@@ -1,0 +1,19 @@
+# 업무일지 데이터 (로컬 JSON)
+data/
+
+# 가상환경
+.venv/
+.venv-1/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# 환경/에디터
+.DS_Store
+.cursor/
