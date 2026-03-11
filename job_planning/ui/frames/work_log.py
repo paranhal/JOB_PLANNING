@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""처리 이력(work_log) 입력·목록·조회·수정·삭제 — NICOM/원콜/세종KLAS 통합."""
+"""통합 처리 이력(접수대장) 입력·목록·조회·수정·삭제 — 구현_탭_파일구조_설계.md §3-4."""
 from datetime import datetime
 
 from PySide6.QtWidgets import (
@@ -27,7 +27,7 @@ class WorkLogFrame(QWidget):
         form_group = QGroupBox("처리 이력 입력")
         form_layout = QGridLayout(form_group)
 
-        form_layout.addWidget(QLabel("출처:"), 0, 0)
+        form_layout.addWidget(QLabel("구분:"), 0, 0)
         self._source_combo = QComboBox()
         self._source_combo.addItems(config.SOURCES)
         self._source_combo.setMaximumWidth(100)
@@ -46,18 +46,25 @@ class WorkLogFrame(QWidget):
         self._status_combo.addItems(config.STATUS_LIST)
         form_layout.addWidget(self._status_combo, 1, 1)
 
-        form_layout.addWidget(QLabel("고객:"), 1, 2)
+        form_layout.addWidget(QLabel("접수 방법:"), 1, 2)
+        self._reception_combo = QComboBox()
+        self._reception_combo.setMaximumWidth(100)
+        self._reception_combo.addItem("— 선택 —", None)
+        self._reception_combo.addItems(config.RECEPTION_METHODS)
+        form_layout.addWidget(self._reception_combo, 1, 3)
+
+        form_layout.addWidget(QLabel("고객:"), 2, 0)
         self._customer_combo = QComboBox()
         self._customer_combo.setMinimumWidth(180)
         self._customer_combo.addItem("— 선택 —", None)
         self._customer_combo.currentIndexChanged.connect(self._on_customer_changed)
-        form_layout.addWidget(self._customer_combo, 1, 3)
+        form_layout.addWidget(self._customer_combo, 2, 1, 1, 3)
 
-        form_layout.addWidget(QLabel("내용:"), 2, 0, Qt.AlignTop)
+        form_layout.addWidget(QLabel("내용:"), 3, 0, Qt.AlignTop)
         self._content_edit = QTextEdit()
         self._content_edit.setMaximumHeight(60)
         self._content_edit.setPlaceholderText("내용 (필수)")
-        form_layout.addWidget(self._content_edit, 2, 1, 1, 3)
+        form_layout.addWidget(self._content_edit, 3, 1, 1, 3)
 
         # NICOM 전용
         self._nicom_widget = QFrame()
@@ -86,7 +93,7 @@ class WorkLogFrame(QWidget):
         self._handled_edit = QTextEdit()
         self._handled_edit.setMaximumHeight(50)
         nicom_layout.addWidget(self._handled_edit, 3, 1, 1, 3)
-        form_layout.addWidget(self._nicom_widget, 3, 0, 1, 4)
+        form_layout.addWidget(self._nicom_widget, 4, 0, 1, 4)
 
         # 원콜/세종KLAS 전용
         self._oncall_widget = QFrame()
@@ -106,16 +113,16 @@ class WorkLogFrame(QWidget):
         self._reply_edit = QTextEdit()
         self._reply_edit.setMaximumHeight(50)
         oncall_layout.addWidget(self._reply_edit, 2, 1, 1, 3)
-        form_layout.addWidget(self._oncall_widget, 4, 0, 1, 4)
+        form_layout.addWidget(self._oncall_widget, 5, 0, 1, 4)
 
-        form_layout.addWidget(QLabel("비고:"), 5, 0)
+        form_layout.addWidget(QLabel("비고:"), 6, 0)
         self._remarks_edit = QLineEdit()
-        form_layout.addWidget(self._remarks_edit, 5, 1, 1, 3)
+        form_layout.addWidget(self._remarks_edit, 6, 1, 1, 3)
 
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(QPushButton("저장", clicked=self._on_save))
         btn_layout.addWidget(QPushButton("새로 작성", clicked=self._clear_form))
-        form_layout.addLayout(btn_layout, 6, 1, 1, 3)
+        form_layout.addLayout(btn_layout, 7, 1, 1, 3)
 
         self._on_source_changed(self._source_combo.currentText())
 
@@ -142,15 +149,20 @@ class WorkLogFrame(QWidget):
                 self._contact_combo.addItem(c.get("name") or "", c.get("id"))
 
     def _build_list(self):
-        list_group = QGroupBox("조회·목록")
+        list_group = QGroupBox("접수대장·목록")
         list_layout = QVBoxLayout(list_group)
 
         range_layout = QHBoxLayout()
-        range_layout.addWidget(QLabel("출처:"))
+        range_layout.addWidget(QLabel("구분:"))
         self._filter_source_combo = QComboBox()
         self._filter_source_combo.addItem("전체", None)
         self._filter_source_combo.addItems(config.SOURCES)
         range_layout.addWidget(self._filter_source_combo)
+        range_layout.addWidget(QLabel("접수방법:"))
+        self._filter_reception_combo = QComboBox()
+        self._filter_reception_combo.addItem("전체", None)
+        self._filter_reception_combo.addItems(config.RECEPTION_METHODS)
+        range_layout.addWidget(self._filter_reception_combo)
         range_layout.addWidget(QLabel("시작일:"))
         self._date_from_edit = QLineEdit()
         self._date_from_edit.setPlaceholderText("YYYY-MM-DD")
@@ -168,9 +180,9 @@ class WorkLogFrame(QWidget):
         list_layout.addLayout(range_layout)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(6)
-        self._table.setHorizontalHeaderLabels(["ID", "출처", "일시", "고객", "진행", "내용"])
-        self._table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self._table.setColumnCount(7)
+        self._table.setHorizontalHeaderLabels(["ID", "구분", "일시", "접수방법", "고객", "진행", "내용"])
+        self._table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -187,10 +199,14 @@ class WorkLogFrame(QWidget):
 
     def _get_form_data(self):
         cid = self._customer_combo.currentData()
+        reception = None
+        if self._reception_combo.currentIndex() > 0:
+            reception = self._reception_combo.currentText().strip()
         data = {
             "source": self._source_combo.currentText().strip(),
             "occurred_at": self._occurred_edit.text().strip(),
             "status": self._status_combo.currentText().strip(),
+            "reception_method": reception,
             "content": self._content_edit.toPlainText().strip(),
             "customer_id": cid,
             "contact_id": self._contact_combo.currentData() if self._source_combo.currentText() == "NICOM" else None,
@@ -211,6 +227,9 @@ class WorkLogFrame(QWidget):
         self._source_combo.setCurrentText(row.get("source") or "NICOM")
         self._occurred_edit.setText(row.get("occurred_at", "")[:19].replace("T", " "))
         self._status_combo.setCurrentText(row.get("status") or "진행중")
+        rec = row.get("reception_method") or ""
+        idx = self._reception_combo.findText(rec) if rec else 0
+        self._reception_combo.setCurrentIndex(max(0, idx))
         self._content_edit.setPlainText(row.get("content") or "")
         cid = row.get("customer_id")
         idx = self._customer_combo.findData(cid)
@@ -237,6 +256,7 @@ class WorkLogFrame(QWidget):
         self._source_combo.setCurrentIndex(0)
         self._occurred_edit.setText(datetime.now().strftime("%Y-%m-%d"))
         self._status_combo.setCurrentIndex(0)
+        self._reception_combo.setCurrentIndex(0)
         self._content_edit.clear()
         self._customer_combo.setCurrentIndex(0)
         self._contact_combo.clear()
@@ -262,7 +282,7 @@ class WorkLogFrame(QWidget):
                 self._clear_form()
                 self.load_list()
             else:
-                QMessageBox.warning(self, "경고", "출처, 일시, 내용, 진행을 모두 입력해 주세요.")
+                QMessageBox.warning(self, "경고", "구분, 일시, 내용, 진행을 모두 입력해 주세요.")
         else:
             id_ = work_log_service.create(data)
             if id_:
@@ -270,7 +290,7 @@ class WorkLogFrame(QWidget):
                 self._clear_form()
                 self.load_list()
             else:
-                QMessageBox.warning(self, "경고", "출처, 일시, 내용, 진행을 모두 입력해 주세요.")
+                QMessageBox.warning(self, "경고", "구분, 일시, 내용, 진행을 모두 입력해 주세요.")
 
     def load_list(self):
         self._refresh_customers()
@@ -283,7 +303,15 @@ class WorkLogFrame(QWidget):
         source = None
         if self._filter_source_combo.currentIndex() > 0:
             source = self._filter_source_combo.currentText()
-        rows = work_log_service.list_(source=source, date_from=date_from, date_to=date_to)
+        reception_method = None
+        if self._filter_reception_combo.currentIndex() > 0:
+            reception_method = self._filter_reception_combo.currentText()
+        rows = work_log_service.list_(
+            source=source,
+            date_from=date_from,
+            date_to=date_to,
+            reception_method=reception_method,
+        )
         customers = {c["id"]: c.get("name") for c in customer_service.list_()}
         for r in rows:
             content = (r.get("content") or "")[:35]
@@ -295,9 +323,10 @@ class WorkLogFrame(QWidget):
             self._table.setItem(row_pos, 0, QTableWidgetItem(str(r.get("id", ""))))
             self._table.setItem(row_pos, 1, QTableWidgetItem(r.get("source") or ""))
             self._table.setItem(row_pos, 2, QTableWidgetItem((r.get("occurred_at") or "")[:16].replace("T", " ")))
-            self._table.setItem(row_pos, 3, QTableWidgetItem(cust_name))
-            self._table.setItem(row_pos, 4, QTableWidgetItem(r.get("status") or ""))
-            self._table.setItem(row_pos, 5, QTableWidgetItem(content))
+            self._table.setItem(row_pos, 3, QTableWidgetItem(r.get("reception_method") or ""))
+            self._table.setItem(row_pos, 4, QTableWidgetItem(cust_name))
+            self._table.setItem(row_pos, 5, QTableWidgetItem(r.get("status") or ""))
+            self._table.setItem(row_pos, 6, QTableWidgetItem(content))
 
     def _on_select(self):
         row = self._table.currentRow()

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""고객 담당자(contact) JSON 저장소."""
+"""담당자(contact) JSON 저장소 — 고객별 1:N, 구현_탭_파일구조_설계.md §4-2."""
 from datetime import datetime
 from typing import Optional
 

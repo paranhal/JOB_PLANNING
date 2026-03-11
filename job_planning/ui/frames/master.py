@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""고객·담당자·장비 마스터 목록·입력·수정·삭제."""
+"""통합 고객·담당자·장비 마스터 — 구현_탭_파일구조_설계.md §4."""
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
     QLabel, QLineEdit, QComboBox, QPushButton, QTableWidget,
@@ -21,6 +21,14 @@ class CustomerTab(QWidget):
         layout = QVBoxLayout(self)
         g = QGroupBox("고객 목록")
         g_layout = QVBoxLayout(g)
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("구분 필터:"))
+        self._filter_division_combo = QComboBox()
+        self._filter_division_combo.addItem("전체", None)
+        self._filter_division_combo.setMinimumWidth(120)
+        filter_layout.addWidget(self._filter_division_combo)
+        filter_layout.addStretch()
+        g_layout.addLayout(filter_layout)
         self._table = QTableWidget()
         self._table.setColumnCount(4)
         self._table.setHorizontalHeaderLabels(["ID", "고객명", "구분", "연락처"])
@@ -47,6 +55,8 @@ class CustomerTab(QWidget):
         self._phone_edit = QLineEdit()
         f_layout.addWidget(self._phone_edit, 1, 1, 1, 3)
         layout.addWidget(self._form)
+        self._filter_division_combo.currentIndexChanged.connect(self.load_list)
+        self._divisions_loaded = False
 
     def _on_select(self):
         row = self._table.currentRow()
@@ -57,8 +67,20 @@ class CustomerTab(QWidget):
         self._selected_id = int(it.text()) if it else None
 
     def load_list(self):
+        if not getattr(self, "_divisions_loaded", False):
+            self._divisions_loaded = True
+            all_cust = customer_service.list_()
+            divisions = sorted({r.get("division") for r in all_cust if r.get("division")})
+            self._filter_division_combo.blockSignals(True)
+            self._filter_division_combo.clear()
+            self._filter_division_combo.addItem("전체", None)
+            for d in divisions:
+                self._filter_division_combo.addItem(d, d)
+            self._filter_division_combo.blockSignals(False)
+        division = self._filter_division_combo.currentData()
+        all_rows = customer_service.list_(division=division)
         self._table.setRowCount(0)
-        for r in customer_service.list_():
+        for r in all_rows:
             self._table.insertRow(self._table.rowCount())
             row = self._table.rowCount() - 1
             self._table.setItem(row, 0, QTableWidgetItem(str(r.get("id", ""))))
@@ -81,6 +103,7 @@ class CustomerTab(QWidget):
             self._name_edit.clear()
             self._division_edit.clear()
             self._phone_edit.clear()
+            self._divisions_loaded = False
             self.load_list()
 
     def _on_edit(self):
@@ -94,6 +117,7 @@ class CustomerTab(QWidget):
         })
         if ok:
             QMessageBox.information(self, "알림", "수정되었습니다.")
+            self._divisions_loaded = False
             self.load_list()
         else:
             QMessageBox.warning(self, "경고", "고객명을 입력하세요.")
@@ -107,6 +131,7 @@ class CustomerTab(QWidget):
         if customer_service.delete(self._selected_id):
             QMessageBox.information(self, "알림", "삭제되었습니다.")
             self._selected_id = None
+            self._divisions_loaded = False
             self.load_list()
 
 

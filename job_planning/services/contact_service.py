@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""고객 담당자(contact) 서비스."""
+"""담당자(contact) 서비스 — 구현_탭_파일구조_설계.md §4-2."""
 from typing import Optional
 
 from ..store import contact as store

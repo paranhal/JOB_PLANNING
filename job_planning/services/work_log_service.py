@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
-"""처리 이력(work_log) 비즈니스 로직 — NICOM/원콜/세종KLAS 통합."""
+"""통합 처리 이력(work_log) 비즈니스 로직 — 접수·조치·접수대장 (구현_탭_파일구조_설계.md §3-3)."""
 from typing import Optional
 
 from .. import config
 from ..store import work_log as store
 
 
+def _norm_reception_method(v):
+    if not v or not (v := (v or "").strip()):
+        return None
+    return v if v in getattr(config, "RECEPTION_METHODS", ()) else None
+
+
 def create(data: dict) -> Optional[int]:
-    """처리 이력 생성. source, occurred_at, content, status 필수."""
+    """처리 이력 생성. 구분(source), 일시(occurred_at), 내용(content), 진행(status) 필수."""
     source = (data.get("source") or "").strip()
     occurred_at = (data.get("occurred_at") or "").strip()
     content = (data.get("content") or "").strip()
@@ -18,12 +24,14 @@ def create(data: dict) -> Optional[int]:
         return None
     if status not in config.STATUS_LIST:
         status = config.STATUS_LIST[0] if config.STATUS_LIST else "진행중"
+    reception_method = _norm_reception_method(data.get("reception_method"))
 
     row = {
         "source": source,
         "occurred_at": occurred_at,
         "content": content,
         "status": status,
+        "reception_method": reception_method,
         "customer_id": data.get("customer_id") or None,
         "contact_id": data.get("contact_id") or None,
         "processed_at": (data.get("processed_at") or "").strip() or None,
@@ -45,13 +53,21 @@ def get(id: int) -> Optional[dict]:
     return store.get_by_id(id)
 
 
-def list_(source=None, date_from=None, date_to=None, customer_id=None, status=None):
+def list_(
+    source=None,
+    date_from=None,
+    date_to=None,
+    customer_id=None,
+    status=None,
+    reception_method=None,
+):
     return store.list_(
         source=source,
         date_from=date_from,
         date_to=date_to,
         customer_id=customer_id,
         status=status,
+        reception_method=reception_method,
     )
 
 
@@ -73,6 +89,7 @@ def update(id: int, data: dict) -> bool:
         "occurred_at": occurred_at,
         "content": content,
         "status": status,
+        "reception_method": _norm_reception_method(data.get("reception_method")),
         "customer_id": data.get("customer_id") or None,
         "contact_id": data.get("contact_id") or None,
         "processed_at": (data.get("processed_at") or "").strip() or None,

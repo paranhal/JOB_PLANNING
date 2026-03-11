@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""고객(customer) 서비스."""
+"""통합 고객(customer) 서비스 — 구현_탭_파일구조_설계.md §4-1."""
 from typing import Optional
 
 from ..store import customer as store
@@ -34,13 +34,13 @@ def update(id: int, data: dict) -> bool:
     name = (data.get("name") or "").strip()
     if not name:
         return False
-    row.update({
-        "name": name,
-        "division": (data.get("division") or "").strip() or None,
-        "address": (data.get("address") or "").strip() or None,
-        "phone": (data.get("phone") or "").strip() or None,
-        "remarks": (data.get("remarks") or "").strip() or None,
-    })
+    row["name"] = name
+    row["division"] = (data.get("division") or "").strip() or None
+    row["phone"] = (data.get("phone") or "").strip() or None
+    if "address" in data:
+        row["address"] = (data.get("address") or "").strip() or None
+    if "remarks" in data:
+        row["remarks"] = (data.get("remarks") or "").strip() or None
     return store.update(id, row)
 
 

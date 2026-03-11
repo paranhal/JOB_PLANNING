@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""장비(equipment) 서비스."""
+"""장비(equipment) 서비스 — 구현_탭_파일구조_설계.md §4-3."""
 from typing import Optional
 
 from ..store import equipment as store

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""처리 이력(work_log) JSON 저장소 — NICOM/원콜/세종KLAS 통합."""
+"""통합 처리 이력(work_log) JSON 저장소 — 접수·조치·접수대장 (구현_탭_파일구조_설계.md §3)."""
 from datetime import datetime
 from typing import Optional
 
@@ -34,7 +34,15 @@ def get_by_id(id: int) -> Optional[dict]:
     return None
 
 
-def list_(source=None, date_from=None, date_to=None, customer_id=None, status=None, limit=500) -> list:
+def list_(
+    source=None,
+    date_from=None,
+    date_to=None,
+    customer_id=None,
+    status=None,
+    reception_method=None,
+    limit=500,
+) -> list:
     rows = _load()
     if source:
         rows = [r for r in rows if r.get("source") == source]
@@ -46,6 +54,8 @@ def list_(source=None, date_from=None, date_to=None, customer_id=None, status=No
         rows = [r for r in rows if r.get("customer_id") == customer_id]
     if status:
         rows = [r for r in rows if r.get("status") == status]
+    if reception_method:
+        rows = [r for r in rows if r.get("reception_method") == reception_method]
     rows.sort(key=lambda r: (r.get("occurred_at") or "") + (r.get("updated_at") or ""), reverse=True)
     return rows[:limit]
 
