@@ -1,1 +1,6 @@
-PySide6>=6.5
+# 고객지원 시스템 1단계 — Python 3.10+
+# GUI: PySide6 (pip 설치 필요, tkinter 불필요)
+
+PySide6>=6.5.0
+
+# 저장: JSON (내장). PostgreSQL은 2단계 확장 시 추가.

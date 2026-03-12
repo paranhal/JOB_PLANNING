@@ -1,42 +1,47 @@
 # 업무일지 프로그램
 
-엑셀 업무일지(유지보수현황·처리리스트)를 대체·보완하는 파이썬 실행형 프로그램.  
-**기획·데이터 설계:** `기획_업무일지_프로그램_요구사항.md`, `데이터_처리_설계_PostgreSQL확장.md` 반영.
+**상태:** **기획서 기준 재구축** 단계. 이전 설계·정보는 클리어했으며, 기획서만 기준으로 새로 구축합니다.
 
-## 기능 요약
+**유일 기준 문서:** `기획_업무일지_프로그램_요구사항.md` (기획서)
 
-- **처리 이력 (work_log)**  
-  NICOM 처리리스트 / 원콜·세종 KLAS 처리 이력을 하나의 목록으로 통합.  
-  출처(source): NICOM, 원콜, 세종KLAS. 기간·출처별 조회, 수정·삭제.
-- **고객·담당자·장비 마스터**  
-  고객(customer), 담당자(contact), 장비(equipment) 목록 입력·수정·삭제.  
-  처리 이력에서 고객/담당자 선택 시 마스터와 연동.
+---
 
-## 설치
+## 현재 구조
 
-```bash
-pip install -r requirements.txt
-```
+- **기획서** — 통합 목표, 핵심 기능, 통합 데이터·MVP·개발 순서·비기능 등 모든 요구사항이 정의되어 있음.
+- **설계 문서** (`구현_탭_파일구조_설계.md`, `데이터_*.md`, `검수_배포_탭.md`, `엑셀_시트_분석결과.md`) — 기획서 기준으로 재작성 예정. 플레이스홀더만 있음.
+- **화면** — `화면설계서.pptx`(및 `화면설계서_요약.md`)로 관리. 구현 시 참고.
+- **에이전트** — 기획/구현/DB설계/테스트/패치 5종. 모두 기획서 단일 기준. 사용법은 `AGENTS.md` 참고.
 
-## 실행
+---
 
-프로젝트 루트(`JOB_PLANNING`)에서:
+## 고객지원 시스템 실행 (1단계)
 
-```bash
-python3 -m job_planning.main
-```
+기획서 §13·§16 1단계 구현 패키지: **`as_support/`**
 
-## 데이터 저장 (JSON, 1차)
+- **실행 (venv 권장):**
+  ```bash
+  cd /Users/paranhal/Projects/JOB_PLANNING
+  python3 -m venv .venv
+  source .venv/bin/activate   # Windows: .venv\Scripts\activate
+  pip install -r requirements.txt
+  python3 -m as_support.main
+  ```
+- **필요 조건:** Python 3.10+, **PySide6** (pip로 설치). 데이터는 `data/` 폴더에 JSON으로 저장됨.
+- **메뉴:** 기준정보(고객·공간·담당자·담당자이력) | 자산관리(설치자산·SW상세) | 관리(코드관리)
 
-- **위치:** 프로젝트 루트 `data/` (실행 시 자동 생성)
-- **파일:**  
-  `work_log.json`, `customers.json`, `contacts.json`, `equipment.json`  
-  포맷: `{ "items": [ ... ], "meta": { "updated_at": "..." } }`
-- **확장:** DBMS(PostgreSQL) 전환 시 동일 필드명으로 이관 가능 (데이터 설계 문서 참고).
+---
 
-## 프로젝트 구조
+## 기존 코드 (`job_planning/`)
 
-- `job_planning/config.py` — 데이터 경로, SOURCES/CATEGORIES/STATUS 등
-- `job_planning/store/` — work_log, customer, contact, equipment JSON CRUD
-- `job_planning/services/` — work_log_service, customer_service, contact_service, equipment_service
-- `job_planning/ui/` — PySide6: 처리 이력 탭, 고객·담당자·장비 탭
+- 재구축 **이전**에 만들어진 구현입니다. 기획서 기준으로 **새로 구축**할 때 참고하거나 교체할 수 있습니다.
+- 기획서와 맞지 않는 부분은 기획서를 따르는 쪽으로 재작성하는 것이 원칙입니다.
+
+---
+
+## 다음 단계
+
+1. 기획서 내용 확정 후, **DB 설계 에이전트**로 데이터·스키마 설계 문서 채우기.
+2. **구현 에이전트**로 기획서·화면설계서 반영하여 구현 설계·코드 작성.
+3. **테스트 에이전트**로 기획서 §8 수용 기준·시나리오 반영 테스트 작성.
+4. 필요 시 **패치 에이전트**로 검수·배포 절차 정리.

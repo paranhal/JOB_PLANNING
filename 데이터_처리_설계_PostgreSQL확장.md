@@ -1,325 +1,384 @@
-# 데이터 처리 설계 — 엑셀 분석 기반 + PostgreSQL 확장
+# 데이터 처리 설계 — 고객지원 시스템 (PostgreSQL 확장)
 
-**기준 문서:** `엑셀_시트_분석결과.md`, `기획_업무일지_프로그램_요구사항.md`, `데이터_엑셀_구조_설계.md`
+**기준 문서:** `기획_업무일지_프로그램_요구사항.md` (고객지원 시스템 구축 기획서)
 
-**목표:** 실제 엑셀 시트 구조를 반영한 입력·저장 설계. **DBMS 확장 전까지는 JSON 파일**을 주 저장소로 사용하고, 확장 시 **PostgreSQL**으로 전환하는 데이터 처리 계획.
+**목표:** 기획서 §5~§12에 따른 기준정보·설치자산·AS·코드의 데이터 구조와 저장 방식을 정의한다. 1단계는 JSON 또는 SQLite로 운영하고, 확장 시 PostgreSQL로 전환할 수 있도록 설계한다.
 
----
-
-## 1. 엑셀 분석 결과 기반 엔티티 매핑
-
-실제 파일(`2025년_비젼아이티_유지보수현황(06161800).xlsx`)의 시트를 **데이터 입력/저장 관점**으로 분류한다.
-
-| 엑셀 시트 | 역할 | 프로그램 엔티티 | 비고 |
-|-----------|------|-----------------|------|
-| NICOM_처리리스트 | 처리 이력(일지+AS 혼합) | `work_log` (라인타입으로 구분) | 일시·고객·접수/처리내용·진행여부 |
-| 25년원콜지원센터통합 | 원콜 문의/처리 이력 | `work_log` (source=원콜) | 일자·처리일자·분류·제목·내용·진행·답변·도서관 |
-| 세종시_KLAS 처리리스트 | KLAS 처리 이력 | `work_log` (source=세종KLAS) | 동일 구조 |
-| NICOM_유지보수현황 | 고객+담당자+장비 마스터 | `customer` + `contact` + `equipment` | 구분·담당자·장비명·점검주기·유/무상 등 |
-| VISIONIT_MaintenanceList | 동일 | 위와 통합 | 제품분류·유지보수품목 등 |
-| 충남교육청_KLAS, 세종시도서관_KLAS | 고객+담당자 목록 | `customer` + `contact` | 장비 행 없을 수 있음 |
-| AS (엑셀) | 유지보수 현황 요약(지역별) | 참고용 → 고객/점검일정과 연계 | 2차에서 계약·기간 매핑 검토 |
-| 1월~12월 | 월별 달력(뷰) | 저장 테이블 없음, **조회/출력용** | 일지+점검일정에서 생성 |
-| NICOM_유지보수_통계, 2025예산 | 집계/예산 | 2차 통계·예산 테이블 검토 | 1차는 생략 |
+**설계 원칙(기획서 §2.2):**
+- 모든 주요 엔터티는 이름이 아닌 **고유 ID**로 연결한다.
+- **현재 정보**와 **이력 정보**를 분리하여 변경 추적이 가능하도록 한다.
+- 설치 위치는 **건물-층-실** 구조 기반으로 표준화한다.
+- AS 정보는 **설치자산과 연결**하여 동일 장비의 반복 장애·교체주기를 추적한다.
+- 비밀번호 등 **민감정보는 DB에 평문 저장하지 않는다.**
 
 ---
 
-## 2. 실제 엑셀 컬럼 → 프로그램 필드 매핑
+## 1. 저장 전략 요약
 
-### 2-1. NICOM_처리리스트 (처리 이력)
+| 단계 | 저장소 | 용도 |
+|------|--------|------|
+| 1단계 | JSON 파일 또는 SQLite | 단일 사용자·로컬 운영, 기준정보·AS 1차 구축 |
+| 확장 | PostgreSQL | 다중 사용자, 원격 DB, 백업·이관·영업분석 확장 |
 
-| 엑셀 컬럼 | 프로그램 필드 | DB 타입(SQLite/PostgreSQL) | 필수 | 비고 |
-|-----------|----------------|----------------------------|------|------|
-| 번호 | (자동 id) | INTEGER / SERIAL | ✅ | PK |
-| 일시 | `occurred_at` | DATETIME / TIMESTAMPTZ | ✅ | 접수·처리 일시 |
-| 고객 | `customer_id` | INTEGER / FK | ✅ | 고객 마스터 연결 |
-| 고객담당자 | `contact_id` | INTEGER / FK | ⬜ | 연락처 담당자 |
-| 모델명 | `equipment_name` 또는 `equipment_id` | VARCHAR / FK | ⬜ | 장비명 또는 장비 마스터 |
-| 장비위치 | `equipment_location` | VARCHAR(200) | ⬜ | 1층, 2층 등 |
-| 유/무상 | `billing_type` | VARCHAR(20) | ⬜ | 유상/무상 |
-| 접수내용 | `received_content` | TEXT | ⬜ | 접수/요청 내용 |
-| 처리내용 | `handled_content` | TEXT | ⬜ | 처리/조치 내용 |
-| 진행 여부 | `status` | VARCHAR(20) | ✅ | 완료/진행중 등 |
-| (날짜 컬럼 25.06.16 등) | (미저장 또는 메타) | — | — | 엑셀 메타, 프로그램에서는 무시 |
-| — | `source` | VARCHAR(20) | ✅ | 'NICOM' (시트 구분용) |
-| — | `created_at`, `updated_at` | DATETIME/TIMESTAMPTZ | ✅ | 시스템 |
-
-- **통합 시:** `work_log` 한 테이블에 두고 `source`(또는 `line_type`)로 NICOM / 원콜 / 세종KLAS 구분.
-
-### 2-2. 25년원콜지원센터통합 · 세종시_KLAS 처리리스트 (문의/처리 이력)
-
-| 엑셀 컬럼 | 프로그램 필드 | DB 타입 | 필수 | 비고 |
-|-----------|----------------|---------|------|------|
-| 번호 | (자동 id) | PK | ✅ | |
-| 일자 | `occurred_at` (또는 date만) | DATE/TIMESTAMPTZ | ✅ | 접수 일자 |
-| 처리일자 | `processed_at` | DATE/TIMESTAMPTZ | ⬜ | 처리 완료일 |
-| 분류 | `category` | VARCHAR(50) | ⬜ | 메일문의/홈페이지/전화문의/정기방문/현장방문 등 |
-| 제목 | `title` | VARCHAR(500) | ⬜ | |
-| 내용 | `content` | TEXT | ✅ | |
-| 진행 | `status` | VARCHAR(20) | ✅ | 처리완료 등 |
-| 답변 | `reply` | TEXT | ⬜ | 처리 답변 내용 |
-| 도서관 | `customer_id` | FK | ✅ | 고객 = 도서관 |
-| 비고 | `remarks` | TEXT | ⬜ | |
-| — | `source` | VARCHAR(20) | ✅ | '원콜' / '세종KLAS' |
-
-- **NICOM과 통합 시:**  
-  - `work_log`에 `title`, `reply`, `processed_at`, `category` 추가.  
-  - NICOM 행은 `title`/`reply` null 또는 `received_content`/`handled_content`로만 채움.
-
-### 2-3. NICOM_유지보수현황 / VISIONIT_MaintenanceList (고객·담당자·장비)
-
-| 엑셀 컬럼 | 프로그램 필드 | 테이블 | DB 타입 | 비고 |
-|-----------|----------------|--------|---------|------|
-| No. | (id) | customer / contact / equipment | PK | 고객·담당자·장비는 별도 행으로 정규화 |
-| 고객명 | `name` | customer | VARCHAR(200) | |
-| 구분 | `division` | customer 또는 equipment | VARCHAR(50) | NICOM / K-LAS 등 |
-| 담당자 | `name` | contact | VARCHAR(100) | contact 테이블 |
-| 직장 | `phone_office` | contact | VARCHAR(50) | |
-| 핸드폰 | `phone_mobile` | contact | VARCHAR(50) | |
-| 이메일 | `email` | contact | VARCHAR(200) | |
-| 장비명 / 유지보수품목 | `name` | equipment | VARCHAR(200) | |
-| 제품분류 | `product_category` | equipment | VARCHAR(100) | VISIONIT용 |
-| 수량 | `quantity` | equipment | INTEGER | 기본 1 |
-| 설치위치 | `location` | equipment | VARCHAR(200) | |
-| 납품연도 | `delivery_year` | equipment | VARCHAR(50) | |
-| 점검주기 | `inspection_interval` | equipment 또는 inspection_schedule | VARCHAR(20) | 월/Call/분기 등 |
-| 유/무상 | `billing_type` | equipment 또는 계약 | VARCHAR(20) | |
-| 사이트기준/청구처 | `billing_entity` | equipment 또는 별도 | VARCHAR(100) | |
-| 청구주기 | `billing_interval` | VARCHAR(100) | ⬜ | |
-| 참고사항 | `remarks` | customer/contact/equipment | TEXT | |
-
-- 한 엑셀 행에 “고객+담당자+장비”가 같이 있는 경우:  
-  - **정규화:** `customer` 1건, `contact` 1건, `equipment` 1건(또는 N건)으로 나누어 저장.  
-  - 고객·담당자는 중복 제거 후 FK로 연결.
-
-### 2-4. 월별 시트 (1월~12월)
-
-- **저장 구조:** 별도 테이블 없음.  
-- **생성 방식:**  
-  - `work_log` + `inspection_schedule`(다음 예정일)을 기간으로 조회한 뒤,  
-  - 날짜별·요일별로 그룹핑하여 “해당 날짜 셀에 표시할 텍스트”를 만든다.  
-- **출력:** 엑셀/PDF 달력 뷰 내보내기 시 위 결과를 셀에 채워 넣는 형태로 설계.
+본 문서는 **논리 스키마**를 먼저 정의하고, JSON/SQLite 구현 시 필드명을 동일하게 유지하여 이후 PostgreSQL 마이그레이션 시 매핑을 일치시킨다.
 
 ---
 
-## 3. 통합 데이터 모델 (엑셀 라인타입 통합)
+## 2. 코드관리 (공통)
 
-실제 엑셀의 “처리리스트” 3종(NICOM, 원콜, 세종KLAS)을 **하나의 work_log 테이블**로 수용하고, 원본 시트 구분은 `source`(및 선택 시 `line_type`)로 구분한다.
+기획서 §11. 모든 업무 입력의 표준화를 위해 **코드 그룹**을 먼저 정의한다. 1단계에서는 JSON 또는 SQLite 단일 테이블(또는 코드그룹별 파일)로 관리한다.
 
-### 3-1. work_log (처리 이력 통합)
+| 코드그룹 | 설명 | 예시 값 |
+|----------|------|---------|
+| 업종 | 기관 분류 | 도서관, 학교, 공공기관, 민간 |
+| 담당업무 | 담당자 업무 영역 | 전산, 네트워크, 도서관리시스템, 행정시스템 |
+| 제품구분 | 설치자산 제품 유형 | SW, HW, 서버, 네트워크장비, 주변장비 |
+| 설치주체 | 설치 수행 주체 | 자사, 타사, 제조사, 협력사, 미상 |
+| 관리유형 | 자산 관리 방식 | 직접유지보수, 장애대응, 정기점검, 요청시지원, 참고관리 |
+| 요청주체유형 | AS 요청 주체 | 고객직접, 제조사, 협력사, 원청, 내부 |
+| AS상태 | 접수 건 상태 | 접수, 진행중, 보류, 완료, 종료 |
+| 원인분류 | 장애 원인 | HW고장, SW오류, 네트워크, 환경문제, 사용자오류 |
+| 처리유형 | AS 처리 방식 | 원격지원, 방문, 교체, 설정변경, 문의응대 |
+| 운영상태 | 설치자산 운영 상태 | 운영중, 점검중, 장애, 철수, 폐기 |
+| 건물구분 | 건물 용도(선택) | 본관, 별관, 기타 |
+| 실용도 | 실 용도 | 전산실, 자료실, 서버실 등 |
 
-| 필드명 | 타입(SQLite) | 타입(PostgreSQL) | 필수 | 설명 |
-|--------|----------------|-------------------|------|------|
-| id | INTEGER PK | BIGSERIAL PK | ✅ | |
-| source | TEXT | VARCHAR(20) | ✅ | 'NICOM' / '원콜' / '세종KLAS' |
-| occurred_at | TEXT (ISO8601) | TIMESTAMPTZ | ✅ | 일시(또는 일자만 사용 시 DATE) |
-| processed_at | TEXT | TIMESTAMPTZ NULL | ⬜ | 처리일자(원콜/KLAS) |
-| customer_id | INTEGER | INTEGER FK→customer.id | ✅ | 고객(도서관) |
-| contact_id | INTEGER NULL | INTEGER FK→contact.id NULL | ⬜ | 고객담당자(NICOM) |
-| category | TEXT NULL | VARCHAR(50) NULL | ⬜ | 분류(원콜/KLAS) |
-| title | TEXT NULL | VARCHAR(500) NULL | ⬜ | 제목(원콜/KLAS) |
-| content | TEXT | TEXT | ✅ | 내용 (NICOM은 접수+처리 합치거나 별도 필드 사용) |
-| received_content | TEXT NULL | TEXT NULL | ⬜ | NICOM 접수내용 |
-| handled_content | TEXT NULL | TEXT NULL | ⬜ | NICOM 처리내용 |
-| reply | TEXT NULL | TEXT NULL | ⬜ | 답변(원콜/KLAS) |
-| status | TEXT | VARCHAR(30) | ✅ | 진행여부/진행 (완료, 처리완료, 진행중 등) |
-| equipment_name | TEXT NULL | VARCHAR(200) NULL | ⬜ | 모델명(NICOM) |
-| equipment_id | INTEGER NULL | INTEGER FK NULL | ⬜ | 장비 마스터 연결 |
-| equipment_location | TEXT NULL | VARCHAR(200) NULL | ⬜ | 장비위치(NICOM) |
-| billing_type | TEXT NULL | VARCHAR(20) NULL | ⬜ | 유/무상 |
-| remarks | TEXT NULL | TEXT NULL | ⬜ | 비고 |
-| created_at | TEXT | TIMESTAMPTZ | ✅ | |
-| updated_at | TEXT | TIMESTAMPTZ | ✅ | |
-
-- **인덱스 권장:** `(source, occurred_at)`, `(customer_id, occurred_at)`, `(status)`, `occurred_at` 단독.  
-- PostgreSQL 확장 시: `occurred_at` 범위 검색·월별 집계용으로 인덱스 유지.
-
-### 3-2. customer (고객)
-
-| 필드명 | SQLite | PostgreSQL | 필수 | 설명 |
-|--------|--------|------------|------|------|
-| id | INTEGER PK | BIGSERIAL PK | ✅ | |
-| name | TEXT | VARCHAR(200) | ✅ | 고객명 |
-| division | TEXT NULL | VARCHAR(50) NULL | ⬜ | 구분(NICOM/K-LAS 등) |
-| address | TEXT NULL | TEXT NULL | ⬜ | |
-| phone | TEXT NULL | VARCHAR(50) NULL | ⬜ | 대표 연락처 |
-| remarks | TEXT NULL | TEXT NULL | ⬜ | 참고사항 등 |
-| created_at | TEXT | TIMESTAMPTZ | ✅ | |
-| updated_at | TEXT | TIMESTAMPTZ | ✅ | |
-
-### 3-3. contact (고객 담당자)
-
-| 필드명 | SQLite | PostgreSQL | 필수 | 설명 |
-|--------|--------|------------|------|------|
-| id | INTEGER PK | BIGSERIAL PK | ✅ | |
-| customer_id | INTEGER | INTEGER FK | ✅ | 소속 고객 |
-| name | TEXT | VARCHAR(100) | ✅ | 담당자명 |
-| phone_office | TEXT NULL | VARCHAR(50) NULL | ⬜ | 직장 |
-| phone_mobile | TEXT NULL | VARCHAR(50) NULL | ⬜ | 핸드폰 |
-| email | TEXT NULL | VARCHAR(200) NULL | ⬜ | |
-| remarks | TEXT NULL | TEXT NULL | ⬜ | |
-| created_at | TEXT | TIMESTAMPTZ | ✅ | |
-| updated_at | TEXT | TIMESTAMPTZ | ✅ | |
-
-### 3-4. equipment (장비)
-
-| 필드명 | SQLite | PostgreSQL | 필수 | 설명 |
-|--------|--------|------------|------|------|
-| id | INTEGER PK | BIGSERIAL PK | ✅ | |
-| customer_id | INTEGER | INTEGER FK | ✅ | 고객 |
-| name | TEXT | VARCHAR(200) | ✅ | 장비명/유지보수품목 |
-| product_category | TEXT NULL | VARCHAR(100) NULL | ⬜ | 제품분류 |
-| quantity | INTEGER | INTEGER DEFAULT 1 | ⬜ | 수량 |
-| location | TEXT NULL | VARCHAR(200) NULL | ⬜ | 설치위치 |
-| delivery_year | TEXT NULL | VARCHAR(50) NULL | ⬜ | 납품연도 |
-| inspection_interval | TEXT NULL | VARCHAR(20) NULL | ⬜ | 점검주기(월/Call 등) |
-| billing_type | TEXT NULL | VARCHAR(20) NULL | ⬜ | 유/무상 |
-| billing_entity | TEXT NULL | VARCHAR(100) NULL | ⬜ | 청구처 |
-| billing_interval | TEXT NULL | VARCHAR(100) NULL | ⬜ | 청구주기 |
-| remarks | TEXT NULL | TEXT NULL | ⬜ | |
-| created_at | TEXT | TIMESTAMPTZ | ✅ | |
-| updated_at | TEXT | TIMESTAMPTZ | ✅ | |
-
-### 3-5. inspection_schedule (정기 점검 일정)
-
-| 필드명 | SQLite | PostgreSQL | 필수 | 설명 |
-|--------|--------|------------|------|------|
-| id | INTEGER PK | BIGSERIAL PK | ✅ | |
-| customer_id | INTEGER | INTEGER FK | ✅ | |
-| equipment_id | INTEGER NULL | INTEGER FK NULL | ⬜ | |
-| next_due_date | TEXT | DATE | ✅ | 다음 예정일 |
-| interval_type | TEXT NULL | VARCHAR(20) NULL | ⬜ | 월/분기 등 |
-| assignee_notes | TEXT NULL | TEXT NULL | ⬜ | 담당자 메모(내부용) |
-| remarks | TEXT NULL | TEXT NULL | ⬜ | |
-| created_at | TEXT | TIMESTAMPTZ | ✅ | |
-| updated_at | TEXT | TIMESTAMPTZ | ✅ | |
-
-### 3-6. 첨부(선택) — PostgreSQL 확장 시 유리
-
-| 필드명 | PostgreSQL 권장 | 설명 |
-|--------|----------------|------|
-| attachments | JSONB | `[{ "path": "...", "name": "..." }]` 등. 검색·필터는 2차에서 |
-
-- SQLite: TEXT로 JSON 문자열 저장해도 동일 구조 사용 가능.
+**저장 구조(예시):**
+- `code_group`: 코드그룹 식별
+- `code_value`: 코드 값
+- `code_name`: 표시명
+- `sort_order`: 정렬 순서
+- `use_yn`: 사용 여부
 
 ---
 
-## 4. PostgreSQL 확장 고려 사항
+## 3. 기준정보 — 고객(기관) 마스터
 
-### 4-1. 타입·호환성
+기획서 §5.1.
 
-- **날짜/시간:**  
-  - SQLite: TEXT ISO8601 권장.  
-  - PostgreSQL: `TIMESTAMPTZ` 사용 시 타임존 일관성 유지.  
-  - 애플리케이션에서 **동일한 필드명·논리 타입**을 쓰고, 드라이버에서 `date`/`timestamp`만 매핑하면 SQLite↔PostgreSQL 전환 시 스키마 변경 최소화.
-- **자동 증가:**  
-  - SQLite: `AUTOINCREMENT`.  
-  - PostgreSQL: `BIGSERIAL`(또는 `SERIAL`).  
-  - 마이그레이션 시 시퀀스 값 맞추기 필요할 수 있음.
-- **문자열 길이:**  
-  - SQLite는 길이 제한이 없으므로, PostgreSQL에서 `VARCHAR(n)` 제약을 두어도 1차는 넉넉히 잡으면 호환 유지 가능.
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| customer_id | string (UUID 또는 내부 ID) | Y | 내부 고유 식별자 |
+| name | string | Y | 기관명(실무상 명칭) |
+| official_name | string | Y | 공식명칭(계약서·공문 기준) |
+| email | string | N | 기관 대표/공식 이메일 |
+| phone | string | Y | 대표전화 |
+| homepage | string | N | 기관 홈페이지 |
+| business_number | string | N | 사업자번호(중복 판별) |
+| representative | string | N | 대표자명 |
+| industry_code | string | Y | 업종(코드) |
+| parent_customer_id | string | N | 상위기관 ID(본청-산하) |
+| address | string | N | 기본주소 |
+| address_detail | string | N | 상세주소 |
+| use_yn | boolean | Y | 사용 여부 |
+| remarks | string | N | 비고(통합/폐쇄/휴면 등) |
+| created_at | datetime | Y | 등록일시 |
+| updated_at | datetime | Y | 수정일시 |
 
-### 4-2. 스키마 구조 (PostgreSQL 확장 시)
-
-- **1차:** 기본 `public` 스키마만 사용.  
-- **확장(2차):**  
-  - 예: `app.work_log`, `app.customer` 등으로 스키마 분리하면, 향후 다중 테넌트·다른 앱과 DB 공유 시 유리.  
-  - 스키마가 바뀌어도 **테이블·컬럼명은 동일**하게 두면 코드 변경을 최소화할 수 있음.
-
-### 4-3. 인덱스 (공통 설계, PostgreSQL에서 활용)
-
-| 테이블 | 인덱스 | 용도 |
-|--------|--------|------|
-| work_log | (source, occurred_at) | 시트별·기간별 조회 |
-| work_log | (customer_id, occurred_at) | 고객별 이력 |
-| work_log | (status) | 진행상태 필터 |
-| work_log | occurred_at | 월별·기간 검색 |
-| customer | name (또는 name_trgm) | 고객명 검색 (PostgreSQL: pg_trgm 2차) |
-| contact | (customer_id) | 고객별 담당자 |
-| equipment | (customer_id) | 고객별 장비 |
-| inspection_schedule | (next_due_date), (customer_id) | 점검 예정일·고객별 |
-
-- PostgreSQL 전용 확장:  
-  - **전문 검색:** `content`, `title` 등에 `tsvector`+GIN 인덱스(2차).  
-  - **유사 검색:** `pg_trgm`으로 고객명/담당자명 검색.
-
-### 4-4. 제약·참조 무결성
-
-- 모든 FK에 `ON DELETE` 정책 명시(예: RESTRICT 또는 SET NULL).  
-- SQLite에서도 FK를 활성화하고 동일한 제약을 두면, PostgreSQL 이전 시 동작이 맞춰진다.
+**제약:** 사업자번호 또는 내부 규칙으로 동일 기관 중복 등록 방지(기획서 §14).
 
 ---
 
-## 5. 저장 계층: JSON 파일(1차) → PostgreSQL(DBMS 확장 시)
+## 4. 공간정보 — 건물·층·실
 
-### 5-1. 추상화 원칙 (저장소 독립)
+기획서 §5.2. 설치자산의 위치는 건물-층-실 기준 선택 + 상세위치 보조 입력.
 
-- **저장소에 의존하지 않는 인터페이스:**  
-  - “연결 문자열/설정만 바꾸면 JSON(1차) 또는 PostgreSQL(확장 시) 사용”하도록,  
-  - **CRUD 및 조회를 리포지토리(또는 서비스) 계층**에서 추상화.  
-- **필드명·구조:** JSON 키와 PostgreSQL 컬럼명을 **동일**하게 두면 이관 스크립트가 단순해진다. (예: `WorkLogRepository.load_all()` → JSON이면 파일 읽어 파싱, PostgreSQL이면 SELECT 쿼리.)
+### 4.1 고객건물
 
-### 5-2. 1차: JSON 파일 주 저장 (DBMS 확장 전)
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| building_id | string | Y | 건물 고유 ID |
+| customer_id | string | Y | 소속 기관 |
+| building_name | string | Y | 건물명 |
+| building_type_code | string | N | 건물구분(코드) |
+| address | string | N | 주소 |
+| use_yn | boolean | Y | 사용 여부 |
+| created_at, updated_at | datetime | Y | |
 
-- **DBMS 도입 전까지** 모든 데이터는 **로컬 JSON 파일**로 저장한다.
+### 4.2 고객층
 
-| 파일명 | 내용 | 배열 키 |
-|--------|------|---------|
-| `work_log.json` | 처리 이력 통합(NICOM/원콜/세종KLAS) | `items` |
-| `customers.json` | 고객 마스터 | `items` |
-| `contacts.json` | 고객 담당자 | `items` |
-| `equipment.json` | 장비 | `items` |
-| `inspection_schedule.json` | 정기 점검 일정 | `items` |
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| floor_id | string | Y | 층 고유 ID |
+| building_id | string | Y | 소속 건물 |
+| floor_name | string | Y | 층명(B1, 1F, 2F 등) |
+| sort_order | int | N | 정렬 순서 |
+| created_at, updated_at | datetime | Y | |
 
-- **공통 포맷:** `{ "items": [ {...}, {...} ], "meta": { "updated_at": "..." } }` (또는 `items`만). 날짜는 ISO8601 문자열. ID는 정수, 새 건은 `max(id)+1`. FK(`customer_id` 등)는 숫자로 저장하고 참조 무결성은 앱에서 검증.
-- **유의점:** 단일 사용자/단일 프로세스 전제. 저장 시 전체 파일 쓰기 → 쓰기 직렬화 권장. 건수 매우 많으면 DBMS 전환 권장.
+### 4.3 고객실
 
-### 5-3. 2차: DBMS(PostgreSQL) 확장 시 전환
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| room_id | string | Y | 실 고유 ID |
+| floor_id | string | Y | 소속 층 |
+| room_name | string | Y | 실명 |
+| room_number | string | N | 실번호 |
+| room_use_code | string | N | 용도(전산실, 자료실 등) |
+| created_at, updated_at | datetime | Y | |
 
-- **전환:** JSON 파일의 `items`를 읽어 해당 테이블에 INSERT. ID는 JSON 값 그대로 사용 또는 SERIAL 후 FK 매핑. 설정만 PostgreSQL로 변경.
-- **호환:** 테이블/컬럼명과 JSON 키를 동일하게 두었으므로 데이터만 이전하면 되고, 조회/검색/필터/월별 로직은 그대로 재사용 가능.
-
-### 5-4. 엑셀 내보내기
-
-- **1차(JSON):** JSON 파일에서 로드한 데이터를 pandas DataFrame으로 만든 뒤, openpyxl/pandas로 시트별 엑셀 생성.  
-- **2차(PostgreSQL):** DB 조회 결과를 DataFrame으로 만든 뒤 동일하게 시트별 엑셀 생성.  
-- **시트 매핑:**  
-  - NICOM_처리리스트 → `work_log` WHERE source='NICOM'  
-  - 원콜/KLAS → `work_log` WHERE source IN ('원콜','세종KLAS')  
-  - 유지보수현황 → `customer` + `contact` + `equipment` 조인 후 기존 엑셀 컬럼 순서로 매핑.  
-- **월별 시트:**  
-  - `work_log` + `inspection_schedule` 기간 조회 후, 날짜별 텍스트 집계하여 달력 시트 생성.
-
----
-
-## 6. 검색·필터·월별·출력 (설계 유지 + PostgreSQL 활용)
-
-- **검색:**  
-  - 기간(`occurred_at`), 고객(`customer_id`), 진행(`status`), 출처(`source`), 내용(`content`/`title` LIKE).  
-  - PostgreSQL 2차: `content` 등에 전문검색(tsvector) 적용 시 검색 품질 향상.
-- **필터:**  
-  - 위 조건을 쿼리 파라미터로 전달, 동적 WHERE 절 구성.  
-  - SQLite/PostgreSQL 모두 동일 로직.
-- **월별:**  
-  - `DATE(occurred_at)` 또는 `date_trunc('month', occurred_at)`로 월 단위 그룹.  
-  - “이번 달 일지” / “특정 월” 조회·엑셀 출력.
-- **출력:**  
-  - 목록(페이징·정렬) + 시트별 엑셀 + 월별 달력 뷰 엑셀.  
-  - 데이터는 모두 위 테이블에서만 조회.
+**상세위치**는 설치자산(설치기본정보)에만 저장(복도 좌측 등 자유 서술).
 
 ---
 
-## 7. 데이터 구조 요약 표 (PostgreSQL 확장 반영)
+## 5. 담당자·담당자 이력
 
-| 테이블 | PK | 주요 필드 | 비고 |
-|--------|-----|-----------|------|
-| **work_log** | id (BIGSERIAL) | source, occurred_at, processed_at, customer_id, contact_id, category, title, content, received_content, handled_content, reply, status, equipment_*, billing_type, remarks, created_at, updated_at | NICOM/원콜/세종KLAS 통합 |
-| **customer** | id | name, division, address, phone, remarks, created_at, updated_at | 고객명·구분 |
-| **contact** | id | customer_id, name, phone_office, phone_mobile, email, remarks, created_at, updated_at | 고객 담당자 |
-| **equipment** | id | customer_id, name, product_category, quantity, location, delivery_year, inspection_interval, billing_type, billing_entity, billing_interval, remarks, created_at, updated_at | 장비·점검주기·유무상 |
-| **inspection_schedule** | id | customer_id, equipment_id, next_due_date, interval_type, assignee_notes, remarks, created_at, updated_at | 다음 점검 예정일 |
+기획서 §5.3, §5.4. 담당자는 삭제하지 않고 재직상태·이력으로 관리한다.
 
-- **저장:** 1차 **JSON 파일**(DBMS 확장 전), 확장 시 **PostgreSQL**.  
-- **엑셀:** 위 테이블 기준 시트별·월별 내보내기로 실무 사용성 및 기존 양식 호환을 유지.
+### 5.1 고객담당자(현재 담당자)
 
-이 문서를 엑셀 분석 결과 반영 + PostgreSQL 확장까지 포함한 **데이터 처리 설계** 기준으로 사용하면 된다.
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| contact_id | string | Y | 담당자 고유 ID |
+| customer_id | string | Y | 소속 기관 |
+| name | string | Y | 담당자 실명 |
+| duty_code | string | N | 담당업무(코드) |
+| job_title | string | N | 직함/직급 |
+| phone | string | N | 전화번호 |
+| mobile | string | N | 핸드폰번호 |
+| email | string | N | 개별 이메일 |
+| appointed_at | date | N | 부임일 |
+| retired_at | date | N | 퇴임일 |
+| in_office_yn | boolean | Y | 재직 여부 |
+| main_contact_yn | boolean | N | 주담당 여부 |
+| created_at, updated_at | datetime | Y | |
+
+### 5.2 고객담당자이력
+
+변경 시 과거 이력을 별도 행으로 보존. AS 건 발생 시점의 담당자 재현 가능.
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| contact_history_id | string | Y | 이력 고유 ID |
+| contact_id | string | Y | 담당자 |
+| customer_id | string | Y | 기관 |
+| start_date | date | Y | 시작일 |
+| end_date | date | N | 종료일 |
+| department_name | string | N | 부서명 |
+| duty_code | string | N | 담당업무 |
+| job_title | string | N | 직함 |
+| phone | string | N | 연락처 |
+| email | string | N | 이메일 |
+| status_code | string | N | 상태(재직, 전보, 퇴직, 변경 등) |
+| change_reason | string | N | 변경사유 |
+| created_at | datetime | Y | 등록일시 |
+| created_by | string | N | 등록자 |
+
+---
+
+## 6. 설치자산
+
+기획서 §6.1, §6.2, §6.3.
+
+### 6.1 설치기본정보
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| installation_id | string | Y | 설치자산 고유 ID |
+| customer_id | string | Y | 소속 기관 |
+| product_name | string | N | 제품명 |
+| product_type_code | string | N | 제품구분(SW, HW 등) |
+| model_name | string | N | 모델명 |
+| manufacturer | string | N | 제조사명 |
+| serial_number | string | N | S/N |
+| installed_at | date | N | 설치일 |
+| removed_at | date | N | 철수일 |
+| install_owner_code | string | N | 설치주체(자사, 타사 등) |
+| install_owner_name | string | N | 원설치사명 |
+| operation_status_code | string | N | 운영상태(운영중, 점검중 등) |
+| management_type_code | string | N | 관리유형 |
+| managed_by_us_yn | boolean | N | 현재관리대상 여부 |
+| request_owner_type_code | string | N | 요청주체유형 |
+| request_owner_name | string | N | 요청주체명 |
+| contact_id | string | N | 고객 담당자(현행) |
+| assignee_id | string | N | 당사 담당자(내부 사용자 ID 등) |
+| building_id | string | N | 건물 |
+| floor_id | string | N | 층 |
+| room_id | string | N | 실 |
+| location_detail | string | N | 상세위치(자유 서술) |
+| remarks | string | N | 비고 |
+| created_at, updated_at | datetime | Y | |
+
+### 6.2 설치SW상세
+
+설치기본정보와 1:0..1 또는 1:N(동일 설치에 SW 다수).
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| sw_detail_id | string | Y | 상세 고유 ID |
+| installation_id | string | Y | 설치자산 |
+| software_name | string | N | 소프트웨어명 |
+| software_version | string | N | 버전 |
+| install_type_code | string | N | 설치형태(PC설치형, 서버형, 웹형) |
+| hardware_info | string | N | 설치 HW 정보 |
+| os_name | string | N | OS |
+| os_version | string | N | OS 버전 |
+| dbms_name | string | N | DBMS |
+| dbms_version | string | N | DB 버전 |
+| access_type | string | N | 접속방식 |
+| access_address | string | N | 접속주소 |
+| install_path | string | N | 설치경로 |
+| backup_path | string | N | 백업경로 |
+| config_file_path | string | N | 환경설정파일 위치 |
+| created_at, updated_at | datetime | Y | |
+
+### 6.3 접속정보참조
+
+기획서 §6.3. ID/PASSWORD는 DB에 저장하지 않음. 경로·관리주체만 저장.
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| access_ref_id | string | Y | 참조 고유 ID |
+| installation_id | string | Y | 설치자산(또는 sw_detail_id) |
+| storage_type | string | N | 저장방식(암호화파일, 금고 등) |
+| storage_path | string | N | 파일/저장소 경로(비밀 제외) |
+| last_verified_at | date | N | 최종 확인일 |
+| managed_by | string | N | 관리주체 |
+| created_at, updated_at | datetime | Y | |
+
+---
+
+## 7. 수행관계
+
+기획서 §7. 제조사/협력사/원청/요청주체 관계. 기관 또는 설치건 단위 연결.
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| relation_id | string | Y | 수행관계 고유 ID |
+| customer_id | string | Y | 기관 |
+| installation_id | string | N | 설치건(선택) |
+| relation_type_code | string | N | 관계구분 |
+| partner_type_code | string | N | 상대회사구분 |
+| partner_name | string | N | 상대회사명 |
+| contact_person | string | N | 담당자명 |
+| contact_phone | string | N | 연락처 |
+| contact_email | string | N | 이메일 |
+| start_date | date | N | 시작일 |
+| end_date | date | N | 종료일 |
+| current_yn | boolean | Y | 현재 유효 여부 |
+| remarks | string | N | 비고 |
+| created_at, updated_at | datetime | Y | |
+
+---
+
+## 8. AS 접수·처리
+
+기획서 §8. AS는 가급적 설치자산(installation_id)과 연결. 연결 불가 시 임시 접수 후 자산 매핑.
+
+### 8.1 AS접수(접수 및 상태)
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| as_id | string | Y | 접수 건 고유 ID(AS번호) |
+| received_at | datetime | Y | 접수일시 |
+| customer_id | string | Y | 기관 |
+| installation_id | string | N | 설치자산(가급적 연결) |
+| channel_code | string | N | 접수채널(전화, 이메일, 방문 등) |
+| requester_name | string | N | 요청자(실명) |
+| symptom | string | N | 증상내용 |
+| urgency_code | string | N | 긴급도(상/중/하) |
+| importance_code | string | N | 중요도 |
+| request_owner_type_code | string | N | 요청주체유형 |
+| request_owner_name | string | N | 요청주체명 |
+| assignee_id | string | Y | 배정담당자(당사) |
+| status_code | string | Y | AS상태(접수, 진행중, 보류, 완료, 종료) |
+| created_at, updated_at | datetime | Y | |
+
+### 8.2 AS처리(처리 세부 이력)
+
+AS접수와 1:N 가능(한 건에 처리 이력 여러 번).
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| as_action_id | string | Y | 처리 이력 고유 ID |
+| as_id | string | Y | AS접수 건 |
+| started_at | datetime | N | 처리시작일시 |
+| completed_at | datetime | N | 완료일시 |
+| action_type_code | string | N | 처리유형 |
+| cause_code | string | N | 원인분류 |
+| action_detail | string | N | 조치내용 |
+| parts_used | string | N | 사용부품/교체품 |
+| recurrence_yn | boolean | N | 재발 여부 |
+| reopen_yn | boolean | N | 재오픈 여부 |
+| result_code | string | N | 처리결과코드 |
+| customer_confirmed_by | string | N | 고객 확인자 |
+| customer_confirmed_at | datetime | N | 확인일시 |
+| follow_up | string | N | 후속조치 |
+| replacement_candidate_yn | boolean | N | 교체대상 여부 |
+| sales_memo | string | N | 영업메모 |
+| created_at, updated_at | datetime | Y | |
+
+---
+
+## 9. 첨부파일관리
+
+기획서 §12. 고객, 설치, AS, 수행관계 등에 범용 연결.
+
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| attachment_id | string | Y | 첨부 고유 ID |
+| entity_type | string | Y | 연결 대상 유형(customer, installation, as, relation 등) |
+| entity_id | string | Y | 연결 대상 ID |
+| file_name | string | Y | 파일명 |
+| file_path | string | Y | 저장 경로(또는 스토리지 키) |
+| file_type | string | N | 유형(설치사진, 점검표, 장애사진 등) |
+| file_size | long | N | 크기 |
+| created_at, created_by | datetime/string | Y | |
+
+---
+
+## 10. PostgreSQL 확장 시 적용
+
+### 10.1 전환 시 유의사항
+
+- 위 필드명을 **그대로 컬럼명**으로 사용하면 애플리케이션 수정을 최소화할 수 있다.
+- ID는 UUID 또는 `SERIAL`/`IDENTITY`로 생성.
+- **코드관리**는 `code_group`, `code_value` 테이블로 이관.
+- **담당자 이력**, **AS처리**는 1:N 관계로 FK 설정.
+- **접속정보참조**에는 비밀번호·평문 계정 정보 컬럼을 두지 않는다.
+
+### 10.2 PostgreSQL 스키마 예시(요약)
+
+```sql
+-- 예: 고객마스터
+CREATE TABLE customer_master (
+  customer_id   VARCHAR(36) PRIMARY KEY,
+  name          VARCHAR(200) NOT NULL,
+  official_name VARCHAR(200) NOT NULL,
+  email         VARCHAR(200),
+  phone         VARCHAR(50) NOT NULL,
+  homepage      VARCHAR(500),
+  business_number VARCHAR(20),
+  representative  VARCHAR(100),
+  industry_code   VARCHAR(20) NOT NULL,
+  parent_customer_id VARCHAR(36) REFERENCES customer_master(customer_id),
+  address       VARCHAR(500),
+  address_detail VARCHAR(500),
+  use_yn        BOOLEAN NOT NULL DEFAULT true,
+  remarks       TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 나머지 테이블: 고객건물, 고객층, 고객실, 고객담당자, 고객담당자이력,
+-- 설치기본정보, 설치SW상세, 접속정보참조, 수행관계정보, AS접수, AS처리, 첨부파일관리, 코드관리
+-- 는 위 논리 스키마에 맞춰 동일한 필드명으로 CREATE TABLE 정의.
+```
+
+### 10.3 JSON/SQLite → PostgreSQL 마이그레이션
+
+1. 코드·고객·공간·담당자·설치·수행관계·AS·첨부 순으로 **마스터 → 트랜잭션** 순서로 INSERT.
+2. FK 제약은 마이그레이션 후 활성화하거나, 임시로 비활성화 후 데이터 적재 뒤 활성화.
+3. 기존 JSON/파일은 백업 보관 후, 검증 완료 시 제거.
+
+---
+
+## 11. 단계별 반영 요약
+
+| 단계 | 범위(기획서 §16) | 데이터 반영 |
+|------|------------------|-------------|
+| 1단계 | 고객마스터, 공간정보, 담당자, 설치자산, 코드관리 | §3~§6, §2 코드관리 |
+| 2단계 | AS 접수, 처리, 현황, 첨부파일 | §8, §9 첨부파일 |
+| 3단계 | 수행관계, 교체대상 분석, 영업활용 | §7, §9 영업활용(집계/뷰) |
+| 확장 | PostgreSQL 전환 | §10 적용 |
+
+이 문서는 기획서를 유일 기준으로 하며, 구현 시 필드 추가·코드값 확장은 기획서 §11·§14와 맞춰 진행한다.
