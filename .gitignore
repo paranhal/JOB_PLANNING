@@ -1,5 +1,6 @@
-# 업무일지 데이터 (로컬 JSON)
+# 업무일지 데이터 (로컬 JSON) — JSON 파일만 저장소에 포함
 data/
+!data/*.json
 
 # 가상환경
 .venv/

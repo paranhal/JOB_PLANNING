@@ -1,0 +1,502 @@
+{
+  "items": [
+    {
+      "code_group": "industry",
+      "code_value": "도서관",
+      "code_name": "도서관",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.748940",
+      "updated_at": "2026-03-12T18:23:57.749064"
+    },
+    {
+      "code_group": "industry",
+      "code_value": "학교",
+      "code_name": "학교",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.749157",
+      "updated_at": "2026-03-12T18:23:57.749245"
+    },
+    {
+      "code_group": "industry",
+      "code_value": "공공기관",
+      "code_name": "공공기관",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.749330",
+      "updated_at": "2026-03-12T18:23:57.749416"
+    },
+    {
+      "code_group": "industry",
+      "code_value": "민간",
+      "code_name": "민간",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.749517",
+      "updated_at": "2026-03-12T18:23:57.749624"
+    },
+    {
+      "code_group": "duty",
+      "code_value": "전산",
+      "code_name": "전산",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.749727",
+      "updated_at": "2026-03-12T18:23:57.749827"
+    },
+    {
+      "code_group": "duty",
+      "code_value": "네트워크",
+      "code_name": "네트워크",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.749935",
+      "updated_at": "2026-03-12T18:23:57.750053"
+    },
+    {
+      "code_group": "duty",
+      "code_value": "도서관리시스템",
+      "code_name": "도서관리시스템",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.750143",
+      "updated_at": "2026-03-12T18:23:57.750231"
+    },
+    {
+      "code_group": "duty",
+      "code_value": "행정시스템",
+      "code_name": "행정시스템",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.750318",
+      "updated_at": "2026-03-12T18:23:57.750403"
+    },
+    {
+      "code_group": "product_type",
+      "code_value": "SW",
+      "code_name": "SW",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.750511",
+      "updated_at": "2026-03-12T18:23:57.750614"
+    },
+    {
+      "code_group": "product_type",
+      "code_value": "HW",
+      "code_name": "HW",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.750705",
+      "updated_at": "2026-03-12T18:23:57.750788"
+    },
+    {
+      "code_group": "product_type",
+      "code_value": "서버",
+      "code_name": "서버",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.750872",
+      "updated_at": "2026-03-12T18:23:57.750956"
+    },
+    {
+      "code_group": "product_type",
+      "code_value": "네트워크장비",
+      "code_name": "네트워크장비",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.751041",
+      "updated_at": "2026-03-12T18:23:57.751125"
+    },
+    {
+      "code_group": "product_type",
+      "code_value": "주변장비",
+      "code_name": "주변장비",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.751233",
+      "updated_at": "2026-03-12T18:23:57.751331"
+    },
+    {
+      "code_group": "install_owner",
+      "code_value": "자사",
+      "code_name": "자사",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.751420",
+      "updated_at": "2026-03-12T18:23:57.751504"
+    },
+    {
+      "code_group": "install_owner",
+      "code_value": "타사",
+      "code_name": "타사",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.751589",
+      "updated_at": "2026-03-12T18:23:57.751673"
+    },
+    {
+      "code_group": "install_owner",
+      "code_value": "제조사",
+      "code_name": "제조사",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.751758",
+      "updated_at": "2026-03-12T18:23:57.751841"
+    },
+    {
+      "code_group": "install_owner",
+      "code_value": "협력사",
+      "code_name": "협력사",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.751925",
+      "updated_at": "2026-03-12T18:23:57.752008"
+    },
+    {
+      "code_group": "install_owner",
+      "code_value": "미상",
+      "code_name": "미상",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.752092",
+      "updated_at": "2026-03-12T18:23:57.752176"
+    },
+    {
+      "code_group": "management_type",
+      "code_value": "직접유지보수",
+      "code_name": "직접유지보수",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.752262",
+      "updated_at": "2026-03-12T18:23:57.752346"
+    },
+    {
+      "code_group": "management_type",
+      "code_value": "장애대응",
+      "code_name": "장애대응",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.752431",
+      "updated_at": "2026-03-12T18:23:57.752516"
+    },
+    {
+      "code_group": "management_type",
+      "code_value": "정기점검",
+      "code_name": "정기점검",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.752607",
+      "updated_at": "2026-03-12T18:23:57.752699"
+    },
+    {
+      "code_group": "management_type",
+      "code_value": "요청시지원",
+      "code_name": "요청시지원",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.752784",
+      "updated_at": "2026-03-12T18:23:57.752870"
+    },
+    {
+      "code_group": "management_type",
+      "code_value": "참고관리",
+      "code_name": "참고관리",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.752956",
+      "updated_at": "2026-03-12T18:23:57.753041"
+    },
+    {
+      "code_group": "request_owner_type",
+      "code_value": "고객직접",
+      "code_name": "고객직접",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.753129",
+      "updated_at": "2026-03-12T18:23:57.753225"
+    },
+    {
+      "code_group": "request_owner_type",
+      "code_value": "제조사",
+      "code_name": "제조사",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.753317",
+      "updated_at": "2026-03-12T18:23:57.753411"
+    },
+    {
+      "code_group": "request_owner_type",
+      "code_value": "협력사",
+      "code_name": "협력사",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.753499",
+      "updated_at": "2026-03-12T18:23:57.753589"
+    },
+    {
+      "code_group": "request_owner_type",
+      "code_value": "원청",
+      "code_name": "원청",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.753675",
+      "updated_at": "2026-03-12T18:23:57.753762"
+    },
+    {
+      "code_group": "request_owner_type",
+      "code_value": "내부",
+      "code_name": "내부",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.753851",
+      "updated_at": "2026-03-12T18:23:57.753936"
+    },
+    {
+      "code_group": "as_status",
+      "code_value": "접수",
+      "code_name": "접수",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.754025",
+      "updated_at": "2026-03-12T18:23:57.754115"
+    },
+    {
+      "code_group": "as_status",
+      "code_value": "진행중",
+      "code_name": "진행중",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.754201",
+      "updated_at": "2026-03-12T18:23:57.754286"
+    },
+    {
+      "code_group": "as_status",
+      "code_value": "보류",
+      "code_name": "보류",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.754372",
+      "updated_at": "2026-03-12T18:23:57.754462"
+    },
+    {
+      "code_group": "as_status",
+      "code_value": "완료",
+      "code_name": "완료",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.754548",
+      "updated_at": "2026-03-12T18:23:57.754634"
+    },
+    {
+      "code_group": "as_status",
+      "code_value": "종료",
+      "code_name": "종료",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.754721",
+      "updated_at": "2026-03-12T18:23:57.754807"
+    },
+    {
+      "code_group": "cause",
+      "code_value": "HW고장",
+      "code_name": "HW고장",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.754892",
+      "updated_at": "2026-03-12T18:23:57.754978"
+    },
+    {
+      "code_group": "cause",
+      "code_value": "SW오류",
+      "code_name": "SW오류",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.755182",
+      "updated_at": "2026-03-12T18:23:57.755265"
+    },
+    {
+      "code_group": "cause",
+      "code_value": "네트워크",
+      "code_name": "네트워크",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.755348",
+      "updated_at": "2026-03-12T18:23:57.755434"
+    },
+    {
+      "code_group": "cause",
+      "code_value": "환경문제",
+      "code_name": "환경문제",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.755524",
+      "updated_at": "2026-03-12T18:23:57.755610"
+    },
+    {
+      "code_group": "cause",
+      "code_value": "사용자오류",
+      "code_name": "사용자오류",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.755699",
+      "updated_at": "2026-03-12T18:23:57.755785"
+    },
+    {
+      "code_group": "action_type",
+      "code_value": "원격지원",
+      "code_name": "원격지원",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.755872",
+      "updated_at": "2026-03-12T18:23:57.755958"
+    },
+    {
+      "code_group": "action_type",
+      "code_value": "방문",
+      "code_name": "방문",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.756047",
+      "updated_at": "2026-03-12T18:23:57.756146"
+    },
+    {
+      "code_group": "action_type",
+      "code_value": "교체",
+      "code_name": "교체",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.756245",
+      "updated_at": "2026-03-12T18:23:57.756358"
+    },
+    {
+      "code_group": "action_type",
+      "code_value": "설정변경",
+      "code_name": "설정변경",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.756445",
+      "updated_at": "2026-03-12T18:23:57.756534"
+    },
+    {
+      "code_group": "action_type",
+      "code_value": "문의응대",
+      "code_name": "문의응대",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.756633",
+      "updated_at": "2026-03-12T18:23:57.756741"
+    },
+    {
+      "code_group": "operation_status",
+      "code_value": "운영중",
+      "code_name": "운영중",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.756849",
+      "updated_at": "2026-03-12T18:23:57.756944"
+    },
+    {
+      "code_group": "operation_status",
+      "code_value": "점검중",
+      "code_name": "점검중",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.757036",
+      "updated_at": "2026-03-12T18:23:57.757135"
+    },
+    {
+      "code_group": "operation_status",
+      "code_value": "장애",
+      "code_name": "장애",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.757224",
+      "updated_at": "2026-03-12T18:23:57.757312"
+    },
+    {
+      "code_group": "operation_status",
+      "code_value": "철수",
+      "code_name": "철수",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.757403",
+      "updated_at": "2026-03-12T18:23:57.757491"
+    },
+    {
+      "code_group": "operation_status",
+      "code_value": "폐기",
+      "code_name": "폐기",
+      "sort_order": 4,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.757579",
+      "updated_at": "2026-03-12T18:23:57.757668"
+    },
+    {
+      "code_group": "building_type",
+      "code_value": "본관",
+      "code_name": "본관",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.757758",
+      "updated_at": "2026-03-12T18:23:57.757847"
+    },
+    {
+      "code_group": "building_type",
+      "code_value": "별관",
+      "code_name": "별관",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.757934",
+      "updated_at": "2026-03-12T18:23:57.758025"
+    },
+    {
+      "code_group": "building_type",
+      "code_value": "기타",
+      "code_name": "기타",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.758121",
+      "updated_at": "2026-03-12T18:23:57.758211"
+    },
+    {
+      "code_group": "room_use",
+      "code_value": "전산실",
+      "code_name": "전산실",
+      "sort_order": 0,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.758299",
+      "updated_at": "2026-03-12T18:23:57.758388"
+    },
+    {
+      "code_group": "room_use",
+      "code_value": "자료실",
+      "code_name": "자료실",
+      "sort_order": 1,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.758476",
+      "updated_at": "2026-03-12T18:23:57.758567"
+    },
+    {
+      "code_group": "room_use",
+      "code_value": "서버실",
+      "code_name": "서버실",
+      "sort_order": 2,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.758663",
+      "updated_at": "2026-03-12T18:23:57.758752"
+    },
+    {
+      "code_group": "room_use",
+      "code_value": "기타",
+      "code_name": "기타",
+      "sort_order": 3,
+      "use_yn": true,
+      "created_at": "2026-03-12T18:23:57.758841",
+      "updated_at": "2026-03-12T18:23:57.758930"
+    }
+  ],
+  "meta": {
+    "updated_at": "2026-03-12T18:23:57.759098"
+  }
+}

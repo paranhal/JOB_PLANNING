@@ -1,0 +1,49 @@
+{
+  "items": [
+    {
+      "customer_id": "Cf4ccd4d894b1",
+      "name": "충남교육청 초등특수교육과",
+      "official_name": "충청남도교육청 통합도서관 관리",
+      "email": "",
+      "phone": "041-000-0000",
+      "homepage": "",
+      "business_number": "",
+      "representative": "",
+      "industry_code": "공공기관",
+      "parent_customer_id": null,
+      "address": "충남 홍성군 홍북읍 선화로 22",
+      "address_detail": "",
+      "use_yn": true,
+      "remarks": "우편번호 : 32255",
+      "created_at": "2026-03-12T18:42:01.155210",
+      "updated_at": "2026-03-12T18:42:01.155234"
+    },
+    {
+      "customer_id": "C263c662ce5e8",
+      "name": "공주도서관",
+      "official_name": "충청남도공주교육지원청공주도서관",
+      "email": "",
+      "phone": "041-855-7120",
+      "homepage": "",
+      "business_number": "",
+      "representative": "",
+      "industry_code": "도서관",
+      "parent_customer_id": "Cf4ccd4d894b1",
+      "address": "충청남도 공주시 영명학당2길 24-5",
+      "address_detail": "",
+      "use_yn": true,
+      "remarks": "",
+      "created_at": "2026-03-12T18:44:30.191122",
+      "updated_at": "2026-03-12T18:59:49.574623",
+      "photo_urls": [
+        "",
+        "",
+        "",
+        ""
+      ]
+    }
+  ],
+  "meta": {
+    "updated_at": "2026-03-12T18:59:49.575876"
+  }
+}
