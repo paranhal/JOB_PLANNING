@@ -29,6 +29,12 @@ func main() {
 	e := echo.New()
 	e.HideBanner = true
 
+	// 에러 핸들러 — 500 오류 원인을 로그에 출력
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		log.Printf("❌ 오류 [%s %s]: %v", c.Request().Method, c.Request().URL.Path, err)
+		e.DefaultHTTPErrorHandler(err, c)
+	}
+
 	// 미들웨어
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "[${time_rfc3339}] ${method} ${uri} → ${status} (${latency_human})\n",

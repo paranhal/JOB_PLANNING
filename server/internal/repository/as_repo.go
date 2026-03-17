@@ -162,17 +162,17 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	return err
 }
 
-// Stats AS 현황 통계
+// Stats AS 현황 통계 (빈 테이블에서 SUM이 NULL 반환 → COALESCE로 0 처리)
 func (r *ASRepo) Stats() (*model.ASStats, error) {
 	var stats model.ASStats
 	err := r.db.QueryRow(`
 		SELECT
 			COUNT(*) AS total,
-			SUM(CASE WHEN status IN ('received','in_progress') THEN 1 ELSE 0 END) AS in_progress,
-			SUM(CASE WHEN status IN ('completed','closed') THEN 1 ELSE 0 END) AS completed,
-			SUM(CASE WHEN status IN ('received','in_progress')
-			         AND julianday('now')-julianday(receipt_datetime) > 3 THEN 1 ELSE 0 END) AS overdue,
-			SUM(CASE WHEN date(receipt_datetime)=date('now') THEN 1 ELSE 0 END) AS today
+			COALESCE(SUM(CASE WHEN status IN ('received','in_progress') THEN 1 ELSE 0 END), 0) AS in_progress,
+			COALESCE(SUM(CASE WHEN status IN ('completed','closed') THEN 1 ELSE 0 END), 0) AS completed,
+			COALESCE(SUM(CASE WHEN status IN ('received','in_progress')
+			         AND julianday('now')-julianday(receipt_datetime) > 3 THEN 1 ELSE 0 END), 0) AS overdue,
+			COALESCE(SUM(CASE WHEN date(receipt_datetime)=date('now') THEN 1 ELSE 0 END), 0) AS today
 		FROM as_receipts`,
 	).Scan(
 		&stats.TotalReceived, &stats.InProgress,
