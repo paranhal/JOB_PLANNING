@@ -1,0 +1,165 @@
+{{define "title"}}{{if .IsNew}}고객 등록{{else}}고객 수정{{end}} · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="max-w-2xl mx-auto space-y-6">
+
+  <!-- 헤더 -->
+  <div class="flex items-center gap-3">
+    <a href="/customers" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}고객 등록{{else}}고객 수정{{end}}</h2>
+      <p class="text-sm text-gray-500">기획서 §5.1 기준</p>
+    </div>
+  </div>
+
+  <!-- 폼 -->
+  <form method="POST"
+        action="{{if .IsNew}}/customers{{else}}/customers/{{.Customer.CustomerID}}/update{{end}}"
+        class="space-y-6">
+
+    <!-- 기관 기본정보 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">기관 기본정보</h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            기관명 <span class="text-red-500">*</span>
+          </label>
+          <input type="text" name="org_name" value="{{.Customer.OrgName}}" required
+                 placeholder="실무상 사용하는 명칭"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            공식명칭 <span class="text-red-500">*</span>
+          </label>
+          <input type="text" name="official_name" value="{{.Customer.OfficialName}}" required
+                 placeholder="계약서·공문 기준 명칭"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">대표전화 <span class="text-red-500">*</span></label>
+          <input type="text" name="main_phone" value="{{.Customer.MainPhone}}"
+                 placeholder="02-0000-0000"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업종 <span class="text-red-500">*</span></label>
+          <select name="industry"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">선택</option>
+            <option value="도서관" {{if eq .Customer.Industry "도서관"}}selected{{end}}>도서관</option>
+            <option value="학교" {{if eq .Customer.Industry "학교"}}selected{{end}}>학교</option>
+            <option value="공공기관" {{if eq .Customer.Industry "공공기관"}}selected{{end}}>공공기관</option>
+            <option value="민간" {{if eq .Customer.Industry "민간"}}selected{{end}}>민간</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">기관 이메일</label>
+          <input type="email" name="org_email" value="{{.Customer.OrgEmail}}"
+                 placeholder="info@example.go.kr"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">홈페이지</label>
+          <input type="text" name="website" value="{{.Customer.Website}}"
+                 placeholder="https://www.example.go.kr"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- 법인정보 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">법인 정보</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">사업자번호</label>
+          <input type="text" name="business_number" value="{{.Customer.BusinessNumber}}"
+                 placeholder="000-00-00000"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">대표자</label>
+          <input type="text" name="representative" value="{{.Customer.Representative}}"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- 주소 + 계층 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">주소 · 계층</h3>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">기본주소</label>
+        <input type="text" name="address" value="{{.Customer.Address}}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">상세주소</label>
+        <input type="text" name="address_detail" value="{{.Customer.AddressDetail}}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div x-data="{ hasParent: {{if .Customer.HasParent}}true{{else}}false{{end}} }">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="has_parent" value="1"
+                 x-model="hasParent"
+                 {{if .Customer.HasParent}}checked{{end}}
+                 class="rounded border-gray-300 text-blue-600">
+          <span class="text-sm font-medium text-gray-700">상위기관 있음</span>
+        </label>
+        <div x-show="hasParent" x-cloak class="mt-2">
+          <select name="parent_customer_id"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">상위기관 선택</option>
+            {{range .Customers}}
+            <option value="{{.CustomerID}}" {{if eq $.Customer.ParentCustomerID .CustomerID}}selected{{end}}>
+              {{.OrgName}}
+            </option>
+            {{end}}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 비고 + 상태 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">비고</label>
+        <textarea name="notes" rows="3"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{{.Customer.Notes}}</textarea>
+      </div>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="is_active" value="1"
+               {{if .Customer.IsActive}}checked{{end}}
+               class="rounded border-gray-300 text-blue-600">
+        <span class="text-sm font-medium text-gray-700">활성 기관</span>
+      </label>
+    </div>
+
+    <!-- 버튼 -->
+    <div class="flex gap-3 justify-end">
+      <a href="/customers" class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        취소
+      </a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+        {{if .IsNew}}등록{{else}}저장{{end}}
+      </button>
+    </div>
+
+  </form>
+</div>
+{{end}}
