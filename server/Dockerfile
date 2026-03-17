@@ -3,12 +3,13 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-# 의존성 먼저 캐시 (소스 변경 시 재다운로드 방지)
-COPY go.mod go.sum ./
+# 의존성 먼저 캐시 (go.sum이 없어도 빌드 가능)
+COPY go.mod ./
 RUN go mod download
 
 # 소스 복사 및 빌드
 COPY . .
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
 
 # ── 2단계: 실행 이미지 (~20MB) ────────────────────────────────────
