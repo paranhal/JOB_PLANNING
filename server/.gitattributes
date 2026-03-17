@@ -1,0 +1,17 @@
+# 맥/윈도우 혼용 개발 환경 줄바꿈 통일 (LF)
+* text=auto eol=lf
+
+# Go 소스는 LF 강제
+*.go text eol=lf
+
+# 템플릿 / 설정 파일
+*.html text eol=lf
+*.toml text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+*.env* text eol=lf
+
+# 바이너리
+*.db binary
