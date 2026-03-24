@@ -73,6 +73,8 @@ func main() {
 	contact.GET("/new", h.Contact.New)
 	contact.POST("", h.Contact.Create)
 	contact.GET("/:id", h.Contact.Show)
+	contact.GET("/:id/edit", h.Contact.Edit)
+	contact.POST("/:id/update", h.Contact.Update)
 
 	// 설치자산 관리
 	asset := e.Group("/assets")

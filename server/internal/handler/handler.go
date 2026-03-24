@@ -24,12 +24,13 @@ type Handler struct {
 
 func New(db *sql.DB) *Handler {
 	customerRepo := repository.NewCustomerRepo(db)
+	contactRepo := repository.NewContactRepo(db)
 	asRepo := repository.NewASRepo(db)
 
 	return &Handler{
 		Customer: &CustomerHandler{repo: customerRepo},
 		Space:    &SpaceHandler{db: db},
-		Contact:  &ContactHandler{db: db},
+		Contact:  &ContactHandler{repo: contactRepo, customerRepo: customerRepo},
 		Asset:    &AssetHandler{db: db, customerRepo: customerRepo},
 		AS:       &ASHandler{repo: asRepo, customerRepo: customerRepo},
 		Analysis: &AnalysisHandler{db: db},

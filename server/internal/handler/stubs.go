@@ -19,32 +19,6 @@ func (h *SpaceHandler) List(c echo.Context) error {
 	})
 }
 
-// ── Contact 핸들러 ───────────────────────────────────────────────
-
-type ContactHandler struct{ db *sql.DB }
-
-func (h *ContactHandler) List(c echo.Context) error {
-	return c.Render(http.StatusOK, "contact/list.html", map[string]interface{}{
-		"Title": "담당자 관리", "Active": "contacts",
-	})
-}
-
-func (h *ContactHandler) New(c echo.Context) error {
-	return c.Render(http.StatusOK, "contact/form.html", map[string]interface{}{
-		"Title": "담당자 등록", "Active": "contacts", "IsNew": true,
-	})
-}
-
-func (h *ContactHandler) Create(c echo.Context) error {
-	return c.Redirect(http.StatusSeeOther, "/contacts")
-}
-
-func (h *ContactHandler) Show(c echo.Context) error {
-	return c.Render(http.StatusOK, "contact/show.html", map[string]interface{}{
-		"Title": "담당자 상세", "Active": "contacts",
-	})
-}
-
 // ── Asset 핸들러 ─────────────────────────────────────────────────
 
 type AssetHandler struct {
