@@ -1,6 +1,112 @@
-{{define "title"}}자산 등록 · 고객지원시스템{{end}}
+{{define "title"}}{{if .IsNew}}자산 등록{{else}}자산 수정{{end}} · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="flex items-center justify-center h-64 text-gray-400">
-  <p class="text-sm">자산 등록 폼 — 구현 예정</p>
+<div class="max-w-3xl mx-auto space-y-6">
+  <div class="flex items-center gap-3">
+    <a href="/assets" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+    <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}자산 등록{{else}}자산 수정{{end}}</h2>
+  </div>
+
+  <form method="POST" action="{{if .IsNew}}/assets{{else}}/assets/{{.Asset.AssetID}}/update{{end}}" class="space-y-6">
+
+    <!-- 기관/제품 기본 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">기본 정보</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">소속 기관 <span class="text-red-500">*</span></label>
+          <select name="customer_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .Customers}}<option value="{{.CustomerID}}" {{if eq .CustomerID $.Asset.CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제품명 <span class="text-red-500">*</span></label>
+          <input type="text" name="product_name" value="{{.Asset.ProductName}}" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제품구분</label>
+          <select name="product_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .ProductTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.ProductType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">모델명</label>
+          <input type="text" name="model_name" value="{{.Asset.ModelName}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제조사</label>
+          <input type="text" name="manufacturer" value="{{.Asset.Manufacturer}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">S/N</label>
+          <input type="text" name="serial_number" value="{{.Asset.SerialNumber}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <!-- 일정/설치주체 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">설치/관리 정보</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">설치일</label><input type="date" name="install_date" value="{{.Asset.InstallDate}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">철수일</label><input type="date" name="retire_date" value="{{.Asset.RetireDate}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">설치주체</label>
+          <select name="installer_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .InstallerTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.InstallerType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">원설치사명</label><input type="text" name="original_installer" value="{{.Asset.OriginalInstaller}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">운영상태</label>
+          <select name="operation_status" class="w-full border rounded-lg px-3 py-2 text-sm">
+            {{range .OpStatuses}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.OperationStatus}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">관리유형</label>
+          <select name="management_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .ManagementTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.ManagementType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">요청주체유형</label>
+          <select name="requester_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .RequesterTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.RequesterType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">요청주체명</label><input type="text" name="requester_name" value="{{.Asset.RequesterName}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="is_managed" value="1" {{if .Asset.IsManaged}}checked{{end}} class="rounded border-gray-300 text-blue-600">
+        <label class="text-sm text-gray-700">현재 관리 대상</label>
+      </div>
+    </div>
+
+    <!-- 위치/담당 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">위치 · 담당</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">건물ID</label><input type="text" name="building_id" value="{{.Asset.BuildingID}}" placeholder="공간관리에서 확인" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">층ID</label><input type="text" name="floor_id" value="{{.Asset.FloorID}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">실ID</label><input type="text" name="room_id" value="{{.Asset.RoomID}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">상세위치</label><input type="text" name="location_detail" value="{{.Asset.LocationDetail}}" placeholder="복도 좌측, 안내데스크 옆 등" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">고객담당자</label><input type="text" name="customer_contact_id" value="{{.Asset.CustomerContactID}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">당사담당자</label><input type="text" name="our_contact" value="{{.Asset.OurContact}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">비고</label><textarea name="notes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">{{.Asset.Notes}}</textarea></div>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <a href="/assets" class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">{{if .IsNew}}등록{{else}}저장{{end}}</button>
+    </div>
+  </form>
 </div>
 {{end}}

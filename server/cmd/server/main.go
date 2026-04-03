@@ -14,47 +14,51 @@ import (
 )
 
 func main() {
-	// .env 로드 (없어도 무시)
 	_ = godotenv.Load()
-
 	cfg := config.Load()
 
-	// DB 초기화
 	db, err := repository.InitDB(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("DB 초기화 실패: %v", err)
 	}
 	defer db.Close()
 
+	// 기본 관리자 계정 확보
+	userRepo := repository.NewUserRepo(db)
+	userRepo.EnsureAdmin(handler.HashPassword("admin"))
+
 	e := echo.New()
 	e.HideBanner = true
 
-	// 에러 핸들러 — 500 오류 원인을 로그에 출력
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		log.Printf("❌ 오류 [%s %s]: %v", c.Request().Method, c.Request().URL.Path, err)
+		log.Printf("오류 [%s %s]: %v", c.Request().Method, c.Request().URL.Path, err)
 		e.DefaultHTTPErrorHandler(err, c)
 	}
 
-	// 미들웨어
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "[${time_rfc3339}] ${method} ${uri} → ${status} (${latency_human})\n",
 	}))
 	e.Use(middleware.Recover())
 
-	// 템플릿 렌더러
 	e.Renderer = handler.NewRenderer()
-
-	// 정적 파일
 	e.Static("/static", "web/static")
+	e.Static("/uploads", "data/uploads")
 
-	// 핸들러 초기화
 	h := handler.New(db)
 
-	// ── 라우트 ──────────────────────────────────────
-	e.GET("/", h.Dashboard)
+	// 인증
+	e.GET("/login", h.Auth.LoginPage)
+	e.POST("/login", h.Auth.Login)
+	e.GET("/logout", h.Auth.Logout)
+
+	// 인증 미들웨어 적용 그룹
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+
+	g.GET("/", h.Dashboard)
 
 	// 고객 관리
-	cust := e.Group("/customers")
+	cust := g.Group("/customers")
 	cust.GET("", h.Customer.List)
 	cust.GET("/new", h.Customer.New)
 	cust.POST("", h.Customer.Create)
@@ -64,11 +68,25 @@ func main() {
 	cust.POST("/:id/delete", h.Customer.Delete)
 
 	// 공간 관리 (건물/층/실)
-	space := e.Group("/spaces")
+	space := g.Group("/spaces")
 	space.GET("", h.Space.List)
+	space.POST("/buildings", h.Space.CreateBuilding)
+	space.POST("/buildings/:id/update", h.Space.UpdateBuilding)
+	space.POST("/buildings/:id/delete", h.Space.DeleteBuilding)
+	space.POST("/floors", h.Space.CreateFloor)
+	space.POST("/floors/:id/delete", h.Space.DeleteFloor)
+	space.POST("/rooms", h.Space.CreateRoom)
+	space.POST("/rooms/:id/delete", h.Space.DeleteRoom)
+
+	// API: 위치 cascade (HTMX/JSON)
+	api := g.Group("/api")
+	api.GET("/buildings/:customer_id", h.Space.APIBuildings)
+	api.GET("/floors/:building_id", h.Space.APIFloors)
+	api.GET("/rooms/:floor_id", h.Space.APIRooms)
+	api.GET("/assets/:customer_id", h.Asset.APIAssetsByCustomer)
 
 	// 담당자 관리
-	contact := e.Group("/contacts")
+	contact := g.Group("/contacts")
 	contact.GET("", h.Contact.List)
 	contact.GET("/new", h.Contact.New)
 	contact.POST("", h.Contact.Create)
@@ -76,29 +94,66 @@ func main() {
 	contact.GET("/:id/edit", h.Contact.Edit)
 	contact.POST("/:id/update", h.Contact.Update)
 
+	// 담당자 이력
+	g.GET("/contact-history", h.ContactHistory.List)
+	g.POST("/contact-history", h.ContactHistory.Create)
+
 	// 설치자산 관리
-	asset := e.Group("/assets")
+	asset := g.Group("/assets")
 	asset.GET("", h.Asset.List)
 	asset.GET("/new", h.Asset.New)
 	asset.POST("", h.Asset.Create)
 	asset.GET("/:id", h.Asset.Show)
+	asset.GET("/:id/edit", h.Asset.Edit)
+	asset.POST("/:id/update", h.Asset.Update)
+	asset.POST("/:id/delete", h.Asset.Delete)
+
+	// SW 상세 관리
+	asset.GET("/:asset_id/sw", h.SWDetail.ListByAsset)
+	asset.POST("/:asset_id/sw", h.SWDetail.Create)
+	g.GET("/sw/:id/edit", h.SWDetail.Edit)
+	g.POST("/sw/:id/update", h.SWDetail.Update)
+	g.POST("/sw/:id/delete", h.SWDetail.Delete)
+
+	// 수행관계 관리
+	rel := g.Group("/relations")
+	rel.GET("", h.Relation.List)
+	rel.GET("/new", h.Relation.New)
+	rel.POST("", h.Relation.Create)
+	rel.GET("/:id/edit", h.Relation.Edit)
+	rel.POST("/:id/update", h.Relation.Update)
+	rel.POST("/:id/delete", h.Relation.Delete)
 
 	// AS 관리
-	as := e.Group("/as")
+	as := g.Group("/as")
 	as.GET("", h.AS.List)
 	as.GET("/new", h.AS.New)
 	as.POST("", h.AS.Create)
+	as.GET("/stats", h.AS.StatsDashboard)
 	as.GET("/:id", h.AS.Show)
 	as.POST("/:id/update", h.AS.Update)
+	as.POST("/:id/process", h.AS.AddProcess)
 
 	// 분석/영업
-	e.GET("/analysis", h.Analysis.Dashboard)
+	g.GET("/analysis", h.Analysis.Dashboard)
 
 	// 코드 관리
-	e.GET("/codes", h.Code.List)
+	g.GET("/codes", h.Code.List)
+	g.POST("/codes", h.Code.Create)
+	g.POST("/codes/:id/update", h.Code.Update)
+	g.POST("/codes/:id/delete", h.Code.Delete)
 
-	// ── 서버 시작 ─────────────────────────────────
-	log.Printf("🚀 고객지원시스템 서버 시작: http://localhost:%s", cfg.Port)
+	// 첨부파일
+	g.POST("/attachments", h.Attachment.Upload)
+	g.GET("/attachments/:id", h.Attachment.Download)
+	g.POST("/attachments/:id/delete", h.Attachment.Delete)
+
+	// 사용자 관리
+	g.GET("/users", h.Auth.UserList)
+	g.POST("/users", h.Auth.UserCreate)
+	g.POST("/users/:id/update", h.Auth.UserUpdate)
+
+	log.Printf("고객지원시스템 서버 시작: http://localhost:%s", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}

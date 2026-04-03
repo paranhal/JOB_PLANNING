@@ -1,0 +1,31 @@
+{{define "title"}}SW 상세 수정 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-2xl mx-auto space-y-6">
+  <div class="flex items-center gap-3">
+    <a href="/assets/{{.SW.AssetID}}/sw" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+    <h2 class="text-xl font-bold text-gray-800">SW 상세 수정</h2>
+  </div>
+  <form method="POST" action="/sw/{{.SW.SWDetailID}}/update" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+    <input type="hidden" name="asset_id" value="{{.SW.AssetID}}">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">소프트웨어명</label><input type="text" name="software_name" value="{{.SW.SoftwareName}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">버전</label><input type="text" name="version" value="{{.SW.Version}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">설치형태</label><select name="install_type" class="w-full border rounded-lg px-3 py-2 text-sm"><option value="pc" {{if eq .SW.InstallType "pc"}}selected{{end}}>PC설치형</option><option value="server" {{if eq .SW.InstallType "server"}}selected{{end}}>서버형</option><option value="web" {{if eq .SW.InstallType "web"}}selected{{end}}>웹형</option></select></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">설치 HW</label><input type="text" name="hw_info" value="{{.SW.HWInfo}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">OS</label><input type="text" name="os" value="{{.SW.OS}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">OS 버전</label><input type="text" name="os_version" value="{{.SW.OSVersion}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">DBMS</label><input type="text" name="dbms" value="{{.SW.DBMS}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">DB 버전</label><input type="text" name="db_version" value="{{.SW.DBVersion}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">접속방식</label><input type="text" name="access_method" value="{{.SW.AccessMethod}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">접속주소</label><input type="text" name="access_url" value="{{.SW.AccessURL}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">설치경로</label><input type="text" name="install_path" value="{{.SW.InstallPath}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">백업경로</label><input type="text" name="backup_path" value="{{.SW.BackupPath}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    </div>
+    <div><label class="block text-xs font-medium text-gray-600 mb-1">환경설정파일위치</label><input type="text" name="config_path" value="{{.SW.ConfigPath}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    <div class="flex gap-3 justify-end">
+      <a href="/assets/{{.SW.AssetID}}/sw" class="px-5 py-2 border rounded-lg text-sm text-gray-700 hover:bg-gray-50">취소</a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장</button>
+    </div>
+  </form>
+</div>
+{{end}}

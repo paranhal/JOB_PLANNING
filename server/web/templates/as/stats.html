@@ -1,0 +1,57 @@
+{{define "title"}}AS 현황 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <h2 class="text-xl font-bold text-gray-800">AS 현황 대시보드</h2>
+
+  <!-- 통계 카드 -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-2xl font-bold text-gray-800">{{.Stats.TotalReceived}}</p>
+      <p class="text-xs text-gray-500 mt-1">전체 접수</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-2xl font-bold text-yellow-600">{{.Stats.InProgress}}</p>
+      <p class="text-xs text-gray-500 mt-1">진행중</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-2xl font-bold text-green-600">{{.Stats.Completed}}</p>
+      <p class="text-xs text-gray-500 mt-1">완료</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-2xl font-bold text-red-600">{{.Stats.Overdue}}</p>
+      <p class="text-xs text-gray-500 mt-1">지연 (3일+)</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-2xl font-bold text-blue-600">{{.Stats.TodayReceived}}</p>
+      <p class="text-xs text-gray-500 mt-1">오늘 접수</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- 상태별 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">상태별 현황</h3>
+      {{range .ByStatus}}
+      <div class="flex items-center justify-between py-2 border-b border-gray-50">
+        <span class="text-sm"><span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span></span>
+        <span class="font-bold text-gray-800">{{.Count}}건</span>
+      </div>
+      {{end}}
+    </div>
+
+    <!-- 기관별 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">기관별 AS 현황 (Top 20)</h3>
+      {{range .ByCustomer}}
+      <div class="flex items-center justify-between py-2 border-b border-gray-50">
+        <span class="text-sm text-gray-700">{{.Name}}</span>
+        <div class="text-sm">
+          <span class="font-bold text-gray-800">{{.Count}}건</span>
+          {{if .Open}}<span class="text-xs text-yellow-600 ml-1">(미처리 {{.Open}})</span>{{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

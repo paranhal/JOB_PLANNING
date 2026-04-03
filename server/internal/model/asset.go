@@ -89,6 +89,18 @@ type Attachment struct {
 	UploadedAt   time.Time `json:"uploaded_at"`
 }
 
+// AccessInfoReference 접속정보참조 (기획서 §6.3)
+type AccessInfoReference struct {
+	AccessInfoID  string    `json:"access_info_id"`
+	AssetID       string    `json:"asset_id"`
+	FilePath      string    `json:"file_path"`
+	StorageMethod string    `json:"storage_method"` // 암호화파일, 금고시스템, 별도저장소
+	LastVerified  string    `json:"last_verified"`
+	ManagedBy     string    `json:"managed_by"`
+	Notes         string    `json:"notes"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 // Code 코드관리 (기획서 §11)
 type Code struct {
 	CodeID     string `json:"code_id"`
@@ -97,4 +109,15 @@ type Code struct {
 	CodeName   string `json:"code_name"`
 	SortOrder  int    `json:"sort_order"`
 	IsActive   bool   `json:"is_active"`
+}
+
+// User 사용자 (기획서 §10)
+type User struct {
+	UserID       string    `json:"user_id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"password_hash"`
+	FullName     string    `json:"full_name"`
+	Role         string    `json:"role"` // admin, receipt, tech, sales, viewer
+	IsActive     bool      `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
 }

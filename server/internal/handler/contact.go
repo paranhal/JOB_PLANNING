@@ -13,6 +13,7 @@ import (
 type ContactHandler struct {
 	repo         *repository.ContactRepo
 	customerRepo *repository.CustomerRepo
+	histRepo     *repository.ContactHistoryRepo
 }
 
 // List 담당자 목록
@@ -105,10 +106,16 @@ func (h *ContactHandler) Edit(c echo.Context) error {
 	})
 }
 
-// Update 담당자 수정 처리
+// Update 담당자 수정 처리 (변경 전 이력 자동 저장)
 func (h *ContactHandler) Update(c echo.Context) error {
+	id := c.Param("id")
+	old, _ := h.repo.GetByID(id)
+	if old != nil {
+		h.histRepo.SnapshotFromContact(old, "수정")
+	}
+
 	ct := bindContact(c)
-	ct.ContactID = c.Param("id")
+	ct.ContactID = id
 	if err := h.repo.Update(ct); err != nil {
 		return err
 	}

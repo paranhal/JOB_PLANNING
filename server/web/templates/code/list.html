@@ -1,22 +1,41 @@
 {{define "title"}}코드 관리 · 고객지원시스템{{end}}
-
 {{define "content"}}
-<div class="space-y-4">
+<div class="space-y-4" x-data="{ showForm: false }">
   <div class="flex items-center justify-between">
     <h2 class="text-xl font-bold text-gray-800">코드 관리</h2>
+    <button @click="showForm=!showForm" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ 코드 추가</button>
   </div>
 
+  <!-- 그룹 필터 -->
+  <div class="flex flex-wrap gap-2">
+    <a href="/codes" class="px-3 py-1 rounded-full text-xs font-medium {{if not .SelectedGroup}}bg-blue-600 text-white{{else}}bg-gray-100 text-gray-600 hover:bg-gray-200{{end}}">전체</a>
+    {{range .Groups}}
+    <a href="/codes?group={{.}}" class="px-3 py-1 rounded-full text-xs font-medium {{if eq . $.SelectedGroup}}bg-blue-600 text-white{{else}}bg-gray-100 text-gray-600 hover:bg-gray-200{{end}}">{{.}}</a>
+    {{end}}
+  </div>
+
+  <!-- 추가 폼 -->
+  <div x-show="showForm" x-cloak class="bg-white rounded-xl border border-gray-200 p-6">
+    <form method="POST" action="/codes" class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">코드그룹</label><input type="text" name="code_group" required placeholder="industry" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">코드값</label><input type="text" name="code_value" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">코드명</label><input type="text" name="code_name" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">순서</label><input type="number" name="sort_order" value="0" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium">등록</button>
+    </form>
+  </div>
+
+  <!-- 목록 -->
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="w-full text-sm">
-      <thead class="bg-gray-50 border-b border-gray-200">
-        <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">코드그룹</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">코드값</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">코드명</th>
-          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">순서</th>
-          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">활성</th>
-        </tr>
-      </thead>
+      <thead class="bg-gray-50 border-b border-gray-200"><tr>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">코드그룹</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">코드값</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">코드명</th>
+        <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">순서</th>
+        <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">활성</th>
+        <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">작업</th>
+      </tr></thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Codes}}
         <tr class="hover:bg-gray-50">
@@ -24,12 +43,12 @@
           <td class="px-4 py-2.5 font-mono text-xs">{{.CodeValue}}</td>
           <td class="px-4 py-2.5 font-medium text-gray-800">{{.CodeName}}</td>
           <td class="px-4 py-2.5 text-center text-gray-500">{{.SortOrder}}</td>
+          <td class="px-4 py-2.5 text-center">{{if .IsActive}}<span class="text-green-600">●</span>{{else}}<span class="text-gray-300">●</span>{{end}}</td>
           <td class="px-4 py-2.5 text-center">
-            {{if .IsActive}}
-              <span class="text-green-600">●</span>
-            {{else}}
-              <span class="text-gray-300">●</span>
-            {{end}}
+            <form method="POST" action="/codes/{{.CodeID}}/delete" class="inline"
+                  onsubmit="return confirm('삭제하시겠습니까?')">
+              <button type="submit" class="text-red-500 hover:text-red-700 text-xs">삭제</button>
+            </form>
           </td>
         </tr>
         {{end}}

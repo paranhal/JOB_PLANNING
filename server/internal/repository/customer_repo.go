@@ -178,6 +178,11 @@ func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
 	return customers, rows.Err()
 }
 
+// CountActive 활성 고객 수
+func (r *CustomerRepo) CountActive(count *int) {
+	r.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE is_active=1`).Scan(count)
+}
+
 // ── 유틸 ──────────────────────────────────────────────────────────
 
 func newID(prefix string) string {

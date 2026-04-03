@@ -1,106 +1,78 @@
 {{define "title"}}대시보드 · 고객지원시스템{{end}}
-
 {{define "content"}}
 <div class="space-y-6">
+  <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
 
-  <!-- 통계 카드 -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-    <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-      <p class="text-sm text-gray-500 mb-1">전체 AS</p>
-      <p class="text-3xl font-bold text-gray-800">{{.Stats.TotalReceived}}</p>
-      <p class="text-xs text-gray-400 mt-1">누적 접수 건</p>
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+      <p class="text-2xl font-bold text-gray-800">{{.Stats.TotalReceived}}</p>
+      <p class="text-xs text-gray-500 mt-1">전체 AS</p>
     </div>
-
-    <div class="bg-white rounded-xl p-5 shadow-sm border border-yellow-100">
-      <p class="text-sm text-gray-500 mb-1">처리중</p>
-      <p class="text-3xl font-bold text-yellow-600">{{.Stats.InProgress}}</p>
-      <p class="text-xs text-gray-400 mt-1">접수 + 진행중</p>
+    <div class="bg-white rounded-xl border border-yellow-200 p-5 text-center">
+      <p class="text-2xl font-bold text-yellow-600">{{.Stats.InProgress}}</p>
+      <p class="text-xs text-gray-500 mt-1">진행중</p>
     </div>
-
-    <div class="bg-white rounded-xl p-5 shadow-sm border border-red-100">
-      <p class="text-sm text-gray-500 mb-1">지연</p>
-      <p class="text-3xl font-bold text-red-600">{{.Stats.Overdue}}</p>
-      <p class="text-xs text-gray-400 mt-1">3일 초과 미처리</p>
+    <div class="bg-white rounded-xl border border-green-200 p-5 text-center">
+      <p class="text-2xl font-bold text-green-600">{{.Stats.Completed}}</p>
+      <p class="text-xs text-gray-500 mt-1">완료</p>
     </div>
-
-    <div class="bg-white rounded-xl p-5 shadow-sm border border-blue-100">
-      <p class="text-sm text-gray-500 mb-1">오늘 접수</p>
-      <p class="text-3xl font-bold text-blue-600">{{.Stats.TodayReceived}}</p>
-      <p class="text-xs text-gray-400 mt-1">금일 신규</p>
+    <div class="bg-white rounded-xl border border-red-200 p-5 text-center">
+      <p class="text-2xl font-bold text-red-600">{{.Stats.Overdue}}</p>
+      <p class="text-xs text-gray-500 mt-1">지연</p>
     </div>
-
+    <div class="bg-white rounded-xl border border-blue-200 p-5 text-center">
+      <p class="text-2xl font-bold text-blue-600">{{.Stats.TodayReceived}}</p>
+      <p class="text-xs text-gray-500 mt-1">오늘 접수</p>
+    </div>
   </div>
 
-  <!-- 최근 미처리 AS -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-      <h2 class="font-semibold text-gray-800">최근 미처리 AS</h2>
-      <a href="/as?status=received" class="text-sm text-blue-600 hover:underline">전체 보기 →</a>
-    </div>
-    <div class="divide-y divide-gray-50">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">최근 AS 접수</h3>
+        <a href="/as" class="text-blue-600 text-xs hover:underline">전체 보기 →</a>
+      </div>
       {{if .RecentAS}}
+      <div class="space-y-3">
         {{range .RecentAS}}
-        <div class="px-6 py-4 flex items-start gap-4 hover:bg-gray-50 transition-colors">
-          <span class="{{urgencyColor .Urgency}} text-sm font-medium w-4 flex-shrink-0 pt-0.5">
-            {{urgencyLabel .Urgency}}
-          </span>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <a href="/as/{{.ASID}}" class="font-medium text-sm text-gray-800 hover:text-blue-600">
-                {{.ASNumber}}
-              </a>
-              <span class="text-xs px-2 py-0.5 rounded-full {{statusColor .Status}}">
-                {{statusLabel .Status}}
-              </span>
-            </div>
-            <p class="text-sm text-gray-600 truncate">{{.OrgName}} · {{.Symptom}}</p>
-            <p class="text-xs text-gray-400 mt-1">
-              {{.ReceiptDatetime.Format "2006-01-02 15:04"}}
-              {{if .AssignedTo}} · 담당: {{.AssignedTo}}{{end}}
-            </p>
+        <div class="flex items-center justify-between py-2 border-b border-gray-50">
+          <div>
+            <a href="/as/{{.ASID}}" class="text-sm font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
+            <p class="text-xs text-gray-500">{{.OrgName}} · {{.Symptom}}</p>
           </div>
-          <span class="text-xs text-gray-400 flex-shrink-0 pt-0.5">{{.DaysElapsed}}일 경과</span>
+          <div class="text-right">
+            <span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span>
+            <span class="{{urgencyColor .Urgency}} text-xs ml-1">{{urgencyLabel .Urgency}}</span>
+          </div>
         </div>
         {{end}}
+      </div>
       {{else}}
-        <div class="px-6 py-10 text-center text-gray-400 text-sm">
-          미처리 AS가 없습니다.
-        </div>
+      <p class="text-sm text-gray-400 text-center py-6">접수된 AS가 없습니다.</p>
       {{end}}
     </div>
-  </div>
 
-  <!-- 바로가기 -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-    <a href="/as/new" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-5 text-center transition-colors">
-      <svg class="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      <p class="text-sm font-medium">AS 접수</p>
-    </a>
-    <a href="/customers/new" class="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-5 text-center transition-colors">
-      <svg class="w-6 h-6 mx-auto mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-      </svg>
-      <p class="text-sm font-medium text-gray-700">고객 등록</p>
-    </a>
-    <a href="/assets/new" class="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-5 text-center transition-colors">
-      <svg class="w-6 h-6 mx-auto mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/>
-      </svg>
-      <p class="text-sm font-medium text-gray-700">자산 등록</p>
-    </a>
-    <a href="/analysis" class="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-5 text-center transition-colors">
-      <svg class="w-6 h-6 mx-auto mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-      </svg>
-      <p class="text-sm font-medium text-gray-700">교체분석</p>
-    </a>
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">빠른 링크</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <a href="/as/new" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+          <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></div>
+          <span class="text-sm font-medium text-gray-700">AS 접수</span>
+        </a>
+        <a href="/customers/new" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+          <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16"/></svg></div>
+          <span class="text-sm font-medium text-gray-700">고객 등록</span>
+        </a>
+        <a href="/assets/new" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+          <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
+          <span class="text-sm font-medium text-gray-700">자산 등록</span>
+        </a>
+        <a href="/analysis" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+          <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z"/></svg></div>
+          <span class="text-sm font-medium text-gray-700">교체 분석</span>
+        </a>
+      </div>
+    </div>
   </div>
-
 </div>
 {{end}}

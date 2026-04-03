@@ -25,10 +25,12 @@ type ASReceipt struct {
 	ActionTaken       string    `json:"action_taken"`       // 조치내용
 	PartsUsed         string    `json:"parts_used"`
 	IsRecurrence      bool      `json:"is_recurrence"`      // 재발여부
+	IsReopen          bool      `json:"is_reopen"`          // 재오픈여부
 	ResultCode        string    `json:"result_code"`        // 완료, 임시조치, 타사이관 등
 	CustomerConfirmer string    `json:"customer_confirmer"`
 	ConfirmDatetime   *time.Time `json:"confirm_datetime"`
 	FollowupAction    string    `json:"followup_action"`    // 후속조치
+	ReplaceReview     bool      `json:"replace_review"`     // 교체검토여부
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 
