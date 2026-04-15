@@ -25,6 +25,9 @@ type Asset struct {
 	BuildingID       string    `json:"building_id"`
 	FloorID          string    `json:"floor_id"`
 	RoomID           string    `json:"room_id"`
+	LocBuildingName  string    `json:"loc_building_name"` // 건물명 (전용 필드)
+	LocFloorName     string    `json:"loc_floor_name"`    // 층 (전용 필드)
+	LocRoomName      string    `json:"loc_room_name"`     // 호·실명 (전용 필드)
 	LocationDetail   string    `json:"location_detail"`
 	Notes            string    `json:"notes"`
 	CreatedAt        time.Time `json:"created_at"`

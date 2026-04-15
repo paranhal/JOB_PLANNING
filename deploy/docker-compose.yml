@@ -1,0 +1,13 @@
+services:
+  app:
+    image: server-app:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=8080
+      - DB_TYPE=sqlite
+      - DB_PATH=/app/data/app.db
+      - APP_ENV=production
+    restart: unless-stopped

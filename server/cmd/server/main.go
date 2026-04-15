@@ -74,8 +74,10 @@ func main() {
 	space.POST("/buildings/:id/update", h.Space.UpdateBuilding)
 	space.POST("/buildings/:id/delete", h.Space.DeleteBuilding)
 	space.POST("/floors", h.Space.CreateFloor)
+	space.POST("/floors/:id/update", h.Space.UpdateFloor)
 	space.POST("/floors/:id/delete", h.Space.DeleteFloor)
 	space.POST("/rooms", h.Space.CreateRoom)
+	space.POST("/rooms/:id/update", h.Space.UpdateRoom)
 	space.POST("/rooms/:id/delete", h.Space.DeleteRoom)
 
 	// API: 위치 cascade (HTMX/JSON)

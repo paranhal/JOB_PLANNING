@@ -6,7 +6,10 @@
     <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}자산 등록{{else}}자산 수정{{end}}</h2>
   </div>
 
-  <form method="POST" action="{{if .IsNew}}/assets{{else}}/assets/{{.Asset.AssetID}}/update{{end}}" class="space-y-6">
+  <form id="asset-form" method="POST" action="{{if .IsNew}}/assets{{else}}/assets/{{.Asset.AssetID}}/update{{end}}" class="space-y-6"
+        data-init-building="{{.Asset.BuildingID}}"
+        data-init-floor="{{.Asset.FloorID}}"
+        data-init-room="{{.Asset.RoomID}}">
 
     <!-- 기관/제품 기본 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
@@ -87,13 +90,44 @@
       </div>
     </div>
 
-    <!-- 위치/담당 -->
+    <!-- 위치/담당: 건물명·층·호(실명) 각각 전용 필드 + 공간관리 연동 선택 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">위치 · 담당</h3>
+      <p class="text-xs text-gray-500">아래 <span class="font-medium">건물명 · 층 · 호(실명)</span>은 각각 저장되는 필드입니다. 하단에서 공간관리를 선택하면 자동으로 채워지며, 필요하면 직접 수정할 수 있습니다. (<a href="/spaces" class="text-blue-600 hover:underline">공간 관리</a>에 본관·1층·복도 등을 먼저 등록하세요.)</p>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div><label class="block text-sm font-medium text-gray-700 mb-1">건물ID</label><input type="text" name="building_id" value="{{.Asset.BuildingID}}" placeholder="공간관리에서 확인" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-sm font-medium text-gray-700 mb-1">층ID</label><input type="text" name="floor_id" value="{{.Asset.FloorID}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-sm font-medium text-gray-700 mb-1">실ID</label><input type="text" name="room_id" value="{{.Asset.RoomID}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">건물명</label>
+          <input type="text" name="loc_building_name" id="loc-building-txt" value="{{if .Asset.LocBuildingName}}{{.Asset.LocBuildingName}}{{else}}{{.Asset.BuildingName}}{{end}}" placeholder="예: 본관" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">층</label>
+          <input type="text" name="loc_floor_name" id="loc-floor-txt" value="{{if .Asset.LocFloorName}}{{.Asset.LocFloorName}}{{else}}{{.Asset.FloorName}}{{end}}" placeholder="예: 1층" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">호(실명)</label>
+          <input type="text" name="loc_room_name" id="loc-room-txt" value="{{if .Asset.LocRoomName}}{{.Asset.LocRoomName}}{{else}}{{.Asset.RoomName}}{{end}}" placeholder="예: 어린이실, 복도" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <p class="text-xs text-gray-400">공간관리 연동 선택</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">건물</label>
+          <select name="building_id" id="asset-building_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">건물 선택</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">층</label>
+          <select name="floor_id" id="asset-floor_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">층 선택</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">호</label>
+          <select name="room_id" id="asset-room_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">호 선택</option>
+          </select>
+        </div>
       </div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">상세위치</label><input type="text" name="location_detail" value="{{.Asset.LocationDetail}}" placeholder="복도 좌측, 안내데스크 옆 등" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -108,5 +142,141 @@
       <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">{{if .IsNew}}등록{{else}}저장{{end}}</button>
     </div>
   </form>
+
+  <script>
+  (function () {
+    var form = document.getElementById('asset-form');
+    if (!form) return;
+    var custSel = form.querySelector('[name="customer_id"]');
+    var bSel = document.getElementById('asset-building_id');
+    var fSel = document.getElementById('asset-floor_id');
+    var rSel = document.getElementById('asset-room_id');
+    var txtB = document.getElementById('loc-building-txt');
+    var txtF = document.getElementById('loc-floor-txt');
+    var txtR = document.getElementById('loc-room-txt');
+    var initB = form.getAttribute('data-init-building') || '';
+    var initF = form.getAttribute('data-init-floor') || '';
+    var initR = form.getAttribute('data-init-room') || '';
+
+    function optText(sel) {
+      if (!sel || !sel.value) return '';
+      var o = sel.options[sel.selectedIndex];
+      return o ? o.textContent : '';
+    }
+    function syncFromSelects() {
+      if (txtB) txtB.value = optText(bSel);
+      if (txtF) txtF.value = optText(fSel);
+      if (txtR) txtR.value = optText(rSel);
+    }
+
+    function clearFloorsRooms() {
+      fSel.innerHTML = '<option value="">층 선택</option>';
+      rSel.innerHTML = '<option value="">호 선택</option>';
+      if (txtF) txtF.value = '';
+      if (txtR) txtR.value = '';
+    }
+    function clearRooms() {
+      rSel.innerHTML = '<option value="">호 선택</option>';
+      if (txtR) txtR.value = '';
+    }
+
+    function loadBuildings(cid) {
+      bSel.innerHTML = '<option value="">건물 선택</option>';
+      clearFloorsRooms();
+      if (!cid) {
+        if (txtB) txtB.value = '';
+        if (txtF) txtF.value = '';
+        if (txtR) txtR.value = '';
+        return Promise.resolve();
+      }
+      return fetch('/api/buildings/' + encodeURIComponent(cid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          arr.forEach(function (b) {
+            var opt = document.createElement('option');
+            opt.value = b.building_id;
+            opt.textContent = b.building_name;
+            bSel.appendChild(opt);
+          });
+        });
+    }
+
+    function loadFloors(bid) {
+      clearFloorsRooms();
+      if (txtB) txtB.value = optText(bSel);
+      if (!bid) return Promise.resolve();
+      return fetch('/api/floors/' + encodeURIComponent(bid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          arr.forEach(function (f) {
+            var opt = document.createElement('option');
+            opt.value = f.floor_id;
+            opt.textContent = f.floor_name;
+            fSel.appendChild(opt);
+          });
+        });
+    }
+
+    function loadRooms(fid) {
+      clearRooms();
+      if (txtF) txtF.value = optText(fSel);
+      if (!fid) return Promise.resolve();
+      return fetch('/api/rooms/' + encodeURIComponent(fid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          arr.forEach(function (r) {
+            var opt = document.createElement('option');
+            opt.value = r.room_id;
+            opt.textContent = r.room_name;
+            rSel.appendChild(opt);
+          });
+        });
+    }
+
+    function bootstrap() {
+      var cid = custSel.value;
+      if (!cid) return Promise.resolve();
+      return loadBuildings(cid).then(function () {
+        if (initB) {
+          bSel.value = initB;
+          return loadFloors(initB).then(function () {
+            if (initF) {
+              fSel.value = initF;
+              return loadRooms(initF).then(function () {
+                if (initR) rSel.value = initR;
+                syncFromSelects();
+              });
+            }
+            syncFromSelects();
+          });
+        }
+        syncFromSelects();
+      });
+    }
+
+    custSel.addEventListener('change', function () {
+      if (txtB) txtB.value = '';
+      if (txtF) txtF.value = '';
+      if (txtR) txtR.value = '';
+      loadBuildings(custSel.value);
+    });
+    bSel.addEventListener('change', function () {
+      loadFloors(bSel.value).then(syncFromSelects);
+    });
+    fSel.addEventListener('change', function () {
+      loadRooms(fSel.value).then(syncFromSelects);
+    });
+    rSel.addEventListener('change', syncFromSelects);
+
+    function runInit() {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootstrap);
+      } else {
+        bootstrap();
+      }
+    }
+    runInit();
+  })();
+  </script>
 </div>
 {{end}}

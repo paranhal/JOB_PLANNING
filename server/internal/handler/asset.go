@@ -148,6 +148,9 @@ func bindAsset(c echo.Context) *model.Asset {
 		BuildingID:        c.FormValue("building_id"),
 		FloorID:           c.FormValue("floor_id"),
 		RoomID:            c.FormValue("room_id"),
+		LocBuildingName:   c.FormValue("loc_building_name"),
+		LocFloorName:      c.FormValue("loc_floor_name"),
+		LocRoomName:       c.FormValue("loc_room_name"),
 		LocationDetail:    c.FormValue("location_detail"),
 		Notes:             c.FormValue("notes"),
 	}

@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -40,11 +41,16 @@ func (h *SpaceHandler) List(c echo.Context) error {
 // ── 건물 CRUD ──
 
 func (h *SpaceHandler) CreateBuilding(c echo.Context) error {
+	customerID := c.FormValue("customer_id")
+	name := strings.TrimSpace(c.FormValue("building_name"))
+	if name == "" {
+		return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+customerID)
+	}
 	b := &model.CustomerBuilding{
-		CustomerID:   c.FormValue("customer_id"),
-		BuildingName: c.FormValue("building_name"),
-		BuildingType: c.FormValue("building_type"),
-		Address:      c.FormValue("address"),
+		CustomerID:   customerID,
+		BuildingName: name,
+		BuildingType: "",
+		Address:      "",
 		IsActive:     true,
 	}
 	if err := h.repo.CreateBuilding(b); err != nil {
@@ -54,14 +60,18 @@ func (h *SpaceHandler) CreateBuilding(c echo.Context) error {
 }
 
 func (h *SpaceHandler) UpdateBuilding(c echo.Context) error {
+	customerID := c.FormValue("customer_id")
+	name := strings.TrimSpace(c.FormValue("building_name"))
+	if name == "" {
+		return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+customerID)
+	}
 	b := &model.CustomerBuilding{
 		BuildingID:   c.Param("id"),
-		BuildingName: c.FormValue("building_name"),
-		BuildingType: c.FormValue("building_type"),
-		Address:      c.FormValue("address"),
-		IsActive:     c.FormValue("is_active") != "0",
+		BuildingName: name,
+		BuildingType: "",
+		Address:      "",
+		IsActive:     true,
 	}
-	customerID := c.FormValue("customer_id")
 	if err := h.repo.UpdateBuilding(b); err != nil {
 		return err
 	}
@@ -87,6 +97,24 @@ func (h *SpaceHandler) CreateFloor(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+c.FormValue("customer_id"))
 }
 
+func (h *SpaceHandler) UpdateFloor(c echo.Context) error {
+	customerID := c.FormValue("customer_id")
+	name := strings.TrimSpace(c.FormValue("floor_name"))
+	if name == "" {
+		return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+customerID)
+	}
+	order, _ := strconv.Atoi(c.FormValue("sort_order"))
+	f := &model.CustomerFloor{
+		FloorID:   c.Param("id"),
+		FloorName: name,
+		SortOrder: order,
+	}
+	if err := h.repo.UpdateFloor(f); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+customerID)
+}
+
 func (h *SpaceHandler) DeleteFloor(c echo.Context) error {
 	h.repo.DeleteFloor(c.Param("id"))
 	return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+c.QueryParam("customer_id"))
@@ -103,6 +131,24 @@ func (h *SpaceHandler) CreateRoom(c echo.Context) error {
 	}
 	h.repo.CreateRoom(rm)
 	return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+c.FormValue("customer_id"))
+}
+
+func (h *SpaceHandler) UpdateRoom(c echo.Context) error {
+	customerID := c.FormValue("customer_id")
+	name := strings.TrimSpace(c.FormValue("room_name"))
+	if name == "" {
+		return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+customerID)
+	}
+	rm := &model.CustomerRoom{
+		RoomID:     c.Param("id"),
+		RoomName:   name,
+		RoomNumber: "",
+		Purpose:    "",
+	}
+	if err := h.repo.UpdateRoom(rm); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/spaces?customer_id="+customerID)
 }
 
 func (h *SpaceHandler) DeleteRoom(c echo.Context) error {

@@ -20,8 +20,9 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 		       COALESCE(a.install_date,''), COALESCE(a.operation_status,'operating'),
 		       COALESCE(a.management_type,''), a.is_managed,
 		       c.org_name,
-		       COALESCE(b.building_name,'') AS bname, COALESCE(f.floor_name,'') AS fname,
-		       COALESCE(rm.room_name,'') AS rname,
+		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,'') AS bname,
+		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,'') AS fname,
+		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,'') AS rname,
 		       (SELECT COUNT(*) FROM as_receipts ar WHERE ar.asset_id=a.asset_id) AS as_cnt,
 		       CASE WHEN a.install_date!='' THEN CAST((julianday('now')-julianday(a.install_date))/365 AS INTEGER) ELSE 0 END AS yrs
 		FROM assets a
@@ -92,10 +93,13 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		       a.is_managed, COALESCE(a.requester_type,''), COALESCE(a.requester_name,''),
 		       COALESCE(a.customer_contact_id,''), COALESCE(a.our_contact,''),
 		       COALESCE(a.building_id,''), COALESCE(a.floor_id,''), COALESCE(a.room_id,''),
+		       COALESCE(a.loc_building_name,''), COALESCE(a.loc_floor_name,''), COALESCE(a.loc_room_name,''),
 		       COALESCE(a.location_detail,''), COALESCE(a.notes,''),
 		       a.created_at, a.updated_at,
 		       c.org_name,
-		       COALESCE(b.building_name,''), COALESCE(f.floor_name,''), COALESCE(rm.room_name,'')
+		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
+		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,''),
+		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,'')
 		FROM assets a
 		JOIN customers c ON c.customer_id=a.customer_id
 		LEFT JOIN customer_buildings b ON b.building_id=a.building_id
@@ -115,6 +119,7 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		&managed, &a.RequesterType, &a.RequesterName,
 		&a.CustomerContactID, &a.OurContact,
 		&a.BuildingID, &a.FloorID, &a.RoomID,
+		&a.LocBuildingName, &a.LocFloorName, &a.LocRoomName,
 		&a.LocationDetail, &a.Notes,
 		&createdAt, &updatedAt,
 		&a.OrgName, &a.BuildingName, &a.FloorName, &a.RoomName,
@@ -141,15 +146,18 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 			installer_type, original_installer, operation_status, management_type,
 			is_managed, requester_type, requester_name,
 			customer_contact_id, our_contact,
-			building_id, floor_id, room_id, location_detail, notes,
+			building_id, floor_id, room_id,
+			loc_building_name, loc_floor_name, loc_room_name,
+			location_detail, notes,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ModelName,
 		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
 		boolToInt(a.IsManaged), a.RequesterType, a.RequesterName,
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
+		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
 		a.LocationDetail, a.Notes, now, now,
 	)
 	return err
@@ -164,7 +172,9 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			installer_type=?, original_installer=?, operation_status=?, management_type=?,
 			is_managed=?, requester_type=?, requester_name=?,
 			customer_contact_id=?, our_contact=?,
-			building_id=?, floor_id=?, room_id=?, location_detail=?, notes=?,
+			building_id=?, floor_id=?, room_id=?,
+			loc_building_name=?, loc_floor_name=?, loc_room_name=?,
+			location_detail=?, notes=?,
 			updated_at=?
 		WHERE asset_id=?`,
 		a.CustomerID, a.ProductName, a.ProductType, a.ModelName,
@@ -173,6 +183,7 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 		boolToInt(a.IsManaged), a.RequesterType, a.RequesterName,
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
+		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
 		a.LocationDetail, a.Notes, now, a.AssetID,
 	)
 	return err

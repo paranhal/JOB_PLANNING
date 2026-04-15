@@ -33,8 +33,9 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">위치 · 담당</h3>
       <dl class="space-y-2 text-sm">
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">건물</dt><dd class="text-gray-800">{{.Asset.BuildingName}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">층/실</dt><dd class="text-gray-800">{{.Asset.FloorName}} {{.Asset.RoomName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">건물명</dt><dd class="text-gray-800">{{.Asset.BuildingName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">층</dt><dd class="text-gray-800">{{.Asset.FloorName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">호(실명)</dt><dd class="text-gray-800">{{.Asset.RoomName}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">상세위치</dt><dd class="text-gray-800">{{.Asset.LocationDetail}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">요청주체</dt><dd class="text-gray-800">{{.Asset.RequesterType}} {{if .Asset.RequesterName}}({{.Asset.RequesterName}}){{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">당사담당</dt><dd class="text-gray-800">{{.Asset.OurContact}}</dd></div>

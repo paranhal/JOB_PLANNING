@@ -173,6 +173,9 @@ CREATE TABLE IF NOT EXISTS assets (
     building_id         TEXT,
     floor_id            TEXT,
     room_id             TEXT,
+    loc_building_name   TEXT,
+    loc_floor_name      TEXT,
+    loc_room_name       TEXT,
     location_detail     TEXT,
     notes               TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -389,6 +392,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE as_receipts ADD COLUMN is_reopen INTEGER DEFAULT 0`,
 		`ALTER TABLE as_receipts ADD COLUMN replace_review INTEGER DEFAULT 0`,
 		`ALTER TABLE contact_history ADD COLUMN created_by TEXT`,
+		`ALTER TABLE assets ADD COLUMN loc_building_name TEXT`,
+		`ALTER TABLE assets ADD COLUMN loc_floor_name TEXT`,
+		`ALTER TABLE assets ADD COLUMN loc_room_name TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
