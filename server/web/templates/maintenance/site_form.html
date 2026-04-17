@@ -1,0 +1,73 @@
+{{define "title"}}{{if .Config}}점검 사이트 수정{{else}}점검 사이트 등록{{end}} · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="max-w-xl space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">{{if .Config}}점검 사이트 수정{{else}}점검 사이트 등록{{end}}</h2>
+
+  <form method="POST" action="/maintenance/sites" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4 text-sm">
+    {{if .Config}}
+    <input type="hidden" name="customer_id" value="{{.Config.CustomerID}}">
+    <div>
+      <label class="block text-gray-600 mb-1">고객</label>
+      <p class="font-medium text-gray-900">{{.Config.CustomerID}}</p>
+    </div>
+    {{else}}
+    <div>
+      <label class="block text-gray-600 mb-1">고객 <span class="text-red-500">*</span></label>
+      <select name="customer_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        <option value="">선택</option>
+        {{range .Pending}}
+        <option value="{{.ID}}">{{.OrgName}}</option>
+        {{end}}
+      </select>
+      <p class="text-xs text-gray-500 mt-1">이미 설정된 고객은 목록에 나오지 않습니다.</p>
+    </div>
+    {{end}}
+
+    <div>
+      <label class="block text-gray-600 mb-1">달력·엑셀 표시명 <span class="text-red-500">*</span></label>
+      <input type="text" name="short_name" required
+             value="{{with .Config}}{{.ShortName}}{{end}}"
+             placeholder="예: 국립세종"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-gray-600 mb-1">지역 (자동 배정 묶음용)</label>
+      <input type="text" name="region" value="{{with .Config}}{{.Region}}{{end}}" placeholder="예: 세종, 대전"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2">
+    </div>
+    <div class="flex gap-6">
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" name="has_klas" value="1" class="rounded"
+               {{if .Config}}{{if .Config.HasKlas}}checked{{end}}{{end}}>
+        KLAS 점검
+      </label>
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" name="has_rfid" value="1" class="rounded"
+               {{if .Config}}{{if .Config.HasRfid}}checked{{end}}{{end}}>
+        RFID 자동화 장비
+      </label>
+    </div>
+    <div>
+      <label class="block text-gray-600 mb-1">엑셀 글자색 구분</label>
+      <select name="entry_category" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        <option value="normal" {{if .Config}}{{if eq .Config.EntryCategory "normal"}}selected{{end}}{{end}}>일반 (녹색)</option>
+        <option value="fixed" {{if .Config}}{{if eq .Config.EntryCategory "fixed"}}selected{{end}}{{end}}>고정·지정일 (적색)</option>
+        <option value="office" {{if .Config}}{{if eq .Config.EntryCategory "office"}}selected{{end}}{{end}}>사무소 등 (청색)</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-gray-600 mb-1">고정 규칙 (선택)</label>
+      <select name="fixed_rule" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        <option value="">없음 (자동 배정만)</option>
+        <option value="LAST_MONDAY_OF_MONTH" {{if .Config}}{{if eq .Config.FixedRule "LAST_MONDAY_OF_MONTH"}}selected{{end}}{{end}}>매월 마지막 월요일</option>
+      </select>
+    </div>
+
+    <div class="flex gap-2 pt-2">
+      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">저장</button>
+      <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg">취소</a>
+    </div>
+  </form>
+</div>
+{{end}}

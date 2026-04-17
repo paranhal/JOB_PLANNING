@@ -1,6 +1,282 @@
-{{define "title"}}자산 등록 · 고객지원시스템{{end}}
+{{define "title"}}{{if .IsNew}}자산 등록{{else}}자산 수정{{end}} · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="flex items-center justify-center h-64 text-gray-400">
-  <p class="text-sm">자산 등록 폼 — 구현 예정</p>
+<div class="max-w-3xl mx-auto space-y-6">
+  <div class="flex items-center gap-3">
+    <a href="/assets" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+    <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}자산 등록{{else}}자산 수정{{end}}</h2>
+  </div>
+
+  <form id="asset-form" method="POST" action="{{if .IsNew}}/assets{{else}}/assets/{{.Asset.AssetID}}/update{{end}}" class="space-y-6"
+        data-init-building="{{.Asset.BuildingID}}"
+        data-init-floor="{{.Asset.FloorID}}"
+        data-init-room="{{.Asset.RoomID}}">
+
+    <!-- 기관/제품 기본 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">기본 정보</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">소속 기관 <span class="text-red-500">*</span></label>
+          <select name="customer_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .Customers}}<option value="{{.CustomerID}}" {{if eq .CustomerID $.Asset.CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제품명 <span class="text-red-500">*</span></label>
+          <input type="text" name="product_name" value="{{.Asset.ProductName}}" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제품구분</label>
+          <select name="product_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .ProductTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.ProductType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">모델명</label>
+          <input type="text" name="model_name" value="{{.Asset.ModelName}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제조사</label>
+          <input type="text" name="manufacturer" value="{{.Asset.Manufacturer}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">S/N</label>
+          <input type="text" name="serial_number" value="{{.Asset.SerialNumber}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <!-- 일정/설치주체 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">설치/관리 정보</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">설치일</label><input type="date" name="install_date" value="{{.Asset.InstallDate}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">철수일</label><input type="date" name="retire_date" value="{{.Asset.RetireDate}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">설치주체</label>
+          <select name="installer_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .InstallerTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.InstallerType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">원설치사명</label><input type="text" name="original_installer" value="{{.Asset.OriginalInstaller}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">운영상태</label>
+          <select name="operation_status" class="w-full border rounded-lg px-3 py-2 text-sm">
+            {{range .OpStatuses}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.OperationStatus}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">관리유형</label>
+          <select name="management_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .ManagementTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.ManagementType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">요청주체유형</label>
+          <select name="requester_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .RequesterTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.RequesterType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">요청주체명</label><input type="text" name="requester_name" value="{{.Asset.RequesterName}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="is_managed" value="1" {{if .Asset.IsManaged}}checked{{end}} class="rounded border-gray-300 text-blue-600">
+        <label class="text-sm text-gray-700">현재 관리 대상</label>
+      </div>
+    </div>
+
+    <!-- 위치/담당: 건물명·층·호(실명) 각각 전용 필드 + 공간관리 연동 선택 -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">위치 · 담당</h3>
+      <p class="text-xs text-gray-500">아래 <span class="font-medium">건물명 · 층 · 호(실명)</span>은 각각 저장되는 필드입니다. 하단에서 공간관리를 선택하면 자동으로 채워지며, 필요하면 직접 수정할 수 있습니다. (<a href="/spaces" class="text-blue-600 hover:underline">공간 관리</a>에 본관·1층·복도 등을 먼저 등록하세요.)</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">건물명</label>
+          <input type="text" name="loc_building_name" id="loc-building-txt" value="{{if .Asset.LocBuildingName}}{{.Asset.LocBuildingName}}{{else}}{{.Asset.BuildingName}}{{end}}" placeholder="예: 본관" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">층</label>
+          <input type="text" name="loc_floor_name" id="loc-floor-txt" value="{{if .Asset.LocFloorName}}{{.Asset.LocFloorName}}{{else}}{{.Asset.FloorName}}{{end}}" placeholder="예: 1층" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">호(실명)</label>
+          <input type="text" name="loc_room_name" id="loc-room-txt" value="{{if .Asset.LocRoomName}}{{.Asset.LocRoomName}}{{else}}{{.Asset.RoomName}}{{end}}" placeholder="예: 어린이실, 복도" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <p class="text-xs text-gray-400">공간관리 연동 선택</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">건물</label>
+          <select name="building_id" id="asset-building_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">건물 선택</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">층</label>
+          <select name="floor_id" id="asset-floor_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">층 선택</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">호</label>
+          <select name="room_id" id="asset-room_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">호 선택</option>
+          </select>
+        </div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">상세위치</label><input type="text" name="location_detail" value="{{.Asset.LocationDetail}}" placeholder="복도 좌측, 안내데스크 옆 등" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">고객담당자</label><input type="text" name="customer_contact_id" value="{{.Asset.CustomerContactID}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">당사담당자</label><input type="text" name="our_contact" value="{{.Asset.OurContact}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">비고</label><textarea name="notes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">{{.Asset.Notes}}</textarea></div>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <a href="/assets" class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">{{if .IsNew}}등록{{else}}저장{{end}}</button>
+    </div>
+  </form>
+
+  <script>
+  (function () {
+    var form = document.getElementById('asset-form');
+    if (!form) return;
+    var custSel = form.querySelector('[name="customer_id"]');
+    var bSel = document.getElementById('asset-building_id');
+    var fSel = document.getElementById('asset-floor_id');
+    var rSel = document.getElementById('asset-room_id');
+    var txtB = document.getElementById('loc-building-txt');
+    var txtF = document.getElementById('loc-floor-txt');
+    var txtR = document.getElementById('loc-room-txt');
+    var initB = form.getAttribute('data-init-building') || '';
+    var initF = form.getAttribute('data-init-floor') || '';
+    var initR = form.getAttribute('data-init-room') || '';
+
+    function optText(sel) {
+      if (!sel || !sel.value) return '';
+      var o = sel.options[sel.selectedIndex];
+      return o ? o.textContent : '';
+    }
+    function syncFromSelects() {
+      if (txtB) txtB.value = optText(bSel);
+      if (txtF) txtF.value = optText(fSel);
+      if (txtR) txtR.value = optText(rSel);
+    }
+
+    function clearFloorsRooms() {
+      fSel.innerHTML = '<option value="">층 선택</option>';
+      rSel.innerHTML = '<option value="">호 선택</option>';
+      if (txtF) txtF.value = '';
+      if (txtR) txtR.value = '';
+    }
+    function clearRooms() {
+      rSel.innerHTML = '<option value="">호 선택</option>';
+      if (txtR) txtR.value = '';
+    }
+
+    function loadBuildings(cid) {
+      bSel.innerHTML = '<option value="">건물 선택</option>';
+      clearFloorsRooms();
+      if (!cid) {
+        if (txtB) txtB.value = '';
+        if (txtF) txtF.value = '';
+        if (txtR) txtR.value = '';
+        return Promise.resolve();
+      }
+      return fetch('/api/buildings/' + encodeURIComponent(cid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          arr.forEach(function (b) {
+            var opt = document.createElement('option');
+            opt.value = b.building_id;
+            opt.textContent = b.building_name;
+            bSel.appendChild(opt);
+          });
+        });
+    }
+
+    function loadFloors(bid) {
+      clearFloorsRooms();
+      if (txtB) txtB.value = optText(bSel);
+      if (!bid) return Promise.resolve();
+      return fetch('/api/floors/' + encodeURIComponent(bid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          arr.forEach(function (f) {
+            var opt = document.createElement('option');
+            opt.value = f.floor_id;
+            opt.textContent = f.floor_name;
+            fSel.appendChild(opt);
+          });
+        });
+    }
+
+    function loadRooms(fid) {
+      clearRooms();
+      if (txtF) txtF.value = optText(fSel);
+      if (!fid) return Promise.resolve();
+      return fetch('/api/rooms/' + encodeURIComponent(fid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          arr.forEach(function (r) {
+            var opt = document.createElement('option');
+            opt.value = r.room_id;
+            opt.textContent = r.room_name;
+            rSel.appendChild(opt);
+          });
+        });
+    }
+
+    function bootstrap() {
+      var cid = custSel.value;
+      if (!cid) return Promise.resolve();
+      return loadBuildings(cid).then(function () {
+        if (initB) {
+          bSel.value = initB;
+          return loadFloors(initB).then(function () {
+            if (initF) {
+              fSel.value = initF;
+              return loadRooms(initF).then(function () {
+                if (initR) rSel.value = initR;
+                syncFromSelects();
+              });
+            }
+            syncFromSelects();
+          });
+        }
+        syncFromSelects();
+      });
+    }
+
+    custSel.addEventListener('change', function () {
+      if (txtB) txtB.value = '';
+      if (txtF) txtF.value = '';
+      if (txtR) txtR.value = '';
+      loadBuildings(custSel.value);
+    });
+    bSel.addEventListener('change', function () {
+      loadFloors(bSel.value).then(syncFromSelects);
+    });
+    fSel.addEventListener('change', function () {
+      loadRooms(fSel.value).then(syncFromSelects);
+    });
+    rSel.addEventListener('change', syncFromSelects);
+
+    function runInit() {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootstrap);
+      } else {
+        bootstrap();
+      }
+    }
+    runInit();
+  })();
+  </script>
 </div>
 {{end}}

@@ -1,10 +1,57 @@
 {{define "title"}}설치자산 관리 · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="flex items-center justify-center h-64 text-gray-400">
-  <div class="text-center">
-    <p class="text-lg font-medium">설치자산 관리</p>
-    <p class="text-sm mt-1">장비 / SW 설치 현황 관리 — 구현 예정</p>
-    <a href="/" class="mt-4 inline-block text-blue-600 text-sm hover:underline">← 대시보드로</a>
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h2 class="text-xl font-bold text-gray-800">설치자산 관리 <span class="text-sm font-normal text-gray-400">({{.Total}}건)</span></h2>
+    <a href="/assets/new" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ 자산 등록</a>
   </div>
+
+  <form method="GET" action="/assets" class="flex gap-3">
+    <input type="text" name="search" value="{{.Search}}" placeholder="제품명, S/N, 기관명 검색"
+           class="flex-1 max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    <select name="customer_id" class="border rounded-lg px-3 py-2 text-sm">
+      <option value="">전체 기관</option>
+      {{range .Customers}}<option value="{{.CustomerID}}" {{if eq .CustomerID $.CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+    </select>
+    <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">검색</button>
+  </form>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b"><tr>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">기관</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">제품명</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">구분</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">S/N</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">위치</th>
+        <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500">상태</th>
+        <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500">설치연수</th>
+        <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500">AS</th>
+      </tr></thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Items}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5 text-gray-600">{{.OrgName}}</td>
+          <td class="px-4 py-2.5"><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline font-medium">{{.ProductName}}</a></td>
+          <td class="px-4 py-2.5 text-gray-500 text-xs">{{.ProductType}}</td>
+          <td class="px-4 py-2.5 font-mono text-xs text-gray-500">{{.SerialNumber}}</td>
+          <td class="px-4 py-2.5 text-xs text-gray-500">{{.BuildingName}} {{.FloorName}} {{.RoomName}}</td>
+          <td class="px-4 py-2.5 text-center"><span class="px-2 py-0.5 rounded-full text-xs {{if eq .OperationStatus "operating"}}bg-green-100 text-green-700{{else if eq .OperationStatus "fault"}}bg-red-100 text-red-700{{else}}bg-gray-100 text-gray-600{{end}}">{{opStatusLabel .OperationStatus}}</span></td>
+          <td class="px-4 py-2.5 text-center {{if ge .InstallYears 5}}text-red-600 font-bold{{else}}text-gray-500{{end}}">{{if .InstallYears}}{{.InstallYears}}년{{end}}</td>
+          <td class="px-4 py-2.5 text-center text-gray-500">{{.AsCount}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if gt .TotalPages 1}}
+  <div class="flex justify-center gap-1">
+    {{range seq .TotalPages}}
+    <a href="/assets?page={{.}}&search={{$.Search}}&customer_id={{$.CustomerID}}"
+       class="px-3 py-1 rounded text-sm {{if eq . $.Page}}bg-blue-600 text-white{{else}}bg-gray-100 hover:bg-gray-200 text-gray-600{{end}}">{{.}}</a>
+    {{end}}
+  </div>
+  {{end}}
 </div>
 {{end}}

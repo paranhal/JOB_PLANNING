@@ -1,22 +1,14 @@
-{{define "title"}}{{.AS.ASNumber}} · AS관리 · 고객지원시스템{{end}}
-
+{{define "title"}}{{.AS.ASNumber}} · AS관리{{end}}
 {{define "content"}}
-<div class="max-w-3xl mx-auto space-y-6">
-
+<div class="max-w-4xl mx-auto space-y-6">
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <a href="/as" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-        </svg>
-      </a>
+      <a href="/as" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
       <div>
         <div class="flex items-center gap-2">
           <h2 class="text-xl font-bold text-gray-800">{{.AS.ASNumber}}</h2>
-          <span class="px-2 py-0.5 rounded-full text-xs font-medium {{statusColor .AS.Status}}">
-            {{statusLabel .AS.Status}}
-          </span>
-          <span class="{{urgencyColor .AS.Urgency}} text-sm font-bold">{{urgencyLabel .AS.Urgency}}</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium {{statusColor .AS.Status}}">{{statusLabel .AS.Status}}</span>
+          <span class="{{urgencyColor .AS.Urgency}} text-sm font-bold">긴급:{{urgencyLabel .AS.Urgency}}</span>
         </div>
         <p class="text-sm text-gray-500">{{.AS.ReceiptDatetime.Format "2006-01-02 15:04"}} 접수</p>
       </div>
@@ -24,54 +16,40 @@
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-    <!-- 접수 정보 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">접수 정보</h3>
-      <dl class="space-y-3">
-        <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-20 flex-shrink-0">기관</dt>
-          <dd class="text-sm text-gray-800 font-medium">
-            <a href="/customers/{{.AS.CustomerID}}" class="hover:text-blue-600">{{.AS.OrgName}}</a>
-          </dd>
-        </div>
-        <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-20 flex-shrink-0">자산</dt>
-          <dd class="text-sm text-gray-800">{{if .AS.ProductName}}{{.AS.ProductName}}{{else}}-{{end}}</dd>
-        </div>
-        <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-20 flex-shrink-0">접수채널</dt>
-          <dd class="text-sm text-gray-800">{{.AS.ReceiptChannel}}</dd>
-        </div>
-        <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-20 flex-shrink-0">요청자</dt>
-          <dd class="text-sm text-gray-800">{{.AS.Requester}}</dd>
-        </div>
-        <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-20 flex-shrink-0">담당자</dt>
-          <dd class="text-sm text-gray-800">{{.AS.AssignedTo}}</dd>
-        </div>
+      <dl class="space-y-2 text-sm">
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">기관</dt><dd><a href="/customers/{{.AS.CustomerID}}" class="text-blue-600 hover:underline">{{.AS.OrgName}}</a></dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">자산</dt><dd>{{if .AS.ProductName}}{{.AS.ProductName}}{{else}}-{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">접수채널</dt><dd>{{.AS.ReceiptChannel}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">요청자</dt><dd>{{.AS.Requester}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">요청주체</dt><dd>{{.AS.RequesterType}} {{if .AS.RequesterName}}({{.AS.RequesterName}}){{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">배정담당</dt><dd>{{.AS.AssignedTo}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">중요도</dt><dd>{{.AS.Priority}}</dd></div>
       </dl>
     </div>
-
-    <!-- 증상 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">증상 내용</h3>
       <p class="text-sm text-gray-700 whitespace-pre-line">{{.AS.Symptom}}</p>
+      {{if .AS.ActionTaken}}
+      <h4 class="font-semibold text-gray-700 text-sm mt-4 mb-2">조치 내용</h4>
+      <p class="text-sm text-gray-700 whitespace-pre-line">{{.AS.ActionTaken}}</p>
+      {{end}}
+      {{if .AS.FollowupAction}}
+      <h4 class="font-semibold text-gray-700 text-sm mt-4 mb-2">후속 조치</h4>
+      <p class="text-sm text-gray-600">{{.AS.FollowupAction}}</p>
+      {{end}}
     </div>
-
   </div>
 
-  <!-- 처리 내용 업데이트 폼 -->
+  <!-- 처리 내용 업데이트 -->
   <div class="bg-white rounded-xl border border-gray-200 p-6">
-    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">처리 내용</h3>
+    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">처리 내용 업데이트</h3>
     <form method="POST" action="/as/{{.AS.ASID}}/update" class="space-y-4">
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">처리 상태</label>
-          <select name="status"
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+          <select name="status" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="received" {{if eq .AS.Status "received"}}selected{{end}}>접수</option>
             <option value="in_progress" {{if eq .AS.Status "in_progress"}}selected{{end}}>진행중</option>
             <option value="hold" {{if eq .AS.Status "hold"}}selected{{end}}>보류</option>
@@ -80,52 +58,82 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">처리 유형</label>
-          <select name="process_type"
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <label class="block text-sm font-medium text-gray-700 mb-1">처리유형</label>
+          <select name="process_type" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">선택</option>
-            <option value="remote" {{if eq .AS.ProcessType "remote"}}selected{{end}}>원격지원</option>
-            <option value="visit" {{if eq .AS.ProcessType "visit"}}selected{{end}}>현장방문</option>
-            <option value="replace" {{if eq .AS.ProcessType "replace"}}selected{{end}}>부품교체</option>
-            <option value="config" {{if eq .AS.ProcessType "config"}}selected{{end}}>설정변경</option>
-            <option value="inquiry" {{if eq .AS.ProcessType "inquiry"}}selected{{end}}>문의응대</option>
+            {{range .ProcTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.ProcessType}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">원인분류</label>
+          <select name="cause_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .CauseTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.CauseType}}selected{{end}}>{{.CodeName}}</option>{{end}}
           </select>
         </div>
       </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">원인 분류</label>
-        <select name="cause_type"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">선택</option>
-          <option value="hw" {{if eq .AS.CauseType "hw"}}selected{{end}}>HW 고장</option>
-          <option value="sw" {{if eq .AS.CauseType "sw"}}selected{{end}}>SW 오류</option>
-          <option value="network" {{if eq .AS.CauseType "network"}}selected{{end}}>네트워크</option>
-          <option value="env" {{if eq .AS.CauseType "env"}}selected{{end}}>환경문제</option>
-          <option value="user" {{if eq .AS.CauseType "user"}}selected{{end}}>사용자 오류</option>
-        </select>
-      </div>
-
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">조치 내용</label>
-        <textarea name="action_taken" rows="3"
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{{.AS.ActionTaken}}</textarea>
+        <textarea name="action_taken" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm">{{.AS.ActionTaken}}</textarea>
       </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">후속 조치</label>
-        <input type="text" name="followup_action" value="{{.AS.FollowupAction}}"
-               placeholder="정기점검, 교체제안, 교육안내 등"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">사용부품/교체품</label><input type="text" name="parts_used" value="{{.AS.PartsUsed}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">처리결과코드</label>
+          <select name="result_code" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .ResultCodes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.ResultCode}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">배정담당자</label><input type="text" name="assigned_to" value="{{.AS.AssignedTo}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1">고객확인자</label><input type="text" name="customer_confirmer" value="{{.AS.CustomerConfirmer}}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
       </div>
-
-      <div class="flex justify-end">
-        <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-          처리 내용 저장
-        </button>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">후속 조치</label><input type="text" name="followup_action" value="{{.AS.FollowupAction}}" placeholder="정기점검, 교체제안, 교육안내 등" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div class="flex flex-wrap gap-4">
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_recurrence" value="1" {{if .AS.IsRecurrence}}checked{{end}} class="rounded border-gray-300 text-blue-600"> 재발여부</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_reopen" value="1" {{if .AS.IsReopen}}checked{{end}} class="rounded border-gray-300 text-blue-600"> 재오픈</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="replace_review" value="1" {{if .AS.ReplaceReview}}checked{{end}} class="rounded border-gray-300 text-blue-600"> 교체검토</label>
       </div>
+      <div class="flex justify-end"><button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장</button></div>
     </form>
   </div>
 
+  <!-- 처리 이력 (1:N) -->
+  <div class="bg-white rounded-xl border border-gray-200 p-6">
+    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">처리 이력</h3>
+
+    {{range .Processes}}
+    <div class="border-l-2 border-blue-200 pl-4 mb-4 pb-2">
+      <div class="flex items-center gap-2 text-xs text-gray-400">
+        <span>{{.ProcessDatetime.Format "2006-01-02 15:04"}}</span>
+        <span class="font-medium text-gray-600">{{.Worker}}</span>
+        <span class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">{{.WorkType}}</span>
+        {{if .TimeSpent}}<span>{{.TimeSpent}}분</span>{{end}}
+      </div>
+      <p class="text-sm text-gray-700 mt-1">{{.WorkContent}}</p>
+      {{if .PartsUsed}}<p class="text-xs text-gray-400 mt-1">부품: {{.PartsUsed}}</p>{{end}}
+      {{if .Notes}}<p class="text-xs text-gray-400">메모: {{.Notes}}</p>{{end}}
+    </div>
+    {{end}}
+
+    <form method="POST" action="/as/{{.AS.ASID}}/process" class="border-t pt-4 mt-4 space-y-3">
+      <p class="text-sm font-medium text-gray-700">처리 기록 추가</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div><input type="text" name="worker" placeholder="처리자" class="w-full border rounded px-3 py-2 text-sm"></div>
+        <div>
+          <select name="work_type" class="w-full border rounded px-3 py-2 text-sm">
+            {{range .ProcTypes}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+        <div><input type="number" name="time_spent" placeholder="소요시간(분)" class="w-full border rounded px-3 py-2 text-sm"></div>
+      </div>
+      <div><textarea name="work_content" rows="2" placeholder="처리 내용" class="w-full border rounded px-3 py-2 text-sm"></textarea></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <input type="text" name="parts_used" placeholder="사용부품" class="border rounded px-3 py-2 text-sm">
+        <input type="text" name="notes" placeholder="메모" class="border rounded px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">기록 추가</button>
+    </form>
+  </div>
 </div>
 {{end}}

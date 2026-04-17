@@ -21,8 +21,8 @@ func (r *CustomerRepo) List(search string, page, pageSize int) ([]model.Customer
 	offset := (page - 1) * pageSize
 
 	baseQuery := `
-		SELECT c.customer_id, c.org_name, c.official_name, c.industry,
-		       c.main_phone, c.is_active,
+		SELECT c.customer_id, c.org_name, c.official_name,
+		       COALESCE(c.industry,''), COALESCE(c.main_phone,''), c.is_active,
 		       COUNT(DISTINCT a.asset_id) AS asset_count,
 		       COUNT(DISTINCT ar.as_id) AS as_count
 		FROM customers c
@@ -76,8 +76,10 @@ func (r *CustomerRepo) List(search string, page, pageSize int) ([]model.Customer
 // GetByID 고객 단건 조회
 func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 	query := `
-		SELECT customer_id, org_name, official_name, org_email, main_phone,
-		       website, business_number, representative, industry,
+		SELECT customer_id, org_name, official_name,
+		       COALESCE(org_email,''), COALESCE(main_phone,''),
+		       COALESCE(website,''), COALESCE(business_number,''),
+		       COALESCE(representative,''), COALESCE(industry,''),
 		       has_parent, COALESCE(parent_customer_id,''),
 		       COALESCE(address,''), COALESCE(address_detail,''),
 		       is_active, COALESCE(notes,''), created_at, updated_at
@@ -102,8 +104,8 @@ func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 	}
 	c.HasParent = hasParent == 1
 	c.IsActive = isActive == 1
-	c.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	c.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	c.CreatedAt = parseTime(createdAt)
+	c.UpdatedAt = parseTime(updatedAt)
 	return &c, nil
 }
 
@@ -176,6 +178,11 @@ func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
 	return customers, rows.Err()
 }
 
+// CountActive 활성 고객 수
+func (r *CustomerRepo) CountActive(count *int) {
+	r.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE is_active=1`).Scan(count)
+}
+
 // ── 유틸 ──────────────────────────────────────────────────────────
 
 func newID(prefix string) string {
@@ -194,4 +201,19 @@ func nullStr(s string) interface{} {
 		return nil
 	}
 	return s
+}
+
+func parseTime(s string) time.Time {
+	formats := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04:05.999999",
+		time.RFC3339,
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }

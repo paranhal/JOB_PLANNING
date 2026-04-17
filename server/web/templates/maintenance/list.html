@@ -1,0 +1,49 @@
+{{define "title"}}정기점검 일정 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 justify-between items-start">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">정기점검 일정</h2>
+      <p class="text-sm text-gray-500">연도별 계획 · 자동 배정 · 엑셀(월별 달력) 보내기</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">점검 사이트 설정</a>
+      <a href="/maintenance/new" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">연도 계획 추가</a>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="text-left px-4 py-3 font-medium">연도</th>
+          <th class="text-left px-4 py-3 font-medium">제목</th>
+          <th class="text-left px-4 py-3 font-medium">상태</th>
+          <th class="text-right px-4 py-3 font-medium">작업</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Plans}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium">{{.PlanYear}}</td>
+          <td class="px-4 py-3">{{if .Title}}{{.Title}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3">
+            {{if eq .Status "approved"}}
+            <span class="text-green-700">승인</span>
+            {{else}}
+            <span class="text-amber-700">초안</span>
+            {{end}}
+          </td>
+          <td class="px-4 py-3 text-right">
+            <a href="/maintenance/{{.PlanID}}" class="text-blue-600 hover:underline">열기</a>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">등록된 계획이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

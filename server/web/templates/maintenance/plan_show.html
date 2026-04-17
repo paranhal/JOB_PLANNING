@@ -1,0 +1,142 @@
+{{define "title"}}정기점검 {{.Plan.PlanYear}}년 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">정기점검 {{.Plan.PlanYear}}년</h2>
+      <p class="text-sm text-gray-500">
+        {{if .Plan.Title}}{{.Plan.Title}} · {{end}}
+        {{if eq .Plan.Status "approved"}}<span class="text-green-700 font-medium">승인됨</span>{{else}}<span class="text-amber-700 font-medium">초안</span>{{end}}
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/maintenance/{{.Plan.PlanID}}/export.xlsx"
+         class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">엑셀(월별 달력) 받기</a>
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/generate" class="inline"
+            onsubmit="return confirm('자동 생성된 방문만 삭제한 뒤 다시 채웁니다. 계속할까요?');">
+        <button type="submit"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">자동 배정</button>
+      </form>
+      {{if eq .Plan.Status "approved"}}
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/unapprove" class="inline">
+        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">승인 취소</button>
+      </form>
+      {{else}}
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/approve" class="inline">
+        <button type="submit" class="px-4 py-2 border border-green-600 text-green-800 rounded-lg text-sm font-medium">승인</button>
+      </form>
+      {{end}}
+      <a href="/maintenance" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">목록</a>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 text-sm">
+    <a href="/maintenance/{{.Plan.PlanID}}" class="px-3 py-1 rounded-lg {{if eq .Month 0}}bg-gray-900 text-white{{else}}bg-gray-100{{end}}">전체</a>
+    {{range $m := seq 12}}
+    <a href="/maintenance/{{$.Plan.PlanID}}?month={{$m}}"
+       class="px-3 py-1 rounded-lg {{if eq $.Month $m}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">{{$m}}월</a>
+    {{end}}
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <h3 class="font-semibold text-gray-800">수동 방문 추가</h3>
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/visits" class="space-y-3 text-sm">
+        <div>
+          <label class="block text-gray-600 mb-1">날짜</label>
+          <input type="date" name="visit_date" required
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">고객</label>
+          <select name="customer_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <option value="">선택</option>
+            {{range .Customers}}
+            <option value="{{.CustomerID}}">{{.OrgName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">표시 유형 (엑셀 글자색)</label>
+          <select name="entry_category" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <option value="normal">일반 (녹색)</option>
+            <option value="fixed">고정·지정일 (적색)</option>
+            <option value="office">사무소 등 (청색)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">비고</label>
+          <input type="text" name="notes" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        </div>
+        <button type="submit" class="w-full py-2 bg-gray-800 text-white rounded-lg font-medium">추가</button>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-xl border border-red-100 p-4 space-y-2 text-sm text-red-800">
+      <h3 class="font-semibold">삭제</h3>
+      <p>계획 전체를 삭제하면 방문 데이터도 함께 삭제됩니다.</p>
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/delete"
+            onsubmit="return confirm('정말 이 연도 계획을 삭제할까요?');">
+        <button type="submit" class="px-4 py-2 border border-red-300 rounded-lg text-red-800 hover:bg-red-50">계획 삭제</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <h3 class="px-4 py-3 font-semibold border-b border-gray-100 bg-gray-50">
+      {{if eq .Month 0}}전체 방문 목록{{else}}{{.Month}}월 방문{{end}}
+    </h3>
+    <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600 sticky top-0">
+          <tr>
+            <th class="text-left px-4 py-2">날짜</th>
+            <th class="text-left px-4 py-2">사이트</th>
+            <th class="text-left px-4 py-2">유형</th>
+            <th class="text-left px-4 py-2">자동</th>
+            <th class="text-right px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{if ne .Month 0}}
+            {{range .MonthVisits}}
+            <tr>
+              <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}</td>
+              <td class="px-4 py-2">{{.ShortName}}</td>
+              <td class="px-4 py-2">{{.EntryCategory}}</td>
+              <td class="px-4 py-2">{{if .AutoGenerated}}예{{else}}아니오{{end}}</td>
+              <td class="px-4 py-2 text-right">
+                <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$.Plan.PlanID}}" class="inline"
+                      onsubmit="return confirm('이 방문을 삭제할까요?');">
+                  <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
+                </form>
+              </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">이 달에 방문이 없습니다.</td></tr>
+            {{end}}
+          {{else}}
+            {{range .Visits}}
+            <tr>
+              <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}</td>
+              <td class="px-4 py-2">{{.ShortName}}</td>
+              <td class="px-4 py-2">{{.EntryCategory}}</td>
+              <td class="px-4 py-2">{{if .AutoGenerated}}예{{else}}아니오{{end}}</td>
+              <td class="px-4 py-2 text-right">
+                <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$.Plan.PlanID}}" class="inline"
+                      onsubmit="return confirm('이 방문을 삭제할까요?');">
+                  <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
+                </form>
+              </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">방문이 없습니다. 자동 배정 또는 수동 추가를 사용하세요.</td></tr>
+            {{end}}
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

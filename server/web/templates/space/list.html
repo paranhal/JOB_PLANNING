@@ -1,10 +1,130 @@
 {{define "title"}}공간 관리 · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="flex items-center justify-center h-64 text-gray-400">
-  <div class="text-center">
-    <p class="text-lg font-medium">공간 관리</p>
-    <p class="text-sm mt-1">건물 / 층 / 실 관리 — 구현 예정</p>
-    <a href="/" class="mt-4 inline-block text-blue-600 text-sm hover:underline">← 대시보드로</a>
+<div class="space-y-6">
+  <h2 class="text-xl font-bold text-gray-800">공간 관리 (건물 · 층 · 호)</h2>
+  <p class="text-sm text-gray-500">건물명(예: 본관), 층(예: 1층), 호(예: 어린이실·복도 등 공간명) 순으로 등록합니다.</p>
+
+  <!-- 기관 선택 -->
+  <form method="GET" action="/spaces" class="flex gap-3 items-end">
+    <div class="flex-1 max-w-sm">
+      <label class="block text-sm font-medium text-gray-700 mb-1">기관 선택</label>
+      <select name="customer_id" onchange="this.form.submit()"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="">-- 기관을 선택하세요 --</option>
+        {{range .Customers}}
+        <option value="{{.CustomerID}}" {{if eq .CustomerID $.CustomerID}}selected{{end}}>{{.OrgName}}</option>
+        {{end}}
+      </select>
+    </div>
+  </form>
+
+  {{if .CustomerID}}
+  <!-- 건물 추가 -->
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <form method="POST" action="/spaces/buildings" class="flex flex-wrap gap-3 items-end">
+      <input type="hidden" name="customer_id" value="{{.CustomerID}}">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">건물명</label>
+        <input type="text" name="building_name" required placeholder="본관" class="border rounded-lg px-3 py-2 text-sm w-64">
+      </div>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium">+ 건물 추가</button>
+    </form>
   </div>
+
+  <!-- 건물/층/호 트리 -->
+  {{range .Buildings}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" x-data="{ open: true }">
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b">
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <button type="button" @click="open=!open" class="p-1 rounded hover:bg-gray-200 shrink-0" title="펼치기/접기">
+          <svg class="w-4 h-4 text-gray-400 transition-transform" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <form method="POST" action="/spaces/buildings/{{.BuildingID}}/update" class="flex flex-wrap items-center gap-2 flex-1 min-w-0" @click.stop>
+          <input type="hidden" name="customer_id" value="{{$.CustomerID}}">
+          <label class="text-xs text-gray-500 whitespace-nowrap">건물명</label>
+          <input type="text" name="building_name" value="{{.BuildingName}}" required class="flex-1 min-w-[10rem] max-w-md border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+          <button type="submit" class="shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700">저장</button>
+        </form>
+      </div>
+      <form method="POST" action="/spaces/buildings/{{.BuildingID}}/delete?customer_id={{$.CustomerID}}" class="inline shrink-0" onsubmit="return confirm('건물을 삭제하시겠습니까?')" @click.stop>
+        <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">삭제</button>
+      </form>
+    </div>
+
+    <div x-show="open" class="p-4 space-y-4">
+      <!-- 층 추가 -->
+      <form method="POST" action="/spaces/floors" class="flex flex-wrap gap-2 items-end">
+        <input type="hidden" name="building_id" value="{{.BuildingID}}">
+        <input type="hidden" name="customer_id" value="{{$.CustomerID}}">
+        <div>
+          <label class="block text-xs text-gray-500 mb-0.5">층</label>
+          <input type="text" name="floor_name" required placeholder="1층" class="border rounded px-2 py-1.5 text-sm w-36">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-0.5">층 순서</label>
+          <input type="number" name="sort_order" placeholder="0" value="0" class="border rounded px-2 py-1.5 text-sm w-20">
+        </div>
+        <button type="submit" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ 층 추가</button>
+      </form>
+
+      {{range .Floors}}
+      <div class="ml-4 border-l-2 border-blue-200 pl-4">
+        <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+          <form method="POST" action="/spaces/floors/{{.FloorID}}/update" class="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="customer_id" value="{{$.CustomerID}}">
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">층</label>
+              <input type="text" name="floor_name" value="{{.FloorName}}" required class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-36">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">순서</label>
+              <input type="number" name="sort_order" value="{{.SortOrder}}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20">
+            </div>
+            <button type="submit" class="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-900">저장</button>
+          </form>
+          <form method="POST" action="/spaces/floors/{{.FloorID}}/delete?customer_id={{$.CustomerID}}" class="inline" onsubmit="return confirm('층을 삭제하시겠습니까?')">
+            <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">삭제</button>
+          </form>
+        </div>
+
+        <!-- 호 추가 (실·복도 등 공간명) -->
+        <form method="POST" action="/spaces/rooms" class="flex flex-wrap gap-2 items-end mb-2">
+          <input type="hidden" name="floor_id" value="{{.FloorID}}">
+          <input type="hidden" name="customer_id" value="{{$.CustomerID}}">
+          <div>
+            <label class="block text-xs text-gray-500 mb-0.5">호</label>
+            <input type="text" name="room_name" required placeholder="어린이실, 복도 등" class="border rounded px-2 py-1 text-sm w-48">
+          </div>
+          <button type="submit" class="text-blue-600 hover:text-blue-800 text-xs font-medium">+ 호 추가</button>
+        </form>
+
+        {{range .Rooms}}
+        <div class="flex flex-wrap items-end justify-between gap-2 ml-4 py-2 border-b border-gray-100 last:border-0">
+          <form method="POST" action="/spaces/rooms/{{.RoomID}}/update" class="flex flex-wrap items-end gap-2 flex-1 min-w-0">
+            <input type="hidden" name="customer_id" value="{{$.CustomerID}}">
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">호(실명)</label>
+              <input type="text" name="room_name" value="{{.RoomName}}" required class="border border-gray-300 rounded-lg px-2 py-1 text-sm w-52">
+            </div>
+            <button type="submit" class="text-xs font-medium px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-900">저장</button>
+          </form>
+          <form method="POST" action="/spaces/rooms/{{.RoomID}}/delete?customer_id={{$.CustomerID}}" class="inline shrink-0" onsubmit="return confirm('이 호를 삭제할까요?')">
+            <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">삭제</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{if not .Buildings}}
+  <p class="text-sm text-gray-400 text-center py-8">이 기관에 등록된 건물이 없습니다. 위에서 건물을 추가하세요.</p>
+  {{end}}
+
+  {{else}}
+  <p class="text-sm text-gray-400 text-center py-16">기관을 선택하면 건물·층·호 정보가 표시됩니다.</p>
+  {{end}}
 </div>
 {{end}}

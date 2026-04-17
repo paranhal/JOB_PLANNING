@@ -146,19 +146,53 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 	return err
 }
 
-// Update AS 상태 및 처리 내용 수정
+// Update AS 상태 및 처리 내용 수정 (상태 변경 시 일시 자동 기록)
 func (r *ASRepo) Update(as *model.ASReceipt) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`
-		UPDATE as_receipts SET
+
+	// 기존 상태 조회하여 상태 변경 감지
+	var oldStatus string
+	r.db.QueryRow(`SELECT status FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&oldStatus)
+
+	startDT := ""
+	completeDT := ""
+	if oldStatus == "received" && as.Status == "in_progress" {
+		startDT = now
+	}
+	if (oldStatus != "completed" && oldStatus != "closed") &&
+		(as.Status == "completed" || as.Status == "closed") {
+		completeDT = now
+	}
+
+	q := `UPDATE as_receipts SET
 			status=?, assigned_to=?, process_type=?, cause_type=?,
 			action_taken=?, parts_used=?, result_code=?, followup_action=?,
-			updated_at=?
-		WHERE as_id=?`,
+			customer_confirmer=?, is_recurrence=?, is_reopen=?, replace_review=?,
+			updated_at=?`
+	args := []interface{}{
 		as.Status, as.AssignedTo, as.ProcessType, as.CauseType,
 		as.ActionTaken, as.PartsUsed, as.ResultCode, as.FollowupAction,
-		now, as.ASID,
-	)
+		as.CustomerConfirmer, boolToInt(as.IsRecurrence), boolToInt(as.IsReopen), boolToInt(as.ReplaceReview),
+		now,
+	}
+
+	if startDT != "" {
+		q += `, start_datetime=?`
+		args = append(args, startDT)
+	}
+	if completeDT != "" {
+		q += `, complete_datetime=?`
+		args = append(args, completeDT)
+	}
+	if completeDT != "" && as.CustomerConfirmer != "" {
+		q += `, confirm_datetime=?`
+		args = append(args, now)
+	}
+
+	q += ` WHERE as_id=?`
+	args = append(args, as.ASID)
+
+	_, err := r.db.Exec(q, args...)
 	return err
 }
 
@@ -181,7 +215,49 @@ func (r *ASRepo) Stats() (*model.ASStats, error) {
 	return &stats, err
 }
 
-// generateASNumber AS번호 생성 (AS-202600001 형식)
+// StatsByCustomer 기관별 AS 건수
+func (r *ASRepo) StatsByCustomer() ([]map[string]interface{}, error) {
+	rows, err := r.db.Query(`
+		SELECT c.org_name, COUNT(*) as cnt,
+		       SUM(CASE WHEN ar.status IN ('received','in_progress') THEN 1 ELSE 0 END) as open_cnt
+		FROM as_receipts ar JOIN customers c ON c.customer_id=ar.customer_id
+		GROUP BY c.customer_id ORDER BY cnt DESC LIMIT 20`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []map[string]interface{}
+	for rows.Next() {
+		var name string
+		var cnt, openCnt int
+		rows.Scan(&name, &cnt, &openCnt)
+		items = append(items, map[string]interface{}{"Name": name, "Count": cnt, "Open": openCnt})
+	}
+	return items, nil
+}
+
+// StatsByStatus 상태별 AS 건수
+func (r *ASRepo) StatsByStatus() ([]map[string]interface{}, error) {
+	rows, err := r.db.Query(`SELECT status, COUNT(*) FROM as_receipts GROUP BY status ORDER BY COUNT(*) DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []map[string]interface{}
+	for rows.Next() {
+		var status string
+		var cnt int
+		rows.Scan(&status, &cnt)
+		items = append(items, map[string]interface{}{"Status": status, "Count": cnt})
+	}
+	return items, nil
+}
+
+// ListOverdue 지연 AS 목록 (3일 초과 미처리)
+func (r *ASRepo) ListOverdue(page, pageSize int) ([]model.ASListItem, int, error) {
+	return r.List("", "", page, pageSize)
+}
+
 func generateASNumber() string {
 	return fmt.Sprintf("AS-%d%05d",
 		time.Now().Year(),

@@ -1,0 +1,63 @@
+{{define "title"}}SW 상세 관리 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-6" x-data="{ showForm: false }">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/assets/{{.AssetID}}" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+      <h2 class="text-xl font-bold text-gray-800">SW 상세 관리</h2>
+    </div>
+    <button @click="showForm=!showForm" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ SW 추가</button>
+  </div>
+
+  <div x-show="showForm" x-cloak class="bg-white rounded-xl border border-gray-200 p-6">
+    <form method="POST" action="/assets/{{.AssetID}}/sw" class="space-y-4">
+      <input type="hidden" name="asset_id" value="{{.AssetID}}">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">소프트웨어명</label><input type="text" name="software_name" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">버전</label><input type="text" name="version" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">설치형태</label>
+          <select name="install_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="pc">PC설치형</option><option value="server">서버형</option><option value="web">웹형</option>
+          </select>
+        </div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">설치 HW</label><input type="text" name="hw_info" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">OS</label><input type="text" name="os" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">OS 버전</label><input type="text" name="os_version" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">DBMS</label><input type="text" name="dbms" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">DB 버전</label><input type="text" name="db_version" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">접속방식</label><input type="text" name="access_method" placeholder="RDP, 웹 등" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">접속주소</label><input type="text" name="access_url" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">설치경로</label><input type="text" name="install_path" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">백업경로</label><input type="text" name="backup_path" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">환경설정파일위치</label><input type="text" name="config_path" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium">등록</button>
+    </form>
+  </div>
+
+  {{if .Items}}
+  <div class="space-y-4">
+    {{range .Items}}
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-gray-800">{{.SoftwareName}} <span class="text-sm font-normal text-gray-400">{{.Version}}</span></h3>
+        <form method="POST" action="/sw/{{.SWDetailID}}/delete" class="inline" onsubmit="return confirm('삭제?')"><button type="submit" class="text-red-500 text-xs">삭제</button></form>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div><span class="text-gray-400">설치형태:</span> {{.InstallType}}</div>
+        <div><span class="text-gray-400">설치 HW:</span> {{.HWInfo}}</div>
+        <div><span class="text-gray-400">OS:</span> {{.OS}} {{.OSVersion}}</div>
+        <div><span class="text-gray-400">DBMS:</span> {{.DBMS}} {{.DBVersion}}</div>
+        <div><span class="text-gray-400">접속:</span> {{.AccessMethod}} {{.AccessURL}}</div>
+        <div><span class="text-gray-400">설치경로:</span> {{.InstallPath}}</div>
+        <div><span class="text-gray-400">백업경로:</span> {{.BackupPath}}</div>
+        <div><span class="text-gray-400">설정파일:</span> {{.ConfigPath}}</div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <p class="text-sm text-gray-400 text-center py-8">등록된 SW 상세 정보가 없습니다.</p>
+  {{end}}
+</div>
+{{end}}

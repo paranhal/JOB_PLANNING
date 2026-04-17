@@ -1,6 +1,47 @@
-{{define "title"}}자산 상세 · 고객지원시스템{{end}}
+{{define "title"}}{{.Asset.ProductName}} · 자산 상세{{end}}
 {{define "content"}}
-<div class="flex items-center justify-center h-64 text-gray-400">
-  <p class="text-sm">자산 상세 — 구현 예정</p>
+<div class="max-w-4xl mx-auto space-y-6">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/assets" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">{{.Asset.ProductName}}</h2>
+        <p class="text-sm text-gray-500">{{.Asset.OrgName}} · {{.Asset.ProductType}}</p>
+      </div>
+      <span class="px-2 py-0.5 rounded-full text-xs font-medium {{if eq .Asset.OperationStatus "operating"}}bg-green-100 text-green-700{{else if eq .Asset.OperationStatus "fault"}}bg-red-100 text-red-700{{else}}bg-gray-100 text-gray-600{{end}}">{{opStatusLabel .Asset.OperationStatus}}</span>
+    </div>
+    <div class="flex gap-2">
+      <a href="/assets/{{.Asset.AssetID}}/edit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">수정</a>
+      <a href="/assets/{{.Asset.AssetID}}/sw" class="px-4 py-2 border border-blue-300 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50">SW상세</a>
+      <a href="/as/new?customer_id={{.Asset.CustomerID}}&asset_id={{.Asset.AssetID}}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">AS접수</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">제품 정보</h3>
+      <dl class="space-y-2 text-sm">
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">모델명</dt><dd class="text-gray-800">{{.Asset.ModelName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">제조사</dt><dd class="text-gray-800">{{.Asset.Manufacturer}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">S/N</dt><dd class="text-gray-800 font-mono">{{.Asset.SerialNumber}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치일</dt><dd class="text-gray-800">{{.Asset.InstallDate}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치주체</dt><dd class="text-gray-800">{{.Asset.InstallerType}} {{if .Asset.OriginalInstaller}}({{.Asset.OriginalInstaller}}){{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">관리유형</dt><dd class="text-gray-800">{{.Asset.ManagementType}}</dd></div>
+      </dl>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">위치 · 담당</h3>
+      <dl class="space-y-2 text-sm">
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">건물명</dt><dd class="text-gray-800">{{.Asset.BuildingName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">층</dt><dd class="text-gray-800">{{.Asset.FloorName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">호(실명)</dt><dd class="text-gray-800">{{.Asset.RoomName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">상세위치</dt><dd class="text-gray-800">{{.Asset.LocationDetail}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">요청주체</dt><dd class="text-gray-800">{{.Asset.RequesterType}} {{if .Asset.RequesterName}}({{.Asset.RequesterName}}){{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">당사담당</dt><dd class="text-gray-800">{{.Asset.OurContact}}</dd></div>
+        {{if .Asset.Notes}}<div class="flex gap-4"><dt class="text-gray-500 w-24">비고</dt><dd class="text-gray-800">{{.Asset.Notes}}</dd></div>{{end}}
+      </dl>
+    </div>
+  </div>
 </div>
 {{end}}
