@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: server-app-1
     image: server-app:latest
     ports:
       - "8080:8080"

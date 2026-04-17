@@ -372,13 +372,64 @@ CREATE TABLE customer_master (
 
 ---
 
-## 11. 단계별 반영 요약
+## 11. 정기 점검 일정(기획서 §17)
+
+월간 정기점검 계획·방문·사이트별 점검 설정을 SQLite/PostgreSQL 공통 논리로 정의한다.
+
+### 11.1 maintenance_site_config (사이트별 점검 기준)
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| customer_id | TEXT (PK, FK→customers) | Y | 점검 대상 기관 |
+| short_name | TEXT | Y | 달력·엑셀에 쓰는 짧은 표시명 |
+| region | TEXT | N | 지역(자동 배정 시 묶음·정렬) |
+| has_klas | INTEGER 0/1 | N | KLAS 점검 대상 |
+| has_rfid | INTEGER 0/1 | N | RFID 자동화 장비 점검 대상 |
+| entry_category | TEXT | Y | `normal` \| `fixed` \| `office` — 엑셀 글자색 구분(기획서 §17.11.4) |
+| fixed_rule | TEXT | N | 예: `LAST_MONDAY_OF_MONTH` (매월 마지막 월요일) |
+| updated_at | DATETIME | Y | 수정 시각 |
+
+### 11.2 maintenance_plans (연도 계획 헤더)
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| plan_id | TEXT (PK) | Y | 내부 ID |
+| plan_year | INTEGER | Y | 연도(연도당 1건 UNIQUE) |
+| title | TEXT | N | 계획 제목 |
+| status | TEXT | Y | `draft` \| `approved` |
+| created_at, updated_at | DATETIME | Y | |
+
+### 11.3 maintenance_visits (일자별 방문)
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| visit_id | TEXT (PK) | Y | |
+| plan_id | TEXT (FK) | Y | |
+| visit_date | TEXT (YYYY-MM-DD) | Y | 방문일 |
+| customer_id | TEXT (FK) | Y | |
+| sort_order | INTEGER | N | 같은 날 복수 건 정렬 |
+| auto_generated | INTEGER 0/1 | Y | 1=자동 배정(재생성 시 삭제 대상) |
+| entry_category | TEXT | Y | 엑셀 색상·표시용 |
+| notes | TEXT | N | |
+| created_at | DATETIME | Y | |
+
+**제약:** `(plan_id, visit_date, customer_id)` UNIQUE — 동일일·동일 사이트 중복 방지.
+
+### 11.4 구현 참고
+
+- 공휴일·자동 배정 로직은 애플리케이션 계층(`internal/service`)에서 처리하고, DB에는 결과 방문만 저장한다.
+- 엑셀(§17.11)은 `maintenance_visits` + `maintenance_site_config` 조인 표시명으로 생성한다.
+
+---
+
+## 12. 단계별 반영 요약
 
 | 단계 | 범위(기획서 §16) | 데이터 반영 |
 |------|------------------|-------------|
 | 1단계 | 고객마스터, 공간정보, 담당자, 설치자산, 코드관리 | §3~§6, §2 코드관리 |
 | 2단계 | AS 접수, 처리, 현황, 첨부파일 | §8, §9 첨부파일 |
 | 3단계 | 수행관계, 교체대상 분석, 영업활용 | §7, §9 영업활용(집계/뷰) |
+| 4단계 | 정기점검 일정·엑셀 | **§11** |
 | 확장 | PostgreSQL 전환 | §10 적용 |
 
-이 문서는 기획서를 유일 기준으로 하며, 구현 시 필드 추가·코드값 확장은 기획서 §11·§14와 맞춰 진행한다.
+이 문서는 기획서를 유일 기준으로 하며, 구현 시 필드 추가·코드값 확장은 기획서의 코드관리·핵심 업무 규칙과 맞춰 진행한다.

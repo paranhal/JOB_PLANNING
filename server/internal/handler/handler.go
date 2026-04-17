@@ -21,6 +21,7 @@ type Handler struct {
 	Code           *CodeHandler
 	Attachment     *AttachmentHandler
 	Auth           *AuthHandler
+	Maintenance    *MaintenanceHandler
 
 	customerRepo *repository.CustomerRepo
 	asRepo       *repository.ASRepo
@@ -39,6 +40,7 @@ func New(db *sql.DB) *Handler {
 	swDetailRepo := repository.NewSWDetailRepo(db)
 	attachRepo := repository.NewAttachmentRepo(db)
 	userRepo := repository.NewUserRepo(db)
+	maintRepo := repository.NewMaintenanceRepo(db)
 
 	jwtSecret := []byte("cs-system-jwt-secret-2026")
 
@@ -57,6 +59,9 @@ func New(db *sql.DB) *Handler {
 		Code:     &CodeHandler{repo: codeRepo},
 		Attachment: &AttachmentHandler{repo: attachRepo, uploadDir: "data/uploads"},
 		Auth:     &AuthHandler{userRepo: userRepo, jwtSecret: jwtSecret},
+		Maintenance: &MaintenanceHandler{
+			repo: maintRepo, customerRepo: customerRepo,
+		},
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,

@@ -6,6 +6,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.12.0
+	github.com/xuri/excelize/v2 v2.8.1
 	modernc.org/sqlite v1.29.5
 )
 

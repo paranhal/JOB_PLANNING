@@ -136,6 +136,27 @@ func main() {
 	as.POST("/:id/update", h.AS.Update)
 	as.POST("/:id/process", h.AS.AddProcess)
 
+	// 정기 점검 (기획서 §17) — /maintenance/sites 를 :id 보다 먼저 등록
+	ms := g.Group("/maintenance/sites")
+	ms.GET("", h.Maintenance.ListSiteConfigs)
+	ms.GET("/new", h.Maintenance.NewSiteConfigPage)
+	ms.POST("", h.Maintenance.SaveSiteConfig)
+	ms.GET("/:customer_id/edit", h.Maintenance.EditSiteConfigPage)
+	ms.POST("/:customer_id/delete", h.Maintenance.DeleteSiteConfig)
+
+	maint := g.Group("/maintenance")
+	maint.GET("", h.Maintenance.ListPlans)
+	maint.GET("/new", h.Maintenance.NewPlanPage)
+	maint.POST("", h.Maintenance.CreatePlan)
+	maint.POST("/visits/:visit_id/delete", h.Maintenance.DeleteVisit)
+	maint.GET("/:id/export.xlsx", h.Maintenance.ExportExcel)
+	maint.POST("/:id/generate", h.Maintenance.GenerateAuto)
+	maint.POST("/:id/approve", h.Maintenance.ApprovePlan)
+	maint.POST("/:id/unapprove", h.Maintenance.UnapprovePlan)
+	maint.POST("/:id/delete", h.Maintenance.DeletePlan)
+	maint.POST("/:id/visits", h.Maintenance.AddVisit)
+	maint.GET("/:id", h.Maintenance.ShowPlan)
+
 	// 분석/영업
 	g.GET("/analysis", h.Analysis.Dashboard)
 

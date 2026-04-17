@@ -77,6 +77,7 @@ server/
 │   ├── customer/               # 고객 관리
 │   └── as/                     # AS 접수·처리
 ├── migrations/001_init.sql     # DB 스키마 참조
+├── migrations/002_maintenance.sql  # 정기점검(§17) DDL 참조
 ├── data/app.db                 # SQLite 파일 (자동 생성)
 ├── Dockerfile
 └── docker-compose.yml
@@ -95,7 +96,8 @@ server/
 | 담당자 관리 | 🔲 구현 예정 |
 | 설치자산 관리 | 🔲 구현 예정 |
 | 교체대상 분석 | 🔲 구현 예정 |
-| 엑셀 출력 | 🔲 구현 예정 |
+| 정기점검(연도 계획·사이트 설정·자동 배정·승인) | ✅ 1차 |
+| 정기점검 엑셀(월별 달력, §17.11) | ✅ excelize |
 | 사용자 인증/권한 | 🔲 구현 예정 |
 | PostgreSQL 전환 | 🔲 2단계 |
 
