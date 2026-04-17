@@ -42,6 +42,22 @@ air
 go run ./cmd/server
 ```
 
+### 4. 테스트
+
+프로젝트 루트를 `server/` 로 맞춘 뒤:
+
+```bash
+cd server
+go mod tidy
+go test ./... -count=1
+```
+
+Docker만 있는 환경:
+
+```bash
+docker run --rm -v "$(pwd):/app" -w /app golang:1.22-alpine sh -c "go mod tidy && go test ./... -count=1"
+```
+
 ---
 
 ## Mac Mini 서버 배포 (Docker)

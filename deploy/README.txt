@@ -32,6 +32,8 @@
   (첫 로그인 후 비밀번호 변경 권장)
 
 ■ 주의사항
+  - 정기점검 일정 등 최신 기능은 deploy에 포함된 server-app.tar(또는 최신 이미지)로
+    start.bat / start.sh 를 다시 실행해 이미지를 로드해야 반영됩니다.
   - data/ 폴더에 SQLite DB가 저장됨 (백업 시 이 폴더 보관)
   - Mac에서 Apple Silicon(M1/M2/M3)인 경우
     이미지가 linux/amd64로 빌드되어 있어

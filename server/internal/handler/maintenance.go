@@ -161,7 +161,7 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 }
 
 func (h *MaintenanceHandler) DeleteVisit(c echo.Context) error {
-	vid := c.Param("vid")
+	vid := c.Param("visit_id")
 	planID := c.QueryParam("plan_id")
 	if err := h.repo.DeleteVisit(vid); err != nil {
 		return err
