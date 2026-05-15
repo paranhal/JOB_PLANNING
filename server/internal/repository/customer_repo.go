@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"customer-support/internal/model"
@@ -121,7 +122,7 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 			is_active, notes, created_at, updated_at
 		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.CustomerID, c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
-		c.Website, c.BusinessNumber, c.Representative, c.Industry,
+		c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
 		boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
 		c.Address, c.AddressDetail,
 		boolToInt(c.IsActive), c.Notes, now, now,
@@ -140,7 +141,7 @@ func (r *CustomerRepo) Update(c *model.Customer) error {
 			is_active=?, notes=?, updated_at=?
 		WHERE customer_id=?`,
 		c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
-		c.Website, c.BusinessNumber, c.Representative, c.Industry,
+		c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
 		boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
 		c.Address, c.AddressDetail,
 		boolToInt(c.IsActive), c.Notes, now, c.CustomerID,
