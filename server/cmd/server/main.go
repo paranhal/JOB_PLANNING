@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -13,7 +16,20 @@ import (
 	"customer-support/internal/repository"
 )
 
+// 템플릿·정적 파일·SQLite 경로가 상대 경로이므로, 실행 위치와 무관하게 server 모듈 루트를 작업 디렉터리로 맞춘다.
+func chdirToServerRoot() {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Fatal("runtime.Caller 실패")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	if err := os.Chdir(root); err != nil {
+		log.Fatalf("작업 디렉터리를 server 루트로 바꿀 수 없습니다 (%s): %v", root, err)
+	}
+}
+
 func main() {
+	chdirToServerRoot()
 	_ = godotenv.Load()
 	cfg := config.Load()
 
