@@ -17,8 +17,8 @@ func scanHistory(rows *sql.Rows) ([]model.ContactHistory, error) {
 		var h model.ContactHistory
 		if err := rows.Scan(&h.HistoryID, &h.ContactID, &h.CustomerID,
 			&h.StartDate, &h.EndDate, &h.Department,
-			&h.JobRole, &h.Title, &h.Phone,
-			&h.Email, &h.Status, &h.ContactRole, &h.ChangeReason,
+			&h.JobRole, &h.Title, &h.Phone, &h.Mobile,
+			&h.Email, &h.Status, &h.Affiliation, &h.ContactRole, &h.ChangeReason,
 			&h.ContactName); err != nil {
 			return nil, err
 		}
@@ -30,7 +30,8 @@ func scanHistory(rows *sql.Rows) ([]model.ContactHistory, error) {
 const historySelect = `SELECT ch.history_id, ch.contact_id, ch.customer_id,
 		        COALESCE(ch.start_date,''), COALESCE(ch.end_date,''), COALESCE(ch.department,''),
 		        COALESCE(ch.job_role,''), COALESCE(ch.title,''), COALESCE(ch.phone,''),
-		        COALESCE(ch.email,''), COALESCE(ch.status,''), COALESCE(ch.contact_role,''),
+		        COALESCE(ch.mobile,''), COALESCE(ch.email,''), COALESCE(ch.status,''),
+		        COALESCE(ch.affiliation,''), COALESCE(ch.contact_role,''),
 		        COALESCE(ch.change_reason,''),
 		        COALESCE(c.full_name,'')
 		 FROM contact_history ch
@@ -58,15 +59,18 @@ func (r *ContactHistoryRepo) ListByCustomer(customerID string) ([]model.ContactH
 
 func (r *ContactHistoryRepo) Create(h *model.ContactHistory) error {
 	h.HistoryID = newID("CH")
+	if h.Affiliation == "" {
+		h.Affiliation = "institution"
+	}
 	_, err := r.db.Exec(`
 		INSERT INTO contact_history
 		(history_id,contact_id,customer_id,start_date,end_date,department,
-		 job_role,title,phone,email,status,contact_role,change_reason,created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 job_role,title,phone,mobile,email,status,affiliation,contact_role,change_reason,created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		h.HistoryID, h.ContactID, h.CustomerID,
 		h.StartDate, h.EndDate, h.Department,
-		h.JobRole, h.Title, h.Phone, h.Email,
-		h.Status, h.ContactRole, h.ChangeReason,
+		h.JobRole, h.Title, h.Phone, h.Mobile, h.Email,
+		h.Status, h.Affiliation, h.ContactRole, h.ChangeReason,
 		time.Now().Format("2006-01-02 15:04:05"))
 	return err
 }
@@ -81,6 +85,10 @@ func (r *ContactHistoryRepo) SnapshotFromContact(ct *model.Contact, reason strin
 			role = "regular"
 		}
 	}
+	aff := ct.Affiliation
+	if aff == "" {
+		aff = "institution"
+	}
 	h := &model.ContactHistory{
 		ContactID:    ct.ContactID,
 		CustomerID:   ct.CustomerID,
@@ -89,8 +97,10 @@ func (r *ContactHistoryRepo) SnapshotFromContact(ct *model.Contact, reason strin
 		JobRole:      ct.JobRole,
 		Title:        ct.Title,
 		Phone:        ct.Phone,
+		Mobile:       ct.Mobile,
 		Email:        ct.Email,
 		Status:       ct.Status,
+		Affiliation:  aff,
 		ContactRole:  role,
 		ChangeReason: reason,
 	}

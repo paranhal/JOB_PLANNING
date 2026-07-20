@@ -67,6 +67,7 @@ type Contact struct {
 	ContactID   string    `json:"contact_id"`
 	CustomerID  string    `json:"customer_id"`
 	FullName    string    `json:"full_name"`
+	Affiliation string    `json:"affiliation"` // institution=소속기관, integrator=통합사업자
 	JobRole     string    `json:"job_role"`
 	Title       string    `json:"title"`
 	JobGrade    string    `json:"job_grade"` // librarian/it/other 또는 직접입력 문구
@@ -96,8 +97,10 @@ type ContactHistory struct {
 	JobRole      string    `json:"job_role"`
 	Title        string    `json:"title"`
 	Phone        string    `json:"phone"`
+	Mobile       string    `json:"mobile"`
 	Email        string    `json:"email"`
 	Status       string    `json:"status"`
+	Affiliation  string    `json:"affiliation"`
 	ContactRole  string    `json:"contact_role"`
 	ChangeReason string    `json:"change_reason"` // transfer, resign, role_adjust
 	CreatedAt    time.Time `json:"created_at"`
@@ -110,11 +113,13 @@ type ContactHistory struct {
 type ContactHistoryListItem struct {
 	ContactID    string `json:"contact_id"`
 	Name         string `json:"name"`
+	Affiliation  string `json:"affiliation"`
 	StartDate    string `json:"start_date"`
 	EndDate      string `json:"end_date"`
 	ContactRole  string `json:"contact_role"`
 	ChangeReason string `json:"change_reason"`
 	Phone        string `json:"phone"`
+	Mobile       string `json:"mobile"`
 	Email        string `json:"email"`
 	IsCurrent    bool   `json:"is_current"` // 변경 이력 없을 때 현행 담당자 행
 }

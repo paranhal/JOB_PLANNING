@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     contact_id  TEXT PRIMARY KEY,
     customer_id TEXT NOT NULL,
     full_name   TEXT NOT NULL,
+    affiliation TEXT DEFAULT 'institution',
     job_role    TEXT,
     title       TEXT,
     job_grade   TEXT,
@@ -144,8 +145,10 @@ CREATE TABLE IF NOT EXISTS contact_history (
     job_role      TEXT,
     title         TEXT,
     phone         TEXT,
+    mobile        TEXT,
     email         TEXT,
     status        TEXT,
+    affiliation   TEXT,
     contact_role  TEXT,
     change_reason TEXT,
     created_by    TEXT,
@@ -477,7 +480,10 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE assets ADD COLUMN maint_billing_cycle TEXT`,
 		`ALTER TABLE contacts ADD COLUMN job_grade TEXT`,
 		`ALTER TABLE contacts ADD COLUMN contact_role TEXT`,
+		`ALTER TABLE contacts ADD COLUMN affiliation TEXT`,
 		`ALTER TABLE contact_history ADD COLUMN contact_role TEXT`,
+		`ALTER TABLE contact_history ADD COLUMN affiliation TEXT`,
+		`ALTER TABLE contact_history ADD COLUMN mobile TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
@@ -486,6 +492,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	// 기존 is_primary → contact_role 보강
 	db.Exec(`UPDATE contacts SET contact_role='primary' WHERE is_primary=1 AND (contact_role IS NULL OR contact_role='')`)
 	db.Exec(`UPDATE contacts SET contact_role='regular' WHERE (contact_role IS NULL OR contact_role='')`)
+	db.Exec(`UPDATE contacts SET affiliation='institution' WHERE affiliation IS NULL OR affiliation=''`)
 
 	// 점검주기 코드를 청구주기와 동일 체계로 동기화 (기존 Call/연/없음 시드 교체)
 	db.Exec(`DELETE FROM codes WHERE code_group='maint_cycle'`)
@@ -504,14 +511,16 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('JG003','job_grade','other','기타',3),
 		('JG004','job_grade','custom','직접입력',4)`)
 
-	// 담당구분 · 변경사유 코드
+	// 담당구분 · 변경사유 · 소속 코드
 	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
 		('CROLE001','contact_role','primary','주담당',1),
 		('CROLE002','contact_role','secondary','부담당',2),
 		('CROLE003','contact_role','regular','일반 담당자',3),
 		('CHRS001','contact_change_reason','transfer','전보',1),
 		('CHRS002','contact_change_reason','resign','퇴직',2),
-		('CHRS003','contact_change_reason','role_adjust','업무조정',3)`)
+		('CHRS003','contact_change_reason','role_adjust','업무조정',3),
+		('CAFF001','contact_affiliation','institution','소속기관',1),
+		('CAFF002','contact_affiliation','integrator','통합사업자',2)`)
 
 	return nil
 }

@@ -43,8 +43,9 @@
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">담당자명</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">소속</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">직급</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">소속 기관</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">연결 기관</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">직장전화</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">핸드폰</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">이메일</th>
@@ -63,6 +64,9 @@
                 {{if .IsPrimary}}
                 <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-700">주담당</span>
                 {{end}}
+              </td>
+              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs">
+                {{affiliationLabel .Affiliation}}
               </td>
               <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs">
                 {{if .JobGrade}}{{jobGradeLabel .JobGrade}}{{else}}—{{end}}

@@ -172,6 +172,18 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"affiliationLabel": func(s string) string {
+			m := map[string]string{
+				"institution": "소속기관", "integrator": "통합사업자",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			if s == "" {
+				return "소속기관"
+			}
+			return s
+		},
 		"changeReasonLabel": func(s string) string {
 			m := map[string]string{
 				"transfer": "전보", "resign": "퇴직", "role_adjust": "업무조정",

@@ -44,11 +44,13 @@
           <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th class="px-4 py-3 font-medium">이름</th>
+              <th class="px-4 py-3 font-medium">소속</th>
               <th class="px-4 py-3 font-medium">부임일</th>
               <th class="px-4 py-3 font-medium">퇴임일</th>
               <th class="px-4 py-3 font-medium">담당구분</th>
               <th class="px-4 py-3 font-medium">변경사유</th>
               <th class="px-4 py-3 font-medium">전화번호</th>
+              <th class="px-4 py-3 font-medium">핸드폰</th>
               <th class="px-4 py-3 font-medium">이메일</th>
             </tr>
           </thead>
@@ -58,6 +60,7 @@
               <td class="px-4 py-3">
                 <a href="/contacts/{{.ContactID}}" class="font-medium text-gray-800 hover:text-blue-600">{{.Name}}</a>
               </td>
+              <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{affiliationLabel .Affiliation}}</td>
               <td class="px-4 py-3 text-gray-700">{{if .StartDate}}{{.StartDate}}{{else}}—{{end}}</td>
               <td class="px-4 py-3 text-gray-700">{{if .EndDate}}{{.EndDate}}{{else}}—{{end}}</td>
               <td class="px-4 py-3">
@@ -78,6 +81,7 @@
                 {{end}}
               </td>
               <td class="px-4 py-3 text-gray-700">{{if .Phone}}{{.Phone}}{{else}}—{{end}}</td>
+              <td class="px-4 py-3 text-gray-700">{{if .Mobile}}{{.Mobile}}{{else}}—{{end}}</td>
               <td class="px-4 py-3 text-gray-700">{{if .Email}}{{.Email}}{{else}}—{{end}}</td>
             </tr>
             {{end}}

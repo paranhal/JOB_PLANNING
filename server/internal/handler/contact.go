@@ -49,7 +49,7 @@ func (h *ContactHandler) List(c echo.Context) error {
 func (h *ContactHandler) New(c echo.Context) error {
 	customers, _ := h.customerRepo.ListAll()
 	jobGrades, _ := h.codeRepo.ActiveByGroup("job_grade")
-	ct := &model.Contact{Status: "active", ContactRole: "primary", IsPrimary: true}
+	ct := &model.Contact{Status: "active", ContactRole: "primary", IsPrimary: true, Affiliation: "institution"}
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		ct.CustomerID = cid
 	}
@@ -194,6 +194,7 @@ func bindContact(c echo.Context) *model.Contact {
 	return &model.Contact{
 		CustomerID:  c.FormValue("customer_id"),
 		FullName:    c.FormValue("full_name"),
+		Affiliation: c.FormValue("affiliation"),
 		JobRole:     c.FormValue("job_role"),
 		Title:       c.FormValue("title"),
 		JobGrade:    jobGrade,

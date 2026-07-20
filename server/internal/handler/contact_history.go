@@ -23,11 +23,13 @@ func historyToListItem(h model.ContactHistory) model.ContactHistoryListItem {
 	return model.ContactHistoryListItem{
 		ContactID:    h.ContactID,
 		Name:         h.ContactName,
+		Affiliation:  h.Affiliation,
 		StartDate:    h.StartDate,
 		EndDate:      h.EndDate,
 		ContactRole:  role,
 		ChangeReason: h.ChangeReason,
 		Phone:        h.Phone,
+		Mobile:       h.Mobile,
 		Email:        h.Email,
 		IsCurrent:    false,
 	}
@@ -45,11 +47,13 @@ func contactToCurrentListItem(ct model.Contact) model.ContactHistoryListItem {
 	return model.ContactHistoryListItem{
 		ContactID:    ct.ContactID,
 		Name:         ct.FullName,
+		Affiliation:  ct.Affiliation,
 		StartDate:    ct.StartDate,
 		EndDate:      ct.EndDate,
 		ContactRole:  role,
 		ChangeReason: "",
 		Phone:        ct.Phone,
+		Mobile:       ct.Mobile,
 		Email:        ct.Email,
 		IsCurrent:    true,
 	}

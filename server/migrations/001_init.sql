@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     start_date  DATE,
     end_date    DATE,
     status      VARCHAR(20)  DEFAULT 'active',
+    affiliation VARCHAR(20) DEFAULT 'institution',
     contact_role VARCHAR(20) DEFAULT 'regular',
     is_primary  BOOLEAN      DEFAULT FALSE,
     notes       TEXT,
@@ -99,8 +100,10 @@ CREATE TABLE IF NOT EXISTS contact_history (
     job_role      VARCHAR(100),
     title         VARCHAR(100),
     phone         VARCHAR(50),
+    mobile        VARCHAR(50),
     email         VARCHAR(200),
     status        VARCHAR(20),
+    affiliation   VARCHAR(20),
     contact_role  VARCHAR(20),
     change_reason TEXT,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
