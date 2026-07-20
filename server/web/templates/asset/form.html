@@ -102,12 +102,30 @@
             {{range .MaintContractTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.MaintContractType}}selected{{end}}>{{.CodeName}}</option>{{end}}
           </select>
         </div>
-        <div>
+        <div
+             data-saved="{{.Asset.MaintCycle}}"
+             x-data="{
+               presets: ['monthly','quarterly','semi','odd_bimonthly','even_bimonthly'],
+               mode: '',
+               customText: '',
+               init() {
+                 const s = this.$el.getAttribute('data-saved') || '';
+                 if (this.presets.includes(s)) { this.mode = s; }
+                 else if (s) { this.mode = 'custom'; this.customText = s; }
+               }
+             }">
           <label class="block text-sm font-medium text-gray-700 mb-1">점검주기</label>
-          <select name="maint_cycle" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <select name="maint_cycle_code" x-model="mode" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">선택</option>
-            {{range .MaintCycles}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.MaintCycle}}selected{{end}}>{{.CodeName}}</option>{{end}}
+            {{range .MaintCycles}}
+            <option value="{{.CodeValue}}">{{.CodeName}}</option>
+            {{end}}
           </select>
+          <div x-show="mode==='custom'" x-cloak class="mt-2">
+            <input type="text" name="maint_cycle_custom" x-model="customText"
+                   placeholder="예: 격주, 요청 시"
+                   class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">계약 시작일</label>

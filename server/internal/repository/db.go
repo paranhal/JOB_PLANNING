@@ -379,12 +379,13 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('MCT002','maint_contract_type','free','무상',2),
 ('MCT003','maint_contract_type','call','CALL',3),
 ('MCT004','maint_contract_type','none','미계약',4),
--- 유지보수 점검주기
+-- 유지보수 점검주기 (청구주기와 동일 체계)
 ('MCY001','maint_cycle','monthly','월',1),
-('MCY002','maint_cycle','call','Call',2),
-('MCY003','maint_cycle','quarterly','분기',3),
-('MCY004','maint_cycle','yearly','연',4),
-('MCY005','maint_cycle','none','없음',5),
+('MCY002','maint_cycle','quarterly','분기',2),
+('MCY003','maint_cycle','semi','반기',3),
+('MCY004','maint_cycle','odd_bimonthly','홀수격월',4),
+('MCY005','maint_cycle','even_bimonthly','짝수격월',5),
+('MCY006','maint_cycle','custom','직접입력',6),
 -- 유지보수 청구주기
 ('MBC001','maint_billing_cycle','monthly','월',1),
 ('MBC002','maint_billing_cycle','quarterly','분기',2),
@@ -470,6 +471,16 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
 	}
+
+	// 점검주기 코드를 청구주기와 동일 체계로 동기화 (기존 Call/연/없음 시드 교체)
+	db.Exec(`DELETE FROM codes WHERE code_group='maint_cycle'`)
+	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
+		('MCY001','maint_cycle','monthly','월',1),
+		('MCY002','maint_cycle','quarterly','분기',2),
+		('MCY003','maint_cycle','semi','반기',3),
+		('MCY004','maint_cycle','odd_bimonthly','홀수격월',4),
+		('MCY005','maint_cycle','even_bimonthly','짝수격월',5),
+		('MCY006','maint_cycle','custom','직접입력',6)`)
 
 	return nil
 }

@@ -129,8 +129,11 @@ func funcMap() template.FuncMap {
 		},
 		"maintCycleLabel": func(s string) string {
 			m := map[string]string{
-				"monthly": "월", "call": "Call", "quarterly": "분기",
-				"yearly": "연", "none": "없음",
+				"monthly": "월", "quarterly": "분기", "semi": "반기",
+				"odd_bimonthly": "홀수격월", "even_bimonthly": "짝수격월",
+				"custom": "직접입력",
+				// 이전 시드 호환
+				"call": "Call", "yearly": "연", "none": "없음",
 			}
 			if l, ok := m[s]; ok {
 				return l

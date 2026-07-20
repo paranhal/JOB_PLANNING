@@ -20,7 +20,7 @@ type Asset struct {
 	IsManaged        bool      `json:"is_managed"`
 	// 유지보수 계약 (기획서 §6.1) — 관리유형과 별개
 	MaintContractType string `json:"maint_contract_type"` // paid/free/call/none
-	MaintCycle        string `json:"maint_cycle"`         // monthly/call/quarterly/yearly/none
+	MaintCycle        string `json:"maint_cycle"`         // monthly/quarterly/semi/odd_bimonthly/even_bimonthly 또는 직접입력 문구
 	MaintStartDate    string `json:"maint_start_date"`
 	MaintEndDate      string `json:"maint_end_date"`
 	MaintBillingParty string `json:"maint_billing_party"`

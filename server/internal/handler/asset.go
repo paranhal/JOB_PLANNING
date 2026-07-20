@@ -141,6 +141,10 @@ func bindAsset(c echo.Context) *model.Asset {
 	if billingCycle == "custom" {
 		billingCycle = c.FormValue("maint_billing_cycle_custom")
 	}
+	maintCycle := c.FormValue("maint_cycle_code")
+	if maintCycle == "custom" {
+		maintCycle = c.FormValue("maint_cycle_custom")
+	}
 
 	return &model.Asset{
 		CustomerID:        c.FormValue("customer_id"),
@@ -157,7 +161,7 @@ func bindAsset(c echo.Context) *model.Asset {
 		ManagementType:    c.FormValue("management_type"),
 		IsManaged:         c.FormValue("is_managed") != "0",
 		MaintContractType: c.FormValue("maint_contract_type"),
-		MaintCycle:        c.FormValue("maint_cycle"),
+		MaintCycle:        maintCycle,
 		MaintStartDate:    c.FormValue("maint_start_date"),
 		MaintEndDate:      c.FormValue("maint_end_date"),
 		MaintBillingParty: c.FormValue("maint_billing_party"),
