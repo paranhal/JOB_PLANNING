@@ -106,6 +106,7 @@ func main() {
 	api.GET("/floors/:building_id", h.Space.APIFloors)
 	api.GET("/rooms/:floor_id", h.Space.APIRooms)
 	api.GET("/assets/:customer_id", h.Asset.APIAssetsByCustomer)
+	api.GET("/contacts/:customer_id", h.Contact.APIContactsByCustomer)
 
 	// 담당자 관리
 	contact := g.Group("/contacts")

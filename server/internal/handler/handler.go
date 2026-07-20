@@ -59,7 +59,11 @@ func New(db *sql.DB) *Handler {
 		Asset:    &AssetHandler{repo: assetRepo, customerRepo: customerRepo, codeRepo: codeRepo},
 		SWDetail: &SWDetailHandler{repo: swDetailRepo},
 		Relation: &RelationHandler{repo: relationRepo, customerRepo: customerRepo, codeRepo: codeRepo},
-		AS:       &ASHandler{repo: asRepo, processRepo: asProcessRepo, customerRepo: customerRepo, assetRepo: assetRepo, codeRepo: codeRepo},
+		AS: &ASHandler{
+			repo: asRepo, processRepo: asProcessRepo,
+			customerRepo: customerRepo, assetRepo: assetRepo,
+			contactRepo: contactRepo, codeRepo: codeRepo,
+		},
 		Analysis: &AnalysisHandler{db: db},
 		Code:     &CodeHandler{repo: codeRepo},
 		Attachment: &AttachmentHandler{repo: attachRepo, uploadDir: "data/uploads"},

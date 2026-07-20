@@ -7,7 +7,8 @@
   </div>
 
   <form id="as-form" method="POST" action="/as" class="space-y-6"
-        data-init-asset="{{.AS.AssetID}}">
+        data-init-asset="{{.AS.AssetID}}"
+        data-init-requester="{{.AS.Requester}}">
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">접수 대상</h3>
       <div>
@@ -54,7 +55,21 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">요청자</label>
-          <input type="text" name="requester" value="{{.AS.Requester}}" placeholder="요청자 이름" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <select name="requester_code" id="as-requester_code" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .Contacts}}
+            <option value="{{.FullName}}" {{if eq $.AS.Requester .FullName}}selected{{end}}>
+              {{.FullName}}{{if .Title}} · {{.Title}}{{end}}{{if .IsPrimary}} (주담당){{end}}{{if ne .Status "active"}} [{{.Status}}]{{end}}
+            </option>
+            {{end}}
+            <option value="custom">직접입력</option>
+          </select>
+          <div id="as-requester-custom-wrap" class="mt-2 hidden">
+            <input type="text" name="requester_custom" id="as-requester_custom"
+                   placeholder="요청자 이름 직접 입력"
+                   class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <p class="mt-1 text-xs text-gray-400">기관 담당자 목록에서 선택하거나 직접입력하세요.</p>
         </div>
       </div>
 
@@ -93,7 +108,11 @@
     if (!form) return;
     var custSel = document.getElementById('as-customer_id');
     var assetSel = document.getElementById('as-asset_id');
+    var reqSel = document.getElementById('as-requester_code');
+    var reqCustomWrap = document.getElementById('as-requester-custom-wrap');
+    var reqCustom = document.getElementById('as-requester_custom');
     var initAsset = form.getAttribute('data-init-asset') || '';
+    var initRequester = form.getAttribute('data-init-requester') || '';
 
     function assetLabel(a) {
       var t = a.product_name || a.ProductName || '';
@@ -104,12 +123,46 @@
       return t || (a.asset_id || a.AssetID);
     }
 
+    function contactLabel(ct) {
+      var name = ct.full_name || ct.FullName || '';
+      var title = ct.title || ct.Title || '';
+      var primary = ct.is_primary || ct.IsPrimary;
+      var status = ct.status || ct.Status || 'active';
+      var t = name;
+      if (title) t += ' · ' + title;
+      if (primary) t += ' (주담당)';
+      if (status && status !== 'active') t += ' [' + status + ']';
+      return t || name;
+    }
+
+    function syncRequesterCustom() {
+      if (reqSel.value === 'custom') {
+        reqCustomWrap.classList.remove('hidden');
+      } else {
+        reqCustomWrap.classList.add('hidden');
+        reqCustom.value = '';
+      }
+    }
+
     function resetAssets(keepPlaceholder) {
       assetSel.innerHTML = '';
       var opt0 = document.createElement('option');
       opt0.value = '';
       opt0.textContent = keepPlaceholder ? '자산 미연결 (나중에 매핑)' : '기관을 먼저 선택하세요';
       assetSel.appendChild(opt0);
+    }
+
+    function resetRequesters(keepPlaceholder) {
+      reqSel.innerHTML = '';
+      var opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = keepPlaceholder ? '선택' : '기관을 먼저 선택하세요';
+      reqSel.appendChild(opt0);
+      var optCustom = document.createElement('option');
+      optCustom.value = 'custom';
+      optCustom.textContent = '직접입력';
+      reqSel.appendChild(optCustom);
+      syncRequesterCustom();
     }
 
     function loadAssets(cid, selectedId) {
@@ -123,23 +176,56 @@
             var opt = document.createElement('option');
             opt.value = id;
             opt.textContent = assetLabel(a);
-            if (selectedId && id === selectedId) opt.selected = true;
             assetSel.appendChild(opt);
           });
           if (selectedId) assetSel.value = selectedId;
         })
-        .catch(function () { /* 목록 비움 유지 */ });
+        .catch(function () {});
     }
+
+    function loadContacts(cid, selectedName) {
+      resetRequesters(!!cid);
+      if (!cid) return Promise.resolve();
+      return fetch('/api/contacts/' + encodeURIComponent(cid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          var names = [];
+          (arr || []).forEach(function (ct) {
+            var name = ct.full_name || ct.FullName || '';
+            if (!name) return;
+            names.push(name);
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = contactLabel(ct);
+            // 직접입력 앞에 삽입
+            reqSel.insertBefore(opt, reqSel.querySelector('option[value="custom"]'));
+          });
+          if (selectedName) {
+            if (names.indexOf(selectedName) >= 0) {
+              reqSel.value = selectedName;
+            } else {
+              reqSel.value = 'custom';
+              reqCustom.value = selectedName;
+            }
+          }
+          syncRequesterCustom();
+        })
+        .catch(function () {});
+    }
+
+    reqSel.addEventListener('change', syncRequesterCustom);
 
     custSel.addEventListener('change', function () {
       loadAssets(custSel.value, '');
+      loadContacts(custSel.value, '');
     });
 
-    // 기관이 미리 선택된 경우(고객/자산 상세에서 진입) 목록 재로드해 최신 반영
     if (custSel.value) {
       loadAssets(custSel.value, initAsset);
+      loadContacts(custSel.value, initRequester);
     } else {
       resetAssets(false);
+      resetRequesters(false);
     }
   })();
   </script>

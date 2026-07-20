@@ -15,6 +15,7 @@ type ASHandler struct {
 	processRepo  *repository.ASProcessRepo
 	customerRepo *repository.CustomerRepo
 	assetRepo    *repository.AssetRepo
+	contactRepo  *repository.ContactRepo
 	codeRepo     *repository.CodeRepo
 }
 
@@ -56,23 +57,32 @@ func (h *ASHandler) New(c echo.Context) error {
 	}
 
 	var assets []model.Asset
+	var contacts []model.Contact
 	if as.CustomerID != "" {
 		assets, _ = h.assetRepo.ListByCustomer(as.CustomerID)
+		contacts, _ = h.contactRepo.ListByCustomer(as.CustomerID)
 	}
 
 	return c.Render(http.StatusOK, "as/form.html", map[string]interface{}{
 		"Title": "AS 접수", "Active": "as", "IsNew": true,
-		"AS": as, "Customers": customers, "Assets": assets,
+		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
 		"Channels": channels, "Urgencies": urgencies, "ReqTypes": reqTypes,
 	})
 }
 
 func (h *ASHandler) Create(c echo.Context) error {
+	requester := c.FormValue("requester_code")
+	if requester == "custom" {
+		requester = c.FormValue("requester_custom")
+	} else if requester == "" {
+		requester = c.FormValue("requester")
+	}
+
 	as := &model.ASReceipt{
 		CustomerID:     c.FormValue("customer_id"),
 		AssetID:        c.FormValue("asset_id"),
 		ReceiptChannel: c.FormValue("receipt_channel"),
-		Requester:      c.FormValue("requester"),
+		Requester:      requester,
 		Symptom:        c.FormValue("symptom"),
 		Urgency:        c.FormValue("urgency"),
 		Priority:       c.FormValue("priority"),

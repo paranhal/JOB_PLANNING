@@ -122,6 +122,18 @@ func (h *ContactHandler) Update(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/contacts/"+ct.ContactID)
 }
 
+// APIContactsByCustomer 고객별 담당자 목록 JSON (AS 접수 요청자 콤보 등)
+func (h *ContactHandler) APIContactsByCustomer(c echo.Context) error {
+	items, err := h.repo.ListByCustomer(c.Param("customer_id"))
+	if err != nil {
+		return err
+	}
+	if items == nil {
+		items = []model.Contact{}
+	}
+	return c.JSON(http.StatusOK, items)
+}
+
 func bindContact(c echo.Context) *model.Contact {
 	return &model.Contact{
 		CustomerID: c.FormValue("customer_id"),
