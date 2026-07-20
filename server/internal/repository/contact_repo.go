@@ -16,6 +16,23 @@ func NewContactRepo(db *sql.DB) *ContactRepo {
 	return &ContactRepo{db: db}
 }
 
+func normalizeContactRole(role string, isPrimary bool) string {
+	switch role {
+	case "primary", "secondary", "regular":
+		return role
+	}
+	if isPrimary {
+		return "primary"
+	}
+	return "regular"
+}
+
+func applyContactFlags(ct *model.Contact, isPrimary int, role string) {
+	ct.IsPrimary = isPrimary == 1
+	ct.ContactRole = normalizeContactRole(role, ct.IsPrimary)
+	ct.IsPrimary = ct.ContactRole == "primary"
+}
+
 // List 담당자 목록 조회 (검색, 페이징)
 func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, int, error) {
 	offset := (page - 1) * pageSize
@@ -26,7 +43,7 @@ func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, 
 		       COALESCE(c.phone,''), COALESCE(c.mobile,''),
 		       COALESCE(c.email,''), COALESCE(c.start_date,''),
 		       COALESCE(c.end_date,''), COALESCE(c.status,'active'),
-		       c.is_primary, COALESCE(c.notes,''),
+		       COALESCE(c.contact_role,''), c.is_primary, COALESCE(c.notes,''),
 		       cu.org_name
 		FROM contacts c
 		JOIN customers cu ON cu.customer_id = c.customer_id
@@ -50,7 +67,7 @@ func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, 
 		countArgs = append(countArgs, like, like, like, like, like)
 	}
 
-	baseQuery += ` ORDER BY cu.org_name, c.full_name LIMIT ? OFFSET ?`
+	baseQuery += ` ORDER BY cu.org_name, CASE COALESCE(c.contact_role,'') WHEN 'primary' THEN 0 WHEN 'secondary' THEN 1 ELSE 2 END, c.full_name LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	var total int
@@ -68,18 +85,19 @@ func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, 
 	for rows.Next() {
 		var item model.Contact
 		var isPrimary int
+		var role string
 		if err := rows.Scan(
 			&item.ContactID, &item.CustomerID, &item.FullName,
 			&item.JobRole, &item.Title, &item.JobGrade,
 			&item.Phone, &item.Mobile,
 			&item.Email, &item.StartDate,
 			&item.EndDate, &item.Status,
-			&isPrimary, &item.Notes,
+			&role, &isPrimary, &item.Notes,
 			&item.OrgName,
 		); err != nil {
 			return nil, 0, err
 		}
-		item.IsPrimary = isPrimary == 1
+		applyContactFlags(&item, isPrimary, role)
 		items = append(items, item)
 	}
 	return items, total, rows.Err()
@@ -93,10 +111,10 @@ func (r *ContactRepo) ListByCustomer(customerID string) ([]model.Contact, error)
 		       COALESCE(phone,''), COALESCE(mobile,''),
 		       COALESCE(email,''), COALESCE(start_date,''),
 		       COALESCE(end_date,''), COALESCE(status,'active'),
-		       is_primary, COALESCE(notes,'')
+		       COALESCE(contact_role,''), is_primary, COALESCE(notes,'')
 		FROM contacts
 		WHERE customer_id = ?
-		ORDER BY is_primary DESC, full_name`
+		ORDER BY CASE COALESCE(contact_role,'') WHEN 'primary' THEN 0 WHEN 'secondary' THEN 1 ELSE 2 END, full_name`
 
 	rows, err := r.db.Query(query, customerID)
 	if err != nil {
@@ -108,17 +126,18 @@ func (r *ContactRepo) ListByCustomer(customerID string) ([]model.Contact, error)
 	for rows.Next() {
 		var item model.Contact
 		var isPrimary int
+		var role string
 		if err := rows.Scan(
 			&item.ContactID, &item.CustomerID, &item.FullName,
 			&item.JobRole, &item.Title, &item.JobGrade,
 			&item.Phone, &item.Mobile,
 			&item.Email, &item.StartDate,
 			&item.EndDate, &item.Status,
-			&isPrimary, &item.Notes,
+			&role, &isPrimary, &item.Notes,
 		); err != nil {
 			return nil, err
 		}
-		item.IsPrimary = isPrimary == 1
+		applyContactFlags(&item, isPrimary, role)
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -132,7 +151,7 @@ func (r *ContactRepo) GetByID(id string) (*model.Contact, error) {
 		       COALESCE(c.phone,''), COALESCE(c.mobile,''),
 		       COALESCE(c.email,''), COALESCE(c.start_date,''),
 		       COALESCE(c.end_date,''), COALESCE(c.status,'active'),
-		       c.is_primary, COALESCE(c.notes,''),
+		       COALESCE(c.contact_role,''), c.is_primary, COALESCE(c.notes,''),
 		       cu.org_name
 		FROM contacts c
 		JOIN customers cu ON cu.customer_id = c.customer_id
@@ -140,13 +159,14 @@ func (r *ContactRepo) GetByID(id string) (*model.Contact, error) {
 
 	var ct model.Contact
 	var isPrimary int
+	var role string
 	err := r.db.QueryRow(query, id).Scan(
 		&ct.ContactID, &ct.CustomerID, &ct.FullName,
 		&ct.JobRole, &ct.Title, &ct.JobGrade,
 		&ct.Phone, &ct.Mobile,
 		&ct.Email, &ct.StartDate,
 		&ct.EndDate, &ct.Status,
-		&isPrimary, &ct.Notes,
+		&role, &isPrimary, &ct.Notes,
 		&ct.OrgName,
 	)
 	if err == sql.ErrNoRows {
@@ -155,38 +175,42 @@ func (r *ContactRepo) GetByID(id string) (*model.Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	ct.IsPrimary = isPrimary == 1
+	applyContactFlags(&ct, isPrimary, role)
 	return &ct, nil
 }
 
 // Create 담당자 등록
 func (r *ContactRepo) Create(ct *model.Contact) error {
 	ct.ContactID = fmt.Sprintf("CONT-%d", time.Now().UnixNano())
+	ct.ContactRole = normalizeContactRole(ct.ContactRole, ct.IsPrimary)
+	ct.IsPrimary = ct.ContactRole == "primary"
 	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err := r.db.Exec(`
 		INSERT INTO contacts (
 			contact_id, customer_id, full_name, job_role, title, job_grade,
 			phone, mobile, email, start_date, end_date,
-			status, is_primary, notes, created_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			status, contact_role, is_primary, notes, created_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		ct.ContactID, ct.CustomerID, ct.FullName, ct.JobRole, ct.Title, ct.JobGrade,
 		ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
-		ct.Status, boolToInt(ct.IsPrimary), ct.Notes, now,
+		ct.Status, ct.ContactRole, boolToInt(ct.IsPrimary), ct.Notes, now,
 	)
 	return err
 }
 
 // Update 담당자 수정
 func (r *ContactRepo) Update(ct *model.Contact) error {
+	ct.ContactRole = normalizeContactRole(ct.ContactRole, ct.IsPrimary)
+	ct.IsPrimary = ct.ContactRole == "primary"
 	_, err := r.db.Exec(`
 		UPDATE contacts SET
 			customer_id=?, full_name=?, job_role=?, title=?, job_grade=?,
 			phone=?, mobile=?, email=?, start_date=?, end_date=?,
-			status=?, is_primary=?, notes=?
+			status=?, contact_role=?, is_primary=?, notes=?
 		WHERE contact_id=?`,
 		ct.CustomerID, ct.FullName, ct.JobRole, ct.Title, ct.JobGrade,
 		ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
-		ct.Status, boolToInt(ct.IsPrimary), ct.Notes, ct.ContactID,
+		ct.Status, ct.ContactRole, boolToInt(ct.IsPrimary), ct.Notes, ct.ContactID,
 	)
 	return err
 }

@@ -160,6 +160,31 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"contactRoleLabel": func(s string) string {
+			m := map[string]string{
+				"primary": "주담당", "secondary": "부담당", "regular": "일반 담당자",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			if s == "" {
+				return "일반 담당자"
+			}
+			return s
+		},
+		"changeReasonLabel": func(s string) string {
+			m := map[string]string{
+				"transfer": "전보", "resign": "퇴직", "role_adjust": "업무조정",
+				"전보": "전보", "퇴직": "퇴직", "업무조정": "업무조정",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			if s == "" {
+				return "현행"
+			}
+			return s
+		},
 		"codeLabel": func(val string, codes interface{}) string {
 			// 범용 코드→이름 변환
 			return val

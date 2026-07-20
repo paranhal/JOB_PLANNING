@@ -49,7 +49,7 @@ func (h *ContactHandler) List(c echo.Context) error {
 func (h *ContactHandler) New(c echo.Context) error {
 	customers, _ := h.customerRepo.ListAll()
 	jobGrades, _ := h.codeRepo.ActiveByGroup("job_grade")
-	ct := &model.Contact{Status: "active", IsPrimary: true}
+	ct := &model.Contact{Status: "active", ContactRole: "primary", IsPrimary: true}
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		ct.CustomerID = cid
 	}
@@ -111,20 +111,57 @@ func (h *ContactHandler) Edit(c echo.Context) error {
 	})
 }
 
-// Update 담당자 수정 처리 (변경 전 이력 자동 저장)
+// Update 담당자 수정 처리 (전보·퇴직·업무조정 시에만 이력 저장)
 func (h *ContactHandler) Update(c echo.Context) error {
 	id := c.Param("id")
 	old, _ := h.repo.GetByID(id)
-	if old != nil {
-		h.histRepo.SnapshotFromContact(old, "수정")
-	}
 
 	ct := bindContact(c)
 	ct.ContactID = id
+
+	if old != nil {
+		if reason := contactChangeReason(old, ct); reason != "" {
+			h.histRepo.SnapshotFromContact(old, reason)
+		}
+	}
+
 	if err := h.repo.Update(ct); err != nil {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/contacts/"+ct.ContactID)
+}
+
+// contactChangeReason 담당자 변경 이력 사유 (없으면 빈 문자열 = 이력 미기록)
+func contactChangeReason(old, neu *model.Contact) string {
+	oldRole := old.ContactRole
+	if oldRole == "" {
+		if old.IsPrimary {
+			oldRole = "primary"
+		} else {
+			oldRole = "regular"
+		}
+	}
+	newRole := neu.ContactRole
+	if newRole == "" {
+		if neu.IsPrimary {
+			newRole = "primary"
+		} else {
+			newRole = "regular"
+		}
+	}
+
+	if old.Status != neu.Status {
+		switch neu.Status {
+		case "transferred":
+			return "transfer"
+		case "resigned":
+			return "resign"
+		}
+	}
+	if oldRole != newRole {
+		return "role_adjust"
+	}
+	return ""
 }
 
 // APIContactsByCustomer 고객별 담당자 목록 JSON (AS 접수 요청자 콤보 등)
@@ -145,19 +182,29 @@ func bindContact(c echo.Context) *model.Contact {
 		jobGrade = c.FormValue("job_grade_custom")
 	}
 
+	role := c.FormValue("contact_role")
+	if role == "" {
+		if c.FormValue("is_primary") == "1" {
+			role = "primary"
+		} else {
+			role = "regular"
+		}
+	}
+
 	return &model.Contact{
-		CustomerID: c.FormValue("customer_id"),
-		FullName:   c.FormValue("full_name"),
-		JobRole:    c.FormValue("job_role"),
-		Title:      c.FormValue("title"),
-		JobGrade:   jobGrade,
-		Phone:      c.FormValue("phone"),
-		Mobile:     c.FormValue("mobile"),
-		Email:      c.FormValue("email"),
-		StartDate:  c.FormValue("start_date"),
-		EndDate:    c.FormValue("end_date"),
-		Status:     c.FormValue("status"),
-		IsPrimary:  c.FormValue("is_primary") == "1",
-		Notes:      c.FormValue("notes"),
+		CustomerID:  c.FormValue("customer_id"),
+		FullName:    c.FormValue("full_name"),
+		JobRole:     c.FormValue("job_role"),
+		Title:       c.FormValue("title"),
+		JobGrade:    jobGrade,
+		Phone:       c.FormValue("phone"),
+		Mobile:      c.FormValue("mobile"),
+		Email:       c.FormValue("email"),
+		StartDate:   c.FormValue("start_date"),
+		EndDate:     c.FormValue("end_date"),
+		Status:      c.FormValue("status"),
+		ContactRole: role,
+		IsPrimary:   role == "primary",
+		Notes:       c.FormValue("notes"),
 	}
 }

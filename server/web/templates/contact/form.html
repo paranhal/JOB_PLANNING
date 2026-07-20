@@ -130,12 +130,15 @@
       </div>
     </div>
 
-    <!-- 주담당 여부 -->
-    <div class="flex items-center gap-2">
-      <input type="checkbox" name="is_primary" value="1" id="is_primary"
-             {{if .Contact.IsPrimary}}checked{{end}}
-             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-      <label for="is_primary" class="text-sm text-gray-700">주담당자로 지정</label>
+    <!-- 담당구분 -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">담당구분</label>
+      <select name="contact_role"
+              class="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="primary" {{if or (eq .Contact.ContactRole "primary") (and (eq .Contact.ContactRole "") .Contact.IsPrimary)}}selected{{end}}>주담당</option>
+        <option value="secondary" {{if eq .Contact.ContactRole "secondary"}}selected{{end}}>부담당</option>
+        <option value="regular" {{if or (eq .Contact.ContactRole "regular") (and (eq .Contact.ContactRole "") (not .Contact.IsPrimary))}}selected{{end}}>일반 담당자</option>
+      </select>
     </div>
 
     <!-- 비고 -->

@@ -64,21 +64,22 @@ type CustomerRoom struct {
 
 // Contact 고객 담당자 (기획서 §5.3)
 type Contact struct {
-	ContactID  string    `json:"contact_id"`
-	CustomerID string    `json:"customer_id"`
-	FullName   string    `json:"full_name"`
-	JobRole    string    `json:"job_role"`
-	Title      string    `json:"title"`
-	JobGrade   string    `json:"job_grade"` // librarian/it/other 또는 직접입력 문구
-	Phone      string    `json:"phone"`
-	Mobile     string    `json:"mobile"`
-	Email      string    `json:"email"`
-	StartDate  string    `json:"start_date"`
-	EndDate    string    `json:"end_date"`
-	Status     string    `json:"status"`    // active, transferred, resigned
-	IsPrimary  bool      `json:"is_primary"`
-	Notes      string    `json:"notes"`
-	CreatedAt  time.Time `json:"created_at"`
+	ContactID   string    `json:"contact_id"`
+	CustomerID  string    `json:"customer_id"`
+	FullName    string    `json:"full_name"`
+	JobRole     string    `json:"job_role"`
+	Title       string    `json:"title"`
+	JobGrade    string    `json:"job_grade"` // librarian/it/other 또는 직접입력 문구
+	Phone       string    `json:"phone"`
+	Mobile      string    `json:"mobile"`
+	Email       string    `json:"email"`
+	StartDate   string    `json:"start_date"`
+	EndDate     string    `json:"end_date"`
+	Status      string    `json:"status"`       // active, transferred, resigned
+	ContactRole string    `json:"contact_role"` // primary, secondary, regular
+	IsPrimary   bool      `json:"is_primary"`   // contact_role==primary 와 동기
+	Notes       string    `json:"notes"`
+	CreatedAt   time.Time `json:"created_at"`
 
 	// JOIN용
 	OrgName string `json:"org_name,omitempty"`
@@ -97,11 +98,25 @@ type ContactHistory struct {
 	Phone        string    `json:"phone"`
 	Email        string    `json:"email"`
 	Status       string    `json:"status"`
-	ChangeReason string    `json:"change_reason"`
+	ContactRole  string    `json:"contact_role"`
+	ChangeReason string    `json:"change_reason"` // transfer, resign, role_adjust
 	CreatedAt    time.Time `json:"created_at"`
 
 	// JOIN용
 	ContactName string `json:"contact_name,omitempty"`
+}
+
+// ContactHistoryListItem 담당자 이력 화면 행 (§5.4 표시용)
+type ContactHistoryListItem struct {
+	ContactID    string `json:"contact_id"`
+	Name         string `json:"name"`
+	StartDate    string `json:"start_date"`
+	EndDate      string `json:"end_date"`
+	ContactRole  string `json:"contact_role"`
+	ChangeReason string `json:"change_reason"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	IsCurrent    bool   `json:"is_current"` // 변경 이력 없을 때 현행 담당자 행
 }
 
 // CustomerListItem 목록 표시용 (집계 포함)

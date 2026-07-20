@@ -15,7 +15,57 @@ type ContactHistoryHandler struct {
 	customerRepo *repository.CustomerRepo
 }
 
-// List 기관별 등록 담당자 정보 목록 (수정 스냅샷이 아닌 담당자 본인 정보)
+func historyToListItem(h model.ContactHistory) model.ContactHistoryListItem {
+	role := h.ContactRole
+	if role == "" {
+		role = "regular"
+	}
+	return model.ContactHistoryListItem{
+		ContactID:    h.ContactID,
+		Name:         h.ContactName,
+		StartDate:    h.StartDate,
+		EndDate:      h.EndDate,
+		ContactRole:  role,
+		ChangeReason: h.ChangeReason,
+		Phone:        h.Phone,
+		Email:        h.Email,
+		IsCurrent:    false,
+	}
+}
+
+func contactToCurrentListItem(ct model.Contact) model.ContactHistoryListItem {
+	role := ct.ContactRole
+	if role == "" {
+		if ct.IsPrimary {
+			role = "primary"
+		} else {
+			role = "regular"
+		}
+	}
+	return model.ContactHistoryListItem{
+		ContactID:    ct.ContactID,
+		Name:         ct.FullName,
+		StartDate:    ct.StartDate,
+		EndDate:      ct.EndDate,
+		ContactRole:  role,
+		ChangeReason: "",
+		Phone:        ct.Phone,
+		Email:        ct.Email,
+		IsCurrent:    true,
+	}
+}
+
+func filterMeaningful(hist []model.ContactHistory) []model.ContactHistory {
+	var out []model.ContactHistory
+	for _, h := range hist {
+		if repository.IsMeaningfulChangeReason(h.ChangeReason) {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// List 기관별 담당자 변경 이력 (미변경 시 현행 담당자만 표시)
 func (h *ContactHistoryHandler) List(c echo.Context) error {
 	contactID := c.QueryParam("contact_id")
 	customerID := c.QueryParam("customer_id")
@@ -23,34 +73,53 @@ func (h *ContactHistoryHandler) List(c echo.Context) error {
 	customers, _ := h.customerRepo.ListAll()
 
 	var contacts []model.Contact
-	var items []model.Contact
+	var items []model.ContactHistoryListItem
+	showingCurrent := false
 
 	if contactID != "" {
 		if ct, _ := h.contactRepo.GetByID(contactID); ct != nil {
 			if customerID == "" {
 				customerID = ct.CustomerID
 			}
-			items = []model.Contact{*ct}
 		}
 	}
 
 	if customerID != "" {
 		contacts, _ = h.contactRepo.ListByCustomer(customerID)
-		if contactID == "" {
-			items = contacts
-		}
-	}
 
-	var orgName string
-	for _, cu := range customers {
-		if cu.CustomerID == customerID {
-			orgName = cu.OrgName
-			break
+		var hist []model.ContactHistory
+		if contactID != "" {
+			hist, _ = h.repo.ListByContact(contactID)
+		} else {
+			hist, _ = h.repo.ListByCustomer(customerID)
 		}
-	}
-	for i := range items {
-		if items[i].OrgName == "" {
-			items[i].OrgName = orgName
+		hist = filterMeaningful(hist)
+
+		if len(hist) > 0 {
+			for _, row := range hist {
+				items = append(items, historyToListItem(row))
+			}
+		} else {
+			// 아직 담당자가 바뀌지 않은 경우: 현행 담당자만 표시
+			showingCurrent = true
+			if contactID != "" {
+				if ct, _ := h.contactRepo.GetByID(contactID); ct != nil {
+					items = append(items, contactToCurrentListItem(*ct))
+				}
+			} else {
+				for _, ct := range contacts {
+					// 미변경 시에는 재직 중 담당자를 우선 표시
+					if ct.Status == "active" || ct.Status == "" {
+						items = append(items, contactToCurrentListItem(ct))
+					}
+				}
+				// 재직자가 없으면 등록된 전원(보통 1명) 표시
+				if len(items) == 0 {
+					for _, ct := range contacts {
+						items = append(items, contactToCurrentListItem(ct))
+					}
+				}
+			}
 		}
 	}
 
@@ -58,7 +127,7 @@ func (h *ContactHistoryHandler) List(c echo.Context) error {
 		"Title": "담당자 이력", "Active": "contact_history",
 		"Items": items, "ContactID": contactID, "CustomerID": customerID,
 		"Customers": customers, "Contacts": contacts,
-		"ItemCount": len(items),
+		"ItemCount": len(items), "ShowingCurrent": showingCurrent,
 	})
 }
 
@@ -74,6 +143,7 @@ func (h *ContactHistoryHandler) Create(c echo.Context) error {
 		Phone:        c.FormValue("phone"),
 		Email:        c.FormValue("email"),
 		Status:       c.FormValue("status"),
+		ContactRole:  c.FormValue("contact_role"),
 		ChangeReason: c.FormValue("change_reason"),
 	}
 	h.repo.Create(hist)

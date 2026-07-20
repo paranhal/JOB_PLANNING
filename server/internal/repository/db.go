@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     start_date  TEXT,
     end_date    TEXT,
     status      TEXT DEFAULT 'active',
+    contact_role TEXT DEFAULT 'regular',
     is_primary  INTEGER DEFAULT 0,
     notes       TEXT,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -145,6 +146,7 @@ CREATE TABLE IF NOT EXISTS contact_history (
     phone         TEXT,
     email         TEXT,
     status        TEXT,
+    contact_role  TEXT,
     change_reason TEXT,
     created_by    TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -474,10 +476,16 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE assets ADD COLUMN maint_billing_party TEXT`,
 		`ALTER TABLE assets ADD COLUMN maint_billing_cycle TEXT`,
 		`ALTER TABLE contacts ADD COLUMN job_grade TEXT`,
+		`ALTER TABLE contacts ADD COLUMN contact_role TEXT`,
+		`ALTER TABLE contact_history ADD COLUMN contact_role TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
 	}
+
+	// 기존 is_primary → contact_role 보강
+	db.Exec(`UPDATE contacts SET contact_role='primary' WHERE is_primary=1 AND (contact_role IS NULL OR contact_role='')`)
+	db.Exec(`UPDATE contacts SET contact_role='regular' WHERE (contact_role IS NULL OR contact_role='')`)
 
 	// 점검주기 코드를 청구주기와 동일 체계로 동기화 (기존 Call/연/없음 시드 교체)
 	db.Exec(`DELETE FROM codes WHERE code_group='maint_cycle'`)
@@ -495,6 +503,15 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('JG002','job_grade','it','전산직',2),
 		('JG003','job_grade','other','기타',3),
 		('JG004','job_grade','custom','직접입력',4)`)
+
+	// 담당구분 · 변경사유 코드
+	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
+		('CROLE001','contact_role','primary','주담당',1),
+		('CROLE002','contact_role','secondary','부담당',2),
+		('CROLE003','contact_role','regular','일반 담당자',3),
+		('CHRS001','contact_change_reason','transfer','전보',1),
+		('CHRS002','contact_change_reason','resign','퇴직',2),
+		('CHRS003','contact_change_reason','role_adjust','업무조정',3)`)
 
 	return nil
 }
