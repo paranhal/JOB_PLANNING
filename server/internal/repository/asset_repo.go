@@ -253,7 +253,8 @@ func (r *AssetRepo) ListForTab(customerID string) ([]model.Asset, error) {
 
 func (r *AssetRepo) ListByCustomer(customerID string) ([]model.Asset, error) {
 	rows, err := r.db.Query(
-		`SELECT asset_id, product_name, COALESCE(product_type,''), COALESCE(serial_number,'')
+		`SELECT asset_id, product_name, COALESCE(product_type,''), COALESCE(model_name,''), COALESCE(serial_number,''),
+		        COALESCE(operation_status,'operating')
 		 FROM assets WHERE customer_id=? AND operation_status!='disposed' ORDER BY product_name`,
 		customerID)
 	if err != nil {
@@ -263,7 +264,7 @@ func (r *AssetRepo) ListByCustomer(customerID string) ([]model.Asset, error) {
 	var items []model.Asset
 	for rows.Next() {
 		var a model.Asset
-		if err := rows.Scan(&a.AssetID, &a.ProductName, &a.ProductType, &a.SerialNumber); err != nil {
+		if err := rows.Scan(&a.AssetID, &a.ProductName, &a.ProductType, &a.ModelName, &a.SerialNumber, &a.OperationStatus); err != nil {
 			return nil, err
 		}
 		items = append(items, a)

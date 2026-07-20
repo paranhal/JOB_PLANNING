@@ -6,19 +6,28 @@
     <div><h2 class="text-xl font-bold text-gray-800">AS 접수</h2><p class="text-sm text-gray-500">기획서 §8 기준</p></div>
   </div>
 
-  <form method="POST" action="/as" class="space-y-6">
+  <form id="as-form" method="POST" action="/as" class="space-y-6"
+        data-init-asset="{{.AS.AssetID}}">
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">접수 대상</h3>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">기관 <span class="text-red-500">*</span></label>
-        <select name="customer_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        <select name="customer_id" id="as-customer_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">기관 선택</option>
           {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.AS.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
         </select>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">설치자산 (선택)</label>
-        <input type="text" name="asset_id" value="{{.AS.AssetID}}" placeholder="자산 ID" class="w-full border rounded-lg px-3 py-2 text-sm">
+        <select name="asset_id" id="as-asset_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">자산 미연결 (나중에 매핑)</option>
+          {{range .Assets}}
+          <option value="{{.AssetID}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
+            {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}}
+          </option>
+          {{end}}
+        </select>
+        <p class="mt-1 text-xs text-gray-400">기관을 선택하면 해당 기관의 설치자산 목록이 표시됩니다.</p>
       </div>
     </div>
 
@@ -77,5 +86,62 @@
       <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">접수 등록</button>
     </div>
   </form>
+
+  <script>
+  (function () {
+    var form = document.getElementById('as-form');
+    if (!form) return;
+    var custSel = document.getElementById('as-customer_id');
+    var assetSel = document.getElementById('as-asset_id');
+    var initAsset = form.getAttribute('data-init-asset') || '';
+
+    function assetLabel(a) {
+      var t = a.product_name || a.ProductName || '';
+      var model = a.model_name || a.ModelName || '';
+      var sn = a.serial_number || a.SerialNumber || '';
+      if (model) t += ' / ' + model;
+      if (sn) t += ' (' + sn + ')';
+      return t || (a.asset_id || a.AssetID);
+    }
+
+    function resetAssets(keepPlaceholder) {
+      assetSel.innerHTML = '';
+      var opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = keepPlaceholder ? '자산 미연결 (나중에 매핑)' : '기관을 먼저 선택하세요';
+      assetSel.appendChild(opt0);
+    }
+
+    function loadAssets(cid, selectedId) {
+      resetAssets(!!cid);
+      if (!cid) return Promise.resolve();
+      return fetch('/api/assets/' + encodeURIComponent(cid))
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (arr) {
+          (arr || []).forEach(function (a) {
+            var id = a.asset_id || a.AssetID;
+            var opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = assetLabel(a);
+            if (selectedId && id === selectedId) opt.selected = true;
+            assetSel.appendChild(opt);
+          });
+          if (selectedId) assetSel.value = selectedId;
+        })
+        .catch(function () { /* 목록 비움 유지 */ });
+    }
+
+    custSel.addEventListener('change', function () {
+      loadAssets(custSel.value, '');
+    });
+
+    // 기관이 미리 선택된 경우(고객/자산 상세에서 진입) 목록 재로드해 최신 반영
+    if (custSel.value) {
+      loadAssets(custSel.value, initAsset);
+    } else {
+      resetAssets(false);
+    }
+  })();
+  </script>
 </div>
 {{end}}

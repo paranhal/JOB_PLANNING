@@ -51,10 +51,18 @@ func (h *ASHandler) New(c echo.Context) error {
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		as.CustomerID = cid
 	}
+	if aid := c.QueryParam("asset_id"); aid != "" {
+		as.AssetID = aid
+	}
+
+	var assets []model.Asset
+	if as.CustomerID != "" {
+		assets, _ = h.assetRepo.ListByCustomer(as.CustomerID)
+	}
 
 	return c.Render(http.StatusOK, "as/form.html", map[string]interface{}{
 		"Title": "AS 접수", "Active": "as", "IsNew": true,
-		"AS": as, "Customers": customers,
+		"AS": as, "Customers": customers, "Assets": assets,
 		"Channels": channels, "Urgencies": urgencies, "ReqTypes": reqTypes,
 	})
 }
