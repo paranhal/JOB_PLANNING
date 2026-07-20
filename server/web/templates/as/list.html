@@ -5,29 +5,36 @@
 
   <!-- 통계 바 -->
   {{if .Stats}}
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-    <a href="/as" class="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 transition-colors">
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <a href="/as" class="bg-white rounded-lg border {{if eq .Status ""}}border-blue-400 ring-1 ring-blue-200{{else}}border-gray-200{{end}} p-4 hover:border-blue-300 transition-colors">
       <p class="text-xs text-gray-500">전체</p>
       <p class="text-2xl font-bold text-gray-800 mt-1">{{.Stats.TotalReceived}}</p>
     </a>
-    <a href="/as?status=in_progress" class="bg-white rounded-lg border border-yellow-200 p-4 hover:border-yellow-300 transition-colors">
+    <a href="/as?status=in_progress" class="bg-white rounded-lg border {{if eq .Status "in_progress"}}border-yellow-400 ring-1 ring-yellow-200{{else}}border-yellow-200{{end}} p-4 hover:border-yellow-300 transition-colors">
       <p class="text-xs text-gray-500">진행중</p>
       <p class="text-2xl font-bold text-yellow-600 mt-1">{{.Stats.InProgress}}</p>
     </a>
-    <a href="/as?status=overdue" class="bg-white rounded-lg border border-red-200 p-4 hover:border-red-300 transition-colors">
+    <a href="/as?status=completed" class="bg-white rounded-lg border {{if eq .Status "completed"}}border-green-400 ring-1 ring-green-200{{else}}border-green-200{{end}} p-4 hover:border-green-300 transition-colors">
+      <p class="text-xs text-gray-500">완료</p>
+      <p class="text-2xl font-bold text-green-600 mt-1">{{.Stats.Completed}}</p>
+    </a>
+    <a href="/as?status=overdue" class="bg-white rounded-lg border {{if eq .Status "overdue"}}border-red-400 ring-1 ring-red-200{{else}}border-red-200{{end}} p-4 hover:border-red-300 transition-colors">
       <p class="text-xs text-gray-500">지연(3일↑)</p>
       <p class="text-2xl font-bold text-red-600 mt-1">{{.Stats.Overdue}}</p>
     </a>
-    <a href="/as?status=completed" class="bg-white rounded-lg border border-green-200 p-4 hover:border-green-300 transition-colors">
-      <p class="text-xs text-gray-500">완료</p>
-      <p class="text-2xl font-bold text-green-600 mt-1">{{.Stats.Completed}}</p>
+    <a href="/as?status=today" class="bg-white rounded-lg border {{if eq .Status "today"}}border-blue-400 ring-1 ring-blue-200{{else}}border-blue-200{{end}} p-4 hover:border-blue-300 transition-colors">
+      <p class="text-xs text-gray-500">오늘 접수</p>
+      <p class="text-2xl font-bold text-blue-600 mt-1">{{.Stats.TodayReceived}}</p>
     </a>
   </div>
   {{end}}
 
   <!-- 헤더 + 검색 -->
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-    <p class="text-sm text-gray-500">전체 {{.Total}}건</p>
+    <p class="text-sm text-gray-500">
+      {{if eq .Status "in_progress"}}진행중{{else if eq .Status "completed"}}완료{{else if eq .Status "overdue"}}지연{{else if eq .Status "today"}}오늘 접수{{else if eq .Status "received"}}접수{{else if eq .Status "hold"}}보류{{else if eq .Status "closed"}}종료{{else}}전체{{end}}
+      {{.Total}}건
+    </p>
     <a href="/as/new"
        class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,11 +50,13 @@
       <select name="status"
               class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="" {{if eq .Status ""}}selected{{end}}>전체 상태</option>
-        <option value="received" {{if eq .Status "received"}}selected{{end}}>접수</option>
-        <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행중</option>
+        <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행중(접수+진행)</option>
+        <option value="overdue" {{if eq .Status "overdue"}}selected{{end}}>지연(3일↑)</option>
+        <option value="today" {{if eq .Status "today"}}selected{{end}}>오늘 접수</option>
+        <option value="completed" {{if eq .Status "completed"}}selected{{end}}>완료(완료+종료)</option>
+        <option value="received" {{if eq .Status "received"}}selected{{end}}>접수만</option>
         <option value="hold" {{if eq .Status "hold"}}selected{{end}}>보류</option>
-        <option value="completed" {{if eq .Status "completed"}}selected{{end}}>완료</option>
-        <option value="closed" {{if eq .Status "closed"}}selected{{end}}>종료</option>
+        <option value="closed" {{if eq .Status "closed"}}selected{{end}}>종료만</option>
       </select>
       <input type="text" name="search" value="{{.Search}}"
              placeholder="AS번호, 기관명, 증상 검색..."

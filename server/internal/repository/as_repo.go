@@ -17,6 +17,7 @@ func NewASRepo(db *sql.DB) *ASRepo {
 }
 
 // List AS 목록 조회
+// status: 일반 상태값, 또는 특수 필터 overdue / today / open / done
 func (r *ASRepo) List(status, search string, page, pageSize int) ([]model.ASListItem, int, error) {
 	offset := (page - 1) * pageSize
 
@@ -34,7 +35,29 @@ func (r *ASRepo) List(status, search string, page, pageSize int) ([]model.ASList
 	args := []interface{}{}
 	countArgs := []interface{}{}
 
-	if status != "" {
+	switch status {
+	case "overdue":
+		cond := ` AND ar.status IN ('received','in_progress')
+		          AND julianday('now') - julianday(ar.receipt_datetime) > 3`
+		baseQuery += cond
+		countQuery += cond
+	case "today":
+		cond := ` AND date(ar.receipt_datetime) = date('now')`
+		baseQuery += cond
+		countQuery += cond
+	case "open", "in_progress":
+		// 대시보드·현황 '진행중' = 접수+진행중 (미완료)
+		cond := ` AND ar.status IN ('received','in_progress')`
+		baseQuery += cond
+		countQuery += cond
+	case "done", "completed":
+		// 대시보드 '완료' = 완료+종료
+		cond := ` AND ar.status IN ('completed','closed')`
+		baseQuery += cond
+		countQuery += cond
+	case "":
+		// 전체
+	default:
 		baseQuery += ` AND ar.status = ?`
 		countQuery += ` AND ar.status = ?`
 		args = append(args, status)
@@ -255,7 +278,7 @@ func (r *ASRepo) StatsByStatus() ([]map[string]interface{}, error) {
 
 // ListOverdue 지연 AS 목록 (3일 초과 미처리)
 func (r *ASRepo) ListOverdue(page, pageSize int) ([]model.ASListItem, int, error) {
-	return r.List("", "", page, pageSize)
+	return r.List("overdue", "", page, pageSize)
 }
 
 // ListByCustomer 고객별 AS 이력 목록 (최신순, 최대 50건)
