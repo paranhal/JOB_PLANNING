@@ -2,9 +2,10 @@
 {{define "content"}}
 <div class="space-y-6">
   <h2 class="text-xl font-bold text-gray-800">교체대상 분석 / 영업활용</h2>
+  <p class="text-sm text-gray-500">노후·장애다발·타사 설치 자산을 조회합니다. 목록은 페이지당 {{.PageSize}}건이며 이전/다음으로 전체 확인할 수 있습니다.</p>
 
   <!-- 요약 -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <p class="text-sm text-gray-500">전체 운영 자산</p>
       <p class="text-3xl font-bold text-gray-800 mt-1">{{.TotalAssets}}</p>
@@ -13,6 +14,10 @@
       <p class="text-sm text-red-600">노후장비 (5년+)</p>
       <p class="text-3xl font-bold text-red-600 mt-1">{{.AgingCount}}</p>
     </div>
+    <div class="bg-white rounded-xl border border-amber-200 p-5">
+      <p class="text-sm text-amber-600">장애다발 (AS 3건+)</p>
+      <p class="text-3xl font-bold text-amber-600 mt-1">{{.FreqCount}}</p>
+    </div>
     <div class="bg-white rounded-xl border border-orange-200 p-5">
       <p class="text-sm text-orange-600">타사 설치 자산</p>
       <p class="text-3xl font-bold text-orange-600 mt-1">{{.OtherCount}}</p>
@@ -20,66 +25,146 @@
   </div>
 
   <!-- 노후장비 -->
-  <div class="bg-white rounded-xl border border-gray-200 p-6" x-data="{ open: true }">
-    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4 cursor-pointer flex items-center gap-2" @click="open=!open">
-      <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-      노후장비 (설치 5년 이상) — {{len .Aging}}건</h3>
-    <div x-show="open">
-      <table class="w-full text-sm">
-        <thead class="text-xs text-gray-500 border-b"><tr>
-          <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th><th class="text-left py-2">구분</th>
-          <th class="text-left py-2">제조사</th><th class="text-center py-2">설치연수</th><th class="text-center py-2">AS건수</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-50">
-          {{range .Aging}}
-          <tr><td class="py-2">{{.CustomerName}}</td><td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
-          <td class="text-xs text-gray-500">{{.ProductType}}</td><td class="text-xs text-gray-500">{{.Manufacturer}}</td>
-          <td class="text-center text-red-600 font-bold">{{.InstallYears}}년</td><td class="text-center">{{.ASCount}}</td></tr>
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" x-data="{ open: true }">
+    <button type="button" class="w-full px-6 py-4 flex items-center gap-2 text-left" @click="open=!open">
+      <svg class="w-4 h-4 text-gray-400 transition-transform shrink-0" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">노후장비 (설치 5년 이상) — {{.AgingCount}}건</h3>
+    </button>
+    <div x-show="open" class="border-t border-gray-100">
+      <div class="overflow-x-auto px-6 pt-2">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-gray-500 border-b"><tr>
+            <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th><th class="text-left py-2">구분</th>
+            <th class="text-left py-2">제조사</th><th class="text-center py-2">설치연수</th><th class="text-center py-2">AS건수</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-50">
+            {{range .Aging}}
+            <tr>
+              <td class="py-2">{{.CustomerName}}</td>
+              <td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
+              <td class="text-xs text-gray-500">{{.ProductType}}</td>
+              <td class="text-xs text-gray-500">{{.Manufacturer}}</td>
+              <td class="text-center text-red-600 font-bold">{{.InstallYears}}년</td>
+              <td class="text-center">{{.ASCount}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="6" class="py-8 text-center text-gray-400">해당 자산이 없습니다.</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{if gt .AgingPages 1}}
+      <div class="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+        <p class="text-sm text-gray-500">
+          {{add (mul (sub .AgingPage 1) .PageSize) 1}} – {{min (mul .AgingPage .PageSize) .AgingCount}} / {{.AgingCount}}건
+        </p>
+        <div class="flex gap-1">
+          {{if gt .AgingPage 1}}
+          <a href="/analysis?aging_page={{sub .AgingPage 1}}&freq_page={{.FreqPage}}&other_page={{.OtherPage}}"
+             class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">이전</a>
           {{end}}
-        </tbody>
-      </table>
+          {{if lt .AgingPage .AgingPages}}
+          <a href="/analysis?aging_page={{add .AgingPage 1}}&freq_page={{.FreqPage}}&other_page={{.OtherPage}}"
+             class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">다음</a>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
     </div>
   </div>
 
   <!-- 장애다발 -->
-  <div class="bg-white rounded-xl border border-gray-200 p-6" x-data="{ open: true }">
-    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4 cursor-pointer flex items-center gap-2" @click="open=!open">
-      <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-      장애다발장비 (AS 3건+) — {{len .Frequent}}건</h3>
-    <div x-show="open">
-      <table class="w-full text-sm">
-        <thead class="text-xs text-gray-500 border-b"><tr>
-          <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th>
-          <th class="text-center py-2">AS건수</th><th class="text-center py-2">설치연수</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-50">
-          {{range .Frequent}}
-          <tr><td class="py-2">{{.CustomerName}}</td><td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
-          <td class="text-center font-bold text-orange-600">{{.ASCount}}</td><td class="text-center">{{.InstallYears}}년</td></tr>
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" x-data="{ open: true }">
+    <button type="button" class="w-full px-6 py-4 flex items-center gap-2 text-left" @click="open=!open">
+      <svg class="w-4 h-4 text-gray-400 transition-transform shrink-0" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">장애다발장비 (AS 3건+) — {{.FreqCount}}건</h3>
+    </button>
+    <div x-show="open" class="border-t border-gray-100">
+      <div class="overflow-x-auto px-6 pt-2">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-gray-500 border-b"><tr>
+            <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th>
+            <th class="text-center py-2">AS건수</th><th class="text-center py-2">설치연수</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-50">
+            {{range .Frequent}}
+            <tr>
+              <td class="py-2">{{.CustomerName}}</td>
+              <td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
+              <td class="text-center font-bold text-orange-600">{{.ASCount}}</td>
+              <td class="text-center">{{.InstallYears}}년</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="4" class="py-8 text-center text-gray-400">해당 자산이 없습니다.</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{if gt .FreqPages 1}}
+      <div class="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+        <p class="text-sm text-gray-500">
+          {{add (mul (sub .FreqPage 1) .PageSize) 1}} – {{min (mul .FreqPage .PageSize) .FreqCount}} / {{.FreqCount}}건
+        </p>
+        <div class="flex gap-1">
+          {{if gt .FreqPage 1}}
+          <a href="/analysis?aging_page={{.AgingPage}}&freq_page={{sub .FreqPage 1}}&other_page={{.OtherPage}}"
+             class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">이전</a>
           {{end}}
-        </tbody>
-      </table>
+          {{if lt .FreqPage .FreqPages}}
+          <a href="/analysis?aging_page={{.AgingPage}}&freq_page={{add .FreqPage 1}}&other_page={{.OtherPage}}"
+             class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">다음</a>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
     </div>
   </div>
 
   <!-- 타사설치 -->
-  <div class="bg-white rounded-xl border border-gray-200 p-6" x-data="{ open: true }">
-    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4 cursor-pointer flex items-center gap-2" @click="open=!open">
-      <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-      타사 설치 자산 — {{len .Other}}건</h3>
-    <div x-show="open">
-      <table class="w-full text-sm">
-        <thead class="text-xs text-gray-500 border-b"><tr>
-          <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th>
-          <th class="text-left py-2">설치주체</th><th class="text-center py-2">설치연수</th><th class="text-center py-2">AS</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-50">
-          {{range .Other}}
-          <tr><td class="py-2">{{.CustomerName}}</td><td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
-          <td class="text-xs text-gray-500">{{.InstallerType}}</td><td class="text-center">{{.InstallYears}}년</td><td class="text-center">{{.ASCount}}</td></tr>
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" x-data="{ open: true }">
+    <button type="button" class="w-full px-6 py-4 flex items-center gap-2 text-left" @click="open=!open">
+      <svg class="w-4 h-4 text-gray-400 transition-transform shrink-0" :class="open && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">타사 설치 자산 — {{.OtherCount}}건</h3>
+    </button>
+    <div x-show="open" class="border-t border-gray-100">
+      <div class="overflow-x-auto px-6 pt-2">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-gray-500 border-b"><tr>
+            <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th>
+            <th class="text-left py-2">설치주체</th><th class="text-center py-2">설치연수</th><th class="text-center py-2">AS</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-50">
+            {{range .Other}}
+            <tr>
+              <td class="py-2">{{.CustomerName}}</td>
+              <td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
+              <td class="text-xs text-gray-500">{{.InstallerType}}</td>
+              <td class="text-center">{{.InstallYears}}년</td>
+              <td class="text-center">{{.ASCount}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="py-8 text-center text-gray-400">해당 자산이 없습니다.</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{if gt .OtherPages 1}}
+      <div class="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+        <p class="text-sm text-gray-500">
+          {{add (mul (sub .OtherPage 1) .PageSize) 1}} – {{min (mul .OtherPage .PageSize) .OtherCount}} / {{.OtherCount}}건
+        </p>
+        <div class="flex gap-1">
+          {{if gt .OtherPage 1}}
+          <a href="/analysis?aging_page={{.AgingPage}}&freq_page={{.FreqPage}}&other_page={{sub .OtherPage 1}}"
+             class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">이전</a>
           {{end}}
-        </tbody>
-      </table>
+          {{if lt .OtherPage .OtherPages}}
+          <a href="/analysis?aging_page={{.AgingPage}}&freq_page={{.FreqPage}}&other_page={{add .OtherPage 1}}"
+             class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">다음</a>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
     </div>
   </div>
 </div>
