@@ -20,6 +20,7 @@
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">모델명</th>
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">시리얼</th>
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">설치일</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">계약</th>
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
           <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">위치</th>
         </tr>
@@ -34,6 +35,18 @@
           <td class="py-2.5 pr-4 text-gray-600">{{.ModelName}}</td>
           <td class="py-2.5 pr-4 text-gray-500 font-mono text-xs">{{.SerialNumber}}</td>
           <td class="py-2.5 pr-4 text-gray-600">{{.InstallDate}}</td>
+          <td class="py-2.5 pr-4 text-xs">
+            {{if .MaintContractType}}
+              <span class="px-2 py-0.5 rounded-full font-medium
+                {{if eq .MaintContractType "paid"}}bg-blue-100 text-blue-700
+                {{else if eq .MaintContractType "free"}}bg-green-100 text-green-700
+                {{else if eq .MaintContractType "call"}}bg-amber-100 text-amber-700
+                {{else}}bg-gray-100 text-gray-600{{end}}">{{maintContractLabel .MaintContractType}}</span>
+              {{if .MaintCycle}}<span class="text-gray-400 ml-1">{{maintCycleLabel .MaintCycle}}</span>{{end}}
+            {{else}}
+              <span class="text-gray-300">—</span>
+            {{end}}
+          </td>
           <td class="py-2.5 pr-4">
             {{if eq .OperationStatus "operating"}}
               <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">운영중</span>

@@ -166,6 +166,12 @@ CREATE TABLE IF NOT EXISTS assets (
     operation_status    TEXT DEFAULT 'operating',
     management_type     TEXT,
     is_managed          INTEGER DEFAULT 1,
+    maint_contract_type TEXT,
+    maint_cycle         TEXT,
+    maint_start_date    TEXT,
+    maint_end_date      TEXT,
+    maint_billing_party TEXT,
+    maint_billing_cycle TEXT,
     requester_type      TEXT,
     requester_name      TEXT,
     customer_contact_id TEXT,
@@ -368,6 +374,17 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('MT003','management_type','periodic','정기점검',3),
 ('MT004','management_type','on_demand','요청시지원',4),
 ('MT005','management_type','reference','참고관리',5),
+-- 유지보수 계약구분 (§6.1)
+('MCT001','maint_contract_type','paid','유상',1),
+('MCT002','maint_contract_type','free','무상',2),
+('MCT003','maint_contract_type','call','CALL',3),
+('MCT004','maint_contract_type','none','미계약',4),
+-- 유지보수 점검주기
+('MCY001','maint_cycle','monthly','월',1),
+('MCY002','maint_cycle','call','Call',2),
+('MCY003','maint_cycle','quarterly','분기',3),
+('MCY004','maint_cycle','yearly','연',4),
+('MCY005','maint_cycle','none','없음',5),
 -- 요청주체유형
 ('RQ001','requester_type','customer','고객직접',1),
 ('RQ002','requester_type','manufacturer','제조사',2),
@@ -436,6 +453,12 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE assets ADD COLUMN loc_building_name TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_floor_name TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_room_name TEXT`,
+		`ALTER TABLE assets ADD COLUMN maint_contract_type TEXT`,
+		`ALTER TABLE assets ADD COLUMN maint_cycle TEXT`,
+		`ALTER TABLE assets ADD COLUMN maint_start_date TEXT`,
+		`ALTER TABLE assets ADD COLUMN maint_end_date TEXT`,
+		`ALTER TABLE assets ADD COLUMN maint_billing_party TEXT`,
+		`ALTER TABLE assets ADD COLUMN maint_billing_cycle TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시

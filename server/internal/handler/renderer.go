@@ -118,6 +118,25 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"maintContractLabel": func(s string) string {
+			m := map[string]string{
+				"paid": "유상", "free": "무상", "call": "CALL", "none": "미계약",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			return s
+		},
+		"maintCycleLabel": func(s string) string {
+			m := map[string]string{
+				"monthly": "월", "call": "Call", "quarterly": "분기",
+				"yearly": "연", "none": "없음",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			return s
+		},
 		"codeLabel": func(val string, codes interface{}) string {
 			// 범용 코드→이름 변환
 			return val

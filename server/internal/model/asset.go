@@ -18,6 +18,13 @@ type Asset struct {
 	OperationStatus  string    `json:"operation_status"`  // 운영중, 점검중, 장애, 철수, 폐기
 	ManagementType   string    `json:"management_type"`   // 직접유지보수, 장애대응 등
 	IsManaged        bool      `json:"is_managed"`
+	// 유지보수 계약 (기획서 §6.1) — 관리유형과 별개
+	MaintContractType string `json:"maint_contract_type"` // paid/free/call/none
+	MaintCycle        string `json:"maint_cycle"`         // monthly/call/quarterly/yearly/none
+	MaintStartDate    string `json:"maint_start_date"`
+	MaintEndDate      string `json:"maint_end_date"`
+	MaintBillingParty string `json:"maint_billing_party"`
+	MaintBillingCycle string `json:"maint_billing_cycle"`
 	RequesterType    string    `json:"requester_type"`    // 고객직접, 제조사, 협력사 등
 	RequesterName    string    `json:"requester_name"`
 	CustomerContactID string   `json:"customer_contact_id"`

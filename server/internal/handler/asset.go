@@ -47,6 +47,8 @@ func (h *AssetHandler) New(c echo.Context) error {
 	managementTypes, _ := h.codeRepo.ActiveByGroup("management_type")
 	requesterTypes, _ := h.codeRepo.ActiveByGroup("requester_type")
 	opStatuses, _ := h.codeRepo.ActiveByGroup("operation_status")
+	maintContractTypes, _ := h.codeRepo.ActiveByGroup("maint_contract_type")
+	maintCycles, _ := h.codeRepo.ActiveByGroup("maint_cycle")
 
 	asset := &model.Asset{IsManaged: true, OperationStatus: "operating"}
 	if cid := c.QueryParam("customer_id"); cid != "" {
@@ -59,6 +61,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 		"ProductTypes": productTypes, "InstallerTypes": installerTypes,
 		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
 		"OpStatuses": opStatuses,
+		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
 	})
 }
 
@@ -96,6 +99,8 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	managementTypes, _ := h.codeRepo.ActiveByGroup("management_type")
 	requesterTypes, _ := h.codeRepo.ActiveByGroup("requester_type")
 	opStatuses, _ := h.codeRepo.ActiveByGroup("operation_status")
+	maintContractTypes, _ := h.codeRepo.ActiveByGroup("maint_contract_type")
+	maintCycles, _ := h.codeRepo.ActiveByGroup("maint_cycle")
 
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
 		"Title": "자산 수정", "Active": "assets", "IsNew": false,
@@ -103,6 +108,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 		"ProductTypes": productTypes, "InstallerTypes": installerTypes,
 		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
 		"OpStatuses": opStatuses,
+		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
 	})
 }
 
@@ -141,6 +147,12 @@ func bindAsset(c echo.Context) *model.Asset {
 		OperationStatus:   c.FormValue("operation_status"),
 		ManagementType:    c.FormValue("management_type"),
 		IsManaged:         c.FormValue("is_managed") != "0",
+		MaintContractType: c.FormValue("maint_contract_type"),
+		MaintCycle:        c.FormValue("maint_cycle"),
+		MaintStartDate:    c.FormValue("maint_start_date"),
+		MaintEndDate:      c.FormValue("maint_end_date"),
+		MaintBillingParty: c.FormValue("maint_billing_party"),
+		MaintBillingCycle: c.FormValue("maint_billing_cycle"),
 		RequesterType:     c.FormValue("requester_type"),
 		RequesterName:     c.FormValue("requester_name"),
 		CustomerContactID: c.FormValue("customer_contact_id"),

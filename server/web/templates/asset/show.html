@@ -31,6 +31,17 @@
     </div>
 
     <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">유지보수 계약</h3>
+      <dl class="space-y-2 text-sm">
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">계약구분</dt><dd class="text-gray-800">{{if .Asset.MaintContractType}}{{maintContractLabel .Asset.MaintContractType}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">점검주기</dt><dd class="text-gray-800">{{if .Asset.MaintCycle}}{{maintCycleLabel .Asset.MaintCycle}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">계약기간</dt><dd class="text-gray-800">{{if or .Asset.MaintStartDate .Asset.MaintEndDate}}{{.Asset.MaintStartDate}} ~ {{.Asset.MaintEndDate}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">청구처</dt><dd class="text-gray-800">{{if .Asset.MaintBillingParty}}{{.Asset.MaintBillingParty}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">청구주기</dt><dd class="text-gray-800">{{if .Asset.MaintBillingCycle}}{{.Asset.MaintBillingCycle}}{{else}}—{{end}}</dd></div>
+      </dl>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">위치 · 담당</h3>
       <dl class="space-y-2 text-sm">
         <div class="flex gap-4"><dt class="text-gray-500 w-24">건물명</dt><dd class="text-gray-800">{{.Asset.BuildingName}}</dd></div>
