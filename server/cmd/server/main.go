@@ -97,6 +97,7 @@ func main() {
 	space.POST("/floors/:id/update", h.Space.UpdateFloor)
 	space.POST("/floors/:id/delete", h.Space.DeleteFloor)
 	space.POST("/rooms", h.Space.CreateRoom)
+	space.POST("/rooms/batch", h.Space.BatchUpdateRooms)
 	space.POST("/rooms/:id/update", h.Space.UpdateRoom)
 	space.POST("/rooms/:id/delete", h.Space.DeleteRoom)
 

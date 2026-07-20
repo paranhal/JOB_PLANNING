@@ -163,6 +163,11 @@ func (r *SpaceRepo) UpdateRoom(rm *model.CustomerRoom) error {
 	return err
 }
 
+func (r *SpaceRepo) UpdateRoomName(roomID, roomName string) error {
+	_, err := r.db.Exec(`UPDATE customer_rooms SET room_name=? WHERE room_id=?`, roomName, roomID)
+	return err
+}
+
 func (r *SpaceRepo) DeleteRoom(id string) error {
 	_, err := r.db.Exec(`DELETE FROM customer_rooms WHERE room_id=?`, id)
 	return err
