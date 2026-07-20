@@ -43,6 +43,7 @@
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">담당자명</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">직급</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">소속 기관</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">직장전화</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">핸드폰</th>
@@ -62,6 +63,9 @@
                 {{if .IsPrimary}}
                 <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-700">주담당</span>
                 {{end}}
+              </td>
+              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs">
+                {{if .JobGrade}}{{jobGradeLabel .JobGrade}}{{else}}—{{end}}
               </td>
               <td class="px-4 py-3">
                 <a href="/customers?search={{.OrgName}}" class="text-gray-600 hover:text-blue-600">{{.OrgName}}</a>
@@ -90,7 +94,7 @@
             {{end}}
           {{else}}
             <tr>
-              <td colspan="7" class="px-4 py-12 text-center text-gray-400">
+              <td colspan="8" class="px-4 py-12 text-center text-gray-400">
                 {{if .Search}}
                   "{{.Search}}" 검색 결과가 없습니다.
                 {{else}}

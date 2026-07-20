@@ -151,6 +151,15 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"jobGradeLabel": func(s string) string {
+			m := map[string]string{
+				"librarian": "사서직", "it": "전산직", "other": "기타", "custom": "직접입력",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			return s
+		},
 		"codeLabel": func(val string, codes interface{}) string {
 			// 범용 코드→이름 변환
 			return val

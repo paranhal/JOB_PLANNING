@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     full_name   TEXT NOT NULL,
     job_role    TEXT,
     title       TEXT,
+    job_grade   TEXT,
     phone       TEXT,
     mobile      TEXT,
     email       TEXT,
@@ -356,6 +357,11 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('JR003','job_role','library_system','도서관리시스템',3),
 ('JR004','job_role','admin_system','행정시스템',4),
 ('JR005','job_role','general','일반행정',5),
+-- 담당자 직급 (§5.3)
+('JG001','job_grade','librarian','사서직',1),
+('JG002','job_grade','it','전산직',2),
+('JG003','job_grade','other','기타',3),
+('JG004','job_grade','custom','직접입력',4),
 -- 제품구분
 ('PT001','product_type','sw','SW',1),
 ('PT002','product_type','hw','HW',2),
@@ -467,6 +473,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE assets ADD COLUMN maint_end_date TEXT`,
 		`ALTER TABLE assets ADD COLUMN maint_billing_party TEXT`,
 		`ALTER TABLE assets ADD COLUMN maint_billing_cycle TEXT`,
+		`ALTER TABLE contacts ADD COLUMN job_grade TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
@@ -481,6 +488,13 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('MCY004','maint_cycle','odd_bimonthly','홀수격월',4),
 		('MCY005','maint_cycle','even_bimonthly','짝수격월',5),
 		('MCY006','maint_cycle','custom','직접입력',6)`)
+
+	// 담당자 직급 코드 시드 (기존 DB에도 반영)
+	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
+		('JG001','job_grade','librarian','사서직',1),
+		('JG002','job_grade','it','전산직',2),
+		('JG003','job_grade','other','기타',3),
+		('JG004','job_grade','custom','직접입력',4)`)
 
 	return nil
 }

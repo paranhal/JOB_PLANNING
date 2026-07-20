@@ -52,7 +52,10 @@ func New(db *sql.DB) *Handler {
 			asRepo:      asRepo,
 		},
 		Space:    &SpaceHandler{repo: spaceRepo, customerRepo: customerRepo},
-		Contact:  &ContactHandler{repo: contactRepo, customerRepo: customerRepo, histRepo: contactHistRepo},
+		Contact: &ContactHandler{
+			repo: contactRepo, customerRepo: customerRepo,
+			histRepo: contactHistRepo, codeRepo: codeRepo,
+		},
 		ContactHistory: &ContactHistoryHandler{
 			repo: contactHistRepo, contactRepo: contactRepo, customerRepo: customerRepo,
 		},

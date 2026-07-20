@@ -69,8 +69,12 @@
         <dd class="text-sm text-gray-800">{{if .Contact.JobRole}}{{.Contact.JobRole}}{{else}}-{{end}}</dd>
       </div>
       <div>
-        <dt class="text-xs text-gray-500 mb-1">직함/직급</dt>
+        <dt class="text-xs text-gray-500 mb-1">직함</dt>
         <dd class="text-sm text-gray-800">{{if .Contact.Title}}{{.Contact.Title}}{{else}}-{{end}}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 mb-1">직급</dt>
+        <dd class="text-sm text-gray-800">{{if .Contact.JobGrade}}{{jobGradeLabel .Contact.JobGrade}}{{else}}-{{end}}</dd>
       </div>
       <div>
         <dt class="text-xs text-gray-500 mb-1">부임일</dt>

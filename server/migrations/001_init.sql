@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     full_name   VARCHAR(100) NOT NULL,
     job_role    VARCHAR(100),
     title       VARCHAR(100),
+    job_grade   VARCHAR(100),
     phone       VARCHAR(50),
     mobile      VARCHAR(50),
     email       VARCHAR(200),

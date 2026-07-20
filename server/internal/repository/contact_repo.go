@@ -22,7 +22,7 @@ func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, 
 
 	baseQuery := `
 		SELECT c.contact_id, c.customer_id, c.full_name,
-		       COALESCE(c.job_role,''), COALESCE(c.title,''),
+		       COALESCE(c.job_role,''), COALESCE(c.title,''), COALESCE(c.job_grade,''),
 		       COALESCE(c.phone,''), COALESCE(c.mobile,''),
 		       COALESCE(c.email,''), COALESCE(c.start_date,''),
 		       COALESCE(c.end_date,''), COALESCE(c.status,'active'),
@@ -70,7 +70,7 @@ func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, 
 		var isPrimary int
 		if err := rows.Scan(
 			&item.ContactID, &item.CustomerID, &item.FullName,
-			&item.JobRole, &item.Title,
+			&item.JobRole, &item.Title, &item.JobGrade,
 			&item.Phone, &item.Mobile,
 			&item.Email, &item.StartDate,
 			&item.EndDate, &item.Status,
@@ -89,7 +89,7 @@ func (r *ContactRepo) List(search string, page, pageSize int) ([]model.Contact, 
 func (r *ContactRepo) ListByCustomer(customerID string) ([]model.Contact, error) {
 	query := `
 		SELECT contact_id, customer_id, full_name,
-		       COALESCE(job_role,''), COALESCE(title,''),
+		       COALESCE(job_role,''), COALESCE(title,''), COALESCE(job_grade,''),
 		       COALESCE(phone,''), COALESCE(mobile,''),
 		       COALESCE(email,''), COALESCE(start_date,''),
 		       COALESCE(end_date,''), COALESCE(status,'active'),
@@ -110,7 +110,7 @@ func (r *ContactRepo) ListByCustomer(customerID string) ([]model.Contact, error)
 		var isPrimary int
 		if err := rows.Scan(
 			&item.ContactID, &item.CustomerID, &item.FullName,
-			&item.JobRole, &item.Title,
+			&item.JobRole, &item.Title, &item.JobGrade,
 			&item.Phone, &item.Mobile,
 			&item.Email, &item.StartDate,
 			&item.EndDate, &item.Status,
@@ -128,7 +128,7 @@ func (r *ContactRepo) ListByCustomer(customerID string) ([]model.Contact, error)
 func (r *ContactRepo) GetByID(id string) (*model.Contact, error) {
 	query := `
 		SELECT c.contact_id, c.customer_id, c.full_name,
-		       COALESCE(c.job_role,''), COALESCE(c.title,''),
+		       COALESCE(c.job_role,''), COALESCE(c.title,''), COALESCE(c.job_grade,''),
 		       COALESCE(c.phone,''), COALESCE(c.mobile,''),
 		       COALESCE(c.email,''), COALESCE(c.start_date,''),
 		       COALESCE(c.end_date,''), COALESCE(c.status,'active'),
@@ -142,7 +142,7 @@ func (r *ContactRepo) GetByID(id string) (*model.Contact, error) {
 	var isPrimary int
 	err := r.db.QueryRow(query, id).Scan(
 		&ct.ContactID, &ct.CustomerID, &ct.FullName,
-		&ct.JobRole, &ct.Title,
+		&ct.JobRole, &ct.Title, &ct.JobGrade,
 		&ct.Phone, &ct.Mobile,
 		&ct.Email, &ct.StartDate,
 		&ct.EndDate, &ct.Status,
@@ -165,11 +165,11 @@ func (r *ContactRepo) Create(ct *model.Contact) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err := r.db.Exec(`
 		INSERT INTO contacts (
-			contact_id, customer_id, full_name, job_role, title,
+			contact_id, customer_id, full_name, job_role, title, job_grade,
 			phone, mobile, email, start_date, end_date,
 			status, is_primary, notes, created_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		ct.ContactID, ct.CustomerID, ct.FullName, ct.JobRole, ct.Title,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		ct.ContactID, ct.CustomerID, ct.FullName, ct.JobRole, ct.Title, ct.JobGrade,
 		ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
 		ct.Status, boolToInt(ct.IsPrimary), ct.Notes, now,
 	)
@@ -180,11 +180,11 @@ func (r *ContactRepo) Create(ct *model.Contact) error {
 func (r *ContactRepo) Update(ct *model.Contact) error {
 	_, err := r.db.Exec(`
 		UPDATE contacts SET
-			customer_id=?, full_name=?, job_role=?, title=?,
+			customer_id=?, full_name=?, job_role=?, title=?, job_grade=?,
 			phone=?, mobile=?, email=?, start_date=?, end_date=?,
 			status=?, is_primary=?, notes=?
 		WHERE contact_id=?`,
-		ct.CustomerID, ct.FullName, ct.JobRole, ct.Title,
+		ct.CustomerID, ct.FullName, ct.JobRole, ct.Title, ct.JobGrade,
 		ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
 		ct.Status, boolToInt(ct.IsPrimary), ct.Notes, ct.ContactID,
 	)

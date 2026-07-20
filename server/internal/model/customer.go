@@ -69,6 +69,7 @@ type Contact struct {
 	FullName   string    `json:"full_name"`
 	JobRole    string    `json:"job_role"`
 	Title      string    `json:"title"`
+	JobGrade   string    `json:"job_grade"` // librarian/it/other 또는 직접입력 문구
 	Phone      string    `json:"phone"`
 	Mobile     string    `json:"mobile"`
 	Email      string    `json:"email"`
