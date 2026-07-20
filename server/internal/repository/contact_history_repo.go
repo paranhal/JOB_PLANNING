@@ -13,11 +13,14 @@ func NewContactHistoryRepo(db *sql.DB) *ContactHistoryRepo { return &ContactHist
 
 func (r *ContactHistoryRepo) ListByContact(contactID string) ([]model.ContactHistory, error) {
 	rows, err := r.db.Query(
-		`SELECT history_id, contact_id, customer_id,
-		        COALESCE(start_date,''), COALESCE(end_date,''), COALESCE(department,''),
-		        COALESCE(job_role,''), COALESCE(title,''), COALESCE(phone,''),
-		        COALESCE(email,''), COALESCE(status,''), COALESCE(change_reason,'')
-		 FROM contact_history WHERE contact_id=? ORDER BY start_date DESC`, contactID)
+		`SELECT ch.history_id, ch.contact_id, ch.customer_id,
+		        COALESCE(ch.start_date,''), COALESCE(ch.end_date,''), COALESCE(ch.department,''),
+		        COALESCE(ch.job_role,''), COALESCE(ch.title,''), COALESCE(ch.phone,''),
+		        COALESCE(ch.email,''), COALESCE(ch.status,''), COALESCE(ch.change_reason,''),
+		        COALESCE(c.full_name,'')
+		 FROM contact_history ch
+		 LEFT JOIN contacts c ON c.contact_id = ch.contact_id
+		 WHERE ch.contact_id=? ORDER BY ch.start_date DESC`, contactID)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +31,8 @@ func (r *ContactHistoryRepo) ListByContact(contactID string) ([]model.ContactHis
 		if err := rows.Scan(&h.HistoryID, &h.ContactID, &h.CustomerID,
 			&h.StartDate, &h.EndDate, &h.Department,
 			&h.JobRole, &h.Title, &h.Phone,
-			&h.Email, &h.Status, &h.ChangeReason); err != nil {
+			&h.Email, &h.Status, &h.ChangeReason,
+			&h.ContactName); err != nil {
 			return nil, err
 		}
 		items = append(items, h)
@@ -41,8 +45,10 @@ func (r *ContactHistoryRepo) ListByCustomer(customerID string) ([]model.ContactH
 		`SELECT ch.history_id, ch.contact_id, ch.customer_id,
 		        COALESCE(ch.start_date,''), COALESCE(ch.end_date,''), COALESCE(ch.department,''),
 		        COALESCE(ch.job_role,''), COALESCE(ch.title,''), COALESCE(ch.phone,''),
-		        COALESCE(ch.email,''), COALESCE(ch.status,''), COALESCE(ch.change_reason,'')
+		        COALESCE(ch.email,''), COALESCE(ch.status,''), COALESCE(ch.change_reason,''),
+		        COALESCE(c.full_name,'')
 		 FROM contact_history ch
+		 LEFT JOIN contacts c ON c.contact_id = ch.contact_id
 		 WHERE ch.customer_id=? ORDER BY ch.start_date DESC`, customerID)
 	if err != nil {
 		return nil, err
@@ -54,7 +60,8 @@ func (r *ContactHistoryRepo) ListByCustomer(customerID string) ([]model.ContactH
 		if err := rows.Scan(&h.HistoryID, &h.ContactID, &h.CustomerID,
 			&h.StartDate, &h.EndDate, &h.Department,
 			&h.JobRole, &h.Title, &h.Phone,
-			&h.Email, &h.Status, &h.ChangeReason); err != nil {
+			&h.Email, &h.Status, &h.ChangeReason,
+			&h.ContactName); err != nil {
 			return nil, err
 		}
 		items = append(items, h)

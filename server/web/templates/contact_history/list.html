@@ -3,17 +3,26 @@
 <div class="space-y-6">
   <h2 class="text-xl font-bold text-gray-800">담당자 이력 관리</h2>
 
-  <form method="GET" action="/contact-history" class="flex gap-3 items-end">
-    <div class="flex-1 max-w-sm">
-      <label class="block text-sm font-medium text-gray-700 mb-1">기관별 조회</label>
-      <select name="customer_id" onchange="this.form.submit()" class="w-full border rounded-lg px-3 py-2 text-sm">
+  <form id="ch-filter" method="GET" action="/contact-history" class="flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[200px] max-w-sm">
+      <label class="block text-sm font-medium text-gray-700 mb-1">기관</label>
+      <select name="customer_id" id="ch-customer_id" class="w-full border rounded-lg px-3 py-2 text-sm">
         <option value="">-- 기관 선택 --</option>
         {{range .Customers}}<option value="{{.CustomerID}}" {{if eq .CustomerID $.CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
       </select>
     </div>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">담당자ID</label>
-      <input type="text" name="contact_id" value="{{.ContactID}}" placeholder="특정 담당자" class="border rounded-lg px-3 py-2 text-sm">
+    <div class="flex-1 min-w-[200px] max-w-sm">
+      <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
+      <select name="contact_id" id="ch-contact_id" class="w-full border rounded-lg px-3 py-2 text-sm"
+              {{if not .CustomerID}}disabled{{end}}>
+        <option value="">{{if .CustomerID}}전체 담당자{{else}}기관을 먼저 선택하세요{{end}}</option>
+        {{range .Contacts}}
+        <option value="{{.ContactID}}" {{if eq .ContactID $.ContactID}}selected{{end}}>
+          {{.FullName}}{{if .Title}} · {{.Title}}{{end}}{{if .IsPrimary}} (주담당){{end}}
+        </option>
+        {{end}}
+      </select>
+      <p class="mt-1 text-xs text-gray-400">등록된 담당자가 있으면 목록에서 선택합니다.</p>
     </div>
     <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">조회</button>
   </form>
@@ -22,7 +31,7 @@
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b"><tr>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">담당자ID</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">담당자</th>
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">기간</th>
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">부서</th>
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">담당업무</th>
@@ -34,7 +43,13 @@
       <tbody class="divide-y divide-gray-100">
         {{range .Items}}
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-2.5 font-mono text-xs text-gray-500">{{.ContactID}}</td>
+          <td class="px-4 py-2.5">
+            {{if .ContactName}}
+              <a href="/contacts/{{.ContactID}}" class="font-medium text-gray-800 hover:text-blue-600">{{.ContactName}}</a>
+            {{else}}
+              <span class="font-mono text-xs text-gray-500">{{.ContactID}}</span>
+            {{end}}
+          </td>
           <td class="px-4 py-2.5 text-xs">{{.StartDate}} ~ {{.EndDate}}</td>
           <td class="px-4 py-2.5">{{.Department}}</td>
           <td class="px-4 py-2.5">{{.JobRole}}</td>
@@ -51,4 +66,57 @@
   <p class="text-sm text-gray-400 text-center py-16">기관 또는 담당자를 선택하면 변경 이력이 표시됩니다.</p>
   {{end}}
 </div>
+
+<script>
+(function () {
+  var custSel = document.getElementById('ch-customer_id');
+  var contactSel = document.getElementById('ch-contact_id');
+  if (!custSel || !contactSel) return;
+
+  function contactLabel(ct) {
+    var name = ct.full_name || ct.FullName || '';
+    var title = ct.title || ct.Title || '';
+    var primary = ct.is_primary || ct.IsPrimary;
+    var t = name;
+    if (title) t += ' · ' + title;
+    if (primary) t += ' (주담당)';
+    return t || name;
+  }
+
+  function resetContacts(hasCustomer) {
+    contactSel.innerHTML = '';
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = hasCustomer ? '전체 담당자' : '기관을 먼저 선택하세요';
+    contactSel.appendChild(opt0);
+    contactSel.disabled = !hasCustomer;
+  }
+
+  function loadContacts(cid, selectedId) {
+    resetContacts(!!cid);
+    if (!cid) return Promise.resolve();
+    return fetch('/api/contacts/' + encodeURIComponent(cid))
+      .then(function (res) { return res.ok ? res.json() : []; })
+      .then(function (arr) {
+        (arr || []).forEach(function (ct) {
+          var id = ct.contact_id || ct.ContactID;
+          var opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = contactLabel(ct);
+          contactSel.appendChild(opt);
+        });
+        if (selectedId) contactSel.value = selectedId;
+      })
+      .catch(function () {});
+  }
+
+  custSel.addEventListener('change', function () {
+    // 기관 변경 시 담당자 초기화 후 목록 로드, 바로 조회(전체 담당자)
+    var cid = custSel.value;
+    loadContacts(cid, '').then(function () {
+      document.getElementById('ch-filter').submit();
+    });
+  });
+})();
+</script>
 {{end}}

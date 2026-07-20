@@ -99,6 +99,9 @@ type ContactHistory struct {
 	Status       string    `json:"status"`
 	ChangeReason string    `json:"change_reason"`
 	CreatedAt    time.Time `json:"created_at"`
+
+	// JOIN용
+	ContactName string `json:"contact_name,omitempty"`
 }
 
 // CustomerListItem 목록 표시용 (집계 포함)
