@@ -197,6 +197,7 @@ func main() {
 	g.GET("/users", h.Auth.UserList)
 	g.POST("/users", h.Auth.UserCreate)
 	g.POST("/users/:id/update", h.Auth.UserUpdate)
+	g.POST("/users/:id/password", h.Auth.UserChangePassword)
 
 	log.Printf("고객지원시스템 서버 시작: http://localhost:%s", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {

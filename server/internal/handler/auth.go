@@ -75,8 +75,15 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 // UserList 사용자 관리 화면
 func (h *AuthHandler) UserList(c echo.Context) error {
 	users, _ := h.userRepo.ListAll()
+	msg := ""
+	switch c.QueryParam("ok") {
+	case "password":
+		msg = "비밀번호가 변경되었습니다."
+	case "saved":
+		msg = "사용자 정보가 저장되었습니다."
+	}
 	return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-		"Title": "사용자 관리", "Active": "users", "Users": users,
+		"Title": "사용자 관리", "Active": "users", "Users": users, "OK": msg,
 	})
 }
 
@@ -102,10 +109,57 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	u.IsActive = c.FormValue("is_active") != "0"
 	h.userRepo.Update(u)
 
-	if pw := c.FormValue("password"); pw != "" {
+	if pw := strings.TrimSpace(c.FormValue("password")); pw != "" {
+		confirm := strings.TrimSpace(c.FormValue("password_confirm"))
+		if confirm != "" && pw != confirm {
+			users, _ := h.userRepo.ListAll()
+			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
+				"Title": "사용자 관리", "Active": "users", "Users": users,
+				"Error": "비밀번호와 확인 입력이 일치하지 않습니다.",
+			})
+		}
+		if len(pw) < 4 {
+			users, _ := h.userRepo.ListAll()
+			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
+				"Title": "사용자 관리", "Active": "users", "Users": users,
+				"Error": "비밀번호는 4자 이상이어야 합니다.",
+			})
+		}
 		h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
+		return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 	}
-	return c.Redirect(http.StatusSeeOther, "/users")
+	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
+}
+
+// UserChangePassword 비밀번호만 변경
+func (h *AuthHandler) UserChangePassword(c echo.Context) error {
+	u, _ := h.userRepo.GetByID(c.Param("id"))
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	pw := strings.TrimSpace(c.FormValue("password"))
+	confirm := strings.TrimSpace(c.FormValue("password_confirm"))
+	users, _ := h.userRepo.ListAll()
+	if pw == "" {
+		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
+			"Title": "사용자 관리", "Active": "users", "Users": users,
+			"Error": "새 비밀번호를 입력하세요.", "FocusUser": u.UserID,
+		})
+	}
+	if pw != confirm {
+		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
+			"Title": "사용자 관리", "Active": "users", "Users": users,
+			"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "FocusUser": u.UserID,
+		})
+	}
+	if len(pw) < 4 {
+		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
+			"Title": "사용자 관리", "Active": "users", "Users": users,
+			"Error": "비밀번호는 4자 이상이어야 합니다.", "FocusUser": u.UserID,
+		})
+	}
+	h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
+	return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 }
 
 // AuthMiddleware JWT 인증 미들웨어
