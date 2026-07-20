@@ -1,0 +1,74 @@
+<div class="p-6">
+  <div class="flex items-center justify-between mb-4">
+    <p class="text-sm text-gray-500">총 {{len .Items}}건</p>
+    <a href="/as/new?customer_id={{.CustomerID}}"
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      AS 접수
+    </a>
+  </div>
+
+  {{if .Items}}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-200">
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">접수번호</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">접수일시</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">제품</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">증상</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">긴급도</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
+          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">담당자</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Items}}
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="py-2.5 pr-4">
+            <a href="/as/{{.ASID}}" class="font-mono text-xs text-blue-600 hover:underline">{{.ASNumber}}</a>
+          </td>
+          <td class="py-2.5 pr-4 text-gray-600 text-xs">
+            {{.ReceiptDatetime.Format "2006-01-02 15:04"}}
+          </td>
+          <td class="py-2.5 pr-4 text-gray-600 text-xs">{{.ProductName}}</td>
+          <td class="py-2.5 pr-4 text-gray-700 max-w-xs truncate" title="{{.Symptom}}">{{.Symptom}}</td>
+          <td class="py-2.5 pr-4">
+            {{if eq .Urgency "high"}}
+              <span class="text-red-600 font-bold text-xs">상</span>
+            {{else if eq .Urgency "normal"}}
+              <span class="text-yellow-600 text-xs">중</span>
+            {{else}}
+              <span class="text-gray-400 text-xs">하</span>
+            {{end}}
+          </td>
+          <td class="py-2.5 pr-4">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {{if eq .Status "received"}}bg-blue-100 text-blue-800
+              {{else if eq .Status "in_progress"}}bg-yellow-100 text-yellow-800
+              {{else if eq .Status "hold"}}bg-gray-100 text-gray-600
+              {{else if eq .Status "completed"}}bg-green-100 text-green-800
+              {{else}}bg-gray-100 text-gray-500{{end}}">
+              {{statusLabel .Status}}
+            </span>
+          </td>
+          <td class="py-2.5 text-gray-600 text-xs">{{.AssignedTo}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="text-center py-10">
+    <svg class="mx-auto w-10 h-10 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+    </svg>
+    <p class="text-sm text-gray-400">AS 이력이 없습니다.</p>
+    <a href="/as/new?customer_id={{.CustomerID}}"
+       class="inline-block mt-3 text-sm text-blue-600 hover:underline">AS 접수하기</a>
+  </div>
+  {{end}}
+</div>

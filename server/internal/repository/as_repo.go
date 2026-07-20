@@ -258,6 +258,44 @@ func (r *ASRepo) ListOverdue(page, pageSize int) ([]model.ASListItem, int, error
 	return r.List("", "", page, pageSize)
 }
 
+// ListByCustomer 고객별 AS 이력 목록 (최신순, 최대 50건)
+func (r *ASRepo) ListByCustomer(customerID string) ([]model.ASListItem, error) {
+	query := `
+		SELECT ar.as_id, ar.as_number, ar.receipt_datetime,
+		       c.org_name, COALESCE(a.product_name,'') AS product_name,
+		       ar.symptom, ar.urgency, ar.status, COALESCE(ar.assigned_to,''),
+		       CAST(julianday('now') - julianday(ar.receipt_datetime) AS INTEGER) AS days_elapsed
+		FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.customer_id = ?
+		ORDER BY ar.receipt_datetime DESC
+		LIMIT 50`
+
+	rows, err := r.db.Query(query, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.ASListItem
+	for rows.Next() {
+		var item model.ASListItem
+		var receiptStr string
+		if err := rows.Scan(
+			&item.ASID, &item.ASNumber, &receiptStr,
+			&item.OrgName, &item.ProductName,
+			&item.Symptom, &item.Urgency, &item.Status, &item.AssignedTo,
+			&item.DaysElapsed,
+		); err != nil {
+			return nil, err
+		}
+		item.ReceiptDatetime, _ = time.Parse("2006-01-02 15:04:05", receiptStr)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func generateASNumber() string {
 	return fmt.Sprintf("AS-%d%05d",
 		time.Now().Year(),

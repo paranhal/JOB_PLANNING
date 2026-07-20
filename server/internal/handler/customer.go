@@ -11,7 +11,49 @@ import (
 )
 
 type CustomerHandler struct {
-	repo *repository.CustomerRepo
+	repo        *repository.CustomerRepo
+	assetRepo   *repository.AssetRepo
+	contactRepo *repository.ContactRepo
+	asRepo      *repository.ASRepo
+}
+
+// TabAssets HTMX: 고객별 설치자산 탭 부분 렌더링
+func (h *CustomerHandler) TabAssets(c echo.Context) error {
+	customerID := c.Param("id")
+	assets, err := h.assetRepo.ListForTab(customerID)
+	if err != nil {
+		return err
+	}
+	return RenderPartial(c, "customer/tab_assets.html", map[string]interface{}{
+		"Assets":     assets,
+		"CustomerID": customerID,
+	})
+}
+
+// TabContacts HTMX: 고객별 담당자 탭 부분 렌더링
+func (h *CustomerHandler) TabContacts(c echo.Context) error {
+	customerID := c.Param("id")
+	contacts, err := h.contactRepo.ListByCustomer(customerID)
+	if err != nil {
+		return err
+	}
+	return RenderPartial(c, "customer/tab_contacts.html", map[string]interface{}{
+		"Contacts":   contacts,
+		"CustomerID": customerID,
+	})
+}
+
+// TabAS HTMX: 고객별 AS 이력 탭 부분 렌더링
+func (h *CustomerHandler) TabAS(c echo.Context) error {
+	customerID := c.Param("id")
+	items, err := h.asRepo.ListByCustomer(customerID)
+	if err != nil {
+		return err
+	}
+	return RenderPartial(c, "customer/tab_as.html", map[string]interface{}{
+		"Items":      items,
+		"CustomerID": customerID,
+	})
 }
 
 // List 고객 목록

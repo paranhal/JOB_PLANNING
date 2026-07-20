@@ -196,6 +196,37 @@ func (r *AssetRepo) Delete(id string) error {
 	return err
 }
 
+// ListForTab 고객 상세 탭 전용 — 화면 표시에 필요한 컬럼 포함
+func (r *AssetRepo) ListForTab(customerID string) ([]model.Asset, error) {
+	rows, err := r.db.Query(`
+		SELECT asset_id, COALESCE(product_name,''), COALESCE(product_type,''),
+		       COALESCE(model_name,''), COALESCE(serial_number,''),
+		       COALESCE(install_date,''), COALESCE(operation_status,'operating'),
+		       TRIM(COALESCE(loc_building_name,'') || ' ' || COALESCE(loc_floor_name,'') || ' ' ||
+		            COALESCE(loc_room_name,'') || ' ' || COALESCE(location_detail,''))
+		FROM assets
+		WHERE customer_id = ?
+		ORDER BY install_date DESC, product_name`, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.Asset
+	for rows.Next() {
+		var a model.Asset
+		if err := rows.Scan(
+			&a.AssetID, &a.ProductName, &a.ProductType,
+			&a.ModelName, &a.SerialNumber,
+			&a.InstallDate, &a.OperationStatus,
+			&a.LocationDetail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, a)
+	}
+	return items, rows.Err()
+}
+
 func (r *AssetRepo) ListByCustomer(customerID string) ([]model.Asset, error) {
 	rows, err := r.db.Query(
 		`SELECT asset_id, product_name, COALESCE(product_type,''), COALESCE(serial_number,'')

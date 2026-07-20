@@ -45,7 +45,12 @@ func New(db *sql.DB) *Handler {
 	jwtSecret := []byte("cs-system-jwt-secret-2026")
 
 	return &Handler{
-		Customer: &CustomerHandler{repo: customerRepo},
+		Customer: &CustomerHandler{
+			repo:        customerRepo,
+			assetRepo:   assetRepo,
+			contactRepo: contactRepo,
+			asRepo:      asRepo,
+		},
 		Space:    &SpaceHandler{repo: spaceRepo, customerRepo: customerRepo},
 		Contact:  &ContactHandler{repo: contactRepo, customerRepo: customerRepo, histRepo: contactHistRepo},
 		ContactHistory: &ContactHistoryHandler{

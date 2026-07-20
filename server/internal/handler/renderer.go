@@ -38,6 +38,18 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	return tmpl.ExecuteTemplate(w, blockName, data)
 }
 
+// RenderPartial HTMX 부분 응답용 — base.html 없이 템플릿 파일만 직접 렌더링
+func RenderPartial(c echo.Context, name string, data interface{}) error {
+	tmpl, err := template.New(filepath.Base(name)).Funcs(funcMap()).ParseFiles(
+		filepath.Join("web/templates", name),
+	)
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return tmpl.Execute(c.Response().Writer, data)
+}
+
 func funcMap() template.FuncMap {
 	return template.FuncMap{
 		"add": func(a, b int) int { return a + b },

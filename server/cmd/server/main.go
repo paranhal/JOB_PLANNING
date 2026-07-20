@@ -82,6 +82,10 @@ func main() {
 	cust.GET("/:id/edit", h.Customer.Edit)
 	cust.POST("/:id/update", h.Customer.Update)
 	cust.POST("/:id/delete", h.Customer.Delete)
+	// 고객 상세 탭 (HTMX 부분 렌더링)
+	cust.GET("/:id/tab/assets", h.Customer.TabAssets)
+	cust.GET("/:id/tab/contacts", h.Customer.TabContacts)
+	cust.GET("/:id/tab/as", h.Customer.TabAS)
 
 	// 공간 관리 (건물/층/실)
 	space := g.Group("/spaces")
