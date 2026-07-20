@@ -67,7 +67,7 @@ type Contact struct {
 	ContactID   string    `json:"contact_id"`
 	CustomerID  string    `json:"customer_id"`
 	FullName    string    `json:"full_name"`
-	Affiliation string    `json:"affiliation"` // institution=소속기관, integrator=통합사업자
+	Affiliation string    `json:"affiliation"` // institution/integrator/partner/other
 	JobRole     string    `json:"job_role"`
 	Title       string    `json:"title"`
 	JobGrade    string    `json:"job_grade"` // librarian/it/other 또는 직접입력 문구

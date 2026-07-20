@@ -37,8 +37,10 @@
               class="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="institution" {{if or (eq .Contact.Affiliation "institution") (eq .Contact.Affiliation "")}}selected{{end}}>소속기관</option>
         <option value="integrator" {{if eq .Contact.Affiliation "integrator"}}selected{{end}}>통합사업자</option>
+        <option value="partner" {{if eq .Contact.Affiliation "partner"}}selected{{end}}>협력업체</option>
+        <option value="other" {{if eq .Contact.Affiliation "other"}}selected{{end}}>기타</option>
       </select>
-      <p class="text-xs text-gray-400 mt-1">해당 기관 소속인지, 통합사업자 소속인지 구분합니다.</p>
+      <p class="text-xs text-gray-400 mt-1">담당자의 소속 유형을 선택합니다.</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

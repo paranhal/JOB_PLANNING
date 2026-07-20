@@ -174,7 +174,10 @@ func funcMap() template.FuncMap {
 		},
 		"affiliationLabel": func(s string) string {
 			m := map[string]string{
-				"institution": "소속기관", "integrator": "통합사업자",
+				"institution": "소속기관",
+				"integrator":  "통합사업자",
+				"partner":     "협력업체",
+				"other":       "기타",
 			}
 			if l, ok := m[s]; ok {
 				return l

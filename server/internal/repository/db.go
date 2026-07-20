@@ -520,7 +520,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('CHRS002','contact_change_reason','resign','퇴직',2),
 		('CHRS003','contact_change_reason','role_adjust','업무조정',3),
 		('CAFF001','contact_affiliation','institution','소속기관',1),
-		('CAFF002','contact_affiliation','integrator','통합사업자',2)`)
+		('CAFF002','contact_affiliation','integrator','통합사업자',2),
+		('CAFF003','contact_affiliation','partner','협력업체',3),
+		('CAFF004','contact_affiliation','other','기타',4)`)
 
 	return nil
 }

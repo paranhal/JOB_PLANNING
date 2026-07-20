@@ -29,7 +29,7 @@ func normalizeContactRole(role string, isPrimary bool) string {
 
 func normalizeAffiliation(a string) string {
 	switch a {
-	case "institution", "integrator":
+	case "institution", "integrator", "partner", "other":
 		return a
 	default:
 		return "institution"
