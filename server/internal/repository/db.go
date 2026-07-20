@@ -385,6 +385,13 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('MCY003','maint_cycle','quarterly','분기',3),
 ('MCY004','maint_cycle','yearly','연',4),
 ('MCY005','maint_cycle','none','없음',5),
+-- 유지보수 청구주기
+('MBC001','maint_billing_cycle','monthly','월',1),
+('MBC002','maint_billing_cycle','quarterly','분기',2),
+('MBC003','maint_billing_cycle','semi','반기',3),
+('MBC004','maint_billing_cycle','odd_bimonthly','홀수격월',4),
+('MBC005','maint_billing_cycle','even_bimonthly','짝수격월',5),
+('MBC006','maint_billing_cycle','custom','직접입력',6),
 -- 요청주체유형
 ('RQ001','requester_type','customer','고객직접',1),
 ('RQ002','requester_type','manufacturer','제조사',2),

@@ -37,6 +37,7 @@
 | 관리유형 | 자산 관리 방식 | 직접유지보수, 장애대응, 정기점검, 요청시지원, 참고관리 |
 | 유지보수계약구분 | 계약·과금 성격 | 유상, 무상, CALL, 미계약 |
 | 유지보수점검주기 | 방문·대응 주기 | 월, Call, 분기, 연, 없음 |
+| 유지보수청구주기 | 청구 시점 | 월, 분기, 반기, 홀수격월, 짝수격월, 직접입력 |
 | 요청주체유형 | AS 요청 주체 | 고객직접, 제조사, 협력사, 원청, 내부 |
 | AS상태 | 접수 건 상태 | 접수, 진행중, 보류, 완료, 종료 |
 | 원인분류 | 장애 원인 | HW고장, SW오류, 네트워크, 환경문제, 사용자오류 |
@@ -193,7 +194,7 @@
 | maint_start_date | date | N | 계약 시작일 |
 | maint_end_date | date | N | 계약 종료일 |
 | maint_billing_party | string | N | 청구처 |
-| maint_billing_cycle | string | N | 청구주기(자유 서술) |
+| maint_billing_cycle | string | N | 청구주기(월/분기/반기/홀수격월/짝수격월 코드 또는 직접입력 문구) |
 | managed_by_us_yn | boolean | N | 현재관리대상 여부 |
 | request_owner_type_code | string | N | 요청주체유형 |
 | request_owner_name | string | N | 요청주체명 |

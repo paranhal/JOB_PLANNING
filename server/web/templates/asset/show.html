@@ -37,7 +37,7 @@
         <div class="flex gap-4"><dt class="text-gray-500 w-24">점검주기</dt><dd class="text-gray-800">{{if .Asset.MaintCycle}}{{maintCycleLabel .Asset.MaintCycle}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">계약기간</dt><dd class="text-gray-800">{{if or .Asset.MaintStartDate .Asset.MaintEndDate}}{{.Asset.MaintStartDate}} ~ {{.Asset.MaintEndDate}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">청구처</dt><dd class="text-gray-800">{{if .Asset.MaintBillingParty}}{{.Asset.MaintBillingParty}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">청구주기</dt><dd class="text-gray-800">{{if .Asset.MaintBillingCycle}}{{.Asset.MaintBillingCycle}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">청구주기</dt><dd class="text-gray-800">{{if .Asset.MaintBillingCycle}}{{maintBillingCycleLabel .Asset.MaintBillingCycle}}{{else}}—{{end}}</dd></div>
       </dl>
     </div>
 

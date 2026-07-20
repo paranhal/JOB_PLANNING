@@ -137,6 +137,17 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"maintBillingCycleLabel": func(s string) string {
+			m := map[string]string{
+				"monthly": "월", "quarterly": "분기", "semi": "반기",
+				"odd_bimonthly": "홀수격월", "even_bimonthly": "짝수격월",
+				"custom": "직접입력",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			return s
+		},
 		"codeLabel": func(val string, codes interface{}) string {
 			// 범용 코드→이름 변환
 			return val
