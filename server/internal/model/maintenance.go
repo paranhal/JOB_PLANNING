@@ -2,13 +2,15 @@ package model
 
 // MaintenanceSiteConfig 사이트별 정기점검 기준정보 (기획서 §17)
 type MaintenanceSiteConfig struct {
-	CustomerID    string
-	ShortName     string
-	Region        string
-	HasKlas       bool
-	HasRfid       bool
-	EntryCategory string // normal | fixed | office
-	FixedRule     string // e.g. LAST_MONDAY_OF_MONTH
+	CustomerID       string
+	ShortName        string
+	Region           string
+	HasKlas          bool
+	HasRfid          bool
+	InspectionCycle  string // monthly|odd_bimonthly|even_bimonthly|quarterly|semi|yearly
+	EntryCategory    string // normal | fixed | office
+	FixedRule        string // e.g. LAST_MONDAY_OF_MONTH
+	OrgName          string // JOIN customers (목록·엑셀용)
 }
 
 // MaintenancePlan 연도 단위 점검 계획

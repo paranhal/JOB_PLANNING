@@ -10,6 +10,32 @@ import (
 
 type AnalysisHandler struct{ db *sql.DB }
 
+type ReplacementSummary struct {
+	AgingCount int
+	FreqCount  int
+	OtherCount int
+}
+
+func (h *AnalysisHandler) ReplacementSummary() ReplacementSummary {
+	var s ReplacementSummary
+	h.db.QueryRow(`
+		SELECT COUNT(*) FROM assets
+		WHERE install_date!='' AND operation_status NOT IN ('disposed','retired')
+		  AND (julianday('now')-julianday(install_date))/365 >= 5`).Scan(&s.AgingCount)
+	h.db.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT a.asset_id FROM assets a
+			WHERE a.operation_status NOT IN ('disposed','retired')
+			GROUP BY a.asset_id
+			HAVING (SELECT COUNT(*) FROM as_receipts ar WHERE ar.asset_id=a.asset_id) >= 3
+		)`).Scan(&s.FreqCount)
+	h.db.QueryRow(`
+		SELECT COUNT(*) FROM assets
+		WHERE installer_type IN ('other','manufacturer','partner','unknown')
+		  AND operation_status NOT IN ('disposed','retired')`).Scan(&s.OtherCount)
+	return s
+}
+
 type analysisRow struct {
 	AssetID       string
 	CustomerName  string

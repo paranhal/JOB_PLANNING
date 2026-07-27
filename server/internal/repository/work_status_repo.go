@@ -1,0 +1,210 @@
+package repository
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"customer-support/internal/model"
+)
+
+type WorkStatusRepo struct{ db *sql.DB }
+
+func NewWorkStatusRepo(db *sql.DB) *WorkStatusRepo { return &WorkStatusRepo{db: db} }
+
+// MonthSummary 선택 분류 기준 월 요약 (접수/완료/전월이관)
+func (r *WorkStatusRepo) MonthSummary(year, month int, category string) (model.WorkCalSummary, error) {
+	var s model.WorkCalSummary
+	start := fmt.Sprintf("%04d-%02d-01", year, month)
+	endEx := nextMonthStart(year, month)
+	prevStart, prevEndEx := prevMonthRange(year, month)
+
+	switch category {
+	case "maintenance":
+		q := `SELECT COUNT(*) FROM maintenance_visits WHERE visit_date >= ? AND visit_date < ?`
+		_ = r.db.QueryRow(q, start, endEx).Scan(&s.ReceiptCount)
+		s.CompleteCount = s.ReceiptCount
+		return s, nil
+	case "other":
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_other WHERE work_date >= ? AND work_date < ? AND phase='receipt'`, start, endEx).Scan(&s.ReceiptCount)
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_other WHERE work_date >= ? AND work_date < ? AND phase='complete'`, start, endEx).Scan(&s.CompleteCount)
+		return s, nil
+	default: // as
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE date(receipt_datetime) >= date(?) AND date(receipt_datetime) < date(?)`, start, endEx).Scan(&s.ReceiptCount)
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status IN ('completed','closed')
+			AND date(COALESCE(complete_datetime, updated_at)) >= date(?) AND date(COALESCE(complete_datetime, updated_at)) < date(?)`, start, endEx).Scan(&s.CompleteCount)
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status='transfer'
+			AND date(updated_at) >= date(?) AND date(updated_at) < date(?)`, prevStart, prevEndEx).Scan(&s.PrevTransferCount)
+		return s, nil
+	}
+}
+
+// ListMonthItems 월 단위 항목 (category: as|maintenance|other, phase: receipt|visit|complete)
+func (r *WorkStatusRepo) ListMonthItems(year, month int, category, phase string) ([]model.WorkCalItem, error) {
+	start := fmt.Sprintf("%04d-%02d-01", year, month)
+	endEx := nextMonthStart(year, month)
+
+	switch category {
+	case "maintenance":
+		return r.listMaintenance(start, endEx, phase)
+	case "other":
+		return r.listOther(start, endEx, phase)
+	default:
+		return r.listAS(start, endEx, phase)
+	}
+}
+
+func (r *WorkStatusRepo) listAS(start, endEx, phase string) ([]model.WorkCalItem, error) {
+	var dateExpr string
+	var extra string
+	switch phase {
+	case "visit":
+		dateExpr = `ar.visit_scheduled_date`
+		extra = ` AND ar.visit_scheduled_date != '' AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?`
+	case "complete":
+		dateExpr = `date(COALESCE(ar.complete_datetime, ar.updated_at))`
+		extra = ` AND ar.status IN ('completed','closed')
+			AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
+			AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)`
+	default: // receipt
+		dateExpr = `date(ar.receipt_datetime)`
+		extra = ` AND date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?)`
+	}
+
+	q := fmt.Sprintf(`
+		SELECT ar.as_id, ar.as_number, c.org_name, %s
+		FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		WHERE 1=1 %s
+		ORDER BY %s, ar.as_number`, dateExpr, extra, dateExpr)
+
+	rows, err := r.db.Query(q, start, endEx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.WorkCalItem
+	for rows.Next() {
+		var it model.WorkCalItem
+		var d string
+		if err := rows.Scan(&it.ID, &it.Title, &it.Subtitle, &d); err != nil {
+			return nil, err
+		}
+		it.Category = "as"
+		it.Date = trimDate(d)
+		it.Link = "/as/" + it.ID
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+func (r *WorkStatusRepo) listMaintenance(start, endEx, phase string) ([]model.WorkCalItem, error) {
+	_ = phase
+	q := `
+		SELECT v.visit_id, COALESCE(NULLIF(cfg.short_name,''), c.org_name), c.org_name, v.visit_date
+		FROM maintenance_visits v
+		JOIN customers c ON c.customer_id = v.customer_id
+		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
+		WHERE v.visit_date >= ? AND v.visit_date < ?
+		ORDER BY v.visit_date, cfg.short_name, c.org_name`
+	rows, err := r.db.Query(q, start, endEx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.WorkCalItem
+	for rows.Next() {
+		var it model.WorkCalItem
+		var d string
+		if err := rows.Scan(&it.ID, &it.Title, &it.Subtitle, &d); err != nil {
+			return nil, err
+		}
+		it.Category = "maintenance"
+		it.Date = trimDate(d)
+		it.Link = "/maintenance"
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+func (r *WorkStatusRepo) listOther(start, endEx, phase string) ([]model.WorkCalItem, error) {
+	q := `
+		SELECT other_id, title, COALESCE(org_name,''), work_date
+		FROM work_other
+		WHERE work_date >= ? AND work_date < ? AND phase = ?
+		ORDER BY work_date, title`
+	rows, err := r.db.Query(q, start, endEx, phase)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.WorkCalItem
+	for rows.Next() {
+		var it model.WorkCalItem
+		var d string
+		if err := rows.Scan(&it.ID, &it.Title, &it.Subtitle, &d); err != nil {
+			return nil, err
+		}
+		it.Category = "other"
+		it.Date = trimDate(d)
+		it.Link = ""
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+func nextMonthStart(year, month int) string {
+	t := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local).AddDate(0, 1, 0)
+	return t.Format("2006-01-02")
+}
+
+func prevMonthRange(year, month int) (string, string) {
+	t := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local).AddDate(0, -1, 0)
+	start := t.Format("2006-01-02")
+	endEx := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local).Format("2006-01-02")
+	return start, endEx
+}
+
+func trimDate(s string) string {
+	if len(s) >= 10 {
+		return s[:10]
+	}
+	return s
+}
+
+// BuildCalendar 월 달력 격자(월~일) 생성
+func BuildCalendar(year, month int, items []model.WorkCalItem) []model.WorkCalDay {
+	byDate := map[string][]model.WorkCalItem{}
+	for _, it := range items {
+		byDate[it.Date] = append(byDate[it.Date], it)
+	}
+
+	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
+	last := first.AddDate(0, 1, -1)
+	startPad := (int(first.Weekday()) + 6) % 7
+	today := time.Now().In(time.Local).Format("2006-01-02")
+
+	var days []model.WorkCalDay
+	for i := 0; i < startPad; i++ {
+		days = append(days, model.WorkCalDay{})
+	}
+	for d := 1; d <= last.Day(); d++ {
+		date := fmt.Sprintf("%04d-%02d-%02d", year, month, d)
+		list := byDate[date]
+		days = append(days, model.WorkCalDay{
+			Day:     d,
+			Date:    date,
+			Count:   len(list),
+			Items:   list,
+			IsToday: date == today,
+			InMonth: true,
+		})
+	}
+	for len(days)%7 != 0 {
+		days = append(days, model.WorkCalDay{})
+	}
+	return days
+}

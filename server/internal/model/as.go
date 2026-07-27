@@ -16,8 +16,12 @@ type ASReceipt struct {
 	Priority          string    `json:"priority"`
 	RequesterType     string    `json:"requester_type"`     // 고객직접, 제조사, 협력사 등
 	RequesterName     string    `json:"requester_name"`
-	AssignedTo        string    `json:"assigned_to"`        // 배정 담당자
-	Status            string    `json:"status"`             // 접수, 진행중, 보류, 완료, 종료
+	AssignedTo        string    `json:"assigned_to"`         // 배정 담당자 표시명
+	AssignedUserID    string    `json:"assigned_user_id"`    // 배정 사용자 ID
+	ReceivedBy        string    `json:"received_by"`         // 접수자
+	VisitScheduledDate string   `json:"visit_scheduled_date"` // 예정업무일 (YYYY-MM-DD, 선택)
+	ScheduleConfirmed  bool     `json:"schedule_confirmed"`  // 일정 확정 시 진행중
+	Status            string    `json:"status"`             // 접수, 담당자배정, 진행중, 보류, 이관, 접수취소, 완료, 종료
 	StartDatetime     *time.Time `json:"start_datetime"`
 	CompleteDatetime  *time.Time `json:"complete_datetime"`
 	ProcessType       string    `json:"process_type"`       // 원격지원, 방문, 교체 등
@@ -26,7 +30,11 @@ type ASReceipt struct {
 	PartsUsed         string    `json:"parts_used"`
 	IsRecurrence      bool      `json:"is_recurrence"`      // 재발여부
 	IsReopen          bool      `json:"is_reopen"`          // 재오픈여부
-	ResultCode        string    `json:"result_code"`        // 완료, 임시조치, 타사이관 등
+	ResultCode        string    `json:"result_code"`        // 완료, 임시조치, 재방문필요 등
+	RevisitReason     string    `json:"revisit_reason"`     // 재방문 사유 (재방문필요 시)
+	HoldReason        string    `json:"hold_reason"`        // 보류 사유
+	HoldNextAction    string    `json:"hold_next_action"`   // 보류 시 선택: action|transfer|cancel
+	CancelDatetime    *time.Time `json:"cancel_datetime"`   // 접수취소 일자
 	CustomerConfirmer string    `json:"customer_confirmer"`
 	ConfirmDatetime   *time.Time `json:"confirm_datetime"`
 	FollowupAction    string    `json:"followup_action"`    // 후속조치
@@ -35,13 +43,28 @@ type ASReceipt struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 
 	// JOIN용
-	OrgName     string `json:"org_name,omitempty"`
-	ProductName string `json:"product_name,omitempty"`
+	OrgName          string `json:"org_name,omitempty"`
+	ProductName      string `json:"product_name,omitempty"`
+	InstallLocation  string `json:"install_location,omitempty"` // 연결 자산의 설치위치
+}
+
+// ASHistoryItem 기관의 과거(완료) AS 이력 — 접수 화면 처리 이력 리스트
+type ASHistoryItem struct {
+	ASID           string `json:"as_id"`
+	ASNumber       string `json:"as_number"`
+	ReceiptDate    string `json:"receipt_date"`    // YYYY-MM-DD
+	VisitDate      string `json:"visit_date"`      // 방문/예정업무일
+	CompleteDate   string `json:"complete_date"`   // 최종완료일
+	Visitor        string `json:"visitor"`         // 방문자(처리담당)
+	Symptom        string `json:"symptom"`
+	ActionTaken    string `json:"action_taken"`
+	DurationText   string `json:"duration_text"`   // 접수→완료 소요기간
 }
 
 // ASProcess AS 처리 이력 (접수 1건에 N개 처리 기록 가능)
 type ASProcess struct {
 	ProcessID       string    `json:"process_id"`
+	ProcessNumber   string    `json:"process_number"`
 	ASID            string    `json:"as_id"`
 	ProcessDatetime time.Time `json:"process_datetime"`
 	Worker          string    `json:"worker"`
@@ -70,7 +93,21 @@ type ASListItem struct {
 type ASStats struct {
 	TotalReceived  int `json:"total_received"`
 	InProgress     int `json:"in_progress"`
-	Completed      int `json:"completed"`
-	Overdue        int `json:"overdue"`       // 지연 건수
+	Completed      int `json:"completed"` // 대시보드: 오늘 완료
+	Overdue        int `json:"overdue"`
 	TodayReceived  int `json:"today_received"`
+	WeekReceived   int `json:"week_received"`  // 월~일 주간 접수
+	WeekCompleted  int `json:"week_completed"` // 월~일 주간 완료
+}
+
+// AssigneeDashStats 대시보드 담당자별 주간/일간 지표
+type AssigneeDashStats struct {
+	UserID          string  `json:"user_id"`
+	Name            string  `json:"name"`
+	Username        string  `json:"username"`
+	WeekInProgress  int     `json:"week_in_progress"`  // 이번 주 접수분 중 미완료
+	WeekCompleted   int     `json:"week_completed"`    // 이번 주 완료 합계
+	DayAvgCompleted float64 `json:"day_avg_completed"` // 일평균 완료(주간완료÷월~오늘 일수)
+	DayCompleted    int     `json:"day_completed"`     // 오늘 완료(참고)
+	Overdue         int     `json:"overdue"`           // 지연(전체)
 }

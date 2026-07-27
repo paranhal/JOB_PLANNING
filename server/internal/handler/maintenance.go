@@ -60,7 +60,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	customers, _, err := h.customerRepo.List("", 1, 2000)
+	customers, _, err := h.customerRepo.List("", "", "", "", "", 1, 2000)
 	if err != nil {
 		return err
 	}
@@ -135,11 +135,11 @@ func (h *MaintenanceHandler) ExportExcel(c echo.Context) error {
 	}
 	defer func() { _ = f.Close() }()
 
-	fn := time.Now().Format("20060102") + "유지보수계획.xlsx"
-	c.Response().Header().Set(echo.HeaderContentType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s"`, fn))
-	c.Response().WriteHeader(http.StatusOK)
-	return f.Write(c.Response())
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return err
+	}
+	return writeExcelDownload(c, buf.Bytes(), "maintenance_plan")
 }
 
 func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
@@ -215,16 +215,22 @@ func (h *MaintenanceHandler) EditSiteConfigPage(c echo.Context) error {
 
 func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 	cfg := &model.MaintenanceSiteConfig{
-		CustomerID:    c.FormValue("customer_id"),
-		ShortName:     c.FormValue("short_name"),
-		Region:        c.FormValue("region"),
-		HasKlas:       c.FormValue("has_klas") == "1",
-		HasRfid:       c.FormValue("has_rfid") == "1",
-		EntryCategory: c.FormValue("entry_category"),
-		FixedRule:     c.FormValue("fixed_rule"),
+		CustomerID:      c.FormValue("customer_id"),
+		ShortName:       c.FormValue("short_name"),
+		Region:          c.FormValue("region"),
+		HasKlas:         c.FormValue("has_klas") == "1",
+		HasRfid:         c.FormValue("has_rfid") == "1",
+		InspectionCycle: c.FormValue("inspection_cycle"),
+		EntryCategory:   c.FormValue("entry_category"),
+		FixedRule:       c.FormValue("fixed_rule"),
 	}
 	if cfg.CustomerID == "" || cfg.ShortName == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "고객과 표시명은 필수입니다")
+	}
+	switch cfg.InspectionCycle {
+	case "monthly", "odd_bimonthly", "even_bimonthly", "quarterly", "semi", "yearly":
+	default:
+		cfg.InspectionCycle = "monthly"
 	}
 	if cfg.EntryCategory == "" {
 		cfg.EntryCategory = "normal"
@@ -240,4 +246,22 @@ func (h *MaintenanceHandler) DeleteSiteConfig(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/maintenance/sites")
+}
+
+func (h *MaintenanceHandler) ExportSiteConfigsExcel(c echo.Context) error {
+	items, err := h.repo.ListSiteConfigs()
+	if err != nil {
+		return err
+	}
+	f, err := BuildSiteConfigExcelWorkbook(items)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return err
+	}
+	return writeExcelDownload(c, buf.Bytes(), "sites")
 }

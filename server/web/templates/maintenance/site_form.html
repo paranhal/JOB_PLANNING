@@ -36,6 +36,17 @@
       <input type="text" name="region" value="{{with .Config}}{{.Region}}{{end}}" placeholder="예: 세종, 대전"
              class="w-full border border-gray-300 rounded-lg px-3 py-2">
     </div>
+    <div>
+      <label class="block text-gray-600 mb-1">점검주기 <span class="text-red-500">*</span></label>
+      <select name="inspection_cycle" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        <option value="monthly" {{if .Config}}{{if eq .Config.InspectionCycle "monthly"}}selected{{end}}{{else}}selected{{end}}>월</option>
+        <option value="odd_bimonthly" {{if .Config}}{{if eq .Config.InspectionCycle "odd_bimonthly"}}selected{{end}}{{end}}>홀수격월</option>
+        <option value="even_bimonthly" {{if .Config}}{{if eq .Config.InspectionCycle "even_bimonthly"}}selected{{end}}{{end}}>짝수격월</option>
+        <option value="quarterly" {{if .Config}}{{if eq .Config.InspectionCycle "quarterly"}}selected{{end}}{{end}}>분기</option>
+        <option value="semi" {{if .Config}}{{if eq .Config.InspectionCycle "semi"}}selected{{end}}{{end}}>반기</option>
+        <option value="yearly" {{if .Config}}{{if eq .Config.InspectionCycle "yearly"}}selected{{end}}{{end}}>년1회</option>
+      </select>
+    </div>
     <div class="flex gap-6">
       <label class="inline-flex items-center gap-2">
         <input type="checkbox" name="has_klas" value="1" class="rounded"

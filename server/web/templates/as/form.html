@@ -1,21 +1,33 @@
-{{define "title"}}AS 접수 · 고객지원시스템{{end}}
+{{define "title"}}{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}} · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="max-w-2xl mx-auto space-y-6">
+<div class="max-w-5xl mx-auto space-y-6">
   <div class="flex items-center gap-3">
-    <a href="/as" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
-    <div><h2 class="text-xl font-bold text-gray-800">AS 접수</h2><p class="text-sm text-gray-500">기획서 §8 기준</p></div>
+    <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}}</h2>
+      <p class="text-sm text-gray-500">기획서 §8 기준</p>
+    </div>
   </div>
 
-  <form id="as-form" method="POST" action="/as" class="space-y-6"
+  <form id="as-form" method="POST" action="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}/edit{{end}}" class="space-y-6"
         data-init-asset="{{.AS.AssetID}}"
-        data-init-requester="{{.AS.Requester}}">
+        data-init-requester="{{.AS.Requester}}"
+        data-exclude-as="{{if not .IsNew}}{{.AS.ASID}}{{end}}">
+    {{if not .IsNew}}
+    <div class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-800">
+      <span class="text-blue-600">접수번호</span>
+      <span class="font-mono font-semibold ml-2">{{.AS.ASNumber}}</span>
+      <span class="text-blue-500 text-xs ml-2">(수정 불가)</span>
+    </div>
+    {{end}}
+
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">접수 대상</h3>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">기관 <span class="text-red-500">*</span></label>
         <select name="customer_id" id="as-customer_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">기관 선택</option>
-          {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.AS.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+          {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.AS.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}} ({{.CustomerID}})</option>{{end}}
         </select>
       </div>
       <div>
@@ -24,11 +36,11 @@
           <option value="">자산 미연결 (나중에 매핑)</option>
           {{range .Assets}}
           <option value="{{.AssetID}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
-            {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}}
+            {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
           </option>
           {{end}}
         </select>
-        <p class="mt-1 text-xs text-gray-400">기관을 선택하면 해당 기관의 설치자산 목록이 표시됩니다.</p>
+        <p class="mt-1 text-xs text-gray-400">기관 선택 시 자산 목록에 자산번호·건물/층/실이 함께 표시됩니다.</p>
       </div>
     </div>
 
@@ -36,21 +48,33 @@
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">접수 정보</h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">접수자</label>
+          <input type="text" name="received_by" value="{{.AS.ReceivedBy}}" required
+                 class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="접수 담당자 이름">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">접수일시</label>
+          <input type="datetime-local" name="receipt_datetime" value="{{.ReceiptLocal}}" required
+                 class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">접수 채널</label>
           <select name="receipt_channel" class="w-full border rounded-lg px-3 py-2 text-sm">
-            {{range .Channels}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+            {{range .Channels}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.ReceiptChannel}}selected{{end}}>{{.CodeName}}</option>{{end}}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">긴급도</label>
           <select name="urgency" class="w-full border rounded-lg px-3 py-2 text-sm">
-            {{range .Urgencies}}<option value="{{.CodeValue}}" {{if eq .CodeValue "normal"}}selected{{end}}>{{.CodeName}}</option>{{end}}
+            {{range .Urgencies}}<option value="{{.CodeValue}}" {{if or (eq .CodeValue $.AS.Urgency) (and (not $.AS.Urgency) (eq .CodeValue "normal"))}}selected{{end}}>{{.CodeName}}</option>{{end}}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">중요도</label>
           <select name="priority" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="high">상</option><option value="normal" selected>중</option><option value="low">하</option>
+            <option value="high" {{if eq .AS.Priority "high"}}selected{{end}}>상</option>
+            <option value="normal" {{if or (eq .AS.Priority "normal") (not .AS.Priority)}}selected{{end}}>중</option>
+            <option value="low" {{if eq .AS.Priority "low"}}selected{{end}}>하</option>
           </select>
         </div>
         <div>
@@ -59,17 +83,15 @@
             <option value="">선택</option>
             {{range .Contacts}}
             <option value="{{.FullName}}" {{if eq $.AS.Requester .FullName}}selected{{end}}>
-              {{.FullName}}{{if .Title}} · {{.Title}}{{end}}{{if .IsPrimary}} (주담당){{end}}{{if ne .Status "active"}} [{{.Status}}]{{end}}
+              {{.FullName}}{{if .Title}} · {{.Title}}{{end}}{{if .IsPrimary}} (주담당){{end}}
             </option>
             {{end}}
             <option value="custom">직접입력</option>
           </select>
           <div id="as-requester-custom-wrap" class="mt-2 hidden">
             <input type="text" name="requester_custom" id="as-requester_custom"
-                   placeholder="요청자 이름 직접 입력"
-                   class="w-full border rounded-lg px-3 py-2 text-sm">
+                   placeholder="요청자 이름 직접 입력" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
-          <p class="mt-1 text-xs text-gray-400">기관 담당자 목록에서 선택하거나 직접입력하세요.</p>
         </div>
       </div>
 
@@ -82,23 +104,72 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">요청주체 유형</label>
           <select name="requester_type" class="w-full border rounded-lg px-3 py-2 text-sm">
-            {{range .ReqTypes}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+            {{range .ReqTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.RequesterType}}selected{{end}}>{{.CodeName}}</option>{{end}}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">요청주체명</label>
-          <input type="text" name="requester_name" value="{{.AS.RequesterName}}" placeholder="요청 주체 회사/기관명" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <select name="requester_name_code" id="as-reqname-code" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .RequesterNames}}<option value="{{.}}" {{if eq . $.AS.RequesterName}}selected{{end}}>{{.}}</option>{{end}}
+            <option value="custom" {{if and $.AS.RequesterName (not (hasString $.RequesterNames $.AS.RequesterName))}}selected{{end}}>직접입력</option>
+          </select>
+          <div id="as-reqname-custom-wrap" class="mt-2 {{if and .AS.RequesterName (not (hasString .RequesterNames .AS.RequesterName))}}{{else}}hidden{{end}}">
+            <input type="text" name="requester_name_custom" value="{{if and .AS.RequesterName (not (hasString .RequesterNames .AS.RequesterName))}}{{.AS.RequesterName}}{{end}}" placeholder="요청주체명 직접 입력"
+                   class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">배정 담당자</label>
+          <select name="assigned_to_code" id="as-assigned-code" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">미배정</option>
+            {{range .Assignees}}
+            <option value="{{.UserID}}" {{if or (eq $.AS.AssignedUserID .UserID) (eq $.AS.AssignedTo .FullName)}}selected{{end}}>{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
+            {{end}}
+            <option value="custom" {{if and .AS.AssignedTo (not .AS.AssignedUserID)}}selected{{end}}>직접입력</option>
+          </select>
+          <div id="as-assigned-custom-wrap" class="mt-2 {{if and .AS.AssignedTo (not .AS.AssignedUserID)}}{{else}}hidden{{end}}">
+            <input type="text" name="assigned_to_custom" value="{{if and .AS.AssignedTo (not .AS.AssignedUserID)}}{{.AS.AssignedTo}}{{end}}" placeholder="배정 담당자 이름 직접 입력"
+                   class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">배정 담당자</label>
-          <input type="text" name="assigned_to" value="{{.AS.AssignedTo}}" placeholder="담당자 이름" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <label class="block text-sm font-medium text-gray-700 mb-1">예정업무일</label>
+          {{if .CanEditVisitDate}}
+          <input type="date" name="visit_scheduled_date" id="as-visit-date" value="{{.AS.VisitScheduledDate}}"
+                 class="w-full border rounded-lg px-3 py-2 text-sm">
+          <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input type="checkbox" name="schedule_confirmed" id="as-schedule-confirmed" value="1"
+                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                   {{if .AS.ScheduleConfirmed}}checked{{end}}>
+            <span class="font-medium">일정 확정</span>
+            <span class="text-xs text-gray-400">(체크 시 상태를 진행중으로 변경)</span>
+          </label>
+          <p class="mt-1 text-xs text-gray-400">선택 항목 · 날짜 입력 후 일정 확정. 수정은 관리자·배정담당자만 가능</p>
+          {{if eq .Err "schedule_date"}}
+          <p class="mt-1 text-xs text-red-600">일정 확정 시 예정업무일을 먼저 입력하세요.</p>
+          {{end}}
+          {{else}}
+          <input type="hidden" name="visit_scheduled_date" value="{{.AS.VisitScheduledDate}}">
+          {{if .AS.ScheduleConfirmed}}<input type="hidden" name="schedule_confirmed" value="1">{{end}}
+          <p class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700">{{if .AS.VisitScheduledDate}}{{.AS.VisitScheduledDate}}{{else}}—{{end}}</p>
+          <p class="mt-1 text-xs text-gray-500">{{if .AS.ScheduleConfirmed}}일정 확정됨{{else}}일정 미확정{{end}} · 보기 전용</p>
+          {{end}}
         </div>
       </div>
     </div>
 
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+      <div>
+        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">처리 이력</h3>
+        <p class="text-xs text-gray-400 mt-1">동일 기관의 완료·종료 AS 내역입니다. 접수번호를 누르면 해당 건으로 이동합니다.</p>
+      </div>
+      {{template "as_history_table" .}}
+    </div>
+
     <div class="flex gap-3 justify-end">
-      <a href="/as" class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</a>
-      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">접수 등록</button>
+      <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">{{if .IsNew}}접수 등록{{else}}접수 저장{{end}}</button>
     </div>
   </form>
 
@@ -110,122 +181,135 @@
     var assetSel = document.getElementById('as-asset_id');
     var reqSel = document.getElementById('as-requester_code');
     var reqCustomWrap = document.getElementById('as-requester-custom-wrap');
-    var reqCustom = document.getElementById('as-requester_custom');
     var initAsset = form.getAttribute('data-init-asset') || '';
     var initRequester = form.getAttribute('data-init-requester') || '';
+    var excludeAS = form.getAttribute('data-exclude-as') || '';
+
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+    function cell(v) { return v ? esc(v) : '—'; }
+    function loadHistory(cid) {
+      var tbody = document.getElementById('as-history-tbody');
+      if (!tbody) return;
+      if (!cid) {
+        tbody.innerHTML = '<tr data-empty="1"><td colspan="8" class="py-6 text-center text-gray-400">기관을 선택하면 과거 AS 이력이 표시됩니다.</td></tr>';
+        return;
+      }
+      var url = '/api/as/history/' + encodeURIComponent(cid);
+      if (excludeAS) url += '?exclude=' + encodeURIComponent(excludeAS);
+      fetch(url).then(function(r){ return r.json(); }).then(function(list){
+        if (!list || !list.length) {
+          tbody.innerHTML = '<tr data-empty="1"><td colspan="8" class="py-6 text-center text-gray-400">완료된 과거 AS 이력이 없습니다.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = list.map(function(it){
+          var id = it.as_id || it.ASID || '';
+          var num = it.as_number || it.ASNumber || '';
+          return '<tr class="hover:bg-gray-50 align-top">' +
+            '<td class="py-2 pr-3 whitespace-nowrap"><a href="/as/' + esc(id) + '" class="font-mono text-blue-600 hover:underline">' + esc(num) + '</a></td>' +
+            '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.receipt_date || it.ReceiptDate) + '</td>' +
+            '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.visit_date || it.VisitDate) + '</td>' +
+            '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.complete_date || it.CompleteDate) + '</td>' +
+            '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.visitor || it.Visitor) + '</td>' +
+            '<td class="py-2 pr-3 text-gray-700 max-w-[12rem] truncate" title="' + esc(it.symptom || it.Symptom || '') + '">' + cell(it.symptom || it.Symptom) + '</td>' +
+            '<td class="py-2 pr-3 text-gray-700 max-w-[12rem] truncate" title="' + esc(it.action_taken || it.ActionTaken || '') + '">' + cell(it.action_taken || it.ActionTaken) + '</td>' +
+            '<td class="py-2 whitespace-nowrap text-gray-700">' + cell(it.duration_text || it.DurationText) + '</td>' +
+            '</tr>';
+        }).join('');
+      }).catch(function(){
+        tbody.innerHTML = '<tr data-empty="1"><td colspan="8" class="py-6 text-center text-gray-400">이력을 불러오지 못했습니다.</td></tr>';
+      });
+    }
 
     function assetLabel(a) {
+      var id = a.asset_id || a.AssetID || '';
       var t = a.product_name || a.ProductName || '';
       var model = a.model_name || a.ModelName || '';
       var sn = a.serial_number || a.SerialNumber || '';
+      var b = a.building_name || a.BuildingName || '';
+      var f = a.floor_name || a.FloorName || '';
+      var r = a.room_name || a.RoomName || '';
+      var il = a.install_location || a.InstallLocation || '';
       if (model) t += ' / ' + model;
       if (sn) t += ' (' + sn + ')';
-      return t || (a.asset_id || a.AssetID);
+      var loc = [b, f, r].filter(Boolean).join('/');
+      if (loc) t += ' · ' + loc;
+      if (il) t += ' · [' + il + ']';
+      if (id) t += ' · ' + id;
+      return t || id;
     }
 
     function contactLabel(ct) {
       var name = ct.full_name || ct.FullName || '';
       var title = ct.title || ct.Title || '';
       var primary = ct.is_primary || ct.IsPrimary;
-      var status = ct.status || ct.Status || 'active';
       var t = name;
       if (title) t += ' · ' + title;
       if (primary) t += ' (주담당)';
-      if (status && status !== 'active') t += ' [' + status + ']';
       return t || name;
     }
 
-    function syncRequesterCustom() {
-      if (reqSel.value === 'custom') {
-        reqCustomWrap.classList.remove('hidden');
-      } else {
-        reqCustomWrap.classList.add('hidden');
-        reqCustom.value = '';
-      }
+    function toggleCustom(sel, wrap) {
+      if (!sel || !wrap) return;
+      wrap.classList.toggle('hidden', sel.value !== 'custom');
     }
 
-    function resetAssets(keepPlaceholder) {
-      assetSel.innerHTML = '';
-      var opt0 = document.createElement('option');
-      opt0.value = '';
-      opt0.textContent = keepPlaceholder ? '자산 미연결 (나중에 매핑)' : '기관을 먼저 선택하세요';
-      assetSel.appendChild(opt0);
-    }
-
-    function resetRequesters(keepPlaceholder) {
-      reqSel.innerHTML = '';
-      var opt0 = document.createElement('option');
-      opt0.value = '';
-      opt0.textContent = keepPlaceholder ? '선택' : '기관을 먼저 선택하세요';
-      reqSel.appendChild(opt0);
-      var optCustom = document.createElement('option');
-      optCustom.value = 'custom';
-      optCustom.textContent = '직접입력';
-      reqSel.appendChild(optCustom);
-      syncRequesterCustom();
-    }
-
-    function loadAssets(cid, selectedId) {
-      resetAssets(!!cid);
-      if (!cid) return Promise.resolve();
-      return fetch('/api/assets/' + encodeURIComponent(cid))
-        .then(function (res) { return res.ok ? res.json() : []; })
-        .then(function (arr) {
-          (arr || []).forEach(function (a) {
-            var id = a.asset_id || a.AssetID;
-            var opt = document.createElement('option');
-            opt.value = id;
-            opt.textContent = assetLabel(a);
-            assetSel.appendChild(opt);
-          });
-          if (selectedId) assetSel.value = selectedId;
-        })
-        .catch(function () {});
-    }
-
-    function loadContacts(cid, selectedName) {
-      resetRequesters(!!cid);
-      if (!cid) return Promise.resolve();
-      return fetch('/api/contacts/' + encodeURIComponent(cid))
-        .then(function (res) { return res.ok ? res.json() : []; })
-        .then(function (arr) {
-          var names = [];
-          (arr || []).forEach(function (ct) {
-            var name = ct.full_name || ct.FullName || '';
-            if (!name) return;
-            names.push(name);
-            var opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = contactLabel(ct);
-            // 직접입력 앞에 삽입
-            reqSel.insertBefore(opt, reqSel.querySelector('option[value="custom"]'));
-          });
-          if (selectedName) {
-            if (names.indexOf(selectedName) >= 0) {
-              reqSel.value = selectedName;
-            } else {
-              reqSel.value = 'custom';
-              reqCustom.value = selectedName;
-            }
-          }
-          syncRequesterCustom();
-        })
-        .catch(function () {});
-    }
-
+    function syncRequesterCustom() { toggleCustom(reqSel, reqCustomWrap); }
     reqSel.addEventListener('change', syncRequesterCustom);
+    syncRequesterCustom();
 
-    custSel.addEventListener('change', function () {
-      loadAssets(custSel.value, '');
-      loadContacts(custSel.value, '');
+    var rn = document.getElementById('as-reqname-code');
+    var rnWrap = document.getElementById('as-reqname-custom-wrap');
+    if (rn) { rn.addEventListener('change', function(){ toggleCustom(rn, rnWrap); }); toggleCustom(rn, rnWrap); }
+
+    var asg = document.getElementById('as-assigned-code');
+    var asgWrap = document.getElementById('as-assigned-custom-wrap');
+    if (asg) { asg.addEventListener('change', function(){ toggleCustom(asg, asgWrap); }); toggleCustom(asg, asgWrap); }
+
+    function loadAssetsAndContacts(cid, keepAsset, keepRequester) {
+      assetSel.innerHTML = '<option value=\"\">자산 미연결 (나중에 매핑)</option>';
+      reqSel.innerHTML = '<option value=\"\">선택</option>';
+      if (!cid) { reqSel.innerHTML += '<option value=\"custom\">직접입력</option>'; syncRequesterCustom(); return; }
+      fetch('/api/assets/' + encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(list){
+        (list || []).forEach(function(a){
+          var opt = document.createElement('option');
+          opt.value = a.asset_id || a.AssetID;
+          opt.textContent = assetLabel(a);
+          if (keepAsset && opt.value === keepAsset) opt.selected = true;
+          assetSel.appendChild(opt);
+        });
+      }).catch(function(){});
+      fetch('/api/contacts/' + encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(list){
+        (list || []).forEach(function(ct){
+          var opt = document.createElement('option');
+          opt.value = ct.full_name || ct.FullName;
+          opt.textContent = contactLabel(ct);
+          if (keepRequester && opt.value === keepRequester) opt.selected = true;
+          reqSel.appendChild(opt);
+        });
+        var custom = document.createElement('option');
+        custom.value = 'custom'; custom.textContent = '직접입력';
+        if (keepRequester && ![].slice.call(reqSel.options).some(function(o){ return o.value === keepRequester; })) {
+          custom.selected = true;
+          document.getElementById('as-requester_custom').value = keepRequester;
+        }
+        reqSel.appendChild(custom);
+        syncRequesterCustom();
+      }).catch(function(){});
+    }
+
+    custSel.addEventListener('change', function(){
+      loadAssetsAndContacts(custSel.value, '', '');
+      loadHistory(custSel.value);
     });
-
     if (custSel.value) {
-      loadAssets(custSel.value, initAsset);
-      loadContacts(custSel.value, initRequester);
+      loadAssetsAndContacts(custSel.value, initAsset, initRequester);
+      loadHistory(custSel.value);
     } else {
-      resetAssets(false);
-      resetRequesters(false);
+      loadHistory('');
     }
   })();
   </script>

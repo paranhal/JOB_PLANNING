@@ -15,8 +15,12 @@ type Customer struct {
 	Industry         string    `json:"industry"`           // 업종 코드
 	HasParent        bool      `json:"has_parent"`
 	ParentCustomerID string    `json:"parent_customer_id"` // 상위기관 ID
-	Address          string    `json:"address"`
-	AddressDetail    string    `json:"address_detail"`
+	PostalCode       string    `json:"postal_code"`        // 우편번호
+	AddrSido         string    `json:"addr_sido"`          // 시도
+	AddrSigungu      string    `json:"addr_sigungu"`       // 시군구(군구)
+	AddrDong         string    `json:"addr_dong"`          // 동읍면
+	Address          string    `json:"address"`            // 표시·검색용 조합주소(시도~동)
+	AddressDetail    string    `json:"address_detail"`     // 상세주소
 	IsActive         bool      `json:"is_active"`
 	Notes            string    `json:"notes"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -126,12 +130,32 @@ type ContactHistoryListItem struct {
 
 // CustomerListItem 목록 표시용 (집계 포함)
 type CustomerListItem struct {
-	CustomerID   string `json:"customer_id"`
-	OrgName      string `json:"org_name"`
-	OfficialName string `json:"official_name"`
-	Industry     string `json:"industry"`
-	MainPhone    string `json:"main_phone"`
-	IsActive     bool   `json:"is_active"`
-	AssetCount   int    `json:"asset_count"`
-	AsCount      int    `json:"as_count"`
+	CustomerID       string `json:"customer_id"`
+	OrgName          string `json:"org_name"`
+	OfficialName     string `json:"official_name"`
+	Industry         string `json:"industry"`
+	MainPhone        string `json:"main_phone"`
+	IsActive         bool   `json:"is_active"`
+	AssetCount       int    `json:"asset_count"`
+	AsCount          int    `json:"as_count"`
+	ParentCustomerID string `json:"parent_customer_id"`
+	ParentOrgName    string `json:"parent_org_name"`
+	HasParent        bool   `json:"has_parent"`
+	Address          string `json:"address,omitempty"`      // 엑셀·지역필터용(조합 또는 구주소)
+	AddrSido         string `json:"addr_sido,omitempty"`    // 시도(구조화)
+	SiteRegion       string `json:"site_region,omitempty"` // 점검사이트 지역
 }
+
+// CustomerCategory 고객현황 상위기관 카테고리(콤보)
+type CustomerCategory struct {
+	ParentID   string `json:"parent_id"`   // 빈값=전체, "none"=상위기관 없음
+	Name       string `json:"name"`
+	ChildCount int    `json:"child_count"`
+}
+
+// CustomerIndustryStat 업종별 건수
+type CustomerIndustryStat struct {
+	Industry string `json:"industry"`
+	Count    int    `json:"count"`
+}
+

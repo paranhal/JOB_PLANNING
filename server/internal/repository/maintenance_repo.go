@@ -193,23 +193,27 @@ func (r *MaintenanceRepo) DeleteVisit(visitID string) error {
 
 func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, error) {
 	rows, err := r.db.Query(`
-		SELECT customer_id, short_name, COALESCE(region,''),
-		       has_klas, has_rfid, entry_category, COALESCE(fixed_rule,'')
-		FROM maintenance_site_config ORDER BY region, short_name`)
+		SELECT s.customer_id, s.short_name, COALESCE(s.region,''),
+		       s.has_klas, s.has_rfid, COALESCE(s.inspection_cycle,'monthly'),
+		       s.entry_category, COALESCE(s.fixed_rule,''),
+		       COALESCE(c.org_name,'')
+		FROM maintenance_site_config s
+		LEFT JOIN customers c ON c.customer_id = s.customer_id
+		ORDER BY s.region, s.short_name`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []model.MaintenanceSiteConfig
 	for rows.Next() {
-		var c model.MaintenanceSiteConfig
+		var cfg model.MaintenanceSiteConfig
 		var klas, rfid int
-		if err := rows.Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.EntryCategory, &c.FixedRule); err != nil {
+		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName); err != nil {
 			return nil, err
 		}
-		c.HasKlas = klas == 1
-		c.HasRfid = rfid == 1
-		out = append(out, c)
+		cfg.HasKlas = klas == 1
+		cfg.HasRfid = rfid == 1
+		out = append(out, cfg)
 	}
 	return out, rows.Err()
 }
@@ -219,9 +223,10 @@ func (r *MaintenanceRepo) GetSiteConfig(customerID string) (*model.MaintenanceSi
 	var klas, rfid int
 	err := r.db.QueryRow(`
 		SELECT customer_id, short_name, COALESCE(region,''),
-		       has_klas, has_rfid, entry_category, COALESCE(fixed_rule,'')
+		       has_klas, has_rfid, COALESCE(inspection_cycle,'monthly'),
+		       entry_category, COALESCE(fixed_rule,'')
 		FROM maintenance_site_config WHERE customer_id = ?`, customerID).
-		Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.EntryCategory, &c.FixedRule)
+		Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.InspectionCycle, &c.EntryCategory, &c.FixedRule)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -241,12 +246,15 @@ func (r *MaintenanceRepo) UpsertSiteConfig(c *model.MaintenanceSiteConfig) error
 	if c.HasRfid {
 		rfid = 1
 	}
+	if c.InspectionCycle == "" {
+		c.InspectionCycle = "monthly"
+	}
 	res, err := r.db.Exec(`
 		UPDATE maintenance_site_config SET
 			short_name = ?, region = ?, has_klas = ?, has_rfid = ?,
-			entry_category = ?, fixed_rule = ?, updated_at = CURRENT_TIMESTAMP
+			inspection_cycle = ?, entry_category = ?, fixed_rule = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE customer_id = ?`,
-		c.ShortName, c.Region, klas, rfid, c.EntryCategory, nullString(c.FixedRule), c.CustomerID)
+		c.ShortName, c.Region, klas, rfid, c.InspectionCycle, c.EntryCategory, nullString(c.FixedRule), c.CustomerID)
 	if err != nil {
 		return err
 	}
@@ -256,9 +264,9 @@ func (r *MaintenanceRepo) UpsertSiteConfig(c *model.MaintenanceSiteConfig) error
 	}
 	_, err = r.db.Exec(`
 		INSERT INTO maintenance_site_config
-		(customer_id, short_name, region, has_klas, has_rfid, entry_category, fixed_rule, updated_at)
-		VALUES (?,?,?,?,?,?,?, CURRENT_TIMESTAMP)`,
-		c.CustomerID, c.ShortName, c.Region, klas, rfid, c.EntryCategory, nullString(c.FixedRule))
+		(customer_id, short_name, region, has_klas, has_rfid, inspection_cycle, entry_category, fixed_rule, updated_at)
+		VALUES (?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)`,
+		c.CustomerID, c.ShortName, c.Region, klas, rfid, c.InspectionCycle, c.EntryCategory, nullString(c.FixedRule))
 	return err
 }
 

@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -14,6 +15,7 @@ type AssetHandler struct {
 	repo         *repository.AssetRepo
 	customerRepo *repository.CustomerRepo
 	codeRepo     *repository.CodeRepo
+	attachRepo   *repository.AttachmentRepo
 }
 
 func (h *AssetHandler) List(c echo.Context) error {
@@ -43,6 +45,7 @@ func (h *AssetHandler) List(c echo.Context) error {
 func (h *AssetHandler) New(c echo.Context) error {
 	customers, _ := h.customerRepo.ListAll()
 	productTypes, _ := h.codeRepo.ActiveByGroup("product_type")
+	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
 	installerTypes, _ := h.codeRepo.ActiveByGroup("installer_type")
 	managementTypes, _ := h.codeRepo.ActiveByGroup("management_type")
 	requesterTypes, _ := h.codeRepo.ActiveByGroup("requester_type")
@@ -51,7 +54,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 	maintCycles, _ := h.codeRepo.ActiveByGroup("maint_cycle")
 	maintBillingCycles, _ := h.codeRepo.ActiveByGroup("maint_billing_cycle")
 
-	asset := &model.Asset{IsManaged: true, OperationStatus: "operating"}
+	asset := &model.Asset{IsManaged: true, OperationStatus: "operating", ProductCategory: "rfid"}
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		asset.CustomerID = cid
 	}
@@ -59,7 +62,8 @@ func (h *AssetHandler) New(c echo.Context) error {
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
 		"Title": "자산 등록", "Active": "assets", "IsNew": true,
 		"Asset": asset, "Customers": customers,
-		"ProductTypes": productTypes, "InstallerTypes": installerTypes,
+		"ProductTypes": productTypes, "ProductCategories": productCategories,
+		"InstallerTypes": installerTypes,
 		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
 		"OpStatuses": opStatuses,
 		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
@@ -69,6 +73,9 @@ func (h *AssetHandler) New(c echo.Context) error {
 
 func (h *AssetHandler) Create(c echo.Context) error {
 	a := bindAsset(c)
+	if a.ProductCategory == "" {
+		a.ProductCategory = "rfid"
+	}
 	if err := h.repo.Create(a); err != nil {
 		return err
 	}
@@ -84,9 +91,37 @@ func (h *AssetHandler) Show(c echo.Context) error {
 	if a == nil {
 		return echo.ErrNotFound
 	}
+	atts, _ := h.attachRepo.ListByRef("asset", id)
+	images := make([]map[string]string, 0, 3)
+	for _, att := range atts {
+		if len(images) >= 3 {
+			break
+		}
+		url := attachmentPublicURL(att.FilePath)
+		images = append(images, map[string]string{
+			"ID": att.AttachmentID, "Name": att.FileName, "URL": url,
+		})
+	}
+	for len(images) < 3 {
+		images = append(images, map[string]string{})
+	}
 	return c.Render(http.StatusOK, "asset/show.html", map[string]interface{}{
 		"Title": a.ProductName, "Active": "assets", "Asset": a,
+		"Images": images, "ImageCount": len(atts), "CanUpload": len(atts) < 3,
+		"CanWrite": canWriteMaster(c),
 	})
+}
+
+func attachmentPublicURL(filePath string) string {
+	p := strings.ReplaceAll(filePath, "\\", "/")
+	const prefix = "data/uploads/"
+	if i := strings.Index(p, prefix); i >= 0 {
+		return "/uploads/" + p[i+len(prefix):]
+	}
+	if strings.HasPrefix(p, "uploads/") {
+		return "/" + p
+	}
+	return "/attachments/" // fallback — prefer download by id from template
 }
 
 func (h *AssetHandler) Edit(c echo.Context) error {
@@ -97,6 +132,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	}
 	customers, _ := h.customerRepo.ListAll()
 	productTypes, _ := h.codeRepo.ActiveByGroup("product_type")
+	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
 	installerTypes, _ := h.codeRepo.ActiveByGroup("installer_type")
 	managementTypes, _ := h.codeRepo.ActiveByGroup("management_type")
 	requesterTypes, _ := h.codeRepo.ActiveByGroup("requester_type")
@@ -108,7 +144,8 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
 		"Title": "자산 수정", "Active": "assets", "IsNew": false,
 		"Asset": a, "Customers": customers,
-		"ProductTypes": productTypes, "InstallerTypes": installerTypes,
+		"ProductTypes": productTypes, "ProductCategories": productCategories,
+		"InstallerTypes": installerTypes,
 		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
 		"OpStatuses": opStatuses,
 		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
@@ -150,6 +187,7 @@ func bindAsset(c echo.Context) *model.Asset {
 		CustomerID:        c.FormValue("customer_id"),
 		ProductName:       c.FormValue("product_name"),
 		ProductType:       c.FormValue("product_type"),
+		ProductCategory:   c.FormValue("product_category"),
 		ModelName:         c.FormValue("model_name"),
 		Manufacturer:      c.FormValue("manufacturer"),
 		SerialNumber:      c.FormValue("serial_number"),
@@ -176,6 +214,7 @@ func bindAsset(c echo.Context) *model.Asset {
 		LocBuildingName:   c.FormValue("loc_building_name"),
 		LocFloorName:      c.FormValue("loc_floor_name"),
 		LocRoomName:       c.FormValue("loc_room_name"),
+		InstallLocation:   c.FormValue("install_location"),
 		LocationDetail:    c.FormValue("location_detail"),
 		Notes:             c.FormValue("notes"),
 	}

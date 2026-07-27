@@ -35,6 +35,12 @@ func (r *AttachmentRepo) ListByRef(refType, refID string) ([]model.Attachment, e
 	return items, rows.Err()
 }
 
+func (r *AttachmentRepo) CountByRef(refType, refID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM attachments WHERE ref_type=? AND ref_id=?`, refType, refID).Scan(&n)
+	return n, err
+}
+
 func (r *AttachmentRepo) Create(a *model.Attachment) error {
 	a.AttachmentID = newID("ATT")
 	_, err := r.db.Exec(`

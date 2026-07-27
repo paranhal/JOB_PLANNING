@@ -1,0 +1,132 @@
+{{define "title"}}통계 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">통계</h2>
+      <p class="text-sm text-gray-500 mt-1">
+        리스트 조회 · 기간 {{.PeriodLabel}}{{if .OffsetLabel}} · {{.OffsetLabel}}{{end}} · {{.RowCount}}건
+      </p>
+    </div>
+    <div class="flex flex-col items-stretch sm:items-end gap-2">
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <form method="GET" action="/stats" id="stats-period-form" class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">기간</label>
+          <select name="period" onchange="this.form.submit()"
+                  class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {{range .PeriodOptions}}
+            <option value="{{.Value}}" {{if eq $.Period .Value}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </form>
+        <a href="/stats/export.xlsx?period={{.Period}}&offset={{.Offset}}"
+           class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
+          엑셀 다운로드
+        </a>
+      </div>
+
+      {{if .ShowOffset}}
+      <div class="flex flex-wrap items-center justify-between gap-3 w-full sm:min-w-[28rem]">
+        <div class="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+          {{range .RangeLabels}}
+          <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-100 border border-gray-200 font-medium tabular-nums">{{.}}</span>
+          {{end}}
+        </div>
+        <form method="GET" action="/stats" class="flex items-center gap-2">
+          <input type="hidden" name="period" value="{{.Period}}">
+          <select name="offset" onchange="this.form.submit()"
+                  class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+            {{range .OffsetOptions}}
+            <option value="{{.Value}}" {{if eq $.Offset .Value}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </form>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <p class="text-xs text-gray-400">엑셀은 일별·주간별·월별·분기별·전체 시트로 구성됩니다(각 시트는 현재 기준). 각 시트에 상세 목록과 담당자별·종합이 포함됩니다.</p>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700">상세 목록</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wider">
+          <tr>
+            <th class="px-3 py-2 font-medium">제품분류</th>
+            <th class="px-3 py-2 font-medium">제품모델명</th>
+            <th class="px-3 py-2 font-medium">업무형태</th>
+            <th class="px-3 py-2 font-medium">접수형태</th>
+            <th class="px-3 py-2 font-medium">거래처명</th>
+            <th class="px-3 py-2 font-medium">수행담당자</th>
+            <th class="px-3 py-2 font-medium">접수내용</th>
+            <th class="px-3 py-2 font-medium">처리내용</th>
+            <th class="px-3 py-2 font-medium">처리상태</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{if .Rows}}
+          {{range .Rows}}
+          <tr class="hover:bg-gray-50 align-top">
+            <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{.ProductCategory}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{if .ProductModel}}{{.ProductModel}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{.WorkForm}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{.ReceiptForm}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{.CustomerName}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{.Assignee}}</td>
+            <td class="px-3 py-2 text-gray-700 max-w-[14rem] truncate" title="{{.Symptom}}">{{if .Symptom}}{{.Symptom}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 text-gray-700 max-w-[14rem] truncate" title="{{.ActionTaken}}">{{if .ActionTaken}}{{.ActionTaken}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 whitespace-nowrap">
+              <a href="/as/{{.ASID}}" class="text-blue-600 hover:underline">{{.StatusLabel}}</a>
+            </td>
+          </tr>
+          {{end}}
+          {{else}}
+          <tr>
+            <td colspan="9" class="px-3 py-10 text-center text-gray-400">해당 기간 통계 데이터가 없습니다.</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700">담당자별</h3>
+      <p class="text-xs text-gray-400 mt-0.5">담당자당 1행 · 맨 아래 종합</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wider">
+          <tr>
+            <th class="px-4 py-2 font-medium">수행담당자</th>
+            <th class="px-4 py-2 font-medium text-right">건수</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .Assignees}}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2 text-gray-800">{{.Assignee}}</td>
+            <td class="px-4 py-2 text-right font-medium text-gray-800">{{.Count}}</td>
+          </tr>
+          {{else}}
+          <tr>
+            <td colspan="2" class="px-4 py-8 text-center text-gray-400">담당자 집계 없음</td>
+          </tr>
+          {{end}}
+          {{if .Assignees}}
+          <tr class="bg-gray-50 font-semibold">
+            <td class="px-4 py-2.5 text-gray-900">종합</td>
+            <td class="px-4 py-2.5 text-right text-gray-900">{{.AssigneeTotal}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

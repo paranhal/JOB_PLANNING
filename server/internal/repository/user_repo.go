@@ -34,6 +34,30 @@ func (r *UserRepo) ListAll() ([]model.User, error) {
 	return items, rows.Err()
 }
 
+func (r *UserRepo) ListAssignable() ([]model.User, error) {
+	rows, err := r.db.Query(`
+		SELECT user_id, username, full_name, role, is_active, created_at
+		FROM users WHERE is_active=1 AND role IN ('admin','tech','receipt')
+		ORDER BY full_name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.User
+	for rows.Next() {
+		var u model.User
+		var active int
+		var createdStr string
+		if err := rows.Scan(&u.UserID, &u.Username, &u.FullName, &u.Role, &active, &createdStr); err != nil {
+			return nil, err
+		}
+		u.IsActive = active == 1
+		u.CreatedAt = parseTime(createdStr)
+		items = append(items, u)
+	}
+	return items, rows.Err()
+}
+
 func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
 	var u model.User
 	var active int

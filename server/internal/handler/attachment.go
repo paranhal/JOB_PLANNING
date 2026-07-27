@@ -23,6 +23,13 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	refType := c.FormValue("ref_type")
 	refID := c.FormValue("ref_id")
 
+	if refType == "asset" {
+		n, _ := h.repo.CountByRef("asset", refID)
+		if n >= 3 {
+			return c.String(http.StatusBadRequest, "설치자산 이미지는 최대 3장까지입니다")
+		}
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		return c.String(http.StatusBadRequest, "파일이 필요합니다")
@@ -81,7 +88,10 @@ func (h *AttachmentHandler) Delete(c echo.Context) error {
 		os.Remove(att.FilePath)
 	}
 	h.repo.Delete(c.Param("id"))
-	redirect := c.QueryParam("redirect")
+	redirect := c.FormValue("redirect")
+	if redirect == "" {
+		redirect = c.QueryParam("redirect")
+	}
 	if redirect == "" {
 		redirect = "/"
 	}

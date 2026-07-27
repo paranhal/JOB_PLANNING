@@ -7,7 +7,8 @@ type Asset struct {
 	AssetID          string    `json:"asset_id"`
 	CustomerID       string    `json:"customer_id"`
 	ProductName      string    `json:"product_name"`
-	ProductType      string    `json:"product_type"`      // 코드: SW, HW, 서버, 네트워크장비 등
+	ProductType      string    `json:"product_type"`      // 제품구분 코드: SW, HW, 서버 등
+	ProductCategory  string    `json:"product_category"`  // 제품분류: 홈페이지, 전자도서관, 모바일, RFID자동화, 자료관리, 기타
 	ModelName        string    `json:"model_name"`
 	Manufacturer     string    `json:"manufacturer"`
 	SerialNumber     string    `json:"serial_number"`
@@ -35,7 +36,8 @@ type Asset struct {
 	LocBuildingName  string    `json:"loc_building_name"` // 건물명 (전용 필드)
 	LocFloorName     string    `json:"loc_floor_name"`    // 층 (전용 필드)
 	LocRoomName      string    `json:"loc_room_name"`     // 호·실명 (전용 필드)
-	LocationDetail   string    `json:"location_detail"`
+	InstallLocation  string    `json:"install_location"`  // 설치위치 — 동일층·동일실·동일모델 구분 (AS 접수 중요)
+	LocationDetail   string    `json:"location_detail"`   // 상세위치(보조 서술)
 	Notes            string    `json:"notes"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`

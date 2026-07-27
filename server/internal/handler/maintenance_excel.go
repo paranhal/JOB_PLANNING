@@ -176,3 +176,109 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 	}
 	return nil
 }
+
+// BuildSiteConfigExcelWorkbook 점검 사이트(고객 사이트) 설정 목록 xlsx
+func BuildSiteConfigExcelWorkbook(items []model.MaintenanceSiteConfig) (*excelize.File, error) {
+	f := excelize.NewFile()
+	sheet := f.GetSheetName(0)
+	if sheet == "" {
+		sheet = "Sheet1"
+	}
+	if err := f.SetSheetName(sheet, "Sites"); err != nil {
+		return nil, err
+	}
+	sheet = "Sites"
+
+	headers := []interface{}{
+		"고객ID", "기관명", "표시명", "지역", "점검주기",
+		"KLAS", "RFID", "엑셀유형", "고정규칙",
+	}
+	hdrStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true, Family: "맑은 고딕", Size: 11,
+			Color: "FFFFFF",
+		},
+		Fill: excelize.Fill{
+			Type: "pattern", Color: []string{"2F5496"}, Pattern: 1,
+		},
+		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := f.SetSheetRow(sheet, "A1", &headers); err != nil {
+		return nil, err
+	}
+	if err := f.SetCellStyle(sheet, "A1", "I1", hdrStyle); err != nil {
+		return nil, err
+	}
+	if err := f.SetRowHeight(sheet, 1, 30); err != nil {
+		return nil, err
+	}
+	for r, it := range items {
+		row := []interface{}{
+			it.CustomerID,
+			it.OrgName,
+			it.ShortName,
+			it.Region,
+			siteInspectionCycleLabel(it.InspectionCycle),
+			boolMark(it.HasKlas),
+			boolMark(it.HasRfid),
+			siteEntryCategoryLabel(it.EntryCategory),
+			siteFixedRuleLabel(it.FixedRule),
+		}
+		cell := fmt.Sprintf("A%d", r+2)
+		if err := f.SetSheetRow(sheet, cell, &row); err != nil {
+			return nil, err
+		}
+	}
+	widths := []float64{22, 28, 16, 12, 12, 8, 8, 14, 22}
+	for i, w := range widths {
+		col, _ := excelize.ColumnNumberToName(i + 1)
+		_ = f.SetColWidth(sheet, col, col, w)
+	}
+	return f, nil
+}
+
+func boolMark(v bool) string {
+	if v {
+		return "○"
+	}
+	return ""
+}
+
+func siteInspectionCycleLabel(s string) string {
+	m := map[string]string{
+		"monthly": "월", "odd_bimonthly": "홀수격월", "even_bimonthly": "짝수격월",
+		"quarterly": "분기", "semi": "반기", "yearly": "년1회",
+	}
+	if l, ok := m[s]; ok {
+		return l
+	}
+	if s == "" {
+		return "월"
+	}
+	return s
+}
+
+func siteEntryCategoryLabel(s string) string {
+	switch s {
+	case "fixed":
+		return "고정·지정일"
+	case "office":
+		return "사무소 등"
+	default:
+		return "일반"
+	}
+}
+
+func siteFixedRuleLabel(s string) string {
+	switch s {
+	case "LAST_MONDAY_OF_MONTH":
+		return "매월 마지막 월요일"
+	case "":
+		return ""
+	default:
+		return s
+	}
+}

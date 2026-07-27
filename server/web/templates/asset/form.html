@@ -14,6 +14,14 @@
     <!-- 기관/제품 기본 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">기본 정보</h3>
+      {{if not .IsNew}}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">자산번호</label>
+        <input type="text" value="{{.Asset.AssetID}}" readonly class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-700">
+      </div>
+      {{else}}
+      <p class="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">자산번호는 등록 시 자동 부여됩니다. (모델-구분-일련번호)</p>
+      {{end}}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">소속 기관 <span class="text-red-500">*</span></label>
@@ -25,6 +33,13 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">제품명 <span class="text-red-500">*</span></label>
           <input type="text" name="product_name" value="{{.Asset.ProductName}}" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제품분류</label>
+          <select name="product_category" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range .ProductCategories}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.ProductCategory}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">제품구분</label>
@@ -205,6 +220,15 @@
             <option value="">호 선택</option>
           </select>
         </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          설치위치 <span class="text-red-500">*</span>
+          <span class="font-normal text-xs text-gray-500 ml-1">동일 층·실·모델 구분용 (AS 접수 시 표시)</span>
+        </label>
+        <input type="text" name="install_location" value="{{.Asset.InstallLocation}}" required
+               placeholder="예: 1호기, 좌측 게이트, 안내데스크 A"
+               class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">상세위치</label><input type="text" name="location_detail" value="{{.Asset.LocationDetail}}" placeholder="복도 좌측, 안내데스크 옆 등" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

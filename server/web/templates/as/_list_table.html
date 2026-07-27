@@ -1,0 +1,114 @@
+{{define "as_list_table"}}
+{{$isHold := .IsHoldList}}
+{{$canUnhold := and .IsHoldList (or .CanProcess .CanReceive)}}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">!</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <a href="{{index .SortLinks "as_number"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
+              접수번호
+              <span class="inline-flex flex-col leading-none text-[9px]">
+                <span class="{{if and (eq .Sort "as_number") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                <span class="{{if and (eq .Sort "as_number") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+              </span>
+            </a>
+          </th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <a href="{{index .SortLinks "org_name"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
+              기관(고객명)
+              <span class="inline-flex flex-col leading-none text-[9px]">
+                <span class="{{if and (eq .Sort "org_name") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                <span class="{{if and (eq .Sort "org_name") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+              </span>
+            </a>
+          </th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">증상</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <a href="{{index .SortLinks "status"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
+              상태
+              <span class="inline-flex flex-col leading-none text-[9px]">
+                <span class="{{if and (eq .Sort "status") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                <span class="{{if and (eq .Sort "status") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+              </span>
+            </a>
+          </th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
+            <a href="{{index .SortLinks "assigned"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
+              담당
+              <span class="inline-flex flex-col leading-none text-[9px]">
+                <span class="{{if and (eq .Sort "assigned") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                <span class="{{if and (eq .Sort "assigned") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+              </span>
+            </a>
+          </th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <a href="{{index .SortLinks "days"}}" class="inline-flex items-center gap-1 hover:text-gray-800 justify-end w-full">
+              경과
+              <span class="inline-flex flex-col leading-none text-[9px]">
+                <span class="{{if and (eq .Sort "days") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                <span class="{{if and (eq .Sort "days") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+              </span>
+            </a>
+          </th>
+          {{if $isHold}}
+          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">삭제</th>
+          {{end}}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{if .Items}}
+          {{range .Items}}
+          <tr class="hover:bg-gray-50 transition-colors {{if gt .DaysElapsed 3}}bg-red-50/30{{end}}">
+            <td class="px-4 py-3">
+              <span class="{{urgencyColor .Urgency}} text-xs font-bold">{{urgencyLabel .Urgency}}</span>
+            </td>
+            <td class="px-4 py-3">
+              <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
+              <p class="text-xs text-gray-400 mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
+            </td>
+            <td class="px-4 py-3">
+              <span class="font-medium text-gray-800">{{.OrgName}}</span>
+              {{if .ProductName}}
+              <p class="text-xs text-gray-400 mt-0.5">{{.ProductName}}</p>
+              {{end}}
+            </td>
+            <td class="px-4 py-3 hidden lg:table-cell text-gray-600 max-w-xs truncate">{{.Symptom}}</td>
+            <td class="px-4 py-3 text-center">
+              <span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span>
+            </td>
+            <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{.AssignedTo}}</td>
+            <td class="px-4 py-3 text-right text-gray-500">{{.DaysElapsed}}일</td>
+            {{if $isHold}}
+            <td class="px-4 py-3 text-center">
+              {{if $canUnhold}}
+              <form method="POST" action="/as/{{.ASID}}/hold-release"
+                    onsubmit="return confirm('보류를 삭제하고 접수 상태로 되돌릴까요?');">
+                <input type="hidden" name="redirect" value="list">
+                <button type="submit" class="text-red-600 hover:underline text-xs font-medium">삭제</button>
+              </form>
+              {{else}}
+              <span class="text-gray-300 text-xs">—</span>
+              {{end}}
+            </td>
+            {{end}}
+          </tr>
+          {{end}}
+        {{else}}
+          <tr><td colspan="{{if $isHold}}8{{else}}7{{end}}" class="px-4 py-10 text-center text-gray-400">표시할 AS가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{if gt .TotalPages 1}}
+<div class="flex justify-center gap-2 mt-4">
+  {{if gt .Page 1}}<a href="{{.PrevURL}}" class="px-3 py-1 border rounded text-sm">이전</a>{{end}}
+  <span class="px-3 py-1 text-sm text-gray-600">{{.Page}} / {{.TotalPages}}</span>
+  {{if lt .Page .TotalPages}}<a href="{{.NextURL}}" class="px-3 py-1 border rounded text-sm">다음</a>{{end}}
+</div>
+{{end}}
+{{end}}

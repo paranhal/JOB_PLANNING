@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"customer-support/internal/model"
 
 	_ "modernc.org/sqlite"
 )
@@ -72,6 +75,10 @@ CREATE TABLE IF NOT EXISTS customers (
     parent_customer_id TEXT,
     address            TEXT,
     address_detail     TEXT,
+    postal_code        TEXT,
+    addr_sido          TEXT,
+    addr_sigungu       TEXT,
+    addr_dong          TEXT,
     is_active          INTEGER DEFAULT 1,
     notes              TEXT,
     created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -162,6 +169,7 @@ CREATE TABLE IF NOT EXISTS assets (
     customer_id         TEXT NOT NULL,
     product_name        TEXT NOT NULL,
     product_type        TEXT,
+    product_category    TEXT,
     model_name          TEXT,
     manufacturer        TEXT,
     serial_number       TEXT,
@@ -188,6 +196,7 @@ CREATE TABLE IF NOT EXISTS assets (
     loc_building_name   TEXT,
     loc_floor_name      TEXT,
     loc_room_name       TEXT,
+    install_location    TEXT,
     location_detail     TEXT,
     notes               TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -262,6 +271,10 @@ CREATE TABLE IF NOT EXISTS as_receipts (
     requester_type      TEXT,
     requester_name      TEXT,
     assigned_to         TEXT,
+    assigned_user_id    TEXT,
+    received_by         TEXT,
+    visit_scheduled_date TEXT,
+    schedule_confirmed  INTEGER DEFAULT 0,
     status              TEXT DEFAULT 'received',
     start_datetime      DATETIME,
     complete_datetime   DATETIME,
@@ -272,6 +285,10 @@ CREATE TABLE IF NOT EXISTS as_receipts (
     is_recurrence       INTEGER DEFAULT 0,
     is_reopen           INTEGER DEFAULT 0,
     result_code         TEXT,
+    revisit_reason      TEXT,
+    hold_reason         TEXT,
+    hold_next_action    TEXT,
+    cancel_datetime     DATETIME,
     customer_confirmer  TEXT,
     confirm_datetime    DATETIME,
     followup_action     TEXT,
@@ -286,6 +303,7 @@ CREATE TABLE IF NOT EXISTS as_receipts (
 CREATE TABLE IF NOT EXISTS as_processes (
     process_id       TEXT PRIMARY KEY,
     as_id            TEXT NOT NULL,
+    process_number   TEXT,
     process_datetime DATETIME DEFAULT CURRENT_TIMESTAMP,
     worker           TEXT,
     work_type        TEXT,
@@ -294,6 +312,12 @@ CREATE TABLE IF NOT EXISTS as_processes (
     time_spent       INTEGER,
     notes            TEXT,
     FOREIGN KEY (as_id) REFERENCES as_receipts(as_id)
+);
+
+-- 업무 고유번호 시퀀스 (§10.2)
+CREATE TABLE IF NOT EXISTS id_sequences (
+    seq_key TEXT PRIMARY KEY,
+    last_no INTEGER NOT NULL DEFAULT 0
 );
 
 -- 첨부파일 (§12)
@@ -315,6 +339,7 @@ CREATE TABLE IF NOT EXISTS maintenance_site_config (
     region         TEXT,
     has_klas       INTEGER NOT NULL DEFAULT 0,
     has_rfid       INTEGER NOT NULL DEFAULT 0,
+    inspection_cycle TEXT NOT NULL DEFAULT 'monthly',
     entry_category TEXT NOT NULL DEFAULT 'normal',
     fixed_rule     TEXT,
     updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -349,6 +374,19 @@ CREATE TABLE IF NOT EXISTS maintenance_visits (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_visit_dedup
 ON maintenance_visits(plan_id, visit_date, customer_id);
 
+-- 업무처리현황 · 기타 업무
+CREATE TABLE IF NOT EXISTS work_other (
+    other_id   TEXT PRIMARY KEY,
+    work_date  TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    phase      TEXT NOT NULL DEFAULT 'receipt',
+    org_name   TEXT,
+    notes      TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_work_other_date ON work_other(work_date, phase);
+
 -- ── 기본 코드 시드 데이터 (§11 전체 코드그룹) ──
 INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
 -- 업종
@@ -373,6 +411,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('PT003','product_type','server','서버',3),
 ('PT004','product_type','network','네트워크장비',4),
 ('PT005','product_type','peripheral','주변장비',5),
+('PT006','product_type','kiosk','키오스크',6),
 -- 설치주체
 ('INST001','installer_type','self','자사',1),
 ('INST002','installer_type','other','타사',2),
@@ -410,6 +449,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('RQ003','requester_type','partner','협력사',3),
 ('RQ004','requester_type','prime','원청',4),
 ('RQ005','requester_type','internal','내부',5),
+('RQ006','requester_type','onecall','원콜',6),
 -- AS상태
 ('AS_S001','as_status','received','접수',1),
 ('AS_S002','as_status','in_progress','진행중',2),
@@ -446,8 +486,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 -- 처리결과코드
 ('RSC001','result_code','done','완료',1),
 ('RSC002','result_code','temporary','임시조치',2),
-('RSC003','result_code','transfer','타사이관',3),
-('RSC004','result_code','escalation','제조사에스컬레이션',4),
+('RSC005','result_code','revisit_needed','재방문필요',3),
+('RSC003','result_code','transfer','타사이관',4),
+('RSC004','result_code','escalation','제조사에스컬레이션',5),
 -- 수행관계 구분
 ('REL001','relation_type','mfg_request','제조사요청수행',1),
 ('REL002','relation_type','partner_request','협력사요청수행',2),
@@ -468,10 +509,22 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	alters := []string{
 		`ALTER TABLE as_receipts ADD COLUMN is_reopen INTEGER DEFAULT 0`,
 		`ALTER TABLE as_receipts ADD COLUMN replace_review INTEGER DEFAULT 0`,
+		`ALTER TABLE as_receipts ADD COLUMN received_by TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN assigned_user_id TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN visit_scheduled_date TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN schedule_confirmed INTEGER DEFAULT 0`,
+		`ALTER TABLE maintenance_site_config ADD COLUMN inspection_cycle TEXT DEFAULT 'monthly'`,
+		`ALTER TABLE as_receipts ADD COLUMN revisit_reason TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN hold_reason TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN hold_next_action TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN cancel_datetime TEXT`,
+		`ALTER TABLE assets ADD COLUMN product_category TEXT`,
+		`ALTER TABLE as_processes ADD COLUMN process_number TEXT`,
 		`ALTER TABLE contact_history ADD COLUMN created_by TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_building_name TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_floor_name TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_room_name TEXT`,
+		`ALTER TABLE assets ADD COLUMN install_location TEXT`,
 		`ALTER TABLE assets ADD COLUMN maint_contract_type TEXT`,
 		`ALTER TABLE assets ADD COLUMN maint_cycle TEXT`,
 		`ALTER TABLE assets ADD COLUMN maint_start_date TEXT`,
@@ -484,10 +537,33 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE contact_history ADD COLUMN contact_role TEXT`,
 		`ALTER TABLE contact_history ADD COLUMN affiliation TEXT`,
 		`ALTER TABLE contact_history ADD COLUMN mobile TEXT`,
+		`ALTER TABLE customers ADD COLUMN postal_code TEXT`,
+		`ALTER TABLE customers ADD COLUMN addr_sido TEXT`,
+		`ALTER TABLE customers ADD COLUMN addr_sigungu TEXT`,
+		`ALTER TABLE customers ADD COLUMN addr_dong TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
 	}
+
+	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
+		('PT006','product_type','kiosk','키오스크',6),
+		('RQ006','requester_type','onecall','원콜',6),
+		('RSC005','result_code','revisit_needed','재방문필요',3)`)
+	db.Exec(`UPDATE codes SET sort_order=4 WHERE code_id='RSC003'`)
+	db.Exec(`UPDATE codes SET sort_order=5 WHERE code_id='RSC004'`)
+	db.Exec(`UPDATE codes SET sort_order=3, code_name='재방문필요' WHERE code_id='RSC005'`)
+
+	// 기존 배정명을 user_id로 보강
+	db.Exec(`
+		UPDATE as_receipts SET assigned_user_id=(
+			SELECT u.user_id FROM users u
+			WHERE TRIM(u.full_name)=TRIM(as_receipts.assigned_to)
+			   OR TRIM(u.username)=TRIM(as_receipts.assigned_to)
+			LIMIT 1
+		)
+		WHERE (assigned_user_id IS NULL OR assigned_user_id='')
+		  AND assigned_to IS NOT NULL AND TRIM(assigned_to)!=''`)
 
 	// 기존 is_primary → contact_role 보강
 	db.Exec(`UPDATE contacts SET contact_role='primary' WHERE is_primary=1 AND (contact_role IS NULL OR contact_role='')`)
@@ -524,5 +600,96 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('CAFF003','contact_affiliation','partner','협력업체',3),
 		('CAFF004','contact_affiliation','other','기타',4)`)
 
+	// 통계 분류 코드
+	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
+		('SPC001','stats_product_category','homepage','홈페이지',1),
+		('SPC002','stats_product_category','elibrary','전자도서관',2),
+		('SPC003','stats_product_category','mobile','모바일',3),
+		('SPC004','stats_product_category','rfid','RFID자동화',4),
+		('SPC005','stats_product_category','materials','자료관리',5),
+		('SPC006','stats_product_category','other','기타',6),
+		('SWF001','work_form','maintenance','정기점검',1),
+		('SWF002','work_form','as','AS',2),
+		('SWF003','work_form','install','설치',3),
+		('SWF004','work_form','other','기타',4),
+		('SRF001','receipt_form','onecall','원콜',1),
+		('SRF002','receipt_form','phone','전화',2),
+		('SRF003','receipt_form','manufacturer','제조사요청',3),
+		('SRF004','receipt_form','onsite','현장',4),
+		('SRF005','receipt_form','mail','메일',5)`)
+
+	// 기존 설치자산 제품분류 기본값: RFID자동화
+	db.Exec(`UPDATE assets SET product_category='rfid' WHERE product_category IS NULL OR TRIM(product_category)=''`)
+
+	// 기관명·공식명칭에 '도서관'이 있으면 업종을 도서관으로 통일
+	db.Exec(`UPDATE customers SET industry='도서관', updated_at=CURRENT_TIMESTAMP
+		WHERE (org_name LIKE '%도서관%' OR official_name LIKE '%도서관%')
+		  AND COALESCE(industry,'') != '도서관'`)
+
+	// AS 워크플로 상태 보정: 일정확정→진행중, 배정만→담당자배정, 그 외→접수
+	// 기존 진행중 건은 일정 확정으로 이관(1회성 의미, 이후 필드 기준 재파생)
+	db.Exec(`UPDATE as_receipts SET schedule_confirmed=1
+		WHERE status='in_progress' AND COALESCE(schedule_confirmed,0)=0`)
+	db.Exec(`UPDATE as_receipts SET status='in_progress', updated_at=CURRENT_TIMESTAMP
+		WHERE status IN ('received','assigned','in_progress','')
+		  AND COALESCE(schedule_confirmed,0)=1`)
+	db.Exec(`UPDATE as_receipts SET status='assigned', updated_at=CURRENT_TIMESTAMP
+		WHERE status IN ('received','assigned','in_progress','')
+		  AND COALESCE(schedule_confirmed,0)=0
+		  AND (
+		    (assigned_to IS NOT NULL AND TRIM(assigned_to)!='')
+		    OR (assigned_user_id IS NOT NULL AND TRIM(assigned_user_id)!='')
+		  )`)
+	db.Exec(`UPDATE as_receipts SET status='received', updated_at=CURRENT_TIMESTAMP
+		WHERE status IN ('received','assigned','in_progress','')
+		  AND COALESCE(schedule_confirmed,0)=0
+		  AND (assigned_to IS NULL OR TRIM(assigned_to)='')
+		  AND (assigned_user_id IS NULL OR TRIM(assigned_user_id)='')`)
+
+	db.Exec(`UPDATE maintenance_site_config SET inspection_cycle='monthly'
+		WHERE inspection_cycle IS NULL OR TRIM(inspection_cycle)=''`)
+
+	migrateCustomerStructuredAddresses(db)
+
 	return nil
+}
+
+// migrateCustomerStructuredAddresses 구 address → 우편번호/시도/군구/동/상세 분해 이관
+func migrateCustomerStructuredAddresses(db *sql.DB) {
+	rows, err := db.Query(`
+		SELECT customer_id, COALESCE(address,''), COALESCE(address_detail,'')
+		FROM customers
+		WHERE (addr_sido IS NULL OR TRIM(addr_sido)='')
+		  AND (
+		    (address IS NOT NULL AND TRIM(address)!='')
+		    OR (address_detail IS NOT NULL AND TRIM(address_detail)!='')
+		  )`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	type row struct{ id, addr, det string }
+	var list []row
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.id, &r.addr, &r.det) != nil {
+			continue
+		}
+		list = append(list, r)
+	}
+	for _, r := range list {
+		pc, sido, sigungu, dong, det := model.ParseLegacyCustomerAddress(r.addr, r.det)
+		c := &model.Customer{
+			PostalCode: pc, AddrSido: sido, AddrSigungu: sigungu, AddrDong: dong, AddressDetail: det,
+		}
+		c.SyncCombinedAddress()
+		if c.Address == "" {
+			c.Address = strings.TrimSpace(r.addr)
+		}
+		_, _ = db.Exec(`UPDATE customers SET
+			postal_code=?, addr_sido=?, addr_sigungu=?, addr_dong=?,
+			address=?, address_detail=?, updated_at=CURRENT_TIMESTAMP
+			WHERE customer_id=?`,
+			pc, sido, sigungu, dong, c.Address, det, r.id)
+	}
 }

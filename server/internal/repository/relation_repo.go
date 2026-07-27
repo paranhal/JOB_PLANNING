@@ -117,3 +117,24 @@ func (r *RelationRepo) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM performance_relations WHERE relation_id=?`, id)
 	return err
 }
+
+// DistinctCompanyNames 요청주체명 드롭다운용
+func (r *RelationRepo) DistinctCompanyNames() ([]string, error) {
+	rows, err := r.db.Query(`
+		SELECT DISTINCT company_name FROM performance_relations
+		WHERE company_name IS NOT NULL AND TRIM(company_name)!=''
+		ORDER BY company_name LIMIT 200`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
+}

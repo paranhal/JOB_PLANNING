@@ -6,7 +6,7 @@
       <a href="/assets" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
       <div>
         <h2 class="text-xl font-bold text-gray-800">{{.Asset.ProductName}}</h2>
-        <p class="text-sm text-gray-500">{{.Asset.OrgName}} · {{.Asset.ProductType}}</p>
+        <p class="text-sm text-gray-500">자산번호 <span class="font-mono text-gray-700">{{.Asset.AssetID}}</span> · {{.Asset.OrgName}} · {{productCategoryLabel .Asset.ProductCategory}}</p>
       </div>
       <span class="px-2 py-0.5 rounded-full text-xs font-medium {{if eq .Asset.OperationStatus "operating"}}bg-green-100 text-green-700{{else if eq .Asset.OperationStatus "fault"}}bg-red-100 text-red-700{{else}}bg-gray-100 text-gray-600{{end}}">{{opStatusLabel .Asset.OperationStatus}}</span>
     </div>
@@ -21,6 +21,9 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">제품 정보</h3>
       <dl class="space-y-2 text-sm">
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">자산번호</dt><dd class="text-gray-800 font-mono">{{.Asset.AssetID}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">제품분류</dt><dd class="text-gray-800">{{productCategoryLabel .Asset.ProductCategory}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">제품구분</dt><dd class="text-gray-800">{{if .Asset.ProductType}}{{.Asset.ProductType}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">모델명</dt><dd class="text-gray-800">{{.Asset.ModelName}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">제조사</dt><dd class="text-gray-800">{{.Asset.Manufacturer}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">S/N</dt><dd class="text-gray-800 font-mono">{{.Asset.SerialNumber}}</dd></div>
@@ -47,12 +50,52 @@
         <div class="flex gap-4"><dt class="text-gray-500 w-24">건물명</dt><dd class="text-gray-800">{{.Asset.BuildingName}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">층</dt><dd class="text-gray-800">{{.Asset.FloorName}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">호(실명)</dt><dd class="text-gray-800">{{.Asset.RoomName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치위치</dt><dd class="text-gray-800 font-medium">{{if .Asset.InstallLocation}}{{.Asset.InstallLocation}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">상세위치</dt><dd class="text-gray-800">{{.Asset.LocationDetail}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">요청주체</dt><dd class="text-gray-800">{{.Asset.RequesterType}} {{if .Asset.RequesterName}}({{.Asset.RequesterName}}){{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">당사담당</dt><dd class="text-gray-800">{{.Asset.OurContact}}</dd></div>
         {{if .Asset.Notes}}<div class="flex gap-4"><dt class="text-gray-500 w-24">비고</dt><dd class="text-gray-800">{{.Asset.Notes}}</dd></div>{{end}}
       </dl>
     </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">설치 사진 (최대 3장)</h3>
+      <span class="text-xs text-gray-400">{{.ImageCount}}/3</span>
+    </div>
+    <div class="grid grid-cols-3 gap-4">
+      {{range .Images}}
+      <div class="aspect-square rounded-lg border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden relative">
+        {{if .URL}}
+        <a href="{{.URL}}" target="_blank" class="block w-full h-full">
+          <img src="{{.URL}}" alt="{{.Name}}" class="w-full h-full object-cover">
+        </a>
+        {{if $.CanWrite}}
+        <form method="POST" action="/attachments/{{.ID}}/delete" class="absolute top-1 right-1"
+              onsubmit="return confirm('이 사진을 삭제할까요?')">
+          <input type="hidden" name="redirect" value="/assets/{{$.Asset.AssetID}}">
+          <button type="submit" class="px-1.5 py-0.5 bg-black/50 text-white text-xs rounded">삭제</button>
+        </form>
+        {{end}}
+        {{else}}
+        <span class="text-xs text-gray-300">빈칸</span>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{if and .CanWrite .CanUpload}}
+    <form method="POST" action="/attachments" enctype="multipart/form-data" class="mt-4 flex flex-wrap items-end gap-3">
+      <input type="hidden" name="ref_type" value="asset">
+      <input type="hidden" name="ref_id" value="{{.Asset.AssetID}}">
+      <input type="hidden" name="redirect" value="/assets/{{.Asset.AssetID}}">
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-xs text-gray-500 mb-1">이미지 업로드</label>
+        <input type="file" name="file" accept="image/*" required class="w-full text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">업로드</button>
+    </form>
+    {{end}}
   </div>
 </div>
 {{end}}

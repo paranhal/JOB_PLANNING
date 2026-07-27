@@ -25,6 +25,16 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">기관 기본정보</h3>
 
+      {{if not .IsNew}}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">고객번호</label>
+        <input type="text" value="{{.Customer.CustomerID}}" readonly
+               class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-700">
+      </div>
+      {{else}}
+      <p class="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">고객번호는 등록 시 자동 부여됩니다. (지역번호-연도-일련번호)</p>
+      {{end}}
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -102,14 +112,42 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">주소 · 계층</h3>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">기본주소</label>
-        <input type="text" name="address" value="{{.Customer.Address}}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">우편번호</label>
+          <input type="text" name="postal_code" value="{{.Customer.PostalCode}}" maxlength="5" inputmode="numeric"
+                 placeholder="12345"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">시도</label>
+          <select name="addr_sido"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">선택</option>
+            {{range .SidoOptions}}
+            <option value="{{.}}" {{if eq $.Customer.AddrSido .}}selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">군구 (시·군·구)</label>
+          <input type="text" name="addr_sigungu" value="{{.Customer.AddrSigungu}}"
+                 placeholder="예: 천안시 동남구, 홍성군"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">동읍면</label>
+          <input type="text" name="addr_dong" value="{{.Customer.AddrDong}}"
+                 placeholder="예: 안서동, 홍북읍"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">상세주소</label>
         <input type="text" name="address_detail" value="{{.Customer.AddressDetail}}"
+               placeholder="도로명·건물·층 등"
                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 

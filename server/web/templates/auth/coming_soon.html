@@ -1,0 +1,11 @@
+{{define "title"}}준비 중 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-lg mx-auto text-center space-y-4 py-16">
+  <h2 class="text-xl font-bold text-gray-800">기능 준비 중</h2>
+  <p class="text-sm text-gray-500 leading-relaxed">
+    {{.RoleLabel}} 역할의 업무 화면은 당분간 제공되지 않습니다.<br>
+    계정 설정은 <a href="/account" class="text-blue-600 hover:underline">내 계정</a>에서 이용할 수 있습니다.
+  </p>
+  <a href="/logout" class="inline-block px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium">로그아웃</a>
+</div>
+{{end}}
