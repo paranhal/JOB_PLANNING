@@ -2,50 +2,10 @@
 
 {{define "content"}}
 <div class="space-y-4">
-  {{if eq .Role "tech"}}
-  <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-    <span><strong>{{.DisplayName}}</strong> 님의 배정 업무 기준입니다. (진행중·오늘완료·지연·오늘은 내 배정)</span>
-    <div class="flex gap-2">
-      {{if .Mine}}
-      <a href="/as?mine=0{{if .Status}}&status={{.Status}}{{end}}" class="text-xs underline hover:no-underline">전체 AS 보기</a>
-      {{else}}
-      <a href="/as?mine=1{{if .Status}}&status={{.Status}}{{end}}" class="text-xs underline hover:no-underline">내 배정만 보기</a>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
-
-  <!-- 통계 바 -->
-  {{if .Stats}}
-  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-    <a href="/as{{if eq .Role "tech"}}?mine=0{{end}}" class="bg-white rounded-lg border {{if and (eq .Status "") (or (ne .Role "tech") (not .Mine))}}border-blue-400 ring-1 ring-blue-200{{else}}border-gray-200{{end}} p-4 hover:border-blue-300 transition-colors">
-      <p class="text-xs text-gray-500">전체</p>
-      <p class="text-2xl font-bold text-gray-800 mt-1">{{.Stats.TotalReceived}}</p>
-    </a>
-    <a href="/as?status=in_progress{{if eq .Role "tech"}}&mine=1{{end}}" class="bg-white rounded-lg border {{if eq .Status "in_progress"}}border-yellow-400 ring-1 ring-yellow-200{{else}}border-yellow-200{{end}} p-4 hover:border-yellow-300 transition-colors">
-      <p class="text-xs text-gray-500">{{if eq .Role "tech"}}내 진행중{{else}}진행중{{end}}</p>
-      <p class="text-2xl font-bold text-yellow-600 mt-1">{{.Stats.InProgress}}</p>
-    </a>
-    <a href="/as?status=completed_today{{if eq .Role "tech"}}&mine=1{{end}}" class="bg-white rounded-lg border {{if eq .Status "completed_today"}}border-green-400 ring-1 ring-green-200{{else}}border-green-200{{end}} p-4 hover:border-green-300 transition-colors">
-      <p class="text-xs text-gray-500">{{if eq .Role "tech"}}오늘 완료(내){{else}}오늘 완료{{end}}</p>
-      <p class="text-2xl font-bold text-green-600 mt-1">{{.Stats.Completed}}</p>
-    </a>
-    <a href="/as?status=overdue{{if eq .Role "tech"}}&mine=1{{end}}" class="bg-white rounded-lg border {{if eq .Status "overdue"}}border-red-400 ring-1 ring-red-200{{else}}border-red-200{{end}} p-4 hover:border-red-300 transition-colors">
-      <p class="text-xs text-gray-500">지연(3일↑)</p>
-      <p class="text-2xl font-bold text-red-600 mt-1">{{.Stats.Overdue}}</p>
-    </a>
-    <a href="/as?status=today{{if eq .Role "tech"}}&mine=1{{end}}" class="bg-white rounded-lg border {{if eq .Status "today"}}border-blue-400 ring-1 ring-blue-200{{else}}border-blue-200{{end}} p-4 hover:border-blue-300 transition-colors">
-      <p class="text-xs text-gray-500">{{if eq .Role "tech"}}오늘(내 배정){{else}}오늘 접수{{end}}</p>
-      <p class="text-2xl font-bold text-blue-600 mt-1">{{.Stats.TodayReceived}}</p>
-    </a>
-  </div>
-  {{end}}
-
-  <!-- 헤더 + 검색 -->
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <p class="text-sm text-gray-500">
       {{if .Mine}}<span class="text-blue-600 font-medium">내 배정 · </span>{{end}}
-      {{if eq .Status "in_progress"}}진행중{{else if eq .Status "completed_today"}}오늘 완료{{else if eq .Status "completed"}}완료{{else if eq .Status "overdue"}}지연{{else if eq .Status "today"}}오늘 접수{{else if eq .Status "week_received"}}주간접수{{else if eq .Status "week_completed"}}주간완료{{else if eq .Status "week_in_progress"}}주간진행중{{else if eq .Status "received"}}접수{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "cancelled"}}접수취소{{else if eq .Status "closed"}}종료{{else}}전체{{end}}
+      {{if eq .Status "in_progress"}}진행중{{else if eq .Status "completed_today"}}오늘 완료{{else if eq .Status "completed"}}완료{{else if eq .Status "overdue"}}접수 지연{{else if eq .Status "today"}}오늘 접수{{else if eq .Status "visit_past"}}예정일 경과{{else if eq .Status "visit_today"}}오늘 방문{{else if eq .Status "visit_upcoming"}}예정(미도래){{else if eq .Status "transfer_overdue"}}이관 지연{{else if eq .Status "week_received"}}주간접수{{else if eq .Status "week_completed"}}주간완료{{else if eq .Status "week_in_progress"}}주간진행중{{else if eq .Status "received"}}접수{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관(회신 대기){{else if eq .Status "cancelled"}}접수취소{{else if eq .Status "closed"}}종료{{else}}전체{{end}}
       {{if or .AssigneeID .AssigneeName}}<span class="text-blue-600 font-medium"> · 담당자 필터</span>{{end}}
       {{.Total}}건
     </p>
@@ -60,7 +20,6 @@
     {{end}}
   </div>
 
-  <!-- 필터 + 검색 -->
   <div class="bg-white rounded-xl border border-gray-200 p-4">
     <form method="GET" action="/as" class="flex flex-col sm:flex-row gap-3">
       {{if eq .Role "tech"}}
@@ -69,9 +28,12 @@
       <select name="status"
               class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="" {{if eq .Status ""}}selected{{end}}>전체 상태</option>
-        <option value="open" {{if eq .Status "open"}}selected{{end}}>미완료(접수+배정+진행)</option>
+        <option value="open" {{if eq .Status "open"}}selected{{end}}>미완료(접수+배정+진행+보류+이관)</option>
         <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행중만</option>
-        <option value="overdue" {{if eq .Status "overdue"}}selected{{end}}>지연(3일↑)</option>
+        <option value="visit_past" {{if eq .Status "visit_past"}}selected{{end}}>예정일 경과</option>
+        <option value="visit_today" {{if eq .Status "visit_today"}}selected{{end}}>오늘 방문</option>
+        <option value="visit_upcoming" {{if eq .Status "visit_upcoming"}}selected{{end}}>예정(미도래)</option>
+        <option value="overdue" {{if eq .Status "overdue"}}selected{{end}}>접수 지연(3일↑)</option>
         <option value="today" {{if eq .Status "today"}}selected{{end}}>오늘 접수</option>
         <option value="week_received" {{if eq .Status "week_received"}}selected{{end}}>주간접수(월~일)</option>
         <option value="week_completed" {{if eq .Status "week_completed"}}selected{{end}}>주간완료(월~일)</option>
@@ -81,7 +43,8 @@
         <option value="received" {{if eq .Status "received"}}selected{{end}}>접수만</option>
         <option value="assigned" {{if eq .Status "assigned"}}selected{{end}}>담당자 배정</option>
         <option value="hold" {{if eq .Status "hold"}}selected{{end}}>보류</option>
-        <option value="transfer" {{if eq .Status "transfer"}}selected{{end}}>이관</option>
+        <option value="transfer" {{if eq .Status "transfer"}}selected{{end}}>이관(회신 대기)</option>
+        <option value="transfer_overdue" {{if eq .Status "transfer_overdue"}}selected{{end}}>이관 지연(확인일 경과)</option>
         <option value="cancelled" {{if eq .Status "cancelled"}}selected{{end}}>접수취소</option>
         <option value="closed" {{if eq .Status "closed"}}selected{{end}}>종료만</option>
       </select>
@@ -98,7 +61,6 @@
     </form>
   </div>
 
-  <!-- 테이블 -->
   {{template "as_list_table" .}}
 </div>
 {{end}}

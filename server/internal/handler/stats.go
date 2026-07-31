@@ -3,7 +3,8 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"strconv"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -21,104 +22,200 @@ func NewStatsHandler(repo *repository.StatsRepo) *StatsHandler {
 	return &StatsHandler{repo: repo}
 }
 
-var statsPeriodOptions = []struct {
-	Value string
-	Label string
-}{
-	{model.StatsPeriodAll, "전체"},
-	{model.StatsPeriodDay, "일별"},
-	{model.StatsPeriodWeek, "주간별"},
-	{model.StatsPeriodMonth, "월별"},
-	{model.StatsPeriodQuarter, "분기별"},
+func normalizeStatsMetric(m string) string {
+	switch m {
+	case model.StatsMetricCompleted, model.StatsMetricReceived, model.StatsMetricOverdue:
+		return m
+	default:
+		return model.StatsMetricProgress
+	}
 }
 
-func normalizeStatsPeriod(p string) string {
+func normalizeStatsScope(s string) string {
+	if s == model.StatsScopeAssignee {
+		return model.StatsScopeAssignee
+	}
+	return model.StatsScopeTeam
+}
+
+func normalizeStatsPeriod(p, metric string) string {
 	switch p {
-	case model.StatsPeriodDay, model.StatsPeriodWeek, model.StatsPeriodMonth, model.StatsPeriodQuarter:
+	case model.StatsPeriodWeek, model.StatsPeriodMonth, model.StatsPeriodRange:
+		return p
+	case model.StatsPeriodQuarter:
+		if metric == model.StatsMetricProgress {
+			return model.StatsPeriodDay
+		}
+		return p
+	case model.StatsPeriodDay:
 		return p
 	default:
-		return model.StatsPeriodAll
+		return model.StatsPeriodDay
 	}
+}
+
+func statsMetricLabel(m string) string {
+	switch m {
+	case model.StatsMetricCompleted:
+		return "완료업무"
+	case model.StatsMetricReceived:
+		return "접수업무"
+	case model.StatsMetricOverdue:
+		return "지연"
+	default:
+		return "업무진행"
+	}
+}
+
+func statsScopeLabel(s string) string {
+	if s == model.StatsScopeAssignee {
+		return "담당자별"
+	}
+	return "도서관사업팀 전체"
 }
 
 func statsPeriodLabel(p string) string {
-	for _, o := range statsPeriodOptions {
-		if o.Value == p {
-			return o.Label
-		}
-	}
-	return "전체"
-}
-
-func statsOffsetOptions(period string) []struct {
-	Value int
-	Label string
-} {
-	switch period {
-	case model.StatsPeriodDay:
-		return []struct {
-			Value int
-			Label string
-		}{
-			{0, "현재 기준일"},
-			{1, "전일"},
-			{2, "전전일"},
-		}
+	switch p {
 	case model.StatsPeriodWeek:
-		return []struct {
-			Value int
-			Label string
-		}{
-			{0, "현재 주"},
-			{1, "전주"},
-			{2, "전전주"},
-		}
+		return "주간별"
 	case model.StatsPeriodMonth:
-		return []struct {
-			Value int
-			Label string
-		}{
-			{0, "현재 월"},
-			{1, "전월"},
-			{2, "전전월"},
-		}
+		return "월별"
 	case model.StatsPeriodQuarter:
-		return []struct {
-			Value int
-			Label string
-		}{
-			{0, "현재 분기"},
-			{1, "전분기"},
-			{2, "전전분기"},
-		}
+		return "분기별"
+	case model.StatsPeriodRange:
+		return "원하는 기간"
 	default:
-		return nil
+		return "일별"
 	}
 }
 
-func statsOffsetLabel(period string, offset int) string {
-	for _, o := range statsOffsetOptions(period) {
-		if o.Value == offset {
-			return o.Label
+func parseStatsQuery(c echo.Context) model.StatsQuery {
+	metric := normalizeStatsMetric(c.QueryParam("metric"))
+	scope := normalizeStatsScope(c.QueryParam("scope"))
+	period := normalizeStatsPeriod(c.QueryParam("period"), metric)
+	now := time.Now()
+	q := model.StatsQuery{
+		Metric:  metric,
+		Scope:   scope,
+		Period:  period,
+		Date:    strings.TrimSpace(c.QueryParam("date")),
+		Month:   strings.TrimSpace(c.QueryParam("month")),
+		Quarter: strings.TrimSpace(c.QueryParam("quarter")),
+		From:    strings.TrimSpace(c.QueryParam("from")),
+		To:      strings.TrimSpace(c.QueryParam("to")),
+	}
+	// 기본값 채우기
+	if q.Date == "" {
+		q.Date = now.Format("2006-01-02")
+	}
+	if q.Period == model.StatsPeriodWeek {
+		if t, err := time.ParseInLocation("2006-01-02", q.Date, now.Location()); err == nil {
+			wd := int(t.Weekday())
+			if wd == 0 {
+				wd = 7
+			}
+			q.Date = t.AddDate(0, 0, -(wd - 1)).Format("2006-01-02")
 		}
 	}
-	return ""
+	if q.Month == "" {
+		q.Month = now.Format("2006-01")
+	}
+	if q.Quarter == "" {
+		qn := (int(now.Month())-1)/3 + 1
+		q.Quarter = fmt.Sprintf("%d-Q%d", now.Year(), qn)
+	}
+	if q.From == "" {
+		q.From = now.Format("2006-01-02")
+	}
+	if q.To == "" {
+		q.To = now.Format("2006-01-02")
+	}
+	return q
+}
+
+func statsQueryString(q model.StatsQuery) string {
+	v := url.Values{}
+	v.Set("metric", q.Metric)
+	v.Set("scope", q.Scope)
+	v.Set("period", q.Period)
+	switch q.Period {
+	case model.StatsPeriodDay, model.StatsPeriodWeek:
+		v.Set("date", q.Date)
+	case model.StatsPeriodMonth:
+		v.Set("month", q.Month)
+	case model.StatsPeriodQuarter:
+		v.Set("quarter", q.Quarter)
+	case model.StatsPeriodRange:
+		v.Set("from", q.From)
+		v.Set("to", q.To)
+	}
+	return v.Encode()
+}
+
+func quarterOptions(now time.Time) []struct{ Value, Label string } {
+	out := make([]struct{ Value, Label string }, 0, 8)
+	y, m, _ := now.Date()
+	curQ := (int(m)-1)/3 + 1
+	// 최근 2년 분기
+	for yy := y; yy >= y-1; yy-- {
+		maxQ := 4
+		if yy == y {
+			maxQ = curQ
+		}
+		for qn := maxQ; qn >= 1; qn-- {
+			out = append(out, struct{ Value, Label string }{
+				Value: fmt.Sprintf("%d-Q%d", yy, qn),
+				Label: fmt.Sprintf("%d년 %d분기", yy, qn),
+			})
+		}
+	}
+	return out
+}
+
+func monthOptions(now time.Time) []struct{ Value, Label string } {
+	out := make([]struct{ Value, Label string }, 0, 24)
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	for i := 0; i < 24; i++ {
+		t := start.AddDate(0, -i, 0)
+		out = append(out, struct{ Value, Label string }{
+			Value: t.Format("2006-01"),
+			Label: t.Format("2006년 01월"),
+		})
+	}
+	return out
+}
+
+func weekOptions(now time.Time) []struct{ Value, Label string } {
+	out := make([]struct{ Value, Label string }, 0, 16)
+	y, m, d := now.Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+	wd := int(today.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	mon := today.AddDate(0, 0, -(wd - 1))
+	for i := 0; i < 16; i++ {
+		w := mon.AddDate(0, 0, -7*i)
+		sun := w.AddDate(0, 0, 6)
+		_, wn := w.ISOWeek()
+		out = append(out, struct{ Value, Label string }{
+			Value: w.Format("2006-01-02"),
+			Label: fmt.Sprintf("%d년 %d주 (%s~%s)", w.Year(), wn, w.Format("01/02"), sun.Format("01/02")),
+		})
+	}
+	return out
 }
 
 func (h *StatsHandler) List(c echo.Context) error {
-	period := normalizeStatsPeriod(c.QueryParam("period"))
-	offset, _ := strconv.Atoi(c.QueryParam("offset"))
-	if period == model.StatsPeriodAll {
-		offset = 0
-	} else {
-		offset = repository.NormalizeStatsOffset(offset)
-	}
+	q := parseStatsQuery(c)
+	now := time.Now()
+	_, _, _, rangeLabel := repository.ResolveStatsRange(q, now)
 
-	rows, err := h.repo.ListDetail(period, offset)
+	rows, err := h.repo.ListDetail(q)
 	if err != nil {
 		return err
 	}
-	assignees, err := h.repo.ListByAssignee(period, offset)
+	assignees, err := h.repo.ListByAssignee(q)
 	if err != nil {
 		return err
 	}
@@ -127,65 +224,122 @@ func (h *StatsHandler) List(c echo.Context) error {
 		total += a.Count
 	}
 
-	now := time.Now()
-	rangeLabels := repository.PeriodDisplayLabels(period, offset, now)
+	// 담당자별: 사람 단위로 건 리스트 그룹핑
+	groups := groupStatsByAssignee(rows)
+
+	periodOptions := []struct{ Value, Label string }{
+		{model.StatsPeriodDay, "일별"},
+		{model.StatsPeriodWeek, "주간별"},
+		{model.StatsPeriodMonth, "월별"},
+	}
+	if q.Metric != model.StatsMetricProgress {
+		periodOptions = append(periodOptions, struct{ Value, Label string }{model.StatsPeriodQuarter, "분기별"})
+	}
+	periodOptions = append(periodOptions, struct{ Value, Label string }{model.StatsPeriodRange, "원하는 기간"})
+
+	metricOptions := []struct{ Value, Label string }{
+		{model.StatsMetricProgress, "업무진행"},
+		{model.StatsMetricCompleted, "완료업무"},
+		{model.StatsMetricReceived, "접수업무"},
+		{model.StatsMetricOverdue, "지연"},
+	}
+	scopeOptions := []struct{ Value, Label string }{
+		{model.StatsScopeTeam, "도서관사업팀 전체"},
+		{model.StatsScopeAssignee, "담당자별"},
+	}
 
 	return c.Render(http.StatusOK, "stats/list.html", map[string]interface{}{
 		"Title":          "통계",
 		"Active":         "stats",
-		"Period":         period,
-		"PeriodLabel":    statsPeriodLabel(period),
-		"PeriodOptions":  statsPeriodOptions,
-		"Offset":         offset,
-		"OffsetLabel":    statsOffsetLabel(period, offset),
-		"OffsetOptions":  statsOffsetOptions(period),
-		"RangeLabels":    rangeLabels,
-		"ShowOffset":     period != model.StatsPeriodAll,
+		"Query":          q,
+		"QueryString":    statsQueryString(q),
+		"Metric":         q.Metric,
+		"MetricLabel":    statsMetricLabel(q.Metric),
+		"MetricOptions":  metricOptions,
+		"Scope":          q.Scope,
+		"ScopeLabel":     statsScopeLabel(q.Scope),
+		"ScopeOptions":   scopeOptions,
+		"Period":         q.Period,
+		"PeriodLabel":    statsPeriodLabel(q.Period),
+		"PeriodOptions":  periodOptions,
+		"RangeLabel":     rangeLabel,
+		"MonthOptions":   monthOptions(now),
+		"WeekOptions":    weekOptions(now),
+		"QuarterOptions": quarterOptions(now),
 		"Rows":           rows,
 		"Assignees":      assignees,
+		"AssigneeGroups": groups,
 		"AssigneeTotal":  total,
 		"RowCount":       len(rows),
+		"ShowTeam":       q.Scope == model.StatsScopeTeam,
+		"ShowAssignee":   q.Scope == model.StatsScopeAssignee,
+		"OverdueNote":    q.Metric == model.StatsMetricOverdue,
 	})
 }
 
+func groupStatsByAssignee(rows []model.StatsRow) []model.StatsAssigneeGroup {
+	order := []string{}
+	m := map[string][]model.StatsRow{}
+	for _, r := range rows {
+		name := r.Assignee
+		if name == "" {
+			name = "(미배정)"
+		}
+		if _, ok := m[name]; !ok {
+			order = append(order, name)
+		}
+		m[name] = append(m[name], r)
+	}
+	out := make([]model.StatsAssigneeGroup, 0, len(order))
+	for _, name := range order {
+		rs := m[name]
+		out = append(out, model.StatsAssigneeGroup{
+			Assignee: name,
+			Count:    len(rs),
+			Rows:     rs,
+		})
+	}
+	return out
+}
+
 func (h *StatsHandler) ExportExcel(c echo.Context) error {
+	q := parseStatsQuery(c)
+	rows, err := h.repo.ListDetail(q)
+	if err != nil {
+		return err
+	}
+	assignees, err := h.repo.ListByAssignee(q)
+	if err != nil {
+		return err
+	}
+
 	f := excelize.NewFile()
 	defer f.Close()
-
-	periods := []string{
-		model.StatsPeriodDay,
-		model.StatsPeriodWeek,
-		model.StatsPeriodMonth,
-		model.StatsPeriodQuarter,
-		model.StatsPeriodAll,
+	sheet := statsMetricLabel(q.Metric)
+	f.SetSheetName("Sheet1", sheet)
+	if err := writeStatsSheet(f, sheet, rows, assignees); err != nil {
+		return err
 	}
-	first := true
-	for _, p := range periods {
-		sheet := statsPeriodLabel(p)
-		if first {
-			f.SetSheetName("Sheet1", sheet)
-			first = false
-		} else {
-			f.NewSheet(sheet)
-		}
-		rows, err := h.repo.ListDetail(p, 0)
-		if err != nil {
-			return err
-		}
-		assignees, err := h.repo.ListByAssignee(p, 0)
-		if err != nil {
-			return err
-		}
-		if err := writeStatsSheet(f, sheet, rows, assignees); err != nil {
-			return err
-		}
+	// 요약 시트
+	sumSheet := "담당자별"
+	f.NewSheet(sumSheet)
+	_ = f.SetCellValue(sumSheet, "A1", "수행담당자")
+	_ = f.SetCellValue(sumSheet, "B1", "건수")
+	total := 0
+	for i, a := range assignees {
+		_ = f.SetCellValue(sumSheet, fmt.Sprintf("A%d", i+2), a.Assignee)
+		_ = f.SetCellValue(sumSheet, fmt.Sprintf("B%d", i+2), a.Count)
+		total += a.Count
 	}
+	_ = f.SetCellValue(sumSheet, fmt.Sprintf("A%d", len(assignees)+2), "종합")
+	_ = f.SetCellValue(sumSheet, fmt.Sprintf("B%d", len(assignees)+2), total)
 
 	buf, err := f.WriteToBuffer()
 	if err != nil {
 		return err
 	}
-	return writeExcelDownload(c, buf.Bytes(), "stats")
+	name := fmt.Sprintf("stats_%s_%s", q.Metric, q.Period)
+	return writeExcelDownload(c, buf.Bytes(), name)
 }
 
 func writeStatsSheet(f *excelize.File, sheet string, rows []model.StatsRow, assignees []model.StatsAssigneeRow) error {

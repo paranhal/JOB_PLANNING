@@ -5,207 +5,205 @@
     <div>
       <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
       <p class="text-sm text-gray-500 mt-1">
-        {{.RoleLabel}}(<span class="font-medium text-gray-700">{{.DisplayName}}</span> · @{{.LoginID}}) 기준 요약입니다.
-        {{if eq .Role "tech"}}전체·진행중·지연은 <strong>내 배정 업무</strong>만 표시됩니다.{{else}}숫자를 누르면 해당 목록으로 이동합니다.{{end}}
+        {{.RoleLabel}}(<span class="font-medium text-gray-700">{{.DisplayName}}</span> · @{{.LoginID}})
+        {{if .ScopeMine}} · <strong>내 배정 업무</strong>{{else}} · 전체 업무{{end}}
       </p>
     </div>
     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{{.RoleLabel}}</span>
   </div>
 
-  {{if .ShowASStats}}
-  <div class="grid grid-cols-3 gap-3">
-    <a href="{{.TotalHref}}" class="bg-white rounded-xl border border-gray-200 p-4 text-center hover:border-blue-400 hover:shadow-sm transition-all block">
-      <p class="text-2xl font-bold text-gray-800">{{.Stats.TotalReceived}}</p>
-      <p class="text-xs text-gray-500 mt-1">{{if eq .Role "tech"}}내 전체 AS{{else}}전체 AS{{end}}</p>
-    </a>
-    <a href="{{.ProgressHref}}" class="bg-white rounded-xl border border-yellow-200 p-4 text-center hover:border-yellow-400 hover:shadow-sm transition-all block">
-      <p class="text-2xl font-bold text-yellow-600">{{.Stats.InProgress}}</p>
-      <p class="text-xs text-gray-500 mt-1">{{if eq .Role "tech"}}내 진행중{{else}}진행중{{end}}</p>
-    </a>
-    <a href="{{.OverdueHref}}" class="bg-white rounded-xl border border-red-200 p-4 text-center hover:border-red-400 hover:shadow-sm transition-all block">
-      <p class="text-2xl font-bold text-red-600">{{.Stats.Overdue}}</p>
-      <p class="text-xs text-gray-500 mt-1">지연(3일↑)</p>
-    </a>
-  </div>
-  {{end}}
-
-  {{if .ShowSchedulePending}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">예정 일정 대기
-          {{if .SchedulePendingTotal}}<span class="ml-1 text-amber-600 font-bold">({{.SchedulePendingTotal}})</span>{{end}}
-        </h3>
-        <p class="text-xs text-gray-400 mt-0.5">배정됐으나 방문·업무 일정이 미확정인 건입니다. 항목을 눌러 예정일을 입력·확정하세요.</p>
+  <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+    <a href="{{.OpenHref}}" class="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-400 hover:shadow-sm transition-all block min-h-[7.5rem]">
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-2xl font-bold text-gray-800">{{.WorkStats.OpenTotal}}</p>
+        <p class="text-xs text-gray-500 shrink-0">전체 업무</p>
       </div>
-    </div>
-    {{if .SchedulePending}}
-    <div class="divide-y divide-gray-50">
-      {{range .SchedulePending}}
-      <a href="/as/{{.ASID}}/edit" class="flex items-center justify-between px-5 py-3 hover:bg-amber-50/60 transition-colors">
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-blue-600 truncate">{{.ASNumber}} · {{.OrgName}}</p>
-          <p class="text-xs text-gray-500 truncate mt-0.5">{{.Symptom}}</p>
-        </div>
-        <div class="text-right shrink-0 ml-3">
-          <span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span>
-          {{if .AssignedTo}}<p class="text-[10px] text-gray-400 mt-1">{{.AssignedTo}}</p>{{end}}
-        </div>
-      </a>
-      {{end}}
-    </div>
-    {{else}}
-    <p class="text-sm text-gray-400 text-center py-8">예정 일정 대기 건이 없습니다.</p>
-    {{end}}
-  </div>
-  {{end}}
-
-  {{if .ShowAssigneeStats}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">담당자별 현황</h3>
-      <p class="text-xs text-gray-400">주간진행중 · 일평균완료(월~오늘 ÷ {{.WeekElapsedDays}}일) · 지연 — 숫자 클릭 시 목록</p>
-    </div>
-    {{if .AssigneeStats}}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 border-b border-gray-100">
-          <tr>
-            <th class="text-left px-5 py-2.5 text-xs font-semibold text-gray-500">담당자</th>
-            <th class="text-right px-5 py-2.5 text-xs font-semibold text-gray-500">주간 진행중</th>
-            <th class="text-right px-5 py-2.5 text-xs font-semibold text-gray-500">일평균 완료</th>
-            <th class="text-right px-5 py-2.5 text-xs font-semibold text-gray-500">지연(전체)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-50">
-          {{range .AssigneeStats}}
-          <tr class="hover:bg-gray-50">
-            <td class="px-5 py-2.5">
-              <span class="font-medium text-gray-800">{{.Name}}</span>
-              {{if .Username}}<span class="text-xs text-gray-400 ml-1">@{{.Username}}</span>{{end}}
-            </td>
-            <td class="px-5 py-2.5 text-right">
-              {{if gt .WeekInProgress 0}}
-              <a href="/as?status=week_in_progress{{if .UserID}}&amp;assignee={{.UserID}}{{else}}&amp;assignee_name={{urlquery .Name}}{{end}}"
-                 class="font-bold text-yellow-600 hover:underline">{{.WeekInProgress}}</a>
-              {{else}}
-              <span class="text-gray-300">0</span>
-              {{end}}
-            </td>
-            <td class="px-5 py-2.5 text-right">
-              {{if gt .WeekCompleted 0}}
-              <a href="/as?status=week_completed{{if .UserID}}&amp;assignee={{.UserID}}{{else}}&amp;assignee_name={{urlquery .Name}}{{end}}"
-                 class="font-bold text-green-600 hover:underline" title="주간완료 {{.WeekCompleted}}건 ÷ {{$.WeekElapsedDays}}일">{{printf "%.1f" .DayAvgCompleted}}</a>
-              <p class="text-[10px] text-gray-400">주간 {{.WeekCompleted}}건</p>
-              {{else}}
-              <span class="text-gray-300">0.0</span>
-              {{end}}
-            </td>
-            <td class="px-5 py-2.5 text-right">
-              {{if gt .Overdue 0}}
-              <a href="/as?status=overdue{{if .UserID}}&amp;assignee={{.UserID}}{{else}}&amp;assignee_name={{urlquery .Name}}{{end}}"
-                 class="font-bold text-red-600 hover:underline">{{.Overdue}}</a>
-              {{else}}
-              <span class="text-gray-300">0</span>
-              {{end}}
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </div>
-    {{else}}
-    <p class="text-sm text-gray-400 text-center py-8">표시할 담당자별 현황이 없습니다.</p>
-    {{end}}
-  </div>
-  {{end}}
-
-  {{if or .ShowCustomers .ShowAssets}}
-  <div class="grid grid-cols-2 gap-4">
-    {{if .ShowCustomers}}
-    <a href="/customers" class="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between hover:border-blue-300 transition-colors">
-      <span class="text-sm text-gray-600">활성 기관</span>
-      <span class="text-xl font-bold text-gray-800">{{.TotalCustomers}}</span>
-    </a>
-    {{end}}
-    {{if .ShowAssets}}
-    <a href="/assets" class="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between hover:border-blue-300 transition-colors">
-      <span class="text-sm text-gray-600">운영 자산</span>
-      <span class="text-xl font-bold text-gray-800">{{.TotalAssets}}</span>
-    </a>
-    {{end}}
-  </div>
-  {{end}}
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    {{if .ShowAssigned}}
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">미 완료 업무
-          {{if .AssignedTotal}}<span class="ml-1 text-yellow-600 font-bold">({{.AssignedTotal}})</span>{{end}}
-        </h3>
-        <a href="/as?status=open&mine=1" class="text-blue-600 text-xs hover:underline">전체 보기 →</a>
-      </div>
-      {{if .AssignedAS}}
-      <div class="space-y-3">
-        {{range .AssignedAS}}
-        <div class="flex items-center justify-between py-2 border-b border-gray-50">
-          <div>
-            <a href="/as/{{.ASID}}" class="text-sm font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
-            <p class="text-xs text-gray-500">{{.OrgName}} · {{.Symptom}}</p>
-          </div>
-          <div class="text-right">
-            <span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span>
-          </div>
-        </div>
+      {{if .WorkStats.OpenByAssignee}}
+      <div class="mt-2 space-y-0.5 max-h-24 overflow-y-auto">
+        {{range .WorkStats.OpenByAssignee}}
+        <p class="text-[11px] text-gray-600 leading-snug">{{.Line}}</p>
         {{end}}
       </div>
       {{else}}
-      <p class="text-sm text-gray-400 text-center py-6">배정된 미처리 AS가 없습니다.</p>
+      <p class="text-[10px] text-gray-400 mt-2">진행중 · 미완료</p>
       {{end}}
-    </div>
-    {{end}}
-
-    {{if and (not .ShowAssigned)}}
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">{{if .ListTitle}}{{.ListTitle}}{{else}}최근 AS{{end}}</h3>
-        <a href="/as" class="text-blue-600 text-xs hover:underline">전체 보기 →</a>
+    </a>
+    <a href="{{.TodayHref}}" class="bg-white rounded-xl border border-sky-200 p-4 hover:border-sky-400 hover:shadow-sm transition-all block min-h-[7.5rem]">
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-2xl font-bold text-sky-600">{{.WorkStats.TodayScheduled.Total}}</p>
+        <p class="text-xs text-gray-500 shrink-0">오늘 예정 업무</p>
       </div>
-      {{if .RecentAS}}
-      <div class="space-y-3">
-        {{range .RecentAS}}
-        <div class="flex items-center justify-between py-2 border-b border-gray-50">
-          <div>
-            <a href="/as/{{.ASID}}" class="text-sm font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
-            <p class="text-xs text-gray-500">{{.OrgName}} · {{.Symptom}}</p>
-          </div>
-          <div class="text-right">
-            <span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span>
-            <span class="{{urgencyColor .Urgency}} text-xs ml-1">{{urgencyLabel .Urgency}}</span>
-          </div>
-        </div>
+      {{if .WorkStats.TodayByAssignee}}
+      <div class="mt-2 space-y-0.5 max-h-24 overflow-y-auto">
+        {{range .WorkStats.TodayByAssignee}}
+        <p class="text-[11px] text-sky-800/80 leading-snug">{{.Line}}</p>
         {{end}}
       </div>
       {{else}}
-      <p class="text-sm text-gray-400 text-center py-6">표시할 AS가 없습니다.</p>
+      <p class="text-[10px] text-gray-400 mt-2">확정 일정 · 오늘</p>
       {{end}}
-    </div>
-    {{end}}
+    </a>
+    <a href="{{.DelayedHref}}" class="bg-white rounded-xl border border-red-200 p-4 hover:border-red-400 hover:shadow-sm transition-all block min-h-[7.5rem]">
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-2xl font-bold text-red-600">{{.WorkStats.Delayed}}</p>
+        <p class="text-xs text-gray-500 shrink-0">지연 업무</p>
+      </div>
+      {{if .WorkStats.DelayedByAssignee}}
+      <div class="mt-2 space-y-0.5 max-h-24 overflow-y-auto">
+        {{range .WorkStats.DelayedByAssignee}}
+        <p class="text-[11px] text-red-800/80 leading-snug">{{.Line}}</p>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="text-[10px] text-gray-400 mt-2">확정 예정일 경과</p>
+      {{end}}
+    </a>
+    <a href="{{.CompletedHref}}" class="bg-white rounded-xl border border-green-200 p-4 hover:border-green-400 hover:shadow-sm transition-all block min-h-[7.5rem]">
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-2xl font-bold text-green-600">{{.WorkStats.TodayCompleted.Total}}</p>
+        <p class="text-xs text-gray-500 shrink-0">오늘 완료</p>
+      </div>
+      {{if .WorkStats.CompletedByAssignee}}
+      <div class="mt-2 space-y-0.5 max-h-24 overflow-y-auto">
+        {{range .WorkStats.CompletedByAssignee}}
+        <p class="text-[11px] text-green-800/80 leading-snug">{{.Line}}</p>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="text-[10px] text-gray-400 mt-2">오늘 처리 완료</p>
+      {{end}}
+    </a>
+    <a href="{{.PendingHref}}" class="bg-white rounded-xl border border-amber-200 p-4 hover:border-amber-400 hover:shadow-sm transition-all block min-h-[7.5rem]">
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-2xl font-bold text-amber-600">{{.WorkStats.SchedulePending}}</p>
+        <p class="text-xs text-gray-500 shrink-0">방문 미확정</p>
+      </div>
+      {{if .WorkStats.PendingByAssignee}}
+      <div class="mt-2 space-y-0.5 max-h-24 overflow-y-auto">
+        {{range .WorkStats.PendingByAssignee}}
+        <p class="text-[11px] text-amber-900/80 leading-snug">{{.Line}}</p>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="text-[10px] text-gray-400 mt-2">배정됨 · 일정 미확정</p>
+      {{end}}
+    </a>
+    <a href="{{.UnassignedHref}}" class="bg-white rounded-xl border border-orange-200 p-4 hover:border-orange-400 hover:shadow-sm transition-all block min-h-[7.5rem]">
+      <div class="flex items-baseline justify-between gap-2">
+        <p class="text-2xl font-bold text-orange-600">{{.WorkStats.Unassigned}}</p>
+        <p class="text-xs text-gray-500 shrink-0">담당자 미배정</p>
+      </div>
+      {{if and (gt .WorkStats.Unassigned 0) .WorkStats.UnassignedPrefixLine}}
+      <p class="text-[11px] text-orange-900/80 leading-snug mt-2">{{.WorkStats.UnassignedPrefixLine}}</p>
+      {{else}}
+      <p class="text-[10px] text-gray-400 mt-2">전체 대상</p>
+      {{end}}
+    </a>
+  </div>
 
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">빠른 링크</h3>
-      <div class="grid grid-cols-2 gap-3">
-        {{range .QuickLinks}}
-        <a href="{{.Href}}" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center
-            {{if eq .Tone "blue"}}bg-blue-100 text-blue-600{{else if eq .Tone "green"}}bg-green-100 text-green-600{{else if eq .Tone "purple"}}bg-purple-100 text-purple-600{{else if eq .Tone "orange"}}bg-orange-100 text-orange-600{{else if eq .Tone "yellow"}}bg-yellow-100 text-yellow-700{{else if eq .Tone "red"}}bg-red-100 text-red-600{{else if eq .Tone "indigo"}}bg-indigo-100 text-indigo-600{{else}}bg-gray-100 text-gray-600{{end}}">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+  {{if .QuickLinks}}
+  <div class="flex flex-wrap gap-2">
+    {{range .QuickLinks}}
+    <a href="{{.Href}}" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-700">{{.Label}}</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border border-sky-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-sky-100 flex items-center justify-between bg-sky-50/50">
+        <h3 class="font-semibold text-sky-800 text-sm">오늘 예정</h3>
+        <a href="{{.TodayHref}}" class="text-xs text-sky-700 hover:underline">전체 →</a>
+      </div>
+      {{if .TodayList}}
+      <div class="divide-y divide-gray-50">
+        {{range .TodayList}}
+        <a href="{{.Href}}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 text-sm">
+              {{if $.ShowAssignee}}{{if .Assignee}}<span class="text-xs font-medium text-gray-600">{{.Assignee}}</span>{{end}}{{end}}
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+              <span class="font-medium text-blue-600 truncate">{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate mt-0.5">{{if .RefNumber}}{{.RefNumber}} · {{end}}{{.Title}}</p>
           </div>
-          <span class="text-sm font-medium text-gray-700">{{.Label}}</span>
+          {{if .ScheduledDate}}<p class="text-xs font-medium text-gray-700 shrink-0">{{.ScheduledDate}}</p>{{end}}
         </a>
         {{end}}
       </div>
+      {{else}}<p class="text-sm text-gray-400 text-center py-8">해당 업무가 없습니다.</p>{{end}}
+    </div>
+
+    <div class="bg-white rounded-xl border border-red-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-red-100 flex items-center justify-between bg-red-50/50">
+        <h3 class="font-semibold text-red-800 text-sm">지연 업무</h3>
+        <a href="{{.DelayedHref}}" class="text-xs text-red-700 hover:underline">전체 →</a>
+      </div>
+      {{if .DelayedList}}
+      <div class="divide-y divide-gray-50">
+        {{range .DelayedList}}
+        <a href="{{.Href}}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 text-sm">
+              {{if $.ShowAssignee}}{{if .Assignee}}<span class="text-xs font-medium text-gray-600">{{.Assignee}}</span>{{end}}{{end}}
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+              <span class="font-medium text-blue-600 truncate">{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate mt-0.5">{{if .RefNumber}}{{.RefNumber}} · {{end}}{{.Title}}</p>
+          </div>
+          <div class="text-right shrink-0">
+            {{if .ScheduledDate}}<p class="text-xs font-medium text-red-600">{{.ScheduledDate}}</p>{{end}}
+            {{if gt .DaysOverdue 0}}<p class="text-[10px] text-red-500">D+{{.DaysOverdue}}</p>{{end}}
+          </div>
+        </a>
+        {{end}}
+      </div>
+      {{else}}<p class="text-sm text-gray-400 text-center py-8">해당 업무가 없습니다.</p>{{end}}
+    </div>
+
+    <div class="bg-white rounded-xl border border-amber-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-amber-100 flex items-center justify-between bg-amber-50/50">
+        <h3 class="font-semibold text-amber-800 text-sm">방문 미확정</h3>
+        <a href="{{.PendingHref}}" class="text-xs text-amber-700 hover:underline">전체 →</a>
+      </div>
+      {{if .PendingList}}
+      <div class="divide-y divide-gray-50">
+        {{range .PendingList}}
+        <a href="{{.Href}}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 text-sm">
+              {{if $.ShowAssignee}}{{if .Assignee}}<span class="text-xs font-medium text-gray-600">{{.Assignee}}</span>{{end}}{{end}}
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+              <span class="font-medium text-blue-600 truncate">{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate mt-0.5">{{.RefNumber}}</p>
+          </div>
+        </a>
+        {{end}}
+      </div>
+      {{else}}<p class="text-sm text-gray-400 text-center py-8">해당 업무가 없습니다.</p>{{end}}
+    </div>
+
+    <div class="bg-white rounded-xl border border-orange-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-orange-100 flex items-center justify-between bg-orange-50/50">
+        <h3 class="font-semibold text-orange-800 text-sm">담당자 미배정</h3>
+        <a href="{{.UnassignedHref}}" class="text-xs text-orange-700 hover:underline">전체 →</a>
+      </div>
+      {{if .UnassignedList}}
+      <div class="divide-y divide-gray-50">
+        {{range .UnassignedList}}
+        <a href="{{.Href}}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 text-sm">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+              <span class="font-medium text-blue-600 truncate">{{.OrgName}}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate mt-0.5">{{.RefNumber}} · {{.Title}}</p>
+          </div>
+        </a>
+        {{end}}
+      </div>
+      {{else}}<p class="text-sm text-gray-400 text-center py-8">해당 업무가 없습니다.</p>{{end}}
     </div>
   </div>
 </div>

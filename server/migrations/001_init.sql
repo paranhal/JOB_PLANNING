@@ -237,6 +237,8 @@ CREATE TABLE IF NOT EXISTS attachments (
     file_path     TEXT         NOT NULL,
     file_size     BIGINT,
     mime_type     VARCHAR(100),
+    keywords      TEXT,
+    slot_no       INTEGER      DEFAULT 0,
     uploaded_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
 

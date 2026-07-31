@@ -3,7 +3,9 @@
 <div class="space-y-4">
   <div class="flex items-center justify-between">
     <h2 class="text-xl font-bold text-gray-800">설치자산 관리 <span class="text-sm font-normal text-gray-400">({{.Total}}건)</span></h2>
+    {{if .CanWrite}}
     <a href="/assets/new" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ 자산 등록</a>
+    {{end}}
   </div>
 
   <form method="GET" action="/assets" class="flex gap-3">

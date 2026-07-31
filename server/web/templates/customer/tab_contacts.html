@@ -1,6 +1,7 @@
 <div class="p-6">
   <div class="flex items-center justify-between mb-4">
     <p class="text-sm text-gray-500">총 {{len .Contacts}}건</p>
+    {{if .CanWrite}}
     <a href="/contacts/new?customer_id={{.CustomerID}}"
        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8,6 +9,7 @@
       </svg>
       담당자 등록
     </a>
+    {{end}}
   </div>
 
   {{if .Contacts}}
@@ -65,8 +67,10 @@
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
     </svg>
     <p class="text-sm text-gray-400">등록된 담당자가 없습니다.</p>
+    {{if .CanWrite}}
     <a href="/contacts/new?customer_id={{.CustomerID}}"
        class="inline-block mt-3 text-sm text-blue-600 hover:underline">첫 담당자 등록하기</a>
+    {{end}}
   </div>
   {{end}}
 </div>

@@ -4,8 +4,8 @@ package model
 type WorkCalItem struct {
 	Category string // as | maintenance | other
 	ID       string
-	Title    string // 접수번호·기관명 등
-	Subtitle string
+	Title    string // 고객(기관)명 등 표시 우선
+	Subtitle string // 접수번호 등 보조
 	Link     string
 	Date     string // YYYY-MM-DD
 }

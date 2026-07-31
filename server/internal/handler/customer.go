@@ -31,6 +31,7 @@ func (h *CustomerHandler) TabAssets(c echo.Context) error {
 	return RenderPartial(c, "customer/tab_assets.html", map[string]interface{}{
 		"Assets":     assets,
 		"CustomerID": customerID,
+		"CanWrite":   canWriteMaster(c),
 	})
 }
 
@@ -44,6 +45,7 @@ func (h *CustomerHandler) TabContacts(c echo.Context) error {
 	return RenderPartial(c, "customer/tab_contacts.html", map[string]interface{}{
 		"Contacts":   contacts,
 		"CustomerID": customerID,
+		"CanWrite":   canWriteMaster(c),
 	})
 }
 
@@ -262,9 +264,11 @@ func (h *CustomerHandler) Show(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	return c.Render(http.StatusOK, "customer/show.html", map[string]interface{}{
-		"Title":    cust.OrgName,
-		"Active":   "customers",
-		"Customer": cust,
+		"Title":      cust.OrgName,
+		"Active":     "customers",
+		"Customer":   cust,
+		"CanWrite":   canWriteMaster(c),
+		"CanReceive": canReceiveAS(c),
 	})
 }
 

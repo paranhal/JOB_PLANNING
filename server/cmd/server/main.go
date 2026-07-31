@@ -73,6 +73,7 @@ func main() {
 	g.Use(h.Auth.RequireActiveRole)
 
 	g.GET("/", h.Dashboard)
+	g.GET("/work", h.Work.List)
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
@@ -117,6 +118,7 @@ func main() {
 	api.GET("/assets/:customer_id", h.Asset.APIAssetsByCustomer)
 	api.GET("/contacts/:customer_id", h.Contact.APIContactsByCustomer)
 	api.GET("/as/history/:customer_id", h.AS.APIHistory)
+	api.GET("/as/asset-history/:asset_id", h.AS.APIAssetHistory)
 
 	contact := g.Group("/contacts")
 	contact.GET("", h.Contact.List, adminOnly)
@@ -161,11 +163,11 @@ func main() {
 	as.POST("/:id/edit", h.AS.UpdateReceipt, receiveAS)
 	as.POST("/:id/visit-date", h.AS.UpdateVisitDate)
 	as.POST("/:id/update", h.AS.Update)
-	as.POST("/:id/hold", h.AS.Hold)
-	as.POST("/:id/hold-release", h.AS.ReleaseHold)
-	as.POST("/:id/transfer", h.AS.Transfer)
+	as.POST("/:id/hold", h.AS.Hold, processAS)
+	as.POST("/:id/hold-release", h.AS.ReleaseHold, processAS)
+	as.POST("/:id/transfer", h.AS.Transfer, processAS)
 	as.POST("/:id/transfer-complete", h.AS.CompleteTransfer, processAS)
-	as.POST("/:id/cancel", h.AS.Cancel)
+	as.POST("/:id/cancel", h.AS.Cancel, processAS)
 	as.POST("/:id/process", h.AS.AddProcess, processAS)
 	as.POST("/:id/process/:process_id/delete", h.AS.DeleteProcess, adminOnly)
 	as.POST("/:id/delete", h.AS.Delete, adminOnly)
@@ -206,6 +208,7 @@ func main() {
 
 	g.POST("/attachments", h.Attachment.Upload, masterWrite)
 	g.GET("/attachments/:id", h.Attachment.Download)
+	g.POST("/attachments/:id/keywords", h.Attachment.UpdateKeywords, masterWrite)
 	g.POST("/attachments/:id/delete", h.Attachment.Delete, masterWrite)
 
 	g.GET("/users", h.Auth.UserList, adminOnly)

@@ -30,7 +30,10 @@ type ASReceipt struct {
 	PartsUsed         string    `json:"parts_used"`
 	IsRecurrence      bool      `json:"is_recurrence"`      // 재발여부
 	IsReopen          bool      `json:"is_reopen"`          // 재오픈여부
-	ResultCode        string    `json:"result_code"`        // 완료, 임시조치, 재방문필요 등
+	ResultCode        string    `json:"result_code"`        // 완료, 타사이관, 재방문필요
+	TransferDetail    string    `json:"transfer_detail"`    // completed | waiting
+	ConfirmTarget     string    `json:"confirm_target"`     // 확인대상자
+	ConfirmContact    string    `json:"confirm_contact"`    // 연락처
 	RevisitReason     string    `json:"revisit_reason"`     // 재방문 사유 (재방문필요 시)
 	HoldReason        string    `json:"hold_reason"`        // 보류 사유
 	HoldNextAction    string    `json:"hold_next_action"`   // 보류 시 선택: action|transfer|cancel
@@ -48,17 +51,19 @@ type ASReceipt struct {
 	InstallLocation  string `json:"install_location,omitempty"` // 연결 자산의 설치위치
 }
 
-// ASHistoryItem 기관의 과거(완료) AS 이력 — 접수 화면 처리 이력 리스트
+// ASHistoryItem 기관·자산 AS 이력 리스트
 type ASHistoryItem struct {
-	ASID           string `json:"as_id"`
-	ASNumber       string `json:"as_number"`
-	ReceiptDate    string `json:"receipt_date"`    // YYYY-MM-DD
-	VisitDate      string `json:"visit_date"`      // 방문/예정업무일
-	CompleteDate   string `json:"complete_date"`   // 최종완료일
-	Visitor        string `json:"visitor"`         // 방문자(처리담당)
-	Symptom        string `json:"symptom"`
-	ActionTaken    string `json:"action_taken"`
-	DurationText   string `json:"duration_text"`   // 접수→완료 소요기간
+	ASID         string `json:"as_id"`
+	ASNumber     string `json:"as_number"`
+	ReceiptDate  string `json:"receipt_date"`  // YYYY-MM-DD
+	VisitDate    string `json:"visit_date"`    // 방문/예정업무일
+	CompleteDate string `json:"complete_date"` // 최종완료일
+	Visitor      string `json:"visitor"`       // 방문자(처리담당)
+	Symptom      string `json:"symptom"`
+	ActionTaken  string `json:"action_taken"`
+	DurationText string `json:"duration_text"` // 접수→완료 소요기간
+	Status       string `json:"status,omitempty"`
+	StatusLabel  string `json:"status_label,omitempty"`
 }
 
 // ASProcess AS 처리 이력 (접수 1건에 N개 처리 기록 가능)
@@ -77,16 +82,52 @@ type ASProcess struct {
 
 // ASListItem AS 목록 표시용
 type ASListItem struct {
-	ASID            string    `json:"as_id"`
-	ASNumber        string    `json:"as_number"`
-	ReceiptDatetime time.Time `json:"receipt_datetime"`
-	OrgName         string    `json:"org_name"`
-	ProductName     string    `json:"product_name"`
-	Symptom         string    `json:"symptom"`
-	Urgency         string    `json:"urgency"`
-	Status          string    `json:"status"`
-	AssignedTo      string    `json:"assigned_to"`
-	DaysElapsed     int       `json:"days_elapsed"` // 처리 경과일
+	ASID               string    `json:"as_id"`
+	ASNumber           string    `json:"as_number"`
+	ReceiptDatetime    time.Time `json:"receipt_datetime"`
+	OrgName            string    `json:"org_name"`
+	ProductName        string    `json:"product_name"`
+	Symptom            string    `json:"symptom"`
+	Urgency            string    `json:"urgency"`
+	Status             string    `json:"status"`
+	AssignedTo         string    `json:"assigned_to"`
+	DaysElapsed        int       `json:"days_elapsed"`         // 접수 경과일
+	VisitScheduledDate string    `json:"visit_scheduled_date"` // 예정업무일 YYYY-MM-DD
+	VisitDaysOverdue   int       `json:"visit_days_overdue"`   // 방문일 기준 경과(오늘-예정일, 양수=지남)
+	WorkChildren       []ASWorkItem `json:"work_children,omitempty"` // 목록 들여쓰기용 하부업무
+}
+
+// ASWorkItem 접수 하부 확인·재방문 업무 ({접수번호}-Wnn)
+type ASWorkItem struct {
+	WorkID            string    `json:"work_id"`
+	WorkNumber        string    `json:"work_number"`
+	ASID              string    `json:"as_id"`
+	WorkKind          string    `json:"work_kind"` // confirm | revisit
+	ScheduledDate     string    `json:"scheduled_date"`
+	ScheduleConfirmed bool      `json:"schedule_confirmed"`
+	ConfirmTarget     string    `json:"confirm_target"`
+	ConfirmContact    string    `json:"confirm_contact"`
+	Status            string    `json:"status"` // open | done
+	Notes             string    `json:"notes"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// WorkKind labels
+const (
+	WorkKindConfirm = "confirm"
+	WorkKindRevisit = "revisit"
+)
+
+func WorkKindLabel(kind string) string {
+	switch kind {
+	case WorkKindConfirm:
+		return "확인"
+	case WorkKindRevisit:
+		return "재방문"
+	default:
+		return kind
+	}
 }
 
 // ASStats AS 현황 통계
@@ -94,10 +135,14 @@ type ASStats struct {
 	TotalReceived  int `json:"total_received"`
 	InProgress     int `json:"in_progress"`
 	Completed      int `json:"completed"` // 대시보드: 오늘 완료
-	Overdue        int `json:"overdue"`
+	Overdue        int `json:"overdue"`   // 접수 지연(3일↑)
 	TodayReceived  int `json:"today_received"`
 	WeekReceived   int `json:"week_received"`  // 월~일 주간 접수
 	WeekCompleted  int `json:"week_completed"` // 월~일 주간 완료
+	VisitPast      int `json:"visit_past"`      // 진행중 · 예정일 < 오늘
+	VisitToday     int `json:"visit_today"`     // 진행중 · 예정일 = 오늘
+	VisitUpcoming  int `json:"visit_upcoming"`  // 진행중 · 예정일 > 오늘
+	TransferOverdue int `json:"transfer_overdue"` // 이관 · 회신확인일 없음/경과
 }
 
 // AssigneeDashStats 대시보드 담당자별 주간/일간 지표

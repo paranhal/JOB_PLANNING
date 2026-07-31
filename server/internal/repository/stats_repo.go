@@ -13,7 +13,7 @@ type StatsRepo struct{ db *sql.DB }
 
 func NewStatsRepo(db *sql.DB) *StatsRepo { return &StatsRepo{db: db} }
 
-// NormalizeStatsOffset 0~2 로 제한
+// NormalizeStatsOffset 0~2 로 제한 (하위호환)
 func NormalizeStatsOffset(n int) int {
 	if n < 0 {
 		return 0
@@ -25,7 +25,6 @@ func NormalizeStatsOffset(n int) int {
 }
 
 // PeriodRange 기간 필터 → [from, to) (to exclusive). all 이면 ok=false
-// offset: 0=현재, 1=직전(전일/전주/전월/전분기), 2=전전
 func PeriodRange(period string, offset int, now time.Time) (from, to time.Time, ok bool) {
 	offset = NormalizeStatsOffset(offset)
 	loc := now.Location()
@@ -54,7 +53,84 @@ func PeriodRange(period string, offset int, now time.Time) (from, to time.Time, 
 	}
 }
 
-// PeriodDisplayLabels 좌측 기준 표기 라벨
+// ResolveStatsRange StatsQuery → [from, to) exclusive end
+func ResolveStatsRange(q model.StatsQuery, now time.Time) (from, to time.Time, ok bool, label string) {
+	loc := now.Location()
+	y, m, d := now.Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, loc)
+
+	switch q.Period {
+	case model.StatsPeriodDay:
+		day := today
+		if t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(q.Date), loc); err == nil {
+			day = t
+		}
+		return day, day.AddDate(0, 0, 1), true, day.Format("2006/01/02")
+
+	case model.StatsPeriodWeek:
+		ref := today
+		if t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(q.Date), loc); err == nil {
+			ref = t
+		}
+		wd := int(ref.Weekday())
+		if wd == 0 {
+			wd = 7
+		}
+		mon := ref.AddDate(0, 0, -(wd - 1))
+		sun := mon.AddDate(0, 0, 6)
+		label = fmt.Sprintf("월 %s ~ 일 %s", mon.Format("2006/01/02"), sun.Format("2006/01/02"))
+		return mon, mon.AddDate(0, 0, 7), true, label
+
+	case model.StatsPeriodMonth:
+		start := time.Date(y, m, 1, 0, 0, 0, 0, loc)
+		if ms := strings.TrimSpace(q.Month); len(ms) >= 7 {
+			if t, err := time.ParseInLocation("2006-01", ms[:7], loc); err == nil {
+				start = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, loc)
+			}
+		}
+		return start, start.AddDate(0, 1, 0), true, start.Format("2006/01")
+
+	case model.StatsPeriodQuarter:
+		qm := ((int(m)-1)/3)*3 + 1
+		start := time.Date(y, time.Month(qm), 1, 0, 0, 0, 0, loc)
+		qs := strings.TrimSpace(q.Quarter)
+		if len(qs) >= 6 { // 2026-Q3
+			var yy, qn int
+			if _, err := fmt.Sscanf(qs, "%d-Q%d", &yy, &qn); err == nil && qn >= 1 && qn <= 4 {
+				start = time.Date(yy, time.Month((qn-1)*3+1), 1, 0, 0, 0, 0, loc)
+			}
+		}
+		qn := ((int(start.Month())-1)/3 + 1)
+		label = fmt.Sprintf("%d년 %d분기", start.Year(), qn)
+		return start, start.AddDate(0, 3, 0), true, label
+
+	case model.StatsPeriodRange:
+		fromStr := strings.TrimSpace(q.From)
+		toStr := strings.TrimSpace(q.To)
+		if fromStr == "" {
+			fromStr = today.Format("2006-01-02")
+		}
+		if toStr == "" {
+			toStr = today.Format("2006-01-02")
+		}
+		f, err1 := time.ParseInLocation("2006-01-02", fromStr, loc)
+		t, err2 := time.ParseInLocation("2006-01-02", toStr, loc)
+		if err1 != nil || err2 != nil {
+			return time.Time{}, time.Time{}, false, ""
+		}
+		if t.Before(f) {
+			f, t = t, f
+		}
+		label = f.Format("2006/01/02") + " ~ " + t.Format("2006/01/02")
+		return f, t.AddDate(0, 0, 1), true, label
+
+	default:
+		from, to, ok := PeriodRange(q.Period, 0, now)
+		return from, to, ok, ""
+	}
+}
+
+// PeriodDisplayLabels 좌측 기준 표기 라벨 (하위호환)
 func PeriodDisplayLabels(period string, offset int, now time.Time) []string {
 	offset = NormalizeStatsOffset(offset)
 	from, to, ok := PeriodRange(period, offset, now)
@@ -93,8 +169,8 @@ func PeriodDisplayLabels(period string, offset int, now time.Time) []string {
 }
 
 func quarterLabels(start time.Time, tag string) []string {
-	q := ((int(start.Month())-1)/3)*3 + 1
-	qn := (q-1)/3 + 1
+	q := ((int(start.Month()) - 1) / 3) * 3
+	qn := q/3 + 1
 	_, week := start.ISOWeek()
 	return []string{
 		fmt.Sprintf("%s %d년 %d분기", tag, start.Year(), qn),
@@ -103,9 +179,36 @@ func quarterLabels(start time.Time, tag string) []string {
 	}
 }
 
-func (r *StatsRepo) ListDetail(period string, offset int) ([]model.StatsRow, error) {
+func metricDateExpr(metric string) string {
+	switch metric {
+	case model.StatsMetricCompleted:
+		return `date(COALESCE(ar.complete_datetime, ar.updated_at))`
+	default:
+		return `date(ar.receipt_datetime)`
+	}
+}
+
+func metricStatusCond(metric string) string {
+	switch metric {
+	case model.StatsMetricProgress:
+		// 미완료(업무진행)
+		return ` AND ar.status IN ('received','assigned','in_progress','hold')`
+	case model.StatsMetricCompleted:
+		return ` AND ar.status IN ('completed','closed')`
+	case model.StatsMetricReceived:
+		return `` // 접수 전체(기간만)
+	case model.StatsMetricOverdue:
+		return ` AND ar.status IN ('received','assigned','in_progress')
+		         AND julianday('now','localtime') - julianday(date(ar.receipt_datetime)) > 3`
+	default:
+		return ` AND ar.status IN ('received','assigned','in_progress','hold')`
+	}
+}
+
+// ListDetail 통계 상세
+func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 	now := time.Now()
-	q := `
+	sqlQ := `
 		SELECT ar.as_id, ar.as_number,
 		       COALESCE(ar.receipt_datetime,''),
 		       COALESCE(a.product_category,''), COALESCE(a.product_type,''),
@@ -120,13 +223,18 @@ func (r *StatsRepo) ListDetail(period string, offset int) ([]model.StatsRow, err
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE 1=1`
 	args := []interface{}{}
-	if from, to, ok := PeriodRange(period, offset, now); ok {
-		q += ` AND ar.receipt_datetime >= ? AND ar.receipt_datetime < ?`
-		args = append(args, from.Format("2006-01-02 15:04:05"), to.Format("2006-01-02 15:04:05"))
-	}
-	q += ` ORDER BY ar.receipt_datetime DESC, ar.as_number DESC`
 
-	rows, err := r.db.Query(q, args...)
+	sqlQ += metricStatusCond(q.Metric)
+
+	if from, to, ok, _ := ResolveStatsRange(q, now); ok {
+		expr := metricDateExpr(q.Metric)
+		sqlQ += fmt.Sprintf(` AND %s >= date(?) AND %s < date(?)`, expr, expr)
+		args = append(args, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	}
+
+	sqlQ += ` ORDER BY ar.receipt_datetime DESC, ar.as_number DESC`
+
+	rows, err := r.db.Query(sqlQ, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +272,9 @@ func (r *StatsRepo) ListDetail(period string, offset int) ([]model.StatsRow, err
 	return items, rows.Err()
 }
 
-func (r *StatsRepo) ListByAssignee(period string, offset int) ([]model.StatsAssigneeRow, error) {
-	details, err := r.ListDetail(period, offset)
+// ListByAssignee 담당자별 집계
+func (r *StatsRepo) ListByAssignee(q model.StatsQuery) ([]model.StatsAssigneeRow, error) {
+	details, err := r.ListDetail(q)
 	if err != nil {
 		return nil, err
 	}
@@ -183,6 +292,15 @@ func (r *StatsRepo) ListByAssignee(period string, offset int) ([]model.StatsAssi
 		rows = append(rows, model.StatsAssigneeRow{Assignee: name, Count: counts[name]})
 	}
 	return rows, nil
+}
+
+// 하위호환 래퍼
+func (r *StatsRepo) ListDetailPeriod(period string, offset int) ([]model.StatsRow, error) {
+	return r.ListDetail(model.StatsQuery{
+		Metric: model.StatsMetricReceived,
+		Period: period,
+		Date:   time.Now().AddDate(0, 0, -NormalizeStatsOffset(offset)).Format("2006-01-02"),
+	})
 }
 
 func mapProductCategory(productCategory, productType, productName string) string {

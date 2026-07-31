@@ -1,6 +1,7 @@
 <div class="p-6">
   <div class="flex items-center justify-between mb-4">
     <p class="text-sm text-gray-500">총 {{len .Assets}}건</p>
+    {{if .CanWrite}}
     <a href="/assets/new?customer_id={{.CustomerID}}"
        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8,6 +9,7 @@
       </svg>
       자산 등록
     </a>
+    {{end}}
   </div>
 
   {{if .Assets}}
@@ -81,8 +83,10 @@
             d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
     </svg>
     <p class="text-sm text-gray-400">등록된 설치자산이 없습니다.</p>
+    {{if .CanWrite}}
     <a href="/assets/new?customer_id={{.CustomerID}}"
        class="inline-block mt-3 text-sm text-blue-600 hover:underline">첫 자산 등록하기</a>
+    {{end}}
   </div>
   {{end}}
 </div>

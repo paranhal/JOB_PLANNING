@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -314,6 +315,23 @@ CREATE TABLE IF NOT EXISTS as_processes (
     FOREIGN KEY (as_id) REFERENCES as_receipts(as_id)
 );
 
+-- AS 하부업무: 확인·재방문 ({접수번호}-Wnn)
+CREATE TABLE IF NOT EXISTS as_work_items (
+    work_id             TEXT PRIMARY KEY,
+    work_number         TEXT NOT NULL UNIQUE,
+    as_id               TEXT NOT NULL,
+    work_kind           TEXT NOT NULL,
+    scheduled_date      TEXT,
+    schedule_confirmed  INTEGER DEFAULT 0,
+    confirm_target      TEXT,
+    confirm_contact     TEXT,
+    status              TEXT DEFAULT 'open',
+    notes               TEXT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (as_id) REFERENCES as_receipts(as_id)
+);
+
 -- 업무 고유번호 시퀀스 (§10.2)
 CREATE TABLE IF NOT EXISTS id_sequences (
     seq_key TEXT PRIMARY KEY,
@@ -329,6 +347,8 @@ CREATE TABLE IF NOT EXISTS attachments (
     file_path     TEXT NOT NULL,
     file_size     INTEGER,
     mime_type     TEXT,
+    keywords      TEXT,
+    slot_no       INTEGER DEFAULT 0,
     uploaded_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -541,6 +561,11 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE customers ADD COLUMN addr_sido TEXT`,
 		`ALTER TABLE customers ADD COLUMN addr_sigungu TEXT`,
 		`ALTER TABLE customers ADD COLUMN addr_dong TEXT`,
+		`ALTER TABLE attachments ADD COLUMN keywords TEXT`,
+		`ALTER TABLE attachments ADD COLUMN slot_no INTEGER DEFAULT 0`,
+		`ALTER TABLE as_receipts ADD COLUMN transfer_detail TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN confirm_target TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN confirm_contact TEXT`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
@@ -550,9 +575,24 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('PT006','product_type','kiosk','키오스크',6),
 		('RQ006','requester_type','onecall','원콜',6),
 		('RSC005','result_code','revisit_needed','재방문필요',3)`)
-	db.Exec(`UPDATE codes SET sort_order=4 WHERE code_id='RSC003'`)
-	db.Exec(`UPDATE codes SET sort_order=5 WHERE code_id='RSC004'`)
-	db.Exec(`UPDATE codes SET sort_order=3, code_name='재방문필요' WHERE code_id='RSC005'`)
+	db.Exec(`UPDATE codes SET is_active=0 WHERE code_id IN ('RSC002','RSC004')`) // 임시조치·제조사에스컬레이션 비활성
+	db.Exec(`UPDATE codes SET sort_order=1, code_name='완료', is_active=1 WHERE code_id='RSC001'`)
+	db.Exec(`UPDATE codes SET sort_order=2, code_name='타사이관', is_active=1 WHERE code_id='RSC003'`)
+	db.Exec(`UPDATE codes SET sort_order=3, code_name='재방문필요', is_active=1 WHERE code_id='RSC005'`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS as_work_items (
+		work_id             TEXT PRIMARY KEY,
+		work_number         TEXT NOT NULL UNIQUE,
+		as_id               TEXT NOT NULL,
+		work_kind           TEXT NOT NULL,
+		scheduled_date      TEXT,
+		schedule_confirmed  INTEGER DEFAULT 0,
+		confirm_target      TEXT,
+		confirm_contact     TEXT,
+		status              TEXT DEFAULT 'open',
+		notes               TEXT,
+		created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`)
 
 	// 기존 배정명을 user_id로 보강
 	db.Exec(`
@@ -650,6 +690,12 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		WHERE inspection_cycle IS NULL OR TRIM(inspection_cycle)=''`)
 
 	migrateCustomerStructuredAddresses(db)
+
+	if err := migrateBusinessIDsV2(db); err != nil {
+		log.Printf("warning: business id migrate v2: %v", err)
+	}
+
+	BackfillAssetImageSlots(db)
 
 	return nil
 }

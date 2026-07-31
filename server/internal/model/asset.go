@@ -98,7 +98,18 @@ type Attachment struct {
 	FilePath     string    `json:"file_path"`
 	FileSize     int64     `json:"file_size"`
 	MIMEType     string    `json:"mime_type"`
+	Keywords     string    `json:"keywords"`  // 설치사진 등 검색·매뉴얼용 키워드
+	SlotNo       int       `json:"slot_no"`   // 자산 이미지 슬롯 1~3
 	UploadedAt   time.Time `json:"uploaded_at"`
+}
+
+// AssetImageSlot 자산 상세/수정 화면용 사진 슬롯(최대 3)
+type AssetImageSlot struct {
+	Slot     int    `json:"slot"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Keywords string `json:"keywords,omitempty"`
 }
 
 // AccessInfoReference 접속정보참조 (기획서 §6.3)

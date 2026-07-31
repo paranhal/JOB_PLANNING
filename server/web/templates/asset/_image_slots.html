@@ -1,0 +1,62 @@
+{{define "asset_image_slots"}}
+{{/* 기대: .Asset .Images .ImageCount .CanWrite .CanUpload .Redirect .Editable */}}
+<div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">설치 사진 (최대 3장)</h3>
+      <p class="text-xs text-gray-500 mt-1">파일명 <span class="font-mono">{{.Asset.AssetID}}_img_N</span> · 폴더 <span class="font-mono">uploads/assets/…</span> · 키워드는 검색·매뉴얼용으로 별도 저장</p>
+    </div>
+    <span class="text-xs text-gray-400">{{.ImageCount}}/3</span>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    {{range .Images}}
+    <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+      <div class="aspect-square rounded-lg border border-dashed border-gray-200 bg-white flex items-center justify-center overflow-hidden relative">
+        {{if .URL}}
+        <a href="{{.URL}}" target="_blank" class="block w-full h-full">
+          <img src="{{.URL}}" alt="{{.Name}}" class="w-full h-full object-cover">
+        </a>
+        {{if and $.CanWrite $.Editable}}
+        <form method="POST" action="/attachments/{{.ID}}/delete" class="absolute top-1 right-1"
+              onsubmit="return confirm('이 사진을 삭제할까요?')">
+          <input type="hidden" name="redirect" value="{{$.Redirect}}">
+          <button type="submit" class="px-1.5 py-0.5 bg-black/50 text-white text-xs rounded">삭제</button>
+        </form>
+        {{end}}
+        {{else}}
+        <span class="text-xs text-gray-300">슬롯 {{.Slot}} 비어 있음</span>
+        {{end}}
+      </div>
+      <p class="text-xs text-gray-500 font-mono truncate">{{if .Name}}{{.Name}}{{else}}{{$.Asset.AssetID}}_img_{{.Slot}}{{end}}</p>
+      {{if .ID}}
+        {{if and $.CanWrite $.Editable}}
+        <form method="POST" action="/attachments/{{.ID}}/keywords" class="space-y-1">
+          <input type="hidden" name="redirect" value="{{$.Redirect}}">
+          <label class="block text-xs font-medium text-gray-600">키워드</label>
+          <input type="text" name="keywords" value="{{.Keywords}}" placeholder="예: 게이트, 1호기, 정면"
+                 class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+          <button type="submit" class="w-full px-2 py-1 text-xs rounded-lg border border-gray-300 text-gray-700 hover:bg-white">키워드 저장</button>
+        </form>
+        {{else}}
+        <p class="text-sm text-gray-700"><span class="text-xs text-gray-400 block mb-0.5">키워드</span>{{if .Keywords}}{{.Keywords}}{{else}}-{{end}}</p>
+        {{end}}
+      {{else if and $.CanWrite $.Editable $.CanUpload}}
+      <form method="POST" action="/attachments" enctype="multipart/form-data" class="space-y-1">
+        <input type="hidden" name="ref_type" value="asset">
+        <input type="hidden" name="ref_id" value="{{$.Asset.AssetID}}">
+        <input type="hidden" name="slot_no" value="{{.Slot}}">
+        <input type="hidden" name="redirect" value="{{$.Redirect}}">
+        <label class="block text-xs font-medium text-gray-600">키워드</label>
+        <input type="text" name="keywords" placeholder="예: 게이트, 1호기, 정면"
+               class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+        <input type="file" name="file" accept="image/*" required class="w-full text-xs">
+        <button type="submit" class="w-full px-2 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700">업로드</button>
+      </form>
+      {{else}}
+      <p class="text-sm text-gray-500"><span class="text-xs text-gray-400 block mb-0.5">키워드</span>-</p>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

@@ -11,11 +11,29 @@ type AttachmentRepo struct{ db *sql.DB }
 
 func NewAttachmentRepo(db *sql.DB) *AttachmentRepo { return &AttachmentRepo{db: db} }
 
-func (r *AttachmentRepo) ListByRef(refType, refID string) ([]model.Attachment, error) {
-	rows, err := r.db.Query(`
+const attachmentSelect = `
 		SELECT attachment_id, ref_type, ref_id, file_name, file_path,
-		       COALESCE(file_size,0), COALESCE(mime_type,''), uploaded_at
-		FROM attachments WHERE ref_type=? AND ref_id=? ORDER BY uploaded_at DESC`,
+		       COALESCE(file_size,0), COALESCE(mime_type,''),
+		       COALESCE(keywords,''), COALESCE(slot_no,0), uploaded_at`
+
+func scanAttachment(scanner interface {
+	Scan(dest ...any) error
+}) (*model.Attachment, error) {
+	var a model.Attachment
+	var uploadedStr string
+	if err := scanner.Scan(&a.AttachmentID, &a.RefType, &a.RefID,
+		&a.FileName, &a.FilePath, &a.FileSize, &a.MIMEType,
+		&a.Keywords, &a.SlotNo, &uploadedStr); err != nil {
+		return nil, err
+	}
+	a.UploadedAt = parseTime(uploadedStr)
+	return &a, nil
+}
+
+func (r *AttachmentRepo) ListByRef(refType, refID string) ([]model.Attachment, error) {
+	rows, err := r.db.Query(attachmentSelect+`
+		FROM attachments WHERE ref_type=? AND ref_id=?
+		ORDER BY CASE WHEN slot_no>0 THEN slot_no ELSE 999 END ASC, uploaded_at ASC`,
 		refType, refID)
 	if err != nil {
 		return nil, err
@@ -23,14 +41,11 @@ func (r *AttachmentRepo) ListByRef(refType, refID string) ([]model.Attachment, e
 	defer rows.Close()
 	var items []model.Attachment
 	for rows.Next() {
-		var a model.Attachment
-		var uploadedStr string
-		if err := rows.Scan(&a.AttachmentID, &a.RefType, &a.RefID,
-			&a.FileName, &a.FilePath, &a.FileSize, &a.MIMEType, &uploadedStr); err != nil {
+		a, err := scanAttachment(rows)
+		if err != nil {
 			return nil, err
 		}
-		a.UploadedAt = parseTime(uploadedStr)
-		items = append(items, a)
+		items = append(items, *a)
 	}
 	return items, rows.Err()
 }
@@ -41,36 +56,90 @@ func (r *AttachmentRepo) CountByRef(refType, refID string) (int, error) {
 	return n, err
 }
 
+// NextAssetImageSlot 사용 중인 슬롯(1~3)을 피해 다음 빈 번호 반환. 없으면 0.
+func (r *AttachmentRepo) NextAssetImageSlot(assetID string) (int, error) {
+	rows, err := r.db.Query(`SELECT COALESCE(slot_no,0) FROM attachments WHERE ref_type='asset' AND ref_id=?`, assetID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	used := map[int]bool{}
+	for rows.Next() {
+		var s int
+		if err := rows.Scan(&s); err != nil {
+			return 0, err
+		}
+		if s >= 1 && s <= 3 {
+			used[s] = true
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		if !used[i] {
+			return i, nil
+		}
+	}
+	return 0, nil
+}
+
 func (r *AttachmentRepo) Create(a *model.Attachment) error {
 	a.AttachmentID = newID("ATT")
 	_, err := r.db.Exec(`
-		INSERT INTO attachments (attachment_id,ref_type,ref_id,file_name,file_path,file_size,mime_type,uploaded_at)
-		VALUES (?,?,?,?,?,?,?,?)`,
+		INSERT INTO attachments
+		(attachment_id,ref_type,ref_id,file_name,file_path,file_size,mime_type,keywords,slot_no,uploaded_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?)`,
 		a.AttachmentID, a.RefType, a.RefID, a.FileName, a.FilePath,
-		a.FileSize, a.MIMEType, time.Now().Format("2006-01-02 15:04:05"))
+		a.FileSize, a.MIMEType, a.Keywords, a.SlotNo,
+		time.Now().Format("2006-01-02 15:04:05"))
 	return err
 }
 
 func (r *AttachmentRepo) GetByID(id string) (*model.Attachment, error) {
-	var a model.Attachment
-	var uploadedStr string
-	err := r.db.QueryRow(`
-		SELECT attachment_id, ref_type, ref_id, file_name, file_path,
-		       COALESCE(file_size,0), COALESCE(mime_type,''), uploaded_at
-		FROM attachments WHERE attachment_id=?`, id).
-		Scan(&a.AttachmentID, &a.RefType, &a.RefID,
-			&a.FileName, &a.FilePath, &a.FileSize, &a.MIMEType, &uploadedStr)
+	a, err := scanAttachment(r.db.QueryRow(attachmentSelect+` FROM attachments WHERE attachment_id=?`, id))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	a.UploadedAt = parseTime(uploadedStr)
-	return &a, nil
+	return a, nil
+}
+
+func (r *AttachmentRepo) UpdateKeywords(id, keywords string) error {
+	_, err := r.db.Exec(`UPDATE attachments SET keywords=? WHERE attachment_id=?`, keywords, id)
+	return err
 }
 
 func (r *AttachmentRepo) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM attachments WHERE attachment_id=?`, id)
 	return err
+}
+
+// BackfillAssetImageSlots 기존 자산 이미지에 slot_no가 없으면 업로드순으로 1~3 부여
+func BackfillAssetImageSlots(db *sql.DB) {
+	rows, err := db.Query(`
+		SELECT attachment_id, ref_id FROM attachments
+		WHERE ref_type='asset' AND (slot_no IS NULL OR slot_no=0)
+		ORDER BY ref_id, uploaded_at ASC, attachment_id ASC`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	type row struct{ id, ref string }
+	var list []row
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.id, &r.ref) != nil {
+			continue
+		}
+		list = append(list, r)
+	}
+	counters := map[string]int{}
+	for _, r := range list {
+		counters[r.ref]++
+		slot := counters[r.ref]
+		if slot > 3 {
+			continue
+		}
+		db.Exec(`UPDATE attachments SET slot_no=? WHERE attachment_id=?`, slot, r.id)
+	}
 }

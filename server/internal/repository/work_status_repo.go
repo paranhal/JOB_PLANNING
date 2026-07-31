@@ -72,11 +72,11 @@ func (r *WorkStatusRepo) listAS(start, endEx, phase string) ([]model.WorkCalItem
 	}
 
 	q := fmt.Sprintf(`
-		SELECT ar.as_id, ar.as_number, c.org_name, %s
+		SELECT ar.as_id, c.org_name, ar.as_number, %s
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		WHERE 1=1 %s
-		ORDER BY %s, ar.as_number`, dateExpr, extra, dateExpr)
+		ORDER BY %s, c.org_name, ar.as_number`, dateExpr, extra, dateExpr)
 
 	rows, err := r.db.Query(q, start, endEx)
 	if err != nil {

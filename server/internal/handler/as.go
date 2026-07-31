@@ -18,6 +18,7 @@ import (
 type ASHandler struct {
 	repo         *repository.ASRepo
 	processRepo  *repository.ASProcessRepo
+	workRepo     *repository.ASWorkRepo
 	customerRepo *repository.CustomerRepo
 	assetRepo    *repository.AssetRepo
 	contactRepo  *repository.ContactRepo
@@ -74,23 +75,16 @@ func (h *ASHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-
-	// 통계 바: 기술담당은 대시보드와 동일(전체 건수 + 내 배정 진행/완료/지연/오늘/주간)
-	var stats *model.ASStats
-	if role == "tech" {
-		allStats, _ := h.repo.DashboardStats("", nil)
-		mineStats, _ := h.repo.DashboardStats(uid, keys)
-		stats = &model.ASStats{
-			TotalReceived: allStats.TotalReceived,
-			InProgress:    mineStats.InProgress,
-			Completed:     mineStats.Completed,
-			Overdue:       mineStats.Overdue,
-			TodayReceived: mineStats.TodayReceived,
-			WeekReceived:  mineStats.WeekReceived,
-			WeekCompleted: mineStats.WeekCompleted,
+	if len(items) > 0 && h.workRepo != nil {
+		ids := make([]string, len(items))
+		for i := range items {
+			ids[i] = items[i].ASID
 		}
-	} else {
-		stats, _ = h.repo.DashboardStats("", nil)
+		if byAS, err := h.workRepo.ListByASIDs(ids); err == nil {
+			for i := range items {
+				items[i].WorkChildren = byAS[items[i].ASID]
+			}
+		}
 	}
 
 	totalPages := (total + 19) / 20
@@ -121,13 +115,23 @@ func (h *ASHandler) List(c echo.Context) error {
 		statusLabel = "주간완료"
 	case "week_in_progress":
 		statusLabel = "주간진행중"
+	case "visit_past":
+		statusLabel = "예정일 경과"
+	case "visit_today":
+		statusLabel = "오늘 방문"
+	case "visit_upcoming":
+		statusLabel = "예정(미도래)"
+	case "transfer_overdue":
+		statusLabel = "이관 지연(확인일 경과)"
+	case "overdue":
+		statusLabel = "접수 지연"
 	}
 
 	return c.Render(http.StatusOK, "as/list.html", map[string]interface{}{
 		"Title": "AS 관리", "Active": "as",
 		"Items": items, "Total": total,
 		"Page": page, "TotalPages": totalPages,
-		"Status": status, "Search": search, "Stats": stats,
+		"Status": status, "Search": search,
 		"Mine": mine, "MineQ": mineQ, "SortQ": sortQ, "ListPath": "/as", "Role": role,
 		"Sort": sort, "Dir": dir,
 		"SortLinks": asListSortLinks("/as", listBase, sort, dir),
@@ -148,7 +152,7 @@ func parseASSort(c echo.Context) (sort, dir string) {
 		dir = "desc"
 	}
 	switch sort {
-	case "org_name", "days", "as_number", "status", "assigned", "receipt":
+	case "org_name", "days", "as_number", "status", "assigned", "receipt", "visit":
 	default:
 		sort = "receipt"
 	}
@@ -205,13 +209,13 @@ func asPageURL(path string, base url.Values, page int) template.URL {
 }
 
 func asListSortLinks(path string, base url.Values, currentSort, currentDir string) map[string]template.URL {
-	fields := []string{"receipt", "as_number", "org_name", "status", "assigned", "days"}
+	fields := []string{"receipt", "as_number", "org_name", "status", "assigned", "days", "visit"}
 	links := make(map[string]template.URL, len(fields))
 	for _, field := range fields {
 		v := cloneURLValues(base)
 		v.Set("sort", field)
 		newDir := "desc"
-		if field == "org_name" {
+		if field == "org_name" || field == "visit" {
 			newDir = "asc"
 		}
 		if currentSort == field {
@@ -482,12 +486,16 @@ func (h *ASHandler) Show(c echo.Context) error {
 	}
 
 	processes, _ := h.processRepo.ListByAS(id)
+	workItems, _ := h.workRepo.ListByAS(id)
 	procTypes, _ := h.codeRepo.ActiveByGroup("process_type")
 	causeTypes, _ := h.codeRepo.ActiveByGroup("cause_type")
 	resultCodes, _ := h.codeRepo.ActiveByGroup("result_code")
 	assignees, _ := h.userRepo.ListAssignable()
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
-	history, _ := h.repo.ListPastHistory(as.CustomerID, as.ASID, 50)
+	var assetHistory []model.ASHistoryItem
+	if as.AssetID != "" {
+		assetHistory, _ = h.repo.ListHistoryByAsset(as.AssetID, as.ASID, 50)
+	}
 
 	now := time.Now()
 	startLocal := ""
@@ -519,11 +527,11 @@ func (h *ASHandler) Show(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "as/show.html", map[string]interface{}{
 		"Title": as.ASNumber, "Active": "as", "AS": as,
-		"Processes": processes,
+		"Processes": processes, "WorkItems": workItems,
 		"ProcTypes": procTypes, "CauseTypes": causeTypes, "ResultCodes": resultCodes,
 		"Assignees":            assignees,
 		"Contacts":             contacts,
-		"History":              history,
+		"AssetHistory":         assetHistory,
 		"CanProcess":           canProcessAS(c),
 		"CanReceive":           canReceiveAS(c),
 		"CanDelete":            isAdminRole(c),
@@ -539,6 +547,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"TodayLocal":           now.Format("2006-01-02"),
 		"WorkerDefault":        ctxString(c, "user_name"),
 		"OpenAction":           c.QueryParam("action") == "1",
+		"ActionErr":            c.QueryParam("err"),
 	})
 }
 
@@ -578,6 +587,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 			}
 		}
 	}
+	var applyOut *model.ActionApplyResult
 	if canProcessAS(c) {
 		formStatus := c.FormValue("status")
 		as.Status = formStatus
@@ -587,9 +597,6 @@ func (h *ASHandler) Update(c echo.Context) error {
 		as.PartsUsed = c.FormValue("parts_used")
 		as.ResultCode = c.FormValue("result_code")
 		as.RevisitReason = strings.TrimSpace(c.FormValue("revisit_reason"))
-		if as.ResultCode != "revisit_needed" {
-			as.RevisitReason = ""
-		}
 		as.FollowupAction = c.FormValue("followup_action")
 		confCode := c.FormValue("customer_confirmer_code")
 		if confCode == "custom" {
@@ -599,21 +606,77 @@ func (h *ASHandler) Update(c echo.Context) error {
 		} else {
 			as.CustomerConfirmer = strings.TrimSpace(c.FormValue("customer_confirmer"))
 		}
-		as.IsRecurrence = c.FormValue("is_recurrence") == "1"
-		as.IsReopen = c.FormValue("is_reopen") == "1"
-		as.ReplaceReview = c.FormValue("replace_review") == "1"
 		if t, ok := parseFormDatetime(c.FormValue("start_datetime")); ok {
 			as.StartDatetime = &t
 		}
 		if t, ok := parseFormDatetime(c.FormValue("complete_datetime")); ok {
 			as.CompleteDatetime = &t
 		}
-		// 완료·보류 등 특수 상태 유지, 그 외는 접수/배정/예정일 기준 자동 파생
-		if formStatus == "" || formStatus == "hold" || model.IsASWorkflowStatus(formStatus) {
-			if formStatus == "hold" {
-				as.Status = "hold"
-			} else {
-				as.Status = model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
+
+		nextVisit := normalizeVisitDate(c.FormValue("visit_scheduled_date"))
+		confirmDate := normalizeVisitDate(c.FormValue("confirm_scheduled_date"))
+		revisitDate := normalizeVisitDate(c.FormValue("revisit_scheduled_date"))
+		scheduleConfirmed := c.FormValue("schedule_confirmed") == "1"
+		transferDetail := strings.TrimSpace(c.FormValue("transfer_detail"))
+		confirmTarget := strings.TrimSpace(c.FormValue("confirm_target"))
+		confirmContact := strings.TrimSpace(c.FormValue("confirm_contact"))
+		createRevisit := c.FormValue("create_revisit_after") == "1"
+		revisitConfirmed := c.FormValue("revisit_schedule_confirmed") == "1"
+
+		if as.ResultCode != "" {
+			in := model.ActionApplyInput{
+				ScheduleConfirmed:         scheduleConfirmed,
+				TransferDetail:            transferDetail,
+				ConfirmTarget:             confirmTarget,
+				ConfirmContact:            confirmContact,
+				CreateRevisitAfterConfirm: createRevisit,
+				RevisitDate:               revisitDate,
+				RevisitScheduleConfirmed:  revisitConfirmed,
+			}
+			switch as.ResultCode {
+			case model.ResultRevisit, model.ResultTemporary:
+				in.NextDate = firstNonEmpty(revisitDate, nextVisit)
+			case model.ResultTransfer, model.ResultEscalation:
+				in.NextDate = firstNonEmpty(confirmDate, nextVisit)
+				as.TransferDetail = transferDetail
+				as.ConfirmTarget = confirmTarget
+				as.ConfirmContact = confirmContact
+			default:
+				in.NextDate = nextVisit
+			}
+			out, err := model.ApplyActionResult(as, in, time.Now())
+			if err != nil {
+				switch err {
+				case model.ErrRevisitReasonRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=revisit_reason")
+				case model.ErrRevisitDateRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=revisit_date")
+				case model.ErrTemporaryDateRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=temporary_date")
+				case model.ErrTransferDetailRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=transfer_detail")
+				case model.ErrConfirmDateRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=confirm_date")
+				case model.ErrConfirmTargetRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=confirm_target")
+				case model.ErrConfirmContactRequired:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=confirm_contact")
+				default:
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=action")
+				}
+			}
+			applyOut = out
+		} else {
+			as.RevisitReason = ""
+			if nextVisit != "" {
+				as.VisitScheduledDate = nextVisit
+			}
+			if formStatus == "" || formStatus == "hold" || model.IsASWorkflowStatus(formStatus) {
+				if formStatus == "hold" {
+					as.Status = "hold"
+				} else {
+					as.Status = model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
+				}
 			}
 		}
 	} else if model.IsASWorkflowStatus(as.Status) {
@@ -623,12 +686,113 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if err := h.repo.Update(as); err != nil {
 		return err
 	}
+	if canProcessAS(c) {
+		_ = h.appendActionProcess(c, as)
+		if applyOut != nil {
+			for _, d := range applyOut.WorkItems {
+				_ = h.workRepo.Create(&model.ASWorkItem{
+					ASID:              as.ASID,
+					WorkKind:          d.WorkKind,
+					ScheduledDate:     d.ScheduledDate,
+					ScheduleConfirmed: d.ScheduleConfirmed,
+					ConfirmTarget:     d.ConfirmTarget,
+					ConfirmContact:    d.ConfirmContact,
+					Notes:             d.Notes,
+					Status:            "open",
+				})
+			}
+		}
+	}
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+func actionResultLabel(code string) string {
+	switch strings.TrimSpace(code) {
+	case model.ResultDone:
+		return "완료"
+	case model.ResultTemporary:
+		return "임시조치"
+	case model.ResultRevisit:
+		return "재방문필요"
+	case model.ResultTransfer:
+		return "타사이관"
+	case model.ResultEscalation:
+		return "제조사에스컬레이션"
+	default:
+		if code == "" {
+			return ""
+		}
+		return code
+	}
+}
+
+// appendActionProcess 조치 폼 저장 내용을 처리 이력으로 남긴다.
+func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt) error {
+	action := strings.TrimSpace(as.ActionTaken)
+	result := strings.TrimSpace(as.ResultCode)
+	if action == "" && result == "" {
+		return nil
+	}
+	content := action
+	if content == "" {
+		content = "조치 저장"
+	}
+	notesParts := []string{}
+	if lbl := actionResultLabel(result); lbl != "" {
+		notesParts = append(notesParts, "결과:"+lbl)
+	}
+	if as.TransferDetail != "" && result == model.ResultTransfer {
+		if as.TransferDetail == model.TransferDetailWaiting {
+			notesParts = append(notesParts, "세부:조치결과대기")
+		} else if as.TransferDetail == model.TransferDetailCompleted {
+			notesParts = append(notesParts, "세부:완료")
+		}
+	}
+	if as.VisitScheduledDate != "" && (result == model.ResultRevisit || result == model.ResultTransfer) {
+		label := "방문예정일"
+		if result == model.ResultTransfer {
+			label = "확인예정일"
+		}
+		notesParts = append(notesParts, label+":"+as.VisitScheduledDate)
+	}
+	if as.ConfirmTarget != "" {
+		notesParts = append(notesParts, "확인대상:"+as.ConfirmTarget)
+	}
+	if as.RevisitReason != "" {
+		notesParts = append(notesParts, "재방문사유:"+as.RevisitReason)
+	}
+	worker := strings.TrimSpace(as.AssignedTo)
+	if worker == "" {
+		worker = ctxString(c, "user_name")
+	}
+	p := &model.ASProcess{
+		ASID:        as.ASID,
+		Worker:      worker,
+		WorkType:    as.ProcessType,
+		WorkContent: content,
+		PartsUsed:   as.PartsUsed,
+		Notes:       strings.Join(notesParts, " · "),
+	}
+	if as.StartDatetime != nil && !as.StartDatetime.IsZero() {
+		p.ProcessDatetime = *as.StartDatetime
+	} else {
+		p.ProcessDatetime = time.Now()
+	}
+	return h.processRepo.Create(p)
 }
 
 // Hold 보류 처리 — 후속(조치/이관/접수취소) 선택 후 사유 입력
 func (h *ASHandler) Hold(c echo.Context) error {
-	if !canProcessAS(c) && !canReceiveAS(c) {
+	if !canProcessAS(c) {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
@@ -654,7 +818,7 @@ func (h *ASHandler) Hold(c echo.Context) error {
 
 // ReleaseHold 보류 삭제(해제) → 필드 기준 워크플로 상태 복귀
 func (h *ASHandler) ReleaseHold(c echo.Context) error {
-	if !canProcessAS(c) && !canReceiveAS(c) {
+	if !canProcessAS(c) {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
@@ -680,7 +844,7 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 
 // Transfer 이관 처리
 func (h *ASHandler) Transfer(c echo.Context) error {
-	if !canProcessAS(c) && !canReceiveAS(c) {
+	if !canProcessAS(c) {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
@@ -717,7 +881,7 @@ func (h *ASHandler) CompleteTransfer(c echo.Context) error {
 
 // Cancel 접수취소
 func (h *ASHandler) Cancel(c echo.Context) error {
-	if !canProcessAS(c) && !canReceiveAS(c) {
+	if !canProcessAS(c) {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
@@ -824,6 +988,20 @@ func (h *ASHandler) APIHistory(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+// APIAssetHistory 자산별 AS 이력 JSON
+func (h *ASHandler) APIAssetHistory(c echo.Context) error {
+	assetID := c.Param("asset_id")
+	exclude := c.QueryParam("exclude")
+	items, err := h.repo.ListHistoryByAsset(assetID, exclude, 50)
+	if err != nil {
+		return err
+	}
+	if items == nil {
+		items = []model.ASHistoryItem{}
+	}
+	return c.JSON(http.StatusOK, items)
+}
+
 func (h *ASHandler) StatsDashboard(c echo.Context) error {
 	role := currentRole(c)
 	uid := currentUserID(c)
@@ -843,13 +1021,17 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 		allStats, _ := h.repo.DashboardStats("", nil)
 		mineStats, _ := h.repo.DashboardStats(uid, keys)
 		stats = &model.ASStats{
-			TotalReceived: allStats.TotalReceived,
-			InProgress:    mineStats.InProgress,
-			Completed:     mineStats.Completed,
-			Overdue:       mineStats.Overdue,
-			TodayReceived: mineStats.TodayReceived,
-			WeekReceived:  mineStats.WeekReceived,
-			WeekCompleted: mineStats.WeekCompleted,
+			TotalReceived:   allStats.TotalReceived,
+			InProgress:      mineStats.InProgress,
+			Completed:       mineStats.Completed,
+			Overdue:         mineStats.Overdue,
+			TodayReceived:   mineStats.TodayReceived,
+			WeekReceived:    mineStats.WeekReceived,
+			WeekCompleted:   mineStats.WeekCompleted,
+			VisitPast:       mineStats.VisitPast,
+			VisitToday:      mineStats.VisitToday,
+			VisitUpcoming:   mineStats.VisitUpcoming,
+			TransferOverdue: mineStats.TransferOverdue,
 		}
 	} else {
 		stats, _ = h.repo.DashboardStats("", nil)

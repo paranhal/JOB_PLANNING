@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -15,20 +17,14 @@ import (
 )
 
 type AttachmentHandler struct {
-	repo       *repository.AttachmentRepo
-	uploadDir  string
+	repo      *repository.AttachmentRepo
+	uploadDir string
 }
 
 func (h *AttachmentHandler) Upload(c echo.Context) error {
 	refType := c.FormValue("ref_type")
 	refID := c.FormValue("ref_id")
-
-	if refType == "asset" {
-		n, _ := h.repo.CountByRef("asset", refID)
-		if n >= 3 {
-			return c.String(http.StatusBadRequest, "설치자산 이미지는 최대 3장까지입니다")
-		}
-	}
+	keywords := strings.TrimSpace(c.FormValue("keywords"))
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -41,11 +37,49 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	}
 	defer src.Close()
 
-	dir := filepath.Join(h.uploadDir, refType, refID)
-	os.MkdirAll(dir, 0755)
+	var (
+		dstPath  string
+		filename string
+		slotNo   int
+	)
 
-	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
-	dstPath := filepath.Join(dir, filename)
+	if refType == "asset" {
+		n, _ := h.repo.CountByRef("asset", refID)
+		if n >= 3 {
+			return c.String(http.StatusBadRequest, "설치자산 이미지는 최대 3장까지입니다")
+		}
+		slotNo, err = h.repo.NextAssetImageSlot(refID)
+		if err != nil {
+			return err
+		}
+		if slotNo == 0 {
+			return c.String(http.StatusBadRequest, "설치자산 이미지는 최대 3장까지입니다")
+		}
+		if v := strings.TrimSpace(c.FormValue("slot_no")); v != "" {
+			if s, e := strconv.Atoi(v); e == nil && s >= 1 && s <= 3 {
+				slotNo = s
+			}
+		}
+		existing, _ := h.repo.ListByRef("asset", refID)
+		for _, a := range existing {
+			if a.SlotNo == slotNo {
+				return c.String(http.StatusBadRequest, "해당 슬롯에 이미 이미지가 있습니다")
+			}
+		}
+		dir := repository.AssetImageDir(h.uploadDir, refID)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		filename = repository.AssetImageFileName(refID, slotNo, file.Filename)
+		dstPath = filepath.Join(dir, filename)
+	} else {
+		dir := filepath.Join(h.uploadDir, refType, refID)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		filename = fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		dstPath = filepath.Join(dir, filename)
+	}
 
 	dst, err := os.Create(dstPath)
 	if err != nil {
@@ -60,13 +94,30 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	att := &model.Attachment{
 		RefType:  refType,
 		RefID:    refID,
-		FileName: file.Filename,
+		FileName: filename,
 		FilePath: dstPath,
 		FileSize: file.Size,
 		MIMEType: file.Header.Get("Content-Type"),
+		Keywords: keywords,
+		SlotNo:   slotNo,
 	}
-	h.repo.Create(att)
+	if err := h.repo.Create(att); err != nil {
+		return err
+	}
 
+	redirect := c.FormValue("redirect")
+	if redirect == "" {
+		redirect = "/"
+	}
+	return c.Redirect(http.StatusSeeOther, redirect)
+}
+
+func (h *AttachmentHandler) UpdateKeywords(c echo.Context) error {
+	id := c.Param("id")
+	keywords := strings.TrimSpace(c.FormValue("keywords"))
+	if err := h.repo.UpdateKeywords(id, keywords); err != nil {
+		return err
+	}
 	redirect := c.FormValue("redirect")
 	if redirect == "" {
 		redirect = "/"

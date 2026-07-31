@@ -11,9 +11,13 @@
       <span class="px-2 py-0.5 rounded-full text-xs font-medium {{if eq .Asset.OperationStatus "operating"}}bg-green-100 text-green-700{{else if eq .Asset.OperationStatus "fault"}}bg-red-100 text-red-700{{else}}bg-gray-100 text-gray-600{{end}}">{{opStatusLabel .Asset.OperationStatus}}</span>
     </div>
     <div class="flex gap-2">
+      {{if .CanWrite}}
       <a href="/assets/{{.Asset.AssetID}}/edit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">수정</a>
+      {{end}}
       <a href="/assets/{{.Asset.AssetID}}/sw" class="px-4 py-2 border border-blue-300 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50">SW상세</a>
+      {{if .CanReceive}}
       <a href="/as/new?customer_id={{.Asset.CustomerID}}&asset_id={{.Asset.AssetID}}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">AS접수</a>
+      {{end}}
     </div>
   </div>
 
@@ -47,9 +51,9 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">위치 · 담당</h3>
       <dl class="space-y-2 text-sm">
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">건물명</dt><dd class="text-gray-800">{{.Asset.BuildingName}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">층</dt><dd class="text-gray-800">{{.Asset.FloorName}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">호(실명)</dt><dd class="text-gray-800">{{.Asset.RoomName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">공간정보</dt>
+          <dd class="text-gray-800">{{if or .Asset.LocBuildingName .Asset.LocFloorName .Asset.LocRoomName .Asset.BuildingName .Asset.FloorName .Asset.RoomName}}{{or .Asset.LocBuildingName .Asset.BuildingName}}{{if or .Asset.LocFloorName .Asset.FloorName}} {{or .Asset.LocFloorName .Asset.FloorName}}{{end}}{{if or .Asset.LocRoomName .Asset.RoomName}} {{or .Asset.LocRoomName .Asset.RoomName}}{{end}}{{else}}-{{end}}</dd>
+        </div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">설치위치</dt><dd class="text-gray-800 font-medium">{{if .Asset.InstallLocation}}{{.Asset.InstallLocation}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">상세위치</dt><dd class="text-gray-800">{{.Asset.LocationDetail}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">요청주체</dt><dd class="text-gray-800">{{.Asset.RequesterType}} {{if .Asset.RequesterName}}({{.Asset.RequesterName}}){{end}}</dd></div>
@@ -59,43 +63,6 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">설치 사진 (최대 3장)</h3>
-      <span class="text-xs text-gray-400">{{.ImageCount}}/3</span>
-    </div>
-    <div class="grid grid-cols-3 gap-4">
-      {{range .Images}}
-      <div class="aspect-square rounded-lg border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden relative">
-        {{if .URL}}
-        <a href="{{.URL}}" target="_blank" class="block w-full h-full">
-          <img src="{{.URL}}" alt="{{.Name}}" class="w-full h-full object-cover">
-        </a>
-        {{if $.CanWrite}}
-        <form method="POST" action="/attachments/{{.ID}}/delete" class="absolute top-1 right-1"
-              onsubmit="return confirm('이 사진을 삭제할까요?')">
-          <input type="hidden" name="redirect" value="/assets/{{$.Asset.AssetID}}">
-          <button type="submit" class="px-1.5 py-0.5 bg-black/50 text-white text-xs rounded">삭제</button>
-        </form>
-        {{end}}
-        {{else}}
-        <span class="text-xs text-gray-300">빈칸</span>
-        {{end}}
-      </div>
-      {{end}}
-    </div>
-    {{if and .CanWrite .CanUpload}}
-    <form method="POST" action="/attachments" enctype="multipart/form-data" class="mt-4 flex flex-wrap items-end gap-3">
-      <input type="hidden" name="ref_type" value="asset">
-      <input type="hidden" name="ref_id" value="{{.Asset.AssetID}}">
-      <input type="hidden" name="redirect" value="/assets/{{.Asset.AssetID}}">
-      <div class="flex-1 min-w-[200px]">
-        <label class="block text-xs text-gray-500 mb-1">이미지 업로드</label>
-        <input type="file" name="file" accept="image/*" required class="w-full text-sm">
-      </div>
-      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">업로드</button>
-    </form>
-    {{end}}
-  </div>
+  {{template "asset_image_slots" dict "Asset" .Asset "Images" .Images "ImageCount" .ImageCount "CanWrite" .CanWrite "CanUpload" .CanUpload "Editable" false "Redirect" (printf "/assets/%s" .Asset.AssetID)}}
 </div>
 {{end}}

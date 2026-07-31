@@ -22,14 +22,18 @@
       {{end}}
     </div>
     <div class="flex gap-2">
+      {{if .CanWrite}}
       <a href="/customers/{{.Customer.CustomerID}}/edit"
          class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
         수정
       </a>
+      {{end}}
+      {{if .CanReceive}}
       <a href="/as/new?customer_id={{.Customer.CustomerID}}"
          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
         AS 접수
       </a>
+      {{end}}
     </div>
   </div>
 

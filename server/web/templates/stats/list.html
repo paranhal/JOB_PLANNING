@@ -5,48 +5,188 @@
     <div>
       <h2 class="text-xl font-bold text-gray-800">통계</h2>
       <p class="text-sm text-gray-500 mt-1">
-        리스트 조회 · 기간 {{.PeriodLabel}}{{if .OffsetLabel}} · {{.OffsetLabel}}{{end}} · {{.RowCount}}건
+        {{.MetricLabel}} · {{.ScopeLabel}} · {{.PeriodLabel}}
+        {{if .RangeLabel}} · {{.RangeLabel}}{{end}}
+        · <span class="font-semibold text-gray-700">{{.RowCount}}건</span>
       </p>
-    </div>
-    <div class="flex flex-col items-stretch sm:items-end gap-2">
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <form method="GET" action="/stats" id="stats-period-form" class="flex items-center gap-2">
-          <label class="text-sm text-gray-600">기간</label>
-          <select name="period" onchange="this.form.submit()"
-                  class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            {{range .PeriodOptions}}
-            <option value="{{.Value}}" {{if eq $.Period .Value}}selected{{end}}>{{.Label}}</option>
-            {{end}}
-          </select>
-        </form>
-        <a href="/stats/export.xlsx?period={{.Period}}&offset={{.Offset}}"
-           class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
-          엑셀 다운로드
-        </a>
-      </div>
-
-      {{if .ShowOffset}}
-      <div class="flex flex-wrap items-center justify-between gap-3 w-full sm:min-w-[28rem]">
-        <div class="flex flex-wrap items-center gap-2 text-sm text-gray-700">
-          {{range .RangeLabels}}
-          <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-100 border border-gray-200 font-medium tabular-nums">{{.}}</span>
-          {{end}}
-        </div>
-        <form method="GET" action="/stats" class="flex items-center gap-2">
-          <input type="hidden" name="period" value="{{.Period}}">
-          <select name="offset" onchange="this.form.submit()"
-                  class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-            {{range .OffsetOptions}}
-            <option value="{{.Value}}" {{if eq $.Offset .Value}}selected{{end}}>{{.Label}}</option>
-            {{end}}
-          </select>
-        </form>
-      </div>
+      {{if .OverdueNote}}
+      <p class="text-xs text-red-600 mt-1">지연: 접수일 기준 3일 초과 · 미완료(접수·배정·진행중)</p>
       {{end}}
+    </div>
+    <a href="/stats/export.xlsx?{{.QueryString}}"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shrink-0">
+      엑셀 다운로드
+    </a>
+  </div>
+
+  <!-- 필터 -->
+  <form method="GET" action="/stats" id="stats-filter-form"
+        class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">통계 종류</label>
+        <select name="metric" onchange="this.form.submit()"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .MetricOptions}}
+          <option value="{{.Value}}" {{if eq $.Metric .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">집계 범위</label>
+        <select name="scope" onchange="this.form.submit()"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .ScopeOptions}}
+          <option value="{{.Value}}" {{if eq $.Scope .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">기간 단위</label>
+        <select name="period" onchange="this.form.submit()"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .PeriodOptions}}
+          <option value="{{.Value}}" {{if eq $.Period .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        {{if eq .Period "day"}}
+        <label class="block text-xs text-gray-500 mb-1">날짜</label>
+        <input type="date" name="date" value="{{.Query.Date}}" onchange="this.form.submit()"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        {{else if eq .Period "week"}}
+        <label class="block text-xs text-gray-500 mb-1">주차</label>
+        <select name="date" onchange="this.form.submit()"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .WeekOptions}}
+          <option value="{{.Value}}" {{if eq $.Query.Date .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+        {{else if eq .Period "month"}}
+        <label class="block text-xs text-gray-500 mb-1">월</label>
+        <select name="month" onchange="this.form.submit()"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .MonthOptions}}
+          <option value="{{.Value}}" {{if eq $.Query.Month .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+        {{else if eq .Period "quarter"}}
+        <label class="block text-xs text-gray-500 mb-1">분기</label>
+        <select name="quarter" onchange="this.form.submit()"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .QuarterOptions}}
+          <option value="{{.Value}}" {{if eq $.Query.Quarter .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+        {{else if eq .Period "range"}}
+        <label class="block text-xs text-gray-500 mb-1">기간</label>
+        <div class="flex items-center gap-1">
+          <input type="date" name="from" value="{{.Query.From}}"
+                 class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm">
+          <span class="text-gray-400 text-xs">~</span>
+          <input type="date" name="to" value="{{.Query.To}}"
+                 class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm">
+          <button type="submit" class="px-3 py-2 bg-gray-800 text-white rounded-lg text-xs shrink-0">적용</button>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </form>
+
+  <!-- 건수 요약 -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wider">{{.MetricLabel}} 건수</p>
+      <p class="text-3xl font-bold text-gray-800 mt-1">{{.RowCount}}</p>
+      <p class="text-xs text-gray-400 mt-1">{{.ScopeLabel}} · {{if .RangeLabel}}{{.RangeLabel}}{{else}}{{.PeriodLabel}}{{end}}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wider">담당자 수</p>
+      <p class="text-3xl font-bold text-gray-800 mt-1">{{len .AssigneeGroups}}</p>
+      <p class="text-xs text-gray-400 mt-1">해당 조건에 건이 있는 담당자</p>
     </div>
   </div>
 
-  <p class="text-xs text-gray-400">엑셀은 일별·주간별·월별·분기별·전체 시트로 구성됩니다(각 시트는 현재 기준). 각 시트에 상세 목록과 담당자별·종합이 포함됩니다.</p>
+  {{if eq .Scope "assignee"}}
+  <!-- 담당자별: 사람마다 건 리스트 -->
+  <div class="space-y-4">
+    {{if .AssigneeGroups}}
+    {{range .AssigneeGroups}}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2 bg-gray-50/80">
+        <h3 class="text-sm font-semibold text-gray-800">{{.Assignee}}</h3>
+        <span class="text-sm font-bold text-blue-700">{{.Count}}건</span>
+      </div>
+      <ul class="divide-y divide-gray-100">
+        {{range .Rows}}
+        <li class="px-4 py-3 hover:bg-gray-50">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <a href="/as/{{.ASID}}" class="font-medium text-blue-600 hover:underline shrink-0">{{.ASNumber}}</a>
+              <span class="font-medium text-gray-800">{{.CustomerName}}</span>
+              {{if .ProductModel}}<span class="text-gray-500">· {{.ProductModel}}</span>{{end}}
+              <span class="text-gray-500">· {{.ReceiptForm}}</span>
+              {{if .Symptom}}<span class="text-gray-500 truncate max-w-[20rem]">· {{.Symptom}}</span>{{end}}
+              {{if .ActionTaken}}<span class="text-gray-400 truncate max-w-[16rem]">· 처리: {{.ActionTaken}}</span>{{end}}
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              {{if .ReceiptDate}}<span class="text-[10px] text-gray-400">접수 {{.ReceiptDate}}</span>{{end}}
+              <span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{.StatusLabel}}</span>
+            </div>
+          </div>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
+    <div class="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between text-sm font-semibold text-gray-800">
+      <span>종합</span>
+      <span>{{.AssigneeTotal}}건 · {{len .AssigneeGroups}}명</span>
+    </div>
+    {{else}}
+    <div class="bg-white rounded-xl border border-gray-200 px-4 py-10 text-center text-gray-400 text-sm">
+      해당 조건의 담당자별 데이터가 없습니다.
+    </div>
+    {{end}}
+  </div>
+
+  {{else}}
+  <!-- 팀 전체: 담당자 요약 + 상세 테이블 -->
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700">담당자별 요약</h3>
+      <p class="text-xs text-gray-400 mt-0.5">담당자당 건수 · 맨 아래 종합</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wider">
+          <tr>
+            <th class="px-4 py-2 font-medium">수행담당자</th>
+            <th class="px-4 py-2 font-medium text-right">건수</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .Assignees}}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2 text-gray-800">{{.Assignee}}</td>
+            <td class="px-4 py-2 text-right font-medium text-gray-800">{{.Count}}</td>
+          </tr>
+          {{else}}
+          <tr>
+            <td colspan="2" class="px-4 py-8 text-center text-gray-400">담당자 집계 없음</td>
+          </tr>
+          {{end}}
+          {{if .Assignees}}
+          <tr class="bg-gray-50 font-semibold">
+            <td class="px-4 py-2.5 text-gray-900">종합</td>
+            <td class="px-4 py-2.5 text-right text-gray-900">{{.AssigneeTotal}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="px-4 py-3 border-b border-gray-100">
@@ -86,47 +226,13 @@
           {{end}}
           {{else}}
           <tr>
-            <td colspan="9" class="px-3 py-10 text-center text-gray-400">해당 기간 통계 데이터가 없습니다.</td>
+            <td colspan="9" class="px-3 py-10 text-center text-gray-400">해당 조건의 통계 데이터가 없습니다.</td>
           </tr>
           {{end}}
         </tbody>
       </table>
     </div>
   </div>
-
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100">
-      <h3 class="text-sm font-semibold text-gray-700">담당자별</h3>
-      <p class="text-xs text-gray-400 mt-0.5">담당자당 1행 · 맨 아래 종합</p>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500 uppercase tracking-wider">
-          <tr>
-            <th class="px-4 py-2 font-medium">수행담당자</th>
-            <th class="px-4 py-2 font-medium text-right">건수</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          {{range .Assignees}}
-          <tr class="hover:bg-gray-50">
-            <td class="px-4 py-2 text-gray-800">{{.Assignee}}</td>
-            <td class="px-4 py-2 text-right font-medium text-gray-800">{{.Count}}</td>
-          </tr>
-          {{else}}
-          <tr>
-            <td colspan="2" class="px-4 py-8 text-center text-gray-400">담당자 집계 없음</td>
-          </tr>
-          {{end}}
-          {{if .Assignees}}
-          <tr class="bg-gray-50 font-semibold">
-            <td class="px-4 py-2.5 text-gray-900">종합</td>
-            <td class="px-4 py-2.5 text-right text-gray-900">{{.AssigneeTotal}}</td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {{end}}
 </div>
 {{end}}

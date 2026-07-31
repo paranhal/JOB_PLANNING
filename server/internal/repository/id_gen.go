@@ -9,6 +9,8 @@ import (
 	"unicode"
 )
 
+const idFormatV2MetaKey = "__meta:id_format_v2"
+
 // NextSeq 시퀀스 키에 대한 다음 일련번호(1부터)를 원자적으로 반환한다.
 func NextSeq(db *sql.DB, seqKey string) (int, error) {
 	tx, err := db.Begin()
@@ -38,9 +40,8 @@ func NextSeq(db *sql.DB, seqKey string) (int, error) {
 	return last, nil
 }
 
-func fmtSeq(n int) string {
-	return fmt.Sprintf("%04d", n)
-}
+func fmtSeq3(n int) string { return fmt.Sprintf("%03d", n) }
+func fmtSeq2(n int) string { return fmt.Sprintf("%02d", n) }
 
 // ExtractAreaCode 대표전화에서 지역번호 추출 (02 또는 0xx). 없으면 000.
 func ExtractAreaCode(phone string) string {
@@ -103,19 +104,19 @@ func ProductTypeCode(productType string) string {
 	}
 }
 
-// NextCustomerID 고객번호: {지역}-{YYYY}-{NNNN}
+// NextCustomerID 고객번호: C{지역코드}-{YY}-{NNN}
 func NextCustomerID(db *sql.DB, mainPhone string) (string, error) {
 	area := ExtractAreaCode(mainPhone)
-	year := time.Now().Format("2006")
-	key := fmt.Sprintf("customer:%s:%s", area, year)
+	yy := time.Now().Format("06")
+	key := fmt.Sprintf("customer:%s:%s", area, yy)
 	n, err := NextSeq(db, key)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s-%s-%s", area, year, fmtSeq(n)), nil
+	return fmt.Sprintf("C%s-%s-%s", area, yy, fmtSeq3(n)), nil
 }
 
-// NextAssetID 설치자산: {모델}-{구분}-{NNNN}
+// NextAssetID 설치자산: A{모델코드}{구분}-{NNN}
 func NextAssetID(db *sql.DB, modelName, productName, productType string) (string, error) {
 	model := NormalizeModelCode(modelName, productName)
 	code := ProductTypeCode(productType)
@@ -124,27 +125,36 @@ func NextAssetID(db *sql.DB, modelName, productName, productType string) (string
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s-%s-%s", model, code, fmtSeq(n)), nil
+	return fmt.Sprintf("A%s%s-%s", model, code, fmtSeq3(n)), nil
 }
 
-// NextASNumber 접수번호: {YYYYMM}-{NNNN} (as_id와 as_number 동일 사용)
+// NextASNumber 접수번호: R{YYMM}-{NNN} (as_id와 as_number 동일)
 func NextASNumber(db *sql.DB, at time.Time) (string, error) {
-	ym := at.Format("200601")
+	ym := at.Format("0601")
 	key := fmt.Sprintf("as:%s", ym)
 	n, err := NextSeq(db, key)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s-%s", ym, fmtSeq(n)), nil
+	return fmt.Sprintf("R%s-%s", ym, fmtSeq3(n)), nil
 }
 
-// NextProcessNumber 처리번호: {접수번호}-{YYYYMM}-{NNNN}
-func NextProcessNumber(db *sql.DB, asNumber string, at time.Time) (string, error) {
-	ym := at.Format("200601")
-	key := fmt.Sprintf("process:%s:%s", asNumber, ym)
+// NextProcessNumber 처리번호: {접수번호}-P{NN}
+func NextProcessNumber(db *sql.DB, asNumber string, _ time.Time) (string, error) {
+	key := fmt.Sprintf("process:%s", asNumber)
 	n, err := NextSeq(db, key)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s-%s-%s", asNumber, ym, fmtSeq(n)), nil
+	return fmt.Sprintf("%s-P%s", asNumber, fmtSeq2(n)), nil
+}
+
+// NextWorkNumber 하부업무번호: {접수번호}-W{NN}
+func NextWorkNumber(db *sql.DB, asNumber string) (string, error) {
+	key := fmt.Sprintf("work:%s", asNumber)
+	n, err := NextSeq(db, key)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s-W%s", asNumber, fmtSeq2(n)), nil
 }

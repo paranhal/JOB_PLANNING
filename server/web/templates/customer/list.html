@@ -32,6 +32,7 @@
           엑셀 다운로드
         </button>
       </form>
+      {{if .CanWrite}}
       <a href="/customers/new"
          class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,6 +40,7 @@
         </svg>
         고객 등록
       </a>
+      {{end}}
     </div>
   </div>
 
@@ -203,7 +205,7 @@
                 {{if or .Search .Category .Industry}}
                   조건에 맞는 고객이 없습니다.
                 {{else}}
-                  등록된 고객이 없습니다. <a href="/customers/new" class="text-blue-600 hover:underline">첫 번째 고객을 등록하세요.</a>
+                  등록된 고객이 없습니다.{{if $.CanWrite}} <a href="/customers/new" class="text-blue-600 hover:underline">첫 번째 고객을 등록하세요.</a>{{end}}
                 {{end}}
               </td>
             </tr>

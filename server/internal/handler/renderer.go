@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+
+	"customer-support/internal/model"
 )
 
 type TemplateRenderer struct{}
@@ -21,6 +23,11 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	}
 	if strings.HasPrefix(name, "as/") {
 		if partials, err := filepath.Glob("web/templates/as/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if strings.HasPrefix(name, "asset/") {
+		if partials, err := filepath.Glob("web/templates/asset/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
 	}
@@ -86,6 +93,14 @@ func funcMap() template.FuncMap {
 			}
 			return false
 		},
+		"dict": func(pairs ...interface{}) map[string]interface{} {
+			m := make(map[string]interface{}, len(pairs)/2)
+			for i := 0; i+1 < len(pairs); i += 2 {
+				key, _ := pairs[i].(string)
+				m[key] = pairs[i+1]
+			}
+			return m
+		},
 		"sub": func(a, b int) int { return a - b },
 		"mul": func(a, b int) int { return a * b },
 		"min": func(a, b int) int {
@@ -112,6 +127,26 @@ func funcMap() template.FuncMap {
 				return l
 			}
 			return s
+		},
+		"workKindLabel": func(s string) string {
+			return model.WorkKindLabel(s)
+		},
+		"workPrefixLabel": func(s string) string {
+			return model.WorkPrefixLabel(s)
+		},
+		"workPrefixClass": func(s string) string {
+			switch s {
+			case model.WorkPrefixAS:
+				return "bg-blue-100 text-blue-800"
+			case model.WorkPrefixConfirm:
+				return "bg-purple-100 text-purple-800"
+			case model.WorkPrefixMaintenance:
+				return "bg-slate-100 text-slate-800"
+			case model.WorkPrefixGeneral:
+				return "bg-emerald-100 text-emerald-800"
+			default:
+				return "bg-gray-100 text-gray-700"
+			}
 		},
 		"holdNextLabel": func(s string) string {
 			m := map[string]string{

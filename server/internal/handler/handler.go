@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -17,6 +18,7 @@ type Handler struct {
 	SWDetail       *SWDetailHandler
 	Relation       *RelationHandler
 	AS             *ASHandler
+	Work           *WorkHandler
 	Stats          *StatsHandler
 	WorkStatus     *WorkStatusHandler
 	Analysis       *AnalysisHandler
@@ -27,6 +29,7 @@ type Handler struct {
 
 	customerRepo *repository.CustomerRepo
 	asRepo       *repository.ASRepo
+	workBoard    *repository.WorkBoardRepo
 	assetRepo    *repository.AssetRepo
 	attachRepo   *repository.AttachmentRepo
 }
@@ -37,6 +40,7 @@ func New(db *sql.DB) *Handler {
 	contactHistRepo := repository.NewContactHistoryRepo(db)
 	asRepo := repository.NewASRepo(db)
 	asProcessRepo := repository.NewASProcessRepo(db)
+	asWorkRepo := repository.NewASWorkRepo(db)
 	assetRepo := repository.NewAssetRepo(db)
 	spaceRepo := repository.NewSpaceRepo(db)
 	codeRepo := repository.NewCodeRepo(db)
@@ -46,6 +50,7 @@ func New(db *sql.DB) *Handler {
 	userRepo := repository.NewUserRepo(db)
 	maintRepo := repository.NewMaintenanceRepo(db)
 	statsRepo := repository.NewStatsRepo(db)
+	workBoardRepo := repository.NewWorkBoardRepo(db)
 
 	jwtSecret := []byte("cs-system-jwt-secret-2026")
 
@@ -70,23 +75,25 @@ func New(db *sql.DB) *Handler {
 		SWDetail: &SWDetailHandler{repo: swDetailRepo},
 		Relation: &RelationHandler{repo: relationRepo, customerRepo: customerRepo, codeRepo: codeRepo},
 		AS: &ASHandler{
-			repo: asRepo, processRepo: asProcessRepo,
+			repo: asRepo, processRepo: asProcessRepo, workRepo: asWorkRepo,
 			customerRepo: customerRepo, assetRepo: assetRepo,
 			contactRepo: contactRepo, codeRepo: codeRepo,
 			userRepo: userRepo, relationRepo: relationRepo,
 		},
-		Stats:    NewStatsHandler(statsRepo),
+		Work:       NewWorkHandler(workBoardRepo),
+		Stats:      NewStatsHandler(statsRepo),
 		WorkStatus: NewWorkStatusHandler(repository.NewWorkStatusRepo(db)),
-		Analysis: &AnalysisHandler{db: db},
-		Code:     &CodeHandler{repo: codeRepo},
+		Analysis:   &AnalysisHandler{db: db},
+		Code:       &CodeHandler{repo: codeRepo},
 		Attachment: &AttachmentHandler{repo: attachRepo, uploadDir: "data/uploads"},
-		Auth:     &AuthHandler{userRepo: userRepo, jwtSecret: jwtSecret},
+		Auth:       &AuthHandler{userRepo: userRepo, jwtSecret: jwtSecret},
 		Maintenance: &MaintenanceHandler{
 			repo: maintRepo, customerRepo: customerRepo,
 		},
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
+		workBoard:    workBoardRepo,
 		assetRepo:    assetRepo,
 		attachRepo:   attachRepo,
 	}
@@ -109,10 +116,23 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		})
 	}
 
-	var totalCustomers, totalAssets int
-	h.customerRepo.CountActive(&totalCustomers)
-	h.assetRepo.CountOperating(&totalAssets)
+	mineUID, mineK := "", []string(nil)
+	mine := false
+	if role == "tech" {
+		mineUID, mineK = userID, mineKeys
+		mine = true
+	}
 
+	stats, err := h.workBoard.DashStats(mineUID, mineK)
+	if err != nil {
+		return err
+	}
+	todayList, _ := h.workBoard.ListBucket(model.WorkBucketToday, mineUID, mineK, 10)
+	delayedList, _ := h.workBoard.ListBucket(model.WorkBucketDelayed, mineUID, mineK, 8)
+	pendingList, _ := h.workBoard.ListBucket(model.WorkBucketSchedulePending, mineUID, mineK, 8)
+	unassignedList, _ := h.workBoard.ListBucket(model.WorkBucketUnassigned, "", nil, 8)
+
+	showAssignee := role == "admin" || role == "receipt"
 	data := map[string]interface{}{
 		"Title":               "대시보드",
 		"Active":              "dashboard",
@@ -120,108 +140,47 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		"RoleLabel":           roleLabelText(role),
 		"DisplayName":         userName,
 		"LoginID":             username,
-		"TotalCustomers":      totalCustomers,
-		"TotalAssets":         totalAssets,
-		"ShowASStats":         true,
-		"ShowCustomers":       false,
-		"ShowAssets":          false,
-		"ShowSales":           false,
-		"ShowAssigned":        false,
-		"ShowAssigneeStats":   true,
-		"ShowSchedulePending": true,
-		"ReadOnly":            false,
-		"MineQuery":           "",
-		"ProgressHref":        "/as?status=in_progress",
-		"OverdueHref":         "/as?status=overdue",
-		"TotalHref":           "/as",
-		"WeekElapsedDays":     repository.WeekElapsedDays(),
+		"WorkStats":      stats,
+		"OpenHref":       workListURL(model.WorkBucketOpen, mine, role),
+		"TodayHref":      workListURL(model.WorkBucketToday, mine, role),
+		"DelayedHref":    workListURL(model.WorkBucketDelayed, mine, role),
+		"CompletedHref":  workListURL(model.WorkBucketCompletedToday, mine, role),
+		"PendingHref":    workListURL(model.WorkBucketSchedulePending, mine, role),
+		"UnassignedHref": workListURL(model.WorkBucketUnassigned, false, role),
+		"TodayList":      todayList,
+		"DelayedList":    delayedList,
+		"PendingList":    pendingList,
+		"UnassignedList": unassignedList,
+		"ShowAssignee":   showAssignee,
+		"ScopeMine":      mine,
 	}
 
 	switch role {
 	case "admin":
-		stats, err := h.asRepo.DashboardStats("", nil)
-		if err != nil {
-			return err
-		}
-		data["Stats"] = stats
-		pending, pendingTotal, _ := h.asRepo.ListSchedulePending("", nil, 15)
-		data["SchedulePending"] = pending
-		data["SchedulePendingTotal"] = pendingTotal
-		recentAS, _, _ := h.asRepo.List("", "", 1, 5)
-		data["RecentAS"] = recentAS
-		data["ListTitle"] = "최근 AS 접수"
-		data["ShowCustomers"] = true
-		data["ShowAssets"] = true
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
-			{Href: "/customers/new", Label: "고객 등록", Tone: "green"},
-			{Href: "/assets/new", Label: "자산 등록", Tone: "purple"},
-			{Href: "/analysis", Label: "교체 분석", Tone: "orange"},
+			{Href: "/work?bucket=today", Label: "오늘 예정", Tone: "sky"},
+			{Href: "/work?bucket=unassigned", Label: "미배정", Tone: "amber"},
 			{Href: "/maintenance", Label: "정기점검", Tone: "slate"},
-			{Href: "/as/stats", Label: "AS 현황", Tone: "indigo"},
+			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
 		}
-
 	case "receipt":
-		stats, err := h.asRepo.DashboardStats("", nil)
-		if err != nil {
-			return err
-		}
-		data["Stats"] = stats
-		pending, pendingTotal, _ := h.asRepo.ListSchedulePending("", nil, 15)
-		data["SchedulePending"] = pending
-		data["SchedulePendingTotal"] = pendingTotal
-		recentAS, _, _ := h.asRepo.List("today", "", 1, 8)
-		if len(recentAS) == 0 {
-			recentAS, _, _ = h.asRepo.List("", "", 1, 8)
-		}
-		data["RecentAS"] = recentAS
-		data["ListTitle"] = "오늘·최근 AS 접수"
-		data["ShowCustomers"] = true
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
+			{Href: "/work?bucket=today", Label: "오늘 예정", Tone: "sky"},
+			{Href: "/work?bucket=unassigned", Label: "미배정", Tone: "amber"},
 			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
-			{Href: "/as/stats", Label: "AS 현황", Tone: "slate"},
 			{Href: "/customers", Label: "고객현황", Tone: "green"},
 		}
-
 	case "tech":
-		mineStats, err := h.asRepo.DashboardStats(userID, mineKeys)
-		if err != nil {
-			return err
-		}
-		data["Stats"] = mineStats
-		data["MineQuery"] = "&mine=1"
-		data["TotalHref"] = "/as?mine=1"
-		data["ProgressHref"] = "/as?status=in_progress&mine=1"
-		data["OverdueHref"] = "/as?status=overdue&mine=1"
-		pending, pendingTotal, _ := h.asRepo.ListSchedulePending(userID, mineKeys, 15)
-		data["SchedulePending"] = pending
-		data["SchedulePendingTotal"] = pendingTotal
-		assigned, assignedTotal, _ := h.asRepo.ListAssignedOpen(userID, mineKeys, 1, 8)
-		data["RecentAS"] = assigned
-		data["ListTitle"] = "내 배정 AS (미완료)"
-		data["AssignedAS"] = assigned
-		data["AssignedTotal"] = assignedTotal
-		data["ShowAssigned"] = true
-		data["ShowAssets"] = true
 		data["QuickLinks"] = []dashLink{
+			{Href: workListURL(model.WorkBucketToday, true, role), Label: "오늘 예정", Tone: "sky"},
+			{Href: workListURL(model.WorkBucketDelayed, true, role), Label: "지연 업무", Tone: "red"},
+			{Href: workListURL(model.WorkBucketOpen, true, role), Label: "내 전체 업무", Tone: "yellow"},
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
-			{Href: "/as?status=open&mine=1", Label: "내 미처리", Tone: "yellow"},
-			{Href: "/as?status=overdue&mine=1", Label: "내 지연", Tone: "red"},
 			{Href: "/assets", Label: "설치자산", Tone: "purple"},
-			{Href: "/maintenance", Label: "정기점검", Tone: "slate"},
-			{Href: "/as/stats", Label: "AS 현황", Tone: "indigo"},
 		}
-
-	default:
-		return c.Render(200, "auth/coming_soon.html", map[string]interface{}{
-			"Title": "준비 중", "Active": "dashboard",
-			"Role": role, "RoleLabel": roleLabelText(role),
-		})
 	}
-
-	assigneeStats, _ := h.asRepo.AssigneeDashboardStats()
-	data["AssigneeStats"] = assigneeStats
 
 	return c.Render(200, "dashboard.html", data)
 }

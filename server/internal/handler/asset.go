@@ -39,6 +39,7 @@ func (h *AssetHandler) List(c echo.Context) error {
 		"Page": page, "TotalPages": totalPages,
 		"Search": search, "CustomerID": customerID,
 		"Customers": customers,
+		"CanWrite": canWriteMaster(c),
 	})
 }
 
@@ -91,25 +92,51 @@ func (h *AssetHandler) Show(c echo.Context) error {
 	if a == nil {
 		return echo.ErrNotFound
 	}
-	atts, _ := h.attachRepo.ListByRef("asset", id)
-	images := make([]map[string]string, 0, 3)
-	for _, att := range atts {
-		if len(images) >= 3 {
-			break
-		}
-		url := attachmentPublicURL(att.FilePath)
-		images = append(images, map[string]string{
-			"ID": att.AttachmentID, "Name": att.FileName, "URL": url,
-		})
-	}
-	for len(images) < 3 {
-		images = append(images, map[string]string{})
-	}
+	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 	return c.Render(http.StatusOK, "asset/show.html", map[string]interface{}{
 		"Title": a.ProductName, "Active": "assets", "Asset": a,
-		"Images": images, "ImageCount": len(atts), "CanUpload": len(atts) < 3,
-		"CanWrite": canWriteMaster(c),
+		"Images": slots, "ImageCount": filled, "CanUpload": filled < 3,
+		"CanWrite": canWriteMaster(c), "CanReceive": canReceiveAS(c),
 	})
+}
+
+func buildAssetImageSlots(repo *repository.AttachmentRepo, assetID string) ([]model.AssetImageSlot, int) {
+	atts, _ := repo.ListByRef("asset", assetID)
+	bySlot := map[int]model.Attachment{}
+	unslotted := []model.Attachment{}
+	for _, att := range atts {
+		if att.SlotNo >= 1 && att.SlotNo <= 3 {
+			bySlot[att.SlotNo] = att
+		} else {
+			unslotted = append(unslotted, att)
+		}
+	}
+	// 슬롯 없는 구 데이터는 빈 슬롯에 순서대로 배치(표시용)
+	next := 1
+	for _, att := range unslotted {
+		for next <= 3 {
+			if _, ok := bySlot[next]; !ok {
+				bySlot[next] = att
+				next++
+				break
+			}
+			next++
+		}
+	}
+	slots := make([]model.AssetImageSlot, 0, 3)
+	filled := 0
+	for i := 1; i <= 3; i++ {
+		s := model.AssetImageSlot{Slot: i}
+		if att, ok := bySlot[i]; ok {
+			filled++
+			s.ID = att.AttachmentID
+			s.Name = att.FileName
+			s.URL = attachmentPublicURL(att.FilePath)
+			s.Keywords = att.Keywords
+		}
+		slots = append(slots, s)
+	}
+	return slots, filled
 }
 
 func attachmentPublicURL(filePath string) string {
@@ -121,7 +148,7 @@ func attachmentPublicURL(filePath string) string {
 	if strings.HasPrefix(p, "uploads/") {
 		return "/" + p
 	}
-	return "/attachments/" // fallback — prefer download by id from template
+	return ""
 }
 
 func (h *AssetHandler) Edit(c echo.Context) error {
@@ -140,6 +167,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	maintContractTypes, _ := h.codeRepo.ActiveByGroup("maint_contract_type")
 	maintCycles, _ := h.codeRepo.ActiveByGroup("maint_cycle")
 	maintBillingCycles, _ := h.codeRepo.ActiveByGroup("maint_billing_cycle")
+	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
 		"Title": "자산 수정", "Active": "assets", "IsNew": false,
@@ -150,6 +178,8 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 		"OpStatuses": opStatuses,
 		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
 		"MaintBillingCycles": maintBillingCycles,
+		"Images": slots, "ImageCount": filled, "CanUpload": filled < 3,
+		"CanWrite": canWriteMaster(c),
 	})
 }
 
