@@ -15,8 +15,32 @@ func TestApplyActionResult_Revisit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if as.Status != "in_progress" || as.VisitScheduledDate != "2026-08-05" || !as.ScheduleConfirmed {
+	if as.Status != StatusPartialComplete || as.VisitScheduledDate != "2026-08-05" || !as.ScheduleConfirmed {
 		t.Fatalf("unexpected: %+v", as)
+	}
+	if as.CompleteDatetime == nil {
+		t.Fatal("partial complete must set complete_datetime for stats")
+	}
+	if len(out.WorkItems) != 1 || out.WorkItems[0].WorkKind != WorkKindRevisit {
+		t.Fatalf("work: %+v", out.WorkItems)
+	}
+	if !IsOpenIncompleteStatus(as.Status) || !IsStatsCompletedStatus(as.Status) {
+		t.Fatal("partial_complete should be open ops + stats completed")
+	}
+}
+
+func TestApplyActionResult_Partial(t *testing.T) {
+	now := time.Date(2026, 7, 31, 10, 0, 0, 0, time.Local)
+	as := &ASReceipt{ResultCode: ResultPartial, RevisitReason: "추가확인"}
+	if _, err := ApplyActionResult(as, ActionApplyInput{}, now); err != ErrRevisitDateRequired {
+		t.Fatalf("want date required, got %v", err)
+	}
+	out, err := ApplyActionResult(as, ActionApplyInput{NextDate: "2026-08-10"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if as.Status != StatusPartialComplete || as.CompleteDatetime == nil {
+		t.Fatalf("partial: %+v", as)
 	}
 	if len(out.WorkItems) != 1 || out.WorkItems[0].WorkKind != WorkKindRevisit {
 		t.Fatalf("work: %+v", out.WorkItems)
@@ -42,8 +66,8 @@ func TestApplyActionResult_TransferWaitingAndDone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if as.Status != "in_progress" || len(out.WorkItems) != 1 || out.WorkItems[0].WorkKind != WorkKindConfirm {
-		t.Fatalf("waiting: status=%s work=%+v", as.Status, out.WorkItems)
+	if as.Status != StatusPartialComplete || as.CompleteDatetime == nil || len(out.WorkItems) != 1 || out.WorkItems[0].WorkKind != WorkKindConfirm {
+		t.Fatalf("waiting: status=%s complete=%v work=%+v", as.Status, as.CompleteDatetime, out.WorkItems)
 	}
 
 	as2 := &ASReceipt{ResultCode: ResultTransfer}
@@ -64,12 +88,18 @@ func TestApplyActionResult_TransferWaitingAndDone(t *testing.T) {
 }
 
 func TestIsOpenIncompleteStatus(t *testing.T) {
-	for _, s := range []string{"received", "assigned", "in_progress", "hold", "transfer"} {
+	for _, s := range []string{"received", "assigned", "in_progress", "hold", "transfer", StatusPartialComplete} {
 		if !IsOpenIncompleteStatus(s) {
 			t.Fatalf("%s should be open", s)
 		}
 	}
 	if IsOpenIncompleteStatus("completed") {
 		t.Fatal("completed should not be open")
+	}
+	if CanReopenAS(StatusPartialComplete) {
+		t.Fatal("partial_complete is not reopen target")
+	}
+	if MapASStatusToWB(StatusPartialComplete) != WBTaskInProgress {
+		t.Fatal("partial_complete should map to workboard in_progress")
 	}
 }

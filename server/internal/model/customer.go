@@ -23,6 +23,8 @@ type Customer struct {
 	AddressDetail    string    `json:"address_detail"`     // 상세주소
 	IsActive         bool      `json:"is_active"`
 	Notes            string    `json:"notes"`
+	NeedsReview      bool      `json:"needs_review"`  // 자동 생성·미매칭 등으로 사람이 확인해야 하는 기관
+	ReviewReason     string    `json:"review_reason"` // 확인이 필요한 이유
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 
@@ -144,6 +146,8 @@ type CustomerListItem struct {
 	Address          string `json:"address,omitempty"`      // 엑셀·지역필터용(조합 또는 구주소)
 	AddrSido         string `json:"addr_sido,omitempty"`    // 시도(구조화)
 	SiteRegion       string `json:"site_region,omitempty"` // 점검사이트 지역
+	NeedsReview      bool   `json:"needs_review,omitempty"`
+	ReviewReason     string `json:"review_reason,omitempty"`
 }
 
 // CustomerCategory 고객현황 상위기관 카테고리(콤보)

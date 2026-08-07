@@ -26,6 +26,10 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	refID := c.FormValue("ref_id")
 	keywords := strings.TrimSpace(c.FormValue("keywords"))
 
+	if !canUploadAttachment(c, refType) {
+		return echo.ErrForbidden
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		return c.String(http.StatusBadRequest, "파일이 필요합니다")
@@ -112,8 +116,21 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, redirect)
 }
 
+func canUploadAttachment(c echo.Context, refType string) bool {
+	switch strings.TrimSpace(refType) {
+	case "as":
+		return canProcessAS(c) || canWriteMaster(c)
+	default:
+		return canWriteMaster(c)
+	}
+}
+
 func (h *AttachmentHandler) UpdateKeywords(c echo.Context) error {
 	id := c.Param("id")
+	att, _ := h.repo.GetByID(id)
+	if att != nil && !canUploadAttachment(c, att.RefType) {
+		return echo.ErrForbidden
+	}
 	keywords := strings.TrimSpace(c.FormValue("keywords"))
 	if err := h.repo.UpdateKeywords(id, keywords); err != nil {
 		return err
@@ -136,6 +153,9 @@ func (h *AttachmentHandler) Download(c echo.Context) error {
 func (h *AttachmentHandler) Delete(c echo.Context) error {
 	att, _ := h.repo.GetByID(c.Param("id"))
 	if att != nil {
+		if !canUploadAttachment(c, att.RefType) {
+			return echo.ErrForbidden
+		}
 		os.Remove(att.FilePath)
 	}
 	h.repo.Delete(c.Param("id"))

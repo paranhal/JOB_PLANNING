@@ -1,0 +1,349 @@
+{{define "title"}}일일 업무 등록{{end}}
+{{define "content"}}
+<div class="-mx-1 sm:-mx-2 space-y-3"
+     x-data="{
+       taskOpen: false,
+       projectOpen: false,
+       dailyKind: '',
+       preselect: '',
+       preDue: '{{.Date}}',
+       preWork: '{{.Date}}',
+       preStart: '09:00',
+       preEnd: '09:30',
+       asQ: '',
+       mntQ: '',
+       sel: null,
+       addMinutes(hhmm, mins) {
+         const p = (hhmm || '09:00').split(':');
+         let t = (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0) + (mins||0);
+         if (t > 20*60) t = 20*60;
+         if (t < 0) t = 0;
+         return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0');
+       },
+       pick(el) {
+         const d = el.dataset;
+         if (this.sel && this.sel.kind === d.kind && this.sel.ref === d.ref) { this.sel = null; return; }
+         this.sel = {
+           kind: d.kind, ref: d.ref, title: d.title || '', assignee: d.assignee || '',
+           duration: d.duration || '30', href: d.href || '', edit: d.edit || '',
+           zone: d.zone || '', workDate: d.workDate || ''
+         };
+       },
+       isPicked(kind, ref) {
+         return this.sel && this.sel.kind === kind && this.sel.ref === ref;
+       },
+       place(el) {
+         if (!this.sel) return;
+         const date = el.dataset.date;
+         // 월간 칸은 시각 없음 → 서버가 담당자 기준 빈 슬롯 배정
+         const time = (el.dataset.time === undefined || el.dataset.time === null) ? '09:00' : el.dataset.time;
+         if (this.sel.zone === 'grid' || this.sel.kind === 'task') {
+           const f = this.$refs.placeForm;
+           f.kind.value = this.sel.kind;
+           f.ref_id.value = this.sel.ref;
+           f.title.value = this.sel.title;
+           f.assignee.value = this.sel.assignee;
+           f.duration_min.value = this.sel.duration || '30';
+           f.work_date.value = date;
+           f.start_time.value = time;
+           f.end_time.value = time ? this.addMinutes(time, parseInt(this.sel.duration||'30',10)||30) : '';
+           f.submit();
+           return;
+         }
+         if (this.sel.kind === 'as' || this.sel.kind === 'maintenance') {
+           this.preDue = date;
+           this.preWork = this.sel.workDate || date;
+           this.preStart = time || '09:00';
+           this.preEnd = this.addMinutes(this.preStart, 30);
+           this.openDaily(this.sel.kind, this.sel.ref, true);
+         }
+       },
+       openWork(el) {
+         const href = el.dataset.href;
+         if (href) { window.location.href = href; return; }
+         const d = el.dataset;
+         if (d.kind === 'as' || d.kind === 'maintenance') {
+           this.openDaily(d.kind, d.ref, false);
+         }
+       },
+       editWork(el) {
+         const href = el.dataset.edit;
+         if (href) window.location.href = href;
+       },
+       openDaily(kind, ref, keepPrefill) {
+         if (!keepPrefill) {
+           this.preDue = '{{.Date}}';
+           this.preWork = '{{.Date}}';
+           this.preStart = '09:00';
+           this.preEnd = '09:30';
+         }
+         this.dailyKind = kind === 'as' || kind === 'maintenance' ? kind : '';
+         this.preselect = ref || '';
+         this.taskOpen = true;
+       },
+       openTaskModal() {
+         this.dailyKind = '';
+         this.preselect = '';
+         this.preDue = '{{.Date}}';
+         this.preWork = '{{.Date}}';
+         this.preStart = '09:00';
+         this.preEnd = '09:30';
+         this.taskOpen = true;
+       }
+     }">
+
+  {{if .FlashOK}}
+  <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-sm text-emerald-800 shadow-sm">
+    {{if eq .FlashOK "place"}}업무가 시간표에 배치되었습니다.{{else if eq .FlashOK "unplace"}}업무를 시간표에서 내렸습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else}}저장되었습니다.{{end}}
+  </div>
+  {{end}}
+  {{if .FlashErr}}
+  <div class="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 shadow-sm">
+    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else}}업무명과 일자를 입력해 주세요.{{end}}
+  </div>
+  {{end}}
+
+  {{/* 툴바 — Figma/스크린샷: 제목·범례·뷰·날짜를 한 줄 구성 */}}
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-xl font-bold text-slate-900 tracking-tight">{{.ViewLabel}}</h2>
+          <form method="GET" action="/workboard/register" class="inline-flex">
+            <input type="hidden" name="view" value="{{.View}}">
+            <input type="hidden" name="date" value="{{.Date}}">
+            <label class="sr-only" for="reg-assignee">담당자</label>
+            <select id="reg-assignee" name="assignee" onchange="this.form.submit()"
+                    class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[7.5rem]">
+              <option value="" {{if eq .AssigneeFilter ""}}selected{{end}}>팀전체</option>
+              {{range .Assignees}}
+              <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
+              {{end}}
+            </select>
+          </form>
+        </div>
+        <p class="text-[12px] text-slate-500 mt-1">
+          {{.PeriodLabel}} · 07:00~20:00 15분 단위 · 배치 <span class="font-semibold text-slate-700">{{.PlacedCount}}</span>건
+          {{if .AssigneeFilter}} · <span class="text-blue-700 font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
+          · 예정일은 07:00부터 순차 표시
+        </p>
+        <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-600">
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#16a34a"></span>앤로보틱스</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#2563eb"></span>K-LAS</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#9333ea"></span>세종 K-LAS</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#ea580c"></span>행정·AS</span>
+        </div>
+        {{if .AssigneeLegend}}
+        <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-600">
+          <span class="text-slate-400 shrink-0">담당자</span>
+          {{range .AssigneeLegend}}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border" style="background-color:{{.Soft}};border-color:{{.Border}};border-left-width:3px">
+            <span class="font-medium" style="color:{{.Border}}">{{.Name}}</span>
+          </span>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+          <a href="/workboard/register?view=day&date={{.Date}}{{.AssigneeQ}}"
+             class="px-3 py-1.5 text-xs font-semibold {{if eq .View "day"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">일일</a>
+          <a href="/workboard/register?view=week&date={{.Date}}{{.AssigneeQ}}"
+             class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .View "week"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">주간</a>
+          <a href="/workboard/register?view=month&date={{.Date}}{{.AssigneeQ}}"
+             class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .View "month"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">월간</a>
+        </div>
+        <div class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-0.5 shadow-sm">
+          <a href="/workboard/register?view={{.View}}&date={{.PrevDate}}{{.AssigneeQ}}"
+             class="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md" title="이전">←</a>
+          <form method="GET" action="/workboard/register" class="flex items-center">
+            <input type="hidden" name="view" value="{{.View}}">
+            {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
+            <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
+                   class="border-0 bg-transparent px-1 py-1 text-xs text-slate-700 focus:ring-0">
+          </form>
+          <a href="/workboard/register?view={{.View}}&date={{.NextDate}}{{.AssigneeQ}}"
+             class="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md" title="다음">→</a>
+          <a href="/workboard/register?view={{.View}}&date={{.Today}}{{.AssigneeQ}}"
+             class="px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-md">오늘</a>
+        </div>
+        {{if .CanWrite}}
+        <button type="button" @click="openTaskModal()"
+                class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/20">
+          + 일일 업무 등록
+        </button>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  {{if .CanWrite}}
+  <form method="post" action="/workboard/schedule" x-ref="placeForm" class="hidden">
+    <input type="hidden" name="redirect" value="/workboard/register?view={{.View}}&date={{.Date}}{{.AssigneeQ}}">
+    <input type="hidden" name="kind">
+    <input type="hidden" name="ref_id">
+    <input type="hidden" name="title">
+    <input type="hidden" name="assignee">
+    <input type="hidden" name="duration_min">
+    <input type="hidden" name="work_date">
+    <input type="hidden" name="start_time">
+    <input type="hidden" name="end_time">
+  </form>
+
+  <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900 shadow-sm"
+       x-show="sel" x-cloak>
+    <span class="font-semibold" x-text="sel ? sel.title : ''"></span>
+    <span class="text-blue-700/80"> 선택됨 · 시간표 칸을 클릭하면 그 시각으로 배정됩니다.</span>
+    <button type="button" @click="sel=null" class="ml-2 font-medium underline decoration-blue-400 hover:text-blue-950">선택 해제</button>
+  </div>
+  {{end}}
+
+  <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] gap-3 items-start">
+
+    {{if eq .View "month"}}
+    {{/* 월간 캘린더 (피그마형) */}}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center">
+        {{range list "일" "월" "화" "수" "목" "금" "토"}}
+        <div class="px-1 py-2 text-[11px] font-bold text-slate-500 border-r border-slate-100 last:border-r-0 {{if or (eq . "일") (eq . "토")}}text-rose-400{{end}}">{{.}}</div>
+        {{end}}
+      </div>
+      <div class="divide-y divide-slate-100">
+        {{range .MonthWeeks}}
+        <div class="grid grid-cols-7 min-h-[7.5rem]">
+          {{range .}}
+          <div class="relative border-r border-slate-50 last:border-r-0 p-1.5 min-h-[7.5rem] {{if not .InMonth}}bg-slate-50/60{{else if .IsToday}}bg-blue-50/40{{else}}bg-white{{end}} {{if .InMonth}}hover:bg-blue-50/50 cursor-pointer{{end}} transition-colors"
+               {{if .InMonth}}data-date="{{.Date}}" data-time=""
+               @click="place($event.currentTarget)"
+               @dragover.prevent
+               @drop.prevent="place($event.currentTarget)"{{end}}>
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-[11px] font-semibold {{if not .InMonth}}text-slate-300{{else if .IsToday}}text-blue-700{{else if .IsWeekend}}text-rose-500{{else}}text-slate-700{{end}}">{{.DayNum}}</span>
+              {{if and .InMonth (gt .Total 0)}}
+              <span class="text-[9px] text-slate-400 tabular-nums">{{.Total}}건</span>
+              {{end}}
+            </div>
+            {{if and .InMonth (gt .Unassigned 0)}}
+            <span class="inline-flex mb-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-orange-100 text-orange-700">미배정 {{.Unassigned}}</span>
+            {{end}}
+            <div class="space-y-0.5">
+              {{range .Visible}}
+              <div class="truncate rounded px-1 py-0.5 text-[10px] leading-tight border border-black/5 cursor-pointer"
+                   {{if .ProductType}}style="{{mntProductStyle .ProductType}}"{{else}}style="background-color:#ffedd5;border-left:3px solid #ea580c"{{end}}
+                   data-kind="task" data-ref="{{.TaskID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
+                   data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}"
+                   data-zone="grid" data-href="{{.DetailHref}}" data-edit="{{.EditHref}}"
+                   @click.stop="pick($event.currentTarget)"
+                   title="{{.Title}}{{if .Assignee}} · {{.Assignee}}{{end}}{{if .StartTime}} · {{.StartTime}}{{end}}">
+                <span class="font-medium">{{.Title}}</span>
+              </div>
+              {{end}}
+              {{if gt .MoreCount 0}}
+              <a href="/workboard/register?view=day&date={{.Date}}{{$.AssigneeQ}}"
+                 class="block text-[9px] text-blue-600 hover:underline px-0.5"
+                 @click.stop>+{{.MoreCount}}건 더보기</a>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    {{/* 일·주 시간표 — 담당자 다른 겹침은 가로 분할, 같은 담당자는 겹침 금지 */}}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="max-h-[74vh] overflow-auto">
+        <div class="min-w-[36rem]">
+          <div class="sticky top-0 z-20 flex border-b border-slate-200 bg-slate-50/95 backdrop-blur">
+            <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-slate-400 border-r border-slate-200">시간</div>
+            {{range .DayColumns}}
+            <div class="flex-1 min-w-0 px-1.5 py-2 border-r border-slate-200 last:border-r-0 text-center {{if .IsToday}}bg-blue-50/95{{end}}">
+              <p class="text-[11px] font-bold {{if .IsToday}}text-blue-700{{else}}text-slate-700{{end}}">{{.Label}}</p>
+              <p class="text-[9px] {{if .IsToday}}text-blue-500{{else}}text-slate-400{{end}}">{{.Sub}}</p>
+            </div>
+            {{end}}
+          </div>
+          <div class="flex relative">
+            <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-10 bg-white">
+              {{range .SlotTimes}}
+              <div class="h-[1.55rem] box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-slate-50{{end}}">
+                <span class="block text-right text-[9px] leading-[1.55rem] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-slate-600{{else}}text-slate-300{{end}}">{{.}}</span>
+              </div>
+              {{end}}
+            </div>
+            {{range .DayColumns}}
+            {{$col := .}}
+            <div class="flex-1 min-w-0 relative border-r border-slate-50 last:border-r-0 {{if $col.IsToday}}bg-blue-50/15{{end}}"
+                 style="{{$.GridHeightStyle}}">
+              {{range $i, $t := $.SlotTimes}}
+              <div class="absolute left-0 right-0 h-[1.55rem] box-border border-t border-slate-100/80 hover:bg-blue-50/60 cursor-pointer"
+                   style="{{index $.SlotTopStyles $i}}"
+                   data-date="{{$col.Date}}" data-time="{{$t}}"
+                   @click="place($event.currentTarget)"
+                   @dragover.prevent
+                   @drop.prevent="place($event.currentTarget)"></div>
+              {{end}}
+              {{range $col.Blocks}}
+              <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight cursor-pointer pl-1.5 pr-4 py-0.5 border border-black/5"
+                   style="{{.Style}}"
+                   data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
+                   data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
+                   data-zone="grid"
+                   data-href="{{.Card.DetailHref}}"
+                   data-edit="{{.Card.EditHref}}"
+                   @click.stop="pick($event.currentTarget)"
+                   :class="isPicked('task', '{{.Card.TaskID}}') ? 'ring-2 ring-blue-500 ring-offset-1 !z-20' : ''"
+                   title="{{.Card.Title}} · {{.Card.Assignee}} · {{.Card.StartTime}}~{{.Card.EndTime}}">
+                <span class="flex items-start justify-between gap-0.5">
+                  <span class="truncate min-w-0 font-semibold">{{.Card.Title}}</span>
+                  <span class="shrink-0 inline-flex items-center gap-0.5">
+                    <button type="button"
+                            class="px-1 rounded border border-blue-300/80 bg-white/95 text-[8px] font-semibold text-blue-700 hover:bg-blue-50"
+                            @click.stop="openWork($event.currentTarget.closest('[data-kind]'))"
+                            title="{{if eq .Card.Category "as"}}조치 화면{{else}}업무 화면{{end}}">조치</button>
+                    {{if .Card.EditHref}}
+                    <button type="button"
+                            class="px-1 rounded border border-slate-300/80 bg-white/95 text-[8px] font-semibold text-slate-700 hover:bg-slate-50"
+                            @click.stop="editWork($event.currentTarget.closest('[data-kind]'))"
+                            title="일일 업무 수정">수정</button>
+                    {{end}}
+                  </span>
+                </span>
+                {{if .Card.SourceNumber}}
+                <span class="font-mono text-[8px] opacity-75 truncate block">{{.Card.SourceNumber}}</span>
+                {{end}}
+                <span class="text-[8px] opacity-70 block truncate">{{.Card.StartTime}}~{{.Card.EndTime}}{{if .Card.Assignee}} · {{.Card.Assignee}}{{end}}</span>
+                {{if and $.CanWrite .Card.TaskID}}
+                <form method="post" action="/workboard/unschedule"
+                      class="absolute top-0 right-0 z-10"
+                      @click.stop>
+                  <input type="hidden" name="redirect" value="/workboard/register?view={{$.View}}&date={{$.Date}}{{$.AssigneeQ}}">
+                  <input type="hidden" name="task_id" value="{{.Card.TaskID}}">
+                  <button type="submit"
+                          class="w-4 h-4 flex items-center justify-center rounded text-sm leading-none text-slate-400 hover:text-red-600 hover:bg-white/90"
+                          title="대기 목록으로 내리기">&times;</button>
+                </form>
+                {{end}}
+              </div>
+              {{end}}
+            </div>
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </div>
+    {{end}}
+
+    {{/* 우측 대기 팔레트 */}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-2 min-w-0">
+      {{template "wb_palette" (wbPalette "AS" "border-rose-200" "text-rose-700" "bg-rose-50" .ASCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "정기점검" "border-sky-200" "text-sky-700" "bg-sky-50" .MntCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "행정관련업무" "border-violet-200" "text-violet-700" "bg-violet-50" .AdminCards .CanWrite)}}
+    </div>
+
+  </div>
+
+  {{template "wb_modals" .}}
+</div>
+{{end}}

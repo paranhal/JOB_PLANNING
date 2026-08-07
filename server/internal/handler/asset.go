@@ -16,30 +16,63 @@ type AssetHandler struct {
 	customerRepo *repository.CustomerRepo
 	codeRepo     *repository.CodeRepo
 	attachRepo   *repository.AttachmentRepo
+	wbRepo       *repository.WBRepo
 }
 
 func (h *AssetHandler) List(c echo.Context) error {
 	search := c.QueryParam("search")
 	customerID := c.QueryParam("customer_id")
+	projectID := c.QueryParam("project_id")
+	category := c.QueryParam("category")
+	sort := c.QueryParam("sort")
+	dir := c.QueryParam("dir")
+	if dir != "asc" && dir != "desc" {
+		dir = "asc"
+	}
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	if page < 1 {
 		page = 1
 	}
 
-	items, total, err := h.repo.List(customerID, search, page, 20)
+	items, total, err := h.repo.List(customerID, search, projectID, category, sort, dir, page, 20)
 	if err != nil {
 		return err
 	}
 	totalPages := (total + 19) / 20
 	customers, _ := h.customerRepo.ListAll()
+	projects, _ := h.wbRepo.ListProjects(false)
+	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
+
+	nextDir := func(col string) string {
+		if sort == col && dir == "asc" {
+			return "desc"
+		}
+		return "asc"
+	}
 
 	return c.Render(http.StatusOK, "asset/list.html", map[string]interface{}{
 		"Title": "설치자산 관리", "Active": "assets",
 		"Items": items, "Total": total,
 		"Page": page, "TotalPages": totalPages,
 		"Search": search, "CustomerID": customerID,
-		"Customers": customers,
-		"CanWrite": canWriteMaster(c),
+		"ProjectID": projectID, "Category": category,
+		"Customers": customers, "Projects": projects,
+		"ProductCategories": productCategories,
+		"Sort": sort, "Dir": dir,
+		"SortDirAsset": nextDir("asset_id"),
+		"SortDirOrg":   nextDir("org_name"),
+		"SortDirName":  nextDir("product_name"),
+		"SortDirCat":   nextDir("product_category"),
+		"SortDirType":  nextDir("product_type"),
+		"SortDirSN":    nextDir("serial_number"),
+		"SortDirLoc":   nextDir("location"),
+		"SortDirInst":  nextDir("install_location"),
+		"SortDirMaint": nextDir("maint_contract"),
+		"SortDirStat":  nextDir("status"),
+		"SortDirYears": nextDir("install_years"),
+		"SortDirAS":    nextDir("as_count"),
+		"SortDirProj":  nextDir("project"),
+		"CanWrite":     canWriteMaster(c),
 	})
 }
 
@@ -55,14 +88,18 @@ func (h *AssetHandler) New(c echo.Context) error {
 	maintCycles, _ := h.codeRepo.ActiveByGroup("maint_cycle")
 	maintBillingCycles, _ := h.codeRepo.ActiveByGroup("maint_billing_cycle")
 
-	asset := &model.Asset{IsManaged: true, OperationStatus: "operating", ProductCategory: "rfid"}
+	asset := &model.Asset{
+		IsManaged: true, OperationStatus: "operating",
+		ProductCategory: "rfid", ProjectID: repository.ProjectIDAnroboticsRFID,
+	}
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		asset.CustomerID = cid
 	}
+	projects, _ := h.wbRepo.ListProjects(false)
 
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
 		"Title": "자산 등록", "Active": "assets", "IsNew": true,
-		"Asset": asset, "Customers": customers,
+		"Asset": asset, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
 		"InstallerTypes": installerTypes,
 		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
@@ -74,9 +111,11 @@ func (h *AssetHandler) New(c echo.Context) error {
 
 func (h *AssetHandler) Create(c echo.Context) error {
 	a := bindAsset(c)
+	// 타사 장비는 RFID자동화가 아닌 경우가 많아, 미선택 시 기타로 둔다.
 	if a.ProductCategory == "" {
-		a.ProductCategory = "rfid"
+		a.ProductCategory = "other"
 	}
+	applyRFIDProjectDefault(a)
 	if err := h.repo.Create(a); err != nil {
 		return err
 	}
@@ -167,11 +206,12 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	maintContractTypes, _ := h.codeRepo.ActiveByGroup("maint_contract_type")
 	maintCycles, _ := h.codeRepo.ActiveByGroup("maint_cycle")
 	maintBillingCycles, _ := h.codeRepo.ActiveByGroup("maint_billing_cycle")
+	projects, _ := h.wbRepo.ListProjects(false)
 	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
 		"Title": "자산 수정", "Active": "assets", "IsNew": false,
-		"Asset": a, "Customers": customers,
+		"Asset": a, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
 		"InstallerTypes": installerTypes,
 		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
@@ -186,10 +226,21 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 func (h *AssetHandler) Update(c echo.Context) error {
 	a := bindAsset(c)
 	a.AssetID = c.Param("id")
+	applyRFIDProjectDefault(a)
 	if err := h.repo.Update(a); err != nil {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/assets/"+a.AssetID)
+}
+
+// applyRFIDProjectDefault RFID자동화 분류이고 사업 미선택이면 앤로보틱스 RFID 사업으로 둔다.
+func applyRFIDProjectDefault(a *model.Asset) {
+	if a == nil {
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(a.ProductCategory), "rfid") && strings.TrimSpace(a.ProjectID) == "" {
+		a.ProjectID = repository.ProjectIDAnroboticsRFID
+	}
 }
 
 func (h *AssetHandler) Delete(c echo.Context) error {
@@ -213,10 +264,14 @@ func bindAsset(c echo.Context) *model.Asset {
 		maintCycle = c.FormValue("maint_cycle_custom")
 	}
 
+	productType := strings.TrimSpace(c.FormValue("product_type"))
+	if productType != "" {
+		productType = strings.ToUpper(productType)
+	}
 	return &model.Asset{
 		CustomerID:        c.FormValue("customer_id"),
 		ProductName:       c.FormValue("product_name"),
-		ProductType:       c.FormValue("product_type"),
+		ProductType:       productType,
 		ProductCategory:   c.FormValue("product_category"),
 		ModelName:         c.FormValue("model_name"),
 		Manufacturer:      c.FormValue("manufacturer"),
@@ -247,5 +302,6 @@ func bindAsset(c echo.Context) *model.Asset {
 		InstallLocation:   c.FormValue("install_location"),
 		LocationDetail:    c.FormValue("location_detail"),
 		Notes:             c.FormValue("notes"),
+		ProjectID:         strings.TrimSpace(c.FormValue("project_id")),
 	}
 }

@@ -1,0 +1,348 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+{{$kpi := .KPI}}
+{{$execOK := ge $kpi.ExecutionRate $.ExecTarget}}
+{{$visitOK := and $kpi.HasVisit (le $kpi.VisitAvgDays $.VisitTarget)}}
+<div class="space-y-5" x-data="statsDashboard()">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">통계</h2>
+      <p class="text-sm text-gray-500 mt-1">계획대비 실행율 · 접수→방문 · 접수→조치완료 · 숫자/그래프</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 shrink-0">
+      <a href="/stats/detail" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50">상세 · 엑셀</a>
+    </div>
+  </div>
+
+  {{/* KPI 카드 3 */}}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-2">
+        <p class="text-sm font-medium text-gray-600">계획대비 실행율</p>
+        <span class="shrink-0 inline-flex items-center gap-1">
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $execOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $execOK}}기준충족{{else}}기준미충족{{end}}</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $execOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">목표 {{printf "%.0f" .ExecTarget}}%</span>
+        </span>
+      </div>
+      <p class="mt-2 text-3xl font-bold tabular-nums {{if $execOK}}text-emerald-600{{else}}text-rose-600{{end}}">{{printf "%.1f" $kpi.ExecutionRate}}%</p>
+      <p class="mt-1 text-[11px] {{if ge $kpi.ExecutionDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
+        {{if ge $kpi.ExecutionDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.ExecutionDelta}}%p 이전 기간 대비
+      </p>
+      <div class="mt-3 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div class="h-full rounded-full {{if $execOK}}bg-emerald-500{{else}}bg-rose-500{{end}}"
+             style="width:{{if gt $kpi.ExecutionRate 100.0}}100{{else}}{{printf "%.1f" $kpi.ExecutionRate}}{{end}}%"></div>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-2">
+        <p class="text-sm font-medium text-gray-600">접수 후 방문까지 기간</p>
+        <span class="shrink-0 inline-flex items-center gap-1">
+          {{if $kpi.HasVisit}}
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $visitOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $visitOK}}기준충족{{else}}기준미충족{{end}}</span>
+          {{else}}
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">데이터없음</span>
+          {{end}}
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $visitOK}}bg-emerald-50 text-emerald-700{{else if $kpi.HasVisit}}bg-rose-50 text-rose-700{{else}}bg-slate-100 text-slate-600{{end}}">목표 {{printf "%.0f" .VisitTarget}}일</span>
+        </span>
+      </div>
+      {{if $kpi.HasVisit}}
+      <p class="mt-2 text-3xl font-bold tabular-nums {{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}">{{printf "%.1f" $kpi.VisitAvgDays}}일</p>
+      <p class="mt-1 text-[11px] {{if le $kpi.VisitDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
+        {{if gt $kpi.VisitDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.VisitDelta}}일 이전 기간 대비 · {{$kpi.VisitSample}}건
+      </p>
+      {{else}}
+      <p class="mt-2 text-3xl font-bold text-gray-300">—</p>
+      <p class="mt-1 text-[11px] text-gray-400">해당 기간 방문예정 데이터 없음</p>
+      {{end}}
+    </div>
+
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-2">
+        <p class="text-sm font-medium text-gray-600">접수 후 조치 완료까지 기간</p>
+        <span class="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">기준 없음</span>
+      </div>
+      {{if $kpi.HasComplete}}
+      <p class="mt-2 text-3xl font-bold tabular-nums text-sky-700">{{printf "%.1f" $kpi.CompleteAvgDays}}일</p>
+      <p class="mt-1 text-[11px] {{if le $kpi.CompleteDelta 0.0}}text-emerald-600{{else}}text-amber-700{{end}}">
+        {{if gt $kpi.CompleteDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.CompleteDelta}}일 이전 기간 대비 · {{$kpi.CompleteSample}}건
+      </p>
+      {{else}}
+      <p class="mt-2 text-3xl font-bold text-gray-300">—</p>
+      <p class="mt-1 text-[11px] text-gray-400">해당 기간 완료 데이터 없음</p>
+      {{end}}
+    </div>
+  </div>
+
+  {{/* 필터 바 — 드롭다운 즉시 표시, 선택 시 자동 조회 */}}
+  <form method="GET" action="/stats" id="statsFilterForm"
+        class="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm"
+        x-data="{ scope: '{{.Filter.Scope}}' }">
+    <input type="hidden" name="date" value="{{.AnchorDate}}">
+    <input type="hidden" name="view" id="statsViewField" value="{{.View}}">
+    <input type="hidden" name="scope" :value="scope">
+
+    <div>
+      <p class="text-[11px] text-gray-500 mb-1">통계 기간</p>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+          <button type="button" onclick="document.getElementById('statsViewField').value='day'; this.form.submit()"
+                  class="px-3 py-1.5 text-xs font-semibold {{if eq .View "day"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">일별</button>
+          <button type="button" onclick="document.getElementById('statsViewField').value='week'; this.form.submit()"
+                  class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq .View "week"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">주별</button>
+          <button type="button" onclick="document.getElementById('statsViewField').value='month'; this.form.submit()"
+                  class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq .View "month"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">월별</button>
+        </div>
+        <div class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-1 py-0.5">
+          <a href="/stats?view={{.View}}&date={{.PrevAnchor}}{{.FilterQ}}"
+             class="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-md" title="이전">←</a>
+          <input type="date" value="{{.AnchorDate}}"
+                 onchange="(function(el){var f=document.getElementById('statsFilterForm'); var d=f.querySelector('input[name=date]'); if(d)d.value=el.value; f.submit();})(this)"
+                 class="border-0 bg-transparent px-1 py-1 text-xs text-gray-700 focus:ring-0 cursor-pointer">
+          <a href="/stats?view={{.View}}&date={{.NextAnchor}}{{.FilterQ}}"
+             class="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-md" title="다음">→</a>
+          <a href="/stats?view={{.View}}&date={{.Today}}{{.FilterQ}}"
+             class="px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-md">오늘</a>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-[11px] text-gray-500 mb-1">통계 대상</p>
+      <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+        <button type="button" @click="scope='team'; $nextTick(() => $el.closest('form').submit())"
+                :class="scope==='team' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 text-xs font-semibold">팀전체</button>
+        <button type="button" @click="scope='assignee'"
+                :class="scope==='assignee' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200">담당자별</button>
+        <button type="button" @click="scope='product'"
+                :class="scope==='product' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200">업무별</button>
+      </div>
+    </div>
+
+    <div x-show="scope==='assignee'" x-cloak class="min-w-[8rem]">
+      <label class="block text-[11px] text-gray-500 mb-1">담당자</label>
+      <select {{if eq .Filter.Scope "assignee"}}name="key"{{end}}
+              :name="scope==='assignee' ? 'key' : null"
+              {{if ne .Filter.Scope "assignee"}}disabled{{end}}
+              :disabled="scope!=='assignee'"
+              onchange="if(this.value) this.form.submit()"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full">
+        <option value="">담당자 선택</option>
+        {{range .Assignees}}
+        <option value="{{.FullName}}" {{if and (eq $.Filter.Scope "assignee") (eq $.Filter.Key .FullName)}}selected{{end}}>{{.FullName}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div x-show="scope==='product'" x-cloak class="min-w-[8rem]">
+      <label class="block text-[11px] text-gray-500 mb-1">업무(제품)</label>
+      <select {{if eq .Filter.Scope "product"}}name="key"{{end}}
+              :name="scope==='product' ? 'key' : null"
+              {{if ne .Filter.Scope "product"}}disabled{{end}}
+              :disabled="scope!=='product'"
+              onchange="if(this.value) this.form.submit()"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full">
+        <option value="">업무 선택</option>
+        {{range .ProductOptions}}
+        <option value="{{.}}" {{if and (eq $.Filter.Scope "product") (eq $.Filter.Key .)}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-[11px] text-gray-500 mb-1">사업별</label>
+      <select name="project" onchange="this.form.submit()"
+              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[9rem]">
+        <option value="">사업 선택</option>
+        {{range .Projects}}
+        <option value="{{.ProjectID}}" {{if eq $.Filter.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+
+    <a href="/stats/export.xlsx?metric=progress&period={{.View}}&date={{.AnchorDate}}&month={{.AnchorMonth}}{{.FilterQ}}"
+       class="px-4 py-1.5 text-xs font-semibold rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50">Excel</a>
+  </form>
+
+  {{/* 차트 */}}
+  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+      <h3 class="text-sm font-bold text-gray-800">{{if eq .View "week"}}주별{{else if eq .View "month"}}월별{{else}}일자별{{end}} 업무 현황</h3>
+      <div class="flex flex-wrap items-center gap-3 text-[11px] text-gray-600">
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>접수</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-sky-400"></span>미완료</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>완료</span>
+      </div>
+    </div>
+    <p class="text-[11px] text-gray-400 mb-3">
+      {{if eq .View "week"}}기준일이 속한 주=이번주 · 전전주/전주/이번주 옆 숫자는 해당 주 월요일{{else if eq .View "month"}}기준일이 속한 달=이번달 · 전전월/전월/이번달{{else}}기준일 포함 최근 14일{{end}}
+      · 미완료=접수·담당자 배정·진행중·보류·이관 등 미종료
+      · 부분완료 접수는 완료로 집계하고, 그때 생긴 하위업무(확인·재방문)는 접수·미완료로 별도 집계
+    </p>
+    <div class="h-64"><canvas id="statsBarChart"></canvas></div>
+  </div>
+
+  {{/* 현재 기간 완료 건 — 조치내용 */}}
+  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h3 class="text-sm font-bold text-gray-800">완료 건 <span class="font-normal text-gray-500">({{if .CompletedRange}}{{.CompletedRange}}{{else}}현재 기간{{end}} · {{len .CompletedRows}}건)</span></h3>
+      <span class="text-[11px] text-gray-400">조치내용 포함 · 최대 200건</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500">
+          <tr>
+            <th class="px-3 py-2 font-medium whitespace-nowrap">완료일</th>
+            <th class="px-3 py-2 font-medium whitespace-nowrap">접수번호</th>
+            <th class="px-3 py-2 font-medium whitespace-nowrap">거래처</th>
+            <th class="px-3 py-2 font-medium whitespace-nowrap">담당</th>
+            <th class="px-3 py-2 font-medium">접수내용</th>
+            <th class="px-3 py-2 font-medium">조치내용</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{if .CompletedRows}}
+          {{range .CompletedRows}}
+          <tr class="hover:bg-gray-50 align-top">
+            <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .CompleteDate}}{{.CompleteDate}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 whitespace-nowrap">
+              <span class="inline-flex items-center gap-1.5">
+                <a href="/as/{{.ASID}}/action" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>
+                {{statusBadge .Status}}
+              </span>
+            </td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{.CustomerName}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{.Assignee}}</td>
+            <td class="px-3 py-2 text-gray-700 max-w-[14rem]"><div class="whitespace-pre-line line-clamp-3">{{if .Symptom}}{{.Symptom}}{{else}}—{{end}}</div></td>
+            <td class="px-3 py-2 text-gray-800 max-w-[20rem]"><div class="whitespace-pre-line line-clamp-4">{{if .ActionTaken}}{{.ActionTaken}}{{else}}<span class="text-gray-400">—</span>{{end}}</div></td>
+          </tr>
+          {{end}}
+          {{else}}
+          <tr>
+            <td colspan="6" class="px-3 py-8 text-center text-gray-400">해당 기간 완료 건이 없습니다.</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-bold text-gray-800">실행률 추이</h3>
+      <span class="text-[11px] text-gray-500">계획대비 실행율(%) · 목표 {{printf "%.0f" .ExecTarget}}%</span>
+    </div>
+    <div class="h-56"><canvas id="statsLineChart"></canvas></div>
+  </div>
+
+  <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-600 space-y-1">
+    <p><span class="font-medium text-gray-800">실행율</span> = 계획대로 완료÷예정×100 (예정일 당일 완료. 일정 변경 분은 제외, 최대 100%. 목표 {{printf "%.0f" .ExecTarget}}%) · <span class="font-medium text-gray-800">방문기간</span> = 접수일→방문예정일 평균(목표 {{printf "%.0f" .VisitTarget}}일)</p>
+    <p><span class="font-medium text-gray-800">조치완료기간</span> = 접수일→완료일 평균(기준 없음) · 업무별=앤로보틱스/KLAS/세종 K-LAS · 사업별=업무 프로젝트</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+function statsDashboard(){ return {}; }
+(function(){
+  var series = {{.SeriesJSON}};
+  if (!series || !series.length || typeof Chart === 'undefined') return;
+  var labels = series.map(function(p){ return p.label; });
+  var tipTitle = function(items){
+    if (!items || !items.length) return '';
+    var i = items[0].dataIndex;
+    var p = series[i] || {};
+    if (p.range_label && p.range_label !== p.label) return p.label + ' (' + p.range_label + ')';
+    return p.label || '';
+  };
+  // 막대/포인트 위 숫자 표시
+  var valueLabelsPlugin = {
+    id: 'valueLabels',
+    afterDatasetsDraw: function(chart) {
+      var ctx = chart.ctx;
+      chart.data.datasets.forEach(function(ds, di) {
+        var meta = chart.getDatasetMeta(di);
+        if (!meta || meta.hidden) return;
+        meta.data.forEach(function(el, i) {
+          var v = ds.data[i];
+          if (v == null || v === 0) return;
+          var pos = el.tooltipPosition();
+          ctx.save();
+          ctx.fillStyle = '#334155';
+          ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          var text = (chart.config.type === 'line') ? (v + '%') : String(v);
+          ctx.fillText(text, pos.x, pos.y - 3);
+          ctx.restore();
+        });
+      });
+    }
+  };
+  var bar = document.getElementById('statsBarChart');
+  if (bar) {
+    new Chart(bar, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: '접수', data: series.map(function(p){ return p.received; }), backgroundColor: '#fb7185', borderRadius: 3 },
+          { label: '미완료', data: series.map(function(p){ return p.open || 0; }), backgroundColor: '#38bdf8', borderRadius: 3 },
+          { label: '완료', data: series.map(function(p){ return p.completed; }), backgroundColor: '#fbbf24', borderRadius: 3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
+        // 일자(카테고리) 간격은 넓게, 같은 일자 안 항목 막대는 밀착
+        datasets: { bar: { categoryPercentage: 0.52, barPercentage: 0.96 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: tipTitle } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, font: { size: 11 } } },
+          y: { beginAtZero: true, grace: '8%', ticks: { precision: 0, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+        }
+      },
+      plugins: [valueLabelsPlugin]
+    });
+  }
+  var line = document.getElementById('statsLineChart');
+  if (line) {
+    new Chart(line, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '실행률',
+          data: series.map(function(p){ return p.exec_rate; }),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.12)',
+          borderDash: [5, 4],
+          tension: 0.25,
+          pointRadius: 3,
+          pointBackgroundColor: '#3b82f6',
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: tipTitle } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, font: { size: 11 } } },
+          y: { min: 0, max: 100, ticks: { callback: function(v){ return v + '%'; }, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+        }
+      },
+      plugins: [valueLabelsPlugin]
+    });
+  }
+})();
+</script>
+{{end}}

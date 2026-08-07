@@ -19,8 +19,8 @@ func NewCustomerRepo(db *sql.DB) *CustomerRepo {
 
 // List 고객 목록 조회 (검색, 상위기관·업종 필터, 정렬, 페이징)
 // category: ""=전체, "none"=상위기관 없음, 그 외=상위기관 customer_id
-// sort: ""=기본(카테고리), org_name|industry|assets|as
-func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, pageSize int) ([]model.CustomerListItem, int, error) {
+// sort: ""=기본(카테고리), customer_id|org_name|parent|industry|phone|assets|as|status
+func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, pageSize int, reviewOnly bool) ([]model.CustomerListItem, int, error) {
 	offset := (page - 1) * pageSize
 
 	baseQuery := `
@@ -30,7 +30,8 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 		       COUNT(DISTINCT ar.as_id) AS as_count,
 		       COALESCE(c.parent_customer_id,''),
 		       COALESCE(p.org_name,''),
-		       CASE WHEN c.has_parent=1 AND COALESCE(c.parent_customer_id,'')!='' THEN 1 ELSE 0 END
+		       CASE WHEN c.has_parent=1 AND COALESCE(c.parent_customer_id,'')!='' THEN 1 ELSE 0 END,
+		       COALESCE(c.needs_review,0), COALESCE(c.review_reason,'')
 		FROM customers c
 		LEFT JOIN customers p ON p.customer_id = c.parent_customer_id
 		LEFT JOIN assets a ON a.customer_id = c.customer_id
@@ -68,6 +69,12 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 		}
 	}
 
+	if reviewOnly {
+		cond := ` AND COALESCE(c.needs_review,0)=1`
+		baseQuery += cond
+		countQuery += cond
+	}
+
 	if search != "" {
 		like := "%" + search + "%"
 		baseQuery += ` AND (c.org_name LIKE ? OR c.official_name LIKE ? OR c.main_phone LIKE ? OR COALESCE(p.org_name,'') LIKE ? OR COALESCE(c.industry,'') LIKE ?)`
@@ -82,14 +89,22 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 		orderDir = "DESC"
 	}
 	switch sort {
-	case "industry":
-		baseQuery += `ORDER BY c.industry ` + orderDir + `, c.org_name ASC`
+	case "customer_id":
+		baseQuery += `ORDER BY c.customer_id ` + orderDir
 	case "org_name":
-		baseQuery += `ORDER BY c.org_name ` + orderDir
+		baseQuery += `ORDER BY c.org_name COLLATE NOCASE ` + orderDir
+	case "parent":
+		baseQuery += `ORDER BY COALESCE(p.org_name,'') COLLATE NOCASE ` + orderDir + `, c.org_name ASC`
+	case "industry":
+		baseQuery += `ORDER BY c.industry COLLATE NOCASE ` + orderDir + `, c.org_name ASC`
+	case "phone":
+		baseQuery += `ORDER BY COALESCE(c.main_phone,'') ` + orderDir + `, c.org_name ASC`
 	case "assets":
 		baseQuery += `ORDER BY asset_count ` + orderDir + `, c.org_name ASC`
 	case "as":
 		baseQuery += `ORDER BY as_count ` + orderDir + `, c.org_name ASC`
+	case "status":
+		baseQuery += `ORDER BY c.is_active ` + orderDir + `, c.org_name ASC`
 	default:
 		if category == "" && industry == "" {
 			baseQuery += `ORDER BY
@@ -126,17 +141,19 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 	var items []model.CustomerListItem
 	for rows.Next() {
 		var item model.CustomerListItem
-		var isActive, hasParent int
+		var isActive, hasParent, needsReview int
 		if err := rows.Scan(
 			&item.CustomerID, &item.OrgName, &item.OfficialName,
 			&item.Industry, &item.MainPhone, &isActive,
 			&item.AssetCount, &item.AsCount,
 			&item.ParentCustomerID, &item.ParentOrgName, &hasParent,
+			&needsReview, &item.ReviewReason,
 		); err != nil {
 			return nil, 0, err
 		}
 		item.IsActive = isActive == 1
 		item.HasParent = hasParent == 1
+		item.NeedsReview = needsReview == 1
 		items = append(items, item)
 	}
 	return items, total, rows.Err()
@@ -210,11 +227,13 @@ func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 		       COALESCE(postal_code,''), COALESCE(addr_sido,''),
 		       COALESCE(addr_sigungu,''), COALESCE(addr_dong,''),
 		       COALESCE(address,''), COALESCE(address_detail,''),
-		       is_active, COALESCE(notes,''), created_at, updated_at
+		       is_active, COALESCE(notes,''),
+		       COALESCE(needs_review,0), COALESCE(review_reason,''),
+		       created_at, updated_at
 		FROM customers WHERE customer_id = ?`
 
 	var c model.Customer
-	var hasParent, isActive int
+	var hasParent, isActive, needsReview int
 	var createdAt, updatedAt string
 
 	err := r.db.QueryRow(query, id).Scan(
@@ -223,7 +242,8 @@ func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 		&c.Industry, &hasParent, &c.ParentCustomerID,
 		&c.PostalCode, &c.AddrSido, &c.AddrSigungu, &c.AddrDong,
 		&c.Address, &c.AddressDetail,
-		&isActive, &c.Notes, &createdAt, &updatedAt,
+		&isActive, &c.Notes, &needsReview, &c.ReviewReason,
+		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -233,6 +253,7 @@ func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 	}
 	c.HasParent = hasParent == 1
 	c.IsActive = isActive == 1
+	c.NeedsReview = needsReview == 1
 	c.CreatedAt = parseTime(createdAt)
 	c.UpdatedAt = parseTime(updatedAt)
 	return &c, nil
@@ -321,7 +342,7 @@ func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
 
 // ListExport 엑셀용 전체 목록 (주소·점검사이트 지역 포함, 페이징 없음)
 func (r *CustomerRepo) ListExport(search, category, industry, sort, dir, region, siteID string) ([]model.CustomerListItem, error) {
-	items, _, err := r.List(search, category, industry, sort, dir, 1, 0)
+	items, _, err := r.List(search, category, industry, sort, dir, 1, 0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -401,6 +422,28 @@ func (r *CustomerRepo) ListExportRegions() ([]string, error) {
 // CountActive 활성 고객 수
 func (r *CustomerRepo) CountActive(count *int) {
 	r.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE is_active=1`).Scan(count)
+}
+
+// ReviewReasonImportedCustomer AS 엑셀 적재 중 기관명이 매칭되지 않아 새로 만든 고객에 붙는 사유
+const ReviewReasonImportedCustomer = "AS 완료내역 엑셀 적재 중 기관명이 기존 고객과 매칭되지 않아 자동 생성됨 — 기관 정보 확인 필요"
+
+// SetNeedsReview 확인 필요 표식을 켜거나 끈다. 끌 때는 사유도 함께 지운다.
+func (r *CustomerRepo) SetNeedsReview(id string, on bool, reason string) error {
+	if !on {
+		reason = ""
+	}
+	_, err := r.db.Exec(
+		`UPDATE customers SET needs_review=?, review_reason=?, updated_at=? WHERE customer_id=?`,
+		boolToInt(on), reason, time.Now().Format("2006-01-02 15:04:05"), id,
+	)
+	return err
+}
+
+// CountNeedsReview 확인이 필요한 고객 수
+func (r *CustomerRepo) CountNeedsReview() int {
+	var n int
+	r.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE COALESCE(needs_review,0)=1`).Scan(&n)
+	return n
 }
 
 // ── 유틸 ──────────────────────────────────────────────────────────

@@ -27,11 +27,31 @@ func IsASWorkflowStatus(status string) bool {
 	}
 }
 
-// 처리결과코드 (조치 화면: 완료 · 타사이관 · 재방문필요)
+// AS 상태값
 const (
-	ResultDone    = "done"
+	StatusPartialComplete = "partial_complete" // 부분완료: 통계=완료, 운영=진행중
+)
+
+// SQL IN 절용 상태 집합
+const (
+	// SQLStatusStatsCompleted 통계 완료 집계(부분완료 포함)
+	SQLStatusStatsCompleted = "('completed','closed','partial_complete')"
+	// SQLStatusStatsOpen 통계 미완료(부분완료 제외 — 하위업무는 별도 집계)
+	SQLStatusStatsOpen = "('received','assigned','in_progress','hold','transfer')"
+	// SQLStatusFullyClosed 완전 종료(읽기전용·재접수 대상)
+	SQLStatusFullyClosed = "('completed','closed')"
+	// SQLStatusOpenIncomplete 담당자 미완료(운영)
+	SQLStatusOpenIncomplete = "('received','assigned','in_progress','hold','transfer','partial_complete')"
+	// SQLStatusOpsInProgress 운영상 진행중(방문일정 버킷 등)
+	SQLStatusOpsInProgress = "('in_progress','partial_complete')"
+)
+
+// 처리결과코드 (조치 화면: 완료 · 부분완료 · 타사이관 · 재방문필요)
+const (
+	ResultDone     = "done"
+	ResultPartial  = "partial" // 부분완료 — 추가 업무 남음
 	ResultTransfer = "transfer"
-	ResultRevisit = "revisit_needed"
+	ResultRevisit  = "revisit_needed"
 	// 하위 호환(더 이상 조치 UI에 노출하지 않음)
 	ResultTemporary  = "temporary"
 	ResultEscalation = "escalation"
@@ -40,7 +60,7 @@ const (
 // 타사이관 세부
 const (
 	TransferDetailCompleted = "completed" // 이관 완료 → 접수 완료
-	TransferDetailWaiting   = "waiting"   // 조치 결과 대기 → 진행중 + 확인 하부업무
+	TransferDetailWaiting   = "waiting"   // 조치 결과 대기 → 부분완료 + 확인 하부업무
 )
 
 var (
@@ -81,6 +101,19 @@ type ASWorkItemDraft struct {
 	Notes             string
 }
 
+func setCompleteDatetimeIfEmpty(as *ASReceipt, now time.Time) {
+	if as.CompleteDatetime == nil || as.CompleteDatetime.IsZero() {
+		t := now
+		as.CompleteDatetime = &t
+	}
+}
+
+// markPartialComplete 부분완료: 통계용 완료일시 기록 + 운영상 미완료 유지
+func markPartialComplete(as *ASReceipt, now time.Time) {
+	as.Status = StatusPartialComplete
+	setCompleteDatetimeIfEmpty(as, now)
+}
+
 // ApplyActionResult 조치 결과코드에 따라 상태·예정일을 반영하고 하부업무 초안을 반환한다.
 func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*ActionApplyResult, error) {
 	code := strings.TrimSpace(as.ResultCode)
@@ -95,20 +128,30 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 	case ResultDone:
 		as.Status = "completed"
 		as.RevisitReason = ""
-		if as.CompleteDatetime == nil || as.CompleteDatetime.IsZero() {
-			t := now
-			as.CompleteDatetime = &t
+		setCompleteDatetimeIfEmpty(as, now)
+
+	case ResultPartial:
+		// 추가 업무가 남은 부분완료 — 통계 완료 + 운영 진행중
+		as.RevisitReason = strings.TrimSpace(as.RevisitReason)
+		if in.NextDate == "" {
+			return nil, ErrRevisitDateRequired
 		}
+		as.VisitScheduledDate = in.NextDate
+		as.ScheduleConfirmed = in.ScheduleConfirmed
+		markPartialComplete(as, now)
+		out.WorkItems = append(out.WorkItems, ASWorkItemDraft{
+			WorkKind:          WorkKindRevisit,
+			ScheduledDate:     in.NextDate,
+			ScheduleConfirmed: in.ScheduleConfirmed,
+			Notes:             firstNonEmptyNote(as.RevisitReason, "부분완료·추가 업무"),
+		})
 
 	case ResultTransfer:
 		switch in.TransferDetail {
 		case TransferDetailCompleted:
 			as.Status = "completed"
 			as.RevisitReason = ""
-			if as.CompleteDatetime == nil || as.CompleteDatetime.IsZero() {
-				t := now
-				as.CompleteDatetime = &t
-			}
+			setCompleteDatetimeIfEmpty(as, now)
 		case TransferDetailWaiting:
 			if in.NextDate == "" {
 				return nil, ErrConfirmDateRequired
@@ -119,11 +162,10 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 			if in.ConfirmContact == "" {
 				return nil, ErrConfirmContactRequired
 			}
-			as.Status = "in_progress"
 			as.RevisitReason = ""
-			as.CompleteDatetime = nil
 			as.VisitScheduledDate = in.NextDate
 			as.ScheduleConfirmed = in.ScheduleConfirmed
+			markPartialComplete(as, now)
 			out.WorkItems = append(out.WorkItems, ASWorkItemDraft{
 				WorkKind:          WorkKindConfirm,
 				ScheduledDate:     in.NextDate,
@@ -157,8 +199,7 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 		}
 		as.VisitScheduledDate = in.NextDate
 		as.ScheduleConfirmed = in.ScheduleConfirmed
-		as.Status = "in_progress"
-		as.CompleteDatetime = nil
+		markPartialComplete(as, now)
 		out.WorkItems = append(out.WorkItems, ASWorkItemDraft{
 			WorkKind:          WorkKindRevisit,
 			ScheduledDate:     in.NextDate,
@@ -167,14 +208,14 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 		})
 
 	case ResultTemporary:
-		// 하위 호환: 진행중 + 방문일(있으면)
-		as.Status = "in_progress"
-		as.RevisitReason = ""
+		// 하위 호환: 부분완료 + 방문일
 		if in.NextDate == "" {
 			return nil, ErrTemporaryDateRequired
 		}
+		as.RevisitReason = ""
 		as.VisitScheduledDate = in.NextDate
 		as.ScheduleConfirmed = in.ScheduleConfirmed
+		markPartialComplete(as, now)
 		out.WorkItems = append(out.WorkItems, ASWorkItemDraft{
 			WorkKind:          WorkKindRevisit,
 			ScheduledDate:     in.NextDate,
@@ -183,13 +224,13 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 		})
 
 	case ResultEscalation:
-		// 하위 호환: 조치 결과 대기와 동일하게 진행중+확인
+		// 하위 호환: 부분완료 + 확인
 		if in.NextDate == "" {
 			in.NextDate = now.AddDate(0, 0, 7).Format("2006-01-02")
 		}
-		as.Status = "in_progress"
 		as.VisitScheduledDate = in.NextDate
 		as.ScheduleConfirmed = in.ScheduleConfirmed
+		markPartialComplete(as, now)
 		out.WorkItems = append(out.WorkItems, ASWorkItemDraft{
 			WorkKind:          WorkKindConfirm,
 			ScheduledDate:     in.NextDate,
@@ -203,20 +244,69 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 		as.RevisitReason = ""
 
 	default:
-		if code != ResultRevisit {
+		if code != ResultRevisit && code != ResultPartial {
 			as.RevisitReason = ""
 		}
 	}
 	return out, nil
 }
 
+func firstNonEmptyNote(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
 // IsOpenIncompleteStatus 담당자 미완료(open)에 포함되는 상태
 func IsOpenIncompleteStatus(status string) bool {
 	switch status {
-	case "received", "assigned", "in_progress", "hold", "transfer":
+	case "received", "assigned", "in_progress", "hold", "transfer", StatusPartialComplete:
 		return true
 	default:
 		return false
+	}
+}
+
+// IsStatsCompletedStatus 통계 완료 집계에 포함되는 상태
+func IsStatsCompletedStatus(status string) bool {
+	switch status {
+	case "completed", "closed", StatusPartialComplete:
+		return true
+	default:
+		return false
+	}
+}
+
+// CanReopenAS 재접수할 수 있는 상태인지 — 이미 끝난 건만 다시 접수한다.
+// 부분완료·진행 중인 건은 재접수 대신 조치로 이어간다.
+func CanReopenAS(status string) bool {
+	return status == "completed" || status == "closed"
+}
+
+// NewReopenReceipt 완료된 접수를 바탕으로 같은 증상의 새 접수를 만든다.
+// 접수번호·상태는 저장 단계에서 새로 매겨지므로 여기서는 내용만 옮긴다.
+func NewReopenReceipt(src *ASReceipt, reason string, now time.Time) *ASReceipt {
+	reason = strings.TrimSpace(reason)
+	return &ASReceipt{
+		ReceiptDatetime: now,
+		CustomerID:      src.CustomerID,
+		AssetID:         src.AssetID,
+		ReceiptChannel:  src.ReceiptChannel,
+		Requester:       src.Requester,
+		RequesterType:   src.RequesterType,
+		RequesterName:   src.RequesterName,
+		Symptom:         src.Symptom,
+		Urgency:         src.Urgency,
+		Priority:        src.Priority,
+		AssignedTo:      src.AssignedTo,
+		AssignedUserID:  src.AssignedUserID,
+		IsRecurrence:    true,
+		IsReopen:        true,
+		ParentASID:      src.ASID,
+		ReopenReason:    reason,
 	}
 }
 

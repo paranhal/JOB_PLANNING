@@ -38,7 +38,7 @@ func TestIDFormats(t *testing.T) {
 		t.Fatalf("customer id: %s", cid)
 	}
 
-	aid, err := NextAssetID(db, "EZ-200E2", "", "hw")
+	aid, err := NextAssetID(db, "EZ-200E2", "", "hw", "")
 	if err != nil {
 		t.Fatal(err)
 	}

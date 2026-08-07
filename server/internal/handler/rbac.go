@@ -74,6 +74,11 @@ func canProcessAS(c echo.Context) bool {
 	return r == "admin" || r == "tech"
 }
 
+// isASClosedStatus 완료·종료 — 기본 읽기 전용
+func isASClosedStatus(status string) bool {
+	return model.CanReopenAS(status)
+}
+
 func canWriteMaster(c echo.Context) bool {
 	return currentRole(c) == "admin"
 }
@@ -89,6 +94,36 @@ func canViewAnalysis(c echo.Context) bool {
 func canViewMaintenance(c echo.Context) bool {
 	r := currentRole(c)
 	return r == "admin" || r == "tech"
+}
+
+// canEditMaintenanceSchedule 정기점검 방문 일정 수정 — 관리자·기술담당(현장 담당자)
+func canEditMaintenanceSchedule(c echo.Context) bool {
+	r := currentRole(c)
+	return r == "admin" || r == "tech"
+}
+
+// mntScopeAll 정기점검 일정 조회 범위 — 관리자는 항상 전체, 기술담당은 all=1 일 때만 전체
+func mntScopeAll(c echo.Context) bool {
+	if isAdminRole(c) {
+		return true
+	}
+	if !isTechRole(c) {
+		return true
+	}
+	v := c.QueryParam("all")
+	if v == "" {
+		v = c.FormValue("all")
+	}
+	return v == "1"
+}
+
+func (h *AuthHandler) RequireMaintenanceEdit(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if !canEditMaintenanceSchedule(c) {
+			return h.forbidden(c)
+		}
+		return next(c)
+	}
 }
 
 func assigneeKeys(c echo.Context) []string {

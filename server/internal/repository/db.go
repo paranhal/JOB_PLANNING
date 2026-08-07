@@ -200,6 +200,7 @@ CREATE TABLE IF NOT EXISTS assets (
     install_location    TEXT,
     location_detail     TEXT,
     notes               TEXT,
+    project_id          TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
@@ -386,13 +387,16 @@ CREATE TABLE IF NOT EXISTS maintenance_visits (
     auto_generated  INTEGER NOT NULL DEFAULT 0,
     entry_category  TEXT NOT NULL DEFAULT 'normal',
     notes           TEXT,
+    assignee        TEXT,
+    product_type    TEXT,
+    completed       INTEGER NOT NULL DEFAULT 0,
+    completed_date  TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plan_id) REFERENCES maintenance_plans(plan_id),
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_visit_dedup
-ON maintenance_visits(plan_id, visit_date, customer_id);
+-- 중복 방지 인덱스는 product_type 컬럼이 추가된 뒤(아래 마이그레이션) 만든다.
 
 -- 업무처리현황 · 기타 업무
 CREATE TABLE IF NOT EXISTS work_other (
@@ -406,6 +410,63 @@ CREATE TABLE IF NOT EXISTS work_other (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_work_other_date ON work_other(work_date, phase);
+
+-- 워크보드 (프로젝트·업무 · 칸반/목록)
+CREATE TABLE IF NOT EXISTS work_projects (
+    project_id        TEXT PRIMARY KEY,
+    name              TEXT NOT NULL,
+    short_name        TEXT,
+    plan_year         INTEGER DEFAULT 0,
+    is_paid           INTEGER NOT NULL DEFAULT 1,
+    sort_order        INTEGER NOT NULL DEFAULT 0,
+    ordering_party_id TEXT,
+    ordering_party    TEXT,
+    customer_id       TEXT,
+    contract_type   TEXT,
+    billing_type    TEXT,
+    start_date      TEXT,
+    end_date        TEXT,
+    notes           TEXT,
+    contact_id      TEXT,
+    color           TEXT NOT NULL DEFAULT '#3B82F6',
+    status          TEXT NOT NULL DEFAULT 'active',
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS project_scope_rules (
+    rule_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    parent_customer_id TEXT,
+    product_keys TEXT,
+    work_kinds TEXT,
+    notes TEXT,
+    FOREIGN KEY (project_id) REFERENCES work_projects(project_id)
+);
+CREATE TABLE IF NOT EXISTS work_tasks (
+    task_id         TEXT PRIMARY KEY,
+    work_type       TEXT NOT NULL DEFAULT 'admin',
+    project_id      TEXT,
+    title           TEXT NOT NULL,
+    description     TEXT,
+    due_date        TEXT,
+    work_date       TEXT,
+    start_time      TEXT,
+    end_time        TEXT,
+    duration_min    INTEGER NOT NULL DEFAULT 30,
+    status          TEXT NOT NULL DEFAULT 'waiting',
+    priority        TEXT NOT NULL DEFAULT 'normal',
+    assignee        TEXT,
+    tags            TEXT,
+    progress        INTEGER NOT NULL DEFAULT 0,
+    source_type     TEXT,
+    source_id       TEXT,
+    parent_task_id  TEXT,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES work_projects(project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status, due_date);
+-- work_date·source_type 인덱스는 기존 DB에 컬럼을 먼저 추가해야 하므로 마이그레이션에서 만든다.
 
 -- ── 기본 코드 시드 데이터 (§11 전체 코드그룹) ──
 INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
@@ -426,12 +487,12 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('JG003','job_grade','other','기타',3),
 ('JG004','job_grade','custom','직접입력',4),
 -- 제품구분
-('PT001','product_type','sw','SW',1),
-('PT002','product_type','hw','HW',2),
-('PT003','product_type','server','서버',3),
-('PT004','product_type','network','네트워크장비',4),
-('PT005','product_type','peripheral','주변장비',5),
-('PT006','product_type','kiosk','키오스크',6),
+('PT001','product_type','SW','SW',1),
+('PT002','product_type','HW','HW',2),
+('PT003','product_type','SERVER','서버',3),
+('PT004','product_type','NETWORK','네트워크장비',4),
+('PT005','product_type','PERIPHERAL','주변장비',5),
+('PT006','product_type','KIOSK','키오스크',6),
 -- 설치주체
 ('INST001','installer_type','self','자사',1),
 ('INST002','installer_type','other','타사',2),
@@ -474,8 +535,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('AS_S001','as_status','received','접수',1),
 ('AS_S002','as_status','in_progress','진행중',2),
 ('AS_S003','as_status','hold','보류',3),
-('AS_S004','as_status','completed','완료',4),
-('AS_S005','as_status','closed','종료',5),
+('AS_S006','as_status','partial_complete','부분완료',4),
+('AS_S004','as_status','completed','완료',5),
+('AS_S005','as_status','closed','종료',6),
 -- 긴급도
 ('URG001','urgency','high','상',1),
 ('URG002','urgency','normal','중',2),
@@ -503,12 +565,15 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('RC002','receipt_channel','email','이메일',2),
 ('RC003','receipt_channel','visit','방문',3),
 ('RC004','receipt_channel','partner','협력사요청',4),
+('RC005','receipt_channel','onecall','원콜',5),
+('RC006','receipt_channel','maker','제조사요청',6),
 -- 처리결과코드
 ('RSC001','result_code','done','완료',1),
-('RSC002','result_code','temporary','임시조치',2),
-('RSC005','result_code','revisit_needed','재방문필요',3),
+('RSC006','result_code','partial','부분완료',2),
+('RSC002','result_code','temporary','임시조치',3),
 ('RSC003','result_code','transfer','타사이관',4),
-('RSC004','result_code','escalation','제조사에스컬레이션',5),
+('RSC005','result_code','revisit_needed','재방문필요',5),
+('RSC004','result_code','escalation','제조사에스컬레이션',6),
 -- 수행관계 구분
 ('REL001','relation_type','mfg_request','제조사요청수행',1),
 ('REL002','relation_type','partner_request','협력사요청수행',2),
@@ -561,24 +626,144 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE customers ADD COLUMN addr_sido TEXT`,
 		`ALTER TABLE customers ADD COLUMN addr_sigungu TEXT`,
 		`ALTER TABLE customers ADD COLUMN addr_dong TEXT`,
+		`ALTER TABLE customers ADD COLUMN needs_review INTEGER DEFAULT 0`,
+		`ALTER TABLE customers ADD COLUMN review_reason TEXT`,
+		// 완료된 건과 같은 증상으로 다시 접수한 건을 원 접수와 잇는다.
+		`ALTER TABLE as_receipts ADD COLUMN parent_as_id TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN reopen_reason TEXT`,
+		`CREATE INDEX IF NOT EXISTS idx_as_receipts_parent ON as_receipts(parent_as_id)`,
+		`ALTER TABLE maintenance_visits ADD COLUMN assignee TEXT`,
+		`ALTER TABLE maintenance_visits ADD COLUMN product_type TEXT`,
+		`ALTER TABLE maintenance_visits ADD COLUMN completed INTEGER DEFAULT 0`,
+		`ALTER TABLE maintenance_visits ADD COLUMN completed_date TEXT`,
+		// 같은 날 같은 기관이라도 KLAS·앤로보틱스처럼 점검 대상이 다르면 별도 방문으로 둔다.
+		`DROP INDEX IF EXISTS idx_maintenance_visit_dedup`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_visit_dedup2
+			ON maintenance_visits(plan_id, visit_date, customer_id, COALESCE(product_type,''))`,
 		`ALTER TABLE attachments ADD COLUMN keywords TEXT`,
 		`ALTER TABLE attachments ADD COLUMN slot_no INTEGER DEFAULT 0`,
 		`ALTER TABLE as_receipts ADD COLUMN transfer_detail TEXT`,
 		`ALTER TABLE as_receipts ADD COLUMN confirm_target TEXT`,
 		`ALTER TABLE as_receipts ADD COLUMN confirm_contact TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN import_key TEXT`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_as_receipts_import_key ON as_receipts(import_key)
+			WHERE import_key IS NOT NULL AND import_key != ''`,
+		`ALTER TABLE work_projects ADD COLUMN ordering_party TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN customer_id TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN contract_type TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN billing_type TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN notes TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN contact_id TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN ordering_party_id TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN plan_year INTEGER DEFAULT 0`,
+		`ALTER TABLE work_projects ADD COLUMN short_name TEXT`,
+		`ALTER TABLE work_projects ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 1`,
+		`ALTER TABLE work_projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE assets ADD COLUMN project_id TEXT`,
+		`CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id)`,
+		`CREATE TABLE IF NOT EXISTS project_scope_rules (
+			rule_id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL,
+			parent_customer_id TEXT,
+			product_keys TEXT,
+			work_kinds TEXT,
+			notes TEXT,
+			FOREIGN KEY (project_id) REFERENCES work_projects(project_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_scope_rules_project ON project_scope_rules(project_id)`,
+		`ALTER TABLE work_tasks ADD COLUMN work_type TEXT NOT NULL DEFAULT 'admin'`,
+		`ALTER TABLE work_tasks ADD COLUMN work_date TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN start_time TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN end_time TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN source_type TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN source_id TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN duration_min INTEGER NOT NULL DEFAULT 30`,
+		`ALTER TABLE work_tasks ADD COLUMN parent_task_id TEXT`,
+		`CREATE INDEX IF NOT EXISTS idx_work_tasks_work_date ON work_tasks(work_date)`,
+		`CREATE INDEX IF NOT EXISTS idx_work_tasks_parent ON work_tasks(parent_task_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_work_tasks_source ON work_tasks(source_type, source_id)
+			WHERE source_type IS NOT NULL AND source_type != ''`,
+		// 완료·종료 AS 수정 잠금 해제용 설정·세션·감사 로그
+		`CREATE TABLE IF NOT EXISTS app_settings (
+			setting_key   TEXT PRIMARY KEY,
+			setting_value TEXT NOT NULL,
+			updated_at    TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS as_edit_unlocks (
+			unlock_id   TEXT PRIMARY KEY,
+			as_id       TEXT NOT NULL,
+			user_id     TEXT NOT NULL,
+			unlocked_at TEXT NOT NULL,
+			expires_at  TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_as_edit_unlocks_lookup ON as_edit_unlocks(as_id, user_id)`,
+		`CREATE TABLE IF NOT EXISTS as_edit_unlock_log (
+			log_id      TEXT PRIMARY KEY,
+			as_id       TEXT NOT NULL,
+			user_id     TEXT NOT NULL,
+			username    TEXT,
+			success     INTEGER NOT NULL DEFAULT 0,
+			ip_address  TEXT,
+			created_at  TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_as_edit_unlock_log_as ON as_edit_unlock_log(as_id, created_at)`,
+		// 일일 업무회의: 계획대비 실행률(매일 단위)
+		`CREATE TABLE IF NOT EXISTS daily_meeting_stats (
+			stat_date       TEXT NOT NULL,
+			scope           TEXT NOT NULL DEFAULT 'team',
+			scope_key       TEXT NOT NULL DEFAULT '',
+			planned         INTEGER NOT NULL DEFAULT 0,
+			receipt         INTEGER NOT NULL DEFAULT 0,
+			process         INTEGER NOT NULL DEFAULT 0,
+			modified        INTEGER NOT NULL DEFAULT 0,
+			execution_rate  REAL NOT NULL DEFAULT 0,
+			as_planned      INTEGER NOT NULL DEFAULT 0,
+			as_receipt      INTEGER NOT NULL DEFAULT 0,
+			as_process      INTEGER NOT NULL DEFAULT 0,
+			mnt_planned     INTEGER NOT NULL DEFAULT 0,
+			mnt_receipt     INTEGER NOT NULL DEFAULT 0,
+			mnt_process     INTEGER NOT NULL DEFAULT 0,
+			admin_planned   INTEGER NOT NULL DEFAULT 0,
+			admin_receipt   INTEGER NOT NULL DEFAULT 0,
+			admin_process   INTEGER NOT NULL DEFAULT 0,
+			computed_at     TEXT NOT NULL,
+			PRIMARY KEY (stat_date, scope, scope_key)
+		)`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
 	}
 
 	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
-		('PT006','product_type','kiosk','키오스크',6),
+		('PT006','product_type','KIOSK','키오스크',6),
 		('RQ006','requester_type','onecall','원콜',6),
-		('RSC005','result_code','revisit_needed','재방문필요',3)`)
+		('RC005','receipt_channel','onecall','원콜',5),
+		('RC006','receipt_channel','maker','제조사요청',6),
+		('RSC005','result_code','revisit_needed','재방문필요',4),
+		('RSC006','result_code','partial','부분완료',2),
+		('AS_S006','as_status','partial_complete','부분완료',4),
+		('PCT001','project_contract_type','private','수의계약',1),
+		('PCT002','project_contract_type','open_bid','일반경쟁입찰',2),
+		('PCT003','project_contract_type','limited_bid','제한경쟁입찰',3),
+		('PCT004','project_contract_type','designated_bid','지명경쟁입찰',4),
+		('PCT005','project_contract_type','negotiated','협상에의한계약',5),
+		('PCT006','project_contract_type','unit_price','단가계약',6),
+		('PCT007','project_contract_type','custom','직접입력',7),
+		('PBT001','project_billing_type','lump_sum','일시불',1),
+		('PBT002','project_billing_type','installment','분할청구(선금·중도금·잔금)',2),
+		('PBT003','project_billing_type','monthly','월정액',3),
+		('PBT004','project_billing_type','quarterly','분기',4),
+		('PBT005','project_billing_type','semi','반기',5),
+		('PBT006','project_billing_type','yearly','연간',6),
+		('PBT007','project_billing_type','custom','직접입력',7)`)
 	db.Exec(`UPDATE codes SET is_active=0 WHERE code_id IN ('RSC002','RSC004')`) // 임시조치·제조사에스컬레이션 비활성
 	db.Exec(`UPDATE codes SET sort_order=1, code_name='완료', is_active=1 WHERE code_id='RSC001'`)
-	db.Exec(`UPDATE codes SET sort_order=2, code_name='타사이관', is_active=1 WHERE code_id='RSC003'`)
-	db.Exec(`UPDATE codes SET sort_order=3, code_name='재방문필요', is_active=1 WHERE code_id='RSC005'`)
+	db.Exec(`UPDATE codes SET sort_order=2, code_name='부분완료', is_active=1 WHERE code_id='RSC006'`)
+	db.Exec(`UPDATE codes SET sort_order=3, code_name='타사이관', is_active=1 WHERE code_id='RSC003'`)
+	db.Exec(`UPDATE codes SET sort_order=4, code_name='재방문필요', is_active=1 WHERE code_id='RSC005'`)
+	db.Exec(`UPDATE codes SET sort_order=4, code_name='부분완료', is_active=1 WHERE code_id='AS_S006'`)
+	db.Exec(`UPDATE codes SET sort_order=5 WHERE code_id='AS_S004'`) // 완료
+	db.Exec(`UPDATE codes SET sort_order=6 WHERE code_id='AS_S005'`) // 종료
 	db.Exec(`CREATE TABLE IF NOT EXISTS as_work_items (
 		work_id             TEXT PRIMARY KEY,
 		work_number         TEXT NOT NULL UNIQUE,
@@ -658,8 +843,21 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('SRF004','receipt_form','onsite','현장',4),
 		('SRF005','receipt_form','mail','메일',5)`)
 
-	// 기존 설치자산 제품분류 기본값: RFID자동화
-	db.Exec(`UPDATE assets SET product_category='rfid' WHERE product_category IS NULL OR TRIM(product_category)=''`)
+	// 기존 설치자산 제품분류 기본값(RFID자동화)은 1회성 백필이다.
+	// 매번 실행하면 타사 장비를 다른 분류로 비워둔 경우까지 RFID로 되돌린다.
+	if !metaDone(db, assetCategoryBackfillMetaKey) {
+		db.Exec(`UPDATE assets SET product_category='rfid' WHERE product_category IS NULL OR TRIM(product_category)=''`)
+		markMetaDone(db, assetCategoryBackfillMetaKey)
+	}
+
+	// AS 엑셀 적재 중 기관명이 매칭되지 않아 자동 생성된 고객은 사람이 확인해야 한다.
+	// 표식을 지운 뒤 다시 켜지면 안 되므로 1회만 세운다.
+	if !metaDone(db, importedCustomerReviewMetaKey) {
+		db.Exec(`UPDATE customers SET needs_review=1, review_reason=?
+			WHERE COALESCE(needs_review,0)=0 AND notes LIKE '%AS 완료내역 엑셀 적재%'`,
+			ReviewReasonImportedCustomer)
+		markMetaDone(db, importedCustomerReviewMetaKey)
+	}
 
 	// 기관명·공식명칭에 '도서관'이 있으면 업종을 도서관으로 통일
 	db.Exec(`UPDATE customers SET industry='도서관', updated_at=CURRENT_TIMESTAMP
@@ -690,9 +888,19 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		WHERE inspection_cycle IS NULL OR TRIM(inspection_cycle)=''`)
 
 	migrateCustomerStructuredAddresses(db)
+	seedDefaultProjects(db)
+	renameSeedProjectDisplayNames(db)
+	linkRFIDAssetsToAnroboticsProject(db)
+	linkMaterialsChungnamToSWProject(db)
+	linkSejongLibraryToICTProject(db)
+	uppercaseAssetProductTypes(db)
 
 	if err := migrateBusinessIDsV2(db); err != nil {
 		log.Printf("warning: business id migrate v2: %v", err)
+	}
+
+	if err := migrateAssetIDsToASCII(db); err != nil {
+		log.Printf("warning: asset id ascii migrate: %v", err)
 	}
 
 	BackfillAssetImageSlots(db)

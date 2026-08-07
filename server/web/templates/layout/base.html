@@ -8,7 +8,16 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <style>[x-cloak]{display:none!important}.htmx-indicator{opacity:0;transition:opacity 200ms}.htmx-request .htmx-indicator{opacity:1}</style>
+  <style>
+    [x-cloak]{display:none!important}
+    .htmx-indicator{opacity:0;transition:opacity 200ms}
+    .htmx-request .htmx-indicator{opacity:1}
+    /* 모든 목록 테이블 제목행 가운데 정렬 */
+    table thead th{text-align:center!important}
+    table thead th > a{justify-content:center;width:100%}
+    /* 제목행 정렬(▲▼) 표시 크기 */
+    table thead th .inline-flex.flex-col{font-size:1rem!important;line-height:1!important}
+  </style>
 </head>
 <body class="h-full" x-data="{ sidebarOpen: false }">
 
@@ -41,6 +50,29 @@
         대시보드</a>
 
       {{if or (eq $role "admin") (eq $role "receipt") (eq $role "tech")}}
+      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">업무 관리</p>
+      <a href="/workboard/kanban" class="{{if eq $a "work_plan"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">일일 업무 현황</a>
+      <a href="/workboard/register" class="{{if eq $a "work_register"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">일일 업무 등록</a>
+      <a href="/work-status" class="{{if eq $a "work_status"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">업무처리현황</a>
+
+      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">사업(프로젝트)관리</p>
+      <a href="/projects" class="{{if eq $a "projects"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사업(프로젝트)관리</a>
+
+      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">AS관리</p>
+      <a href="/as" class="{{if eq $a "as"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">AS 접수/처리</a>
+      <a href="/as/stats" class="{{if eq $a "as_stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">AS 현황</a>
+
+      {{if or (eq $role "admin") (eq $role "tech")}}
+      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">정기점검 관리</p>
+      <a href="/maintenance" class="{{if eq $a "maintenance"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">정기점검 일정</a>
+      {{if eq $role "admin"}}
+      <a href="/maintenance/sites" class="{{if eq $a "maintenance_sites"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">점검 사이트 설정</a>
+      {{end}}
+      {{end}}
+
+      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">통계</p>
+      <a href="/stats" class="{{if or (eq $a "stats") (eq $a "stats_detail")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">통계</a>
+
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">기준정보</p>
       <a href="/customers" class="{{if eq $a "customers"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">고객현황</a>
       {{if eq $role "admin"}}
@@ -53,22 +85,6 @@
       <a href="/assets" class="{{if eq $a "assets"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">설치자산 관리</a>
       {{if eq $role "admin"}}
       <a href="/relations" class="{{if eq $a "relations"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">수행관계 관리</a>
-      {{end}}
-
-      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">AS관리</p>
-      <a href="/as" class="{{if eq $a "as"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">AS 접수/처리</a>
-      <a href="/as/stats" class="{{if eq $a "as_stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">AS 현황</a>
-      <a href="/work-status" class="{{if eq $a "work_status"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">업무처리현황</a>
-
-      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">통계</p>
-      <a href="/stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">통계</a>
-
-      {{if or (eq $role "admin") (eq $role "tech")}}
-      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">운영/일정</p>
-      <a href="/maintenance" class="{{if eq $a "maintenance"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">정기점검 일정</a>
-      {{if eq $role "admin"}}
-      <a href="/maintenance/sites" class="{{if eq $a "maintenance_sites"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 px-3 py-2 rounded-lg">점검 사이트 설정</a>
-      {{end}}
       {{end}}
 
       {{if eq $role "admin"}}

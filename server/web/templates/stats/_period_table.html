@@ -1,0 +1,88 @@
+{{define "stats_period_table"}}
+{{/* . = []StatsPeriodColumn */}}
+<div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead>
+      <tr class="bg-gray-50 text-gray-600 border-b border-gray-200">
+        <th class="px-3 py-2.5 text-left font-medium sticky left-0 bg-gray-50 z-10">업무</th>
+        <th class="px-3 py-2.5 text-left font-medium">구분</th>
+        {{range .}}
+        <th class="px-3 py-2.5 text-center font-medium min-w-[6.5rem]">
+          <div>{{.Label}}</div>
+          <div class="text-[11px] font-normal text-gray-400 mt-0.5">{{.RangeLabel}}</div>
+        </th>
+        {{end}}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{/* AS */}}
+      <tr class="hover:bg-rose-50/40">
+        <td class="px-3 py-2 font-medium text-rose-800 sticky left-0 bg-white" rowspan="3">AS</td>
+        <td class="px-3 py-2 text-gray-600">예정업무</td>
+        {{range .}}<td class="px-3 py-2 text-center tabular-nums font-semibold text-gray-800">{{.Counts.AS.Planned}}</td>{{end}}
+      </tr>
+      <tr class="hover:bg-rose-50/40">
+        <td class="px-3 py-2 text-gray-600">접수</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums text-gray-700">{{.Counts.AS.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+      <tr class="hover:bg-rose-50/40">
+        <td class="px-3 py-2 text-gray-600">처리</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums text-gray-700">{{.Counts.AS.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+
+      {{/* 정기점검 */}}
+      <tr class="hover:bg-sky-50/40">
+        <td class="px-3 py-2 font-medium text-sky-800 sticky left-0 bg-white" rowspan="3">정기점검</td>
+        <td class="px-3 py-2 text-gray-600">예정업무</td>
+        {{range .}}<td class="px-3 py-2 text-center tabular-nums font-semibold text-gray-800">{{.Counts.Mnt.Planned}}</td>{{end}}
+      </tr>
+      <tr class="hover:bg-sky-50/40">
+        <td class="px-3 py-2 text-gray-600">접수</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums text-gray-700">{{.Counts.Mnt.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+      <tr class="hover:bg-sky-50/40">
+        <td class="px-3 py-2 text-gray-600">처리</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums text-gray-700">{{.Counts.Mnt.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+
+      {{/* 행정/지원 */}}
+      <tr class="hover:bg-violet-50/40">
+        <td class="px-3 py-2 font-medium text-violet-800 sticky left-0 bg-white" rowspan="3">행정/지원</td>
+        <td class="px-3 py-2 text-gray-600">예정업무</td>
+        {{range .}}<td class="px-3 py-2 text-center tabular-nums font-semibold text-gray-800">{{.Counts.Admin.Planned}}</td>{{end}}
+      </tr>
+      <tr class="hover:bg-violet-50/40">
+        <td class="px-3 py-2 text-gray-600">접수</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums text-gray-700">{{.Counts.Admin.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+      <tr class="hover:bg-violet-50/40">
+        <td class="px-3 py-2 text-gray-600">처리</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums text-gray-700">{{.Counts.Admin.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+
+      {{/* 합계 */}}
+      <tr class="bg-slate-50 font-semibold border-t-2 border-slate-200">
+        <td class="px-3 py-2.5 sticky left-0 bg-slate-50" rowspan="5">합계</td>
+        <td class="px-3 py-2.5 text-gray-700">예정업무</td>
+        {{range .}}<td class="px-3 py-2.5 text-center tabular-nums text-slate-900">{{.Counts.PlannedTotal}}</td>{{end}}
+      </tr>
+      <tr class="bg-slate-50 font-semibold">
+        <td class="px-3 py-2.5 text-gray-700">접수</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-blue-800">{{.Counts.ReceiptTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+      <tr class="bg-slate-50 font-semibold">
+        <td class="px-3 py-2.5 text-gray-700">처리</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-emerald-800">{{.Counts.ProcessTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+      <tr class="bg-slate-50 font-semibold">
+        <td class="px-3 py-2.5 text-gray-700">계획수정</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-amber-800">{{.Counts.ModifiedTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+      <tr class="bg-slate-50 font-semibold">
+        <td class="px-3 py-2.5 text-gray-700">실행률</td>
+        {{range .}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-indigo-800">{{printf "%.1f" .Counts.ExecutionRatePct}}%</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}
+      </tr>
+    </tbody>
+  </table>
+</div>
+{{end}}

@@ -6,7 +6,22 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-gray-800">고객현황</h2>
-      <p class="text-sm text-gray-500">전체 {{.Total}}개 기관</p>
+      <p class="text-sm text-gray-500">
+        {{if .ReviewOnly}}확인 필요 {{.Total}}개 기관{{else}}전체 {{.Total}}개 기관{{end}}
+      </p>
+      {{if .ReviewCount}}
+      <div class="mt-2">
+        {{if .ReviewOnly}}
+        <a href="/customers" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
+          전체 보기
+        </a>
+        {{else}}
+        <a href="/customers?review=1" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200">
+          확인 필요 {{.ReviewCount}}건 보기
+        </a>
+        {{end}}
+      </div>
+      {{end}}
     </div>
     <div class="flex flex-col items-stretch sm:items-end gap-2">
       <form method="GET" action="/customers/export.xlsx" class="flex flex-wrap items-center gap-2">
@@ -48,6 +63,7 @@
     <form method="GET" action="/customers" class="flex flex-col lg:flex-row gap-3 flex-wrap">
       {{if .Sort}}<input type="hidden" name="sort" value="{{.Sort}}">{{end}}
       {{if .Dir}}<input type="hidden" name="dir" value="{{.Dir}}">{{end}}
+      {{if .ReviewOnly}}<input type="hidden" name="review" value="1">{{end}}
       <select name="category" onchange="this.form.submit()"
               class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[12rem] focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="" {{if eq .Category ""}}selected{{end}}>전체 카테고리</option>
@@ -87,50 +103,78 @@
       <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">고객번호</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=org_name&dir={{.SortDirOrg}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}"
-                 class="inline-flex items-center gap-1 hover:text-gray-800">
-                기관명
-                <span class="inline-flex flex-col leading-none text-[9px]">
+              <a href="/customers?sort=customer_id&dir={{.SortDirID}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800">고객번호
+                <span class="inline-flex flex-col leading-none text-base">
+                  <span class="{{if and (eq .Sort "customer_id") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                  <span class="{{if and (eq .Sort "customer_id") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+                </span>
+              </a>
+            </th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <a href="/customers?sort=org_name&dir={{.SortDirOrg}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800">기관명
+                <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "org_name") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
                   <span class="{{if and (eq .Sort "org_name") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
                 </span>
               </a>
             </th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">상위기관</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
+              <a href="/customers?sort=parent&dir={{.SortDirParent}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800">상위기관
+                <span class="inline-flex flex-col leading-none text-base">
+                  <span class="{{if and (eq .Sort "parent") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                  <span class="{{if and (eq .Sort "parent") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+                </span>
+              </a>
+            </th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-              <a href="/customers?sort=industry&dir={{.SortDirInd}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}"
-                 class="inline-flex items-center gap-1 hover:text-gray-800">
-                업종
-                <span class="inline-flex flex-col leading-none text-[9px]">
+              <a href="/customers?sort=industry&dir={{.SortDirInd}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800">업종
+                <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "industry") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
                   <span class="{{if and (eq .Sort "industry") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
                 </span>
               </a>
             </th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">대표전화</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+              <a href="/customers?sort=phone&dir={{.SortDirPhone}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800">대표전화
+                <span class="inline-flex flex-col leading-none text-base">
+                  <span class="{{if and (eq .Sort "phone") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                  <span class="{{if and (eq .Sort "phone") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+                </span>
+              </a>
+            </th>
             <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=assets&dir={{.SortDirAst}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}"
-                 class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">
-                자산
-                <span class="inline-flex flex-col leading-none text-[9px]">
+              <a href="/customers?sort=assets&dir={{.SortDirAst}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">자산
+                <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "assets") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
                   <span class="{{if and (eq .Sort "assets") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
                 </span>
               </a>
             </th>
             <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=as&dir={{.SortDirAS}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}"
-                 class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">
-                AS
-                <span class="inline-flex flex-col leading-none text-[9px]">
+              <a href="/customers?sort=as&dir={{.SortDirAS}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">AS
+                <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "as") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
                   <span class="{{if and (eq .Sort "as") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
                 </span>
               </a>
             </th>
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <a href="/customers?sort=status&dir={{.SortDirStatus}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+                 class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">상태
+                <span class="inline-flex flex-col leading-none text-base">
+                  <span class="{{if and (eq .Sort "status") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
+                  <span class="{{if and (eq .Sort "status") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
+                </span>
+              </a>
+            </th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -140,11 +184,20 @@
             <tr class="hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.CustomerID}}</td>
               <td class="px-4 py-3">
-                <a href="/customers/{{.CustomerID}}" class="font-medium text-gray-800 hover:text-blue-600">
-                  {{.OrgName}}
-                </a>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <a href="/customers/{{.CustomerID}}" class="font-medium text-gray-800 hover:text-blue-600">
+                    {{.OrgName}}
+                  </a>
+                  {{if .NeedsReview}}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800"
+                        title="{{.ReviewReason}}">확인 필요</span>
+                  {{end}}
+                </div>
                 {{if ne .OfficialName .OrgName}}
                 <p class="text-xs text-gray-400 mt-0.5">{{.OfficialName}}</p>
+                {{end}}
+                {{if and .NeedsReview $.ReviewOnly}}
+                <p class="text-xs text-amber-700 mt-1">{{.ReviewReason}}</p>
                 {{end}}
               </td>
               <td class="px-4 py-3 text-gray-600 hidden md:table-cell text-xs">
@@ -182,6 +235,13 @@
                   <a href="/customers/{{.CustomerID}}" class="text-xs text-blue-600 hover:underline">상세</a>
                   {{if $.CanWrite}}
                   <a href="/customers/{{.CustomerID}}/edit" class="text-xs text-gray-500 hover:text-gray-700">수정</a>
+                  {{if .NeedsReview}}
+                  <form method="POST" action="/customers/{{.CustomerID}}/review" class="inline">
+                    <input type="hidden" name="on" value="0">
+                    <input type="hidden" name="redirect" value="/customers?review=1{{if $.Search}}&search={{$.Search}}{{end}}">
+                    <button type="submit" class="text-xs text-amber-700 hover:underline">확인 완료</button>
+                  </form>
+                  {{end}}
                   {{if .IsActive}}
                   <form method="POST" action="/customers/{{.CustomerID}}/delete" class="inline"
                         onsubmit="return confirm('이 기관을 삭제(비활성)할까요?');">
@@ -221,11 +281,11 @@
       </p>
       <div class="flex gap-1">
         {{if gt .Page 1}}
-        <a href="/customers?page={{sub .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}"
+        <a href="/customers?page={{sub .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}{{if .ReviewOnly}}&review=1{{end}}"
            class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">이전</a>
         {{end}}
         {{if lt .Page .TotalPages}}
-        <a href="/customers?page={{add .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}"
+        <a href="/customers?page={{add .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}{{if .ReviewOnly}}&review=1{{end}}"
            class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">다음</a>
         {{end}}
       </div>

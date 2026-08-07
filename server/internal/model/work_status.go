@@ -2,12 +2,13 @@ package model
 
 // WorkCalItem 캘린더 칸에 표시하는 업무 1건
 type WorkCalItem struct {
-	Category string // as | maintenance | other
-	ID       string
-	Title    string // 고객(기관)명 등 표시 우선
-	Subtitle string // 접수번호 등 보조
-	Link     string
-	Date     string // YYYY-MM-DD
+	Category    string // as | maintenance | other
+	ID          string
+	Title       string // 고객(기관)명 등 표시 우선
+	Subtitle    string // 접수번호·점검대상 등 보조
+	ProductType string // 정기점검 점검 대상(색 구분)
+	Link        string
+	Date        string // YYYY-MM-DD
 }
 
 // WorkCalDay 달력 1칸

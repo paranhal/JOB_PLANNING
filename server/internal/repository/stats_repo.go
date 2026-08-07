@@ -191,17 +191,17 @@ func metricDateExpr(metric string) string {
 func metricStatusCond(metric string) string {
 	switch metric {
 	case model.StatsMetricProgress:
-		// 미완료(업무진행)
-		return ` AND ar.status IN ('received','assigned','in_progress','hold')`
+		// 미완료 — 차트 open과 동일(이관 포함, 부분완료 제외)
+		return ` AND ar.status IN ` + model.SQLStatusStatsOpen
 	case model.StatsMetricCompleted:
-		return ` AND ar.status IN ('completed','closed')`
+		return ` AND ar.status IN ` + model.SQLStatusStatsCompleted
 	case model.StatsMetricReceived:
 		return `` // 접수 전체(기간만)
 	case model.StatsMetricOverdue:
 		return ` AND ar.status IN ('received','assigned','in_progress')
 		         AND julianday('now','localtime') - julianday(date(ar.receipt_datetime)) > 3`
 	default:
-		return ` AND ar.status IN ('received','assigned','in_progress','hold')`
+		return ` AND ar.status IN ` + model.SQLStatusStatsOpen
 	}
 }
 
@@ -264,6 +264,94 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 		it.WorkForm = "AS"
 		it.ReceiptForm = mapReceiptForm(channel, reqType)
 		it.StatusLabel = statsStatusLabel(it.Status)
+		if it.Assignee == "" {
+			it.Assignee = "(미배정)"
+		}
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 접수·미완료 통계에 부분완료 하위업무를 포함한다.
+	if q.Metric == model.StatsMetricReceived || q.Metric == model.StatsMetricProgress {
+		workRows, err := r.listPartialWorkDetail(q, now)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, workRows...)
+	}
+	return items, nil
+}
+
+// listPartialWorkDetail 부분완료 접수의 하위업무를 접수/진행중 상세 행으로 반환한다.
+func (r *StatsRepo) listPartialWorkDetail(q model.StatsQuery, now time.Time) ([]model.StatsRow, error) {
+	sqlQ := `
+		SELECT ar.as_id, w.work_number,
+		       COALESCE(w.created_at,''),
+		       COALESCE(a.product_category,''), COALESCE(a.product_type,''),
+		       COALESCE(a.model_name,''), COALESCE(a.product_name,''),
+		       COALESCE(ar.receipt_channel,''), COALESCE(ar.requester_type,''),
+		       COALESCE(c.org_name,''),
+		       COALESCE(ar.assigned_to,''),
+		       COALESCE(ar.symptom,''), COALESCE(w.notes,''),
+		       COALESCE(w.work_kind,''), COALESCE(w.schedule_confirmed,0), COALESCE(w.status,'open')
+		FROM as_work_items w
+		JOIN as_receipts ar ON ar.as_id = w.as_id
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.status = 'partial_complete'`
+	args := []interface{}{}
+	if q.Metric == model.StatsMetricProgress {
+		sqlQ += ` AND COALESCE(w.status,'open') = 'open'`
+	}
+	if from, to, ok, _ := ResolveStatsRange(q, now); ok {
+		sqlQ += ` AND date(w.created_at) >= date(?) AND date(w.created_at) < date(?)`
+		args = append(args, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	}
+	sqlQ += ` ORDER BY w.created_at DESC, w.work_number DESC`
+
+	rows, err := r.db.Query(sqlQ, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.StatsRow
+	for rows.Next() {
+		var it model.StatsRow
+		var createdStr, productCategory, productType, modelName, productName, channel, reqType string
+		var workKind, workStatus string
+		var confirmed int
+		if err := rows.Scan(
+			&it.ASID, &it.ASNumber, &createdStr,
+			&productCategory, &productType, &modelName, &productName,
+			&channel, &reqType,
+			&it.CustomerName, &it.Assignee,
+			&it.Symptom, &it.ActionTaken,
+			&workKind, &confirmed, &workStatus,
+		); err != nil {
+			return nil, err
+		}
+		if t := parseTime(createdStr); !t.IsZero() {
+			it.ReceiptDate = t.Format("2006-01-02")
+		}
+		it.ProductCategory = mapProductCategory(productCategory, productType, productName)
+		it.ProductModel = strings.TrimSpace(modelName)
+		if it.ProductModel == "" {
+			it.ProductModel = strings.TrimSpace(productName)
+		}
+		it.WorkForm = "AS·" + model.WorkKindLabel(workKind)
+		it.ReceiptForm = mapReceiptForm(channel, reqType)
+		if confirmed == 1 {
+			it.Status = "in_progress"
+		} else {
+			it.Status = "received"
+		}
+		it.StatusLabel = statsStatusLabel(it.Status)
+		if strings.TrimSpace(it.ActionTaken) == "" {
+			it.ActionTaken = "[" + model.WorkKindLabel(workKind) + "] 하위업무"
+		}
 		if it.Assignee == "" {
 			it.Assignee = "(미배정)"
 		}
@@ -379,7 +467,7 @@ func statsStatusLabel(s string) string {
 	m := map[string]string{
 		"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "보류",
 		"transfer": "이관", "cancelled": "접수취소",
-		"completed": "완료", "closed": "종료",
+		"completed": "완료", "closed": "종료", "partial_complete": "부분완료",
 	}
 	if l, ok := m[s]; ok {
 		return l

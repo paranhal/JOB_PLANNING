@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"fmt"
 	"html/template"
 	"io"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -30,6 +32,19 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		if partials, err := filepath.Glob("web/templates/asset/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
+	}
+	if strings.HasPrefix(name, "workboard/") {
+		if partials, err := filepath.Glob("web/templates/workboard/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if strings.HasPrefix(name, "stats/") {
+		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if name == "dashboard.html" {
+		files = append(files, "web/templates/stats/_period_table.html")
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
@@ -79,9 +94,10 @@ func RenderPartial(c echo.Context, name string, data interface{}) error {
 
 func funcMap() template.FuncMap {
 	return template.FuncMap{
-		"add":      func(a, b int) int { return a + b },
-		"subtract": func(a, b int) int { return a - b },
-		"urlquery": url.QueryEscape,
+		"add":       func(a, b int) int { return a + b },
+		"subtract":  func(a, b int) int { return a - b },
+		"hasSuffix": strings.HasSuffix,
+		"urlquery":  url.QueryEscape,
 		"hasString": func(list interface{}, s string) bool {
 			switch v := list.(type) {
 			case []string:
@@ -117,16 +133,52 @@ func funcMap() template.FuncMap {
 			return s
 		},
 		"contains": func(s, sub string) bool { return strings.Contains(s, sub) },
+		"upper":    strings.ToUpper,
+
 		"statusLabel": func(s string) string {
 			m := map[string]string{
 				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "보류",
 				"transfer": "이관", "cancelled": "접수취소",
+				"partial_complete": "부분완료",
 				"completed": "완료", "closed": "종료",
 			}
 			if l, ok := m[s]; ok {
 				return l
 			}
 			return s
+		},
+		// statusBadge 상태 뱃지. 부분완료는 「부분완료」로 명확히 표시한다.
+		"statusBadge": func(s string) template.HTML {
+			label := map[string]string{
+				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "보류",
+				"transfer": "이관", "cancelled": "접수취소",
+				"partial_complete": "부분완료", "completed": "완료", "closed": "종료",
+			}[s]
+			if label == "" {
+				label = s
+			}
+			color := map[string]string{
+				"received":         "bg-blue-100 text-blue-800",
+				"assigned":         "bg-indigo-100 text-indigo-800",
+				"in_progress":      "bg-yellow-100 text-yellow-800",
+				"hold":             "bg-orange-100 text-orange-800",
+				"transfer":         "bg-purple-100 text-purple-800",
+				"cancelled":        "bg-gray-100 text-gray-500",
+				"partial_complete": "bg-teal-100 text-teal-800",
+				"completed":        "bg-green-100 text-green-800",
+				"closed":           "bg-gray-100 text-gray-500",
+			}[s]
+			if color == "" {
+				color = "bg-gray-100 text-gray-800"
+			}
+			title := ""
+			if s == model.StatusPartialComplete {
+				title = ` title="통계는 완료 집계 · 하위업무는 접수/미완료 · 운영은 진행중"`
+			}
+			return template.HTML(fmt.Sprintf(
+				`<span class="px-2 py-0.5 rounded-full text-xs font-medium %s"%s>%s</span>`,
+				color, title, template.HTMLEscapeString(label),
+			))
 		},
 		"workKindLabel": func(s string) string {
 			return model.WorkKindLabel(s)
@@ -148,6 +200,15 @@ func funcMap() template.FuncMap {
 				return "bg-gray-100 text-gray-700"
 			}
 		},
+		"visitLabel":           visitLabel,
+		"mntViewLabel":         mntViewLabel,
+		"mntProductClass":      mntProductClass,
+		"mntProductStyle":      mntProductStyle,
+		"mntProductBadgeClass": mntProductBadgeClass,
+		"mntProductBadgeStyle": mntProductBadgeStyle,
+		"list": func(items ...string) []string {
+			return items
+		},
 		"holdNextLabel": func(s string) string {
 			m := map[string]string{
 				"action": "조치", "transfer": "이관", "cancel": "접수취소",
@@ -159,14 +220,15 @@ func funcMap() template.FuncMap {
 		},
 		"statusColor": func(s string) string {
 			m := map[string]string{
-				"received":    "bg-blue-100 text-blue-800",
-				"assigned":    "bg-indigo-100 text-indigo-800",
-				"in_progress": "bg-yellow-100 text-yellow-800",
-				"hold":        "bg-orange-100 text-orange-800",
-				"transfer":    "bg-purple-100 text-purple-800",
-				"cancelled":   "bg-gray-100 text-gray-500",
-				"completed":   "bg-green-100 text-green-800",
-				"closed":      "bg-gray-100 text-gray-500",
+				"received":         "bg-blue-100 text-blue-800",
+				"assigned":         "bg-indigo-100 text-indigo-800",
+				"in_progress":      "bg-yellow-100 text-yellow-800",
+				"hold":             "bg-orange-100 text-orange-800",
+				"transfer":         "bg-purple-100 text-purple-800",
+				"cancelled":        "bg-gray-100 text-gray-500",
+				"partial_complete": "bg-teal-100 text-teal-800",
+				"completed":        "bg-green-100 text-green-800",
+				"closed":           "bg-gray-100 text-gray-500",
 			}
 			if c, ok := m[s]; ok {
 				return c
@@ -311,8 +373,78 @@ func funcMap() template.FuncMap {
 			return s
 		},
 		"codeLabel": func(val string, codes interface{}) string {
-			// 범용 코드→이름 변환
 			return val
 		},
+		"wbTaskStatusLabel": model.WBTaskStatusLabel,
+		"wbPriorityLabel":   model.WBPriorityLabel,
+		"wbWorkTypeLabel":   model.WBWorkTypeLabel,
+		"wbWorkTypeClass":   model.WBWorkTypeClass,
+		"wbCategoryLabel":   model.WBCategoryLabel,
+		"wbCategoryClass":   model.WBCategoryClass,
+		"wbProjectStatusLabel": model.WBProjectStatusLabel,
+		"productKeyLabel":      model.ProductKeyLabel,
+		"productKeysLabel":     model.ProductKeysLabel,
+		"scopeWorkKindLabel":   model.ScopeWorkKindLabel,
+		"scopeWorkKindsLabel":  model.ScopeWorkKindsLabel,
+		"wbPriorityClass": func(p string) string {
+			switch p {
+			case model.WBPriorityUrgent:
+				return "bg-red-100 text-red-700"
+			case model.WBPriorityHigh:
+				return "bg-orange-100 text-orange-700"
+			case model.WBPriorityNormal:
+				return "bg-sky-100 text-sky-700"
+			default:
+				return "bg-gray-100 text-gray-600"
+			}
+		},
+		"wbDdayLabel": func(d int, status string) string {
+			if status == model.WBTaskComplete {
+				if d < 0 {
+					return "+" + fmtInt(-d) + "일"
+				}
+				return "완료"
+			}
+			if d == 0 {
+				return "D-day"
+			}
+			if d > 0 {
+				return "D-" + fmtInt(d)
+			}
+			return "D+" + fmtInt(-d)
+		},
+		"kanbanCol": func(root interface{}, title, border, key string) map[string]interface{} {
+			m, _ := root.(map[string]interface{})
+			items := []model.WorkTask{}
+			// 완료 열은 상태 기준, 그 외는 업무 유형 기준
+			if key == model.WBTaskComplete {
+				if by, ok := m["ByStatus"].(map[string][]model.WorkTask); ok {
+					items = by[key]
+				}
+			} else if by, ok := m["ByWorkType"].(map[string][]model.WorkTask); ok {
+				if list, ok := by[key]; ok {
+					items = list
+				}
+			} else if by, ok := m["ByStatus"].(map[string][]model.WorkTask); ok {
+				items = by[key]
+			}
+			return map[string]interface{}{
+				"Title": title, "Border": border, "Items": items,
+			}
+		},
+		"wbPalette": func(title, border, text, headBg string, cards []model.WBCard, canWrite bool) map[string]interface{} {
+			return map[string]interface{}{
+				"Title": title, "Border": border, "Text": text, "HeadBg": headBg,
+				"Cards": cards, "CanWrite": canWrite,
+			}
+		},
+		"printf": fmt.Sprintf,
 	}
+}
+
+func fmtInt(n int) string {
+	if n < 0 {
+		n = -n
+	}
+	return strconv.Itoa(n)
 }

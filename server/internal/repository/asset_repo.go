@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"customer-support/internal/model"
@@ -11,8 +12,14 @@ type AssetRepo struct{ db *sql.DB }
 
 func NewAssetRepo(db *sql.DB) *AssetRepo { return &AssetRepo{db: db} }
 
-func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model.Asset, int, error) {
-	offset := (page - 1) * pageSize
+func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir string, page, pageSize int) ([]model.Asset, int, error) {
+	offset := 0
+	if page < 1 {
+		page = 1
+	}
+	if pageSize > 0 {
+		offset = (page - 1) * pageSize
+	}
 
 	base := `
 		SELECT a.asset_id, a.customer_id, a.product_name, COALESCE(a.product_type,''),
@@ -26,6 +33,8 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,'') AS fname,
 		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,'') AS rname,
 		       COALESCE(a.install_location,''),
+		       COALESCE(a.project_id,''),
+		       COALESCE(NULLIF(TRIM(p.short_name),''), p.name, '') AS project_name,
 		       (SELECT COUNT(*) FROM as_receipts ar WHERE ar.asset_id=a.asset_id) AS as_cnt,
 		       CASE WHEN a.install_date!='' THEN CAST((julianday('now')-julianday(a.install_date))/365 AS INTEGER) ELSE 0 END AS yrs
 		FROM assets a
@@ -33,6 +42,7 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 		LEFT JOIN customer_buildings b ON b.building_id=a.building_id
 		LEFT JOIN customer_floors f ON f.floor_id=a.floor_id
 		LEFT JOIN customer_rooms rm ON rm.room_id=a.room_id
+		LEFT JOIN work_projects p ON p.project_id=a.project_id
 		WHERE 1=1`
 
 	cnt := `SELECT COUNT(*) FROM assets a JOIN customers c ON c.customer_id=a.customer_id WHERE 1=1`
@@ -44,13 +54,25 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 		args = append(args, customerID)
 		cntArgs = append(cntArgs, customerID)
 	}
+	if projectID != "" {
+		base += ` AND a.project_id=?`
+		cnt += ` AND a.project_id=?`
+		args = append(args, projectID)
+		cntArgs = append(cntArgs, projectID)
+	}
+	if category != "" {
+		base += ` AND LOWER(TRIM(COALESCE(a.product_category,'')))=?`
+		cnt += ` AND LOWER(TRIM(COALESCE(a.product_category,'')))=?`
+		args = append(args, strings.ToLower(strings.TrimSpace(category)))
+		cntArgs = append(cntArgs, strings.ToLower(strings.TrimSpace(category)))
+	}
 	if search != "" {
 		like := "%" + search + "%"
-		f := ` AND (a.product_name LIKE ? OR a.serial_number LIKE ? OR c.org_name LIKE ? OR a.model_name LIKE ? OR a.install_location LIKE ?)`
+		f := ` AND (a.product_name LIKE ? OR a.serial_number LIKE ? OR c.org_name LIKE ? OR a.model_name LIKE ? OR a.install_location LIKE ? OR a.asset_id LIKE ?)`
 		base += f
 		cnt += f
-		args = append(args, like, like, like, like, like)
-		cntArgs = append(cntArgs, like, like, like, like, like)
+		args = append(args, like, like, like, like, like, like)
+		cntArgs = append(cntArgs, like, like, like, like, like, like)
 	}
 
 	var total int
@@ -58,8 +80,15 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 		return nil, 0, err
 	}
 
-	base += ` ORDER BY c.org_name, a.product_name LIMIT ? OFFSET ?`
-	args = append(args, pageSize, offset)
+	orderDir := "ASC"
+	if dir == "desc" {
+		orderDir = "DESC"
+	}
+	base += " " + assetListOrderBy(sort, orderDir)
+	if pageSize > 0 {
+		base += ` LIMIT ? OFFSET ?`
+		args = append(args, pageSize, offset)
+	}
 
 	rows, err := r.db.Query(base, args...)
 	if err != nil {
@@ -78,7 +107,7 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 			&a.InstallDate, &a.OperationStatus, &a.ManagementType, &managed,
 			&a.MaintContractType, &a.MaintCycle,
 			&a.OrgName, &a.BuildingName, &a.FloorName, &a.RoomName,
-			&a.InstallLocation,
+			&a.InstallLocation, &a.ProjectID, &a.ProjectName,
 			&a.AsCount, &a.InstallYears,
 		); err != nil {
 			return nil, 0, err
@@ -87,6 +116,52 @@ func (r *AssetRepo) List(customerID, search string, page, pageSize int) ([]model
 		items = append(items, a)
 	}
 	return items, total, rows.Err()
+}
+
+// ListExport 엑셀용 전체 목록 (현재 필터·정렬 반영, 페이징 없음)
+func (r *AssetRepo) ListExport(customerID, search, projectID, category, sort, dir string) ([]model.Asset, error) {
+	items, _, err := r.List(customerID, search, projectID, category, sort, dir, 1, 0)
+	return items, err
+}
+
+// CountByProject 사업에 연결된 설치자산 건수
+func (r *AssetRepo) CountByProject(projectID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM assets WHERE project_id=?`, projectID).Scan(&n)
+	return n, err
+}
+
+func assetListOrderBy(sort, orderDir string) string {
+	switch sort {
+	case "asset_id":
+		return `ORDER BY a.asset_id ` + orderDir
+	case "org_name":
+		return `ORDER BY c.org_name COLLATE NOCASE ` + orderDir + `, a.product_name ASC`
+	case "product_name":
+		return `ORDER BY a.product_name COLLATE NOCASE ` + orderDir + `, c.org_name ASC`
+	case "product_category":
+		return `ORDER BY a.product_category ` + orderDir + `, c.org_name ASC`
+	case "product_type":
+		return `ORDER BY a.product_type ` + orderDir + `, a.product_name ASC`
+	case "serial_number":
+		return `ORDER BY a.serial_number ` + orderDir
+	case "location":
+		return `ORDER BY bname ` + orderDir + `, fname ` + orderDir + `, rname ` + orderDir
+	case "install_location":
+		return `ORDER BY a.install_location COLLATE NOCASE ` + orderDir
+	case "maint_contract":
+		return `ORDER BY a.maint_contract_type ` + orderDir + `, a.maint_cycle ` + orderDir
+	case "status":
+		return `ORDER BY a.operation_status ` + orderDir + `, c.org_name ASC`
+	case "install_years":
+		return `ORDER BY yrs ` + orderDir + `, a.install_date ` + orderDir
+	case "as_count":
+		return `ORDER BY as_cnt ` + orderDir + `, c.org_name ASC`
+	case "project":
+		return `ORDER BY project_name COLLATE NOCASE ` + orderDir + `, c.org_name ASC`
+	default:
+		return `ORDER BY c.org_name COLLATE NOCASE ASC, a.product_name ASC`
+	}
 }
 
 func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
@@ -107,16 +182,19 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		       COALESCE(a.loc_building_name,''), COALESCE(a.loc_floor_name,''), COALESCE(a.loc_room_name,''),
 		       COALESCE(a.install_location,''),
 		       COALESCE(a.location_detail,''), COALESCE(a.notes,''),
+		       COALESCE(a.project_id,''),
 		       a.created_at, a.updated_at,
 		       c.org_name,
 		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
 		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,''),
-		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,'')
+		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,''),
+		       COALESCE(NULLIF(TRIM(p.short_name),''), p.name, '')
 		FROM assets a
 		JOIN customers c ON c.customer_id=a.customer_id
 		LEFT JOIN customer_buildings b ON b.building_id=a.building_id
 		LEFT JOIN customer_floors f ON f.floor_id=a.floor_id
 		LEFT JOIN customer_rooms rm ON rm.room_id=a.room_id
+		LEFT JOIN work_projects p ON p.project_id=a.project_id
 		WHERE a.asset_id=?`
 
 	var a model.Asset
@@ -139,8 +217,10 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		&a.LocBuildingName, &a.LocFloorName, &a.LocRoomName,
 		&a.InstallLocation,
 		&a.LocationDetail, &a.Notes,
+		&a.ProjectID,
 		&createdAt, &updatedAt,
 		&a.OrgName, &a.BuildingName, &a.FloorName, &a.RoomName,
+		&a.ProjectName,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -155,7 +235,7 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 }
 
 func (r *AssetRepo) Create(a *model.Asset) error {
-	id, err := NextAssetID(r.db, a.ModelName, a.ProductName, a.ProductType)
+	id, err := NextAssetID(r.db, a.ModelName, a.ProductName, a.ProductType, a.Manufacturer)
 	if err != nil {
 		return err
 	}
@@ -173,9 +253,9 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 			customer_contact_id, our_contact,
 			building_id, floor_id, room_id,
 			loc_building_name, loc_floor_name, loc_room_name,
-			install_location, location_detail, notes,
+			install_location, location_detail, notes, project_id,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
 		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
@@ -186,7 +266,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
 		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
-		a.InstallLocation, a.LocationDetail, a.Notes, now, now,
+		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, now,
 	)
 	return err
 }
@@ -205,7 +285,7 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			customer_contact_id=?, our_contact=?,
 			building_id=?, floor_id=?, room_id=?,
 			loc_building_name=?, loc_floor_name=?, loc_room_name=?,
-			install_location=?, location_detail=?, notes=?,
+			install_location=?, location_detail=?, notes=?, project_id=?,
 			updated_at=?
 		WHERE asset_id=?`,
 		a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
@@ -218,7 +298,7 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
 		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
-		a.InstallLocation, a.LocationDetail, a.Notes, now, a.AssetID,
+		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, a.AssetID,
 	)
 	return err
 }
@@ -302,4 +382,62 @@ func (r *AssetRepo) CountOperating(count *int) {
 	r.db.QueryRow(`
 		SELECT COUNT(*) FROM assets
 		WHERE operation_status NOT IN ('disposed','retired')`).Scan(count)
+}
+
+// ListMaintExport 고객현황 엑셀용 — 기관별 설치자산 유지보수 계약 행
+func (r *AssetRepo) ListMaintExport(customerIDs []string) ([]model.Asset, error) {
+	if len(customerIDs) == 0 {
+		return nil, nil
+	}
+	allow := make(map[string]struct{}, len(customerIDs))
+	for _, id := range customerIDs {
+		allow[id] = struct{}{}
+	}
+	rows, err := r.db.Query(`
+		SELECT a.asset_id, a.customer_id, COALESCE(c.org_name,''),
+		       COALESCE(a.product_name,''), COALESCE(a.product_type,''), COALESCE(a.product_category,''),
+		       COALESCE(a.model_name,''), COALESCE(a.serial_number,''), COALESCE(a.install_date,''),
+		       COALESCE(a.operation_status,'operating'),
+		       COALESCE(a.maint_contract_type,''), COALESCE(a.maint_cycle,''),
+		       COALESCE(a.maint_start_date,''), COALESCE(a.maint_end_date,''),
+		       COALESCE(a.maint_billing_party,''), COALESCE(a.maint_billing_cycle,''),
+		       COALESCE(a.install_location,''),
+		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
+		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,''),
+		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,''),
+		       COALESCE(a.notes,'')
+		FROM assets a
+		JOIN customers c ON c.customer_id = a.customer_id
+		LEFT JOIN customer_buildings b ON b.building_id = a.building_id
+		LEFT JOIN customer_floors f ON f.floor_id = a.floor_id
+		LEFT JOIN customer_rooms rm ON rm.room_id = a.room_id
+		WHERE a.operation_status NOT IN ('disposed','retired')
+		ORDER BY c.org_name, a.product_name, a.install_location, a.asset_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.Asset
+	for rows.Next() {
+		var a model.Asset
+		if err := rows.Scan(
+			&a.AssetID, &a.CustomerID, &a.OrgName,
+			&a.ProductName, &a.ProductType, &a.ProductCategory,
+			&a.ModelName, &a.SerialNumber, &a.InstallDate,
+			&a.OperationStatus,
+			&a.MaintContractType, &a.MaintCycle,
+			&a.MaintStartDate, &a.MaintEndDate,
+			&a.MaintBillingParty, &a.MaintBillingCycle,
+			&a.InstallLocation,
+			&a.BuildingName, &a.FloorName, &a.RoomName,
+			&a.Notes,
+		); err != nil {
+			return nil, err
+		}
+		if _, ok := allow[a.CustomerID]; !ok {
+			continue
+		}
+		items = append(items, a)
+	}
+	return items, rows.Err()
 }

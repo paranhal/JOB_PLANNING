@@ -20,6 +20,9 @@
       {{else}}
         <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">비활성</span>
       {{end}}
+      {{if .Customer.NeedsReview}}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">확인 필요</span>
+      {{end}}
     </div>
     <div class="flex gap-2">
       {{if .CanWrite}}
@@ -36,6 +39,39 @@
       {{end}}
     </div>
   </div>
+
+  {{if .Customer.NeedsReview}}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p class="text-sm font-semibold text-amber-900">확인이 필요한 기관입니다</p>
+        <p class="text-sm text-amber-800 mt-1">{{.Customer.ReviewReason}}</p>
+        <p class="text-xs text-amber-700 mt-1">기관명·공식명칭·주소·연락처를 확인해 수정하거나, 기존 기관과 중복이면 통합해 주세요.</p>
+      </div>
+      {{if .CanWrite}}
+      <div class="flex items-center gap-2">
+        <a href="/customers/{{.Customer.CustomerID}}/edit"
+           class="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">정보 수정</a>
+        <form method="POST" action="/customers/{{.Customer.CustomerID}}/review">
+          <input type="hidden" name="on" value="0">
+          <input type="hidden" name="redirect" value="/customers/{{.Customer.CustomerID}}">
+          <button type="submit" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-100">
+            확인 완료
+          </button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{else if .CanWrite}}
+  <div class="flex justify-end">
+    <form method="POST" action="/customers/{{.Customer.CustomerID}}/review">
+      <input type="hidden" name="on" value="1">
+      <input type="hidden" name="redirect" value="/customers/{{.Customer.CustomerID}}">
+      <button type="submit" class="text-xs text-gray-400 hover:text-amber-700 hover:underline">확인 필요로 표시</button>
+    </form>
+  </div>
+  {{end}}
 
   <!-- 정보 카드 -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

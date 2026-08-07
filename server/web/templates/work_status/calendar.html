@@ -62,14 +62,17 @@
             {{if .Link}}
             <a href="{{.Link}}" class="block rounded px-1.5 py-0.5 text-[11px] leading-tight truncate
               {{if eq .Category "as"}}bg-sky-100 text-sky-900 hover:bg-sky-200
-              {{else if eq .Category "maintenance"}}bg-emerald-100 text-emerald-900 hover:bg-emerald-200
+              {{else if eq .Category "maintenance"}}{{mntProductClass .ProductType}}
               {{else}}bg-amber-100 text-amber-900 hover:bg-amber-200{{end}}"
-               title="{{.Title}} {{.Subtitle}}">
+               {{if and (eq .Category "maintenance") .ProductType}}style="{{mntProductStyle .ProductType}}"{{end}}
+               title="{{.Title}}{{if .Subtitle}} · {{.Subtitle}}{{end}}">
               <span class="font-medium">{{.Title}}</span>{{if .Subtitle}} · {{.Subtitle}}{{end}}
             </a>
             {{else}}
-            <span class="block rounded px-1.5 py-0.5 text-[11px] leading-tight truncate bg-amber-100 text-amber-900"
-                  title="{{.Title}} {{.Subtitle}}">
+            <span class="block rounded px-1.5 py-0.5 text-[11px] leading-tight truncate
+              {{if eq .Category "maintenance"}}{{mntProductClass .ProductType}}{{else}}bg-amber-100 text-amber-900{{end}}"
+              {{if and (eq .Category "maintenance") .ProductType}}style="{{mntProductStyle .ProductType}}"{{end}}
+                  title="{{.Title}}{{if .Subtitle}} · {{.Subtitle}}{{end}}">
               <span class="font-medium">{{.Title}}</span>{{if .Subtitle}} · {{.Subtitle}}{{end}}
             </span>
             {{end}}
@@ -82,10 +85,16 @@
     </div>
   </div>
 
-  <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+  <div class="flex flex-wrap gap-3 text-xs text-gray-600">
+    {{if eq .Category "maintenance"}}
+    <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#bbf7d0;border:2px solid #16a34a"></span>초록 · 앤로보틱스</span>
+    <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#bfdbfe;border:2px solid #2563eb"></span>파랑 · K-LAS</span>
+    <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#e9d5ff;border:2px solid #9333ea"></span>보라 · 세종 K-LAS</span>
+    {{else}}
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-sky-100 border border-sky-200"></span> AS</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-100 border border-emerald-200"></span> 정기점검</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-200"></span> 기타</span>
+    {{end}}
   </div>
 </div>
 {{end}}

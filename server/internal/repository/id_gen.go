@@ -7,9 +7,38 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
-const idFormatV2MetaKey = "__meta:id_format_v2"
+const (
+	idFormatV2MetaKey             = "__meta:id_format_v2"
+	assetCategoryBackfillMetaKey  = "__meta:asset_category_backfill"
+	assetIDASCIIMetaKey           = "__meta:asset_id_ascii"
+	importedCustomerReviewMetaKey = "__meta:imported_customer_review"
+	assetRFIDProjectLinkMetaKey      = "__meta:asset_rfid_project_wpseed03_v1"
+	assetMaterialsChungnamLinkMetaKey = "__meta:asset_materials_chungnam_wpseed01_v1"
+	assetSejongLibraryICTLinkMetaKey  = "__meta:asset_sejong_library_ict_wpseed02_v2"
+	projectDisplayNamesV2MetaKey      = "__meta:project_display_names_v2"
+	assetProductTypeUpperMetaKey      = "__meta:asset_product_type_upper_v1"
+)
+
+// 시드 사업 ID
+const (
+	ProjectIDAnroboticsRFID = "WPSEED03" // 충남세종 앤로보틱스 RFID
+	ProjectIDChungnamSW2026 = "WPSEED01" // 2026 충남교육청 SW 유지관리
+	ProjectIDSejongICT2026  = "WPSEED02" // 세종시 도서관 ICT 2026
+)
+
+// metaDone 1회성 마이그레이션이 이미 끝났는지 확인한다.
+func metaDone(db *sql.DB, key string) bool {
+	var done int
+	err := db.QueryRow(`SELECT last_no FROM id_sequences WHERE seq_key=?`, key).Scan(&done)
+	return err == nil && done >= 1
+}
+
+func markMetaDone(db *sql.DB, key string) {
+	db.Exec(`INSERT OR REPLACE INTO id_sequences(seq_key,last_no) VALUES(?,1)`, key)
+}
 
 // NextSeq 시퀀스 키에 대한 다음 일련번호(1부터)를 원자적으로 반환한다.
 func NextSeq(db *sql.DB, seqKey string) (int, error) {
@@ -58,23 +87,30 @@ func ExtractAreaCode(phone string) string {
 	return "000"
 }
 
-// NormalizeModelCode 모델/제품명을 ID용으로 정규화
-func NormalizeModelCode(model, product string) string {
-	s := strings.TrimSpace(model)
-	if s == "" {
-		s = strings.TrimSpace(product)
+// NormalizeModelCode 모델/제품명/제조사를 ID용 코드로 정규화한다.
+//
+// 자산번호는 URL 경로와 이미지 파일 경로에 그대로 쓰이므로 ASCII 영숫자와
+// 하이픈만 남긴다. 타사 장비는 모델명이 없고 제품명이 한글뿐인 경우가 많아
+// 모델명 → 제품명 → 제조사 순으로 ASCII를 찾고, 모두 없으면 ETC를 쓴다.
+func NormalizeModelCode(model, product, manufacturer string) string {
+	for _, s := range []string{model, product, manufacturer} {
+		if code := asciiIDCode(s); code != "" {
+			return code
+		}
 	}
-	if s == "" {
-		s = "MODEL"
-	}
+	return "ETC"
+}
+
+func asciiIDCode(s string) string {
 	var b strings.Builder
 	prevDash := false
 	for _, r := range s {
 		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
+		case r < utf8.RuneSelf && (unicode.IsLetter(r) || unicode.IsDigit(r)):
 			b.WriteRune(unicode.ToUpper(r))
 			prevDash = false
-		case r == '-' || r == '_' || r == ' ' || r == '/':
+		// 한글 등 ASCII가 아닌 문자는 구분자로 취급해 앞뒤 코드가 붙지 않게 한다.
+		case r == '-' || r == '_' || r == ' ' || r == '/' || r >= utf8.RuneSelf:
 			if !prevDash && b.Len() > 0 {
 				b.WriteByte('-')
 				prevDash = true
@@ -82,11 +118,8 @@ func NormalizeModelCode(model, product string) string {
 		}
 	}
 	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		return "MODEL"
-	}
 	if len(out) > 40 {
-		out = out[:40]
+		out = strings.Trim(out[:40], "-")
 	}
 	return out
 }
@@ -117,8 +150,8 @@ func NextCustomerID(db *sql.DB, mainPhone string) (string, error) {
 }
 
 // NextAssetID 설치자산: A{모델코드}{구분}-{NNN}
-func NextAssetID(db *sql.DB, modelName, productName, productType string) (string, error) {
-	model := NormalizeModelCode(modelName, productName)
+func NextAssetID(db *sql.DB, modelName, productName, productType, manufacturer string) (string, error) {
+	model := NormalizeModelCode(modelName, productName, manufacturer)
 	code := ProductTypeCode(productType)
 	key := fmt.Sprintf("asset:%s:%s", model, code)
 	n, err := NextSeq(db, key)

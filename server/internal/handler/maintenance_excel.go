@@ -152,13 +152,15 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 				{Text: fmt.Sprintf("%d\n", dayNum), Font: &excelize.Font{Bold: true, Size: 11, Color: "FF000000", Family: "맑은 고딕"}},
 			}
 			for _, v := range list {
-				line := v.ShortName
-				if line == "" {
-					line = v.OrgName
+				line := visitLabel(v)
+				color := excelProductFontColor(v.ProductType)
+				if color == "FF333333" {
+					// 점검 대상이 없으면 예전 엑셀 유형(고정/사무소) 색을 쓴다.
+					color = excelEntryFontColor(v.EntryCategory)
 				}
 				runs = append(runs, excelize.RichTextRun{
 					Text: line + "\n",
-					Font: &excelize.Font{Size: 10, Color: excelEntryFontColor(v.EntryCategory), Family: "맑은 고딕"},
+					Font: &excelize.Font{Size: 10, Color: color, Family: "맑은 고딕"},
 				})
 			}
 			_ = f.SetCellRichText(sheet, cell, runs)

@@ -59,11 +59,15 @@ func TestMaintenanceHTTP_ListRequiresAuth(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "http://localhost/maintenance", nil)
 	req2.AddCookie(jwtCookie(t))
 	e.ServeHTTP(rec2, req2)
-	if rec2.Code != http.StatusOK {
+	// 계획 없으면 빈 안내 화면, 있으면 해당 연도 계획으로 리다이렉트
+	if rec2.Code != http.StatusOK && rec2.Code != http.StatusSeeOther {
 		t.Fatalf("auth: status=%d body=%s", rec2.Code, rec2.Body.String()[:min(200, rec2.Body.Len())])
 	}
-	if !strings.Contains(rec2.Body.String(), "정기점검") {
-		t.Fatal("expected maintenance page body")
+	if rec2.Code == http.StatusOK && !strings.Contains(rec2.Body.String(), "정기점검") {
+		t.Fatal("expected maintenance empty page body")
+	}
+	if rec2.Code == http.StatusSeeOther && !strings.Contains(rec2.Header().Get("Location"), "/maintenance/") {
+		t.Fatalf("expected redirect to plan, loc=%q", rec2.Header().Get("Location"))
 	}
 }
 

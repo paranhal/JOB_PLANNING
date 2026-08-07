@@ -23,7 +23,7 @@ func (r *WorkStatusRepo) MonthSummary(year, month int, category string) (model.W
 	case "maintenance":
 		q := `SELECT COUNT(*) FROM maintenance_visits WHERE visit_date >= ? AND visit_date < ?`
 		_ = r.db.QueryRow(q, start, endEx).Scan(&s.ReceiptCount)
-		s.CompleteCount = s.ReceiptCount
+		_ = r.db.QueryRow(q+` AND COALESCE(completed,0)=1`, start, endEx).Scan(&s.CompleteCount)
 		return s, nil
 	case "other":
 		_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_other WHERE work_date >= ? AND work_date < ? AND phase='receipt'`, start, endEx).Scan(&s.ReceiptCount)
@@ -31,7 +31,13 @@ func (r *WorkStatusRepo) MonthSummary(year, month int, category string) (model.W
 		return s, nil
 	default: // as
 		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE date(receipt_datetime) >= date(?) AND date(receipt_datetime) < date(?)`, start, endEx).Scan(&s.ReceiptCount)
-		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status IN ('completed','closed')
+		var workRec int
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_work_items w
+			JOIN as_receipts ar ON ar.as_id = w.as_id
+			WHERE ar.status = 'partial_complete'
+			  AND date(w.created_at) >= date(?) AND date(w.created_at) < date(?)`, start, endEx).Scan(&workRec)
+		s.ReceiptCount += workRec
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status IN `+model.SQLStatusStatsCompleted+`
 			AND date(COALESCE(complete_datetime, updated_at)) >= date(?) AND date(COALESCE(complete_datetime, updated_at)) < date(?)`, start, endEx).Scan(&s.CompleteCount)
 		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status='transfer'
 			AND date(updated_at) >= date(?) AND date(updated_at) < date(?)`, prevStart, prevEndEx).Scan(&s.PrevTransferCount)
@@ -63,7 +69,7 @@ func (r *WorkStatusRepo) listAS(start, endEx, phase string) ([]model.WorkCalItem
 		extra = ` AND ar.visit_scheduled_date != '' AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?`
 	case "complete":
 		dateExpr = `date(COALESCE(ar.complete_datetime, ar.updated_at))`
-		extra = ` AND ar.status IN ('completed','closed')
+		extra = ` AND ar.status IN ` + model.SQLStatusStatsCompleted + `
 			AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
 			AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)`
 	default: // receipt
@@ -102,7 +108,8 @@ func (r *WorkStatusRepo) listAS(start, endEx, phase string) ([]model.WorkCalItem
 func (r *WorkStatusRepo) listMaintenance(start, endEx, phase string) ([]model.WorkCalItem, error) {
 	_ = phase
 	q := `
-		SELECT v.visit_id, COALESCE(NULLIF(cfg.short_name,''), c.org_name), c.org_name, v.visit_date
+		SELECT v.visit_id, COALESCE(NULLIF(cfg.short_name,''), c.org_name),
+		       COALESCE(v.product_type,''), v.visit_date, v.plan_id
 		FROM maintenance_visits v
 		JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
@@ -117,13 +124,18 @@ func (r *WorkStatusRepo) listMaintenance(start, endEx, phase string) ([]model.Wo
 	var items []model.WorkCalItem
 	for rows.Next() {
 		var it model.WorkCalItem
-		var d string
-		if err := rows.Scan(&it.ID, &it.Title, &it.Subtitle, &d); err != nil {
+		var d, planID string
+		if err := rows.Scan(&it.ID, &it.Title, &it.ProductType, &d, &planID); err != nil {
 			return nil, err
 		}
 		it.Category = "maintenance"
+		it.Subtitle = it.ProductType
 		it.Date = trimDate(d)
-		it.Link = "/maintenance"
+		if planID != "" {
+			it.Link = "/maintenance/" + planID
+		} else {
+			it.Link = "/maintenance"
+		}
 		items = append(items, it)
 	}
 	return items, rows.Err()

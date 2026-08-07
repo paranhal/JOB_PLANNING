@@ -1,61 +1,168 @@
 {{define "title"}}정기점검 {{.Plan.PlanYear}}년 · 고객지원시스템{{end}}
 
 {{define "content"}}
-<div class="space-y-6">
+<div class="space-y-5" x-data="{
+  addOpen: false, doneOpen: false, editOpen: false,
+  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'' },
+  openEdit(el) {
+    const d = el.dataset;
+    this.edit = {
+      id: d.id || '', date: d.date || '', customer: d.customer || '',
+      product: d.product || '', assignee: d.assignee || '',
+      category: d.category || 'normal', notes: d.notes || '',
+      completed: d.completed === '1', completedDate: d.completedDate || d.date || ''
+    };
+    this.editOpen = true;
+  }
+}">
   <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">정기점검 {{.Plan.PlanYear}}년</h2>
-      <p class="text-sm text-gray-500">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="text-xl font-bold text-gray-800">정기점검</h2>
+        <label class="sr-only" for="mnt-year-select">연도 선택</label>
+        <select id="mnt-year-select"
+                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                data-query="{{.YearQuery}}">
+          {{range .Plans}}
+          <option value="{{.PlanID}}" {{if eq .PlanID $.Plan.PlanID}}selected{{end}}>{{.PlanYear}}년</option>
+          {{end}}
+          {{if .IsAdmin}}
+          <option value="__new__">+ 연도 추가…</option>
+          {{end}}
+        </select>
+      </div>
+      <p class="text-sm text-gray-500 mt-1">
         {{if .Plan.Title}}{{.Plan.Title}} · {{end}}
         {{if eq .Plan.Status "approved"}}<span class="text-green-700 font-medium">승인됨</span>{{else}}<span class="text-amber-700 font-medium">초안</span>{{end}}
+        · {{.ScopeNote}} · 방문 {{len .Visits}}건 (완료 <span class="text-green-700 font-medium">{{.DoneCount}}</span> · 예정 {{.OpenCount}})
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a href="/maintenance/{{.Plan.PlanID}}/export.xlsx"
-         class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">엑셀(월별 달력) 받기</a>
+      {{if .ShowScopeToggle}}
+      {{if .ScopeAll}}
+      <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}"
+         class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">내 일정만 보기</a>
+      {{else}}
+      <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}&all=1"
+         class="px-4 py-2 border border-indigo-300 text-indigo-800 rounded-lg text-sm font-medium hover:bg-indigo-50">전체 일정 보기</a>
+      {{end}}
+      {{end}}
+      {{if .CanEdit}}
+      <button type="button" @click="addOpen = true"
+              class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">+ 방문 추가</button>
+      <button type="button" @click="doneOpen = true"
+              class="px-4 py-2 border border-green-600 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">지난 방문 일괄 완료</button>
+      {{end}}
+      {{if .IsAdmin}}
       <form method="POST" action="/maintenance/{{.Plan.PlanID}}/generate" class="inline"
             onsubmit="return confirm('자동 생성된 방문만 삭제한 뒤 다시 채웁니다. 계속할까요?');">
-        <button type="submit"
-                class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">자동 배정</button>
+        <button type="submit" class="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50">자동 배정</button>
       </form>
+      {{end}}
+      <a href="/maintenance/{{.Plan.PlanID}}/export.xlsx{{if and .ShowScopeToggle .ScopeAll}}?all=1{{end}}"
+         class="px-4 py-2 border border-green-300 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">엑셀 받기</a>
+      {{if .IsAdmin}}
       {{if eq .Plan.Status "approved"}}
       <form method="POST" action="/maintenance/{{.Plan.PlanID}}/unapprove" class="inline">
         <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">승인 취소</button>
       </form>
       {{else}}
       <form method="POST" action="/maintenance/{{.Plan.PlanID}}/approve" class="inline">
-        <button type="submit" class="px-4 py-2 border border-green-600 text-green-800 rounded-lg text-sm font-medium">승인</button>
+        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">승인</button>
       </form>
       {{end}}
-      <a href="/maintenance" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">목록</a>
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/delete" class="inline"
+            onsubmit="return confirm('계획을 삭제하면 방문 데이터도 함께 지워집니다. 계속할까요?');">
+        <button type="submit" class="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">계획 삭제</button>
+      </form>
+      {{end}}
+      <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">사이트 설정</a>
     </div>
   </div>
 
-  <div class="flex flex-wrap gap-2 text-sm">
-    <a href="/maintenance/{{.Plan.PlanID}}" class="px-3 py-1 rounded-lg {{if eq .Month 0}}bg-gray-900 text-white{{else}}bg-gray-100{{end}}">전체</a>
-    {{range $m := seq 12}}
-    <a href="/maintenance/{{$.Plan.PlanID}}?month={{$m}}"
-       class="px-3 py-1 rounded-lg {{if eq $.Month $m}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">{{$m}}월</a>
-    {{end}}
+  {{if .FlashDone}}
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+    {{.FlashDone}}건을 방문 완료로 처리했습니다.
+  </div>
+  {{end}}
+  {{if eq .FlashOK "edit"}}
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+    방문 일정을 수정했습니다.
+  </div>
+  {{end}}
+
+  <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+    <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+      {{$view := .View}}{{$month := .Month}}{{$pid := .Plan.PlanID}}{{$all := .ScopeAll}}{{$tog := .ShowScopeToggle}}
+      {{range $v := list "calendar" "kanban" "list"}}
+      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{if and $tog $all}}&all=1{{end}}"
+         class="px-4 py-2 {{if eq $view $v}}bg-gray-900 text-white{{else}}bg-white text-gray-700 hover:bg-gray-50{{end}}">{{mntViewLabel $v}}</a>
+      {{end}}
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 text-xs text-gray-700">
+      <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#bbf7d0;border:2px solid #16a34a"></span>초록 · 앤로보틱스</span>
+      <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#bfdbfe;border:2px solid #2563eb"></span>파랑 · K-LAS</span>
+      <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#e9d5ff;border:2px solid #9333ea"></span>보라 · 세종 K-LAS</span>
+    </div>
+
+    <div class="flex flex-wrap gap-1.5 text-sm">
+      {{if eq .View "list"}}
+      <a href="/maintenance/{{$pid}}?view=list{{if and $tog $all}}&all=1{{end}}"
+         class="px-3 py-1 rounded-lg {{if eq .Month 0}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">전체</a>
+      {{end}}
+      {{range $m := seq 12}}
+      <a href="/maintenance/{{$pid}}?view={{$view}}&month={{$m}}{{if and $tog $all}}&all=1{{end}}"
+         class="px-3 py-1 rounded-lg {{if eq $month $m}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">{{$m}}월</a>
+      {{end}}
+    </div>
   </div>
 
-  <div class="grid lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-      <h3 class="font-semibold text-gray-800">수동 방문 추가</h3>
+  {{if eq .View "calendar"}}
+    {{template "mnt_calendar" .}}
+  {{else if eq .View "kanban"}}
+    {{template "mnt_kanban" .}}
+  {{else}}
+    {{template "mnt_list" .}}
+  {{end}}
+
+  <!-- 방문 추가 -->
+  <div x-show="addOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+       @click.self="addOpen = false">
+    <div class="bg-white rounded-xl w-full max-w-md p-5 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-gray-800">방문 추가</h3>
+        <button type="button" @click="addOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
+      </div>
       <form method="POST" action="/maintenance/{{.Plan.PlanID}}/visits" class="space-y-3 text-sm">
         <div>
           <label class="block text-gray-600 mb-1">날짜</label>
-          <input type="date" name="visit_date" required
-                 class="w-full border border-gray-300 rounded-lg px-3 py-2">
+          <input type="date" name="visit_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
         </div>
         <div>
           <label class="block text-gray-600 mb-1">고객</label>
           <select name="customer_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
             <option value="">선택</option>
-            {{range .Customers}}
-            <option value="{{.CustomerID}}">{{.OrgName}}</option>
-            {{end}}
+            {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
           </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-gray-600 mb-1">점검 대상</label>
+            <input type="text" name="product_type" list="mnt-products" placeholder="K-LAS / 앤로보틱스 / 세종 K-LAS"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <datalist id="mnt-products">
+              <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
+            </datalist>
+            <p class="text-[11px] text-gray-400 mt-1">같은 사이트라도 점검 대상이 다르면 따로 등록합니다.</p>
+          </div>
+          <div>
+            <label class="block text-gray-600 mb-1">담당자</label>
+            <select name="assignee" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+              <option value="">— 선택 —</option>
+              {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+            </select>
+          </div>
         </div>
         <div>
           <label class="block text-gray-600 mb-1">표시 유형 (엑셀 글자색)</label>
@@ -69,74 +176,327 @@
           <label class="block text-gray-600 mb-1">비고</label>
           <input type="text" name="notes" class="w-full border border-gray-300 rounded-lg px-3 py-2">
         </div>
-        <button type="submit" class="w-full py-2 bg-gray-800 text-white rounded-lg font-medium">추가</button>
-      </form>
-    </div>
-
-    <div class="bg-white rounded-xl border border-red-100 p-4 space-y-2 text-sm text-red-800">
-      <h3 class="font-semibold">삭제</h3>
-      <p>계획 전체를 삭제하면 방문 데이터도 함께 삭제됩니다.</p>
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/delete"
-            onsubmit="return confirm('정말 이 연도 계획을 삭제할까요?');">
-        <button type="submit" class="px-4 py-2 border border-red-300 rounded-lg text-red-800 hover:bg-red-50">계획 삭제</button>
+        <label class="flex items-center gap-2 text-gray-700">
+          <input type="checkbox" name="completed" value="1" class="rounded border-gray-300">
+          이미 방문 완료한 건
+        </label>
+        <input type="hidden" name="month" value="{{.Month}}">
+        <input type="hidden" name="view" value="{{.View}}">
+        {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+        <div class="flex gap-2 pt-1">
+          <button type="button" @click="addOpen = false" class="flex-1 py-2 border border-gray-300 rounded-lg">취소</button>
+          <button type="submit" class="flex-1 py-2 bg-gray-900 text-white rounded-lg font-medium">추가</button>
+        </div>
       </form>
     </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <h3 class="px-4 py-3 font-semibold border-b border-gray-100 bg-gray-50">
-      {{if eq .Month 0}}전체 방문 목록{{else}}{{.Month}}월 방문{{end}}
-    </h3>
-    <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50 text-gray-600 sticky top-0">
-          <tr>
-            <th class="text-left px-4 py-2">날짜</th>
-            <th class="text-left px-4 py-2">사이트</th>
-            <th class="text-left px-4 py-2">유형</th>
-            <th class="text-left px-4 py-2">자동</th>
-            <th class="text-right px-4 py-2"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          {{if ne .Month 0}}
-            {{range .MonthVisits}}
-            <tr>
-              <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}</td>
-              <td class="px-4 py-2">{{.ShortName}}</td>
-              <td class="px-4 py-2">{{.EntryCategory}}</td>
-              <td class="px-4 py-2">{{if .AutoGenerated}}예{{else}}아니오{{end}}</td>
-              <td class="px-4 py-2 text-right">
-                <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$.Plan.PlanID}}" class="inline"
-                      onsubmit="return confirm('이 방문을 삭제할까요?');">
-                  <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
-                </form>
-              </td>
-            </tr>
-            {{else}}
-            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">이 달에 방문이 없습니다.</td></tr>
-            {{end}}
-          {{else}}
-            {{range .Visits}}
-            <tr>
-              <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}</td>
-              <td class="px-4 py-2">{{.ShortName}}</td>
-              <td class="px-4 py-2">{{.EntryCategory}}</td>
-              <td class="px-4 py-2">{{if .AutoGenerated}}예{{else}}아니오{{end}}</td>
-              <td class="px-4 py-2 text-right">
-                <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$.Plan.PlanID}}" class="inline"
-                      onsubmit="return confirm('이 방문을 삭제할까요?');">
-                  <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
-                </form>
-              </td>
-            </tr>
-            {{else}}
-            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">방문이 없습니다. 자동 배정 또는 수동 추가를 사용하세요.</td></tr>
-            {{end}}
-          {{end}}
-        </tbody>
-      </table>
+  <!-- 방문 수정 -->
+  <div x-show="editOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+       @click.self="editOpen = false">
+    <div class="bg-white rounded-xl w-full max-w-md p-5 space-y-4 max-h-[92vh] overflow-y-auto">
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-gray-800">방문 일정 수정</h3>
+        <button type="button" @click="editOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
+      </div>
+      <form method="POST" :action="'/maintenance/visits/' + edit.id + '/update'" class="space-y-3 text-sm">
+        <input type="hidden" name="plan_id" value="{{.Plan.PlanID}}">
+        <input type="hidden" name="month" value="{{.Month}}">
+        <input type="hidden" name="view" value="{{.View}}">
+        {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+        <input type="hidden" name="completed_present" value="1">
+        <div>
+          <label class="block text-gray-600 mb-1">날짜</label>
+          <input type="date" name="visit_date" x-model="edit.date" required
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">고객</label>
+          <select name="customer_id" x-model="edit.customer" required
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <option value="">선택</option>
+            {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-gray-600 mb-1">점검 대상</label>
+            <input type="text" name="product_type" x-model="edit.product" list="mnt-products-edit"
+                   placeholder="K-LAS / 앤로보틱스 / 세종 K-LAS"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <datalist id="mnt-products-edit">
+              <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-gray-600 mb-1">담당자</label>
+            <select name="assignee" x-model="edit.assignee" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+              <option value="">— 선택 —</option>
+              {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">표시 유형</label>
+          <select name="entry_category" x-model="edit.category" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <option value="normal">일반 (녹색)</option>
+            <option value="fixed">고정·지정일 (적색)</option>
+            <option value="office">사무소 등 (청색)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">비고</label>
+          <input type="text" name="notes" x-model="edit.notes" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        </div>
+        <label class="flex items-center gap-2 text-gray-700">
+          <input type="checkbox" name="completed" value="1" x-model="edit.completed" class="rounded border-gray-300">
+          방문 완료
+        </label>
+        <div x-show="edit.completed" x-cloak>
+          <label class="block text-gray-600 mb-1">실제 방문일</label>
+          <input type="date" name="completed_date" x-model="edit.completedDate"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        </div>
+        <div class="flex gap-2 pt-1">
+          <button type="button" @click="editOpen = false" class="flex-1 py-2 border border-gray-300 rounded-lg">취소</button>
+          <button type="submit" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium">저장</button>
+        </div>
+      </form>
+      {{if .CanEdit}}
+      <form method="POST" :action="'/maintenance/visits/' + edit.id + '/delete?plan_id={{.Plan.PlanID}}&month={{.Month}}&view={{.View}}{{if and .ShowScopeToggle .ScopeAll}}&all=1{{end}}'"
+            class="pt-1 border-t border-gray-100"
+            onsubmit="return confirm('이 방문 일정을 삭제할까요? 중복 건을 정리할 때 사용하세요.');">
+        <button type="submit" class="w-full py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">이 일정 삭제</button>
+      </form>
+      {{end}}
     </div>
+  </div>
+
+  <!-- 지난 방문 일괄 완료 -->
+  {{if .CanEdit}}
+  <div x-show="doneOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+       @click.self="doneOpen = false">
+    <div class="bg-white rounded-xl w-full max-w-sm p-5 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-gray-800">지난 방문 일괄 완료</h3>
+        <button type="button" @click="doneOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
+      </div>
+      <p class="text-sm text-gray-500">기준일까지의 예정 방문을 모두 완료로 바꿉니다. 이미 완료된 건은 그대로 둡니다.</p>
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/complete-until" class="space-y-3 text-sm">
+        <div>
+          <label class="block text-gray-600 mb-1">기준일</label>
+          <input type="date" name="until" value="{{.Today}}" required
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2">
+        </div>
+        <input type="hidden" name="month" value="{{.Month}}">
+        <input type="hidden" name="view" value="{{.View}}">
+        {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+        <div class="flex gap-2">
+          <button type="button" @click="doneOpen = false" class="flex-1 py-2 border border-gray-300 rounded-lg">취소</button>
+          <button type="submit" class="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium">완료 처리</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "mnt_calendar"}}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+  <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+    <h3 class="font-semibold text-gray-800">{{.Month}}월 점검 캘린더</h3>
+    <p class="text-xs text-gray-500">{{len .MonthVisits}}건 · 사이트명 옆은 점검 대상</p>
+  </div>
+  <div class="grid grid-cols-7 text-xs font-medium text-gray-600 bg-gray-50 border-b border-gray-100">
+    {{range $i, $d := list "일" "월" "화" "수" "목" "금" "토"}}
+    <div class="px-2 py-2 text-center {{if or (eq $i 0) (eq $i 6)}}text-gray-400{{end}}">{{$d}}</div>
+    {{end}}
+  </div>
+  <div class="divide-y divide-gray-100">
+    {{range .Weeks}}
+    <div class="grid grid-cols-7 divide-x divide-gray-100">
+      {{range .}}
+      <div class="min-h-[120px] p-1.5 align-top {{if not .Date}}bg-gray-50{{else if .Weekend}}bg-gray-50/60{{end}}">
+        {{if .Date}}
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold {{if .Today}}bg-gray-900 text-white rounded-full px-1.5{{else if .Weekend}}text-gray-400{{else}}text-gray-700{{end}}">{{.Day}}</span>
+          {{if .Visits}}<span class="text-[10px] text-gray-400">{{len .Visits}}</span>{{end}}
+        </div>
+        <div class="space-y-1">
+          {{$pid := $.Plan.PlanID}}{{$month := $.Month}}
+          {{range .Visits}}
+          <div class="px-1.5 py-1 rounded text-[11px] leading-tight {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
+               style="{{mntProductStyle .ProductType}}">
+            <div class="font-medium truncate" title="{{visitLabel .}}{{if .Assignee}} · {{.Assignee}}{{end}}">{{visitLabel .}}</div>
+            <div class="flex items-center justify-between mt-0.5 text-[10px] opacity-90 gap-1">
+              <span class="truncate">{{.Assignee}}</span>
+              {{if $.CanEdit}}
+              <span class="shrink-0 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
+                <button type="button" class="text-blue-600 hover:underline"
+                        data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
+                        data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                        data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
+                        data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
+                        @click.stop="openEdit($event.currentTarget)">수정</button>
+                <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=calendar{{if and $.ShowScopeToggle $.ScopeAll}}&all=1{{end}}" class="inline">
+                  <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
+                  <button type="submit" class="{{if .Completed}}text-green-700{{else}}text-gray-500 hover:text-green-700{{end}} hover:underline">
+                    {{if .Completed}}완료{{else}}완료{{end}}</button>
+                </form>
+                <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=calendar{{if and $.ShowScopeToggle $.ScopeAll}}&all=1{{end}}" class="inline"
+                      onsubmit="return confirm('이 방문 일정을 삭제할까요?');">
+                  <button type="submit" class="text-red-600 hover:underline">삭제</button>
+                </form>
+              </span>
+              {{else if .Completed}}<span class="text-green-700 shrink-0">완료</span>{{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{end}}
   </div>
 </div>
+{{end}}
+
+{{define "mnt_kanban"}}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
+  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
+  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
+  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
+</div>
+{{end}}
+
+{{define "mnt_kanban_col"}}
+<div class="bg-gray-50 rounded-xl border border-gray-200 flex flex-col">
+  <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+    <span class="text-sm font-semibold
+                 {{if eq .Tone "red"}}text-red-700{{else if eq .Tone "sky"}}text-sky-700{{else if eq .Tone "green"}}text-green-700{{else}}text-gray-700{{end}}">{{.Title}}</span>
+    <span class="text-xs text-gray-500">{{len .Visits}}</span>
+  </div>
+  <div class="p-2 space-y-2 max-h-[560px] overflow-y-auto">
+    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$all := and .ShowScopeToggle .ScopeAll}}
+    {{range .Visits}}
+    <div class="rounded-lg p-2.5 text-sm {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
+         style="{{mntProductStyle .ProductType}}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="font-medium truncate">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</p>
+          {{if .ProductType}}<p class="text-[11px] mt-0.5 opacity-90">{{.ProductType}}</p>{{end}}
+        </div>
+        <span class="text-[11px] opacity-70 whitespace-nowrap">{{.VisitDate}}</span>
+      </div>
+      <div class="flex items-center justify-between mt-2">
+        <span class="text-xs opacity-90">{{.Assignee}}</span>
+        {{if $can}}
+        <div class="flex items-center gap-2">
+          <button type="button" class="text-xs text-blue-600 hover:underline"
+                  data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
+                  data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                  data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
+                  data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
+                  @click="openEdit($event.currentTarget)">수정</button>
+          <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{if $all}}&all=1{{end}}" class="inline">
+            <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
+            <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
+              {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
+          </form>
+          <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{if $all}}&all=1{{end}}" class="inline"
+                onsubmit="return confirm('이 방문을 삭제할까요?');">
+            <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    <p class="text-xs text-gray-400 text-center py-6">없음</p>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "mnt_list"}}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+  <h3 class="px-4 py-3 font-semibold border-b border-gray-100 bg-gray-50">
+    {{if eq .Month 0}}전체 방문 목록{{else}}{{.Month}}월 방문{{end}} · {{len .MonthVisits}}건
+  </h3>
+  <div class="overflow-x-auto max-h-[560px] overflow-y-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600 sticky top-0">
+        <tr>
+          <th class="text-left px-4 py-2">날짜</th>
+          <th class="text-left px-4 py-2">사이트</th>
+          <th class="text-left px-4 py-2">점검 대상</th>
+          <th class="text-left px-4 py-2">담당자</th>
+          <th class="text-left px-4 py-2">상태</th>
+          <th class="text-right px-4 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{$pid := .Plan.PlanID}}{{$month := .Month}}{{$all := and .ShowScopeToggle .ScopeAll}}
+        {{range .MonthVisits}}
+        <tr class="{{if .Completed}}bg-gray-50/80{{end}}">
+          <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}</td>
+          <td class="px-4 py-2">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
+          <td class="px-4 py-2">
+            {{if .ProductType}}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium {{mntProductBadgeClass .ProductType}}"
+                  style="{{mntProductBadgeStyle .ProductType}}">{{.ProductType}}</span>
+            {{end}}
+          </td>
+          <td class="px-4 py-2 text-gray-600">{{.Assignee}}</td>
+          <td class="px-4 py-2">
+            {{if .Completed}}
+            <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs">방문 완료</span>
+            {{if ne .CompletedDate .VisitDate}}<span class="text-[11px] text-gray-500 ml-1">{{.CompletedDate}}</span>{{end}}
+            {{else}}<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">예정</span>{{end}}
+          </td>
+          <td class="px-4 py-2 text-right whitespace-nowrap">
+            {{if $.CanEdit}}
+            <button type="button" class="text-xs text-blue-600 hover:underline"
+                    data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
+                    data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                    data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
+                    data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
+                    @click="openEdit($event.currentTarget)">수정</button>
+            <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=list{{if $all}}&all=1{{end}}" class="inline ml-2">
+              <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
+              <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
+                {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
+            </form>
+            <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{if $all}}&all=1{{end}}" class="inline ml-2"
+                  onsubmit="return confirm('이 방문을 삭제할까요?');">
+              <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">방문이 없습니다. 방문 추가 또는 자동 배정을 사용하세요.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function () {
+  var sel = document.getElementById('mnt-year-select');
+  if (!sel) return;
+  sel.addEventListener('change', function () {
+    var v = sel.value;
+    if (v === '__new__') {
+      location.href = '/maintenance/new';
+      return;
+    }
+    if (!v) return;
+    location.href = '/maintenance/' + v + (sel.getAttribute('data-query') || '');
+  });
+})();
+</script>
 {{end}}

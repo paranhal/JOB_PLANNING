@@ -1,0 +1,41 @@
+{{define "wb_palette"}}
+<div class="bg-white rounded-xl border {{.Border}} shadow-sm flex flex-col min-h-0 overflow-hidden">
+  <div class="px-2.5 py-2 border-b {{.Border}} {{.HeadBg}}">
+    <p class="text-xs font-bold {{.Text}} tracking-tight">{{.Title}} <span class="font-semibold opacity-80">({{len .Cards}}건)</span></p>
+  </div>
+  <div class="flex-1 max-h-[66vh] overflow-y-auto p-1.5 space-y-1.5 bg-slate-50/40">
+    {{range .Cards}}
+    <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug {{if .ProductType}}{{mntProductClass .ProductType}}{{else}}{{wbCategoryClass .Category}}{{end}} {{if $.CanWrite}}cursor-grab active:cursor-grabbing{{end}} transition-shadow hover:shadow"
+         {{if .ProductType}}style="{{mntProductStyle .ProductType}}"{{end}}
+         {{if $.CanWrite}}draggable="true"{{end}}
+         data-zone="palette"
+         data-kind="{{.Kind}}" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
+         data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}"
+         data-work-date="{{.WorkDate}}"
+         data-href="{{.DetailHref}}"
+         @click="pick($event.currentTarget)"
+         @dragstart="pick($event.currentTarget)"
+         :class="isPicked('{{.Kind}}', '{{.RefID}}') ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
+         title="클릭·드래그: 시간표에 놓으면 등록 모달 · 「등록」버튼: 일일 업무 등록">
+      <div class="flex items-start justify-between gap-1">
+        <p class="font-semibold truncate min-w-0 flex-1">{{.Title}}</p>
+        <button type="button"
+                class="shrink-0 px-1.5 py-0.5 rounded border border-blue-300/80 bg-white/95 text-[10px] font-medium text-blue-700 hover:bg-blue-50"
+                @click.stop="openWork($event.currentTarget.closest('[data-kind]'))"
+                title="일일 업무 등록">등록</button>
+      </div>
+      {{if .SourceNumber}}
+      <p class="text-[10px] mt-0.5 font-mono opacity-80 truncate">{{.SourceNumber}}</p>
+      {{end}}
+      {{if .SubTitle}}<p class="text-[10px] opacity-70 truncate mt-0.5">{{.SubTitle}}</p>{{end}}
+      <p class="text-[10px] opacity-60 mt-0.5">
+        {{if .PlannedDay}}{{.PlannedDay}}{{end}}{{if .Assignee}} · {{.Assignee}}{{end}}
+        {{if .DurationMin}} · {{.DurationMin}}분{{end}}
+      </p>
+    </div>
+    {{else}}
+    <p class="text-[11px] text-gray-400 text-center py-8">배치할 업무가 없습니다.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

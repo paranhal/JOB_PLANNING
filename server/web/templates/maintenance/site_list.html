@@ -11,9 +11,21 @@
       <a href="/maintenance/sites/export.xlsx"
          class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">엑셀 다운로드</a>
       <a href="/maintenance" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">연도 계획</a>
+      <form method="POST" action="/maintenance/sites/sync" class="inline"
+            onsubmit="return confirm('유상 유지보수 계약과 점검주기가 등록된 자산의 기관을 사이트 설정에 추가합니다. 이미 등록된 기관은 그대로 둡니다. 진행할까요?');">
+        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">자산 기준 일괄 추가</button>
+      </form>
       <a href="/maintenance/sites/new" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">사이트 추가</a>
     </div>
   </div>
+
+  {{if .Synced}}
+  <div class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+    자산 기준으로 <strong>{{.Synced}}</strong>개 기관을 추가했습니다.
+    {{if .Skipped}}이미 설정이 있는 {{.Skipped}}개 기관은 그대로 두었습니다.{{end}}
+    표시명·지역·KLAS/RFID 여부는 자산 정보로 채웠으니 필요하면 수정하세요.
+  </div>
+  {{end}}
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="min-w-full text-sm">

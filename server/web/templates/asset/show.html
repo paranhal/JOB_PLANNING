@@ -27,7 +27,7 @@
       <dl class="space-y-2 text-sm">
         <div class="flex gap-4"><dt class="text-gray-500 w-24">자산번호</dt><dd class="text-gray-800 font-mono">{{.Asset.AssetID}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">제품분류</dt><dd class="text-gray-800">{{productCategoryLabel .Asset.ProductCategory}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">제품구분</dt><dd class="text-gray-800">{{if .Asset.ProductType}}{{.Asset.ProductType}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">제품구분</dt><dd class="text-gray-800">{{if .Asset.ProductType}}{{upper .Asset.ProductType}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">모델명</dt><dd class="text-gray-800">{{.Asset.ModelName}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">제조사</dt><dd class="text-gray-800">{{.Asset.Manufacturer}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">S/N</dt><dd class="text-gray-800 font-mono">{{.Asset.SerialNumber}}</dd></div>
@@ -40,6 +40,13 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">유지보수 계약</h3>
       <dl class="space-y-2 text-sm">
+        <div class="flex gap-4"><dt class="text-gray-500 w-24 shrink-0">사업명</dt>
+          <dd class="text-gray-800">
+            {{if .Asset.ProjectID}}
+            <a href="/projects/{{.Asset.ProjectID}}" class="text-blue-700 hover:underline">{{if .Asset.ProjectName}}{{.Asset.ProjectName}}{{else}}{{.Asset.ProjectID}}{{end}}</a>
+            {{else}}—{{end}}
+          </dd>
+        </div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">계약구분</dt><dd class="text-gray-800">{{if .Asset.MaintContractType}}{{maintContractLabel .Asset.MaintContractType}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">점검주기</dt><dd class="text-gray-800">{{if .Asset.MaintCycle}}{{maintCycleLabel .Asset.MaintCycle}}{{else}}—{{end}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">계약기간</dt><dd class="text-gray-800">{{if or .Asset.MaintStartDate .Asset.MaintEndDate}}{{.Asset.MaintStartDate}} ~ {{.Asset.MaintEndDate}}{{else}}—{{end}}</dd></div>

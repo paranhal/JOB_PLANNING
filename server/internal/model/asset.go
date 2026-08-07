@@ -39,6 +39,7 @@ type Asset struct {
 	InstallLocation  string    `json:"install_location"`  // 설치위치 — 동일층·동일실·동일모델 구분 (AS 접수 중요)
 	LocationDetail   string    `json:"location_detail"`   // 상세위치(보조 서술)
 	Notes            string    `json:"notes"`
+	ProjectID        string    `json:"project_id"` // 사업(프로젝트) work_projects
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 
@@ -47,6 +48,7 @@ type Asset struct {
 	BuildingName string `json:"building_name,omitempty"`
 	FloorName    string `json:"floor_name,omitempty"`
 	RoomName     string `json:"room_name,omitempty"`
+	ProjectName  string `json:"project_name,omitempty"`
 	AsCount      int    `json:"as_count,omitempty"`
 	InstallYears int    `json:"install_years,omitempty"` // 설치연수 (영업활용)
 }

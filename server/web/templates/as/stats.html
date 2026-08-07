@@ -18,92 +18,63 @@
     </div>
   </div>
 
-  <!-- 통계 카드 -->
-  <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-    <a href="/as/stats{{if .Personal}}?status=in_progress{{end}}" class="bg-white rounded-xl border border-gray-200 p-4 text-center hover:border-blue-300 block">
-      <p class="text-2xl font-bold text-gray-800">{{.Stats.TotalReceived}}</p>
-      <p class="text-xs text-gray-500 mt-1">전체 접수</p>
+  <!-- 통계 카드 10개 · 1줄 -->
+  <div class="grid grid-cols-2 sm:grid-cols-5 xl:grid-cols-10 gap-2">
+    <a href="/as/stats{{if .Personal}}?status=in_progress{{end}}" class="bg-white rounded-xl border border-gray-200 p-3 text-center hover:border-blue-300 block min-w-0">
+      <p class="text-xl font-bold text-gray-800 tabular-nums">{{.Stats.TotalReceived}}</p>
+      <p class="text-[11px] text-gray-500 mt-1 leading-tight">전체 접수</p>
     </a>
-    <a href="/as/stats?status=in_progress" class="bg-white rounded-xl border border-yellow-200 p-4 text-center hover:border-yellow-400 block">
-      <p class="text-2xl font-bold text-yellow-600">{{.Stats.InProgress}}</p>
-      <p class="text-xs text-gray-500 mt-1">{{if .Personal}}내 진행중{{else}}진행중{{end}}</p>
+    <a href="/as/stats?status=assigned" class="bg-white rounded-xl border {{if eq .ListStatus "assigned"}}border-indigo-500 ring-1 ring-indigo-200{{else}}border-indigo-200{{end}} p-3 text-center hover:border-indigo-400 block min-w-0">
+      <p class="text-xl font-bold text-indigo-600 tabular-nums">{{.Stats.Assigned}}</p>
+      <p class="text-[11px] text-gray-500 mt-1 leading-tight">{{if .Personal}}내 담당자 배정{{else}}담당자 배정{{end}}</p>
     </a>
-    <a href="/as/stats?status=completed_today" class="bg-white rounded-xl border border-green-200 p-4 text-center hover:border-green-400 block">
-      <p class="text-2xl font-bold text-green-600">{{.Stats.Completed}}</p>
-      <p class="text-xs text-gray-500 mt-1">{{if .Personal}}오늘 완료(내){{else}}오늘 완료{{end}}</p>
+    <a href="/as/stats?status=in_progress" class="bg-white rounded-xl border {{if eq .ListStatus "in_progress"}}border-yellow-500 ring-1 ring-yellow-200{{else}}border-yellow-200{{end}} p-3 text-center hover:border-yellow-400 block min-w-0">
+      <p class="text-xl font-bold text-yellow-600 tabular-nums">{{.Stats.InProgress}}</p>
+      <p class="text-[11px] text-gray-500 mt-1 leading-tight">{{if .Personal}}내 진행중{{else}}진행중{{end}}</p>
     </a>
-    <a href="/as/stats?status=overdue&amp;sort=days&amp;dir=desc" class="bg-white rounded-xl border border-red-200 p-4 text-center hover:border-red-400 block">
-      <p class="text-2xl font-bold text-red-600">{{.Stats.Overdue}}</p>
-      <p class="text-xs text-gray-500 mt-1">접수 지연(3일↑)</p>
+    <a href="/as/stats?status=completed_today" class="bg-white rounded-xl border {{if eq .ListStatus "completed_today"}}border-green-500 ring-1 ring-green-200{{else}}border-green-200{{end}} p-3 text-center hover:border-green-400 block min-w-0">
+      <p class="text-xl font-bold text-green-600 tabular-nums">{{.Stats.Completed}}</p>
+      <p class="text-[11px] text-gray-500 mt-1 leading-tight">{{if .Personal}}오늘 완료(내){{else}}오늘 완료{{end}}</p>
     </a>
-    <a href="/as/stats?status=today" class="bg-white rounded-xl border border-blue-200 p-4 text-center hover:border-blue-400 block">
-      <p class="text-2xl font-bold text-blue-600">{{.Stats.TodayReceived}}</p>
-      <p class="text-xs text-gray-500 mt-1">{{if .Personal}}오늘 접수(내){{else}}오늘 접수{{end}}</p>
+    <a href="/as/stats?status=overdue&amp;sort=days&amp;dir=desc" class="bg-white rounded-xl border {{if eq .ListStatus "overdue"}}border-red-500 ring-1 ring-red-200{{else}}border-red-200{{end}} p-3 text-center hover:border-red-400 block min-w-0">
+      <p class="text-xl font-bold text-red-600 tabular-nums">{{.Stats.Overdue}}</p>
+      <p class="text-[11px] text-gray-500 mt-1 leading-tight">접수 지연(3일↑)</p>
     </a>
-  </div>
-
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-    <a href="/as/stats?status=visit_past" class="bg-white rounded-xl border {{if eq .ListStatus "visit_past"}}border-red-500 ring-1 ring-red-200{{else}}border-red-200{{end}} p-4 text-center hover:border-red-400 block">
-      <p class="text-2xl font-bold text-red-600">{{.Stats.VisitPast}}</p>
-      <p class="text-xs text-gray-600 mt-1">예정일 경과</p>
-      <p class="text-[10px] text-gray-400 mt-0.5">예정일 &lt; 오늘 · 진행중</p>
+    <a href="/as/stats?status=today" class="bg-white rounded-xl border {{if eq .ListStatus "today"}}border-blue-500 ring-1 ring-blue-200{{else}}border-blue-200{{end}} p-3 text-center hover:border-blue-400 block min-w-0">
+      <p class="text-xl font-bold text-blue-600 tabular-nums">{{.Stats.TodayReceived}}</p>
+      <p class="text-[11px] text-gray-500 mt-1 leading-tight">{{if .Personal}}오늘 접수(내){{else}}오늘 접수{{end}}</p>
     </a>
-    <a href="/as/stats?status=visit_today" class="bg-white rounded-xl border {{if eq .ListStatus "visit_today"}}border-sky-500 ring-1 ring-sky-200{{else}}border-sky-200{{end}} p-4 text-center hover:border-sky-400 block">
-      <p class="text-2xl font-bold text-sky-600">{{.Stats.VisitToday}}</p>
-      <p class="text-xs text-gray-600 mt-1">오늘 방문</p>
-      <p class="text-[10px] text-gray-400 mt-0.5">예정일 = 오늘 · 진행중</p>
+    <a href="/as/stats?status=visit_past" class="bg-white rounded-xl border {{if eq .ListStatus "visit_past"}}border-red-500 ring-1 ring-red-200{{else}}border-red-200{{end}} p-3 text-center hover:border-red-400 block min-w-0">
+      <p class="text-xl font-bold text-red-600 tabular-nums">{{.Stats.VisitPast}}</p>
+      <p class="text-[11px] text-gray-600 mt-1 leading-tight">예정일 경과</p>
     </a>
-    <a href="/as/stats?status=visit_upcoming" class="bg-white rounded-xl border {{if eq .ListStatus "visit_upcoming"}}border-gray-400 ring-1 ring-gray-200{{else}}border-gray-200{{end}} p-4 text-center hover:border-gray-400 block">
-      <p class="text-2xl font-bold text-gray-700">{{.Stats.VisitUpcoming}}</p>
-      <p class="text-xs text-gray-600 mt-1">예정(미도래)</p>
-      <p class="text-[10px] text-gray-400 mt-0.5">예정일 &gt; 오늘 · 진행중</p>
+    <a href="/as/stats?status=visit_done_open" class="bg-white rounded-xl border {{if eq .ListStatus "visit_done_open"}}border-amber-500 ring-1 ring-amber-200{{else}}border-amber-200{{end}} p-3 text-center hover:border-amber-400 block min-w-0">
+      <p class="text-xl font-bold text-amber-600 tabular-nums">{{.Stats.VisitDoneOpen}}</p>
+      <p class="text-[11px] text-gray-600 mt-1 leading-tight">다음 일정 미정</p>
     </a>
-  </div>
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">상태별 현황{{if .Personal}} (내 배정){{end}}</h3>
-      {{if .ByStatus}}
-      {{range .ByStatus}}
-      <div class="flex items-center justify-between py-2 border-b border-gray-50">
-        <span class="text-sm"><span class="px-2 py-0.5 rounded-full text-xs {{statusColor .Status}}">{{statusLabel .Status}}</span></span>
-        <span class="font-bold text-gray-800">{{.Count}}건</span>
-      </div>
-      {{end}}
-      {{else}}
-      <p class="text-sm text-gray-400 text-center py-6">데이터가 없습니다.</p>
-      {{end}}
-    </div>
-
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">기관별 AS 현황{{if .Personal}} (내 배정){{end}}</h3>
-      {{if .ByCustomer}}
-      {{range .ByCustomer}}
-      <div class="flex items-center justify-between py-2 border-b border-gray-50">
-        <span class="text-sm text-gray-700">{{.Name}}</span>
-        <div class="text-sm">
-          <span class="font-bold text-gray-800">{{.Count}}건</span>
-          {{if .Open}}<span class="text-xs text-yellow-600 ml-1">(미처리 {{.Open}})</span>{{end}}
-        </div>
-      </div>
-      {{end}}
-      {{else}}
-      <p class="text-sm text-gray-400 text-center py-6">데이터가 없습니다.</p>
-      {{end}}
-    </div>
+    <a href="/as/stats?status=visit_today" class="bg-white rounded-xl border {{if eq .ListStatus "visit_today"}}border-sky-500 ring-1 ring-sky-200{{else}}border-sky-200{{end}} p-3 text-center hover:border-sky-400 block min-w-0">
+      <p class="text-xl font-bold text-sky-600 tabular-nums">{{.Stats.VisitToday}}</p>
+      <p class="text-[11px] text-gray-600 mt-1 leading-tight">오늘 방문</p>
+    </a>
+    <a href="/as/stats?status=visit_upcoming" class="bg-white rounded-xl border {{if eq .ListStatus "visit_upcoming"}}border-gray-400 ring-1 ring-gray-200{{else}}border-gray-200{{end}} p-3 text-center hover:border-gray-400 block min-w-0">
+      <p class="text-xl font-bold text-gray-700 tabular-nums">{{.Stats.VisitUpcoming}}</p>
+      <p class="text-[11px] text-gray-600 mt-1 leading-tight">예정(미도래)</p>
+    </a>
   </div>
 
   <div class="space-y-3">
     <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">
         AS 목록
-        {{if eq .ListStatus "all"}}· 전체{{else if eq .ListStatus "in_progress"}}· 진행중{{else if eq .ListStatus "visit_past"}}· 예정일 경과{{else if eq .ListStatus "visit_today"}}· 오늘 방문{{else if eq .ListStatus "visit_upcoming"}}· 예정(미도래){{else if eq .ListStatus "overdue"}}· 접수 지연{{else if eq .ListStatus "today"}}· 오늘 접수{{else if eq .ListStatus "completed_today"}}· 오늘 완료{{else if eq .ListStatus "completed"}}· 완료{{else if .ListStatus}}· {{.ListStatus}}{{end}}
+        {{if eq .ListStatus "all"}}· 전체{{else if eq .ListStatus "assigned"}}· 담당자 배정{{else if eq .ListStatus "in_progress"}}· 진행중{{else if eq .ListStatus "visit_past"}}· 예정일 경과{{else if eq .ListStatus "visit_done_open"}}· 다음 일정 미정{{else if eq .ListStatus "visit_today"}}· 오늘 방문{{else if eq .ListStatus "visit_upcoming"}}· 예정(미도래){{else if eq .ListStatus "overdue"}}· 접수 지연{{else if eq .ListStatus "today"}}· 오늘 접수{{else if eq .ListStatus "completed_today"}}· 오늘 완료{{else if eq .ListStatus "completed"}}· 완료{{else if .ListStatus}}· {{.ListStatus}}{{end}}
         <span class="text-gray-400 font-normal normal-case">({{.Total}}건)</span>
       </h3>
       <form method="GET" action="/as/stats" class="flex gap-2">
         <select name="status" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+          <option value="assigned" {{if eq .ListStatus "assigned"}}selected{{end}}>담당자 배정</option>
           <option value="in_progress" {{if eq .ListStatus "in_progress"}}selected{{end}}>진행중</option>
           <option value="visit_past" {{if eq .ListStatus "visit_past"}}selected{{end}}>예정일 경과</option>
+          <option value="visit_done_open" {{if eq .ListStatus "visit_done_open"}}selected{{end}}>다음 일정 미정</option>
           <option value="visit_today" {{if eq .ListStatus "visit_today"}}selected{{end}}>오늘 방문</option>
           <option value="visit_upcoming" {{if eq .ListStatus "visit_upcoming"}}selected{{end}}>예정(미도래)</option>
           <option value="overdue" {{if eq .ListStatus "overdue"}}selected{{end}}>접수 지연(3일↑)</option>

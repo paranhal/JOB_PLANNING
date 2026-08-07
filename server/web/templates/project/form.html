@@ -1,0 +1,201 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-4"
+     x-data="projectForm()">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
+      <p class="text-sm text-gray-500">기본 정보와 AS/정기점검 귀속 범위를 설정합니다.</p>
+    </div>
+    <a href="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="text-sm text-gray-500 hover:underline">← 돌아가기</a>
+  </div>
+
+  {{if .FormError}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  {{end}}
+
+  <form method="post" action="{{if .IsEdit}}/projects/{{.Project.ProjectID}}/update{{else}}/projects{{end}}" class="space-y-4"
+        @submit="syncRuleFields()">
+    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <h3 class="font-semibold text-gray-800">기본 정보</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500">*</span></label>
+          <input name="name" required value="{{.Project.Name}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">짧은 이름</label>
+          <input name="short_name" value="{{.Project.ShortName}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="목록 표시용">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">사업 연도</label>
+          <input type="number" name="plan_year" value="{{if .Project.PlanYear}}{{.Project.PlanYear}}{{end}}" min="2000" max="2100" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">유상/무상</label>
+          <select name="is_paid" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="1" {{if .Project.IsPaid}}selected{{end}}>유상</option>
+            <option value="0" {{if not .Project.IsPaid}}selected{{end}}>무상</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+          <select name="status" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="active" {{if eq .Project.Status "active"}}selected{{end}}>진행</option>
+            <option value="complete" {{if eq .Project.Status "complete"}}selected{{end}}>완료</option>
+            <option value="archived" {{if eq .Project.Status "archived"}}selected{{end}}>보관</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">정렬</label>
+          <input type="number" name="sort_order" value="{{.Project.SortOrder}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">발주처</label>
+        <select name="ordering_party_id" x-model="orderingPartyId" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">— 선택 —</option>
+          {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
+          <option value="custom">직접입력</option>
+        </select>
+        <input x-show="orderingPartyId === 'custom'" x-cloak type="text" name="ordering_party_custom"
+               value="{{.Project.OrderingParty}}" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주처 직접입력">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">고객</label>
+        <select name="customer_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">— 선택 —</option>
+          {{range .Customers}}
+          <option value="{{.CustomerID}}" {{if eq $.Project.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약방식</label>
+          <select name="contract_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">— 선택 —</option>
+            {{range .ContractTypes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.ContractType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">청구방식</label>
+          <select name="billing_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">— 선택 —</option>
+            {{range .BillingTypes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.BillingType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 시작</label>
+          <input type="date" name="start_date" value="{{.Project.StartDate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 마감</label>
+          <input type="date" name="end_date" value="{{.Project.EndDate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">비고</label>
+        <textarea name="notes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">{{.Project.Notes}}</textarea>
+      </div>
+      <input type="hidden" name="color" value="{{if .Project.Color}}{{.Project.Color}}{{else}}#3B82F6{{end}}">
+      <input type="hidden" name="contact_id" value="{{.Project.ContactID}}">
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-gray-800">범위 규칙</h3>
+          <p class="text-xs text-gray-500 mt-0.5">상위기관 · 제품 · 업무유형으로 AS/정기점검 귀속을 조회합니다.</p>
+        </div>
+        <button type="button" @click="addRule()" class="text-sm text-blue-600 hover:underline">+ 규칙 추가</button>
+      </div>
+
+      <template x-for="(rule, idx) in rules" :key="idx">
+        <div class="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-medium text-gray-700" x-text="'규칙 ' + (idx+1)"></span>
+            <button type="button" @click="rules.splice(idx,1)" class="text-xs text-red-600 hover:underline">삭제</button>
+          </div>
+          <input type="hidden" :name="'rule_id'" :value="rule.id">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">상위기관</label>
+            <select x-model="rule.parent" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">제한 없음</option>
+              {{range .Parents}}
+              <option value="{{.ParentID}}">{{.Name}}</option>
+              {{end}}
+            </select>
+            <input type="hidden" name="rule_parent_id" :value="rule.parent">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">제품</label>
+            <div class="flex flex-wrap gap-3 text-sm">
+              {{range .ProductKeys}}
+              <label class="inline-flex items-center gap-1.5">
+                <input type="checkbox" :checked="rule.products.includes('{{.Key}}')"
+                       @change="toggleKey(rule.products, '{{.Key}}', $event.target.checked)" class="rounded text-blue-600">
+                {{.Label}}
+              </label>
+              {{end}}
+            </div>
+            <input type="hidden" name="rule_product_keys" :value="rule.products.join(',')">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">업무유형</label>
+            <div class="flex flex-wrap gap-3 text-sm">
+              {{range .WorkKinds}}
+              <label class="inline-flex items-center gap-1.5">
+                <input type="checkbox" :checked="rule.kinds.includes('{{.Key}}')"
+                       @change="toggleKey(rule.kinds, '{{.Key}}', $event.target.checked)" class="rounded text-blue-600">
+                {{.Label}}
+              </label>
+              {{end}}
+            </div>
+            <input type="hidden" name="rule_work_kinds" :value="rule.kinds.join(',')">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">설명</label>
+            <input type="text" name="rule_notes" x-model="rule.notes" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          </div>
+        </div>
+      </template>
+      <p x-show="rules.length===0" class="text-sm text-gray-400">규칙이 없으면 상세 화면에서 AS/정기점검 자동 매칭이 되지 않습니다.</p>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <a href="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="px-4 py-2 text-sm border rounded-lg">취소</a>
+      <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">{{if .IsEdit}}저장{{else}}등록{{end}}</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function projectForm() {
+  let initial = [];
+  try { initial = JSON.parse({{printf "%q" .RulesJSON}}); } catch (e) { initial = []; }
+  return {
+    orderingPartyId: {{if .Project.OrderingPartyID}}{{printf "%q" .Project.OrderingPartyID}}{{else if .Project.OrderingParty}}"custom"{{else}}""{{end}},
+    rules: Array.isArray(initial) ? initial : [],
+    addRule() {
+      this.rules.push({ id: '', parent: '', products: [], kinds: [], notes: '' });
+    },
+    toggleKey(arr, key, on) {
+      const i = arr.indexOf(key);
+      if (on && i < 0) arr.push(key);
+      if (!on && i >= 0) arr.splice(i, 1);
+    },
+    syncRuleFields() {}
+  };
+}
+</script>
+{{end}}

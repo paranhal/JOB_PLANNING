@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -19,6 +20,7 @@ type Handler struct {
 	Relation       *RelationHandler
 	AS             *ASHandler
 	Work           *WorkHandler
+	Workboard      *WorkboardHandler
 	Stats          *StatsHandler
 	WorkStatus     *WorkStatusHandler
 	Analysis       *AnalysisHandler
@@ -26,12 +28,14 @@ type Handler struct {
 	Attachment     *AttachmentHandler
 	Auth           *AuthHandler
 	Maintenance    *MaintenanceHandler
+	Project        *ProjectHandler
 
 	customerRepo *repository.CustomerRepo
 	asRepo       *repository.ASRepo
 	workBoard    *repository.WorkBoardRepo
 	assetRepo    *repository.AssetRepo
 	attachRepo   *repository.AttachmentRepo
+	statsRepo    *repository.StatsRepo
 }
 
 func New(db *sql.DB) *Handler {
@@ -71,31 +75,44 @@ func New(db *sql.DB) *Handler {
 		},
 		Asset: &AssetHandler{
 			repo: assetRepo, customerRepo: customerRepo, codeRepo: codeRepo, attachRepo: attachRepo,
+			wbRepo: repository.NewWBRepo(db),
 		},
 		SWDetail: &SWDetailHandler{repo: swDetailRepo},
 		Relation: &RelationHandler{repo: relationRepo, customerRepo: customerRepo, codeRepo: codeRepo},
 		AS: &ASHandler{
 			repo: asRepo, processRepo: asProcessRepo, workRepo: asWorkRepo,
+			wbRepo:       repository.NewWBRepo(db),
+			settingsRepo: repository.NewSettingsRepo(db),
+			unlockRepo:   repository.NewASUnlockRepo(db),
 			customerRepo: customerRepo, assetRepo: assetRepo,
 			contactRepo: contactRepo, codeRepo: codeRepo,
 			userRepo: userRepo, relationRepo: relationRepo,
+			attachRepo: attachRepo,
 		},
 		Work:       NewWorkHandler(workBoardRepo),
-		Stats:      NewStatsHandler(statsRepo),
+		Workboard: NewWorkboardHandler(
+			repository.NewWBRepo(db), userRepo, customerRepo, contactRepo, codeRepo,
+			asRepo, maintRepo,
+		),
+		Stats:      NewStatsHandler(statsRepo, userRepo, repository.NewWBRepo(db)),
 		WorkStatus: NewWorkStatusHandler(repository.NewWorkStatusRepo(db)),
 		Analysis:   &AnalysisHandler{db: db},
 		Code:       &CodeHandler{repo: codeRepo},
 		Attachment: &AttachmentHandler{repo: attachRepo, uploadDir: "data/uploads"},
 		Auth:       &AuthHandler{userRepo: userRepo, jwtSecret: jwtSecret},
 		Maintenance: &MaintenanceHandler{
-			repo: maintRepo, customerRepo: customerRepo,
+			repo: maintRepo, customerRepo: customerRepo, userRepo: userRepo,
 		},
+		Project: NewProjectHandler(
+			repository.NewProjectRepo(db), customerRepo, contactRepo, codeRepo, assetRepo,
+		),
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
 		workBoard:    workBoardRepo,
 		assetRepo:    assetRepo,
 		attachRepo:   attachRepo,
+		statsRepo:    statsRepo,
 	}
 }
 
@@ -132,15 +149,28 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	pendingList, _ := h.workBoard.ListBucket(model.WorkBucketSchedulePending, mineUID, mineK, 8)
 	unassignedList, _ := h.workBoard.ListBucket(model.WorkBucketUnassigned, "", nil, 8)
 
+	// 상단: 주간 통계 KPI(팀전체, 표시 전용) — 일일 업무회의 표 대신
+	now := time.Now()
+	var weekKPI model.StatsKPICard
+	if h.statsRepo != nil {
+		weekCols := repository.BuildStatsPeriodColumns(model.StatsViewWeek, now)
+		f := model.StatsMeetingFilter{Scope: model.StatsScopeTeam}
+		_ = h.statsRepo.FillPeriodOverview(weekCols, f)
+		weekKPI, _ = h.statsRepo.LoadStatsKPI(model.StatsViewWeek, weekCols, f)
+	}
+
 	showAssignee := role == "admin" || role == "receipt"
 	data := map[string]interface{}{
-		"Title":               "대시보드",
-		"Active":              "dashboard",
-		"Role":                role,
-		"RoleLabel":           roleLabelText(role),
-		"DisplayName":         userName,
-		"LoginID":             username,
-		"WorkStats":      stats,
+		"Title":       "대시보드",
+		"Active":      "dashboard",
+		"Role":        role,
+		"RoleLabel":   roleLabelText(role),
+		"DisplayName": userName,
+		"LoginID":     username,
+		"WorkStats":   stats,
+		"WeekKPI":     weekKPI,
+		"ExecTarget":  model.StatsExecTargetPct,
+		"VisitTarget": model.StatsVisitTargetDays,
 		"OpenHref":       workListURL(model.WorkBucketOpen, mine, role),
 		"TodayHref":      workListURL(model.WorkBucketToday, mine, role),
 		"DelayedHref":    workListURL(model.WorkBucketDelayed, mine, role),

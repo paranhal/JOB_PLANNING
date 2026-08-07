@@ -186,15 +186,16 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	users, _ := h.userRepo.ListAll()
-	msg := ""
-	switch c.QueryParam("ok") {
+	msg := c.QueryParam("ok")
+	switch msg {
 	case "password":
 		msg = "비밀번호가 변경되었습니다."
 	case "saved":
 		msg = "사용자 정보가 저장되었습니다."
 	}
+	errMsg := c.QueryParam("err")
 	return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-		"Title": "사용자 관리", "Active": "users", "Users": users, "OK": msg,
+		"Title": "사용자 관리", "Active": "users", "Users": users, "OK": msg, "Error": errMsg,
 	})
 }
 

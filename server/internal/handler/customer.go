@@ -77,8 +77,9 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		page = 1
 	}
 	pageSize := 20
+	reviewOnly := c.QueryParam("review") == "1"
 
-	items, total, err := h.repo.List(search, category, industry, sort, dir, page, pageSize)
+	items, total, err := h.repo.List(search, category, industry, sort, dir, page, pageSize, reviewOnly)
 	if err != nil {
 		return err
 	}
@@ -120,15 +121,21 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		"Industries":    industries,
 		"Sort":          sort,
 		"Dir":           dir,
+		"SortDirID":     nextDir("customer_id"),
 		"SortDirOrg":    nextDir("org_name"),
+		"SortDirParent": nextDir("parent"),
 		"SortDirInd":    nextDir("industry"),
+		"SortDirPhone":  nextDir("phone"),
 		"SortDirAst":    nextDir("assets"),
 		"SortDirAS":     nextDir("as"),
+		"SortDirStatus": nextDir("status"),
 		"CanWrite":      canWriteMaster(c),
 		"ExportRegions": exportRegions,
 		"ExportSites":   exportSites,
 		"ExportRegion":  "",
 		"ExportSite":    "",
+		"ReviewOnly":    reviewOnly,
+		"ReviewCount":   h.repo.CountNeedsReview(),
 	})
 }
 
@@ -148,7 +155,15 @@ func (h *CustomerHandler) ExportExcel(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := buildCustomerExcelWorkbook(items)
+	custIDs := make([]string, 0, len(items))
+	for _, it := range items {
+		custIDs = append(custIDs, it.CustomerID)
+	}
+	maintRows, err := h.assetRepo.ListMaintExport(custIDs)
+	if err != nil {
+		return err
+	}
+	f, err := buildCustomerExcelWorkbook(items, maintRows)
 	if err != nil {
 		return err
 	}
@@ -161,7 +176,7 @@ func (h *CustomerHandler) ExportExcel(c echo.Context) error {
 	return writeExcelDownload(c, buf.Bytes(), "customers")
 }
 
-func buildCustomerExcelWorkbook(items []model.CustomerListItem) (*excelize.File, error) {
+func buildCustomerExcelWorkbook(items []model.CustomerListItem, maintRows []model.Asset) (*excelize.File, error) {
 	f := excelize.NewFile()
 	sheet := f.GetSheetName(0)
 	if sheet == "" {
@@ -172,9 +187,25 @@ func buildCustomerExcelWorkbook(items []model.CustomerListItem) (*excelize.File,
 	}
 	sheet = "Customers"
 
+	contractByCust := map[string]string{}
+	for _, a := range maintRows {
+		label := excelMaintContractLabel(a.MaintContractType)
+		if label == "" {
+			continue
+		}
+		prev := contractByCust[a.CustomerID]
+		if prev == "" {
+			contractByCust[a.CustomerID] = label
+			continue
+		}
+		if !strings.Contains(prev, label) {
+			contractByCust[a.CustomerID] = prev + ", " + label
+		}
+	}
+
 	headers := []interface{}{
 		"고객ID", "기관명", "공식명칭", "상위기관", "지역", "업종",
-		"대표전화", "자산수", "AS수", "상태",
+		"대표전화", "자산수", "AS수", "유지보수계약", "상태",
 	}
 	hdrStyle, err := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
@@ -192,7 +223,7 @@ func buildCustomerExcelWorkbook(items []model.CustomerListItem) (*excelize.File,
 	if err := f.SetSheetRow(sheet, "A1", &headers); err != nil {
 		return nil, err
 	}
-	if err := f.SetCellStyle(sheet, "A1", "J1", hdrStyle); err != nil {
+	if err := f.SetCellStyle(sheet, "A1", "K1", hdrStyle); err != nil {
 		return nil, err
 	}
 	if err := f.SetRowHeight(sheet, 1, 30); err != nil {
@@ -216,19 +247,130 @@ func buildCustomerExcelWorkbook(items []model.CustomerListItem) (*excelize.File,
 		}
 		row := []interface{}{
 			it.CustomerID, it.OrgName, it.OfficialName, it.ParentOrgName, region, it.Industry,
-			it.MainPhone, it.AssetCount, it.AsCount, status,
+			it.MainPhone, it.AssetCount, it.AsCount, contractByCust[it.CustomerID], status,
 		}
 		cell := fmt.Sprintf("A%d", r+2)
 		if err := f.SetSheetRow(sheet, cell, &row); err != nil {
 			return nil, err
 		}
 	}
-	widths := []float64{22, 28, 28, 22, 10, 12, 14, 8, 8, 8}
+	widths := []float64{22, 28, 28, 22, 10, 12, 14, 8, 8, 16, 8}
 	for i, w := range widths {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		_ = f.SetColWidth(sheet, col, col, w)
 	}
+
+	if err := fillCustomerMaintSheet(f, hdrStyle, maintRows); err != nil {
+		return nil, err
+	}
 	return f, nil
+}
+
+func fillCustomerMaintSheet(f *excelize.File, hdrStyle int, rows []model.Asset) error {
+	const sheet = "유지보수계약"
+	idx, err := f.NewSheet(sheet)
+	if err != nil {
+		return err
+	}
+	_ = idx
+
+	headers := []interface{}{
+		"고객ID", "기관명", "제품명", "제품구분", "모델명", "시리얼", "설치일",
+		"설치위치", "계약구분", "점검주기", "계약시작", "계약종료", "청구처", "청구주기", "비고",
+	}
+	if err := f.SetSheetRow(sheet, "A1", &headers); err != nil {
+		return err
+	}
+	lastCol, _ := excelize.ColumnNumberToName(len(headers))
+	if err := f.SetCellStyle(sheet, "A1", lastCol+"1", hdrStyle); err != nil {
+		return err
+	}
+	_ = f.SetRowHeight(sheet, 1, 30)
+
+	for i, a := range rows {
+		loc := strings.TrimSpace(a.InstallLocation)
+		if loc == "" {
+			loc = strings.TrimSpace(strings.Join([]string{a.BuildingName, a.FloorName, a.RoomName}, " "))
+		}
+		row := []interface{}{
+			a.CustomerID, a.OrgName, a.ProductName, a.ProductType, a.ModelName, a.SerialNumber, a.InstallDate,
+			loc,
+			excelMaintContractLabel(a.MaintContractType),
+			excelMaintCycleLabel(a.MaintCycle),
+			a.MaintStartDate, a.MaintEndDate,
+			a.MaintBillingParty,
+			excelMaintBillingCycleLabel(a.MaintBillingCycle),
+			a.Notes,
+		}
+		if err := f.SetSheetRow(sheet, fmt.Sprintf("A%d", i+2), &row); err != nil {
+			return err
+		}
+	}
+	widths := []float64{22, 28, 22, 12, 16, 16, 12, 22, 10, 12, 12, 12, 14, 12, 30}
+	for i, w := range widths {
+		col, _ := excelize.ColumnNumberToName(i + 1)
+		_ = f.SetColWidth(sheet, col, col, w)
+	}
+	return nil
+}
+
+func excelMaintContractLabel(s string) string {
+	switch s {
+	case "paid":
+		return "유상"
+	case "free":
+		return "무상"
+	case "call":
+		return "CALL"
+	case "none":
+		return "미계약"
+	default:
+		return strings.TrimSpace(s)
+	}
+}
+
+func excelMaintCycleLabel(s string) string {
+	switch s {
+	case "monthly":
+		return "월"
+	case "quarterly":
+		return "분기"
+	case "semi":
+		return "반기"
+	case "odd_bimonthly":
+		return "홀수격월"
+	case "even_bimonthly":
+		return "짝수격월"
+	case "yearly":
+		return "년1회"
+	case "custom":
+		return "직접입력"
+	case "call":
+		return "Call"
+	case "none":
+		return "없음"
+	default:
+		return strings.TrimSpace(s)
+	}
+}
+
+func excelMaintBillingCycleLabel(s string) string {
+	switch s {
+	case "monthly":
+		return "월"
+	case "quarterly":
+		return "분기"
+	case "semi":
+		return "반기"
+	case "odd_bimonthly":
+		return "홀수격월"
+	case "even_bimonthly":
+		return "짝수격월"
+	case "custom":
+		return "직접입력"
+	default:
+		return strings.TrimSpace(s)
+	}
 }
 
 // New 고객 등록 폼
@@ -270,6 +412,34 @@ func (h *CustomerHandler) Show(c echo.Context) error {
 		"CanWrite":   canWriteMaster(c),
 		"CanReceive": canReceiveAS(c),
 	})
+}
+
+// ToggleReview 확인 필요 표식을 켜고 끈다. 수작업 보정이 끝난 기관을 목록에서 걸러내는 용도.
+func (h *CustomerHandler) ToggleReview(c echo.Context) error {
+	if !canWriteMaster(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	cust, err := h.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if cust == nil {
+		return echo.ErrNotFound
+	}
+	on := c.FormValue("on") == "1"
+	reason := strings.TrimSpace(c.FormValue("reason"))
+	if on && reason == "" {
+		reason = "수작업 확인 필요로 표시함"
+	}
+	if err := h.repo.SetNeedsReview(id, on, reason); err != nil {
+		return err
+	}
+	back := strings.TrimSpace(c.FormValue("redirect"))
+	if back == "" {
+		back = "/customers/" + id
+	}
+	return c.Redirect(http.StatusSeeOther, back)
 }
 
 // Edit 고객 수정 폼

@@ -1,0 +1,271 @@
+{{define "title"}}{{.Task.Title}} · 일일 업무 등록{{end}}
+{{define "content"}}
+{{$isAS := or (eq .Task.WorkType "as") (eq .Task.SourceType "as")}}
+{{$isMnt := or (eq .Task.WorkType "maintenance") (eq .Task.SourceType "maintenance")}}
+{{$t := .Task}}
+<div class="max-w-3xl mx-auto space-y-5"
+     x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}' }">
+  <div class="flex items-start justify-between gap-3">
+    <div>
+      <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="text-sm text-gray-500 hover:text-gray-700">← 일일 업무 등록</a>
+      <div class="flex items-center gap-2 mt-1 flex-wrap">
+        <h2 class="text-xl font-bold text-gray-800">
+          {{if $isAS}}AS 업무 등록{{else if $isMnt}}정기점검 업무 등록{{else}}행정/지원업무 등록{{end}}
+        </h2>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbWorkTypeClass $t.WorkType}}">{{wbWorkTypeLabel $t.WorkType}}</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbPriorityClass $t.Priority}}">{{wbPriorityLabel $t.Priority}}</span>
+      </div>
+      <p class="text-sm text-gray-500 mt-1">업무 고유번호 <span class="font-mono text-gray-800">{{$t.TaskID}}</span>
+        {{if .Parent}} · 상위 <a href="/workboard/tasks/{{.Parent.TaskID}}" class="text-blue-600 hover:underline">{{.Parent.Title}}</a>{{end}}
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {{if and $isAS .SourceHref}}
+      <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-rose-300 text-rose-800 rounded-lg hover:bg-rose-50">AS접수이동</a>
+      {{if and .CanAction .ActionHref}}
+      <a href="{{.ActionHref}}" class="px-3 py-1.5 text-sm {{if .ASClosed}}bg-slate-700 hover:bg-slate-800{{else}}bg-blue-600 hover:bg-blue-700{{end}} text-white rounded-lg">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치{{end}}</a>
+      {{end}}
+      {{end}}
+      {{if and $isMnt .SourceHref}}
+      <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-sky-300 text-sky-800 rounded-lg hover:bg-sky-50">정기점검등록이동</a>
+      {{end}}
+      <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register?view=day&date={{if $t.WorkDate}}{{$t.WorkDate}}{{else}}{{.Today}}{{end}}{{end}}"
+         class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">시간표</a>
+    </div>
+  </div>
+
+  {{if .FlashOK}}
+  <div class="rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
+    {{if eq .FlashOK "sub"}}하위업무를 추가했습니다.{{else if eq .FlashOK "place"}}시간표에 배치하고 업무를 등록했습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "saved"}}저장되었습니다.{{else}}저장되었습니다.{{end}}
+  </div>
+  {{end}}
+  {{if .FlashErr}}
+  <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
+    {{if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else}}업무명과 예정일을 확인하세요.{{end}}
+  </div>
+  {{end}}
+
+  {{if and $isAS .ASClosed .ASSource}}
+  <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+    <div class="border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2 bg-slate-50">
+      <div class="flex items-center gap-2">
+        <h3 class="text-sm font-semibold text-slate-800">조치 완료</h3>
+        {{statusBadge .ASSource.Status}}
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">읽기 전용</span>
+      </div>
+      {{if .ActionHref}}
+      <a href="{{.ActionHref}}" class="text-sm text-blue-700 hover:underline">조치 완료 화면 열기 →</a>
+      {{end}}
+    </div>
+    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+      <div><p class="text-xs text-slate-500">처리담당자</p><p>{{if .ASSource.AssignedTo}}{{.ASSource.AssignedTo}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-slate-500">결과코드</p><p>{{if .ASSource.ResultCode}}{{.ASSource.ResultCode}}{{else}}—{{end}}</p></div>
+      <div class="sm:col-span-2"><p class="text-xs text-slate-500 mb-1">조치내용</p><p class="whitespace-pre-line">{{if .ASSource.ActionTaken}}{{.ASSource.ActionTaken}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-slate-500">사용부품</p><p>{{if .ASSource.PartsUsed}}{{.ASSource.PartsUsed}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-slate-500">완료일시</p><p>{{if .CompleteLocal}}{{.CompleteLocal}}{{else}}—{{end}}</p></div>
+    </div>
+  </div>
+  {{end}}
+
+  {{if .CanWrite}}
+  <form method="post" action="/workboard/tasks/{{$t.TaskID}}/update" class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 text-sm">
+    <input type="hidden" name="back" value="{{.BackURL}}">
+
+    {{if or $isAS $isMnt}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{if $isAS}}AS 접수번호{{else}}정기점검번호{{end}}</label>
+        {{if .SourceHref}}
+        <a href="{{.SourceHref}}" class="font-mono text-blue-600 hover:underline">{{.SourceLabel}}</a>
+        {{else}}<p class="font-mono">{{$t.SourceID}}</p>{{end}}
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">업무 구분</label>
+        <p class="font-medium">{{wbWorkTypeLabel $t.WorkType}}</p>
+      </div>
+    </div>
+    {{else}}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">업무 구분 <span class="text-red-500">*</span></label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
+               :class="workType === 'admin' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+          <input type="radio" name="work_type" value="admin" x-model="workType" class="text-blue-600">
+          <span>행정업무</span>
+        </label>
+        <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
+               :class="workType === 'support' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+          <input type="radio" name="work_type" value="support" x-model="workType" class="text-blue-600">
+          <span>지원업무</span>
+        </label>
+      </div>
+    </div>
+    {{end}}
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">업무명 <span class="text-red-500">*</span></label>
+      <input name="title" required value="{{$t.Title}}" class="w-full border rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">{{if $isAS}}접수 내용{{else if $isMnt}}점검 내용{{else}}설명{{end}}</label>
+      <textarea name="description" rows="3" class="w-full border rounded-lg px-3 py-2">{{$t.Description}}</textarea>
+    </div>
+
+    {{if not (or $isAS $isMnt)}}
+    <div x-show="workType === 'support'" x-cloak>
+      <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500">*</span></label>
+      <select name="project_id" :required="workType === 'support'" :disabled="workType !== 'support'"
+              class="w-full border rounded-lg px-3 py-2">
+        <option value="">— 선택 —</option>
+        {{range .Projects}}
+        <option value="{{.ProjectID}}" {{if eq $.Task.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+    {{end}}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{if or $isAS $isMnt}}예정일{{else}}마감일{{end}} <span class="text-red-500">*</span></label>
+        <input type="date" name="due_date" required value="{{$t.DueDate}}" class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">업무 배정일 <span class="text-red-500">*</span></label>
+        <input type="date" name="work_date" required value="{{if $t.WorkDate}}{{$t.WorkDate}}{{else}}{{$t.DueDate}}{{end}}"
+               class="w-full border rounded-lg px-3 py-2">
+      </div>
+    </div>
+
+    <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
+      <p class="text-xs font-medium text-gray-700">소요 예상 시간 <span class="text-red-500">*</span></p>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">시작</label>
+          <input type="time" name="start_time" x-model="start" required step="60"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">종료</label>
+          <input type="time" name="end_time" x-model="end" required step="60"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+      </div>
+      <p class="text-[11px] text-gray-400">07:00~20:00 · 15분 단위</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+        <select name="status" class="w-full border rounded-lg px-3 py-2">
+          <option value="waiting" {{if eq $t.Status "waiting"}}selected{{end}}>오늘예정업무</option>
+          <option value="in_progress" {{if eq $t.Status "in_progress"}}selected{{end}}>진행중</option>
+          <option value="hold" {{if or (eq $t.Status "hold") (eq $t.Status "review")}}selected{{end}}>보류</option>
+          <option value="transfer" {{if eq $t.Status "transfer"}}selected{{end}}>이관</option>
+          <option value="complete" {{if eq $t.Status "complete"}}selected{{end}}>완료</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">우선순위</label>
+        <select name="priority" class="w-full border rounded-lg px-3 py-2">
+          <option value="urgent" {{if eq $t.Priority "urgent"}}selected{{end}}>긴급</option>
+          <option value="high" {{if eq $t.Priority "high"}}selected{{end}}>높음</option>
+          <option value="normal" {{if eq $t.Priority "normal"}}selected{{end}}>보통</option>
+          <option value="low" {{if eq $t.Priority "low"}}selected{{end}}>낮음</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
+        <select name="assignee" class="w-full border rounded-lg px-3 py-2">
+          <option value="">— 선택 —</option>
+          {{range .Assignees}}
+          <option value="{{.FullName}}" {{if eq $.Task.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">진행률 (%)</label>
+        <input type="number" name="progress" min="0" max="100" value="{{$t.Progress}}"
+               class="w-full border rounded-lg px-3 py-2">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">태그</label>
+      <input name="tags" value="{{$t.Tags}}" placeholder="쉼표로 구분" class="w-full border rounded-lg px-3 py-2">
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}"
+         class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">취소</a>
+      <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">저장</button>
+    </div>
+  </form>
+  {{else}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3 text-sm">
+    <p class="font-medium text-gray-900">{{$t.Title}}</p>
+    {{if $t.Description}}<p class="whitespace-pre-wrap text-gray-800">{{$t.Description}}</p>{{end}}
+    <div class="grid grid-cols-2 gap-3 pt-1">
+      <div><p class="text-xs text-gray-500">예정일</p><p>{{if $t.DueDate}}{{$t.DueDate}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-gray-500">업무 배정일</p><p>{{if $t.WorkDate}}{{$t.WorkDate}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-gray-500">시간</p><p>{{if $t.StartTime}}{{$t.StartTime}}~{{$t.EndTime}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-gray-500">담당자</p><p>{{if $t.Assignee}}{{$t.Assignee}}{{else}}—{{end}}</p></div>
+    </div>
+  </div>
+  {{end}}
+
+  {{if and .CanWrite (eq .Task.SourceType "") (eq .Task.ParentTaskID "")}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3" x-data="{ mode: 'daily' }">
+    <h3 class="font-semibold text-gray-800">하위업무 추가</h3>
+    <p class="text-xs text-gray-500">여러 날에 걸쳐 할 일은 일자별 하위업무로 나눕니다. 매일 단위 또는 필요한 날짜만 지정할 수 있습니다.</p>
+    <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/subtasks" class="space-y-3 text-sm">
+      <div class="flex gap-3">
+        <label class="flex items-center gap-2"><input type="radio" name="sub_mode" value="daily" x-model="mode"> 매일(기간)</label>
+        <label class="flex items-center gap-2"><input type="radio" name="sub_mode" value="dates" x-model="mode"> 날짜 지정</label>
+      </div>
+      <div class="grid grid-cols-2 gap-3" x-show="mode==='daily'">
+        <div>
+          <label class="block text-gray-600 mb-1">시작일</label>
+          <input type="date" name="daily_from" value="{{.Today}}" class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">종료일</label>
+          <input type="date" name="daily_to" class="w-full border rounded-lg px-3 py-2">
+        </div>
+      </div>
+      <div x-show="mode==='dates'" x-cloak>
+        <label class="block text-gray-600 mb-1">날짜 목록</label>
+        <textarea name="sub_dates" rows="3" placeholder="2026-08-05&#10;2026-08-12&#10;2026-08-19"
+                  class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+        <p class="text-[11px] text-gray-400 mt-1">줄바꿈 또는 쉼표로 구분 · YYYY-MM-DD</p>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">하위업무 만들기</button>
+    </form>
+  </div>
+  {{end}}
+
+  {{if .Children}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <h3 class="px-4 py-3 font-semibold border-b bg-gray-50">하위업무 {{len .Children}}건</h3>
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="text-left px-4 py-2">예정일</th>
+          <th class="text-left px-4 py-2">업무</th>
+          <th class="text-left px-4 py-2">시간</th>
+          <th class="text-left px-4 py-2">상태</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {{range .Children}}
+        <tr>
+          <td class="px-4 py-2 whitespace-nowrap">{{if .DueDate}}{{.DueDate}}{{else}}{{.WorkDate}}{{end}}</td>
+          <td class="px-4 py-2"><a href="/workboard/tasks/{{.TaskID}}" class="text-blue-600 hover:underline">{{.Title}}</a></td>
+          <td class="px-4 py-2 text-gray-500">{{if .StartTime}}{{.StartTime}}~{{.EndTime}}{{else}}미배치{{end}}</td>
+          <td class="px-4 py-2">{{wbTaskStatusLabel .Status}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+</div>
+{{end}}

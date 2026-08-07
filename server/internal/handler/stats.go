@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,11 +17,13 @@ import (
 )
 
 type StatsHandler struct {
-	repo *repository.StatsRepo
+	repo     *repository.StatsRepo
+	userRepo *repository.UserRepo
+	wbRepo   *repository.WBRepo
 }
 
-func NewStatsHandler(repo *repository.StatsRepo) *StatsHandler {
-	return &StatsHandler{repo: repo}
+func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, wbRepo *repository.WBRepo) *StatsHandler {
+	return &StatsHandler{repo: repo, userRepo: userRepo, wbRepo: wbRepo}
 }
 
 func normalizeStatsMetric(m string) string {
@@ -206,6 +210,121 @@ func weekOptions(now time.Time) []struct{ Value, Label string } {
 	return out
 }
 
+// Overview 일일/주간/월간 KPI·차트·예정·접수·처리 요약
+func (h *StatsHandler) Overview(c echo.Context) error {
+	now := time.Now()
+	view := strings.TrimSpace(c.QueryParam("view"))
+	switch view {
+	case model.StatsViewWeek, model.StatsViewMonth:
+	default:
+		view = model.StatsViewDay
+	}
+	filter := repository.ParseMeetingFilter(c.QueryParam("scope"), c.QueryParam("key"), c.QueryParam("project"))
+	anchor := repository.ParseStatsAnchor(view, c.QueryParam("date"), c.QueryParam("month"), now)
+	cols := repository.BuildStatsPeriodColumns(view, anchor)
+	if err := h.repo.FillPeriodOverview(cols, filter); err != nil {
+		return err
+	}
+	kpi, err := h.repo.LoadStatsKPI(view, cols, filter)
+	if err != nil {
+		return err
+	}
+	series, err := h.repo.LoadStatsChartSeries(view, anchor, filter)
+	if err != nil {
+		return err
+	}
+	seriesJSON, _ := json.Marshal(series)
+
+	// 현재 기간(오늘/이번주/이번달) 완료 건 — 조치내용 포함
+	var completedRows []model.StatsRow
+	var completedRange string
+	if len(cols) >= 2 {
+		cur := cols[1]
+		completedRows, err = h.repo.ListCompletedDetail(cur.From, cur.ToExclusive, filter)
+		if err != nil {
+			return err
+		}
+		completedRange = cur.Label
+		if completedRange == "" {
+			completedRange = cur.From + " ~ " + cur.ToExclusive
+		}
+	}
+
+	viewLabel := "일별"
+	switch view {
+	case model.StatsViewWeek:
+		viewLabel = "주별"
+	case model.StatsViewMonth:
+		viewLabel = "월별"
+	}
+
+	var assignees []model.User
+	if h.userRepo != nil {
+		assignees, _ = h.userRepo.ListAssignable()
+	}
+	var projects []model.WorkProject
+	if h.wbRepo != nil {
+		projects, _ = h.wbRepo.ListProjects(true)
+	}
+
+	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
+		"Title":            "통계",
+		"Active":           "stats",
+		"View":             view,
+		"ViewLabel":        viewLabel,
+		"Columns":          cols,
+		"KPI":              kpi,
+		"SeriesJSON":       template.JS(seriesJSON),
+		"CompletedRows":    completedRows,
+		"CompletedRange":   completedRange,
+		"ExecTarget":       model.StatsExecTargetPct,
+		"VisitTarget":      model.StatsVisitTargetDays,
+		"Filter":           filter,
+		"Assignees":        assignees,
+		"Projects":         projects,
+		"ProductOptions":   repository.StatsProductOptions(),
+		"FilterQ":          meetingFilterQuery(filter),
+		"AnchorDate":       anchor.Format("2006-01-02"),
+		"AnchorMonth":      anchor.Format("2006-01"),
+		"AnchorMonthLabel": anchor.Format("2006년 01월"),
+		"Today":            now.Format("2006-01-02"),
+		"CurrentMonth":     now.Format("2006-01"),
+		"PrevAnchor":       statsOverviewShift(view, anchor, -1).Format("2006-01-02"),
+		"NextAnchor":       statsOverviewShift(view, anchor, 1).Format("2006-01-02"),
+		"PrevMonth":        statsOverviewShift(view, anchor, -1).Format("2006-01"),
+		"NextMonth":        statsOverviewShift(view, anchor, 1).Format("2006-01"),
+	})
+}
+
+func meetingFilterQuery(f model.StatsMeetingFilter) string {
+	q := url.Values{}
+	if f.Scope != "" && f.Scope != model.StatsScopeTeam {
+		q.Set("scope", f.Scope)
+		if f.Key != "" {
+			q.Set("key", f.Key)
+		}
+	}
+	if f.ProjectID != "" {
+		q.Set("project", f.ProjectID)
+	}
+	s := q.Encode()
+	if s == "" {
+		return ""
+	}
+	return "&" + s
+}
+
+func statsOverviewShift(view string, anchor time.Time, dir int) time.Time {
+	switch view {
+	case model.StatsViewWeek:
+		return anchor.AddDate(0, 0, 7*dir)
+	case model.StatsViewMonth:
+		return time.Date(anchor.Year(), anchor.Month(), 1, 0, 0, 0, 0, anchor.Location()).AddDate(0, dir, 0)
+	default:
+		return anchor.AddDate(0, 0, dir)
+	}
+}
+
 func (h *StatsHandler) List(c echo.Context) error {
 	q := parseStatsQuery(c)
 	now := time.Now()
@@ -249,8 +368,8 @@ func (h *StatsHandler) List(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "stats/list.html", map[string]interface{}{
-		"Title":          "통계",
-		"Active":         "stats",
+		"Title":          "통계 상세",
+		"Active":         "stats_detail",
 		"Query":          q,
 		"QueryString":    statsQueryString(q),
 		"Metric":         q.Metric,
@@ -345,7 +464,7 @@ func (h *StatsHandler) ExportExcel(c echo.Context) error {
 func writeStatsSheet(f *excelize.File, sheet string, rows []model.StatsRow, assignees []model.StatsAssigneeRow) error {
 	headers := []string{
 		"제품분류", "제품모델명", "업무형태", "접수형태", "거래처명",
-		"수행담당자", "접수내용", "처리내용", "처리상태",
+		"수행담당자", "접수내용", "조치내용", "처리상태",
 	}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)

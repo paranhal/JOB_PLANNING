@@ -16,6 +16,90 @@ var (
 	reProcessIDV2  = regexp.MustCompile(`^R\d{4}-\d{3}-P\d{2}$`)
 )
 
+// migrateAssetIDsToASCII 한글 등 비ASCII 문자가 든 자산번호를 ASCII 형식으로 이관한다.
+//
+// 타사 장비를 한글 제품명만으로 등록하던 시기에 만들어진 번호가 대상이다.
+// 자산번호는 URL 경로와 이미지 파일 경로에 그대로 쓰여서 인코딩·경로 충돌을
+// 일으키므로, 참조 테이블까지 한 트랜잭션으로 함께 바꾼다. 1회만 실행한다.
+func migrateAssetIDsToASCII(db *sql.DB) error {
+	if metaDone(db, assetIDASCIIMetaKey) {
+		return nil
+	}
+
+	rows, err := db.Query(`
+		SELECT asset_id, COALESCE(model_name,''), COALESCE(product_name,''),
+		       COALESCE(product_type,''), COALESCE(manufacturer,'')
+		FROM assets WHERE asset_id GLOB '*[^ -~]*' ORDER BY asset_id`)
+	if err != nil {
+		return err
+	}
+	type row struct{ id, model, product, ptype, maker string }
+	var list []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.model, &r.product, &r.ptype, &r.maker); err != nil {
+			rows.Close()
+			return err
+		}
+		list = append(list, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	m := make(map[string]string, len(list))
+	for _, r := range list {
+		newID, err := nextFreeAssetID(db, r.model, r.product, r.ptype, r.maker)
+		if err != nil {
+			return err
+		}
+		m[r.id] = newID
+	}
+
+	if len(m) > 0 {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		// 자산번호를 참조하는 행을 먼저 바꾸므로 FK 검사는 커밋 시점으로 미룬다.
+		if _, err := tx.Exec(`PRAGMA defer_foreign_keys=ON`); err != nil {
+			return err
+		}
+		if err := applyAssetIDMap(tx, m); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		for old, newID := range m {
+			log.Printf("asset id ascii migrate: %s -> %s", old, newID)
+		}
+	}
+
+	markMetaDone(db, assetIDASCIIMetaKey)
+	return nil
+}
+
+// nextFreeAssetID 시퀀스로 자산번호를 뽑되 이미 쓰이는 번호는 건너뛴다.
+func nextFreeAssetID(db *sql.DB, model, product, ptype, maker string) (string, error) {
+	for i := 0; i < 1000; i++ {
+		id, err := NextAssetID(db, model, product, ptype, maker)
+		if err != nil {
+			return "", err
+		}
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM assets WHERE asset_id=?`, id).Scan(&n); err != nil {
+			return "", err
+		}
+		if n == 0 {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("자산번호 후보를 찾지 못했습니다")
+}
+
 // migrateBusinessIDsV2 고객·설치자산·접수·처리 고유번호를 신규 형식으로 일괄 이관한다.
 func migrateBusinessIDsV2(db *sql.DB) error {
 	var done int
@@ -175,18 +259,19 @@ func yearYY(created string) string {
 
 func buildAssetIDMap(tx *sql.Tx) (map[string]string, map[string]int, error) {
 	rows, err := tx.Query(`
-		SELECT asset_id, COALESCE(model_name,''), COALESCE(product_name,''), COALESCE(product_type,''), COALESCE(created_at,'')
+		SELECT asset_id, COALESCE(model_name,''), COALESCE(product_name,''), COALESCE(product_type,''),
+		       COALESCE(manufacturer,''), COALESCE(created_at,'')
 		FROM assets ORDER BY created_at ASC, asset_id ASC`)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer rows.Close()
 
-	type row struct{ id, model, product, ptype, created string }
+	type row struct{ id, model, product, ptype, maker, created string }
 	var list []row
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.id, &r.model, &r.product, &r.ptype, &r.created); err != nil {
+		if err := rows.Scan(&r.id, &r.model, &r.product, &r.ptype, &r.maker, &r.created); err != nil {
 			return nil, nil, err
 		}
 		list = append(list, r)
@@ -200,7 +285,7 @@ func buildAssetIDMap(tx *sql.Tx) (map[string]string, map[string]int, error) {
 	used := map[string]string{}
 
 	for _, r := range list {
-		model := NormalizeModelCode(r.model, r.product)
+		model := NormalizeModelCode(r.model, r.product, r.maker)
 		code := ProductTypeCode(r.ptype)
 		key := fmt.Sprintf("asset:%s:%s", model, code)
 

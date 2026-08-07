@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -19,12 +20,16 @@ type ASHandler struct {
 	repo         *repository.ASRepo
 	processRepo  *repository.ASProcessRepo
 	workRepo     *repository.ASWorkRepo
+	wbRepo       *repository.WBRepo
+	settingsRepo *repository.SettingsRepo
+	unlockRepo   *repository.ASUnlockRepo
 	customerRepo *repository.CustomerRepo
 	assetRepo    *repository.AssetRepo
 	contactRepo  *repository.ContactRepo
 	codeRepo     *repository.CodeRepo
 	userRepo     *repository.UserRepo
 	relationRepo *repository.RelationRepo
+	attachRepo   *repository.AttachmentRepo
 }
 
 func (h *ASHandler) List(c echo.Context) error {
@@ -117,6 +122,8 @@ func (h *ASHandler) List(c echo.Context) error {
 		statusLabel = "주간진행중"
 	case "visit_past":
 		statusLabel = "예정일 경과"
+	case "visit_done_open":
+		statusLabel = "다음 일정 미정"
 	case "visit_today":
 		statusLabel = "오늘 방문"
 	case "visit_upcoming":
@@ -142,6 +149,80 @@ func (h *ASHandler) List(c echo.Context) error {
 		"StatusLabel": statusLabel,
 		"AssigneeID":  assigneeID, "AssigneeName": assigneeName,
 		"IsHoldList":  status == "hold",
+	})
+}
+
+// ASKanbanColumn 칸반 한 컬럼 (상태 기준)
+type ASKanbanColumn struct {
+	Key    string
+	Title  string
+	Border string
+	Items  []model.ASListItem
+	Total  int
+	MoreQ  string
+}
+
+// Kanban AS 접수를 상태별 칸반으로 표시
+func (h *ASHandler) Kanban(c echo.Context) error {
+	role := currentRole(c)
+	search := strings.TrimSpace(c.QueryParam("search"))
+
+	mineParam := c.QueryParam("mine")
+	mine := false
+	if role == "tech" {
+		mine = mineParam != "0"
+	} else if mineParam == "1" {
+		mine = true
+	}
+
+	var mineUserID string
+	var mineKeys []string
+	if mine {
+		mineUserID = currentUserID(c)
+		mineKeys = assigneeKeys(c)
+	}
+
+	defs := []ASKanbanColumn{
+		{Key: "received", Title: "접수", Border: "border-blue-200"},
+		{Key: "assigned", Title: "담당자 배정", Border: "border-indigo-200"},
+		{Key: "in_progress", Title: "진행중", Border: "border-amber-200"},
+		{Key: "hold", Title: "보류", Border: "border-orange-200"},
+		{Key: "completed", Title: "완료", Border: "border-green-200"},
+	}
+
+	const perColumn = 30
+	columns := make([]ASKanbanColumn, 0, len(defs))
+	grand := 0
+	for _, col := range defs {
+		items, total, err := h.repo.ListFiltered(col.Key, search, mineUserID, mineKeys, "", "", 1, perColumn)
+		if err != nil {
+			return err
+		}
+		col.Items = items
+		col.Total = total
+		q := url.Values{}
+		q.Set("status", col.Key)
+		if search != "" {
+			q.Set("search", search)
+		}
+		if role == "tech" || mine {
+			if mine {
+				q.Set("mine", "1")
+			} else {
+				q.Set("mine", "0")
+			}
+		}
+		col.MoreQ = "/as?" + q.Encode()
+		columns = append(columns, col)
+		grand += total
+	}
+
+	return c.Render(http.StatusOK, "as/kanban.html", map[string]interface{}{
+		"Title": "AS 관리", "Active": "as",
+		"Columns": columns, "Total": grand,
+		"Search": search, "Mine": mine, "Role": role,
+		"PerColumn":  perColumn,
+		"CanReceive": canReceiveAS(c), "CanProcess": canProcessAS(c),
 	})
 }
 
@@ -400,6 +481,9 @@ func (h *ASHandler) Edit(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "show")
+	}
 
 	customers, _ := h.customerRepo.ListAll()
 	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
@@ -437,6 +521,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	existing, err := h.repo.GetByID(id)
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
+	}
+	if isASClosedStatus(existing.Status) && !h.canModifyAS(c, existing) {
+		return h.redirectLocked(c, id, "show")
 	}
 	as := h.parseReceiptForm(c)
 	as.ASID = existing.ASID
@@ -485,18 +572,107 @@ func (h *ASHandler) Show(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 
+	var customer *model.Customer
+	if as.CustomerID != "" {
+		customer, _ = h.customerRepo.GetByID(as.CustomerID)
+	}
+	var asset *model.Asset
+	var assetHistory []model.ASHistoryItem
+	if as.AssetID != "" {
+		asset, _ = h.assetRepo.GetByID(as.AssetID)
+		assetHistory, _ = h.repo.ListHistoryByAsset(as.AssetID, as.ASID, 50)
+	}
+	reopens, _ := h.repo.ListReopens(as.ASID)
+	var parent *model.ASReceipt
+	if as.ParentASID != "" {
+		parent, _ = h.repo.GetByID(as.ParentASID)
+	}
+	assignees, _ := h.userRepo.ListAssignable()
+
+	var dailyTask *model.WorkTask
+	if h.wbRepo != nil {
+		dailyTask, _ = h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
+	}
+
+	closed := isASClosedStatus(as.Status)
+	unlocked, unlockExp, _ := h.unlockActive(c, as.ASID)
+	canMod := h.canModifyAS(c, as)
+	now := time.Now()
+	unlockExpLocal := ""
+	if unlocked && !unlockExp.IsZero() {
+		unlockExpLocal = unlockExp.Format("15:04")
+	}
+	embed := c.QueryParam("embed") == "1"
+	data := map[string]interface{}{
+		"Title": as.ASNumber, "Active": "as", "AS": as,
+		"Customer": customer, "Asset": asset,
+		"AssetHistory":     assetHistory,
+		"ParentAS":         parent,
+		"Reopens":          reopens,
+		"Assignees":        assignees,
+		"DailyTask":        dailyTask,
+		"CanReopen":        closed && canReceiveAS(c) && !embed,
+		"CanReceive":       canReceiveAS(c),
+		"IsClosed":         closed,
+		"EditUnlocked":     unlocked,
+		"UnlockExpires":    unlockExpLocal,
+		"CanUnlockEdit":    closed && isAdminRole(c) && !unlocked && !embed,
+		"CanEditReceipt":   !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
+		"CanDelete":        !embed && isAdminRole(c) && (!closed || canMod),
+		"CanWriteDaily":    !embed && canWriteWorkboard(c) && !closed,
+		"TodayLocal":       now.Format("2006-01-02"),
+		"ActionErr":        c.QueryParam("err"),
+		"ActionOK":         c.QueryParam("ok"),
+		"OpenDaily":        !embed && c.QueryParam("daily") == "1",
+		"Embed":            embed,
+	}
+	if embed {
+		data["HideNav"] = true
+		data["UserName"] = ctxString(c, "user_name")
+		data["UserRole"] = ctxString(c, "role")
+		data["Username"] = ctxString(c, "username")
+		data["UserID"] = ctxString(c, "user_id")
+	}
+	return c.Render(http.StatusOK, "as/show.html", data)
+}
+
+// Action 조치 전용 화면 — 일일 업무에서 진입(완료·종료는 조회 전용)
+func (h *ASHandler) Action(c echo.Context) error {
+	// 조회: 접수·기술·관리자·일일업무 작성 가능 역할. 저장·워크플로는 POST·권한에서 차단.
+	if !canReceiveAS(c) && !canWriteWorkboard(c) && !canProcessAS(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	as, err := h.repo.GetByID(id)
+	if err != nil || as == nil {
+		return echo.ErrNotFound
+	}
+
 	processes, _ := h.processRepo.ListByAS(id)
 	workItems, _ := h.workRepo.ListByAS(id)
+	var attachments []model.Attachment
+	if h.attachRepo != nil {
+		attachments, _ = h.attachRepo.ListByRef("as", id)
+	}
 	procTypes, _ := h.codeRepo.ActiveByGroup("process_type")
 	causeTypes, _ := h.codeRepo.ActiveByGroup("cause_type")
 	resultCodes, _ := h.codeRepo.ActiveByGroup("result_code")
 	assignees, _ := h.userRepo.ListAssignable()
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
-	var assetHistory []model.ASHistoryItem
-	if as.AssetID != "" {
-		assetHistory, _ = h.repo.ListHistoryByAsset(as.AssetID, as.ASID, 50)
+
+	var dailyTask *model.WorkTask
+	if h.wbRepo != nil {
+		dailyTask, _ = h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
 	}
 
+	var parent *model.ASReceipt
+	if as.ParentASID != "" {
+		parent, _ = h.repo.GetByID(as.ParentASID)
+	}
+
+	closed := isASClosedStatus(as.Status)
+	unlocked, unlockExp, _ := h.unlockActive(c, as.ASID)
+	canMod := h.canModifyAS(c, as)
 	now := time.Now()
 	startLocal := ""
 	if as.StartDatetime != nil && !as.StartDatetime.IsZero() {
@@ -511,10 +687,10 @@ func (h *ASHandler) Show(c echo.Context) error {
 		cancelLocal = as.CancelDatetime.Format("2006-01-02")
 	}
 
-	// 워크플로 콤보: 접수/진행중 → 조치·보류·이관 / 보류 → 조치·이관·접수취소
-	showWorkflow := as.Status == "received" || as.Status == "assigned" || as.Status == "in_progress" || as.Status == "hold"
+	canProcess := canProcessAS(c) && (canMod || !closed)
+	showWorkflow := canProcess && !closed && (as.Status == "received" || as.Status == "assigned" || as.Status == "in_progress" || as.Status == "hold" || as.Status == model.StatusPartialComplete)
 	workflowHoldMode := as.Status == "hold"
-	showTransferComplete := as.Status == "transfer"
+	showTransferComplete := as.Status == "transfer" && canProcess
 	confirmerIsCustom := as.CustomerConfirmer != ""
 	if confirmerIsCustom {
 		for _, ct := range contacts {
@@ -524,18 +700,29 @@ func (h *ASHandler) Show(c echo.Context) error {
 			}
 		}
 	}
+	unlockExpLocal := ""
+	if unlocked && !unlockExp.IsZero() {
+		unlockExpLocal = unlockExp.Format("15:04")
+	}
+	titleSuffix := " · 조치"
+	if closed {
+		titleSuffix = " · 조치 완료"
+	}
 
-	return c.Render(http.StatusOK, "as/show.html", map[string]interface{}{
-		"Title": as.ASNumber, "Active": "as", "AS": as,
-		"Processes": processes, "WorkItems": workItems,
+	return c.Render(http.StatusOK, "as/action.html", map[string]interface{}{
+		"Title": as.ASNumber + titleSuffix, "Active": "as", "AS": as,
+		"ParentAS":  parent,
+		"Processes": processes, "WorkItems": workItems, "Attachments": attachments,
 		"ProcTypes": procTypes, "CauseTypes": causeTypes, "ResultCodes": resultCodes,
 		"Assignees":            assignees,
 		"Contacts":             contacts,
-		"AssetHistory":         assetHistory,
-		"CanProcess":           canProcessAS(c),
-		"CanReceive":           canReceiveAS(c),
-		"CanDelete":            isAdminRole(c),
-		"CanEditVisitDate":     canEditVisitDate(c, as),
+		"DailyTask":            dailyTask,
+		"IsClosed":             closed,
+		"EditUnlocked":         unlocked,
+		"UnlockExpires":        unlockExpLocal,
+		"CanUnlockEdit":        closed && isAdminRole(c) && !unlocked,
+		"CanProcess":           canProcess,
+		"ReadOnly":             closed && !canMod,
 		"ShowWorkflow":         showWorkflow,
 		"WorkflowHoldMode":     workflowHoldMode,
 		"ShowTransferComplete": showTransferComplete,
@@ -546,8 +733,8 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"CancelLocal":          cancelLocal,
 		"TodayLocal":           now.Format("2006-01-02"),
 		"WorkerDefault":        ctxString(c, "user_name"),
-		"OpenAction":           c.QueryParam("action") == "1",
 		"ActionErr":            c.QueryParam("err"),
+		"ActionOK":             c.QueryParam("ok"),
 	})
 }
 
@@ -559,6 +746,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 	as, err := h.repo.GetByID(id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
+	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "action")
 	}
 
 	// 접수담당은 배정만, 기술/관리자는 처리 필드 포함
@@ -634,7 +824,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 				RevisitScheduleConfirmed:  revisitConfirmed,
 			}
 			switch as.ResultCode {
-			case model.ResultRevisit, model.ResultTemporary:
+			case model.ResultRevisit, model.ResultTemporary, model.ResultPartial:
 				in.NextDate = firstNonEmpty(revisitDate, nextVisit)
 			case model.ResultTransfer, model.ResultEscalation:
 				in.NextDate = firstNonEmpty(confirmDate, nextVisit)
@@ -648,21 +838,21 @@ func (h *ASHandler) Update(c echo.Context) error {
 			if err != nil {
 				switch err {
 				case model.ErrRevisitReasonRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=revisit_reason")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=revisit_reason")
 				case model.ErrRevisitDateRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=revisit_date")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=revisit_date")
 				case model.ErrTemporaryDateRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=temporary_date")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=temporary_date")
 				case model.ErrTransferDetailRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=transfer_detail")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=transfer_detail")
 				case model.ErrConfirmDateRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=confirm_date")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=confirm_date")
 				case model.ErrConfirmTargetRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=confirm_target")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=confirm_target")
 				case model.ErrConfirmContactRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=confirm_contact")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=confirm_contact")
 				default:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"?action=1&err=action")
+					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=action")
 				}
 			}
 			applyOut = out
@@ -703,7 +893,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 			}
 		}
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -719,6 +909,8 @@ func actionResultLabel(code string) string {
 	switch strings.TrimSpace(code) {
 	case model.ResultDone:
 		return "완료"
+	case model.ResultPartial:
+		return "부분완료"
 	case model.ResultTemporary:
 		return "임시조치"
 	case model.ResultRevisit:
@@ -757,7 +949,7 @@ func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt) err
 			notesParts = append(notesParts, "세부:완료")
 		}
 	}
-	if as.VisitScheduledDate != "" && (result == model.ResultRevisit || result == model.ResultTransfer) {
+	if as.VisitScheduledDate != "" && (result == model.ResultRevisit || result == model.ResultTransfer || result == model.ResultPartial) {
 		label := "방문예정일"
 		if result == model.ResultTransfer {
 			label = "확인예정일"
@@ -800,20 +992,23 @@ func (h *ASHandler) Hold(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "action")
+	}
 	next := strings.TrimSpace(c.FormValue("hold_next_action"))
 	switch next {
 	case "action", "transfer", "cancel":
 	default:
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=hold_next")
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_next")
 	}
 	reason := strings.TrimSpace(c.FormValue("hold_reason"))
 	if reason == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=hold_reason")
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_reason")
 	}
 	if err := h.repo.SetHold(id, reason, next); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
 // ReleaseHold 보류 삭제(해제) → 필드 기준 워크플로 상태 복귀
@@ -827,7 +1022,7 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if as.Status != "hold" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id)
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 	}
 	if err := h.repo.ReleaseHold(id); err != nil {
 		return err
@@ -839,7 +1034,7 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 	if redir == "list" {
 		return c.Redirect(http.StatusSeeOther, "/as?status=hold")
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
 // Transfer 이관 처리
@@ -852,10 +1047,13 @@ func (h *ASHandler) Transfer(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "action")
+	}
 	if err := h.repo.SetTransfer(id); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
 // CompleteTransfer 이관 건 완료 (결과코드 + 완료일)
@@ -868,15 +1066,18 @@ func (h *ASHandler) CompleteTransfer(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "action")
+	}
 	resultCode := strings.TrimSpace(c.FormValue("result_code"))
 	completeDate := strings.TrimSpace(c.FormValue("complete_date"))
 	if resultCode == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=result_code")
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=result_code")
 	}
 	if err := h.repo.CompleteTransfer(id, resultCode, completeDate); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
 // Cancel 접수취소
@@ -889,11 +1090,14 @@ func (h *ASHandler) Cancel(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "action")
+	}
 	cancelDate := strings.TrimSpace(c.FormValue("cancel_date"))
 	if err := h.repo.SetCancelled(id, cancelDate); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
 func parseFormDatetime(s string) (time.Time, bool) {
@@ -938,7 +1142,64 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/as/"+asID)
 }
 
-// Delete AS 접수 삭제 (처리 이력 포함) — 관리자만
+// Reopen 완료된 접수를 같은 증상으로 다시 접수한다.
+// 완료 건을 되돌리지 않고 새 접수번호를 발급해 원 접수와 이어 둔다.
+func (h *ASHandler) Reopen(c echo.Context) error {
+	if !canReceiveAS(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	src, err := h.repo.GetByID(id)
+	if err != nil || src == nil {
+		return echo.ErrNotFound
+	}
+	if !model.CanReopenAS(src.Status) {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+url.QueryEscape("완료·종료된 건만 재접수할 수 있습니다"))
+	}
+	reason := strings.TrimSpace(c.FormValue("reopen_reason"))
+	if reason == "" {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+url.QueryEscape("재접수 사유를 입력하세요"))
+	}
+
+	as := model.NewReopenReceipt(src, reason, time.Now())
+	as.ReceivedBy = ctxString(c, "user_name")
+	if ch := strings.TrimSpace(c.FormValue("receipt_channel")); ch != "" {
+		as.ReceiptChannel = ch
+	}
+	if sym := strings.TrimSpace(c.FormValue("symptom")); sym != "" {
+		as.Symptom = sym
+	}
+	if u := strings.TrimSpace(c.FormValue("urgency")); u != "" {
+		as.Urgency = u
+	}
+	if code := strings.TrimSpace(c.FormValue("assigned_to_code")); code != "" {
+		if u, _ := h.userRepo.GetByID(code); u != nil {
+			as.AssignedUserID = u.UserID
+			as.AssignedTo = u.FullName
+		}
+	}
+	as.VisitScheduledDate = normalizeVisitDate(c.FormValue("visit_scheduled_date"))
+	as.ScheduleConfirmed = as.VisitScheduledDate != "" && c.FormValue("schedule_confirmed") == "1"
+
+	if err := h.repo.Create(as); err != nil {
+		return err
+	}
+	// 원 접수에도 재접수 사실을 이력으로 남긴다.
+	h.appendReopenProcess(src, as, reason, c)
+	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID)
+}
+
+func (h *ASHandler) appendReopenProcess(src, as *model.ASReceipt, reason string, c echo.Context) {
+	worker := ctxString(c, "user_name")
+	_ = h.processRepo.Create(&model.ASProcess{
+		ASID:            src.ASID,
+		ProcessDatetime: time.Now(),
+		Worker:          worker,
+		Notes:           fmt.Sprintf("동일 증상 재접수 — %s (사유: %s)", as.ASNumber, reason),
+	})
+}
+
+// Delete AS 접수 삭제 (처리 이력 포함) — 관리자만 (완료·종료는 잠금 해제 필요)
 func (h *ASHandler) Delete(c echo.Context) error {
 	if !isAdminRole(c) {
 		return echo.ErrForbidden
@@ -948,13 +1209,16 @@ func (h *ASHandler) Delete(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, id, "show")
+	}
 	if err := h.repo.Delete(id); err != nil {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/as")
 }
 
-// DeleteProcess 처리(조치) 이력 삭제 — 관리자만
+// DeleteProcess 처리(조치) 이력 삭제 — 관리자만 (완료·종료는 잠금 해제 필요)
 func (h *ASHandler) DeleteProcess(c echo.Context) error {
 	if !isAdminRole(c) {
 		return echo.ErrForbidden
@@ -965,13 +1229,16 @@ func (h *ASHandler) DeleteProcess(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		return h.redirectLocked(c, asID, "action")
+	}
 	if err := h.processRepo.DeleteByASAndID(asID, processID); err != nil {
 		if err == sql.ErrNoRows {
 			return echo.ErrNotFound
 		}
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+asID)
+	return c.Redirect(http.StatusSeeOther, "/as/"+asID+"/action")
 }
 
 // APIHistory 기관별 과거(완료) AS 이력 JSON
@@ -1029,6 +1296,7 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 			WeekReceived:    mineStats.WeekReceived,
 			WeekCompleted:   mineStats.WeekCompleted,
 			VisitPast:       mineStats.VisitPast,
+			VisitDoneOpen:   mineStats.VisitDoneOpen,
 			VisitToday:      mineStats.VisitToday,
 			VisitUpcoming:   mineStats.VisitUpcoming,
 			TransferOverdue: mineStats.TransferOverdue,
@@ -1036,9 +1304,6 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 	} else {
 		stats, _ = h.repo.DashboardStats("", nil)
 	}
-
-	byCustomer, _ := h.repo.StatsByCustomer(mineUserID, mineKeys)
-	byStatus, _ := h.repo.StatsByStatus(mineUserID, mineKeys)
 
 	listStatus := c.QueryParam("status")
 	if listStatus == "" {
@@ -1065,7 +1330,7 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "as/stats.html", map[string]interface{}{
 		"Title": title, "Active": "as_stats",
-		"Stats": stats, "ByCustomer": byCustomer, "ByStatus": byStatus,
+		"Stats":    stats,
 		"Personal": personal,
 		"DisplayName": ctxString(c, "user_name"),
 		"Role":        role,

@@ -1,0 +1,91 @@
+{{define "title"}}사업(프로젝트)관리 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">사업(프로젝트)관리</h2>
+      <p class="text-sm text-gray-500">사업 마스터 · 범위 규칙(상위기관×제품×업무유형)</p>
+    </div>
+    {{if .CanWrite}}
+    <a href="/projects/new"
+       class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      사업 등록
+    </a>
+    {{end}}
+  </div>
+
+  {{if eq .FlashOK "deleted"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">사업을 삭제했습니다.</div>
+  {{end}}
+  {{if eq .FlashErr "notfound"}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">사업을 찾을 수 없습니다.</div>
+  {{end}}
+
+  <form method="get" action="/projects" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">사업 연도</label>
+      <select name="year" onchange="this.form.submit()" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+        <option value="">전체</option>
+        {{range .Years}}
+        <option value="{{.}}" {{if eq $.Year .}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">상태</label>
+      <select name="status" onchange="this.form.submit()" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+        <option value="" {{if eq .Status ""}}selected{{end}}>전체</option>
+        <option value="active" {{if eq .Status "active"}}selected{{end}}>진행</option>
+        <option value="complete" {{if eq .Status "complete"}}selected{{end}}>완료</option>
+        <option value="archived" {{if eq .Status "archived"}}selected{{end}}>보관</option>
+      </select>
+    </div>
+  </form>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600 text-left">
+        <tr>
+          <th class="px-4 py-3 font-medium">연도</th>
+          <th class="px-4 py-3 font-medium">사업명</th>
+          <th class="px-4 py-3 font-medium">발주처</th>
+          <th class="px-4 py-3 font-medium">유상</th>
+          <th class="px-4 py-3 font-medium">상태</th>
+          <th class="px-4 py-3 font-medium">기간</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Projects}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-gray-600">{{if .PlanYear}}{{.PlanYear}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3">
+            <a href="/projects/{{.ProjectID}}" class="font-medium text-blue-700 hover:underline">
+              {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}
+            </a>
+            {{if .ShortName}}<p class="text-xs text-gray-400 mt-0.5 truncate max-w-md">{{.Name}}</p>{{end}}
+          </td>
+          <td class="px-4 py-3 text-gray-700">{{.OrderingPartyLabel}}</td>
+          <td class="px-4 py-3">
+            {{if .IsPaid}}
+            <span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700">유상</span>
+            {{else}}
+            <span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">무상</span>
+            {{end}}
+          </td>
+          <td class="px-4 py-3">{{wbProjectStatusLabel .Status}}</td>
+          <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
+            {{if or .StartDate .EndDate}}{{.StartDate}} ~ {{.EndDate}}{{else}}—{{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="6" class="px-4 py-10 text-center text-gray-400">등록된 사업이 없습니다.</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

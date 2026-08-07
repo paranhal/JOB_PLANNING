@@ -29,7 +29,9 @@ type ASReceipt struct {
 	ActionTaken       string    `json:"action_taken"`       // 조치내용
 	PartsUsed         string    `json:"parts_used"`
 	IsRecurrence      bool      `json:"is_recurrence"`      // 재발여부
-	IsReopen          bool      `json:"is_reopen"`          // 재오픈여부
+	IsReopen          bool      `json:"is_reopen"`          // 재접수여부 (완료 건의 동일 증상 재접수)
+	ParentASID        string    `json:"parent_as_id"`       // 재접수의 원 접수번호
+	ReopenReason      string    `json:"reopen_reason"`      // 재접수 사유
 	ResultCode        string    `json:"result_code"`        // 완료, 타사이관, 재방문필요
 	TransferDetail    string    `json:"transfer_detail"`    // completed | waiting
 	ConfirmTarget     string    `json:"confirm_target"`     // 확인대상자
@@ -91,9 +93,11 @@ type ASListItem struct {
 	Urgency            string    `json:"urgency"`
 	Status             string    `json:"status"`
 	AssignedTo         string    `json:"assigned_to"`
-	DaysElapsed        int       `json:"days_elapsed"`         // 접수 경과일
+	DaysElapsed        int       `json:"days_elapsed"`         // 경과일: 완료=완료일−접수일, 미완료=오늘−접수일
 	VisitScheduledDate string    `json:"visit_scheduled_date"` // 예정업무일 YYYY-MM-DD
 	VisitDaysOverdue   int       `json:"visit_days_overdue"`   // 방문일 기준 경과(오늘-예정일, 양수=지남)
+	VisitDone          bool      `json:"visit_done"`           // 예정일 이후 방문(처리) 이력이 있음 — 경과가 아니라 다음 일정 미정
+	IsReopen           bool      `json:"is_reopen"`            // 완료 건의 동일 증상 재접수
 	WorkChildren       []ASWorkItem `json:"work_children,omitempty"` // 목록 들여쓰기용 하부업무
 }
 
@@ -132,16 +136,18 @@ func WorkKindLabel(kind string) string {
 
 // ASStats AS 현황 통계
 type ASStats struct {
-	TotalReceived  int `json:"total_received"`
-	InProgress     int `json:"in_progress"`
-	Completed      int `json:"completed"` // 대시보드: 오늘 완료
-	Overdue        int `json:"overdue"`   // 접수 지연(3일↑)
-	TodayReceived  int `json:"today_received"`
-	WeekReceived   int `json:"week_received"`  // 월~일 주간 접수
-	WeekCompleted  int `json:"week_completed"` // 월~일 주간 완료
-	VisitPast      int `json:"visit_past"`      // 진행중 · 예정일 < 오늘
-	VisitToday     int `json:"visit_today"`     // 진행중 · 예정일 = 오늘
-	VisitUpcoming  int `json:"visit_upcoming"`  // 진행중 · 예정일 > 오늘
+	TotalReceived   int `json:"total_received"`
+	Assigned        int `json:"assigned"`    // 담당자 배정
+	InProgress      int `json:"in_progress"`
+	Completed       int `json:"completed"` // 대시보드: 오늘 완료
+	Overdue         int `json:"overdue"`   // 접수 지연(3일↑)
+	TodayReceived   int `json:"today_received"`
+	WeekReceived    int `json:"week_received"`  // 월~일 주간 접수
+	WeekCompleted   int `json:"week_completed"` // 월~일 주간 완료
+	VisitPast       int `json:"visit_past"`      // 진행중 · 예정일 < 오늘 · 방문 이력 없음
+	VisitDoneOpen   int `json:"visit_done_open"` // 진행중 · 예정일 < 오늘 · 이미 다녀옴(다음 일정 미정)
+	VisitToday      int `json:"visit_today"`     // 진행중 · 예정일 = 오늘
+	VisitUpcoming   int `json:"visit_upcoming"`  // 진행중 · 예정일 > 오늘
 	TransferOverdue int `json:"transfer_overdue"` // 이관 · 회신확인일 없음/경과
 }
 

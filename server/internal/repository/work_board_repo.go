@@ -125,7 +125,7 @@ func (r *WorkBoardRepo) collectOpen(mineUserID string, mineKeys []string) ([]mod
 
 	// 정기점검: 오늘 이후(포함) 미도래·오늘 — 진행중으로 간주
 	today := time.Now().Format("2006-01-02")
-	mItems, err := r.queryMaintenance(`mv.visit_date >= ?`, []interface{}{today}, 200)
+	mItems, err := r.queryMaintenance(`mv.visit_date >= ? AND COALESCE(mv.completed,0)=0`, []interface{}{today}, 200)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,8 @@ func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date
 		}
 		out = append(out, wItems...)
 
-		mItems, err := r.queryMaintenance(`mv.visit_date = ?`, []interface{}{date}, 200)
+		mItems, err := r.queryMaintenance(
+			`mv.visit_date = ? AND COALESCE(mv.completed,0)=0`, []interface{}{date}, 200)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +183,8 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 		`ar.status IN ('received','assigned','in_progress','hold','transfer')
 		 AND COALESCE(ar.visit_scheduled_date,'') != ''
 		 AND COALESCE(ar.schedule_confirmed,0)=1
-		 AND date(ar.visit_scheduled_date) < date(?)`,
+		 AND date(ar.visit_scheduled_date) < date(?)
+		 AND NOT `+visitAlreadyDone("ar."),
 		mineUserID, mineKeys, []interface{}{today})
 	if err != nil {
 		return nil, err
@@ -205,7 +207,8 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 	}
 	out = append(out, wItems...)
 
-	mItems, err := r.queryMaintenance(`mv.visit_date < ?`, []interface{}{today}, 200)
+	mItems, err := r.queryMaintenance(
+		`mv.visit_date < ? AND COALESCE(mv.completed,0)=0`, []interface{}{today}, 200)
 	if err != nil {
 		return nil, err
 	}
@@ -239,6 +242,14 @@ func (r *WorkBoardRepo) collectCompletedOn(mineUserID string, mineKeys []string,
 	}
 	out = append(out, wItems...)
 
+	mItems, err := r.queryMaintenance(
+		`COALESCE(mv.completed,0)=1 AND COALESCE(NULLIF(mv.completed_date,''), mv.visit_date)=?`,
+		[]interface{}{date}, 200)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, mItems...)
+
 	gItems, err := r.queryGeneral(`wo.phase='complete' AND wo.work_date=?`, []interface{}{date})
 	if err != nil {
 		return nil, err
@@ -247,11 +258,16 @@ func (r *WorkBoardRepo) collectCompletedOn(mineUserID string, mineKeys []string,
 	return out, nil
 }
 
+// collectSchedulePending 다음 방문 일정을 아직 잡지 않은 건.
+// 일정 미확정 건과, 이미 다녀왔지만 예정일이 옛 날짜로 남아 있는 건을 함께 본다.
 func (r *WorkBoardRepo) collectSchedulePending(mineUserID string, mineKeys []string) ([]model.WorkListItem, error) {
 	return r.queryAS(
 		`ar.status IN ('received','assigned','in_progress')
 		 AND (COALESCE(ar.assigned_to,'') != '' OR COALESCE(ar.assigned_user_id,'') != '')
-		 AND COALESCE(ar.schedule_confirmed,0)=0`,
+		 AND (COALESCE(ar.schedule_confirmed,0)=0
+		      OR (COALESCE(ar.visit_scheduled_date,'') != ''
+		          AND date(ar.visit_scheduled_date) < date('now','localtime')
+		          AND `+visitAlreadyDone("ar.")+`))`,
 		mineUserID, mineKeys, nil)
 }
 
@@ -353,7 +369,8 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, limit int) ([]model.WorkListItem, error) {
 	q := fmt.Sprintf(`
 		SELECT mv.visit_id, mv.visit_date, COALESCE(cfg.short_name, c.org_name), c.org_name,
-		       COALESCE(mv.entry_category,''), mv.plan_id
+		       COALESCE(mv.entry_category,''), mv.plan_id,
+		       COALESCE(mv.completed,0), COALESCE(mv.assignee,''), COALESCE(mv.product_type,'')
 		FROM maintenance_visits mv
 		JOIN customers c ON c.customer_id = mv.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = mv.customer_id
@@ -372,16 +389,25 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 	var items []model.WorkListItem
 	for rows.Next() {
 		var it model.WorkListItem
-		var planID, cat string
-		if err := rows.Scan(&it.RefID, &it.ScheduledDate, &it.Title, &it.OrgName, &cat, &planID); err != nil {
+		var planID, cat, product string
+		var completed int
+		if err := rows.Scan(&it.RefID, &it.ScheduledDate, &it.Title, &it.OrgName, &cat, &planID,
+			&completed, &it.Assignee, &product); err != nil {
 			return nil, err
 		}
 		it.Prefix = model.WorkPrefixMaintenance
 		it.RefNumber = it.ScheduledDate
-		it.Status = "planned"
-		it.StatusLabel = "예정"
+		if completed == 1 {
+			it.Status = "done"
+			it.StatusLabel = "방문 완료"
+		} else {
+			it.Status = "planned"
+			it.StatusLabel = "예정"
+		}
 		it.Href = "/maintenance/" + planID
-		if cat != "" {
+		if product != "" {
+			it.SubLabel = product
+		} else if cat != "" {
 			it.SubLabel = cat
 		}
 		items = append(items, it)
