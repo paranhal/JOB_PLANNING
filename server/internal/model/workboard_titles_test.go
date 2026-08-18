@@ -36,14 +36,15 @@ func TestWBCardDetailHref(t *testing.T) {
 	}
 	mnt := WBCard{
 		Kind: "task", TaskID: "wt_2",
-		Category: WBSourceMaintenance,
+		Category:   WBSourceMaintenance,
 		SourceHref: "/maintenance/mpl_1?month=8&view=list",
+		ActionHref: "/maintenance/visits/v1/action",
 	}
-	if got := mnt.DetailHref(); got != "/workboard/tasks/wt_2" {
-		t.Fatalf("배치 점검 열기: %q", got)
+	if got := mnt.DetailHref(); got != "/maintenance/visits/v1/action" {
+		t.Fatalf("배치 점검 조치(방문): %q", got)
 	}
 	if got := mnt.EditHref(); got != "/workboard/tasks/wt_2" {
-		t.Fatalf("배치 점검 수정: %q", got)
+		t.Fatalf("배치 점검 수정(업무등록): %q", got)
 	}
 	palette := WBCard{Kind: WBSourceAS, Category: WBSourceAS, RefID: "as_1", SourceHref: "/as/as_1"}
 	if got := palette.DetailHref(); got != "" {
@@ -69,5 +70,17 @@ func TestDurationHelpers(t *testing.T) {
 	}
 	if got := FormatHHMMMinutes(7*60 + 15); got != "07:15" {
 		t.Fatalf("fmt: %q", got)
+	}
+}
+
+func TestWorkTaskCustomerLabel(t *testing.T) {
+	if got := (WorkTask{OrgName: "충남교육청", CustomerName: "직접입력"}).CustomerLabel(); got != "충남교육청" {
+		t.Fatalf("기관명 우선: %q", got)
+	}
+	if got := (WorkTask{CustomerName: "충남교육청"}).CustomerLabel(); got != "충남교육청" {
+		t.Fatalf("직접입력: %q", got)
+	}
+	if got := (WorkTask{Title: "과업심의 자료 제출"}).CustomerLabel(); got != "" {
+		t.Fatalf("거래처 없으면 업무명을 쓰지 않음: %q", got)
 	}
 }

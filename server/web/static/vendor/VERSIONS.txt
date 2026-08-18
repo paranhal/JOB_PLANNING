@@ -1,0 +1,11 @@
+로컬 고정 버전 (폐쇄망 · CDN 없음)
+
+htmx.org     2.0.3     htmx.min.js
+alpinejs     3.14.8    alpine.min.js
+chart.js     4.4.1     chart.umd.min.js
+tailwindcss  3.4.17    tailwind.css  (템플릿·Go 클래스 스캔 후 빌드)
+
+CSS 재생성 (인터넷 있는 개발기에서만):
+  cd server
+  docker run --rm -v "${PWD}:/app" -w /app node:20-alpine sh -c "npm install && npm run build:css"
+

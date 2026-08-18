@@ -1,0 +1,55 @@
+{{define "admin_work_table"}}
+<div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
+      <tr>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">번호</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">구분</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">거래처</th>
+        <th class="px-3 py-2.5 font-medium">업무명</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">사업명</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">담당</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">예정일</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">배정일</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap">상태</th>
+        {{if $.CanWrite}}<th class="px-3 py-2.5 font-medium whitespace-nowrap">분류</th>{{end}}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{range .Items}}
+      <tr class="hover:bg-violet-50/40">
+        <td class="px-3 py-2 whitespace-nowrap font-mono">
+          <a href="/admin-work/{{.TaskID}}{{if $.FromStats}}?from=stats{{end}}" class="text-blue-600 hover:underline">{{.TaskID}}</a>
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">{{wbWorkTypeLabel .WorkType}}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{if .CustomerLabel}}{{.CustomerLabel}}{{else}}—{{end}}</td>
+        <td class="px-3 py-2 text-gray-800 max-w-[22rem]"><div class="line-clamp-2">{{.Title}}</div></td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .ProjectName}}{{.ProjectName}}{{else}}—{{end}}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .WorkDate}}{{.WorkDate}}{{else}}—{{end}}</td>
+        <td class="px-3 py-2 whitespace-nowrap">
+          {{wbAdminStatusLabel .Status}}
+          {{if gt .WaitingActionCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px]">회신 대기 {{.WaitingActionCount}}건</span>{{end}}
+        </td>
+        {{if $.CanWrite}}
+        <td class="px-3 py-2 whitespace-nowrap">
+          {{if eq .Status "inbox"}}
+          <form method="post" action="/admin-work/{{.TaskID}}/classify" class="flex items-center gap-1">
+            <input type="hidden" name="status" value="waiting">
+            <input type="date" name="due_date" value="{{$.Today}}" required class="border rounded px-1.5 py-1 text-xs">
+            <button type="submit" class="px-2 py-1 text-xs text-white bg-violet-600 rounded hover:bg-violet-700">할 일로</button>
+          </form>
+          {{else}}—{{end}}
+        </td>
+        {{end}}
+      </tr>
+      {{else}}
+      <tr>
+        <td colspan="{{if $.CanWrite}}10{{else}}9{{end}}" class="px-3 py-10 text-center text-gray-400">해당 조건의 행정관련업무가 없습니다.</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

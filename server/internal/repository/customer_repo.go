@@ -284,14 +284,19 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 		c.Address, c.AddressDetail,
 		boolToInt(c.IsActive), c.Notes, now, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "customers", "customer_id", c.CustomerID, c.OrgName)
+	return nil
 }
 
 // Update 고객 수정
 func (r *CustomerRepo) Update(c *model.Customer) error {
-	c.SyncCombinedAddress()
-	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`
+	return touchUpdate(r.db, "customers", "customer_id", c.CustomerID, c.OrgName, func() error {
+		c.SyncCombinedAddress()
+		now := time.Now().Format("2006-01-02 15:04:05")
+		_, err := r.db.Exec(`
 		UPDATE customers SET
 			org_name=?, official_name=?, org_email=?, main_phone=?,
 			website=?, business_number=?, representative=?, industry=?,
@@ -300,23 +305,26 @@ func (r *CustomerRepo) Update(c *model.Customer) error {
 			address=?, address_detail=?,
 			is_active=?, notes=?, updated_at=?
 		WHERE customer_id=?`,
-		c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
-		c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
-		boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
-		c.PostalCode, c.AddrSido, c.AddrSigungu, c.AddrDong,
-		c.Address, c.AddressDetail,
-		boolToInt(c.IsActive), c.Notes, now, c.CustomerID,
-	)
-	return err
+			c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
+			c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
+			boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
+			c.PostalCode, c.AddrSido, c.AddrSigungu, c.AddrDong,
+			c.Address, c.AddressDetail,
+			boolToInt(c.IsActive), c.Notes, now, c.CustomerID,
+		)
+		return err
+	})
 }
 
 // Delete 고객 비활성화 (실제 삭제 안 함)
 func (r *CustomerRepo) Delete(id string) error {
-	_, err := r.db.Exec(
-		`UPDATE customers SET is_active=0, updated_at=? WHERE customer_id=?`,
-		time.Now().Format("2006-01-02 15:04:05"), id,
-	)
-	return err
+	return touchUpdate(r.db, "customers", "customer_id", id, "고객", func() error {
+		_, err := r.db.Exec(
+			`UPDATE customers SET is_active=0, updated_at=? WHERE customer_id=?`,
+			time.Now().Format("2006-01-02 15:04:05"), id,
+		)
+		return err
+	})
 }
 
 // ListAll 전체 고객 목록 (드롭다운용)
@@ -338,6 +346,86 @@ func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
 		customers = append(customers, c)
 	}
 	return customers, rows.Err()
+}
+
+const customerAPISelect = `
+		SELECT customer_id, org_name, official_name,
+		       COALESCE(org_email,''), COALESCE(main_phone,''),
+		       COALESCE(website,''), COALESCE(business_number,''),
+		       COALESCE(representative,''), COALESCE(industry,''),
+		       has_parent, COALESCE(parent_customer_id,''),
+		       COALESCE(postal_code,''), COALESCE(addr_sido,''),
+		       COALESCE(addr_sigungu,''), COALESCE(addr_dong,''),
+		       COALESCE(address,''), COALESCE(address_detail,''),
+		       is_active, COALESCE(notes,''),
+		       COALESCE(needs_review,0), COALESCE(review_reason,''),
+		       created_at, updated_at
+		FROM customers`
+
+func scanCustomerAPI(sc interface{ Scan(...interface{}) error }) (*model.Customer, error) {
+	var c model.Customer
+	var hasParent, isActive, needsReview int
+	var createdAt, updatedAt string
+	if err := sc.Scan(
+		&c.CustomerID, &c.OrgName, &c.OfficialName, &c.OrgEmail,
+		&c.MainPhone, &c.Website, &c.BusinessNumber, &c.Representative,
+		&c.Industry, &hasParent, &c.ParentCustomerID,
+		&c.PostalCode, &c.AddrSido, &c.AddrSigungu, &c.AddrDong,
+		&c.Address, &c.AddressDetail,
+		&isActive, &c.Notes, &needsReview, &c.ReviewReason,
+		&createdAt, &updatedAt,
+	); err != nil {
+		return nil, err
+	}
+	c.HasParent = hasParent == 1
+	c.IsActive = isActive == 1
+	c.NeedsReview = needsReview == 1
+	c.CreatedAt = parseTime(createdAt)
+	c.UpdatedAt = parseTime(updatedAt)
+	return &c, nil
+}
+
+// ListForAPI 영업관리 연동용 고객 목록. search 는 기관명·공식명칭·ID·사업자번호.
+func (r *CustomerRepo) ListForAPI(search string, active *bool, limit, offset int) ([]model.Customer, int, error) {
+	if limit < 1 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	where := ` WHERE 1=1`
+	args := []interface{}{}
+	if search = strings.TrimSpace(search); search != "" {
+		like := "%" + search + "%"
+		where += ` AND (org_name LIKE ? OR official_name LIKE ? OR customer_id LIKE ? OR COALESCE(business_number,'') LIKE ?)`
+		args = append(args, like, like, like, like)
+	}
+	if active != nil {
+		where += ` AND is_active=?`
+		args = append(args, boolToInt(*active))
+	}
+	var total int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM customers`+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	qargs := append(append([]interface{}{}, args...), limit, offset)
+	rows, err := r.db.Query(customerAPISelect+where+` ORDER BY org_name LIMIT ? OFFSET ?`, qargs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.Customer
+	for rows.Next() {
+		c, err := scanCustomerAPI(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, *c)
+	}
+	if items == nil {
+		items = []model.Customer{}
+	}
+	return items, total, rows.Err()
 }
 
 // ListExport 엑셀용 전체 목록 (주소·점검사이트 지역 포함, 페이징 없음)

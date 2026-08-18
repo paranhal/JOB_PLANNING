@@ -1,0 +1,305 @@
+{{define "title"}}보고서 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-5">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">보고서</h2>
+    <p class="text-sm text-gray-500 mt-1">정기 산출물을 한곳에서 내려받습니다. 과거 이관 데이터는 제외합니다.</p>
+  </div>
+
+  {{range .HolidayBanners}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
+    <p>{{.}}</p>
+    <a href="/admin/holidays" class="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">휴무일 관리</a>
+  </div>
+  {{end}}
+
+  {{/* 전사 주간업무보고 시트 생성 §16.6.2 · §16.6.12 */}}
+  <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">회사 공통 파일</p>
+      <h3 class="text-base font-bold text-gray-800 mt-1">전사 주간업무보고 시트 생성</h3>
+      <p class="text-sm text-gray-500 mt-1">회사 xlsx 사본에 (업무) 시트 한 장을 추가합니다. 자동 문장은 초안이며 미리보기에서 고칠 수 있습니다.</p>
+    </div>
+    <div x-data="{ show: localStorage.getItem('jp_company_weekly_notice') !== '1' }" x-show="show" x-cloak
+         class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-start justify-between gap-2">
+      <p>회사 공통 파일입니다. 생성 전 원본을 따로 보관하세요.</p>
+      <button type="button" class="px-3 py-1 rounded-lg bg-amber-800 text-white text-xs font-medium"
+              @click="localStorage.setItem('jp_company_weekly_notice','1'); show=false">확인</button>
+    </div>
+    <form method="POST" action="/stats/company-weekly" enctype="multipart/form-data" class="space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">보고 기준일 (월요일)</label>
+          <input type="date" name="company_date" value="{{.CompanyDate}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">시트 이름</label>
+          <input type="text" name="sheet_name" value="{{.CompanySheetName}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <button type="submit" formmethod="get" formaction="/stats/reports"
+                class="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50">미리보기</button>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">회사 파일</label>
+        <input type="file" name="file" accept=".xlsx"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+      </div>
+      {{if .CompanyWeekly}}
+      <p class="text-xs text-gray-500">전주 {{.CompanyWeekly.Period.PrevRangeLabel}} · 금주 {{.CompanyWeekly.Period.ThisRangeLabel}}</p>
+      <div class="space-y-3">
+        {{range .CompanyWeekly.Rows}}
+        <div class="rounded-lg border {{if .Highlight}}border-yellow-300 bg-yellow-50{{else}}border-gray-100 bg-gray-50{{end}} p-3 space-y-2">
+          <p class="text-sm font-semibold text-gray-800">{{if .NoLabel}}{{.NoLabel}} {{end}}{{.DisplayName}}</p>
+          {{if .MissingProject}}
+          <p class="text-xs text-amber-800">⚠ 대응 사업이 없어 자동 집계하지 않습니다.</p>
+          {{end}}
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">전주 추진내역</label>
+            <textarea name="prev_{{.RowKey}}" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.PrevText}}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">금주 추진계획</label>
+            <textarea name="plan_{{.RowKey}}" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.PlanText}}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">지원 필요사항</label>
+            <textarea name="help_{{.RowKey}}" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.HelpText}}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">주요 의사결정</label>
+            <textarea name="decision_{{.RowKey}}" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.DecisionText}}</textarea>
+          </div>
+        </div>
+        {{end}}
+      </div>
+      {{if .CompanyWeekly.Unassigned}}
+      <details class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+        <summary class="text-sm text-amber-900 cursor-pointer font-medium">미배정 활동 {{len .CompanyWeekly.Unassigned}}건 (사업 연결 안 됨)</summary>
+        <ul class="mt-2 text-sm text-amber-950 space-y-1">
+          {{range .CompanyWeekly.Unassigned}}
+          <li><span class="text-xs text-amber-700">{{.KindLabel}} · {{.BucketLabel}}</span>
+            {{if .Href}}<a href="{{.Href}}" class="text-blue-700 hover:underline">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+            {{if .Date}}<span class="text-xs text-gray-500">{{.Date}}</span>{{end}}
+            {{if .ProjectName}}<span class="text-xs text-gray-500">{{.ProjectName}}</span>{{end}}
+          </li>
+          {{end}}
+        </ul>
+      </details>
+      {{end}}
+      {{end}}
+      <button type="submit" class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">시트 생성</button>
+    </form>
+  </div>
+
+  <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4"
+       x-data="{
+         period: 'week',
+         date: '{{.DefaultWeek}}',
+         month: '{{.DefaultMonth}}',
+         from: '{{.DefaultWeek}}',
+         to: '{{.DefaultMonthDate}}',
+         qs() {
+           if (this.period === 'month') return 'period=month&month=' + this.month;
+           if (this.period === 'range') return 'period=range&from=' + this.from + '&to=' + this.to;
+           return 'period=week&date=' + this.date;
+         }
+       }">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">팀 내부 산출물</p>
+      <h3 class="text-base font-bold text-gray-800 mt-1">기본 출력물</h3>
+      <p class="text-sm text-gray-500 mt-1">주간업무보고서와 담당자별 일일업무가 같은 기간을 씁니다. 이관 데이터는 제외합니다.</p>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">기간</label>
+        <select x-model="period" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="week">주간</option>
+          <option value="month">월</option>
+          <option value="range">지정</option>
+        </select>
+      </div>
+      <div x-show="period==='week'">
+        <label class="block text-xs text-gray-500 mb-1">주차</label>
+        <select x-model="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .WeekOptions}}
+          <option value="{{.Value}}" {{if eq $.DefaultWeek .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div x-show="period==='month'" x-cloak>
+        <label class="block text-xs text-gray-500 mb-1">월</label>
+        <select x-model="month" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .MonthOptions}}
+          <option value="{{.Value}}" {{if eq $.DefaultMonth .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div x-show="period==='range'" x-cloak class="lg:col-span-2 flex items-end gap-2">
+        <div class="flex-1">
+          <label class="block text-xs text-gray-500 mb-1">시작</label>
+          <input type="date" x-model="from" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <span class="text-gray-400 text-xs pb-2">~</span>
+        <div class="flex-1">
+          <label class="block text-xs text-gray-500 mb-1">끝</label>
+          <input type="date" x-model="to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
+      {{/* 주간업무보고서 §16.1 */}}
+      <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
+        <div>
+          <h4 class="text-sm font-bold text-gray-800">주간업무보고서</h4>
+          <p class="text-xs text-gray-500 mt-1">통계 · 전체 리스트 2개 시트 · AS + 정기점검 + 행정/지원</p>
+        </div>
+        <a :href="'/stats/weekly-report.xlsx?' + qs()"
+           href="/stats/weekly-report.xlsx?period=week&amp;date={{.DefaultWeek}}"
+           class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+          엑셀 다운로드
+        </a>
+      </div>
+
+      {{/* 담당자별 일일업무 §16.4 */}}
+      <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
+        <div>
+          <h4 class="text-sm font-bold text-gray-800">담당자별 일일업무</h4>
+          <p class="text-xs text-gray-500 mt-1">일자별 매트릭스 · 담당자별 일일 상세 2개 시트</p>
+        </div>
+        <a :href="'/stats/daily-assignee.xlsx?' + qs()"
+           href="/stats/daily-assignee.xlsx?period=week&amp;date={{.DefaultWeek}}"
+           class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+          엑셀 다운로드
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+    {{/* 월간업무보고 §16.2 — 미구현 */}}
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm flex flex-col gap-4">
+      <div>
+        <h3 class="text-base font-bold text-gray-800">월간업무보고</h3>
+        <p class="text-sm text-gray-500 mt-1">주간과 같은 2시트 구조 · 월 단위 · 전월 대비 증감</p>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">월</label>
+        <select disabled class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400">
+          {{range .MonthOptions}}
+          <option value="{{.Value}}" {{if eq $.DefaultMonth .Value}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <p class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">준비 중 — §16.2 월간 보고</p>
+      <button type="button" disabled
+              class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-gray-200 text-gray-500 text-sm font-semibold cursor-not-allowed">
+        엑셀 다운로드
+      </button>
+    </div>
+
+    {{/* 정기점검 월별 캘린더 §16.3 · 기존 /maintenance/{계획}/export.xlsx */}}
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm flex flex-col gap-4"
+         x-data="{ planId: '{{.DefaultPlanID}}' }">
+      <div>
+        <h3 class="text-base font-bold text-gray-800">정기점검 월별 캘린더</h3>
+        <p class="text-sm text-gray-500 mt-1">연간 12개월 시트 · 계획 &gt; 정기점검 일정과 동일 파일</p>
+      </div>
+      {{if .Plans}}
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">연도</label>
+        <select x-model="planId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          {{range .Plans}}
+          <option value="{{.PlanID}}" {{if eq $.DefaultPlanID .PlanID}}selected{{end}}>{{.PlanYear}}년{{if .Title}} · {{.Title}}{{end}}</option>
+          {{end}}
+        </select>
+      </div>
+      <a :href="'/maintenance/' + planId + '/export.xlsx'"
+         href="/maintenance/{{.DefaultPlanID}}/export.xlsx"
+         class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+        엑셀 다운로드
+      </a>
+      {{else}}
+      <p class="text-sm text-gray-500">등록된 정기점검 계획이 없습니다. 계획 &gt; 정기점검 일정에서 연도를 만드세요.</p>
+      {{end}}
+    </div>
+
+    {{/* 상세 통계 — /stats/detail · /stats/export.xlsx */}}
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+         x-data="{ period: '{{.DefaultPeriod}}' }">
+      <form method="GET" action="/stats/detail" class="flex flex-col gap-4">
+        <div>
+          <h3 class="text-base font-bold text-gray-800">상세 통계</h3>
+          <p class="text-sm text-gray-500 mt-1">종류·범위·기간을 고르면 상세 화면으로 이동합니다. 엑셀은 그 화면에서 받습니다.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">종류</label>
+            <select name="metric" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              {{range .MetricOptions}}
+              <option value="{{.Value}}" {{if eq $.DefaultMetric .Value}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">범위</label>
+            <select name="scope" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              {{range .ScopeOptions}}
+              <option value="{{.Value}}" {{if eq $.DefaultScope .Value}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">기간</label>
+            <select name="period" x-model="period" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              {{range .PeriodOptions}}
+              <option value="{{.Value}}" {{if eq $.DefaultPeriod .Value}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+          </div>
+        </div>
+        <div>
+          <template x-if="period==='day'">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">날짜</label>
+              <input type="date" name="date" value="{{.DefaultMonthDate}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+          </template>
+          <template x-if="period==='week'">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">주차</label>
+              <select name="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                {{range .WeekOptions}}
+                <option value="{{.Value}}" {{if eq $.DefaultWeek .Value}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+          </template>
+          <template x-if="period==='month'">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">월</label>
+              <select name="month" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                {{range .MonthOptions}}
+                <option value="{{.Value}}" {{if eq $.DefaultMonth .Value}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+          </template>
+          <template x-if="period==='range'">
+            <div class="flex items-center gap-1">
+              <input type="date" name="from" value="{{.DefaultWeek}}" class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm">
+              <span class="text-gray-400 text-xs">~</span>
+              <input type="date" name="to" value="{{.DefaultMonthDate}}" class="flex-1 border border-gray-300 rounded-lg px-2 py-2 text-sm">
+            </div>
+          </template>
+        </div>
+        <button type="submit"
+                class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+          상세 통계로 이동
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

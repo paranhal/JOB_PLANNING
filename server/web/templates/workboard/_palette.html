@@ -5,8 +5,8 @@
   </div>
   <div class="flex-1 max-h-[66vh] overflow-y-auto p-1.5 space-y-1.5 bg-slate-50/40">
     {{range .Cards}}
-    <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug {{if .ProductType}}{{mntProductClass .ProductType}}{{else}}{{wbCategoryClass .Category}}{{end}} {{if $.CanWrite}}cursor-grab active:cursor-grabbing{{end}} transition-shadow hover:shadow"
-         {{if .ProductType}}style="{{mntProductStyle .ProductType}}"{{end}}
+    <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug border border-black/5 {{if $.CanWrite}}cursor-grab active:cursor-grabbing{{end}} transition-shadow hover:shadow"
+         style="{{workCardColorStyle .Assignee .ProductType .Category}}"
          {{if $.CanWrite}}draggable="true"{{end}}
          data-zone="palette"
          data-kind="{{.Kind}}" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"

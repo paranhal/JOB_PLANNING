@@ -32,8 +32,16 @@
         <div class="flex gap-4"><dt class="text-gray-500 w-24">제조사</dt><dd class="text-gray-800">{{.Asset.Manufacturer}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">S/N</dt><dd class="text-gray-800 font-mono">{{.Asset.SerialNumber}}</dd></div>
         <div class="flex gap-4"><dt class="text-gray-500 w-24">설치일</dt><dd class="text-gray-800">{{.Asset.InstallDate}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치주체</dt><dd class="text-gray-800">{{.Asset.InstallerType}} {{if .Asset.OriginalInstaller}}({{.Asset.OriginalInstaller}}){{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">관리유형</dt><dd class="text-gray-800">{{.Asset.ManagementType}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치주체</dt><dd class="text-gray-800">{{installerTypeLabel .Asset.InstallerType}} {{if .Asset.OriginalInstaller}}({{.Asset.OriginalInstaller}}){{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">관리유형</dt>
+          <dd class="text-gray-800">
+            {{if eq .Asset.ManagementType "third_party"}}
+            <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">타사장비</span>
+            <span class="text-xs text-gray-500 ml-1">당사 비관리 · 연동 참고</span>
+            {{else}}{{managementTypeLabel .Asset.ManagementType}}{{end}}
+          </dd>
+        </div>
+        <div class="flex gap-4"><dt class="text-gray-500 w-24">관리대상</dt><dd class="text-gray-800">{{if .Asset.IsManaged}}예{{else}}아니오{{end}}</dd></div>
       </dl>
     </div>
 

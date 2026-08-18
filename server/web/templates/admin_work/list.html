@@ -1,0 +1,63 @@
+{{define "title"}}행정관련업무등록/처리 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <p class="text-sm text-gray-500">
+      {{if eq .Status "waiting"}}할 일{{else if eq .Status "inbox"}}수집함{{else if eq .Status "waiting_for"}}회신 대기{{else if eq .Status "in_progress"}}진행중{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "review"}}검토중{{else if eq .Status "complete"}}완료{{else if eq .Status "cancelled"}}취소{{else if eq .Status "open"}}미완료{{else if eq .Status "overdue"}}기한 초과{{else if eq .Status "today"}}오늘{{else}}전체{{end}}
+      {{.Total}}건
+    </p>
+    <div class="flex flex-wrap items-center gap-2">
+      {{if .CanWrite}}
+      <a href="/admin-work/new"
+         class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        행정관련업무 등록
+      </a>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .FlashOK}}
+  <div class="rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
+    {{if eq .FlashOK "inbox"}}수집함에 넣었습니다.{{else if eq .FlashOK "classify"}}수집함에서 분류했습니다.{{else}}등록되었습니다.{{end}}
+  </div>
+  {{end}}
+  {{if .FlashErr}}
+  <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
+    {{if .FlashErrText}}{{.FlashErrText}}{{else}}업무명·예정일·거래처를 확인하세요.{{end}}
+  </div>
+  {{end}}
+
+  {{if .CanWrite}}
+  <form method="post" action="/admin-work/inbox" class="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col sm:flex-row gap-2">
+    <input name="title" required placeholder="수집함 — 제목만 빠르게 적기" class="flex-1 border border-violet-200 rounded-lg px-3 py-2 text-sm bg-white">
+    <button type="submit" class="px-4 py-2 text-sm text-white bg-violet-600 rounded-lg shrink-0">수집함 등록</button>
+  </form>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <form method="GET" action="/admin-work" class="flex flex-col sm:flex-row gap-3">
+      <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="" {{if eq .Status ""}}selected{{end}}>전체 상태</option>
+        <option value="open" {{if eq .Status "open"}}selected{{end}}>미완료</option>
+        <option value="inbox" {{if eq .Status "inbox"}}selected{{end}}>수집함</option>
+        <option value="waiting" {{if eq .Status "waiting"}}selected{{end}}>할 일</option>
+        <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행중</option>
+        <option value="waiting_for" {{if eq .Status "waiting_for"}}selected{{end}}>회신 대기</option>
+        <option value="hold" {{if eq .Status "hold"}}selected{{end}}>보류</option>
+        <option value="transfer" {{if eq .Status "transfer"}}selected{{end}}>이관</option>
+        <option value="review" {{if eq .Status "review"}}selected{{end}}>검토중</option>
+        <option value="complete" {{if eq .Status "complete"}}selected{{end}}>완료</option>
+        <option value="cancelled" {{if eq .Status "cancelled"}}selected{{end}}>취소</option>
+        <option value="overdue" {{if eq .Status "overdue"}}selected{{end}}>기한 초과</option>
+        <option value="today" {{if eq .Status "today"}}selected{{end}}>오늘</option>
+      </select>
+      <input type="text" name="search" value="{{.Search}}"
+             placeholder="거래처, 업무명, 담당자, 번호 검색..."
+             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium">검색</button>
+    </form>
+  </div>
+
+  {{template "admin_work_table" .}}
+</div>
+{{end}}

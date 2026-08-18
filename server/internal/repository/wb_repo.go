@@ -20,10 +20,17 @@ const workTaskSelect = `
 		       COALESCE(t.status,'waiting'), COALESCE(t.priority,'normal'),
 		       COALESCE(t.assignee,''), COALESCE(t.tags,''), COALESCE(t.progress,0),
 		       COALESCE(t.source_type,''), COALESCE(t.source_id,''), COALESCE(t.parent_task_id,''),
+		       COALESCE(t.customer_id,''), COALESCE(t.customer_name,''),
+		       COALESCE(t.hold_reason,''), COALESCE(t.review_date,''), COALESCE(t.cancel_reason,''),
+		       COALESCE(t.wait_party_kind,''), COALESCE(t.wait_party,''), COALESCE(t.wait_request,''),
+		       COALESCE(t.reply_due_date,''), COALESCE(t.next_check_date,''), COALESCE(t.complete_note,''),
+		       COALESCE(t.receipt_date,''), COALESCE(t.complete_date,''),
+		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
 		       t.created_at, t.updated_at,
 		       COALESCE(p.name,''), COALESCE(p.color,'')
 		FROM work_tasks t
-		LEFT JOIN work_projects p ON p.project_id = t.project_id`
+		LEFT JOIN work_projects p ON p.project_id = t.project_id
+		LEFT JOIN customers c ON c.customer_id = t.customer_id`
 
 func (r *WBRepo) Summary() (model.WBSummary, error) {
 	return r.SummaryOnDate("")
@@ -53,8 +60,12 @@ func (r *WBRepo) SummaryOnDate(date string) (model.WBSummary, error) {
 		if err := rows.Scan(&st, &pri); err != nil {
 			return s, err
 		}
+		bucket := model.WBKanbanBucket(st)
+		if bucket == "" {
+			continue
+		}
 		s.TotalTasks++
-		switch model.WBKanbanBucket(st) {
+		switch bucket {
 		case model.WBTaskWaiting:
 			s.Waiting++
 		case model.WBTaskInProgress:
@@ -143,7 +154,8 @@ func (r *WBRepo) ListChildren(parentID string) ([]model.WorkTask, error) {
 	return scanWorkTasks(rows)
 }
 
-// ListTasksBetween 수행일이 기간 안에 있고 시작시간이 정해진 업무 (업무 등록 시간표용)
+// ListTasksBetween 수행일(WorkDate)이 기간 안인 업무 (일일 업무 등록 시간표용).
+// 시각이 비어 있어도 포함하며, 화면에서 표시용 시각을 채운다.
 func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
 	all, err := r.ListTasks()
 	if err != nil {
@@ -151,7 +163,7 @@ func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
 	}
 	var items []model.WorkTask
 	for _, t := range all {
-		if t.WorkDate == "" || t.StartTime == "" {
+		if t.WorkDate == "" {
 			continue
 		}
 		if t.WorkDate >= from && t.WorkDate <= to {
@@ -159,6 +171,58 @@ func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
 		}
 	}
 	return items, nil
+}
+
+// ListTasksDatedBetween 배정일(없으면 예정일)이 기간 안인 업무 — 시간 유무 무관(업무처리현황용)
+func (r *WBRepo) ListTasksDatedBetween(from, to string) ([]model.WorkTask, error) {
+	all, err := r.ListTasks()
+	if err != nil {
+		return nil, err
+	}
+	var items []model.WorkTask
+	for _, t := range all {
+		d := strings.TrimSpace(t.WorkDate)
+		if d == "" {
+			d = strings.TrimSpace(t.DueDate)
+		}
+		if d == "" || d < from || d > to {
+			continue
+		}
+		items = append(items, t)
+	}
+	return items, nil
+}
+
+// MaintenanceCompletedByIDs visit_id → 완료 여부
+func (r *WBRepo) MaintenanceCompletedByIDs(visitIDs []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(visitIDs) == 0 {
+		return out, nil
+	}
+	ph := make([]string, len(visitIDs))
+	args := make([]interface{}, len(visitIDs))
+	for i, id := range visitIDs {
+		ph[i] = "?"
+		args[i] = id
+	}
+	q := `SELECT visit_id, COALESCE(completed,0) FROM maintenance_visits WHERE visit_id IN (` + strings.Join(ph, ",") + `)`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return out, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var done int
+		if err := rows.Scan(&id, &done); err != nil {
+			return nil, err
+		}
+		out[id] = done == 1
+	}
+	return out, rows.Err()
 }
 
 func (r *WBRepo) ListTasksByDate(date string) ([]model.WorkTask, error) {
@@ -214,7 +278,8 @@ func (r *WBRepo) ASStatusesByIDs(ids []string) (map[string]string, error) {
 	return out, rows.Err()
 }
 
-// ListUnplacedAdminTasks 시간표에 아직 올리지 않은 행정/지원 업무(상위·하위 포함)
+// ListUnplacedAdminTasks 일자가 확정되지 않은(WorkDate 없음) 행정/지원 업무(상위·하위 포함).
+// WorkDate가 있으면 왼쪽 시간표 쪽이며 우측 대기 목록에는 두지 않는다.
 func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 	all, err := r.ListTasks()
 	if err != nil {
@@ -222,17 +287,120 @@ func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 	}
 	var items []model.WorkTask
 	for _, t := range all {
-		if t.SourceType != "" || t.Status == model.WBTaskComplete {
+		if t.SourceType != "" || t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
+			continue
+		}
+		if t.Status == model.WBTaskInbox {
 			continue
 		}
 		if t.WorkType != model.WBWorkAdmin && t.WorkType != model.WBWorkSupport {
 			continue
 		}
-		if t.WorkDate == "" || t.StartTime == "" {
+		if strings.TrimSpace(t.WorkDate) == "" {
 			items = append(items, t)
 		}
 	}
 	return items, nil
+}
+
+// AdminWorkStats 행정/지원 업무 현황 건수
+type AdminWorkStats struct {
+	Total             int
+	Inbox             int
+	Waiting           int
+	InProgress        int
+	WaitingFor        int
+	WaitingForOverdue int
+	Hold              int
+	Transfer          int
+	Review            int // 보류+이관+검토중 (하위호환)
+	Complete          int
+	Today             int
+	Overdue           int
+}
+
+// ListAdminWork 행정·지원 업무 목록(검색·상태).
+func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) {
+	q := workTaskSelect + `
+		WHERE t.work_type IN ('admin','support')
+		  AND TRIM(COALESCE(t.source_type,'')) = ''`
+	args := []interface{}{}
+	switch strings.TrimSpace(status) {
+	case "inbox":
+		q += ` AND t.status = 'inbox'`
+	case "waiting":
+		q += ` AND COALESCE(t.status,'waiting') = 'waiting'`
+	case "in_progress":
+		q += ` AND t.status = 'in_progress'`
+	case "waiting_for":
+		q += ` AND t.status = 'waiting_for'`
+	case "hold":
+		q += ` AND t.status = 'hold'`
+	case "transfer":
+		q += ` AND t.status = 'transfer'`
+	case "review":
+		q += ` AND t.status = 'review'`
+	case "complete":
+		q += ` AND t.status = 'complete'`
+	case "cancelled":
+		q += ` AND t.status = 'cancelled'`
+	case "open":
+		q += ` AND COALESCE(t.status,'') NOT IN ('complete','cancelled')`
+	case "overdue":
+		today := time.Now().Format("2006-01-02")
+		q += ` AND COALESCE(t.status,'') NOT IN ('complete','cancelled','inbox')
+			AND TRIM(COALESCE(t.due_date,'')) != '' AND t.due_date < ?`
+		args = append(args, today)
+	case "today":
+		today := time.Now().Format("2006-01-02")
+		q += ` AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') = ?`
+		args = append(args, today)
+	}
+	search = strings.TrimSpace(search)
+	if search != "" {
+		like := "%" + search + "%"
+		q += ` AND (t.title LIKE ? OR t.description LIKE ? OR t.task_id LIKE ?
+			OR COALESCE(t.assignee,'') LIKE ? OR COALESCE(c.org_name,'') LIKE ?
+			OR COALESCE(t.customer_name,'') LIKE ? OR COALESCE(p.name,'') LIKE ?)`
+		args = append(args, like, like, like, like, like, like, like)
+	}
+	q += ` ORDER BY COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), t.created_at) DESC, t.task_id DESC`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanWorkTasks(rows)
+}
+
+// CountAdminWorkStats 행정·지원 현황 카드.
+func (r *WBRepo) CountAdminWorkStats() (AdminWorkStats, error) {
+	var s AdminWorkStats
+	today := time.Now().Format("2006-01-02")
+	err := r.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(CASE WHEN status='inbox' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN COALESCE(status,'waiting')='waiting' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status='in_progress' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status='waiting_for' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status='waiting_for' AND (
+				(TRIM(COALESCE(reply_due_date,'')) != '' AND reply_due_date < ?)
+				OR (TRIM(COALESCE(next_check_date,'')) != '' AND next_check_date < ?)
+			) THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status='hold' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status='transfer' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status IN ('hold','transfer','review') THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status='complete' THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(work_date),''), NULLIF(TRIM(due_date),''), '')=? THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN COALESCE(status,'') NOT IN ('complete','cancelled','inbox')
+				AND TRIM(COALESCE(due_date,'')) != '' AND due_date < ? THEN 1 ELSE 0 END),0)
+		FROM work_tasks
+		WHERE work_type IN ('admin','support') AND TRIM(COALESCE(source_type,'')) = ''`,
+		today, today, today, today).Scan(
+		&s.Total, &s.Inbox, &s.Waiting, &s.InProgress, &s.WaitingFor, &s.WaitingForOverdue,
+		&s.Hold, &s.Transfer, &s.Review, &s.Complete, &s.Today, &s.Overdue)
+	return s, err
 }
 
 func (r *WBRepo) GetTaskBySource(sourceType, sourceID string) (*model.WorkTask, error) {
@@ -354,13 +522,19 @@ func (r *WBRepo) PlaceTask(taskID, workDate, startTime, endTime string) error {
 	return err
 }
 
+// SetTaskAssignee 배치된 업무의 담당자만 바꾼다. 일일 열 이동. §7.6.6
+func (r *WBRepo) SetTaskAssignee(taskID, assignee string) error {
+	_, err := r.db.Exec(`UPDATE work_tasks SET assignee=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, strings.TrimSpace(assignee), taskID)
+	return err
+}
+
 // SetTaskDueDate 예정일만 갱신한다.
 func (r *WBRepo) SetTaskDueDate(taskID, dueDate string) error {
 	_, err := r.db.Exec(`UPDATE work_tasks SET due_date=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, dueDate, taskID)
 	return err
 }
 
-// UnplaceTask 시간표에서 내린다. 출처가 있는 카드(AS·점검)는 행 자체를 지운다.
+// UnplaceTask 시간표에서 내린다. 행은 유지해 × 후에도 원본 연결이 남게 한다.
 func (r *WBRepo) UnplaceTask(taskID string) error {
 	var sourceType string
 	err := r.db.QueryRow(`SELECT COALESCE(source_type,'') FROM work_tasks WHERE task_id=?`, taskID).Scan(&sourceType)
@@ -371,7 +545,10 @@ func (r *WBRepo) UnplaceTask(taskID string) error {
 		return err
 	}
 	if sourceType != "" {
-		_, err = r.db.Exec(`DELETE FROM work_tasks WHERE task_id=?`, taskID)
+		// AS·점검: 배정일·시간만 비움. 예정일(due_date)은 원본 일정을 가리키도록 둔다.
+		_, err = r.db.Exec(`
+			UPDATE work_tasks SET work_date='', start_time='', end_time='', updated_at=CURRENT_TIMESTAMP
+			WHERE task_id=?`, taskID)
 		return err
 	}
 	// 행정/지원: 예정일·배정일·시간도 모두 비워 대기열로 되돌린다.
@@ -420,7 +597,49 @@ func (r *WBRepo) CreateProject(p *model.WorkProject) error {
 		p.ProjectID, p.Name, p.ShortName, p.PlanYear, paid, p.SortOrder,
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID), p.Color, p.Status)
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "work_projects", "project_id", p.ProjectID, p.Name)
+	return nil
+}
+
+// GetProject 사업 1건 조회(범위 규칙 포함)
+func (r *WBRepo) GetProject(id string) (*model.WorkProject, error) {
+	return NewProjectRepo(r.db).Get(id)
+}
+
+// UpdateProject 사업 수정
+func (r *WBRepo) UpdateProject(p *model.WorkProject) error {
+	return NewProjectRepo(r.db).Update(p)
+}
+
+// SetProjectStatus 사업 상태 변경
+func (r *WBRepo) SetProjectStatus(id, status string) error {
+	return NewProjectRepo(r.db).SetStatus(id, status)
+}
+
+// DeleteProject 사업 삭제(연결 업무 없으면). 연결 있으면 거부.
+func (r *WBRepo) DeleteProject(id string) error {
+	repo := NewProjectRepo(r.db)
+	n, err := repo.CountLinkedTasks(id)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("연결된 일일업무가 있어 삭제할 수 없습니다")
+	}
+	return repo.Delete(id)
+}
+
+// CountTasksByProject 사업에 연결된 업무 건수
+func (r *WBRepo) CountTasksByProject(id string) (int, error) {
+	return NewProjectRepo(r.db).CountLinkedTasks(id)
+}
+
+// ListProjectsFiltered 검색·상태 필터 목록
+func (r *WBRepo) ListProjectsFiltered(search, status string) ([]model.WorkProject, error) {
+	return NewProjectRepo(r.db).ListFiltered(search, 0, status)
 }
 
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {
@@ -430,15 +649,26 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	}
 	t.TaskID = id
 	normalizeWorkTask(t)
+	stampNewWorkTaskDates(t)
 	_, err = r.db.Exec(`
 		INSERT INTO work_tasks (task_id, work_type, project_id, title, description, due_date,
 			work_date, start_time, end_time, duration_min, status, priority, assignee, tags, progress,
-			source_type, source_id, parent_task_id)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			source_type, source_id, parent_task_id, customer_id, customer_name,
+			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
+			reply_due_date, next_check_date, complete_note, receipt_date, complete_date)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.Tags, t.Progress,
-		t.SourceType, t.SourceID, nullStr(t.ParentTaskID))
-	return err
+		t.SourceType, t.SourceID, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
+		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
+		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
+		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
+		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate))
+	if err != nil {
+		return err
+	}
+	// §25.2 일일업무 시간 배치는 이력 미기록(○)
+	return nil
 }
 
 // UpdateTask 업무 내용·배정일·소요시간 등을 수정한다. source·parent 는 유지.
@@ -450,11 +680,91 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 	_, err := r.db.Exec(`
 		UPDATE work_tasks SET work_type=?, project_id=?, title=?, description=?, due_date=?,
 			work_date=?, start_time=?, end_time=?, duration_min=?, status=?, priority=?,
-			assignee=?, tags=?, progress=?, updated_at=CURRENT_TIMESTAMP
+			assignee=?, tags=?, progress=?, customer_id=?, customer_name=?,
+			hold_reason=?, review_date=?, cancel_reason=?, wait_party_kind=?, wait_party=?, wait_request=?,
+			reply_due_date=?, next_check_date=?, complete_note=?,
+			receipt_date=CASE
+				WHEN TRIM(COALESCE(?,'')) != '' THEN ?
+				WHEN TRIM(COALESCE(receipt_date,'')) != '' THEN receipt_date
+				ELSE date('now','localtime')
+			END,
+			complete_date=CASE
+				WHEN ? != 'complete' THEN ''
+				WHEN TRIM(COALESCE(?,'')) != '' THEN ?
+				WHEN TRIM(COALESCE(complete_date,'')) != '' THEN complete_date
+				ELSE date('now','localtime')
+			END,
+			updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=?`,
 		t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority,
-		t.Assignee, t.Tags, t.Progress, t.TaskID)
+		t.Assignee, t.Tags, t.Progress, nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
+		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
+		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
+		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
+		t.ReceiptDate, t.ReceiptDate,
+		t.Status, t.CompleteDate, t.CompleteDate, t.TaskID)
+	return err
+}
+
+// SyncMaintenanceTaskStatus 정기점검 방문 완료 여부에 맞춰 연결된 work_tasks 상태를 맞춘다.
+func (r *WBRepo) SyncMaintenanceTaskStatus(visitID string, completed bool) error {
+	if strings.TrimSpace(visitID) == "" {
+		return nil
+	}
+	if completed {
+		_, err := r.db.Exec(`
+			UPDATE work_tasks
+			SET status=?, progress=100,
+			    complete_date=CASE WHEN TRIM(COALESCE(complete_date,''))='' THEN date('now','localtime') ELSE complete_date END,
+			    updated_at=CURRENT_TIMESTAMP
+			WHERE source_type=? AND source_id=?`,
+			model.WBTaskComplete, model.WBSourceMaintenance, visitID)
+		return err
+	}
+	_, err := r.db.Exec(`
+		UPDATE work_tasks
+		SET status=?, progress=CASE WHEN progress>=100 THEN 0 ELSE progress END,
+			complete_date='',
+			updated_at=CURRENT_TIMESTAMP
+		WHERE source_type=? AND source_id=? AND status=?`,
+		model.WBTaskWaiting, model.WBSourceMaintenance, visitID, model.WBTaskComplete)
+	return err
+}
+
+// BackfillMaintenanceTaskStatuses 방문 완료된 정기점검과 work_tasks 상태를 일괄 동기화한다.
+func (r *WBRepo) BackfillMaintenanceTaskStatuses() error {
+	_, err := r.db.Exec(`
+		UPDATE work_tasks
+		SET status=?, progress=100,
+		    complete_date=CASE WHEN TRIM(COALESCE(complete_date,''))='' THEN date('now','localtime') ELSE complete_date END,
+		    updated_at=CURRENT_TIMESTAMP
+		WHERE source_type=?
+		  AND status != ?
+		  AND source_id IN (
+			SELECT visit_id FROM maintenance_visits WHERE COALESCE(completed,0)=1
+		  )`,
+		model.WBTaskComplete, model.WBSourceMaintenance, model.WBTaskComplete)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	_, err = r.db.Exec(`
+		UPDATE work_tasks
+		SET status=?, progress=CASE WHEN progress>=100 THEN 0 ELSE progress END,
+			complete_date='',
+			updated_at=CURRENT_TIMESTAMP
+		WHERE source_type=?
+		  AND status=?
+		  AND source_id IN (
+			SELECT visit_id FROM maintenance_visits WHERE COALESCE(completed,0)=0
+		  )`,
+		model.WBTaskWaiting, model.WBSourceMaintenance, model.WBTaskComplete)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return nil
+	}
 	return err
 }
 
@@ -470,20 +780,35 @@ func normalizeWorkTask(t *model.WorkTask) {
 	}
 	t.DurationMin = model.NormalizeDurationMin(t.DurationMin)
 	switch t.WorkType {
-	case model.WBWorkSupport:
-		// project 유지
+	case model.WBWorkSupport, model.WBWorkAdmin:
+		// 행정·지원 모두 사업명 연결 가능(지원은 화면에서 필수)
 	case model.WBWorkAS, model.WBWorkMaintenance:
 		t.ProjectID = ""
 	default:
-		if t.WorkType != model.WBWorkAdmin {
-			t.WorkType = model.WBWorkAdmin
-		}
-		t.ProjectID = ""
+		t.WorkType = model.WBWorkAdmin
 	}
 	if t.StartTime != "" && t.EndTime != "" {
 		t.DurationMin = model.DurationFromTimes(t.StartTime, t.EndTime)
 	} else if t.StartTime != "" && t.EndTime == "" {
 		t.EndTime = model.FormatHHMMMinutes(model.ParseHHMMMinutes(t.StartTime) + t.DurationMin)
+	}
+}
+
+// stampNewWorkTaskDates 신규 등록 시 접수일 기본=오늘, 완료면 완료일 기록(§13.4).
+func stampNewWorkTaskDates(t *model.WorkTask) {
+	if t == nil {
+		return
+	}
+	today := time.Now().Format("2006-01-02")
+	if strings.TrimSpace(t.ReceiptDate) == "" {
+		t.ReceiptDate = today
+	}
+	if t.Status == model.WBTaskComplete {
+		if strings.TrimSpace(t.CompleteDate) == "" {
+			t.CompleteDate = today
+		}
+	} else {
+		t.CompleteDate = ""
 	}
 }
 
@@ -512,6 +837,8 @@ func (r *WBRepo) CreateSubtasks(parent *model.WorkTask, dates []string) (int, er
 			Priority:     parent.Priority,
 			Assignee:     parent.Assignee,
 			Tags:         parent.Tags,
+			CustomerID:   parent.CustomerID,
+			CustomerName: parent.CustomerName,
 			ParentTaskID: parent.TaskID,
 		}
 		if err := r.CreateTask(child); err != nil {
@@ -564,6 +891,12 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&t.DueDate, &t.WorkDate, &t.StartTime, &t.EndTime, &t.DurationMin,
 			&t.Status, &t.Priority, &t.Assignee, &t.Tags, &t.Progress,
 			&t.SourceType, &t.SourceID, &t.ParentTaskID,
+			&t.CustomerID, &t.CustomerName,
+			&t.HoldReason, &t.ReviewDate, &t.CancelReason,
+			&t.WaitPartyKind, &t.WaitParty, &t.WaitRequest,
+			&t.ReplyDueDate, &t.NextCheckDate, &t.CompleteNote,
+			&t.ReceiptDate, &t.CompleteDate,
+			&t.OrgName,
 			&created, &updated,
 			&t.ProjectName, &t.ProjectColor,
 		); err != nil {

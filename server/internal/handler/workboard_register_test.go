@@ -179,8 +179,75 @@ func TestRegisterTemplateRenders(t *testing.T) {
 	if !strings.Contains(out, `/workboard/unschedule`) || !strings.Contains(out, `name="task_id" value="WT-1"`) {
 		t.Fatal("배치된 카드의 대기 목록으로 내리기(×) 폼이 없다")
 	}
+	if strings.Contains(out, `data-time="09:00" data-assignee=`) {
+		t.Fatal("주간 드롭 칸에 data-assignee가 있으면 안 됨")
+	}
 	if err := tmpl.ExecuteTemplate(io.Discard, "base.html", data); err != nil {
 		t.Fatalf("base 렌더링 실패: %v", err)
+	}
+}
+
+func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
+	root := findTemplateRoot(t)
+	files := []string{
+		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "workboard", "register.html"),
+	}
+	partials, err := filepath.Glob(filepath.Join(root, "workboard", "_*.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files = append(files, partials...)
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dateCol := RegisterColumn{Date: "2026-08-18", From: "2026-08-18", To: "2026-08-18"}
+	placed := []model.WorkTask{
+		{TaskID: "A", Title: "[점검]광진", Assignee: "최혜영", WorkDate: "2026-08-18", StartTime: "07:30", EndTime: "08:00", DurationMin: 30},
+		{TaskID: "B", Title: "[점검]양천", Assignee: "최혜영", WorkDate: "2026-08-18", StartTime: "09:00", EndTime: "09:30", DurationMin: 30},
+		{TaskID: "C", Title: "[점검]양기헌건", Assignee: "양기헌", WorkDate: "2026-08-18", StartTime: "08:45", EndTime: "09:15", DurationMin: 30},
+	}
+	slotTimes := registerSlotTimes()
+	gridH, slotTops := registerGridStyles(len(slotTimes))
+	data := map[string]interface{}{
+		"Title": "일일 업무 등록", "Active": "work_register", "UserRole": "admin",
+		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
+		"Date": "2026-08-18", "PeriodLabel": "2026-08-18",
+		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",
+		"Columns":    []RegisterColumn{dateCol},
+		"DayColumns": buildRegisterAssigneeColumns(dateCol, placed, taskCardFromWork, []string{"양기헌", "최혜영"}, ""),
+		"SlotTimes": slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
+		"AssigneeLegend": buildAssigneeLegend(placed, nil),
+		"ASCards": []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
+		"PlacedCount": 3, "Projects": nil, "Assignees": nil,
+		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18",
+		"ExtraAssignees": []string{"이해진"}, "DayLeaveNames": []string{},
+		"AssigneeColMin": registerAssigneeColMinPx,
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatalf("일일 content 렌더링 실패: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `data-time="07:30" data-assignee="최혜영"`) {
+		t.Fatal("일일 드롭 칸에 data-assignee가 없다")
+	}
+	if !strings.Contains(out, "최혜영") || !strings.Contains(out, "양기헌") {
+		t.Fatal("일일 열 머리글에 담당자가 없다")
+	}
+	if !strings.Contains(out, "2건 · 1시간") {
+		t.Fatal("열 머리글 건수·소요가 없다")
+	}
+	if strings.Contains(out, "07:30~08:00 · 최혜영") {
+		t.Fatal("일일 카드에 담당자 이름이 남아 있다")
+	}
+	if !strings.Contains(out, "sticky left-0") {
+		t.Fatal("시간 열 sticky 가 없다")
+	}
+	if !strings.Contains(out, "＋담당자") {
+		t.Fatal("＋담당자 버튼이 없다")
 	}
 }
 

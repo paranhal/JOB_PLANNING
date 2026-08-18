@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -96,6 +97,63 @@ func BuildStatsChartBuckets(view string, anchor time.Time) (from, toEx string, b
 	}
 }
 
+// BuildStatsChartBucketsForRange 사용자 지정 기간 차트 버킷. ≤31일=일, ≤98일=주, 그 외=월.
+func BuildStatsChartBucketsForRange(fromIncl, toIncl time.Time) (from, toEx string, buckets []StatsChartBucket) {
+	loc := fromIncl.Location()
+	start := time.Date(fromIncl.Year(), fromIncl.Month(), fromIncl.Day(), 0, 0, 0, 0, loc)
+	endDay := time.Date(toIncl.Year(), toIncl.Month(), toIncl.Day(), 0, 0, 0, 0, loc)
+	endEx := endDay.AddDate(0, 0, 1)
+	days := int(endDay.Sub(start).Hours()/24) + 1
+	if days < 1 {
+		days = 1
+	}
+	switch {
+	case days <= 31:
+		from = start.Format("2006-01-02")
+		toEx = endEx.Format("2006-01-02")
+		for t := start; t.Before(endEx); t = t.AddDate(0, 0, 1) {
+			buckets = append(buckets, StatsChartBucket{
+				Label: t.Format("01/02"),
+				From:  t.Format("2006-01-02"),
+				ToEx:  t.AddDate(0, 0, 1).Format("2006-01-02"),
+			})
+		}
+		return from, toEx, buckets
+	case days <= 98:
+		wd := int(start.Weekday())
+		if wd == 0 {
+			wd = 7
+		}
+		mon := start.AddDate(0, 0, -(wd - 1))
+		for t := mon; t.Before(endEx); t = t.AddDate(0, 0, 7) {
+			sunEx := t.AddDate(0, 0, 7)
+			sun := sunEx.AddDate(0, 0, -1)
+			buckets = append(buckets, StatsChartBucket{
+				Label: t.Format("01/02") + "~" + sun.Format("01/02"),
+				From:  t.Format("2006-01-02"),
+				ToEx:  sunEx.Format("2006-01-02"),
+			})
+		}
+		from = buckets[0].From
+		toEx = buckets[len(buckets)-1].ToEx
+		return from, toEx, buckets
+	default:
+		monthStart := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, loc)
+		lastMonthEx := time.Date(endDay.Year(), endDay.Month(), 1, 0, 0, 0, 0, loc).AddDate(0, 1, 0)
+		for t := monthStart; t.Before(lastMonthEx); t = t.AddDate(0, 1, 0) {
+			next := t.AddDate(0, 1, 0)
+			buckets = append(buckets, StatsChartBucket{
+				Label: t.Format("2006-01"),
+				From:  t.Format("2006-01-02"),
+				ToEx:  next.Format("2006-01-02"),
+			})
+		}
+		from = buckets[0].From
+		toEx = buckets[len(buckets)-1].ToEx
+		return from, toEx, buckets
+	}
+}
+
 // BuildStatsChartRange 하위호환: 버킷 From 목록을 일자 키로 반환.
 func BuildStatsChartRange(view string, anchor time.Time) (from, toEx string, labels []string) {
 	from, toEx, buckets := BuildStatsChartBuckets(view, anchor)
@@ -118,36 +176,57 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 	curRate := cur.Counts.ExecutionRatePct()
 	prevRate := prev.Counts.ExecutionRatePct()
 	out.ExecutionRate = math.Round(curRate*10) / 10
-	out.ExecutionDelta = math.Round((curRate-prevRate)*10) / 10
+	out.ExecutionSample = cur.Counts.PlannedTotal()
+	out.HasExecution = cur.Counts.HasExecutionRate()
+	out.ExecDisplay = model.StatsReliability(out.ExecutionSample, !out.HasExecution, out.ExecutionRate).
+		CapGradeIfImport(f.IncludeImport)
+	prevExec := model.StatsReliability(prev.Counts.PlannedTotal(), !prev.Counts.HasExecutionRate(), prevRate)
+	if out.ExecDisplay.ShowDelta && prevExec.ShowDelta {
+		out.ExecutionDelta = math.Round((curRate-prevRate)*10) / 10
+	} else {
+		out.ExecDisplay.ShowDelta = false
+	}
 
 	visitCur, nVisitCur, err := r.avgASDays(cur.From, cur.ToExclusive, f, "visit")
 	if err != nil {
 		return out, err
 	}
-	visitPrev, _, err := r.avgASDays(prev.From, prev.ToExclusive, f, "visit")
+	visitPrev, nVisitPrev, err := r.avgASDays(prev.From, prev.ToExclusive, f, "visit")
 	if err != nil {
 		return out, err
 	}
 	out.VisitSample = nVisitCur
 	out.HasVisit = nVisitCur > 0
-	if out.HasVisit {
-		out.VisitAvgDays = math.Round(visitCur*10) / 10
+	out.VisitAvgDays = math.Round(visitCur*10) / 10
+	out.VisitDisplay = model.StatsReliability(nVisitCur, nVisitCur == 0, out.VisitAvgDays).
+		CapGradeIfImport(f.IncludeImport).
+		WithReason("해당 기간 방문 데이터 없음")
+	prevVisit := model.StatsReliability(nVisitPrev, nVisitPrev == 0, visitPrev)
+	if out.VisitDisplay.ShowDelta && prevVisit.ShowDelta {
 		out.VisitDelta = math.Round((visitCur-visitPrev)*10) / 10
+	} else {
+		out.VisitDisplay.ShowDelta = false
 	}
 
 	compCur, nCompCur, err := r.avgASDays(cur.From, cur.ToExclusive, f, "complete")
 	if err != nil {
 		return out, err
 	}
-	compPrev, _, err := r.avgASDays(prev.From, prev.ToExclusive, f, "complete")
+	compPrev, nCompPrev, err := r.avgASDays(prev.From, prev.ToExclusive, f, "complete")
 	if err != nil {
 		return out, err
 	}
 	out.CompleteSample = nCompCur
 	out.HasComplete = nCompCur > 0
-	if out.HasComplete {
-		out.CompleteAvgDays = math.Round(compCur*10) / 10
+	out.CompleteAvgDays = math.Round(compCur*10) / 10
+	out.CompleteDisplay = model.StatsReliability(nCompCur, nCompCur == 0, out.CompleteAvgDays).
+		CapGradeIfImport(f.IncludeImport).
+		WithReason("해당 기간 완료 데이터 없음")
+	prevComp := model.StatsReliability(nCompPrev, nCompPrev == 0, compPrev)
+	if out.CompleteDisplay.ShowDelta && prevComp.ShowDelta {
 		out.CompleteDelta = math.Round((compCur-compPrev)*10) / 10
+	} else {
+		out.CompleteDisplay.ShowDelta = false
 	}
 	return out, nil
 }
@@ -156,6 +235,17 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 func (r *StatsRepo) LoadStatsChartSeries(view string, anchor time.Time, f model.StatsMeetingFilter) ([]model.StatsChartPoint, error) {
 	f = normalizeMeetingFilter(f)
 	from, toEx, buckets := BuildStatsChartBuckets(view, anchor)
+	return r.chartSeriesFromBuckets(view, from, toEx, buckets, f)
+}
+
+// LoadStatsChartSeriesRange 사용자 지정 기간 차트
+func (r *StatsRepo) LoadStatsChartSeriesRange(fromIncl, toIncl time.Time, f model.StatsMeetingFilter) ([]model.StatsChartPoint, error) {
+	from, toEx, buckets := BuildStatsChartBucketsForRange(fromIncl, toIncl)
+	return r.chartSeriesFromBuckets(model.StatsViewRange, from, toEx, buckets, f)
+}
+
+func (r *StatsRepo) chartSeriesFromBuckets(view, from, toEx string, buckets []StatsChartBucket, f model.StatsMeetingFilter) ([]model.StatsChartPoint, error) {
+	f = normalizeMeetingFilter(f)
 	recMap, err := r.mapDayCountsAS(from, toEx, f, "received")
 	if err != nil {
 		return nil, err
@@ -217,7 +307,7 @@ func (r *StatsRepo) LoadStatsChartSeries(view string, anchor time.Time, f model.
 		}
 		return n
 	}
-	monthMode := view == model.StatsViewMonth
+	monthMode := view == model.StatsViewMonth || view == model.StatsViewRange && len(buckets) > 0 && strings.Count(buckets[0].Label, "-") == 1 && len(buckets[0].Label) == 7
 
 	out := make([]model.StatsChartPoint, 0, len(buckets))
 	for _, b := range buckets {
@@ -226,15 +316,9 @@ func (r *StatsRepo) LoadStatsChartSeries(view string, anchor time.Time, f model.
 		if onPlan > planned {
 			onPlan = planned
 		}
-		rate := 0.0
-		if planned > 0 {
-			rate = math.Round(float64(onPlan)*1000/float64(planned)) / 10
-			if rate > 100 {
-				rate = 100
-			}
-		}
+		rate := math.Round(model.StatsWorkSlice{Planned: planned, OnPlan: onPlan}.ExecutionRatePct()*10) / 10
 		rangeLbl := chartRangeLabel(b.From, b.ToEx, monthMode)
-		if view == model.StatsViewDay {
+		if view == model.StatsViewDay || (view == model.StatsViewRange && b.ToEx == nextDay(b.From)) {
 			rangeLbl = b.From
 		}
 		out = append(out, model.StatsChartPoint{
@@ -302,6 +386,7 @@ func (r *StatsRepo) ListCompletedDetail(from, toEx string, f model.StatsMeetingF
 			it.ProductModel = strings.TrimSpace(productName)
 		}
 		it.WorkForm = "AS"
+		it.Href = "/as/" + it.ASID + "/action"
 		it.ReceiptForm = mapReceiptForm(channel, reqType)
 		it.StatusLabel = statsStatusLabel(it.Status)
 		if it.Assignee == "" {
@@ -309,7 +394,35 @@ func (r *StatsRepo) ListCompletedDetail(from, toEx string, f model.StatsMeetingF
 		}
 		items = append(items, it)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	mntDone, err := r.listMntCases(from, toEx, f, statsCaseCompleted, 200)
+	if err != nil {
+		return nil, err
+	}
+	for _, it := range mntDone {
+		it.ActionTaken = it.Symptom
+		items = append(items, it)
+	}
+	adminDone, err := r.listAdminCases(from, toEx, f, statsCaseCompleted, 200)
+	if err != nil {
+		return nil, err
+	}
+	for _, it := range adminDone {
+		it.ActionTaken = it.Symptom
+		items = append(items, it)
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].CompleteDate != items[j].CompleteDate {
+			return items[i].CompleteDate > items[j].CompleteDate
+		}
+		return items[i].ASNumber > items[j].ASNumber
+	})
+	if len(items) > 200 {
+		items = items[:200]
+	}
+	return items, nil
 }
 
 func nextDay(d string) string {
@@ -325,13 +438,14 @@ func (r *StatsRepo) avgASDays(from, toEx string, f model.StatsMeetingFilter, kin
 	var q string
 	switch kind {
 	case "visit":
+		visitExpr := `COALESCE(date(NULLIF(TRIM(ar.start_datetime),'')), NULLIF(TRIM(ar.visit_scheduled_date),''))`
 		q = `
-			SELECT AVG(julianday(ar.visit_scheduled_date) - julianday(date(ar.receipt_datetime))),
+			SELECT AVG(julianday(` + visitExpr + `) - julianday(date(ar.receipt_datetime))),
 			       COUNT(*)
 			FROM as_receipts ar
 			LEFT JOIN assets a ON a.asset_id = ar.asset_id
-			WHERE TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
-			  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
+			WHERE TRIM(COALESCE(` + visitExpr + `,'')) != ''
+			  AND ` + visitExpr + ` >= date(?) AND ` + visitExpr + ` < date(?)
 			  AND ar.status NOT IN ('cancelled')` + asSQL
 	default:
 		q = `
@@ -437,6 +551,7 @@ func (r *StatsRepo) mapDayCountsAdmin(from, toEx string, f model.StatsMeetingFil
 	base := `COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')`
 	status := ``
 	if completed {
+		base = adminTaskCompleteDateSQL
 		status = ` AND t.status='complete'`
 	}
 	q := `
@@ -494,7 +609,7 @@ func (r *StatsRepo) mapDayPlannedOnPlan(from, toEx string, f model.StatsMeetingF
 			LEFT JOIN assets a ON a.asset_id = ar.asset_id
 			WHERE TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
 			  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
-			  AND ar.status IN ` + model.SQLStatusStatsCompleted + `
+			  AND ar.status IN `+model.SQLStatusStatsCompleted+`
 			  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) = date(ar.visit_scheduled_date)`+asSQL+` GROUP BY d`,
 			append([]interface{}{from, toEx}, asArgs...)...)
 		if e != nil {
@@ -586,13 +701,31 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	var b strings.Builder
 	var args []interface{}
 	if f.Scope == model.StatsScopeAssignee && f.Key != "" {
-		b.WriteString(` AND (TRIM(COALESCE(ar.assigned_to,'')) = ? OR TRIM(COALESCE(ar.assigned_user_id,'')) = ?)`)
-		args = append(args, f.Key, f.Key)
+		if f.Key == model.StatsUnassignedLabel {
+			b.WriteString(` AND TRIM(COALESCE(ar.assigned_to,'')) = '' AND TRIM(COALESCE(ar.assigned_user_id,'')) = ''`)
+		} else {
+			b.WriteString(` AND (TRIM(COALESCE(ar.assigned_to,'')) = ? OR TRIM(COALESCE(ar.assigned_user_id,'')) = ?)`)
+			args = append(args, f.Key, f.Key)
+		}
 	}
 	if f.Scope == model.StatsScopeProduct && f.Key != "" {
 		frag, a := productMatchSQL("a", "ar", f.Key)
 		b.WriteString(frag)
 		args = append(args, a...)
+	}
+	if f.ProjectID != "" {
+		b.WriteString(` AND (
+			TRIM(COALESCE(a.project_id,'')) = ?
+			OR EXISTS (
+				SELECT 1 FROM work_tasks t
+				WHERE t.source_type='as' AND t.source_id=ar.as_id
+				  AND TRIM(COALESCE(t.project_id,'')) = ?
+			)
+		)`)
+		args = append(args, f.ProjectID, f.ProjectID)
+	}
+	if !f.IncludeImport {
+		b.WriteString(` AND COALESCE(ar.data_origin,'app') != 'import'`)
 	}
 	return b.String(), args
 }
@@ -601,8 +734,12 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	var b strings.Builder
 	var args []interface{}
 	if f.Scope == model.StatsScopeAssignee && f.Key != "" {
-		b.WriteString(` AND TRIM(COALESCE(v.assignee,'')) = ?`)
-		args = append(args, f.Key)
+		if f.Key == model.StatsUnassignedLabel {
+			b.WriteString(` AND TRIM(COALESCE(v.assignee,'')) = ''`)
+		} else {
+			b.WriteString(` AND TRIM(COALESCE(v.assignee,'')) = ?`)
+			args = append(args, f.Key)
+		}
 	}
 	if f.Scope == model.StatsScopeProduct && f.Key != "" {
 		b.WriteString(` AND (` + productTypeLike("v.product_type", f.Key) + `)`)
@@ -613,15 +750,28 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 			b.WriteString(` AND 1=0`)
 		}
 	}
+	if f.ProjectID != "" {
+		b.WriteString(` AND TRIM(COALESCE(v.project_id,'')) = ?`)
+		args = append(args, f.ProjectID)
+	}
+	if !f.IncludeImport {
+		b.WriteString(` AND COALESCE(v.data_origin,'app') != 'import'`)
+	}
 	return b.String(), args
 }
 
 func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	var b strings.Builder
 	var args []interface{}
+	// AS·정기점검 일일업무는 해당 유형에서 집계. work_type 기본값이 admin이라 중복될 수 있음.
+	b.WriteString(` AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')`)
 	if f.Scope == model.StatsScopeAssignee && f.Key != "" {
-		b.WriteString(` AND TRIM(COALESCE(t.assignee,'')) = ?`)
-		args = append(args, f.Key)
+		if f.Key == model.StatsUnassignedLabel {
+			b.WriteString(` AND TRIM(COALESCE(t.assignee,'')) = ''`)
+		} else {
+			b.WriteString(` AND TRIM(COALESCE(t.assignee,'')) = ?`)
+			args = append(args, f.Key)
+		}
 	}
 	if f.Scope == model.StatsScopeProduct {
 		b.WriteString(` AND 1=0`)

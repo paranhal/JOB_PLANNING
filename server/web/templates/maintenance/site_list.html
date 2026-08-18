@@ -27,6 +27,26 @@
   </div>
   {{end}}
 
+  {{if .Quota}}
+  <div class="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3">
+    <p class="text-sm font-semibold text-sky-900">{{.Quota.MonthLabel}} 방문 목표</p>
+    <p class="text-sm text-sky-800 mt-1">
+      주기 해당 사이트 <span class="font-bold tabular-nums">{{.Quota.DueSites}}</span>곳
+      · 방문 건수 <span class="font-bold tabular-nums">{{.Quota.Slots}}</span>건
+      <span class="text-sky-700">(KLAS {{.Quota.KlasSlots}} · RFID {{.Quota.RfidSlots}} · 둘 다면 2건)</span>
+    </p>
+    {{if .Quota.CycleRows}}
+    <div class="flex flex-wrap gap-2 mt-2">
+      {{range .Quota.CycleRows}}
+      <span class="inline-flex items-center gap-1 rounded-full bg-white border border-sky-200 px-2.5 py-0.5 text-[11px] text-sky-800">
+        {{.Label}} {{.Sites}}곳 · {{.Slots}}건
+      </span>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">

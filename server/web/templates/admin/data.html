@@ -1,0 +1,246 @@
+{{define "title"}}데이터 관리 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">데이터 관리</h2>
+      <p class="text-sm text-gray-500 mt-1">백업 목록, 변경 이력(언제·누가·무엇·어떻게), 롤백, 기존 백업 분석.</p>
+      <p class="text-xs text-gray-400 mt-1 font-mono">{{.DataPath}}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <form method="POST" action="/admin/data/save"
+            onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='저장 중…';">
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">현재 데이터 저장</button>
+      </form>
+      <form method="POST" action="/admin/data/archive"
+            onsubmit="return confirm('변경 이력을 파일로 백업한 뒤 테이블을 비웁니다. 계속할까요?');">
+        <button type="submit" class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium">관리 로그 백업 후 초기화</button>
+      </form>
+    </div>
+  </div>
+
+  {{if .OK}}
+  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>
+  {{end}}
+  {{if .Error}}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
+  {{end}}
+  {{if .Due}}
+  <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">변경 이력이 3개월을 넘었습니다. 관리 로그를 백업한 뒤 테이블을 비우는 것을 권장합니다.</div>
+  {{end}}
+
+  <div class="flex gap-1 border-b border-gray-200">
+    <a href="/admin/data?tab=backup" class="px-4 py-2 text-sm {{if eq .Tab "backup"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">백업 목록</a>
+    <a href="/admin/data?tab=logs" class="px-4 py-2 text-sm {{if eq .Tab "logs"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">변경 이력</a>
+    <a href="/admin/data?tab=analyze" class="px-4 py-2 text-sm {{if eq .Tab "analyze"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">백업 분석</a>
+    <a href="/admin/data?tab=unassigned" class="px-4 py-2 text-sm {{if eq .Tab "unassigned"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">사업 미배정</a>
+  </div>
+
+  {{if eq .Tab "backup"}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-gray-700">저장된 복사본</h3>
+      <span class="text-xs text-gray-400">일 단위 스냅샷은 최근 14일 · 관리 로그는 유지</span>
+    </div>
+    {{if .Items}}
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">폴더</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">구분</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">저장 시각</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">저장한 사람</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Items}}
+        <tr>
+          <td class="px-4 py-3 font-mono text-xs text-gray-800">{{.Name}}</td>
+          <td class="px-4 py-3">
+            {{if eq .Kind "manual"}}
+            <span class="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">{{.KindLabel}}</span>
+            {{else if eq .Kind "log_archive"}}
+            <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">{{.KindLabel}}</span>
+            {{else}}
+            <span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{.KindLabel}}</span>
+            {{end}}
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{.SavedAt}}</td>
+          <td class="px-4 py-3 text-gray-600">{{if .CreatedByName}}{{.CreatedByName}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-right">
+            <a href="/admin/data?name={{.Name}}" class="text-xs text-blue-600 hover:underline">분석</a>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="px-4 py-8 text-sm text-gray-400 text-center">아직 저장된 복사본이 없습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "logs"}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-gray-700">변경 이력</h3>
+      <span class="text-xs text-gray-400">현재 {{.LogCount}}건{{if .OldestLog}} · 가장 오래됨 {{.OldestLog}}{{end}}</span>
+    </div>
+    {{if .Logs}}
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">언제</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">누가</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">어떻게</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">어떤 데이터</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Logs}}
+        <tr class="{{if .RolledBack}}opacity-50{{end}} align-top">
+          <td class="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{{.OccurredAt}}</td>
+          <td class="px-4 py-3 text-gray-800">{{.Who}}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs {{if eq .Action "delete"}}bg-red-100 text-red-700{{else if eq .Action "update"}}bg-amber-100 text-amber-800{{else}}bg-green-100 text-green-700{{end}}">{{.ActionLabel}}</span>
+            {{if .RolledBack}}<span class="ml-1 text-xs text-gray-400">롤백됨</span>{{end}}
+          </td>
+          <td class="px-4 py-3">
+            <div class="text-gray-800">{{.TableLabel}} · {{.EntityLabel}} <span class="font-mono text-xs text-gray-400">{{.EntityID}}</span></div>
+            {{if or .BeforePretty .AfterPretty}}
+            <details class="mt-1">
+              <summary class="text-xs text-blue-600 cursor-pointer">전·후 값</summary>
+              <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                {{if .BeforePretty}}<pre class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48">{{.BeforePretty}}</pre>{{end}}
+                {{if .AfterPretty}}<pre class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48">{{.AfterPretty}}</pre>{{end}}
+              </div>
+            </details>
+            {{end}}
+          </td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            {{if .CanRollback}}
+            <form method="POST" action="/admin/data/rollback" class="inline"
+                  onsubmit="return confirm('이 변경을 되돌릴까요?');">
+              <input type="hidden" name="log_id" value="{{.LogID}}">
+              <button type="submit" class="text-xs text-blue-600 hover:underline">롤백</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="px-4 py-8 text-sm text-gray-400 text-center">기록된 변경이 없습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "analyze"}}
+  <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+    <form method="GET" action="/admin/data" class="flex flex-wrap gap-2 items-end">
+      <input type="hidden" name="tab" value="analyze">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">백업 폴더</label>
+        <select name="name" class="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[20rem]">
+          <option value="">선택</option>
+          {{range .Items}}
+          <option value="{{.Name}}" {{if and $.Stats (eq $.Stats.Name .Name)}}selected{{end}}>{{.KindLabel}} · {{.Name}}</option>
+          {{end}}
+        </select>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm">분석</button>
+    </form>
+
+    {{if .Stats}}
+      {{if .Stats.Error}}
+      <p class="text-sm text-red-600">{{.Stats.Error}}</p>
+      {{else}}
+      <p class="text-sm text-gray-700"><span class="font-semibold">{{.Stats.KindLabel}}</span> · <span class="font-mono text-xs">{{.Stats.Name}}</span></p>
+      {{if .Stats.IsLogArchive}}
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">변경 이력</p><p class="text-lg font-semibold">{{.Stats.ChangeLogs}}</p></div>
+      </div>
+      {{if .Stats.LogByUser}}
+      <div>
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">사용자별</h4>
+        <ul class="text-sm text-gray-600 space-y-1">{{range .Stats.LogByUser}}<li>{{index . 0}} · {{index . 1}}건</li>{{end}}</ul>
+      </div>
+      {{end}}
+      {{if .Stats.LogByTable}}
+      <div>
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">데이터별</h4>
+        <ul class="text-sm text-gray-600 space-y-1">{{range .Stats.LogByTable}}<li>{{index . 0}} · {{index . 1}}건</li>{{end}}</ul>
+      </div>
+      {{end}}
+      {{else}}
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">고객</p><p class="text-lg font-semibold">{{.Stats.Customers}}</p></div>
+        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">설치자산</p><p class="text-lg font-semibold">{{.Stats.Assets}}</p></div>
+        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">AS 접수</p><p class="text-lg font-semibold">{{.Stats.ASReceipts}}</p></div>
+        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">첨부</p><p class="text-lg font-semibold">{{.Stats.Attachments}}</p></div>
+        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">일일업무</p><p class="text-lg font-semibold">{{.Stats.WorkTasks}}</p></div>
+      </div>
+      {{if .Stats.RecentAS}}
+      <div>
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">최근 AS</h4>
+        <table class="w-full text-sm">
+          <thead><tr class="text-xs text-gray-500"><th class="text-left py-1">번호</th><th class="text-left py-1">기관</th><th class="text-left py-1">상태</th></tr></thead>
+          <tbody>
+            {{range .Stats.RecentAS}}
+            <tr><td class="py-1 font-mono text-xs">{{index . 0}}</td><td>{{index . 1}}</td><td>{{index . 2}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{end}}
+      {{end}}
+      {{end}}
+    {{else}}
+      <p class="text-sm text-gray-400">목록에서 백업을 고르면 건수와 최근 내용을 보여 줍니다. 관리 로그 폴더는 다른 PC로 옮긴 뒤에도 여기서 열 수 있습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "unassigned"}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700">사업 미배정</h3>
+      <p class="text-xs text-gray-500 mt-1">정기점검 방문·AS 접수 중 <span class="font-mono">project_id</span>가 비어 있는 건입니다. 상위기관을 연결하거나 범위 규칙을 맞춘 뒤 서버를 다시 시작하면 채워집니다. 해석에 실패한 건은 버리지 않습니다.</p>
+    </div>
+    {{if .Unresolved}}
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">구분</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">번호</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">일자</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">기관</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">제품</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">사유</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Unresolved}}
+        <tr>
+          <td class="px-4 py-3 whitespace-nowrap">
+            <span class="px-2 py-0.5 rounded-full text-xs {{if eq .Kind "as"}}bg-blue-100 text-blue-700{{else}}bg-emerald-100 text-emerald-800{{end}}">{{.KindLabel}}</span>
+          </td>
+          <td class="px-4 py-3 font-mono text-xs"><a href="{{.Href}}" class="text-blue-600 hover:underline">{{.Number}}</a></td>
+          <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{.Date}}</td>
+          <td class="px-4 py-3 text-gray-800">{{if .OrgName}}{{.OrgName}}{{else}}<span class="text-gray-400">{{.CustomerID}}</span>{{end}}</td>
+          <td class="px-4 py-3 text-gray-600">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-amber-800">{{.Reason}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="px-4 py-8 text-sm text-gray-400 text-center">미배정 건이 없습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}

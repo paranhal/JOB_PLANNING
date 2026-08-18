@@ -102,3 +102,52 @@ func TestProductKeysSQL(t *testing.T) {
 		t.Fatalf("unexpected sql: %s", sqlFrag)
 	}
 }
+
+func TestDedupeWorkProjectsByName(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "dedupe.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	name := "세종시 도서관 ICT 통합정보시스템 유지관리(2026년)"
+	_, err = db.Exec(`
+		INSERT INTO work_projects (project_id, name, short_name, plan_year, is_paid, sort_order, color, status)
+		VALUES ('WP-004', ?, '', 0, 1, 0, '#3B82F6', 'active')`, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`
+		INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C1','기관','기관',1);
+		INSERT INTO assets (asset_id, customer_id, product_name, project_id) VALUES ('A1','C1','KLAS','WP-004');
+		INSERT INTO work_tasks (task_id, project_id, title, status) VALUES ('T1','WP-004','업무','waiting')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _ = db.Exec(`DELETE FROM id_sequences WHERE seq_key=?`, projectDedupeByNameMetaKey)
+	dedupeWorkProjectsByName(db)
+
+	var n int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM work_projects WHERE TRIM(name)=?`, name).Scan(&n)
+	if n != 1 {
+		t.Fatalf("중복 미정리: %d", n)
+	}
+	var keep string
+	_ = db.QueryRow(`SELECT project_id FROM work_projects WHERE TRIM(name)=?`, name).Scan(&keep)
+	if keep != "WPSEED02" {
+		t.Fatalf("시드 ID를 남겨야 함: %s", keep)
+	}
+	var assetPID, taskPID string
+	_ = db.QueryRow(`SELECT project_id FROM assets WHERE asset_id='A1'`).Scan(&assetPID)
+	_ = db.QueryRow(`SELECT project_id FROM work_tasks WHERE task_id='T1'`).Scan(&taskPID)
+	if assetPID != "WPSEED02" || taskPID != "WPSEED02" {
+		t.Fatalf("참조 미이전 asset=%s task=%s", assetPID, taskPID)
+	}
+	var old int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM work_projects WHERE project_id='WP-004'`).Scan(&old)
+	if old != 0 {
+		t.Fatal("중복 WP-004가 남아 있음")
+	}
+}

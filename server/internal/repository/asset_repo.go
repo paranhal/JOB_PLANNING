@@ -268,12 +268,17 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
 		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "assets", "asset_id", a.AssetID, a.ProductName+" "+a.ModelName)
+	return nil
 }
 
 func (r *AssetRepo) Update(a *model.Asset) error {
-	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`
+	return touchUpdate(r.db, "assets", "asset_id", a.AssetID, a.ProductName+" "+a.ModelName, func() error {
+		now := time.Now().Format("2006-01-02 15:04:05")
+		_, err := r.db.Exec(`
 		UPDATE assets SET
 			customer_id=?, product_name=?, product_type=?, product_category=?, model_name=?,
 			manufacturer=?, serial_number=?, install_date=?, retire_date=?,
@@ -288,26 +293,29 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			install_location=?, location_detail=?, notes=?, project_id=?,
 			updated_at=?
 		WHERE asset_id=?`,
-		a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
-		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
-		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
-		boolToInt(a.IsManaged),
-		a.MaintContractType, a.MaintCycle, a.MaintStartDate, a.MaintEndDate,
-		a.MaintBillingParty, a.MaintBillingCycle,
-		a.RequesterType, a.RequesterName,
-		a.CustomerContactID, a.OurContact,
-		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
-		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
-		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, a.AssetID,
-	)
-	return err
+			a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
+			a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
+			a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
+			boolToInt(a.IsManaged),
+			a.MaintContractType, a.MaintCycle, a.MaintStartDate, a.MaintEndDate,
+			a.MaintBillingParty, a.MaintBillingCycle,
+			a.RequesterType, a.RequesterName,
+			a.CustomerContactID, a.OurContact,
+			nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
+			a.LocBuildingName, a.LocFloorName, a.LocRoomName,
+			a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, a.AssetID,
+		)
+		return err
+	})
 }
 
 func (r *AssetRepo) Delete(id string) error {
-	_, err := r.db.Exec(
-		`UPDATE assets SET operation_status='disposed', updated_at=? WHERE asset_id=?`,
-		time.Now().Format("2006-01-02 15:04:05"), id)
-	return err
+	return touchUpdate(r.db, "assets", "asset_id", id, "설치자산", func() error {
+		_, err := r.db.Exec(
+			`UPDATE assets SET operation_status='disposed', updated_at=? WHERE asset_id=?`,
+			time.Now().Format("2006-01-02 15:04:05"), id)
+		return err
+	})
 }
 
 // ListForTab 고객 상세 탭 전용 — 화면 표시에 필요한 컬럼 포함

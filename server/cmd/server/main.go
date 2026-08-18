@@ -11,8 +11,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
+	"customer-support/internal/audit"
+	"customer-support/internal/auditlog"
+	"customer-support/internal/backup"
 	"customer-support/internal/config"
 	"customer-support/internal/handler"
+	"customer-support/internal/hwpx"
 	"customer-support/internal/repository"
 )
 
@@ -30,6 +34,9 @@ func chdirToServerRoot() {
 
 func main() {
 	chdirToServerRoot()
+	if err := hwpx.WritePlaceholderTemplate(hwpx.DefaultTemplatePath()); err != nil {
+		log.Printf("조치완료보고서 템플릿 준비 실패: %v", err)
+	}
 	_ = godotenv.Load()
 	cfg := config.Load()
 
@@ -39,11 +46,42 @@ func main() {
 	}
 	defer db.Close()
 
+	audit.Init(db)
+
+	accessPath := filepath.Join(filepath.Dir(cfg.DBPath), "audit", "access.db")
+	if err := auditlog.Init(accessPath); err != nil {
+		log.Printf("접속기록 DB 열기 실패: %v (업무는 계속됩니다)", err)
+	} else {
+		log.Printf("접속기록: %s (쓰기 전용)", accessPath)
+	}
+	defer auditlog.Close()
+
+	// 휴무일 시드·캐시는 InitDB(008)와 handler.New 의 Calendar 가 담당한다. §23.13.2
+	// 화면을 그릴 때 특일 API 를 부르지 않는다.
+
 	// 기본 관리자 계정 확보
 	userRepo := repository.NewUserRepo(db)
 	userRepo.EnsureAdmin(handler.HashPassword("admin"))
+	userRepo.EnsureObserver(handler.HashPassword("1234"))
 	// 완료·종료 AS 수정 잠금 해제 비밀번호 시드 (기본: as-edit)
 	_ = repository.NewSettingsRepo(db).EnsureASCompletedEditPassword(handler.HashPassword)
+	if pw, err := repository.NewSettingsRepo(db).EnsureMaintenanceDeletePassword(handler.HashPassword); err != nil {
+		log.Printf("정기점검 삭제 비밀번호 시드 실패: %v", err)
+	} else if pw != "" {
+		log.Printf("정기점검 계획 삭제 비밀번호 초기값: %s (관리 > 사용자에서 변경하세요)", pw)
+	}
+
+	backupCfg := backup.Config{
+		DataDir: filepath.Dir(cfg.DBPath),
+		DB:      db,
+	}
+	if n, err := backup.SyncIndex(backupCfg); err != nil {
+		log.Printf("백업 목록 보정 실패: %v", err)
+	} else if n > 0 {
+		log.Printf("백업 목록 보정: %d건", n)
+	}
+	backup.Start(backupCfg)
+	audit.StartArchiveScheduler(filepath.Dir(cfg.DBPath))
 
 	e := echo.New()
 	e.HideBanner = true
@@ -71,6 +109,14 @@ func main() {
 	e.POST("/login", h.Auth.Login)
 	e.GET("/logout", h.Auth.Logout)
 
+	v1 := e.Group("/api/v1", h.Integration.RequireAPIKey)
+	v1.GET("/customers", h.Integration.ListCustomers)
+	v1.GET("/customers/:id/contacts", h.Integration.ListCustomerContacts)
+	v1.GET("/customers/:id", h.Integration.GetCustomer)
+	v1.GET("/contacts", h.Integration.ListContacts)
+	v1.GET("/contacts/:id", h.Integration.GetContact)
+	v1.GET("/codes", h.Integration.ListCodes)
+
 	// 인증 미들웨어 적용 그룹
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
@@ -78,6 +124,10 @@ func main() {
 
 	g.GET("/", h.Dashboard)
 	g.GET("/work", h.Work.List)
+	g.GET("/plan/unplanned", h.Work.UnplannedList)
+	g.POST("/plan/unplanned/assign", h.Work.UnplannedAssign)
+	g.POST("/plan/unplanned/no-date", h.Work.UnplannedNoDate)
+	g.GET("/meeting", h.Meeting.Show)
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
@@ -165,7 +215,12 @@ func main() {
 	as.GET("/new", h.AS.New, receiveAS)
 	as.POST("", h.AS.Create, receiveAS)
 	as.GET("/stats", h.AS.StatsDashboard)
+	// 하부업무 조치(원 접수와 독립) — /:id 보다 먼저 등록
+	as.GET("/work/:work_id/action", h.AS.WorkAction)
+	as.POST("/work/:work_id/action", h.AS.UpdateWorkAction)
 	as.GET("/:id", h.AS.Show)
+	as.GET("/:id/report", h.AS.ReportPreview)
+	as.POST("/:id/report", h.AS.ReportIssue)
 	as.GET("/:id/action", h.AS.Action) // 조회: 접수·업무 역할 / 수정은 핸들러·POST에서 제한
 	as.POST("/:id/unlock-edit", h.AS.UnlockEdit, adminOnly)
 	as.GET("/:id/edit", h.AS.Edit, receiveAS)
@@ -196,45 +251,80 @@ func main() {
 	maint.GET("", h.Maintenance.ListPlans)
 	maint.GET("/new", h.Maintenance.NewPlanPage, adminOnly)
 	maint.POST("", h.Maintenance.CreatePlan, adminOnly)
+	maint.GET("/visits/:visit_id/action", h.Maintenance.VisitAction)
+	maint.POST("/visits/:visit_id/action", h.Maintenance.UpdateVisitAction, mntEdit)
 	maint.POST("/visits/:visit_id/update", h.Maintenance.UpdateVisit, mntEdit)
 	maint.POST("/visits/:visit_id/delete", h.Maintenance.DeleteVisit, mntEdit)
 	maint.POST("/visits/:visit_id/complete", h.Maintenance.CompleteVisit, mntEdit)
 	maint.POST("/:id/complete-until", h.Maintenance.CompleteVisitsUntil, mntEdit)
 	maint.GET("/:id/export.xlsx", h.Maintenance.ExportExcel)
+	maint.GET("/:id/generate", h.Maintenance.GenerateConfirm, adminOnly)
 	maint.POST("/:id/generate", h.Maintenance.GenerateAuto, adminOnly)
 	maint.POST("/:id/approve", h.Maintenance.ApprovePlan, adminOnly)
 	maint.POST("/:id/unapprove", h.Maintenance.UnapprovePlan, adminOnly)
+	maint.GET("/:id/delete", h.Maintenance.DeletePlanPage, adminOnly)
 	maint.POST("/:id/delete", h.Maintenance.DeletePlan, adminOnly)
+	maint.POST("/:id/archive", h.Maintenance.ArchivePlan, adminOnly)
+	maint.GET("/:id/duplicates", h.Maintenance.DuplicatesPreview, adminOnly)
+	maint.POST("/:id/duplicates", h.Maintenance.CollapseDuplicates, adminOnly)
+	maint.GET("/:id/manage", h.Maintenance.ManagePlan)
+	maint.POST("/:id/copy", h.Maintenance.CopyPlan, adminOnly)
+	maint.POST("/:id/status", h.Maintenance.SetPlanStatus, adminOnly)
+	maint.POST("/:id/bulk-assignee", h.Maintenance.BulkUpdateAssignees, adminOnly)
+	maint.POST("/:id/bulk-delete", h.Maintenance.BulkDeleteVisits, adminOnly)
+	maint.POST("/:id/assign-slots", h.Maintenance.AssignUnassignedSlots, adminOnly)
 	maint.POST("/:id/visits", h.Maintenance.AddVisit, mntEdit)
+	maint.POST("/:id/assign-slot", h.Maintenance.AssignUnassignedSlot, mntEdit)
 	maint.GET("/:id", h.Maintenance.ShowPlan)
 
 	g.GET("/analysis", h.Analysis.Dashboard, adminOnly)
 
 	stats := g.Group("/stats")
 	stats.GET("", h.Stats.Overview)
+	stats.GET("/reports", h.Stats.Reports)
+	stats.POST("/company-weekly", h.Stats.CreateCompanyWeekly)
+	stats.GET("/company-weekly/download", h.Stats.DownloadCompanyWeekly)
 	stats.GET("/detail", h.Stats.List)
 	stats.GET("/export.xlsx", h.Stats.ExportExcel)
+	stats.GET("/weekly-report.xlsx", h.Stats.ExportWeeklyReport)
+	stats.GET("/daily-assignee.xlsx", h.Stats.ExportDailyAssigneeReport)
 
 	g.GET("/work-status", h.WorkStatus.Calendar)
 
 	proj := g.Group("/projects")
 	proj.GET("", h.Project.List)
-	proj.GET("/new", h.Project.New, adminOnly)
-	proj.POST("", h.Project.Create, adminOnly)
+	proj.GET("/new", h.Project.New)
+	proj.POST("", h.Project.Create)
 	proj.GET("/:id", h.Project.Show)
-	proj.GET("/:id/edit", h.Project.Edit, adminOnly)
-	proj.POST("/:id/update", h.Project.Update, adminOnly)
-	proj.POST("/:id/delete", h.Project.Delete, adminOnly)
+	proj.GET("/:id/edit", h.Project.Edit)
+	proj.POST("/:id", h.Project.Update)
+	proj.POST("/:id/update", h.Project.Update)
+	proj.POST("/:id/archive", h.Project.Archive)
+	proj.POST("/:id/activate", h.Project.Activate)
+	proj.POST("/:id/delete", h.Project.Delete)
+
+	aw := g.Group("/admin-work")
+	aw.GET("", h.AdminWork.List)
+	aw.GET("/stats", h.AdminWork.Stats)
+	aw.GET("/new", h.AdminWork.New)
+	aw.POST("", h.AdminWork.Create)
+	aw.POST("/inbox", h.AdminWork.CreateInbox)
+	aw.POST("/:id/classify", h.AdminWork.Classify)
+	aw.GET("/:id", h.AdminWork.Show)
 
 	wb := g.Group("/workboard")
 	wb.GET("", h.Workboard.Index)
 	wb.GET("/kanban", h.Workboard.Kanban)
 	wb.GET("/tasks", h.Workboard.List)
 	wb.GET("/register", h.Workboard.Register)
+	wb.POST("/register/unlock-past", h.Workboard.UnlockPastRegister, adminOnly)
 	wb.POST("/projects", h.Workboard.CreateProject)
 	wb.POST("/tasks", h.Workboard.CreateTask)
 	wb.GET("/tasks/:id", h.Workboard.ShowTask)
 	wb.POST("/tasks/:id/update", h.Workboard.UpdateTask)
+	wb.POST("/tasks/:id/actions", h.Workboard.CreateAction)
+	wb.POST("/tasks/:id/actions/:aid/update", h.Workboard.UpdateAction)
+	wb.POST("/tasks/:id/activities", h.Workboard.CreateActivity)
 	wb.POST("/tasks/:id/subtasks", h.Workboard.CreateSubtasks)
 	wb.POST("/schedule", h.Workboard.Schedule)
 	wb.POST("/unschedule", h.Workboard.Unschedule)
@@ -247,13 +337,30 @@ func main() {
 	g.POST("/attachments", h.Attachment.Upload) // 권한은 Upload 내부에서 ref_type별 검사
 	g.GET("/attachments/:id", h.Attachment.Download)
 	g.POST("/attachments/:id/keywords", h.Attachment.UpdateKeywords)
+	g.POST("/attachments/:id/promote-asset", h.Attachment.PromoteToAsset)
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 
 	g.GET("/users", h.Auth.UserList, adminOnly)
 	g.POST("/users/as-edit-password", h.AS.UpdateCompletedEditPassword, adminOnly)
+	g.POST("/users/mnt-delete-password", h.Auth.UpdateMaintenanceDeletePassword, adminOnly)
 	g.POST("/users", h.Auth.UserCreate, adminOnly)
 	g.POST("/users/:id/update", h.Auth.UserUpdate, adminOnly)
 	g.POST("/users/:id/password", h.Auth.UserChangePassword, adminOnly)
+
+	g.GET("/admin/holidays", h.Holiday.List)
+	g.POST("/admin/holidays", h.Holiday.Create)
+	g.POST("/admin/holidays/update", h.Holiday.Update)
+	g.POST("/admin/holidays/delete", h.Holiday.Delete)
+	g.POST("/admin/holidays/sync", h.Holiday.SyncAPI)
+	g.POST("/admin/holidays/leaves", h.Holiday.CreateLeave)
+	g.POST("/admin/holidays/leaves/delete", h.Holiday.DeleteLeave)
+
+	g.GET("/admin/data", h.Backup.Page, adminOnly)
+	g.POST("/admin/data/save", h.Backup.Save, adminOnly)
+	g.POST("/admin/data/rollback", h.Backup.Rollback, adminOnly)
+	g.POST("/admin/data/archive", h.Backup.Archive, adminOnly)
+	g.GET("/admin/backup", h.Backup.RedirectLegacy, adminOnly)
+	g.POST("/admin/backup", h.Backup.Save, adminOnly)
 
 	log.Printf("고객지원시스템 서버 시작: http://localhost:%s", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {

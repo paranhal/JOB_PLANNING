@@ -32,6 +32,11 @@ const projectSelect = `
 	LEFT JOIN customers op ON op.customer_id = p.ordering_party_id`
 
 func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error) {
+	return r.ListFiltered("", year, status)
+}
+
+// ListFiltered 사업명·발주처·고객 검색 + 연도·상태 필터
+func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]model.WorkProject, error) {
 	q := projectSelect + ` WHERE 1=1`
 	var args []interface{}
 	if year > 0 {
@@ -41,6 +46,15 @@ func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error)
 	if status != "" {
 		q += ` AND p.status=?`
 		args = append(args, status)
+	}
+	if s := strings.TrimSpace(search); s != "" {
+		like := "%" + s + "%"
+		q += ` AND (
+			p.name LIKE ? OR COALESCE(p.short_name,'') LIKE ?
+			OR COALESCE(p.ordering_party,'') LIKE ? OR COALESCE(op.org_name,'') LIKE ?
+			OR COALESCE(cu.org_name,'') LIKE ?
+		)`
+		args = append(args, like, like, like, like, like)
 	}
 	q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
 	rows, err := r.db.Query(q, args...)
@@ -52,6 +66,21 @@ func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error)
 	}
 	defer rows.Close()
 	return scanProjectRows(rows)
+}
+
+// SetStatus 사업 상태만 변경(보관/재개/완료 등)
+func (r *ProjectRepo) SetStatus(id, status string) error {
+	id = strings.TrimSpace(id)
+	status = strings.TrimSpace(status)
+	if id == "" || status == "" {
+		return fmt.Errorf("project_id·status 필요")
+	}
+	return touchUpdate(r.db, "work_projects", "project_id", id, "사업", func() error {
+		_, err := r.db.Exec(`
+			UPDATE work_projects SET status=?, updated_at=CURRENT_TIMESTAMP
+			WHERE project_id=?`, status, id)
+		return err
+	})
 }
 
 func (r *ProjectRepo) ListYears() ([]int, error) {
@@ -103,7 +132,11 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
 		p.Color, p.Status)
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "work_projects", "project_id", p.ProjectID, p.Name)
+	return nil
 }
 
 func (r *ProjectRepo) Update(p *model.WorkProject) error {
@@ -111,33 +144,39 @@ func (r *ProjectRepo) Update(p *model.WorkProject) error {
 		return fmt.Errorf("project_id 필요")
 	}
 	normalizeProject(p)
-	_, err := r.db.Exec(`
+	return touchUpdate(r.db, "work_projects", "project_id", p.ProjectID, p.Name, func() error {
+		_, err := r.db.Exec(`
 		UPDATE work_projects SET
 			name=?, short_name=?, plan_year=?, is_paid=?, sort_order=?,
 			ordering_party_id=?, ordering_party=?, customer_id=?,
 			contract_type=?, billing_type=?, start_date=?, end_date=?, notes=?, contact_id=?,
 			color=?, status=?, updated_at=CURRENT_TIMESTAMP
 		WHERE project_id=?`,
-		p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
-		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
-		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status, p.ProjectID)
-	return err
+			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
+			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
+			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
+			p.Color, p.Status, p.ProjectID)
+		return err
+	})
 }
 
 func (r *ProjectRepo) Delete(id string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM project_scope_rules WHERE project_id=?`, id); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM work_projects WHERE project_id=?`, id); err != nil {
-		return err
-	}
-	return tx.Commit()
+	var name string
+	_ = r.db.QueryRow(`SELECT name FROM work_projects WHERE project_id=?`, id).Scan(&name)
+	return touchDelete(r.db, "work_projects", "project_id", id, name, func() error {
+		tx, err := r.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec(`DELETE FROM project_scope_rules WHERE project_id=?`, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM work_projects WHERE project_id=?`, id); err != nil {
+			return err
+		}
+		return tx.Commit()
+	})
 }
 
 func (r *ProjectRepo) CountLinkedTasks(id string) (int, error) {
@@ -408,6 +447,32 @@ func parentOrgSQL(alias, parentID string) (string, []interface{}) {
 	}
 	return fmt.Sprintf(`(%s.customer_id=? OR %s.parent_customer_id=?)`, alias, alias),
 		[]interface{}{parentID, parentID}
+}
+
+// matchProductKeys productKeysSQL 과 같은 제품키 판정. ResolveProjectID 가 SQL 없이 쓴다.
+func matchProductKeys(keysCSV, text string) bool {
+	keys := splitCSV(keysCSV)
+	if len(keys) == 0 {
+		return true
+	}
+	u := strings.ToUpper(text)
+	for _, k := range keys {
+		switch k {
+		case model.ProductKeySejongKLAS:
+			if strings.Contains(text, "세종") || strings.Contains(u, "SEJONG") {
+				return true
+			}
+		case model.ProductKeyKLAS:
+			if (strings.Contains(u, "KLAS") || strings.Contains(u, "K-LAS")) && !strings.Contains(text, "세종") {
+				return true
+			}
+		case model.ProductKeyAnrobotics:
+			if strings.Contains(text, "앤로") || strings.Contains(u, "ANROBOT") || strings.Contains(u, "RFID") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // productKeysSQL 제품키 매칭. asMode면 asset 컬럼+증상, 아니면 product_type 단일 컬럼(정기점검).

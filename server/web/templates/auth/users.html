@@ -1,12 +1,16 @@
 {{define "title"}}사용자 관리 · 고객지원시스템{{end}}
 {{define "content"}}
+{{$permDefs := .PermDefs}}
+{{$canEdit := .CanEditUsers}}
 <div class="space-y-6" x-data="{ showForm: false, pwUser: '{{.FocusUser}}' }">
   <div class="flex items-center justify-between gap-3 flex-wrap">
     <div>
       <h2 class="text-xl font-bold text-gray-800">사용자 / 권한 관리</h2>
-      <p class="text-sm text-gray-500 mt-1">역할·활성 상태를 저장하고, 사용자별 비밀번호를 변경할 수 있습니다.</p>
+      <p class="text-sm text-gray-500 mt-1">등급을 고르고, 체크박스로 세부 권한을 지정합니다. 등급: 기술·영업·행정·관리자·옵저버{{if not $canEdit}} (조회 전용){{end}}</p>
     </div>
+    {{if $canEdit}}
     <button type="button" @click="showForm=!showForm" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ 사용자 추가</button>
+    {{end}}
   </div>
 
   {{if .OK}}
@@ -16,22 +20,54 @@
   <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
   {{end}}
 
-  <div x-show="showForm" x-cloak class="bg-white rounded-xl border border-gray-200 p-6">
-    <form method="POST" action="/users" class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">아이디</label><input type="text" name="username" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">비밀번호</label><input type="password" name="password" required minlength="4" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">이름</label><input type="text" name="full_name" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">역할</label>
-        <select name="role" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="admin">관리자</option><option value="receipt">접수담당</option>
-          <option value="tech">기술담당</option><option value="sales">영업담당</option>
-          <option value="viewer" selected>열람사용자</option>
-        </select>
+  {{if .HashMig}}
+    {{if .HashMig.Complete}}
+    <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">비밀번호 해시가 bcrypt로 전환되었습니다. 사용자 {{.HashMig.UserBcrypt}}명 · AS 수정·정기점검 삭제 비밀번호 포함.</div>
+    {{else}}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      비밀번호 해시 전환 진행 중 — 사용자 {{.HashMig.UserBcrypt}}/{{.HashMig.UserTotal}}명이 bcrypt입니다. 나머지 계정은 다음 로그인 시 자동 전환됩니다.
+      AS 수정 비밀번호:
+      {{if .HashMig.ASBcrypt}}전환됨{{else if .HashMig.ASSet}}미전환 (다음 잠금 해제 시 자동 전환){{else}}미설정{{end}}
+      · 정기점검 삭제 비밀번호:
+      {{if .HashMig.DelBcrypt}}전환됨{{else if .HashMig.DelSet}}미전환{{else}}미설정{{end}}
+    </div>
+    {{end}}
+  {{end}}
+
+  {{if $canEdit}}
+  <div x-show="showForm" x-cloak class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+    <form method="POST" action="/users" class="space-y-4" id="user-create-form">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">아이디</label><input type="text" name="username" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">비밀번호</label><input type="password" name="password" required minlength="4" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">이름</label><input type="text" name="full_name" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">등급</label>
+          <select name="role" id="create-role" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="tech">기술</option>
+            <option value="sales">영업</option>
+            <option value="office">행정</option>
+            <option value="admin">관리자</option>
+            <option value="observer" selected>옵저버</option>
+          </select>
+        </div>
       </div>
-      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium">등록</button>
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-2">권한 (체크)</p>
+        <div class="flex flex-wrap gap-3" id="create-perms">
+          {{range $permDefs}}
+          <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+            <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600 create-perm"> {{.Label}}
+          </label>
+          {{end}}
+        </div>
+        <p class="text-[11px] text-gray-400 mt-1">등급을 바꾸면 기본 권한이 채워집니다. 이후 체크를 조정할 수 있습니다.</p>
+      </div>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium">등록</button>
     </form>
   </div>
+  {{end}}
 
+  {{if $canEdit}}
   <div class="bg-white rounded-xl border border-amber-200 p-5 space-y-3">
     <div>
       <h3 class="font-semibold text-gray-800 text-sm">완료·종료 AS 수정 비밀번호</h3>
@@ -54,43 +90,91 @@
       <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium">변경</button>
     </form>
   </div>
+  <div class="bg-white rounded-xl border border-rose-200 p-5 space-y-3">
+    <div>
+      <h3 class="font-semibold text-gray-800 text-sm">정기점검 계획 삭제 비밀번호</h3>
+      <p class="text-xs text-gray-500 mt-1">로그인·AS 수정 비밀번호와 별도입니다. 기동 시 임의 생성된 값은 서버 로그에 1회만 남습니다.</p>
+    </div>
+    <form method="POST" action="/users/mnt-delete-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+          onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">현재 삭제 비밀번호</label>
+        <input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">새 삭제 비밀번호</label>
+        <input type="password" name="new_password" required minlength="4" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label>
+        <input type="password" name="confirm_password" required minlength="4" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium">변경</button>
+    </form>
+  </div>
+  {{end}}
 
   <div class="space-y-3">
     {{range .Users}}
+    {{$uperms := userPermList .}}
     <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="font-medium text-gray-800">{{.FullName}}
-            <span class="ml-2 font-mono text-xs text-gray-500">{{.Username}}</span>
-          </p>
-          <p class="text-xs text-gray-500 mt-0.5">
-            {{if eq .Role "admin"}}관리자{{else if eq .Role "receipt"}}접수{{else if eq .Role "tech"}}기술{{else if eq .Role "sales"}}영업{{else}}열람{{end}}
-            · {{if .IsActive}}<span class="text-green-600">활성</span>{{else}}<span class="text-gray-400">비활성</span>{{end}}
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <form method="POST" action="/users/{{.UserID}}/update" class="inline-flex flex-wrap gap-1 items-center">
-            <select name="role" class="border rounded px-2 py-1 text-xs">
-              <option value="admin" {{if eq .Role "admin"}}selected{{end}}>관리자</option>
-              <option value="receipt" {{if eq .Role "receipt"}}selected{{end}}>접수</option>
+      {{if $canEdit}}
+      <form method="POST" action="/users/{{.UserID}}/update" class="space-y-3">
+      {{else}}
+      <div class="space-y-3">
+      {{end}}
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="font-medium text-gray-800">{{.FullName}}
+              <span class="ml-2 font-mono text-xs text-gray-500">{{.Username}}</span>
+            </p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              {{roleLabel .Role}}
+              · {{if .IsActive}}<span class="text-green-600">활성</span>{{else}}<span class="text-gray-400">비활성</span>{{end}}
+            </p>
+          </div>
+          {{if $canEdit}}
+          <div class="flex flex-wrap items-center gap-2">
+            <select name="role" class="border rounded px-2 py-1 text-xs role-select">
               <option value="tech" {{if eq .Role "tech"}}selected{{end}}>기술</option>
               <option value="sales" {{if eq .Role "sales"}}selected{{end}}>영업</option>
-              <option value="viewer" {{if eq .Role "viewer"}}selected{{end}}>열람</option>
+              <option value="office" {{if eq .Role "office"}}selected{{end}}>행정</option>
+              <option value="admin" {{if eq .Role "admin"}}selected{{end}}>관리자</option>
+              <option value="observer" {{if eq .Role "observer"}}selected{{end}}>옵저버</option>
             </select>
             <select name="is_active" class="border rounded px-2 py-1 text-xs">
               <option value="1" {{if .IsActive}}selected{{end}}>활성</option>
               <option value="0" {{if not .IsActive}}selected{{end}}>비활성</option>
             </select>
             <input type="hidden" name="full_name" value="{{.FullName}}">
-            <button type="submit" class="text-blue-600 hover:underline text-xs px-1">저장</button>
-          </form>
-          <button type="button" @click="pwUser = (pwUser==='{{.UserID}}' ? '' : '{{.UserID}}')"
-                  class="text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50">
-            비밀번호 변경
+            <button type="button" @click="pwUser = (pwUser==='{{.UserID}}' ? '' : '{{.UserID}}')"
+                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50">
+              비밀번호 변경
+            </button>
+          </div>
+          {{end}}
+        </div>
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-2">권한{{if $canEdit}} (체크){{end}}</p>
+          <div class="flex flex-wrap gap-3">
+            {{range $permDefs}}
+            <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
+              <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600"
+                     {{if hasUserPerm $uperms .Key}}checked{{end}} {{if not $canEdit}}disabled{{end}}> {{.Label}}
+            </label>
+            {{end}}
+          </div>
+        </div>
+        {{if $canEdit}}
+        <div class="flex justify-end pt-1">
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+            저장
           </button>
         </div>
-      </div>
+        {{end}}
+      {{if $canEdit}}</form>{{else}}</div>{{end}}
 
+      {{if $canEdit}}
       <div x-show="pwUser==='{{.UserID}}'" x-cloak class="mt-3 pt-3 border-t border-gray-100">
         <form method="POST" action="/users/{{.UserID}}/password" class="flex flex-wrap gap-2 items-end"
               onsubmit="if(this.password.value!==this.password_confirm.value){alert('비밀번호 확인이 일치하지 않습니다.');return false;}">
@@ -109,8 +193,32 @@
         </form>
         <p class="text-xs text-gray-400 mt-2">4자 이상 입력하세요.</p>
       </div>
+      {{end}}
     </div>
     {{end}}
   </div>
 </div>
+{{if $canEdit}}
+<script>
+(function () {
+  var defaults = {
+    tech: ['as_receive','as_process','workboard','maintenance','maintenance_edit','stats'],
+    sales: ['analysis','stats'],
+    office: ['as_receive','workboard','stats'],
+    admin: ['as_receive','as_process','workboard','maintenance','maintenance_edit','master_write','codes_users','analysis','stats'],
+    observer: ['workboard','maintenance','analysis','stats']
+  };
+  var roleSel = document.getElementById('create-role');
+  if (!roleSel) return;
+  function applyDefaults() {
+    var keys = defaults[roleSel.value] || [];
+    document.querySelectorAll('.create-perm').forEach(function (cb) {
+      cb.checked = keys.indexOf(cb.value) >= 0;
+    });
+  }
+  roleSel.addEventListener('change', applyDefaults);
+  applyDefaults();
+})();
+</script>
+{{end}}
 {{end}}

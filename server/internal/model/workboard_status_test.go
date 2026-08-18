@@ -9,7 +9,10 @@ func TestWBKanbanBucket(t *testing.T) {
 		WBTaskHold:       WBTaskReview,
 		WBTaskTransfer:   WBTaskReview,
 		WBTaskReview:     WBTaskReview,
+		WBTaskWaitingFor: WBTaskReview,
 		WBTaskComplete:   WBTaskComplete,
+		WBTaskInbox:      "",
+		WBTaskCancelled:  "",
 		"":               WBTaskWaiting,
 	}
 	for in, want := range cases {

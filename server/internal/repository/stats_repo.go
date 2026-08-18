@@ -293,7 +293,7 @@ func (r *StatsRepo) listPartialWorkDetail(q model.StatsQuery, now time.Time) ([]
 		       COALESCE(a.model_name,''), COALESCE(a.product_name,''),
 		       COALESCE(ar.receipt_channel,''), COALESCE(ar.requester_type,''),
 		       COALESCE(c.org_name,''),
-		       COALESCE(ar.assigned_to,''),
+		       COALESCE(NULLIF(TRIM(w.assigned_to),''), ar.assigned_to,''),
 		       COALESCE(ar.symptom,''), COALESCE(w.notes,''),
 		       COALESCE(w.work_kind,''), COALESCE(w.schedule_confirmed,0), COALESCE(w.status,'open')
 		FROM as_work_items w

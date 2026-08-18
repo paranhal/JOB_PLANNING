@@ -1,0 +1,10 @@
+{
+  "name": "job-planning-frontend",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./web/css/input.css -o ./web/static/vendor/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

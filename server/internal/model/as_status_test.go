@@ -103,3 +103,19 @@ func TestIsOpenIncompleteStatus(t *testing.T) {
 		t.Fatal("partial_complete should map to workboard in_progress")
 	}
 }
+
+func TestActionResultLabels(t *testing.T) {
+	if ActionResultLabel(ResultPartial) != "추가조치 필요" {
+		t.Fatal(ActionResultLabel(ResultPartial))
+	}
+	if ActionResultLabel(ResultHold) != "대기" {
+		t.Fatal(ActionResultLabel(ResultHold))
+	}
+	if TransferDetailLabel(TransferDetailWaiting) != "우리 팀 추가 작업" {
+		t.Fatal(TransferDetailLabel(TransferDetailWaiting))
+	}
+	opts := ActionResultOptions()
+	if len(opts) != 5 || opts[1].Value != ResultPartial || opts[4].Value != ResultHold {
+		t.Fatalf("%+v", opts)
+	}
+}

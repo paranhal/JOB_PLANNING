@@ -12,11 +12,21 @@ import (
 )
 
 type WorkHandler struct {
-	repo *repository.WorkBoardRepo
+	repo     *repository.WorkBoardRepo
+	asRepo   *repository.ASRepo
+	mntRepo  *repository.MaintenanceRepo
+	wbRepo   *repository.WBRepo
+	userRepo *repository.UserRepo
 }
 
-func NewWorkHandler(repo *repository.WorkBoardRepo) *WorkHandler {
-	return &WorkHandler{repo: repo}
+func NewWorkHandler(
+	repo *repository.WorkBoardRepo,
+	asRepo *repository.ASRepo,
+	mntRepo *repository.MaintenanceRepo,
+	wbRepo *repository.WBRepo,
+	userRepo *repository.UserRepo,
+) *WorkHandler {
+	return &WorkHandler{repo: repo, asRepo: asRepo, mntRepo: mntRepo, wbRepo: wbRepo, userRepo: userRepo}
 }
 
 func (h *WorkHandler) List(c echo.Context) error {
@@ -33,7 +43,7 @@ func (h *WorkHandler) List(c echo.Context) error {
 	scopeAll := false
 	if bucket == model.WorkBucketUnassigned {
 		scopeAll = true
-	} else if role == "tech" {
+	} else if role == model.RoleTech {
 		if mineParam == "0" {
 			scopeAll = true
 		} else {
@@ -48,7 +58,7 @@ func (h *WorkHandler) List(c echo.Context) error {
 		return err
 	}
 
-	showAssignee := role == "admin" || role == "receipt" || scopeAll
+	showAssignee := role == model.RoleAdmin || role == model.RoleOffice || scopeAll
 	title := workBucketTitle(bucket)
 	return c.Render(http.StatusOK, "work/list.html", map[string]interface{}{
 		"Title":        title,
@@ -85,7 +95,7 @@ func workScopeNote(role string, scopeAll bool, bucket string) string {
 	if bucket == model.WorkBucketUnassigned {
 		return "전체 접수 기준(담당자 없는 건)"
 	}
-	if role == "tech" && !scopeAll {
+	if role == model.RoleTech && !scopeAll {
 		return "내 배정 업무 기준"
 	}
 	return "전체 업무 기준"
@@ -94,7 +104,7 @@ func workScopeNote(role string, scopeAll bool, bucket string) string {
 func workListURL(bucket string, mine bool, role string) string {
 	v := url.Values{}
 	v.Set("bucket", bucket)
-	if role == "tech" {
+	if role == model.RoleTech {
 		if mine {
 			v.Set("mine", "1")
 		} else {
@@ -102,4 +112,23 @@ func workListURL(bucket string, mine bool, role string) string {
 		}
 	}
 	return "/work?" + v.Encode()
+}
+
+func planUnplannedURL(mine bool, role, kind string) string {
+	v := url.Values{}
+	if role == model.RoleTech {
+		if mine {
+			v.Set("mine", "1")
+		} else {
+			v.Set("mine", "0")
+		}
+	}
+	if kind != "" {
+		v.Set("kind", kind)
+	}
+	s := v.Encode()
+	if s == "" {
+		return "/plan/unplanned"
+	}
+	return "/plan/unplanned?" + s
 }

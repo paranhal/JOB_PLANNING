@@ -64,19 +64,27 @@ func (r *SpaceRepo) CreateBuilding(b *model.CustomerBuilding) error {
 		 VALUES (?,?,?,?,?,?,?)`,
 		b.BuildingID, b.CustomerID, b.BuildingName, b.BuildingType, b.Address,
 		boolToInt(b.IsActive), time.Now().Format("2006-01-02 15:04:05"))
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "customer_buildings", "building_id", b.BuildingID, b.BuildingName)
+	return nil
 }
 
 func (r *SpaceRepo) UpdateBuilding(b *model.CustomerBuilding) error {
-	_, err := r.db.Exec(
-		`UPDATE customer_buildings SET building_name=?,building_type=?,address=?,is_active=? WHERE building_id=?`,
-		b.BuildingName, b.BuildingType, b.Address, boolToInt(b.IsActive), b.BuildingID)
-	return err
+	return touchUpdate(r.db, "customer_buildings", "building_id", b.BuildingID, b.BuildingName, func() error {
+		_, err := r.db.Exec(
+			`UPDATE customer_buildings SET building_name=?,building_type=?,address=?,is_active=? WHERE building_id=?`,
+			b.BuildingName, b.BuildingType, b.Address, boolToInt(b.IsActive), b.BuildingID)
+		return err
+	})
 }
 
 func (r *SpaceRepo) DeleteBuilding(id string) error {
-	_, err := r.db.Exec(`DELETE FROM customer_buildings WHERE building_id=?`, id)
-	return err
+	return touchDelete(r.db, "customer_buildings", "building_id", id, "건물", func() error {
+		_, err := r.db.Exec(`DELETE FROM customer_buildings WHERE building_id=?`, id)
+		return err
+	})
 }
 
 // ── 층 ──
@@ -108,20 +116,28 @@ func (r *SpaceRepo) CreateFloor(f *model.CustomerFloor) error {
 		`INSERT INTO customer_floors (floor_id,building_id,floor_name,sort_order,created_at)
 		 VALUES (?,?,?,?,?)`,
 		f.FloorID, f.BuildingID, f.FloorName, f.SortOrder, time.Now().Format("2006-01-02 15:04:05"))
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "customer_floors", "floor_id", f.FloorID, f.FloorName)
+	return nil
 }
 
 func (r *SpaceRepo) UpdateFloor(f *model.CustomerFloor) error {
-	_, err := r.db.Exec(
-		`UPDATE customer_floors SET floor_name=?,sort_order=? WHERE floor_id=?`,
-		f.FloorName, f.SortOrder, f.FloorID)
-	return err
+	return touchUpdate(r.db, "customer_floors", "floor_id", f.FloorID, f.FloorName, func() error {
+		_, err := r.db.Exec(
+			`UPDATE customer_floors SET floor_name=?,sort_order=? WHERE floor_id=?`,
+			f.FloorName, f.SortOrder, f.FloorID)
+		return err
+	})
 }
 
 func (r *SpaceRepo) DeleteFloor(id string) error {
-	r.db.Exec(`DELETE FROM customer_rooms WHERE floor_id=?`, id)
-	_, err := r.db.Exec(`DELETE FROM customer_floors WHERE floor_id=?`, id)
-	return err
+	return touchDelete(r.db, "customer_floors", "floor_id", id, "층", func() error {
+		r.db.Exec(`DELETE FROM customer_rooms WHERE floor_id=?`, id)
+		_, err := r.db.Exec(`DELETE FROM customer_floors WHERE floor_id=?`, id)
+		return err
+	})
 }
 
 // ── 실 ──
@@ -153,24 +169,34 @@ func (r *SpaceRepo) CreateRoom(rm *model.CustomerRoom) error {
 		 VALUES (?,?,?,?,?,?)`,
 		rm.RoomID, rm.FloorID, rm.RoomName, rm.RoomNumber, rm.Purpose,
 		time.Now().Format("2006-01-02 15:04:05"))
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "customer_rooms", "room_id", rm.RoomID, rm.RoomName)
+	return nil
 }
 
 func (r *SpaceRepo) UpdateRoom(rm *model.CustomerRoom) error {
-	_, err := r.db.Exec(
-		`UPDATE customer_rooms SET room_name=?,room_number=?,purpose=? WHERE room_id=?`,
-		rm.RoomName, rm.RoomNumber, rm.Purpose, rm.RoomID)
-	return err
+	return touchUpdate(r.db, "customer_rooms", "room_id", rm.RoomID, rm.RoomName, func() error {
+		_, err := r.db.Exec(
+			`UPDATE customer_rooms SET room_name=?,room_number=?,purpose=? WHERE room_id=?`,
+			rm.RoomName, rm.RoomNumber, rm.Purpose, rm.RoomID)
+		return err
+	})
 }
 
 func (r *SpaceRepo) UpdateRoomName(roomID, roomName string) error {
-	_, err := r.db.Exec(`UPDATE customer_rooms SET room_name=? WHERE room_id=?`, roomName, roomID)
-	return err
+	return touchUpdate(r.db, "customer_rooms", "room_id", roomID, roomName, func() error {
+		_, err := r.db.Exec(`UPDATE customer_rooms SET room_name=? WHERE room_id=?`, roomName, roomID)
+		return err
+	})
 }
 
 func (r *SpaceRepo) DeleteRoom(id string) error {
-	_, err := r.db.Exec(`DELETE FROM customer_rooms WHERE room_id=?`, id)
-	return err
+	return touchDelete(r.db, "customer_rooms", "room_id", id, "호실", func() error {
+		_, err := r.db.Exec(`DELETE FROM customer_rooms WHERE room_id=?`, id)
+		return err
+	})
 }
 
 // ── 위치 조회용 (드롭다운) ──

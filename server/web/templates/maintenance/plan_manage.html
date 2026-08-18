@@ -1,0 +1,331 @@
+{{define "title"}}정기점검 관리 {{.Plan.PlanYear}}년 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">
+    <div>
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="text-xl font-bold text-gray-800">정기점검 관리</h2>
+        <label class="sr-only" for="mnt-year-select">연도 선택</label>
+        <select id="mnt-year-select"
+                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                data-query="/manage">
+          {{range .Plans}}
+          <option value="{{.PlanID}}" {{if eq .PlanID $.Plan.PlanID}}selected{{end}}>{{.PlanYear}}년</option>
+          {{end}}
+          {{if .IsAdmin}}
+          <option value="__new__">+ 연도 추가…</option>
+          {{end}}
+        </select>
+      </div>
+      <p class="text-sm text-gray-500 mt-1">연도 계획과 방문을 일괄로 손봅니다. 일정 화면에서 한 건씩 고치지 않아도 됩니다.</p>
+    </div>
+    <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+      <a href="/maintenance/{{.Plan.PlanID}}" class="px-4 py-2 bg-white text-gray-700 hover:bg-gray-50">일정</a>
+      <a href="/maintenance/{{.Plan.PlanID}}/manage" class="px-4 py-2 bg-gray-900 text-white">관리</a>
+    </div>
+  </div>
+
+  {{if .FlashErr}}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>
+  {{end}}
+  {{if .FlashOK}}
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>
+  {{end}}
+
+  {{if .HolidayMissing}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
+    <p>{{.HolidayMissing}}</p>
+    <a href="/admin/holidays?year={{.Plan.PlanYear}}" class="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">휴무일 등록</a>
+  </div>
+  {{end}}
+
+  {{if and .DupCount (gt .DupCount 0)}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
+    <p>중복 {{.DupCount}}건 발견 — 같은 달·같은 기관·같은 점검대상입니다.</p>
+    {{if .IsAdmin}}
+    <a href="/maintenance/{{.Plan.PlanID}}/duplicates" class="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">정리하기</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <section class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <h3 class="px-4 py-3 font-semibold border-b border-gray-100 bg-gray-50">연도 계획</h3>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-xs text-gray-500 bg-gray-50">
+          <tr>
+            <th class="px-4 py-2">연도</th>
+            <th class="px-4 py-2">제목</th>
+            <th class="px-4 py-2">상태</th>
+            <th class="px-4 py-2 text-right">방문</th>
+            <th class="px-4 py-2 text-right">완료</th>
+            <th class="px-4 py-2">최종 수정</th>
+            <th class="px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {{range .Plans}}
+          <tr class="{{if eq .PlanID $.Plan.PlanID}}bg-blue-50/60{{end}}">
+            <td class="px-4 py-2 font-medium">{{.PlanYear}}</td>
+            <td class="px-4 py-2">{{if .Title}}{{.Title}}{{else}}—{{end}}</td>
+            <td class="px-4 py-2">
+              {{if eq .Status "approved"}}<span class="text-green-700">승인</span>
+              {{else if eq .Status "archived"}}<span class="text-gray-500">보관</span>
+              {{else}}<span class="text-amber-700">초안</span>{{end}}
+            </td>
+            <td class="px-4 py-2 text-right">{{.VisitCount}}</td>
+            <td class="px-4 py-2 text-right">{{.DoneCount}}</td>
+            <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{.UpdatedAt}}</td>
+            <td class="px-4 py-2 text-right whitespace-nowrap">
+              <a href="/maintenance/{{.PlanID}}" class="text-blue-600 hover:underline text-xs">일정</a>
+              <a href="/maintenance/{{.PlanID}}/manage" class="text-blue-600 hover:underline text-xs ml-2">관리</a>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {{if .IsAdmin}}
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <h3 class="font-semibold text-gray-800">계획 생성</h3>
+      <p class="text-xs text-gray-500">연도당 1개입니다. 이미 있으면 안내합니다.</p>
+      <form method="POST" action="/maintenance" class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="next" value="manage">
+        <input type="hidden" name="from_plan_id" value="{{.Plan.PlanID}}">
+        <div>
+          <label class="block text-[11px] text-gray-500 mb-1">연도</label>
+          <input type="number" name="plan_year" value="{{.NewYear}}" required min="2000" max="2100"
+                 class="border rounded-lg px-3 py-1.5 text-sm w-28">
+        </div>
+        <div class="flex-1 min-w-[10rem]">
+          <label class="block text-[11px] text-gray-500 mb-1">제목</label>
+          <input type="text" name="title" placeholder="예: 2027년 정기점검" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">만들기</button>
+      </form>
+    </section>
+
+    <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <h3 class="font-semibold text-gray-800">계획 복사</h3>
+      <p class="text-xs text-gray-500">{{.Plan.PlanYear}}년의 사이트·주기(공통 설정)와 담당자를 새 연도로 넘기고 방문일은 비웁니다.</p>
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/copy" class="flex flex-wrap items-end gap-2">
+        <div>
+          <label class="block text-[11px] text-gray-500 mb-1">새 연도</label>
+          <input type="number" name="plan_year" value="{{.CopyYear}}" required min="2000" max="2100"
+                 class="border rounded-lg px-3 py-1.5 text-sm w-28">
+        </div>
+        <div class="flex-1 min-w-[10rem]">
+          <label class="block text-[11px] text-gray-500 mb-1">제목</label>
+          <input type="text" name="title" placeholder="{{.CopyYear}}년 정기점검" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">복사</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <h3 class="font-semibold text-gray-800">이 계획 상태</h3>
+    <p class="text-xs text-gray-500">현재:
+      {{if eq .Plan.Status "approved"}}승인{{else if eq .Plan.Status "archived"}}보관{{else}}초안{{end}}
+      · 지난 연도는 삭제가 아니라 보관만 가능합니다.
+    </p>
+    <div class="flex flex-wrap gap-2">
+      {{if ne .Plan.Status "draft"}}
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/status">
+        <input type="hidden" name="status" value="draft">
+        <button type="submit" class="px-3 py-1.5 border rounded-lg text-sm">초안으로</button>
+      </form>
+      {{end}}
+      {{if ne .Plan.Status "approved"}}
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/status">
+        <input type="hidden" name="status" value="approved">
+        <button type="submit" class="px-3 py-1.5 border rounded-lg text-sm">승인</button>
+      </form>
+      {{end}}
+      {{if ne .Plan.Status "archived"}}
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/status">
+        <input type="hidden" name="status" value="archived">
+        <button type="submit" class="px-3 py-1.5 border rounded-lg text-sm">보관</button>
+      </form>
+      {{end}}
+      {{if eq .Plan.Status "archived"}}
+      <span class="px-3 py-1.5 text-sm text-gray-500">보관됨 · 삭제는 막혀 있습니다</span>
+      {{else}}
+      <a href="/maintenance/{{.Plan.PlanID}}/delete" class="px-3 py-1.5 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">계획 삭제…</a>
+      {{end}}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <h3 class="font-semibold text-gray-800">방문 일괄 담당자 변경</h3>
+    <p class="text-xs text-gray-500">월·지역·점검대상으로 골라 담당자를 한 번에 넣습니다.</p>
+    <form method="POST" action="/maintenance/{{.Plan.PlanID}}/bulk-assignee" class="flex flex-wrap items-end gap-2">
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">월</label>
+        <select name="month" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+          {{range seq 12}}<option value="{{.}}">{{.}}월</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">지역</label>
+        <select name="region" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+          {{range .Regions}}<option value="{{.}}">{{.}}</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">점검대상</label>
+        <select name="product_type" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+          <option value="KLAS">KLAS</option>
+          <option value="앤로보틱스">앤로보틱스</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">담당자</label>
+        <select name="assignee" required class="border rounded-lg px-2 py-1.5 text-sm min-w-[8rem]">
+          <option value="">선택</option>
+          {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+        </select>
+      </div>
+      <button type="submit" class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm">적용</button>
+    </form>
+  </section>
+
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <h3 class="font-semibold text-gray-800">방문 일괄 삭제</h3>
+    <p class="text-xs text-gray-500">조건으로 고른 뒤 건수를 확인하고 지웁니다. 당월·이전 달은 제외됩니다 (§23.11).</p>
+    <form method="POST" action="/maintenance/{{.Plan.PlanID}}/bulk-delete" class="flex flex-wrap items-end gap-2">
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">월</label>
+        <select name="month" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+          {{range seq 12}}<option value="{{.}}" {{if eq (printf "%d" .) $.FilterMonth}}selected{{end}}>{{.}}월</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">지역</label>
+        <select name="region" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+          {{range .Regions}}<option value="{{.}}" {{if eq . $.FilterRegion}}selected{{end}}>{{.}}</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1">점검대상</label>
+        <select name="product_type" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+          <option value="KLAS" {{if eq $.FilterProduct "KLAS"}}selected{{end}}>KLAS</option>
+          <option value="앤로보틱스" {{if eq $.FilterProduct "앤로보틱스"}}selected{{end}}>앤로보틱스</option>
+        </select>
+      </div>
+      <button type="submit" class="px-3 py-1.5 border border-red-300 text-red-700 rounded-lg text-sm">건수 확인</button>
+    </form>
+    {{if .Preview}}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+      조건에 맞는 방문 {{len .Preview}}건 — 삭제 가능 {{.PreviewN}}건, 당월·이전 제외 {{.PreviewSkip}}건.
+    </div>
+    <div class="overflow-x-auto max-h-56 overflow-y-auto border rounded-lg">
+      <table class="min-w-full text-xs">
+        <thead class="bg-gray-50 text-left text-gray-500">
+          <tr><th class="px-3 py-1">날짜</th><th class="px-3 py-1">기관</th><th class="px-3 py-1">대상</th><th class="px-3 py-1">상태</th></tr>
+        </thead>
+        <tbody class="divide-y">
+          {{range .Preview}}
+          <tr>
+            <td class="px-3 py-1">{{.VisitDate}}</td>
+            <td class="px-3 py-1">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
+            <td class="px-3 py-1">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
+            <td class="px-3 py-1">{{if visitProtected .VisitDate}}<span class="text-amber-800">기간 보호</span>{{else}}<span class="text-red-700">삭제 예정</span>{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if gt .PreviewN 0}}
+    <form method="POST" action="/maintenance/{{.Plan.PlanID}}/bulk-delete" class="flex gap-2"
+          onsubmit="return confirm('삭제 가능한 {{.PreviewN}}건을 지울까요? 당월·이전 {{.PreviewSkip}}건은 남습니다.');">
+      <input type="hidden" name="confirm" value="1">
+      <input type="hidden" name="month" value="{{.FilterMonth}}">
+      <input type="hidden" name="region" value="{{.FilterRegion}}">
+      <input type="hidden" name="product_type" value="{{.FilterProduct}}">
+      <button type="submit" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm">확인하고 삭제</button>
+    </form>
+    {{end}}
+    {{end}}
+  </section>
+
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="font-semibold text-gray-800">미배정 일괄 배정</h3>
+      <form method="GET" action="/maintenance/{{.Plan.PlanID}}/manage" class="flex items-center gap-2 text-sm">
+        <label class="text-xs text-gray-500">월</label>
+        <select name="um" class="border rounded-lg px-2 py-1 text-sm" onchange="this.form.submit()">
+          {{range seq 12}}<option value="{{.}}" {{if eq . $.UnassignedMonth}}selected{{end}}>{{.}}월</option>{{end}}
+        </select>
+      </form>
+    </div>
+    <p class="text-xs text-gray-500">{{.UnassignedMonth}}월 주기에 해당하는데 방문일이 없는 건입니다. 날짜를 넣고 배정하면 캘린더에 올라갑니다. 담당자를 비우면 지난해(또는 복사본) 값을 씁니다.</p>
+    {{if not .Unassigned}}
+    <p class="text-sm text-gray-500">이 달 미배정 건이 없습니다.</p>
+    {{else}}
+    <form method="POST" action="/maintenance/{{.Plan.PlanID}}/assign-slots" class="space-y-2">
+      <div class="flex flex-wrap items-end gap-2">
+        <div>
+          <label class="block text-[11px] text-gray-500 mb-1">일괄 담당자 (선택)</label>
+          <select name="assignee" class="border rounded-lg px-2 py-1.5 text-sm">
+            <option value="">지난해·복사본 담당자</option>
+            {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+          </select>
+        </div>
+        <button type="submit" class="px-3 py-1.5 bg-amber-800 text-white rounded-lg text-sm">날짜 넣은 건 배정</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-xs text-gray-500">
+            <tr>
+              <th class="py-1 pr-3">사이트</th>
+              <th class="py-1 pr-3">점검 대상</th>
+              <th class="py-1 pr-3">주기</th>
+              <th class="py-1">방문일</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            {{range .Unassigned}}
+            <tr>
+              <td class="py-1.5 pr-3">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}
+                <input type="hidden" name="customer_id" value="{{.CustomerID}}">
+                <input type="hidden" name="product_type" value="{{.ProductType}}">
+              </td>
+              <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
+              <td class="py-1.5 pr-3 text-xs">{{maintCycleLabel .Cycle}}</td>
+              <td class="py-1.5"><input type="date" name="visit_date" class="border rounded-lg px-2 py-1 text-xs"></td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </form>
+    {{end}}
+  </section>
+  {{else}}
+  <p class="text-sm text-gray-500">생성·복사·상태 변경·일괄 변경은 관리자만 할 수 있습니다. 조회만 가능합니다.</p>
+  {{end}}
+</div>
+<script>
+(function () {
+  var sel = document.getElementById('mnt-year-select');
+  if (!sel) return;
+  sel.addEventListener('change', function () {
+    var v = sel.value;
+    if (v === '__new__') { location.href = '/maintenance/new'; return; }
+    if (!v) return;
+    location.href = '/maintenance/' + v + (sel.getAttribute('data-query') || '');
+  });
+})();
+</script>
+{{end}}

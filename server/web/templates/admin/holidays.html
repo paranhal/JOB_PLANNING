@@ -1,0 +1,252 @@
+{{define "title"}}휴무일 관리 · 고객지원시스템{{end}}
+{{define "content"}}
+{{$year := .Year}}
+{{$admin := .IsAdmin}}
+{{$tab := .Tab}}
+<div class="space-y-5">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">휴무일 관리</h2>
+      <p class="text-sm text-gray-500 mt-1">공휴일·회사 휴무일·연차를 달력과 자동배정에 반영합니다.</p>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-end justify-between gap-3 border-b border-gray-200">
+    <div class="flex gap-1">
+      <a href="/admin/holidays?year={{$year}}"
+         class="px-4 py-2 text-sm {{if eq $tab "leave"}}text-gray-500 hover:text-gray-800{{else}}border-b-2 border-blue-600 text-blue-700 font-semibold{{end}}">공휴일</a>
+      <a href="/admin/holidays?year={{$year}}&tab=leave"
+         class="px-4 py-2 text-sm {{if eq $tab "leave"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">연차</a>
+    </div>
+    <div class="flex flex-wrap gap-1 pb-1">
+      {{range .Years}}
+      <a href="/admin/holidays?year={{.}}{{if eq $tab "leave"}}&tab=leave{{end}}"
+         class="px-3 py-1.5 text-sm rounded-lg {{if eq . $year}}bg-blue-600 text-white font-semibold{{else}}text-gray-500 hover:bg-gray-100{{end}}">{{.}}년</a>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .FlashErr}}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>
+  {{end}}
+  {{if .FlashOK}}
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>
+  {{end}}
+  {{if .YearMissing}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">{{.MissingBanner}}</div>
+  {{end}}
+
+  {{if ne $tab "leave"}}
+  {{if $admin}}
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+    <form method="POST" action="/admin/holidays/sync"
+          onsubmit="return confirm('{{$year}}년 공휴일을 공공데이터포털에서 가져올까요? 손으로 넣은 회사 휴무일은 그대로 둡니다.');">
+      <input type="hidden" name="year" value="{{$year}}">
+      <button type="submit" class="px-4 py-2 border border-indigo-300 text-indigo-800 rounded-lg text-sm font-medium hover:bg-indigo-50">공휴일 불러오기</button>
+    </form>
+    <p class="text-[11px] text-gray-400">
+      {{if .LastSynced}}마지막 동기화 {{.LastSynced}}{{else}}아직 API 동기화 없음 (저장된 목록만 표시){{end}}
+    </p>
+  </div>
+  {{end}}
+
+  {{if $admin}}
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">회사 휴무일 추가</h3>
+    <form method="POST" action="/admin/holidays" class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+      <input type="hidden" name="year" value="{{$year}}">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">날짜</label>
+        <input type="date" name="holiday_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-medium text-gray-600 mb-1">이름</label>
+        <input type="text" name="name" required placeholder="창립기념일" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">구분</label>
+        <select name="kind" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="company">회사 휴무일</option>
+          <option value="public">공휴일</option>
+          <option value="substitute">대체공휴일</option>
+        </select>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">등록</button>
+    </form>
+  </div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">날짜</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">이름</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">구분</th>
+          {{if $admin}}<th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">작업</th>{{end}}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Items}}
+        {{if and $admin (eq .Date $.EditDate)}}
+        <tr class="bg-blue-50/40">
+          <td colspan="{{if $admin}}4{{else}}3{{end}}" class="px-4 py-3">
+            <form method="POST" action="/admin/holidays/update" class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+              <input type="hidden" name="year" value="{{$year}}">
+              <input type="hidden" name="old_date" value="{{.Date}}">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">날짜</label>
+                <input type="date" name="holiday_date" value="{{.Date}}" required class="w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs text-gray-500 mb-1">이름</label>
+                <input type="text" name="name" value="{{.Name}}" required class="w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">구분</label>
+                <select name="kind" class="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="public" {{if eq .Kind "public"}}selected{{end}}>공휴일</option>
+                  <option value="substitute" {{if eq .Kind "substitute"}}selected{{end}}>대체공휴일</option>
+                  <option value="company" {{if eq .Kind "company"}}selected{{end}}>회사 휴무일</option>
+                </select>
+              </div>
+              <div class="flex gap-2">
+                <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">저장</button>
+                <a href="/admin/holidays?year={{$year}}" class="px-3 py-2 border rounded-lg text-xs">취소</a>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5 font-mono text-xs text-gray-800">{{dateLabelMDW .Date}}</td>
+          <td class="px-4 py-2.5 font-medium text-gray-800">{{.Name}}</td>
+          <td class="px-4 py-2.5">
+            {{if eq .Kind "substitute"}}<span class="px-2 py-0.5 rounded-full text-xs bg-violet-100 text-violet-800">대체공휴일</span>
+            {{else if eq .Kind "company"}}<span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">회사 휴무일</span>
+            {{else}}<span class="px-2 py-0.5 rounded-full text-xs bg-sky-100 text-sky-800">공휴일</span>{{end}}
+          </td>
+          {{if $admin}}
+          <td class="px-4 py-2.5 text-right whitespace-nowrap">
+            <a href="/admin/holidays?year={{$year}}&edit={{.Date}}" class="text-xs text-blue-600 hover:underline">수정</a>
+            <form method="POST" action="/admin/holidays/delete" class="inline ml-2"
+                  onsubmit="return confirm('{{.Date}} {{.Name}}을(를) 삭제할까요?')">
+              <input type="hidden" name="year" value="{{$year}}">
+              <input type="hidden" name="holiday_date" value="{{.Date}}">
+              <button type="submit" class="text-xs text-red-500 hover:text-red-700">삭제</button>
+            </form>
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+        {{else}}
+        <tr><td colspan="{{if $admin}}4{{else}}3{{end}}" class="px-4 py-10 text-center text-gray-400">등록된 휴무일이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">{{$year}}년 달력 미리보기</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      {{range .Months}}
+      <div class="bg-white rounded-xl border border-gray-200 p-3">
+        <p class="text-xs font-semibold text-gray-700 mb-2">{{.Label}}</p>
+        <div class="grid grid-cols-7 text-[10px] text-center mb-1">
+          <span style="color:#DC2626">일</span><span class="text-gray-400">월</span><span class="text-gray-400">화</span>
+          <span class="text-gray-400">수</span><span class="text-gray-400">목</span><span class="text-gray-400">금</span>
+          <span style="color:#2563EB">토</span>
+        </div>
+        {{range .Weeks}}
+        <div class="grid grid-cols-7">
+          {{range .}}
+          <div class="min-h-[1.75rem] flex flex-col items-center justify-center text-[11px] rounded px-0.5 {{if not .InMonth}}text-gray-200{{end}}"
+               style="{{if .InMonth}}{{.DayStyle}};{{.CellStyle}}{{end}}" title="{{.Title}}">
+            {{if .InMonth}}
+            <span class="leading-none {{.DayClass}}" style="{{.DayStyle}}">{{.Day}}</span>
+            {{if .Name}}<span class="text-[8px] leading-tight truncate max-w-full" style="{{.DayStyle}}">{{.Name}}</span>{{end}}
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    <p class="text-[11px] text-gray-400 mt-2">일요일·공휴일 빨강 · 토요일 파랑 · 공휴일 칸에 이름을 함께 표시</p>
+  </div>
+  {{else}}
+  {{if $admin}}
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">연차 등록</h3>
+    <form method="POST" action="/admin/holidays/leaves" class="grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
+      <input type="hidden" name="year" value="{{$year}}">
+      <input type="hidden" name="tab" value="leave">
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-medium text-gray-600 mb-1">직원</label>
+        <select name="user_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">선택</option>
+          {{range .Users}}
+          <option value="{{.UserID}}">{{.FullName}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">시작</label>
+        <input type="date" name="leave_from" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">종료</label>
+        <input type="date" name="leave_to" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">종류</label>
+        <select name="leave_kind" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="annual">연차</option>
+          <option value="half_am">오전반차</option>
+          <option value="half_pm">오후반차</option>
+        </select>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">등록</button>
+    </form>
+    <p class="text-[11px] text-gray-400 mt-2">기간 안의 주말·공휴일은 건너뜁니다. 공휴일과 겹치는 날은 등록되지 않습니다.</p>
+  </div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">날짜</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">직원</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">종류</th>
+          {{if $admin}}<th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">작업</th>{{end}}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Leaves}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5 text-gray-800">{{dateLabelMDW .Date}}</td>
+          <td class="px-4 py-2.5 font-medium text-gray-800">{{.UserName}}</td>
+          <td class="px-4 py-2.5">{{leaveKindLabel .Kind}}</td>
+          {{if $admin}}
+          <td class="px-4 py-2.5 text-right">
+            <form method="POST" action="/admin/holidays/leaves/delete" class="inline"
+                  onsubmit="return confirm('{{.UserName}} {{dateLabelMDW .Date}} 연차를 삭제할까요?')">
+              <input type="hidden" name="year" value="{{$year}}">
+              <input type="hidden" name="tab" value="leave">
+              <input type="hidden" name="leave_id" value="{{.LeaveID}}">
+              <button type="submit" class="text-xs text-red-500 hover:text-red-700">삭제</button>
+            </form>
+          </td>
+          {{end}}
+        </tr>
+        {{else}}
+        <tr><td colspan="{{if $admin}}4{{else}}3{{end}}" class="px-4 py-10 text-center text-gray-400">등록된 연차가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+</div>
+{{end}}

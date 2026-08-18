@@ -8,12 +8,14 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/auditlog"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
 type ProjectHandler struct {
 	repo         *repository.ProjectRepo
+	wbRepo       *repository.WBRepo
 	customerRepo *repository.CustomerRepo
 	contactRepo  *repository.ContactRepo
 	codeRepo     *repository.CodeRepo
@@ -22,23 +24,36 @@ type ProjectHandler struct {
 
 func NewProjectHandler(
 	repo *repository.ProjectRepo,
+	wbRepo *repository.WBRepo,
 	customerRepo *repository.CustomerRepo,
 	contactRepo *repository.ContactRepo,
 	codeRepo *repository.CodeRepo,
 	assetRepo *repository.AssetRepo,
 ) *ProjectHandler {
 	return &ProjectHandler{
-		repo: repo, customerRepo: customerRepo, contactRepo: contactRepo, codeRepo: codeRepo,
+		repo: repo, wbRepo: wbRepo,
+		customerRepo: customerRepo, contactRepo: contactRepo, codeRepo: codeRepo,
 		assetRepo: assetRepo,
 	}
 }
 
 func canViewProjects(c echo.Context) bool {
 	r := currentRole(c)
-	return r == "admin" || r == "receipt" || r == "tech"
+	return r == model.RoleAdmin || r == model.RoleOffice || r == model.RoleTech ||
+		r == model.RoleObserver || hasPerm(c, model.PermWorkboard)
 }
 
+// canWriteProjects 등록·수정·보관/재개 — 일일업무와 동일
 func canWriteProjects(c echo.Context) bool {
+	if isObserverRole(c) {
+		return false
+	}
+	r := currentRole(c)
+	return r == model.RoleAdmin || r == model.RoleOffice || r == model.RoleTech ||
+		hasPerm(c, model.PermWorkboard)
+}
+
+func canDeleteProjects(c echo.Context) bool {
 	return isAdminRole(c)
 }
 
@@ -48,14 +63,15 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	}
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
-	items, err := h.repo.List(year, status)
+	search := strings.TrimSpace(c.QueryParam("search"))
+	items, err := h.repo.ListFiltered(search, year, status)
 	if err != nil {
 		return err
 	}
 	years, _ := h.repo.ListYears()
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
 		"Title": "사업(프로젝트)관리", "Active": "projects",
-		"Projects": items, "Years": years, "Year": year, "Status": status,
+		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
@@ -102,8 +118,9 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": "projects",
 		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
-		"CanWrite": canWriteProjects(c),
-		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"CanWrite":  canWriteProjects(c),
+		"CanDelete": canDeleteProjects(c),
+		"FlashOK":   c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 
@@ -141,21 +158,89 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=updated")
 }
 
-func (h *ProjectHandler) Delete(c echo.Context) error {
+func (h *ProjectHandler) Archive(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	n, err := h.repo.CountLinkedTasks(id)
-	if err != nil {
+	if _, err := h.repo.Get(id); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+	}
+	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectArchived); err != nil {
 		return err
 	}
-	if n > 0 {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=linked")
+	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=archived")
+}
+
+func (h *ProjectHandler) Activate(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
 	}
-	if err := h.repo.Delete(id); err != nil {
+	id := c.Param("id")
+	if _, err := h.repo.Get(id); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+	}
+	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectActive); err != nil {
 		return err
 	}
+	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=activated")
+}
+
+func (h *ProjectHandler) Delete(c echo.Context) error {
+	id := c.Param("id")
+	if !canDeleteProjects(c) {
+		accessLog(c, auditlog.Record{
+			Action:      auditlog.ActionDelete,
+			TargetTable: "work_projects",
+			TargetID:    id,
+			Detail:      "권한없음",
+			Reason:      "권한없음",
+			Result:      auditlog.ResultDeny,
+		})
+		return echo.ErrForbidden
+	}
+	p, _ := h.wbRepo.GetProject(id)
+	subjectType, subjectID, subjectName := "project", id, id
+	if p != nil {
+		subjectName = p.Name
+		if p.CustomerID != "" {
+			subjectType, subjectID, subjectName = "customer", p.CustomerID, p.CustomerName
+			if subjectName == "" {
+				subjectName = p.Name
+			}
+		}
+	}
+	if err := h.wbRepo.DeleteProject(id); err != nil {
+		result := auditlog.ResultDeny
+		accessLog(c, auditlog.Record{
+			Action:      auditlog.ActionDelete,
+			TargetTable: "work_projects",
+			TargetID:    id,
+			SubjectType: subjectType,
+			SubjectID:   subjectID,
+			SubjectName: subjectName,
+			Detail:      err.Error(),
+			Reason:      accessReason(c, "사업 삭제"),
+			Result:      result,
+			BeforeJSON:  toJSON(p),
+		})
+		if strings.Contains(err.Error(), "연결") {
+			return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=linked")
+		}
+		return err
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionDelete,
+		TargetTable: "work_projects",
+		TargetID:    id,
+		SubjectType: subjectType,
+		SubjectID:   subjectID,
+		SubjectName: subjectName,
+		Detail:      "사업 삭제",
+		Reason:      accessReason(c, "사업 삭제"),
+		Result:      auditlog.ResultOK,
+		BeforeJSON:  toJSON(p),
+	})
 	return c.Redirect(http.StatusSeeOther, "/projects?ok=deleted")
 }
 
@@ -221,52 +306,7 @@ func splitCSVLocal(s string) []string {
 }
 
 func (h *ProjectHandler) parseForm(c echo.Context) (*model.WorkProject, []model.ProjectScopeRule) {
-	contactID := strings.TrimSpace(c.FormValue("contact_id"))
-	if contactID == "__new__" {
-		contactID = ""
-	}
-	orderingPartyID := strings.TrimSpace(c.FormValue("ordering_party_id"))
-	orderingParty := ""
-	if orderingPartyID == "custom" {
-		orderingPartyID = ""
-		orderingParty = strings.TrimSpace(c.FormValue("ordering_party_custom"))
-	}
-	contractType := strings.TrimSpace(c.FormValue("contract_type"))
-	if contractType == "custom" {
-		contractType = strings.TrimSpace(c.FormValue("contract_type_custom"))
-	}
-	billingType := strings.TrimSpace(c.FormValue("billing_type"))
-	if billingType == "custom" {
-		billingType = strings.TrimSpace(c.FormValue("billing_type_custom"))
-	}
-	year, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("plan_year")))
-	sortOrder, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("sort_order")))
-	isPaid := c.FormValue("is_paid") != "0"
-	p := &model.WorkProject{
-		Name:            strings.TrimSpace(c.FormValue("name")),
-		ShortName:       strings.TrimSpace(c.FormValue("short_name")),
-		PlanYear:        year,
-		IsPaid:          isPaid,
-		SortOrder:       sortOrder,
-		OrderingPartyID: orderingPartyID,
-		OrderingParty:   orderingParty,
-		CustomerID:      strings.TrimSpace(c.FormValue("customer_id")),
-		ContractType:    contractType,
-		BillingType:     billingType,
-		StartDate:       strings.TrimSpace(c.FormValue("start_date")),
-		EndDate:         strings.TrimSpace(c.FormValue("end_date")),
-		Notes:           strings.TrimSpace(c.FormValue("notes")),
-		ContactID:       contactID,
-		Color:           strings.TrimSpace(c.FormValue("color")),
-		Status:          strings.TrimSpace(c.FormValue("status")),
-	}
-	if p.Color == "" {
-		p.Color = "#3B82F6"
-	}
-	if p.Status == "" {
-		p.Status = model.WBProjectActive
-	}
-	return p, parseScopeRules(c)
+	return ParseWorkProjectForm(c), parseScopeRules(c)
 }
 
 func parseScopeRules(c echo.Context) []model.ProjectScopeRule {

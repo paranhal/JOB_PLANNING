@@ -3,49 +3,35 @@
 ============================================
 
 ■ 사전 요구사항
-  - Docker Desktop 설치 필요 (https://www.docker.com/products/docker-desktop)
-  - 그 외 개발 도구(Go, Node 등)는 필요 없음
+  - Ubuntu: Docker Engine + Compose plugin
+  - Windows: Docker Desktop
 
 ■ 폴더 구성
-  server-app.tar    : Docker 이미지 파일 (9MB)
-  docker-compose.yml: 실행 설정
-  start.bat         : Windows 실행 스크립트
-  start.sh          : Mac/Linux 실행 스크립트
-  stop.bat          : Windows 중지 스크립트
-  stop.sh           : Mac/Linux 중지 스크립트
+  server-app.tar     : Docker 이미지
+  docker-compose.yml : 호스트 8888 → 컨테이너 8080
+  data/              : SQLite DB·업로드
+  start.sh / stop.sh : Linux
+  start.bat / stop.bat : Windows
 
-■ Windows에서 실행
-  1. deploy 폴더를 원하는 위치에 복사
-  2. start.bat 더블클릭
-  3. 브라우저에서 http://localhost:8080 접속
+■ Ubuntu 배포 (앱만 교체 — 운영 DB가 이미 있을 때)
+  1. WinSCP로 server-app.tar 만 ~/deploy 에 덮어쓰기 (data/ 는 올리지 말 것)
+  2. SSH:
+       cd ~/deploy
+       docker compose down
+       docker load -i server-app.tar
+       docker compose up -d
+  3. http://공인IP:8888
 
-■ Mac/Linux에서 실행
-  1. deploy 폴더를 원하는 위치에 복사
-  2. 터미널에서:
-     cd deploy
-     chmod +x start.sh stop.sh
-     ./start.sh
-  3. 브라우저에서 http://localhost:8080 접속
+■ Ubuntu 최초 배포
+  1. WinSCP로 deploy 폴더 전체를 서버에 복사
+  2. SSH:
+       cd /home/sys2/deploy
+       sed -i 's/\r$//' start.sh stop.sh
+       chmod +x start.sh stop.sh
+       ./start.sh
+  3. http://공인IP:8888
 
-■ 로그인 정보
-  관리자 계정: admin / admin
-  (첫 로그인 후 비밀번호 변경 권장)
-
-■ 주의사항
-  - 정기점검 일정 등 최신 기능은 deploy에 포함된 server-app.tar(또는 최신 이미지)로
-    start.bat / start.sh 를 다시 실행해 이미지를 로드해야 반영됩니다.
-  - data/ 폴더에 SQLite DB가 저장됨 (백업 시 이 폴더 보관)
-  - Mac에서 Apple Silicon(M1/M2/M3)인 경우
-    이미지가 linux/amd64로 빌드되어 있어
-    에뮬레이션으로 동작함 (정상 작동, 약간 느릴 수 있음)
-  - ARM 네이티브 이미지가 필요하면 Mac에서 직접 빌드:
-    git clone https://github.com/paranhal/JOB_PLANNING.git
-    cd JOB_PLANNING/server
-    docker compose build
-    docker compose up -d
-
-■ 서버 관리
-  중지: stop.bat (Windows) 또는 ./stop.sh (Mac)
-  로그: docker logs server-app-1
-  재시작: docker compose restart
+■ 관리
+  중지: ./stop.sh
+  로그: docker logs -f server-app-1
 ============================================

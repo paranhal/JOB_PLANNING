@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -38,8 +39,18 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			files = append(files, partials...)
 		}
 	}
+	if strings.HasPrefix(name, "admin_work/") {
+		if partials, err := filepath.Glob("web/templates/admin_work/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "stats/") {
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if strings.HasPrefix(name, "work_status/") {
+		if partials, err := filepath.Glob("web/templates/work_status/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
 	}
@@ -60,9 +71,10 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	if dataMap, ok := data.(map[string]interface{}); ok {
 		if _, exists := dataMap["HideNav"]; !exists {
 			dataMap["UserName"] = ctxString(c, "user_name")
-			dataMap["UserRole"] = ctxString(c, "role")
+			dataMap["UserRole"] = model.NormalizeRole(ctxString(c, "role"))
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
+			dataMap["UserPerms"] = currentPerms(c)
 		}
 	}
 
@@ -94,8 +106,10 @@ func RenderPartial(c echo.Context, name string, data interface{}) error {
 
 func funcMap() template.FuncMap {
 	return template.FuncMap{
-		"add":       func(a, b int) int { return a + b },
-		"subtract":  func(a, b int) int { return a - b },
+		"add":            func(a, b int) int { return a + b },
+		"subtract":       func(a, b int) int { return a - b },
+		"dateLabelMDW":   model.DateLabelMDW,
+		"leaveKindLabel": model.LeaveKindLabel,
 		"hasSuffix": strings.HasSuffix,
 		"urlquery":  url.QueryEscape,
 		"hasString": func(list interface{}, s string) bool {
@@ -137,7 +151,7 @@ func funcMap() template.FuncMap {
 
 		"statusLabel": func(s string) string {
 			m := map[string]string{
-				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "보류",
+				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "대기",
 				"transfer": "이관", "cancelled": "접수취소",
 				"partial_complete": "부분완료",
 				"completed": "완료", "closed": "종료",
@@ -150,7 +164,7 @@ func funcMap() template.FuncMap {
 		// statusBadge 상태 뱃지. 부분완료는 「부분완료」로 명확히 표시한다.
 		"statusBadge": func(s string) template.HTML {
 			label := map[string]string{
-				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "보류",
+				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "대기",
 				"transfer": "이관", "cancelled": "접수취소",
 				"partial_complete": "부분완료", "completed": "완료", "closed": "종료",
 			}[s]
@@ -183,6 +197,8 @@ func funcMap() template.FuncMap {
 		"workKindLabel": func(s string) string {
 			return model.WorkKindLabel(s)
 		},
+		"actionResultLabel":    model.ActionResultLabel,
+		"transferDetailLabel":  model.TransferDetailLabel,
 		"workPrefixLabel": func(s string) string {
 			return model.WorkPrefixLabel(s)
 		},
@@ -206,6 +222,8 @@ func funcMap() template.FuncMap {
 		"mntProductStyle":      mntProductStyle,
 		"mntProductBadgeClass": mntProductBadgeClass,
 		"mntProductBadgeStyle": mntProductBadgeStyle,
+		"assigneeColorStyle":   model.AssigneeColorStyle,
+		"workCardColorStyle":   model.WorkCardColorStyle,
 		"list": func(items ...string) []string {
 			return items
 		},
@@ -274,6 +292,29 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"installerTypeLabel": func(s string) string {
+			m := map[string]string{
+				"self": "자사", "other": "타사", "manufacturer": "제조사",
+				"partner": "협력사", "unknown": "미상",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			return s
+		},
+		"managementTypeLabel": func(s string) string {
+			m := map[string]string{
+				"direct": "직접유지보수", "fault": "장애대응", "periodic": "정기점검",
+				"on_demand": "요청시지원", "reference": "참고관리", "third_party": "타사장비",
+			}
+			if l, ok := m[s]; ok {
+				return l
+			}
+			if s == "" {
+				return "—"
+			}
+			return s
+		},
 		"maintContractLabel": func(s string) string {
 			m := map[string]string{
 				"paid": "유상", "free": "무상", "call": "CALL", "none": "미계약",
@@ -282,6 +323,9 @@ func funcMap() template.FuncMap {
 				return l
 			}
 			return s
+		},
+		"visitProtected": func(date string) bool {
+			return model.VisitDeleteProtected(date, time.Now())
 		},
 		"maintCycleLabel": func(s string) string {
 			m := map[string]string{
@@ -344,14 +388,20 @@ func funcMap() template.FuncMap {
 			return s
 		},
 		"roleLabel": func(s string) string {
-			m := map[string]string{
-				"admin": "관리자", "receipt": "접수담당", "tech": "기술담당",
-				"sales": "영업담당", "viewer": "열람사용자",
+			return model.RoleLabel(s)
+		},
+		"hasUserPerm": func(perms interface{}, key string) bool {
+			switch v := perms.(type) {
+			case []string:
+				return model.HasPermission(v, key)
+			case string:
+				return model.HasPermission(model.ParsePermissions(v), key)
+			default:
+				return false
 			}
-			if l, ok := m[s]; ok {
-				return l
-			}
-			return s
+		},
+		"userPermList": func(u model.User) []string {
+			return u.PermList()
 		},
 		"initial": func(s string) string {
 			for _, r := range s {
@@ -375,10 +425,16 @@ func funcMap() template.FuncMap {
 		"codeLabel": func(val string, codes interface{}) string {
 			return val
 		},
-		"wbTaskStatusLabel": model.WBTaskStatusLabel,
+		"wbTaskStatusLabel":    model.WBTaskStatusLabel,
+		"wbAdminStatusLabel":   model.WBAdminStatusLabel,
+		"wbActionStatusLabel":  model.WBActionStatusLabel,
+		"wbActivityTypeLabel":  model.WBActivityTypeLabel,
+		"wbWaitPartyKindLabel": model.WBWaitPartyKindLabel,
 		"wbPriorityLabel":   model.WBPriorityLabel,
 		"wbWorkTypeLabel":   model.WBWorkTypeLabel,
 		"wbWorkTypeClass":   model.WBWorkTypeClass,
+		"workPlaceLabel":    model.WorkPlaceLabel,
+		"attDisplayName":    func(a model.Attachment) string { return a.DisplayName() },
 		"wbCategoryLabel":   model.WBCategoryLabel,
 		"wbCategoryClass":   model.WBCategoryClass,
 		"wbProjectStatusLabel": model.WBProjectStatusLabel,
@@ -413,20 +469,26 @@ func funcMap() template.FuncMap {
 			}
 			return "D+" + fmtInt(-d)
 		},
+		"wbBoardStatusLabel": func(t model.WorkTask) string {
+			if model.IsAdminGTDTask(t) {
+				return model.WBAdminStatusLabel(t.Status)
+			}
+			return model.WBTaskStatusLabel(t.Status)
+		},
 		"kanbanCol": func(root interface{}, title, border, key string) map[string]interface{} {
 			m, _ := root.(map[string]interface{})
 			items := []model.WorkTask{}
-			// 완료 열은 상태 기준, 그 외는 업무 유형 기준
-			if key == model.WBTaskComplete {
+			switch key {
+			case model.WBTaskWaiting, model.WBTaskInProgress, model.WBTaskReview, model.WBTaskComplete:
 				if by, ok := m["ByStatus"].(map[string][]model.WorkTask); ok {
 					items = by[key]
 				}
-			} else if by, ok := m["ByWorkType"].(map[string][]model.WorkTask); ok {
-				if list, ok := by[key]; ok {
-					items = list
+			default:
+				if by, ok := m["ByWorkType"].(map[string][]model.WorkTask); ok {
+					if list, ok := by[key]; ok {
+						items = list
+					}
 				}
-			} else if by, ok := m["ByStatus"].(map[string][]model.WorkTask); ok {
-				items = by[key]
 			}
 			return map[string]interface{}{
 				"Title": title, "Border": border, "Items": items,

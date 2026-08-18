@@ -26,7 +26,8 @@
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Err}}</div>
   {{end}}
 
-  <form id="as-form" method="POST" action="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}/edit{{end}}" class="space-y-4 pb-24"
+  <form id="as-form" method="POST" action="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}/edit{{end}}" class="space-y-4"
+        {{if .IsNew}}enctype="multipart/form-data"{{end}}
         data-init-asset="{{.AS.AssetID}}"
         data-init-requester="{{.AS.Requester}}"
         data-exclude-as="{{if not .IsNew}}{{.AS.ASID}}{{end}}">
@@ -181,22 +182,38 @@
       </div>
     </section>
 
-    <!-- 처리 이력 -->
-    <section class="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 space-y-3 shadow-sm">
+    {{if .IsNew}}
+    <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-sky-500 p-5 sm:p-6 space-y-3 shadow-sm">
       <div>
-        <h3 class="text-sm font-semibold text-slate-800">처리 이력</h3>
-        <p class="text-xs text-slate-400 mt-1">동일 기관의 완료·종료 AS 내역입니다. 접수번호를 누르면 해당 건으로 이동합니다.</p>
+        <h3 class="text-sm font-semibold text-slate-800">4. 증상 사진</h3>
+        <p class="text-xs text-slate-400 mt-1">선택 · 최대 10장 · jpg/png/webp/heic/pdf · 장당 20MB 이하. 이미지는 업로드 시 긴 변 1600px로 축소됩니다.</p>
       </div>
-      {{template "as_history_table" .}}
+      <input type="file" name="receipt_photo" multiple accept="image/*,.heic,.heif,.pdf,.webp"
+             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+      <input type="text" name="photo_memo" placeholder="사진 메모 (선택, 예: 오류 화면)"
+             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
     </section>
-
-    <div class="fixed bottom-0 inset-x-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3">
-      <div class="max-w-5xl mx-auto flex gap-3 justify-end">
-        <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="px-5 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">취소</a>
-        <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm">{{if .IsNew}}접수 등록{{else}}접수 저장{{end}}</button>
-      </div>
-    </div>
+    {{end}}
   </form>
+
+  {{if not .IsNew}}
+  {{template "as_receipt_photos" .}}
+  {{end}}
+
+  <section class="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 space-y-3 shadow-sm mb-24">
+    <div>
+      <h3 class="text-sm font-semibold text-slate-800">처리 이력</h3>
+      <p class="text-xs text-slate-400 mt-1">동일 기관의 완료·종료 AS 내역입니다. 접수번호를 누르면 해당 건으로 이동합니다.</p>
+    </div>
+    {{template "as_history_table" .}}
+  </section>
+
+  <div class="fixed bottom-0 inset-x-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3">
+    <div class="max-w-5xl mx-auto flex gap-3 justify-end">
+      <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="px-5 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">취소</a>
+      <button type="submit" form="as-form" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm">{{if .IsNew}}접수 등록{{else}}접수 저장{{end}}</button>
+    </div>
+  </div>
 
   <script>
   (function () {

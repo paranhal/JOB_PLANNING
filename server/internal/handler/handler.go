@@ -6,8 +6,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/audit"
+	"customer-support/internal/backup"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
+	"customer-support/internal/service"
 )
 
 type Handler struct {
@@ -21,14 +24,19 @@ type Handler struct {
 	AS             *ASHandler
 	Work           *WorkHandler
 	Workboard      *WorkboardHandler
+	Meeting        *MeetingHandler
 	Stats          *StatsHandler
 	WorkStatus     *WorkStatusHandler
 	Analysis       *AnalysisHandler
 	Code           *CodeHandler
 	Attachment     *AttachmentHandler
+	Backup         *BackupHandler
+	Holiday        *HolidayHandler
 	Auth           *AuthHandler
 	Maintenance    *MaintenanceHandler
 	Project        *ProjectHandler
+	AdminWork      *AdminWorkHandler
+	Integration    *IntegrationHandler
 
 	customerRepo *repository.CustomerRepo
 	asRepo       *repository.ASRepo
@@ -39,6 +47,7 @@ type Handler struct {
 }
 
 func New(db *sql.DB) *Handler {
+	audit.Init(db)
 	customerRepo := repository.NewCustomerRepo(db)
 	contactRepo := repository.NewContactRepo(db)
 	contactHistRepo := repository.NewContactHistoryRepo(db)
@@ -56,7 +65,22 @@ func New(db *sql.DB) *Handler {
 	statsRepo := repository.NewStatsRepo(db)
 	workBoardRepo := repository.NewWorkBoardRepo(db)
 
+	holidayRepo := repository.NewHolidayRepo(db)
+	service.SetHolidayCalendar(service.NewCalendar(holidayRepo))
 	jwtSecret := []byte("cs-system-jwt-secret-2026")
+	settingsRepo := repository.NewSettingsRepo(db)
+	unlockRepo := repository.NewASUnlockRepo(db)
+	attachH := &AttachmentHandler{
+		repo: attachRepo, asRepo: asRepo, unlockRepo: unlockRepo, uploadDir: "data/uploads",
+	}
+
+	wbH := NewWorkboardHandler(
+		repository.NewWBRepo(db), userRepo, customerRepo, contactRepo, codeRepo,
+		asRepo, maintRepo,
+		settingsRepo, repository.NewASUnlockRepo(db),
+	)
+	wbH.attach = attachH
+	authH := &AuthHandler{userRepo: userRepo, settingsRepo: settingsRepo, jwtSecret: jwtSecret}
 
 	return &Handler{
 		Customer: &CustomerHandler{
@@ -65,7 +89,7 @@ func New(db *sql.DB) *Handler {
 			contactRepo: contactRepo,
 			asRepo:      asRepo,
 		},
-		Space:    &SpaceHandler{repo: spaceRepo, customerRepo: customerRepo},
+		Space: &SpaceHandler{repo: spaceRepo, customerRepo: customerRepo},
 		Contact: &ContactHandler{
 			repo: contactRepo, customerRepo: customerRepo,
 			histRepo: contactHistRepo, codeRepo: codeRepo,
@@ -82,30 +106,43 @@ func New(db *sql.DB) *Handler {
 		AS: &ASHandler{
 			repo: asRepo, processRepo: asProcessRepo, workRepo: asWorkRepo,
 			wbRepo:       repository.NewWBRepo(db),
-			settingsRepo: repository.NewSettingsRepo(db),
-			unlockRepo:   repository.NewASUnlockRepo(db),
+			settingsRepo: settingsRepo,
+			unlockRepo:   unlockRepo,
 			customerRepo: customerRepo, assetRepo: assetRepo,
 			contactRepo: contactRepo, codeRepo: codeRepo,
 			userRepo: userRepo, relationRepo: relationRepo,
 			attachRepo: attachRepo,
+			attach:     attachH,
 		},
-		Work:       NewWorkHandler(workBoardRepo),
-		Workboard: NewWorkboardHandler(
-			repository.NewWBRepo(db), userRepo, customerRepo, contactRepo, codeRepo,
-			asRepo, maintRepo,
-		),
-		Stats:      NewStatsHandler(statsRepo, userRepo, repository.NewWBRepo(db)),
-		WorkStatus: NewWorkStatusHandler(repository.NewWorkStatusRepo(db)),
+		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo),
+		Workboard:  wbH,
+		Meeting:    NewMeetingHandler(workBoardRepo, statsRepo),
+		Stats:      NewStatsHandler(statsRepo, userRepo, repository.NewWBRepo(db), workBoardRepo, maintRepo),
+		WorkStatus: NewWorkStatusHandler(repository.NewWBRepo(db), userRepo, holidayRepo),
 		Analysis:   &AnalysisHandler{db: db},
 		Code:       &CodeHandler{repo: codeRepo},
-		Attachment: &AttachmentHandler{repo: attachRepo, uploadDir: "data/uploads"},
-		Auth:       &AuthHandler{userRepo: userRepo, jwtSecret: jwtSecret},
+		Attachment: attachH,
+		Backup: &BackupHandler{
+			cfg:      backup.Config{DataDir: dataDirFromEnv(), DB: db},
+			projects: repository.NewProjectRepo(db),
+		},
+		Auth:    authH,
+		Holiday: &HolidayHandler{
+			repo: holidayRepo, leave: repository.NewStaffLeaveRepo(db),
+			users: userRepo, auth: authH, api: service.NewHolidayAPIClient(),
+		},
 		Maintenance: &MaintenanceHandler{
 			repo: maintRepo, customerRepo: customerRepo, userRepo: userRepo,
+			wbRepo: repository.NewWBRepo(db), settingsRepo: settingsRepo,
+			holidayRepo: holidayRepo,
+			dataDir:     dataDirFromEnv(),
 		},
 		Project: NewProjectHandler(
-			repository.NewProjectRepo(db), customerRepo, contactRepo, codeRepo, assetRepo,
+			repository.NewProjectRepo(db), repository.NewWBRepo(db),
+			customerRepo, contactRepo, codeRepo, assetRepo,
 		),
+		AdminWork: NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo),
+		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
@@ -119,23 +156,18 @@ func New(db *sql.DB) *Handler {
 func (h *Handler) Dashboard(c echo.Context) error {
 	role := ctxString(c, "role")
 	if role == "" {
-		role = "viewer"
+		role = model.RoleObserver
 	}
 	userName := ctxString(c, "user_name")
 	username := ctxString(c, "username")
 	userID := ctxString(c, "user_id")
 	mineKeys := []string{userName, username}
 
-	if role == "sales" || role == "viewer" {
-		return c.Render(200, "auth/coming_soon.html", map[string]interface{}{
-			"Title": "준비 중", "Active": "dashboard",
-			"Role": role, "RoleLabel": roleLabelText(role),
-		})
-	}
+	role = model.NormalizeRole(role)
 
 	mineUID, mineK := "", []string(nil)
 	mine := false
-	if role == "tech" {
+	if role == model.RoleTech {
 		mineUID, mineK = userID, mineKeys
 		mine = true
 	}
@@ -157,26 +189,29 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		f := model.StatsMeetingFilter{Scope: model.StatsScopeTeam}
 		_ = h.statsRepo.FillPeriodOverview(weekCols, f)
 		weekKPI, _ = h.statsRepo.LoadStatsKPI(model.StatsViewWeek, weekCols, f)
+		applyPlanningToKPI(h.workBoard, &weekKPI)
 	}
 
-	showAssignee := role == "admin" || role == "receipt"
+	showAssignee := role == model.RoleAdmin || role == model.RoleOffice
 	data := map[string]interface{}{
-		"Title":       "대시보드",
-		"Active":      "dashboard",
-		"Role":        role,
-		"RoleLabel":   roleLabelText(role),
-		"DisplayName": userName,
-		"LoginID":     username,
-		"WorkStats":   stats,
-		"WeekKPI":     weekKPI,
-		"ExecTarget":  model.StatsExecTargetPct,
-		"VisitTarget": model.StatsVisitTargetDays,
+		"Title":          "대시보드",
+		"Active":         "dashboard",
+		"Role":           role,
+		"RoleLabel":      model.RoleLabel(role),
+		"DisplayName":    userName,
+		"LoginID":        username,
+		"WorkStats":      stats,
+		"WeekKPI":        weekKPI,
+		"ExecTarget":     model.StatsExecTargetPct,
+		"VisitTarget":    model.StatsVisitTargetDays,
+		"CompleteTarget": model.StatsCompleteTargetDays,
 		"OpenHref":       workListURL(model.WorkBucketOpen, mine, role),
 		"TodayHref":      workListURL(model.WorkBucketToday, mine, role),
 		"DelayedHref":    workListURL(model.WorkBucketDelayed, mine, role),
 		"CompletedHref":  workListURL(model.WorkBucketCompletedToday, mine, role),
 		"PendingHref":    workListURL(model.WorkBucketSchedulePending, mine, role),
 		"UnassignedHref": workListURL(model.WorkBucketUnassigned, false, role),
+		"UnplannedHref":  planUnplannedURL(mine, role, ""),
 		"TodayList":      todayList,
 		"DelayedList":    delayedList,
 		"PendingList":    pendingList,
@@ -186,7 +221,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	}
 
 	switch role {
-	case "admin":
+	case model.RoleAdmin:
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
 			{Href: "/work?bucket=today", Label: "오늘 예정", Tone: "sky"},
@@ -194,7 +229,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 			{Href: "/maintenance", Label: "정기점검", Tone: "slate"},
 			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
 		}
-	case "receipt":
+	case model.RoleOffice:
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
 			{Href: "/work?bucket=today", Label: "오늘 예정", Tone: "sky"},
@@ -202,13 +237,18 @@ func (h *Handler) Dashboard(c echo.Context) error {
 			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
 			{Href: "/customers", Label: "고객현황", Tone: "green"},
 		}
-	case "tech":
+	case model.RoleTech:
 		data["QuickLinks"] = []dashLink{
 			{Href: workListURL(model.WorkBucketToday, true, role), Label: "오늘 예정", Tone: "sky"},
 			{Href: workListURL(model.WorkBucketDelayed, true, role), Label: "지연 업무", Tone: "red"},
 			{Href: workListURL(model.WorkBucketOpen, true, role), Label: "내 전체 업무", Tone: "yellow"},
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
 			{Href: "/assets", Label: "설치자산", Tone: "purple"},
+		}
+	case model.RoleSales:
+		data["QuickLinks"] = []dashLink{
+			{Href: "/analysis", Label: "분석", Tone: "indigo"},
+			{Href: "/stats", Label: "통계", Tone: "sky"},
 		}
 	}
 
@@ -222,12 +262,5 @@ type dashLink struct {
 }
 
 func roleLabelText(role string) string {
-	m := map[string]string{
-		"admin": "관리자", "receipt": "접수담당", "tech": "기술담당",
-		"sales": "영업담당", "viewer": "열람사용자",
-	}
-	if l, ok := m[role]; ok {
-		return l
-	}
-	return role
+	return model.RoleLabel(role)
 }

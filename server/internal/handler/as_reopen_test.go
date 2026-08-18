@@ -132,7 +132,7 @@ func TestASReopenCreatesLinkedReceipt(t *testing.T) {
 		t.Fatalf("상세 조회: status=%d", show.Code)
 	}
 	body := show.Body.String()
-	if !strings.Contains(body, "재접수 건") || !strings.Contains(body, srcID) {
+	if !strings.Contains(body, "재접수 연결") || !strings.Contains(body, srcID) {
 		t.Error("재접수 배너에 원 접수가 보이지 않는다")
 	}
 }

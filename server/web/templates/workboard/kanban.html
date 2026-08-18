@@ -9,7 +9,7 @@
     <div>
       <p class="text-xs font-semibold text-blue-600 tracking-wide">일일 업무 현황</p>
       <h2 class="text-xl font-bold text-gray-800">칸반 보드</h2>
-      <p class="text-sm text-gray-500">오늘({{.TodayLabel}}) 예정 · 정기점검 · AS · 행정/사업지원 · 완료</p>
+      <p class="text-sm text-gray-500">오늘({{.TodayLabel}}) 예정 · 할 일 · 진행중 · 검토 · 완료</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <a href="/workboard/kanban" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">칸반</a>
@@ -19,13 +19,21 @@
 
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
     <div class="bg-white rounded-lg border p-3 text-center"><p class="text-lg font-bold">{{.Summary.TotalTasks}}</p><p class="text-[10px] text-gray-500">전체</p></div>
-    <div class="bg-white rounded-lg border border-sky-200 p-3 text-center"><p class="text-lg font-bold text-sky-700">{{.Summary.Maintenance}}</p><p class="text-[10px] text-gray-500">정기점검</p></div>
-    <div class="bg-white rounded-lg border border-rose-200 p-3 text-center"><p class="text-lg font-bold text-rose-700">{{.Summary.AS}}</p><p class="text-[10px] text-gray-500">AS</p></div>
-    <div class="bg-white rounded-lg border border-violet-200 p-3 text-center"><p class="text-lg font-bold text-violet-700">{{.Summary.Admin}}</p><p class="text-[10px] text-gray-500">행정/사업지원</p></div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3 text-center"><p class="text-lg font-bold text-slate-700">{{.Summary.Waiting}}</p><p class="text-[10px] text-gray-500">할 일</p></div>
+    <div class="bg-white rounded-lg border border-yellow-200 p-3 text-center"><p class="text-lg font-bold text-yellow-700">{{.Summary.InProgress}}</p><p class="text-[10px] text-gray-500">진행중</p></div>
+    <div class="bg-white rounded-lg border border-amber-200 p-3 text-center"><p class="text-lg font-bold text-amber-700">{{.Summary.Review}}</p><p class="text-[10px] text-gray-500">검토</p></div>
     <div class="bg-white rounded-lg border border-emerald-200 p-3 text-center"><p class="text-lg font-bold text-emerald-700">{{.Summary.Complete}}</p><p class="text-[10px] text-gray-500">완료</p></div>
     <div class="bg-white rounded-lg border p-3 text-center"><p class="text-lg font-bold text-red-600">{{.Summary.Urgent}}</p><p class="text-[10px] text-gray-500">긴급</p></div>
   </div>
 
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    {{template "wb_kanban_col" (kanbanCol . "할 일" "border-slate-200" "waiting")}}
+    {{template "wb_kanban_col" (kanbanCol . "진행중" "border-yellow-200" "in_progress")}}
+    {{template "wb_kanban_col" (kanbanCol . "검토" "border-amber-200" "review")}}
+    {{template "wb_kanban_col" (kanbanCol . "완료" "border-emerald-200" "complete")}}
+  </div>
+
+  <p class="text-xs text-gray-500">유형별 · 완료 건은 완료 열에만 표시합니다. 수집함·취소는 칸반에 올리지 않습니다.</p>
   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
     {{template "wb_kanban_col" (kanbanCol . "정기점검" "border-sky-200" "maintenance")}}
     {{template "wb_kanban_col" (kanbanCol . "AS" "border-rose-200" "as")}}

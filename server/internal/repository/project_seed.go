@@ -167,7 +167,9 @@ func linkRFIDAssetsToAnroboticsProject(db *sql.DB) {
 	}
 	res, err := db.Exec(`
 		UPDATE assets SET project_id=?, updated_at=CURRENT_TIMESTAMP
-		WHERE LOWER(TRIM(COALESCE(product_category,''))) = 'rfid'`, pid)
+		WHERE LOWER(TRIM(COALESCE(product_category,''))) = 'rfid'
+		  AND LOWER(TRIM(COALESCE(management_type,''))) != 'third_party'
+		  AND COALESCE(is_managed,1)=1`, pid)
 	if err != nil {
 		return
 	}
@@ -253,6 +255,89 @@ func findProjectIDByHint(db *sql.DB, preferredID, nameLike string) string {
 		return ""
 	}
 	return id
+}
+
+// dedupeWorkProjectsByName 동일 사업명(TRIM) 중복 행을 하나로 합친다.
+// WPSEED* 시드 ID를 우선 남기고, 참조(assets/work_tasks)를 옮긴 뒤 중복 행을 삭제한다.
+func dedupeWorkProjectsByName(db *sql.DB) {
+	if metaDone(db, projectDedupeByNameMetaKey) {
+		return
+	}
+	rows, err := db.Query(`
+		SELECT TRIM(name) AS n FROM work_projects
+		WHERE TRIM(COALESCE(name,'')) != ''
+		GROUP BY TRIM(name)
+		HAVING COUNT(*) > 1`)
+	if err != nil {
+		return
+	}
+	var names []string
+	for rows.Next() {
+		var n string
+		if rows.Scan(&n) == nil && n != "" {
+			names = append(names, n)
+		}
+	}
+	_ = rows.Close()
+
+	type cand struct {
+		id        string
+		planYear  int
+		shortName string
+		seed      bool
+	}
+	prefer := func(a, b cand) bool {
+		if a.seed != b.seed {
+			return a.seed
+		}
+		if (a.planYear > 0) != (b.planYear > 0) {
+			return a.planYear > 0
+		}
+		aShort := strings.TrimSpace(a.shortName) != ""
+		bShort := strings.TrimSpace(b.shortName) != ""
+		if aShort != bShort {
+			return aShort
+		}
+		return a.id < b.id
+	}
+
+	for _, name := range names {
+		crows, err := db.Query(`
+			SELECT project_id, COALESCE(plan_year,0), COALESCE(short_name,'')
+			FROM work_projects WHERE TRIM(name)=?`, name)
+		if err != nil {
+			continue
+		}
+		var cands []cand
+		for crows.Next() {
+			var c cand
+			if crows.Scan(&c.id, &c.planYear, &c.shortName) != nil {
+				continue
+			}
+			c.seed = strings.HasPrefix(c.id, "WPSEED")
+			cands = append(cands, c)
+		}
+		_ = crows.Close()
+		if len(cands) < 2 {
+			continue
+		}
+		keep := cands[0]
+		for _, c := range cands[1:] {
+			if prefer(c, keep) {
+				keep = c
+			}
+		}
+		for _, c := range cands {
+			if c.id == keep.id {
+				continue
+			}
+			_, _ = db.Exec(`UPDATE assets SET project_id=?, updated_at=CURRENT_TIMESTAMP WHERE project_id=?`, keep.id, c.id)
+			_, _ = db.Exec(`UPDATE work_tasks SET project_id=?, updated_at=CURRENT_TIMESTAMP WHERE project_id=?`, keep.id, c.id)
+			_, _ = db.Exec(`DELETE FROM project_scope_rules WHERE project_id=?`, c.id)
+			_, _ = db.Exec(`DELETE FROM work_projects WHERE project_id=?`, c.id)
+		}
+	}
+	markMetaDone(db, projectDedupeByNameMetaKey)
 }
 
 // uppercaseAssetProductTypes 제품구분 영문 소문자를 대문자로 통일한다.

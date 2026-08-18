@@ -9,6 +9,7 @@ type Config struct {
 	DBDSN   string
 	JWTSecret string
 	AppEnv  string
+	IntegrationAPIKey string
 }
 
 func Load() *Config {
@@ -19,6 +20,7 @@ func Load() *Config {
 		DBDSN:     getEnv("DB_DSN", ""),
 		JWTSecret: getEnv("JWT_SECRET", "dev-secret-change-in-production"),
 		AppEnv:    getEnv("APP_ENV", "development"),
+		IntegrationAPIKey: getEnv("INTEGRATION_API_KEY", ""),
 	}
 }
 

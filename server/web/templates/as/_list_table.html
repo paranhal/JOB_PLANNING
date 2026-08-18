@@ -77,6 +77,7 @@
             <td class="px-4 py-3">
               <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
               {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
+              {{if gt .PhotoCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 text-[10px] align-middle" title="증상 사진">📷 {{.PhotoCount}}</span>{{end}}
               <p class="text-xs text-gray-400 mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
             </td>
             <td class="px-4 py-3">
@@ -123,7 +124,7 @@
           <tr class="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
             <td class="px-4 py-2"></td>
             <td class="px-4 py-2 pl-8">
-              <a href="/as/{{.ASID}}" class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-700 hover:underline">
+              <a href="/as/work/{{.WorkID}}/action" class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-700 hover:underline">
                 <span class="text-gray-300">└</span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if eq .WorkKind "confirm"}}bg-purple-100 text-purple-800{{else}}bg-sky-100 text-sky-800{{end}}">[{{workKindLabel .WorkKind}}]</span>
                 <span>{{.WorkNumber}}</span>
@@ -134,14 +135,16 @@
             </td>
             <td class="px-4 py-2 hidden lg:table-cell text-xs text-gray-400">{{if .Notes}}{{.Notes}}{{else}}—{{end}}</td>
             <td class="px-4 py-2 text-center">
-              {{if .ScheduleConfirmed}}
+              {{if eq .Status "done"}}
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-700">완료</span>
+              {{else if .ScheduleConfirmed}}
               <span class="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-800">일정 확정</span>
               {{else}}
               <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800">미확정</span>
               {{end}}
             </td>
             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{{if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
-            <td class="px-4 py-2 hidden md:table-cell text-gray-400 text-xs">—</td>
+            <td class="px-4 py-2 hidden md:table-cell text-gray-600 text-xs">{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td>
             <td class="px-4 py-2 text-right text-gray-300 text-xs">—</td>
             {{if $isHold}}<td class="px-4 py-2"></td>{{end}}
           </tr>

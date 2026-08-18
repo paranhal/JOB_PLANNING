@@ -61,8 +61,7 @@ func (h *ASHandler) UnlockEdit(c echo.Context) error {
 	if redirect == "" {
 		redirect = "/as/" + id
 	}
-	hash, _ := h.settingsRepo.Get(repository.SettingASCompletedEditPassword)
-	ok := pw != "" && hash != "" && HashPassword(pw) == hash
+	ok := verifyAndUpgradeSetting(h.settingsRepo, repository.SettingASCompletedEditPassword, pw)
 	_ = h.unlockRepo.LogAttempt(id, currentUserID(c), ctxString(c, "username"), c.RealIP(), ok)
 	if !ok {
 		sep := "?"
@@ -96,11 +95,42 @@ func (h *ASHandler) UpdateCompletedEditPassword(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호 확인이 일치하지 않습니다"))
 	}
 	hash, _ := h.settingsRepo.Get(repository.SettingASCompletedEditPassword)
-	if hash == "" || HashPassword(cur) != hash {
+	if !verifyPassword(hash, cur) {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("현재 수정 비밀번호가 올바르지 않습니다"))
 	}
-	if err := h.settingsRepo.Set(repository.SettingASCompletedEditPassword, HashPassword(nw)); err != nil {
+	nh := HashPassword(nw)
+	if nh == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호를 저장하지 못했습니다"))
+	}
+	if err := h.settingsRepo.Set(repository.SettingASCompletedEditPassword, nh); err != nil {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/users?ok="+url.QueryEscape("완료 건 수정 비밀번호를 변경했습니다"))
+}
+
+func (h *AuthHandler) UpdateMaintenanceDeletePassword(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return echo.ErrForbidden
+	}
+	cur := strings.TrimSpace(c.FormValue("current_password"))
+	nw := strings.TrimSpace(c.FormValue("new_password"))
+	confirm := strings.TrimSpace(c.FormValue("confirm_password"))
+	if nw == "" || len(nw) < 4 {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호는 4자 이상이어야 합니다"))
+	}
+	if nw != confirm {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호 확인이 일치하지 않습니다"))
+	}
+	hash, _ := h.settingsRepo.Get(repository.SettingMaintenanceDeletePassword)
+	if !verifyPassword(hash, cur) {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("현재 삭제 비밀번호가 올바르지 않습니다"))
+	}
+	nh := HashPassword(nw)
+	if nh == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호를 저장하지 못했습니다"))
+	}
+	if err := h.settingsRepo.Set(repository.SettingMaintenanceDeletePassword, nh); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/users?ok="+url.QueryEscape("정기점검 삭제 비밀번호를 변경했습니다"))
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,13 +18,32 @@ import (
 )
 
 type StatsHandler struct {
-	repo     *repository.StatsRepo
-	userRepo *repository.UserRepo
-	wbRepo   *repository.WBRepo
+	repo      *repository.StatsRepo
+	userRepo  *repository.UserRepo
+	wbRepo    *repository.WBRepo
+	workBoard *repository.WorkBoardRepo
+	mntRepo   *repository.MaintenanceRepo
 }
 
-func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, wbRepo *repository.WBRepo) *StatsHandler {
-	return &StatsHandler{repo: repo, userRepo: userRepo, wbRepo: wbRepo}
+func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, wbRepo *repository.WBRepo, workBoard *repository.WorkBoardRepo, mntRepo *repository.MaintenanceRepo) *StatsHandler {
+	return &StatsHandler{repo: repo, userRepo: userRepo, wbRepo: wbRepo, workBoard: workBoard, mntRepo: mntRepo}
+}
+
+func applyPlanningToKPI(workBoard *repository.WorkBoardRepo, kpi *model.StatsKPICard) {
+	if workBoard == nil || kpi == nil {
+		return
+	}
+	pc, err := workBoard.CountPlanning()
+	if err != nil {
+		return
+	}
+	rate := pc.Rate()
+	kpi.PlanningRate = math.Round(rate*10) / 10
+	kpi.PlanningOpen = pc.Open
+	kpi.PlanningPlanned = pc.Planned
+	kpi.HasPlanning = pc.HasPlanningRate()
+	kpi.PlanDisplay = model.StatsReliability(pc.Open, !pc.HasPlanningRate(), kpi.PlanningRate)
+	kpi.ExecDisplay = kpi.ExecDisplay.CapIfLowPlanning(pc.HasPlanningRate(), rate)
 }
 
 func normalizeStatsMetric(m string) string {
@@ -215,13 +235,23 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 	now := time.Now()
 	view := strings.TrimSpace(c.QueryParam("view"))
 	switch view {
-	case model.StatsViewWeek, model.StatsViewMonth:
+	case model.StatsViewWeek, model.StatsViewMonth, model.StatsViewRange:
 	default:
 		view = model.StatsViewDay
 	}
 	filter := repository.ParseMeetingFilter(c.QueryParam("scope"), c.QueryParam("key"), c.QueryParam("project"))
+	filter.IncludeImport = c.QueryParam("import") == "1"
+	rangeFrom, rangeTo := repository.ParseStatsRangeBounds(c.QueryParam("from"), c.QueryParam("to"), now)
+
+	var cols []model.StatsPeriodColumn
+	var series []model.StatsChartPoint
+	var err error
 	anchor := repository.ParseStatsAnchor(view, c.QueryParam("date"), c.QueryParam("month"), now)
-	cols := repository.BuildStatsPeriodColumns(view, anchor)
+	if view == model.StatsViewRange {
+		cols = repository.BuildStatsRangeColumns(rangeFrom, rangeTo)
+	} else {
+		cols = repository.BuildStatsPeriodColumns(view, anchor)
+	}
 	if err := h.repo.FillPeriodOverview(cols, filter); err != nil {
 		return err
 	}
@@ -229,15 +259,22 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	series, err := h.repo.LoadStatsChartSeries(view, anchor, filter)
+	applyPlanningToKPI(h.workBoard, &kpi)
+	if view == model.StatsViewRange {
+		series, err = h.repo.LoadStatsChartSeriesRange(rangeFrom, rangeTo, filter)
+	} else {
+		series, err = h.repo.LoadStatsChartSeries(view, anchor, filter)
+	}
 	if err != nil {
 		return err
 	}
 	seriesJSON, _ := json.Marshal(series)
 
-	// 현재 기간(오늘/이번주/이번달) 완료 건 — 조치내용 포함
+	// 현재 기간(오늘/이번주/이번달/선택 기간) 완료 건 — 조치내용 포함
 	var completedRows []model.StatsRow
 	var completedRange string
+	var analysis model.StatsWorkAnalysis
+	var spotlight model.StatsSpotlight
 	if len(cols) >= 2 {
 		cur := cols[1]
 		completedRows, err = h.repo.ListCompletedDetail(cur.From, cur.ToExclusive, filter)
@@ -245,8 +282,16 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 			return err
 		}
 		completedRange = cur.Label
-		if completedRange == "" {
-			completedRange = cur.From + " ~ " + cur.ToExclusive
+		if cur.RangeLabel != "" {
+			completedRange = cur.Label + " " + cur.RangeLabel
+		}
+		analysis, err = h.repo.LoadStatsWorkAnalysis(cur.From, cur.ToExclusive, filter)
+		if err != nil {
+			return err
+		}
+		spotlight, err = h.repo.LoadStatsSpotlight(cur.From, cur.ToExclusive, filter, analysis.Receipt)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -256,6 +301,8 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		viewLabel = "주별"
 	case model.StatsViewMonth:
 		viewLabel = "월별"
+	case model.StatsViewRange:
+		viewLabel = "기간 지정"
 	}
 
 	var assignees []model.User
@@ -267,6 +314,15 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		projects, _ = h.wbRepo.ListProjects(true)
 	}
 
+	rangeDays := int(rangeTo.Sub(rangeFrom).Hours()/24) + 1
+	if rangeDays < 1 {
+		rangeDays = 1
+	}
+	prevRangeFrom := rangeFrom.AddDate(0, 0, -rangeDays)
+	prevRangeTo := rangeFrom.AddDate(0, 0, -1)
+	nextRangeFrom := rangeTo.AddDate(0, 0, 1)
+	nextRangeTo := rangeTo.AddDate(0, 0, rangeDays)
+
 	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
 		"Title":            "통계",
 		"Active":           "stats",
@@ -277,8 +333,12 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"SeriesJSON":       template.JS(seriesJSON),
 		"CompletedRows":    completedRows,
 		"CompletedRange":   completedRange,
+		"Analysis":         analysis,
+		"Spotlight":        spotlight,
 		"ExecTarget":       model.StatsExecTargetPct,
 		"VisitTarget":      model.StatsVisitTargetDays,
+		"CompleteTarget":   model.StatsCompleteTargetDays,
+		"PlanTarget":       model.StatsPlanTargetPct,
 		"Filter":           filter,
 		"Assignees":        assignees,
 		"Projects":         projects,
@@ -289,6 +349,12 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"AnchorMonthLabel": anchor.Format("2006년 01월"),
 		"Today":            now.Format("2006-01-02"),
 		"CurrentMonth":     now.Format("2006-01"),
+		"RangeFrom":        rangeFrom.Format("2006-01-02"),
+		"RangeTo":          rangeTo.Format("2006-01-02"),
+		"PrevRangeFrom":    prevRangeFrom.Format("2006-01-02"),
+		"PrevRangeTo":      prevRangeTo.Format("2006-01-02"),
+		"NextRangeFrom":    nextRangeFrom.Format("2006-01-02"),
+		"NextRangeTo":      nextRangeTo.Format("2006-01-02"),
 		"PrevAnchor":       statsOverviewShift(view, anchor, -1).Format("2006-01-02"),
 		"NextAnchor":       statsOverviewShift(view, anchor, 1).Format("2006-01-02"),
 		"PrevMonth":        statsOverviewShift(view, anchor, -1).Format("2006-01"),
@@ -306,6 +372,9 @@ func meetingFilterQuery(f model.StatsMeetingFilter) string {
 	}
 	if f.ProjectID != "" {
 		q.Set("project", f.ProjectID)
+	}
+	if f.IncludeImport {
+		q.Set("import", "1")
 	}
 	s := q.Encode()
 	if s == "" {

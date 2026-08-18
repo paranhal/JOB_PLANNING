@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  [x-cloak] {
+    display: none !important;
+  }
+}
+
+/* htmx 인디케이터 · 목록 제목행 */
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.htmx-request .htmx-indicator {
+  opacity: 1;
+}
+table thead th {
+  text-align: center !important;
+}
+table thead th > a {
+  justify-content: center;
+  width: 100%;
+}
+table thead th .inline-flex.flex-col {
+  font-size: 1rem !important;
+  line-height: 1 !important;
+}

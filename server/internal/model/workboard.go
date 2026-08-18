@@ -12,6 +12,7 @@ const (
 	WBTaskHold       = "hold"     // 보류 → 검토 열
 	WBTaskTransfer   = "transfer" // 이관 → 검토 열
 	WBTaskComplete   = "complete"
+	// inbox / waiting_for / cancelled 는 work_gtd.go
 )
 
 const (
@@ -84,7 +85,8 @@ type WBCard struct {
 	SubTitle     string `json:"sub_title"`     // 증상·설명
 	ProductType  string `json:"product_type"`  // 정기점검 점검 대상(색 구분용)
 	SourceNumber string `json:"source_number"` // AS 접수번호 / 정기점검 방문번호
-	SourceHref   string `json:"source_href"`   // 원본 화면 링크
+	SourceHref   string `json:"source_href"`   // 원본 화면 링크(연간 일정 등)
+	ActionHref   string `json:"action_href"`   // 조치 화면(있으면 DetailHref 우선)
 	Assignee     string `json:"assignee"`
 	WorkDate     string `json:"work_date"`
 	StartTime    string `json:"start_time"`
@@ -93,21 +95,34 @@ type WBCard struct {
 	PlannedDay   string `json:"planned_day"`
 	TaskID       string `json:"task_id"`
 	ParentTaskID string `json:"parent_task_id,omitempty"`
+	Status       string `json:"status,omitempty"`       // 업무처리현황 등 표시용
+	StatusLabel  string `json:"status_label,omitempty"` // 완료·부분완료 등
+	ProjectID    string `json:"project_id,omitempty"`
 }
 
 // Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [행정]
 func (c WBCard) Label() string { return "[" + WBCategoryLabel(c.Category) + "]" }
 
-// DetailHref 「열기」— 배치된 AS는 조치 화면(`/as/{id}/action`), 그 외는 일일 업무 화면.
-// 미배치 팔레트(TaskID 없음)는 빈 문자열 → 「등록」모달로 연다.
+// DetailHref 「조치」— AS는 `/as/{id}/action`, 정기점검은 방문 조치(`/maintenance/visits/{id}/action`).
+// 수정(EditHref)과 분리. 미배치 팔레트는 빈 문자열 → 「등록」모달.
 func (c WBCard) DetailHref() string {
+	placed := c.TaskID != "" || (c.Kind == "task" && c.RefID != "")
+	if !placed {
+		return ""
+	}
+	if href := strings.TrimSpace(c.ActionHref); href != "" {
+		return href
+	}
 	if c.Category == WBSourceAS {
-		if c.TaskID == "" && !(c.Kind == "task" && c.RefID != "") {
-			return ""
-		}
 		asID := strings.TrimPrefix(c.SourceHref, "/as/")
 		if asID != "" && !strings.Contains(asID, "/") {
 			return "/as/" + asID + "/action"
+		}
+	}
+	if c.Category == WBSourceMaintenance {
+		// Kind=maintenance 팔레트 RefID=visit_id (배치된 task는 ActionHref 사용)
+		if c.Kind == WBSourceMaintenance && strings.TrimSpace(c.RefID) != "" {
+			return "/maintenance/visits/" + c.RefID + "/action"
 		}
 	}
 	return c.EditHref()
@@ -166,19 +181,56 @@ func WBTaskStatusLabel(s string) string {
 		return "이관"
 	case WBTaskReview:
 		return "검토"
+	case WBTaskInbox:
+		return "수집함"
+	case WBTaskWaitingFor:
+		return "회신 대기"
+	case WBTaskCancelled:
+		return "취소"
 	case WBTaskComplete:
+		return "완료"
+	case StatusPartialComplete:
+		return "부분완료"
+	case "done", "visit_done":
 		return "완료"
 	default:
 		return s
 	}
 }
 
-// WBKanbanBucket 칸반 열 키. 보류·이관·검토 → review(검토 열).
+// ASStatusDisplayLabel AS 원본 상태 → 업무처리현황 카드 표기
+func ASStatusDisplayLabel(asStatus string) string {
+	switch strings.TrimSpace(asStatus) {
+	case "completed", "closed":
+		return "완료"
+	case StatusPartialComplete:
+		return "부분완료"
+	case "hold":
+		return "보류"
+	case "transfer":
+		return "이관"
+	case "in_progress":
+		return "진행중"
+	case "assigned":
+		return "담당자 배정"
+	case "received":
+		return "접수"
+	case "cancelled":
+		return "접수취소"
+	default:
+		return asStatus
+	}
+}
+
+// WBKanbanBucket 칸반 열 키. 보류·이관·검토중·회신 대기 → review(검토 열).
+// 수집함·취소는 칸반에 올리지 않는다(§11·§13.5).
 func WBKanbanBucket(status string) string {
 	switch status {
+	case WBTaskInbox, WBTaskCancelled:
+		return ""
 	case WBTaskInProgress:
 		return WBTaskInProgress
-	case WBTaskHold, WBTaskTransfer, WBTaskReview:
+	case WBTaskHold, WBTaskTransfer, WBTaskReview, WBTaskWaitingFor:
 		return WBTaskReview
 	case WBTaskComplete:
 		return WBTaskComplete
@@ -299,6 +351,20 @@ type ProjectScopeRule struct {
 	Notes            string `json:"notes"`
 
 	ParentOrgName string `json:"parent_org_name,omitempty"`
+}
+
+// UnresolvedProjectRow 사업 귀속 해석 실패 건 (§16.6.9). 조용히 버리지 않고 관리 화면에 모은다.
+type UnresolvedProjectRow struct {
+	Kind        string // as | maintenance
+	KindLabel   string
+	ID          string
+	Number      string
+	Date        string
+	CustomerID  string
+	OrgName     string
+	ProductType string
+	Reason      string
+	Href        string
 }
 
 func (r ProjectScopeRule) HasWorkKind(kind string) bool {
@@ -432,14 +498,37 @@ type WorkTask struct {
 	SourceType   string    `json:"source_type"` // as / maintenance / 빈 값
 	SourceID     string    `json:"source_id"`   // as_id / visit_id
 	ParentTaskID string    `json:"parent_task_id"`
-	CreatedAt    time.Time `json:"created_at"`
+	CustomerID   string    `json:"customer_id"`   // 거래처(고객마스터)
+	CustomerName   string    `json:"customer_name"` // 거래처 직접입력
+	HoldReason     string    `json:"hold_reason"`
+	ReviewDate     string    `json:"review_date"`
+	CancelReason   string    `json:"cancel_reason"`
+	WaitPartyKind  string    `json:"wait_party_kind"`
+	WaitParty      string    `json:"wait_party"`
+	WaitRequest    string    `json:"wait_request"`
+	ReplyDueDate   string    `json:"reply_due_date"`
+	NextCheckDate  string    `json:"next_check_date"`
+	CompleteNote   string    `json:"complete_note"`
+	ReceiptDate    string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
+	CompleteDate   string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
+	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 
 	ProjectName  string `json:"project_name,omitempty"`
 	ProjectColor string `json:"project_color,omitempty"`
+	OrgName      string `json:"org_name,omitempty"` // 거래처 표시명(기관명 또는 직접입력)
 	DaysLeft     int    `json:"days_left"`
 	ChildCount   int    `json:"child_count,omitempty"`
 	BoardHref    string `json:"board_href,omitempty"` // 칸반·목록 링크(원본 AS/점검 등)
+	WaitingActionCount int `json:"waiting_action_count,omitempty"` // 목록 뱃지: 회신 대기 n건
+}
+
+// CustomerLabel 거래처 표시. 고객마스터 기관명 우선, 없으면 직접입력.
+func (t WorkTask) CustomerLabel() string {
+	if s := strings.TrimSpace(t.OrgName); s != "" {
+		return s
+	}
+	return strings.TrimSpace(t.CustomerName)
 }
 
 // DetailHref 일일 업무 현황 카드/목록 링크

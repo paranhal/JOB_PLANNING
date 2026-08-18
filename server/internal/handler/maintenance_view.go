@@ -37,11 +37,21 @@ func mntViewLabel(v string) string {
 
 // MntCalDay 달력 한 칸
 type MntCalDay struct {
-	Date    string // YYYY-MM-DD (빈 칸이면 "")
-	Day     int
-	Weekend bool
-	Today   bool
-	Visits  []model.MaintenanceVisit
+	Date        string // YYYY-MM-DD (빈 칸이면 "")
+	Day         int
+	Weekend     bool
+	Today       bool
+	IsSunday    bool
+	IsSaturday  bool
+	HolidayName string
+	HolidayKind string
+	DateTitle   string
+	DayClass    string
+	CellClass   string
+	DayStyle    string
+	CellStyle   string
+	Leaves      LeaveBadgeGroup
+	Visits      []model.MaintenanceVisit
 }
 
 // MntVisitBoard 칸반 열 묶음
@@ -99,7 +109,7 @@ func filterVisitsByAssignee(visits []model.MaintenanceVisit, keys []string) []mo
 }
 
 // buildVisitCalendar 월간 달력(일~토 6주) 격자. month가 0이면 만들지 않는다.
-func buildVisitCalendar(year, month int, visits []model.MaintenanceVisit, today string) [][]MntCalDay {
+func buildVisitCalendar(year, month int, visits []model.MaintenanceVisit, today string, offDates ...map[string]bool) [][]MntCalDay {
 	if month < 1 || month > 12 {
 		return nil
 	}
@@ -124,6 +134,8 @@ func buildVisitCalendar(year, month int, visits []model.MaintenanceVisit, today 
 				cell.Date = fmt.Sprintf("%04d-%02d-%02d", year, month, day)
 				cell.Today = cell.Date == today
 				cell.Visits = byDate[cell.Date]
+				cell.IsSunday = col == 0
+				cell.IsSaturday = col == 6
 				filled = true
 			}
 			week[col] = cell
@@ -252,12 +264,12 @@ func mntProductBadgeStyle(product string) string {
 func excelProductFontColor(product string) string {
 	switch mntProductKind(product) {
 	case "anrobotics":
-		return "FF00B050" // 초록
+		return "00B050" // 초록
 	case "klas":
-		return "FF0070C0" // 파랑
+		return "0070C0" // 파랑
 	case "sejong_klas":
-		return "FF7030A0" // 보라
+		return "7030A0" // 보라
 	default:
-		return "FF333333"
+		return "333333"
 	}
 }

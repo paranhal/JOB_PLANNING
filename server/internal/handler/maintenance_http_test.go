@@ -95,11 +95,11 @@ func TestMaintenanceHTTP_DeleteVisit_visitIDRoute(t *testing.T) {
 	userRepo.EnsureAdmin(HashPassword("admin"))
 
 	repo := repository.NewMaintenanceRepo(db)
-	p, err := repo.CreatePlan(2025, "del")
+	p, err := repo.CreatePlan(2026, "del")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.InsertVisit(p.PlanID, "2025-06-10", "cx", 0, 0, "normal", ""); err != nil {
+	if err := repo.InsertVisit(p.PlanID, "2026-11-10", "cx", 0, 0, "normal", ""); err != nil {
 		t.Fatal(err)
 	}
 	visits, err := repo.ListVisits(p.PlanID)

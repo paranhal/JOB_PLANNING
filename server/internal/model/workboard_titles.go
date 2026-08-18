@@ -31,6 +31,19 @@ func FormatMaintenanceWorkTitle(orgName, visitNumber string) string {
 	return "[점검]" + name + "_" + num
 }
 
+// FormatMaintenanceVisitNumber 정기점검 번호 — "방문일 · 점검대상".
+func FormatMaintenanceVisitNumber(visitDate, productType string) string {
+	num := strings.TrimSpace(visitDate)
+	p := strings.TrimSpace(productType)
+	if p == "" {
+		return num
+	}
+	if num == "" {
+		return p
+	}
+	return num + " · " + p
+}
+
 // FormatMaintenanceDescription 정기점검 설명 — "[제품]고객명 정기점검".
 func FormatMaintenanceDescription(productType, orgName string) string {
 	p := strings.TrimSpace(productType)

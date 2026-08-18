@@ -18,6 +18,9 @@ build/
 # 서버 환경 설정 (비밀값 포함 가능)
 server/.env
 
+# Tailwind 빌드 도구 (생성 CSS는 web/static/vendor/ 에 커밋)
+server/node_modules/
+
 # 환경/에디터
 .DS_Store
 .cursor/

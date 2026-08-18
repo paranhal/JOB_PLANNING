@@ -124,6 +124,30 @@ func TestSyncSiteConfigsFromAssets(t *testing.T) {
 	}
 }
 
+func TestSyncSiteConfigsSkipsThirdPartyEquipment(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "tp.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	insertSyncCustomer(t, db, "c_tp", "타사장비교도서관", "충청남도")
+	_, err = db.Exec(`INSERT INTO assets (asset_id, customer_id, product_name, product_category,
+		maint_contract_type, maint_cycle, management_type, is_managed) VALUES (?,?,?,?,?,?,?,?)`,
+		"ATP-001", "c_tp", "타사 RFID 게이트", "rfid", "paid", "monthly", "third_party", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := NewMaintenanceRepo(db).SyncSiteConfigsFromAssets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Added != 0 {
+		t.Fatalf("타사장비 기관이 점검 사이트로 들어가면 안 됨: added=%d %v", res.Added, res.Names)
+	}
+}
+
 func TestShortestCycleAndRegion(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"quarterly,monthly", "monthly"},

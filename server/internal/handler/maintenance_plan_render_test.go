@@ -30,6 +30,8 @@ func planViewData(view string, month int, visits []model.MaintenanceVisit) map[s
 		"FlashDone": "", "FlashOK": "", "Today": today,
 		"CanEdit": true, "IsAdmin": true,
 		"ScopeAll": true, "ShowScopeToggle": false, "ScopeNote": "전체 일정",
+		"Projects": nil, "Unassigned": nil, "QuotaMonth": month,
+		"DupCount": 0, "DeleteAfter": "2026-01-01", "FlashErr": "",
 	}
 }
 
@@ -69,7 +71,7 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 		}
 		out := buf.String()
 		for _, want := range []string{"KLAS", "앤로보틱스", "새롬동도서관", "방문 추가", "지난 방문 일괄 완료", "방문 일정 수정",
-			"bbf7d0", "bfdbfe", "세종 K-LAS", "mntProductStyle"} {
+			"관리", "bbf7d0", "bfdbfe", "세종 K-LAS", "mntProductStyle"} {
 			if want == "mntProductStyle" {
 				if !strings.Contains(out, "background-color:#bbf7d0") && !strings.Contains(out, "background-color:#bfdbfe") {
 					t.Errorf("%s 화면에 점검 대상 색 style 이 없다", view)
@@ -223,6 +225,31 @@ func TestFilterVisitsByAssignee(t *testing.T) {
 	}
 	if n := filterVisitsByAssignee(visits, nil); n != nil && len(n) != 0 {
 		t.Fatalf("키 없으면 비어야 한다: %+v", n)
+	}
+}
+
+func TestMaintenanceDupBannerRender(t *testing.T) {
+	root := findTemplateRoot(t)
+	files := []string{
+		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "maintenance", "plan_show.html"),
+	}
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := planViewData(mntViewList, 0, sampleVisits())
+	data["DupCount"] = 3
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "중복 3건 발견") {
+		t.Fatalf("중복 안내 없음: %s", out)
+	}
+	if !strings.Contains(out, "정리하기") {
+		t.Fatal("정리하기 링크 없음")
 	}
 }
 

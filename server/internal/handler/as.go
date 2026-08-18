@@ -12,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/auditlog"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -30,6 +31,10 @@ type ASHandler struct {
 	userRepo     *repository.UserRepo
 	relationRepo *repository.RelationRepo
 	attachRepo   *repository.AttachmentRepo
+	attach       *AttachmentHandler
+
+	reportTemplateBytes []byte
+	reportTemplatePath  string
 }
 
 func (h *ASHandler) List(c echo.Context) error {
@@ -80,14 +85,23 @@ func (h *ASHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(items) > 0 && h.workRepo != nil {
+	if len(items) > 0 {
 		ids := make([]string, len(items))
 		for i := range items {
 			ids[i] = items[i].ASID
 		}
-		if byAS, err := h.workRepo.ListByASIDs(ids); err == nil {
-			for i := range items {
-				items[i].WorkChildren = byAS[items[i].ASID]
+		if h.workRepo != nil {
+			if byAS, err := h.workRepo.ListByASIDs(ids); err == nil {
+				for i := range items {
+					items[i].WorkChildren = byAS[items[i].ASID]
+				}
+			}
+		}
+		if h.attachRepo != nil {
+			if counts, err := h.attachRepo.CountByRefIDs(model.RefTypeASReceipt, ids); err == nil {
+				for i := range items {
+					items[i].PhotoCount = counts[items[i].ASID]
+				}
 			}
 		}
 	}
@@ -141,14 +155,14 @@ func (h *ASHandler) List(c echo.Context) error {
 		"Status": status, "Search": search,
 		"Mine": mine, "MineQ": mineQ, "SortQ": sortQ, "ListPath": "/as", "Role": role,
 		"Sort": sort, "Dir": dir,
-		"SortLinks": asListSortLinks("/as", listBase, sort, dir),
-		"PrevURL": asPageURL("/as", listBase, page-1),
-		"NextURL": asPageURL("/as", listBase, page+1),
+		"SortLinks":   asListSortLinks("/as", listBase, sort, dir),
+		"PrevURL":     asPageURL("/as", listBase, page-1),
+		"NextURL":     asPageURL("/as", listBase, page+1),
 		"DisplayName": ctxString(c, "user_name"),
 		"CanReceive":  canReceiveAS(c), "CanProcess": canProcessAS(c),
 		"StatusLabel": statusLabel,
 		"AssigneeID":  assigneeID, "AssigneeName": assigneeName,
-		"IsHoldList":  status == "hold",
+		"IsHoldList": status == "hold",
 	})
 }
 
@@ -186,7 +200,7 @@ func (h *ASHandler) Kanban(c echo.Context) error {
 		{Key: "received", Title: "접수", Border: "border-blue-200"},
 		{Key: "assigned", Title: "담당자 배정", Border: "border-indigo-200"},
 		{Key: "in_progress", Title: "진행중", Border: "border-amber-200"},
-		{Key: "hold", Title: "보류", Border: "border-orange-200"},
+		{Key: "hold", Title: "대기", Border: "border-orange-200"},
 		{Key: "completed", Title: "완료", Border: "border-green-200"},
 	}
 
@@ -469,6 +483,20 @@ func (h *ASHandler) Create(c echo.Context) error {
 	if err := h.repo.Create(as); err != nil {
 		return err
 	}
+	h.syncASPlannedDailyTask(as.ASID)
+	if h.attach != nil {
+		if files, err := uploadFileHeaders(c); err == nil && len(files) > 0 {
+			if err := h.attach.saveReceiptPhotos(as.ASID, strings.TrimSpace(c.FormValue("photo_memo")), files); err != nil {
+				msg := err.Error()
+				if httpErr, ok := err.(*echo.HTTPError); ok {
+					if s, ok := httpErr.Message.(string); ok {
+						msg = s
+					}
+				}
+				return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?err="+url.QueryEscape(msg))
+			}
+		}
+	}
 	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID)
 }
 
@@ -501,7 +529,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		history, _ = h.repo.ListPastHistory(as.CustomerID, as.ASID, 50)
 	}
 
-	return c.Render(http.StatusOK, "as/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "AS 접수 수정", "Active": "as", "IsNew": false,
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
 		"Channels": channels, "Urgencies": urgencies, "ReqTypes": reqTypes,
@@ -510,7 +538,10 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		"CanEditVisitDate": canEditVisitDate(c, as),
 		"History":          history,
 		"Err":              c.QueryParam("err"),
-	})
+	}
+	h.mergeReceiptPhotoData(c, as, data)
+	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"
+	return c.Render(http.StatusOK, "as/form.html", data)
 }
 
 func (h *ASHandler) UpdateReceipt(c echo.Context) error {
@@ -541,6 +572,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	if err := h.repo.UpdateReceipt(as); err != nil {
 		return err
 	}
+	h.syncASPlannedDailyTask(id)
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
 }
 
@@ -562,7 +594,56 @@ func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	if err := h.repo.UpdateVisitScheduledDate(id, date, confirmed); err != nil {
 		return err
 	}
+	h.syncASPlannedDailyTask(id)
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+}
+
+// syncASPlannedDailyTask 방문예정일이 있으면 일일업무(work_tasks)를 만들고/맞춘다.
+// 시간은 비워 두어 「일일 업무 등록」화면에서 해당 날짜에 자동 배치되게 한다.
+func (h *ASHandler) syncASPlannedDailyTask(asID string) {
+	if h.wbRepo == nil || strings.TrimSpace(asID) == "" {
+		return
+	}
+	as, err := h.repo.GetByID(asID)
+	if err != nil || as == nil {
+		return
+	}
+	visit := strings.TrimSpace(as.VisitScheduledDate)
+	if visit == "" {
+		return
+	}
+	existing, _ := h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
+	title := model.FormatASWorkTitle(as.OrgName, as.ASNumber)
+	if existing != nil {
+		existing.DueDate = visit
+		existing.Title = title
+		if strings.TrimSpace(existing.Description) == "" {
+			existing.Description = as.Symptom
+		}
+		if strings.TrimSpace(existing.Assignee) == "" {
+			existing.Assignee = as.AssignedTo
+		}
+		// 아직 시간표에 안 올린 건 배정일도 예정일에 맞춘다.
+		if strings.TrimSpace(existing.StartTime) == "" {
+			existing.WorkDate = visit
+		}
+		_ = h.wbRepo.UpdateTask(existing)
+		return
+	}
+	t := &model.WorkTask{
+		WorkType:    model.WBWorkAS,
+		Title:       title,
+		Description: as.Symptom,
+		DueDate:     visit,
+		WorkDate:    visit,
+		DurationMin: 30,
+		Status:      model.WBTaskWaiting,
+		Priority:    model.WBPriorityNormal,
+		Assignee:    strings.TrimSpace(as.AssignedTo),
+		SourceType:  model.WBSourceAS,
+		SourceID:    as.ASID,
+	}
+	_ = h.wbRepo.CreateTask(t)
 }
 
 func (h *ASHandler) Show(c echo.Context) error {
@@ -606,25 +687,26 @@ func (h *ASHandler) Show(c echo.Context) error {
 	data := map[string]interface{}{
 		"Title": as.ASNumber, "Active": "as", "AS": as,
 		"Customer": customer, "Asset": asset,
-		"AssetHistory":     assetHistory,
-		"ParentAS":         parent,
-		"Reopens":          reopens,
-		"Assignees":        assignees,
-		"DailyTask":        dailyTask,
-		"CanReopen":        closed && canReceiveAS(c) && !embed,
-		"CanReceive":       canReceiveAS(c),
-		"IsClosed":         closed,
-		"EditUnlocked":     unlocked,
-		"UnlockExpires":    unlockExpLocal,
-		"CanUnlockEdit":    closed && isAdminRole(c) && !unlocked && !embed,
-		"CanEditReceipt":   !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
-		"CanDelete":        !embed && isAdminRole(c) && (!closed || canMod),
-		"CanWriteDaily":    !embed && canWriteWorkboard(c) && !closed,
-		"TodayLocal":       now.Format("2006-01-02"),
-		"ActionErr":        c.QueryParam("err"),
-		"ActionOK":         c.QueryParam("ok"),
-		"OpenDaily":        !embed && c.QueryParam("daily") == "1",
-		"Embed":            embed,
+		"AssetHistory":   assetHistory,
+		"ParentAS":       parent,
+		"Reopens":        reopens,
+		"Assignees":      assignees,
+		"DailyTask":      dailyTask,
+		"CanReopen":      closed && canReceiveAS(c) && !embed,
+		"CanReceive":     canReceiveAS(c),
+		"CanProcess":     canProcessAS(c) && (!closed || canMod),
+		"IsClosed":       closed,
+		"EditUnlocked":   unlocked,
+		"UnlockExpires":  unlockExpLocal,
+		"CanUnlockEdit":  closed && isAdminRole(c) && !unlocked && !embed,
+		"CanEditReceipt": !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
+		"CanDelete":      !embed && isAdminRole(c) && (!closed || canMod),
+		"CanWriteDaily":  !embed && canWriteWorkboard(c) && !closed,
+		"TodayLocal":     now.Format("2006-01-02"),
+		"ActionErr":      c.QueryParam("err"),
+		"ActionOK":       c.QueryParam("ok"),
+		"OpenDaily":      !embed && c.QueryParam("daily") == "1",
+		"Embed":          embed,
 	}
 	if embed {
 		data["HideNav"] = true
@@ -633,15 +715,41 @@ func (h *ASHandler) Show(c echo.Context) error {
 		data["Username"] = ctxString(c, "username")
 		data["UserID"] = ctxString(c, "user_id")
 	}
+	h.mergeReceiptPhotoData(c, as, data)
+	h.mergeASReportData(c, as, data)
 	return c.Render(http.StatusOK, "as/show.html", data)
 }
 
-// Action 조치 전용 화면 — 일일 업무에서 진입(완료·종료는 조회 전용)
-func (h *ASHandler) Action(c echo.Context) error {
-	// 조회: 접수·기술·관리자·일일업무 작성 가능 역할. 저장·워크플로는 POST·권한에서 차단.
-	if !canReceiveAS(c) && !canWriteWorkboard(c) && !canProcessAS(c) {
-		return echo.ErrForbidden
+func (h *ASHandler) mergeReceiptPhotoData(c echo.Context, as *model.ASReceipt, data map[string]interface{}) {
+	if as == nil {
+		return
 	}
+	var photos []model.Attachment
+	if h.attachRepo != nil {
+		photos, _ = h.attachRepo.ListByRef(model.RefTypeASReceipt, as.ASID)
+	}
+	assetCount := 0
+	if as.AssetID != "" && h.attachRepo != nil {
+		assetCount, _ = h.attachRepo.CountByRef(model.RefTypeAsset, as.AssetID)
+	}
+	closed := isASClosedStatus(as.Status)
+	canMod := h.canModifyAS(c, as)
+	canEdit := canManageReceiptPhoto(c, as) && (!closed || canMod)
+	if embed, _ := data["Embed"].(bool); embed {
+		canEdit = false
+	}
+	data["ReceiptPhotos"] = photos
+	data["ReceiptPhotoCount"] = len(photos)
+	data["CanEditPhotos"] = canEdit
+	data["CanPromote"] = (canWriteMaster(c) || canReceiveAS(c)) && as.AssetID != ""
+	data["AssetImageCount"] = assetCount
+	data["PhotoRedirect"] = "/as/" + as.ASID
+	data["PhotoSectionTitle"] = "증상 사진"
+	data["HideIfEmpty"] = false
+}
+
+// Action 조치 전용 화면 — 쓰기 권한 없으면 조회 전용(버튼·저장 숨김)
+func (h *ASHandler) Action(c echo.Context) error {
 	id := c.Param("id")
 	as, err := h.repo.GetByID(id)
 	if err != nil || as == nil {
@@ -676,7 +784,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 	now := time.Now()
 	startLocal := ""
 	if as.StartDatetime != nil && !as.StartDatetime.IsZero() {
-		startLocal = as.StartDatetime.Format("2006-01-02T15:04")
+		startLocal = as.StartDatetime.Format("2006-01-02 15:04")
 	}
 	completeLocal := ""
 	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() {
@@ -688,6 +796,8 @@ func (h *ASHandler) Action(c echo.Context) error {
 	}
 
 	canProcess := canProcessAS(c) && (canMod || !closed)
+	// 쓰기 불가(옵저버 등)면 항상 조회 전용 — 저장·완료 버튼 비표시
+	readOnly := !canProcess
 	showWorkflow := canProcess && !closed && (as.Status == "received" || as.Status == "assigned" || as.Status == "in_progress" || as.Status == "hold" || as.Status == model.StatusPartialComplete)
 	workflowHoldMode := as.Status == "hold"
 	showTransferComplete := as.Status == "transfer" && canProcess
@@ -708,12 +818,16 @@ func (h *ASHandler) Action(c echo.Context) error {
 	if closed {
 		titleSuffix = " · 조치 완료"
 	}
+	if readOnly && !closed {
+		titleSuffix = " · 조치 (조회)"
+	}
 
-	return c.Render(http.StatusOK, "as/action.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": as.ASNumber + titleSuffix, "Active": "as", "AS": as,
 		"ParentAS":  parent,
 		"Processes": processes, "WorkItems": workItems, "Attachments": attachments,
 		"ProcTypes": procTypes, "CauseTypes": causeTypes, "ResultCodes": resultCodes,
+		"ActionResults":        model.ActionResultOptions(),
 		"Assignees":            assignees,
 		"Contacts":             contacts,
 		"DailyTask":            dailyTask,
@@ -722,7 +836,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"UnlockExpires":        unlockExpLocal,
 		"CanUnlockEdit":        closed && isAdminRole(c) && !unlocked,
 		"CanProcess":           canProcess,
-		"ReadOnly":             closed && !canMod,
+		"ReadOnly":             readOnly,
 		"ShowWorkflow":         showWorkflow,
 		"WorkflowHoldMode":     workflowHoldMode,
 		"ShowTransferComplete": showTransferComplete,
@@ -734,8 +848,20 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"TodayLocal":           now.Format("2006-01-02"),
 		"WorkerDefault":        ctxString(c, "user_name"),
 		"ActionErr":            c.QueryParam("err"),
+		"ActionErrMsg":         actionErrMessage(c.QueryParam("err")),
+		"ActionWarn":           c.QueryParam("warn"),
+		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
 		"ActionOK":             c.QueryParam("ok"),
-	})
+		"ConclusionDraft":      asConclusionDraft(as, processes),
+	}
+	h.mergeReceiptPhotoData(c, as, data)
+	data["CanEditPhotos"] = false
+	data["CanPromote"] = false
+	data["PhotoRedirect"] = "/as/" + as.ASID + "/action"
+	data["PhotoSectionTitle"] = "접수 시 증상 사진"
+	data["PhotoPanelClass"] = "bg-sky-50 border-2 border-sky-200"
+	data["HideIfEmpty"] = true
+	return c.Render(http.StatusOK, "as/action.html", data)
 }
 
 func (h *ASHandler) Update(c echo.Context) error {
@@ -778,15 +904,24 @@ func (h *ASHandler) Update(c echo.Context) error {
 		}
 	}
 	var applyOut *model.ActionApplyResult
+	formResult := ""
+	prepNotes := ""
 	if canProcessAS(c) {
 		formStatus := c.FormValue("status")
 		as.Status = formStatus
-		as.ProcessType = c.FormValue("process_type")
-		as.CauseType = c.FormValue("cause_type")
-		as.ActionTaken = c.FormValue("action_taken")
+		as.ProcessType = strings.TrimSpace(c.FormValue("process_type"))
+		as.WorkPlace = model.NormalizeWorkPlace(c.FormValue("work_place"))
+		as.CauseType = strings.TrimSpace(c.FormValue("cause_type"))
+		as.ActionTaken = strings.TrimSpace(c.FormValue("action_taken"))
 		as.PartsUsed = c.FormValue("parts_used")
-		as.ResultCode = c.FormValue("result_code")
+		formResult = strings.TrimSpace(c.FormValue("result_code"))
+		as.ResultCode = formResult
+		if formResult == model.ResultDone {
+			as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
+			as.Conclusion = strings.TrimSpace(c.FormValue("conclusion"))
+		}
 		as.RevisitReason = strings.TrimSpace(c.FormValue("revisit_reason"))
+		prepNotes = strings.TrimSpace(c.FormValue("revisit_prep"))
 		as.FollowupAction = c.FormValue("followup_action")
 		confCode := c.FormValue("customer_confirmer_code")
 		if confCode == "custom" {
@@ -796,9 +931,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		} else {
 			as.CustomerConfirmer = strings.TrimSpace(c.FormValue("customer_confirmer"))
 		}
-		if t, ok := parseFormDatetime(c.FormValue("start_datetime")); ok {
-			as.StartDatetime = &t
-		}
+		// 착수시각은 폼에서 받지 않는다. 첫 조치의 process_datetime으로 서버가 채운다(§4.2 · §12.5-4).
 		if t, ok := parseFormDatetime(c.FormValue("complete_datetime")); ok {
 			as.CompleteDatetime = &t
 		}
@@ -813,7 +946,34 @@ func (h *ASHandler) Update(c echo.Context) error {
 		createRevisit := c.FormValue("create_revisit_after") == "1"
 		revisitConfirmed := c.FormValue("revisit_schedule_confirmed") == "1"
 
-		if as.ResultCode != "" {
+		holdResumeDate := normalizeVisitDate(c.FormValue("hold_resume_date"))
+
+		if code := actionSaveMissingErr(as, formResult); code != "" {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
+		}
+
+		if formResult == model.ResultHold {
+			next := strings.TrimSpace(c.FormValue("hold_next_action"))
+			switch next {
+			case "action", "transfer", "cancel":
+			default:
+				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_next")
+			}
+			if strings.TrimSpace(as.RevisitReason) == "" && strings.TrimSpace(c.FormValue("hold_reason")) == "" {
+				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_reason")
+			}
+			reason := strings.TrimSpace(c.FormValue("hold_reason"))
+			if reason == "" {
+				reason = as.RevisitReason
+			}
+			as.Status = "hold"
+			as.HoldReason = reason
+			as.HoldNextAction = next
+			as.ResultCode = ""
+			if holdResumeDate != "" {
+				as.VisitScheduledDate = holdResumeDate
+			}
+		} else if formResult != "" {
 			in := model.ActionApplyInput{
 				ScheduleConfirmed:         scheduleConfirmed,
 				TransferDetail:            transferDetail,
@@ -823,7 +983,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 				RevisitDate:               revisitDate,
 				RevisitScheduleConfirmed:  revisitConfirmed,
 			}
-			switch as.ResultCode {
+			switch formResult {
 			case model.ResultRevisit, model.ResultTemporary, model.ResultPartial:
 				in.NextDate = firstNonEmpty(revisitDate, nextVisit)
 			case model.ResultTransfer, model.ResultEscalation:
@@ -873,13 +1033,28 @@ func (h *ASHandler) Update(c echo.Context) error {
 		as.Status = model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
 	}
 
+	timeSpent := 0
+	if canProcessAS(c) {
+		timeSpent, _ = strconv.Atoi(strings.TrimSpace(c.FormValue("time_spent")))
+		if (strings.TrimSpace(as.ActionTaken) != "" || formResult != "") && timeSpent <= 0 {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=time_spent")
+		}
+	}
 	if err := h.repo.Update(as); err != nil {
 		return err
 	}
+	h.syncASPlannedDailyTask(as.ASID)
 	if canProcessAS(c) {
-		_ = h.appendActionProcess(c, as)
+		_ = h.appendActionProcess(c, as, formResult, prepNotes, timeSpent)
 		if applyOut != nil {
+			// 하부업무 담당자(폼) — 미입력 시 Create가 원 접수 담당자를 초기값으로만 복사
+			workTo, workUID := resolveAssigneeFormFields(c, h.userRepo,
+				"work_assigned_to_code", "work_assigned_to_custom", "work_assigned_to")
 			for _, d := range applyOut.WorkItems {
+				aTo, aUID := d.AssignedTo, d.AssignedUserID
+				if strings.TrimSpace(aTo) == "" && strings.TrimSpace(aUID) == "" {
+					aTo, aUID = workTo, workUID
+				}
 				_ = h.workRepo.Create(&model.ASWorkItem{
 					ASID:              as.ASID,
 					WorkKind:          d.WorkKind,
@@ -887,13 +1062,112 @@ func (h *ASHandler) Update(c echo.Context) error {
 					ScheduleConfirmed: d.ScheduleConfirmed,
 					ConfirmTarget:     d.ConfirmTarget,
 					ConfirmContact:    d.ConfirmContact,
+					AssignedTo:        aTo,
+					AssignedUserID:    aUID,
 					Notes:             d.Notes,
 					Status:            "open",
 				})
 			}
 		}
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	loc := "/as/" + id + "/action"
+	if formResult == model.ResultDone &&
+		(strings.TrimSpace(as.CauseDetail) == "" || strings.TrimSpace(as.Conclusion) == "") {
+		loc += "?warn=cause_report"
+	}
+	return c.Redirect(http.StatusSeeOther, loc)
+}
+
+// actionSaveMissingErr 부록 A.2: 조치 저장 시 조치내용·근무구분·원인분류·처리유형 필수.
+// 결과코드가 있으면 조치내용 공백은 action_required (완료만 빠져 있던 구멍).
+func actionSaveMissingErr(as *model.ASReceipt, formResult string) string {
+	if as == nil {
+		return ""
+	}
+	action := strings.TrimSpace(as.ActionTaken)
+	saving := action != "" || strings.TrimSpace(formResult) != ""
+	if strings.TrimSpace(formResult) != "" && action == "" {
+		return "action_required"
+	}
+	if !saving {
+		return ""
+	}
+	switch as.WorkPlace {
+	case model.WorkPlaceOffice, model.WorkPlaceField:
+	default:
+		return "work_place"
+	}
+	if strings.TrimSpace(as.CauseType) == "" {
+		return "cause_type"
+	}
+	if strings.TrimSpace(as.ProcessType) == "" {
+		return "process_type"
+	}
+	return ""
+}
+
+func actionErrMessage(code string) string {
+	switch strings.TrimSpace(code) {
+	case "action_required":
+		return "조치내용을 입력하세요."
+	case "work_place":
+		return "근무구분(내근/외근)을 선택하세요."
+	case "cause_type":
+		return "원인분류를 선택하세요."
+	case "process_type":
+		return "처리유형을 선택하세요."
+	case "time_spent":
+		return "소요시간을 입력하세요."
+	case "revisit_date":
+		return "재방문·추가조치 시 방문예정일자를 입력하세요."
+	case "revisit_reason":
+		return "재방문 사유를 입력하세요."
+	case "temporary_date":
+		return "임시조치 시 방문예정일자를 입력하세요."
+	case "transfer_detail":
+		return "이관 시 「처리 확인 후 완료」 또는 「우리 팀 추가 작업」을 선택하세요."
+	case "confirm_date":
+		return "우리 팀 추가 작업 시 확인예정일자를 입력하세요."
+	case "confirm_target":
+		return "확인대상자를 입력하세요."
+	case "confirm_contact":
+		return "연락처를 입력하세요."
+	case "hold_reason":
+		return "대기 사유를 입력하세요."
+	case "hold_next":
+		return "대기 후속(조치/이관/접수취소)을 선택하세요."
+	case "result_code":
+		return "처리결과코드를 선택하세요."
+	case "action":
+		return "조치 내용을 확인 후 다시 저장하세요."
+	default:
+		return code
+	}
+}
+
+func actionWarnMessage(code string) string {
+	switch strings.TrimSpace(code) {
+	case "cause_report":
+		return "장애원인·결론이 비어 있습니다. 지금은 저장했고, 보고서 발급 때 다시 필요합니다."
+	default:
+		return ""
+	}
+}
+
+func asConclusionDraft(as *model.ASReceipt, processes []model.ASProcess) string {
+	if as == nil {
+		return ""
+	}
+	work := strings.TrimSpace(as.ActionTaken)
+	if work == "" {
+		for i := len(processes) - 1; i >= 0; i-- {
+			if s := strings.TrimSpace(processes[i].WorkContent); s != "" {
+				work = s
+				break
+			}
+		}
+	}
+	return model.BuildASConclusionDraft(as.CauseDetail, as.Symptom, work)
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -906,78 +1180,71 @@ func firstNonEmpty(vals ...string) string {
 }
 
 func actionResultLabel(code string) string {
-	switch strings.TrimSpace(code) {
-	case model.ResultDone:
-		return "완료"
-	case model.ResultPartial:
-		return "부분완료"
-	case model.ResultTemporary:
-		return "임시조치"
-	case model.ResultRevisit:
-		return "재방문필요"
-	case model.ResultTransfer:
-		return "타사이관"
-	case model.ResultEscalation:
-		return "제조사에스컬레이션"
-	default:
-		if code == "" {
-			return ""
-		}
-		return code
-	}
+	return model.ActionResultLabel(code)
 }
 
-// appendActionProcess 조치 폼 저장 내용을 처리 이력으로 남긴다.
-func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt) error {
+// appendActionProcess 조치 폼 저장 내용을 처리 이력으로 남긴다. 회차별 결과·사유는 컬럼에 보존한다.
+func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, result, prepNotes string, timeSpent int) error {
 	action := strings.TrimSpace(as.ActionTaken)
-	result := strings.TrimSpace(as.ResultCode)
+	result = strings.TrimSpace(result)
 	if action == "" && result == "" {
 		return nil
 	}
 	content := action
 	if content == "" {
-		content = "조치 저장"
+		content = model.ActionResultLabel(result)
+		if content == "" {
+			content = "조치 저장"
+		}
 	}
+	waitReason := strings.TrimSpace(as.HoldReason)
+	if waitReason == "" {
+		waitReason = strings.TrimSpace(as.RevisitReason)
+	}
+	nextDate := strings.TrimSpace(as.VisitScheduledDate)
 	notesParts := []string{}
-	if lbl := actionResultLabel(result); lbl != "" {
+	if lbl := model.ActionResultLabel(result); lbl != "" {
 		notesParts = append(notesParts, "결과:"+lbl)
 	}
-	if as.TransferDetail != "" && result == model.ResultTransfer {
-		if as.TransferDetail == model.TransferDetailWaiting {
-			notesParts = append(notesParts, "세부:조치결과대기")
-		} else if as.TransferDetail == model.TransferDetailCompleted {
-			notesParts = append(notesParts, "세부:완료")
+	if result == model.ResultTransfer {
+		if d := model.TransferDetailLabel(as.TransferDetail); d != "" {
+			notesParts = append(notesParts, "이관:"+d)
 		}
 	}
-	if as.VisitScheduledDate != "" && (result == model.ResultRevisit || result == model.ResultTransfer || result == model.ResultPartial) {
-		label := "방문예정일"
-		if result == model.ResultTransfer {
+	if nextDate != "" && (result == model.ResultRevisit || result == model.ResultTransfer || result == model.ResultPartial || result == model.ResultHold) {
+		label := "다음예정일"
+		if result == model.ResultTransfer && as.TransferDetail == model.TransferDetailWaiting {
 			label = "확인예정일"
 		}
-		notesParts = append(notesParts, label+":"+as.VisitScheduledDate)
+		notesParts = append(notesParts, label+":"+nextDate)
 	}
 	if as.ConfirmTarget != "" {
 		notesParts = append(notesParts, "확인대상:"+as.ConfirmTarget)
 	}
-	if as.RevisitReason != "" {
-		notesParts = append(notesParts, "재방문사유:"+as.RevisitReason)
+	if waitReason != "" {
+		notesParts = append(notesParts, "사유:"+waitReason)
+	}
+	if prepNotes != "" {
+		notesParts = append(notesParts, "준비:"+prepNotes)
 	}
 	worker := strings.TrimSpace(as.AssignedTo)
 	if worker == "" {
 		worker = ctxString(c, "user_name")
 	}
 	p := &model.ASProcess{
-		ASID:        as.ASID,
-		Worker:      worker,
-		WorkType:    as.ProcessType,
-		WorkContent: content,
-		PartsUsed:   as.PartsUsed,
-		Notes:       strings.Join(notesParts, " · "),
-	}
-	if as.StartDatetime != nil && !as.StartDatetime.IsZero() {
-		p.ProcessDatetime = *as.StartDatetime
-	} else {
-		p.ProcessDatetime = time.Now()
+		ASID:            as.ASID,
+		Worker:          worker,
+		WorkType:        as.ProcessType,
+		WorkContent:     content,
+		PartsUsed:       as.PartsUsed,
+		Notes:           strings.Join(notesParts, " · "),
+		ResultCode:      result,
+		TransferDetail:  as.TransferDetail,
+		NextActionDate:  nextDate,
+		WaitReason:      waitReason,
+		PrepNotes:       prepNotes,
+		TimeSpent:       timeSpent,
+		ProcessDatetime: time.Now(),
 	}
 	return h.processRepo.Create(p)
 }
@@ -1008,6 +1275,10 @@ func (h *ASHandler) Hold(c echo.Context) error {
 	if err := h.repo.SetHold(id, reason, next); err != nil {
 		return err
 	}
+	as.Status = "hold"
+	as.HoldReason = reason
+	as.HoldNextAction = next
+	_ = h.appendActionProcess(c, as, model.ResultHold, "", 0)
 	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
@@ -1201,20 +1472,64 @@ func (h *ASHandler) appendReopenProcess(src, as *model.ASReceipt, reason string,
 
 // Delete AS 접수 삭제 (처리 이력 포함) — 관리자만 (완료·종료는 잠금 해제 필요)
 func (h *ASHandler) Delete(c echo.Context) error {
+	id := c.Param("id")
 	if !isAdminRole(c) {
+		accessLog(c, auditlog.Record{
+			Action:      auditlog.ActionDelete,
+			TargetTable: "as_receipts",
+			TargetID:    id,
+			Detail:      "권한없음",
+			Reason:      "권한없음",
+			Result:      auditlog.ResultDeny,
+		})
 		return echo.ErrForbidden
 	}
-	id := c.Param("id")
 	as, err := h.repo.GetByID(id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+		accessLog(c, auditlog.Record{
+			Action:      auditlog.ActionDelete,
+			TargetTable: "as_receipts",
+			TargetID:    as.ASID,
+			SubjectType: "customer",
+			SubjectID:   as.CustomerID,
+			SubjectName: as.OrgName,
+			Detail:      "완료·종료 건 삭제 거부",
+			Reason:      "잠금",
+			Result:      auditlog.ResultDeny,
+			BeforeJSON:  toJSON(as),
+		})
 		return h.redirectLocked(c, id, "show")
 	}
 	if err := h.repo.Delete(id); err != nil {
+		accessLog(c, auditlog.Record{
+			Action:      auditlog.ActionDelete,
+			TargetTable: "as_receipts",
+			TargetID:    as.ASID,
+			SubjectType: "customer",
+			SubjectID:   as.CustomerID,
+			SubjectName: as.OrgName,
+			Detail:      err.Error(),
+			Reason:      accessReason(c, "AS 접수 삭제"),
+			Result:      auditlog.ResultDeny,
+			BeforeJSON:  toJSON(as),
+		})
 		return err
 	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionDelete,
+		TargetTable: "as_receipts",
+		TargetID:    as.ASID,
+		SubjectType: "customer",
+		SubjectID:   as.CustomerID,
+		SubjectName: as.OrgName,
+		Detail:      "AS 접수 삭제 " + as.ASNumber,
+		Reason:      accessReason(c, "AS 접수 삭제"),
+		Result:      auditlog.ResultOK,
+		BeforeJSON:  toJSON(as),
+	})
 	return c.Redirect(http.StatusSeeOther, "/as")
 }
 
@@ -1330,17 +1645,17 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "as/stats.html", map[string]interface{}{
 		"Title": title, "Active": "as_stats",
-		"Stats":    stats,
-		"Personal": personal,
+		"Stats":       stats,
+		"Personal":    personal,
 		"DisplayName": ctxString(c, "user_name"),
 		"Role":        role,
-		"Items": items, "Total": listTotal,
+		"Items":       items, "Total": listTotal,
 		"Page": page, "TotalPages": listTotalPages,
 		"ListStatus": listStatus,
-		"Sort": sort, "Dir": dir,
+		"Sort":       sort, "Dir": dir,
 		"SortLinks": asListSortLinks("/as/stats", listBase, sort, dir),
-		"PrevURL": asPageURL("/as/stats", listBase, page-1),
-		"NextURL": asPageURL("/as/stats", listBase, page+1),
-		"ListPath": "/as/stats", "ListQ": listQ,
+		"PrevURL":   asPageURL("/as/stats", listBase, page-1),
+		"NextURL":   asPageURL("/as/stats", listBase, page+1),
+		"ListPath":  "/as/stats", "ListQ": listQ,
 	})
 }

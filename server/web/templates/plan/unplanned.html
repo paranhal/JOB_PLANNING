@@ -1,0 +1,159 @@
+{{define "title"}}미계획 업무함 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4" x-data="{ nodateKey: '', nodateOpen: false }">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">미계획 업무함</h2>
+      <p class="text-sm text-gray-500 mt-1">{{.ScopeNote}} · {{.Counts.Total}}건</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      {{if eq .Role "tech"}}
+      <a href="/plan/unplanned?mine={{if .Mine}}0{{else}}1{{end}}{{if .Kind}}&kind={{.Kind}}{{end}}"
+         class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+        {{if .Mine}}팀전체 보기{{else}}내 업무만{{end}}
+      </a>
+      {{end}}
+    </div>
+  </div>
+
+  {{if eq .Err "date"}}<p class="text-sm text-red-600">날짜를 입력하세요.</p>{{end}}
+  {{if eq .Err "select"}}<p class="text-sm text-red-600">배정할 업무를 선택하세요.</p>{{end}}
+  {{if eq .Err "assign"}}<p class="text-sm text-red-600">날짜 배정에 실패했습니다.</p>{{end}}
+  {{if eq .Err "reason"}}<p class="text-sm text-red-600">미정 사유를 선택하세요.</p>{{end}}
+  {{if eq .Err "nodate"}}<p class="text-sm text-red-600">미정 등록은 AS 건만 가능합니다.</p>{{end}}
+  {{if eq .Ok "assign"}}<p class="text-sm text-emerald-700">예정일을 배정했습니다.</p>{{end}}
+  {{if eq .Ok "nodate"}}<p class="text-sm text-emerald-700">미정+사유를 등록했습니다. 14일 후 재검토로 올라옵니다.</p>{{end}}
+
+  <div class="flex flex-wrap gap-2 text-xs">
+    <a href="/plan/unplanned{{if .MineQ}}?{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind ""}}border-rose-400 bg-rose-50 text-rose-800{{else}}border-gray-200 bg-white{{end}}">전체 {{.Counts.Total}}</a>
+    <a href="/plan/unplanned?kind=no_date{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "no_date"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정없음 {{.Counts.NoDate}}</a>
+    <a href="/plan/unplanned?kind=delayed{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "delayed"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정일경과 {{.Counts.Delayed}}</a>
+    <a href="/plan/unplanned?kind=next{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "next"}}border-amber-400 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white{{end}}">다음일정미정 {{.Counts.Next}}</a>
+    <a href="/plan/unplanned?kind=unassigned{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "unassigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">담당자미배정 {{.Counts.Unassigned}}</a>
+    <a href="/plan/unplanned?kind=review{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "review"}}border-amber-400 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white{{end}}">재검토 {{.Counts.Review}}</a>
+  </div>
+
+  {{if .CanWrite}}
+  <form id="bulk" method="POST" action="/plan/unplanned/assign" class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap items-end gap-3">
+    {{if .MineQ}}<input type="hidden" name="mine" value="{{if .Mine}}1{{else}}0{{end}}">{{end}}
+    {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
+    <div>
+      <label class="block text-[11px] text-gray-500 mb-1">일괄 예정일</label>
+      <input type="date" name="visit_date" required class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+    </div>
+    <div>
+      <label class="block text-[11px] text-gray-500 mb-1">담당자(선택)</label>
+      <select name="assignee" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm min-w-[8rem]">
+        <option value="">유지</option>
+        {{range .Users}}
+        <option value="{{.FullName}}">{{.FullName}}</option>
+        {{end}}
+      </select>
+    </div>
+    <button type="submit" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">선택 건 일괄 배정</button>
+    <p class="text-[11px] text-gray-400">체크한 건에 같은 날짜를 넣습니다.</p>
+  </form>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+          <tr>
+            {{if .CanWrite}}<th class="px-3 py-3 text-xs font-semibold text-gray-500 w-8"></th>{{end}}
+            {{if .ShowAssignee}}<th class="px-3 py-3 text-xs font-semibold text-gray-500">담당자</th>{{end}}
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500">구분</th>
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500">번호</th>
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500">기관 / 제목</th>
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500">유형</th>
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500">예정일</th>
+            {{if .CanWrite}}<th class="px-3 py-3 text-xs font-semibold text-gray-500">즉시 배정</th>{{end}}
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500">원본</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{if .Items}}
+          {{range .Items}}
+          <tr class="hover:bg-gray-50 {{if .HasKind "delayed"}}bg-red-50/30{{end}}">
+            {{if $.CanWrite}}
+            <td class="px-3 py-2 text-center">
+              <input form="bulk" type="checkbox" name="item_key" value="{{.ItemKey}}" class="rounded border-gray-300">
+            </td>
+            {{end}}
+            {{if $.ShowAssignee}}
+            <td class="px-3 py-2 whitespace-nowrap text-gray-700 font-medium">{{if .Assignee}}{{.Assignee}}{{else}}<span class="text-gray-300">—</span>{{end}}</td>
+            {{end}}
+            <td class="px-3 py-2 whitespace-nowrap">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+              {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
+            </td>
+            <td class="px-3 py-2 font-mono text-blue-600">
+              <a href="{{.Href}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}}{{else}}—{{end}}</a>
+            </td>
+            <td class="px-3 py-2">
+              <a href="{{.Href}}" class="block hover:underline">
+                <span class="font-medium text-gray-800">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</span>
+                <p class="text-xs text-gray-500 mt-0.5 truncate max-w-md">{{.Title}}</p>
+              </a>
+              {{if .NoDateReason}}<p class="text-[11px] text-amber-800 mt-0.5">미정 · {{.NoDateReason}}{{if .NoDateAt}} · {{.NoDateAt}}{{end}}</p>{{end}}
+            </td>
+            <td class="px-3 py-2">
+              <div class="flex flex-wrap gap-1">
+                {{range .Badges}}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{.Class}}">{{.Label}}</span>
+                {{end}}
+              </div>
+            </td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
+            {{if $.CanWrite}}
+            <td class="px-3 py-2 whitespace-nowrap">
+              <form method="POST" action="/plan/unplanned/assign" class="inline-flex items-center gap-1">
+                {{if $.MineQ}}<input type="hidden" name="mine" value="{{if $.Mine}}1{{else}}0{{end}}">{{end}}
+                {{if $.Kind}}<input type="hidden" name="kind" value="{{$.Kind}}">{{end}}
+                <input type="hidden" name="item_key" value="{{.ItemKey}}">
+                <input type="date" name="visit_date" required class="border border-gray-300 rounded px-1.5 py-1 text-xs">
+                <button type="submit" class="px-2 py-1 rounded bg-blue-600 text-white text-[11px] hover:bg-blue-700">배정</button>
+              </form>
+              {{if .CanNoDate}}
+              <button type="button" data-key="{{.ItemKey}}" @click="nodateKey=$event.currentTarget.getAttribute('data-key'); nodateOpen=true"
+                      class="mt-1 px-2 py-0.5 rounded border border-amber-200 text-amber-800 text-[11px] hover:bg-amber-50">미정</button>
+              {{end}}
+            </td>
+            {{end}}
+            <td class="px-3 py-2 whitespace-nowrap">
+              <a href="{{.Href}}" class="text-xs text-blue-600 hover:underline">원본 →</a>
+            </td>
+          </tr>
+          {{end}}
+          {{else}}
+          <tr><td colspan="9" class="px-4 py-10 text-center text-gray-400">미계획 업무가 없습니다.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {{if .CanWrite}}
+  <div x-show="nodateOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4" @keydown.escape.window="nodateOpen=false">
+    <form method="POST" action="/plan/unplanned/no-date" class="bg-white rounded-xl shadow-lg w-full max-w-md p-5 space-y-3">
+      {{if .MineQ}}<input type="hidden" name="mine" value="{{if .Mine}}1{{else}}0{{end}}">{{end}}
+      {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
+      <input type="hidden" name="item_key" :value="nodateKey">
+      <h3 class="font-semibold text-gray-800">미정 + 사유</h3>
+      <p class="text-xs text-gray-500">예정일을 정할 수 없으면 사유를 남깁니다. 14일 후 재검토 뱃지가 붙습니다.</p>
+      <select name="no_date_reason" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="parts">부품 대기</option>
+        <option value="customer">고객 일정 미확정</option>
+        <option value="vendor">외부 업체 회신 대기</option>
+        <option value="other">기타</option>
+      </select>
+      <input type="text" name="no_date_detail" placeholder="기타인 경우 직접 입력" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <div class="flex justify-end gap-2">
+        <button type="button" @click="nodateOpen=false" class="px-3 py-1.5 rounded-lg border text-sm">취소</button>
+        <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm">등록</button>
+      </div>
+    </form>
+  </div>
+  {{end}}
+</div>
+{{end}}

@@ -3,14 +3,15 @@
 {{define "content"}}
 <div class="space-y-5" x-data="{
   addOpen: false, doneOpen: false, editOpen: false,
-  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'' },
+  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'', project:'' },
   openEdit(el) {
     const d = el.dataset;
     this.edit = {
       id: d.id || '', date: d.date || '', customer: d.customer || '',
       product: d.product || '', assignee: d.assignee || '',
       category: d.category || 'normal', notes: d.notes || '',
-      completed: d.completed === '1', completedDate: d.completedDate || d.date || ''
+      completed: d.completed === '1', completedDate: d.completedDate || d.date || '',
+      project: d.project || ''
     };
     this.editOpen = true;
   }
@@ -54,10 +55,8 @@
               class="px-4 py-2 border border-green-600 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">지난 방문 일괄 완료</button>
       {{end}}
       {{if .IsAdmin}}
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/generate" class="inline"
-            onsubmit="return confirm('자동 생성된 방문만 삭제한 뒤 다시 채웁니다. 계속할까요?');">
-        <button type="submit" class="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50">자동 배정</button>
-      </form>
+      <a href="/maintenance/{{.Plan.PlanID}}/generate"
+         class="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50">자동 배정</a>
       {{end}}
       <a href="/maintenance/{{.Plan.PlanID}}/export.xlsx{{if and .ShowScopeToggle .ScopeAll}}?all=1{{end}}"
          class="px-4 py-2 border border-green-300 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">엑셀 받기</a>
@@ -71,15 +70,24 @@
         <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">승인</button>
       </form>
       {{end}}
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/delete" class="inline"
-            onsubmit="return confirm('계획을 삭제하면 방문 데이터도 함께 지워집니다. 계속할까요?');">
-        <button type="submit" class="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">계획 삭제</button>
+      {{if eq .Plan.Status "archived"}}
+      <span class="px-4 py-2 text-sm text-gray-500">보관됨</span>
+      {{else}}
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/archive" class="inline"
+            onsubmit="return confirm('이 계획을 보관할까요? 일정은 남고 삭제만 막힙니다.');">
+        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">보관</button>
       </form>
+      <a href="/maintenance/{{.Plan.PlanID}}/delete"
+         class="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">계획 삭제</a>
+      {{end}}
       {{end}}
       <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">사이트 설정</a>
     </div>
   </div>
 
+  {{if .FlashErr}}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>
+  {{end}}
   {{if .FlashDone}}
   <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
     {{.FlashDone}}건을 방문 완료로 처리했습니다.
@@ -88,6 +96,77 @@
   {{if eq .FlashOK "edit"}}
   <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
     방문 일정을 수정했습니다.
+  </div>
+  {{else if eq .FlashOK "assign"}}
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+    미배정 건에 방문일을 넣었습니다.
+  </div>
+  {{else if .FlashOK}}
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>
+  {{end}}
+
+  {{if .HolidayMissing}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
+    <p>{{.HolidayMissing}}</p>
+    <a href="/admin/holidays?year={{.Plan.PlanYear}}" class="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">휴무일 등록</a>
+  </div>
+  {{end}}
+
+  {{if and .DupCount (gt .DupCount 0)}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
+    <p>중복 {{.DupCount}}건 발견 — 같은 달·같은 기관·같은 점검대상입니다.</p>
+    {{if .IsAdmin}}
+    <a href="/maintenance/{{.Plan.PlanID}}/duplicates?month={{.Month}}&view={{.View}}"
+       class="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">정리하기</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if .Unassigned}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="text-sm font-bold text-amber-950">일정 배정안됨</h3>
+      <p class="text-xs text-amber-800">{{.QuotaMonth}}월 주기 해당 · {{len .Unassigned}}건 (사이트×점검대상)</p>
+    </div>
+    <p class="text-[11px] text-amber-800">이번 달에 방문해야 하는데 아직 방문일이 없는 건입니다. 날짜를 넣고 배정하면 캘린더에 1건으로 들어갑니다.</p>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-[11px] text-amber-900">
+            <th class="py-1 pr-3 font-medium">사이트</th>
+            <th class="py-1 pr-3 font-medium">점검 대상</th>
+            <th class="py-1 pr-3 font-medium">주기</th>
+            {{if $.CanEdit}}<th class="py-1 font-medium">방문일 배정</th>{{end}}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-amber-200/70">
+          {{range .Unassigned}}
+          <tr>
+            <td class="py-1.5 pr-3 font-medium text-amber-950">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
+            <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
+            <td class="py-1.5 pr-3 text-xs">{{maintCycleLabel .Cycle}}</td>
+            {{if $.CanEdit}}
+            <td class="py-1.5">
+              <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/assign-slot" class="flex flex-wrap items-center gap-1.5">
+                <input type="hidden" name="customer_id" value="{{.CustomerID}}">
+                <input type="hidden" name="product_type" value="{{.ProductType}}">
+                <input type="hidden" name="month" value="{{$.Month}}">
+                <input type="hidden" name="view" value="{{$.View}}">
+                {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+                <input type="date" name="visit_date" required class="border border-amber-300 rounded-lg px-2 py-1 text-xs bg-white">
+                <select name="project_id" class="border border-amber-300 rounded-lg px-2 py-1 text-xs bg-white max-w-[10rem]">
+                  <option value="">사업명</option>
+                  {{range $.Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
+                </select>
+                <button type="submit" class="px-2 py-1 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">배정</button>
+              </form>
+            </td>
+            {{end}}
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
   </div>
   {{end}}
 
@@ -98,6 +177,8 @@
       <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{if and $tog $all}}&all=1{{end}}"
          class="px-4 py-2 {{if eq $view $v}}bg-gray-900 text-white{{else}}bg-white text-gray-700 hover:bg-gray-50{{end}}">{{mntViewLabel $v}}</a>
       {{end}}
+      <a href="/maintenance/{{$pid}}/manage"
+         class="px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300">관리</a>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 text-xs text-gray-700">
@@ -155,6 +236,13 @@
               <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
             </datalist>
             <p class="text-[11px] text-gray-400 mt-1">같은 사이트라도 점검 대상이 다르면 따로 등록합니다.</p>
+          </div>
+          <div>
+            <label class="block text-gray-600 mb-1">사업명</label>
+            <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+              <option value="">— 선택 —</option>
+              {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
+            </select>
           </div>
           <div>
             <label class="block text-gray-600 mb-1">담당자</label>
@@ -237,6 +325,13 @@
           </div>
         </div>
         <div>
+          <label class="block text-gray-600 mb-1">사업명</label>
+          <select name="project_id" x-model="edit.project" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <option value="">— 선택 —</option>
+            {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
+          </select>
+        </div>
+        <div>
           <label class="block text-gray-600 mb-1">표시 유형</label>
           <select name="entry_category" x-model="edit.category" class="w-full border border-gray-300 rounded-lg px-3 py-2">
             <option value="normal">일반 (녹색)</option>
@@ -263,7 +358,8 @@
         </div>
       </form>
       {{if .CanEdit}}
-      <form method="POST" :action="'/maintenance/visits/' + edit.id + '/delete?plan_id={{.Plan.PlanID}}&month={{.Month}}&view={{.View}}{{if and .ShowScopeToggle .ScopeAll}}&all=1{{end}}'"
+      <form method="POST" x-show="edit.date >= '{{.DeleteAfter}}'"
+            :action="'/maintenance/visits/' + edit.id + '/delete?plan_id={{.Plan.PlanID}}&month={{.Month}}&view={{.View}}{{if and .ShowScopeToggle .ScopeAll}}&all=1{{end}}'"
             class="pt-1 border-t border-gray-100"
             onsubmit="return confirm('이 방문 일정을 삭제할까요? 중복 건을 정리할 때 사용하세요.');">
         <button type="submit" class="w-full py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">이 일정 삭제</button>
@@ -308,21 +404,43 @@
     <h3 class="font-semibold text-gray-800">{{.Month}}월 점검 캘린더</h3>
     <p class="text-xs text-gray-500">{{len .MonthVisits}}건 · 사이트명 옆은 점검 대상</p>
   </div>
-  <div class="grid grid-cols-7 text-xs font-medium text-gray-600 bg-gray-50 border-b border-gray-100">
+  <div class="grid grid-cols-7 text-xs font-medium bg-gray-50 border-b border-gray-100">
     {{range $i, $d := list "일" "월" "화" "수" "목" "금" "토"}}
-    <div class="px-2 py-2 text-center {{if or (eq $i 0) (eq $i 6)}}text-gray-400{{end}}">{{$d}}</div>
+    <div class="px-2 py-2 text-center" style="{{if eq $i 0}}color:#DC2626{{else if eq $i 6}}color:#2563EB{{else}}color:#4B5563{{end}}">{{$d}}</div>
     {{end}}
   </div>
   <div class="divide-y divide-gray-100">
     {{range .Weeks}}
     <div class="grid grid-cols-7 divide-x divide-gray-100">
       {{range .}}
-      <div class="min-h-[120px] p-1.5 align-top {{if not .Date}}bg-gray-50{{else if .Weekend}}bg-gray-50/60{{end}}">
+      <div class="min-h-[120px] p-1.5 align-top {{if not .Date}}bg-gray-50{{end}}"
+           style="{{if .Date}}{{.CellStyle}}{{end}}" title="{{.DateTitle}}">
         {{if .Date}}
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold {{if .Today}}bg-gray-900 text-white rounded-full px-1.5{{else if .Weekend}}text-gray-400{{else}}text-gray-700{{end}}">{{.Day}}</span>
+          <span class="text-xs font-semibold {{if .Today}}bg-gray-900 text-white rounded-full px-1.5{{end}}"
+                style="{{if not .Today}}{{.DayStyle}}{{end}}">{{.Day}}</span>
           {{if .Visits}}<span class="text-[10px] text-gray-400">{{len .Visits}}</span>{{end}}
         </div>
+        {{if .HolidayName}}
+        <p class="text-[9px] leading-tight truncate mb-1" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
+        {{end}}
+        {{if .Leaves.Shown}}
+        <div class="mb-1 space-y-0.5" x-data="{open:false}">
+          {{range .Leaves.Shown}}
+          <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
+                style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
+          {{end}}
+          {{if gt .Leaves.More 0}}
+          <button type="button" class="block text-[9px] text-orange-700 hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
+          <div x-show="open" x-cloak class="space-y-0.5">
+            {{range .Leaves.Hidden}}
+            <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
+                  style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+        {{end}}
         <div class="space-y-1">
           {{$pid := $.Plan.PlanID}}{{$month := $.Month}}
           {{range .Visits}}
@@ -336,6 +454,7 @@
                 <button type="button" class="text-blue-600 hover:underline"
                         data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                         data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                        data-project="{{.ProjectID}}"
                         data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                         data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                         @click.stop="openEdit($event.currentTarget)">수정</button>
@@ -344,10 +463,12 @@
                   <button type="submit" class="{{if .Completed}}text-green-700{{else}}text-gray-500 hover:text-green-700{{end}} hover:underline">
                     {{if .Completed}}완료{{else}}완료{{end}}</button>
                 </form>
+                {{if ge .VisitDate $.DeleteAfter}}
                 <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=calendar{{if and $.ShowScopeToggle $.ScopeAll}}&all=1{{end}}" class="inline"
                       onsubmit="return confirm('이 방문 일정을 삭제할까요?');">
                   <button type="submit" class="text-red-600 hover:underline">삭제</button>
                 </form>
+                {{end}}
               </span>
               {{else if .Completed}}<span class="text-green-700 shrink-0">완료</span>{{end}}
             </div>
@@ -365,10 +486,10 @@
 
 {{define "mnt_kanban"}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
-  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
-  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
-  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle}}
+  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
+  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
+  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
+  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
 </div>
 {{end}}
 
@@ -380,7 +501,7 @@
     <span class="text-xs text-gray-500">{{len .Visits}}</span>
   </div>
   <div class="p-2 space-y-2 max-h-[560px] overflow-y-auto">
-    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$all := and .ShowScopeToggle .ScopeAll}}
+    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$all := and .ShowScopeToggle .ScopeAll}}{{$del := .DeleteAfter}}
     {{range .Visits}}
     <div class="rounded-lg p-2.5 text-sm {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
          style="{{mntProductStyle .ProductType}}">
@@ -398,6 +519,7 @@
           <button type="button" class="text-xs text-blue-600 hover:underline"
                   data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                   data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                  data-project="{{.ProjectID}}"
                   data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                   data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                   @click="openEdit($event.currentTarget)">수정</button>
@@ -406,10 +528,12 @@
             <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
               {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
           </form>
+          {{if ge .VisitDate $del}}
           <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{if $all}}&all=1{{end}}" class="inline"
                 onsubmit="return confirm('이 방문을 삭제할까요?');">
             <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
           </form>
+          {{end}}
         </div>
         {{end}}
       </div>
@@ -433,6 +557,7 @@
           <th class="text-left px-4 py-2">날짜</th>
           <th class="text-left px-4 py-2">사이트</th>
           <th class="text-left px-4 py-2">점검 대상</th>
+          <th class="text-left px-4 py-2">사업명</th>
           <th class="text-left px-4 py-2">담당자</th>
           <th class="text-left px-4 py-2">상태</th>
           <th class="text-right px-4 py-2"></th>
@@ -450,6 +575,7 @@
                   style="{{mntProductBadgeStyle .ProductType}}">{{.ProductType}}</span>
             {{end}}
           </td>
+          <td class="px-4 py-2 text-gray-600">{{if .ProjectName}}{{.ProjectName}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-gray-600">{{.Assignee}}</td>
           <td class="px-4 py-2">
             {{if .Completed}}
@@ -462,6 +588,7 @@
             <button type="button" class="text-xs text-blue-600 hover:underline"
                     data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                     data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                  data-project="{{.ProjectID}}"
                     data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                     data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                     @click="openEdit($event.currentTarget)">수정</button>
@@ -470,15 +597,17 @@
               <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
                 {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
             </form>
+            {{if ge .VisitDate $.DeleteAfter}}
             <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{if $all}}&all=1{{end}}" class="inline ml-2"
                   onsubmit="return confirm('이 방문을 삭제할까요?');">
               <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
             </form>
             {{end}}
+            {{end}}
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">방문이 없습니다. 방문 추가 또는 자동 배정을 사용하세요.</td></tr>
+        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">방문이 없습니다. 방문 추가 또는 자동 배정을 사용하세요.</td></tr>
         {{end}}
       </tbody>
     </table>

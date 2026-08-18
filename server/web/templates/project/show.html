@@ -17,12 +17,25 @@
       </p>
     </div>
     {{if .CanWrite}}
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
+      <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">일일 업무 현황</a>
       <a href="/projects/{{.Project.ProjectID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
+      {{if eq .Project.Status "archived"}}
+      <form method="post" action="/projects/{{.Project.ProjectID}}/activate">
+        <button type="submit" class="px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">재개</button>
+      </form>
+      {{else}}
+      <form method="post" action="/projects/{{.Project.ProjectID}}/archive"
+            onsubmit="return confirm('이 사업을 보관할까요? 일일업무 사업명 콤보에서 제외됩니다.');">
+        <button type="submit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">보관</button>
+      </form>
+      {{end}}
+      {{if .CanDelete}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/delete"
             onsubmit="return confirm('이 사업을 삭제할까요?');">
         <button type="submit" class="px-4 py-2 text-sm border border-red-200 text-red-700 rounded-lg hover:bg-red-50">삭제</button>
       </form>
+      {{end}}
     </div>
     {{end}}
   </div>
@@ -31,6 +44,10 @@
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">사업을 등록했습니다.</div>
   {{else if eq .FlashOK "updated"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.</div>
+  {{else if eq .FlashOK "archived"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">보관 처리했습니다.</div>
+  {{else if eq .FlashOK "activated"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">재개했습니다.</div>
   {{end}}
   {{if eq .FlashErr "linked"}}
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">연결된 일일업무가 있어 삭제할 수 없습니다.</div>
@@ -56,7 +73,9 @@
         </li>
         <li class="flex justify-between"><span class="text-gray-600">AS</span><span class="font-semibold">{{.Project.ASCount}}건</span></li>
         <li class="flex justify-between"><span class="text-gray-600">정기점검</span><span class="font-semibold">{{.Project.MntCount}}건</span></li>
-        <li class="flex justify-between"><span class="text-gray-600">행정/지원 업무</span><span class="font-semibold">{{.Project.TaskCount}}건</span></li>
+        <li class="flex justify-between"><span class="text-gray-600">행정/지원 업무</span>
+          <a href="/workboard/tasks" class="font-semibold text-blue-700 hover:underline">{{.Project.TaskCount}}건</a>
+        </li>
       </ul>
       <p class="text-xs text-gray-400 mt-3">AS·정기점검은 범위 규칙으로 조회합니다(원본에 사업 ID를 쓰지 않음).</p>
     </div>

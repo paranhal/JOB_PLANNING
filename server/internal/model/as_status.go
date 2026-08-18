@@ -46,16 +46,68 @@ const (
 	SQLStatusOpsInProgress = "('in_progress','partial_complete')"
 )
 
-// 처리결과코드 (조치 화면: 완료 · 부분완료 · 타사이관 · 재방문필요)
+// 처리결과코드 (조치 화면: 완료 · 추가조치 필요 · 재방문 필요 · 이관 · 대기)
 const (
 	ResultDone     = "done"
-	ResultPartial  = "partial" // 부분완료 — 추가 업무 남음
+	ResultPartial  = "partial" // 부분완료 — 화면 「추가조치 필요」
 	ResultTransfer = "transfer"
 	ResultRevisit  = "revisit_needed"
+	ResultHold     = "hold" // 화면 「대기」 → 접수 상태 hold. 저장 코드 신설 없음
 	// 하위 호환(더 이상 조치 UI에 노출하지 않음)
 	ResultTemporary  = "temporary"
 	ResultEscalation = "escalation"
 )
+
+// ActionResultOption 조치 화면 결과 선택지 (저장 코드는 유지, 문구만 화면용)
+type ActionResultOption struct {
+	Value string
+	Label string
+}
+
+// ActionResultOptions 조치 등록 화면의 결과 다섯 가지.
+func ActionResultOptions() []ActionResultOption {
+	return []ActionResultOption{
+		{ResultDone, "완료"},
+		{ResultPartial, "추가조치 필요"},
+		{ResultRevisit, "재방문 필요"},
+		{ResultTransfer, "이관"},
+		{ResultHold, "대기"},
+	}
+}
+
+// ActionResultLabel 조치 결과 화면 문구. 저장 코드는 바꾸지 않는다.
+func ActionResultLabel(code string) string {
+	switch strings.TrimSpace(code) {
+	case ResultDone:
+		return "완료"
+	case ResultPartial:
+		return "추가조치 필요"
+	case ResultRevisit:
+		return "재방문 필요"
+	case ResultTransfer:
+		return "이관"
+	case ResultHold:
+		return "대기"
+	case ResultTemporary:
+		return "임시조치"
+	case ResultEscalation:
+		return "제조사에스컬레이션"
+	default:
+		return strings.TrimSpace(code)
+	}
+}
+
+// TransferDetailLabel 이관 후 처리 화면 문구.
+func TransferDetailLabel(detail string) string {
+	switch strings.TrimSpace(detail) {
+	case TransferDetailCompleted:
+		return "처리 확인 후 완료"
+	case TransferDetailWaiting:
+		return "우리 팀 추가 작업"
+	default:
+		return strings.TrimSpace(detail)
+	}
+}
 
 // 타사이관 세부
 const (
@@ -99,6 +151,8 @@ type ASWorkItemDraft struct {
 	ConfirmTarget     string
 	ConfirmContact    string
 	Notes             string
+	AssignedTo        string
+	AssignedUserID    string
 }
 
 func setCompleteDatetimeIfEmpty(as *ASReceipt, now time.Time) {

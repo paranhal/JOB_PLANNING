@@ -12,24 +12,49 @@ import (
 
 // Role helpers
 func currentRole(c echo.Context) string {
-	return ctxString(c, "role")
+	return model.NormalizeRole(ctxString(c, "role"))
+}
+
+func currentPerms(c echo.Context) []string {
+	if v := c.Get("permissions"); v != nil {
+		if p, ok := v.([]string); ok {
+			return p
+		}
+	}
+	return model.EffectivePermissions(currentRole(c), "")
+}
+
+func hasPerm(c echo.Context, key string) bool {
+	if currentRole(c) == model.RoleAdmin {
+		return true
+	}
+	return model.HasPermission(currentPerms(c), key)
 }
 
 func isAdminRole(c echo.Context) bool {
-	return currentRole(c) == "admin"
+	return currentRole(c) == model.RoleAdmin
 }
 
 func isTechRole(c echo.Context) bool {
-	return currentRole(c) == "tech"
+	return currentRole(c) == model.RoleTech
 }
 
 func isReceiptRole(c echo.Context) bool {
-	return currentRole(c) == "receipt"
+	// 행정 등급이 기존 접수담당 역할 대체
+	return currentRole(c) == model.RoleOffice
 }
 
+func isOfficeRole(c echo.Context) bool {
+	return currentRole(c) == model.RoleOffice
+}
+
+func isObserverRole(c echo.Context) bool {
+	return currentRole(c) == model.RoleObserver
+}
+
+// isSuspendedRole 옵저버는 쓰기 메뉴·작업 제한(조회·계정만)
 func isSuspendedRole(c echo.Context) bool {
-	r := currentRole(c)
-	return r == "sales" || r == "viewer"
+	return isObserverRole(c)
 }
 
 func canEditVisitDate(c echo.Context, as *model.ASReceipt) bool {
@@ -65,13 +90,17 @@ func normalizeVisitDate(s string) string {
 }
 
 func canReceiveAS(c echo.Context) bool {
-	r := currentRole(c)
-	return r == "admin" || r == "receipt" || r == "tech"
+	if isObserverRole(c) {
+		return false
+	}
+	return hasPerm(c, model.PermASReceive)
 }
 
 func canProcessAS(c echo.Context) bool {
-	r := currentRole(c)
-	return r == "admin" || r == "tech"
+	if isObserverRole(c) {
+		return false
+	}
+	return hasPerm(c, model.PermASProcess)
 }
 
 // isASClosedStatus 완료·종료 — 기본 읽기 전용
@@ -80,26 +109,30 @@ func isASClosedStatus(status string) bool {
 }
 
 func canWriteMaster(c echo.Context) bool {
-	return currentRole(c) == "admin"
+	if isObserverRole(c) {
+		return false
+	}
+	return hasPerm(c, model.PermMasterWrite)
 }
 
 func canManageCodes(c echo.Context) bool {
-	return currentRole(c) == "admin"
+	return hasPerm(c, model.PermCodesUsers)
 }
 
 func canViewAnalysis(c echo.Context) bool {
-	return currentRole(c) == "admin"
+	return hasPerm(c, model.PermAnalysis)
 }
 
 func canViewMaintenance(c echo.Context) bool {
-	r := currentRole(c)
-	return r == "admin" || r == "tech"
+	return hasPerm(c, model.PermMaintenance) || hasPerm(c, model.PermMaintenanceEdit)
 }
 
-// canEditMaintenanceSchedule 정기점검 방문 일정 수정 — 관리자·기술담당(현장 담당자)
+// canEditMaintenanceSchedule 정기점검 방문 일정 수정
 func canEditMaintenanceSchedule(c echo.Context) bool {
-	r := currentRole(c)
-	return r == "admin" || r == "tech"
+	if isObserverRole(c) {
+		return false
+	}
+	return hasPerm(c, model.PermMaintenanceEdit)
 }
 
 // mntScopeAll 정기점검 일정 조회 범위 — 관리자는 항상 전체, 기술담당은 all=1 일 때만 전체
@@ -134,26 +167,35 @@ func currentUserID(c echo.Context) string {
 	return ctxString(c, "user_id")
 }
 
-// RequireActiveRole sales/viewer 업무 접근 차단 (account/logout 제외는 라우트에서 분리)
+// RequireActiveRole 옵저버는 전체 화면 조회(GET) 가능, 쓰기는 계정만 허용
 func (h *AuthHandler) RequireActiveRole(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if isSuspendedRole(c) {
-			path := c.Request().URL.Path
-			if path == "/" || path == "/account" || strings.HasPrefix(path, "/account/") {
-				return next(c)
-			}
-			return c.Redirect(http.StatusSeeOther, "/")
+		if !isSuspendedRole(c) {
+			return next(c)
 		}
-		return next(c)
+		path := c.Request().URL.Path
+		method := c.Request().Method
+		if method == http.MethodGet || method == http.MethodHead {
+			return next(c)
+		}
+		// 계정 프로필·비밀번호 변경만 POST 허용
+		if strings.HasPrefix(path, "/account/") {
+			return next(c)
+		}
+		return c.Redirect(http.StatusSeeOther, path)
 	}
 }
 
 func (h *AuthHandler) RequireAdminMW(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if !isAdminRole(c) {
-			return h.forbidden(c)
+		if isAdminRole(c) || hasPerm(c, model.PermCodesUsers) {
+			return next(c)
 		}
-		return next(c)
+		// 옵저버: 관리 메뉴도 조회(GET)만
+		if isObserverRole(c) && (c.Request().Method == http.MethodGet || c.Request().Method == http.MethodHead) {
+			return next(c)
+		}
+		return h.forbidden(c)
 	}
 }
 
@@ -182,4 +224,13 @@ func (h *AuthHandler) RequireMasterWrite(next echo.HandlerFunc) echo.HandlerFunc
 		}
 		return next(c)
 	}
+}
+
+// parsePermForm 체크박스 name=perm 수집
+func parsePermForm(c echo.Context) string {
+	form, err := c.FormParams()
+	if err != nil || form == nil {
+		return ""
+	}
+	return model.FormatPermissions(form["perm"])
 }

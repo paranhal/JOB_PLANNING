@@ -122,8 +122,8 @@ func TestVisitPastExcludesAlreadyVisited(t *testing.T) {
 	insert("AS-DONE", "R2605-001") // 예정일 이후 방문 이력 있음
 	insert("AS-NONE", "R2605-002") // 아직 안 다녀온 건
 
-	if _, err := db.Exec(`INSERT INTO as_processes (process_id, process_number, as_id, process_datetime, worker, work_content)
-		VALUES ('P1','P1','AS-DONE',?,'테크','임시조치')`, visited); err != nil {
+	if _, err := db.Exec(`INSERT INTO as_processes (process_id, process_number, as_id, process_datetime, worker, work_content, time_spent)
+		VALUES ('P1','P1','AS-DONE',?,'테크','임시조치',30)`, visited); err != nil {
 		t.Fatal(err)
 	}
 

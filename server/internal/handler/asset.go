@@ -90,7 +90,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 
 	asset := &model.Asset{
 		IsManaged: true, OperationStatus: "operating",
-		ProductCategory: "rfid", ProjectID: repository.ProjectIDAnroboticsRFID,
+		ProductCategory: "rfid",
 	}
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		asset.CustomerID = cid
@@ -115,7 +115,7 @@ func (h *AssetHandler) Create(c echo.Context) error {
 	if a.ProductCategory == "" {
 		a.ProductCategory = "other"
 	}
-	applyRFIDProjectDefault(a)
+	applyAssetBusinessRules(a)
 	if err := h.repo.Create(a); err != nil {
 		return err
 	}
@@ -226,20 +226,28 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 func (h *AssetHandler) Update(c echo.Context) error {
 	a := bindAsset(c)
 	a.AssetID = c.Param("id")
-	applyRFIDProjectDefault(a)
+	applyAssetBusinessRules(a)
 	if err := h.repo.Update(a); err != nil {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/assets/"+a.AssetID)
 }
 
-// applyRFIDProjectDefault RFID자동화 분류이고 사업 미선택이면 앤로보틱스 RFID 사업으로 둔다.
-func applyRFIDProjectDefault(a *model.Asset) {
+// applyAssetBusinessRules 타사장비 규칙을 적용한다.
+func applyAssetBusinessRules(a *model.Asset) {
+	applyThirdPartyRules(a)
+}
+
+// applyThirdPartyRules 관리유형 타사장비는 당사 비관리. 설치주체만 타사이고 유형이 비면 타사장비로 둔다.
+func applyThirdPartyRules(a *model.Asset) {
 	if a == nil {
 		return
 	}
-	if strings.EqualFold(strings.TrimSpace(a.ProductCategory), "rfid") && strings.TrimSpace(a.ProjectID) == "" {
-		a.ProjectID = repository.ProjectIDAnroboticsRFID
+	if strings.TrimSpace(a.ManagementType) == "" && strings.EqualFold(strings.TrimSpace(a.InstallerType), "other") {
+		a.ManagementType = model.ManagementTypeThirdParty
+	}
+	if a.IsThirdPartyEquipment() {
+		a.IsManaged = false
 	}
 }
 
@@ -282,7 +290,7 @@ func bindAsset(c echo.Context) *model.Asset {
 		OriginalInstaller: c.FormValue("original_installer"),
 		OperationStatus:   c.FormValue("operation_status"),
 		ManagementType:    c.FormValue("management_type"),
-		IsManaged:         c.FormValue("is_managed") != "0",
+		IsManaged:         c.FormValue("is_managed") == "1",
 		MaintContractType: c.FormValue("maint_contract_type"),
 		MaintCycle:        maintCycle,
 		MaintStartDate:    c.FormValue("maint_start_date"),

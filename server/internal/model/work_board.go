@@ -60,6 +60,7 @@ type WorkDashStats struct {
 	PendingByAssignee    []AssigneePrefixStats `json:"pending_by_assignee"`
 	Unassigned           int                   `json:"unassigned"`
 	UnassignedPrefixLine string                `json:"unassigned_prefix_line"` // 미배정은 접두어만: "[AS] 2 / [정기점검] 1"
+	Unplanned            int                   `json:"unplanned"`              // §8 미계획(유형 합산, 건 중복 제거)
 }
 
 // AssigneePrefixStats 담당자별 접두어 집계 (대시보드 카드용)

@@ -17,6 +17,16 @@ func NewASRepo(db *sql.DB) *ASRepo {
 	return &ASRepo{db: db}
 }
 
+// touchReceipt §25.2 AS 접수 수정 이력을 남긴다.
+func (r *ASRepo) touchReceipt(asID string, fn func() error) error {
+	label := asID
+	var num string
+	if err := r.db.QueryRow(`SELECT COALESCE(as_number,'') FROM as_receipts WHERE as_id=?`, asID).Scan(&num); err == nil && num != "" {
+		label = num
+	}
+	return touchUpdate(r.db, "as_receipts", "as_id", asID, label, fn)
+}
+
 // List AS 목록 조회
 // status: overdue / today / visit_past|visit_today|visit_upcoming / open|in_progress / done|completed / completed_today / 일반상태
 // mineUserID / mineKeys: 본인 배정 필터 (user_id 우선, 이름·아이디 보조)
@@ -431,7 +441,8 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.received_by,''),
 		       COALESCE(ar.visit_scheduled_date,''),
 		       COALESCE(ar.schedule_confirmed,0),
-		       ar.status, COALESCE(ar.process_type,''), COALESCE(ar.cause_type,''),
+		       ar.status, COALESCE(ar.process_type,''), COALESCE(ar.work_place,''), COALESCE(ar.cause_type,''),
+		       COALESCE(ar.cause_detail,''), COALESCE(ar.conclusion,''),
 		       COALESCE(ar.action_taken,''), COALESCE(ar.parts_used,''),
 		       ar.is_recurrence, COALESCE(ar.is_reopen,0), COALESCE(ar.replace_review,0),
 		       COALESCE(ar.result_code,''), COALESCE(ar.revisit_reason,''),
@@ -462,7 +473,8 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		&as.ReceivedBy,
 		&as.VisitScheduledDate,
 		&scheduleConfirmed,
-		&as.Status, &as.ProcessType, &as.CauseType,
+		&as.Status, &as.ProcessType, &as.WorkPlace, &as.CauseType,
+		&as.CauseDetail, &as.Conclusion,
 		&as.ActionTaken, &as.PartsUsed,
 		&isRecurrence, &isReopen, &replaceReview,
 		&as.ResultCode, &as.RevisitReason,
@@ -511,6 +523,7 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 	}
 	as.ASNumber = num
 	as.ASID = num // 신규: PK = 표시용 접수번호
+	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
 	now := time.Now().Format("2006-01-02 15:04:05")
 	receiptStr := receiptAt.Format("2006-01-02 15:04:05")
 	_, err = r.db.Exec(`
@@ -520,8 +533,8 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			requester_type, requester_name, assigned_to, assigned_user_id, received_by,
 			visit_scheduled_date, schedule_confirmed, status,
 			is_recurrence, is_reopen, parent_as_id, reopen_reason,
-			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			project_id, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
 		as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
@@ -529,9 +542,13 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 		model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed),
 		boolToInt(as.IsRecurrence), boolToInt(as.IsReopen),
 		nullStr(as.ParentASID), nullStr(as.ReopenReason),
-		now, now,
+		nullStr(as.ProjectID), now, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	// §25.2 AS 접수 등록은 이력 미기록(○)
+	return nil
 }
 
 // ListReopens 이 접수를 원본으로 다시 접수된 건들 (최신순)
@@ -567,15 +584,13 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	nowStr := now.Format("2006-01-02 15:04:05")
 
 	var oldStatus string
-	var oldStart, oldComplete string
-	r.db.QueryRow(`SELECT status, COALESCE(start_datetime,''), COALESCE(complete_datetime,'') FROM as_receipts WHERE as_id=?`, as.ASID).
-		Scan(&oldStatus, &oldStart, &oldComplete)
+	var oldComplete string
+	r.db.QueryRow(`SELECT status, COALESCE(complete_datetime,'') FROM as_receipts WHERE as_id=?`, as.ASID).
+		Scan(&oldStatus, &oldComplete)
 
 	startDT := ""
 	if as.StartDatetime != nil && !as.StartDatetime.IsZero() {
 		startDT = as.StartDatetime.Format("2006-01-02 15:04:05")
-	} else if model.IsASWorkflowStatus(oldStatus) && as.Status == "in_progress" && oldStart == "" {
-		startDT = nowStr
 	}
 
 	completeDT := ""
@@ -591,14 +606,16 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	}
 
 	q := `UPDATE as_receipts SET
-			status=?, assigned_to=?, assigned_user_id=?, process_type=?, cause_type=?,
+			status=?, assigned_to=?, assigned_user_id=?, process_type=?, work_place=?, cause_type=?,
+			cause_detail=?, conclusion=?,
 			action_taken=?, parts_used=?, result_code=?, revisit_reason=?, hold_reason=?, followup_action=?,
 			customer_confirmer=?, is_recurrence=?, is_reopen=?, replace_review=?,
 			visit_scheduled_date=?, schedule_confirmed=?,
 			transfer_detail=?, confirm_target=?, confirm_contact=?,
 			updated_at=?`
 	args := []interface{}{
-		as.Status, as.AssignedTo, as.AssignedUserID, as.ProcessType, as.CauseType,
+		as.Status, as.AssignedTo, as.AssignedUserID, as.ProcessType, as.WorkPlace, as.CauseType,
+		as.CauseDetail, as.Conclusion,
 		as.ActionTaken, as.PartsUsed, as.ResultCode, as.RevisitReason, as.HoldReason, as.FollowupAction,
 		as.CustomerConfirmer, boolToInt(as.IsRecurrence), boolToInt(as.IsReopen), boolToInt(as.ReplaceReview),
 		nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
@@ -624,7 +641,29 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	q += ` WHERE as_id=?`
 	args = append(args, as.ASID)
 
-	_, err := r.db.Exec(q, args...)
+	err := touchUpdate(r.db, "as_receipts", "as_id", as.ASID, as.ASNumber, func() error {
+		_, err := r.db.Exec(q, args...)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	// 접수 완료·종료·취소 시 확인·재방문 하부업무도 함께 닫아 지연 목록에 남지 않게 한다.
+	if as.Status == "completed" || as.Status == "closed" || as.Status == "cancelled" {
+		_ = NewASWorkRepo(r.db).CloseOpenByAS(as.ASID)
+	}
+	return nil
+}
+
+// SetStartDatetimeFromFirstProcess 착수시각이 비어 있고 조치가 있으면
+// 최초 process_datetime으로 채운다. 이미 값이 있으면 덮어쓰지 않는다. (§4.2 · §12.5-4)
+func (r *ASRepo) SetStartDatetimeFromFirstProcess(asID string) error {
+	_, err := r.db.Exec(`
+		UPDATE as_receipts SET start_datetime = (
+			SELECT MIN(p.process_datetime) FROM as_processes p WHERE p.as_id = as_receipts.as_id)
+		 WHERE as_id = ?
+		   AND TRIM(COALESCE(start_datetime,'')) = ''
+		   AND EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id = as_receipts.as_id)`, asID)
 	return err
 }
 
@@ -636,16 +675,19 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	var curStatus string
 	_ = r.db.QueryRow(`SELECT status FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&curStatus)
 
+	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
 	q := `UPDATE as_receipts SET
 			receipt_datetime=?, customer_id=?, asset_id=?,
 			receipt_channel=?, requester=?, symptom=?, urgency=?, priority=?,
 			requester_type=?, requester_name=?, assigned_to=?, assigned_user_id=?,
-			received_by=?, visit_scheduled_date=?, schedule_confirmed=?, updated_at=?`
+			received_by=?, visit_scheduled_date=?, schedule_confirmed=?,
+			project_id=?, updated_at=?`
 	args := []interface{}{
 		receiptStr, as.CustomerID, nullStr(as.AssetID),
 		as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID,
-		as.ReceivedBy, nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed), now,
+		as.ReceivedBy, nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
+		nullStr(as.ProjectID), now,
 	}
 	if model.IsASWorkflowStatus(curStatus) {
 		q += `, status=?`
@@ -653,8 +695,10 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	}
 	q += ` WHERE as_id=?`
 	args = append(args, as.ASID)
-	_, err := r.db.Exec(q, args...)
-	return err
+	return touchUpdate(r.db, "as_receipts", "as_id", as.ASID, as.ASNumber, func() error {
+		_, err := r.db.Exec(q, args...)
+		return err
+	})
 }
 
 // UpdateVisitScheduledDate 예정업무일·일정확정 수정 (+워크플로 상태 재파생)
@@ -665,14 +709,66 @@ func (r *ASRepo) UpdateVisitScheduledDate(asID, date string, scheduleConfirmed b
 		Scan(&assignedTo, &assignedUID, &curStatus)
 	q := `UPDATE as_receipts SET visit_scheduled_date=?, schedule_confirmed=?, updated_at=?`
 	args := []interface{}{nullStr(date), boolToInt(scheduleConfirmed), now}
+	if strings.TrimSpace(date) != "" {
+		q += `, schedule_no_date_reason=NULL, schedule_no_date_at=NULL`
+	}
 	if model.IsASWorkflowStatus(curStatus) {
 		q += `, status=?`
 		args = append(args, model.DeriveASWorkflowStatus(assignedTo, assignedUID, scheduleConfirmed))
 	}
 	q += ` WHERE as_id=?`
 	args = append(args, asID)
-	_, err := r.db.Exec(q, args...)
-	return err
+	return r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(q, args...)
+		return err
+	})
+}
+
+// AssignUnplanned 미계획 업무함에서 예정일을 넣고(확정) 선택적으로 담당자를 붙인다.
+func (r *ASRepo) AssignUnplanned(asID, date, assignee, assigneeUID string) error {
+	date = strings.TrimSpace(date)
+	if date == "" {
+		return fmt.Errorf("날짜가 필요합니다")
+	}
+	assignee = strings.TrimSpace(assignee)
+	assigneeUID = strings.TrimSpace(assigneeUID)
+	if assignee != "" || assigneeUID != "" {
+		now := time.Now().Format("2006-01-02 15:04:05")
+		if err := r.touchReceipt(asID, func() error {
+			_, err := r.db.Exec(`UPDATE as_receipts SET assigned_to=?, assigned_user_id=?, updated_at=? WHERE as_id=?`,
+				assignee, assigneeUID, now, asID)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+	return r.UpdateVisitScheduledDate(asID, date, true)
+}
+
+// SetScheduleNoDate 「미정+사유」 등록. 예정일은 비우고 14일 후 재검토 기준일을 남긴다.
+func (r *ASRepo) SetScheduleNoDate(asID, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return fmt.Errorf("미정 사유가 필요합니다")
+	}
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	ts := now.Format("2006-01-02 15:04:05")
+	var assignedTo, assignedUID, curStatus string
+	_ = r.db.QueryRow(`SELECT COALESCE(assigned_to,''), COALESCE(assigned_user_id,''), status FROM as_receipts WHERE as_id=?`, asID).
+		Scan(&assignedTo, &assignedUID, &curStatus)
+	status := curStatus
+	if model.IsASWorkflowStatus(curStatus) {
+		status = model.DeriveASWorkflowStatus(assignedTo, assignedUID, false)
+	}
+	return r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(`
+		UPDATE as_receipts
+		SET visit_scheduled_date=NULL, schedule_confirmed=0,
+		    schedule_no_date_reason=?, schedule_no_date_at=?, status=?, updated_at=?
+		WHERE as_id=?`, reason, today, status, ts, asID)
+		return err
+	})
 }
 
 // SyncWorkflowStatus 보류 해제 등에서 필드 기준 상태로 맞춤
@@ -686,9 +782,11 @@ func (r *ASRepo) SyncWorkflowStatus(asID string) error {
 		return err
 	}
 	st := model.DeriveASWorkflowStatus(assignedTo, assignedUID, confirmed == 1)
-	_, err = r.db.Exec(`UPDATE as_receipts SET status=?, hold_reason='', hold_next_action='', updated_at=? WHERE as_id=?`,
-		st, now, asID)
-	return err
+	return r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(`UPDATE as_receipts SET status=?, hold_reason='', hold_next_action='', updated_at=? WHERE as_id=?`,
+			st, now, asID)
+		return err
+	})
 }
 
 // ListSchedulePending 배정됐으나 일정 미확정 건
@@ -743,9 +841,11 @@ func (r *ASRepo) ListSchedulePending(mineUserID string, mineKeys []string, limit
 // SetHold 보류 처리 (nextAction: action|transfer|cancel)
 func (r *ASRepo) SetHold(asID, reason, nextAction string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`UPDATE as_receipts SET status='hold', hold_reason=?, hold_next_action=?, updated_at=? WHERE as_id=?`,
-		reason, nextAction, now, asID)
-	return err
+	return r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(`UPDATE as_receipts SET status='hold', hold_reason=?, hold_next_action=?, updated_at=? WHERE as_id=?`,
+			reason, nextAction, now, asID)
+		return err
+	})
 }
 
 // ReleaseHold 보류 해제 → 필드 기준 워크플로 상태로 복귀
@@ -758,11 +858,13 @@ func (r *ASRepo) SetTransfer(asID string) error {
 	now := time.Now()
 	follow := model.DefaultTransferFollowupDate(now)
 	ts := now.Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`UPDATE as_receipts SET status='in_progress', transfer_detail='waiting',
+	return r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(`UPDATE as_receipts SET status='in_progress', transfer_detail='waiting',
 		visit_scheduled_date = CASE WHEN COALESCE(visit_scheduled_date,'') = '' THEN ? ELSE visit_scheduled_date END,
 		schedule_confirmed = 1,
 		updated_at=? WHERE as_id=?`, follow, ts, asID)
-	return err
+		return err
+	})
 }
 
 // CompleteTransfer 이관 건 결과코드로 완료 (완료일 지정)
@@ -775,9 +877,16 @@ func (r *ASRepo) CompleteTransfer(asID, resultCode, completeDate string) error {
 	if len(completeDT) == 10 {
 		completeDT = completeDT + " 00:00:00"
 	}
-	_, err := r.db.Exec(`UPDATE as_receipts SET status='completed', result_code=?, complete_datetime=?, updated_at=? WHERE as_id=?`,
-		resultCode, completeDT, now, asID)
-	return err
+	err := r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(`UPDATE as_receipts SET status='completed', result_code=?, complete_datetime=?, updated_at=? WHERE as_id=?`,
+			resultCode, completeDT, now, asID)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	_ = NewASWorkRepo(r.db).CloseOpenByAS(asID)
+	return nil
 }
 
 // SetCancelled 접수취소
@@ -790,9 +899,16 @@ func (r *ASRepo) SetCancelled(asID, cancelDate string) error {
 	if len(cancelDT) == 10 {
 		cancelDT = cancelDT + " 00:00:00"
 	}
-	_, err := r.db.Exec(`UPDATE as_receipts SET status='cancelled', cancel_datetime=?, updated_at=? WHERE as_id=?`,
-		cancelDT, now, asID)
-	return err
+	err := r.touchReceipt(asID, func() error {
+		_, err := r.db.Exec(`UPDATE as_receipts SET status='cancelled', cancel_datetime=?, updated_at=? WHERE as_id=?`,
+			cancelDT, now, asID)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	_ = NewASWorkRepo(r.db).CloseOpenByAS(asID)
+	return nil
 }
 
 // ListPastHistory 동일 기관의 완료·종료 AS 이력 (현재 건 제외)
@@ -947,21 +1063,25 @@ func formatElapsed(from, to time.Time) string {
 
 // Delete 접수 및 처리 이력 삭제
 func (r *ASRepo) Delete(asID string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM as_processes WHERE as_id=?`, asID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM as_work_items WHERE as_id=?`, asID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM as_receipts WHERE as_id=?`, asID); err != nil {
-		return err
-	}
-	return tx.Commit()
+	var num string
+	_ = r.db.QueryRow(`SELECT as_number FROM as_receipts WHERE as_id=?`, asID).Scan(&num)
+	return touchDelete(r.db, "as_receipts", "as_id", asID, num, func() error {
+		tx, err := r.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec(`DELETE FROM as_processes WHERE as_id=?`, asID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM as_work_items WHERE as_id=?`, asID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM as_receipts WHERE as_id=?`, asID); err != nil {
+			return err
+		}
+		return tx.Commit()
+	})
 }
 
 // ListOverdue 지연 AS 목록 (3일 초과 미처리)

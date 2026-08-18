@@ -19,7 +19,9 @@ const (
 	assetMaterialsChungnamLinkMetaKey = "__meta:asset_materials_chungnam_wpseed01_v1"
 	assetSejongLibraryICTLinkMetaKey  = "__meta:asset_sejong_library_ict_wpseed02_v2"
 	projectDisplayNamesV2MetaKey      = "__meta:project_display_names_v2"
+	projectDedupeByNameMetaKey        = "__meta:project_dedupe_by_name_v1"
 	assetProductTypeUpperMetaKey      = "__meta:asset_product_type_upper_v1"
+	asPlannedDailyTaskMetaKey         = "__meta:as_planned_daily_task_v1"
 )
 
 // 시드 사업 ID

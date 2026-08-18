@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,18 +10,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/audit"
+	"customer-support/internal/auditlog"
 	"customer-support/internal/model"
+	"customer-support/internal/passwd"
 	"customer-support/internal/repository"
 )
 
 type AuthHandler struct {
-	userRepo  *repository.UserRepo
-	jwtSecret []byte
-}
-
-func HashPassword(pw string) string {
-	h := sha256.Sum256([]byte(pw))
-	return fmt.Sprintf("%x", h)
+	userRepo     *repository.UserRepo
+	settingsRepo *repository.SettingsRepo
+	jwtSecret    []byte
 }
 
 func (h *AuthHandler) LoginPage(c echo.Context) error {
@@ -32,16 +30,43 @@ func (h *AuthHandler) LoginPage(c echo.Context) error {
 }
 
 func (h *AuthHandler) Login(c echo.Context) error {
-	username := c.FormValue("username")
+	username := strings.TrimSpace(c.FormValue("username"))
 	password := c.FormValue("password")
 
-	user, err := h.userRepo.GetByUsername(username)
-	if err != nil || user == nil || user.PasswordHash != HashPassword(password) || !user.IsActive {
+	fail := func(user *model.User, reason string) error {
+		rec := auditlog.Record{
+			Action:   auditlog.ActionLoginFail,
+			Result:   auditlog.ResultDeny,
+			Reason:   reason,
+			Detail:   "로그인 실패",
+			Username: username,
+		}
+		if user != nil {
+			rec.UserID = user.UserID
+			rec.Username = user.Username
+			rec.FullName = user.FullName
+			rec.Role = user.Role
+		}
+		accessLog(c, rec)
 		return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
 			"Title": "로그인", "Active": "login", "HideNav": true,
 			"Error": "아이디 또는 비밀번호가 잘못되었습니다.",
 		})
 	}
+
+	user, err := h.userRepo.GetByUsername(username)
+	if err != nil || user == nil {
+		return fail(nil, "비밀번호오류")
+	}
+	if !user.IsActive {
+		return fail(user, "권한없음")
+	}
+	if !verifyPassword(user.PasswordHash, password) {
+		return fail(user, "비밀번호오류")
+	}
+	upgradeLegacyPassword(user.PasswordHash, password, func(nh string) error {
+		return h.userRepo.UpdatePassword(user.UserID, nh)
+	})
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":  user.UserID,
@@ -60,10 +85,29 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   86400,
 	})
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionLogin,
+		Result:      auditlog.ResultOK,
+		UserID:      user.UserID,
+		Username:    user.Username,
+		FullName:    user.FullName,
+		Role:        user.Role,
+		SessionID:   auditlog.SessionFingerprint(tokenStr),
+		Detail:      "로그인",
+		TargetTable: "users",
+		TargetID:    user.UserID,
+	})
 	return c.Redirect(http.StatusSeeOther, "/")
 }
 
 func (h *AuthHandler) Logout(c echo.Context) error {
+	rec := auditlog.Record{
+		Action: auditlog.ActionLogout,
+		Result: auditlog.ResultOK,
+		Detail: "로그아웃",
+	}
+	h.fillActorFromTokenCookie(c, &rec)
+	accessLog(c, rec)
 	c.SetCookie(&http.Cookie{
 		Name:     "token",
 		Value:    "",
@@ -127,7 +171,7 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 			"Title": "내 계정", "Active": "account", "User": u, "Error": msg,
 		})
 	}
-	if u.PasswordHash != HashPassword(current) {
+	if !verifyPassword(u.PasswordHash, current) {
 		return renderErr("현재 비밀번호가 올바르지 않습니다.")
 	}
 	if pw == "" {
@@ -139,11 +183,15 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 	if pw != confirm {
 		return renderErr("새 비밀번호와 확인 입력이 일치하지 않습니다.")
 	}
-	if HashPassword(pw) == u.PasswordHash {
+	if verifyPassword(u.PasswordHash, pw) {
 		return renderErr("새 비밀번호는 현재 비밀번호와 달라야 합니다.")
 	}
-	h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
-	u.PasswordHash = HashPassword(pw)
+	nh := HashPassword(pw)
+	if nh == "" {
+		return renderErr("비밀번호를 저장하지 못했습니다.")
+	}
+	h.userRepo.UpdatePassword(u.UserID, nh)
+	u.PasswordHash = nh
 	h.refreshSession(c, u)
 	return c.Redirect(http.StatusSeeOther, "/account?ok=password")
 }
@@ -180,9 +228,9 @@ func (h *AuthHandler) forbidden(c echo.Context) error {
 	})
 }
 
-// UserList 사용자 관리 화면
+// UserList 사용자 관리 화면 (옵저버는 조회만)
 func (h *AuthHandler) UserList(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if !h.isAdmin(c) && !isObserverRole(c) && !hasPerm(c, model.PermCodesUsers) {
 		return h.forbidden(c)
 	}
 	users, _ := h.userRepo.ListAll()
@@ -194,20 +242,57 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		msg = "사용자 정보가 저장되었습니다."
 	}
 	errMsg := c.QueryParam("err")
-	return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
+	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
+	data := map[string]interface{}{
 		"Title": "사용자 관리", "Active": "users", "Users": users, "OK": msg, "Error": errMsg,
-	})
+		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit,
+	}
+	if canEdit {
+		data["HashMig"] = h.passwordMigrationStatus()
+	}
+	return c.Render(http.StatusOK, "auth/users.html", data)
+}
+
+func (h *AuthHandler) passwordMigrationStatus() map[string]interface{} {
+	total, bcryptN := 0, 0
+	if h.userRepo != nil {
+		total, bcryptN, _ = h.userRepo.PasswordHashStats()
+	}
+	asHash, delHash := "", ""
+	if h.settingsRepo != nil {
+		asHash, _ = h.settingsRepo.Get(repository.SettingASCompletedEditPassword)
+		delHash, _ = h.settingsRepo.Get(repository.SettingMaintenanceDeletePassword)
+	}
+	asBcrypt := passwd.IsBcrypt(asHash)
+	delBcrypt := passwd.IsBcrypt(delHash)
+	legacy := total - bcryptN
+	return map[string]interface{}{
+		"UserTotal":  total,
+		"UserBcrypt": bcryptN,
+		"UserLegacy": legacy,
+		"ASSet":      strings.TrimSpace(asHash) != "",
+		"ASBcrypt":   asBcrypt,
+		"DelSet":     strings.TrimSpace(delHash) != "",
+		"DelBcrypt":  delBcrypt,
+		"Complete":   total > 0 && legacy == 0 && asBcrypt && delBcrypt,
+	}
 }
 
 func (h *AuthHandler) UserCreate(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
 	}
+	role := model.NormalizeRole(c.FormValue("role"))
+	perms := parsePermForm(c)
+	if perms == "" {
+		perms = model.FormatPermissions(model.DefaultPermissions(role))
+	}
 	u := &model.User{
 		Username:     c.FormValue("username"),
 		PasswordHash: HashPassword(c.FormValue("password")),
 		FullName:     c.FormValue("full_name"),
-		Role:         c.FormValue("role"),
+		Role:         role,
+		Permissions:  perms,
 		IsActive:     true,
 	}
 	h.userRepo.Create(u)
@@ -222,10 +307,28 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	if u == nil {
 		return echo.ErrNotFound
 	}
+	before := userPublic(u)
+	wasActive := u.IsActive
 	u.FullName = c.FormValue("full_name")
-	u.Role = c.FormValue("role")
+	u.Role = model.NormalizeRole(c.FormValue("role"))
+	u.Permissions = parsePermForm(c)
 	u.IsActive = c.FormValue("is_active") != "0"
 	h.userRepo.Update(u)
+	if wasActive && !u.IsActive {
+		accessLog(c, auditlog.Record{
+			Action:      auditlog.ActionDelete,
+			TargetTable: "users",
+			TargetID:    u.UserID,
+			SubjectType: "user",
+			SubjectID:   u.UserID,
+			SubjectName: u.FullName,
+			Detail:      "사용자 비활성",
+			Reason:      accessReason(c, "사용자 비활성"),
+			Result:      auditlog.ResultOK,
+			BeforeJSON:  toJSON(before),
+			AfterJSON:   toJSON(userPublic(u)),
+		})
+	}
 
 	if pw := strings.TrimSpace(c.FormValue("password")); pw != "" {
 		confirm := strings.TrimSpace(c.FormValue("password_confirm"))
@@ -233,14 +336,14 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 			users, _ := h.userRepo.ListAll()
 			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
 				"Title": "사용자 관리", "Active": "users", "Users": users,
-				"Error": "비밀번호와 확인 입력이 일치하지 않습니다.",
+				"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "PermDefs": model.AllPermissions, "CanEditUsers": true,
 			})
 		}
 		if len(pw) < 4 {
 			users, _ := h.userRepo.ListAll()
 			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
 				"Title": "사용자 관리", "Active": "users", "Users": users,
-				"Error": "비밀번호는 4자 이상이어야 합니다.",
+				"Error": "비밀번호는 4자 이상이어야 합니다.", "PermDefs": model.AllPermissions, "CanEditUsers": true,
 			})
 		}
 		h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
@@ -264,19 +367,19 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	if pw == "" {
 		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
 			"Title": "사용자 관리", "Active": "users", "Users": users,
-			"Error": "새 비밀번호를 입력하세요.", "FocusUser": u.UserID,
+			"Error": "새 비밀번호를 입력하세요.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
 		})
 	}
 	if pw != confirm {
 		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
 			"Title": "사용자 관리", "Active": "users", "Users": users,
-			"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "FocusUser": u.UserID,
+			"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
 		})
 	}
 	if len(pw) < 4 {
 		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
 			"Title": "사용자 관리", "Active": "users", "Users": users,
-			"Error": "비밀번호는 4자 이상이어야 합니다.", "FocusUser": u.UserID,
+			"Error": "비밀번호는 4자 이상이어야 합니다.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
 		})
 	}
 	h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
@@ -325,10 +428,17 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 					return c.Redirect(http.StatusSeeOther, "/login")
 				}
 				c.Set("username", u.Username)
-				c.Set("role", u.Role)
+				c.Set("role", model.NormalizeRole(u.Role))
 				c.Set("user_name", u.FullName)
+				c.Set("permissions", u.PermList())
 			}
 		}
+		pop := audit.Push(audit.Actor{
+			UserID:   ctxString(c, "user_id"),
+			Username: ctxString(c, "username"),
+			Name:     ctxString(c, "user_name"),
+		})
+		defer pop()
 		return next(c)
 	}
 }

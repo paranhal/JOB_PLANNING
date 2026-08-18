@@ -11,6 +11,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -74,10 +75,20 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("프로젝트 등록: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 	projects, err := repo.ListProjects(false)
-	if err != nil || len(projects) != 1 {
-		t.Fatalf("ListProjects: len=%d err=%v", len(projects), err)
+	if err != nil {
+		t.Fatalf("ListProjects: err=%v", err)
 	}
-	p := projects[0]
+	// 기본 사업이 함께 들어 있으므로 방금 등록한 건만 찾는다.
+	var p model.WorkProject
+	for _, item := range projects {
+		if item.Name == "2026 도서관 자동화 유지보수" {
+			p = item
+			break
+		}
+	}
+	if p.ProjectID == "" {
+		t.Fatalf("등록한 사업이 목록에 없음: len=%d", len(projects))
+	}
 	if p.Status != "active" || p.Color == "" {
 		t.Fatalf("프로젝트 기본값: status=%q color=%q", p.Status, p.Color)
 	}
@@ -119,7 +130,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("칸반: status=%d", kanban.Code)
 	}
 	body := kanban.Body.String()
-	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%"} {
+	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%", "할 일", "진행중", "검토"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("칸반 화면에 %q 없음", want)
 		}
@@ -137,7 +148,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 	}
 }
 
-// 지원업무는 사업명 없이 등록되면 안 되고, 행정업무는 사업명 없이 등록된다.
+// 지원업무는 사업명 없이 등록되면 안 되고, 행정업무는 사업명 없이도 등록된다.
 func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 	e, repo := newWorkboardServer(t, "wb_rules.db")
 
@@ -219,5 +230,72 @@ func TestWorkboardCompleteTaskProgress(t *testing.T) {
 	}
 	if byTitle["진행률 초과 입력"] != 100 {
 		t.Errorf("진행률 상한 = %d, want 100", byTitle["진행률 초과 입력"])
+	}
+}
+
+func TestInboxAndCancelledExcludedFromKanban(t *testing.T) {
+	e, repo := newWorkboardServer(t, "wb_inbox_kanban.db")
+	today := time.Now().Format("2006-01-02")
+	inbox := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "수집함만있는메모",
+		Status: model.WBTaskInbox, DueDate: today, WorkDate: today,
+	}
+	if err := repo.CreateTask(inbox); err != nil {
+		t.Fatal(err)
+	}
+	cancelled := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "취소된행정업무",
+		Status: model.WBTaskCancelled, CancelReason: "중복", DueDate: today, WorkDate: today,
+	}
+	if err := repo.CreateTask(cancelled); err != nil {
+		t.Fatal(err)
+	}
+	hold := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "보류된행정업무",
+		Status: model.WBTaskHold, HoldReason: "일정조정", ReviewDate: today, DueDate: today, WorkDate: today,
+	}
+	if err := repo.CreateTask(hold); err != nil {
+		t.Fatal(err)
+	}
+	waitingFor := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "회신대기행정업무",
+		Status: model.WBTaskWaitingFor, WaitParty: "업체", WaitRequest: "견적",
+		ReplyDueDate: today, DueDate: today, WorkDate: today,
+	}
+	if err := repo.CreateTask(waitingFor); err != nil {
+		t.Fatal(err)
+	}
+
+	body := doGet(t, e, "/workboard/kanban").Body.String()
+	if strings.Contains(body, "수집함만있는메모") {
+		t.Fatal("수집함이 칸반에 올라감")
+	}
+	if strings.Contains(body, "취소된행정업무") {
+		t.Fatal("취소 건이 칸반에 올라감")
+	}
+	if !strings.Contains(body, "보류된행정업무") || !strings.Contains(body, "회신대기행정업무") {
+		t.Fatal("검토 열에 보류·회신 대기가 없음")
+	}
+}
+
+func TestWaitingActionNextCheckShowsAsTodayTodo(t *testing.T) {
+	e, repo := newWorkboardServer(t, "wb_next_check.db")
+	today := time.Now().Format("2006-01-02")
+	task := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "IRM 본건", Status: model.WBTaskWaitingFor,
+		DueDate: today, WorkDate: today,
+	}
+	if err := repo.CreateTask(task); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateAction(&model.WorkAction{
+		TaskID: task.TaskID, Title: "전자도서관 부문 재확인", Status: model.WBActionWaiting, Required: true,
+		WaitParty: "□□정보", WaitRequest: "수정본", ReplyDueDate: today, NextCheckDate: today,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	body := doGet(t, e, "/workboard/kanban").Body.String()
+	if !strings.Contains(body, "확인: 전자도서관 부문 재확인") {
+		t.Fatal("다음 확인일이 오늘인 행동이 할 일로 안 보임")
 	}
 }

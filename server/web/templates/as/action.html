@@ -36,7 +36,7 @@
         <option value="cancel">접수취소</option>
         {{else}}
         <option value="action">조치</option>
-        <option value="hold">보류</option>
+        <option value="hold">대기</option>
         <option value="transfer">이관</option>
         {{end}}
       </select>
@@ -64,7 +64,10 @@
   <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.ActionOK}}</div>
   {{end}}
   {{if .ActionErr}}
-  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErr}}</div>
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErrMsg}}</div>
+  {{end}}
+  {{if .ActionWarnMsg}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">{{.ActionWarnMsg}}</div>
   {{end}}
   {{if or .AS.IsReopen .ParentAS}}
   {{template "as_parent_complete" .}}
@@ -81,15 +84,15 @@
   {{if eq .AS.Status "hold"}}
   <div class="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
     <div>
-      <span class="font-medium">보류</span>
+      <span class="font-medium">대기</span>
       {{if .AS.HoldNextAction}} · 후속: {{holdNextLabel .AS.HoldNextAction}}{{end}}
       {{if .AS.HoldReason}} — {{.AS.HoldReason}}{{end}}
-      <a href="/as?status=hold" class="ml-2 text-orange-700 underline text-xs">보류 목록</a>
+      <a href="/as?status=hold" class="ml-2 text-orange-700 underline text-xs">대기 목록</a>
     </div>
-    {{if true}}
+    {{if and .CanProcess (not .ReadOnly)}}
     <form method="POST" action="/as/{{.AS.ASID}}/hold-release"
-          onsubmit="return confirm('보류를 삭제하고 접수 상태로 되돌릴까요?');">
-      <button type="submit" class="px-3 py-1.5 border border-orange-300 rounded-lg text-xs font-medium text-orange-800 hover:bg-orange-100">보류 삭제</button>
+          onsubmit="return confirm('대기를 해제하고 접수 상태로 되돌릴까요?');">
+      <button type="submit" class="px-3 py-1.5 border border-orange-300 rounded-lg text-xs font-medium text-orange-800 hover:bg-orange-100">대기 해제</button>
     </form>
     {{end}}
   </div>
@@ -146,15 +149,18 @@
     <p class="text-slate-800 whitespace-pre-line">{{.AS.Symptom}}</p>
   </div>
 
+  {{template "as_receipt_photos" .}}
+
   {{if .ReadOnly}}
   <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
     <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-slate-800">조치 완료 (조회)</h3>
+      <h3 class="text-sm font-semibold text-slate-800">{{if .IsClosed}}조치 완료 (조회){{else}}조치 사항 (조회){{end}}</h3>
       <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">읽기 전용</span>
     </div>
     <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
       <div><p class="text-xs text-slate-500">처리담당자</p><p>{{if .AS.AssignedTo}}{{.AS.AssignedTo}}{{else}}—{{end}}</p></div>
-      <div><p class="text-xs text-slate-500">결과코드</p><p>{{if .AS.ResultCode}}{{.AS.ResultCode}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-slate-500">근무구분</p><p>{{if workPlaceLabel .AS.WorkPlace}}{{workPlaceLabel .AS.WorkPlace}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-slate-500">결과</p><p>{{if .AS.ResultCode}}{{actionResultLabel .AS.ResultCode}}{{else}}—{{end}}</p></div>
       <div class="sm:col-span-2"><p class="text-xs text-slate-500 mb-1">조치내용</p><p class="whitespace-pre-line">{{if .AS.ActionTaken}}{{.AS.ActionTaken}}{{else}}—{{end}}</p></div>
       <div><p class="text-xs text-slate-500">사용부품</p><p>{{if .AS.PartsUsed}}{{.AS.PartsUsed}}{{else}}—{{end}}</p></div>
       <div><p class="text-xs text-slate-500">완료일시</p><p>{{if .CompleteLocal}}{{.CompleteLocal}}{{else}}—{{end}}</p></div>
@@ -172,14 +178,7 @@
     <form method="POST" action="/as/{{.AS.ASID}}/update" class="flex-1 min-h-0 overflow-y-auto" id="as-action-form">
 <div class="p-4 sm:p-5 space-y-4">
         {{if .ActionErr}}
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {{if eq .ActionErr "revisit_date"}}재방문필요 시 방문예정일자를 입력하세요.
-          {{else if eq .ActionErr "transfer_detail"}}타사이관 시 완료 / 조치 결과 대기를 선택하세요.
-          {{else if eq .ActionErr "confirm_date"}}조치 결과 대기 시 확인예정일자를 입력하세요.
-          {{else if eq .ActionErr "confirm_target"}}확인대상자를 입력하세요.
-          {{else if eq .ActionErr "confirm_contact"}}연락처를 입력하세요.
-          {{else}}조치 내용을 확인 후 다시 저장하세요.{{end}}
-        </div>
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErrMsg}}</div>
         {{end}}
 
         <!-- 조치 내역 (Figma: 상태 · 담당자 · 조치내용) -->
@@ -205,35 +204,50 @@
                 <option value="partial_complete" {{if eq .AS.Status "partial_complete"}}selected{{end}}>부분완료</option>
                 <option value="completed" {{if eq .AS.Status "completed"}}selected{{end}}>완료</option>
                 <option value="closed" {{if eq .AS.Status "closed"}}selected{{end}}>종료</option>
-                <option value="hold" {{if eq .AS.Status "hold"}}selected{{end}}>보류</option>
+                <option value="hold" {{if eq .AS.Status "hold"}}selected{{end}}>대기</option>
                 <option value="transfer" {{if eq .AS.Status "transfer"}}selected{{end}}>이관</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">처리유형</label>
-              <select name="process_type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <label class="block text-sm font-medium text-slate-700 mb-1">근무구분 <span class="text-red-500">*</span></label>
+              <div class="flex items-center gap-5 h-[42px]">
+                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                  <input type="radio" name="work_place" value="office" {{if eq .AS.WorkPlace "office"}}checked{{end}} required class="text-blue-600"> 내근
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                  <input type="radio" name="work_place" value="field" {{if eq .AS.WorkPlace "field"}}checked{{end}} required class="text-blue-600"> 외근
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">처리유형 <span class="text-red-500">*</span></label>
+              <select name="process_type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">선택</option>
                 {{range .ProcTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.ProcessType}}selected{{end}}>{{.CodeName}}</option>{{end}}
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">원인분류</label>
-              <select name="cause_type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <label class="block text-sm font-medium text-slate-700 mb-1">원인분류 <span class="text-red-500">*</span></label>
+              <select name="cause_type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">선택</option>
                 {{range .CauseTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.CauseType}}selected{{end}}>{{.CodeName}}</option>{{end}}
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">처리시작일시</label>
-              <input type="datetime-local" name="start_datetime" value="{{.StartLocal}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <label class="block text-sm font-medium text-slate-700 mb-1">착수 시각</label>
+              {{if .StartLocal}}
+              <p class="w-full border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-700">{{.StartLocal}}</p>
+              {{else}}
+              <p class="w-full border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-500">첫 조치 저장 시 자동 기록</p>
+              {{end}}
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">완료일시</label>
               <input type="datetime-local" name="complete_datetime" id="as-complete-datetime" value="{{.CompleteLocal}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
             </div>
             <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">조치내용</label>
-              <textarea name="action_taken" rows="4" placeholder="수행한 조치 내용을 입력하세요"
+              <label class="block text-sm font-medium text-slate-700 mb-1">조치내용 <span class="text-red-500">*</span></label>
+              <textarea name="action_taken" rows="4" required placeholder="수행한 조치 내용을 입력하세요"
                         class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.ActionTaken}}</textarea>
             </div>
             <div class="sm:col-span-2">
@@ -247,22 +261,51 @@
         <!-- 처리 결과 -->
         <section class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <h4 class="text-sm font-semibold text-slate-800">처리 결과</h4>
-            <p class="text-[11px] text-slate-500"><strong>완료</strong>→종료 · <strong>부분완료</strong>·재방문·이관(결과대기)→통계완료/운영진행중 · <strong>타사이관(완료)</strong>→완료</p>
+            <h4 class="text-sm font-semibold text-slate-800">조치 결과</h4>
+            <p class="text-[11px] text-slate-500">선택한 결과에 따라 추가 입력이 열립니다. 저장 코드·통계 규칙은 그대로입니다.</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">처리결과코드</label>
-            <select name="result_code" id="as-result-code" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-md">
-              <option value="">선택</option>
-              {{range .ResultCodes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.ResultCode}}selected{{end}}>{{.CodeName}}</option>{{end}}
-            </select>
+            <label class="block text-sm font-medium text-slate-700 mb-1">소요시간(분) <span class="text-red-500">*</span></label>
+            <input type="number" name="time_spent" value="30" min="1" step="1" required
+                   class="w-full max-w-[12rem] border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                   placeholder="30">
+            <p class="text-xs text-slate-400 mt-1">기본 30분. 0 이하는 저장되지 않습니다.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">결과 <span class="text-red-500">*</span></label>
+            <div id="as-result-code-group" class="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+              {{range .ActionResults}}
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="result_code" value="{{.Value}}" class="as-result-radio text-blue-600"
+                       {{if eq .Value $.AS.ResultCode}}checked{{end}}
+                       {{if and (eq .Value "hold") (eq $.AS.Status "hold") (eq $.AS.ResultCode "")}}checked{{end}}>
+                {{.Label}}
+              </label>
+              {{end}}
+            </div>
+          </div>
+
+          <div id="as-cause-report-wrap" data-symptom="{{.AS.Symptom}}"
+               class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 {{if ne .AS.ResultCode "done"}}hidden{{end}}">
+            <p class="text-sm font-semibold text-emerald-900">완료 보고 문장</p>
+            <p class="text-xs text-emerald-800">원인분류(코드)와 다른 칸입니다. 고객이 읽는 문장이며, 초안은 고칠 수 있습니다. 비워도 조치는 저장됩니다.</p>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">장애원인</label>
+              <textarea name="cause_detail" id="as-cause-detail" rows="2" placeholder="예: 전원 불량"
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.CauseDetail}}</textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">결론</label>
+              <textarea name="conclusion" id="as-conclusion" rows="3" placeholder="초안을 확인한 뒤 고치세요"
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{if .AS.Conclusion}}{{.AS.Conclusion}}{{else}}{{.ConclusionDraft}}{{end}}</textarea>
+            </div>
           </div>
 
           <div id="as-transfer-detail-wrap" class="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-3 {{if ne .AS.ResultCode "transfer"}}hidden{{end}}">
-            <p class="text-sm font-semibold text-purple-900">타사이관 세부</p>
+            <p class="text-sm font-semibold text-purple-900">이관 후 처리</p>
             <div class="flex flex-wrap gap-4 text-sm">
-              <label class="inline-flex items-center gap-2"><input type="radio" name="transfer_detail" value="completed" id="transfer-detail-completed" {{if eq .AS.TransferDetail "completed"}}checked{{end}} class="text-purple-600"> 완료</label>
-              <label class="inline-flex items-center gap-2"><input type="radio" name="transfer_detail" value="waiting" id="transfer-detail-waiting" {{if or (eq .AS.TransferDetail "waiting") (eq .AS.TransferDetail "")}}checked{{end}} class="text-purple-600"> 조치 결과 대기</label>
+              <label class="inline-flex items-center gap-2"><input type="radio" name="transfer_detail" value="completed" id="transfer-detail-completed" {{if eq .AS.TransferDetail "completed"}}checked{{end}} class="text-purple-600"> 처리 확인 후 완료</label>
+              <label class="inline-flex items-center gap-2"><input type="radio" name="transfer_detail" value="waiting" id="transfer-detail-waiting" {{if or (eq .AS.TransferDetail "waiting") (eq .AS.TransferDetail "")}}checked{{end}} class="text-purple-600"> 처리 후 우리 팀 추가 작업 필요</label>
             </div>
             <div id="as-transfer-waiting-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -296,8 +339,8 @@
           </div>
 
           <div id="as-revisit-fields" class="rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-3 {{if and (ne .AS.ResultCode "revisit_needed") (ne .AS.ResultCode "partial")}}hidden{{end}}">
-            <p class="text-sm font-semibold text-sky-900" id="as-revisit-title">{{if eq .AS.ResultCode "partial"}}부분완료 · 추가 업무{{else}}재방문필요{{end}}</p>
-            <p class="text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 {{if ne .AS.ResultCode "partial"}}hidden{{end}}" id="as-partial-hint">통계에는 완료로 집계되고, 목록·일일업무에서는 진행중으로 관리됩니다.</p>
+            <p class="text-sm font-semibold text-sky-900" id="as-revisit-title">{{if eq .AS.ResultCode "partial"}}추가조치 필요{{else}}재방문 필요{{end}}</p>
+            <p class="text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 {{if ne .AS.ResultCode "partial"}}hidden{{end}}" id="as-partial-hint">통계에는 완료(부분완료)로 집계되고, 목록·일일업무에서는 진행중으로 관리됩니다.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">방문예정일자 <span class="text-red-600">*</span></label>
@@ -307,10 +350,51 @@
                 <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="schedule_confirmed" value="1" id="as-revisit-confirmed" {{if and (or (eq .AS.ResultCode "revisit_needed") (eq .AS.ResultCode "partial")) .AS.ScheduleConfirmed}}checked{{end}} class="rounded border-gray-300 text-blue-600"> 일정확정 → [재방문] 업무 등록</label>
               </div>
               <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">재방문·추가업무 사유</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1" id="as-revisit-reason-label">{{if eq .AS.ResultCode "partial"}}추가조치 사유{{else}}재방문 사유{{end}}</label>
                 <textarea name="revisit_reason" id="as-revisit-reason" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.RevisitReason}}</textarea>
               </div>
+              <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">준비사항</label>
+                <input type="text" name="revisit_prep" id="as-revisit-prep" placeholder="다음 방문 시 준비할 것" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
             </div>
+          </div>
+
+          <div id="as-hold-result-wrap" class="rounded-xl border border-orange-200 bg-orange-50/50 p-4 space-y-3 {{if ne .AS.Status "hold"}}hidden{{end}}">
+            <p class="text-sm font-semibold text-orange-900">대기</p>
+            <p class="text-xs text-orange-800">작업을 포기한 것이 아니라 부품·고객 일정·개발 수정 등 조건을 기다리는 상태입니다. 저장 상태는 보류(`hold`)입니다.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">후속 처리 <span class="text-red-600">*</span></label>
+                <select name="hold_next_action" id="as-hold-next" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                  <option value="">선택…</option>
+                  <option value="action" {{if eq .AS.HoldNextAction "action"}}selected{{end}}>조치</option>
+                  <option value="transfer" {{if eq .AS.HoldNextAction "transfer"}}selected{{end}}>이관</option>
+                  <option value="cancel" {{if eq .AS.HoldNextAction "cancel"}}selected{{end}}>접수취소</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">확인 예정일</label>
+                <input type="date" name="hold_resume_date" id="as-hold-resume" value="{{if eq .AS.Status "hold"}}{{.AS.VisitScheduledDate}}{{end}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">대기 사유 <span class="text-red-600">*</span></label>
+                <textarea name="hold_reason" id="as-hold-reason" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="부품 입고 · 고객 일정 · 개발 수정 등">{{.AS.HoldReason}}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div id="as-work-assignee-fields" class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-2 {{if and (ne .AS.ResultCode "revisit_needed") (ne .AS.ResultCode "partial") (ne .AS.ResultCode "transfer")}}hidden{{end}}">
+            <p class="text-sm font-semibold text-slate-800">하부업무 담당자</p>
+            <p class="text-xs text-slate-500">새로 등록되는 확인·재방문 업무의 담당자입니다. 원 접수 처리담당자와 별도로 지정할 수 있습니다.</p>
+            <select name="work_assigned_to_code" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-md">
+              <option value="">원 접수 담당자 그대로(초기값)</option>
+              {{range .Assignees}}
+              <option value="{{.UserID}}">{{.FullName}} ({{.Username}})</option>
+              {{end}}
+              <option value="custom">직접입력</option>
+            </select>
+            <input type="text" name="work_assigned_to_custom" placeholder="직접입력 시 이름" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-md">
           </div>
         </section>
 
@@ -353,31 +437,28 @@
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
     <div class="flex items-center justify-between gap-2">
       <div>
-        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">조치 내역 (사진)</h3>
-        <p class="text-xs text-gray-400 mt-1">현장 조치 사진을 등록합니다.</p>
+        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">조치 첨부</h3>
+        <p class="text-xs text-gray-400 mt-1">조치완료보고서·관련 파일. 서버에 저장하고 화면에는 파일명만 표시합니다.</p>
       </div>
-      <span class="text-xs text-gray-400">{{len .Attachments}}장</span>
+      <span class="text-xs text-gray-400">{{len .Attachments}}건</span>
     </div>
     {{if .Attachments}}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <ul class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
       {{range .Attachments}}
-      <div class="rounded-lg border border-gray-200 overflow-hidden bg-gray-50 relative group">
-        <a href="/attachments/{{.AttachmentID}}" target="_blank" class="block aspect-square bg-white">
-          <img src="/uploads/{{.RefType}}/{{.RefID}}/{{.FileName}}" alt="{{.FileName}}" class="w-full h-full object-cover">
-        </a>
+      <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm bg-white hover:bg-slate-50">
+        <a href="/attachments/{{.AttachmentID}}" class="min-w-0 truncate text-blue-700 hover:underline" title="{{attDisplayName .}}">{{attDisplayName .}}</a>
         {{if and $.CanProcess (not $.ReadOnly)}}
-        <form method="POST" action="/attachments/{{.AttachmentID}}/delete" class="absolute top-1 right-1"
-              onsubmit="return confirm('이 사진을 삭제할까요?');">
+        <form method="POST" action="/attachments/{{.AttachmentID}}/delete" class="shrink-0"
+              onsubmit="return confirm('이 파일을 삭제할까요?');">
           <input type="hidden" name="redirect" value="/as/{{$.AS.ASID}}/action">
-          <button type="submit" class="px-1.5 py-0.5 bg-black/50 text-white text-xs rounded opacity-90">삭제</button>
+          <button type="submit" class="px-2 py-0.5 text-xs text-slate-500 hover:text-red-600">삭제</button>
         </form>
         {{end}}
-        <p class="px-2 py-1 text-[10px] text-gray-500 truncate">{{.FileName}}</p>
-      </div>
+      </li>
       {{end}}
-    </div>
+    </ul>
     {{else}}
-    <p class="text-sm text-gray-400 text-center py-4">첨부된 사진이 없습니다.</p>
+    <p class="text-sm text-gray-400 text-center py-4">첨부된 파일이 없습니다.</p>
     {{end}}
     {{if and .CanProcess (not .ReadOnly)}}
     <form method="POST" action="/attachments" enctype="multipart/form-data"
@@ -385,38 +466,41 @@
       <input type="hidden" name="ref_type" value="as">
       <input type="hidden" name="ref_id" value="{{.AS.ASID}}">
       <input type="hidden" name="redirect" value="/as/{{$.AS.ASID}}/action">
-      <p class="text-sm text-slate-600">조치 현장 사진을 업로드하세요</p>
-      <input type="file" name="file" accept="image/*" required class="mx-auto block text-sm">
-      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">사진 업로드</button>
+      <p class="text-sm text-slate-600">조치완료보고서 또는 관련 파일을 업로드하세요</p>
+      <input type="file" name="file" multiple required class="mx-auto block text-sm">
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">파일 업로드</button>
     </form>
     {{end}}
   </div>
 
-  <!-- 하부 업무(확인·재방문) -->
+  <!-- 하부 업무(확인·재방문) — 원 접수와 별도 업무 -->
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
     <div>
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">하부 업무</h3>
-      <p class="text-xs text-gray-400 mt-1">접수 {{.AS.ASNumber}} 하위 확인·재방문 일정입니다.</p>
+      <p class="text-xs text-gray-400 mt-1">접수 {{.AS.ASNumber}}와 연결되나 담당자·완료는 별도입니다.{{if and .CanProcess (not .ReadOnly)}} 행을 눌러 하부업무만 조치하세요.{{else}} 행을 눌러 조회할 수 있습니다.{{end}}</p>
     </div>
     {{if .WorkItems}}
     <div class="space-y-2">
       {{range .WorkItems}}
-      <div class="flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded-lg px-4 py-3">
+      <a href="/as/work/{{.WorkID}}/action" class="flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded-lg px-4 py-3 hover:border-sky-200 hover:bg-sky-50/40 transition-colors">
         <div class="min-w-0">
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if eq .WorkKind "confirm"}}bg-purple-100 text-purple-800{{else}}bg-sky-100 text-sky-800{{end}}">[{{workKindLabel .WorkKind}}]</span>
             <span class="font-mono text-blue-600">{{.WorkNumber}}</span>
             {{if .ScheduledDate}}<span class="text-gray-700">{{.ScheduledDate}}</span>{{end}}
             {{if .ScheduleConfirmed}}<span class="text-[10px] text-green-700 font-medium">확정</span>{{else}}<span class="text-[10px] text-amber-700 font-medium">미확정</span>{{end}}
+            {{if eq .Status "done"}}<span class="text-[10px] text-slate-600 font-medium">완료</span>{{else}}<span class="text-[10px] text-amber-700 font-medium">진행중</span>{{end}}
           </div>
-          {{if or .ConfirmTarget .ConfirmContact .Notes}}
           <p class="text-xs text-gray-500 mt-1">
-            {{if .ConfirmTarget}}{{.ConfirmTarget}}{{end}}{{if and .ConfirmTarget .ConfirmContact}} · {{end}}{{if .ConfirmContact}}{{.ConfirmContact}}{{end}}
+            담당 {{if .AssignedTo}}{{.AssignedTo}}{{else}}미배정{{end}}
+            {{if or .ConfirmTarget .ConfirmContact .Notes}}
+            · {{if .ConfirmTarget}}{{.ConfirmTarget}}{{end}}{{if and .ConfirmTarget .ConfirmContact}} · {{end}}{{if .ConfirmContact}}{{.ConfirmContact}}{{end}}
             {{if .Notes}}{{if or .ConfirmTarget .ConfirmContact}} · {{end}}{{.Notes}}{{end}}
+            {{end}}
           </p>
-          {{end}}
         </div>
-      </div>
+        <span class="text-xs text-sky-700 font-medium shrink-0">{{if and $.CanProcess (not $.ReadOnly)}}조치 →{{else}}조회 →{{end}}</span>
+      </a>
       {{end}}
     </div>
     {{else}}
@@ -427,33 +511,35 @@
   <!-- 이 접수의 처리 이력 -->
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
     <div>
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">처리 이력</h3>
-      <p class="text-xs text-gray-400 mt-1">이 접수({{.AS.ASNumber}})에 등록된 처리 기록입니다.</p>
+      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">조치 이력</h3>
+      <p class="text-xs text-gray-400 mt-1">이 접수({{.AS.ASNumber}})의 조치 기록입니다. 회차마다 결과·다음 일정이 남습니다.</p>
     </div>
     {{if .Processes}}
-    <div class="space-y-3">
+    <div class="space-y-4">
       {{range .Processes}}
-      <div class="border-l-2 border-blue-200 pl-4 py-1">
-        <div class="flex flex-wrap gap-2 text-xs text-gray-500">
+      <div class="border-l-2 {{if eq .ResultCode "done"}}border-green-400{{else if eq .ResultCode "hold"}}border-orange-400{{else if eq .ResultCode "transfer"}}border-purple-400{{else}}border-blue-200{{end}} pl-4 py-1">
+        <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
           {{if .ProcessNumber}}<span class="font-mono text-blue-600">{{.ProcessNumber}}</span>{{end}}
           <span>{{if .ProcessDatetime.IsZero}}—{{else}}{{.ProcessDatetime.Format "2006-01-02 15:04"}}{{end}}</span>
           <span>{{.Worker}}</span>
+          {{if .ResultCode}}<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">{{actionResultLabel .ResultCode}}</span>{{end}}
+          {{if and (eq .ResultCode "transfer") .TransferDetail}}<span class="text-purple-700">{{transferDetailLabel .TransferDetail}}</span>{{end}}
           {{if .WorkType}}<span class="bg-gray-100 px-1.5 rounded">{{.WorkType}}</span>{{end}}
-          {{if .TimeSpent}}<span>{{.TimeSpent}}분</span>{{end}}
         </div>
-        <p class="text-sm text-gray-700 mt-1 whitespace-pre-line">{{if .WorkContent}}{{.WorkContent}}{{else}}—{{end}}</p>
-        {{if or .PartsUsed .Notes}}
-        <p class="text-xs text-gray-400 mt-1">
-          {{if .PartsUsed}}부품: {{.PartsUsed}}{{end}}
-          {{if and .PartsUsed .Notes}} · {{end}}
-          {{if .Notes}}메모: {{.Notes}}{{end}}
+        <p class="text-sm text-gray-800 mt-1 whitespace-pre-line">{{if .WorkContent}}{{.WorkContent}}{{else}}—{{end}}</p>
+        {{if or .WaitReason .NextActionDate .PrepNotes .PartsUsed}}
+        <p class="text-xs text-gray-500 mt-1">
+          {{if .WaitReason}}<span>사유: {{.WaitReason}}</span>{{end}}
+          {{if .NextActionDate}}{{if .WaitReason}} · {{end}}<span>다음: {{.NextActionDate}}</span>{{end}}
+          {{if .PrepNotes}}{{if or .WaitReason .NextActionDate}} · {{end}}<span>준비: {{.PrepNotes}}</span>{{end}}
+          {{if .PartsUsed}}{{if or .WaitReason .NextActionDate .PrepNotes}} · {{end}}<span>부품: {{.PartsUsed}}</span>{{end}}
         </p>
         {{end}}
       </div>
       {{end}}
     </div>
     {{else}}
-    <p class="text-sm text-gray-400 text-center py-6">이 접수에 등록된 처리 기록이 없습니다. 조치 저장 시 자동으로 남습니다.</p>
+    <p class="text-sm text-gray-400 text-center py-6">이 접수에 등록된 조치 기록이 없습니다. 조치 저장 시 자동으로 남습니다.</p>
     {{end}}
   </div>
 </div>
@@ -487,7 +573,7 @@
 <div id="modal-hold" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40">
   <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
     <div class="border-b px-5 py-3 flex items-center justify-between">
-      <h3 class="font-semibold text-gray-800">보류</h3>
+      <h3 class="font-semibold text-gray-800">대기</h3>
       <button type="button" data-close-modal="modal-hold" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
     </div>
     <form method="POST" action="/as/{{.AS.ASID}}/hold" id="form-hold" class="p-5 space-y-4">
@@ -502,14 +588,14 @@
         </select>
       </div>
       <div id="hold-reason-wrap" class="hidden">
-        <label class="block text-sm font-medium text-gray-700 mb-1">보류 사유 <span class="text-red-500">*</span></label>
-        <textarea name="hold_reason" id="hold-reason" rows="3" placeholder="보류 사유를 입력하세요"
+        <label class="block text-sm font-medium text-gray-700 mb-1">대기 사유 <span class="text-red-500">*</span></label>
+        <textarea name="hold_reason" id="hold-reason" rows="3" placeholder="대기 사유를 입력하세요"
                   class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
       <div class="flex justify-end gap-2">
         <button type="button" data-close-modal="modal-hold" class="px-4 py-2 border rounded-lg text-sm">취소</button>
         <button type="submit" id="hold-submit" disabled
-                class="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">보류 저장</button>
+                class="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">대기 저장</button>
       </div>
     </form>
   </div>
@@ -630,11 +716,55 @@
 
   var resultSel = document.getElementById('as-result-code');
   var statusSel = document.getElementById('as-action-status');
+  var causeReportWrap = document.getElementById('as-cause-report-wrap');
+  var causeDetailEl = document.getElementById('as-cause-detail');
+  var conclusionEl = document.getElementById('as-conclusion');
+  var actionTakenEl = document.querySelector('textarea[name="action_taken"]');
+  var symptomText = causeReportWrap ? (causeReportWrap.getAttribute('data-symptom') || '') : '';
+  function koreanEuro(s) {
+    s = (s || '').trim();
+    if (!s) return '로';
+    var last = s.charCodeAt(s.length - 1);
+    if (last < 0xAC00 || last > 0xD7A3) return '로';
+    var jong = (last - 0xAC00) % 28;
+    if (jong === 0 || jong === 8) return '로';
+    return '으로';
+  }
+  function buildConclusionDraft() {
+    var cause = causeDetailEl ? causeDetailEl.value.trim() : '';
+    var work = actionTakenEl ? actionTakenEl.value.trim() : '';
+    var symptom = (symptomText || '').trim();
+    if (!cause && !symptom && !work) return '';
+    if (!symptom) symptom = '해당';
+    if (!work) work = '조치';
+    if (!cause) return symptom + ' 문제가 발생했고, ' + work + '하여 정상작동하는 것으로 확인됨.';
+    return cause + koreanEuro(cause) + ' ' + symptom + ' 문제가 발생했고, ' + work + '하여 정상작동하는 것으로 확인됨.';
+  }
+  var lastAutoDraft = buildConclusionDraft();
+  var userEditedConclusion = !!(conclusionEl && conclusionEl.value.trim() && conclusionEl.value.trim() !== lastAutoDraft);
+  function refreshConclusionDraft() {
+    if (!conclusionEl || userEditedConclusion) return;
+    lastAutoDraft = buildConclusionDraft();
+    if (selectedResult() === 'done') conclusionEl.value = lastAutoDraft;
+  }
+  if (causeDetailEl) causeDetailEl.addEventListener('input', refreshConclusionDraft);
+  if (actionTakenEl) actionTakenEl.addEventListener('input', refreshConclusionDraft);
+  if (conclusionEl) {
+    conclusionEl.addEventListener('input', function () {
+      userEditedConclusion = conclusionEl.value.trim() !== lastAutoDraft;
+    });
+  }
   var transferWrap = document.getElementById('as-transfer-detail-wrap');
   var waitingFields = document.getElementById('as-transfer-waiting-fields');
   var revisitFields = document.getElementById('as-revisit-fields');
+  var holdResultWrap = document.getElementById('as-hold-result-wrap');
+  var workAssigneeFields = document.getElementById('as-work-assignee-fields');
   var createRevisit = document.getElementById('as-create-revisit');
   var revisitAfterWrap = document.getElementById('as-revisit-after-wrap');
+  function selectedResult() {
+    var el = document.querySelector('input.as-result-radio:checked');
+    return el ? el.value : '';
+  }
   function setEnabled(root, on) {
     if (!root) return;
     root.querySelectorAll('input,select,textarea').forEach(function (el) {
@@ -654,37 +784,55 @@
     if (revisitAfterWrap) revisitAfterWrap.classList.toggle('hidden', !on);
     setEnabled(revisitAfterWrap, !!on);
   }
+  function syncWorkAssigneeUI() {
+    var v = selectedResult();
+    var waiting = document.getElementById('transfer-detail-waiting');
+    var show = v === 'revisit_needed' || v === 'partial' ||
+      (v === 'transfer' && waiting && waiting.checked);
+    if (workAssigneeFields) workAssigneeFields.classList.toggle('hidden', !show);
+    setEnabled(workAssigneeFields, !!show);
+  }
   function syncResultUI() {
-    var v = resultSel ? resultSel.value : '';
+    var v = selectedResult();
     var isTransfer = v === 'transfer';
     var isRevisit = v === 'revisit_needed' || v === 'partial';
     var isPartial = v === 'partial';
+    var isHold = v === 'hold';
     if (transferWrap) transferWrap.classList.toggle('hidden', !isTransfer);
     if (revisitFields) revisitFields.classList.toggle('hidden', !isRevisit);
+    if (holdResultWrap) holdResultWrap.classList.toggle('hidden', !isHold);
     setEnabled(transferWrap, isTransfer);
     setEnabled(revisitFields, isRevisit);
+    setEnabled(holdResultWrap, isHold);
     var title = document.getElementById('as-revisit-title');
     var hint = document.getElementById('as-partial-hint');
-    if (title) title.textContent = isPartial ? '부분완료 · 추가 업무' : '재방문필요';
+    var reasonLabel = document.getElementById('as-revisit-reason-label');
+    if (title) title.textContent = isPartial ? '추가조치 필요' : '재방문 필요';
+    if (reasonLabel) reasonLabel.textContent = isPartial ? '추가조치 사유' : '재방문 사유';
     if (hint) hint.classList.toggle('hidden', !isPartial);
+    if (causeReportWrap) causeReportWrap.classList.toggle('hidden', v !== 'done');
+    setEnabled(causeReportWrap, v === 'done');
+    if (v === 'done') refreshConclusionDraft();
     if (isTransfer) syncTransferWaiting();
+    syncWorkAssigneeUI();
     if (statusSel) {
       if (v === 'done') statusSel.value = 'completed';
       else if (v === 'partial' || v === 'revisit_needed') statusSel.value = 'partial_complete';
+      else if (v === 'hold') statusSel.value = 'hold';
       else if (v === 'transfer') {
         var completed = document.getElementById('transfer-detail-completed');
         statusSel.value = (completed && completed.checked) ? 'completed' : 'partial_complete';
       }
     }
   }
-  if (resultSel) {
-    resultSel.addEventListener('change', syncResultUI);
-    document.querySelectorAll('input[name="transfer_detail"]').forEach(function (el) {
-      el.addEventListener('change', function () { syncTransferWaiting(); syncResultUI(); });
-    });
-    if (createRevisit) createRevisit.addEventListener('change', syncRevisitAfter);
-    syncResultUI();
-  }
+  document.querySelectorAll('input.as-result-radio').forEach(function (el) {
+    el.addEventListener('change', syncResultUI);
+  });
+  document.querySelectorAll('input[name="transfer_detail"]').forEach(function (el) {
+    el.addEventListener('change', function () { syncTransferWaiting(); syncResultUI(); });
+  });
+  if (createRevisit) createRevisit.addEventListener('change', syncRevisitAfter);
+  if (document.querySelector('input.as-result-radio')) syncResultUI();
   var confSel = document.getElementById('as-confirmer-code');
   var confWrap = document.getElementById('as-confirmer-custom-wrap');
   if (confSel && confWrap) {

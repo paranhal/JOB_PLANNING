@@ -58,16 +58,17 @@ func mntVisitHref(v model.MaintenanceVisit) string {
 	return href
 }
 
+// mntVisitActionHref 일일업무「조치」용 — 해당 방문 조치 화면
+func mntVisitActionHref(v model.MaintenanceVisit) string {
+	if strings.TrimSpace(v.VisitID) == "" {
+		return ""
+	}
+	return "/maintenance/visits/" + v.VisitID + "/action"
+}
+
 func mntVisitNumber(v model.MaintenanceVisit) string {
 	// 화면용 점검 번호 — 방문일·점검대상으로 식별
-	name := v.ShortName
-	if name == "" {
-		name = v.OrgName
-	}
-	num := v.VisitDate
-	if v.ProductType != "" {
-		num += " · " + v.ProductType
-	}
+	num := model.FormatMaintenanceVisitNumber(v.VisitDate, v.ProductType)
 	if num == "" {
 		return v.VisitID
 	}
@@ -97,6 +98,9 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 		EndTime:      t.EndTime,
 		DurationMin:  t.DurationMin,
 		ParentTaskID: t.ParentTaskID,
+		ProjectID:    t.ProjectID,
+		Status:       t.Status,
+		StatusLabel:  model.WBTaskStatusLabel(t.Status),
 	}
 	switch t.SourceType {
 	case model.WBSourceAS:

@@ -46,6 +46,11 @@ func AssetImageFileName(assetID string, slot int, origName string) string {
 	return fmt.Sprintf("%s_img_%d%s", SanitizeAssetIDForPath(assetID), slot, ext)
 }
 
+// ReceiptPhotoDir 접수 사진 저장 폴더. data/uploads/as/{접수ID}/receipt/
+func ReceiptPhotoDir(uploadRoot, asID string) string {
+	return filepath.Join(uploadRoot, "as", asID, "receipt")
+}
+
 // AssetImageRelPath uploads 아래 공개 URL용 상대 경로
 func AssetImageRelPath(assetID string, slot int, origName string) string {
 	safe := SanitizeAssetIDForPath(assetID)

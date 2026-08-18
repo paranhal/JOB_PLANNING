@@ -5,7 +5,8 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/app/data       # SQLite DB 파일 영속
-      - ./web:/app/web         # 개발 시 템플릿 핫리로드
+    env_file:
+      - ./.env
     environment:
       - PORT=8080
       - DB_TYPE=sqlite

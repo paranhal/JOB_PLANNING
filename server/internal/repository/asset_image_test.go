@@ -23,6 +23,14 @@ func TestAssetImageDir(t *testing.T) {
 	}
 }
 
+func TestReceiptPhotoDir(t *testing.T) {
+	got := ReceiptPhotoDir("data/uploads", "AS-1")
+	want := filepath.Join("data/uploads", "as", "AS-1", "receipt")
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
 func TestNextAssetImageSlot(t *testing.T) {
 	dir := t.TempDir()
 	db, err := InitDB(filepath.Join(dir, "t.db"))

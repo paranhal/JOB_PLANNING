@@ -66,20 +66,28 @@ func (r *CodeRepo) Create(c *model.Code) error {
 		`INSERT INTO codes (code_id,code_group,code_value,code_name,sort_order,is_active)
 		 VALUES (?,?,?,?,?,?)`,
 		c.CodeID, c.CodeGroup, c.CodeValue, c.CodeName, c.SortOrder, boolToInt(c.IsActive))
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "codes", "code_id", c.CodeID, c.CodeName)
+	return nil
 }
 
 func (r *CodeRepo) Update(c *model.Code) error {
-	_, err := r.db.Exec(
-		`UPDATE codes SET code_group=?,code_value=?,code_name=?,sort_order=?,is_active=?
+	return touchUpdate(r.db, "codes", "code_id", c.CodeID, c.CodeName, func() error {
+		_, err := r.db.Exec(
+			`UPDATE codes SET code_group=?,code_value=?,code_name=?,sort_order=?,is_active=?
 		 WHERE code_id=?`,
-		c.CodeGroup, c.CodeValue, c.CodeName, c.SortOrder, boolToInt(c.IsActive), c.CodeID)
-	return err
+			c.CodeGroup, c.CodeValue, c.CodeName, c.SortOrder, boolToInt(c.IsActive), c.CodeID)
+		return err
+	})
 }
 
 func (r *CodeRepo) Delete(id string) error {
-	_, err := r.db.Exec(`DELETE FROM codes WHERE code_id=?`, id)
-	return err
+	return touchDelete(r.db, "codes", "code_id", id, "코드", func() error {
+		_, err := r.db.Exec(`DELETE FROM codes WHERE code_id=?`, id)
+		return err
+	})
 }
 
 func scanCodes(rows *sql.Rows) ([]model.Code, error) {

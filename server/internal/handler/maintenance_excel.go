@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -13,16 +14,17 @@ import (
 func excelEntryFontColor(category string) string {
 	switch category {
 	case "fixed":
-		return "FFFF0000"
+		return "FF0000"
 	case "office":
-		return "FF0070C0"
+		return "0070C0"
 	default:
-		return "FF00B050"
+		return "00B050"
 	}
 }
 
-// BuildMaintenanceExcelWorkbook 기획서 §17.11 월별 달력 시트(1월~12월) xlsx 생성.
-func BuildMaintenanceExcelWorkbook(year int, visits []model.MaintenanceVisit) (*excelize.File, error) {
+// BuildMaintenanceExcelWorkbook 기획서 §23.7 월별 달력 시트(1월~12월) xlsx 생성.
+// offDates·holidayNames가 있으면 휴일 칸을 회색으로 칠하고 공휴일명을 적는다. §23.13.6
+func BuildMaintenanceExcelWorkbook(year int, visits []model.MaintenanceVisit, offDates map[string]bool, holidayNames ...map[string]string) (*excelize.File, error) {
 	byDate := make(map[string][]model.MaintenanceVisit)
 	for _, v := range visits {
 		byDate[v.VisitDate] = append(byDate[v.VisitDate], v)
@@ -44,20 +46,28 @@ func BuildMaintenanceExcelWorkbook(year int, visits []model.MaintenanceVisit) (*
 	}
 
 	loc := time.Local
+	var off map[string]bool
+	if offDates != nil {
+		off = offDates
+	}
+	var names map[string]string
+	if len(holidayNames) > 0 {
+		names = holidayNames[0]
+	}
 	for m := 1; m <= 12; m++ {
 		sheet := fmt.Sprintf("%d월", m)
-		if err := fillMaintenanceMonthSheet(f, sheet, year, m, byDate, loc); err != nil {
+		if err := fillMaintenanceMonthSheet(f, sheet, year, m, byDate, loc, off, names); err != nil {
 			return nil, err
 		}
 	}
 	return f, nil
 }
 
-func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, byDate map[string][]model.MaintenanceVisit, loc *time.Location) error {
+func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, byDate map[string][]model.MaintenanceVisit, loc *time.Location, off map[string]bool, names map[string]string) error {
 	lastDay := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, loc).Day()
 
 	titleStyle, err := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 18, Color: "FF00B050", Family: "맑은 고딕"},
+		Font:      &excelize.Font{Bold: true, Size: 18, Color: "00B050", Family: "맑은 고딕"},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
 	})
 	if err != nil {
@@ -66,13 +76,13 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 	hdrStyle, err := f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFE2EFDA"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"E2EFDA"}, Pattern: 1},
 	})
 	if err != nil {
 		return err
 	}
 	outStyle, err := f.NewStyle(&excelize.Style{
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"FFF2F2F2"}, Pattern: 1},
+		Fill: excelize.Fill{Type: "pattern", Color: []string{"F2F2F2"}, Pattern: 1},
 	})
 	if err != nil {
 		return err
@@ -80,7 +90,7 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 	weekendHdr, err := f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFDDDDDD"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"DDDDDD"}, Pattern: 1},
 	})
 	if err != nil {
 		return err
@@ -92,7 +102,7 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 		return err
 	}
 	weekendWrap, err := f.NewStyle(&excelize.Style{
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFEEEEEE"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"EEEEEE"}, Pattern: 1},
 		Alignment: &excelize.Alignment{WrapText: true, Vertical: "top", Horizontal: "left"},
 	})
 	if err != nil {
@@ -134,13 +144,22 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 
 			ds := fmt.Sprintf("%04d-%02d-%02d", year, month, dayNum)
 			list := byDate[ds]
+			isOff := isWeekendCol || off[ds]
+			hName := ""
+			if names != nil {
+				hName = strings.TrimSpace(names[ds])
+			}
 
 			if len(list) == 0 {
+				dayText := fmt.Sprintf("%d", dayNum)
+				if hName != "" {
+					dayText = fmt.Sprintf("%d\n%s", dayNum, hName)
+				}
 				runs := []excelize.RichTextRun{
-					{Text: fmt.Sprintf("%d", dayNum), Font: &excelize.Font{Bold: true, Size: 11, Color: "FF333333", Family: "맑은 고딕"}},
+					{Text: dayText, Font: &excelize.Font{Bold: true, Size: 11, Color: "333333", Family: "맑은 고딕"}},
 				}
 				_ = f.SetCellRichText(sheet, cell, runs)
-				if isWeekendCol {
+				if isOff {
 					_ = f.SetCellStyle(sheet, cell, cell, weekendWrap)
 				} else {
 					_ = f.SetCellStyle(sheet, cell, cell, wrapTop)
@@ -148,13 +167,17 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 				continue
 			}
 
+			head := fmt.Sprintf("%d\n", dayNum)
+			if hName != "" {
+				head = fmt.Sprintf("%d %s\n", dayNum, hName)
+			}
 			runs := []excelize.RichTextRun{
-				{Text: fmt.Sprintf("%d\n", dayNum), Font: &excelize.Font{Bold: true, Size: 11, Color: "FF000000", Family: "맑은 고딕"}},
+				{Text: head, Font: &excelize.Font{Bold: true, Size: 11, Color: "000000", Family: "맑은 고딕"}},
 			}
 			for _, v := range list {
 				line := visitLabel(v)
 				color := excelProductFontColor(v.ProductType)
-				if color == "FF333333" {
+				if color == "333333" {
 					// 점검 대상이 없으면 예전 엑셀 유형(고정/사무소) 색을 쓴다.
 					color = excelEntryFontColor(v.EntryCategory)
 				}
@@ -164,7 +187,7 @@ func fillMaintenanceMonthSheet(f *excelize.File, sheet string, year, month int, 
 				})
 			}
 			_ = f.SetCellRichText(sheet, cell, runs)
-			if isWeekendCol {
+			if isOff {
 				_ = f.SetCellStyle(sheet, cell, cell, weekendWrap)
 			} else {
 				_ = f.SetCellStyle(sheet, cell, cell, wrapTop)

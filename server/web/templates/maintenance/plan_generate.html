@@ -1,0 +1,25 @@
+{{define "title"}}자동 배정 확인 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-lg mx-auto space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">자동 배정 확인</h2>
+  <p class="text-sm text-gray-600">{{.Plan.PlanYear}}년 계획 · {{if .Plan.Title}}{{.Plan.Title}}{{else}}제목 없음{{end}}</p>
+  {{if .HolidayMissing}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+    <p>{{.HolidayMissing}}</p>
+    <a href="/admin/holidays?year={{.Plan.PlanYear}}" class="inline-block mt-2 text-xs font-medium text-amber-900 underline">휴무일 등록</a>
+  </div>
+  {{end}}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 space-y-1">
+    <p>기존 자동 생성 방문 <strong>{{.DeleteCount}}건</strong>이 삭제됩니다.</p>
+    {{if gt .KeepCount 0}}
+    <p class="text-xs">당월·이전(또는 완료) {{.KeepCount}}건은 기간 보호로 그대로 둡니다.</p>
+    {{end}}
+    <p class="text-xs text-amber-800">다음 달 이후 자동 생성분만 지운 뒤 주기가 도래한 슬롯을 다시 채웁니다. 수동 방문은 건드리지 않습니다.</p>
+  </div>
+  <form method="POST" action="/maintenance/{{.Plan.PlanID}}/generate" class="flex gap-2">
+    <input type="hidden" name="confirm" value="1">
+    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">확인하고 자동 배정</button>
+    <a href="/maintenance/{{.Plan.PlanID}}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">취소</a>
+  </form>
+</div>
+{{end}}

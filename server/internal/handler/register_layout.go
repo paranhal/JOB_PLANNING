@@ -10,7 +10,95 @@ import (
 	"customer-support/internal/model"
 )
 
-const registerSlotRem = 1.55 // 15분 칸 높이(rem) — 템플릿과 동일
+const registerSlotRem = 1.55 // 15분 칸 높이(rem) — 카드 높이는 소요시간과 연동
+
+// registerCardMaxWidthPct 일 열 안에서 카드 최대 가로(%). 한 화면에 약 5개가 나란히 보이도록.
+const registerCardMaxWidthPct = 20.0
+
+type displaySpan struct{ s, e int }
+
+// ensureTimelineDisplayTimes 시간표 표시용으로 WorkDate·StartTime을 채운다(DB는 변경하지 않음).
+// WorkDate가 비면 DueDate를 쓰고, 시각이 없으면 같은 날 기존 일정과 겹치지 않게 순차 배정한다.
+func ensureTimelineDisplayTimes(tasks []model.WorkTask) []model.WorkTask {
+	out := make([]model.WorkTask, len(tasks))
+	copy(out, tasks)
+
+	occupied := map[string][]displaySpan{}
+	for i := range out {
+		d := strings.TrimSpace(out[i].WorkDate)
+		if d == "" {
+			d = strings.TrimSpace(out[i].DueDate)
+		}
+		if d == "" {
+			continue
+		}
+		out[i].WorkDate = d
+		if strings.TrimSpace(out[i].StartTime) == "" {
+			continue
+		}
+		sm, ok := parseHHMMToMin(out[i].StartTime)
+		if !ok {
+			continue
+		}
+		em := eventEndMin(sm, out[i].DurationMin, out[i].EndTime)
+		if em <= sm {
+			em = sm + 30
+		}
+		occupied[d] = append(occupied[d], displaySpan{sm, em})
+		if strings.TrimSpace(out[i].EndTime) == "" {
+			out[i].EndTime = fmt.Sprintf("%02d:%02d", em/60, em%60)
+		}
+	}
+
+	dayStart := workdayStartHour * 60
+	dayEnd := workdayEndHour * 60
+	for i := range out {
+		d := strings.TrimSpace(out[i].WorkDate)
+		if d == "" || strings.TrimSpace(out[i].StartTime) != "" {
+			continue
+		}
+		dur := out[i].DurationMin
+		if dur <= 0 {
+			dur = 30
+		}
+		start := nextFreeDisplaySlot(occupied[d], dayStart, dayEnd, dur)
+		end := start + dur
+		if end > dayEnd {
+			end = dayEnd
+		}
+		out[i].StartTime = fmt.Sprintf("%02d:%02d", start/60, start%60)
+		out[i].EndTime = fmt.Sprintf("%02d:%02d", end/60, end%60)
+		out[i].DurationMin = dur
+		occupied[d] = append(occupied[d], displaySpan{start, end})
+	}
+	return out
+}
+
+func nextFreeDisplaySlot(busy []displaySpan, dayStart, dayEnd, dur int) int {
+	if dur <= 0 {
+		dur = 30
+	}
+	cursor := 9 * 60
+	if cursor < dayStart {
+		cursor = dayStart
+	}
+	for cursor+dur <= dayEnd {
+		overlap := false
+		for _, b := range busy {
+			if cursor < b.e && cursor+dur > b.s {
+				overlap = true
+				if b.e > cursor {
+					cursor = b.e
+				}
+				break
+			}
+		}
+		if !overlap {
+			return cursor
+		}
+	}
+	return cursor
+}
 
 // RegisterBlock 시간표에 절대 배치되는 업무 카드
 type RegisterBlock struct {
@@ -25,12 +113,19 @@ type RegisterBlock struct {
 	HeightRem   float64
 	LeftPct     float64
 	WidthPct    float64
+	OverlapWarn bool // 같은 담당자 시간 겹침. §7.6.4
 }
 
 // RegisterDayColumn 요일(또는 일) 열 + 배치 블록
 type RegisterDayColumn struct {
 	RegisterColumn
-	Blocks []RegisterBlock
+	Blocks        []RegisterBlock
+	Assignee      string // 일일 담당자 열. 비면 날짜 열(주간)
+	Unassigned    bool
+	Count         int
+	DurationMin   int
+	DurationLabel string
+	OnLeave       bool
 }
 
 // AssigneeLegend 상단 범례용
@@ -42,16 +137,26 @@ type AssigneeLegend struct {
 
 // RegisterMonthDay 월간 캘린더 하루 칸
 type RegisterMonthDay struct {
-	Date       string
-	DayNum     int
-	InMonth    bool
-	IsToday    bool
-	IsWeekend  bool
-	Cards      []model.WBCard
-	Visible    []model.WBCard
-	MoreCount  int
-	Unassigned int
-	Total      int
+	Date        string
+	DayNum      int
+	InMonth     bool
+	IsToday     bool
+	IsWeekend   bool
+	IsSunday    bool
+	IsSaturday  bool
+	HolidayName string
+	HolidayKind string
+	DateTitle   string
+	DayClass    string
+	CellClass   string
+	DayStyle    string
+	CellStyle   string
+	Leaves      LeaveBadgeGroup
+	Cards       []model.WBCard
+	Visible     []model.WBCard
+	MoreCount   int
+	Unassigned  int
+	Total       int
 }
 
 const registerMonthVisibleMax = 3
@@ -244,21 +349,25 @@ func buildRegisterDayColumns(cols []RegisterColumn, placed []model.WorkTask, toC
 			if lane < 0 {
 				lane = 0
 			}
-			width := 100.0 / float64(lanes)
-			left := width * float64(lane)
+			laneWidth := 100.0 / float64(lanes)
+			left := laneWidth * float64(lane)
 			// 레인 사이 미세 간격(calc 없이 — html/template CSS 필터 회피)
 			gapPct := 0.4
-			w := width - gapPct
+			w := laneWidth - gapPct
 			if w < 8 {
-				w = width
+				w = laneWidth
 				gapPct = 0
+			}
+			// 가로는 최대 ~1/5열 — 높이는 시간(span)과만 연동
+			if w > registerCardMaxWidthPct {
+				w = registerCardMaxWidthPct
 			}
 			l := left + gapPct/2
 			topRem := float64(topSlots) * registerSlotRem
 			heightRem := float64(span) * registerSlotRem
 			style := fmt.Sprintf(
-				"position:absolute;top:%.3frem;height:%.3frem;left:%.3f%%;width:%.3f%%;border-left:3px solid %s;background-color:%s;color:%s;box-sizing:border-box;z-index:5",
-				topRem, heightRem, l, w, border, soft, text,
+				"position:absolute;top:%.3frem;height:%.3frem;left:%.3f%%;width:%.3f%%;max-width:%.3f%%;border-left:3px solid %s;background-color:%s;color:%s;box-sizing:border-box;z-index:5",
+				topRem, heightRem, l, w, registerCardMaxWidthPct, border, soft, text,
 			)
 			blocks = append(blocks, RegisterBlock{
 				Card: e.card, Style: template.CSS(style),
@@ -272,8 +381,8 @@ func buildRegisterDayColumns(cols []RegisterColumn, placed []model.WorkTask, toC
 	return out
 }
 
-// assignAssigneeLanes 직접 시간이 겹치고 담당자가 다르면 가로 레인으로 나눈다.
-// (전이적 연결로 하루 전체를 한 덩어리로 묶지 않음)
+// assignAssigneeLanes 시간이 겹치는 카드는 담당자 동일 여부와 관계없이 가로 레인으로 나눈다.
+// (같은 담당자·같은 시각에 여러 완료 건이 있으면 서로 덮어쓰지 않도록 함)
 func assignAssigneeLanes(evs []layoutEvent) {
 	n := len(evs)
 	if n == 0 {
@@ -291,7 +400,10 @@ func assignAssigneeLanes(evs []layoutEvent) {
 		if evs[i].endMin != evs[j].endMin {
 			return evs[i].endMin > evs[j].endMin
 		}
-		return evs[i].assignee < evs[j].assignee
+		if evs[i].assignee != evs[j].assignee {
+			return evs[i].assignee < evs[j].assignee
+		}
+		return evs[i].card.TaskID < evs[j].card.TaskID
 	})
 
 	for _, idx := range order {
@@ -301,7 +413,7 @@ func assignAssigneeLanes(evs []layoutEvent) {
 			if evs[j].lane < 0 || j == idx {
 				continue
 			}
-			if timeOverlap(*e, evs[j]) && e.assignee != evs[j].assignee {
+			if timeOverlap(*e, evs[j]) {
 				used[evs[j].lane] = true
 			}
 		}
@@ -314,24 +426,21 @@ func assignAssigneeLanes(evs []layoutEvent) {
 
 	for i := 0; i < n; i++ {
 		maxLane := evs[i].lane
-		cross := false
+		overlapAny := false
 		for j := 0; j < n; j++ {
 			if i == j || !timeOverlap(evs[i], evs[j]) {
 				continue
 			}
-			if evs[i].assignee == evs[j].assignee {
-				continue
-			}
-			cross = true
+			overlapAny = true
 			if evs[j].lane > maxLane {
 				maxLane = evs[j].lane
 			}
 		}
-		if !cross {
+		if overlapAny {
+			evs[i].lanes = maxLane + 1
+		} else {
 			evs[i].lanes = 1
 			evs[i].lane = 0
-		} else {
-			evs[i].lanes = maxLane + 1
 		}
 	}
 }

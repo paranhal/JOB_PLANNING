@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"log"
@@ -9,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"customer-support/internal/passwd"
 	"customer-support/internal/repository"
 )
 
@@ -409,7 +409,7 @@ func createCustomer(db *sql.DB, name string) (string, error) {
 func createUser(db *sql.DB, fullName string) (string, error) {
 	username := makeUsername(db, fullName)
 	id := fmt.Sprintf("USR%d", time.Now().UnixNano()%1000000000)
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte("1234")))
+	hash := passwd.Hash("1234")
 	_, err := db.Exec(`INSERT INTO users (user_id, username, password_hash, full_name, role, is_active, created_at)
 		VALUES (?,?,?,?,?,1,?)`,
 		id, username, hash, fullName, "user", time.Now().Format("2006-01-02 15:04:05"))

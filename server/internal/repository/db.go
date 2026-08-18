@@ -50,13 +50,14 @@ CREATE TABLE IF NOT EXISTS codes (
     is_active   INTEGER DEFAULT 1
 );
 
--- 사용자 (§10)
+-- 사용자 (§10) — role: admin/tech/sales/office/observer
 CREATE TABLE IF NOT EXISTS users (
     user_id       TEXT PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name     TEXT NOT NULL,
-    role          TEXT NOT NULL DEFAULT 'viewer',
+    role          TEXT NOT NULL DEFAULT 'observer',
+    permissions   TEXT DEFAULT '',
     is_active     INTEGER DEFAULT 1,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -281,7 +282,13 @@ CREATE TABLE IF NOT EXISTS as_receipts (
     start_datetime      DATETIME,
     complete_datetime   DATETIME,
     process_type        TEXT,
+    work_place          TEXT,
+    transfer_detail     TEXT,
+    confirm_target      TEXT,
+    confirm_contact     TEXT,
     cause_type          TEXT,
+    cause_detail        TEXT,
+    conclusion          TEXT,
     action_taken        TEXT,
     parts_used          TEXT,
     is_recurrence       INTEGER DEFAULT 0,
@@ -295,6 +302,7 @@ CREATE TABLE IF NOT EXISTS as_receipts (
     confirm_datetime    DATETIME,
     followup_action     TEXT,
     replace_review      INTEGER DEFAULT 0,
+    project_id          TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
@@ -313,6 +321,11 @@ CREATE TABLE IF NOT EXISTS as_processes (
     parts_used       TEXT,
     time_spent       INTEGER,
     notes            TEXT,
+    result_code      TEXT,
+    transfer_detail  TEXT,
+    next_action_date TEXT,
+    wait_reason      TEXT,
+    prep_notes       TEXT,
     FOREIGN KEY (as_id) REFERENCES as_receipts(as_id)
 );
 
@@ -326,6 +339,8 @@ CREATE TABLE IF NOT EXISTS as_work_items (
     schedule_confirmed  INTEGER DEFAULT 0,
     confirm_target      TEXT,
     confirm_contact     TEXT,
+    assigned_to         TEXT,
+    assigned_user_id    TEXT,
     status              TEXT DEFAULT 'open',
     notes               TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -391,6 +406,7 @@ CREATE TABLE IF NOT EXISTS maintenance_visits (
     product_type    TEXT,
     completed       INTEGER NOT NULL DEFAULT 0,
     completed_date  TEXT,
+    project_id      TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plan_id) REFERENCES maintenance_plans(plan_id),
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
@@ -442,6 +458,20 @@ CREATE TABLE IF NOT EXISTS project_scope_rules (
     notes TEXT,
     FOREIGN KEY (project_id) REFERENCES work_projects(project_id)
 );
+CREATE TABLE IF NOT EXISTS weekly_report_rows (
+    row_key      TEXT PRIMARY KEY,
+    sheet_row    INTEGER NOT NULL,
+    division     TEXT NOT NULL DEFAULT '',
+    team         TEXT NOT NULL DEFAULT '',
+    no_label     TEXT NOT NULL DEFAULT '',
+    display_name TEXT NOT NULL DEFAULT '',
+    project_id   TEXT,
+    row_kind     TEXT NOT NULL DEFAULT 'project',
+    highlight    INTEGER NOT NULL DEFAULT 0,
+    is_active    INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_weekly_report_rows_project ON weekly_report_rows(project_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_report_rows_sheet ON weekly_report_rows(sheet_row);
 CREATE TABLE IF NOT EXISTS work_tasks (
     task_id         TEXT PRIMARY KEY,
     work_type       TEXT NOT NULL DEFAULT 'admin',
@@ -461,6 +491,10 @@ CREATE TABLE IF NOT EXISTS work_tasks (
     source_type     TEXT,
     source_id       TEXT,
     parent_task_id  TEXT,
+    customer_id     TEXT,
+    customer_name   TEXT,
+    receipt_date    TEXT,
+    complete_date   TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES work_projects(project_id)
@@ -505,6 +539,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('MT003','management_type','periodic','정기점검',3),
 ('MT004','management_type','on_demand','요청시지원',4),
 ('MT005','management_type','reference','참고관리',5),
+('MT006','management_type','third_party','타사장비',6),
 -- 유지보수 계약구분 (§6.1)
 ('MCT001','maint_contract_type','paid','유상',1),
 ('MCT002','maint_contract_type','free','무상',2),
@@ -605,6 +640,11 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE as_receipts ADD COLUMN cancel_datetime TEXT`,
 		`ALTER TABLE assets ADD COLUMN product_category TEXT`,
 		`ALTER TABLE as_processes ADD COLUMN process_number TEXT`,
+		`ALTER TABLE as_processes ADD COLUMN result_code TEXT`,
+		`ALTER TABLE as_processes ADD COLUMN transfer_detail TEXT`,
+		`ALTER TABLE as_processes ADD COLUMN next_action_date TEXT`,
+		`ALTER TABLE as_processes ADD COLUMN wait_reason TEXT`,
+		`ALTER TABLE as_processes ADD COLUMN prep_notes TEXT`,
 		`ALTER TABLE contact_history ADD COLUMN created_by TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_building_name TEXT`,
 		`ALTER TABLE assets ADD COLUMN loc_floor_name TEXT`,
@@ -636,6 +676,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE maintenance_visits ADD COLUMN product_type TEXT`,
 		`ALTER TABLE maintenance_visits ADD COLUMN completed INTEGER DEFAULT 0`,
 		`ALTER TABLE maintenance_visits ADD COLUMN completed_date TEXT`,
+		`ALTER TABLE maintenance_visits ADD COLUMN project_id TEXT`,
+		`CREATE INDEX IF NOT EXISTS idx_maintenance_visits_project ON maintenance_visits(project_id)`,
 		// 같은 날 같은 기관이라도 KLAS·앤로보틱스처럼 점검 대상이 다르면 별도 방문으로 둔다.
 		`DROP INDEX IF EXISTS idx_maintenance_visit_dedup`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_visit_dedup2
@@ -645,6 +687,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE as_receipts ADD COLUMN transfer_detail TEXT`,
 		`ALTER TABLE as_receipts ADD COLUMN confirm_target TEXT`,
 		`ALTER TABLE as_receipts ADD COLUMN confirm_contact TEXT`,
+		`ALTER TABLE as_receipts ADD COLUMN work_place TEXT`,
 		`ALTER TABLE as_receipts ADD COLUMN import_key TEXT`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_as_receipts_import_key ON as_receipts(import_key)
 			WHERE import_key IS NOT NULL AND import_key != ''`,
@@ -683,6 +726,14 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`CREATE INDEX IF NOT EXISTS idx_work_tasks_parent ON work_tasks(parent_task_id)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_work_tasks_source ON work_tasks(source_type, source_id)
 			WHERE source_type IS NOT NULL AND source_type != ''`,
+		`ALTER TABLE work_tasks ADD COLUMN customer_id TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN customer_name TEXT`,
+		`UPDATE work_tasks SET customer_id = (
+			SELECT p.customer_id FROM work_projects p
+			WHERE p.project_id = work_tasks.project_id AND TRIM(COALESCE(p.customer_id,'')) != ''
+		) WHERE TRIM(COALESCE(work_tasks.customer_id,'')) = ''
+		  AND TRIM(COALESCE(work_tasks.project_id,'')) != ''
+		  AND work_tasks.work_type IN ('admin','support')`,
 		// 완료·종료 AS 수정 잠금 해제용 설정·세션·감사 로그
 		`CREATE TABLE IF NOT EXISTS app_settings (
 			setting_key   TEXT PRIMARY KEY,
@@ -708,6 +759,89 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_as_edit_unlock_log_as ON as_edit_unlock_log(as_id, created_at)`,
 		// 일일 업무회의: 계획대비 실행률(매일 단위)
+		`CREATE TABLE IF NOT EXISTS data_change_logs (
+			log_id TEXT PRIMARY KEY,
+			occurred_at TEXT NOT NULL,
+			user_id TEXT,
+			username TEXT,
+			user_name TEXT,
+			action TEXT NOT NULL,
+			table_name TEXT NOT NULL,
+			pk_column TEXT,
+			entity_id TEXT,
+			entity_label TEXT,
+			summary TEXT,
+			before_json TEXT,
+			after_json TEXT,
+			rolled_back INTEGER DEFAULT 0,
+			rolled_back_at TEXT
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_data_change_logs_at ON data_change_logs(occurred_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_data_change_logs_entity ON data_change_logs(table_name, entity_id)`,
+		`CREATE TABLE IF NOT EXISTS data_backups (
+			backup_id TEXT PRIMARY KEY,
+			folder_name TEXT NOT NULL UNIQUE,
+			kind TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			created_by_id TEXT,
+			created_by_name TEXT,
+			note TEXT
+		)`,
+		// 기존 DB는 CREATE TABLE IF NOT EXISTS가 UNIQUE를 추가하지 않는다.
+		// ON CONFLICT(folder_name)이 동작하려면 인덱스가 필요하다.
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_data_backups_folder ON data_backups(folder_name)`,
+		`CREATE TABLE IF NOT EXISTS data_log_archives (
+			archive_id TEXT PRIMARY KEY,
+			folder_name TEXT NOT NULL,
+			from_at TEXT,
+			to_at TEXT,
+			log_count INTEGER DEFAULT 0,
+			created_at TEXT NOT NULL
+		)`,
+		`ALTER TABLE work_tasks ADD COLUMN hold_reason TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN review_date TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN cancel_reason TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN wait_party_kind TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN wait_party TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN wait_request TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN reply_due_date TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN next_check_date TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN complete_note TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN receipt_date TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN complete_date TEXT`,
+		`CREATE TABLE IF NOT EXISTS work_actions (
+			action_id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'todo',
+			required INTEGER NOT NULL DEFAULT 1,
+			scheduled_date TEXT,
+			due_date TEXT,
+			assignee TEXT,
+			wait_party_kind TEXT,
+			wait_party TEXT,
+			wait_request TEXT,
+			reply_due_date TEXT,
+			next_check_date TEXT,
+			confirmed INTEGER NOT NULL DEFAULT 0,
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (task_id) REFERENCES work_tasks(task_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_work_actions_task ON work_actions(task_id, sort_order, action_id)`,
+		`CREATE TABLE IF NOT EXISTS work_activities (
+			activity_id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			action_id TEXT,
+			activity_type TEXT NOT NULL DEFAULT 'other',
+			content TEXT NOT NULL,
+			actor TEXT,
+			spent_minutes INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (task_id) REFERENCES work_tasks(task_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_work_activities_task ON work_activities(task_id, created_at)`,
 		`CREATE TABLE IF NOT EXISTS daily_meeting_stats (
 			stat_date       TEXT NOT NULL,
 			scope           TEXT NOT NULL DEFAULT 'team',
@@ -773,11 +907,23 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		schedule_confirmed  INTEGER DEFAULT 0,
 		confirm_target      TEXT,
 		confirm_contact     TEXT,
+		assigned_to         TEXT,
+		assigned_user_id    TEXT,
 		status              TEXT DEFAULT 'open',
 		notes               TEXT,
 		created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
+	db.Exec(`ALTER TABLE as_work_items ADD COLUMN assigned_to TEXT`)
+	db.Exec(`ALTER TABLE as_work_items ADD COLUMN assigned_user_id TEXT`)
+	// 기존 하부업무: 담당자 비어 있으면 원 접수 담당자를 초기값으로만 복사(이후 독립)
+	db.Exec(`
+		UPDATE as_work_items
+		SET assigned_to=(SELECT ar.assigned_to FROM as_receipts ar WHERE ar.as_id=as_work_items.as_id),
+		    assigned_user_id=(SELECT ar.assigned_user_id FROM as_receipts ar WHERE ar.as_id=as_work_items.as_id)
+		WHERE (assigned_to IS NULL OR TRIM(assigned_to)='')
+		  AND EXISTS (SELECT 1 FROM as_receipts ar WHERE ar.as_id=as_work_items.as_id
+		              AND ar.assigned_to IS NOT NULL AND TRIM(ar.assigned_to)!='')`)
 
 	// 기존 배정명을 user_id로 보강
 	db.Exec(`
@@ -804,6 +950,10 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('MCY004','maint_cycle','odd_bimonthly','홀수격월',4),
 		('MCY005','maint_cycle','even_bimonthly','짝수격월',5),
 		('MCY006','maint_cycle','custom','직접입력',6)`)
+
+	// 관리유형: 타사장비 (당사 비관리 · 연동 참고)
+	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
+		('MT006','management_type','third_party','타사장비',6)`)
 
 	// 담당자 직급 코드 시드 (기존 DB에도 반영)
 	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
@@ -867,7 +1017,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	// AS 워크플로 상태 보정: 일정확정→진행중, 배정만→담당자배정, 그 외→접수
 	// 기존 진행중 건은 일정 확정으로 이관(1회성 의미, 이후 필드 기준 재파생)
 	db.Exec(`UPDATE as_receipts SET schedule_confirmed=1
-		WHERE status='in_progress' AND COALESCE(schedule_confirmed,0)=0`)
+		WHERE status='in_progress' AND COALESCE(schedule_confirmed,0)=0
+		  AND TRIM(COALESCE(visit_scheduled_date,'')) != ''`)
 	db.Exec(`UPDATE as_receipts SET status='in_progress', updated_at=CURRENT_TIMESTAMP
 		WHERE status IN ('received','assigned','in_progress','')
 		  AND COALESCE(schedule_confirmed,0)=1`)
@@ -890,10 +1041,28 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	migrateCustomerStructuredAddresses(db)
 	seedDefaultProjects(db)
 	renameSeedProjectDisplayNames(db)
+	dedupeWorkProjectsByName(db)
 	linkRFIDAssetsToAnroboticsProject(db)
 	linkMaterialsChungnamToSWProject(db)
 	linkSejongLibraryToICTProject(db)
 	uppercaseAssetProductTypes(db)
+	backfillASPlannedDailyTasks(db)
+	applyAppendixB(db)
+	applyS11WorkTaskDates(db)
+	applyASReceiptsProjectID(db)
+	applyWeeklyReportRows(db)
+	applyASReceiptsCauseReport(db)
+	applyHolidaySource(db)
+	applyStaffLeaves(db)
+
+	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
+	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&
+		!strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+		log.Printf("schedule_no_date_at: %v", err)
+	}
+	db.Exec(`UPDATE as_receipts SET schedule_no_date_at = date(updated_at)
+		WHERE TRIM(COALESCE(schedule_no_date_reason,'')) != ''
+		  AND TRIM(COALESCE(schedule_no_date_at,'')) = ''`)
 
 	if err := migrateBusinessIDsV2(db); err != nil {
 		log.Printf("warning: business id migrate v2: %v", err)
@@ -904,8 +1073,46 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	}
 
 	BackfillAssetImageSlots(db)
+	migrateUserRolesAndPermissions(db)
 
 	return nil
+}
+
+// migrateUserRolesAndPermissions 등급 체계·권한 CSV 컬럼 보강
+func migrateUserRolesAndPermissions(db *sql.DB) {
+	db.Exec(`ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT ''`)
+	// 레거시 역할 명칭 정리
+	db.Exec(`UPDATE users SET role='office' WHERE role IN ('receipt','user','접수','접수담당')`)
+	db.Exec(`UPDATE users SET role='observer' WHERE role IN ('viewer','열람','열람사용자')`)
+	// 권한이 비어 있으면 등급 기본값 채움
+	rows, err := db.Query(`SELECT user_id, role, COALESCE(permissions,'') FROM users`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	type row struct{ id, role, perms string }
+	var list []row
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.id, &r.role, &r.perms) == nil {
+			list = append(list, r)
+		}
+	}
+	for _, r := range list {
+		role := model.NormalizeRole(r.role)
+		perms := strings.TrimSpace(r.perms)
+		// 옵저버: 통계만/빈 값 → 전체 조회 기본 권한
+		if role == model.RoleObserver && (perms == "" || perms == "stats") {
+			db.Exec(`UPDATE users SET role=?, permissions=? WHERE user_id=?`,
+				role, model.FormatPermissions(model.ObserverViewPermissions()), r.id)
+			continue
+		}
+		if perms != "" {
+			continue
+		}
+		db.Exec(`UPDATE users SET role=?, permissions=? WHERE user_id=?`,
+			role, model.FormatPermissions(model.DefaultPermissions(role)), r.id)
+	}
 }
 
 // migrateCustomerStructuredAddresses 구 address → 우편번호/시도/군구/동/상세 분해 이관

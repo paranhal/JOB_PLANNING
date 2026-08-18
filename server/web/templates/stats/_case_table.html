@@ -1,0 +1,44 @@
+{{define "stats_case_table"}}
+{{$showDur := .ShowDuration}}
+{{$showRnd := .ShowRounds}}
+<div class="overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500">
+      <tr>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">업무</th>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">접수번호</th>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">거래처</th>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">담당</th>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">접수일</th>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">방문일</th>
+        <th class="px-2 py-2 font-medium whitespace-nowrap">완료일</th>
+        {{if $showDur}}<th class="px-2 py-2 font-medium whitespace-nowrap">소요</th>{{end}}
+        {{if $showRnd}}<th class="px-2 py-2 font-medium whitespace-nowrap">차수</th>{{end}}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{if .Rows}}
+      {{range .Rows}}
+      <tr class="hover:bg-gray-50">
+        <td class="px-2 py-1.5 whitespace-nowrap text-gray-500">{{if .WorkForm}}{{.WorkForm}}{{else}}AS{{end}}</td>
+        <td class="px-2 py-1.5 whitespace-nowrap">
+          {{if .Href}}<a href="{{.Href}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{else}}<a href="/as/{{.ASID}}/action" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{end}}
+        </td>
+        <td class="px-2 py-1.5 whitespace-nowrap text-gray-800">{{.CustomerName}}</td>
+        <td class="px-2 py-1.5 whitespace-nowrap text-gray-600">{{.Assignee}}</td>
+        <td class="px-2 py-1.5 whitespace-nowrap text-gray-600">{{if .ReceiptDate}}{{.ReceiptDate}}{{else}}—{{end}}</td>
+        <td class="px-2 py-1.5 whitespace-nowrap text-gray-600">{{if .VisitDate}}{{.VisitDate}}{{else}}—{{end}}</td>
+        <td class="px-2 py-1.5 whitespace-nowrap text-gray-600">{{if .CompleteDate}}{{.CompleteDate}}{{else}}—{{end}}</td>
+        {{if $showDur}}<td class="px-2 py-1.5 whitespace-nowrap font-medium text-gray-800">{{if .DurationLabel}}{{.DurationLabel}}{{else if .DurationMin}}{{.DurationMin}}분{{else}}—{{end}}</td>{{end}}
+        {{if $showRnd}}<td class="px-2 py-1.5 whitespace-nowrap font-semibold text-gray-800">{{.VisitRounds}}차</td>{{end}}
+      </tr>
+      {{end}}
+      {{else}}
+      <tr>
+        <td colspan="8" class="px-3 py-6 text-center text-gray-400">{{if .Empty}}{{.Empty}}{{else}}해당 건이 없습니다.{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

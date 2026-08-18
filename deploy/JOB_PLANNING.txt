@@ -1,0 +1,10 @@
+JOB_PLANNING/
+├ 기획_업무일지_프로그램_요구사항_v2.md      ← 새로 넣기 (유일 기준)
+├ AGENTS.md                                ← 덮어쓰기
+├ 화면설계서_요약.md                         ← 덮어쓰기
+├ 검수_배포_탭.md                            ← 덮어쓰기
+├ docs/
+│  ├ JOB_PLANNING_기획검토의견.md            ← 넣기 (참고)
+│  └ JOB_PLANNING_E2E검증결과.md             ← 넣기 (참고)
+└ docs/archive/
+   └ 기획_업무일지_프로그램_요구사항.md       ← v1.0을 여기로 이동

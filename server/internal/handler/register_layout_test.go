@@ -25,14 +25,45 @@ func TestAssignAssigneeLanesSideBySide(t *testing.T) {
 	}
 }
 
-func TestAssignAssigneeLanesSameAssigneeFullWidth(t *testing.T) {
+func TestAssignAssigneeLanesSameAssigneeSideBySide(t *testing.T) {
+	// 같은 담당자라도 시간이 겹치면 나란히 표시(업무처리현황에서 숨김 방지)
 	evs := []layoutEvent{
-		{assignee: "태자운", startMin: 9 * 60, endMin: 18 * 60, lane: -1},
-		{assignee: "태자운", startMin: 10 * 60, endMin: 11 * 60, lane: -1},
+		{assignee: "양기헌", startMin: 9 * 60, endMin: 9*60 + 30, lane: -1, card: model.WBCard{TaskID: "A"}},
+		{assignee: "양기헌", startMin: 9 * 60, endMin: 9*60 + 30, lane: -1, card: model.WBCard{TaskID: "B"}},
 	}
 	assignAssigneeLanes(evs)
-	if evs[0].lanes != 1 || evs[1].lanes != 1 {
-		t.Fatalf("같은 담당자 겹침은 가로 분할 안 함: %d,%d", evs[0].lanes, evs[1].lanes)
+	if evs[0].lanes < 2 || evs[1].lanes < 2 {
+		t.Fatalf("같은 담당자 겹침도 2레인 이상: %d,%d", evs[0].lanes, evs[1].lanes)
+	}
+	if evs[0].lane == evs[1].lane {
+		t.Fatalf("겹치는 같은 담당자도 다른 레인: %d==%d", evs[0].lane, evs[1].lane)
+	}
+}
+
+func TestBuildRegisterDayColumnsSameAssigneeAllVisible(t *testing.T) {
+	cols := []RegisterColumn{{
+		Label: "월", Date: "2026-08-10", From: "2026-08-10", To: "2026-08-10",
+	}}
+	placed := []model.WorkTask{
+		{TaskID: "WT-121", Title: "AS1", Assignee: "양기헌", WorkDate: "2026-08-10", StartTime: "09:00", EndTime: "09:30", DurationMin: 30},
+		{TaskID: "WT-122", Title: "AS2", Assignee: "양기헌", WorkDate: "2026-08-10", StartTime: "09:00", EndTime: "09:30", DurationMin: 30},
+		{TaskID: "WT-050", Title: "점검", Assignee: "최혜영", WorkDate: "2026-08-10", StartTime: "09:00", EndTime: "09:30", DurationMin: 30},
+		{TaskID: "WT-124", Title: "AS3", Assignee: "최혜영", WorkDate: "2026-08-10", StartTime: "09:00", EndTime: "09:30", DurationMin: 30},
+		{TaskID: "WT-110", Title: "행정", Assignee: "태자운", WorkDate: "2026-08-10", StartTime: "09:00", EndTime: "09:30", DurationMin: 30},
+	}
+	days := buildRegisterDayColumns(cols, placed, taskCardFromWork)
+	if len(days[0].Blocks) != 5 {
+		t.Fatalf("blocks=%d want 5", len(days[0].Blocks))
+	}
+	lanes := map[int]bool{}
+	for _, b := range days[0].Blocks {
+		lanes[b.Lane] = true
+		if b.Lanes < 5 {
+			t.Fatalf("task %s lanes=%d want >=5", b.Card.TaskID, b.Lanes)
+		}
+	}
+	if len(lanes) != 5 {
+		t.Fatalf("distinct lanes=%d want 5", len(lanes))
 	}
 }
 

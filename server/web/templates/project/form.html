@@ -15,7 +15,7 @@
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
 
-  <form method="post" action="{{if .IsEdit}}/projects/{{.Project.ProjectID}}/update{{else}}/projects{{end}}" class="space-y-4"
+  <form method="post" action="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="space-y-4"
         @submit="syncRuleFields()">
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <h3 class="font-semibold text-gray-800">기본 정보</h3>

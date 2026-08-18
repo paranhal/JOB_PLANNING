@@ -1,0 +1,113 @@
+{{define "title"}}정기점검 조치{{end}}
+{{define "content"}}
+<div class="max-w-2xl mx-auto space-y-5">
+  <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 shadow-sm">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="text-sm text-gray-500 hover:text-gray-700">← 돌아가기</a>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+          <h2 class="text-xl font-bold text-gray-800">{{.SiteName}}</h2>
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">정기점검</span>
+          {{if .Visit.Completed}}
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">방문 완료</span>
+          {{else}}
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">예정</span>
+          {{end}}
+        </div>
+        <p class="text-sm text-gray-500 mt-1">
+          예정일 <span class="font-mono text-gray-800">{{.Visit.VisitDate}}</span>
+          {{if .Visit.ProductType}} · {{.Visit.ProductType}}{{end}}
+        </p>
+      </div>
+      <a href="{{.PlanHref}}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">연간 일정</a>
+    </div>
+  </div>
+
+  {{if .FlashOK}}
+  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>
+  {{end}}
+  {{if .FlashErr}}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.FlashErr}}</div>
+  {{end}}
+
+  {{if .CanEdit}}
+  <form method="POST" action="/maintenance/visits/{{.Visit.VisitID}}/action" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <input type="hidden" name="back" value="{{.BackURL}}">
+    <div class="p-4 sm:p-5 space-y-4">
+      <h3 class="text-sm font-semibold text-slate-800">방문 조치</h3>
+      <p class="text-xs text-slate-500">이 방문 건만 처리합니다. 연간 목록이 아니라 조치 화면입니다.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">예정일</label>
+          <input type="date" name="visit_date" value="{{.Visit.VisitDate}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">담당자</label>
+          <select name="assignee" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">— 선택 —</option>
+            {{range .Assignees}}
+            <option value="{{.FullName}}" {{if eq $.Visit.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">사업명</label>
+          <select name="project_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">— 선택 —</option>
+            {{range .Projects}}
+            <option value="{{.ProjectID}}" {{if eq $.Visit.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">점검 대상</label>
+          <input type="text" name="product_type" value="{{.Visit.ProductType}}" list="mnt-action-products"
+                 placeholder="K-LAS / 앤로보틱스 / 세종 K-LAS"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <datalist id="mnt-action-products">
+            <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
+          </datalist>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">상태</label>
+          <select name="status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="open" {{if not .Visit.Completed}}selected{{end}}>예정</option>
+            <option value="done" {{if .Visit.Completed}}selected{{end}}>방문 완료</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="completed" value="1" {{if .Visit.Completed}}checked{{end}}
+                   class="rounded border-gray-300 text-sky-600"
+                   onchange="var s=this.form.status; if(s) s.value=this.checked?'done':'open'; var w=document.getElementById('mnt-done-date-wrap'); if(w) w.classList.toggle('hidden', !this.checked);">
+            방문 완료
+          </label>
+        </div>
+        <div id="mnt-done-date-wrap" class="sm:col-span-2 {{if not .Visit.Completed}}hidden{{end}}">
+          <label class="block text-sm font-medium text-slate-700 mb-1">실제 방문일</label>
+          <input type="date" name="completed_date" value="{{if .Visit.CompletedDate}}{{.Visit.CompletedDate}}{{else}}{{.Visit.VisitDate}}{{end}}"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-xs">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-slate-700 mb-1">조치·비고</label>
+          <textarea name="notes" rows="4" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="점검 결과·특이사항">{{.Visit.Notes}}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="px-5 py-4 border-t border-slate-200 flex flex-wrap justify-end gap-2">
+      {{if not .Visit.Completed}}
+      <button type="submit" name="mark_done" value="1" class="px-5 py-2 border border-green-600 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">방문 완료 처리</button>
+      {{end}}
+      <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium">저장</button>
+    </div>
+  </form>
+  {{else}}
+  <section class="bg-white rounded-xl border border-slate-200 p-5 text-sm space-y-2">
+    <p>담당: {{if .Visit.Assignee}}{{.Visit.Assignee}}{{else}}—{{end}}</p>
+    <p>점검 대상: {{if .Visit.ProductType}}{{.Visit.ProductType}}{{else}}—{{end}}</p>
+    {{if .Visit.Notes}}<p class="whitespace-pre-wrap text-slate-600">{{.Visit.Notes}}</p>{{end}}
+  </section>
+  {{end}}
+</div>
+{{end}}

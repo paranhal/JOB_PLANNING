@@ -1,0 +1,60 @@
+{{define "title"}}행정관련업무현황 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-2">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">행정관련업무현황</h2>
+      <p class="text-sm text-gray-500 mt-1">수집함·할 일·회신 대기 · 카드를 누르면 목록이 바뀝니다</p>
+    </div>
+    <a href="/admin-work" class="text-sm text-violet-700 hover:underline">행정관련업무등록/처리 →</a>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
+    <a href="/admin-work/stats?status=inbox" class="bg-white rounded-xl border {{if eq .ListStatus "inbox"}}border-violet-500 ring-1 ring-violet-200{{else}}border-violet-200{{end}} p-3 text-center hover:border-violet-400">
+      <p class="text-xl font-bold text-violet-700 tabular-nums">{{.Stats.Inbox}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">수집함</p>
+    </a>
+    <a href="/admin-work/stats?status=waiting" class="bg-white rounded-xl border {{if eq .ListStatus "waiting"}}border-slate-500 ring-1 ring-slate-200{{else}}border-slate-200{{end}} p-3 text-center hover:border-slate-400">
+      <p class="text-xl font-bold text-slate-700 tabular-nums">{{.Stats.Waiting}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">할 일</p>
+    </a>
+    <a href="/admin-work/stats?status=in_progress" class="bg-white rounded-xl border {{if eq .ListStatus "in_progress"}}border-yellow-500 ring-1 ring-yellow-200{{else}}border-yellow-200{{end}} p-3 text-center hover:border-yellow-400">
+      <p class="text-xl font-bold text-yellow-600 tabular-nums">{{.Stats.InProgress}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">진행중</p>
+    </a>
+    <a href="/admin-work/stats?status=waiting_for" class="bg-white rounded-xl border {{if eq .ListStatus "waiting_for"}}border-indigo-500 ring-1 ring-indigo-200{{else}}border-indigo-200{{end}} p-3 text-center hover:border-indigo-400">
+      <p class="text-xl font-bold text-indigo-700 tabular-nums">{{.Stats.WaitingFor}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">회신 대기</p>
+      {{if gt .Stats.WaitingForOverdue 0}}<p class="text-[10px] text-red-600 mt-0.5">기한 경과 {{.Stats.WaitingForOverdue}}</p>{{end}}
+    </a>
+    <a href="/admin-work/stats?status=hold" class="bg-white rounded-xl border {{if eq .ListStatus "hold"}}border-amber-500 ring-1 ring-amber-200{{else}}border-amber-200{{end}} p-3 text-center hover:border-amber-400">
+      <p class="text-xl font-bold text-amber-600 tabular-nums">{{.Stats.Hold}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">보류</p>
+    </a>
+    <a href="/admin-work/stats?status=transfer" class="bg-white rounded-xl border {{if eq .ListStatus "transfer"}}border-orange-500 ring-1 ring-orange-200{{else}}border-orange-200{{end}} p-3 text-center hover:border-orange-400">
+      <p class="text-xl font-bold text-orange-600 tabular-nums">{{.Stats.Transfer}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">이관</p>
+    </a>
+    <a href="/admin-work/stats?status=complete" class="bg-white rounded-xl border {{if eq .ListStatus "complete"}}border-emerald-500 ring-1 ring-emerald-200{{else}}border-emerald-200{{end}} p-3 text-center hover:border-emerald-400">
+      <p class="text-xl font-bold text-emerald-600 tabular-nums">{{.Stats.Complete}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">완료</p>
+    </a>
+    <a href="/admin-work/stats?status=today" class="bg-white rounded-xl border {{if eq .ListStatus "today"}}border-sky-500 ring-1 ring-sky-200{{else}}border-sky-200{{end}} p-3 text-center hover:border-sky-400">
+      <p class="text-xl font-bold text-sky-600 tabular-nums">{{.Stats.Today}}</p>
+      <p class="text-[11px] text-gray-500 mt-1">오늘</p>
+    </a>
+  </div>
+  {{if gt .Stats.Overdue 0}}
+  <p class="text-sm text-red-700">기한 초과 {{.Stats.Overdue}}건 — <a href="/admin-work/stats?status=overdue" class="underline">목록 보기</a></p>
+  {{end}}
+
+  <div class="space-y-3">
+    <h3 class="font-semibold text-gray-700 text-sm">
+      목록
+      {{if eq .ListStatus "waiting"}}· 할 일{{else if eq .ListStatus "inbox"}}· 수집함{{else if eq .ListStatus "waiting_for"}}· 회신 대기{{else if eq .ListStatus "in_progress"}}· 진행중{{else if eq .ListStatus "hold"}}· 보류{{else if eq .ListStatus "transfer"}}· 이관{{else if eq .ListStatus "review"}}· 검토중{{else if eq .ListStatus "complete"}}· 완료{{else if eq .ListStatus "today"}}· 오늘{{else if eq .ListStatus "open"}}· 미완료{{else if eq .ListStatus "overdue"}}· 기한 초과{{else}}· 전체{{end}}
+      <span class="text-gray-400 font-normal">({{.Total}}건)</span>
+    </h3>
+    {{template "admin_work_table" .}}
+  </div>
+</div>
+{{end}}

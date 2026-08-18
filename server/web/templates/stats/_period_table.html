@@ -34,7 +34,14 @@
       <tr class="hover:bg-sky-50/40">
         <td class="px-3 py-2 font-medium text-sky-800 sticky left-0 bg-white" rowspan="3">정기점검</td>
         <td class="px-3 py-2 text-gray-600">예정업무</td>
-        {{range .}}<td class="px-3 py-2 text-center tabular-nums font-semibold text-gray-800">{{.Counts.Mnt.Planned}}</td>{{end}}
+        {{range .}}
+        <td class="px-3 py-2 text-center tabular-nums font-semibold text-gray-800">
+          {{.Counts.Mnt.Planned}}
+          {{if gt .Counts.Mnt.Quota 0}}
+          <div class="text-[11px] font-normal text-sky-700 mt-0.5">({{.Counts.Mnt.Cumulative}}/{{.Counts.Mnt.Remaining}})</div>
+          {{end}}
+        </td>
+        {{end}}
       </tr>
       <tr class="hover:bg-sky-50/40">
         <td class="px-3 py-2 text-gray-600">접수</td>
@@ -80,7 +87,7 @@
       </tr>
       <tr class="bg-slate-50 font-semibold">
         <td class="px-3 py-2.5 text-gray-700">실행률</td>
-        {{range .}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-indigo-800">{{printf "%.1f" .Counts.ExecutionRatePct}}%</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}
+        {{range .}}{{if and .ShowActual .Counts.HasExecutionRate}}<td class="px-3 py-2.5 text-center tabular-nums text-indigo-800">{{printf "%.1f" .Counts.ExecutionRatePct}}%</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300" {{if and .ShowActual (not .Counts.HasExecutionRate)}}title="해당 기간 예정 업무 없음"{{end}}>—</td>{{end}}{{end}}
       </tr>
     </tbody>
   </table>

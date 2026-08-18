@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"customer-support/internal/model"
@@ -157,6 +158,79 @@ func (r *ContactRepo) ListByCustomer(customerID string) ([]model.Contact, error)
 	return items, rows.Err()
 }
 
+// ListForAPI 영업관리 연동용 담당자 목록.
+func (r *ContactRepo) ListForAPI(search, customerID, status string, limit, offset int) ([]model.Contact, int, error) {
+	if limit < 1 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	where := ` WHERE 1=1`
+	args := []interface{}{}
+	if customerID = strings.TrimSpace(customerID); customerID != "" {
+		where += ` AND c.customer_id=?`
+		args = append(args, customerID)
+	}
+	if status = strings.TrimSpace(status); status != "" {
+		where += ` AND COALESCE(c.status,'active')=?`
+		args = append(args, status)
+	}
+	if search = strings.TrimSpace(search); search != "" {
+		like := "%" + search + "%"
+		where += ` AND (c.full_name LIKE ? OR cu.org_name LIKE ? OR c.phone LIKE ? OR c.mobile LIKE ? OR c.email LIKE ?)`
+		args = append(args, like, like, like, like, like)
+	}
+	countQ := `SELECT COUNT(*) FROM contacts c JOIN customers cu ON cu.customer_id=c.customer_id` + where
+	var total int
+	if err := r.db.QueryRow(countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	listQ := `
+		SELECT c.contact_id, c.customer_id, c.full_name,
+		       COALESCE(c.affiliation,'institution'),
+		       COALESCE(c.job_role,''), COALESCE(c.title,''), COALESCE(c.job_grade,''),
+		       COALESCE(c.phone,''), COALESCE(c.mobile,''),
+		       COALESCE(c.email,''), COALESCE(c.start_date,''),
+		       COALESCE(c.end_date,''), COALESCE(c.status,'active'),
+		       COALESCE(c.contact_role,''), c.is_primary, COALESCE(c.notes,''),
+		       cu.org_name
+		FROM contacts c
+		JOIN customers cu ON cu.customer_id = c.customer_id` + where + `
+		ORDER BY cu.org_name, CASE COALESCE(c.contact_role,'') WHEN 'primary' THEN 0 WHEN 'secondary' THEN 1 ELSE 2 END, c.full_name
+		LIMIT ? OFFSET ?`
+	qargs := append(append([]interface{}{}, args...), limit, offset)
+	rows, err := r.db.Query(listQ, qargs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.Contact
+	for rows.Next() {
+		var item model.Contact
+		var isPrimary int
+		var role, affiliation string
+		if err := rows.Scan(
+			&item.ContactID, &item.CustomerID, &item.FullName,
+			&affiliation,
+			&item.JobRole, &item.Title, &item.JobGrade,
+			&item.Phone, &item.Mobile,
+			&item.Email, &item.StartDate,
+			&item.EndDate, &item.Status,
+			&role, &isPrimary, &item.Notes,
+			&item.OrgName,
+		); err != nil {
+			return nil, 0, err
+		}
+		applyContactFlags(&item, isPrimary, role, affiliation)
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []model.Contact{}
+	}
+	return items, total, rows.Err()
+}
+
 // GetByID 담당자 단건 조회
 func (r *ContactRepo) GetByID(id string) (*model.Contact, error) {
 	query := `
@@ -212,7 +286,11 @@ func (r *ContactRepo) Create(ct *model.Contact) error {
 		ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
 		ct.Status, ct.ContactRole, boolToInt(ct.IsPrimary), ct.Notes, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "contacts", "contact_id", ct.ContactID, ct.FullName)
+	return nil
 }
 
 // Update 담당자 수정
@@ -220,15 +298,17 @@ func (r *ContactRepo) Update(ct *model.Contact) error {
 	ct.ContactRole = normalizeContactRole(ct.ContactRole, ct.IsPrimary)
 	ct.IsPrimary = ct.ContactRole == "primary"
 	ct.Affiliation = normalizeAffiliation(ct.Affiliation)
-	_, err := r.db.Exec(`
+	return touchUpdate(r.db, "contacts", "contact_id", ct.ContactID, ct.FullName, func() error {
+		_, err := r.db.Exec(`
 		UPDATE contacts SET
 			customer_id=?, full_name=?, affiliation=?, job_role=?, title=?, job_grade=?,
 			phone=?, mobile=?, email=?, start_date=?, end_date=?,
 			status=?, contact_role=?, is_primary=?, notes=?
 		WHERE contact_id=?`,
-		ct.CustomerID, ct.FullName, ct.Affiliation, ct.JobRole, ct.Title, ct.JobGrade,
-		ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
-		ct.Status, ct.ContactRole, boolToInt(ct.IsPrimary), ct.Notes, ct.ContactID,
-	)
-	return err
+			ct.CustomerID, ct.FullName, ct.Affiliation, ct.JobRole, ct.Title, ct.JobGrade,
+			ct.Phone, ct.Mobile, ct.Email, ct.StartDate, ct.EndDate,
+			ct.Status, ct.ContactRole, boolToInt(ct.IsPrimary), ct.Notes, ct.ContactID,
+		)
+		return err
+	})
 }
