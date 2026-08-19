@@ -42,6 +42,12 @@ const (
 	WBSourceMaintenance = "maintenance"
 )
 
+// work_task_members.member_role (§7.7.2). work_tasks.assignee 는 주담당(owner)과 같다.
+const (
+	WBMemberOwner   = "owner"
+	WBMemberSupport = "support"
+)
+
 // WBCategory 시간표 카드의 분류: as / maintenance / admin
 func WBCategory(sourceType string) string {
 	switch sourceType {
