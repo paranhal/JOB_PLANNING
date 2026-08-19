@@ -304,22 +304,6 @@
             </div>
           </div>
 
-          <div id="as-cause-report-wrap" data-symptom="{{.AS.Symptom}}"
-               class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 {{if ne .AS.ResultCode "done"}}hidden{{end}}">
-            <p class="text-sm font-semibold text-emerald-900">완료 보고 문장</p>
-            <p class="text-xs text-emerald-800">원인분류(코드)와 다른 칸입니다. 고객이 읽는 문장이며, 초안은 고칠 수 있습니다. 비워도 조치는 저장됩니다.</p>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">장애원인</label>
-              <textarea name="cause_detail" id="as-cause-detail" rows="2" placeholder="예: 전원 불량"
-                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.CauseDetail}}</textarea>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">결론</label>
-              <textarea name="conclusion" id="as-conclusion" rows="3" placeholder="초안을 확인한 뒤 고치세요"
-                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{if .AS.Conclusion}}{{.AS.Conclusion}}{{else}}{{.ConclusionDraft}}{{end}}</textarea>
-            </div>
-          </div>
-
           <div id="as-transfer-detail-wrap" class="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-3 {{if ne .AS.ResultCode "transfer"}}hidden{{end}}">
             <p class="text-sm font-semibold text-purple-900">이관 후 처리</p>
             <div class="flex flex-wrap gap-4 text-sm">
@@ -414,6 +398,22 @@
               <option value="custom">직접입력</option>
             </select>
             <input type="text" name="work_assigned_to_custom" placeholder="직접입력 시 이름" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-md">
+          </div>
+        </section>
+
+        <section id="as-cause-report-wrap" data-symptom="{{.AS.Symptom}}"
+                 class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4 {{if and (ne .AS.ResultCode "done") (ne .AS.ResultCode "partial")}}hidden{{end}}">
+          <h4 class="text-sm font-semibold text-slate-800">조치 정보</h4>
+          <p class="text-xs text-slate-500">원인분류(코드)와 다른 칸입니다. 고객이 읽는 문장이며, 초안은 고칠 수 있습니다. 비워도 조치는 저장됩니다.</p>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">장애원인</label>
+            <textarea name="cause_detail" id="as-cause-detail" rows="2" placeholder="예: 전원 불량"
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.CauseDetail}}</textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">결론</label>
+            <textarea name="conclusion" id="as-conclusion" rows="3" placeholder="초안을 확인한 뒤 고치세요"
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{if .AS.Conclusion}}{{.AS.Conclusion}}{{else}}{{.ConclusionDraft}}{{end}}</textarea>
           </div>
         </section>
 
@@ -765,12 +765,25 @@
     if (!cause) return symptom + ' 문제가 발생했고, ' + work + '하여 정상작동하는 것으로 확인됨.';
     return cause + koreanEuro(cause) + ' ' + symptom + ' 문제가 발생했고, ' + work + '하여 정상작동하는 것으로 확인됨.';
   }
-  var lastAutoDraft = buildConclusionDraft();
+  function showsCauseReport(v) {
+    return v === 'done' || v === 'partial';
+  }
+  function selectedResult() {
+    var el = document.querySelector('input.as-result-radio:checked');
+    return el ? el.value : '';
+  }
+  function conclusionDraftValue() {
+    var d = buildConclusionDraft();
+    if (!d) return '';
+    if (selectedResult() === 'partial') return '(부분 조치) ' + d;
+    return d;
+  }
+  var lastAutoDraft = conclusionDraftValue();
   var userEditedConclusion = !!(conclusionEl && conclusionEl.value.trim() && conclusionEl.value.trim() !== lastAutoDraft);
   function refreshConclusionDraft() {
     if (!conclusionEl || userEditedConclusion) return;
-    lastAutoDraft = buildConclusionDraft();
-    if (selectedResult() === 'done') conclusionEl.value = lastAutoDraft;
+    lastAutoDraft = conclusionDraftValue();
+    if (showsCauseReport(selectedResult())) conclusionEl.value = lastAutoDraft;
   }
   if (causeDetailEl) causeDetailEl.addEventListener('input', refreshConclusionDraft);
   if (actionTakenEl) actionTakenEl.addEventListener('input', refreshConclusionDraft);
@@ -786,10 +799,6 @@
   var workAssigneeFields = document.getElementById('as-work-assignee-fields');
   var createRevisit = document.getElementById('as-create-revisit');
   var revisitAfterWrap = document.getElementById('as-revisit-after-wrap');
-  function selectedResult() {
-    var el = document.querySelector('input.as-result-radio:checked');
-    return el ? el.value : '';
-  }
   function setEnabled(root, on) {
     if (!root) return;
     root.querySelectorAll('input,select,textarea').forEach(function (el) {
@@ -835,9 +844,9 @@
     if (title) title.textContent = isPartial ? '추가조치 필요' : '재방문 필요';
     if (reasonLabel) reasonLabel.textContent = isPartial ? '추가조치 사유' : '재방문 사유';
     if (hint) hint.classList.toggle('hidden', !isPartial);
-    if (causeReportWrap) causeReportWrap.classList.toggle('hidden', v !== 'done');
-    setEnabled(causeReportWrap, v === 'done');
-    if (v === 'done') refreshConclusionDraft();
+    if (causeReportWrap) causeReportWrap.classList.toggle('hidden', !showsCauseReport(v));
+    setEnabled(causeReportWrap, showsCauseReport(v));
+    if (showsCauseReport(v)) refreshConclusionDraft();
     if (isTransfer) syncTransferWaiting();
     syncWorkAssigneeUI();
     if (statusSel) {

@@ -58,6 +58,16 @@ const (
 	ResultEscalation = "escalation"
 )
 
+// ShowsASCauseReport 장애원인·결론(조치 정보)을 여는 결과. 완료·추가조치 필요. §12.10.4 v2.12
+func ShowsASCauseReport(resultCode string) bool {
+	switch strings.TrimSpace(resultCode) {
+	case ResultDone, ResultPartial:
+		return true
+	default:
+		return false
+	}
+}
+
 // ActionResultOption 조치 화면 결과 선택지 (저장 코드는 유지, 문구만 화면용)
 type ActionResultOption struct {
 	Value string

@@ -196,6 +196,9 @@ func WorkPlaceLabel(s string) string {
 	}
 }
 
+// PartialConclusionPrefix 추가조치 필요(partial) 결론 초안 머리말. §12.10.4 v2.12
+const PartialConclusionPrefix = "(부분 조치) "
+
 // BuildASConclusionDraft 완료 시 결론 초안. 빈 칸은 그대로 두고 문장을 강제하지 않는다. §12.10.4
 func BuildASConclusionDraft(causeDetail, symptom, workContent string) string {
 	causeDetail = strings.TrimSpace(causeDetail)
@@ -214,6 +217,18 @@ func BuildASConclusionDraft(causeDetail, symptom, workContent string) string {
 		return symptom + " 문제가 발생했고, " + workContent + "하여 정상작동하는 것으로 확인됨."
 	}
 	return causeDetail + koreanEuro(causeDetail) + " " + symptom + " 문제가 발생했고, " + workContent + "하여 정상작동하는 것으로 확인됨."
+}
+
+// BuildASConclusionDraftForResult 결과코드에 맞춘 초안. partial 은 「(부분 조치)」로 시작한다. §12.10.4 v2.12
+func BuildASConclusionDraftForResult(resultCode, causeDetail, symptom, workContent string) string {
+	d := BuildASConclusionDraft(causeDetail, symptom, workContent)
+	if d == "" {
+		return ""
+	}
+	if resultCode == ResultPartial {
+		return PartialConclusionPrefix + d
+	}
+	return d
 }
 
 // koreanEuro 받침에 따라 (으)로.

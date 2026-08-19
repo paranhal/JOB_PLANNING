@@ -2,8 +2,10 @@ package handler
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -398,6 +400,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		"ReceiptLocal":     now.Format("2006-01-02T15:04"),
 		"CanEditVisitDate": true, // 신규 접수 시 접수 권한자가 설정 가능
 		"History":          history,
+		"Err":              c.QueryParam("err"),
 	})
 }
 
@@ -477,11 +480,15 @@ func (h *ASHandler) Create(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	as := h.parseReceiptForm(c)
+	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && as.VisitScheduledDate == "" {
+		return c.Redirect(http.StatusSeeOther, "/as/new?err=date_year")
+	}
 	if as.ScheduleConfirmed && as.VisitScheduledDate == "" {
 		as.ScheduleConfirmed = false
 	}
 	if err := h.repo.Create(as); err != nil {
-		return err
+		log.Printf("AS 접수 등록 실패: %v", err)
+		return c.Redirect(http.StatusSeeOther, "/as/new?err="+receiptCreateErrQuery(err))
 	}
 	h.syncASPlannedDailyTask(as.ASID)
 	if h.attach != nil {
@@ -956,7 +963,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		as.PartsUsed = c.FormValue("parts_used")
 		formResult = strings.TrimSpace(c.FormValue("result_code"))
 		as.ResultCode = formResult
-		if formResult == model.ResultDone {
+		if model.ShowsASCauseReport(formResult) {
 			as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
 			as.Conclusion = strings.TrimSpace(c.FormValue("conclusion"))
 		}
@@ -1121,7 +1128,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if canIssueASReportStatus(as.Status) {
 		q.Set("report", "1")
 	}
-	if formResult == model.ResultDone &&
+	if model.ShowsASCauseReport(formResult) &&
 		(strings.TrimSpace(as.CauseDetail) == "" || strings.TrimSpace(as.Conclusion) == "") {
 		q.Set("warn", "cause_report")
 	}
@@ -1224,7 +1231,7 @@ func asConclusionDraft(as *model.ASReceipt, processes []model.ASProcess) string 
 			}
 		}
 	}
-	return model.BuildASConclusionDraft(as.CauseDetail, as.Symptom, work)
+	return model.BuildASConclusionDraftForResult(as.ResultCode, as.CauseDetail, as.Symptom, work)
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -1426,6 +1433,20 @@ func (h *ASHandler) Cancel(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+}
+
+func receiptCreateErrQuery(err error) string {
+	if errors.Is(err, model.ErrAppDateYear) {
+		return "date_year"
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "unique") {
+		return url.QueryEscape("접수번호가 중복되었습니다. 다시 등록해 주세요.")
+	}
+	if strings.Contains(msg, "foreign key") {
+		return url.QueryEscape("선택한 기관 또는 자산이 유효하지 않습니다.")
+	}
+	return url.QueryEscape("접수 저장에 실패했습니다.")
 }
 
 func parseFormDatetime(s string) (time.Time, bool) {

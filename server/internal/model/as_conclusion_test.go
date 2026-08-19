@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestBuildASConclusionDraft(t *testing.T) {
 	got := BuildASConclusionDraft("전원 불량", "부팅 불가", "파워 교체")
@@ -18,5 +21,38 @@ func TestBuildASConclusionDraft(t *testing.T) {
 	}
 	if BuildASConclusionDraft("", "", "") != "" {
 		t.Fatal("전부 빈 초안은 없어야 한다")
+	}
+}
+
+func TestBuildASConclusionDraftForResultPartialPrefix(t *testing.T) {
+	base := BuildASConclusionDraft("설정 오류", "로그인 실패", "설정 복구")
+	got := BuildASConclusionDraftForResult(ResultPartial, "설정 오류", "로그인 실패", "설정 복구")
+	want := PartialConclusionPrefix + base
+	if got != want {
+		t.Fatalf("partial 초안=%q want %q", got, want)
+	}
+	if !strings.HasPrefix(got, "(부분 조치)") {
+		t.Fatalf("머리말 없음: %q", got)
+	}
+	done := BuildASConclusionDraftForResult(ResultDone, "설정 오류", "로그인 실패", "설정 복구")
+	if done != base {
+		t.Fatalf("완료 초안이 바뀜: %q", done)
+	}
+	if BuildASConclusionDraftForResult(ResultPartial, "", "", "") != "" {
+		t.Fatal("빈 초안에 머리말만 붙으면 안 된다")
+	}
+	if BuildASConclusionDraftForResult(ResultRevisit, "설정 오류", "로그인 실패", "설정 복구") != base {
+		t.Fatal("재방문은 초안 문장만 두고 머리말은 붙이지 않는다")
+	}
+}
+
+func TestShowsASCauseReport(t *testing.T) {
+	if !ShowsASCauseReport(ResultDone) || !ShowsASCauseReport(ResultPartial) {
+		t.Fatal("완료·추가조치 필요는 열려야 한다")
+	}
+	for _, code := range []string{ResultRevisit, ResultTransfer, ResultHold, ""} {
+		if ShowsASCauseReport(code) {
+			t.Fatalf("%q 는 닫혀야 한다", code)
+		}
 	}
 }
