@@ -5,27 +5,31 @@
 <div class="space-y-4">
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">일일 업무 회의</h2>
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-xl font-bold text-gray-800">일일 업무 회의</h2>
+        <form method="GET" action="/meeting" class="inline-flex items-center gap-2">
+          <input type="hidden" name="date" value="{{.Date}}">
+          <label class="text-sm text-gray-600" for="meeting-assignee">담당자</label>
+          <select id="meeting-assignee" name="assignee" onchange="this.form.submit()"
+                  class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+            <option value="all" {{if eq .Assignee ""}}selected{{end}}>팀전체</option>
+            {{range .Users}}
+            <option value="{{.FullName}}" {{if eq $.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
+            {{end}}
+          </select>
+        </form>
+      </div>
       <p class="text-sm text-gray-500 mt-1">{{.ScopeNote}} · 기준일 {{.Date}}</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/meeting?date={{.PrevDate}}{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">← 전일</a>
+      <a href="/meeting?date={{.PrevDate}}&{{.AssigneeQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">← 전일</a>
       <form method="GET" action="/meeting" class="inline-flex items-center gap-2">
         <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
                class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-        {{if eq .Role "tech"}}
-        <input type="hidden" name="mine" value="{{if .Mine}}1{{else}}0{{end}}">
-        {{else if .Mine}}
-        <input type="hidden" name="mine" value="1">
-        {{end}}
+        <input type="hidden" name="assignee" value="{{if .Assignee}}{{.Assignee}}{{else}}all{{end}}">
       </form>
-      <a href="/meeting?date={{.NextDate}}{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">익일 →</a>
-      <a href="/meeting{{if .MineQ}}?{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 hover:bg-blue-100">오늘</a>
-      {{if eq .Role "tech"}}
-      <a href="/meeting?date={{.Date}}&mine={{if .Mine}}0{{else}}1{{end}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs text-gray-600 hover:bg-gray-50">
-        {{if .Mine}}팀전체 보기{{else}}내 업무만{{end}}
-      </a>
-      {{end}}
+      <a href="/meeting?date={{.NextDate}}&{{.AssigneeQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">익일 →</a>
+      <a href="/meeting?{{.AssigneeQ}}" class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 hover:bg-blue-100">오늘</a>
     </div>
   </div>
 
@@ -78,7 +82,6 @@
         <table class="w-full text-sm">
           <thead class="bg-white border-b">
             <tr>
-              {{if .ShowAssignee}}<th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">담당자</th>{{end}}
               <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">구분</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">번호</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">기관 / 제목</th>
@@ -86,12 +89,13 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            {{if .Yesterday}}
-            {{range .Yesterday}}
+            {{if .YesterdayGroups}}
+            {{range .YesterdayGroups}}
+            <tr class="bg-slate-50">
+              <td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-700">{{.Label}} · {{.Count}}건</td>
+            </tr>
+            {{range .Items}}
             <tr class="hover:bg-gray-50">
-              {{if $.ShowAssignee}}
-              <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{if .Assignee}}{{.Assignee}}{{else}}<span class="text-gray-300">—</span>{{end}}</td>
-              {{end}}
               <td class="px-3 py-2 whitespace-nowrap">
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
@@ -108,8 +112,9 @@
               <td class="px-3 py-2 text-xs text-gray-600">{{.StatusLabel}}</td>
             </tr>
             {{end}}
+            {{end}}
             {{else}}
-            <tr><td colspan="{{if .ShowAssignee}}5{{else}}4{{end}}" class="px-4 py-10 text-center text-gray-400">전일 실적이 없습니다.</td></tr>
+            <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400">전일 실적이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>
@@ -125,7 +130,6 @@
         <table class="w-full text-sm">
           <thead class="bg-white border-b">
             <tr>
-              {{if .ShowAssignee}}<th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">담당자</th>{{end}}
               <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">구분</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">번호</th>
               <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">기관 / 제목</th>
@@ -133,12 +137,13 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            {{if .TodayItems}}
-            {{range .TodayItems}}
+            {{if .TodayGroups}}
+            {{range .TodayGroups}}
+            <tr class="bg-slate-50">
+              <td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-700">{{.Label}} · {{.Count}}건</td>
+            </tr>
+            {{range .Items}}
             <tr class="hover:bg-gray-50">
-              {{if $.ShowAssignee}}
-              <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{if .Assignee}}{{.Assignee}}{{else}}<span class="text-gray-300">—</span>{{end}}</td>
-              {{end}}
               <td class="px-3 py-2 whitespace-nowrap">
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
@@ -155,8 +160,9 @@
               <td class="px-3 py-2 text-xs text-gray-600">{{.StatusLabel}}</td>
             </tr>
             {{end}}
+            {{end}}
             {{else}}
-            <tr><td colspan="{{if .ShowAssignee}}5{{else}}4{{end}}" class="px-4 py-10 text-center text-gray-400">오늘 예정이 없습니다.</td></tr>
+            <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400">오늘 예정이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>

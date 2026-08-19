@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -13,62 +12,53 @@ import (
 )
 
 type MeetingHandler struct {
-	work  *repository.WorkBoardRepo
-	stats *repository.StatsRepo
+	work     *repository.WorkBoardRepo
+	stats    *repository.StatsRepo
+	userRepo *repository.UserRepo
 }
 
-func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo) *MeetingHandler {
-	return &MeetingHandler{work: work, stats: stats}
+func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo) *MeetingHandler {
+	return &MeetingHandler{work: work, stats: stats, userRepo: userRepo}
 }
 
-// Show GET /meeting?date=YYYY-MM-DD&mine=0|1
+// Show GET /meeting?date=YYYY-MM-DD&assignee=
 func (h *MeetingHandler) Show(c echo.Context) error {
-	role := currentRole(c)
-	uid := currentUserID(c)
-	keys := assigneeKeys(c)
-
 	today := parseMeetingAnchor(c.QueryParam("date"))
 	dateStr := today.Format("2006-01-02")
 	prevStr := today.AddDate(0, 0, -1).Format("2006-01-02")
 
-	mineParam := c.QueryParam("mine")
-	mineUID, mineKeys := "", []string(nil)
-	scopeAll := false
-	if role == "tech" {
-		if mineParam == "0" {
-			scopeAll = true
-		} else {
-			mineUID, mineKeys = uid, keys
-		}
-	} else if mineParam == "1" {
-		mineUID, mineKeys = uid, keys
-	} else {
-		scopeAll = true
+	var users []model.User
+	if h.userRepo != nil {
+		users, _ = h.userRepo.ListAssignable()
 	}
+	selected := resolveMeetingAssignee(c, users)
+	order := assignableNameOrder(users)
+	assigneeQ := meetingAssigneeQuery(selected)
 
-	yesterday, err := h.work.ListCompletedOn(prevStr, mineUID, mineKeys, 300)
+	yesterday, err := h.work.ListCompletedOn(prevStr, "", nil, 300)
 	if err != nil {
 		return err
 	}
-	todayItems, err := h.work.ListScheduledOn(dateStr, mineUID, mineKeys, 300)
+	todayItems, err := h.work.ListScheduledOn(dateStr, "", nil, 300)
 	if err != nil {
 		return err
 	}
-	unplanned, _, err := h.work.ListUnplanned(mineUID, mineKeys, "")
+	yesterday = filterWorkItemsByAssignee(yesterday, selected)
+	todayItems = filterWorkItemsByAssignee(todayItems, selected)
+
+	mineKeys := []string(nil)
+	if selected != "" {
+		mineKeys = []string{selected}
+	}
+	unplanned, _, err := h.work.ListUnplanned("", mineKeys, "")
 	if err != nil {
 		return err
 	}
 
 	cols := repository.BuildStatsPeriodColumns(model.StatsViewDay, today)
 	filter := repository.ParseMeetingFilter(model.StatsScopeTeam, "", "")
-	if mineUID != "" {
-		name := strings.TrimSpace(ctxString(c, "user_name"))
-		if name == "" && len(mineKeys) > 0 {
-			name = strings.TrimSpace(mineKeys[0])
-		}
-		if name != "" {
-			filter = repository.ParseMeetingFilter(model.StatsScopeAssignee, name, "")
-		}
+	if selected != "" {
+		filter = repository.ParseMeetingFilter(model.StatsScopeAssignee, selected, "")
 	}
 	_ = h.stats.FillPeriodOverview(cols, filter)
 
@@ -82,27 +72,28 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		}
 	}
 
-	showAssignee := role == "admin" || role == "receipt" || scopeAll
 	return c.Render(http.StatusOK, "meeting/show.html", map[string]interface{}{
-		"Title":          "일일 업무 회의",
-		"Active":         "meeting",
-		"Date":           dateStr,
-		"PrevDate":       prevStr,
-		"NextDate":       today.AddDate(0, 0, 1).Format("2006-01-02"),
-		"Yesterday":      yesterday,
-		"TodayItems":     todayItems,
-		"YesterdayN":     len(yesterday),
-		"TodayN":         len(todayItems),
-		"UnplannedN":     len(unplanned),
-		"UnplannedHref":  planUnplannedURL(mineUID != "", role, ""),
-		"PrevCol":        prevCol,
-		"CurCol":         curCol,
-		"ShowAssignee":   showAssignee,
-		"Role":           role,
-		"Mine":           mineUID != "",
-		"ScopeNote":      meetingScopeNote(role, scopeAll),
-		"MineQ":          meetingMineQuery(role, mineUID != ""),
-		"HolidayBanner":  meetingHolidayBanner(dateStr),
+		"Title":           "일일 업무 회의",
+		"Active":          "meeting",
+		"Date":            dateStr,
+		"PrevDate":        prevStr,
+		"NextDate":        today.AddDate(0, 0, 1).Format("2006-01-02"),
+		"Yesterday":       yesterday,
+		"TodayItems":      todayItems,
+		"YesterdayGroups": groupWorkItemsByAssignee(yesterday, order),
+		"TodayGroups":     groupWorkItemsByAssignee(todayItems, order),
+		"YesterdayN":      len(yesterday),
+		"TodayN":          len(todayItems),
+		"UnplannedN":      len(unplanned),
+		"UnplannedHref":   planUnplannedURL(false, currentRole(c), ""),
+		"PrevCol":         prevCol,
+		"CurCol":          curCol,
+		"Users":           users,
+		"Assignee":        selected,
+		"AssigneeQ":       assigneeQ,
+		"Role":            currentRole(c),
+		"ScopeNote":       meetingScopeNote(selected),
+		"HolidayBanner":   meetingHolidayBanner(dateStr),
 	})
 }
 
@@ -117,24 +108,9 @@ func parseMeetingAnchor(s string) time.Time {
 	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, n.Location())
 }
 
-func meetingScopeNote(role string, scopeAll bool) string {
-	if role == "tech" && !scopeAll {
-		return "내 배정 업무 기준"
+func meetingScopeNote(assignee string) string {
+	if assignee != "" {
+		return assignee + " 기준"
 	}
 	return "전체 업무 기준"
-}
-
-// meetingMineQuery mine 쿼리만 (앞에 & 없음). 날짜와 조합할 때 사용.
-func meetingMineQuery(role string, mine bool) string {
-	v := url.Values{}
-	if role == "tech" {
-		if mine {
-			v.Set("mine", "1")
-		} else {
-			v.Set("mine", "0")
-		}
-	} else if mine {
-		v.Set("mine", "1")
-	}
-	return v.Encode()
 }
