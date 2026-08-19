@@ -152,7 +152,7 @@ func (r *ASWorkRepo) SetScheduledDate(workID, date string) error {
 		return fmt.Errorf("날짜가 필요합니다")
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`UPDATE as_work_items SET scheduled_date=?, schedule_confirmed=1, updated_at=? WHERE work_id=?`,
+	_, err = r.db.Exec(`UPDATE as_work_items SET scheduled_date=?, schedule_confirmed=1, updated_at=? WHERE work_id=?`,
 		date, now, workID)
 	return err
 }

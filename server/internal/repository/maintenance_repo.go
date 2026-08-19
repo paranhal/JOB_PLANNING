@@ -529,7 +529,7 @@ func (r *MaintenanceRepo) SetVisitDate(visitID, visitDate string) error {
 	if visitID == "" || visitDate == "" {
 		return nil
 	}
-	_, err := r.db.Exec(`
+	_, err = r.db.Exec(`
 		UPDATE maintenance_visits SET visit_date=?
 		WHERE visit_id=? AND visit_date!=? AND COALESCE(completed,0)=0`,
 		visitDate, visitID, visitDate)
