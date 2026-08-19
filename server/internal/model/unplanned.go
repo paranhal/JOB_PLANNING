@@ -85,10 +85,22 @@ type UnplannedBadge struct {
 }
 
 func UnplannedBadgeOf(kind string, daysOverdue int) UnplannedBadge {
+	return UnplannedBadgeOfStarted(kind, daysOverdue, false)
+}
+
+// UnplannedBadgeOfStarted §8.2.2 착수한 예정일경과는 노란 「진행중 D+n」.
+func UnplannedBadgeOfStarted(kind string, daysOverdue int, started bool) UnplannedBadge {
 	switch kind {
 	case UnplannedNoDate:
 		return UnplannedBadge{Kind: kind, Label: "예정없음", Class: "bg-red-100 text-red-800"}
 	case UnplannedDelayed:
+		if started {
+			label := "진행중"
+			if daysOverdue > 0 {
+				label = "진행중 D+" + strconv.Itoa(daysOverdue)
+			}
+			return UnplannedBadge{Kind: kind, Label: label, Class: "bg-amber-100 text-amber-800"}
+		}
 		label := "예정일경과"
 		if daysOverdue > 0 {
 			label = "D+" + strconv.Itoa(daysOverdue)
@@ -118,6 +130,7 @@ type UnplannedItem struct {
 	PlanID        string           `json:"plan_id"`
 	CustomerID    string           `json:"customer_id"`
 	ProductType   string           `json:"product_type"`
+	Started       bool             `json:"started"` // §8.2.2 착수(start_datetime 또는 as_processes)
 }
 
 func (it UnplannedItem) HasKind(kind string) bool {
@@ -129,6 +142,20 @@ func (it UnplannedItem) HasKind(kind string) bool {
 	return false
 }
 
+// NeedPlanKind §8.2.1 「계획을 세워야 할 건」 — 예정없음 · 담당자미배정.
+// 재검토(미정+사유 만료)는 밀린 건 묶음이므로 예정없음이 있어도 여기 세지 않는다.
+func (it UnplannedItem) NeedPlanKind() bool {
+	if it.HasKind(UnplannedUnassigned) {
+		return true
+	}
+	return it.HasKind(UnplannedNoDate) && !it.HasKind(UnplannedReview)
+}
+
+// OverdueKind §8.2.1 「일정이 지난 건」 — 예정일경과 · 다음일정미정 · 재검토
+func (it UnplannedItem) OverdueKind() bool {
+	return it.HasKind(UnplannedDelayed) || it.HasKind(UnplannedNext) || it.HasKind(UnplannedReview)
+}
+
 // UnplannedKindCounts 유형별 건수(한 건이 여러 유형이면 각각 센다)
 type UnplannedKindCounts struct {
 	NoDate     int
@@ -136,11 +163,19 @@ type UnplannedKindCounts struct {
 	Next       int
 	Unassigned int
 	Review     int
+	NeedPlan   int // 고유: 계획이 없는 건
+	Overdue    int // 고유: 밀린 건
 	Total      int // 고유 건수
 }
 
 func (c *UnplannedKindCounts) AddItem(it UnplannedItem) {
 	c.Total++
+	if it.NeedPlanKind() {
+		c.NeedPlan++
+	}
+	if it.OverdueKind() {
+		c.Overdue++
+	}
 	for _, k := range it.Kinds {
 		switch k {
 		case UnplannedNoDate:
@@ -157,10 +192,12 @@ func (c *UnplannedKindCounts) AddItem(it UnplannedItem) {
 	}
 }
 
-// PlanningCounts §8.4 계획 수립률 분모·분자
+// PlanningCounts §8.4 계획 수립률 분모·분자.
+// 분자(Planned)는 예정일 있음 또는 미정+사유. 밀린 건(경과·다음일정·재검토)은 계획이 있으므로 분자에 둔다(§8.2.1).
 type PlanningCounts struct {
-	Open    int // 전체 미완료
-	Planned int // 예정일 있음 또는 미정+사유
+	Open     int // 전체 미완료
+	Planned  int // 계획이 있는 건 (예정일 또는 미정+사유). 담당자미배정은 제외
+	NeedPlan int // 계획이 없는 건 (예정없음·담당자미배정)
 }
 
 func (p PlanningCounts) HasPlanningRate() bool {

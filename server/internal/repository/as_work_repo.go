@@ -143,7 +143,11 @@ func (r *ASWorkRepo) Update(w *model.ASWorkItem) error {
 // SetScheduledDate 미계획 업무함에서 하부업무 예정일만 넣는다.
 func (r *ASWorkRepo) SetScheduledDate(workID, date string) error {
 	workID = strings.TrimSpace(workID)
-	date = strings.TrimSpace(date)
+	parsed, err := model.ParseAppDate(date)
+	if err != nil {
+		return err
+	}
+	date = parsed
 	if workID == "" || date == "" {
 		return fmt.Errorf("날짜가 필요합니다")
 	}

@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +46,10 @@ func TestListUnplannedFiveKindsAndMaintenanceSlot(t *testing.T) {
 	insertAS("AS-NEXT", "R-NX", past, "1", "테크", "in_progress", "", "")
 	insertAS("AS-UNAS", "R-UA", today, "1", "", "received", "", "")
 	insertAS("AS-REV", "R-RV", "", "0", "테크", "in_progress", "부품 대기", expiredAt)
+	insertAS("AS-STARTED", "R-ST", past, "1", "테크", "in_progress", "", "")
+	if _, err := db.Exec(`UPDATE as_receipts SET start_datetime=? WHERE as_id='AS-STARTED'`, past+" 10:00:00"); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := db.Exec(`INSERT INTO as_processes (process_id, process_number, as_id, process_datetime, worker, work_content, time_spent)
 		VALUES ('P1','P1','AS-NEXT',?,'테크','방문',30)`, past+" 14:00:00"); err != nil {
@@ -94,6 +100,59 @@ func TestListUnplannedFiveKindsAndMaintenanceSlot(t *testing.T) {
 	if !has["R-RV|"+model.UnplannedReview] {
 		t.Fatal("미정사유만료 재검토 누락")
 	}
+	if !has["R-ST|"+model.UnplannedDelayed] {
+		t.Fatal("착수한 경과 건이 예정일경과에 있어야 한다")
+	}
+
+	if counts.NeedPlan < 2 {
+		t.Fatalf("계획을 세워야 할 건=%d", counts.NeedPlan)
+	}
+	if counts.Overdue < 3 {
+		t.Fatalf("일정이 지난 건=%d", counts.Overdue)
+	}
+
+	var delayStarted, delayNot bool
+	for _, it := range items {
+		if it.RefNumber == "R-DL" && it.HasKind(model.UnplannedDelayed) {
+			if it.Started {
+				t.Fatal("착수 없는 경과는 Started=false 여야 한다")
+			}
+			if len(it.Badges) == 0 || !strings.HasPrefix(it.Badges[0].Label, "D+") || !strings.Contains(it.Badges[0].Class, "red") {
+				t.Fatalf("미착수 뱃지=%+v", it.Badges)
+			}
+			delayNot = true
+		}
+		if it.RefNumber == "R-ST" && it.HasKind(model.UnplannedDelayed) {
+			if !it.Started {
+				t.Fatal("start_datetime 있는 경과는 Started=true")
+			}
+			found := false
+			for _, b := range it.Badges {
+				if strings.HasPrefix(b.Label, "진행중 D+") && strings.Contains(b.Class, "amber") {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("착수 뱃지=%+v", it.Badges)
+			}
+			delayStarted = true
+		}
+	}
+	if !delayNot || !delayStarted {
+		t.Fatalf("경과 착수 구분 누락 not=%v started=%v", delayNot, delayStarted)
+	}
+	rankNot, rankStarted := -1, -1
+	for i, it := range items {
+		if it.RefNumber == "R-DL" && rankNot < 0 {
+			rankNot = i
+		}
+		if it.RefNumber == "R-ST" && rankStarted < 0 {
+			rankStarted = i
+		}
+	}
+	if rankNot < 0 || rankStarted < 0 || rankNot > rankStarted {
+		t.Fatalf("빨강이 노랑보다 앞이어야 한다: 미착수=%d 착수=%d", rankNot, rankStarted)
+	}
 
 	slots := 0
 	for _, it := range items {
@@ -120,9 +179,9 @@ func TestListUnplannedFiveKindsAndMaintenanceSlot(t *testing.T) {
 	if !pc.HasPlanningRate() || pc.Open < counts.Total {
 		t.Fatalf("계획수립률 분모=%d 미계획=%d", pc.Open, counts.Total)
 	}
-	// 미정 사유 건(AS-REV)은 분자에 포함
-	if pc.Planned < 1 {
-		t.Fatalf("미정 사유는 계획 수립률 분자에 들어가야 한다: %+v", pc)
+	// 미정 사유 건(AS-REV)은 분자에 포함. 밀린 건(AS-DELAY)도 계획이 있으므로 분자.
+	if pc.Planned < 3 {
+		t.Fatalf("예정일·미정사유가 있는 건은 분자: %+v", pc)
 	}
 
 	if err := wb.AssignUnplannedDate("as:AS-NODATE", today, "테크", ""); err != nil {
@@ -233,5 +292,108 @@ func TestOverdueWaitingActionInUnplannedAndDelayed(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("미계획 업무함에 회신 경과 행동이 없음")
+	}
+}
+
+func TestCountPlanningTreatsDelayedAsPlannedNotNeedPlan(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "plan_rate.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ts := time.Now().Format("2006-01-02 15:04:05")
+	past := time.Now().AddDate(0, 0, -3).Format("2006-01-02")
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C1','기관','기관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, receipt_datetime, customer_id, symptom, urgency, status,
+		visit_scheduled_date, schedule_confirmed, assigned_to, created_at, updated_at)
+		VALUES ('AS1','R1',?,'C1','s','중','in_progress',?,1,'테크',?,?),
+		       ('AS2','R2',?,'C1','s','중','in_progress','',0,'테크',?,?)`,
+		ts, past, ts, ts, ts, ts, ts); err != nil {
+		t.Fatal(err)
+	}
+	pc, err := NewWorkBoardRepo(db).CountPlanning()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pc.Open < 2 || pc.Planned < 1 {
+		t.Fatalf("분모=%d 분자=%d", pc.Open, pc.Planned)
+	}
+	// 밀린 건을 분자에서 빼면 계획을 세워도 지표가 떨어진다.
+	if pc.Planned < 1 {
+		t.Fatal("예정일 경과 건은 계획 수립률 분자에 남아야 한다")
+	}
+}
+
+func TestAssignUnplannedDateRejectsYear0206(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "date_year.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ts := time.Now().Format("2006-01-02 15:04:05")
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C1','기관','기관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, receipt_datetime, customer_id, symptom, urgency, status,
+		assigned_to, created_at, updated_at)
+		VALUES ('AS1','R1',?,'C1','s','중','received','테크',?,?)`, ts, ts, ts); err != nil {
+		t.Fatal(err)
+	}
+	err = NewWorkBoardRepo(db).AssignUnplannedDate("as:AS1", "0206-08-12", "테크", "")
+	if !errors.Is(err, model.ErrAppDateYear) {
+		t.Fatalf("0206 거절: %v", err)
+	}
+	var visit string
+	if err := db.QueryRow(`SELECT COALESCE(visit_scheduled_date,'') FROM as_receipts WHERE as_id='AS1'`).Scan(&visit); err != nil {
+		t.Fatal(err)
+	}
+	if visit != "" {
+		t.Fatalf("거절 후에도 저장됨: %q", visit)
+	}
+}
+
+func TestAppendixCListsYearOutOfRangeDates(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "appendix_c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ts := time.Now().Format("2006-01-02 15:04:05")
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C1','기관','기관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, receipt_datetime, customer_id, symptom, urgency, status,
+		visit_scheduled_date, schedule_confirmed, assigned_to, created_at, updated_at)
+		VALUES ('AS-BAD','R2608-039',?,'C1','s','중','in_progress','0206-08-12',1,'테크',?,?)`, ts, ts, ts); err != nil {
+		t.Fatal(err)
+	}
+	checks := RunAppendixC(db, false)
+	var v11 *AppendixCCheck
+	for i := range checks {
+		if checks[i].ID == "V-11" {
+			v11 = &checks[i]
+		}
+	}
+	if v11 == nil || v11.Count < 1 {
+		t.Fatalf("V-11 건수=%v", v11)
+	}
+	found := false
+	for _, r := range v11.Rows {
+		if r.Number == "R2608-039" && r.Column == "visit_scheduled_date" && r.Value == "0206-08-12" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("0206 행이 목록에 없다: %+v", v11.Rows)
+	}
+	var still string
+	_ = db.QueryRow(`SELECT visit_scheduled_date FROM as_receipts WHERE as_id='AS-BAD'`).Scan(&still)
+	if still != "0206-08-12" {
+		t.Fatalf("자동으로 고치면 안 된다: %q", still)
 	}
 }

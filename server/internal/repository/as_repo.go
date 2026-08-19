@@ -513,6 +513,12 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 
 // Create AS 접수 등록
 func (r *ASRepo) Create(as *model.ASReceipt) error {
+	if err := model.RequireAppDateYear(as.VisitScheduledDate); err != nil {
+		return err
+	}
+	if !as.ReceiptDatetime.IsZero() && !model.AppDateYearOK(as.ReceiptDatetime) {
+		return model.ErrAppDateYear
+	}
 	receiptAt := as.ReceiptDatetime
 	if receiptAt.IsZero() {
 		receiptAt = time.Now()
@@ -580,6 +586,12 @@ func (r *ASRepo) ListReopens(asID string) ([]model.ASHistoryItem, error) {
 
 // Update AS 상태 및 처리 내용 수정 (일시 미입력 시 상태 변경에 따라 자동 기록)
 func (r *ASRepo) Update(as *model.ASReceipt) error {
+	if err := model.RequireAppDateYear(as.VisitScheduledDate); err != nil {
+		return err
+	}
+	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() && !model.AppDateYearOK(*as.CompleteDatetime) {
+		return model.ErrAppDateYear
+	}
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05")
 
@@ -703,6 +715,9 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 
 // UpdateVisitScheduledDate 예정업무일·일정확정 수정 (+워크플로 상태 재파생)
 func (r *ASRepo) UpdateVisitScheduledDate(asID, date string, scheduleConfirmed bool) error {
+	if err := model.RequireAppDateYear(date); err != nil {
+		return err
+	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	var assignedTo, assignedUID, curStatus string
 	_ = r.db.QueryRow(`SELECT COALESCE(assigned_to,''), COALESCE(assigned_user_id,''), status FROM as_receipts WHERE as_id=?`, asID).

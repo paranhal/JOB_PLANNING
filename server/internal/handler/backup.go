@@ -65,6 +65,10 @@ func (h *BackupHandler) Page(c echo.Context) error {
 	if tab == "unassigned" && h.projects != nil {
 		unresolved, _ = h.projects.ListUnresolvedProjectRows()
 	}
+	var checks []repository.AppendixCCheck
+	if tab == "checks" && h.cfg.DB != nil {
+		checks = repository.RunAppendixC(h.cfg.DB, true)
+	}
 	return c.Render(http.StatusOK, "admin/data.html", map[string]interface{}{
 		"Title":      "데이터 관리",
 		"Active":     "data",
@@ -75,6 +79,7 @@ func (h *BackupHandler) Page(c echo.Context) error {
 		"OldestLog":  oldest,
 		"Stats":      stats,
 		"Unresolved": unresolved,
+		"Checks":     checks,
 		"OK":         ok,
 		"Error":      errMsg,
 		"DataPath":   filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),

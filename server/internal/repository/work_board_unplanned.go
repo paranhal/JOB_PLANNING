@@ -44,16 +44,23 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 				return
 			}
 		}
+		if k == model.UnplannedDelayed && base.Started {
+			cur.Started = true
+		}
 		cur.Kinds = append(cur.Kinds, k)
-		cur.Badges = append(cur.Badges, model.UnplannedBadgeOf(k, cur.DaysOverdue))
+		cur.Badges = append(cur.Badges, model.UnplannedBadgeOfStarted(k, cur.DaysOverdue, cur.Started && k == model.UnplannedDelayed))
 	}
 
 	delayed, err := r.collectDelayed(mineUserID, mineKeys, today)
 	if err != nil {
 		return nil, model.UnplannedKindCounts{}, err
 	}
+	started := r.asStartedSet(delayedIDs(delayed))
 	for _, it := range delayed {
 		u := toUnplannedItem(it)
+		if it.Prefix == model.WorkPrefixAS {
+			u.Started = started[it.RefID]
+		}
 		if it.SubLabel == "회신 대기" && it.Status == model.WBActionWaiting {
 			u.ItemKey = "wa:" + it.RefID
 			u.CanAssignDate = false
@@ -247,7 +254,9 @@ func (r *WorkBoardRepo) currentMntPlanYM() (planID string, year, month int, err 
 	return p.PlanID, year, month, nil
 }
 
-// CountPlanning §8.4 계획 수립률. 미정+사유는 분자에 포함한다. 정기점검 배정안됨은 분모에만 더한다.
+// CountPlanning §8.4 계획 수립률.
+// 분자는 「계획이 있는 건」(예정일 또는 미정+사유). 밀린 건(경과·다음일정·재검토)은 계획이 있으므로 분자에 둔다(§8.2.1).
+// 담당자미배정은 계획이 없는 건이므로 분자에서 뺀다. 정기점검 배정안됨은 분모에만 더한다.
 func (r *WorkBoardRepo) CountPlanning() (model.PlanningCounts, error) {
 	var p model.PlanningCounts
 	add := func(open, planned int) {
@@ -259,6 +268,7 @@ func (r *WorkBoardRepo) CountPlanning() (model.PlanningCounts, error) {
 	err := r.db.QueryRow(`
 		SELECT COUNT(*),
 		       COALESCE(SUM(CASE
+		         WHEN TRIM(COALESCE(assigned_to,''))='' AND TRIM(COALESCE(assigned_user_id,''))='' THEN 0
 		         WHEN TRIM(COALESCE(visit_scheduled_date,'')) != ''
 		           OR TRIM(COALESCE(schedule_no_date_reason,'')) != '' THEN 1 ELSE 0 END),0)
 		FROM as_receipts
@@ -317,6 +327,16 @@ func (r *WorkBoardRepo) CountPlanning() (model.PlanningCounts, error) {
 		return p, err
 	}
 	add(open, planned)
+	if p.Planned < 0 {
+		p.Planned = 0
+	}
+	if p.Planned > p.Open {
+		p.Planned = p.Open
+	}
+	p.NeedPlan = p.Open - p.Planned
+	if p.NeedPlan < 0 {
+		p.NeedPlan = 0
+	}
 	return p, nil
 }
 
@@ -353,19 +373,64 @@ func unplannedItemKey(it model.WorkListItem) string {
 	}
 }
 
+func delayedIDs(items []model.WorkListItem) []string {
+	out := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	for _, it := range items {
+		if it.Prefix != model.WorkPrefixAS || it.RefID == "" || seen[it.RefID] {
+			continue
+		}
+		seen[it.RefID] = true
+		out = append(out, it.RefID)
+	}
+	return out
+}
+
+// asStartedSet §8.2.2 착수 = start_datetime 또는 as_processes.
+func (r *WorkBoardRepo) asStartedSet(ids []string) map[string]bool {
+	out := map[string]bool{}
+	if len(ids) == 0 {
+		return out
+	}
+	ph := strings.Repeat("?,", len(ids))
+	ph = ph[:len(ph)-1]
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	q := `SELECT ar.as_id FROM as_receipts ar
+		WHERE ar.as_id IN (` + ph + `)
+		  AND (TRIM(COALESCE(ar.start_datetime,'')) != ''
+		       OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id = ar.as_id))`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && id != "" {
+			out[id] = true
+		}
+	}
+	return out
+}
+
 func sortUnplanned(items []model.UnplannedItem) {
 	rank := func(it model.UnplannedItem) int {
 		switch {
-		case it.HasKind(model.UnplannedDelayed):
-			return 0
-		case it.HasKind(model.UnplannedNoDate):
+		case it.HasKind(model.UnplannedDelayed) && !it.Started:
+			return 0 // 빨강 D+n 먼저 (§8.2.2)
+		case it.HasKind(model.UnplannedDelayed) && it.Started:
 			return 1
-		case it.HasKind(model.UnplannedReview):
+		case it.HasKind(model.UnplannedNoDate):
 			return 2
-		case it.HasKind(model.UnplannedNext):
+		case it.HasKind(model.UnplannedReview):
 			return 3
-		default:
+		case it.HasKind(model.UnplannedNext):
 			return 4
+		default:
+			return 5
 		}
 	}
 	sort.SliceStable(items, func(i, j int) bool {
@@ -402,7 +467,10 @@ func parseSlotKey(id string) (planID, customerID, product string) {
 
 // AssignUnplannedDate 미계획 목록에서 날짜를 바로 넣는다.
 func (r *WorkBoardRepo) AssignUnplannedDate(key, date, assignee, assigneeUID string) error {
-	date = strings.TrimSpace(date)
+	date, err := model.ParseAppDate(date)
+	if err != nil {
+		return err
+	}
 	if date == "" {
 		return fmt.Errorf("날짜가 필요합니다")
 	}

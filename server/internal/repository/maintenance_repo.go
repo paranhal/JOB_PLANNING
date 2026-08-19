@@ -521,7 +521,11 @@ func (r *MaintenanceRepo) HasVisitInMonth(planID, customerID string, year, month
 // 완료된 방문은 실적이므로 그대로 두고, 같은 날 같은 대상이 이미 있으면 조용히 넘긴다.
 func (r *MaintenanceRepo) SetVisitDate(visitID, visitDate string) error {
 	visitID = strings.TrimSpace(visitID)
-	visitDate = strings.TrimSpace(visitDate)
+	parsed, err := model.ParseAppDate(visitDate)
+	if err != nil {
+		return err
+	}
+	visitDate = parsed
 	if visitID == "" || visitDate == "" {
 		return nil
 	}

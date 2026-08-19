@@ -301,7 +301,10 @@ func (h *MaintenanceHandler) AssignUnassignedSlot(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	planID := c.Param("id")
-	date := strings.TrimSpace(c.FormValue("visit_date"))
+	date, err := model.ParseAppDate(c.FormValue("visit_date"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 	cust := strings.TrimSpace(c.FormValue("customer_id"))
 	product := strings.TrimSpace(c.FormValue("product_type"))
 	if date == "" || cust == "" {
@@ -374,7 +377,10 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 }
 
 func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVisit, error) {
-	date := strings.TrimSpace(c.FormValue("visit_date"))
+	date, err := model.ParseAppDate(c.FormValue("visit_date"))
+	if err != nil {
+		return model.MaintenanceVisit{}, err
+	}
 	cust := strings.TrimSpace(c.FormValue("customer_id"))
 	cat := c.FormValue("entry_category")
 	if cat == "" {

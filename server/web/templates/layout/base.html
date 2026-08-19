@@ -164,6 +164,18 @@
 </div>
 {{end}}
 
+<script>
+(function () {
+  document.querySelectorAll('input[type="date"]').forEach(function (el) {
+    if (!el.getAttribute('min')) el.setAttribute('min', '2000-01-01');
+    if (!el.getAttribute('max')) el.setAttribute('max', '2100-12-31');
+  });
+  document.querySelectorAll('input[type="datetime-local"]').forEach(function (el) {
+    if (!el.getAttribute('min')) el.setAttribute('min', '2000-01-01T00:00');
+    if (!el.getAttribute('max')) el.setAttribute('max', '2100-12-31T23:59');
+  });
+})();
+</script>
 </body>
 </html>
 {{end}}

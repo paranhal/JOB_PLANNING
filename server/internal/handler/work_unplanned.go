@@ -109,7 +109,10 @@ func (h *WorkHandler) UnplannedAssign(c echo.Context) error {
 	if !canWriteUnplanned(c) {
 		return echo.ErrForbidden
 	}
-	date := normalizeVisitDate(c.FormValue("visit_date"))
+	date, err := model.ParseAppDate(c.FormValue("visit_date"))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, unplannedBack(c)+qjoin(unplannedBack(c), "err=date_year"))
+	}
 	if date == "" {
 		return c.Redirect(http.StatusSeeOther, unplannedBack(c)+qjoin(unplannedBack(c), "err=date"))
 	}

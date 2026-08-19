@@ -457,9 +457,7 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 		as.ReceivedBy = ctxString(c, "user_name")
 	}
 	if dt := c.FormValue("receipt_datetime"); dt != "" {
-		if t, err := time.Parse("2006-01-02T15:04", dt); err == nil {
-			as.ReceiptDatetime = t
-		} else if t, err := time.Parse("2006-01-02 15:04:05", dt); err == nil {
+		if t, ok := parseFormDatetime(dt); ok {
 			as.ReceiptDatetime = t
 		}
 	}
@@ -562,6 +560,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	if as.ReceiptDatetime.IsZero() {
 		as.ReceiptDatetime = existing.ReceiptDatetime
 	}
+	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && as.VisitScheduledDate == "" {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err=date_year")
+	}
 	// 방문 예정일·일정확정: 관리자·배정담당자만 변경. 그 외는 기존 값 유지
 	if !canEditVisitDate(c, existing) {
 		as.VisitScheduledDate = existing.VisitScheduledDate
@@ -586,7 +587,10 @@ func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	if !canEditVisitDate(c, as) {
 		return echo.ErrForbidden
 	}
-	date := normalizeVisitDate(c.FormValue("visit_scheduled_date"))
+	date, err := model.ParseAppDate(c.FormValue("visit_scheduled_date"))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=date_year")
+	}
 	confirmed := c.FormValue("schedule_confirmed") == "1"
 	if confirmed && date == "" {
 		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=schedule_date")
@@ -703,7 +707,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"CanDelete":      !embed && isAdminRole(c) && (!closed || canMod),
 		"CanWriteDaily":  !embed && canWriteWorkboard(c) && !closed,
 		"TodayLocal":     now.Format("2006-01-02"),
-		"ActionErr":      c.QueryParam("err"),
+		"ActionErr":      actionErrMessage(c.QueryParam("err")),
 		"ActionOK":       c.QueryParam("ok"),
 		"OpenDaily":      !embed && c.QueryParam("daily") == "1",
 		"Embed":          embed,
@@ -947,6 +951,12 @@ func (h *ASHandler) Update(c echo.Context) error {
 		revisitConfirmed := c.FormValue("revisit_schedule_confirmed") == "1"
 
 		holdResumeDate := normalizeVisitDate(c.FormValue("hold_resume_date"))
+		if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && nextVisit == "" {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
+		}
+		if raw := strings.TrimSpace(c.FormValue("complete_datetime")); raw != "" && as.CompleteDatetime == nil {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
+		}
 
 		if code := actionSaveMissingErr(as, formResult); code != "" {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
@@ -1140,6 +1150,10 @@ func actionErrMessage(code string) string {
 		return "처리결과코드를 선택하세요."
 	case "action":
 		return "조치 내용을 확인 후 다시 저장하세요."
+	case "date_year":
+		return "날짜 연도는 2000~2100 사이여야 합니다."
+	case "schedule_date":
+		return "일정 확정 시 예정업무일을 먼저 입력하세요."
 	default:
 		return code
 	}
@@ -1378,6 +1392,9 @@ func parseFormDatetime(s string) (time.Time, bool) {
 	}
 	for _, f := range []string{"2006-01-02T15:04", "2006-01-02 15:04:05", "2006-01-02T15:04:05", "2006-01-02 15:04"} {
 		if t, err := time.ParseInLocation(f, s, time.Local); err == nil {
+			if !model.AppDateYearOK(t) {
+				return time.Time{}, false
+			}
 			return t, true
 		}
 	}

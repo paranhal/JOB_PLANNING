@@ -15,6 +15,7 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -485,7 +486,11 @@ func parseExcelDate(s string) (string, bool) {
 		}
 	}
 	if len(parts[0]) == 4 {
-		return fmt.Sprintf("%s-%s-%s", parts[0], pad2(parts[1]), pad2(parts[2])), true
+		out := fmt.Sprintf("%s-%s-%s", parts[0], pad2(parts[1]), pad2(parts[2]))
+		if model.NormalizeAppDate(out) == "" {
+			return "", false
+		}
+		return out, true
 	}
 	mm, dd, yy := pad2(parts[0]), pad2(parts[1]), parts[2]
 	if len(yy) == 2 {
@@ -494,7 +499,11 @@ func parseExcelDate(s string) (string, bool) {
 	if mm > "12" || dd > "31" {
 		return "", false
 	}
-	return fmt.Sprintf("%s-%s-%s", yy, mm, dd), true
+	out := fmt.Sprintf("%s-%s-%s", yy, mm, dd)
+	if model.NormalizeAppDate(out) == "" {
+		return "", false
+	}
+	return out, true
 }
 
 func pad2(s string) string {

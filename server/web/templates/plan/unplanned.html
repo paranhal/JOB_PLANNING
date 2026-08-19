@@ -4,7 +4,8 @@
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">미계획 업무함</h2>
-      <p class="text-sm text-gray-500 mt-1">{{.ScopeNote}} · {{.Counts.Total}}건</p>
+      <p class="text-sm text-gray-500 mt-1">계획이 없거나, 일정이 지났거나, 다음 일정이 정해지지 않은 업무</p>
+      <p class="text-xs text-gray-400 mt-0.5">{{.ScopeNote}} · {{.Counts.Total}}건</p>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-xs">
       {{if eq .Role "tech"}}
@@ -17,6 +18,7 @@
   </div>
 
   {{if eq .Err "date"}}<p class="text-sm text-red-600">날짜를 입력하세요.</p>{{end}}
+  {{if eq .Err "date_year"}}<p class="text-sm text-red-600">날짜 연도는 2000~2100 사이여야 합니다.</p>{{end}}
   {{if eq .Err "select"}}<p class="text-sm text-red-600">배정할 업무를 선택하세요.</p>{{end}}
   {{if eq .Err "assign"}}<p class="text-sm text-red-600">날짜 배정에 실패했습니다.</p>{{end}}
   {{if eq .Err "reason"}}<p class="text-sm text-red-600">미정 사유를 선택하세요.</p>{{end}}
@@ -24,13 +26,23 @@
   {{if eq .Ok "assign"}}<p class="text-sm text-emerald-700">예정일을 배정했습니다.</p>{{end}}
   {{if eq .Ok "nodate"}}<p class="text-sm text-emerald-700">미정+사유를 등록했습니다. 14일 후 재검토로 올라옵니다.</p>{{end}}
 
-  <div class="flex flex-wrap gap-2 text-xs">
-    <a href="/plan/unplanned{{if .MineQ}}?{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind ""}}border-rose-400 bg-rose-50 text-rose-800{{else}}border-gray-200 bg-white{{end}}">전체 {{.Counts.Total}}</a>
-    <a href="/plan/unplanned?kind=no_date{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "no_date"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정없음 {{.Counts.NoDate}}</a>
-    <a href="/plan/unplanned?kind=delayed{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "delayed"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정일경과 {{.Counts.Delayed}}</a>
-    <a href="/plan/unplanned?kind=next{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "next"}}border-amber-400 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white{{end}}">다음일정미정 {{.Counts.Next}}</a>
-    <a href="/plan/unplanned?kind=unassigned{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "unassigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">담당자미배정 {{.Counts.Unassigned}}</a>
-    <a href="/plan/unplanned?kind=review{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "review"}}border-amber-400 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white{{end}}">재검토 {{.Counts.Review}}</a>
+  <div class="space-y-3">
+    <div>
+      <p class="text-[11px] font-semibold text-gray-500 mb-1.5">계획을 세워야 할 건 <span class="font-normal text-gray-400">{{.Counts.NeedPlan}}</span></p>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <a href="/plan/unplanned{{if .MineQ}}?{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind ""}}border-rose-400 bg-rose-50 text-rose-800{{else}}border-gray-200 bg-white{{end}}">전체 {{.Counts.Total}}</a>
+        <a href="/plan/unplanned?kind=no_date{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "no_date"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정없음 {{.Counts.NoDate}}</a>
+        <a href="/plan/unplanned?kind=unassigned{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "unassigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">담당자미배정 {{.Counts.Unassigned}}</a>
+      </div>
+    </div>
+    <div class="border-t border-gray-200 pt-3">
+      <p class="text-[11px] font-semibold text-gray-500 mb-1.5">일정이 지난 건 <span class="font-normal text-gray-400">{{.Counts.Overdue}}</span></p>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <a href="/plan/unplanned?kind=delayed{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "delayed"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정일경과 {{.Counts.Delayed}}</a>
+        <a href="/plan/unplanned?kind=next{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "next"}}border-amber-400 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white{{end}}">다음일정미정 {{.Counts.Next}}</a>
+        <a href="/plan/unplanned?kind=review{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "review"}}border-amber-400 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white{{end}}">재검토 {{.Counts.Review}}</a>
+      </div>
+    </div>
   </div>
 
   {{if .CanWrite}}
@@ -39,7 +51,7 @@
     {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
     <div>
       <label class="block text-[11px] text-gray-500 mb-1">일괄 예정일</label>
-      <input type="date" name="visit_date" required class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+      <input type="date" name="visit_date" required min="2000-01-01" max="2100-12-31" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
     </div>
     <div>
       <label class="block text-[11px] text-gray-500 mb-1">담당자(선택)</label>
@@ -74,7 +86,7 @@
         <tbody class="divide-y divide-gray-100">
           {{if .Items}}
           {{range .Items}}
-          <tr class="hover:bg-gray-50 {{if .HasKind "delayed"}}bg-red-50/30{{end}}">
+          <tr class="hover:bg-gray-50 {{if and (.HasKind "delayed") .Started}}bg-amber-50/40{{else if .HasKind "delayed"}}bg-red-50/30{{end}}">
             {{if $.CanWrite}}
             <td class="px-3 py-2 text-center">
               <input form="bulk" type="checkbox" name="item_key" value="{{.ItemKey}}" class="rounded border-gray-300">
@@ -111,7 +123,7 @@
                 {{if $.MineQ}}<input type="hidden" name="mine" value="{{if $.Mine}}1{{else}}0{{end}}">{{end}}
                 {{if $.Kind}}<input type="hidden" name="kind" value="{{$.Kind}}">{{end}}
                 <input type="hidden" name="item_key" value="{{.ItemKey}}">
-                <input type="date" name="visit_date" required class="border border-gray-300 rounded px-1.5 py-1 text-xs">
+                <input type="date" name="visit_date" required min="2000-01-01" max="2100-12-31" class="border border-gray-300 rounded px-1.5 py-1 text-xs">
                 <button type="submit" class="px-2 py-1 rounded bg-blue-600 text-white text-[11px] hover:bg-blue-700">배정</button>
               </form>
               {{if .CanNoDate}}

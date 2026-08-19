@@ -3,7 +3,6 @@ package handler
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"customer-support/internal/model"
 
@@ -79,14 +78,7 @@ func canEditVisitDate(c echo.Context, as *model.ASReceipt) bool {
 }
 
 func normalizeVisitDate(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return ""
-	}
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t.Format("2006-01-02")
-	}
-	return ""
+	return model.NormalizeAppDate(s)
 }
 
 func canReceiveAS(c echo.Context) bool {

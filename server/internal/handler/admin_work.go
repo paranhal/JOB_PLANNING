@@ -101,6 +101,20 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 	}
 	dueDate := strings.TrimSpace(c.FormValue("due_date"))
 	workDate := strings.TrimSpace(c.FormValue("work_date"))
+	if dueDate != "" {
+		d, err := model.ParseAppDate(dueDate)
+		if err != nil {
+			return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
+		}
+		dueDate = d
+	}
+	if workDate != "" {
+		d, err := model.ParseAppDate(workDate)
+		if err != nil {
+			return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
+		}
+		workDate = d
+	}
 	title := strings.TrimSpace(c.FormValue("title"))
 	status := strings.TrimSpace(c.FormValue("status"))
 	if title == "" {

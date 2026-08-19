@@ -22,6 +22,8 @@
 
   {{if eq .Err "schedule_date"}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">일정 확정 시 예정업무일을 먼저 입력하세요.</div>
+  {{else if eq .Err "date_year"}}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">날짜 연도는 2000~2100 사이여야 합니다.</div>
   {{else if .Err}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Err}}</div>
   {{end}}

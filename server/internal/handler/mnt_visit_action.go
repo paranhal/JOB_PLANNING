@@ -63,7 +63,13 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	v.ProductType = strings.TrimSpace(c.FormValue("product_type"))
 	v.ProjectID = strings.TrimSpace(c.FormValue("project_id"))
 	if d := strings.TrimSpace(c.FormValue("visit_date")); d != "" {
-		v.VisitDate = d
+		parsed, err := model.ParseAppDate(d)
+		if err != nil {
+			return err
+		}
+		if parsed != "" {
+			v.VisitDate = parsed
+		}
 	}
 	status := strings.TrimSpace(c.FormValue("status"))
 	markDone := status == "done" || c.FormValue("completed") == "1" || c.FormValue("mark_done") == "1"

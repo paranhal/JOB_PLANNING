@@ -1342,6 +1342,20 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 func parseRequiredSchedule(c echo.Context) (workDate, dueDate, start, end string, dur int, ok bool) {
 	workDate = strings.TrimSpace(c.FormValue("work_date"))
 	dueDate = strings.TrimSpace(c.FormValue("due_date"))
+	if workDate != "" {
+		if d, err := model.ParseAppDate(workDate); err != nil {
+			return "", "", "", "", 0, false
+		} else {
+			workDate = d
+		}
+	}
+	if dueDate != "" {
+		if d, err := model.ParseAppDate(dueDate); err != nil {
+			return "", "", "", "", 0, false
+		} else {
+			dueDate = d
+		}
+	}
 	start = strings.TrimSpace(c.FormValue("start_time"))
 	end = strings.TrimSpace(c.FormValue("end_time"))
 	dur = 30

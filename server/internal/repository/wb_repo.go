@@ -542,7 +542,11 @@ func (r *WBRepo) SetTaskAssignee(taskID, assignee string) error {
 
 // SetTaskDueDate 예정일만 갱신한다.
 func (r *WBRepo) SetTaskDueDate(taskID, dueDate string) error {
-	_, err := r.db.Exec(`UPDATE work_tasks SET due_date=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, dueDate, taskID)
+	parsed, err := model.ParseAppDate(dueDate)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`UPDATE work_tasks SET due_date=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, parsed, taskID)
 	return err
 }
 
@@ -655,6 +659,12 @@ func (r *WBRepo) ListProjectsFiltered(search, status string) ([]model.WorkProjec
 }
 
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {
+	if err := model.RequireAppDateYear(t.DueDate); err != nil {
+		return err
+	}
+	if err := model.RequireAppDateYear(t.WorkDate); err != nil {
+		return err
+	}
 	id, err := r.nextID("work_task", "WT")
 	if err != nil {
 		return err
@@ -687,6 +697,12 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 	if t == nil || t.TaskID == "" {
 		return fmt.Errorf("task_id 필요")
+	}
+	if err := model.RequireAppDateYear(t.DueDate); err != nil {
+		return err
+	}
+	if err := model.RequireAppDateYear(t.WorkDate); err != nil {
+		return err
 	}
 	normalizeWorkTask(t)
 	_, err := r.db.Exec(`

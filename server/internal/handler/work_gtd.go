@@ -139,6 +139,13 @@ func (h *AdminWorkHandler) Classify(c echo.Context) error {
 		status = model.WBTaskWaiting
 	}
 	dueDate := strings.TrimSpace(c.FormValue("due_date"))
+	if dueDate != "" {
+		parsed, err := model.ParseAppDate(dueDate)
+		if err != nil {
+			return c.Redirect(http.StatusSeeOther, "/admin-work?err=classify")
+		}
+		dueDate = parsed
+	}
 	if dueDate == "" {
 		dueDate = time.Now().Format("2006-01-02")
 	}

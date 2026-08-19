@@ -58,6 +58,9 @@ func TestBackupPageAndSave(t *testing.T) {
 	if !strings.Contains(body, "사업 미배정") {
 		t.Error("사업 미배정 탭이 없다")
 	}
+	if !strings.Contains(body, "정합성 점검") {
+		t.Error("정합성 점검 탭이 없다")
+	}
 
 	un := httptest.NewRecorder()
 	reqU := httptest.NewRequest(http.MethodGet, "http://localhost/admin/data?tab=unassigned", nil)
@@ -68,6 +71,17 @@ func TestBackupPageAndSave(t *testing.T) {
 	}
 	if !strings.Contains(un.Body.String(), "사업 미배정") {
 		t.Error("미배정 화면 제목이 없다")
+	}
+
+	chk := httptest.NewRecorder()
+	reqC := httptest.NewRequest(http.MethodGet, "http://localhost/admin/data?tab=checks", nil)
+	reqC.AddCookie(jwtCookie(t))
+	e.ServeHTTP(chk, reqC)
+	if chk.Code != http.StatusOK {
+		t.Fatalf("정합성 탭: status=%d body=%s", chk.Code, chk.Body.String())
+	}
+	if !strings.Contains(chk.Body.String(), "V-11") || !strings.Contains(chk.Body.String(), "연도가 2000") {
+		t.Error("V-11 연도 범위 항목이 없다")
 	}
 
 	rec := httptest.NewRecorder()
