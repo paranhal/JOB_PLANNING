@@ -52,3 +52,34 @@ func TestNextFreeSlotForAssigneeNoOverlap(t *testing.T) {
 		t.Fatalf("no overlap: %v %v", ok, err)
 	}
 }
+
+func TestAssigneeTimeOverlapsIncludesSupportMember(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "sup.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewWBRepo(db)
+	a := &model.WorkTask{
+		Title: "공동", WorkType: model.WBWorkAdmin,
+		WorkDate: "2026-08-18", StartTime: "09:00", EndTime: "11:00", DurationMin: 120,
+		Assignee: "최혜영", Status: model.WBTaskWaiting,
+	}
+	if err := repo.CreateTask(a); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ReplaceSupportMembers(a.TaskID, []model.WorkTaskMember{
+		{Assignee: "양기헌", Role: model.WBMemberSupport, DurationMin: 120},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ok, err := repo.AssigneeTimeOverlaps("2026-08-18", "양기헌", "09:00", "10:00", "")
+	if err != nil || !ok {
+		t.Fatalf("지원자 겹침 want true: %v %v", ok, err)
+	}
+	ok, err = repo.AssigneeTimeOverlaps("2026-08-18", "양기헌", "11:00", "11:30", "")
+	if err != nil || ok {
+		t.Fatalf("지원자 빈 시간: %v %v", ok, err)
+	}
+}

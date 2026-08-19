@@ -529,6 +529,20 @@ type WorkTask struct {
 	WaitingActionCount int `json:"waiting_action_count,omitempty"` // 목록 뱃지: 회신 대기 n건
 }
 
+// WorkTaskMember 업무 참여자 1명. work_task_members (§7.7.2).
+// DurationMin 0 이면 업무 전체 소요시간을 따른다.
+type WorkTaskMember struct {
+	TaskID      string    `json:"task_id"`
+	Assignee    string    `json:"assignee"`
+	Role        string    `json:"member_role"`
+	DurationMin int       `json:"duration_min"`
+	SortOrder   int       `json:"sort_order"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (m WorkTaskMember) IsOwner() bool   { return m.Role == WBMemberOwner }
+func (m WorkTaskMember) IsSupport() bool { return m.Role == WBMemberSupport }
+
 // CustomerLabel 거래처 표시. 고객마스터 기관명 우선, 없으면 직접입력.
 func (t WorkTask) CustomerLabel() string {
 	if s := strings.TrimSpace(t.OrgName); s != "" {

@@ -433,6 +433,7 @@ func (r *WBRepo) nextFreeSlotFiltered(date string, durationMin int, assignee str
 	if err != nil {
 		return "", "", err
 	}
+	members, _ := r.membersForTasks(placed)
 	startMin := workdayStartMin
 	for _, t := range placed {
 		if excludeTaskID != "" && t.TaskID == excludeTaskID {
@@ -441,7 +442,7 @@ func (r *WBRepo) nextFreeSlotFiltered(date string, durationMin int, assignee str
 		if strings.TrimSpace(t.StartTime) == "" {
 			continue
 		}
-		if byAssignee && strings.TrimSpace(t.Assignee) != assignee {
+		if byAssignee && !personOnTask(t, assignee, members) {
 			continue
 		}
 		em := model.ParseHHMMMinutes(t.EndTime)
@@ -480,11 +481,12 @@ func (r *WBRepo) AssigneeTimeOverlaps(date, assignee, start, end, excludeTaskID 
 	if err != nil {
 		return false, err
 	}
+	members, _ := r.membersForTasks(placed)
 	for _, t := range placed {
 		if excludeTaskID != "" && t.TaskID == excludeTaskID {
 			continue
 		}
-		if strings.TrimSpace(t.Assignee) != assignee {
+		if !personOnTask(t, assignee, members) {
 			continue
 		}
 		if strings.TrimSpace(t.StartTime) == "" {
@@ -503,6 +505,16 @@ func (r *WBRepo) AssigneeTimeOverlaps(date, assignee, start, end, excludeTaskID 
 		}
 	}
 	return false, nil
+}
+
+func (r *WBRepo) membersForTasks(tasks []model.WorkTask) (map[string][]model.WorkTaskMember, error) {
+	ids := make([]string, 0, len(tasks))
+	for _, t := range tasks {
+		if t.TaskID != "" {
+			ids = append(ids, t.TaskID)
+		}
+	}
+	return r.ListMembersByTaskIDs(ids)
 }
 
 const (
