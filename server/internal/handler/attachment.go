@@ -63,6 +63,20 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, redirect)
 	}
 
+	if refType == model.RefTypeASActionPhoto {
+		if err := h.guardActionPhotoWrite(c, refID); err != nil {
+			return err
+		}
+		if err := h.saveActionPhotos(refID, keywords, headers); err != nil {
+			if httpErr, ok := err.(*echo.HTTPError); ok {
+				msg, _ := httpErr.Message.(string)
+				return redirectAttachErr(c, redirect, msg, httpErr.Code)
+			}
+			return err
+		}
+		return c.Redirect(http.StatusSeeOther, redirect)
+	}
+
 	if refType == model.RefTypeAsset {
 		slotOverride := 0
 		if v := strings.TrimSpace(c.FormValue("slot_no")); v != "" {
@@ -168,29 +182,55 @@ func (h *AttachmentHandler) saveGenericFile(refType, refID, keywords string, fil
 }
 
 func (h *AttachmentHandler) saveReceiptPhotos(asID, keywords string, files []*multipart.FileHeader) error {
-	n, err := h.repo.CountByRef(model.RefTypeASReceipt, asID)
+	return h.saveProcessedPhotos(processedPhotoOpts{
+		refType: model.RefTypeASReceipt, asID: asID, keywords: keywords,
+		max: model.MaxReceiptPhotos, dir: repository.ReceiptPhotoDir(h.uploadDir, asID),
+		errMax: fmt.Sprintf("접수 사진은 최대 %d장입니다", model.MaxReceiptPhotos),
+	}, files)
+}
+
+func (h *AttachmentHandler) saveActionPhotos(asID, keywords string, files []*multipart.FileHeader) error {
+	return h.saveProcessedPhotos(processedPhotoOpts{
+		refType: model.RefTypeASActionPhoto, asID: asID, keywords: keywords,
+		max: model.MaxActionPhotos, dir: repository.ActionPhotoDir(h.uploadDir, asID),
+		imageOnly: true,
+		errMax:    fmt.Sprintf("조치 사진은 최대 %d장입니다", model.MaxActionPhotos),
+	}, files)
+}
+
+type processedPhotoOpts struct {
+	refType   string
+	asID      string
+	keywords  string
+	max       int
+	dir       string
+	imageOnly bool
+	errMax    string
+}
+
+func (h *AttachmentHandler) saveProcessedPhotos(opt processedPhotoOpts, files []*multipart.FileHeader) error {
+	n, err := h.repo.CountByRef(opt.refType, opt.asID)
 	if err != nil {
 		return err
 	}
-	if n+len(files) > model.MaxReceiptPhotos {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("접수 사진은 최대 %d장입니다", model.MaxReceiptPhotos))
+	if n+len(files) > opt.max {
+		return echo.NewHTTPError(http.StatusBadRequest, opt.errMax)
 	}
-	dir := repository.ReceiptPhotoDir(h.uploadDir, asID)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(opt.dir, 0755); err != nil {
 		return err
 	}
 	for i, fh := range files {
 		if fh.Size > model.MaxReceiptBytes {
 			return echo.NewHTTPError(http.StatusBadRequest, "파일은 20MB 이하여야 합니다")
 		}
-		if err := h.saveOneReceiptPhoto(asID, keywords, fh, i, dir); err != nil {
+		if err := h.saveOneProcessedPhoto(opt, fh, i); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *AttachmentHandler) saveOneReceiptPhoto(asID, keywords string, file *multipart.FileHeader, seq int, dir string) error {
+func (h *AttachmentHandler) saveOneProcessedPhoto(opt processedPhotoOpts, file *multipart.FileHeader, seq int) error {
 	origName := safeUploadBaseName(file.Filename)
 	src, err := file.Open()
 	if err != nil {
@@ -205,7 +245,7 @@ func (h *AttachmentHandler) saveOneReceiptPhoto(asID, keywords string, file *mul
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 		stored := fmt.Sprintf("%d_%d%s", time.Now().UnixNano(), seq, out.StoredExt)
-		dstPath := filepath.Join(dir, stored)
+		dstPath := filepath.Join(opt.dir, stored)
 		if err := os.WriteFile(dstPath, out.Full, 0644); err != nil {
 			return err
 		}
@@ -213,18 +253,22 @@ func (h *AttachmentHandler) saveOneReceiptPhoto(asID, keywords string, file *mul
 			return err
 		}
 		return h.repo.Create(&model.Attachment{
-			RefType:  model.RefTypeASReceipt,
-			RefID:    asID,
+			RefType:  opt.refType,
+			RefID:    opt.asID,
 			FileName: origName,
 			FilePath: filepath.ToSlash(dstPath),
 			FileSize: int64(len(out.Full)),
 			MIMEType: out.MIMEType,
-			Keywords: keywords,
+			Keywords: opt.keywords,
 		})
 	}
 
+	if opt.imageOnly {
+		return echo.NewHTTPError(http.StatusBadRequest, "조치 사진은 이미지만 올릴 수 있습니다")
+	}
+
 	stored := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), seq, origName)
-	dstPath := filepath.Join(dir, stored)
+	dstPath := filepath.Join(opt.dir, stored)
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		return err
@@ -243,13 +287,13 @@ func (h *AttachmentHandler) saveOneReceiptPhoto(asID, keywords string, file *mul
 		mime = "application/octet-stream"
 	}
 	return h.repo.Create(&model.Attachment{
-		RefType:  model.RefTypeASReceipt,
-		RefID:    asID,
+		RefType:  opt.refType,
+		RefID:    opt.asID,
 		FileName: origName,
 		FilePath: filepath.ToSlash(dstPath),
 		FileSize: written,
 		MIMEType: mime,
-		Keywords: keywords,
+		Keywords: opt.keywords,
 	})
 }
 
@@ -301,6 +345,8 @@ func canUploadAttachment(c echo.Context, refType string) bool {
 		return canProcessAS(c) || canWriteMaster(c)
 	case model.RefTypeASReceipt:
 		return canReceiveAS(c) || canWriteMaster(c) || canProcessAS(c)
+	case model.RefTypeASActionPhoto:
+		return canProcessAS(c) || canWriteMaster(c)
 	case model.RefTypeWorkActivity:
 		return canWriteWorkboard(c)
 	default:
@@ -324,6 +370,23 @@ func (h *AttachmentHandler) guardReceiptPhotoWrite(c echo.Context, asID string) 
 		return echo.NewHTTPError(http.StatusBadRequest, "접수를 찾을 수 없습니다")
 	}
 	if !canManageReceiptPhoto(c, as) {
+		return echo.ErrForbidden
+	}
+	if isASClosedStatus(as.Status) && !h.receiptUnlocked(c, as) {
+		return echo.NewHTTPError(http.StatusForbidden, "완료·종료 건은 읽기 전용입니다. 관리자는 수정 잠금 해제 후 이용하세요")
+	}
+	return nil
+}
+
+func (h *AttachmentHandler) guardActionPhotoWrite(c echo.Context, asID string) error {
+	if h.asRepo == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
+	}
+	as, err := h.asRepo.GetByID(asID)
+	if err != nil || as == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "접수를 찾을 수 없습니다")
+	}
+	if !canProcessAS(c) && !canWriteMaster(c) {
 		return echo.ErrForbidden
 	}
 	if isASClosedStatus(as.Status) && !h.receiptUnlocked(c, as) {
@@ -372,6 +435,10 @@ func (h *AttachmentHandler) UpdateKeywords(c echo.Context) error {
 		if err := h.guardReceiptPhotoWrite(c, att.RefID); err != nil {
 			return err
 		}
+	} else if att.RefType == model.RefTypeASActionPhoto {
+		if err := h.guardActionPhotoWrite(c, att.RefID); err != nil {
+			return err
+		}
 	} else if !canUploadAttachment(c, att.RefType) {
 		return echo.ErrForbidden
 	}
@@ -397,6 +464,10 @@ func (h *AttachmentHandler) Delete(c echo.Context) error {
 	}
 	if att.RefType == model.RefTypeASReceipt {
 		if err := h.guardReceiptPhotoWrite(c, att.RefID); err != nil {
+			return err
+		}
+	} else if att.RefType == model.RefTypeASActionPhoto {
+		if err := h.guardActionPhotoWrite(c, att.RefID); err != nil {
 			return err
 		}
 	} else if !canUploadAttachment(c, att.RefType) {

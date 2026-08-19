@@ -434,11 +434,17 @@
   </div>
   {{end}}
 
+  {{if .ActionGallery}}
+  {{template "as_photo_gallery" .ActionGallery}}
+  {{end}}
+
+  <hr class="border-slate-200">
+
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
     <div class="flex items-center justify-between gap-2">
       <div>
-        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">조치 첨부</h3>
-        <p class="text-xs text-gray-400 mt-1">조치완료보고서·관련 파일. 서버에 저장하고 화면에는 파일명만 표시합니다.</p>
+        <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">조치 첨부(문서)</h3>
+        <p class="text-xs text-gray-400 mt-1">관련 파일. 서버에 저장하고 화면에는 파일명만 표시합니다.</p>
       </div>
       <span class="text-xs text-gray-400">{{len .Attachments}}건</span>
     </div>
@@ -466,7 +472,7 @@
       <input type="hidden" name="ref_type" value="as">
       <input type="hidden" name="ref_id" value="{{.AS.ASID}}">
       <input type="hidden" name="redirect" value="/as/{{$.AS.ASID}}/action">
-      <p class="text-sm text-slate-600">조치완료보고서 또는 관련 파일을 업로드하세요</p>
+      <p class="text-sm text-slate-600">관련 파일을 업로드하세요</p>
       <input type="file" name="file" multiple required class="mx-auto block text-sm">
       <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">파일 업로드</button>
     </form>

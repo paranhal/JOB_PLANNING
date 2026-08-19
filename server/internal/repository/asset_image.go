@@ -51,6 +51,11 @@ func ReceiptPhotoDir(uploadRoot, asID string) string {
 	return filepath.Join(uploadRoot, "as", asID, "receipt")
 }
 
+// ActionPhotoDir 조치 사진 저장 폴더. data/uploads/as/{접수ID}/action/ §12.9.8
+func ActionPhotoDir(uploadRoot, asID string) string {
+	return filepath.Join(uploadRoot, "as", asID, "action")
+}
+
 // AssetImageRelPath uploads 아래 공개 URL용 상대 경로
 func AssetImageRelPath(assetID string, slot int, origName string) string {
 	safe := SanitizeAssetIDForPath(assetID)

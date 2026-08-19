@@ -57,6 +57,8 @@ func newASActionFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 	g.POST("/as/:id/update", h.AS.Update)
 	g.POST("/attachments", h.Attachment.Upload)
 	g.GET("/attachments/:id", h.Attachment.Download)
+	g.POST("/attachments/:id/delete", h.Attachment.Delete)
+	g.POST("/attachments/:id/keywords", h.Attachment.UpdateKeywords)
 	return e, h, asRepo, repository.NewAttachmentRepo(db), src.ASID
 }
 
@@ -182,8 +184,28 @@ func TestASActionUploadStoresNameAndPath(t *testing.T) {
 	if strings.Contains(body, report.FilePath) || strings.Contains(body, h.Attachment.uploadDir) {
 		t.Error("화면에 저장 경로가 노출됐다")
 	}
-	if strings.Contains(body, `accept="image/*"`) {
-		t.Error("이미지 전용 업로드면 안 된다")
+	if !strings.Contains(body, "조치 사진") {
+		t.Error("조치 사진 영역이 없다")
+	}
+	if !strings.Contains(body, "조치 첨부(문서)") {
+		t.Error("문서 첨부 제목이 없다")
+	}
+	if strings.Contains(body, "조치완료보고서·관련") || strings.Contains(body, "조치완료보고서 또는 관련") {
+		t.Error("문서 안내에 조치완료보고서가 남아 있다")
+	}
+	if !strings.Contains(body, `ref_type" value="as_action_photo"`) {
+		t.Error("조치 사진 업로드가 없다")
+	}
+	if !strings.Contains(body, `accept="image/*"`) {
+		t.Error("조치 사진은 image/* 이어야 한다")
+	}
+	docStart := strings.Index(body, "조치 첨부(문서)")
+	if docStart < 0 {
+		t.Fatal("문서 영역 없음")
+	}
+	docChunk := body[docStart:]
+	if strings.Contains(docChunk, `accept="image/*"`) {
+		t.Error("문서 첨부는 형식 제한이 없어야 한다")
 	}
 
 	dl := httptest.NewRecorder()

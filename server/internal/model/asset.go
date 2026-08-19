@@ -109,7 +109,7 @@ type PerformanceRelation struct {
 // Attachment 첨부파일 (기획서 §12)
 type Attachment struct {
 	AttachmentID string    `json:"attachment_id"`
-	RefType      string    `json:"ref_type"` // customer, asset, as, as_receipt, relation
+	RefType      string    `json:"ref_type"` // asset, as, as_receipt, as_action_photo, as_report
 	RefID        string    `json:"ref_id"`
 	FileName     string    `json:"file_name"`
 	FilePath     string    `json:"file_path"`
@@ -144,15 +144,17 @@ func (a Attachment) DisplayName() string {
 }
 
 const (
-	RefTypeAsset        = "asset"
-	RefTypeAS           = "as"
-	RefTypeASReceipt    = "as_receipt"
-	RefTypeASReport     = "as_report"
-	RefTypeWorkActivity = "work_activity"
+	RefTypeAsset         = "asset"
+	RefTypeAS            = "as"
+	RefTypeASReceipt     = "as_receipt"
+	RefTypeASActionPhoto = "as_action_photo" // §12.9.8 조치 사진
+	RefTypeASReport      = "as_report"
+	RefTypeWorkActivity  = "work_activity"
 )
 
 const (
 	MaxReceiptPhotos = 10
+	MaxActionPhotos  = 3
 	MaxReceiptBytes  = 20 << 20 // 20MB
 )
 

@@ -539,6 +539,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"
+	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
 	return c.Render(http.StatusOK, "as/form.html", data)
 }
 
@@ -750,6 +751,7 @@ func (h *ASHandler) mergeReceiptPhotoData(c echo.Context, as *model.ASReceipt, d
 	data["PhotoRedirect"] = "/as/" + as.ASID
 	data["PhotoSectionTitle"] = "증상 사진"
 	data["HideIfEmpty"] = false
+	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
 }
 
 // Action 조치 전용 화면 — 쓰기 권한 없으면 조회 전용(버튼·저장 숨김)
@@ -865,7 +867,37 @@ func (h *ASHandler) Action(c echo.Context) error {
 	data["PhotoSectionTitle"] = "접수 시 증상 사진"
 	data["PhotoPanelClass"] = "bg-sky-50 border-2 border-sky-200"
 	data["HideIfEmpty"] = true
+	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
+	h.mergeActionPhotoData(as, data, canProcess && !readOnly)
 	return c.Render(http.StatusOK, "as/action.html", data)
+}
+
+func (h *ASHandler) mergeActionPhotoData(as *model.ASReceipt, data map[string]interface{}, canEdit bool) {
+	if as == nil {
+		return
+	}
+	var photos []model.Attachment
+	if h.attachRepo != nil {
+		photos, _ = h.attachRepo.ListByRef(model.RefTypeASActionPhoto, as.ASID)
+	}
+	data["ActionPhotos"] = photos
+	data["ActionGallery"] = PhotoGalleryVM{
+		AS:                as,
+		Photos:            photos,
+		CanEditPhotos:     canEdit,
+		CanPromote:        false,
+		PhotoRedirect:     "/as/" + as.ASID + "/action",
+		PhotoSectionTitle: "조치 사진",
+		PhotoPanelClass:   "bg-white border border-slate-200",
+		HideIfEmpty:       false,
+		PhotoMax:          model.MaxActionPhotos,
+		PhotoRefType:      model.RefTypeASActionPhoto,
+		PhotoAccept:       "image/*",
+		PhotoHint:         "조치 과정·결과 사진 (jpg · png · webp · heic). 최대 3장.",
+		PhotoEmpty:        "등록된 조치 사진이 없습니다.",
+		PhotoAddLabel:     "올리기",
+		PhotoGalleryID:    "action-photo",
+	}
 }
 
 func (h *ASHandler) Update(c echo.Context) error {
