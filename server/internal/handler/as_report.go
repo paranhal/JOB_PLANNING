@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -56,6 +57,7 @@ func (h *ASHandler) ReportPreview(c echo.Context) error {
 		"ReportBlockReason": "",
 		"ReportMissing":     draft.MissingReportFields(),
 		"ActionErr":         c.QueryParam("err"),
+		"ActionPhotos":      h.listActionPhotos(as.ASID),
 	}
 	if !closed {
 		data["ReportBlockReason"] = "완료된 건만 발급할 수 있습니다. 현재 상태: " + model.ASStatusDisplayLabel(as.Status)
@@ -87,6 +89,17 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 	data, err := hwpx.Replace(tpl, draft.Values())
 	if err != nil {
 		return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+	}
+	_ = c.Request().ParseForm()
+	photos, err := h.loadSelectedActionJPEGs(as.ASID, c.Request().PostForm["include_photo"])
+	if err != nil {
+		return h.redirectReportErr(c, as.ASID, err.Error())
+	}
+	if len(photos) > 0 {
+		data, err = hwpx.AppendJPEGs(data, photos)
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, "보고서 사진을 넣지 못했습니다: "+err.Error())
+		}
 	}
 
 	now := time.Now()
@@ -168,6 +181,57 @@ func (h *ASHandler) buildASReportDraft(as *model.ASReceipt, now time.Time) model
 		processes, _ = h.processRepo.ListByAS(as.ASID)
 	}
 	return model.BuildASReportDraft(as, processes, customer, asset, contacts, now)
+}
+
+func (h *ASHandler) listActionPhotos(asID string) []model.Attachment {
+	if h.attachRepo == nil || asID == "" {
+		return nil
+	}
+	items, _ := h.attachRepo.ListByRef(model.RefTypeASActionPhoto, asID)
+	return items
+}
+
+func (h *ASHandler) loadSelectedActionJPEGs(asID string, ids []string) ([]hwpx.JPEGPhoto, error) {
+	if len(ids) == 0 || h.attachRepo == nil {
+		return nil, nil
+	}
+	want := make(map[string]int, len(ids))
+	order := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := want[id]; ok {
+			continue
+		}
+		want[id] = len(order)
+		order = append(order, id)
+	}
+	if len(order) == 0 {
+		return nil, nil
+	}
+	all, err := h.attachRepo.ListByRef(model.RefTypeASActionPhoto, asID)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]model.Attachment, len(all))
+	for _, a := range all {
+		byID[a.AttachmentID] = a
+	}
+	out := make([]hwpx.JPEGPhoto, 0, len(order))
+	for _, id := range order {
+		att, ok := byID[id]
+		if !ok || !att.IsImage() {
+			continue
+		}
+		raw, err := os.ReadFile(att.FilePath)
+		if err != nil {
+			return nil, fmt.Errorf("조치 사진을 읽지 못했습니다")
+		}
+		out = append(out, hwpx.JPEGPhoto{JPEG: raw, Caption: att.Keywords})
+	}
+	return out, nil
 }
 
 func reportDraftFromForm(c echo.Context) model.ASReportDraft {

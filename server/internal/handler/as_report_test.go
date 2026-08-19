@@ -178,6 +178,80 @@ func TestASReportIssueSpecialCharsThreeProcessesAndNoPlaceholder(t *testing.T) {
 	}
 }
 
+func TestASReportIssueIncludesSelectedActionPhoto(t *testing.T) {
+	e, h, asRepo, attachRepo, asID := newASReportFixture(t)
+	up := postActionPhotoEcho(t, e, asID, "결과.png", "교체 후", makePNG(t, 80, 40))
+	if up.Code != http.StatusSeeOther {
+		t.Fatalf("사진 업로드 status=%d", up.Code)
+	}
+	photos, _ := attachRepo.ListByRef(model.RefTypeASActionPhoto, asID)
+	if len(photos) != 1 {
+		t.Fatalf("조치 사진 n=%d", len(photos))
+	}
+
+	completeASForReport(t, asRepo, asID, "게이트 오작동", "전원부 불량", "교체 후 정상")
+	preview := httptest.NewRecorder()
+	preq := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/report", nil)
+	preq.AddCookie(jwtCookie(t))
+	e.ServeHTTP(preview, preq)
+	if preview.Code != http.StatusOK {
+		t.Fatalf("미리보기 status=%d", preview.Code)
+	}
+	pbody := preview.Body.String()
+	if !strings.Contains(pbody, `name="include_photo"`) || !strings.Contains(pbody, photos[0].AttachmentID) {
+		t.Fatal("미리보기에 사진 선택이 없다")
+	}
+
+	as, _ := asRepo.GetByID(asID)
+	draft := h.AS.buildASReportDraft(as, time.Now())
+	form := url.Values{
+		"customer_name": {draft.CustomerName},
+		"department":    {draft.Department},
+		"manager":       {draft.Manager},
+		"phone":         {draft.Phone},
+		"service":       {draft.Service},
+		"symptom":       {draft.Symptom},
+		"cause_detail":  {draft.CauseDetail},
+		"conclusion":    {draft.Conclusion},
+		"report_date":   {draft.ReportDate},
+		"inspector":     {draft.Inspector},
+		"confirmer":     {draft.Confirmer},
+		"work_dates":    {draft.WorkDates},
+		"actions":       {draft.Actions},
+		"include_photo": {photos[0].AttachmentID},
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
+		strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("발급 status=%d loc=%s body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+	}
+	assertHWPXXML(t, rec.Body.Bytes())
+	sec := string(zipFileBytes(t, rec.Body.Bytes(), "Contents/section0.xml"))
+	if !strings.Contains(sec, `binaryItemIDRef="actionphoto1"`) {
+		t.Fatal("보고서에 사진이 없다")
+	}
+	if !strings.Contains(sec, "교체 후") {
+		t.Fatal("사진 메모가 보고서에 없다")
+	}
+	found := false
+	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(len(rec.Body.Bytes())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range zr.File {
+		if f.Name == "Contents/BinData/actionphoto1.jpg" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("BinData JPEG가 없다")
+	}
+}
+
 func TestASReportPreviewEditDoesNotWriteBack(t *testing.T) {
 	e, h, asRepo, _, asID := newASReportFixture(t)
 	completeASForReport(t, asRepo, asID, "게이트 오작동", "원본원인", "원본결론")
