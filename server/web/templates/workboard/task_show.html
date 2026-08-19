@@ -4,7 +4,9 @@
 {{$isMnt := or (eq .Task.WorkType "maintenance") (eq .Task.SourceType "maintenance")}}
 {{$t := .Task}}
 <div class="{{if .IsAdminGTD}}max-w-4xl{{else}}max-w-3xl{{end}} mx-auto space-y-5"
-     x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo' }">
+     x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo',
+       memberRows: [{{range $i, $m := .SupportMembers}}{{if $i}},{{end}}{name:{{printf "%q" $m.Assignee}}, mins:{{if $m.DurationMin}}'{{$m.DurationMin}}'{{else}}''{{end}}}{{end}}],
+       leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{printf "%q" $n}}{{end}}] }">
   <div class="flex items-start justify-between gap-3">
     <div>
       <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="text-sm text-gray-500 hover:text-gray-700">← 일일 업무 등록</a>
@@ -44,7 +46,7 @@
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
-    {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else}}업무명과 예정일을 확인하세요.{{end}}
+    {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
@@ -246,8 +248,8 @@
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
-        <select name="assignee" class="w-full border rounded-lg px-3 py-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
+        <select name="assignee" required class="w-full border rounded-lg px-3 py-2">
           <option value="">— 선택 —</option>
           {{range .Assignees}}
           <option value="{{.FullName}}" {{if eq $.Task.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
@@ -261,6 +263,7 @@
         {{if $.ProgressShow}}<p class="text-[11px] text-gray-400 mt-1">다음 행동 기준 {{$.ProgressDone}}/{{$.ProgressRequired}} ({{$.ProgressPct}}%). 수동 수정도 가능합니다.</p>{{end}}
       </div>
     </div>
+    {{template "wb_member_fields" .}}
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">태그</label>
       <input name="tags" value="{{$t.Tags}}" placeholder="쉼표로 구분" class="w-full border rounded-lg px-3 py-2">

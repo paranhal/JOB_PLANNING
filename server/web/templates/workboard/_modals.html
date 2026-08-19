@@ -33,7 +33,7 @@
 
     <!-- 행정/지원 -->
     <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='admin'" x-cloak
-          x-data="{ workType: 'admin' }">
+          x-data="{ workType: 'admin', memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''">← 종류 선택</button>
       <div>
@@ -121,8 +121,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
-          <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
+          <select name="assignee" x-model="preAssignee" required class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
           </select>
@@ -132,6 +132,7 @@
           <input type="number" name="progress" min="0" max="100" value="0" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
       </div>
+      {{template "wb_member_fields" .}}
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
         <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">업무 추가</button>
@@ -139,7 +140,8 @@
     </form>
 
     <!-- AS 일일업무 -->
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='as'" x-cloak>
+    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='as'" x-cloak
+          x-data="{ memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="as">
       <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''">← 종류 선택</button>
@@ -198,13 +200,14 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
           <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 원본 담당자 —</option>
             {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
           </select>
         </div>
       </div>
+      {{template "wb_member_fields" .}}
       <input type="hidden" name="priority" value="normal">
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
@@ -213,7 +216,8 @@
     </form>
 
     <!-- 정기점검 일일업무 -->
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='maintenance'" x-cloak>
+    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='maintenance'" x-cloak
+          x-data="{ memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="maintenance">
       <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''">← 종류 선택</button>
@@ -272,13 +276,14 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
           <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 원본 담당자 —</option>
             {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
           </select>
         </div>
       </div>
+      {{template "wb_member_fields" .}}
       <input type="hidden" name="priority" value="normal">
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>

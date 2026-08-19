@@ -1,0 +1,32 @@
+{{define "wb_member_fields"}}
+<div class="space-y-2">
+  <div class="flex items-center justify-between gap-2">
+    <label class="block text-sm font-medium text-gray-700">참여자</label>
+    <button type="button" class="text-xs font-semibold text-blue-700 hover:underline"
+            @click="memberRows.push({name:'', mins:''})">＋추가</button>
+  </div>
+  <template x-for="(row, i) in memberRows" :key="i">
+    <div class="flex flex-wrap items-center gap-2">
+      <select name="member_name" x-model="row.name"
+              class="flex-1 min-w-[7rem] border rounded-lg px-2 py-1.5 text-sm"
+              @change="
+                const f = $el.closest('form');
+                const ownerSel = f && f.querySelector('select[name=assignee]');
+                const owner = ownerSel ? ownerSel.value : '';
+                if (row.name && row.name === owner) { alert('주담당은 참여자에 넣을 수 없습니다'); row.name=''; return; }
+                const names = ($root && $root.leaveNames) || [];
+                if (row.name && names.indexOf(row.name) >= 0 && !confirm(row.name + '은 이 날 연차입니다. 그래도 넣을까요?')) { row.name=''; }
+              ">
+        <option value="">— 선택 —</option>
+        {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+      </select>
+      <span class="text-xs text-gray-500 shrink-0">지원</span>
+      <input name="member_min" x-model="row.mins" type="number" min="0" step="15" placeholder="분"
+             class="w-20 border rounded-lg px-2 py-1.5 text-sm" title="비우면 업무 전체 소요시간">
+      <button type="button" class="text-gray-400 hover:text-red-600 text-lg leading-none px-1"
+              @click="memberRows.splice(i,1)" title="삭제">×</button>
+    </div>
+  </template>
+  <p class="text-[11px] text-gray-400">소요분을 비우면 업무 전체 소요시간을 씁니다.</p>
+</div>
+{{end}}

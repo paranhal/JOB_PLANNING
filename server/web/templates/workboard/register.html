@@ -123,7 +123,7 @@
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 shadow-sm">
-    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else}}{{.FlashErr}}{{end}}
+    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
@@ -416,24 +416,31 @@
                    @drop.prevent="place($event.currentTarget)"></div>
               {{end}}
               {{range $col.Blocks}}
-              <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight cursor-pointer pl-1.5 pr-4 py-0.5 border border-black/5 relative"
+              <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative {{if .IsSupport}}opacity-60 border border-dashed border-slate-400{{else}}border border-black/5 cursor-pointer{{end}}"
                    style="{{.Style}}"
-                   {{if $.CanWrite}}draggable="true"{{end}}
+                   {{if and $.CanWrite (not .IsSupport)}}draggable="true"{{end}}
                    data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
                    data-start-time="{{.Card.StartTime}}" data-end-time="{{.Card.EndTime}}"
                    data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
                    data-zone="grid"
                    data-href="{{.Card.DetailHref}}"
                    data-edit="{{.Card.EditHref}}"
+                   {{if .IsSupport}}
+                   @click.stop="openWork($event.currentTarget)"
+                   {{else}}
                    @click.stop="pick($event.currentTarget)"
                    @dragstart="pick($event.currentTarget)"
                    :class="isPicked('task', '{{.Card.TaskID}}') ? 'ring-2 ring-blue-500 ring-offset-1 !z-20' : ''"
-                   title="{{if .OverlapWarn}}같은 담당자 시간 겹침 · {{end}}{{.Card.Title}} · {{.Card.StartTime}}~{{.Card.EndTime}}">
-                {{if .OverlapWarn}}
+                   {{end}}
+                   title="{{if .IsSupport}}지원 · {{end}}{{if .OverlapWarn}}같은 담당자 시간 겹침 · {{end}}{{.Card.Title}} · {{.Card.StartTime}}~{{.Card.EndTime}}">
+                {{if .IsSupport}}
+                <span class="absolute left-0 top-0 z-10 text-[8px] leading-none px-0.5 rounded-br bg-white/90 text-slate-600 border-r border-b border-dashed">지원</span>
+                {{else if .OverlapWarn}}
                 <span class="absolute left-0 top-0 z-10 text-[9px] leading-none text-amber-600" title="같은 담당자 시간 겹침">⚠</span>
                 {{end}}
                 <span class="flex items-start justify-between gap-0.5">
-                  <span class="truncate min-w-0 font-semibold {{if .OverlapWarn}}pl-2.5{{end}}">{{.Card.Title}}</span>
+                  <span class="truncate min-w-0 font-semibold {{if or .OverlapWarn .IsSupport}}pl-2.5{{end}}">{{.Card.Title}}</span>
+                  {{if not .IsSupport}}
                   <span class="shrink-0 inline-flex items-center gap-0.5">
                     {{if $.CanWrite}}
                     <button type="button"
@@ -448,12 +455,13 @@
                     {{end}}
                     {{end}}
                   </span>
+                  {{end}}
                 </span>
                 {{if .Card.SourceNumber}}
                 <span class="font-mono text-[8px] opacity-75 truncate block">{{.Card.SourceNumber}}</span>
                 {{end}}
-                <span class="text-[8px] opacity-70 block truncate">{{.Card.StartTime}}~{{.Card.EndTime}}</span>
-                {{if and $.CanWrite .Card.TaskID}}
+                <span class="text-[8px] opacity-70 block truncate">{{.Card.StartTime}}~{{.Card.EndTime}}{{if gt .ExtraCount 0}} · 외 {{.ExtraCount}}명{{end}}</span>
+                {{if and $.CanWrite .Card.TaskID (not .IsSupport)}}
                 <form method="post" action="/workboard/unschedule"
                       class="absolute top-0 right-0 z-10"
                       @click.stop>

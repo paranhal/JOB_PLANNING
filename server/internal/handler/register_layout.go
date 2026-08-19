@@ -114,6 +114,8 @@ type RegisterBlock struct {
 	LeftPct     float64
 	WidthPct    float64
 	OverlapWarn bool // 같은 담당자 시간 겹침. §7.6.4
+	IsSupport   bool // 지원 카드. §7.7.4
+	ExtraCount  int  // 나 제외 참여 인원. 카드 하단 「외 n명」
 }
 
 // RegisterDayColumn 요일(또는 일) 열 + 배치 블록
@@ -225,6 +227,8 @@ type layoutEvent struct {
 	assignee string
 	lane     int
 	lanes    int
+	support  bool
+	extra    int
 }
 
 func registerSlotTimes() []string {

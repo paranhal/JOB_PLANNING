@@ -159,7 +159,17 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 
 	assigneeFilter := normalizeAssigneeFilter(c.QueryParam("assignee"))
 	projectFilter := strings.TrimSpace(c.QueryParam("project"))
-	placed = filterTasksByAssignee(placed, assigneeFilter)
+	memberMap := map[string][]model.WorkTaskMember{}
+	if ids := taskIDsOf(placed); len(ids) > 0 {
+		if m, err := h.repo.ListMembersByTaskIDs(ids); err == nil {
+			memberMap = m
+		}
+	}
+	if view == regViewDay {
+		placed = filterTasksByParticipants(placed, memberMap, assigneeFilter)
+	} else {
+		placed = filterTasksByAssignee(placed, assigneeFilter)
+	}
 	placed = filterTasksByProject(placed, projectFilter)
 	asCards, mntCards, adminCards, err := h.registerPalette()
 	if err != nil {
@@ -211,7 +221,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		if len(period.Columns) > 0 {
 			dateCol = period.Columns[0]
 		}
-		dayCols = buildRegisterAssigneeColumns(dateCol, placed, h.taskCard, order, assigneeFilter)
+		dayCols = buildRegisterAssigneeColumnsMembers(dateCol, placed, h.taskCard, order, assigneeFilter, memberMap)
 	} else {
 		dayCols = buildRegisterDayColumns(period.Columns, placed, h.taskCard)
 	}
@@ -362,6 +372,27 @@ func filterTasksByAssignee(tasks []model.WorkTask, assignee string) []model.Work
 	for _, t := range tasks {
 		if strings.TrimSpace(t.Assignee) == assignee {
 			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func filterTasksByParticipants(tasks []model.WorkTask, members map[string][]model.WorkTaskMember, assignee string) []model.WorkTask {
+	assignee = strings.TrimSpace(assignee)
+	if assignee == "" {
+		return tasks
+	}
+	var out []model.WorkTask
+	for _, t := range tasks {
+		if strings.TrimSpace(t.Assignee) == assignee {
+			out = append(out, t)
+			continue
+		}
+		for _, m := range members[t.TaskID] {
+			if strings.TrimSpace(m.Assignee) == assignee {
+				out = append(out, t)
+				break
+			}
 		}
 	}
 	return out
@@ -727,10 +758,20 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 		_ = e
 	}
 	end, dur := parseDurationForm(start, c.FormValue("end_time"), c.FormValue("duration_min"), durFallback)
-	if ok, err := h.repo.AssigneeTimeOverlaps(date, assignee, start, end, excludeID); err != nil {
-		return err
-	} else if ok {
-		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+url.QueryEscape(assigneeOverlapMessage(assignee, start, end))))
+	occ := []string{assignee}
+	if excludeID != "" {
+		if ms, err := h.repo.ListMembers(excludeID); err == nil {
+			var supports []model.WorkTaskMember
+			for _, m := range ms {
+				if m.IsSupport() {
+					supports = append(supports, m)
+				}
+			}
+			occ = occupancyNames(assignee, supports)
+		}
+	}
+	if msg := h.firstParticipantOverlap(date, start, end, excludeID, occ); msg != "" {
+		return overlapRedirect(c, msg)
 	}
 
 	fromColumn := strings.TrimSpace(c.FormValue("assignee_from_column")) == "1"
@@ -1192,12 +1233,24 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=task"))
 		}
 		if existing, _ := h.repo.GetTaskBySource(kind, sourceID); existing != nil {
+			owner := strings.TrimSpace(c.FormValue("assignee"))
+			if owner == "" {
+				owner = strings.TrimSpace(existing.Assignee)
+			}
+			supports := parseSupportMembers(c, owner)
+			if msg := h.firstParticipantOverlap(workDate, start, end, existing.TaskID, occupancyNames(owner, supports)); msg != "" {
+				return overlapRedirect(c, msg)
+			}
 			if err := h.repo.PlaceTask(existing.TaskID, workDate, start, end); err != nil {
 				return err
 			}
 			if dueDate != "" {
 				_ = h.repo.SetTaskDueDate(existing.TaskID, dueDate)
 			}
+			if owner != strings.TrimSpace(existing.Assignee) {
+				_ = h.repo.SetTaskAssignee(existing.TaskID, owner)
+			}
+			_ = h.saveSupportMembers(c, existing.TaskID, owner)
 			h.syncVisitDateFromTask(kind, sourceID, workDate)
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=place"))
 		}
@@ -1218,9 +1271,13 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		if pr := strings.TrimSpace(c.FormValue("priority")); pr != "" {
 			t.Priority = pr
 		}
+		if msg := h.firstParticipantOverlap(workDate, start, end, "", occupancyNames(t.Assignee, parseSupportMembers(c, t.Assignee))); msg != "" {
+			return overlapRedirect(c, msg)
+		}
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
+		_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
 		h.syncVisitDateFromTask(kind, sourceID, workDate)
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 	}
@@ -1261,9 +1318,17 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if t.WorkType == model.WBWorkSupport && t.ProjectID == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=project_required"))
 	}
+	supports := parseSupportMembers(c, t.Assignee)
+	if len(supports) > 0 && t.Assignee == "" {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=owner"))
+	}
+	if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, "", occupancyNames(t.Assignee, supports)); msg != "" {
+		return overlapRedirect(c, msg)
+	}
 	if err := h.repo.CreateTask(t); err != nil {
 		return err
 	}
+	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
 		dates, err := collectDatesFromForm(mode, c.FormValue("daily_from"), c.FormValue("daily_to"), c.FormValue("sub_dates"))
 		if err == nil && len(dates) > 0 {
@@ -1395,9 +1460,21 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther,
 			"/workboard/tasks/"+id+"?err=task&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
+	supports := parseSupportMembers(c, t.Assignee)
+	if len(supports) > 0 && t.Assignee == "" {
+		return c.Redirect(http.StatusSeeOther,
+			"/workboard/tasks/"+id+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+	}
+	if t.StartTime != "" {
+		if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, t.TaskID, occupancyNames(t.Assignee, supports)); msg != "" {
+			return c.Redirect(http.StatusSeeOther,
+				"/workboard/tasks/"+id+"?err="+url.QueryEscape(msg)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		}
+	}
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
 	}
+	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
 	if adminGTD {
 		if t.Status == model.WBTaskComplete && existing.Status != model.WBTaskComplete {
 			note := t.CompleteNote
@@ -1486,6 +1563,28 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 	assignees, _ := h.userRepo.ListAssignable()
 	projects, _ := h.repo.ListProjects(false)
 	customers, _ := h.customerRepo.ListAll()
+	supportMembers, _ := h.repo.ListMembers(t.TaskID)
+	var supportOnly []model.WorkTaskMember
+	for _, m := range supportMembers {
+		if m.IsSupport() {
+			supportOnly = append(supportOnly, m)
+		}
+	}
+	var taskLeaveNames []string
+	if h.mntRepo != nil {
+		if lr := h.mntRepo.Leaves(); lr != nil && t.WorkDate != "" {
+			if items, err := lr.ListInRange(t.WorkDate, t.WorkDate); err == nil {
+				hit := map[string]bool{}
+				for _, it := range items {
+					n := strings.TrimSpace(it.UserName)
+					if n != "" && !hit[n] {
+						hit[n] = true
+						taskLeaveNames = append(taskLeaveNames, n)
+					}
+				}
+			}
+		}
+	}
 	back := strings.TrimSpace(c.QueryParam("back"))
 	if back == "" {
 		back = "/workboard/register"
@@ -1497,28 +1596,30 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		active = "admin_work"
 	}
 	data := map[string]interface{}{
-		"Title":         t.Title,
-		"Active":        active,
-		"Task":          t,
-		"Children":      children,
-		"Parent":        parent,
-		"SourceHref":    sourceHref,
-		"SourceLabel":   sourceLabel,
-		"ActionHref":    actionHref,
-		"ActionLabel":   actionLabel,
-		"CanAction":     canAction,
-		"ASClosed":      asClosed,
-		"ASSource":      asSource,
-		"CompleteLocal": completeLocal,
-		"Assignees":     assignees,
-		"Projects":      projects,
-		"Customers":     customers,
-		"CanWrite":      canWriteWorkboard(c),
-		"FlashOK":       c.QueryParam("ok"),
-		"FlashErr":      c.QueryParam("err"),
-		"FlashErrMsg":   gtdFlash(c.QueryParam("err")),
-		"Today":         time.Now().Format(dateLayout),
-		"BackURL":       back,
+		"Title":          t.Title,
+		"Active":         active,
+		"Task":           t,
+		"Children":       children,
+		"Parent":         parent,
+		"SourceHref":     sourceHref,
+		"SourceLabel":    sourceLabel,
+		"ActionHref":     actionHref,
+		"ActionLabel":    actionLabel,
+		"CanAction":      canAction,
+		"ASClosed":       asClosed,
+		"ASSource":       asSource,
+		"CompleteLocal":  completeLocal,
+		"Assignees":      assignees,
+		"SupportMembers": supportOnly,
+		"DayLeaveNames":  taskLeaveNames,
+		"Projects":       projects,
+		"Customers":      customers,
+		"CanWrite":       canWriteWorkboard(c),
+		"FlashOK":        c.QueryParam("ok"),
+		"FlashErr":       c.QueryParam("err"),
+		"FlashErrMsg":    gtdFlash(c.QueryParam("err")),
+		"Today":          time.Now().Format(dateLayout),
+		"BackURL":        back,
 	}
 	h.renderTaskGTD(c, data, t)
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)

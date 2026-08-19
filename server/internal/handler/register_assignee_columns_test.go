@@ -131,6 +131,62 @@ func TestExtraAssigneesForDay(t *testing.T) {
 	}
 }
 
+func TestBuildRegisterAssigneeColumnsSupportCards(t *testing.T) {
+	dateCol := RegisterColumn{Date: "2026-08-18", From: "2026-08-18", To: "2026-08-18"}
+	placed := []model.WorkTask{
+		{TaskID: "T1", Title: "CRM 자산정비", Assignee: "최혜영", WorkDate: "2026-08-18", StartTime: "09:00", EndTime: "11:00", DurationMin: 120},
+	}
+	members := map[string][]model.WorkTaskMember{
+		"T1": {
+			{TaskID: "T1", Assignee: "최혜영", Role: model.WBMemberOwner},
+			{TaskID: "T1", Assignee: "양기헌", Role: model.WBMemberSupport, DurationMin: 120},
+			{TaskID: "T1", Assignee: "태자운", Role: model.WBMemberSupport, DurationMin: 60},
+		},
+	}
+	cols := buildRegisterAssigneeColumnsMembers(dateCol, placed, taskCardFromWork, []string{"최혜영", "양기헌", "태자운"}, "", members)
+	if len(cols) != 3 {
+		t.Fatalf("열=%d want 3 %+v", len(cols), labelsOfCols(cols))
+	}
+	var owner, support int
+	for _, c := range cols {
+		if len(c.Blocks) != 1 {
+			t.Fatalf("%s blocks=%d", c.Assignee, len(c.Blocks))
+		}
+		b := c.Blocks[0]
+		if b.ExtraCount != 2 {
+			t.Fatalf("%s extra=%d want 2", c.Assignee, b.ExtraCount)
+		}
+		if c.Assignee == "최혜영" {
+			if b.IsSupport {
+				t.Fatal("주담당 카드가 지원이면 안 됨")
+			}
+			owner++
+		} else {
+			if !b.IsSupport {
+				t.Fatalf("%s 지원 카드여야 함", c.Assignee)
+			}
+			support++
+		}
+	}
+	if owner != 1 || support != 2 {
+		t.Fatalf("owner=%d support=%d", owner, support)
+	}
+}
+
+func TestFilterTasksByParticipantsIncludesSupport(t *testing.T) {
+	tasks := []model.WorkTask{
+		{TaskID: "T1", Assignee: "최혜영"},
+		{TaskID: "T2", Assignee: "양기헌"},
+	}
+	members := map[string][]model.WorkTaskMember{
+		"T1": {{Assignee: "최혜영", Role: model.WBMemberOwner}, {Assignee: "이해진", Role: model.WBMemberSupport}},
+	}
+	got := filterTasksByParticipants(tasks, members, "이해진")
+	if len(got) != 1 || got[0].TaskID != "T1" {
+		t.Fatalf("지원 필터: %+v", got)
+	}
+}
+
 func labelsOfCols(cols []RegisterDayColumn) []string {
 	var s []string
 	for _, c := range cols {

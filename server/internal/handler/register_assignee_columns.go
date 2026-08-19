@@ -13,17 +13,28 @@ const registerAssigneeColMinPx = 160
 
 const registerUnassignedLabel = "미배정"
 
+type assigneeColItem struct {
+	task   model.WorkTask
+	role   string
+	extra  int
+	durMin int
+}
+
 // buildRegisterAssigneeColumns 일일 보기 전용. 가로축을 담당자 열로 둔다. §7.6.2~7.6.4
 // dateCol 은 그날 1열(날짜). order 는 상단 담당자 칩과 같은 이름 순서.
 // filter 가 있으면 그 사람 1열만. 기존 buildRegisterDayColumns 는 바꾸지 않는다.
 func buildRegisterAssigneeColumns(dateCol RegisterColumn, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard, order []string, filter string) []RegisterDayColumn {
+	return buildRegisterAssigneeColumnsMembers(dateCol, placed, toCard, order, filter, nil)
+}
+
+func buildRegisterAssigneeColumnsMembers(dateCol RegisterColumn, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard, order []string, filter string, members map[string][]model.WorkTaskMember) []RegisterDayColumn {
 	filter = strings.TrimSpace(filter)
 	date := strings.TrimSpace(dateCol.Date)
 	if date == "" {
 		date = dateCol.From
 	}
-	byName := map[string][]model.WorkTask{}
-	var unassigned []model.WorkTask
+	byName := map[string][]assigneeColItem{}
+	var unassigned []assigneeColItem
 	seen := map[string]bool{}
 	for _, t := range placed {
 		if strings.TrimSpace(t.WorkDate) != date {
@@ -32,13 +43,16 @@ func buildRegisterAssigneeColumns(dateCol RegisterColumn, placed []model.WorkTas
 		if strings.TrimSpace(t.StartTime) == "" {
 			continue
 		}
-		name := strings.TrimSpace(t.Assignee)
-		if name == "" {
-			unassigned = append(unassigned, t)
-			continue
+		items := expandTaskForAssigneeColumns(t, members)
+		for _, it := range items {
+			name := strings.TrimSpace(columnPerson(it))
+			if name == "" {
+				unassigned = append(unassigned, it)
+				continue
+			}
+			seen[name] = true
+			byName[name] = append(byName[name], it)
 		}
-		seen[name] = true
-		byName[name] = append(byName[name], t)
 	}
 
 	var names []string
@@ -74,26 +88,58 @@ func buildRegisterAssigneeColumns(dateCol RegisterColumn, placed []model.WorkTas
 	return out
 }
 
-func makeAssigneeColumn(dateCol RegisterColumn, label string, unassigned bool, tasks []model.WorkTask, toCard func(model.WorkTask) model.WBCard) RegisterDayColumn {
+func expandTaskForAssigneeColumns(t model.WorkTask, members map[string][]model.WorkTaskMember) []assigneeColItem {
+	ms := members[t.TaskID]
+	if len(ms) == 0 {
+		dur := assigneeTaskDuration(t)
+		return []assigneeColItem{{task: t, role: model.WBMemberOwner, extra: 0, durMin: dur}}
+	}
+	n := len(ms)
+	extra := n - 1
+	if extra < 0 {
+		extra = 0
+	}
+	out := make([]assigneeColItem, 0, n)
+	for _, m := range ms {
+		dur := m.DurationMin
+		if dur <= 0 {
+			dur = assigneeTaskDuration(t)
+		}
+		role := m.Role
+		if role == "" {
+			role = model.WBMemberOwner
+		}
+		it := assigneeColItem{task: t, role: role, extra: extra, durMin: dur}
+		it.task.Assignee = strings.TrimSpace(m.Assignee)
+		out = append(out, it)
+	}
+	return out
+}
+
+func columnPerson(it assigneeColItem) string {
+	return strings.TrimSpace(it.task.Assignee)
+}
+
+func makeAssigneeColumn(dateCol RegisterColumn, label string, unassigned bool, items []assigneeColItem, toCard func(model.WorkTask) model.WBCard) RegisterDayColumn {
 	col := dateCol
 	col.Label = label
 	dur := 0
-	for _, t := range tasks {
-		dur += assigneeTaskDuration(t)
+	for _, it := range items {
+		dur += it.durMin
 	}
-	col.Sub = assigneeColumnSub(len(tasks), dur)
+	col.Sub = assigneeColumnSub(len(items), dur)
 	day := RegisterDayColumn{
 		RegisterColumn: col,
 		Assignee:       "",
 		Unassigned:     unassigned,
-		Count:          len(tasks),
+		Count:          len(items),
 		DurationMin:    dur,
 		DurationLabel:  model.FormatStatsDuration(dur),
 	}
 	if !unassigned {
 		day.Assignee = label
 	}
-	day.Blocks = layoutAssigneeBlocks(tasks, toCard)
+	day.Blocks = layoutAssigneeBlocksItems(items, toCard)
 	return day
 }
 
@@ -116,11 +162,12 @@ func assigneeTaskDuration(t model.WorkTask) int {
 	return 0
 }
 
-func layoutAssigneeBlocks(tasks []model.WorkTask, toCard func(model.WorkTask) model.WBCard) []RegisterBlock {
+func layoutAssigneeBlocksItems(items []assigneeColItem, toCard func(model.WorkTask) model.WBCard) []RegisterBlock {
 	dayStart := workdayStartHour * 60
 	dayEnd := workdayEndHour*60 + 15
 	var evs []layoutEvent
-	for _, t := range tasks {
+	for _, it := range items {
+		t := it.task
 		sm, ok := parseHHMMToMin(t.StartTime)
 		if !ok {
 			continue
@@ -143,6 +190,8 @@ func layoutAssigneeBlocks(tasks []model.WorkTask, toCard func(model.WorkTask) mo
 			card: card, startMin: sm, endMin: em,
 			assignee: strings.TrimSpace(card.Assignee),
 			lane:     -1,
+			support:  it.role == model.WBMemberSupport,
+			extra:    it.extra,
 		})
 	}
 	assignAssigneeLanes(evs)
@@ -176,10 +225,13 @@ func layoutAssigneeBlocks(tasks []model.WorkTask, toCard func(model.WorkTask) mo
 		l := left + gapPct/2
 		topRem := float64(topSlots) * registerSlotRem
 		heightRem := float64(span) * registerSlotRem
-		// 일일 담당자 열은 열 폭을 가득 채운다. registerCardMaxWidthPct 를 쓰지 않는다. §7.6.4
+		z := 5
+		if e.support {
+			z = 4
+		}
 		style := fmt.Sprintf(
-			"position:absolute;top:%.3frem;height:%.3frem;left:%.3f%%;width:%.3f%%;border-left:3px solid %s;background-color:%s;color:%s;box-sizing:border-box;z-index:5",
-			topRem, heightRem, l, w, border, soft, text,
+			"position:absolute;top:%.3frem;height:%.3frem;left:%.3f%%;width:%.3f%%;border-left:3px solid %s;background-color:%s;color:%s;box-sizing:border-box;z-index:%d",
+			topRem, heightRem, l, w, border, soft, text, z,
 		)
 		blocks = append(blocks, RegisterBlock{
 			Card: e.card, Style: template.CSS(style),
@@ -187,6 +239,8 @@ func layoutAssigneeBlocks(tasks []model.WorkTask, toCard func(model.WorkTask) mo
 			Lane: lane, Lanes: lanes,
 			TopRem: topRem, HeightRem: heightRem, LeftPct: l, WidthPct: w,
 			OverlapWarn: lanes > 1,
+			IsSupport:   e.support,
+			ExtraCount:  e.extra,
 		})
 	}
 	return blocks

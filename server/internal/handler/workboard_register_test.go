@@ -161,12 +161,12 @@ func TestRegisterTemplateRenders(t *testing.T) {
 		"View": regViewWeek, "ViewLabel": registerViewLabel(regViewWeek),
 		"Date": "2026-08-04", "PeriodLabel": period.Label,
 		"PrevDate": period.Prev, "NextDate": period.Next, "Today": "2026-08-04",
-		"Columns": period.Columns,
+		"Columns":    period.Columns,
 		"DayColumns": buildRegisterDayColumns(period.Columns, placed, taskCardFromWork),
-		"SlotTimes": slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
-		"Rows": buildRegisterRows(period.Columns, nil),
+		"SlotTimes":  slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
+		"Rows":           buildRegisterRows(period.Columns, nil),
 		"AssigneeLegend": buildAssigneeLegend(placed, nil),
-		"ASCards": cards, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
+		"ASCards":        cards, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
 		"PlacedCount": 1, "Projects": nil, "Assignees": nil,
 		"CanWrite": true, "ModalRedirect": "/workboard/register?view=week&date=2026-08-04",
 	}
@@ -218,9 +218,9 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",
 		"Columns":    []RegisterColumn{dateCol},
 		"DayColumns": buildRegisterAssigneeColumns(dateCol, placed, taskCardFromWork, []string{"양기헌", "최혜영"}, ""),
-		"SlotTimes": slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
+		"SlotTimes":  slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
 		"AssigneeLegend": buildAssigneeLegend(placed, nil),
-		"ASCards": []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
+		"ASCards":        []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
 		"PlacedCount": 3, "Projects": nil, "Assignees": nil,
 		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18",
 		"ExtraAssignees": []string{"이해진"}, "DayLeaveNames": []string{},
@@ -248,6 +248,71 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 	}
 	if !strings.Contains(out, "＋담당자") {
 		t.Fatal("＋담당자 버튼이 없다")
+	}
+	if !strings.Contains(out, "주담당") || !strings.Contains(out, "참여자") {
+		t.Fatal("등록 모달에 주담당·참여자 칸이 없다")
+	}
+}
+
+func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
+	root := findTemplateRoot(t)
+	files := []string{
+		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "workboard", "register.html"),
+	}
+	partials, err := filepath.Glob(filepath.Join(root, "workboard", "_*.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files = append(files, partials...)
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dateCol := RegisterColumn{Date: "2026-08-18", From: "2026-08-18", To: "2026-08-18"}
+	placed := []model.WorkTask{
+		{TaskID: "T1", Title: "CRM 자산정비", Assignee: "최혜영", WorkDate: "2026-08-18", StartTime: "09:00", EndTime: "11:00", DurationMin: 120},
+	}
+	members := map[string][]model.WorkTaskMember{
+		"T1": {
+			{TaskID: "T1", Assignee: "최혜영", Role: model.WBMemberOwner},
+			{TaskID: "T1", Assignee: "양기헌", Role: model.WBMemberSupport},
+			{TaskID: "T1", Assignee: "태자운", Role: model.WBMemberSupport},
+		},
+	}
+	slotTimes := registerSlotTimes()
+	gridH, slotTops := registerGridStyles(len(slotTimes))
+	data := map[string]interface{}{
+		"Title": "일일 업무 등록", "Active": "work_register", "UserRole": "admin",
+		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
+		"Date": "2026-08-18", "PeriodLabel": "2026-08-18",
+		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",
+		"Columns":    []RegisterColumn{dateCol},
+		"DayColumns": buildRegisterAssigneeColumnsMembers(dateCol, placed, taskCardFromWork, []string{"최혜영", "양기헌", "태자운"}, "", members),
+		"SlotTimes":  slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
+		"AssigneeLegend": nil,
+		"ASCards":        []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
+		"PlacedCount": 1, "Projects": nil, "Assignees": nil,
+		"CanWrite": true, "ModalRedirect": "/workboard/register",
+		"ExtraAssignees": []string{}, "DayLeaveNames": []string{},
+		"AssigneeColMin": registerAssigneeColMinPx,
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := buf.String()
+	if n := strings.Count(out, `border-dashed">지원</span>`); n != 2 {
+		t.Fatalf("지원 뱃지=%d want 2", n)
+	}
+	if strings.Count(out, ">조치<") != 1 {
+		t.Fatalf("조치 버튼=%d want 1 (주담당만)", strings.Count(out, ">조치<"))
+	}
+	if !strings.Contains(out, "외 2명") {
+		t.Fatal("카드 하단에 외 n명이 없다")
+	}
+	if strings.Count(out, `draggable="true"`) != 1 {
+		t.Fatalf("드래그 가능 카드=%d want 1 (주담당만)", strings.Count(out, `draggable="true"`))
 	}
 }
 
