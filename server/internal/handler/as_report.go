@@ -11,6 +11,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	docxpkg "customer-support/internal/docx"
 	"customer-support/internal/hwpx"
 	"customer-support/internal/model"
 )
@@ -24,18 +25,20 @@ func (h *ASHandler) mergeASReportData(c echo.Context, as *model.ASReceipt, data 
 	if h.attachRepo != nil {
 		reports, _ = h.attachRepo.ListByRef(model.RefTypeASReport, as.ASID)
 	}
-	closed := isASClosedStatus(as.Status)
+	ready := canIssueASReportStatus(as.Status)
 	canIssue := !embed && canProcessAS(c)
 	reason := ""
-	if !closed {
-		reason = "완료된 건만 발급할 수 있습니다. 현재 상태: " + model.ASStatusDisplayLabel(as.Status)
+	if !ready {
+		reason = "조치를 저장하면 발급됩니다"
 	}
 	draft := h.buildASReportDraft(as, time.Now())
 	data["ASReports"] = reports
 	data["CanIssueReport"] = canIssue
-	data["ReportReady"] = closed
+	data["ReportReady"] = ready
+	data["ReportPartial"] = as.Status == model.StatusPartialComplete
 	data["ReportBlockReason"] = reason
 	data["ReportMissing"] = draft.MissingReportFields()
+	data["HasDocxTemplate"] = h.hasDocxTemplate()
 }
 
 func (h *ASHandler) ReportPreview(c echo.Context) error {
@@ -46,21 +49,23 @@ func (h *ASHandler) ReportPreview(c echo.Context) error {
 	if !canProcessAS(c) {
 		return echo.ErrForbidden
 	}
-	closed := isASClosedStatus(as.Status)
+	ready := canIssueASReportStatus(as.Status)
 	draft := h.buildASReportDraft(as, time.Now())
 	data := map[string]interface{}{
 		"Title":             "조치완료보고서",
 		"Active":            "as",
 		"AS":                as,
 		"Draft":             draft,
-		"ReportReady":       closed,
+		"ReportReady":       ready,
+		"ReportPartial":     as.Status == model.StatusPartialComplete,
 		"ReportBlockReason": "",
 		"ReportMissing":     draft.MissingReportFields(),
 		"ActionErr":         c.QueryParam("err"),
 		"ActionPhotos":      h.listActionPhotos(as.ASID),
+		"HasDocxTemplate":   h.hasDocxTemplate(),
 	}
-	if !closed {
-		data["ReportBlockReason"] = "완료된 건만 발급할 수 있습니다. 현재 상태: " + model.ASStatusDisplayLabel(as.Status)
+	if !ready {
+		data["ReportBlockReason"] = "조치를 저장하면 발급됩니다"
 	}
 	return c.Render(http.StatusOK, "as/report.html", data)
 }
@@ -73,8 +78,8 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 	if !canProcessAS(c) {
 		return echo.ErrForbidden
 	}
-	if !isASClosedStatus(as.Status) {
-		return h.redirectReportErr(c, as.ASID, "완료된 건만 발급할 수 있습니다. 현재 상태: "+model.ASStatusDisplayLabel(as.Status))
+	if !canIssueASReportStatus(as.Status) {
+		return h.redirectReportErr(c, as.ASID, "조치를 저장하면 발급됩니다")
 	}
 
 	draft := reportDraftFromForm(c)
@@ -82,28 +87,60 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		return h.redirectReportErr(c, as.ASID, strings.Join(miss, "·")+"이(가) 비어 있습니다. 미리보기에서 입력하거나 조치 화면에서 채워 주세요.")
 	}
 
-	tpl, err := h.loadASReportTemplate()
-	if err != nil {
-		return h.redirectReportErr(c, as.ASID, err.Error())
+	format := strings.ToLower(strings.TrimSpace(c.FormValue("format")))
+	if format == "" {
+		if h.hasDocxTemplate() {
+			format = "docx"
+		} else {
+			format = "hwpx"
+		}
 	}
-	data, err := hwpx.Replace(tpl, draft.Values())
-	if err != nil {
-		return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+	if format != "docx" && format != "hwpx" {
+		return h.redirectReportErr(c, as.ASID, "지원하지 않는 형식입니다")
 	}
+	if format == "docx" && !h.hasDocxTemplate() {
+		return h.redirectReportErr(c, as.ASID, "DOCX 템플릿이 없습니다. HWPX로 발급하세요")
+	}
+
 	_ = c.Request().ParseForm()
 	photos, err := h.loadSelectedActionJPEGs(as.ASID, c.Request().PostForm["include_photo"])
 	if err != nil {
 		return h.redirectReportErr(c, as.ASID, err.Error())
 	}
-	if len(photos) > 0 {
-		data, err = hwpx.AppendJPEGs(data, photos)
-		if err != nil {
-			return h.redirectReportErr(c, as.ASID, "보고서 사진을 넣지 못했습니다: "+err.Error())
-		}
-	}
 
+	var data []byte
+	var mime, asciiName string
+	utf8Name := draft.FilenameWithExt(time.Now(), format)
+	if format == "docx" {
+		tpl, err := h.loadASReportDocxTemplate()
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, err.Error())
+		}
+		data, err = docxpkg.Replace(tpl, draft.Values())
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+		}
+		mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+		asciiName = "as_report.docx"
+	} else {
+		tpl, err := h.loadASReportTemplate()
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, err.Error())
+		}
+		data, err = hwpx.Replace(tpl, draft.Values())
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+		}
+		if len(photos) > 0 {
+			data, err = hwpx.AppendJPEGs(data, photos)
+			if err != nil {
+				return h.redirectReportErr(c, as.ASID, "보고서 사진을 넣지 못했습니다: "+err.Error())
+			}
+		}
+		mime = "application/hwp+zip"
+		asciiName = "as_report.hwpx"
+	}
 	now := time.Now()
-	utf8Name := draft.Filename(now)
 	dir := filepath.Join(h.reportUploadDir(), "as_report", as.ASID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return h.redirectReportErr(c, as.ASID, "저장 폴더를 만들지 못했습니다")
@@ -121,7 +158,7 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 			FileName: stored,
 			FilePath: path,
 			FileSize: int64(len(data)),
-			MIMEType: "application/hwp+zip",
+			MIMEType: mime,
 			Keywords: model.ASReportIssuerPrefix + strings.TrimSpace(ctxString(c, "user_name")),
 		}
 		if err := h.attachRepo.Create(att); err != nil {
@@ -129,7 +166,7 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		}
 	}
 
-	return writeDownloadBytes(c, data, "application/hwp+zip", "as_report.hwpx", utf8Name)
+	return writeDownloadBytes(c, data, mime, asciiName, utf8Name)
 }
 
 func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
@@ -154,6 +191,36 @@ func (h *ASHandler) loadASReportTemplate() ([]byte, error) {
 		return hwpx.BuildPlaceholderTemplate(), nil
 	}
 	return data, nil
+}
+
+func (h *ASHandler) hasDocxTemplate() bool {
+	if len(h.reportDocxBytes) > 0 {
+		return true
+	}
+	path := h.reportDocxPath
+	if path == "" {
+		path = docxpkg.DefaultTemplatePath()
+	}
+	return docxpkg.TemplateExists(path)
+}
+
+func (h *ASHandler) loadASReportDocxTemplate() ([]byte, error) {
+	if len(h.reportDocxBytes) > 0 {
+		return append([]byte(nil), h.reportDocxBytes...), nil
+	}
+	path := h.reportDocxPath
+	if path == "" {
+		path = docxpkg.DefaultTemplatePath()
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) == 0 {
+		return nil, fmt.Errorf("DOCX 템플릿이 없습니다")
+	}
+	return data, nil
+}
+
+func canIssueASReportStatus(status string) bool {
+	return model.CanIssueASReport(status)
 }
 
 func (h *ASHandler) reportUploadDir() string {

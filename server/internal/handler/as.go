@@ -35,6 +35,8 @@ type ASHandler struct {
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
+	reportDocxBytes     []byte
+	reportDocxPath      string
 }
 
 func (h *ASHandler) List(c echo.Context) error {
@@ -869,6 +871,8 @@ func (h *ASHandler) Action(c echo.Context) error {
 	data["HideIfEmpty"] = true
 	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
 	h.mergeActionPhotoData(as, data, canProcess && !readOnly)
+	h.mergeASReportData(c, as, data)
+	data["OfferReport"] = c.QueryParam("report") == "1" && canIssueASReportStatus(as.Status)
 	return c.Render(http.StatusOK, "as/action.html", data)
 }
 
@@ -1113,9 +1117,16 @@ func (h *ASHandler) Update(c echo.Context) error {
 		}
 	}
 	loc := "/as/" + id + "/action"
+	q := url.Values{}
+	if canIssueASReportStatus(as.Status) {
+		q.Set("report", "1")
+	}
 	if formResult == model.ResultDone &&
 		(strings.TrimSpace(as.CauseDetail) == "" || strings.TrimSpace(as.Conclusion) == "") {
-		loc += "?warn=cause_report"
+		q.Set("warn", "cause_report")
+	}
+	if len(q) > 0 {
+		loc += "?" + q.Encode()
 	}
 	return c.Redirect(http.StatusSeeOther, loc)
 }

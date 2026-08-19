@@ -99,6 +99,12 @@ func TestIsOpenIncompleteStatus(t *testing.T) {
 	if CanReopenAS(StatusPartialComplete) {
 		t.Fatal("partial_complete is not reopen target")
 	}
+	if !CanIssueASReport(StatusPartialComplete) || !CanIssueASReport("completed") || !CanIssueASReport("closed") {
+		t.Fatal("완료·부분완료는 보고서 발급이 되어야 한다")
+	}
+	if CanIssueASReport("in_progress") {
+		t.Fatal("진행중은 보고서 발급이 되면 안 된다")
+	}
 	if MapASStatusToWB(StatusPartialComplete) != WBTaskInProgress {
 		t.Fatal("partial_complete should map to workboard in_progress")
 	}

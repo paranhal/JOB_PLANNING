@@ -55,6 +55,10 @@ func TestASReportFilenameSanitizesAndClips(t *testing.T) {
 	if !strings.HasSuffix(name, "_조치완료보고서_20260818.hwpx") {
 		t.Fatalf("접미사: %q", name)
 	}
+	docx := d.FilenameWithExt(time.Date(2026, 8, 18, 0, 0, 0, 0, time.Local), "docx")
+	if !strings.HasSuffix(docx, "_조치완료보고서_20260818.docx") {
+		t.Fatalf("docx 접미사: %q", docx)
+	}
 	if strings.Contains(name, "여분") {
 		t.Fatalf("증상 20자를 넘김: %q", name)
 	}

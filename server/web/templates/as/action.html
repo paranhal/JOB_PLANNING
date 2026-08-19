@@ -27,6 +27,15 @@
       {{end}}
       <button type="button" @click="receiptOpen=true"
               class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">접수 보기</button>
+      {{if .CanIssueReport}}
+        {{if .ReportReady}}
+        <a href="/as/{{.AS.ASID}}/report" id="btn-as-report"
+           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">조치완료보고서</a>
+        {{else}}
+        <span id="btn-as-report-disabled" title="{{.ReportBlockReason}}"
+              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">조치완료보고서</span>
+        {{end}}
+      {{end}}
       {{if .ShowWorkflow}}
       <select id="as-workflow-action" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[8rem]">
         <option value="">다음 처리…</option>
@@ -68,6 +77,16 @@
   {{end}}
   {{if .ActionWarnMsg}}
   <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">{{.ActionWarnMsg}}</div>
+  {{end}}
+  {{if .OfferReport}}
+  <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 flex flex-wrap items-center justify-between gap-3" id="as-report-offer">
+    <div>
+      <p class="text-sm font-semibold text-emerald-900">조치완료보고서 만들기</p>
+      <p class="text-xs text-emerald-800 mt-0.5">방금 저장한 내용으로 고객에게 낼 보고서를 뽑을 수 있습니다.{{if .ReportPartial}} 부분 조치 상태입니다.{{end}}</p>
+    </div>
+    <a href="/as/{{.AS.ASID}}/report" id="btn-as-report-make"
+       class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">조치완료보고서 만들기</a>
+  </div>
   {{end}}
   {{if or .AS.IsReopen .ParentAS}}
   {{template "as_parent_complete" .}}

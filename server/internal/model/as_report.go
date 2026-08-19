@@ -59,8 +59,17 @@ func (d ASReportDraft) MissingReportFields() []string {
 
 // Filename {고객명}_{증상요약 20자}_조치완료보고서_{YYYYMMDD}.hwpx §12.10.7
 func (d ASReportDraft) Filename(issued time.Time) string {
+	return d.FilenameWithExt(issued, "hwpx")
+}
+
+// FilenameWithExt 확장자만 바꾼 파일명. §12.10.7
+func (d ASReportDraft) FilenameWithExt(issued time.Time, ext string) string {
 	if issued.IsZero() {
 		issued = time.Now()
+	}
+	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
+	if ext == "" {
+		ext = "hwpx"
 	}
 	org := SanitizeReportFilename(strings.TrimSpace(d.CustomerName))
 	if org == "" {
@@ -70,7 +79,7 @@ func (d ASReportDraft) Filename(issued time.Time) string {
 	if sym == "" {
 		sym = "증상없음"
 	}
-	return org + "_" + sym + "_조치완료보고서_" + issued.Format("20060102") + ".hwpx"
+	return org + "_" + sym + "_조치완료보고서_" + issued.Format("20060102") + "." + ext
 }
 
 // BuildASReportDraft §12.10.3 필드 매핑. 조치 여러 건은 한 셀에 날짜별 여러 줄. §12.10.2

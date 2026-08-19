@@ -340,6 +340,11 @@ func CanReopenAS(status string) bool {
 	return status == "completed" || status == "closed"
 }
 
+// CanIssueASReport 조치완료보고서 발급 가능 상태. 완료·종료·부분완료. §12.10.5
+func CanIssueASReport(status string) bool {
+	return status == "completed" || status == "closed" || status == StatusPartialComplete
+}
+
 // NewReopenReceipt 완료된 접수를 바탕으로 같은 증상의 새 접수를 만든다.
 // 접수번호·상태는 저장 단계에서 새로 매겨지므로 여기서는 내용만 옮긴다.
 func NewReopenReceipt(src *ASReceipt, reason string, now time.Time) *ASReceipt {

@@ -32,10 +32,10 @@
       {{if .CanIssueReport}}
         {{if .ReportReady}}
         <a href="/as/{{.AS.ASID}}/report" id="btn-as-report"
-           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">조치완료보고서</a>
+           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">보고서 재발급</a>
         {{else}}
         <span id="btn-as-report-disabled" title="{{.ReportBlockReason}}"
-              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">조치완료보고서</span>
+              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">보고서 재발급</span>
         {{end}}
       {{end}}
       {{if .DailyTask}}

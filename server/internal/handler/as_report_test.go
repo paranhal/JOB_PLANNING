@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/docx"
 	"customer-support/internal/hwpx"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -81,6 +83,7 @@ func postASReport(t *testing.T, e *echo.Echo, asID string, d model.ASReportDraft
 		"confirmer":     {d.Confirmer},
 		"work_dates":    {d.WorkDates},
 		"actions":       {d.Actions},
+		"format":        {"hwpx"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
@@ -104,7 +107,7 @@ func TestASShowReportButtonDisabledWhenNotComplete(t *testing.T) {
 	if !strings.Contains(body, `id="btn-as-report-disabled"`) {
 		t.Fatal("미완료 건에 비활성 버튼이 없다")
 	}
-	if !strings.Contains(body, "완료된 건만 발급할 수 있습니다") {
+	if !strings.Contains(body, "조치를 저장하면 발급됩니다") {
 		t.Fatal("비활성 사유가 없다")
 	}
 	if strings.Contains(body, `id="btn-as-report"`) && !strings.Contains(body, `id="btn-as-report-disabled"`) {
@@ -219,6 +222,7 @@ func TestASReportIssueIncludesSelectedActionPhoto(t *testing.T) {
 		"work_dates":    {draft.WorkDates},
 		"actions":       {draft.Actions},
 		"include_photo": {photos[0].AttachmentID},
+		"format":        {"hwpx"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
@@ -303,6 +307,174 @@ func TestASShowListsReportHistory(t *testing.T) {
 	}
 	if !strings.Contains(body, "관리자") {
 		t.Fatal("발급자가 없다")
+	}
+}
+
+func TestASActionReportButtonAndPartialIssue(t *testing.T) {
+	e, h, asRepo, _, asID := newASReportFixture(t)
+
+	page := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(page, req)
+	if page.Code != http.StatusOK {
+		t.Fatalf("status=%d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, `id="btn-as-report-disabled"`) {
+		t.Fatal("조치 화면에 비활성 발급 버튼이 없다")
+	}
+	if !strings.Contains(body, "조치를 저장하면 발급됩니다") {
+		t.Fatal("조치 화면 비활성 사유가 없다")
+	}
+
+	as, _ := asRepo.GetByID(asID)
+	as.Status = model.StatusPartialComplete
+	as.CauseDetail = "전원부 불량"
+	as.Conclusion = "임시 조치 후 재방문"
+	if err := asRepo.Update(as); err != nil {
+		t.Fatal(err)
+	}
+
+	page = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(page, req)
+	body = page.Body.String()
+	if !strings.Contains(body, `id="btn-as-report"`) {
+		t.Fatal("부분완료인데 조치 화면 발급 버튼이 없다")
+	}
+
+	preview := httptest.NewRecorder()
+	preq := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/report", nil)
+	preq.AddCookie(jwtCookie(t))
+	e.ServeHTTP(preview, preq)
+	if preview.Code != http.StatusOK {
+		t.Fatalf("미리보기 status=%d", preview.Code)
+	}
+	pbody := preview.Body.String()
+	if !strings.Contains(pbody, "부분 조치 상태입니다") {
+		t.Fatal("부분완료 안내가 없다")
+	}
+	if strings.Contains(pbody, `id="btn-as-report-docx"`) {
+		t.Fatal("DOCX 템플릿이 없는데 DOCX 버튼이 있다")
+	}
+	if !strings.Contains(pbody, `id="btn-as-report-hwpx"`) {
+		t.Fatal("HWPX 버튼이 없다")
+	}
+
+	as, _ = asRepo.GetByID(asID)
+	draft := h.AS.buildASReportDraft(as, time.Now())
+	rec := postASReport(t, e, asID, draft)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("부분완료 발급 status=%d loc=%s body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+	}
+	assertHWPXXML(t, rec.Body.Bytes())
+}
+
+func TestASActionSaveOffersReportButton(t *testing.T) {
+	e, _, _, _, asID := newASReportFixture(t)
+	rec := postASAction(t, e, asID, url.Values{
+		"work_place":   {"field"},
+		"process_type": {"visit"},
+		"cause_type":   {"hw"},
+		"cause_detail": {"센서 불량"},
+		"conclusion":   {"교체 후 정상"},
+		"action_taken": {"센서 교체"},
+		"time_spent":   {"30"},
+		"result_code":  {model.ResultDone},
+	})
+	loc := rec.Header().Get("Location")
+	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
+		t.Fatalf("저장 실패: %s", loc)
+	}
+	if !strings.Contains(loc, "report=1") {
+		t.Fatalf("저장 직후 보고서 안내가 없다: %s", loc)
+	}
+	page := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost"+loc, nil)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(page, req)
+	if !strings.Contains(page.Body.String(), "조치완료보고서 만들기") {
+		t.Fatal("저장 결과 화면에 보고서 만들기 버튼이 없다")
+	}
+}
+
+func TestASReportDocxIssueAndHwpxWithoutDocxTemplate(t *testing.T) {
+	e, h, asRepo, _, asID := newASReportFixture(t)
+	completeASForReport(t, asRepo, asID, `게이트 <고장> & "소음"`, "전원부 불량", "교체 후 정상")
+	as, _ := asRepo.GetByID(asID)
+	draft := h.AS.buildASReportDraft(as, time.Now())
+
+	h.AS.reportDocxBytes = docx.BuildSplitPlaceholderTemplate(true)
+	form := url.Values{
+		"customer_name": {draft.CustomerName},
+		"department":    {draft.Department},
+		"manager":       {draft.Manager},
+		"phone":         {draft.Phone},
+		"service":       {draft.Service},
+		"symptom":       {draft.Symptom},
+		"cause_detail":  {draft.CauseDetail},
+		"conclusion":    {draft.Conclusion},
+		"report_date":   {draft.ReportDate},
+		"inspector":     {draft.Inspector},
+		"confirmer":     {draft.Confirmer},
+		"work_dates":    {draft.WorkDates},
+		"actions":       {draft.Actions},
+		"format":        {"docx"},
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
+		strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("DOCX status=%d loc=%s body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+	}
+	cd := rec.Header().Get("Content-Disposition")
+	if !strings.Contains(cd, ".docx") {
+		t.Fatalf("파일명: %q", cd)
+	}
+	doc := zipFileBytes(t, rec.Body.Bytes(), "word/document.xml")
+	assertXMLBytes(t, doc)
+	if strings.Contains(string(doc), "{{") {
+		t.Fatal("DOCX에 {{ 가 남았다")
+	}
+	if !strings.Contains(string(doc), "&lt;") || !strings.Contains(string(doc), "&amp;") {
+		t.Fatalf("DOCX 특수문자 이스케이프 없음: %s", doc)
+	}
+
+	h.AS.reportDocxBytes = nil
+	h.AS.reportDocxPath = filepath.Join(t.TempDir(), "없는파일.docx")
+	preview := httptest.NewRecorder()
+	preq := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/report", nil)
+	preq.AddCookie(jwtCookie(t))
+	e.ServeHTTP(preview, preq)
+	if strings.Contains(preview.Body.String(), `id="btn-as-report-docx"`) {
+		t.Fatal("템플릿이 없는데 DOCX 버튼이 있다")
+	}
+	if !strings.Contains(preview.Body.String(), `id="btn-as-report-hwpx"`) {
+		t.Fatal("HWPX 버튼이 사라졌다")
+	}
+	hw := postASReport(t, e, asID, draft)
+	if hw.Code != http.StatusOK {
+		t.Fatalf("DOCX 없이 HWPX status=%d loc=%s", hw.Code, hw.Header().Get("Location"))
+	}
+	assertHWPXXML(t, hw.Body.Bytes())
+}
+
+func assertXMLBytes(t *testing.T, data []byte) {
+	t.Helper()
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		_, err := dec.Token()
+		if err == io.EOF {
+			return
+		}
+		if err != nil {
+			t.Fatalf("XML 무효: %v", err)
+		}
 	}
 }
 
