@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -293,4 +294,97 @@ func CopySalesFields(dst, src *WorkProject) {
 	dst.WinProbability = src.WinProbability
 	dst.Competitor = src.Competitor
 	dst.LeadSource = src.LeadSource
+}
+
+const (
+	ProjectTabAll    = "all"    // 전체
+	ProjectTabSales  = "sales"  // 영업(수주 전)
+	ProjectTabActive = "active" // 진행
+	ProjectTabClosed = "closed" // 종료
+)
+
+func NormalizeProjectTab(tab string) string {
+	switch strings.TrimSpace(tab) {
+	case ProjectTabAll, ProjectTabSales, ProjectTabClosed:
+		return strings.TrimSpace(tab)
+	default:
+		return ProjectTabActive
+	}
+}
+
+func (p WorkProject) IsPreWon() bool {
+	if !p.IsSales() {
+		return false
+	}
+	switch NormalizeSalesStage(p.SalesStage) {
+	case SalesStageWon, SalesStageLost, SalesStageDropped:
+		return false
+	default:
+		return true
+	}
+}
+
+func (p WorkProject) ExpectedYMOverdue(nowYM string) bool {
+	if !p.IsPreWon() {
+		return false
+	}
+	ym := NormalizeExpectedYM(p.ExpectedYM)
+	nowYM = NormalizeExpectedYM(nowYM)
+	return ym != "" && nowYM != "" && ym < nowYM
+}
+
+func FormatKRW(n int64) string {
+	if n <= 0 {
+		return ""
+	}
+	s := strconv.FormatInt(n, 10)
+	var b strings.Builder
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(c)
+	}
+	return b.String() + "원"
+}
+
+func (p WorkProject) ExpectedAmountLabel() string {
+	return FormatKRW(p.ExpectedAmount)
+}
+
+// SalesTimelineMonths 가로축. 이번 달·다음 달은 항상 넣고, 목록의 예정월을 덮는다.
+func SalesTimelineMonths(items []WorkProject, now time.Time) []string {
+	cur := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	seen := map[string]bool{}
+	var months []string
+	add := func(ym string) {
+		ym = NormalizeExpectedYM(ym)
+		if ym == "" || seen[ym] {
+			return
+		}
+		seen[ym] = true
+		months = append(months, ym)
+	}
+	add(cur.Format("2006-01"))
+	add(cur.AddDate(0, 1, 0).Format("2006-01"))
+	for _, p := range items {
+		add(p.ExpectedYM)
+	}
+	sort.Strings(months)
+	return months
+}
+
+type SalesKanbanColumn struct {
+	Stage string
+	Label string
+}
+
+func SalesKanbanColumns() []SalesKanbanColumn {
+	return []SalesKanbanColumn{
+		{Stage: SalesStageLead, Label: SalesStageLabel(SalesStageLead)},
+		{Stage: SalesStageProposal, Label: SalesStageLabel(SalesStageProposal)},
+		{Stage: SalesStageQuote, Label: SalesStageLabel(SalesStageQuote)},
+		{Stage: SalesStageBid, Label: SalesStageLabel(SalesStageBid)},
+		{Stage: SalesStageWon, Label: SalesStageLabel(SalesStageWon)},
+	}
 }

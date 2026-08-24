@@ -11,7 +11,8 @@ const (
 	UnplannedDelayed    = "delayed"    // 예정일경과
 	UnplannedNext       = "next"       // 다음일정미정
 	UnplannedUnassigned = "unassigned" // 담당자미배정
-	UnplannedReview     = "review"     // 미정사유만료
+	UnplannedReview        = "review"         // 미정사유만료
+	UnplannedSalesFollowup = "sales_followup" // 영업 후속없음 (§22.1.1 ⑨)
 )
 
 // UnplannedNoDateReviewDays 「미정+사유」 재검토 주기(일)
@@ -72,6 +73,8 @@ func UnplannedKindLabel(kind string) string {
 		return "담당자미배정"
 	case UnplannedReview:
 		return "미정사유만료"
+	case UnplannedSalesFollowup:
+		return "영업 후속없음"
 	default:
 		return kind
 	}
@@ -112,6 +115,8 @@ func UnplannedBadgeOfStarted(kind string, daysOverdue int, started bool) Unplann
 		return UnplannedBadge{Kind: kind, Label: "미배정", Class: "bg-orange-100 text-orange-800"}
 	case UnplannedReview:
 		return UnplannedBadge{Kind: kind, Label: "재검토", Class: "bg-amber-100 text-amber-900"}
+	case UnplannedSalesFollowup:
+		return UnplannedBadge{Kind: kind, Label: "영업 후속없음", Class: "bg-orange-100 text-orange-800"}
 	default:
 		return UnplannedBadge{Kind: kind, Label: kind, Class: "bg-gray-100 text-gray-700"}
 	}
@@ -145,7 +150,7 @@ func (it UnplannedItem) HasKind(kind string) bool {
 // NeedPlanKind §8.2.1 「계획을 세워야 할 건」 — 예정없음 · 담당자미배정.
 // 재검토(미정+사유 만료)는 밀린 건 묶음이므로 예정없음이 있어도 여기 세지 않는다.
 func (it UnplannedItem) NeedPlanKind() bool {
-	if it.HasKind(UnplannedUnassigned) {
+	if it.HasKind(UnplannedUnassigned) || it.HasKind(UnplannedSalesFollowup) {
 		return true
 	}
 	return it.HasKind(UnplannedNoDate) && !it.HasKind(UnplannedReview)
@@ -161,11 +166,12 @@ type UnplannedKindCounts struct {
 	NoDate     int
 	Delayed    int
 	Next       int
-	Unassigned int
-	Review     int
-	NeedPlan   int // 고유: 계획이 없는 건
-	Overdue    int // 고유: 밀린 건
-	Total      int // 고유 건수
+	Unassigned    int
+	Review        int
+	SalesFollowup int
+	NeedPlan      int // 고유: 계획이 없는 건
+	Overdue       int // 고유: 밀린 건
+	Total         int // 고유 건수
 }
 
 func (c *UnplannedKindCounts) AddItem(it UnplannedItem) {
@@ -188,6 +194,8 @@ func (c *UnplannedKindCounts) AddItem(it UnplannedItem) {
 			c.Unassigned++
 		case UnplannedReview:
 			c.Review++
+		case UnplannedSalesFollowup:
+			c.SalesFollowup++
 		}
 	}
 }

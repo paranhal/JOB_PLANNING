@@ -40,6 +40,7 @@ const (
 const (
 	WBSourceAS          = "as"
 	WBSourceMaintenance = "maintenance"
+	WBSourceProject     = "project" // 영업 사업 다음 행동 (§22.1.1 ⑨)
 )
 
 // work_task_members.member_role (§7.7.2). work_tasks.assignee 는 주담당(owner)과 같다.
@@ -66,6 +67,8 @@ func WBCategoryLabel(cat string) string {
 		return "AS"
 	case WBSourceMaintenance:
 		return "점검"
+	case WBSourceProject:
+		return "영업"
 	default:
 		return "행정"
 	}
@@ -603,6 +606,9 @@ func (t WorkTask) DetailHref() string {
 	}
 	if t.SourceType == WBSourceMaintenance && t.SourceID != "" {
 		return "/maintenance/visits/" + t.SourceID
+	}
+	if t.SourceType == WBSourceProject && t.SourceID != "" {
+		return "/projects/" + t.SourceID
 	}
 	return "#"
 }

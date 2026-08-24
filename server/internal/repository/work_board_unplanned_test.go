@@ -397,3 +397,75 @@ func TestAppendixCListsYearOutOfRangeDates(t *testing.T) {
 		t.Fatalf("자동으로 고치면 안 된다: %q", still)
 	}
 }
+
+func TestSalesUnplannedFollowupReviewAndAssign(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "sales_unplanned.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewProjectRepo(db)
+	open := &model.WorkProject{
+		Name: "후속없는건", ProjectKind: model.ProjectKindBuild, SalesStage: model.SalesStageLead,
+		ExpectedYM: "2027-03", SalesOwner: "관리자", ProspectName: "후속기관",
+		Status: model.WBProjectActive, Color: "#3B82F6",
+	}
+	if err := repo.Create(open); err != nil {
+		t.Fatal(err)
+	}
+	over := &model.WorkProject{
+		Name: "지난예정", ProjectKind: model.ProjectKindSupply, SalesStage: model.SalesStageQuote,
+		ExpectedYM: "2020-01", SalesOwner: "관리자", ProspectName: "지난기관",
+		Status: model.WBProjectActive, Color: "#3B82F6",
+	}
+	if err := repo.Create(over); err != nil {
+		t.Fatal(err)
+	}
+	board := NewWorkBoardRepo(db)
+	items, counts, err := board.ListUnplanned("", nil, model.UnplannedSalesFollowup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.SalesFollowup < 2 {
+		t.Fatalf("후속없음 counts=%+v n=%d", counts, len(items))
+	}
+	rev, _, err := board.ListUnplanned("", nil, model.UnplannedReview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundRev := false
+	for _, it := range rev {
+		if it.RefID == over.ProjectID {
+			foundRev = true
+		}
+	}
+	if !foundRev {
+		t.Fatal("예정월 경과 건이 재검토에 없다")
+	}
+	pc, err := board.CountPlanning()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pc.Open < 2 || pc.NeedPlan < 2 {
+		t.Fatalf("영업 미계획 분모=%d 미계획=%d", pc.Open, pc.NeedPlan)
+	}
+	if err := board.AssignUnplannedDate("proj:"+open.ProjectID, "2026-09-01", "관리자", ""); err != nil {
+		t.Fatal(err)
+	}
+	after, counts2, err := board.ListUnplanned("", nil, model.UnplannedSalesFollowup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range after {
+		if it.RefID == open.ProjectID {
+			t.Fatal("날짜를 배정했는데 후속없음에 남았다")
+		}
+	}
+	if counts2.SalesFollowup >= counts.SalesFollowup {
+		t.Fatalf("후속없음이 줄어야 한다 before=%d after=%d", counts.SalesFollowup, counts2.SalesFollowup)
+	}
+	task, err := NewWBRepo(db).GetTaskBySource(model.WBSourceProject, open.ProjectID)
+	if err != nil || task == nil || task.SourceType != model.WBSourceProject {
+		t.Fatalf("source_type=project 없음: %+v err=%v", task, err)
+	}
+}

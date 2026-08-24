@@ -18,6 +18,9 @@ func TestIsAdminGTDTask(t *testing.T) {
 	if IsAdminGTDTask(WorkTask{WorkType: WBWorkAS, SourceType: WBSourceAS}) {
 		t.Fatal("AS work type")
 	}
+	if !IsAdminGTDTask(WorkTask{WorkType: WBWorkAdmin, SourceType: WBSourceProject}) {
+		t.Fatal("project source uses GTD next actions")
+	}
 }
 
 func TestWBAdminStatusLabel(t *testing.T) {

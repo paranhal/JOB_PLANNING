@@ -44,6 +44,84 @@ func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error)
 	return r.ListFiltered("", year, status, model.ProjectKindMaintenance, false)
 }
 
+// ListForTab §22.1.1 ⑧ 전체 / 영업(수주 전) / 진행 / 종료
+func (r *ProjectRepo) ListForTab(tab, search string, year int, extraStatus string, includeLost bool) ([]model.WorkProject, error) {
+	tab = model.NormalizeProjectTab(tab)
+	q := projectSelect + ` WHERE 1=1`
+	var args []interface{}
+	switch tab {
+	case model.ProjectTabAll:
+		if !includeLost {
+			q += ` AND COALESCE(p.sales_stage,'') NOT IN (?,?)`
+			args = append(args, model.SalesStageLost, model.SalesStageDropped)
+		}
+	case model.ProjectTabSales:
+		q += ` AND COALESCE(p.project_kind,'maintenance') != ?`
+		args = append(args, model.ProjectKindMaintenance)
+		if includeLost {
+			q += ` AND COALESCE(p.sales_stage,'') != ?`
+			args = append(args, model.SalesStageWon)
+		} else {
+			q += ` AND COALESCE(p.sales_stage,'') NOT IN (?,?,?)`
+			args = append(args, model.SalesStageWon, model.SalesStageLost, model.SalesStageDropped)
+		}
+	case model.ProjectTabClosed:
+		q += ` AND (p.status IN (?,?) OR COALESCE(p.sales_stage,'') IN (?,?))`
+		args = append(args, model.WBProjectComplete, model.WBProjectArchived, model.SalesStageLost, model.SalesStageDropped)
+	default: // 진행
+		q += ` AND p.status=? AND (COALESCE(p.project_kind,'maintenance')=? OR COALESCE(p.sales_stage,'')=?)`
+		args = append(args, model.WBProjectActive, model.ProjectKindMaintenance, model.SalesStageWon)
+	}
+	if year > 0 {
+		q += ` AND COALESCE(p.plan_year,0)=?`
+		args = append(args, year)
+	}
+	if extraStatus != "" && tab != model.ProjectTabActive && tab != model.ProjectTabClosed {
+		q += ` AND p.status=?`
+		args = append(args, extraStatus)
+	}
+	if s := strings.TrimSpace(search); s != "" {
+		like := "%" + s + "%"
+		q += ` AND (
+			p.name LIKE ? OR COALESCE(p.short_name,'') LIKE ?
+			OR COALESCE(p.ordering_party,'') LIKE ? OR COALESCE(op.org_name,'') LIKE ?
+			OR COALESCE(cu.org_name,'') LIKE ? OR COALESCE(p.prospect_name,'') LIKE ?
+		)`
+		args = append(args, like, like, like, like, like, like)
+	}
+	if tab == model.ProjectTabSales {
+		q += ` ORDER BY COALESCE(p.expected_ym,''), COALESCE(p.sort_order,0), p.name`
+	} else {
+		q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
+	}
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	return scanProjectRows(rows)
+}
+
+func (r *ProjectRepo) SetSalesStage(id, stage string) error {
+	id = strings.TrimSpace(id)
+	stage = model.NormalizeSalesStage(stage)
+	if id == "" || stage == "" {
+		return fmt.Errorf("project_id·sales_stage 필요")
+	}
+	p, err := r.Get(id)
+	if err != nil {
+		return err
+	}
+	p.SalesStage = stage
+	if err := model.ValidateWorkProject(p); err != nil {
+		return err
+	}
+	return r.Update(p)
+}
+
 // ListFiltered 사업명·발주처·고객 검색 + 연도·상태·유형 필터.
 // kind 가 비면 유지보수만(§22.1.1 기본). kind=all 이면 유형을 가리지 않는다.
 // kind=sales 이면 유지보수 외. 영업 목록은 기본으로 lost·dropped 를 숨긴다.
