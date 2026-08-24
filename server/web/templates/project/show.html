@@ -13,6 +13,10 @@
         {{else}}
         <span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">무상</span>
         {{end}}
+        {{if .Project.IsSales}}
+        <span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">{{projectKindLabel .Project.ProjectKind}}</span>
+        {{if .Project.SalesStage}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">{{salesStageLabel .Project.SalesStage}}</span>{{end}}
+        {{end}}
         <span>{{wbProjectStatusLabel .Project.Status}}</span>
       </p>
     </div>
@@ -48,9 +52,17 @@
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">보관 처리했습니다.</div>
   {{else if eq .FlashOK "activated"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">재개했습니다.</div>
+  {{else if eq .FlashOK "promoted"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">고객으로 등록했습니다. 가등록 이름은 이력으로 남겨 두었습니다.</div>
+  {{else if eq .FlashOK "already_customer"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">이미 고객이 연결되어 있습니다.</div>
   {{end}}
   {{if eq .FlashErr "linked"}}
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">연결된 일일업무가 있어 삭제할 수 없습니다.</div>
+  {{else if eq .FlashErr "prospect"}}
+  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">가등록 기관명이 없어 고객으로 등록할 수 없습니다.</div>
+  {{else if eq .FlashErr "notsales"}}
+  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">유지보수 사업은 이 화면에서 고객을 만들지 않습니다.</div>
   {{end}}
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -59,11 +71,36 @@
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
         <div><dt class="text-gray-500">짧은 이름</dt><dd class="text-gray-800">{{if .Project.ShortName}}{{.Project.ShortName}}{{else}}—{{end}}</dd></div>
         <div><dt class="text-gray-500">발주처</dt><dd class="text-gray-800">{{.Project.OrderingPartyLabel}}</dd></div>
-        <div><dt class="text-gray-500">고객</dt><dd class="text-gray-800">{{if .Project.CustomerName}}{{.Project.CustomerName}}{{else}}—{{end}}</dd></div>
+        <div><dt class="text-gray-500">고객</dt><dd class="text-gray-800">
+          {{if .Project.CustomerLabel}}{{.Project.CustomerLabel}}{{else}}—{{end}}
+          {{if .Project.IsProspect}}{{if .Project.CustomerLabel}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">가등록</span>{{end}}{{end}}
+        </dd></div>
         <div><dt class="text-gray-500">계약/청구</dt><dd class="text-gray-800">{{if .Project.ContractType}}{{.Project.ContractType}}{{else}}—{{end}} / {{if .Project.BillingType}}{{.Project.BillingType}}{{else}}—{{end}}</dd></div>
         <div><dt class="text-gray-500">기간</dt><dd class="text-gray-800">{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</dd></div>
         <div class="sm:col-span-2"><dt class="text-gray-500">비고</dt><dd class="text-gray-800 whitespace-pre-wrap">{{if .Project.Notes}}{{.Project.Notes}}{{else}}—{{end}}</dd></div>
+        {{if .Project.IsSales}}
+        <div><dt class="text-gray-500">예정 시기</dt><dd class="text-gray-800">{{if .Project.ExpectedPeriodLabel}}{{.Project.ExpectedPeriodLabel}}{{else}}—{{end}}{{if .Project.ExpectedNote}} · {{.Project.ExpectedNote}}{{end}}</dd></div>
+        <div><dt class="text-gray-500">영업담당</dt><dd class="text-gray-800">{{if .Project.SalesOwner}}{{.Project.SalesOwner}}{{else}}—{{end}}</dd></div>
+        <div><dt class="text-gray-500">예상 금액 / 확도</dt><dd class="text-gray-800">{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}원{{else}}—{{end}} / {{.Project.WinProbability}}%</dd></div>
+        <div><dt class="text-gray-500">출처 / 경쟁사</dt><dd class="text-gray-800">{{if .Project.LeadSource}}{{leadSourceLabel .Project.LeadSource}}{{else}}—{{end}}{{if .Project.Competitor}} · {{.Project.Competitor}}{{end}}</dd></div>
+        {{if .Project.ProspectName}}
+        <div class="sm:col-span-2"><dt class="text-gray-500">가등록 이력</dt><dd class="text-gray-800">{{.Project.ProspectName}}{{if .Project.ProspectRegion}} · {{.Project.ProspectRegion}}{{end}}</dd></div>
+        {{end}}
+        {{end}}
       </dl>
+      {{if and .CanWrite .Project.IsSales .Project.IsProspect .Project.ProspectName}}
+      <form method="post" action="/projects/{{.Project.ProjectID}}/promote-customer" class="mt-4 pt-3 border-t border-gray-100">
+        {{if .Project.ProspectContactName}}
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700 mb-2">
+          <input type="checkbox" name="promote_contact" value="1" checked>
+          가등록 담당자({{.Project.ProspectContactName}})도 함께 등록
+        </label>
+        {{end}}
+        <div>
+          <button type="submit" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">고객으로 등록</button>
+        </div>
+      </form>
+      {{end}}
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <h3 class="font-semibold text-gray-800 mb-3">매칭 요약</h3>

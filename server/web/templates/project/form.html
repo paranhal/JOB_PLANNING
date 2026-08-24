@@ -6,7 +6,7 @@
   <div class="flex items-center justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
-      <p class="text-sm text-gray-500">기본 정보와 AS/정기점검 귀속 범위를 설정합니다.</p>
+      <p class="text-sm text-gray-500">{{if .IsSales}}영업 건 — 예정 시기는 월 단위입니다. 고객 마스터는 비워 둘 수 있습니다.{{else}}기본 정보와 AS/정기점검 귀속 범위를 설정합니다.{{end}}</p>
     </div>
     <a href="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="text-sm text-gray-500 hover:underline">← 돌아가기</a>
   </div>
@@ -17,6 +17,7 @@
 
   <form method="post" action="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="space-y-4"
         @submit="syncRuleFields()">
+    <input type="hidden" name="project_kind" value="{{if .Project.ProjectKind}}{{.Project.ProjectKind}}{{else}}maintenance{{end}}">
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <h3 class="font-semibold text-gray-800">기본 정보</h3>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -34,8 +35,8 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">사업 연도</label>
           <input type="number" name="plan_year" value="{{if .Project.PlanYear}}{{.Project.PlanYear}}{{end}}" min="2000" max="2100" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">유상/무상</label>
+        <div x-show="!isSales || salesStage === 'won'">
+          <label class="block text-sm font-medium text-gray-700 mb-1">유상/무상{{if .IsSales}} <span class="text-red-500">*</span>{{end}}</label>
           <select name="is_paid" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="1" {{if .Project.IsPaid}}selected{{end}}>유상</option>
             <option value="0" {{if not .Project.IsPaid}}selected{{end}}>무상</option>
@@ -73,9 +74,131 @@
           {{end}}
         </select>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {{if .IsSales}}
+      <div class="rounded-lg border border-amber-100 bg-amber-50/50 p-4 space-y-3">
+        <h4 class="text-sm font-semibold text-gray-800">영업</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">영업 단계</label>
+            <select name="sales_stage" x-model="salesStage" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="lead" {{if eq .Project.SalesStage "lead"}}selected{{end}}>발굴</option>
+              <option value="proposal" {{if eq .Project.SalesStage "proposal"}}selected{{end}}>제안</option>
+              <option value="quote" {{if eq .Project.SalesStage "quote"}}selected{{end}}>견적</option>
+              <option value="bid" {{if eq .Project.SalesStage "bid"}}selected{{end}}>입찰·협상</option>
+              <option value="won" {{if eq .Project.SalesStage "won"}}selected{{end}}>수주</option>
+              <option value="lost" {{if eq .Project.SalesStage "lost"}}selected{{end}}>실주</option>
+              <option value="dropped" {{if eq .Project.SalesStage "dropped"}}selected{{end}}>보류</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">영업담당 <span class="text-red-500">*</span></label>
+            <select name="sales_owner_id" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">— 선택 —</option>
+              {{range .Users}}
+              <option value="{{.UserID}}" {{if eq $.Project.SalesOwnerID .UserID}}selected{{end}}>{{.FullName}}</option>
+              {{end}}
+            </select>
+          </div>
+        </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">계약방식</label>
+          <input type="hidden" name="expected_undated" :value="undated ? '1' : '0'">
+          <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" x-model="undated">
+            예정 시기 미정
+          </label>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" x-show="!undated">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">예정 월 <span class="text-red-500">*</span></label>
+            <input type="month" name="expected_ym" value="{{.Project.ExpectedYM}}" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">표시 정밀도</label>
+            <select name="expected_precision" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="month" {{if eq .Project.ExpectedPrecision "month"}}selected{{end}}>월 (2027-03)</option>
+              <option value="quarter" {{if eq .Project.ExpectedPrecision "quarter"}}selected{{end}}>분기</option>
+              <option value="half" {{if eq .Project.ExpectedPrecision "half"}}selected{{end}}>반기</option>
+              <option value="year" {{if eq .Project.ExpectedPrecision "year"}}selected{{end}}>연</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">시기 메모</label>
+            <input type="text" name="expected_note" value="{{.Project.ExpectedNote}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="예산 편성 후 등">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="undated" x-cloak>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">미정 사유 <span class="text-red-500">*</span></label>
+            <select name="expected_undated_reason" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+              {{range .NoDateReasons}}
+              <option value="{{.Key}}" {{if eq $.Project.ExpectedUndatedReason .Key}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">기타 상세</label>
+            <input type="text" name="expected_undated_detail" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="기타인 경우">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">가등록 기관명 <span class="text-red-500">*</span></label>
+            <input type="text" name="prospect_name" value="{{.Project.ProspectName}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="고객 마스터 없이 저장">
+            <p class="text-[11px] text-gray-500 mt-1">등록 고객을 고르면 그쪽을 쓰고, 없으면 이 이름을 보여 줍니다.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">지역</label>
+            <input type="text" name="prospect_region" value="{{.Project.ProspectRegion}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="시도·시군구">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">가등록 담당자</label>
+            <input type="text" name="prospect_contact_name" value="{{.Project.ProspectContactName}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">직함</label>
+            <input type="text" name="prospect_contact_title" value="{{.Project.ProspectContactTitle}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">전화</label>
+            <input type="text" name="prospect_contact_phone" value="{{.Project.ProspectContactPhone}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <input type="text" name="prospect_contact_email" value="{{.Project.ProspectContactEmail}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">예상 금액(원)</label>
+            <input type="number" name="expected_amount" value="{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}{{end}}" min="0" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">확도 %</label>
+            <input type="number" name="win_probability" value="{{.Project.WinProbability}}" min="0" max="100" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">경쟁사</label>
+            <input type="text" name="competitor" value="{{.Project.Competitor}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">정보 출처</label>
+            <select name="lead_source" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">— 선택 —</option>
+              <option value="existing" {{if eq .Project.LeadSource "existing"}}selected{{end}}>기존 고객</option>
+              <option value="bid" {{if eq .Project.LeadSource "bid"}}selected{{end}}>입찰공고</option>
+              <option value="referral" {{if eq .Project.LeadSource "referral"}}selected{{end}}>소개</option>
+              <option value="exhibition" {{if eq .Project.LeadSource "exhibition"}}selected{{end}}>전시회</option>
+              <option value="other" {{if eq .Project.LeadSource "other"}}selected{{end}}>기타</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      {{end}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="!isSales || salesStage === 'won'">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약방식{{if .IsSales}} <span class="text-red-500">*</span>{{end}}</label>
           <select name="contract_type" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .ContractTypes}}
@@ -93,13 +216,13 @@
           </select>
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="!isSales || salesStage === 'won'">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 시작</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 시작{{if .IsSales}} <span class="text-red-500">*</span>{{end}}</label>
           <input type="date" name="start_date" value="{{.Project.StartDate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 마감</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 마감{{if .IsSales}} <span class="text-red-500">*</span>{{end}}</label>
           <input type="date" name="end_date" value="{{.Project.EndDate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
       </div>
@@ -185,6 +308,9 @@ function projectForm() {
   try { initial = JSON.parse({{printf "%q" .RulesJSON}}); } catch (e) { initial = []; }
   return {
     orderingPartyId: {{if .Project.OrderingPartyID}}{{printf "%q" .Project.OrderingPartyID}}{{else if .Project.OrderingParty}}"custom"{{else}}""{{end}},
+    isSales: {{if .IsSales}}true{{else}}false{{end}},
+    salesStage: {{if .Project.SalesStage}}{{printf "%q" .Project.SalesStage}}{{else}}"lead"{{end}},
+    undated: {{if .Project.ExpectedUndatedReason}}true{{else}}false{{end}},
     rules: Array.isArray(initial) ? initial : [],
     addRule() {
       this.rules.push({ id: '', parent: '', products: [], kinds: [], notes: '' });

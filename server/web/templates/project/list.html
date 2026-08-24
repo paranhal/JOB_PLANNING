@@ -15,6 +15,10 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         사업 등록
       </a>
+      <a href="/projects/new?kind=build"
+         class="inline-flex items-center gap-2 border border-amber-200 text-amber-900 bg-amber-50 hover:bg-amber-100 px-4 py-2 rounded-lg text-sm font-medium">
+        영업 건 등록
+      </a>
       {{end}}
     </div>
   </div>
@@ -51,8 +55,18 @@
       </select>
     </div>
     <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-    {{if or .Search .Year .Status}}
+    {{if eq .Kind "sales"}}
+    <input type="hidden" name="kind" value="sales">
+    <label class="inline-flex items-center gap-1.5 text-sm text-gray-600 pb-1">
+      <input type="checkbox" name="lost" value="1" {{if .IncludeLost}}checked{{end}}>
+      실주·보류 포함
+    </label>
+    {{end}}
+    {{if or .Search .Year .Status .IsSalesList}}
     <a href="/projects" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
+    {{end}}
+    {{if not .IsSalesList}}
+    <a href="/projects?kind=sales" class="px-4 py-2 border rounded-lg text-sm text-amber-800 hover:bg-amber-50">영업 목록</a>
     {{end}}
   </form>
 
@@ -64,10 +78,14 @@
           <th class="px-4 py-3 font-medium">사업명</th>
           <th class="px-4 py-3 font-medium">발주처</th>
           <th class="px-4 py-3 font-medium">고객</th>
+          {{if $.IsSalesList}}
+          <th class="px-4 py-3 font-medium">단계</th>
+          {{else}}
           <th class="px-4 py-3 font-medium">계약방식</th>
+          {{end}}
           <th class="px-4 py-3 font-medium">유상</th>
           <th class="px-4 py-3 font-medium">상태</th>
-          <th class="px-4 py-3 font-medium">기간</th>
+          <th class="px-4 py-3 font-medium">{{if $.IsSalesList}}예정{{else}}기간{{end}}</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
@@ -81,8 +99,11 @@
             {{if .ShortName}}<p class="text-xs text-gray-400 mt-0.5 truncate max-w-md">{{.Name}}</p>{{end}}
           </td>
           <td class="px-4 py-3 text-gray-700">{{.OrderingPartyLabel}}</td>
-          <td class="px-4 py-3 text-gray-700">{{if .CustomerName}}{{.CustomerName}}{{else}}—{{end}}</td>
-          <td class="px-4 py-3 text-gray-600">{{if .ContractType}}{{.ContractType}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-gray-700">
+            {{if .CustomerLabel}}{{.CustomerLabel}}{{else}}—{{end}}
+            {{if .IsProspect}}{{if .CustomerLabel}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">가등록</span>{{end}}{{end}}
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{if $.IsSalesList}}{{salesStageLabel .SalesStage}}{{else if .ContractType}}{{.ContractType}}{{else}}—{{end}}</td>
           <td class="px-4 py-3">
             {{if .IsPaid}}
             <span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700">유상</span>
@@ -92,7 +113,7 @@
           </td>
           <td class="px-4 py-3">{{wbProjectStatusLabel .Status}}</td>
           <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
-            {{if or .StartDate .EndDate}}{{.StartDate}} ~ {{.EndDate}}{{else}}—{{end}}
+            {{if $.IsSalesList}}{{if .ExpectedPeriodLabel}}{{.ExpectedPeriodLabel}}{{else}}—{{end}}{{else if or .StartDate .EndDate}}{{.StartDate}} ~ {{.EndDate}}{{else}}—{{end}}
           </td>
         </tr>
         {{else}}

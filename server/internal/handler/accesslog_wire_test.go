@@ -215,7 +215,7 @@ func TestAccessLogUserDeactivate(t *testing.T) {
 
 func TestAccessLogProjectDelete(t *testing.T) {
 	path := initTestAccessDB(t)
-	e, repo, _ := newProjectServer(t)
+	e, repo, _, _ := newProjectServer(t)
 	p := &model.WorkProject{Name: "접속기록사업", Status: model.WBProjectActive, Color: "#3B82F6"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)

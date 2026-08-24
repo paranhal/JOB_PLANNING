@@ -20,6 +20,7 @@ type ProjectHandler struct {
 	contactRepo  *repository.ContactRepo
 	codeRepo     *repository.CodeRepo
 	assetRepo    *repository.AssetRepo
+	userRepo     *repository.UserRepo
 }
 
 func NewProjectHandler(
@@ -29,11 +30,12 @@ func NewProjectHandler(
 	contactRepo *repository.ContactRepo,
 	codeRepo *repository.CodeRepo,
 	assetRepo *repository.AssetRepo,
+	userRepo *repository.UserRepo,
 ) *ProjectHandler {
 	return &ProjectHandler{
 		repo: repo, wbRepo: wbRepo,
 		customerRepo: customerRepo, contactRepo: contactRepo, codeRepo: codeRepo,
-		assetRepo: assetRepo,
+		assetRepo: assetRepo, userRepo: userRepo,
 	}
 }
 
@@ -68,7 +70,8 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	if kind == "" {
 		kind = model.ProjectKindMaintenance
 	}
-	items, err := h.repo.ListFiltered(search, year, status, kind)
+	includeLost := c.QueryParam("lost") == "1"
+	items, err := h.repo.ListFiltered(search, year, status, kind, includeLost)
 	if err != nil {
 		return err
 	}
@@ -76,9 +79,11 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
 		"Title": "사업(프로젝트)관리", "Active": "projects",
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
-		"Kind":     kind,
-		"CanWrite": canWriteProjects(c),
-		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Kind":        kind,
+		"IncludeLost": includeLost,
+		"IsSalesList": strings.EqualFold(kind, "sales") || model.IsSalesKind(kind),
+		"CanWrite":    canWriteProjects(c),
+		"FlashOK":     c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 
@@ -86,7 +91,15 @@ func (h *ProjectHandler) New(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	return h.renderForm(c, &model.WorkProject{IsPaid: true, Status: model.WBProjectActive, Color: "#3B82F6"}, nil, false)
+	p := &model.WorkProject{IsPaid: true, Status: model.WBProjectActive, Color: "#3B82F6"}
+	kind := model.NormalizeProjectKind(c.QueryParam("kind"))
+	if model.IsSalesKind(kind) {
+		p.ProjectKind = kind
+		p.SalesStage = model.SalesStageLead
+		p.ExpectedPrecision = model.ExpectedPrecisionMonth
+		p.WinProbability = model.DefaultWinProbability(p.SalesStage)
+	}
+	return h.renderForm(c, p, nil, false)
 }
 
 func (h *ProjectHandler) Create(c echo.Context) error {
@@ -94,8 +107,9 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	p, rules := h.parseForm(c)
-	if p.Name == "" {
-		return h.renderForm(c, p, rules, false, "사업명을 입력하세요.")
+	h.fillSalesOwner(p)
+	if err := model.ValidateWorkProject(p); err != nil {
+		return h.renderForm(c, p, rules, false, err.Error())
 	}
 	if err := h.repo.Create(p); err != nil {
 		return err
@@ -151,8 +165,12 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	}
 	p, rules := h.parseForm(c)
 	p.ProjectID = existing.ProjectID
-	if p.Name == "" {
-		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
+	if !p.IsSales() {
+		model.CopySalesFields(p, existing)
+	}
+	h.fillSalesOwner(p)
+	if err := model.ValidateWorkProject(p); err != nil {
+		return h.renderForm(c, p, rules, true, err.Error())
 	}
 	if err := h.repo.Update(p); err != nil {
 		return err
@@ -249,11 +267,88 @@ func (h *ProjectHandler) Delete(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/projects?ok=deleted")
 }
 
+func (h *ProjectHandler) fillSalesOwner(p *model.WorkProject) {
+	if p == nil || !p.IsSales() || h.userRepo == nil {
+		return
+	}
+	if p.SalesOwnerID == "" {
+		return
+	}
+	u, err := h.userRepo.GetByID(p.SalesOwnerID)
+	if err != nil || u == nil {
+		return
+	}
+	if p.SalesOwner == "" {
+		p.SalesOwner = u.FullName
+		if p.SalesOwner == "" {
+			p.SalesOwner = u.Username
+		}
+	}
+}
+
+func (h *ProjectHandler) PromoteCustomer(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	p, err := h.repo.Get(id)
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+	}
+	if !p.IsSales() {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=notsales")
+	}
+	if p.CustomerID != "" {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=already_customer")
+	}
+	name := strings.TrimSpace(p.ProspectName)
+	if name == "" {
+		name = strings.TrimSpace(c.FormValue("org_name"))
+	}
+	if name == "" {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=prospect")
+	}
+	cust := &model.Customer{
+		OrgName:      name,
+		OfficialName: name,
+		AddrSido:     strings.TrimSpace(p.ProspectRegion),
+		IsActive:     true,
+		Notes:        "영업 가등록에서 승격",
+	}
+	if err := h.customerRepo.Create(cust); err != nil {
+		return err
+	}
+	contactID := ""
+	if c.FormValue("promote_contact") == "1" && strings.TrimSpace(p.ProspectContactName) != "" {
+		ct := &model.Contact{
+			CustomerID: cust.CustomerID,
+			FullName:   p.ProspectContactName,
+			Title:      p.ProspectContactTitle,
+			Phone:      p.ProspectContactPhone,
+			Email:      p.ProspectContactEmail,
+			Status:     "active",
+			IsPrimary:  true,
+		}
+		if err := h.contactRepo.Create(ct); err != nil {
+			return err
+		}
+		contactID = ct.ContactID
+	}
+	if err := h.repo.LinkCustomer(id, cust.CustomerID, contactID); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=promoted")
+}
+
 func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules []model.ProjectScopeRule, isEdit bool, errs ...string) error {
 	customers, _ := h.customerRepo.ListAll()
 	parents, _, _ := h.customerRepo.ListCategories()
 	contractTypes, _ := h.codeRepo.ActiveByGroup("project_contract_type")
 	billingTypes, _ := h.codeRepo.ActiveByGroup("project_billing_type")
+	var users []model.User
+	if h.userRepo != nil {
+		users, _ = h.userRepo.ListAssignable()
+	}
 	errMsg := ""
 	if len(errs) > 0 {
 		errMsg = errs[0]
@@ -261,6 +356,13 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	title := "사업 등록"
 	if isEdit {
 		title = "사업 수정"
+	}
+	if p != nil && p.IsSales() {
+		if isEdit {
+			title = "영업 건 수정"
+		} else {
+			title = "영업 건 등록"
+		}
 	}
 	type ruleJS struct {
 		ID       string   `json:"id"`
@@ -282,7 +384,8 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
 		"Title": title, "Active": "projects",
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": isEdit,
-		"Customers": customers, "Parents": parents,
+		"IsSales": p != nil && p.IsSales(),
+		"Customers": customers, "Parents": parents, "Users": users,
 		"ContractTypes": contractTypes, "BillingTypes": billingTypes,
 		"ProductKeys": []map[string]string{
 			{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
@@ -296,6 +399,12 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 		},
 		"FormError": errMsg,
 		"CanWrite":  true,
+		"NoDateReasons": []map[string]string{
+			{"Key": model.NoDateReasonParts, "Label": "부품 대기"},
+			{"Key": model.NoDateReasonCustomer, "Label": "고객 일정 미확정"},
+			{"Key": model.NoDateReasonVendor, "Label": "외부 업체 회신 대기"},
+			{"Key": model.NoDateReasonOther, "Label": "기타"},
+		},
 	})
 }
 
