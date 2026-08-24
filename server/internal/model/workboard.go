@@ -322,8 +322,27 @@ type WorkProject struct {
 	Color           string `json:"color"`
 	Status          string `json:"status"`
 	ProjectKind     string `json:"project_kind"` // maintenance|build|supply|consumable|other
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+
+	SalesStage             string `json:"sales_stage"`
+	ExpectedYM             string `json:"expected_ym"`
+	ExpectedPrecision      string `json:"expected_precision"`
+	ExpectedNote           string `json:"expected_note"`
+	ExpectedUndatedReason  string `json:"expected_undated_reason"`
+	ProspectName           string `json:"prospect_name"`
+	ProspectRegion         string `json:"prospect_region"`
+	ProspectContactName    string `json:"prospect_contact_name"`
+	ProspectContactTitle   string `json:"prospect_contact_title"`
+	ProspectContactPhone   string `json:"prospect_contact_phone"`
+	ProspectContactEmail   string `json:"prospect_contact_email"`
+	SalesOwner             string `json:"sales_owner"`
+	SalesOwnerID           string `json:"sales_owner_id"`
+	ExpectedAmount         int64  `json:"expected_amount"`
+	WinProbability         int    `json:"win_probability"`
+	Competitor             string `json:"competitor"`
+	LeadSource             string `json:"lead_source"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	CustomerName      string `json:"customer_name,omitempty"`
 	ContactName       string `json:"contact_name,omitempty"`

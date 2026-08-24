@@ -141,3 +141,58 @@ func TestSalesProjectExcludedFromStatsKPI(t *testing.T) {
 		}
 	}
 }
+
+func TestSalesProjectSchema(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "sales.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	for _, col := range []string{
+		"sales_stage", "expected_ym", "expected_precision", "expected_note", "expected_undated_reason",
+		"prospect_name", "prospect_region",
+		"prospect_contact_name", "prospect_contact_title", "prospect_contact_phone", "prospect_contact_email",
+		"sales_owner", "sales_owner_id", "expected_amount", "win_probability", "competitor", "lead_source",
+	} {
+		var n int
+		q := `SELECT COUNT(*) FROM pragma_table_info('work_projects') WHERE name=?`
+		if err := db.QueryRow(q, col).Scan(&n); err != nil || n != 1 {
+			t.Fatalf("column %s n=%d err=%v", col, n, err)
+		}
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_stage'`).Scan(&n); err != nil || n != 7 {
+		t.Fatalf("sales_stage codes n=%d err=%v", n, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_lead_source'`).Scan(&n); err != nil || n != 5 {
+		t.Fatalf("sales_lead_source codes n=%d err=%v", n, err)
+	}
+
+	repo := NewProjectRepo(db)
+	p := &model.WorkProject{
+		Name: "가등록영업", ProjectKind: model.ProjectKindBuild, SalesStage: model.SalesStageLead,
+		ExpectedYM: "2027-03", ExpectedPrecision: model.ExpectedPrecisionQuarter,
+		SalesOwner: "관리자", ProspectName: "가등록기관", Status: model.WBProjectActive,
+	}
+	if err := repo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.Get(p.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CustomerID != "" || got.ProspectName != "가등록기관" || got.ExpectedPeriodLabel() != "2027년 1분기" {
+		t.Fatalf("가등록 조회: %+v", got)
+	}
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C-DUMMY','승격고객','승격고객',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.LinkCustomer(p.ProjectID, "C-DUMMY", ""); err != nil {
+		t.Fatal(err)
+	}
+	got, err = repo.Get(p.ProjectID)
+	if err != nil || got.CustomerID != "C-DUMMY" || got.ProspectName != "가등록기관" {
+		t.Fatalf("승격 후 prospect 유지: %+v err=%v", got, err)
+	}
+}

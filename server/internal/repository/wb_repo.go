@@ -84,21 +84,7 @@ func (r *WBRepo) SummaryOnDate(date string) (model.WBSummary, error) {
 }
 
 func (r *WBRepo) ListProjects(activeOnly bool) ([]model.WorkProject, error) {
-	q := `SELECT p.project_id, p.name, COALESCE(p.short_name,''), COALESCE(p.plan_year,0),
-		COALESCE(p.is_paid,1), COALESCE(p.sort_order,0),
-		COALESCE(p.ordering_party_id,''), COALESCE(p.ordering_party,''), COALESCE(p.customer_id,''),
-		COALESCE(p.contract_type,''), COALESCE(p.billing_type,''),
-		COALESCE(p.start_date,''), COALESCE(p.end_date,''),
-		COALESCE(p.notes,''), COALESCE(p.contact_id,''),
-		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
-		COALESCE(p.project_kind,'maintenance'),
-		p.created_at, p.updated_at,
-		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,'')
-		FROM work_projects p
-		LEFT JOIN customers cu ON cu.customer_id = p.customer_id
-		LEFT JOIN contacts ct ON ct.contact_id = p.contact_id
-		LEFT JOIN customers op ON op.customer_id = p.ordering_party_id`
-	q += ` WHERE COALESCE(p.project_kind,'maintenance') = 'maintenance'`
+	q := projectSelect + ` WHERE COALESCE(p.project_kind,'maintenance') = 'maintenance'`
 	if activeOnly {
 		q += ` AND p.status = 'active'`
 	}
@@ -111,7 +97,7 @@ func (r *WBRepo) ListProjects(activeOnly bool) ([]model.WorkProject, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanProjects(rows)
+	return scanProjectRows(rows)
 }
 
 func (r *WBRepo) ListTasks() ([]model.WorkTask, error) {
@@ -658,7 +644,7 @@ func (r *WBRepo) CountTasksByProject(id string) (int, error) {
 
 // ListProjectsFiltered 검색·상태 필터 목록
 func (r *WBRepo) ListProjectsFiltered(search, status string) ([]model.WorkProject, error) {
-	return NewProjectRepo(r.db).ListFiltered(search, 0, status, model.ProjectKindMaintenance)
+	return NewProjectRepo(r.db).ListFiltered(search, 0, status, model.ProjectKindMaintenance, false)
 }
 
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {
@@ -944,29 +930,3 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 	return items, rows.Err()
 }
 
-func scanProjects(rows *sql.Rows) ([]model.WorkProject, error) {
-	var items []model.WorkProject
-	for rows.Next() {
-		var p model.WorkProject
-		var created, updated string
-		var paid int
-		if err := rows.Scan(
-			&p.ProjectID, &p.Name, &p.ShortName, &p.PlanYear, &paid, &p.SortOrder,
-			&p.OrderingPartyID, &p.OrderingParty, &p.CustomerID,
-			&p.ContractType, &p.BillingType,
-			&p.StartDate, &p.EndDate,
-			&p.Notes, &p.ContactID,
-			&p.Color, &p.Status, &p.ProjectKind,
-			&created, &updated,
-			&p.CustomerName, &p.ContactName, &p.OrderingPartyName,
-		); err != nil {
-			return nil, err
-		}
-		p.IsPaid = paid != 0
-		p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
-		p.CreatedAt = parseTime(created)
-		p.UpdatedAt = parseTime(updated)
-		items = append(items, p)
-	}
-	return items, rows.Err()
-}
