@@ -56,6 +56,8 @@
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">고객으로 등록했습니다. 가등록 이름은 이력으로 남겨 두었습니다.</div>
   {{else if eq .FlashOK "already_customer"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">이미 고객이 연결되어 있습니다.</div>
+  {{else if eq .FlashOK "followup"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">다음 행동을 붙였습니다.</div>
   {{end}}
   {{if eq .FlashErr "linked"}}
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">연결된 일일업무가 있어 삭제할 수 없습니다.</div>
@@ -63,6 +65,8 @@
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">가등록 기관명이 없어 고객으로 등록할 수 없습니다.</div>
   {{else if eq .FlashErr "notsales"}}
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">유지보수 사업은 이 화면에서 고객을 만들지 않습니다.</div>
+  {{else if eq .FlashErr "followup"}}
+  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">다음 행동 제목과 기한(연도 2000~2100)을 확인하세요.</div>
   {{end}}
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -100,6 +104,35 @@
           <button type="submit" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">고객으로 등록</button>
         </div>
       </form>
+      {{end}}
+      {{if and .CanWrite .Project.IsSales}}
+      <div class="mt-4 pt-3 border-t border-gray-100 space-y-2">
+        <h4 class="text-sm font-semibold text-gray-800">다음 행동</h4>
+        {{if .Followups}}
+        <ul class="text-sm space-y-1">
+          {{range .Followups}}
+          <li class="flex justify-between gap-2">
+            <span>{{.Title}}</span>
+            <span class="text-gray-500 whitespace-nowrap">{{if .DueDate}}{{.DueDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</span>
+          </li>
+          {{end}}
+        </ul>
+        {{if .FollowTask}}<p class="text-xs"><a href="/workboard/tasks/{{.FollowTask.TaskID}}" class="text-blue-600 hover:underline">업무 상세에서 조치 →</a></p>{{end}}
+        {{else}}
+        <p class="text-xs text-orange-700">다음 행동이 없습니다. 기한을 정하지 않으면 미계획 업무함에 올라갑니다.</p>
+        {{end}}
+        <form method="post" action="/projects/{{.Project.ProjectID}}/follow-up" class="flex flex-wrap gap-2 items-end">
+          <div class="flex-1 min-w-[10rem]">
+            <label class="block text-[11px] text-gray-500 mb-1">할 일</label>
+            <input type="text" name="followup_title" required placeholder="과업심의 자료 송부" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500 mb-1">기한</label>
+            <input type="date" name="followup_due" required min="2000-01-01" max="2100-12-31" class="border rounded-lg px-2 py-1.5 text-sm">
+          </div>
+          <button type="submit" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg">추가</button>
+        </form>
+      </div>
       {{end}}
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-5">

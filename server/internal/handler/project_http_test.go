@@ -36,6 +36,8 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.GET("/projects/:id/edit", h.Project.Edit)
 	g.POST("/projects/:id", h.Project.Update)
 	g.POST("/projects/:id/promote-customer", h.Project.PromoteCustomer)
+	g.POST("/projects/:id/stage", h.Project.SetStage)
+	g.POST("/projects/:id/follow-up", h.Project.AddFollowup)
 	g.POST("/projects/:id/archive", h.Project.Archive)
 	g.POST("/projects/:id/activate", h.Project.Activate)
 	g.POST("/projects/:id/delete", h.Project.Delete)
@@ -307,6 +309,125 @@ func TestLostSalesHiddenFromDefaultList(t *testing.T) {
 	shown := doGet(t, e, "/projects?kind=sales&lost=1")
 	if !strings.Contains(shown.Body.String(), "실주건") {
 		t.Fatal("lost=1 에도 실주가 안 보인다")
+	}
+}
+
+func TestSalesTabsFollowupAndUnplanned(t *testing.T) {
+	e, repo, wb, db := newProjectServer(t)
+	users, err := repository.NewUserRepo(db).ListAssignable()
+	if err != nil || len(users) == 0 {
+		t.Fatal(err)
+	}
+	home := doGet(t, e, "/projects")
+	if home.Code != http.StatusOK {
+		t.Fatalf("status=%d", home.Code)
+	}
+	body := home.Body.String()
+	if !strings.Contains(body, "영업(수주 전)") || !strings.Contains(body, "진행") || !strings.Contains(body, "종료") {
+		t.Fatal("탭이 없다")
+	}
+
+	rec := doForm(t, e, "/projects", url.Values{
+		"name":           {"타임라인건"},
+		"project_kind":   {model.ProjectKindBuild},
+		"sales_stage":    {model.SalesStageLead},
+		"expected_ym":    {"2027-03"},
+		"sales_owner_id": {users[0].UserID},
+		"prospect_name":  {"타임라인기관"},
+		"status":         {"active"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("저장 status=%d", rec.Code)
+	}
+	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
+
+	tl := doGet(t, e, "/projects?tab=sales")
+	if !strings.Contains(tl.Body.String(), "예정월 타임라인") || !strings.Contains(tl.Body.String(), "타임라인건") {
+		t.Fatal("타임라인에 영업 건이 없다")
+	}
+	if !strings.Contains(tl.Body.String(), "이번 달") || !strings.Contains(tl.Body.String(), "다음 달") {
+		t.Fatal("이번 달·다음 달 표시가 없다")
+	}
+	kb := doGet(t, e, "/projects?tab=sales&view=kanban")
+	if !strings.Contains(kb.Body.String(), "발굴") || !strings.Contains(kb.Body.String(), "타임라인건") {
+		t.Fatal("칸반에 없다")
+	}
+
+	board := repository.NewWorkBoardRepo(db)
+	items, counts, err := board.ListUnplanned("", nil, model.UnplannedSalesFollowup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, it := range items {
+		if it.RefID == id {
+			found = true
+		}
+	}
+	if !found || counts.SalesFollowup < 1 {
+		t.Fatalf("영업 후속없음 없음 n=%d counts=%+v", len(items), counts)
+	}
+
+	fu := doForm(t, e, "/projects/"+id+"/follow-up", url.Values{
+		"followup_title": {"과업심의 자료"},
+		"followup_due":   {"2026-09-01"},
+	})
+	if fu.Code != http.StatusSeeOther {
+		t.Fatalf("다음 행동 status=%d body=%s", fu.Code, fu.Body.String())
+	}
+	task, err := wb.GetTaskBySource(model.WBSourceProject, id)
+	if err != nil || task == nil || task.SourceType != model.WBSourceProject {
+		t.Fatalf("source_type=project 업무 없음: %+v err=%v", task, err)
+	}
+	items2, _, err := board.ListUnplanned("", nil, model.UnplannedSalesFollowup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range items2 {
+		if it.RefID == id {
+			t.Fatal("다음 행동을 붙였는데 후속없음에 남았다")
+		}
+	}
+
+	st := doForm(t, e, "/projects/"+id+"/stage", url.Values{
+		"sales_stage": {model.SalesStageProposal},
+		"back":        {"/projects?tab=sales&view=kanban"},
+	})
+	if st.Code != http.StatusSeeOther {
+		t.Fatalf("단계 이동 status=%d", st.Code)
+	}
+	got, _ := repo.Get(id)
+	if got.SalesStage != model.SalesStageProposal {
+		t.Fatalf("stage=%q", got.SalesStage)
+	}
+
+	over := &model.WorkProject{
+		Name: "지난예정", ProjectKind: model.ProjectKindSupply, SalesStage: model.SalesStageQuote,
+		ExpectedYM: "2020-01", SalesOwner: "관리자", ProspectName: "지난기관",
+		Status: model.WBProjectActive, Color: "#3B82F6",
+	}
+	if err := repo.Create(over); err != nil {
+		t.Fatal(err)
+	}
+	rev, _, err := board.ListUnplanned("", nil, model.UnplannedReview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundRev := false
+	for _, it := range rev {
+		if it.RefID == over.ProjectID {
+			foundRev = true
+		}
+	}
+	if !foundRev {
+		t.Fatal("예정월이 지난 영업 건이 재검토에 없다")
+	}
+
+	won := doForm(t, e, "/projects/"+id+"/stage", url.Values{
+		"sales_stage": {model.SalesStageWon},
+	})
+	if won.Code == http.StatusSeeOther && strings.Contains(won.Header().Get("Location"), "view=kanban") && !strings.Contains(won.Header().Get("Location"), "edit") {
+		t.Fatal("칸반에서 고객 없이 won 으로 옮겼다")
 	}
 }
 

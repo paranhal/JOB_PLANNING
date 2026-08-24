@@ -300,6 +300,8 @@ func main() {
 	proj.POST("/:id", h.Project.Update)
 	proj.POST("/:id/update", h.Project.Update)
 	proj.POST("/:id/promote-customer", h.Project.PromoteCustomer)
+	proj.POST("/:id/stage", h.Project.SetStage)
+	proj.POST("/:id/follow-up", h.Project.AddFollowup)
 	proj.POST("/:id/archive", h.Project.Archive)
 	proj.POST("/:id/activate", h.Project.Activate)
 	proj.POST("/:id/delete", h.Project.Delete)

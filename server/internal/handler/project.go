@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -67,23 +69,54 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
 	kind := strings.TrimSpace(c.QueryParam("kind"))
-	if kind == "" {
-		kind = model.ProjectKindMaintenance
+	tab := strings.TrimSpace(c.QueryParam("tab"))
+	if tab == "" {
+		switch {
+		case strings.EqualFold(kind, "sales") || model.IsSalesKind(kind):
+			tab = model.ProjectTabSales
+		case strings.EqualFold(kind, "all"):
+			tab = model.ProjectTabAll
+		default:
+			tab = model.ProjectTabActive
+		}
 	}
+	tab = model.NormalizeProjectTab(tab)
 	includeLost := c.QueryParam("lost") == "1"
-	items, err := h.repo.ListFiltered(search, year, status, kind, includeLost)
+	view := strings.TrimSpace(c.QueryParam("view"))
+	if view != "kanban" {
+		view = "timeline"
+	}
+	items, err := h.repo.ListForTab(tab, search, year, status, includeLost)
 	if err != nil {
 		return err
+	}
+	dues := map[string]string{}
+	if h.wbRepo != nil {
+		dues, _ = h.wbRepo.NextActionDueMap()
+	}
+	type card struct {
+		model.WorkProject
+		NextActionDue string
+	}
+	cards := make([]card, 0, len(items))
+	for _, p := range items {
+		cards = append(cards, card{WorkProject: p, NextActionDue: dues[p.ProjectID]})
 	}
 	years, _ := h.repo.ListYears()
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
 		"Title": "사업(프로젝트)관리", "Active": "projects",
-		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
+		"Projects": items, "Cards": cards, "Years": years, "Year": year, "Status": status, "Search": search,
 		"Kind":        kind,
+		"Tab":         tab,
+		"View":        view,
 		"IncludeLost": includeLost,
-		"IsSalesList": strings.EqualFold(kind, "sales") || model.IsSalesKind(kind),
-		"CanWrite":    canWriteProjects(c),
-		"FlashOK":     c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"IsSalesList": tab == model.ProjectTabSales,
+		"TimelineMonths": model.SalesTimelineMonths(items, time.Now()),
+		"KanbanCols":     model.SalesKanbanColumns(),
+		"ThisMonth":      time.Now().Format("2006-01"),
+		"NextMonth":      time.Now().AddDate(0, 1, 0).Format("2006-01"),
+		"CanWrite":       canWriteProjects(c),
+		"FlashOK":        c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 
@@ -134,9 +167,16 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	taskRows, taskTotal, _ := h.repo.MatchAdminTasks(id, 20)
 	assetTotal, _ := h.assetRepo.CountByProject(id)
 	p.ASCount, p.MntCount, p.TaskCount, p.AssetCount = asTotal, mntTotal, taskTotal, assetTotal
+	var followups []model.WorkAction
+	var followTask *model.WorkTask
+	if p.IsSales() && h.wbRepo != nil {
+		followTask, _ = h.wbRepo.GetTaskBySource(model.WBSourceProject, p.ProjectID)
+		followups, _ = h.wbRepo.ListOpenProjectActions(p.ProjectID)
+	}
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": "projects",
 		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
+		"Followups": followups, "FollowTask": followTask,
 		"CanWrite":  canWriteProjects(c),
 		"CanDelete": canDeleteProjects(c),
 		"FlashOK":   c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
@@ -338,6 +378,52 @@ func (h *ProjectHandler) PromoteCustomer(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=promoted")
+}
+
+func (h *ProjectHandler) SetStage(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	stage := model.NormalizeSalesStage(c.FormValue("sales_stage"))
+	if err := h.repo.SetSalesStage(id, stage); err != nil {
+		if strings.Contains(err.Error(), "수주") || strings.Contains(err.Error(), "고객") || strings.Contains(err.Error(), "계약") {
+			return c.Redirect(http.StatusSeeOther, "/projects/"+id+"/edit?err=won")
+		}
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, projectSalesBack(c.FormValue("back")))
+}
+
+func projectSalesBack(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "/projects") && !strings.Contains(raw, "://") && !strings.ContainsAny(raw, " \t\n\\") {
+		return raw
+	}
+	return "/projects?tab=sales&view=kanban"
+}
+
+func (h *ProjectHandler) AddFollowup(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	p, err := h.repo.Get(id)
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+	}
+	if !p.IsSales() {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=notsales")
+	}
+	if h.wbRepo == nil {
+		return fmt.Errorf("업무 저장소를 쓸 수 없습니다")
+	}
+	title := strings.TrimSpace(c.FormValue("followup_title"))
+	due := strings.TrimSpace(c.FormValue("followup_due"))
+	if err := h.wbRepo.AddProjectFollowup(p, title, due, p.SalesOwner); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=followup")
+	}
+	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=followup")
 }
 
 func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules []model.ProjectScopeRule, isEdit bool, errs ...string) error {

@@ -33,6 +33,7 @@
         <a href="/plan/unplanned{{if .MineQ}}?{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind ""}}border-rose-400 bg-rose-50 text-rose-800{{else}}border-gray-200 bg-white{{end}}">전체 {{.Counts.Total}}</a>
         <a href="/plan/unplanned?kind=no_date{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "no_date"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">예정없음 {{.Counts.NoDate}}</a>
         <a href="/plan/unplanned?kind=unassigned{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "unassigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">담당자미배정 {{.Counts.Unassigned}}</a>
+        <a href="/plan/unplanned?kind=sales_followup{{if .MineQ}}&{{.MineQ}}{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "sales_followup"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">영업 후속없음 {{.Counts.SalesFollowup}}</a>
       </div>
     </div>
     <div class="border-t border-gray-200 pt-3">
