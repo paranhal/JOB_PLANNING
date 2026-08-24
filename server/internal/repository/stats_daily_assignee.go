@@ -263,7 +263,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
 		  AND COALESCE(ar.data_origin,'app') != 'import'
 		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)
+		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)` + statsProjectKindSQL("ar.project_id") + `
 		GROUP BY 1, 2`
 	if err := r.scanNamedDayCounts(qAS, from, toEx, add); err != nil {
 		return out, err
@@ -274,7 +274,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 		WHERE COALESCE(v.completed,0)=1
 		  AND COALESCE(v.data_origin,'app') != 'import'
 		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
-		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?
+		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?` + statsProjectKindSQL("v.project_id") + `
 		GROUP BY 1, 2`
 	if err := r.scanNamedDayCounts(qMnt, from, toEx, add); err != nil {
 		return out, err
@@ -284,7 +284,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support') AND t.status='complete'
 		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
-		  AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?
+		  AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?` + statsProjectKindSQL("t.project_id") + `
 		GROUP BY 1, 2`
 	if err := r.scanNamedDayCounts(qAdmin, from, toEx, add); err != nil {
 		return out, err
@@ -312,7 +312,7 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 		WHERE ar.status != 'cancelled'
 		  AND COALESCE(ar.data_origin,'app') != 'import'
 		  AND p.process_datetime IS NOT NULL
-		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)
+		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)` + statsProjectKindSQL("ar.project_id") + `
 		GROUP BY 1, 2`
 	if err := r.scanNamedDayCounts(qAS, from, toEx, add); err != nil {
 		return out, err
@@ -326,7 +326,7 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 		WHERE t.work_type IN ('admin','support')
 		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
 		  AND date(a.created_at) >= date(?)
-		  AND date(a.created_at) < date(?)
+		  AND date(a.created_at) < date(?)` + statsProjectKindSQL("t.project_id") + `
 		GROUP BY 1, 2`
 	if err := r.scanNamedDayCounts(qAct, from, toEx, add); err != nil {
 		if !strings.Contains(err.Error(), "no such table") && !strings.Contains(err.Error(), "no such column") {
