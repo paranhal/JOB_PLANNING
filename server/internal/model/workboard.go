@@ -321,6 +321,7 @@ type WorkProject struct {
 	ContactID       string `json:"contact_id"`        // 고객 담당자
 	Color           string `json:"color"`
 	Status          string `json:"status"`
+	ProjectKind     string `json:"project_kind"` // maintenance|build|supply|consumable|other
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 
@@ -346,6 +347,25 @@ const (
 	ScopeWorkMaintenance = "maintenance"
 	ScopeWorkAdmin       = "admin"
 )
+
+// 사업 유형 (§22.1.1)
+const (
+	ProjectKindMaintenance = "maintenance" // 유지보수
+	ProjectKindBuild       = "build"       // 신규구축
+	ProjectKindSupply      = "supply"      // 장비납품
+	ProjectKindConsumable  = "consumable"  // 소모품납품
+	ProjectKindOther       = "other"       // 기타
+)
+
+// NormalizeProjectKind 빈 값·모르는 값은 유지보수(기본).
+func NormalizeProjectKind(kind string) string {
+	switch strings.TrimSpace(kind) {
+	case ProjectKindBuild, ProjectKindSupply, ProjectKindConsumable, ProjectKindOther:
+		return kind
+	default:
+		return ProjectKindMaintenance
+	}
+}
 
 // ProjectScopeRule 사업 귀속 규칙(상위기관 × 제품 × 업무유형)
 type ProjectScopeRule struct {

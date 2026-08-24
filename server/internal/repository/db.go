@@ -22,9 +22,15 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// SQLite는 연결이 여러 개면 쓰기가 database is locked 로 바로 죽는다.
+	db.SetMaxOpenConns(1)
+	db.SetConnMaxLifetime(0)
 
 	// WAL 모드 활성화 (동시 읽기 성능 향상)
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
 		return nil, err
 	}
 	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
@@ -446,6 +452,7 @@ CREATE TABLE IF NOT EXISTS work_projects (
     contact_id      TEXT,
     color           TEXT NOT NULL DEFAULT '#3B82F6',
     status          TEXT NOT NULL DEFAULT 'active',
+    project_kind    TEXT NOT NULL DEFAULT 'maintenance',
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -702,6 +709,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE work_projects ADD COLUMN short_name TEXT`,
 		`ALTER TABLE work_projects ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 1`,
 		`ALTER TABLE work_projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE work_projects ADD COLUMN project_kind TEXT NOT NULL DEFAULT 'maintenance'`,
 		`ALTER TABLE assets ADD COLUMN project_id TEXT`,
 		`CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id)`,
 		`CREATE TABLE IF NOT EXISTS project_scope_rules (
@@ -881,6 +889,19 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('PCT003','project_contract_type','limited_bid','제한경쟁입찰',3),
 		('PCT004','project_contract_type','designated_bid','지명경쟁입찰',4),
 		('PCT005','project_contract_type','negotiated','협상에의한계약',5),
+		('PK001','project_kind','maintenance','유지보수',1),
+		('PK002','project_kind','build','신규구축',2),
+		('PK003','project_kind','supply','장비납품',3),
+		('PK004','project_kind','consumable','소모품납품',4),
+		('PK005','project_kind','other','기타',5),
+		('WPK001','weekly_ref_project_kind','build','정보시스템_구축',1),
+		('WPK002','weekly_ref_project_kind','build','1_CCTV_설치',2),
+		('WPK003','weekly_ref_project_kind','build','2_통신_공사',3),
+		('WPK004','weekly_ref_project_kind','build','3_무선_인프라_구축',4),
+		('WPK005','weekly_ref_project_kind','maintenance','4_인프라_유지_관리',5),
+		('WPK006','weekly_ref_project_kind','other','기타_활동',6),
+		('WPK007','weekly_ref_project_kind','supply','기타_활동',7),
+		('WPK008','weekly_ref_project_kind','consumable','기타_활동',8),
 		('PCT006','project_contract_type','unit_price','단가계약',6),
 		('PCT007','project_contract_type','custom','직접입력',7),
 		('PBT001','project_billing_type','lump_sum','일시불',1),
@@ -1055,6 +1076,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyHolidaySource(db)
 	applyStaffLeaves(db)
 	applyWorkTaskMembers(db)
+	applyProjectKind(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
 	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&

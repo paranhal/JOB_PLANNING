@@ -24,6 +24,7 @@ const projectSelect = `
 		COALESCE(p.start_date,''), COALESCE(p.end_date,''),
 		COALESCE(p.notes,''), COALESCE(p.contact_id,''),
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
+		COALESCE(p.project_kind,'maintenance'),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,'')
 	FROM work_projects p
@@ -32,13 +33,22 @@ const projectSelect = `
 	LEFT JOIN customers op ON op.customer_id = p.ordering_party_id`
 
 func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error) {
-	return r.ListFiltered("", year, status)
+	return r.ListFiltered("", year, status, model.ProjectKindMaintenance)
 }
 
-// ListFiltered 사업명·발주처·고객 검색 + 연도·상태 필터
-func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]model.WorkProject, error) {
+// ListFiltered 사업명·발주처·고객 검색 + 연도·상태·유형 필터.
+// kind 가 비면 유지보수만(§22.1.1 기본). kind=all 이면 유형을 가리지 않는다.
+func (r *ProjectRepo) ListFiltered(search string, year int, status, kind string) ([]model.WorkProject, error) {
 	q := projectSelect + ` WHERE 1=1`
 	var args []interface{}
+	kind = strings.TrimSpace(kind)
+	if kind == "" {
+		kind = model.ProjectKindMaintenance
+	}
+	if !strings.EqualFold(kind, "all") {
+		q += ` AND COALESCE(p.project_kind,'maintenance')=?`
+		args = append(args, model.NormalizeProjectKind(kind))
+	}
 	if year > 0 {
 		q += ` AND COALESCE(p.plan_year,0)=?`
 		args = append(args, year)
@@ -126,12 +136,12 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 			project_id, name, short_name, plan_year, is_paid, sort_order,
 			ordering_party_id, ordering_party, customer_id,
 			contract_type, billing_type, start_date, end_date, notes, contact_id,
-			color, status
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			color, status, project_kind
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status)
+		p.Color, p.Status, p.ProjectKind)
 	if err != nil {
 		return err
 	}
@@ -150,12 +160,12 @@ func (r *ProjectRepo) Update(p *model.WorkProject) error {
 			name=?, short_name=?, plan_year=?, is_paid=?, sort_order=?,
 			ordering_party_id=?, ordering_party=?, customer_id=?,
 			contract_type=?, billing_type=?, start_date=?, end_date=?, notes=?, contact_id=?,
-			color=?, status=?, updated_at=CURRENT_TIMESTAMP
+			color=?, status=?, project_kind=?, updated_at=CURRENT_TIMESTAMP
 		WHERE project_id=?`,
 			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-			p.Color, p.Status, p.ProjectID)
+			p.Color, p.Status, p.ProjectKind, p.ProjectID)
 		return err
 	})
 }
@@ -551,6 +561,7 @@ func normalizeProject(p *model.WorkProject) {
 	if p.Status == "" {
 		p.Status = model.WBProjectActive
 	}
+	p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
 	if p.Color == "" {
 		p.Color = "#3B82F6"
 	}
@@ -597,7 +608,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.ContractType, &p.BillingType,
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
-		&p.Color, &p.Status,
+		&p.Color, &p.Status, &p.ProjectKind,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName,
 	)
@@ -605,6 +616,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		return nil, err
 	}
 	p.IsPaid = paid != 0
+	p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
 	p.CreatedAt = parseTime(created)
 	p.UpdatedAt = parseTime(updated)
 	return &p, nil

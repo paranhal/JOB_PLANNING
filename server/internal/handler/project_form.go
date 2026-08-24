@@ -53,6 +53,7 @@ func ParseWorkProjectForm(c echo.Context) *model.WorkProject {
 		ContactID:       contactID,
 		Color:           strings.TrimSpace(c.FormValue("color")),
 		Status:          strings.TrimSpace(c.FormValue("status")),
+		ProjectKind:     model.NormalizeProjectKind(c.FormValue("project_kind")),
 	}
 	if p.Color == "" {
 		p.Color = "#3B82F6"

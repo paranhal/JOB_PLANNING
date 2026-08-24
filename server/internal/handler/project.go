@@ -64,7 +64,11 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	items, err := h.repo.ListFiltered(search, year, status)
+	kind := strings.TrimSpace(c.QueryParam("kind"))
+	if kind == "" {
+		kind = model.ProjectKindMaintenance
+	}
+	items, err := h.repo.ListFiltered(search, year, status, kind)
 	if err != nil {
 		return err
 	}
@@ -72,6 +76,7 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
 		"Title": "사업(프로젝트)관리", "Active": "projects",
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
+		"Kind":     kind,
 		"CanWrite": canWriteProjects(c),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
