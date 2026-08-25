@@ -1,0 +1,9 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="max-w-lg mx-auto text-center space-y-4 py-16">
+  <h2 class="text-xl font-bold text-gray-800">{{.Heading}}</h2>
+  <p class="text-sm text-gray-500 leading-relaxed">{{.Message}}</p>
+  <a href="/sales" class="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">영업 사업으로</a>
+</div>
+{{end}}

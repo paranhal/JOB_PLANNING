@@ -51,6 +51,28 @@ func isObserverRole(c echo.Context) bool {
 	return currentRole(c) == model.RoleObserver
 }
 
+func isSalesRole(c echo.Context) bool {
+	return currentRole(c) == model.RoleSales
+}
+
+func canViewSales(c echo.Context) bool {
+	r := currentRole(c)
+	return r == model.RoleAdmin || r == model.RoleSales || r == model.RoleOffice ||
+		r == model.RoleTech || r == model.RoleObserver
+}
+
+func canWriteSales(c echo.Context) bool {
+	if isObserverRole(c) {
+		return false
+	}
+	r := currentRole(c)
+	return r == model.RoleAdmin || r == model.RoleSales || r == model.RoleOffice
+}
+
+func canDeleteSales(c echo.Context) bool {
+	return isAdminRole(c)
+}
+
 // isSuspendedRole 옵저버는 쓰기 메뉴·작업 제한(조회·계정만)
 func isSuspendedRole(c echo.Context) bool {
 	return isObserverRole(c)

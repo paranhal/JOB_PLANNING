@@ -1,0 +1,127 @@
+{{define "title"}}{{.Title}} · 영업 사업{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <a href="/sales" class="text-sm text-gray-500 hover:underline">← 목록</a>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 {{if not .Project.NameConfirmed}}text-gray-400{{end}}">{{.Project.Name}}</h2>
+      <p class="text-sm text-gray-500 mt-1 flex flex-wrap gap-2 items-center">
+        <span class="font-medium text-gray-800">{{.Project.DisplayStage}}</span>
+        {{if .Project.HasOverride}}<span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">수동 조정</span>{{end}}
+        {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">미확정</span>{{end}}
+        <span>{{.Project.ConfirmationLabel}}</span>
+      </p>
+    </div>
+    {{if .CanWrite}}
+    <div class="flex flex-wrap gap-2">
+      <a href="/sales/{{.Project.SalesID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
+      {{if .CanDelete}}
+      <form method="post" action="/sales/{{.Project.SalesID}}/delete"
+            onsubmit="return confirm('이 영업 사업을 삭제할까요?');">
+        <button type="submit" class="px-4 py-2 text-sm border border-red-200 text-red-700 rounded-lg hover:bg-red-50">삭제</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+
+  {{if eq .FlashOK "created"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">등록했습니다.</div>
+  {{else if eq .FlashOK "updated"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.</div>
+  {{else if eq .FlashOK "stage"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">단계를 변경했습니다.</div>
+  {{end}}
+  {{if .FormError}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  {{end}}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h3 class="font-semibold text-gray-800">정보</h3>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <div>
+          <dt class="text-gray-500">고객</dt>
+          <dd class="{{if not .Project.CustomerConfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
+            {{if .Project.Customer}}{{.Project.Customer}}{{else}}—{{end}}
+            {{if not .Project.CustomerConfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">사업 시기</dt>
+          <dd class="{{if not .Project.ExpectedYMConfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
+            {{if .Project.Period}}{{.Project.Period}}{{else}}—{{end}}
+            {{if not .Project.ExpectedYMConfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">예상 금액</dt>
+          <dd class="{{if not .Project.ExpectedAmountConfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
+            {{if .Project.Amount}}{{.Project.Amount}}{{else}}—{{end}}
+            {{if not .Project.ExpectedAmountConfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">영업담당</dt>
+          <dd class="text-gray-800">{{if .Project.Owner}}{{.Project.Owner}}{{else}}—{{end}}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">경쟁사</dt>
+          <dd class="text-gray-800">{{if .Project.Competitor}}{{.Project.Competitor}}{{else}}—{{end}}</dd>
+        </div>
+        {{if .Project.LostReason}}
+        <div class="sm:col-span-2">
+          <dt class="text-gray-500">수주실패 사유</dt>
+          <dd class="text-gray-800">{{.Project.LostReason}}</dd>
+        </div>
+        {{end}}
+        {{if .Project.Notes}}
+        <div class="sm:col-span-2">
+          <dt class="text-gray-500">메모</dt>
+          <dd class="text-gray-800 whitespace-pre-wrap">{{.Project.Notes}}</dd>
+        </div>
+        {{end}}
+      </dl>
+    </div>
+
+    <div class="space-y-4">
+      {{if .CanWrite}}
+      <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <h3 class="font-semibold text-gray-800">단계 변경</h3>
+        <p class="text-xs text-gray-500">어느 단계로든 이동할 수 있습니다. 뒤로 갈 때는 사유가 필요합니다.</p>
+        <form method="post" action="/sales/{{.Project.SalesID}}/stage" class="space-y-2">
+          <select name="stage" class="w-full border rounded-lg px-3 py-2 text-sm">
+            {{range .Stages}}
+            <option value="{{.Code}}" {{if eq $.Project.Stage .Code}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+          <input name="reason" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="후퇴·수주실패 사유">
+          {{if .Project.HasOverride}}
+          <label class="flex items-center gap-2 text-xs text-gray-600">
+            <input type="checkbox" name="keep_override" value="1"> 수동 확도 유지
+          </label>
+          {{end}}
+          <button type="submit" class="w-full px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">단계 저장</button>
+        </form>
+      </div>
+      {{end}}
+
+      <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
+        <h3 class="font-semibold text-gray-800">단계 이력</h3>
+        <ul class="text-sm space-y-2">
+          {{range .History}}
+          <li class="border-l-2 border-gray-200 pl-3">
+            <p class="text-gray-800">{{if .FromLabel}}{{.FromLabel}} → {{end}}{{.ToLabel}}</p>
+            <p class="text-xs text-gray-500">{{.ChangedAt}} {{.ChangedBy}}</p>
+            {{if .Reason}}<p class="text-xs text-gray-600">{{.Reason}}</p>{{end}}
+          </li>
+          {{else}}
+          <li class="text-gray-400 text-sm">이력이 없습니다.</li>
+          {{end}}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

@@ -303,6 +303,18 @@ func main() {
 	proj.POST("/:id/activate", h.Project.Activate)
 	proj.POST("/:id/delete", h.Project.Delete)
 
+	sales := g.Group("/sales")
+	sales.GET("", h.Sales.List)
+	sales.GET("/new", h.Sales.New)
+	sales.POST("", h.Sales.Create)
+	sales.GET("/activities", h.Sales.Activities)
+	sales.GET("/pipeline", h.Sales.Pipeline)
+	sales.GET("/:id", h.Sales.Show)
+	sales.GET("/:id/edit", h.Sales.Edit)
+	sales.POST("/:id", h.Sales.Update)
+	sales.POST("/:id/stage", h.Sales.ChangeStage)
+	sales.POST("/:id/delete", h.Sales.Delete)
+
 	aw := g.Group("/admin-work")
 	aw.GET("", h.AdminWork.List)
 	aw.GET("/stats", h.AdminWork.Stats)

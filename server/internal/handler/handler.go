@@ -35,6 +35,7 @@ type Handler struct {
 	Auth           *AuthHandler
 	Maintenance    *MaintenanceHandler
 	Project        *ProjectHandler
+	Sales          *SalesHandler
 	AdminWork      *AdminWorkHandler
 	Integration    *IntegrationHandler
 
@@ -140,6 +141,9 @@ func New(db *sql.DB) *Handler {
 		Project: NewProjectHandler(
 			repository.NewProjectRepo(db), repository.NewWBRepo(db),
 			customerRepo, contactRepo, codeRepo, assetRepo,
+		),
+		Sales: NewSalesHandler(
+			repository.NewSalesRepo(db), customerRepo, userRepo, codeRepo,
 		),
 		AdminWork: NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo),
 		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),
@@ -247,8 +251,9 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		}
 	case model.RoleSales:
 		data["QuickLinks"] = []dashLink{
-			{Href: "/analysis", Label: "분석", Tone: "indigo"},
-			{Href: "/stats", Label: "통계", Tone: "sky"},
+			{Href: "/sales", Label: "영업 사업", Tone: "blue"},
+			{Href: "/sales/activities", Label: "영업 활동", Tone: "sky"},
+			{Href: "/customers", Label: "고객현황", Tone: "green"},
 		}
 	}
 
