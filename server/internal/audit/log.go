@@ -335,6 +335,10 @@ func TableLabel(t string) string {
 		return "첨부"
 	case "work_projects":
 		return "사업"
+	case "sales_projects":
+		return "영업 사업"
+	case "sales_projects":
+		return "영업 사업"
 	case "work_tasks":
 		return "일일업무"
 	case "work_actions":
