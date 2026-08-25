@@ -24,15 +24,6 @@ const projectSelect = `
 		COALESCE(p.start_date,''), COALESCE(p.end_date,''),
 		COALESCE(p.notes,''), COALESCE(p.contact_id,''),
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
-		COALESCE(p.project_kind,'maintenance'),
-		COALESCE(p.sales_stage,''), COALESCE(p.expected_ym,''), COALESCE(p.expected_precision,'month'),
-		COALESCE(p.expected_note,''), COALESCE(p.expected_undated_reason,''),
-		COALESCE(p.prospect_name,''), COALESCE(p.prospect_region,''),
-		COALESCE(p.prospect_contact_name,''), COALESCE(p.prospect_contact_title,''),
-		COALESCE(p.prospect_contact_phone,''), COALESCE(p.prospect_contact_email,''),
-		COALESCE(p.sales_owner,''), COALESCE(p.sales_owner_id,''),
-		COALESCE(p.expected_amount,0), COALESCE(p.win_probability,0),
-		COALESCE(p.competitor,''), COALESCE(p.lead_source,''),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,'')
 	FROM work_projects p
@@ -41,106 +32,13 @@ const projectSelect = `
 	LEFT JOIN customers op ON op.customer_id = p.ordering_party_id`
 
 func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error) {
-	return r.ListFiltered("", year, status, model.ProjectKindMaintenance, false)
+	return r.ListFiltered("", year, status)
 }
 
-// ListForTab §22.1.1 ⑧ 전체 / 영업(수주 전) / 진행 / 종료
-func (r *ProjectRepo) ListForTab(tab, search string, year int, extraStatus string, includeLost bool) ([]model.WorkProject, error) {
-	tab = model.NormalizeProjectTab(tab)
+// ListFiltered 사업명·발주처·고객 검색 + 연도·상태 필터
+func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]model.WorkProject, error) {
 	q := projectSelect + ` WHERE 1=1`
 	var args []interface{}
-	switch tab {
-	case model.ProjectTabAll:
-		if !includeLost {
-			q += ` AND COALESCE(p.sales_stage,'') NOT IN (?,?)`
-			args = append(args, model.SalesStageLost, model.SalesStageDropped)
-		}
-	case model.ProjectTabSales:
-		q += ` AND COALESCE(p.project_kind,'maintenance') != ?`
-		args = append(args, model.ProjectKindMaintenance)
-		if includeLost {
-			q += ` AND COALESCE(p.sales_stage,'') != ?`
-			args = append(args, model.SalesStageWon)
-		} else {
-			q += ` AND COALESCE(p.sales_stage,'') NOT IN (?,?,?)`
-			args = append(args, model.SalesStageWon, model.SalesStageLost, model.SalesStageDropped)
-		}
-	case model.ProjectTabClosed:
-		q += ` AND (p.status IN (?,?) OR COALESCE(p.sales_stage,'') IN (?,?))`
-		args = append(args, model.WBProjectComplete, model.WBProjectArchived, model.SalesStageLost, model.SalesStageDropped)
-	default: // 진행
-		q += ` AND p.status=? AND (COALESCE(p.project_kind,'maintenance')=? OR COALESCE(p.sales_stage,'')=?)`
-		args = append(args, model.WBProjectActive, model.ProjectKindMaintenance, model.SalesStageWon)
-	}
-	if year > 0 {
-		q += ` AND COALESCE(p.plan_year,0)=?`
-		args = append(args, year)
-	}
-	if extraStatus != "" && tab != model.ProjectTabActive && tab != model.ProjectTabClosed {
-		q += ` AND p.status=?`
-		args = append(args, extraStatus)
-	}
-	if s := strings.TrimSpace(search); s != "" {
-		like := "%" + s + "%"
-		q += ` AND (
-			p.name LIKE ? OR COALESCE(p.short_name,'') LIKE ?
-			OR COALESCE(p.ordering_party,'') LIKE ? OR COALESCE(op.org_name,'') LIKE ?
-			OR COALESCE(cu.org_name,'') LIKE ? OR COALESCE(p.prospect_name,'') LIKE ?
-		)`
-		args = append(args, like, like, like, like, like, like)
-	}
-	if tab == model.ProjectTabSales {
-		q += ` ORDER BY COALESCE(p.expected_ym,''), COALESCE(p.sort_order,0), p.name`
-	} else {
-		q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
-	}
-	rows, err := r.db.Query(q, args...)
-	if err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer rows.Close()
-	return scanProjectRows(rows)
-}
-
-func (r *ProjectRepo) SetSalesStage(id, stage string) error {
-	id = strings.TrimSpace(id)
-	stage = model.NormalizeSalesStage(stage)
-	if id == "" || stage == "" {
-		return fmt.Errorf("project_id·sales_stage 필요")
-	}
-	p, err := r.Get(id)
-	if err != nil {
-		return err
-	}
-	p.SalesStage = stage
-	if err := model.ValidateWorkProject(p); err != nil {
-		return err
-	}
-	return r.Update(p)
-}
-
-// ListFiltered 사업명·발주처·고객 검색 + 연도·상태·유형 필터.
-// kind 가 비면 유지보수만(§22.1.1 기본). kind=all 이면 유형을 가리지 않는다.
-// kind=sales 이면 유지보수 외. 영업 목록은 기본으로 lost·dropped 를 숨긴다.
-func (r *ProjectRepo) ListFiltered(search string, year int, status, kind string, includeLost bool) ([]model.WorkProject, error) {
-	q := projectSelect + ` WHERE 1=1`
-	var args []interface{}
-	kind = strings.TrimSpace(kind)
-	if kind == "" {
-		kind = model.ProjectKindMaintenance
-	}
-	switch {
-	case strings.EqualFold(kind, "all"):
-	case strings.EqualFold(kind, "sales"):
-		q += ` AND COALESCE(p.project_kind,'maintenance') != ?`
-		args = append(args, model.ProjectKindMaintenance)
-	default:
-		q += ` AND COALESCE(p.project_kind,'maintenance')=?`
-		args = append(args, model.NormalizeProjectKind(kind))
-	}
 	if year > 0 {
 		q += ` AND COALESCE(p.plan_year,0)=?`
 		args = append(args, year)
@@ -149,25 +47,16 @@ func (r *ProjectRepo) ListFiltered(search string, year int, status, kind string,
 		q += ` AND p.status=?`
 		args = append(args, status)
 	}
-	hideLost := !includeLost && (strings.EqualFold(kind, "sales") || model.IsSalesKind(kind))
-	if hideLost {
-		q += ` AND COALESCE(p.sales_stage,'') NOT IN (?,?)`
-		args = append(args, model.SalesStageLost, model.SalesStageDropped)
-	}
 	if s := strings.TrimSpace(search); s != "" {
 		like := "%" + s + "%"
 		q += ` AND (
 			p.name LIKE ? OR COALESCE(p.short_name,'') LIKE ?
 			OR COALESCE(p.ordering_party,'') LIKE ? OR COALESCE(op.org_name,'') LIKE ?
-			OR COALESCE(cu.org_name,'') LIKE ? OR COALESCE(p.prospect_name,'') LIKE ?
+			OR COALESCE(cu.org_name,'') LIKE ?
 		)`
-		args = append(args, like, like, like, like, like, like)
+		args = append(args, like, like, like, like, like)
 	}
-	if strings.EqualFold(kind, "sales") || model.IsSalesKind(kind) {
-		q += ` ORDER BY COALESCE(p.expected_ym,''), COALESCE(p.sort_order,0), p.name`
-	} else {
-		q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
-	}
+	q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
@@ -232,21 +121,17 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 	}
 	p.ProjectID = fmt.Sprintf("WP-%03d", id)
 	normalizeProject(p)
-	args := []interface{}{
-		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
-		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
-		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status, p.ProjectKind,
-	}
-	args = append(args, salesProjectArgs(p)...)
 	_, err = r.db.Exec(`
 		INSERT INTO work_projects (
 			project_id, name, short_name, plan_year, is_paid, sort_order,
 			ordering_party_id, ordering_party, customer_id,
 			contract_type, billing_type, start_date, end_date, notes, contact_id,
-			color, status, project_kind, `+salesProjectInsertCols()+`
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,`+salesProjectInsertPlaceholders()+`)`,
-		args...)
+			color, status
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
+		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
+		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
+		p.Color, p.Status)
 	if err != nil {
 		return err
 	}
@@ -260,47 +145,17 @@ func (r *ProjectRepo) Update(p *model.WorkProject) error {
 	}
 	normalizeProject(p)
 	return touchUpdate(r.db, "work_projects", "project_id", p.ProjectID, p.Name, func() error {
-		args := []interface{}{
-			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
-			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
-			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-			p.Color, p.Status, p.ProjectKind,
-		}
-		args = append(args, salesProjectArgs(p)...)
-		args = append(args, p.ProjectID)
 		_, err := r.db.Exec(`
 		UPDATE work_projects SET
 			name=?, short_name=?, plan_year=?, is_paid=?, sort_order=?,
 			ordering_party_id=?, ordering_party=?, customer_id=?,
 			contract_type=?, billing_type=?, start_date=?, end_date=?, notes=?, contact_id=?,
-			color=?, status=?, project_kind=?,
-			sales_stage=?, expected_ym=?, expected_precision=?, expected_note=?, expected_undated_reason=?,
-			prospect_name=?, prospect_region=?,
-			prospect_contact_name=?, prospect_contact_title=?, prospect_contact_phone=?, prospect_contact_email=?,
-			sales_owner=?, sales_owner_id=?, expected_amount=?, win_probability=?, competitor=?, lead_source=?,
-			updated_at=CURRENT_TIMESTAMP
-		WHERE project_id=?`, args...)
-		return err
-	})
-}
-
-// LinkCustomer 가등록 고객을 마스터에 연결한다. prospect_name 은 남긴다.
-func (r *ProjectRepo) LinkCustomer(projectID, customerID, contactID string) error {
-	projectID = strings.TrimSpace(projectID)
-	customerID = strings.TrimSpace(customerID)
-	if projectID == "" || customerID == "" {
-		return fmt.Errorf("project_id·customer_id 필요")
-	}
-	return touchUpdate(r.db, "work_projects", "project_id", projectID, "사업", func() error {
-		if strings.TrimSpace(contactID) != "" {
-			_, err := r.db.Exec(`
-				UPDATE work_projects SET customer_id=?, contact_id=?, updated_at=CURRENT_TIMESTAMP
-				WHERE project_id=?`, customerID, contactID, projectID)
-			return err
-		}
-		_, err := r.db.Exec(`
-			UPDATE work_projects SET customer_id=?, updated_at=CURRENT_TIMESTAMP
-			WHERE project_id=?`, customerID, projectID)
+			color=?, status=?, updated_at=CURRENT_TIMESTAMP
+		WHERE project_id=?`,
+			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
+			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
+			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
+			p.Color, p.Status, p.ProjectID)
 		return err
 	})
 }
@@ -696,10 +551,6 @@ func normalizeProject(p *model.WorkProject) {
 	if p.Status == "" {
 		p.Status = model.WBProjectActive
 	}
-	p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
-	p.SalesStage = model.NormalizeSalesStage(p.SalesStage)
-	p.ExpectedPrecision = model.NormalizeExpectedPrecision(p.ExpectedPrecision)
-	p.ExpectedYM = model.NormalizeExpectedYM(p.ExpectedYM)
 	if p.Color == "" {
 		p.Color = "#3B82F6"
 	}
@@ -746,15 +597,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.ContractType, &p.BillingType,
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
-		&p.Color, &p.Status, &p.ProjectKind,
-		&p.SalesStage, &p.ExpectedYM, &p.ExpectedPrecision,
-		&p.ExpectedNote, &p.ExpectedUndatedReason,
-		&p.ProspectName, &p.ProspectRegion,
-		&p.ProspectContactName, &p.ProspectContactTitle,
-		&p.ProspectContactPhone, &p.ProspectContactEmail,
-		&p.SalesOwner, &p.SalesOwnerID,
-		&p.ExpectedAmount, &p.WinProbability,
-		&p.Competitor, &p.LeadSource,
+		&p.Color, &p.Status,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName,
 	)
@@ -762,10 +605,6 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		return nil, err
 	}
 	p.IsPaid = paid != 0
-	p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
-	p.SalesStage = model.NormalizeSalesStage(p.SalesStage)
-	p.ExpectedPrecision = model.NormalizeExpectedPrecision(p.ExpectedPrecision)
-	p.ExpectedYM = model.NormalizeExpectedYM(p.ExpectedYM)
 	p.CreatedAt = parseTime(created)
 	p.UpdatedAt = parseTime(updated)
 	return &p, nil

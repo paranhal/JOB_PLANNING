@@ -77,8 +77,7 @@ type WorkActivity struct {
 
 // IsAdminGTDTask 행정·지원 직접 등록 건만 GTD 규칙을 적용한다.
 func IsAdminGTDTask(t WorkTask) bool {
-	st := strings.TrimSpace(t.SourceType)
-	if st != "" && st != WBSourceProject {
+	if strings.TrimSpace(t.SourceType) != "" {
 		return false
 	}
 	switch t.WorkType {

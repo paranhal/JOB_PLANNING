@@ -107,8 +107,8 @@ func seedDefaultProjects(db *sql.DB) {
 		_, err := db.Exec(`
 			INSERT INTO work_projects (
 				project_id, name, short_name, plan_year, is_paid, sort_order,
-				notes, color, status, project_kind, start_date, end_date
-			) VALUES (?,?,?,?,?,?,?,'#3B82F6','active','maintenance',?,?)`,
+				notes, color, status, start_date, end_date
+			) VALUES (?,?,?,?,?,?,?,'#3B82F6','active',?,?)`,
 			s.id, s.name, s.shortName, s.year, s.paid, s.sort, s.notes,
 			fmt.Sprintf("%d-01-01", s.year), fmt.Sprintf("%d-12-31", s.year),
 		)

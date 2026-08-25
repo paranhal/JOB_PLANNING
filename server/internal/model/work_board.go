@@ -6,7 +6,6 @@ const (
 	WorkPrefixMaintenance  = "maintenance"  // [정기점검]
 	WorkPrefixConfirm      = "confirm"      // [확인]
 	WorkPrefixGeneral      = "general"      // [일반업무]
-	WorkPrefixSales        = "sales"        // [영업]
 )
 
 func WorkPrefixLabel(p string) string {
@@ -19,8 +18,6 @@ func WorkPrefixLabel(p string) string {
 		return "확인"
 	case WorkPrefixGeneral:
 		return "일반업무"
-	case WorkPrefixSales:
-		return "영업"
 	default:
 		return p
 	}

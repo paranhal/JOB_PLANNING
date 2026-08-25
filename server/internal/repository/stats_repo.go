@@ -231,7 +231,6 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 		sqlQ += fmt.Sprintf(` AND %s >= date(?) AND %s < date(?)`, expr, expr)
 		args = append(args, from.Format("2006-01-02"), to.Format("2006-01-02"))
 	}
-	sqlQ += statsProjectKindSQL("ar.project_id")
 
 	sqlQ += ` ORDER BY ar.receipt_datetime DESC, ar.as_number DESC`
 

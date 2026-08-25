@@ -212,13 +212,10 @@ func funcMap() template.FuncMap {
 				return "bg-slate-100 text-slate-800"
 			case model.WorkPrefixGeneral:
 				return "bg-emerald-100 text-emerald-800"
-			case model.WorkPrefixSales:
-				return "bg-orange-100 text-orange-800"
 			default:
 				return "bg-gray-100 text-gray-700"
 			}
 		},
-		"formatKRW": model.FormatKRW,
 		"visitLabel":           visitLabel,
 		"mntViewLabel":         mntViewLabel,
 		"mntProductClass":      mntProductClass,
@@ -441,9 +438,6 @@ func funcMap() template.FuncMap {
 		"wbCategoryLabel":   model.WBCategoryLabel,
 		"wbCategoryClass":   model.WBCategoryClass,
 		"wbProjectStatusLabel": model.WBProjectStatusLabel,
-		"salesStageLabel":      model.SalesStageLabel,
-		"projectKindLabel":     model.ProjectKindLabel,
-		"leadSourceLabel":      model.LeadSourceLabel,
 		"productKeyLabel":      model.ProductKeyLabel,
 		"productKeysLabel":     model.ProductKeysLabel,
 		"scopeWorkKindLabel":   model.ScopeWorkKindLabel,

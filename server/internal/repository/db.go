@@ -22,15 +22,9 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// SQLite는 연결이 여러 개면 쓰기가 database is locked 로 바로 죽는다.
-	db.SetMaxOpenConns(1)
-	db.SetConnMaxLifetime(0)
 
 	// WAL 모드 활성화 (동시 읽기 성능 향상)
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		return nil, err
-	}
-	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
 		return nil, err
 	}
 	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
@@ -452,24 +446,6 @@ CREATE TABLE IF NOT EXISTS work_projects (
     contact_id      TEXT,
     color           TEXT NOT NULL DEFAULT '#3B82F6',
     status          TEXT NOT NULL DEFAULT 'active',
-    project_kind    TEXT NOT NULL DEFAULT 'maintenance',
-    sales_stage     TEXT,
-    expected_ym     TEXT,
-    expected_precision TEXT NOT NULL DEFAULT 'month',
-    expected_note   TEXT,
-    expected_undated_reason TEXT,
-    prospect_name   TEXT,
-    prospect_region TEXT,
-    prospect_contact_name TEXT,
-    prospect_contact_title TEXT,
-    prospect_contact_phone TEXT,
-    prospect_contact_email TEXT,
-    sales_owner     TEXT,
-    sales_owner_id  TEXT,
-    expected_amount INTEGER,
-    win_probability INTEGER,
-    competitor      TEXT,
-    lead_source     TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -726,24 +702,6 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE work_projects ADD COLUMN short_name TEXT`,
 		`ALTER TABLE work_projects ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 1`,
 		`ALTER TABLE work_projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
-		`ALTER TABLE work_projects ADD COLUMN project_kind TEXT NOT NULL DEFAULT 'maintenance'`,
-		`ALTER TABLE work_projects ADD COLUMN sales_stage TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN expected_ym TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN expected_precision TEXT NOT NULL DEFAULT 'month'`,
-		`ALTER TABLE work_projects ADD COLUMN expected_note TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN expected_undated_reason TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN prospect_name TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN prospect_region TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN prospect_contact_name TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN prospect_contact_title TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN prospect_contact_phone TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN prospect_contact_email TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN sales_owner TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN sales_owner_id TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN expected_amount INTEGER`,
-		`ALTER TABLE work_projects ADD COLUMN win_probability INTEGER`,
-		`ALTER TABLE work_projects ADD COLUMN competitor TEXT`,
-		`ALTER TABLE work_projects ADD COLUMN lead_source TEXT`,
 		`ALTER TABLE assets ADD COLUMN project_id TEXT`,
 		`CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id)`,
 		`CREATE TABLE IF NOT EXISTS project_scope_rules (
@@ -923,19 +881,6 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('PCT003','project_contract_type','limited_bid','제한경쟁입찰',3),
 		('PCT004','project_contract_type','designated_bid','지명경쟁입찰',4),
 		('PCT005','project_contract_type','negotiated','협상에의한계약',5),
-		('PK001','project_kind','maintenance','유지보수',1),
-		('PK002','project_kind','build','신규구축',2),
-		('PK003','project_kind','supply','장비납품',3),
-		('PK004','project_kind','consumable','소모품납품',4),
-		('PK005','project_kind','other','기타',5),
-		('WPK001','weekly_ref_project_kind','build','정보시스템_구축',1),
-		('WPK002','weekly_ref_project_kind','build','1_CCTV_설치',2),
-		('WPK003','weekly_ref_project_kind','build','2_통신_공사',3),
-		('WPK004','weekly_ref_project_kind','build','3_무선_인프라_구축',4),
-		('WPK005','weekly_ref_project_kind','maintenance','4_인프라_유지_관리',5),
-		('WPK006','weekly_ref_project_kind','other','기타_활동',6),
-		('WPK007','weekly_ref_project_kind','supply','기타_활동',7),
-		('WPK008','weekly_ref_project_kind','consumable','기타_활동',8),
 		('PCT006','project_contract_type','unit_price','단가계약',6),
 		('PCT007','project_contract_type','custom','직접입력',7),
 		('PBT001','project_billing_type','lump_sum','일시불',1),
@@ -944,19 +889,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('PBT004','project_billing_type','quarterly','분기',4),
 		('PBT005','project_billing_type','semi','반기',5),
 		('PBT006','project_billing_type','yearly','연간',6),
-		('PBT007','project_billing_type','custom','직접입력',7),
-		('SS001','sales_stage','lead','발굴',1),
-		('SS002','sales_stage','proposal','제안',2),
-		('SS003','sales_stage','quote','견적',3),
-		('SS004','sales_stage','bid','입찰·협상',4),
-		('SS005','sales_stage','won','수주',5),
-		('SS006','sales_stage','lost','실주',6),
-		('SS007','sales_stage','dropped','보류',7),
-		('SLS001','sales_lead_source','existing','기존 고객',1),
-		('SLS002','sales_lead_source','bid','입찰공고',2),
-		('SLS003','sales_lead_source','referral','소개',3),
-		('SLS004','sales_lead_source','exhibition','전시회',4),
-		('SLS005','sales_lead_source','other','기타',5)`)
+		('PBT007','project_billing_type','custom','직접입력',7)`)
 	db.Exec(`UPDATE codes SET is_active=0 WHERE code_id IN ('RSC002','RSC004')`) // 임시조치·제조사에스컬레이션 비활성
 	db.Exec(`UPDATE codes SET sort_order=1, code_name='완료', is_active=1 WHERE code_id='RSC001'`)
 	db.Exec(`UPDATE codes SET sort_order=2, code_name='부분완료', is_active=1 WHERE code_id='RSC006'`)
@@ -1122,8 +1055,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyHolidaySource(db)
 	applyStaffLeaves(db)
 	applyWorkTaskMembers(db)
-	applyProjectKind(db)
-	applySalesProject(db)
+	applyV214ProjectKindRollback(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
 	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&

@@ -15,10 +15,6 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         사업 등록
       </a>
-      <a href="/projects/new?kind=build"
-         class="inline-flex items-center gap-2 border border-amber-200 text-amber-900 bg-amber-50 hover:bg-amber-100 px-4 py-2 rounded-lg text-sm font-medium">
-        영업 건 등록
-      </a>
       {{end}}
     </div>
   </div>
@@ -29,20 +25,8 @@
   {{if eq .FlashErr "notfound"}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">사업을 찾을 수 없습니다.</div>
   {{end}}
-  {{if eq .FlashErr "won"}}
-  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">수주로 바꾸려면 고객 등록과 계약 정보가 필요합니다.</div>
-  {{end}}
-
-  <div class="flex flex-wrap gap-2 text-sm">
-    <a href="/projects?tab=all" class="px-3 py-1.5 rounded-lg border {{if eq .Tab "all"}}border-gray-800 bg-gray-800 text-white{{else}}border-gray-200 bg-white text-gray-700 hover:bg-gray-50{{end}}">전체</a>
-    <a href="/projects?tab=sales" class="px-3 py-1.5 rounded-lg border {{if eq .Tab "sales"}}border-amber-500 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white text-gray-700 hover:bg-gray-50{{end}}">영업(수주 전)</a>
-    <a href="/projects?tab=active" class="px-3 py-1.5 rounded-lg border {{if eq .Tab "active"}}border-gray-800 bg-gray-800 text-white{{else}}border-gray-200 bg-white text-gray-700 hover:bg-gray-50{{end}}">진행</a>
-    <a href="/projects?tab=closed" class="px-3 py-1.5 rounded-lg border {{if eq .Tab "closed"}}border-gray-800 bg-gray-800 text-white{{else}}border-gray-200 bg-white text-gray-700 hover:bg-gray-50{{end}}">종료</a>
-  </div>
 
   <form method="get" action="/projects" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
-    <input type="hidden" name="tab" value="{{.Tab}}">
-    {{if eq .Tab "sales"}}<input type="hidden" name="view" value="{{.View}}">{{end}}
     <div class="flex-1 min-w-[12rem]">
       <label class="block text-xs text-gray-500 mb-1">검색</label>
       <input type="text" name="search" value="{{.Search}}" placeholder="사업명, 발주처, 고객"
@@ -57,7 +41,6 @@
         {{end}}
       </select>
     </div>
-    {{if or (eq .Tab "all") (eq .Tab "sales")}}
     <div>
       <label class="block text-xs text-gray-500 mb-1">상태</label>
       <select name="status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
@@ -67,98 +50,12 @@
         <option value="archived" {{if eq .Status "archived"}}selected{{end}}>보관</option>
       </select>
     </div>
-    {{end}}
     <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-    {{if eq .Tab "sales"}}
-    <label class="inline-flex items-center gap-1.5 text-sm text-gray-600 pb-1">
-      <input type="checkbox" name="lost" value="1" {{if .IncludeLost}}checked{{end}}>
-      실주·보류 포함
-    </label>
-    {{end}}
-    {{if or .Search .Year .Status .IncludeLost}}
-    <a href="/projects?tab={{.Tab}}{{if eq .Tab "sales"}}&view={{.View}}{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
+    {{if or .Search .Year .Status}}
+    <a href="/projects" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
     {{end}}
   </form>
 
-  {{if eq .Tab "sales"}}
-  <div class="flex flex-wrap gap-2 text-sm">
-    <a href="/projects?tab=sales&view=timeline{{if .Search}}&search={{.Search}}{{end}}{{if .IncludeLost}}&lost=1{{end}}"
-       class="px-3 py-1.5 rounded-lg border {{if eq .View "timeline"}}border-amber-500 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white hover:bg-gray-50{{end}}">예정월 타임라인</a>
-    <a href="/projects?tab=sales&view=kanban{{if .Search}}&search={{.Search}}{{end}}{{if .IncludeLost}}&lost=1{{end}}"
-       class="px-3 py-1.5 rounded-lg border {{if eq .View "kanban"}}border-amber-500 bg-amber-50 text-amber-900{{else}}border-gray-200 bg-white hover:bg-gray-50{{end}}">단계 칸반</a>
-  </div>
-  {{end}}
-
-  {{if and (eq .Tab "sales") (eq .View "timeline")}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead class="bg-gray-50 text-gray-600">
-        <tr>
-          <th class="px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 z-10 min-w-[12rem]">사업</th>
-          {{range .TimelineMonths}}
-          <th class="px-2 py-2 text-center font-medium min-w-[5.5rem] {{if or (eq . $.ThisMonth) (eq . $.NextMonth)}}bg-amber-50 text-amber-900{{end}}">
-            {{.}}{{if eq . $.ThisMonth}}<div class="text-[10px] font-normal">이번 달</div>{{end}}{{if eq . $.NextMonth}}<div class="text-[10px] font-normal">다음 달</div>{{end}}
-          </th>
-          {{end}}
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-100">
-        {{range .Cards}}
-        <tr class="hover:bg-gray-50">
-          <td class="px-3 py-2 sticky left-0 bg-white z-10 align-top">
-            {{template "sales_card" .}}
-          </td>
-          {{$card := .}}
-          {{range $.TimelineMonths}}
-          <td class="px-1 py-2 text-center {{if or (eq . $.ThisMonth) (eq . $.NextMonth)}}bg-amber-50/40{{end}}">
-            {{if eq $card.ExpectedYM .}}
-            <span class="inline-block w-3 h-3 rounded-full bg-amber-500" title="{{$card.ExpectedPeriodLabel}}"></span>
-            {{end}}
-          </td>
-          {{end}}
-        </tr>
-        {{else}}
-        <tr><td colspan="20" class="px-4 py-10 text-center text-gray-400">수주 전 영업 건이 없습니다.</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  {{else if and (eq .Tab "sales") (eq .View "kanban")}}
-  <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
-    {{range .KanbanCols}}
-    <div class="bg-gray-50 rounded-xl border border-gray-200 p-2 min-h-[12rem]"
-         ondragover="event.preventDefault()" ondrop="salesStageDrop(event, '{{.Stage}}')">
-      <p class="text-xs font-semibold text-gray-600 px-1 py-1.5">{{.Label}}</p>
-      <div class="space-y-2">
-        {{$st := .Stage}}
-        {{range $.Cards}}
-        {{if eq .SalesStage $st}}
-        <div class="bg-white rounded-lg border border-gray-200 p-2 cursor-grab" draggable="true"
-             data-id="{{.ProjectID}}" ondragstart="event.dataTransfer.setData('text/plain', this.dataset.id)">
-          {{template "sales_card" .}}
-        </div>
-        {{end}}
-        {{end}}
-      </div>
-    </div>
-    {{end}}
-  </div>
-  <form id="sales-stage-form" method="post" class="hidden">
-    <input type="hidden" name="sales_stage">
-    <input type="hidden" name="back" value="/projects?tab=sales&view=kanban">
-  </form>
-  <script>
-  function salesStageDrop(ev, stage) {
-    ev.preventDefault();
-    var id = ev.dataTransfer.getData('text/plain');
-    if (!id) return;
-    var f = document.getElementById('sales-stage-form');
-    f.action = '/projects/' + id + '/stage';
-    f.sales_stage.value = stage;
-    f.submit();
-  }
-  </script>
-  {{else}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">
@@ -184,10 +81,7 @@
             {{if .ShortName}}<p class="text-xs text-gray-400 mt-0.5 truncate max-w-md">{{.Name}}</p>{{end}}
           </td>
           <td class="px-4 py-3 text-gray-700">{{.OrderingPartyLabel}}</td>
-          <td class="px-4 py-3 text-gray-700">
-            {{if .CustomerLabel}}{{.CustomerLabel}}{{else}}—{{end}}
-            {{if .IsProspect}}{{if .CustomerLabel}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">가등록</span>{{end}}{{end}}
-          </td>
+          <td class="px-4 py-3 text-gray-700">{{if .CustomerName}}{{.CustomerName}}{{else}}—{{end}}</td>
           <td class="px-4 py-3 text-gray-600">{{if .ContractType}}{{.ContractType}}{{else}}—{{end}}</td>
           <td class="px-4 py-3">
             {{if .IsPaid}}
@@ -209,25 +103,5 @@
       </tbody>
     </table>
   </div>
-  {{end}}
-</div>
-{{end}}
-
-{{define "sales_card"}}
-<div class="text-left space-y-0.5">
-  <a href="/projects/{{.ProjectID}}" class="font-medium text-blue-700 hover:underline text-sm">
-    {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}
-  </a>
-  <p class="text-xs text-gray-700">
-    {{if .CustomerLabel}}{{.CustomerLabel}}{{else}}—{{end}}
-    {{if .IsProspect}}{{if .CustomerLabel}}<span class="ml-1 px-1 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">가등록</span>{{end}}{{end}}
-  </p>
-  <p class="text-[11px] text-gray-500">{{if .ExpectedPeriodLabel}}{{.ExpectedPeriodLabel}}{{else}}미정{{end}}
-    {{if .ExpectedAmountLabel}} · {{.ExpectedAmountLabel}}{{end}}
-    {{if .WinProbability}} · {{.WinProbability}}%{{end}}
-  </p>
-  <p class="text-[11px] text-gray-500">{{if .SalesOwner}}{{.SalesOwner}}{{else}}—{{end}}
-    {{if .NextActionDue}} · 다음 {{.NextActionDue}}{{else}} · <span class="text-orange-700">다음 행동 없음</span>{{end}}
-  </p>
 </div>
 {{end}}

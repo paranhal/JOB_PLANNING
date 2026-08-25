@@ -101,8 +101,7 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 
 	tasks, err := r.queryWorkTasks(
 		`t.work_type IN ('admin','support') AND t.status != 'complete'
-		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=''
-		 AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance','project')`,
+		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=''`,
 		mineUserID, mineKeys, nil)
 	if err != nil {
 		return nil, model.UnplannedKindCounts{}, err
@@ -141,19 +140,6 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 	}
 	for _, it := range slots {
 		add(it, model.UnplannedNoDate)
-	}
-
-	salesItems, err := r.listSalesUnplanned(mineUserID, mineKeys)
-	if err != nil {
-		return nil, model.UnplannedKindCounts{}, err
-	}
-	for _, it := range salesItems {
-		kinds := append([]string(nil), it.Kinds...)
-		it.Kinds = nil
-		it.Badges = nil
-		for _, k := range kinds {
-			add(it, k)
-		}
 	}
 
 	var counts model.UnplannedKindCounts
@@ -249,95 +235,6 @@ func (r *WorkBoardRepo) listUnassignedSlotsAsItems() ([]model.UnplannedItem, err
 	return out, nil
 }
 
-func (r *WorkBoardRepo) listSalesUnplanned(mineUserID string, mineKeys []string) ([]model.UnplannedItem, error) {
-	q := `
-		SELECT p.project_id, p.name, COALESCE(p.short_name,''),
-		       COALESCE(NULLIF(TRIM(cu.org_name),''), NULLIF(TRIM(p.prospect_name),''), ''),
-		       COALESCE(p.sales_owner,''), COALESCE(p.expected_ym,''), COALESCE(p.sales_stage,''),
-		       CASE WHEN ` + salesFollowupExistsSQL + ` THEN 1 ELSE 0 END
-		FROM work_projects p
-		LEFT JOIN customers cu ON cu.customer_id = p.customer_id
-		WHERE ` + salesPreWonSQL()
-	var args []interface{}
-	if mineUserID != "" || len(mineKeys) > 0 {
-		q += ` AND (`
-		parts := []string{}
-		if mineUserID != "" {
-			parts = append(parts, `COALESCE(p.sales_owner_id,'')=?`)
-			args = append(args, mineUserID)
-		}
-		for _, k := range mineKeys {
-			if strings.TrimSpace(k) == "" {
-				continue
-			}
-			parts = append(parts, `p.sales_owner=?`)
-			args = append(args, k)
-		}
-		if len(parts) == 0 {
-			q += `1=1)`
-		} else {
-			q += strings.Join(parts, " OR ") + `)`
-		}
-	}
-	rows, err := r.db.Query(q, args...)
-	if err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer rows.Close()
-	nowYM := time.Now().Format("2006-01")
-	var out []model.UnplannedItem
-	for rows.Next() {
-		var id, name, short, org, owner, ym, stage string
-		var hasFollow int
-		if err := rows.Scan(&id, &name, &short, &org, &owner, &ym, &stage, &hasFollow); err != nil {
-			return nil, err
-		}
-		title := name
-		if short != "" {
-			title = short
-		}
-		it := model.UnplannedItem{
-			WorkListItem: model.WorkListItem{
-				Prefix:      model.WorkPrefixSales,
-				RefID:       id,
-				RefNumber:   id,
-				Title:       title,
-				OrgName:     org,
-				Assignee:    owner,
-				Status:      stage,
-				StatusLabel: model.SalesStageLabel(stage),
-				Href:        "/projects/" + id,
-				SubLabel:    model.FormatExpectedPeriod(ym, model.ExpectedPrecisionMonth),
-			},
-			ItemKey:       "proj:" + id,
-			CanAssignDate: true,
-			CanNoDate:     false,
-		}
-		if hasFollow == 0 {
-			it.Kinds = append(it.Kinds, model.UnplannedSalesFollowup)
-		}
-		p := model.WorkProject{ProjectKind: model.ProjectKindBuild, SalesStage: stage, ExpectedYM: ym}
-		if p.ExpectedYMOverdue(nowYM) {
-			it.Kinds = append(it.Kinds, model.UnplannedReview)
-			if t, err := time.Parse("2006-01", model.NormalizeExpectedYM(ym)); err == nil {
-				end := t.AddDate(0, 1, 0).AddDate(0, 0, -1)
-				it.DaysOverdue = int(time.Now().Sub(end).Hours() / 24)
-				if it.DaysOverdue < 0 {
-					it.DaysOverdue = 0
-				}
-			}
-		}
-		if len(it.Kinds) == 0 {
-			continue
-		}
-		out = append(out, it)
-	}
-	return out, rows.Err()
-}
-
 func (r *WorkBoardRepo) currentMntPlanYM() (planID string, year, month int, err error) {
 	now := time.Now()
 	year, month = now.Year(), int(now.Month())
@@ -415,19 +312,7 @@ func (r *WorkBoardRepo) CountPlanning() (model.PlanningCounts, error) {
 		       COALESCE(SUM(CASE
 		         WHEN COALESCE(NULLIF(TRIM(work_date),''), NULLIF(TRIM(due_date),''), '') != '' THEN 1 ELSE 0 END),0)
 		FROM work_tasks
-		WHERE work_type IN ('admin','support') AND status != 'complete'
-		  AND TRIM(COALESCE(source_type,'')) NOT IN ('as','maintenance','project')`).Scan(&open, &planned)
-	if err != nil && !strings.Contains(err.Error(), "no such table") {
-		return p, err
-	}
-	add(open, planned)
-
-	open, planned = 0, 0
-	err = r.db.QueryRow(`
-		SELECT COUNT(*),
-		       COALESCE(SUM(CASE WHEN ` + salesFollowupExistsSQL + ` THEN 1 ELSE 0 END),0)
-		FROM work_projects p
-		WHERE ` + salesPreWonSQL()).Scan(&open, &planned)
+		WHERE work_type IN ('admin','support') AND status != 'complete'`).Scan(&open, &planned)
 	if err != nil && !strings.Contains(err.Error(), "no such table") {
 		return p, err
 	}
@@ -481,8 +366,6 @@ func unplannedItemKey(it model.WorkListItem) string {
 		return "as:" + it.RefID
 	case strings.HasPrefix(href, "/workboard/tasks/"):
 		return "task:" + it.RefID
-	case strings.HasPrefix(href, "/projects/"):
-		return "proj:" + it.RefID
 	case it.Prefix == model.WorkPrefixMaintenance:
 		return "mnt:" + it.RefID
 	default:
@@ -540,7 +423,7 @@ func sortUnplanned(items []model.UnplannedItem) {
 			return 0 // 빨강 D+n 먼저 (§8.2.2)
 		case it.HasKind(model.UnplannedDelayed) && it.Started:
 			return 1
-		case it.HasKind(model.UnplannedNoDate), it.HasKind(model.UnplannedSalesFollowup):
+		case it.HasKind(model.UnplannedNoDate):
 			return 2
 		case it.HasKind(model.UnplannedReview):
 			return 3
@@ -618,19 +501,6 @@ func (r *WorkBoardRepo) AssignUnplannedDate(key, date, assignee, assigneeUID str
 			assignee=CASE WHEN TRIM(?)!='' AND TRIM(COALESCE(assignee,''))='' THEN ? ELSE assignee END,
 			updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, date, assignee, assignee, id)
 		return err
-	case "proj":
-		p, err := NewProjectRepo(r.db).Get(id)
-		if err != nil {
-			return err
-		}
-		title := "다음 행동"
-		if strings.TrimSpace(p.Name) != "" {
-			title = p.Name
-		}
-		if strings.TrimSpace(assignee) == "" {
-			assignee = p.SalesOwner
-		}
-		return NewWBRepo(r.db).AddProjectFollowup(p, title, date, assignee)
 	case "gen":
 		_, err := r.db.Exec(`UPDATE work_other SET work_date=? WHERE other_id=?`, date, id)
 		return err

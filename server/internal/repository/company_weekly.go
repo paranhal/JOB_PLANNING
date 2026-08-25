@@ -176,7 +176,7 @@ func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx string) (int,
 		SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
 		WHERE COALESCE(v.completed,0)=1
 		  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?
-		  AND TRIM(COALESCE(v.project_id,'')) = ?`+statsProjectKindSQL("v.project_id"), from, toEx, projectID).Scan(&n)
+		  AND TRIM(COALESCE(v.project_id,'')) = ?`, from, toEx, projectID).Scan(&n)
 	return n, err
 }
 
@@ -185,7 +185,7 @@ func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx string) (i
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
 		WHERE v.visit_date >= ? AND v.visit_date < ?
-		  AND TRIM(COALESCE(v.project_id,'')) = ?`+statsProjectKindSQL("v.project_id"), from, toEx, projectID).Scan(&n)
+		  AND TRIM(COALESCE(v.project_id,'')) = ?`, from, toEx, projectID).Scan(&n)
 	return n, err
 }
 
@@ -195,7 +195,7 @@ func (r *StatsRepo) countCompanyASDone(projectID, from, toEx string) (int, error
 		SELECT COUNT(*) FROM as_receipts ar
 		WHERE TRIM(COALESCE(ar.complete_datetime,'')) != ''
 		  AND date(ar.complete_datetime) >= date(?) AND date(ar.complete_datetime) < date(?)
-		  AND TRIM(COALESCE(ar.project_id,'')) = ?`+statsProjectKindSQL("ar.project_id"), from, toEx, projectID).Scan(&n)
+		  AND TRIM(COALESCE(ar.project_id,'')) = ?`, from, toEx, projectID).Scan(&n)
 	return n, err
 }
 
@@ -207,7 +207,7 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx string) ([]adminL
 		  AND COALESCE(t.source_type,'') = ''
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)
-		  AND TRIM(COALESCE(t.project_id,'')) = ?`+statsProjectKindSQL("t.project_id")+`
+		  AND TRIM(COALESCE(t.project_id,'')) = ?
 		ORDER BY `+adminTaskCompleteDateSQL+`, t.title`, from, toEx, projectID)
 }
 
@@ -220,7 +220,7 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx string) ([]adminL
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(t.due_date,'')) != ''
 		  AND date(t.due_date) >= date(?) AND date(t.due_date) < date(?)
-		  AND TRIM(COALESCE(t.project_id,'')) = ?`+statsProjectKindSQL("t.project_id")+`
+		  AND TRIM(COALESCE(t.project_id,'')) = ?
 		ORDER BY date(t.due_date), t.title`, from, toEx, projectID)
 }
 
@@ -233,7 +233,7 @@ func (r *StatsRepo) listCompanyAdminCarry(projectID, from, toEx string) ([]admin
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(t.due_date,'')) != ''
 		  AND date(t.due_date) >= date(?) AND date(t.due_date) < date(?)
-		  AND TRIM(COALESCE(t.project_id,'')) = ?`+statsProjectKindSQL("t.project_id")+`
+		  AND TRIM(COALESCE(t.project_id,'')) = ?
 		ORDER BY date(t.due_date), t.title`, from, toEx, projectID)
 }
 

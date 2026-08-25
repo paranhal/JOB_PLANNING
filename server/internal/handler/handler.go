@@ -139,7 +139,7 @@ func New(db *sql.DB) *Handler {
 		},
 		Project: NewProjectHandler(
 			repository.NewProjectRepo(db), repository.NewWBRepo(db),
-			customerRepo, contactRepo, codeRepo, assetRepo, userRepo,
+			customerRepo, contactRepo, codeRepo, assetRepo,
 		),
 		AdminWork: NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo),
 		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),

@@ -40,7 +40,6 @@ const (
 const (
 	WBSourceAS          = "as"
 	WBSourceMaintenance = "maintenance"
-	WBSourceProject     = "project" // 영업 사업 다음 행동 (§22.1.1 ⑨)
 )
 
 // work_task_members.member_role (§7.7.2). work_tasks.assignee 는 주담당(owner)과 같다.
@@ -67,8 +66,6 @@ func WBCategoryLabel(cat string) string {
 		return "AS"
 	case WBSourceMaintenance:
 		return "점검"
-	case WBSourceProject:
-		return "영업"
 	default:
 		return "행정"
 	}
@@ -324,28 +321,8 @@ type WorkProject struct {
 	ContactID       string `json:"contact_id"`        // 고객 담당자
 	Color           string `json:"color"`
 	Status          string `json:"status"`
-	ProjectKind     string `json:"project_kind"` // maintenance|build|supply|consumable|other
-
-	SalesStage             string `json:"sales_stage"`
-	ExpectedYM             string `json:"expected_ym"`
-	ExpectedPrecision      string `json:"expected_precision"`
-	ExpectedNote           string `json:"expected_note"`
-	ExpectedUndatedReason  string `json:"expected_undated_reason"`
-	ProspectName           string `json:"prospect_name"`
-	ProspectRegion         string `json:"prospect_region"`
-	ProspectContactName    string `json:"prospect_contact_name"`
-	ProspectContactTitle   string `json:"prospect_contact_title"`
-	ProspectContactPhone   string `json:"prospect_contact_phone"`
-	ProspectContactEmail   string `json:"prospect_contact_email"`
-	SalesOwner             string `json:"sales_owner"`
-	SalesOwnerID           string `json:"sales_owner_id"`
-	ExpectedAmount         int64  `json:"expected_amount"`
-	WinProbability         int    `json:"win_probability"`
-	Competitor             string `json:"competitor"`
-	LeadSource             string `json:"lead_source"`
-
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 
 	CustomerName      string `json:"customer_name,omitempty"`
 	ContactName       string `json:"contact_name,omitempty"`
@@ -369,25 +346,6 @@ const (
 	ScopeWorkMaintenance = "maintenance"
 	ScopeWorkAdmin       = "admin"
 )
-
-// 사업 유형 (§22.1.1)
-const (
-	ProjectKindMaintenance = "maintenance" // 유지보수
-	ProjectKindBuild       = "build"       // 신규구축
-	ProjectKindSupply      = "supply"      // 장비납품
-	ProjectKindConsumable  = "consumable"  // 소모품납품
-	ProjectKindOther       = "other"       // 기타
-)
-
-// NormalizeProjectKind 빈 값·모르는 값은 유지보수(기본).
-func NormalizeProjectKind(kind string) string {
-	switch strings.TrimSpace(kind) {
-	case ProjectKindBuild, ProjectKindSupply, ProjectKindConsumable, ProjectKindOther:
-		return kind
-	default:
-		return ProjectKindMaintenance
-	}
-}
 
 // ProjectScopeRule 사업 귀속 규칙(상위기관 × 제품 × 업무유형)
 type ProjectScopeRule struct {
@@ -606,9 +564,6 @@ func (t WorkTask) DetailHref() string {
 	}
 	if t.SourceType == WBSourceMaintenance && t.SourceID != "" {
 		return "/maintenance/visits/" + t.SourceID
-	}
-	if t.SourceType == WBSourceProject && t.SourceID != "" {
-		return "/projects/" + t.SourceID
 	}
 	return "#"
 }

@@ -2,11 +2,9 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -22,7 +20,6 @@ type ProjectHandler struct {
 	contactRepo  *repository.ContactRepo
 	codeRepo     *repository.CodeRepo
 	assetRepo    *repository.AssetRepo
-	userRepo     *repository.UserRepo
 }
 
 func NewProjectHandler(
@@ -32,12 +29,11 @@ func NewProjectHandler(
 	contactRepo *repository.ContactRepo,
 	codeRepo *repository.CodeRepo,
 	assetRepo *repository.AssetRepo,
-	userRepo *repository.UserRepo,
 ) *ProjectHandler {
 	return &ProjectHandler{
 		repo: repo, wbRepo: wbRepo,
 		customerRepo: customerRepo, contactRepo: contactRepo, codeRepo: codeRepo,
-		assetRepo: assetRepo, userRepo: userRepo,
+		assetRepo: assetRepo,
 	}
 }
 
@@ -68,55 +64,16 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	kind := strings.TrimSpace(c.QueryParam("kind"))
-	tab := strings.TrimSpace(c.QueryParam("tab"))
-	if tab == "" {
-		switch {
-		case strings.EqualFold(kind, "sales") || model.IsSalesKind(kind):
-			tab = model.ProjectTabSales
-		case strings.EqualFold(kind, "all"):
-			tab = model.ProjectTabAll
-		default:
-			tab = model.ProjectTabActive
-		}
-	}
-	tab = model.NormalizeProjectTab(tab)
-	includeLost := c.QueryParam("lost") == "1"
-	view := strings.TrimSpace(c.QueryParam("view"))
-	if view != "kanban" {
-		view = "timeline"
-	}
-	items, err := h.repo.ListForTab(tab, search, year, status, includeLost)
+	items, err := h.repo.ListFiltered(search, year, status)
 	if err != nil {
 		return err
-	}
-	dues := map[string]string{}
-	if h.wbRepo != nil {
-		dues, _ = h.wbRepo.NextActionDueMap()
-	}
-	type card struct {
-		model.WorkProject
-		NextActionDue string
-	}
-	cards := make([]card, 0, len(items))
-	for _, p := range items {
-		cards = append(cards, card{WorkProject: p, NextActionDue: dues[p.ProjectID]})
 	}
 	years, _ := h.repo.ListYears()
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
 		"Title": "사업(프로젝트)관리", "Active": "projects",
-		"Projects": items, "Cards": cards, "Years": years, "Year": year, "Status": status, "Search": search,
-		"Kind":        kind,
-		"Tab":         tab,
-		"View":        view,
-		"IncludeLost": includeLost,
-		"IsSalesList": tab == model.ProjectTabSales,
-		"TimelineMonths": model.SalesTimelineMonths(items, time.Now()),
-		"KanbanCols":     model.SalesKanbanColumns(),
-		"ThisMonth":      time.Now().Format("2006-01"),
-		"NextMonth":      time.Now().AddDate(0, 1, 0).Format("2006-01"),
-		"CanWrite":       canWriteProjects(c),
-		"FlashOK":        c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
+		"CanWrite": canWriteProjects(c),
+		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 
@@ -124,15 +81,7 @@ func (h *ProjectHandler) New(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	p := &model.WorkProject{IsPaid: true, Status: model.WBProjectActive, Color: "#3B82F6"}
-	kind := model.NormalizeProjectKind(c.QueryParam("kind"))
-	if model.IsSalesKind(kind) {
-		p.ProjectKind = kind
-		p.SalesStage = model.SalesStageLead
-		p.ExpectedPrecision = model.ExpectedPrecisionMonth
-		p.WinProbability = model.DefaultWinProbability(p.SalesStage)
-	}
-	return h.renderForm(c, p, nil, false)
+	return h.renderForm(c, &model.WorkProject{IsPaid: true, Status: model.WBProjectActive, Color: "#3B82F6"}, nil, false)
 }
 
 func (h *ProjectHandler) Create(c echo.Context) error {
@@ -140,9 +89,8 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	p, rules := h.parseForm(c)
-	h.fillSalesOwner(p)
-	if err := model.ValidateWorkProject(p); err != nil {
-		return h.renderForm(c, p, rules, false, err.Error())
+	if p.Name == "" {
+		return h.renderForm(c, p, rules, false, "사업명을 입력하세요.")
 	}
 	if err := h.repo.Create(p); err != nil {
 		return err
@@ -167,16 +115,9 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	taskRows, taskTotal, _ := h.repo.MatchAdminTasks(id, 20)
 	assetTotal, _ := h.assetRepo.CountByProject(id)
 	p.ASCount, p.MntCount, p.TaskCount, p.AssetCount = asTotal, mntTotal, taskTotal, assetTotal
-	var followups []model.WorkAction
-	var followTask *model.WorkTask
-	if p.IsSales() && h.wbRepo != nil {
-		followTask, _ = h.wbRepo.GetTaskBySource(model.WBSourceProject, p.ProjectID)
-		followups, _ = h.wbRepo.ListOpenProjectActions(p.ProjectID)
-	}
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": "projects",
 		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
-		"Followups": followups, "FollowTask": followTask,
 		"CanWrite":  canWriteProjects(c),
 		"CanDelete": canDeleteProjects(c),
 		"FlashOK":   c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
@@ -205,12 +146,8 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	}
 	p, rules := h.parseForm(c)
 	p.ProjectID = existing.ProjectID
-	if !p.IsSales() {
-		model.CopySalesFields(p, existing)
-	}
-	h.fillSalesOwner(p)
-	if err := model.ValidateWorkProject(p); err != nil {
-		return h.renderForm(c, p, rules, true, err.Error())
+	if p.Name == "" {
+		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
 	}
 	if err := h.repo.Update(p); err != nil {
 		return err
@@ -307,134 +244,11 @@ func (h *ProjectHandler) Delete(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/projects?ok=deleted")
 }
 
-func (h *ProjectHandler) fillSalesOwner(p *model.WorkProject) {
-	if p == nil || !p.IsSales() || h.userRepo == nil {
-		return
-	}
-	if p.SalesOwnerID == "" {
-		return
-	}
-	u, err := h.userRepo.GetByID(p.SalesOwnerID)
-	if err != nil || u == nil {
-		return
-	}
-	if p.SalesOwner == "" {
-		p.SalesOwner = u.FullName
-		if p.SalesOwner == "" {
-			p.SalesOwner = u.Username
-		}
-	}
-}
-
-func (h *ProjectHandler) PromoteCustomer(c echo.Context) error {
-	if !canWriteProjects(c) {
-		return echo.ErrForbidden
-	}
-	id := c.Param("id")
-	p, err := h.repo.Get(id)
-	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
-	}
-	if !p.IsSales() {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=notsales")
-	}
-	if p.CustomerID != "" {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=already_customer")
-	}
-	name := strings.TrimSpace(p.ProspectName)
-	if name == "" {
-		name = strings.TrimSpace(c.FormValue("org_name"))
-	}
-	if name == "" {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=prospect")
-	}
-	cust := &model.Customer{
-		OrgName:      name,
-		OfficialName: name,
-		AddrSido:     strings.TrimSpace(p.ProspectRegion),
-		IsActive:     true,
-		Notes:        "영업 가등록에서 승격",
-	}
-	if err := h.customerRepo.Create(cust); err != nil {
-		return err
-	}
-	contactID := ""
-	if c.FormValue("promote_contact") == "1" && strings.TrimSpace(p.ProspectContactName) != "" {
-		ct := &model.Contact{
-			CustomerID: cust.CustomerID,
-			FullName:   p.ProspectContactName,
-			Title:      p.ProspectContactTitle,
-			Phone:      p.ProspectContactPhone,
-			Email:      p.ProspectContactEmail,
-			Status:     "active",
-			IsPrimary:  true,
-		}
-		if err := h.contactRepo.Create(ct); err != nil {
-			return err
-		}
-		contactID = ct.ContactID
-	}
-	if err := h.repo.LinkCustomer(id, cust.CustomerID, contactID); err != nil {
-		return err
-	}
-	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=promoted")
-}
-
-func (h *ProjectHandler) SetStage(c echo.Context) error {
-	if !canWriteProjects(c) {
-		return echo.ErrForbidden
-	}
-	id := c.Param("id")
-	stage := model.NormalizeSalesStage(c.FormValue("sales_stage"))
-	if err := h.repo.SetSalesStage(id, stage); err != nil {
-		if strings.Contains(err.Error(), "수주") || strings.Contains(err.Error(), "고객") || strings.Contains(err.Error(), "계약") {
-			return c.Redirect(http.StatusSeeOther, "/projects/"+id+"/edit?err=won")
-		}
-		return err
-	}
-	return c.Redirect(http.StatusSeeOther, projectSalesBack(c.FormValue("back")))
-}
-
-func projectSalesBack(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if strings.HasPrefix(raw, "/projects") && !strings.Contains(raw, "://") && !strings.ContainsAny(raw, " \t\n\\") {
-		return raw
-	}
-	return "/projects?tab=sales&view=kanban"
-}
-
-func (h *ProjectHandler) AddFollowup(c echo.Context) error {
-	if !canWriteProjects(c) {
-		return echo.ErrForbidden
-	}
-	id := c.Param("id")
-	p, err := h.repo.Get(id)
-	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
-	}
-	if !p.IsSales() {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=notsales")
-	}
-	if h.wbRepo == nil {
-		return fmt.Errorf("업무 저장소를 쓸 수 없습니다")
-	}
-	title := strings.TrimSpace(c.FormValue("followup_title"))
-	due := strings.TrimSpace(c.FormValue("followup_due"))
-	if err := h.wbRepo.AddProjectFollowup(p, title, due, p.SalesOwner); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?err=followup")
-	}
-	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=followup")
-}
-
 func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules []model.ProjectScopeRule, isEdit bool, errs ...string) error {
 	customers, _ := h.customerRepo.ListAll()
 	parents, _, _ := h.customerRepo.ListCategories()
 	contractTypes, _ := h.codeRepo.ActiveByGroup("project_contract_type")
 	billingTypes, _ := h.codeRepo.ActiveByGroup("project_billing_type")
-	var users []model.User
-	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
-	}
 	errMsg := ""
 	if len(errs) > 0 {
 		errMsg = errs[0]
@@ -442,13 +256,6 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	title := "사업 등록"
 	if isEdit {
 		title = "사업 수정"
-	}
-	if p != nil && p.IsSales() {
-		if isEdit {
-			title = "영업 건 수정"
-		} else {
-			title = "영업 건 등록"
-		}
 	}
 	type ruleJS struct {
 		ID       string   `json:"id"`
@@ -470,8 +277,7 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
 		"Title": title, "Active": "projects",
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": isEdit,
-		"IsSales": p != nil && p.IsSales(),
-		"Customers": customers, "Parents": parents, "Users": users,
+		"Customers": customers, "Parents": parents,
 		"ContractTypes": contractTypes, "BillingTypes": billingTypes,
 		"ProductKeys": []map[string]string{
 			{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
@@ -485,12 +291,6 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 		},
 		"FormError": errMsg,
 		"CanWrite":  true,
-		"NoDateReasons": []map[string]string{
-			{"Key": model.NoDateReasonParts, "Label": "부품 대기"},
-			{"Key": model.NoDateReasonCustomer, "Label": "고객 일정 미확정"},
-			{"Key": model.NoDateReasonVendor, "Label": "외부 업체 회신 대기"},
-			{"Key": model.NoDateReasonOther, "Label": "기타"},
-		},
 	})
 }
 
