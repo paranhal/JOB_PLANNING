@@ -105,6 +105,7 @@ func (h *WorkboardHandler) PreviewRecurrence(c echo.Context) error {
 	prev := service.ExpandOccurrencePreview(rule, service.DefaultCalendar(), h.holidayYearMissing())
 	c.Set("recurrence_form", &rule)
 	c.Set("recurrence_preview", &prev)
+	c.Set("recurrence_change_mode", model.NormalizeRecurrenceChangeMode(c.FormValue("change_mode")))
 	return h.ShowTask(c)
 }
 
@@ -150,9 +151,17 @@ func (h *WorkboardHandler) runOccurrenceWrite(c echo.Context, regenerate bool) e
 	if prev.Warn200 && c.FormValue("confirm_over_200") != "1" {
 		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_warn")
 	}
+	mode := ""
+	if regenerate {
+		mode = model.NormalizeRecurrenceChangeMode(c.FormValue("change_mode"))
+		if mode == model.RecurrenceChangeReplace && c.FormValue("confirm_replace") != "1" {
+			return c.Redirect(http.StatusSeeOther, loc+"?err=rec_replace")
+		}
+	}
 	var res model.OccurrenceGenerateResult
 	if regenerate {
-		res, err = h.repo.RegenerateOccurrences(t, rule, prev.Dates)
+		today := time.Now().Format("2006-01-02")
+		res, err = h.repo.ApplyOccurrenceChange(t, rule, prev.Dates, mode, today)
 	} else {
 		res, err = h.repo.GenerateOccurrences(t, rule, prev.Dates)
 	}
@@ -276,4 +285,54 @@ func (h *WorkboardHandler) SaveRecurrenceSettings(c echo.Context) error {
 	}
 	_ = h.repo.MaybeAutoCompleteParent(id)
 	return c.Redirect(http.StatusSeeOther, loc+"?ok=saved")
+}
+
+func (h *WorkboardHandler) ArchiveRecurrence(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	t, err := h.repo.GetTask(id)
+	if err != nil || t == nil {
+		return echo.ErrNotFound
+	}
+	loc := "/workboard/tasks/" + id
+	if t.ParentTaskID != "" {
+		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_parent")
+	}
+	on := c.FormValue("archived") != "0"
+	if err := h.repo.SetRecurrenceArchived(id, on); err != nil {
+		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_rule")
+	}
+	ok := "rec_archived"
+	if !on {
+		ok = "rec_restored"
+	}
+	return c.Redirect(http.StatusSeeOther, loc+"?ok="+ok)
+}
+
+func (h *WorkboardHandler) DeleteRecurrenceParent(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	t, err := h.repo.GetTask(id)
+	if err != nil || t == nil {
+		return echo.ErrNotFound
+	}
+	loc := "/workboard/tasks/" + id
+	if t.ParentTaskID != "" {
+		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_has_complete")
+	}
+	if err := h.repo.DeleteParentTask(id); err != nil {
+		if strings.Contains(err.Error(), "보관") {
+			return c.Redirect(http.StatusSeeOther, loc+"?err=rec_has_complete")
+		}
+		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_rule")
+	}
+	back := strings.TrimSpace(c.FormValue("back"))
+	if back == "" {
+		back = "/workboard/register"
+	}
+	return c.Redirect(http.StatusSeeOther, back+"?ok=rec_deleted")
 }

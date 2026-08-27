@@ -1659,11 +1659,14 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		"BackURL":        back,
 	}
 	rule := defaultRecurrenceForm(t, data["Today"].(string))
+	archived := false
 	if saved, _ := h.repo.GetRecurrence(t.TaskID); saved != nil {
 		rule = *saved
+		archived = saved.Archived
 	}
 	if form, ok := c.Get("recurrence_form").(*model.WorkRecurrence); ok && form != nil {
 		rule = *form
+		rule.Archived = archived
 	}
 	var preview *model.OccurrencePreview
 	if p, ok := c.Get("recurrence_preview").(*model.OccurrencePreview); ok {
@@ -1685,6 +1688,17 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 	data["WeekdayOn"] = model.ParseWeekdays(rule.Weekdays)
 	data["RecurrencePreview"] = preview
 	data["OccurrenceCount"] = occN
+	data["RecurrenceArchived"] = archived
+	completeOcc, _ := h.repo.CountCompleteOccurrences(t.TaskID)
+	data["CompleteOccurrenceCount"] = completeOcc
+	changeMode := model.RecurrenceChangeFuture
+	if m, ok := c.Get("recurrence_change_mode").(string); ok && m != "" {
+		changeMode = model.NormalizeRecurrenceChangeMode(m)
+	}
+	data["ChangeMode"] = changeMode
+	if preview != nil && occN > 0 {
+		model.AnnotateOccurrenceChange(preview, children, changeMode, today)
+	}
 	data["HolidayBanners"] = holidayBanners
 	data["FlashN"] = c.QueryParam("n")
 	data["FlashReport"] = c.QueryParam("report")

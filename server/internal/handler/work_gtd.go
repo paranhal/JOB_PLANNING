@@ -394,6 +394,10 @@ func gtdFlashMsg(err, n string) string {
 		return "제외 사유를 입력하세요."
 	case "rec_defer_date":
 		return "다음 조치일을 입력하세요."
+	case "rec_replace":
+		return "미완료 일정을 모두 지우고 다시 만듭니다. 확인란을 선택한 뒤 다시 실행하세요."
+	case "rec_has_complete":
+		return "완료된 실행 작업이 있어 삭제할 수 없습니다. 보관으로 내리세요."
 	default:
 		return ""
 	}

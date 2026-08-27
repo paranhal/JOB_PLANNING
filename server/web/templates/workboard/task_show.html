@@ -40,18 +40,40 @@
       {{end}}
       <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register?view=day&date={{if $t.WorkDate}}{{$t.WorkDate}}{{else}}{{.Today}}{{end}}{{end}}"
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">시간표</a>
+      {{if and .CanWrite (eq $t.ParentTaskID "") (gt .OccurrenceCount 0)}}
+      {{if .RecurrenceArchived}}
+      <form method="post" action="/workboard/tasks/{{$t.TaskID}}/archive">
+        <input type="hidden" name="archived" value="0">
+        <button class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">보관 해제</button>
+      </form>
+      {{else}}
+      <form method="post" action="/workboard/tasks/{{$t.TaskID}}/archive">
+        <input type="hidden" name="archived" value="1">
+        <button class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">보관</button>
+      </form>
+      {{end}}
+      <form method="post" action="/workboard/tasks/{{$t.TaskID}}/delete"
+            onsubmit="return confirm('상위 업무를 삭제합니다. 완료된 실행 작업이 있으면 거부됩니다.')">
+        <input type="hidden" name="back" value="{{.BackURL}}">
+        <button class="px-3 py-1.5 text-sm border border-red-200 text-red-800 rounded-lg hover:bg-red-50">삭제</button>
+      </form>
+      {{end}}
     </div>
   </div>
 
   {{if .FlashOK}}
   <div class="rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
-    {{if eq .FlashOK "sub"}}하위업무를 추가했습니다.{{else if eq .FlashOK "place"}}시간표에 배치하고 업무를 등록했습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "saved"}}저장되었습니다.{{else if eq .FlashOK "action"}}다음 행동을 저장했습니다.{{else if eq .FlashOK "activity"}}조치 이력을 남겼습니다.{{else if eq .FlashOK "rec_gen"}}실행 작업 {{.FlashN}}건을 만들었습니다.{{else if eq .FlashOK "rec_regen"}}{{if .FlashReport}}{{.FlashReport}}{{else}}실행 작업을 다시 만들었습니다.{{end}}{{else}}저장되었습니다.{{end}}
+    {{if eq .FlashOK "sub"}}하위업무를 추가했습니다.{{else if eq .FlashOK "place"}}시간표에 배치하고 업무를 등록했습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "saved"}}저장되었습니다.{{else if eq .FlashOK "action"}}다음 행동을 저장했습니다.{{else if eq .FlashOK "activity"}}조치 이력을 남겼습니다.{{else if eq .FlashOK "rec_gen"}}실행 작업 {{.FlashN}}건을 만들었습니다.{{else if eq .FlashOK "rec_regen"}}{{if .FlashReport}}{{.FlashReport}}{{else}}실행 작업을 다시 만들었습니다.{{end}}{{else if eq .FlashOK "rec_archived"}}보관했습니다. 완료된 실행 작업은 그대로 있습니다.{{else if eq .FlashOK "rec_restored"}}보관을 해제했습니다.{{else}}저장되었습니다.{{end}}
   </div>
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
     {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "sales_linked"}}이미 원본이 연결된 업무입니다.{{else if eq .FlashErr "activity"}}영업 활동으로 만들 수 없습니다.{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
+  {{end}}
+
+  {{if and (gt .OccurrenceCount 0) (eq $t.ParentTaskID "") .RecurrenceArchived}}
+  <div class="rounded-lg bg-slate-50 border border-slate-200 px-4 py-2 text-sm text-slate-800">보관된 반복 업무입니다. 완료된 실행 작업은 그대로 있습니다. 시간표에는 올라오지 않습니다.</div>
   {{end}}
 
   {{if and (gt .OccurrenceCount 0) (eq $t.ParentTaskID "")}}
@@ -620,7 +642,7 @@
 
   {{if and .CanWrite (eq .Task.SourceType "") (eq .Task.ParentTaskID "")}}
   <div class="bg-white rounded-xl border border-indigo-200 p-5 space-y-3"
-       x-data="{ rule: '{{.Recurrence.RuleType}}' }">
+       x-data="{ rule: '{{.Recurrence.RuleType}}', changeMode: '{{if .ChangeMode}}{{.ChangeMode}}{{else}}future{{end}}' }">
     <h3 class="font-semibold text-gray-800">기간 내 반복 실행</h3>
     <p class="text-xs text-gray-500">상위 마감일과 실행 예정일을 나눕니다. 실행 작업은 일자 하위업무로 만들어 <strong>일일 업무 등록 시간표</strong>에 올라갑니다.</p>
     {{range .HolidayBanners}}
@@ -704,6 +726,9 @@
         {{range .RecurrencePreview.Notes}}
         <p class="text-amber-800">{{.}}</p>
         {{end}}
+        {{range .RecurrencePreview.ChangeNotes}}
+        <p class="text-indigo-800">{{.}}</p>
+        {{end}}
         {{end}}
         {{if .RecurrencePreview.Warn200}}
         <label class="flex items-center gap-2 text-amber-800">
@@ -720,9 +745,28 @@
         <button type="submit" formaction="/workboard/tasks/{{.Task.TaskID}}/recurrence/generate"
                 class="px-4 py-2 bg-indigo-600 text-white rounded-lg">생성</button>
         {{else}}
+        <div class="w-full space-y-2 text-sm text-gray-700">
+          <p class="font-medium text-gray-800">시작일·마감일·주기가 바뀌면</p>
+          <label class="flex items-start gap-2">
+            <input type="radio" name="change_mode" value="future" x-model="changeMode" class="mt-1">
+            <span>미완료 미래 일정만 다시 생성 (기본) — 지난 일정과 완료분은 그대로</span>
+          </label>
+          <label class="flex items-start gap-2">
+            <input type="radio" name="change_mode" value="keep_add" x-model="changeMode" class="mt-1">
+            <span>기존 유지 + 새 일정만 추가 — 중복은 미리보기에 표시</span>
+          </label>
+          <label class="flex items-start gap-2">
+            <input type="radio" name="change_mode" value="replace" x-model="changeMode" class="mt-1">
+            <span>모든 미완료 일정 삭제 후 재생성</span>
+          </label>
+          <label class="flex items-center gap-2 text-amber-800" x-show="changeMode==='replace'" x-cloak>
+            <input type="checkbox" name="confirm_replace" value="1">
+            미완료 일정을 모두 지우고 다시 만듭니다. 완료된 회차는 남습니다.
+          </label>
+        </div>
         <button type="submit" formaction="/workboard/tasks/{{.Task.TaskID}}/recurrence/regenerate"
                 class="px-4 py-2 bg-indigo-600 text-white rounded-lg"
-                onclick="return confirm('미완료 실행 작업을 지우고 다시 만듭니다. 완료된 회차는 남습니다.')">재생성</button>
+                @click="if (changeMode==='replace' && !$el.form.confirm_replace.checked) { alert('미완료 일정을 모두 지우려면 확인란을 선택하세요.'); $event.preventDefault() }">다시 만들기</button>
         {{end}}
       </div>
     </form>

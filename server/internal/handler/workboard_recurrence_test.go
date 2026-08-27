@@ -237,3 +237,77 @@ func TestOccurrenceSkipAutoCompletesParent(t *testing.T) {
 		t.Fatalf("auto 상위 상태=%s", got.Status)
 	}
 }
+
+func TestRecurrenceChangeKeepsCompleteAndBlocksDelete(t *testing.T) {
+	e, repo := newWorkboardServer(t, "occ_change.db")
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "주기변경", DueDate: "2026-09-30",
+		Assignee: "관리자", Status: model.WBTaskWaiting,
+	}
+	if err := repo.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	gen := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/generate", recurrenceForm(nil))
+	if gen.Code != http.StatusSeeOther || !strings.Contains(gen.Header().Get("Location"), "ok=rec_gen") {
+		t.Fatalf("generate loc=%q", gen.Header().Get("Location"))
+	}
+	chs, _ := repo.ListChildren(parent.TaskID)
+	keepID := chs[0].TaskID
+	done := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/occurrences/"+keepID, url.Values{
+		"occurrence_status": {"complete"},
+	})
+	if done.Code != http.StatusSeeOther {
+		t.Fatalf("완료 status=%d", done.Code)
+	}
+	if err := repo.CreateActivity(&model.WorkActivity{TaskID: keepID, Content: "1회차 처리", Actor: "관리자"}); err != nil {
+		t.Fatal(err)
+	}
+
+	form := recurrenceForm(url.Values{
+		"interval_n":     {"7"},
+		"change_mode":    {"future"},
+		"start_date":     {"2026-09-01"},
+		"end_date":       {"2026-09-30"},
+		"rule_type":      {"every_n_days"},
+		"holiday_policy": {"as_is"},
+	})
+	reg := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/regenerate", form)
+	if reg.Code != http.StatusSeeOther || strings.Contains(reg.Header().Get("Location"), "err=") {
+		t.Fatalf("재생성 loc=%q", reg.Header().Get("Location"))
+	}
+	still, _ := repo.GetTask(keepID)
+	if still == nil || still.OccurrenceStatus != model.OccurrenceComplete {
+		t.Fatalf("완료 회차가 지워졌다 %+v", still)
+	}
+	acts, _ := repo.ListActivities(keepID)
+	if len(acts) == 0 || acts[0].Content != "1회차 처리" {
+		t.Fatalf("처리 기록이 없다 %+v", acts)
+	}
+
+	del := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/delete", url.Values{})
+	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "err=rec_has_complete") {
+		t.Fatalf("삭제 거부 loc=%q", del.Header().Get("Location"))
+	}
+	if got, _ := repo.GetTask(parent.TaskID); got == nil {
+		t.Fatal("상위가 삭제됐다")
+	}
+	if got, _ := repo.GetTask(keepID); got == nil {
+		t.Fatal("완료 회차가 삭제됐다")
+	}
+
+	getDel := doGet(t, e, "/workboard/tasks/"+parent.TaskID+"/delete")
+	if getDel.Code == http.StatusSeeOther {
+		t.Fatalf("GET 삭제가 동작하면 안 된다 status=%d loc=%q", getDel.Code, getDel.Header().Get("Location"))
+	}
+	if got, _ := repo.GetTask(parent.TaskID); got == nil {
+		t.Fatal("GET이 상위를 지웠다")
+	}
+
+	noConfirm := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/regenerate", recurrenceForm(url.Values{
+		"change_mode": {"replace"},
+		"interval_n":  {"7"},
+	}))
+	if noConfirm.Code != http.StatusSeeOther || !strings.Contains(noConfirm.Header().Get("Location"), "err=rec_replace") {
+		t.Fatalf("replace 확인 없이 loc=%q", noConfirm.Header().Get("Location"))
+	}
+}
