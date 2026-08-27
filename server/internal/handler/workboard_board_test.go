@@ -34,8 +34,14 @@ func newWorkboardServer(t *testing.T, name string) (*echo.Echo, *repository.WBRe
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/workboard/kanban", h.Workboard.Kanban)
 	g.GET("/workboard/tasks", h.Workboard.List)
+	g.GET("/workboard/register", h.Workboard.Register)
+	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.POST("/workboard/projects", h.Workboard.CreateProject)
+	g.POST("/workboard/tasks/:id/subtasks", h.Workboard.CreateSubtasks)
+	g.POST("/workboard/tasks/:id/recurrence/preview", h.Workboard.PreviewRecurrence)
+	g.POST("/workboard/tasks/:id/recurrence/generate", h.Workboard.GenerateRecurrence)
+	g.POST("/workboard/tasks/:id/recurrence/regenerate", h.Workboard.RegenerateRecurrence)
 	return e, repository.NewWBRepo(db)
 }
 

@@ -364,6 +364,20 @@ func gtdFlash(err string) string {
 		return "조치 내용을 입력하세요."
 	case "spent":
 		return "소요 시간(분)은 0보다 커야 합니다. 기본 30분입니다."
+	case "rec_exists":
+		return "이미 실행 작업이 있습니다. 재생성 버튼을 쓰세요."
+	case "rec_year":
+		return "매일 × 1년은 만들 수 없습니다. 기간이나 주기를 줄이세요."
+	case "rec_limit":
+		return "실행 예정일이 500건을 넘으면 만들 수 없습니다."
+	case "rec_warn":
+		return "200건을 넘습니다. 확인란을 선택한 뒤 다시 생성하세요."
+	case "rec_rule":
+		return "반복 규칙·기간을 확인하세요."
+	case "rec_source":
+		return "AS·점검 원본 업무에는 실행 작업을 만들 수 없습니다."
+	case "rec_parent":
+		return "상위 업무에서만 실행 작업을 만들 수 있습니다."
 	default:
 		return ""
 	}

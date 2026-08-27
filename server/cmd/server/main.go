@@ -338,6 +338,9 @@ func main() {
 	wb.POST("/tasks/:id/actions/:aid/update", h.Workboard.UpdateAction)
 	wb.POST("/tasks/:id/activities", h.Workboard.CreateActivity)
 	wb.POST("/tasks/:id/subtasks", h.Workboard.CreateSubtasks)
+	wb.POST("/tasks/:id/recurrence/preview", h.Workboard.PreviewRecurrence)
+	wb.POST("/tasks/:id/recurrence/generate", h.Workboard.GenerateRecurrence)
+	wb.POST("/tasks/:id/recurrence/regenerate", h.Workboard.RegenerateRecurrence)
 	wb.POST("/schedule", h.Workboard.Schedule)
 	wb.POST("/unschedule", h.Workboard.Unschedule)
 

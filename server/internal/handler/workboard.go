@@ -1635,6 +1635,36 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		"Today":          time.Now().Format(dateLayout),
 		"BackURL":        back,
 	}
+	rule := defaultRecurrenceForm(t, data["Today"].(string))
+	if saved, _ := h.repo.GetRecurrence(t.TaskID); saved != nil {
+		rule = *saved
+	}
+	if form, ok := c.Get("recurrence_form").(*model.WorkRecurrence); ok && form != nil {
+		rule = *form
+	}
+	var preview *model.OccurrencePreview
+	if p, ok := c.Get("recurrence_preview").(*model.OccurrencePreview); ok {
+		preview = p
+	}
+	occN, _ := h.repo.CountOccurrences(t.TaskID)
+	holidayBanners := []string{}
+	if preview != nil {
+		holidayBanners = preview.HolidayBanners
+	} else {
+		missing := h.holidayYearMissing()
+		for _, y := range recurrenceYears(rule.StartDate, rule.EndDate) {
+			if missing(y) {
+				holidayBanners = append(holidayBanners, model.HolidayMissingBanner(y))
+			}
+		}
+	}
+	data["Recurrence"] = rule
+	data["WeekdayOn"] = model.ParseWeekdays(rule.Weekdays)
+	data["RecurrencePreview"] = preview
+	data["OccurrenceCount"] = occN
+	data["HolidayBanners"] = holidayBanners
+	data["FlashN"] = c.QueryParam("n")
+	data["FlashReport"] = c.QueryParam("report")
 	h.renderTaskGTD(c, data, t)
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)
 }
