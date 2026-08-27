@@ -274,6 +274,28 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 		return nil, err
 	}
 	out = append(out, wa...)
+
+	_, _ = NewWBRepo(r.db).MarkPastOccurrencesOverdue(today)
+	occItems, err := r.queryWorkTasks(
+		`COALESCE(t.recurrence_role,'')='occurrence'
+		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		 AND COALESCE(t.occurrence_status,'') NOT IN ('complete','skipped')
+		 AND (
+			COALESCE(t.occurrence_status,'')='overdue'
+			OR (TRIM(COALESCE(t.work_date,'')) != '' AND date(t.work_date) < date(?)
+			    AND COALESCE(t.occurrence_status,'') IN ('scheduled','in_progress',''))
+			OR (COALESCE(t.occurrence_status,'')='deferred'
+			    AND (TRIM(COALESCE(t.next_check_date,''))='' OR date(t.next_check_date) < date(?)))
+		 )`,
+		mineUserID, mineKeys, []interface{}{today, today})
+	if err != nil {
+		return nil, err
+	}
+	for i := range occItems {
+		occItems[i].DaysOverdue = daysBetween(occItems[i].ScheduledDate, today)
+		occItems[i].SubLabel = "미완료"
+		out = append(out, occItems[i])
+	}
 	return out, nil
 }
 

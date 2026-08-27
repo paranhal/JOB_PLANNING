@@ -42,27 +42,27 @@ const (
 
 // WorkRecurrence 상위 업무 1건의 기간 내 반복 규칙 (§13.15.4)
 type WorkRecurrence struct {
-	TaskID                 string
-	StartDate              string
-	EndDate                string
-	RuleType               string
-	IntervalN              int
-	Weekdays               string
-	HolidayPolicy          string
-	CompletePolicy         string
-	ProgressIncludeFuture  bool
-	FinalResult            string
-	ManualDates            []string // 폼 전용. DB에 안 넣는다.
+	TaskID                string
+	StartDate             string
+	EndDate               string
+	RuleType              string
+	IntervalN             int
+	Weekdays              string
+	HolidayPolicy         string
+	CompletePolicy        string
+	ProgressIncludeFuture bool
+	FinalResult           string
+	ManualDates           []string // 폼 전용. DB에 안 넣는다.
 }
 
 type OccurrencePreviewItem struct {
-	Date         string
-	Label        string
-	RawDate      string
-	HolidayName  string
-	Moved        bool
-	Skipped      bool
-	Note         string
+	Date        string
+	Label       string
+	RawDate     string
+	HolidayName string
+	Moved       bool
+	Skipped     bool
+	Note        string
 }
 
 type OccurrencePreview struct {
@@ -257,4 +257,102 @@ func (p OccurrencePreview) SummaryLine() string {
 		}
 	}
 	return b.String()
+}
+
+func NormalizeOccurrenceStatus(s string) string {
+	switch strings.TrimSpace(s) {
+	case OccurrenceInProgress, OccurrenceComplete, OccurrenceOverdue, OccurrenceDeferred, OccurrenceSkipped:
+		return s
+	default:
+		return OccurrenceScheduled
+	}
+}
+
+func OccurrenceDone(t WorkTask) bool {
+	return t.Status == WBTaskComplete || t.OccurrenceStatus == OccurrenceComplete
+}
+
+func OccurrenceSkippedStatus(t WorkTask) bool {
+	return t.OccurrenceStatus == OccurrenceSkipped
+}
+
+func OccurrenceOpen(t WorkTask) bool {
+	return !OccurrenceDone(t) && !OccurrenceSkippedStatus(t)
+}
+
+func OccurrenceDueBy(t WorkTask, today string) bool {
+	d := strings.TrimSpace(t.WorkDate)
+	if d == "" {
+		d = strings.TrimSpace(t.DueDate)
+	}
+	return d != "" && d <= today
+}
+
+// OccurrenceProgress 실행 작업 진행률 (§13.15.11)
+type OccurrenceProgress struct {
+	Complete   int
+	Overdue    int
+	Scheduled  int
+	InProgress int
+	Deferred   int
+	Skipped    int
+	Open       int
+	Target     int
+	Percent    int
+	Has        bool
+}
+
+func CalcOccurrenceProgress(items []WorkTask, includeFuture bool, today string) OccurrenceProgress {
+	today = strings.TrimSpace(today)
+	var p OccurrenceProgress
+	for _, t := range items {
+		if t.RecurrenceRole != RecurrenceRoleOccurrence {
+			continue
+		}
+		st := NormalizeOccurrenceStatus(t.OccurrenceStatus)
+		if OccurrenceDone(t) {
+			st = OccurrenceComplete
+		}
+		switch st {
+		case OccurrenceComplete:
+			p.Complete++
+		case OccurrenceOverdue:
+			p.Overdue++
+		case OccurrenceInProgress:
+			p.InProgress++
+		case OccurrenceDeferred:
+			p.Deferred++
+		case OccurrenceSkipped:
+			p.Skipped++
+		default:
+			p.Scheduled++
+		}
+		if OccurrenceOpen(t) {
+			p.Open++
+		}
+		if OccurrenceSkippedStatus(t) {
+			continue
+		}
+		if !includeFuture && !OccurrenceDueBy(t, today) {
+			continue
+		}
+		p.Target++
+	}
+	if p.Target > 0 {
+		done := 0
+		for _, t := range items {
+			if t.RecurrenceRole != RecurrenceRoleOccurrence || OccurrenceSkippedStatus(t) {
+				continue
+			}
+			if !includeFuture && !OccurrenceDueBy(t, today) {
+				continue
+			}
+			if OccurrenceDone(t) {
+				done++
+			}
+		}
+		p.Percent = done * 100 / p.Target
+		p.Has = true
+	}
+	return p
 }

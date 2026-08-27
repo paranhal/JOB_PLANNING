@@ -69,7 +69,7 @@ func (r *WBRepo) UpsertRecurrence(w model.WorkRecurrence) error {
 			holiday_policy=excluded.holiday_policy,
 			complete_policy=excluded.complete_policy,
 			progress_include_future=excluded.progress_include_future,
-			final_result=excluded.final_result,
+			final_result=CASE WHEN TRIM(excluded.final_result)='' THEN work_recurrence.final_result ELSE excluded.final_result END,
 			updated_at=CURRENT_TIMESTAMP`,
 		w.TaskID, w.StartDate, w.EndDate, w.RuleType, w.IntervalN, w.Weekdays,
 		w.HolidayPolicy, w.CompletePolicy, include, w.FinalResult)
@@ -244,4 +244,171 @@ func occurrenceSupports(parentID string, r *WBRepo) []model.WorkTaskMember {
 		}
 	}
 	return out
+}
+
+func (r *WBRepo) MarkPastOccurrencesOverdue(today string) (int, error) {
+	return markPastOccurrencesOverdue(r.db, today)
+}
+
+func markPastOccurrencesOverdue(db *sql.DB, today string) (int, error) {
+	if db == nil {
+		return 0, nil
+	}
+	today = strings.TrimSpace(today)
+	if today == "" {
+		return 0, nil
+	}
+	res, err := db.Exec(`
+		UPDATE work_tasks
+		SET occurrence_status=?, updated_at=CURRENT_TIMESTAMP
+		WHERE COALESCE(recurrence_role,'')=?
+		  AND COALESCE(status,'') NOT IN ('complete','cancelled')
+		  AND COALESCE(occurrence_status,'') NOT IN (?,?,?)
+		  AND (
+			(COALESCE(occurrence_status,'') IN ('scheduled','in_progress','')
+			 AND TRIM(COALESCE(work_date,'')) != ''
+			 AND date(work_date) < date(?))
+			OR
+			(COALESCE(occurrence_status,'')=?
+			 AND (TRIM(COALESCE(next_check_date,''))='' OR date(next_check_date) < date(?)))
+		  )`,
+		model.OccurrenceOverdue, model.RecurrenceRoleOccurrence,
+		model.OccurrenceComplete, model.OccurrenceSkipped, model.OccurrenceOverdue,
+		today, model.OccurrenceDeferred, today)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+func (r *WBRepo) CountOpenOccurrences(parentID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks
+		WHERE parent_task_id=?
+		  AND COALESCE(recurrence_role,'')=?
+		  AND COALESCE(status,'') != ?
+		  AND COALESCE(occurrence_status,'') NOT IN (?,?)`,
+		parentID, model.RecurrenceRoleOccurrence, model.WBTaskComplete,
+		model.OccurrenceComplete, model.OccurrenceSkipped).Scan(&n)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
+}
+
+func (r *WBRepo) UpdateOccurrenceFields(taskID, occStatus, reason, nextCheck string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("업무가 없습니다")
+	}
+	occStatus = model.NormalizeOccurrenceStatus(occStatus)
+	reason = strings.TrimSpace(reason)
+	nextCheck = strings.TrimSpace(nextCheck)
+	if occStatus == model.OccurrenceSkipped && reason == "" {
+		return fmt.Errorf("제외 사유를 입력하세요")
+	}
+	if occStatus == model.OccurrenceDeferred && nextCheck == "" {
+		return fmt.Errorf("다음 조치일을 입력하세요")
+	}
+	status := ""
+	progress := -1
+	switch occStatus {
+	case model.OccurrenceComplete:
+		status = model.WBTaskComplete
+		progress = 100
+	case model.OccurrenceInProgress:
+		status = model.WBTaskInProgress
+	}
+	q := `
+		UPDATE work_tasks SET
+			occurrence_status=?,
+			not_done_reason=?,
+			next_check_date=?,
+			updated_at=CURRENT_TIMESTAMP`
+	args := []interface{}{occStatus, nullIfEmpty(reason), nullIfEmpty(nextCheck)}
+	if status != "" {
+		q += `, status=?`
+		args = append(args, status)
+	}
+	if progress >= 0 {
+		q += `, progress=?, complete_date=CASE WHEN TRIM(COALESCE(complete_date,''))!='' THEN complete_date ELSE date('now','localtime') END`
+		args = append(args, progress)
+	}
+	q += ` WHERE task_id=? AND COALESCE(recurrence_role,'')=?`
+	args = append(args, taskID, model.RecurrenceRoleOccurrence)
+	_, err := r.db.Exec(q, args...)
+	return err
+}
+
+func (r *WBRepo) MaybeAutoCompleteParent(parentID string) error {
+	parentID = strings.TrimSpace(parentID)
+	if parentID == "" {
+		return nil
+	}
+	rule, err := r.GetRecurrence(parentID)
+	if err != nil || rule == nil {
+		return err
+	}
+	if model.NormalizeCompletePolicy(rule.CompletePolicy) == model.CompletePolicyManual {
+		return nil
+	}
+	open, err := r.CountOpenOccurrences(parentID)
+	if err != nil || open > 0 {
+		return err
+	}
+	if model.NormalizeCompletePolicy(rule.CompletePolicy) == model.CompletePolicyRequireResult &&
+		strings.TrimSpace(rule.FinalResult) == "" {
+		return nil
+	}
+	_, err = r.db.Exec(`
+		UPDATE work_tasks
+		SET status=?, progress=100,
+		    complete_note=CASE WHEN TRIM(COALESCE(complete_note,''))='' THEN ? ELSE complete_note END,
+		    complete_date=CASE WHEN TRIM(COALESCE(complete_date,''))='' THEN date('now','localtime') ELSE complete_date END,
+		    updated_at=CURRENT_TIMESTAMP
+		WHERE task_id=? AND COALESCE(status,'') NOT IN ('complete','cancelled')`,
+		model.WBTaskComplete, "실행 작업이 모두 완료·제외되어 자동 완료", parentID)
+	return err
+}
+
+func (r *WBRepo) SetRecurrenceFinalResult(taskID, result string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("상위 업무가 없습니다")
+	}
+	_, err := r.db.Exec(`
+		UPDATE work_recurrence SET final_result=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`,
+		strings.TrimSpace(result), taskID)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return nil
+	}
+	return err
+}
+
+func (r *WBRepo) UpdateRecurrenceSettings(taskID, policy string, includeFuture bool, finalResult string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("상위 업무가 없습니다")
+	}
+	include := 0
+	if includeFuture {
+		include = 1
+	}
+	_, err := r.db.Exec(`
+		UPDATE work_recurrence
+		SET complete_policy=?, progress_include_future=?, final_result=?, updated_at=CURRENT_TIMESTAMP
+		WHERE task_id=?`,
+		model.NormalizeCompletePolicy(policy), include, strings.TrimSpace(finalResult), taskID)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return nil
+	}
+	return err
 }

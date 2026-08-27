@@ -163,3 +163,203 @@ func TestOccurrenceKPIUnchangedForAugustView(t *testing.T) {
 		t.Fatalf("8월 KPI가 바뀌었다 before=%+v after=%+v", before, after)
 	}
 }
+
+func TestMarkPastOccurrencesOverdueLeavesFuture(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "overdue.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	wb := NewWBRepo(db)
+	today := time.Now().Format("2006-01-02")
+	past := time.Now().AddDate(0, 0, -5).Format("2006-01-02")
+	future := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "반복 확인", DueDate: future,
+		Assignee: "양기헌", Status: model.WBTaskWaiting,
+	}
+	if err := wb.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(parent, model.WorkRecurrence{
+		StartDate: past, EndDate: future, RuleType: model.RecurrenceManual,
+		HolidayPolicy: model.HolidayPolicyAsIs, CompletePolicy: model.CompletePolicyManual,
+	}, []string{past, today, future}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := wb.MarkPastOccurrencesOverdue(today)
+	if err != nil || n < 1 {
+		t.Fatalf("marked=%d err=%v", n, err)
+	}
+	children, _ := wb.ListChildren(parent.TaskID)
+	if len(children) != 3 {
+		t.Fatalf("다음 회차가 지워졌다 children=%d", len(children))
+	}
+	byDate := map[string]model.WorkTask{}
+	for _, ch := range children {
+		byDate[ch.WorkDate] = ch
+	}
+	if byDate[past].OccurrenceStatus != model.OccurrenceOverdue {
+		t.Fatalf("과거 상태=%s", byDate[past].OccurrenceStatus)
+	}
+	if byDate[today].OccurrenceStatus != model.OccurrenceScheduled {
+		t.Fatalf("당일까지 미완료가 되면 안 됨 status=%s", byDate[today].OccurrenceStatus)
+	}
+	if byDate[future].OccurrenceStatus != model.OccurrenceScheduled || byDate[future].WorkDate != future {
+		t.Fatalf("미래 회차가 바뀌었다 %+v", byDate[future])
+	}
+
+	board := NewWorkBoardRepo(db)
+	items, counts, err := board.ListUnplanned("", nil, model.UnplannedDelayed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.Delayed < 1 {
+		t.Fatalf("미계획 예정일경과=%d", counts.Delayed)
+	}
+	found := false
+	for _, it := range items {
+		if it.RefID == byDate[past].TaskID && it.HasKind(model.UnplannedDelayed) {
+			found = true
+			if it.CanAssignDate {
+				t.Fatal("실행 작업은 미계획함에서 일자를 바꾸면 안 된다")
+			}
+			if it.SubLabel != "미완료" {
+				t.Fatalf("SubLabel=%s", it.SubLabel)
+			}
+		}
+		if it.RefID == byDate[future].TaskID {
+			t.Fatal("미래 실행 작업이 일정이 지난 건에 올랐다")
+		}
+	}
+	if !found {
+		t.Fatal("미완료 실행 작업이 미계획 업무함에 없다")
+	}
+}
+
+func TestCompletePolicyAutoManualRequireResult(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "policy.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	wb := NewWBRepo(db)
+	dates := []string{"2026-09-01", "2026-09-04"}
+
+	autoParent := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "자동완료", DueDate: "2026-09-30", Status: model.WBTaskWaiting, Assignee: "양기헌"}
+	if err := wb.CreateTask(autoParent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(autoParent, model.WorkRecurrence{
+		StartDate: "2026-09-01", EndDate: "2026-09-30", RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyAuto,
+	}, dates); err != nil {
+		t.Fatal(err)
+	}
+	chs, _ := wb.ListChildren(autoParent.TaskID)
+	if err := wb.UpdateOccurrenceFields(chs[0].TaskID, model.OccurrenceComplete, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.UpdateOccurrenceFields(chs[1].TaskID, model.OccurrenceSkipped, "휴일 제외", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.MaybeAutoCompleteParent(autoParent.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := wb.GetTask(autoParent.TaskID)
+	if got.Status != model.WBTaskComplete {
+		t.Fatalf("auto 상위 상태=%s", got.Status)
+	}
+	still, _ := wb.GetTask(chs[1].TaskID)
+	if still == nil || still.OccurrenceStatus != model.OccurrenceSkipped {
+		t.Fatalf("제외 기록이 지워졌다 %+v", still)
+	}
+
+	manualParent := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "수동완료", DueDate: "2026-09-30", Status: model.WBTaskWaiting, Assignee: "양기헌"}
+	if err := wb.CreateTask(manualParent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(manualParent, model.WorkRecurrence{
+		StartDate: "2026-09-01", EndDate: "2026-09-30", RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyManual,
+	}, dates); err != nil {
+		t.Fatal(err)
+	}
+	mchs, _ := wb.ListChildren(manualParent.TaskID)
+	_ = wb.UpdateOccurrenceFields(mchs[0].TaskID, model.OccurrenceComplete, "", "")
+	_ = wb.UpdateOccurrenceFields(mchs[1].TaskID, model.OccurrenceComplete, "", "")
+	_ = wb.MaybeAutoCompleteParent(manualParent.TaskID)
+	got, _ = wb.GetTask(manualParent.TaskID)
+	if got.Status == model.WBTaskComplete {
+		t.Fatal("manual은 담당자가 완료하기 전에 상위가 끝나면 안 된다")
+	}
+
+	reqParent := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "결과필수", DueDate: "2026-09-30", Status: model.WBTaskWaiting, Assignee: "양기헌"}
+	if err := wb.CreateTask(reqParent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(reqParent, model.WorkRecurrence{
+		StartDate: "2026-09-01", EndDate: "2026-09-30", RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyRequireResult,
+	}, dates); err != nil {
+		t.Fatal(err)
+	}
+	rchs, _ := wb.ListChildren(reqParent.TaskID)
+	_ = wb.UpdateOccurrenceFields(rchs[0].TaskID, model.OccurrenceComplete, "", "")
+	_ = wb.UpdateOccurrenceFields(rchs[1].TaskID, model.OccurrenceComplete, "", "")
+	_ = wb.MaybeAutoCompleteParent(reqParent.TaskID)
+	got, _ = wb.GetTask(reqParent.TaskID)
+	if got.Status == model.WBTaskComplete {
+		t.Fatal("최종 결과 없이 require_result가 완료되면 안 된다")
+	}
+	if err := wb.SetRecurrenceFinalResult(reqParent.TaskID, "9월 확인 종료"); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.MaybeAutoCompleteParent(reqParent.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = wb.GetTask(reqParent.TaskID)
+	if got.Status != model.WBTaskComplete {
+		t.Fatalf("최종 결과 후 상위 상태=%s", got.Status)
+	}
+}
+
+func TestParentCompleteKeepsOpenOccurrenceRows(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "keep.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	wb := NewWBRepo(db)
+	parent := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "기록유지", DueDate: "2026-09-30", Status: model.WBTaskWaiting, Assignee: "양기헌"}
+	if err := wb.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(parent, model.WorkRecurrence{
+		StartDate: "2026-09-01", EndDate: "2026-09-30", RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyManual,
+	}, []string{"2026-09-01", "2026-09-04"}); err != nil {
+		t.Fatal(err)
+	}
+	chs, _ := wb.ListChildren(parent.TaskID)
+	openID := chs[0].TaskID
+	if err := wb.UpdateOccurrenceFields(openID, model.OccurrenceOverdue, "미처리", ""); err != nil {
+		t.Fatal(err)
+	}
+	parent.Status = model.WBTaskComplete
+	parent.CompleteNote = "상위로 종결"
+	if err := wb.UpdateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	left, err := wb.GetTask(openID)
+	if err != nil || left == nil {
+		t.Fatalf("미완료 실행 작업이 지워졌다 err=%v", err)
+	}
+	if left.OccurrenceStatus != model.OccurrenceOverdue {
+		t.Fatalf("미완료 기록이 바뀌었다 %+v", left)
+	}
+	n, _ := wb.CountOccurrences(parent.TaskID)
+	if n != 2 {
+		t.Fatalf("실행 작업 수=%d", n)
+	}
+}
