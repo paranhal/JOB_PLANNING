@@ -2,6 +2,7 @@ package repository
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -361,5 +362,110 @@ func TestParentCompleteKeepsOpenOccurrenceRows(t *testing.T) {
 	n, _ := wb.CountOccurrences(parent.TaskID)
 	if n != 2 {
 		t.Fatalf("실행 작업 수=%d", n)
+	}
+}
+
+func TestOccurrenceChangeModesAndDeleteProtect(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "chg.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	wb := NewWBRepo(db)
+	today := time.Now().Format("2006-01-02")
+	past := time.Now().AddDate(0, 0, -5).Format("2006-01-02")
+	future := time.Now().AddDate(0, 0, 10).Format("2006-01-02")
+	future2 := time.Now().AddDate(0, 0, 17).Format("2006-01-02")
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "일정변경", DueDate: future2,
+		Assignee: "양기헌", Status: model.WBTaskWaiting,
+	}
+	if err := wb.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(parent, model.WorkRecurrence{
+		StartDate: past, EndDate: future, RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyManual,
+	}, []string{past, future}); err != nil {
+		t.Fatal(err)
+	}
+	chs, _ := wb.ListChildren(parent.TaskID)
+	var pastID, futureID string
+	for _, ch := range chs {
+		switch ch.WorkDate {
+		case past:
+			pastID = ch.TaskID
+		case future:
+			futureID = ch.TaskID
+		}
+	}
+	if err := wb.UpdateOccurrenceFields(pastID, model.OccurrenceComplete, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.CreateActivity(&model.WorkActivity{
+		TaskID: pastID, Content: "8월 회차 확인 완료", Actor: "양기헌",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	keepAdd, err := wb.ApplyOccurrenceChange(parent, model.WorkRecurrence{
+		StartDate: past, EndDate: future2, RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyManual,
+	}, []string{past, future, future2}, model.RecurrenceChangeKeepAdd, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keepAdd.Deleted != 0 || keepAdd.Created != 1 {
+		t.Fatalf("keep_add %+v", keepAdd)
+	}
+	if got, _ := wb.GetTask(futureID); got == nil {
+		t.Fatal("keep_add가 기존 미래를 지웠다")
+	}
+
+	res, err := wb.ApplyOccurrenceChange(parent, model.WorkRecurrence{
+		StartDate: past, EndDate: future2, RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyManual,
+	}, []string{past, future, future2}, model.RecurrenceChangeFuture, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.KeptComplete != 1 {
+		t.Fatalf("완료 유지 %+v", res)
+	}
+	still, _ := wb.GetTask(pastID)
+	if still == nil || still.OccurrenceStatus != model.OccurrenceComplete {
+		t.Fatalf("완료 회차가 바뀌었다 %+v", still)
+	}
+	acts, _ := wb.ListActivities(pastID)
+	if len(acts) != 1 || acts[0].Content != "8월 회차 확인 완료" {
+		t.Fatalf("처리 기록이 지워졌다 %+v", acts)
+	}
+	if got, _ := wb.GetTask(futureID); got != nil {
+		t.Fatalf("미래 미완료가 남아 있다 %+v deleted=%d", got, res.Deleted)
+	}
+
+	if err := wb.DeleteParentTask(parent.TaskID); err == nil {
+		t.Fatal("완료 회차가 있는 상위는 삭제가 거부돼야 한다")
+	} else if !strings.Contains(err.Error(), "보관") {
+		t.Fatalf("보관 안내 없음: %v", err)
+	}
+	if got, _ := wb.GetTask(parent.TaskID); got == nil {
+		t.Fatal("거부했는데 상위가 지워졌다")
+	}
+	if got, _ := wb.GetTask(pastID); got == nil {
+		t.Fatal("삭제 거부 시 완료 회차도 남아야 한다")
+	}
+
+	if err := wb.SetRecurrenceArchived(parent.TaskID, true); err != nil {
+		t.Fatal(err)
+	}
+	listed, _ := wb.ListTasks()
+	for _, it := range listed {
+		if it.TaskID == parent.TaskID || it.TaskID == pastID {
+			t.Fatalf("보관한 상위·실행이 목록에 남음 %s", it.TaskID)
+		}
+	}
+	if got, _ := wb.GetTask(pastID); got == nil {
+		t.Fatal("보관이 완료 회차를 지웠다")
 	}
 }

@@ -16,12 +16,13 @@ func (r *WBRepo) GetRecurrence(taskID string) (*model.WorkRecurrence, error) {
 	row := r.db.QueryRow(`
 		SELECT task_id, COALESCE(start_date,''), COALESCE(end_date,''), COALESCE(rule_type,'none'),
 		       COALESCE(interval_n,1), COALESCE(weekdays,''), COALESCE(holiday_policy,'as_is'),
-		       COALESCE(complete_policy,'manual'), COALESCE(progress_include_future,0), COALESCE(final_result,'')
+		       COALESCE(complete_policy,'manual'), COALESCE(progress_include_future,0), COALESCE(final_result,''),
+		       COALESCE(archived,0)
 		FROM work_recurrence WHERE task_id=?`, taskID)
 	var w model.WorkRecurrence
-	var include int
+	var include, archived int
 	err := row.Scan(&w.TaskID, &w.StartDate, &w.EndDate, &w.RuleType, &w.IntervalN, &w.Weekdays,
-		&w.HolidayPolicy, &w.CompletePolicy, &include, &w.FinalResult)
+		&w.HolidayPolicy, &w.CompletePolicy, &include, &w.FinalResult, &archived)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -32,6 +33,7 @@ func (r *WBRepo) GetRecurrence(taskID string) (*model.WorkRecurrence, error) {
 		return nil, err
 	}
 	w.ProgressIncludeFuture = include != 0
+	w.Archived = archived != 0
 	w.RuleType = model.NormalizeRecurrenceRuleType(w.RuleType)
 	w.HolidayPolicy = model.NormalizeHolidayPolicy(w.HolidayPolicy)
 	w.CompletePolicy = model.NormalizeCompletePolicy(w.CompletePolicy)
@@ -103,18 +105,22 @@ func (r *WBRepo) GenerateOccurrences(parent *model.WorkTask, rule model.WorkRecu
 	if n > 0 {
 		return out, fmt.Errorf("이미 실행 작업이 있습니다. 재생성 버튼을 쓰세요")
 	}
-	return r.writeOccurrences(parent, rule, dates, false)
+	return r.writeOccurrences(parent, rule, dates, "", "")
 }
 
 func (r *WBRepo) RegenerateOccurrences(parent *model.WorkTask, rule model.WorkRecurrence, dates []string) (model.OccurrenceGenerateResult, error) {
+	return r.ApplyOccurrenceChange(parent, rule, dates, model.RecurrenceChangeReplace, "")
+}
+
+func (r *WBRepo) ApplyOccurrenceChange(parent *model.WorkTask, rule model.WorkRecurrence, dates []string, mode, today string) (model.OccurrenceGenerateResult, error) {
 	var out model.OccurrenceGenerateResult
 	if parent == nil || parent.TaskID == "" {
 		return out, fmt.Errorf("상위 업무가 없습니다")
 	}
-	return r.writeOccurrences(parent, rule, dates, true)
+	return r.writeOccurrences(parent, rule, dates, model.NormalizeRecurrenceChangeMode(mode), strings.TrimSpace(today))
 }
 
-func (r *WBRepo) writeOccurrences(parent *model.WorkTask, rule model.WorkRecurrence, dates []string, regenerate bool) (model.OccurrenceGenerateResult, error) {
+func (r *WBRepo) writeOccurrences(parent *model.WorkTask, rule model.WorkRecurrence, dates []string, changeMode, today string) (model.OccurrenceGenerateResult, error) {
 	var out model.OccurrenceGenerateResult
 	rule.TaskID = parent.TaskID
 	if err := r.UpsertRecurrence(rule); err != nil {
@@ -135,7 +141,7 @@ func (r *WBRepo) writeOccurrences(parent *model.WorkTask, rule model.WorkRecurre
 
 	keepDates := map[string]bool{}
 	maxSeq := 0
-	if regenerate {
+	if changeMode != "" {
 		children, err := r.ListChildren(parent.TaskID)
 		if err != nil {
 			return out, err
@@ -145,6 +151,7 @@ func (r *WBRepo) writeOccurrences(parent *model.WorkTask, rule model.WorkRecurre
 			return out, err
 		}
 		listedOcc := 0
+		var delIDs []string
 		for _, ch := range children {
 			if ch.RecurrenceRole != model.RecurrenceRoleOccurrence {
 				continue
@@ -156,31 +163,27 @@ func (r *WBRepo) writeOccurrences(parent *model.WorkTask, rule model.WorkRecurre
 			if ch.OccurrenceSeq > maxSeq {
 				maxSeq = ch.OccurrenceSeq
 			}
-			complete := ch.Status == model.WBTaskComplete || ch.OccurrenceStatus == model.OccurrenceComplete
-			if complete {
-				out.KeptComplete++
+			if model.KeepOccurrenceOnChange(ch, changeMode, today) {
+				if model.OccurrenceDone(ch) {
+					out.KeptComplete++
+				} else if !model.OccurrenceSkippedStatus(ch) {
+					out.KeptPast++
+				}
 				if d := strings.TrimSpace(ch.WorkDate); d != "" {
 					keepDates[d] = true
 				}
+				continue
 			}
+			delIDs = append(delIDs, ch.TaskID)
 		}
 		if listedOcc != sqlCount {
 			out.ParentMismatch++
 		}
-		res, err := r.db.Exec(`
-			DELETE FROM work_tasks
-			WHERE parent_task_id=?
-			  AND COALESCE(recurrence_role,'')=?
-			  AND COALESCE(status,'') != ?
-			  AND COALESCE(occurrence_status,'') != ?`,
-			parent.TaskID, model.RecurrenceRoleOccurrence, model.WBTaskComplete, model.OccurrenceComplete)
+		n, err := r.deleteIncompleteOccurrences(parent.TaskID, delIDs)
 		if err != nil {
 			return out, err
 		}
-		if res != nil {
-			n, _ := res.RowsAffected()
-			out.Deleted = int(n)
-		}
+		out.Deleted = n
 	}
 
 	supports := occurrenceSupports(parent.TaskID, r)
@@ -204,10 +207,170 @@ func (r *WBRepo) writeOccurrences(parent *model.WorkTask, rule model.WorkRecurre
 	if err != nil {
 		return out, err
 	}
-	if linked != out.Created+out.KeptComplete {
+	kept, _ := r.CountCompleteOccurrences(parent.TaskID)
+	if kept < out.KeptComplete || linked < out.KeptComplete {
 		out.ParentMismatch++
 	}
 	return out, nil
+}
+
+func (r *WBRepo) deleteIncompleteOccurrences(parentID string, ids []string) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	// 완료·제외 행은 WHERE에서 한 번 더 막아 처리 기록이 따라 지워지지 않게 한다.
+	ph := make([]string, len(ids))
+	args := []interface{}{parentID, model.RecurrenceRoleOccurrence, model.WBTaskComplete, model.OccurrenceComplete, model.OccurrenceSkipped}
+	for i, id := range ids {
+		ph[i] = "?"
+		args = append(args, id)
+	}
+	in := strings.Join(ph, ",")
+	guard := `
+		SELECT task_id FROM work_tasks
+		WHERE parent_task_id=?
+		  AND COALESCE(recurrence_role,'')=?
+		  AND COALESCE(status,'') != ?
+		  AND COALESCE(occurrence_status,'') NOT IN (?,?)
+		  AND task_id IN (` + in + `)`
+	// 완료·제외 회차의 처리 기록은 어떤 경우에도 지우지 않는다.
+	if _, err := r.db.Exec(`DELETE FROM work_activities WHERE task_id IN (`+guard+`)`, args...); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return 0, err
+	}
+	if _, err := r.db.Exec(`DELETE FROM work_actions WHERE task_id IN (`+guard+`)`, args...); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return 0, err
+	}
+	res, err := r.db.Exec(`
+		DELETE FROM work_tasks
+		WHERE parent_task_id=?
+		  AND COALESCE(recurrence_role,'')=?
+		  AND COALESCE(status,'') != ?
+		  AND COALESCE(occurrence_status,'') NOT IN (?,?)
+		  AND task_id IN (`+in+`)`, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+func (r *WBRepo) CountCompleteOccurrences(parentID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks
+		WHERE parent_task_id=?
+		  AND COALESCE(recurrence_role,'')=?
+		  AND (COALESCE(status,'')=? OR COALESCE(occurrence_status,'')=?)`,
+		parentID, model.RecurrenceRoleOccurrence, model.WBTaskComplete, model.OccurrenceComplete).Scan(&n)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
+}
+
+func (r *WBRepo) SetRecurrenceArchived(taskID string, archived bool) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("상위 업무가 없습니다")
+	}
+	v := 0
+	if archived {
+		v = 1
+	}
+	res, err := r.db.Exec(`
+		UPDATE work_recurrence SET archived=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, v, taskID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return fmt.Errorf("반복 규칙이 없습니다")
+		}
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("반복 규칙이 없습니다")
+	}
+	return nil
+}
+
+func (r *WBRepo) DeleteParentTask(taskID string) error {
+	taskID = strings.TrimSpace(taskID)
+	t, err := r.GetTask(taskID)
+	if err != nil || t == nil {
+		return fmt.Errorf("업무가 없습니다")
+	}
+	if t.ParentTaskID != "" {
+		if model.OccurrenceDone(*t) {
+			return fmt.Errorf("완료된 실행 작업은 삭제할 수 없습니다")
+		}
+		return fmt.Errorf("실행 작업은 상위 업무에서 일정을 바꾸세요")
+	}
+	n, err := r.CountCompleteOccurrences(taskID)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("완료된 실행 작업이 있어 삭제할 수 없습니다. 보관으로 내리세요")
+	}
+	if _, err := r.db.Exec(`
+		DELETE FROM work_tasks
+		WHERE parent_task_id=?
+		  AND COALESCE(recurrence_role,'')=?
+		  AND COALESCE(status,'') != ?
+		  AND COALESCE(occurrence_status,'') != ?`,
+		taskID, model.RecurrenceRoleOccurrence, model.WBTaskComplete, model.OccurrenceComplete); err != nil {
+		return err
+	}
+	left, err := r.CountCompleteOccurrences(taskID)
+	if err != nil {
+		return err
+	}
+	if left > 0 {
+		return fmt.Errorf("완료된 실행 작업이 있어 삭제할 수 없습니다. 보관으로 내리세요")
+	}
+	if _, err := r.db.Exec(`DELETE FROM work_recurrence WHERE task_id=?`, taskID); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	_, err = r.db.Exec(`DELETE FROM work_tasks WHERE task_id=? AND COALESCE(parent_task_id,'')=''`, taskID)
+	return err
+}
+
+func (r *WBRepo) archivedRecurrenceParents() map[string]bool {
+	out := map[string]bool{}
+	if r == nil || r.db == nil {
+		return out
+	}
+	rows, err := r.db.Query(`SELECT task_id FROM work_recurrence WHERE COALESCE(archived,0)=1`)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && strings.TrimSpace(id) != "" {
+			out[id] = true
+		}
+	}
+	return out
+}
+
+func hideArchivedRecurrence(items []model.WorkTask, archived map[string]bool) []model.WorkTask {
+	if len(archived) == 0 {
+		return items
+	}
+	out := make([]model.WorkTask, 0, len(items))
+	for _, t := range items {
+		if archived[t.TaskID] || archived[t.ParentTaskID] {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
 }
 
 func occurrenceFromParent(parent *model.WorkTask, finalDue, workDate string, seq int) *model.WorkTask {

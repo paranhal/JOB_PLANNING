@@ -48,7 +48,20 @@ func applyWorkRecurrence(db *sql.DB) {
 		ON work_tasks(parent_task_id, recurrence_role)`); err != nil {
 		log.Printf("017 idx_work_tasks_recurrence_parent: %v", err)
 	}
+	if !workRecurrenceHasColumn(db, "archived") {
+		if _, err := db.Exec(`ALTER TABLE work_recurrence ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`); err != nil {
+			log.Printf("018 work_recurrence.archived: %v", err)
+		}
+	}
 	markMetaDone(db, workRecurrenceMetaKey)
+}
+
+func workRecurrenceHasColumn(db *sql.DB, name string) bool {
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('work_recurrence') WHERE name=?`, name).Scan(&n); err != nil {
+		return false
+	}
+	return n > 0
 }
 
 func workTaskHasColumn(db *sql.DB, name string) bool {

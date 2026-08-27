@@ -35,6 +35,10 @@ const (
 	OccurrenceDeferred   = "deferred"
 	OccurrenceSkipped    = "skipped"
 
+	RecurrenceChangeFuture  = "future"   // 미완료 미래만 다시 생성 (기본)
+	RecurrenceChangeKeepAdd = "keep_add" // 기존 유지 + 새 일정만 추가
+	RecurrenceChangeReplace = "replace"  // 모든 미완료 삭제 후 재생성
+
 	RecurrenceWarnLimit   = 200
 	RecurrenceRejectLimit = 500
 	RecurrenceDailyYearN  = 365
@@ -52,6 +56,7 @@ type WorkRecurrence struct {
 	CompletePolicy        string
 	ProgressIncludeFuture bool
 	FinalResult           string
+	Archived              bool     // 보관. 완료 회차를 지우지 않고 목록에서만 내린다.
 	ManualDates           []string // 폼 전용. DB에 안 넣는다.
 }
 
@@ -75,19 +80,156 @@ type OccurrencePreview struct {
 	Reject500      bool
 	RejectYear     bool
 	Error          string
+	ChangeMode     string
+	Duplicates     []string
+	ChangeNotes    []string
+	WillCreate     int
+	WillDelete     int
+	KeptComplete   int
+	KeptOpenPast   int
 }
 
 // OccurrenceGenerateResult 생성·재생성 건수 보고. §13.15.3
 type OccurrenceGenerateResult struct {
 	Created        int
 	KeptComplete   int
+	KeptPast       int
 	Deleted        int
 	ParentMismatch int
 }
 
 func (r OccurrenceGenerateResult) Report() string {
-	return fmt.Sprintf("생성 %d건 · 완료 유지 %d건 · 미완료 삭제 %d건 · 부모연결 불일치 %d건",
-		r.Created, r.KeptComplete, r.Deleted, r.ParentMismatch)
+	return fmt.Sprintf("생성 %d건 · 완료 유지 %d건 · 지난 일정 유지 %d건 · 미완료 삭제 %d건 · 부모연결 불일치 %d건",
+		r.Created, r.KeptComplete, r.KeptPast, r.Deleted, r.ParentMismatch)
+}
+
+func NormalizeRecurrenceChangeMode(s string) string {
+	switch strings.TrimSpace(s) {
+	case RecurrenceChangeKeepAdd, RecurrenceChangeReplace:
+		return s
+	default:
+		return RecurrenceChangeFuture
+	}
+}
+
+func RecurrenceChangeModeLabel(s string) string {
+	switch NormalizeRecurrenceChangeMode(s) {
+	case RecurrenceChangeKeepAdd:
+		return "기존 유지 + 새 일정만 추가"
+	case RecurrenceChangeReplace:
+		return "모든 미완료 일정 삭제 후 재생성"
+	default:
+		return "미완료 미래 일정만 다시 생성"
+	}
+}
+
+func OccurrenceProtected(t WorkTask) bool {
+	return OccurrenceDone(t) || OccurrenceSkippedStatus(t)
+}
+
+func occurrenceDate(t WorkTask) string {
+	d := strings.TrimSpace(t.WorkDate)
+	if d == "" {
+		d = strings.TrimSpace(t.DueDate)
+	}
+	return d
+}
+
+func KeepOccurrenceOnChange(t WorkTask, mode, today string) bool {
+	if t.RecurrenceRole != RecurrenceRoleOccurrence {
+		return true
+	}
+	if OccurrenceProtected(t) {
+		return true
+	}
+	switch NormalizeRecurrenceChangeMode(mode) {
+	case RecurrenceChangeKeepAdd:
+		return true
+	case RecurrenceChangeFuture:
+		d := occurrenceDate(t)
+		return d != "" && today != "" && d <= today
+	default:
+		return false
+	}
+}
+
+// AnnotateOccurrenceChange 일정 변경 미리보기. 쓰기는 하지 않는다. §13.15.8
+func AnnotateOccurrenceChange(p *OccurrencePreview, children []WorkTask, mode, today string) {
+	if p == nil {
+		return
+	}
+	mode = NormalizeRecurrenceChangeMode(mode)
+	today = strings.TrimSpace(today)
+	p.ChangeMode = mode
+	remain := map[string]bool{}
+	exist := map[string]bool{}
+	p.WillDelete, p.KeptComplete, p.KeptOpenPast = 0, 0, 0
+	for _, ch := range children {
+		if ch.RecurrenceRole != RecurrenceRoleOccurrence {
+			continue
+		}
+		d := occurrenceDate(ch)
+		if d != "" {
+			exist[d] = true
+		}
+		if KeepOccurrenceOnChange(ch, mode, today) {
+			if d != "" {
+				remain[d] = true
+			}
+			if OccurrenceDone(ch) {
+				p.KeptComplete++
+			} else if !OccurrenceSkippedStatus(ch) {
+				p.KeptOpenPast++
+			}
+			continue
+		}
+		p.WillDelete++
+	}
+	var dups, create []string
+	for _, d := range p.Dates {
+		d = strings.TrimSpace(d)
+		if d == "" {
+			continue
+		}
+		if exist[d] {
+			dups = append(dups, d)
+		}
+		if !remain[d] {
+			create = append(create, d)
+		}
+	}
+	p.Duplicates = dups
+	p.WillCreate = len(create)
+	var notes []string
+	switch mode {
+	case RecurrenceChangeKeepAdd:
+		notes = append(notes, fmt.Sprintf("기존 일정은 그대로 두고 없는 날짜만 추가합니다. 추가 %d건.", p.WillCreate))
+		if len(dups) > 0 {
+			notes = append(notes, "중복 "+strconv.Itoa(len(dups))+"건은 이미 있어 추가하지 않습니다. "+joinOccurrenceLabels(dups, 8))
+		}
+	case RecurrenceChangeReplace:
+		notes = append(notes, fmt.Sprintf("완료·제외 %d건은 그대로 둡니다. 미완료 %d건을 지우고 다시 만듭니다(추가 %d건).",
+			p.KeptComplete, p.WillDelete, p.WillCreate))
+	default:
+		notes = append(notes, fmt.Sprintf("지난 일정 %d건·완료 %d건은 그대로 둡니다. 미완료 미래 %d건을 지우고 다시 만듭니다(추가 %d건).",
+			p.KeptOpenPast, p.KeptComplete, p.WillDelete, p.WillCreate))
+	}
+	p.ChangeNotes = notes
+}
+
+func joinOccurrenceLabels(dates []string, max int) string {
+	var b strings.Builder
+	for i, d := range dates {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(FormatOccurrenceLabel(d))
+		if i+1 >= max && len(dates) > max {
+			b.WriteString(" …")
+			break
+		}
+	}
+	return b.String()
 }
 
 func NormalizeRecurrenceRuleType(s string) string {

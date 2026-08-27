@@ -127,7 +127,11 @@ func (r *WBRepo) ListTasks() ([]model.WorkTask, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanWorkTasks(rows)
+	items, err := scanWorkTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+	return hideArchivedRecurrence(items, r.archivedRecurrenceParents()), nil
 }
 
 func (r *WBRepo) GetTask(id string) (*model.WorkTask, error) {
