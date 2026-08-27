@@ -430,7 +430,9 @@ func funcMap() template.FuncMap {
 		"codeLabel": func(val string, codes interface{}) string {
 			return val
 		},
-		"wbTaskStatusLabel":    model.WBTaskStatusLabel,
+		"wbTaskStatusLabel":     model.WBTaskStatusLabel,
+		"occurrenceStatusLabel": model.OccurrenceStatusLabel,
+		"recurrenceRuleLabel":   model.RecurrenceRuleLabel,
 		"wbAdminStatusLabel":   model.WBAdminStatusLabel,
 		"wbActionStatusLabel":  model.WBActionStatusLabel,
 		"wbActivityTypeLabel":  model.WBActivityTypeLabel,

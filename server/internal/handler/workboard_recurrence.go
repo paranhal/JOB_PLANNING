@@ -170,3 +170,110 @@ func (h *WorkboardHandler) runOccurrenceWrite(c echo.Context, regenerate bool) e
 		"&n="+fmt.Sprintf("%d", res.Created)+
 		"&report="+url.QueryEscape(res.Report()))
 }
+
+func (h *WorkboardHandler) recurrenceCompleteErr(existing, t *model.WorkTask, c echo.Context) string {
+	if existing == nil || t == nil {
+		return ""
+	}
+	if t.Status != model.WBTaskComplete || existing.Status == model.WBTaskComplete {
+		return ""
+	}
+	if existing.ParentTaskID != "" {
+		return ""
+	}
+	occN, err := h.repo.CountOccurrences(existing.TaskID)
+	if err != nil || occN == 0 {
+		return ""
+	}
+	open, _ := h.repo.CountOpenOccurrences(existing.TaskID)
+	if open > 0 && c.FormValue("confirm_incomplete_occ") != "1" {
+		return "rec_open"
+	}
+	rule, _ := h.repo.GetRecurrence(existing.TaskID)
+	if rule != nil && model.NormalizeCompletePolicy(rule.CompletePolicy) == model.CompletePolicyRequireResult {
+		result := strings.TrimSpace(rule.FinalResult)
+		if result == "" {
+			result = strings.TrimSpace(c.FormValue("final_result"))
+		}
+		if result == "" {
+			return "rec_result"
+		}
+	}
+	if fr := strings.TrimSpace(c.FormValue("final_result")); fr != "" {
+		_ = h.repo.SetRecurrenceFinalResult(existing.TaskID, fr)
+	}
+	return ""
+}
+
+func (h *WorkboardHandler) saveOccurrenceStatus(existing, t *model.WorkTask, c echo.Context) error {
+	if existing == nil || existing.RecurrenceRole != model.RecurrenceRoleOccurrence {
+		return nil
+	}
+	occ := strings.TrimSpace(c.FormValue("occurrence_status"))
+	if occ == "" && t != nil && t.Status == model.WBTaskComplete {
+		occ = model.OccurrenceComplete
+	}
+	if occ == "" {
+		return nil
+	}
+	err := h.repo.UpdateOccurrenceFields(existing.TaskID, occ,
+		c.FormValue("not_done_reason"), c.FormValue("next_check_date"))
+	if err != nil {
+		return err
+	}
+	return h.repo.MaybeAutoCompleteParent(existing.ParentTaskID)
+}
+
+func (h *WorkboardHandler) UpdateOccurrence(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	parentID := c.Param("id")
+	oid := c.Param("oid")
+	occ, err := h.repo.GetTask(oid)
+	if err != nil || occ == nil {
+		return echo.ErrNotFound
+	}
+	loc := "/workboard/tasks/" + parentID
+	if occ.ParentTaskID != parentID || occ.RecurrenceRole != model.RecurrenceRoleOccurrence {
+		return echo.ErrNotFound
+	}
+	status := strings.TrimSpace(c.FormValue("occurrence_status"))
+	if status == "" {
+		status = model.OccurrenceComplete
+	}
+	if err := h.repo.UpdateOccurrenceFields(oid, status, c.FormValue("not_done_reason"), c.FormValue("next_check_date")); err != nil {
+		code := "rec_rule"
+		if strings.Contains(err.Error(), "제외 사유") {
+			code = "rec_skip_reason"
+		} else if strings.Contains(err.Error(), "다음 조치일") {
+			code = "rec_defer_date"
+		}
+		return c.Redirect(http.StatusSeeOther, loc+"?err="+code)
+	}
+	_ = h.repo.MaybeAutoCompleteParent(parentID)
+	return c.Redirect(http.StatusSeeOther, loc+"?ok=saved")
+}
+
+func (h *WorkboardHandler) SaveRecurrenceSettings(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	t, err := h.repo.GetTask(id)
+	if err != nil || t == nil {
+		return echo.ErrNotFound
+	}
+	loc := "/workboard/tasks/" + id
+	if t.ParentTaskID != "" {
+		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_parent")
+	}
+	if err := h.repo.UpdateRecurrenceSettings(id,
+		c.FormValue("complete_policy"),
+		c.FormValue("progress_include_future") == "1",
+		c.FormValue("final_result")); err != nil {
+		return err
+	}
+	_ = h.repo.MaybeAutoCompleteParent(id)
+	return c.Redirect(http.StatusSeeOther, loc+"?ok=saved")
+}

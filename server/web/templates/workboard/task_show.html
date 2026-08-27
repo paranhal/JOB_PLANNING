@@ -5,6 +5,7 @@
 {{$t := .Task}}
 <div class="{{if .IsAdminGTD}}max-w-4xl{{else}}max-w-3xl{{end}} mx-auto space-y-5"
      x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo',
+       openOcc: {{if .OpenOccurrenceCount}}{{.OpenOccurrenceCount}}{{else}}0{{end}},
        memberRows: [{{range $i, $m := .SupportMembers}}{{if $i}},{{end}}{name:{{printf "%q" $m.Assignee}}, mins:{{if $m.DurationMin}}'{{$m.DurationMin}}'{{else}}''{{end}}}{{end}}],
        leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{printf "%q" $n}}{{end}}] }">
   <div class="flex items-start justify-between gap-3">
@@ -50,6 +51,48 @@
   {{if .FlashErr}}
   <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
     {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "sales_linked"}}이미 원본이 연결된 업무입니다.{{else if eq .FlashErr "activity"}}영업 활동으로 만들 수 없습니다.{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
+  </div>
+  {{end}}
+
+  {{if and (gt .OccurrenceCount 0) (eq $t.ParentTaskID "")}}
+  <div class="bg-white rounded-xl border border-indigo-200 p-5 space-y-3">
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <p class="text-xs text-gray-500">{{.Recurrence.StartDate}} ~ {{.Recurrence.EndDate}}</p>
+        <p class="text-sm text-gray-700 mt-0.5">{{if eq .Recurrence.RuleType "every_n_days"}}{{.Recurrence.IntervalN}}일마다{{else if eq .Recurrence.RuleType "every_n_weeks"}}{{.Recurrence.IntervalN}}주마다{{else}}{{recurrenceRuleLabel .Recurrence.RuleType}}{{end}}{{if .NextOccurrence}} · 다음 실행 {{.NextOccurrence}}{{end}}</p>
+      </div>
+      <p class="text-2xl font-bold text-indigo-800">{{if .OccProgress.Has}}{{.OccProgress.Percent}}%{{else}}—{{end}}</p>
+    </div>
+    <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-full bg-indigo-500 rounded-full" style="width: {{if .OccProgress.Has}}{{.OccProgress.Percent}}{{else}}0{{end}}%"></div>
+    </div>
+    <p class="text-sm text-gray-600">완료 {{.OccProgress.Complete}} · 미완료 {{.OccProgress.Overdue}} · 예정 {{.OccProgress.Scheduled}}{{if .OccProgress.Skipped}} · 제외 {{.OccProgress.Skipped}}{{end}}</p>
+    {{if .NeedFinalResult}}
+    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">실행 작업이 모두 완료·제외됐습니다. 최종 결과를 입력하면 상위 업무가 완료됩니다.</p>
+    {{end}}
+    {{if .CanWrite}}
+    <form method="post" action="/workboard/tasks/{{$t.TaskID}}/recurrence/settings" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">완료 정책</label>
+        <select name="complete_policy" class="w-full border rounded-lg px-3 py-2">
+          <option value="manual" {{if eq .Recurrence.CompletePolicy "manual"}}selected{{end}}>담당자 최종 완료</option>
+          <option value="auto" {{if eq .Recurrence.CompletePolicy "auto"}}selected{{end}}>전부 완료 시 자동</option>
+          <option value="require_result" {{if eq .Recurrence.CompletePolicy "require_result"}}selected{{end}}>최종 결과 필수</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 text-gray-600 sm:mt-6">
+        <input type="checkbox" name="progress_include_future" value="1" {{if .Recurrence.ProgressIncludeFuture}}checked{{end}}>
+        진행률에 미래 일정 포함
+      </label>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-500 mb-1">최종 결과</label>
+        <textarea name="final_result" rows="2" class="w-full border rounded-lg px-3 py-2">{{.Recurrence.FinalResult}}</textarea>
+      </div>
+      <div>
+        <button class="px-4 py-2 border border-indigo-300 text-indigo-800 rounded-lg">설정 저장</button>
+      </div>
+    </form>
+    {{end}}
   </div>
   {{end}}
 
@@ -145,7 +188,8 @@
   {{end}}
 
   {{if .CanWrite}}
-  <form method="post" action="/workboard/tasks/{{$t.TaskID}}/update" class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 text-sm">
+  <form method="post" action="/workboard/tasks/{{$t.TaskID}}/update" class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 text-sm"
+        @submit="if (status === 'complete' && openOcc > 0) { var box = $refs.confirmOcc; if (box && !box.checked) { if (!confirm('완료되지 않은 실행 작업이 ' + openOcc + '건 있습니다. 전체 업무를 완료 처리하시겠습니까?')) { $event.preventDefault(); return } box.checked = true } }">
     <input type="hidden" name="back" value="{{.BackURL}}">
 
     {{if or $isAS $isMnt}}
@@ -278,6 +322,12 @@
           <option value="complete" {{if eq $t.Status "complete"}}selected{{end}}>완료</option>
           {{end}}
         </select>
+        {{if and (eq $t.ParentTaskID "") (gt .OpenOccurrenceCount 0)}}
+        <label class="mt-2 flex items-start gap-2 text-xs text-amber-800">
+          <input type="checkbox" name="confirm_incomplete_occ" value="1" class="mt-0.5" x-ref="confirmOcc">
+          완료되지 않은 실행 작업이 {{.OpenOccurrenceCount}}건 있습니다. 전체 업무를 완료 처리합니다.
+        </label>
+        {{end}}
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">우선순위</label>
@@ -288,6 +338,28 @@
           <option value="low" {{if eq $t.Priority "low"}}selected{{end}}>낮음</option>
         </select>
       </div>
+      {{if eq $t.RecurrenceRole "occurrence"}}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">실행 작업 상태</label>
+        <select name="occurrence_status" class="w-full border rounded-lg px-3 py-2">
+          <option value="scheduled" {{if or (eq $t.OccurrenceStatus "scheduled") (eq $t.OccurrenceStatus "")}}selected{{end}}>예정</option>
+          <option value="in_progress" {{if eq $t.OccurrenceStatus "in_progress"}}selected{{end}}>진행중</option>
+          <option value="complete" {{if eq $t.OccurrenceStatus "complete"}}selected{{end}}>완료</option>
+          <option value="overdue" {{if eq $t.OccurrenceStatus "overdue"}}selected{{end}}>미완료</option>
+          <option value="deferred" {{if eq $t.OccurrenceStatus "deferred"}}selected{{end}}>연기</option>
+          <option value="skipped" {{if eq $t.OccurrenceStatus "skipped"}}selected{{end}}>제외</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">미완료·제외 사유</label>
+        <input name="not_done_reason" value="{{$t.NotDoneReason}}" class="w-full border rounded-lg px-3 py-2" placeholder="제외할 때 필수">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">다음 조치일</label>
+        <input type="date" name="next_check_date" value="{{$t.NextCheckDate}}" class="w-full border rounded-lg px-3 py-2">
+        <p class="text-[11px] text-gray-400 mt-1">연기는 다음 조치일이 필요합니다.</p>
+      </div>
+      {{end}}
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
         <select name="assignee" required class="w-full border rounded-lg px-3 py-2">
@@ -689,7 +761,7 @@
 
   {{if .Children}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <h3 class="px-4 py-3 font-semibold border-b bg-gray-50">하위업무 {{len .Children}}건</h3>
+    <h3 class="px-4 py-3 font-semibold border-b bg-gray-50">{{if gt .OccurrenceCount 0}}실행 작업{{else}}하위업무{{end}} {{len .Children}}건</h3>
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">
         <tr>
@@ -697,6 +769,7 @@
           <th class="text-left px-4 py-2">업무</th>
           <th class="text-left px-4 py-2">시간</th>
           <th class="text-left px-4 py-2">상태</th>
+          {{if and $.CanWrite (gt .OccurrenceCount 0)}}<th class="text-left px-4 py-2">처리</th>{{end}}
         </tr>
       </thead>
       <tbody class="divide-y">
@@ -705,7 +778,29 @@
           <td class="px-4 py-2 whitespace-nowrap">{{if .WorkDate}}{{.WorkDate}}{{else}}{{.DueDate}}{{end}}</td>
           <td class="px-4 py-2"><a href="/workboard/tasks/{{.TaskID}}" class="text-blue-600 hover:underline">{{.Title}}</a></td>
           <td class="px-4 py-2 text-gray-500">{{if .StartTime}}{{.StartTime}}~{{.EndTime}}{{else}}미배치{{end}}</td>
-          <td class="px-4 py-2">{{wbTaskStatusLabel .Status}}</td>
+          <td class="px-4 py-2">{{if eq .RecurrenceRole "occurrence"}}{{occurrenceStatusLabel .OccurrenceStatus}}{{else}}{{wbTaskStatusLabel .Status}}{{end}}</td>
+          {{if and $.CanWrite (eq .RecurrenceRole "occurrence")}}
+          <td class="px-4 py-2">
+            {{if and (ne .OccurrenceStatus "complete") (ne .OccurrenceStatus "skipped")}}
+            <form method="post" action="/workboard/tasks/{{$.Task.TaskID}}/occurrences/{{.TaskID}}" class="flex flex-wrap gap-1 items-center">
+              <input type="hidden" name="occurrence_status" value="complete">
+              <button class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">완료</button>
+            </form>
+            <form method="post" action="/workboard/tasks/{{$.Task.TaskID}}/occurrences/{{.TaskID}}" class="mt-1 flex flex-wrap gap-1 items-center">
+              <input type="hidden" name="occurrence_status" value="skipped">
+              <input name="not_done_reason" placeholder="제외 사유" class="border rounded px-2 py-1 text-xs w-28">
+              <button class="px-2 py-1 text-xs border rounded">제외</button>
+            </form>
+            <form method="post" action="/workboard/tasks/{{$.Task.TaskID}}/occurrences/{{.TaskID}}" class="mt-1 flex flex-wrap gap-1 items-center">
+              <input type="hidden" name="occurrence_status" value="deferred">
+              <input type="date" name="next_check_date" class="border rounded px-2 py-1 text-xs">
+              <button class="px-2 py-1 text-xs border rounded">연기</button>
+            </form>
+            {{end}}
+          </td>
+          {{else if and $.CanWrite (gt $.OccurrenceCount 0)}}
+          <td class="px-4 py-2"></td>
+          {{end}}
         </tr>
         {{end}}
       </tbody>

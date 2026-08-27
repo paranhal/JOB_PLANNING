@@ -42,6 +42,9 @@ func newWorkboardServer(t *testing.T, name string) (*echo.Echo, *repository.WBRe
 	g.POST("/workboard/tasks/:id/recurrence/preview", h.Workboard.PreviewRecurrence)
 	g.POST("/workboard/tasks/:id/recurrence/generate", h.Workboard.GenerateRecurrence)
 	g.POST("/workboard/tasks/:id/recurrence/regenerate", h.Workboard.RegenerateRecurrence)
+	g.POST("/workboard/tasks/:id/recurrence/settings", h.Workboard.SaveRecurrenceSettings)
+	g.POST("/workboard/tasks/:id/occurrences/:oid", h.Workboard.UpdateOccurrence)
+	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
 	return e, repository.NewWBRepo(db)
 }
 

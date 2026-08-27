@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -341,6 +342,10 @@ func actionBack(c echo.Context, taskID string) string {
 }
 
 func gtdFlash(err string) string {
+	return gtdFlashMsg(err, "")
+}
+
+func gtdFlashMsg(err, n string) string {
 	switch err {
 	case "hold_required":
 		return "보류는 사유와 재검토일이 필요합니다."
@@ -378,6 +383,17 @@ func gtdFlash(err string) string {
 		return "AS·점검 원본 업무에는 실행 작업을 만들 수 없습니다."
 	case "rec_parent":
 		return "상위 업무에서만 실행 작업을 만들 수 있습니다."
+	case "rec_open":
+		if strings.TrimSpace(n) == "" {
+			n = "0"
+		}
+		return fmt.Sprintf("완료되지 않은 실행 작업이 %s건 있습니다. 전체 업무를 완료 처리하시겠습니까?", n)
+	case "rec_result":
+		return "최종 결과를 입력해야 완료됩니다."
+	case "rec_skip_reason":
+		return "제외 사유를 입력하세요."
+	case "rec_defer_date":
+		return "다음 조치일을 입력하세요."
 	default:
 		return ""
 	}

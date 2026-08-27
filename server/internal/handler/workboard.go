@@ -1479,6 +1479,18 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther,
 			"/workboard/tasks/"+id+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
+	if code := h.recurrenceCompleteErr(existing, t, c); code != "" {
+		loc := "/workboard/tasks/" + id + "?err=" + code
+		if code == "rec_open" {
+			open, _ := h.repo.CountOpenOccurrences(id)
+			loc += "&n=" + fmt.Sprintf("%d", open)
+		}
+		back := strings.TrimSpace(c.FormValue("back"))
+		if back != "" {
+			loc += "&back=" + url.QueryEscape(back)
+		}
+		return c.Redirect(http.StatusSeeOther, loc)
+	}
 	if t.StartTime != "" {
 		if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, t.TaskID, occupancyNames(t.Assignee, supports)); msg != "" {
 			return c.Redirect(http.StatusSeeOther,
@@ -1487,6 +1499,15 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	}
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
+	}
+	if err := h.saveOccurrenceStatus(existing, t, c); err != nil {
+		code := "rec_rule"
+		if strings.Contains(err.Error(), "제외 사유") {
+			code = "rec_skip_reason"
+		} else if strings.Contains(err.Error(), "다음 조치일") {
+			code = "rec_defer_date"
+		}
+		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+id+"?err="+code)
 	}
 	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
 	if adminGTD {
@@ -1519,6 +1540,8 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 // ShowTask 업무 상세 — AS/점검 원본 링크·하위업무 관리
 func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 	id := c.Param("id")
+	today := time.Now().Format(dateLayout)
+	_, _ = h.repo.MarkPastOccurrencesOverdue(today)
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil {
 		return echo.ErrNotFound
@@ -1631,7 +1654,7 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		"CanWrite":       canWriteWorkboard(c),
 		"FlashOK":        c.QueryParam("ok"),
 		"FlashErr":       c.QueryParam("err"),
-		"FlashErrMsg":    gtdFlash(c.QueryParam("err")),
+		"FlashErrMsg":    gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n")),
 		"Today":          time.Now().Format(dateLayout),
 		"BackURL":        back,
 	}
@@ -1665,6 +1688,32 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 	data["HolidayBanners"] = holidayBanners
 	data["FlashN"] = c.QueryParam("n")
 	data["FlashReport"] = c.QueryParam("report")
+	prog := model.CalcOccurrenceProgress(children, rule.ProgressIncludeFuture, today)
+	data["OccProgress"] = prog
+	data["OpenOccurrenceCount"] = prog.Open
+	data["IsOccurrence"] = t.RecurrenceRole == model.RecurrenceRoleOccurrence
+	data["NeedFinalResult"] = occN > 0 &&
+		model.NormalizeCompletePolicy(rule.CompletePolicy) == model.CompletePolicyRequireResult &&
+		prog.Open == 0 && strings.TrimSpace(rule.FinalResult) == "" &&
+		t.Status != model.WBTaskComplete
+	nextOcc := ""
+	for _, ch := range children {
+		if ch.RecurrenceRole != model.RecurrenceRoleOccurrence || !model.OccurrenceOpen(ch) {
+			continue
+		}
+		d := strings.TrimSpace(ch.WorkDate)
+		if d == "" {
+			d = strings.TrimSpace(ch.DueDate)
+		}
+		if d >= today {
+			nextOcc = d
+			break
+		}
+		if nextOcc == "" {
+			nextOcc = d
+		}
+	}
+	data["NextOccurrence"] = nextOcc
 	h.renderTaskGTD(c, data, t)
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)
 }
