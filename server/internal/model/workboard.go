@@ -517,6 +517,10 @@ type WorkTask struct {
 	CompleteNote   string    `json:"complete_note"`
 	ReceiptDate    string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
 	CompleteDate   string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
+	RecurrenceRole    string `json:"recurrence_role,omitempty"`
+	OccurrenceSeq     int    `json:"occurrence_seq,omitempty"`
+	OccurrenceStatus  string `json:"occurrence_status,omitempty"`
+	NotDoneReason     string `json:"not_done_reason,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 

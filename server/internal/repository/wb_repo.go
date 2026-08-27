@@ -25,6 +25,8 @@ const workTaskSelect = `
 		       COALESCE(t.wait_party_kind,''), COALESCE(t.wait_party,''), COALESCE(t.wait_request,''),
 		       COALESCE(t.reply_due_date,''), COALESCE(t.next_check_date,''), COALESCE(t.complete_note,''),
 		       COALESCE(t.receipt_date,''), COALESCE(t.complete_date,''),
+		       COALESCE(t.recurrence_role,''), COALESCE(t.occurrence_seq,0),
+		       COALESCE(t.occurrence_status,''), COALESCE(t.not_done_reason,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
 		       t.created_at, t.updated_at,
 		       COALESCE(p.name,''), COALESCE(p.color,'')
@@ -146,7 +148,7 @@ func (r *WBRepo) GetTask(id string) (*model.WorkTask, error) {
 func (r *WBRepo) ListChildren(parentID string) ([]model.WorkTask, error) {
 	rows, err := r.db.Query(workTaskSelect+`
 		WHERE t.parent_task_id=?
-		ORDER BY COALESCE(NULLIF(t.work_date,''), t.due_date), t.start_time, t.title`, parentID)
+		ORDER BY COALESCE(t.occurrence_seq,0), COALESCE(NULLIF(t.work_date,''), t.due_date), t.start_time, t.title`, parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -677,15 +679,17 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 			work_date, start_time, end_time, duration_min, status, priority, assignee, tags, progress,
 			source_type, source_id, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
-			reply_due_date, next_check_date, complete_note, receipt_date, complete_date)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
+			recurrence_role, occurrence_seq, occurrence_status, not_done_reason)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
-		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate))
+		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate),
+		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason))
 	if err != nil {
 		return err
 	}
@@ -924,6 +928,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&t.WaitPartyKind, &t.WaitParty, &t.WaitRequest,
 			&t.ReplyDueDate, &t.NextCheckDate, &t.CompleteNote,
 			&t.ReceiptDate, &t.CompleteDate,
+			&t.RecurrenceRole, &t.OccurrenceSeq, &t.OccurrenceStatus, &t.NotDoneReason,
 			&t.OrgName,
 			&created, &updated,
 			&t.ProjectName, &t.ProjectColor,

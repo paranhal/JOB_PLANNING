@@ -26,6 +26,7 @@ var restoreTables = map[string]string{
 	"sales_projects":           "sales_id",
 	"sales_stage_history":      "history_id",
 	"work_tasks":               "task_id",
+	"work_recurrence":          "task_id",
 	"work_actions":             "action_id",
 	"work_activities":          "activity_id",
 	"maintenance_visits":       "visit_id",

@@ -495,6 +495,10 @@ CREATE TABLE IF NOT EXISTS work_tasks (
     customer_name   TEXT,
     receipt_date    TEXT,
     complete_date   TEXT,
+    recurrence_role    TEXT,
+    occurrence_seq     INTEGER,
+    occurrence_status  TEXT,
+    not_done_reason    TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES work_projects(project_id)
@@ -1057,6 +1061,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWorkTaskMembers(db)
 	applyV214ProjectKindRollback(db)
 	applySalesProjects(db)
+	applyWorkRecurrence(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
 	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&

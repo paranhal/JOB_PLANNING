@@ -145,6 +145,44 @@ func (c *Calendar) WorkingDaysBetween(from, to string) int {
 	return n
 }
 
+// NextWorkingDay date 가 근무일이면 그대로, 아니면 이후 첫 근무일. 판정은 IsWorkingDay 만 쓴다.
+func (c *Calendar) NextWorkingDay(date string) string {
+	if c == nil {
+		c = &Calendar{}
+	}
+	t, _, ok := parseHolidayDate(date)
+	if !ok {
+		return ""
+	}
+	for i := 0; i < 366; i++ {
+		ds := t.Format("2006-01-02")
+		if c.IsWorkingDay(ds) {
+			return ds
+		}
+		t = t.AddDate(0, 0, 1)
+	}
+	return ""
+}
+
+// PrevWorkingDay date 가 근무일이면 그대로, 아니면 이전 첫 근무일. 판정은 IsWorkingDay 만 쓴다.
+func (c *Calendar) PrevWorkingDay(date string) string {
+	if c == nil {
+		c = &Calendar{}
+	}
+	t, _, ok := parseHolidayDate(date)
+	if !ok {
+		return ""
+	}
+	for i := 0; i < 366; i++ {
+		ds := t.Format("2006-01-02")
+		if c.IsWorkingDay(ds) {
+			return ds
+		}
+		t = t.AddDate(0, 0, -1)
+	}
+	return ""
+}
+
 func IsHoliday(date string) (bool, string) {
 	return defaultCal.IsHoliday(date)
 }
