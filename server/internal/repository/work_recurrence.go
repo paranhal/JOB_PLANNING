@@ -303,11 +303,18 @@ func (r *WBRepo) DeleteParentTask(taskID string) error {
 	if err != nil || t == nil {
 		return fmt.Errorf("업무가 없습니다")
 	}
-	if t.ParentTaskID != "" {
+	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {
 		if model.OccurrenceDone(*t) {
 			return fmt.Errorf("완료된 실행 작업은 삭제할 수 없습니다")
 		}
 		return fmt.Errorf("실행 작업은 상위 업무에서 일정을 바꾸세요")
+	}
+	nSub, err := r.CountSubtasks(taskID)
+	if err != nil {
+		return err
+	}
+	if nSub > 0 {
+		return model.ErrHasSubtasks{N: nSub}
 	}
 	n, err := r.CountCompleteOccurrences(taskID)
 	if err != nil {
@@ -336,7 +343,7 @@ func (r *WBRepo) DeleteParentTask(taskID string) error {
 		!strings.Contains(err.Error(), "no such table") {
 		return err
 	}
-	_, err = r.db.Exec(`DELETE FROM work_tasks WHERE task_id=? AND COALESCE(parent_task_id,'')=''`, taskID)
+	_, err = r.db.Exec(`DELETE FROM work_tasks WHERE task_id=?`, taskID)
 	return err
 }
 

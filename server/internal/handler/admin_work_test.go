@@ -236,3 +236,75 @@ func TestAdminWorkNewFormSection33Labels(t *testing.T) {
 		t.Fatal("등록 폼에 상태·우선순위 입력란이 있다")
 	}
 }
+
+func TestAdminWorkCreateSubtaskPrefillAndDepth(t *testing.T) {
+	e, repo := newAdminWorkServer(t)
+	rec := doForm(t, e, "/admin-work", url.Values{
+		"work_type":     {"admin"},
+		"customer_name": {"충남교육청"},
+		"title":         {"상위 업무"},
+		"due_date":      {"2026-09-30"},
+		"assignee":      {"관리자"},
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("parent loc=%q", rec.Header().Get("Location"))
+	}
+	items, err := repo.ListAdminWork("", "")
+	if err != nil || len(items) != 1 {
+		t.Fatalf("len=%d err=%v", len(items), err)
+	}
+	parent := items[0]
+	form := doGet(t, e, "/admin-work/new?parent="+parent.TaskID)
+	if form.Code != http.StatusOK {
+		t.Fatalf("form status=%d", form.Code)
+	}
+	body := form.Body.String()
+	if !strings.Contains(body, `name="parent_task_id"`) || !strings.Contains(body, parent.TaskID) {
+		t.Fatal("상위 번호가 폼에 없다")
+	}
+	if !strings.Contains(body, "충남교육청") {
+		t.Fatal("거래처 기본값이 없다")
+	}
+
+	rec = doForm(t, e, "/admin-work", url.Values{
+		"work_type":      {"admin"},
+		"title":          {"1단계 하위"},
+		"due_date":       {"2026-09-10"},
+		"parent_task_id": {parent.TaskID},
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("child loc=%q", rec.Header().Get("Location"))
+	}
+	child, err := repo.GetTask(parent.TaskID + "-1")
+	if err != nil || child == nil {
+		t.Fatalf("child missing err=%v", err)
+	}
+	if child.ParentTaskID != parent.TaskID {
+		t.Fatalf("parent=%q", child.ParentTaskID)
+	}
+
+	rec = doForm(t, e, "/admin-work", url.Values{
+		"work_type":      {"admin"},
+		"title":          {"2단계 하위"},
+		"due_date":       {"2026-09-11"},
+		"parent_task_id": {child.TaskID},
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("grandchild loc=%q", rec.Header().Get("Location"))
+	}
+	g := parent.TaskID + "-1-1"
+	rec = doForm(t, e, "/admin-work", url.Values{
+		"work_type":      {"admin"},
+		"title":          {"4단계"},
+		"due_date":       {"2026-09-12"},
+		"parent_task_id": {g},
+	})
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=sub_depth") {
+		t.Fatalf("depth loc=%q", rec.Header().Get("Location"))
+	}
+
+	list := doGet(t, e, "/admin-work")
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "＋하위 업무 등록") {
+		t.Fatal("목록에 하위 등록 버튼이 없다")
+	}
+}

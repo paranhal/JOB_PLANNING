@@ -18,12 +18,19 @@
     <tbody class="divide-y divide-gray-100">
       {{range .Items}}
       <tr class="hover:bg-violet-50/40">
-        <td class="px-3 py-2 whitespace-nowrap font-mono">
+        <td class="px-3 py-2 whitespace-nowrap font-mono {{if eq .Depth 2}}pl-7{{else if eq .Depth 3}}pl-12{{end}}">
           <a href="/admin-work/{{.TaskID}}{{if $.FromStats}}?from=stats{{end}}" class="text-blue-600 hover:underline">{{.TaskID}}</a>
+          {{if and $.CanWrite (ne .RecurrenceRole "occurrence") (or (eq .Depth 0) (eq .Depth 1) (eq .Depth 2))}}
+          <button type="button" class="ml-1 text-[11px] text-violet-700 hover:underline"
+                  data-id="{{.TaskID}}" data-assignee="{{.Assignee}}" data-customer="{{.CustomerID}}"
+                  data-customer-name="{{.CustomerName}}" data-project="{{.ProjectID}}" data-work-type="{{.WorkType}}"
+                  data-redirect="{{if $.FromStats}}/admin-work/stats{{else}}/admin-work{{end}}"
+                  @click="openSub($el)">＋하위 업무 등록</button>
+          {{end}}
         </td>
         <td class="px-3 py-2 whitespace-nowrap">{{wbWorkTypeLabel .WorkType}}</td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{if .CustomerLabel}}{{.CustomerLabel}}{{else}}—{{end}}</td>
-        <td class="px-3 py-2 text-gray-800 max-w-[22rem]"><div class="line-clamp-2">{{.Title}}</div></td>
+        <td class="px-3 py-2 text-gray-800 max-w-[22rem]"><div class="line-clamp-2 {{if eq .Depth 2}}pl-3{{else if eq .Depth 3}}pl-6{{end}}">{{.Title}}</div></td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .ProjectName}}{{.ProjectName}}{{else}}—{{end}}</td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>

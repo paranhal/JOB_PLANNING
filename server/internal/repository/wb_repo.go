@@ -169,7 +169,7 @@ func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
 	}
 	var items []model.WorkTask
 	for _, t := range all {
-		if t.WorkDate == "" {
+		if t.WorkDate == "" || t.RecurrenceRole == model.RecurrenceRoleParent {
 			continue
 		}
 		if t.WorkDate >= from && t.WorkDate <= to {
@@ -192,6 +192,9 @@ func (r *WBRepo) ListTasksDatedBetween(from, to string) ([]model.WorkTask, error
 			d = strings.TrimSpace(t.DueDate)
 		}
 		if d == "" || d < from || d > to {
+			continue
+		}
+		if t.RecurrenceRole == model.RecurrenceRoleParent {
 			continue
 		}
 		items = append(items, t)
@@ -239,6 +242,7 @@ func (r *WBRepo) ListTasksByDate(date string) ([]model.WorkTask, error) {
 func (r *WBRepo) ListTasksOnDate(date string) ([]model.WorkTask, error) {
 	rows, err := r.db.Query(workTaskSelect+`
 		WHERE COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),'')) = ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'
 		ORDER BY
 		  CASE t.status
 		    WHEN 'waiting' THEN 1 WHEN 'in_progress' THEN 2
@@ -284,7 +288,7 @@ func (r *WBRepo) ASStatusesByIDs(ids []string) (map[string]string, error) {
 	return out, rows.Err()
 }
 
-// ListUnplacedAdminTasks 일자가 확정되지 않은(WorkDate 없음) 행정/지원 업무(상위·하위 포함).
+// ListUnplacedAdminTasks 일자가 확정되지 않은(WorkDate 없음) 행정/지원 실행 작업. 반복 상위는 제외.
 // WorkDate가 있으면 왼쪽 시간표 쪽이며 우측 대기 목록에는 두지 않는다.
 func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 	all, err := r.ListTasks()
@@ -300,6 +304,9 @@ func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 			continue
 		}
 		if t.WorkType != model.WBWorkAdmin && t.WorkType != model.WBWorkSupport {
+			continue
+		}
+		if t.RecurrenceRole == model.RecurrenceRoleParent {
 			continue
 		}
 		if strings.TrimSpace(t.WorkDate) == "" {
@@ -329,7 +336,8 @@ type AdminWorkStats struct {
 func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) {
 	q := workTaskSelect + `
 		WHERE t.work_type IN ('admin','support')
-		  AND TRIM(COALESCE(t.source_type,'')) = ''`
+		  AND TRIM(COALESCE(t.source_type,'')) = ''
+		  AND COALESCE(t.recurrence_role,'') != 'occurrence'`
 	args := []interface{}{}
 	switch strings.TrimSpace(status) {
 	case "inbox":
@@ -671,14 +679,12 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	if err := model.RequireAppDateYear(t.WorkDate); err != nil {
 		return err
 	}
-	id, err := r.nextID("work_task", "WT")
-	if err != nil {
+	if err := r.assignNewTaskID(t); err != nil {
 		return err
 	}
-	t.TaskID = id
 	normalizeWorkTask(t)
 	stampNewWorkTaskDates(t)
-	_, err = r.db.Exec(`
+	_, err := r.db.Exec(`
 		INSERT INTO work_tasks (task_id, work_type, project_id, title, description, due_date,
 			work_date, start_time, end_time, duration_min, status, priority, assignee, tags, progress,
 			source_type, source_id, parent_task_id, customer_id, customer_name,
@@ -852,6 +858,9 @@ func stampNewWorkTaskDates(t *model.WorkTask) {
 func (r *WBRepo) CreateSubtasks(parent *model.WorkTask, dates []string) (int, error) {
 	if parent == nil || parent.TaskID == "" {
 		return 0, fmt.Errorf("상위 업무가 없습니다")
+	}
+	if err := r.CanAttachSubtask(parent.TaskID); err != nil {
+		return 0, err
 	}
 	n := 0
 	seen := map[string]bool{}

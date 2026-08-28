@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -321,10 +322,13 @@ func (h *WorkboardHandler) DeleteRecurrenceParent(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	loc := "/workboard/tasks/" + id
-	if t.ParentTaskID != "" {
+	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {
 		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_has_complete")
 	}
 	if err := h.repo.DeleteParentTask(id); err != nil {
+		if n, ok := model.HasSubtasksN(err); ok {
+			return c.Redirect(http.StatusSeeOther, loc+"?err=has_subtasks&n="+strconv.Itoa(n))
+		}
 		if strings.Contains(err.Error(), "보관") {
 			return c.Redirect(http.StatusSeeOther, loc+"?err=rec_has_complete")
 		}

@@ -137,7 +137,7 @@
         기간 내 반복 실행
       </label>
       <div class="flex items-center justify-between gap-2 pt-2">
-        <button type="button" class="px-4 py-2 text-sm border rounded-lg text-gray-700">＋하위 업무 등록</button>
+        <button type="button" class="px-4 py-2 text-sm border rounded-lg text-gray-700" @click="alert('상위 업무를 저장한 뒤 상세에서 하위 업무를 등록하세요.')">＋하위 업무 등록</button>
         <div class="flex gap-2">
           <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
           <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">저장</button>

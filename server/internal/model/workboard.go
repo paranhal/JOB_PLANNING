@@ -38,8 +38,9 @@ const (
 
 // 업무 등록 시간표에 올리는 카드의 출처. 빈 값은 행정관련 업무(직접 등록).
 const (
-	WBSourceAS          = "as"
-	WBSourceMaintenance = "maintenance"
+	WBSourceAS            = "as"
+	WBSourceMaintenance   = "maintenance"
+	WBSourceSalesActivity = "sales_activity"
 )
 
 // work_task_members.member_role (§7.7.2). work_tasks.assignee 는 주담당(owner)과 같다.
@@ -55,6 +56,8 @@ func WBCategory(sourceType string) string {
 		return WBSourceAS
 	case WBSourceMaintenance:
 		return WBSourceMaintenance
+	case WBSourceSalesActivity:
+		return WBSourceSalesActivity
 	default:
 		return WBWorkAdmin
 	}
@@ -66,6 +69,8 @@ func WBCategoryLabel(cat string) string {
 		return "AS"
 	case WBSourceMaintenance:
 		return "점검"
+	case WBSourceSalesActivity:
+		return "영업"
 	default:
 		return "행정"
 	}
@@ -77,6 +82,8 @@ func WBCategoryClass(cat string) string {
 		return "bg-rose-100 text-rose-800 border border-rose-300 border-l-[3px] border-l-rose-500 shadow-sm"
 	case WBSourceMaintenance:
 		return "bg-sky-100 text-sky-800 border border-sky-300 border-l-[3px] border-l-sky-500 shadow-sm"
+	case WBSourceSalesActivity:
+		return "bg-orange-100 text-orange-800 border border-orange-300 border-l-[3px] border-l-orange-500 shadow-sm"
 	default:
 		return "bg-violet-100 text-violet-800 border border-violet-300 border-l-[3px] border-l-violet-500 shadow-sm"
 	}
@@ -321,6 +328,7 @@ type WorkProject struct {
 	ContactID       string `json:"contact_id"`        // 고객 담당자
 	Color           string `json:"color"`
 	Status          string `json:"status"`
+	SalesProjectID  string `json:"sales_project_id,omitempty"` // 승격 원본 (§32.10). 승격 외에 쓰지 않는다.
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 
@@ -529,6 +537,7 @@ type WorkTask struct {
 	OrgName      string `json:"org_name,omitempty"` // 거래처 표시명(기관명 또는 직접입력)
 	DaysLeft     int    `json:"days_left"`
 	ChildCount   int    `json:"child_count,omitempty"`
+	Depth        int    `json:"depth,omitempty"` // 목록 들여쓰기(1=상위)
 	BoardHref    string `json:"board_href,omitempty"` // 칸반·목록 링크(원본 AS/점검 등)
 	WaitingActionCount int `json:"waiting_action_count,omitempty"` // 목록 뱃지: 회신 대기 n건
 }

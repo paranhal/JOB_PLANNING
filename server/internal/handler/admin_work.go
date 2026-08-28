@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,6 +31,10 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 		return err
 	}
 	fillWaitingActionCounts(h.repo, items)
+	h.repo.FillTaskDepth(items)
+	projects, _ := h.repo.ListProjects(true)
+	assignees, _ := h.userRepo.ListAssignable()
+	customers, _ := h.customerRepo.ListAll()
 	flashErr := c.QueryParam("err")
 	return c.Render(http.StatusOK, "admin_work/list.html", map[string]interface{}{
 		"Title":        "행정관련업무등록/처리",
@@ -40,9 +45,12 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 		"Total":        len(items),
 		"Today":        time.Now().Format("2006-01-02"),
 		"CanWrite":     canWriteWorkboard(c),
+		"Projects":     projects,
+		"Assignees":    assignees,
+		"Customers":    customers,
 		"FlashOK":      c.QueryParam("ok"),
 		"FlashErr":     flashErr,
-		"FlashErrText": gtdFlash(flashErr),
+		"FlashErrText": gtdFlashMsg(flashErr, c.QueryParam("n")),
 	})
 }
 
@@ -60,6 +68,10 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 		return err
 	}
 	fillWaitingActionCounts(h.repo, items)
+	h.repo.FillTaskDepth(items)
+	projects, _ := h.repo.ListProjects(true)
+	assignees, _ := h.userRepo.ListAssignable()
+	customers, _ := h.customerRepo.ListAll()
 	return c.Render(http.StatusOK, "admin_work/stats.html", map[string]interface{}{
 		"Title":      "행정관련업무현황",
 		"Active":     NavAdminWorkStats,
@@ -70,6 +82,9 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 		"Today":      time.Now().Format("2006-01-02"),
 		"FromStats":  true,
 		"CanWrite":   canWriteWorkboard(c),
+		"Projects":   projects,
+		"Assignees":  assignees,
+		"Customers":  customers,
 	})
 }
 
@@ -80,7 +95,7 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 	projects, _ := h.repo.ListProjects(true)
 	assignees, _ := h.userRepo.ListAssignable()
 	customers, _ := h.customerRepo.ListAll()
-	return c.Render(http.StatusOK, "admin_work/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":     "행정관련업무 등록",
 		"Active":    NavAdminWork,
 		"Projects":  projects,
@@ -88,7 +103,22 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 		"Customers": customers,
 		"Today":     time.Now().Format("2006-01-02"),
 		"FlashErr":  c.QueryParam("err"),
-	})
+	}
+	parentID := strings.TrimSpace(c.QueryParam("parent"))
+	if parentID != "" {
+		parent, err := h.repo.GetTask(parentID)
+		if err != nil || parent == nil {
+			data["FlashErr"] = "sub_parent"
+		} else if err := h.repo.CanAttachSubtask(parentID); err != nil {
+			data["FlashErr"] = subtaskErrQuery(err)
+		} else {
+			data["Parent"] = parent
+		}
+	} else {
+		choices, _ := h.repo.ListSubtaskParentCandidates("")
+		data["ParentChoices"] = choices
+	}
+	return c.Render(http.StatusOK, "admin_work/form.html", data)
 }
 
 func (h *AdminWorkHandler) Create(c echo.Context) error {
@@ -117,19 +147,27 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 	}
 	title := strings.TrimSpace(c.FormValue("title"))
 	status, priority := createTaskStatusPriority(c)
+	parentID := strings.TrimSpace(c.FormValue("parent_task_id"))
+	fail := func(code string) error {
+		loc := "/admin-work/new?err=" + code
+		if parentID != "" {
+			loc += "&parent=" + url.QueryEscape(parentID)
+		}
+		return c.Redirect(http.StatusSeeOther, loc)
+	}
 	if title == "" {
-		return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
+		return fail("task")
 	}
 	if dueUndeterminedFromForm(c) {
 		if model.FormatNoDateReason(c.FormValue("no_date_reason"), c.FormValue("no_date_detail")) == "" {
-			return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
+			return fail("task")
 		}
 		dueDate = ""
 	} else if status != model.WBTaskInbox && dueDate == "" {
-		return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
+		return fail("task")
 	}
 	if workType == model.WBWorkSupport && strings.TrimSpace(c.FormValue("project_id")) == "" {
-		return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=project_required")
+		return fail("project_required")
 	}
 	progress := 0
 	if p := strings.TrimSpace(c.FormValue("progress")); p != "" {
@@ -147,8 +185,9 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		DurationMin: 30,
 		Status:      status,
 		Priority:    priority,
-		Assignee:    strings.TrimSpace(c.FormValue("assignee")),
-		Progress:    progress,
+		Assignee:     strings.TrimSpace(c.FormValue("assignee")),
+		Progress:     progress,
+		ParentTaskID: parentID,
 	}
 	if d := strings.TrimSpace(c.FormValue("duration_min")); d != "" {
 		fmtScanInt(d, &t.DurationMin)
@@ -160,10 +199,13 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 			t.WaitParty, t.WaitRequest, t.ReplyDueDate, t.NextCheckDate, t.CompleteNote,
 			0, 0, isAdminRole(c), strings.TrimSpace(c.FormValue("force_complete")) == "1",
 			strings.TrimSpace(c.FormValue("force_reason"))); code != "" {
-			return c.Redirect(http.StatusSeeOther, "/admin-work/new?err="+code)
+			return fail(code)
 		}
 	}
 	if err := h.repo.CreateTask(t); err != nil {
+		if q := subtaskErrQuery(err); q != "" {
+			return fail(q)
+		}
 		return err
 	}
 	if t.Status == model.WBTaskComplete && t.CompleteNote != "" {
@@ -184,6 +226,13 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 			ReplyDueDate: t.ReplyDueDate, NextCheckDate: t.NextCheckDate,
 		})
 	}
+	if t.ParentTaskID != "" {
+		back := strings.TrimSpace(c.FormValue("redirect"))
+		if back == "" {
+			back = "/workboard/tasks/" + url.PathEscape(t.ParentTaskID) + "?ok=sub"
+		}
+		return c.Redirect(http.StatusSeeOther, back)
+	}
 	return c.Redirect(http.StatusSeeOther, "/admin-work?ok=task")
 }
 
@@ -194,6 +243,23 @@ func (h *AdminWorkHandler) Show(c echo.Context) error {
 		back = "/admin-work/stats"
 	}
 	return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+url.PathEscape(id)+"?back="+url.QueryEscape(back))
+}
+
+func subtaskErrQuery(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch {
+	case errors.Is(err, model.ErrSubtaskDepth):
+		return "sub_depth"
+	case errors.Is(err, model.ErrSubtaskCycle):
+		return "sub_cycle"
+	case errors.Is(err, model.ErrSubtaskOccur):
+		return "sub_occur"
+	case errors.Is(err, model.ErrSubtaskParent):
+		return "sub_parent"
+	}
+	return ""
 }
 
 func fillWaitingActionCounts(repo *repository.WBRepo, items []model.WorkTask) {

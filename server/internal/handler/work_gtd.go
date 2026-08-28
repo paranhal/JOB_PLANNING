@@ -398,6 +398,19 @@ func gtdFlashMsg(err, n string) string {
 		return "미완료 일정을 모두 지우고 다시 만듭니다. 확인란을 선택한 뒤 다시 실행하세요."
 	case "rec_has_complete":
 		return "완료된 실행 작업이 있어 삭제할 수 없습니다. 보관으로 내리세요."
+	case "sub_depth":
+		return "하위 업무는 3단계까지만 만들 수 있습니다."
+	case "sub_cycle":
+		return "자기 자신이나 하위 업무는 상위가 될 수 없습니다."
+	case "sub_occur":
+		return "실행 작업에는 하위 업무를 달 수 없습니다."
+	case "sub_parent":
+		return "상위 업무를 확인할 수 없습니다."
+	case "has_subtasks":
+		if strings.TrimSpace(n) == "" {
+			n = "0"
+		}
+		return fmt.Sprintf("하위 업무 %s건을 먼저 처리하세요", n)
 	default:
 		return ""
 	}

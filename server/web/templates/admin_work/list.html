@@ -1,6 +1,21 @@
 {{define "title"}}행정관련업무등록/처리 · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="space-y-4">
+<div class="space-y-4"
+     x-data="{
+       subOpen: false, subParent: '', subAssignee: '', subCustomer: '', subCustomerName: '',
+       subProject: '', subWorkType: 'admin', subRedirect: '/admin-work',
+       openSub(el) {
+         const d = el.dataset;
+         this.subParent = d.id || '';
+         this.subAssignee = d.assignee || '';
+         this.subCustomer = d.customer || '';
+         this.subCustomerName = d.customerName || '';
+         this.subProject = d.project || '';
+         this.subWorkType = d.workType || 'admin';
+         this.subRedirect = d.redirect || '/admin-work';
+         this.subOpen = true;
+       }
+     }">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <p class="text-sm text-gray-500">
       {{if eq .Status "waiting"}}할 일{{else if eq .Status "inbox"}}수집함{{else if eq .Status "waiting_for"}}회신 대기{{else if eq .Status "in_progress"}}진행중{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "review"}}검토중{{else if eq .Status "complete"}}완료{{else if eq .Status "cancelled"}}취소{{else if eq .Status "open"}}미완료{{else if eq .Status "overdue"}}기한 초과{{else if eq .Status "today"}}오늘{{else}}전체{{end}}
@@ -59,5 +74,6 @@
   </div>
 
   {{template "admin_work_table" .}}
+  {{if .CanWrite}}{{template "wb_subtask_modal" .}}{{end}}
 </div>
 {{end}}

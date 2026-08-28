@@ -1,6 +1,21 @@
 {{define "title"}}행정관련업무현황 · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="space-y-6">
+<div class="space-y-6"
+     x-data="{
+       subOpen: false, subParent: '', subAssignee: '', subCustomer: '', subCustomerName: '',
+       subProject: '', subWorkType: 'admin', subRedirect: '/admin-work/stats',
+       openSub(el) {
+         const d = el.dataset;
+         this.subParent = d.id || '';
+         this.subAssignee = d.assignee || '';
+         this.subCustomer = d.customer || '';
+         this.subCustomerName = d.customerName || '';
+         this.subProject = d.project || '';
+         this.subWorkType = d.workType || 'admin';
+         this.subRedirect = d.redirect || '/admin-work/stats';
+         this.subOpen = true;
+       }
+     }">
   <div class="flex flex-wrap items-end justify-between gap-2">
     <div>
       <h2 class="text-xl font-bold text-gray-800">행정관련업무현황</h2>
@@ -56,5 +71,6 @@
     </h3>
     {{template "admin_work_table" .}}
   </div>
+  {{if .CanWrite}}{{template "wb_subtask_modal" .}}{{end}}
 </div>
 {{end}}
