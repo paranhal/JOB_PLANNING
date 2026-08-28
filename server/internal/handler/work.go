@@ -62,7 +62,7 @@ func (h *WorkHandler) List(c echo.Context) error {
 	title := workBucketTitle(bucket)
 	return c.Render(http.StatusOK, "work/list.html", map[string]interface{}{
 		"Title":        title,
-		"Active":       "dashboard",
+		"Active":       NavWork,
 		"Bucket":       bucket,
 		"BucketLabel":  title,
 		"Items":        items,
