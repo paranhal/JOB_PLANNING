@@ -219,6 +219,13 @@
         <div class="sm:col-span-2">
           <dt class="text-xs text-slate-500 mb-1">접수내용 (증상)</dt>
           <dd class="text-slate-800 whitespace-pre-line rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">{{.AS.Symptom}}</dd>
+          {{if .KeywordLinks}}
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            {{range .KeywordLinks}}
+            <a href="/as/search?keyword_id={{.KeywordID}}" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] hover:bg-blue-50 hover:text-blue-700">{{.Keyword}}</a>
+            {{end}}
+          </div>
+          {{end}}
         </div>
       </dl>
     </div>
@@ -296,18 +303,24 @@
         <p class="font-mono font-semibold text-rose-900">{{.AS.ASNumber}}</p>
         <p class="text-xs text-rose-700 mt-1">{{.AS.OrgName}}</p>
       </div>
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{.TodayLocal}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">예정일</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일</label>
           <input type="date" name="due_date" value="{{if .AS.VisitScheduledDate}}{{.AS.VisitScheduledDate}}{{else}}{{.TodayLocal}}{{end}}"
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 배정일 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
           <input type="date" name="work_date" required value="{{.TodayLocal}}"
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
       </div>
+      <input type="hidden" name="status" value="waiting">
+      <input type="hidden" name="priority" value="normal">
       <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
         <p class="text-xs font-medium text-gray-700">소요 예상 시간 <span class="text-red-500">*</span></p>
         <div class="grid grid-cols-2 gap-3">

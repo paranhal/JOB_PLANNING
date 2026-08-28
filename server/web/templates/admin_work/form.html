@@ -1,10 +1,10 @@
 {{define "title"}}행정관련업무 등록 · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="max-w-3xl mx-auto space-y-5" x-data="{ workType: 'admin', status: 'waiting' }">
+<div class="max-w-3xl mx-auto space-y-5" x-data="{ workType: 'admin', dueUndetermined: false }">
   <div>
     <a href="/admin-work" class="text-sm text-gray-500 hover:text-gray-700">← 행정관련업무등록/처리</a>
-    <h2 class="text-xl font-bold text-gray-800 mt-1">행정관련업무 등록</h2>
-    <p class="text-sm text-gray-500 mt-1">거래처(기관)와 업무명을 구분해 등록합니다. 배정일·시간은 일일 업무 등록에서 배치해도 됩니다.</p>
+    <h2 class="text-xl font-bold text-gray-800 mt-1">행정·지원업무 등록</h2>
+    <p class="text-sm text-gray-500 mt-1">거래처(기관)와 업무명을 구분해 등록합니다. 시작일·시간은 일일 업무 등록에서 배치해도 됩니다.</p>
   </div>
 
   {{if .FlashErr}}
@@ -14,7 +14,7 @@
     {{else if eq .FlashErr "waiting_for"}}회신 대기는 대상·요청 내용·회신 예정일 또는 다음 확인일이 필요합니다.
     {{else if eq .FlashErr "complete_note"}}완료 시 최종 조치 내용을 입력하세요.
     {{else if eq .FlashErr "cancel_reason"}}취소 사유를 입력하세요.
-    {{else}}업무명과 예정일을 입력하세요.{{end}}
+    {{else}}업무명과 업무 종료일을 입력하세요.{{end}}
   </div>
   {{end}}
 
@@ -49,7 +49,7 @@
       <input name="title" required class="w-full border rounded-lg px-3 py-2" placeholder="예: 27년 유지보수 계약을 위한 과업심의 안건 자료 제출">
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">접수·처리 내용</label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">업무 내용</label>
       <textarea name="description" rows="3" class="w-full border rounded-lg px-3 py-2"></textarea>
     </div>
 
@@ -62,42 +62,37 @@
       <p class="text-[11px] text-gray-400 mt-1">사업에 해당하는 업무만 선택합니다. 지원업무는 필수입니다.</p>
     </div>
 
+    <div>
+      <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
+      <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{.Today}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+    </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">예정일 <span class="text-red-500" x-show="status !== 'inbox'">*</span></label>
-        <input type="date" name="due_date" :required="status !== 'inbox'" value="{{.Today}}" class="w-full border rounded-lg px-3 py-2">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">업무 배정일</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일</label>
         <input type="date" name="work_date" class="w-full border rounded-lg px-3 py-2">
         <p class="text-[11px] text-gray-400 mt-1">비우면 일일 업무 등록 대기열에 올라갑니다.</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일 <span class="text-red-500" x-show="!dueUndetermined">*</span></label>
+        <input type="date" name="due_date" :required="!dueUndetermined" :disabled="dueUndetermined" value="{{.Today}}" class="w-full border rounded-lg px-3 py-2 disabled:bg-gray-50">
+        <label class="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
+          <input type="checkbox" name="due_undetermined" value="1" x-model="dueUndetermined" class="rounded">
+          미정 + 사유
+        </label>
+        <div x-show="dueUndetermined" x-cloak class="mt-2 space-y-1">
+          <select name="no_date_reason" :required="dueUndetermined" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+            <option value="">— 사유 선택 —</option>
+            <option value="parts">부품 대기</option>
+            <option value="customer">고객 일정 미확정</option>
+            <option value="vendor">외부 업체 회신 대기</option>
+            <option value="other">기타</option>
+          </select>
+          <input name="no_date_detail" class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="기타인 경우 직접 입력">
+        </div>
       </div>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
-        <select name="status" x-model="status" class="w-full border rounded-lg px-3 py-2">
-          <option value="inbox">수집함</option>
-          <option value="waiting" selected>할 일</option>
-          <option value="in_progress">진행중</option>
-          <option value="waiting_for">회신 대기</option>
-          <option value="hold">보류</option>
-          <option value="transfer">이관</option>
-          <option value="review">검토중</option>
-          <option value="complete">완료</option>
-          <option value="cancelled">취소</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">우선순위</label>
-        <select name="priority" class="w-full border rounded-lg px-3 py-2">
-          <option value="normal">보통</option>
-          <option value="urgent">긴급</option>
-          <option value="high">높음</option>
-          <option value="low">낮음</option>
-        </select>
-      </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
         <select name="assignee" class="w-full border rounded-lg px-3 py-2">
@@ -106,65 +101,25 @@
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">진행률 (%)</label>
-        <input type="number" name="progress" min="0" max="100" value="0" class="w-full border rounded-lg px-3 py-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">소요시간</label>
+        <div class="flex items-center gap-2">
+          <input type="number" name="duration_min" min="1" value="30" class="w-full border rounded-lg px-3 py-2">
+          <span class="text-sm text-gray-500 shrink-0">분</span>
+        </div>
       </div>
     </div>
 
-    <div x-show="status === 'waiting_for'" x-cloak class="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
-      <p class="text-xs font-medium text-indigo-900">회신 대기</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs text-gray-600 mb-1">대상 구분</label>
-          <select name="wait_party_kind" class="w-full border rounded-lg px-3 py-2">
-            <option value="internal">내부 담당</option>
-            <option value="dept">내부 부서</option>
-            <option value="vendor">외부 업체</option>
-            <option value="customer">고객</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs text-gray-600 mb-1">대기 대상 <span class="text-red-500">*</span></label>
-          <input name="wait_party" class="w-full border rounded-lg px-3 py-2" placeholder="이름·부서·업체">
-        </div>
-      </div>
-      <div>
-        <label class="block text-xs text-gray-600 mb-1">요청 내용 <span class="text-red-500">*</span></label>
-        <input name="wait_request" class="w-full border rounded-lg px-3 py-2">
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs text-gray-600 mb-1">회신 예정일</label>
-          <input type="date" name="reply_due_date" class="w-full border rounded-lg px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-xs text-gray-600 mb-1">다음 확인일</label>
-          <input type="date" name="next_check_date" class="w-full border rounded-lg px-3 py-2">
-        </div>
-      </div>
-    </div>
-    <div x-show="status === 'hold'" x-cloak class="rounded-lg border border-amber-200 bg-amber-50/50 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="sm:col-span-2">
-        <label class="block text-xs text-gray-600 mb-1">보류 사유 <span class="text-red-500">*</span></label>
-        <input name="hold_reason" class="w-full border rounded-lg px-3 py-2">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-600 mb-1">재검토일 <span class="text-red-500">*</span></label>
-        <input type="date" name="review_date" class="w-full border rounded-lg px-3 py-2">
-      </div>
-    </div>
-    <div x-show="status === 'cancelled'" x-cloak>
-      <label class="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span class="text-red-500">*</span></label>
-      <input name="cancel_reason" class="w-full border rounded-lg px-3 py-2">
-    </div>
-    <div x-show="status === 'complete'" x-cloak>
-      <label class="block text-sm font-medium text-gray-700 mb-1">최종 조치 내용 <span class="text-red-500">*</span></label>
-      <textarea name="complete_note" rows="2" class="w-full border rounded-lg px-3 py-2"></textarea>
-    </div>
+    <label class="flex items-center gap-2 text-sm text-gray-700">
+      <input type="checkbox" name="recurrence_enabled" value="1" class="rounded">
+      기간 내 반복 실행
+    </label>
 
-    <div class="flex justify-end gap-2 pt-2">
-      <a href="/admin-work" class="px-4 py-2 text-sm border rounded-lg">취소</a>
-      <button type="submit" class="px-4 py-2 text-sm text-white bg-violet-600 rounded-lg">등록</button>
+    <div class="flex items-center justify-between gap-2 pt-2">
+      <button type="button" class="px-4 py-2 text-sm border rounded-lg text-gray-700">＋하위 업무 등록</button>
+      <div class="flex gap-2">
+        <a href="/admin-work" class="px-4 py-2 text-sm border rounded-lg">취소</a>
+        <button type="submit" class="px-4 py-2 text-sm text-white bg-violet-600 rounded-lg">저장</button>
+      </div>
     </div>
   </form>
 </div>

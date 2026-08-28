@@ -186,6 +186,13 @@ func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Location"), "ok=task") {
 		t.Fatalf("행정업무 등록 실패: loc=%q", rec.Header().Get("Location"))
 	}
+	tasks, err := repo.ListTasks()
+	if err != nil || len(tasks) != 1 {
+		t.Fatalf("ListTasks: len=%d err=%v", len(tasks), err)
+	}
+	if tasks[0].Status != model.WBTaskWaiting || tasks[0].Priority != model.WBPriorityNormal {
+		t.Fatalf("기본값 status=%q priority=%q", tasks[0].Status, tasks[0].Priority)
+	}
 
 	rec = doForm(t, e, "/workboard/tasks", url.Values{
 		"work_type": {"admin"}, "title": {"시간 없음"}, "due_date": {"2026-08-31"},
@@ -199,7 +206,7 @@ func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 		t.Fatalf("사업명 검증 실패: loc=%q", rec.Header().Get("Location"))
 	}
 
-	tasks, _ := repo.ListTasks()
+	tasks, _ = repo.ListTasks()
 	if len(tasks) != 1 {
 		t.Fatalf("등록된 업무 수 = %d, want 1", len(tasks))
 	}

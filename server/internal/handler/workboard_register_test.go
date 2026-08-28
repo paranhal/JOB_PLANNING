@@ -252,6 +252,14 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 	if !strings.Contains(out, "주담당") || !strings.Contains(out, "참여자") {
 		t.Fatal("등록 모달에 주담당·참여자 칸이 없다")
 	}
+	for _, want := range []string{"업무 내용", "업무 등록일", "업무 시작일", "업무 종료일", "＋하위 업무 등록", "기간 내 반복 실행"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("등록 모달에 %q 없음", want)
+		}
+	}
+	if strings.Contains(out, ">예정일") || strings.Contains(out, "업무 배정일") {
+		t.Fatal("예정일·업무 배정일 라벨이 남아 있다")
+	}
 }
 
 func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {

@@ -116,11 +116,16 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		workDate = d
 	}
 	title := strings.TrimSpace(c.FormValue("title"))
-	status := strings.TrimSpace(c.FormValue("status"))
+	status, priority := createTaskStatusPriority(c)
 	if title == "" {
 		return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
 	}
-	if status != model.WBTaskInbox && dueDate == "" {
+	if dueUndeterminedFromForm(c) {
+		if model.FormatNoDateReason(c.FormValue("no_date_reason"), c.FormValue("no_date_detail")) == "" {
+			return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
+		}
+		dueDate = ""
+	} else if status != model.WBTaskInbox && dueDate == "" {
 		return c.Redirect(http.StatusSeeOther, "/admin-work/new?err=task")
 	}
 	if workType == model.WBWorkSupport && strings.TrimSpace(c.FormValue("project_id")) == "" {
@@ -141,7 +146,7 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		EndTime:     strings.TrimSpace(c.FormValue("end_time")),
 		DurationMin: 30,
 		Status:      status,
-		Priority:    strings.TrimSpace(c.FormValue("priority")),
+		Priority:    priority,
 		Assignee:    strings.TrimSpace(c.FormValue("assignee")),
 		Progress:    progress,
 	}
@@ -206,4 +211,22 @@ func fillWaitingActionCounts(repo *repository.WBRepo, items []model.WorkTask) {
 	for i := range items {
 		items[i].WaitingActionCount = counts[items[i].TaskID]
 	}
+}
+
+// createTaskStatusPriority 등록 폼에 상태·우선순위가 없으면 기본값. 컬럼은 유지한다(§33.2).
+func createTaskStatusPriority(c echo.Context) (status, priority string) {
+	status = strings.TrimSpace(c.FormValue("status"))
+	if status == "" {
+		status = model.WBTaskWaiting
+	}
+	priority = strings.TrimSpace(c.FormValue("priority"))
+	if priority == "" {
+		priority = model.WBPriorityNormal
+	}
+	return status, priority
+}
+
+func dueUndeterminedFromForm(c echo.Context) bool {
+	v := strings.TrimSpace(c.FormValue("due_undetermined"))
+	return v == "1" || v == "on" || v == "true"
 }

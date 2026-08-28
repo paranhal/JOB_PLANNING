@@ -33,7 +33,7 @@
 
     <!-- 행정/지원 -->
     <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='admin'" x-cloak
-          x-data="{ workType: 'admin', memberRows: [] }">
+          x-data="{ workType: 'admin', memberRows: [], dueUndetermined: false }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''">← 종류 선택</button>
       <div>
@@ -64,7 +64,7 @@
         <input name="title" required class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">설명</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">업무 내용</label>
         <textarea name="description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
       <div>
@@ -75,16 +75,34 @@
           {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
         </select>
       </div>
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">예정일 <span class="text-red-500">*</span></label>
-          <input type="date" name="due_date" x-model="preDue" required
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
+          <input type="date" name="work_date" x-model="preWork" required
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 배정일 <span class="text-red-500">*</span></label>
-          <input type="date" name="work_date" x-model="preWork" required
-                 class="w-full border rounded-lg px-3 py-2 text-sm">
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일 <span class="text-red-500" x-show="!dueUndetermined">*</span></label>
+          <input type="date" name="due_date" x-model="preDue" :required="!dueUndetermined" :disabled="dueUndetermined"
+                 class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
+          <label class="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
+            <input type="checkbox" name="due_undetermined" value="1" x-model="dueUndetermined" class="rounded">
+            미정 + 사유
+          </label>
+          <div x-show="dueUndetermined" x-cloak class="mt-2 space-y-1">
+            <select name="no_date_reason" :required="dueUndetermined" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+              <option value="">— 사유 선택 —</option>
+              <option value="parts">부품 대기</option>
+              <option value="customer">고객 일정 미확정</option>
+              <option value="vendor">외부 업체 회신 대기</option>
+              <option value="other">기타</option>
+            </select>
+            <input name="no_date_detail" class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="기타인 경우 직접 입력">
+          </div>
         </div>
       </div>
       <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
@@ -102,25 +120,6 @@
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
-          <select name="status" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="waiting">오늘예정업무</option>
-            <option value="in_progress">진행중</option>
-            <option value="hold">보류</option>
-            <option value="transfer">이관</option>
-            <option value="complete">완료</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">우선순위</label>
-          <select name="priority" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="normal">보통</option>
-            <option value="urgent">긴급</option>
-            <option value="high">높음</option>
-            <option value="low">낮음</option>
-          </select>
-        </div>
-        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
           <select name="assignee" x-model="preAssignee" required class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
@@ -133,9 +132,16 @@
         </div>
       </div>
       {{template "wb_member_fields" .}}
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
-        <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">업무 추가</button>
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" name="recurrence_enabled" value="1" class="rounded">
+        기간 내 반복 실행
+      </label>
+      <div class="flex items-center justify-between gap-2 pt-2">
+        <button type="button" class="px-4 py-2 text-sm border rounded-lg text-gray-700">＋하위 업무 등록</button>
+        <div class="flex gap-2">
+          <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
+          <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">저장</button>
+        </div>
       </div>
     </form>
 
@@ -162,15 +168,19 @@
         </select>
         <p class="text-[11px] text-gray-400 mt-1">업무명: [AS]고객명_접수번호 · 등록 시 업무 고유번호 부여</p>
       </div>
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">예정일</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일</label>
           <input type="date" name="due_date" x-model="preDue"
                  class="w-full border rounded-lg px-3 py-2 text-sm">
           <p class="text-[11px] text-gray-400 mt-1">드롭한 날짜 · 비우면 AS 방문예정일</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 배정일 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
           <input type="date" name="work_date" x-model="preWork" required
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
@@ -188,27 +198,16 @@
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
-          <select name="status" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="waiting">오늘예정업무</option>
-            <option value="in_progress">진행중</option>
-            <option value="hold">보류</option>
-            <option value="transfer">이관</option>
-            <option value="complete">완료</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
-          <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="">— 원본 담당자 —</option>
-            {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
-          </select>
-        </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
+        <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">— 원본 담당자 —</option>
+          {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+        </select>
       </div>
       {{template "wb_member_fields" .}}
       <input type="hidden" name="priority" value="normal">
+      <input type="hidden" name="status" value="waiting">
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
         <button type="submit" class="px-4 py-2 text-sm text-white bg-rose-600 rounded-lg">AS 업무 등록</button>
@@ -238,15 +237,19 @@
         </select>
         <p class="text-[11px] text-gray-400 mt-1">업무명: [점검]고객_점검번호 · 설명 [제품]고객 정기점검</p>
       </div>
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">예정일</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일</label>
           <input type="date" name="due_date" x-model="preDue"
                  class="w-full border rounded-lg px-3 py-2 text-sm">
           <p class="text-[11px] text-gray-400 mt-1">드롭한 날짜 · 비우면 방문예정일</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 배정일 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
           <input type="date" name="work_date" x-model="preWork" required
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
@@ -264,27 +267,16 @@
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
-          <select name="status" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="waiting">오늘예정업무</option>
-            <option value="in_progress">진행중</option>
-            <option value="hold">보류</option>
-            <option value="transfer">이관</option>
-            <option value="complete">완료</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
-          <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="">— 원본 담당자 —</option>
-            {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
-          </select>
-        </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
+        <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">— 원본 담당자 —</option>
+          {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+        </select>
       </div>
       {{template "wb_member_fields" .}}
       <input type="hidden" name="priority" value="normal">
+      <input type="hidden" name="status" value="waiting">
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
         <button type="submit" class="px-4 py-2 text-sm text-white bg-sky-600 rounded-lg">정기점검 업무 등록</button>

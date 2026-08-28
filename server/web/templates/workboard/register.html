@@ -123,7 +123,7 @@
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 shadow-sm">
-    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 배정일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
+    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
@@ -174,7 +174,7 @@
         <p class="text-[12px] text-slate-500 mt-1">
           {{.PeriodLabel}} · 07:00~20:00 15분 단위 · 확정 배치 <span class="font-semibold text-slate-700">{{.PlacedCount}}</span>건 · 우측은 미확정 대기
           {{if .AssigneeFilter}} · <span class="text-blue-700 font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
-          · 예정일은 07:00부터 순차 표시
+          · 시작일만 있고 시간이 없는 건은 07:00부터 순차 표시
         </p>
         <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-600">
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#16a34a"></span>양기헌 · 앤로보틱스</span>

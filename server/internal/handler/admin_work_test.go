@@ -169,3 +169,70 @@ func TestAdminWorkCreateKeepsProjectForAdmin(t *testing.T) {
 		t.Fatalf("목록에 사업명 없음 project=%q", items[0].ProjectName)
 	}
 }
+
+func TestAdminWorkCreateDefaultsStatusPriority(t *testing.T) {
+	e, repo := newAdminWorkServer(t)
+	rec := doForm(t, e, "/admin-work", url.Values{
+		"work_type":     {"admin"},
+		"customer_name": {"충남교육청"},
+		"title":         {"상태 없이 등록"},
+		"due_date":      {"2026-08-20"},
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("등록 loc=%q", rec.Header().Get("Location"))
+	}
+	items, err := repo.ListAdminWork("", "")
+	if err != nil || len(items) != 1 {
+		t.Fatalf("len=%d err=%v", len(items), err)
+	}
+	if items[0].Status != "waiting" || items[0].Priority != "normal" {
+		t.Fatalf("기본값 status=%q priority=%q", items[0].Status, items[0].Priority)
+	}
+	if items[0].DueDate != "2026-08-20" {
+		t.Fatalf("due_date=%q — 실행률 분모 컬럼이 바뀌면 안 된다", items[0].DueDate)
+	}
+}
+
+func TestAdminWorkCreateUndeterminedClearsDueDate(t *testing.T) {
+	e, repo := newAdminWorkServer(t)
+	rec := doForm(t, e, "/admin-work", url.Values{
+		"work_type":        {"admin"},
+		"title":            {"종료일 미정"},
+		"due_date":         {"2026-08-20"},
+		"due_undetermined": {"1"},
+		"no_date_reason":   {"customer"},
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("미정 등록 loc=%q", rec.Header().Get("Location"))
+	}
+	items, err := repo.ListAdminWork("", "")
+	if err != nil || len(items) != 1 {
+		t.Fatalf("len=%d err=%v", len(items), err)
+	}
+	if items[0].DueDate != "" {
+		t.Fatalf("미정이면 due_date가 비어야 한다: %q", items[0].DueDate)
+	}
+	if items[0].Status != "waiting" || items[0].Priority != "normal" {
+		t.Fatalf("기본값 status=%q priority=%q", items[0].Status, items[0].Priority)
+	}
+}
+
+func TestAdminWorkNewFormSection33Labels(t *testing.T) {
+	e, _ := newAdminWorkServer(t)
+	form := doGet(t, e, "/admin-work/new")
+	if form.Code != http.StatusOK {
+		t.Fatalf("status=%d", form.Code)
+	}
+	body := form.Body.String()
+	for _, want := range []string{"업무 내용", "업무 등록일", "업무 시작일", "업무 종료일", "＋하위 업무 등록", "기간 내 반복 실행"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("등록 화면에 %q 없음", want)
+		}
+	}
+	if strings.Contains(body, "접수·처리") {
+		t.Fatal("접수·처리 내용 라벨이 남아 있다")
+	}
+	if strings.Contains(body, `name="status"`) || strings.Contains(body, `name="priority"`) {
+		t.Fatal("등록 폼에 상태·우선순위 입력란이 있다")
+	}
+}
