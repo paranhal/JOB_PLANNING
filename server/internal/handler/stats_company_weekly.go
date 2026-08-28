@@ -123,7 +123,7 @@ func (h *StatsHandler) DownloadCompanyWeekly(c echo.Context) error {
 	if !ok {
 		return c.Render(http.StatusGone, "stats/company_weekly_result.html", map[string]interface{}{
 			"Title":  "보고서",
-			"Active": "stats_reports",
+			"Active": NavStatsReports,
 			"Error":  "내려받기 기한이 지났습니다. 확인 > 보고서에서 다시 생성하세요.",
 		})
 	}
@@ -171,7 +171,7 @@ func companyWeeklyAuditDetail(r companyWeeklyBuildResult, uploadName string) str
 func companyWeeklyResultData(draft interface{}, sheetName, token string, result *companyWeeklyBuildResult, errMsg string) map[string]interface{} {
 	data := map[string]interface{}{
 		"Title":            "보고서",
-		"Active":           "stats_reports",
+		"Active":           NavStatsReports,
 		"CompanyWeekly":    draft,
 		"CompanySheetName": sheetName,
 		"DownloadToken":    token,

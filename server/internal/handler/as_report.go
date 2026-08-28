@@ -53,7 +53,7 @@ func (h *ASHandler) ReportPreview(c echo.Context) error {
 	draft := h.buildASReportDraft(as, time.Now())
 	data := map[string]interface{}{
 		"Title":             "조치완료보고서",
-		"Active":            "as",
+		"Active":            NavAS,
 		"AS":                as,
 		"Draft":             draft,
 		"ReportReady":       ready,

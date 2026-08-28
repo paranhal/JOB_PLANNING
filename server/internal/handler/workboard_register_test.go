@@ -157,7 +157,7 @@ func TestRegisterTemplateRenders(t *testing.T) {
 	slotTimes := registerSlotTimes()
 	gridH, slotTops := registerGridStyles(len(slotTimes))
 	data := map[string]interface{}{
-		"Title": "일일 업무 등록", "Active": "work_register", "UserRole": "admin",
+		"Title": "일일 업무 등록", "Active": NavWorkRegister, "UserRole": "admin",
 		"View": regViewWeek, "ViewLabel": registerViewLabel(regViewWeek),
 		"Date": "2026-08-04", "PeriodLabel": period.Label,
 		"PrevDate": period.Prev, "NextDate": period.Next, "Today": "2026-08-04",
@@ -212,7 +212,7 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 	slotTimes := registerSlotTimes()
 	gridH, slotTops := registerGridStyles(len(slotTimes))
 	data := map[string]interface{}{
-		"Title": "일일 업무 등록", "Active": "work_register", "UserRole": "admin",
+		"Title": "일일 업무 등록", "Active": NavWorkRegister, "UserRole": "admin",
 		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
 		"Date": "2026-08-18", "PeriodLabel": "2026-08-18",
 		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",
@@ -283,7 +283,7 @@ func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
 	slotTimes := registerSlotTimes()
 	gridH, slotTops := registerGridStyles(len(slotTimes))
 	data := map[string]interface{}{
-		"Title": "일일 업무 등록", "Active": "work_register", "UserRole": "admin",
+		"Title": "일일 업무 등록", "Active": NavWorkRegister, "UserRole": "admin",
 		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
 		"Date": "2026-08-18", "PeriodLabel": "2026-08-18",
 		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",

@@ -33,7 +33,7 @@ func (h *MaintenanceHandler) VisitAction(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", map[string]interface{}{
 		"Title":     "정기점검 조치 · " + name,
-		"Active":    "work_register",
+		"Active":    NavWorkRegister,
 		"Visit":     v,
 		"SiteName":  name,
 		"Assignees": assignees,

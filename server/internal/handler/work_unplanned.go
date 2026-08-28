@@ -45,7 +45,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 	canWrite := canWriteUnplanned(c)
 	return c.Render(http.StatusOK, "plan/unplanned.html", map[string]interface{}{
 		"Title":        "미계획 업무함",
-		"Active":       "plan_unplanned",
+		"Active":       NavPlanUnplanned,
 		"Items":        items,
 		"Total":        len(items),
 		"Counts":       counts,

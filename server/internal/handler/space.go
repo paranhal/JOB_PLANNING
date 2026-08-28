@@ -91,7 +91,7 @@ func (h *SpaceHandler) List(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "space/list.html", map[string]interface{}{
-		"Title": "공간 관리", "Active": "spaces",
+		"Title": "공간 관리", "Active": NavSpaces,
 		"Customers": customers, "CustomerID": customerID,
 		"Buildings": buildings, "BuildingID": buildingID,
 		"Selected": selectedBuilding,

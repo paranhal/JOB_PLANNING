@@ -35,7 +35,7 @@ func (h *ContactHandler) List(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "contact/list.html", map[string]interface{}{
 		"Title":      "담당자 관리",
-		"Active":     "contacts",
+		"Active":     NavContacts,
 		"Items":      items,
 		"Total":      total,
 		"Page":       page,
@@ -55,7 +55,7 @@ func (h *ContactHandler) New(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "contact/form.html", map[string]interface{}{
 		"Title":     "담당자 등록",
-		"Active":    "contacts",
+		"Active":    NavContacts,
 		"Contact":   ct,
 		"Customers": customers,
 		"JobGrades": jobGrades,
@@ -84,7 +84,7 @@ func (h *ContactHandler) Show(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "contact/show.html", map[string]interface{}{
 		"Title":   ct.FullName + " · 담당자",
-		"Active":  "contacts",
+		"Active":  NavContacts,
 		"Contact": ct,
 	})
 }
@@ -103,7 +103,7 @@ func (h *ContactHandler) Edit(c echo.Context) error {
 	jobGrades, _ := h.codeRepo.ActiveByGroup("job_grade")
 	return c.Render(http.StatusOK, "contact/form.html", map[string]interface{}{
 		"Title":     "담당자 수정",
-		"Active":    "contacts",
+		"Active":    NavContacts,
 		"Contact":   ct,
 		"Customers": customers,
 		"JobGrades": jobGrades,

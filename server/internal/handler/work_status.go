@@ -156,7 +156,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "work_status/timeline.html", map[string]interface{}{
 		"Title":           "업무처리현황",
-		"Active":          "work_status",
+		"Active":          NavWorkStatus,
 		"View":            view,
 		"ViewLabel":       workStatusViewLabel(view),
 		"Kind":            kind,

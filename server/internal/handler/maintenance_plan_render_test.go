@@ -14,7 +14,7 @@ import (
 func planViewData(view string, month int, visits []model.MaintenanceVisit) map[string]interface{} {
 	const today = "2026-08-05"
 	return map[string]interface{}{
-		"Title": "정기점검 2026년", "Active": "maintenance", "UserRole": "admin",
+		"Title": "정기점검 2026년", "Active": NavMaintenance, "UserRole": "admin",
 		"Plan":      &model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Status: "draft"},
 		"Plans":     []model.MaintenancePlan{{PlanID: "mpl_1", PlanYear: 2026, Status: "draft"}},
 		"YearQuery": "",

@@ -128,7 +128,7 @@ func (h *ContactHistoryHandler) List(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "contact_history/list.html", map[string]interface{}{
-		"Title": "담당자 이력", "Active": "contact_history",
+		"Title": "담당자 이력", "Active": NavContactHistory,
 		"Items": items, "ContactID": contactID, "CustomerID": customerID,
 		"Customers": customers, "Contacts": contacts,
 		"ItemCount": len(items), "ShowingCurrent": showingCurrent,

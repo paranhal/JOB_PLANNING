@@ -107,7 +107,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "customer/list.html", map[string]interface{}{
 		"Title":         "고객현황",
-		"Active":        "customers",
+		"Active":        NavCustomers,
 		"Items":         items,
 		"Total":         total,
 		"Page":          page,
@@ -378,7 +378,7 @@ func (h *CustomerHandler) New(c echo.Context) error {
 	customers, _ := h.repo.ListAll()
 	return c.Render(http.StatusOK, "customer/form.html", map[string]interface{}{
 		"Title":       "고객 등록",
-		"Active":      "customers",
+		"Active":      NavCustomers,
 		"Customer":    &model.Customer{IsActive: true},
 		"Customers":   customers,
 		"IsNew":       true,
@@ -407,7 +407,7 @@ func (h *CustomerHandler) Show(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "customer/show.html", map[string]interface{}{
 		"Title":      cust.OrgName,
-		"Active":     "customers",
+		"Active":     NavCustomers,
 		"Customer":   cust,
 		"CanWrite":   canWriteMaster(c),
 		"CanReceive": canReceiveAS(c),
@@ -455,7 +455,7 @@ func (h *CustomerHandler) Edit(c echo.Context) error {
 	customers, _ := h.repo.ListAll()
 	return c.Render(http.StatusOK, "customer/form.html", map[string]interface{}{
 		"Title":       "고객 수정",
-		"Active":      "customers",
+		"Active":      NavCustomers,
 		"Customer":    cust,
 		"Customers":   customers,
 		"IsNew":       false,

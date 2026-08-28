@@ -58,7 +58,7 @@ func (h *MaintenanceHandler) GenerateConfirm(c echo.Context) error {
 		return err
 	}
 	return c.Render(http.StatusOK, "maintenance/plan_generate.html", map[string]interface{}{
-		"Title": "자동 배정 확인", "Active": "maintenance", "Plan": plan,
+		"Title": "자동 배정 확인", "Active": NavMaintenance, "Plan": plan,
 		"DeleteCount": del, "KeepCount": keep,
 		"HolidayMissing": holidayMissingBanner(h.holidayRepo, plan.PlanYear),
 	})
@@ -114,7 +114,7 @@ func (h *MaintenanceHandler) DeletePlanPage(c echo.Context) error {
 		block = model.ProtectedVisitRangeMessage(now, st.Protected)
 	}
 	return c.Render(http.StatusOK, "maintenance/plan_delete.html", map[string]interface{}{
-		"Title": "계획 삭제", "Active": "maintenance", "Plan": plan,
+		"Title": "계획 삭제", "Active": NavMaintenance, "Plan": plan,
 		"Stats": st, "Block": block, "Error": c.QueryParam("err"),
 		"ConfirmTitle": confirmTitle,
 	})
@@ -211,7 +211,7 @@ func (h *MaintenanceHandler) DuplicatesPreview(c echo.Context) error {
 		return err
 	}
 	return c.Render(http.StatusOK, "maintenance/plan_duplicates.html", map[string]interface{}{
-		"Title": "중복 정리", "Active": "maintenance", "Plan": plan,
+		"Title": "중복 정리", "Active": NavMaintenance, "Plan": plan,
 		"Drops": drops, "Month": month, "View": c.QueryParam("view"),
 	})
 }

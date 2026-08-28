@@ -33,7 +33,7 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 	flashErr := c.QueryParam("err")
 	return c.Render(http.StatusOK, "admin_work/list.html", map[string]interface{}{
 		"Title":        "행정관련업무등록/처리",
-		"Active":       "admin_work",
+		"Active":       NavAdminWork,
 		"Items":        items,
 		"Status":       status,
 		"Search":       search,
@@ -62,7 +62,7 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 	fillWaitingActionCounts(h.repo, items)
 	return c.Render(http.StatusOK, "admin_work/stats.html", map[string]interface{}{
 		"Title":      "행정관련업무현황",
-		"Active":     "admin_work_stats",
+		"Active":     NavAdminWorkStats,
 		"Stats":      st,
 		"Items":      items,
 		"ListStatus": status,
@@ -82,7 +82,7 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 	customers, _ := h.customerRepo.ListAll()
 	return c.Render(http.StatusOK, "admin_work/form.html", map[string]interface{}{
 		"Title":     "행정관련업무 등록",
-		"Active":    "admin_work",
+		"Active":    NavAdminWork,
 		"Projects":  projects,
 		"Assignees": assignees,
 		"Customers": customers,

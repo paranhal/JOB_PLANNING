@@ -76,7 +76,7 @@ func (h *HolidayHandler) List(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "admin/holidays.html", map[string]interface{}{
 		"Title":         "휴무일 관리",
-		"Active":        "holidays",
+		"Active":        NavHolidays,
 		"Year":          year,
 		"Years":         years,
 		"Tab":           tab,

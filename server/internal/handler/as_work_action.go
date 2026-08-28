@@ -24,7 +24,7 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 	assignees, _ := h.userRepo.ListAssignable()
 	return c.Render(http.StatusOK, "as/work_action.html", map[string]interface{}{
 		"Title":        "하부업무 조치 · " + w.WorkNumber,
-		"Active":       "as",
+		"Active":       NavAS,
 		"Work":         w,
 		"AS":           as,
 		"Assignees":    assignees,

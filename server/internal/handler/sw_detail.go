@@ -17,7 +17,7 @@ func (h *SWDetailHandler) ListByAsset(c echo.Context) error {
 	assetID := c.Param("asset_id")
 	items, _ := h.repo.ListByAsset(assetID)
 	return c.Render(http.StatusOK, "sw_detail/list.html", map[string]interface{}{
-		"Title": "SW 상세 관리", "Active": "assets",
+		"Title": "SW 상세 관리", "Active": NavAssets,
 		"Items": items, "AssetID": assetID,
 	})
 }
@@ -34,7 +34,7 @@ func (h *SWDetailHandler) Edit(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	return c.Render(http.StatusOK, "sw_detail/form.html", map[string]interface{}{
-		"Title": "SW 상세 수정", "Active": "assets",
+		"Title": "SW 상세 수정", "Active": NavAssets,
 		"SW": s, "IsNew": false,
 	})
 }

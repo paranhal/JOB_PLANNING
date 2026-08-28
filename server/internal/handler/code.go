@@ -28,7 +28,7 @@ func (h *CodeHandler) List(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "code/list.html", map[string]interface{}{
-		"Title": "코드 관리", "Active": "codes",
+		"Title": "코드 관리", "Active": NavCodes,
 		"Codes": codes, "Groups": groups, "SelectedGroup": group,
 	})
 }

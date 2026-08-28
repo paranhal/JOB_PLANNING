@@ -43,7 +43,7 @@ func (h *MaintenanceHandler) ListPlans(c echo.Context) error {
 	if len(plans) == 0 {
 		return c.Render(http.StatusOK, "maintenance/list.html", map[string]interface{}{
 			"Title":   "정기점검 일정",
-			"Active":  "maintenance",
+			"Active":  NavMaintenance,
 			"Plans":   plans,
 			"IsAdmin": isAdminRole(c),
 			"Empty":   true,
@@ -61,7 +61,7 @@ func (h *MaintenanceHandler) ListPlans(c echo.Context) error {
 func (h *MaintenanceHandler) NewPlanPage(c echo.Context) error {
 	return c.Render(200, "maintenance/plan_new.html", map[string]interface{}{
 		"Title":  "연도 계획 등록",
-		"Active": "maintenance",
+		"Active": NavMaintenance,
 		"Year":   time.Now().Year(),
 	})
 }
@@ -179,7 +179,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, dupMonth)
 	return c.Render(200, "maintenance/plan_show.html", map[string]interface{}{
 		"Title":           fmt.Sprintf("정기점검 %d년", plan.PlanYear),
-		"Active":          "maintenance",
+		"Active":          NavMaintenance,
 		"Plan":            plan,
 		"Plans":           plans,
 		"YearQuery":       yearQuery,
@@ -538,7 +538,7 @@ func (h *MaintenanceHandler) ListSiteConfigs(c echo.Context) error {
 	quota := model.SummarizeMonthVisitQuota(items, now.Year(), int(now.Month()))
 	return c.Render(200, "maintenance/site_list.html", map[string]interface{}{
 		"Title":   "정기점검 사이트 설정",
-		"Active":  "maintenance_sites",
+		"Active":  NavMaintenanceSites,
 		"Items":   items,
 		"Quota":   quota,
 		"Synced":  c.QueryParam("synced"),
@@ -563,7 +563,7 @@ func (h *MaintenanceHandler) NewSiteConfigPage(c echo.Context) error {
 	}
 	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
 		"Title":   "점검 사이트 등록",
-		"Active":  "maintenance_sites",
+		"Active":  NavMaintenanceSites,
 		"Pending": pending,
 		"Config":  (*model.MaintenanceSiteConfig)(nil),
 	})
@@ -577,7 +577,7 @@ func (h *MaintenanceHandler) EditSiteConfigPage(c echo.Context) error {
 	}
 	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
 		"Title":  "점검 사이트 수정",
-		"Active": "maintenance_sites",
+		"Active": NavMaintenanceSites,
 		"Config": cfg,
 	})
 }

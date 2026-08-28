@@ -51,7 +51,7 @@ func (h *AssetHandler) List(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "asset/list.html", map[string]interface{}{
-		"Title": "설치자산 관리", "Active": "assets",
+		"Title": "설치자산 관리", "Active": NavAssets,
 		"Items": items, "Total": total,
 		"Page": page, "TotalPages": totalPages,
 		"Search": search, "CustomerID": customerID,
@@ -98,7 +98,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 	projects, _ := h.wbRepo.ListProjects(false)
 
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
-		"Title": "자산 등록", "Active": "assets", "IsNew": true,
+		"Title": "자산 등록", "Active": NavAssets, "IsNew": true,
 		"Asset": asset, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
 		"InstallerTypes": installerTypes,
@@ -133,7 +133,7 @@ func (h *AssetHandler) Show(c echo.Context) error {
 	}
 	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 	return c.Render(http.StatusOK, "asset/show.html", map[string]interface{}{
-		"Title": a.ProductName, "Active": "assets", "Asset": a,
+		"Title": a.ProductName, "Active": NavAssets, "Asset": a,
 		"Images": slots, "ImageCount": filled, "CanUpload": filled < 3,
 		"CanWrite": canWriteMaster(c), "CanReceive": canReceiveAS(c),
 	})
@@ -210,7 +210,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 
 	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
-		"Title": "자산 수정", "Active": "assets", "IsNew": false,
+		"Title": "자산 수정", "Active": NavAssets, "IsNew": false,
 		"Asset": a, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
 		"InstallerTypes": installerTypes,

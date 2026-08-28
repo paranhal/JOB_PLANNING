@@ -136,7 +136,7 @@ func (h *AnalysisHandler) Dashboard(c echo.Context) error {
 	h.db.QueryRow(`SELECT COUNT(*) FROM assets WHERE operation_status NOT IN ('disposed','retired')`).Scan(&totalAssets)
 
 	return c.Render(http.StatusOK, "analysis/dashboard.html", map[string]interface{}{
-		"Title": "교체대상 분석 / 영업활용", "Active": "analysis",
+		"Title": "교체대상 분석 / 영업활용", "Active": NavAnalysis,
 		"Aging": aging, "Frequent": frequent, "Other": other,
 		"TotalAssets": totalAssets,
 		"AgingCount":  agingTotal, "FreqCount": freqTotal, "OtherCount": otherTotal,

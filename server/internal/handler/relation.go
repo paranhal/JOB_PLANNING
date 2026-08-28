@@ -33,7 +33,7 @@ func (h *RelationHandler) List(c echo.Context) error {
 	compTypes, _ := h.codeRepo.ActiveByGroup("company_type")
 
 	return c.Render(http.StatusOK, "relation/list.html", map[string]interface{}{
-		"Title": "수행관계 관리", "Active": "relations",
+		"Title": "수행관계 관리", "Active": NavRelations,
 		"Items": items, "Total": total, "Page": page, "TotalPages": totalPages,
 		"CustomerID": customerID, "Customers": customers,
 		"RelTypes": relTypes, "CompTypes": compTypes,
@@ -49,7 +49,7 @@ func (h *RelationHandler) New(c echo.Context) error {
 		rel.CustomerID = cid
 	}
 	return c.Render(http.StatusOK, "relation/form.html", map[string]interface{}{
-		"Title": "수행관계 등록", "Active": "relations", "IsNew": true,
+		"Title": "수행관계 등록", "Active": NavRelations, "IsNew": true,
 		"Relation": rel, "Customers": customers,
 		"RelTypes": relTypes, "CompTypes": compTypes,
 	})
@@ -72,7 +72,7 @@ func (h *RelationHandler) Edit(c echo.Context) error {
 	relTypes, _ := h.codeRepo.ActiveByGroup("relation_type")
 	compTypes, _ := h.codeRepo.ActiveByGroup("company_type")
 	return c.Render(http.StatusOK, "relation/form.html", map[string]interface{}{
-		"Title": "수행관계 수정", "Active": "relations", "IsNew": false,
+		"Title": "수행관계 수정", "Active": NavRelations, "IsNew": false,
 		"Relation": p, "Customers": customers,
 		"RelTypes": relTypes, "CompTypes": compTypes,
 	})

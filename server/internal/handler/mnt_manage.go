@@ -80,7 +80,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "maintenance/plan_manage.html", map[string]interface{}{
-		"Title": fmt.Sprintf("정기점검 관리 %d년", plan.PlanYear), "Active": "maintenance",
+		"Title": fmt.Sprintf("정기점검 관리 %d년", plan.PlanYear), "Active": NavMaintenance,
 		"Plan": plan, "Plans": plans, "IsAdmin": isAdminRole(c),
 		"Regions": regions, "Assignees": assignees,
 		"Unassigned": unassigned, "UnassignedMonth": um,

@@ -194,7 +194,7 @@ func TestManagePlanRender(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := map[string]interface{}{
-		"Title": "정기점검 관리", "Active": "maintenance", "UserRole": "admin",
+		"Title": "정기점검 관리", "Active": NavMaintenance, "UserRole": "admin",
 		"Plan": &model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Status: "draft", Title: "2026년 정기점검"},
 		"Plans": []repository.PlanListItem{
 			{MaintenancePlan: model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Status: "draft", Title: "t"}, VisitCount: 2, DoneCount: 1},
