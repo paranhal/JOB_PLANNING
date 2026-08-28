@@ -16,6 +16,9 @@ const (
 	RecurrenceWeeklyDOW   = "weekly_dow"
 	RecurrenceEveryNDays  = "every_n_days"
 	RecurrenceEveryNWeeks = "every_n_weeks"
+	RecurrenceMonthly     = "monthly"
+	RecurrenceQuarterly   = "quarterly"
+	RecurrenceYearly      = "yearly"
 	RecurrenceManual      = "manual"
 	RecurrenceNone        = "none"
 
@@ -39,9 +42,10 @@ const (
 	RecurrenceChangeKeepAdd = "keep_add" // 기존 유지 + 새 일정만 추가
 	RecurrenceChangeReplace = "replace"  // 모든 미완료 삭제 후 재생성
 
-	RecurrenceWarnLimit   = 200
-	RecurrenceRejectLimit = 500
-	RecurrenceDailyYearN  = 365
+	RecurrenceWarnLimit    = 200
+	RecurrenceRejectLimit  = 500
+	RecurrenceDailyYearN   = 365
+	RecurrenceUpcomingDays = 3 // 대시보드 「다가오는 실행」 미리보기 일수. 당일은 제외(오늘 예정).
 )
 
 // WorkRecurrence 상위 업무 1건의 기간 내 반복 규칙 (§13.15.4)
@@ -57,7 +61,10 @@ type WorkRecurrence struct {
 	ProgressIncludeFuture bool
 	FinalResult           string
 	Archived              bool     // 보관. 완료 회차를 지우지 않고 목록에서만 내린다.
-	ManualDates           []string // 폼 전용. DB에 안 넣는다.
+	MonthDay              int      // 매월 N일 · 매년 일 · 분기 일 (1–31)
+	MonthN                int      // 매년 월 · 분기 시작월 (1–12)
+	LastWorkday           bool     // 매월 마지막 영업일
+	ManualDates           []string // 지정일자. work_recurrence.manual_dates
 }
 
 type OccurrencePreviewItem struct {
@@ -234,7 +241,8 @@ func joinOccurrenceLabels(dates []string, max int) string {
 
 func NormalizeRecurrenceRuleType(s string) string {
 	switch strings.TrimSpace(s) {
-	case RecurrenceDaily, RecurrenceWeeklyDOW, RecurrenceEveryNDays, RecurrenceEveryNWeeks, RecurrenceManual:
+	case RecurrenceDaily, RecurrenceWeeklyDOW, RecurrenceEveryNDays, RecurrenceEveryNWeeks,
+		RecurrenceMonthly, RecurrenceQuarterly, RecurrenceYearly, RecurrenceManual:
 		return s
 	default:
 		return RecurrenceNone
@@ -269,11 +277,113 @@ func RecurrenceRuleLabel(s string) string {
 		return "N일마다"
 	case RecurrenceEveryNWeeks:
 		return "N주마다"
+	case RecurrenceMonthly:
+		return "매월"
+	case RecurrenceQuarterly:
+		return "분기"
+	case RecurrenceYearly:
+		return "매년"
 	case RecurrenceManual:
-		return "날짜 지정"
+		return "지정일자"
 	default:
 		return "없음"
 	}
+}
+
+func RecurrenceCycleLabel(w WorkRecurrence) string {
+	n := w.IntervalN
+	if n < 1 {
+		n = 1
+	}
+	switch NormalizeRecurrenceRuleType(w.RuleType) {
+	case RecurrenceDaily:
+		return "매일"
+	case RecurrenceWeeklyDOW:
+		return "매주 요일"
+	case RecurrenceEveryNDays:
+		return fmt.Sprintf("%d일마다", n)
+	case RecurrenceEveryNWeeks:
+		return fmt.Sprintf("%d주마다", n)
+	case RecurrenceMonthly:
+		if w.LastWorkday {
+			return "매월 마지막 영업일"
+		}
+		d := w.MonthDay
+		if d < 1 {
+			d = n
+		}
+		if d < 1 {
+			d = 1
+		}
+		return fmt.Sprintf("매월 %d일", d)
+	case RecurrenceQuarterly:
+		m := w.MonthN
+		if m < 1 || m > 12 {
+			m = 1
+		}
+		return fmt.Sprintf("분기(%d월 시작)", m)
+	case RecurrenceYearly:
+		m, d := w.MonthN, w.MonthDay
+		if m < 1 || m > 12 {
+			m = 1
+		}
+		if d < 1 {
+			d = 1
+		}
+		return fmt.Sprintf("매년 %d월 %d일", m, d)
+	case RecurrenceManual:
+		return "지정일자"
+	default:
+		return RecurrenceRuleLabel(w.RuleType)
+	}
+}
+
+// FormatRecurrenceProgress 주간보고 완료 부기. 「정기 데이터 확인 · 5회 중 4회」 §13.15.9
+func FormatRecurrenceProgress(title string, total, done int) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "반복 업무"
+	}
+	if total <= 0 {
+		return title
+	}
+	return fmt.Sprintf("%s · %d회 중 %d회", title, total, done)
+}
+
+// FormatRecurrenceTimes 전사 주간보고 F열. 「·정기 데이터 확인 5회」 §13.15.9 · §16.6
+func FormatRecurrenceTimes(title string, n int) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "반복 업무"
+	}
+	if n <= 1 {
+		return "·" + title
+	}
+	return fmt.Sprintf("·%s %d회", title, n)
+}
+
+// DaysUntil today 기준 date까지 남은 일수. 당일 0, 지난 날은 음수.
+func DaysUntil(date, today string) (int, bool) {
+	d, err1 := time.ParseInLocation("2006-01-02", strings.TrimSpace(date), time.Local)
+	t, err2 := time.ParseInLocation("2006-01-02", strings.TrimSpace(today), time.Local)
+	if err1 != nil || err2 != nil {
+		return 0, false
+	}
+	return int(d.Sub(t).Hours() / 24), true
+}
+
+// DueUrgency 마감 D-n. 3일 이내 soon, 경과 over. §13.15.12
+func DueUrgency(days int, ok bool) string {
+	if !ok {
+		return ""
+	}
+	if days < 0 {
+		return "over"
+	}
+	if days <= RecurrenceUpcomingDays {
+		return "soon"
+	}
+	return ""
 }
 
 func HolidayPolicyLabel(s string) string {
@@ -356,6 +466,35 @@ func FormatOccurrenceLabel(date string) string {
 	}
 	names := []string{"일", "월", "화", "수", "목", "금", "토"}
 	return fmt.Sprintf("%d/%d(%s)", int(t.Month()), t.Day(), names[int(t.Weekday())])
+}
+
+func JoinDateList(dates []string) string {
+	return strings.Join(ParseDateList(strings.Join(dates, "\n")), "\n")
+}
+
+func ClampMonthDay(year int, month time.Month, day int) time.Time {
+	if month < 1 {
+		month = 1
+	}
+	if day < 1 {
+		day = 1
+	}
+	last := time.Date(year, month+1, 0, 0, 0, 0, 0, time.Local).Day()
+	if day > last {
+		day = last
+	}
+	return time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+}
+
+func QuarterMonths(startMonth int) []int {
+	if startMonth < 1 || startMonth > 12 {
+		startMonth = 1
+	}
+	out := make([]int, 4)
+	for i := 0; i < 4; i++ {
+		out[i] = ((startMonth-1+i*3)%12)+1
+	}
+	return out
 }
 
 func ParseDateList(raw string) []string {

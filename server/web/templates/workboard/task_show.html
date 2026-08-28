@@ -668,80 +668,14 @@
 
   {{if and .CanWrite (eq .Task.SourceType "") (eq .Task.ParentTaskID "")}}
   <div class="bg-white rounded-xl border border-indigo-200 p-5 space-y-3"
-       x-data="{ rule: '{{.Recurrence.RuleType}}', changeMode: '{{if .ChangeMode}}{{.ChangeMode}}{{else}}future{{end}}' }">
+       x-data="{ rule: '{{.Recurrence.RuleType}}', changeMode: '{{if .ChangeMode}}{{.ChangeMode}}{{else}}future{{end}}', monthlyMode: '{{if .Recurrence.LastWorkday}}last{{else}}day{{end}}' }">
     <h3 class="font-semibold text-gray-800">기간 내 반복 실행</h3>
     <p class="text-xs text-gray-500">상위 마감일과 실행 예정일을 나눕니다. 실행 작업은 일자 하위업무로 만들어 <strong>일일 업무 등록 시간표</strong>에 올라갑니다.</p>
     {{range .HolidayBanners}}
     <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">{{.}}</div>
     {{end}}
     <form method="post" class="space-y-3 text-sm">
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-gray-600 mb-1">시작일</label>
-          <input type="date" name="start_date" value="{{.Recurrence.StartDate}}" class="w-full border rounded-lg px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-gray-600 mb-1">최종 마감일</label>
-          <input type="date" name="end_date" value="{{.Recurrence.EndDate}}" class="w-full border rounded-lg px-3 py-2">
-        </div>
-      </div>
-      <div>
-        <label class="block text-gray-600 mb-1">반복 규칙</label>
-        <select name="rule_type" x-model="rule" class="w-full border rounded-lg px-3 py-2">
-          <option value="none" {{if eq .Recurrence.RuleType "none"}}selected{{end}}>선택</option>
-          <option value="daily" {{if eq .Recurrence.RuleType "daily"}}selected{{end}}>매일</option>
-          <option value="weekly_dow" {{if eq .Recurrence.RuleType "weekly_dow"}}selected{{end}}>매주 요일</option>
-          <option value="every_n_days" {{if eq .Recurrence.RuleType "every_n_days"}}selected{{end}}>N일마다</option>
-          <option value="every_n_weeks" {{if eq .Recurrence.RuleType "every_n_weeks"}}selected{{end}}>N주마다</option>
-          <option value="manual" {{if eq .Recurrence.RuleType "manual"}}selected{{end}}>날짜 지정</option>
-        </select>
-      </div>
-      <div class="grid grid-cols-2 gap-3" x-show="rule==='every_n_days' || rule==='every_n_weeks'">
-        <div>
-          <label class="block text-gray-600 mb-1">주기 N</label>
-          <input type="number" name="interval_n" min="1" value="{{.Recurrence.IntervalN}}" class="w-full border rounded-lg px-3 py-2">
-        </div>
-      </div>
-      <div x-show="rule==='weekly_dow'" x-cloak>
-        <label class="block text-gray-600 mb-1">요일 (월=1 … 일=7)</label>
-        <div class="flex flex-wrap gap-3">
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="1" {{if index .WeekdayOn 1}}checked{{end}}> 월</label>
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="2" {{if index .WeekdayOn 2}}checked{{end}}> 화</label>
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="3" {{if index .WeekdayOn 3}}checked{{end}}> 수</label>
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="4" {{if index .WeekdayOn 4}}checked{{end}}> 목</label>
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="5" {{if index .WeekdayOn 5}}checked{{end}}> 금</label>
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="6" {{if index .WeekdayOn 6}}checked{{end}}> 토</label>
-          <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="7" {{if index .WeekdayOn 7}}checked{{end}}> 일</label>
-        </div>
-      </div>
-      <div x-show="rule==='manual'" x-cloak>
-        <label class="block text-gray-600 mb-1">날짜 목록</label>
-        <textarea name="manual_dates" rows="3" placeholder="2026-09-01&#10;2026-09-04"
-                  class="w-full border rounded-lg px-3 py-2 font-mono text-xs">{{range .Recurrence.ManualDates}}{{.}}&#10;{{end}}</textarea>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-gray-600 mb-1">주말·공휴일</label>
-          <select name="holiday_policy" class="w-full border rounded-lg px-3 py-2">
-            <option value="as_is" {{if eq .Recurrence.HolidayPolicy "as_is"}}selected{{end}}>그대로 실행</option>
-            <option value="next_workday" {{if eq .Recurrence.HolidayPolicy "next_workday"}}selected{{end}}>다음 근무일</option>
-            <option value="prev_workday" {{if eq .Recurrence.HolidayPolicy "prev_workday"}}selected{{end}}>이전 근무일</option>
-            <option value="skip" {{if eq .Recurrence.HolidayPolicy "skip"}}selected{{end}}>제외</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-gray-600 mb-1">완료 정책</label>
-          <select name="complete_policy" class="w-full border rounded-lg px-3 py-2">
-            <option value="manual" {{if eq .Recurrence.CompletePolicy "manual"}}selected{{end}}>담당자 최종 완료</option>
-            <option value="auto" {{if eq .Recurrence.CompletePolicy "auto"}}selected{{end}}>전부 완료 시 자동</option>
-            <option value="require_result" {{if eq .Recurrence.CompletePolicy "require_result"}}selected{{end}}>최종 결과 필수</option>
-          </select>
-        </div>
-      </div>
-      <label class="flex items-center gap-2 text-gray-600">
-        <input type="checkbox" name="progress_include_future" value="1" {{if .Recurrence.ProgressIncludeFuture}}checked{{end}}>
-        진행률에 미래 일정 포함
-      </label>
+      {{template "wb_recurrence_fields" .}}
       {{if .RecurrencePreview}}
       <div class="rounded-lg bg-slate-50 border border-slate-200 px-3 py-3 space-y-1">
         {{if .RecurrencePreview.Error}}

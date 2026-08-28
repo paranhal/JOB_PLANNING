@@ -208,6 +208,11 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		}
 		return err
 	}
+	if applied, code := applyRecurrenceFromForm(c, h.repo, t, nil); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+url.PathEscape(t.TaskID)+"?err="+code)
+	} else if applied {
+		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+url.PathEscape(t.TaskID)+"?ok=rec_gen")
+	}
 	if t.Status == model.WBTaskComplete && t.CompleteNote != "" {
 		_ = h.repo.CreateActivity(&model.WorkActivity{
 			TaskID: t.TaskID, ActivityType: model.WBActivityDone,

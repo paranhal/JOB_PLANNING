@@ -53,6 +53,22 @@ func applyWorkRecurrence(db *sql.DB) {
 			log.Printf("018 work_recurrence.archived: %v", err)
 		}
 	}
+	for _, col := range []struct {
+		name string
+		def  string
+	}{
+		{"month_day", "INTEGER NOT NULL DEFAULT 0"},
+		{"month_n", "INTEGER NOT NULL DEFAULT 0"},
+		{"last_workday", "INTEGER NOT NULL DEFAULT 0"},
+		{"manual_dates", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if workRecurrenceHasColumn(db, col.name) {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE work_recurrence ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
+			log.Printf("023 work_recurrence.%s: %v", col.name, err)
+		}
+	}
 	markMetaDone(db, workRecurrenceMetaKey)
 }
 

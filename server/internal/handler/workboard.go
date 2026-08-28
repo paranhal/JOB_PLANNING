@@ -1335,6 +1335,11 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			_, _ = h.repo.CreateSubtasks(t, dates)
 		}
 	}
+	if applied, code := applyRecurrenceFromForm(c, h.repo, t, h.holidayYearMissing()); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"?err="+code)
+	} else if applied {
+		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"?ok=rec_gen")
+	}
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 }
 

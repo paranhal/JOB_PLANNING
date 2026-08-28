@@ -69,6 +69,9 @@ func TestAdminWorkMenuPagesRender(t *testing.T) {
 	if !strings.Contains(fb, "충남교육청") {
 		t.Fatal("거래처 직접입력 안내(충남교육청) 없음")
 	}
+	if !strings.Contains(fb, "매월") || !strings.Contains(fb, "지정일자") {
+		t.Fatal("등록 화면에 매월·지정일자 반복 규칙이 없다")
+	}
 }
 
 func TestAdminWorkCreateSeparatesCustomerAndTitle(t *testing.T) {

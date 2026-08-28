@@ -469,3 +469,91 @@ func TestOccurrenceChangeModesAndDeleteProtect(t *testing.T) {
 		t.Fatal("보관이 완료 회차를 지웠다")
 	}
 }
+
+func TestRecurrenceDashboardAlerts(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "dash_alert.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	wb := NewWBRepo(db)
+	today := time.Now().Format("2006-01-02")
+	soon := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+	pastDue := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "마감 반복", DueDate: pastDue,
+		Assignee: "양기헌", Status: model.WBTaskWaiting,
+	}
+	if err := wb.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.GenerateOccurrences(parent, model.WorkRecurrence{
+		StartDate: soon, EndDate: soon, RuleType: model.RecurrenceManual,
+		HolidayPolicy: model.HolidayPolicyAsIs, CompletePolicy: model.CompletePolicyManual,
+	}, []string{soon}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := NewWorkBoardRepo(db).DashStats("", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.UpcomingOcc != 1 {
+		t.Fatalf("다가오는 실행=%d want 1 (today=%s soon=%s)", st.UpcomingOcc, today, soon)
+	}
+	if st.OverdueDeadline != 1 {
+		t.Fatalf("마감 경과=%d want 1", st.OverdueDeadline)
+	}
+}
+
+func TestUpsertRecurrenceUnitFields(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "rec_units.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	wb := NewWBRepo(db)
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "분기 보고",
+		DueDate: "2026-12-31", Assignee: "양기헌", Status: model.WBTaskWaiting,
+	}
+	if err := wb.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	rule := model.WorkRecurrence{
+		TaskID: parent.TaskID, StartDate: "2026-01-01", EndDate: "2026-12-31",
+		RuleType: model.RecurrenceQuarterly, MonthN: 1, MonthDay: 1,
+		HolidayPolicy: model.HolidayPolicyAsIs, CompletePolicy: model.CompletePolicyManual,
+		LastWorkday: false, ManualDates: []string{"2026-03-01"},
+	}
+	if err := wb.UpsertRecurrence(rule); err != nil {
+		t.Fatal(err)
+	}
+	got, err := wb.GetRecurrence(parent.TaskID)
+	if err != nil || got == nil {
+		t.Fatalf("get err=%v", err)
+	}
+	if got.RuleType != model.RecurrenceQuarterly || got.MonthN != 1 || got.MonthDay != 1 {
+		t.Fatalf("quarterly fields %+v", got)
+	}
+	rule.RuleType = model.RecurrenceMonthly
+	rule.LastWorkday = true
+	rule.MonthDay = 0
+	rule.ManualDates = nil
+	if err := wb.UpsertRecurrence(rule); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = wb.GetRecurrence(parent.TaskID)
+	if got == nil || !got.LastWorkday || got.RuleType != model.RecurrenceMonthly {
+		t.Fatalf("monthly last %+v", got)
+	}
+	rule.RuleType = model.RecurrenceManual
+	rule.LastWorkday = false
+	rule.ManualDates = []string{"2026-09-24", "2026-10-03"}
+	if err := wb.UpsertRecurrence(rule); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = wb.GetRecurrence(parent.TaskID)
+	if got == nil || strings.Join(got.ManualDates, ",") != "2026-09-24,2026-10-03" {
+		t.Fatalf("manual dates %+v", got)
+	}
+}

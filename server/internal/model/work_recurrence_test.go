@@ -67,3 +67,43 @@ func TestKeepOccurrenceOnChangeFutureLeavesPast(t *testing.T) {
 		t.Fatal("replace는 지난 미완료도 지운다")
 	}
 }
+
+func TestRecurrenceDisplayHelpers(t *testing.T) {
+	if got := FormatRecurrenceProgress("정기 데이터 확인", 5, 4); got != "정기 데이터 확인 · 5회 중 4회" {
+		t.Fatalf("progress=%s", got)
+	}
+	if got := FormatRecurrenceTimes("정기 데이터 확인", 5); got != "·정기 데이터 확인 5회" {
+		t.Fatalf("times=%s", got)
+	}
+	n, ok := DaysUntil("2026-08-30", "2026-08-27")
+	if !ok || n != 3 {
+		t.Fatalf("D-n %d ok=%v", n, ok)
+	}
+	if DueUrgency(3, true) != "soon" || DueUrgency(-1, true) != "over" {
+		t.Fatal("urgency")
+	}
+	if RecurrenceCycleLabel(WorkRecurrence{RuleType: RecurrenceEveryNDays, IntervalN: 3}) != "3일마다" {
+		t.Fatal("cycle")
+	}
+	if RecurrenceCycleLabel(WorkRecurrence{RuleType: RecurrenceMonthly, MonthDay: 15}) != "매월 15일" {
+		t.Fatal("monthly day")
+	}
+	if RecurrenceCycleLabel(WorkRecurrence{RuleType: RecurrenceMonthly, LastWorkday: true}) != "매월 마지막 영업일" {
+		t.Fatal("monthly last")
+	}
+	if RecurrenceCycleLabel(WorkRecurrence{RuleType: RecurrenceQuarterly, MonthN: 1}) != "분기(1월 시작)" {
+		t.Fatal("quarterly")
+	}
+	if RecurrenceCycleLabel(WorkRecurrence{RuleType: RecurrenceYearly, MonthN: 3, MonthDay: 15}) != "매년 3월 15일" {
+		t.Fatal("yearly")
+	}
+	if RecurrenceRuleLabel(RecurrenceManual) != "지정일자" {
+		t.Fatal("manual label")
+	}
+	if got := QuarterMonths(1); len(got) != 4 || got[0] != 1 || got[1] != 4 || got[2] != 7 || got[3] != 10 {
+		t.Fatalf("Q1 start=%v", got)
+	}
+	if got := ClampMonthDay(2026, 2, 31).Format("2006-01-02"); got != "2026-02-28" {
+		t.Fatalf("feb clamp=%s", got)
+	}
+}

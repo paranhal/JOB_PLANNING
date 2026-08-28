@@ -43,6 +43,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		if partials, err := filepath.Glob("web/templates/admin_work/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
+		files = append(files, "web/templates/workboard/_recurrence_fields.html")
 	}
 	if strings.HasPrefix(name, "stats/") {
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {

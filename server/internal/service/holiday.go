@@ -183,6 +183,25 @@ func (c *Calendar) PrevWorkingDay(date string) string {
 	return ""
 }
 
+// LastWorkingDayOfMonth 해당 달의 마지막 근무일. 판정은 IsWorkingDay 만 쓴다. §33.4
+func (c *Calendar) LastWorkingDayOfMonth(year int, month time.Month) string {
+	if c == nil {
+		c = &Calendar{}
+	}
+	if month < 1 {
+		month = 1
+	}
+	last := time.Date(year, month+1, 0, 0, 0, 0, 0, time.Local)
+	for i := 0; i < 31; i++ {
+		ds := last.Format("2006-01-02")
+		if c.IsWorkingDay(ds) {
+			return ds
+		}
+		last = last.AddDate(0, 0, -1)
+	}
+	return ""
+}
+
 func IsHoliday(date string) (bool, string) {
 	return defaultCal.IsHoliday(date)
 }

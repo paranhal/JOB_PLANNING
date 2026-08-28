@@ -33,7 +33,7 @@
 
     <!-- 행정/지원 -->
     <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='admin'" x-cloak
-          x-data="{ workType: 'admin', memberRows: [], dueUndetermined: false }">
+          x-data="{ workType: 'admin', memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day' }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''">← 종류 선택</button>
       <div>
@@ -133,9 +133,12 @@
       </div>
       {{template "wb_member_fields" .}}
       <label class="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" name="recurrence_enabled" value="1" class="rounded">
+        <input type="checkbox" name="recurrence_enabled" value="1" x-model="recOn" class="rounded">
         기간 내 반복 실행
       </label>
+      <div x-show="recOn" x-cloak class="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+        {{template "wb_recurrence_fields" .}}
+      </div>
       <div class="flex items-center justify-between gap-2 pt-2">
         <button type="button" class="px-4 py-2 text-sm border rounded-lg text-gray-700" @click="alert('상위 업무를 저장한 뒤 상세에서 하위 업무를 등록하세요.')">＋하위 업무 등록</button>
         <div class="flex gap-2">

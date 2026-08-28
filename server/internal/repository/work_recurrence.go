@@ -17,12 +17,15 @@ func (r *WBRepo) GetRecurrence(taskID string) (*model.WorkRecurrence, error) {
 		SELECT task_id, COALESCE(start_date,''), COALESCE(end_date,''), COALESCE(rule_type,'none'),
 		       COALESCE(interval_n,1), COALESCE(weekdays,''), COALESCE(holiday_policy,'as_is'),
 		       COALESCE(complete_policy,'manual'), COALESCE(progress_include_future,0), COALESCE(final_result,''),
-		       COALESCE(archived,0)
+		       COALESCE(archived,0), COALESCE(month_day,0), COALESCE(month_n,0), COALESCE(last_workday,0),
+		       COALESCE(manual_dates,'')
 		FROM work_recurrence WHERE task_id=?`, taskID)
 	var w model.WorkRecurrence
-	var include, archived int
+	var include, archived, lastWD int
+	var manualRaw string
 	err := row.Scan(&w.TaskID, &w.StartDate, &w.EndDate, &w.RuleType, &w.IntervalN, &w.Weekdays,
-		&w.HolidayPolicy, &w.CompletePolicy, &include, &w.FinalResult, &archived)
+		&w.HolidayPolicy, &w.CompletePolicy, &include, &w.FinalResult, &archived,
+		&w.MonthDay, &w.MonthN, &lastWD, &manualRaw)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -34,6 +37,8 @@ func (r *WBRepo) GetRecurrence(taskID string) (*model.WorkRecurrence, error) {
 	}
 	w.ProgressIncludeFuture = include != 0
 	w.Archived = archived != 0
+	w.LastWorkday = lastWD != 0
+	w.ManualDates = model.ParseDateList(manualRaw)
 	w.RuleType = model.NormalizeRecurrenceRuleType(w.RuleType)
 	w.HolidayPolicy = model.NormalizeHolidayPolicy(w.HolidayPolicy)
 	w.CompletePolicy = model.NormalizeCompletePolicy(w.CompletePolicy)
@@ -57,11 +62,16 @@ func (r *WBRepo) UpsertRecurrence(w model.WorkRecurrence) error {
 	if w.ProgressIncludeFuture {
 		include = 1
 	}
+	lastWD := 0
+	if w.LastWorkday {
+		lastWD = 1
+	}
 	_, err := r.db.Exec(`
 		INSERT INTO work_recurrence (
 			task_id, start_date, end_date, rule_type, interval_n, weekdays,
-			holiday_policy, complete_policy, progress_include_future, final_result, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+			holiday_policy, complete_policy, progress_include_future, final_result,
+			month_day, month_n, last_workday, manual_dates, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
 		ON CONFLICT(task_id) DO UPDATE SET
 			start_date=excluded.start_date,
 			end_date=excluded.end_date,
@@ -72,9 +82,14 @@ func (r *WBRepo) UpsertRecurrence(w model.WorkRecurrence) error {
 			complete_policy=excluded.complete_policy,
 			progress_include_future=excluded.progress_include_future,
 			final_result=CASE WHEN TRIM(excluded.final_result)='' THEN work_recurrence.final_result ELSE excluded.final_result END,
+			month_day=excluded.month_day,
+			month_n=excluded.month_n,
+			last_workday=excluded.last_workday,
+			manual_dates=excluded.manual_dates,
 			updated_at=CURRENT_TIMESTAMP`,
 		w.TaskID, w.StartDate, w.EndDate, w.RuleType, w.IntervalN, w.Weekdays,
-		w.HolidayPolicy, w.CompletePolicy, include, w.FinalResult)
+		w.HolidayPolicy, w.CompletePolicy, include, w.FinalResult,
+		w.MonthDay, w.MonthN, lastWD, model.JoinDateList(w.ManualDates))
 	return err
 }
 

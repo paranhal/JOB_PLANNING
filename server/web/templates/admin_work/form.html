@@ -1,7 +1,7 @@
 {{define "title"}}행정관련업무 등록 · 고객지원시스템{{end}}
 {{define "content"}}
 {{$p := .Parent}}
-<div class="max-w-3xl mx-auto space-y-5" x-data="{ workType: '{{if $p}}{{$p.WorkType}}{{else}}admin{{end}}', dueUndetermined: false }">
+<div class="max-w-3xl mx-auto space-y-5" x-data="{ workType: '{{if $p}}{{$p.WorkType}}{{else}}admin{{end}}', dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day' }">
   <div>
     <a href="/admin-work" class="text-sm text-gray-500 hover:text-gray-700">← 행정관련업무등록/처리</a>
     <h2 class="text-xl font-bold text-gray-800 mt-1">행정·지원업무 등록</h2>
@@ -130,9 +130,12 @@
     </div>
 
     <label class="flex items-center gap-2 text-sm text-gray-700">
-      <input type="checkbox" name="recurrence_enabled" value="1" class="rounded">
+      <input type="checkbox" name="recurrence_enabled" value="1" x-model="recOn" class="rounded">
       기간 내 반복 실행
     </label>
+    <div x-show="recOn" x-cloak class="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm">
+      {{template "wb_recurrence_fields" .}}
+    </div>
 
     {{if not $p}}
     <div class="flex items-center justify-between gap-2 pt-2">

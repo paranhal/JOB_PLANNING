@@ -1,0 +1,165 @@
+{{define "wb_recurrence_fields"}}
+{{$r := .Recurrence}}
+{{$today := .Today}}
+{{if not $today}}{{$today = .Date}}{{end}}
+<div class="grid grid-cols-2 gap-3">
+  <div>
+    <label class="block text-gray-600 mb-1">시작일</label>
+    <input type="date" name="start_date" value="{{if $r}}{{$r.StartDate}}{{else}}{{$today}}{{end}}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+  <div>
+    <label class="block text-gray-600 mb-1">최종 마감일</label>
+    <input type="date" name="end_date" value="{{if $r}}{{$r.EndDate}}{{else}}{{$today}}{{end}}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+</div>
+<div>
+  <label class="block text-gray-600 mb-1">반복 규칙</label>
+  <select name="rule_type" x-model="rule" class="w-full border rounded-lg px-3 py-2">
+    <option value="none" {{if or (not $r) (eq $r.RuleType "none") (eq $r.RuleType "")}}selected{{end}}>선택</option>
+    <option value="daily" {{if and $r (eq $r.RuleType "daily")}}selected{{end}}>매일</option>
+    <option value="weekly_dow" {{if and $r (eq $r.RuleType "weekly_dow")}}selected{{end}}>매주 요일</option>
+    <option value="every_n_days" {{if and $r (eq $r.RuleType "every_n_days")}}selected{{end}}>N일마다</option>
+    <option value="every_n_weeks" {{if and $r (eq $r.RuleType "every_n_weeks")}}selected{{end}}>N주마다</option>
+    <option value="monthly" {{if and $r (eq $r.RuleType "monthly")}}selected{{end}}>매월</option>
+    <option value="quarterly" {{if and $r (eq $r.RuleType "quarterly")}}selected{{end}}>분기</option>
+    <option value="yearly" {{if and $r (eq $r.RuleType "yearly")}}selected{{end}}>매년</option>
+    <option value="manual" {{if and $r (eq $r.RuleType "manual")}}selected{{end}}>지정일자</option>
+  </select>
+</div>
+<div class="grid grid-cols-2 gap-3" x-show="rule==='every_n_days' || rule==='every_n_weeks'" x-cloak>
+  <div>
+    <label class="block text-gray-600 mb-1">주기 N</label>
+    <input type="number" name="interval_n" min="1" :disabled="rule!=='every_n_days' && rule!=='every_n_weeks'" value="{{if $r}}{{$r.IntervalN}}{{else}}1{{end}}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+</div>
+<div x-show="rule==='weekly_dow'" x-cloak>
+  <label class="block text-gray-600 mb-1">요일 (월=1 … 일=7)</label>
+  <div class="flex flex-wrap gap-3">
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="1" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 1)}}checked{{end}}> 월</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="2" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 2)}}checked{{end}}> 화</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="3" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 3)}}checked{{end}}> 수</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="4" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 4)}}checked{{end}}> 목</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="5" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 5)}}checked{{end}}> 금</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="6" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 6)}}checked{{end}}> 토</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="weekdays" value="7" :disabled="rule!=='weekly_dow'" {{if and .WeekdayOn (index .WeekdayOn 7)}}checked{{end}}> 일</label>
+  </div>
+</div>
+<div class="space-y-2" x-show="rule==='monthly'" x-cloak>
+  <label class="flex items-center gap-2">
+    <input type="radio" name="monthly_mode" value="day" x-model="monthlyMode" :disabled="rule!=='monthly'">
+    매월 N일
+  </label>
+  <input type="number" name="month_day" min="1" max="31" x-show="monthlyMode==='day'"
+         :disabled="rule!=='monthly' || monthlyMode!=='day'"
+         value="{{if and $r $r.MonthDay}}{{$r.MonthDay}}{{else}}1{{end}}"
+         class="w-32 border rounded-lg px-3 py-2">
+  <label class="flex items-center gap-2">
+    <input type="radio" name="monthly_mode" value="last" x-model="monthlyMode" :disabled="rule!=='monthly'">
+    매월 마지막 영업일
+  </label>
+</div>
+<div x-show="rule==='quarterly'" x-cloak>
+  <label class="block text-gray-600 mb-1">분기 시작월</label>
+  <select name="month_n" :disabled="rule!=='quarterly'" class="w-full border rounded-lg px-3 py-2">
+    <option value="1" {{if or (not $r) (eq $r.MonthN 0) (eq $r.MonthN 1)}}selected{{end}}>1월 시작</option>
+    <option value="2" {{if and $r (eq $r.MonthN 2)}}selected{{end}}>2월 시작</option>
+    <option value="3" {{if and $r (eq $r.MonthN 3)}}selected{{end}}>3월 시작</option>
+    <option value="4" {{if and $r (eq $r.MonthN 4)}}selected{{end}}>4월 시작</option>
+    <option value="5" {{if and $r (eq $r.MonthN 5)}}selected{{end}}>5월 시작</option>
+    <option value="6" {{if and $r (eq $r.MonthN 6)}}selected{{end}}>6월 시작</option>
+    <option value="7" {{if and $r (eq $r.MonthN 7)}}selected{{end}}>7월 시작</option>
+    <option value="8" {{if and $r (eq $r.MonthN 8)}}selected{{end}}>8월 시작</option>
+    <option value="9" {{if and $r (eq $r.MonthN 9)}}selected{{end}}>9월 시작</option>
+    <option value="10" {{if and $r (eq $r.MonthN 10)}}selected{{end}}>10월 시작</option>
+    <option value="11" {{if and $r (eq $r.MonthN 11)}}selected{{end}}>11월 시작</option>
+    <option value="12" {{if and $r (eq $r.MonthN 12)}}selected{{end}}>12월 시작</option>
+  </select>
+  <label class="block text-gray-600 mb-1 mt-2">실행일 (일)</label>
+  <input type="number" name="month_day" min="1" max="31" :disabled="rule!=='quarterly'" value="{{if and $r $r.MonthDay}}{{$r.MonthDay}}{{else}}1{{end}}" class="w-32 border rounded-lg px-3 py-2">
+</div>
+<div class="grid grid-cols-2 gap-3" x-show="rule==='yearly'" x-cloak>
+  <div>
+    <label class="block text-gray-600 mb-1">월</label>
+    <input type="number" name="month_n" min="1" max="12" :disabled="rule!=='yearly'" value="{{if and $r $r.MonthN}}{{$r.MonthN}}{{else}}1{{end}}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+  <div>
+    <label class="block text-gray-600 mb-1">일</label>
+    <input type="number" name="month_day" min="1" max="31" :disabled="rule!=='yearly'" value="{{if and $r $r.MonthDay}}{{$r.MonthDay}}{{else}}1{{end}}" class="w-full border rounded-lg px-3 py-2">
+  </div>
+</div>
+<template x-if="rule==='manual'">
+<div x-data="{
+       y: parseInt('{{if and $today (ge (len $today) 4)}}{{slice $today 0 4}}{{else}}2026{{end}}', 10) || 2026,
+       m: parseInt('{{if and $today (ge (len $today) 7)}}{{slice $today 5 7}}{{else}}1{{end}}', 10) || 1,
+       sel: { {{if $r}}{{range $r.ManualDates}}'{{.}}': true,{{end}}{{end}} },
+       names: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+       iso(d) { const mm = String(this.m).padStart(2,'0'); const dd = String(d).padStart(2,'0'); return this.y + '-' + mm + '-' + dd; },
+       weekend(iso) { const w = new Date(iso + 'T12:00:00').getDay(); return w===0 || w===6; },
+       cells() {
+         const first = new Date(this.y, this.m-1, 1);
+         const last = new Date(this.y, this.m, 0).getDate();
+         const pad = first.getDay();
+         const out = [];
+         for (let i=0;i<pad;i++) out.push('');
+         for (let d=1;d<=last;d++) out.push(this.iso(d));
+         return out;
+       },
+       toggle(iso) { if (!iso) return; if (this.sel[iso]) { delete this.sel[iso]; } else { this.sel[iso] = true; } this.sel = Object.assign({}, this.sel); },
+       prev() { if (this.m===1) { this.m=12; this.y--; } else this.m--; },
+       next() { if (this.m===12) { this.m=1; this.y++; } else this.m++; },
+       picked() { return Object.keys(this.sel).filter(k => this.sel[k]).sort(); },
+       clear() { this.sel = {}; }
+     }">
+  <p class="text-xs text-gray-500 mb-1">달력에서 여러 날을 고릅니다. 여러 달에 걸쳐 선택할 수 있습니다. 고른 날은 옮기지 않습니다.</p>
+  <div class="flex items-center justify-between mb-2">
+    <button type="button" class="px-2 py-1 border rounded" @click="prev()">◀</button>
+    <span class="font-medium text-gray-800" x-text="y + '년 ' + names[m-1]"></span>
+    <button type="button" class="px-2 py-1 border rounded" @click="next()">▶</button>
+  </div>
+  <div class="grid grid-cols-7 gap-1 text-center text-[11px] text-gray-500 mb-1">
+    <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+  </div>
+  <div class="grid grid-cols-7 gap-1">
+    <template x-for="iso in cells()" :key="iso || Math.random()">
+      <button type="button" class="h-8 rounded text-sm"
+              :class="!iso ? 'invisible' : (sel[iso] ? 'bg-indigo-600 text-white' : (weekend(iso) ? 'text-amber-700 hover:bg-amber-50' : 'hover:bg-gray-100'))"
+              x-text="iso ? Number(iso.slice(8)) : ''"
+              @click="toggle(iso)"></button>
+    </template>
+  </div>
+  <p class="text-xs text-gray-600 mt-2">
+    선택 <span x-text="picked().length"></span>일:
+    <span x-text="picked().map(d => (Number(d.slice(5,7))+'/'+Number(d.slice(8)))).join(' · ')"></span>
+    <button type="button" class="ml-2 text-indigo-700 underline" @click="clear()" x-show="picked().length">지우기</button>
+  </p>
+  <input type="hidden" name="manual_dates" :value="picked().join('\n')">
+</div>
+</template>
+<div class="grid grid-cols-2 gap-3">
+  <div x-show="rule!=='manual'" x-cloak>
+    <label class="block text-gray-600 mb-1">주말·공휴일</label>
+    <select name="holiday_policy" :disabled="rule==='manual'" class="w-full border rounded-lg px-3 py-2">
+      <option value="as_is" {{if or (not $r) (eq $r.HolidayPolicy "as_is")}}selected{{end}}>그대로 실행</option>
+      <option value="next_workday" {{if and $r (eq $r.HolidayPolicy "next_workday")}}selected{{end}}>다음 근무일</option>
+      <option value="prev_workday" {{if and $r (eq $r.HolidayPolicy "prev_workday")}}selected{{end}}>이전 근무일</option>
+      <option value="skip" {{if and $r (eq $r.HolidayPolicy "skip")}}selected{{end}}>제외</option>
+    </select>
+  </div>
+  <div x-show="rule==='manual'" x-cloak>
+    <p class="text-xs text-amber-800 mt-6">지정일자는 주말·공휴일 정책을 적용하지 않습니다. 휴일이면 미리보기에 경고만 표시합니다.</p>
+    <input type="hidden" name="holiday_policy" value="as_is" :disabled="rule!=='manual'">
+  </div>
+  <div>
+    <label class="block text-gray-600 mb-1">완료 정책</label>
+    <select name="complete_policy" class="w-full border rounded-lg px-3 py-2">
+      <option value="manual" {{if or (not $r) (eq $r.CompletePolicy "manual")}}selected{{end}}>담당자 최종 완료</option>
+      <option value="auto" {{if and $r (eq $r.CompletePolicy "auto")}}selected{{end}}>전부 완료 시 자동</option>
+      <option value="require_result" {{if and $r (eq $r.CompletePolicy "require_result")}}selected{{end}}>최종 결과 필수</option>
+    </select>
+  </div>
+</div>
+<label class="flex items-center gap-2 text-gray-600">
+  <input type="checkbox" name="progress_include_future" value="1" {{if and $r $r.ProgressIncludeFuture}}checked{{end}}>
+  진행률에 미래 일정 포함
+</label>
+{{end}}

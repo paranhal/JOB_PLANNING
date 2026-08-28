@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 	"customer-support/internal/service"
 )
 
@@ -21,17 +22,35 @@ func parseRecurrenceForm(c echo.Context) model.WorkRecurrence {
 	if n < 1 {
 		n = 1
 	}
-	return model.WorkRecurrence{
-		StartDate:             strings.TrimSpace(c.FormValue("start_date")),
-		EndDate:               strings.TrimSpace(c.FormValue("end_date")),
+	monthDay, monthN := 0, 0
+	fmtScanInt(c.FormValue("month_day"), &monthDay)
+	fmtScanInt(c.FormValue("month_n"), &monthN)
+	start := strings.TrimSpace(c.FormValue("start_date"))
+	if start == "" {
+		start = strings.TrimSpace(c.FormValue("work_date"))
+	}
+	end := strings.TrimSpace(c.FormValue("end_date"))
+	if end == "" {
+		end = strings.TrimSpace(c.FormValue("due_date"))
+	}
+	w := model.WorkRecurrence{
+		StartDate:             start,
+		EndDate:               end,
 		RuleType:              c.FormValue("rule_type"),
 		IntervalN:             n,
 		Weekdays:              model.JoinWeekdays(c.Request().PostForm["weekdays"]),
 		HolidayPolicy:         c.FormValue("holiday_policy"),
 		CompletePolicy:        c.FormValue("complete_policy"),
 		ProgressIncludeFuture: c.FormValue("progress_include_future") == "1",
+		MonthDay:              monthDay,
+		MonthN:                monthN,
+		LastWorkday:           c.FormValue("monthly_mode") == "last" || c.FormValue("last_workday") == "1",
 		ManualDates:           model.ParseDateList(c.FormValue("manual_dates")),
 	}
+	if model.NormalizeRecurrenceRuleType(w.RuleType) == model.RecurrenceManual {
+		w.HolidayPolicy = model.HolidayPolicyAsIs
+	}
+	return w
 }
 
 func (h *WorkboardHandler) holidayYearMissing() func(int) bool {
@@ -339,4 +358,36 @@ func (h *WorkboardHandler) DeleteRecurrenceParent(c echo.Context) error {
 		back = "/workboard/register"
 	}
 	return c.Redirect(http.StatusSeeOther, back+"?ok=rec_deleted")
+}
+
+// applyRecurrenceFromForm 등록 폼에서 「기간 내 반복 실행」이 켜져 있으면 실행 작업을 만든다. §33.4
+func applyRecurrenceFromForm(c echo.Context, repo *repository.WBRepo, t *model.WorkTask, missing func(int) bool) (applied bool, errCode string) {
+	if c == nil || repo == nil || t == nil || strings.TrimSpace(c.FormValue("recurrence_enabled")) != "1" {
+		return false, ""
+	}
+	rule := parseRecurrenceForm(c)
+	if model.NormalizeRecurrenceRuleType(rule.RuleType) == model.RecurrenceNone {
+		return false, ""
+	}
+	rule.TaskID = t.TaskID
+	prev := service.ExpandOccurrencePreview(rule, service.DefaultCalendar(), missing)
+	if prev.RejectYear {
+		return false, "rec_year"
+	}
+	if prev.Reject500 {
+		return false, "rec_limit"
+	}
+	if prev.Count == 0 || (prev.Error != "" && !prev.Warn200) {
+		return false, "rec_rule"
+	}
+	if prev.Warn200 && c.FormValue("confirm_over_200") != "1" {
+		return false, "rec_warn"
+	}
+	if _, err := repo.GenerateOccurrences(t, rule, prev.Dates); err != nil {
+		if strings.Contains(err.Error(), "이미 실행 작업") {
+			return false, "rec_exists"
+		}
+		return false, "rec_rule"
+	}
+	return true, ""
 }

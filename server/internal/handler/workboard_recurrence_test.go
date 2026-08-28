@@ -311,3 +311,112 @@ func TestRecurrenceChangeKeepsCompleteAndBlocksDelete(t *testing.T) {
 		t.Fatalf("replace 확인 없이 loc=%q", noConfirm.Header().Get("Location"))
 	}
 }
+
+func TestRecurrenceUnitPreviewAndRegisterLabels(t *testing.T) {
+	e, repo := newWorkboardServer(t, "rec_units.db")
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "매월 확인",
+		DueDate: "2026-11-30", Assignee: "관리자", Status: model.WBTaskWaiting,
+	}
+	if err := repo.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	rec := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/preview", url.Values{
+		"start_date":      {"2026-09-01"},
+		"end_date":        {"2026-11-30"},
+		"rule_type":       {"monthly"},
+		"month_day":       {"15"},
+		"holiday_policy":  {"as_is"},
+		"complete_policy": {"manual"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("monthly preview status=%d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "실행 예정일 3건이 생성됩니다.") || !strings.Contains(body, "9/15") {
+		t.Fatalf("매월 15일 미리보기 없음: %s", clipHTML(body))
+	}
+
+	last := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/preview", url.Values{
+		"start_date":      {"2026-10-01"},
+		"end_date":        {"2026-10-31"},
+		"rule_type":       {"monthly"},
+		"monthly_mode":    {"last"},
+		"holiday_policy":  {"as_is"},
+		"complete_policy": {"manual"},
+	})
+	if last.Code != http.StatusOK || !strings.Contains(last.Body.String(), "10/30") {
+		t.Fatalf("마지막 영업일 미리보기 없음: %s", clipHTML(last.Body.String()))
+	}
+
+	manual := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/preview", url.Values{
+		"rule_type":       {"manual"},
+		"manual_dates":    {"2026-09-24\n2026-09-27"},
+		"holiday_policy":  {"next_workday"},
+		"complete_policy": {"manual"},
+	})
+	if manual.Code != http.StatusOK {
+		t.Fatalf("manual preview status=%d", manual.Code)
+	}
+	mb := manual.Body.String()
+	if strings.Contains(mb, "옮겨집니다") {
+		t.Fatalf("지정일자 HTTP 미리보기가 날짜를 옮겼다: %s", clipHTML(mb))
+	}
+	if !strings.Contains(mb, "옮기지 않습니다") || !strings.Contains(mb, "9/24") {
+		t.Fatalf("지정일자 경고·날짜 없음: %s", clipHTML(mb))
+	}
+
+	reg := doGet(t, e, "/workboard/register?view=week&date=2026-09-01")
+	if reg.Code != http.StatusOK {
+		t.Fatalf("register status=%d", reg.Code)
+	}
+	rb := reg.Body.String()
+	if !strings.Contains(rb, "매월") || !strings.Contains(rb, "지정일자") {
+		t.Fatalf("등록 화면에 매월·지정일자 없음: %s", clipHTML(rb))
+	}
+}
+
+func TestCreateTaskMonthlyRecurrenceFromForm(t *testing.T) {
+	e, repo := newWorkboardServer(t, "rec_create.db")
+	rec := doForm(t, e, "/workboard/tasks", url.Values{
+		"work_type":          {"admin"},
+		"title":              {"매월 15일 보고"},
+		"due_date":           {"2026-11-30"},
+		"work_date":          {"2026-09-01"},
+		"start_time":         {"09:00"},
+		"end_time":           {"10:00"},
+		"assignee":           {"관리자"},
+		"recurrence_enabled": {"1"},
+		"start_date":         {"2026-09-01"},
+		"end_date":           {"2026-11-30"},
+		"rule_type":          {"monthly"},
+		"month_day":          {"15"},
+		"holiday_policy":     {"as_is"},
+		"complete_policy":    {"manual"},
+	})
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=rec_gen") {
+		t.Fatalf("등록+반복 loc=%q", rec.Header().Get("Location"))
+	}
+	tasks, err := repo.ListTasks()
+	if err != nil || len(tasks) == 0 {
+		t.Fatalf("tasks=%d err=%v", len(tasks), err)
+	}
+	var parent *model.WorkTask
+	for i := range tasks {
+		if tasks[i].Title == "매월 15일 보고" && tasks[i].ParentTaskID == "" {
+			parent = &tasks[i]
+			break
+		}
+	}
+	if parent == nil {
+		t.Fatal("상위 업무가 없다")
+	}
+	children, err := repo.ListChildren(parent.TaskID)
+	if err != nil || len(children) != 3 {
+		t.Fatalf("children=%d err=%v", len(children), err)
+	}
+	rule, err := repo.GetRecurrence(parent.TaskID)
+	if err != nil || rule == nil || rule.RuleType != model.RecurrenceMonthly || rule.MonthDay != 15 {
+		t.Fatalf("rule=%+v err=%v", rule, err)
+	}
+}

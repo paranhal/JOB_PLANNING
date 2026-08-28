@@ -39,6 +39,9 @@ func TestAllTemplatesParse(t *testing.T) {
 		if partials, err := filepath.Glob(filepath.Join(filepath.Dir(page), "_*.html")); err == nil {
 			files = append(files, partials...)
 		}
+		if strings.Contains(filepath.ToSlash(page), "/admin_work/") {
+			files = append(files, filepath.Join(root, "workboard", "_recurrence_fields.html"))
+		}
 		if _, err := template.New("").Funcs(funcMap()).ParseFiles(files...); err != nil {
 			t.Errorf("%s: %v", page, err)
 		}

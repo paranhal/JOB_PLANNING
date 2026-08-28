@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -119,5 +120,101 @@ func TestNextWorkingDayUsesIsWorkingDay(t *testing.T) {
 	}
 	if got := cal.PrevWorkingDay("2026-09-24"); got != "2026-09-23" {
 		t.Fatalf("prev=%s want 2026-09-23", got)
+	}
+}
+
+func datesOf(prev model.OccurrencePreview) string {
+	return strings.Join(prev.Dates, ",")
+}
+
+func TestExpandMonthlyDaySeptemberToNovember(t *testing.T) {
+	prev := ExpandOccurrencePreview(model.WorkRecurrence{
+		StartDate:     "2026-09-01",
+		EndDate:       "2026-11-30",
+		RuleType:      model.RecurrenceMonthly,
+		MonthDay:      15,
+		HolidayPolicy: model.HolidayPolicyAsIs,
+	}, NewCalendar(nil), nil)
+	if prev.Error != "" || datesOf(prev) != "2026-09-15,2026-10-15,2026-11-15" {
+		t.Fatalf("count=%d err=%s dates=%v", prev.Count, prev.Error, prev.Dates)
+	}
+}
+
+func TestExpandMonthlyLastWorkdayOctober2026(t *testing.T) {
+	dir := t.TempDir()
+	db, err := repository.InitDB(filepath.Join(dir, "lastwd.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	cal := NewCalendar(repository.NewHolidayRepo(db))
+	if got := cal.LastWorkingDayOfMonth(2026, time.October); got != "2026-10-30" {
+		t.Fatalf("last workday=%s want 2026-10-30", got)
+	}
+	prev := ExpandOccurrencePreview(model.WorkRecurrence{
+		StartDate:     "2026-10-01",
+		EndDate:       "2026-10-31",
+		RuleType:      model.RecurrenceMonthly,
+		LastWorkday:   true,
+		HolidayPolicy: model.HolidayPolicyAsIs,
+	}, cal, nil)
+	if prev.Error != "" || datesOf(prev) != "2026-10-30" {
+		t.Fatalf("count=%d err=%s dates=%v", prev.Count, prev.Error, prev.Dates)
+	}
+}
+
+func TestExpandQuarterlyJanuaryStart2026(t *testing.T) {
+	prev := ExpandOccurrencePreview(model.WorkRecurrence{
+		StartDate:     "2026-01-01",
+		EndDate:       "2026-12-31",
+		RuleType:      model.RecurrenceQuarterly,
+		MonthN:        1,
+		MonthDay:      1,
+		HolidayPolicy: model.HolidayPolicyAsIs,
+	}, NewCalendar(nil), nil)
+	if prev.Error != "" || datesOf(prev) != "2026-01-01,2026-04-01,2026-07-01,2026-10-01" {
+		t.Fatalf("count=%d err=%s dates=%v", prev.Count, prev.Error, prev.Dates)
+	}
+}
+
+func TestExpandYearlyMarch15(t *testing.T) {
+	prev := ExpandOccurrencePreview(model.WorkRecurrence{
+		StartDate:     "2026-01-01",
+		EndDate:       "2026-12-31",
+		RuleType:      model.RecurrenceYearly,
+		MonthN:        3,
+		MonthDay:      15,
+		HolidayPolicy: model.HolidayPolicyAsIs,
+	}, NewCalendar(nil), nil)
+	if prev.Error != "" || datesOf(prev) != "2026-03-15" {
+		t.Fatalf("count=%d err=%s dates=%v", prev.Count, prev.Error, prev.Dates)
+	}
+}
+
+func TestExpandManualWeekendAndChuseokStayPut(t *testing.T) {
+	dir := t.TempDir()
+	db, err := repository.InitDB(filepath.Join(dir, "manual.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	cal := NewCalendar(repository.NewHolidayRepo(db))
+	prev := ExpandOccurrencePreview(model.WorkRecurrence{
+		RuleType:      model.RecurrenceManual,
+		ManualDates:   []string{"2026-09-24", "2026-09-26", "2026-09-27"},
+		HolidayPolicy: model.HolidayPolicyNextWorkday,
+	}, cal, nil)
+	if prev.Error != "" || datesOf(prev) != "2026-09-24,2026-09-26,2026-09-27" {
+		t.Fatalf("지정일자가 옮겨졌다 count=%d err=%s dates=%v", prev.Count, prev.Error, prev.Dates)
+	}
+	joined := strings.Join(prev.Notes, "\n")
+	if strings.Contains(joined, "옮겨집니다") {
+		t.Fatalf("지정일자에 이동 안내가 있으면 안 된다: %s", joined)
+	}
+	if !strings.Contains(joined, "옮기지 않습니다") {
+		t.Fatalf("지정일자 경고가 없다: %s", joined)
+	}
+	if !strings.Contains(joined, "추석") {
+		t.Fatalf("추석 경고가 없다: %s", joined)
 	}
 }
