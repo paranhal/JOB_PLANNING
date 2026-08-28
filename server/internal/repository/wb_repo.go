@@ -300,9 +300,6 @@ func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 		if t.SourceType != "" || t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
 			continue
 		}
-		if t.Status == model.WBTaskInbox {
-			continue
-		}
 		if t.WorkType != model.WBWorkAdmin && t.WorkType != model.WBWorkSupport {
 			continue
 		}
@@ -334,6 +331,10 @@ type AdminWorkStats struct {
 
 // ListAdminWork 행정·지원 업무 목록(검색·상태).
 func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) {
+	return r.ListAdminWorkSorted(status, search, "", "")
+}
+
+func (r *WBRepo) ListAdminWorkSorted(status, search, sort, dir string) ([]model.WorkTask, error) {
 	q := workTaskSelect + `
 		WHERE t.work_type IN ('admin','support')
 		  AND TRIM(COALESCE(t.source_type,'')) = ''
@@ -341,7 +342,7 @@ func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) 
 	args := []interface{}{}
 	switch strings.TrimSpace(status) {
 	case "inbox":
-		q += ` AND t.status = 'inbox'`
+		q += ` AND COALESCE(t.status,'waiting') = 'waiting'`
 	case "waiting":
 		q += ` AND COALESCE(t.status,'waiting') = 'waiting'`
 	case "in_progress":
@@ -362,7 +363,7 @@ func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) 
 		q += ` AND COALESCE(t.status,'') NOT IN ('complete','cancelled')`
 	case "overdue":
 		today := time.Now().Format("2006-01-02")
-		q += ` AND COALESCE(t.status,'') NOT IN ('complete','cancelled','inbox')
+		q += ` AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 			AND TRIM(COALESCE(t.due_date,'')) != '' AND t.due_date < ?`
 		args = append(args, today)
 	case "today":
@@ -378,7 +379,7 @@ func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) 
 			OR COALESCE(t.customer_name,'') LIKE ? OR COALESCE(p.name,'') LIKE ?)`
 		args = append(args, like, like, like, like, like, like, like)
 	}
-	q += ` ORDER BY COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), t.created_at) DESC, t.task_id DESC`
+	q += ` ORDER BY ` + model.AdminWorkOrderSQL(sort, dir)
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -407,7 +408,7 @@ func (r *WBRepo) CountAdminWorkStats() (AdminWorkStats, error) {
 			COALESCE(SUM(CASE WHEN status IN ('hold','transfer','review') THEN 1 ELSE 0 END),0),
 			COALESCE(SUM(CASE WHEN status='complete' THEN 1 ELSE 0 END),0),
 			COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(work_date),''), NULLIF(TRIM(due_date),''), '')=? THEN 1 ELSE 0 END),0),
-			COALESCE(SUM(CASE WHEN COALESCE(status,'') NOT IN ('complete','cancelled','inbox')
+			COALESCE(SUM(CASE WHEN COALESCE(status,'') NOT IN ('complete','cancelled')
 				AND TRIM(COALESCE(due_date,'')) != '' AND due_date < ? THEN 1 ELSE 0 END),0)
 		FROM work_tasks
 		WHERE work_type IN ('admin','support') AND TRIM(COALESCE(source_type,'')) = ''`,
@@ -811,7 +812,7 @@ func (r *WBRepo) BackfillMaintenanceTaskStatuses() error {
 }
 
 func normalizeWorkTask(t *model.WorkTask) {
-	if t.Status == "" {
+	if t.Status == "" || t.Status == model.WBTaskInbox {
 		t.Status = model.WBTaskWaiting
 	}
 	if t.Priority == "" {

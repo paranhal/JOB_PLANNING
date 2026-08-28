@@ -6,12 +6,12 @@ func TestWBKanbanBucket(t *testing.T) {
 	cases := map[string]string{
 		WBTaskWaiting:    WBTaskWaiting,
 		WBTaskInProgress: WBTaskInProgress,
-		WBTaskHold:       WBTaskReview,
-		WBTaskTransfer:   WBTaskReview,
-		WBTaskReview:     WBTaskReview,
-		WBTaskWaitingFor: WBTaskReview,
+		WBTaskHold:       WBTaskInProgress,
+		WBTaskTransfer:   WBTaskInProgress,
+		WBTaskReview:     WBTaskInProgress,
+		WBTaskWaitingFor: WBTaskInProgress,
 		WBTaskComplete:   WBTaskComplete,
-		WBTaskInbox:      "",
+		WBTaskInbox:      WBTaskWaiting,
 		WBTaskCancelled:  "",
 		"":               WBTaskWaiting,
 	}
@@ -19,6 +19,9 @@ func TestWBKanbanBucket(t *testing.T) {
 		if got := WBKanbanBucket(in); got != want {
 			t.Fatalf("WBKanbanBucket(%q)=%q want %q", in, got, want)
 		}
+	}
+	if WBKanbanBadge(WBTaskHold) != "보류" || WBKanbanBadge(WBTaskWaitingFor) != "회신대기" {
+		t.Fatal("badge")
 	}
 }
 

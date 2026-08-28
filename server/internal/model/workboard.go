@@ -8,9 +8,9 @@ import (
 const (
 	WBTaskWaiting    = "waiting"
 	WBTaskInProgress = "in_progress"
-	WBTaskReview     = "review"   // 하위호환 — 칸반「검토」열
-	WBTaskHold       = "hold"     // 보류 → 검토 열
-	WBTaskTransfer   = "transfer" // 이관 → 검토 열
+	WBTaskReview     = "review"   // 검토중 — 칸반「진행중」열 뱃지 (§33.5.2)
+	WBTaskHold       = "hold"     // 보류 → 진행중 열 뱃지
+	WBTaskTransfer   = "transfer" // 이관 → 진행중 열 뱃지
 	WBTaskComplete   = "complete"
 	// inbox / waiting_for / cancelled 는 work_gtd.go
 )
@@ -235,16 +235,14 @@ func ASStatusDisplayLabel(asStatus string) string {
 	}
 }
 
-// WBKanbanBucket 칸반 열 키. 보류·이관·검토중·회신 대기 → review(검토 열).
-// 수집함·취소는 칸반에 올리지 않는다(§11·§13.5).
+// WBKanbanBucket 칸반 열 키. §33.5.2 3열 — 할 일 / 진행중 / 완료.
+// 보류·이관·회신 대기·검토중은 진행중. 취소는 칸반에 올리지 않는다.
 func WBKanbanBucket(status string) string {
 	switch status {
-	case WBTaskInbox, WBTaskCancelled:
+	case WBTaskCancelled:
 		return ""
-	case WBTaskInProgress:
+	case WBTaskInProgress, WBTaskHold, WBTaskTransfer, WBTaskReview, WBTaskWaitingFor:
 		return WBTaskInProgress
-	case WBTaskHold, WBTaskTransfer, WBTaskReview, WBTaskWaitingFor:
-		return WBTaskReview
 	case WBTaskComplete:
 		return WBTaskComplete
 	default:
@@ -252,8 +250,39 @@ func WBKanbanBucket(status string) string {
 	}
 }
 
+// WBKanbanBadge 진행중 열에서 보류·이관·회신대기를 구분하는 뱃지 문구. §33.5.2
+func WBKanbanBadge(status string) string {
+	switch strings.TrimSpace(status) {
+	case WBTaskHold:
+		return "보류"
+	case WBTaskTransfer:
+		return "이관"
+	case WBTaskWaitingFor:
+		return "회신대기"
+	case WBTaskReview:
+		return "검토중"
+	default:
+		return ""
+	}
+}
+
+func WBKanbanBadgeClass(status string) string {
+	switch strings.TrimSpace(status) {
+	case WBTaskHold:
+		return "bg-amber-100 text-amber-900"
+	case WBTaskTransfer:
+		return "bg-sky-100 text-sky-800"
+	case WBTaskWaitingFor:
+		return "bg-indigo-100 text-indigo-800"
+	case WBTaskReview:
+		return "bg-orange-100 text-orange-800"
+	default:
+		return ""
+	}
+}
+
 // MapASStatusToWB AS 접수 상태 → 일일 업무 현황 표시 상태.
-// 보류·이관은 검토 열. 취소는 빈 문자열(제외).
+// 보류·이관은 진행중 열 뱃지. 취소는 빈 문자열(제외).
 func MapASStatusToWB(asStatus string) string {
 	switch strings.TrimSpace(asStatus) {
 	case "hold":

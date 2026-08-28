@@ -11,7 +11,7 @@
         <div class="flex flex-wrap items-center gap-1">
           <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbWorkTypeClass .WorkType}}">{{wbWorkTypeLabel .WorkType}}</span>
           <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbPriorityClass .Priority}}">{{wbPriorityLabel .Priority}}</span>
-          <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">{{wbBoardStatusLabel .}}</span>
+          {{if wbKanbanBadge .Status}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbKanbanBadgeClass .Status}}">{{wbKanbanBadge .Status}}</span>{{end}}
         </div>
         <span class="text-[10px] font-medium {{if lt .DaysLeft 0}}text-red-500{{else}}text-gray-400{{end}}">{{wbDdayLabel .DaysLeft .Status}}</span>
       </div>

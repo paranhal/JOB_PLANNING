@@ -343,7 +343,6 @@
         <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
         <select name="status" x-model="status" class="w-full border rounded-lg px-3 py-2">
           {{if $.IsAdminGTD}}
-          <option value="inbox" {{if eq $t.Status "inbox"}}selected{{end}}>수집함</option>
           <option value="waiting" {{if eq $t.Status "waiting"}}selected{{end}}>할 일</option>
           <option value="in_progress" {{if eq $t.Status "in_progress"}}selected{{end}}>진행중</option>
           <option value="waiting_for" {{if eq $t.Status "waiting_for"}}selected{{end}}>회신 대기</option>

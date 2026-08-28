@@ -111,7 +111,7 @@ func (h *AdminWorkHandler) CreateInbox(c echo.Context) error {
 		WorkType:    model.WBWorkAdmin,
 		Title:       title,
 		Description: strings.TrimSpace(c.FormValue("description")),
-		Status:      model.WBTaskInbox,
+		Status:      model.WBTaskWaiting,
 		Priority:    model.WBPriorityNormal,
 		DurationMin: 30,
 	}
@@ -119,10 +119,61 @@ func (h *AdminWorkHandler) CreateInbox(c echo.Context) error {
 	if err := h.repo.CreateTask(t); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/admin-work?ok=inbox")
+	return c.Redirect(http.StatusSeeOther, "/admin-work?ok=waiting")
 }
 
-// Classify 수집함 건을 할 일 등으로 분류한다(§13.5·§13.11). 삭제하지 않는다.
+// MoveKanban 칸반 드래그로 상태를 바꾼다. 완료 열은 §13.9 검증. §33.5.2
+func (h *AdminWorkHandler) MoveKanban(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	back := "/admin-work?view=kanban"
+	id := strings.TrimSpace(c.Param("id"))
+	existing, err := h.repo.GetTask(id)
+	if err != nil || existing == nil || !model.IsAdminGTDTask(*existing) {
+		return echo.ErrNotFound
+	}
+	to := strings.TrimSpace(c.FormValue("status"))
+	switch to {
+	case model.WBTaskWaiting, model.WBTaskInProgress, model.WBTaskComplete:
+	default:
+		return c.Redirect(http.StatusSeeOther, back+"&err=task")
+	}
+	if model.WBKanbanBucket(existing.Status) == to {
+		return c.Redirect(http.StatusSeeOther, back)
+	}
+	t := *existing
+	t.Status = to
+	if to == model.WBTaskComplete {
+		applyAdminGTDForm(&t, c)
+		if t.CompleteNote == "" {
+			t.CompleteNote = existing.CompleteNote
+		}
+	}
+	openReq, unconf := 0, 0
+	if to == model.WBTaskComplete {
+		openReq, unconf, _ = h.repo.AdminCompleteBlockers(t.TaskID)
+	}
+	if code := model.AdminGTDErr(t.Status, t.HoldReason, t.ReviewDate, t.CancelReason,
+		t.WaitParty, t.WaitRequest, t.ReplyDueDate, t.NextCheckDate, t.CompleteNote,
+		openReq, unconf, isAdminRole(c), strings.TrimSpace(c.FormValue("force_complete")) == "1",
+		strings.TrimSpace(c.FormValue("force_reason"))); code != "" {
+		return c.Redirect(http.StatusSeeOther, back+"&err="+code)
+	}
+	if err := h.repo.UpdateTask(&t); err != nil {
+		return err
+	}
+	if t.Status == model.WBTaskComplete && t.CompleteNote != "" {
+		_ = h.repo.CreateActivity(&model.WorkActivity{
+			TaskID: t.TaskID, ActivityType: model.WBActivityDone,
+			Content: t.CompleteNote, Actor: ctxString(c, "user_name"),
+			SpentMinutes: model.WBActivityDefaultSpent,
+		})
+	}
+	return c.Redirect(http.StatusSeeOther, back+"&ok=task")
+}
+
+// Classify 하위호환. §33.5.1 이후 inbox는 남지 않아 분류 대상이 없다.
 func (h *AdminWorkHandler) Classify(c echo.Context) error {
 	if !canWriteWorkboard(c) {
 		return echo.ErrForbidden
@@ -360,9 +411,9 @@ func gtdFlashMsg(err, n string) string {
 	case "cancel_reason":
 		return "취소 사유를 입력하세요."
 	case "inbox":
-		return "수집함은 제목이 필요합니다."
+		return "제목을 입력하세요."
 	case "classify":
-		return "수집함 건만 분류할 수 있습니다."
+		return "분류할 수 없는 상태입니다."
 	case "action":
 		return "다음 행동 제목을 입력하세요."
 	case "activity":

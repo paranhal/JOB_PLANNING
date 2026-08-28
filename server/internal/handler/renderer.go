@@ -434,7 +434,9 @@ func funcMap() template.FuncMap {
 		"wbTaskStatusLabel":     model.WBTaskStatusLabel,
 		"occurrenceStatusLabel": model.OccurrenceStatusLabel,
 		"recurrenceRuleLabel":   model.RecurrenceRuleLabel,
-		"wbAdminStatusLabel":   model.WBAdminStatusLabel,
+		"wbAdminStatusLabel":    model.WBAdminStatusLabel,
+		"wbKanbanBadge":         model.WBKanbanBadge,
+		"wbKanbanBadgeClass":    model.WBKanbanBadgeClass,
 		"wbActionStatusLabel":  model.WBActionStatusLabel,
 		"wbActivityTypeLabel":  model.WBActivityTypeLabel,
 		"wbWaitPartyKindLabel": model.WBWaitPartyKindLabel,
@@ -487,7 +489,7 @@ func funcMap() template.FuncMap {
 			m, _ := root.(map[string]interface{})
 			items := []model.WorkTask{}
 			switch key {
-			case model.WBTaskWaiting, model.WBTaskInProgress, model.WBTaskReview, model.WBTaskComplete:
+			case model.WBTaskWaiting, model.WBTaskInProgress, model.WBTaskComplete:
 				if by, ok := m["ByStatus"].(map[string][]model.WorkTask); ok {
 					items = by[key]
 				}

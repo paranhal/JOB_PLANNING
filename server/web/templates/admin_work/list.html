@@ -4,6 +4,7 @@
      x-data="{
        subOpen: false, subParent: '', subAssignee: '', subCustomer: '', subCustomerName: '',
        subProject: '', subWorkType: 'admin', subRedirect: '/admin-work',
+       dragging: null, completeOpen: false, completeId: '', note: '',
        openSub(el) {
          const d = el.dataset;
          this.subParent = d.id || '';
@@ -14,14 +15,31 @@
          this.subWorkType = d.workType || 'admin';
          this.subRedirect = d.redirect || '/admin-work';
          this.subOpen = true;
-       }
+       },
+       start(id, bucket) { this.dragging = { id: id, bucket: bucket }; },
+       drop(col) {
+         if (!this.dragging || this.dragging.bucket === col) { this.dragging = null; return; }
+         if (col === 'complete') { this.completeId = this.dragging.id; this.note = ''; this.completeOpen = true; this.dragging = null; return; }
+         this.post(this.dragging.id, col, '');
+       },
+       post(id, status, note) {
+         const f = document.createElement('form');
+         f.method = 'post';
+         f.action = '/admin-work/' + id + '/move';
+         const s = document.createElement('input'); s.type = 'hidden'; s.name = 'status'; s.value = status; f.appendChild(s);
+         if (note) { const n = document.createElement('input'); n.type = 'hidden'; n.name = 'complete_note'; n.value = note; f.appendChild(n); }
+         document.body.appendChild(f); f.submit();
+       },
+       submitComplete() { if (!this.completeId || !this.note.trim()) return; this.post(this.completeId, 'complete', this.note.trim()); }
      }">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <p class="text-sm text-gray-500">
-      {{if eq .Status "waiting"}}할 일{{else if eq .Status "inbox"}}수집함{{else if eq .Status "waiting_for"}}회신 대기{{else if eq .Status "in_progress"}}진행중{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "review"}}검토중{{else if eq .Status "complete"}}완료{{else if eq .Status "cancelled"}}취소{{else if eq .Status "open"}}미완료{{else if eq .Status "overdue"}}기한 초과{{else if eq .Status "today"}}오늘{{else}}전체{{end}}
+      {{if eq .Status "waiting"}}할 일{{else if eq .Status "waiting_for"}}회신 대기{{else if eq .Status "in_progress"}}진행중{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "review"}}검토중{{else if eq .Status "complete"}}완료{{else if eq .Status "cancelled"}}취소{{else if eq .Status "open"}}미완료{{else if eq .Status "overdue"}}기한 초과{{else if eq .Status "today"}}오늘{{else}}전체{{end}}
       {{.Total}}건
     </p>
     <div class="flex flex-wrap items-center gap-2">
+      <a href="/admin-work?view=list{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">목록</a>
+      <a href="/admin-work?view=kanban{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
       {{if .CanWrite}}
       <a href="/admin-work/new"
          class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -33,7 +51,7 @@
 
   {{if .FlashOK}}
   <div class="rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
-    {{if eq .FlashOK "inbox"}}수집함에 넣었습니다.{{else if eq .FlashOK "classify"}}수집함에서 분류했습니다.{{else}}등록되었습니다.{{end}}
+    {{if eq .FlashOK "waiting"}}할 일로 등록했습니다.{{else}}등록되었습니다.{{end}}
   </div>
   {{end}}
   {{if .FlashErr}}
@@ -44,17 +62,21 @@
 
   {{if .CanWrite}}
   <form method="post" action="/admin-work/inbox" class="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col sm:flex-row gap-2">
-    <input name="title" required placeholder="수집함 — 제목만 빠르게 적기" class="flex-1 border border-violet-200 rounded-lg px-3 py-2 text-sm bg-white">
-    <button type="submit" class="px-4 py-2 text-sm text-white bg-violet-600 rounded-lg shrink-0">수집함 등록</button>
+    <input name="title" required placeholder="제목만 빠르게 적기 — 할 일로 들어갑니다" class="flex-1 border border-violet-200 rounded-lg px-3 py-2 text-sm bg-white">
+    <button type="submit" class="px-4 py-2 text-sm text-white bg-violet-600 rounded-lg shrink-0">빠른 등록</button>
   </form>
   {{end}}
 
   <div class="bg-white rounded-xl border border-gray-200 p-4">
     <form method="GET" action="/admin-work" class="flex flex-col sm:flex-row gap-3">
+      {{if eq .View "kanban"}}<input type="hidden" name="view" value="kanban">{{end}}
+      {{if and .Sort (or (ne .Sort "due_date") (ne .Dir "asc"))}}
+      <input type="hidden" name="sort" value="{{.Sort}}">
+      <input type="hidden" name="dir" value="{{.Dir}}">
+      {{end}}
       <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
         <option value="" {{if eq .Status ""}}selected{{end}}>전체 상태</option>
         <option value="open" {{if eq .Status "open"}}selected{{end}}>미완료</option>
-        <option value="inbox" {{if eq .Status "inbox"}}selected{{end}}>수집함</option>
         <option value="waiting" {{if eq .Status "waiting"}}selected{{end}}>할 일</option>
         <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행중</option>
         <option value="waiting_for" {{if eq .Status "waiting_for"}}selected{{end}}>회신 대기</option>
@@ -73,7 +95,29 @@
     </form>
   </div>
 
+  {{if eq .View "kanban"}}
+  {{template "admin_work_kanban" .}}
+  {{else}}
   {{template "admin_work_table" .}}
+  {{end}}
   {{if .CanWrite}}{{template "wb_subtask_modal" .}}{{end}}
+
+  {{if .CanWrite}}
+  <div x-show="completeOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md" @click.outside="completeOpen=false">
+      <div class="px-5 py-3 border-b">
+        <h3 class="font-semibold text-gray-800">완료 내용</h3>
+        <p class="text-xs text-gray-500 mt-1">완료로 옮기려면 최종 조치 내용을 입력하세요.</p>
+      </div>
+      <div class="p-5 space-y-3">
+        <textarea x-model="note" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="무엇을 어떻게 마무리했는지"></textarea>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="px-3 py-1.5 text-sm border rounded-lg" @click="completeOpen=false">취소</button>
+          <button type="button" class="px-3 py-1.5 text-sm text-white bg-emerald-600 rounded-lg" @click="submitComplete()">완료</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {{end}}
 </div>
 {{end}}

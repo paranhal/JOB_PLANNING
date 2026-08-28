@@ -8,7 +8,7 @@ import (
 
 // 행정·지원 GTD 상태 (§10.3.2). AS·정기점검은 쓰지 않는다.
 const (
-	WBTaskInbox      = "inbox"       // 수집함
+	WBTaskInbox      = "inbox"       // 하위호환. §33.5.1 마이그레이션으로 waiting
 	WBTaskWaitingFor = "waiting_for" // 회신 대기
 	WBTaskCancelled  = "cancelled"   // 취소(삭제하지 않음)
 )
@@ -434,4 +434,42 @@ func AdminGTDErr(status, holdReason, reviewDate, cancelReason, waitParty, waitRe
 		}
 	}
 	return ""
+}
+
+// NormalizeAdminWorkSort 행정 목록 정렬. 기본 = 업무 종료일 오름차순. §33.5.3
+func NormalizeAdminWorkSort(sort, dir string) (string, string) {
+	switch strings.TrimSpace(sort) {
+	case "task_id", "title", "customer", "assignee", "work_date", "due_date", "status", "duration", "created_at":
+		sort = strings.TrimSpace(sort)
+	default:
+		sort = "due_date"
+	}
+	if strings.TrimSpace(dir) != "desc" {
+		dir = "asc"
+	}
+	return sort, dir
+}
+
+// AdminWorkOrderSQL ORDER BY 절. sort·dir 은 NormalizeAdminWorkSort 를 거친 값.
+func AdminWorkOrderSQL(sort, dir string) string {
+	sort, dir = NormalizeAdminWorkSort(sort, dir)
+	ord := "ASC"
+	if dir == "desc" {
+		ord = "DESC"
+	}
+	col := map[string]string{
+		"task_id":    "t.task_id",
+		"title":      "t.title COLLATE NOCASE",
+		"customer":   "COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), '') COLLATE NOCASE",
+		"assignee":   "COALESCE(t.assignee,'') COLLATE NOCASE",
+		"work_date":  "COALESCE(NULLIF(TRIM(t.work_date),''), '9999-99-99')",
+		"due_date":   "COALESCE(NULLIF(TRIM(t.due_date),''), '9999-99-99')",
+		"status":     "t.status",
+		"duration":   "COALESCE(t.duration_min,0)",
+		"created_at": "t.created_at",
+	}[sort]
+	if col == "" {
+		col = "COALESCE(NULLIF(TRIM(t.due_date),''), '9999-99-99')"
+	}
+	return col + " " + ord + ", t.task_id ASC"
 }

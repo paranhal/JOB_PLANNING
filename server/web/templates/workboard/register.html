@@ -609,11 +609,6 @@
     {{/* 우측: 일일 업무 미확정(일자 미배정) 대기 목록 — 왼쪽 확정 건과 겹치지 않음 */}}
     <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-2 min-w-0">
       <p class="sm:col-span-3 xl:col-span-1 text-[11px] text-slate-500 px-0.5">단위 업무별 대기 · 미확정만 표시</p>
-      {{if .InboxCount}}
-      <a href="/admin-work?status=inbox" class="sm:col-span-3 xl:col-span-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-[11px] text-violet-800 hover:bg-violet-100">
-        수집함 {{.InboxCount}}건 — 분류 전까지 시간표에 올리지 않습니다. 분류하기 →
-      </a>
-      {{end}}
       {{template "wb_palette" (wbPalette "AS" "border-rose-200" "text-rose-700" "bg-rose-50" .ASCards .CanWrite)}}
       {{template "wb_palette" (wbPalette "정기점검" "border-sky-200" "text-sky-700" "bg-sky-50" .MntCards .CanWrite)}}
       {{template "wb_palette" (wbPalette "행정관련업무" "border-violet-200" "text-violet-700" "bg-violet-50" .AdminCards .CanWrite)}}

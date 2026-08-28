@@ -54,7 +54,7 @@ func TestWorkGTDActionsAndCompleteBlock(t *testing.T) {
 	}
 }
 
-func TestInboxExcludedFromPalette(t *testing.T) {
+func TestInboxNormalizedToWaitingOnCreate(t *testing.T) {
 	dir := t.TempDir()
 	db, err := InitDB(filepath.Join(dir, "gtd_inbox.db"))
 	if err != nil {
@@ -71,21 +71,25 @@ func TestInboxExcludedFromPalette(t *testing.T) {
 	if err := wb.CreateTask(ready); err != nil {
 		t.Fatal(err)
 	}
+	got, _ := wb.GetTask(inbox.TaskID)
+	if got == nil || got.Status != model.WBTaskWaiting {
+		t.Fatalf("inbox→waiting %+v", got)
+	}
 
 	items, err := wb.ListUnplacedAdminTasks()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].Title != "할 일" {
-		t.Fatalf("palette %+v", items)
+	if len(items) != 2 {
+		t.Fatalf("palette len=%d %+v", len(items), items)
 	}
 
-	listed, err := wb.ListAdminWork("inbox", "")
-	if err != nil || len(listed) != 1 {
-		t.Fatalf("inbox list len=%d err=%v", len(listed), err)
+	listed, err := wb.ListAdminWork("waiting", "")
+	if err != nil || len(listed) != 2 {
+		t.Fatalf("waiting list len=%d err=%v", len(listed), err)
 	}
 	st, err := wb.CountAdminWorkStats()
-	if err != nil || st.Inbox != 1 || st.Waiting != 1 {
+	if err != nil || st.Inbox != 0 || st.Waiting != 2 {
 		t.Fatalf("stats %+v err=%v", st, err)
 	}
 

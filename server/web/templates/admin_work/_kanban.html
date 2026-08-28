@@ -1,0 +1,35 @@
+{{define "admin_work_kanban"}}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {{template "admin_work_kanban_col" (dict "Title" "할 일" "Border" "border-slate-200" "Key" "waiting" "Items" (index .ByStatus "waiting") "CanWrite" .CanWrite)}}
+  {{template "admin_work_kanban_col" (dict "Title" "진행중" "Border" "border-yellow-200" "Key" "in_progress" "Items" (index .ByStatus "in_progress") "CanWrite" .CanWrite)}}
+  {{template "admin_work_kanban_col" (dict "Title" "완료" "Border" "border-emerald-200" "Key" "complete" "Items" (index .ByStatus "complete") "CanWrite" .CanWrite)}}
+</div>
+<p class="text-xs text-gray-500">보류·이관·회신대기는 진행중 열에 뱃지로 구분합니다. 취소는 필터로만 봅니다. 완료로 끌면 완료 내용을 묻습니다.</p>
+{{end}}
+
+{{define "admin_work_kanban_col"}}
+<div class="bg-gray-50/80 rounded-xl border {{.Border}} min-h-[14rem]"
+     @dragover.prevent @drop.prevent="drop('{{.Key}}')">
+  <div class="px-4 py-3 border-b bg-white/80 rounded-t-xl flex justify-between items-center">
+    <h3 class="font-semibold text-sm text-gray-800">{{.Title}}</h3>
+    <span class="text-xs text-gray-400">{{len .Items}}</span>
+  </div>
+  <div class="p-3 space-y-2">
+    {{range .Items}}
+    <div class="bg-white rounded-lg border border-gray-100 p-3 shadow-sm"
+         {{if $.CanWrite}}draggable="true" @dragstart="start('{{.TaskID}}', '{{$.Key}}')"{{end}}>
+      <div class="flex flex-wrap items-center gap-1 mb-1">
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbWorkTypeClass .WorkType}}">{{wbWorkTypeLabel .WorkType}}</span>
+        {{if wbKanbanBadge .Status}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbKanbanBadgeClass .Status}}">{{wbKanbanBadge .Status}}</span>{{end}}
+      </div>
+      <a href="/admin-work/{{.TaskID}}" class="text-sm font-medium text-gray-800 hover:text-blue-700">{{.Title}}</a>
+      {{if .CustomerLabel}}<p class="text-[11px] text-gray-500 mt-1">{{.CustomerLabel}}</p>{{end}}
+      {{if .Assignee}}<p class="text-[11px] text-gray-600 mt-1">● {{.Assignee}}</p>{{end}}
+      {{if .DueDate}}<p class="text-[11px] text-gray-400 mt-1">종료 {{.DueDate}}</p>{{end}}
+    </div>
+    {{else}}
+    <p class="text-xs text-gray-400 text-center py-6">업무 없음</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

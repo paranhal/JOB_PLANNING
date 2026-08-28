@@ -26,7 +26,12 @@ func NewAdminWorkHandler(repo *repository.WBRepo, userRepo *repository.UserRepo,
 func (h *AdminWorkHandler) List(c echo.Context) error {
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	items, err := h.repo.ListAdminWork(status, search)
+	view := strings.TrimSpace(c.QueryParam("view"))
+	if view != "kanban" {
+		view = "list"
+	}
+	sort, dir := model.NormalizeAdminWorkSort(c.QueryParam("sort"), c.QueryParam("dir"))
+	items, err := h.repo.ListAdminWorkSorted(status, search, sort, dir)
 	if err != nil {
 		return err
 	}
@@ -36,12 +41,30 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 	assignees, _ := h.userRepo.ListAssignable()
 	customers, _ := h.customerRepo.ListAll()
 	flashErr := c.QueryParam("err")
+	byStatus := map[string][]model.WorkTask{
+		model.WBTaskWaiting:    {},
+		model.WBTaskInProgress: {},
+		model.WBTaskComplete:   {},
+	}
+	for _, t := range items {
+		b := model.WBKanbanBucket(t.Status)
+		if b == "" {
+			continue
+		}
+		byStatus[b] = append(byStatus[b], t)
+	}
 	return c.Render(http.StatusOK, "admin_work/list.html", map[string]interface{}{
 		"Title":        "행정관련업무등록/처리",
 		"Active":       NavAdminWork,
 		"Items":        items,
+		"ByStatus":     byStatus,
 		"Status":       status,
 		"Search":       search,
+		"View":         view,
+		"Sort":         sort,
+		"Dir":          dir,
+		"SortHref":     adminWorkSortHrefs("/admin-work", status, search, view, sort, dir),
+		"QuerySuffix":  adminWorkQuerySuffix(status, search, view, sort, dir),
 		"Total":        len(items),
 		"Today":        time.Now().Format("2006-01-02"),
 		"CanWrite":     canWriteWorkboard(c),
@@ -63,7 +86,8 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 	if status == "" {
 		status = "all"
 	}
-	items, err := h.repo.ListAdminWork(status, "")
+	sort, dir := model.NormalizeAdminWorkSort(c.QueryParam("sort"), c.QueryParam("dir"))
+	items, err := h.repo.ListAdminWorkSorted(status, "", sort, dir)
 	if err != nil {
 		return err
 	}
@@ -77,8 +101,12 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 		"Active":     NavAdminWorkStats,
 		"Stats":      st,
 		"Items":      items,
-		"ListStatus": status,
-		"Total":      len(items),
+		"ListStatus":  status,
+		"Sort":        sort,
+		"Dir":         dir,
+		"SortHref":    adminWorkSortHrefs("/admin-work/stats", status, "", "list", sort, dir),
+		"QuerySuffix": adminWorkQuerySuffix(status, "", "list", sort, dir),
+		"Total":       len(items),
 		"Today":      time.Now().Format("2006-01-02"),
 		"FromStats":  true,
 		"CanWrite":   canWriteWorkboard(c),
@@ -300,4 +328,53 @@ func createTaskStatusPriority(c echo.Context) (status, priority string) {
 func dueUndeterminedFromForm(c echo.Context) bool {
 	v := strings.TrimSpace(c.FormValue("due_undetermined"))
 	return v == "1" || v == "on" || v == "true"
+}
+
+func adminWorkQuerySuffix(status, search, view, sort, dir string) string {
+	q := url.Values{}
+	if status != "" && status != "all" {
+		q.Set("status", status)
+	}
+	if search != "" {
+		q.Set("search", search)
+	}
+	_ = view
+	sort, dir = model.NormalizeAdminWorkSort(sort, dir)
+	if sort != "due_date" || dir != "asc" {
+		q.Set("sort", sort)
+		q.Set("dir", dir)
+	}
+	enc := q.Encode()
+	if enc == "" {
+		return ""
+	}
+	return "&" + enc
+}
+
+func adminWorkSortHrefs(path, status, search, view, curSort, curDir string) map[string]string {
+	if path == "" {
+		path = "/admin-work"
+	}
+	curSort, curDir = model.NormalizeAdminWorkSort(curSort, curDir)
+	out := map[string]string{}
+	for _, col := range []string{"task_id", "title", "customer", "assignee", "work_date", "due_date", "status", "duration", "created_at"} {
+		dir := "asc"
+		if curSort == col && curDir == "asc" {
+			dir = "desc"
+		}
+		q := url.Values{}
+		if status != "" && status != "all" {
+			q.Set("status", status)
+		}
+		if search != "" {
+			q.Set("search", search)
+		}
+		if view == "kanban" {
+			q.Set("view", "kanban")
+		}
+		q.Set("sort", col)
+		q.Set("dir", dir)
+		out[col] = path + "?" + q.Encode()
+	}
+	return out
 }

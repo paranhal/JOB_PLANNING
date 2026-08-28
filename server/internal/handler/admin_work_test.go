@@ -34,6 +34,7 @@ func newAdminWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo) {
 	aw.POST("", h.AdminWork.Create)
 	aw.POST("/inbox", h.AdminWork.CreateInbox)
 	aw.POST("/:id/classify", h.AdminWork.Classify)
+	aw.POST("/:id/move", h.AdminWork.MoveKanban)
 	aw.GET("/:id", h.AdminWork.Show)
 	return e, repository.NewWBRepo(db)
 }
@@ -48,6 +49,17 @@ func TestAdminWorkMenuPagesRender(t *testing.T) {
 	body := list.Body.String()
 	if !strings.Contains(body, "행정·지원업무") || !strings.Contains(body, `href="/admin-work"`) {
 		t.Fatal("사이드바 행정관련업무 메뉴 없음")
+	}
+	if strings.Contains(body, "수집함") {
+		t.Fatal("목록에 수집함 문구가 남아 있음")
+	}
+	if !strings.Contains(body, "빠른 등록") || !strings.Contains(body, "sort=due_date") {
+		t.Fatal("빠른 등록 또는 정렬 링크 없음")
+	}
+	kanban := doGet(t, e, "/admin-work?view=kanban")
+	kb := kanban.Body.String()
+	if kanban.Code != http.StatusOK || !strings.Contains(kb, "할 일") || !strings.Contains(kb, "진행중") || !strings.Contains(kb, "완료") {
+		t.Fatal("칸반 3열이 렌더되지 않음")
 	}
 
 	stats := doGet(t, e, "/admin-work/stats")

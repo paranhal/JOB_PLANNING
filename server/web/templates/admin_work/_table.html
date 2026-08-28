@@ -1,18 +1,20 @@
 {{define "admin_work_table"}}
+{{$sort := .Sort}}{{$dir := .Dir}}{{$href := .SortHref}}
 <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
   <table class="min-w-full text-sm">
     <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
       <tr>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap">번호</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "task_id"}}" class="hover:text-violet-700">번호{{if eq $sort "task_id"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
         <th class="px-3 py-2.5 font-medium whitespace-nowrap">구분</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap">거래처</th>
-        <th class="px-3 py-2.5 font-medium">업무명</th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "customer"}}" class="hover:text-violet-700">거래처{{if eq $sort "customer"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        <th class="px-3 py-2.5 font-medium"><a href="{{index $href "title"}}" class="hover:text-violet-700">업무명{{if eq $sort "title"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
         <th class="px-3 py-2.5 font-medium whitespace-nowrap">사업명</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap">담당</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap">업무 종료일</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap">업무 시작일</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap">상태</th>
-        {{if $.CanWrite}}<th class="px-3 py-2.5 font-medium whitespace-nowrap">분류</th>{{end}}
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "assignee"}}" class="hover:text-violet-700">담당자{{if eq $sort "assignee"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "work_date"}}" class="hover:text-violet-700">시작일{{if eq $sort "work_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "due_date"}}" class="hover:text-violet-700">종료일{{if eq $sort "due_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "status"}}" class="hover:text-violet-700">상태{{if eq $sort "status"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "duration"}}" class="hover:text-violet-700">소요시간{{if eq $sort "duration"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "created_at"}}" class="hover:text-violet-700">등록일{{if eq $sort "created_at"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -33,27 +35,19 @@
         <td class="px-3 py-2 text-gray-800 max-w-[22rem]"><div class="line-clamp-2 {{if eq .Depth 2}}pl-3{{else if eq .Depth 3}}pl-6{{end}}">{{.Title}}</div></td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .ProjectName}}{{.ProjectName}}{{else}}—{{end}}</td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>
-        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>
         <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .WorkDate}}{{.WorkDate}}{{else}}—{{end}}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>
         <td class="px-3 py-2 whitespace-nowrap">
           {{wbAdminStatusLabel .Status}}
+          {{if wbKanbanBadge .Status}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbKanbanBadgeClass .Status}}">{{wbKanbanBadge .Status}}</span>{{end}}
           {{if gt .WaitingActionCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px]">회신 대기 {{.WaitingActionCount}}건</span>{{end}}
         </td>
-        {{if $.CanWrite}}
-        <td class="px-3 py-2 whitespace-nowrap">
-          {{if eq .Status "inbox"}}
-          <form method="post" action="/admin-work/{{.TaskID}}/classify" class="flex items-center gap-1">
-            <input type="hidden" name="status" value="waiting">
-            <input type="date" name="due_date" value="{{$.Today}}" required class="border rounded px-1.5 py-1 text-xs">
-            <button type="submit" class="px-2 py-1 text-xs text-white bg-violet-600 rounded hover:bg-violet-700">할 일로</button>
-          </form>
-          {{else}}—{{end}}
-        </td>
-        {{end}}
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .DurationMin}}{{.DurationMin}}분{{else}}—{{end}}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if not .CreatedAt.IsZero}}{{.CreatedAt.Format "2006-01-02"}}{{else}}—{{end}}</td>
       </tr>
       {{else}}
       <tr>
-        <td colspan="{{if $.CanWrite}}10{{else}}9{{end}}" class="px-3 py-10 text-center text-gray-400">해당 조건의 행정관련업무가 없습니다.</td>
+        <td colspan="11" class="px-3 py-10 text-center text-gray-400">해당 조건의 행정관련업무가 없습니다.</td>
       </tr>
       {{end}}
     </tbody>

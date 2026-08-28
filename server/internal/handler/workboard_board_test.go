@@ -141,7 +141,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("칸반: status=%d", kanban.Code)
 	}
 	body := kanban.Body.String()
-	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%", "할 일", "진행중", "검토"} {
+	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%", "할 일", "진행중"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("칸반 화면에 %q 없음", want)
 		}
@@ -251,15 +251,19 @@ func TestWorkboardCompleteTaskProgress(t *testing.T) {
 	}
 }
 
-func TestInboxAndCancelledExcludedFromKanban(t *testing.T) {
+func TestCancelledExcludedAndHoldOnInProgressKanban(t *testing.T) {
 	e, repo := newWorkboardServer(t, "wb_inbox_kanban.db")
 	today := time.Now().Format("2006-01-02")
-	inbox := &model.WorkTask{
-		WorkType: model.WBWorkAdmin, Title: "수집함만있는메모",
+	waiting := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "할일로올린메모",
 		Status: model.WBTaskInbox, DueDate: today, WorkDate: today,
 	}
-	if err := repo.CreateTask(inbox); err != nil {
+	if err := repo.CreateTask(waiting); err != nil {
 		t.Fatal(err)
+	}
+	got, _ := repo.GetTask(waiting.TaskID)
+	if got == nil || got.Status != model.WBTaskWaiting {
+		t.Fatalf("inbox→waiting %+v", got)
 	}
 	cancelled := &model.WorkTask{
 		WorkType: model.WBWorkAdmin, Title: "취소된행정업무",
@@ -285,14 +289,20 @@ func TestInboxAndCancelledExcludedFromKanban(t *testing.T) {
 	}
 
 	body := doGet(t, e, "/workboard/kanban").Body.String()
-	if strings.Contains(body, "수집함만있는메모") {
-		t.Fatal("수집함이 칸반에 올라감")
+	if !strings.Contains(body, "할일로올린메모") {
+		t.Fatal("할 일 메모가 칸반에 없음")
 	}
 	if strings.Contains(body, "취소된행정업무") {
 		t.Fatal("취소 건이 칸반에 올라감")
 	}
 	if !strings.Contains(body, "보류된행정업무") || !strings.Contains(body, "회신대기행정업무") {
-		t.Fatal("검토 열에 보류·회신 대기가 없음")
+		t.Fatal("진행중 열에 보류·회신 대기가 없음")
+	}
+	if !strings.Contains(body, "보류") || !strings.Contains(body, "회신대기") {
+		t.Fatal("진행중 뱃지가 없음")
+	}
+	if strings.Contains(body, ">검토<") || strings.Contains(body, "검토 열") {
+		t.Fatal("검토 열이 남아 있음")
 	}
 }
 
@@ -315,5 +325,54 @@ func TestWaitingActionNextCheckShowsAsTodayTodo(t *testing.T) {
 	body := doGet(t, e, "/workboard/kanban").Body.String()
 	if !strings.Contains(body, "확인: 전자도서관 부문 재확인") {
 		t.Fatal("다음 확인일이 오늘인 행동이 할 일로 안 보임")
+	}
+}
+
+func TestWorkboardSubtaskTreeAndDelete(t *testing.T) {
+	e, repo := newWorkboardServer(t, "wb_sub_tree.db")
+	root := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "상위", DueDate: "2026-09-30", Status: model.WBTaskWaiting, Assignee: "관리자"}
+	if err := repo.CreateTask(root); err != nil {
+		t.Fatal(err)
+	}
+	child := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "하위", DueDate: "2026-09-10", Status: model.WBTaskWaiting, ParentTaskID: root.TaskID}
+	if err := repo.CreateTask(child); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.GenerateOccurrences(root, model.WorkRecurrence{
+		StartDate: "2026-09-01", EndDate: "2026-09-01", RuleType: model.RecurrenceManual,
+		HolidayPolicy: model.HolidayPolicyAsIs, CompletePolicy: model.CompletePolicyManual,
+	}, []string{"2026-09-01"}); err != nil {
+		t.Fatal(err)
+	}
+	occs, _ := repo.ListChildren(root.TaskID)
+	occID := ""
+	for _, ch := range occs {
+		if ch.RecurrenceRole == model.RecurrenceRoleOccurrence {
+			occID = ch.TaskID
+			break
+		}
+	}
+	if occID == "" {
+		t.Fatal("실행 작업이 없다")
+	}
+
+	page := doGet(t, e, "/workboard/tasks/"+root.TaskID)
+	if page.Code != http.StatusOK {
+		t.Fatalf("show status=%d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, "하위 업무") || !strings.Contains(body, child.TaskID) {
+		t.Fatal("하위 업무 영역에 자식이 없다")
+	}
+	if !strings.Contains(body, "실행 이력") || !strings.Contains(body, occID) {
+		t.Fatal("실행 이력에 실행 작업이 없다")
+	}
+	if !strings.Contains(body, "행정·지원업무 등록") {
+		t.Fatal("하위 등록 팝업이 없다")
+	}
+
+	del := doForm(t, e, "/workboard/tasks/"+root.TaskID+"/delete", url.Values{"back": {"/workboard/register"}})
+	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "err=has_subtasks") {
+		t.Fatalf("delete loc=%q", del.Header().Get("Location"))
 	}
 }

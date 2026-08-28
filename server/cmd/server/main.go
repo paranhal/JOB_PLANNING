@@ -322,6 +322,7 @@ func main() {
 	aw.POST("", h.AdminWork.Create)
 	aw.POST("/inbox", h.AdminWork.CreateInbox)
 	aw.POST("/:id/classify", h.AdminWork.Classify)
+	aw.POST("/:id/move", h.AdminWork.MoveKanban)
 	aw.GET("/:id", h.AdminWork.Show)
 
 	wb := g.Group("/workboard")

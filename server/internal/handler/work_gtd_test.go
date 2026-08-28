@@ -35,6 +35,7 @@ func newGTDServer(t *testing.T) (*echo.Echo, *repository.WBRepo) {
 	aw.POST("", h.AdminWork.Create)
 	aw.POST("/inbox", h.AdminWork.CreateInbox)
 	aw.POST("/:id/classify", h.AdminWork.Classify)
+	aw.POST("/:id/move", h.AdminWork.MoveKanban)
 	aw.GET("/:id", h.AdminWork.Show)
 	wb := g.Group("/workboard")
 	wb.GET("/tasks/:id", h.Workboard.ShowTask)
@@ -45,74 +46,64 @@ func newGTDServer(t *testing.T) (*echo.Echo, *repository.WBRepo) {
 	return e, repository.NewWBRepo(db)
 }
 
-func TestAdminWorkInboxAndStats(t *testing.T) {
+func TestAdminWorkQuickRegisterAndStats(t *testing.T) {
 	e, repo := newGTDServer(t)
 
 	list := doGet(t, e, "/admin-work")
-	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "수집함 등록") {
-		t.Fatalf("목록 수집함 폼 없음 status=%d", list.Code)
+	body := list.Body.String()
+	if list.Code != http.StatusOK || !strings.Contains(body, "빠른 등록") {
+		t.Fatalf("목록 빠른 등록 폼 없음 status=%d", list.Code)
+	}
+	if strings.Contains(body, "수집함 등록") || strings.Contains(body, "수집함은") {
+		t.Fatal("수집함 문구가 남아 있음")
 	}
 
 	rec := doForm(t, e, "/admin-work/inbox", url.Values{"title": {"월간 실적 자료 요청"}})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=inbox") {
-		t.Fatalf("inbox: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=waiting") {
+		t.Fatalf("quick: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("inbox", "")
-	if err != nil || len(items) != 1 || items[0].Status != model.WBTaskInbox {
-		t.Fatalf("inbox items %+v err=%v", items, err)
+	items, err := repo.ListAdminWork("waiting", "")
+	if err != nil || len(items) != 1 || items[0].Status != model.WBTaskWaiting {
+		t.Fatalf("waiting items %+v err=%v", items, err)
 	}
 
 	stats := doGet(t, e, "/admin-work/stats")
-	body := stats.Body.String()
-	if stats.Code != http.StatusOK || !strings.Contains(body, "수집함") || !strings.Contains(body, "회신 대기") || !strings.Contains(body, "할 일") {
+	sbody := stats.Body.String()
+	if stats.Code != http.StatusOK || strings.Contains(sbody, "수집함") {
+		t.Fatalf("현황에 수집함이 남음 status=%d", stats.Code)
+	}
+	if !strings.Contains(sbody, "회신 대기") || !strings.Contains(sbody, "할 일") {
 		t.Fatalf("현황 카드 문구 없음")
 	}
-	if !strings.Contains(body, ">보류<") || !strings.Contains(body, ">이관<") {
+	if !strings.Contains(sbody, ">보류<") || !strings.Contains(sbody, ">이관<") {
 		t.Fatal("현황 카드에 보류·이관 분리가 없음")
 	}
-	if strings.Contains(body, "보류·이관") {
+	if strings.Contains(sbody, "보류·이관") {
 		t.Fatal("보류·이관 합침 카드가 남아 있음")
 	}
 }
 
-func TestAdminWorkClassifyInbox(t *testing.T) {
+func TestAdminWorkClassifyRejectsWaiting(t *testing.T) {
 	e, repo := newGTDServer(t)
 	rec := doForm(t, e, "/admin-work/inbox", url.Values{"title": {"분류할 메모"}})
 	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("inbox status=%d", rec.Code)
+		t.Fatalf("quick status=%d", rec.Code)
 	}
-	items, err := repo.ListAdminWork("inbox", "")
+	items, err := repo.ListAdminWork("waiting", "")
 	if err != nil || len(items) != 1 {
-		t.Fatalf("inbox %+v err=%v", items, err)
+		t.Fatalf("waiting %+v err=%v", items, err)
 	}
 	id := items[0].TaskID
 
-	list := doGet(t, e, "/admin-work?status=inbox")
-	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "/admin-work/"+id+"/classify") {
-		t.Fatal("수집함 목록에 분류 폼이 없음")
-	}
-
 	bad := doForm(t, e, "/admin-work/"+id+"/classify", url.Values{
-		"status": {"hold"},
+		"status": {"waiting"},
 	})
-	if bad.Code != http.StatusSeeOther || !strings.Contains(bad.Header().Get("Location"), "err=hold_required") {
-		t.Fatalf("보류 필수값 loc=%q", bad.Header().Get("Location"))
+	if bad.Code != http.StatusSeeOther || !strings.Contains(bad.Header().Get("Location"), "err=classify") {
+		t.Fatalf("classify loc=%q", bad.Header().Get("Location"))
 	}
 	got, _ := repo.GetTask(id)
-	if got == nil || got.Status != model.WBTaskInbox {
-		t.Fatalf("분류 실패 후 상태 %+v", got)
-	}
-
-	ok := doForm(t, e, "/admin-work/"+id+"/classify", url.Values{
-		"status":   {"waiting"},
-		"due_date": {"2026-08-20"},
-	})
-	if ok.Code != http.StatusSeeOther || !strings.Contains(ok.Header().Get("Location"), "ok=classify") {
-		t.Fatalf("classify loc=%q", ok.Header().Get("Location"))
-	}
-	got, err = repo.GetTask(id)
-	if err != nil || got == nil || got.Status != model.WBTaskWaiting || got.DueDate != "2026-08-20" {
-		t.Fatalf("분류 후 %+v err=%v", got, err)
+	if got == nil || got.Status != model.WBTaskWaiting {
+		t.Fatalf("분류 거부 후 상태 %+v", got)
 	}
 }
 
@@ -409,5 +400,72 @@ func TestActivitySpentMinutesRequired(t *testing.T) {
 	})
 	if zero.Code != http.StatusSeeOther || !strings.Contains(zero.Header().Get("Location"), "err=spent") {
 		t.Fatalf("0분 거부 loc=%q", zero.Header().Get("Location"))
+	}
+}
+
+func TestAdminWorkKanbanMoveAndListSort(t *testing.T) {
+	e, repo := newGTDServer(t)
+	early := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "가나다 마감먼저", DueDate: "2026-08-10", Status: model.WBTaskWaiting}
+	late := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "하하하 마감나중", DueDate: "2026-08-30", Status: model.WBTaskWaiting}
+	if err := repo.CreateTask(early); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateTask(late); err != nil {
+		t.Fatal(err)
+	}
+
+	list := doGet(t, e, "/admin-work")
+	body := list.Body.String()
+	if list.Code != http.StatusOK {
+		t.Fatalf("list status=%d", list.Code)
+	}
+	if !strings.Contains(body, `href="`) || !strings.Contains(body, "sort=due_date") {
+		t.Fatal("종료일 정렬 링크 없음")
+	}
+	ei := strings.Index(body, "가나다 마감먼저")
+	li := strings.Index(body, "하하하 마감나중")
+	if ei < 0 || li < 0 || ei > li {
+		t.Fatalf("기본 정렬이 종료일 오름차순이 아님 ei=%d li=%d", ei, li)
+	}
+
+	byTitle := doGet(t, e, "/admin-work?sort=title&dir=desc")
+	tb := byTitle.Body.String()
+	if !strings.Contains(tb, "sort=title") || !strings.Contains(tb, `name="dir"`) || !strings.Contains(tb, `value="desc"`) {
+		t.Fatal("?sort= 유지 안 됨")
+	}
+	if strings.Index(tb, "하하하 마감나중") > strings.Index(tb, "가나다 마감먼저") {
+		t.Fatal("제목 내림차순이 아님")
+	}
+
+	kanban := doGet(t, e, "/admin-work?view=kanban")
+	kb := kanban.Body.String()
+	if kanban.Code != http.StatusOK || !strings.Contains(kb, "할 일") || !strings.Contains(kb, "진행중") || !strings.Contains(kb, "완료") {
+		t.Fatal("칸반 3열 없음")
+	}
+	if strings.Contains(kb, ">검토<") {
+		t.Fatal("칸반에 검토 열이 있음")
+	}
+
+	noNote := doForm(t, e, "/admin-work/"+early.TaskID+"/move", url.Values{"status": {"complete"}})
+	if noNote.Code != http.StatusSeeOther || !strings.Contains(noNote.Header().Get("Location"), "err=complete_note") {
+		t.Fatalf("완료 검증 loc=%q", noNote.Header().Get("Location"))
+	}
+	prog := doForm(t, e, "/admin-work/"+early.TaskID+"/move", url.Values{"status": {"in_progress"}})
+	if prog.Code != http.StatusSeeOther || strings.Contains(prog.Header().Get("Location"), "err=") {
+		t.Fatalf("진행중 이동 loc=%q", prog.Header().Get("Location"))
+	}
+	got, _ := repo.GetTask(early.TaskID)
+	if got == nil || got.Status != model.WBTaskInProgress {
+		t.Fatalf("진행중 %+v", got)
+	}
+	done := doForm(t, e, "/admin-work/"+early.TaskID+"/move", url.Values{
+		"status": {"complete"}, "complete_note": {"자료 제출 완료"},
+	})
+	if done.Code != http.StatusSeeOther || strings.Contains(done.Header().Get("Location"), "err=") {
+		t.Fatalf("완료 이동 loc=%q", done.Header().Get("Location"))
+	}
+	got, _ = repo.GetTask(early.TaskID)
+	if got == nil || got.Status != model.WBTaskComplete {
+		t.Fatalf("완료 %+v", got)
 	}
 }

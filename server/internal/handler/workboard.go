@@ -182,11 +182,6 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	mntCards = filterCardsByProject(mntCards, projectFilter)
 	adminCards = filterCardsByProject(adminCards, projectFilter)
 
-	inboxCount := 0
-	if st, e := h.repo.CountAdminWorkStats(); e == nil {
-		inboxCount = st.Inbox
-	}
-
 	projects, _ := h.repo.ListProjects(true)
 	assignees, _ := h.userRepo.ListAssignable()
 	customers, _ := h.customerRepo.ListAll()
@@ -302,7 +297,6 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"ASCards":         asCards,
 		"MntCards":        mntCards,
 		"AdminCards":      adminCards,
-		"InboxCount":      inboxCount,
 		"PlacedCount":     len(placed),
 		"Projects":        projects,
 		"Assignees":       assignees,
@@ -1028,7 +1022,7 @@ func waitingActionChecks(today string, repo *repository.WBRepo, seenTask map[str
 		if parent == nil || !model.IsAdminGTDTask(*parent) {
 			continue
 		}
-		if parent.Status == model.WBTaskInbox || parent.Status == model.WBTaskCancelled || parent.Status == model.WBTaskComplete {
+		if parent.Status == model.WBTaskCancelled || parent.Status == model.WBTaskComplete {
 			continue
 		}
 		title := "확인: " + a.Title
@@ -1090,7 +1084,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		} else if t.SourceType == model.WBSourceMaintenance && mntDone[t.SourceID] {
 			t.Status = model.WBTaskComplete
 		}
-		if model.IsAdminGTDTask(t) && (t.Status == model.WBTaskInbox || t.Status == model.WBTaskCancelled) {
+		if model.IsAdminGTDTask(t) && t.Status == model.WBTaskCancelled {
 			continue
 		}
 		board = append(board, t)
@@ -1122,7 +1116,6 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	byStatus := map[string][]model.WorkTask{
 		model.WBTaskWaiting:    {},
 		model.WBTaskInProgress: {},
-		model.WBTaskReview:     {},
 		model.WBTaskComplete:   {},
 	}
 	for _, t := range board {
@@ -1137,8 +1130,6 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 			summary.Waiting++
 		case model.WBTaskInProgress:
 			summary.InProgress++
-		case model.WBTaskReview:
-			summary.Review++
 		case model.WBTaskComplete:
 			summary.Complete++
 		}

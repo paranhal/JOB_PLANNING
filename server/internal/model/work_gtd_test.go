@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -28,7 +29,18 @@ func TestWBAdminStatusLabel(t *testing.T) {
 		t.Fatal("waiting_for")
 	}
 	if WBAdminStatusLabel(WBTaskInbox) != "수집함" {
-		t.Fatal("inbox")
+		t.Fatal("inbox leftover label")
+	}
+	sort, dir := NormalizeAdminWorkSort("", "")
+	if sort != "due_date" || dir != "asc" {
+		t.Fatalf("default sort=%s dir=%s", sort, dir)
+	}
+	sort, dir = NormalizeAdminWorkSort("title", "desc")
+	if sort != "title" || dir != "desc" {
+		t.Fatalf("title sort=%s dir=%s", sort, dir)
+	}
+	if !strings.Contains(AdminWorkOrderSQL("due_date", "asc"), "due_date") {
+		t.Fatal("order sql")
 	}
 }
 
