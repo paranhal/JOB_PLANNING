@@ -126,8 +126,14 @@ func TestASReportPreviewGuidesMissingFields(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "장애원인") || !strings.Contains(body, "결론") {
+	if !strings.Contains(body, "장애원인") {
 		t.Fatal("빠진 칸을 명시하지 않는다")
+	}
+	if !strings.Contains(body, "name=\"conclusion\"") {
+		t.Fatal("미리보기에 결론 입력란이 없다")
+	}
+	if !strings.Contains(body, "문제가 발생했고") {
+		t.Fatal("결론 초안이 비었다")
 	}
 	if !strings.Contains(body, "/as/"+asID+"/action") {
 		t.Fatal("조치 화면으로 유도하지 않는다")

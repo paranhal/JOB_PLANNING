@@ -46,6 +46,38 @@ func TestBuildASReportDraftMappingAndProcessLines(t *testing.T) {
 	}
 }
 
+func TestBuildASReportDraftFillsEmptyConclusion(t *testing.T) {
+	as := &ASReceipt{
+		OrgName: "가나도서관", Symptom: "오작동", CauseDetail: "센서 불량",
+		ActionTaken: "센서 교체", ResultCode: ResultDone,
+	}
+	d := BuildASReportDraft(as, nil, nil, nil, nil, time.Date(2026, 8, 18, 12, 0, 0, 0, time.Local))
+	if strings.TrimSpace(d.Conclusion) == "" {
+		t.Fatal("접수 결론이 비면 초안으로 채워야 한다")
+	}
+	if !strings.Contains(d.Conclusion, "센서 교체하여 정상작동") {
+		t.Fatalf("초안=%q", d.Conclusion)
+	}
+	if miss := d.MissingReportFields(); len(miss) != 0 {
+		t.Fatalf("초안이 있는데 누락: %v", miss)
+	}
+
+	as.Conclusion = "교체 후 정상"
+	kept := BuildASReportDraft(as, nil, nil, nil, nil, time.Time{})
+	if kept.Conclusion != "교체 후 정상" {
+		t.Fatalf("적어 둔 결론을 덮어씀: %q", kept.Conclusion)
+	}
+
+	partial := &ASReceipt{
+		Symptom: "로그인 실패", CauseDetail: "설정 오류", ActionTaken: "설정 복구",
+		ResultCode: ResultPartial,
+	}
+	pd := BuildASReportDraft(partial, nil, nil, nil, nil, time.Time{})
+	if !strings.HasPrefix(pd.Conclusion, PartialConclusionPrefix) {
+		t.Fatalf("부분 조치 초안 머리말 없음: %q", pd.Conclusion)
+	}
+}
+
 func TestASReportFilenameSanitizesAndClips(t *testing.T) {
 	d := ASReportDraft{CustomerName: `가/나:도서관`, Symptom: `게이트 <고장> & "소음" 아주긴증상요약입니다여분`}
 	name := d.Filename(time.Date(2026, 8, 18, 0, 0, 0, 0, time.Local))

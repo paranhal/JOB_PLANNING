@@ -109,7 +109,43 @@ func TestASActionPageDoesNotExposeStartDatetimeInput(t *testing.T) {
 	if strings.Contains(body, `name="start_datetime"`) {
 		t.Error("착수시각 입력란이 있으면 안 된다")
 	}
-	if !strings.Contains(body, "첫 조치 저장 시 자동 기록") {
-		t.Error("자동 기록 안내가 없다")
+	if strings.Contains(body, "착수 시각") || strings.Contains(body, "첫 조치 저장 시 자동 기록") {
+		t.Error("조치 화면에 착수 시각 안내가 남아 있다")
+	}
+}
+
+func TestASShowDisplaysStartDatetimeReadOnly(t *testing.T) {
+	e, h, asRepo, _, asID := newASActionFixture(t)
+	e.GET("/as/:id", h.AS.Show, h.Auth.AuthMiddleware)
+
+	rec := postASAction(t, e, asID, url.Values{
+		"status":       {"in_progress"},
+		"work_place":   {"field"},
+		"process_type": {"visit"},
+		"cause_type":   {"hw"},
+		"action_taken": {"현장 점검"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("저장 실패: status=%d", rec.Code)
+	}
+	got, err := asRepo.GetByID(asID)
+	if err != nil || got == nil || got.StartDatetime == nil {
+		t.Fatalf("start_datetime 미기록: %+v err=%v", got, err)
+	}
+	want := "착수 " + got.StartDatetime.Format("2006-01-02 15:04")
+
+	page := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(page, req)
+	if page.Code != http.StatusOK {
+		t.Fatalf("상세: status=%d", page.Code)
+	}
+	body := page.Body.String()
+	if strings.Contains(body, `name="start_datetime"`) {
+		t.Error("상세에 착수 입력란이 있다")
+	}
+	if !strings.Contains(body, want) {
+		t.Fatalf("상세에 %q 가 없다", want)
 	}
 }

@@ -18,18 +18,19 @@ func TestASActionCauseReportFieldsOnPage(t *testing.T) {
 	for _, want := range []string{
 		`id="as-cause-report-wrap"`,
 		`name="cause_detail"`,
-		`name="conclusion"`,
 		`name="cause_type"`,
 		"장애원인",
-		"결론",
 		">조치 정보</h4>",
 		"원인분류(코드)와 다른 칸입니다",
-		"(부분 조치)",
+		"보고서 미리보기에서 입력",
 		"v === 'done' || v === 'partial'",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q", want)
 		}
+	}
+	if strings.Contains(body, `name="conclusion"`) {
+		t.Fatal("결론 입력란이 조치 화면에 있으면 안 된다")
 	}
 	formStart := strings.Index(body, `id="as-action-form"`)
 	if formStart < 0 {
@@ -122,7 +123,7 @@ func TestASActionDoneEmptyCauseReportWarnsButSaves(t *testing.T) {
 	}
 }
 
-func TestASActionDoneSavesCauseDetailAndConclusion(t *testing.T) {
+func TestASActionDoneSavesCauseDetailIgnoresConclusion(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
 	rec := postASAction(t, e, asID, url.Values{
 		"status":       {"in_progress"},
@@ -149,8 +150,8 @@ func TestASActionDoneSavesCauseDetailAndConclusion(t *testing.T) {
 	if got.CauseDetail != "설정 오류" {
 		t.Fatalf("cause_detail=%q", got.CauseDetail)
 	}
-	if !strings.Contains(got.Conclusion, "설정 복구하여 정상작동") {
-		t.Fatalf("conclusion=%q", got.Conclusion)
+	if got.Conclusion != "" {
+		t.Fatalf("조치 화면 결론이 접수에 저장되면 안 된다: %q", got.Conclusion)
 	}
 }
 
@@ -171,14 +172,14 @@ func TestASActionRevisitDoesNotClearCauseReport(t *testing.T) {
 	}
 
 	rec := postASAction(t, e, asID, url.Values{
-		"status":                {"in_progress"},
-		"work_place":            {"field"},
-		"process_type":          {"visit"},
-		"cause_type":            {"hw"},
-		"action_taken":          {"부품 대기"},
-		"time_spent":            {"30"},
-		"result_code":           {model.ResultRevisit},
-		"revisit_reason":        {"부품 수급"},
+		"status":                 {"in_progress"},
+		"work_place":             {"field"},
+		"process_type":           {"visit"},
+		"cause_type":             {"hw"},
+		"action_taken":           {"부품 대기"},
+		"time_spent":             {"30"},
+		"result_code":            {model.ResultRevisit},
+		"revisit_reason":         {"부품 수급"},
 		"revisit_scheduled_date": {"2026-08-20"},
 	})
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
@@ -193,7 +194,7 @@ func TestASActionRevisitDoesNotClearCauseReport(t *testing.T) {
 	}
 }
 
-func TestASActionPartialSavesCauseDetailAndConclusion(t *testing.T) {
+func TestASActionPartialSavesCauseDetailIgnoresConclusion(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
 	rec := postASAction(t, e, asID, url.Values{
 		"status":                 {"in_progress"},
@@ -219,8 +220,8 @@ func TestASActionPartialSavesCauseDetailAndConclusion(t *testing.T) {
 	if got.CauseDetail != "설정 오류" {
 		t.Fatalf("cause_detail=%q", got.CauseDetail)
 	}
-	if !strings.Contains(got.Conclusion, "(부분 조치)") || !strings.Contains(got.Conclusion, "설정 복구하여 정상작동") {
-		t.Fatalf("conclusion=%q", got.Conclusion)
+	if got.Conclusion != "" {
+		t.Fatalf("조치 화면 결론이 접수에 저장되면 안 된다: %q", got.Conclusion)
 	}
 
 	body := getASActionPage(t, e, asID)
@@ -231,8 +232,11 @@ func TestASActionPartialSavesCauseDetailAndConclusion(t *testing.T) {
 	formStart := strings.Index(body, `id="as-action-form"`)
 	formEndRel := strings.Index(body[formStart:], "</form>")
 	form := body[formStart : formStart+formEndRel]
-	if !strings.Contains(form, `name="cause_detail"`) || !strings.Contains(form, `name="conclusion"`) {
-		t.Fatal("장애원인·결론이 조치 폼 밖에 있다")
+	if !strings.Contains(form, `name="cause_detail"`) {
+		t.Fatal("장애원인이 조치 폼 밖에 있다")
+	}
+	if strings.Contains(form, `name="conclusion"`) {
+		t.Fatal("결론이 조치 폼에 남아 있다")
 	}
 }
 
@@ -258,7 +262,7 @@ func TestASActionDoneShowsCauseReportWrap(t *testing.T) {
 	}
 	form := body[formStart : formStart+formEndRel]
 	if !strings.Contains(form, `id="as-cause-report-wrap"`) {
-		t.Fatal("장애원인·결론이 조치 폼 밖에 있다")
+		t.Fatal("장애원인이 조치 폼 밖에 있다")
 	}
 }
 

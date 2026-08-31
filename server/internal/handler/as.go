@@ -965,7 +965,6 @@ func (h *ASHandler) Update(c echo.Context) error {
 		as.ResultCode = formResult
 		if model.ShowsASCauseReport(formResult) {
 			as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
-			as.Conclusion = strings.TrimSpace(c.FormValue("conclusion"))
 		}
 		as.RevisitReason = strings.TrimSpace(c.FormValue("revisit_reason"))
 		prepNotes = strings.TrimSpace(c.FormValue("revisit_prep"))
@@ -1088,10 +1087,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 
 	timeSpent := 0
 	if canProcessAS(c) {
-		timeSpent, _ = strconv.Atoi(strings.TrimSpace(c.FormValue("time_spent")))
-		if (strings.TrimSpace(as.ActionTaken) != "" || formResult != "") && timeSpent <= 0 {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=time_spent")
-		}
+		timeSpent = h.actionDurationMin(as.ASID)
 	}
 	if err := h.repo.Update(as); err != nil {
 		return err
@@ -1128,8 +1124,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if canIssueASReportStatus(as.Status) {
 		q.Set("report", "1")
 	}
-	if model.ShowsASCauseReport(formResult) &&
-		(strings.TrimSpace(as.CauseDetail) == "" || strings.TrimSpace(as.Conclusion) == "") {
+	if model.ShowsASCauseReport(formResult) && strings.TrimSpace(as.CauseDetail) == "" {
 		q.Set("warn", "cause_report")
 	}
 	if len(q) > 0 {
@@ -1177,7 +1172,7 @@ func actionErrMessage(code string) string {
 	case "process_type":
 		return "처리유형을 선택하세요."
 	case "time_spent":
-		return "소요시간을 입력하세요."
+		return "소요시간은 일일 업무 등록에서 입력합니다."
 	case "revisit_date":
 		return "재방문·추가조치 시 방문예정일자를 입력하세요."
 	case "revisit_reason":
@@ -1212,26 +1207,23 @@ func actionErrMessage(code string) string {
 func actionWarnMessage(code string) string {
 	switch strings.TrimSpace(code) {
 	case "cause_report":
-		return "장애원인·결론이 비어 있습니다. 지금은 저장했고, 보고서 발급 때 다시 필요합니다."
+		return "장애원인이 비어 있습니다. 지금은 저장했고, 보고서 발급 때 다시 필요합니다."
 	default:
 		return ""
 	}
 }
 
 func asConclusionDraft(as *model.ASReceipt, processes []model.ASProcess) string {
-	if as == nil {
-		return ""
-	}
-	work := strings.TrimSpace(as.ActionTaken)
-	if work == "" {
-		for i := len(processes) - 1; i >= 0; i-- {
-			if s := strings.TrimSpace(processes[i].WorkContent); s != "" {
-				work = s
-				break
-			}
+	return model.ASConclusionDraftFrom(as, processes)
+}
+
+func (h *ASHandler) actionDurationMin(asID string) int {
+	if h.wbRepo != nil {
+		if t, _ := h.wbRepo.GetTaskBySource(model.WBSourceAS, asID); t != nil {
+			return model.NormalizeDurationMin(t.DurationMin)
 		}
 	}
-	return model.BuildASConclusionDraftForResult(as.ResultCode, as.CauseDetail, as.Symptom, work)
+	return model.NormalizeDurationMin(0)
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -1342,7 +1334,7 @@ func (h *ASHandler) Hold(c echo.Context) error {
 	as.Status = "hold"
 	as.HoldReason = reason
 	as.HoldNextAction = next
-	_ = h.appendActionProcess(c, as, model.ResultHold, "", 0)
+	_ = h.appendActionProcess(c, as, model.ResultHold, "", h.actionDurationMin(id))
 	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 
@@ -1471,6 +1463,9 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 	}
 	asID := c.Param("id")
 	timeSpent, _ := strconv.Atoi(c.FormValue("time_spent"))
+	if timeSpent <= 0 {
+		timeSpent = h.actionDurationMin(asID)
+	}
 	p := &model.ASProcess{
 		ASID:        asID,
 		Worker:      c.FormValue("worker"),

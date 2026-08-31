@@ -231,6 +231,23 @@ func BuildASConclusionDraftForResult(resultCode, causeDetail, symptom, workConte
 	return d
 }
 
+// ASConclusionDraftFrom 접수·조치 이력으로 결론 초안. 보고서 미리보기(§12.10.4 · §34.1③)에서 쓴다.
+func ASConclusionDraftFrom(as *ASReceipt, processes []ASProcess) string {
+	if as == nil {
+		return ""
+	}
+	work := strings.TrimSpace(as.ActionTaken)
+	if work == "" {
+		for i := len(processes) - 1; i >= 0; i-- {
+			if s := strings.TrimSpace(processes[i].WorkContent); s != "" {
+				work = s
+				break
+			}
+		}
+	}
+	return BuildASConclusionDraftForResult(as.ResultCode, as.CauseDetail, as.Symptom, work)
+}
+
 // koreanEuro 받침에 따라 (으)로.
 func koreanEuro(s string) string {
 	r := []rune(strings.TrimSpace(s))

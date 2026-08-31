@@ -105,7 +105,10 @@ func BuildASReportDraft(as *ASReceipt, processes []ASProcess, customer *Customer
 	}
 	d.Symptom = as.Symptom
 	d.CauseDetail = as.CauseDetail
-	d.Conclusion = as.Conclusion
+	d.Conclusion = strings.TrimSpace(as.Conclusion)
+	if d.Conclusion == "" {
+		d.Conclusion = ASConclusionDraftFrom(as, processes)
+	}
 	d.Inspector = strings.TrimSpace(as.AssignedTo)
 	d.Confirmer = strings.TrimSpace(as.CustomerConfirmer)
 	if d.Confirmer == "" {

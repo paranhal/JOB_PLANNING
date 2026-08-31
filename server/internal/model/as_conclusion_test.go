@@ -46,6 +46,24 @@ func TestBuildASConclusionDraftForResultPartialPrefix(t *testing.T) {
 	}
 }
 
+func TestASConclusionDraftFromUsesActionThenProcess(t *testing.T) {
+	as := &ASReceipt{Symptom: "부팅 불가", CauseDetail: "전원 불량", ActionTaken: "파워 교체", ResultCode: ResultDone}
+	got := ASConclusionDraftFrom(as, nil)
+	want := BuildASConclusionDraft("전원 불량", "부팅 불가", "파워 교체")
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	as.ActionTaken = ""
+	procs := []ASProcess{{WorkContent: "1차"}, {WorkContent: "파워 교체"}}
+	got = ASConclusionDraftFrom(as, procs)
+	if got != want {
+		t.Fatalf("이력 마지막 작업: %q", got)
+	}
+	if ASConclusionDraftFrom(nil, nil) != "" {
+		t.Fatal("nil 접수는 빈 초안")
+	}
+}
+
 func TestShowsASCauseReport(t *testing.T) {
 	if !ShowsASCauseReport(ResultDone) || !ShowsASCauseReport(ResultPartial) {
 		t.Fatal("완료·추가조치 필요는 열려야 한다")

@@ -84,7 +84,7 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 
 	draft := reportDraftFromForm(c)
 	if miss := draft.MissingReportFields(); len(miss) > 0 {
-		return h.redirectReportErr(c, as.ASID, strings.Join(miss, "·")+"이(가) 비어 있습니다. 미리보기에서 입력하거나 조치 화면에서 채워 주세요.")
+		return h.redirectReportErr(c, as.ASID, strings.Join(miss, "·")+"이(가) 비어 있습니다. 미리보기에서 입력하세요.")
 	}
 
 	format := strings.ToLower(strings.TrimSpace(c.FormValue("format")))

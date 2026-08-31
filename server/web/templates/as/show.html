@@ -14,7 +14,7 @@
           {{statusBadge .AS.Status}}
           <span class="{{urgencyColor .AS.Urgency}} text-sm font-bold">{{urgencyLabel .AS.Urgency}}</span>
         </div>
-        <p class="text-sm text-gray-500">{{.AS.OrgName}} · {{.AS.ReceiptDatetime.Format "2006-01-02 15:04"}} 접수</p>
+        <p class="text-sm text-gray-500">{{.AS.OrgName}} · {{.AS.ReceiptDatetime.Format "2006-01-02 15:04"}} 접수{{if .AS.StartDatetime}} · 착수 {{.AS.StartDatetime.Format "2006-01-02 15:04"}}{{end}}</p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 justify-end">
@@ -85,6 +85,10 @@
         <dd>{{if .AS.AssignedTo}}{{.AS.AssignedTo}}{{else}}—{{end}}</dd>
       </div>
       <div>
+        <dt class="text-xs text-slate-500">착수</dt>
+        <dd>{{if .AS.StartDatetime}}{{.AS.StartDatetime.Format "2006-01-02 15:04"}}{{else}}—{{end}}</dd>
+      </div>
+      <div>
         <dt class="text-xs text-slate-500">완료일시</dt>
         <dd>{{if .AS.CompleteDatetime}}{{.AS.CompleteDatetime.Format "2006-01-02 15:04"}}{{else}}—{{end}}</dd>
       </div>
@@ -110,8 +114,8 @@
     <p class="text-sm text-amber-800">보고서 발급에
       {{range $i, $f := .ReportMissing}}{{if $i}}·{{end}}<strong>{{$f}}</strong>{{end}}
       이(가) 없습니다.
-      <a href="/as/{{.AS.ASID}}/action" class="font-medium text-blue-700 hover:underline">조치 화면에서 입력</a>
-      하거나 미리보기에서 넣을 수 있습니다.
+      <a href="/as/{{.AS.ASID}}/report" class="font-medium text-blue-700 hover:underline">보고서 미리보기에서 입력</a>
+      할 수 있습니다.
     </p>
     {{end}}
     {{if .ASReports}}
