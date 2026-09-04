@@ -1,7 +1,7 @@
 {{define "title"}}{{.Title}} · 영업 사업{{end}}
 
 {{define "content"}}
-<div class="space-y-4" x-data="salesActPanel({{if .FromTask}}true{{else}}false{{end}}, '{{.Tab}}')">
+<div class="space-y-4" x-data="Object.assign(salesDnd({kind:'project'}), salesActPanel({{if .FromTask}}true{{else}}false{{end}}, '{{.Tab}}'))">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <a href="/sales" class="text-sm text-gray-500 hover:underline">← 목록</a>
@@ -24,6 +24,7 @@
       {{if .WorkProjectID}}
       <a href="/projects/{{.WorkProjectID}}" class="px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">사업관리에서 보기</a>
       {{end}}
+      <button type="button" class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-lg" @click="open=true">+ 활동 추가</button>
       <a href="/sales/{{.Project.SalesID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
       {{if .CanDelete}}
       <form method="post" action="/sales/{{.Project.SalesID}}/delete"
@@ -59,9 +60,23 @@
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-      <h3 class="font-semibold text-gray-800">정보</h3>
+  {{$fromSort := 0}}
+  {{range .Stages}}{{if eq .Code $.Project.Stage}}{{$fromSort = .SortOrder}}{{end}}{{end}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+    <h3 class="font-semibold text-gray-800">영업 단계</h3>
+    <div class="flex flex-wrap gap-2">
+      {{range .Stages}}
+      <button type="button"
+              class="px-3 py-1.5 rounded-full text-sm border {{if eq $.Project.Stage .Code}}bg-gray-800 text-white border-gray-800{{else if .IsLost}}bg-white text-gray-600 border-gray-200 hover:border-red-300 hover:text-red-700{{else}}bg-white text-gray-700 border-gray-200 hover:bg-gray-50{{end}} {{if not $.CanWrite}}pointer-events-none{{end}}"
+              {{if $.CanWrite}}@click="pickStage('{{$.Project.SalesID}}', '{{$.Project.Stage}}', {{$fromSort}}, '{{.Code}}', {{.SortOrder}}, {{if .IsLost}}true{{else}}false{{end}})"{{end}}>
+        {{.Label}}{{if eq $.Project.Stage .Code}}●{{end}}
+      </button>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h3 class="font-semibold text-gray-800">사업 정보</h3>
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <div>
           <dt class="text-gray-500">고객</dt>
@@ -92,6 +107,10 @@
           <dt class="text-gray-500">경쟁사</dt>
           <dd class="text-gray-800">{{if .Project.Competitor}}{{.Project.Competitor}}{{else}}—{{end}}</dd>
         </div>
+        <div>
+          <dt class="text-gray-500">확률</dt>
+          <dd class="text-gray-800">{{.Project.EffectiveProb}}%</dd>
+        </div>
         {{if or .Project.WonAt .Project.ContractedAt}}
         <div>
           <dt class="text-gray-500">수주일</dt>
@@ -115,35 +134,6 @@
         </div>
         {{end}}
       </dl>
-    </div>
-
-    <div class="space-y-4">
-      {{if .CanWrite}}
-      <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-        <h3 class="font-semibold text-gray-800">단계 변경</h3>
-        <p class="text-xs text-gray-500">어느 단계로든 이동할 수 있습니다. 뒤로 갈 때는 사유가 필요합니다.</p>
-        <form method="post" action="/sales/{{.Project.SalesID}}/stage" class="space-y-2">
-          <select name="stage" class="w-full border rounded-lg px-3 py-2 text-sm">
-            {{range .Stages}}
-            <option value="{{.Code}}" {{if eq $.Project.Stage .Code}}selected{{end}}>{{.Label}}</option>
-            {{end}}
-          </select>
-          <input name="reason" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="후퇴·실주 사유">
-          {{if .Project.HasOverride}}
-          <label class="flex items-center gap-2 text-xs text-gray-600">
-            <input type="checkbox" name="keep_override" value="1"> 수동 확도 유지
-          </label>
-          {{end}}
-          <button type="submit" class="w-full px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">단계 저장</button>
-        </form>
-      </div>
-      {{end}}
-
-      <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
-        <h3 class="font-semibold text-gray-800">단계 이력</h3>
-        <p class="text-xs text-gray-500">활동·단계·금액 변경이 한 타임라인에 이어집니다.</p>
-      </div>
-    </div>
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200">
@@ -157,15 +147,8 @@
     </div>
 
     <div class="p-5 space-y-4" x-show="tab==='timeline'">
-      {{if .CanWrite}}
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        {{if .FromTask}}
-        <p class="text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">일일 업무 「{{.FromTask.Title}}」을 이 사업의 활동으로 연결합니다.</p>
-        {{else}}
-        <p class="text-xs text-gray-500">한 번 적으면 일일 업무 일정표에도 보입니다.</p>
-        {{end}}
-        <button type="button" class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg" @click="open=true">활동 등록</button>
-      </div>
+      {{if and .FromTask .CanWrite}}
+      <p class="text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">일일 업무 「{{.FromTask.Title}}」을 이 사업의 활동으로 연결합니다.</p>
       {{end}}
 
       <div class="space-y-3">
@@ -389,6 +372,7 @@
     </div>
   </div>
   {{if .CanWrite}}{{template "sales_activity_panel" .}}{{end}}
+  {{template "sales_stage_reason" .}}
 </div>
 <script>
 function salesPartyChipsMixin() {

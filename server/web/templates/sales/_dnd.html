@@ -1,0 +1,102 @@
+{{define "sales_dnd"}}
+<script>
+function salesDnd(opts) {
+  opts = opts || {};
+  return {
+    kind: opts.kind || 'project',
+    group: opts.group || 'type',
+    dragging: null,
+    reasonOpen: false,
+    reason: '',
+    pending: null,
+    lostOpen: false,
+    dragProject(ev, id, from) {
+      this.dragging = { id: id, from: from, fromSort: this._fromSort(from) };
+      try { ev.dataTransfer.setData('text/plain', id); } catch (e) {}
+    },
+    dropProject(ev, to, toSort, isLost) {
+      if (!this.dragging || this.dragging.from === to) return;
+      const fromSort = parseInt(this.dragging.fromSort, 10);
+      this.applyProjectMove(this.dragging.id, fromSort, to, toSort, isLost);
+      this.dragging = null;
+    },
+    pickStage(id, from, fromSort, to, toSort, isLost) {
+      if (!id || from === to) return;
+      this.applyProjectMove(id, fromSort, to, toSort, isLost);
+    },
+    applyProjectMove(id, fromSort, to, toSort, isLost) {
+      fromSort = parseInt(fromSort, 10);
+      toSort = parseInt(toSort, 10);
+      if (to === 'won') {
+        if (!confirm('수주로 옮기려면 사업명·고객·시기·금액이 확정돼 있어야 합니다. 옮길까요?')) {
+          return;
+        }
+      }
+      const need = isLost || (!isNaN(fromSort) && !isNaN(toSort) && toSort < fromSort);
+      if (need) {
+        this.pending = { id: id, to: to, lost: !!isLost };
+        this.reason = '';
+        this.reasonOpen = true;
+        return;
+      }
+      this.postStage(id, to, '');
+    },
+    _fromSort(stage) {
+      const cols = document.querySelectorAll('[data-col]');
+      for (const c of cols) {
+        if (c.getAttribute('data-col') === stage) return c.getAttribute('data-sort');
+      }
+      return '0';
+    },
+    submitReason() {
+      if (!this.pending) return;
+      this.postStage(this.pending.id, this.pending.to, this.reason);
+    },
+    async postStage(id, to, reason) {
+      const body = new URLSearchParams({
+        stage: to,
+        reason: reason || '',
+        return: location.pathname + location.search
+      });
+      const res = await fetch('/sales/' + encodeURIComponent(id) + '/stage', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      });
+      const data = await res.json().catch(function () { return { ok: false, error: '저장에 실패했습니다' }; });
+      if (!data.ok) {
+        alert(data.error || '저장에 실패했습니다');
+        return;
+      }
+      location.reload();
+    },
+    dragAct(ev, id) {
+      this.dragging = { id: id };
+      try { ev.dataTransfer.setData('text/plain', id); } catch (e) {}
+    },
+    dropAct(ev, value) {
+      if (!this.dragging) return;
+      this.postAct(this.dragging.id, value);
+    },
+    async postAct(id, value) {
+      const body = new URLSearchParams({
+        group: this.group,
+        value: value,
+        return: location.pathname + location.search
+      });
+      const res = await fetch('/sales/activities/' + encodeURIComponent(id) + '/move', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      });
+      const data = await res.json().catch(function () { return { ok: false, error: '저장에 실패했습니다' }; });
+      if (!data.ok) {
+        alert(data.error || '저장에 실패했습니다');
+        return;
+      }
+      location.reload();
+    }
+  };
+}
+</script>
+{{end}}
