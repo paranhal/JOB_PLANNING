@@ -42,7 +42,7 @@ func TestFilterByAssignee(t *testing.T) {
 	}
 }
 
-// 일일·주간·월간 시간표의 열 구성 (2026-08-04는 화요일)
+// 일일·주간·월간 일정표의 열 구성 (2026-08-04는 화요일)
 func TestBuildRegisterPeriodColumns(t *testing.T) {
 	base := mustDate(t, "2026-08-04")
 
@@ -128,18 +128,25 @@ func TestBuildRegisterRowsPlacesCards(t *testing.T) {
 }
 
 // 파싱만으로는 실행 중 오류(함수 인자 타입 등)를 잡지 못해 실제 데이터로 렌더링한다.
-func TestRegisterTemplateRenders(t *testing.T) {
+func registerParseFiles(t *testing.T) []string {
+	t.Helper()
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "workboard", "register.html"),
 	}
-	partials, err := filepath.Glob(filepath.Join(root, "workboard", "_*.html"))
-	if err != nil {
-		t.Fatal(err)
+	for _, dir := range []string{"workboard", "kanban"} {
+		partials, err := filepath.Glob(filepath.Join(root, dir, "_*.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, partials...)
 	}
-	files = append(files, partials...)
+	return files
+}
 
+func TestRegisterTemplateRenders(t *testing.T) {
+	files := registerParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)
@@ -182,22 +189,16 @@ func TestRegisterTemplateRenders(t *testing.T) {
 	if strings.Contains(out, `data-time="09:00" data-assignee=`) {
 		t.Fatal("주간 드롭 칸에 data-assignee가 있으면 안 됨")
 	}
+	if strings.Contains(out, ">칸반<") {
+		t.Fatal("주간 보기에는 칸반 전환 버튼이 없어야 한다")
+	}
 	if err := tmpl.ExecuteTemplate(io.Discard, "base.html", data); err != nil {
 		t.Fatalf("base 렌더링 실패: %v", err)
 	}
 }
 
 func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "workboard", "register.html"),
-	}
-	partials, err := filepath.Glob(filepath.Join(root, "workboard", "_*.html"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	files = append(files, partials...)
+	files := registerParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)
@@ -263,16 +264,7 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 }
 
 func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "workboard", "register.html"),
-	}
-	partials, err := filepath.Glob(filepath.Join(root, "workboard", "_*.html"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	files = append(files, partials...)
+	files := registerParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)
@@ -316,6 +308,12 @@ func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
 	if strings.Count(out, ">조치<") != 1 {
 		t.Fatalf("조치 버튼=%d want 1 (주담당만)", strings.Count(out, ">조치<"))
 	}
+	if strings.Count(out, ">수정<") != 1 {
+		t.Fatalf("수정 버튼=%d want 1 (주담당만)", strings.Count(out, ">수정<"))
+	}
+	if !strings.Contains(out, `/workboard/tasks/T1/edit`) {
+		t.Fatal("수정이 일일 업무 등록 화면으로 연결되지 않는다")
+	}
 	if !strings.Contains(out, "외 2명") {
 		t.Fatal("카드 하단에 외 n명이 없다")
 	}
@@ -343,5 +341,72 @@ func TestAddMinutesHHMM(t *testing.T) {
 		if got := addMinutesHHMM(in, 30); got != want {
 			t.Errorf("addMinutesHHMM(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestRegisterKanbanTemplateFiveColumns(t *testing.T) {
+	files := registerParseFiles(t)
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols := []model.KanbanColumn{
+		{Key: model.WorkBucketUnplanned, Title: "미계획업무", Count: 1, Items: []model.KanbanCard{{
+			Prefix: model.WorkPrefixAS, PrefixLabel: "AS", RefID: "A1", Title: "게이트", OrgName: "중앙", Bucket: model.WorkBucketUnplanned,
+			ItemKey: "as:A1", Kind: "as",
+		}}},
+		{Key: model.WorkBucketToday, Title: "8/18 예정", Count: 0, Items: []model.KanbanCard{}},
+		{Key: model.WorkBucketInProgress, Title: "진행중", Count: 1, Items: []model.KanbanCard{{
+			Prefix: model.WorkPrefixGeneral, PrefixLabel: "일반업무", RefID: "T1", Title: "행정", Assignee: "양기헌",
+			Bucket: model.WorkBucketInProgress, ItemKey: "task:T1", Kind: "task",
+			DelayBadge: "진행중 D+2", DelayClass: "bg-amber-100 text-amber-800",
+			ActionHref: "/workboard/tasks/T1", EditHref: "/workboard/tasks/T1/edit",
+		}}},
+		{Key: model.WorkBucketDelayed, Title: "지연", Count: 0, Items: []model.KanbanCard{}},
+		{Key: model.WorkBucketCompletedToday, Title: "8/18 완료", Count: 0, Items: []model.KanbanCard{}},
+	}
+	data := map[string]interface{}{
+		"Title": "일일 업무 등록", "Active": NavWorkRegister, "UserRole": "admin",
+		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
+		"Display": "kanban", "Date": "2026-08-18", "PeriodLabel": "2026-08-18",
+		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-19",
+		"KanbanColumns": cols, "KanbanTotal": 2, "KanbanDrag": true, "KanbanDrop": "el",
+		"AssigneeQ": "&assignee=양기헌", "DisplayQ": "&assignee=양기헌&display=kanban",
+		"AssigneeFilter": "양기헌", "Assignees": nil, "Projects": nil,
+		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18&display=kanban",
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatalf("칸반 렌더: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"미계획업무", "8/18 예정", "진행중", "지연", "8/18 완료", "게이트", "task:T1", "display=kanban"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("칸반에 %q 없음", want)
+		}
+	}
+	if !strings.Contains(out, "진행중 D+2") && !strings.Contains(out, "진행중 D&#43;2") {
+		t.Errorf("칸반에 %q 없음", "진행중 D+2")
+	}
+	if !strings.Contains(out, ">일정표<") || !strings.Contains(out, ">칸반<") {
+		t.Fatal("일일에 일정표|칸반 전환이 없다")
+	}
+	if strings.Contains(out, "data-time=") {
+		t.Fatal("칸반에 일정표 시간 칸이 남아 있다")
+	}
+}
+
+func TestRegisterFilterQueryKeepsKanbanDisplay(t *testing.T) {
+	got := registerFilterQueryDisplay("양기헌", "", "", "kanban")
+	if !strings.Contains(got, "display=kanban") || !strings.Contains(got, "assignee=") {
+		t.Fatalf("필터+칸반 유지: %q", got)
+	}
+	week := registerURLDisplay(regViewWeek, "2026-08-18", "양기헌", "", "", "kanban")
+	if strings.Contains(week, "display=kanban") {
+		t.Fatalf("주간 URL에 칸반이 남으면 안 됨: %s", week)
+	}
+	day := registerURLDisplay(regViewDay, "2026-08-18", "양기헌", "", "", "kanban")
+	if !strings.Contains(day, "display=kanban") {
+		t.Fatalf("일일 칸반 URL: %s", day)
 	}
 }

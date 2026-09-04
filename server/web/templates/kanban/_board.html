@@ -1,0 +1,97 @@
+{{define "kanban_board"}}
+{{$drag := .KanbanDrag}}
+{{$drop := .KanbanDrop}}
+{{$write := .CanWrite}}
+{{$n := len .KanbanColumns}}
+<div class="flex gap-3 overflow-x-auto pb-2 items-stretch">
+  {{range .KanbanColumns}}
+  <div class="flex-1 basis-0 min-w-[260px] {{if le $n 3}}max-w-[420px]{{end}} bg-slate-50/80 rounded-xl border {{if .Border}}{{.Border}}{{else}}border-slate-200{{end}} min-h-[14rem] flex flex-col"
+       data-col="{{.Key}}"
+       data-sort="{{.Sort}}"
+       {{if .IsLost}}data-lost="1" data-collapsed="1"{{end}}
+       {{if and $drag (eq $drop "key")}}@dragover.prevent @drop.prevent="drop('{{.Key}}')"{{end}}
+       {{if and $drag (eq $drop "el")}}@dragover.prevent @drop.prevent="dropKanban($event.currentTarget)"{{end}}
+       {{if and $drag (eq $drop "sales")}}@dragover.prevent @drop.prevent="dropProject($event, '{{.Key}}', {{.Sort}}, {{if .IsLost}}true{{else}}false{{end}})"{{end}}
+       {{if and $drag (eq $drop "act")}}@dragover.prevent @drop.prevent="dropAct($event, '{{.Key}}')"{{end}}>
+    <div class="px-3 py-2.5 border-b bg-white/90 rounded-t-xl {{if .IsLost}}cursor-pointer{{end}}"
+         {{if .IsLost}}@click="lostOpen=!lostOpen"{{end}}>
+      <div class="flex justify-between items-center gap-2">
+        <h3 class="font-semibold text-sm text-slate-800 truncate">{{.Title}}{{if .IsLost}} <span class="text-[10px] font-normal text-slate-400" x-text="lostOpen ? '▾' : '▸'"></span>{{end}}</h3>
+        <span class="text-xs text-slate-400 tabular-nums shrink-0">{{.Count}}{{if .CountUnit}}{{.CountUnit}}{{end}}</span>
+      </div>
+      {{if .Subtitle}}<p class="text-[11px] text-slate-500 mt-0.5 tabular-nums">{{.Subtitle}}</p>{{end}}
+    </div>
+    <div class="p-2 space-y-2 flex-1" {{if .IsLost}}x-show="lostOpen" x-cloak{{end}}>
+      {{range .Items}}
+      {{template "kanban_card" (dict "Card" . "Drag" $drag "Drop" $drop "CanWrite" $write)}}
+      {{else}}
+      <p class="text-xs text-slate-400 text-center py-8">0건</p>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{if .KanbanHint}}<p class="text-[11px] text-slate-500 mt-2">{{.KanbanHint}}</p>{{end}}
+{{end}}
+
+{{define "kanban_card"}}
+{{$c := .Card}}
+<div class="bg-white rounded-lg border border-slate-100 p-2.5 shadow-sm text-left"
+     style="{{$c.LeftStyle}}"
+     {{if and $.Drag $.CanWrite}}draggable="true"{{end}}
+     {{if $c.Kind}}data-kind="{{$c.Kind}}"{{end}}
+     {{if $c.RefID}}data-ref="{{$c.RefID}}"{{end}}
+     data-title="{{$c.Title}}" data-assignee="{{$c.Assignee}}" data-col="{{$c.Bucket}}"
+     {{if $c.ItemKey}}data-item-key="{{$c.ItemKey}}"{{end}}
+     {{if $c.ActionHref}}data-href="{{$c.ActionHref}}"{{end}}
+     {{if $c.EditHref}}data-edit="{{$c.EditHref}}"{{end}}
+     {{if and $.Drag $.CanWrite (eq $.Drop "el")}}@click.stop="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)"{{end}}
+     {{if and $.Drag $.CanWrite (eq $.Drop "key")}}@dragstart="start('{{$c.RefID}}', '{{$c.Bucket}}')"{{end}}
+     {{if and $.Drag $.CanWrite (eq $.Drop "sales")}}@dragstart="dragProject($event, '{{$c.RefID}}', '{{$c.Stage}}')"{{end}}
+     {{if and $.Drag $.CanWrite (eq $.Drop "act")}}@dragstart="dragAct($event, '{{$c.RefID}}')"{{end}}>
+  <div class="flex flex-wrap items-center gap-1 mb-1">
+    {{if $c.PrefixLabel}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass $c.Prefix}}">[{{$c.PrefixLabel}}]</span>{{end}}
+    {{if $c.TypeLabel}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbWorkTypeClass $c.WorkType}}">{{$c.TypeLabel}}</span>{{end}}
+    {{if wbKanbanBadge $c.MappedStatus}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbKanbanBadgeClass $c.MappedStatus}}">{{wbKanbanBadge $c.MappedStatus}}</span>{{end}}
+    {{if $c.DelayBadge}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if $c.DelayClass}}{{$c.DelayClass}}{{else}}bg-red-100 text-red-800{{end}}">{{$c.DelayBadge}}</span>{{end}}
+    {{if $c.Urgent}}<span class="text-[11px]" title="긴급">🔴</span>{{end}}
+    {{if $c.Grouped}}<span class="text-[11px]" title="묶음 접수">🔗</span>{{end}}
+    {{if $c.Tentative}}<span class="text-[10px] text-gray-400">미확정</span>{{end}}
+    {{if $c.RefNumber}}{{if eq $c.Prefix "as"}}<span class="font-mono text-[11px] font-medium text-blue-600">{{$c.RefNumber}}</span>{{end}}{{end}}
+  </div>
+  {{if $c.Href}}
+  <a href="{{$c.Href}}" class="text-sm font-medium text-slate-800 leading-snug hover:text-blue-700" {{if eq $.Drop "el"}}@click.stop{{end}}>{{$c.Title}}</a>
+  {{else}}
+  <p class="text-sm font-medium text-slate-800 leading-snug">{{$c.Title}}</p>
+  {{end}}
+  {{if $c.Symptom}}<p class="text-[11px] text-slate-500 mt-1 line-clamp-2">{{$c.Symptom}}</p>{{end}}
+  {{if or $c.OrgName $c.DueDate}}
+  <p class="text-[11px] text-slate-500 mt-1">{{if $c.OrgName}}{{$c.OrgName}}{{else if not $c.TypeLabel}}기관 미입력{{end}}{{if and $c.OrgName $c.DueDate}} · {{end}}{{if and (not $c.OrgName) $c.DueDate}}{{$c.DueDate}}{{else if $c.DueDate}}{{$c.DueDate}}{{end}}</p>
+  {{else if not $c.TypeLabel}}
+  <p class="text-[11px] text-slate-500 mt-1">기관 미입력</p>
+  {{end}}
+  {{if $c.Extra}}<p class="text-[11px] mt-0.5 {{if $c.AmountUnconfirmed}}text-gray-400{{else}}text-slate-500{{end}}">{{$c.Extra}}{{if $c.AmountUnconfirmed}} 미확정{{end}}</p>{{end}}
+  {{if $c.Assignee}}<p class="text-[11px] text-slate-600 mt-0.5">{{$c.Assignee}}</p>{{else if eq $c.Prefix "as"}}<p class="text-[11px] text-amber-600 mt-0.5">미배정</p>{{end}}
+  {{if $c.LastActivity}}<p class="text-[11px] text-slate-400">마지막 활동 {{$c.LastActivity}}</p>{{end}}
+  {{if and $.CanWrite (or $c.ActionHref $c.EditHref)}}
+  <div class="mt-1.5 flex gap-1">
+    {{if $c.ActionHref}}
+    {{if eq $.Drop "el"}}
+    <button type="button" class="px-1.5 py-0.5 rounded border border-blue-300 bg-white text-[10px] font-semibold text-blue-700 hover:bg-blue-50"
+            @click.stop="openWork($event.currentTarget.closest('[data-kind]'))">조치</button>
+    {{else}}
+    <a href="{{$c.ActionHref}}" class="px-1.5 py-0.5 rounded border border-blue-300 bg-white text-[10px] font-semibold text-blue-700 hover:bg-blue-50">조치</a>
+    {{end}}
+    {{end}}
+    {{if $c.EditHref}}
+    {{if eq $.Drop "el"}}
+    <button type="button" class="px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+            @click.stop="editWork($event.currentTarget.closest('[data-kind]'))">수정</button>
+    {{else}}
+    <a href="{{$c.EditHref}}" class="px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-semibold text-slate-700 hover:bg-slate-50">수정</a>
+    {{end}}
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
