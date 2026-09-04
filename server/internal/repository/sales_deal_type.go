@@ -36,6 +36,7 @@ func applySalesDealTypeV228(db *sql.DB) {
 			log.Printf("034 sales deal_type: %v", err)
 		}
 	}
+	applySalesItems(db)
 }
 
 func addSalesDealTypeColumn(db *sql.DB, name, ddl string) {
