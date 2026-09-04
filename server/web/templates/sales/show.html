@@ -1,7 +1,7 @@
 {{define "title"}}{{.Title}} · 영업 사업{{end}}
 
 {{define "content"}}
-<div class="space-y-4">
+<div class="space-y-4" x-data="salesActPanel({{if .FromTask}}true{{else}}false{{end}}, '{{.Tab}}')">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <a href="/sales" class="text-sm text-gray-500 hover:underline">← 목록</a>
@@ -12,9 +12,18 @@
         {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">미확정</span>{{end}}
         <span>{{.Project.ConfirmationLabel}}</span>
       </p>
+      {{if .ShowProgress}}
+      <p class="text-sm text-gray-600 mt-1">견적 {{if .Progress.Quote}}✔{{else}}○{{end}} · RFP {{if .Progress.RFP}}✔{{else}}○{{end}} · 제안서 {{if .Progress.Proposal}}✔{{else}}○{{end}}</p>
+      {{end}}
     </div>
     {{if .CanWrite}}
     <div class="flex flex-wrap gap-2">
+      {{if .CanPromote}}
+      <a href="/sales/{{.Raw.SalesID}}/promote" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">사업관리로 등록</a>
+      {{end}}
+      {{if .WorkProjectID}}
+      <a href="/projects/{{.WorkProjectID}}" class="px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">사업관리에서 보기</a>
+      {{end}}
       <a href="/sales/{{.Project.SalesID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
       {{if .CanDelete}}
       <form method="post" action="/sales/{{.Project.SalesID}}/delete"
@@ -26,12 +35,25 @@
     {{end}}
   </div>
 
+  {{if .FromTask}}
+  <div class="rounded-lg bg-orange-50 text-orange-900 text-sm px-4 py-2 border border-orange-200">
+    일일 업무 <span class="font-medium">{{.FromTask.Title}}</span>을 이 사업의 영업 활동으로 연결합니다. 아래 활동 등록을 저장하면 같은 건이 일정표와 영업 화면에 보입니다.
+  </div>
+  {{end}}
   {{if eq .FlashOK "created"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">등록했습니다.</div>
   {{else if eq .FlashOK "updated"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.</div>
   {{else if eq .FlashOK "stage"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">단계를 변경했습니다.</div>
+  {{else if eq .FlashOK "activity"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">활동을 등록했습니다. 일일 업무 등록 일정표에도 올라갑니다.</div>
+  {{else if eq .FlashOK "party"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">관계자를 추가했습니다.</div>
+  {{else if eq .FlashOK "replaced"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">관계자를 바꿨습니다. 이전 담당자는 이력으로 남아 있습니다.</div>
+  {{else if eq .FlashOK "link"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">기준정보 담당자와 연결했습니다.</div>
   {{end}}
   {{if .FormError}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
@@ -70,9 +92,19 @@
           <dt class="text-gray-500">경쟁사</dt>
           <dd class="text-gray-800">{{if .Project.Competitor}}{{.Project.Competitor}}{{else}}—{{end}}</dd>
         </div>
+        {{if or .Project.WonAt .Project.ContractedAt}}
+        <div>
+          <dt class="text-gray-500">수주일</dt>
+          <dd class="text-gray-800">{{if .Project.WonAt}}{{.Project.WonAt}}{{else}}—{{end}}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">계약 날인일</dt>
+          <dd class="text-gray-800">{{if .Project.ContractedAt}}{{.Project.ContractedAt}}{{else}}—{{end}}</dd>
+        </div>
+        {{end}}
         {{if .Project.LostReason}}
         <div class="sm:col-span-2">
-          <dt class="text-gray-500">수주실패 사유</dt>
+          <dt class="text-gray-500">실패 사유</dt>
           <dd class="text-gray-800">{{.Project.LostReason}}</dd>
         </div>
         {{end}}
@@ -96,7 +128,7 @@
             <option value="{{.Code}}" {{if eq $.Project.Stage .Code}}selected{{end}}>{{.Label}}</option>
             {{end}}
           </select>
-          <input name="reason" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="후퇴·수주실패 사유">
+          <input name="reason" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="후퇴·실주 사유">
           {{if .Project.HasOverride}}
           <label class="flex items-center gap-2 text-xs text-gray-600">
             <input type="checkbox" name="keep_override" value="1"> 수동 확도 유지
@@ -109,19 +141,347 @@
 
       <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
         <h3 class="font-semibold text-gray-800">단계 이력</h3>
-        <ul class="text-sm space-y-2">
-          {{range .History}}
-          <li class="border-l-2 border-gray-200 pl-3">
-            <p class="text-gray-800">{{if .FromLabel}}{{.FromLabel}} → {{end}}{{.ToLabel}}</p>
-            <p class="text-xs text-gray-500">{{.ChangedAt}} {{.ChangedBy}}</p>
-            {{if .Reason}}<p class="text-xs text-gray-600">{{.Reason}}</p>{{end}}
-          </li>
-          {{else}}
-          <li class="text-gray-400 text-sm">이력이 없습니다.</li>
-          {{end}}
-        </ul>
+        <p class="text-xs text-gray-500">활동·단계·금액 변경이 한 타임라인에 이어집니다.</p>
       </div>
     </div>
   </div>
+
+  <div class="bg-white rounded-xl border border-gray-200">
+    <div class="flex flex-wrap gap-1 border-b border-gray-200 px-3 pt-3">
+      <button type="button" @click="tab='timeline'"
+              class="px-3 py-2 text-sm rounded-t-lg"
+              :class="tab==='timeline' ? 'bg-white font-semibold text-gray-800 border border-b-white border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-800'">활동 로그</button>
+      <button type="button" @click="tab='parties'"
+              class="px-3 py-2 text-sm rounded-t-lg"
+              :class="tab==='parties' ? 'bg-white font-semibold text-gray-800 border border-b-white border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-800'">관계자</button>
+    </div>
+
+    <div class="p-5 space-y-4" x-show="tab==='timeline'">
+      {{if .CanWrite}}
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        {{if .FromTask}}
+        <p class="text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">일일 업무 「{{.FromTask.Title}}」을 이 사업의 활동으로 연결합니다.</p>
+        {{else}}
+        <p class="text-xs text-gray-500">한 번 적으면 일일 업무 일정표에도 보입니다.</p>
+        {{end}}
+        <button type="button" class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg" @click="open=true">활동 등록</button>
+      </div>
+      {{end}}
+
+      <div class="space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="font-semibold text-gray-800">활동 로그</h3>
+            <p class="text-xs text-gray-500">{{if eq .ActView "kanban"}}열 = {{if eq .ActGroup "stage"}}단계{{else}}활동 유형{{end}}. 카드를 끌어 옮깁니다.{{else}}시간 역순. 활동·단계·금액·고객·관계자 변경이 한 줄기로 이어집니다.{{end}}</p>
+          </div>
+          <div class="flex gap-1">
+            <a href="/sales/{{.Project.SalesID}}?tab=timeline&actview=list"
+               class="px-2 py-1 text-xs rounded {{if ne .ActView "kanban"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600{{end}}">리스트</a>
+            <a href="/sales/{{.Project.SalesID}}?tab=timeline&actview=kanban&group=type"
+               class="px-2 py-1 text-xs rounded {{if and (eq .ActView "kanban") (eq .ActGroup "type")}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600{{end}}">칸반 · 유형</a>
+            <a href="/sales/{{.Project.SalesID}}?tab=timeline&actview=kanban&group=stage"
+               class="px-2 py-1 text-xs rounded {{if and (eq .ActView "kanban") (eq .ActGroup "stage")}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600{{end}}">칸반 · 단계</a>
+          </div>
+        </div>
+        {{if eq .ActView "kanban"}}
+        <div x-data="salesDnd({kind:'activity', group: '{{.ActGroup}}'})">
+          {{template "kanban_board" .}}
+        </div>
+        {{else}}
+        <div class="space-y-2">
+          {{range .Timeline}}
+          {{template "sales_timeline_card" (dict "Event" . "HideSalesName" true)}}
+          {{else}}
+          <p class="text-sm text-gray-400">아직 활동이 없습니다.</p>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+
+    <div class="p-5 space-y-5" x-show="tab==='parties'" x-cloak>
+      <div>
+        <h3 class="font-semibold text-gray-800">관계자</h3>
+        <p class="text-xs text-gray-500">당사·협력사·고객을 여러 명 붙일 수 있습니다. 사람이 바뀌면 지우지 않고 교체합니다. 누구와 이야기해 왔는지가 영업 자산입니다.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="space-y-2">
+          <h4 class="text-sm font-semibold text-gray-700">당사</h4>
+          {{range .ActiveParties}}{{if eq .PartyType "own"}}
+          <div class="rounded-lg border border-gray-200 p-3 space-y-2 text-sm">
+            <p class="font-medium text-gray-800">{{.DisplayName}}{{if .IsPrimary}} <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100">주담당</span>{{end}}</p>
+            {{if .RoleLabel}}<p class="text-xs text-gray-500">{{.RoleLabel}}</p>{{end}}
+            {{if or .Title .Phone .Email}}<p class="text-xs text-gray-500">{{.Title}} {{.Phone}} {{.Email}}</p>{{end}}
+            {{if $.CanWrite}}
+            <details class="text-xs">
+              <summary class="cursor-pointer text-orange-700">교체</summary>
+              <form method="post" action="/sales/{{$.Project.SalesID}}/parties/{{.PartyID}}/replace" class="mt-2 grid grid-cols-1 gap-2">
+                <input type="hidden" name="party_type" value="{{.PartyType}}">
+                <select name="user_id" class="border rounded px-2 py-1">
+                  <option value="">사용자 선택</option>
+                  {{range $.Users}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
+                </select>
+                <input name="person_name" class="border rounded px-2 py-1" placeholder="이름">
+                <select name="party_role" class="border rounded px-2 py-1">
+                  <option value="">역할</option>
+                  {{range $.PartyRoles}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+                </select>
+                <input name="replaced_reason" required class="border rounded px-2 py-1" placeholder="교체 사유 (필수)">
+                <button class="px-2 py-1 bg-gray-800 text-white rounded">교체 저장</button>
+              </form>
+            </details>
+            {{end}}
+          </div>
+          {{end}}{{end}}
+        </div>
+        <div class="space-y-2">
+          <h4 class="text-sm font-semibold text-gray-700">협력사</h4>
+          {{range .ActiveParties}}{{if eq .PartyType "partner"}}
+          <div class="rounded-lg border border-gray-200 p-3 space-y-2 text-sm">
+            <p class="font-medium text-gray-800">{{.DisplayName}}{{if .IsPrimary}} <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100">주담당</span>{{end}}</p>
+            {{if .RoleLabel}}<p class="text-xs text-gray-500">{{.RoleLabel}}</p>{{end}}
+            {{if or .Title .Phone .Email}}<p class="text-xs text-gray-500">{{.Title}} {{.Phone}} {{.Email}}</p>{{end}}
+            {{if $.CanWrite}}
+            <details class="text-xs">
+              <summary class="cursor-pointer text-orange-700">교체</summary>
+              <form method="post" action="/sales/{{$.Project.SalesID}}/parties/{{.PartyID}}/replace" class="mt-2 grid grid-cols-1 gap-2">
+                <input type="hidden" name="party_type" value="{{.PartyType}}">
+                <input name="org_name" class="border rounded px-2 py-1" placeholder="기관명 (미등록이면 자유입력)" value="{{.OrgName}}">
+                <input name="person_name" class="border rounded px-2 py-1" placeholder="이름" required>
+                <input name="title" class="border rounded px-2 py-1" placeholder="직함">
+                <select name="party_role" class="border rounded px-2 py-1">
+                  <option value="">역할</option>
+                  {{range $.PartyRoles}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+                </select>
+                <input name="replaced_reason" required class="border rounded px-2 py-1" placeholder="교체 사유 (필수)">
+                <button class="px-2 py-1 bg-gray-800 text-white rounded">교체 저장</button>
+              </form>
+            </details>
+            {{end}}
+          </div>
+          {{end}}{{end}}
+        </div>
+        <div class="space-y-2">
+          <h4 class="text-sm font-semibold text-gray-700">고객</h4>
+          {{range .ActiveParties}}{{if eq .PartyType "customer"}}
+          <div class="rounded-lg border border-gray-200 p-3 space-y-2 text-sm">
+            <p class="font-medium text-gray-800">{{.DisplayName}}{{if .IsPrimary}} <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100">주담당</span>{{end}}{{if .NeedsSupplement}} <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">보완 필요</span>{{end}}</p>
+            {{if .RoleLabel}}<p class="text-xs text-gray-500">{{.RoleLabel}}</p>{{end}}
+            {{if or .Title .Phone .Email}}<p class="text-xs text-gray-500">{{.Title}} {{.Phone}} {{.Email}}</p>{{end}}
+            {{if $.CanWrite}}
+            {{if and $.Contacts (not .ContactID)}}
+            <form method="post" action="/sales/{{$.Project.SalesID}}/parties/{{.PartyID}}/link" class="flex gap-2">
+              <select name="contact_id" class="border rounded px-2 py-1 text-xs flex-1">
+                <option value="">기준정보 담당자 연결</option>
+                {{range $.Contacts}}<option value="{{.ContactID}}">{{.FullName}}</option>{{end}}
+              </select>
+              <button class="px-2 py-1 text-xs border rounded">연결</button>
+            </form>
+            {{end}}
+            <details class="text-xs">
+              <summary class="cursor-pointer text-orange-700">교체</summary>
+              <form method="post" action="/sales/{{$.Project.SalesID}}/parties/{{.PartyID}}/replace" class="mt-2 grid grid-cols-1 gap-2">
+                <input type="hidden" name="party_type" value="{{.PartyType}}">
+                <input name="org_name" class="border rounded px-2 py-1" placeholder="기관명 (미등록이면 자유입력)" value="{{.OrgName}}">
+                <input name="person_name" class="border rounded px-2 py-1" placeholder="이름" required>
+                <input name="title" class="border rounded px-2 py-1" placeholder="직함">
+                <select name="party_role" class="border rounded px-2 py-1">
+                  <option value="">역할</option>
+                  {{range $.PartyRoles}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+                </select>
+                {{if $.Contacts}}
+                <select name="contact_id" class="border rounded px-2 py-1">
+                  <option value="">기준정보 담당자 (선택)</option>
+                  {{range $.Contacts}}<option value="{{.ContactID}}">{{.FullName}}</option>{{end}}
+                </select>
+                {{end}}
+                <input name="replaced_reason" required class="border rounded px-2 py-1" placeholder="교체 사유 (필수)">
+                <button class="px-2 py-1 bg-gray-800 text-white rounded">교체 저장</button>
+              </form>
+            </details>
+            {{end}}
+          </div>
+          {{end}}{{end}}
+        </div>
+      </div>
+
+      {{if .CanWrite}}
+      <div class="rounded-xl border border-gray-200 p-4 space-y-3">
+        <h4 class="text-sm font-semibold text-gray-800">관계자 추가</h4>
+        <form method="post" action="/sales/{{.Project.SalesID}}/parties" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+              x-data="{ ptype: 'own' }">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">구분</label>
+            <select name="party_type" x-model="ptype" class="w-full border rounded-lg px-3 py-2 text-sm">
+              {{range .PartyTypes}}
+              <option value="{{.CodeValue}}">{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">역할</label>
+            <select name="party_role" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">선택</option>
+              {{range .PartyRoles}}
+              <option value="{{.CodeValue}}">{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">기관명</label>
+            <input name="org_name" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="미등록이면 자유입력">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">이름</label>
+            <input name="person_name" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="이름">
+          </div>
+          <div x-show="ptype==='own'" x-cloak>
+            <label class="block text-xs text-gray-500 mb-1">등록 사용자</label>
+            <select name="user_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">직접 입력</option>
+              {{range .Users}}
+              <option value="{{.UserID}}">{{.FullName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">직함</label>
+            <input name="title" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">전화</label>
+            <input name="phone" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">이메일</label>
+            <input name="email" class="w-full border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div class="flex items-end gap-3">
+            <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+              <input type="checkbox" name="is_primary" value="1"> 주담당
+            </label>
+            <button type="submit" class="px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">추가</button>
+          </div>
+        </form>
+      </div>
+      {{end}}
+
+      {{if .InactiveParties}}
+      <div class="space-y-2">
+        <h4 class="text-sm font-semibold text-gray-700">이전 관계자</h4>
+        <p class="text-xs text-gray-500">비활성. 지워지지 않고 남아 있습니다.</p>
+        <ul class="space-y-2">
+          {{range .InactiveParties}}
+          <li class="rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-600">
+            <p>
+              <span class="px-1.5 py-0.5 rounded text-[10px] bg-gray-100">비활성</span>
+              {{if .TypeLabel}}{{.TypeLabel}} · {{end}}{{.DisplayName}}
+              {{if .RoleLabel}} ({{.RoleLabel}}){{end}}
+            </p>
+            {{if .ReplacedByName}}<p class="text-xs mt-1">→ {{.ReplacedByName}} 으로 교체</p>{{end}}
+            {{if .ReplacedReason}}<p class="text-xs text-gray-500">{{.ReplacedReason}}</p>{{end}}
+          </li>
+          {{end}}
+        </ul>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{if .CanWrite}}{{template "sales_activity_panel" .}}{{end}}
 </div>
+<script>
+function salesPartyChipsMixin() {
+  return {
+    counterChips: [],
+    counterDraft: '',
+    memberChips: [],
+    partyHints: [],
+    initPartyChips() {
+      const v = document.getElementById('sales-default-members');
+      if (v && v.value.trim()) {
+        this.memberChips = v.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      const dl = document.getElementById('party-hints');
+      if (dl) {
+        const names = [];
+        dl.querySelectorAll('option').forEach(function (o) {
+          if (o.value && names.indexOf(o.value) < 0) names.push(o.value);
+        });
+        this.partyHints = names;
+      }
+    },
+    addCounterChip() {
+      const raw = (this.counterDraft || '').split(/[,;/]/);
+      this.counterDraft = '';
+      const self = this;
+      raw.forEach(function (p) {
+        p = (p || '').trim();
+        if (!p) return;
+        if (self.counterChips.indexOf(p) >= 0) return;
+        self.counterChips.push(p);
+      });
+    },
+    addMember(name) {
+      name = (name || '').trim();
+      if (!name) return;
+      if (this.memberChips.indexOf(name) >= 0) return;
+      this.memberChips.push(name);
+    },
+    flushPartyFields(form) {
+      this.addCounterChip();
+      const c = form.querySelector('[name=counterparts]');
+      if (c) c.value = (this.counterChips || []).join(', ');
+      const m = form.querySelector('[name=our_members]');
+      if (m) m.value = (this.memberChips || []).join(', ');
+    },
+    async loadPartyHints(id) {
+      if (!id) return;
+      const res = await fetch('/sales/' + id + '/party-hints');
+      const data = await res.json().catch(function () { return {}; });
+      this.partyHints = data.names || [];
+      const dl = document.getElementById('party-hints');
+      if (dl) {
+        dl.innerHTML = '';
+        this.partyHints.forEach(function (n) {
+          const o = document.createElement('option');
+          o.value = n;
+          dl.appendChild(o);
+        });
+      }
+    }
+  };
+}
+function salesActPanel(startOpen, tab) {
+  return Object.assign(salesPartyChipsMixin(), {
+    open: !!startOpen,
+    tab: tab || 'timeline',
+    dur: 30,
+    nextAction: '',
+    nextDate: '',
+    init() { this.initPartyChips(); },
+    async submit(ev) {
+      const form = ev.target;
+      this.flushPartyFields(form);
+      if (!(this.nextAction || '').trim() && !(this.nextDate || '').trim()) {
+        if (!confirm('다음 행동을 비우고 저장할까요?')) return;
+      }
+      const body = new URLSearchParams(new FormData(form));
+      const res = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      });
+      const data = await res.json().catch(function () { return { ok: false, error: '저장에 실패했습니다' }; });
+      if (!data.ok) {
+        alert(data.error || '저장에 실패했습니다');
+        return;
+      }
+      this.open = false;
+      location.reload();
+    }
+  });
+}
+</script>
+{{template "sales_dnd" .}}
 {{end}}
