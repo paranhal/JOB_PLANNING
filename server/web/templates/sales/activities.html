@@ -1,0 +1,228 @@
+{{define "title"}}영업 활동 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-4" x-data="salesActPanel({{if .FromTask}}true{{else}}false{{end}})">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">영업 활동</h2>
+      <p class="text-sm text-gray-500 mt-1">{{if eq .View "day"}}일일 단위 · 담당자별. 활동이 없는 영업 담당자도 열로 둡니다.{{else if eq .View "kanban"}}열 = 활동 유형.{{else}}날짜별 타임라인. 필터를 바꾸면 요약도 같이 바뀝니다.{{end}}</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {{if eq .View "day"}}
+      <a href="/sales/activities?date={{.PrevDate}}{{.FilterQ}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">← 전날</a>
+      <form method="get" action="/sales/activities" class="inline-flex items-center gap-2">
+        {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
+        <input type="hidden" name="view" value="day">
+        <input type="date" name="date" value="{{.Date}}" class="border rounded-lg px-2 py-1.5 text-sm" onchange="this.form.submit()">
+      </form>
+      <a href="/sales/activities?date={{.NextDate}}{{.FilterQ}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">다음날 →</a>
+      {{else if ne .View "kanban"}}
+      <form method="get" action="/sales/activities" class="inline-flex items-center gap-2">
+        {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+        {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
+        {{if ne .Month "all"}}
+        <input type="month" name="month" value="{{.Month}}" class="border rounded-lg px-2 py-1.5 text-sm" onchange="this.form.submit()">
+        {{end}}
+      </form>
+      {{end}}
+      <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+        <a href="/sales/activities{{if and (ne .View "kanban") (ne .View "day")}}?{{.LogQuery}}{{end}}"
+           class="px-3 py-1.5 {{if ne .View "kanban"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
+        <a href="/sales/activities?view=kanban&group=type{{.TypeQuery}}"
+           class="px-3 py-1.5 {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
+      </div>
+      {{if ne .View "kanban"}}
+      <a href="/sales/activities{{if .LogQuery}}?{{.LogQuery}}{{end}}"
+         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "log"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">로그</a>
+      <a href="/sales/activities?view=day{{if .Date}}&date={{.Date}}{{end}}{{.FilterQ}}"
+         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "day"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">일일</a>
+      {{end}}
+      {{if and .CanWrite .ShowHeaderAdd}}
+      <button type="button" class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg" @click="open=true">+ 활동 추가</button>
+      {{end}}
+    </div>
+  </div>
+
+  {{if eq .View "day"}}
+  {{if .Assignees}}
+  <form method="get" action="/sales/activities" class="flex flex-wrap items-center gap-2 text-xs">
+    <input type="hidden" name="date" value="{{.Date}}">
+    <span class="text-gray-500">담당자</span>
+    <a href="/sales/activities?date={{.Date}}" class="px-2 py-1 rounded border {{if eq .AssigneeFilter ""}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">전체</a>
+    {{range .Assignees}}
+    {{if eq .Role "sales"}}
+    <a href="/sales/activities?date={{$.Date}}&assignee={{.FullName}}" class="px-2 py-1 rounded border {{if eq $.AssigneeFilter .FullName}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">{{.FullName}}</a>
+    {{end}}
+    {{end}}
+  </form>
+  {{end}}
+  {{end}}
+
+  {{if eq .View "kanban"}}
+  <div x-data="salesDnd({kind:'activity', group: '{{.ActGroup}}'})">
+    {{template "kanban_board" .}}
+  </div>
+  {{template "sales_dnd" .}}
+  {{else if eq .View "day"}}
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    {{if eq (len .DayColumns) 0}}
+    <div class="px-4 py-10 text-center text-sm text-slate-500">표시할 담당자가 없습니다. 영업 역할 사용자를 등록하세요.</div>
+    {{else}}
+    <div class="max-h-[74vh] overflow-auto">
+      <div style="min-width:calc(3rem + {{len .DayColumns}} * {{.AssigneeColMin}}px)">
+        <div class="sticky top-0 z-20 flex border-b border-slate-200 bg-slate-50/95 backdrop-blur">
+          <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-slate-400 border-r border-slate-200 sticky left-0 z-30 bg-slate-50">시간</div>
+          {{range .DayColumns}}
+          <div class="px-1.5 py-2 border-r border-slate-200 text-center"
+               style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{.CellStyle}}">
+            <p class="text-[11px] font-bold truncate">{{.Label}}</p>
+            <p class="text-[9px] truncate {{if eq .Count 0}}text-orange-700{{else}}text-slate-400{{end}}">
+              {{if eq .Count 0}}활동 없음{{else}}{{.Sub}}{{end}}
+            </p>
+          </div>
+          {{end}}
+        </div>
+        <div class="flex relative">
+          <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-30 bg-white">
+            {{range .SlotTimes}}
+            <div class="box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-slate-50{{end}}"
+                 style="height:{{$.SlotRem}}rem">
+              <span class="block text-right text-[9px] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-slate-600{{else}}text-slate-300{{end}}"
+                    style="line-height:{{$.SlotRem}}rem">{{.}}</span>
+            </div>
+            {{end}}
+          </div>
+          {{range .DayColumns}}
+          {{$col := .}}
+          <div class="relative border-r border-slate-50"
+               style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{$.GridHeightStyle}}">
+            {{range $i, $t := $.SlotTimes}}
+            <div class="absolute left-0 right-0 box-border border-t border-slate-100/80"
+                 style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"></div>
+            {{end}}
+            {{if eq $col.Count 0}}
+            <p class="absolute inset-0 flex items-center justify-center text-[11px] text-orange-700/80 pointer-events-none">활동 없음</p>
+            {{end}}
+            {{range $col.Blocks}}
+            <a href="{{.Card.DetailHref}}"
+               class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-1 py-0.5 relative border border-black/5 hover:ring-2 hover:ring-orange-400"
+               style="{{.Style}}"
+               title="{{.Card.Title}} · {{.Card.StartTime}}~{{.Card.EndTime}}">
+              <span class="truncate block font-semibold">{{.Card.Title}}</span>
+              <span class="text-[8px] opacity-70 block truncate">{{.Card.StartTime}}~{{.Card.EndTime}}{{if gt .ExtraCount 0}} · 외 {{.ExtraCount}}명{{end}}</span>
+            </a>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  {{template "sales_activity_log" .}}
+  {{end}}
+
+  {{if .CanWrite}}{{template "sales_activity_panel" .}}{{end}}
+</div>
+<script>
+function salesPartyChipsMixin() {
+  return {
+    counterChips: [],
+    counterDraft: '',
+    memberChips: [],
+    partyHints: [],
+    initPartyChips() {
+      const v = document.getElementById('sales-default-members');
+      if (v && v.value.trim()) {
+        this.memberChips = v.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      const dl = document.getElementById('party-hints');
+      if (dl) {
+        const names = [];
+        dl.querySelectorAll('option').forEach(function (o) {
+          if (o.value && names.indexOf(o.value) < 0) names.push(o.value);
+        });
+        this.partyHints = names;
+      }
+    },
+    addCounterChip() {
+      const raw = (this.counterDraft || '').split(/[,;/]/);
+      this.counterDraft = '';
+      const self = this;
+      raw.forEach(function (p) {
+        p = (p || '').trim();
+        if (!p) return;
+        if (self.counterChips.indexOf(p) >= 0) return;
+        self.counterChips.push(p);
+      });
+    },
+    addMember(name) {
+      name = (name || '').trim();
+      if (!name) return;
+      if (this.memberChips.indexOf(name) >= 0) return;
+      this.memberChips.push(name);
+    },
+    flushPartyFields(form) {
+      this.addCounterChip();
+      const c = form.querySelector('[name=counterparts]');
+      if (c) c.value = (this.counterChips || []).join(', ');
+      const m = form.querySelector('[name=our_members]');
+      if (m) m.value = (this.memberChips || []).join(', ');
+    },
+    async loadPartyHints(id) {
+      if (!id) return;
+      const res = await fetch('/sales/' + id + '/party-hints');
+      const data = await res.json().catch(function () { return {}; });
+      this.partyHints = data.names || [];
+      const dl = document.getElementById('party-hints');
+      if (dl) {
+        dl.innerHTML = '';
+        this.partyHints.forEach(function (n) {
+          const o = document.createElement('option');
+          o.value = n;
+          dl.appendChild(o);
+        });
+      }
+    }
+  };
+}
+function salesActPanel(startOpen) {
+  return Object.assign(salesPartyChipsMixin(), {
+    open: !!startOpen,
+    dur: 30,
+    nextAction: '',
+    nextDate: '',
+    init() { this.initPartyChips(); },
+    async submit(ev) {
+      const form = ev.target;
+      this.flushPartyFields(form);
+      if (!(this.nextAction || '').trim() && !(this.nextDate || '').trim()) {
+        if (!confirm('다음 행동을 비우고 저장할까요?')) return;
+      }
+      const body = new URLSearchParams(new FormData(form));
+      const res = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      });
+      const data = await res.json().catch(function () { return { ok: false, error: '저장에 실패했습니다' }; });
+      if (!data.ok) {
+        alert(data.error || '저장에 실패했습니다');
+        return;
+      }
+      this.open = false;
+      const main = document.getElementById('sales-act-main');
+      if (main) {
+        const u = new URL(location.href);
+        u.searchParams.set('partial', '1');
+        const html = await fetch(u.toString()).then(function (r) { return r.text(); });
+        main.outerHTML = html;
+      } else {
+        location.reload();
+      }
+    }
+  });
+}
+</script>
+{{end}}

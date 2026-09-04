@@ -1,0 +1,65 @@
+{{define "sales_activity_log"}}
+<div id="sales-act-main" class="space-y-4">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <p class="text-xs text-slate-500">이번 달 활동</p>
+      <p class="text-xl font-bold text-gray-800 mt-1">{{.Summary.Count}}건</p>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <p class="text-xs text-slate-500">총 소요 시간</p>
+      <p class="text-xl font-bold text-gray-800 mt-1">{{.Summary.DurationLabel}}</p>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <p class="text-xs text-slate-500">유형별 최다</p>
+      <p class="text-xl font-bold text-gray-800 mt-1">{{if .Summary.TopLabel}}{{.Summary.TopLabel}}{{else}}—{{end}}</p>
+    </div>
+  </div>
+
+  <form method="get" action="/sales/activities" class="flex flex-wrap gap-2 items-end">
+    <input type="hidden" name="month" value="{{.Month}}">
+    {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+    <div class="flex-1 min-w-[14rem]">
+      <label class="block text-xs text-gray-500 mb-1">검색</label>
+      <input type="search" name="q" value="{{.Query}}" placeholder="활동명 · 사업명 · 고객명"
+             class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-3 py-2 bg-gray-800 text-white rounded-lg text-sm">검색</button>
+  </form>
+
+  <div class="flex flex-wrap gap-1.5 items-center">
+    <a href="/sales/activities?month={{.Month}}{{if .Query}}&q={{urlquery .Query}}{{end}}"
+       class="px-2.5 py-1 rounded-full text-xs border {{if eq (len .SelectedTypes) 0}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">전체 {{.ChipTotal}}</a>
+    {{range .TypeChips}}
+    <a href="{{.Href}}"
+       class="px-2.5 py-1 rounded-full text-xs border {{if .Selected}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">{{.Label}} {{.Count}}</a>
+    {{end}}
+  </div>
+
+  {{if eq (len .DayGroups) 0}}
+  <div class="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center space-y-3">
+    {{if .HasAnyActivity}}
+    <p class="text-sm text-gray-600">{{.MonthEmptyLabel}}</p>
+    <a href="{{.AllPeriodHref}}" class="inline-block text-sm text-orange-700 hover:underline">전체 기간 보기</a>
+    {{else}}
+    <p class="text-sm text-gray-600">아직 등록된 활동이 없습니다</p>
+    {{if .CanWrite}}
+    <button type="button" class="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm" @click="open=true">첫 활동 등록하기</button>
+    {{end}}
+    {{end}}
+  </div>
+  {{else}}
+  <div class="space-y-6">
+    {{range .DayGroups}}
+    <section>
+      <h3 class="text-sm font-semibold mb-2" style="{{.DayStyle}}">{{.Heading}}</h3>
+      <div class="space-y-2">
+        {{range .Items}}
+        {{template "sales_activity_card" (dict "Activity" . "HideSalesName" false)}}
+        {{end}}
+      </div>
+    </section>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
