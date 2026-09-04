@@ -1,6 +1,6 @@
 {{define "wb_modals"}}
 {{if .CanWrite}}
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="taskOpen" x-cloak
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="typeof taskOpen !== 'undefined' && taskOpen" x-cloak
      @keydown.escape.window="taskOpen=false">
   <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" @click.outside="taskOpen=false">
     <div class="flex items-center justify-between px-5 py-4 border-b">
@@ -288,7 +288,7 @@
   </div>
 </div>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="projectOpen" x-cloak @keydown.escape.window="projectOpen=false">
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="typeof projectOpen !== 'undefined' && projectOpen" x-cloak @keydown.escape.window="projectOpen=false">
   <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" @click.outside="projectOpen=false">
     <div class="flex items-center justify-between px-5 py-4 border-b">
       <h3 class="font-semibold text-gray-800">새 프로젝트 등록</h3>

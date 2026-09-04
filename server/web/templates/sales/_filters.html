@@ -1,0 +1,101 @@
+{{define "sales_list_filters"}}
+<form method="get" action="{{.FilterAction}}" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
+  {{if .View}}<input type="hidden" name="display" value="{{.View}}"><input type="hidden" name="view" value="{{.View}}">{{end}}
+  {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
+  <div class="flex-1 min-w-[10rem]">
+    <label class="block text-xs text-gray-500 mb-1">검색</label>
+    <input type="text" name="search" value="{{.Search}}" placeholder="사업명"
+           class="w-full border rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div class="min-w-[8rem]">
+    <label class="block text-xs text-gray-500 mb-1">고객</label>
+    <input type="text" name="customer" value="{{.Customer}}" placeholder="고객·가칭"
+           class="w-full border rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">영업담당</label>
+    <select name="owner" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .Users}}
+      <option value="{{.FullName}}" {{if eq $.Owner .FullName}}selected{{end}}>{{.FullName}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">사업 시기</label>
+    <select name="period" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .PeriodOptions}}
+      <option value="{{.CodeValue}}" {{if eq $.Period .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">금액 확정</label>
+    <select name="amount_confirmed" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[7rem]">
+      <option value="" {{if eq .AmountConfirmed ""}}selected{{end}}>전체</option>
+      <option value="1" {{if eq .AmountConfirmed "1"}}selected{{end}}>확정</option>
+      <option value="0" {{if eq .AmountConfirmed "0"}}selected{{end}}>미확정</option>
+    </select>
+  </div>
+  {{if eq .FilterAction "/sales"}}
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">단계</label>
+    <select name="stage" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .Stages}}
+      <option value="{{.Code}}" {{if eq $.Stage .Code}}selected{{end}}>{{.Label}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">상태</label>
+    <select name="status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="" {{if eq .Status ""}}selected{{end}}>전체</option>
+      <option value="active" {{if eq .Status "active"}}selected{{end}}>진행</option>
+      <option value="lost" {{if eq .Status "lost"}}selected{{end}}>실주</option>
+      <option value="promoted" {{if eq .Status "promoted"}}selected{{end}}>승격완료</option>
+    </select>
+  </div>
+  {{end}}
+  <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
+  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed}}
+  <a href="{{.FilterAction}}{{if and (eq .FilterAction "/sales") .View}}?display={{.View}}{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
+  {{end}}
+</form>
+{{end}}
+
+{{define "sales_pipeline_metrics"}}
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500">파이프라인 총액</p>
+    <p class="text-2xl font-bold text-gray-800">{{.Pipe.TotalAmountLabel}}</p>
+    <p class="text-[11px] text-gray-400 mt-1">수주 전 단계 금액 합</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500">가중 금액</p>
+    <p class="text-2xl font-bold text-orange-800">{{.Pipe.WeightedLabel}}</p>
+    <p class="text-[11px] text-gray-400 mt-1">예상 금액 × 확도</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <p class="text-xs text-gray-500">수주 확정 금액</p>
+    <p class="text-2xl font-bold text-gray-800">{{.Pipe.WonAmountLabel}}</p>
+    <p class="text-[11px] text-gray-400 mt-1">stage = 수주</p>
+  </div>
+</div>
+{{end}}
+
+{{define "sales_stage_reason"}}
+  <div x-show="typeof reasonOpen !== 'undefined' && reasonOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4">
+    <form class="bg-white rounded-xl p-4 w-full max-w-sm space-y-3" @submit.prevent="submitReason()">
+      <p class="font-semibold text-gray-800">단계 변경 사유</p>
+      <p class="text-xs text-gray-500">뒤로 가거나 실주로 옮길 때 필요합니다. 실주는 실패 사유 없이 옮길 수 없습니다.</p>
+      <textarea x-model="reason" class="w-full border rounded-lg px-3 py-2 text-sm" rows="3" required></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-1.5 border rounded-lg text-sm" @click="reasonOpen=false">취소</button>
+        <button type="submit" class="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-sm">저장</button>
+      </div>
+    </form>
+  </div>
+{{end}}
+
