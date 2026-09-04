@@ -1,0 +1,49 @@
+{{define "title"}}영업 파이프라인 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-4" x-data="salesDnd({kind:'project'})">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">영업 파이프라인</h2>
+      <p class="text-sm text-gray-500">단계 칸반과 같은 보드입니다. 헤더 3지표와 열 금액 합만 더 있습니다.</p>
+      {{template "sales_deal_tabs" .}}
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/sales?display=kanban{{if .FilterQ}}&{{.FilterQ}}{{end}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">단계 칸반</a>
+      <a href="/sales{{if .FilterQ}}?{{.FilterQ}}{{end}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">사업 목록</a>
+    </div>
+  </div>
+
+  {{if eq .FlashOK "stage"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">단계를 변경했습니다.</div>
+  {{end}}
+  {{if .FormError}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  {{end}}
+
+  {{template "sales_pipeline_metrics" .}}
+  {{template "sales_list_filters" .}}
+  {{template "kanban_board" .}}
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+      <h3 class="font-semibold text-gray-800">수주율</h3>
+      <p class="text-3xl font-bold text-gray-800">{{.Pipe.WinRateLabel}}</p>
+      <p class="text-xs text-gray-500">{{.Pipe.WinSampleLabel}} · won / (won + lost). 분모 0이면 —.</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+      <h3 class="font-semibold text-gray-800">담당자별 활동 건수</h3>
+      <ul class="text-sm divide-y divide-gray-100">
+        {{range .Pipe.People}}
+        <li class="flex justify-between py-1.5"><span>{{.Name}}</span><span class="font-medium">{{.Count}}</span></li>
+        {{else}}
+        <li class="text-gray-400">활동이 없습니다.</li>
+        {{end}}
+      </ul>
+    </div>
+  </div>
+
+  {{template "sales_stage_reason" .}}
+</div>
+{{template "sales_dnd" .}}
+{{end}}

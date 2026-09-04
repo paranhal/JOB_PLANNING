@@ -51,14 +51,14 @@ func (h *SalesHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	stages, _ := h.repo.Stages()
+	stages, _ := h.repo.StagesFor(f.DealType)
 	rows := make([]map[string]interface{}, 0, len(items))
 	for i := range items {
 		def := model.FindSalesStage(stages, items[i].Stage)
 		rows = append(rows, h.viewProject(&items[i], def))
 	}
 	fromTask := strings.TrimSpace(c.QueryParam("from_task"))
-	filterQ := salesFilterEncode(f, "")
+	dealType, buildHref, supplyHref, newHref, resetHref, filterQ := salesDealBoardLinks("/sales", view, f, fromTask)
 	lastAct, _ := h.repo.LatestActivityDateBySales()
 	kanbanCols := salesProjectKanban(items, stages, fromTask, lastAct, false)
 	kanbanTotal := 0
@@ -78,6 +78,9 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"View":          view,
 		"FilterQ":       filterQ,
 		"Filter":        f,
+		"DealType":      dealType,
+		"DealBuildHref": buildHref, "DealSupplyHref": supplyHref,
+		"NewHref":       newHref, "FilterReset": resetHref,
 		"Search":        f.Search, "Status": f.Status, "Stage": f.Stage,
 		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
 		"PeriodOptions": salesPeriodOptions(time.Now()),
@@ -97,9 +100,10 @@ func (h *SalesHandler) New(c echo.Context) error {
 	}
 	p := &model.SalesProject{
 		IsTentativeName: true,
-		Stage:           model.DefaultSalesStageCode(),
+		DealType:        model.NormalizeSalesDealType(c.QueryParam("deal")),
 		Status:          model.SalesStatusActive,
 	}
+	p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
 	return h.renderForm(c, p, false, "")
 }
 
@@ -129,7 +133,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		}
 		return err
 	}
-	stages, _ := h.repo.Stages()
+	stages, _ := h.repo.StagesFor(p.DealType)
 	def := model.FindSalesStage(stages, p.Stage)
 	hist, _ := h.repo.ListHistory(p.SalesID)
 	acts, _ := h.repo.ListActivities(p.SalesID)
@@ -205,6 +209,12 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"FormError": querySalesErr(c.QueryParam("err")),
 		"FromTask":  fromTask,
+		"ListBack": func() string {
+			if p.IsSupply() {
+				return "/sales?deal=supply"
+			}
+			return "/sales"
+		}(),
 	})
 }
 
@@ -444,14 +454,14 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	stages, _ := h.repo.Stages()
+	stages, _ := h.repo.StagesFor(f.DealType)
 	lastAct, _ := h.repo.LatestActivityDateBySales()
 	kanbanCols := salesProjectKanban(items, stages, "", lastAct, true)
 	kanbanTotal := 0
 	for _, col := range kanbanCols {
 		kanbanTotal += col.Count
 	}
-	filterQ := salesFilterEncode(f, "")
+	dealType, buildHref, supplyHref, _, resetHref, filterQ := salesDealBoardLinks("/sales/pipeline", "", f, "")
 	return c.Render(http.StatusOK, "sales/pipeline.html", map[string]interface{}{
 		"Title": "영업 파이프라인", "Active": NavSalesPipeline,
 		"Pipe": pipe, "CanWrite": canWriteSales(c),
@@ -463,6 +473,9 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 		"KanbanHint":    "열 = 단계. 실주 열은 기본으로 접혀 있습니다.",
 		"FilterQ":       filterQ,
 		"Filter":        f,
+		"DealType":      dealType,
+		"DealBuildHref": buildHref, "DealSupplyHref": supplyHref,
+		"FilterReset":         resetHref,
 		"Search":        f.Search, "Status": f.Status, "Stage": f.Stage,
 		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
 		"PeriodOptions":       salesPeriodOptions(time.Now()),
@@ -476,7 +489,7 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 }
 
 func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit bool, formErr string) error {
-	stages, _ := h.repo.Stages()
+	stages, _ := h.repo.StagesFor(p.DealType)
 	customers, _ := h.customerRepo.ListAll()
 	users, _ := h.userRepo.ListAssignable()
 	sources, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupLeadSource)
@@ -485,12 +498,16 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		title = "영업 사업 수정"
 	}
 	def := model.FindSalesStage(stages, p.Stage)
-	if def != nil && !p.HasOverride {
+	if def != nil && !p.HasOverride && !p.IsSupply() {
 		p.Probability = def.Probability
 	}
 	fromTask := strings.TrimSpace(c.QueryParam("from_task"))
 	if fromTask == "" {
 		fromTask = strings.TrimSpace(c.FormValue("from_task"))
+	}
+	listBack := "/sales"
+	if p.IsSupply() {
+		listBack = "/sales?deal=supply"
 	}
 	return c.Render(http.StatusOK, "sales/form.html", map[string]interface{}{
 		"Title": title, "Active": NavSales,
@@ -498,6 +515,7 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		"Stages": stages, "Customers": customers, "Users": users, "LeadSources": sources,
 		"DisplayStage": p.DisplayStage(def),
 		"FromTask":     fromTask,
+		"ListBack":     listBack,
 	})
 }
 
@@ -505,6 +523,7 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 	p := &model.SalesProject{
 		Name:                    strings.TrimSpace(c.FormValue("name")),
 		IsTentativeName:         c.FormValue("is_tentative_name") == "1",
+		DealType:                model.NormalizeSalesDealType(c.FormValue("deal_type")),
 		Stage:                   strings.TrimSpace(c.FormValue("stage")),
 		CustomerID:              strings.TrimSpace(c.FormValue("customer_id")),
 		ProspectName:            strings.TrimSpace(c.FormValue("prospect_name")),
@@ -522,6 +541,8 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		LostReason:              strings.TrimSpace(c.FormValue("lost_reason")),
 		Notes:                   strings.TrimSpace(c.FormValue("notes")),
 		ContractedAt:            strings.TrimSpace(c.FormValue("contracted_at")),
+		PONo:                    strings.TrimSpace(c.FormValue("po_no")),
+		DeliveredAt:             strings.TrimSpace(c.FormValue("delivered_at")),
 		Status:                  model.SalesStatusActive,
 	}
 	if p.SalesOwnerID != "" && p.SalesOwner == "" && h.userRepo != nil {
@@ -529,14 +550,20 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 			p.SalesOwner = u.FullName
 		}
 	}
-	stages, _ := h.repo.Stages()
+	stages, _ := h.repo.StagesFor(p.DealType)
 	if p.Stage == "" {
-		p.Stage = model.DefaultSalesStageCode()
+		p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
 	}
 	def := model.FindSalesStage(stages, p.Stage)
 	stageProb := 0
 	if def != nil {
 		stageProb = def.Probability
+	}
+	if p.IsSupply() {
+		p.Probability = 0
+		p.HasOverride = false
+		p.OverrideValue = 0
+		return p
 	}
 	rawProb := strings.TrimSpace(c.FormValue("probability"))
 	if rawProb != "" {
@@ -561,6 +588,8 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"Name":                    p.Name,
 		"IsTentativeName":         p.IsTentativeName,
 		"NameConfirmed":           p.NameConfirmed(),
+		"DealType":                model.NormalizeSalesDealType(p.DealType),
+		"IsSupply":                p.IsSupply(),
 		"Stage":                   p.Stage,
 		"StageLabel":              stageLabel(def, p.Stage),
 		"DisplayStage":            p.DisplayStage(def),
@@ -578,6 +607,8 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"Notes":                   p.Notes,
 		"WonAt":                   p.WonAt,
 		"ContractedAt":            p.ContractedAt,
+		"PONo":                    p.PONo,
+		"DeliveredAt":             p.DeliveredAt,
 		"Competitor":              p.Competitor,
 		"LeadSource":              p.LeadSource,
 		"ExpectedYM":              p.ExpectedYM,

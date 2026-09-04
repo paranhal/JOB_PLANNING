@@ -1,57 +1,89 @@
 {{define "title"}}영업 사업 · 고객지원시스템{{end}}
 
 {{define "content"}}
-<div class="space-y-4">
+<div class="space-y-4" x-data="salesDnd({kind:'project'})">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-gray-800">영업 사업</h2>
       <p class="text-sm text-gray-500">수주 전 영업 건. 사업명만 있으면 등록됩니다.</p>
+      {{template "sales_deal_tabs" .}}
     </div>
-    {{if .CanWrite}}
-    <a href="/sales/new"
-       class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-      영업 사업 등록
-    </a>
-    {{end}}
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/sales?display=list{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "list"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
+      <a href="/sales?display=kanban{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">단계 칸반</a>
+      <a href="/sales?display=timeline{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "timeline"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">예정월 타임라인</a>
+      <a href="/sales/pipeline{{if .FilterQ}}?{{.FilterQ}}{{end}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">파이프라인</a>
+      {{if .CanWrite}}
+      <a href="{{.NewHref}}"
+         class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        영업 사업 등록
+      </a>
+      {{end}}
+    </div>
   </div>
 
   {{if eq .FlashOK "deleted"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">삭제했습니다.</div>
+  {{else if eq .FlashOK "stage"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">단계를 변경했습니다.</div>
+  {{end}}
+  {{if .FromTask}}
+  <div class="rounded-lg bg-orange-50 text-orange-900 text-sm px-4 py-2 border border-orange-200">
+    일일 업무를 영업 활동으로 만들 사업을 고르세요. 고른 사업의 활동 등록에서 이 업무가 연결됩니다.
+  </div>
+  {{end}}
+  {{if .FormError}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
   {{if eq .FlashErr "notfound"}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">영업 사업을 찾을 수 없습니다.</div>
   {{end}}
 
-  <form method="get" action="/sales" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
-    <div class="flex-1 min-w-[12rem]">
-      <label class="block text-xs text-gray-500 mb-1">검색</label>
-      <input type="text" name="search" value="{{.Search}}" placeholder="사업명, 고객"
-             class="w-full border rounded-lg px-3 py-2 text-sm">
-    </div>
-    <div>
-      <label class="block text-xs text-gray-500 mb-1">단계</label>
-      <select name="stage" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[9rem]">
-        <option value="">전체</option>
-        {{range .Stages}}
-        <option value="{{.Code}}" {{if eq $.Stage .Code}}selected{{end}}>{{.Label}}</option>
-        {{end}}
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-gray-500 mb-1">상태</label>
-      <select name="status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
-        <option value="" {{if eq .Status ""}}selected{{end}}>전체</option>
-        <option value="active" {{if eq .Status "active"}}selected{{end}}>진행</option>
-        <option value="lost" {{if eq .Status "lost"}}selected{{end}}>수주실패</option>
-        <option value="promoted" {{if eq .Status "promoted"}}selected{{end}}>승격완료</option>
-      </select>
-    </div>
-    <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-    {{if or .Search .Stage .Status}}
-    <a href="/sales" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
-    {{end}}
-  </form>
+  {{template "sales_list_filters" .}}
 
+  {{if eq .View "kanban"}}
+  {{template "kanban_board" .}}
+  {{else if eq .View "timeline"}}
+  <p class="text-xs text-gray-500">가로축 = 월, 세로 = 사업. 시기가 비어 있으면 미정 열에 둡니다.</p>
+  <div class="bg-white rounded-xl border border-gray-200 overflow-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 z-10">사업</th>
+          <th class="px-3 py-2 text-left font-medium">미정</th>
+          {{range .Timeline.Months}}
+          <th class="px-3 py-2 text-center font-medium whitespace-nowrap">{{.}}</th>
+          {{end}}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Timeline.Rows}}
+        <tr>
+          <td class="px-3 py-2 sticky left-0 bg-white z-10">
+            <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.Name}}</a>
+            <p class="text-[11px] text-gray-400">{{.StageLabel}}</p>
+          </td>
+          <td class="px-3 py-2 text-center">
+            {{if .Unscheduled}}<span class="inline-block px-2 py-1 rounded bg-gray-100 text-xs text-gray-600">미정</span>{{end}}
+          </td>
+          {{$ym := .YM}}{{$period := .Period}}
+          {{range $.Timeline.Months}}
+          <td class="px-1 py-2 text-center">
+            {{if eq $ym .}}<span class="inline-block min-w-[4rem] px-2 py-1 rounded bg-orange-50 border border-orange-200 text-xs text-orange-800">{{if $period}}{{$period}}{{else}}{{.}}{{end}}</span>{{end}}
+          </td>
+          {{end}}
+        </tr>
+        {{else}}
+        <tr><td colspan="20" class="px-4 py-8 text-center text-gray-500">등록된 영업 사업이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">
@@ -68,7 +100,7 @@
         {{range .Projects}}
         <tr class="hover:bg-gray-50">
           <td class="px-4 py-3">
-            <a href="/sales/{{.SalesID}}" class="font-medium text-blue-700 hover:underline">{{.Name}}</a>
+            <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.Name}}</a>
             {{if .IsTentativeName}}<span class="ml-1 text-xs text-gray-400">미확정</span>{{end}}
           </td>
           <td class="px-4 py-3">
@@ -95,5 +127,9 @@
       </tbody>
     </table>
   </div>
+  {{end}}
+
+  {{template "sales_stage_reason" .}}
 </div>
+{{template "sales_dnd" .}}
 {{end}}

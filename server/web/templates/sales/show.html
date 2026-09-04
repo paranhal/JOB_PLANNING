@@ -4,11 +4,11 @@
 <div class="space-y-4" x-data="Object.assign(salesDnd({kind:'project'}), salesActPanel({{if .FromTask}}true{{else}}false{{end}}, '{{.Tab}}'))">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
-      <a href="/sales" class="text-sm text-gray-500 hover:underline">← 목록</a>
+      <a href="{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}" class="text-sm text-gray-500 hover:underline">← 목록</a>
       <h2 class="text-xl font-bold text-gray-800 mt-1 {{if not .Project.NameConfirmed}}text-gray-400{{end}}">{{.Project.Name}}</h2>
       <p class="text-sm text-gray-500 mt-1 flex flex-wrap gap-2 items-center">
         <span class="font-medium text-gray-800">{{.Project.DisplayStage}}</span>
-        {{if .Project.HasOverride}}<span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">수동 조정</span>{{end}}
+        {{if and .Project.HasOverride (not .Project.IsSupply)}}<span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">수동 조정</span>{{end}}
         {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">미확정</span>{{end}}
         <span>{{.Project.ConfirmationLabel}}</span>
       </p>
@@ -93,7 +93,7 @@
           </dd>
         </div>
         <div>
-          <dt class="text-gray-500">예상 금액</dt>
+          <dt class="text-gray-500">{{if .Project.IsSupply}}견적 금액{{else}}예상 금액{{end}}</dt>
           <dd class="{{if not .Project.ExpectedAmountConfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
             {{if .Project.Amount}}{{.Project.Amount}}{{else}}—{{end}}
             {{if not .Project.ExpectedAmountConfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
@@ -107,10 +107,22 @@
           <dt class="text-gray-500">경쟁사</dt>
           <dd class="text-gray-800">{{if .Project.Competitor}}{{.Project.Competitor}}{{else}}—{{end}}</dd>
         </div>
+        {{if not .Project.IsSupply}}
         <div>
           <dt class="text-gray-500">확률</dt>
           <dd class="text-gray-800">{{.Project.EffectiveProb}}%</dd>
         </div>
+        {{end}}
+        {{if .Project.IsSupply}}
+        <div>
+          <dt class="text-gray-500">발주번호</dt>
+          <dd class="text-gray-800">{{if .Project.PONo}}{{.Project.PONo}}{{else}}—{{end}}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">납품일</dt>
+          <dd class="text-gray-800">{{if .Project.DeliveredAt}}{{.Project.DeliveredAt}}{{else}}—{{end}}</dd>
+        </div>
+        {{end}}
         {{if or .Project.WonAt .Project.ContractedAt}}
         <div>
           <dt class="text-gray-500">수주일</dt>
