@@ -1061,6 +1061,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWorkTaskMembers(db)
 	applyV214ProjectKindRollback(db)
 	applySalesProjects(db)
+	applySalesDealTypeV228(db)
 	applyWorkRecurrence(db)
 	applyInboxToWaiting(db)
 
