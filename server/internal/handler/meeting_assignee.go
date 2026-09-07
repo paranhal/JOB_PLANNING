@@ -113,18 +113,18 @@ func meetingFilterQuery(date, selected, display string) string {
 	return v.Encode()
 }
 
-func filterWorkItemsByAssignee(items []model.WorkListItem, name string) []model.WorkListItem {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return items
+func meetingAssigneeKeys(selected string, users []model.User) (userID string, keys []string) {
+	selected = strings.TrimSpace(selected)
+	if selected == "" {
+		return "", nil
 	}
-	var out []model.WorkListItem
-	for _, it := range items {
-		if strings.TrimSpace(it.Assignee) == name {
-			out = append(out, it)
+	keys = []string{selected}
+	for _, u := range users {
+		if strings.TrimSpace(u.FullName) == selected {
+			return strings.TrimSpace(u.UserID), keys
 		}
 	}
-	return out
+	return "", keys
 }
 
 func groupWorkItemsByAssignee(items []model.WorkListItem, order []string) []meetingAssigneeGroup {

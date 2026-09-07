@@ -35,23 +35,18 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 	selected := resolveMeetingAssignee(c, users)
 	order := assignableNameOrder(users)
 	assigneeQ := meetingAssigneeQuery(selected)
+	mineUID, mineKeys := meetingAssigneeKeys(selected, users)
 
-	yesterday, err := h.work.ListCompletedOn(prevStr, "", nil, 300)
+	yesterday, err := h.work.ListCompletedOn(prevStr, mineUID, mineKeys, 300)
 	if err != nil {
 		return err
 	}
-	todayItems, err := h.work.ListScheduledOn(dateStr, "", nil, 300)
+	todayItems, err := h.work.ListScheduledOn(dateStr, mineUID, mineKeys, 300)
 	if err != nil {
 		return err
 	}
-	yesterday = filterWorkItemsByAssignee(yesterday, selected)
-	todayItems = filterWorkItemsByAssignee(todayItems, selected)
 
-	mineKeys := []string(nil)
-	if selected != "" {
-		mineKeys = []string{selected}
-	}
-	unplannedRaw, _, err := h.work.ListUnplanned("", mineKeys, "")
+	unplannedRaw, _, err := h.work.ListUnplanned(mineUID, mineKeys, "")
 	if err != nil {
 		return err
 	}
@@ -67,7 +62,7 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		}
 		unplannedNeed = append(unplannedNeed, it)
 	}
-	progress, err := h.work.ListBucketOn(model.WorkBucketInProgress, dateStr, "", mineKeys, 300)
+	progress, err := h.work.ListBucketOn(model.WorkBucketInProgress, dateStr, mineUID, mineKeys, 300)
 	if err != nil {
 		return err
 	}

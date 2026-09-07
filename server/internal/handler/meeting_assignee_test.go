@@ -52,25 +52,22 @@ func TestMeetingFilterQueryKeepsDateAssigneeDisplay(t *testing.T) {
 	}
 }
 
-func TestFilterWorkItemsByAssignee(t *testing.T) {
-	items := []model.WorkListItem{
-		{Assignee: "양기헌", RefNumber: "A"},
-		{Assignee: "최혜영", RefNumber: "C"},
-	}
-	got := filterWorkItemsByAssignee(items, "양기헌")
-	if len(got) != 1 || got[0].RefNumber != "A" {
-		t.Fatalf("%+v", got)
-	}
-	if n := len(filterWorkItemsByAssignee(items, "")); n != 2 {
-		t.Fatalf("팀전체=%d", n)
-	}
-}
-
 func TestAssignableNameOrderHangul(t *testing.T) {
 	users := []model.User{{FullName: "최혜영"}, {FullName: "양기헌"}, {FullName: "태자운"}}
 	got := assignableNameOrder(users)
 	want := []string{"양기헌", "최혜영", "태자운"}
 	if len(got) != 3 || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Fatalf("%v want %v", got, want)
+	}
+}
+
+func TestMeetingAssigneeKeysNameAndUserID(t *testing.T) {
+	users := []model.User{{FullName: "양기헌", UserID: "USR-YANG"}}
+	uid, keys := meetingAssigneeKeys("양기헌", users)
+	if uid != "USR-YANG" || len(keys) != 1 || keys[0] != "양기헌" {
+		t.Fatalf("uid=%q keys=%v", uid, keys)
+	}
+	if id, k := meetingAssigneeKeys("", users); id != "" || k != nil {
+		t.Fatalf("팀전체 uid=%q keys=%v", id, k)
 	}
 }
