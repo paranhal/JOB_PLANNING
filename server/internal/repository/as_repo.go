@@ -280,28 +280,9 @@ func cleanAssignees(assignees []string) []string {
 	return out
 }
 
-// mineAssigneeCond 본인 배정: assigned_user_id 또는 표시명/아이디 매칭
+// mineAssigneeCond 본인 배정. §38.4 assigneeMatchSQL.
 func mineAssigneeCond(alias, userID string, keys []string) (string, []interface{}) {
-	names := cleanAssignees(keys)
-	userID = strings.TrimSpace(userID)
-	if userID == "" && len(names) == 0 {
-		return "", nil
-	}
-	parts := []string{}
-	args := []interface{}{}
-	if userID != "" {
-		parts = append(parts, fmt.Sprintf("(%sassigned_user_id!='' AND %sassigned_user_id=?)", alias, alias))
-		args = append(args, userID)
-	}
-	if len(names) > 0 {
-		ph := make([]string, len(names))
-		for i, n := range names {
-			ph[i] = "?"
-			args = append(args, n)
-		}
-		parts = append(parts, fmt.Sprintf("TRIM(%sassigned_to) IN (%s)", alias, strings.Join(ph, ",")))
-	}
-	return ` AND (` + strings.Join(parts, " OR ") + `)`, args
+	return assigneeMatchKeys(AssigneeKindAS, alias, mergeAssigneeKeys(userID, "", keys...))
 }
 
 // Stats AS 현황 통계 (완료=전체 완료+종료) — 목록/현황 화면용

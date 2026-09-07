@@ -136,8 +136,9 @@ func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFil
 		args = append(args, s)
 	}
 	if s := strings.TrimSpace(f.Assigned); s != "" {
-		where += ` AND (ar.assigned_user_id = ? OR ar.assigned_to = ?)`
-		args = append(args, s, s)
+		frag, a := assigneeMatchSQL(AssigneeKindAS, "ar", s)
+		where += frag
+		args = append(args, a...)
 	}
 	if s := strings.TrimSpace(f.KeywordID); s != "" {
 		where += ` AND EXISTS (SELECT 1 FROM as_keyword_links l WHERE l.as_id=ar.as_id AND l.keyword_id=?)`
@@ -190,6 +191,46 @@ func (r *ASRepo) SearchAS(f model.ASSearchFilter) ([]model.ASSearchHit, int, err
 		decorateSearchHit(&items[i], q)
 	}
 	return items, total, nil
+}
+
+// MatchIDs 제목·기관·본문 검색에 쓰는 접수 ID. §12.11 FTS5+trigram, 없으면 LIKE.
+func (r *ASRepo) MatchIDs(q string) map[string]bool {
+	out := map[string]bool{}
+	q = strings.TrimSpace(q)
+	if q == "" || r == nil || r.db == nil {
+		return out
+	}
+	var rows *sql.Rows
+	var err error
+	if asSearchHasFTS(r.db) && utf8.RuneCountInString(q) >= 3 {
+		rows, err = r.db.Query(`SELECT as_id FROM as_search WHERE as_search MATCH ?`, fts5Query(q))
+		if err != nil {
+			log.Printf("as_search MatchIDs FTS: %v — LIKE", err)
+			rows = nil
+		}
+	}
+	if rows == nil {
+		like := "%" + q + "%"
+		rows, err = r.db.Query(`
+			SELECT ar.as_id FROM as_receipts ar
+			JOIN customers c ON c.customer_id = ar.customer_id
+			WHERE ar.as_number LIKE ? OR c.org_name LIKE ? OR ar.symptom LIKE ? OR ar.action_taken LIKE ?
+			   OR ar.cause_detail LIKE ? OR ar.conclusion LIKE ?
+			   OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id = ar.as_id
+			              AND (p.work_content LIKE ? OR p.notes LIKE ?))`,
+			like, like, like, like, like, like, like, like)
+		if err != nil {
+			return out
+		}
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && id != "" {
+			out[id] = true
+		}
+	}
+	return out
 }
 
 func decorateSearchHit(h *model.ASSearchHit, q string) {

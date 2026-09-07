@@ -815,8 +815,9 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		if f.Key == model.StatsUnassignedLabel {
 			b.WriteString(` AND TRIM(COALESCE(ar.assigned_to,'')) = '' AND TRIM(COALESCE(ar.assigned_user_id,'')) = ''`)
 		} else {
-			b.WriteString(` AND (TRIM(COALESCE(ar.assigned_to,'')) = ? OR TRIM(COALESCE(ar.assigned_user_id,'')) = ?)`)
-			args = append(args, f.Key, f.Key)
+			frag, a := assigneeMatchSQL(AssigneeKindAS, "ar", f.Key)
+			b.WriteString(frag)
+			args = append(args, a...)
 		}
 	}
 	if f.Scope == model.StatsScopeProduct && f.Key != "" {
@@ -852,8 +853,9 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		if f.Key == model.StatsUnassignedLabel {
 			b.WriteString(` AND TRIM(COALESCE(v.assignee,'')) = ''`)
 		} else {
-			b.WriteString(` AND TRIM(COALESCE(v.assignee,'')) = ?`)
-			args = append(args, f.Key)
+			frag, a := assigneeMatchSQL(AssigneeKindMaintenance, "v", f.Key)
+			b.WriteString(frag)
+			args = append(args, a...)
 		}
 	}
 	if f.Scope == model.StatsScopeProduct && f.Key != "" {
@@ -891,8 +893,9 @@ func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		if f.Key == model.StatsUnassignedLabel {
 			b.WriteString(` AND TRIM(COALESCE(t.assignee,'')) = ''`)
 		} else {
-			b.WriteString(` AND TRIM(COALESCE(t.assignee,'')) = ?`)
-			args = append(args, f.Key)
+			frag, a := assigneeMatchSQL(AssigneeKindTask, "t", f.Key)
+			b.WriteString(frag)
+			args = append(args, a...)
 		}
 	}
 	if f.Scope == model.StatsScopeProduct {
