@@ -1,0 +1,20 @@
+{{define "as_keyword_checks"}}
+{{$field := .KeywordField}}
+<div id="as-kw-box" class="sm:col-span-2" data-field="{{$field}}" data-extra="{{if .AS}}{{.AS.Symptom}}{{end}}">
+  <p class="text-xs font-medium text-slate-600 mb-1">키워드 후보
+    <span class="font-normal text-slate-400">· 해당하면 체크하세요. 자동으로 붙이지 않습니다</span>
+    <a href="/as/keywords" class="ml-1 text-blue-600 hover:underline">사전</a>
+  </p>
+  <input type="hidden" name="kw_suggested_{{$field}}" id="as-kw-suggested" value="{{range .KeywordChecks}}{{if .Suggested}}{{.KeywordID}},{{end}}{{end}}">
+  <div id="as-kw-list" class="flex flex-wrap gap-2">
+    {{range .KeywordChecks}}
+    <label data-label="{{.Keyword}}" data-group="{{.Group}}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs {{if .Linked}}border-blue-300 bg-blue-50{{else}}border-slate-200 bg-white{{end}}">
+      <input type="checkbox" name="kw_{{$field}}" value="{{.KeywordID}}" {{if .Linked}}checked{{end}} class="rounded border-slate-300 text-blue-600">
+      <span>{{.Keyword}}</span>
+      <span class="text-slate-400">{{.Group}}</span>
+    </label>
+    {{end}}
+  </div>
+  <p id="as-kw-empty" class="text-[11px] text-slate-400 {{if .KeywordChecks}}hidden{{end}}">본문에 맞는 사전 키워드가 있으면 여기 뜹니다.</p>
+</div>
+{{end}}

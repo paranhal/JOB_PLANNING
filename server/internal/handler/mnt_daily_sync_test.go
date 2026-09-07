@@ -290,7 +290,7 @@ func TestRegisterShowsAllKLASVisitsForDay(t *testing.T) {
 	}
 }
 
-// ×로 내린 점검 카드는 등록 화면을 다시 열어도 시간표에 자동으로 올라가지 않는다.
+// ×로 내린 점검 카드는 등록 화면을 다시 열어도 일정표에 자동으로 올라가지 않는다.
 func TestUnplaceMaintenanceStaysOffGrid(t *testing.T) {
 	e, db := newMntSyncServer(t, "mnt_unplace.db")
 	seedVisit(t, db, "mvs_u1", "2026-08-14", "최혜영", "KLAS", "해밀동도서관")

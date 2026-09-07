@@ -69,6 +69,7 @@ func applySalesItems(db *sql.DB) {
 	if err := SeedSalesItemsFromAssets(db); err != nil {
 		log.Printf("035 sales_items from assets: %v", err)
 	}
+	applySalesQuotes(db)
 }
 
 // SeedSalesItemsFromAssets assets 의 품명·모델·제조사를 distinct 로 모아 초안을 넣는다.

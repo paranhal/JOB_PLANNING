@@ -1,0 +1,167 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 목록</a>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{.Quote.DisplayNo}}</h2>
+      <p class="text-sm text-gray-500 mt-1">{{.Quote.QuoteDate}} · {{quoteStatusLabel .Quote.Status}} · {{vatModeLabel .Quote.VATMode}}</p>
+      <p class="mt-2 flex flex-wrap gap-1">
+        <span class="px-1.5 py-0.5 rounded text-[11px] font-semibold {{quotePurposeClass .Quote.Purpose}}">{{quotePurposeLabel .Quote.Purpose}}</span>
+        {{if .Quote.IsReverseCalc}}<span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800">역산</span>{{end}}
+        {{if .Quote.IsLegacy}}<span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">옛 번호</span>{{end}}
+        {{if not .IsLatest}}<span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-600">읽기 전용</span>{{end}}
+      </p>
+    </div>
+    {{if .CanWrite}}
+    <div class="flex flex-wrap gap-2">
+      <a href="/quotes/{{.Quote.QuoteID}}/xlsx" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">xlsx 내려받기</a>
+      {{if .IsLatest}}
+      <a href="/quotes/{{.Quote.QuoteID}}/edit" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">수정</a>
+      <form method="post" action="/quotes/{{.Quote.QuoteID}}/revise" class="flex items-center gap-2">
+        <input name="rev_reason" required placeholder="개정 사유" class="border rounded-lg px-3 py-2 text-sm w-40">
+        <button type="submit" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">개정</button>
+      </form>
+      {{end}}
+      <form method="post" action="/quotes/{{.Quote.QuoteID}}/copy">
+        <button type="submit" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">이 견적으로 새로 만들기</button>
+      </form>
+      {{if .IsLatest}}
+      <form method="post" action="/quotes/{{.Quote.QuoteID}}/order">
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">수주로 넘기기</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+
+  {{if eq .FlashOK "created"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">등록했습니다. 합계는 라인에서 계산한 값입니다.</div>
+  {{else if eq .FlashOK "updated"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.</div>
+  {{else if eq .FlashOK "revised"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">개정했습니다. 이전 회차는 읽기 전용으로 남아 있습니다.</div>
+  {{end}}
+  {{if .AskNames}}
+  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">
+    품목 마스터에 없는 이름입니다. 품목으로 등록할까요?
+    <ul class="mt-1 list-disc pl-5">
+      {{range .AskNames}}<li>{{.}}</li>{{end}}
+    </ul>
+    <a href="/items/new" class="text-blue-700 hover:underline">품목 등록</a>
+  </div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+    <div><dt class="text-gray-500">수신</dt><dd>{{if .Quote.RecipientName}}{{.Quote.RecipientName}}{{else}}—{{end}}</dd></div>
+    <div><dt class="text-gray-500">건명</dt><dd>{{if .Quote.Title}}{{.Quote.Title}}{{else}}—{{end}}</dd></div>
+    <div><dt class="text-gray-500">담당자</dt><dd>{{.Quote.OwnerName}} · {{.Quote.OwnerPhone}}</dd></div>
+    <div><dt class="text-gray-500">양식</dt><dd>{{quoteFormLabel .Quote.FormType}}</dd></div>
+    {{if .Quote.RevReason}}<div><dt class="text-gray-500">개정 사유</dt><dd>{{.Quote.RevReason}}</dd></div>{{end}}
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b"><tr>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">구분</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">내용</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">수량</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">단위</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">단가</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">금액</th>
+      </tr></thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Quote.Lines}}
+        <tr>
+          <td class="px-4 py-2 text-gray-600">{{if .GroupLabel}}{{.GroupLabel}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 whitespace-pre-wrap">{{.Name}}{{if .Spec}}<br><span class="text-xs text-gray-500">{{.Spec}}</span>{{end}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Qty}}</td>
+          <td class="px-4 py-2">{{.Unit}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .UnitPrice}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">
+            {{won .Amount}}
+            {{if .LaborYearBadge $.QuoteYear}}<div class="text-[10px] text-amber-700">{{.LaborYearBadge $.QuoteYear}}</div>{{end}}
+            {{if .PriceOverridden}}<div class="text-[10px] text-gray-500">단가 수정</div>{{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">라인이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if .Groups}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 text-sm">
+    <p class="text-xs text-gray-500 mb-2">그룹 소계</p>
+    {{range .Groups}}
+    <div class="flex justify-between py-1"><span>{{if .Label}}{{.Label}}{{else}}(구분 없음){{end}}</span><span class="tabular-nums">{{won .Sum}}원</span></div>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+    {{if .Totals.Direct}}
+    <div>
+      <p class="text-xs text-gray-500">직접인건비</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.Direct}}원</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">제경비 {{if .OverheadDiff}}<span class="text-amber-700">{{.OverheadDiff}}</span>{{end}}</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.Overhead}}원</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">기술료 {{if .TechDiff}}<span class="text-amber-700">{{.TechDiff}}</span>{{end}}</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.TechFee}}원</p>
+    </div>
+    {{end}}
+    <div>
+      <p class="text-xs text-gray-500">소계</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.LineSum}}원</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">공급가</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.Supply}}원</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">부가세</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.VAT}}원</p>
+    </div>
+    <div class="sm:col-span-3">
+      <p class="text-xs text-gray-500">합계 {{vatModeLabel .Quote.VATMode}}</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Totals.Total}}원</p>
+      {{if and (ne .Totals.RoundRule "none") (ne .Totals.Total .Totals.TotalBeforeRound)}}
+      <p class="text-xs text-gray-500 mt-1">{{roundRuleLabel .Quote.RoundRule}} (절사 전 {{won .Totals.TotalBeforeRound}})</p>
+      {{else}}
+      <p class="text-xs text-gray-500 mt-1">{{roundRuleLabel .Quote.RoundRule}}</p>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .Revs}}
+  {{if gt (len .Revs) 1}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 text-sm">
+    <p class="text-xs text-gray-500 mb-2">개정 이력</p>
+    <ul class="space-y-1">
+      {{range .Revs}}
+      <li><a href="/quotes/{{.QuoteID}}" class="text-blue-700 hover:underline font-mono">{{.DisplayNo}}</a>
+        {{if .RevReason}} · {{.RevReason}}{{end}}
+        · {{won .Total}}원</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{end}}
+
+  {{if .Orders}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 text-sm">
+    <p class="text-xs text-gray-500 mb-2">연결된 수주</p>
+    <ul class="space-y-1">
+      {{range .Orders}}
+      <li><a href="/orders/{{.OrderID}}" class="text-blue-700 hover:underline font-mono">{{.DisplayNo}}</a> · {{won .Total}}원</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+</div>
+{{end}}

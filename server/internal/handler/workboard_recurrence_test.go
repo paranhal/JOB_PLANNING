@@ -67,7 +67,7 @@ func TestRecurrencePreviewGenerateRegister(t *testing.T) {
 		t.Fatalf("register status=%d", reg.Code)
 	}
 	if !strings.Contains(reg.Body.String(), "3일마다 확인") {
-		t.Fatalf("시간표에 실행 작업이 없다: %s", clipHTML(reg.Body.String()))
+		t.Fatalf("일정표에 실행 작업이 없다: %s", clipHTML(reg.Body.String()))
 	}
 
 	year := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/recurrence/generate", url.Values{

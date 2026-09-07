@@ -60,11 +60,11 @@ func TestLoadStatsWorkAnalysisAndSpotlight(t *testing.T) {
 	if an.Completed != 1 { // a1
 		t.Fatalf("completed=%d want 1", an.Completed)
 	}
-	if an.CarryIn != 1 { // a2 received 7/30 still open
-		t.Fatalf("carryIn=%d want 1 %+v", an.CarryIn, an)
+	if an.CarryIn != 0 { // a2 접수는 기준일 이전
+		t.Fatalf("carryIn=%d want 0 %+v", an.CarryIn, an)
 	}
-	if an.CarryOut != 2 { // a2 + a3 still open at 8/10
-		t.Fatalf("carryOut=%d want 2 %+v", an.CarryOut, an)
+	if an.CarryOut != 1 { // a3 still open at 8/10 (a2 는 기준일 이전)
+		t.Fatalf("carryOut=%d want 1 %+v", an.CarryOut, an)
 	}
 
 	sp, err := repo.LoadStatsSpotlight(from, toEx, f, an.Receipt)

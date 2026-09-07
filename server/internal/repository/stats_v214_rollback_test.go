@@ -20,6 +20,7 @@ func TestV214RollbackStatsBaseline(t *testing.T) {
 		VALUES ('c1','도서관','도서관',1)`); err != nil {
 		t.Fatal(err)
 	}
+	setMetricsPolicy(t, db, "2026-08-01", "as,maintenance")
 	if _, err := db.Exec(`
 		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
 			start_datetime, status, assigned_to, complete_datetime, data_origin)

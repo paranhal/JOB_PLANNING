@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"html/template"
 	"net/http"
 	"strings"
 	"time"
@@ -50,10 +51,30 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 	if selected != "" {
 		mineKeys = []string{selected}
 	}
-	unplanned, _, err := h.work.ListUnplanned("", mineKeys, "")
+	unplannedRaw, _, err := h.work.ListUnplanned("", mineKeys, "")
 	if err != nil {
 		return err
 	}
+	var unplannedNeed []model.WorkListItem
+	for _, u := range unplannedRaw {
+		if !u.NeedPlanKind() {
+			continue
+		}
+		it := u.WorkListItem
+		it.NeedPlan = true
+		if it.ProductType == "" {
+			it.ProductType = u.ProductType
+		}
+		unplannedNeed = append(unplannedNeed, it)
+	}
+	progress, err := h.work.ListBucketOn(model.WorkBucketInProgress, dateStr, "", mineKeys, 300)
+	if err != nil {
+		return err
+	}
+
+	kanban := model.FillMeetingKanban(yesterday, progress, todayItems, unplannedNeed)
+	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
+	navQ := meetingNavQuery(selected, display)
 
 	cols := repository.BuildStatsPeriodColumns(model.StatsViewDay, today)
 	filter := repository.ParseMeetingFilter(model.StatsScopeTeam, "", "")
@@ -74,7 +95,7 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "meeting/show.html", map[string]interface{}{
 		"Title":           "일일 업무 회의",
-		"Active":          "meeting",
+		"Active":          NavMeeting,
 		"Date":            dateStr,
 		"PrevDate":        prevStr,
 		"NextDate":        today.AddDate(0, 0, 1).Format("2006-01-02"),
@@ -84,13 +105,23 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		"TodayGroups":     groupWorkItemsByAssignee(todayItems, order),
 		"YesterdayN":      len(yesterday),
 		"TodayN":          len(todayItems),
-		"UnplannedN":      len(unplanned),
+		"UnplannedN":      len(unplannedRaw),
 		"UnplannedHref":   planUnplannedURL(false, currentRole(c), ""),
 		"PrevCol":         prevCol,
 		"CurCol":          curCol,
 		"Users":           users,
 		"Assignee":        selected,
-		"AssigneeQ":       assigneeQ,
+		"AssigneeQ":       template.URL(assigneeQ),
+		"NavQ":            template.URL(navQ),
+		"Display":         display,
+		"KanbanHref":      "/meeting?" + meetingFilterQuery(dateStr, selected, "kanban"),
+		"ListHref":        "/meeting?" + meetingFilterQuery(dateStr, selected, "list"),
+		"KanbanColumns":   kanban.Columns,
+		"KanbanTotal":     kanban.Total,
+		"KanbanDrag":      false,
+		"KanbanDrop":      "",
+		"KanbanHint":      "전일 완료 → 진행중 → 오늘 예정 → 미계획 순으로 한 열에만 넣습니다. 카드를 누르면 원본으로 갑니다.",
+		"CanWrite":        false,
 		"Role":            currentRole(c),
 		"ScopeNote":       meetingScopeNote(selected),
 		"HolidayBanner":   meetingHolidayBanner(dateStr),

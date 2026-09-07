@@ -106,7 +106,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if showScopeToggle && !scopeAll {
 		visits = filterVisitsByAssignee(visits, assigneeKeys(c))
 	}
-	customers, _, err := h.customerRepo.List("", "", "", "", "", 1, 2000, false)
+	customers, _, err := h.customerRepo.List("", "", "", "", "", 1, 2000, false, model.PartyKindCustomer)
 	if err != nil {
 		return err
 	}
@@ -562,10 +562,12 @@ func (h *MaintenanceHandler) NewSiteConfigPage(c echo.Context) error {
 		return err
 	}
 	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
-		"Title":   "점검 사이트 등록",
-		"Active":  NavMaintenanceSites,
-		"Pending": pending,
-		"Config":  (*model.MaintenanceSiteConfig)(nil),
+		"Title":           "점검 사이트 등록",
+		"Active":          NavMaintenanceSites,
+		"Pending":         pending,
+		"Config":          (*model.MaintenanceSiteConfig)(nil),
+		"FixedDaySet":     map[int]bool{},
+		"FixedLastMonday": false,
 	})
 }
 
@@ -575,14 +577,34 @@ func (h *MaintenanceHandler) EditSiteConfigPage(c echo.Context) error {
 	if err != nil || cfg == nil {
 		return echo.NewHTTPError(http.StatusNotFound, "설정이 없습니다")
 	}
+	_, lastMon := model.ParseFixedRule(cfg.FixedRule)
 	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
-		"Title":  "점검 사이트 수정",
-		"Active": NavMaintenanceSites,
-		"Config": cfg,
+		"Title":           "점검 사이트 수정",
+		"Active":          NavMaintenanceSites,
+		"Config":          cfg,
+		"FixedDaySet":     model.FixedDaySet(cfg.FixedRule),
+		"FixedLastMonday": lastMon,
 	})
 }
 
+func parseFixedDayValues(vals []string) []int {
+	var days []int
+	seen := map[int]bool{}
+	for _, s := range vals {
+		n, err := strconv.Atoi(strings.TrimSpace(s))
+		if err != nil || n < 1 || n > 31 || seen[n] {
+			continue
+		}
+		seen[n] = true
+		days = append(days, n)
+	}
+	return days
+}
+
 func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
+	_ = c.Request().ParseForm()
+	days := parseFixedDayValues(c.Request().PostForm["fixed_day"])
+	lastMon := c.FormValue("fixed_last_monday") == "1" || c.FormValue("fixed_rule") == model.FixedRuleLastMonday
 	cfg := &model.MaintenanceSiteConfig{
 		CustomerID:      c.FormValue("customer_id"),
 		ShortName:       c.FormValue("short_name"),
@@ -591,7 +613,7 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 		HasRfid:         c.FormValue("has_rfid") == "1",
 		InspectionCycle: c.FormValue("inspection_cycle"),
 		EntryCategory:   c.FormValue("entry_category"),
-		FixedRule:       c.FormValue("fixed_rule"),
+		FixedRule:       model.FormatFixedRule(days, lastMon),
 	}
 	if cfg.CustomerID == "" || cfg.ShortName == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "고객과 표시명은 필수입니다")

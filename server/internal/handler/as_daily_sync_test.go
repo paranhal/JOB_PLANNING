@@ -65,7 +65,7 @@ func TestASVisitDateCreatesDailyTaskAndRegisterPalette(t *testing.T) {
 		t.Fatalf("업무명: %s", task.Title)
 	}
 
-	// 예정일 날짜의 등록 화면 → 자동 배치되어 시간표에 나타남
+	// 예정일 날짜의 등록 화면 → 자동 배치되어 일정표에 나타남
 	page := doGet(t, e, "/workboard/register?date=2026-08-14&view=day")
 	if page.Code != http.StatusOK {
 		t.Fatalf("register status=%d", page.Code)

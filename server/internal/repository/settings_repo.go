@@ -20,6 +20,13 @@ const SettingMaintenanceDeletePassword = "maintenance_delete_password_hash"
 // SettingMaintenanceAutoDailyLimit 자동 초안 하루 배치 상한 (§23.5). 기본 4건.
 const SettingMaintenanceAutoDailyLimit = "maintenance_auto_daily_limit"
 
+// SettingMetricsBaseDate 지표 집계 하한일 (§4.5). 값은 app_settings, 코드에 박지 않는다.
+const SettingMetricsBaseDate = "metrics_base_date"
+
+// SettingProgressScope 계획 대비 실행률 대상 업무 유형. 쉼표 구분. 예: as,maintenance
+// 행정·지원을 다시 넣으려면 예정일 입력률 4주 연속 90% 이상일 때 admin 을 추가한다 (§4.5.4).
+const SettingProgressScope = "progress_scope"
+
 // DefaultASCompletedEditPassword 완료·종료 AS 수정 잠금 해제 기본 비밀번호 (최초 시드).
 // 관리자는 /users 화면에서 변경할 수 있다.
 const DefaultASCompletedEditPassword = "as-edit"

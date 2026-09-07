@@ -64,7 +64,7 @@ func countTableLogs(t *testing.T, table, action string) int {
 	return n
 }
 
-// §25.2 이력 기록 대상: 접수·조치 등록은 ○, 접수 수정·조치 삭제·방문 완료는 ●, 시간표 배치는 ○.
+// §25.2 이력 기록 대상: 접수·조치 등록은 ○, 접수 수정·조치 삭제·방문 완료는 ●, 일정표 배치는 ○.
 func TestChangeLogScopePerSpec252(t *testing.T) {
 	db, err := InitDB(filepath.Join(t.TempDir(), "scope.db"))
 	if err != nil {
@@ -151,7 +151,7 @@ func TestChangeLogScopePerSpec252(t *testing.T) {
 		t.Fatal(err)
 	}
 	if n := countTableLogs(t, "work_tasks", ""); n != 0 {
-		t.Fatalf("시간표 배치는 미기록이어야 함: %d", n)
+		t.Fatalf("일정표 배치는 미기록이어야 함: %d", n)
 	}
 	if err := wb.PlaceTask(task.TaskID, "2026-08-15", "10:00", "11:00"); err != nil {
 		t.Fatal(err)

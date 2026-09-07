@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS customers (
     addr_dong          TEXT,
     is_active          INTEGER DEFAULT 1,
     notes              TEXT,
+    party_kind         TEXT DEFAULT 'customer',
     created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_customer_id) REFERENCES customers(customer_id)
@@ -303,10 +304,29 @@ CREATE TABLE IF NOT EXISTS as_receipts (
     followup_action     TEXT,
     replace_review      INTEGER DEFAULT 0,
     project_id          TEXT,
+    receipt_group_id    TEXT,
+    urgency_reason      TEXT,
+    urgency_reason_note TEXT,
+    cause_cat1          TEXT,
+    cause_cat2          TEXT,
+    cause_cat3          TEXT,
+    followup_note       TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
     FOREIGN KEY (asset_id) REFERENCES assets(asset_id)
+);
+
+-- 원인분류 계층. 지금은 1차만. 2·3차는 엑셀 수급 후. §34.3.3
+CREATE TABLE IF NOT EXISTS as_cause_categories (
+    code            TEXT PRIMARY KEY,
+    level           INTEGER NOT NULL,
+    parent_code     TEXT,
+    label           TEXT NOT NULL,
+    sort_order      INTEGER DEFAULT 0,
+    is_active       INTEGER DEFAULT 1,
+    cause_type_map  TEXT NOT NULL DEFAULT '',
+    is_fault        INTEGER NOT NULL DEFAULT 1
 );
 
 -- AS 처리 이력
@@ -446,6 +466,7 @@ CREATE TABLE IF NOT EXISTS work_projects (
     contact_id      TEXT,
     color           TEXT NOT NULL DEFAULT '#3B82F6',
     status          TEXT NOT NULL DEFAULT 'active',
+    sales_project_id TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -1061,9 +1082,24 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWorkTaskMembers(db)
 	applyV214ProjectKindRollback(db)
 	applySalesProjects(db)
-	applySalesDealTypeV228(db)
+	applySalesActivities(db)
+	applySalesParties(db)
+	applySalesPromote(db)
+	applySalesStagesV227(db)
+	applySalesActivityTypesV227(db)
+	applySalesPartyAutoV227(db)
 	applyWorkRecurrence(db)
 	applyInboxToWaiting(db)
+	applyMetricsSettings(db)
+	applyASSearch(db)
+	applyASKeywords(db)
+	applyASImport(db)
+	applyASReceiptGroup(db)
+	applyAS34ReceiptUX(db)
+	applyAS34ActionUX(db)
+	applyAS34TransferFollowup(db)
+	applyRegionDistanceOrder(db)
+	applyASCauseCategoriesV2(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
 	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&

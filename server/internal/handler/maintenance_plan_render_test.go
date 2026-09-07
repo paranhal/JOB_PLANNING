@@ -58,7 +58,10 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
 	}
-	visits := sampleVisits()
+	visits := append(sampleVisits(), model.MaintenanceVisit{
+		VisitID: "mvs_3", PlanID: "mpl_1", VisitDate: "2026-08-01",
+		ShortName: "지난도서관", ProductType: "KLAS", EntryCategory: "normal",
+	})
 
 	for _, view := range []string{mntViewCalendar, mntViewKanban, mntViewList} {
 		tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
@@ -70,7 +73,7 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 			t.Fatalf("%s 렌더링 실패: %v", view, err)
 		}
 		out := buf.String()
-		for _, want := range []string{"KLAS", "앤로보틱스", "새롬동도서관", "방문 추가", "지난 방문 일괄 완료", "방문 일정 수정",
+		for _, want := range []string{"KLAS", "앤로보틱스", "새롬동도서관", "방문 추가", "전월", "방문 일정 수정",
 			"관리", "bbf7d0", "bfdbfe", "세종 K-LAS", "mntProductStyle"} {
 			if want == "mntProductStyle" {
 				if !strings.Contains(out, "background-color:#bbf7d0") && !strings.Contains(out, "background-color:#bfdbfe") {
@@ -88,8 +91,23 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 		if !strings.Contains(out, "/maintenance/visits/mvs_2/delete") {
 			t.Errorf("%s 화면에 삭제 버튼이 없다", view)
 		}
+		if !strings.Contains(out, "방문완료") || !strings.Contains(out, "2026-08-03") {
+			t.Errorf("%s 화면에 방문완료 뱃지·완료일이 없다", view)
+		}
+		if strings.Contains(out, "/maintenance/visits/mvs_1/delete") {
+			t.Errorf("%s 화면에 완료 방문 삭제 버튼이 있다", view)
+		}
+		if !strings.Contains(out, "지난도서관") {
+			t.Errorf("%s 화면에 경과 방문이 없다", view)
+		}
+		if !strings.Contains(out, "D+4") && !strings.Contains(out, "D&#43;4") {
+			t.Errorf("%s 화면에 예정일 경과 D+n 뱃지가 없다", view)
+		}
 		if !strings.Contains(out, "openEdit") {
 			t.Errorf("%s 화면에 수정 버튼이 없다", view)
+		}
+		if strings.Contains(out, "지난 방문 일괄 완료") || strings.Contains(out, "계획 삭제") || strings.Contains(out, "엑셀 받기") {
+			t.Errorf("%s 화면에 정리된 버튼이 남아 있다", view)
 		}
 		if err := tmpl.ExecuteTemplate(&buf, "base.html", planViewData(view, 8, visits)); err != nil {
 			t.Fatalf("%s base 렌더링 실패: %v", view, err)
@@ -250,6 +268,47 @@ func TestMaintenanceDupBannerRender(t *testing.T) {
 	}
 	if !strings.Contains(out, "정리하기") {
 		t.Fatal("정리하기 링크 없음")
+	}
+}
+
+func TestGenerateConfirmMonthCopyRender(t *testing.T) {
+	root := findTemplateRoot(t)
+	files := []string{
+		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "maintenance", "plan_generate.html"),
+	}
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := map[string]interface{}{
+		"Title": "자동 배정 확인", "Active": NavMaintenance, "UserRole": "admin",
+		"Plan": &model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Title: "2026년"},
+		"Year": 2026, "Month": 9,
+		"DeleteCount": 12, "CompletedKeep": 8, "PastKeep": 3, "ManualKeep": 1,
+		"PastMonth": false, "Today": "2026-09-01", "TodayLabel": "9/1",
+		"Visits": []model.MaintenanceVisit{
+			{VisitID: "a", VisitDate: "2026-09-08", ShortName: "도서관", ProductType: "KLAS", Completed: true, CompletedDate: "2026-09-08"},
+			{VisitID: "b", VisitDate: "2026-09-10", ShortName: "시청", ProductType: "KLAS"},
+		},
+		"AssignOrder": "prev_month", "UnregisteredRegionCount": 0, "HolidayMissing": "",
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"2026년 9월 자동 배정",
+		"9월 자동 생성 방문", "12건",
+		"방문 완료 8건", "오늘(9/1) 이전 3건",
+		"수동 방문은 건드리지 않습니다",
+		"방문완료", "2026-09-08",
+		`name="month"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("확인 화면에 %q 가 없다", want)
+		}
 	}
 }
 

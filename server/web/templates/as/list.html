@@ -10,8 +10,10 @@
       {{.Total}}건
     </p>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/as/kanban{{if .Search}}?search={{urlquery .Search}}{{end}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">칸반</a>
-      <a href="/as" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">목록</a>
+      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">칸반</a>
+      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">리스트</a>
+      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
+      <a href="/as/keywords" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">키워드</a>
       {{if .CanReceive}}
       <a href="/as/new"
          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -24,7 +26,13 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 p-4">
+  <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <form method="GET" action="/as/search" class="flex flex-col sm:flex-row gap-3">
+      <input type="search" name="q"
+             placeholder="증상·조치·원인 본문 검색 (과거 사례 포함)"
+             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">본문 검색</button>
+    </form>
     <form method="GET" action="/as" class="flex flex-col sm:flex-row gap-3">
       {{if eq .Role "tech"}}
       <input type="hidden" name="mine" value="{{if .Mine}}1{{else}}0{{end}}">
@@ -55,7 +63,7 @@
         <option value="closed" {{if eq .Status "closed"}}selected{{end}}>종료만</option>
       </select>
       <input type="text" name="search" value="{{.Search}}"
-             placeholder="AS번호, 기관명, 증상 검색..."
+             placeholder="AS번호, 기관명 빠른 찾기"
              class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
       {{if or (ne .Sort "receipt") (ne .Dir "desc")}}
       <input type="hidden" name="sort" value="{{.Sort}}">

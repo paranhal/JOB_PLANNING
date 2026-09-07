@@ -1,70 +1,96 @@
-{{define "title"}}{{.BucketLabel}} · 업무 리스트{{end}}
+{{define "title"}}오늘 내 업무 · 고객지원시스템{{end}}
 {{define "content"}}
 <div class="space-y-4">
+  {{if .RoleUnresolved}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    권한 정보를 불러오지 못했습니다. 새로고침하거나 다시 로그인해 주세요.
+  </div>
+  {{end}}
+
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
-      <div class="flex items-center gap-2">
-        <a href="/" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
-        <h2 class="text-xl font-bold text-gray-800">{{.BucketLabel}}</h2>
-      </div>
-      <p class="text-sm text-gray-500 mt-1 ml-11">{{.ScopeNote}} · {{.Total}}건</p>
+      <h2 class="text-xl font-bold text-gray-800">오늘 내 업무</h2>
+      <p class="text-sm text-gray-500 mt-1">{{.ScopeNote}} · {{.Total}}건</p>
     </div>
-    <div class="flex flex-wrap gap-2 text-xs">
-      <a href="/work?bucket=open{{if .Mine}}&mine=1{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Bucket "open"}}border-blue-400 bg-blue-50 text-blue-800{{else}}border-gray-200 bg-white{{end}}">전체</a>
-      <a href="/work?bucket=today{{if .Mine}}&mine=1{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Bucket "today"}}border-sky-400 bg-sky-50 text-sky-800{{else}}border-gray-200 bg-white{{end}}">오늘 예정</a>
-      <a href="/work?bucket=delayed{{if .Mine}}&mine=1{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Bucket "delayed"}}border-red-400 bg-red-50 text-red-800{{else}}border-gray-200 bg-white{{end}}">지연</a>
-      <a href="/work?bucket=completed_today{{if .Mine}}&mine=1{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Bucket "completed_today"}}border-green-400 bg-green-50 text-green-800{{else}}border-gray-200 bg-white{{end}}">오늘 완료</a>
-      <a href="/work?bucket=schedule_pending{{if .Mine}}&mine=1{{end}}" class="px-3 py-1.5 rounded-lg border {{if eq .Bucket "schedule_pending"}}border-amber-400 bg-amber-50 text-amber-800{{else}}border-gray-200 bg-white{{end}}">방문 미확정</a>
-      <a href="/work?bucket=unassigned" class="px-3 py-1.5 rounded-lg border {{if eq .Bucket "unassigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">미배정</a>
+    <div class="flex flex-wrap items-center gap-2">
+      {{if or (eq .Role "tech") (eq .Role "sales")}}
+      {{if .ScopeAll}}
+      <a href="{{.MineHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">내 배정만</a>
+      {{else}}
+      <a href="{{.TeamHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100">팀 전체 보기</a>
+      {{end}}
+      {{end}}
+      {{if and .Assignees (or (eq .Role "admin") (eq .Role "office"))}}
+      <form method="GET" action="/work" class="inline-flex items-center">
+        <input type="hidden" name="display" value="{{.View}}">
+        <input type="hidden" name="view" value="{{.View}}">
+        {{if and .Sort (or (ne .Sort "due_date") (ne .Dir "asc"))}}
+        <input type="hidden" name="sort" value="{{.Sort}}">
+        <input type="hidden" name="dir" value="{{.Dir}}">
+        {{end}}
+        <label class="sr-only" for="work-assignee">담당자</label>
+        <select id="work-assignee" name="assignee" onchange="this.form.submit()"
+                class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 bg-white min-w-[7.5rem]">
+          <option value="" {{if eq .AssigneeFilter ""}}selected{{end}}>팀전체</option>
+          {{range .Assignees}}
+          <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
+          {{end}}
+        </select>
+      </form>
+      {{end}}
+      <a href="{{.KanbanHref}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
+      <a href="{{.ListHref}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "list"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
     </div>
   </div>
 
+  {{if eq .View "list"}}
+  {{$sort := .Sort}}{{$dir := .Dir}}{{$href := .SortHref}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b">
           <tr>
-            {{if .ShowAssignee}}<th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">담당자</th>{{end}}
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">구분</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">번호</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">기관 / 제목</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">예정일</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">상태</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "task_id"}}" class="hover:text-blue-700">번호{{if eq $sort "task_id"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">구분</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "title"}}" class="hover:text-blue-700">업무명{{if eq $sort "title"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "customer"}}" class="hover:text-blue-700">거래처{{if eq $sort "customer"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+            {{if .ShowAssignee}}<th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "assignee"}}" class="hover:text-blue-700">담당자{{if eq $sort "assignee"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>{{end}}
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "work_date"}}" class="hover:text-blue-700">시작일{{if eq $sort "work_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "due_date"}}" class="hover:text-blue-700">종료일{{if eq $sort "due_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "status"}}" class="hover:text-blue-700">상태{{if eq $sort "status"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           {{if .Items}}
           {{range .Items}}
-          <tr class="hover:bg-gray-50 {{if gt .DaysOverdue 0}}bg-red-50/30{{end}}">
-            {{if $.ShowAssignee}}
-            <td class="px-4 py-3 whitespace-nowrap text-gray-700 font-medium">{{if .Assignee}}{{.Assignee}}{{else}}<span class="text-gray-300">—</span>{{end}}</td>
-            {{end}}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 font-mono text-blue-600 whitespace-nowrap"><a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a></td>
             <td class="px-4 py-3 whitespace-nowrap">
               <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
               {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
             </td>
-            <td class="px-4 py-3 font-mono text-blue-600">
-              <a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a>
-            </td>
-            <td class="px-4 py-3">
-              <a href="{{.Href}}" class="block hover:underline">
-                <span class="font-medium text-gray-800">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</span>
-                <p class="text-xs text-gray-500 mt-0.5 truncate max-w-md">{{.Title}}</p>
-              </a>
-            </td>
+            <td class="px-4 py-3"><a href="{{.Href}}" class="font-medium text-gray-800 hover:underline">{{.Title}}</a></td>
+            <td class="px-4 py-3 text-gray-700">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</td>
+            {{if $.ShowAssignee}}<td class="px-4 py-3 whitespace-nowrap text-gray-700">{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>{{end}}
+            <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{if .WorkDate}}{{.WorkDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
             <td class="px-4 py-3 whitespace-nowrap">
-              {{if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}
-              {{if gt .DaysOverdue 0}}<span class="ml-1 text-[10px] font-semibold text-red-600">D+{{.DaysOverdue}}</span>{{end}}
+              <span class="text-xs text-gray-600">{{.StatusLabel}}</span>
+              {{if wbKanbanBadge .MappedStatus}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbKanbanBadgeClass .MappedStatus}}">{{wbKanbanBadge .MappedStatus}}</span>{{end}}
             </td>
-            <td class="px-4 py-3 text-xs text-gray-600">{{.StatusLabel}}</td>
           </tr>
           {{end}}
           {{else}}
-          <tr><td colspan="{{if .ShowAssignee}}6{{else}}5{{end}}" class="px-4 py-10 text-center text-gray-400">표시할 업무가 없습니다.</td></tr>
+          <tr><td colspan="{{if .ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-10 text-center text-gray-400">표시할 업무가 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>
     </div>
   </div>
+  {{else}}
+  {{template "kanban_board" .}}
+  {{end}}
 </div>
 {{end}}

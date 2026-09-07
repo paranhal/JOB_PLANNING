@@ -61,6 +61,9 @@ func TestAdminWorkMenuPagesRender(t *testing.T) {
 	if kanban.Code != http.StatusOK || !strings.Contains(kb, "할 일") || !strings.Contains(kb, "진행중") || !strings.Contains(kb, "완료") {
 		t.Fatal("칸반 3열이 렌더되지 않음")
 	}
+	if !strings.Contains(kb, "min-w-[260px]") || !strings.Contains(kb, "display=list") {
+		t.Fatal("공통 칸반·display 전환이 없다")
+	}
 
 	stats := doGet(t, e, "/admin-work/stats")
 	if stats.Code != http.StatusOK || !strings.Contains(stats.Body.String(), "행정관련업무현황") {

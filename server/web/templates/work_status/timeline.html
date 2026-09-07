@@ -1,12 +1,58 @@
 {{define "title"}}업무처리현황{{end}}
 {{define "content"}}
-<div class="-mx-1 sm:-mx-2 space-y-3"
-     x-data="{
-       openWork(el) {
-         const href = el.dataset.href;
-         if (href) window.location.href = href;
-       }
-     }">
+<div class="-mx-1 sm:-mx-2 space-y-3">
+
+  {{if .RoleUnresolved}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    권한 정보를 불러오지 못했습니다. 새로고침하거나 다시 로그인해 주세요.
+  </div>
+  {{end}}
+
+  {{if .HolidayMissing}}
+  <div class="rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800">{{.HolidayMissing}}</div>
+  {{end}}
+
+  {{if and .MissingComplete (gt .MissingComplete.Total 0)}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
+    <p>완료일 미기록 <strong>{{.MissingComplete.Total}}건</strong>
+      {{if .MissingComplete.AS}} · AS {{.MissingComplete.AS}}{{end}}
+      {{if .MissingComplete.Mnt}} · 점검 {{.MissingComplete.Mnt}}{{end}}
+      {{if .MissingComplete.Admin}} · 행정 {{.MissingComplete.Admin}}{{end}}
+      — 집계에 넣지 않았습니다.</p>
+    <a href="/work-status?view={{.View}}&date={{.Date}}{{.FilterQ}}&missing=complete"
+       class="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900">목록 보기</a>
+  </div>
+  {{end}}
+
+  {{if and .MissingAssignee (gt .MissingAssignee.Total 0)}}
+  <div class="rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-950 flex flex-wrap items-center justify-between gap-2">
+    <p>담당자 미배정 <strong>{{.MissingAssignee.Total}}건</strong>
+      {{if .MissingAssignee.AS}} · AS {{.MissingAssignee.AS}}{{end}}
+      {{if .MissingAssignee.Mnt}} · 점검 {{.MissingAssignee.Mnt}}{{end}}
+      {{if .MissingAssignee.Admin}} · 행정 {{.MissingAssignee.Admin}}{{end}}</p>
+    <a href="/work-status?view={{.View}}&date={{.Date}}{{.FilterQ}}&missing=assignee"
+       class="px-3 py-1.5 rounded-lg bg-orange-800 text-white text-xs font-medium hover:bg-orange-900">목록 보기</a>
+  </div>
+  {{end}}
+
+  {{if .ShowMissing}}
+  <div class="rounded-xl border border-amber-200 bg-white px-4 py-3 space-y-2">
+    <div class="flex items-center justify-between gap-2">
+      <h3 class="text-sm font-bold text-amber-950">{{if .MissingTitle}}{{.MissingTitle}}{{else}}누락 목록{{end}}</h3>
+      <a href="/work-status?view={{.View}}&date={{.Date}}{{.FilterQ}}" class="text-xs text-slate-500 underline">닫기</a>
+    </div>
+    <ul class="text-sm space-y-1">
+      {{range .MissingItems}}
+      <li class="flex items-center justify-between gap-2">
+        <span class="truncate">{{.Title}}</span>
+        {{if .BoardHref}}<a href="{{.BoardHref}}" class="text-xs text-blue-700 underline shrink-0">원본</a>{{end}}
+      </li>
+      {{else}}
+      <li class="text-xs text-slate-500">없습니다.</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
 
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -16,6 +62,9 @@
           <form method="GET" action="/work-status" class="inline-flex flex-wrap gap-1.5">
             <input type="hidden" name="view" value="{{.View}}">
             <input type="hidden" name="date" value="{{.Date}}">
+            <input type="hidden" name="kind" value="{{.Kind}}">
+            {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
+            {{if not .ShowScopeToggle}}
             <label class="sr-only" for="ws-assignee">담당자</label>
             <select id="ws-assignee" name="assignee" onchange="this.form.submit()"
                     class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[7.5rem]">
@@ -24,6 +73,7 @@
               <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
               {{end}}
             </select>
+            {{end}}
             <label class="sr-only" for="ws-project">사업</label>
             <select id="ws-project" name="project" onchange="this.form.submit()"
                     class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[9rem]">
@@ -32,23 +82,26 @@
               <option value="{{.ProjectID}}" {{if eq $.ProjectFilter .ProjectID}}selected{{end}}>{{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}</option>
               {{end}}
             </select>
-            <input type="hidden" name="kind" value="{{.Kind}}">
           </form>
+          {{if .ShowScopeToggle}}
+          {{if .ScopeAll}}
+          <a href="{{.MineHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">내 배정만</a>
+          {{else}}
+          <a href="{{.TeamHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100">팀 전체 보기</a>
+          {{end}}
+          {{end}}
           <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-            <a href="/work-status?view={{.View}}&date={{.Date}}&kind=receipt{{if .AssigneeFilter}}&assignee={{urlquery .AssigneeFilter}}{{end}}{{if .ProjectFilter}}&project={{urlquery .ProjectFilter}}{{end}}"
+            <a href="/work-status?view={{.View}}&date={{.Date}}&kind=receipt{{if .AssigneeFilter}}{{if not .ShowScopeToggle}}&assignee={{urlquery .AssigneeFilter}}{{end}}{{end}}{{if .ProjectFilter}}&project={{urlquery .ProjectFilter}}{{end}}{{if eq .MineParam "0"}}&mine=0{{end}}"
                class="px-3 py-1.5 text-xs font-semibold {{if eq .Kind "receipt"}}bg-amber-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">접수</a>
-            <a href="/work-status?view={{.View}}&date={{.Date}}&kind=planned{{if .AssigneeFilter}}&assignee={{urlquery .AssigneeFilter}}{{end}}{{if .ProjectFilter}}&project={{urlquery .ProjectFilter}}{{end}}"
-               class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .Kind "planned"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">예정업무</a>
-            <a href="/work-status?view={{.View}}&date={{.Date}}&kind=action{{if .AssigneeFilter}}&assignee={{urlquery .AssigneeFilter}}{{end}}{{if .ProjectFilter}}&project={{urlquery .ProjectFilter}}{{end}}"
+            <a href="/work-status?view={{.View}}&date={{.Date}}&kind=action{{if .AssigneeFilter}}{{if not .ShowScopeToggle}}&assignee={{urlquery .AssigneeFilter}}{{end}}{{end}}{{if .ProjectFilter}}&project={{urlquery .ProjectFilter}}{{end}}{{if eq .MineParam "0"}}&mine=0{{end}}"
                class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .Kind "action"}}bg-emerald-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">조치</a>
           </div>
         </div>
         <p class="text-[12px] text-slate-500 mt-1">
-          {{.PeriodLabel}} · 07:00~20:00 15분 단위 · {{if eq .Kind "receipt"}}접수{{else if eq .Kind "planned"}}예정업무{{else}}조치 실적{{end}}
+          {{.PeriodLabel}} · {{if eq .Kind "receipt"}}접수{{else}}조치 실적{{end}}
           AS <span class="font-semibold text-rose-700">{{len .ASCards}}</span>
           · 정기점검 <span class="font-semibold text-sky-700">{{len .MntCards}}</span>
           · 행정관련업무 <span class="font-semibold text-violet-700">{{len .AdminCards}}</span>
-          {{if .AssigneeFilter}} · <span class="text-blue-700 font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
           · {{.ScopeNote}}
         </p>
         <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-600">
@@ -57,16 +110,6 @@
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#9333ea"></span>세종 K-LAS</span>
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#ea580c"></span>행정·기타</span>
         </div>
-        {{if .AssigneeLegend}}
-        <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-600">
-          <span class="text-slate-400 shrink-0">담당자</span>
-          {{range .AssigneeLegend}}
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border" style="background-color:{{.Soft}};border-color:{{.Border}};border-left-width:3px">
-            <span class="font-medium" style="color:{{.Border}}">{{.Name}}</span>
-          </span>
-          {{end}}
-        </div>
-        {{end}}
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
@@ -83,8 +126,9 @@
           <form method="GET" action="/work-status" class="flex items-center">
             <input type="hidden" name="view" value="{{.View}}">
             <input type="hidden" name="kind" value="{{.Kind}}">
-            {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
+            {{if and .AssigneeFilter (not .ShowScopeToggle)}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
             {{if .ProjectFilter}}<input type="hidden" name="project" value="{{.ProjectFilter}}">{{end}}
+            {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
             <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
                    class="border-0 bg-transparent px-1 py-1 text-xs text-slate-700 focus:ring-0">
           </form>
@@ -100,48 +144,49 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] gap-3 items-start">
+  <div class="grid grid-cols-1 {{if ne .View "day"}}xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]{{end}} gap-3 items-start">
 
-    {{if eq .View "month"}}
+    {{if ne .View "day"}}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-3 py-2 border-b border-slate-100 bg-slate-50/80">
-        <p class="text-[11px] font-semibold text-slate-600">시간별 일일업무처리</p>
-      </div>
       <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center">
-        {{range $i, $d := list "일" "월" "화" "수" "목" "금" "토"}}
+        {{range $i, $d := .WeekdayLabels}}
         <div class="px-1 py-2 text-[11px] font-bold border-r border-slate-100 last:border-r-0"
-             style="{{if eq $i 0}}color:#DC2626{{else if eq $i 6}}color:#2563EB{{else}}color:#64748B{{end}}">{{$d}}</div>
+             style="{{if eq $d "일"}}color:#DC2626{{else if eq $d "토"}}color:#2563EB{{else}}color:#64748B{{end}}">{{$d}}</div>
         {{end}}
       </div>
       <div class="divide-y divide-slate-100">
         {{range .MonthWeeks}}
-        <div class="grid grid-cols-7 min-h-[7.5rem]">
+        <div class="grid grid-cols-7 {{if eq $.View "week"}}min-h-[12rem]{{else}}min-h-[7.5rem]{{end}}">
           {{range .}}
-          <div class="relative border-r border-slate-50 last:border-r-0 p-1.5 min-h-[7.5rem] {{if not .InMonth}}bg-slate-50/60{{else}}bg-white{{end}}"
+          <div class="relative border-r border-slate-50 last:border-r-0 p-1.5 {{if eq $.View "week"}}min-h-[12rem]{{else}}min-h-[7.5rem]{{end}} {{if not .InMonth}}bg-slate-50/60{{else}}bg-white{{end}}"
                style="{{if .InMonth}}{{.CellStyle}}{{end}}" title="{{.DateTitle}}">
-            <div class="flex items-center justify-between gap-1 mb-1">
+            {{if .InMonth}}
+            <a href="/work-status?view=day&date={{.Date}}{{$.FilterQ}}" class="absolute inset-0 z-0" aria-label="{{.Date}} 일간 보기"></a>
+            {{end}}
+            <div class="relative z-10 flex items-center justify-between gap-1 mb-1 pointer-events-none">
               <span class="text-[11px] font-semibold {{if not .InMonth}}text-slate-300{{end}}"
                     style="{{if .InMonth}}{{.DayStyle}}{{end}}">{{.DayNum}}</span>
-              {{if and .InMonth (gt .Total 0)}}
-              <span class="text-[9px] text-slate-400 tabular-nums">{{.Total}}건</span>
+              {{if and .InMonth (or (gt .ActionCount 0) (gt .ReceiptCount 0))}}
+              <span class="text-[9px] text-slate-500 tabular-nums">조치 {{.ActionCount}} · 접수 {{.ReceiptCount}}</span>
               {{end}}
             </div>
             {{if and .InMonth .HolidayName}}
-            <p class="text-[9px] leading-tight truncate mb-0.5" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
+            <p class="relative z-10 text-[9px] leading-tight truncate mb-0.5 pointer-events-none" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
             {{end}}
-            <div class="space-y-0.5">
+            <div class="relative z-10 space-y-0.5">
               {{range .Visible}}
               <a href="{{.DetailHref}}"
                  class="block truncate rounded px-1 py-0.5 text-[10px] leading-tight border border-black/5 hover:ring-1 hover:ring-slate-300"
                  style="{{workCardColorStyle .Assignee .ProductType .Category}}"
-                 title="{{.Title}}{{if .Assignee}} · {{.Assignee}}{{end}}{{if .StartTime}} · {{.StartTime}}{{end}}{{if .StatusLabel}} · {{.StatusLabel}}{{end}}">
+                 title="{{.Title}}{{if .Assignee}} · {{.Assignee}}{{end}}{{if .StatusLabel}} · {{.StatusLabel}}{{end}}">
                 <span class="font-medium">{{.Title}}</span>
+                {{if .Assignee}}<span class="ml-0.5 opacity-70">{{.Assignee}}</span>{{end}}
                 {{if .StatusLabel}}<span class="ml-0.5 text-[9px] opacity-80">{{.StatusLabel}}</span>{{end}}
               </a>
               {{end}}
               {{if gt .MoreCount 0}}
               <a href="/work-status?view=day&date={{.Date}}{{$.FilterQ}}"
-                 class="block text-[9px] text-blue-600 hover:underline px-0.5">+{{.MoreCount}}건 더보기</a>
+                 class="block text-[9px] text-blue-600 hover:underline px-0.5">외 {{.MoreCount}}건</a>
               {{end}}
             </div>
           </div>
@@ -150,72 +195,10 @@
         {{end}}
       </div>
     </div>
-    {{else}}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-3 py-2 border-b border-slate-100 bg-slate-50/80">
-        <p class="text-[11px] font-semibold text-slate-600">시간별 일일업무처리</p>
-      </div>
-      <div class="max-h-[74vh] overflow-auto">
-        <div class="min-w-[36rem]">
-          <div class="sticky top-0 z-20 flex border-b border-slate-200 bg-slate-50/95 backdrop-blur">
-            <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-slate-400 border-r border-slate-200">시간</div>
-            {{range .DayColumns}}
-            <div class="flex-1 min-w-0 px-1.5 py-2 border-r border-slate-200 last:border-r-0 text-center"
-                 style="{{.CellStyle}}" title="{{.DateTitle}}">
-              <p class="text-[11px] font-bold" style="{{.DayStyle}}">{{.Label}}</p>
-              {{if .HolidayName}}
-              <p class="text-[9px] truncate" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
-              {{else}}
-              <p class="text-[9px] text-slate-400">{{.Sub}}</p>
-              {{end}}
-            </div>
-            {{end}}
-          </div>
-          <div class="flex relative">
-            <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-10 bg-white">
-              {{range .SlotTimes}}
-              <div class="box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-slate-50{{end}}"
-                   style="height:{{$.SlotRem}}rem">
-                <span class="block text-right text-[9px] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-slate-600{{else}}text-slate-300{{end}}"
-                      style="line-height:{{$.SlotRem}}rem">{{.}}</span>
-              </div>
-              {{end}}
-            </div>
-            {{range .DayColumns}}
-            {{$col := .}}
-            <div class="flex-1 min-w-0 relative border-r border-slate-50 last:border-r-0"
-                 style="{{$.GridHeightStyle}};{{$col.CellStyle}}">
-              {{range $i, $t := $.SlotTimes}}
-              <div class="absolute left-0 right-0 box-border border-t border-slate-100/80"
-                   style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"></div>
-              {{end}}
-              {{range $col.Blocks}}
-              <a href="{{.Card.DetailHref}}"
-                 class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight block pl-1.5 pr-1.5 py-0.5 border border-black/5 hover:ring-2 hover:ring-blue-400/50"
-                 style="{{.Style}}"
-                 title="{{.Card.Title}} · {{.Card.Assignee}} · {{.Card.StartTime}}~{{.Card.EndTime}}{{if .Card.StatusLabel}} · {{.Card.StatusLabel}}{{end}}">
-                <span class="flex items-start justify-between gap-0.5">
-                  <span class="truncate min-w-0 font-semibold">{{.Card.Title}}</span>
-                  {{if .Card.StatusLabel}}
-                  <span class="shrink-0 px-1 rounded border bg-white/95 text-[8px] font-semibold {{if eq $.Kind "action"}}border-emerald-300/80 text-emerald-800{{else if eq $.Kind "planned"}}border-blue-300/80 text-blue-800{{else}}border-amber-300/80 text-amber-800{{end}}">{{.Card.StatusLabel}}</span>
-                  {{end}}
-                </span>
-                {{if .Card.SourceNumber}}
-                <span class="font-mono text-[8px] opacity-75 truncate block">{{.Card.SourceNumber}}</span>
-                {{end}}
-                <span class="text-[8px] opacity-70 block truncate">{{.Card.StartTime}}~{{.Card.EndTime}}{{if .Card.Assignee}} · {{.Card.Assignee}}{{end}}</span>
-              </a>
-              {{end}}
-            </div>
-            {{end}}
-          </div>
-        </div>
-      </div>
-    </div>
     {{end}}
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-2 min-w-0">
-      <div class="sm:col-span-3 xl:col-span-1 px-0.5">
+    <div class="grid grid-cols-1 {{if eq .View "day"}}sm:grid-cols-3{{else}}sm:grid-cols-3 xl:grid-cols-1{{end}} gap-2 min-w-0">
+      <div class="{{if eq .View "day"}}sm:col-span-3{{else}}sm:col-span-3 xl:col-span-1{{end}} px-0.5">
         <p class="text-[11px] font-semibold text-slate-600">단위 업무별 현황</p>
         <p class="text-[11px] text-slate-500 tabular-nums">
           총 <span class="font-semibold text-slate-700">{{.TotalStats.Total}}</span>건 중

@@ -160,7 +160,7 @@ func (r *WBRepo) ListChildren(parentID string) ([]model.WorkTask, error) {
 	return scanWorkTasks(rows)
 }
 
-// ListTasksBetween 수행일(WorkDate)이 기간 안인 업무 (일일 업무 등록 시간표용).
+// ListTasksBetween 수행일(WorkDate)이 기간 안인 업무 (일일 업무 등록 일정표용).
 // 시각이 비어 있어도 포함하며, 화면에서 표시용 시각을 채운다.
 func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
 	all, err := r.ListTasks()
@@ -289,7 +289,7 @@ func (r *WBRepo) ASStatusesByIDs(ids []string) (map[string]string, error) {
 }
 
 // ListUnplacedAdminTasks 일자가 확정되지 않은(WorkDate 없음) 행정/지원 실행 작업. 반복 상위는 제외.
-// WorkDate가 있으면 왼쪽 시간표 쪽이며 우측 대기 목록에는 두지 않는다.
+// WorkDate가 있으면 왼쪽 일정표 쪽이며 우측 대기 목록에는 두지 않는다.
 func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 	all, err := r.ListTasks()
 	if err != nil {
@@ -537,7 +537,7 @@ const (
 	workdayEndMin   = 20 * 60
 )
 
-// PlaceTask 업무를 시간표의 특정 날짜·시각에 배치한다.
+// PlaceTask 업무를 일정표의 특정 날짜·시각에 배치한다.
 // 예정일(due_date)이 비어 있으면 배정일과 같게 채운다.
 func (r *WBRepo) PlaceTask(taskID, workDate, startTime, endTime string) error {
 	dur := model.DurationFromTimes(startTime, endTime)
@@ -565,7 +565,7 @@ func (r *WBRepo) SetTaskDueDate(taskID, dueDate string) error {
 	return err
 }
 
-// UnplaceTask 시간표에서 내린다. 행은 유지해 × 후에도 원본 연결이 남게 한다.
+// UnplaceTask 일정표에서 내린다. 행은 유지해 × 후에도 원본 연결이 남게 한다.
 func (r *WBRepo) UnplaceTask(taskID string) error {
 	var sourceType string
 	err := r.db.QueryRow(`SELECT COALESCE(source_type,'') FROM work_tasks WHERE task_id=?`, taskID).Scan(&sourceType)
@@ -708,7 +708,16 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	return nil
 }
 
-// UpdateTask 업무 내용·배정일·소요시간 등을 수정한다. source·parent 는 유지.
+// TouchWorkTaskUpdate 업무 수정 + data_change_logs. 칸반 이동 등에서 재사용.
+func TouchWorkTaskUpdate(r *WBRepo, t *model.WorkTask) error {
+	if r == nil || t == nil || t.TaskID == "" {
+		return fmt.Errorf("task_id 필요")
+	}
+	return touchUpdate(r.db, "work_tasks", "task_id", t.TaskID, t.Title, func() error {
+		return r.UpdateTask(t)
+	})
+}
+
 func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 	if t == nil || t.TaskID == "" {
 		return fmt.Errorf("task_id 필요")
@@ -877,7 +886,7 @@ func (r *WBRepo) CreateSubtasks(parent *model.WorkTask, dates []string) (int, er
 			Title:        parent.Title,
 			Description:  parent.Description,
 			DueDate:      d,
-			WorkDate:     "", // 시간표 배치 전
+			WorkDate:     "", // 일정표 배치 전
 			DurationMin:  parent.DurationMin,
 			Status:       model.WBTaskWaiting,
 			Priority:     parent.Priority,

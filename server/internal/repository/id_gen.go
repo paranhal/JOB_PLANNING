@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	idFormatV2MetaKey             = "__meta:id_format_v2"
-	assetCategoryBackfillMetaKey  = "__meta:asset_category_backfill"
-	assetIDASCIIMetaKey           = "__meta:asset_id_ascii"
-	importedCustomerReviewMetaKey = "__meta:imported_customer_review"
-	assetRFIDProjectLinkMetaKey      = "__meta:asset_rfid_project_wpseed03_v1"
+	idFormatV2MetaKey                 = "__meta:id_format_v2"
+	assetCategoryBackfillMetaKey      = "__meta:asset_category_backfill"
+	assetIDASCIIMetaKey               = "__meta:asset_id_ascii"
+	importedCustomerReviewMetaKey     = "__meta:imported_customer_review"
+	assetRFIDProjectLinkMetaKey       = "__meta:asset_rfid_project_wpseed03_v1"
 	assetMaterialsChungnamLinkMetaKey = "__meta:asset_materials_chungnam_wpseed01_v1"
 	assetSejongLibraryICTLinkMetaKey  = "__meta:asset_sejong_library_ict_wpseed02_v2"
 	projectDisplayNamesV2MetaKey      = "__meta:project_display_names_v2"
@@ -49,23 +49,30 @@ func NextSeq(db *sql.DB, seqKey string) (int, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
+	n, err := nextSeqTx(tx, seqKey)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
 
+func nextSeqTx(tx *sql.Tx, seqKey string) (int, error) {
 	var last int
-	err = tx.QueryRow(`SELECT last_no FROM id_sequences WHERE seq_key=?`, seqKey).Scan(&last)
+	err := tx.QueryRow(`SELECT last_no FROM id_sequences WHERE seq_key=?`, seqKey).Scan(&last)
 	if err == sql.ErrNoRows {
 		if _, err := tx.Exec(`INSERT INTO id_sequences (seq_key, last_no) VALUES (?, 1)`, seqKey); err != nil {
 			return 0, err
 		}
-		last = 1
-	} else if err != nil {
-		return 0, err
-	} else {
-		last++
-		if _, err := tx.Exec(`UPDATE id_sequences SET last_no=? WHERE seq_key=?`, last, seqKey); err != nil {
-			return 0, err
-		}
+		return 1, nil
 	}
-	if err := tx.Commit(); err != nil {
+	if err != nil {
+		return 0, err
+	}
+	last++
+	if _, err := tx.Exec(`UPDATE id_sequences SET last_no=? WHERE seq_key=?`, last, seqKey); err != nil {
 		return 0, err
 	}
 	return last, nil

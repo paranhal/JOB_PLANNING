@@ -114,8 +114,15 @@
   </div>
   {{end}}
 
-  <div class="space-y-3">
-    {{range .Users}}
+  <div class="space-y-4">
+    {{range .RoleGroups}}
+    <div class="space-y-2" x-data="{open:true}">
+      <button type="button" class="w-full flex items-center justify-between px-1 py-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900" @click="open=!open">
+        <span>{{.Label}} <span class="font-normal text-slate-400">{{len .Items}}명</span></span>
+        <span class="text-xs text-slate-400 font-normal" x-text="open ? '접기' : '펼치기'"></span>
+      </button>
+      <div class="space-y-3" x-show="open">
+    {{range .Items}}
     {{$uperms := userPermList .}}
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       {{if $canEdit}}
@@ -194,6 +201,9 @@
         <p class="text-xs text-gray-400 mt-2">4자 이상 입력하세요.</p>
       </div>
       {{end}}
+    </div>
+    {{end}}
+      </div>
     </div>
     {{end}}
   </div>

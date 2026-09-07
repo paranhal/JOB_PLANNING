@@ -12,7 +12,9 @@
           <h2 class="text-xl font-bold text-gray-800 font-mono">{{.AS.ASNumber}}</h2>
           <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">AS</span>
           {{statusBadge .AS.Status}}
-          <span class="{{urgencyColor .AS.Urgency}} text-sm font-bold">{{urgencyLabel .AS.Urgency}}</span>
+          {{if eq .AS.Urgency "high"}}
+          <span class="text-sm font-bold text-red-600">🔴 {{urgencyReasonText .AS.UrgencyReason .AS.UrgencyReasonNote}}</span>
+          {{end}}
         </div>
         <p class="text-sm text-gray-500">{{.AS.OrgName}} · {{.AS.ReceiptDatetime.Format "2006-01-02 15:04"}} 접수{{if .AS.StartDatetime}} · 착수 {{.AS.StartDatetime.Format "2006-01-02 15:04"}}{{end}}</p>
       </div>
@@ -143,9 +145,30 @@
   </div>
   {{end}}
 
-  {{if or .AS.IsReopen .ParentAS}}
+  {{with .GroupMates}}
+  {{if gt (len .) 1}}
+  <div class="rounded-lg border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-sm">
+    <p class="font-medium text-indigo-950 mb-1">함께 접수된 건 {{len .}}건</p>
+    <ul class="space-y-1">
+      {{range .}}
+      {{if ne .ASID $.AS.ASID}}
+      <li class="flex flex-wrap items-center gap-2 text-slate-700">
+        <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-700 hover:underline">{{.ASNumber}}</a>
+        {{if .ProductName}}<span>{{.ProductName}}</span>{{end}}
+        {{statusBadge .Status}}
+        <span class="text-xs text-slate-500 max-w-xs truncate">{{.Symptom}}</span>
+      </li>
+      {{end}}
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{end}}
+
+  {{if .AS.IsReopen}}
   {{template "as_parent_complete" .}}
   {{end}}
+  {{template "as_transfer_link" .}}
 
   {{if .Reopens}}
   <div class="rounded-lg border border-amber-200 bg-white px-4 py-3 text-sm">
@@ -195,7 +218,7 @@
         </div>
         <div>
           <dt class="text-xs text-slate-500">연락처</dt>
-          <dd>{{if .Customer}}{{if .Customer.MainPhone}}{{.Customer.MainPhone}}{{else}}—{{end}}{{else}}—{{end}}</dd>
+          <dd>{{if .AS.ConfirmContact}}{{.AS.ConfirmContact}}{{else if .Customer}}{{if .Customer.MainPhone}}{{.Customer.MainPhone}}{{else}}—{{end}}{{else}}—{{end}}</dd>
         </div>
         <div class="sm:col-span-2">
           <dt class="text-xs text-slate-500">주소</dt>
@@ -223,6 +246,10 @@
         <div class="sm:col-span-2">
           <dt class="text-xs text-slate-500 mb-1">접수내용 (증상)</dt>
           <dd class="text-slate-800 whitespace-pre-line rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">{{.AS.Symptom}}</dd>
+          {{if .AS.FollowupNote}}
+          <dt class="text-xs text-violet-700 mt-2 mb-1">추가 접수 내용</dt>
+          <dd class="text-violet-950 whitespace-pre-line rounded-lg bg-violet-50 border border-violet-100 px-3 py-2">{{.AS.FollowupNote}}</dd>
+          {{end}}
           {{if .KeywordLinks}}
           <div class="mt-2 flex flex-wrap gap-1.5">
             {{range .KeywordLinks}}

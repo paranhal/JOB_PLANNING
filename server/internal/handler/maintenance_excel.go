@@ -298,12 +298,12 @@ func siteEntryCategoryLabel(s string) string {
 }
 
 func siteFixedRuleLabel(s string) string {
-	switch s {
-	case "LAST_MONDAY_OF_MONTH":
+	days, last := model.ParseFixedRule(s)
+	if last && len(days) == 0 {
 		return "매월 마지막 월요일"
-	case "":
-		return ""
-	default:
-		return s
 	}
+	if len(days) == 0 && !last {
+		return ""
+	}
+	return s
 }

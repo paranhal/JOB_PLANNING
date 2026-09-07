@@ -69,6 +69,11 @@ func TestBuildRegisterAssigneeColumnsUnassignedAndFilter(t *testing.T) {
 	if len(filteredEmpty) != 1 || filteredEmpty[0].Assignee != "이해진" || filteredEmpty[0].Count != 0 {
 		t.Fatalf("필터한 사람은 0건이어도 1열: %+v", filteredEmpty)
 	}
+
+	forced := buildRegisterAssigneeColumnsAlways(dateCol, nil, taskCardFromWork, []string{"최혜영", "태자운"}, "", nil, []string{"최혜영", "태자운"})
+	if len(forced) != 2 {
+		t.Fatalf("영업 빈 열=%d want 2 labels=%v", len(forced), labelsOfCols(forced))
+	}
 }
 
 func TestBuildRegisterAssigneeColumnsOverlapWarn(t *testing.T) {

@@ -31,12 +31,11 @@ TRIM(COALESCE(%s,'')) != ''
 AND TRIM(%s) GLOB '[0-9][0-9][0-9][0-9]*'
 AND CAST(substr(TRIM(%s),1,4) AS INTEGER) NOT BETWEEN 2000 AND 2100`
 
-// RunAppendixC 부록 C V-1~V-11. appOnly 이면 data_origin='app' 기준(V-4~V-7 권장).
+// RunAppendixC 부록 C V-1~V-12. appOnly 이면 data_origin='app' 기준(V-4~V-7 권장).
+// V-1~V-8 은 §4.5 지표 기준일 하한을 같은 조건으로 건다. V-9~V-12 은 전 기간(옛 자료 오류를 찾기 위함).
 func RunAppendixC(db *sql.DB, appOnly bool) []AppendixCCheck {
-	appAS := ""
-	if appOnly {
-		appAS = ` AND COALESCE(data_origin,'app')='app'`
-	}
+	appAS := appendixCASWhere(db, "", appOnly)
+	appR := appendixCASWhere(db, "r", appOnly)
 	checks := []AppendixCCheck{
 		runCountCheck(db, "V-1", "예정일 없이 확정된 건", "0",
 			`SELECT COUNT(*) FROM as_receipts WHERE schedule_confirmed=1 AND TRIM(COALESCE(visit_scheduled_date,''))=''`+appAS),
@@ -45,10 +44,10 @@ func RunAppendixC(db *sql.DB, appOnly bool) []AppendixCCheck {
 			 AND TRIM(COALESCE(visit_scheduled_date,''))='' AND TRIM(COALESCE(schedule_no_date_reason,''))=''`+appAS),
 		runCountCheck(db, "V-3", "조치는 있는데 착수시각 없음", "0",
 			`SELECT COUNT(*) FROM as_receipts r WHERE TRIM(COALESCE(r.start_datetime,''))=''
-			 AND EXISTS(SELECT 1 FROM as_processes p WHERE p.as_id=r.as_id)`+originOn("r", appOnly)),
+			 AND EXISTS(SELECT 1 FROM as_processes p WHERE p.as_id=r.as_id)`+appR),
 		runCountCheck(db, "V-4", "소요시간 미입력 조치", "신규분 0",
 			`SELECT COUNT(*) FROM as_processes p JOIN as_receipts r ON r.as_id=p.as_id
-			 WHERE COALESCE(p.time_spent,0)<=0`+originOn("r", appOnly)),
+			 WHERE COALESCE(p.time_spent,0)<=0`+appR),
 		runCountCheck(db, "V-5", "근무구분 미입력 완료건", "신규분 0",
 			`SELECT COUNT(*) FROM as_receipts WHERE status IN ('completed','closed','partial_complete')
 			 AND TRIM(COALESCE(work_place,''))=''`+appAS),
@@ -61,7 +60,8 @@ func RunAppendixC(db *sql.DB, appOnly bool) []AppendixCCheck {
 	}
 
 	v8 := AppendixCCheck{ID: "V-8", Purpose: "데이터 출처 분포", Expected: "app 비중 증가"}
-	rows, err := db.Query(`SELECT COALESCE(data_origin,'app'), COUNT(*) FROM as_receipts GROUP BY 1 ORDER BY 2 DESC`)
+	v8q := `SELECT COALESCE(data_origin,'app'), COUNT(*) FROM as_receipts WHERE 1=1` + appendixCASWhere(db, "", false) + ` GROUP BY 1 ORDER BY 2 DESC`
+	rows, err := db.Query(v8q)
 	if err == nil {
 		defer rows.Close()
 		var parts []string
@@ -109,6 +109,25 @@ func RunAppendixC(db *sql.DB, appOnly bool) []AppendixCCheck {
 		}
 	}
 	checks = append(checks, v11)
+
+	v12 := AppendixCCheck{
+		ID:       "V-12",
+		Purpose:  "착수가 완료보다 늦은 건",
+		Expected: "0",
+	}
+	lateRows, n12, err := listStartAfterComplete(db)
+	if err != nil {
+		v12.Detail = err.Error()
+	} else {
+		v12.Rows = lateRows
+		v12.Count = n12
+		v12.OK = n12 == 0
+		v12.Detail = "start_datetime > complete_datetime. 자동으로 고치지 않습니다."
+		if n12 > len(lateRows) {
+			v12.Detail += fmt.Sprintf(" (표시 %d / 전체 %d)", len(lateRows), n12)
+		}
+	}
+	checks = append(checks, v12)
 	return checks
 }
 
@@ -116,7 +135,24 @@ func originOn(alias string, appOnly bool) string {
 	if !appOnly {
 		return ""
 	}
-	return ` AND COALESCE(` + alias + `.data_origin,'app')='app'`
+	col := "data_origin"
+	if alias != "" {
+		col = alias + `.data_origin`
+	}
+	return ` AND COALESCE(` + col + `,'app')='app'`
+}
+
+func appendixCASWhere(db *sql.DB, alias string, appOnly bool) string {
+	w := originOn(alias, appOnly)
+	d := metricsBaseFromDB(db)
+	if len(d) != 10 || d[4] != '-' || d[7] != '-' {
+		return w
+	}
+	col := "receipt_datetime"
+	if alias != "" {
+		col = alias + `.receipt_datetime`
+	}
+	return w + ` AND date(` + col + `) >= date('` + d + `')`
 }
 
 func runCountCheck(db *sql.DB, id, purpose, expected, q string) AppendixCCheck {
@@ -178,4 +214,41 @@ func listDateYearOutOfRange(db *sql.DB) ([]AppendixCDateRow, int, error) {
 		rows.Close()
 	}
 	return out, total, nil
+}
+
+func listStartAfterComplete(db *sql.DB) ([]AppendixCDateRow, int, error) {
+	q := `
+SELECT as_id, COALESCE(as_number,''), start_datetime, complete_datetime
+FROM as_receipts
+WHERE TRIM(COALESCE(start_datetime,'')) != ''
+  AND TRIM(COALESCE(complete_datetime,'')) != ''
+  AND datetime(start_datetime) > datetime(complete_datetime)
+ORDER BY as_number`
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM as_receipts
+		WHERE TRIM(COALESCE(start_datetime,'')) != ''
+		  AND TRIM(COALESCE(complete_datetime,'')) != ''
+		  AND datetime(start_datetime) > datetime(complete_datetime)`).Scan(&n); err != nil {
+		return nil, 0, err
+	}
+	rows, err := db.Query(q)
+	if err != nil {
+		return nil, n, err
+	}
+	defer rows.Close()
+	var out []AppendixCDateRow
+	for rows.Next() {
+		var r AppendixCDateRow
+		var start, complete string
+		r.Table, r.Column = "as_receipts", "start_datetime"
+		if rows.Scan(&r.EntityID, &r.Number, &start, &complete) != nil {
+			continue
+		}
+		r.Value = start + " > " + complete
+		out = append(out, r)
+		if len(out) >= 200 {
+			break
+		}
+	}
+	return out, n, rows.Err()
 }

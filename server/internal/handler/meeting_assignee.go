@@ -81,11 +81,34 @@ func assignableNameOrder(users []model.User) []string {
 }
 
 func meetingAssigneeQuery(selected string) string {
+	return meetingNavQuery(selected, "")
+}
+
+func meetingNavQuery(selected, display string) string {
 	v := url.Values{}
 	if selected == "" {
 		v.Set("assignee", meetingAssigneeAll)
 	} else {
 		v.Set("assignee", selected)
+	}
+	if display == "kanban" {
+		v.Set("display", "kanban")
+	}
+	return v.Encode()
+}
+
+func meetingFilterQuery(date, selected, display string) string {
+	v := url.Values{}
+	if date != "" {
+		v.Set("date", date)
+	}
+	if selected == "" {
+		v.Set("assignee", meetingAssigneeAll)
+	} else {
+		v.Set("assignee", selected)
+	}
+	if display == "kanban" || display == "list" {
+		v.Set("display", display)
 	}
 	return v.Encode()
 }

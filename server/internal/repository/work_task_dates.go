@@ -6,11 +6,13 @@ import (
 	"strings"
 )
 
-// 행정/지원 완료일·접수일 SQL. 별칭 t. (§13.4 · §13.10 · §15.3)
-// complete_date 가 비면 종전 대리지표 updated_at. receipt_date 가 비면 created_at.
+// 완료일·접수일 SQL. 별칭 t / ar / v. (§13.4 · §14.1 · §15.3)
+// 완료일이 비면 NULL — updated_at·visit_date 로 다른 날에 끼워 넣지 않는다.
 const (
-	adminTaskCompleteDateSQL = `date(COALESCE(NULLIF(TRIM(t.complete_date),''), t.updated_at))`
+	adminTaskCompleteDateSQL = `date(NULLIF(TRIM(t.complete_date),''))`
 	adminTaskReceiptDateSQL  = `date(COALESCE(NULLIF(TRIM(t.receipt_date),''), t.created_at))`
+	asCompleteDateSQL        = `date(NULLIF(TRIM(ar.complete_datetime),''))`
+	mntCompleteDateSQL       = `NULLIF(TRIM(v.completed_date),'')`
 )
 
 // applyS11WorkTaskDates 마이그레이션 004. 컬럼 추가·기존 행 보정.

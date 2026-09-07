@@ -1,6 +1,8 @@
 {{define "title"}}{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}} · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="max-w-5xl mx-auto space-y-5" id="as-form-root">
+<div class="max-w-7xl mx-auto" id="as-form-root">
+  <div class="lg:flex lg:gap-5 lg:items-start">
+  <div class="min-w-0 flex-1 space-y-5">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="flex items-center gap-3">
       <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500" title="뒤로">
@@ -15,7 +17,7 @@
           <span class="font-mono text-sm text-slate-600">{{.AS.ASNumber}}</span>
           {{end}}
         </div>
-        <p class="text-sm text-slate-500 mt-0.5">기본 정보 · 기기 정보 · 접수 정보를 순서대로 입력합니다.</p>
+        <p class="text-sm text-slate-500 mt-0.5">{{if .IsNew}}기관·요청자·연락처는 공통, 장비별로 증상·담당자를 입력합니다.{{else}}기본 정보 · 기기 정보 · 접수 정보를 순서대로 입력합니다.{{end}}</p>
       </div>
     </div>
   </div>
@@ -27,9 +29,15 @@
   {{else if .Err}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Err}}</div>
   {{end}}
+  {{if and (not .IsNew) .AS.IsTransferFollowup}}
+  <div class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 space-y-1">
+    <p class="font-medium">이관후속 건입니다. 기관·자산·요청자·접수채널·증상은 바꿀 수 없습니다.</p>
+    {{if .AS.FollowupNote}}<p>추가 접수 내용: {{.AS.FollowupNote}}</p>{{end}}
+  </div>
+  {{end}}
 
   <form id="as-form" method="POST" action="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}/edit{{end}}" class="space-y-4"
-        {{if .IsNew}}enctype="multipart/form-data"{{end}}
+        {{if .IsNew}}enctype="multipart/form-data" data-multi="1"{{end}}
         data-init-asset="{{.AS.AssetID}}"
         data-init-requester="{{.AS.Requester}}"
         data-exclude-as="{{if not .IsNew}}{{.AS.ASID}}{{end}}">
@@ -41,12 +49,15 @@
         <span class="text-[11px] text-slate-400">고객 · 요청자</span>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="sm:col-span-2">
+        <div class="sm:col-span-2 relative">
           <label class="block text-sm font-medium text-slate-700 mb-1">기관 <span class="text-red-500">*</span></label>
-          <select name="customer_id" id="as-customer_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            <option value="">기관 선택</option>
-            {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.AS.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}} ({{.CustomerID}})</option>{{end}}
-          </select>
+          <input type="hidden" name="customer_id" id="as-customer_id" value="{{.AS.CustomerID}}" required>
+          <input type="text" id="as-customer-search" autocomplete="off"
+                 placeholder="기관명 · 짧은이름 · 지역 · 고객번호 · 초성(ㅈㅊㅇ)"
+                 value="{{range .Customers}}{{if eq $.AS.CustomerID .CustomerID}}{{.OrgName}}{{end}}{{end}}"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <div id="as-customer-list" class="hidden absolute z-30 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg text-sm"></div>
+          <p class="mt-1 text-xs text-slate-400">초성 검색은 입력이 전부 초성일 때만 적용합니다. ↑↓·Enter로 고릅니다.</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">요청자</label>
@@ -65,27 +76,20 @@
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">요청주체 유형</label>
-          <select name="requester_type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            {{range .ReqTypes}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.RequesterType}}selected{{end}}>{{.CodeName}}</option>{{end}}
-          </select>
+          <label class="block text-sm font-medium text-slate-700 mb-1">연락처</label>
+          <p id="as-contact-readonly" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-700">—</p>
         </div>
-        <div class="sm:col-span-2">
-          <label class="block text-sm font-medium text-slate-700 mb-1">요청주체명</label>
-          <select name="requester_name_code" id="as-reqname-code" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            <option value="">선택</option>
-            {{range .RequesterNames}}<option value="{{.}}" {{if eq . $.AS.RequesterName}}selected{{end}}>{{.}}</option>{{end}}
-            <option value="custom" {{if and $.AS.RequesterName (not (hasString $.RequesterNames $.AS.RequesterName))}}selected{{end}}>직접입력</option>
-          </select>
-          <div id="as-reqname-custom-wrap" class="mt-2 {{if and .AS.RequesterName (not (hasString .RequesterNames .AS.RequesterName))}}{{else}}hidden{{end}}">
-            <input type="text" name="requester_name_custom" value="{{if and .AS.RequesterName (not (hasString .RequesterNames .AS.RequesterName))}}{{.AS.RequesterName}}{{end}}" placeholder="요청주체명 직접 입력"
-                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-          </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">이번 건 연락처</label>
+          <input type="text" name="confirm_contact" id="as-confirm-contact" value="{{.AS.ConfirmContact}}"
+                 placeholder="그날만 다른 번호일 때" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <p class="mt-1 text-xs text-slate-400">담당자 기준정보는 바꾸지 않습니다.</p>
         </div>
       </div>
     </section>
 
-    <!-- 기기 정보 -->
+    {{if not .IsNew}}
+    <!-- 기기 정보 (수정: 1건 유지) -->
     <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 p-5 sm:p-6 space-y-4 shadow-sm">
       <div class="flex items-center justify-between gap-2">
         <h3 class="text-sm font-semibold text-slate-800">2. 기기 정보</h3>
@@ -96,7 +100,7 @@
         <select name="asset_id" id="as-asset_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           <option value="">자산 미연결 (나중에 매핑)</option>
           {{range .Assets}}
-          <option value="{{.AssetID}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
+          <option value="{{.AssetID}}" data-family="{{assetUrgencyFamily .}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
             {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
           </option>
           {{end}}
@@ -105,7 +109,7 @@
       </div>
     </section>
 
-    <!-- 접수 정보 -->
+    <!-- 접수 정보 (수정) -->
     <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-amber-500 p-5 sm:p-6 space-y-4 shadow-sm">
       <div class="flex items-center justify-between gap-2">
         <h3 class="text-sm font-semibold text-slate-800">3. 접수 정보</h3>
@@ -129,18 +133,16 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">긴급도</label>
-          <select name="urgency" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            {{range .Urgencies}}<option value="{{.CodeValue}}" {{if or (eq .CodeValue $.AS.Urgency) (and (not $.AS.Urgency) (eq .CodeValue "normal"))}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          <label class="block text-sm font-medium text-slate-700 mb-1">긴급 사유</label>
+          <select name="urgency_reason" id="as-urgency-reason" class="eq-urgency-reason w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            {{range .UrgencyReasons}}
+            <option value="{{.CodeValue}}" data-family="{{urgencyReasonFamily .CodeGroup}}" {{if or (eq .CodeValue $.AS.UrgencyReason) (and (not $.AS.UrgencyReason) (eq .CodeValue "none"))}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
           </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">중요도</label>
-          <select name="priority" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            <option value="high" {{if eq .AS.Priority "high"}}selected{{end}}>상</option>
-            <option value="normal" {{if or (eq .AS.Priority "normal") (not .AS.Priority)}}selected{{end}}>중</option>
-            <option value="low" {{if eq .AS.Priority "low"}}selected{{end}}>하</option>
-          </select>
+          <div class="eq-urgency-note-wrap mt-2 {{if eq .AS.UrgencyReason "other"}}{{else}}hidden{{end}}">
+            <input type="text" name="urgency_reason_note" value="{{.AS.UrgencyReasonNote}}" placeholder="기타 사유 직접 입력"
+                   class="eq-urgency-note w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자</label>
@@ -158,31 +160,169 @@
         </div>
         <div class="sm:col-span-2">
           <label class="block text-sm font-medium text-slate-700 mb-1">증상 내용 <span class="text-red-500">*</span></label>
-          <textarea name="symptom" rows="4" required placeholder="장애 또는 지원 요청 내용을 자세히 입력하세요."
+          <textarea name="symptom" id="as-symptom" rows="4" required placeholder="장애 또는 지원 요청 내용을 자세히 입력하세요."
                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.Symptom}}</textarea>
         </div>
+        {{template "as_keyword_checks" .}}
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">예정업무일</label>
           {{if .CanEditVisitDate}}
           <input type="date" name="visit_scheduled_date" id="as-visit-date" value="{{.AS.VisitScheduledDate}}"
                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-          <label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
-            <input type="checkbox" name="schedule_confirmed" id="as-schedule-confirmed" value="1"
-                   class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                   {{if .AS.ScheduleConfirmed}}checked{{end}}>
-            <span class="font-medium">일정 확정</span>
-            <span class="text-xs text-slate-400">(체크 시 상태를 진행중으로 변경)</span>
-          </label>
-          <p class="mt-1 text-xs text-slate-400">선택 · 날짜 입력 후 일정 확정. 수정은 관리자·배정담당자만 가능</p>
+          <p class="mt-1 text-xs text-slate-400">날짜가 있으면 일정이 확정됩니다. 비우면 미정입니다.</p>
           {{else}}
           <input type="hidden" name="visit_scheduled_date" value="{{.AS.VisitScheduledDate}}">
-          {{if .AS.ScheduleConfirmed}}<input type="hidden" name="schedule_confirmed" value="1">{{end}}
           <p class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-700">{{if .AS.VisitScheduledDate}}{{.AS.VisitScheduledDate}}{{else}}—{{end}}</p>
-          <p class="mt-1 text-xs text-slate-500">{{if .AS.ScheduleConfirmed}}일정 확정됨{{else}}일정 미확정{{end}} · 보기 전용</p>
+          <p class="mt-1 text-xs text-slate-500">{{if .AS.VisitScheduledDate}}일정 확정됨{{else}}일정 미확정{{end}} · 보기 전용</p>
           {{end}}
         </div>
       </div>
     </section>
+    {{else}}
+    <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 p-5 sm:p-6 space-y-4 shadow-sm">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-sm font-semibold text-slate-800">2. 대상 장비</h3>
+        <button type="button" id="eq-add" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100">＋장비 추가</button>
+      </div>
+      <p class="text-xs text-slate-400">장비마다 접수번호가 따로 부여됩니다. 기관·요청자·연락처는 공통입니다.</p>
+      <div id="eq-rows" class="space-y-3">
+        <div class="eq-row rounded-lg border border-slate-200 p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-slate-700">장비 <span class="eq-row-num">1</span></p>
+            <button type="button" class="eq-remove text-xs text-slate-400 hover:text-red-600 hidden">삭제</button>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">설치자산</label>
+            <select name="eq_asset_id" class="eq-asset w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">자산 미연결 (나중에 매핑)</option>
+              {{range .Assets}}
+              <option value="{{.AssetID}}" data-family="{{assetUrgencyFamily .}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
+                {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
+              </option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">증상 내용 <span class="text-red-500">*</span></label>
+            <textarea name="eq_symptom" id="as-symptom" rows="3" required placeholder="이 장비의 장애·지원 요청 내용"
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.Symptom}}</textarea>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">긴급 사유</label>
+              <select name="eq_urgency_reason" class="eq-urgency-reason w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                {{range $.UrgencyReasons}}
+                <option value="{{.CodeValue}}" data-family="{{urgencyReasonFamily .CodeGroup}}" {{if eq .CodeValue "none"}}selected{{end}}>{{.CodeName}}</option>
+                {{end}}
+              </select>
+              <div class="eq-urgency-note-wrap mt-2 hidden">
+                <input type="text" name="eq_urgency_note" placeholder="기타 사유 직접 입력"
+                       class="eq-urgency-note w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자</label>
+              <select name="eq_assigned_code" class="eq-assigned-code w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">미배정</option>
+                {{range .Assignees}}
+                <option value="{{.UserID}}">{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
+                {{end}}
+                <option value="custom">직접입력</option>
+              </select>
+              <div class="eq-assigned-custom-wrap mt-2 hidden">
+                <input type="text" name="eq_assigned_custom" placeholder="배정 담당자 이름 직접 입력"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-slate-700 mb-1">예정업무일</label>
+              <input type="date" name="eq_visit_date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <p class="mt-1 text-xs text-slate-400">날짜가 있으면 일정이 확정됩니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {{template "as_keyword_checks" .}}
+    </section>
+    <template id="eq-row-template">
+      <div class="eq-row rounded-lg border border-slate-200 p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-semibold text-slate-700">장비 <span class="eq-row-num">2</span></p>
+          <button type="button" class="eq-remove text-xs text-slate-400 hover:text-red-600">삭제</button>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">설치자산</label>
+          <select name="eq_asset_id" class="eq-asset w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">자산 미연결 (나중에 매핑)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">증상 내용 <span class="text-red-500">*</span></label>
+          <textarea name="eq_symptom" rows="3" required placeholder="이 장비의 장애·지원 요청 내용"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">긴급 사유</label>
+            <select name="eq_urgency_reason" class="eq-urgency-reason w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              {{range $.UrgencyReasons}}
+              <option value="{{.CodeValue}}" data-family="{{urgencyReasonFamily .CodeGroup}}" {{if eq .CodeValue "none"}}selected{{end}}>{{.CodeName}}</option>
+              {{end}}
+            </select>
+            <div class="eq-urgency-note-wrap mt-2 hidden">
+              <input type="text" name="eq_urgency_note" placeholder="기타 사유 직접 입력"
+                     class="eq-urgency-note w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자</label>
+            <select name="eq_assigned_code" class="eq-assigned-code w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">미배정</option>
+              {{range .Assignees}}
+              <option value="{{.UserID}}">{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
+              {{end}}
+              <option value="custom">직접입력</option>
+            </select>
+            <div class="eq-assigned-custom-wrap mt-2 hidden">
+              <input type="text" name="eq_assigned_custom" placeholder="배정 담당자 이름 직접 입력"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">예정업무일</label>
+            <input type="date" name="eq_visit_date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <p class="mt-1 text-xs text-slate-400">날짜가 있으면 일정이 확정됩니다.</p>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-amber-500 p-5 sm:p-6 space-y-4 shadow-sm">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-sm font-semibold text-slate-800">3. 접수 정보</h3>
+        <span class="text-[11px] text-slate-400">공통 · 일시 · 채널</span>
+      </div>
+      <input type="hidden" name="priority" value="normal">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">접수자 <span class="text-red-500">*</span></label>
+          <input type="text" name="received_by" value="{{.AS.ReceivedBy}}" required
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="접수 담당자 이름">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">접수일시 <span class="text-red-500">*</span></label>
+          <input type="datetime-local" name="receipt_datetime" value="{{.ReceiptLocal}}" required
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">접수 채널</label>
+          <select name="receipt_channel" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            {{range .Channels}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.AS.ReceiptChannel}}selected{{end}}>{{.CodeName}}</option>{{end}}
+          </select>
+        </div>
+      </div>
+    </section>
+    {{end}}
 
     {{if .IsNew}}
     <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-sky-500 p-5 sm:p-6 space-y-3 shadow-sm">
@@ -210,10 +350,18 @@
     {{template "as_history_table" .}}
   </section>
 
+  {{if .IsNew}}
+  </div>
+  <aside id="as-similar-panel" class="hidden w-full lg:w-80 shrink-0 lg:sticky lg:top-4 space-y-2 mt-4 lg:mt-0"></aside>
+  {{else}}
+  </div>
+  {{end}}
+  </div>
+
   <div class="fixed bottom-0 inset-x-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3">
     <div class="max-w-5xl mx-auto flex gap-3 justify-end">
       <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="px-5 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">취소</a>
-      <button type="submit" form="as-form" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm">{{if .IsNew}}접수 등록{{else}}접수 저장{{end}}</button>
+      <button type="submit" form="as-form" id="as-submit-btn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm">{{if .IsNew}}접수 등록{{else}}접수 저장{{end}}</button>
     </div>
   </div>
 
@@ -228,6 +376,89 @@
     var initAsset = form.getAttribute('data-init-asset') || '';
     var initRequester = form.getAttribute('data-init-requester') || '';
     var excludeAS = form.getAttribute('data-exclude-as') || '';
+    var isMulti = form.getAttribute('data-multi') === '1';
+    var lastAssetList = [];
+    var lastContacts = [];
+    var CUSTOMERS = {{if .CustomersJSON}}{{.CustomersJSON}}{{else}}[]{{end}};
+    var CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+
+    function choSung(s) {
+      var out = '';
+      s = String(s || '');
+      for (var i = 0; i < s.length; i++) {
+        var c = s.charCodeAt(i);
+        if (c >= 0xAC00 && c <= 0xD7A3) out += CHO.charAt(Math.floor((c - 0xAC00) / 588));
+      }
+      return out;
+    }
+    function isAllCho(q) { return q.length > 0 && /^[ㄱ-ㅎ]+$/.test(q); }
+    function matchCustomer(c, q) {
+      if (!q) return true;
+      var hay = [c.org_name, c.short_name, c.region, c.id].map(function(v){ return String(v || '').toLowerCase(); }).join('\n');
+      if (hay.indexOf(q.toLowerCase()) >= 0) return true;
+      if (!isAllCho(q)) return false;
+      return (choSung(c.org_name) + choSung(c.short_name) + choSung(c.region)).indexOf(q) >= 0;
+    }
+    function assetFamily(a) {
+      var cat = String(a.product_category || a.ProductCategory || '').toLowerCase();
+      var blob = ((a.product_name || a.ProductName || '') + ' ' + (a.product_type || a.ProductType || '') + ' ' + cat).toLowerCase();
+      if (cat === 'rfid') return 'rfid';
+      if (cat === 'homepage' || cat === 'elibrary' || cat === 'mobile') return 'web';
+      if (cat === 'materials') return 'klas';
+      if (blob.indexOf('rfid') >= 0 || blob.indexOf('앤로보') >= 0 || blob.indexOf('자가대출') >= 0 || blob.indexOf('반납기') >= 0) return 'rfid';
+      if (blob.indexOf('klas') >= 0 || blob.indexOf('k-las') >= 0) return 'klas';
+      if (blob.indexOf('홈페이지') >= 0 || blob.indexOf('전자도서') >= 0 || blob.indexOf('elibrary') >= 0) return 'web';
+      return 'common';
+    }
+    function toggleUrgencyNote(sel) {
+      if (!sel) return;
+      var wrap = sel.parentNode && sel.parentNode.querySelector('.eq-urgency-note-wrap');
+      if (wrap) wrap.classList.toggle('hidden', sel.value !== 'other');
+    }
+    function filterUrgencySelect(sel, family) {
+      if (!sel) return;
+      var fam = family || 'common';
+      var showAll = fam === 'common';
+      var opts = sel.options;
+      for (var i = 0; i < opts.length; i++) {
+        var f = opts[i].getAttribute('data-family') || 'common';
+        var show = showAll || f === 'common' || f === fam;
+        opts[i].hidden = !show;
+        opts[i].disabled = !show;
+      }
+      var cur = sel.options[sel.selectedIndex];
+      if (cur && cur.hidden) {
+        for (var j = 0; j < opts.length; j++) {
+          if (opts[j].value === 'none' && !opts[j].hidden) { sel.value = 'none'; break; }
+        }
+      }
+      toggleUrgencyNote(sel);
+    }
+    function familyFromAssetSel(sel) {
+      if (!sel || !sel.value) return 'common';
+      var opt = sel.options[sel.selectedIndex];
+      return (opt && opt.getAttribute('data-family')) || 'common';
+    }
+    function syncUrgencyNear(assetSel) {
+      var row = assetSel && assetSel.closest ? assetSel.closest('.eq-row') : null;
+      var urg = row ? row.querySelector('.eq-urgency-reason') : document.getElementById('as-urgency-reason');
+      if (!urg && form) urg = form.querySelector('.eq-urgency-reason');
+      filterUrgencySelect(urg, familyFromAssetSel(assetSel));
+    }
+    function contactPhone(ct) {
+      return String(ct.mobile || ct.Mobile || ct.phone || ct.Phone || '').trim();
+    }
+    function updateContactReadonly() {
+      var el = document.getElementById('as-contact-readonly');
+      if (!el || !reqSel) return;
+      var name = reqSel.value;
+      if (!name || name === 'custom') { el.textContent = '—'; return; }
+      for (var i = 0; i < lastContacts.length; i++) {
+        var n = lastContacts[i].full_name || lastContacts[i].FullName;
+        if (n === name) { el.textContent = contactPhone(lastContacts[i]) || '—'; return; }
+      }
+      el.textContent = '—';
+    }
 
     function esc(s) {
       return String(s == null ? '' : s)
@@ -301,7 +532,7 @@
       wrap.classList.toggle('hidden', sel.value !== 'custom');
     }
 
-    function syncRequesterCustom() { toggleCustom(reqSel, reqCustomWrap); }
+    function syncRequesterCustom() { toggleCustom(reqSel, reqCustomWrap); updateContactReadonly(); }
     reqSel.addEventListener('change', syncRequesterCustom);
     syncRequesterCustom();
 
@@ -313,24 +544,50 @@
     var asgWrap = document.getElementById('as-assigned-custom-wrap');
     if (asg) { asg.addEventListener('change', function(){ toggleCustom(asg, asgWrap); }); toggleCustom(asg, asgWrap); }
 
+    function fillAssetSelect(sel, list, keep) {
+      if (!sel) return;
+      var keepVal = keep || '';
+      sel.innerHTML = '<option value="">자산 미연결 (나중에 매핑)</option>';
+      (list || []).forEach(function(a){
+        var opt = document.createElement('option');
+        opt.value = a.asset_id || a.AssetID;
+        opt.textContent = assetLabel(a);
+        opt.setAttribute('data-family', assetFamily(a));
+        if (keepVal && opt.value === keepVal) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+    function assetSelects() {
+      if (isMulti) return [].slice.call(form.querySelectorAll('.eq-asset'));
+      return assetSel ? [assetSel] : [];
+    }
+    function selectedAssetID() {
+      var sels = assetSelects();
+      return sels.length ? (sels[0].value || '') : '';
+    }
+
     function loadAssetsAndContacts(cid, keepAsset, keepRequester) {
-      assetSel.innerHTML = '<option value=\"\">자산 미연결 (나중에 매핑)</option>';
-      reqSel.innerHTML = '<option value=\"\">선택</option>';
-      if (!cid) { reqSel.innerHTML += '<option value=\"custom\">직접입력</option>'; syncRequesterCustom(); return; }
+      lastAssetList = [];
+      assetSelects().forEach(function(sel, i){
+        fillAssetSelect(sel, [], i === 0 ? keepAsset : '');
+      });
+      reqSel.innerHTML = '<option value="">선택</option>';
+      if (!cid) { lastContacts = []; reqSel.innerHTML += '<option value="custom">직접입력</option>'; syncRequesterCustom(); return; }
       fetch('/api/assets/' + encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(list){
-        (list || []).forEach(function(a){
-          var opt = document.createElement('option');
-          opt.value = a.asset_id || a.AssetID;
-          opt.textContent = assetLabel(a);
-          if (keepAsset && opt.value === keepAsset) opt.selected = true;
-          assetSel.appendChild(opt);
+        lastAssetList = list || [];
+        assetSelects().forEach(function(sel, i){
+          fillAssetSelect(sel, lastAssetList, i === 0 ? keepAsset : sel.value);
+          syncUrgencyNear(sel);
         });
       }).catch(function(){});
       fetch('/api/contacts/' + encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(list){
-        (list || []).forEach(function(ct){
+        lastContacts = list || [];
+        var primaryName = '';
+        lastContacts.forEach(function(ct){
           var opt = document.createElement('option');
           opt.value = ct.full_name || ct.FullName;
           opt.textContent = contactLabel(ct);
+          if (ct.is_primary || ct.IsPrimary) primaryName = opt.value;
           if (keepRequester && opt.value === keepRequester) opt.selected = true;
           reqSel.appendChild(opt);
         });
@@ -339,6 +596,8 @@
         if (keepRequester && ![].slice.call(reqSel.options).some(function(o){ return o.value === keepRequester; })) {
           custom.selected = true;
           document.getElementById('as-requester_custom').value = keepRequester;
+        } else if (!keepRequester && primaryName) {
+          reqSel.value = primaryName;
         }
         reqSel.appendChild(custom);
         syncRequesterCustom();
@@ -348,13 +607,283 @@
     custSel.addEventListener('change', function(){
       loadAssetsAndContacts(custSel.value, '', '');
       loadHistory(custSel.value);
+      fetchSimilar();
     });
+    if (assetSel) assetSel.addEventListener('change', function(){
+      fetchSimilar();
+      syncUrgencyNear(assetSel);
+    });
+    form.addEventListener('change', function(e){
+      if (!e.target || !e.target.classList) return;
+      if (e.target.classList.contains('eq-asset')) {
+        fetchSimilar();
+        syncUrgencyNear(e.target);
+      }
+      if (e.target.classList.contains('eq-urgency-reason')) toggleUrgencyNote(e.target);
+    });
+
+    (function bindCustomerSearch(){
+      var searchEl = document.getElementById('as-customer-search');
+      var listEl = document.getElementById('as-customer-list');
+      if (!searchEl || !listEl || !custSel) return;
+      var hi = -1;
+      var filtered = CUSTOMERS.slice();
+      function renderList() {
+        if (!filtered.length) {
+          listEl.innerHTML = '<div class="px-3 py-2 text-slate-400">일치하는 기관이 없습니다.</div>';
+          listEl.classList.remove('hidden');
+          hi = -1;
+          return;
+        }
+        listEl.innerHTML = filtered.map(function(c, i){
+          var sub = [c.short_name, c.region, c.id].filter(Boolean).join(' · ');
+          return '<button type="button" data-idx="'+i+'" class="as-cust-opt w-full text-left px-3 py-2 hover:bg-blue-50'+(i===hi?' bg-blue-50':'')+'">' +
+            '<span class="font-medium text-slate-800">'+esc(c.org_name)+'</span>' +
+            (sub ? '<span class="block text-xs text-slate-400">'+esc(sub)+'</span>' : '') +
+            '</button>';
+        }).join('');
+        listEl.classList.remove('hidden');
+      }
+      function applyFilter() {
+        var q = (searchEl.value || '').trim();
+        filtered = CUSTOMERS.filter(function(c){ return matchCustomer(c, q); });
+        if (hi >= filtered.length) hi = filtered.length - 1;
+        renderList();
+      }
+      function pick(c) {
+        if (!c) return;
+        custSel.value = c.id;
+        searchEl.value = c.org_name;
+        listEl.classList.add('hidden');
+        custSel.dispatchEvent(new Event('change'));
+      }
+      searchEl.addEventListener('input', function(){ hi = 0; applyFilter(); });
+      searchEl.addEventListener('focus', function(){ hi = 0; applyFilter(); });
+      searchEl.addEventListener('keydown', function(e){
+        if (listEl.classList.contains('hidden') && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+          applyFilter();
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!filtered.length) return;
+          hi = (hi + 1) % filtered.length;
+          renderList();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!filtered.length) return;
+          hi = (hi - 1 + filtered.length) % filtered.length;
+          renderList();
+        } else if (e.key === 'Enter') {
+          if (!listEl.classList.contains('hidden') && hi >= 0 && filtered[hi]) {
+            e.preventDefault();
+            pick(filtered[hi]);
+          }
+        } else if (e.key === 'Escape') {
+          listEl.classList.add('hidden');
+        }
+      });
+      listEl.addEventListener('mousedown', function(e){
+        var btn = e.target.closest('.as-cust-opt');
+        if (!btn) return;
+        e.preventDefault();
+        pick(filtered[parseInt(btn.getAttribute('data-idx'), 10)]);
+      });
+      searchEl.addEventListener('blur', function(){ setTimeout(function(){ listEl.classList.add('hidden'); }, 150); });
+    })();
+
+    var similarPanel = document.getElementById('as-similar-panel');
+    var symptomEl = document.getElementById('as-symptom');
+    var similarTimer = null;
+    var similarAbort = null;
+    function renderSimilar(items) {
+      if (!similarPanel) return;
+      if (!items || !items.length) {
+        similarPanel.classList.add('hidden');
+        similarPanel.innerHTML = '';
+        return;
+      }
+      similarPanel.classList.remove('hidden');
+      similarPanel.innerHTML = '<div class="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-2">' +
+        '<h3 class="text-sm font-semibold text-amber-950">비슷한 사례</h3>' +
+        items.map(function(it){
+          var actionClass = it.has_action ? 'text-slate-800' : 'text-slate-400';
+          var reopen = '';
+          if (it.can_reopen) {
+            reopen = '<form method="POST" action="/as/' + esc(it.as_id) + '/reopen" class="pt-1 space-y-1">' +
+              '<input type="text" name="reopen_reason" required placeholder="재접수 사유" class="w-full border border-amber-200 rounded px-2 py-1 text-xs">' +
+              '<button type="submit" class="w-full text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-100">동일 증상 재접수로 만들기</button></form>';
+          }
+          var badge = it.weight_label ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">' + esc(it.weight_label) + '</span>' : '';
+          return '<div class="bg-white rounded-lg border border-amber-100 p-3 space-y-1.5 text-sm">' +
+            '<div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">' +
+            '<a href="/as/' + esc(it.as_id) + '" class="font-mono font-semibold text-blue-700 hover:underline">' + esc(it.as_number) + '</a>' +
+            '<span>' + esc(it.org_name) + '</span>' +
+            '<span>' + esc(it.process_date || it.receipt_date) + '</span>' + badge + '</div>' +
+            '<p class="text-slate-800 leading-snug"><span class="text-[11px] text-slate-400">증상</span> ' + esc(it.symptom_summary) + '</p>' +
+            '<p class="leading-snug ' + actionClass + '"><span class="text-[11px] text-slate-400">조치</span> ' + esc(it.action_summary) + '</p>' +
+            reopen + '</div>';
+        }).join('') + '</div>';
+    }
+    function fetchSimilar() {
+      if (!similarPanel || !symptomEl) return;
+      var q = (symptomEl.value || '').trim();
+      if (q.length < 2) { renderSimilar([]); return; }
+      var url = '/as/similar?q=' + encodeURIComponent(q);
+      if (custSel && custSel.value) url += '&customer_id=' + encodeURIComponent(custSel.value);
+      var aid = selectedAssetID();
+      if (aid) url += '&asset_id=' + encodeURIComponent(aid);
+      if (excludeAS) url += '&exclude=' + encodeURIComponent(excludeAS);
+      if (similarAbort) similarAbort.abort();
+      similarAbort = new AbortController();
+      fetch(url, {signal: similarAbort.signal}).then(function(r){ return r.json(); }).then(function(data){
+        renderSimilar((data && data.items) || []);
+      }).catch(function(){});
+    }
+    if (symptomEl) {
+      symptomEl.addEventListener('input', function(){
+        clearTimeout(similarTimer);
+        similarTimer = setTimeout(fetchSimilar, 400);
+      });
+      if ((symptomEl.value || '').trim().length >= 2) fetchSimilar();
+    }
+
+    (function bindKw(){
+      var box = document.getElementById('as-kw-box');
+      var list = document.getElementById('as-kw-list');
+      var empty = document.getElementById('as-kw-empty');
+      var sug = document.getElementById('as-kw-suggested');
+      var src = document.getElementById('as-symptom');
+      if (!box || !list || !src) return;
+      var field = box.getAttribute('data-field') || 'symptom';
+      var t = null;
+      function checkedMap(){
+        var m = {};
+        list.querySelectorAll('input[type=checkbox]:checked').forEach(function(el){
+          var lab = el.closest('label');
+          m[el.value] = lab ? lab.getAttribute('data-label') || el.value : el.value;
+          m[el.value + ':g'] = lab ? lab.getAttribute('data-group') || '' : '';
+        });
+        return m;
+      }
+      function render(items){
+        var keep = checkedMap();
+        var sugIds = [];
+        var html = '';
+        (items || []).forEach(function(it){
+          var id = it.keyword_id;
+          sugIds.push(id);
+          var on = keep[id] ? ' checked' : '';
+          delete keep[id]; delete keep[id + ':g'];
+          html += '<label data-label="' + esc(it.keyword) + '" data-group="' + esc(it.kw_group) + '" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs border-slate-200 bg-white">' +
+            '<input type="checkbox" name="kw_' + field + '" value="' + esc(id) + '"' + on + ' class="rounded border-slate-300 text-blue-600">' +
+            '<span>' + esc(it.keyword) + '</span><span class="text-slate-400">' + esc(it.kw_group) + '</span></label>';
+        });
+        Object.keys(keep).forEach(function(k){
+          if (k.indexOf(':g') >= 0) return;
+          html += '<label data-label="' + esc(keep[k]) + '" data-group="' + esc(keep[k + ':g'] || '') + '" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs border-blue-300 bg-blue-50">' +
+            '<input type="checkbox" name="kw_' + field + '" value="' + esc(k) + '" checked class="rounded border-slate-300 text-blue-600">' +
+            '<span>' + esc(keep[k]) + '</span></label>';
+        });
+        list.innerHTML = html;
+        if (sug) sug.value = sugIds.join(',');
+        if (empty) empty.classList.toggle('hidden', html !== '');
+      }
+      function run(){
+        var q = (src.value || '').trim();
+        if (q.length < 2) { render([]); return; }
+        fetch('/as/keywords/suggest?q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(d){
+          render((d && d.items) || []);
+        }).catch(function(){});
+      }
+      src.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(run, 400); });
+      if ((src.value || '').trim().length >= 2) run();
+    })();
+
     if (custSel.value) {
       loadAssetsAndContacts(custSel.value, initAsset, initRequester);
       loadHistory(custSel.value);
     } else {
       loadHistory('');
     }
+
+    (function bindEq(){
+      var box = document.getElementById('eq-rows');
+      var tpl = document.getElementById('eq-row-template');
+      var addBtn = document.getElementById('eq-add');
+      var submitBtn = document.getElementById('as-submit-btn');
+      if (!box) return;
+      function rows() { return [].slice.call(box.querySelectorAll('.eq-row')); }
+      function filledCount() {
+        var n = 0;
+        rows().forEach(function(row){
+          var a = row.querySelector('.eq-asset');
+          var s = row.querySelector('textarea[name="eq_symptom"]');
+          if ((a && a.value) || (s && (s.value || '').trim())) n++;
+        });
+        return n;
+      }
+      function syncEqUI() {
+        var list = rows();
+        list.forEach(function(row, i){
+          var num = row.querySelector('.eq-row-num');
+          if (num) num.textContent = String(i + 1);
+          var rm = row.querySelector('.eq-remove');
+          if (rm) rm.classList.toggle('hidden', list.length < 2);
+        });
+        if (submitBtn) {
+          var n = Math.max(filledCount(), list.length);
+          submitBtn.textContent = n >= 2 ? ('저장 — 접수 ' + n + '건 생성') : '접수 등록';
+        }
+      }
+      function bindRow(row) {
+        var code = row.querySelector('.eq-assigned-code');
+        var wrap = row.querySelector('.eq-assigned-custom-wrap');
+        if (code) {
+          code.addEventListener('change', function(){ toggleCustom(code, wrap); });
+          toggleCustom(code, wrap);
+        }
+        var urg = row.querySelector('.eq-urgency-reason');
+        if (urg) {
+          urg.addEventListener('change', function(){ toggleUrgencyNote(urg); });
+          filterUrgencySelect(urg, familyFromAssetSel(row.querySelector('.eq-asset')));
+        }
+        var ta = row.querySelector('textarea[name="eq_symptom"]');
+        if (ta) ta.addEventListener('input', syncEqUI);
+      }
+      rows().forEach(bindRow);
+      box.addEventListener('click', function(e){
+        var btn = e.target.closest('.eq-remove');
+        if (!btn || rows().length < 2) return;
+        var row = btn.closest('.eq-row');
+        if (row) row.remove();
+        syncEqUI();
+      });
+      if (addBtn && tpl) {
+        addBtn.addEventListener('click', function(){
+          var node = tpl.content.firstElementChild.cloneNode(true);
+          fillAssetSelect(node.querySelector('.eq-asset'), lastAssetList, '');
+          box.appendChild(node);
+          bindRow(node);
+          syncEqUI();
+        });
+      }
+      form.addEventListener('submit', function(e){
+        var n = filledCount();
+        if (n < 1) n = rows().length;
+        if (n >= 2 && !confirm('접수 ' + n + '건이 생성됩니다. 계속할까요?')) {
+          e.preventDefault();
+        }
+      });
+      syncEqUI();
+    })();
+
+    (function initUrgency(){
+      if (assetSel) syncUrgencyNear(assetSel);
+      else {
+        var u = document.getElementById('as-urgency-reason');
+        if (u) filterUrgencySelect(u, 'common');
+      }
+    })();
   })();
   </script>
 </div>

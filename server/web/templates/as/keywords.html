@@ -1,0 +1,96 @@
+{{define "title"}}AS 키워드 사전 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <h2 class="text-lg font-bold text-slate-800">AS 키워드 사전</h2>
+      <p class="text-xs text-slate-500 mt-0.5">빈도 추출은 후보만 보여 줍니다. 사람이 고른 것만 사전에 들어갑니다. 인사말·조사·URL 조각은 후보에서 뺍니다.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
+      <a href="/as" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">목록</a>
+    </div>
+  </div>
+
+  {{if eq .Err "stopword"}}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">불용어(인사말 등)는 키워드로 넣을 수 없습니다.</div>
+  {{else if eq .Err "keyword"}}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">키워드와 구분을 입력하세요.</div>
+  {{else if .OK}}
+  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">저장했습니다.</div>
+  {{end}}
+
+  <form method="POST" action="/as/keywords" class="bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
+    <div class="sm:col-span-2">
+      <label class="block text-xs text-slate-500 mb-1">키워드</label>
+      <input name="keyword" required class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="예: 팝업">
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">구분</label>
+      <select name="kw_group" class="w-full border rounded-lg px-3 py-2 text-sm">
+        {{range .Groups}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">동의어</label>
+      <input name="synonyms" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="누리집,홈페이지">
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">순서</label>
+      <input name="sort_order" type="number" value="0" class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="bg-blue-600 text-white rounded-lg py-2 text-sm font-medium">사전에 추가</button>
+  </form>
+
+  {{if .Candidates}}
+  <section class="bg-white rounded-xl border border-amber-200 p-4 space-y-3">
+    <h3 class="text-sm font-semibold text-amber-950">본문에서 뽑은 후보</h3>
+    <p class="text-xs text-slate-500">자동으로 넣지 않습니다. 쓸 단어만 골라 사전에 추가하세요.</p>
+    <div class="flex flex-wrap gap-2">
+      {{range .Candidates}}
+      <form method="POST" action="/as/keywords" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-100 bg-amber-50 text-xs">
+        <input type="hidden" name="keyword" value="{{.Word}}">
+        <span class="font-medium">{{.Word}}</span>
+        <span class="text-slate-400">{{.Count}}</span>
+        <select name="kw_group" class="border-0 bg-transparent text-[11px]">
+          {{range $.Groups}}<option value="{{.}}">{{.}}</option>{{end}}
+        </select>
+        <button type="submit" class="text-blue-700 hover:underline">추가</button>
+      </form>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b text-xs text-slate-500">
+        <tr>
+          <th class="text-left px-3 py-2">키워드</th>
+          <th class="text-left px-3 py-2">구분</th>
+          <th class="text-left px-3 py-2">동의어</th>
+          <th class="text-right px-3 py-2">연결</th>
+          <th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {{range .Items}}
+        <tr class="{{if not .IsActive}}opacity-50{{end}}">
+          <td class="px-3 py-2">
+            <a href="/as/search?keyword_id={{.KeywordID}}" class="font-medium text-blue-700 hover:underline">{{.Keyword}}</a>
+          </td>
+          <td class="px-3 py-2 text-slate-500">{{.Group}}</td>
+          <td class="px-3 py-2 text-slate-500">{{if .Synonyms}}{{.Synonyms}}{{else}}—{{end}}</td>
+          <td class="px-3 py-2 text-right">{{.LinkCount}}</td>
+          <td class="px-3 py-2 text-right">
+            <form method="POST" action="/as/keywords/{{.KeywordID}}/delete" class="inline" onsubmit="return confirm('사전에서 지울까요? 건별 연결도 함께 지워집니다.');">
+              <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
+            </form>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

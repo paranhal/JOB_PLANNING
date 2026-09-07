@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strings"
 	"testing"
 
 	"customer-support/internal/model"
@@ -33,6 +34,21 @@ func TestGroupWorkItemsByAssigneeOrderAndUnassignedLast(t *testing.T) {
 	}
 	if g[0].Items[0].Prefix != model.WorkPrefixAS || g[0].Items[1].Prefix != model.WorkPrefixMaintenance {
 		t.Fatalf("같은 시각이면 유형 순: %s %s", g[0].Items[0].Prefix, g[0].Items[1].Prefix)
+	}
+}
+
+func TestMeetingFilterQueryKeepsDateAssigneeDisplay(t *testing.T) {
+	got := meetingFilterQuery("2026-08-11", "양기헌", "kanban")
+	if !strings.Contains(got, "date=2026-08-11") || !strings.Contains(got, "assignee=") || !strings.Contains(got, "display=kanban") {
+		t.Fatalf("%s", got)
+	}
+	list := meetingFilterQuery("2026-08-11", "양기헌", "list")
+	if !strings.Contains(list, "display=list") || !strings.Contains(list, "date=2026-08-11") {
+		t.Fatalf("list %s", list)
+	}
+	nav := meetingNavQuery("양기헌", "kanban")
+	if strings.Contains(nav, "date=") || !strings.Contains(nav, "display=kanban") {
+		t.Fatalf("nav %s", nav)
 	}
 }
 

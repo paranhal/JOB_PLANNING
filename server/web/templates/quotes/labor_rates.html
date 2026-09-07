@@ -1,0 +1,50 @@
+{{define "title"}}노임단가 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-4">
+  <div>
+    <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 견적</a>
+    <h2 class="text-xl font-bold text-gray-800 mt-1">SW기술자 노임단가 {{.Year}}</h2>
+    <p class="text-sm text-gray-500">한국소프트웨어산업협회 공표. 견적 화면은 이 표의 표준 요율로 시작합니다.</p>
+  </div>
+  {{if eq .FlashOK "saved"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">표준 요율을 저장했습니다. 이미 만든 견적 금액은 바뀌지 않습니다.</div>
+  {{end}}
+  {{if .CanWrite}}
+  <form method="post" action="/labor-rates" class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">제경비율 표준 (%)</label>
+      <input name="overhead_rate" value="{{printf "%g" .Overhead}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">기술료율 표준 (%)</label>
+      <input name="tech_fee_rate" value="{{printf "%g" .TechFee}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">표준 요율 저장</button>
+  </form>
+  {{end}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b"><tr>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">코드</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">직군</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">월 (M/M)</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">일 (M/D)</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">시 (M/H)</th>
+      </tr></thead>
+      <tbody class="divide-y">
+        {{range .Items}}
+        <tr>
+          <td class="px-4 py-2 font-mono text-xs">{{.JobCode}}</td>
+          <td class="px-4 py-2">{{.JobName}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .Monthly}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .Daily}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .Hourly}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">해당 연도 표가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

@@ -91,15 +91,13 @@ func main() {
 		return
 	}
 
+	if *apply {
+		log.Fatalf("§12.11.7: 검증 리포트 없이 반영할 수 없습니다. 관리 > 데이터 관리 > AS 반입에서 올려 주세요. (-apply 는 막혔습니다)")
+	}
+
 	plan := buildPlan(db, rows)
 	printPlan(plan)
-	if !*apply {
-		fmt.Println("\n미리보기입니다. 실제 적재하려면 -apply 를 붙여 실행하세요.")
-		return
-	}
-	if err := applyPlan(db, plan); err != nil {
-		log.Fatalf("적재 실패: %v", err)
-	}
+	fmt.Println("\n미리보기입니다. 반영은 관리 > 데이터 관리 > AS 반입에서 검증 리포트를 거친 뒤에만 됩니다.")
 }
 
 func cell(row []string, idx int) string {

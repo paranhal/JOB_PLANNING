@@ -15,7 +15,7 @@ import (
 const (
 	wsKindAction  = "action"  // 조치(완료 실적)
 	wsKindReceipt = "receipt" // 접수(당일 신규)
-	wsKindPlanned = "planned" // 예정업무(아직 완료되지 않은 그날 업무)
+	wsKindPlanned = "planned" // 삭제됨 — 들어오면 조치로 되돌린다. §14.2
 )
 
 type WorkStatusHandler struct {
@@ -28,15 +28,25 @@ func NewWorkStatusHandler(wb *repository.WBRepo, userRepo *repository.UserRepo, 
 	return &WorkStatusHandler{wb: wb, userRepo: userRepo, holidayRepo: holidayRepo}
 }
 
-// Calendar 업무처리현황 — 일일 업무 등록과 동일 UI. kind=action|receipt|planned
+// Calendar 업무처리현황 — 월 캘린더(기본). kind=action|receipt. §14.2 · §14.3
 func (h *WorkStatusHandler) Calendar(c echo.Context) error {
-	view := strings.TrimSpace(c.QueryParam("view"))
-	if view != regViewWeek && view != regViewMonth {
-		view = regViewDay
-	}
 	kind := strings.TrimSpace(c.QueryParam("kind"))
-	if kind != wsKindReceipt && kind != wsKindPlanned {
+	if kind == wsKindPlanned {
+		q := c.QueryParams()
+		q.Del("kind")
+		loc := "/work-status"
+		if enc := q.Encode(); enc != "" {
+			loc += "?" + enc
+		}
+		return c.Redirect(http.StatusFound, loc)
+	}
+	if kind != wsKindReceipt {
 		kind = wsKindAction
+	}
+
+	view := strings.TrimSpace(c.QueryParam("view"))
+	if view != regViewWeek && view != regViewDay {
+		view = regViewMonth
 	}
 
 	today := time.Now().Format(dateLayout)
@@ -47,7 +57,9 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	base = time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, time.Local)
 	period := buildRegisterPeriod(view, base, today)
 
-	assigneeFilter := normalizeAssigneeFilter(c.QueryParam("assignee"))
+	role := currentRole(c)
+	roleUnresolved := !model.IsKnownRole(role)
+	assigneeFilter, mineParam, scopeAll, showScopeToggle := workStatusResolveScope(c, role, roleUnresolved)
 	projectFilter := strings.TrimSpace(c.QueryParam("project"))
 
 	assignees, _ := h.userRepo.ListAssignable()
@@ -56,67 +68,45 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		colorNames = append(colorNames, u.FullName)
 	}
 
-	var tasks []model.WorkTask
-	var cardFn func(model.WorkTask) model.WBCard
-	scopeNote := ""
+	h.wb.SyncMaintenanceBoard()
+	actionTasks, err := h.wb.ListCompletedForStatusPeriod(period.From, period.To)
+	if err != nil {
+		return err
+	}
+	asIDs, _ := collectSourceIDs(actionTasks)
+	asStatus, _ := h.wb.ASStatusesByIDs(asIDs)
+	enrichCompletedStatus(actionTasks, asStatus)
 
-	if kind == wsKindReceipt {
-		tasks, err = h.wb.ListASReceivedBetween(period.From, period.To)
-		if err != nil {
-			return err
-		}
-		for _, t := range tasks {
-			colorNames = append(colorNames, t.Assignee)
-		}
-		model.SetAssigneeColorOrder(colorNames)
-		cardFn = receiptCardFromWork
-		scopeNote = "그날 신규 접수 건"
-	} else if kind == wsKindPlanned {
-		// 정기점검 일정 변경분을 먼저 일일업무에 반영한 뒤 집계한다.
-		h.wb.SyncMaintenanceBoard()
-		dated, err := h.wb.ListTasksDatedBetween(period.From, period.To)
-		if err != nil {
-			return err
-		}
-		asIDs, mntIDs := collectSourceIDs(dated)
-		asStatus, _ := h.wb.ASStatusesByIDs(asIDs)
-		mntDone, _ := h.wb.MaintenanceCompletedByIDs(mntIDs)
-		tasks = filterPlannedWorkTasks(dated, asStatus, mntDone)
-		enrichPlannedStatus(tasks, asStatus)
-		// 아직 일일업무로 만들지 않은 예정 건(AS 방문예정·점검 방문)도 합친다.
-		extra, err := h.wb.ListPlannedSourcesBetween(period.From, period.To)
-		if err != nil {
-			return err
-		}
-		tasks = append(tasks, extra...)
-		for _, t := range tasks {
-			colorNames = append(colorNames, t.Assignee)
-		}
-		model.SetAssigneeColorOrder(colorNames)
-		cardFn = plannedCardFromWork
-		scopeNote = "완료 전 예정·진행 업무"
-	} else {
-		// 통계「처리」와 같은 완료일 기준(AS 완료일시 · 점검 완료일 · 행정 배정일).
-		h.wb.SyncMaintenanceBoard()
-		tasks, err = h.wb.ListCompletedForStatusPeriod(period.From, period.To)
-		if err != nil {
-			return err
-		}
-		asIDs, _ := collectSourceIDs(tasks)
-		asStatus, _ := h.wb.ASStatusesByIDs(asIDs)
-		enrichCompletedStatus(tasks, asStatus)
-		for _, t := range tasks {
-			colorNames = append(colorNames, t.Assignee)
-		}
-		model.SetAssigneeColorOrder(colorNames)
-		cardFn = statusCardFromWork
-		scopeNote = "완료 실적(통계 처리와 동일 기준)"
+	receiptTasks, err := h.wb.ListASReceivedBetween(period.From, period.To)
+	if err != nil {
+		return err
 	}
 
-	tasks = filterTasksByAssignee(tasks, assigneeFilter)
-	tasks = filterTasksByProject(tasks, projectFilter)
-	// 좌(시간표)·우(단위업무)는 같은 집합. 시각이 없는 완료 건도 표시용 시각을 채운다.
-	tasks = ensureTimelineDisplayTimes(tasks)
+	actionTasks = filterTasksByAssignee(actionTasks, assigneeFilter)
+	actionTasks = filterTasksByProject(actionTasks, projectFilter)
+	receiptTasks = filterTasksByAssignee(receiptTasks, assigneeFilter)
+	receiptTasks = filterTasksByProject(receiptTasks, projectFilter)
+
+	var tasks []model.WorkTask
+	var cardFn func(model.WorkTask) model.WBCard
+	kindNote := "완료 실적(통계 처리와 동일 기준)"
+	if kind == wsKindReceipt {
+		tasks = receiptTasks
+		cardFn = receiptCardFromWork
+		kindNote = "그날 신규 접수 건"
+	} else {
+		tasks = actionTasks
+		cardFn = statusCardFromWork
+	}
+	for _, t := range actionTasks {
+		colorNames = append(colorNames, t.Assignee)
+	}
+	for _, t := range receiptTasks {
+		colorNames = append(colorNames, t.Assignee)
+	}
+	model.SetAssigneeColorOrder(colorNames)
+
+	scopeNote := kindNote + " · " + registerScopeNote(role, scopeAll, assigneeFilter, roleUnresolved)
 
 	var asCards, mntCards, adminCards []model.WBCard
 	for _, t := range tasks {
@@ -132,17 +122,16 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	}
 
 	projects, _ := h.wb.ListProjects(true)
-
-	slotTimes := registerSlotTimes()
-	dayCols := buildRegisterDayColumns(period.Columns, tasks, cardFn)
 	holi := loadHolidays(h.holidayRepo, period.From, period.To)
-	decorateRegisterColumns(period.Columns, today, holi)
-	decorateRegisterDayColumns(dayCols, today, holi)
-	assigneeLegend := buildAssigneeLegend(tasks, assignees, asCards, mntCards, adminCards)
-	gridHeightStyle, slotTopStyles := registerGridStyles(len(slotTimes))
 	var monthWeeks [][]RegisterMonthDay
-	if view == regViewMonth {
+	switch view {
+	case regViewWeek:
+		monthWeeks = buildRegisterWeekDays(period.Columns, today, tasks, cardFn, registerWeekVisibleMax)
+		attachStatusDayCounts(monthWeeks, actionTasks, receiptTasks)
+		decorateMonthWeeks(monthWeeks, today, holi, nil)
+	case regViewMonth:
 		monthWeeks = buildRegisterMonthWeeks(base, today, tasks, cardFn)
+		attachStatusDayCounts(monthWeeks, actionTasks, receiptTasks)
 		decorateMonthWeeks(monthWeeks, today, holi, nil)
 	}
 
@@ -151,8 +140,37 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	adminStats := buildCardStats(adminCards, today)
 
 	dateStr := base.Format(dateLayout)
-	filterQ := workStatusFilterQuery(assigneeFilter, projectFilter, kind)
-	plannedURL := registerURLWithProject(view, dateStr, assigneeFilter, projectFilter)
+	queryAssignee := assigneeFilter
+	mineForQuery := ""
+	if showScopeToggle {
+		queryAssignee = ""
+		if mineParam == "0" {
+			mineForQuery = "0"
+		}
+	}
+	filterQ := workStatusFilterQuery(queryAssignee, projectFilter, kind, mineForQuery)
+	plannedURL := registerURLWithProject(view, dateStr, queryAssignee, projectFilter)
+	if mineForQuery != "" {
+		plannedURL += "&mine=" + url.QueryEscape(mineForQuery)
+	}
+
+	missing, _ := h.wb.CountMissingCompleteDates()
+	missingAssignee, _ := h.wb.CountMissingAssignees()
+	showMissing := strings.TrimSpace(c.QueryParam("missing"))
+	var missingItems []model.WorkTask
+	missingTitle := ""
+	switch showMissing {
+	case "complete":
+		missingTitle = "완료일 미기록"
+		if missing.Total() > 0 {
+			missingItems, _ = h.wb.ListMissingCompleteDates()
+		}
+	case "assignee":
+		missingTitle = "담당자 미배정"
+		if missingAssignee.Total() > 0 {
+			missingItems, _ = h.wb.ListMissingAssignees()
+		}
+	}
 
 	return c.Render(http.StatusOK, "work_status/timeline.html", map[string]interface{}{
 		"Title":           "업무처리현황",
@@ -165,14 +183,8 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"PrevDate":        period.Prev,
 		"NextDate":        period.Next,
 		"Today":           today,
-		"Columns":         period.Columns,
-		"DayColumns":      dayCols,
 		"MonthWeeks":      monthWeeks,
-		"SlotTimes":       slotTimes,
-		"SlotRem":         registerSlotRem,
-		"GridHeightStyle": gridHeightStyle,
-		"SlotTopStyles":   slotTopStyles,
-		"AssigneeLegend":  assigneeLegend,
+		"WeekdayLabels":   workStatusWeekdayLabels(view),
 		"ASCards":         asCards,
 		"MntCards":        mntCards,
 		"AdminCards":      adminCards,
@@ -189,6 +201,19 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"FilterQ":         filterQ,
 		"PlannedURL":      plannedURL,
 		"ScopeNote":       scopeNote,
+		"Role":            role,
+		"RoleUnresolved":  roleUnresolved,
+		"ShowScopeToggle": showScopeToggle,
+		"ScopeAll":        scopeAll,
+		"MineParam":       mineParam,
+		"TeamHref":        workStatusURL(view, dateStr, kind, "", projectFilter, "0"),
+		"MineHref":        workStatusURL(view, dateStr, kind, "", projectFilter, ""),
+		"MissingComplete": missing,
+		"MissingAssignee": missingAssignee,
+		"HolidayMissing":  holidayMissingBanner(h.holidayRepo, base.Year()),
+		"ShowMissing":     showMissing,
+		"MissingTitle":    missingTitle,
+		"MissingItems":    missingItems,
 	})
 }
 
@@ -203,7 +228,7 @@ func workStatusViewLabel(view string) string {
 	}
 }
 
-func workStatusFilterQuery(assignee, project, kind string) string {
+func workStatusFilterQuery(assignee, project, kind, mine string) string {
 	v := url.Values{}
 	if assignee != "" {
 		v.Set("assignee", assignee)
@@ -214,11 +239,99 @@ func workStatusFilterQuery(assignee, project, kind string) string {
 	if kind != "" && kind != wsKindAction {
 		v.Set("kind", kind)
 	}
+	if mine != "" {
+		v.Set("mine", mine)
+	}
 	enc := v.Encode()
 	if enc == "" {
 		return ""
 	}
 	return "&" + enc
+}
+
+func workStatusURL(view, date, kind, assignee, project, mine string) string {
+	v := url.Values{}
+	if view != "" {
+		v.Set("view", view)
+	}
+	if date != "" {
+		v.Set("date", date)
+	}
+	if kind != "" && kind != wsKindAction {
+		v.Set("kind", kind)
+	}
+	if assignee != "" {
+		v.Set("assignee", assignee)
+	}
+	if project != "" {
+		v.Set("project", project)
+	}
+	if mine != "" {
+		v.Set("mine", mine)
+	}
+	enc := v.Encode()
+	if enc == "" {
+		return "/work-status"
+	}
+	return "/work-status?" + enc
+}
+
+func workStatusWeekdayLabels(view string) []string {
+	if view == regViewWeek {
+		return []string{"월", "화", "수", "목", "금", "토", "일"}
+	}
+	return []string{"일", "월", "화", "수", "목", "금", "토"}
+}
+
+func workStatusResolveScope(c echo.Context, role string, unresolved bool) (assignee, mineParam string, scopeAll, showToggle bool) {
+	mineParam = c.QueryParam("mine")
+	assignee = normalizeAssigneeFilter(c.QueryParam("assignee"))
+	scopeAll = true
+	if unresolved {
+		return
+	}
+	if role == model.RoleAdmin || role == model.RoleOffice {
+		scopeAll = assignee == ""
+		return
+	}
+	if role == model.RoleTech || role == model.RoleSales || role == model.RoleObserver {
+		showToggle = true
+		if mineParam == "0" {
+			scopeAll = true
+			return
+		}
+		scopeAll = false
+		if assignee == "" {
+			assignee = currentUserDisplayName(c)
+		}
+	}
+	return
+}
+
+func attachStatusDayCounts(weeks [][]RegisterMonthDay, action, receipt []model.WorkTask) {
+	ac := countTasksByWorkDate(action)
+	rc := countTasksByWorkDate(receipt)
+	for wi := range weeks {
+		for di := range weeks[wi] {
+			d := weeks[wi][di].Date
+			if d == "" {
+				continue
+			}
+			weeks[wi][di].ActionCount = ac[d]
+			weeks[wi][di].ReceiptCount = rc[d]
+		}
+	}
+}
+
+func countTasksByWorkDate(tasks []model.WorkTask) map[string]int {
+	m := map[string]int{}
+	for _, t := range tasks {
+		d := strings.TrimSpace(t.WorkDate)
+		if d != "" {
+			m[d]++
+		}
+	}
+	return m
 }
 
 func collectSourceIDs(tasks []model.WorkTask) (asIDs, mntIDs []string) {
@@ -284,6 +397,10 @@ func enrichCompletedStatus(tasks []model.WorkTask, asStatus map[string]string) {
 
 func statusCardFromWork(t model.WorkTask) model.WBCard {
 	card := taskCardFromWork(t)
+	if href := strings.TrimSpace(t.BoardHref); href != "" {
+		card.ActionHref = href
+		card.SourceHref = href
+	}
 	switch t.SourceType {
 	case model.WBSourceAS:
 		card.Status = t.Status
@@ -293,7 +410,7 @@ func statusCardFromWork(t model.WorkTask) model.WBCard {
 		}
 	case model.WBSourceMaintenance:
 		card.Status = model.WBTaskComplete
-		card.StatusLabel = "완료"
+		card.StatusLabel = "방문완료"
 	default:
 		card.Status = model.WBTaskComplete
 		card.StatusLabel = "완료"

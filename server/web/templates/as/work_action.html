@@ -70,13 +70,6 @@
           <input type="text" name="assigned_to_custom" value="{{if and .Work.AssignedTo (not .Work.AssignedUserID)}}{{.Work.AssignedTo}}{{end}}" placeholder="직접입력 시 이름" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2">
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">상태</label>
-          <select name="status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            <option value="open" {{if ne .Work.Status "done"}}selected{{end}}>진행중</option>
-            <option value="done" {{if eq .Work.Status "done"}}selected{{end}}>완료</option>
-          </select>
-        </div>
-        <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">예정일자</label>
           <input type="date" name="scheduled_date" value="{{.Work.ScheduledDate}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
         </div>

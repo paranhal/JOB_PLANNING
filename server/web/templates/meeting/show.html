@@ -9,6 +9,7 @@
         <h2 class="text-xl font-bold text-gray-800">일일 업무 회의</h2>
         <form method="GET" action="/meeting" class="inline-flex items-center gap-2">
           <input type="hidden" name="date" value="{{.Date}}">
+          {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
           <label class="text-sm text-gray-600" for="meeting-assignee">담당자</label>
           <select id="meeting-assignee" name="assignee" onchange="this.form.submit()"
                   class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
@@ -22,14 +23,17 @@
       <p class="text-sm text-gray-500 mt-1">{{.ScopeNote}} · 기준일 {{.Date}}</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/meeting?date={{.PrevDate}}&{{.AssigneeQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">← 전일</a>
+      <a href="/meeting?date={{.PrevDate}}&{{.NavQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">← 전일</a>
       <form method="GET" action="/meeting" class="inline-flex items-center gap-2">
         <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
                class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
         <input type="hidden" name="assignee" value="{{if .Assignee}}{{.Assignee}}{{else}}all{{end}}">
+        {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
       </form>
-      <a href="/meeting?date={{.NextDate}}&{{.AssigneeQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">익일 →</a>
-      <a href="/meeting?{{.AssigneeQ}}" class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 hover:bg-blue-100">오늘</a>
+      <a href="/meeting?date={{.NextDate}}&{{.NavQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">익일 →</a>
+      <a href="/meeting?{{.NavQ}}" class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 hover:bg-blue-100">오늘</a>
+      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
+      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
     </div>
   </div>
 
@@ -72,6 +76,10 @@
     </a>
   </div>
 
+  {{if eq .Display "kanban"}}
+  <p class="text-sm text-gray-500">칸반 {{.KanbanTotal}}건 · 리스트 전일 {{.YesterdayN}} · 오늘 예정 {{.TodayN}}</p>
+  {{template "kanban_board" .}}
+  {{else}}
   <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
@@ -169,5 +177,6 @@
       </div>
     </div>
   </div>
+  {{end}}
 </div>
 {{end}}

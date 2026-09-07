@@ -17,6 +17,20 @@ func (r *SalesRepo) PipelineFilter(now time.Time, extraPeople []string, f SalesL
 	if err != nil {
 		return model.SalesPipeline{}, err
 	}
+	skip, err := NewQuoteRepo(r.db).NonDealQuoteSalesIDs()
+	if err != nil {
+		return model.SalesPipeline{}, err
+	}
+	if len(skip) > 0 {
+		kept := items[:0]
+		for i := range items {
+			if skip[items[i].SalesID] {
+				continue
+			}
+			kept = append(kept, items[i])
+		}
+		items = kept
+	}
 	stages, _ := r.StagesFor(f.DealType)
 	hist, err := r.ListAllHistory()
 	if err != nil {
@@ -144,4 +158,28 @@ func filterSalesActivitiesByID(items []model.SalesActivity, ids map[string]bool)
 		}
 	}
 	return out
+}
+
+type SupplyMetrics struct {
+	ConversionSubmitted int
+	ConversionWon       int
+}
+
+func (r *SalesRepo) LoadSupplyMetrics(_ time.Time, _ bool) (SupplyMetrics, error) {
+	items, err := NewQuoteRepo(r.db).List(QuoteFilter{Purpose: model.QuotePurposeDeal})
+	if err != nil {
+		return SupplyMetrics{}, err
+	}
+	var m SupplyMetrics
+	for _, q := range items {
+		st := model.NormalizeQuoteStatus(q.Status)
+		if st == model.QuoteStatusDraft {
+			continue
+		}
+		m.ConversionSubmitted++
+		if st == model.QuoteStatusWon {
+			m.ConversionWon++
+		}
+	}
+	return m, nil
 }

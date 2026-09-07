@@ -278,7 +278,7 @@ func (r *WBRepo) CountWaitingActionsByTasks(ids []string) (map[string]int, error
 	return out, rows.Err()
 }
 
-// ListWaitingActionsDueCheck 다음 확인일이 그날인 회신 대기 행동(시간표에는 올리지 않고 할 일로만 표시).
+// ListWaitingActionsDueCheck 다음 확인일이 그날인 회신 대기 행동(일정표에는 올리지 않고 할 일로만 표시).
 func (r *WBRepo) ListWaitingActionsDueCheck(today string) ([]model.WorkAction, error) {
 	rows, err := r.db.Query(workActionSelect+`
 		WHERE status='waiting' AND COALESCE(confirmed,0)=0

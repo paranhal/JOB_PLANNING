@@ -1,0 +1,50 @@
+{{define "title"}}지역 거리 순서 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-3xl space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 justify-between items-start">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">지역 거리 순서</h2>
+      <p class="text-sm text-gray-500 mt-1">당사 기준 가까운 시·군·구부터 번호를 매깁니다. 위경도는 없고 이 표만 씁니다. 한 번 정하면 자동 배정(근거리·원거리)에 계속 사용합니다.</p>
+    </div>
+    <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">점검 사이트 설정</a>
+  </div>
+
+  {{if .Saved}}
+  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">순서를 저장했습니다.</div>
+  {{end}}
+
+  <form method="POST" action="/maintenance/sites/distance" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="text-left px-4 py-3">시·도</th>
+          <th class="text-left px-4 py-3">시·군·구</th>
+          <th class="text-left px-4 py-3 w-28">가까운 순</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Rows}}
+        <tr>
+          <td class="px-4 py-2">
+            <input type="hidden" name="sido" value="{{.Sido}}">{{if .Sido}}{{.Sido}}{{else}}—{{end}}
+          </td>
+          <td class="px-4 py-2">
+            <input type="hidden" name="sigungu" value="{{.Sigungu}}">{{if .Sigungu}}{{.Sigungu}}{{else}}(시·도 전체){{end}}
+          </td>
+          <td class="px-4 py-2">
+            <input type="number" name="sort_order" min="0" step="1" value="{{if .SortOrder}}{{.SortOrder}}{{end}}"
+                   placeholder="미등록" class="w-24 border border-gray-300 rounded-lg px-2 py-1">
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="3" class="px-4 py-6 text-gray-500">사이트 설정의 고객 주소(시·도·시군구)가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+    <div class="px-4 py-3 border-t border-gray-100 flex items-center gap-3">
+      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">저장</button>
+      <p class="text-xs text-gray-500">번호를 비우거나 0이면 순서 미등록(자동 배정 때 맨 뒤)입니다.</p>
+    </div>
+  </form>
+</div>
+{{end}}

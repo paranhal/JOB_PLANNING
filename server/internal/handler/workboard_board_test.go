@@ -35,6 +35,8 @@ func newWorkboardServer(t *testing.T, name string) (*echo.Echo, *repository.WBRe
 	g.GET("/workboard/kanban", h.Workboard.Kanban)
 	g.GET("/workboard/tasks", h.Workboard.List)
 	g.GET("/workboard/register", h.Workboard.Register)
+	g.POST("/workboard/register/kanban-move", h.Workboard.RegisterKanbanMove)
+	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)
 	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.POST("/workboard/projects", h.Workboard.CreateProject)

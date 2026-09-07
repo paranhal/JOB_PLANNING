@@ -182,7 +182,7 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		       COALESCE(a.loc_building_name,''), COALESCE(a.loc_floor_name,''), COALESCE(a.loc_room_name,''),
 		       COALESCE(a.install_location,''),
 		       COALESCE(a.location_detail,''), COALESCE(a.notes,''),
-		       COALESCE(a.project_id,''),
+		       COALESCE(a.project_id,''), COALESCE(a.sales_order_id,''),
 		       a.created_at, a.updated_at,
 		       c.org_name,
 		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
@@ -217,7 +217,7 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		&a.LocBuildingName, &a.LocFloorName, &a.LocRoomName,
 		&a.InstallLocation,
 		&a.LocationDetail, &a.Notes,
-		&a.ProjectID,
+		&a.ProjectID, &a.SalesOrderID,
 		&createdAt, &updatedAt,
 		&a.OrgName, &a.BuildingName, &a.FloorName, &a.RoomName,
 		&a.ProjectName,
@@ -253,9 +253,9 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 			customer_contact_id, our_contact,
 			building_id, floor_id, room_id,
 			loc_building_name, loc_floor_name, loc_room_name,
-			install_location, location_detail, notes, project_id,
+			install_location, location_detail, notes, project_id, sales_order_id,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
 		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
@@ -266,7 +266,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
 		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
-		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, now,
+		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), a.SalesOrderID, now, now,
 	)
 	if err != nil {
 		return err
@@ -306,6 +306,27 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, a.AssetID,
 		)
 		return err
+	})
+}
+
+func (r *AssetRepo) UpdateOperationStatus(id, status string) error {
+	status = model.AssignAssetKanbanColumn(status)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return sql.ErrNoRows
+	}
+	return touchUpdate(r.db, "assets", "asset_id", id, "운영상태", func() error {
+		res, err := r.db.Exec(
+			`UPDATE assets SET operation_status=?, updated_at=? WHERE asset_id=?`,
+			status, time.Now().Format("2006-01-02 15:04:05"), id)
+		if err != nil {
+			return err
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			return sql.ErrNoRows
+		}
+		return nil
 	})
 }
 
@@ -444,6 +465,41 @@ func (r *AssetRepo) ListMaintExport(customerIDs []string) ([]model.Asset, error)
 		}
 		if _, ok := allow[a.CustomerID]; !ok {
 			continue
+		}
+		items = append(items, a)
+	}
+	return items, rows.Err()
+}
+
+func (r *AssetRepo) ListBySalesOrder(orderID string) ([]model.Asset, error) {
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT asset_id, customer_id, COALESCE(product_name,''), COALESCE(product_category,''),
+			COALESCE(model_name,''), COALESCE(manufacturer,''), COALESCE(serial_number,''),
+			COALESCE(install_date,''), COALESCE(installer_type,''), COALESCE(install_location,''),
+			COALESCE(maint_contract_type,''), COALESCE(maint_cycle,''),
+			COALESCE(maint_start_date,''), COALESCE(maint_end_date,''),
+			COALESCE(maint_billing_party,''), COALESCE(maint_billing_cycle,''),
+			COALESCE(sales_order_id,'')
+		FROM assets WHERE sales_order_id=? ORDER BY asset_id`, orderID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such column") || strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.Asset
+	for rows.Next() {
+		var a model.Asset
+		if err := rows.Scan(&a.AssetID, &a.CustomerID, &a.ProductName, &a.ProductCategory,
+			&a.ModelName, &a.Manufacturer, &a.SerialNumber, &a.InstallDate, &a.InstallerType, &a.InstallLocation,
+			&a.MaintContractType, &a.MaintCycle, &a.MaintStartDate, &a.MaintEndDate,
+			&a.MaintBillingParty, &a.MaintBillingCycle, &a.SalesOrderID); err != nil {
+			return nil, err
 		}
 		items = append(items, a)
 	}

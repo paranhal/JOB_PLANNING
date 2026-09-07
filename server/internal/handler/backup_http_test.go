@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,6 +40,7 @@ func TestBackupPageAndSave(t *testing.T) {
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/admin/data", h.Backup.Page)
 	g.POST("/admin/data/save", h.Backup.Save)
+	g.POST("/admin/data/metrics", h.Backup.SaveMetrics)
 	g.POST("/admin/backup", h.Backup.Save)
 
 	show := httptest.NewRecorder()
@@ -61,6 +63,12 @@ func TestBackupPageAndSave(t *testing.T) {
 	if !strings.Contains(body, "정합성 점검") {
 		t.Error("정합성 점검 탭이 없다")
 	}
+	if !strings.Contains(body, "AS 반입") {
+		t.Error("AS 반입 탭이 없다")
+	}
+	if !strings.Contains(body, "지표 기준") {
+		t.Error("지표 기준 탭이 없다")
+	}
 
 	un := httptest.NewRecorder()
 	reqU := httptest.NewRequest(http.MethodGet, "http://localhost/admin/data?tab=unassigned", nil)
@@ -82,6 +90,40 @@ func TestBackupPageAndSave(t *testing.T) {
 	}
 	if !strings.Contains(chk.Body.String(), "V-11") || !strings.Contains(chk.Body.String(), "연도가 2000") {
 		t.Error("V-11 연도 범위 항목이 없다")
+	}
+	if !strings.Contains(chk.Body.String(), "V-12") || !strings.Contains(chk.Body.String(), "착수가 완료보다") {
+		t.Error("V-12 착수>완료 항목이 없다")
+	}
+
+	met := httptest.NewRecorder()
+	reqM := httptest.NewRequest(http.MethodGet, "http://localhost/admin/data?tab=metrics", nil)
+	reqM.AddCookie(jwtCookie(t))
+	e.ServeHTTP(met, reqM)
+	if met.Code != http.StatusOK {
+		t.Fatalf("지표 탭: status=%d", met.Code)
+	}
+	mb := met.Body.String()
+	if !strings.Contains(mb, "name=\"metrics_base_date\"") || !strings.Contains(mb, "name=\"progress_scope\"") {
+		t.Error("지표 설정 폼이 없다")
+	}
+	if !strings.Contains(mb, "4주 연속 90%") {
+		t.Error("실행률 되돌림 조건이 없다")
+	}
+
+	form := url.Values{}
+	form.Set("metrics_base_date", "2026-08-10")
+	form.Set("progress_scope", "as,maintenance")
+	recM := httptest.NewRecorder()
+	reqSave := httptest.NewRequest(http.MethodPost, "http://localhost/admin/data/metrics", strings.NewReader(form.Encode()))
+	reqSave.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqSave.AddCookie(jwtCookie(t))
+	e.ServeHTTP(recM, reqSave)
+	if recM.Code != http.StatusSeeOther {
+		t.Fatalf("지표 저장: status=%d", recM.Code)
+	}
+	got, _ := repository.NewSettingsRepo(db).Get(repository.SettingMetricsBaseDate)
+	if got != "2026-08-10" {
+		t.Fatalf("기준일 저장=%q", got)
 	}
 
 	rec := httptest.NewRecorder()

@@ -53,7 +53,8 @@ func TestASActionDoneRequiresWorkPlaceCauseProcessType(t *testing.T) {
 		"status":       {"in_progress"},
 		"work_place":   {"field"},
 		"process_type": {"visit"},
-		"cause_type":   {"hw"},
+		"cause_cat1":   {"server"},
+		"cause_cat2":   {"server.hw"},
 		"action_taken": {"현장 점검 완료"},
 		"time_spent":   {"30"},
 		"result_code":  {model.ResultDone},
@@ -63,7 +64,7 @@ func TestASActionDoneRequiresWorkPlaceCauseProcessType(t *testing.T) {
 	}{
 		{"work_place", "work_place"},
 		{"process_type", "process_type"},
-		{"cause_type", "cause_type"},
+		{"cause_cat2", "cause_cat2"},
 	}
 	for _, tc := range cases {
 		e, h, asRepo, _, asID := newASActionFixture(t)
@@ -129,7 +130,7 @@ func TestASActionPageMapsActionRequiredBanner(t *testing.T) {
 	cases := []struct{ code, msg string }{
 		{"action_required", "조치내용을 입력하세요"},
 		{"work_place", "근무구분(내근/외근)을 선택하세요"},
-		{"cause_type", "원인분류를 선택하세요"},
+		{"cause_cat2", "2차 분류를 선택하세요"},
 		{"process_type", "처리유형을 선택하세요"},
 	}
 	for _, tc := range cases {

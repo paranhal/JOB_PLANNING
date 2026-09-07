@@ -136,6 +136,18 @@ func TestStatsReportsPageCardsAndExistingEndpoints(t *testing.T) {
 	if !strings.Contains(ob, "보고서로 이동") || !strings.Contains(ob, `href="/stats/reports`) {
 		t.Fatal("보고서로 이동 링크 없음")
 	}
+	if !strings.Contains(ob, "최근 1개월") {
+		t.Fatal("통계 기본 기간이 최근 1개월이 아니다")
+	}
+	if !strings.Contains(ob, "2026-08-03 이후 데이터 기준") {
+		t.Fatal("통계 상단에 기준일 안내가 없다")
+	}
+	if !strings.Contains(ob, "AS · 정기점검 기준") {
+		t.Fatal("실행률 카드에 대상 안내가 없다")
+	}
+	if !strings.Contains(body, "2026-08-03 이후 데이터 기준") {
+		t.Fatal("보고서 상단에 기준일 안내가 없다")
+	}
 }
 
 func TestStatsReportsRequiresLogin(t *testing.T) {

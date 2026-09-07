@@ -153,9 +153,10 @@ type StatsWorkSlice struct {
 
 // StatsBucketCounts 한 기간의 집계
 type StatsBucketCounts struct {
-	AS    StatsWorkSlice
-	Mnt   StatsWorkSlice
-	Admin StatsWorkSlice
+	AS            StatsWorkSlice
+	Mnt           StatsWorkSlice
+	Admin         StatsWorkSlice
+	ProgressScope string // 실행률 대상. 비면 전 유형. 건수 합계 PlannedTotal 에는 쓰지 않는다 (§4.5.4)
 }
 
 func (b StatsBucketCounts) PlannedTotal() int {
@@ -194,7 +195,32 @@ func (s StatsWorkSlice) ExecutionRatePct() float64 {
 }
 
 func (b StatsBucketCounts) HasExecutionRate() bool {
-	return b.PlannedTotal() > 0
+	p, _ := b.execParts()
+	return p > 0
+}
+
+// execParts 계획 대비 실행률의 분모·분자만 고른다 (§4.5.4).
+// progress_scope 에 admin 이 없으면 행정·지원은 여기만 빠진다. 건수·소요시간은 PlannedTotal 등을 쓴다.
+// 되돌림: 행정·지원 예정일 입력률이 4주 연속 90% 이상이면 app_settings.progress_scope 에 admin 을 넣는다.
+func (b StatsBucketCounts) execParts() (planned, onPlan int) {
+	if ProgressScopeIncludes(b.ProgressScope, "as") {
+		planned += b.AS.Planned
+		onPlan += b.AS.OnPlan
+	}
+	if ProgressScopeIncludes(b.ProgressScope, "maintenance") {
+		planned += b.Mnt.Planned
+		onPlan += b.Mnt.OnPlan
+	}
+	if ProgressScopeIncludes(b.ProgressScope, "admin") {
+		planned += b.Admin.Planned
+		onPlan += b.Admin.OnPlan
+	}
+	return planned, onPlan
+}
+
+func (b StatsBucketCounts) ExecPlanned() int {
+	p, _ := b.execParts()
+	return p
 }
 
 // StatsGrade §4.4 신뢰도 등급
@@ -320,11 +346,10 @@ func DailyAvgCompleted(completed, workingDays int) (float64, bool) {
 // 예정 중 "계획대로(예정일 당일) 완료"한 비율. 처리 건수와 무관하며 100%를 넘지 않음.
 // 예: 예정 4곳 중 2곳만 일정 변경 → (4-2)/4 = 50% (= OnPlan/Planned).
 func (b StatsBucketCounts) ExecutionRatePct() float64 {
-	p := b.PlannedTotal()
+	p, on := b.execParts()
 	if p <= 0 {
 		return 0
 	}
-	on := b.OnPlanTotal()
 	if on < 0 {
 		on = 0
 	}
@@ -350,7 +375,10 @@ type StatsMeetingFilter struct {
 	Scope         string // team | assignee | work_type | product
 	Key           string // 담당자명 · as|maintenance|admin · 제품명
 	ProjectID     string // 사업(work_projects) 선택 시
-	IncludeImport bool   // true면 data_origin=import 포함. 기본은 제외(§4.3)
+	IncludeImport         bool // true면 data_origin=import 포함. 기본은 제외(§4.3)
+	ExcludeSalesActivity  bool // true면 source_type=sales_activity 를 실행률에서 뺀다. 기본은 포함(§32.11)
+	MetricsBaseDate       string // 집계 하한 YYYY-MM-DD. 설정에서 채운다. 토글로 풀리지 않는다 (§4.5.3)
+	ProgressScope         string // 실행률 대상. 예: as,maintenance (§4.5.4)
 }
 
 // StatsKPICard 상단 중요 통계 카드
@@ -367,6 +395,7 @@ type StatsKPICard struct {
 	CompleteSample  int
 	HasVisit        bool
 	HasComplete     bool
+	LeadTimeWarn    string // §4.6.5 방문 > 완료이면 화면 경고
 	ExecDisplay     StatsValue
 	VisitDisplay    StatsValue
 	CompleteDisplay StatsValue
@@ -462,16 +491,18 @@ type WeeklyPersonRow struct {
 
 // WeeklyEventRow 전체 리스트 1행. 같은 건의 접수·조치·완료는 각각 한 행.
 type WeeklyEventRow struct {
-	Kind      string // 접수 / 조치 / 완료 / 점검 / 행정
-	WorkNo    string
-	OccurDate string
-	WorkType  string // AS / 정기점검 / 행정 / 지원
-	Customer  string
-	Product   string
-	Assignee  string
-	Content   string
-	Result    string
-	Minutes   int
+	Kind           string // 접수 / 조치 / 완료 / 점검 / 행정
+	WorkNo         string
+	OccurDate      string
+	WorkType       string // AS / 정기점검 / 행정 / 지원
+	Customer       string
+	Product        string
+	Assignee       string
+	Content        string
+	Result         string
+	Minutes        int
+	ParentTaskID   string
+	RecurrenceRole string
 }
 
 // StatsSpotlight 기간 내 주목 건(최장소요·1시간초과·방문차수·긴급·중요 상)

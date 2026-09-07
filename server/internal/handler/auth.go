@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,7 +26,7 @@ type AuthHandler struct {
 
 func (h *AuthHandler) LoginPage(c echo.Context) error {
 	return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
-		"Title": "로그인", "Active": "login", "HideNav": true,
+		"Title": "로그인", "Active": NavLogin, "HideNav": true,
 	})
 }
 
@@ -49,13 +50,27 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		}
 		accessLog(c, rec)
 		return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
-			"Title": "로그인", "Active": "login", "HideNav": true,
+			"Title": "로그인", "Active": NavLogin, "HideNav": true,
 			"Error": "아이디 또는 비밀번호가 잘못되었습니다.",
 		})
 	}
 
 	user, err := h.userRepo.GetByUsername(username)
-	if err != nil || user == nil {
+	if err != nil {
+		log.Printf("로그인 사용자 조회 실패 username=%q: %v", username, err)
+		accessLog(c, auditlog.Record{
+			Action:   auditlog.ActionLoginFail,
+			Result:   auditlog.ResultDeny,
+			Reason:   "시스템오류",
+			Detail:   "로그인 조회 실패",
+			Username: username,
+		})
+		return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
+			"Title": "로그인", "Active": NavLogin, "HideNav": true,
+			"Error": "일시적으로 로그인할 수 없습니다. 서버를 재시작한 뒤 다시 시도하세요.",
+		})
+	}
+	if user == nil {
 		return fail(nil, "비밀번호오류")
 	}
 	if !user.IsActive {
@@ -68,23 +83,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return h.userRepo.UpdatePassword(user.UserID, nh)
 	})
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  user.UserID,
-		"username": user.Username,
-		"role":     user.Role,
-		"name":     user.FullName,
-		"exp":      time.Now().Add(24 * time.Hour).Unix(),
-	})
-	tokenStr, _ := token.SignedString(h.jwtSecret)
-
-	c.SetCookie(&http.Cookie{
-		Name:     "token",
-		Value:    tokenStr,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400,
-	})
+	tokenStr := h.writeSessionCookie(c, sessionClaims(user, false))
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionLogin,
 		Result:      auditlog.ResultOK,
@@ -133,7 +132,7 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 		msg = "이름이 저장되었습니다."
 	}
 	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-		"Title": "내 계정", "Active": "account", "User": u, "OK": msg,
+		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg,
 	})
 }
 
@@ -146,7 +145,7 @@ func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
 	name := strings.TrimSpace(c.FormValue("full_name"))
 	if name == "" {
 		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": "account", "User": u,
+			"Title": "내 계정", "Active": NavAccount, "User": u,
 			"Error": "이름을 입력하세요.",
 		})
 	}
@@ -168,7 +167,7 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 	confirm := strings.TrimSpace(c.FormValue("password_confirm"))
 	renderErr := func(msg string) error {
 		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": "account", "User": u, "Error": msg,
+			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": msg,
 		})
 	}
 	if !verifyPassword(u.PasswordHash, current) {
@@ -197,34 +196,16 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 }
 
 func (h *AuthHandler) refreshSession(c echo.Context, user *model.User) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  user.UserID,
-		"username": user.Username,
-		"role":     user.Role,
-		"name":     user.FullName,
-		"exp":      time.Now().Add(24 * time.Hour).Unix(),
-	})
-	tokenStr, err := token.SignedString(h.jwtSecret)
-	if err != nil {
-		return
-	}
-	c.SetCookie(&http.Cookie{
-		Name:     "token",
-		Value:    tokenStr,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400,
-	})
+	h.writeSessionCookie(c, sessionClaims(user, false))
 }
 
 func (h *AuthHandler) isAdmin(c echo.Context) bool {
-	return ctxString(c, "role") == "admin"
+	return currentRole(c) == model.RoleAdmin
 }
 
 func (h *AuthHandler) forbidden(c echo.Context) error {
 	return c.Render(http.StatusForbidden, "auth/forbidden.html", map[string]interface{}{
-		"Title": "접근 권한 없음", "Active": "",
+		"Title": "접근 권한 없음", "Active": NavNone,
 	})
 }
 
@@ -244,8 +225,9 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
 	data := map[string]interface{}{
-		"Title": "사용자 관리", "Active": "users", "Users": users, "OK": msg, "Error": errMsg,
+		"Title": "사용자 관리", "Active": NavUsers, "Users": users, "OK": msg, "Error": errMsg,
 		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit,
+		"RoleGroups": model.GroupUsersByRole(users),
 	}
 	if canEdit {
 		data["HashMig"] = h.passwordMigrationStatus()
@@ -335,15 +317,17 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		if confirm != "" && pw != confirm {
 			users, _ := h.userRepo.ListAll()
 			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-				"Title": "사용자 관리", "Active": "users", "Users": users,
+				"Title": "사용자 관리", "Active": NavUsers, "Users": users,
 				"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "PermDefs": model.AllPermissions, "CanEditUsers": true,
+				"RoleGroups": model.GroupUsersByRole(users),
 			})
 		}
 		if len(pw) < 4 {
 			users, _ := h.userRepo.ListAll()
 			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-				"Title": "사용자 관리", "Active": "users", "Users": users,
+				"Title": "사용자 관리", "Active": NavUsers, "Users": users,
 				"Error": "비밀번호는 4자 이상이어야 합니다.", "PermDefs": model.AllPermissions, "CanEditUsers": true,
+				"RoleGroups": model.GroupUsersByRole(users),
 			})
 		}
 		h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
@@ -366,20 +350,23 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	users, _ := h.userRepo.ListAll()
 	if pw == "" {
 		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-			"Title": "사용자 관리", "Active": "users", "Users": users,
+			"Title": "사용자 관리", "Active": NavUsers, "Users": users,
 			"Error": "새 비밀번호를 입력하세요.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
+			"RoleGroups": model.GroupUsersByRole(users),
 		})
 	}
 	if pw != confirm {
 		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-			"Title": "사용자 관리", "Active": "users", "Users": users,
+			"Title": "사용자 관리", "Active": NavUsers, "Users": users,
 			"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
+			"RoleGroups": model.GroupUsersByRole(users),
 		})
 	}
 	if len(pw) < 4 {
 		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-			"Title": "사용자 관리", "Active": "users", "Users": users,
+			"Title": "사용자 관리", "Active": NavUsers, "Users": users,
 			"Error": "비밀번호는 4자 이상이어야 합니다.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
+			"RoleGroups": model.GroupUsersByRole(users),
 		})
 	}
 	h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
@@ -413,24 +400,29 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			return c.Redirect(http.StatusSeeOther, "/login")
 		}
 
-		claims := token.Claims.(jwt.MapClaims)
-		uid := claimString(claims, "user_id")
-		c.Set("user_id", uid)
-		c.Set("username", claimString(claims, "username"))
-		c.Set("role", claimString(claims, "role"))
-		c.Set("user_name", claimString(claims, "name"))
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return c.Redirect(http.StatusSeeOther, "/login")
+		}
+		role := applySessionClaims(c, claims)
+		if !model.IsKnownRole(role) {
+			return c.Redirect(http.StatusSeeOther, "/login")
+		}
 
-		// 역할·이름 변경이 JWT에 남아 있어도 DB 기준으로 즉시 반영
-		if uid != "" {
-			if u, err := h.userRepo.GetByID(uid); err == nil && u != nil {
+		uid := ctxString(c, "user_id")
+		if uid != "" && needRevalidate(claims) && h.userRepo != nil {
+			u, err := h.userRepo.GetByID(uid)
+			if err != nil {
+				log.Printf("[auth] 사용자 조회 실패 uid=%s: %v", uid, err)
+				c.Set("auth_unconfirmed", true)
+				h.writeSessionCookie(c, sessionClaimsFromContext(c, true))
+			} else if u != nil {
 				if !u.IsActive {
 					c.SetCookie(&http.Cookie{Name: "token", Value: "", Path: "/", MaxAge: -1})
 					return c.Redirect(http.StatusSeeOther, "/login")
 				}
-				c.Set("username", u.Username)
-				c.Set("role", model.NormalizeRole(u.Role))
-				c.Set("user_name", u.FullName)
-				c.Set("permissions", u.PermList())
+				applyUserSession(c, u)
+				h.refreshSession(c, u)
 			}
 		}
 		pop := audit.Push(audit.Actor{
@@ -443,6 +435,88 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+const authRevalidateInterval = 5 * time.Minute
+
+func sessionClaims(user *model.User, unconfirmed bool) jwt.MapClaims {
+	role := model.NormalizeRole(user.Role)
+	claims := jwt.MapClaims{
+		"user_id":     user.UserID,
+		"username":    user.Username,
+		"role":        role,
+		"name":        user.FullName,
+		"permissions": model.FormatPermissions(user.PermList()),
+		"verified_at": time.Now().Unix(),
+		"exp":         time.Now().Add(24 * time.Hour).Unix(),
+	}
+	if unconfirmed {
+		claims["auth_unconfirmed"] = true
+	}
+	return claims
+}
+
+func sessionClaimsFromContext(c echo.Context, unconfirmed bool) jwt.MapClaims {
+	role := model.NormalizeRole(ctxString(c, "role"))
+	claims := jwt.MapClaims{
+		"user_id":     ctxString(c, "user_id"),
+		"username":    ctxString(c, "username"),
+		"role":        role,
+		"name":        ctxString(c, "user_name"),
+		"permissions": model.FormatPermissions(currentPerms(c)),
+		"verified_at": time.Now().Unix(),
+		"exp":         time.Now().Add(24 * time.Hour).Unix(),
+	}
+	if unconfirmed {
+		claims["auth_unconfirmed"] = true
+	}
+	return claims
+}
+
+func (h *AuthHandler) writeSessionCookie(c echo.Context, claims jwt.MapClaims) string {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString(h.jwtSecret)
+	if err != nil {
+		return ""
+	}
+	c.SetCookie(&http.Cookie{
+		Name:     "token",
+		Value:    tokenStr,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400,
+	})
+	return tokenStr
+}
+
+func applySessionClaims(c echo.Context, claims jwt.MapClaims) string {
+	role := model.NormalizeRole(claimString(claims, "role"))
+	c.Set("user_id", claimString(claims, "user_id"))
+	c.Set("username", claimString(claims, "username"))
+	c.Set("role", role)
+	c.Set("user_name", claimString(claims, "name"))
+	c.Set("permissions", model.EffectivePermissions(role, claimString(claims, "permissions")))
+	if claimBool(claims, "auth_unconfirmed") {
+		c.Set("auth_unconfirmed", true)
+	}
+	return role
+}
+
+func applyUserSession(c echo.Context, u *model.User) {
+	c.Set("username", u.Username)
+	c.Set("role", model.NormalizeRole(u.Role))
+	c.Set("user_name", u.FullName)
+	c.Set("permissions", u.PermList())
+	c.Set("auth_unconfirmed", false)
+}
+
+func needRevalidate(claims jwt.MapClaims) bool {
+	at := claimInt64(claims, "verified_at")
+	if at <= 0 {
+		return true
+	}
+	return time.Since(time.Unix(at, 0)) >= authRevalidateInterval
+}
+
 func claimString(claims jwt.MapClaims, key string) string {
 	v, ok := claims[key]
 	if !ok || v == nil {
@@ -452,4 +526,36 @@ func claimString(claims jwt.MapClaims, key string) string {
 		return s
 	}
 	return fmt.Sprint(v)
+}
+
+func claimInt64(claims jwt.MapClaims, key string) int64 {
+	v, ok := claims[key]
+	if !ok || v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	case json.Number:
+		i, _ := n.Int64()
+		return i
+	default:
+		return 0
+	}
+}
+
+func claimBool(claims jwt.MapClaims, key string) bool {
+	v, ok := claims[key]
+	if !ok || v == nil {
+		return false
+	}
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	s := strings.TrimSpace(fmt.Sprint(v))
+	return s == "1" || strings.EqualFold(s, "true")
 }

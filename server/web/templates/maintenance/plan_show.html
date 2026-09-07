@@ -51,37 +51,20 @@
       {{if .CanEdit}}
       <button type="button" @click="addOpen = true"
               class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">+ 방문 추가</button>
-      <button type="button" @click="doneOpen = true"
-              class="px-4 py-2 border border-green-600 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">지난 방문 일괄 완료</button>
       {{end}}
       {{if .IsAdmin}}
-      <a href="/maintenance/{{.Plan.PlanID}}/generate"
-         class="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50">자동 배정</a>
-      {{end}}
-      <a href="/maintenance/{{.Plan.PlanID}}/export.xlsx{{if and .ShowScopeToggle .ScopeAll}}?all=1{{end}}"
-         class="px-4 py-2 border border-green-300 text-green-800 rounded-lg text-sm font-medium hover:bg-green-50">엑셀 받기</a>
-      {{if .IsAdmin}}
-      {{if eq .Plan.Status "approved"}}
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/unapprove" class="inline">
-        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">승인 취소</button>
-      </form>
-      {{else}}
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/approve" class="inline">
-        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">승인</button>
+      <form method="GET" action="/maintenance/{{.Plan.PlanID}}/generate" class="inline-flex items-center gap-1">
+        <input type="hidden" name="month" value="{{if ne .Month 0}}{{.Month}}{{else}}{{.QuotaMonth}}{{end}}">
+        <label class="sr-only" for="mnt-assign-order">자동 배정 순서</label>
+        <select id="mnt-assign-order" name="assign_order"
+                class="border border-indigo-300 rounded-lg px-2 py-2 text-sm text-indigo-800 bg-white">
+          <option value="prev_month" selected>전월</option>
+          <option value="near">근거리</option>
+          <option value="far">원거리</option>
+        </select>
+        <button type="submit" class="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50">자동 배정</button>
       </form>
       {{end}}
-      {{if eq .Plan.Status "archived"}}
-      <span class="px-4 py-2 text-sm text-gray-500">보관됨</span>
-      {{else}}
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/archive" class="inline"
-            onsubmit="return confirm('이 계획을 보관할까요? 일정은 남고 삭제만 막힙니다.');">
-        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">보관</button>
-      </form>
-      <a href="/maintenance/{{.Plan.PlanID}}/delete"
-         class="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">계획 삭제</a>
-      {{end}}
-      {{end}}
-      <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">사이트 설정</a>
     </div>
   </div>
 
@@ -358,7 +341,7 @@
         </div>
       </form>
       {{if .CanEdit}}
-      <form method="POST" x-show="edit.date >= '{{.DeleteAfter}}'"
+      <form method="POST" x-show="!edit.completed && edit.date >= '{{.DeleteAfter}}'"
             :action="'/maintenance/visits/' + edit.id + '/delete?plan_id={{.Plan.PlanID}}&month={{.Month}}&view={{.View}}{{if and .ShowScopeToggle .ScopeAll}}&all=1{{end}}'"
             class="pt-1 border-t border-gray-100"
             onsubmit="return confirm('이 방문 일정을 삭제할까요? 중복 건을 정리할 때 사용하세요.');">
@@ -368,37 +351,12 @@
     </div>
   </div>
 
-  <!-- 지난 방문 일괄 완료 -->
-  {{if .CanEdit}}
-  <div x-show="doneOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-       @click.self="doneOpen = false">
-    <div class="bg-white rounded-xl w-full max-w-sm p-5 space-y-4">
-      <div class="flex justify-between items-center">
-        <h3 class="font-semibold text-gray-800">지난 방문 일괄 완료</h3>
-        <button type="button" @click="doneOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
-      </div>
-      <p class="text-sm text-gray-500">기준일까지의 예정 방문을 모두 완료로 바꿉니다. 이미 완료된 건은 그대로 둡니다.</p>
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/complete-until" class="space-y-3 text-sm">
-        <div>
-          <label class="block text-gray-600 mb-1">기준일</label>
-          <input type="date" name="until" value="{{.Today}}" required
-                 class="w-full border border-gray-300 rounded-lg px-3 py-2">
-        </div>
-        <input type="hidden" name="month" value="{{.Month}}">
-        <input type="hidden" name="view" value="{{.View}}">
-        {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
-        <div class="flex gap-2">
-          <button type="button" @click="doneOpen = false" class="flex-1 py-2 border border-gray-300 rounded-lg">취소</button>
-          <button type="submit" class="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium">완료 처리</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  {{end}}
+  <!-- 지난 방문 일괄 완료 모달 제거 §34.4.4 — 건별 완료만 -->
 </div>
 {{end}}
 
 {{define "mnt_calendar"}}
+{{$today := .Today}}
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
   <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
     <h3 class="font-semibold text-gray-800">{{.Month}}월 점검 캘린더</h3>
@@ -444,9 +402,16 @@
         <div class="space-y-1">
           {{$pid := $.Plan.PlanID}}{{$month := $.Month}}
           {{range .Visits}}
+          {{$b := mntVisitBadge . $today}}
           <div class="px-1.5 py-1 rounded text-[11px] leading-tight {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
                style="{{mntProductStyle .ProductType}}">
             <div class="font-medium truncate" title="{{visitLabel .}}{{if .Assignee}} · {{.Assignee}}{{end}}">{{visitLabel .}}</div>
+            {{if $b.Label}}
+            <div class="mt-0.5 flex items-center gap-1 flex-wrap">
+              <span class="{{$b.Class}}">{{$b.Label}}</span>
+              {{if $b.Extra}}<span class="text-[10px] text-gray-500">{{$b.Extra}}</span>{{end}}
+            </div>
+            {{end}}
             <div class="flex items-center justify-between mt-0.5 text-[10px] opacity-90 gap-1">
               <span class="truncate">{{.Assignee}}</span>
               {{if $.CanEdit}}
@@ -463,14 +428,14 @@
                   <button type="submit" class="{{if .Completed}}text-green-700{{else}}text-gray-500 hover:text-green-700{{end}} hover:underline">
                     {{if .Completed}}완료{{else}}완료{{end}}</button>
                 </form>
-                {{if ge .VisitDate $.DeleteAfter}}
+                {{if and (not .Completed) (ge .VisitDate $.DeleteAfter)}}
                 <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=calendar{{if and $.ShowScopeToggle $.ScopeAll}}&all=1{{end}}" class="inline"
                       onsubmit="return confirm('이 방문 일정을 삭제할까요?');">
                   <button type="submit" class="text-red-600 hover:underline">삭제</button>
                 </form>
                 {{end}}
               </span>
-              {{else if .Completed}}<span class="text-green-700 shrink-0">완료</span>{{end}}
+              {{end}}
             </div>
           </div>
           {{end}}
@@ -485,11 +450,12 @@
 {{end}}
 
 {{define "mnt_kanban"}}
+{{$today := .Today}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
-  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
-  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
-  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter}}
+  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
+  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
+  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
+  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
 </div>
 {{end}}
 
@@ -501,14 +467,21 @@
     <span class="text-xs text-gray-500">{{len .Visits}}</span>
   </div>
   <div class="p-2 space-y-2 max-h-[560px] overflow-y-auto">
-    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$all := and .ShowScopeToggle .ScopeAll}}{{$del := .DeleteAfter}}
+    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$all := and .ShowScopeToggle .ScopeAll}}{{$del := .DeleteAfter}}{{$today := .Today}}
     {{range .Visits}}
+    {{$b := mntVisitBadge . $today}}
     <div class="rounded-lg p-2.5 text-sm {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
          style="{{mntProductStyle .ProductType}}">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <p class="font-medium truncate">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</p>
           {{if .ProductType}}<p class="text-[11px] mt-0.5 opacity-90">{{.ProductType}}</p>{{end}}
+          {{if $b.Label}}
+          <div class="mt-1 flex items-center gap-1 flex-wrap">
+            <span class="{{$b.Class}}">{{$b.Label}}</span>
+            {{if $b.Extra}}<span class="text-[10px] text-gray-500">{{$b.Extra}}</span>{{end}}
+          </div>
+          {{end}}
         </div>
         <span class="text-[11px] opacity-70 whitespace-nowrap">{{.VisitDate}}</span>
       </div>
@@ -528,7 +501,7 @@
             <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
               {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
           </form>
-          {{if ge .VisitDate $del}}
+          {{if and (not .Completed) (ge .VisitDate $del)}}
           <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{if $all}}&all=1{{end}}" class="inline"
                 onsubmit="return confirm('이 방문을 삭제할까요?');">
             <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
@@ -546,6 +519,7 @@
 {{end}}
 
 {{define "mnt_list"}}
+{{$today := .Today}}
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
   <h3 class="px-4 py-3 font-semibold border-b border-gray-100 bg-gray-50">
     {{if eq .Month 0}}전체 방문 목록{{else}}{{.Month}}월 방문{{end}} · {{len .MonthVisits}}건
@@ -578,10 +552,11 @@
           <td class="px-4 py-2 text-gray-600">{{if .ProjectName}}{{.ProjectName}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-gray-600">{{.Assignee}}</td>
           <td class="px-4 py-2">
-            {{if .Completed}}
-            <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs">방문 완료</span>
-            {{if ne .CompletedDate .VisitDate}}<span class="text-[11px] text-gray-500 ml-1">{{.CompletedDate}}</span>{{end}}
-            {{else}}<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">예정</span>{{end}}
+            {{$b := mntVisitBadge . $today}}
+            {{if $b.Label}}
+            <span class="{{$b.Class}}">{{$b.Label}}</span>
+            {{if $b.Extra}}<span class="text-[11px] text-gray-500 ml-1">{{$b.Extra}}</span>{{end}}
+            {{end}}
           </td>
           <td class="px-4 py-2 text-right whitespace-nowrap">
             {{if $.CanEdit}}
@@ -597,7 +572,7 @@
               <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
                 {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
             </form>
-            {{if ge .VisitDate $.DeleteAfter}}
+            {{if and (not .Completed) (ge .VisitDate $.DeleteAfter)}}
             <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{if $all}}&all=1{{end}}" class="inline ml-2"
                   onsubmit="return confirm('이 방문을 삭제할까요?');">
               <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>

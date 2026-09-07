@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"html/template"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -36,6 +37,9 @@ type Handler struct {
 	Maintenance    *MaintenanceHandler
 	Project        *ProjectHandler
 	Sales          *SalesHandler
+	Quotes         *QuotesHandler
+	Orders         *OrdersHandler
+	Items          *ItemsHandler
 	AdminWork      *AdminWorkHandler
 	Integration    *IntegrationHandler
 
@@ -81,6 +85,8 @@ func New(db *sql.DB) *Handler {
 		settingsRepo, repository.NewASUnlockRepo(db),
 	)
 	wbH.attach = attachH
+	wbH.salesRepo = repository.NewSalesRepo(db)
+	wbH.workBoard = workBoardRepo
 	authH := &AuthHandler{userRepo: userRepo, settingsRepo: settingsRepo, jwtSecret: jwtSecret}
 
 	return &Handler{
@@ -114,6 +120,7 @@ func New(db *sql.DB) *Handler {
 			userRepo: userRepo, relationRepo: relationRepo,
 			attachRepo: attachRepo,
 			attach:     attachH,
+			kwRepo:     repository.NewASKeywordRepo(db),
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo),
 		Workboard:  wbH,
@@ -124,10 +131,13 @@ func New(db *sql.DB) *Handler {
 		Code:       &CodeHandler{repo: codeRepo},
 		Attachment: attachH,
 		Backup: &BackupHandler{
-			cfg:      backup.Config{DataDir: dataDirFromEnv(), DB: db},
-			projects: repository.NewProjectRepo(db),
+			cfg:        backup.Config{DataDir: dataDirFromEnv(), DB: db},
+			projects:   repository.NewProjectRepo(db),
+			settings:   settingsRepo,
+			importRepo: repository.NewASImportRepo(db),
+			customers:  customerRepo,
 		},
-		Auth:    authH,
+		Auth: authH,
 		Holiday: &HolidayHandler{
 			repo: holidayRepo, leave: repository.NewStaffLeaveRepo(db),
 			users: userRepo, auth: authH, api: service.NewHolidayAPIClient(),
@@ -143,9 +153,18 @@ func New(db *sql.DB) *Handler {
 			customerRepo, contactRepo, codeRepo, assetRepo,
 		),
 		Sales: NewSalesHandler(
-			repository.NewSalesRepo(db), customerRepo, userRepo, codeRepo,
+			repository.NewSalesRepo(db), repository.NewProjectRepo(db), repository.NewWBRepo(db),
+			customerRepo, contactRepo, userRepo, codeRepo,
 		),
-		AdminWork: NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo),
+		Quotes: NewQuotesHandler(
+			repository.NewQuoteRepo(db), repository.NewSalesItemRepo(db), repository.NewSalesRepo(db),
+			userRepo, settingsRepo, repository.NewOrderRepo(db),
+		),
+		Orders: NewOrdersHandler(
+			repository.NewOrderRepo(db), repository.NewQuoteRepo(db), repository.NewSalesRepo(db), attachRepo,
+		),
+		Items: NewItemsHandler(repository.NewSalesItemRepo(db)),
+		AdminWork:   NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo),
 		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),
 
 		customerRepo: customerRepo,
@@ -185,27 +204,33 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	pendingList, _ := h.workBoard.ListBucket(model.WorkBucketSchedulePending, mineUID, mineK, 8)
 	unassignedList, _ := h.workBoard.ListBucket(model.WorkBucketUnassigned, "", nil, 8)
 
-	// 상단: 주간 통계 KPI(팀전체, 표시 전용) — 일일 업무회의 표 대신
+	// 상단 KPI — §15.7 기간 선택(기본 최근 1개월)
 	now := time.Now()
+	metricsBase, metricsScope, metricsHint := metricsViewData(h.statsRepo)
+	lb := parseLookback(c, metricsBase, now)
 	var weekKPI model.StatsKPICard
 	if h.statsRepo != nil {
-		weekCols := repository.BuildStatsPeriodColumns(model.StatsViewWeek, now)
+		fromIncl, toIncl := lookbackTimes(lb, now)
+		cols := repository.BuildStatsRangeColumns(fromIncl, toIncl)
 		f := model.StatsMeetingFilter{Scope: model.StatsScopeTeam}
-		_ = h.statsRepo.FillPeriodOverview(weekCols, f)
-		weekKPI, _ = h.statsRepo.LoadStatsKPI(model.StatsViewWeek, weekCols, f)
+		_ = h.statsRepo.FillPeriodOverview(cols, f)
+		weekKPI, _ = h.statsRepo.LoadStatsKPI(model.StatsViewRange, cols, f)
 		applyPlanningToKPI(h.workBoard, &weekKPI)
 	}
 
 	showAssignee := role == model.RoleAdmin || role == model.RoleOffice
 	data := map[string]interface{}{
 		"Title":          "대시보드",
-		"Active":         "dashboard",
+		"Active":         NavDashboard,
 		"Role":           role,
 		"RoleLabel":      model.RoleLabel(role),
 		"DisplayName":    userName,
 		"LoginID":        username,
 		"WorkStats":      stats,
 		"WeekKPI":        weekKPI,
+		"Lookback":         lb,
+		"LookbackQS":       template.URL(lb.QueryValues()),
+		"LookbackViewID":   "dashLookbackView",
 		"ExecTarget":     model.StatsExecTargetPct,
 		"VisitTarget":    model.StatsVisitTargetDays,
 		"CompleteTarget": model.StatsCompleteTargetDays,
@@ -216,6 +241,10 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		"PendingHref":    workListURL(model.WorkBucketSchedulePending, mine, role),
 		"UnassignedHref": workListURL(model.WorkBucketUnassigned, false, role),
 		"UnplannedHref":  planUnplannedURL(mine, role, ""),
+		"UpcomingDays":   model.RecurrenceUpcomingDays,
+		"MetricsBaseDate":    metricsBase,
+		"ProgressScopeLabel": metricsScope,
+		"ProgressScopeHint":  metricsHint,
 		"TodayList":      todayList,
 		"DelayedList":    delayedList,
 		"PendingList":    pendingList,

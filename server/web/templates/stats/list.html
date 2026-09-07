@@ -10,6 +10,9 @@
         {{if .RangeLabel}} · {{.RangeLabel}}{{end}}
         · <span class="font-semibold text-gray-700">{{.RowCount}}건</span>
       </p>
+      {{if .MetricsBaseDate}}
+      <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
+      {{end}}
       {{if .OverdueNote}}
       <p class="text-xs text-red-600 mt-1">지연: 접수일 기준 3일 초과 · 미완료(접수·배정·진행중)</p>
       {{end}}

@@ -32,7 +32,7 @@ type adminLeadAction struct {
 func (r *StatsRepo) loadAdminLeadBreakdown(from, toEx string, f model.StatsMeetingFilter) (model.AdminLeadBreakdown, error) {
 	var out model.AdminLeadBreakdown
 	f = normalizeMeetingFilter(f)
-	adminSQL, adminArgs := adminFilterSQL(f)
+	adminSQL, adminArgs := r.filterAdmin(f)
 	q := `
 		SELECT t.task_id,
 		       COALESCE(` + adminTaskReceiptDateSQL + `,''),

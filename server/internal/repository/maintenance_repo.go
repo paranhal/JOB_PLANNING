@@ -208,7 +208,22 @@ func (r *MaintenanceRepo) GetVisit(visitID string) (*model.MaintenanceVisit, err
 }
 
 func (r *MaintenanceRepo) DeleteAutoVisits(planID string) (deleted, skipped int, err error) {
-	rows, err := r.db.Query(`SELECT visit_id, visit_date, COALESCE(completed,0) FROM maintenance_visits WHERE plan_id = ? AND auto_generated = 1`, planID)
+	return r.deleteAutoVisitsFiltered(planID, "", false)
+}
+
+// DeleteAutoVisitsInMonth 그 달의 오늘 이후 미완료 자동생성분만 지운다. §34.4.5
+func (r *MaintenanceRepo) DeleteAutoVisitsInMonth(planID string, year, month int) (deleted, skipped int, err error) {
+	return r.deleteAutoVisitsFiltered(planID, model.MonthPrefix(year, month), true)
+}
+
+func (r *MaintenanceRepo) deleteAutoVisitsFiltered(planID, monthPrefix string, useTodayProtect bool) (deleted, skipped int, err error) {
+	q := `SELECT visit_id, visit_date, COALESCE(completed,0) FROM maintenance_visits WHERE plan_id = ? AND auto_generated = 1`
+	args := []interface{}{planID}
+	if monthPrefix != "" {
+		q += ` AND visit_date LIKE ?`
+		args = append(args, monthPrefix+"%")
+	}
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -228,11 +243,21 @@ func (r *MaintenanceRepo) DeleteAutoVisits(planID string) (deleted, skipped int,
 	rows.Close()
 	now := r.nowTime()
 	for _, x := range list {
-		if x.done == 1 || model.VisitDeleteProtected(x.date, now) {
+		protect := model.VisitDeleteProtected(x.date, now)
+		if useTodayProtect {
+			protect = model.VisitAutoReassignProtected(x.date, now)
+		}
+		if x.done == 1 || protect {
 			skipped++
 			continue
 		}
-		if err := r.DeleteVisit(x.id); err != nil {
+		var err error
+		if useTodayProtect {
+			err = r.removeVisitRow(x.id)
+		} else {
+			err = r.DeleteVisit(x.id)
+		}
+		if err != nil {
 			if errors.Is(err, ErrVisitDeleteProtected) {
 				skipped++
 				continue
@@ -630,10 +655,17 @@ func (r *MaintenanceRepo) DeleteVisit(visitID string) error {
 	if v == nil {
 		return fmt.Errorf("방문을 찾을 수 없습니다")
 	}
+	if v.Completed {
+		return fmt.Errorf("완료된 방문은 삭제할 수 없습니다")
+	}
 	if model.VisitDeleteProtected(v.VisitDate, r.nowTime()) {
 		return ErrVisitDeleteProtected
 	}
-	err = touchDelete(r.db, "maintenance_visits", "visit_id", visitID, "정기점검", func() error {
+	return r.removeVisitRow(visitID)
+}
+
+func (r *MaintenanceRepo) removeVisitRow(visitID string) error {
+	err := touchDelete(r.db, "maintenance_visits", "visit_id", visitID, "정기점검", func() error {
 		_, err := r.db.Exec(`DELETE FROM maintenance_visits WHERE visit_id = ?`, visitID)
 		return err
 	})
@@ -649,7 +681,8 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 		SELECT s.customer_id, s.short_name, COALESCE(s.region,''),
 		       s.has_klas, s.has_rfid, COALESCE(s.inspection_cycle,'monthly'),
 		       s.entry_category, COALESCE(s.fixed_rule,''),
-		       COALESCE(c.org_name,'')
+		       COALESCE(c.org_name,''),
+		       COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,'')
 		FROM maintenance_site_config s
 		LEFT JOIN customers c ON c.customer_id = s.customer_id
 		ORDER BY s.region, s.short_name`)
@@ -661,7 +694,7 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 	for rows.Next() {
 		var cfg model.MaintenanceSiteConfig
 		var klas, rfid int
-		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName); err != nil {
+		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName, &cfg.AddrSido, &cfg.AddrSigungu); err != nil {
 			return nil, err
 		}
 		cfg.HasKlas = klas == 1
@@ -739,7 +772,9 @@ func (r *MaintenanceRepo) DeleteSiteConfig(customerID string) error {
 func (r *MaintenanceRepo) ListCustomersWithoutConfig() ([]struct{ ID, OrgName string }, error) {
 	rows, err := r.db.Query(`
 		SELECT c.customer_id, c.org_name FROM customers c
-		WHERE c.is_active = 1 AND NOT EXISTS (
+		WHERE c.is_active = 1
+		  AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'
+		  AND NOT EXISTS (
 			SELECT 1 FROM maintenance_site_config s WHERE s.customer_id = c.customer_id
 		) ORDER BY c.org_name LIMIT 500`)
 	if err != nil {

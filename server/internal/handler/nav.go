@@ -16,6 +16,9 @@ const (
 	NavSales            = "sales"
 	NavSalesActivities  = "sales_activities"
 	NavSalesPipeline    = "sales_pipeline"
+	NavSalesItems       = "sales_items"
+	NavQuotes           = "quotes"
+	NavOrders           = "orders"
 	NavWorkStatus       = "work_status"
 	NavStats            = "stats"
 	NavStatsReports     = "stats_reports"
@@ -29,6 +32,7 @@ const (
 	NavRelations        = "relations"
 	NavProjects         = "projects"
 	NavMaintenanceSites = "maintenance_sites"
+	NavRegionOrder      = "region_order"
 	NavCodes            = "codes"
 	NavUsers            = "users"
 	NavHolidays         = "holidays"
@@ -55,6 +59,9 @@ func navSidebarKeys() []string {
 		NavSales,
 		NavSalesActivities,
 		NavSalesPipeline,
+		NavSalesItems,
+		NavQuotes,
+		NavOrders,
 		NavWorkStatus,
 		NavStats,
 		NavStatsReports,
@@ -68,6 +75,7 @@ func navSidebarKeys() []string {
 		NavRelations,
 		NavProjects,
 		NavMaintenanceSites,
+		NavRegionOrder,
 		NavCodes,
 		NavUsers,
 		NavHolidays,

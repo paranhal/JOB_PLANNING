@@ -54,17 +54,22 @@ func TestWorkStatusPaletteShowsCounts(t *testing.T) {
 	e, db := newMntSyncServer(t, "ws_counts.db")
 
 	seedVisit(t, db, "mvs_c1", "2026-08-14", "최혜영", "KLAS", "나성동도서관")
+	if _, err := db.Exec(`UPDATE maintenance_visits SET completed=1, completed_date='2026-08-14' WHERE visit_id='mvs_c1'`); err != nil {
+		t.Fatal(err)
+	}
 	seedVisitTask(t, db, "WT-C1", "mvs_c1", "2026-08-14", "09:00", "09:30", "최혜영",
 		"[점검]나성동도서관_2026-08-14 · KLAS")
-	// 같은 주(월~일) 안의 다른 날
 	seedVisit(t, db, "mvs_c2", "2026-08-12", "최혜영", "KLAS", "보람동도서관")
+	if _, err := db.Exec(`UPDATE maintenance_visits SET completed=1, completed_date='2026-08-12' WHERE visit_id='mvs_c2'`); err != nil {
+		t.Fatal(err)
+	}
 	seedVisitTask(t, db, "WT-C2", "mvs_c2", "2026-08-12", "10:00", "10:30", "최혜영",
 		"[점검]보람동도서관_2026-08-12 · KLAS")
 
 	for _, path := range []string{
-		"/work-status?view=day&date=2026-08-14&kind=planned",
-		"/work-status?view=week&date=2026-08-14&kind=planned",
 		"/work-status?view=day&date=2026-08-14&kind=action",
+		"/work-status?view=week&date=2026-08-14&kind=action",
+		"/work-status?view=month&date=2026-08-14&kind=action",
 	} {
 		body := doGet(t, e, path).Body.String()
 		if !strings.Contains(body, "단위 업무별 현황") {
@@ -75,9 +80,11 @@ func TestWorkStatusPaletteShowsCounts(t *testing.T) {
 		}
 	}
 
-	// 주간 보기에서는 두 건 모두 잡히고, 그중 하나만 8/14
-	week := doGet(t, e, "/work-status?view=week&date=2026-08-14&kind=planned").Body.String()
+	week := doGet(t, e, "/work-status?view=week&date=2026-08-14&kind=action").Body.String()
 	if !strings.Contains(week, "나성동도서관") || !strings.Contains(week, "보람동도서관") {
 		t.Fatal("주간 집계에 기간 내 점검이 빠짐")
+	}
+	if !strings.Contains(week, "조치") || !strings.Contains(week, "접수") {
+		t.Fatal("주간 칸에 조치·접수 건수가 없다")
 	}
 }

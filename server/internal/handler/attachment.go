@@ -33,46 +33,38 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	redirect := attachmentRedirect(c, "/")
 
 	if !canUploadAttachment(c, refType) {
-		return echo.ErrForbidden
+		return redirectAttachFailure(c, redirect, echo.ErrForbidden)
 	}
 	refType, ok := safePathToken(refType)
 	if !ok {
-		return c.String(http.StatusBadRequest, "잘못된 첨부 구분입니다")
+		return redirectAttachErr(c, redirect, "잘못된 첨부 구분입니다", http.StatusBadRequest)
 	}
 	refID, ok = safePathToken(refID)
 	if !ok {
-		return c.String(http.StatusBadRequest, "잘못된 대상입니다")
+		return redirectAttachErr(c, redirect, "잘못된 대상입니다", http.StatusBadRequest)
 	}
 
 	headers, err := uploadFileHeaders(c)
 	if err != nil || len(headers) == 0 {
-		return c.String(http.StatusBadRequest, "파일이 필요합니다")
+		return redirectAttachErr(c, redirect, "attach_file", http.StatusBadRequest)
 	}
 
 	if refType == model.RefTypeASReceipt {
 		if err := h.guardReceiptPhotoWrite(c, refID); err != nil {
-			return err
+			return redirectAttachFailure(c, redirect, err)
 		}
 		if err := h.saveReceiptPhotos(refID, keywords, headers); err != nil {
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				msg, _ := httpErr.Message.(string)
-				return redirectAttachErr(c, redirect, msg, httpErr.Code)
-			}
-			return err
+			return redirectAttachFailure(c, redirect, err)
 		}
 		return c.Redirect(http.StatusSeeOther, redirect)
 	}
 
 	if refType == model.RefTypeASActionPhoto {
 		if err := h.guardActionPhotoWrite(c, refID); err != nil {
-			return err
+			return redirectAttachFailure(c, redirect, err)
 		}
 		if err := h.saveActionPhotos(refID, keywords, headers); err != nil {
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				msg, _ := httpErr.Message.(string)
-				return redirectAttachErr(c, redirect, msg, httpErr.Code)
-			}
-			return err
+			return redirectAttachFailure(c, redirect, err)
 		}
 		return c.Redirect(http.StatusSeeOther, redirect)
 	}
@@ -94,7 +86,7 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	} else {
 		for i, fh := range headers {
 			if err := h.saveGenericFile(refType, refID, keywords, fh, i); err != nil {
-				return err
+				return redirectAttachFailure(c, redirect, err)
 			}
 		}
 	}
@@ -105,16 +97,30 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 func uploadFileHeaders(c echo.Context) ([]*multipart.FileHeader, error) {
 	form, err := c.MultipartForm()
 	if err == nil && form != nil && len(form.File["file"]) > 0 {
-		return form.File["file"], nil
+		return nonemptyUploadHeaders(form.File["file"]), nil
 	}
 	if err == nil && form != nil && len(form.File["receipt_photo"]) > 0 {
-		return form.File["receipt_photo"], nil
+		return nonemptyUploadHeaders(form.File["receipt_photo"]), nil
 	}
 	fh, err := c.FormFile("file")
 	if err != nil {
 		return nil, err
 	}
-	return []*multipart.FileHeader{fh}, nil
+	return nonemptyUploadHeaders([]*multipart.FileHeader{fh}), nil
+}
+
+func nonemptyUploadHeaders(files []*multipart.FileHeader) []*multipart.FileHeader {
+	out := make([]*multipart.FileHeader, 0, len(files))
+	for _, fh := range files {
+		if fh == nil {
+			continue
+		}
+		if strings.TrimSpace(fh.Filename) == "" && fh.Size == 0 {
+			continue
+		}
+		out = append(out, fh)
+	}
+	return out
 }
 
 func (h *AttachmentHandler) saveAssetFile(refID, keywords string, file *multipart.FileHeader, slotOverride int) error {
@@ -194,7 +200,7 @@ func (h *AttachmentHandler) saveActionPhotos(asID, keywords string, files []*mul
 		refType: model.RefTypeASActionPhoto, asID: asID, keywords: keywords,
 		max: model.MaxActionPhotos, dir: repository.ActionPhotoDir(h.uploadDir, asID),
 		imageOnly: true,
-		errMax:    fmt.Sprintf("조치 사진은 최대 %d장입니다", model.MaxActionPhotos),
+		errMax:    "attach_photo_max",
 	}, files)
 }
 
@@ -264,7 +270,7 @@ func (h *AttachmentHandler) saveOneProcessedPhoto(opt processedPhotoOpts, file *
 	}
 
 	if opt.imageOnly {
-		return echo.NewHTTPError(http.StatusBadRequest, "조치 사진은 이미지만 올릴 수 있습니다")
+		return echo.NewHTTPError(http.StatusBadRequest, "attach_not_image")
 	}
 
 	stored := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), seq, origName)
@@ -414,8 +420,52 @@ func attachmentRedirect(c echo.Context, fallback string) string {
 	return redirect
 }
 
+func redirectAttachFailure(c echo.Context, redirect string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if err == echo.ErrForbidden {
+		return redirectAttachErr(c, redirect, "attach_forbidden", http.StatusForbidden)
+	}
+	if he, ok := err.(*echo.HTTPError); ok {
+		msg, _ := he.Message.(string)
+		if he.Code == http.StatusForbidden {
+			if strings.Contains(msg, "읽기 전용") || strings.Contains(msg, "완료") {
+				return redirectAttachErr(c, redirect, "attach_closed", he.Code)
+			}
+			return redirectAttachErr(c, redirect, "attach_forbidden", he.Code)
+		}
+		if strings.Contains(msg, "최대") && strings.Contains(msg, "장") {
+			return redirectAttachErr(c, redirect, "attach_photo_max", he.Code)
+		}
+		if msg == "attach_photo_max" || msg == "attach_not_image" || msg == "attach_file" || msg == "attach_forbidden" || msg == "attach_closed" {
+			return redirectAttachErr(c, redirect, msg, he.Code)
+		}
+		if msg == "" {
+			msg = http.StatusText(he.Code)
+		}
+		return redirectAttachErr(c, redirect, msg, he.Code)
+	}
+	return redirectAttachErr(c, redirect, err.Error(), http.StatusBadRequest)
+}
+
 func redirectAttachErr(c echo.Context, redirect, msg string, code int) error {
 	if strings.TrimSpace(redirect) == "" || redirect == "/" {
+		if msg == "attach_forbidden" {
+			return echo.ErrForbidden
+		}
+		if msg == "attach_file" {
+			return c.String(code, "파일이 필요합니다")
+		}
+		if msg == "attach_photo_max" {
+			return c.String(code, fmt.Sprintf("사진은 최대 %d장입니다", model.MaxActionPhotos))
+		}
+		if msg == "attach_not_image" {
+			return c.String(code, "조치 사진은 이미지만 올릴 수 있습니다")
+		}
+		if msg == "attach_closed" {
+			return echo.NewHTTPError(http.StatusForbidden, "완료·종료 건은 읽기 전용입니다. 관리자는 수정 잠금 해제 후 이용하세요")
+		}
 		return c.String(code, msg)
 	}
 	sep := "?"

@@ -225,6 +225,9 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 	args := []interface{}{}
 
 	sqlQ += metricStatusCond(q.Metric)
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
+	sqlQ += asSQL
+	args = append(args, asArgs...)
 
 	if from, to, ok, _ := ResolveStatsRange(q, now); ok {
 		expr := metricDateExpr(q.Metric)
@@ -301,7 +304,9 @@ func (r *StatsRepo) listPartialWorkDetail(q model.StatsQuery, now time.Time) ([]
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = 'partial_complete'`
-	args := []interface{}{}
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
+	sqlQ += asSQL
+	args := append([]interface{}{}, asArgs...)
 	if q.Metric == model.StatsMetricProgress {
 		sqlQ += ` AND COALESCE(w.status,'open') = 'open'`
 	}

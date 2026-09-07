@@ -15,8 +15,10 @@ type MaintenanceSiteConfig struct {
 	HasRfid         bool
 	InspectionCycle string // monthly|odd_bimonthly|even_bimonthly|quarterly|semi|yearly
 	EntryCategory   string // normal | fixed | office
-	FixedRule       string // e.g. LAST_MONDAY_OF_MONTH
+	FixedRule       string // e.g. LAST_MONDAY_OF_MONTH 또는 "5" · "5,15"
 	OrgName         string // JOIN customers (목록·엑셀용)
+	AddrSido        string // customers.addr_sido
+	AddrSigungu     string // customers.addr_sigungu
 }
 
 // MaintenancePlan 연도 단위 점검 계획
@@ -170,6 +172,67 @@ func VisitDeleteProtected(visitDate string, now time.Time) bool {
 		return true
 	}
 	return d[:10] < NextMonthStart(now).Format("2006-01-02")
+}
+
+// VisitAutoReassignProtected 자동 배정 재생성 보호. 기준은 오늘(당일 포함). §34.4.5
+func VisitAutoReassignProtected(visitDate string, now time.Time) bool {
+	d := strings.TrimSpace(visitDate)
+	if d == "" {
+		return false
+	}
+	if len(d) < 10 {
+		return true
+	}
+	today := now.Format("2006-01-02")
+	return d[:10] <= today
+}
+
+// ErrGeneratePastMonth 지난 달 자동 배정 거부. §34.4.5
+var ErrGeneratePastMonth = fmt.Errorf("지난 달은 배정할 수 없습니다. 이미 지난 일정입니다.")
+
+func IsPastGenerateMonth(year, month int, now time.Time) bool {
+	if month < 1 || month > 12 {
+		return false
+	}
+	if year < now.Year() {
+		return true
+	}
+	return year == now.Year() && month < int(now.Month())
+}
+
+type VisitStatusBadge struct {
+	Kind  string // done | overdue | ""
+	Label string
+	Class string
+	Extra string // 완료일
+}
+
+func VisitStatusBadgeOf(v MaintenanceVisit, today string) VisitStatusBadge {
+	today = strings.TrimSpace(today)
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+	if v.Completed {
+		return VisitStatusBadge{
+			Kind:  "done",
+			Label: "방문완료",
+			Class: "px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-semibold",
+			Extra: v.DoneOn(),
+		}
+	}
+	d := strings.TrimSpace(v.VisitDate)
+	if len(d) >= 10 && d[:10] < today {
+		n := DaysBetweenDates(d[:10], today)
+		if n < 1 {
+			n = 1
+		}
+		return VisitStatusBadge{
+			Kind:  "overdue",
+			Label: fmt.Sprintf("D+%d", n),
+			Class: "px-1.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-semibold",
+		}
+	}
+	return VisitStatusBadge{}
 }
 
 // DatedVisits 방문일이 있는 일정만. 날짜 없는 복사 초안은 캘린더·실적에서 뺀다.

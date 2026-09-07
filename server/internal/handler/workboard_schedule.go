@@ -75,7 +75,7 @@ func mntVisitNumber(v model.MaintenanceVisit) string {
 	return num
 }
 
-// taskCardFromWork 배치된 업무 → 시간표 카드
+// taskCardFromWork 배치된 업무 → 일정표 카드
 func taskCardFromWork(t model.WorkTask) model.WBCard {
 	cat := model.WBCategory(t.SourceType)
 	if t.SourceType == "" {
@@ -109,6 +109,9 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 	case model.WBSourceMaintenance:
 		card.SourceNumber = t.SourceID
 		// 상세는 Show에서 plan 링크로 보강. 기본은 업무 상세.
+		card.SourceHref = "/workboard/tasks/" + t.TaskID
+	case model.WBSourceSalesActivity:
+		card.SourceNumber = t.SourceID
 		card.SourceHref = "/workboard/tasks/" + t.TaskID
 	}
 	if cat == model.WBSourceMaintenance {

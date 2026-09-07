@@ -28,6 +28,49 @@ func TestVisitDeleteProtectedCurrentAndPast(t *testing.T) {
 	}
 }
 
+func TestVisitAutoReassignProtectedToday(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.Local)
+	cases := []struct {
+		date string
+		want bool
+	}{
+		{"2026-08-31", true},
+		{"2026-09-01", true},
+		{"2026-09-02", false},
+		{"2026-10-01", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := VisitAutoReassignProtected(c.date, now); got != c.want {
+			t.Errorf("VisitAutoReassignProtected(%q)=%v want %v", c.date, got, c.want)
+		}
+	}
+	if !IsPastGenerateMonth(2026, 8, now) {
+		t.Fatal("8월은 지난 달")
+	}
+	if IsPastGenerateMonth(2026, 9, now) {
+		t.Fatal("9월은 당월")
+	}
+}
+
+func TestVisitStatusBadgeOf(t *testing.T) {
+	today := "2026-09-01"
+	done := MaintenanceVisit{Completed: true, CompletedDate: "2026-08-20", VisitDate: "2026-08-18"}
+	b := VisitStatusBadgeOf(done, today)
+	if b.Label != "방문완료" || b.Extra != "2026-08-20" {
+		t.Fatalf("완료 뱃지 %+v", b)
+	}
+	over := MaintenanceVisit{VisitDate: "2026-08-28"}
+	b = VisitStatusBadgeOf(over, today)
+	if b.Label != "D+4" {
+		t.Fatalf("경과 뱃지 %+v", b)
+	}
+	soon := MaintenanceVisit{VisitDate: "2026-09-10"}
+	if VisitStatusBadgeOf(soon, today).Label != "" {
+		t.Fatal("예정은 뱃지 없음")
+	}
+}
+
 func TestDatedVisitsSkipsEmpty(t *testing.T) {
 	list := []MaintenanceVisit{
 		{VisitDate: "2026-11-10"},

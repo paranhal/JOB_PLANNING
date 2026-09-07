@@ -77,20 +77,27 @@ func (r *ASProcessRepo) Create(p *model.ASProcess) error {
 	if err != nil {
 		return err
 	}
+	reindexASSearch(r.db, p.ASID)
 	// §25.2 AS 조치 등록은 이력 미기록(○)
 	return NewASRepo(r.db).SetStartDatetimeFromFirstProcess(p.ASID)
 }
 
 func (r *ASProcessRepo) Delete(id string) error {
-	return touchDelete(r.db, "as_processes", "process_id", id, id, func() error {
+	var asID string
+	_ = r.db.QueryRow(`SELECT as_id FROM as_processes WHERE process_id=?`, id).Scan(&asID)
+	err := touchDelete(r.db, "as_processes", "process_id", id, id, func() error {
 		_, err := r.db.Exec(`DELETE FROM as_processes WHERE process_id=?`, id)
 		return err
 	})
+	if err == nil {
+		reindexASSearch(r.db, asID)
+	}
+	return err
 }
 
 // DeleteByASAndID 해당 접수에 속한 처리 이력만 삭제
 func (r *ASProcessRepo) DeleteByASAndID(asID, processID string) error {
-	return touchDelete(r.db, "as_processes", "process_id", processID, processID, func() error {
+	err := touchDelete(r.db, "as_processes", "process_id", processID, processID, func() error {
 		res, err := r.db.Exec(`DELETE FROM as_processes WHERE process_id=? AND as_id=?`, processID, asID)
 		if err != nil {
 			return err
@@ -101,4 +108,8 @@ func (r *ASProcessRepo) DeleteByASAndID(asID, processID string) error {
 		}
 		return nil
 	})
+	if err == nil {
+		reindexASSearch(r.db, asID)
+	}
+	return err
 }

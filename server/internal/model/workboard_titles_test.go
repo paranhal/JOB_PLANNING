@@ -31,7 +31,7 @@ func TestWBCardDetailHref(t *testing.T) {
 	if got := as.DetailHref(); got != "/as/as_99/action" {
 		t.Fatalf("배치 AS 열기(조치): %q", got)
 	}
-	if got := as.EditHref(); got != "/workboard/tasks/wt_1" {
+	if got := as.EditHref(); got != "/workboard/tasks/wt_1/edit" {
 		t.Fatalf("배치 AS 수정: %q", got)
 	}
 	mnt := WBCard{
@@ -43,8 +43,15 @@ func TestWBCardDetailHref(t *testing.T) {
 	if got := mnt.DetailHref(); got != "/maintenance/visits/v1/action" {
 		t.Fatalf("배치 점검 조치(방문): %q", got)
 	}
-	if got := mnt.EditHref(); got != "/workboard/tasks/wt_2" {
+	if got := mnt.EditHref(); got != "/workboard/tasks/wt_2/edit" {
 		t.Fatalf("배치 점검 수정(업무등록): %q", got)
+	}
+	admin := WBCard{Kind: "task", TaskID: "wt_3", Category: WBWorkAdmin}
+	if got := admin.DetailHref(); got != "/workboard/tasks/wt_3" {
+		t.Fatalf("행정 조치: %q", got)
+	}
+	if got := admin.EditHref(); got != "/workboard/tasks/wt_3/edit" {
+		t.Fatalf("행정 수정(등록): %q", got)
 	}
 	palette := WBCard{Kind: WBSourceAS, Category: WBSourceAS, RefID: "as_1", SourceHref: "/as/as_1"}
 	if got := palette.DetailHref(); got != "" {

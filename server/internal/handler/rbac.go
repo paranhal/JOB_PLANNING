@@ -69,6 +69,10 @@ func canWriteSales(c echo.Context) bool {
 	return r == model.RoleAdmin || r == model.RoleSales || r == model.RoleOffice
 }
 
+func canSeeMargin(c echo.Context) bool {
+	return model.CanSeeMargin(currentRole(c))
+}
+
 func canDeleteSales(c echo.Context) bool {
 	return isAdminRole(c)
 }
@@ -175,6 +179,14 @@ func (h *AuthHandler) RequireMaintenanceEdit(next echo.HandlerFunc) echo.Handler
 
 func assigneeKeys(c echo.Context) []string {
 	return []string{ctxString(c, "user_name"), ctxString(c, "username")}
+}
+
+func currentUserDisplayName(c echo.Context) string {
+	n := strings.TrimSpace(ctxString(c, "user_name"))
+	if n != "" {
+		return n
+	}
+	return strings.TrimSpace(ctxString(c, "username"))
 }
 
 func currentUserID(c echo.Context) string {

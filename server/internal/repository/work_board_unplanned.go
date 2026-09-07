@@ -146,6 +146,13 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 		add(it, model.UnplannedNoDate)
 	}
 
+	if err := r.addSalesUnplanned(add, mineUserID, mineKeys); err != nil {
+		return nil, model.UnplannedKindCounts{}, err
+	}
+	if err := r.addAssetSerialUnplanned(add); err != nil {
+		return nil, model.UnplannedKindCounts{}, err
+	}
+
 	var counts model.UnplannedKindCounts
 	all := make([]model.UnplannedItem, 0, len(bag))
 	for _, it := range bag {
@@ -237,6 +244,90 @@ func (r *WorkBoardRepo) listUnassignedSlotsAsItems() ([]model.UnplannedItem, err
 		out = append(out, it)
 	}
 	return out, nil
+}
+
+func (r *WorkBoardRepo) addAssetSerialUnplanned(add func(model.UnplannedItem, string)) error {
+	rows, err := r.db.Query(`
+		SELECT a.asset_id, COALESCE(a.product_name,''), COALESCE(cu.org_name,''), COALESCE(a.sales_order_id,'')
+		FROM assets a
+		LEFT JOIN customers cu ON cu.customer_id = a.customer_id
+		WHERE TRIM(COALESCE(a.sales_order_id,'')) != ''
+		  AND TRIM(COALESCE(a.serial_number,'')) = ''`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return nil
+		}
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, name, org, orderID string
+		if err := rows.Scan(&id, &name, &org, &orderID); err != nil {
+			return err
+		}
+		title := strings.TrimSpace(name)
+		if title == "" {
+			title = "납품 자산"
+		}
+		add(model.UnplannedItem{
+			WorkListItem: model.WorkListItem{
+				Prefix:      model.WorkPrefixGeneral,
+				RefID:       id,
+				RefNumber:   id,
+				Title:       title + " · " + model.UnplannedAssetSerialTitle,
+				OrgName:     org,
+				Href:        "/assets/" + id,
+				Status:      "serial",
+				StatusLabel: model.UnplannedAssetSerialTitle,
+			},
+			ItemKey:       "asset-serial:" + id,
+			CanAssignDate: false,
+		}, model.UnplannedAssetSerial)
+	}
+	return rows.Err()
+}
+
+func (r *WorkBoardRepo) addSalesUnplanned(add func(model.UnplannedItem, string), mineUserID string, mineKeys []string) error {
+	gaps, kinds, err := NewSalesRepo(r.db).ListFollowupGaps(time.Now().Format("2006-01"))
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	mine := strings.TrimSpace(mineUserID) != "" || len(mineKeys) > 0
+	mineSet := map[string]bool{}
+	for _, k := range mineKeys {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			mineSet[k] = true
+		}
+	}
+	for _, p := range gaps {
+		if mine && !mineSet[strings.TrimSpace(p.SalesOwner)] && !mineSet[strings.TrimSpace(p.SalesOwnerID)] {
+			continue
+		}
+		org := p.CustomerValue()
+		it := model.UnplannedItem{
+			WorkListItem: model.WorkListItem{
+				Prefix:        model.WorkPrefixSales,
+				RefID:         p.SalesID,
+				RefNumber:     p.SalesID,
+				Title:         p.Name,
+				OrgName:       org,
+				Assignee:      p.SalesOwner,
+				ScheduledDate: p.ExpectedYM,
+				Href:          "/sales/" + p.SalesID,
+			},
+			ItemKey:       "sales:" + p.SalesID,
+			CanAssignDate: false,
+			CanNoDate:     false,
+		}
+		for _, k := range kinds[p.SalesID] {
+			add(it, k)
+		}
+	}
+	return nil
 }
 
 func (r *WorkBoardRepo) currentMntPlanYM() (planID string, year, month int, err error) {
@@ -358,6 +449,11 @@ func toUnplannedItem(it model.WorkListItem) model.UnplannedItem {
 	if it.Prefix == model.WorkPrefixMaintenance && !strings.HasPrefix(key, "slot:") {
 		u.Href = "/maintenance/visits/" + it.RefID + "/action"
 	}
+	if strings.HasPrefix(it.Href, "/sales/") || it.Prefix == model.WorkPrefixSales {
+		u.CanAssignDate = false
+		u.CanNoDate = false
+		u.Href = "/sales/" + it.RefID
+	}
 	return u
 }
 
@@ -370,6 +466,8 @@ func unplannedItemKey(it model.WorkListItem) string {
 		return "as:" + it.RefID
 	case strings.HasPrefix(href, "/workboard/tasks/"):
 		return "task:" + it.RefID
+	case strings.HasPrefix(href, "/sales/"):
+		return "sales:" + it.RefID
 	case it.Prefix == model.WorkPrefixMaintenance:
 		return "mnt:" + it.RefID
 	default:

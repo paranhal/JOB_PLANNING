@@ -1,0 +1,299 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <a href="/orders" class="text-sm text-gray-500 hover:underline">← 목록</a>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{.Order.DisplayNo}}</h2>
+      <p class="text-sm text-gray-500 mt-1">{{.Order.OrderDate}} · {{orderStatusLabel .Order.Status}} · {{vatModeLabel .Order.VATMode}}</p>
+      {{if .Differs}}
+      <p class="mt-2"><span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800">견적과 다름</span></p>
+      {{end}}
+    </div>
+    {{if .CanWrite}}
+    <div class="flex flex-wrap gap-2">
+      {{if .Order.QuoteID}}<a href="/quotes/{{.Order.QuoteID}}" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">원 견적</a>{{end}}
+      <a href="/orders/{{.Order.OrderID}}/edit" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">수정</a>
+    </div>
+    {{end}}
+  </div>
+
+  {{if eq .FlashOK "created"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">견적 라인을 그대로 복사했습니다. 수량·단가를 조정할 수 있습니다.</div>
+  {{else if eq .FlashOK "updated"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.</div>
+  {{else if eq .FlashOK "purchased"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">발주를 남겼습니다.</div>
+  {{else if eq .FlashOK "delivered"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">납품했습니다. 물품은 시리얼 수만큼 설치자산이 생깁니다.</div>
+  {{end}}
+  {{if .FlashErr}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FlashErr}}</div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+    <div><dt class="text-gray-500">수신</dt><dd>{{if .Order.RecipientName}}{{.Order.RecipientName}}{{else}}—{{end}}</dd></div>
+    <div><dt class="text-gray-500">건명</dt><dd>{{if .Order.Title}}{{.Order.Title}}{{else}}—{{end}}</dd></div>
+    <div><dt class="text-gray-500">고객 발주서</dt><dd>{{if .Order.PONo}}{{.Order.PONo}}{{else}}—{{end}} {{if .Order.PODate}}· {{.Order.PODate}}{{end}}</dd></div>
+    <div><dt class="text-gray-500">납품 요청일</dt><dd>{{if .Order.DueDate}}{{.Order.DueDate}}{{else}}—{{end}}</dd></div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b"><tr>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">내용</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">수량</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500">단위</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">단가</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">금액</th>
+        {{if .CanSeeMargin}}
+        <th class="text-right px-4 py-2 text-xs text-gray-500">매입가</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500">마진</th>
+        {{end}}
+      </tr></thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Order.Lines}}
+        <tr>
+          <td class="px-4 py-2 whitespace-pre-wrap">
+            {{.Name}}{{if .Spec}}<br><span class="text-xs text-gray-500">{{.Spec}}</span>{{end}}
+            {{if .DiffersFromQuote}}<div class="text-[10px] text-amber-700 font-semibold">견적과 다름</div>{{end}}
+          </td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Qty}}</td>
+          <td class="px-4 py-2">{{.Unit}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .UnitPrice}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .Amount}}</td>
+          {{if $.CanSeeMargin}}
+          <td class="px-4 py-2 text-right tabular-nums">{{won .Cost}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{won .Margin}}</td>
+          {{end}}
+        </tr>
+        {{else}}
+        <tr><td colspan="{{if .CanSeeMargin}}7{{else}}5{{end}}" class="px-4 py-6 text-center text-gray-400">라인이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <p class="text-xs text-gray-500">공급가</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Order.Amount}}원</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">부가세</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Order.VAT}}원</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">합계</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Order.Total}}원</p>
+    </div>
+    {{if .CanSeeMargin}}
+    <div>
+      <p class="text-xs text-gray-500">매입 합</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Order.CostTotal}}원</p>
+    </div>
+    <div class="sm:col-span-2">
+      <p class="text-xs text-gray-500">마진 (판매가 − 매입가)</p>
+      <p class="text-lg font-semibold tabular-nums">{{won .Order.Margin}}원</p>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+    <h3 class="text-sm font-semibold text-gray-800">공급사 발주</h3>
+    <p class="text-xs text-gray-500">재고·수량 잔고는 계산하지 않습니다. 라인별 발주 기록만 남깁니다.</p>
+    {{if .Order.Purchases}}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b"><tr>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">공급사</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">발주일</th>
+          <th class="text-right px-3 py-2 text-xs text-gray-500">수량</th>
+          {{if .CanSeeMargin}}<th class="text-right px-3 py-2 text-xs text-gray-500">매입가</th>{{end}}
+          <th class="text-left px-3 py-2 text-xs text-gray-500">입고예정</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">입고일</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">상태</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .Order.Purchases}}
+          <tr>
+            <td class="px-3 py-2">{{.SupplierName}}</td>
+            <td class="px-3 py-2">{{.PurchaseDate}}</td>
+            <td class="px-3 py-2 text-right tabular-nums">{{.Qty}}</td>
+            {{if $.CanSeeMargin}}<td class="px-3 py-2 text-right tabular-nums">{{won .CostPrice}}</td>{{end}}
+            <td class="px-3 py-2">{{if .EtaDate}}{{.EtaDate}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2">{{if .ArrivedDate}}{{.ArrivedDate}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2">{{purchaseStatusLabel .Status}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <p class="text-sm text-gray-400">발주 기록이 없습니다.</p>
+    {{end}}
+
+    {{if .CanWrite}}
+    <form method="post" action="/orders/{{.Order.OrderID}}/purchases" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">라인</label>
+        <select name="line_id" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          {{range .Order.Lines}}<option value="{{.LineID}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">공급사</label>
+        <input name="supplier_name" required class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="앤로보틱스">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">발주일</label>
+        <input type="date" name="purchase_date" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">수량</label>
+        <input name="qty" value="1" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      {{if .CanSeeMargin}}
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">매입가 (단가)</label>
+        <input name="cost_price" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0">
+      </div>
+      {{end}}
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">입고 예정일</label>
+        <input type="date" name="eta_date" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">입고일</label>
+        <input type="date" name="arrived_date" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">상태</label>
+        <select name="status" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="ordered">발주</option>
+          <option value="arrived">입고</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-500 mb-1">메모</label>
+        <input name="note" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">발주 기록</button>
+      </div>
+    </form>
+    {{end}}
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+    <h3 class="text-sm font-semibold text-gray-800">납품</h3>
+    <p class="text-xs text-gray-500">부분 납품을 허용합니다. 물품만 설치자산이 생깁니다. 소모품·용역·AS는 자산을 만들지 않습니다. 시리얼은 수량만큼 받으며 비우면 「나중에 입력」입니다.</p>
+    {{if .Order.Deliveries}}
+    <ul class="text-sm space-y-2">
+      {{range .Order.Deliveries}}
+      <li class="border border-gray-100 rounded-lg p-3">
+        <p>{{.DeliveryDate}} · {{if .LineName}}{{.LineName}}{{else}}{{.LineID}}{{end}} · {{.Qty}}
+          {{if .Place}} · {{.Place}}{{end}}
+          {{if .ReceiverName}} · 수령 {{.ReceiverName}}{{end}}
+          {{if .InstalledBy}} · 설치 {{.InstalledBy}}{{end}}</p>
+        {{$files := index $.DeliveryFiles .DeliveryID}}
+        {{if $files}}
+        <ul class="mt-1 text-xs">
+          {{range $files}}<li><a href="/attachments/{{.AttachmentID}}" class="text-blue-700 hover:underline">{{attDisplayName .}}</a></li>{{end}}
+        </ul>
+        {{end}}
+        {{if $.CanWrite}}
+        <form method="POST" action="/attachments" enctype="multipart/form-data" class="mt-2 flex flex-wrap gap-2 items-center">
+          <input type="hidden" name="ref_type" value="sales_delivery">
+          <input type="hidden" name="ref_id" value="{{.DeliveryID}}">
+          <input type="hidden" name="redirect" value="/orders/{{$.Order.OrderID}}">
+          <input type="file" name="file" accept="image/*,.pdf,.heic" class="text-xs">
+          <button type="submit" class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs">인수증·사진</button>
+        </form>
+        {{end}}
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-sm text-gray-400">납품 기록이 없습니다.</p>
+    {{end}}
+
+    {{if .Order.Assets}}
+    <p class="text-xs text-gray-500 pt-2">이 수주로 생긴 설치자산</p>
+    <ul class="text-sm space-y-1">
+      {{range .Order.Assets}}
+      <li><a href="/assets/{{.AssetID}}" class="text-blue-700 hover:underline">{{.ProductName}}</a>
+        {{if .SerialNumber}} · {{.SerialNumber}}{{else}} · 시리얼 미입력{{end}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+
+    {{if .CanWrite}}
+    <form method="post" action="/orders/{{.Order.OrderID}}/deliveries" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">라인</label>
+        <select name="line_id" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          {{range .Order.Lines}}<option value="{{.LineID}}">{{.Name}} ({{.Qty}})</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">납품일</label>
+        <input type="date" name="delivery_date" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">수량 (부분 납품 가능)</label>
+        <input name="qty" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="라인 수량">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">납품 장소</label>
+        <input name="place" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">수령인</label>
+        <input name="receiver_name" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">설치한 사람</label>
+        <input name="installed_by" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-500 mb-1">설치위치</label>
+        <input name="install_location" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2 space-y-1">
+        <label class="block text-xs text-gray-500">시리얼 (수량만큼. 비우면 「나중에 입력」)</label>
+        <input name="serial" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="1번째">
+        <input name="serial" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="2번째">
+        <input name="serial" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="3번째">
+        <input name="serial" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="4번째">
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">납품 기록</button>
+      </div>
+    </form>
+    {{end}}
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+    <h3 class="text-sm font-semibold text-gray-800">고객 발주서 PDF</h3>
+    {{if .Attachments}}
+    <ul class="text-sm space-y-1">
+      {{range .Attachments}}
+      <li><a href="/attachments/{{.AttachmentID}}" class="text-blue-700 hover:underline">{{attDisplayName .}}</a></li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-sm text-gray-400">첨부된 발주서가 없습니다.</p>
+    {{end}}
+    {{if .CanWrite}}
+    <form method="POST" action="/attachments" enctype="multipart/form-data" class="space-y-2">
+      <input type="hidden" name="ref_type" value="sales_order">
+      <input type="hidden" name="ref_id" value="{{.Order.OrderID}}">
+      <input type="hidden" name="redirect" value="/orders/{{.Order.OrderID}}">
+      <input type="file" name="file" accept=".pdf,application/pdf" class="block text-sm">
+      <button type="submit" class="px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm">PDF 올리기</button>
+    </form>
+    {{end}}
+  </div>
+</div>
+{{end}}

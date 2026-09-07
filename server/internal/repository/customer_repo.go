@@ -20,7 +20,7 @@ func NewCustomerRepo(db *sql.DB) *CustomerRepo {
 // List 고객 목록 조회 (검색, 상위기관·업종 필터, 정렬, 페이징)
 // category: ""=전체, "none"=상위기관 없음, 그 외=상위기관 customer_id
 // sort: ""=기본(카테고리), customer_id|org_name|parent|industry|phone|assets|as|status
-func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, pageSize int, reviewOnly bool) ([]model.CustomerListItem, int, error) {
+func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, pageSize int, reviewOnly bool, partyKind string) ([]model.CustomerListItem, int, error) {
 	offset := (page - 1) * pageSize
 
 	baseQuery := `
@@ -31,7 +31,8 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 		       COALESCE(c.parent_customer_id,''),
 		       COALESCE(p.org_name,''),
 		       CASE WHEN c.has_parent=1 AND COALESCE(c.parent_customer_id,'')!='' THEN 1 ELSE 0 END,
-		       COALESCE(c.needs_review,0), COALESCE(c.review_reason,'')
+		       COALESCE(c.needs_review,0), COALESCE(c.review_reason,''),
+		       COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')
 		FROM customers c
 		LEFT JOIN customers p ON p.customer_id = c.parent_customer_id
 		LEFT JOIN assets a ON a.customer_id = c.customer_id
@@ -73,6 +74,14 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 		cond := ` AND COALESCE(c.needs_review,0)=1`
 		baseQuery += cond
 		countQuery += cond
+	}
+
+	if pk := strings.TrimSpace(partyKind); pk != "" {
+		cond := ` AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')=?`
+		baseQuery += cond
+		countQuery += cond
+		args = append(args, pk)
+		countArgs = append(countArgs, pk)
 	}
 
 	if search != "" {
@@ -147,7 +156,7 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 			&item.Industry, &item.MainPhone, &isActive,
 			&item.AssetCount, &item.AsCount,
 			&item.ParentCustomerID, &item.ParentOrgName, &hasParent,
-			&needsReview, &item.ReviewReason,
+			&needsReview, &item.ReviewReason, &item.PartyKind,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -218,45 +227,14 @@ func (r *CustomerRepo) ListCategories() ([]model.CustomerCategory, int, error) {
 
 // GetByID 고객 단건 조회
 func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
-	query := `
-		SELECT customer_id, org_name, official_name,
-		       COALESCE(org_email,''), COALESCE(main_phone,''),
-		       COALESCE(website,''), COALESCE(business_number,''),
-		       COALESCE(representative,''), COALESCE(industry,''),
-		       has_parent, COALESCE(parent_customer_id,''),
-		       COALESCE(postal_code,''), COALESCE(addr_sido,''),
-		       COALESCE(addr_sigungu,''), COALESCE(addr_dong,''),
-		       COALESCE(address,''), COALESCE(address_detail,''),
-		       is_active, COALESCE(notes,''),
-		       COALESCE(needs_review,0), COALESCE(review_reason,''),
-		       created_at, updated_at
-		FROM customers WHERE customer_id = ?`
-
-	var c model.Customer
-	var hasParent, isActive, needsReview int
-	var createdAt, updatedAt string
-
-	err := r.db.QueryRow(query, id).Scan(
-		&c.CustomerID, &c.OrgName, &c.OfficialName, &c.OrgEmail,
-		&c.MainPhone, &c.Website, &c.BusinessNumber, &c.Representative,
-		&c.Industry, &hasParent, &c.ParentCustomerID,
-		&c.PostalCode, &c.AddrSido, &c.AddrSigungu, &c.AddrDong,
-		&c.Address, &c.AddressDetail,
-		&isActive, &c.Notes, &needsReview, &c.ReviewReason,
-		&createdAt, &updatedAt,
-	)
+	c, err := scanCustomerAPI(r.db.QueryRow(customerAPISelect+` WHERE customer_id = ?`, id))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	c.HasParent = hasParent == 1
-	c.IsActive = isActive == 1
-	c.NeedsReview = needsReview == 1
-	c.CreatedAt = parseTime(createdAt)
-	c.UpdatedAt = parseTime(updatedAt)
-	return &c, nil
+	return c, nil
 }
 
 // Create 고객 등록
@@ -275,14 +253,14 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 			has_parent, parent_customer_id,
 			postal_code, addr_sido, addr_sigungu, addr_dong,
 			address, address_detail,
-			is_active, notes, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			is_active, notes, party_kind, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.CustomerID, c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
 		c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
 		boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
 		c.PostalCode, c.AddrSido, c.AddrSigungu, c.AddrDong,
 		c.Address, c.AddressDetail,
-		boolToInt(c.IsActive), c.Notes, now, now,
+		boolToInt(c.IsActive), c.Notes, model.NormalizePartyKind(c.PartyKind), now, now,
 	)
 	if err != nil {
 		return err
@@ -303,14 +281,14 @@ func (r *CustomerRepo) Update(c *model.Customer) error {
 			has_parent=?, parent_customer_id=?,
 			postal_code=?, addr_sido=?, addr_sigungu=?, addr_dong=?,
 			address=?, address_detail=?,
-			is_active=?, notes=?, updated_at=?
+			is_active=?, notes=?, party_kind=?, updated_at=?
 		WHERE customer_id=?`,
 			c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
 			c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
 			boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
 			c.PostalCode, c.AddrSido, c.AddrSigungu, c.AddrDong,
 			c.Address, c.AddressDetail,
-			boolToInt(c.IsActive), c.Notes, now, c.CustomerID,
+			boolToInt(c.IsActive), c.Notes, model.NormalizePartyKind(c.PartyKind), now, c.CustomerID,
 		)
 		return err
 	})
@@ -348,6 +326,46 @@ func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
 	return customers, rows.Err()
 }
 
+// ListForReceipt AS 접수·정기점검용. party_kind=customer 만. §34.2.5
+func (r *CustomerRepo) ListForReceipt() ([]model.Customer, error) {
+	return r.listForReceipt("")
+}
+
+func (r *CustomerRepo) ListForReceiptIncluding(id string) ([]model.Customer, error) {
+	return r.listForReceipt(id)
+}
+
+func (r *CustomerRepo) listForReceipt(includeID string) ([]model.Customer, error) {
+	q := `
+		SELECT c.customer_id, c.org_name,
+		       COALESCE(cfg.short_name,''), COALESCE(cfg.region,''),
+		       COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')
+		FROM customers c
+		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = c.customer_id
+		WHERE c.is_active=1
+		  AND (COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'`
+	args := []interface{}{}
+	if includeID = strings.TrimSpace(includeID); includeID != "" {
+		q += ` OR c.customer_id=?`
+		args = append(args, includeID)
+	}
+	q += `) ORDER BY c.org_name`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.Customer
+	for rows.Next() {
+		var c model.Customer
+		if err := rows.Scan(&c.CustomerID, &c.OrgName, &c.ShortName, &c.Region, &c.PartyKind); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 const customerAPISelect = `
 		SELECT customer_id, org_name, official_name,
 		       COALESCE(org_email,''), COALESCE(main_phone,''),
@@ -359,6 +377,7 @@ const customerAPISelect = `
 		       COALESCE(address,''), COALESCE(address_detail,''),
 		       is_active, COALESCE(notes,''),
 		       COALESCE(needs_review,0), COALESCE(review_reason,''),
+		       COALESCE(NULLIF(TRIM(party_kind),''),'customer'),
 		       created_at, updated_at
 		FROM customers`
 
@@ -372,7 +391,7 @@ func scanCustomerAPI(sc interface{ Scan(...interface{}) error }) (*model.Custome
 		&c.Industry, &hasParent, &c.ParentCustomerID,
 		&c.PostalCode, &c.AddrSido, &c.AddrSigungu, &c.AddrDong,
 		&c.Address, &c.AddressDetail,
-		&isActive, &c.Notes, &needsReview, &c.ReviewReason,
+		&isActive, &c.Notes, &needsReview, &c.ReviewReason, &c.PartyKind,
 		&createdAt, &updatedAt,
 	); err != nil {
 		return nil, err
@@ -380,6 +399,7 @@ func scanCustomerAPI(sc interface{ Scan(...interface{}) error }) (*model.Custome
 	c.HasParent = hasParent == 1
 	c.IsActive = isActive == 1
 	c.NeedsReview = needsReview == 1
+	c.PartyKind = model.NormalizePartyKind(c.PartyKind)
 	c.CreatedAt = parseTime(createdAt)
 	c.UpdatedAt = parseTime(updatedAt)
 	return &c, nil
@@ -430,7 +450,7 @@ func (r *CustomerRepo) ListForAPI(search string, active *bool, limit, offset int
 
 // ListExport 엑셀용 전체 목록 (주소·점검사이트 지역 포함, 페이징 없음)
 func (r *CustomerRepo) ListExport(search, category, industry, sort, dir, region, siteID string) ([]model.CustomerListItem, error) {
-	items, _, err := r.List(search, category, industry, sort, dir, 1, 0, false)
+	items, _, err := r.List(search, category, industry, sort, dir, 1, 0, false, "")
 	if err != nil {
 		return nil, err
 	}

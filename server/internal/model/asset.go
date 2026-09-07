@@ -44,6 +44,7 @@ type Asset struct {
 	LocationDetail    string    `json:"location_detail"`   // 상세위치(보조 서술)
 	Notes             string    `json:"notes"`
 	ProjectID         string    `json:"project_id"` // 사업(프로젝트) work_projects
+	SalesOrderID      string    `json:"sales_order_id"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 
@@ -57,8 +58,30 @@ type Asset struct {
 	InstallYears int    `json:"install_years,omitempty"` // 설치연수 (영업활용)
 }
 
+// 운영상태 코드 (codes.operation_status) §35.2
+const (
+	AssetOpOperating   = "operating"
+	AssetOpMaintenance = "maintenance"
+	AssetOpFault       = "fault"
+	AssetOpRetired     = "retired"
+	AssetOpDisposed    = "disposed"
+)
+
 // 관리유형 코드값 (codes.management_type)
 const ManagementTypeThirdParty = "third_party"
+const InstallerTypeSelf = "self"
+
+func (a *Asset) MaintFieldsEmpty() bool {
+	if a == nil {
+		return true
+	}
+	return strings.TrimSpace(a.MaintContractType) == "" &&
+		strings.TrimSpace(a.MaintCycle) == "" &&
+		strings.TrimSpace(a.MaintStartDate) == "" &&
+		strings.TrimSpace(a.MaintEndDate) == "" &&
+		strings.TrimSpace(a.MaintBillingParty) == "" &&
+		strings.TrimSpace(a.MaintBillingCycle) == ""
+}
 
 // IsThirdPartyEquipment 당사가 장비를 유지보수하지 않는 타사 장비(연동·환경 참고용).
 func (a *Asset) IsThirdPartyEquipment() bool {
@@ -150,6 +173,8 @@ const (
 	RefTypeASActionPhoto = "as_action_photo" // §12.9.8 조치 사진
 	RefTypeASReport      = "as_report"
 	RefTypeWorkActivity  = "work_activity"
+	RefTypeSalesOrder    = "sales_order"
+	RefTypeSalesDelivery = "sales_delivery"
 )
 
 const (

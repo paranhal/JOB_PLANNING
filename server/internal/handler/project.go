@@ -70,7 +70,7 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	}
 	years, _ := h.repo.ListYears()
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
-		"Title": "사업(프로젝트)관리", "Active": "projects",
+		"Title": "사업(프로젝트)관리", "Active": NavProjects,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
@@ -116,7 +116,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	assetTotal, _ := h.assetRepo.CountByProject(id)
 	p.ASCount, p.MntCount, p.TaskCount, p.AssetCount = asTotal, mntTotal, taskTotal, assetTotal
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
-		"Title": p.DisplayName(), "Active": "projects",
+		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
 		"CanWrite":  canWriteProjects(c),
 		"CanDelete": canDeleteProjects(c),
@@ -146,6 +146,7 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	}
 	p, rules := h.parseForm(c)
 	p.ProjectID = existing.ProjectID
+	p.SalesProjectID = existing.SalesProjectID
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
 	}
@@ -275,7 +276,7 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	}
 	rulesJSON, _ := json.Marshal(jsRules)
 	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
-		"Title": title, "Active": "projects",
+		"Title": title, "Active": NavProjects,
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": isEdit,
 		"Customers": customers, "Parents": parents,
 		"ContractTypes": contractTypes, "BillingTypes": billingTypes,

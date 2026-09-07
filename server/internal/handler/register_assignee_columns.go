@@ -28,7 +28,18 @@ func buildRegisterAssigneeColumns(dateCol RegisterColumn, placed []model.WorkTas
 }
 
 func buildRegisterAssigneeColumnsMembers(dateCol RegisterColumn, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard, order []string, filter string, members map[string][]model.WorkTaskMember) []RegisterDayColumn {
+	return buildRegisterAssigneeColumnsAlways(dateCol, placed, toCard, order, filter, members, nil)
+}
+
+func buildRegisterAssigneeColumnsAlways(dateCol RegisterColumn, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard, order []string, filter string, members map[string][]model.WorkTaskMember, always []string) []RegisterDayColumn {
 	filter = strings.TrimSpace(filter)
+	alwaysSet := map[string]bool{}
+	for _, n := range always {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			alwaysSet[n] = true
+		}
+	}
 	date := strings.TrimSpace(dateCol.Date)
 	if date == "" {
 		date = dateCol.From
@@ -62,7 +73,10 @@ func buildRegisterAssigneeColumnsMembers(dateCol RegisterColumn, placed []model.
 		used := map[string]bool{}
 		for _, n := range order {
 			n = strings.TrimSpace(n)
-			if n == "" || !seen[n] || used[n] {
+			if n == "" || used[n] {
+				continue
+			}
+			if !seen[n] && !alwaysSet[n] {
 				continue
 			}
 			used[n] = true
@@ -70,6 +84,11 @@ func buildRegisterAssigneeColumnsMembers(dateCol RegisterColumn, placed []model.
 		}
 		var extra []string
 		for n := range seen {
+			if !used[n] {
+				extra = append(extra, n)
+			}
+		}
+		for n := range alwaysSet {
 			if !used[n] {
 				extra = append(extra, n)
 			}

@@ -8,14 +8,21 @@
       <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
       <p class="text-sm text-gray-500">기본 정보와 AS/정기점검 귀속 범위를 설정합니다.</p>
     </div>
-    <a href="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="text-sm text-gray-500 hover:underline">← 돌아가기</a>
+    <a href="{{if .FromSales}}/sales/{{.SalesID}}{{else if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="text-sm text-gray-500 hover:underline">← 돌아가기</a>
   </div>
+
+  {{if .FromSales}}
+  <div class="rounded-lg bg-blue-50 text-blue-900 text-sm px-4 py-2 border border-blue-200">
+    영업 사업에서 승격합니다. 계약기간·계약방식·청구방식·유상무상·범위 규칙을 여기서 처음 입력합니다.
+    {{if .SalesAmount}}<span class="block mt-1">옮겨 둔 예상 금액: {{.SalesAmount}}</span>{{end}}
+  </div>
+  {{end}}
 
   {{if .FormError}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
 
-  <form method="post" action="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="space-y-4"
+  <form method="post" action="{{if .FromSales}}/sales/{{.SalesID}}/promote{{else if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="space-y-4"
         @submit="syncRuleFields()">
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <h3 class="font-semibold text-gray-800">기본 정보</h3>
@@ -173,7 +180,7 @@
     </div>
 
     <div class="flex justify-end gap-2">
-      <a href="{{if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="px-4 py-2 text-sm border rounded-lg">취소</a>
+      <a href="{{if .FromSales}}/sales/{{.SalesID}}{{else if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="px-4 py-2 text-sm border rounded-lg">취소</a>
       <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">{{if .IsEdit}}저장{{else}}등록{{end}}</button>
     </div>
   </form>

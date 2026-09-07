@@ -47,34 +47,88 @@ func (h *MaintenanceHandler) planOKRedirect(c echo.Context, planID, msg string) 
 	return c.Redirect(http.StatusSeeOther, back+sep+"ok="+url.QueryEscape(msg))
 }
 
-// GenerateConfirm 자동 배정 전 기존 자동 생성분 삭제 건수를 보여 준다.
+func parseGenerateMonth(c echo.Context, plan *model.MaintenancePlan) int {
+	raw := firstNonEmpty(c.FormValue("month"), c.QueryParam("month"))
+	m, _ := strconv.Atoi(strings.TrimSpace(raw))
+	if m >= 1 && m <= 12 {
+		return m
+	}
+	now := time.Now()
+	if plan != nil {
+		return defaultPlanMonth(plan.PlanYear, nil, now)
+	}
+	return int(now.Month())
+}
+
+func generateConfirmURL(planID string, month int, order string) string {
+	q := url.Values{}
+	if month >= 1 && month <= 12 {
+		q.Set("month", strconv.Itoa(month))
+	}
+	if o := strings.TrimSpace(order); o != "" {
+		q.Set("assign_order", o)
+	}
+	loc := "/maintenance/" + planID + "/generate"
+	if enc := q.Encode(); enc != "" {
+		loc += "?" + enc
+	}
+	return loc
+}
+
+// GenerateConfirm 자동 배정 전 해당 월 삭제·보호 건수를 보여 준다. §34.4.5
 func (h *MaintenanceHandler) GenerateConfirm(c echo.Context) error {
 	plan, err := h.repo.GetPlan(c.Param("id"))
 	if err != nil || plan == nil {
 		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
 	}
-	del, keep, err := h.repo.AutoVisitDeleteStats(plan.PlanID)
+	month := parseGenerateMonth(c, plan)
+	st, err := h.repo.AutoAssignMonthStats(plan.PlanID, plan.PlanYear, month)
 	if err != nil {
 		return err
 	}
+	order := service.NormalizeGenerateOrder(c.QueryParam("assign_order"))
+	configs, _ := h.repo.ListSiteConfigs()
+	dist, _ := h.repo.ListRegionDistanceOrder()
+	unreg := service.UnregisteredRegionCount(configs, dist)
 	return c.Render(http.StatusOK, "maintenance/plan_generate.html", map[string]interface{}{
 		"Title": "자동 배정 확인", "Active": NavMaintenance, "Plan": plan,
-		"DeleteCount": del, "KeepCount": keep,
-		"HolidayMissing": holidayMissingBanner(h.holidayRepo, plan.PlanYear),
+		"Year": plan.PlanYear, "Month": month,
+		"DeleteCount": st.DeleteCount, "CompletedKeep": st.CompletedKeep,
+		"PastKeep": st.PastKeep, "ManualKeep": st.ManualKeep,
+		"PastMonth": st.PastMonth, "Today": st.Today,
+		"TodayLabel":              model.FormatMonthDay(st.Today),
+		"Visits":                  st.Visits,
+		"AssignOrder":             order,
+		"UnregisteredRegionCount": unreg,
+		"HolidayMissing":          holidayMissingBanner(h.holidayRepo, plan.PlanYear),
+		"PastMonthMsg":            model.ErrGeneratePastMonth.Error(),
 	})
 }
 
 func (h *MaintenanceHandler) GenerateAuto(c echo.Context) error {
 	id := c.Param("id")
-	if c.FormValue("confirm") != "1" {
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/generate")
-	}
-	del, _, _ := h.repo.AutoVisitDeleteStats(id)
 	plan, _ := h.repo.GetPlan(id)
-	if err := service.AutoGenerateMaintenance(h.repo, id); err != nil {
+	month := parseGenerateMonth(c, plan)
+	year := 0
+	if plan != nil {
+		year = plan.PlanYear
+	}
+	order := service.NormalizeGenerateOrder(c.FormValue("assign_order"))
+	if c.FormValue("confirm") != "1" {
+		return c.Redirect(http.StatusSeeOther, generateConfirmURL(id, month, order))
+	}
+	now := time.Now()
+	if h.repo != nil && h.repo.Now != nil {
+		now = h.repo.Now()
+	}
+	if model.IsPastGenerateMonth(year, month, now) {
+		return h.planErrRedirect(c, id, model.ErrGeneratePastMonth.Error())
+	}
+	st, _ := h.repo.AutoAssignMonthStats(id, year, month)
+	if err := service.AutoGenerateMaintenanceWithOrder(h.repo, id, order, year, month); err != nil {
 		return h.planErrRedirect(c, id, err.Error())
 	}
-	if del > 0 {
+	if st.DeleteCount > 0 {
 		accessLog(c, auditlog.Record{
 			Action:      auditlog.ActionBulkDelete,
 			TargetTable: "maintenance_visits",
@@ -82,7 +136,7 @@ func (h *MaintenanceHandler) GenerateAuto(c echo.Context) error {
 			SubjectType: "maintenance_plan",
 			SubjectID:   id,
 			SubjectName: planConfirmTitle(plan),
-			Detail:      fmt.Sprintf("자동배정 전 자동생성 방문 %d건 삭제", del),
+			Detail:      fmt.Sprintf("%d년 %d월 자동배정 전 자동생성 방문 %d건 삭제", year, month, st.DeleteCount),
 			Reason:      "자동배정",
 			Result:      auditlog.ResultOK,
 		})
@@ -93,7 +147,9 @@ func (h *MaintenanceHandler) GenerateAuto(c echo.Context) error {
 	return h.planOKRedirect(c, id, "자동 배정을 반영했습니다")
 }
 
-// DeletePlanPage 계획 삭제 3단계 확인 (§23.11).
+const planDeleteDisabledMsg = "계획은 삭제할 수 없습니다. 보관만 가능합니다."
+
+// DeletePlanPage 계획 삭제는 진입만 남기고 실제 삭제는 막는다. §34.4.4 · §23.11
 func (h *MaintenanceHandler) DeletePlanPage(c echo.Context) error {
 	plan, err := h.repo.GetPlan(c.Param("id"))
 	if err != nil || plan == nil {
@@ -103,20 +159,10 @@ func (h *MaintenanceHandler) DeletePlanPage(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	block := ""
-	now := time.Now()
-	confirmTitle := planConfirmTitle(plan)
-	if plan.PlanYear < now.Year() {
-		block = fmt.Sprintf("%d년 계획은 삭제할 수 없습니다. 보관으로만 내릴 수 있습니다.", plan.PlanYear)
-	} else if st.Completed > 0 {
-		block = fmt.Sprintf("완료된 방문 %d건이 있어 계획을 삭제할 수 없습니다. 먼저 보관 상태로 바꾸세요.", st.Completed)
-	} else if st.Protected > 0 {
-		block = model.ProtectedVisitRangeMessage(now, st.Protected)
-	}
 	return c.Render(http.StatusOK, "maintenance/plan_delete.html", map[string]interface{}{
 		"Title": "계획 삭제", "Active": NavMaintenance, "Plan": plan,
-		"Stats": st, "Block": block, "Error": c.QueryParam("err"),
-		"ConfirmTitle": confirmTitle,
+		"Stats": st, "Block": planDeleteDisabledMsg, "Error": c.QueryParam("err"),
+		"ConfirmTitle": planConfirmTitle(plan),
 	})
 }
 
@@ -127,43 +173,7 @@ func (h *MaintenanceHandler) DeletePlan(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
 	}
 	reason := accessReason(c, "계획 삭제")
-	logPlan := func(result, detail string) {
-		visits, _ := h.repo.ListVisits(id)
-		accessLog(c, auditlog.Record{
-			Action:      auditlog.ActionDelete,
-			TargetTable: "maintenance_plans",
-			TargetID:    plan.PlanID,
-			SubjectType: "maintenance_plan",
-			SubjectID:   plan.PlanID,
-			SubjectName: planConfirmTitle(plan),
-			Detail:      detail,
-			Reason:      reason,
-			Result:      result,
-			BeforeJSON:  toJSON(map[string]interface{}{"plan": plan, "visits": visits}),
-		})
-	}
-	if strings.TrimSpace(c.FormValue("confirm_title")) != planConfirmTitle(plan) {
-		logPlan(auditlog.ResultDeny, "계획 제목이 일치하지 않습니다")
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/delete?err="+url.QueryEscape("계획 제목이 일치하지 않습니다"))
-	}
-	pw := strings.TrimSpace(c.FormValue("delete_password"))
-	if !verifyAndUpgradeSetting(h.settingsRepo, repository.SettingMaintenanceDeletePassword, pw) {
-		logPlan(auditlog.ResultDeny, "비밀번호오류")
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/delete?err="+url.QueryEscape("삭제 비밀번호가 올바르지 않습니다"))
-	}
-	if err := h.repo.GuardPlanDelete(id); err != nil {
-		logPlan(auditlog.ResultDeny, err.Error())
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/delete?err="+url.QueryEscape(err.Error()))
-	}
 	visits, _ := h.repo.ListVisits(id)
-	if _, err := backupPlanDeleteJSON(h.dataDir, plan, visits); err != nil {
-		logPlan(auditlog.ResultDeny, "삭제 전 백업에 실패했습니다")
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/delete?err="+url.QueryEscape("삭제 전 백업에 실패했습니다: "+err.Error()))
-	}
-	if err := h.repo.DeletePlan(id); err != nil {
-		logPlan(auditlog.ResultDeny, err.Error())
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/delete?err="+url.QueryEscape(err.Error()))
-	}
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionDelete,
 		TargetTable: "maintenance_plans",
@@ -171,12 +181,12 @@ func (h *MaintenanceHandler) DeletePlan(c echo.Context) error {
 		SubjectType: "maintenance_plan",
 		SubjectID:   plan.PlanID,
 		SubjectName: planConfirmTitle(plan),
-		Detail:      fmt.Sprintf("계획 삭제 (방문 %d건 포함)", len(visits)),
+		Detail:      planDeleteDisabledMsg,
 		Reason:      reason,
-		Result:      auditlog.ResultOK,
+		Result:      auditlog.ResultDeny,
 		BeforeJSON:  toJSON(map[string]interface{}{"plan": plan, "visits": visits}),
 	})
-	return c.Redirect(http.StatusSeeOther, "/maintenance")
+	return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/delete?err="+url.QueryEscape(planDeleteDisabledMsg))
 }
 
 func (h *MaintenanceHandler) ArchivePlan(c echo.Context) error {

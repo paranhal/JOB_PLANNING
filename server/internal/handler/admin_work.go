@@ -26,7 +26,7 @@ func NewAdminWorkHandler(repo *repository.WBRepo, userRepo *repository.UserRepo,
 func (h *AdminWorkHandler) List(c echo.Context) error {
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	view := strings.TrimSpace(c.QueryParam("view"))
+	view := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
 	if view != "kanban" {
 		view = "list"
 	}
@@ -41,23 +41,16 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 	assignees, _ := h.userRepo.ListAssignable()
 	customers, _ := h.customerRepo.ListAll()
 	flashErr := c.QueryParam("err")
-	byStatus := map[string][]model.WorkTask{
-		model.WBTaskWaiting:    {},
-		model.WBTaskInProgress: {},
-		model.WBTaskComplete:   {},
-	}
-	for _, t := range items {
-		b := model.WBKanbanBucket(t.Status)
-		if b == "" {
-			continue
-		}
-		byStatus[b] = append(byStatus[b], t)
-	}
+	kanban := model.FillAdminKanban(model.AdminKanbanColumnDefs(), items)
 	return c.Render(http.StatusOK, "admin_work/list.html", map[string]interface{}{
 		"Title":        "행정관련업무등록/처리",
 		"Active":       NavAdminWork,
 		"Items":        items,
-		"ByStatus":     byStatus,
+		"KanbanColumns": kanban.Columns,
+		"KanbanTotal":   kanban.Total,
+		"KanbanDrag":    canWriteWorkboard(c),
+		"KanbanDrop":    "key",
+		"KanbanHint":    "보류·이관·회신대기는 진행중 열에 뱃지로 구분합니다. 취소는 필터로만 봅니다. 완료로 끌면 완료 내용을 묻습니다.",
 		"Status":       status,
 		"Search":       search,
 		"View":         view,
@@ -370,6 +363,7 @@ func adminWorkSortHrefs(path, status, search, view, curSort, curDir string) map[
 			q.Set("search", search)
 		}
 		if view == "kanban" {
+			q.Set("display", "kanban")
 			q.Set("view", "kanban")
 		}
 		q.Set("sort", col)

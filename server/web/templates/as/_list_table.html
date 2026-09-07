@@ -72,11 +72,15 @@
           {{range .Items}}
           <tr class="hover:bg-gray-50 transition-colors {{if and (gt .VisitDaysOverdue 0) (not .VisitDone)}}bg-red-50/40{{else if gt .DaysElapsed 3}}bg-red-50/20{{end}}">
             <td class="px-4 py-3">
-              <span class="{{urgencyColor .Urgency}} text-xs font-bold">{{urgencyLabel .Urgency}}</span>
+              {{if eq .Urgency "high"}}
+              <span class="text-xs font-bold text-red-600" title="{{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
+              {{end}}
             </td>
             <td class="px-4 py-3">
               <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
+              {{if gt .GroupSize 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 text-[10px] align-middle" title="함께 접수된 건 {{.GroupSize}}건">🔗</span>{{end}}
               {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
+              {{if .IsTransferFollowup}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[10px] align-middle" title="이관하면서 우리 몫이 남은 후속 접수">이관후속</span>{{end}}
               {{if gt .PhotoCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 text-[10px] align-middle" title="증상 사진">📷 {{.PhotoCount}}</span>{{end}}
               <p class="text-xs text-gray-400 mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
             </td>

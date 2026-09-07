@@ -24,6 +24,7 @@ const projectSelect = `
 		COALESCE(p.start_date,''), COALESCE(p.end_date,''),
 		COALESCE(p.notes,''), COALESCE(p.contact_id,''),
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
+		COALESCE(p.sales_project_id,''),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,'')
 	FROM work_projects p
@@ -114,6 +115,19 @@ func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
 	return p, nil
 }
 
+func (r *ProjectRepo) GetBySalesID(salesID string) (*model.WorkProject, error) {
+	salesID = strings.TrimSpace(salesID)
+	if salesID == "" {
+		return nil, sql.ErrNoRows
+	}
+	row := r.db.QueryRow(projectSelect+` WHERE p.sales_project_id=?`, salesID)
+	p, err := scanProjectRow(row)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
 func (r *ProjectRepo) Create(p *model.WorkProject) error {
 	id, err := NextSeq(r.db, "work_project")
 	if err != nil {
@@ -126,12 +140,12 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 			project_id, name, short_name, plan_year, is_paid, sort_order,
 			ordering_party_id, ordering_party, customer_id,
 			contract_type, billing_type, start_date, end_date, notes, contact_id,
-			color, status
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			color, status, sales_project_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status)
+		p.Color, p.Status, nullStr(p.SalesProjectID))
 	if err != nil {
 		return err
 	}
@@ -150,12 +164,12 @@ func (r *ProjectRepo) Update(p *model.WorkProject) error {
 			name=?, short_name=?, plan_year=?, is_paid=?, sort_order=?,
 			ordering_party_id=?, ordering_party=?, customer_id=?,
 			contract_type=?, billing_type=?, start_date=?, end_date=?, notes=?, contact_id=?,
-			color=?, status=?, updated_at=CURRENT_TIMESTAMP
+			color=?, status=?, sales_project_id=?, updated_at=CURRENT_TIMESTAMP
 		WHERE project_id=?`,
 			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-			p.Color, p.Status, p.ProjectID)
+			p.Color, p.Status, nullStr(p.SalesProjectID), p.ProjectID)
 		return err
 	})
 }
@@ -597,7 +611,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.ContractType, &p.BillingType,
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
-		&p.Color, &p.Status,
+		&p.Color, &p.Status, &p.SalesProjectID,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName,
 	)

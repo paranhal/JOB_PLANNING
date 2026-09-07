@@ -35,7 +35,7 @@ func TestCustomerNeedsReviewFlag(t *testing.T) {
 		t.Fatalf("확인 필요 건수 = %d, want 1", n)
 	}
 
-	items, total, err := repo.List("", "", "", "", "", 1, 20, true)
+	items, total, err := repo.List("", "", "", "", "", 1, 20, true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestCustomerNeedsReviewFlag(t *testing.T) {
 		t.Fatalf("확인 필요 항목: %+v", items[0])
 	}
 
-	all, totalAll, err := repo.List("", "", "", "", "", 1, 20, false)
+	all, totalAll, err := repo.List("", "", "", "", "", 1, 20, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}

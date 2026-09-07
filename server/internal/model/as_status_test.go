@@ -85,6 +85,18 @@ func TestApplyActionResult_TransferWaitingAndDone(t *testing.T) {
 	if as3.Status != "completed" {
 		t.Fatalf("done: %s", as3.Status)
 	}
+
+	as4 := &ASReceipt{ResultCode: ResultTransfer}
+	out4, err := ApplyActionResult(as4, ActionApplyInput{TransferDetail: TransferDetailFollowup}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if as4.Status != "completed" || as4.CompleteDatetime == nil {
+		t.Fatalf("followup must complete original: %+v", as4)
+	}
+	if len(out4.WorkItems) != 0 {
+		t.Fatalf("followup must not create work items: %+v", out4.WorkItems)
+	}
 }
 
 func TestIsOpenIncompleteStatus(t *testing.T) {
@@ -120,8 +132,40 @@ func TestActionResultLabels(t *testing.T) {
 	if TransferDetailLabel(TransferDetailWaiting) != "우리 팀 추가 작업" {
 		t.Fatal(TransferDetailLabel(TransferDetailWaiting))
 	}
+	if TransferDetailLabel(TransferDetailFollowup) != "이관후속" {
+		t.Fatal(TransferDetailLabel(TransferDetailFollowup))
+	}
+	if TransferDetailLabel(TransferDetailCompleted) != "이관 완료" {
+		t.Fatal(TransferDetailLabel(TransferDetailCompleted))
+	}
 	opts := ActionResultOptions()
-	if len(opts) != 5 || opts[1].Value != ResultPartial || opts[4].Value != ResultHold {
+	if len(opts) != 3 || opts[1].Value != ResultPartial || opts[2].Value != ResultTransfer {
 		t.Fatalf("%+v", opts)
+	}
+	if IsSelectableActionResult(ResultRevisit) || IsSelectableActionResult(ResultHold) {
+		t.Fatal("재방문·대기는 조치 결과로 고를 수 없다")
+	}
+	if !IsSelectableActionResult(ResultDone) {
+		t.Fatal("완료는 선택 가능해야 한다")
+	}
+}
+
+func TestNewTransferFollowupReceipt_NotReopen(t *testing.T) {
+	now := time.Date(2026, 8, 31, 10, 0, 0, 0, time.Local)
+	src := &ASReceipt{
+		ASID: "AS-SRC", CustomerID: "C1", AssetID: "A1",
+		ReceiptChannel: "phone", Requester: "홍길동", RequesterType: "고객직접",
+		RequesterName: "홍길동", Symptom: "게이트 오작동", AssignedTo: "양기헌",
+	}
+	child := NewTransferFollowupReceipt(src, "펌웨어 재설정", now)
+	if child.IsReopen || !child.IsTransferFollowup() {
+		t.Fatalf("이관후속이어야 한다: reopen=%v followup=%v", child.IsReopen, child.IsTransferFollowup())
+	}
+	if child.ParentASID != src.ASID || child.Symptom != src.Symptom || child.FollowupNote != "펌웨어 재설정" {
+		t.Fatalf("%+v", child)
+	}
+	reopen := NewReopenReceipt(src, "재발", now)
+	if !reopen.IsReopen || reopen.IsTransferFollowup() {
+		t.Fatal("재접수는 이관후속이 아니다")
 	}
 }

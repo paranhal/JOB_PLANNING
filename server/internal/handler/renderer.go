@@ -39,6 +39,19 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			files = append(files, partials...)
 		}
 	}
+	if strings.HasPrefix(name, "sales/") {
+		if partials, err := filepath.Glob("web/templates/sales/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+		if partials, err := filepath.Glob("web/templates/items/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if strings.HasPrefix(name, "items/") || strings.HasPrefix(name, "quotes/") {
+		if partials, err := filepath.Glob("web/templates/items/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "admin_work/") {
 		if partials, err := filepath.Glob("web/templates/admin_work/_*.html"); err == nil {
 			files = append(files, partials...)
@@ -56,7 +69,13 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		}
 	}
 	if name == "dashboard.html" {
-		files = append(files, "web/templates/stats/_period_table.html")
+		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+		files = append(files, "web/templates/sales/_supply_dash.html")
+	}
+	if kpartials, err := filepath.Glob("web/templates/kanban/_*.html"); err == nil {
+		files = append(files, kpartials...)
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
@@ -116,8 +135,8 @@ func funcMap() template.FuncMap {
 		"subtract":       func(a, b int) int { return a - b },
 		"dateLabelMDW":   model.DateLabelMDW,
 		"leaveKindLabel": model.LeaveKindLabel,
-		"hasSuffix": strings.HasSuffix,
-		"urlquery":  url.QueryEscape,
+		"hasSuffix":      strings.HasSuffix,
+		"urlquery":       url.QueryEscape,
 		"hasString": func(list interface{}, s string) bool {
 			switch v := list.(type) {
 			case []string:
@@ -160,7 +179,7 @@ func funcMap() template.FuncMap {
 				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "대기",
 				"transfer": "이관", "cancelled": "접수취소",
 				"partial_complete": "부분완료",
-				"completed": "완료", "closed": "종료",
+				"completed":        "완료", "closed": "종료",
 			}
 			if l, ok := m[s]; ok {
 				return l
@@ -203,8 +222,8 @@ func funcMap() template.FuncMap {
 		"workKindLabel": func(s string) string {
 			return model.WorkKindLabel(s)
 		},
-		"actionResultLabel":    model.ActionResultLabel,
-		"transferDetailLabel":  model.TransferDetailLabel,
+		"actionResultLabel":   model.ActionResultLabel,
+		"transferDetailLabel": model.TransferDetailLabel,
 		"workPrefixLabel": func(s string) string {
 			return model.WorkPrefixLabel(s)
 		},
@@ -218,11 +237,14 @@ func funcMap() template.FuncMap {
 				return "bg-slate-100 text-slate-800"
 			case model.WorkPrefixGeneral:
 				return "bg-emerald-100 text-emerald-800"
+			case model.WorkPrefixSales:
+				return "bg-orange-100 text-orange-800"
 			default:
 				return "bg-gray-100 text-gray-700"
 			}
 		},
 		"visitLabel":           visitLabel,
+		"mntVisitBadge":        model.VisitStatusBadgeOf,
 		"mntViewLabel":         mntViewLabel,
 		"mntProductClass":      mntProductClass,
 		"mntProductStyle":      mntProductStyle,
@@ -265,6 +287,15 @@ func funcMap() template.FuncMap {
 				return l
 			}
 			return s
+		},
+		"urgencyReasonText": func(code, note string) string {
+			return model.UrgencyReasonLabel(code, note, nil)
+		},
+		"partyKindLabel":      model.PartyKindLabel,
+		"processTypePlaces":   model.ProcessTypePlaces,
+		"urgencyReasonFamily": model.UrgencyReasonFamilyFromGroup,
+		"assetUrgencyFamily": func(a model.Asset) string {
+			return model.AssetUrgencyFamily(a.ProductCategory, a.ProductName, a.ProductType)
 		},
 		"urgencyColor": func(s string) string {
 			m := map[string]string{
@@ -437,21 +468,21 @@ func funcMap() template.FuncMap {
 		"wbAdminStatusLabel":    model.WBAdminStatusLabel,
 		"wbKanbanBadge":         model.WBKanbanBadge,
 		"wbKanbanBadgeClass":    model.WBKanbanBadgeClass,
-		"wbActionStatusLabel":  model.WBActionStatusLabel,
-		"wbActivityTypeLabel":  model.WBActivityTypeLabel,
-		"wbWaitPartyKindLabel": model.WBWaitPartyKindLabel,
-		"wbPriorityLabel":   model.WBPriorityLabel,
-		"wbWorkTypeLabel":   model.WBWorkTypeLabel,
-		"wbWorkTypeClass":   model.WBWorkTypeClass,
-		"workPlaceLabel":    model.WorkPlaceLabel,
-		"attDisplayName":    func(a model.Attachment) string { return a.DisplayName() },
-		"wbCategoryLabel":   model.WBCategoryLabel,
-		"wbCategoryClass":   model.WBCategoryClass,
-		"wbProjectStatusLabel": model.WBProjectStatusLabel,
-		"productKeyLabel":      model.ProductKeyLabel,
-		"productKeysLabel":     model.ProductKeysLabel,
-		"scopeWorkKindLabel":   model.ScopeWorkKindLabel,
-		"scopeWorkKindsLabel":  model.ScopeWorkKindsLabel,
+		"wbActionStatusLabel":   model.WBActionStatusLabel,
+		"wbActivityTypeLabel":   model.WBActivityTypeLabel,
+		"wbWaitPartyKindLabel":  model.WBWaitPartyKindLabel,
+		"wbPriorityLabel":       model.WBPriorityLabel,
+		"wbWorkTypeLabel":       model.WBWorkTypeLabel,
+		"wbWorkTypeClass":       model.WBWorkTypeClass,
+		"workPlaceLabel":        model.WorkPlaceLabel,
+		"attDisplayName":        func(a model.Attachment) string { return a.DisplayName() },
+		"wbCategoryLabel":       model.WBCategoryLabel,
+		"wbCategoryClass":       model.WBCategoryClass,
+		"wbProjectStatusLabel":  model.WBProjectStatusLabel,
+		"productKeyLabel":       model.ProductKeyLabel,
+		"productKeysLabel":      model.ProductKeysLabel,
+		"scopeWorkKindLabel":    model.ScopeWorkKindLabel,
+		"scopeWorkKindsLabel":   model.ScopeWorkKindsLabel,
 		"wbPriorityClass": func(p string) string {
 			switch p {
 			case model.WBPriorityUrgent:
@@ -510,7 +541,18 @@ func funcMap() template.FuncMap {
 				"Cards": cards, "CanWrite": canWrite,
 			}
 		},
-		"printf": fmt.Sprintf,
+		"printf":              fmt.Sprintf,
+		"won":                 formatSalesWon,
+		"quoteStatusLabel":    model.QuoteStatusLabel,
+		"vatModeLabel":        model.VATModeLabel,
+		"roundRuleLabel":      model.RoundRuleLabel,
+		"quotePurposeLabel":   model.QuotePurposeLabel,
+		"quotePurposeClass":   model.QuotePurposeBadgeClass,
+		"quoteFormLabel":      model.QuoteFormLabel,
+		"quoteExpiryLabel":    quoteExpiryLabelNow,
+		"quoteExpiredRow":     quoteExpiredRowClass,
+		"orderStatusLabel":    model.OrderStatusLabel,
+		"purchaseStatusLabel": model.PurchaseStatusLabel,
 	}
 }
 
@@ -519,4 +561,16 @@ func fmtInt(n int) string {
 		n = -n
 	}
 	return strconv.Itoa(n)
+}
+
+func quoteExpiryLabelNow(q model.SalesQuote) string {
+	return q.ExpiryLabel(time.Now().Format("2006-01-02"))
+}
+
+func quoteExpiredRowClass(q model.SalesQuote) string {
+	today := time.Now().Format("2006-01-02")
+	if q.IsExpiredSent(today) || q.IsExpiringSoon(today) {
+		return "bg-orange-50"
+	}
+	return ""
 }

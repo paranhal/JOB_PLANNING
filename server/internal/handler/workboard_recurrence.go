@@ -118,7 +118,7 @@ func (h *WorkboardHandler) PreviewRecurrence(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if t.ParentTaskID != "" || t.SourceType != "" {
-		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"?err=rec_parent")
+		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"/edit?err=rec_parent")
 	}
 	rule := parseRecurrenceForm(c)
 	rule.TaskID = t.TaskID
@@ -126,7 +126,7 @@ func (h *WorkboardHandler) PreviewRecurrence(c echo.Context) error {
 	c.Set("recurrence_form", &rule)
 	c.Set("recurrence_preview", &prev)
 	c.Set("recurrence_change_mode", model.NormalizeRecurrenceChangeMode(c.FormValue("change_mode")))
-	return h.ShowTask(c)
+	return h.EditTask(c)
 }
 
 func (h *WorkboardHandler) GenerateRecurrence(c echo.Context) error {
@@ -145,7 +145,7 @@ func (h *WorkboardHandler) runOccurrenceWrite(c echo.Context, regenerate bool) e
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	loc := "/workboard/tasks/" + t.TaskID
+	loc := "/workboard/tasks/" + t.TaskID + "/edit"
 	if t.ParentTaskID != "" {
 		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_parent")
 	}
@@ -293,7 +293,7 @@ func (h *WorkboardHandler) SaveRecurrenceSettings(c echo.Context) error {
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	loc := "/workboard/tasks/" + id
+	loc := "/workboard/tasks/" + id + "/edit"
 	if t.ParentTaskID != "" {
 		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_parent")
 	}

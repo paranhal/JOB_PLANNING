@@ -36,7 +36,7 @@ const (
 	WBWorkMaintenance = "maintenance"
 )
 
-// 업무 등록 시간표에 올리는 카드의 출처. 빈 값은 행정관련 업무(직접 등록).
+// 업무 등록 일정표에 올리는 카드의 출처. 빈 값은 행정관련 업무(직접 등록).
 const (
 	WBSourceAS            = "as"
 	WBSourceMaintenance   = "maintenance"
@@ -49,7 +49,7 @@ const (
 	WBMemberSupport = "support"
 )
 
-// WBCategory 시간표 카드의 분류: as / maintenance / admin
+// WBCategory 일정표 카드의 분류: as / maintenance / admin
 func WBCategory(sourceType string) string {
 	switch sourceType {
 	case WBSourceAS:
@@ -89,7 +89,7 @@ func WBCategoryClass(cat string) string {
 	}
 }
 
-// WBCard 업무 등록 화면의 카드 (시간표에 배치할 대상 · 배치된 업무 공통)
+// WBCard 업무 등록 화면의 카드 (일정표에 배치할 대상 · 배치된 업무 공통)
 type WBCard struct {
 	Kind         string `json:"kind"`          // as | maintenance | task
 	RefID        string `json:"ref_id"`        // as_id / visit_id / task_id
@@ -138,16 +138,26 @@ func (c WBCard) DetailHref() string {
 			return "/maintenance/visits/" + c.RefID + "/action"
 		}
 	}
-	return c.EditHref()
+	if id := c.taskID(); id != "" {
+		return "/workboard/tasks/" + id
+	}
+	return ""
 }
 
-// EditHref 「수정」— 일일 업무 수정 화면(`/workboard/tasks/{id}`).
-func (c WBCard) EditHref() string {
+func (c WBCard) taskID() string {
 	if c.TaskID != "" {
-		return "/workboard/tasks/" + c.TaskID
+		return c.TaskID
 	}
 	if c.Kind == "task" && c.RefID != "" {
-		return "/workboard/tasks/" + c.RefID
+		return c.RefID
+	}
+	return ""
+}
+
+// EditHref 「수정」— 일일 업무 등록 메뉴의 수정 화면(`/workboard/tasks/{id}/edit`).
+func (c WBCard) EditHref() string {
+	if id := c.taskID(); id != "" {
+		return "/workboard/tasks/" + id + "/edit"
 	}
 	return ""
 }
@@ -281,22 +291,27 @@ func WBKanbanBadgeClass(status string) string {
 	}
 }
 
-// MapASStatusToWB AS 접수 상태 → 일일 업무 현황 표시 상태.
-// 보류·이관은 진행중 열 뱃지. 취소는 빈 문자열(제외).
+// MapASStatusToWB 원본 상태 → 통합 칸반용 work_tasks 상태. §33.5.2 · §33.9.1
+// AS·정기점검·행정/지원을 한 함수로 맞춘다. 보류·이관·회신대기·검토중은 뱃지용으로 남기고,
+// WBKanbanBucket이 진행중 열로 보낸다. 취소는 빈 문자열(칸반 제외).
 func MapASStatusToWB(asStatus string) string {
 	switch strings.TrimSpace(asStatus) {
-	case "hold":
-		return WBTaskHold
-	case "transfer":
-		return WBTaskTransfer
-	case "completed", "closed":
-		return WBTaskComplete
-	case "partial_complete", "in_progress", "assigned":
-		return WBTaskInProgress
-	case "received":
-		return WBTaskWaiting
-	case "cancelled":
+	case WBTaskCancelled:
 		return ""
+	case WBTaskHold:
+		return WBTaskHold
+	case WBTaskTransfer:
+		return WBTaskTransfer
+	case WBTaskWaitingFor:
+		return WBTaskWaitingFor
+	case WBTaskReview:
+		return WBTaskReview
+	case "completed", "closed", WBTaskComplete, "done":
+		return WBTaskComplete
+	case "received", WBTaskWaiting, WBTaskInbox, "planned", "open":
+		return WBTaskWaiting
+	case StatusPartialComplete, WBTaskInProgress, "assigned":
+		return WBTaskInProgress
 	default:
 		return WBTaskInProgress
 	}

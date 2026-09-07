@@ -127,8 +127,8 @@ func TestAccessLogPlanAndVisitDelete(t *testing.T) {
 		"confirm_title":   {"2026년 정기점검"},
 		"delete_password": {"wrong"},
 	})
-	if !strings.Contains(locText(wrong), "비밀번호") {
-		t.Fatalf("비밀번호 거부 없음: %s", locText(wrong))
+	if !strings.Contains(locText(wrong), "삭제할 수 없습니다") {
+		t.Fatalf("계획 삭제 거부 없음: %s", locText(wrong))
 	}
 
 	delVisit := mntPost(t, e, "/maintenance/visits/"+visits[0].VisitID+"/delete?plan_id="+p.PlanID, url.Values{})
@@ -136,17 +136,12 @@ func TestAccessLogPlanAndVisitDelete(t *testing.T) {
 		t.Fatalf("방문 삭제 status=%d", delVisit.Code)
 	}
 
-	ok := mntPost(t, e, "/maintenance/"+p.PlanID+"/delete", url.Values{
-		"confirm_title":   {"2026년 정기점검"},
-		"delete_password": {"del-pw"},
-		"reason":          {"테스트 계획 삭제"},
-	})
-	if ok.Code != http.StatusSeeOther || ok.Header().Get("Location") != "/maintenance" {
-		t.Fatalf("계획 삭제: status=%d loc=%s", ok.Code, ok.Header().Get("Location"))
+	if got, _ := h.Maintenance.repo.GetPlan(p.PlanID); got == nil {
+		t.Fatal("계획이 지워졌다")
 	}
 
 	logs := readAccessLogs(t, path)
-	if len(logs) < 3 {
+	if len(logs) < 2 {
 		t.Fatalf("접속기록 부족: %+v", logs)
 	}
 	if logs[0].Action != auditlog.ActionDelete || logs[0].Result != auditlog.ResultDeny || logs[0].Target != "maintenance_plans" {
@@ -154,16 +149,6 @@ func TestAccessLogPlanAndVisitDelete(t *testing.T) {
 	}
 	if logs[1].Action != auditlog.ActionDelete || logs[1].Target != "maintenance_visits" || logs[1].Result != auditlog.ResultOK {
 		t.Fatalf("방문 삭제 기록: %+v", logs[1])
-	}
-	last := logs[len(logs)-1]
-	if last.Action != auditlog.ActionDelete || last.Target != "maintenance_plans" || last.Result != auditlog.ResultOK {
-		t.Fatalf("계획 삭제 기록: %+v", last)
-	}
-	if last.Reason != "테스트 계획 삭제" {
-		t.Fatalf("사유: %q", last.Reason)
-	}
-	if last.Before == "" || !strings.Contains(last.Before, p.PlanID) {
-		t.Fatalf("삭제 직전 값 없음: %s", last.Before)
 	}
 }
 

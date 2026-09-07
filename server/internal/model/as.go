@@ -31,13 +31,17 @@ type ASReceipt struct {
 	WorkPlace          string     `json:"work_place"`   // office=내근, field=외근
 	CauseType          string     `json:"cause_type"`   // HW고장, SW오류, 네트워크 등 (통계용 코드)
 	CauseDetail        string     `json:"cause_detail"` // 장애원인 서술. cause_type 과 별개 (§12.10.4)
+	CauseCat1          string     `json:"cause_cat1"`   // 원인분류 1차. §34.3.3
+	CauseCat2          string     `json:"cause_cat2"`
+	CauseCat3          string     `json:"cause_cat3"`
 	Conclusion         string     `json:"conclusion"`   // 결론 서술. 보고서용 초안·수정 (§12.10.4)
 	ActionTaken        string     `json:"action_taken"` // 조치내용
 	PartsUsed          string     `json:"parts_used"`
 	IsRecurrence       bool       `json:"is_recurrence"`    // 재발여부
 	IsReopen           bool       `json:"is_reopen"`        // 재접수여부 (완료 건의 동일 증상 재접수)
-	ParentASID         string     `json:"parent_as_id"`     // 재접수의 원 접수번호
+	ParentASID         string     `json:"parent_as_id"`     // 재접수·이관후속의 원 접수
 	ReopenReason       string     `json:"reopen_reason"`    // 재접수 사유
+	FollowupNote       string     `json:"followup_note"`    // 이관후속 「추가 접수 내용」. §34.3.5
 	ResultCode         string     `json:"result_code"`      // 완료, 타사이관, 재방문필요
 	TransferDetail     string     `json:"transfer_detail"`  // completed | waiting
 	ConfirmTarget      string     `json:"confirm_target"`   // 확인대상자
@@ -48,9 +52,12 @@ type ASReceipt struct {
 	CancelDatetime     *time.Time `json:"cancel_datetime"`  // 접수취소 일자
 	CustomerConfirmer  string     `json:"customer_confirmer"`
 	ConfirmDatetime    *time.Time `json:"confirm_datetime"`
-	FollowupAction     string     `json:"followup_action"` // 후속조치
-	ReplaceReview      bool       `json:"replace_review"`  // 교체검토여부
-	ProjectID          string     `json:"project_id"`      // 사업 귀속. 생성·수정 시 ResolveProjectID로 저장 (§16.6.9)
+	FollowupAction     string     `json:"followup_action"`  // 후속조치
+	ReplaceReview      bool       `json:"replace_review"`   // 교체검토여부
+	ProjectID          string     `json:"project_id"`       // 사업 귀속. 생성·수정 시 ResolveProjectID로 저장 (§16.6.9)
+	ReceiptGroupID     string     `json:"receipt_group_id"` // 함께 접수한 건 묶음. §34.2.1
+	UrgencyReason      string     `json:"urgency_reason"`   // 긴급 사유 코드. §34.2.2
+	UrgencyReasonNote  string     `json:"urgency_reason_note"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 
@@ -110,8 +117,12 @@ type ASListItem struct {
 	VisitDaysOverdue   int          `json:"visit_days_overdue"`      // 방문일 기준 경과(오늘-예정일, 양수=지남)
 	VisitDone          bool         `json:"visit_done"`              // 예정일 이후 방문(처리) 이력이 있음 — 경과가 아니라 다음 일정 미정
 	IsReopen           bool         `json:"is_reopen"`               // 완료 건의 동일 증상 재접수
+	ParentASID         string       `json:"parent_as_id,omitempty"`  // 재접수·이관후속 원 건
 	WorkChildren       []ASWorkItem `json:"work_children,omitempty"` // 목록 들여쓰기용 하부업무
 	PhotoCount         int          `json:"photo_count,omitempty"`   // 접수 사진 수 (목록 뱃지)
+	GroupSize          int          `json:"group_size,omitempty"`    // 함께 접수한 건 수. 2 이상이면 🔗. §34.2.1
+	UrgencyReason      string       `json:"urgency_reason,omitempty"`
+	UrgencyReasonNote  string       `json:"urgency_reason_note,omitempty"`
 }
 
 // ASWorkItem 접수 하부 확인·재방문 업무 ({접수번호}-Wnn).
@@ -275,4 +286,32 @@ func NormalizeWorkPlace(s string) string {
 	default:
 		return ""
 	}
+}
+
+// IsTransferFollowup 이관하면서 우리 몫이 남아 새로 만든 건. §34.3.5
+// 재접수(IsReopen)와 구분한다. parent_as_id 만으로는 알 수 없다.
+func (as *ASReceipt) IsTransferFollowup() bool {
+	if as == nil {
+		return false
+	}
+	return strings.TrimSpace(as.ParentASID) != "" && !as.IsReopen
+}
+
+// PreserveTransferFollowupClone 이관후속 건의 복제 필드(기관·자산·요청자·채널·증상)를 되돌린다.
+func (as *ASReceipt) PreserveTransferFollowupClone(src *ASReceipt) {
+	if as == nil || src == nil || !src.IsTransferFollowup() {
+		return
+	}
+	as.CustomerID = src.CustomerID
+	as.AssetID = src.AssetID
+	as.Requester = src.Requester
+	as.RequesterType = src.RequesterType
+	as.RequesterName = src.RequesterName
+	as.ReceiptChannel = src.ReceiptChannel
+	as.Symptom = src.Symptom
+}
+
+// IsTransferFollowup 목록 뱃지 「이관후속」. 재접수와 섞지 않는다. §34.3.5
+func (it ASListItem) IsTransferFollowup() bool {
+	return strings.TrimSpace(it.ParentASID) != "" && !it.IsReopen
 }

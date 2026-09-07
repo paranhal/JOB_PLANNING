@@ -34,7 +34,9 @@
     <a href="/admin/data?tab=logs" class="px-4 py-2 text-sm {{if eq .Tab "logs"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">변경 이력</a>
     <a href="/admin/data?tab=analyze" class="px-4 py-2 text-sm {{if eq .Tab "analyze"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">백업 분석</a>
     <a href="/admin/data?tab=unassigned" class="px-4 py-2 text-sm {{if eq .Tab "unassigned"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">사업 미배정</a>
+    <a href="/admin/data?tab=metrics" class="px-4 py-2 text-sm {{if eq .Tab "metrics"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">지표 기준</a>
     <a href="/admin/data?tab=checks" class="px-4 py-2 text-sm {{if eq .Tab "checks"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">정합성 점검</a>
+    <a href="/admin/data?tab=import" class="px-4 py-2 text-sm {{if eq .Tab "import"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">AS 반입</a>
   </div>
 
   {{if eq .Tab "backup"}}
@@ -244,11 +246,37 @@
   </div>
   {{end}}
 
+  {{if eq .Tab "metrics"}}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 max-w-xl">
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700">지표 기준일 · 실행률 대상</h3>
+      <p class="text-xs text-gray-500 mt-1">통계·대시보드 KPI·보고서 집계에만 적용합니다. AS 목록·상세·검색·이력은 바꾸지 않습니다.</p>
+    </div>
+    <form method="POST" action="/admin/data/metrics" class="space-y-4">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">지표 기준일 (metrics_base_date)</label>
+        <input type="date" name="metrics_base_date" value="{{.MetricsBaseDate}}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <p class="text-[11px] text-gray-400 mt-1">이 날짜 이후만 센다. 비우면 하한이 없다. 「이관 포함」 토글은 기준일을 풀지 않는다.</p>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">실행률 대상 (progress_scope)</label>
+        <input type="text" name="progress_scope" value="{{.ProgressScope}}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+               placeholder="as,maintenance">
+        <p class="text-[11px] text-gray-400 mt-1">쉼표 구분. 비우면 전 유형. 건수·소요시간은 이 설정과 무관하다.</p>
+        <p class="text-[11px] text-amber-800 mt-1">{{.ProgressScopeHint}}</p>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장</button>
+    </form>
+  </div>
+  {{end}}
+
   {{if eq .Tab "checks"}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="px-4 py-3 border-b border-gray-100">
       <h3 class="text-sm font-semibold text-gray-700">정합성 점검 (부록 C)</h3>
-      <p class="text-xs text-gray-500 mt-1">신규 건(<span class="font-mono">data_origin='app'</span>) 기준입니다. 값을 자동으로 고치지는 않습니다.</p>
+      <p class="text-xs text-gray-500 mt-1">V-1~V-8은 지표 기준일 이후입니다. 신규 건(<span class="font-mono">data_origin='app'</span>) 기준입니다. 값을 자동으로 고치지는 않습니다.</p>
     </div>
     {{if .Checks}}
     <table class="w-full text-sm">
@@ -268,10 +296,10 @@
           <td class="px-4 py-3 text-right font-semibold {{if and (eq .Expected "0") (not .OK)}}text-amber-800{{else}}text-gray-800{{end}}">{{.Count}}</td>
           <td class="px-4 py-3 text-xs text-gray-500">{{.Expected}}</td>
         </tr>
-        {{if and (eq .ID "V-11") .Rows}}
+        {{if and (or (eq .ID "V-11") (eq .ID "V-12")) .Rows}}
         <tr>
           <td colspan="4" class="px-4 py-3 bg-gray-50">
-            <p class="text-xs font-semibold text-gray-600 mb-2">연도 범위 밖 날짜 (수정은 원본 화면에서)</p>
+            <p class="text-xs font-semibold text-gray-600 mb-2">{{if eq .ID "V-12"}}착수가 완료보다 늦은 건{{else}}연도 범위 밖 날짜 (수정은 원본 화면에서){{end}}</p>
             <table class="w-full text-xs">
               <thead><tr class="text-gray-500">
                 <th class="text-left py-1">테이블</th>
@@ -298,6 +326,143 @@
     </table>
     {{else}}
     <p class="px-4 py-8 text-sm text-gray-400 text-center">점검 결과를 불러오지 못했습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "import"}}
+  <div class="space-y-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <h3 class="text-sm font-semibold text-gray-700">과거 AS 정제 반입</h3>
+      <p class="text-xs text-gray-500">엑셀·CSV를 올려도 바로 반영하지 않습니다. 검증 리포트에서 오류를 고치거나 제외한 뒤 반영합니다. 반영 건은 지표에서 기본 제외되며, 배치로 일괄 취소할 수 있습니다. 키워드는 후보만 계산하고 확정하지 않습니다.</p>
+      <form method="POST" action="/admin/data/import" enctype="multipart/form-data" class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">파일</label>
+          <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="text-sm">
+        </div>
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">올려서 검증</button>
+      </form>
+    </div>
+
+    {{if .ImportBatches}}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100"><h3 class="text-sm font-semibold text-gray-700">배치</h3></div>
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b text-xs text-gray-500">
+          <tr>
+            <th class="text-left px-4 py-2">배치</th>
+            <th class="text-left px-4 py-2">파일</th>
+            <th class="text-left px-4 py-2">상태</th>
+            <th class="text-right px-4 py-2">행</th>
+            <th class="text-right px-4 py-2">오류</th>
+            <th class="px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {{range .ImportBatches}}
+          <tr>
+            <td class="px-4 py-2 font-mono text-xs">{{.BatchID}}</td>
+            <td class="px-4 py-2">{{.Filename}}</td>
+            <td class="px-4 py-2">{{.StatusLabel}}</td>
+            <td class="px-4 py-2 text-right">{{.TotalRows}}</td>
+            <td class="px-4 py-2 text-right">{{.ErrorRows}}</td>
+            <td class="px-4 py-2 text-right"><a href="/admin/data?tab=import&batch={{.BatchID}}" class="text-xs text-blue-600 hover:underline">리포트</a></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
+
+    {{if .ImportBatch}}
+    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-800">검증 리포트 {{.ImportBatch.BatchID}}</h3>
+          <p class="text-xs text-gray-500 mt-0.5">{{.ImportBatch.Filename}} · {{.ImportBatch.StatusLabel}} · 전체 {{.ImportBatch.TotalRows}} · 오류 {{.ImportBatch.ErrorRows}} · 자산미매칭 {{.ImportBatch.WarningRows}} · 제외 {{.ImportBatch.ExcludedRows}} · 반영가능 {{.ImportBatch.ReadyRows}}</p>
+        </div>
+        <div class="flex gap-2">
+          {{if eq .ImportBatch.Status "reported"}}
+          <form method="POST" action="/admin/data/import/{{.ImportBatch.BatchID}}/apply"
+                onsubmit="return confirm('검증을 통과한 행만 반영합니다. 계속할까요?');">
+            <button type="submit" class="px-3 py-1.5 rounded-lg text-sm text-white {{if .ImportBatch.CanApply}}bg-blue-600 hover:bg-blue-700{{else}}bg-gray-300 cursor-not-allowed{{end}}" {{if not .ImportBatch.CanApply}}disabled{{end}}>반영</button>
+          </form>
+          {{end}}
+          {{if .ImportBatch.CanCancel}}
+          <form method="POST" action="/admin/data/import/{{.ImportBatch.BatchID}}/cancel"
+                onsubmit="return confirm('이 배치로 반영한 접수를 한꺼번에 지웁니다. 계속할까요?');">
+            <button type="submit" class="px-3 py-1.5 rounded-lg text-sm border border-red-200 text-red-700 hover:bg-red-50">일괄 취소</button>
+          </form>
+          {{end}}
+        </div>
+      </div>
+
+      {{if .ImportErrors}}
+      <div>
+        <h4 class="text-xs font-semibold text-red-800 mb-2">오류 · 제외하거나 기관·날짜를 고치세요</h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="text-gray-500 border-b"><tr>
+              <th class="text-left py-1 pr-2">행</th>
+              <th class="text-left py-1 pr-2">기관</th>
+              <th class="text-left py-1 pr-2">접수일</th>
+              <th class="text-left py-1 pr-2">증상</th>
+              <th class="text-left py-1 pr-2">문제</th>
+              <th class="py-1"></th>
+            </tr></thead>
+            <tbody class="divide-y">
+              {{range .ImportErrors}}
+              {{$err := .}}
+              <tr class="align-top {{if .Excluded}}opacity-50{{end}}">
+                <td class="py-2 pr-2 font-mono">{{.RowNo}}</td>
+                <td class="py-2 pr-2">{{.CustomerRaw}}</td>
+                <td class="py-2 pr-2 font-mono">{{if .ReceiptDate}}{{.ReceiptDate}}{{else}}{{.ReceiptRaw}}{{end}}</td>
+                <td class="py-2 pr-2 max-w-xs truncate">{{.Symptom}}</td>
+                <td class="py-2 pr-2 text-red-700">{{.IssueText}}</td>
+                <td class="py-2">
+                  {{if eq $.ImportBatch.Status "reported"}}
+                  <form method="POST" action="/admin/data/import/{{$.ImportBatch.BatchID}}/exclude" class="inline">
+                    <input type="hidden" name="row_no" value="{{.RowNo}}">
+                    {{if .Excluded}}
+                    <input type="hidden" name="excluded" value="0">
+                    <button class="text-blue-600 hover:underline">제외 해제</button>
+                    {{else}}
+                    <input type="hidden" name="excluded" value="1">
+                    <button class="text-red-600 hover:underline">제외</button>
+                    {{end}}
+                  </form>
+                  {{if not .Excluded}}
+                  <form method="POST" action="/admin/data/import/{{$.ImportBatch.BatchID}}/patch" class="mt-1 flex flex-wrap gap-1">
+                    <input type="hidden" name="row_no" value="{{.RowNo}}">
+                    <select name="customer_id" class="border rounded px-1 py-0.5">
+                      <option value="">기관 선택</option>
+                      {{range $.ImportCustomers}}<option value="{{.CustomerID}}" {{if eq $err.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+                    </select>
+                    <input type="date" name="receipt_date" min="2000-01-01" max="2100-12-31" value="{{.ReceiptDate}}" class="border rounded px-1 py-0.5">
+                    <button class="text-blue-600 hover:underline">수정</button>
+                  </form>
+                  {{end}}
+                  {{end}}
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {{end}}
+
+      {{if .ImportReady}}
+      <div>
+        <h4 class="text-xs font-semibold text-green-800 mb-2">반영 가능 ({{len .ImportReady}}건)</h4>
+        <ul class="text-xs text-gray-600 space-y-1 max-h-64 overflow-auto">
+          {{range .ImportReady}}
+          <li><span class="font-mono">{{.RowNo}}</span> {{.CustomerRaw}} · {{.ReceiptDate}} · {{.Symptom}}</li>
+          {{end}}
+        </ul>
+      </div>
+      {{end}}
+    </div>
     {{end}}
   </div>
   {{end}}

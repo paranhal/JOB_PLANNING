@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -34,6 +35,7 @@ type ASHandler struct {
 	relationRepo *repository.RelationRepo
 	attachRepo   *repository.AttachmentRepo
 	attach       *AttachmentHandler
+	kwRepo       *repository.ASKeywordRepo
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
@@ -83,6 +85,10 @@ func (h *ASHandler) List(c echo.Context) error {
 			mineUserID = uid
 			mineKeys = keys
 		}
+	}
+
+	if model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view")) == "kanban" {
+		return h.renderASKanban(c, status, search, mineUserID, mineKeys, mine, role, sort, dir, assigneeID, assigneeName)
 	}
 
 	items, total, err := h.repo.ListFiltered(status, search, mineUserID, mineKeys, sort, dir, page, 20)
@@ -152,8 +158,11 @@ func (h *ASHandler) List(c echo.Context) error {
 		statusLabel = "접수 지연"
 	}
 
+	kanbanLink := cloneURLValues(listBase)
+	kanbanLink.Set("display", "kanban")
+
 	return c.Render(http.StatusOK, "as/list.html", map[string]interface{}{
-		"Title": "AS 관리", "Active": "as",
+		"Title": "AS 관리", "Active": NavAS,
 		"Items": items, "Total": total,
 		"Page": page, "TotalPages": totalPages,
 		"Status": status, "Search": search,
@@ -167,81 +176,54 @@ func (h *ASHandler) List(c echo.Context) error {
 		"StatusLabel": statusLabel,
 		"AssigneeID":  assigneeID, "AssigneeName": assigneeName,
 		"IsHoldList": status == "hold",
+		"Display":    "list",
+		"KanbanHref": "/as?" + kanbanLink.Encode(),
+		"ListHref":   "/as?" + listBase.Encode(),
 	})
 }
 
-// ASKanbanColumn 칸반 한 컬럼 (상태 기준)
-type ASKanbanColumn struct {
-	Key    string
-	Title  string
-	Border string
-	Items  []model.ASListItem
-	Total  int
-	MoreQ  string
-}
-
-// Kanban AS 접수를 상태별 칸반으로 표시
-func (h *ASHandler) Kanban(c echo.Context) error {
-	role := currentRole(c)
-	search := strings.TrimSpace(c.QueryParam("search"))
-
-	mineParam := c.QueryParam("mine")
-	mine := false
-	if role == "tech" {
-		mine = mineParam != "0"
-	} else if mineParam == "1" {
-		mine = true
+func (h *ASHandler) renderASKanban(c echo.Context, status, search, mineUserID string, mineKeys []string, mine bool, role, sort, dir, assigneeID, assigneeName string) error {
+	items, listTotal, err := h.repo.ListFiltered(status, search, mineUserID, mineKeys, sort, dir, 1, 2000)
+	if err != nil {
+		return err
 	}
-
-	var mineUserID string
-	var mineKeys []string
-	if mine {
-		mineUserID = currentUserID(c)
-		mineKeys = assigneeKeys(c)
+	board := model.FillASListKanban(model.ASListKanbanColumnDefs(), items)
+	listBase := asListBaseQuery(status, search, sort, dir, mine, role)
+	if assigneeID != "" {
+		listBase.Set("assignee", assigneeID)
+		listBase.Del("mine")
 	}
-
-	defs := []ASKanbanColumn{
-		{Key: "received", Title: "접수", Border: "border-blue-200"},
-		{Key: "assigned", Title: "담당자 배정", Border: "border-indigo-200"},
-		{Key: "in_progress", Title: "진행중", Border: "border-amber-200"},
-		{Key: "hold", Title: "대기", Border: "border-orange-200"},
-		{Key: "completed", Title: "완료", Border: "border-green-200"},
+	if assigneeName != "" {
+		listBase.Set("assignee_name", assigneeName)
+		listBase.Del("mine")
 	}
-
-	const perColumn = 30
-	columns := make([]ASKanbanColumn, 0, len(defs))
-	grand := 0
-	for _, col := range defs {
-		items, total, err := h.repo.ListFiltered(col.Key, search, mineUserID, mineKeys, "", "", 1, perColumn)
-		if err != nil {
-			return err
-		}
-		col.Items = items
-		col.Total = total
-		q := url.Values{}
-		q.Set("status", col.Key)
-		if search != "" {
-			q.Set("search", search)
-		}
-		if role == "tech" || mine {
-			if mine {
-				q.Set("mine", "1")
-			} else {
-				q.Set("mine", "0")
-			}
-		}
-		col.MoreQ = "/as?" + q.Encode()
-		columns = append(columns, col)
-		grand += total
-	}
-
+	kanbanQ := cloneURLValues(listBase)
+	kanbanQ.Set("display", "kanban")
+	listQ := cloneURLValues(listBase)
+	listQ.Del("display")
+	listQ.Del("view")
 	return c.Render(http.StatusOK, "as/kanban.html", map[string]interface{}{
-		"Title": "AS 관리", "Active": "as",
-		"Columns": columns, "Total": grand,
-		"Search": search, "Mine": mine, "Role": role,
-		"PerColumn":  perColumn,
-		"CanReceive": canReceiveAS(c), "CanProcess": canProcessAS(c),
+		"Title": "AS 관리", "Active": NavAS,
+		"KanbanColumns": board.Columns,
+		"KanbanTotal":   board.Total,
+		"KanbanDrag":    false,
+		"KanbanDrop":    "",
+		"KanbanHint":    "대기·진행중·검토·완료. 보류·이관은 진행중 열 뱃지. 한 카드는 한 열에만 있습니다.",
+		"Total":         listTotal,
+		"Search":        search, "Mine": mine, "Role": role,
+		"Status":        status,
+		"CanReceive":    canReceiveAS(c), "CanProcess": canProcessAS(c),
+		"ListHref":      "/as?" + listQ.Encode(),
+		"KanbanHref":    "/as?" + kanbanQ.Encode(),
+		"Display":       "kanban",
 	})
+}
+
+// Kanban /as/kanban — /as?display=kanban 과 같다.
+func (h *ASHandler) Kanban(c echo.Context) error {
+	q := c.QueryParams()
+	q.Set("display", "kanban")
+	return c.Redirect(http.StatusSeeOther, "/as?"+q.Encode())
 }
 
 func parseASSort(c echo.Context) (sort, dir string) {
@@ -363,16 +345,15 @@ func (h *ASHandler) New(c echo.Context) error {
 	if !canReceiveAS(c) {
 		return echo.ErrForbidden
 	}
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListForReceipt()
 	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
-	urgencies, _ := h.codeRepo.ActiveByGroup("urgency")
-	reqTypes, _ := h.codeRepo.ActiveByGroup("requester_type")
+	urgReasons := h.urgencyReasonCodes()
 	assignees, _ := h.userRepo.ListAssignable()
-	reqNames, _ := h.distinctRequesterNames()
 
 	now := time.Now()
 	as := &model.ASReceipt{
 		Urgency: "normal", Priority: "normal", Status: "received",
+		UrgencyReason:   model.UrgencyReasonNone,
 		ReceivedBy:      ctxString(c, "user_name"),
 		ReceiptDatetime: now,
 	}
@@ -393,13 +374,17 @@ func (h *ASHandler) New(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "as/form.html", map[string]interface{}{
-		"Title": "AS 접수", "Active": "as", "IsNew": true,
+		"Title": "AS 접수", "Active": NavAS, "IsNew": true,
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
-		"Channels": channels, "Urgencies": urgencies, "ReqTypes": reqTypes,
-		"Assignees": assignees, "RequesterNames": reqNames,
+		"Channels": channels, "UrgencyReasons": urgReasons,
+		"Assignees":        assignees,
+		"CustomersJSON":    receiptCustomersJSON(customers),
 		"ReceiptLocal":     now.Format("2006-01-02T15:04"),
 		"CanEditVisitDate": true, // 신규 접수 시 접수 권한자가 설정 가능
 		"History":          history,
+		"CanReceive":       true,
+		"KeywordChecks":    h.keywordChecks("", model.KWFieldSymptom, as.Symptom),
+		"KeywordField":     model.KWFieldSymptom,
 		"Err":              c.QueryParam("err"),
 	})
 }
@@ -456,7 +441,9 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 		AssignedUserID:     assignedUID,
 		ReceivedBy:         strings.TrimSpace(c.FormValue("received_by")),
 		VisitScheduledDate: normalizeVisitDate(c.FormValue("visit_scheduled_date")),
-		ScheduleConfirmed:  c.FormValue("schedule_confirmed") == "1",
+		ConfirmContact:     strings.TrimSpace(c.FormValue("confirm_contact")),
+		UrgencyReason:      strings.TrimSpace(c.FormValue("urgency_reason")),
+		UrgencyReasonNote:  strings.TrimSpace(c.FormValue("urgency_reason_note")),
 	}
 	if as.ReceivedBy == "" {
 		as.ReceivedBy = ctxString(c, "user_name")
@@ -466,45 +453,202 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 			as.ReceiptDatetime = t
 		}
 	}
-	if as.Urgency == "" {
-		as.Urgency = "normal"
-	}
+	applyReceiptDerivedFields(as)
+	return as
+}
+
+func applyReceiptDerivedFields(as *model.ASReceipt) {
 	if as.Priority == "" {
 		as.Priority = "normal"
 	}
-	return as
+	if strings.TrimSpace(as.UrgencyReason) != "" {
+		as.Urgency = model.UrgencyFromReason(as.UrgencyReason)
+	} else if as.Urgency == "" {
+		as.UrgencyReason = model.UrgencyReasonNone
+		as.Urgency = "normal"
+	}
+	as.ScheduleConfirmed = model.SyncScheduleConfirmed(as.VisitScheduledDate)
+}
+
+func (h *ASHandler) urgencyReasonCodes() []model.Code {
+	if h.codeRepo == nil {
+		return nil
+	}
+	var all []model.Code
+	for _, g := range []string{"urgency_reason_common", "urgency_reason_rfid", "urgency_reason_klas", "urgency_reason_web"} {
+		cs, _ := h.codeRepo.ActiveByGroup(g)
+		all = append(all, cs...)
+	}
+	return all
+}
+
+func receiptCustomersJSON(list []model.Customer) template.JS {
+	type row struct {
+		ID        string `json:"id"`
+		OrgName   string `json:"org_name"`
+		ShortName string `json:"short_name"`
+		Region    string `json:"region"`
+	}
+	out := make([]row, 0, len(list))
+	for _, c := range list {
+		out = append(out, row{
+			ID: c.CustomerID, OrgName: c.OrgName, ShortName: c.ShortName, Region: c.Region,
+		})
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return template.JS("[]")
+	}
+	return template.JS(b)
+}
+
+func formVals(c echo.Context, key string) []string {
+	req := c.Request()
+	ct := req.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "multipart/form-data") {
+		_ = req.ParseMultipartForm(32 << 20)
+		if req.MultipartForm != nil {
+			return req.MultipartForm.Value[key]
+		}
+	}
+	_ = req.ParseForm()
+	return req.PostForm[key]
+}
+
+func formAt(ss []string, i int) string {
+	if i < 0 || i >= len(ss) {
+		return ""
+	}
+	return strings.TrimSpace(ss[i])
+}
+
+func (h *ASHandler) resolveAssigneeCode(code, custom string) (name, userID string) {
+	code = strings.TrimSpace(code)
+	custom = strings.TrimSpace(custom)
+	if code == "custom" {
+		return custom, ""
+	}
+	if code == "" {
+		return "", ""
+	}
+	if h.userRepo != nil {
+		if u, _ := h.userRepo.GetByID(code); u != nil {
+			return u.FullName, u.UserID
+		}
+	}
+	return code, ""
+}
+
+// parseEquipmentRows 신규 접수 화면의 장비별 행. 필드가 없으면 nil (기존 단일 폼). §34.2.1
+func (h *ASHandler) parseEquipmentRows(c echo.Context, base *model.ASReceipt) []*model.ASReceipt {
+	assets := formVals(c, "eq_asset_id")
+	symptoms := formVals(c, "eq_symptom")
+	urgencies := formVals(c, "eq_urgency")
+	reasons := formVals(c, "eq_urgency_reason")
+	reasonNotes := formVals(c, "eq_urgency_note")
+	visits := formVals(c, "eq_visit_date")
+	codes := formVals(c, "eq_assigned_code")
+	customs := formVals(c, "eq_assigned_custom")
+	n := len(assets)
+	if len(symptoms) > n {
+		n = len(symptoms)
+	}
+	if n == 0 {
+		return nil
+	}
+	var out []*model.ASReceipt
+	for i := 0; i < n; i++ {
+		asset := formAt(assets, i)
+		symptom := formAt(symptoms, i)
+		if asset == "" && symptom == "" {
+			continue
+		}
+		row := *base
+		row.AssetID = asset
+		row.Symptom = symptom
+		if len(reasons) > 0 {
+			reason := formAt(reasons, i)
+			if reason == "" {
+				reason = model.UrgencyReasonNone
+			}
+			row.UrgencyReason = reason
+			row.UrgencyReasonNote = formAt(reasonNotes, i)
+			row.Urgency = model.UrgencyFromReason(reason)
+		} else if u := formAt(urgencies, i); u != "" {
+			row.Urgency = u
+		}
+		rawVisit := formAt(visits, i)
+		row.VisitScheduledDate = normalizeVisitDate(rawVisit)
+		applyReceiptDerivedFields(&row)
+		if name, uid := h.resolveAssigneeCode(formAt(codes, i), formAt(customs, i)); name != "" || uid != "" {
+			row.AssignedTo, row.AssignedUserID = name, uid
+		}
+		out = append(out, &row)
+	}
+	return out
+}
+
+func equipmentVisitDateYearErr(c echo.Context) bool {
+	for _, raw := range formVals(c, "eq_visit_date") {
+		raw = strings.TrimSpace(raw)
+		if raw != "" && normalizeVisitDate(raw) == "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *ASHandler) Create(c echo.Context) error {
 	if !canReceiveAS(c) {
 		return echo.ErrForbidden
 	}
-	as := h.parseReceiptForm(c)
-	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && as.VisitScheduledDate == "" {
+	base := h.parseReceiptForm(c)
+	rows := h.parseEquipmentRows(c, base)
+	if len(rows) == 0 {
+		rows = []*model.ASReceipt{base}
+	}
+	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && base.VisitScheduledDate == "" {
 		return c.Redirect(http.StatusSeeOther, "/as/new?err=date_year")
 	}
-	if as.ScheduleConfirmed && as.VisitScheduledDate == "" {
-		as.ScheduleConfirmed = false
+	if equipmentVisitDateYearErr(c) {
+		return c.Redirect(http.StatusSeeOther, "/as/new?err=date_year")
 	}
-	if err := h.repo.Create(as); err != nil {
-		log.Printf("AS 접수 등록 실패: %v", err)
-		return c.Redirect(http.StatusSeeOther, "/as/new?err="+receiptCreateErrQuery(err))
+	if len(rows) >= 2 {
+		gid := repository.NewReceiptGroupID()
+		for _, r := range rows {
+			r.ReceiptGroupID = gid
+		}
 	}
-	h.syncASPlannedDailyTask(as.ASID)
-	if h.attach != nil {
-		if files, err := uploadFileHeaders(c); err == nil && len(files) > 0 {
-			if err := h.attach.saveReceiptPhotos(as.ASID, strings.TrimSpace(c.FormValue("photo_memo")), files); err != nil {
-				msg := err.Error()
-				if httpErr, ok := err.(*echo.HTTPError); ok {
-					if s, ok := httpErr.Message.(string); ok {
-						msg = s
+	var first *model.ASReceipt
+	for i, as := range rows {
+		applyReceiptDerivedFields(as)
+		if err := h.repo.Create(as); err != nil {
+			log.Printf("AS 접수 등록 실패: %v", err)
+			return c.Redirect(http.StatusSeeOther, "/as/new?err="+receiptCreateErrQuery(err))
+		}
+		h.syncASPlannedDailyTask(as.ASID)
+		if i == 0 {
+			h.saveKeywordChecks(c, as.ASID, model.KWFieldSymptom)
+			first = as
+			if h.attach != nil {
+				if files, err := uploadFileHeaders(c); err == nil && len(files) > 0 {
+					if err := h.attach.saveReceiptPhotos(as.ASID, strings.TrimSpace(c.FormValue("photo_memo")), files); err != nil {
+						msg := err.Error()
+						if httpErr, ok := err.(*echo.HTTPError); ok {
+							if s, ok := httpErr.Message.(string); ok {
+								msg = s
+							}
+						}
+						return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?err="+url.QueryEscape(msg))
 					}
 				}
-				return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?err="+url.QueryEscape(msg))
 			}
 		}
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID)
+	if first == nil {
+		return c.Redirect(http.StatusSeeOther, "/as/new?err="+url.QueryEscape("증상을 입력하세요"))
+	}
+	return c.Redirect(http.StatusSeeOther, "/as/"+first.ASID)
 }
 
 func (h *ASHandler) Edit(c echo.Context) error {
@@ -520,12 +664,10 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		return h.redirectLocked(c, id, "show")
 	}
 
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListForReceiptIncluding(as.CustomerID)
 	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
-	urgencies, _ := h.codeRepo.ActiveByGroup("urgency")
-	reqTypes, _ := h.codeRepo.ActiveByGroup("requester_type")
+	urgReasons := h.urgencyReasonCodes()
 	assignees, _ := h.userRepo.ListAssignable()
-	reqNames, _ := h.distinctRequesterNames()
 
 	var assets []model.Asset
 	var contacts []model.Contact
@@ -537,14 +679,17 @@ func (h *ASHandler) Edit(c echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title": "AS 접수 수정", "Active": "as", "IsNew": false,
+		"Title": "AS 접수 수정", "Active": NavAS, "IsNew": false,
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
-		"Channels": channels, "Urgencies": urgencies, "ReqTypes": reqTypes,
-		"Assignees": assignees, "RequesterNames": reqNames,
+		"Channels": channels, "UrgencyReasons": urgReasons,
+		"Assignees":        assignees,
+		"CustomersJSON":    receiptCustomersJSON(customers),
 		"ReceiptLocal":     as.ReceiptDatetime.Format("2006-01-02T15:04"),
 		"CanEditVisitDate": canEditVisitDate(c, as),
 		"History":          history,
 		"Err":              c.QueryParam("err"),
+		"KeywordChecks":    h.keywordChecks(as.ASID, model.KWFieldSymptom, as.Symptom),
+		"KeywordField":     model.KWFieldSymptom,
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"
@@ -573,17 +718,17 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && as.VisitScheduledDate == "" {
 		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err=date_year")
 	}
-	// 방문 예정일·일정확정: 관리자·배정담당자만 변경. 그 외는 기존 값 유지
+	// 방문 예정일: 관리자·배정담당자만 변경. 그 외는 기존 값 유지. 확정은 서버가 날짜로 채운다. §34.2.3
 	if !canEditVisitDate(c, existing) {
 		as.VisitScheduledDate = existing.VisitScheduledDate
-		as.ScheduleConfirmed = existing.ScheduleConfirmed
-	} else if as.ScheduleConfirmed && as.VisitScheduledDate == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err=schedule_date")
 	}
+	applyReceiptDerivedFields(as)
+	as.PreserveTransferFollowupClone(existing)
 	if err := h.repo.UpdateReceipt(as); err != nil {
 		return err
 	}
 	h.syncASPlannedDailyTask(id)
+	h.saveKeywordChecks(c, id, model.KWFieldSymptom)
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
 }
 
@@ -601,10 +746,7 @@ func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=date_year")
 	}
-	confirmed := c.FormValue("schedule_confirmed") == "1"
-	if confirmed && date == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=schedule_date")
-	}
+	confirmed := model.SyncScheduleConfirmed(date)
 	if err := h.repo.UpdateVisitScheduledDate(id, date, confirmed); err != nil {
 		return err
 	}
@@ -637,7 +779,7 @@ func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 		if strings.TrimSpace(existing.Assignee) == "" {
 			existing.Assignee = as.AssignedTo
 		}
-		// 아직 시간표에 안 올린 건 배정일도 예정일에 맞춘다.
+		// 아직 일정표에 안 올린 건 배정일도 예정일에 맞춘다.
 		if strings.TrimSpace(existing.StartTime) == "" {
 			existing.WorkDate = visit
 		}
@@ -678,6 +820,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		assetHistory, _ = h.repo.ListHistoryByAsset(as.AssetID, as.ASID, 50)
 	}
 	reopens, _ := h.repo.ListReopens(as.ASID)
+	followups, _ := h.repo.ListTransferFollowups(as.ASID)
 	var parent *model.ASReceipt
 	if as.ParentASID != "" {
 		parent, _ = h.repo.GetByID(as.ParentASID)
@@ -699,28 +842,38 @@ func (h *ASHandler) Show(c echo.Context) error {
 	}
 	embed := c.QueryParam("embed") == "1"
 	data := map[string]interface{}{
-		"Title": as.ASNumber, "Active": "as", "AS": as,
+		"Title": as.ASNumber, "Active": NavAS, "AS": as,
 		"Customer": customer, "Asset": asset,
-		"AssetHistory":   assetHistory,
-		"ParentAS":       parent,
-		"Reopens":        reopens,
-		"Assignees":      assignees,
-		"DailyTask":      dailyTask,
-		"CanReopen":      closed && canReceiveAS(c) && !embed,
-		"CanReceive":     canReceiveAS(c),
-		"CanProcess":     canProcessAS(c) && (!closed || canMod),
-		"IsClosed":       closed,
-		"EditUnlocked":   unlocked,
-		"UnlockExpires":  unlockExpLocal,
-		"CanUnlockEdit":  closed && isAdminRole(c) && !unlocked && !embed,
-		"CanEditReceipt": !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
-		"CanDelete":      !embed && isAdminRole(c) && (!closed || canMod),
-		"CanWriteDaily":  !embed && canWriteWorkboard(c) && !closed,
-		"TodayLocal":     now.Format("2006-01-02"),
-		"ActionErr":      actionErrMessage(c.QueryParam("err")),
-		"ActionOK":       c.QueryParam("ok"),
-		"OpenDaily":      !embed && c.QueryParam("daily") == "1",
-		"Embed":          embed,
+		"AssetHistory":      assetHistory,
+		"ParentAS":          parent,
+		"Reopens":           reopens,
+		"TransferFollowups": followups,
+		"Assignees":         assignees,
+		"DailyTask":         dailyTask,
+		"CanReopen":         closed && canReceiveAS(c) && !embed,
+		"CanReceive":        canReceiveAS(c),
+		"CanProcess":        canProcessAS(c) && (!closed || canMod),
+		"IsClosed":          closed,
+		"EditUnlocked":      unlocked,
+		"UnlockExpires":     unlockExpLocal,
+		"CanUnlockEdit":     closed && isAdminRole(c) && !unlocked && !embed,
+		"CanEditReceipt":    !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
+		"CanDelete":         !embed && isAdminRole(c) && (!closed || canMod),
+		"CanWriteDaily":     !embed && canWriteWorkboard(c) && !closed,
+		"TodayLocal":        now.Format("2006-01-02"),
+		"ActionErr":         actionErrMessage(c.QueryParam("err")),
+		"ActionOK":          c.QueryParam("ok"),
+		"OpenDaily":         !embed && c.QueryParam("daily") == "1",
+		"Embed":             embed,
+	}
+	if as.ReceiptGroupID != "" {
+		mates, _ := h.repo.ListByReceiptGroup(as.ReceiptGroupID)
+		data["GroupMates"] = mates
+	}
+	if h.kwRepo != nil {
+		if links, err := h.kwRepo.LinksByAS(as.ASID); err == nil && len(links) > 0 {
+			data["KeywordLinks"] = links
+		}
 	}
 	if embed {
 		data["HideNav"] = true
@@ -778,8 +931,16 @@ func (h *ASHandler) Action(c echo.Context) error {
 		attachments, _ = h.attachRepo.ListByRef("as", id)
 	}
 	procTypes, _ := h.codeRepo.ActiveByGroup("process_type")
+	procTypes = filterSelectableProcessTypes(procTypes)
 	causeTypes, _ := h.codeRepo.ActiveByGroup("cause_type")
 	resultCodes, _ := h.codeRepo.ActiveByGroup("result_code")
+	causeCats, _ := h.repo.ListCauseCategories()
+	var causeCatL1 []model.CauseCategory
+	for _, cat := range causeCats {
+		if cat.Level == 1 {
+			causeCatL1 = append(causeCatL1, cat)
+		}
+	}
 	assignees, _ := h.userRepo.ListAssignable()
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
 
@@ -792,6 +953,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 	if as.ParentASID != "" {
 		parent, _ = h.repo.GetByID(as.ParentASID)
 	}
+	followups, _ := h.repo.ListTransferFollowups(as.ASID)
 
 	closed := isASClosedStatus(as.Status)
 	unlocked, unlockExp, _ := h.unlockActive(c, as.ASID)
@@ -838,10 +1000,13 @@ func (h *ASHandler) Action(c echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title": as.ASNumber + titleSuffix, "Active": "as", "AS": as,
-		"ParentAS":  parent,
-		"Processes": processes, "WorkItems": workItems, "Attachments": attachments,
+		"Title": as.ASNumber + titleSuffix, "Active": NavAS, "AS": as,
+		"ParentAS":          parent,
+		"TransferFollowups": followups,
+		"Processes":         processes, "WorkItems": workItems, "Attachments": attachments,
 		"ProcTypes": procTypes, "CauseTypes": causeTypes, "ResultCodes": resultCodes,
+		"CauseCatL1":           causeCatL1,
+		"CauseCategoriesJSON":  causeCategoriesJSON(causeCats),
 		"ActionResults":        model.ActionResultOptions(),
 		"Assignees":            assignees,
 		"Contacts":             contacts,
@@ -864,10 +1029,15 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"WorkerDefault":        ctxString(c, "user_name"),
 		"ActionErr":            c.QueryParam("err"),
 		"ActionErrMsg":         actionErrMessage(c.QueryParam("err")),
+		"AttachErrMsg":         attachErrMessage(c.QueryParam("err")),
 		"ActionWarn":           c.QueryParam("warn"),
 		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
 		"ActionOK":             c.QueryParam("ok"),
 		"ConclusionDraft":      asConclusionDraft(as, processes),
+		"SimilarCases":         h.loadSimilarCases(as),
+		"CanReceive":           canReceiveAS(c),
+		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
+		"KeywordField":         model.KWFieldAction,
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	data["CanEditPhotos"] = false
@@ -953,22 +1123,21 @@ func (h *ASHandler) Update(c echo.Context) error {
 	var applyOut *model.ActionApplyResult
 	formResult := ""
 	prepNotes := ""
+	var followupChild *model.ASReceipt
 	if canProcessAS(c) {
-		formStatus := c.FormValue("status")
-		as.Status = formStatus
 		as.ProcessType = strings.TrimSpace(c.FormValue("process_type"))
 		as.WorkPlace = model.NormalizeWorkPlace(c.FormValue("work_place"))
-		as.CauseType = strings.TrimSpace(c.FormValue("cause_type"))
 		as.ActionTaken = strings.TrimSpace(c.FormValue("action_taken"))
-		as.PartsUsed = c.FormValue("parts_used")
 		formResult = strings.TrimSpace(c.FormValue("result_code"))
 		as.ResultCode = formResult
-		if model.ShowsASCauseReport(formResult) {
-			as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
-		}
+		as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
+		as.CauseCat1 = strings.TrimSpace(c.FormValue("cause_cat1"))
+		as.CauseCat2 = strings.TrimSpace(c.FormValue("cause_cat2"))
+		as.CauseCat3 = strings.TrimSpace(c.FormValue("cause_cat3"))
+		causeCats, _ := h.repo.ListCauseCategories()
+		as.CauseType = model.CauseTypeFromCat2(causeCats, as.CauseCat2)
 		as.RevisitReason = strings.TrimSpace(c.FormValue("revisit_reason"))
 		prepNotes = strings.TrimSpace(c.FormValue("revisit_prep"))
-		as.FollowupAction = c.FormValue("followup_action")
 		confCode := c.FormValue("customer_confirmer_code")
 		if confCode == "custom" {
 			as.CustomerConfirmer = strings.TrimSpace(c.FormValue("customer_confirmer_custom"))
@@ -991,8 +1160,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 		confirmContact := strings.TrimSpace(c.FormValue("confirm_contact"))
 		createRevisit := c.FormValue("create_revisit_after") == "1"
 		revisitConfirmed := c.FormValue("revisit_schedule_confirmed") == "1"
+		transferNeedFollowup := c.FormValue("transfer_need_followup") == "1"
+		followupNote := strings.TrimSpace(c.FormValue("followup_note"))
 
-		holdResumeDate := normalizeVisitDate(c.FormValue("hold_resume_date"))
 		if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && nextVisit == "" {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
 		}
@@ -1000,32 +1170,27 @@ func (h *ASHandler) Update(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
 		}
 
+		if formResult != "" && !model.IsSelectableActionResult(formResult) {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=result_not_allowed")
+		}
 		if code := actionSaveMissingErr(as, formResult); code != "" {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
 		}
+		if code := actionCauseCatMissingErr(as, causeCats); code != "" {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
+		}
 
-		if formResult == model.ResultHold {
-			next := strings.TrimSpace(c.FormValue("hold_next_action"))
-			switch next {
-			case "action", "transfer", "cancel":
-			default:
-				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_next")
+		if formResult != "" {
+			if formResult == model.ResultTransfer {
+				if transferNeedFollowup {
+					if followupNote == "" {
+						return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=followup_note")
+					}
+					transferDetail = model.TransferDetailFollowup
+				} else {
+					transferDetail = model.TransferDetailCompleted
+				}
 			}
-			if strings.TrimSpace(as.RevisitReason) == "" && strings.TrimSpace(c.FormValue("hold_reason")) == "" {
-				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_reason")
-			}
-			reason := strings.TrimSpace(c.FormValue("hold_reason"))
-			if reason == "" {
-				reason = as.RevisitReason
-			}
-			as.Status = "hold"
-			as.HoldReason = reason
-			as.HoldNextAction = next
-			as.ResultCode = ""
-			if holdResumeDate != "" {
-				as.VisitScheduledDate = holdResumeDate
-			}
-		} else if formResult != "" {
 			in := model.ActionApplyInput{
 				ScheduleConfirmed:         scheduleConfirmed,
 				TransferDetail:            transferDetail,
@@ -1068,17 +1233,21 @@ func (h *ASHandler) Update(c echo.Context) error {
 				}
 			}
 			applyOut = out
+			if formResult == model.ResultTransfer && transferDetail == model.TransferDetailFollowup {
+				child := model.NewTransferFollowupReceipt(as, followupNote, time.Now())
+				child.ReceivedBy = ctxString(c, "user_name")
+				if err := h.repo.Create(child); err != nil {
+					return err
+				}
+				followupChild = child
+			}
 		} else {
 			as.RevisitReason = ""
 			if nextVisit != "" {
 				as.VisitScheduledDate = nextVisit
 			}
-			if formStatus == "" || formStatus == "hold" || model.IsASWorkflowStatus(formStatus) {
-				if formStatus == "hold" {
-					as.Status = "hold"
-				} else {
-					as.Status = model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
-				}
+			if model.IsASWorkflowStatus(as.Status) {
+				as.Status = model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
 			}
 		}
 	} else if model.IsASWorkflowStatus(as.Status) {
@@ -1093,6 +1262,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		return err
 	}
 	h.syncASPlannedDailyTask(as.ASID)
+	h.saveKeywordChecks(c, as.ASID, model.KWFieldAction)
 	if canProcessAS(c) {
 		_ = h.appendActionProcess(c, as, formResult, prepNotes, timeSpent)
 		if applyOut != nil {
@@ -1121,11 +1291,16 @@ func (h *ASHandler) Update(c echo.Context) error {
 	}
 	loc := "/as/" + id + "/action"
 	q := url.Values{}
-	if canIssueASReportStatus(as.Status) {
-		q.Set("report", "1")
-	}
-	if model.ShowsASCauseReport(formResult) && strings.TrimSpace(as.CauseDetail) == "" {
-		q.Set("warn", "cause_report")
+	if followupChild != nil {
+		loc = "/as/" + followupChild.ASID
+		q.Set("ok", "이관 후속 접수를 만들었습니다")
+	} else {
+		if canIssueASReportStatus(as.Status) {
+			q.Set("report", "1")
+		}
+		if model.ShowsASCauseReport(formResult) && strings.TrimSpace(as.CauseDetail) == "" {
+			q.Set("warn", "cause_report")
+		}
 	}
 	if len(q) > 0 {
 		loc += "?" + q.Encode()
@@ -1152,11 +1327,63 @@ func actionSaveMissingErr(as *model.ASReceipt, formResult string) string {
 	default:
 		return "work_place"
 	}
-	if strings.TrimSpace(as.CauseType) == "" {
-		return "cause_type"
-	}
 	if strings.TrimSpace(as.ProcessType) == "" {
 		return "process_type"
+	}
+	if !model.ProcessTypeAllowed(as.WorkPlace, as.ProcessType) {
+		return "process_type_mismatch"
+	}
+	return ""
+}
+
+func actionCauseCatMissingErr(as *model.ASReceipt, cats []model.CauseCategory) string {
+	if as == nil {
+		return ""
+	}
+	action := strings.TrimSpace(as.ActionTaken)
+	saving := action != "" || strings.TrimSpace(as.ResultCode) != ""
+	if !saving {
+		return ""
+	}
+	if strings.TrimSpace(as.CauseCat1) == "" {
+		return "cause_cat1"
+	}
+	if strings.TrimSpace(as.CauseCat2) == "" {
+		return "cause_cat2"
+	}
+	if model.CauseCat2HasChildren(cats, as.CauseCat2) && strings.TrimSpace(as.CauseCat3) == "" {
+		return "cause_cat3"
+	}
+	return ""
+}
+
+func attachErrMessage(raw string) string {
+	s := strings.TrimSpace(raw)
+	switch s {
+	case "attach_forbidden":
+		return "권한이 없습니다"
+	case "attach_file":
+		return "파일이 필요합니다"
+	case "attach_photo_max":
+		return "사진은 최대 3장입니다"
+	case "attach_closed":
+		return "완료·종료 건은 읽기 전용입니다. 관리자는 수정 잠금 해제 후 이용하세요"
+	case "attach_not_image":
+		return "조치 사진은 이미지만 올릴 수 있습니다"
+	case "권한이 없습니다", "파일이 필요합니다":
+		return s
+	}
+	if strings.Contains(s, "최대") && strings.Contains(s, "장") {
+		return "사진은 최대 3장입니다"
+	}
+	if strings.Contains(s, "이미지만") {
+		return "조치 사진은 이미지만 올릴 수 있습니다"
+	}
+	if strings.Contains(s, "읽기 전용") {
+		return s
+	}
+	if strings.Contains(s, "파일은 20MB") || strings.Contains(s, "이미지") {
+		return s
 	}
 	return ""
 }
@@ -1169,8 +1396,18 @@ func actionErrMessage(code string) string {
 		return "근무구분(내근/외근)을 선택하세요."
 	case "cause_type":
 		return "원인분류를 선택하세요."
+	case "cause_cat1":
+		return "1차 분류를 선택하세요."
+	case "cause_cat2":
+		return "2차 분류를 선택하세요."
+	case "cause_cat3":
+		return "3차 분류를 선택하세요."
 	case "process_type":
 		return "처리유형을 선택하세요."
+	case "process_type_mismatch":
+		return "근무구분에 맞는 처리유형을 선택하세요."
+	case "result_not_allowed":
+		return "완료 · 추가조치 필요 · 이관만 선택할 수 있습니다."
 	case "time_spent":
 		return "소요시간은 일일 업무 등록에서 입력합니다."
 	case "revisit_date":
@@ -1180,7 +1417,9 @@ func actionErrMessage(code string) string {
 	case "temporary_date":
 		return "임시조치 시 방문예정일자를 입력하세요."
 	case "transfer_detail":
-		return "이관 시 「처리 확인 후 완료」 또는 「우리 팀 추가 작업」을 선택하세요."
+		return "이관 시 「추가 조치 필요」 여부를 확인하세요."
+	case "followup_note":
+		return "이관 후 추가 조치가 있으면 「추가 접수 내용」을 입력하세요."
 	case "confirm_date":
 		return "우리 팀 추가 작업 시 확인예정일자를 입력하세요."
 	case "confirm_target":
@@ -1202,6 +1441,28 @@ func actionErrMessage(code string) string {
 	default:
 		return code
 	}
+}
+
+func filterSelectableProcessTypes(codes []model.Code) []model.Code {
+	var out []model.Code
+	for _, c := range codes {
+		switch c.CodeValue {
+		case model.ProcessTypeRemote, model.ProcessTypeVisit, model.ProcessTypeInquiry:
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func causeCategoriesJSON(list []model.CauseCategory) template.JS {
+	if list == nil {
+		list = []model.CauseCategory{}
+	}
+	b, err := json.Marshal(list)
+	if err != nil {
+		return "[]"
+	}
+	return template.JS(b)
 }
 
 func actionWarnMessage(code string) string {
@@ -1526,7 +1787,7 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 		}
 	}
 	as.VisitScheduledDate = normalizeVisitDate(c.FormValue("visit_scheduled_date"))
-	as.ScheduleConfirmed = as.VisitScheduledDate != "" && c.FormValue("schedule_confirmed") == "1"
+	as.ScheduleConfirmed = model.SyncScheduleConfirmed(as.VisitScheduledDate)
 
 	if err := h.repo.Create(as); err != nil {
 		return err
@@ -1720,7 +1981,7 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "as/stats.html", map[string]interface{}{
-		"Title": title, "Active": "as_stats",
+		"Title": title, "Active": NavASStats,
 		"Stats":       stats,
 		"Personal":    personal,
 		"DisplayName": ctxString(c, "user_name"),

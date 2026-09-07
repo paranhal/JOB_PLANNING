@@ -1,0 +1,58 @@
+{{define "sales_activity_card"}}
+{{$hide := .HideSalesName}}
+{{$a := .Activity}}
+<article class="rounded-xl border border-slate-200 bg-white p-3 space-y-1.5">
+  <div class="flex items-start justify-between gap-2">
+    <div class="min-w-0 flex items-start gap-2">
+      <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold {{$a.TypeBadgeClass}}">{{if $a.TypeLabel}}{{$a.TypeLabel}}{{else}}{{$a.ActivityType}}{{end}}</span>
+      {{if not $hide}}
+      <a href="/sales/{{$a.SalesID}}" class="text-sm font-semibold text-blue-700 hover:underline truncate">{{if $a.SalesName}}{{$a.SalesName}}{{else}}{{$a.Title}}{{end}}</a>
+      {{else}}
+      <p class="text-sm font-semibold text-gray-800 truncate">{{$a.Title}}</p>
+      {{end}}
+    </div>
+    <span class="shrink-0 text-xs text-slate-500 tabular-nums">{{$a.CardDuration}}</span>
+  </div>
+  {{if not $hide}}
+  {{if and $a.Title $a.SalesName}}<p class="text-xs text-gray-700 truncate">{{$a.Title}}</p>{{end}}
+  {{end}}
+  <p class="text-[11px] text-slate-500 flex flex-wrap gap-x-3 gap-y-0.5">
+    {{if $a.Place}}<span>📍 {{$a.Place}}</span>{{end}}
+    {{if $a.Counterparts}}<span>👤 {{$a.Counterparts}}</span>{{end}}
+    {{if $a.OwnerLabel}}<span>담당 {{$a.OwnerLabel}}</span>{{end}}
+  </p>
+  {{if $a.ContentPreview}}<p class="text-xs text-gray-600 whitespace-pre-wrap line-clamp-2">{{$a.ContentPreview}}</p>{{end}}
+  <p><span class="inline-flex max-w-full px-2 py-0.5 rounded-full text-[11px] border {{$a.NextChipClass}}">{{$a.NextChipLabel}}</span></p>
+</article>
+{{end}}
+
+{{define "sales_timeline_card"}}
+{{$e := .Event}}
+{{$hide := .HideSalesName}}
+<article class="rounded-xl border border-slate-200 bg-white p-3 space-y-1.5">
+  <div class="flex items-start justify-between gap-2">
+    <div class="min-w-0 flex items-start gap-2">
+      <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold {{$e.TypeBadgeClass}}">{{if $e.TypeLabel}}{{$e.TypeLabel}}{{else}}변경{{end}}</span>
+      {{if and (eq $e.Kind "activity") (not $hide) $e.SalesName}}
+      <a href="/sales/{{$e.SalesID}}" class="text-sm font-semibold text-blue-700 hover:underline truncate">{{$e.SalesName}}</a>
+      {{else}}
+      <p class="text-sm font-semibold text-gray-800 truncate">{{$e.Title}}</p>
+      {{end}}
+    </div>
+    {{if $e.CardDuration}}<span class="shrink-0 text-xs text-slate-500 tabular-nums">{{$e.CardDuration}}</span>{{end}}
+  </div>
+  {{if and (eq $e.Kind "activity") (not $hide) $e.Title $e.SalesName}}<p class="text-xs text-gray-700 truncate">{{$e.Title}}</p>{{end}}
+  {{if eq $e.Kind "activity"}}
+  <p class="text-[11px] text-slate-500 flex flex-wrap gap-x-3 gap-y-0.5">
+    {{if $e.Place}}<span>📍 {{$e.Place}}</span>{{end}}
+    {{if $e.Counterparts}}<span>👤 {{$e.Counterparts}}</span>{{end}}
+    {{if $e.Members}}<span>담당 {{$e.Members}}</span>{{else if $e.By}}<span>담당 {{$e.By}}</span>{{end}}
+  </p>
+  {{if $e.ContentPreview}}<p class="text-xs text-gray-600 whitespace-pre-wrap line-clamp-2">{{$e.ContentPreview}}</p>{{end}}
+  <p><span class="inline-flex max-w-full px-2 py-0.5 rounded-full text-[11px] border {{$e.NextChipClass}}">{{$e.NextChipLabel}}</span></p>
+  {{else}}
+  {{if $e.Reason}}<p class="text-xs text-gray-600">{{$e.Reason}}</p>{{end}}
+  {{if $e.By}}<p class="text-[11px] text-gray-400">{{$e.By}}</p>{{end}}
+  {{end}}
+</article>
+{{end}}

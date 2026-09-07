@@ -74,6 +74,7 @@ func applySalesProjects(db *sql.DB) {
 	}
 	markMetaDone(db, salesProjectsMetaKey)
 	seedSalesStageCodes(db)
+	applySalesDealTypeV228(db)
 }
 
 func seedSalesStageCodes(db *sql.DB) {
@@ -108,4 +109,173 @@ func seedSalesStageCodes(db *sql.DB) {
 		return
 	}
 	markMetaDone(db, salesStageCodesMetaKey)
+}
+
+const salesActivitiesMetaKey = "__meta:sales_activities_v1"
+const salesActivityTypeCodesMetaKey = "__meta:sales_activity_type_codes_v1"
+
+const salesActivitiesSchema = `
+CREATE TABLE IF NOT EXISTS sales_activities (
+  activity_id       TEXT PRIMARY KEY,
+  sales_id          TEXT NOT NULL,
+  activity_date     TEXT NOT NULL,
+  start_time        TEXT NOT NULL DEFAULT '',
+  duration_min      INTEGER NOT NULL DEFAULT 30,
+  activity_type     TEXT NOT NULL DEFAULT '',
+  title             TEXT NOT NULL DEFAULT '',
+  content           TEXT NOT NULL DEFAULT '',
+  place             TEXT NOT NULL DEFAULT '',
+  our_members       TEXT NOT NULL DEFAULT '',
+  counterparts      TEXT NOT NULL DEFAULT '',
+  next_action       TEXT NOT NULL DEFAULT '',
+  next_action_date  TEXT NOT NULL DEFAULT '',
+  stage_at_time     TEXT NOT NULL DEFAULT '',
+  created_by        TEXT NOT NULL DEFAULT '',
+  created_at        DATETIME DEFAULT CURRENT_TIMESTAMP
+)`
+
+// applySalesActivities 마이그레이션 014. §32.8 — 영업 활동 로그.
+func applySalesActivities(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if _, err := db.Exec(salesActivitiesSchema); err != nil {
+		log.Printf("014 sales_activities: %v", err)
+		return
+	}
+	for _, q := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_sales_activities_sales ON sales_activities(sales_id, activity_date)`,
+		`CREATE INDEX IF NOT EXISTS idx_sales_activities_date ON sales_activities(activity_date)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			log.Printf("014 sales_activities index: %v", err)
+		}
+	}
+	markMetaDone(db, salesActivitiesMetaKey)
+	seedSalesActivityTypeCodes(db)
+}
+
+func seedSalesActivityTypeCodes(db *sql.DB) {
+	if metaDone(db, salesActivityTypeCodesMetaKey) {
+		return
+	}
+	if _, err := db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order, is_active) VALUES
+		('SAT01','sales_activity_type','research','정보수집',1,1),
+		('SAT02','sales_activity_type','call','전화',2,1),
+		('SAT03','sales_activity_type','visit','방문미팅',3,1),
+		('SAT04','sales_activity_type','online','온라인미팅',4,1),
+		('SAT05','sales_activity_type','mail','메일',5,1),
+		('SAT06','sales_activity_type','material','자료송부',6,1),
+		('SAT07','sales_activity_type','quote','견적제출',7,1),
+		('SAT08','sales_activity_type','proposal','제안서제출',8,1),
+		('SAT09','sales_activity_type','bid','입찰',9,1),
+		('SAT10','sales_activity_type','other','기타',10,1)`); err != nil {
+		log.Printf("014 sales_activity_type codes: %v", err)
+		return
+	}
+	markMetaDone(db, salesActivityTypeCodesMetaKey)
+}
+
+const salesPartiesMetaKey = "__meta:sales_parties_v1"
+const salesPartyCodesMetaKey = "__meta:sales_party_codes_v1"
+
+const salesPartiesSchema = `
+CREATE TABLE IF NOT EXISTS sales_parties (
+  party_id         TEXT PRIMARY KEY,
+  sales_id         TEXT NOT NULL,
+  party_type       TEXT NOT NULL DEFAULT 'own',
+  org_name         TEXT NOT NULL DEFAULT '',
+  person_name      TEXT NOT NULL DEFAULT '',
+  title            TEXT NOT NULL DEFAULT '',
+  phone            TEXT NOT NULL DEFAULT '',
+  email            TEXT NOT NULL DEFAULT '',
+  party_role       TEXT NOT NULL DEFAULT '',
+  is_primary       INTEGER NOT NULL DEFAULT 0,
+  user_id          TEXT,
+  contact_id       TEXT,
+  is_active        INTEGER NOT NULL DEFAULT 1,
+  replaced_by      TEXT,
+  replaced_reason  TEXT NOT NULL DEFAULT '',
+  note             TEXT NOT NULL DEFAULT '',
+  is_auto          INTEGER NOT NULL DEFAULT 0,
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+)`
+
+const salesChangesSchema = `
+CREATE TABLE IF NOT EXISTS sales_changes (
+  change_id    TEXT PRIMARY KEY,
+  sales_id     TEXT NOT NULL,
+  field_key    TEXT NOT NULL,
+  old_value    TEXT NOT NULL DEFAULT '',
+  new_value    TEXT NOT NULL DEFAULT '',
+  changed_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+  changed_by   TEXT NOT NULL DEFAULT '',
+  note         TEXT NOT NULL DEFAULT ''
+)`
+
+// applySalesParties 마이그레이션 015. §32.6~§32.7
+func applySalesParties(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if _, err := db.Exec(salesPartiesSchema); err != nil {
+		log.Printf("015 sales_parties: %v", err)
+		return
+	}
+	if _, err := db.Exec(salesChangesSchema); err != nil {
+		log.Printf("015 sales_changes: %v", err)
+		return
+	}
+	for _, q := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_sales_parties_sales ON sales_parties(sales_id, party_type, is_active)`,
+		`CREATE INDEX IF NOT EXISTS idx_sales_changes_sales ON sales_changes(sales_id, changed_at)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			log.Printf("015 sales_parties index: %v", err)
+		}
+	}
+	markMetaDone(db, salesPartiesMetaKey)
+	seedSalesPartyCodes(db)
+}
+
+func seedSalesPartyCodes(db *sql.DB) {
+	if metaDone(db, salesPartyCodesMetaKey) {
+		return
+	}
+	if _, err := db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order, is_active) VALUES
+		('SPT01','sales_party_type','own','당사',1,1),
+		('SPT02','sales_party_type','partner','협력사',2,1),
+		('SPT03','sales_party_type','customer','고객',3,1),
+		('SPR01','sales_party_role','decision','결정권자',1,1),
+		('SPR02','sales_party_role','working','실무',2,1),
+		('SPR03','sales_party_role','purchase','구매',3,1),
+		('SPR04','sales_party_role','tech','기술검토',4,1),
+		('SPR05','sales_party_role','sales','영업',5,1),
+		('SPR06','sales_party_role','other','기타',6,1)`); err != nil {
+		log.Printf("015 sales_party codes: %v", err)
+		return
+	}
+	markMetaDone(db, salesPartyCodesMetaKey)
+}
+
+const salesPromoteMetaKey = "__meta:sales_promote_v1"
+
+// applySalesPromote 마이그레이션 016. §32.10 — work_projects 에 원본 영업 건만 잇는다.
+func applySalesPromote(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if !workProjectHasColumn(db, "sales_project_id") {
+		if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN sales_project_id TEXT`); err != nil {
+			log.Printf("016 sales_project_id: %v", err)
+			return
+		}
+	}
+	if _, err := db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_work_projects_sales
+		ON work_projects(sales_project_id)
+		WHERE sales_project_id IS NOT NULL AND TRIM(sales_project_id) != ''`); err != nil {
+		log.Printf("016 idx_work_projects_sales: %v", err)
+	}
+	markMetaDone(db, salesPromoteMetaKey)
 }

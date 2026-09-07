@@ -8,7 +8,7 @@ import (
 	"customer-support/internal/model"
 )
 
-// ListASReceivedBetween 기간(포함)에 신규 접수된 AS → 업무처리현황(접수) 시간표용.
+// ListASReceivedBetween 기간(포함)에 신규 접수된 AS → 업무처리현황(접수) 일정표용.
 func (r *WBRepo) ListASReceivedBetween(from, to string) ([]model.WorkTask, error) {
 	toEx := nextDayExclusive(to)
 	q := `

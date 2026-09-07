@@ -209,6 +209,7 @@ func (r *StatsRepo) countBucket(from, toEx string, f model.StatsMeetingFilter) (
 			return b, err
 		}
 	}
+	b.ProgressScope = r.attachMetrics(f).ProgressScope
 	return b, nil
 }
 
@@ -217,7 +218,7 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 	if f.Scope == model.StatsScopeWorkType && f.Key != "" && f.Key != "as" {
 		return s, nil
 	}
-	asSQL, asArgs := asFilterSQL(f)
+	asSQL, asArgs := r.filterAS(f)
 	argsP := append([]interface{}{from, toEx}, asArgs...)
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM as_receipts ar
@@ -253,8 +254,8 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status IN `+model.SQLStatusStatsCompleted+`
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)`+asSQL, argsR...); err != nil {
+		  AND `+asCompleteDateSQL+` >= date(?)
+		  AND `+asCompleteDateSQL+` < date(?)`+asSQL, argsR...); err != nil {
 		return s, err
 	}
 	if s.Modified, err = r.countSQL(`
@@ -264,7 +265,7 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 		  AND TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
 		  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
 		  AND ar.status IN `+model.SQLStatusStatsCompleted+`
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) != date(ar.visit_scheduled_date)`+asSQL, argsP...); err != nil {
+		  AND `+asCompleteDateSQL+` != date(ar.visit_scheduled_date)`+asSQL, argsP...); err != nil {
 		return s, err
 	}
 	// 계획대로: 예정일에 그대로 완료
@@ -274,7 +275,7 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 		WHERE TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
 		  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
 		  AND ar.status IN `+model.SQLStatusStatsCompleted+`
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) = date(ar.visit_scheduled_date)`+asSQL, argsP...); err != nil {
+		  AND `+asCompleteDateSQL+` = date(ar.visit_scheduled_date)`+asSQL, argsP...); err != nil {
 		return s, err
 	}
 	return s, nil
@@ -282,7 +283,7 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 
 func (r *StatsRepo) countMntSlice(from, toEx string, f model.StatsMeetingFilter) (model.StatsWorkSlice, error) {
 	var s model.StatsWorkSlice
-	mntSQL, mntArgs := mntFilterSQL(f)
+	mntSQL, mntArgs := r.filterMnt(f)
 	args := append([]interface{}{from, toEx}, mntArgs...)
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM maintenance_visits v
@@ -295,8 +296,8 @@ func (r *StatsRepo) countMntSlice(from, toEx string, f model.StatsMeetingFilter)
 	if s.Process, err = r.countSQL(`
 		SELECT COUNT(*) FROM maintenance_visits v
 		WHERE COALESCE(v.completed,0)=1
-		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
-		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?`+mntSQL, args...); err != nil {
+		  AND `+mntCompleteDateSQL+` >= ?
+		  AND `+mntCompleteDateSQL+` < ?`+mntSQL, args...); err != nil {
 		return s, err
 	}
 	if s.Modified, err = r.countSQL(`
@@ -359,7 +360,7 @@ func (r *StatsRepo) attachMntMonthProgress(s *model.StatsWorkSlice, from, toEx s
 }
 
 func (r *StatsRepo) countMntCompletedRange(from, toEx string, f model.StatsMeetingFilter) (int, error) {
-	mntSQL, mntArgs := mntFilterSQL(f)
+	mntSQL, mntArgs := r.filterMnt(f)
 	args := append([]interface{}{from, toEx}, mntArgs...)
 	return r.countSQL(`
 		SELECT COUNT(*) FROM maintenance_visits v
@@ -371,7 +372,7 @@ func (r *StatsRepo) countMntCompletedRange(from, toEx string, f model.StatsMeeti
 func (r *StatsRepo) countMntScheduledInMonth(year, month int, f model.StatsMeetingFilter) (int, error) {
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	end := start.AddDate(0, 1, 0)
-	mntSQL, mntArgs := mntFilterSQL(f)
+	mntSQL, mntArgs := r.filterMnt(f)
 	args := append([]interface{}{start.Format("2006-01-02"), end.Format("2006-01-02")}, mntArgs...)
 	return r.countSQL(`
 		SELECT COUNT(*) FROM maintenance_visits v
@@ -434,7 +435,7 @@ func (r *StatsRepo) CountMonthMntQuota(year, month int, f model.StatsMeetingFilt
 
 func (r *StatsRepo) countAdminSlice(from, toEx string, f model.StatsMeetingFilter) (model.StatsWorkSlice, error) {
 	var s model.StatsWorkSlice
-	adminSQL, adminArgs := adminFilterSQL(f)
+	adminSQL, adminArgs := r.filterAdmin(f)
 	args := append([]interface{}{from, toEx}, adminArgs...)
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
@@ -453,22 +454,39 @@ func (r *StatsRepo) countAdminSlice(from, toEx string, f model.StatsMeetingFilte
 		  AND `+adminTaskCompleteDateSQL+` < ?`+adminSQL, args...); err != nil {
 		return s, err
 	}
-	modArgs := append([]interface{}{from, toEx, from, toEx}, adminArgs...)
 	if s.Modified, err = r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
-		  AND TRIM(COALESCE(t.due_date,'')) != '' AND TRIM(COALESCE(t.work_date,'')) != ''
-		  AND t.due_date != t.work_date
-		  AND ((t.work_date >= ? AND t.work_date < ?) OR (t.due_date >= ? AND t.due_date < ?))`+adminSQL, modArgs...); err != nil {
+		  AND (
+		    (COALESCE(t.recurrence_role,'')='occurrence'
+		     AND t.status='complete'
+		     AND TRIM(COALESCE(t.work_date,'')) != ''
+		     AND t.work_date >= ? AND t.work_date < ?
+		     AND `+adminTaskCompleteDateSQL+` != t.work_date)
+		    OR
+		    (COALESCE(t.recurrence_role,'') != 'occurrence'
+		     AND TRIM(COALESCE(t.due_date,'')) != '' AND TRIM(COALESCE(t.work_date,'')) != ''
+		     AND t.due_date != t.work_date
+		     AND ((t.work_date >= ? AND t.work_date < ?) OR (t.due_date >= ? AND t.due_date < ?)))
+		  )`+adminSQL, append([]interface{}{from, toEx, from, toEx, from, toEx}, adminArgs...)...); err != nil {
 		return s, err
 	}
-	// 계획대로: 예정일(due) 기준 기간 안이며 배정일=예정일로 완료
+	// 계획대로: 실행 작업은 예정일(work_date) 당일 완료. 일반은 예정일(due) 당일. §13.15.9
+	onPlanArgs := append([]interface{}{from, toEx, from, toEx}, adminArgs...)
 	if s.OnPlan, err = r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
-		WHERE t.work_type IN ('admin','support') AND t.status = 'complete'
-		  AND TRIM(COALESCE(t.due_date,'')) != ''
-		  AND t.due_date >= ? AND t.due_date < ?
-		  AND (TRIM(COALESCE(t.work_date,'')) = '' OR t.work_date = t.due_date)`+adminSQL, args...); err != nil {
+		WHERE t.work_type IN ('admin','support') AND t.status='complete'
+		  AND (
+		    (COALESCE(t.recurrence_role,'')='occurrence'
+		     AND TRIM(COALESCE(t.work_date,'')) != ''
+		     AND t.work_date >= ? AND t.work_date < ?
+		     AND `+adminTaskCompleteDateSQL+` = t.work_date)
+		    OR
+		    (COALESCE(t.recurrence_role,'') != 'occurrence'
+		     AND TRIM(COALESCE(t.due_date,'')) != ''
+		     AND t.due_date >= ? AND t.due_date < ?
+		     AND (TRIM(COALESCE(t.work_date,'')) = '' OR t.work_date = t.due_date))
+		  )`+adminSQL, onPlanArgs...); err != nil {
 		return s, err
 	}
 	return s, nil

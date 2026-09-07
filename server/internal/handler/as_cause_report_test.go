@@ -16,18 +16,20 @@ func TestASActionCauseReportFieldsOnPage(t *testing.T) {
 	e, _, _, _, asID := newASActionFixture(t)
 	body := getASActionPage(t, e, asID)
 	for _, want := range []string{
-		`id="as-cause-report-wrap"`,
 		`name="cause_detail"`,
-		`name="cause_type"`,
+		`name="cause_cat1"`,
+		`name="cause_cat2"`,
+		`name="cause_cat3"`,
 		"장애원인",
-		">조치 정보</h4>",
-		"원인분류(코드)와 다른 칸입니다",
-		"보고서 미리보기에서 입력",
-		"v === 'done' || v === 'partial'",
+		"1차 분류",
+		"2차 분류",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q", want)
 		}
+	}
+	if strings.Contains(body, `name="cause_type"`) {
+		t.Fatal("원인분류 5종 select 가 남아 있다")
 	}
 	if strings.Contains(body, `name="conclusion"`) {
 		t.Fatal("결론 입력란이 조치 화면에 있으면 안 된다")
@@ -41,19 +43,18 @@ func TestASActionCauseReportFieldsOnPage(t *testing.T) {
 		t.Fatal("조치 폼 닫힘 없음")
 	}
 	form := body[formStart : formStart+formEndRel]
+	typeH := strings.Index(form, `name="cause_cat1"`)
+	cat2H := strings.Index(form, `name="cause_cat2"`)
+	detailH := strings.Index(form, `name="cause_detail"`)
 	resultH := strings.Index(form, ">조치 결과</h4>")
-	infoH := strings.Index(form, ">조치 정보</h4>")
-	followH := strings.Index(form, ">확인 · 후속</h4>")
-	wrap := strings.Index(form, `id="as-cause-report-wrap"`)
-	if resultH < 0 || infoH < 0 || followH < 0 || wrap < 0 {
-		t.Fatalf("섹션 위치 없음 result=%d info=%d follow=%d wrap=%d", resultH, infoH, followH, wrap)
+	if typeH < 0 || cat2H < 0 || detailH < 0 || resultH < 0 {
+		t.Fatalf("칸 위치 없음 cat1=%d cat2=%d detail=%d result=%d", typeH, cat2H, detailH, resultH)
 	}
-	if !(resultH < wrap && wrap < followH && resultH < infoH && infoH < followH) {
-		t.Fatalf("조치 정보가 결과와 확인·후속 사이가 아님: result=%d wrap=%d info=%d follow=%d", resultH, wrap, infoH, followH)
+	if !(typeH < cat2H && cat2H < detailH && detailH < resultH) {
+		t.Fatalf("1차→2차→장애원인이 결과 앞에 나란히 있어야 한다: cat1=%d cat2=%d detail=%d result=%d", typeH, cat2H, detailH, resultH)
 	}
-	tag := causeReportWrapOpenTag(body)
-	if tag == "" || !strings.Contains(tag, "hidden") {
-		t.Fatalf("결과 미선택 때 숨김이 없다: %s", tag)
+	if strings.Contains(form, `id="as-cause-report-wrap"`) {
+		t.Fatal("결과별 숨김 래퍼가 남아 있다")
 	}
 }
 
@@ -67,19 +68,6 @@ func getASActionPage(t *testing.T, e *echo.Echo, asID string) string {
 		t.Fatalf("status=%d", rec.Code)
 	}
 	return rec.Body.String()
-}
-
-func causeReportWrapOpenTag(body string) string {
-	i := strings.Index(body, `id="as-cause-report-wrap"`)
-	if i < 0 {
-		return ""
-	}
-	start := strings.LastIndex(body[:i], "<")
-	end := strings.Index(body[i:], ">")
-	if start < 0 || end < 0 {
-		return ""
-	}
-	return body[start : i+end+1]
 }
 
 func TestASActionDoneEmptyCauseReportWarnsButSaves(t *testing.T) {
@@ -176,14 +164,15 @@ func TestASActionRevisitDoesNotClearCauseReport(t *testing.T) {
 		"work_place":             {"field"},
 		"process_type":           {"visit"},
 		"cause_type":             {"hw"},
+		"cause_detail":           {"전원 불량"},
 		"action_taken":           {"부품 대기"},
 		"time_spent":             {"30"},
-		"result_code":            {model.ResultRevisit},
+		"result_code":            {model.ResultPartial},
 		"revisit_reason":         {"부품 수급"},
 		"revisit_scheduled_date": {"2026-08-20"},
 	})
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
-		t.Fatalf("재방문 저장 실패: %s", rec.Header().Get("Location"))
+		t.Fatalf("추가조치 저장 실패: %s", rec.Header().Get("Location"))
 	}
 	got, _ := asRepo.GetByID(asID)
 	if got.CauseDetail != "전원 불량" || got.Conclusion != "이미 적어 둔 결론" {
@@ -225,10 +214,6 @@ func TestASActionPartialSavesCauseDetailIgnoresConclusion(t *testing.T) {
 	}
 
 	body := getASActionPage(t, e, asID)
-	tag := causeReportWrapOpenTag(body)
-	if tag == "" || strings.Contains(tag, "hidden") {
-		t.Fatalf("추가조치 필요인데 칸이 숨겨짐: %s", tag)
-	}
 	formStart := strings.Index(body, `id="as-action-form"`)
 	formEndRel := strings.Index(body[formStart:], "</form>")
 	form := body[formStart : formStart+formEndRel]
@@ -251,23 +236,19 @@ func TestASActionDoneShowsCauseReportWrap(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := getASActionPage(t, e, asID)
-	tag := causeReportWrapOpenTag(body)
-	if tag == "" || strings.Contains(tag, "hidden") {
-		t.Fatalf("완료인데 칸이 숨겨짐: %s", tag)
-	}
 	formStart := strings.Index(body, `id="as-action-form"`)
 	formEndRel := strings.Index(body[formStart:], "</form>")
 	if formStart < 0 || formEndRel < 0 {
 		t.Fatal("조치 폼 없음")
 	}
 	form := body[formStart : formStart+formEndRel]
-	if !strings.Contains(form, `id="as-cause-report-wrap"`) {
+	if !strings.Contains(form, `name="cause_detail"`) {
 		t.Fatal("장애원인이 조치 폼 밖에 있다")
 	}
 }
 
-func TestASActionCauseReportHiddenForOtherResults(t *testing.T) {
-	for _, code := range []string{model.ResultRevisit, model.ResultTransfer, model.ResultHold} {
+func TestASActionCauseDetailAlwaysVisible(t *testing.T) {
+	for _, code := range []string{model.ResultTransfer, ""} {
 		code := code
 		t.Run(code, func(t *testing.T) {
 			e, _, asRepo, _, asID := newASActionFixture(t)
@@ -279,9 +260,12 @@ func TestASActionCauseReportHiddenForOtherResults(t *testing.T) {
 			if err := asRepo.Update(cur); err != nil {
 				t.Fatal(err)
 			}
-			tag := causeReportWrapOpenTag(getASActionPage(t, e, asID))
-			if tag == "" || !strings.Contains(tag, "hidden") {
-				t.Fatalf("%s 인데 칸이 열려 있다: %s", code, tag)
+			body := getASActionPage(t, e, asID)
+			formStart := strings.Index(body, `id="as-action-form"`)
+			formEndRel := strings.Index(body[formStart:], "</form>")
+			form := body[formStart : formStart+formEndRel]
+			if !strings.Contains(form, `name="cause_detail"`) {
+				t.Fatalf("%s 인데 장애원인이 폼에 없다", code)
 			}
 		})
 	}

@@ -1,6 +1,9 @@
 package model
 
-import "strings"
+import (
+	"log"
+	"strings"
+)
 
 // 등급(역할)
 const (
@@ -40,7 +43,7 @@ var AllPermissions = []struct {
 	{PermStats, "통계"},
 }
 
-// NormalizeRole 레거시 역할 → 신규 등급
+// NormalizeRole 레거시 역할 → 신규 등급. 빈 값·모르는 값은 미인증("")이다.
 func NormalizeRole(role string) string {
 	switch strings.TrimSpace(role) {
 	case RoleAdmin, "관리자":
@@ -54,10 +57,20 @@ func NormalizeRole(role string) string {
 	case RoleObserver, "옵저버", "viewer", "열람", "열람사용자":
 		return RoleObserver
 	default:
-		if role == "" {
-			return RoleObserver
+		if trimmed := strings.TrimSpace(role); trimmed != "" {
+			log.Printf("[auth] 알 수 없는 역할 %q", role)
 		}
-		return role
+		return ""
+	}
+}
+
+// IsKnownRole 정규화 후 알려진 5등급이면 true
+func IsKnownRole(role string) bool {
+	switch NormalizeRole(role) {
+	case RoleAdmin, RoleTech, RoleSales, RoleOffice, RoleObserver:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -75,6 +88,9 @@ func RoleLabel(role string) string {
 	case RoleObserver:
 		return "옵저버"
 	default:
+		if strings.TrimSpace(role) == "" {
+			return "미인증"
+		}
 		return role
 	}
 }

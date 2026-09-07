@@ -19,7 +19,7 @@
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">접수일시</th>
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">제품</th>
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">증상</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">긴급도</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">긴급</th>
           <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
           <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">담당자</th>
         </tr>
@@ -37,11 +37,7 @@
           <td class="py-2.5 pr-4 text-gray-700 max-w-xs truncate" title="{{.Symptom}}">{{.Symptom}}</td>
           <td class="py-2.5 pr-4">
             {{if eq .Urgency "high"}}
-              <span class="text-red-600 font-bold text-xs">상</span>
-            {{else if eq .Urgency "normal"}}
-              <span class="text-yellow-600 text-xs">중</span>
-            {{else}}
-              <span class="text-gray-400 text-xs">하</span>
+              <span class="text-red-600 font-bold text-xs">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
             {{end}}
           </td>
           <td class="py-2.5 pr-4">

@@ -109,3 +109,140 @@ func TestListCompletedForStatusPeriodUsesCompleteDate(t *testing.T) {
 			nAS, nM, nAd, asS.Process, mntS.Process, admS.Process)
 	}
 }
+
+func TestCompletedAdminUsesCompleteDateNotWorkDate(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "adm.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO work_tasks (
+		task_id, work_type, title, work_date, due_date, duration_min, status, assignee, complete_date
+	) VALUES ('WT-sep','admin','8월배정9월완료','2026-08-11','2026-08-11',30,'complete','태자운','2026-09-03')`); err != nil {
+		t.Fatal(err)
+	}
+
+	aug, err := NewWBRepo(db).ListCompletedForStatusPeriod("2026-08-01", "2026-08-31")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range aug {
+		if it.TaskID == "WT-sep" {
+			t.Fatal("8월 배정·9월 완료 건이 8월 조치에 들어갔다")
+		}
+	}
+	sep, err := NewWBRepo(db).ListCompletedForStatusPeriod("2026-09-01", "2026-09-30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, it := range sep {
+		if it.TaskID == "WT-sep" {
+			found = true
+			if it.WorkDate != "2026-09-03" {
+				t.Fatalf("표시일=%s want 완료일 9/3", it.WorkDate)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("9월 완료 행정이 9월 조치에 없다")
+	}
+}
+
+func TestCompletedSkipsMissingCompleteDate(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "miss.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
+		VALUES ('c1','도서관','도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_plans (plan_id, plan_year, title, status)
+		VALUES ('P1', 2026, '2026', 'approved')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, customer_id, receipt_datetime, status, assigned_to, updated_at
+	) VALUES ('a-nodate','R9','c1','2026-08-10 09:00:00','completed','최혜영','2026-09-01 10:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_visits (visit_id, plan_id, visit_date, customer_id, completed, assignee)
+		VALUES ('V-nodate','P1','2026-08-12','c1',1,'양기헌')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, status, assignee, updated_at)
+		VALUES ('WT-nodate','admin','완료일없음','2026-08-11','complete','태자운','2026-09-01 11:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := NewWBRepo(db).ListCompletedForStatusPeriod("2026-08-01", "2026-09-30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("완료일 없는 건이 조치에 들어감: %d", len(items))
+	}
+	miss, err := NewWBRepo(db).CountMissingCompleteDates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if miss.AS != 1 || miss.Mnt != 1 || miss.Admin != 1 || miss.Total() != 3 {
+		t.Fatalf("미기록 %+v", miss)
+	}
+	list, err := NewWBRepo(db).ListMissingCompleteDates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("미기록 목록 %d", len(list))
+	}
+}
+
+func TestCountMissingAssignees(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "unassigned.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
+		VALUES ('c1','도서관','도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_plans (plan_id, plan_year, title, status)
+		VALUES ('P1', 2026, '2026', 'approved')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, customer_id, receipt_datetime, status, complete_datetime
+	) VALUES ('a-none','R1','c1','2026-08-10 09:00:00','completed','2026-08-11 10:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_visits (visit_id, plan_id, visit_date, customer_id, completed, completed_date)
+		VALUES ('V-none','P1','2026-08-12','c1',1,'2026-08-12')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, status, complete_date)
+		VALUES ('WT-none','admin','담당없음','2026-08-11','complete','2026-08-11')`); err != nil {
+		t.Fatal(err)
+	}
+
+	miss, err := NewWBRepo(db).CountMissingAssignees()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if miss.AS != 1 || miss.Mnt != 1 || miss.Admin != 1 || miss.Total() != 3 {
+		t.Fatalf("미배정 %+v", miss)
+	}
+	list, err := NewWBRepo(db).ListMissingAssignees()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("미배정 목록 %d", len(list))
+	}
+}

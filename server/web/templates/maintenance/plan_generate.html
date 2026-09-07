@@ -1,25 +1,67 @@
-{{define "title"}}자동 배정 확인 · 고객지원시스템{{end}}
+{{define "title"}}{{.Year}}년 {{.Month}}월 자동 배정 · 고객지원시스템{{end}}
 {{define "content"}}
+{{$today := .Today}}
 <div class="max-w-lg mx-auto space-y-4">
-  <h2 class="text-xl font-bold text-gray-800">자동 배정 확인</h2>
-  <p class="text-sm text-gray-600">{{.Plan.PlanYear}}년 계획 · {{if .Plan.Title}}{{.Plan.Title}}{{else}}제목 없음{{end}}</p>
+  <h2 class="text-xl font-bold text-gray-800">{{.Year}}년 {{.Month}}월 자동 배정</h2>
   {{if .HolidayMissing}}
   <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
     <p>{{.HolidayMissing}}</p>
     <a href="/admin/holidays?year={{.Plan.PlanYear}}" class="inline-block mt-2 text-xs font-medium text-amber-900 underline">휴무일 등록</a>
   </div>
   {{end}}
-  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 space-y-1">
-    <p>기존 자동 생성 방문 <strong>{{.DeleteCount}}건</strong>이 삭제됩니다.</p>
-    {{if gt .KeepCount 0}}
-    <p class="text-xs">당월·이전(또는 완료) {{.KeepCount}}건은 기간 보호로 그대로 둡니다.</p>
-    {{end}}
-    <p class="text-xs text-amber-800">다음 달 이후 자동 생성분만 지운 뒤 주기가 도래한 슬롯을 다시 채웁니다. 수동 방문은 건드리지 않습니다.</p>
+  {{if .PastMonth}}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <p>{{.PastMonthMsg}}</p>
   </div>
-  <form method="POST" action="/maintenance/{{.Plan.PlanID}}/generate" class="flex gap-2">
+  <a href="/maintenance/{{.Plan.PlanID}}?month={{.Month}}" class="inline-block px-4 py-2 border border-gray-300 rounded-lg text-sm">돌아가기</a>
+  {{else}}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 space-y-1">
+    <p>{{.Month}}월 자동 생성 방문 <strong>{{.DeleteCount}}건</strong>이 삭제되고 다시 채워집니다.</p>
+    <p class="text-xs">방문 완료 {{.CompletedKeep}}건 · 오늘({{.TodayLabel}}) 이전 {{.PastKeep}}건은 그대로 둡니다.</p>
+    <p class="text-xs text-amber-800">수동 방문은 건드리지 않습니다.{{if gt .ManualKeep 0}} ({{.ManualKeep}}건){{end}}</p>
+  </div>
+  {{if .Visits}}
+  <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-2">
+    <p class="text-xs font-medium text-gray-600">{{.Month}}월 방문 미리보기</p>
+    <ul class="space-y-1.5 text-sm">
+      {{range .Visits}}
+      {{$b := mntVisitBadge . $today}}
+      <li class="flex items-center justify-between gap-2">
+        <span class="truncate">{{.VisitDate}} · {{visitLabel .}}</span>
+        <span class="shrink-0 flex items-center gap-1">
+          {{if $b.Label}}
+          <span class="{{$b.Class}}">{{$b.Label}}</span>
+          {{if $b.Extra}}<span class="text-[10px] text-gray-500">{{$b.Extra}}</span>{{end}}
+          {{end}}
+        </span>
+      </li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+  <form method="POST" action="/maintenance/{{.Plan.PlanID}}/generate" class="space-y-3">
     <input type="hidden" name="confirm" value="1">
-    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">확인하고 자동 배정</button>
-    <a href="/maintenance/{{.Plan.PlanID}}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">취소</a>
+    <input type="hidden" name="month" value="{{.Month}}">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1" for="assign_order">배정 순서</label>
+      <select id="assign_order" name="assign_order" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="prev_month" {{if or (eq .AssignOrder "prev_month") (eq .AssignOrder "")}}selected{{end}}>전월</option>
+        <option value="near" {{if eq .AssignOrder "near"}}selected{{end}}>근거리</option>
+        <option value="far" {{if eq .AssignOrder "far"}}selected{{end}}>원거리</option>
+      </select>
+      <p class="text-xs text-gray-500 mt-1">기본은 전월입니다. 전월 방문의 날짜·순번을 그대로 옮깁니다.</p>
+    </div>
+    {{if and .UnregisteredRegionCount (gt .UnregisteredRegionCount 0)}}
+    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+      순서 미등록 {{.UnregisteredRegionCount}}개 지역 — 근거리·원거리 배정 때 맨 뒤로 갑니다.
+      <a href="/maintenance/sites/distance" class="underline">지역 거리 순서</a>
+    </p>
+    {{end}}
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">확인하고 자동 배정</button>
+      <a href="/maintenance/{{.Plan.PlanID}}?month={{.Month}}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">취소</a>
+    </div>
   </form>
+  {{end}}
 </div>
 {{end}}

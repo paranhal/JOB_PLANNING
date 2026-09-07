@@ -1,0 +1,60 @@
+{{define "stats_lookback"}}
+{{$lb := .Lookback}}
+{{$vid := or .LookbackViewID "statsViewField"}}
+<div class="space-y-2" x-data="{ unit: '{{if $lb.Custom}}custom{{else}}{{$lb.Unit}}{{end}}' }">
+  <p class="text-sm font-semibold text-slate-800">{{$lb.Headline}}</p>
+  {{if $lb.ClippedByBase}}
+  <p class="text-xs font-semibold text-amber-800">기준일({{$lb.BaseDate}}) 이후만 집계됩니다</p>
+  {{end}}
+  {{if $lb.ViewNarrowed}}
+  <p class="text-xs text-slate-600">{{$lb.ViewNarrowNote}}</p>
+  {{end}}
+  <div class="flex flex-wrap items-end gap-2">
+    <div>
+      <p class="text-[11px] text-gray-500 mb-1">기간</p>
+      <div class="flex items-center gap-1">
+        <input type="number" name="range_n" min="1" max="365" value="{{if $lb.Custom}}1{{else}}{{$lb.N}}{{end}}"
+               {{if $lb.Custom}}disabled{{end}} :disabled="unit==='custom'"
+               class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+               onchange="this.form.submit()">
+        <select name="range_unit" x-model="unit" onchange="this.form.submit()"
+                class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+          <option value="d" {{if and (not $lb.Custom) (eq $lb.Unit "d")}}selected{{end}}>일</option>
+          <option value="w" {{if and (not $lb.Custom) (eq $lb.Unit "w")}}selected{{end}}>주</option>
+          <option value="m" {{if and (not $lb.Custom) (or (eq $lb.Unit "m") (eq $lb.Unit ""))}}selected{{end}}>월</option>
+          <option value="custom" {{if $lb.Custom}}selected{{end}}>사용자 지정</option>
+        </select>
+      </div>
+    </div>
+    <div x-show="unit==='custom'" x-cloak class="flex items-end gap-1">
+      <div>
+        <p class="text-[11px] text-gray-500 mb-1">시작</p>
+        <input type="date" name="from" value="{{if $lb.Custom}}{{$lb.RequestFrom}}{{else}}{{$lb.From}}{{end}}"
+               onchange="this.form.submit()"
+               class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+      </div>
+      <span class="text-gray-400 text-xs pb-2">~</span>
+      <div>
+        <p class="text-[11px] text-gray-500 mb-1">종료</p>
+        <input type="date" name="to" value="{{if $lb.Custom}}{{$lb.RequestTo}}{{else}}{{$lb.To}}{{end}}"
+               onchange="this.form.submit()"
+               class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+      </div>
+    </div>
+    {{if not .LookbackHideView}}
+    <div>
+      <p class="text-[11px] text-gray-500 mb-1">그래프 단위</p>
+      <input type="hidden" name="view" id="{{$vid}}" value="{{$lb.View}}">
+      <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+        <button type="button" onclick="document.getElementById('{{$vid}}').value='day'; this.form.submit()"
+                class="px-3 py-1.5 text-xs font-semibold {{if eq $lb.View "day"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">일별</button>
+        <button type="button" onclick="document.getElementById('{{$vid}}').value='week'; this.form.submit()"
+                class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq $lb.View "week"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">주별</button>
+        <button type="button" onclick="document.getElementById('{{$vid}}').value='month'; this.form.submit()"
+                class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq $lb.View "month"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">월별</button>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

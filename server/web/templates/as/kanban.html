@@ -5,17 +5,15 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <p class="text-sm text-gray-500">
       {{if .Mine}}<span class="text-blue-600 font-medium">내 배정 · </span>{{end}}
-      상태별 칸반 · {{.Total}}건
+      상태별 칸반 · 리스트 {{.Total}}건 · 칸반 {{.KanbanTotal}}건
     </p>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/as/kanban{{if .Search}}?search={{urlquery .Search}}{{end}}" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">칸반</a>
-      <a href="/as{{if .Search}}?search={{urlquery .Search}}{{end}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">목록</a>
+      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">칸반</a>
+      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">리스트</a>
+      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
       {{if .CanReceive}}
       <a href="/as/new"
          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
         AS 접수
       </a>
       {{end}}
@@ -23,29 +21,22 @@
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 p-4">
-    <form method="GET" action="/as/kanban" class="flex flex-col sm:flex-row gap-3">
+    <form method="GET" action="/as" class="flex flex-col sm:flex-row gap-3">
+      <input type="hidden" name="display" value="kanban">
       {{if eq .Role "tech"}}
       <input type="hidden" name="mine" value="{{if .Mine}}1{{else}}0{{end}}">
       {{end}}
+      {{if .Status}}<input type="hidden" name="status" value="{{.Status}}">{{end}}
       <input type="text" name="search" value="{{.Search}}"
-             placeholder="AS번호, 기관명, 증상 검색..."
+             placeholder="AS번호, 기관명 빠른 찾기"
              class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <a href="/as/search" class="px-4 py-2 border rounded-lg text-sm text-blue-700 hover:bg-blue-50 text-center">본문 검색</a>
       <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 transition-colors">
         검색
       </button>
-      {{if eq .Role "tech"}}
-      <a href="/as/kanban?mine={{if .Mine}}0{{else}}1{{end}}{{if .Search}}&search={{urlquery .Search}}{{end}}"
-         class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50 text-center">
-        {{if .Mine}}전체 보기{{else}}내 배정만{{end}}
-      </a>
-      {{end}}
     </form>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-    {{range .Columns}}
-    {{template "as_kanban_col" (dict "Col" . "PerColumn" $.PerColumn)}}
-    {{end}}
-  </div>
+  {{template "kanban_board" .}}
 </div>
 {{end}}

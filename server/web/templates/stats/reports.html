@@ -4,6 +4,12 @@
   <div>
     <h2 class="text-xl font-bold text-gray-800">보고서</h2>
     <p class="text-sm text-gray-500 mt-1">정기 산출물을 한곳에서 내려받습니다. 과거 이관 데이터는 제외합니다.</p>
+    {{if .MetricsBaseDate}}
+    <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
+    {{end}}
+    {{if .ProgressScopeLabel}}
+    <p class="mt-0.5 text-xs text-gray-500">실행률 {{.ProgressScopeLabel}} · {{.ProgressScopeHint}}</p>
+    {{end}}
   </div>
 
   {{range .HolidayBanners}}
@@ -91,84 +97,46 @@
     </form>
   </div>
 
-  <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4"
-       x-data="{
-         period: 'week',
-         date: '{{.DefaultWeek}}',
-         month: '{{.DefaultMonth}}',
-         from: '{{.DefaultWeek}}',
-         to: '{{.DefaultMonthDate}}',
-         qs() {
-           if (this.period === 'month') return 'period=month&month=' + this.month;
-           if (this.period === 'range') return 'period=range&from=' + this.from + '&to=' + this.to;
-           return 'period=week&date=' + this.date;
-         }
-       }">
+  <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
     <div>
       <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">팀 내부 산출물</p>
       <h3 class="text-base font-bold text-gray-800 mt-1">기본 출력물</h3>
-      <p class="text-sm text-gray-500 mt-1">주간업무보고서와 담당자별 일일업무가 같은 기간을 씁니다. 이관 데이터는 제외합니다.</p>
-    </div>
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">기간</label>
-        <select x-model="period" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="week">주간</option>
-          <option value="month">월</option>
-          <option value="range">지정</option>
-        </select>
-      </div>
-      <div x-show="period==='week'">
-        <label class="block text-xs text-gray-500 mb-1">주차</label>
-        <select x-model="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          {{range .WeekOptions}}
-          <option value="{{.Value}}" {{if eq $.DefaultWeek .Value}}selected{{end}}>{{.Label}}</option>
-          {{end}}
-        </select>
-      </div>
-      <div x-show="period==='month'" x-cloak>
-        <label class="block text-xs text-gray-500 mb-1">월</label>
-        <select x-model="month" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          {{range .MonthOptions}}
-          <option value="{{.Value}}" {{if eq $.DefaultMonth .Value}}selected{{end}}>{{.Label}}</option>
-          {{end}}
-        </select>
-      </div>
-      <div x-show="period==='range'" x-cloak class="lg:col-span-2 flex items-end gap-2">
-        <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">시작</label>
-          <input type="date" x-model="from" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-        <span class="text-gray-400 text-xs pb-2">~</span>
-        <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">끝</label>
-          <input type="date" x-model="to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
+      <p class="text-sm text-gray-500 mt-1">이관 데이터는 제외합니다. 주간업무보고서는 주 단위가 고정입니다.</p>
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
-      {{/* 주간업무보고서 §16.1 */}}
-      <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
+      {{/* 주간업무보고서 §16.1 — 주차 고정(§15.7.4 예외) */}}
+      <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 flex flex-col gap-3"
+           x-data="{ date: '{{.DefaultWeek}}' }">
         <div>
           <h4 class="text-sm font-bold text-gray-800">주간업무보고서</h4>
-          <p class="text-xs text-gray-500 mt-1">통계 · 전체 리스트 2개 시트 · AS + 정기점검 + 행정/지원</p>
+          <p class="text-xs text-gray-500 mt-1">통계 · 전체 리스트 2개 시트 · AS + 정기점검 + 행정/지원 · 월~일</p>
         </div>
-        <a :href="'/stats/weekly-report.xlsx?' + qs()"
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">주차</label>
+          <select x-model="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+            {{range .WeekOptions}}
+            <option value="{{.Value}}" {{if eq $.DefaultWeek .Value}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </div>
+        <a :href="'/stats/weekly-report.xlsx?period=week&date=' + date"
            href="/stats/weekly-report.xlsx?period=week&amp;date={{.DefaultWeek}}"
            class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
           엑셀 다운로드
         </a>
       </div>
 
-      {{/* 담당자별 일일업무 §16.4 */}}
+      {{/* 담당자별 일일업무 §16.4 — §15.7 기간 선택 */}}
       <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
         <div>
           <h4 class="text-sm font-bold text-gray-800">담당자별 일일업무</h4>
           <p class="text-xs text-gray-500 mt-1">일자별 매트릭스 · 담당자별 일일 상세 2개 시트</p>
         </div>
-        <a :href="'/stats/daily-assignee.xlsx?' + qs()"
-           href="/stats/daily-assignee.xlsx?period=week&amp;date={{.DefaultWeek}}"
+        <form method="GET" action="/stats/reports" class="space-y-3">
+          {{template "stats_lookback" .}}
+        </form>
+        <a href="/stats/daily-assignee.xlsx?{{.LookbackQS}}"
            class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
           엑셀 다운로드
         </a>

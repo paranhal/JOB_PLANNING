@@ -12,7 +12,7 @@
     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{{.RoleLabel}}</span>
   </div>
 
-  {{/* 주간 통계 KPI — 세로 압축 */}}
+  {{/* 통계 KPI — §15.7 기간 선택 */}}
   {{$kpi := .WeekKPI}}
   {{$ex := $kpi.ExecDisplay}}
   {{$vis := $kpi.VisitDisplay}}
@@ -20,16 +20,18 @@
   {{$execOK := and $ex.ShowTarget (ge $ex.Value $.ExecTarget)}}
   {{$visitOK := and $vis.ShowTarget (le $vis.Value $.VisitTarget)}}
   {{$completeOK := and $cmp.ShowTarget (le $cmp.Value $.CompleteTarget)}}
-  <div class="space-y-1">
+  <form method="GET" action="/" class="space-y-1 rounded-xl border border-gray-200 bg-white px-3 py-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-sm font-semibold text-gray-800">주간 통계 <span class="font-normal text-gray-500 text-xs">· 팀전체 · 금주 기준 · 이관 데이터 제외</span></p>
-      <a href="/stats?view=week" class="text-xs text-blue-700 hover:underline">통계에서 보기 →</a>
+      <p class="text-sm font-semibold text-gray-800">통계 KPI <span class="font-normal text-gray-500 text-xs">· 팀전체 · 이관 데이터 제외{{if .MetricsBaseDate}} · {{.MetricsBaseDate}} 이후 데이터 기준{{end}}</span></p>
+      <a href="/stats?{{.LookbackQS}}" class="text-xs text-blue-700 hover:underline">통계에서 보기 →</a>
     </div>
+    {{template "stats_lookback" .}}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
       <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
         <div class="flex items-center justify-between gap-1">
           <p class="text-[11px] font-medium text-gray-600">계획대비 실행률</p>
           <span class="inline-flex items-center gap-0.5">
+            {{if $.ProgressScopeLabel}}<span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700" title="{{$.ProgressScopeHint}}">{{$.ProgressScopeLabel}}</span>{{end}}
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$ex.Reason}}">{{$ex.GradeMark}} {{$ex.GradeLabel}}</span>
             {{if $ex.ShowTarget}}
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full {{if $execOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $execOK}}충족{{else}}미충족{{end}}</span>
@@ -75,7 +77,7 @@
         <p class="mt-1 text-xl font-bold text-gray-300 leading-none" title="{{$vis.Reason}}">—</p>
         <p class="text-[10px] text-gray-400 mt-0.5">{{$vis.Reason}}</p>
         {{end}}
-        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$vis.Sample}}건</p>
+        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$vis.Sample}}건 · 완료 n={{$kpi.CompleteSample}}</p>
       </div>
 
       <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
@@ -101,10 +103,13 @@
         <p class="mt-1 text-xl font-bold text-gray-300 leading-none" title="{{$cmp.Reason}}">—</p>
         <p class="text-[10px] text-gray-400 mt-0.5">{{$cmp.Reason}}</p>
         {{end}}
-        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$cmp.Sample}}건</p>
+        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$cmp.Sample}}건 · 방문 n={{$kpi.VisitSample}}</p>
       </div>
     </div>
-  </div>
+    {{if $kpi.LeadTimeWarn}}
+    <div class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">{{$kpi.LeadTimeWarn}}</div>
+    {{end}}
+  </form>
 
   <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
     <a href="{{.OpenHref}}" class="bg-white rounded-xl border border-gray-200 px-3 py-3 hover:border-blue-400 hover:shadow-sm transition-all block">
@@ -199,6 +204,20 @@
         <p class="text-[11px] text-gray-500 shrink-0">미계획</p>
       </div>
       <p class="text-[10px] text-gray-400 mt-1">예정 없음 · 배정안됨</p>
+    </a>
+    <a href="{{.TodayHref}}" class="bg-white rounded-xl border border-indigo-200 px-3 py-3 hover:border-indigo-400 hover:shadow-sm transition-all block">
+      <div class="flex items-baseline justify-between gap-1">
+        <p class="text-xl font-bold text-indigo-700 tabular-nums">{{.WorkStats.UpcomingOcc}}</p>
+        <p class="text-[11px] text-gray-500 shrink-0">다가오는 실행</p>
+      </div>
+      <p class="text-[10px] text-gray-400 mt-1">예정일 {{$.UpcomingDays}}일 전 · 당일은 오늘 예정</p>
+    </a>
+    <a href="{{.OpenHref}}" class="bg-white rounded-xl border border-red-300 px-3 py-3 hover:border-red-500 hover:shadow-sm transition-all block">
+      <div class="flex items-baseline justify-between gap-1">
+        <p class="text-xl font-bold text-red-700 tabular-nums">{{.WorkStats.OverdueDeadline}}</p>
+        <p class="text-[11px] text-gray-500 shrink-0">마감 경과</p>
+      </div>
+      <p class="text-[10px] text-red-700/80 mt-1">상위 업무 최종 마감 · 실행 예정과 구분</p>
     </a>
   </div>
 

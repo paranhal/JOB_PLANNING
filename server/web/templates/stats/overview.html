@@ -16,6 +16,9 @@
     <div>
       <h2 class="text-xl font-bold text-gray-800">통계</h2>
       <p class="text-sm text-gray-500 mt-1">관리 단위(기간·담당·사업) 기준 · 실행율 90% · 방문 3일 · 완료 7일</p>
+      {{if .MetricsBaseDate}}
+      <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
+      {{end}}
       <p class="mt-1.5 text-xs text-gray-600">
         현재 대상:
         {{if and (eq .Filter.Scope "assignee") .Filter.Key}}<span class="font-semibold text-blue-700">담당자 · {{.Filter.Key}}</span>
@@ -38,6 +41,7 @@
       <div class="flex items-start justify-between gap-2">
         <p class="text-sm font-medium text-gray-600">계획대비 실행율</p>
         <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
+          {{if $.ProgressScopeLabel}}<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700" title="{{$.ProgressScopeHint}}">{{$.ProgressScopeLabel}}</span>{{end}}
           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$ex.Reason}}">{{$ex.GradeMark}} {{$ex.GradeLabel}}</span>
           {{if $ex.ShowTarget}}
           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $execOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $execOK}}기준충족{{else}}기준미충족{{end}}</span>
@@ -56,6 +60,7 @@
       <p class="mt-1 text-[11px] text-gray-400">{{$ex.Reason}}</p>
       {{end}}
       <p class="mt-1 text-[11px] text-gray-500">표본 {{$ex.Sample}}건</p>
+      {{if $.ProgressScopeHint}}<p class="mt-1 text-[10px] text-gray-400 leading-snug">{{$.ProgressScopeHint}}</p>{{end}}
     </div>
 
     <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -79,7 +84,7 @@
       <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$vis.Reason}}">—</p>
       <p class="mt-1 text-[11px] text-gray-400">{{$vis.Reason}}</p>
       {{end}}
-      <p class="mt-1 text-[11px] text-gray-500">표본 {{$vis.Sample}}건 · 목표 {{printf "%.0f" .VisitTarget}}일</p>
+      <p class="mt-1 text-[11px] text-gray-500">표본 {{$vis.Sample}}건 · 목표 {{printf "%.0f" .VisitTarget}}일 · 완료 표본 {{$cmp.Sample}}건</p>
     </div>
 
     <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -103,7 +108,7 @@
       <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$cmp.Reason}}">—</p>
       <p class="mt-1 text-[11px] text-gray-400">{{$cmp.Reason}}</p>
       {{end}}
-      <p class="mt-1 text-[11px] text-gray-500">표본 {{$cmp.Sample}}건 · 목표 {{printf "%.0f" .CompleteTarget}}일</p>
+      <p class="mt-1 text-[11px] text-gray-500">표본 {{$cmp.Sample}}건 · 목표 {{printf "%.0f" .CompleteTarget}}일 · 방문 표본 {{$vis.Sample}}건</p>
     </div>
 
     <a href="/plan/unplanned" class="rounded-xl border border-rose-200 bg-white p-4 shadow-sm hover:border-rose-400 transition-all block">
@@ -125,13 +130,14 @@
       <p class="mt-1 text-[11px] text-gray-500">예정+미정 {{$kpi.PlanningPlanned}} / 미완료 {{$kpi.PlanningOpen}} · 목표 {{printf "%.0f" .PlanTarget}}%</p>
     </a>
   </div>
+  {{if $kpi.LeadTimeWarn}}
+  <div class="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{$kpi.LeadTimeWarn}}</div>
+  {{end}}
 
   {{/* 필터 바 — 드롭다운 즉시 표시, 선택 시 자동 조회 */}}
   <form method="GET" action="/stats" id="statsFilterForm"
         class="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm"
         x-data="{ scope: '{{.Filter.Scope}}' }">
-    <input type="hidden" name="date" value="{{.AnchorDate}}">
-    <input type="hidden" name="view" id="statsViewField" value="{{.View}}">
     <input type="hidden" name="scope" :value="scope">
 
     <label class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 cursor-pointer">
@@ -140,50 +146,16 @@
              onchange="this.form.submit()">
       과거 이관 데이터 포함
     </label>
+    <input type="hidden" name="sales" id="statsSalesField" value="{{if .Filter.ExcludeSalesActivity}}0{{end}}">
+    <label class="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs text-orange-900 cursor-pointer">
+      <input type="checkbox" class="rounded border-orange-300 text-orange-700"
+             {{if not .Filter.ExcludeSalesActivity}}checked{{end}}
+             onchange="document.getElementById('statsSalesField').value=this.checked?'':'0'; this.form.submit()">
+      영업 활동 포함
+    </label>
 
-    <div>
-      <p class="text-[11px] text-gray-500 mb-1">통계 기간</p>
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-          <button type="button" onclick="document.getElementById('statsViewField').value='day'; this.form.submit()"
-                  class="px-3 py-1.5 text-xs font-semibold {{if eq .View "day"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">일별</button>
-          <button type="button" onclick="document.getElementById('statsViewField').value='week'; this.form.submit()"
-                  class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq .View "week"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">주별</button>
-          <button type="button" onclick="document.getElementById('statsViewField').value='month'; this.form.submit()"
-                  class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq .View "month"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">월별</button>
-          <button type="button" onclick="document.getElementById('statsViewField').value='range'; this.form.submit()"
-                  class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 {{if eq .View "range"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">기간</button>
-        </div>
-        {{if eq .View "range"}}
-        <div class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-1 py-0.5">
-          <a href="/stats?view=range&from={{.PrevRangeFrom}}&to={{.PrevRangeTo}}{{.FilterQ}}"
-             class="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-md" title="이전 기간">←</a>
-          <input type="date" name="from" value="{{.RangeFrom}}"
-                 onchange="this.form.submit()"
-                 class="border-0 bg-transparent px-1 py-1 text-xs text-gray-700 focus:ring-0 cursor-pointer">
-          <span class="text-[11px] text-gray-400">~</span>
-          <input type="date" name="to" value="{{.RangeTo}}"
-                 onchange="this.form.submit()"
-                 class="border-0 bg-transparent px-1 py-1 text-xs text-gray-700 focus:ring-0 cursor-pointer">
-          <a href="/stats?view=range&from={{.NextRangeFrom}}&to={{.NextRangeTo}}{{.FilterQ}}"
-             class="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-md" title="다음 기간">→</a>
-        </div>
-        {{else}}
-        <input type="hidden" name="from" value="{{.RangeFrom}}">
-        <input type="hidden" name="to" value="{{.RangeTo}}">
-        <div class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-1 py-0.5">
-          <a href="/stats?view={{.View}}&date={{.PrevAnchor}}{{.FilterQ}}"
-             class="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-md" title="이전">←</a>
-          <input type="date" value="{{.AnchorDate}}"
-                 onchange="(function(el){var f=document.getElementById('statsFilterForm'); var d=f.querySelector('input[name=date]'); if(d)d.value=el.value; f.submit();})(this)"
-                 class="border-0 bg-transparent px-1 py-1 text-xs text-gray-700 focus:ring-0 cursor-pointer">
-          <a href="/stats?view={{.View}}&date={{.NextAnchor}}{{.FilterQ}}"
-             class="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-md" title="다음">→</a>
-          <a href="/stats?view={{.View}}&date={{.Today}}{{.FilterQ}}"
-             class="px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-md">오늘</a>
-        </div>
-        {{end}}
-      </div>
+    <div class="w-full sm:w-auto flex-1 min-w-[16rem]">
+      {{template "stats_lookback" .}}
     </div>
 
     <div>
@@ -241,9 +213,9 @@
       </select>
     </div>
 
-    <a href="/stats/export.xlsx?metric=progress&period={{.View}}&date={{.AnchorDate}}&month={{.AnchorMonth}}&from={{.RangeFrom}}&to={{.RangeTo}}{{.FilterQ}}"
+    <a href="/stats/export.xlsx?metric=progress&period=range&from={{.Lookback.From}}&to={{.Lookback.To}}{{.FilterQ}}"
        class="px-4 py-2 text-sm font-semibold rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50">Excel</a>
-    <a href="/stats/reports?date={{.AnchorDate}}"
+    <a href="/stats/reports{{if .LookbackQS}}?{{.LookbackQS}}{{end}}"
        class="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">보고서로 이동</a>
   </form>
 

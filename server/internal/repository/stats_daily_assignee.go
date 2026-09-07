@@ -257,36 +257,38 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 		}
 		out[name][date] += n
 	}
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
 	qAS := `
 		SELECT TRIM(COALESCE(ar.assigned_to,'')), date(COALESCE(ar.complete_datetime, ar.updated_at)), COUNT(*)
 		FROM as_receipts ar
-		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
-		  AND COALESCE(ar.data_origin,'app') != 'import'
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + asSQL + `
 		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
 		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)
 		GROUP BY 1, 2`
-	if err := r.scanNamedDayCounts(qAS, from, toEx, add); err != nil {
+	if err := r.scanNamedDayCounts(qAS, from, toEx, add, asArgs...); err != nil {
 		return out, err
 	}
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
 	qMnt := `
 		SELECT TRIM(COALESCE(v.assignee,'')), COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date), COUNT(*)
 		FROM maintenance_visits v
-		WHERE COALESCE(v.completed,0)=1
-		  AND COALESCE(v.data_origin,'app') != 'import'
+		WHERE COALESCE(v.completed,0)=1` + mntSQL + `
 		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
 		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?
 		GROUP BY 1, 2`
-	if err := r.scanNamedDayCounts(qMnt, from, toEx, add); err != nil {
+	if err := r.scanNamedDayCounts(qMnt, from, toEx, add, mntArgs...); err != nil {
 		return out, err
 	}
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
 	qAdmin := `
 		SELECT TRIM(COALESCE(t.assignee,'')), ` + adminTaskCompleteDateSQL + `, COUNT(*)
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support') AND t.status='complete'
-		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
+		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + SQLRecurrenceWorkUnit + adminSQL + `
 		  AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?
 		GROUP BY 1, 2`
-	if err := r.scanNamedDayCounts(qAdmin, from, toEx, add); err != nil {
+	if err := r.scanNamedDayCounts(qAdmin, from, toEx, add, adminArgs...); err != nil {
 		return out, err
 	}
 	return out, nil
@@ -305,18 +307,20 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 		}
 		out[name][date] += n
 	}
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
 	qAS := `
 		SELECT TRIM(COALESCE(NULLIF(TRIM(p.worker),''), ar.assigned_to, '')), date(p.process_datetime), SUM(COALESCE(p.time_spent,0))
 		FROM as_processes p
 		JOIN as_receipts ar ON ar.as_id = p.as_id
-		WHERE ar.status != 'cancelled'
-		  AND COALESCE(ar.data_origin,'app') != 'import'
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.status != 'cancelled'` + asSQL + `
 		  AND p.process_datetime IS NOT NULL
 		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)
 		GROUP BY 1, 2`
-	if err := r.scanNamedDayCounts(qAS, from, toEx, add); err != nil {
+	if err := r.scanNamedDayCounts(qAS, from, toEx, add, asArgs...); err != nil {
 		return out, err
 	}
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
 	qAct := `
 		SELECT TRIM(COALESCE(NULLIF(TRIM(a.actor),''), t.assignee, '')),
 		       date(a.created_at),
@@ -324,11 +328,11 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 		FROM work_activities a
 		JOIN work_tasks t ON t.task_id = a.task_id
 		WHERE t.work_type IN ('admin','support')
-		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
+		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + adminSQL + `
 		  AND date(a.created_at) >= date(?)
 		  AND date(a.created_at) < date(?)
 		GROUP BY 1, 2`
-	if err := r.scanNamedDayCounts(qAct, from, toEx, add); err != nil {
+	if err := r.scanNamedDayCounts(qAct, from, toEx, add, adminArgs...); err != nil {
 		if !strings.Contains(err.Error(), "no such table") && !strings.Contains(err.Error(), "no such column") {
 			return out, err
 		}
@@ -336,8 +340,8 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 	return out, nil
 }
 
-func (r *StatsRepo) scanNamedDayCounts(q, from, toEx string, add func(name, date string, n int)) error {
-	rows, err := r.db.Query(q, from, toEx)
+func (r *StatsRepo) scanNamedDayCounts(q, from, toEx string, add func(name, date string, n int), extra ...interface{}) error {
+	rows, err := r.db.Query(q, append(append([]interface{}{}, extra...), from, toEx)...)
 	if err != nil {
 		return err
 	}

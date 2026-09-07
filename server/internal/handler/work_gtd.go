@@ -57,12 +57,42 @@ func (h *WorkboardHandler) adminGTDErr(taskID, status string, t *model.WorkTask,
 func (h *WorkboardHandler) addCompleteActivity(taskID, note, actor string) {
 	note = strings.TrimSpace(note)
 	if note == "" {
-		return
+		note = "완료 처리했습니다."
 	}
 	_ = h.repo.CreateActivity(&model.WorkActivity{
 		TaskID:       taskID,
 		ActivityType: model.WBActivityDone,
 		Content:      note,
+		Actor:        actor,
+		SpentMinutes: model.WBActivityDefaultSpent,
+	})
+}
+
+// addActionSaveActivity 조치 저장 시 이력을 자동으로 남긴다. 화면 등록 폼은 쓰지 않는다(§33.6).
+func (h *WorkboardHandler) addActionSaveActivity(existing, t *model.WorkTask, c echo.Context) {
+	if t == nil {
+		return
+	}
+	actor := ctxString(c, "user_name")
+	if t.Status == model.WBTaskComplete && (existing == nil || existing.Status != model.WBTaskComplete) {
+		note := t.CompleteNote
+		if strings.TrimSpace(c.FormValue("force_complete")) == "1" {
+			if r := strings.TrimSpace(c.FormValue("force_reason")); r != "" {
+				note = strings.TrimSpace(note + "\n관리자 강제 완료: " + r)
+			}
+		}
+		h.addCompleteActivity(t.TaskID, note, actor)
+		return
+	}
+	label := model.WBAdminStatusLabel(t.Status)
+	content := "조치를 저장했습니다. 상태: " + label
+	if t.CompleteNote != "" && (existing == nil || t.CompleteNote != existing.CompleteNote) {
+		content += "\n" + t.CompleteNote
+	}
+	_ = h.repo.CreateActivity(&model.WorkActivity{
+		TaskID:       t.TaskID,
+		ActivityType: model.WBActivityEdit,
+		Content:      content,
 		Actor:        actor,
 		SpentMinutes: model.WBActivityDefaultSpent,
 	})

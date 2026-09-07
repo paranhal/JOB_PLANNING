@@ -38,6 +38,7 @@ func newGTDServer(t *testing.T) (*echo.Echo, *repository.WBRepo) {
 	aw.POST("/:id/move", h.AdminWork.MoveKanban)
 	aw.GET("/:id", h.AdminWork.Show)
 	wb := g.Group("/workboard")
+	wb.GET("/tasks/:id/edit", h.Workboard.EditTask)
 	wb.GET("/tasks/:id", h.Workboard.ShowTask)
 	wb.POST("/tasks/:id/update", h.Workboard.UpdateTask)
 	wb.POST("/tasks/:id/actions", h.Workboard.CreateAction)
@@ -152,8 +153,11 @@ func TestAdminWorkCompleteBlockedByRequiredAction(t *testing.T) {
 		t.Fatalf("상세 status=%d", show.Code)
 	}
 	body := show.Body.String()
-	if !strings.Contains(body, "다음 행동") || !strings.Contains(body, "조치 이력") || !strings.Contains(body, "초안") {
-		t.Fatal("상세에 다음 행동·이력이 없음")
+	if strings.Contains(body, "다음 행동") {
+		t.Fatal("조치 화면에 다음 행동이 남아 있음")
+	}
+	if !strings.Contains(body, "조치 이력") {
+		t.Fatal("조치 이력 없음")
 	}
 }
 
@@ -308,20 +312,20 @@ func TestIRMCaseNextActionsAndTimeline(t *testing.T) {
 	body := show.Body.String()
 	for _, want := range []string{
 		"충남교육청통합도서관", "행안부 IRM 평가지표 세부 레벨 작성",
-		"다음 행동", "조치 이력",
-		"홈페이지 부문 요청", "OO소프트 김OO",
-		"자료관리 부문 요청", "전자도서관 부문 요청",
+		"조치 이력",
 		"3사 자료 취합·수정", "90분", "최종본 메일 발송", "20분",
-		"3/3 완료",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("상세에 %q 없음", want)
 		}
 	}
+	if strings.Contains(body, "다음 행동") || strings.Contains(body, "이력 추가") {
+		t.Error("조치 화면에 다음 행동·이력 폼이 남아 있음")
+	}
 
 	list := doGet(t, e, "/admin-work")
-	if !strings.Contains(list.Body.String(), "회신 대기") && !strings.Contains(body, "✔") {
-		t.Fatal("다음 행동 완료 표시 없음")
+	if !strings.Contains(list.Body.String(), "회신 대기") {
+		t.Fatal("목록에 회신 대기 없음")
 	}
 }
 
@@ -373,8 +377,8 @@ func TestMissingNextActionWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 	show := doGet(t, e, "/workboard/tasks/"+task.TaskID+"?back=/admin-work")
-	if !strings.Contains(show.Body.String(), "다음 행동 미지정") {
-		t.Fatal("미지정 경고 없음")
+	if strings.Contains(show.Body.String(), "다음 행동") {
+		t.Fatal("조치 화면에 다음 행동이 남아 있음")
 	}
 }
 
@@ -467,5 +471,84 @@ func TestAdminWorkKanbanMoveAndListSort(t *testing.T) {
 	got, _ = repo.GetTask(early.TaskID)
 	if got == nil || got.Status != model.WBTaskComplete {
 		t.Fatalf("완료 %+v", got)
+	}
+}
+
+func TestSection336ActionVsEdit(t *testing.T) {
+	e, repo := newGTDServer(t)
+	task := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "구분고정", DueDate: "2026-08-20",
+		WorkDate: "2026-08-20", StartTime: "09:00", EndTime: "09:30", Status: model.WBTaskInProgress,
+		CustomerName: "충남교육청"}
+	if err := repo.CreateTask(task); err != nil {
+		t.Fatal(err)
+	}
+
+	show := doGet(t, e, "/workboard/tasks/"+task.TaskID)
+	if show.Code != http.StatusOK {
+		t.Fatalf("조치 status=%d", show.Code)
+	}
+	body := show.Body.String()
+	if !strings.Contains(body, "등록 정보") || !strings.Contains(body, "일정표") {
+		t.Fatal("조치에 등록 정보·일정표가 없다")
+	}
+	if strings.Contains(body, "기간 내 반복 실행") || strings.Contains(body, "다음 행동") || strings.Contains(body, "이력 추가") {
+		t.Fatal("조치에 반복 설정·다음 행동·이력 폼이 남아 있다")
+	}
+	if strings.Contains(body, `name="work_type"`) {
+		i := strings.Index(body, `name="scope" value="action"`)
+		if i < 0 {
+			t.Fatal("조치 저장 폼이 없다")
+		}
+		chunk := body[i:]
+		if j := strings.Index(chunk, "조치 이력"); j > 0 {
+			chunk = chunk[:j]
+		}
+		if strings.Contains(chunk, `name="work_type"`) {
+			t.Fatal("조치에서 업무 구분을 바꿀 수 있다")
+		}
+	}
+	if !strings.Contains(body, "영업 활동으로 만들기") || !strings.Contains(body, "from_task=") {
+		t.Fatal("영업 활동으로 만들기 버튼이 없다")
+	}
+
+	edit := doGet(t, e, "/workboard/tasks/"+task.TaskID+"/edit")
+	if edit.Code != http.StatusOK {
+		t.Fatalf("수정 status=%d", edit.Code)
+	}
+	ebody := edit.Body.String()
+	if !strings.Contains(ebody, "기간 내 반복 실행") || !strings.Contains(ebody, `name="work_type"`) {
+		t.Fatal("수정 화면에 반복·업무 구분이 없다")
+	}
+	if strings.Contains(ebody, "다음 행동") {
+		t.Fatal("수정 화면에 다음 행동이 있다")
+	}
+
+	rec := doForm(t, e, "/workboard/tasks/"+task.TaskID+"/update", url.Values{
+		"scope": {"action"}, "status": {"in_progress"}, "work_type": {"support"},
+		"title": {"바뀌면안됨"}, "priority": {"normal"},
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("조치 저장 loc=%q", rec.Header().Get("Location"))
+	}
+	got, _ := repo.GetTask(task.TaskID)
+	if got == nil || got.WorkType != model.WBWorkAdmin || got.Title != "구분고정" {
+		t.Fatalf("조치에서 등록 정보가 바뀜 %+v", got)
+	}
+	hist, _ := repo.ListActivities(task.TaskID)
+	if len(hist) == 0 {
+		t.Fatal("조치 저장 시 이력이 안 쌓였다")
+	}
+
+	rec = doForm(t, e, "/workboard/tasks/"+task.TaskID+"/update", url.Values{
+		"scope": {"register"}, "work_type": {"admin"}, "title": {"등록에서수정"},
+		"due_date": {"2026-08-20"}, "work_date": {"2026-08-20"},
+		"start_time": {"09:00"}, "end_time": {"09:30"},
+	})
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "/edit") {
+		t.Fatalf("등록 저장 loc=%q", rec.Header().Get("Location"))
+	}
+	got, _ = repo.GetTask(task.TaskID)
+	if got == nil || got.Title != "등록에서수정" {
+		t.Fatalf("등록 수정 실패 %+v", got)
 	}
 }

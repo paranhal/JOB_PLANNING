@@ -130,6 +130,7 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday string) (mo
 	if err != nil {
 		return out, err
 	}
+	out.Events = r.collapseWeeklyReportEvents(out.Events)
 	return out, nil
 }
 
@@ -169,7 +170,7 @@ func (r *StatsRepo) buildWeeklyPersonRow(from, toEx string, workingDays int, ass
 	row.Completed = an.Completed
 	row.CarryOut = an.CarryOut
 	exec := mathRound1(b.ExecutionRatePct())
-	row.ExecDisplay = model.StatsReliability(b.PlannedTotal(), !b.HasExecutionRate(), exec)
+	row.ExecDisplay = model.StatsReliability(b.ExecPlanned(), !b.HasExecutionRate(), exec)
 	if isTeam {
 		if pc, e := NewWorkBoardRepo(r.db).CountPlanning(); e == nil {
 			row.ExecDisplay = row.ExecDisplay.CapIfLowPlanning(pc.HasPlanningRate(), pc.Rate())
@@ -232,7 +233,7 @@ func (r *StatsRepo) weeklyDayMaxCompleted(from, toEx string, f model.StatsMeetin
 }
 
 func (r *StatsRepo) countWeeklyInProgress(toEx string, f model.StatsMeetingFilter) (int, error) {
-	asSQL, asArgs := asFilterSQL(f)
+	asSQL, asArgs := r.filterAS(f)
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
@@ -256,7 +257,7 @@ func (r *StatsRepo) countWeeklyInProgress(toEx string, f model.StatsMeetingFilte
 	}
 	n += w
 
-	mntSQL, mntArgs := mntFilterSQL(f)
+	mntSQL, mntArgs := r.filterMnt(f)
 	m, err := r.countSQL(`
 		SELECT COUNT(*) FROM maintenance_visits v
 		WHERE COALESCE(v.completed,0)=0
@@ -267,7 +268,7 @@ func (r *StatsRepo) countWeeklyInProgress(toEx string, f model.StatsMeetingFilte
 	}
 	n += m
 
-	adminSQL, adminArgs := adminFilterSQL(f)
+	adminSQL, adminArgs := r.filterAdmin(f)
 	dateExpr := `COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at))`
 	a, err := r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
@@ -308,12 +309,21 @@ func (r *StatsRepo) unplannedCountsByAssignee() (map[string]int, error) {
 }
 
 func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
+	base := r.MetricsPolicy().BaseDate
+	asBase, mntBase, adminBase := "", "", ""
+	var asB, mntB, adminB []interface{}
+	if base != "" {
+		asBase = ` AND date(ar.receipt_datetime) >= date(?)`
+		mntBase = ` AND date(v.visit_date) >= date(?)`
+		adminBase = ` AND date(` + adminTaskReceiptDateSQL + `) >= date(?)`
+		asB, mntB, adminB = []interface{}{base}, []interface{}{base}, []interface{}{base}
+	}
 	q := `
 		SELECT name FROM (
 			SELECT TRIM(COALESCE(ar.assigned_to,'')) AS name
 			FROM as_receipts ar
 			WHERE ar.status != 'cancelled'
-			  AND COALESCE(ar.data_origin,'app') != 'import'
+			  AND COALESCE(ar.data_origin,'app') != 'import'` + asBase + `
 			  AND (
 			    (date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?))
 			    OR (TRIM(COALESCE(ar.complete_datetime,'')) != ''
@@ -326,7 +336,7 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			UNION
 			SELECT TRIM(COALESCE(v.assignee,''))
 			FROM maintenance_visits v
-			WHERE COALESCE(v.data_origin,'app') != 'import'
+			WHERE COALESCE(v.data_origin,'app') != 'import'` + mntBase + `
 			  AND (
 			    (v.visit_date >= ? AND v.visit_date < ?)
 			    OR (COALESCE(v.completed,0)=1
@@ -338,7 +348,7 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			SELECT TRIM(COALESCE(t.assignee,''))
 			FROM work_tasks t
 			WHERE t.work_type IN ('admin','support')
-			  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
+			  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + SQLRecurrenceWorkUnit + adminBase + `
 			  AND (
 			    (` + adminTaskReceiptDateSQL + ` >= ? AND ` + adminTaskReceiptDateSQL + ` < ?)
 			    OR (t.status='complete' AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?)
@@ -346,11 +356,13 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			        AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at)) < ?)
 			  )
 		) WHERE 1=1`
-	args := []interface{}{
-		from, toEx, from, toEx, toEx, toEx,
-		from, toEx, from, toEx, toEx,
-		from, toEx, from, toEx, toEx,
-	}
+	args := []interface{}{}
+	args = append(args, asB...)
+	args = append(args, from, toEx, from, toEx, toEx, toEx)
+	args = append(args, mntB...)
+	args = append(args, from, toEx, from, toEx, toEx)
+	args = append(args, adminB...)
+	args = append(args, from, toEx, from, toEx, toEx)
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -477,7 +489,7 @@ func (r *StatsRepo) avgKPIForFilter(from, toEx string, f model.StatsMeetingFilte
 }
 
 func (r *StatsRepo) avgMntCompleteDays(from, toEx string, f model.StatsMeetingFilter) (float64, int, error) {
-	mntSQL, args := mntFilterSQL(f)
+	mntSQL, args := r.filterMnt(f)
 	q := `
 		SELECT AVG(julianday(COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date)) - julianday(v.visit_date)),
 		       COUNT(*)
@@ -489,7 +501,7 @@ func (r *StatsRepo) avgMntCompleteDays(from, toEx string, f model.StatsMeetingFi
 }
 
 func (r *StatsRepo) avgAdminCompleteDays(from, toEx string, f model.StatsMeetingFilter) (float64, int, error) {
-	adminSQL, args := adminFilterSQL(f)
+	adminSQL, args := r.filterAdmin(f)
 	q := `
 		SELECT AVG(julianday(` + adminTaskCompleteDateSQL + `) - julianday(` + adminTaskReceiptDateSQL + `)),
 		       COUNT(*)
@@ -628,6 +640,7 @@ func weeklyEventKindOrder(kind string) int {
 
 func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
 	var out []model.WeeklyEventRow
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
 	base := `
 		SELECT COALESCE(ar.as_number,''), COALESCE(c.org_name,''),
 		       COALESCE(a.product_category,''), COALESCE(a.product_name,''), COALESCE(a.model_name,''),
@@ -638,13 +651,12 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		WHERE ar.status != 'cancelled'
-		  AND COALESCE(ar.data_origin,'app') != 'import'
+		WHERE ar.status != 'cancelled'` + asSQL + `
 		  AND date(%s) >= date(?) AND date(%s) < date(?)`
 
 	add := func(kind, dateExpr, contentExpr string, args ...interface{}) error {
 		q := fmt.Sprintf(base, dateExpr, dateExpr, dateExpr)
-		rows, err := r.db.Query(q, args...)
+		rows, err := r.db.Query(q, append(append([]interface{}{}, asArgs...), args...)...)
 		if err != nil {
 			return err
 		}
@@ -691,10 +703,9 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 		JOIN as_receipts ar ON ar.as_id = p.as_id
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		WHERE ar.status != 'cancelled'
-		  AND COALESCE(ar.data_origin,'app') != 'import'
+		WHERE ar.status != 'cancelled'` + asSQL + `
 		  AND p.process_datetime IS NOT NULL
-		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)`, from, toEx)
+		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)`, append(append([]interface{}{}, asArgs...), from, toEx)...)
 	if err != nil {
 		return nil, err
 	}
@@ -718,6 +729,7 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 
 func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
 	doneDate := `COALESCE(NULLIF(TRIM(v.completed_date),''), CASE WHEN COALESCE(v.completed,0)=1 THEN v.visit_date ELSE '' END)`
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
 	q := `
 		SELECT COALESCE(v.visit_id,''), COALESCE(c.org_name,''), COALESCE(v.product_type,''),
 		       COALESCE(NULLIF(TRIM(v.assignee),''), ''),
@@ -731,12 +743,11 @@ func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventR
 		       CASE WHEN COALESCE(v.completed,0)=1 THEN 1 ELSE 0 END
 		FROM maintenance_visits v
 		JOIN customers c ON c.customer_id = v.customer_id
-		WHERE COALESCE(v.data_origin,'app') != 'import'
-		  AND (
+		WHERE (` + `
 		    (v.visit_date >= ? AND v.visit_date < ?)
 		    OR (TRIM(COALESCE(v.completed_date,'')) != '' AND v.completed_date >= ? AND v.completed_date < ?)
-		  )`
-	rows, err := r.db.Query(q, from, toEx, from, toEx, from, toEx)
+		  )` + mntSQL
+	rows, err := r.db.Query(q, append([]interface{}{from, toEx, from, toEx, from, toEx}, mntArgs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -762,6 +773,7 @@ func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventR
 }
 
 func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
 	q := `
 		SELECT COALESCE(t.task_id,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
@@ -775,17 +787,21 @@ func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEven
 		         ELSE COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at))
 		       END,
 		       COALESCE((SELECT SUM(COALESCE(a.spent_minutes,0)) FROM work_activities a WHERE a.task_id=t.task_id), t.duration_min, 0),
-		       COALESCE(t.wait_party,''), COALESCE(t.reply_due_date,'')
+		       COALESCE(t.wait_party,''), COALESCE(t.reply_due_date,''),
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
 		FROM work_tasks t
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
 		WHERE t.work_type IN ('admin','support')
-		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
+		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + SQLRecurrenceWorkUnit + adminSQL + `
 		  AND (
 		    (` + adminTaskReceiptDateSQL + ` >= ? AND ` + adminTaskReceiptDateSQL + ` < ?)
 		    OR (t.status='complete' AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?)
 		    OR (COALESCE(NULLIF(TRIM(t.work_date),''), '') >= ? AND COALESCE(NULLIF(TRIM(t.work_date),''), '') < ?)
 		  )`
-	rows, err := r.db.Query(q, from, toEx, from, toEx, from, toEx, from, toEx, from, toEx)
+	args := []interface{}{from, toEx, from, toEx}
+	args = append(args, adminArgs...)
+	args = append(args, from, toEx, from, toEx, from, toEx)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -794,7 +810,7 @@ func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEven
 	for rows.Next() {
 		var it model.WeeklyEventRow
 		var desc, status, wtype, waitParty, replyDue string
-		if err := rows.Scan(&it.WorkNo, &it.Customer, &it.Assignee, &it.Content, &desc, &status, &wtype, &it.OccurDate, &it.Minutes, &waitParty, &replyDue); err != nil {
+		if err := rows.Scan(&it.WorkNo, &it.Customer, &it.Assignee, &it.Content, &desc, &status, &wtype, &it.OccurDate, &it.Minutes, &waitParty, &replyDue, &it.ParentTaskID, &it.RecurrenceRole); err != nil {
 			return nil, err
 		}
 		it.Kind = model.WeeklyEventAdmin
@@ -828,7 +844,7 @@ func (r *StatsRepo) listWeeklyWaitingForEvents(from, toEx string) ([]model.Weekl
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
 		WHERE t.work_type IN ('admin','support')
 		  AND t.status = ?
-		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')
+		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + SQLRecurrenceWorkUnit + `
 		  AND (
 		    (TRIM(COALESCE(t.reply_due_date,'')) != '' AND t.reply_due_date >= ? AND t.reply_due_date < ?)
 		    OR (TRIM(COALESCE(t.next_check_date,'')) != '' AND t.next_check_date >= ? AND t.next_check_date < ?)

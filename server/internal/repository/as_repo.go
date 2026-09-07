@@ -67,7 +67,12 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 		            ELSE CAST(julianday(` + visitDateToday + `) - julianday(ar.visit_scheduled_date) AS INTEGER) END AS visit_days,
 		       CASE WHEN COALESCE(ar.visit_scheduled_date,'') = '' THEN 0
 		            WHEN ` + visitAlreadyDone("ar.") + ` THEN 1 ELSE 0 END AS visit_done,
-		       COALESCE(ar.is_reopen,0) AS is_reopen
+		       COALESCE(ar.is_reopen,0) AS is_reopen,
+		       COALESCE(ar.parent_as_id,'') AS parent_as_id,
+		       CASE WHEN TRIM(COALESCE(ar.receipt_group_id,'')) = '' THEN 0
+		            ELSE (SELECT COUNT(*) FROM as_receipts g WHERE g.receipt_group_id = ar.receipt_group_id)
+		       END AS group_size,
+		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
@@ -217,17 +222,19 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	for rows.Next() {
 		var item model.ASListItem
 		var receiptStr string
-		var visitDone, isReopen int
+		var visitDone, isReopen, groupSize int
 		if err := rows.Scan(
 			&item.ASID, &item.ASNumber, &receiptStr,
 			&item.OrgName, &item.ProductName,
 			&item.Symptom, &item.Urgency, &item.Status, &item.AssignedTo,
 			&item.DaysElapsed, &item.VisitScheduledDate, &item.VisitDaysOverdue, &visitDone, &isReopen,
+			&item.ParentASID, &groupSize, &item.UrgencyReason, &item.UrgencyReasonNote,
 		); err != nil {
 			return nil, 0, err
 		}
 		item.VisitDone = visitDone == 1
 		item.IsReopen = isReopen == 1
+		item.GroupSize = groupSize
 		item.ReceiptDatetime = parseTime(receiptStr)
 		items = append(items, item)
 	}
@@ -452,7 +459,10 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.customer_confirmer,''),
 		       COALESCE(ar.start_datetime,''), COALESCE(ar.complete_datetime,''),
 		       COALESCE(ar.confirm_datetime,''), COALESCE(ar.cancel_datetime,''),
-		       COALESCE(ar.parent_as_id,''), COALESCE(ar.reopen_reason,''),
+		       COALESCE(ar.parent_as_id,''), COALESCE(ar.reopen_reason,''), COALESCE(ar.followup_note,''),
+		       COALESCE(ar.receipt_group_id,''),
+		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,''),
+		       COALESCE(ar.cause_cat1,''), COALESCE(ar.cause_cat2,''), COALESCE(ar.cause_cat3,''),
 		       c.org_name, COALESCE(a.product_name,''), COALESCE(a.install_location,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -482,7 +492,9 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		&as.HoldReason, &as.HoldNextAction,
 		&as.FollowupAction, &as.CustomerConfirmer,
 		&startStr, &completeStr, &confirmStr, &cancelStr,
-		&as.ParentASID, &as.ReopenReason,
+		&as.ParentASID, &as.ReopenReason, &as.FollowupNote, &as.ReceiptGroupID,
+		&as.UrgencyReason, &as.UrgencyReasonNote,
+		&as.CauseCat1, &as.CauseCat2, &as.CauseCat3,
 		&as.OrgName, &as.ProductName, &as.InstallLocation,
 	)
 	if err == sql.ErrNoRows {
@@ -523,50 +535,86 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 	if receiptAt.IsZero() {
 		receiptAt = time.Now()
 	}
-	num, err := NextASNumber(r.db, receiptAt)
-	if err != nil {
-		return err
-	}
-	as.ASNumber = num
-	as.ASID = num // 신규: PK = 표시용 접수번호
 	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
 	now := time.Now().Format("2006-01-02 15:04:05")
 	receiptStr := receiptAt.Format("2006-01-02 15:04:05")
-	_, err = r.db.Exec(`
+	status := model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
+
+	var lastErr error
+	for i := 0; i < 8; i++ {
+		num, err := NextASNumber(r.db, receiptAt)
+		if err != nil {
+			return err
+		}
+		as.ASNumber = num
+		as.ASID = num // 신규: PK = 표시용 접수번호
+		_, err = r.db.Exec(`
 		INSERT INTO as_receipts (
 			as_id, as_number, receipt_datetime, customer_id, asset_id,
 			receipt_channel, requester, symptom, urgency, priority,
 			requester_type, requester_name, assigned_to, assigned_user_id, received_by,
 			visit_scheduled_date, schedule_confirmed, status,
-			is_recurrence, is_reopen, parent_as_id, reopen_reason,
-			project_id, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
-		as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
-		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
-		nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
-		model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed),
-		boolToInt(as.IsRecurrence), boolToInt(as.IsReopen),
-		nullStr(as.ParentASID), nullStr(as.ReopenReason),
-		nullStr(as.ProjectID), now, now,
-	)
-	if err != nil {
-		return err
+			is_recurrence, is_reopen, parent_as_id, reopen_reason, followup_note,
+			project_id, receipt_group_id, confirm_contact,
+			urgency_reason, urgency_reason_note, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
+			as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
+			as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
+			nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
+			status,
+			boolToInt(as.IsRecurrence), boolToInt(as.IsReopen),
+			nullStr(as.ParentASID), nullStr(as.ReopenReason), nullStr(as.FollowupNote),
+			nullStr(as.ProjectID), nullStr(as.ReceiptGroupID), nullStr(as.ConfirmContact),
+			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), now, now,
+		)
+		if err == nil {
+			// §25.2 AS 접수 등록은 이력 미기록(○)
+			reindexASSearch(r.db, as.ASID)
+			return nil
+		}
+		lastErr = err
+		if !isASNumberTaken(err) {
+			return err
+		}
 	}
-	// §25.2 AS 접수 등록은 이력 미기록(○)
-	return nil
+	return lastErr
 }
 
-// ListReopens 이 접수를 원본으로 다시 접수된 건들 (최신순)
+func isASNumberTaken(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	if !strings.Contains(s, "unique") {
+		return false
+	}
+	return strings.Contains(s, "as_number") || strings.Contains(s, "as_id") || strings.Contains(s, "as_receipts")
+}
+
+// ListReopens 이 접수를 원본으로 다시 접수된 건들 (최신순). 이관후속은 제외. §12.7 · §34.3.5
 func (r *ASRepo) ListReopens(asID string) ([]model.ASHistoryItem, error) {
+	return r.listByParent(asID, true)
+}
+
+// ListTransferFollowups 이 접수를 원본으로 이관후속된 건들. 재접수와 섞지 않는다. §34.3.5
+func (r *ASRepo) ListTransferFollowups(asID string) ([]model.ASHistoryItem, error) {
+	return r.listByParent(asID, false)
+}
+
+func (r *ASRepo) listByParent(asID string, reopenOnly bool) ([]model.ASHistoryItem, error) {
+	flag := 0
+	if reopenOnly {
+		flag = 1
+	}
 	rows, err := r.db.Query(`
 		SELECT ar.as_id, ar.as_number, date(ar.receipt_datetime),
 		       COALESCE(ar.visit_scheduled_date,''), COALESCE(date(ar.complete_datetime),''),
 		       COALESCE(ar.assigned_to,''), COALESCE(ar.symptom,''),
 		       COALESCE(ar.action_taken,''), ar.status
 		FROM as_receipts ar
-		WHERE ar.parent_as_id = ?
-		ORDER BY ar.receipt_datetime DESC`, asID)
+		WHERE ar.parent_as_id = ? AND COALESCE(ar.is_reopen,0) = ?
+		ORDER BY ar.receipt_datetime DESC`, asID, flag)
 	if err != nil {
 		return nil, err
 	}
@@ -624,6 +672,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 			customer_confirmer=?, is_recurrence=?, is_reopen=?, replace_review=?,
 			visit_scheduled_date=?, schedule_confirmed=?,
 			transfer_detail=?, confirm_target=?, confirm_contact=?,
+			cause_cat1=?, cause_cat2=?, cause_cat3=?,
 			updated_at=?`
 	args := []interface{}{
 		as.Status, as.AssignedTo, as.AssignedUserID, as.ProcessType, as.WorkPlace, as.CauseType,
@@ -632,6 +681,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 		as.CustomerConfirmer, boolToInt(as.IsRecurrence), boolToInt(as.IsReopen), boolToInt(as.ReplaceReview),
 		nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
 		as.TransferDetail, as.ConfirmTarget, as.ConfirmContact,
+		nullStr(as.CauseCat1), nullStr(as.CauseCat2), nullStr(as.CauseCat3),
 		nowStr,
 	}
 
@@ -664,6 +714,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	if as.Status == "completed" || as.Status == "closed" || as.Status == "cancelled" {
 		_ = NewASWorkRepo(r.db).CloseOpenByAS(as.ASID)
 	}
+	reindexASSearch(r.db, as.ASID)
 	return nil
 }
 
@@ -693,12 +744,14 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 			receipt_channel=?, requester=?, symptom=?, urgency=?, priority=?,
 			requester_type=?, requester_name=?, assigned_to=?, assigned_user_id=?,
 			received_by=?, visit_scheduled_date=?, schedule_confirmed=?,
+			confirm_contact=?, urgency_reason=?, urgency_reason_note=?,
 			project_id=?, updated_at=?`
 	args := []interface{}{
 		receiptStr, as.CustomerID, nullStr(as.AssetID),
 		as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID,
 		as.ReceivedBy, nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
+		as.ConfirmContact, as.UrgencyReason, as.UrgencyReasonNote,
 		nullStr(as.ProjectID), now,
 	}
 	if model.IsASWorkflowStatus(curStatus) {
@@ -707,10 +760,15 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	}
 	q += ` WHERE as_id=?`
 	args = append(args, as.ASID)
-	return touchUpdate(r.db, "as_receipts", "as_id", as.ASID, as.ASNumber, func() error {
+	err := touchUpdate(r.db, "as_receipts", "as_id", as.ASID, as.ASNumber, func() error {
 		_, err := r.db.Exec(q, args...)
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	reindexASSearch(r.db, as.ASID)
+	return nil
 }
 
 // UpdateVisitScheduledDate 예정업무일·일정확정 수정 (+워크플로 상태 재파생)
@@ -1092,10 +1150,17 @@ func (r *ASRepo) Delete(asID string) error {
 		if _, err := tx.Exec(`DELETE FROM as_work_items WHERE as_id=?`, asID); err != nil {
 			return err
 		}
+		if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE as_id=?`, asID); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(`DELETE FROM as_receipts WHERE as_id=?`, asID); err != nil {
 			return err
 		}
-		return tx.Commit()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		deleteASSearch(r.db, asID)
+		return nil
 	})
 }
 
@@ -1115,7 +1180,8 @@ func (r *ASRepo) ListByCustomer(customerID string) ([]model.ASListItem, error) {
 		SELECT ar.as_id, ar.as_number, ar.receipt_datetime,
 		       c.org_name, COALESCE(a.product_name,'') AS product_name,
 		       ar.symptom, ar.urgency, ar.status, COALESCE(ar.assigned_to,''),
-		       ` + daysElapsedSQL + ` AS days_elapsed
+		       ` + daysElapsedSQL + ` AS days_elapsed,
+		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
@@ -1137,7 +1203,7 @@ func (r *ASRepo) ListByCustomer(customerID string) ([]model.ASListItem, error) {
 			&item.ASID, &item.ASNumber, &receiptStr,
 			&item.OrgName, &item.ProductName,
 			&item.Symptom, &item.Urgency, &item.Status, &item.AssignedTo,
-			&item.DaysElapsed,
+			&item.DaysElapsed, &item.UrgencyReason, &item.UrgencyReasonNote,
 		); err != nil {
 			return nil, err
 		}

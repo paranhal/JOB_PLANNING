@@ -1,0 +1,69 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-4">
+  <a href="/orders/{{.Order.OrderID}}" class="text-sm text-gray-500 hover:underline">← 상세</a>
+  <h2 class="text-xl font-bold text-gray-800 font-mono">{{.Order.DisplayNo}} 수정</h2>
+  <p class="text-sm text-gray-500">수주번호·일자는 바꿀 수 없습니다. 수량·단가만 조정합니다.</p>
+
+  {{if .FormErr}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormErr}}</div>
+  {{end}}
+
+  <form method="post" action="/orders/{{.Order.OrderID}}" class="space-y-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">수신</label>
+        <input name="recipient_name" value="{{.Order.RecipientName}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">건명</label>
+        <input name="title" value="{{.Order.Title}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">고객 발주서 번호</label>
+        <input name="po_no" value="{{.Order.PONo}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">고객 발주서 일자</label>
+        <input type="date" name="po_date" value="{{.Order.PODate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">납품 요청일</label>
+        <input type="date" name="due_date" value="{{.Order.DueDate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs text-gray-500 mb-1">비고</label>
+        <input name="remarks" value="{{.Order.Remarks}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b"><tr>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">내용</th>
+          <th class="text-right px-3 py-2 text-xs text-gray-500">수량</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">단위</th>
+          <th class="text-right px-3 py-2 text-xs text-gray-500">단가</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500">견적</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .Order.Lines}}
+          <tr>
+            <td class="px-3 py-2">
+              {{.Name}}
+              <input type="hidden" name="line_id" value="{{.LineID}}">
+            </td>
+            <td class="px-3 py-2"><input name="line_qty" value="{{.Qty}}" class="w-24 border rounded-lg px-2 py-1 text-sm text-right"></td>
+            <td class="px-3 py-2"><input name="line_unit" value="{{.Unit}}" class="w-16 border rounded-lg px-2 py-1 text-sm"></td>
+            <td class="px-3 py-2"><input name="line_price" value="{{.UnitPrice}}" class="w-32 border rounded-lg px-2 py-1 text-sm text-right"></td>
+            <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{{.QuoteQty}} × {{won .QuoteUnitPrice}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">저장</button>
+  </form>
+</div>
+{{end}}

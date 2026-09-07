@@ -67,7 +67,11 @@ func (r *StatsRepo) LoadStatsWorkAnalysis(from, toEx string, f model.StatsMeetin
 	out.Mnt.Visit = mntS.Process
 	out.Mnt.Completed = mntS.Process
 	out.Admin.Receipt = adminS.Receipt
-	out.Admin.Completed = adminS.Process
+	if n, err := r.countAdminCompletedParents(from, toEx, f); err != nil {
+		return out, err
+	} else {
+		out.Admin.Completed = n
+	}
 
 	if out.AS.Visit, err = r.countASVisit(from, toEx, f); err != nil {
 		return out, err
@@ -103,7 +107,7 @@ func (r *StatsRepo) LoadStatsWorkAnalysis(from, toEx string, f model.StatsMeetin
 }
 
 func (r *StatsRepo) countASVisit(from, toEx string, f model.StatsMeetingFilter) (int, error) {
-	asSQL, asArgs := asFilterSQL(f)
+	asSQL, asArgs := r.filterAS(f)
 	args := append(append([]interface{}{}, asArgs...), from, toEx)
 	return r.countSQL(`
 		SELECT COUNT(*) FROM as_receipts ar
@@ -114,7 +118,7 @@ func (r *StatsRepo) countASVisit(from, toEx string, f model.StatsMeetingFilter) 
 }
 
 func (r *StatsRepo) countASCarry(receiptBefore, stillOpenAt string, f model.StatsMeetingFilter) (int, error) {
-	asSQL, asArgs := asFilterSQL(f)
+	asSQL, asArgs := r.filterAS(f)
 	args := append(append([]interface{}{}, asArgs...), receiptBefore, stillOpenAt)
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM as_receipts ar
@@ -139,7 +143,7 @@ func (r *StatsRepo) countASCarry(receiptBefore, stillOpenAt string, f model.Stat
 }
 
 func (r *StatsRepo) countAdminVisit(from, toEx string, f model.StatsMeetingFilter) (int, error) {
-	adminSQL, adminArgs := adminFilterSQL(f)
+	adminSQL, adminArgs := r.filterAdmin(f)
 	args := append([]interface{}{from, toEx}, adminArgs...)
 	return r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
@@ -153,7 +157,7 @@ func (r *StatsRepo) countAdminVisit(from, toEx string, f model.StatsMeetingFilte
 }
 
 func (r *StatsRepo) countMntCarry(visitBefore, notDoneBefore string, f model.StatsMeetingFilter) (int, error) {
-	mntSQL, mntArgs := mntFilterSQL(f)
+	mntSQL, mntArgs := r.filterMnt(f)
 	args := append([]interface{}{visitBefore, notDoneBefore}, mntArgs...)
 	return r.countSQL(`
 		SELECT COUNT(*) FROM maintenance_visits v
@@ -165,7 +169,7 @@ func (r *StatsRepo) countMntCarry(visitBefore, notDoneBefore string, f model.Sta
 }
 
 func (r *StatsRepo) countAdminCarry(dateBefore string, f model.StatsMeetingFilter) (int, error) {
-	adminSQL, adminArgs := adminFilterSQL(f)
+	adminSQL, adminArgs := r.filterAdmin(f)
 	dateExpr := `COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at))`
 	args := append([]interface{}{dateBefore}, adminArgs...)
 	return r.countSQL(`
@@ -252,7 +256,7 @@ func (r *StatsRepo) listStatsCases(from, toEx string, f model.StatsMeetingFilter
 	if limit < 1 {
 		limit = 1
 	}
-	asSQL, asArgs := asFilterSQL(f)
+	asSQL, asArgs := r.filterAS(f)
 	where := `
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -351,7 +355,7 @@ func (r *StatsRepo) listMntCases(from, toEx string, f model.StatsMeetingFilter, 
 	if limit < 1 {
 		limit = 1
 	}
-	mntSQL, mntArgs := mntFilterSQL(f)
+	mntSQL, mntArgs := r.filterMnt(f)
 	extra := ""
 	order := "v.visit_date DESC"
 	var extraArgs []interface{}
@@ -416,7 +420,7 @@ func (r *StatsRepo) listAdminCases(from, toEx string, f model.StatsMeetingFilter
 	if limit < 1 {
 		limit = 1
 	}
-	adminSQL, adminArgs := adminFilterSQL(f)
+	adminSQL, adminArgs := r.filterAdmin(f)
 	planExpr := `COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at))`
 	extra := ""
 	order := planExpr + " DESC"

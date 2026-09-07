@@ -68,11 +68,22 @@
       </select>
     </div>
     <div>
-      <label class="block text-gray-600 mb-1">고정 규칙 (선택)</label>
-      <select name="fixed_rule" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-        <option value="">없음 (자동 배정만)</option>
-        <option value="LAST_MONDAY_OF_MONTH" {{if .Config}}{{if eq .Config.FixedRule "LAST_MONDAY_OF_MONTH"}}selected{{end}}{{end}}>매월 마지막 월요일</option>
-      </select>
+      <label class="block text-gray-600 mb-1">고정일 (선택)</label>
+      <p class="text-xs text-gray-500 mb-2">월별 방문일. 여러 날을 고르면 가장 빠른 날에 한 번만 잡힙니다. 휴일이면 같은 달 근무일로 옮깁니다.</p>
+      <div class="grid grid-cols-7 gap-1.5">
+        {{range seq 31}}
+        <label class="inline-flex items-center justify-center gap-0.5 text-xs border border-gray-200 rounded px-1 py-1 {{if index $.FixedDaySet .}}bg-indigo-50 border-indigo-300{{end}}">
+          <input type="checkbox" name="fixed_day" value="{{.}}" class="rounded"
+                 {{if index $.FixedDaySet .}}checked{{end}}>
+          {{.}}
+        </label>
+        {{end}}
+      </div>
+      <label class="inline-flex items-center gap-2 mt-3">
+        <input type="checkbox" name="fixed_last_monday" value="1" class="rounded"
+               {{if .FixedLastMonday}}checked{{end}}>
+        매월 마지막 월요일
+      </label>
     </div>
 
     <div class="flex gap-2 pt-2">

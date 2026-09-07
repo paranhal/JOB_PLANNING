@@ -1,0 +1,103 @@
+{{define "items_quote_line"}}
+<div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3"
+     x-data="{
+       q:'', itemId:'', spec:'', unit:'EA', price:'', customer: {{printf "%q" .QuoteCustomer}}, quotedAt: {{printf "%q" .Today}},
+       hits:[], open:false, picked:'', msg:'',
+       async search(){
+         const q=this.q.trim();
+         if(!q){ this.hits=[]; this.open=false; return; }
+         try {
+           const r=await fetch('/items/suggest?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
+           this.hits=await r.json()||[];
+           this.open=this.hits.length>0;
+         } catch(e){ this.hits=[]; this.open=false; }
+       },
+       pick(it){
+         this.itemId=it.item_id; this.q=it.name; this.picked=it.name;
+         this.spec=it.spec||''; this.unit=it.unit||'EA';
+         this.price=(it.fill_price||it.last_price||it.list_price||'');
+         this.open=false;
+       },
+       onName(){
+         if(this.itemId && this.q!==this.picked){ this.itemId=''; this.picked=''; }
+         this.search();
+       },
+       async save(){
+         this.msg='';
+         const body=new URLSearchParams({
+           item_id:this.itemId, name:this.q, spec:this.spec, unit:this.unit,
+           unit_price:String(this.price||''), customer:this.customer, quoted_at:this.quotedAt
+         });
+         const post=async (extra)=>{
+           const b=new URLSearchParams(body);
+           if(extra){ for(const k in extra){ b.set(k, extra[k]); } }
+           const r=await fetch('/items/quote-line',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:b});
+           return r.json();
+         };
+         try {
+           let d=await post();
+           if(!d||d.ok===false){ this.msg=(d&&d.error)||'저장에 실패했습니다'; return; }
+           if(d.ask_register){
+             if(confirm(d.prompt||'품목으로 등록할까요?')){
+               d=await post({register:'1'});
+               if(!d||d.ok===false){ this.msg=(d&&d.error)||'등록에 실패했습니다'; return; }
+               this.itemId=(d.item&&d.item.item_id)||'';
+               this.msg='품목으로 등록하고 최근 단가를 남겼습니다.';
+               return;
+             }
+             this.msg='견적 라인을 저장했습니다. 품목 마스터에는 넣지 않았습니다.';
+             return;
+           }
+           this.itemId=(d.item&&d.item.item_id)||this.itemId;
+           this.msg='최근 단가를 갱신했습니다.';
+         } catch(e){ this.msg='저장에 실패했습니다'; }
+       }
+     }">
+  <h3 class="font-semibold text-gray-800">견적 라인</h3>
+  <p class="text-xs text-gray-500">목록에서 고르면 규격·단위·최근 단가가 채워집니다. 없는 품목은 그대로 쳐도 됩니다.</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="relative sm:col-span-2">
+      <label class="block text-xs text-gray-500 mb-1">품명</label>
+      <input type="text" x-model="q" @input.debounce.200ms="onName()" @focus="search()" autocomplete="off"
+             placeholder="품명을 입력하거나 고르세요"
+             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <ul x-show="open" x-cloak class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-sm max-h-48 overflow-auto text-sm">
+        <template x-for="it in hits" :key="it.item_id">
+          <li>
+            <button type="button" class="w-full text-left px-3 py-2 hover:bg-blue-50" @click="pick(it)">
+              <span class="font-medium" x-text="it.name"></span>
+              <span class="text-xs text-gray-500 ml-1" x-text="(it.spec||'')+' · '+(it.unit||'')"></span>
+            </button>
+          </li>
+        </template>
+      </ul>
+    </div>
+    <div class="sm:col-span-2">
+      <label class="block text-xs text-gray-500 mb-1">규격</label>
+      <textarea x-model="spec" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">단위</label>
+      <input type="text" x-model="unit" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">단가</label>
+      <input type="text" x-model="price" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">고객</label>
+      <input type="text" x-model="customer" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">견적일</label>
+      <input type="date" x-model="quotedAt" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+  </div>
+  {{if .CanWrite}}
+  <div class="flex items-center gap-3">
+    <button type="button" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm" @click="save()">견적 라인 저장</button>
+    <p class="text-xs text-gray-500" x-text="msg"></p>
+  </div>
+  {{end}}
+</div>
+{{end}}

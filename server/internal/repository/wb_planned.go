@@ -7,7 +7,7 @@ import (
 )
 
 // ListPlannedSourcesBetween 기간 안에 예정돼 있지만 아직 일일업무로 만들지 않은 AS·정기점검.
-// 업무처리현황「예정업무」에서 시간표에 없는 예정 건까지 함께 보여주기 위한 목록이다.
+// 업무처리현황「예정업무」에서 일정표에 없는 예정 건까지 함께 보여주기 위한 목록이다.
 func (r *WBRepo) ListPlannedSourcesBetween(from, to string) ([]model.WorkTask, error) {
 	out, err := r.plannedMaintenanceSources(from, to)
 	if err != nil {

@@ -48,6 +48,8 @@
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">보관 처리했습니다.</div>
   {{else if eq .FlashOK "activated"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">재개했습니다.</div>
+  {{else if eq .FlashOK "promoted"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">영업 사업에서 등록했습니다. 활동 로그는 영업 상세에 남아 있습니다.</div>
   {{end}}
   {{if eq .FlashErr "linked"}}
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">연결된 일일업무가 있어 삭제할 수 없습니다.</div>
@@ -63,6 +65,12 @@
         <div><dt class="text-gray-500">계약/청구</dt><dd class="text-gray-800">{{if .Project.ContractType}}{{.Project.ContractType}}{{else}}—{{end}} / {{if .Project.BillingType}}{{.Project.BillingType}}{{else}}—{{end}}</dd></div>
         <div><dt class="text-gray-500">기간</dt><dd class="text-gray-800">{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</dd></div>
         <div class="sm:col-span-2"><dt class="text-gray-500">비고</dt><dd class="text-gray-800 whitespace-pre-wrap">{{if .Project.Notes}}{{.Project.Notes}}{{else}}—{{end}}</dd></div>
+        {{if .Project.SalesProjectID}}
+        <div class="sm:col-span-2">
+          <dt class="text-gray-500">원본 영업 사업</dt>
+          <dd><a href="/sales/{{.Project.SalesProjectID}}" class="text-blue-700 hover:underline">{{.Project.SalesProjectID}}</a></dd>
+        </div>
+        {{end}}
       </dl>
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-5">

@@ -1,0 +1,586 @@
+package repository
+
+import (
+	"database/sql"
+	"html"
+	"html/template"
+	"log"
+	"sort"
+	"strings"
+	"unicode/utf8"
+
+	"customer-support/internal/model"
+)
+
+const asSearchCreateSQL = `CREATE VIRTUAL TABLE as_search USING fts5(
+  as_id UNINDEXED, symptom, action, cause_detail, conclusion,
+  tokenize='trigram'
+)`
+
+const asSearchSelectSQL = `
+	SELECT ar.as_id,
+	       COALESCE(ar.symptom,''),
+	       TRIM(COALESCE(ar.action_taken,'') || char(10) || COALESCE((
+	         SELECT GROUP_CONCAT(TRIM(COALESCE(p.work_content,'') || ' ' || COALESCE(p.notes,'')), char(10))
+	         FROM as_processes p WHERE p.as_id = ar.as_id
+	       ), '')),
+	       COALESCE(ar.cause_detail,''),
+	       COALESCE(ar.conclusion,'')
+	FROM as_receipts ar`
+
+// applyASSearch FTS5+trigram 색인을 만든다. 안 되면 LIKE 로 간다. §12.11.3
+func applyASSearch(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	var ddl string
+	_ = db.QueryRow(`SELECT sql FROM sqlite_master WHERE name='as_search'`).Scan(&ddl)
+	if ddl != "" && !strings.Contains(strings.ToLower(ddl), "trigram") {
+		if _, err := db.Exec(`DROP TABLE as_search`); err != nil {
+			log.Printf("as_search drop(구 토크나이저): %v", err)
+		}
+		ddl = ""
+	}
+	if ddl == "" {
+		if _, err := db.Exec(asSearchCreateSQL); err != nil {
+			log.Printf("as_search: FTS5+trigram 없음, LIKE 로 검색한다 (§12.11.3): %v", err)
+			return
+		}
+	}
+	if err := RebuildASSearch(db); err != nil {
+		log.Printf("as_search rebuild: %v", err)
+	}
+}
+
+func asSearchHasFTS(db *sql.DB) bool {
+	if db == nil {
+		return false
+	}
+	var n int
+	err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='as_search'`).Scan(&n)
+	return err == nil && n > 0
+}
+
+// RebuildASSearch 접수·조치 본문을 FTS 색인에 다시 넣는다.
+func RebuildASSearch(db *sql.DB) error {
+	if !asSearchHasFTS(db) {
+		return nil
+	}
+	if _, err := db.Exec(`DELETE FROM as_search`); err != nil {
+		return err
+	}
+	_, err := db.Exec(`INSERT INTO as_search(as_id, symptom, action, cause_detail, conclusion)` + asSearchSelectSQL)
+	return err
+}
+
+func reindexASSearch(db *sql.DB, asID string) {
+	asID = strings.TrimSpace(asID)
+	if db == nil || asID == "" || !asSearchHasFTS(db) {
+		return
+	}
+	_, _ = db.Exec(`DELETE FROM as_search WHERE as_id=?`, asID)
+	_, _ = db.Exec(`INSERT INTO as_search(as_id, symptom, action, cause_detail, conclusion)`+
+		asSearchSelectSQL+` WHERE ar.as_id=?`, asID)
+}
+
+func deleteASSearch(db *sql.DB, asID string) {
+	if db == nil || asID == "" || !asSearchHasFTS(db) {
+		return
+	}
+	_, _ = db.Exec(`DELETE FROM as_search WHERE as_id=?`, asID)
+}
+
+func (r *ASRepo) SearchUsesFTS() bool {
+	if r == nil {
+		return false
+	}
+	return asSearchHasFTS(r.db)
+}
+
+func searchPage(f model.ASSearchFilter) (page, size, offset int) {
+	page = f.Page
+	if page < 1 {
+		page = 1
+	}
+	size = f.PageSize
+	if size < 1 || size > 50 {
+		size = 20
+	}
+	return page, size, (page - 1) * size
+}
+
+func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFilter) (string, []interface{}) {
+	// §4.5 기준일·data_origin 필터를 넣지 않는다. 검색은 옛 자료를 찾는다.
+	if s := strings.TrimSpace(f.DateFrom); s != "" {
+		where += ` AND date(ar.receipt_datetime) >= date(?)`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.DateTo); s != "" {
+		where += ` AND date(ar.receipt_datetime) <= date(?)`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.CustomerID); s != "" {
+		where += ` AND ar.customer_id = ?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.Product); s != "" {
+		where += ` AND COALESCE(a.product_name,'') = ?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.CauseType); s != "" {
+		where += ` AND ar.cause_type = ?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.ProcessType); s != "" {
+		where += ` AND ar.process_type = ?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.Assigned); s != "" {
+		where += ` AND (ar.assigned_user_id = ? OR ar.assigned_to = ?)`
+		args = append(args, s, s)
+	}
+	if s := strings.TrimSpace(f.KeywordID); s != "" {
+		where += ` AND EXISTS (SELECT 1 FROM as_keyword_links l WHERE l.as_id=ar.as_id AND l.keyword_id=?)`
+		args = append(args, s)
+	}
+	return where, args
+}
+
+const asSearchHitSQL = `
+		SELECT ar.as_id, ar.as_number, c.org_name, date(ar.receipt_datetime),
+		       COALESCE(ar.symptom,''),
+		       COALESCE(ar.action_taken,''),
+		       COALESCE((
+		         SELECT p.work_content FROM as_processes p
+		          WHERE p.as_id = ar.as_id AND TRIM(COALESCE(p.work_content,'')) != ''
+		          ORDER BY p.process_datetime DESC LIMIT 1
+		       ), ''),
+		       COALESCE(ct.code_name, ar.cause_type, '')
+		FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		LEFT JOIN codes ct ON ct.code_group='cause_type' AND ct.code_value = ar.cause_type`
+
+// SearchAS 증상·조치·원인·결론·처리이력을 찾는다. 기준일 없음. §12.11.4
+func (r *ASRepo) SearchAS(f model.ASSearchFilter) ([]model.ASSearchHit, int, error) {
+	q := strings.TrimSpace(f.Query)
+	kw := strings.TrimSpace(f.KeywordID)
+	if q == "" && kw == "" {
+		return nil, 0, nil
+	}
+	_, size, offset := searchPage(f)
+	useFTS := q != "" && asSearchHasFTS(r.db) && utf8.RuneCountInString(q) >= 3
+	var items []model.ASSearchHit
+	var total int
+	var err error
+	if useFTS {
+		items, total, err = r.searchASFTS(f, q, size, offset)
+		if err != nil {
+			log.Printf("as_search FTS: %v — LIKE 로 재시도", err)
+			useFTS = false
+		}
+	}
+	if !useFTS {
+		items, total, err = r.searchASLike(f, q, size, offset)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range items {
+		decorateSearchHit(&items[i], q)
+	}
+	return items, total, nil
+}
+
+func decorateSearchHit(h *model.ASSearchHit, q string) {
+	actionSrc := strings.TrimSpace(h.Action)
+	if actionSrc == "" {
+		h.HasAction = false
+		h.Action = model.ASActionMissing
+		h.ActionHTML = template.HTML(html.EscapeString(model.ASActionMissing))
+	} else {
+		h.HasAction = true
+		h.ActionHTML = template.HTML(highlightExcerpt(actionSrc, q, 120))
+	}
+	h.SymptomHTML = template.HTML(highlightExcerpt(h.Symptom, q, 120))
+}
+
+func (r *ASRepo) searchASFTS(f model.ASSearchFilter, q string, size, offset int) ([]model.ASSearchHit, int, error) {
+	match := fts5Query(q)
+	like := "%" + q + "%"
+	where := ` WHERE (as_search MATCH ? OR ar.as_number LIKE ? OR c.org_name LIKE ?)`
+	args := []interface{}{match, like, like}
+	where, args = appendASSearchFilters(where, args, f)
+
+	countQ := `SELECT COUNT(*) FROM as_search
+		JOIN as_receipts ar ON ar.as_id = as_search.as_id
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id` + where
+	var total int
+	if err := r.db.QueryRow(countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	order := ` ORDER BY bm25(as_search), ar.receipt_datetime DESC`
+	if strings.TrimSpace(f.Sort) == "newest" {
+		order = ` ORDER BY ar.receipt_datetime DESC`
+	}
+	listQ := asSearchHitSQL + `
+		JOIN as_search ON as_search.as_id = ar.as_id` + where + order + ` LIMIT ? OFFSET ?`
+	listArgs := append(append([]interface{}{}, args...), size, offset)
+	rows, err := r.db.Query(listQ, listArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items, err := scanASSearchHits(rows)
+	return items, total, err
+}
+
+func (r *ASRepo) searchASLike(f model.ASSearchFilter, q string, size, offset int) ([]model.ASSearchHit, int, error) {
+	where := ` WHERE 1=1`
+	args := []interface{}{}
+	if q != "" {
+		like := "%" + q + "%"
+		where += ` AND (
+		ar.as_number LIKE ? OR c.org_name LIKE ? OR ar.symptom LIKE ? OR ar.action_taken LIKE ?
+		OR ar.cause_detail LIKE ? OR ar.conclusion LIKE ?
+		OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id = ar.as_id
+		           AND (p.work_content LIKE ? OR p.notes LIKE ?))
+	)`
+		args = append(args, like, like, like, like, like, like, like, like)
+	}
+	where, args = appendASSearchFilters(where, args, f)
+
+	countQ := `SELECT COUNT(*) FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id` + where
+	var total int
+	if err := r.db.QueryRow(countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	order := ` ORDER BY ar.receipt_datetime DESC`
+	listQ := asSearchHitSQL + where + order + ` LIMIT ? OFFSET ?`
+	listArgs := append(append([]interface{}{}, args...), size, offset)
+	rows, err := r.db.Query(listQ, listArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items, err := scanASSearchHits(rows)
+	return items, total, err
+}
+
+func scanASSearchHits(rows *sql.Rows) ([]model.ASSearchHit, error) {
+	var items []model.ASSearchHit
+	for rows.Next() {
+		var h model.ASSearchHit
+		var actionTaken, lastWork string
+		if err := rows.Scan(&h.ASID, &h.ASNumber, &h.OrgName, &h.ReceiptDate,
+			&h.Symptom, &actionTaken, &lastWork, &h.CauseName); err != nil {
+			return nil, err
+		}
+		h.Action = strings.TrimSpace(actionTaken)
+		if h.Action == "" {
+			h.Action = strings.TrimSpace(lastWork)
+		}
+		items = append(items, h)
+	}
+	return items, rows.Err()
+}
+
+func fts5Query(q string) string {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return `""`
+	}
+	parts := strings.Fields(q)
+	if len(parts) == 0 {
+		parts = []string{q}
+	}
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, `"`+strings.ReplaceAll(p, `"`, `""`)+`"`)
+	}
+	if len(out) == 0 {
+		return `""`
+	}
+	return strings.Join(out, " ")
+}
+
+// SimilarCases 접수 증상과 비슷한 과거 건. 같은 자산 > 기관 > 제품 > 전체. §12.11.5
+func (r *ASRepo) SimilarCases(f model.ASSimilarFilter) ([]model.ASSimilarCase, error) {
+	q := strings.TrimSpace(f.Query)
+	if utf8.RuneCountInString(q) < 2 {
+		return nil, nil
+	}
+	limit := f.Limit
+	if limit < 3 {
+		limit = 5
+	}
+	if limit > 5 {
+		limit = 5
+	}
+	key := similarQueryKey(q)
+	product := ""
+	if aid := strings.TrimSpace(f.AssetID); aid != "" {
+		_ = r.db.QueryRow(`SELECT COALESCE(product_name,'') FROM assets WHERE asset_id=?`, aid).Scan(&product)
+	}
+
+	var items []model.ASSimilarCase
+	var err error
+	if asSearchHasFTS(r.db) && utf8.RuneCountInString(key) >= 3 {
+		items, err = r.similarFTS(f, key, product, limit)
+		if err != nil {
+			log.Printf("as similar FTS: %v — LIKE", err)
+			items, err = r.similarLike(f, key, product, limit)
+		}
+	} else {
+		items, err = r.similarLike(f, key, product, limit)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func similarQueryKey(q string) string {
+	r := []rune(strings.TrimSpace(q))
+	if len(r) > 12 {
+		return string(r[:12])
+	}
+	return string(r)
+}
+
+func (r *ASRepo) similarFTS(f model.ASSimilarFilter, key, product string, limit int) ([]model.ASSimilarCase, error) {
+	match := fts5Query(key)
+	where := ` WHERE as_search MATCH ?`
+	args := []interface{}{match}
+	if x := strings.TrimSpace(f.ExcludeID); x != "" {
+		where += ` AND ar.as_id <> ?`
+		args = append(args, x)
+	}
+	q := similarSelectSQL() + `
+		JOIN as_search ON as_search.as_id = ar.as_id` + where + similarOrderSQL() + ` LIMIT ?`
+	args = append(similarWeightArgs(f, product), args...)
+	args = append(args, limit)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanSimilarCases(rows, f, product)
+}
+
+func (r *ASRepo) similarLike(f model.ASSimilarFilter, key, product string, limit int) ([]model.ASSimilarCase, error) {
+	like := "%" + key + "%"
+	where := ` WHERE (ar.symptom LIKE ? OR ar.action_taken LIKE ?
+		OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id AND p.work_content LIKE ?))`
+	args := []interface{}{like, like, like}
+	if x := strings.TrimSpace(f.ExcludeID); x != "" {
+		where += ` AND ar.as_id <> ?`
+		args = append(args, x)
+	}
+	q := similarSelectSQL() + where + similarOrderSQL() + ` LIMIT ?`
+	args = append(similarWeightArgs(f, product), args...)
+	args = append(args, limit)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanSimilarCases(rows, f, product)
+}
+
+func similarWeightArgs(f model.ASSimilarFilter, product string) []interface{} {
+	asset := strings.TrimSpace(f.AssetID)
+	cust := strings.TrimSpace(f.CustomerID)
+	prod := strings.TrimSpace(product)
+	return []interface{}{asset, asset, cust, cust, prod, prod}
+}
+
+func similarSelectSQL() string {
+	return `
+		SELECT ar.as_id, ar.as_number, c.org_name,
+		       date(ar.receipt_datetime),
+		       COALESCE(date(ar.complete_datetime), date(ar.receipt_datetime)),
+		       COALESCE(ar.symptom,''),
+		       COALESCE(ar.action_taken,''),
+		       COALESCE((
+		         SELECT p.work_content FROM as_processes p
+		          WHERE p.as_id = ar.as_id AND TRIM(COALESCE(p.work_content,'')) != ''
+		          ORDER BY p.process_datetime DESC LIMIT 1
+		       ), ''),
+		       ar.status, COALESCE(ar.asset_id,''), ar.customer_id, COALESCE(a.product_name,''),
+		       CASE
+		         WHEN ? != '' AND ar.asset_id = ? THEN 0
+		         WHEN ? != '' AND ar.customer_id = ? THEN 1
+		         WHEN ? != '' AND COALESCE(a.product_name,'') = ? THEN 2
+		         ELSE 3
+		       END AS w
+		FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id`
+}
+
+func similarOrderSQL() string {
+	return ` ORDER BY w ASC, ar.receipt_datetime DESC`
+}
+
+func scanSimilarCases(rows *sql.Rows, f model.ASSimilarFilter, product string) ([]model.ASSimilarCase, error) {
+	var items []model.ASSimilarCase
+	for rows.Next() {
+		var it model.ASSimilarCase
+		var symptom, actionTaken, lastWork, assetID, customerID, prodName string
+		var w int
+		if err := rows.Scan(&it.ASID, &it.ASNumber, &it.OrgName,
+			&it.ReceiptDate, &it.ProcessDate, &symptom, &actionTaken, &lastWork,
+			&it.Status, &assetID, &customerID, &prodName, &w); err != nil {
+			return nil, err
+		}
+		it.SymptomSummary = truncateRunes(compactSpace(symptom), 80)
+		action := strings.TrimSpace(actionTaken)
+		if action == "" {
+			action = strings.TrimSpace(lastWork)
+		}
+		if action == "" {
+			it.HasAction = false
+			it.ActionSummary = model.ASActionMissing
+		} else {
+			it.HasAction = true
+			it.ActionSummary = truncateRunes(compactSpace(action), 80)
+		}
+		it.SameAsset = strings.TrimSpace(f.AssetID) != "" && assetID == f.AssetID
+		it.SameCustomer = strings.TrimSpace(f.CustomerID) != "" && customerID == f.CustomerID
+		it.SameProduct = strings.TrimSpace(product) != "" && prodName == product
+		it.CanReopen = it.SameAsset && model.CanReopenAS(it.Status)
+		switch {
+		case it.SameAsset:
+			it.WeightLabel = "같은 자산"
+		case it.SameCustomer:
+			it.WeightLabel = "같은 기관"
+		case it.SameProduct:
+			it.WeightLabel = "같은 제품"
+		}
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+func (r *ASRepo) SearchProductNames() ([]string, error) {
+	rows, err := r.db.Query(`
+		SELECT DISTINCT a.product_name FROM assets a
+		JOIN as_receipts ar ON ar.asset_id = a.asset_id
+		WHERE TRIM(COALESCE(a.product_name,'')) != ''
+		ORDER BY a.product_name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func highlightExcerpt(text, query string, maxRunes int) string {
+	text = compactSpace(text)
+	if text == "" {
+		return ""
+	}
+	ex := excerptAround(text, query, maxRunes)
+	escaped := html.EscapeString(ex)
+	return highlightTokens(escaped, query)
+}
+
+func highlightTokens(escaped, query string) string {
+	toks := searchTokens(query)
+	sort.Slice(toks, func(i, j int) bool {
+		return utf8.RuneCountInString(toks[i]) > utf8.RuneCountInString(toks[j])
+	})
+	for _, t := range toks {
+		et := html.EscapeString(t)
+		if et == "" {
+			continue
+		}
+		escaped = strings.ReplaceAll(escaped, et, "<mark>"+et+"</mark>")
+	}
+	return escaped
+}
+
+func searchTokens(query string) []string {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" || seen[s] {
+			return
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	add(query)
+	for _, p := range strings.Fields(query) {
+		add(p)
+	}
+	return out
+}
+
+func excerptAround(text, query string, maxRunes int) string {
+	if maxRunes < 24 {
+		maxRunes = 80
+	}
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	idx := -1
+	for _, t := range searchTokens(query) {
+		idx = strings.Index(text, t)
+		if idx >= 0 {
+			break
+		}
+	}
+	if idx < 0 {
+		return string(runes[:maxRunes]) + "…"
+	}
+	start := utf8.RuneCountInString(text[:idx])
+	half := maxRunes / 2
+	from := start - half
+	if from < 0 {
+		from = 0
+	}
+	to := from + maxRunes
+	if to > len(runes) {
+		to = len(runes)
+		from = to - maxRunes
+		if from < 0 {
+			from = 0
+		}
+	}
+	s := string(runes[from:to])
+	if from > 0 {
+		s = "…" + s
+	}
+	if to < len(runes) {
+		s += "…"
+	}
+	return s
+}
+
+func compactSpace(s string) string {
+	return strings.Join(strings.Fields(strings.ReplaceAll(s, "\n", " ")), " ")
+}

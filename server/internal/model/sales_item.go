@@ -97,6 +97,15 @@ func MapAssetProductToSalesItem(productCategory string) (kind, category string) 
 	}
 }
 
+// LineCreatesInstalledAsset 물품(goods)만 설치자산을 만든다.
+// 소모품·용역·AS 작업은 만들지 않는다 (§36.10.1).
+func LineCreatesInstalledAsset(kind, category string) bool {
+	if NormalizeSalesItemKind(kind) != SalesItemKindGoods {
+		return false
+	}
+	return strings.TrimSpace(category) != SalesItemCatConsumable
+}
+
 func (p *SalesItem) KindLabel() string {
 	if p == nil {
 		return SalesItemKindLabel("")

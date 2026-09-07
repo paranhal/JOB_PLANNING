@@ -37,8 +37,8 @@ func (r *WorkStatusRepo) MonthSummary(year, month int, category string) (model.W
 			WHERE ar.status = 'partial_complete'
 			  AND date(w.created_at) >= date(?) AND date(w.created_at) < date(?)`, start, endEx).Scan(&workRec)
 		s.ReceiptCount += workRec
-		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status IN `+model.SQLStatusStatsCompleted+`
-			AND date(COALESCE(complete_datetime, updated_at)) >= date(?) AND date(COALESCE(complete_datetime, updated_at)) < date(?)`, start, endEx).Scan(&s.CompleteCount)
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar WHERE ar.status IN `+model.SQLStatusStatsCompleted+`
+			AND `+asCompleteDateSQL+` >= date(?) AND `+asCompleteDateSQL+` < date(?)`, start, endEx).Scan(&s.CompleteCount)
 		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE status='transfer'
 			AND date(updated_at) >= date(?) AND date(updated_at) < date(?)`, prevStart, prevEndEx).Scan(&s.PrevTransferCount)
 		return s, nil
@@ -68,10 +68,10 @@ func (r *WorkStatusRepo) listAS(start, endEx, phase string) ([]model.WorkCalItem
 		dateExpr = `ar.visit_scheduled_date`
 		extra = ` AND ar.visit_scheduled_date != '' AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?`
 	case "complete":
-		dateExpr = `date(COALESCE(ar.complete_datetime, ar.updated_at))`
+		dateExpr = asCompleteDateSQL
 		extra = ` AND ar.status IN ` + model.SQLStatusStatsCompleted + `
-			AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
-			AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)`
+			AND ` + asCompleteDateSQL + ` >= date(?)
+			AND ` + asCompleteDateSQL + ` < date(?)`
 	default: // receipt
 		dateExpr = `date(ar.receipt_datetime)`
 		extra = ` AND date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?)`

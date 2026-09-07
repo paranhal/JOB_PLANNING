@@ -83,6 +83,14 @@
           {{end}}
         {{end}}
       </select>
+      <select name="party_kind" onchange="this.form.submit()"
+              class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem] focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="" {{if eq .PartyKind ""}}selected{{end}}>전체 구분</option>
+        <option value="customer" {{if eq .PartyKind "customer"}}selected{{end}}>고객</option>
+        <option value="partner" {{if eq .PartyKind "partner"}}selected{{end}}>협력사</option>
+        <option value="own" {{if eq .PartyKind "own"}}selected{{end}}>자사</option>
+        <option value="vendor" {{if eq .PartyKind "vendor"}}selected{{end}}>제조사·공급사</option>
+      </select>
       <input type="text" name="search" value="{{.Search}}"
              placeholder="기관명, 공식명칭, 전화번호, 상위기관, 업종 검색..."
              class="flex-1 min-w-[12rem] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -90,7 +98,7 @@
               class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
         검색
       </button>
-      {{if or .Search .Category .Industry .Sort}}
+      {{if or .Search .Category .Industry .Sort .PartyKind}}
       <a href="/customers" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors text-center">
         초기화
       </a>
@@ -104,7 +112,7 @@
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=customer_id&dir={{.SortDirID}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=customer_id&dir={{.SortDirID}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">고객번호
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "customer_id") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -113,7 +121,7 @@
               </a>
             </th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=org_name&dir={{.SortDirOrg}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=org_name&dir={{.SortDirOrg}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">기관명
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "org_name") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -121,8 +129,9 @@
                 </span>
               </a>
             </th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">구분</th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
-              <a href="/customers?sort=parent&dir={{.SortDirParent}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=parent&dir={{.SortDirParent}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">상위기관
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "parent") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -131,7 +140,7 @@
               </a>
             </th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-              <a href="/customers?sort=industry&dir={{.SortDirInd}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=industry&dir={{.SortDirInd}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">업종
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "industry") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -140,7 +149,7 @@
               </a>
             </th>
             <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-              <a href="/customers?sort=phone&dir={{.SortDirPhone}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=phone&dir={{.SortDirPhone}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">대표전화
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "phone") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -149,7 +158,7 @@
               </a>
             </th>
             <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=assets&dir={{.SortDirAst}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=assets&dir={{.SortDirAst}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">자산
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "assets") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -158,7 +167,7 @@
               </a>
             </th>
             <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=as&dir={{.SortDirAS}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=as&dir={{.SortDirAS}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">AS
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "as") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -167,7 +176,7 @@
               </a>
             </th>
             <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <a href="/customers?sort=status&dir={{.SortDirStatus}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .ReviewOnly}}&review=1{{end}}"
+              <a href="/customers?sort=status&dir={{.SortDirStatus}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">상태
                 <span class="inline-flex flex-col leading-none text-base">
                   <span class="{{if and (eq .Sort "status") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
@@ -178,10 +187,18 @@
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-          {{if .Items}}
+          {{if .ParentGroups}}
+            {{range .ParentGroups}}
+            <tbody x-data="{open:true}" class="border-b border-slate-100">
+            <tr class="bg-slate-50 cursor-pointer hover:bg-slate-100" @click="open=!open">
+              <td colspan="10" class="px-4 py-2 text-xs font-semibold text-slate-700">
+                <span class="inline-block w-4 text-slate-400" x-text="open ? '▼' : '▶'"></span>
+                {{.Label}}
+                <span class="font-normal text-slate-400 ml-1">{{len .Items}}건</span>
+              </td>
+            </tr>
             {{range .Items}}
-            <tr class="hover:bg-gray-50 transition-colors">
+            <tr class="hover:bg-gray-50 transition-colors" x-show="open">
               <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.CustomerID}}</td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-1.5 flex-wrap">
@@ -199,6 +216,9 @@
                 {{if and .NeedsReview $.ReviewOnly}}
                 <p class="text-xs text-amber-700 mt-1">{{.ReviewReason}}</p>
                 {{end}}
+              </td>
+              <td class="px-4 py-3 text-xs">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">{{partyKindLabel .PartyKind}}</span>
               </td>
               <td class="px-4 py-3 text-gray-600 hidden md:table-cell text-xs">
                 {{if .ParentOrgName}}
@@ -248,6 +268,7 @@
                     <input type="hidden" name="search" value="{{$.Search}}">
                     <input type="hidden" name="category" value="{{$.Category}}">
                     <input type="hidden" name="industry" value="{{$.Industry}}">
+                    <input type="hidden" name="party_kind" value="{{$.PartyKind}}">
                     <input type="hidden" name="sort" value="{{$.Sort}}">
                     <input type="hidden" name="dir" value="{{$.Dir}}">
                     <input type="hidden" name="page" value="{{$.Page}}">
@@ -259,18 +280,21 @@
               </td>
             </tr>
             {{end}}
+            </tbody>
+            {{end}}
           {{else}}
+          <tbody>
             <tr>
-              <td colspan="9" class="px-4 py-12 text-center text-gray-400">
-                {{if or .Search .Category .Industry}}
+              <td colspan="10" class="px-4 py-12 text-center text-gray-400">
+                {{if or .Search .Category .Industry .PartyKind}}
                   조건에 맞는 고객이 없습니다.
                 {{else}}
                   등록된 고객이 없습니다.{{if $.CanWrite}} <a href="/customers/new" class="text-blue-600 hover:underline">첫 번째 고객을 등록하세요.</a>{{end}}
                 {{end}}
               </td>
             </tr>
+          </tbody>
           {{end}}
-        </tbody>
       </table>
     </div>
 
@@ -281,11 +305,11 @@
       </p>
       <div class="flex gap-1">
         {{if gt .Page 1}}
-        <a href="/customers?page={{sub .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}{{if .ReviewOnly}}&review=1{{end}}"
+        <a href="/customers?page={{sub .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}{{if .PartyKind}}&party_kind={{.PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
            class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">이전</a>
         {{end}}
         {{if lt .Page .TotalPages}}
-        <a href="/customers?page={{add .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}{{if .ReviewOnly}}&review=1{{end}}"
+        <a href="/customers?page={{add .Page 1}}&search={{.Search}}&category={{.Category}}&industry={{.Industry}}&sort={{.Sort}}&dir={{.Dir}}{{if .PartyKind}}&party_kind={{.PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
            class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">다음</a>
         {{end}}
       </div>

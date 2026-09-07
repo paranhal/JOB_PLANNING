@@ -177,7 +177,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"Raw":             p,
 		"WorkProjectID":   workProjectID,
 		"CanPromote":      model.CanPromoteSales(p) && workProjectID == "",
-		"ShowProgress":    p.Stage == model.SalesStageProposal,
+		"ShowProgress":    !p.IsSupply() && p.Stage == model.SalesStageProposal,
 		"Progress":        model.SalesProposalProgressFrom(acts),
 		"Stages":          stages,
 		"History":         hist,

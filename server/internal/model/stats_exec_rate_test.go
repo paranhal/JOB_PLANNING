@@ -40,6 +40,28 @@ func TestExecutionRatePctPlanFidelity(t *testing.T) {
 	}
 }
 
+func TestProgressScopeExcludesAdminFromExecutionRate(t *testing.T) {
+	b := StatsBucketCounts{
+		AS:            StatsWorkSlice{Planned: 10, OnPlan: 9},
+		Admin:         StatsWorkSlice{Planned: 33, OnPlan: 0},
+		ProgressScope: "as,maintenance",
+	}
+	if b.PlannedTotal() != 43 {
+		t.Fatalf("건수 합계=%d want 43", b.PlannedTotal())
+	}
+	if b.ExecPlanned() != 10 {
+		t.Fatalf("실행률 분모=%d want 10", b.ExecPlanned())
+	}
+	if got := b.ExecutionRatePct(); got != 90 {
+		t.Fatalf("실행률=%.1f want 90", got)
+	}
+	all := b
+	all.ProgressScope = ""
+	if all.ExecPlanned() != 43 {
+		t.Fatalf("scope 비면 전 유형 분모=%d", all.ExecPlanned())
+	}
+}
+
 func TestStatsReliabilityGrades(t *testing.T) {
 	zero := StatsReliability(0, true, 0)
 	if zero.ShowValue || zero.Grade != StatsGradeNA || zero.GradeMark != "⚪" {

@@ -8,7 +8,7 @@ import (
 )
 
 // backfillASPlannedDailyTasks 방문예정일이 있는 미완료 AS에 일일업무 행이 없으면 1회 생성한다.
-// (예: R2608-036처럼 예정일만 넣고 업무 미생성인 건 → 일일 업무 등록 시간표에 자동 배치)
+// (예: R2608-036처럼 예정일만 넣고 업무 미생성인 건 → 일일 업무 등록 일정표에 자동 배치)
 func backfillASPlannedDailyTasks(db *sql.DB) {
 	if metaDone(db, asPlannedDailyTaskMetaKey) {
 		return

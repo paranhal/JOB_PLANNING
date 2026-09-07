@@ -1,0 +1,27 @@
+{{define "as_transfer_link"}}
+{{if and .ParentAS (not .AS.IsReopen)}}
+<div class="rounded-xl border border-violet-300 bg-violet-50/80 p-4 sm:p-5 space-y-2 shadow-sm">
+  <p class="text-xs font-semibold tracking-wide text-violet-800">이관 원 건 — <a href="/as/{{.ParentAS.ASID}}" class="font-mono text-base font-bold text-violet-950 underline hover:text-violet-800">{{.ParentAS.ASNumber}}</a></p>
+  {{if .AS.FollowupNote}}
+  <p class="text-sm text-violet-900 whitespace-pre-line">추가 접수 내용: {{.AS.FollowupNote}}</p>
+  {{end}}
+  <p class="text-xs text-violet-700">복제된 기관·자산·요청자·접수채널·증상은 수정할 수 없습니다.</p>
+  <a href="/as/{{.ParentAS.ASID}}" class="inline-block px-3 py-1.5 border border-violet-400 rounded-lg text-xs font-medium text-violet-900 hover:bg-violet-100">원 접수 보기</a>
+</div>
+{{else if .AS.IsTransferFollowup}}
+<div class="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+  <span class="font-medium">이관후속 건</span> — 원 접수 연결 ID: {{.AS.ParentASID}}
+  {{if .AS.FollowupNote}}<div class="mt-1">추가 접수 내용: {{.AS.FollowupNote}}</div>{{end}}
+  <p class="mt-1 text-xs text-violet-700">이관 원 건을 찾지 못했습니다. 연결 정보를 확인해 주세요.</p>
+</div>
+{{end}}
+{{if .TransferFollowups}}
+<div class="rounded-xl border border-violet-200 bg-white px-4 py-3 text-sm space-y-1">
+  {{range .TransferFollowups}}
+  <p class="font-medium text-violet-900">이관 후속 건 — <a href="/as/{{.ASID}}" class="font-mono text-violet-800 underline hover:text-violet-600">{{.ASNumber}}</a>
+    <span class="text-xs font-normal text-slate-500">{{.ReceiptDate}} 접수</span>
+  </p>
+  {{end}}
+</div>
+{{end}}
+{{end}}

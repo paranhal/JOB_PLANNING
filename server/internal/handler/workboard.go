@@ -25,6 +25,8 @@ type WorkboardHandler struct {
 	settingsRepo *repository.SettingsRepo
 	unlockRepo   *repository.ASUnlockRepo
 	attach       *AttachmentHandler
+	salesRepo    *repository.SalesRepo
+	workBoard    *repository.WorkBoardRepo
 }
 
 func NewWorkboardHandler(
@@ -79,7 +81,7 @@ const (
 	dateLayout       = "2006-01-02"
 )
 
-// RegisterColumn 시간표의 세로 열. 일간은 1개, 주간은 요일 7개, 월간은 주차별로 만든다.
+// RegisterColumn 일정표의 세로 열. 일간은 1개, 주간은 요일 7개, 월간은 주차별로 만든다.
 type RegisterColumn struct {
 	Label       string // 월 / 7/1주
 	Sub         string // 8/4
@@ -100,7 +102,7 @@ type RegisterColumn struct {
 	Leaves      LeaveBadgeGroup
 }
 
-// RegisterCell 시간표 한 칸 (열 × 시각)
+// RegisterCell 일정표 한 칸 (열 × 시각)
 type RegisterCell struct {
 	Column  int
 	Date    string
@@ -109,14 +111,14 @@ type RegisterCell struct {
 	Cards   []model.WBCard
 }
 
-// RegisterRow 시간표 한 줄 (15분)
+// RegisterRow 일정표 한 줄 (15분)
 type RegisterRow struct {
 	Time   string
 	IsHour bool
 	Cells  []RegisterCell
 }
 
-// Register 업무 등록 화면 — 왼쪽 15분 단위 시간표(07:00~20:00)에
+// Register 업무 등록 화면 — 왼쪽 15분 단위 일정표(07:00~20:00)에
 // 오른쪽 AS·정기점검·행정관련 업무 카드를 끌어다 배치한다.
 func (h *WorkboardHandler) Register(c echo.Context) error {
 	view := strings.TrimSpace(c.QueryParam("view"))
@@ -154,11 +156,32 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	// 시각 미기재 확정 건도 시간표에 보이도록 표시용 시각만 채운다.
+	// 시각 미기재 확정 건도 일정표에 보이도록 표시용 시각만 채운다.
 	placed = ensureTimelineDisplayTimes(placed)
 
+	role := currentRole(c)
+	roleUnresolved := !model.IsKnownRole(role)
+	mineParam := c.QueryParam("mine")
 	assigneeFilter := normalizeAssigneeFilter(c.QueryParam("assignee"))
 	projectFilter := strings.TrimSpace(c.QueryParam("project"))
+	scopeAll := true
+	showScopeToggle := false
+	if roleUnresolved {
+		scopeAll = true
+	} else if role == model.RoleAdmin || role == model.RoleOffice {
+		scopeAll = assigneeFilter == ""
+	} else if role == model.RoleTech || role == model.RoleSales || role == model.RoleObserver {
+		showScopeToggle = true
+		if mineParam == "0" {
+			scopeAll = true
+		} else {
+			scopeAll = false
+			if assigneeFilter == "" {
+				assigneeFilter = currentUserDisplayName(c)
+			}
+		}
+	}
+
 	memberMap := map[string][]model.WorkTaskMember{}
 	if ids := taskIDsOf(placed); len(ids) > 0 {
 		if m, err := h.repo.ListMembersByTaskIDs(ids); err == nil {
@@ -262,8 +285,34 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		decorateMonthWeeks(monthWeeks, today, holi, leaveMap)
 	}
 
-	filterQ := registerFilterQuery(assigneeFilter, projectFilter)
-	regBase := registerURLWithProject(view, dateStr, assigneeFilter, projectFilter)
+	filterAssignee := assigneeFilter
+	mineForQuery := ""
+	if showScopeToggle {
+		if mineParam == "0" {
+			mineForQuery = "0"
+			filterAssignee = ""
+		} else {
+			filterAssignee = ""
+		}
+	}
+	display := strings.TrimSpace(c.QueryParam("display"))
+	if view != regViewDay || display != "kanban" {
+		display = "timetable"
+	}
+
+	var kanbanCols []RegisterKanbanColumn
+	kanbanTotal := 0
+	if display == "kanban" {
+		cols, total, kErr := h.loadRegisterKanban(dateStr, assigneeFilter)
+		if kErr != nil {
+			return kErr
+		}
+		kanbanCols, kanbanTotal = cols, total
+	}
+
+	filterQ := registerFilterQueryDisplay(filterAssignee, projectFilter, mineForQuery, "")
+	displayQ := registerFilterQueryDisplay(filterAssignee, projectFilter, mineForQuery, display)
+	regBase := registerURLDisplay(view, dateStr, filterAssignee, projectFilter, mineForQuery, display)
 
 	writeBase := canWriteWorkboard(c)
 	dayPast := registerPastDayLockEnabled && view == regViewDay && dateStr < today
@@ -277,9 +326,16 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "workboard/register.html", map[string]interface{}{
 		"Title":           "일일 업무 등록",
-		"Active":          "work_register",
+		"Active":          NavWorkRegister,
 		"View":            view,
 		"ViewLabel":       registerViewLabel(view),
+		"Display":         display,
+		"DisplayQ":        displayQ,
+		"KanbanColumns":   kanbanCols,
+		"KanbanTotal":     kanbanTotal,
+		"KanbanDrag":      canWrite,
+		"KanbanDrop":      "el",
+		"KanbanHint":      "다섯 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
 		"Date":            dateStr,
 		"PeriodLabel":     period.Label,
 		"PrevDate":        period.Prev,
@@ -305,6 +361,14 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"ProjectFilter":   projectFilter,
 		"AssigneeQ":       filterQ, // 하위호환: 템플릿 링크용 (&assignee=&project=)
 		"FilterQ":         filterQ,
+		"Role":            role,
+		"RoleUnresolved":  roleUnresolved,
+		"ShowScopeToggle": showScopeToggle,
+		"ScopeAll":        scopeAll,
+		"MineParam":       mineParam,
+		"TeamHref":        registerURLDisplay(view, dateStr, "", projectFilter, "0", display),
+		"MineHref":        registerURLDisplay(view, dateStr, "", projectFilter, "", display),
+		"ScopeNote":       registerScopeNote(role, scopeAll, assigneeFilter, roleUnresolved),
 		"ExtraAssignees":  extraAssigneesForDay(view, assigneeFilter, assignees, dayCols),
 		"DayLeaveNames":   dayLeaveNames,
 		"AssigneeColMin":  registerAssigneeColMinPx,
@@ -336,12 +400,26 @@ func assigneeQuerySuffix(assignee string) string {
 }
 
 func registerFilterQuery(assignee, project string) string {
+	return registerFilterQueryMine(assignee, project, "")
+}
+
+func registerFilterQueryMine(assignee, project, mine string) string {
+	return registerFilterQueryDisplay(assignee, project, mine, "")
+}
+
+func registerFilterQueryDisplay(assignee, project, mine, display string) string {
 	v := url.Values{}
 	if assignee != "" {
 		v.Set("assignee", assignee)
 	}
 	if project != "" {
 		v.Set("project", project)
+	}
+	if mine != "" {
+		v.Set("mine", mine)
+	}
+	if display == "kanban" {
+		v.Set("display", "kanban")
 	}
 	enc := v.Encode()
 	if enc == "" {
@@ -355,7 +433,31 @@ func registerURL(view, date, assignee string) string {
 }
 
 func registerURLWithProject(view, date, assignee, project string) string {
-	return fmt.Sprintf("/workboard/register?view=%s&date=%s%s", view, date, registerFilterQuery(assignee, project))
+	return registerURLFull(view, date, assignee, project, "")
+}
+
+func registerURLFull(view, date, assignee, project, mine string) string {
+	return registerURLDisplay(view, date, assignee, project, mine, "")
+}
+
+func registerURLDisplay(view, date, assignee, project, mine, display string) string {
+	if view != regViewDay {
+		display = ""
+	}
+	return fmt.Sprintf("/workboard/register?view=%s&date=%s%s", view, date, registerFilterQueryDisplay(assignee, project, mine, display))
+}
+
+func registerScopeNote(role string, scopeAll bool, assignee string, unresolved bool) string {
+	if unresolved {
+		return "역할을 확인하지 못해 팀 전체로 표시합니다"
+	}
+	if assignee != "" && (role == model.RoleAdmin || role == model.RoleOffice) {
+		return assignee + " 배정 업무"
+	}
+	if (role == model.RoleTech || role == model.RoleSales || role == model.RoleObserver) && !scopeAll {
+		return "내 배정 업무"
+	}
+	return "팀 전체"
 }
 
 func filterTasksByAssignee(tasks []model.WorkTask, assignee string) []model.WorkTask {
@@ -570,6 +672,12 @@ func (h *WorkboardHandler) taskCard(t model.WorkTask) model.WBCard {
 		if card.ProductType == "" {
 			card.ProductType = productFromMaintDesc(t.Description)
 		}
+	case model.WBSourceSalesActivity:
+		if sid := h.repo.SalesIDByActivity(t.SourceID); sid != "" {
+			card.SourceHref = "/sales/" + sid
+			card.ActionHref = "/sales/" + sid
+			card.SourceNumber = t.SourceID
+		}
 	}
 	return card
 }
@@ -583,7 +691,7 @@ func (h *WorkboardHandler) syncMaintenanceTasks() {
 	h.repo.SyncMaintenanceBoard()
 }
 
-// syncVisitDateFromTask 시간표에서 정기점검 카드를 다른 날짜로 옮기면 점검 일정도 함께 옮긴다.
+// syncVisitDateFromTask 일정표에서 정기점검 카드를 다른 날짜로 옮기면 점검 일정도 함께 옮긴다.
 func (h *WorkboardHandler) syncVisitDateFromTask(sourceType, sourceID, workDate string) {
 	if h == nil || h.mntRepo == nil || sourceType != model.WBSourceMaintenance {
 		return
@@ -591,7 +699,7 @@ func (h *WorkboardHandler) syncVisitDateFromTask(sourceType, sourceID, workDate 
 	_ = h.mntRepo.SetVisitDate(sourceID, workDate)
 }
 
-// registerPalette 아직 시간표에 올리지 않은 AS·정기점검·행정관련 업무 카드
+// registerPalette 아직 일정표에 올리지 않은 AS·정기점검·행정관련 업무 카드
 func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err error) {
 	tasks, err := h.repo.ListTasks()
 	if err != nil {
@@ -703,7 +811,7 @@ func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err
 	return as, mnt, admin, nil
 }
 
-// Schedule 카드를 시간표의 날짜·시각에 배치한다. AS·정기점검 카드는 업무로 복사해 원본과 연결한다.
+// Schedule 카드를 일정표의 날짜·시각에 배치한다. AS·정기점검 카드는 업무로 복사해 원본과 연결한다.
 func (h *WorkboardHandler) Schedule(c echo.Context) error {
 	if !canWriteWorkboard(c) {
 		return echo.ErrForbidden
@@ -929,7 +1037,7 @@ func (h *WorkboardHandler) autoPlacePlanned(from, to string) (int, error) {
 	return n, nil
 }
 
-// Unschedule 시간표에서 카드를 내린다.
+// Unschedule 일정표에서 카드를 내린다.
 func (h *WorkboardHandler) Unschedule(c echo.Context) error {
 	if !canWriteWorkboard(c) {
 		return echo.ErrForbidden
@@ -1007,7 +1115,7 @@ func todayWaitingFromPalette(today string, as, mnt, admin []model.WBCard, seenSo
 	return out
 }
 
-// waitingActionChecks 다음 확인일이 오늘인 회신 대기 행동 → 칸반 「할 일」. 시간표에는 올리지 않는다(§13.8).
+// waitingActionChecks 다음 확인일이 오늘인 회신 대기 행동 → 칸반 「할 일」. 일정표에는 올리지 않는다(§13.8).
 func waitingActionChecks(today string, repo *repository.WBRepo, seenTask map[string]bool) []model.WorkTask {
 	if repo == nil {
 		return nil
@@ -1166,7 +1274,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	}
 	return map[string]interface{}{
 		"Title":         "일일 업무 현황",
-		"Active":        "work_plan",
+		"Active":        NavWorkPlan,
 		"View":          view,
 		"Summary":       summary,
 		"Tasks":         board,
@@ -1253,15 +1361,12 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		if dueDate != "" {
 			t.DueDate = dueDate
 		}
-		if t.DueDate == "" {
+		if t.DueDate == "" && !dueUndeterminedFromForm(c) {
 			t.DueDate = workDate
 		}
-		if st := strings.TrimSpace(c.FormValue("status")); st != "" {
-			t.Status = st
-		}
-		if pr := strings.TrimSpace(c.FormValue("priority")); pr != "" {
-			t.Priority = pr
-		}
+		st, pr := createTaskStatusPriority(c)
+		t.Status = st
+		t.Priority = pr
 		if msg := h.firstParticipantOverlap(workDate, start, end, "", occupancyNames(t.Assignee, parseSupportMembers(c, t.Assignee))); msg != "" {
 			return overlapRedirect(c, msg)
 		}
@@ -1283,27 +1388,35 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if workType != model.WBWorkSupport {
 		workType = model.WBWorkAdmin
 	}
-	if dueDate == "" {
+	if dueDate == "" && !dueUndeterminedFromForm(c) {
 		dueDate = workDate
 	}
+	if dueUndeterminedFromForm(c) {
+		if model.FormatNoDateReason(c.FormValue("no_date_reason"), c.FormValue("no_date_detail")) == "" {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=task"))
+		}
+		dueDate = ""
+	}
+	st, pr := createTaskStatusPriority(c)
 	t := &model.WorkTask{
-		WorkType:    workType,
-		ProjectID:   strings.TrimSpace(c.FormValue("project_id")),
-		Title:       strings.TrimSpace(c.FormValue("title")),
-		Description: strings.TrimSpace(c.FormValue("description")),
-		DueDate:     dueDate,
-		WorkDate:    workDate,
-		StartTime:   start,
-		EndTime:     end,
-		DurationMin: dur,
-		Status:      strings.TrimSpace(c.FormValue("status")),
-		Priority:    strings.TrimSpace(c.FormValue("priority")),
-		Assignee:    strings.TrimSpace(c.FormValue("assignee")),
-		Tags:        strings.TrimSpace(c.FormValue("tags")),
-		Progress:    progress,
+		WorkType:     workType,
+		ProjectID:    strings.TrimSpace(c.FormValue("project_id")),
+		Title:        strings.TrimSpace(c.FormValue("title")),
+		Description:  strings.TrimSpace(c.FormValue("description")),
+		DueDate:      dueDate,
+		WorkDate:     workDate,
+		StartTime:    start,
+		EndTime:      end,
+		DurationMin:  dur,
+		Status:       st,
+		Priority:     pr,
+		Assignee:     strings.TrimSpace(c.FormValue("assignee")),
+		Tags:         strings.TrimSpace(c.FormValue("tags")),
+		Progress:     progress,
+		ParentTaskID: strings.TrimSpace(c.FormValue("parent_task_id")),
 	}
 	applyCustomerForm(t, c)
-	if t.Title == "" || t.DueDate == "" {
+	if t.Title == "" || (t.DueDate == "" && !dueUndeterminedFromForm(c)) {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=task"))
 	}
 	if t.WorkType == model.WBWorkSupport && t.ProjectID == "" {
@@ -1317,6 +1430,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return overlapRedirect(c, msg)
 	}
 	if err := h.repo.CreateTask(t); err != nil {
+		if q := subtaskErrQuery(err); q != "" {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+q))
+		}
 		return err
 	}
 	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
@@ -1334,7 +1450,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 }
 
-// parseRequiredSchedule 업무 배정일·시작·종료(필수). 예정일(due)은 비어 있을 수 있다(원본 예정일 사용).
+// parseRequiredSchedule 업무 시작일·시작·종료(필수). 업무 종료일(due)은 비어 있을 수 있다(원본 일정·미정).
 func parseRequiredSchedule(c echo.Context) (workDate, dueDate, start, end string, dur int, ok bool) {
 	workDate = strings.TrimSpace(c.FormValue("work_date"))
 	dueDate = strings.TrimSpace(c.FormValue("due_date"))
@@ -1381,12 +1497,17 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
 	}
+	registerScope := strings.TrimSpace(c.FormValue("scope")) == "register"
 	workDate, dueDate, start, end, dur, schedOK := parseRequiredSchedule(c)
 	adminGTD := model.IsAdminGTDTask(*existing)
+	if !registerScope {
+		workDate, dueDate, start, end, dur = existing.WorkDate, existing.DueDate, existing.StartTime, existing.EndTime, existing.DurationMin
+		schedOK = true
+	}
 	if !schedOK {
 		if !adminGTD {
 			return c.Redirect(http.StatusSeeOther,
-				"/workboard/tasks/"+id+"?err=time&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+				taskPagePath(id, registerScope)+"?err=time&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 		}
 		dueDate = strings.TrimSpace(c.FormValue("due_date"))
 		workDate = strings.TrimSpace(c.FormValue("work_date"))
@@ -1411,38 +1532,56 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	}
 	workType := existing.WorkType
 	projectID := existing.ProjectID
-	title := strings.TrimSpace(c.FormValue("title"))
-	if title == "" {
-		title = existing.Title
+	title := existing.Title
+	if registerScope {
+		if t := strings.TrimSpace(c.FormValue("title")); t != "" {
+			title = t
+		}
+		// AS는 구분·원본 고정. 정기점검은 사업명 변경 가능. 행정/지원은 구분·사업명 변경
+		if existing.SourceType == model.WBSourceMaintenance {
+			projectID = strings.TrimSpace(c.FormValue("project_id"))
+		} else if existing.SourceType == "" {
+			workType = strings.TrimSpace(c.FormValue("work_type"))
+			if workType != model.WBWorkSupport {
+				workType = model.WBWorkAdmin
+			}
+			projectID = strings.TrimSpace(c.FormValue("project_id"))
+			if workType == model.WBWorkSupport && projectID == "" {
+				return c.Redirect(http.StatusSeeOther,
+					"/workboard/tasks/"+id+"/edit?err=project_required&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+			}
+		}
 	}
-	// AS는 구분·원본 고정. 정기점검은 사업명 변경 가능. 행정/지원은 구분·사업명 변경
-	if existing.SourceType == model.WBSourceMaintenance {
-		projectID = strings.TrimSpace(c.FormValue("project_id"))
-	} else if existing.SourceType == "" {
-		workType = strings.TrimSpace(c.FormValue("work_type"))
-		if workType != model.WBWorkSupport {
-			workType = model.WBWorkAdmin
-		}
-		projectID = strings.TrimSpace(c.FormValue("project_id"))
-		if workType == model.WBWorkSupport && projectID == "" {
-			return c.Redirect(http.StatusSeeOther,
-				"/workboard/tasks/"+id+"?err=project_required&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
-		}
+	status := strings.TrimSpace(c.FormValue("status"))
+	if status == "" {
+		status = existing.Status
+	}
+	priority := strings.TrimSpace(c.FormValue("priority"))
+	if priority == "" {
+		priority = existing.Priority
+	}
+	assignee := strings.TrimSpace(c.FormValue("assignee"))
+	if assignee == "" {
+		assignee = existing.Assignee
+	}
+	desc := existing.Description
+	if registerScope {
+		desc = strings.TrimSpace(c.FormValue("description"))
 	}
 	t := &model.WorkTask{
 		TaskID:       existing.TaskID,
 		WorkType:     workType,
 		ProjectID:    projectID,
 		Title:        title,
-		Description:  strings.TrimSpace(c.FormValue("description")),
+		Description:  desc,
 		DueDate:      dueDate,
 		WorkDate:     workDate,
 		StartTime:    start,
 		EndTime:      end,
 		DurationMin:  dur,
-		Status:       strings.TrimSpace(c.FormValue("status")),
-		Priority:     strings.TrimSpace(c.FormValue("priority")),
-		Assignee:     strings.TrimSpace(c.FormValue("assignee")),
+		Status:       status,
+		Priority:     priority,
+		Assignee:     assignee,
 		Tags:         strings.TrimSpace(c.FormValue("tags")),
 		Progress:     progress,
 		SourceType:   existing.SourceType,
@@ -1451,10 +1590,10 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		CustomerID:   existing.CustomerID,
 		CustomerName: existing.CustomerName,
 	}
-	if existing.SourceType == "" {
+	if registerScope && existing.SourceType == "" {
 		applyCustomerForm(t, c)
 	}
-	if adminGTD {
+	if adminGTD && !registerScope {
 		applyAdminGTDForm(t, c)
 		if code := h.adminGTDErr(id, t.Status, t, c); code != "" {
 			return c.Redirect(http.StatusSeeOther,
@@ -1463,20 +1602,33 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	} else {
 		copyAdminGTDFields(t, existing)
 	}
+	if existing.RecurrenceRole == model.RecurrenceRoleOccurrence {
+		t.CompleteNote = strings.TrimSpace(c.FormValue("complete_note"))
+		t.CompleteDate = strings.TrimSpace(c.FormValue("complete_date"))
+		if t.CompleteNote == "" {
+			t.CompleteNote = existing.CompleteNote
+		}
+		if t.CompleteDate == "" {
+			t.CompleteDate = existing.CompleteDate
+		}
+		if strings.TrimSpace(c.FormValue("occurrence_status")) == model.OccurrenceComplete {
+			t.Status = model.WBTaskComplete
+		}
+	}
 	if t.DueDate == "" && !adminGTD {
 		t.DueDate = workDate
 	}
 	if t.DueDate == "" && t.Status != model.WBTaskInbox {
 		return c.Redirect(http.StatusSeeOther,
-			"/workboard/tasks/"+id+"?err=task&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+			taskPagePath(id, registerScope)+"?err=task&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	supports := parseSupportMembers(c, t.Assignee)
 	if len(supports) > 0 && t.Assignee == "" {
 		return c.Redirect(http.StatusSeeOther,
-			"/workboard/tasks/"+id+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+			taskPagePath(id, registerScope)+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	if code := h.recurrenceCompleteErr(existing, t, c); code != "" {
-		loc := "/workboard/tasks/" + id + "?err=" + code
+		loc := taskPagePath(id, registerScope) + "?err=" + code
 		if code == "rec_open" {
 			open, _ := h.repo.CountOpenOccurrences(id)
 			loc += "&n=" + fmt.Sprintf("%d", open)
@@ -1490,7 +1642,7 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if t.StartTime != "" {
 		if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, t.TaskID, occupancyNames(t.Assignee, supports)); msg != "" {
 			return c.Redirect(http.StatusSeeOther,
-				"/workboard/tasks/"+id+"?err="+url.QueryEscape(msg)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+				taskPagePath(id, registerScope)+"?err="+url.QueryEscape(msg)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 		}
 	}
 	if err := h.repo.UpdateTask(t); err != nil {
@@ -1503,19 +1655,11 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		} else if strings.Contains(err.Error(), "다음 조치일") {
 			code = "rec_defer_date"
 		}
-		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+id+"?err="+code)
+		return c.Redirect(http.StatusSeeOther, taskPagePath(id, registerScope)+"?err="+code)
 	}
 	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
-	if adminGTD {
-		if t.Status == model.WBTaskComplete && existing.Status != model.WBTaskComplete {
-			note := t.CompleteNote
-			if strings.TrimSpace(c.FormValue("force_complete")) == "1" {
-				if r := strings.TrimSpace(c.FormValue("force_reason")); r != "" {
-					note = strings.TrimSpace(note + "\n관리자 강제 완료: " + r)
-				}
-			}
-			h.addCompleteActivity(t.TaskID, note, ctxString(c, "user_name"))
-		}
+	if adminGTD && !registerScope {
+		h.addActionSaveActivity(existing, t, c)
 		h.ensureWaitingAction(t)
 	}
 	if existing.SourceType == model.WBSourceMaintenance && h.mntRepo != nil && existing.SourceID != "" {
@@ -1526,15 +1670,31 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	}
 	h.syncVisitDateFromTask(t.SourceType, t.SourceID, t.WorkDate)
 	back := strings.TrimSpace(c.FormValue("back"))
-	loc := "/workboard/tasks/" + id + "?ok=saved"
+	base := "/workboard/tasks/" + id
+	if registerScope {
+		base += "/edit"
+	}
+	loc := base + "?ok=saved"
 	if back != "" {
 		loc += "&back=" + url.QueryEscape(back)
 	}
 	return c.Redirect(http.StatusSeeOther, loc)
 }
 
-// ShowTask 업무 상세 — AS/점검 원본 링크·하위업무 관리
+// ShowTask 조치 화면 — 등록 정보는 읽기 전용, 상태·완료만 다룬다 (§33.6)
 func (h *WorkboardHandler) ShowTask(c echo.Context) error {
+	return h.renderTaskPage(c, false)
+}
+
+// EditTask 등록·수정 화면 — 업무 구분·반복은 여기서만 바꾼다 (§33.6)
+func (h *WorkboardHandler) EditTask(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	return h.renderTaskPage(c, true)
+}
+
+func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	id := c.Param("id")
 	today := time.Now().Format(dateLayout)
 	_, _ = h.repo.MarkPastOccurrencesOverdue(today)
@@ -1543,6 +1703,7 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	children, _ := h.repo.ListChildren(id)
+	subtasks, _ := h.repo.ListSubtasks(id)
 	var sourceHref, sourceLabel string
 	var actionHref, actionLabel string
 	var canAction, asClosed bool
@@ -1588,6 +1749,14 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 			sourceHref = "/maintenance"
 			sourceLabel = t.SourceID
 		}
+	case model.WBSourceSalesActivity:
+		if sid := h.repo.SalesIDByActivity(t.SourceID); sid != "" {
+			sourceHref = "/sales/" + sid
+			sourceLabel = sid
+			actionHref = "/sales/" + sid
+			actionLabel = "영업 사업"
+			canAction = canViewSales(c)
+		}
 	}
 	var parent *model.WorkTask
 	if t.ParentTaskID != "" {
@@ -1622,15 +1791,18 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 	if back == "" {
 		back = "/workboard/register"
 	}
-	active := "work_register"
-	if strings.Contains(back, "/admin-work/stats") {
-		active = "admin_work_stats"
-	} else if strings.Contains(back, "/admin-work") {
-		active = "admin_work"
+	active := NavWorkRegister
+	if !editMode {
+		if strings.Contains(back, "/admin-work/stats") {
+			active = NavAdminWorkStats
+		} else if strings.Contains(back, "/admin-work") {
+			active = NavAdminWork
+		}
 	}
 	data := map[string]interface{}{
 		"Title":          t.Title,
 		"Active":         active,
+		"EditMode":       editMode,
 		"Task":           t,
 		"Children":       children,
 		"Parent":         parent,
@@ -1653,6 +1825,8 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		"FlashErrMsg":    gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n")),
 		"Today":          time.Now().Format(dateLayout),
 		"BackURL":        back,
+		"Subtasks":       subtasks,
+		"CanAddSubtask":  canWriteWorkboard(c) && t.SourceType == "" && t.RecurrenceRole != model.RecurrenceRoleOccurrence && h.repo.CanAttachSubtask(t.TaskID) == nil,
 	}
 	rule := defaultRecurrenceForm(t, data["Today"].(string))
 	archived := false
@@ -1724,6 +1898,24 @@ func (h *WorkboardHandler) ShowTask(c echo.Context) error {
 		}
 	}
 	data["NextOccurrence"] = nextOcc
+	data["RecurrenceCycle"] = model.RecurrenceCycleLabel(rule)
+	dueForDn := strings.TrimSpace(t.DueDate)
+	if dueForDn == "" {
+		dueForDn = strings.TrimSpace(rule.EndDate)
+	}
+	if days, ok := model.DaysUntil(dueForDn, today); ok && t.ParentTaskID == "" && occN > 0 {
+		data["DueTone"] = model.DueUrgency(days, true)
+		if days >= 0 {
+			data["DueLabel"] = fmt.Sprintf("D-%d", days)
+		} else {
+			data["DueLabel"] = fmt.Sprintf("D+%d", -days)
+		}
+	}
+	if t.SourceType == "" && h.salesRepo != nil && canWriteSales(c) {
+		salesList, _ := h.salesRepo.List("", model.SalesStatusActive, "")
+		data["CanConvertSales"] = true
+		data["ConvertSalesHref"] = convertSalesHref(t.TaskID, salesList)
+	}
 	h.renderTaskGTD(c, data, t)
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)
 }
@@ -1747,6 +1939,9 @@ func (h *WorkboardHandler) CreateSubtasks(c echo.Context) error {
 	}
 	n, err := h.repo.CreateSubtasks(parent, dates)
 	if err != nil {
+		if q := subtaskErrQuery(err); q != "" {
+			return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+parent.TaskID+"?err="+q)
+		}
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther,
@@ -1769,6 +1964,22 @@ func canWriteWorkboard(c echo.Context) bool {
 		return false
 	}
 	return hasPerm(c, model.PermWorkboard)
+}
+
+func taskPagePath(id string, register bool) string {
+	p := "/workboard/tasks/" + id
+	if register {
+		p += "/edit"
+	}
+	return p
+}
+
+func convertSalesHref(taskID string, projects []model.SalesProject) string {
+	q := "from_task=" + url.QueryEscape(taskID)
+	if len(projects) == 1 {
+		return "/sales/" + projects[0].SalesID + "?tab=timeline&" + q
+	}
+	return "/sales?" + q
 }
 
 func redirectBack(c echo.Context, q string) string {

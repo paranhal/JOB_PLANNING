@@ -46,7 +46,7 @@ const (
 	SQLStatusOpsInProgress = "('in_progress','partial_complete')"
 )
 
-// 처리결과코드 (조치 화면: 완료 · 추가조치 필요 · 재방문 필요 · 이관 · 대기)
+// 처리결과코드 (조치 화면: 완료 · 추가조치 필요 · 이관. §34.3.4)
 const (
 	ResultDone     = "done"
 	ResultPartial  = "partial" // 부분완료 — 화면 「추가조치 필요」
@@ -74,14 +74,12 @@ type ActionResultOption struct {
 	Label string
 }
 
-// ActionResultOptions 조치 등록 화면의 결과 다섯 가지.
+// ActionResultOptions 조치 등록 화면의 결과 세 가지. §34.3.4
 func ActionResultOptions() []ActionResultOption {
 	return []ActionResultOption{
 		{ResultDone, "완료"},
 		{ResultPartial, "추가조치 필요"},
-		{ResultRevisit, "재방문 필요"},
 		{ResultTransfer, "이관"},
-		{ResultHold, "대기"},
 	}
 }
 
@@ -111,7 +109,9 @@ func ActionResultLabel(code string) string {
 func TransferDetailLabel(detail string) string {
 	switch strings.TrimSpace(detail) {
 	case TransferDetailCompleted:
-		return "처리 확인 후 완료"
+		return "이관 완료"
+	case TransferDetailFollowup:
+		return "이관후속"
 	case TransferDetailWaiting:
 		return "우리 팀 추가 작업"
 	default:
@@ -122,27 +122,29 @@ func TransferDetailLabel(detail string) string {
 // 타사이관 세부
 const (
 	TransferDetailCompleted = "completed" // 이관 완료 → 접수 완료
-	TransferDetailWaiting   = "waiting"   // 조치 결과 대기 → 부분완료 + 확인 하부업무
+	TransferDetailFollowup  = "followup"  // 이관 + 추가 조치 → 새 접수, 원 건도 완료. §34.3.5
+	TransferDetailWaiting   = "waiting"   // 레거시: 부분완료 + 확인 하부업무. 조치 폼에서는 더 이상 보내지 않음
 )
 
 var (
-	ErrRevisitReasonRequired   = errors.New("revisit_reason_required")
-	ErrRevisitDateRequired     = errors.New("revisit_date_required")
-	ErrTemporaryDateRequired   = errors.New("temporary_date_required")
-	ErrCompleteDateRequired    = errors.New("complete_date_required")
-	ErrTransferDetailRequired  = errors.New("transfer_detail_required")
-	ErrConfirmDateRequired     = errors.New("confirm_date_required")
-	ErrConfirmTargetRequired   = errors.New("confirm_target_required")
-	ErrConfirmContactRequired  = errors.New("confirm_contact_required")
+	ErrRevisitReasonRequired  = errors.New("revisit_reason_required")
+	ErrRevisitDateRequired    = errors.New("revisit_date_required")
+	ErrTemporaryDateRequired  = errors.New("temporary_date_required")
+	ErrCompleteDateRequired   = errors.New("complete_date_required")
+	ErrTransferDetailRequired = errors.New("transfer_detail_required")
+	ErrFollowupNoteRequired   = errors.New("followup_note_required")
+	ErrConfirmDateRequired    = errors.New("confirm_date_required")
+	ErrConfirmTargetRequired  = errors.New("confirm_target_required")
+	ErrConfirmContactRequired = errors.New("confirm_contact_required")
 )
 
 // ActionApplyInput 조치 저장 시 결과코드별 부가 입력
 type ActionApplyInput struct {
-	NextDate          string // 방문예정일 또는 확인예정일
-	ScheduleConfirmed bool
-	TransferDetail    string // completed | waiting
-	ConfirmTarget     string
-	ConfirmContact    string
+	NextDate                  string // 방문예정일 또는 확인예정일
+	ScheduleConfirmed         bool
+	TransferDetail            string // completed | followup | waiting(레거시)
+	ConfirmTarget             string
+	ConfirmContact            string
 	CreateRevisitAfterConfirm bool // 결과 대기 후 재방문 일정 등록
 	RevisitDate               string
 	RevisitScheduleConfirmed  bool
@@ -212,7 +214,8 @@ func ApplyActionResult(as *ASReceipt, in ActionApplyInput, now time.Time) (*Acti
 
 	case ResultTransfer:
 		switch in.TransferDetail {
-		case TransferDetailCompleted:
+		case TransferDetailCompleted, TransferDetailFollowup:
+			// 이관 후속 건을 만들더라도 원 건은 완료한다. §34.3.5
 			as.Status = "completed"
 			as.RevisitReason = ""
 			setCompleteDatetimeIfEmpty(as, now)
@@ -376,6 +379,31 @@ func NewReopenReceipt(src *ASReceipt, reason string, now time.Time) *ASReceipt {
 		IsReopen:        true,
 		ParentASID:      src.ASID,
 		ReopenReason:    reason,
+	}
+}
+
+// NewTransferFollowupReceipt 이관하면서 우리 몫이 남을 때 새 접수를 만든다. §34.3.5
+// 재접수(NewReopenReceipt)와 다르다: IsReopen=false, 증상 복제 + 추가 접수 내용.
+func NewTransferFollowupReceipt(src *ASReceipt, extra string, now time.Time) *ASReceipt {
+	extra = strings.TrimSpace(extra)
+	return &ASReceipt{
+		ReceiptDatetime: now,
+		CustomerID:      src.CustomerID,
+		AssetID:         src.AssetID,
+		ReceiptChannel:  src.ReceiptChannel,
+		Requester:       src.Requester,
+		RequesterType:   src.RequesterType,
+		RequesterName:   src.RequesterName,
+		Symptom:         src.Symptom,
+		Urgency:         src.Urgency,
+		Priority:        src.Priority,
+		AssignedTo:      src.AssignedTo,
+		AssignedUserID:  src.AssignedUserID,
+		ConfirmContact:  src.ConfirmContact,
+		IsRecurrence:    false,
+		IsReopen:        false,
+		ParentASID:      src.ASID,
+		FollowupNote:    extra,
 	}
 }
 

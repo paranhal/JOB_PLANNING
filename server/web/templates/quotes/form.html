@@ -1,0 +1,457 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-6xl mx-auto space-y-4"
+     x-data="quoteForm({
+       vat: '{{.Quote.VATMode}}',
+       round: '{{.Quote.RoundRule}}',
+       formType: '{{.Quote.FormType}}',
+       overhead: {{printf "%g" .Quote.OverheadRate}},
+       tech: {{printf "%g" .Quote.TechFeeRate}},
+       stdOH: {{printf "%g" .StandardOH}},
+       stdTech: {{printf "%g" .StandardTech}},
+       quoteYear: {{.QuoteYear}}
+     })">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 목록</a>
+      <h2 class="text-xl font-bold text-gray-800 mt-1">{{if .IsNew}}견적 작성{{else}}견적 수정{{end}}</h2>
+      <p class="text-sm text-gray-500">라인 금액·소계·부가세·합계는 계산값입니다. 손으로 고칠 칸이 없습니다.</p>
+    </div>
+  </div>
+
+  {{if eq .FlashOK "copied"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">오늘 날짜로 새 번호를 매겼습니다. 내용을 확인하고 저장하세요.</div>
+  {{end}}
+  {{if eq .FlashOK "revised"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">개정했습니다. 번호는 그대로이고 이전 회차는 읽기 전용입니다.</div>
+  {{end}}
+  {{if .FormError}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  {{end}}
+
+  <form method="post" action="{{if .IsNew}}/quotes{{else}}/quotes/{{.Quote.QuoteID}}{{end}}" class="space-y-4" @submit="syncHidden()">
+    <input type="hidden" name="sales_id" value="{{.Quote.SalesID}}">
+    <input type="hidden" name="status" value="{{if .Quote.Status}}{{.Quote.Status}}{{else}}draft{{end}}">
+    <input type="hidden" name="vat_mode" :value="vat">
+    <input type="hidden" name="round_rule" :value="round">
+    <input type="hidden" name="is_reverse_calc" value="{{if .Quote.IsReverseCalc}}1{{end}}">
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">견적번호</label>
+          <p class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-700">
+            {{if .Quote.QuoteNo}}{{.Quote.DisplayNo}}{{else}}저장 시 부여 (VI-견적-오늘-NNN){{end}}
+          </p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">견적일</label>
+          <p class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
+            {{if .IsNew}}저장 시 오늘 날짜{{else}}{{.Quote.QuoteDate}}{{end}}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-2">양식</p>
+        <div class="flex flex-wrap gap-4 text-sm">
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="form_type" value="A1" {{if eq .Quote.FormType "A1"}}checked{{end}} @change="setForm('A1')">
+            A-1 · 물품·작업
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="form_type" value="A2" {{if eq .Quote.FormType "A2"}}checked{{end}} @change="setForm('A2')">
+            A-2 · 개발 용역
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="form_type" value="B1" {{if eq .Quote.FormType "B1"}}checked{{end}} @change="setForm('B1')">
+            B-1 · 조달 단순
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="form_type" value="B2" {{if eq .Quote.FormType "B2"}}checked{{end}} @change="setForm('B2')">
+            B-2 · 조달 그룹
+          </label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">용도</label>
+          <select name="purpose" x-model="purpose" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="deal" {{if ne .Quote.Purpose "budget"}}{{if ne .Quote.Purpose "reference"}}selected{{end}}{{end}}>실거래</option>
+            <option value="budget" {{if eq .Quote.Purpose "budget"}}selected{{end}}>예산용</option>
+            <option value="reference" {{if eq .Quote.Purpose "reference"}}selected{{end}}>참고</option>
+          </select>
+        </div>
+        <div x-show="purpose==='budget'">
+          <label class="block text-sm font-medium text-gray-700 mb-1">예산 대상 연도</label>
+          <input name="budget_year" value="{{if .Quote.BudgetYear}}{{.Quote.BudgetYear}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="2027">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">수신</label>
+          <input name="recipient_name" value="{{.Quote.RecipientName}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="기관명">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">수신 구분</label>
+          <select name="recipient_kind" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="customer" {{if ne .Quote.RecipientKind "partner"}}selected{{end}}>고객</option>
+            <option value="partner" {{if eq .Quote.RecipientKind "partner"}}selected{{end}}>협력사</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">수신인</label>
+          <input name="attn_name" value="{{.Quote.AttnName}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">참조</label>
+          <input name="attn_title" value="{{.Quote.AttnTitle}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">건명</label>
+        <input name="title" value="{{.Quote.Title}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="견적 건명">
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">작업기한</label>
+          <input name="due_text" value="{{.Quote.DueText}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">작업장소</label>
+          <input name="place_text" value="{{.Quote.PlaceText}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">유효기간</label>
+          <input name="valid_until_text" value="{{.Quote.ValidUntilText}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">결제조건</label>
+          <input name="payment_text" value="{{.Quote.PaymentText}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-2">VAT</p>
+        <div class="flex flex-wrap gap-4 text-sm">
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="vat_mode_ui" value="excluded" :checked="vat==='excluded'" @change="vat='excluded'">
+            VAT 미포함 (단가 = 공급가)
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="vat_mode_ui" value="included" :checked="vat==='included'" @change="vat='included'">
+            VAT 포함 (단가 = 합계, ÷1.1 역산)
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">절사</label>
+        <select class="border rounded-lg px-3 py-2 text-sm bg-white" x-model="round">
+          {{range .RoundOptions}}
+          <option value="{{index . 0}}" {{if eq $.Quote.RoundRule (index . 0)}}selected{{end}}>{{index . 1}}</option>
+          {{end}}
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="isLabor()">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">제경비율 (%)</label>
+          <input name="overhead_rate" x-model="overhead" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <p class="text-xs text-amber-700 mt-1" x-show="ohDiff()" x-text="ohDiff()"></p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">기술료율 (%)</label>
+          <input name="tech_fee_rate" x-model="tech" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <p class="text-xs text-amber-700 mt-1" x-show="techDiff()" x-text="techDiff()"></p>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" name="maint_block" value="1" {{if .Quote.MaintBlock}}checked{{end}}>
+          유지보수부분 블록 넣기
+        </label>
+      </div>
+      <template x-if="!isLabor()">
+        <span>
+          <input type="hidden" name="overhead_rate" :value="overhead">
+          <input type="hidden" name="tech_fee_rate" :value="tech">
+        </span>
+      </template>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">목표 총액 (VAT 포함)</label>
+        <input name="target_total" value="{{if .Quote.TargetTotal}}{{.Quote.TargetTotal}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="비우면 역산하지 않음">
+        <p class="text-xs text-gray-500 mt-1">넣으면 단가를 비율대로 역산하고 「역산」 표시가 남습니다.</p>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-gray-800">라인</h3>
+        <button type="button" class="text-sm text-blue-700 hover:underline" @click="addLine()">+ 줄 추가</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[56rem]">
+          <thead class="bg-gray-50 border-b"><tr>
+            <th class="text-left px-2 py-2 text-xs text-gray-500">구분</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500">품명 · 내용</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500">수량</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500">단위</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500">단가</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500">투입율</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500">할인율</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500">금액</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            <template x-for="(ln, i) in lines" :key="ln.key">
+              <tr class="border-b border-gray-100 align-top">
+                <td class="px-2 py-2">
+                  <input type="hidden" :name="'line_item_id'" :value="ln.itemId">
+                  <input name="line_group" x-model="ln.group" class="w-24 border rounded px-2 py-1 text-sm">
+                </td>
+                <td class="px-2 py-2 relative">
+                  <input name="line_name" x-model="ln.name" @input.debounce.200ms="search(i)" autocomplete="off"
+                         class="w-full border rounded px-2 py-1 text-sm" placeholder="품명">
+                  <textarea name="line_spec" x-model="ln.spec" rows="2" class="mt-1 w-full border rounded px-2 py-1 text-xs" placeholder="규격·내용"></textarea>
+                  <ul x-show="ln.open" x-cloak class="absolute z-20 mt-1 w-full bg-white border rounded shadow max-h-40 overflow-auto text-sm">
+                    <template x-for="it in ln.hits" :key="it.item_id">
+                      <li><button type="button" class="w-full text-left px-2 py-1 hover:bg-blue-50" @click="pick(i, it)" x-text="it.name + ' · ' + (it.unit||'')"></button></li>
+                    </template>
+                  </ul>
+                  <select x-show="isLabor()" class="mt-1 w-full border rounded px-2 py-1 text-xs bg-white" @change="pickJob(i, $event)">
+                    <option value="">직군 선택</option>
+                    {{range .LaborRates}}
+                    <option value="{{.RateID}}" data-year="{{.Year}}" data-monthly="{{.Monthly}}" data-name="{{.JobName}}">{{.JobCode}} {{.JobName}}</option>
+                    {{end}}
+                  </select>
+                  <input name="line_note" x-model="ln.note" class="mt-1 w-full border rounded px-2 py-1 text-xs" placeholder="비고 · 물품식별번호">
+                  <input type="hidden" name="line_gov" :value="ln.gov">
+                </td>
+                <td class="px-2 py-2"><input name="line_qty" x-model="ln.qty" inputmode="decimal" class="w-20 border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
+                <td class="px-2 py-2">
+                  <select name="line_unit" x-model="ln.unit" class="border rounded px-2 py-1 text-sm bg-white">
+                    {{range .Units}}<option value="{{.}}">{{.}}</option>{{end}}
+                  </select>
+                </td>
+                <td class="px-2 py-2"><input name="line_price" x-model="ln.price" @input="ln.overridden='1'" inputmode="numeric" class="w-28 border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
+                <td class="px-2 py-2"><input name="line_mm" x-model="ln.mm" class="w-16 border rounded px-2 py-1 text-sm text-right"></td>
+                <td class="px-2 py-2"><input name="line_disc" x-model="ln.disc" class="w-16 border rounded px-2 py-1 text-sm text-right"></td>
+                <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-gray-800">
+                  <span x-text="fmt(lineAmt(ln))"></span>
+                  <div class="text-[10px] text-amber-700" x-show="yearBadge(ln)" x-text="yearBadge(ln)"></div>
+                  <div class="text-[10px] text-gray-500" x-show="ln.overridden==='1'">단가 수정</div>
+                  <input type="hidden" name="line_rate_id" :value="ln.rateId">
+                  <input type="hidden" name="line_labor_year" :value="ln.laborYear">
+                  <input type="hidden" name="line_price_overridden" :value="ln.overridden">
+                </td>
+                <td class="px-2 py-2"><button type="button" class="text-xs text-red-600 hover:underline" @click="remove(i)">삭제</button></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div x-show="isLabor()">
+        <p class="text-xs text-gray-500">직접인건비</p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().direct)+'원'"></p>
+      </div>
+      <div x-show="isLabor()">
+        <p class="text-xs text-gray-500">제경비</p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().overhead)+'원'"></p>
+      </div>
+      <div x-show="isLabor()">
+        <p class="text-xs text-gray-500">기술료</p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().tech)+'원'"></p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">소계</p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().sum)+'원'"></p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">공급가</p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().supply)+'원'"></p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">부가세</p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().vat)+'원'"></p>
+      </div>
+      <div class="sm:col-span-3">
+        <p class="text-xs text-gray-500">합계 <span x-text="vat==='included' ? '(VAT포함)' : '(VAT미포함)'"></span></p>
+        <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().total)+'원'"></p>
+        <p class="text-xs text-gray-500 mt-1" x-show="totals().before !== totals().total" x-text="'(' + (round==='hundred' ? '100원 단위 절사' : (round==='thousand' ? '1,000원 단위 절사' : '절사 없음')) + ' · 절사 전 '+fmt(totals().before)+')'"></p>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">담당자 <span class="text-red-500">*</span></label>
+        <input name="owner_name" required value="{{.Quote.OwnerName}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        <select name="owner_user_id" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm bg-white" onchange="var o=this.options[this.selectedIndex]; if(o && o.dataset.name){ this.form.owner_name.value=o.dataset.name; }">
+          <option value="">사용자에서 고르기</option>
+          {{range .Users}}
+          <option value="{{.UserID}}" data-name="{{.FullName}}" {{if eq $.Quote.OwnerUserID .UserID}}selected{{end}}>{{.FullName}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">연락처 <span class="text-red-500">*</span></label>
+        <input name="owner_phone" required value="{{.Quote.OwnerPhone}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">기타사항</label>
+        <textarea name="remarks" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">{{.Quote.Remarks}}</textarea>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">저장</button>
+      <button type="button" class="px-5 py-2.5 border rounded-lg text-sm" @click="preview($event)">미리보기</button>
+      <p class="text-xs text-gray-500" x-text="previewMsg"></p>
+    </div>
+  </form>
+</div>
+<script>
+function quoteForm(init){
+  const seed = {{if .Quote.Lines}}{{else}}true{{end}};
+  const serverLines = [
+    {{range .Quote.Lines}}
+    {key: Math.random(), itemId: {{printf "%q" .ItemID}}, group: {{printf "%q" .GroupLabel}}, name: {{printf "%q" .Name}}, spec: {{printf "%q" .Spec}}, qty: {{printf "%g" .Qty}}, unit: {{printf "%q" .Unit}}, price: {{.UnitPrice}}, mm: {{printf "%g" .MMRate}}, disc: {{printf "%g" .DiscountRate}}, note: {{printf "%q" .Note}}, gov: {{.GovPrice}}, rateId: {{printf "%q" .RateID}}, laborYear: {{.LaborYear}}, overridden: {{if .PriceOverridden}}'1'{{else}}''{{end}}, hits:[], open:false},
+    {{end}}
+  ];
+  if(serverLines.length===0){
+    serverLines.push({key:1,itemId:'',group:'',name:'',spec:'',qty:1,unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
+    serverLines.push({key:2,itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
+    serverLines.push({key:3,itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
+  }
+  return {
+    vat: init.vat || 'excluded',
+    round: init.round || 'none',
+    formType: init.formType || 'A1',
+    purpose: '{{if .Quote.Purpose}}{{.Quote.Purpose}}{{else}}deal{{end}}',
+    overhead: init.overhead || 110,
+    tech: init.tech || 20,
+    stdOH: init.stdOH || 110,
+    stdTech: init.stdTech || 20,
+    quoteYear: init.quoteYear || 0,
+    lines: serverLines,
+    previewMsg: '',
+    seed: seed,
+    addLine(){
+      this.lines.push({key:Date.now()+Math.random(),itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
+    },
+    remove(i){
+      this.lines.splice(i,1);
+      if(this.lines.length===0) this.addLine();
+    },
+    isLabor(){ return this.formType==='A2'; },
+    setForm(t){
+      this.formType = t;
+      this.vat = (t==='B1' || t==='B2' || t==='B') ? 'included' : 'excluded';
+    },
+    ohDiff(){
+      const u=this.num(this.overhead), s=this.num(this.stdOH);
+      if(!u || !s || u===s) return '';
+      return '표준 '+s+'% → '+u+'%';
+    },
+    techDiff(){
+      const u=this.num(this.tech), s=this.num(this.stdTech);
+      if(!u || !s || u===s) return '';
+      return '표준 '+s+'% → '+u+'%';
+    },
+    yearBadge(ln){
+      const y=parseInt(ln.laborYear,10)||0;
+      if(!y || !this.quoteYear || y===this.quoteYear) return '';
+      return y+'년 단가';
+    },
+    pickJob(i, ev){
+      const opt = ev.target.options[ev.target.selectedIndex];
+      if(!opt || !opt.value) return;
+      const ln=this.lines[i];
+      ln.rateId=opt.value;
+      ln.laborYear=parseInt(opt.dataset.year,10)||0;
+      ln.name=opt.dataset.name||ln.name;
+      ln.price=parseInt(opt.dataset.monthly,10)||ln.price;
+      ln.unit='M/M';
+      ln.overridden='';
+      if(!ln.mm) ln.mm=1;
+    },
+    num(v){
+      const n = parseFloat(String(v==null?'':v).replace(/,/g,''));
+      return isFinite(n) ? n : 0;
+    },
+    lineAmt(ln){
+      let qty = this.num(ln.qty), price = Math.floor(this.num(ln.price));
+      let mm = this.num(ln.mm); if(mm<=0) mm=1; if(mm>1) mm=mm/100;
+      let disc = this.num(ln.disc); if(disc>1) disc=disc/100; if(disc<0) disc=0; if(disc>1) disc=1;
+      const v = qty * price * mm * (1-disc);
+      return v<=0 ? 0 : Math.floor(v);
+    },
+    roundN(n){
+      const u = this.round==='hundred' ? 100 : (this.round==='thousand' ? 1000 : 1);
+      if(u<=1) return n;
+      if(n<0) return -this.roundN(-n);
+      return Math.floor(n/u)*u;
+    },
+    totals(){
+      let sum=0;
+      this.lines.forEach(ln => { sum += this.lineAmt(ln); });
+      let direct=sum, overhead=0, tech=0;
+      if(this.isLabor()){
+        const ohPct=this.num(this.overhead)||110, techPct=this.num(this.tech)||20;
+        overhead = Math.floor(Math.floor(direct * ohPct / 100) / 100) * 100;
+        tech = Math.floor(overhead * techPct / 100);
+        sum = direct + overhead + tech;
+      }
+      if(this.vat==='included'){
+        const before=sum, total=this.roundN(sum), supply=Math.floor(total/1.1), vat=total-supply;
+        return {sum, supply, vat, total, before, direct, overhead, tech};
+      }
+      const supply=sum, vat=Math.floor(sum/10), before=supply+vat, total=this.roundN(before);
+      return {sum, supply, vat, total, before, direct, overhead, tech};
+    },
+    fmt(n){
+      n = Math.floor(n||0);
+      const s = String(Math.abs(n));
+      let out='';
+      for(let i=0;i<s.length;i++){ if(i>0 && (s.length-i)%3===0) out+=','; out+=s[i]; }
+      return (n<0?'-':'')+out;
+    },
+    async search(i){
+      const q=(this.lines[i].name||'').trim();
+      if(!q){ this.lines[i].hits=[]; this.lines[i].open=false; return; }
+      try {
+        const r=await fetch('/items/suggest?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
+        this.lines[i].hits = await r.json() || [];
+        this.lines[i].open = this.lines[i].hits.length>0;
+      } catch(e){ this.lines[i].hits=[]; this.lines[i].open=false; }
+    },
+    pick(i, it){
+      const ln=this.lines[i];
+      ln.itemId=it.item_id; ln.name=it.name; ln.spec=it.spec||ln.spec; ln.unit=it.unit||'EA';
+      ln.price=it.fill_price||it.last_price||it.list_price||ln.price;
+      ln.open=false;
+    },
+    syncHidden(){},
+    async preview(ev){
+      const form = ev.target.closest('form');
+      const body = new FormData(form);
+      body.set('vat_mode', this.vat);
+      body.set('round_rule', this.round);
+      this.previewMsg='';
+      try {
+        const r=await fetch('/quotes/preview',{method:'POST',headers:{'Accept':'application/json'},body});
+        const d=await r.json();
+        if(!d||!d.ok){ this.previewMsg=(d&&d.error)||'미리보기에 실패했습니다'; return; }
+        this.previewMsg='공급가 '+this.fmt(d.supply)+' · 부가세 '+this.fmt(d.vat)+' · 합계 '+this.fmt(d.total)+' · '+d.round_label;
+      } catch(e){ this.previewMsg='미리보기에 실패했습니다'; }
+    }
+  };
+}
+</script>
+{{end}}

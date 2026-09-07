@@ -41,25 +41,45 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 		users, _ = h.userRepo.ListAssignable()
 	}
 
+	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
+	kanban := model.FillUnplannedKanban(items)
+	mineOn := mineUID != ""
 	showAssignee := role == model.RoleAdmin || role == model.RoleOffice || scopeAll
 	canWrite := canWriteUnplanned(c)
 	return c.Render(http.StatusOK, "plan/unplanned.html", map[string]interface{}{
-		"Title":        "미계획 업무함",
-		"Active":       NavPlanUnplanned,
-		"Items":        items,
-		"Total":        len(items),
-		"Counts":       counts,
-		"Kind":         kind,
-		"ShowAssignee": showAssignee,
-		"Role":         role,
-		"Mine":         mineUID != "",
-		"ScopeAll":     scopeAll,
-		"ScopeNote":    unplannedScopeNote(role, scopeAll),
-		"CanWrite":     canWrite,
-		"Users":        users,
-		"Err":          c.QueryParam("err"),
-		"Ok":           c.QueryParam("ok"),
-		"MineQ":        unplannedMineQuery(role, mineUID != ""),
+		"Title":          "미계획 업무함",
+		"Active":         NavPlanUnplanned,
+		"Items":          items,
+		"Total":          len(items),
+		"Counts":         counts,
+		"Kind":           kind,
+		"ShowAssignee":   showAssignee,
+		"Role":           role,
+		"Mine":           mineOn,
+		"ScopeAll":       scopeAll,
+		"ScopeNote":      unplannedScopeNote(role, scopeAll),
+		"CanWrite":       canWrite,
+		"Users":          users,
+		"Err":            c.QueryParam("err"),
+		"Ok":             c.QueryParam("ok"),
+		"MineQ":          unplannedMineQuery(role, mineOn),
+		"Display":        display,
+		"KanbanColumns":  kanban.Columns,
+		"KanbanTotal":    kanban.Total,
+		"KanbanDrag":     false,
+		"KanbanDrop":     "",
+		"KanbanHint":     "열 = §8.1 유형. 한 건이 여러 유형이면 표 위에서 먼저 맞는 열 하나. 유형은 파생값이라 드래그하지 않습니다.",
+		"ListHref":       planUnplannedURLDisp(mineOn, role, kind, "list"),
+		"KanbanHref":     planUnplannedURLDisp(mineOn, role, kind, "kanban"),
+		"MineToggle":     planUnplannedURLDisp(!mineOn, role, kind, display),
+		"KindAllHref":    planUnplannedURLDisp(mineOn, role, "", display),
+		"KindNoDate":     planUnplannedURLDisp(mineOn, role, model.UnplannedNoDate, display),
+		"KindUnassigned": planUnplannedURLDisp(mineOn, role, model.UnplannedUnassigned, display),
+		"KindSales":      planUnplannedURLDisp(mineOn, role, model.UnplannedSalesFollow, display),
+		"KindUnsigned":   planUnplannedURLDisp(mineOn, role, model.UnplannedSalesUnsigned, display),
+		"KindDelayed":    planUnplannedURLDisp(mineOn, role, model.UnplannedDelayed, display),
+		"KindNext":       planUnplannedURLDisp(mineOn, role, model.UnplannedNext, display),
+		"KindReview":     planUnplannedURLDisp(mineOn, role, model.UnplannedReview, display),
 	})
 }
 
@@ -101,7 +121,11 @@ func unplannedBack(c echo.Context) string {
 	if mine == "" {
 		mine = c.QueryParam("mine")
 	}
-	return planUnplannedURL(mine == "1" || (role == model.RoleTech && mine != "0"), role, kind)
+	disp := strings.TrimSpace(c.FormValue("display"))
+	if disp == "" {
+		disp = c.QueryParam("display")
+	}
+	return planUnplannedURLDisp(mine == "1" || (role == model.RoleTech && mine != "0"), role, kind, disp)
 }
 
 // UnplannedAssign POST /plan/unplanned/assign — 단건·일괄 날짜 배정

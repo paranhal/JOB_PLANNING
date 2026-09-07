@@ -1,0 +1,112 @@
+{{define "title"}}AS 본문 검색 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <h2 class="text-lg font-bold text-slate-800">접수·조치 검색</h2>
+      <p class="text-xs text-slate-500 mt-0.5">증상 · 조치 · 원인 · 결론 · 처리 이력. 기준일과 관계없이 옛 자료도 찾습니다.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/as" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">목록</a>
+      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">본문 검색</a>
+      <a href="/as/keywords" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">키워드</a>
+      {{if .CanReceive}}
+      <a href="/as/new" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">AS 접수</a>
+      {{end}}
+    </div>
+  </div>
+
+  <form method="GET" action="/as/search" class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <div class="flex flex-col sm:flex-row gap-2">
+      <input type="search" name="q" value="{{.Q}}" autofocus
+             placeholder="증상·조치·원인 검색 (예: 무인예약)"
+             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900">검색</button>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <input type="date" name="from" value="{{.Filter.DateFrom}}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" title="기간 시작">
+      <input type="date" name="to" value="{{.Filter.DateTo}}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" title="기간 끝">
+      <select name="customer_id" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">기관 전체</option>
+        {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.Filter.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+      </select>
+      <select name="product" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">제품 전체</option>
+        {{range .Products}}<option value="{{.}}" {{if eq $.Filter.Product .}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <select name="cause_type" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">원인분류 전체</option>
+        {{range .CauseTypes}}<option value="{{.CodeValue}}" {{if eq $.Filter.CauseType .CodeValue}}selected{{end}}>{{.CodeName}}</option>{{end}}
+      </select>
+      <select name="process_type" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">처리유형 전체</option>
+        {{range .ProcTypes}}<option value="{{.CodeValue}}" {{if eq $.Filter.ProcessType .CodeValue}}selected{{end}}>{{.CodeName}}</option>{{end}}
+      </select>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select name="assigned" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">담당자 전체</option>
+        {{range .Assignees}}<option value="{{.UserID}}" {{if eq $.Filter.Assigned .UserID}}selected{{end}}>{{.FullName}}</option>{{end}}
+      </select>
+      <select name="sort" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="relevance" {{if eq .Filter.Sort "relevance"}}selected{{end}}>관련도</option>
+        <option value="newest" {{if eq .Filter.Sort "newest"}}selected{{end}}>최신순</option>
+      </select>
+      <input type="hidden" name="keyword_id" value="{{.Filter.KeywordID}}">
+    </div>
+    {{if .Keywords}}
+    <div class="flex flex-wrap gap-1.5 pt-1">
+      <span class="text-[11px] text-slate-400 self-center">모아보기</span>
+      {{range .Keywords}}
+      <a href="/as/search?keyword_id={{.KeywordID}}"
+         class="px-2 py-0.5 rounded-full text-[11px] {{if eq $.Filter.KeywordID .KeywordID}}bg-blue-600 text-white{{else}}bg-slate-100 text-slate-700 hover:bg-blue-50{{end}}">{{.Keyword}}</a>
+      {{end}}
+      {{if .Filter.KeywordID}}
+      <a href="/as/search{{if .Q}}?q={{urlquery .Q}}{{end}}" class="px-2 py-0.5 text-[11px] text-slate-500 hover:underline">해제</a>
+      {{end}}
+    </div>
+    {{end}}
+  </form>
+
+  {{if or .Q .Filter.KeywordID}}
+  <p class="text-sm text-slate-500">{{if .SelectedKeyword}}「{{.SelectedKeyword.Keyword}}」 · {{end}}{{.Total}}건</p>
+  {{if .Items}}
+  <div class="space-y-3">
+    {{range .Items}}
+    <a href="/as/{{.ASID}}" class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-2">
+        <span class="font-mono text-sm font-semibold text-blue-700">{{.ASNumber}}</span>
+        <span>{{.OrgName}}</span>
+        <span>{{.ReceiptDate}}</span>
+        {{if .CauseName}}<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{{.CauseName}}</span>{{end}}
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <div>
+          <p class="text-[11px] font-medium text-slate-400 mb-0.5">증상</p>
+          <p class="text-slate-800 leading-snug">{{.SymptomHTML}}</p>
+        </div>
+        <div>
+          <p class="text-[11px] font-medium text-slate-400 mb-0.5">조치</p>
+          <p class="{{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}} leading-snug">{{.ActionHTML}}</p>
+        </div>
+      </div>
+    </a>
+    {{end}}
+  </div>
+  {{if gt .TotalPages 1}}
+  <div class="flex justify-center gap-3 text-sm">
+    {{if gt .Page 1}}<a href="{{.PrevURL}}" class="text-blue-600 hover:underline">이전</a>{{end}}
+    <span class="text-slate-500">{{.Page}} / {{.TotalPages}}</span>
+    {{if lt .Page .TotalPages}}<a href="{{.NextURL}}" class="text-blue-600 hover:underline">다음</a>{{end}}
+  </div>
+  {{end}}
+  {{else}}
+  <p class="text-sm text-slate-400 py-8 text-center">검색 결과가 없습니다.</p>
+  {{end}}
+  {{end}}
+</div>
+<style>
+mark { background: #fde68a; color: inherit; padding: 0 0.1em; border-radius: 2px; }
+</style>
+{{end}}

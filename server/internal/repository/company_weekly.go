@@ -139,6 +139,10 @@ func composePrevText(mntSites, asCount int, admin []adminLine) string {
 		lines = append(lines, fmt.Sprintf("·AS %d건 처리완료", asCount))
 	}
 	for _, a := range admin {
+		if strings.TrimSpace(a.Date) == "" {
+			lines = append(lines, "·"+a.Title)
+			continue
+		}
 		lines = append(lines, "·"+a.Title+"("+slashMD(a.Date)+")")
 	}
 	return strings.Join(lines, "\n")
@@ -167,78 +171,129 @@ func slashMD(iso string) string {
 }
 
 type adminLine struct {
-	ID, Title, Date, ProjectID string
+	ID, Title, Date, ProjectID, ParentID, Role string
+}
+
+func collapseCompanyAdminLines(lines []adminLine) []adminLine {
+	type grp struct {
+		first adminLine
+		n     int
+	}
+	order := []string{}
+	bag := map[string]*grp{}
+	var rest []adminLine
+	for _, a := range lines {
+		if a.Role != model.RecurrenceRoleOccurrence || strings.TrimSpace(a.ParentID) == "" {
+			rest = append(rest, a)
+			continue
+		}
+		key := a.ParentID
+		g, ok := bag[key]
+		if !ok {
+			g = &grp{first: a}
+			bag[key] = g
+			order = append(order, key)
+		}
+		g.n++
+	}
+	out := append([]adminLine{}, rest...)
+	for _, key := range order {
+		g := bag[key]
+		a := g.first
+		a.ID = key
+		a.Title = strings.TrimPrefix(model.FormatRecurrenceTimes(a.Title, g.n), "·")
+		a.Date = ""
+		out = append(out, a)
+	}
+	return out
 }
 
 func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx string) (int, error) {
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
 	var n int
+	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
 		WHERE COALESCE(v.completed,0)=1
 		  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?
-		  AND TRIM(COALESCE(v.project_id,'')) = ?`, from, toEx, projectID).Scan(&n)
+		  AND TRIM(COALESCE(v.project_id,'')) = ?`+mntSQL, args...).Scan(&n)
 	return n, err
 }
 
 func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx string) (int, error) {
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
 	var n int
+	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
 		WHERE v.visit_date >= ? AND v.visit_date < ?
-		  AND TRIM(COALESCE(v.project_id,'')) = ?`, from, toEx, projectID).Scan(&n)
+		  AND TRIM(COALESCE(v.project_id,'')) = ?`+mntSQL, args...).Scan(&n)
 	return n, err
 }
 
 func (r *StatsRepo) countCompanyASDone(projectID, from, toEx string) (int, error) {
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
 	var n int
+	args := append([]interface{}{from, toEx, projectID}, asArgs...)
 	err := r.db.QueryRow(`
 		SELECT COUNT(*) FROM as_receipts ar
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE TRIM(COALESCE(ar.complete_datetime,'')) != ''
 		  AND date(ar.complete_datetime) >= date(?) AND date(ar.complete_datetime) < date(?)
-		  AND TRIM(COALESCE(ar.project_id,'')) = ?`, from, toEx, projectID).Scan(&n)
+		  AND TRIM(COALESCE(ar.project_id,'')) = ?`+asSQL, args...).Scan(&n)
 	return n, err
 }
 
 func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx string) ([]adminLine, error) {
-	return r.queryAdminLines(`
-		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,'')
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+	lines, err := r.queryAdminLines(`
+		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') = ''
+		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
-		ORDER BY `+adminTaskCompleteDateSQL+`, t.title`, from, toEx, projectID)
+		ORDER BY `+adminTaskCompleteDateSQL+`, t.title`, append(append([]interface{}{}, adminArgs...), from, toEx, projectID)...)
+	if err != nil {
+		return nil, err
+	}
+	return collapseCompanyAdminLines(lines), nil
+}
+
+func companyAdminPlanDateSQL() string {
+	return `CASE WHEN COALESCE(t.recurrence_role,'')='occurrence'
+		THEN NULLIF(TRIM(t.work_date),'')
+		ELSE NULLIF(TRIM(t.due_date),'') END`
 }
 
 func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx string) ([]adminLine, error) {
-	return r.queryAdminLines(`
-		SELECT t.task_id, t.title, COALESCE(t.due_date,''), COALESCE(t.project_id,'')
+	d := companyAdminPlanDateSQL()
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+	lines, err := r.queryAdminLines(`
+		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') = ''
+		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
-		  AND TRIM(COALESCE(t.due_date,'')) != ''
-		  AND date(t.due_date) >= date(?) AND date(t.due_date) < date(?)
+		  AND TRIM(COALESCE(`+d+`,'')) != ''
+		  AND date(`+d+`) >= date(?) AND date(`+d+`) < date(?)
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
-		ORDER BY date(t.due_date), t.title`, from, toEx, projectID)
+		ORDER BY date(`+d+`), t.title`, append(append([]interface{}{}, adminArgs...), from, toEx, projectID)...)
+	if err != nil {
+		return nil, err
+	}
+	return collapseCompanyAdminLines(lines), nil
 }
 
 func (r *StatsRepo) listCompanyAdminCarry(projectID, from, toEx string) ([]adminLine, error) {
-	return r.queryAdminLines(`
-		SELECT t.task_id, t.title, COALESCE(t.due_date,''), COALESCE(t.project_id,'')
-		FROM work_tasks t
-		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') = ''
-		  AND t.status NOT IN ('complete','cancelled')
-		  AND TRIM(COALESCE(t.due_date,'')) != ''
-		  AND date(t.due_date) >= date(?) AND date(t.due_date) < date(?)
-		  AND TRIM(COALESCE(t.project_id,'')) = ?
-		ORDER BY date(t.due_date), t.title`, from, toEx, projectID)
+	return r.listCompanyAdminPlan(projectID, from, toEx)
 }
 
-func (r *StatsRepo) queryAdminLines(q, from, toEx, projectID string) ([]adminLine, error) {
-	rows, err := r.db.Query(q, from, toEx, projectID)
+func (r *StatsRepo) queryAdminLines(q string, args ...interface{}) ([]adminLine, error) {
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +301,7 @@ func (r *StatsRepo) queryAdminLines(q, from, toEx, projectID string) ([]adminLin
 	var out []adminLine
 	for rows.Next() {
 		var a adminLine
-		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -322,7 +377,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') = ''
+		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)`, p.PrevFrom, p.PrevToEx)
 	if err != nil {
@@ -370,17 +425,17 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	prows.Close()
 
 	crows, err := r.db.Query(`
-		SELECT t.task_id, t.title, COALESCE(t.due_date,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
-		       CASE WHEN date(t.due_date) >= date(?) AND date(t.due_date) < date(?) THEN 'plan' ELSE 'carry' END
+		SELECT t.task_id, t.title, COALESCE(`+companyAdminPlanDateSQL()+`,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
+		       CASE WHEN date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') = ''
+		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+`
 		  AND t.status NOT IN ('complete','cancelled')
-		  AND TRIM(COALESCE(t.due_date,'')) != ''
+		  AND TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != ''
 		  AND (
-		        (date(t.due_date) >= date(?) AND date(t.due_date) < date(?))
-		     OR (date(t.due_date) >= date(?) AND date(t.due_date) < date(?))
+		        (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
+		     OR (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
 		  )`, p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisToEx, p.PrevFrom, p.PrevToEx)
 	if err != nil {
 		return nil, err

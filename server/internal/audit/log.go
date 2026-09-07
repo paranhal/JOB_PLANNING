@@ -337,8 +337,12 @@ func TableLabel(t string) string {
 		return "사업"
 	case "sales_projects":
 		return "영업 사업"
-	case "sales_projects":
-		return "영업 사업"
+	case "sales_activities":
+		return "영업 활동"
+	case "sales_parties":
+		return "영업 관계자"
+	case "sales_changes":
+		return "영업 변경 이력"
 	case "work_tasks":
 		return "일일업무"
 	case "work_actions":
@@ -385,4 +389,3 @@ func prettyJSON(s string) string {
 // LogDetail 화면용 전·후 JSON 정리.
 func (l ChangeLog) BeforePretty() string { return prettyJSON(l.BeforeJSON) }
 func (l ChangeLog) AfterPretty() string  { return prettyJSON(l.AfterJSON) }
-

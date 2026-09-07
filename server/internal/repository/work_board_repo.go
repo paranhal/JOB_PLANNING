@@ -81,23 +81,83 @@ func (r *WorkBoardRepo) DashStats(mineUserID string, mineKeys []string) (*model.
 		return nil, err
 	}
 	s.Unplanned = len(unplanned)
+	s.UpcomingOcc, _ = r.countUpcomingOccurrences(today, model.RecurrenceUpcomingDays)
+	s.OverdueDeadline, _ = r.countOverdueRecurrenceParents(today)
 	return s, nil
 }
 
+func (r *WorkBoardRepo) countUpcomingOccurrences(today string, days int) (int, error) {
+	if days < 1 {
+		days = model.RecurrenceUpcomingDays
+	}
+	until, err := time.ParseInLocation("2006-01-02", today, time.Local)
+	if err != nil {
+		return 0, err
+	}
+	end := until.AddDate(0, 0, days).Format("2006-01-02")
+	var n int
+	err = r.db.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks t
+		LEFT JOIN work_recurrence r ON r.task_id = t.parent_task_id
+		WHERE COALESCE(t.recurrence_role,'')='occurrence'
+		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		  AND COALESCE(t.occurrence_status,'') NOT IN ('complete','skipped')
+		  AND TRIM(COALESCE(t.work_date,'')) != ''
+		  AND date(t.work_date) > date(?)
+		  AND date(t.work_date) <= date(?)
+		  AND COALESCE(r.archived,0)=0`, today, end).Scan(&n)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
+}
+
+func (r *WorkBoardRepo) countOverdueRecurrenceParents(today string) (int, error) {
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks t
+		JOIN work_recurrence r ON r.task_id = t.task_id
+		WHERE COALESCE(t.recurrence_role,'')='parent'
+		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		  AND COALESCE(r.archived,0)=0
+		  AND TRIM(COALESCE(t.due_date,'')) != ''
+		  AND date(t.due_date) < date(?)`, today).Scan(&n)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
+}
+
 func (r *WorkBoardRepo) ListBucket(bucket, mineUserID string, mineKeys []string, limit int) ([]model.WorkListItem, error) {
-	today := time.Now().Format("2006-01-02")
-	if bucket == model.WorkBucketDelayed || bucket == "" || bucket == "open" {
+	return r.ListBucketOn(bucket, time.Now().Format("2006-01-02"), mineUserID, mineKeys, limit)
+}
+
+// ListBucketOn 대시보드와 같은 collect* 산식을 선택일 기준으로 조회한다. §7.8.1
+func (r *WorkBoardRepo) ListBucketOn(bucket, date, mineUserID string, mineKeys []string, limit int) ([]model.WorkListItem, error) {
+	date = model.NormalizeAppDate(date)
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+	if bucket == model.WorkBucketDelayed || bucket == "" || bucket == "open" || bucket == model.WorkBucketInProgress {
 		_, _ = NewASWorkRepo(r.db).CloseOpenUnderClosedReceipts()
 	}
 	var items []model.WorkListItem
 	var err error
 	switch bucket {
 	case model.WorkBucketToday:
-		items, err = r.collectByDate(mineUserID, mineKeys, today, false)
+		items, err = r.collectByDate(mineUserID, mineKeys, date, false)
 	case model.WorkBucketDelayed:
-		items, err = r.collectDelayed(mineUserID, mineKeys, today)
+		items, err = r.collectDelayed(mineUserID, mineKeys, date)
 	case model.WorkBucketCompletedToday:
-		items, err = r.collectCompletedOn(mineUserID, mineKeys, today)
+		items, err = r.collectCompletedOn(mineUserID, mineKeys, date)
+	case model.WorkBucketInProgress:
+		items, err = r.collectInProgress(mineUserID, mineKeys, date)
 	case model.WorkBucketSchedulePending:
 		items, err = r.collectSchedulePending(mineUserID, mineKeys)
 	case model.WorkBucketUnassigned:
@@ -109,6 +169,28 @@ func (r *WorkBoardRepo) ListBucket(bucket, mineUserID string, mineKeys []string,
 		return nil, err
 	}
 	return sortLimitWorkItems(items, limit), nil
+}
+
+// collectInProgress 오늘 예정·지연 수집기를 재사용해 진행중만 남긴다. 새 SQL 산식을 만들지 않는다.
+func (r *WorkBoardRepo) collectInProgress(mineUserID string, mineKeys []string, date string) ([]model.WorkListItem, error) {
+	todayItems, err := r.collectByDate(mineUserID, mineKeys, date, false)
+	if err != nil {
+		return nil, err
+	}
+	delayed, err := r.collectDelayed(mineUserID, mineKeys, date)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	merged := appendUniqueWorkItems(nil, todayItems, seen)
+	merged = appendUniqueWorkItems(merged, delayed, seen)
+	var out []model.WorkListItem
+	for _, it := range merged {
+		if model.WBKanbanBucket(model.MapASStatusToWB(it.Status)) == model.WBTaskInProgress {
+			out = append(out, it)
+		}
+	}
+	return out, nil
 }
 
 // ListScheduledOn 기준일 예정 목록(회의·업무 리스트 공용)
@@ -127,6 +209,88 @@ func (r *WorkBoardRepo) ListCompletedOn(date, mineUserID string, mineKeys []stri
 		return nil, err
 	}
 	return sortLimitWorkItems(items, limit), nil
+}
+
+func workItemKey(it model.WorkListItem) string {
+	return it.Prefix + ":" + it.RefID
+}
+
+func appendUniqueWorkItems(dst []model.WorkListItem, src []model.WorkListItem, seen map[string]bool) []model.WorkListItem {
+	for _, it := range src {
+		k := workItemKey(it)
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		dst = append(dst, it)
+	}
+	return dst
+}
+
+func maintMineWhere(extra string, mineKeys []string) (string, []interface{}) {
+	names := cleanAssignees(mineKeys)
+	if len(names) == 0 {
+		return extra, nil
+	}
+	ph := make([]string, len(names))
+	args := make([]interface{}, len(names))
+	for i, n := range names {
+		ph[i] = "?"
+		args[i] = n
+	}
+	return extra + ` AND TRIM(COALESCE(mv.assignee,'')) IN (` + strings.Join(ph, ",") + `)`, args
+}
+
+// ListUnified 「오늘 내 업무」통합 목록. AS·정기점검·행정·지원. 완료는 당일만. §33.9
+func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includeAllSales bool, today string) ([]model.WorkListItem, error) {
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+	open, err := r.collectOpen(mineUserID, mineKeys)
+	if err != nil {
+		return nil, err
+	}
+	done, err := r.collectCompletedOn(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	tasks, err := r.queryWorkTasks(
+		`t.work_type IN ('admin','support') AND COALESCE(t.status,'') NOT IN ('complete','cancelled')`,
+		mineUserID, mineKeys, nil)
+	if err != nil {
+		return nil, err
+	}
+	overdueWhere, overdueArgs := maintMineWhere(
+		`COALESCE(mv.completed,0)=0 AND date(mv.visit_date) < date(?)`, mineKeys)
+	overdueArgs = append([]interface{}{today}, overdueArgs...)
+	overdueM, err := r.queryMaintenance(overdueWhere, overdueArgs, 500)
+	if err != nil {
+		return nil, err
+	}
+	partial, err := r.queryAS(`ar.status='partial_complete'`, mineUserID, mineKeys, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	var out []model.WorkListItem
+	out = appendUniqueWorkItems(out, open, seen)
+	out = appendUniqueWorkItems(out, done, seen)
+	out = appendUniqueWorkItems(out, tasks, seen)
+	out = appendUniqueWorkItems(out, overdueM, seen)
+	out = appendUniqueWorkItems(out, partial, seen)
+
+	if includeAllSales {
+		sales, err := r.queryWorkTasks(
+			`COALESCE(t.source_type,'')='sales_activity' AND COALESCE(t.status,'') NOT IN ('cancelled')
+			 AND (COALESCE(t.status,'')!='complete' OR `+adminTaskCompleteDateSQL+`=date(?))`,
+			"", nil, []interface{}{today})
+		if err != nil {
+			return nil, err
+		}
+		out = appendUniqueWorkItems(out, sales, seen)
+	}
+	return out, nil
 }
 
 func sortLimitWorkItems(items []model.WorkListItem, limit int) []model.WorkListItem {
@@ -341,6 +505,9 @@ func (r *WorkBoardRepo) collectCompletedOn(mineUserID string, mineKeys []string,
 		return nil, err
 	}
 	out = append(out, tItems...)
+	for i := range out {
+		out[i].CompleteDate = date
+	}
 	return out, nil
 }
 
@@ -367,7 +534,8 @@ func (r *WorkBoardRepo) collectUnassigned() ([]model.WorkListItem, error) {
 func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string, extraArgs []interface{}) ([]model.WorkListItem, error) {
 	q := `
 		SELECT ar.as_id, ar.as_number, c.org_name, COALESCE(ar.symptom,''),
-		       COALESCE(ar.assigned_to,''), COALESCE(ar.visit_scheduled_date,''), ar.status
+		       COALESCE(ar.assigned_to,''), COALESCE(ar.visit_scheduled_date,''), ar.status,
+		       COALESCE(ar.urgency,''), COALESCE(ar.receipt_group_id,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		WHERE ` + extraWhere
@@ -386,12 +554,14 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 	for rows.Next() {
 		var it model.WorkListItem
 		var status string
-		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status); err != nil {
+		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID); err != nil {
 			return nil, err
 		}
 		it.Prefix = model.WorkPrefixAS
 		it.Status = status
 		it.StatusLabel = asStatusLabel(status)
+		it.WorkDate = it.ScheduledDate
+		it.DueDate = it.ScheduledDate
 		it.Href = "/as/" + it.RefID
 		items = append(items, it)
 	}
@@ -448,6 +618,8 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 			}
 		}
 		it.StatusLabel = workItemStatusLabel(it.Status)
+		it.WorkDate = it.ScheduledDate
+		it.DueDate = it.ScheduledDate
 		it.Href = "/as/work/" + it.RefID + "/action"
 		items = append(items, it)
 	}
@@ -509,6 +681,8 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		}
 		it.Prefix = model.WorkPrefixMaintenance
 		it.RefNumber = it.ScheduledDate
+		it.WorkDate = it.ScheduledDate
+		it.DueDate = it.ScheduledDate
 		if completed == 1 {
 			it.Status = "done"
 			it.StatusLabel = "방문 완료"
@@ -517,6 +691,7 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 			it.StatusLabel = "예정"
 		}
 		it.Href = "/maintenance/" + planID
+		it.ProductType = product
 		if product != "" {
 			it.SubLabel = product
 		} else if cat != "" {
@@ -550,6 +725,8 @@ func (r *WorkBoardRepo) queryGeneral(extraWhere string, args []interface{}) ([]m
 		}
 		it.Prefix = model.WorkPrefixGeneral
 		it.RefNumber = it.RefID
+		it.WorkDate = it.ScheduledDate
+		it.DueDate = it.ScheduledDate
 		it.Status = phase
 		if phase == "complete" {
 			it.StatusLabel = "완료"
@@ -564,12 +741,15 @@ func (r *WorkBoardRepo) queryGeneral(extraWhere string, args []interface{}) ([]m
 
 func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys []string, extraArgs []interface{}) ([]model.WorkListItem, error) {
 	q := `
-		SELECT t.task_id, COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), ''),
+		SELECT t.task_id, COALESCE(NULLIF(TRIM(t.work_date),''), ''),
+		       COALESCE(NULLIF(TRIM(t.due_date),''), ''),
 		       t.title, COALESCE(t.assignee,''), t.status, t.work_type,
-		       COALESCE(p.short_name, p.name, '')
+		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), COALESCE(p.short_name, p.name, '')),
+		       COALESCE(t.source_type,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE ` + extraWhere
+		LEFT JOIN customers c ON c.customer_id = t.customer_id
+		WHERE ` + extraWhere + SQLRecurrenceWorkUnit
 	args := append([]interface{}{}, extraArgs...)
 	if mineCond, mineArgs := mineTaskAssigneeCond(mineUserID, mineKeys); mineCond != "" {
 		q += mineCond
@@ -587,15 +767,23 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 	var items []model.WorkListItem
 	for rows.Next() {
 		var it model.WorkListItem
-		var workType, project string
-		if err := rows.Scan(&it.RefID, &it.ScheduledDate, &it.Title, &it.Assignee, &it.Status, &workType, &project); err != nil {
+		var workType, sourceType string
+		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType); err != nil {
 			return nil, err
 		}
+		it.ScheduledDate = it.WorkDate
+		if it.ScheduledDate == "" {
+			it.ScheduledDate = it.DueDate
+		}
 		it.Prefix = model.WorkPrefixGeneral
+		if sourceType == model.WBSourceSalesActivity {
+			it.Prefix = model.WorkPrefixSales
+		}
 		it.RefNumber = it.RefID
-		it.OrgName = project
 		if workType == model.WBWorkSupport {
 			it.SubLabel = "지원"
+		} else if it.Prefix == model.WorkPrefixSales {
+			it.SubLabel = "영업"
 		} else {
 			it.SubLabel = "행정"
 		}

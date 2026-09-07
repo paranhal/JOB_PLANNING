@@ -74,6 +74,18 @@
         </div>
       </div>
 
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">구분</label>
+        <select name="party_kind"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="customer" {{if or (eq .Customer.PartyKind "customer") (not .Customer.PartyKind)}}selected{{end}}>고객</option>
+          <option value="partner" {{if eq .Customer.PartyKind "partner"}}selected{{end}}>협력사</option>
+          <option value="own" {{if eq .Customer.PartyKind "own"}}selected{{end}}>자사</option>
+          <option value="vendor" {{if eq .Customer.PartyKind "vendor"}}selected{{end}}>제조사·공급사</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-400">AS 접수·정기점검은 고객만 표시합니다.</p>
+      </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">기관 이메일</label>

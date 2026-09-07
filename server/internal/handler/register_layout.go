@@ -17,7 +17,7 @@ const registerCardMaxWidthPct = 20.0
 
 type displaySpan struct{ s, e int }
 
-// ensureTimelineDisplayTimes 시간표 표시용으로 WorkDate·StartTime을 채운다(DB는 변경하지 않음).
+// ensureTimelineDisplayTimes 일정표 표시용으로 WorkDate·StartTime을 채운다(DB는 변경하지 않음).
 // WorkDate가 비면 DueDate를 쓰고, 시각이 없으면 같은 날 기존 일정과 겹치지 않게 순차 배정한다.
 func ensureTimelineDisplayTimes(tasks []model.WorkTask) []model.WorkTask {
 	out := make([]model.WorkTask, len(tasks))
@@ -100,7 +100,7 @@ func nextFreeDisplaySlot(busy []displaySpan, dayStart, dayEnd, dur int) int {
 	return cursor
 }
 
-// RegisterBlock 시간표에 절대 배치되는 업무 카드
+// RegisterBlock 일정표에 절대 배치되는 업무 카드
 type RegisterBlock struct {
 	Card        model.WBCard
 	Style       template.CSS // html/template이 calc/색을 지우지 않도록 CSS 타입
@@ -139,37 +139,36 @@ type AssigneeLegend struct {
 
 // RegisterMonthDay 월간 캘린더 하루 칸
 type RegisterMonthDay struct {
-	Date        string
-	DayNum      int
-	InMonth     bool
-	IsToday     bool
-	IsWeekend   bool
-	IsSunday    bool
-	IsSaturday  bool
-	HolidayName string
-	HolidayKind string
-	DateTitle   string
-	DayClass    string
-	CellClass   string
-	DayStyle    string
-	CellStyle   string
-	Leaves      LeaveBadgeGroup
-	Cards       []model.WBCard
-	Visible     []model.WBCard
-	MoreCount   int
-	Unassigned  int
-	Total       int
+	Date         string
+	DayNum       int
+	InMonth      bool
+	IsToday      bool
+	IsWeekend    bool
+	IsSunday     bool
+	IsSaturday   bool
+	HolidayName  string
+	HolidayKind  string
+	DateTitle    string
+	DayClass     string
+	CellClass    string
+	DayStyle     string
+	CellStyle    string
+	Leaves       LeaveBadgeGroup
+	Cards        []model.WBCard
+	Visible      []model.WBCard
+	MoreCount    int
+	Unassigned   int
+	Total        int
+	ActionCount  int // 업무처리현황: 그날 조치 건수
+	ReceiptCount int // 업무처리현황: 그날 접수 건수
 }
 
-const registerMonthVisibleMax = 3
+const (
+	registerMonthVisibleMax = 3
+	registerWeekVisibleMax  = 6
+)
 
-// buildRegisterMonthWeeks 일요일 시작 월간 캘린더(피그마형).
-func buildRegisterMonthWeeks(anchor time.Time, today string, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard) [][]RegisterMonthDay {
-	loc := anchor.Location()
-	first := time.Date(anchor.Year(), anchor.Month(), 1, 0, 0, 0, 0, loc)
-	last := first.AddDate(0, 1, -1)
-	start := first.AddDate(0, 0, -int(first.Weekday())) // 일요일
-	end := last.AddDate(0, 0, (6-int(last.Weekday())+7)%7)
+func tasksByWorkDate(placed []model.WorkTask) map[string][]model.WorkTask {
 	byDate := map[string][]model.WorkTask{}
 	for _, t := range placed {
 		d := strings.TrimSpace(t.WorkDate)
@@ -178,6 +177,44 @@ func buildRegisterMonthWeeks(anchor time.Time, today string, placed []model.Work
 		}
 		byDate[d] = append(byDate[d], t)
 	}
+	return byDate
+}
+
+func fillRegisterMonthDay(day *RegisterMonthDay, tasks []model.WorkTask, toCard func(model.WorkTask) model.WBCard, visibleMax int) {
+	if visibleMax <= 0 {
+		visibleMax = registerMonthVisibleMax
+	}
+	tasks = append([]model.WorkTask(nil), tasks...)
+	sort.SliceStable(tasks, func(i, j int) bool {
+		if tasks[i].StartTime != tasks[j].StartTime {
+			return tasks[i].StartTime < tasks[j].StartTime
+		}
+		return tasks[i].Title < tasks[j].Title
+	})
+	for _, t := range tasks {
+		card := toCard(t)
+		day.Cards = append(day.Cards, card)
+		if strings.TrimSpace(card.Assignee) == "" {
+			day.Unassigned++
+		}
+	}
+	day.Total = len(day.Cards)
+	if day.Total > visibleMax {
+		day.Visible = day.Cards[:visibleMax]
+		day.MoreCount = day.Total - visibleMax
+	} else {
+		day.Visible = day.Cards
+	}
+}
+
+// buildRegisterMonthWeeks 일요일 시작 월간 캘린더(피그마형).
+func buildRegisterMonthWeeks(anchor time.Time, today string, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard) [][]RegisterMonthDay {
+	loc := anchor.Location()
+	first := time.Date(anchor.Year(), anchor.Month(), 1, 0, 0, 0, 0, loc)
+	last := first.AddDate(0, 1, -1)
+	start := first.AddDate(0, 0, -int(first.Weekday())) // 일요일
+	end := last.AddDate(0, 0, (6-int(last.Weekday())+7)%7)
+	byDate := tasksByWorkDate(placed)
 	var weeks [][]RegisterMonthDay
 	var week []RegisterMonthDay
 	for cursor := start; !cursor.After(end); cursor = cursor.AddDate(0, 0, 1) {
@@ -189,27 +226,7 @@ func buildRegisterMonthWeeks(anchor time.Time, today string, placed []model.Work
 			IsWeekend: cursor.Weekday() == time.Sunday || cursor.Weekday() == time.Saturday,
 		}
 		if inMonth {
-			tasks := append([]model.WorkTask(nil), byDate[ds]...)
-			sort.SliceStable(tasks, func(i, j int) bool {
-				if tasks[i].StartTime != tasks[j].StartTime {
-					return tasks[i].StartTime < tasks[j].StartTime
-				}
-				return tasks[i].Title < tasks[j].Title
-			})
-			for _, t := range tasks {
-				card := toCard(t)
-				day.Cards = append(day.Cards, card)
-				if strings.TrimSpace(card.Assignee) == "" {
-					day.Unassigned++
-				}
-			}
-			day.Total = len(day.Cards)
-			if day.Total > registerMonthVisibleMax {
-				day.Visible = day.Cards[:registerMonthVisibleMax]
-				day.MoreCount = day.Total - registerMonthVisibleMax
-			} else {
-				day.Visible = day.Cards
-			}
+			fillRegisterMonthDay(&day, byDate[ds], toCard, registerMonthVisibleMax)
 		}
 		week = append(week, day)
 		if len(week) == 7 {
@@ -218,6 +235,29 @@ func buildRegisterMonthWeeks(anchor time.Time, today string, placed []model.Work
 		}
 	}
 	return weeks
+}
+
+// buildRegisterWeekDays 월요일 시작 주간 7열. 칸이 넓어 카드를 더 보여 준다. §14.3
+func buildRegisterWeekDays(cols []RegisterColumn, today string, placed []model.WorkTask, toCard func(model.WorkTask) model.WBCard, visibleMax int) [][]RegisterMonthDay {
+	if visibleMax <= 0 {
+		visibleMax = registerWeekVisibleMax
+	}
+	byDate := tasksByWorkDate(placed)
+	week := make([]RegisterMonthDay, 0, len(cols))
+	for _, col := range cols {
+		ds := strings.TrimSpace(col.Date)
+		day := RegisterMonthDay{Date: ds, InMonth: true, IsToday: ds == today}
+		if t, err := time.ParseInLocation(dateLayout, ds, time.Local); err == nil {
+			day.DayNum = t.Day()
+			day.IsWeekend = t.Weekday() == time.Sunday || t.Weekday() == time.Saturday
+		}
+		fillRegisterMonthDay(&day, byDate[ds], toCard, visibleMax)
+		week = append(week, day)
+	}
+	if len(week) == 0 {
+		return nil
+	}
+	return [][]RegisterMonthDay{week}
 }
 
 type layoutEvent struct {

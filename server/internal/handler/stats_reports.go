@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"html/template"
 	"net/http"
 	"strings"
 	"time"
@@ -76,10 +77,15 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 	if sheetName == "" {
 		sheetName = companyDraft.Period.SheetNameDefault
 	}
+	metricsBase, metricsScope, metricsHint := metricsViewData(h.repo)
+	lb := parseLookback(c, metricsBase, now)
 
 	return c.Render(http.StatusOK, "stats/reports.html", map[string]interface{}{
 		"Title":            "보고서",
-		"Active":           "stats_reports",
+		"Active":           NavStatsReports,
+		"Lookback":         lb,
+		"LookbackQS":       template.URL(lb.QueryValues()),
+		"LookbackViewID":   "reportLookbackView",
 		"WeekOptions":      weeks,
 		"DefaultWeek":      defaultWeek,
 		"MonthOptions":     monthOptions(now),
@@ -97,6 +103,9 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		"CompanyWeekly":    companyDraft,
 		"CompanyDate":      companyDraft.Period.Anchor,
 		"CompanySheetName": sheetName,
+		"MetricsBaseDate":    metricsBase,
+		"ProgressScopeLabel": metricsScope,
+		"ProgressScopeHint":  metricsHint,
 	})
 }
 

@@ -67,6 +67,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 	search := c.QueryParam("search")
 	category := c.QueryParam("category")
 	industry := c.QueryParam("industry")
+	partyKind := c.QueryParam("party_kind")
 	sort := c.QueryParam("sort")
 	dir := c.QueryParam("dir")
 	if dir != "asc" && dir != "desc" {
@@ -79,7 +80,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 	pageSize := 20
 	reviewOnly := c.QueryParam("review") == "1"
 
-	items, total, err := h.repo.List(search, category, industry, sort, dir, page, pageSize, reviewOnly)
+	items, total, err := h.repo.List(search, category, industry, sort, dir, page, pageSize, reviewOnly, partyKind)
 	if err != nil {
 		return err
 	}
@@ -118,6 +119,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		"Categories":    cats,
 		"NoneCount":     noneCount,
 		"Industry":      industry,
+		"PartyKind":     partyKind,
 		"Industries":    industries,
 		"Sort":          sort,
 		"Dir":           dir,
@@ -136,6 +138,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		"ExportSite":    "",
 		"ReviewOnly":    reviewOnly,
 		"ReviewCount":   h.repo.CountNeedsReview(),
+		"ParentGroups":  model.GroupCustomersByParent(items),
 	})
 }
 
@@ -512,5 +515,6 @@ func bindCustomer(c echo.Context) *model.Customer {
 		AddressDetail:    strings.TrimSpace(c.FormValue("address_detail")),
 		IsActive:         c.FormValue("is_active") != "0",
 		Notes:            c.FormValue("notes"),
+		PartyKind:        model.NormalizePartyKind(c.FormValue("party_kind")),
 	}
 }

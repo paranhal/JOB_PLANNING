@@ -38,8 +38,8 @@
       {{.Total}}건
     </p>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/admin-work?view=list{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">목록</a>
-      <a href="/admin-work?view=kanban{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
+      <a href="/admin-work?display=list{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
+      <a href="/admin-work?display=kanban{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
       {{if .CanWrite}}
       <a href="/admin-work/new"
          class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -69,7 +69,7 @@
 
   <div class="bg-white rounded-xl border border-gray-200 p-4">
     <form method="GET" action="/admin-work" class="flex flex-col sm:flex-row gap-3">
-      {{if eq .View "kanban"}}<input type="hidden" name="view" value="kanban">{{end}}
+      {{if eq .View "kanban"}}<input type="hidden" name="display" value="kanban"><input type="hidden" name="view" value="kanban">{{end}}
       {{if and .Sort (or (ne .Sort "due_date") (ne .Dir "asc"))}}
       <input type="hidden" name="sort" value="{{.Sort}}">
       <input type="hidden" name="dir" value="{{.Dir}}">
@@ -96,7 +96,7 @@
   </div>
 
   {{if eq .View "kanban"}}
-  {{template "admin_work_kanban" .}}
+  {{template "kanban_board" .}}
   {{else}}
   {{template "admin_work_table" .}}
   {{end}}

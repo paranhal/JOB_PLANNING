@@ -29,6 +29,14 @@ func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, 
 	return &StatsHandler{repo: repo, userRepo: userRepo, wbRepo: wbRepo, workBoard: workBoard, mntRepo: mntRepo}
 }
 
+func metricsViewData(repo *repository.StatsRepo) (base, scopeLabel, hint string) {
+	if repo == nil {
+		return "", "", model.ProgressScopeRevertHint
+	}
+	p := repo.MetricsPolicy()
+	return p.BaseDate, model.ProgressScopeLabel(p.ProgressScope), model.ProgressScopeRevertHint
+}
+
 func applyPlanningToKPI(workBoard *repository.WorkBoardRepo, kpi *model.StatsKPICard) {
 	if workBoard == nil || kpi == nil {
 		return
@@ -233,44 +241,28 @@ func weekOptions(now time.Time) []struct{ Value, Label string } {
 // Overview 일일/주간/월간 KPI·차트·예정·접수·처리 요약
 func (h *StatsHandler) Overview(c echo.Context) error {
 	now := time.Now()
-	view := strings.TrimSpace(c.QueryParam("view"))
-	switch view {
-	case model.StatsViewWeek, model.StatsViewMonth, model.StatsViewRange:
-	default:
-		view = model.StatsViewDay
-	}
+	metricsBase, metricsScope, metricsHint := metricsViewData(h.repo)
+	lb := parseLookback(c, metricsBase, now)
 	filter := repository.ParseMeetingFilter(c.QueryParam("scope"), c.QueryParam("key"), c.QueryParam("project"))
 	filter.IncludeImport = c.QueryParam("import") == "1"
-	rangeFrom, rangeTo := repository.ParseStatsRangeBounds(c.QueryParam("from"), c.QueryParam("to"), now)
+	filter.ExcludeSalesActivity = c.QueryParam("sales") == "0"
+	fromIncl, toIncl := lookbackTimes(lb, now)
 
-	var cols []model.StatsPeriodColumn
-	var series []model.StatsChartPoint
-	var err error
-	anchor := repository.ParseStatsAnchor(view, c.QueryParam("date"), c.QueryParam("month"), now)
-	if view == model.StatsViewRange {
-		cols = repository.BuildStatsRangeColumns(rangeFrom, rangeTo)
-	} else {
-		cols = repository.BuildStatsPeriodColumns(view, anchor)
-	}
+	cols := repository.BuildStatsRangeColumns(fromIncl, toIncl)
 	if err := h.repo.FillPeriodOverview(cols, filter); err != nil {
 		return err
 	}
-	kpi, err := h.repo.LoadStatsKPI(view, cols, filter)
+	kpi, err := h.repo.LoadStatsKPI(model.StatsViewRange, cols, filter)
 	if err != nil {
 		return err
 	}
 	applyPlanningToKPI(h.workBoard, &kpi)
-	if view == model.StatsViewRange {
-		series, err = h.repo.LoadStatsChartSeriesRange(rangeFrom, rangeTo, filter)
-	} else {
-		series, err = h.repo.LoadStatsChartSeries(view, anchor, filter)
-	}
+	series, err := h.repo.LoadStatsChartSeriesWindow(lb.View, fromIncl, toIncl, filter)
 	if err != nil {
 		return err
 	}
 	seriesJSON, _ := json.Marshal(series)
 
-	// 현재 기간(오늘/이번주/이번달/선택 기간) 완료 건 — 조치내용 포함
 	var completedRows []model.StatsRow
 	var completedRange string
 	var analysis model.StatsWorkAnalysis
@@ -281,10 +273,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		completedRange = cur.Label
-		if cur.RangeLabel != "" {
-			completedRange = cur.Label + " " + cur.RangeLabel
-		}
+		completedRange = lb.Headline
 		analysis, err = h.repo.LoadStatsWorkAnalysis(cur.From, cur.ToExclusive, filter)
 		if err != nil {
 			return err
@@ -296,13 +285,11 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 	}
 
 	viewLabel := "일별"
-	switch view {
+	switch lb.View {
 	case model.StatsViewWeek:
 		viewLabel = "주별"
 	case model.StatsViewMonth:
 		viewLabel = "월별"
-	case model.StatsViewRange:
-		viewLabel = "기간 지정"
 	}
 
 	var assignees []model.User
@@ -314,20 +301,15 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		projects, _ = h.wbRepo.ListProjects(true)
 	}
 
-	rangeDays := int(rangeTo.Sub(rangeFrom).Hours()/24) + 1
-	if rangeDays < 1 {
-		rangeDays = 1
-	}
-	prevRangeFrom := rangeFrom.AddDate(0, 0, -rangeDays)
-	prevRangeTo := rangeFrom.AddDate(0, 0, -1)
-	nextRangeFrom := rangeTo.AddDate(0, 0, 1)
-	nextRangeTo := rangeTo.AddDate(0, 0, rangeDays)
-
+	anchor := now
 	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
 		"Title":            "통계",
-		"Active":           "stats",
-		"View":             view,
+		"Active":           NavStats,
+		"View":             lb.View,
 		"ViewLabel":        viewLabel,
+		"Lookback":         lb,
+		"LookbackQS":       template.URL(lb.QueryValues()),
+		"LookbackViewID":   "statsLookbackView",
 		"Columns":          cols,
 		"KPI":              kpi,
 		"SeriesJSON":       template.JS(seriesJSON),
@@ -343,26 +325,21 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"Assignees":        assignees,
 		"Projects":         projects,
 		"ProductOptions":   repository.StatsProductOptions(),
-		"FilterQ":          meetingFilterQuery(filter),
+		"FilterQ":            statsMeetingFilterQuery(filter),
+		"MetricsBaseDate":    metricsBase,
+		"ProgressScopeLabel": metricsScope,
+		"ProgressScopeHint":  metricsHint,
 		"AnchorDate":       anchor.Format("2006-01-02"),
 		"AnchorMonth":      anchor.Format("2006-01"),
 		"AnchorMonthLabel": anchor.Format("2006년 01월"),
 		"Today":            now.Format("2006-01-02"),
 		"CurrentMonth":     now.Format("2006-01"),
-		"RangeFrom":        rangeFrom.Format("2006-01-02"),
-		"RangeTo":          rangeTo.Format("2006-01-02"),
-		"PrevRangeFrom":    prevRangeFrom.Format("2006-01-02"),
-		"PrevRangeTo":      prevRangeTo.Format("2006-01-02"),
-		"NextRangeFrom":    nextRangeFrom.Format("2006-01-02"),
-		"NextRangeTo":      nextRangeTo.Format("2006-01-02"),
-		"PrevAnchor":       statsOverviewShift(view, anchor, -1).Format("2006-01-02"),
-		"NextAnchor":       statsOverviewShift(view, anchor, 1).Format("2006-01-02"),
-		"PrevMonth":        statsOverviewShift(view, anchor, -1).Format("2006-01"),
-		"NextMonth":        statsOverviewShift(view, anchor, 1).Format("2006-01"),
+		"RangeFrom":        lb.From,
+		"RangeTo":          lb.To,
 	})
 }
 
-func meetingFilterQuery(f model.StatsMeetingFilter) string {
+func statsMeetingFilterQuery(f model.StatsMeetingFilter) string {
 	q := url.Values{}
 	if f.Scope != "" && f.Scope != model.StatsScopeTeam {
 		q.Set("scope", f.Scope)
@@ -375,6 +352,9 @@ func meetingFilterQuery(f model.StatsMeetingFilter) string {
 	}
 	if f.IncludeImport {
 		q.Set("import", "1")
+	}
+	if f.ExcludeSalesActivity {
+		q.Set("sales", "0")
 	}
 	s := q.Encode()
 	if s == "" {
@@ -415,6 +395,8 @@ func (h *StatsHandler) List(c echo.Context) error {
 	// 담당자별: 사람 단위로 건 리스트 그룹핑
 	groups := groupStatsByAssignee(rows)
 
+	metricsBase, metricsScope, metricsHint := metricsViewData(h.repo)
+
 	periodOptions := []struct{ Value, Label string }{
 		{model.StatsPeriodDay, "일별"},
 		{model.StatsPeriodWeek, "주간별"},
@@ -438,7 +420,7 @@ func (h *StatsHandler) List(c echo.Context) error {
 
 	return c.Render(http.StatusOK, "stats/list.html", map[string]interface{}{
 		"Title":          "통계 상세",
-		"Active":         "stats_detail",
+		"Active":         NavStatsDetail,
 		"Query":          q,
 		"QueryString":    statsQueryString(q),
 		"Metric":         q.Metric,
@@ -462,6 +444,9 @@ func (h *StatsHandler) List(c echo.Context) error {
 		"ShowTeam":       q.Scope == model.StatsScopeTeam,
 		"ShowAssignee":   q.Scope == model.StatsScopeAssignee,
 		"OverdueNote":    q.Metric == model.StatsMetricOverdue,
+		"MetricsBaseDate":    metricsBase,
+		"ProgressScopeLabel": metricsScope,
+		"ProgressScopeHint":  metricsHint,
 	})
 }
 

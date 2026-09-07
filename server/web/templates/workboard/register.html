@@ -19,6 +19,11 @@
        mntQ: '',
        sel: null,
        unlockOpen: false,
+       kanbanAskAssignee: false,
+       kanbanAskComplete: false,
+       pendingMove: null,
+       kanbanAssignee: '',
+       kanbanNote: '',
        addMinutes(hhmm, mins) {
          const p = (hhmm || '09:00').split(':');
          let t = (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0) + (mins||0);
@@ -33,7 +38,8 @@
            kind: d.kind, ref: d.ref, title: d.title || '', assignee: d.assignee || '',
            duration: d.duration || '30', href: d.href || '', edit: d.edit || '',
            zone: d.zone || '', workDate: d.workDate || '',
-           startTime: d.startTime || '', endTime: d.endTime || ''
+           startTime: d.startTime || '', endTime: d.endTime || '',
+           col: d.col || '', itemKey: d.itemKey || ''
          };
        },
        isPicked(kind, ref) {
@@ -113,17 +119,53 @@
        addExtra(name) {
          if (name && this.extraCols.indexOf(name) < 0) this.extraCols.push(name);
          this.addOpen = false;
+       },
+       dropKanban(el) {
+         if (!this.sel || !this.sel.itemKey) return;
+         const to = el.dataset.col;
+         if (!to || to === this.sel.col) return;
+         if (to === 'unplanned') { alert('미계획으로 되돌릴 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.'); return; }
+         if (this.sel.col === 'completed_today') {
+           if (!confirm('완료를 취소하고 되돌릴까요?')) return;
+         }
+         this.pendingMove = { from: this.sel.col, to: to, key: this.sel.itemKey, assignee: this.sel.assignee || '' };
+         const needAssignee = (!this.pendingMove.assignee) && (to === 'today' || to === 'in_progress');
+         if (needAssignee) { this.kanbanAssignee = ''; this.kanbanAskAssignee = true; return; }
+         if (to === 'completed_today') { this.kanbanNote = ''; this.kanbanAskComplete = true; return; }
+         this.submitKanban();
+       },
+       submitKanban() {
+         const p = this.pendingMove;
+         if (!p) return;
+         const f = this.$refs.kanbanMoveForm;
+         if (!f) return;
+         f.from.value = p.from;
+         f.to.value = p.to;
+         f.item_key.value = p.key;
+         f.assignee.value = this.kanbanAssignee || p.assignee || '';
+         f.complete_note.value = this.kanbanNote || '';
+         f.confirm_reopen.value = p.from === 'completed_today' ? '1' : '';
+         this.kanbanAskAssignee = false;
+         this.kanbanAskComplete = false;
+         this.pendingMove = null;
+         f.submit();
        }
      }">
 
+  {{if .RoleUnresolved}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    권한 정보를 불러오지 못했습니다. 새로고침하거나 다시 로그인해 주세요.
+  </div>
+  {{end}}
+
   {{if .FlashOK}}
   <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-sm text-emerald-800 shadow-sm">
-    {{if eq .FlashOK "place"}}업무가 시간표에 배치되었습니다.{{else if eq .FlashOK "unplace"}}업무를 시간표에서 내렸습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else}}{{.FlashOK}}{{end}}
+    {{if eq .FlashOK "place"}}업무가 일정표에 배치되었습니다.{{else if eq .FlashOK "unplace"}}업무를 일정표에서 내렸습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "kanban"}}칸반에서 업무를 옮겼습니다.{{else}}{{.FlashOK}}{{end}}
   </div>
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 shadow-sm">
-    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else}}{{.FlashErr}}{{end}}
+    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "kanban_unplanned"}}미계획으로 옮길 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.{{else if eq .FlashErr "kanban_assignee"}}담당자를 지정해야 오늘 예정으로 둘 수 있습니다.{{else if eq .FlashErr "kanban_complete"}}완료 내용을 입력하세요.{{else if eq .FlashErr "kanban_reopen"}}완료를 취소하고 되돌릴까요? 다시 끌어 확인하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
@@ -153,6 +195,10 @@
           <form method="GET" action="/workboard/register" class="inline-flex flex-wrap gap-1.5">
             <input type="hidden" name="view" value="{{.View}}">
             <input type="hidden" name="date" value="{{.Date}}">
+            {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
+            {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
+            {{if .ShowScopeToggle}}
+            {{else}}
             <label class="sr-only" for="reg-assignee">담당자</label>
             <select id="reg-assignee" name="assignee" onchange="this.form.submit()"
                     class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[7.5rem]">
@@ -161,6 +207,7 @@
               <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
               {{end}}
             </select>
+            {{end}}
             <label class="sr-only" for="reg-project">사업</label>
             <select id="reg-project" name="project" onchange="this.form.submit()"
                     class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[9rem]">
@@ -170,10 +217,17 @@
               {{end}}
             </select>
           </form>
+          {{if .ShowScopeToggle}}
+          {{if .ScopeAll}}
+          <a href="{{.MineHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">내 배정만</a>
+          {{else}}
+          <a href="{{.TeamHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100">팀 전체 보기</a>
+          {{end}}
+          {{end}}
         </div>
         <p class="text-[12px] text-slate-500 mt-1">
           {{.PeriodLabel}} · 07:00~20:00 15분 단위 · 확정 배치 <span class="font-semibold text-slate-700">{{.PlacedCount}}</span>건 · 우측은 미확정 대기
-          {{if .AssigneeFilter}} · <span class="text-blue-700 font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
+          {{if .ScopeNote}} · {{.ScopeNote}}{{else if .AssigneeFilter}} · <span class="text-blue-700 font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
           · 시작일만 있고 시간이 없는 건은 07:00부터 순차 표시
         </p>
         <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-600">
@@ -202,19 +256,29 @@
           <a href="/workboard/register?view=month&date={{.Date}}{{.AssigneeQ}}"
              class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .View "month"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">월간</a>
         </div>
+        {{if eq .View "day"}}
+        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+          <a href="/workboard/register?view=day&date={{.Date}}{{.AssigneeQ}}"
+             class="px-3 py-1.5 text-xs font-semibold {{if ne .Display "kanban"}}bg-slate-800 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">일정표</a>
+          <a href="/workboard/register?view=day&date={{.Date}}{{.AssigneeQ}}&display=kanban"
+             class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .Display "kanban"}}bg-slate-800 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">칸반</a>
+        </div>
+        {{end}}
         <div class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-0.5 shadow-sm">
-          <a href="/workboard/register?view={{.View}}&date={{.PrevDate}}{{.AssigneeQ}}"
+          <a href="/workboard/register?view={{.View}}&date={{.PrevDate}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}"
              class="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md" title="이전">←</a>
           <form method="GET" action="/workboard/register" class="flex items-center">
             <input type="hidden" name="view" value="{{.View}}">
+            {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
             {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
             {{if .ProjectFilter}}<input type="hidden" name="project" value="{{.ProjectFilter}}">{{end}}
+            {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
             <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
                    class="border-0 bg-transparent px-1 py-1 text-xs text-slate-700 focus:ring-0">
           </form>
-          <a href="/workboard/register?view={{.View}}&date={{.NextDate}}{{.AssigneeQ}}"
+          <a href="/workboard/register?view={{.View}}&date={{.NextDate}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}"
              class="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md" title="다음">→</a>
-          <a href="/workboard/register?view={{.View}}&date={{.Today}}{{.AssigneeQ}}"
+          <a href="/workboard/register?view={{.View}}&date={{.Today}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}"
              class="px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-md">오늘</a>
         </div>
         {{if .CanWrite}}
@@ -233,8 +297,18 @@
   </div>
 
   {{if .CanWrite}}
+  <form method="post" action="/workboard/register/kanban-move" x-ref="kanbanMoveForm" class="hidden">
+    <input type="hidden" name="redirect" value="/workboard/register?view=day&date={{.Date}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}">
+    <input type="hidden" name="date" value="{{.Date}}">
+    <input type="hidden" name="from">
+    <input type="hidden" name="to">
+    <input type="hidden" name="item_key">
+    <input type="hidden" name="assignee">
+    <input type="hidden" name="complete_note">
+    <input type="hidden" name="confirm_reopen">
+  </form>
   <form method="post" action="/workboard/schedule" x-ref="placeForm" class="hidden">
-    <input type="hidden" name="redirect" value="/workboard/register?view={{.View}}&date={{.Date}}{{.AssigneeQ}}">
+    <input type="hidden" name="redirect" value="/workboard/register?view={{.View}}&date={{.Date}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}">
     <input type="hidden" name="kind">
     <input type="hidden" name="ref_id">
     <input type="hidden" name="title">
@@ -249,11 +323,44 @@
   <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900 shadow-sm"
        x-show="sel" x-cloak>
     <span class="font-semibold" x-text="sel ? sel.title : ''"></span>
-    <span class="text-blue-700/80"> 선택됨 · 시간표 칸을 클릭하면 그 시각으로 배정됩니다.</span>
+    <span class="text-blue-700/80"> 선택됨 · 일정표 칸을 클릭하면 그 시각으로 배정됩니다.</span>
     <button type="button" @click="sel=null" class="ml-2 font-medium underline decoration-blue-400 hover:text-blue-950">선택 해제</button>
   </div>
   {{end}}
 
+  {{if eq .Display "kanban"}}
+  {{template "kanban_board" .}}
+  <p class="text-[11px] text-slate-500">다섯 열 합계 <span class="font-semibold text-slate-700">{{.KanbanTotal}}</span>건 · 한 카드는 한 열에만 있습니다</p>
+
+  <div x-show="kanbanAskAssignee" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" @click.outside="kanbanAskAssignee=false">
+      <h3 class="font-semibold text-slate-800">담당자를 지정하세요</h3>
+      <p class="text-xs text-slate-500">담당자 없이 예정일만 잡으면 미계획으로 돌아갑니다.</p>
+      <select x-model="kanbanAssignee" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+        <option value="">선택</option>
+        {{range .Assignees}}
+        <option value="{{.FullName}}">{{.FullName}}</option>
+        {{end}}
+      </select>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg border" @click="kanbanAskAssignee=false">취소</button>
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white" @click="if(kanbanAssignee) submitKanban()">확인</button>
+      </div>
+    </div>
+  </div>
+  <div x-show="kanbanAskComplete" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" @click.outside="kanbanAskComplete=false">
+      <h3 class="font-semibold text-slate-800">완료 내용</h3>
+      <p class="text-xs text-slate-500">완료 처리를 위해 조치 내용을 입력하세요.</p>
+      <textarea x-model="kanbanNote" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg border" @click="kanbanAskComplete=false">취소</button>
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white" @click="if(kanbanNote.trim()) submitKanban()">완료</button>
+      </div>
+    </div>
+  </div>
+
+  {{else}}
   <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] gap-3 items-start">
 
     {{if eq .View "month"}}
@@ -451,7 +558,7 @@
                     <button type="button"
                             class="px-1 rounded border border-slate-300/80 bg-white/95 text-[8px] font-semibold text-slate-700 hover:bg-slate-50"
                             @click.stop="editWork($event.currentTarget.closest('[data-kind]'))"
-                            title="{{if eq .Card.Category "maintenance"}}정기점검 업무 등록{{else}}일일 업무 수정{{end}}">수정</button>
+                            title="일일 업무 등록">수정</button>
                     {{end}}
                     {{end}}
                   </span>
@@ -495,7 +602,7 @@
       </div>
     </div>
     {{else}}
-    {{/* 주간 시간표 — 기존 요일 열. 일일 변경이 여기 영향을 주지 않게 둔다 */}}
+    {{/* 주간 일정표 — 기존 요일 열. 일일 변경이 여기 영향을 주지 않게 둔다 */}}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="max-h-[74vh] overflow-auto">
         <div class="min-w-[36rem]">
@@ -575,7 +682,7 @@
                     <button type="button"
                             class="px-1 rounded border border-slate-300/80 bg-white/95 text-[8px] font-semibold text-slate-700 hover:bg-slate-50"
                             @click.stop="editWork($event.currentTarget.closest('[data-kind]'))"
-                            title="{{if eq .Card.Category "maintenance"}}정기점검 업무 등록{{else}}일일 업무 수정{{end}}">수정</button>
+                            title="일일 업무 등록">수정</button>
                     {{end}}
                     {{end}}
                   </span>
@@ -615,6 +722,7 @@
     </div>
 
   </div>
+  {{end}}
 
   {{template "wb_modals" .}}
 

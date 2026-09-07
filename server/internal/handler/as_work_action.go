@@ -54,11 +54,8 @@ func (h *ASHandler) UpdateWorkAction(c echo.Context) error {
 	w.AssignedTo, w.AssignedUserID = resolveAssigneeFormFields(c, h.userRepo,
 		"assigned_to_code", "assigned_to_custom", "assigned_to")
 
-	status := strings.TrimSpace(c.FormValue("status"))
-	if status == "done" || c.FormValue("mark_done") == "1" {
+	if c.FormValue("mark_done") == "1" {
 		w.Status = "done"
-	} else if status == "open" {
-		w.Status = "open"
 	}
 
 	if err := h.workRepo.Update(w); err != nil {

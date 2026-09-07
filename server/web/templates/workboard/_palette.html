@@ -16,7 +16,7 @@
          @click="pick($event.currentTarget)"
          @dragstart="pick($event.currentTarget)"
          :class="isPicked('{{.Kind}}', '{{.RefID}}') ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
-         title="클릭·드래그: 시간표에 놓으면 등록 모달 · 「등록」버튼: 일일 업무 등록">
+         title="클릭·드래그: 일정표에 놓으면 등록 모달 · 「등록」버튼: 일일 업무 등록">
       <div class="flex items-start justify-between gap-1">
         <p class="font-semibold truncate min-w-0 flex-1">{{.Title}}</p>
         <button type="button"

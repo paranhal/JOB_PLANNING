@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -33,12 +34,21 @@ func (h *AssetHandler) List(c echo.Context) error {
 	if page < 1 {
 		page = 1
 	}
+	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
+	pageSize := 20
+	if display == "kanban" {
+		pageSize = 0
+		page = 1
+	}
 
-	items, total, err := h.repo.List(customerID, search, projectID, category, sort, dir, page, 20)
+	items, total, err := h.repo.List(customerID, search, projectID, category, sort, dir, page, pageSize)
 	if err != nil {
 		return err
 	}
-	totalPages := (total + 19) / 20
+	totalPages := 1
+	if pageSize > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
 	customers, _ := h.customerRepo.ListAll()
 	projects, _ := h.wbRepo.ListProjects(false)
 	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
@@ -49,6 +59,15 @@ func (h *AssetHandler) List(c echo.Context) error {
 		}
 		return "asc"
 	}
+	kanban := model.FillAssetKanban(items)
+	q := assetListQuery(search, customerID, projectID, category, sort, dir, "")
+	listHref := "/assets"
+	if s := q.Encode(); s != "" {
+		listHref += "?" + s
+	}
+	kq := cloneURLValues(q)
+	kq.Set("display", "kanban")
+	kanbanHref := "/assets?" + kq.Encode()
 
 	return c.Render(http.StatusOK, "asset/list.html", map[string]interface{}{
 		"Title": "설치자산 관리", "Active": NavAssets,
@@ -73,6 +92,15 @@ func (h *AssetHandler) List(c echo.Context) error {
 		"SortDirAS":    nextDir("as_count"),
 		"SortDirProj":  nextDir("project"),
 		"CanWrite":     canWriteMaster(c),
+		"Display":      display,
+		"ListHref":     listHref,
+		"KanbanHref":   kanbanHref,
+		"FilterQ":      q.Encode(),
+		"KanbanColumns": kanban.Columns,
+		"KanbanTotal":   kanban.Total,
+		"KanbanDrag":    canWriteMaster(c),
+		"KanbanDrop":    "key",
+		"KanbanHint":    "열 = 운영상태. 끌어 옮기면 자산의 운영상태가 바뀝니다. 철수·폐기는 확인을 받습니다.",
 	})
 }
 
@@ -231,6 +259,60 @@ func (h *AssetHandler) Update(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/assets/"+a.AssetID)
+}
+
+func (h *AssetHandler) UpdateStatus(c echo.Context) error {
+	if !canWriteMaster(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	status := model.AssignAssetKanbanColumn(c.FormValue("status"))
+	if strings.TrimSpace(c.FormValue("status")) != status {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "운영상태가 올바르지 않습니다"})
+		}
+		return c.Redirect(http.StatusSeeOther, "/assets?display=kanban")
+	}
+	if err := h.repo.UpdateOperationStatus(id, status); err != nil {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "저장에 실패했습니다"})
+		}
+		return err
+	}
+	if wantsJSON(c) {
+		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true})
+	}
+	back := strings.TrimSpace(c.FormValue("return"))
+	if back == "" {
+		back = "/assets?display=kanban"
+	}
+	return c.Redirect(http.StatusSeeOther, back)
+}
+
+func assetListQuery(search, customerID, projectID, category, sort, dir, display string) url.Values {
+	v := url.Values{}
+	if search != "" {
+		v.Set("search", search)
+	}
+	if customerID != "" {
+		v.Set("customer_id", customerID)
+	}
+	if projectID != "" {
+		v.Set("project_id", projectID)
+	}
+	if category != "" {
+		v.Set("category", category)
+	}
+	if sort != "" {
+		v.Set("sort", sort)
+	}
+	if dir != "" && dir != "asc" {
+		v.Set("dir", dir)
+	}
+	if model.ParseDisplay(display, "") == "kanban" {
+		v.Set("display", "kanban")
+	}
+	return v
 }
 
 // applyAssetBusinessRules 타사장비 규칙을 적용한다.
