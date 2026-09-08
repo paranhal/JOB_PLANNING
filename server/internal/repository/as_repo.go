@@ -40,7 +40,7 @@ const visitDateToday = `date('now','localtime')`
 // 완료·종료: 완료일 − 접수일. 미완료: 오늘 − 접수일. (음수는 0)
 const daysElapsedSQL = `MAX(0, CAST((
 		CASE WHEN ar.status IN ` + model.SQLStatusFullyClosed + `
-			THEN julianday(date(COALESCE(ar.complete_datetime, ar.updated_at)))
+			THEN julianday(` + asCompleteDateSQL + `)
 			ELSE julianday(` + visitDateToday + `)
 		END
 	) - julianday(date(ar.receipt_datetime)) AS INTEGER))`
@@ -51,7 +51,7 @@ const daysElapsedSQL = `MAX(0, CAST((
 func visitAlreadyDone(alias string) string {
 	return `EXISTS (SELECT 1 FROM as_processes p
 		WHERE p.as_id = ` + alias + `as_id
-		  AND date(p.process_datetime) >= date(` + alias + `visit_scheduled_date))`
+		  AND date(p.process_datetime) >= ` + alias + `visit_scheduled_date)`
 }
 
 func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []string, sort, dir string, page, pageSize int) ([]model.ASListItem, int, error) {
@@ -96,7 +96,7 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	case "visit_past":
 		cond := ` AND ar.status IN ` + model.SQLStatusOpsInProgress + `
 		          AND COALESCE(ar.visit_scheduled_date,'') != ''
-		          AND date(ar.visit_scheduled_date) < ` + visitDateToday + `
+		          AND ar.visit_scheduled_date < ` + visitDateToday + `
 		          AND NOT ` + visitAlreadyDone("ar.")
 		baseQuery += cond
 		countQuery += cond
@@ -105,7 +105,7 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 		// 예정일은 지났지만 이미 다녀온 건 — 다음 일정을 다시 잡아야 하는 상태
 		cond := ` AND ar.status IN ` + model.SQLStatusOpsInProgress + `
 		          AND COALESCE(ar.visit_scheduled_date,'') != ''
-		          AND date(ar.visit_scheduled_date) < ` + visitDateToday + `
+		          AND ar.visit_scheduled_date < ` + visitDateToday + `
 		          AND ` + visitAlreadyDone("ar.")
 		baseQuery += cond
 		countQuery += cond
@@ -113,14 +113,14 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	case "visit_today":
 		cond := ` AND ar.status IN ` + model.SQLStatusOpsInProgress + `
 		          AND COALESCE(ar.visit_scheduled_date,'') != ''
-		          AND date(ar.visit_scheduled_date) = ` + visitDateToday
+		          AND ar.visit_scheduled_date = ` + visitDateToday
 		baseQuery += cond
 		countQuery += cond
 		visitBucket = true
 	case "visit_upcoming":
 		cond := ` AND ar.status IN ` + model.SQLStatusOpsInProgress + `
 		          AND COALESCE(ar.visit_scheduled_date,'') != ''
-		          AND date(ar.visit_scheduled_date) > ` + visitDateToday
+		          AND ar.visit_scheduled_date > ` + visitDateToday
 		baseQuery += cond
 		countQuery += cond
 		visitBucket = true
@@ -128,7 +128,7 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 		// 이관 + (회신확인일 없음 또는 경과) — 담당자 독촉용
 		cond := ` AND ar.status = 'transfer'
 		          AND (COALESCE(ar.visit_scheduled_date,'') = ''
-		               OR date(ar.visit_scheduled_date) < ` + visitDateToday + `)`
+		               OR ar.visit_scheduled_date < ` + visitDateToday + `)`
 		baseQuery += cond
 		countQuery += cond
 		visitBucket = true
@@ -151,7 +151,7 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	case "completed_today":
 		// 통계상 오늘 완료(부분완료 포함)
 		cond := ` AND ar.status IN ` + model.SQLStatusStatsCompleted + `
-		          AND date(COALESCE(ar.complete_datetime, ar.updated_at)) = date('now')`
+		          AND ` + asCompleteDateSQL + ` = date('now')`
 		baseQuery += cond
 		countQuery += cond
 	case "week_received":
@@ -164,7 +164,7 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	case "week_completed":
 		ws, we := weekRangeDates()
 		cond := ` AND ar.status IN ` + model.SQLStatusStatsCompleted + `
-		          AND date(COALESCE(ar.complete_datetime, ar.updated_at)) BETWEEN date(?) AND date(?)`
+		          AND ` + asCompleteDateSQL + ` BETWEEN date(?) AND date(?)`
 		baseQuery += cond
 		countQuery += cond
 		args = append(args, ws, we)
@@ -304,30 +304,30 @@ func (r *ASRepo) StatsFiltered(mineUserID string, mineKeys []string) (*model.ASS
 			COALESCE(SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END), 0) AS assigned,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + ` THEN 1 ELSE 0 END), 0) AS in_progress,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusStatsCompleted + `
-			         AND date(COALESCE(complete_datetime, updated_at))=date('now') THEN 1 ELSE 0 END), 0) AS completed,
+			         AND ` + asCompleteDateColSQL + `=date('now') THEN 1 ELSE 0 END), 0) AS completed,
 			COALESCE(SUM(CASE WHEN status IN ('received','assigned','in_progress','partial_complete')
 			         AND julianday('now')-julianday(receipt_datetime) > 3 THEN 1 ELSE 0 END), 0) AS overdue,
 			COALESCE(SUM(CASE WHEN date(receipt_datetime)=date('now') THEN 1 ELSE 0 END), 0) AS today,
 			COALESCE(SUM(CASE WHEN date(receipt_datetime) BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_recv,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusStatsCompleted + `
-			         AND date(COALESCE(complete_datetime, updated_at)) BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_done,
+			         AND ` + asCompleteDateColSQL + ` BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_done,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + `
 			         AND COALESCE(visit_scheduled_date,'') != ''
-			         AND date(visit_scheduled_date) < ` + visitDateToday + `
+			         AND visit_scheduled_date < ` + visitDateToday + `
 			         AND NOT ` + visitAlreadyDone("as_receipts.") + ` THEN 1 ELSE 0 END), 0) AS visit_past,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + `
 			         AND COALESCE(visit_scheduled_date,'') != ''
-			         AND date(visit_scheduled_date) < ` + visitDateToday + `
+			         AND visit_scheduled_date < ` + visitDateToday + `
 			         AND ` + visitAlreadyDone("as_receipts.") + ` THEN 1 ELSE 0 END), 0) AS visit_done_open,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + `
 			         AND COALESCE(visit_scheduled_date,'') != ''
-			         AND date(visit_scheduled_date) = ` + visitDateToday + ` THEN 1 ELSE 0 END), 0) AS visit_today,
+			         AND visit_scheduled_date = ` + visitDateToday + ` THEN 1 ELSE 0 END), 0) AS visit_today,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + `
 			         AND COALESCE(visit_scheduled_date,'') != ''
-			         AND date(visit_scheduled_date) > ` + visitDateToday + ` THEN 1 ELSE 0 END), 0) AS visit_upcoming,
+			         AND visit_scheduled_date > ` + visitDateToday + ` THEN 1 ELSE 0 END), 0) AS visit_upcoming,
 			COALESCE(SUM(CASE WHEN status = 'transfer'
 			         AND (COALESCE(visit_scheduled_date,'') = ''
-			              OR date(visit_scheduled_date) < ` + visitDateToday + `) THEN 1 ELSE 0 END), 0) AS transfer_overdue
+			              OR visit_scheduled_date < ` + visitDateToday + `) THEN 1 ELSE 0 END), 0) AS transfer_overdue
 		FROM as_receipts WHERE 1=1`
 	args := []interface{}{ws, we, ws, we}
 	if mineCond, mineArgs := mineAssigneeCond("", mineUserID, mineKeys); mineCond != "" {
@@ -388,9 +388,9 @@ func (r *ASRepo) AssigneeDashboardStats() ([]model.AssigneeDashStats, error) {
 			COALESCE(SUM(CASE WHEN ar.status IN ('received','assigned','in_progress','partial_complete')
 			         AND date(ar.receipt_datetime) BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_ip,
 			COALESCE(SUM(CASE WHEN ar.status IN ` + model.SQLStatusStatsCompleted + `
-			         AND date(COALESCE(ar.complete_datetime, ar.updated_at)) BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_done,
+			         AND ` + asCompleteDateSQL + ` BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_done,
 			COALESCE(SUM(CASE WHEN ar.status IN ` + model.SQLStatusStatsCompleted + `
-			         AND date(COALESCE(ar.complete_datetime, ar.updated_at))=date('now') THEN 1 ELSE 0 END), 0) AS day_done,
+			         AND ` + asCompleteDateSQL + `=date('now') THEN 1 ELSE 0 END), 0) AS day_done,
 			COALESCE(SUM(CASE WHEN ar.status IN ('received','assigned','in_progress','partial_complete')
 			         AND julianday('now')-julianday(ar.receipt_datetime) > 3 THEN 1 ELSE 0 END), 0) AS overdue
 		FROM as_receipts ar
@@ -444,6 +444,7 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.receipt_group_id,''),
 		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,''),
 		       COALESCE(ar.cause_cat1,''), COALESCE(ar.cause_cat2,''), COALESCE(ar.cause_cat3,''),
+		       COALESCE(ar.visit_date,''), COALESCE(ar.process_type_reason,''),
 		       c.org_name, COALESCE(a.product_name,''), COALESCE(a.install_location,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -476,6 +477,7 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		&as.ParentASID, &as.ReopenReason, &as.FollowupNote, &as.ReceiptGroupID,
 		&as.UrgencyReason, &as.UrgencyReasonNote,
 		&as.CauseCat1, &as.CauseCat2, &as.CauseCat3,
+		&as.VisitDate, &as.ProcessTypeReason,
 		&as.OrgName, &as.ProductName, &as.InstallLocation,
 	)
 	if err == sql.ErrNoRows {
@@ -618,16 +620,18 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	if err := model.RequireAppDateYear(as.VisitScheduledDate); err != nil {
 		return err
 	}
+	if err := model.RequireAppDateYear(as.VisitDate); err != nil {
+		return err
+	}
 	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() && !model.AppDateYearOK(*as.CompleteDatetime) {
 		return model.ErrAppDateYear
 	}
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05")
 
-	var oldStatus string
 	var oldComplete string
-	r.db.QueryRow(`SELECT status, COALESCE(complete_datetime,'') FROM as_receipts WHERE as_id=?`, as.ASID).
-		Scan(&oldStatus, &oldComplete)
+	r.db.QueryRow(`SELECT COALESCE(complete_datetime,'') FROM as_receipts WHERE as_id=?`, as.ASID).
+		Scan(&oldComplete)
 
 	startDT := ""
 	if as.StartDatetime != nil && !as.StartDatetime.IsZero() {
@@ -638,11 +642,11 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	clearComplete := false
 	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() {
 		completeDT = as.CompleteDatetime.Format("2006-01-02 15:04:05")
-	} else if (oldStatus != "completed" && oldStatus != "closed") &&
-		(as.Status == "completed" || as.Status == "closed") && oldComplete == "" {
-		completeDT = nowStr
-	} else if as.Status != "completed" && as.Status != "closed" &&
-		(as.CompleteDatetime == nil || as.CompleteDatetime.IsZero()) {
+	} else if model.IsStatsCompletedStatus(as.Status) {
+		if strings.TrimSpace(oldComplete) == "" {
+			completeDT = nowStr
+		}
+	} else if as.CompleteDatetime == nil || as.CompleteDatetime.IsZero() {
 		clearComplete = true
 	}
 
@@ -654,6 +658,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 			visit_scheduled_date=?, schedule_confirmed=?,
 			transfer_detail=?, confirm_target=?, confirm_contact=?,
 			cause_cat1=?, cause_cat2=?, cause_cat3=?,
+			visit_date=?, process_type_reason=?,
 			updated_at=?`
 	args := []interface{}{
 		as.Status, as.AssignedTo, as.AssignedUserID, as.ProcessType, as.WorkPlace, as.CauseType,
@@ -663,6 +668,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 		nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
 		as.TransferDetail, as.ConfirmTarget, as.ConfirmContact,
 		nullStr(as.CauseCat1), nullStr(as.CauseCat2), nullStr(as.CauseCat3),
+		nullStr(as.VisitDate), nullStr(as.ProcessTypeReason),
 		nowStr,
 	}
 

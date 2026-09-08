@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"customer-support/internal/audit"
+	"customer-support/internal/repository"
 )
 
 const (
@@ -104,6 +105,9 @@ func Start(cfg Config) {
 
 // Run 오늘 날짜 폴더에 자동 백업을 만든다.
 func Run(cfg Config) error {
+	if cfg.DB != nil {
+		repository.RunWorkListHousekeeping(cfg.DB)
+	}
 	_, err := Snapshot(cfg, KindAuto)
 	return err
 }

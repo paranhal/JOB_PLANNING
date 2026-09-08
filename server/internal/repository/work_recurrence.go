@@ -452,7 +452,7 @@ func markPastOccurrencesOverdue(db *sql.DB, today string) (int, error) {
 		  AND (
 			(COALESCE(occurrence_status,'') IN ('scheduled','in_progress','')
 			 AND TRIM(COALESCE(work_date,'')) != ''
-			 AND date(work_date) < date(?))
+			 AND work_date < ?)
 			OR
 			(COALESCE(occurrence_status,'')=?
 			 AND (TRIM(COALESCE(next_check_date,''))='' OR date(next_check_date) < date(?)))

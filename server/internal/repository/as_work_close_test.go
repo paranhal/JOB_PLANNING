@@ -46,12 +46,15 @@ func TestDelayedExcludesOpenWorkUnderCompletedAS(t *testing.T) {
 		}
 	}
 
-	// ListBucket(delayed)가 이미 정리했을 수 있으므로, 남은 open만 추가 정리
-	_, err = NewASWorkRepo(db).CloseOpenUnderClosedReceipts()
-	if err != nil {
+	var st string
+	if err := db.QueryRow(`SELECT status FROM as_work_items WHERE work_number='R2608-023-W01'`).Scan(&st); err != nil {
 		t.Fatal(err)
 	}
-	var st string
+	if st != "open" {
+		t.Fatalf("조회가 as_work_items 를 닫음 status=%s", st)
+	}
+
+	RunWorkListHousekeeping(db)
 	if err := db.QueryRow(`SELECT status FROM as_work_items WHERE work_number='R2608-023-W01'`).Scan(&st); err != nil {
 		t.Fatal(err)
 	}

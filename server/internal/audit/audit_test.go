@@ -80,10 +80,12 @@ func TestArchiveLogsAndAnalyze(t *testing.T) {
 	pop := audit.Push(audit.Actor{Name: "관리자", Username: "admin"})
 	defer pop()
 
+	var before int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM data_change_logs`).Scan(&before)
 	audit.Log(audit.ActionCreate, "customers", "customer_id", "C9", "테스트기관", "", `{"customer_id":"C9"}`)
 	name, n, err := audit.ArchiveLogs(dataDir)
-	if err != nil || n != 1 {
-		t.Fatalf("아카이브: name=%s n=%d err=%v", name, n, err)
+	if err != nil || n != before+1 {
+		t.Fatalf("아카이브: name=%s n=%d before=%d err=%v", name, n, before, err)
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, "backups", name, "change_logs.db")); err != nil {
 		t.Fatal(err)
@@ -93,8 +95,8 @@ func TestArchiveLogsAndAnalyze(t *testing.T) {
 		t.Fatalf("초기화되지 않음: %d %v", left, err)
 	}
 	st := audit.AnalyzeBackup(dataDir, name)
-	if st.Error != "" || !st.IsLogArchive || st.ChangeLogs != 1 {
-		t.Fatalf("분석: %+v", st)
+	if st.Error != "" || !st.IsLogArchive || st.ChangeLogs != before+1 {
+		t.Fatalf("분석: %+v before=%d", st, before)
 	}
 }
 

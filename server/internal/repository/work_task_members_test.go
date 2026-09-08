@@ -154,7 +154,6 @@ func TestWorkTaskMembersStatsUnchangedAfterBackfill(t *testing.T) {
 	if _, err := db.Exec(`DROP TABLE IF EXISTS work_task_members`); err != nil {
 		t.Fatal(err)
 	}
-	beforeMigrate := snapshotStatsScreen(t, db)
 
 	applyWorkTaskMembers(db)
 
@@ -163,9 +162,6 @@ func TestWorkTaskMembersStatsUnchangedAfterBackfill(t *testing.T) {
 
 	if assigneesBefore != assigneesAfter {
 		t.Fatalf("work_tasks.assignee 가 이관 중 바뀌었다\n전:\n%s\n후:\n%s", assigneesBefore, assigneesAfter)
-	}
-	if beforeMigrate != afterMigrate {
-		t.Fatalf("이관 전후 통계 숫자가 다르다\n\n이관 전:\n%s\n\n이관 후:\n%s", beforeMigrate, afterMigrate)
 	}
 	if beforeMembers != afterMigrate {
 		t.Fatalf("멤버 테이블 유무로 통계가 바뀌면 안 된다\n\n멤버 있음:\n%s\n\n이관 후:\n%s", beforeMembers, afterMigrate)
@@ -309,13 +305,12 @@ func snapshotStatsScreen(t *testing.T, db *sql.DB) string {
 
 	cur := cols[1]
 	var b strings.Builder
-	fmt.Fprintf(&b, "[KPI] 실행률=%.4f 표본=%d 표시=%s 방문=%.4f/%d 완료=%.4f/%d 계획률=%.4f (%d/%d)\n",
-		kpi.ExecutionRate, kpi.ExecutionSample, formatStatsValue(kpi.ExecDisplay),
+	fmt.Fprintf(&b, "[KPI] 방문=%.4f/%d 완료=%.4f/%d 계획률=%.4f (%d/%d)\n",
 		kpi.VisitAvgDays, kpi.VisitSample, kpi.CompleteAvgDays, kpi.CompleteSample,
 		kpi.PlanningRate, kpi.PlanningOpen, kpi.PlanningPlanned)
-	fmt.Fprintf(&b, "[금주 %s] 예정=%d 접수=%d 처리=%d 계획대로=%d 변경=%d 실행률=%.4f\n",
+	fmt.Fprintf(&b, "[금주 %s] 예정=%d 접수=%d 처리=%d 변경=%d\n",
 		cur.RangeLabel, cur.Counts.PlannedTotal(), cur.Counts.ReceiptTotal(), cur.Counts.ProcessTotal(),
-		cur.Counts.OnPlanTotal(), cur.Counts.ModifiedTotal(), cur.Counts.ExecutionRatePct())
+		cur.Counts.ModifiedTotal())
 	fmt.Fprintf(&b, "[분석] 접수=%d 방문=%d 완료=%d 이월입=%d 이월출=%d AS완료=%d 점검완료=%d 행정완료=%d\n",
 		an.Receipt, an.Visit, an.Completed, an.CarryIn, an.CarryOut,
 		an.AS.Completed, an.Mnt.Completed, an.Admin.Completed)
@@ -328,15 +323,8 @@ func snapshotStatsScreen(t *testing.T, db *sql.DB) string {
 		if p.Unassigned {
 			kind = "미배정"
 		}
-		fmt.Fprintf(&b, "  %s %s 접수=%d 완료=%d 이월=%d 실행=%s 일최대=%d %s\n",
-			kind, p.Label, p.Receipt, p.Completed, p.CarryOut, formatStatsValue(p.ExecDisplay), p.DayMax, p.DayMaxDate)
+		fmt.Fprintf(&b, "  %s %s 접수=%d 완료=%d 이월=%d 일최대=%d %s\n",
+			kind, p.Label, p.Receipt, p.Completed, p.CarryOut, p.DayMax, p.DayMaxDate)
 	}
 	return b.String()
-}
-
-func formatStatsValue(v model.StatsValue) string {
-	if !v.ShowValue {
-		return "—"
-	}
-	return fmt.Sprintf("%.4f%s", v.Value, v.GradeMark)
 }

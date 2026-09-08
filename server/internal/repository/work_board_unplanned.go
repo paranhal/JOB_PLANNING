@@ -12,7 +12,6 @@ import (
 // ListUnplanned §8 미계획 업무함. /work 의 collectDelayed·collectSchedulePending·collectUnassigned를 재사용한다.
 func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind string) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
 	today := time.Now().Format("2006-01-02")
-	_, _ = NewWBRepo(r.db).MarkPastOccurrencesOverdue(today)
 	bag := map[string]*model.UnplannedItem{}
 
 	add := func(base model.UnplannedItem, k string) {

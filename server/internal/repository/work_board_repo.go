@@ -22,8 +22,6 @@ func NewWorkBoardRepo(db *sql.DB) *WorkBoardRepo {
 func (r *WorkBoardRepo) DashStats(mineUserID string, mineKeys []string) (*model.WorkDashStats, error) {
 	s := &model.WorkDashStats{}
 	today := time.Now().Format("2006-01-02")
-	// 완료 접수에 남은 open 하부업무(확인·재방문) 정리 — 지연 오표시 방지
-	_, _ = NewASWorkRepo(r.db).CloseOpenUnderClosedReceipts()
 
 	openItems, err := r.collectOpen(mineUserID, mineKeys)
 	if err != nil {
@@ -103,8 +101,8 @@ func (r *WorkBoardRepo) countUpcomingOccurrences(today string, days int) (int, e
 		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 		  AND COALESCE(t.occurrence_status,'') NOT IN ('complete','skipped')
 		  AND TRIM(COALESCE(t.work_date,'')) != ''
-		  AND date(t.work_date) > date(?)
-		  AND date(t.work_date) <= date(?)
+		  AND t.work_date > ?
+		  AND t.work_date <= ?
 		  AND COALESCE(r.archived,0)=0`, today, end).Scan(&n)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
@@ -124,7 +122,7 @@ func (r *WorkBoardRepo) countOverdueRecurrenceParents(today string) (int, error)
 		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 		  AND COALESCE(r.archived,0)=0
 		  AND TRIM(COALESCE(t.due_date,'')) != ''
-		  AND date(t.due_date) < date(?)`, today).Scan(&n)
+		  AND t.due_date < ?`, today).Scan(&n)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
 			return 0, nil
@@ -143,9 +141,6 @@ func (r *WorkBoardRepo) ListBucketOn(bucket, date, mineUserID string, mineKeys [
 	date = model.NormalizeAppDate(date)
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
-	}
-	if bucket == model.WorkBucketDelayed || bucket == "" || bucket == "open" || bucket == model.WorkBucketInProgress {
-		_, _ = NewASWorkRepo(r.db).CloseOpenUnderClosedReceipts()
 	}
 	var items []model.WorkListItem
 	var err error
@@ -193,9 +188,9 @@ func (r *WorkBoardRepo) collectInProgress(mineUserID string, mineKeys []string, 
 	return out, nil
 }
 
-// ListScheduledOn 기준일 예정 목록(회의·업무 리스트 공용)
+// ListScheduledOn 기준일 예정 목록. §38.5 완료를 포함하고 schedule_confirmed 는 보지 않는다.
 func (r *WorkBoardRepo) ListScheduledOn(date, mineUserID string, mineKeys []string, limit int) ([]model.WorkListItem, error) {
-	items, err := r.collectByDate(mineUserID, mineKeys, date, false)
+	items, err := r.collectByDate(mineUserID, mineKeys, date, true)
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +239,8 @@ func withMaintAssignee(where string, args []interface{}, userID string, mineKeys
 	return w, append(out, extra...)
 }
 
-// ListUnified 통합 목록. AS·정기점검·행정·지원.
-// from==to 이면 「오늘 내 업무」와 같다(완료는 그날만). 기간을 주면 그 사이 완료도 넣는다. §33.9 · §37.2
+// ListUnified 통합 목록. AS·정기점검·행정·지원. /work/all · 대시보드가 쓴다.
+// 미완료는 날짜를 깎지 않는다(§37). 완료만 from~to. 「오늘 내 업무」는 ListWorkToday.
 func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includeAllSales bool, from, to string) ([]model.WorkListItem, error) {
 	if to == "" {
 		to = time.Now().Format("2006-01-02")
@@ -268,7 +263,7 @@ func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includ
 		return nil, err
 	}
 	overdueWhere, overdueArgs := maintMineWhere(
-		`COALESCE(mv.completed,0)=0 AND date(mv.visit_date) < date(?)`, mineUserID, mineKeys)
+		`COALESCE(mv.completed,0)=0 AND mv.visit_date < ?`, mineUserID, mineKeys)
 	overdueArgs = append([]interface{}{to}, overdueArgs...)
 	overdueM, err := r.queryMaintenance(overdueWhere, overdueArgs, 500)
 	if err != nil {
@@ -303,6 +298,132 @@ func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includ
 		out = appendUniqueWorkItems(out, sales, seen)
 	}
 	return out, nil
+}
+
+// ListWorkToday §38.3 「오늘 내 업무」전용. 오늘 예정·오늘 완료·진행중(오늘 이전 시작)·지연만 담는다.
+// collectOpen·ListUnified 는 대시보드·미계획·/work/all 이 그대로 쓴다. 여기서 고치지 않는다.
+func (r *WorkBoardRepo) ListWorkToday(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+
+	seen := map[string]bool{}
+	var out []model.WorkListItem
+
+	open, err := r.collectWorkTodayOpen(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	out = appendUniqueWorkItems(out, open, seen)
+
+	done, err := r.collectCompletedOn(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	out = appendUniqueWorkItems(out, done, seen)
+
+	// 회신 예정 경과·반복 발생 지연만. AS·점검 지연은 collectWorkTodayOpen 이 이미 담는다. §38.9.5
+	extras, err := r.collectWorkTodayExtras(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	out = appendUniqueWorkItems(out, extras, seen)
+
+	stampWorkTodayOverdue(out, today)
+	return out, nil
+}
+
+// collectWorkTodayOpen §38.3 미완료 넷 중 오늘 예정·진행중·지연.
+// 예정일이 내일 이후이거나 아예 없는 건은 넣지 않는다(미계획 업무함).
+func (r *WorkBoardRepo) collectWorkTodayOpen(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {
+	var out []model.WorkListItem
+	asItems, err := r.queryAS(
+		`ar.status IN ('received','assigned','in_progress','hold','transfer')
+		 AND TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
+		 AND ar.visit_scheduled_date <= ?
+		 AND NOT (ar.visit_scheduled_date < ? AND `+visitAlreadyDone("ar.")+`)`,
+		mineUserID, mineKeys, []interface{}{today, today})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, asItems...)
+
+	wItems, err := r.queryWorkItems(
+		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
+		 AND TRIM(COALESCE(w.scheduled_date,'')) != ''
+		 AND w.scheduled_date <= ?`,
+		mineUserID, mineKeys, []interface{}{today})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, wItems...)
+
+	mWhere, mArgs := withMaintAssignee(
+		`COALESCE(mv.completed,0)=0
+		 AND TRIM(COALESCE(mv.visit_date,'')) != ''
+		 AND mv.visit_date <= ?`,
+		[]interface{}{today}, mineUserID, mineKeys)
+	mItems, err := r.queryMaintenance(mWhere, mArgs, 500)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, mItems...)
+
+	gItems, err := r.queryGeneral(
+		`wo.phase != 'complete'
+		 AND TRIM(COALESCE(wo.work_date,'')) != ''
+		 AND wo.work_date <= ?`,
+		[]interface{}{today})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, gItems...)
+
+	tItems, err := r.queryWorkTasks(
+		`t.work_type IN ('admin','support')
+		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		 AND TRIM(COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')) != ''
+		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') <= ?`,
+		mineUserID, mineKeys, []interface{}{today})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tItems...)
+	return out, nil
+}
+
+// collectWorkTodayExtras collectWorkTodayOpen 에 없는 오늘 내 업무:
+// 회신 예정 경과, 반복 발생 지연. §38.9.5
+func (r *WorkBoardRepo) collectWorkTodayExtras(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {
+	var out []model.WorkListItem
+	wa, err := r.collectOverdueWaitingActions(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, wa...)
+	occ, err := r.collectOverdueOccurrences(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, occ...)
+	return out, nil
+}
+
+func stampWorkTodayOverdue(items []model.WorkListItem, today string) {
+	today = strings.TrimSpace(today)
+	for i := range items {
+		if items[i].DaysOverdue > 0 {
+			continue
+		}
+		sched := model.WorkItemScheduledDate(items[i])
+		if sched != "" && today != "" && sched < today {
+			d := model.DaysBetweenDates(sched, today)
+			if d < 1 {
+				d = 1
+			}
+			items[i].DaysOverdue = d
+		}
+	}
 }
 
 func sortLimitWorkItems(items []model.WorkListItem, limit int) []model.WorkListItem {
@@ -351,52 +472,72 @@ func (r *WorkBoardRepo) collectOpen(mineUserID string, mineKeys []string) ([]mod
 	return out, nil
 }
 
-func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date string, completed bool) ([]model.WorkListItem, error) {
+// collectByDate 그날 예정. §38.5 예정일이 있으면 예정이고 schedule_confirmed 는 보지 않는다.
+// includeComplete=true 이면 완료 건도 담는다(회의 목록·통계와 같은 「예정」).
+func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date string, includeComplete bool) ([]model.WorkListItem, error) {
 	var out []model.WorkListItem
-	if !completed {
-		asItems, err := r.queryAS(
-			`ar.status IN ('received','assigned','in_progress','hold','transfer')
-			 AND COALESCE(ar.schedule_confirmed,0)=1
-			 AND date(ar.visit_scheduled_date)=date(?)`,
-			mineUserID, mineKeys, []interface{}{date})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, asItems...)
-
-		wItems, err := r.queryWorkItems(
-			`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
-			 AND COALESCE(w.schedule_confirmed,0)=1 AND date(w.scheduled_date)=date(?)`,
-			mineUserID, mineKeys, []interface{}{date})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, wItems...)
-
-		mWhere, mArgs := withMaintAssignee(
-			`mv.visit_date = ? AND COALESCE(mv.completed,0)=0`, []interface{}{date}, mineUserID, mineKeys)
-		mItems, err := r.queryMaintenance(mWhere, mArgs, 200)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, mItems...)
-
-		gItems, err := r.queryGeneral(`wo.work_date = ? AND wo.phase != 'complete'`, []interface{}{date})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, gItems...)
-
-		tItems, err := r.queryWorkTasks(
-			`t.work_type IN ('admin','support')
-			 AND t.status != 'complete'
-			 AND date(COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), ''))=date(?)`,
-			mineUserID, mineKeys, []interface{}{date})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, tItems...)
+	asStatus := `ar.status IN ('received','assigned','in_progress','hold','transfer')`
+	if includeComplete {
+		asStatus = `ar.status NOT IN ('cancelled')`
 	}
+	asItems, err := r.queryAS(
+		asStatus+`
+			 AND TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
+			 AND ar.visit_scheduled_date=?`,
+		mineUserID, mineKeys, []interface{}{date})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, asItems...)
+
+	wStatus := `w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')`
+	if includeComplete {
+		wStatus = `ar.status NOT IN ('cancelled')`
+	}
+	wItems, err := r.queryWorkItems(
+		wStatus+`
+			 AND TRIM(COALESCE(w.scheduled_date,'')) != ''
+			 AND w.scheduled_date=?`,
+		mineUserID, mineKeys, []interface{}{date})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, wItems...)
+
+	mWhere := `mv.visit_date = ?`
+	if !includeComplete {
+		mWhere = `mv.visit_date = ? AND COALESCE(mv.completed,0)=0`
+	}
+	mWhere, mArgs := withMaintAssignee(mWhere, []interface{}{date}, mineUserID, mineKeys)
+	mItems, err := r.queryMaintenance(mWhere, mArgs, 200)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, mItems...)
+
+	gWhere := `wo.work_date = ? AND wo.phase != 'complete'`
+	if includeComplete {
+		gWhere = `wo.work_date = ?`
+	}
+	gItems, err := r.queryGeneral(gWhere, []interface{}{date})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, gItems...)
+
+	tStatus := `AND t.status != 'complete'`
+	if includeComplete {
+		tStatus = ``
+	}
+	tItems, err := r.queryWorkTasks(
+		`t.work_type IN ('admin','support')
+			 `+tStatus+`
+			 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=?`,
+		mineUserID, mineKeys, []interface{}{date})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tItems...)
 	return out, nil
 }
 
@@ -406,7 +547,7 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 		`ar.status IN ('received','assigned','in_progress','hold','transfer')
 		 AND COALESCE(ar.visit_scheduled_date,'') != ''
 		 AND COALESCE(ar.schedule_confirmed,0)=1
-		 AND date(ar.visit_scheduled_date) < date(?)
+		 AND ar.visit_scheduled_date < ?
 		 AND NOT `+visitAlreadyDone("ar."),
 		mineUserID, mineKeys, []interface{}{today})
 	if err != nil {
@@ -422,7 +563,7 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
 		 AND COALESCE(w.scheduled_date,'') != ''
 		 AND COALESCE(w.schedule_confirmed,0)=1
-		 AND date(w.scheduled_date) < date(?)`,
+		 AND w.scheduled_date < ?`,
 		mineUserID, mineKeys, []interface{}{today})
 	if err != nil {
 		return nil, err
@@ -453,14 +594,22 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 	}
 	out = append(out, wa...)
 
-	_, _ = NewWBRepo(r.db).MarkPastOccurrencesOverdue(today)
+	occItems, err := r.collectOverdueOccurrences(mineUserID, mineKeys, today)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, occItems...)
+	return out, nil
+}
+
+func (r *WorkBoardRepo) collectOverdueOccurrences(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {
 	occItems, err := r.queryWorkTasks(
 		`COALESCE(t.recurrence_role,'')='occurrence'
 		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 		 AND COALESCE(t.occurrence_status,'') NOT IN ('complete','skipped')
 		 AND (
 			COALESCE(t.occurrence_status,'')='overdue'
-			OR (TRIM(COALESCE(t.work_date,'')) != '' AND date(t.work_date) < date(?)
+			OR (TRIM(COALESCE(t.work_date,'')) != '' AND t.work_date < ?
 			    AND COALESCE(t.occurrence_status,'') IN ('scheduled','in_progress',''))
 			OR (COALESCE(t.occurrence_status,'')='deferred'
 			    AND (TRIM(COALESCE(t.next_check_date,''))='' OR date(t.next_check_date) < date(?)))
@@ -472,9 +621,8 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 	for i := range occItems {
 		occItems[i].DaysOverdue = daysBetween(occItems[i].ScheduledDate, today)
 		occItems[i].SubLabel = "미완료"
-		out = append(out, occItems[i])
 	}
-	return out, nil
+	return occItems, nil
 }
 
 func (r *WorkBoardRepo) collectCompletedOn(mineUserID string, mineKeys []string, date string) ([]model.WorkListItem, error) {
@@ -495,7 +643,7 @@ func (r *WorkBoardRepo) collectCompletedRange(mineUserID string, mineKeys []stri
 	if from == "" {
 		from = to
 	}
-	asPred, asArgs := sqlDateEqOrRange("COALESCE(ar.complete_datetime, ar.updated_at)", from, to)
+	asPred, asArgs := sqlDateEqOrRange("NULLIF(TRIM(ar.complete_datetime),'')", from, to)
 	asItems, err := r.queryAS(
 		`ar.status IN `+model.SQLStatusStatsCompleted+` AND `+asPred,
 		mineUserID, mineKeys, asArgs)
@@ -572,7 +720,7 @@ func (r *WorkBoardRepo) collectSchedulePending(mineUserID string, mineKeys []str
 		 AND (COALESCE(ar.assigned_to,'') != '' OR COALESCE(ar.assigned_user_id,'') != '')
 		 AND (COALESCE(ar.schedule_confirmed,0)=0
 		      OR (COALESCE(ar.visit_scheduled_date,'') != ''
-		          AND date(ar.visit_scheduled_date) < date('now','localtime')
+		          AND ar.visit_scheduled_date < date('now','localtime')
 		          AND `+visitAlreadyDone("ar.")+`))`,
 		mineUserID, mineKeys, nil)
 }
@@ -589,7 +737,8 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		SELECT ar.as_id, ar.as_number, c.org_name, COALESCE(ar.symptom,''),
 		       COALESCE(ar.assigned_to,''), COALESCE(ar.visit_scheduled_date,''), ar.status,
 		       COALESCE(ar.urgency,''), COALESCE(ar.receipt_group_id,''),
-		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,'')
+		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,''),
+		       COALESCE(ar.schedule_confirmed,0)
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		WHERE ` + extraWhere
@@ -599,7 +748,7 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		args = append(args, mineArgs...)
 	}
 	q += ` ORDER BY ar.visit_scheduled_date, ar.as_number LIMIT 5000`
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "work.queryAS", q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +757,8 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 	for rows.Next() {
 		var it model.WorkListItem
 		var status string
-		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID, &it.CustomerID, &it.ProjectID); err != nil {
+		var confirmed int
+		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID, &it.CustomerID, &it.ProjectID, &confirmed); err != nil {
 			return nil, err
 		}
 		it.Content = it.Title
@@ -618,6 +768,7 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		it.WorkDate = it.ScheduledDate
 		it.DueDate = it.ScheduledDate
 		it.Href = "/as/" + it.RefID
+		it.Tentative = confirmed == 0
 		items = append(items, it)
 	}
 	return items, rows.Err()
@@ -629,7 +780,8 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 		       COALESCE(NULLIF(TRIM(w.assigned_to),''), ar.assigned_to,''),
 		       COALESCE(w.scheduled_date,''), w.status,
 		       COALESCE(w.confirm_target,''), COALESCE(w.notes,''), ar.as_number,
-		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,'')
+		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,''),
+		       COALESCE(w.schedule_confirmed,0)
 		FROM as_work_items w
 		JOIN as_receipts ar ON ar.as_id = w.as_id
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -641,7 +793,7 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 		args = append(args, mineArgs...)
 	}
 	q += ` ORDER BY w.scheduled_date, w.work_number LIMIT 5000`
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "work.queryWorkItems", q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -650,10 +802,12 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 	for rows.Next() {
 		var it model.WorkListItem
 		var kind, asID, target, notes, asNum string
+		var confirmed int
 		if err := rows.Scan(&it.RefID, &it.RefNumber, &kind, &asID, &it.OrgName,
-			&it.Assignee, &it.ScheduledDate, &it.Status, &target, &notes, &asNum, &it.CustomerID, &it.ProjectID); err != nil {
+			&it.Assignee, &it.ScheduledDate, &it.Status, &target, &notes, &asNum, &it.CustomerID, &it.ProjectID, &confirmed); err != nil {
 			return nil, err
 		}
+		it.Tentative = confirmed == 0
 		if kind == model.WorkKindConfirm {
 			it.Prefix = model.WorkPrefixConfirm
 			it.SubLabel = "확인"
@@ -711,9 +865,8 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		WHERE %s
 		ORDER BY mv.visit_date, c.org_name
 		LIMIT %d`, extraWhere, limit)
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "work.queryMaintenance", q, args...)
 	if err != nil {
-		// 테이블 없으면 빈 목록
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
 		}
@@ -758,7 +911,7 @@ func (r *WorkBoardRepo) queryGeneral(extraWhere string, args []interface{}) ([]m
 		FROM work_other wo
 		WHERE ` + extraWhere + `
 		ORDER BY work_date, title LIMIT 200`
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "work.queryGeneral", q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
@@ -806,7 +959,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		args = append(args, mineArgs...)
 	}
 	q += ` ORDER BY 2, t.task_id LIMIT 5000`
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "work.queryWorkTasks", q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
@@ -863,7 +1016,7 @@ func (r *WorkBoardRepo) collectOverdueWaitingActions(mineUserID string, mineKeys
 		args = append(args, mineArgs...)
 	}
 	q += ` ORDER BY a.reply_due_date, a.action_id LIMIT 500`
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "work.queryWaitingActions", q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
@@ -941,15 +1094,7 @@ func workItemStatusLabel(s string) string {
 }
 
 func daysBetween(from, to string) int {
-	if from == "" || to == "" {
-		return 0
-	}
-	a, err1 := time.ParseInLocation("2006-01-02", from, time.Local)
-	b, err2 := time.ParseInLocation("2006-01-02", to, time.Local)
-	if err1 != nil || err2 != nil {
-		return 0
-	}
-	return int(b.Sub(a).Hours() / 24)
+	return model.DaysBetweenDates(from, to)
 }
 
 func buildAssigneePrefixStats(items []model.WorkListItem) []model.AssigneePrefixStats {
@@ -1005,3 +1150,12 @@ func formatBracketPrefixCounts(c model.WorkPrefixCounts) string {
 	}
 	return strings.Join(parts, " / ")
 }
+
+// CountMissingCompleteDates 완료인데 완료일이 없는 건. 대시보드 배너용. §4.13
+func (r *WorkBoardRepo) CountMissingCompleteDates() (MissingCompleteDates, error) {
+	if r == nil || r.db == nil {
+		return MissingCompleteDates{}, nil
+	}
+	return NewWBRepo(r.db).CountMissingCompleteDates()
+}
+

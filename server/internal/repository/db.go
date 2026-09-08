@@ -282,7 +282,9 @@ CREATE TABLE IF NOT EXISTS as_receipts (
     status              TEXT DEFAULT 'received',
     start_datetime      DATETIME,
     complete_datetime   DATETIME,
+    visit_date          TEXT,
     process_type        TEXT,
+    process_type_reason TEXT,
     work_place          TEXT,
     transfer_detail     TEXT,
     confirm_target      TEXT,
@@ -620,6 +622,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 ('PRT003','process_type','replace','부품교체',3),
 ('PRT004','process_type','config','설정변경',4),
 ('PRT005','process_type','inquiry','문의응대',5),
+('PRT006','process_type','undetermined','미정',6),
 -- 접수채널
 ('RC001','receipt_channel','phone','전화',1),
 ('RC002','receipt_channel','email','이메일',2),
@@ -783,7 +786,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 			created_at  TEXT NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_as_edit_unlock_log_as ON as_edit_unlock_log(as_id, created_at)`,
-		// 일일 업무회의: 계획대비 실행률(매일 단위)
+		// 일일 업무회의 변경 이력
 		`CREATE TABLE IF NOT EXISTS data_change_logs (
 			log_id TEXT PRIMARY KEY,
 			occurred_at TEXT NOT NULL,
@@ -1097,6 +1100,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASReceiptGroup(db)
 	applyAS34ReceiptUX(db)
 	applyAS34ActionUX(db)
+	applyAS47VisitDate(db)
+	applyWorkListIndexes(db)
 	applyAS34TransferFollowup(db)
 	applyRegionDistanceOrder(db)
 	applyASCauseCategoriesV2(db)
