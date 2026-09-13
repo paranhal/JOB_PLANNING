@@ -1,0 +1,172 @@
+{{define "title"}}AS 사례 검색 · 고객지원시스템{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div>
+      <h2 class="text-lg font-bold text-slate-800">AS 사례 검색</h2>
+      <p class="text-xs text-slate-500 mt-0.5">이런 증상에는 이런 조치를 했었구나. 이 사이트에서 무슨 일이 있었나.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/as" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">목록</a>
+      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
+      {{if .CanReceive}}
+      <a href="/as/new" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">AS 접수</a>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="flex gap-2 border-b border-gray-200">
+    <a href="/as/knowledge{{if .Q}}?q={{urlquery .Q}}{{end}}"
+       class="px-3 py-2 text-sm {{if eq .Tab "symptom"}}border-b-2 border-blue-600 font-semibold text-blue-700{{else}}text-slate-500 hover:text-slate-800{{end}}">증상으로 찾기</a>
+    <a href="/as/knowledge?tab=site{{if .Filter.CustomerID}}&amp;customer_id={{urlquery .Filter.CustomerID}}{{end}}"
+       class="px-3 py-2 text-sm {{if eq .Tab "site"}}border-b-2 border-blue-600 font-semibold text-blue-700{{else}}text-slate-500 hover:text-slate-800{{end}}">사이트로 보기</a>
+  </div>
+
+  {{if eq .Tab "symptom"}}
+  <form method="GET" action="/as/knowledge" class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <div class="flex flex-col sm:flex-row gap-2">
+      <input type="search" name="q" value="{{.Q}}" autofocus
+             placeholder="증상이나 조치 내용을 적으세요"
+             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900">검색</button>
+      {{if .Q}}
+      <a href="/as/knowledge.xlsx?q={{urlquery .Q}}{{if .All}}&amp;all=1{{end}}{{if .Filter.CustomerID}}&amp;customer_id={{urlquery .Filter.CustomerID}}{{end}}{{if .Filter.Product}}&amp;product={{urlquery .Filter.Product}}{{end}}{{if .Filter.DateFrom}}&amp;from={{urlquery .Filter.DateFrom}}{{end}}{{if .Filter.DateTo}}&amp;to={{urlquery .Filter.DateTo}}{{end}}{{if .Filter.CauseCat}}&amp;cause_cat={{urlquery .Filter.CauseCat}}{{end}}{{if .Filter.Sort}}&amp;sort={{urlquery .Filter.Sort}}{{end}}"
+         class="px-3 py-2 rounded-lg border border-gray-200 text-sm text-slate-700 hover:bg-gray-50">xlsx</a>
+      {{end}}
+    </div>
+    <div class="flex flex-wrap items-center gap-3 text-sm">
+      <p class="text-slate-600">조치 기록이 있는 {{.WithAction}}건에서 찾습니다 (전체 {{.TotalAll}}건)</p>
+      <label class="inline-flex items-center gap-1.5 text-slate-600">
+        <input type="checkbox" name="all" value="1" class="rounded border-gray-300" {{if .All}}checked{{end}}>
+        전체
+      </label>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+      <select name="customer_id" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">사이트</option>
+        {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.Filter.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+      </select>
+      <select name="product" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">제품</option>
+        {{range .Products}}<option value="{{.}}" {{if eq $.Filter.Product .}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <input type="date" name="from" value="{{.Filter.DateFrom}}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" title="기간 시작">
+      <input type="date" name="to" value="{{.Filter.DateTo}}" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" title="기간 끝">
+      <select name="sort" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="relevance" {{if eq .Filter.Sort "relevance"}}selected{{end}}>관련도</option>
+        <option value="newest" {{if eq .Filter.Sort "newest"}}selected{{end}}>최신순</option>
+      </select>
+    </div>
+    {{if eq .Classified 0}}
+    <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">아직 분류된 건이 없습니다</p>
+    <select name="cause_cat" disabled class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-slate-400 bg-slate-50">
+      <option>원인분류</option>
+    </select>
+    {{else}}
+    <select name="cause_cat" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+      <option value="">원인분류</option>
+      {{range .CauseCats}}<option value="{{.Code}}" {{if eq $.Filter.CauseCat .Code}}selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+    {{end}}
+  </form>
+
+  {{if .Q}}
+  <p class="text-sm text-slate-500">{{.Total}}건</p>
+  {{if .Items}}
+  <div class="space-y-3">
+    {{range .Items}}
+    <article class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <p class="text-sm font-medium text-slate-900 kb-symptom {{if .SymptomLong}}line-clamp-3{{end}}">{{.SymptomHTML}}</p>
+        {{if .LeadLabel}}<span class="shrink-0 text-sm text-slate-600">{{.LeadLabel}}</span>{{end}}
+      </div>
+      {{if .SymptomLong}}
+      <button type="button" class="kb-expand text-[11px] text-blue-700 hover:underline">펼치기</button>
+      {{end}}
+      <p class="text-xs text-slate-500">{{.OrgName}} · {{.ReceiptDate}}{{if .AssignedTo}} · {{.AssignedTo}}{{end}}</p>
+      <div class="flex flex-wrap gap-1">
+        {{if .MatchSymptom}}<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-900 text-[11px]">증상</span>{{end}}
+        {{if .MatchAction}}<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[11px]">조치</span>{{end}}
+      </div>
+      <p class="text-sm {{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}}"><span class="text-[11px] text-slate-400">조치</span> {{.ActionHTML}}</p>
+      <a href="/as/{{.ASID}}/action" class="inline-block text-xs font-medium text-blue-700 hover:underline">원본 열기</a>
+    </article>
+    {{end}}
+  </div>
+  {{if gt .TotalPages 1}}
+  <div class="flex justify-center gap-3 text-sm">
+    {{if gt .Page 1}}<a href="{{.PrevURL}}" class="text-blue-600 hover:underline">이전</a>{{end}}
+    <span class="text-slate-500">{{.Page}} / {{.TotalPages}}</span>
+    {{if lt .Page .TotalPages}}<a href="{{.NextURL}}" class="text-blue-600 hover:underline">다음</a>{{end}}
+  </div>
+  {{end}}
+  {{else}}
+  <p class="text-sm text-slate-400 py-8 text-center">검색 결과가 없습니다.</p>
+  {{end}}
+  {{end}}
+
+  {{else}}
+  <form method="GET" action="/as/knowledge" class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <input type="hidden" name="tab" value="site">
+    <div class="flex flex-col sm:flex-row gap-2">
+      <select name="customer_id" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="">사이트를 고르세요</option>
+        {{range .Sites}}
+        <option value="{{.CustomerID}}" {{if eq $.Filter.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}} ({{.Count}})</option>
+        {{end}}
+      </select>
+      <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900">보기</button>
+      {{if .Filter.CustomerID}}
+      <a href="/as/knowledge.xlsx?tab=site&amp;customer_id={{urlquery .Filter.CustomerID}}"
+         class="px-3 py-2 rounded-lg border border-gray-200 text-sm text-slate-700 hover:bg-gray-50">xlsx</a>
+      {{end}}
+    </div>
+  </form>
+
+  {{if .SiteSummary}}
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="text-base font-semibold text-slate-800">{{.SiteSummary.OrgName}}</h3>
+      <p class="text-sm text-slate-600">AS {{.SiteSummary.Total}}건</p>
+    </div>
+    <p class="text-sm text-slate-600">평균 소요 {{.SiteSummary.AvgLeadLabel}} · 조치 기록 {{.SiteSummary.WithAction}}건{{if .SiteSummary.LatestReceipt}} · 최근 {{.SiteSummary.LatestReceipt}}{{end}}</p>
+    {{if .KeywordFreq}}
+    <p class="text-sm text-slate-700">많이 나온 증상
+      {{range $i, $k := .KeywordFreq}}{{if $i}} · {{end}}{{$k.Keyword}}({{$k.Count}}){{end}}
+    </p>
+    {{end}}
+    <div class="divide-y divide-slate-100">
+      {{range .SiteCases}}
+      <details class="py-2">
+        <summary class="cursor-pointer flex flex-wrap items-center gap-2 text-sm">
+          <span class="text-slate-500">{{.ReceiptDate}}</span>
+          <span class="text-slate-800 flex-1">{{.Symptom}}</span>
+          {{if .LeadLabel}}<span class="text-slate-500">{{.LeadLabel}}</span>{{end}}
+        </summary>
+        <div class="mt-2 pl-2 text-sm space-y-1">
+          <p class="text-slate-700"><span class="text-[11px] text-slate-400">증상</span> {{.Symptom}}</p>
+          <p class="{{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}}"><span class="text-[11px] text-slate-400">조치</span> {{.Action}}</p>
+          <a href="/as/{{.ASID}}/action" class="text-xs text-blue-700 hover:underline">원본 열기</a>
+        </div>
+      </details>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+  {{end}}
+</div>
+<style>
+mark { background: #fde68a; color: inherit; padding: 0 0.1em; border-radius: 2px; }
+</style>
+<script>
+document.querySelectorAll('.kb-expand').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var p = btn.parentElement.querySelector('.kb-symptom');
+    if (!p) return;
+    p.classList.toggle('line-clamp-3');
+    btn.textContent = p.classList.contains('line-clamp-3') ? '펼치기' : '접기';
+  });
+});
+</script>
+{{end}}

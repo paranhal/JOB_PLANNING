@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -20,8 +21,32 @@ import (
 	"customer-support/internal/repository"
 )
 
+// Dockerfile -ldflags 로 주입. 로컬 go run 은 기본값(dev). v2.0 §40.3
+var (
+	buildVersion = "dev"
+	buildCommit  = "unknown"
+	buildTime    = "unknown"
+)
+
 // 템플릿·정적 파일·SQLite 경로가 상대 경로이므로, 실행 위치와 무관하게 server 모듈 루트를 작업 디렉터리로 맞춘다.
+func isServerRoot(dir string) bool {
+	st, err := os.Stat(filepath.Join(dir, "web", "templates"))
+	return err == nil && st.IsDir()
+}
+
 func chdirToServerRoot() {
+	if isServerRoot(".") {
+		return
+	}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		if isServerRoot(dir) {
+			if err := os.Chdir(dir); err != nil {
+				log.Fatalf("작업 디렉터리 변경 실패 (%s): %v", dir, err)
+			}
+			return
+		}
+	}
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		log.Fatal("runtime.Caller 실패")
@@ -33,6 +58,8 @@ func chdirToServerRoot() {
 }
 
 func main() {
+	startedAt := time.Now()
+	handler.SetBuildInfo(buildVersion, buildCommit, buildTime, startedAt)
 	chdirToServerRoot()
 	if err := hwpx.WritePlaceholderTemplate(hwpx.DefaultTemplatePath()); err != nil {
 		log.Printf("조치완료보고서 템플릿 준비 실패: %v", err)
@@ -45,6 +72,19 @@ func main() {
 		log.Fatalf("DB 초기화 실패: %v", err)
 	}
 	defer db.Close()
+	repository.RunWorkListHousekeeping(db)
+
+	host, _ := os.Hostname()
+	startedClock := startedAt.In(backup.SeoulLocation()).Format("2006-01-02 15:04")
+	if err := repository.RecordAppStart(db, repository.AppStart{
+		Version:   buildVersion,
+		Commit:    buildCommit,
+		BuiltAt:   buildTime,
+		StartedAt: startedClock,
+		Host:      host,
+	}); err != nil {
+		log.Printf("app_versions 기록 실패: %v (서버는 계속됩니다)", err)
+	}
 
 	audit.Init(db)
 
@@ -104,6 +144,9 @@ func main() {
 
 	h := handler.New(db)
 
+	// /version 은 로그인 없이. 배포 직후 curl 한 줄로 확인한다. §40.4 ③
+	e.GET("/version", handler.VersionJSON)
+
 	// 인증
 	e.GET("/login", h.Auth.LoginPage)
 	e.POST("/login", h.Auth.Login)
@@ -123,11 +166,13 @@ func main() {
 	g.Use(h.Auth.RequireActiveRole)
 
 	g.GET("/", h.Dashboard)
+	g.GET("/work/all", h.Work.ListAll)
 	g.GET("/work", h.Work.List)
 	g.GET("/plan/unplanned", h.Work.UnplannedList)
 	g.POST("/plan/unplanned/assign", h.Work.UnplannedAssign)
 	g.POST("/plan/unplanned/no-date", h.Work.UnplannedNoDate)
 	g.GET("/meeting", h.Meeting.Show)
+	g.GET("/meeting/overview", h.Meeting.Overview)
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
@@ -214,6 +259,8 @@ func main() {
 	as.GET("", h.AS.List)
 	as.GET("/kanban", h.AS.Kanban)
 	as.GET("/search", h.AS.Search)
+	as.GET("/knowledge", h.AS.Knowledge)
+	as.GET("/knowledge.xlsx", h.AS.KnowledgeExcel)
 	as.GET("/similar", h.AS.Similar)
 	as.GET("/keywords/suggest", h.AS.KeywordSuggest)
 	as.GET("/keywords", h.AS.KeywordList)
@@ -230,11 +277,12 @@ func main() {
 	as.GET("/:id/report", h.AS.ReportPreview)
 	as.POST("/:id/report", h.AS.ReportIssue)
 	as.GET("/:id/action", h.AS.Action) // 조회: 접수·업무 역할 / 수정은 핸들러·POST에서 제한
+	as.GET("/:id/similar-panel", h.AS.SimilarPanel)
 	as.POST("/:id/unlock-edit", h.AS.UnlockEdit, adminOnly)
 	as.GET("/:id/edit", h.AS.Edit, receiveAS)
 	as.POST("/:id/edit", h.AS.UpdateReceipt, receiveAS)
 	as.POST("/:id/visit-date", h.AS.UpdateVisitDate)
-	as.POST("/:id/update", h.AS.Update)
+	as.POST("/:id/update", h.AS.Update, processAS)
 	as.POST("/:id/hold", h.AS.Hold, processAS)
 	as.POST("/:id/hold-release", h.AS.ReleaseHold, processAS)
 	as.POST("/:id/transfer", h.AS.Transfer, processAS)
@@ -320,6 +368,8 @@ func main() {
 	sales.GET("/activities", h.Sales.Activities)
 	sales.POST("/activities", h.Sales.CreateActivity)
 	sales.POST("/activities/:aid/move", h.Sales.MoveActivity)
+	sales.POST("/activities/:aid/delete", h.Sales.DeleteActivity)
+	sales.POST("/activities/:aid", h.Sales.UpdateActivity)
 	sales.GET("/pipeline", h.Sales.Pipeline)
 	sales.POST("/from-task", h.Sales.FromTask)
 	sales.GET("/:id/promote", h.Sales.PromoteForm)
@@ -400,6 +450,7 @@ func main() {
 	g.POST("/admin/holidays/leaves/delete", h.Holiday.DeleteLeave)
 
 	g.GET("/admin/data", h.Backup.Page, adminOnly)
+	g.GET("/admin/system", h.System.Page, h.Auth.RequireAdminOnly)
 	g.POST("/admin/data/save", h.Backup.Save, adminOnly)
 	g.POST("/admin/data/metrics", h.Backup.SaveMetrics, adminOnly)
 	g.POST("/admin/data/rollback", h.Backup.Rollback, adminOnly)
@@ -412,7 +463,8 @@ func main() {
 	g.GET("/admin/backup", h.Backup.RedirectLegacy, adminOnly)
 	g.POST("/admin/backup", h.Backup.Save, adminOnly)
 
-	log.Printf("고객지원시스템 서버 시작: http://localhost:%s", cfg.Port)
+	log.Printf("고객지원시스템 서버 시작: http://localhost:%s  version=%s commit=%s built=%s started=%s",
+		cfg.Port, buildVersion, buildCommit, buildTime, startedAt.In(backup.SeoulLocation()).Format("2006-01-02 15:04"))
 	if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}

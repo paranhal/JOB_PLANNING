@@ -8,9 +8,11 @@ const (
 	NavMaintenance      = "maintenance"
 	NavMeeting          = "meeting"
 	NavWork             = "work"
+	NavWorkAll          = "work_all"
 	NavWorkPlan         = "work_plan"
 	NavAS               = "as"
 	NavASStats          = "as_stats"
+	NavASKnowledge      = "as_knowledge"
 	NavAdminWork        = "admin_work"
 	NavAdminWorkStats   = "admin_work_stats"
 	NavSales            = "sales"
@@ -38,6 +40,7 @@ const (
 	NavHolidays         = "holidays"
 	NavData             = "data"
 	NavBackup           = "backup"
+	NavSystem           = "system"
 	NavAccount          = "account"
 	NavLogin            = "login"
 	NavNone             = ""
@@ -51,9 +54,11 @@ func navSidebarKeys() []string {
 		NavMaintenance,
 		NavMeeting,
 		NavWork,
+		NavWorkAll,
 		NavWorkPlan,
 		NavAS,
 		NavASStats,
+		NavASKnowledge,
 		NavAdminWork,
 		NavAdminWorkStats,
 		NavSales,
@@ -81,6 +86,7 @@ func navSidebarKeys() []string {
 		NavHolidays,
 		NavData,
 		NavBackup,
+		NavSystem,
 		NavAccount,
 	}
 }

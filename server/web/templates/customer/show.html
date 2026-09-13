@@ -32,6 +32,10 @@
         수정
       </a>
       {{end}}
+      <a href="/as/knowledge?tab=site&amp;customer_id={{.Customer.CustomerID}}"
+         class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        AS 이력
+      </a>
       {{if .CanReceive}}
       <a href="/as/new?customer_id={{.Customer.CustomerID}}"
          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
