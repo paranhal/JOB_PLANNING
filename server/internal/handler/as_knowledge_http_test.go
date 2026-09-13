@@ -127,6 +127,9 @@ func TestASKnowledgePageSection416(t *testing.T) {
 	if !strings.Contains(body, "영업일") {
 		t.Fatal("소요 기간이 없다")
 	}
+	if !strings.Contains(body, "👍") {
+		t.Fatal("도움이 된 사례 추천이 없다")
+	}
 
 	allBody := get(q + "&all=1")
 	if !strings.Contains(allBody, "조치 기록 없음") && !strings.Contains(allBody, empty.Symptom[:8]) {

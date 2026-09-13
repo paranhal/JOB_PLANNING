@@ -55,6 +55,7 @@ func newASActionFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/as/:id/action", h.AS.Action)
 	g.POST("/as/:id/update", h.AS.Update)
+	g.POST("/as/:id/vote", h.AS.VoteCase)
 	g.GET("/as/:id", h.AS.Show)
 	g.POST("/as/:id/hold", h.AS.Hold)
 	g.GET("/as/work/:work_id/action", h.AS.WorkAction)
@@ -69,22 +70,16 @@ func newASActionFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 func TestASActionSavesWorkPlace(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
 
-	form := url.Values{
+	rec := postASAction(t, e, asID, url.Values{
 		"status":       {"in_progress"},
 		"work_place":   {"field"},
 		"process_type": {"visit"},
 		"cause_type":   {"hw"},
 		"action_taken": {"현장 점검"},
 		"time_spent":   {"30"},
-	}
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/update",
-		strings.NewReader(form.Encode()))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
-	e.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("저장 실패: status=%d body=%s", rec.Code, rec.Body.String())
+	})
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("저장 실패: status=%d loc=%s body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
 
 	got, err := asRepo.GetByID(asID)
@@ -265,6 +260,16 @@ func TestSafeUploadBaseName(t *testing.T) {
 func postASAction(t *testing.T, e *echo.Echo, asID string, form url.Values) *httptest.ResponseRecorder {
 	t.Helper()
 	fillCauseCatsFromLegacyType(form)
+	if form != nil && strings.TrimSpace(form.Get("process_type")) == model.ProcessTypeVisit {
+		if _, ok := form["visit_date"]; !ok {
+			form.Set("visit_date", "2026-08-10")
+		}
+	}
+	if form.Get("action_short_ok") == "" {
+		form.Set("action_short_ok", "1")
+	} else if form.Get("action_short_ok") == "0" {
+		form.Del("action_short_ok")
+	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/update",
 		strings.NewReader(form.Encode()))

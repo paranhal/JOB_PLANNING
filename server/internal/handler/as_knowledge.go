@@ -148,6 +148,14 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		}
 		repository.DecorateKnowledgeHits(items, f.Query)
 		attachKnowledgeLead(items)
+		ids := make([]string, len(items))
+		for i := range items {
+			ids[i] = items[i].ASID
+		}
+		voted := h.repo.CaseVotedSet(ctxString(c, "user_id"), ids)
+		for i := range items {
+			items[i].Voted = voted[items[i].ASID]
+		}
 	}
 	totalPages := 0
 	if total > 0 {

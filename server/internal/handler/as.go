@@ -169,6 +169,7 @@ func (h *ASHandler) List(c echo.Context) error {
 		"Mine": mine, "MineQ": mineQ, "SortQ": sortQ, "ListPath": "/as", "Role": role,
 		"Sort": sort, "Dir": dir,
 		"SortLinks":   asListSortLinks("/as", listBase, sort, dir),
+		"SortSelect":  sortSelectOptions(asListSortCols(), asSortHrefStrings(asListSortLinks("/as", listBase, sort, dir)), sort, dir),
 		"PrevURL":     asPageURL("/as", listBase, page-1),
 		"NextURL":     asPageURL("/as", listBase, page+1),
 		"DisplayName": ctxString(c, "user_name"),
@@ -211,11 +212,11 @@ func (h *ASHandler) renderASKanban(c echo.Context, status, search, mineUserID st
 		"KanbanHint":    "대기·진행중·검토·완료. 보류·이관은 진행중 열 뱃지. 한 카드는 한 열에만 있습니다.",
 		"Total":         listTotal,
 		"Search":        search, "Mine": mine, "Role": role,
-		"Status":        status,
-		"CanReceive":    canReceiveAS(c), "CanProcess": canProcessAS(c),
-		"ListHref":      "/as?" + listQ.Encode(),
-		"KanbanHref":    "/as?" + kanbanQ.Encode(),
-		"Display":       "kanban",
+		"Status":     status,
+		"CanReceive": canReceiveAS(c), "CanProcess": canProcessAS(c),
+		"ListHref":   "/as?" + listQ.Encode(),
+		"KanbanHref": "/as?" + kanbanQ.Encode(),
+		"Display":    "kanban",
 	})
 }
 
@@ -311,6 +312,14 @@ func asListSortLinks(path string, base url.Values, currentSort, currentDir strin
 		links[field] = template.URL(path + "?" + v.Encode())
 	}
 	return links
+}
+
+func asSortHrefStrings(links map[string]template.URL) map[string]string {
+	out := make(map[string]string, len(links))
+	for k, v := range links {
+		out[k] = string(v)
+	}
+	return out
 }
 
 func cloneURLValues(v url.Values) url.Values {
@@ -814,10 +823,8 @@ func (h *ASHandler) Show(c echo.Context) error {
 		customer, _ = h.customerRepo.GetByID(as.CustomerID)
 	}
 	var asset *model.Asset
-	var assetHistory []model.ASHistoryItem
 	if as.AssetID != "" {
 		asset, _ = h.assetRepo.GetByID(as.AssetID)
-		assetHistory, _ = h.repo.ListHistoryByAsset(as.AssetID, as.ASID, 50)
 	}
 	reopens, _ := h.repo.ListReopens(as.ASID)
 	followups, _ := h.repo.ListTransferFollowups(as.ASID)
@@ -844,7 +851,6 @@ func (h *ASHandler) Show(c echo.Context) error {
 	data := map[string]interface{}{
 		"Title": as.ASNumber, "Active": NavAS, "AS": as,
 		"Customer": customer, "Asset": asset,
-		"AssetHistory":      assetHistory,
 		"ParentAS":          parent,
 		"Reopens":           reopens,
 		"TransferFollowups": followups,
@@ -1034,7 +1040,6 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
 		"ActionOK":             c.QueryParam("ok"),
 		"ConclusionDraft":      asConclusionDraft(as, processes),
-		"SimilarCases":         h.loadSimilarCases(as),
 		"CanReceive":           canReceiveAS(c),
 		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
 		"KeywordField":         model.KWFieldAction,
@@ -1126,10 +1131,24 @@ func (h *ASHandler) Update(c echo.Context) error {
 	var followupChild *model.ASReceipt
 	if canProcessAS(c) {
 		as.ProcessType = strings.TrimSpace(c.FormValue("process_type"))
+		as.ProcessTypeReason = strings.TrimSpace(c.FormValue("process_type_reason"))
 		as.WorkPlace = model.NormalizeWorkPlace(c.FormValue("work_place"))
 		as.ActionTaken = strings.TrimSpace(c.FormValue("action_taken"))
+		na := c.FormValue("action_na") == "1"
+		naReason := strings.TrimSpace(c.FormValue("action_na_reason"))
 		formResult = strings.TrimSpace(c.FormValue("result_code"))
 		as.ResultCode = formResult
+		savingAction := na || as.ActionTaken != "" || formResult != ""
+		if savingAction {
+			resolved, code := model.ResolveActionContent(as.ActionTaken, na, naReason)
+			if code != "" {
+				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
+			}
+			as.ActionTaken = resolved
+			if model.ActionContentTooShort(as.ActionTaken) && c.FormValue("action_short_ok") != "1" {
+				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+model.ActionErrShort)
+			}
+		}
 		as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
 		as.CauseCat1 = strings.TrimSpace(c.FormValue("cause_cat1"))
 		as.CauseCat2 = strings.TrimSpace(c.FormValue("cause_cat2"))
@@ -1150,6 +1169,14 @@ func (h *ASHandler) Update(c echo.Context) error {
 		if t, ok := parseFormDatetime(c.FormValue("complete_datetime")); ok {
 			as.CompleteDatetime = &t
 		}
+		if as.ProcessType != model.ProcessTypeUndetermined {
+			as.ProcessTypeReason = ""
+		}
+		if as.ProcessType == model.ProcessTypeVisit {
+			as.VisitDate = normalizeVisitDate(c.FormValue("visit_date"))
+		} else {
+			as.VisitDate = ""
+		}
 
 		nextVisit := normalizeVisitDate(c.FormValue("visit_scheduled_date"))
 		confirmDate := normalizeVisitDate(c.FormValue("confirm_scheduled_date"))
@@ -1167,6 +1194,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
 		}
 		if raw := strings.TrimSpace(c.FormValue("complete_datetime")); raw != "" && as.CompleteDatetime == nil {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
+		}
+		if raw := strings.TrimSpace(c.FormValue("visit_date")); as.ProcessType == model.ProcessTypeVisit && raw != "" && as.VisitDate == "" {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
 		}
 
@@ -1330,8 +1360,15 @@ func actionSaveMissingErr(as *model.ASReceipt, formResult string) string {
 	if strings.TrimSpace(as.ProcessType) == "" {
 		return "process_type"
 	}
-	if !model.ProcessTypeAllowed(as.WorkPlace, as.ProcessType) {
+	if as.ProcessType == model.ProcessTypeUndetermined {
+		if strings.TrimSpace(as.ProcessTypeReason) == "" {
+			return "process_type_reason"
+		}
+	} else if !model.ProcessTypeAllowed(as.WorkPlace, as.ProcessType) {
 		return "process_type_mismatch"
+	}
+	if as.ProcessType == model.ProcessTypeVisit && strings.TrimSpace(as.VisitDate) == "" {
+		return "visit_date"
 	}
 	return ""
 }
@@ -1392,6 +1429,10 @@ func actionErrMessage(code string) string {
 	switch strings.TrimSpace(code) {
 	case "action_required":
 		return "조치내용을 입력하세요."
+	case "action_na_reason":
+		return "해당 없음이면 사유를 입력하세요."
+	case "action_short":
+		return "조금 더 적어 주시겠습니까?"
 	case "work_place":
 		return "근무구분(내근/외근)을 선택하세요."
 	case "cause_type":
@@ -1404,8 +1445,12 @@ func actionErrMessage(code string) string {
 		return "3차 분류를 선택하세요."
 	case "process_type":
 		return "처리유형을 선택하세요."
+	case "process_type_reason":
+		return "처리유형이 미정이면 사유를 입력하세요."
 	case "process_type_mismatch":
 		return "근무구분에 맞는 처리유형을 선택하세요."
+	case "visit_date":
+		return "현장방문이면 방문일을 입력하세요."
 	case "result_not_allowed":
 		return "완료 · 추가조치 필요 · 이관만 선택할 수 있습니다."
 	case "time_spent":
@@ -1447,7 +1492,7 @@ func filterSelectableProcessTypes(codes []model.Code) []model.Code {
 	var out []model.Code
 	for _, c := range codes {
 		switch c.CodeValue {
-		case model.ProcessTypeRemote, model.ProcessTypeVisit, model.ProcessTypeInquiry:
+		case model.ProcessTypeRemote, model.ProcessTypeVisit, model.ProcessTypeInquiry, model.ProcessTypeUndetermined:
 			out = append(out, c)
 		}
 	}
@@ -1731,11 +1776,20 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 		ASID:        asID,
 		Worker:      c.FormValue("worker"),
 		WorkType:    c.FormValue("work_type"),
-		WorkContent: c.FormValue("work_content"),
+		WorkContent: strings.TrimSpace(c.FormValue("work_content")),
 		PartsUsed:   c.FormValue("parts_used"),
 		TimeSpent:   timeSpent,
 		Notes:       c.FormValue("notes"),
 	}
+	na := c.FormValue("action_na") == "1"
+	resolved, code := model.ResolveActionContent(p.WorkContent, na, strings.TrimSpace(c.FormValue("action_na_reason")))
+	if code != "" {
+		return c.Redirect(http.StatusSeeOther, "/as/"+asID+"?err="+code)
+	}
+	if model.ActionContentTooShort(resolved) && c.FormValue("action_short_ok") != "1" {
+		return c.Redirect(http.StatusSeeOther, "/as/"+asID+"?err="+model.ActionErrShort)
+	}
+	p.WorkContent = resolved
 	if t, ok := parseFormDatetime(c.FormValue("process_datetime")); ok {
 		p.ProcessDatetime = t
 	} else {
@@ -1990,9 +2044,10 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 		"Page": page, "TotalPages": listTotalPages,
 		"ListStatus": listStatus,
 		"Sort":       sort, "Dir": dir,
-		"SortLinks": asListSortLinks("/as/stats", listBase, sort, dir),
-		"PrevURL":   asPageURL("/as/stats", listBase, page-1),
-		"NextURL":   asPageURL("/as/stats", listBase, page+1),
-		"ListPath":  "/as/stats", "ListQ": listQ,
+		"SortLinks":  asListSortLinks("/as/stats", listBase, sort, dir),
+		"SortSelect": sortSelectOptions(asListSortCols(), asSortHrefStrings(asListSortLinks("/as/stats", listBase, sort, dir)), sort, dir),
+		"PrevURL":    asPageURL("/as/stats", listBase, page-1),
+		"NextURL":    asPageURL("/as/stats", listBase, page+1),
+		"ListPath":   "/as/stats", "ListQ": listQ,
 	})
 }
