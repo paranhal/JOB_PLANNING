@@ -43,6 +43,8 @@ type ASSearchHit struct {
 	SymptomLong   bool
 	LeadDays      int
 	LeadLabel     string
+	VoteCount     int
+	Voted         bool
 }
 
 // ASKnowledgeSite 사이트 탭 한 줄. 건수는 ar.customer_id 기준. §41.1.1 · §41.3.2
@@ -95,4 +97,6 @@ type ASSimilarCase struct {
 	CompleteDate   string `json:"complete_date,omitempty"`
 	LeadDays       int    `json:"lead_days,omitempty"`
 	LeadLabel      string `json:"lead_label,omitempty"`
+	VoteCount      int    `json:"vote_count,omitempty"`
+	Voted          bool   `json:"voted,omitempty"`
 }

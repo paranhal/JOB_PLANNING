@@ -299,3 +299,41 @@ func TestKnowledgeSitesUseReceiptCustomerNotAsset(t *testing.T) {
 	}
 }
 
+func TestASSearchVotesRankFirst(t *testing.T) {
+	repo, proc := setupASSearch(t)
+	work := "단말기 전원 재인가 후 정상동작"
+	older := createAS(t, repo, "c2", "B1", "무인예약이 안 됩니다", time.Date(2026, 1, 1, 10, 0, 0, 0, time.Local))
+	completeWithWork(t, repo, proc, older, work, time.Date(2026, 1, 2, 16, 0, 0, 0, time.Local))
+	newer := createAS(t, repo, "c1", "A1", "무인예약이 안 됩니다", time.Date(2026, 8, 1, 10, 0, 0, 0, time.Local))
+	completeWithWork(t, repo, proc, newer, work+" 확인", time.Date(2026, 8, 2, 16, 0, 0, 0, time.Local))
+
+	if _, err := repo.ToggleCaseVote(older.ASID, "u1"); err != nil {
+		t.Fatal(err)
+	}
+
+	hits, _, err := repo.SearchAS(model.ASSearchFilter{Query: "무인예약", RequireAction: true, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) < 2 {
+		t.Fatalf("hits=%d", len(hits))
+	}
+	if hits[0].ASID != older.ASID {
+		t.Fatalf("👍 건이 위: first=%s older=%s newer=%s", hits[0].ASID, older.ASID, newer.ASID)
+	}
+	if hits[0].VoteCount < 1 {
+		t.Fatal("VoteCount")
+	}
+
+	items, err := repo.SimilarCases(model.ASSimilarFilter{
+		Query: "무인예약이 또 안 됩니다", CustomerID: "c1", AssetID: "A1", ExcludeID: newer.ASID, Limit: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) == 0 || items[0].ASID != older.ASID {
+		t.Fatalf("비슷한 사례도 👍 우선: %+v", items)
+	}
+}
+
+

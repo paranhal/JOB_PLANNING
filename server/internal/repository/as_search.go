@@ -169,11 +169,13 @@ const asSearchHitSQL = `
 		       COALESCE(ct.code_name, ar.cause_type, ''),
 		       COALESCE(ar.assigned_to,''),
 		       COALESCE(date(ar.complete_datetime), ''),
-		       COALESCE(ar.customer_id,'')
+		       COALESCE(ar.customer_id,''),
+		       COALESCE(kv.n, 0)
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		LEFT JOIN codes ct ON ct.code_group='cause_type' AND ct.code_value = ar.cause_type`
+		LEFT JOIN codes ct ON ct.code_group='cause_type' AND ct.code_value = ar.cause_type
+		LEFT JOIN (SELECT as_id, COUNT(*) AS n FROM as_case_votes GROUP BY as_id) kv ON kv.as_id = ar.as_id`
 
 // SearchAS 증상·조치·원인·결론·처리이력을 찾는다. 기준일 없음. §12.11.4
 func (r *ASRepo) SearchAS(f model.ASSearchFilter) ([]model.ASSearchHit, int, error) {
@@ -278,9 +280,9 @@ func (r *ASRepo) searchASFTS(f model.ASSearchFilter, q string, size, offset int)
 		return nil, 0, err
 	}
 
-	order := ` ORDER BY bm25(as_search), ar.receipt_datetime DESC`
+	order := ` ORDER BY COALESCE(kv.n,0) DESC, bm25(as_search), ar.receipt_datetime DESC`
 	if strings.TrimSpace(f.Sort) == "newest" {
-		order = ` ORDER BY ar.receipt_datetime DESC`
+		order = ` ORDER BY COALESCE(kv.n,0) DESC, ar.receipt_datetime DESC`
 	}
 	listQ := asSearchHitSQL + `
 		JOIN as_search ON as_search.as_id = ar.as_id` + where + order + ` LIMIT ? OFFSET ?`
@@ -316,7 +318,7 @@ func (r *ASRepo) searchASLike(f model.ASSearchFilter, q string, size, offset int
 	if err := r.db.QueryRow(countQ, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	order := ` ORDER BY ar.receipt_datetime DESC`
+	order := ` ORDER BY COALESCE(kv.n,0) DESC, ar.receipt_datetime DESC`
 	listQ := asSearchHitSQL + where + order + ` LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), size, offset)
 	rows, err := r.db.Query(listQ, listArgs...)
@@ -335,7 +337,7 @@ func scanASSearchHits(rows *sql.Rows) ([]model.ASSearchHit, error) {
 		var actionTaken, lastWork string
 		if err := rows.Scan(&h.ASID, &h.ASNumber, &h.OrgName, &h.ReceiptDate,
 			&h.Symptom, &actionTaken, &lastWork, &h.CauseName,
-			&h.AssignedTo, &h.CompleteDate, &h.CustomerID); err != nil {
+			&h.AssignedTo, &h.CompleteDate, &h.CustomerID, &h.VoteCount); err != nil {
 			return nil, err
 		}
 		h.Action = strings.TrimSpace(actionTaken)
@@ -536,7 +538,8 @@ func similarSelectSQL() string {
 		       CASE
 		         WHEN ? != '' AND ar.customer_id = ? THEN 0
 		         ELSE 1
-		       END AS w
+		       END AS w,
+		       (SELECT COUNT(*) FROM as_case_votes v WHERE v.as_id = ar.as_id) AS votes
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id`
@@ -544,9 +547,9 @@ func similarSelectSQL() string {
 
 func similarOrderSQL(fts bool) string {
 	if fts {
-		return ` ORDER BY w ASC, bm25(as_search), ar.receipt_datetime DESC`
+		return ` ORDER BY votes DESC, w ASC, bm25(as_search), ar.receipt_datetime DESC`
 	}
-	return ` ORDER BY w ASC, ar.receipt_datetime DESC`
+	return ` ORDER BY votes DESC, w ASC, ar.receipt_datetime DESC`
 }
 
 func scanSimilarCases(rows *sql.Rows, f model.ASSimilarFilter, product string) ([]model.ASSimilarCase, error) {
@@ -554,12 +557,13 @@ func scanSimilarCases(rows *sql.Rows, f model.ASSimilarFilter, product string) (
 	for rows.Next() {
 		var it model.ASSimilarCase
 		var symptom, lastWork, assetID, customerID, prodName string
-		var w int
+		var w, votes int
 		if err := rows.Scan(&it.ASID, &it.ASNumber, &it.OrgName,
 			&it.ReceiptDate, &it.CompleteDate, &symptom, &lastWork,
-			&it.Status, &assetID, &customerID, &prodName, &w); err != nil {
+			&it.Status, &assetID, &customerID, &prodName, &w, &votes); err != nil {
 			return nil, err
 		}
+		it.VoteCount = votes
 		it.ProcessDate = it.CompleteDate
 		if it.ProcessDate == "" {
 			it.ProcessDate = it.ReceiptDate

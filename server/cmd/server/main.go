@@ -282,6 +282,7 @@ func main() {
 	as.GET("/:id/edit", h.AS.Edit, receiveAS)
 	as.POST("/:id/edit", h.AS.UpdateReceipt, receiveAS)
 	as.POST("/:id/visit-date", h.AS.UpdateVisitDate)
+	as.POST("/:id/vote", h.AS.VoteCase)
 	as.POST("/:id/update", h.AS.Update, processAS)
 	as.POST("/:id/hold", h.AS.Hold, processAS)
 	as.POST("/:id/hold-release", h.AS.ReleaseHold, processAS)

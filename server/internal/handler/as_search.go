@@ -129,7 +129,7 @@ func attachSimilarLead(items []model.ASSimilarCase) {
 	}
 }
 
-func (h *ASHandler) loadSimilarCases(as *model.ASReceipt) []model.ASSimilarCase {
+func (h *ASHandler) loadSimilarCases(as *model.ASReceipt, userID string) []model.ASSimilarCase {
 	if as == nil || strings.TrimSpace(as.Symptom) == "" {
 		return nil
 	}
@@ -144,6 +144,14 @@ func (h *ASHandler) loadSimilarCases(as *model.ASReceipt) []model.ASSimilarCase 
 		return nil
 	}
 	attachSimilarLead(items)
+	ids := make([]string, len(items))
+	for i := range items {
+		ids[i] = items[i].ASID
+	}
+	voted := h.repo.CaseVotedSet(userID, ids)
+	for i := range items {
+		items[i].Voted = voted[items[i].ASID]
+	}
 	return items
 }
 
@@ -156,7 +164,29 @@ func (h *ASHandler) SimilarPanel(c echo.Context) error {
 	}
 	c.Request().Header.Set("HX-Request", "true")
 	return c.Render(http.StatusOK, "as/similar_panel.html", map[string]interface{}{
-		"SimilarCases": h.loadSimilarCases(as),
+		"SimilarCases": h.loadSimilarCases(as, ctxString(c, "user_id")),
 		"CanReceive":   canReceiveAS(c),
+		"UserID":       ctxString(c, "user_id"),
 	})
+}
+
+// VoteCase 도움이 된 사례 👍. 다음 검색에서 위로. §41.4
+func (h *ASHandler) VoteCase(c echo.Context) error {
+	uid := ctxString(c, "user_id")
+	id := c.Param("id")
+	if uid == "" || id == "" {
+		return echo.ErrForbidden
+	}
+	as, err := h.repo.GetByID(id)
+	if err != nil || as == nil {
+		return echo.ErrNotFound
+	}
+	if _, err := h.repo.ToggleCaseVote(id, uid); err != nil {
+		return err
+	}
+	back := c.Request().Header.Get("Referer")
+	if back == "" {
+		back = "/as/" + id + "/action"
+	}
+	return c.Redirect(http.StatusSeeOther, back)
 }
