@@ -281,6 +281,49 @@ func (r *ASKeywordRepo) Suggest(text string) ([]model.ASKeyword, error) {
 	return out, nil
 }
 
+const maxSimilarQueryTerms = 8
+
+// QueryFromSymptom 증상에서 사전 낱말·토큰을 뽑아 FTS 질의로 만든다. §41.2
+func (r *ASKeywordRepo) QueryFromSymptom(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	seen := map[string]bool{}
+	var parts []string
+	add := func(term string) {
+		term = strings.TrimSpace(term)
+		if term == "" {
+			return
+		}
+		low := strings.ToLower(term)
+		if seen[low] || len(parts) >= maxSimilarQueryTerms {
+			return
+		}
+		seen[low] = true
+		parts = append(parts, term)
+	}
+	if sug, err := r.Suggest(text); err == nil {
+		for _, k := range sug {
+			add(k.Keyword)
+		}
+	}
+	stop, _ := r.Stopwords()
+	if stop == nil {
+		stop = map[string]bool{}
+	}
+	for _, orig := range tokenizeASKeywordText(text) {
+		tok := stripTrailingJosa(orig)
+		lowOrig := strings.ToLower(orig)
+		low := strings.ToLower(tok)
+		if stop[lowOrig] || stop[low] || isNoiseToken(tok) {
+			continue
+		}
+		add(tok)
+	}
+	return strings.Join(parts, " ")
+}
+
 func keywordMatchesText(text string, k model.ASKeyword) bool {
 	for _, term := range k.MatchTerms() {
 		term = strings.TrimSpace(term)

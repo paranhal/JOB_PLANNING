@@ -22,8 +22,8 @@ func TestASKeywordSeedAndNoGreetingsInCandidates(t *testing.T) {
 	repo := NewASRepo(db)
 	kw := NewASKeywordRepo(db)
 	as := &model.ASReceipt{
-		CustomerID: "c1",
-		Symptom:    "안녕하세요 감사합니다 부탁드립니다. https://www.example.kr/go 041-123-4567 무인예약이 안 되고 팝업 오류가 납니다.",
+		CustomerID:      "c1",
+		Symptom:         "안녕하세요 감사합니다 부탁드립니다. https://www.example.kr/go 041-123-4567 무인예약이 안 되고 팝업 오류가 납니다.",
 		ReceiptDatetime: time.Now(), Urgency: "normal", Priority: "normal",
 	}
 	if err := repo.Create(as); err != nil {
@@ -123,5 +123,17 @@ func TestASKeywordRejectsStopword(t *testing.T) {
 	err = kw.Create(&model.ASKeyword{Keyword: "안녕하세요", Group: model.KWGroupSymptom})
 	if err == nil || !strings.Contains(err.Error(), "stopword") {
 		t.Fatalf("인사말은 사전에 못 넣는다: %v", err)
+	}
+}
+
+func TestQueryFromSymptomUsesDictionary(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "kw-sym.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	q := NewASKeywordRepo(db).QueryFromSymptom("무인예약이 안 됩니다")
+	if !strings.Contains(q, "무인예약") {
+		t.Fatalf("증상에서 사전 낱말이 나와야 한다: %q", q)
 	}
 }

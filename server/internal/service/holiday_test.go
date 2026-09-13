@@ -88,6 +88,42 @@ func TestWorkingDaysBetweenInclusive(t *testing.T) {
 	}
 }
 
+func TestLeadBusinessDaysSection414(t *testing.T) {
+	dir := t.TempDir()
+	db, err := repository.InitDB(filepath.Join(dir, "lead.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cal := NewCalendar(repository.NewHolidayRepo(db))
+	d, ok := cal.LeadBusinessDays("2026-08-14", "2026-08-14")
+	if !ok || d != 0 {
+		t.Fatalf("같은 날=%d ok=%v", d, ok)
+	}
+	d, ok = cal.LeadBusinessDays("2026-08-14", "2026-08-17") // 금→월(대체공휴일) → 앞 근무일 금 = 0? 17 is holiday so prev=14, same 0
+	// 금요일 접수 → 월요일 완료(월이 근무일이면 1). 2026-08-17은 대체공휴일.
+	d, ok = cal.LeadBusinessDays("2026-08-07", "2026-08-10") // 금→월
+	if !ok || d != 1 {
+		t.Fatalf("금→월=%d ok=%v want 1", d, ok)
+	}
+	d, ok = cal.LeadBusinessDays("2026-08-08", "2026-08-10") // 토→월
+	if !ok || d != 0 {
+		t.Fatalf("토→월=%d ok=%v want 0", d, ok)
+	}
+	d, ok = cal.LeadBusinessDays("2026-07-31", "2026-08-06")
+	if !ok || d != 4 {
+		t.Fatalf("7/31→8/6=%d want 4", d)
+	}
+	d, ok = cal.LeadBusinessDays("2026-07-30", "2026-08-05")
+	if !ok || d != 4 {
+		t.Fatalf("7/30→8/5=%d want 4", d)
+	}
+	d, ok = cal.LeadBusinessDays("2026-08-05", "2026-08-17")
+	if !ok || d != 7 {
+		t.Fatalf("8/5→8/17=%d want 7", d)
+	}
+}
+
 func TestHolidayCacheInvalidatesOnTableChange(t *testing.T) {
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "cache.db"))

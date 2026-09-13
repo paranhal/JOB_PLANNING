@@ -60,4 +60,7 @@ type ASSimilarCase struct {
 	SameProduct    bool   `json:"same_product"`
 	CanReopen      bool   `json:"can_reopen"`
 	WeightLabel    string `json:"weight_label"`
+	CompleteDate   string `json:"complete_date,omitempty"`
+	LeadDays       int    `json:"lead_days,omitempty"`
+	LeadLabel      string `json:"lead_label,omitempty"`
 }

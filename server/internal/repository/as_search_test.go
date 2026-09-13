@@ -109,24 +109,43 @@ func TestASSearchParticleAndSnippets(t *testing.T) {
 	}
 }
 
+func completeWithWork(t *testing.T, repo *ASRepo, proc *ASProcessRepo, as *model.ASReceipt, work string, done time.Time) {
+	t.Helper()
+	if err := proc.Create(&model.ASProcess{ASID: as.ASID, WorkContent: work, TimeSpent: 20}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.GetByID(as.ASID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got.Status = "completed"
+	got.CompleteDatetime = &done
+	if err := repo.Update(got); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestASSimilarSameAssetFirstAndReopen(t *testing.T) {
 	repo, proc := setupASSearch(t)
+	work := "단말기 전원 재인가 후 정상동작"
 	same := createAS(t, repo, "c1", "A1", "무인예약이 안 됩니다", time.Date(2026, 1, 10, 10, 0, 0, 0, time.Local))
-	same.Status = "completed"
-	same.ActionTaken = "전원 재인가"
-	if err := repo.Update(same); err != nil {
-		t.Fatal(err)
-	}
-	if err := proc.Create(&model.ASProcess{ASID: same.ASID, WorkContent: "전원 재인가", TimeSpent: 20}); err != nil {
-		t.Fatal(err)
-	}
-	otherAsset := createAS(t, repo, "c1", "A2", "무인예약 오류입니다", time.Date(2026, 2, 10, 10, 0, 0, 0, time.Local))
-	_ = otherAsset
+	completeWithWork(t, repo, proc, same, work, time.Date(2026, 1, 14, 16, 0, 0, 0, time.Local))
+
+	sameSite := createAS(t, repo, "c1", "A2", "무인예약 오류입니다", time.Date(2026, 2, 10, 10, 0, 0, 0, time.Local))
+	completeWithWork(t, repo, proc, sameSite, "설정 확인 후 재시작했습니다", time.Date(2026, 2, 11, 16, 0, 0, 0, time.Local))
+
 	otherOrg := createAS(t, repo, "c2", "B1", "무인예약이 느립니다", time.Date(2026, 3, 10, 10, 0, 0, 0, time.Local))
-	_ = otherOrg
+	completeWithWork(t, repo, proc, otherOrg, "네트워크 점검 후 재기동완료", time.Date(2026, 3, 12, 16, 0, 0, 0, time.Local))
+
+	noWork := createAS(t, repo, "c1", "A1", "무인예약이 또 멈춤", time.Date(2026, 4, 1, 10, 0, 0, 0, time.Local))
+	short := createAS(t, repo, "c1", "A1", "무인예약 재부팅", time.Date(2026, 4, 2, 10, 0, 0, 0, time.Local))
+	if err := proc.Create(&model.ASProcess{ASID: short.ASID, WorkContent: "재부팅", TimeSpent: 5}); err != nil {
+		t.Fatal(err)
+	}
+	self := createAS(t, repo, "c1", "A1", "무인예약이 또 안 됩니다", time.Date(2026, 4, 10, 10, 0, 0, 0, time.Local))
 
 	items, err := repo.SimilarCases(model.ASSimilarFilter{
-		Query: "무인예약이 또 안 됩니다", CustomerID: "c1", AssetID: "A1", Limit: 5,
+		Query: "무인예약이 또 안 됩니다", CustomerID: "c1", AssetID: "A1", ExcludeID: self.ASID, Limit: 5,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -134,17 +153,45 @@ func TestASSimilarSameAssetFirstAndReopen(t *testing.T) {
 	if len(items) == 0 {
 		t.Fatal("비슷한 사례가 나와야 한다")
 	}
-	if items[0].ASID != same.ASID {
-		t.Fatalf("같은 자산이 위: got %s want %s (label=%s)", items[0].ASID, same.ASID, items[0].WeightLabel)
+	if !items[0].SameCustomer || items[0].WeightLabel != "같은 사이트" {
+		t.Fatalf("같은 사이트가 위: %+v", items[0])
 	}
-	if !items[0].SameAsset || items[0].WeightLabel != "같은 자산" {
-		t.Fatalf("weight: %+v", items[0])
+	seenSelf, seenNo, seenShort := false, false, false
+	var sameHit *model.ASSimilarCase
+	lastSame := true
+	for i, it := range items {
+		if it.ASID == self.ASID {
+			seenSelf = true
+		}
+		if it.ASID == noWork.ASID {
+			seenNo = true
+		}
+		if it.ASID == short.ASID {
+			seenShort = true
+		}
+		if it.ASID == same.ASID {
+			cp := it
+			sameHit = &cp
+		}
+		if !it.HasAction || strings.TrimSpace(it.ActionSummary) == "" || it.ActionSummary == model.ASActionMissing {
+			t.Fatalf("조치 없는 건: %+v", it)
+		}
+		if i > 0 && it.SameCustomer && !lastSame {
+			t.Fatal("같은 사이트 건이 다른 사이트보다 뒤에 있다")
+		}
+		lastSame = it.SameCustomer
 	}
-	if !items[0].CanReopen {
+	if seenSelf {
+		t.Fatal("자기 자신은 빼야 한다")
+	}
+	if seenNo || seenShort {
+		t.Fatal("조치 없거나 10자 미만은 빼야 한다")
+	}
+	if sameHit == nil {
+		t.Fatal("같은 자산 완료 건이 있어야 한다")
+	}
+	if !sameHit.CanReopen {
 		t.Fatal("완료+같은 자산이면 재접수를 제안해야 한다")
-	}
-	if !items[0].HasAction {
-		t.Fatal("조치 요약이 있어야 한다")
 	}
 }
 

@@ -353,18 +353,22 @@ func fts5Query(q string) string {
 	return strings.Join(out, " ")
 }
 
-// SimilarCases 접수 증상과 비슷한 과거 건. 같은 자산 > 기관 > 제품 > 전체. §12.11.5
+// SimilarCases 접수 증상과 비슷한 과거 건. 같은 사이트 → 관련도 → 최신순. §41.2
 func (r *ASRepo) SimilarCases(f model.ASSimilarFilter) ([]model.ASSimilarCase, error) {
 	q := strings.TrimSpace(f.Query)
 	if utf8.RuneCountInString(q) < 2 {
 		return nil, nil
 	}
 	limit := f.Limit
-	if limit < 3 {
+	if limit < 1 {
 		limit = 5
 	}
 	if limit > 5 {
 		limit = 5
+	}
+	fetch := limit * 2
+	if fetch > 16 {
+		fetch = 16
 	}
 	key := similarQueryKey(q)
 	product := ""
@@ -374,40 +378,79 @@ func (r *ASRepo) SimilarCases(f model.ASSimilarFilter) ([]model.ASSimilarCase, e
 
 	var items []model.ASSimilarCase
 	var err error
-	if asSearchHasFTS(r.db) && utf8.RuneCountInString(key) >= 3 {
-		items, err = r.similarFTS(f, key, product, limit)
+	if asSearchHasFTS(r.db) && utf8.RuneCountInString(key) >= 2 {
+		items, err = r.similarFTS(f, key, product, fetch)
 		if err != nil {
 			log.Printf("as similar FTS: %v — LIKE", err)
-			items, err = r.similarLike(f, key, product, limit)
+			items, err = r.similarLike(f, key, product, fetch)
 		}
 	} else {
-		items, err = r.similarLike(f, key, product, limit)
+		items, err = r.similarLike(f, key, product, fetch)
 	}
 	if err != nil {
 		return nil, err
+	}
+	if len(items) > limit {
+		items = items[:limit]
 	}
 	return items, nil
 }
 
 func similarQueryKey(q string) string {
-	r := []rune(strings.TrimSpace(q))
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return q
+	}
+	if strings.Contains(q, " ") {
+		r := []rune(q)
+		if len(r) > 80 {
+			return string(r[:80])
+		}
+		return q
+	}
+	r := []rune(q)
 	if len(r) > 12 {
 		return string(r[:12])
 	}
 	return string(r)
 }
 
+const similarWorkMinSQL = `LENGTH(TRIM(COALESCE(p.work_content,''))) >= 10`
+
+func similarHasWorkSQL() string {
+	return ` EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id AND ` + similarWorkMinSQL + `)`
+}
+
+func similarFTSMatch(key string) string {
+	parts := strings.Fields(strings.TrimSpace(key))
+	if len(parts) == 0 {
+		return fts5Query(key)
+	}
+	quoted := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if utf8.RuneCountInString(p) < 2 {
+			continue
+		}
+		quoted = append(quoted, `"`+strings.ReplaceAll(p, `"`, `""`)+`"`)
+	}
+	if len(quoted) == 0 {
+		return fts5Query(key)
+	}
+	return strings.Join(quoted, " OR ")
+}
+
 func (r *ASRepo) similarFTS(f model.ASSimilarFilter, key, product string, limit int) ([]model.ASSimilarCase, error) {
-	match := fts5Query(key)
-	where := ` WHERE as_search MATCH ?`
+	match := similarFTSMatch(key)
+	where := ` WHERE as_search MATCH ? AND ` + similarHasWorkSQL()
 	args := []interface{}{match}
 	if x := strings.TrimSpace(f.ExcludeID); x != "" {
 		where += ` AND ar.as_id <> ?`
 		args = append(args, x)
 	}
 	q := similarSelectSQL() + `
-		JOIN as_search ON as_search.as_id = ar.as_id` + where + similarOrderSQL() + ` LIMIT ?`
-	args = append(similarWeightArgs(f, product), args...)
+		JOIN as_search ON as_search.as_id = ar.as_id` + where + similarOrderSQL(true) + ` LIMIT ?`
+	args = append(similarWeightArgs(f), args...)
 	args = append(args, limit)
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
@@ -418,16 +461,35 @@ func (r *ASRepo) similarFTS(f model.ASSimilarFilter, key, product string, limit 
 }
 
 func (r *ASRepo) similarLike(f model.ASSimilarFilter, key, product string, limit int) ([]model.ASSimilarCase, error) {
-	like := "%" + key + "%"
-	where := ` WHERE (ar.symptom LIKE ? OR ar.action_taken LIKE ?
-		OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id AND p.work_content LIKE ?))`
-	args := []interface{}{like, like, like}
+	parts := strings.Fields(strings.TrimSpace(key))
+	if len(parts) == 0 {
+		parts = []string{key}
+	}
+	var ors []string
+	var args []interface{}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if utf8.RuneCountInString(p) < 2 {
+			continue
+		}
+		like := "%" + p + "%"
+		ors = append(ors, `(ar.symptom LIKE ? OR ar.action_taken LIKE ?
+			OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id AND p.work_content LIKE ?))`)
+		args = append(args, like, like, like)
+	}
+	if len(ors) == 0 {
+		like := "%" + strings.TrimSpace(key) + "%"
+		ors = []string{`(ar.symptom LIKE ? OR ar.action_taken LIKE ?
+			OR EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id AND p.work_content LIKE ?))`}
+		args = []interface{}{like, like, like}
+	}
+	where := ` WHERE ` + similarHasWorkSQL() + ` AND (` + strings.Join(ors, " OR ") + `)`
 	if x := strings.TrimSpace(f.ExcludeID); x != "" {
 		where += ` AND ar.as_id <> ?`
 		args = append(args, x)
 	}
-	q := similarSelectSQL() + where + similarOrderSQL() + ` LIMIT ?`
-	args = append(similarWeightArgs(f, product), args...)
+	q := similarSelectSQL() + where + similarOrderSQL(false) + ` LIMIT ?`
+	args = append(similarWeightArgs(f), args...)
 	args = append(args, limit)
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
@@ -437,38 +499,36 @@ func (r *ASRepo) similarLike(f model.ASSimilarFilter, key, product string, limit
 	return scanSimilarCases(rows, f, product)
 }
 
-func similarWeightArgs(f model.ASSimilarFilter, product string) []interface{} {
-	asset := strings.TrimSpace(f.AssetID)
+func similarWeightArgs(f model.ASSimilarFilter) []interface{} {
 	cust := strings.TrimSpace(f.CustomerID)
-	prod := strings.TrimSpace(product)
-	return []interface{}{asset, asset, cust, cust, prod, prod}
+	return []interface{}{cust, cust}
 }
 
 func similarSelectSQL() string {
 	return `
 		SELECT ar.as_id, ar.as_number, c.org_name,
 		       date(ar.receipt_datetime),
-		       COALESCE(date(ar.complete_datetime), date(ar.receipt_datetime)),
+		       COALESCE(date(ar.complete_datetime), ''),
 		       COALESCE(ar.symptom,''),
-		       COALESCE(ar.action_taken,''),
 		       COALESCE((
 		         SELECT p.work_content FROM as_processes p
-		          WHERE p.as_id = ar.as_id AND TRIM(COALESCE(p.work_content,'')) != ''
+		          WHERE p.as_id = ar.as_id AND ` + similarWorkMinSQL + `
 		          ORDER BY p.process_datetime DESC LIMIT 1
 		       ), ''),
 		       ar.status, COALESCE(ar.asset_id,''), ar.customer_id, COALESCE(a.product_name,''),
 		       CASE
-		         WHEN ? != '' AND ar.asset_id = ? THEN 0
-		         WHEN ? != '' AND ar.customer_id = ? THEN 1
-		         WHEN ? != '' AND COALESCE(a.product_name,'') = ? THEN 2
-		         ELSE 3
+		         WHEN ? != '' AND ar.customer_id = ? THEN 0
+		         ELSE 1
 		       END AS w
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id`
 }
 
-func similarOrderSQL() string {
+func similarOrderSQL(fts bool) string {
+	if fts {
+		return ` ORDER BY w ASC, bm25(as_search), ar.receipt_datetime DESC`
+	}
 	return ` ORDER BY w ASC, ar.receipt_datetime DESC`
 }
 
@@ -476,36 +536,30 @@ func scanSimilarCases(rows *sql.Rows, f model.ASSimilarFilter, product string) (
 	var items []model.ASSimilarCase
 	for rows.Next() {
 		var it model.ASSimilarCase
-		var symptom, actionTaken, lastWork, assetID, customerID, prodName string
+		var symptom, lastWork, assetID, customerID, prodName string
 		var w int
 		if err := rows.Scan(&it.ASID, &it.ASNumber, &it.OrgName,
-			&it.ReceiptDate, &it.ProcessDate, &symptom, &actionTaken, &lastWork,
+			&it.ReceiptDate, &it.CompleteDate, &symptom, &lastWork,
 			&it.Status, &assetID, &customerID, &prodName, &w); err != nil {
 			return nil, err
 		}
+		it.ProcessDate = it.CompleteDate
+		if it.ProcessDate == "" {
+			it.ProcessDate = it.ReceiptDate
+		}
 		it.SymptomSummary = truncateRunes(compactSpace(symptom), 80)
-		action := strings.TrimSpace(actionTaken)
-		if action == "" {
-			action = strings.TrimSpace(lastWork)
+		action := strings.TrimSpace(lastWork)
+		if utf8.RuneCountInString(action) < 10 {
+			continue
 		}
-		if action == "" {
-			it.HasAction = false
-			it.ActionSummary = model.ASActionMissing
-		} else {
-			it.HasAction = true
-			it.ActionSummary = truncateRunes(compactSpace(action), 80)
-		}
+		it.HasAction = true
+		it.ActionSummary = truncateRunes(compactSpace(action), 80)
 		it.SameAsset = strings.TrimSpace(f.AssetID) != "" && assetID == f.AssetID
 		it.SameCustomer = strings.TrimSpace(f.CustomerID) != "" && customerID == f.CustomerID
 		it.SameProduct = strings.TrimSpace(product) != "" && prodName == product
 		it.CanReopen = it.SameAsset && model.CanReopenAS(it.Status)
-		switch {
-		case it.SameAsset:
-			it.WeightLabel = "같은 자산"
-		case it.SameCustomer:
-			it.WeightLabel = "같은 기관"
-		case it.SameProduct:
-			it.WeightLabel = "같은 제품"
+		if it.SameCustomer {
+			it.WeightLabel = "같은 사이트"
 		}
 		items = append(items, it)
 	}

@@ -213,3 +213,55 @@ func IsWorkingDay(date string) bool {
 func WorkingDaysBetween(from, to string) int {
 	return defaultCal.WorkingDaysBetween(from, to)
 }
+
+// LeadBusinessDays 접수→완료 소요 영업일. §4.14.3
+// 기산은 접수일의 next_bd(근무일이면 당일, 휴일이면 다음 근무일).
+// 완료가 휴일이면 그 앞 근무일. 같은 날은 0.
+func LeadBusinessDays(receipt, complete string) (int, bool) {
+	cal := defaultCal
+	if cal == nil {
+		cal = &Calendar{}
+	}
+	return cal.LeadBusinessDays(receipt, complete)
+}
+
+func (c *Calendar) LeadBusinessDays(receipt, complete string) (int, bool) {
+	if c == nil {
+		c = &Calendar{}
+	}
+	rs, rk, ok := parseHolidayDate(receipt)
+	if !ok {
+		return 0, false
+	}
+	cs, ck, ok := parseHolidayDate(complete)
+	if !ok {
+		return 0, false
+	}
+	if cs.Before(rs) {
+		return 0, false
+	}
+	if rk == ck {
+		return 0, true
+	}
+	start := rk
+	if !c.IsWorkingDay(rk) {
+		start = c.NextWorkingDay(rk)
+	}
+	end := ck
+	if !c.IsWorkingDay(ck) {
+		end = c.PrevWorkingDay(ck)
+	}
+	if start == "" || end == "" {
+		return 0, false
+	}
+	st, _, ok1 := parseHolidayDate(start)
+	en, _, ok2 := parseHolidayDate(end)
+	if !ok1 || !ok2 || en.Before(st) {
+		return 0, true
+	}
+	n := c.WorkingDaysBetween(start, end)
+	if n <= 0 {
+		return 0, true
+	}
+	return n - 1, true
+}
