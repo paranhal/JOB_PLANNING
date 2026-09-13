@@ -324,6 +324,47 @@ func (r *ASKeywordRepo) QueryFromSymptom(text string) string {
 	return strings.Join(parts, " ")
 }
 
+// CountInTexts 사전 낱말이 본문에 몇 건 나오는지. 새 사전을 만들지 않는다. §41.3.2
+func (r *ASKeywordRepo) CountInTexts(texts []string, limit int) []model.ASKeywordFreq {
+	if limit < 1 {
+		limit = 8
+	}
+	all, err := r.List(true)
+	if err != nil || len(all) == 0 {
+		return nil
+	}
+	type acc struct {
+		word string
+		n    int
+	}
+	var hits []acc
+	for _, k := range all {
+		n := 0
+		for _, t := range texts {
+			if keywordMatchesText(t, k) {
+				n++
+			}
+		}
+		if n > 0 {
+			hits = append(hits, acc{k.Keyword, n})
+		}
+	}
+	sort.Slice(hits, func(i, j int) bool {
+		if hits[i].n == hits[j].n {
+			return hits[i].word < hits[j].word
+		}
+		return hits[i].n > hits[j].n
+	})
+	if len(hits) > limit {
+		hits = hits[:limit]
+	}
+	out := make([]model.ASKeywordFreq, len(hits))
+	for i, h := range hits {
+		out[i] = model.ASKeywordFreq{Keyword: h.word, Count: h.n}
+	}
+	return out
+}
+
 func keywordMatchesText(text string, k model.ASKeyword) bool {
 	for _, term := range k.MatchTerms() {
 		term = strings.TrimSpace(term)

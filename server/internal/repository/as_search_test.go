@@ -206,3 +206,96 @@ func TestASSimilarHidesWhenNoMatch(t *testing.T) {
 		t.Fatalf("없으면 빈 목록: n=%d", len(items))
 	}
 }
+
+func TestKnowledgeSearchMatchesSymptomAndAction(t *testing.T) {
+	repo, proc := setupASSearch(t)
+	long := strings.Repeat("예약대출기 투입 목록이 안 나옵니다. ", 8)
+	sym := createAS(t, repo, "c1", "A1", long, time.Date(2026, 8, 12, 10, 0, 0, 0, time.Local))
+	if err := proc.Create(&model.ASProcess{ASID: sym.ASID, WorkContent: "VNC 원격 후 서비스 재시작 완료함", TimeSpent: 30}); err != nil {
+		t.Fatal(err)
+	}
+	act := createAS(t, repo, "c1", "A2", "로그인 오류가 반복됩니다", time.Date(2026, 8, 5, 10, 0, 0, 0, time.Local))
+	if err := proc.Create(&model.ASProcess{ASID: act.ASID, WorkContent: "예약대출기 펌웨어 확인 후 재시작했습니다", TimeSpent: 20}); err != nil {
+		t.Fatal(err)
+	}
+	none := createAS(t, repo, "c1", "A1", "예약대출기만 있고 조치는 없음", time.Date(2026, 8, 1, 10, 0, 0, 0, time.Local))
+
+	hits, total, err := repo.SearchAS(model.ASSearchFilter{Query: "예약대출기", RequireAction: true, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total < 2 {
+		t.Fatalf("증상·조치 양쪽에서 찾아야 한다 total=%d", total)
+	}
+	var sawSym, sawAct bool
+	for _, h := range hits {
+		if h.ASID == none.ASID {
+			t.Fatal("조치 없는 건은 기본 검색에 넣지 않는다")
+		}
+		if h.ASID == sym.ASID {
+			sawSym = true
+			if !h.MatchSymptom {
+				t.Fatal("증상 뱃지")
+			}
+			if !h.SymptomLong {
+				t.Fatal("긴 증상은 접어야 한다")
+			}
+			if !strings.Contains(string(h.SymptomHTML), "<mark>예약대출기</mark>") {
+				t.Fatalf("하이라이트: %s", h.SymptomHTML)
+			}
+		}
+		if h.ASID == act.ASID {
+			sawAct = true
+			if !h.MatchAction {
+				t.Fatal("조치 뱃지")
+			}
+		}
+	}
+	if !sawSym || !sawAct {
+		t.Fatalf("sym=%v act=%v n=%d", sawSym, sawAct, len(hits))
+	}
+
+	all, _, err := repo.SearchAS(model.ASSearchFilter{Query: "예약대출기", RequireAction: false, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundNone := false
+	for _, h := range all {
+		if h.ASID == none.ASID {
+			foundNone = true
+		}
+	}
+	if !foundNone {
+		t.Fatal("전체 토글이면 조치 없는 건도 나온다")
+	}
+}
+
+func TestKnowledgeSitesUseReceiptCustomerNotAsset(t *testing.T) {
+	repo, proc := setupASSearch(t)
+	noAsset := createAS(t, repo, "c2", "", "사이트만 있는 접수", time.Now())
+	if err := proc.Create(&model.ASProcess{ASID: noAsset.ASID, WorkContent: "방문 확인 후 안내하였습니다", TimeSpent: 15}); err != nil {
+		t.Fatal(err)
+	}
+	sites, err := repo.KnowledgeSites()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sites) == 0 {
+		t.Fatal("사이트가 있어야 한다")
+	}
+	got := map[string]int{}
+	for _, s := range sites {
+		if s.OrgName == "" || s.OrgName == "미지정" || s.CustomerID == "" {
+			t.Fatalf("미지정: %+v", s)
+		}
+		got[s.CustomerID] = s.Count
+	}
+	if got["c2"] < 1 {
+		t.Fatalf("자산 없는 접수도 ar.customer_id 로 센다: %+v", got)
+	}
+	cases, err := repo.KnowledgeSiteCases("c2", 50)
+	if err != nil || len(cases) == 0 {
+		t.Fatalf("사이트 건: n=%d err=%v", len(cases), err)
+	}
+}
+

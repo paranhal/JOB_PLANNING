@@ -103,8 +103,11 @@ func searchPage(f model.ASSearchFilter) (page, size, offset int) {
 		page = 1
 	}
 	size = f.PageSize
-	if size < 1 || size > 50 {
+	if size < 1 {
 		size = 20
+	}
+	if size > 2000 {
+		size = 2000
 	}
 	return page, size, (page - 1) * size
 }
@@ -144,6 +147,13 @@ func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFil
 		where += ` AND EXISTS (SELECT 1 FROM as_keyword_links l WHERE l.as_id=ar.as_id AND l.keyword_id=?)`
 		args = append(args, s)
 	}
+	if s := strings.TrimSpace(f.CauseCat); s != "" {
+		where += ` AND (ar.cause_cat1 = ? OR ar.cause_cat2 = ? OR ar.cause_cat3 = ?)`
+		args = append(args, s, s, s)
+	}
+	if f.RequireAction {
+		where += ` AND` + similarHasWorkSQL()
+	}
 	return where, args
 }
 
@@ -156,7 +166,10 @@ const asSearchHitSQL = `
 		          WHERE p.as_id = ar.as_id AND TRIM(COALESCE(p.work_content,'')) != ''
 		          ORDER BY p.process_datetime DESC LIMIT 1
 		       ), ''),
-		       COALESCE(ct.code_name, ar.cause_type, '')
+		       COALESCE(ct.code_name, ar.cause_type, ''),
+		       COALESCE(ar.assigned_to,''),
+		       COALESCE(date(ar.complete_datetime), ''),
+		       COALESCE(ar.customer_id,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
@@ -244,6 +257,9 @@ func decorateSearchHit(h *model.ASSearchHit, q string) {
 		h.ActionHTML = template.HTML(highlightExcerpt(actionSrc, q, 120))
 	}
 	h.SymptomHTML = template.HTML(highlightExcerpt(h.Symptom, q, 120))
+	h.MatchSymptom = textHasQuery(h.Symptom, q)
+	h.MatchAction = h.HasAction && textHasQuery(actionSrc, q)
+	h.SymptomLong = utf8.RuneCountInString(compactSpace(h.Symptom)) > 90
 }
 
 func (r *ASRepo) searchASFTS(f model.ASSearchFilter, q string, size, offset int) ([]model.ASSearchHit, int, error) {
@@ -318,7 +334,8 @@ func scanASSearchHits(rows *sql.Rows) ([]model.ASSearchHit, error) {
 		var h model.ASSearchHit
 		var actionTaken, lastWork string
 		if err := rows.Scan(&h.ASID, &h.ASNumber, &h.OrgName, &h.ReceiptDate,
-			&h.Symptom, &actionTaken, &lastWork, &h.CauseName); err != nil {
+			&h.Symptom, &actionTaken, &lastWork, &h.CauseName,
+			&h.AssignedTo, &h.CompleteDate, &h.CustomerID); err != nil {
 			return nil, err
 		}
 		h.Action = strings.TrimSpace(actionTaken)
@@ -585,6 +602,114 @@ func (r *ASRepo) SearchProductNames() ([]string, error) {
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+const knowledgeWorkSQL = `EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id AND LENGTH(TRIM(COALESCE(p.work_content,''))) >= 10)`
+
+// KnowledgeCorpus 조치 있는 건 / 전체 / 원인분류된 건. 숫자는 화면이 한계를 말할 때 쓴다. §41.1.2
+func (r *ASRepo) KnowledgeCorpus() (withAction, total, classified int, err error) {
+	err = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar`).Scan(&total)
+	if err != nil {
+		return
+	}
+	err = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar WHERE ` + knowledgeWorkSQL).Scan(&withAction)
+	if err != nil {
+		return
+	}
+	err = r.db.QueryRow(`
+		SELECT COUNT(*) FROM as_receipts ar
+		 WHERE TRIM(COALESCE(ar.cause_cat1,'')) != ''
+		    OR TRIM(COALESCE(ar.cause_cat2,'')) != ''
+		    OR TRIM(COALESCE(ar.cause_cat3,'')) != ''`).Scan(&classified)
+	return
+}
+
+// KnowledgeSites 사이트 목록. assets 를 거치지 않는다. §41.1.1
+func (r *ASRepo) KnowledgeSites() ([]model.ASKnowledgeSite, error) {
+	rows, err := r.db.Query(`
+		SELECT ar.customer_id, c.org_name, COUNT(*)
+		  FROM as_receipts ar
+		  JOIN customers c ON c.customer_id = ar.customer_id
+		 WHERE TRIM(COALESCE(ar.customer_id,'')) != ''
+		 GROUP BY ar.customer_id
+		 ORDER BY c.org_name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.ASKnowledgeSite
+	for rows.Next() {
+		var s model.ASKnowledgeSite
+		if err := rows.Scan(&s.CustomerID, &s.OrgName, &s.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// KnowledgeSiteCases 한 사이트의 접수. 최신순. ar.customer_id.
+func (r *ASRepo) KnowledgeSiteCases(customerID string, limit int) ([]model.ASSearchHit, error) {
+	customerID = strings.TrimSpace(customerID)
+	if customerID == "" {
+		return nil, nil
+	}
+	if limit < 1 || limit > 2000 {
+		limit = 200
+	}
+	q := asSearchHitSQL + `
+		WHERE ar.customer_id = ?
+		ORDER BY ar.receipt_datetime DESC
+		LIMIT ?`
+	rows, err := r.db.Query(q, customerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items, err := scanASSearchHits(rows)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		decorateSearchHit(&items[i], "")
+	}
+	return items, nil
+}
+
+func DecorateKnowledgeHits(items []model.ASSearchHit, q string) {
+	for i := range items {
+		items[i].SymptomHTML = template.HTML(highlightFull(items[i].Symptom, q))
+		if items[i].HasAction {
+			items[i].ActionHTML = template.HTML(highlightFull(items[i].Action, q))
+		}
+		items[i].MatchSymptom = textHasQuery(items[i].Symptom, q)
+		items[i].MatchAction = items[i].HasAction && textHasQuery(items[i].Action, q)
+		items[i].SymptomLong = utf8.RuneCountInString(compactSpace(items[i].Symptom)) > 90
+	}
+}
+
+func highlightFull(text, query string) string {
+	text = compactSpace(text)
+	if text == "" {
+		return ""
+	}
+	return highlightTokens(html.EscapeString(text), query)
+}
+
+func textHasQuery(text, query string) bool {
+	text = strings.ToLower(compactSpace(text))
+	if text == "" {
+		return false
+	}
+	for _, t := range searchTokens(query) {
+		if t == "" {
+			continue
+		}
+		if strings.Contains(text, strings.ToLower(t)) {
+			return true
+		}
+	}
+	return false
 }
 
 func highlightExcerpt(text, query string, maxRunes int) string {

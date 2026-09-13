@@ -16,9 +16,11 @@ type ASSearchFilter struct {
 	ProcessType string
 	Assigned    string
 	Sort        string // relevance | newest
-	KeywordID   string // 키워드 모아보기. §12.11.6
-	Page        int
-	PageSize    int
+	KeywordID     string // 키워드 모아보기. §12.11.6
+	CauseCat      string // §34.3.3 cause_cat*
+	RequireAction bool   // 조치 기록 있는 건만. §41.1.2
+	Page          int
+	PageSize      int
 }
 
 // ASSearchHit 검색 한 줄. 증상·조치를 나란히 보여 주기 위한 원문.
@@ -30,9 +32,39 @@ type ASSearchHit struct {
 	Symptom      string
 	Action       string
 	CauseName    string
-	HasAction    bool
-	SymptomHTML  template.HTML
-	ActionHTML   template.HTML
+	HasAction     bool
+	SymptomHTML   template.HTML
+	ActionHTML    template.HTML
+	AssignedTo    string
+	CompleteDate  string
+	CustomerID    string
+	MatchSymptom  bool
+	MatchAction   bool
+	SymptomLong   bool
+	LeadDays      int
+	LeadLabel     string
+}
+
+// ASKnowledgeSite 사이트 탭 한 줄. 건수는 ar.customer_id 기준. §41.1.1 · §41.3.2
+type ASKnowledgeSite struct {
+	CustomerID string
+	OrgName    string
+	Count      int
+}
+
+// ASKnowledgeSummary 사이트 탭 요약.
+type ASKnowledgeSummary struct {
+	OrgName       string
+	Total         int
+	WithAction    int
+	LatestReceipt string
+	AvgLeadLabel  string
+}
+
+// ASKeywordFreq 사이트에서 많이 나온 사전 낱말. as_keywords 재사용.
+type ASKeywordFreq struct {
+	Keyword string
+	Count   int
 }
 
 // ASSimilarFilter 접수·조치 화면의 비슷한 사례. §12.11.5
