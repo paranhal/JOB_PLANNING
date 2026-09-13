@@ -205,6 +205,7 @@ func (r *ASRepo) SearchAS(f model.ASSearchFilter) ([]model.ASSearchHit, int, err
 	for i := range items {
 		decorateSearchHit(&items[i], q)
 	}
+	r.attachHitPeople(items)
 	return items, total, nil
 }
 
@@ -539,7 +540,17 @@ func similarSelectSQL() string {
 		         WHEN ? != '' AND ar.customer_id = ? THEN 0
 		         ELSE 1
 		       END AS w,
-		       (SELECT COUNT(*) FROM as_case_votes v WHERE v.as_id = ar.as_id) AS votes
+		       (SELECT COUNT(*) FROM as_case_votes v WHERE v.as_id = ar.as_id) AS votes,
+		       COALESCE((
+		         SELECT p.worker FROM as_processes p
+		          WHERE p.as_id = ar.as_id AND ` + similarWorkMinSQL + `
+		          ORDER BY p.process_datetime DESC LIMIT 1
+		       ), ''),
+		       COALESCE((
+		         SELECT p.process_datetime FROM as_processes p
+		          WHERE p.as_id = ar.as_id AND ` + similarWorkMinSQL + `
+		          ORDER BY p.process_datetime DESC LIMIT 1
+		       ), '')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id`
@@ -558,12 +569,15 @@ func scanSimilarCases(rows *sql.Rows, f model.ASSimilarFilter, product string) (
 		var it model.ASSimilarCase
 		var symptom, lastWork, assetID, customerID, prodName string
 		var w, votes int
+		var worker, procAt string
 		if err := rows.Scan(&it.ASID, &it.ASNumber, &it.OrgName,
 			&it.ReceiptDate, &it.CompleteDate, &symptom, &lastWork,
-			&it.Status, &assetID, &customerID, &prodName, &w, &votes); err != nil {
+			&it.Status, &assetID, &customerID, &prodName, &w, &votes, &worker, &procAt); err != nil {
 			return nil, err
 		}
 		it.VoteCount = votes
+		it.AuthorName = model.DisplayPerson(worker)
+		it.AuthorDate, it.AuthorFull = model.KnowledgeWhenString(procAt)
 		it.ProcessDate = it.CompleteDate
 		if it.ProcessDate == "" {
 			it.ProcessDate = it.ReceiptDate
@@ -677,6 +691,7 @@ func (r *ASRepo) KnowledgeSiteCases(customerID string, limit int) ([]model.ASSea
 	for i := range items {
 		decorateSearchHit(&items[i], "")
 	}
+	r.attachHitPeople(items)
 	return items, nil
 }
 

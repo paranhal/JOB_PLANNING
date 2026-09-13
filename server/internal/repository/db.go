@@ -1106,6 +1106,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyRegionDistanceOrder(db)
 	applyASCauseCategoriesV2(db)
 	applyASCaseVotes(db)
+	applyASKbEntries(db)
 	applyAppVersions(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.

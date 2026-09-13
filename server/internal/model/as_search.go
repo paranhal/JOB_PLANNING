@@ -45,6 +45,22 @@ type ASSearchHit struct {
 	LeadLabel     string
 	VoteCount     int
 	Voted         bool
+	KBID          string
+	IsKnowledge   bool
+	Origin        string
+	OriginLabel   string
+	Rev           int
+	RevLabel      string
+	HistoryCount  int
+	AuthorName    string
+	AuthorDate    string
+	AuthorFull    string
+	SourceName    string
+	SourceDate    string
+	SourceFull    string
+	OriginalAction string
+	ChangeNote    string
+	Past          []ASKBEntry
 }
 
 // ASKnowledgeSite 사이트 탭 한 줄. 건수는 ar.customer_id 기준. §41.1.1 · §41.3.2
@@ -99,4 +115,7 @@ type ASSimilarCase struct {
 	LeadLabel      string `json:"lead_label,omitempty"`
 	VoteCount      int    `json:"vote_count,omitempty"`
 	Voted          bool   `json:"voted,omitempty"`
+	AuthorName     string `json:"author_name,omitempty"`
+	AuthorDate     string `json:"author_date,omitempty"`
+	AuthorFull     string `json:"author_full,omitempty"`
 }
