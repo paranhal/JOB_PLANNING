@@ -7,6 +7,7 @@
     <div class="bg-white rounded-lg border border-amber-100 p-3 space-y-2 text-sm">
       <p class="text-slate-800 leading-snug">{{.SymptomSummary}}</p>
       <p class="text-slate-800 leading-snug">→ {{.ActionSummary}}{{if .LeadLabel}} <span class="text-slate-500">{{.LeadLabel}}</span>{{end}}</p>
+      <p class="text-[11px] text-slate-600">{{.AuthorName}} · <span title="{{.AuthorFull}}">{{.AuthorDate}}</span></p>
       <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
         <span>{{.OrgName}}</span>
         <span>{{.ReceiptDate}}</span>

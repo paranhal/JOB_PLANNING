@@ -93,6 +93,7 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		"WithAction": withAction, "TotalAll": totalAll, "Classified": classified,
 		"Customers": customers, "Products": products, "CauseCats": catL1,
 		"Sites": sites, "CanReceive": canReceiveAS(c),
+		"CanProcess": canProcessAS(c),
 		"DisplayName": ctxString(c, "user_name"),
 	}
 
@@ -142,7 +143,7 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 	var items []model.ASSearchHit
 	var total int
 	if strings.TrimSpace(f.Query) != "" {
-		items, total, err = h.repo.SearchAS(f)
+		items, total, err = h.repo.SearchKnowledge(f)
 		if err != nil {
 			return err
 		}
@@ -154,7 +155,9 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		}
 		voted := h.repo.CaseVotedSet(ctxString(c, "user_id"), ids)
 		for i := range items {
-			items[i].Voted = voted[items[i].ASID]
+			if items[i].ASID != "" {
+				items[i].Voted = voted[items[i].ASID]
+			}
 		}
 	}
 	totalPages := 0
@@ -187,7 +190,7 @@ func (h *ASHandler) KnowledgeExcel(c echo.Context) error {
 	if tab == "site" && f.CustomerID != "" {
 		items, err = h.repo.KnowledgeSiteCases(f.CustomerID, 2000)
 	} else if strings.TrimSpace(f.Query) != "" {
-		items, _, err = h.repo.SearchAS(f)
+		items, _, err = h.repo.SearchKnowledge(f)
 	}
 	if err != nil {
 		return err
@@ -215,7 +218,7 @@ func buildKnowledgeExcel(items []model.ASSearchHit) (*excelize.File, error) {
 		return nil, err
 	}
 	sheet = "AS사례"
-	headers := []string{"접수일", "사이트", "증상", "조치", "소요(영업일)", "담당자", "AS번호"}
+	headers := []string{"접수일", "사이트", "증상", "조치", "소요(영업일)", "담당자", "AS번호", "출처", "작성자", "작성일", "원본작성자", "원본작성일"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		_ = f.SetCellValue(sheet, cell, h)
@@ -225,7 +228,14 @@ func buildKnowledgeExcel(items []model.ASSearchHit) (*excelize.File, error) {
 		if !it.HasAction {
 			action = ""
 		}
-		vals := []interface{}{it.ReceiptDate, it.OrgName, it.Symptom, action, it.LeadLabel, it.AssignedTo, it.ASNumber}
+		org := it.OrgName
+		if org == "" {
+			org = "—"
+		}
+		vals := []interface{}{
+			it.ReceiptDate, org, it.Symptom, action, it.LeadLabel, it.AssignedTo, it.ASNumber,
+			it.OriginLabel, it.AuthorName, it.AuthorDate, it.SourceName, it.SourceDate,
+		}
 		for c, v := range vals {
 			cell, _ := excelize.CoordinatesToCellName(c+1, r+2)
 			_ = f.SetCellValue(sheet, cell, v)

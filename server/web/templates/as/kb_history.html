@@ -1,0 +1,22 @@
+{{define "title"}}수정 이력 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-3xl mx-auto space-y-4">
+  <a href="/as/knowledge" class="text-sm text-blue-700 hover:underline">사례 검색으로</a>
+  <h2 class="text-lg font-bold text-slate-800">수정 이력 {{if .Past}}{{len .Past}}{{end}}</h2>
+  <article class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+    <p class="text-xs text-slate-500">현재 rev {{.Current.Rev}} · {{displayPerson .Current.AuthorName}}
+      <span title="{{ymdt .Current.CreatedAt}}">{{ymd .Current.CreatedAt}}</span>
+    </p>
+    <p class="text-sm text-slate-800 whitespace-pre-wrap">{{.Current.ActionText}}</p>
+  </article>
+  {{range .Past}}
+  <article class="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-1">
+    <p class="text-xs text-slate-500">rev {{.Rev}} · {{displayPerson .AuthorName}}
+      <span title="{{ymdt .CreatedAt}}">{{ymd .CreatedAt}}</span>
+      {{if .ChangeNote}} · {{.ChangeNote}}{{end}}
+    </p>
+    <p class="text-sm text-slate-700 whitespace-pre-wrap">{{.ActionText}}</p>
+  </article>
+  {{end}}
+</div>
+{{end}}

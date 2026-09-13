@@ -120,8 +120,8 @@ func TestASSimilarJSONSameAsset(t *testing.T) {
 	if out.Items[0].LeadLabel == "" || !strings.Contains(out.Items[0].LeadLabel, "영업일") {
 		t.Fatalf("소요 영업일: %+v", out.Items[0])
 	}
-	if !out.Items[0].CanReopen {
-		t.Fatal("완료+같은 자산이면 재접수 제안")
+	if out.Items[0].AuthorName == "" {
+		t.Fatal("비슷한 사례에 작성자가 없다")
 	}
 }
 

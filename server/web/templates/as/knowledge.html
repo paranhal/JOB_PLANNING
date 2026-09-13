@@ -71,6 +71,18 @@
     {{end}}
   </form>
 
+  {{if .CanProcess}}
+  <details class="bg-white rounded-xl border border-dashed border-slate-300 p-3 text-sm">
+    <summary class="cursor-pointer text-slate-700">독립 지식 쓰기 (AS 없이)</summary>
+    <form method="POST" action="/as/knowledge" class="mt-3 space-y-2">
+      <input type="hidden" name="q" value="{{.Q}}">
+      <input type="text" name="symptom_text" placeholder="증상" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <textarea name="action_text" required rows="3" placeholder="지식 본문" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+      <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">저장</button>
+    </form>
+  </details>
+  {{end}}
+
   {{if .Q}}
   <p class="text-sm text-slate-500">{{.Total}}건</p>
   {{if .Items}}
@@ -79,22 +91,83 @@
     <article class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
       <div class="flex flex-wrap items-start justify-between gap-2">
         <p class="text-sm font-medium text-slate-900 kb-symptom {{if .SymptomLong}}line-clamp-3{{end}}">{{.SymptomHTML}}</p>
-        {{if .LeadLabel}}<span class="shrink-0 text-sm text-slate-600">{{.LeadLabel}}</span>{{end}}
+        <div class="flex items-center gap-2 shrink-0">
+          {{if .LeadLabel}}<span class="text-sm text-slate-600">{{.LeadLabel}}</span>{{end}}
+          {{if eq .Origin "revised"}}
+          <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-900 text-[11px] font-medium">정정</span>
+          {{else if eq .Origin "added"}}
+          <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-medium">지식 추가</span>
+          {{else if .Origin}}
+          <span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px] font-medium">조치 기록</span>
+          {{end}}
+        </div>
       </div>
       {{if .SymptomLong}}
       <button type="button" class="kb-expand text-[11px] text-blue-700 hover:underline">펼치기</button>
       {{end}}
-      <p class="text-xs text-slate-500">{{.OrgName}} · {{.ReceiptDate}}{{if .AssignedTo}} · {{.AssignedTo}}{{end}}</p>
+      <p class="text-xs text-slate-500">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}} · {{.ReceiptDate}}{{if .AssignedTo}} · {{.AssignedTo}}{{end}}</p>
       <div class="flex flex-wrap gap-1">
         {{if .MatchSymptom}}<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-900 text-[11px]">증상</span>{{end}}
         {{if .MatchAction}}<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[11px]">조치</span>{{end}}
       </div>
       <p class="text-sm {{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}}"><span class="text-[11px] text-slate-400">조치</span> {{.ActionHTML}}</p>
-      <div class="flex items-center gap-3">
+      <p class="text-xs text-slate-600">
+        {{.AuthorName}}
+        <span title="{{.AuthorFull}}">{{.AuthorDate}}</span>
+        {{if .RevLabel}} · {{.RevLabel}}{{end}}
+      </p>
+      {{if eq .Origin "revised"}}
+      <details class="text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+        <summary class="cursor-pointer text-slate-600">당시 조치 기록 보기</summary>
+        <p class="mt-2 text-slate-700">{{.OriginalAction}}</p>
+        <p class="text-xs text-slate-500 mt-1">{{.SourceName}} · <span title="{{.SourceFull}}">{{.SourceDate}}</span></p>
+      </details>
+      {{end}}
+      {{if gt .HistoryCount 0}}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-blue-700">수정 이력 {{.HistoryCount}}</summary>
+        <ul class="mt-2 space-y-2">
+          {{range .Past}}
+          <li class="text-xs text-slate-600 border-t border-slate-100 pt-2">
+            rev {{.Rev}} · {{displayPerson .AuthorName}} · <span title="{{ymdt .CreatedAt}}">{{ymd .CreatedAt}}</span>
+            {{if .ChangeNote}} · {{.ChangeNote}}{{end}}
+            <p class="text-slate-700 mt-1 whitespace-pre-wrap">{{.ActionText}}</p>
+          </li>
+          {{end}}
+        </ul>
+        {{if .KBID}}<a href="/as/kb/{{.KBID}}/history" class="text-[11px] text-blue-700 hover:underline">수정 이력 페이지</a>{{end}}
+      </details>
+      {{end}}
+      <div class="flex flex-wrap items-center gap-3">
+        {{if .ASID}}
         <a href="/as/{{.ASID}}/action" class="inline-block text-xs font-medium text-blue-700 hover:underline">원본 열기</a>
         <form method="POST" action="/as/{{.ASID}}/vote">
           <button type="submit" class="text-xs {{if .Voted}}text-amber-800{{else}}text-slate-500 hover:text-amber-800{{end}}">👍{{if .VoteCount}} {{.VoteCount}}{{end}}</button>
         </form>
+        {{end}}
+        {{if and $.CanProcess (not .IsKnowledge) .ASID}}
+        <details class="text-xs">
+          <summary class="cursor-pointer text-slate-600">지식으로 올리기</summary>
+          <form method="POST" action="/as/knowledge" class="mt-2 space-y-1">
+            <input type="hidden" name="as_id" value="{{.ASID}}">
+            <input type="hidden" name="q" value="{{$.Q}}">
+            <textarea name="action_text" rows="2" required class="w-full border rounded px-2 py-1">{{if .HasAction}}{{.Action}}{{end}}</textarea>
+            <button type="submit" class="px-2 py-1 bg-blue-600 text-white rounded">저장</button>
+          </form>
+        </details>
+        {{end}}
+        {{if and $.CanProcess .IsKnowledge .KBID}}
+        <details class="text-xs">
+          <summary class="cursor-pointer text-slate-600">지식 고치기</summary>
+          <form method="POST" action="/as/kb/{{.KBID}}/revise" class="mt-2 space-y-1">
+            <input type="hidden" name="as_id" value="{{.ASID}}">
+            <input type="hidden" name="q" value="{{$.Q}}">
+            <textarea name="action_text" rows="2" required class="w-full border rounded px-2 py-1">{{.Action}}</textarea>
+            <input type="text" name="change_note" placeholder="무엇이 달라졌나 (비워도 됩니다)" class="w-full border rounded px-2 py-1">
+            <button type="submit" class="px-2 py-1 bg-amber-600 text-white rounded">새 버전으로 저장</button>
+          </form>
+        </details>
+        {{end}}
       </div>
     </article>
     {{end}}
@@ -152,6 +225,7 @@
         <div class="mt-2 pl-2 text-sm space-y-1">
           <p class="text-slate-700"><span class="text-[11px] text-slate-400">증상</span> {{.Symptom}}</p>
           <p class="{{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}}"><span class="text-[11px] text-slate-400">조치</span> {{.Action}}</p>
+          <p class="text-xs text-slate-500">{{.AuthorName}} · <span title="{{.AuthorFull}}">{{.AuthorDate}}</span></p>
           <a href="/as/{{.ASID}}/action" class="text-xs text-blue-700 hover:underline">원본 열기</a>
         </div>
       </details>

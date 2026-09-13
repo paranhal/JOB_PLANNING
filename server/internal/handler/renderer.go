@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,10 +20,24 @@ type TemplateRenderer struct{}
 
 func NewRenderer() *TemplateRenderer { return &TemplateRenderer{} }
 
+func appendExisting(files []string, paths ...string) []string {
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			files = append(files, p)
+		}
+	}
+	return files
+}
+
 func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	files := []string{
 		"web/templates/layout/base.html",
 		filepath.Join("web/templates", name),
+	}
+	if strings.HasPrefix(name, "meeting/") {
+		if partials, err := filepath.Glob("web/templates/meeting/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
 	}
 	if strings.HasPrefix(name, "as/") {
 		if partials, err := filepath.Glob("web/templates/as/_*.html"); err == nil {
@@ -31,6 +46,11 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	}
 	if strings.HasPrefix(name, "asset/") {
 		if partials, err := filepath.Glob("web/templates/asset/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if strings.HasPrefix(name, "work/") {
+		if partials, err := filepath.Glob("web/templates/work/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
 	}
@@ -56,7 +76,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		if partials, err := filepath.Glob("web/templates/admin_work/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
-		files = append(files, "web/templates/workboard/_recurrence_fields.html")
+		files = appendExisting(files, "web/templates/workboard/_recurrence_fields.html")
 	}
 	if strings.HasPrefix(name, "stats/") {
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
@@ -72,10 +92,12 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
-		files = append(files, "web/templates/sales/_supply_dash.html")
 	}
 	if kpartials, err := filepath.Glob("web/templates/kanban/_*.html"); err == nil {
 		files = append(files, kpartials...)
+	}
+	if spartials, err := filepath.Glob("web/templates/sort/_*.html"); err == nil {
+		files = append(files, spartials...)
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
@@ -87,8 +109,14 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		blockName = "content"
 	}
 
-	// 로그인 상태 주입
+	c.Response().Header().Set("Cache-Control", "no-cache")
+
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+	// 로그인 상태·빌드 값 주입. 사이드바와 배지가 같은 값을 쓴다. §40.4
 	if dataMap, ok := data.(map[string]interface{}); ok {
+		injectBuildInfo(dataMap)
 		if _, exists := dataMap["HideNav"]; !exists {
 			dataMap["UserName"] = ctxString(c, "user_name")
 			dataMap["UserRole"] = model.NormalizeRole(ctxString(c, "role"))
@@ -173,6 +201,15 @@ func funcMap() template.FuncMap {
 		},
 		"contains": func(s, sub string) bool { return strings.Contains(s, sub) },
 		"upper":    strings.ToUpper,
+		"displayPerson": model.DisplayPerson,
+		"ymd": func(t time.Time) string {
+			d, _ := model.KnowledgeWhen(t)
+			return d
+		},
+		"ymdt": func(t time.Time) string {
+			_, f := model.KnowledgeWhen(t)
+			return f
+		},
 
 		"statusLabel": func(s string) string {
 			m := map[string]string{

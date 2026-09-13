@@ -89,6 +89,7 @@
         <div>
           <p class="text-[11px] font-medium text-slate-400 mb-0.5">조치</p>
           <p class="{{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}} leading-snug">{{.ActionHTML}}</p>
+          <p class="text-[11px] text-slate-500 mt-1">{{.AuthorName}} · <span title="{{.AuthorFull}}">{{.AuthorDate}}</span></p>
         </div>
       </div>
     </a>

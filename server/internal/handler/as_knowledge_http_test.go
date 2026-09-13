@@ -130,6 +130,12 @@ func TestASKnowledgePageSection416(t *testing.T) {
 	if !strings.Contains(body, "👍") {
 		t.Fatal("도움이 된 사례 추천이 없다")
 	}
+	if !strings.Contains(body, "작성자 미상") && !strings.Contains(body, "관리자") {
+		t.Fatal("작성자가 없다")
+	}
+	if !strings.Contains(body, "조치 기록") {
+		t.Fatal("조치 기록 뱃지가 없다")
+	}
 
 	allBody := get(q + "&all=1")
 	if !strings.Contains(allBody, "조치 기록 없음") && !strings.Contains(allBody, empty.Symptom[:8]) {
