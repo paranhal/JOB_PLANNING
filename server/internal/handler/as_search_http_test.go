@@ -54,6 +54,7 @@ func newASSearchHTTP(t *testing.T) (*echo.Echo, *repository.ASRepo, *repository.
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/as/search", h.AS.Search)
 	g.GET("/as/similar", h.AS.Similar)
+	g.GET("/as/:id/similar-panel", h.AS.SimilarPanel)
 	g.GET("/as/keywords/suggest", h.AS.KeywordSuggest)
 	g.GET("/as/keywords", h.AS.KeywordList)
 	g.GET("/as/:id/action", h.AS.Action)
@@ -110,8 +111,14 @@ func TestASSimilarJSONSameAsset(t *testing.T) {
 	if len(out.Items) == 0 {
 		t.Fatal("비슷한 사례 JSON이 비었다")
 	}
-	if !out.Items[0].SameAsset {
-		t.Fatalf("같은 자산이 위: %+v", out.Items[0])
+	if !out.Items[0].SameCustomer || out.Items[0].WeightLabel != "같은 사이트" {
+		t.Fatalf("같은 사이트가 위: %+v", out.Items[0])
+	}
+	if !out.Items[0].HasAction || out.Items[0].ActionSummary == "" || out.Items[0].ActionSummary == model.ASActionMissing {
+		t.Fatalf("조치 한 줄: %+v", out.Items[0])
+	}
+	if out.Items[0].LeadLabel == "" || !strings.Contains(out.Items[0].LeadLabel, "영업일") {
+		t.Fatalf("소요 영업일: %+v", out.Items[0])
 	}
 	if !out.Items[0].CanReopen {
 		t.Fatal("완료+같은 자산이면 재접수 제안")
@@ -137,6 +144,57 @@ func TestASActionShowsSimilarWhenPresent(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, "비슷한 사례") {
 		t.Fatal("조치 화면에 비슷한 사례가 있어야 한다")
+	}
+}
+
+func TestASSimilarPanelAutoFromSymptom(t *testing.T) {
+	e, asRepo, _, _ := newASSearchHTTP(t)
+	src, _, err := asRepo.SearchAS(model.ASSearchFilter{Query: "무인예약", PageSize: 5})
+	if err != nil || len(src) == 0 {
+		t.Fatalf("seed: %v n=%d", err, len(src))
+	}
+	done, _ := asRepo.GetByID(src[0].ASID)
+	done.Status = "completed"
+	if err := asRepo.Update(done); err != nil {
+		t.Fatal(err)
+	}
+
+	other := &model.ASReceipt{
+		CustomerID: "c1", AssetID: "A1", Symptom: "무인예약이 또 안 됩니다",
+		ReceiptDatetime: time.Now(), Urgency: "normal", Priority: "normal",
+	}
+	if err := asRepo.Create(other); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+other.ASID+"/similar-panel", nil)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `name="q"`) || strings.Contains(body, "type=\"search\"") {
+		t.Fatal("검색어 입력란이 있으면 안 된다")
+	}
+	if !strings.Contains(body, "비슷한 사례") {
+		t.Fatal("검색어 없이 비슷한 사례가 나와야 한다")
+	}
+	if !strings.Contains(body, "같은 사이트") {
+		t.Fatal("같은 사이트 건이 위에 보여야 한다")
+	}
+	if !strings.Contains(body, "재시작") {
+		t.Fatal("조치 내용 한 줄이 보여야 한다")
+	}
+	if !strings.Contains(body, "영업일") {
+		t.Fatal("소요 기간이 보여야 한다")
+	}
+	if !strings.Contains(body, "열기") {
+		t.Fatal("열기 버튼이 있어야 한다")
+	}
+	if strings.Contains(body, "조치 기록 없음") {
+		t.Fatal("조치 없는 건은 빼야 한다")
 	}
 }
 

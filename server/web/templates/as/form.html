@@ -714,13 +714,14 @@
               '<button type="submit" class="w-full text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-100">동일 증상 재접수로 만들기</button></form>';
           }
           var badge = it.weight_label ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">' + esc(it.weight_label) + '</span>' : '';
+          var lead = it.lead_label ? ' <span class="text-slate-500">' + esc(it.lead_label) + '</span>' : '';
           return '<div class="bg-white rounded-lg border border-amber-100 p-3 space-y-1.5 text-sm">' +
+            '<p class="text-slate-800 leading-snug">' + esc(it.symptom_summary) + '</p>' +
+            '<p class="leading-snug ' + actionClass + '">→ ' + esc(it.action_summary) + lead + '</p>' +
             '<div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">' +
-            '<a href="/as/' + esc(it.as_id) + '" class="font-mono font-semibold text-blue-700 hover:underline">' + esc(it.as_number) + '</a>' +
             '<span>' + esc(it.org_name) + '</span>' +
-            '<span>' + esc(it.process_date || it.receipt_date) + '</span>' + badge + '</div>' +
-            '<p class="text-slate-800 leading-snug"><span class="text-[11px] text-slate-400">증상</span> ' + esc(it.symptom_summary) + '</p>' +
-            '<p class="leading-snug ' + actionClass + '"><span class="text-[11px] text-slate-400">조치</span> ' + esc(it.action_summary) + '</p>' +
+            '<span>' + esc(it.receipt_date) + '</span>' + badge +
+            '<a href="/as/' + esc(it.as_id) + '/action" class="ml-auto px-2 py-0.5 rounded border border-amber-200 bg-white text-amber-950 font-medium hover:bg-amber-50">열기</a></div>' +
             reopen + '</div>';
         }).join('') + '</div>';
     }
@@ -886,5 +887,6 @@
     })();
   })();
   </script>
+{{template "photo_zoom_script"}}
 </div>
 {{end}}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/service"
 )
 
 // Search 접수·조치 본문 검색. §4.5 기준일을 적용하지 않는다. §12.11.4
@@ -80,10 +82,10 @@ func (h *ASHandler) Search(c echo.Context) error {
 	})
 }
 
-// Similar 접수·조치 화면의 비슷한 사례 JSON. §12.11.5
+// Similar 접수·조치 화면의 비슷한 사례 JSON. §12.11.5 · §41.2
 func (h *ASHandler) Similar(c echo.Context) error {
 	items, err := h.repo.SimilarCases(model.ASSimilarFilter{
-		Query:      strings.TrimSpace(c.QueryParam("q")),
+		Query:      h.similarQuery(strings.TrimSpace(c.QueryParam("q"))),
 		CustomerID: strings.TrimSpace(c.QueryParam("customer_id")),
 		AssetID:    strings.TrimSpace(c.QueryParam("asset_id")),
 		ExcludeID:  strings.TrimSpace(c.QueryParam("exclude")),
@@ -95,7 +97,36 @@ func (h *ASHandler) Similar(c echo.Context) error {
 	if items == nil {
 		items = []model.ASSimilarCase{}
 	}
+	attachSimilarLead(items)
 	return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (h *ASHandler) similarQuery(symptom string) string {
+	q := strings.TrimSpace(symptom)
+	if q == "" {
+		return ""
+	}
+	if h.kwRepo != nil {
+		if extracted := h.kwRepo.QueryFromSymptom(q); extracted != "" {
+			return extracted
+		}
+	}
+	return q
+}
+
+func attachSimilarLead(items []model.ASSimilarCase) {
+	for i := range items {
+		end := strings.TrimSpace(items[i].CompleteDate)
+		if end == "" {
+			continue
+		}
+		days, ok := service.LeadBusinessDays(items[i].ReceiptDate, end)
+		if !ok {
+			continue
+		}
+		items[i].LeadDays = days
+		items[i].LeadLabel = fmt.Sprintf("%d영업일", days)
+	}
 }
 
 func (h *ASHandler) loadSimilarCases(as *model.ASReceipt) []model.ASSimilarCase {
@@ -103,7 +134,7 @@ func (h *ASHandler) loadSimilarCases(as *model.ASReceipt) []model.ASSimilarCase 
 		return nil
 	}
 	items, err := h.repo.SimilarCases(model.ASSimilarFilter{
-		Query:      as.Symptom,
+		Query:      h.similarQuery(as.Symptom),
 		CustomerID: as.CustomerID,
 		AssetID:    as.AssetID,
 		ExcludeID:  as.ASID,
@@ -112,5 +143,20 @@ func (h *ASHandler) loadSimilarCases(as *model.ASReceipt) []model.ASSimilarCase 
 	if err != nil || len(items) == 0 {
 		return nil
 	}
+	attachSimilarLead(items)
 	return items
+}
+
+// SimilarPanel 조치 화면의 비슷한 사례 HTML. 첫 페인트 뒤에 채운다. §39.2
+func (h *ASHandler) SimilarPanel(c echo.Context) error {
+	id := c.Param("id")
+	as, err := h.repo.GetByID(id)
+	if err != nil || as == nil {
+		return echo.ErrNotFound
+	}
+	c.Request().Header.Set("HX-Request", "true")
+	return c.Render(http.StatusOK, "as/similar_panel.html", map[string]interface{}{
+		"SimilarCases": h.loadSimilarCases(as),
+		"CanReceive":   canReceiveAS(c),
+	})
 }

@@ -1,18 +1,18 @@
 {{define "as_similar_cards"}}
 {{if .SimilarCases}}
 <section class="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
-  <h3 class="text-sm font-semibold text-amber-950">비슷한 사례</h3>
+  <h3 class="text-sm font-semibold text-amber-950">비슷한 사례 {{len .SimilarCases}}건</h3>
   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
     {{range .SimilarCases}}
     <div class="bg-white rounded-lg border border-amber-100 p-3 space-y-2 text-sm">
+      <p class="text-slate-800 leading-snug">{{.SymptomSummary}}</p>
+      <p class="text-slate-800 leading-snug">→ {{.ActionSummary}}{{if .LeadLabel}} <span class="text-slate-500">{{.LeadLabel}}</span>{{end}}</p>
       <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-        <a href="/as/{{.ASID}}" class="font-mono font-semibold text-blue-700 hover:underline">{{.ASNumber}}</a>
         <span>{{.OrgName}}</span>
-        <span>{{if .ProcessDate}}{{.ProcessDate}}{{else}}{{.ReceiptDate}}{{end}}</span>
+        <span>{{.ReceiptDate}}</span>
         {{if .WeightLabel}}<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">{{.WeightLabel}}</span>{{end}}
+        <a href="/as/{{.ASID}}/action" class="ml-auto px-2 py-0.5 rounded border border-amber-200 bg-white text-amber-950 font-medium hover:bg-amber-50">열기</a>
       </div>
-      <p class="text-slate-800 leading-snug"><span class="text-[11px] text-slate-400">증상</span> {{.SymptomSummary}}</p>
-      <p class="leading-snug {{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}}"><span class="text-[11px] text-slate-400">조치</span> {{.ActionSummary}}</p>
       {{if and .CanReopen $.CanReceive}}
       <form method="POST" action="/as/{{.ASID}}/reopen" class="pt-1 space-y-1">
         <input type="text" name="reopen_reason" required placeholder="재접수 사유"
