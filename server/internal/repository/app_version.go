@@ -12,7 +12,7 @@ import (
 )
 
 // AppSchemaVersion 이 바이너리가 필요로 하는 마이그레이션 최대 번호. §40.5.1
-const AppSchemaVersion = 44
+const AppSchemaVersion = 46
 
 // AppStart 기동 한 번. (version, commit, built_at) 이 빌드를 식별한다.
 type AppStart struct {

@@ -509,6 +509,7 @@ CREATE TABLE IF NOT EXISTS work_tasks (
     status          TEXT NOT NULL DEFAULT 'waiting',
     priority        TEXT NOT NULL DEFAULT 'normal',
     assignee        TEXT,
+    assignee_source TEXT NOT NULL DEFAULT '',
     tags            TEXT,
     progress        INTEGER NOT NULL DEFAULT 0,
     source_type     TEXT,
@@ -1107,6 +1108,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASCauseCategoriesV2(db)
 	applyASCaseVotes(db)
 	applyASKbEntries(db)
+	applyASKbGaps(db)
+	applyWorkTaskAssigneeSource(db)
 	applyAppVersions(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.

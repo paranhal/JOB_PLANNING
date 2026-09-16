@@ -18,7 +18,7 @@ const workTaskSelect = `
 		       COALESCE(t.due_date,''), COALESCE(t.work_date,''), COALESCE(t.start_time,''), COALESCE(t.end_time,''),
 		       COALESCE(t.duration_min,30),
 		       COALESCE(t.status,'waiting'), COALESCE(t.priority,'normal'),
-		       COALESCE(t.assignee,''), COALESCE(t.tags,''), COALESCE(t.progress,0),
+		       COALESCE(t.assignee,''), COALESCE(t.assignee_source,''), COALESCE(t.tags,''), COALESCE(t.progress,0),
 		       COALESCE(t.source_type,''), COALESCE(t.source_id,''), COALESCE(t.parent_task_id,''),
 		       COALESCE(t.customer_id,''), COALESCE(t.customer_name,''),
 		       COALESCE(t.hold_reason,''), COALESCE(t.review_date,''), COALESCE(t.cancel_reason,''),
@@ -550,8 +550,10 @@ func (r *WBRepo) PlaceTask(taskID, workDate, startTime, endTime string) error {
 }
 
 // SetTaskAssignee 배치된 업무의 담당자만 바꾼다. 일일 열 이동. §7.6.6
+// 사람이 일일 업무에서 직접 바꾼 것이므로 assignee_source='manual'. §42.3
 func (r *WBRepo) SetTaskAssignee(taskID, assignee string) error {
-	_, err := r.db.Exec(`UPDATE work_tasks SET assignee=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, strings.TrimSpace(assignee), taskID)
+	_, err := r.db.Exec(`UPDATE work_tasks SET assignee=?, assignee_source=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`,
+		strings.TrimSpace(assignee), model.WBAssigneeSourceManual, taskID)
 	return err
 }
 
@@ -687,14 +689,14 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	stampNewWorkTaskDates(t)
 	_, err := r.db.Exec(`
 		INSERT INTO work_tasks (task_id, work_type, project_id, title, description, due_date,
-			work_date, start_time, end_time, duration_min, status, priority, assignee, tags, progress,
+			work_date, start_time, end_time, duration_min, status, priority, assignee, assignee_source, tags, progress,
 			source_type, source_id, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
 			recurrence_role, occurrence_seq, occurrence_status, not_done_reason)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
-		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.Tags, t.Progress,
+		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
@@ -732,7 +734,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 	_, err := r.db.Exec(`
 		UPDATE work_tasks SET work_type=?, project_id=?, title=?, description=?, due_date=?,
 			work_date=?, start_time=?, end_time=?, duration_min=?, status=?, priority=?,
-			assignee=?, tags=?, progress=?, customer_id=?, customer_name=?,
+			assignee=?, assignee_source=?, tags=?, progress=?, customer_id=?, customer_name=?,
 			hold_reason=?, review_date=?, cancel_reason=?, wait_party_kind=?, wait_party=?, wait_request=?,
 			reply_due_date=?, next_check_date=?, complete_note=?,
 			receipt_date=CASE
@@ -750,7 +752,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 		WHERE task_id=?`,
 		t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority,
-		t.Assignee, t.Tags, t.Progress, nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
+		t.Assignee, t.AssigneeSource, t.Tags, t.Progress, nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
@@ -944,7 +946,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 		if err := rows.Scan(
 			&t.TaskID, &t.WorkType, &t.ProjectID, &t.Title, &t.Description,
 			&t.DueDate, &t.WorkDate, &t.StartTime, &t.EndTime, &t.DurationMin,
-			&t.Status, &t.Priority, &t.Assignee, &t.Tags, &t.Progress,
+			&t.Status, &t.Priority, &t.Assignee, &t.AssigneeSource, &t.Tags, &t.Progress,
 			&t.SourceType, &t.SourceID, &t.ParentTaskID,
 			&t.CustomerID, &t.CustomerName,
 			&t.HoldReason, &t.ReviewDate, &t.CancelReason,

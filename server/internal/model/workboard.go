@@ -43,20 +43,27 @@ const (
 	WBSourceSalesActivity = "sales_activity"
 )
 
+// work_tasks.assignee_source. AS 동기화는 'as' 만 덮어쓰고, 일일 업무에서 직접 바꾼 'manual' 은 유지한다. §42.3
+const (
+	WBAssigneeSourceAS     = "as"
+	WBAssigneeSourceManual = "manual"
+)
+
 // work_task_members.member_role (§7.7.2). work_tasks.assignee 는 주담당(owner)과 같다.
 const (
 	WBMemberOwner   = "owner"
 	WBMemberSupport = "support"
 )
 
-// WBCategory 일정표 카드의 분류: as / maintenance / admin
+// WBCategory 일정표 카드의 분류: as / maintenance / sales_activity / admin
+// source_type 뿐 아니라 접두어 "sales" 도 영업으로 둔다. 기본값(admin)으로 떨어지면 「행정」으로 보인다.
 func WBCategory(sourceType string) string {
 	switch sourceType {
 	case WBSourceAS:
 		return WBSourceAS
 	case WBSourceMaintenance:
 		return WBSourceMaintenance
-	case WBSourceSalesActivity:
+	case WBSourceSalesActivity, WorkPrefixSales:
 		return WBSourceSalesActivity
 	default:
 		return WBWorkAdmin
@@ -69,7 +76,7 @@ func WBCategoryLabel(cat string) string {
 		return "AS"
 	case WBSourceMaintenance:
 		return "점검"
-	case WBSourceSalesActivity:
+	case WBSourceSalesActivity, WorkPrefixSales:
 		return "영업"
 	default:
 		return "행정"
@@ -82,7 +89,7 @@ func WBCategoryClass(cat string) string {
 		return "bg-rose-100 text-rose-800 border border-rose-300 border-l-[3px] border-l-rose-500 shadow-sm"
 	case WBSourceMaintenance:
 		return "bg-sky-100 text-sky-800 border border-sky-300 border-l-[3px] border-l-sky-500 shadow-sm"
-	case WBSourceSalesActivity:
+	case WBSourceSalesActivity, WorkPrefixSales:
 		return "bg-orange-100 text-orange-800 border border-orange-300 border-l-[3px] border-l-orange-500 shadow-sm"
 	default:
 		return "bg-violet-100 text-violet-800 border border-violet-300 border-l-[3px] border-l-violet-500 shadow-sm"
@@ -93,8 +100,8 @@ func WBCategoryClass(cat string) string {
 type WBCard struct {
 	Kind         string `json:"kind"`          // as | maintenance | task
 	RefID        string `json:"ref_id"`        // as_id / visit_id / task_id
-	Category     string `json:"category"`      // as | maintenance | admin
-	Title        string `json:"title"`         // 카드 본문 ([AS]고객명 등)
+	Category     string `json:"category"`      // as | maintenance | sales_activity | admin
+	Title        string `json:"title"`         // 카드 본문 ([AS]고객명 · [영업]제목 등)
 	SubTitle     string `json:"sub_title"`     // 증상·설명
 	ProductType  string `json:"product_type"`  // 정기점검 점검 대상(색 구분용)
 	SourceNumber string `json:"source_number"` // AS 접수번호 / 정기점검 방문번호
@@ -113,7 +120,7 @@ type WBCard struct {
 	ProjectID    string `json:"project_id,omitempty"`
 }
 
-// Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [행정]
+// Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [영업] / [행정]
 func (c WBCard) Label() string { return "[" + WBCategoryLabel(c.Category) + "]" }
 
 // DetailHref 「조치」— AS는 `/as/{id}/action`, 정기점검은 방문 조치(`/maintenance/visits/{id}/action`).
@@ -551,6 +558,7 @@ type WorkTask struct {
 	Status       string    `json:"status"`
 	Priority     string    `json:"priority"`
 	Assignee     string    `json:"assignee"`
+	AssigneeSource string  `json:"assignee_source,omitempty"` // as | manual. §42.3
 	Tags         string    `json:"tags"`
 	Progress     int       `json:"progress"`
 	SourceType   string    `json:"source_type"` // as / maintenance / 빈 값
@@ -599,6 +607,11 @@ type WorkTaskMember struct {
 
 func (m WorkTaskMember) IsOwner() bool   { return m.Role == WBMemberOwner }
 func (m WorkTaskMember) IsSupport() bool { return m.Role == WBMemberSupport }
+
+// AssigneeIsManual 일일 업무에서 사람이 직접 바꾼 담당자. AS 동기화가 덮어쓰지 않는다. §42.3
+func (t WorkTask) AssigneeIsManual() bool {
+	return strings.TrimSpace(t.AssigneeSource) == WBAssigneeSourceManual
+}
 
 // CustomerLabel 거래처 표시. 고객마스터 기관명 우선, 없으면 직접입력.
 func (t WorkTask) CustomerLabel() string {
