@@ -763,8 +763,8 @@ func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
 }
 
-// syncASPlannedDailyTask 방문예정일이 있으면 일일업무(work_tasks)를 만들고/맞춘다.
-// 시간은 비워 두어 「일일 업무 등록」화면에서 해당 날짜에 자동 배치되게 한다.
+// syncASPlannedDailyTask 담당자가 있으면 일일업무(work_tasks)를 만들고/맞춘다. §42.2
+// 예정일이 없어도 올린다(날짜는 비움). 담당자 없으면 일일업무에서 내린다.
 func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 	if h.wbRepo == nil || strings.TrimSpace(asID) == "" {
 		return
@@ -773,42 +773,9 @@ func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 	if err != nil || as == nil {
 		return
 	}
-	visit := strings.TrimSpace(as.VisitScheduledDate)
-	if visit == "" {
-		return
+	if err := h.wbRepo.SyncASDailyTask(as); err != nil {
+		log.Printf("AS 일일업무 동기화 실패 %s: %v", asID, err)
 	}
-	existing, _ := h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
-	title := model.FormatASWorkTitle(as.OrgName, as.ASNumber)
-	if existing != nil {
-		existing.DueDate = visit
-		existing.Title = title
-		if strings.TrimSpace(existing.Description) == "" {
-			existing.Description = as.Symptom
-		}
-		if strings.TrimSpace(existing.Assignee) == "" {
-			existing.Assignee = as.AssignedTo
-		}
-		// 아직 일정표에 안 올린 건 배정일도 예정일에 맞춘다.
-		if strings.TrimSpace(existing.StartTime) == "" {
-			existing.WorkDate = visit
-		}
-		_ = h.wbRepo.UpdateTask(existing)
-		return
-	}
-	t := &model.WorkTask{
-		WorkType:    model.WBWorkAS,
-		Title:       title,
-		Description: as.Symptom,
-		DueDate:     visit,
-		WorkDate:    visit,
-		DurationMin: 30,
-		Status:      model.WBTaskWaiting,
-		Priority:    model.WBPriorityNormal,
-		Assignee:    strings.TrimSpace(as.AssignedTo),
-		SourceType:  model.WBSourceAS,
-		SourceID:    as.ASID,
-	}
-	_ = h.wbRepo.CreateTask(t)
 }
 
 func (h *ASHandler) Show(c echo.Context) error {
@@ -1420,6 +1387,12 @@ func attachErrMessage(raw string) string {
 		return s
 	}
 	if strings.Contains(s, "파일은 20MB") || strings.Contains(s, "이미지") {
+		return s
+	}
+	if strings.Contains(s, "까지 올릴 수 있습니다") {
+		return s
+	}
+	if strings.Contains(s, "동영상은 한 건에") {
 		return s
 	}
 	return ""

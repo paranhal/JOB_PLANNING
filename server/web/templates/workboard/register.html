@@ -438,6 +438,33 @@
       </div>
     </div>
     {{else}}
+    <div class="min-w-0 space-y-2">
+    {{if .UndatedCards}}
+    <div class="rounded-xl border border-amber-200 bg-amber-50/80 shadow-sm overflow-hidden">
+      <div class="px-3 py-1.5 border-b border-amber-200 flex items-center justify-between">
+        <p class="text-xs font-bold text-amber-900">날짜 미정 <span class="font-semibold opacity-80">({{len .UndatedCards}}건)</span></p>
+        <p class="text-[10px] text-amber-800/80">시간표에 끌어다 날짜를 잡습니다</p>
+      </div>
+      <div class="flex flex-wrap gap-1.5 p-2">
+        {{range .UndatedCards}}
+        <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug border border-amber-200 bg-white max-w-[14rem] {{if $.CanWrite}}cursor-grab active:cursor-grabbing{{end}} transition-shadow hover:shadow"
+             style="{{workCardColorStyle .Assignee .ProductType .Category}}"
+             {{if $.CanWrite}}draggable="true"{{end}}
+             data-zone="undated"
+             data-kind="task" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
+             data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}"
+             data-href="{{.DetailHref}}"
+             @click="pick($event.currentTarget)"
+             @dragstart="pick($event.currentTarget)"
+             :class="isPicked('task', '{{.RefID}}') ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
+             title="클릭·드래그: 일정표 칸에 놓으면 그날로 배정">
+          <p class="font-semibold truncate">{{.Title}}</p>
+          {{if .Assignee}}<p class="text-[10px] opacity-70 truncate mt-0.5">{{.Assignee}}</p>{{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
     {{if eq .View "day"}}
     {{/* 일일 — 담당자 열. 주간은 아래 else (기존 요일 열) */}}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -711,6 +738,7 @@
       </div>
     </div>
     {{end}}
+    </div>
     {{end}}
 
     {{/* 우측: 일일 업무 미확정(일자 미배정) 대기 목록 — 왼쪽 확정 건과 겹치지 않음 */}}

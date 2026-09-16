@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -35,6 +36,10 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "assignee,prefix,task_id,customer,due_date")
+	if sortKey != "" {
+		sortUnplannedByColumn(items, sortKey, dir)
+	}
 
 	var users []model.User
 	if h.userRepo != nil {
@@ -46,6 +51,11 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 	mineOn := mineUID != ""
 	showAssignee := role == model.RoleAdmin || role == model.RoleOffice || scopeAll
 	canWrite := canWriteUnplanned(c)
+	u := func(k, d string) string {
+		return planUnplannedURLFull(mineOn, role, k, d, sortKey, dir)
+	}
+	filter := unplannedFilterQuery(mineOn, role, kind, display)
+	hrefs := sortLinkHrefs("/plan/unplanned", filter, []string{"assignee", "prefix", "task_id", "customer", "due_date"}, sortKey, dir)
 	return c.Render(http.StatusOK, "plan/unplanned.html", map[string]interface{}{
 		"Title":          "미계획 업무함",
 		"Active":         NavPlanUnplanned,
@@ -69,17 +79,58 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 		"KanbanDrag":     false,
 		"KanbanDrop":     "",
 		"KanbanHint":     "열 = §8.1 유형. 한 건이 여러 유형이면 표 위에서 먼저 맞는 열 하나. 유형은 파생값이라 드래그하지 않습니다.",
-		"ListHref":       planUnplannedURLDisp(mineOn, role, kind, "list"),
-		"KanbanHref":     planUnplannedURLDisp(mineOn, role, kind, "kanban"),
-		"MineToggle":     planUnplannedURLDisp(!mineOn, role, kind, display),
-		"KindAllHref":    planUnplannedURLDisp(mineOn, role, "", display),
-		"KindNoDate":     planUnplannedURLDisp(mineOn, role, model.UnplannedNoDate, display),
-		"KindUnassigned": planUnplannedURLDisp(mineOn, role, model.UnplannedUnassigned, display),
-		"KindSales":      planUnplannedURLDisp(mineOn, role, model.UnplannedSalesFollow, display),
-		"KindUnsigned":   planUnplannedURLDisp(mineOn, role, model.UnplannedSalesUnsigned, display),
-		"KindDelayed":    planUnplannedURLDisp(mineOn, role, model.UnplannedDelayed, display),
-		"KindNext":       planUnplannedURLDisp(mineOn, role, model.UnplannedNext, display),
-		"KindReview":     planUnplannedURLDisp(mineOn, role, model.UnplannedReview, display),
+		"ListHref":       u(kind, "list"),
+		"KanbanHref":     u(kind, "kanban"),
+		"MineToggle":     planUnplannedURLFull(!mineOn, role, kind, display, sortKey, dir),
+		"KindAllHref":    u("", display),
+		"KindNoDate":     u(model.UnplannedNoDate, display),
+		"KindUnassigned": u(model.UnplannedUnassigned, display),
+		"KindSales":      u(model.UnplannedSalesFollow, display),
+		"KindUnsigned":   u(model.UnplannedSalesUnsigned, display),
+		"KindDelayed":    u(model.UnplannedDelayed, display),
+		"KindNext":       u(model.UnplannedNext, display),
+		"KindReview":     u(model.UnplannedReview, display),
+		"Sort":           sortKey,
+		"Dir":            dir,
+		"SortHref":       hrefs,
+		"SortSelect":     sortSelectOptions(unplannedSortCols(showAssignee), hrefs, sortKey, dir),
+	})
+}
+
+func sortUnplannedByColumn(items []model.UnplannedItem, sortKey, dir string) {
+	if len(items) == 0 || sortKey == "" {
+		return
+	}
+	desc := dir == "desc"
+	val := func(it model.UnplannedItem) string {
+		switch sortKey {
+		case "assignee":
+			return strings.ToLower(it.Assignee)
+		case "prefix":
+			return it.Prefix
+		case "task_id":
+			return strings.ToLower(it.RefNumber)
+		case "customer":
+			return strings.ToLower(it.OrgName + "\x00" + it.Title)
+		default:
+			if it.ScheduledDate != "" {
+				return it.ScheduledDate
+			}
+			if it.DueDate != "" {
+				return it.DueDate
+			}
+			return "9999-99-99"
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := val(items[i]), val(items[j])
+		if a != b {
+			if desc {
+				return a > b
+			}
+			return a < b
+		}
+		return false
 	})
 }
 
@@ -222,41 +273,7 @@ func (h *WorkHandler) syncASPlannedFromUnplanned(asID string) {
 	if err != nil || as == nil {
 		return
 	}
-	visit := strings.TrimSpace(as.VisitScheduledDate)
-	if visit == "" {
-		return
-	}
-	existing, _ := h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
-	title := model.FormatASWorkTitle(as.OrgName, as.ASNumber)
-	if existing != nil {
-		existing.DueDate = visit
-		existing.Title = title
-		if strings.TrimSpace(existing.Description) == "" {
-			existing.Description = as.Symptom
-		}
-		if strings.TrimSpace(existing.Assignee) == "" {
-			existing.Assignee = as.AssignedTo
-		}
-		if strings.TrimSpace(existing.StartTime) == "" {
-			existing.WorkDate = visit
-		}
-		_ = h.wbRepo.UpdateTask(existing)
-		return
-	}
-	t := &model.WorkTask{
-		WorkType:    model.WBWorkAS,
-		Title:       title,
-		Description: as.Symptom,
-		DueDate:     visit,
-		WorkDate:    visit,
-		DurationMin: 30,
-		Status:      model.WBTaskWaiting,
-		Priority:    model.WBPriorityNormal,
-		Assignee:    strings.TrimSpace(as.AssignedTo),
-		SourceType:  model.WBSourceAS,
-		SourceID:    as.ASID,
-	}
-	_ = h.wbRepo.CreateTask(t)
+	_ = h.wbRepo.SyncASDailyTask(as)
 }
 
 func qjoin(url, extra string) string {

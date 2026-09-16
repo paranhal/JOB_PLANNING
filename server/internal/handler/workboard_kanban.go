@@ -93,10 +93,10 @@ func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter string) ([]Re
 			items = []model.KanbanCard{}
 		}
 		cols = append(cols, model.KanbanColumn{
-			Key:   key,
-			Title: model.PlanKanbanColumnTitle(key, date, today),
-			Count: len(items),
-			Items: items,
+			Key:    key,
+			Title:  model.PlanKanbanColumnTitle(key, date, today),
+			Count:  len(items),
+			Items:  items,
 			Border: "border-slate-200",
 		})
 	}
@@ -107,9 +107,9 @@ func emptyRegisterKanban(date, today string) []RegisterKanbanColumn {
 	cols := make([]RegisterKanbanColumn, 0, len(registerPlanKanbanOrder))
 	for _, key := range registerPlanKanbanOrder {
 		cols = append(cols, model.KanbanColumn{
-			Key:   key,
-			Title: model.PlanKanbanColumnTitle(key, date, today),
-			Items: []model.KanbanCard{},
+			Key:    key,
+			Title:  model.PlanKanbanColumnTitle(key, date, today),
+			Items:  []model.KanbanCard{},
 			Border: "border-slate-200",
 		})
 	}
@@ -412,32 +412,7 @@ func (h *WorkboardHandler) syncASPlannedFromKanban(asID string) {
 	if err != nil || as == nil {
 		return
 	}
-	visit := strings.TrimSpace(as.VisitScheduledDate)
-	if visit == "" {
-		return
-	}
-	existing, _ := h.repo.GetTaskBySource(model.WBSourceAS, as.ASID)
-	title := model.FormatASWorkTitle(as.OrgName, as.ASNumber)
-	if existing != nil {
-		existing.DueDate = visit
-		existing.Title = title
-		if strings.TrimSpace(existing.Assignee) == "" {
-			existing.Assignee = as.AssignedTo
-		}
-		if strings.TrimSpace(existing.StartTime) == "" {
-			existing.WorkDate = visit
-		}
-		_ = h.updateTaskLogged(existing)
-		return
-	}
-	t := &model.WorkTask{
-		WorkType: model.WBWorkAS, Title: title, Description: as.Symptom,
-		DueDate: visit, WorkDate: visit, DurationMin: 30,
-		Status: model.WBTaskWaiting, Priority: model.WBPriorityNormal,
-		Assignee: strings.TrimSpace(as.AssignedTo),
-		SourceType: model.WBSourceAS, SourceID: as.ASID,
-	}
-	_ = h.repo.CreateTask(t)
+	_ = h.repo.SyncASDailyTask(as)
 }
 
 func (h *WorkboardHandler) kanbanSetProgress(key string, start bool) error {

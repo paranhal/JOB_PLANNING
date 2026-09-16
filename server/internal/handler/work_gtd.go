@@ -154,15 +154,15 @@ func (h *AdminWorkHandler) CreateInbox(c echo.Context) error {
 
 // MoveKanban 칸반 드래그로 상태를 바꾼다. 완료 열은 §13.9 검증. §33.5.2
 func (h *AdminWorkHandler) MoveKanban(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
-	back := "/admin-work?view=kanban"
 	id := strings.TrimSpace(c.Param("id"))
 	existing, err := h.repo.GetTask(id)
 	if err != nil || existing == nil || !model.IsAdminGTDTask(*existing) {
 		return echo.ErrNotFound
 	}
+	if err := denyUnlessCanEditTask(c, existing); err != nil {
+		return err
+	}
+	back := "/admin-work?view=kanban"
 	to := strings.TrimSpace(c.FormValue("status"))
 	switch to {
 	case model.WBTaskWaiting, model.WBTaskInProgress, model.WBTaskComplete:
@@ -205,13 +205,13 @@ func (h *AdminWorkHandler) MoveKanban(c echo.Context) error {
 
 // Classify 하위호환. §33.5.1 이후 inbox는 남지 않아 분류 대상이 없다.
 func (h *AdminWorkHandler) Classify(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := strings.TrimSpace(c.Param("id"))
 	existing, err := h.repo.GetTask(id)
 	if err != nil || existing == nil || !model.IsAdminGTDTask(*existing) {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, existing); err != nil {
+		return err
 	}
 	if existing.Status != model.WBTaskInbox {
 		return c.Redirect(http.StatusSeeOther, "/admin-work?err=classify")
@@ -236,6 +236,9 @@ func (h *AdminWorkHandler) Classify(c echo.Context) error {
 	t.DueDate = dueDate
 	if strings.TrimSpace(c.FormValue("assignee")) != "" {
 		t.Assignee = strings.TrimSpace(c.FormValue("assignee"))
+		if t.Assignee != existing.Assignee {
+			t.AssigneeSource = model.WBAssigneeSourceManual
+		}
 	}
 	applyAdminGTDForm(&t, c)
 	if code := model.AdminGTDErr(t.Status, t.HoldReason, t.ReviewDate, t.CancelReason,
@@ -259,13 +262,13 @@ func (h *AdminWorkHandler) Classify(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) CreateAction(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := strings.TrimSpace(c.Param("id"))
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil || !model.IsAdminGTDTask(*t) {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	back := actionBack(c, id)
 	title := strings.TrimSpace(c.FormValue("action_title"))
@@ -301,14 +304,14 @@ func (h *WorkboardHandler) CreateAction(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) UpdateAction(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := strings.TrimSpace(c.Param("id"))
 	aid := strings.TrimSpace(c.Param("aid"))
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil || !model.IsAdminGTDTask(*t) {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	a, err := h.repo.GetAction(aid)
 	if err != nil || a == nil || a.TaskID != id {
@@ -360,13 +363,13 @@ func (h *WorkboardHandler) UpdateAction(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) CreateActivity(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := strings.TrimSpace(c.Param("id"))
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil || !model.IsAdminGTDTask(*t) {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	back := actionBack(c, id)
 	content := strings.TrimSpace(c.FormValue("activity_content"))
