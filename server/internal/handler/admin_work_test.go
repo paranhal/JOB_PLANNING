@@ -120,6 +120,43 @@ func TestAdminWorkCreateSeparatesCustomerAndTitle(t *testing.T) {
 	if got.CustomerLabel() != "충남교육청" {
 		t.Fatalf("CustomerLabel=%q", got.CustomerLabel())
 	}
+	if strings.TrimSpace(got.Assignee) != "" {
+		t.Fatalf("담당자 없이 등록했는데 assignee=%q", got.Assignee)
+	}
+
+	rec2 := doForm(t, e, "/admin-work", url.Values{
+		"work_type":     {"admin"},
+		"customer_name": {"공주시"},
+		"title":         {"지원 업무"},
+		"due_date":      {"2026-08-20"},
+		"assignee":      {"태자운"},
+	})
+	if rec2.Code != http.StatusSeeOther || strings.Contains(rec2.Header().Get("Location"), "err=") {
+		t.Fatalf("담당자 등록 loc=%q", rec2.Header().Get("Location"))
+	}
+	items, err = repo.ListAdminWork("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, it := range items {
+		if it.Title == "지원 업무" {
+			found = true
+			if it.Assignee != "태자운" {
+				t.Fatalf("행정업무 담당자가 work_tasks 에 안 남는다: %q", it.Assignee)
+			}
+			if err := repo.SetTaskAssignee(it.TaskID, "양기헌"); err != nil {
+				t.Fatal(err)
+			}
+			got2, err := repo.GetTask(it.TaskID)
+			if err != nil || got2 == nil || got2.Assignee != "양기헌" {
+				t.Fatalf("행정 담당자 변경이 같은 행에 안 반영: %+v", got2)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("담당자 넣은 행정업무가 없다")
+	}
 
 	list := doGet(t, e, "/admin-work")
 	body := list.Body.String()

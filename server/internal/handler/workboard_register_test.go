@@ -250,6 +250,9 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 	if !strings.Contains(out, "＋담당자") {
 		t.Fatal("＋담당자 버튼이 없다")
 	}
+	if strings.Contains(out, "날짜 미정") {
+		t.Fatal("UndatedCards 없이 날짜 미정 줄이 렌더되면 안 된다")
+	}
 	if !strings.Contains(out, "주담당") || !strings.Contains(out, "참여자") {
 		t.Fatal("등록 모달에 주담당·참여자 칸이 없다")
 	}
@@ -319,6 +322,44 @@ func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
 	}
 	if strings.Count(out, `draggable="true"`) != 1 {
 		t.Fatalf("드래그 가능 카드=%d want 1 (주담당만)", strings.Count(out, `draggable="true"`))
+	}
+}
+
+func TestRegisterDayTemplateUndatedRow(t *testing.T) {
+	files := registerParseFiles(t)
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dateCol := RegisterColumn{Date: "2026-08-18", From: "2026-08-18", To: "2026-08-18"}
+	slotTimes := registerSlotTimes()
+	gridH, slotTops := registerGridStyles(len(slotTimes))
+	data := map[string]interface{}{
+		"Title": "일일 업무 등록", "Active": NavWorkRegister, "UserRole": "admin",
+		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
+		"Date": "2026-08-18", "PeriodLabel": "2026-08-18",
+		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",
+		"Columns": []RegisterColumn{dateCol}, "DayColumns": []RegisterDayColumn{},
+		"SlotTimes": slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
+		"ASCards": []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
+		"UndatedCards": []model.WBCard{{
+			Kind: "task", RefID: "WT-1", Category: model.WBSourceAS,
+			Title: "[AS]유구도서관", Assignee: "최혜영", TaskID: "WT-1",
+		}},
+		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18",
+		"ExtraAssignees": []string{}, "DayLeaveNames": []string{},
+		"AssigneeColMin": registerAssigneeColMinPx,
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatalf("날짜 미정 렌더링 실패: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "날짜 미정") || !strings.Contains(out, "[AS]유구도서관") {
+		t.Fatal("시간표 위 날짜 미정 줄이 없다")
+	}
+	if !strings.Contains(out, `data-kind="task"`) || !strings.Contains(out, `data-ref="WT-1"`) {
+		t.Fatal("날짜 미정 카드를 일정표로 끌어다 놓을 수 없다")
 	}
 }
 
@@ -408,5 +449,22 @@ func TestRegisterFilterQueryKeepsKanbanDisplay(t *testing.T) {
 	day := registerURLDisplay(regViewDay, "2026-08-18", "양기헌", "", "", "kanban")
 	if !strings.Contains(day, "display=kanban") {
 		t.Fatalf("일일 칸반 URL: %s", day)
+	}
+}
+
+func TestTaskCardFromWorkSalesLabel(t *testing.T) {
+	c := taskCardFromWork(model.WorkTask{
+		TaskID: "wt_s", Title: "방문미팅 · 세종 RFID",
+		SourceType: model.WBSourceSalesActivity, Assignee: "최혜영",
+		WorkDate: "2026-08-19", StartTime: "10:00",
+	})
+	if c.Category != model.WBSourceSalesActivity {
+		t.Fatalf("category=%q want sales_activity (행정으로 떨어지면 안 됨)", c.Category)
+	}
+	if c.Label() != "[영업]" {
+		t.Fatalf("label=%q", c.Label())
+	}
+	if c.Title != "[영업]방문미팅 · 세종 RFID" {
+		t.Fatalf("title=%q", c.Title)
 	}
 }
