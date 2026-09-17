@@ -24,8 +24,8 @@ func TestDecodePathMiddlewareKoreanID(t *testing.T) {
 
 	cases := map[string]string{
 		"디코딩된 경로": "/assets/A자료검색대3-001",
-		"대문자 인코딩":  "/assets/A%EC%9E%90%EB%A3%8C%EA%B2%80%EC%83%89%EB%8C%803-001",
-		"소문자 인코딩":  "/assets/A%ec%9e%90%eb%a3%8c%ea%b2%80%ec%83%89%eb%8c%803-001",
+		"대문자 인코딩": "/assets/A%EC%9E%90%EB%A3%8C%EA%B2%80%EC%83%89%EB%8C%803-001",
+		"소문자 인코딩": "/assets/A%ec%9e%90%eb%a3%8c%ea%b2%80%ec%83%89%eb%8c%803-001",
 	}
 
 	for name, path := range cases {

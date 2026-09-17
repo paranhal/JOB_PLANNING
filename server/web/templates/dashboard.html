@@ -6,58 +6,49 @@
       <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
       <p class="text-sm text-gray-500 mt-1">
         {{.RoleLabel}}(<span class="font-medium text-gray-700">{{.DisplayName}}</span> · @{{.LoginID}})
-        {{if .ScopeMine}} · <strong>내 배정 업무</strong>{{else}} · 전체 업무{{end}}
+        {{if .ScopeMine}} · <strong>내 업무</strong>{{else}} · 팀 전체{{end}}
+        {{if .CanToggleTeam}}
+          {{if .ScopeMine}}
+          <a href="{{.TeamScopeHref}}" class="ml-2 text-xs text-blue-700 hover:underline">팀 전체</a>
+          {{else}}
+          <a href="{{.MineScopeHref}}" class="ml-2 text-xs text-blue-700 hover:underline">내 업무</a>
+          {{end}}
+        {{end}}
       </p>
     </div>
     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{{.RoleLabel}}</span>
   </div>
 
-  {{/* 통계 KPI — §15.7 기간 선택 */}}
+  {{if .ShowWeekReview}}
+  <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+    <p class="text-sm text-slate-800">{{.WeekReviewLine}}</p>
+    <form method="POST" action="/dashboard/week-review/dismiss" class="shrink-0">
+      <input type="hidden" name="back" value="/">
+      <button type="submit" class="text-xs text-slate-600 hover:text-slate-900 underline">닫기</button>
+    </form>
+  </div>
+  {{end}}
+
+	{{/* 통계 KPI — §4.10 두 지표 · §15.7 기간 선택 */}}
   {{$kpi := .WeekKPI}}
-  {{$ex := $kpi.ExecDisplay}}
   {{$vis := $kpi.VisitDisplay}}
   {{$cmp := $kpi.CompleteDisplay}}
-  {{$execOK := and $ex.ShowTarget (ge $ex.Value $.ExecTarget)}}
   {{$visitOK := and $vis.ShowTarget (le $vis.Value $.VisitTarget)}}
   {{$completeOK := and $cmp.ShowTarget (le $cmp.Value $.CompleteTarget)}}
-  <form method="GET" action="/" class="space-y-1 rounded-xl border border-gray-200 bg-white px-3 py-3">
+  <form method="GET" action="/" class="space-y-3 rounded-xl border border-gray-200 bg-white px-3 py-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm font-semibold text-gray-800">통계 KPI <span class="font-normal text-gray-500 text-xs">· 팀전체 · 이관 데이터 제외{{if .MetricsBaseDate}} · {{.MetricsBaseDate}} 이후 데이터 기준{{end}}</span></p>
       <a href="/stats?{{.LookbackQS}}" class="text-xs text-blue-700 hover:underline">통계에서 보기 →</a>
     </div>
     {{template "stats_lookback" .}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-      <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex items-center justify-between gap-1">
-          <p class="text-[11px] font-medium text-gray-600">계획대비 실행률</p>
-          <span class="inline-flex items-center gap-0.5">
-            {{if $.ProgressScopeLabel}}<span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700" title="{{$.ProgressScopeHint}}">{{$.ProgressScopeLabel}}</span>{{end}}
-            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$ex.Reason}}">{{$ex.GradeMark}} {{$ex.GradeLabel}}</span>
-            {{if $ex.ShowTarget}}
-            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full {{if $execOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $execOK}}충족{{else}}미충족{{end}}</span>
-            {{end}}
-          </span>
-        </div>
-        {{if $ex.ShowValue}}
-        <div class="mt-1 flex items-end justify-between gap-2">
-          <p class="text-xl font-bold tabular-nums leading-none {{if $ex.ShowTarget}}{{if $execOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $ex.Value}}%</p>
-          {{if $ex.ShowDelta}}
-          <p class="text-[10px] {{if ge $kpi.ExecutionDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
-            {{if ge $kpi.ExecutionDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.ExecutionDelta}}%p
-          </p>
-          {{end}}
-        </div>
-        {{else}}
-        <p class="mt-1 text-xl font-bold text-gray-300 leading-none" title="{{$ex.Reason}}">—</p>
-        <p class="text-[10px] text-gray-400 mt-0.5">{{$ex.Reason}}</p>
-        {{end}}
-        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$ex.Sample}}건</p>
-      </div>
-
-      <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
-        <div class="flex items-center justify-between gap-1">
-          <p class="text-[11px] font-medium text-gray-600">접수→방문</p>
-          <span class="inline-flex items-center gap-0.5">
+          <p class="text-sm font-medium text-gray-600">접수→방문</p>
+          <span class="inline-flex items-center gap-0.5 flex-wrap justify-end">
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800" title="{{$.VisitLeadHint}}">[참고]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$vis.Sample}}건</span>
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$vis.Reason}}">{{$vis.GradeMark}} {{$vis.GradeLabel}}</span>
             {{if $vis.ShowTarget}}
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full {{if $visitOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $visitOK}}충족{{else}}미충족{{end}}</span>
@@ -65,8 +56,8 @@
           </span>
         </div>
         {{if $vis.ShowValue}}
-        <div class="mt-1 flex items-end justify-between gap-2">
-          <p class="text-xl font-bold tabular-nums leading-none {{if $vis.ShowTarget}}{{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $vis.Value}}일</p>
+        <div class="mt-2 flex items-end justify-between gap-2">
+          <p class="text-3xl font-bold tabular-nums leading-none {{if $vis.ShowTarget}}{{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $vis.Value}}일</p>
           {{if $vis.ShowDelta}}
           <p class="text-[10px] {{if le $kpi.VisitDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
             {{if gt $kpi.VisitDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.VisitDelta}}일
@@ -74,16 +65,18 @@
           {{end}}
         </div>
         {{else}}
-        <p class="mt-1 text-xl font-bold text-gray-300 leading-none" title="{{$vis.Reason}}">—</p>
+        <p class="mt-2 text-3xl font-bold text-gray-300 leading-none" title="{{$vis.Reason}}">—</p>
         <p class="text-[10px] text-gray-400 mt-0.5">{{$vis.Reason}}</p>
         {{end}}
-        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$vis.Sample}}건 · 완료 n={{$kpi.CompleteSample}}</p>
+        <p class="text-[10px] text-amber-800/90 mt-1 leading-snug">목표 {{printf "%.0f" $.VisitTarget}}일 · {{$.VisitLeadHint}}</p>
       </div>
 
-      <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
+      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex items-center justify-between gap-1">
-          <p class="text-[11px] font-medium text-gray-600">접수→조치완료</p>
-          <span class="inline-flex items-center gap-0.5">
+          <p class="text-sm font-medium text-gray-600">접수→조치완료</p>
+          <span class="inline-flex items-center gap-0.5 flex-wrap justify-end">
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$cmp.Sample}}건</span>
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$cmp.Reason}}">{{$cmp.GradeMark}} {{$cmp.GradeLabel}}</span>
             {{if $cmp.ShowTarget}}
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full {{if $completeOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $completeOK}}충족{{else}}미충족{{end}}</span>
@@ -91,8 +84,8 @@
           </span>
         </div>
         {{if $cmp.ShowValue}}
-        <div class="mt-1 flex items-end justify-between gap-2">
-          <p class="text-xl font-bold tabular-nums leading-none {{if $cmp.ShowTarget}}{{if $completeOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $cmp.Value}}일</p>
+        <div class="mt-2 flex items-end justify-between gap-2">
+          <p class="text-3xl font-bold tabular-nums leading-none {{if $cmp.ShowTarget}}{{if $completeOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $cmp.Value}}일</p>
           {{if $cmp.ShowDelta}}
           <p class="text-[10px] {{if le $kpi.CompleteDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
             {{if gt $kpi.CompleteDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.CompleteDelta}}일
@@ -100,15 +93,28 @@
           {{end}}
         </div>
         {{else}}
-        <p class="mt-1 text-xl font-bold text-gray-300 leading-none" title="{{$cmp.Reason}}">—</p>
+        <p class="mt-2 text-3xl font-bold text-gray-300 leading-none" title="{{$cmp.Reason}}">—</p>
         <p class="text-[10px] text-gray-400 mt-0.5">{{$cmp.Reason}}</p>
         {{end}}
-        <p class="text-[10px] text-gray-400 mt-0.5">표본 {{$cmp.Sample}}건 · 방문 n={{$kpi.VisitSample}}</p>
+        <p class="text-[10px] text-gray-400 mt-1">목표 {{printf "%.0f" $.CompleteTarget}}일 · AS만</p>
       </div>
     </div>
-    {{if $kpi.LeadTimeWarn}}
-    <div class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">{{$kpi.LeadTimeWarn}}</div>
+    {{if and .MissingComplete (gt .MissingComplete.AS 0)}}
+    <div class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+      완료일 미기록 {{.MissingComplete.AS}}건 제외
+      <a href="/work-status?missing=complete" class="ml-1 underline">목록</a>
+    </div>
     {{end}}
+    {{if $kpi.LeadTimeWarn}}
+    <div id="stats-lead-time-warn" role="alert" class="rounded-lg border-2 border-rose-500 bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-900">{{$kpi.LeadTimeWarn}}</div>
+    {{end}}
+    <div>
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <h3 class="text-sm font-bold text-gray-800">업무 현황</h3>
+        <p class="text-[11px] text-gray-500">{{.ChartBucketNote}}</p>
+      </div>
+      <div class="h-52"><canvas id="dashBarChart"></canvas></div>
+    </div>
   </form>
 
   <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
@@ -281,6 +287,33 @@
       {{else}}<p class="text-sm text-gray-400 text-center py-8">해당 업무가 없습니다.</p>{{end}}
     </div>
 
+    {{if and .ScopeMine .TeamDelayedList}}
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 class="font-semibold text-slate-800 text-sm">팀 전체 · 지연</h3>
+        <a href="{{.TeamScopeHref}}" class="text-xs text-slate-700 hover:underline">팀 전체 →</a>
+      </div>
+      <div class="divide-y divide-gray-50">
+        {{range .TeamDelayedList}}
+        <a href="{{.Href}}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 text-sm">
+              {{if .Assignee}}<span class="text-xs font-medium text-gray-600">{{.Assignee}}</span>{{end}}
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+              <span class="font-medium text-blue-600 truncate">{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate mt-0.5">{{if .RefNumber}}{{.RefNumber}} · {{end}}{{.Title}}</p>
+          </div>
+          <div class="text-right shrink-0">
+            {{if .ScheduledDate}}<p class="text-xs font-medium text-red-600">{{.ScheduledDate}}</p>{{end}}
+            {{if gt .DaysOverdue 0}}<p class="text-[10px] text-red-500">D+{{.DaysOverdue}}</p>{{end}}
+          </div>
+        </a>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+
     <div class="bg-white rounded-xl border border-amber-200 overflow-hidden">
       <div class="px-5 py-3 border-b border-amber-100 flex items-center justify-between bg-amber-50/50">
         <h3 class="font-semibold text-amber-800 text-sm">방문 미확정</h3>
@@ -327,4 +360,35 @@
     </div>
   </div>
 </div>
+<script src="/static/vendor/chart.umd.min.js?v={{.AssetQuery}}"></script>
+<script>
+(function(){
+  var series = {{.SeriesJSON}};
+  if (!series || !series.length || typeof Chart === 'undefined') return;
+  var labels = series.map(function(p){ return p.label; });
+  var canvas = document.getElementById('dashBarChart');
+  if (!canvas) return;
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: '접수', data: series.map(function(p){ return p.received; }), backgroundColor: '#fb7185', borderRadius: 3 },
+        { label: '미완료', data: series.map(function(p){ return p.open || 0; }), backgroundColor: '#38bdf8', borderRadius: 3 },
+        { label: '완료', data: series.map(function(p){ return p.completed; }), backgroundColor: '#fbbf24', borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 8 } },
+      datasets: { bar: { categoryPercentage: 0.52, barPercentage: 0.96 } },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, font: { size: 11 } } },
+        y: { beginAtZero: true, grace: '8%', ticks: { precision: 0, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+      }
+    }
+  });
+})();
+</script>
 {{end}}

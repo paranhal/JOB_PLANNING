@@ -100,10 +100,8 @@ func TestSupplyDealDoesNotChangeExecVisitCompleteAndBudgetOutOfConversion(t *tes
 }
 
 func formatSupplyKPI(kpi model.StatsKPICard) string {
-	return "exec=" + strconv.FormatFloat(kpi.ExecutionRate, 'f', -1, 64) +
-		" visit=" + strconv.FormatFloat(kpi.VisitAvgDays, 'f', -1, 64) +
+	return "visit=" + strconv.FormatFloat(kpi.VisitAvgDays, 'f', -1, 64) +
 		" complete=" + strconv.FormatFloat(kpi.CompleteAvgDays, 'f', -1, 64) +
-		" nExec=" + strconv.Itoa(kpi.ExecutionSample) +
 		" nVisit=" + strconv.Itoa(kpi.VisitSample) +
 		" nComplete=" + strconv.Itoa(kpi.CompleteSample)
 }

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"customer-support/internal/model"
 )
 
 var (
@@ -531,12 +533,15 @@ func applyAssetIDMap(tx *sql.Tx, m map[string]string) error {
 			`UPDATE access_info_references SET asset_id=? WHERE asset_id=?`,
 			`UPDATE performance_relations SET asset_id=? WHERE asset_id=?`,
 			`UPDATE as_receipts SET asset_id=? WHERE asset_id=?`,
-			`UPDATE attachments SET ref_id=? WHERE ref_type='asset' AND ref_id=?`,
 			`UPDATE assets SET asset_id=? WHERE asset_id=?`,
 		} {
 			if _, err := tx.Exec(q, newID, old); err != nil {
 				return fmt.Errorf("asset map %s: %w", q, err)
 			}
+		}
+		if _, err := tx.Exec(`UPDATE attachments SET ref_id=? WHERE ref_type=? AND ref_id=?`,
+			newID, model.AttachRefAsset, old); err != nil {
+			return fmt.Errorf("asset map attachments: %w", err)
 		}
 	}
 	return nil
@@ -550,7 +555,8 @@ func applyASIDMap(tx *sql.Tx, m map[string]string) error {
 		if _, err := tx.Exec(`UPDATE as_processes SET as_id=? WHERE as_id=?`, newID, old); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE attachments SET ref_id=? WHERE ref_type='as' AND ref_id=?`, newID, old); err != nil {
+		if _, err := tx.Exec(`UPDATE attachments SET ref_id=? WHERE ref_type IN (?,?) AND ref_id=?`,
+			newID, model.AttachRefAS, model.AttachFormReceipt, old); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE as_receipts SET as_id=?, as_number=? WHERE as_id=?`, newID, newID, old); err != nil {

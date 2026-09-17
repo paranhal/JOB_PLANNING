@@ -1,7 +1,5 @@
 {{define "title"}}일일 업무 회의{{end}}
 {{define "content"}}
-{{$prev := .PrevCol}}
-{{$cur := .CurCol}}
 <div class="space-y-4">
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div>
@@ -9,7 +7,7 @@
         <h2 class="text-xl font-bold text-gray-800">일일 업무 회의</h2>
         <form method="GET" action="/meeting" class="inline-flex items-center gap-2">
           <input type="hidden" name="date" value="{{.Date}}">
-          {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
+          <input type="hidden" name="display" value="{{.Display}}">
           <label class="text-sm text-gray-600" for="meeting-assignee">담당자</label>
           <select id="meeting-assignee" name="assignee" onchange="this.form.submit()"
                   class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
@@ -28,12 +26,14 @@
         <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
                class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
         <input type="hidden" name="assignee" value="{{if .Assignee}}{{.Assignee}}{{else}}all{{end}}">
-        {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
+        <input type="hidden" name="display" value="{{.Display}}">
       </form>
       <a href="/meeting?date={{.NextDate}}&{{.NavQ}}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50">익일 →</a>
       <a href="/meeting?{{.NavQ}}" class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 hover:bg-blue-100">오늘</a>
-      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
-      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
+      <a href="{{.ListHref}}" id="meeting-toggle-list" data-meeting-display="list"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
+      <a href="{{.KanbanHref}}" id="meeting-toggle-kanban" data-meeting-display="kanban"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
     </div>
   </div>
 
@@ -41,46 +41,14 @@
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.HolidayBanner}}</div>
   {{end}}
 
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-    <div class="rounded-xl border border-gray-200 bg-white p-4">
-      <div class="flex items-baseline justify-between gap-2">
-        <h3 class="text-sm font-semibold text-gray-700">전일 {{if $prev}}{{$prev.RangeLabel}}{{else}}{{.PrevDate}}{{end}}</h3>
-        <span class="text-xs text-gray-400">실적 {{.YesterdayN}}건</span>
-      </div>
-      {{if $prev}}
-      <p class="mt-2 text-2xl font-bold tabular-nums text-emerald-700">{{printf "%.1f" $prev.Counts.ExecutionRatePct}}%</p>
-      <p class="mt-1 text-xs text-gray-500">예정 {{$prev.Counts.PlannedTotal}} · 처리 {{$prev.Counts.ProcessTotal}}</p>
-      {{else}}
-      <p class="mt-2 text-2xl font-bold text-gray-300">—</p>
-      {{end}}
-    </div>
-    <div class="rounded-xl border border-gray-200 bg-white p-4">
-      <div class="flex items-baseline justify-between gap-2">
-        <h3 class="text-sm font-semibold text-gray-700">오늘 {{if $cur}}{{$cur.RangeLabel}}{{else}}{{.Date}}{{end}}</h3>
-        <span class="text-xs text-gray-400">예정 {{.TodayN}}건</span>
-      </div>
-      {{if $cur}}
-      <p class="mt-2 text-2xl font-bold tabular-nums text-sky-700">예정 {{$cur.Counts.PlannedTotal}}</p>
-      <p class="mt-1 text-xs text-gray-500">처리 {{$cur.Counts.ProcessTotal}} · 실행률 {{printf "%.1f" $cur.Counts.ExecutionRatePct}}%</p>
-      {{else}}
-      <p class="mt-2 text-2xl font-bold text-gray-300">—</p>
-      {{end}}
-    </div>
-    <a href="{{.UnplannedHref}}" class="rounded-xl border border-rose-200 bg-white p-4 hover:border-rose-400 transition-all block">
-      <div class="flex items-baseline justify-between gap-2">
-        <h3 class="text-sm font-semibold text-rose-800">미계획</h3>
-        <span class="text-xs text-gray-400">빠짐 방지</span>
-      </div>
-      <p class="mt-2 text-2xl font-bold tabular-nums text-rose-700">{{.UnplannedN}}건</p>
-      <p class="mt-1 text-xs text-gray-500">미계획 업무함으로 이동</p>
-    </a>
-  </div>
+  {{template "meeting_summary_cards" .}}
 
-  {{if eq .Display "kanban"}}
-  <p class="text-sm text-gray-500">칸반 {{.KanbanTotal}}건 · 리스트 전일 {{.YesterdayN}} · 오늘 예정 {{.TodayN}}</p>
+  <p id="meeting-kanban-caption" class="text-sm text-gray-500 {{if ne .Display "kanban"}}hidden{{end}}">칸반 {{.KanbanTotal}}건 · 리스트 전일 {{.YesterdayN}} · 오늘 예정 {{.PlannedN}}</p>
+  <div id="meeting-kanban" class="{{if ne .Display "kanban"}}hidden{{end}}">
   {{template "kanban_board" .}}
-  {{else}}
-  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+  </div><!--meeting-kanban-->
+
+  <div id="meeting-list" class="grid grid-cols-1 xl:grid-cols-2 gap-4 {{if eq .Display "kanban"}}hidden{{end}}">
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
         <h3 class="text-sm font-bold text-gray-800">전일 실적</h3>
@@ -107,6 +75,7 @@
               <td class="px-3 py-2 whitespace-nowrap">
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
+                {{if .Tentative}}<span class="ml-1 text-[10px] text-gray-400">미확정</span>{{end}}
               </td>
               <td class="px-3 py-2 font-mono text-blue-600">
                 <a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a>
@@ -132,7 +101,7 @@
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
         <h3 class="text-sm font-bold text-gray-800">오늘 예정</h3>
-        <span class="text-xs text-gray-500">{{.Date}} · {{.TodayN}}건</span>
+        <span class="text-xs text-gray-500">{{.Date}} · {{.PlannedN}}건</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -155,6 +124,7 @@
               <td class="px-3 py-2 whitespace-nowrap">
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
+                {{if .Tentative}}<span class="ml-1 text-[10px] text-gray-400">미확정</span>{{end}}
               </td>
               <td class="px-3 py-2 font-mono text-blue-600">
                 <a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a>
@@ -176,7 +146,35 @@
         </table>
       </div>
     </div>
-  </div>
-  {{end}}
+  </div><!--meeting-list-->
 </div>
+<script>
+(function(){
+  function setMeetingDisplay(mode){
+    var isK = mode === 'kanban';
+    var list = document.getElementById('meeting-list');
+    var kanban = document.getElementById('meeting-kanban');
+    var cap = document.getElementById('meeting-kanban-caption');
+    var btnL = document.getElementById('meeting-toggle-list');
+    var btnK = document.getElementById('meeting-toggle-kanban');
+    if (list) list.classList.toggle('hidden', isK);
+    if (kanban) kanban.classList.toggle('hidden', !isK);
+    if (cap) cap.classList.toggle('hidden', !isK);
+    var on = 'px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white';
+    var off = 'px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50';
+    if (btnL) btnL.className = isK ? off : on;
+    if (btnK) btnK.className = isK ? on : off;
+    document.querySelectorAll('input[name="display"]').forEach(function(el){ el.value = isK ? 'kanban' : 'list'; });
+    var u = new URL(window.location.href);
+    u.searchParams.set('display', isK ? 'kanban' : 'list');
+    history.replaceState(null, '', u.pathname + u.search);
+  }
+  document.querySelectorAll('[data-meeting-display]').forEach(function(a){
+    a.addEventListener('click', function(ev){
+      ev.preventDefault();
+      setMeetingDisplay(a.getAttribute('data-meeting-display'));
+    });
+  });
+})();
+</script>
 {{end}}

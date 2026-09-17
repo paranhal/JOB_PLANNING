@@ -11,7 +11,6 @@ import (
 
 // applyMetricsSettings 019. INSERT OR IGNORE — 관리자가 바꾼 값은 덮지 않는다.
 // 시드 값은 마이그레이션 SQL 과 같다. 집계는 항상 app_settings 를 읽는다 (§4.5).
-// progress_scope 에서 행정·지원을 뺀 것은 임시. 예정일 입력률 4주 연속 90% 이상이면 admin 을 다시 넣는다.
 func applyMetricsSettings(db *sql.DB) {
 	if db == nil {
 		return
@@ -32,9 +31,7 @@ func (r *StatsRepo) MetricsPolicy() model.MetricsPolicy {
 	}
 	s := NewSettingsRepo(r.db)
 	base, _ := s.Get(SettingMetricsBaseDate)
-	scope, _ := s.Get(SettingProgressScope)
 	out.BaseDate = normalizeMetricsDate(base)
-	out.ProgressScope = strings.TrimSpace(scope)
 	return out
 }
 
@@ -57,7 +54,6 @@ func (r *StatsRepo) attachMetrics(f model.StatsMeetingFilter) model.StatsMeeting
 	f = normalizeMeetingFilter(f)
 	p := r.MetricsPolicy()
 	f.MetricsBaseDate = p.BaseDate
-	f.ProgressScope = p.ProgressScope
 	return f
 }
 

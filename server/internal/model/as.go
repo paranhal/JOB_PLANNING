@@ -19,15 +19,18 @@ type ASReceipt struct {
 	Priority           string     `json:"priority"`
 	RequesterType      string     `json:"requester_type"` // 고객직접, 제조사, 협력사 등
 	RequesterName      string     `json:"requester_name"`
-	AssignedTo         string     `json:"assigned_to"`          // 배정 담당자 표시명
+	AssignedTo         string     `json:"assigned_to"`          // 배정 담당자 표시명 (우리 직원)
 	AssignedUserID     string     `json:"assigned_user_id"`     // 배정 사용자 ID
+	ExternalAssignee   string     `json:"external_assignee,omitempty"` // 외부 협력사 담당자. assignee 에 넣지 않는다. §44.8.3
 	ReceivedBy         string     `json:"received_by"`          // 접수자
 	VisitScheduledDate string     `json:"visit_scheduled_date"` // 예정업무일 (YYYY-MM-DD, 선택)
 	ScheduleConfirmed  bool       `json:"schedule_confirmed"`   // 일정 확정 시 진행중
 	Status             string     `json:"status"`               // 접수, 담당자배정, 진행중, 보류, 이관, 접수취소, 완료, 종료
 	StartDatetime      *time.Time `json:"start_datetime"`
 	CompleteDatetime   *time.Time `json:"complete_datetime"`
+	VisitDate          string     `json:"visit_date"` // §4.7 현장 방문일 YYYY-MM-DD. start_datetime 과 별개
 	ProcessType        string     `json:"process_type"` // 원격지원, 방문, 교체 등
+	ProcessTypeReason  string     `json:"process_type_reason"` // §4.7 처리유형 미정 사유
 	WorkPlace          string     `json:"work_place"`   // office=내근, field=외근
 	CauseType          string     `json:"cause_type"`   // HW고장, SW오류, 네트워크 등 (통계용 코드)
 	CauseDetail        string     `json:"cause_detail"` // 장애원인 서술. cause_type 과 별개 (§12.10.4)
@@ -90,6 +93,7 @@ type ASProcess struct {
 	ProcessDatetime time.Time `json:"process_datetime"`
 	Worker          string    `json:"worker"`
 	WorkType        string    `json:"work_type"`
+	CauseType       string    `json:"cause_type,omitempty"`
 	WorkContent     string    `json:"work_content"`
 	PartsUsed       string    `json:"parts_used"`
 	TimeSpent       int       `json:"time_spent"` // 분 단위

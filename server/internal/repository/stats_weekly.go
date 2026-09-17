@@ -153,10 +153,6 @@ func (r *StatsRepo) buildWeeklyPersonRow(from, toEx string, workingDays int, ass
 	}
 	f := weeklyFilter(assignee)
 
-	b, err := r.countBucket(from, toEx, f)
-	if err != nil {
-		return row, err
-	}
 	an, err := r.LoadStatsWorkAnalysis(from, toEx, f)
 	if err != nil {
 		return row, err
@@ -169,16 +165,10 @@ func (r *StatsRepo) buildWeeklyPersonRow(from, toEx string, workingDays int, ass
 	row.Receipt = an.Receipt
 	row.Completed = an.Completed
 	row.CarryOut = an.CarryOut
-	exec := mathRound1(b.ExecutionRatePct())
-	row.ExecDisplay = model.StatsReliability(b.ExecPlanned(), !b.HasExecutionRate(), exec)
-	if isTeam {
-		if pc, e := NewWorkBoardRepo(r.db).CountPlanning(); e == nil {
-			row.ExecDisplay = row.ExecDisplay.CapIfLowPlanning(pc.HasPlanningRate(), pc.Rate())
-		}
-	}
 
 	row.VisitDisplay = model.StatsReliability(kpi.nVisitAS, kpi.nVisitAS == 0, mathRound1(kpi.visitAS)).
-		WithReason("해당 기간 방문 데이터 없음")
+		WithReason("해당 기간 방문 데이터 없음").
+		WithHoldJudgment()
 	row.CompleteDisplay = model.StatsReliability(kpi.nCompleteAS, kpi.nCompleteAS == 0, mathRound1(kpi.completeAS)).
 		WithReason("해당 기간 완료 데이터 없음")
 
@@ -238,9 +228,9 @@ func (r *StatsRepo) countWeeklyInProgress(toEx string, f model.StatsMeetingFilte
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status IN `+model.SQLStatusOpsInProgress+`
-		  AND date(ar.receipt_datetime) < date(?)
+		  AND ar.receipt_datetime < ?
 		  AND (TRIM(COALESCE(ar.complete_datetime,'')) = ''
-		       OR date(ar.complete_datetime) >= date(?))`+asSQL,
+		       OR ar.complete_datetime >= ?)`+asSQL,
 		append([]interface{}{toEx, toEx}, asArgs...)...)
 	if err != nil {
 		return 0, err
@@ -251,7 +241,7 @@ func (r *StatsRepo) countWeeklyInProgress(toEx string, f model.StatsMeetingFilte
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = 'partial_complete'
 		  AND COALESCE(w.status,'open') = 'open'
-		  AND date(w.created_at) < date(?)`+asSQL, append([]interface{}{toEx}, asArgs...)...)
+		  AND w.created_at < ?`+asSQL, append([]interface{}{toEx}, asArgs...)...)
 	if err != nil {
 		return 0, err
 	}
@@ -313,10 +303,10 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 	asBase, mntBase, adminBase := "", "", ""
 	var asB, mntB, adminB []interface{}
 	if base != "" {
-		asBase = ` AND date(ar.receipt_datetime) >= date(?)`
-		mntBase = ` AND date(v.visit_date) >= date(?)`
+		asBase = ` AND ar.receipt_datetime >= ?`
+		mntBase = ` AND v.visit_date >= ?`
 		adminBase = ` AND date(` + adminTaskReceiptDateSQL + `) >= date(?)`
-		asB, mntB, adminB = []interface{}{base}, []interface{}{base}, []interface{}{base}
+		asB, mntB, adminB = []interface{}{dayTimeStart(base)}, []interface{}{base}, []interface{}{base}
 	}
 	q := `
 		SELECT name FROM (
@@ -325,13 +315,13 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			WHERE ar.status != 'cancelled'
 			  AND COALESCE(ar.data_origin,'app') != 'import'` + asBase + `
 			  AND (
-			    (date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?))
+			    (ar.receipt_datetime >= ? AND ar.receipt_datetime < ?)
 			    OR (TRIM(COALESCE(ar.complete_datetime,'')) != ''
-			        AND date(ar.complete_datetime) >= date(?) AND date(ar.complete_datetime) < date(?))
+			        AND ar.complete_datetime >= ? AND ar.complete_datetime < ?)
 			    OR (ar.status IN ` + model.SQLStatusStatsOpen + `
-			        AND date(ar.receipt_datetime) < date(?)
+			        AND ar.receipt_datetime < ?
 			        AND (TRIM(COALESCE(ar.complete_datetime,'')) = ''
-			             OR date(ar.complete_datetime) >= date(?)))
+			             OR ar.complete_datetime >= ?)))
 			  )
 			UNION
 			SELECT TRIM(COALESCE(v.assignee,''))
@@ -645,14 +635,14 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 		SELECT COALESCE(ar.as_number,''), COALESCE(c.org_name,''),
 		       COALESCE(a.product_category,''), COALESCE(a.product_name,''), COALESCE(a.model_name,''),
 		       COALESCE(NULLIF(TRIM(ar.assigned_to),''), ''),
-		       COALESCE(ar.symptom,''), COALESCE(ar.action_taken,''),
-		       COALESCE(ar.result_code,''), COALESCE(ar.status,''),
+		       COALESCE(ar.symptom,''), COALESCE(` + asActionTakenSQL("ar") + `,''),
+		       COALESCE(` + asResultCodeSQL("ar") + `,''), COALESCE(ar.status,''),
 		       COALESCE(date(%s),'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status != 'cancelled'` + asSQL + `
-		  AND date(%s) >= date(?) AND date(%s) < date(?)`
+		  AND %s >= ? AND %s < ?`
 
 	add := func(kind, dateExpr, contentExpr string, args ...interface{}) error {
 		q := fmt.Sprintf(base, dateExpr, dateExpr, dateExpr)
@@ -685,10 +675,10 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 		}
 		return rows.Err()
 	}
-	if err := add(model.WeeklyEventReceipt, "ar.receipt_datetime", "symptom", from, toEx); err != nil {
+	if err := add(model.WeeklyEventReceipt, "ar.receipt_datetime", "symptom", dayTimeStart(from), dayTimeStart(toEx)); err != nil {
 		return nil, err
 	}
-	if err := add(model.WeeklyEventComplete, "ar.complete_datetime", "action", from, toEx); err != nil {
+	if err := add(model.WeeklyEventComplete, "ar.complete_datetime", "action", dayTimeStart(from), dayTimeStart(toEx)); err != nil {
 		return nil, err
 	}
 
@@ -697,15 +687,15 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 		       COALESCE(a.product_category,''), COALESCE(a.product_name,''), COALESCE(a.model_name,''),
 		       COALESCE(NULLIF(TRIM(p.worker),''), NULLIF(TRIM(ar.assigned_to),''), ''),
 		       COALESCE(NULLIF(TRIM(p.work_content),''), ar.action_taken, ar.symptom, ''),
-		       COALESCE(ar.result_code,''), COALESCE(ar.status,''),
+		       COALESCE(NULLIF(TRIM(p.result_code),''), ar.result_code, ''), COALESCE(ar.status,''),
 		       COALESCE(date(p.process_datetime),''), COALESCE(p.time_spent,0)
 		FROM as_processes p
 		JOIN as_receipts ar ON ar.as_id = p.as_id
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		WHERE ar.status != 'cancelled'` + asSQL + `
+		WHERE ar.status != 'cancelled'`+asSQL+`
 		  AND p.process_datetime IS NOT NULL
-		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)`, append(append([]interface{}{}, asArgs...), from, toEx)...)
+		  AND p.process_datetime >= ? AND p.process_datetime < ?`, append(append([]interface{}{}, asArgs...), dayTimeStart(from), dayTimeStart(toEx))...)
 	if err != nil {
 		return nil, err
 	}

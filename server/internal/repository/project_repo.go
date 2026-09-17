@@ -183,6 +183,14 @@ func (r *ProjectRepo) Delete(id string) error {
 			return err
 		}
 		defer tx.Rollback()
+		if _, err := tx.Exec(`DELETE FROM project_scope_product_keys WHERE rule_id IN (SELECT rule_id FROM project_scope_rules WHERE project_id=?)`, id); err != nil &&
+			!strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM project_scope_work_kinds WHERE rule_id IN (SELECT rule_id FROM project_scope_rules WHERE project_id=?)`, id); err != nil &&
+			!strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return err
+		}
 		if _, err := tx.Exec(`DELETE FROM project_scope_rules WHERE project_id=?`, id); err != nil {
 			return err
 		}
@@ -224,7 +232,11 @@ func (r *ProjectRepo) ListRules(projectID string) ([]model.ProjectScopeRule, err
 		}
 		out = append(out, rule)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	overlayScopeJunction(r.db, out)
+	return out, nil
 }
 
 func (r *ProjectRepo) ReplaceRules(projectID string, rules []model.ProjectScopeRule) error {
@@ -248,6 +260,14 @@ func (r *ProjectRepo) ReplaceRules(projectID string, rules []model.ProjectScopeR
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM project_scope_product_keys WHERE rule_id IN (SELECT rule_id FROM project_scope_rules WHERE project_id=?)`, projectID); err != nil &&
+		!strings.Contains(strings.ToLower(err.Error()), "no such table") {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM project_scope_work_kinds WHERE rule_id IN (SELECT rule_id FROM project_scope_rules WHERE project_id=?)`, projectID); err != nil &&
+		!strings.Contains(strings.ToLower(err.Error()), "no such table") {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM project_scope_rules WHERE project_id=?`, projectID); err != nil {
 		return err
 	}
@@ -257,6 +277,9 @@ func (r *ProjectRepo) ReplaceRules(projectID string, rules []model.ProjectScopeR
 			VALUES (?,?,?,?,?,?)`,
 			rule.RuleID, projectID, nullStr(rule.ParentCustomerID),
 			strings.TrimSpace(rule.ProductKeys), strings.TrimSpace(rule.WorkKinds), strings.TrimSpace(rule.Notes)); err != nil {
+			return err
+		}
+		if err := replaceScopeJunction(tx, rule.RuleID, rule.ProductKeys, rule.WorkKinds); err != nil {
 			return err
 		}
 	}

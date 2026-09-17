@@ -43,6 +43,7 @@ func (r *ASWorkRepo) Create(w *model.ASWorkItem) error {
 			w.ASID).Scan(&aTo, &aUID)
 		w.AssignedTo, w.AssignedUserID = aTo, aUID
 	}
+	w.AssignedTo, w.AssignedUserID = bindStaff(r.db, w.AssignedTo, w.AssignedUserID)
 	var asNumber string
 	if err := r.db.QueryRow(`SELECT as_number FROM as_receipts WHERE as_id=?`, w.ASID).Scan(&asNumber); err != nil {
 		return err
@@ -129,6 +130,7 @@ func (r *ASWorkRepo) Update(w *model.ASWorkItem) error {
 		return fmt.Errorf("work_id 필요")
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
+	w.AssignedTo, w.AssignedUserID = bindStaff(r.db, w.AssignedTo, w.AssignedUserID)
 	return touchUpdate(r.db, "as_work_items", "work_id", w.WorkID, w.WorkNumber, func() error {
 		_, err := r.db.Exec(`UPDATE as_work_items SET
 		scheduled_date=?, schedule_confirmed=?, confirm_target=?, confirm_contact=?,

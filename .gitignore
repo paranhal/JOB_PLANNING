@@ -20,7 +20,19 @@ server/.env
 
 # Tailwind 빌드 도구 (생성 CSS는 web/static/vendor/ 에 커밋)
 server/node_modules/
+server/.gocache/
+server/.gotmp/
+server/server
 
 # 환경/에디터
 .DS_Store
 .cursor/
+
+# 서버 접속 정보 (평문 비밀번호 포함) — 절대 커밋하지 않는다 §43.6
+*접속 정보*.md
+*접속정보*.md
+
+# 배포 산출물 백업·로컬 덤프
+deploy/server-app.tar.prev
+docs/_schema_dump.txt
+server/docs/figma_register_ref/

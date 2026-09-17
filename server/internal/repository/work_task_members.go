@@ -21,6 +21,7 @@ const workTaskMembersSchema = `
 CREATE TABLE IF NOT EXISTS work_task_members (
   task_id      TEXT NOT NULL,
   assignee     TEXT NOT NULL DEFAULT '',
+  user_id      TEXT NOT NULL DEFAULT '',
   member_role  TEXT NOT NULL CHECK (member_role IN ('owner', 'support')),
   duration_min INTEGER,
   sort_order   INTEGER NOT NULL DEFAULT 0,
@@ -74,6 +75,43 @@ func dropWorkTaskMemberTriggers(db *sql.DB) {
 }
 
 func installWorkTaskMemberTriggers(db *sql.DB) {
+	uidSQL := ownerMemberUserIDSQL("NEW")
+	insertSQL := `CREATE TRIGGER trg_wt_insert_owner_member
+AFTER INSERT ON work_tasks
+FOR EACH ROW
+BEGIN
+  INSERT INTO work_task_members (task_id, assignee, member_role, duration_min, sort_order, created_at)
+  VALUES (NEW.task_id, COALESCE(NEW.assignee, ''), 'owner', NEW.duration_min, 0, CURRENT_TIMESTAMP);
+END`
+	updateSQL := `CREATE TRIGGER trg_wt_update_owner_assignee
+AFTER UPDATE OF assignee ON work_tasks
+FOR EACH ROW
+WHEN COALESCE(NEW.assignee, '') != COALESCE(OLD.assignee, '')
+BEGIN
+  UPDATE work_task_members
+     SET assignee = COALESCE(NEW.assignee, '')
+   WHERE task_id = NEW.task_id AND member_role = 'owner';
+END`
+	if tableHasColumn(db, "work_task_members", "user_id") && tableHasColumn(db, "work_tasks", "assignee_user_id") {
+		insertSQL = `CREATE TRIGGER trg_wt_insert_owner_member
+AFTER INSERT ON work_tasks
+FOR EACH ROW
+BEGIN
+  INSERT INTO work_task_members (task_id, assignee, user_id, member_role, duration_min, sort_order, created_at)
+  VALUES (NEW.task_id, COALESCE(NEW.assignee, ''), ` + uidSQL + `, 'owner', NEW.duration_min, 0, CURRENT_TIMESTAMP);
+END`
+		updateSQL = `CREATE TRIGGER trg_wt_update_owner_assignee
+AFTER UPDATE OF assignee, assignee_user_id ON work_tasks
+FOR EACH ROW
+WHEN COALESCE(NEW.assignee, '') != COALESCE(OLD.assignee, '')
+  OR COALESCE(NEW.assignee_user_id, '') != COALESCE(OLD.assignee_user_id, '')
+BEGIN
+  UPDATE work_task_members
+     SET assignee = COALESCE(NEW.assignee, ''),
+         user_id = ` + uidSQL + `
+   WHERE task_id = NEW.task_id AND member_role = 'owner';
+END`
+	}
 	for _, q := range []string{
 		`CREATE TRIGGER trg_wtm_reject_second_owner
 BEFORE INSERT ON work_task_members
@@ -117,22 +155,8 @@ WHEN OLD.member_role = 'owner'
 BEGIN
   SELECT RAISE(ABORT, '` + workTaskMembersOwnerMsg + `');
 END`,
-		`CREATE TRIGGER trg_wt_insert_owner_member
-AFTER INSERT ON work_tasks
-FOR EACH ROW
-BEGIN
-  INSERT INTO work_task_members (task_id, assignee, member_role, duration_min, sort_order, created_at)
-  VALUES (NEW.task_id, COALESCE(NEW.assignee, ''), 'owner', NEW.duration_min, 0, CURRENT_TIMESTAMP);
-END`,
-		`CREATE TRIGGER trg_wt_update_owner_assignee
-AFTER UPDATE OF assignee ON work_tasks
-FOR EACH ROW
-WHEN COALESCE(NEW.assignee, '') != COALESCE(OLD.assignee, '')
-BEGIN
-  UPDATE work_task_members
-     SET assignee = COALESCE(NEW.assignee, '')
-   WHERE task_id = NEW.task_id AND member_role = 'owner';
-END`,
+		insertSQL,
+		updateSQL,
 		`CREATE TRIGGER trg_wt_delete_members
 AFTER DELETE ON work_tasks
 FOR EACH ROW

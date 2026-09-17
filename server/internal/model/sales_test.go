@@ -23,6 +23,42 @@ func TestFormatSalesPeriod(t *testing.T) {
 	}
 }
 
+func TestSalesPeriodFirstYMAndBannerTitle(t *testing.T) {
+	if got := SalesPeriodFirstYM("2026-11", SalesPrecisionQuarter); got != "2026-10" {
+		t.Fatalf("Q4 first: %q", got)
+	}
+	if got := SalesPeriodFirstYM("2026-08", SalesPrecisionHalf); got != "2026-07" {
+		t.Fatalf("H2 first: %q", got)
+	}
+	if got := SalesPeriodFirstYM("2026-06", SalesPrecisionYear); got != "2026-01" {
+		t.Fatalf("year first: %q", got)
+	}
+	if got := SalesPeriodFirstYM("2026-09", SalesPrecisionMonth); got != "2026-09" {
+		t.Fatalf("month: %q", got)
+	}
+	if got := SalesPeriodBannerNote("2026-10", SalesPrecisionQuarter); got != "4분기 중" {
+		t.Fatalf("note: %q", got)
+	}
+	if got := FormatSalesMonthBannerTitle("2026-09", "부여군도서관 제안", SalesPrecisionMonth, false); got != "9월 · 부여군도서관 제안 (월 미정)" {
+		t.Fatalf("month title: %q", got)
+	}
+	if got := FormatSalesMonthBannerTitle("2026-10", "부여군도서관 제안", SalesPrecisionQuarter, false); got != "10월 · 부여군도서관 제안 (4분기 중)" {
+		t.Fatalf("quarter title: %q", got)
+	}
+	b, ok := SalesMonthBannerFromProject(SalesProject{
+		SalesID: "SP-1", Name: "부여군도서관 제안", ExpectedYM: "2026-09", ExpectedPrecision: SalesPrecisionMonth,
+	})
+	if !ok || b.Href != "/sales/SP-1" || b.PlaceYM != "2026-09" {
+		t.Fatalf("project banner: %+v ok=%v", b, ok)
+	}
+	if IsSalesMonthOnly("2026-09-15") || !IsSalesMonthOnly("2026-09") {
+		t.Fatal("month-only 판정")
+	}
+	if err := RequireSalesDateOrYM("2026-09"); err != nil {
+		t.Fatalf("YM 허용: %v", err)
+	}
+}
+
 func TestSalesProjectConfirmationAndDisplay(t *testing.T) {
 	p := &SalesProject{Name: "가칭 사업", IsTentativeName: true, Stage: SalesStageProposal, Probability: 40}
 	if n, total := p.ConfirmedCount(); n != 0 || total != 4 {

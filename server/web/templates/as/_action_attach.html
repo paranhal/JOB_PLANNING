@@ -1,5 +1,5 @@
 {{define "as_action_attach"}}
-<div class="space-y-3" data-action-attach="1">
+<div class="space-y-3" data-action-attach="1" data-photo-zoom>
   {{/* §12.9.8 · 화면설계서 공통 UI: ?err= 코드별 한글 문구를 첨부 영역 상단 배너에 표시 */}}
   {{if eq .ActionErr "attach_photo_max"}}
   <div data-attach-err class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">사진은 최대 3장입니다</div>
@@ -65,7 +65,7 @@
     <div class="flex flex-wrap items-end gap-3">
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">종류</label>
-        <select name="ref_type" id="as-attach-kind" form="as-action-attach-form"
+        <select name="ref_type" data-attach-kind form="as-action-attach-form"
                 class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
           <option value="as_action_photo">사진</option>
           <option value="as">문서</option>
@@ -75,88 +75,17 @@
       <input type="hidden" name="redirect" form="as-action-attach-form" value="/as/{{.AS.ASID}}/action">
       <div class="flex-1 min-w-[12rem]">
         <label class="block text-xs font-medium text-slate-600 mb-1">파일</label>
-        <input type="file" name="file" id="as-attach-file" form="as-action-attach-form" multiple required
+        <input type="file" name="file" data-attach-file form="as-action-attach-form" multiple required
                accept="image/*" class="block w-full text-sm">
       </div>
-      <button type="submit" id="as-attach-submit" form="as-action-attach-form"
+      <button type="submit" form="as-action-attach-form"
               class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">올리기</button>
     </div>
     <p class="text-[11px] text-slate-500">사진: 최대 3장 · 축소·썸네일 저장. 문서: 원본 그대로. 조치 저장과 따로 올라갑니다.</p>
   </div>
   {{end}}
+  {{if .ActionPhotos}}{{template "photo_lightbox" "action-attach-lightbox"}}{{end}}
 </div>
-
-{{if .ActionPhotos}}
-<div id="action-attach-lightbox" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/80 p-4">
-  <button type="button" data-lightbox-close class="absolute top-4 right-4 text-white text-3xl leading-none">&times;</button>
-  <button type="button" data-lightbox-prev class="absolute left-3 text-white text-4xl px-2">&lsaquo;</button>
-  <figure class="max-w-5xl max-h-[90vh] flex flex-col items-center">
-    <img data-lightbox-img src="" alt="" class="max-h-[80vh] max-w-full object-contain rounded shadow-lg">
-    <figcaption data-lightbox-cap class="mt-3 text-sm text-white/90"></figcaption>
-  </figure>
-  <button type="button" data-lightbox-next class="absolute right-3 text-white text-4xl px-2">&rsaquo;</button>
-</div>
-<script>
-(function(){
-  var root = document.querySelector('[data-action-attach]');
-  if (!root) return;
-  var btns = root.querySelectorAll('[data-full-url]');
-  if (!btns.length) return;
-  var items = [];
-  btns.forEach(function(btn){ items.push({url: btn.getAttribute('data-full-url'), cap: btn.getAttribute('data-cap')||''}); });
-  var box = document.getElementById('action-attach-lightbox');
-  if (!box) return;
-  var img = box.querySelector('[data-lightbox-img]');
-  var cap = box.querySelector('[data-lightbox-cap]');
-  var idx = 0;
-  function show(i){
-    idx = (i + items.length) % items.length;
-    img.src = items[idx].url;
-    cap.textContent = items[idx].cap;
-    box.classList.remove('hidden');
-    box.classList.add('flex');
-  }
-  function hide(){ box.classList.add('hidden'); box.classList.remove('flex'); }
-  btns.forEach(function(btn, i){ btn.addEventListener('click', function(){ show(i); }); });
-  box.querySelector('[data-lightbox-close]').addEventListener('click', hide);
-  box.querySelector('[data-lightbox-prev]').addEventListener('click', function(){ show(idx-1); });
-  box.querySelector('[data-lightbox-next]').addEventListener('click', function(){ show(idx+1); });
-  box.addEventListener('click', function(e){ if (e.target === box) hide(); });
-  document.addEventListener('keydown', function(e){
-    if (box.classList.contains('hidden')) return;
-    if (e.key === 'Escape') hide();
-    if (e.key === 'ArrowLeft') show(idx-1);
-    if (e.key === 'ArrowRight') show(idx+1);
-  });
-})();
-</script>
-{{end}}
-<script>
-(function(){
-  var kind = document.getElementById('as-attach-kind');
-  var file = document.getElementById('as-attach-file');
-  var form = document.getElementById('as-action-attach-form');
-  if (!kind || !file || !form) return;
-  var imgExt = /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i;
-  function syncAccept(){
-    if (kind.value === 'as_action_photo') file.setAttribute('accept', 'image/*');
-    else file.removeAttribute('accept');
-  }
-  kind.addEventListener('change', syncAccept);
-  syncAccept();
-  form.addEventListener('submit', function(e){
-    if (kind.value !== 'as') return;
-    var files = file.files || [];
-    var hasImg = false;
-    for (var i = 0; i < files.length; i++) {
-      if (imgExt.test(files[i].name || '')) { hasImg = true; break; }
-    }
-    if (hasImg && !confirm('이미지 파일인데 종류가 「문서」입니다. 문서(원본 그대로)로 올릴까요?')) {
-      e.preventDefault();
-    }
-  });
-})();
-</script>
 {{end}}
 
 {{define "as_action_attach_dels"}}

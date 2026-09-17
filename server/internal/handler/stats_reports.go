@@ -77,7 +77,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 	if sheetName == "" {
 		sheetName = companyDraft.Period.SheetNameDefault
 	}
-	metricsBase, metricsScope, metricsHint := metricsViewData(h.repo)
+	metricsBase := metricsViewData(h.repo)
 	lb := parseLookback(c, metricsBase, now)
 
 	return c.Render(http.StatusOK, "stats/reports.html", map[string]interface{}{
@@ -103,9 +103,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		"CompanyWeekly":    companyDraft,
 		"CompanyDate":      companyDraft.Period.Anchor,
 		"CompanySheetName": sheetName,
-		"MetricsBaseDate":    metricsBase,
-		"ProgressScopeLabel": metricsScope,
-		"ProgressScopeHint":  metricsHint,
+		"MetricsBaseDate":  metricsBase,
 	})
 }
 

@@ -10,11 +10,11 @@ import (
 
 // WorkPrefix 업무 리스트 접두어
 const (
-	WorkPrefixAS           = "as"           // [AS]
-	WorkPrefixMaintenance  = "maintenance"  // [정기점검]
-	WorkPrefixConfirm      = "confirm"      // [확인]
-	WorkPrefixGeneral      = "general"      // [일반업무]
-	WorkPrefixSales        = "sales"        // [영업]
+	WorkPrefixAS          = "as"          // [AS]
+	WorkPrefixMaintenance = "maintenance" // [정기점검]
+	WorkPrefixConfirm     = "confirm"     // [확인]
+	WorkPrefixGeneral     = "general"     // [일반업무]
+	WorkPrefixSales       = "sales"       // [영업]
 )
 
 func WorkPrefixLabel(p string) string {
@@ -106,6 +106,19 @@ type WorkListItem struct {
 	Urgency        string `json:"urgency,omitempty"`
 	ReceiptGroupID string `json:"receipt_group_id,omitempty"`
 	ProductType    string `json:"product_type,omitempty"`
+	EditLocked     bool   `json:"edit_locked,omitempty"`    // §37.3 읽기 전용
+	AssigneeOther  bool   `json:"assignee_other,omitempty"` // 내 배정이 아님
+	CustomerID     string `json:"customer_id,omitempty"`    // §37.4 기관 필터
+	ProjectID      string `json:"project_id,omitempty"`     // §37.4 사업 필터
+	Content        string `json:"content,omitempty"`        // 제목·기관 외 본문(검색)
+	Tentative      bool   `json:"tentative,omitempty"`      // §38.5 미확정 뱃지. 집계에는 안 씀
+	BlockedReason  string `json:"blocked_reason,omitempty"` // §42.7 막힌 이유. 있으면 기다리는 것
+	BlockedAt      string `json:"blocked_at,omitempty"`
+}
+
+// IsWaiting 막힌 이유가 있으면 지연이 아니라 기다리는 것. §42.7
+func (it WorkListItem) IsWaiting() bool {
+	return strings.TrimSpace(it.BlockedReason) != ""
 }
 
 const (
@@ -243,12 +256,21 @@ func FormatMonthDay(date string) string {
 }
 
 func DaysBetweenDates(from, to string) int {
-	a, err1 := time.ParseInLocation("2006-01-02", NormalizeAppDate(from), time.Local)
-	b, err2 := time.ParseInLocation("2006-01-02", NormalizeAppDate(to), time.Local)
+	from = NormalizeAppDate(from)
+	to = NormalizeAppDate(to)
+	if from == "" || to == "" {
+		return 0
+	}
+	a, err1 := time.Parse("2006-01-02", from)
+	b, err2 := time.Parse("2006-01-02", to)
 	if err1 != nil || err2 != nil {
 		return 0
 	}
-	return int(b.Sub(a).Hours() / 24)
+	days := int(b.Sub(a) / (24 * time.Hour))
+	if days < 1 && from < to {
+		return 1
+	}
+	return days
 }
 
 func PlanDelayBadge(daysOverdue int, inProgress bool) (label, class string) {
@@ -262,6 +284,15 @@ func PlanDelayBadge(daysOverdue int, inProgress bool) (label, class string) {
 	return "D+" + strconv.Itoa(daysOverdue), "bg-red-100 text-red-800"
 }
 
+// WaitingBadge 막힌 이유. 지연(빨강 D+n)과 색·라벨을 가른다. §42.7
+func WaitingBadge(reason string) (label, class string) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return "", ""
+	}
+	return "기다리는 중 · " + reason, "bg-amber-100 text-amber-800"
+}
+
 func WorkItemUrgent(urgency string) bool {
 	switch strings.TrimSpace(urgency) {
 	case "상", "urgent", "high", "긴급":
@@ -273,7 +304,14 @@ func WorkItemUrgent(urgency string) bool {
 
 // SortWorkListItems §33.5.3 과 같은 정렬. 기본 = 종료일 오름차순.
 func SortWorkListItems(items []WorkListItem, sortKey, dir string) {
-	sortKey, dir = NormalizeAdminWorkSort(sortKey, dir)
+	if strings.TrimSpace(sortKey) == "prefix" {
+		sortKey = "prefix"
+		if strings.TrimSpace(dir) != "desc" {
+			dir = "asc"
+		}
+	} else {
+		sortKey, dir = NormalizeAdminWorkSort(sortKey, dir)
+	}
 	desc := dir == "desc"
 	val := func(it WorkListItem) string {
 		switch sortKey {
@@ -285,6 +323,8 @@ func SortWorkListItems(items []WorkListItem, sortKey, dir string) {
 			return strings.ToLower(it.OrgName)
 		case "assignee":
 			return strings.ToLower(it.Assignee)
+		case "prefix":
+			return it.Prefix
 		case "work_date":
 			if it.WorkDate != "" {
 				return it.WorkDate
@@ -316,7 +356,6 @@ func SortWorkListItems(items []WorkListItem, sortKey, dir string) {
 
 // WorkBucket 리스트 필터 버킷
 const (
-	WorkBucketOpen            = "open"
 	WorkBucketToday           = "today"
 	WorkBucketDelayed         = "delayed"
 	WorkBucketCompletedToday  = "completed_today"

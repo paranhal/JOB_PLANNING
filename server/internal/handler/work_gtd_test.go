@@ -182,7 +182,7 @@ func TestAdminWorkWaitingForAndActivity(t *testing.T) {
 		"due_date":        {"2026-08-20"},
 		"status":          {"waiting_for"},
 		"wait_party_kind": {"vendor"},
-		"wait_party":      {"외부업체",},
+		"wait_party":      {"외부업체"},
 		"wait_request":    {"견적서 회신"},
 		"reply_due_date":  {"2026-08-25"},
 	})
@@ -250,15 +250,15 @@ func TestIRMCaseNextActionsAndTimeline(t *testing.T) {
 	}
 	for _, v := range vendors {
 		rec = doForm(t, e, "/workboard/tasks/"+id+"/actions", url.Values{
-			"action_title":        {v[0]},
-			"action_status":       {"waiting"},
-			"action_required":     {"1"},
-			"wait_party_kind":     {v[1]},
-			"wait_party":          {v[2]},
-			"wait_request":        {v[3]},
-			"reply_due_date":      {v[4]},
-			"next_check_date":     {v[5]},
-			"back":                {"/admin-work"},
+			"action_title":    {v[0]},
+			"action_status":   {"waiting"},
+			"action_required": {"1"},
+			"wait_party_kind": {v[1]},
+			"wait_party":      {v[2]},
+			"wait_request":    {v[3]},
+			"reply_due_date":  {v[4]},
+			"next_check_date": {v[5]},
+			"back":            {"/admin-work"},
 		})
 		if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 			t.Fatalf("행동 %s loc=%q", v[0], rec.Header().Get("Location"))

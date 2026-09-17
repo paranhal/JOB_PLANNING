@@ -171,6 +171,14 @@ func TestListUnplannedFiveKindsAndMaintenanceSlot(t *testing.T) {
 	if stats.Unplanned != counts.Total {
 		t.Fatalf("대시보드 미계획=%d 목록=%d", stats.Unplanned, counts.Total)
 	}
+	_, todayL, delayedL, pendingL, unassignedL, err := wb.DashHome("", nil, 2, 2, 2, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(todayL) > 2 || len(delayedL) > 2 || len(pendingL) > 2 || len(unassignedL) > 2 {
+		t.Fatalf("미리보기 한도 초과 today=%d delayed=%d pending=%d unassigned=%d",
+			len(todayL), len(delayedL), len(pendingL), len(unassignedL))
+	}
 
 	pc, err := wb.CountPlanning()
 	if err != nil {

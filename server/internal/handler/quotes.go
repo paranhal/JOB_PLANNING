@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,39 @@ func NewQuotesHandler(
 	return &QuotesHandler{repo: repo, items: items, sales: sales, users: users, settings: settings, orders: orders}
 }
 
+func sortQuotes(items []model.SalesQuote, sortKey, dir string) {
+	if len(items) == 0 || sortKey == "" {
+		return
+	}
+	desc := dir == "desc"
+	val := func(q model.SalesQuote) string {
+		switch sortKey {
+		case "quote_no":
+			return strings.ToLower(q.DisplayNo())
+		case "recipient":
+			return strings.ToLower(q.RecipientName)
+		case "title":
+			return strings.ToLower(q.Title)
+		case "total":
+			return fmt.Sprintf("%020d", q.Total)
+		case "status":
+			return q.Status
+		default:
+			return q.QuoteDate
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := val(items[i]), val(items[j])
+		if a != b {
+			if desc {
+				return a > b
+			}
+			return a < b
+		}
+		return false
+	})
+}
+
 func (h *QuotesHandler) List(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
@@ -48,6 +83,10 @@ func (h *QuotesHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "quote_no,quote_date,recipient,title,total,status")
+	if display != "kanban" && sortKey != "" {
+		sortQuotes(items, sortKey, dir)
+	}
 	kanban := model.FillQuoteKanban(items)
 	qv := url.Values{}
 	if f.Search != "" {
@@ -62,6 +101,10 @@ func (h *QuotesHandler) List(c echo.Context) error {
 	if f.Purpose != "" {
 		qv.Set("purpose", f.Purpose)
 	}
+	if sortKey != "" {
+		qv.Set("sort", sortKey)
+		qv.Set("dir", dir)
+	}
 	listHref := "/quotes"
 	if s := qv.Encode(); s != "" {
 		listHref += "?" + s
@@ -75,6 +118,13 @@ func (h *QuotesHandler) List(c echo.Context) error {
 			expiredN++
 		}
 	}
+	filter := cloneURLValues(qv)
+	filter.Del("sort")
+	filter.Del("dir")
+	if display == "kanban" {
+		filter.Set("display", "kanban")
+	}
+	hrefs := sortLinkHrefs("/quotes", filter, []string{"quote_no", "quote_date", "recipient", "title", "total", "status"}, sortKey, dir)
 	return c.Render(http.StatusOK, "quotes/list.html", map[string]interface{}{
 		"Title": "견적", "Active": NavQuotes,
 		"Items": items, "Total": len(items),
@@ -88,6 +138,10 @@ func (h *QuotesHandler) List(c echo.Context) error {
 		"FlashOK":    c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"NewHref":      "/quotes/new",
 		"ExpiredCount": expiredN,
+		"Sort":         sortKey,
+		"Dir":          dir,
+		"SortHref":     hrefs,
+		"SortSelect":   sortSelectOptions(quoteListSortCols(), hrefs, sortKey, dir),
 	})
 }
 

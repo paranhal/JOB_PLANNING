@@ -220,15 +220,15 @@ func TestASCreateMultiEquipmentGroup(t *testing.T) {
 func TestASCreateUrgencyReasonSetsHighAndConfirmsDate(t *testing.T) {
 	e, _, asRepo, _, _ := newReceiptPhotoFixture(t)
 	form := url.Values{
-		"customer_id":       {"cust_a"},
-		"received_by":       {"테스터"},
-		"receipt_datetime":  {time.Now().Format("2006-01-02T15:04")},
-		"eq_asset_id":       {""},
-		"eq_symptom":        {"게이트 정지"},
-		"eq_urgency_reason": {"rfid_ops_stop"},
-		"eq_urgency_note":   {""},
-		"eq_visit_date":     {"2026-09-01"},
-		"eq_assigned_code":  {""},
+		"customer_id":        {"cust_a"},
+		"received_by":        {"테스터"},
+		"receipt_datetime":   {time.Now().Format("2006-01-02T15:04")},
+		"eq_asset_id":        {""},
+		"eq_symptom":         {"게이트 정지"},
+		"eq_urgency_reason":  {"rfid_ops_stop"},
+		"eq_urgency_note":    {""},
+		"eq_visit_date":      {"2026-09-01"},
+		"eq_assigned_code":   {""},
 		"eq_assigned_custom": {""},
 	}
 	rec := httptest.NewRecorder()
@@ -352,4 +352,3 @@ func TestCustomerListPartyKindFilter(t *testing.T) {
 		t.Fatal("구분 필터가 없다")
 	}
 }
-

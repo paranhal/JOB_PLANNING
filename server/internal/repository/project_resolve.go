@@ -137,7 +137,11 @@ func (r *ProjectRepo) listAllScopeRules() ([]model.ProjectScopeRule, error) {
 		}
 		out = append(out, rule)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	overlayScopeJunction(r.db, out)
+	return out, nil
 }
 
 func resolveStoredProjectID(db *sql.DB, customerID, productType, workKind string) string {

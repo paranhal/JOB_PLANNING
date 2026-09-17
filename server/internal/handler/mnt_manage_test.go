@@ -200,7 +200,7 @@ func TestManagePlanRender(t *testing.T) {
 			{MaintenancePlan: model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Status: "draft", Title: "t"}, VisitCount: 2, DoneCount: 1},
 		},
 		"IsAdmin": true, "Regions": []string{"세종"}, "Assignees": []model.User{{FullName: "최혜영"}},
-		"Unassigned": []model.UnassignedMonthSlot{{CustomerID: "c1", ShortName: "가나", ProductType: "KLAS", Cycle: "monthly"}},
+		"Unassigned":      []model.UnassignedMonthSlot{{CustomerID: "c1", ShortName: "가나", ProductType: "KLAS", Cycle: "monthly"}},
 		"UnassignedMonth": 8, "DupCount": 0, "FlashOK": "", "FlashErr": "",
 		"Preview": nil, "PreviewN": 0, "PreviewSkip": 0,
 		"FilterMonth": "", "FilterRegion": "", "FilterProduct": "",

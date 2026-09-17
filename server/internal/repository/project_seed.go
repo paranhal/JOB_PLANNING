@@ -16,10 +16,10 @@ func seedDefaultProjects(db *sql.DB) {
 		return
 	}
 	type rule struct {
-		parentHint   string // 고객명 LIKE
-		productKeys  string
-		workKinds    string
-		notes        string
+		parentHint  string // 고객명 LIKE
+		productKeys string
+		workKinds   string
+		notes       string
 	}
 	type seed struct {
 		id        string
@@ -80,7 +80,7 @@ func seedDefaultProjects(db *sql.DB) {
 			shortName: "2026년 세종시교육청 통합정보시스템 유지보수(무상)", year: 2026, paid: 0, sort: 50,
 			notes: "세종시교육청 소속 KLAS·RFID(앤로보틱스) 무상",
 			rules: []rule{{
-				parentHint: "세종시교육청",
+				parentHint:  "세종시교육청",
 				productKeys: model.ProductKeyKLAS + "," + model.ProductKeySejongKLAS + "," + model.ProductKeyAnrobotics,
 				workKinds:   model.ScopeWorkAS + "," + model.ScopeWorkMaintenance,
 				notes:       "세종시교육청 · KLAS/RFID 무상",

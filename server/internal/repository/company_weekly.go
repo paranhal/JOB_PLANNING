@@ -239,7 +239,7 @@ func (r *StatsRepo) countCompanyASDone(projectID, from, toEx string) (int, error
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE TRIM(COALESCE(ar.complete_datetime,'')) != ''
-		  AND date(ar.complete_datetime) >= date(?) AND date(ar.complete_datetime) < date(?)
+		  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?
 		  AND TRIM(COALESCE(ar.project_id,'')) = ?`+asSQL, args...).Scan(&n)
 	return n, err
 }
@@ -279,9 +279,9 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx string) ([]adminL
 		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+d+`,'')) != ''
-		  AND date(`+d+`) >= date(?) AND date(`+d+`) < date(?)
+		  AND `+d+` >= ? AND `+d+` < ?
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
-		ORDER BY date(`+d+`), t.title`, append(append([]interface{}{}, adminArgs...), from, toEx, projectID)...)
+		ORDER BY `+d+`, t.title`, append(append([]interface{}{}, adminArgs...), from, toEx, projectID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		LEFT JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN work_projects p ON p.project_id = ar.project_id
 		WHERE TRIM(COALESCE(ar.complete_datetime,'')) != ''
-		  AND date(ar.complete_datetime) >= date(?) AND date(ar.complete_datetime) < date(?)`, p.PrevFrom, p.PrevToEx)
+		  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?`, p.PrevFrom, p.PrevToEx)
 	if err != nil {
 		return nil, err
 	}

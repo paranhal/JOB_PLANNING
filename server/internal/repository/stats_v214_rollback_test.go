@@ -23,8 +23,8 @@ func TestV214RollbackStatsBaseline(t *testing.T) {
 	setMetricsPolicy(t, db, "2026-08-01", "as,maintenance")
 	if _, err := db.Exec(`
 		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
-			start_datetime, status, assigned_to, complete_datetime, data_origin)
-		VALUES ('a1','R1','c1','2026-08-01','2026-08-03','2026-08-03','completed','양기헌','2026-08-05','app')`); err != nil {
+			start_datetime, status, assigned_to, complete_datetime, process_type, visit_date, data_origin)
+		VALUES ('a1','R1','c1','2026-08-01','2026-08-03','2026-08-03','completed','양기헌','2026-08-05','visit','2026-08-03','app')`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,11 +48,11 @@ func TestV214RollbackStatsBaseline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := fmt.Sprintf("exec=%.6f visit=%.6f complete=%.6f receipt=%d completed=%d events=%d",
-		kpi.ExecutionRate, kpi.VisitAvgDays, kpi.CompleteAvgDays, an.AS.Receipt, an.AS.Completed, len(events))
+	got := fmt.Sprintf("visit=%.6f complete=%.6f receipt=%d completed=%d events=%d",
+		kpi.VisitAvgDays, kpi.CompleteAvgDays, an.AS.Receipt, an.AS.Completed, len(events))
 	t.Log(got)
 
-	const want = "exec=0.000000 visit=2.000000 complete=4.000000 receipt=1 completed=1 events=2"
+	const want = "visit=2.000000 complete=4.000000 receipt=1 completed=1 events=2"
 	if got != want {
 		t.Fatalf("통계가 이관 전과 다름\n got %s\nwant %s", got, want)
 	}

@@ -289,6 +289,8 @@ func (r *WBRepo) DeleteTasksBySource(sourceType, sourceID string) error {
 	if sourceType == "" || sourceID == "" {
 		return nil
 	}
+	_, _ = r.db.Exec(`DELETE FROM work_task_tags WHERE task_id IN (
+		SELECT task_id FROM work_tasks WHERE source_type=? AND source_id=?)`, sourceType, sourceID)
 	_, err := r.db.Exec(`DELETE FROM work_tasks WHERE source_type=? AND source_id=?`, sourceType, sourceID)
 	if err != nil && strings.Contains(err.Error(), "no such table") {
 		return nil

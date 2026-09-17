@@ -85,12 +85,16 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 			cat = model.WBSourceMaintenance
 		}
 	}
+	title := t.Title
+	if cat == model.WBSourceSalesActivity {
+		title = model.FormatSalesWorkTitle(t.Title)
+	}
 	card := model.WBCard{
 		Kind:         "task",
 		RefID:        t.TaskID,
 		TaskID:       t.TaskID,
 		Category:     cat,
-		Title:        t.Title,
+		Title:        title,
 		SubTitle:     t.Description,
 		Assignee:     t.Assignee,
 		WorkDate:     t.WorkDate,

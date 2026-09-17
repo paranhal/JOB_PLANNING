@@ -27,6 +27,7 @@ type WorkboardHandler struct {
 	attach       *AttachmentHandler
 	salesRepo    *repository.SalesRepo
 	workBoard    *repository.WorkBoardRepo
+	notices      *assignNoticeHook
 }
 
 func NewWorkboardHandler(
@@ -968,6 +969,9 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 		if err := h.repo.SetTaskAssignee(openedTaskID, assignee); err != nil {
 			return err
 		}
+		if t, err := h.repo.GetTask(openedTaskID); err == nil && t != nil {
+			recordTaskNotice(h.notices, c, t, "")
+		}
 	}
 	// AS·정기점검은 배치 후 업무 등록 화면으로 이동한다.
 	if (kind == model.WBSourceAS || kind == model.WBSourceMaintenance) && openedTaskID != "" {
@@ -1403,6 +1407,8 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			}
 			if owner != strings.TrimSpace(existing.Assignee) {
 				_ = h.repo.SetTaskAssignee(existing.TaskID, owner)
+				existing.Assignee = owner
+				recordTaskNotice(h.notices, c, existing, "")
 			}
 			_ = h.saveSupportMembers(c, existing.TaskID, owner)
 			h.syncVisitDateFromTask(kind, sourceID, workDate)
@@ -1490,6 +1496,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		}
 		return err
 	}
+	recordTaskNotice(h.notices, c, t, "")
 	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
 		dates, err := collectDatesFromForm(mode, c.FormValue("daily_from"), c.FormValue("daily_to"), c.FormValue("sub_dates"))
@@ -1624,27 +1631,27 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		desc = strings.TrimSpace(c.FormValue("description"))
 	}
 	t := &model.WorkTask{
-		TaskID:       existing.TaskID,
-		WorkType:     workType,
-		ProjectID:    projectID,
-		Title:        title,
-		Description:  desc,
-		DueDate:      dueDate,
-		WorkDate:     workDate,
-		StartTime:    start,
-		EndTime:      end,
-		DurationMin:  dur,
-		Status:       status,
-		Priority:     priority,
-		Assignee:     assignee,
+		TaskID:         existing.TaskID,
+		WorkType:       workType,
+		ProjectID:      projectID,
+		Title:          title,
+		Description:    desc,
+		DueDate:        dueDate,
+		WorkDate:       workDate,
+		StartTime:      start,
+		EndTime:        end,
+		DurationMin:    dur,
+		Status:         status,
+		Priority:       priority,
+		Assignee:       assignee,
 		AssigneeSource: existing.AssigneeSource,
-		Tags:         strings.TrimSpace(c.FormValue("tags")),
-		Progress:     progress,
-		SourceType:   existing.SourceType,
-		SourceID:     existing.SourceID,
-		ParentTaskID: existing.ParentTaskID,
-		CustomerID:   existing.CustomerID,
-		CustomerName: existing.CustomerName,
+		Tags:           strings.TrimSpace(c.FormValue("tags")),
+		Progress:       progress,
+		SourceType:     existing.SourceType,
+		SourceID:       existing.SourceID,
+		ParentTaskID:   existing.ParentTaskID,
+		CustomerID:     existing.CustomerID,
+		CustomerName:   existing.CustomerName,
 	}
 	if strings.TrimSpace(assignee) != strings.TrimSpace(existing.Assignee) {
 		t.AssigneeSource = model.WBAssigneeSourceManual
@@ -1707,6 +1714,7 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
 	}
+	recordTaskNotice(h.notices, c, t, existing.Assignee)
 	if err := h.saveOccurrenceStatus(existing, t, c); err != nil {
 		code := "rec_rule"
 		if strings.Contains(err.Error(), "제외 사유") {

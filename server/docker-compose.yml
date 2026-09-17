@@ -1,6 +1,12 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-unknown}
+        BUILD_TIME: "${BUILD_TIME:-unknown}"
     ports:
       - "8080:8080"
     volumes:
@@ -14,6 +20,7 @@ services:
       - APP_ENV=development
       - TZ=Asia/Seoul
     restart: unless-stopped
+    stop_grace_period: 30s
 
   # ── 2단계: PostgreSQL 전환 시 주석 해제 ──────────────────────────
   # db:

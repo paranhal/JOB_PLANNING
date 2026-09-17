@@ -8,6 +8,7 @@
       <span title="{{ymdt .Current.CreatedAt}}">{{ymd .Current.CreatedAt}}</span>
     </p>
     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{.Current.ActionText}}</p>
+    {{template "kb_attachments" dict "Attachments" .Attachments "KBID" .KBID "CanProcess" .CanProcess "PhotoRedirect" (printf "/as/kb/%s/history" .KBID) "AttachErrMsg" .AttachErrMsg}}
   </article>
   {{range .Past}}
   <article class="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-1">

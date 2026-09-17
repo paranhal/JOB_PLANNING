@@ -20,12 +20,10 @@ func TestWriteWeeklyReportTwoSheetsNoDropdown(t *testing.T) {
 				Label: model.StatsTeamLabel, IsTeam: true,
 				Receipt: 23, Completed: 18, HasDayAvg: true, DayAvg: 3.6,
 				DayMax: 7, DayMaxDate: "2026-08-12", CarryOut: 5, InProgress: 9, Unplanned: 3,
-				ExecDisplay: model.StatsReliability(23, false, 78),
 			},
 			{
 				Label: "최혜경", Receipt: 9, Completed: 8, HasDayAvg: true, DayAvg: 1.6,
 				DayMax: 3, DayMaxDate: "2026-08-12", CarryOut: 1, InProgress: 3, Unplanned: 1,
-				ExecDisplay: model.StatsReliability(9, false, 82),
 			},
 			{
 				Label: model.StatsUnassignedLabel, Unassigned: true,

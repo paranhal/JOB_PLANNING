@@ -73,10 +73,9 @@ func (h *BackupHandler) Page(c echo.Context) error {
 	if tab == "checks" && h.cfg.DB != nil {
 		checks = repository.RunAppendixC(h.cfg.DB, true)
 	}
-	metricsBase, progressScope := "", ""
+	metricsBase := ""
 	if h.settings != nil {
 		metricsBase, _ = h.settings.Get(repository.SettingMetricsBaseDate)
-		progressScope, _ = h.settings.Get(repository.SettingProgressScope)
 	}
 	var importBatches []model.ASImportBatch
 	var importBatch *model.ASImportBatch
@@ -92,30 +91,38 @@ func (h *BackupHandler) Page(c echo.Context) error {
 			importCustomers, _ = h.customers.ListAll()
 		}
 	}
+	var unmatched []repository.UnmatchedAssignee
+	if tab == "assignees" && h.cfg.DB != nil {
+		unmatched = repository.ListUnmatchedAssignees(h.cfg.DB)
+	}
+	var processConflicts []repository.ActionProcessConflict
+	if tab == "processes" && h.cfg.DB != nil {
+		processConflicts = repository.ListActionConflicts(h.cfg.DB)
+	}
 	return c.Render(http.StatusOK, "admin/data.html", map[string]interface{}{
-		"Title":              "데이터 관리",
-		"Active":             NavData,
-		"Tab":                tab,
-		"Items":              items,
-		"Logs":               logs,
-		"LogCount":           logCount,
-		"OldestLog":          oldest,
-		"Stats":              stats,
-		"Unresolved":         unresolved,
-		"Checks":             checks,
-		"OK":                 ok,
-		"Error":              errMsg,
-		"DataPath":           filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),
-		"Due":                audit.DueForArchive(),
-		"MetricsBaseDate":    metricsBase,
-		"ProgressScope":      progressScope,
-		"ProgressScopeHint":  model.ProgressScopeRevertHint,
-		"ImportBatches":      importBatches,
-		"ImportBatch":        importBatch,
-		"ImportRows":         importRows,
-		"ImportErrors":       importIssueRows(importRows, true),
-		"ImportReady":        importIssueRows(importRows, false),
-		"ImportCustomers":    importCustomers,
+		"Title":           "데이터 관리",
+		"Active":          NavData,
+		"Tab":             tab,
+		"Items":           items,
+		"Logs":            logs,
+		"LogCount":        logCount,
+		"OldestLog":       oldest,
+		"Stats":           stats,
+		"Unresolved":      unresolved,
+		"Checks":          checks,
+		"UnmatchedAssignees": unmatched,
+		"ProcessConflicts": processConflicts,
+		"OK":              ok,
+		"Error":           errMsg,
+		"DataPath":        filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),
+		"Due":             audit.DueForArchive(),
+		"MetricsBaseDate": metricsBase,
+		"ImportBatches":   importBatches,
+		"ImportBatch":     importBatch,
+		"ImportRows":      importRows,
+		"ImportErrors":    importIssueRows(importRows, true),
+		"ImportReady":     importIssueRows(importRows, false),
+		"ImportCustomers": importCustomers,
 	})
 }
 
@@ -161,24 +168,8 @@ func (h *BackupHandler) SaveMetrics(c echo.Context) error {
 			return redirect("", "기준일은 YYYY-MM-DD 형식이어야 합니다")
 		}
 	}
-	scope := strings.Join(splitCSV(c.FormValue("progress_scope")), ",")
 	if err := h.settings.Set(repository.SettingMetricsBaseDate, base); err != nil {
 		return redirect("", fmt.Sprintf("기준일 저장 실패: %v", err))
 	}
-	if err := h.settings.Set(repository.SettingProgressScope, scope); err != nil {
-		return redirect("", fmt.Sprintf("실행률 대상 저장 실패: %v", err))
-	}
 	return redirect("지표 기준을 저장했습니다. 통계·보고서·대시보드 KPI가 함께 바뀝니다.", "")
-}
-
-func splitCSV(s string) []string {
-	var out []string
-	for _, p := range strings.Split(s, ",") {
-		p = strings.ToLower(strings.TrimSpace(p))
-		if p == "" {
-			continue
-		}
-		out = append(out, p)
-	}
-	return out
 }

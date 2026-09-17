@@ -1,0 +1,58 @@
+{{define "kb_attachments"}}
+{{if or .Attachments .CanProcess}}
+<div class="space-y-2 pt-1">
+  {{if .AttachErrMsg}}
+  <p class="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{{.AttachErrMsg}}</p>
+  {{end}}
+  {{range .Attachments}}
+  {{if .IsVideo}}
+  <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 space-y-1">
+    <p class="text-xs text-slate-700">🎬 {{attDisplayName .}} · {{formatBytes .FileSize}}</p>
+    <video controls preload="metadata" class="w-full max-h-56 rounded bg-black" src="/attachments/{{.AttachmentID}}">
+      이 브라우저는 동영상을 재생하지 못합니다.
+    </video>
+    {{if $.CanProcess}}
+    <form method="POST" action="/attachments/{{.AttachmentID}}/delete" onsubmit="return confirm('이 동영상을 삭제할까요?');">
+      <input type="hidden" name="redirect" value="{{$.PhotoRedirect}}">
+      <button type="submit" class="text-[11px] text-red-600">삭제</button>
+    </form>
+    {{end}}
+  </div>
+  {{else if .IsImage}}
+  <div class="inline-flex flex-col gap-1">
+    <a href="/attachments/{{.AttachmentID}}" class="inline-block">
+      <img src="{{.ThumbURL}}" alt="{{attDisplayName .}}" class="h-20 w-20 object-cover rounded border border-slate-200"
+           onerror="this.onerror=null;this.src='{{.PublicURL}}'">
+    </a>
+    {{if $.CanProcess}}
+    <form method="POST" action="/attachments/{{.AttachmentID}}/delete" onsubmit="return confirm('이 사진을 삭제할까요?');">
+      <input type="hidden" name="redirect" value="{{$.PhotoRedirect}}">
+      <button type="submit" class="text-[11px] text-red-600">삭제</button>
+    </form>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="flex items-center gap-2 text-xs">
+    <a href="/attachments/{{.AttachmentID}}" class="text-blue-700 hover:underline">📎 {{attDisplayName .}} · {{formatBytes .FileSize}}</a>
+    {{if $.CanProcess}}
+    <form method="POST" action="/attachments/{{.AttachmentID}}/delete" onsubmit="return confirm('이 파일을 삭제할까요?');">
+      <input type="hidden" name="redirect" value="{{$.PhotoRedirect}}">
+      <button type="submit" class="text-red-600">삭제</button>
+    </form>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
+  {{if .CanProcess}}
+  <form method="POST" action="/attachments" enctype="multipart/form-data" class="space-y-1">
+    <input type="hidden" name="ref_type" value="as_kb">
+    <input type="hidden" name="ref_id" value="{{.KBID}}">
+    <input type="hidden" name="redirect" value="{{.PhotoRedirect}}">
+    <p class="text-[11px] text-slate-500">동영상에는 화면 사진도 한 장 같이 올려 주세요</p>
+    <input type="file" name="file" multiple accept="image/*,.heic,.heif,.mp4,.mov,.webm,.pdf" class="block text-xs">
+    <button type="submit" class="px-2 py-0.5 text-[11px] rounded border border-slate-300 text-slate-700">첨부 올리기</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+{{end}}

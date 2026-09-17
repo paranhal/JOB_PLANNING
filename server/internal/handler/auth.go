@@ -377,7 +377,7 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		path := c.Request().URL.Path
-		if path == "/login" || strings.HasPrefix(path, "/static") {
+		if path == "/login" || path == "/version" || strings.HasPrefix(path, "/static") {
 			return next(c)
 		}
 

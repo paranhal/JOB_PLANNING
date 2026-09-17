@@ -14,7 +14,7 @@ import (
 // recurrence_role 을 넣어야 하는 쿼리(반영 단위는 기획 표 그대로, 임의 산식 없음):
 //
 // | 지표 | 파일/함수 | 단위 | 조건 |
-// | 계획 대비 실행률 | countAdminSlice · mapDayPlannedOnPlan | 실행 작업 | != parent, 예정일=work_date |
+// | 예정 건수 | countAdminSlice | 실행 작업 | != parent, 예정일=work_date |
 // | 주간보고 완료 건수 | countAdminCompletedParents · collapseWeeklyReportEvents | 상위 1건+횟수 | DISTINCT parent |
 // | 담당자별 일일업무 | listCompletedByAssigneeDate · ListWeeklyEventRows | 실행 작업 | != parent, 접지 않음 |
 // | 일정표 | ListTasksBetween | 실행 작업 | parent 제외 |
@@ -123,7 +123,7 @@ func TestRecurrenceAggregationUnits(t *testing.T) {
 		t.Fatalf("반영 전 예정=%d want 11 (상위+실행 이중)", naivePlanned)
 	}
 	if slice.Planned != 10 {
-		t.Fatalf("실행률 분모=%d want 10", slice.Planned)
+		t.Fatalf("예정=%d want 10", slice.Planned)
 	}
 	if parents != 1 || an.Admin.Completed != 1 {
 		t.Fatalf("주간 완료 상위=%d analysis=%d want 1", parents, an.Admin.Completed)

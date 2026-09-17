@@ -24,6 +24,11 @@ func assigneeMatchSQLID(kind, alias, name, userID string) (string, []interface{}
 	return assigneeMatchKeys(kind, alias, mergeAssigneeKeys(name, userID))
 }
 
+// MergeAssigneeKeys 이름·사용자 ID·추가 표시명을 모아 §38.4 매칭에 넘긴다.
+func MergeAssigneeKeys(name, userID string, extra ...string) []string {
+	return mergeAssigneeKeys(name, userID, extra...)
+}
+
 func mergeAssigneeKeys(name, userID string, extra ...string) []string {
 	all := make([]string, 0, 2+len(extra))
 	all = append(all, name, userID)
@@ -51,7 +56,7 @@ func assigneeMatchExpr(kind, alias string, keys []string) (string, []interface{}
 		mem, mArgs := linkedTaskMembersExpr(alias+"as_id", model.WBSourceAS, keys)
 		return core + " OR " + mem, append(args, mArgs...)
 	case AssigneeKindMaintenance:
-		core, args := nameColsExpr(alias+"assignee", keys)
+		core, args := asColsExpr(alias+"assignee", alias+"assignee_user_id", keys)
 		mem, mArgs := linkedTaskMembersExpr(alias+"visit_id", model.WBSourceMaintenance, keys)
 		return core + " OR " + mem, append(args, mArgs...)
 	case AssigneeKindTask:
@@ -150,8 +155,8 @@ func taskColsExpr(alias string, keys []string) (string, []interface{}) {
 	if len(keys) == 0 {
 		return "", nil
 	}
-	nameExpr, nameArgs := nameColsExpr(alias+"assignee", keys)
-	memExpr, memArgs := nameColsExpr("m.assignee", keys)
+	nameExpr, nameArgs := asColsExpr(alias+"assignee", alias+"assignee_user_id", keys)
+	memExpr, memArgs := asColsExpr("m.assignee", "m.user_id", keys)
 	expr := fmt.Sprintf(`(%s) OR EXISTS (SELECT 1 FROM work_task_members m WHERE m.task_id = %stask_id AND (%s))`,
 		nameExpr, alias, memExpr)
 	return expr, append(nameArgs, memArgs...)
@@ -163,7 +168,7 @@ func linkedTaskMembersExpr(sourceIDCol, sourceType string, keys []string) (strin
 	if len(keys) == 0 {
 		return "", nil
 	}
-	memExpr, memArgs := nameColsExpr("m.assignee", keys)
+	memExpr, memArgs := asColsExpr("m.assignee", "m.user_id", keys)
 	expr := fmt.Sprintf(
 		`EXISTS (SELECT 1 FROM work_tasks wt JOIN work_task_members m ON m.task_id = wt.task_id`+
 			` WHERE TRIM(COALESCE(wt.source_type,'')) = ?`+

@@ -63,6 +63,9 @@ func TestBackupPageAndSave(t *testing.T) {
 	if !strings.Contains(body, "정합성 점검") {
 		t.Error("정합성 점검 탭이 없다")
 	}
+	if !strings.Contains(body, "조치 단일화") {
+		t.Error("조치 단일화 탭이 없다")
+	}
 	if !strings.Contains(body, "AS 반입") {
 		t.Error("AS 반입 탭이 없다")
 	}
@@ -103,16 +106,12 @@ func TestBackupPageAndSave(t *testing.T) {
 		t.Fatalf("지표 탭: status=%d", met.Code)
 	}
 	mb := met.Body.String()
-	if !strings.Contains(mb, "name=\"metrics_base_date\"") || !strings.Contains(mb, "name=\"progress_scope\"") {
+	if !strings.Contains(mb, "name=\"metrics_base_date\"") {
 		t.Error("지표 설정 폼이 없다")
-	}
-	if !strings.Contains(mb, "4주 연속 90%") {
-		t.Error("실행률 되돌림 조건이 없다")
 	}
 
 	form := url.Values{}
 	form.Set("metrics_base_date", "2026-08-10")
-	form.Set("progress_scope", "as,maintenance")
 	recM := httptest.NewRecorder()
 	reqSave := httptest.NewRequest(http.MethodPost, "http://localhost/admin/data/metrics", strings.NewReader(form.Encode()))
 	reqSave.Header.Set("Content-Type", "application/x-www-form-urlencoded")

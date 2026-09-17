@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -175,5 +176,46 @@ func TestVisitPastExcludesAlreadyVisited(t *testing.T) {
 	}
 	if !foundPending {
 		t.Fatal("다녀온 건이 방문 미확정 목록에 없다")
+	}
+}
+
+func TestListFiltered_PageDoesNotLoadAll(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "as_page.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
+		VALUES ('C-P','페이징기관','페이징기관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	for i := 0; i < 25; i++ {
+		id := fmt.Sprintf("AS-P%02d", i)
+		num := fmt.Sprintf("R2609-P%02d", i)
+		if _, err := db.Exec(`INSERT INTO as_receipts (
+			as_id, as_number, receipt_datetime, customer_id, symptom, urgency, status,
+			created_at, updated_at
+		) VALUES (?,?,?, 'C-P','증상','중','received',?,?)`, id, num, now, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	repo := NewASRepo(db)
+	items, total, err := repo.ListFiltered("", "", "", nil, "receipt", "desc", 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 25 {
+		t.Fatalf("total=%d want 25", total)
+	}
+	if len(items) != 20 {
+		t.Fatalf("page rows=%d want 20 (전체를 읽어 자르면 안 된다)", len(items))
+	}
+	page2, total2, err := repo.ListFiltered("", "", "", nil, "receipt", "desc", 2, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total2 != 25 || len(page2) != 5 {
+		t.Fatalf("page2 rows=%d total=%d", len(page2), total2)
 	}
 }

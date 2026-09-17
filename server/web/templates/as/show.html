@@ -27,7 +27,7 @@
       {{if .CanEditReceipt}}
       <a href="/as/{{.AS.ASID}}/edit" class="px-3 py-1.5 border border-amber-400 rounded-lg text-sm font-medium text-amber-800 hover:bg-amber-50">접수 정보 수정</a>
       {{end}}
-      {{if or .CanProcess .CanReceive .CanWriteDaily}}
+      {{if .CanProcess}}
       <a href="/as/{{.AS.ASID}}/action"
          class="px-3 py-1.5 {{if .IsClosed}}bg-slate-700 hover:bg-slate-800{{else}}bg-blue-600 hover:bg-blue-700{{end}} text-white rounded-lg text-sm font-medium">{{if .IsClosed}}조치 완료{{else}}조치{{end}}</a>
       {{end}}
@@ -77,7 +77,7 @@
   <div class="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-sm font-semibold text-emerald-800">조치 완료 요약</h3>
-      {{if or .CanProcess .CanReceive .CanWriteDaily}}
+      {{if .CanProcess}}
       <a href="/as/{{.AS.ASID}}/action" class="text-xs font-medium text-blue-700 hover:underline">조치 화면 →</a>
       {{end}}
     </div>
@@ -192,7 +192,7 @@
       · 고유번호 <a href="/workboard/tasks/{{.DailyTask.TaskID}}?back={{urlquery (printf "/as/%s" .AS.ASID)}}" class="font-mono underline">{{.DailyTask.TaskID}}</a>
     </div>
     <div class="flex flex-wrap gap-2">
-      {{if or .CanProcess .CanReceive .CanWriteDaily}}
+      {{if .CanProcess}}
       <a href="/as/{{.AS.ASID}}/action"
          class="px-3 py-1.5 {{if .IsClosed}}bg-slate-700 hover:bg-slate-800{{else}}bg-blue-600 hover:bg-blue-700{{end}} text-white rounded-lg text-xs font-medium">{{if .IsClosed}}조치 완료{{else}}조치{{end}}</a>
       {{end}}
@@ -390,26 +390,9 @@
       <h3 class="font-semibold text-gray-800 text-sm">장비 AS 내역</h3>
       <button type="button" data-close-modal="modal-asset-as-history" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
     </div>
-    <div class="p-4 overflow-y-auto text-sm">
-      {{if .AssetHistory}}
-      <table class="min-w-full text-sm">
-        <thead><tr class="border-b text-left text-xs text-gray-500">
-          <th class="py-2 pr-3">접수번호</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">완료일</th><th class="py-2">증상</th>
-        </tr></thead>
-        <tbody class="divide-y">
-          {{range .AssetHistory}}
-          <tr>
-            <td class="py-2 pr-3"><a href="/as/{{.ASID}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a></td>
-            <td class="py-2 pr-3">{{.ReceiptDate}}</td>
-            <td class="py-2 pr-3">{{if .CompleteDate}}{{.CompleteDate}}{{else}}—{{end}}</td>
-            <td class="py-2 truncate max-w-xs">{{if .Symptom}}{{.Symptom}}{{else}}—{{end}}</td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-      {{else}}
-      <p class="text-gray-400 text-center py-8">동일 장비의 다른 AS 이력이 없습니다.</p>
-      {{end}}
+    <div class="p-4 overflow-y-auto text-sm" id="asset-as-history-body"
+         data-asset-id="{{.AS.AssetID}}" data-exclude="{{.AS.ASID}}">
+      <p class="text-gray-400 text-center py-8">버튼을 누르면 이력을 불러옵니다.</p>
     </div>
   </div>
 </div>
@@ -469,11 +452,43 @@
     btn.addEventListener('click', function(){ closeModal(btn.getAttribute('data-close-modal')); });
   });
   var btnHist=document.getElementById('btn-asset-as-history');
-  if(btnHist) btnHist.addEventListener('click', function(){ openModal('modal-asset-as-history'); });
+  var histLoaded=false;
+  if(btnHist) btnHist.addEventListener('click', function(){
+    openModal('modal-asset-as-history');
+    if(histLoaded) return;
+    var body=document.getElementById('asset-as-history-body');
+    if(!body) return;
+    histLoaded=true;
+    var asset=body.getAttribute('data-asset-id')||'';
+    var exclude=body.getAttribute('data-exclude')||'';
+    fetch('/api/as/asset-history/'+encodeURIComponent(asset)+'?exclude='+encodeURIComponent(exclude), {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(items){
+        if(!items || !items.length){
+          body.innerHTML='<p class="text-gray-400 text-center py-8">동일 장비의 다른 AS 이력이 없습니다.</p>';
+          return;
+        }
+        var html='<table class="min-w-full text-sm"><thead><tr class="border-b text-left text-xs text-gray-500">'
+          +'<th class="py-2 pr-3">접수번호</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">완료일</th><th class="py-2">증상</th>'
+          +'</tr></thead><tbody class="divide-y">';
+        items.forEach(function(it){
+          html+='<tr><td class="py-2 pr-3"><a href="/as/'+it.as_id+'" class="font-mono text-blue-600 hover:underline">'
+            +(it.as_number||'')+'</a></td><td class="py-2 pr-3">'+(it.receipt_date||'')+'</td><td class="py-2 pr-3">'
+            +(it.complete_date||'—')+'</td><td class="py-2 truncate max-w-xs">'+(it.symptom||'—')+'</td></tr>';
+        });
+        html+='</tbody></table>';
+        body.innerHTML=html;
+      })
+      .catch(function(){
+        histLoaded=false;
+        body.innerHTML='<p class="text-gray-400 text-center py-8">이력을 불러오지 못했습니다.</p>';
+      });
+  });
   var btnReopen=document.getElementById('btn-reopen');
   if(btnReopen) btnReopen.addEventListener('click', function(){ openModal('modal-reopen'); });
   var btnUnlock=document.getElementById('btn-unlock-edit');
   if(btnUnlock) btnUnlock.addEventListener('click', function(){ openModal('modal-unlock-edit'); });
 })();
 </script>
+{{template "photo_zoom_script"}}
 {{end}}

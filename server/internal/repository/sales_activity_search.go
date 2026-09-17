@@ -80,9 +80,10 @@ func reindexSalesActivitySearch(db *sql.DB, activityID string) {
 }
 
 type SalesActivityFilter struct {
-	Month string
-	Types []string
-	Query string
+	Month  string
+	Types  []string
+	Query  string
+	Member string // 참여한 사람 정확 일치. 40-F
 }
 
 func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesActivity, error) {
@@ -101,6 +102,10 @@ func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesAc
 		for _, id := range ids {
 			args = append(args, id)
 		}
+	}
+	if m := strings.TrimSpace(f.Member); m != "" {
+		q += ` AND EXISTS (SELECT 1 FROM sales_activity_members sm WHERE sm.activity_id=a.activity_id AND sm.member=?)`
+		args = append(args, m)
 	}
 	if types := compactTypes(f.Types); len(types) > 0 {
 		ph := strings.Repeat("?,", len(types))
@@ -178,8 +183,10 @@ func (r *SalesRepo) activitySearchLike(q string) []string {
 		LEFT JOIN sales_projects s ON s.sales_id = a.sales_id
 		LEFT JOIN customers cu ON cu.customer_id = s.customer_id
 		WHERE a.title LIKE ? OR COALESCE(s.name,'') LIKE ?
-		   OR COALESCE(cu.org_name,'') LIKE ? OR COALESCE(s.prospect_name,'') LIKE ?`,
-		like, like, like, like)
+		   OR COALESCE(cu.org_name,'') LIKE ? OR COALESCE(s.prospect_name,'') LIKE ?
+		   OR EXISTS (SELECT 1 FROM sales_activity_members sm
+		              WHERE sm.activity_id=a.activity_id AND (sm.member=? OR sm.member LIKE ?))`,
+		like, like, like, like, q, like)
 	if err != nil {
 		return []string{}
 	}

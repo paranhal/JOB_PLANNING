@@ -18,24 +18,57 @@ func InitDB(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// PRAGMA 는 커넥션별 설정이다. DSN 으로 넘겨야 풀의 모든 커넥션에 걸린다. §44.5
+	sep := "?"
+	if strings.Contains(dbPath, "?") {
+		sep = "&"
+	}
+	dsn := dbPath + sep +
+		"_pragma=busy_timeout(5000)" +
+		"&_pragma=journal_mode(WAL)" +
+		"&_pragma=foreign_keys(1)" +
+		"&_pragma=synchronous(NORMAL)" +
+		"&_pragma=cache_size(-32000)" + // 32MB. 운영 DB 17MB 를 통째로 메모리에
+		"&_pragma=wal_autocheckpoint(512)"
+
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	// WAL 모드 활성화 (동시 읽기 성능 향상)
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		return nil, err
-	}
-	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
-		return nil, err
-	}
+	// 체크포인트가 WAL 을 되감으려면 활성 독자가 없는 순간이 있어야 한다.
+	// 커넥션이 무제한이면 그 순간이 오지 않는다. §44.5 ③
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(8)
+	db.SetConnMaxLifetime(0)
 
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := initSchema(db); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
-
+	logForeignKeyCheck(db)
 	return db, nil
+}
+
+func logForeignKeyCheck(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	rows, err := db.Query(`PRAGMA foreign_key_check`)
+	if err != nil {
+		log.Printf("foreign_key_check: %v", err)
+		return
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		n++
+	}
+	log.Printf("foreign_key_check: %d건", n)
 }
 
 func initSchema(db *sql.DB) error {
@@ -196,9 +229,6 @@ CREATE TABLE IF NOT EXISTS assets (
     building_id         TEXT,
     floor_id            TEXT,
     room_id             TEXT,
-    loc_building_name   TEXT,
-    loc_floor_name      TEXT,
-    loc_room_name       TEXT,
     install_location    TEXT,
     location_detail     TEXT,
     notes               TEXT,
@@ -339,6 +369,7 @@ CREATE TABLE IF NOT EXISTS as_processes (
     process_datetime DATETIME DEFAULT CURRENT_TIMESTAMP,
     worker           TEXT,
     work_type        TEXT,
+    cause_type       TEXT,
     work_content     TEXT,
     parts_used       TEXT,
     time_spent       INTEGER,
@@ -709,8 +740,6 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`CREATE INDEX IF NOT EXISTS idx_maintenance_visits_project ON maintenance_visits(project_id)`,
 		// 같은 날 같은 기관이라도 KLAS·앤로보틱스처럼 점검 대상이 다르면 별도 방문으로 둔다.
 		`DROP INDEX IF EXISTS idx_maintenance_visit_dedup`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_visit_dedup2
-			ON maintenance_visits(plan_id, visit_date, customer_id, COALESCE(product_type,''))`,
 		`ALTER TABLE attachments ADD COLUMN keywords TEXT`,
 		`ALTER TABLE attachments ADD COLUMN slot_no INTEGER DEFAULT 0`,
 		`ALTER TABLE as_receipts ADD COLUMN transfer_detail TEXT`,
@@ -816,9 +845,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 			created_by_name TEXT,
 			note TEXT
 		)`,
-		// 기존 DB는 CREATE TABLE IF NOT EXISTS가 UNIQUE를 추가하지 않는다.
-		// ON CONFLICT(folder_name)이 동작하려면 인덱스가 필요하다.
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_data_backups_folder ON data_backups(folder_name)`,
+		// folder_name UNIQUE 가 인덱스를 만든다. 중복 idx_data_backups_folder 는 049 에서 뗀다. §44.7
 		`CREATE TABLE IF NOT EXISTS data_log_archives (
 			archive_id TEXT PRIMARY KEY,
 			folder_name TEXT NOT NULL,
@@ -1103,6 +1130,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyAS34ActionUX(db)
 	applyAS47VisitDate(db)
 	applyWorkListIndexes(db)
+	applyQueryPlanIndexes(db)
 	applyAS34TransferFollowup(db)
 	applyRegionDistanceOrder(db)
 	applyASCauseCategoriesV2(db)
@@ -1110,6 +1138,11 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASKbEntries(db)
 	applyASKbGaps(db)
 	applyWorkTaskAssigneeSource(db)
+	applyWorkAssignNotices(db)
+	applyWorkTaskBlocked(db)
+	applyAssigneeUserIDs(db)
+	applyASProcessTruth(db)
+	applyNF1(db)
 	applyAppVersions(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
@@ -1131,6 +1164,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)
+	LoadLookupCache(db)
 
 	return nil
 }

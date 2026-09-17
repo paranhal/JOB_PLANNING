@@ -19,13 +19,13 @@ func TestQuoteRepoNumberDateDuplicateAndCopy(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 
 	q := &model.SalesQuote{
-		FormType:    model.QuoteFormA,
-		VATMode:     model.QuoteVATExcluded,
-		RoundRule:   model.QuoteRoundNone,
-		QuoteDate:   today,
-		Title:       "감열지",
-		OwnerName:   "최혜영",
-		OwnerPhone:  "010-1111-2222",
+		FormType:      model.QuoteFormA,
+		VATMode:       model.QuoteVATExcluded,
+		RoundRule:     model.QuoteRoundNone,
+		QuoteDate:     today,
+		Title:         "감열지",
+		OwnerName:     "최혜영",
+		OwnerPhone:    "010-1111-2222",
 		RecipientName: "세종시교육청",
 		Lines: []model.SalesQuoteLine{
 			{Name: "감열지", Qty: 1, UnitPrice: 150000, Unit: "EA"},

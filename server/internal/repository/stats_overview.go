@@ -3,7 +3,6 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -96,7 +95,7 @@ func buildStatsRangeColumns(fromIncl, toIncl, now time.Time) []model.StatsPeriod
 	return cols
 }
 
-// applyPeriodShowActual 기간 시작일이 달력 오늘 이하면 접수·처리·실행률을 표시한다.
+// applyPeriodShowActual 기간 시작일이 달력 오늘 이하면 접수·처리를 표시한다.
 // 아직 시작하지 않은 미래 기간만 예정 건수.
 func applyPeriodShowActual(cols []model.StatsPeriodColumn, now time.Time) {
 	today := calendarDate(now).Format("2006-01-02")
@@ -146,6 +145,8 @@ func monthCol(key, label string, start time.Time) model.StatsPeriodColumn {
 
 // FillPeriodOverview 각 열 집계. 과거 열은 daily_meeting_stats에 저장.
 func (r *StatsRepo) FillPeriodOverview(cols []model.StatsPeriodColumn, f model.StatsMeetingFilter) error {
+	start := time.Now()
+	defer logSlowSQL("stats.FillPeriodOverview", start)
 	f = normalizeMeetingFilter(f)
 	now := time.Now()
 	applyPeriodShowActual(cols, now)
@@ -209,7 +210,6 @@ func (r *StatsRepo) countBucket(from, toEx string, f model.StatsMeetingFilter) (
 			return b, err
 		}
 	}
-	b.ProgressScope = r.attachMetrics(f).ProgressScope
 	return b, nil
 }
 
@@ -231,12 +231,12 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 	}
 	s.Planned = n
 
-	argsR := append([]interface{}{from, toEx}, asArgs...)
+	argsR := append([]interface{}{dayTimeStart(from), dayTimeStart(toEx)}, asArgs...)
 	if s.Receipt, err = r.countSQL(`
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status NOT IN ('cancelled')
-		  AND date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?)`+asSQL, argsR...); err != nil {
+		  AND ar.receipt_datetime >= ? AND ar.receipt_datetime < ?`+asSQL, argsR...); err != nil {
 		return s, err
 	}
 	// 부분완료 하위업무도 접수로 합산
@@ -245,7 +245,7 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 		JOIN as_receipts ar ON ar.as_id = w.as_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = 'partial_complete'
-		  AND date(w.created_at) >= date(?) AND date(w.created_at) < date(?)`+asSQL, argsR...)
+		  AND w.created_at >= ? AND w.created_at < ?`+asSQL, argsR...)
 	if err != nil {
 		return s, err
 	}
@@ -254,8 +254,8 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status IN `+model.SQLStatusStatsCompleted+`
-		  AND `+asCompleteDateSQL+` >= date(?)
-		  AND `+asCompleteDateSQL+` < date(?)`+asSQL, argsR...); err != nil {
+		  AND `+asCompleteDT+` >= ?
+		  AND `+asCompleteDT+` < ?`+asSQL, argsR...); err != nil {
 		return s, err
 	}
 	if s.Modified, err = r.countSQL(`
@@ -265,17 +265,7 @@ func (r *StatsRepo) countASSlice(from, toEx string, f model.StatsMeetingFilter) 
 		  AND TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
 		  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
 		  AND ar.status IN `+model.SQLStatusStatsCompleted+`
-		  AND `+asCompleteDateSQL+` != date(ar.visit_scheduled_date)`+asSQL, argsP...); err != nil {
-		return s, err
-	}
-	// 계획대로: 예정일에 그대로 완료
-	if s.OnPlan, err = r.countSQL(`
-		SELECT COUNT(*) FROM as_receipts ar
-		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		WHERE TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
-		  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
-		  AND ar.status IN `+model.SQLStatusStatsCompleted+`
-		  AND `+asCompleteDateSQL+` = date(ar.visit_scheduled_date)`+asSQL, argsP...); err != nil {
+		  AND `+asCompleteDateSQL+` != NULLIF(TRIM(ar.visit_scheduled_date),'')`+asSQL, argsP...); err != nil {
 		return s, err
 	}
 	return s, nil
@@ -306,14 +296,6 @@ func (r *StatsRepo) countMntSlice(from, toEx string, f model.StatsMeetingFilter)
 		  AND COALESCE(v.completed,0)=1
 		  AND TRIM(COALESCE(v.completed_date,'')) != ''
 		  AND v.completed_date != v.visit_date`+mntSQL, args...); err != nil {
-		return s, err
-	}
-	// 계획대로: 방문일에 완료(완료일 비어 있으면 방문일 완료로 간주)
-	if s.OnPlan, err = r.countSQL(`
-		SELECT COUNT(*) FROM maintenance_visits v
-		WHERE v.visit_date >= ? AND v.visit_date < ?
-		  AND COALESCE(v.completed,0)=1
-		  AND (TRIM(COALESCE(v.completed_date,'')) = '' OR v.completed_date = v.visit_date)`+mntSQL, args...); err != nil {
 		return s, err
 	}
 	if err := r.attachMntMonthProgress(&s, from, toEx, f); err != nil {
@@ -471,24 +453,6 @@ func (r *StatsRepo) countAdminSlice(from, toEx string, f model.StatsMeetingFilte
 		  )`+adminSQL, append([]interface{}{from, toEx, from, toEx, from, toEx}, adminArgs...)...); err != nil {
 		return s, err
 	}
-	// 계획대로: 실행 작업은 예정일(work_date) 당일 완료. 일반은 예정일(due) 당일. §13.15.9
-	onPlanArgs := append([]interface{}{from, toEx, from, toEx}, adminArgs...)
-	if s.OnPlan, err = r.countSQL(`
-		SELECT COUNT(*) FROM work_tasks t
-		WHERE t.work_type IN ('admin','support') AND t.status='complete'
-		  AND (
-		    (COALESCE(t.recurrence_role,'')='occurrence'
-		     AND TRIM(COALESCE(t.work_date,'')) != ''
-		     AND t.work_date >= ? AND t.work_date < ?
-		     AND `+adminTaskCompleteDateSQL+` = t.work_date)
-		    OR
-		    (COALESCE(t.recurrence_role,'') != 'occurrence'
-		     AND TRIM(COALESCE(t.due_date,'')) != ''
-		     AND t.due_date >= ? AND t.due_date < ?
-		     AND (TRIM(COALESCE(t.work_date,'')) = '' OR t.work_date = t.due_date))
-		  )`+adminSQL, onPlanArgs...); err != nil {
-		return s, err
-	}
 	return s, nil
 }
 
@@ -502,7 +466,6 @@ func (r *StatsRepo) countSQL(q string, args ...interface{}) (int, error) {
 func (r *StatsRepo) UpsertDailyMeetingStat(col model.StatsPeriodColumn, f model.StatsMeetingFilter) error {
 	f = normalizeMeetingFilter(f)
 	c := col.Counts
-	rate := math.Round(c.ExecutionRatePct()*10) / 10
 	_, err := r.db.Exec(`
 		INSERT INTO daily_meeting_stats (
 			stat_date, scope, scope_key,
@@ -520,7 +483,7 @@ func (r *StatsRepo) UpsertDailyMeetingStat(col model.StatsPeriodColumn, f model.
 			admin_planned=excluded.admin_planned, admin_receipt=excluded.admin_receipt, admin_process=excluded.admin_process,
 			computed_at=excluded.computed_at`,
 		col.From, f.Scope, f.Key,
-		c.PlannedTotal(), c.ReceiptTotal(), c.ProcessTotal(), c.ModifiedTotal(), rate,
+		c.PlannedTotal(), c.ReceiptTotal(), c.ProcessTotal(), c.ModifiedTotal(), 0,
 		c.AS.Planned, c.AS.Receipt, c.AS.Process,
 		c.Mnt.Planned, c.Mnt.Receipt, c.Mnt.Process,
 		c.Admin.Planned, c.Admin.Receipt, c.Admin.Process,
@@ -538,8 +501,9 @@ func (r *StatsRepo) GetDailyMeetingStat(statDate string, f model.StatsMeetingFil
 		FROM daily_meeting_stats WHERE stat_date=? AND scope=? AND scope_key=?`,
 		statDate, f.Scope, f.Key)
 	var s model.DailyMeetingStat
+	var unusedRate float64
 	err := row.Scan(
-		&s.StatDate, &s.Scope, &s.ScopeKey, &s.Planned, &s.Receipt, &s.Process, &s.Modified, &s.ExecutionRate,
+		&s.StatDate, &s.Scope, &s.ScopeKey, &s.Planned, &s.Receipt, &s.Process, &s.Modified, &unusedRate,
 		&s.ASPlanned, &s.ASReceipt, &s.ASProcess, &s.MntPlanned, &s.MntReceipt, &s.MntProcess,
 		&s.AdminPlanned, &s.AdminReceipt, &s.AdminProcess,
 	)

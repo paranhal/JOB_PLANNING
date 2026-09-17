@@ -16,6 +16,8 @@ func applyWorkListIndexes(db *sql.DB) {
 		`CREATE INDEX IF NOT EXISTS idx_maintenance_visits_assignee ON maintenance_visits(assignee)`,
 		`CREATE INDEX IF NOT EXISTS idx_as_processes_as_id ON as_processes(as_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_as_work_items_status_as ON as_work_items(status, as_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_work_tasks_type_status ON work_tasks(work_type, status)`,
+		`CREATE INDEX IF NOT EXISTS idx_as_processes_as_datetime ON as_processes(as_id, process_datetime)`,
 	}
 	for _, q := range stmts {
 		if _, err := db.Exec(q); err != nil {

@@ -6,6 +6,12 @@
     <div>
       <h2 class="text-xl font-bold text-gray-800">업무처리현황</h2>
       <p class="text-sm text-gray-600 mt-1">
+        목록 · 전체 기간 · 이관 데이터 포함 (통계 집계와 다름)
+      </p>
+      {{if and .MissingComplete (gt .MissingComplete.AS 0)}}
+      <p class="mt-1 text-sm text-amber-800">완료일 미기록 {{.MissingComplete.AS}}건 제외</p>
+      {{end}}
+      <p class="text-sm text-gray-600 mt-1">
         {{.MonthLabel}}
         (접수건수 {{.Summary.ReceiptCount}}
         / 완료건수 {{.Summary.CompleteCount}}

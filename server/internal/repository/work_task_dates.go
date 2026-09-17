@@ -9,9 +9,12 @@ import (
 // 완료일·접수일 SQL. 별칭 t / ar / v. (§13.4 · §14.1 · §15.3)
 // 완료일이 비면 NULL — updated_at·visit_date 로 다른 날에 끼워 넣지 않는다.
 const (
-	adminTaskCompleteDateSQL = `date(NULLIF(TRIM(t.complete_date),''))`
+	adminTaskCompleteDateSQL = `NULLIF(TRIM(t.complete_date),'')`
 	adminTaskReceiptDateSQL  = `date(COALESCE(NULLIF(TRIM(t.receipt_date),''), t.created_at))`
 	asCompleteDateSQL        = `date(NULLIF(TRIM(ar.complete_datetime),''))`
+	asCompleteDateColSQL     = `date(NULLIF(TRIM(complete_datetime),''))`
+	asCompleteDT             = `NULLIF(TRIM(ar.complete_datetime),'')`
+	asCompleteDTCol          = `NULLIF(TRIM(complete_datetime),'')`
 	mntCompleteDateSQL       = `NULLIF(TRIM(v.completed_date),'')`
 )
 

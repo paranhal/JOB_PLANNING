@@ -125,3 +125,46 @@ func TestBackfillActivityCounterpartsToParties(t *testing.T) {
 		t.Fatalf("이관을 두 번 돌렸더니 늘었다 n=%d", n)
 	}
 }
+
+func TestDeleteActivityKeepsAutoPartiesAndDropsWorkTask(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "act_del.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repo := NewSalesRepo(db)
+	p := &model.SalesProject{Name: "삭제 후 관계자", ProspectName: "고객사", IsTentativeName: true}
+	if err := repo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	act := &model.SalesActivity{
+		SalesID: p.SalesID, ActivityDate: "2026-08-19", ActivityType: "visit",
+		Title: "지울 미팅", Counterparts: "한상대", OurMembers: "관리자",
+	}
+	if err := repo.CreateActivity(act, "관리자", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.DeleteActivity(act.ActivityID); err != nil {
+		t.Fatal(err)
+	}
+	task, err := NewWBRepo(db).GetTaskBySource(model.WBSourceSalesActivity, act.ActivityID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task != nil {
+		t.Fatal("work_tasks 가 남았다")
+	}
+	parties, err := repo.ListParties(p.SalesID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, pt := range parties {
+		if pt.PersonName == "한상대" && pt.IsAuto {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("자동 관계자가 지워졌다: %+v", parties)
+	}
+}

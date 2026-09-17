@@ -61,6 +61,17 @@ func canViewSales(c echo.Context) bool {
 		r == model.RoleTech || r == model.RoleObserver
 }
 
+// canEditSalesActivity §39.5 · §37.3 — 본인 등록은 본인, 남의 것은 관리자·행정만.
+func canEditSalesActivity(c echo.Context, createdBy string) bool {
+	if !canWriteSales(c) || isObserverRole(c) {
+		return false
+	}
+	if isAdminRole(c) || isOfficeRole(c) {
+		return true
+	}
+	return assigneeIsMine(c, createdBy, "")
+}
+
 func canWriteSales(c echo.Context) bool {
 	if isObserverRole(c) {
 		return false
@@ -181,6 +192,55 @@ func assigneeKeys(c echo.Context) []string {
 	return []string{ctxString(c, "user_name"), ctxString(c, "username")}
 }
 
+// assigneeIsMine 현재 사용자 이름·아이디가 담당자와 같으면 true. assigneeKeys 를 쓴다.
+func assigneeIsMine(c echo.Context, assignee, assignedUserID string) bool {
+	uid := strings.TrimSpace(currentUserID(c))
+	if uid != "" && strings.TrimSpace(assignedUserID) == uid {
+		return true
+	}
+	name := strings.TrimSpace(assignee)
+	if name == "" {
+		return false
+	}
+	for _, k := range assigneeKeys(c) {
+		if strings.TrimSpace(k) != "" && strings.TrimSpace(k) == name {
+			return true
+		}
+	}
+	return false
+}
+
+// canEditTask §37.3 — 보는 것과 고치는 것을 나눈다.
+// canWriteWorkboard 로 쓰기 권한을 열고, 기술·영업은 assigneeKeys 로 내 배정만 허용한다.
+func canEditTask(c echo.Context, assignee, assignedUserID string) bool {
+	if isObserverRole(c) {
+		return false
+	}
+	if isAdminRole(c) || isOfficeRole(c) {
+		return true
+	}
+	if isTechRole(c) {
+		if !canWriteWorkboard(c) {
+			return false
+		}
+		return assigneeIsMine(c, assignee, assignedUserID)
+	}
+	if isSalesRole(c) {
+		return assigneeIsMine(c, assignee, assignedUserID)
+	}
+	return false
+}
+
+func denyUnlessCanEditTask(c echo.Context, t *model.WorkTask) error {
+	if t == nil {
+		return echo.ErrNotFound
+	}
+	if !canEditTask(c, t.Assignee, "") {
+		return echo.ErrForbidden
+	}
+	return nil
+}
+
 func currentUserDisplayName(c echo.Context) string {
 	n := strings.TrimSpace(ctxString(c, "user_name"))
 	if n != "" {
@@ -222,6 +282,16 @@ func (h *AuthHandler) RequireAdminMW(next echo.HandlerFunc) echo.HandlerFunc {
 			return next(c)
 		}
 		return h.forbidden(c)
+	}
+}
+
+// RequireAdminOnly 관리자 등급만. 시스템 정보처럼 커밋 해시를 보여 주는 화면에 쓴다. §40.5.2
+func (h *AuthHandler) RequireAdminOnly(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if !isAdminRole(c) {
+			return h.forbidden(c)
+		}
+		return next(c)
 	}
 }
 

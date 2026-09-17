@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -132,7 +133,7 @@ type PerformanceRelation struct {
 // Attachment 첨부파일 (기획서 §12)
 type Attachment struct {
 	AttachmentID string    `json:"attachment_id"`
-	RefType      string    `json:"ref_type"` // asset, as, as_receipt, as_action_photo, as_report
+	RefType      string    `json:"ref_type"` // AttachRef* 상수. 폼 분기만 AttachFormReceipt
 	RefID        string    `json:"ref_id"`
 	FileName     string    `json:"file_name"`
 	FilePath     string    `json:"file_path"`
@@ -166,21 +167,49 @@ func (a Attachment) DisplayName() string {
 	return name
 }
 
+// 첨부 ref_type 은 여기만 쓴다. 자리마다 문자열을 적으면 사진이 조용히 사라진다. 40-F
 const (
-	RefTypeAsset         = "asset"
-	RefTypeAS            = "as"
-	RefTypeASReceipt     = "as_receipt"
-	RefTypeASActionPhoto = "as_action_photo" // §12.9.8 조치 사진
-	RefTypeASReport      = "as_report"
-	RefTypeWorkActivity  = "work_activity"
-	RefTypeSalesOrder    = "sales_order"
-	RefTypeSalesDelivery = "sales_delivery"
+	AttachRefAsset         = "asset"
+	AttachRefAS            = "as"
+	AttachRefASActionPhoto = "as_action_photo"
+	AttachRefASReport      = "as_report"
+	AttachRefWorkActivity  = "work_activity"
+	AttachRefSalesOrder    = "sales_order"
+	AttachRefSalesDelivery = "sales_delivery"
+	AttachRefASKB          = "as_kb"
+	AttachFormReceipt      = "as_receipt" // 폼 분기용. DB 값은 AttachRefAS
 )
+
+const (
+	RefTypeAsset         = AttachRefAsset
+	RefTypeAS            = AttachRefAS
+	RefTypeASReceipt     = AttachFormReceipt
+	RefTypeASActionPhoto = AttachRefASActionPhoto
+	RefTypeASReport      = AttachRefASReport
+	RefTypeWorkActivity  = AttachRefWorkActivity
+	RefTypeSalesOrder    = AttachRefSalesOrder
+	RefTypeSalesDelivery = AttachRefSalesDelivery
+	RefTypeASKB          = AttachRefASKB
+)
+
+// CanonicalAttachRef 옛 as_receipt 를 as 로 본다. 40-F
+func CanonicalAttachRef(refType string) string {
+	s := strings.TrimSpace(refType)
+	if s == AttachFormReceipt {
+		return AttachRefAS
+	}
+	return s
+}
 
 const (
 	MaxReceiptPhotos = 10
 	MaxActionPhotos  = 3
 	MaxReceiptBytes  = 20 << 20 // 20MB
+	MaxKBPhotoBytes  = 10 << 20 // 10MB 사진·문서
+	MaxKBVideoBytes  = 50 << 20 // 50MB 동영상
+	MaxKBVideos      = 2
+	UploadWarnBytes  = 1 << 30  // 1GB 경고
+	UploadAlertBytes = 5 << 30  // 5GB 위험 (50MB×100)
 )
 
 // IsImage 접수 사진 썸네일 대상. HEIC는 업로드 시 JPEG로 바뀌지만 원본명으로도 판별한다.
@@ -199,6 +228,70 @@ func (a Attachment) IsImage() bool {
 		return true
 	}
 	return false
+}
+
+// LooksLikeVideo 지식 첨부의 동영상. mp4·mov·webm 만. §41.12
+func LooksLikeVideo(name, mime string) bool {
+	_ = mime
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mp4", ".mov", ".webm":
+		return true
+	}
+	return false
+}
+
+func VideoMIME(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mp4":
+		return "video/mp4"
+	case ".mov":
+		return "video/quicktime"
+	case ".webm":
+		return "video/webm"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func (a Attachment) IsVideo() bool {
+	return LooksLikeVideo(a.FileName, a.MIMEType) || LooksLikeVideo(a.FilePath, a.MIMEType)
+}
+
+func FormatByteSize(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+	const kb, mb, gb = 1024, 1024 * 1024, 1024 * 1024 * 1024
+	switch {
+	case n >= gb:
+		return fmt.Sprintf("%.1fGB", float64(n)/float64(gb))
+	case n >= mb:
+		return fmt.Sprintf("%dMB", (n+mb/2)/mb)
+	case n >= kb:
+		return fmt.Sprintf("%dKB", (n+kb/2)/kb)
+	default:
+		return fmt.Sprintf("%dB", n)
+	}
+}
+
+func SizeLimitMessage(limit, got int64) string {
+	return fmt.Sprintf("%s 까지 올릴 수 있습니다 (지금 %s)", FormatByteSize(limit), FormatByteSize(got))
+}
+
+func KBAttachReject(name, mime string, size int64, videoAlready int) string {
+	if LooksLikeVideo(name, mime) {
+		if size > MaxKBVideoBytes {
+			return SizeLimitMessage(MaxKBVideoBytes, size)
+		}
+		if videoAlready >= MaxKBVideos {
+			return "동영상은 한 건에 2개까지입니다"
+		}
+		return ""
+	}
+	if size > MaxKBPhotoBytes {
+		return SizeLimitMessage(MaxKBPhotoBytes, size)
+	}
+	return ""
 }
 
 func publicUploadURL(filePath string) string {

@@ -325,13 +325,15 @@ func (r *MaintenanceRepo) InsertVisitFull(v model.MaintenanceVisit) error {
 	if strings.TrimSpace(v.ProjectID) == "" {
 		v.ProjectID = resolveStoredProjectID(r.db, v.CustomerID, v.ProductType, model.ScopeWorkMaintenance)
 	}
+	name, uid := bindStaff(r.db, v.Assignee, "")
+	v.Assignee = name
 	_, err := r.db.Exec(`
 		INSERT INTO maintenance_visits
 		(visit_id, plan_id, visit_date, customer_id, sort_order, auto_generated, entry_category, notes,
-		 assignee, product_type, completed, completed_date, project_id)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 assignee, assignee_user_id, product_type, completed, completed_date, project_id)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		id, v.PlanID, v.VisitDate, v.CustomerID, v.SortOrder, auto, v.EntryCategory, nullIfEmpty(v.Notes),
-		nullIfEmpty(v.Assignee), nullIfEmpty(v.ProductType), completed, nullIfEmpty(completedDate),
+		nullIfEmpty(v.Assignee), nullIfEmpty(uid), nullIfEmpty(v.ProductType), completed, nullIfEmpty(completedDate),
 		nullIfEmpty(v.ProjectID))
 	return err
 }
@@ -359,14 +361,16 @@ func (r *MaintenanceRepo) UpdateVisit(v model.MaintenanceVisit) error {
 	if strings.TrimSpace(v.ProjectID) == "" {
 		v.ProjectID = resolveStoredProjectID(r.db, v.CustomerID, v.ProductType, model.ScopeWorkMaintenance)
 	}
+	name, uid := bindStaff(r.db, v.Assignee, "")
+	v.Assignee = name
 	before := rowJSON(r.db, "maintenance_visits", "visit_id", v.VisitID)
 	res, err := r.db.Exec(`
 		UPDATE maintenance_visits SET
 			visit_date=?, customer_id=?, entry_category=?, notes=?,
-			assignee=?, product_type=?, completed=?, completed_date=?, project_id=?
+			assignee=?, assignee_user_id=?, product_type=?, completed=?, completed_date=?, project_id=?
 		WHERE visit_id=?`,
 		v.VisitDate, v.CustomerID, v.EntryCategory, nullIfEmpty(v.Notes),
-		nullIfEmpty(v.Assignee), nullIfEmpty(v.ProductType),
+		nullIfEmpty(v.Assignee), nullIfEmpty(uid), nullIfEmpty(v.ProductType),
 		completed, nullIfEmpty(completedDate), nullIfEmpty(v.ProjectID), v.VisitID)
 	if err != nil {
 		return err

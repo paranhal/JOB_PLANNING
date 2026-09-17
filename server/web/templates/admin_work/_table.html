@@ -1,20 +1,23 @@
 {{define "admin_work_table"}}
 {{$sort := .Sort}}{{$dir := .Dir}}{{$href := .SortHref}}
+{{if .SortSelect}}
+<div class="md:hidden mb-2">{{template "sort_select" (dict "Options" .SortSelect "ID" "admin-work-sort")}}</div>
+{{end}}
 <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
   <table class="min-w-full text-sm">
     <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
       <tr>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "task_id"}}" class="hover:text-violet-700">번호{{if eq $sort "task_id"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        {{template "sort_th" (dict "Label" "번호" "Key" "task_id" "Cur" $sort "Dir" $dir "Href" (index $href "task_id") "PadClass" "px-3 py-2.5")}}
         <th class="px-3 py-2.5 font-medium whitespace-nowrap">구분</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "customer"}}" class="hover:text-violet-700">거래처{{if eq $sort "customer"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-        <th class="px-3 py-2.5 font-medium"><a href="{{index $href "title"}}" class="hover:text-violet-700">업무명{{if eq $sort "title"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        {{template "sort_th" (dict "Label" "거래처" "Key" "customer" "Cur" $sort "Dir" $dir "Href" (index $href "customer") "PadClass" "px-3 py-2.5")}}
+        {{template "sort_th" (dict "Label" "업무명" "Key" "title" "Cur" $sort "Dir" $dir "Href" (index $href "title") "PadClass" "px-3 py-2.5")}}
         <th class="px-3 py-2.5 font-medium whitespace-nowrap">사업명</th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "assignee"}}" class="hover:text-violet-700">담당자{{if eq $sort "assignee"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "work_date"}}" class="hover:text-violet-700">시작일{{if eq $sort "work_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "due_date"}}" class="hover:text-violet-700">종료일{{if eq $sort "due_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "status"}}" class="hover:text-violet-700">상태{{if eq $sort "status"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "duration"}}" class="hover:text-violet-700">소요시간{{if eq $sort "duration"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-        <th class="px-3 py-2.5 font-medium whitespace-nowrap"><a href="{{index $href "created_at"}}" class="hover:text-violet-700">등록일{{if eq $sort "created_at"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+        {{template "sort_th" (dict "Label" "담당자" "Key" "assignee" "Cur" $sort "Dir" $dir "Href" (index $href "assignee") "PadClass" "px-3 py-2.5")}}
+        {{template "sort_th" (dict "Label" "시작일" "Key" "work_date" "Cur" $sort "Dir" $dir "Href" (index $href "work_date") "PadClass" "px-3 py-2.5")}}
+        {{template "sort_th" (dict "Label" "종료일" "Key" "due_date" "Cur" $sort "Dir" $dir "Href" (index $href "due_date") "PadClass" "px-3 py-2.5")}}
+        {{template "sort_th" (dict "Label" "상태" "Key" "status" "Cur" $sort "Dir" $dir "Href" (index $href "status") "PadClass" "px-3 py-2.5")}}
+        {{template "sort_th" (dict "Label" "소요시간" "Key" "duration" "Cur" $sort "Dir" $dir "Href" (index $href "duration") "PadClass" "px-3 py-2.5")}}
+        {{template "sort_th" (dict "Label" "등록일" "Key" "created_at" "Cur" $sort "Dir" $dir "Href" (index $href "created_at") "PadClass" "px-3 py-2.5")}}
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">

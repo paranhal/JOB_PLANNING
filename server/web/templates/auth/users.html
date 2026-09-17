@@ -60,7 +60,7 @@
           </label>
           {{end}}
         </div>
-        <p class="text-[11px] text-gray-400 mt-1">등급을 바꾸면 기본 권한이 채워집니다. 이후 체크를 조정할 수 있습니다.</p>
+        <p class="text-[11px] text-gray-400 mt-1">등급을 바꾸면 기본 권한이 채워집니다. 이후 체크를 조정할 수 있습니다. 영업담당 기본값에는 AS가 없습니다. 기술영업이면 AS 접수와 조치를 따로 켜세요.</p>
       </div>
       <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium">등록</button>
     </form>
@@ -163,6 +163,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-600 mb-2">권한{{if $canEdit}} (체크){{end}}</p>
+          <p class="text-[11px] text-gray-400 mb-2">AS 접수와 조치는 따로 줍니다. 영업담당은 기본으로 둘 다 꺼져 있습니다.</p>
           <div class="flex flex-wrap gap-3">
             {{range $permDefs}}
             <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">

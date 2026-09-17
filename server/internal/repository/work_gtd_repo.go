@@ -82,12 +82,14 @@ func (r *WBRepo) CreateAction(a *model.WorkAction) error {
 	if a.Confirmed {
 		conf = 1
 	}
+	name, uid := bindStaff(r.db, a.Assignee, "")
+	a.Assignee = name
 	_, err = r.db.Exec(`
-		INSERT INTO work_actions (action_id, task_id, title, status, required, scheduled_date, due_date, assignee,
+		INSERT INTO work_actions (action_id, task_id, title, status, required, scheduled_date, due_date, assignee, assignee_user_id,
 			wait_party_kind, wait_party, wait_request, reply_due_date, next_check_date, confirmed, sort_order)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.ActionID, a.TaskID, a.Title, a.Status, req, nullIfEmpty(a.ScheduledDate), nullIfEmpty(a.DueDate),
-		nullIfEmpty(a.Assignee), nullIfEmpty(a.WaitPartyKind), nullIfEmpty(a.WaitParty), nullIfEmpty(a.WaitRequest),
+		nullIfEmpty(a.Assignee), nullIfEmpty(uid), nullIfEmpty(a.WaitPartyKind), nullIfEmpty(a.WaitParty), nullIfEmpty(a.WaitRequest),
 		nullIfEmpty(a.ReplyDueDate), nullIfEmpty(a.NextCheckDate), conf, a.SortOrder)
 	if err != nil {
 		return err
@@ -109,12 +111,14 @@ func (r *WBRepo) UpdateAction(a *model.WorkAction) error {
 		conf = 1
 	}
 	return touchUpdate(r.db, "work_actions", "action_id", a.ActionID, a.Title, func() error {
+		name, uid := bindStaff(r.db, a.Assignee, "")
+		a.Assignee = name
 		_, err := r.db.Exec(`
-			UPDATE work_actions SET title=?, status=?, required=?, scheduled_date=?, due_date=?, assignee=?,
+			UPDATE work_actions SET title=?, status=?, required=?, scheduled_date=?, due_date=?, assignee=?, assignee_user_id=?,
 				wait_party_kind=?, wait_party=?, wait_request=?, reply_due_date=?, next_check_date=?,
 				confirmed=?, sort_order=?, updated_at=CURRENT_TIMESTAMP
 			WHERE action_id=?`,
-			a.Title, a.Status, req, nullIfEmpty(a.ScheduledDate), nullIfEmpty(a.DueDate), nullIfEmpty(a.Assignee),
+			a.Title, a.Status, req, nullIfEmpty(a.ScheduledDate), nullIfEmpty(a.DueDate), nullIfEmpty(a.Assignee), nullIfEmpty(uid),
 			nullIfEmpty(a.WaitPartyKind), nullIfEmpty(a.WaitParty), nullIfEmpty(a.WaitRequest),
 			nullIfEmpty(a.ReplyDueDate), nullIfEmpty(a.NextCheckDate), conf, a.SortOrder, a.ActionID)
 		return err
@@ -184,10 +188,12 @@ func (r *WBRepo) CreateActivity(a *model.WorkActivity) error {
 		return err
 	}
 	a.ActivityID = id
+	actor, actorUID := bindStaff(r.db, a.Actor, "")
+	a.Actor = actor
 	_, err = r.db.Exec(`
-		INSERT INTO work_activities (activity_id, task_id, action_id, activity_type, content, actor, spent_minutes)
-		VALUES (?,?,?,?,?,?,?)`,
-		a.ActivityID, a.TaskID, nullIfEmpty(a.ActionID), a.ActivityType, a.Content, nullIfEmpty(a.Actor), a.SpentMinutes)
+		INSERT INTO work_activities (activity_id, task_id, action_id, activity_type, content, actor, actor_user_id, spent_minutes)
+		VALUES (?,?,?,?,?,?,?,?)`,
+		a.ActivityID, a.TaskID, nullIfEmpty(a.ActionID), a.ActivityType, a.Content, nullIfEmpty(a.Actor), nullIfEmpty(actorUID), a.SpentMinutes)
 	if err != nil {
 		return err
 	}

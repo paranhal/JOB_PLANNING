@@ -2,7 +2,9 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"html/template"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -42,6 +44,8 @@ type Handler struct {
 	Items          *ItemsHandler
 	AdminWork      *AdminWorkHandler
 	Integration    *IntegrationHandler
+	System         *SystemHandler
+	notices        *assignNoticeHook
 
 	customerRepo *repository.CustomerRepo
 	asRepo       *repository.ASRepo
@@ -88,8 +92,10 @@ func New(db *sql.DB) *Handler {
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
 	authH := &AuthHandler{userRepo: userRepo, settingsRepo: settingsRepo, jwtSecret: jwtSecret}
+	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)
+	wbH.notices = noticeHook
 
-	return &Handler{
+	h := &Handler{
 		Customer: &CustomerHandler{
 			repo:        customerRepo,
 			assetRepo:   assetRepo,
@@ -121,12 +127,13 @@ func New(db *sql.DB) *Handler {
 			attachRepo: attachRepo,
 			attach:     attachH,
 			kwRepo:     repository.NewASKeywordRepo(db),
+			notices:    noticeHook,
 		},
-		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo),
+		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,
 		Meeting:    NewMeetingHandler(workBoardRepo, statsRepo, userRepo),
 		Stats:      NewStatsHandler(statsRepo, userRepo, repository.NewWBRepo(db), workBoardRepo, maintRepo),
-		WorkStatus: NewWorkStatusHandler(repository.NewWBRepo(db), userRepo, holidayRepo),
+		WorkStatus: NewWorkStatusHandler(repository.NewWBRepo(db), userRepo, holidayRepo, repository.NewSalesRepo(db)),
 		Analysis:   &AnalysisHandler{db: db},
 		Code:       &CodeHandler{repo: codeRepo},
 		Attachment: attachH,
@@ -145,8 +152,8 @@ func New(db *sql.DB) *Handler {
 		Maintenance: &MaintenanceHandler{
 			repo: maintRepo, customerRepo: customerRepo, userRepo: userRepo,
 			wbRepo: repository.NewWBRepo(db), settingsRepo: settingsRepo,
-			holidayRepo: holidayRepo,
-			dataDir:     dataDirFromEnv(),
+			holidayRepo: holidayRepo, notices: noticeHook,
+			dataDir: dataDirFromEnv(),
 		},
 		Project: NewProjectHandler(
 			repository.NewProjectRepo(db), repository.NewWBRepo(db),
@@ -163,9 +170,10 @@ func New(db *sql.DB) *Handler {
 		Orders: NewOrdersHandler(
 			repository.NewOrderRepo(db), repository.NewQuoteRepo(db), repository.NewSalesRepo(db), attachRepo,
 		),
-		Items: NewItemsHandler(repository.NewSalesItemRepo(db)),
+		Items:       NewItemsHandler(repository.NewSalesItemRepo(db)),
 		AdminWork:   NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo),
 		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),
+		System:      &SystemHandler{db: db, auth: authH, uploadDir: attachH.uploadDir},
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
@@ -173,7 +181,12 @@ func New(db *sql.DB) *Handler {
 		assetRepo:    assetRepo,
 		attachRepo:   attachRepo,
 		statsRepo:    statsRepo,
+		notices:      noticeHook,
 	}
+	h.Work.notices = noticeHook
+	h.AdminWork.notices = noticeHook
+	bindSchemaDB(db)
+	return h
 }
 
 func (h *Handler) Dashboard(c echo.Context) error {
@@ -190,91 +203,120 @@ func (h *Handler) Dashboard(c echo.Context) error {
 
 	mineUID, mineK := "", []string(nil)
 	mine := false
-	if role == model.RoleTech {
+	teamScope := strings.TrimSpace(c.QueryParam("scope")) == "team"
+	if model.IsKnownRole(role) && !teamScope {
 		mineUID, mineK = userID, mineKeys
 		mine = true
 	}
 
-	stats, err := h.workBoard.DashStats(mineUID, mineK)
+	stats, todayList, delayedList, pendingList, unassignedList, err := h.workBoard.DashHome(mineUID, mineK, 10, 8, 8, 8)
 	if err != nil {
 		return err
 	}
-	todayList, _ := h.workBoard.ListBucket(model.WorkBucketToday, mineUID, mineK, 10)
-	delayedList, _ := h.workBoard.ListBucket(model.WorkBucketDelayed, mineUID, mineK, 8)
-	pendingList, _ := h.workBoard.ListBucket(model.WorkBucketSchedulePending, mineUID, mineK, 8)
-	unassignedList, _ := h.workBoard.ListBucket(model.WorkBucketUnassigned, "", nil, 8)
 
-	// 상단 KPI — §15.7 기간 선택(기본 최근 1개월)
+	var teamDelayed []model.WorkListItem
+	if mine && (role == model.RoleAdmin || role == model.RoleOffice) {
+		teamDelayed, _ = h.workBoard.ListBucket(model.WorkBucketDelayed, "", nil, 8)
+	}
+
 	now := time.Now()
-	metricsBase, metricsScope, metricsHint := metricsViewData(h.statsRepo)
+	var weekReview model.WeekReview
+	showWeekReview := false
+	if mine && weekReviewShouldShow(now, weekReviewCookieValue(c)) {
+		weekReview = loadWeekReview(h.workBoard, mineUID, mineK, now)
+		showWeekReview = true
+	}
+	metricsBase := metricsViewData(h.statsRepo)
 	lb := parseLookback(c, metricsBase, now)
+	model.ApplyDashboardChartView(&lb)
 	var weekKPI model.StatsKPICard
+	seriesJSON := []byte("[]")
 	if h.statsRepo != nil {
 		fromIncl, toIncl := lookbackTimes(lb, now)
 		cols := repository.BuildStatsRangeColumns(fromIncl, toIncl)
 		f := model.StatsMeetingFilter{Scope: model.StatsScopeTeam}
-		_ = h.statsRepo.FillPeriodOverview(cols, f)
+		// FillPeriodOverview 는 회의 요약·통계 화면용. 대시보드는 KPI·차트만 쓴다.
 		weekKPI, _ = h.statsRepo.LoadStatsKPI(model.StatsViewRange, cols, f)
 		applyPlanningToKPI(h.workBoard, &weekKPI)
+		if series, err := h.statsRepo.LoadStatsChartSeriesWindow(lb.View, fromIncl, toIncl, f); err == nil {
+			if b, err := json.Marshal(series); err == nil {
+				seriesJSON = b
+			}
+		}
+	}
+	var missingComplete repository.MissingCompleteDates
+	if h.workBoard != nil {
+		missingComplete, _ = h.workBoard.CountMissingCompleteDates()
 	}
 
-	showAssignee := role == model.RoleAdmin || role == model.RoleOffice
+	showAssignee := !mine && (role == model.RoleAdmin || role == model.RoleOffice)
+	canToggleTeam := role == model.RoleAdmin || role == model.RoleOffice || role == model.RoleSales
 	data := map[string]interface{}{
-		"Title":          "대시보드",
-		"Active":         NavDashboard,
-		"Role":           role,
-		"RoleLabel":      model.RoleLabel(role),
-		"DisplayName":    userName,
-		"LoginID":        username,
-		"WorkStats":      stats,
-		"WeekKPI":        weekKPI,
-		"Lookback":         lb,
-		"LookbackQS":       template.URL(lb.QueryValues()),
-		"LookbackViewID":   "dashLookbackView",
-		"ExecTarget":     model.StatsExecTargetPct,
-		"VisitTarget":    model.StatsVisitTargetDays,
-		"CompleteTarget": model.StatsCompleteTargetDays,
-		"OpenHref":       workListURL(model.WorkBucketOpen, mine, role),
-		"TodayHref":      workListURL(model.WorkBucketToday, mine, role),
-		"DelayedHref":    workListURL(model.WorkBucketDelayed, mine, role),
-		"CompletedHref":  workListURL(model.WorkBucketCompletedToday, mine, role),
-		"PendingHref":    workListURL(model.WorkBucketSchedulePending, mine, role),
-		"UnassignedHref": workListURL(model.WorkBucketUnassigned, false, role),
-		"UnplannedHref":  planUnplannedURL(mine, role, ""),
-		"UpcomingDays":   model.RecurrenceUpcomingDays,
-		"MetricsBaseDate":    metricsBase,
-		"ProgressScopeLabel": metricsScope,
-		"ProgressScopeHint":  metricsHint,
-		"TodayList":      todayList,
-		"DelayedList":    delayedList,
-		"PendingList":    pendingList,
-		"UnassignedList": unassignedList,
-		"ShowAssignee":   showAssignee,
-		"ScopeMine":      mine,
+		"Title":             "대시보드",
+		"Active":            NavDashboard,
+		"Role":              role,
+		"RoleLabel":         model.RoleLabel(role),
+		"DisplayName":       userName,
+		"LoginID":           username,
+		"WorkStats":         stats,
+		"WeekKPI":           weekKPI,
+		"Lookback":          lb,
+		"LookbackQS":        template.URL(lb.PeriodQueryValues()),
+		"LookbackViewID":    "dashLookbackView",
+		"LookbackHideView":  true,
+		"ChartBucketNote":   model.ChartBucketNote(lb.View),
+		"SeriesJSON":        template.JS(string(seriesJSON)),
+		"VisitTarget":       model.StatsVisitTargetDays,
+		"VisitLeadHint":     model.StatsVisitLeadHint,
+		"MetricScopeAS":     model.StatsMetricScopeASOnly,
+		"MetricScopeCounts": model.StatsMetricScopeCounts,
+		"CompleteTarget":    model.StatsCompleteTargetDays,
+		"OpenHref":          "/work/all",
+		"TodayHref":         "/work",
+		"DelayedHref":       workAllURL("", "delayed"),
+		"CompletedHref":     workAllURL("", workStatusComplete),
+		"PendingHref":       workAllURL("", workStatusWaiting),
+		"UnassignedHref":    workAllURL(workAssigneeNone, ""),
+		"UnplannedHref":     planUnplannedURL(mine, role, ""),
+		"UpcomingDays":      model.RecurrenceUpcomingDays,
+		"MetricsBaseDate":   metricsBase,
+		"TodayList":         todayList,
+		"DelayedList":       delayedList,
+		"PendingList":       pendingList,
+		"UnassignedList":    unassignedList,
+		"TeamDelayedList":   teamDelayed,
+		"ShowAssignee":      showAssignee,
+		"ScopeMine":         mine,
+		"CanToggleTeam":     canToggleTeam,
+		"TeamScopeHref":     "/?scope=team",
+		"MineScopeHref":     "/",
+		"ShowWeekReview":    showWeekReview,
+		"WeekReviewLine":    weekReview.Line(),
+		"MissingComplete":   missingComplete,
 	}
 
 	switch role {
 	case model.RoleAdmin:
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
-			{Href: "/work?bucket=today", Label: "오늘 예정", Tone: "sky"},
-			{Href: "/work?bucket=unassigned", Label: "미배정", Tone: "amber"},
+			{Href: "/work", Label: "오늘 예정", Tone: "sky"},
+			{Href: workAllURL(workAssigneeNone, ""), Label: "미배정", Tone: "amber"},
 			{Href: "/maintenance", Label: "정기점검", Tone: "slate"},
 			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
 		}
 	case model.RoleOffice:
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
-			{Href: "/work?bucket=today", Label: "오늘 예정", Tone: "sky"},
-			{Href: "/work?bucket=unassigned", Label: "미배정", Tone: "amber"},
+			{Href: "/work", Label: "오늘 예정", Tone: "sky"},
+			{Href: workAllURL(workAssigneeNone, ""), Label: "미배정", Tone: "amber"},
 			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
 			{Href: "/customers", Label: "고객현황", Tone: "green"},
 		}
 	case model.RoleTech:
 		data["QuickLinks"] = []dashLink{
-			{Href: workListURL(model.WorkBucketToday, true, role), Label: "오늘 예정", Tone: "sky"},
-			{Href: workListURL(model.WorkBucketDelayed, true, role), Label: "지연 업무", Tone: "red"},
-			{Href: workListURL(model.WorkBucketOpen, true, role), Label: "내 전체 업무", Tone: "yellow"},
+			{Href: "/work", Label: "오늘 예정", Tone: "sky"},
+			{Href: workAllURL("", "delayed"), Label: "지연 업무", Tone: "red"},
+			{Href: "/work/all", Label: "내 전체 업무", Tone: "yellow"},
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
 			{Href: "/assets", Label: "설치자산", Tone: "purple"},
 		}

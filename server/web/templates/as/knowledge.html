@@ -10,6 +10,9 @@
     <div class="flex flex-wrap items-center gap-2">
       <a href="/as" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">목록</a>
       <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
+      {{if .CanProcess}}
+      <a href="/as/knowledge/gaps" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50">지식 보완 목록</a>
+      {{end}}
       {{if .CanReceive}}
       <a href="/as/new" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">AS 접수</a>
       {{end}}
@@ -169,6 +172,9 @@
         </details>
         {{end}}
       </div>
+      {{if .IsKnowledge}}
+      {{template "kb_attachments" dict "Attachments" .Attachments "KBID" .KBID "CanProcess" $.CanProcess "PhotoRedirect" $.KBRedirect "AttachErrMsg" $.AttachErrMsg}}
+      {{end}}
     </article>
     {{end}}
   </div>

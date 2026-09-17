@@ -191,4 +191,3 @@ func TestChangeLogBindsRepoDBWithoutInit(t *testing.T) {
 		t.Fatalf("Init 없이도 고객 등록이 기록돼야 함: %d", n)
 	}
 }
-

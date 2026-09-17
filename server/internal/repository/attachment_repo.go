@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,10 +33,33 @@ func scanAttachment(scanner interface {
 }
 
 func (r *AttachmentRepo) ListByRef(refType, refID string) ([]model.Attachment, error) {
+	return r.listByRefTypes(refID, canonicalAttachTypes(refType)...)
+}
+
+func canonicalAttachTypes(refType string) []string {
+	switch model.CanonicalAttachRef(refType) {
+	case model.AttachRefAS:
+		return []string{model.AttachRefAS, model.AttachFormReceipt}
+	default:
+		return []string{strings.TrimSpace(refType)}
+	}
+}
+
+func (r *AttachmentRepo) listByRefTypes(refID string, types ...string) ([]model.Attachment, error) {
+	if len(types) == 0 {
+		return nil, nil
+	}
+	ph := strings.Repeat("?,", len(types))
+	ph = strings.TrimSuffix(ph, ",")
+	args := make([]interface{}, 0, 1+len(types))
+	args = append(args, refID)
+	for _, t := range types {
+		args = append(args, t)
+	}
 	rows, err := r.db.Query(attachmentSelect+`
-		FROM attachments WHERE ref_type=? AND ref_id=?
+		FROM attachments WHERE ref_id=? AND ref_type IN (`+ph+`)
 		ORDER BY CASE WHEN slot_no>0 THEN slot_no ELSE 999 END ASC, uploaded_at ASC`,
-		refType, refID)
+		args...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +75,94 @@ func (r *AttachmentRepo) ListByRef(refType, refID string) ([]model.Attachment, e
 	return items, rows.Err()
 }
 
-func (r *AttachmentRepo) CountByRef(refType, refID string) (int, error) {
+// ListReceiptPhotos 접수 증상 사진·자료. as 와 옛 as_receipt 를 같이 본다. 40-F
+func (r *AttachmentRepo) ListReceiptPhotos(asID string) ([]model.Attachment, error) {
+	items, err := r.ListByRef(model.AttachRefAS, asID)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.Attachment
+	for _, a := range items {
+		if isReceiptAttachPath(a.FilePath, a.RefType) {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func isReceiptAttachPath(filePath, refType string) bool {
+	p := filepath.ToSlash(filePath)
+	if strings.Contains(p, "/action/") {
+		return false
+	}
+	if strings.Contains(p, "/receipt/") {
+		return true
+	}
+	return refType == model.AttachFormReceipt
+}
+
+func receiptAttachSQL() string {
+	return `(instr(replace(file_path,'\','/'), '/receipt/') > 0 OR ref_type=?)`
+}
+
+func receiptAttachArgs() []interface{} {
+	return []interface{}{model.AttachRefAS, model.AttachFormReceipt, model.AttachFormReceipt}
+}
+
+func (r *AttachmentRepo) CountReceiptPhotos(asID string) (int, error) {
 	var n int
-	err := r.db.QueryRow(`SELECT COUNT(*) FROM attachments WHERE ref_type=? AND ref_id=?`, refType, refID).Scan(&n)
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM attachments
+		 WHERE ref_id=? AND ref_type IN (?,?) AND `+receiptAttachSQL()+`
+		   AND instr(replace(file_path,'\','/'), '/action/')=0`,
+		asID, model.AttachRefAS, model.AttachFormReceipt, model.AttachFormReceipt).Scan(&n)
+	return n, err
+}
+
+// CountReceiptPhotosByIDs 목록 사진 뱃지. 문서·조치 사진과 섞지 않는다. 40-F
+func (r *AttachmentRepo) CountReceiptPhotosByIDs(ids []string) (map[string]int, error) {
+	out := map[string]int{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	ph := strings.Repeat("?,", len(ids))
+	ph = strings.TrimSuffix(ph, ",")
+	args := receiptAttachArgs()
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	rows, err := r.db.Query(`
+		SELECT ref_id, COUNT(*) FROM attachments
+		 WHERE ref_type IN (?,?) AND `+receiptAttachSQL()+`
+		   AND instr(replace(file_path,'\','/'), '/action/')=0
+		   AND ref_id IN (`+ph+`)
+		 GROUP BY ref_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}
+
+func (r *AttachmentRepo) CountByRef(refType, refID string) (int, error) {
+	types := canonicalAttachTypes(refType)
+	ph := strings.Repeat("?,", len(types))
+	ph = strings.TrimSuffix(ph, ",")
+	args := make([]interface{}, 0, 1+len(types))
+	args = append(args, refID)
+	for _, t := range types {
+		args = append(args, t)
+	}
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM attachments WHERE ref_id=? AND ref_type IN (`+ph+`)`, args...).Scan(&n)
 	return n, err
 }
 
@@ -63,14 +172,19 @@ func (r *AttachmentRepo) CountByRefIDs(refType string, ids []string) (map[string
 	if len(ids) == 0 {
 		return out, nil
 	}
+	types := canonicalAttachTypes(refType)
+	phT := strings.Repeat("?,", len(types))
+	phT = strings.TrimSuffix(phT, ",")
 	ph := strings.Repeat("?,", len(ids))
 	ph = strings.TrimSuffix(ph, ",")
-	args := make([]interface{}, 0, 1+len(ids))
-	args = append(args, refType)
+	args := make([]interface{}, 0, len(types)+len(ids))
+	for _, t := range types {
+		args = append(args, t)
+	}
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	rows, err := r.db.Query(`SELECT ref_id, COUNT(*) FROM attachments WHERE ref_type=? AND ref_id IN (`+ph+`) GROUP BY ref_id`, args...)
+	rows, err := r.db.Query(`SELECT ref_id, COUNT(*) FROM attachments WHERE ref_type IN (`+phT+`) AND ref_id IN (`+ph+`) GROUP BY ref_id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +202,7 @@ func (r *AttachmentRepo) CountByRefIDs(refType string, ids []string) (map[string
 
 // NextAssetImageSlot 사용 중인 슬롯(1~3)을 피해 다음 빈 번호 반환. 없으면 0.
 func (r *AttachmentRepo) NextAssetImageSlot(assetID string) (int, error) {
-	rows, err := r.db.Query(`SELECT COALESCE(slot_no,0) FROM attachments WHERE ref_type='asset' AND ref_id=?`, assetID)
+	rows, err := r.db.Query(`SELECT COALESCE(slot_no,0) FROM attachments WHERE ref_type=? AND ref_id=?`, model.AttachRefAsset, assetID)
 	if err != nil {
 		return 0, err
 	}
@@ -156,8 +270,8 @@ func (r *AttachmentRepo) Delete(id string) error {
 func BackfillAssetImageSlots(db *sql.DB) {
 	rows, err := db.Query(`
 		SELECT attachment_id, ref_id FROM attachments
-		WHERE ref_type='asset' AND (slot_no IS NULL OR slot_no=0)
-		ORDER BY ref_id, uploaded_at ASC, attachment_id ASC`)
+		WHERE ref_type=? AND (slot_no IS NULL OR slot_no=0)
+		ORDER BY ref_id, uploaded_at ASC, attachment_id ASC`, model.AttachRefAsset)
 	if err != nil {
 		return
 	}

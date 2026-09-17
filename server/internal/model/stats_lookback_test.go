@@ -59,6 +59,21 @@ func TestFitStatsViewShortRange(t *testing.T) {
 	}
 }
 
+func TestAutoStatsViewByDays(t *testing.T) {
+	if AutoStatsView(31) != StatsViewDay {
+		t.Fatal("31일 → 일별")
+	}
+	if AutoStatsView(32) != StatsViewWeek || AutoStatsView(180) != StatsViewWeek {
+		t.Fatal("32~180일 → 주별")
+	}
+	if AutoStatsView(181) != StatsViewMonth {
+		t.Fatal("181일 → 월별")
+	}
+	if ChartBucketNote(StatsViewWeek) != "주별로 묶어 표시" {
+		t.Fatalf("note=%q", ChartBucketNote(StatsViewWeek))
+	}
+}
+
 func TestParseStatsLookbackCaps(t *testing.T) {
 	now := time.Date(2026, 9, 3, 0, 0, 0, 0, time.Local)
 	lb := ParseStatsLookback("999d", "", "", "", "", "", now)

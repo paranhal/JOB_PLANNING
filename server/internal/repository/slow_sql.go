@@ -21,3 +21,10 @@ func queryTimed(db *sql.DB, path, q string, args ...interface{}) (*sql.Rows, err
 	logSlowSQL(path, start)
 	return rows, err
 }
+
+func queryRowTimed(db *sql.DB, path, q string, args ...interface{}) *sql.Row {
+	start := time.Now()
+	row := db.QueryRow(q, args...)
+	logSlowSQL(path, start)
+	return row
+}

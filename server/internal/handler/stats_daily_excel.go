@@ -18,7 +18,7 @@ const (
 // ExportDailyAssigneeReport 담당자별 일일업무 엑셀. §16.4
 func (h *StatsHandler) ExportDailyAssigneeReport(c echo.Context) error {
 	now := time.Now()
-	base, _, _ := metricsViewData(h.repo)
+	base := metricsViewData(h.repo)
 	p := parseLookbackReportPeriod(c, now, base)
 	rep, err := h.repo.BuildDailyAssigneeReport(p.FromStr, p.ToExStr, p.FileDay)
 	if err != nil {

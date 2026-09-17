@@ -115,12 +115,12 @@ func searchPage(f model.ASSearchFilter) (page, size, offset int) {
 func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFilter) (string, []interface{}) {
 	// §4.5 기준일·data_origin 필터를 넣지 않는다. 검색은 옛 자료를 찾는다.
 	if s := strings.TrimSpace(f.DateFrom); s != "" {
-		where += ` AND date(ar.receipt_datetime) >= date(?)`
-		args = append(args, s)
+		where += ` AND ar.receipt_datetime >= ?`
+		args = append(args, dayTimeStart(s))
 	}
 	if s := strings.TrimSpace(f.DateTo); s != "" {
-		where += ` AND date(ar.receipt_datetime) <= date(?)`
-		args = append(args, s)
+		where += ` AND ar.receipt_datetime < ?`
+		args = append(args, dayTimeNext(s))
 	}
 	if s := strings.TrimSpace(f.CustomerID); s != "" {
 		where += ` AND ar.customer_id = ?`
@@ -131,11 +131,11 @@ func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFil
 		args = append(args, s)
 	}
 	if s := strings.TrimSpace(f.CauseType); s != "" {
-		where += ` AND ar.cause_type = ?`
+		where += ` AND ` + asCauseTypeSQL("ar") + ` = ?`
 		args = append(args, s)
 	}
 	if s := strings.TrimSpace(f.ProcessType); s != "" {
-		where += ` AND ar.process_type = ?`
+		where += ` AND ` + asProcessTypeSQL("ar") + ` = ?`
 		args = append(args, s)
 	}
 	if s := strings.TrimSpace(f.Assigned); s != "" {
@@ -157,7 +157,7 @@ func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFil
 	return where, args
 }
 
-const asSearchHitSQL = `
+var asSearchHitSQL = `
 		SELECT ar.as_id, ar.as_number, c.org_name, date(ar.receipt_datetime),
 		       COALESCE(ar.symptom,''),
 		       COALESCE(ar.action_taken,''),
@@ -166,7 +166,7 @@ const asSearchHitSQL = `
 		          WHERE p.as_id = ar.as_id AND TRIM(COALESCE(p.work_content,'')) != ''
 		          ORDER BY p.process_datetime DESC LIMIT 1
 		       ), ''),
-		       COALESCE(ct.code_name, ar.cause_type, ''),
+		       COALESCE(ct.code_name, ` + asCauseTypeSQL("ar") + `, ''),
 		       COALESCE(ar.assigned_to,''),
 		       COALESCE(date(ar.complete_datetime), ''),
 		       COALESCE(ar.customer_id,''),
@@ -174,7 +174,7 @@ const asSearchHitSQL = `
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		LEFT JOIN codes ct ON ct.code_group='cause_type' AND ct.code_value = ar.cause_type
+		LEFT JOIN codes ct ON ct.code_group='cause_type' AND ct.code_value = ` + asCauseTypeSQL("ar") + `
 		LEFT JOIN (SELECT as_id, COUNT(*) AS n FROM as_case_votes GROUP BY as_id) kv ON kv.as_id = ar.as_id`
 
 // SearchAS 증상·조치·원인·결론·처리이력을 찾는다. 기준일 없음. §12.11.4
@@ -341,9 +341,9 @@ func scanASSearchHits(rows *sql.Rows) ([]model.ASSearchHit, error) {
 			&h.AssignedTo, &h.CompleteDate, &h.CustomerID, &h.VoteCount); err != nil {
 			return nil, err
 		}
-		h.Action = strings.TrimSpace(actionTaken)
+		h.Action = strings.TrimSpace(lastWork)
 		if h.Action == "" {
-			h.Action = strings.TrimSpace(lastWork)
+			h.Action = strings.TrimSpace(actionTaken)
 		}
 		items = append(items, h)
 	}

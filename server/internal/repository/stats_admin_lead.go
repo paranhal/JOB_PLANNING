@@ -8,10 +8,10 @@ import (
 )
 
 type adminLeadRow struct {
-	TaskID    string
-	Receipt   string
-	Complete  string
-	WorkMin   int
+	TaskID   string
+	Receipt  string
+	Complete string
+	WorkMin  int
 }
 
 type adminLeadAct struct {

@@ -18,7 +18,7 @@ func jwtCookie(t *testing.T) *http.Cookie {
 	t.Helper()
 	secret := []byte("cs-system-jwt-secret-2026")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  "admin-id", "username": "admin", "role": "admin",
+		"user_id": "admin-id", "username": "admin", "role": "admin",
 		"name": "관리자", "exp": time.Now().Add(time.Hour).Unix(),
 	})
 	s, err := token.SignedString(secret)

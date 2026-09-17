@@ -30,12 +30,12 @@ func TestAssigneeMatchSQLFragments(t *testing.T) {
 	}
 
 	mntSQL, _ := assigneeMatchSQL(AssigneeKindMaintenance, "v", "양기헌")
-	if !strings.Contains(mntSQL, "v.assignee") {
-		t.Fatalf("정기점검 assignee 없음: %s", mntSQL)
+	if !strings.Contains(mntSQL, "v.assignee") || !strings.Contains(mntSQL, "assignee_user_id") {
+		t.Fatalf("정기점검 assignee/user_id 없음: %s", mntSQL)
 	}
 
 	taskSQL, _ := assigneeMatchSQL(AssigneeKindTask, "t", "양기헌")
-	if !strings.Contains(taskSQL, "t.assignee") || !strings.Contains(taskSQL, "work_task_members") {
+	if !strings.Contains(taskSQL, "t.assignee") || !strings.Contains(taskSQL, "assignee_user_id") || !strings.Contains(taskSQL, "work_task_members") {
 		t.Fatalf("행정 멤버 없음: %s", taskSQL)
 	}
 

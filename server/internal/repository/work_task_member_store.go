@@ -45,7 +45,7 @@ func (r *WBRepo) ListMembersByTaskIDs(ids []string) (map[string][]model.WorkTask
 		args[i] = id
 	}
 	rows, err := r.db.Query(`
-		SELECT task_id, COALESCE(assignee,''), COALESCE(member_role,''), duration_min, COALESCE(sort_order,0)
+		SELECT task_id, COALESCE(assignee,''), COALESCE(user_id,''), COALESCE(member_role,''), duration_min, COALESCE(sort_order,0)
 		  FROM work_task_members
 		 WHERE task_id IN (`+strings.Join(ph, ",")+`)
 		 ORDER BY CASE member_role WHEN 'owner' THEN 0 ELSE 1 END, sort_order, assignee`, args...)
@@ -59,8 +59,13 @@ func (r *WBRepo) ListMembersByTaskIDs(ids []string) (map[string][]model.WorkTask
 	for rows.Next() {
 		var m model.WorkTaskMember
 		var dur sql.NullInt64
-		if err := rows.Scan(&m.TaskID, &m.Assignee, &m.Role, &dur, &m.SortOrder); err != nil {
+		if err := rows.Scan(&m.TaskID, &m.Assignee, &m.UserID, &m.Role, &dur, &m.SortOrder); err != nil {
 			return nil, err
+		}
+		if m.UserID != "" {
+			if n := UserName(r.db, m.UserID); n != "" {
+				m.Assignee = n
+			}
 		}
 		if dur.Valid {
 			m.DurationMin = int(dur.Int64)
@@ -90,10 +95,16 @@ func (r *WBRepo) ReplaceSupportMembers(taskID string, supports []model.WorkTaskM
 	seen := map[string]bool{}
 	for i, m := range supports {
 		name := strings.TrimSpace(m.Assignee)
-		if name == "" || seen[name] {
+		uid := strings.TrimSpace(m.UserID)
+		name, uid = bindStaff(r.db, name, uid)
+		key := uid
+		if key == "" {
+			key = name
+		}
+		if key == "" || seen[key] {
 			continue
 		}
-		seen[name] = true
+		seen[key] = true
 		var dur interface{}
 		if m.DurationMin > 0 {
 			dur = m.DurationMin
@@ -103,8 +114,8 @@ func (r *WBRepo) ReplaceSupportMembers(taskID string, supports []model.WorkTaskM
 			order = i + 1
 		}
 		if _, err := tx.Exec(`
-			INSERT INTO work_task_members (task_id, assignee, member_role, duration_min, sort_order)
-			VALUES (?,?,?,?,?)`, taskID, name, model.WBMemberSupport, dur, order); err != nil {
+			INSERT INTO work_task_members (task_id, assignee, user_id, member_role, duration_min, sort_order)
+			VALUES (?,?,?,?,?,?)`, taskID, name, uid, model.WBMemberSupport, dur, order); err != nil {
 			return fmt.Errorf("참여자 저장: %w", err)
 		}
 	}
@@ -118,7 +129,7 @@ func personOnTask(t model.WorkTask, name string, members map[string][]model.Work
 	}
 	if ms := members[t.TaskID]; len(ms) > 0 {
 		for _, m := range ms {
-			if strings.TrimSpace(m.Assignee) == name {
+			if strings.TrimSpace(m.Assignee) == name || strings.TrimSpace(m.UserID) == name {
 				return true
 			}
 		}

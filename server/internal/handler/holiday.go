@@ -25,19 +25,19 @@ type HolidayHandler struct {
 }
 
 type holidayCalDay struct {
-	Day         int
-	Date        string
-	Kind        string
-	Name        string
-	Weekend     bool
-	IsSunday    bool
-	IsSaturday  bool
-	InMonth     bool
-	DayClass    string
-	CellClass   string
-	DayStyle    string
-	CellStyle   string
-	Title       string
+	Day        int
+	Date       string
+	Kind       string
+	Name       string
+	Weekend    bool
+	IsSunday   bool
+	IsSaturday bool
+	InMonth    bool
+	DayClass   string
+	CellClass  string
+	DayStyle   string
+	CellStyle  string
+	Title      string
 }
 
 type holidayCalMonth struct {

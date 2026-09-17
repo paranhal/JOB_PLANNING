@@ -22,10 +22,11 @@ type WorkStatusHandler struct {
 	wb          *repository.WBRepo
 	userRepo    *repository.UserRepo
 	holidayRepo *repository.HolidayRepo
+	sales       *repository.SalesRepo
 }
 
-func NewWorkStatusHandler(wb *repository.WBRepo, userRepo *repository.UserRepo, holidayRepo *repository.HolidayRepo) *WorkStatusHandler {
-	return &WorkStatusHandler{wb: wb, userRepo: userRepo, holidayRepo: holidayRepo}
+func NewWorkStatusHandler(wb *repository.WBRepo, userRepo *repository.UserRepo, holidayRepo *repository.HolidayRepo, sales *repository.SalesRepo) *WorkStatusHandler {
+	return &WorkStatusHandler{wb: wb, userRepo: userRepo, holidayRepo: holidayRepo, sales: sales}
 }
 
 // Calendar 업무처리현황 — 월 캘린더(기본). kind=action|receipt. §14.2 · §14.3
@@ -89,11 +90,11 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 
 	var tasks []model.WorkTask
 	var cardFn func(model.WorkTask) model.WBCard
-	kindNote := "완료 실적(통계 처리와 동일 기준)"
+	kindNote := "목록 · 전체 기간 · 이관 데이터 포함 (통계 집계와 다름)"
 	if kind == wsKindReceipt {
 		tasks = receiptTasks
 		cardFn = receiptCardFromWork
-		kindNote = "그날 신규 접수 건"
+		kindNote = "그날 신규 접수 건 · 목록 · 전체 기간 · 이관 데이터 포함 (통계 집계와 다름)"
 	} else {
 		tasks = actionTasks
 		cardFn = statusCardFromWork
@@ -138,6 +139,11 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	asStats := buildCardStats(asCards, today)
 	mntStats := buildCardStats(mntCards, today)
 	adminStats := buildCardStats(adminCards, today)
+
+	var monthBanners []model.SalesMonthBanner
+	if view == regViewMonth && h.sales != nil {
+		monthBanners, _ = h.sales.ListMonthBanners(base.Year(), int(base.Month()))
+	}
 
 	dateStr := base.Format(dateLayout)
 	queryAssignee := assigneeFilter
@@ -184,6 +190,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"NextDate":        period.Next,
 		"Today":           today,
 		"MonthWeeks":      monthWeeks,
+		"MonthBanners":    monthBanners,
 		"WeekdayLabels":   workStatusWeekdayLabels(view),
 		"ASCards":         asCards,
 		"MntCards":        mntCards,

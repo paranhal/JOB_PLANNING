@@ -1,0 +1,26 @@
+{{define "sort_th"}}
+{{$align := or .Align ""}}{{$dir := or .Dir ""}}{{$cur := or .Cur ""}}{{$key := or .Key ""}}
+<th class="{{if .ThClass}}{{.ThClass}} {{end}}{{if .PadClass}}{{.PadClass}}{{else}}px-4 py-3 {{end}}text-xs font-semibold whitespace-nowrap {{if eq $align "right"}}text-right{{else if eq $align "center"}}text-center{{else}}text-left{{end}} {{if eq $cur $key}}text-gray-800{{else}}text-gray-500{{end}}">
+  <a href="{{.Href}}" class="inline-flex items-center gap-0.5 hover:text-blue-700 {{if eq $align "right"}}justify-end w-full{{else if eq $align "center"}}justify-center w-full{{end}}">
+    <span>{{.Label}}</span>
+    {{if eq $cur $key}}
+      {{if eq $dir "desc"}}<span class="font-semibold text-gray-800">▼</span>{{else}}<span class="font-semibold text-gray-800">▲</span>{{end}}
+    {{else}}
+      <span class="text-gray-300 font-normal">⇅</span>
+    {{end}}
+  </a>
+</th>
+{{end}}
+
+{{define "sort_select"}}
+<div class="md:hidden">
+  <label class="sr-only" for="{{if .ID}}{{.ID}}{{else}}sort-select{{end}}">정렬</label>
+  <select id="{{if .ID}}{{.ID}}{{else}}sort-select{{end}}"
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 bg-white"
+          onchange="if(this.value) location.href=this.value">
+    {{range .Options}}
+    <option value="{{.Href}}" {{if .Active}}selected{{end}}>{{.Label}} {{.Mark}}</option>
+    {{end}}
+  </select>
+</div>
+{{end}}

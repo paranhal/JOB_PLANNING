@@ -23,6 +23,9 @@ func (h *ASHandler) kbWriteFrom(c echo.Context) repository.KBWrite {
 }
 
 func kbBack(c echo.Context, asID string) string {
+	if strings.TrimSpace(c.FormValue("from")) == "gaps" {
+		return "/as/knowledge/gaps"
+	}
 	if ref := strings.TrimSpace(c.Request().Header.Get("Referer")); ref != "" {
 		return ref
 	}
@@ -43,8 +46,12 @@ func (h *ASHandler) CreateKnowledge(c echo.Context) error {
 	if strings.TrimSpace(in.ActionText) == "" {
 		return c.Redirect(http.StatusSeeOther, kbBack(c, in.ASID))
 	}
-	if _, err := h.repo.PublishKB(in); err != nil {
+	kb, err := h.repo.PublishKB(in)
+	if err != nil {
 		return err
+	}
+	if kb != nil {
+		_ = h.repo.ResolveKBGap(strings.TrimSpace(c.FormValue("gap_id")), kb.KBID)
 	}
 	return c.Redirect(http.StatusSeeOther, kbBack(c, in.ASID))
 }
@@ -79,11 +86,18 @@ func (h *ASHandler) KnowledgeHistory(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	past := h.repo.KBHistory(id)
+	var atts []model.Attachment
+	if h.attachRepo != nil {
+		atts, _ = h.attachRepo.ListByRef(model.RefTypeASKB, id)
+	}
 	return c.Render(http.StatusOK, "as/kb_history.html", map[string]interface{}{
 		"Title": "수정 이력", "Active": NavASKnowledge,
-		"Current": cur, "Past": past,
+		"Current": cur, "Past": past, "Attachments": atts,
 		"AuthorName": model.DisplayPerson(cur.AuthorName),
 		"CanReceive": canReceiveAS(c),
+		"CanProcess": canProcessAS(c),
+		"KBID": id,
+		"AttachErrMsg": attachErrMessage(c.QueryParam("err")),
 		"DisplayName": ctxString(c, "user_name"),
 	})
 }

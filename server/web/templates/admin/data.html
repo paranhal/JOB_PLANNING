@@ -36,6 +36,8 @@
     <a href="/admin/data?tab=unassigned" class="px-4 py-2 text-sm {{if eq .Tab "unassigned"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">사업 미배정</a>
     <a href="/admin/data?tab=metrics" class="px-4 py-2 text-sm {{if eq .Tab "metrics"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">지표 기준</a>
     <a href="/admin/data?tab=checks" class="px-4 py-2 text-sm {{if eq .Tab "checks"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">정합성 점검</a>
+    <a href="/admin/data?tab=assignees" class="px-4 py-2 text-sm {{if eq .Tab "assignees"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">담당자 매칭</a>
+    <a href="/admin/data?tab=processes" class="px-4 py-2 text-sm {{if eq .Tab "processes"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">조치 단일화</a>
     <a href="/admin/data?tab=import" class="px-4 py-2 text-sm {{if eq .Tab "import"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">AS 반입</a>
   </div>
 
@@ -249,7 +251,7 @@
   {{if eq .Tab "metrics"}}
   <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 max-w-xl">
     <div>
-      <h3 class="text-sm font-semibold text-gray-700">지표 기준일 · 실행률 대상</h3>
+      <h3 class="text-sm font-semibold text-gray-700">지표 기준일</h3>
       <p class="text-xs text-gray-500 mt-1">통계·대시보드 KPI·보고서 집계에만 적용합니다. AS 목록·상세·검색·이력은 바꾸지 않습니다.</p>
     </div>
     <form method="POST" action="/admin/data/metrics" class="space-y-4">
@@ -258,14 +260,6 @@
         <input type="date" name="metrics_base_date" value="{{.MetricsBaseDate}}"
                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
         <p class="text-[11px] text-gray-400 mt-1">이 날짜 이후만 센다. 비우면 하한이 없다. 「이관 포함」 토글은 기준일을 풀지 않는다.</p>
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">실행률 대상 (progress_scope)</label>
-        <input type="text" name="progress_scope" value="{{.ProgressScope}}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
-               placeholder="as,maintenance">
-        <p class="text-[11px] text-gray-400 mt-1">쉼표 구분. 비우면 전 유형. 건수·소요시간은 이 설정과 무관하다.</p>
-        <p class="text-[11px] text-amber-800 mt-1">{{.ProgressScopeHint}}</p>
       </div>
       <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장</button>
     </form>
@@ -326,6 +320,77 @@
     </table>
     {{else}}
     <p class="px-4 py-8 text-sm text-gray-400 text-center">점검 결과를 불러오지 못했습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "assignees"}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700">담당자 이름 ↔ 직원 ID 매칭 실패</h3>
+      <p class="text-xs text-gray-500 mt-1">이름 열이 <span class="font-mono">users</span> 에 없는 값입니다. 우리 직원이 아니면 사용자로 넣지 말고 외부 협력사 담당자로 다룹니다. <span class="font-mono">assignee</span> 에는 우리 직원만 들어갑니다.</p>
+    </div>
+    {{if .UnmatchedAssignees}}
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">테이블</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">열</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">이름</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">건수</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .UnmatchedAssignees}}
+        <tr class="bg-amber-50">
+          <td class="px-4 py-3 font-mono text-xs text-gray-700">{{.Table}}</td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-700">{{.Column}}</td>
+          <td class="px-4 py-3 text-amber-900 font-medium">{{.Name}}</td>
+          <td class="px-4 py-3 text-right font-semibold text-amber-800">{{.Count}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="px-4 py-8 text-sm text-gray-500 text-center">매칭 실패가 없습니다. 이름 열을 지우기 전에 한두 주 더 돌려 보세요.</p>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "processes"}}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+      <div>
+        <h3 class="text-sm font-semibold text-gray-700">접수 조치 ↔ 처리 이력 어긋남</h3>
+        <p class="text-xs text-gray-500 mt-1"><span class="font-mono">as_receipts.action_taken</span> 과 <span class="font-mono">as_processes.work_content</span> 가 둘 다 있는데 내용이 다릅니다. 화면은 이력을 정답으로 보여 줍니다. <strong>사람이 확인하기 전에는 어느 열도 지우지 않습니다.</strong></p>
+      </div>
+      <a href="/admin/data/process-conflicts.xlsx" class="shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium">xlsx 받기</a>
+    </div>
+    {{if .ProcessConflicts}}
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">AS번호</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">사이트</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">접수 조치</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">이력 조치</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .ProcessConflicts}}
+        <tr class="bg-amber-50 align-top">
+          <td class="px-4 py-3 font-mono text-xs text-gray-800 whitespace-nowrap">{{.ASNumber}}</td>
+          <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{.OrgName}}</td>
+          <td class="px-4 py-3 text-amber-900 text-xs whitespace-pre-wrap">{{.ReceiptAction}}</td>
+          <td class="px-4 py-3 text-blue-900 text-xs whitespace-pre-wrap">{{.ProcessAction}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="px-4 py-8 text-sm text-gray-500 text-center">어긋난 건이 없습니다. 접수 조치 열은 아직 지우지 않습니다.</p>
     {{end}}
   </div>
   {{end}}

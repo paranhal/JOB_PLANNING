@@ -1,4 +1,10 @@
 node_modules
+.gocache
 data
 .env
 *.exe
+docs
+tmp_pptx
+*.zip
+dash*.html
+.git

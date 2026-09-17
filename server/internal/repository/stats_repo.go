@@ -39,7 +39,7 @@ func PeriodRange(period string, offset int, now time.Time) (from, to time.Time, 
 		if weekday == 0 {
 			weekday = 7
 		}
-		mon := today.AddDate(0, 0, -(weekday - 1)).AddDate(0, 0, -7*offset)
+		mon := today.AddDate(0, 0, -(weekday-1)).AddDate(0, 0, -7*offset)
 		return mon, mon.AddDate(0, 0, 7), true
 	case model.StatsPeriodMonth:
 		start := time.Date(y, m, 1, 0, 0, 0, 0, loc).AddDate(0, -offset, 0)
@@ -182,9 +182,9 @@ func quarterLabels(start time.Time, tag string) []string {
 func metricDateExpr(metric string) string {
 	switch metric {
 	case model.StatsMetricCompleted:
-		return `date(COALESCE(ar.complete_datetime, ar.updated_at))`
+		return asCompleteDT
 	default:
-		return `date(ar.receipt_datetime)`
+		return `ar.receipt_datetime`
 	}
 }
 
@@ -216,7 +216,7 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 		       COALESCE(ar.receipt_channel,''), COALESCE(ar.requester_type,''),
 		       COALESCE(c.org_name,''),
 		       COALESCE(ar.assigned_to,''),
-		       COALESCE(ar.symptom,''), COALESCE(ar.action_taken,''),
+		       COALESCE(ar.symptom,''), COALESCE(` + asActionTakenSQL("ar") + `,''),
 		       COALESCE(ar.status,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -231,8 +231,8 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 
 	if from, to, ok, _ := ResolveStatsRange(q, now); ok {
 		expr := metricDateExpr(q.Metric)
-		sqlQ += fmt.Sprintf(` AND %s >= date(?) AND %s < date(?)`, expr, expr)
-		args = append(args, from.Format("2006-01-02"), to.Format("2006-01-02"))
+		sqlQ += fmt.Sprintf(` AND %s >= ? AND %s < ?`, expr, expr)
+		args = append(args, dayTimeStart(from.Format("2006-01-02")), dayTimeStart(to.Format("2006-01-02")))
 	}
 
 	sqlQ += ` ORDER BY ar.receipt_datetime DESC, ar.as_number DESC`
@@ -311,8 +311,8 @@ func (r *StatsRepo) listPartialWorkDetail(q model.StatsQuery, now time.Time) ([]
 		sqlQ += ` AND COALESCE(w.status,'open') = 'open'`
 	}
 	if from, to, ok, _ := ResolveStatsRange(q, now); ok {
-		sqlQ += ` AND date(w.created_at) >= date(?) AND date(w.created_at) < date(?)`
-		args = append(args, from.Format("2006-01-02"), to.Format("2006-01-02"))
+		sqlQ += ` AND w.created_at >= ? AND w.created_at < ?`
+		args = append(args, dayTimeStart(from.Format("2006-01-02")), dayTimeStart(to.Format("2006-01-02")))
 	}
 	sqlQ += ` ORDER BY w.created_at DESC, w.work_number DESC`
 

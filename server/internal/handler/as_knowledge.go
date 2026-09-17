@@ -72,6 +72,7 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		tab = "symptom"
 	}
 	f := knowledgeFilter(c)
+	asRef := strings.TrimSpace(c.QueryParam("as_id"))
 	withAction, totalAll, classified, err := h.repo.KnowledgeCorpus()
 	if err != nil {
 		return err
@@ -95,6 +96,8 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		"Sites": sites, "CanReceive": canReceiveAS(c),
 		"CanProcess": canProcessAS(c),
 		"DisplayName": ctxString(c, "user_name"),
+		"AttachErrMsg": attachErrMessage(c.QueryParam("err")),
+		"KBRedirect": c.Request().URL.RequestURI(),
 	}
 
 	if tab == "site" {
@@ -158,6 +161,10 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 			if items[i].ASID != "" {
 				items[i].Voted = voted[items[i].ASID]
 			}
+		}
+		h.attachKBFiles(items)
+		if total == 0 {
+			_, _ = h.repo.RecordKBGap(f.Query, ctxString(c, "user_name"), asRef)
 		}
 	}
 	totalPages := 0
@@ -242,4 +249,21 @@ func buildKnowledgeExcel(items []model.ASSearchHit) (*excelize.File, error) {
 		}
 	}
 	return f, nil
+}
+
+func (h *ASHandler) attachKBFiles(items []model.ASSearchHit) {
+	if h == nil || h.attachRepo == nil {
+		return
+	}
+	for i := range items {
+		id := strings.TrimSpace(items[i].KBID)
+		if id == "" {
+			continue
+		}
+		atts, err := h.attachRepo.ListByRef(model.RefTypeASKB, id)
+		if err != nil || len(atts) == 0 {
+			continue
+		}
+		items[i].Attachments = atts
+	}
 }

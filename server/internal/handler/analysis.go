@@ -140,13 +140,13 @@ func (h *AnalysisHandler) Dashboard(c echo.Context) error {
 		"Aging": aging, "Frequent": frequent, "Other": other,
 		"TotalAssets": totalAssets,
 		"AgingCount":  agingTotal, "FreqCount": freqTotal, "OtherCount": otherTotal,
-		"PageSize":      analysisPageSize,
-		"AgingPage":     agingPage,
-		"AgingPages":    totalPages(agingTotal, analysisPageSize),
-		"FreqPage":      freqPage,
-		"FreqPages":     totalPages(freqTotal, analysisPageSize),
-		"OtherPage":     otherPage,
-		"OtherPages":    totalPages(otherTotal, analysisPageSize),
+		"PageSize":   analysisPageSize,
+		"AgingPage":  agingPage,
+		"AgingPages": totalPages(agingTotal, analysisPageSize),
+		"FreqPage":   freqPage,
+		"FreqPages":  totalPages(freqTotal, analysisPageSize),
+		"OtherPage":  otherPage,
+		"OtherPages": totalPages(otherTotal, analysisPageSize),
 	})
 }
 

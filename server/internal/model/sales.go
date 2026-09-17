@@ -502,6 +502,145 @@ func FormatSalesPeriod(ym, precision string) string {
 	}
 }
 
+// SalesMonthBanner 월별 캘린더 맨 위 띠. 날짜 칸에 넣지 않는다 (§39.7).
+type SalesMonthBanner struct {
+	SalesID   string
+	Href      string
+	Title     string
+	Confirmed bool
+	PlaceYM   string
+}
+
+// SalesPeriodFirstYM 정밀도 기간의 첫 달 (YYYY-MM). 분기·반기·연은 그 기간 첫 달에 놓는다.
+func SalesPeriodFirstYM(ym, precision string) string {
+	ym = NormalizeSalesYM(ym)
+	if ym == "" {
+		return ""
+	}
+	year, _ := strconv.Atoi(ym[:4])
+	month, _ := strconv.Atoi(ym[5:7])
+	switch NormalizeSalesPrecision(precision) {
+	case SalesPrecisionQuarter:
+		month = ((month-1)/3)*3 + 1
+	case SalesPrecisionHalf:
+		if month <= 6 {
+			month = 1
+		} else {
+			month = 7
+		}
+	case SalesPrecisionYear:
+		month = 1
+	}
+	return fmt.Sprintf("%04d-%02d", year, month)
+}
+
+// SalesPeriodBannerNote 띠 괄호 문구. 월은 「월 미정」, 분기는 「4분기 중」.
+func SalesPeriodBannerNote(ym, precision string) string {
+	ym = NormalizeSalesYM(ym)
+	if ym == "" {
+		return ""
+	}
+	month, _ := strconv.Atoi(ym[5:7])
+	switch NormalizeSalesPrecision(precision) {
+	case SalesPrecisionQuarter:
+		return fmt.Sprintf("%d분기 중", (month-1)/3+1)
+	case SalesPrecisionHalf:
+		if month <= 6 {
+			return "상반기 중"
+		}
+		return "하반기 중"
+	case SalesPrecisionYear:
+		return ym[:4] + "년 중"
+	default:
+		return "월 미정"
+	}
+}
+
+// FormatSalesMonthBannerTitle 「9월 · 부여군도서관 제안 (월 미정)」.
+func FormatSalesMonthBannerTitle(placeYM, name, precision string, confirmed bool) string {
+	placeYM = NormalizeSalesYM(placeYM)
+	if placeYM == "" {
+		return strings.TrimSpace(name)
+	}
+	month, _ := strconv.Atoi(placeYM[5:7])
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "영업 사업"
+	}
+	prec := NormalizeSalesPrecision(precision)
+	note := ""
+	if prec == SalesPrecisionMonth {
+		if !confirmed {
+			note = "월 미정"
+		}
+	} else {
+		note = SalesPeriodBannerNote(placeYM, prec)
+	}
+	if note == "" {
+		return fmt.Sprintf("%d월 · %s", month, name)
+	}
+	return fmt.Sprintf("%d월 · %s (%s)", month, name, note)
+}
+
+func SalesMonthBannerFromProject(p SalesProject) (SalesMonthBanner, bool) {
+	ym := NormalizeSalesYM(p.ExpectedYM)
+	if ym == "" {
+		return SalesMonthBanner{}, false
+	}
+	place := SalesPeriodFirstYM(ym, p.ExpectedPrecision)
+	id := strings.TrimSpace(p.SalesID)
+	return SalesMonthBanner{
+		SalesID:   id,
+		Href:      "/sales/" + id,
+		Title:     FormatSalesMonthBannerTitle(place, p.Name, p.ExpectedPrecision, p.ExpectedYMConfirmed),
+		Confirmed: p.ExpectedYMConfirmed,
+		PlaceYM:   place,
+	}, true
+}
+
+func IsSalesMonthOnly(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" || NormalizeAppDate(s) != "" {
+		return false
+	}
+	return NormalizeSalesYM(s) != ""
+}
+
+func RequireSalesDateOrYM(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	if err := RequireAppDateYear(s); err == nil {
+		return nil
+	}
+	if NormalizeSalesYM(s) != "" {
+		return nil
+	}
+	return ErrAppDateYear
+}
+
+func SalesMonthBannerFromNextAction(salesID, salesName, nextAction, nextDate string) (SalesMonthBanner, bool) {
+	if !IsSalesMonthOnly(nextDate) {
+		return SalesMonthBanner{}, false
+	}
+	place := NormalizeSalesYM(nextDate)
+	label := strings.TrimSpace(nextAction)
+	if label == "" {
+		label = strings.TrimSpace(salesName)
+	}
+	if label == "" {
+		label = "다음 활동"
+	}
+	id := strings.TrimSpace(salesID)
+	return SalesMonthBanner{
+		SalesID: id,
+		Href:    "/sales/" + id,
+		Title:   FormatSalesMonthBannerTitle(place, label, SalesPrecisionMonth, false),
+		PlaceYM: place,
+	}, true
+}
+
 func formatSalesAmount(n int) string {
 	s := strconv.Itoa(n)
 	if n < 0 {
@@ -878,6 +1017,7 @@ type SalesTimelineEvent struct {
 	DurationLabel  string
 	SalesID        string
 	SalesName      string
+	ActivityID     string
 	NextChipLabel  string
 	NextChipClass  string
 }
@@ -922,6 +1062,7 @@ func MergeSalesTimeline(acts []SalesActivity, hist []SalesStageHistory, changes 
 			DurationLabel:  FormatMinutesAsCard(a.DurationMin),
 			SalesID:        a.SalesID,
 			SalesName:      a.SalesName,
+			ActivityID:     a.ActivityID,
 			NextChipLabel:  nextLabel,
 			NextChipClass:  nextClass,
 		})

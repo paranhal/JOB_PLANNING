@@ -162,6 +162,34 @@ func (r *MaintenanceRepo) BulkUpdateAssignees(planID string, year int, f VisitFi
 	return n, nil
 }
 
+// FindVisitBySlot 같은 계획·고객·제품·날짜의 방문 한 건. 방금 넣은 알림 대상. §42.5
+func (r *MaintenanceRepo) FindVisitBySlot(planID, customerID, product, date string) *model.MaintenanceVisit {
+	if r == nil {
+		return nil
+	}
+	visits, err := r.ListVisits(planID)
+	if err != nil {
+		return nil
+	}
+	wantP := model.VisitProductSlotKey(product)
+	wantD := strings.TrimSpace(date)
+	var found *model.MaintenanceVisit
+	for i := range visits {
+		v := visits[i]
+		if v.CustomerID != customerID {
+			continue
+		}
+		if strings.TrimSpace(v.VisitDate) != wantD {
+			continue
+		}
+		if model.VisitProductSlotKey(v.ProductType) != wantP {
+			continue
+		}
+		found = &visits[i]
+	}
+	return found
+}
+
 // AssignSlot 미배정 슬롯에 날짜를 넣는다. 계획 복사로 날짜만 비운 행이 있으면 그 행을 쓴다.
 func (r *MaintenanceRepo) AssignSlot(v model.MaintenanceVisit) error {
 	v.VisitDate = strings.TrimSpace(v.VisitDate)

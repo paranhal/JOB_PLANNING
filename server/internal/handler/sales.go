@@ -51,6 +51,10 @@ func (h *SalesHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "name,stage,customer,period,amount")
+	if view == "list" && sortKey != "" {
+		sortSalesProjects(items, sortKey, dir)
+	}
 	stages, _ := h.repo.StagesFor(f.DealType)
 	rows := make([]map[string]interface{}, 0, len(items))
 	for i := range items {
@@ -59,6 +63,14 @@ func (h *SalesHandler) List(c echo.Context) error {
 	}
 	fromTask := strings.TrimSpace(c.QueryParam("from_task"))
 	dealType, buildHref, supplyHref, newHref, resetHref, filterQ := salesDealBoardLinks("/sales", view, f, fromTask)
+	if sortKey != "" {
+		if filterQ != "" {
+			filterQ += "&"
+		}
+		filterQ += "sort=" + url.QueryEscape(sortKey) + "&dir=" + url.QueryEscape(dir)
+	}
+	sortBase := salesListFilterValues(f, view, fromTask)
+	hrefs := sortLinkHrefs("/sales", sortBase, []string{"name", "stage", "customer", "period", "amount"}, sortKey, dir)
 	lastAct, _ := h.repo.LatestActivityDateBySales()
 	kanbanCols := salesProjectKanban(items, stages, fromTask, lastAct, false)
 	kanbanTotal := 0
@@ -80,17 +92,21 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"Filter":        f,
 		"DealType":      dealType,
 		"DealBuildHref": buildHref, "DealSupplyHref": supplyHref,
-		"NewHref":       newHref, "FilterReset": resetHref,
-		"Search":        f.Search, "Status": f.Status, "Stage": f.Stage,
+		"NewHref": newHref, "FilterReset": resetHref,
+		"Search": f.Search, "Status": f.Status, "Stage": f.Stage,
 		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
 		"PeriodOptions": salesPeriodOptions(time.Now()),
 		"Users":         users,
 		"FilterAction":  "/sales",
 		"CanWrite":      canWriteSales(c),
 		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"FormError":     querySalesErr(c.QueryParam("err")),
-		"FromTask":      fromTask,
+		"FormError":           querySalesErr(c.QueryParam("err")),
+		"FromTask":            fromTask,
 		"ShowPipelineMetrics": false,
+		"Sort":                sortKey,
+		"Dir":                 dir,
+		"SortHref":            hrefs,
+		"SortSelect":          sortSelectOptions(salesListSortCols(), hrefs, sortKey, dir),
 	})
 }
 
@@ -206,6 +222,8 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"PartyHints":      model.CustomerPartyHintNames(parties),
 		"Today":           time.Now().Format("2006-01-02"),
 		"CanWrite":        canWriteSales(c), "CanDelete": canDeleteSales(c),
+		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
+		"CurrentUser":     ctxString(c, "user_name"),
 		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"FormError": querySalesErr(c.QueryParam("err")),
 		"FromTask":  fromTask,
@@ -410,6 +428,8 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 		"AssigneeFilter":  assigneeFilter,
 		"FilterQ":         filterQ,
 		"CanWrite":        canWriteSales(c),
+		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
+		"CurrentUser":     ctxString(c, "user_name"),
 		"ShowHeaderAdd":   canWriteSales(c) && view != "day",
 		"LogQuery":        "",
 		"TypeQuery":       "",
@@ -475,8 +495,8 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 		"Filter":        f,
 		"DealType":      dealType,
 		"DealBuildHref": buildHref, "DealSupplyHref": supplyHref,
-		"FilterReset":         resetHref,
-		"Search":        f.Search, "Status": f.Status, "Stage": f.Stage,
+		"FilterReset": resetHref,
+		"Search":      f.Search, "Status": f.Status, "Stage": f.Stage,
 		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
 		"PeriodOptions":       salesPeriodOptions(time.Now()),
 		"Users":               users,
@@ -484,7 +504,7 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 		"View":                "kanban",
 		"ShowPipelineMetrics": true,
 		"FlashOK":             c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"FormError":           querySalesErr(c.QueryParam("err")),
+		"FormError": querySalesErr(c.QueryParam("err")),
 	})
 }
 
@@ -578,6 +598,37 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 	return p
 }
 
+func sortSalesProjects(items []model.SalesProject, sortKey, dir string) {
+	if len(items) == 0 || sortKey == "" {
+		return
+	}
+	desc := dir == "desc"
+	val := func(p model.SalesProject) string {
+		switch sortKey {
+		case "name":
+			return strings.ToLower(p.Name)
+		case "stage":
+			return p.Stage
+		case "customer":
+			return strings.ToLower(p.CustomerValue())
+		case "amount":
+			return fmt.Sprintf("%020d", p.ExpectedAmount)
+		default:
+			return p.ExpectedYM
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := val(items[i]), val(items[j])
+		if a != b {
+			if desc {
+				return a > b
+			}
+			return a < b
+		}
+		return false
+	})
+}
+
 func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageDef) map[string]interface{} {
 	n, total := p.ConfirmedCount()
 	customer := p.CustomerValue()
@@ -663,6 +714,70 @@ func (h *SalesHandler) CreateActivity(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/sales/activities?ok=activity")
 	}
 	return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?ok=activity")
+}
+
+func (h *SalesHandler) UpdateActivity(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	aid := strings.TrimSpace(c.Param("aid"))
+	cur, err := h.repo.GetActivity(aid)
+	if err != nil || cur == nil {
+		return echo.ErrNotFound
+	}
+	if !canEditSalesActivity(c, cur.CreatedBy) {
+		return echo.ErrForbidden
+	}
+	a := h.parseActivityForm(c)
+	a.ActivityID = cur.ActivityID
+	a.SalesID = cur.SalesID
+	replyErr := func(err error) error {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "code": salesErrCode(err), "error": err.Error()})
+		}
+		back := salesReturnPath(c, "/sales/activities")
+		sep := "?"
+		if strings.Contains(back, "?") {
+			sep = "&"
+		}
+		return c.Redirect(http.StatusSeeOther, back+sep+"err="+salesErrCode(err))
+	}
+	if err := h.repo.UpdateActivity(a); err != nil {
+		return replyErr(err)
+	}
+	if wantsJSON(c) {
+		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "activity_id": a.ActivityID})
+	}
+	return c.Redirect(http.StatusSeeOther, salesReturnPath(c, "/sales/"+cur.SalesID+"?ok=activity"))
+}
+
+func (h *SalesHandler) DeleteActivity(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	aid := strings.TrimSpace(c.Param("aid"))
+	cur, err := h.repo.GetActivity(aid)
+	if err != nil || cur == nil {
+		return echo.ErrNotFound
+	}
+	if !canEditSalesActivity(c, cur.CreatedBy) {
+		return echo.ErrForbidden
+	}
+	if err := h.repo.DeleteActivity(aid); err != nil {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "code": salesErrCode(err), "error": err.Error()})
+		}
+		back := salesReturnPath(c, "/sales/activities")
+		sep := "?"
+		if strings.Contains(back, "?") {
+			sep = "&"
+		}
+		return c.Redirect(http.StatusSeeOther, back+sep+"err="+salesErrCode(err))
+	}
+	if wantsJSON(c) {
+		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true})
+	}
+	return c.Redirect(http.StatusSeeOther, salesReturnPath(c, "/sales/"+cur.SalesID+"?ok=deleted"))
 }
 
 func (h *SalesHandler) PartyHints(c echo.Context) error {

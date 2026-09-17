@@ -38,8 +38,16 @@ func salesActGroup(v string) string {
 	return "type"
 }
 
-func salesFilterQuery(search, status, stage, extra string) string {
-	return salesFilterEncode(repository.SalesListFilter{Search: search, Status: status, Stage: stage}, extra)
+func salesListFilterValues(f repository.SalesListFilter, view, fromTask string) url.Values {
+	s := salesFilterEncode(f, "")
+	v, _ := url.ParseQuery(s)
+	if view != "" && view != "list" {
+		v.Set("display", view)
+	}
+	if strings.TrimSpace(fromTask) != "" {
+		v.Set("from_task", fromTask)
+	}
+	return v
 }
 
 func parseSalesListFilter(c echo.Context) repository.SalesListFilter {
@@ -264,7 +272,7 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 			OrgName: p.CustomerValue(), Extra: amt,
 			Assignee: p.SalesOwner, Bucket: key, Stage: key,
 			LeftStyle: model.WorkCardColorStyle(p.SalesOwner, "", "sales"),
-			SortDate: model.NormalizeSalesYM(p.ExpectedYM), DueDate: p.PeriodLabel(),
+			SortDate:  model.NormalizeSalesYM(p.ExpectedYM), DueDate: p.PeriodLabel(),
 			AmountUnconfirmed: !p.ExpectedAmountConfirmed, LastActivity: last,
 			AmountDesc: p.ExpectedAmount,
 		})

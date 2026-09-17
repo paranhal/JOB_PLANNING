@@ -11,6 +11,12 @@ import (
 
 // ListUnplanned §8 미계획 업무함. /work 의 collectDelayed·collectSchedulePending·collectUnassigned를 재사용한다.
 func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind string) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
+	return r.listUnplanned(mineUserID, mineKeys, kind, nil)
+}
+
+func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind string, reuse *unplannedBase) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
+	start := time.Now()
+	defer logSlowSQL("work.ListUnplanned", start)
 	today := time.Now().Format("2006-01-02")
 	bag := map[string]*model.UnplannedItem{}
 
@@ -51,9 +57,27 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 		cur.Badges = append(cur.Badges, model.UnplannedBadgeOfStarted(k, cur.DaysOverdue, cur.Started && k == model.UnplannedDelayed))
 	}
 
-	delayed, err := r.collectDelayed(mineUserID, mineKeys, today)
-	if err != nil {
-		return nil, model.UnplannedKindCounts{}, err
+	var delayed, pending, open, unassigned []model.WorkListItem
+	var err error
+	if reuse != nil {
+		delayed, pending, open, unassigned = reuse.Delayed, reuse.Pending, reuse.Open, reuse.Unassigned
+	} else {
+		delayed, err = r.collectDelayed(mineUserID, mineKeys, today)
+		if err != nil {
+			return nil, model.UnplannedKindCounts{}, err
+		}
+		pending, err = r.collectSchedulePending(mineUserID, mineKeys)
+		if err != nil {
+			return nil, model.UnplannedKindCounts{}, err
+		}
+		open, err = r.collectOpen(mineUserID, mineKeys)
+		if err != nil {
+			return nil, model.UnplannedKindCounts{}, err
+		}
+		unassigned, err = r.collectUnassigned()
+		if err != nil {
+			return nil, model.UnplannedKindCounts{}, err
+		}
 	}
 	started := r.asStartedSet(delayedIDs(delayed))
 	for _, it := range delayed {
@@ -71,10 +95,6 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 		add(u, model.UnplannedDelayed)
 	}
 
-	pending, err := r.collectSchedulePending(mineUserID, mineKeys)
-	if err != nil {
-		return nil, model.UnplannedKindCounts{}, err
-	}
 	for _, it := range pending {
 		d := strings.TrimSpace(it.ScheduledDate)
 		if d != "" && d < today {
@@ -82,10 +102,6 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 		}
 	}
 
-	open, err := r.collectOpen(mineUserID, mineKeys)
-	if err != nil {
-		return nil, model.UnplannedKindCounts{}, err
-	}
 	for _, it := range open {
 		if strings.TrimSpace(it.ScheduledDate) == "" {
 			add(toUnplannedItem(it), model.UnplannedNoDate)
@@ -113,10 +129,6 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 		add(toUnplannedItem(it), model.UnplannedNoDate)
 	}
 
-	unassigned, err := r.collectUnassigned()
-	if err != nil {
-		return nil, model.UnplannedKindCounts{}, err
-	}
 	for _, it := range unassigned {
 		add(toUnplannedItem(it), model.UnplannedUnassigned)
 	}
@@ -173,6 +185,10 @@ func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind
 
 	sortUnplanned(out)
 	return out, counts, nil
+}
+
+type unplannedBase struct {
+	Delayed, Pending, Open, Unassigned []model.WorkListItem
 }
 
 type noDateMeta struct {

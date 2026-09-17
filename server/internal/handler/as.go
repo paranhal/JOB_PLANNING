@@ -36,6 +36,7 @@ type ASHandler struct {
 	attachRepo   *repository.AttachmentRepo
 	attach       *AttachmentHandler
 	kwRepo       *repository.ASKeywordRepo
+	notices      *assignNoticeHook
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
@@ -108,7 +109,7 @@ func (h *ASHandler) List(c echo.Context) error {
 			}
 		}
 		if h.attachRepo != nil {
-			if counts, err := h.attachRepo.CountByRefIDs(model.RefTypeASReceipt, ids); err == nil {
+			if counts, err := h.attachRepo.CountReceiptPhotosByIDs(ids); err == nil {
 				for i := range items {
 					items[i].PhotoCount = counts[items[i].ASID]
 				}
@@ -636,6 +637,9 @@ func (h *ASHandler) Create(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther, "/as/new?err="+receiptCreateErrQuery(err))
 		}
 		h.syncASPlannedDailyTask(as.ASID)
+		if h.notices != nil {
+			h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, "", "")
+		}
 		if i == 0 {
 			h.saveKeywordChecks(c, as.ASID, model.KWFieldSymptom)
 			first = as
@@ -715,6 +719,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
 	}
+	prevTo, prevUID := existing.AssignedTo, existing.AssignedUserID
 	if isASClosedStatus(existing.Status) && !h.canModifyAS(c, existing) {
 		return h.redirectLocked(c, id, "show")
 	}
@@ -737,6 +742,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 		return err
 	}
 	h.syncASPlannedDailyTask(id)
+	if h.notices != nil {
+		h.notices.Record(c, model.AssignNoticeSourceAS, id, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)
+	}
 	h.saveKeywordChecks(c, id, model.KWFieldSymptom)
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
 }
@@ -866,7 +874,7 @@ func (h *ASHandler) mergeReceiptPhotoData(c echo.Context, as *model.ASReceipt, d
 	}
 	var photos []model.Attachment
 	if h.attachRepo != nil {
-		photos, _ = h.attachRepo.ListByRef(model.RefTypeASReceipt, as.ASID)
+		photos, _ = h.attachRepo.ListReceiptPhotos(as.ASID)
 	}
 	assetCount := 0
 	if as.AssetID != "" && h.attachRepo != nil {
@@ -1062,6 +1070,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	prevTo, prevUID := as.AssignedTo, as.AssignedUserID
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "action")
 	}
@@ -1237,6 +1246,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 					return err
 				}
 				followupChild = child
+				if h.notices != nil {
+					h.notices.Record(c, model.AssignNoticeSourceAS, child.ASID, child.AssignedTo, child.AssignedUserID, "", "")
+				}
 			}
 		} else {
 			as.RevisitReason = ""
@@ -1259,6 +1271,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 		return err
 	}
 	h.syncASPlannedDailyTask(as.ASID)
+	if h.notices != nil {
+		h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)
+	}
 	h.saveKeywordChecks(c, as.ASID, model.KWFieldAction)
 	if canProcessAS(c) {
 		_ = h.appendActionProcess(c, as, formResult, prepNotes, timeSpent)
@@ -1570,6 +1585,7 @@ func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, res
 		ASID:            as.ASID,
 		Worker:          worker,
 		WorkType:        as.ProcessType,
+		CauseType:       as.CauseType,
 		WorkContent:     content,
 		PartsUsed:       as.PartsUsed,
 		Notes:           strings.Join(notesParts, " · "),

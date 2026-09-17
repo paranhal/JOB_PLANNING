@@ -1,0 +1,149 @@
+{{define "work_filters"}}
+<form method="GET" action="/work/all" id="work-all-filter"
+      class="bg-white rounded-xl border border-gray-200 p-4 space-y-3"
+      x-data='workCustFilter({{.CustomersJSON}}, {{.SelCustomerJSON}})'>
+  {{if eq .View "kanban"}}<input type="hidden" name="display" value="kanban"><input type="hidden" name="view" value="kanban">{{end}}
+  {{if and .Sort (or (ne .Sort "due_date") (ne .Dir "desc"))}}
+  <input type="hidden" name="sort" value="{{.Sort}}"><input type="hidden" name="dir" value="{{.Dir}}">
+  {{end}}
+  <template x-for="id in selected" :key="id">
+    <input type="hidden" name="customer" :value="id">
+  </template>
+
+  <div class="flex flex-col sm:flex-row gap-2">
+    <label class="sr-only" for="work-q">검색</label>
+    <input id="work-q" type="search" name="q" value="{{.Q}}" placeholder="제목 · 기관 · 내용"
+           class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium">검색</button>
+    <a href="{{.ResetHref}}" class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 text-center">초기화</a>
+  </div>
+
+  {{if .FilterChips}}
+  <div class="flex flex-wrap gap-1.5">
+    {{range .FilterChips}}
+    <a href="{{.Href}}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs hover:bg-slate-200">
+      {{.Label}} <span aria-hidden="true">✕</span>
+    </a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="flex flex-wrap gap-2 text-sm">
+    <details class="relative">
+      <summary class="cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50">담당자 ▼</summary>
+      <div class="absolute z-20 mt-1 w-52 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1">
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="assignee" value="__none__" {{if index .SelAssignee "__none__"}}checked{{end}} onchange="this.form.submit()"> 미배정</label>
+        {{range .Assignees}}
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="assignee" value="{{.FullName}}" {{if index $.SelAssignee .FullName}}checked{{end}} onchange="this.form.submit()"> {{.FullName}}</label>
+        {{end}}
+      </div>
+    </details>
+
+    <details class="relative">
+      <summary class="cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50">구분 ▼</summary>
+      <div class="absolute z-20 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1">
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="as" {{if index .SelKind "as"}}checked{{end}} onchange="this.form.submit()"> AS</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="maintenance" {{if index .SelKind "maintenance"}}checked{{end}} onchange="this.form.submit()"> 정기점검</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="admin" {{if index .SelKind "admin"}}checked{{end}} onchange="this.form.submit()"> 행정·지원</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="sales" {{if index .SelKind "sales"}}checked{{end}} onchange="this.form.submit()"> 영업 활동</label>
+      </div>
+    </details>
+
+    <details class="relative">
+      <summary class="cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50">상태 ▼</summary>
+      <div class="absolute z-20 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1">
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="status" value="waiting" {{if index .SelStatus "waiting"}}checked{{end}} onchange="this.form.submit()"> 대기</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="status" value="in_progress" {{if index .SelStatus "in_progress"}}checked{{end}} onchange="this.form.submit()"> 진행중</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="status" value="complete" {{if index .SelStatus "complete"}}checked{{end}} onchange="this.form.submit()"> 완료</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="status" value="delayed" {{if index .SelStatus "delayed"}}checked{{end}} onchange="this.form.submit()"> 지연</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="status" value="hold" {{if index .SelStatus "hold"}}checked{{end}} onchange="this.form.submit()"> 보류</label>
+      </div>
+    </details>
+
+    <div class="relative" @click.outside="open=false">
+      <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50" @click="open=!open">기관 ▼</button>
+      <div x-show="open" x-cloak class="absolute z-20 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-2">
+        <label class="sr-only" for="work-cust-q">기관 찾기</label>
+        <input id="work-cust-q" type="search" x-model="q" placeholder="기관명 입력"
+               class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs mb-2">
+        <div class="max-h-56 overflow-y-auto space-y-1">
+          <template x-for="c in filtered()" :key="c.id">
+            <label class="flex items-center gap-2 px-1 py-0.5 text-xs">
+              <input type="checkbox" :value="c.id" :checked="selected.indexOf(c.id)>=0" @change="toggle(c.id); $nextTick(function(){ $el.form.submit(); })">
+              <span x-text="c.org_name"></span>
+            </label>
+          </template>
+          <p class="text-[11px] text-gray-400 px-1" x-show="filtered().length===0">맞는 기관이 없습니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <details class="relative">
+      <summary class="cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50">사업 ▼</summary>
+      <div class="absolute z-20 mt-1 w-56 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1">
+        {{range .Projects}}
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="project" value="{{.ProjectID}}" {{if index $.SelProject .ProjectID}}checked{{end}} onchange="this.form.submit()"> {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}</label>
+        {{else}}
+        <p class="text-[11px] text-gray-400 px-1">등록된 사업이 없습니다.</p>
+        {{end}}
+      </div>
+    </details>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="sr-only" for="work-period">기간</label>
+      <select id="work-period" name="period" onchange="this.form.submit()"
+              class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm">
+        <option value="today" {{if eq .Period "today"}}selected{{end}}>오늘</option>
+        <option value="week" {{if eq .Period "week"}}selected{{end}}>이번 주</option>
+        <option value="month" {{if eq .Period "month"}}selected{{end}}>이번 달</option>
+        <option value="3m" {{if or (eq .Period "3m") (eq .Period "")}}selected{{end}}>최근 3개월</option>
+        <option value="year" {{if eq .Period "year"}}selected{{end}}>올해</option>
+        <option value="custom" {{if eq .Period "custom"}}selected{{end}}>직접 지정</option>
+      </select>
+      {{if eq .Period "custom"}}
+      <input type="date" name="from" value="{{.From}}" onchange="this.form.submit()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+      <span class="text-gray-400 text-xs">~</span>
+      <input type="date" name="to" value="{{.To}}" onchange="this.form.submit()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+      {{end}}
+    </div>
+  </div>
+</form>
+<script>
+function workCustFilter(all, selected) {
+  all = all || [];
+  selected = (selected || []).slice();
+  var CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+  function choSung(s) {
+    var out = '';
+    s = String(s || '');
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0xAC00 && c <= 0xD7A3) out += CHO.charAt(Math.floor((c - 0xAC00) / 588));
+    }
+    return out;
+  }
+  return {
+    open: false,
+    q: '',
+    selected: selected,
+    filtered: function() {
+      var q = String(this.q || '').trim();
+      if (!q) return all.slice(0, 80);
+      var low = q.toLowerCase();
+      var choQ = /^[ㄱ-ㅎ]+$/.test(q);
+      return all.filter(function(c) {
+        var hay = [c.org_name, c.short_name, c.region, c.id].join('\n').toLowerCase();
+        if (hay.indexOf(low) >= 0) return true;
+        if (!choQ) return false;
+        return (choSung(c.org_name) + choSung(c.short_name) + choSung(c.region)).indexOf(q) >= 0;
+      }).slice(0, 80);
+    },
+    toggle: function(id) {
+      var i = this.selected.indexOf(id);
+      if (i >= 0) this.selected.splice(i, 1);
+      else this.selected.push(id);
+    }
+  };
+}
+</script>
+{{end}}

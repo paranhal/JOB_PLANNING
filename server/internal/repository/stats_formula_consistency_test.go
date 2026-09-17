@@ -21,7 +21,7 @@ func TestDashboardStatsWeeklySameFormula(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 금주(2026-08-03~08-09): app 2건 + import 1건.
-	// app1 예정일 당일 완료(OnPlan), app2 다음날 완료(변경), import는 당일 완료.
+	// app1 예정일 당일 완료, app2 다음날 완료, import는 당일 완료.
 	_, err = db.Exec(`
 		INSERT INTO as_receipts (
 			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
@@ -73,31 +73,12 @@ func TestDashboardStatsWeeklySameFormula(t *testing.T) {
 	if cur.Counts.AS.Planned != 2 {
 		t.Fatalf("이관 제외 예정=%d want 2 (app만)", cur.Counts.AS.Planned)
 	}
-	if cur.Counts.AS.OnPlan != 1 {
-		t.Fatalf("OnPlan=%d want 1", cur.Counts.AS.OnPlan)
-	}
-	wantRate := cur.Counts.ExecutionRatePct()
-	if wantRate != 50 {
-		t.Fatalf("실행률=%.1f want 50", wantRate)
-	}
 
-	if kpi.ExecutionRate != team.ExecDisplay.Value {
-		t.Fatalf("실행률 불일치 KPI=%.1f 주간=%.1f", kpi.ExecutionRate, team.ExecDisplay.Value)
-	}
-	if kpi.HasExecution == team.ExecDisplay.DenomZero {
-		t.Fatalf("HasExec KPI=%v 주간 denomZero=%v", kpi.HasExecution, team.ExecDisplay.DenomZero)
-	}
 	if kpi.VisitAvgDays != team.VisitDisplay.Value || kpi.VisitSample != team.VisitDisplay.Sample {
 		t.Fatalf("방문 KPI=%.1f/%d 주간=%.1f/%d", kpi.VisitAvgDays, kpi.VisitSample, team.VisitDisplay.Value, team.VisitDisplay.Sample)
 	}
 	if kpi.CompleteAvgDays != team.CompleteDisplay.Value || kpi.CompleteSample != team.CompleteDisplay.Sample {
 		t.Fatalf("완료 KPI=%.1f/%d 주간=%.1f/%d", kpi.CompleteAvgDays, kpi.CompleteSample, team.CompleteDisplay.Value, team.CompleteDisplay.Sample)
-	}
-	if kpi.ExecutionSample != 2 {
-		t.Fatalf("표본=%d want 2", kpi.ExecutionSample)
-	}
-	if kpi.ExecDisplay.ShowValue {
-		t.Fatal("표본 2건은 §4.4 측정불가라 값을 숨긴다")
 	}
 
 	// 토글 켜면 import 1건이 합산된다.
@@ -114,12 +95,8 @@ func TestDashboardStatsWeeklySameFormula(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kpiIn.ExecutionSample != 3 {
-		t.Fatalf("이관 포함 표본=%d want 3", kpiIn.ExecutionSample)
-	}
-	wantIn := colsIn[1].Counts.ExecutionRatePct()
-	if wantIn <= wantRate {
-		t.Fatalf("이관 포함 실행률 %.1f 는 제외 시 %.1f 보다 커야 함", wantIn, wantRate)
+	if kpiIn.CompleteSample != 3 {
+		t.Fatalf("이관 포함 완료 표본=%d want 3", kpiIn.CompleteSample)
 	}
 }
 
@@ -153,9 +130,6 @@ func TestIncludeImportToggleDoesNotAffectWeeklyByDefault(t *testing.T) {
 		t.Fatal("팀 행 없음")
 	}
 	team := rep.PersonRows[0]
-	if !team.ExecDisplay.DenomZero {
-		t.Fatal("주간보고서는 이관 건을 기본 제외하므로 예정 0이어야 함")
-	}
 	if team.Receipt != 0 {
 		t.Fatalf("이관 접수 포함됨: %d", team.Receipt)
 	}

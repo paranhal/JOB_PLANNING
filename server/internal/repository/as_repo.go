@@ -51,7 +51,7 @@ const daysElapsedSQL = `MAX(0, CAST((
 func visitAlreadyDone(alias string) string {
 	return `EXISTS (SELECT 1 FROM as_processes p
 		WHERE p.as_id = ` + alias + `as_id
-		  AND date(p.process_datetime) >= ` + alias + `visit_scheduled_date)`
+		  AND p.process_datetime >= ` + alias + `visit_scheduled_date)`
 }
 
 func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []string, sort, dir string, page, pageSize int) ([]model.ASListItem, int, error) {
@@ -90,9 +90,11 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 		baseQuery += cond
 		countQuery += cond
 	case "today":
-		cond := ` AND date(ar.receipt_datetime) = date('now')`
+		cond := ` AND ar.receipt_datetime >= ? AND ar.receipt_datetime < ?`
 		baseQuery += cond
 		countQuery += cond
+		args = append(args, todayTimeStart(), tomorrowTimeStart())
+		countArgs = append(countArgs, todayTimeStart(), tomorrowTimeStart())
 	case "visit_past":
 		cond := ` AND ar.status IN ` + model.SQLStatusOpsInProgress + `
 		          AND COALESCE(ar.visit_scheduled_date,'') != ''
@@ -151,32 +153,34 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	case "completed_today":
 		// 통계상 오늘 완료(부분완료 포함)
 		cond := ` AND ar.status IN ` + model.SQLStatusStatsCompleted + `
-		          AND ` + asCompleteDateSQL + ` = date('now')`
+		          AND ` + asCompleteDT + ` >= ? AND ` + asCompleteDT + ` < ?`
 		baseQuery += cond
 		countQuery += cond
+		args = append(args, todayTimeStart(), tomorrowTimeStart())
+		countArgs = append(countArgs, todayTimeStart(), tomorrowTimeStart())
 	case "week_received":
 		ws, we := weekRangeDates()
-		cond := ` AND date(ar.receipt_datetime) BETWEEN date(?) AND date(?)`
+		cond := ` AND ar.receipt_datetime >= ? AND ar.receipt_datetime < ?`
 		baseQuery += cond
 		countQuery += cond
-		args = append(args, ws, we)
-		countArgs = append(countArgs, ws, we)
+		args = append(args, dayTimeStart(ws), dayTimeNext(we))
+		countArgs = append(countArgs, dayTimeStart(ws), dayTimeNext(we))
 	case "week_completed":
 		ws, we := weekRangeDates()
 		cond := ` AND ar.status IN ` + model.SQLStatusStatsCompleted + `
-		          AND ` + asCompleteDateSQL + ` BETWEEN date(?) AND date(?)`
+		          AND ` + asCompleteDT + ` >= ? AND ` + asCompleteDT + ` < ?`
 		baseQuery += cond
 		countQuery += cond
-		args = append(args, ws, we)
-		countArgs = append(countArgs, ws, we)
+		args = append(args, dayTimeStart(ws), dayTimeNext(we))
+		countArgs = append(countArgs, dayTimeStart(ws), dayTimeNext(we))
 	case "week_in_progress":
 		ws, we := weekRangeDates()
 		cond := ` AND ar.status IN ('received','assigned','in_progress','partial_complete')
-		          AND date(ar.receipt_datetime) BETWEEN date(?) AND date(?)`
+		          AND ar.receipt_datetime >= ? AND ar.receipt_datetime < ?`
 		baseQuery += cond
 		countQuery += cond
-		args = append(args, ws, we)
-		countArgs = append(countArgs, ws, we)
+		args = append(args, dayTimeStart(ws), dayTimeNext(we))
+		countArgs = append(countArgs, dayTimeStart(ws), dayTimeNext(we))
 	case "":
 	default:
 		baseQuery += ` AND ar.status = ?`
@@ -208,11 +212,11 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 	args = append(args, pageSize, offset)
 
 	var total int
-	if err := r.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+	if err := queryRowTimed(r.db, "as.listFiltered.count", countQuery, countArgs...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := r.db.Query(baseQuery, args...)
+	rows, err := queryTimed(r.db, "as.listFiltered", baseQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -298,19 +302,21 @@ func (r *ASRepo) DashboardStats(mineUserID string, mineKeys []string) (*model.AS
 // StatsFiltered 배정 기준 통계. Completed = 오늘 완료. Week* = 월~일. Visit* = 진행중 예정일 버킷.
 func (r *ASRepo) StatsFiltered(mineUserID string, mineKeys []string) (*model.ASStats, error) {
 	ws, we := weekRangeDates()
+	day0, day1 := todayTimeStart(), tomorrowTimeStart()
+	week0, week1 := dayTimeStart(ws), dayTimeNext(we)
 	q := `
 		SELECT
 			COUNT(*) AS total,
 			COALESCE(SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END), 0) AS assigned,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + ` THEN 1 ELSE 0 END), 0) AS in_progress,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusStatsCompleted + `
-			         AND ` + asCompleteDateColSQL + `=date('now') THEN 1 ELSE 0 END), 0) AS completed,
+			         AND ` + asCompleteDTCol + ` >= ? AND ` + asCompleteDTCol + ` < ? THEN 1 ELSE 0 END), 0) AS completed,
 			COALESCE(SUM(CASE WHEN status IN ('received','assigned','in_progress','partial_complete')
 			         AND julianday('now')-julianday(receipt_datetime) > 3 THEN 1 ELSE 0 END), 0) AS overdue,
-			COALESCE(SUM(CASE WHEN date(receipt_datetime)=date('now') THEN 1 ELSE 0 END), 0) AS today,
-			COALESCE(SUM(CASE WHEN date(receipt_datetime) BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_recv,
+			COALESCE(SUM(CASE WHEN receipt_datetime >= ? AND receipt_datetime < ? THEN 1 ELSE 0 END), 0) AS today,
+			COALESCE(SUM(CASE WHEN receipt_datetime >= ? AND receipt_datetime < ? THEN 1 ELSE 0 END), 0) AS week_recv,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusStatsCompleted + `
-			         AND ` + asCompleteDateColSQL + ` BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_done,
+			         AND ` + asCompleteDTCol + ` >= ? AND ` + asCompleteDTCol + ` < ? THEN 1 ELSE 0 END), 0) AS week_done,
 			COALESCE(SUM(CASE WHEN status IN ` + model.SQLStatusOpsInProgress + `
 			         AND COALESCE(visit_scheduled_date,'') != ''
 			         AND visit_scheduled_date < ` + visitDateToday + `
@@ -329,7 +335,7 @@ func (r *ASRepo) StatsFiltered(mineUserID string, mineKeys []string) (*model.ASS
 			         AND (COALESCE(visit_scheduled_date,'') = ''
 			              OR visit_scheduled_date < ` + visitDateToday + `) THEN 1 ELSE 0 END), 0) AS transfer_overdue
 		FROM as_receipts WHERE 1=1`
-	args := []interface{}{ws, we, ws, we}
+	args := []interface{}{day0, day1, day0, day1, week0, week1, week0, week1}
 	if mineCond, mineArgs := mineAssigneeCond("", mineUserID, mineKeys); mineCond != "" {
 		q += mineCond
 		args = append(args, mineArgs...)
@@ -376,6 +382,8 @@ func WeekElapsedDays() int {
 // AssigneeDashboardStats 담당자별 주간 진행중·일평균 완료·지연
 func (r *ASRepo) AssigneeDashboardStats() ([]model.AssigneeDashStats, error) {
 	ws, we := weekRangeDates()
+	week0, week1 := dayTimeStart(ws), dayTimeNext(we)
+	day0, day1 := todayTimeStart(), tomorrowTimeStart()
 	elapsed := weekElapsedDays()
 	if elapsed < 1 {
 		elapsed = 1
@@ -386,11 +394,11 @@ func (r *ASRepo) AssigneeDashboardStats() ([]model.AssigneeDashStats, error) {
 			COALESCE(NULLIF(MAX(u.full_name), ''), NULLIF(MAX(ar.assigned_to), ''), '미배정') AS name,
 			COALESCE(MAX(u.username), '') AS username,
 			COALESCE(SUM(CASE WHEN ar.status IN ('received','assigned','in_progress','partial_complete')
-			         AND date(ar.receipt_datetime) BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_ip,
+			         AND ar.receipt_datetime >= ? AND ar.receipt_datetime < ? THEN 1 ELSE 0 END), 0) AS week_ip,
 			COALESCE(SUM(CASE WHEN ar.status IN ` + model.SQLStatusStatsCompleted + `
-			         AND ` + asCompleteDateSQL + ` BETWEEN date(?) AND date(?) THEN 1 ELSE 0 END), 0) AS week_done,
+			         AND ` + asCompleteDT + ` >= ? AND ` + asCompleteDT + ` < ? THEN 1 ELSE 0 END), 0) AS week_done,
 			COALESCE(SUM(CASE WHEN ar.status IN ` + model.SQLStatusStatsCompleted + `
-			         AND ` + asCompleteDateSQL + `=date('now') THEN 1 ELSE 0 END), 0) AS day_done,
+			         AND ` + asCompleteDT + ` >= ? AND ` + asCompleteDT + ` < ? THEN 1 ELSE 0 END), 0) AS day_done,
 			COALESCE(SUM(CASE WHEN ar.status IN ('received','assigned','in_progress','partial_complete')
 			         AND julianday('now')-julianday(ar.receipt_datetime) > 3 THEN 1 ELSE 0 END), 0) AS overdue
 		FROM as_receipts ar
@@ -399,7 +407,7 @@ func (r *ASRepo) AssigneeDashboardStats() ([]model.AssigneeDashStats, error) {
 		GROUP BY COALESCE(NULLIF(ar.assigned_user_id,''), ar.assigned_to)
 		HAVING week_ip > 0 OR week_done > 0 OR day_done > 0 OR overdue > 0
 		ORDER BY week_ip DESC, overdue DESC, name ASC`
-	rows, err := r.db.Query(q, ws, we, ws, we)
+	rows, err := r.db.Query(q, week0, week1, week0, week1, day0, day1)
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +463,7 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 	var receiptStr, startStr, completeStr, confirmStr, cancelStr string
 	var isRecurrence, isReopen, replaceReview, scheduleConfirmed int
 
-	err := r.db.QueryRow(query, id).Scan(
+	err := queryRowTimed(r.db, "as.getByID", query, id).Scan(
 		&as.ASID, &as.ASNumber, &receiptStr,
 		&as.CustomerID, &as.AssetID,
 		&as.ReceiptChannel, &as.Requester,
@@ -503,6 +511,11 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 	if t := parseTime(cancelStr); !t.IsZero() {
 		as.CancelDatetime = &t
 	}
+	procs, err := NewASProcessRepo(r.db).ListByAS(as.ASID)
+	if err != nil {
+		return nil, err
+	}
+	overlayProcessActionFields(&as, procs)
 	return &as, nil
 }
 
@@ -519,6 +532,7 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 		receiptAt = time.Now()
 	}
 	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
+	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
 	now := time.Now().Format("2006-01-02 15:04:05")
 	receiptStr := receiptAt.Format("2006-01-02 15:04:05")
 	status := model.DeriveASWorkflowStatus(as.AssignedTo, as.AssignedUserID, as.ScheduleConfirmed)
@@ -539,8 +553,8 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			visit_scheduled_date, schedule_confirmed, status,
 			is_recurrence, is_reopen, parent_as_id, reopen_reason, followup_note,
 			project_id, receipt_group_id, confirm_contact,
-			urgency_reason, urgency_reason_note, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			urgency_reason, urgency_reason_note, external_assignee, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
 			as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 			as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
@@ -549,7 +563,7 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			boolToInt(as.IsRecurrence), boolToInt(as.IsReopen),
 			nullStr(as.ParentASID), nullStr(as.ReopenReason), nullStr(as.FollowupNote),
 			nullStr(as.ProjectID), nullStr(as.ReceiptGroupID), nullStr(as.ConfirmContact),
-			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), now, now,
+			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), nullIfEmpty(as.ExternalAssignee), now, now,
 		)
 		if err == nil {
 			// §25.2 AS 접수 등록은 이력 미기록(○)
@@ -594,7 +608,7 @@ func (r *ASRepo) listByParent(asID string, reopenOnly bool) ([]model.ASHistoryIt
 		SELECT ar.as_id, ar.as_number, date(ar.receipt_datetime),
 		       COALESCE(ar.visit_scheduled_date,''), COALESCE(date(ar.complete_datetime),''),
 		       COALESCE(ar.assigned_to,''), COALESCE(ar.symptom,''),
-		       COALESCE(ar.action_taken,''), ar.status
+		       COALESCE(` + asActionTakenSQL("ar") + `,''), ar.status
 		FROM as_receipts ar
 		WHERE ar.parent_as_id = ? AND COALESCE(ar.is_reopen,0) = ?
 		ORDER BY ar.receipt_datetime DESC`, asID, flag)
@@ -626,6 +640,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() && !model.AppDateYearOK(*as.CompleteDatetime) {
 		return model.ErrAppDateYear
 	}
+	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05")
 
@@ -651,7 +666,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	}
 
 	q := `UPDATE as_receipts SET
-			status=?, assigned_to=?, assigned_user_id=?, process_type=?, work_place=?, cause_type=?,
+			status=?, assigned_to=?, assigned_user_id=?, external_assignee=?, process_type=?, work_place=?, cause_type=?,
 			cause_detail=?, conclusion=?,
 			action_taken=?, parts_used=?, result_code=?, revisit_reason=?, hold_reason=?, followup_action=?,
 			customer_confirmer=?, is_recurrence=?, is_reopen=?, replace_review=?,
@@ -661,7 +676,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 			visit_date=?, process_type_reason=?,
 			updated_at=?`
 	args := []interface{}{
-		as.Status, as.AssignedTo, as.AssignedUserID, as.ProcessType, as.WorkPlace, as.CauseType,
+		as.Status, as.AssignedTo, as.AssignedUserID, as.ExternalAssignee, as.ProcessType, as.WorkPlace, as.CauseType,
 		as.CauseDetail, as.Conclusion,
 		as.ActionTaken, as.PartsUsed, as.ResultCode, as.RevisitReason, as.HoldReason, as.FollowupAction,
 		as.CustomerConfirmer, boolToInt(as.IsRecurrence), boolToInt(as.IsReopen), boolToInt(as.ReplaceReview),
@@ -726,17 +741,18 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	_ = r.db.QueryRow(`SELECT status FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&curStatus)
 
 	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
+	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
 	q := `UPDATE as_receipts SET
 			receipt_datetime=?, customer_id=?, asset_id=?,
 			receipt_channel=?, requester=?, symptom=?, urgency=?, priority=?,
-			requester_type=?, requester_name=?, assigned_to=?, assigned_user_id=?,
+			requester_type=?, requester_name=?, assigned_to=?, assigned_user_id=?, external_assignee=?,
 			received_by=?, visit_scheduled_date=?, schedule_confirmed=?,
 			confirm_contact=?, urgency_reason=?, urgency_reason_note=?,
 			project_id=?, updated_at=?`
 	args := []interface{}{
 		receiptStr, as.CustomerID, nullStr(as.AssetID),
 		as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
-		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID,
+		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ExternalAssignee,
 		as.ReceivedBy, nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
 		as.ConfirmContact, as.UrgencyReason, as.UrgencyReasonNote,
 		nullStr(as.ProjectID), now,
@@ -793,10 +809,11 @@ func (r *ASRepo) AssignUnplanned(asID, date, assignee, assigneeUID string) error
 	assignee = strings.TrimSpace(assignee)
 	assigneeUID = strings.TrimSpace(assigneeUID)
 	if assignee != "" || assigneeUID != "" {
+		assignee, assigneeUID, ext := bindStaffExternal(r.db, assignee, assigneeUID)
 		now := time.Now().Format("2006-01-02 15:04:05")
 		if err := r.touchReceipt(asID, func() error {
-			_, err := r.db.Exec(`UPDATE as_receipts SET assigned_to=?, assigned_user_id=?, updated_at=? WHERE as_id=?`,
-				assignee, assigneeUID, now, asID)
+			_, err := r.db.Exec(`UPDATE as_receipts SET assigned_to=?, assigned_user_id=?, external_assignee=?, updated_at=? WHERE as_id=?`,
+				assignee, assigneeUID, ext, now, asID)
 			return err
 		}); err != nil {
 			return err
@@ -987,7 +1004,7 @@ func (r *ASRepo) ListPastHistory(customerID, excludeASID string, limit int) ([]m
 		       COALESCE(ar.complete_datetime,''),
 		       COALESCE(ar.assigned_to,''),
 		       COALESCE(ar.symptom,''),
-		       COALESCE(ar.action_taken,'')
+		       COALESCE(` + asActionTakenSQL("ar") + `,'')
 		FROM as_receipts ar
 		WHERE ar.customer_id=?
 		  AND ar.status IN ` + model.SQLStatusFullyClosed
@@ -1051,7 +1068,7 @@ func (r *ASRepo) ListHistoryByAsset(assetID, excludeASID string, limit int) ([]m
 		       COALESCE(ar.complete_datetime,''),
 		       COALESCE(ar.assigned_to,''),
 		       COALESCE(ar.symptom,''),
-		       COALESCE(ar.action_taken,''),
+		       COALESCE(` + asActionTakenSQL("ar") + `,''),
 		       COALESCE(ar.status,'')
 		FROM as_receipts ar
 		WHERE ar.asset_id=?`
@@ -1063,7 +1080,7 @@ func (r *ASRepo) ListHistoryByAsset(assetID, excludeASID string, limit int) ([]m
 	q += ` ORDER BY ar.receipt_datetime DESC, ar.as_number DESC LIMIT ?`
 	args = append(args, limit)
 
-	rows, err := r.db.Query(q, args...)
+	rows, err := queryTimed(r.db, "as.listHistoryByAsset", q, args...)
 	if err != nil {
 		return nil, err
 	}

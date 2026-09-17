@@ -107,6 +107,25 @@ func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
 	return &u, nil
 }
 
+// FindAssignable 사용자 ID·로그인명·표시명으로 배정 대상 사용자를 찾는다. §42.5
+func (r *UserRepo) FindAssignable(idOrName string) *model.User {
+	idOrName = strings.TrimSpace(idOrName)
+	if r == nil || idOrName == "" {
+		return nil
+	}
+	users, err := r.ListAssignable()
+	if err != nil {
+		return nil
+	}
+	for i := range users {
+		u := users[i]
+		if u.UserID == idOrName || u.Username == idOrName || strings.TrimSpace(u.FullName) == idOrName {
+			return &u
+		}
+	}
+	return nil
+}
+
 func (r *UserRepo) GetByID(id string) (*model.User, error) {
 	row := r.db.QueryRow(userSelectAuth+` WHERE user_id=?`, id)
 	u, err := scanUser(row, true)
@@ -134,17 +153,22 @@ func (r *UserRepo) Create(u *model.User) error {
 		return err
 	}
 	logCreate(r.db, "users", "user_id", u.UserID, u.FullName)
+	rememberUserName(u.UserID, u.FullName)
 	return nil
 }
 
 func (r *UserRepo) Update(u *model.User) error {
 	u.Role = model.NormalizeRole(u.Role)
-	return touchUpdate(r.db, "users", "user_id", u.UserID, u.FullName, func() error {
+	err := touchUpdate(r.db, "users", "user_id", u.UserID, u.FullName, func() error {
 		_, err := r.db.Exec(`
 		UPDATE users SET full_name=?,role=?,permissions=?,is_active=? WHERE user_id=?`,
 			u.FullName, u.Role, u.Permissions, boolToInt(u.IsActive), u.UserID)
 		return err
 	})
+	if err == nil {
+		rememberUserName(u.UserID, u.FullName)
+	}
+	return err
 }
 
 func (r *UserRepo) UpdatePassword(id, hash string) error {

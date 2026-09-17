@@ -95,7 +95,7 @@ func (h *SpaceHandler) List(c echo.Context) error {
 		"Customers": customers, "CustomerID": customerID,
 		"Buildings": buildings, "BuildingID": buildingID,
 		"Selected": selectedBuilding,
-		"Floors": floors, "FloorID": floorID, "SelectedFloor": selectedFloor,
+		"Floors":   floors, "FloorID": floorID, "SelectedFloor": selectedFloor,
 	})
 }
 

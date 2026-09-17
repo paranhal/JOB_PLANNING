@@ -22,7 +22,27 @@ type MaintenanceHandler struct {
 	wbRepo       *repository.WBRepo
 	settingsRepo *repository.SettingsRepo
 	holidayRepo  *repository.HolidayRepo
+	notices      *assignNoticeHook
 	dataDir      string
+}
+
+func (h *MaintenanceHandler) recordVisitAssign(c echo.Context, visitID, assignee, planID, customerID, product, date string) {
+	if h == nil || h.notices == nil {
+		return
+	}
+	visitID = strings.TrimSpace(visitID)
+	if visitID == "" && h.repo != nil {
+		if got := h.repo.FindVisitBySlot(planID, customerID, product, date); got != nil {
+			visitID = got.VisitID
+			if strings.TrimSpace(assignee) == "" {
+				assignee = got.Assignee
+			}
+		}
+	}
+	if visitID == "" {
+		return
+	}
+	h.notices.Record(c, model.AssignNoticeSourceMaintenance, visitID, assignee, "", "", "")
 }
 
 // syncVisitTask 방문 상태·일정·담당자를 연결된 일일업무(work_tasks)에 반영한다.
@@ -291,6 +311,7 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 	if h.wbRepo != nil {
 		_, _ = h.wbRepo.EnsureMaintenanceTasks()
 	}
+	h.recordVisitAssign(c, v.VisitID, v.Assignee, planID, v.CustomerID, v.ProductType, v.VisitDate)
 	h.repo.TouchPlanUpdated(planID)
 	return c.Redirect(http.StatusSeeOther, planURLFrom(c, planID, ""))
 }
@@ -321,6 +342,7 @@ func (h *MaintenanceHandler) AssignUnassignedSlot(c echo.Context) error {
 	if h.wbRepo != nil {
 		_, _ = h.wbRepo.EnsureMaintenanceTasks()
 	}
+	h.recordVisitAssign(c, v.VisitID, v.Assignee, planID, cust, product, date)
 	h.repo.TouchPlanUpdated(planID)
 	back := planURLFrom(c, planID, "")
 	sep := "?"
@@ -367,6 +389,7 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	h.syncVisitTask(vid, v.Completed)
+	h.recordVisitAssign(c, vid, v.Assignee, "", "", "", "")
 	h.repo.TouchPlanUpdated(planID)
 	back := planURLFrom(c, planID, "")
 	sep := "?"

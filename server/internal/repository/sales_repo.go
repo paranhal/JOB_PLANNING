@@ -210,6 +210,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 	if err != nil {
 		return err
 	}
+	p.SalesOwner, p.SalesOwnerID = bindStaff(r.db, p.SalesOwner, p.SalesOwnerID)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -260,6 +261,7 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 	stages, _ := r.StagesFor(p.DealType)
 	normalizeSalesProject(p, stages)
 	applySupplyAutoStage(p, stages)
+	p.SalesOwner, p.SalesOwnerID = bindStaff(r.db, p.SalesOwner, p.SalesOwnerID)
 	err = touchUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, func() error {
 		_, err := r.db.Exec(`
 			UPDATE sales_projects SET
@@ -296,6 +298,10 @@ func (r *SalesRepo) Delete(id string) error {
 		return fmt.Errorf("sales_id 필요")
 	}
 	before := rowJSON(r.db, "sales_projects", "sales_id", id)
+	_, _ = r.db.Exec(`DELETE FROM work_task_tags WHERE task_id IN (
+		SELECT task_id FROM work_tasks WHERE source_type=? AND source_id IN (SELECT activity_id FROM sales_activities WHERE sales_id=?))`,
+		model.WBSourceSalesActivity, id)
+	_, _ = r.db.Exec(`DELETE FROM sales_activity_members WHERE activity_id IN (SELECT activity_id FROM sales_activities WHERE sales_id=?)`, id)
 	if _, err := r.db.Exec(`
 		DELETE FROM work_tasks
 		WHERE source_type=? AND source_id IN (SELECT activity_id FROM sales_activities WHERE sales_id=?)`,

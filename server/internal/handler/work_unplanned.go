@@ -227,12 +227,7 @@ func (h *WorkHandler) UnplannedAssign(c echo.Context) error {
 			continue
 		}
 		n++
-		if strings.HasPrefix(key, "as:") {
-			h.syncASPlannedFromUnplanned(strings.TrimPrefix(key, "as:"))
-		}
-		if strings.HasPrefix(key, "slot:") && h.wbRepo != nil {
-			_, _ = h.wbRepo.EnsureMaintenanceTasks()
-		}
+		h.recordUnplannedAssignNotice(c, key, date, assignee)
 	}
 	back := unplannedBack(c)
 	if n == 0 {
@@ -263,6 +258,54 @@ func (h *WorkHandler) UnplannedNoDate(c echo.Context) error {
 	}
 	back := unplannedBack(c)
 	return c.Redirect(http.StatusSeeOther, back+qjoin(back, "ok=nodate"))
+}
+
+func (h *WorkHandler) recordUnplannedAssignNotice(c echo.Context, key, date, assignee string) {
+	if h == nil || h.notices == nil {
+		return
+	}
+	switch {
+	case strings.HasPrefix(key, "as:"):
+		asID := strings.TrimPrefix(key, "as:")
+		h.syncASPlannedFromUnplanned(asID)
+		if h.asRepo != nil {
+			if as, err := h.asRepo.GetByID(asID); err == nil && as != nil {
+				h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, "", "")
+			}
+		}
+	case strings.HasPrefix(key, "mnt:"):
+		vid := strings.TrimPrefix(key, "mnt:")
+		who := assignee
+		if h.mntRepo != nil {
+			if v, err := h.mntRepo.GetVisit(vid); err == nil && v != nil {
+				if who == "" {
+					who = v.Assignee
+				}
+			}
+		}
+		h.notices.Record(c, model.AssignNoticeSourceMaintenance, vid, who, "", "", "")
+	case strings.HasPrefix(key, "slot:"):
+		if h.wbRepo != nil {
+			_, _ = h.wbRepo.EnsureMaintenanceTasks()
+		}
+		id := strings.TrimPrefix(key, "slot:")
+		parts := strings.SplitN(id, "|", 3)
+		if len(parts) >= 2 && h.mntRepo != nil {
+			product := ""
+			if len(parts) == 3 {
+				product = parts[2]
+			}
+			if got := h.mntRepo.FindVisitBySlot(parts[0], parts[1], product, date); got != nil {
+				who := assignee
+				if who == "" {
+					who = got.Assignee
+				}
+				h.notices.Record(c, model.AssignNoticeSourceMaintenance, got.VisitID, who, "", "", "")
+			}
+		}
+	case strings.HasPrefix(key, "task:"):
+		h.notices.Record(c, model.AssignNoticeSourceTask, strings.TrimPrefix(key, "task:"), assignee, "", "", "")
+	}
 }
 
 func (h *WorkHandler) syncASPlannedFromUnplanned(asID string) {

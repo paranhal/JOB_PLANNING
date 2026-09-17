@@ -61,11 +61,14 @@ const (
 
 // 중요 KPI 기준값 (사업팀 관리 목표)
 const (
-	StatsExecTargetPct      = 90.0 // 계획대비 실행율 목표(%)
 	StatsVisitTargetDays    = 3.0  // 접수→방문(조치시작) 목표(일)
 	StatsCompleteTargetDays = 7.0  // 접수→조치완료 목표(일, 1주일)
 	StatsDurationOverMin    = 60   // 최장 소요 시간 기준(분)
 	StatsPlanTargetPct      = 95.0 // 계획 수립률 목표(%). §8.4
+	// StatsVisitLeadHint §4.7 접수→방문 카드 설명. 착수일시가 아니라 방문일.
+	StatsVisitLeadHint = "착수일시가 아니라 방문일 기준입니다. 현장방문이고 방문일이 있는 완료 건만 셉니다. 방문일이 없는 옛 데이터는 빠져 표본이 작을 수 있습니다."
+	StatsMetricScopeASOnly = "AS만"
+	StatsMetricScopeCounts = "AS · 정기점검 · 행정지원"
 )
 
 // StatsLongestTopN 기간 건수에 따른 최장 소요 표시 건수. 기본 1, 10건↑ 2, 20건↑ 3.
@@ -144,7 +147,6 @@ type StatsWorkSlice struct {
 	Receipt    int
 	Process    int
 	Modified   int // 계획 대비 일정 변경(예정일과 다르게 처리)
-	OnPlan     int // 예정일 그대로 완료(계획대로 실행)
 	Quota      int // 정기점검: 해당 월 방문 목표(사이트×점검대상)
 	Cumulative int // 정기점검: 그 달 1일~기간 종료 완료 누적
 	Remaining  int // 정기점검: 월 목표 − 누적
@@ -153,10 +155,9 @@ type StatsWorkSlice struct {
 
 // StatsBucketCounts 한 기간의 집계
 type StatsBucketCounts struct {
-	AS            StatsWorkSlice
-	Mnt           StatsWorkSlice
-	Admin         StatsWorkSlice
-	ProgressScope string // 실행률 대상. 비면 전 유형. 건수 합계 PlannedTotal 에는 쓰지 않는다 (§4.5.4)
+	AS    StatsWorkSlice
+	Mnt   StatsWorkSlice
+	Admin StatsWorkSlice
 }
 
 func (b StatsBucketCounts) PlannedTotal() int {
@@ -170,57 +171,6 @@ func (b StatsBucketCounts) ProcessTotal() int {
 }
 func (b StatsBucketCounts) ModifiedTotal() int {
 	return b.AS.Modified + b.Mnt.Modified + b.Admin.Modified
-}
-func (b StatsBucketCounts) OnPlanTotal() int {
-	return b.AS.OnPlan + b.Mnt.OnPlan + b.Admin.OnPlan
-}
-
-func (s StatsWorkSlice) HasExecutionRate() bool {
-	return s.Planned > 0
-}
-
-func (s StatsWorkSlice) ExecutionRatePct() float64 {
-	p := s.Planned
-	if p <= 0 {
-		return 0
-	}
-	on := s.OnPlan
-	if on < 0 {
-		on = 0
-	}
-	if on > p {
-		on = p
-	}
-	return float64(on) * 100 / float64(p)
-}
-
-func (b StatsBucketCounts) HasExecutionRate() bool {
-	p, _ := b.execParts()
-	return p > 0
-}
-
-// execParts 계획 대비 실행률의 분모·분자만 고른다 (§4.5.4).
-// progress_scope 에 admin 이 없으면 행정·지원은 여기만 빠진다. 건수·소요시간은 PlannedTotal 등을 쓴다.
-// 되돌림: 행정·지원 예정일 입력률이 4주 연속 90% 이상이면 app_settings.progress_scope 에 admin 을 넣는다.
-func (b StatsBucketCounts) execParts() (planned, onPlan int) {
-	if ProgressScopeIncludes(b.ProgressScope, "as") {
-		planned += b.AS.Planned
-		onPlan += b.AS.OnPlan
-	}
-	if ProgressScopeIncludes(b.ProgressScope, "maintenance") {
-		planned += b.Mnt.Planned
-		onPlan += b.Mnt.OnPlan
-	}
-	if ProgressScopeIncludes(b.ProgressScope, "admin") {
-		planned += b.Admin.Planned
-		onPlan += b.Admin.OnPlan
-	}
-	return planned, onPlan
-}
-
-func (b StatsBucketCounts) ExecPlanned() int {
-	p, _ := b.execParts()
-	return p
 }
 
 // StatsGrade §4.4 신뢰도 등급
@@ -244,7 +194,7 @@ type StatsValue struct {
 	Reason     string
 }
 
-// StatsReliability 표본·분모로 §4.4 등급을 붙인다. value는 ExecutionRatePct 등 기존 산식 결과.
+// StatsReliability 표본·분모로 §4.4 등급을 붙인다. value는 리드타임 등 기존 산식 결과.
 func StatsReliability(sample int, denomZero bool, value float64) StatsValue {
 	v := StatsValue{Value: value, Sample: sample, DenomZero: denomZero}
 	if denomZero || sample <= 0 {
@@ -296,8 +246,15 @@ func (v StatsValue) WithReason(reason string) StatsValue {
 	return v
 }
 
-// CapIfLowPlanning 계획 수립률이 목표 미만이면 실행율을 ⚪ 측정불가로 내린다(§8.4).
-// ExecutionRatePct 산식 자체는 바꾸지 않고 표시 등급만 조정한다.
+// WithHoldJudgment 표본 1~4건은 ⚪ 판단 보류. §4.7
+func (v StatsValue) WithHoldJudgment() StatsValue {
+	if v.Grade == StatsGradeNA && v.Sample > 0 && v.Sample < 5 {
+		v.GradeLabel = "판단 보류"
+	}
+	return v
+}
+
+// CapIfLowPlanning 계획 수립률이 목표 미만이면 지표를 ⚪ 측정불가로 내린다(§8.4).
 func (v StatsValue) CapIfLowPlanning(hasPlanning bool, planningPct float64) StatsValue {
 	if !hasPlanning || planningPct >= StatsPlanTargetPct {
 		return v
@@ -342,23 +299,6 @@ func DailyAvgCompleted(completed, workingDays int) (float64, bool) {
 	return float64(completed) / float64(workingDays), true
 }
 
-// ExecutionRatePct 계획대비 실행률(%).
-// 예정 중 "계획대로(예정일 당일) 완료"한 비율. 처리 건수와 무관하며 100%를 넘지 않음.
-// 예: 예정 4곳 중 2곳만 일정 변경 → (4-2)/4 = 50% (= OnPlan/Planned).
-func (b StatsBucketCounts) ExecutionRatePct() float64 {
-	p, on := b.execParts()
-	if p <= 0 {
-		return 0
-	}
-	if on < 0 {
-		on = 0
-	}
-	if on > p {
-		on = p
-	}
-	return float64(on) * 100 / float64(p)
-}
-
 // StatsPeriodColumn 요약 표의 기간 열
 type StatsPeriodColumn struct {
 	Key         string // prev | current | next
@@ -366,7 +306,7 @@ type StatsPeriodColumn struct {
 	From        string // YYYY-MM-DD inclusive
 	ToExclusive string // YYYY-MM-DD exclusive
 	RangeLabel  string // 표시용 기간 문구
-	ShowActual  bool   // 기간 시작일 ≤ 오늘: 접수·처리·수정·실행률 표시. 미래 기간은 예정만.
+	ShowActual  bool   // 기간 시작일 ≤ 오늘: 접수·처리·수정 표시. 미래 기간은 예정만.
 	Counts      StatsBucketCounts
 }
 
@@ -376,17 +316,12 @@ type StatsMeetingFilter struct {
 	Key           string // 담당자명 · as|maintenance|admin · 제품명
 	ProjectID     string // 사업(work_projects) 선택 시
 	IncludeImport         bool // true면 data_origin=import 포함. 기본은 제외(§4.3)
-	ExcludeSalesActivity  bool // true면 source_type=sales_activity 를 실행률에서 뺀다. 기본은 포함(§32.11)
+	ExcludeSalesActivity  bool // true면 source_type=sales_activity 를 집계에서 뺀다. 기본은 포함(§32.11)
 	MetricsBaseDate       string // 집계 하한 YYYY-MM-DD. 설정에서 채운다. 토글로 풀리지 않는다 (§4.5.3)
-	ProgressScope         string // 실행률 대상. 예: as,maintenance (§4.5.4)
 }
 
 // StatsKPICard 상단 중요 통계 카드
 type StatsKPICard struct {
-	ExecutionRate   float64 // 계획대비 실행율(%). 분모 0이면 0 — 화면은 ExecDisplay 사용
-	ExecutionDelta  float64
-	ExecutionSample int
-	HasExecution    bool
 	VisitAvgDays    float64
 	VisitDelta      float64
 	VisitSample     int
@@ -396,7 +331,6 @@ type StatsKPICard struct {
 	HasVisit        bool
 	HasComplete     bool
 	LeadTimeWarn    string // §4.6.5 방문 > 완료이면 화면 경고
-	ExecDisplay     StatsValue
 	VisitDisplay    StatsValue
 	CompleteDisplay StatsValue
 	PlanningRate    float64
@@ -470,7 +404,7 @@ type WeeklyReport struct {
 	Events             []WeeklyEventRow
 }
 
-// WeeklyPersonRow 통계 시트 1행 (팀 또는 담당자). 실행률·소요일은 팀/담당자 기준으로 각각 재계산.
+// WeeklyPersonRow 통계 시트 1행 (팀 또는 담당자). 소요일은 팀/담당자 기준으로 각각 재계산.
 type WeeklyPersonRow struct {
 	Label           string
 	IsTeam          bool
@@ -484,7 +418,6 @@ type WeeklyPersonRow struct {
 	CarryOut        int
 	InProgress      int
 	Unplanned       int
-	ExecDisplay     StatsValue
 	VisitDisplay    StatsValue
 	CompleteDisplay StatsValue
 }
@@ -523,22 +456,19 @@ type StatsChartPoint struct {
 	Date       string  `json:"date"`        // 버킷 시작일 YYYY-MM-DD
 	Received   int     `json:"received"`    // 접수
 	Open       int     `json:"open"`        // 미완료(접수·배정·진행중·보류·이관 등)
-	Completed  int     `json:"completed"`   // 완료
-	ExecRate   float64 `json:"exec_rate"`
-	Planned    int     `json:"planned"`
-	Process    int     `json:"process"`
+	Completed int `json:"completed"` // 완료
+	Planned   int `json:"planned"`
 }
 
-// DailyMeetingStat 일 단위 저장(계획대비 실행률)
+// DailyMeetingStat 일 단위 저장
 type DailyMeetingStat struct {
-	StatDate      string
-	Scope         string
-	ScopeKey      string
-	Planned       int
-	Receipt       int
-	Process       int
-	Modified      int
-	ExecutionRate float64
+	StatDate string
+	Scope    string
+	ScopeKey string
+	Planned  int
+	Receipt  int
+	Process  int
+	Modified int
 	ASPlanned     int
 	ASReceipt     int
 	ASProcess     int

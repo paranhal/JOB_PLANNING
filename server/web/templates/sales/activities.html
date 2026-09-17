@@ -38,7 +38,7 @@
          class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "day"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">일일</a>
       {{end}}
       {{if and .CanWrite .ShowHeaderAdd}}
-      <button type="button" class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg" @click="open=true">+ 활동 추가</button>
+      <button type="button" class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg" @click="startCreate()">+ 활동 추가</button>
       {{end}}
     </div>
   </div>
@@ -193,7 +193,60 @@ function salesActPanel(startOpen) {
     dur: 30,
     nextAction: '',
     nextDate: '',
+    editingId: '',
+    createAction: '{{.FormAction}}',
     init() { this.initPartyChips(); },
+    startCreate() {
+      this.editingId = '';
+      this.dur = 30;
+      this.nextAction = '';
+      this.nextDate = '';
+      this.counterChips = [];
+      this.counterDraft = '';
+      this.memberChips = [];
+      this.initPartyChips();
+      const form = this.$refs.actForm;
+      if (form) {
+        form.action = this.createAction;
+        this.setField(form, 'activity_type', '');
+        this.setField(form, 'start_time', '');
+        this.setField(form, 'title', '');
+        this.setField(form, 'place', '');
+        this.setField(form, 'content', '');
+        if (!form.querySelector('[name=from_task]')) {
+          this.setField(form, 'activity_date', '{{.Today}}');
+        }
+      }
+      this.open = true;
+    },
+    editFrom(el) {
+      const d = el.dataset || {};
+      this.editingId = d.id || '';
+      this.dur = parseInt(d.duration, 10) || 30;
+      this.nextAction = d.next || '';
+      this.nextDate = d.nextDate || '';
+      this.counterChips = (d.counterparts || '').split(/[,;/]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      this.memberChips = (d.members || '').split(/[,;/]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      this.open = true;
+      const self = this;
+      this.$nextTick(function () {
+        const form = self.$refs.actForm;
+        if (!form) return;
+        form.action = '/sales/activities/' + self.editingId;
+        self.setField(form, 'sales_id', d.salesId);
+        self.setField(form, 'activity_date', d.date);
+        self.setField(form, 'activity_type', d.type);
+        self.setField(form, 'start_time', d.start);
+        self.setField(form, 'title', d.title);
+        self.setField(form, 'place', d.place);
+        self.setField(form, 'content', d.content);
+        if (d.salesId) self.loadPartyHints(d.salesId);
+      });
+    },
+    setField(form, name, val) {
+      const el = form.querySelector('[name="' + name + '"]');
+      if (el) el.value = val || '';
+    },
     async submit(ev) {
       const form = ev.target;
       this.flushPartyFields(form);
@@ -206,6 +259,10 @@ function salesActPanel(startOpen) {
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body
       });
+      if (res.status === 403) {
+        alert('이 활동을 수정할 권한이 없습니다');
+        return;
+      }
       const data = await res.json().catch(function () { return { ok: false, error: '저장에 실패했습니다' }; });
       if (!data.ok) {
         alert(data.error || '저장에 실패했습니다');

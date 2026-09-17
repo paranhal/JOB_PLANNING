@@ -18,6 +18,18 @@ func FormatASWorkTitle(orgName, asNumber string) string {
 	return "[AS]" + name + "_" + num
 }
 
+// FormatSalesWorkTitle 영업 활동 일정표 제목 — "[영업]제목". 이미 접두어가 있으면 그대로 둔다.
+func FormatSalesWorkTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "[영업]"
+	}
+	if strings.HasPrefix(title, "[영업]") {
+		return title
+	}
+	return "[영업]" + title
+}
+
 // FormatMaintenanceWorkTitle 정기점검 업무명 — "[점검]고객명_정기점검번호".
 func FormatMaintenanceWorkTitle(orgName, visitNumber string) string {
 	name := strings.TrimSpace(orgName)

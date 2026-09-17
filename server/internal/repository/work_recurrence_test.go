@@ -159,8 +159,7 @@ func TestOccurrenceKPIUnchangedForAugustView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.ExecutionRate != after.ExecutionRate || before.ExecutionSample != after.ExecutionSample ||
-		before.VisitAvgDays != after.VisitAvgDays || before.CompleteAvgDays != after.CompleteAvgDays {
+	if before.VisitAvgDays != after.VisitAvgDays || before.CompleteAvgDays != after.CompleteAvgDays {
 		t.Fatalf("8월 KPI가 바뀌었다 before=%+v after=%+v", before, after)
 	}
 }

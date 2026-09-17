@@ -118,9 +118,9 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 		title += " · 공휴일 미등록"
 	}
 	_ = f.SetCellValue(weeklyStatsSheet, "A1", title)
-	_ = f.MergeCell(weeklyStatsSheet, "A1", "J1")
+	_ = f.MergeCell(weeklyStatsSheet, "A1", "H1")
 
-	headers := []string{"구분", "계획대비 실행률", "신뢰도", "접수", "완료", "일일 평균", "일일 최대", "이월", "진행중", "미계획"}
+	headers := []string{"구분", "접수", "완료", "일일 평균", "일일 최대", "이월", "진행중", "미계획"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 3)
 		_ = f.SetCellValue(weeklyStatsSheet, cell, h)
@@ -132,7 +132,7 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    weeklyThinBorder(),
 	}); err == nil {
-		_ = f.SetCellStyle(weeklyStatsSheet, "A3", "J3", st)
+		_ = f.SetCellStyle(weeklyStatsSheet, "A3", "H3", st)
 	}
 	teamSt, _ := f.NewStyle(&excelize.Style{
 		Font:   &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
@@ -160,8 +160,6 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 		r := 4 + i
 		vals := []interface{}{
 			row.Label,
-			weeklyRateText(row.ExecDisplay),
-			weeklyGradeText(row.ExecDisplay),
 			row.Receipt,
 			row.Completed,
 			weeklyDayAvgText(row),
@@ -176,9 +174,6 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 			st := plainSt
 			if row.IsTeam {
 				st = teamSt
-			}
-			if j == 1 {
-				st = weeklyTargetStyle(row.ExecDisplay, true, model.StatsExecTargetPct, okSt, badSt, naSt, st)
 			}
 			_ = f.SetCellStyle(weeklyStatsSheet, cell, cell, st)
 		}
@@ -231,15 +226,15 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 	} else {
 		_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", planRow), "계획 수립률 — (미완료 업무 없음)")
 	}
-	_ = f.MergeCell(weeklyStatsSheet, fmt.Sprintf("A%d", planRow), fmt.Sprintf("J%d", planRow))
+	_ = f.MergeCell(weeklyStatsSheet, fmt.Sprintf("A%d", planRow), fmt.Sprintf("H%d", planRow))
 
 	adminLeadRow := planRow + 2
 	waitShareRow := adminLeadRow + 1
 	avgText, waitText := weeklyAdminLeadSheetTexts(rep.AdminLead)
 	_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", adminLeadRow), avgText)
-	_ = f.MergeCell(weeklyStatsSheet, fmt.Sprintf("A%d", adminLeadRow), fmt.Sprintf("J%d", adminLeadRow))
+	_ = f.MergeCell(weeklyStatsSheet, fmt.Sprintf("A%d", adminLeadRow), fmt.Sprintf("H%d", adminLeadRow))
 	_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", waitShareRow), waitText)
-	_ = f.MergeCell(weeklyStatsSheet, fmt.Sprintf("A%d", waitShareRow), fmt.Sprintf("J%d", waitShareRow))
+	_ = f.MergeCell(weeklyStatsSheet, fmt.Sprintf("A%d", waitShareRow), fmt.Sprintf("H%d", waitShareRow))
 
 	mntRow := waitShareRow + 2
 	_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", mntRow), "정기점검 월 진행")
@@ -260,9 +255,7 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 	}
 
 	_ = f.SetColWidth(weeklyStatsSheet, "A", "A", 16)
-	_ = f.SetColWidth(weeklyStatsSheet, "B", "B", 16)
-	_ = f.SetColWidth(weeklyStatsSheet, "C", "C", 14)
-	_ = f.SetColWidth(weeklyStatsSheet, "D", "J", 12)
+	_ = f.SetColWidth(weeklyStatsSheet, "B", "H", 12)
 	_ = f.SetRowHeight(weeklyStatsSheet, 1, 22)
 	_ = f.SetPanes(weeklyStatsSheet, &excelize.Panes{
 		Freeze: true, Split: false, XSplit: 1, YSplit: 3,

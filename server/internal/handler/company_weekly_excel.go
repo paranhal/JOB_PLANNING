@@ -365,13 +365,13 @@ func buildCompanyWeeklySingleSheet(in companyWeeklyBuildInput) ([]byte, error) {
 }
 
 type companyWeeklyPreserveHints struct {
-	names         []string
-	sheetCount    int
-	formulaCount  int
-	bizSheet      string
-	n3, w3, y3    string
-	abHidden      bool
-	hasBizChecks  bool
+	names        []string
+	sheetCount   int
+	formulaCount int
+	bizSheet     string
+	n3, w3, y3   string
+	abHidden     bool
+	hasBizChecks bool
 }
 
 type companyWeeklyPreserveCheck struct {

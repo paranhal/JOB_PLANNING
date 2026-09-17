@@ -107,8 +107,11 @@ func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, lin
 		return err
 	}
 	if a.NextActionDate != "" {
-		if err := model.RequireAppDateYear(a.NextActionDate); err != nil {
+		if err := model.RequireSalesDateOrYM(a.NextActionDate); err != nil {
 			return err
+		}
+		if ym := model.NormalizeSalesYM(a.NextActionDate); model.IsSalesMonthOnly(a.NextActionDate) {
+			a.NextActionDate = ym
 		}
 	}
 	types, _ := r.ActivityTypes()
@@ -177,6 +180,129 @@ func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, lin
 	reindexSalesActivitySearch(r.db, a.ActivityID)
 	if err := r.EnsureCustomerPartiesFromCounterparts(a.SalesID, a.Counterparts, a.CreatedBy); err != nil {
 		return err
+	}
+	replaceSalesMembers(r.db, a.ActivityID, a.OurMembers)
+	return nil
+}
+
+func (r *SalesRepo) UpdateActivity(a *model.SalesActivity) error {
+	if a == nil || strings.TrimSpace(a.ActivityID) == "" {
+		return fmt.Errorf("활동이 필요합니다")
+	}
+	cur, err := r.GetActivity(a.ActivityID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("활동을 찾을 수 없습니다")
+		}
+		return err
+	}
+	p, err := r.Get(cur.SalesID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("영업 사업을 찾을 수 없습니다")
+		}
+		return err
+	}
+	a.SalesID = cur.SalesID
+	a.CreatedBy = cur.CreatedBy
+	a.StageAtTime = cur.StageAtTime
+	a.ActivityDate = strings.TrimSpace(a.ActivityDate)
+	if a.ActivityDate == "" {
+		a.ActivityDate = cur.ActivityDate
+	}
+	if err := model.RequireAppDateYear(a.ActivityDate); err != nil {
+		return err
+	}
+	a.NextActionDate = strings.TrimSpace(a.NextActionDate)
+	if a.NextActionDate != "" {
+		if err := model.RequireSalesDateOrYM(a.NextActionDate); err != nil {
+			return err
+		}
+		if ym := model.NormalizeSalesYM(a.NextActionDate); model.IsSalesMonthOnly(a.NextActionDate) {
+			a.NextActionDate = ym
+		}
+	}
+	types, _ := r.ActivityTypes()
+	a.ActivityType = strings.TrimSpace(a.ActivityType)
+	if a.ActivityType == "" {
+		a.ActivityType = cur.ActivityType
+	}
+	if a.ActivityType == "" {
+		return fmt.Errorf("활동 유형을 선택하세요")
+	}
+	a.TypeLabel = r.activityTypeLabel(a.ActivityType, types)
+	a.Title = strings.TrimSpace(a.Title)
+	if a.Title == "" {
+		return fmt.Errorf("제목을 입력하세요")
+	}
+	a.Content = strings.TrimSpace(a.Content)
+	a.Place = strings.TrimSpace(a.Place)
+	a.OurMembers = model.JoinSalesPeople(model.SplitSalesPeople(a.OurMembers))
+	if a.OurMembers == "" {
+		a.OurMembers = cur.OurMembers
+	}
+	a.Counterparts = model.JoinSalesPeople(model.SplitSalesPeople(a.Counterparts))
+	a.NextAction = strings.TrimSpace(a.NextAction)
+	a.DurationMin = model.NormalizeDurationMin(a.DurationMin)
+	a.StartTime = strings.TrimSpace(a.StartTime)
+	if len(a.StartTime) > 5 {
+		a.StartTime = a.StartTime[:5]
+	}
+	if a.StartTime == "" {
+		a.StartTime = strings.TrimSpace(cur.StartTime)
+	}
+	if a.StartTime == "" {
+		a.StartTime = "09:00"
+	}
+	if _, err := r.db.Exec(`
+		UPDATE sales_activities SET
+			activity_date=?, start_time=?, duration_min=?, activity_type=?,
+			title=?, content=?, place=?, our_members=?, counterparts=?,
+			next_action=?, next_action_date=?
+		WHERE activity_id=?`,
+		a.ActivityDate, a.StartTime, a.DurationMin, a.ActivityType,
+		a.Title, a.Content, a.Place, a.OurMembers, a.Counterparts,
+		a.NextAction, a.NextActionDate, a.ActivityID); err != nil {
+		return err
+	}
+	a.SalesName = p.Name
+	r.fillActivityLabels(a, types)
+	if err := r.syncWorkTask(a, p, nil); err != nil {
+		return err
+	}
+	reindexSalesActivitySearch(r.db, a.ActivityID)
+	if err := r.EnsureCustomerPartiesFromCounterparts(a.SalesID, a.Counterparts, a.CreatedBy); err != nil {
+		return err
+	}
+	replaceSalesMembers(r.db, a.ActivityID, a.OurMembers)
+	return nil
+}
+
+func (r *SalesRepo) DeleteActivity(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Errorf("활동이 필요합니다")
+	}
+	a, err := r.GetActivity(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("활동을 찾을 수 없습니다")
+		}
+		return err
+	}
+	wb := NewWBRepo(r.db)
+	if t, err := wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID); err == nil && t != nil {
+		_, _ = r.db.Exec(`DELETE FROM work_task_members WHERE task_id=?`, t.TaskID)
+	}
+	if err := wb.DeleteTasksBySource(model.WBSourceSalesActivity, a.ActivityID); err != nil {
+		return err
+	}
+	_, _ = r.db.Exec(`DELETE FROM sales_activity_members WHERE activity_id=?`, a.ActivityID)
+	if _, err := r.db.Exec(`DELETE FROM sales_activities WHERE activity_id=?`, a.ActivityID); err != nil {
+		return err
+	}
+	if salesActivitySearchHasFTS(r.db) {
+		_, _ = r.db.Exec(`DELETE FROM sales_activity_search WHERE activity_id=?`, a.ActivityID)
 	}
 	return nil
 }

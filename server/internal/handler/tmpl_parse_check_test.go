@@ -42,8 +42,16 @@ func TestAllTemplatesParse(t *testing.T) {
 		if kpartials, err := filepath.Glob(filepath.Join(root, "kanban", "_*.html")); err == nil {
 			files = append(files, kpartials...)
 		}
+		if spartials, err := filepath.Glob(filepath.Join(root, "sort", "_*.html")); err == nil {
+			files = append(files, spartials...)
+		}
 		if strings.Contains(filepath.ToSlash(page), "/admin_work/") {
 			files = append(files, filepath.Join(root, "workboard", "_recurrence_fields.html"))
+		}
+		if filepath.Base(page) == "dashboard.html" {
+			if sp, err := filepath.Glob(filepath.Join(root, "stats", "_*.html")); err == nil {
+				files = append(files, sp...)
+			}
 		}
 		if _, err := template.New("").Funcs(funcMap()).ParseFiles(files...); err != nil {
 			t.Errorf("%s: %v", page, err)

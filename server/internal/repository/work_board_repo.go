@@ -20,6 +20,38 @@ func NewWorkBoardRepo(db *sql.DB) *WorkBoardRepo {
 }
 
 func (r *WorkBoardRepo) DashStats(mineUserID string, mineKeys []string) (*model.WorkDashStats, error) {
+	page, err := r.loadDash(mineUserID, mineKeys)
+	if err != nil {
+		return nil, err
+	}
+	return page.Stats, nil
+}
+
+type dashPage struct {
+	Stats      *model.WorkDashStats
+	Today      []model.WorkListItem
+	Delayed    []model.WorkListItem
+	Pending    []model.WorkListItem
+	Unassigned []model.WorkListItem
+}
+
+// DashHome 대시보드 숫자와 미리보기 목록을 한 번에 만든다. collect* 를 다시 돌리지 않는다.
+func (r *WorkBoardRepo) DashHome(mineUserID string, mineKeys []string, todayN, delayedN, pendingN, unassignedN int) (
+	*model.WorkDashStats, []model.WorkListItem, []model.WorkListItem, []model.WorkListItem, []model.WorkListItem, error,
+) {
+	page, err := r.loadDash(mineUserID, mineKeys)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	return page.Stats,
+		sortLimitWorkItems(page.Today, todayN),
+		sortLimitWorkItems(page.Delayed, delayedN),
+		sortLimitWorkItems(page.Pending, pendingN),
+		sortLimitWorkItems(page.Unassigned, unassignedN),
+		nil
+}
+
+func (r *WorkBoardRepo) loadDash(mineUserID string, mineKeys []string) (*dashPage, error) {
 	s := &model.WorkDashStats{}
 	today := time.Now().Format("2006-01-02")
 
@@ -62,7 +94,6 @@ func (r *WorkBoardRepo) DashStats(mineUserID string, mineKeys []string) (*model.
 	s.SchedulePending = len(pending)
 	s.PendingByAssignee = buildAssigneePrefixStats(pending)
 
-	// 담당자 미배정은 항상 전체 — 담당자 대신 접두어 합계만
 	unassigned, err := r.collectUnassigned()
 	if err != nil {
 		return nil, err
@@ -74,14 +105,18 @@ func (r *WorkBoardRepo) DashStats(mineUserID string, mineKeys []string) (*model.
 	}
 	s.UnassignedPrefixLine = formatBracketPrefixCounts(uc)
 
-	unplanned, _, err := r.ListUnplanned(mineUserID, mineKeys, "")
+	unplanned, _, err := r.listUnplanned(mineUserID, mineKeys, "", &unplannedBase{
+		Delayed: delayed, Pending: pending, Open: openItems, Unassigned: unassigned,
+	})
 	if err != nil {
 		return nil, err
 	}
 	s.Unplanned = len(unplanned)
 	s.UpcomingOcc, _ = r.countUpcomingOccurrences(today, model.RecurrenceUpcomingDays)
 	s.OverdueDeadline, _ = r.countOverdueRecurrenceParents(today)
-	return s, nil
+	return &dashPage{
+		Stats: s, Today: todayItems, Delayed: delayed, Pending: pending, Unassigned: unassigned,
+	}, nil
 }
 
 func (r *WorkBoardRepo) countUpcomingOccurrences(today string, days int) (int, error) {
@@ -138,6 +173,8 @@ func (r *WorkBoardRepo) ListBucket(bucket, mineUserID string, mineKeys []string,
 
 // ListBucketOn 대시보드와 같은 collect* 산식을 선택일 기준으로 조회한다. §7.8.1
 func (r *WorkBoardRepo) ListBucketOn(bucket, date, mineUserID string, mineKeys []string, limit int) ([]model.WorkListItem, error) {
+	start := time.Now()
+	defer logSlowSQL("work.ListBucketOn."+bucket, start)
 	date = model.NormalizeAppDate(date)
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
@@ -190,6 +227,8 @@ func (r *WorkBoardRepo) collectInProgress(mineUserID string, mineKeys []string, 
 
 // ListScheduledOn 기준일 예정 목록. §38.5 완료를 포함하고 schedule_confirmed 는 보지 않는다.
 func (r *WorkBoardRepo) ListScheduledOn(date, mineUserID string, mineKeys []string, limit int) ([]model.WorkListItem, error) {
+	start := time.Now()
+	defer logSlowSQL("work.ListScheduledOn", start)
 	items, err := r.collectByDate(mineUserID, mineKeys, date, true)
 	if err != nil {
 		return nil, err
@@ -199,6 +238,8 @@ func (r *WorkBoardRepo) ListScheduledOn(date, mineUserID string, mineKeys []stri
 
 // ListCompletedOn 기준일 완료(실적) 목록. AS는 부분완료 포함.
 func (r *WorkBoardRepo) ListCompletedOn(date, mineUserID string, mineKeys []string, limit int) ([]model.WorkListItem, error) {
+	start := time.Now()
+	defer logSlowSQL("work.ListCompletedOn", start)
 	items, err := r.collectCompletedOn(mineUserID, mineKeys, date)
 	if err != nil {
 		return nil, err
@@ -330,6 +371,7 @@ func (r *WorkBoardRepo) ListWorkToday(mineUserID string, mineKeys []string, toda
 	out = appendUniqueWorkItems(out, extras, seen)
 
 	stampWorkTodayOverdue(out, today)
+	r.fillBlockedReasons(out)
 	return out, nil
 }
 
@@ -599,7 +641,7 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 		return nil, err
 	}
 	out = append(out, occItems...)
-	return out, nil
+	return r.withoutWaiting(out), nil
 }
 
 func (r *WorkBoardRepo) collectOverdueOccurrences(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {
@@ -612,7 +654,7 @@ func (r *WorkBoardRepo) collectOverdueOccurrences(mineUserID string, mineKeys []
 			OR (TRIM(COALESCE(t.work_date,'')) != '' AND t.work_date < ?
 			    AND COALESCE(t.occurrence_status,'') IN ('scheduled','in_progress',''))
 			OR (COALESCE(t.occurrence_status,'')='deferred'
-			    AND (TRIM(COALESCE(t.next_check_date,''))='' OR date(t.next_check_date) < date(?)))
+			AND (TRIM(COALESCE(t.next_check_date,''))='' OR t.next_check_date < ?))
 		 )`,
 		mineUserID, mineKeys, []interface{}{today, today})
 	if err != nil {
@@ -720,9 +762,9 @@ func (r *WorkBoardRepo) collectSchedulePending(mineUserID string, mineKeys []str
 		 AND (COALESCE(ar.assigned_to,'') != '' OR COALESCE(ar.assigned_user_id,'') != '')
 		 AND (COALESCE(ar.schedule_confirmed,0)=0
 		      OR (COALESCE(ar.visit_scheduled_date,'') != ''
-		          AND ar.visit_scheduled_date < date('now','localtime')
+		          AND ar.visit_scheduled_date < ?
 		          AND `+visitAlreadyDone("ar.")+`))`,
-		mineUserID, mineKeys, nil)
+		mineUserID, mineKeys, []interface{}{time.Now().Format("2006-01-02")})
 }
 
 func (r *WorkBoardRepo) collectUnassigned() ([]model.WorkListItem, error) {
@@ -1006,7 +1048,7 @@ func (r *WorkBoardRepo) collectOverdueWaitingActions(mineUserID string, mineKeys
 		JOIN work_tasks t ON t.task_id = a.task_id
 		WHERE a.status='waiting' AND COALESCE(a.confirmed,0)=0
 		  AND TRIM(COALESCE(a.reply_due_date,'')) != ''
-		  AND date(a.reply_due_date) < date(?)
+		  AND a.reply_due_date < ?
 		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 		  AND t.work_type IN ('admin','support')
 		  AND TRIM(COALESCE(t.source_type,'')) = ''`
@@ -1158,4 +1200,3 @@ func (r *WorkBoardRepo) CountMissingCompleteDates() (MissingCompleteDates, error
 	}
 	return NewWBRepo(r.db).CountMissingCompleteDates()
 }
-

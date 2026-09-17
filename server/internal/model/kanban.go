@@ -3,6 +3,7 @@ package model
 import (
 	"sort"
 	"strings"
+	"time"
 )
 
 const (
@@ -115,15 +116,16 @@ func FillAssetKanban(items []Asset) KanbanView {
 func MeetingKanbanColumnDefs() []KanbanColumnDef {
 	return []KanbanColumnDef{
 		{Key: MeetingKanbanPrevComplete, Title: "전일 완료", Border: "border-emerald-200"},
-		{Key: WorkBucketToday, Title: "오늘 예정", Border: "border-sky-200"},
+		{Key: WorkBucketCompletedToday, Title: "오늘 완료", Border: "border-teal-200"},
 		{Key: WorkBucketInProgress, Title: "진행중", Border: "border-yellow-200"},
+		{Key: WorkBucketToday, Title: "오늘 예정", Border: "border-sky-200"},
 		{Key: WorkBucketUnplanned, Title: "미계획", Border: "border-rose-200"},
 	}
 }
 
-// FillMeetingKanban §35.4. 산식은 호출 측(§10·§8.2.1)이 채운다. 배타 순서만 적용한다.
-// 전일 완료 → 진행중 → 오늘 예정 → 미계획.
-func FillMeetingKanban(prevComplete, inProgress, todaySched, unplanned []WorkListItem) KanbanView {
+// FillMeetingKanban §38.6. 산식은 호출 측이 채운다. 배타 순서만 적용한다.
+// 전일 완료 → 오늘 완료 → 진행중 → 오늘 예정 → 미계획.
+func FillMeetingKanban(prevComplete, todayComplete, inProgress, todaySched, unplanned []WorkListItem) KanbanView {
 	cols := emptyKanbanColumns(MeetingKanbanColumnDefs())
 	idx := indexKanbanColumns(cols)
 	seen := map[string]bool{}
@@ -147,10 +149,22 @@ func FillMeetingKanban(prevComplete, inProgress, todaySched, unplanned []WorkLis
 		}
 	}
 	add(prevComplete, MeetingKanbanPrevComplete)
+	add(todayComplete, WorkBucketCompletedToday)
 	add(inProgress, WorkBucketInProgress)
 	add(todaySched, WorkBucketToday)
 	add(unplanned, WorkBucketUnplanned)
 	return finishKanbanView(cols)
+}
+
+// MeetingKanbanScheduledSum 오늘 예정 + 오늘 완료. §38.6 요약 「예정」과 같아야 한다.
+func MeetingKanbanScheduledSum(view KanbanView) int {
+	n := 0
+	for _, c := range view.Columns {
+		if c.Key == WorkBucketToday || c.Key == WorkBucketCompletedToday {
+			n += c.Count
+		}
+	}
+	return n
 }
 
 // KanbanColumnDef 화면이 넘기는 열 정의. 판정은 AssignKanbanColumn.
@@ -208,6 +222,8 @@ type KanbanCard struct {
 	AmountUnconfirmed bool
 	LastActivity      string
 	AmountDesc        int
+	EditLocked        bool
+	AssigneeOther     bool
 }
 
 // KanbanView 화면이 열 정의와 카드를 넘기면 배타 배정·건수·정렬을 채운다. §35.1
@@ -375,28 +391,46 @@ func FillASListKanban(defs []KanbanColumnDef, items []ASListItem) KanbanView {
 }
 
 func KanbanCardFromWork(it WorkListItem) KanbanCard {
+	days := it.DaysOverdue
+	if days <= 0 {
+		if sched := WorkItemScheduledDate(it); sched != "" {
+			today := time.Now().Format("2006-01-02")
+			if sched < today {
+				days = DaysBetweenDates(sched, today)
+				if days < 1 {
+					days = 1
+				}
+			}
+		}
+	}
 	inProg := it.Bucket == WorkBucketInProgress || it.Bucket == WBTaskInProgress
-	delay, delayClass := PlanDelayBadge(it.DaysOverdue, inProg)
+	delay, delayClass := PlanDelayBadge(days, inProg)
+	if it.IsWaiting() {
+		delay, delayClass = WaitingBadge(it.BlockedReason)
+	}
 	return KanbanCard{
-		ID:           WorkListItemKey(it),
-		RefID:        it.RefID,
-		RefNumber:    it.RefNumber,
-		Title:        it.Title,
-		Href:         it.Href,
-		OrgName:      it.OrgName,
-		Assignee:     it.Assignee,
-		Prefix:       it.Prefix,
-		PrefixLabel:  WorkPrefixLabel(it.Prefix),
-		MappedStatus: it.MappedStatus,
-		Bucket:       it.Bucket,
-		LeftStyle:    WorkCardColorStyle(it.Assignee, it.ProductType, it.Prefix),
-		SortDate:     WorkItemScheduledDate(it),
-		DueDate:      firstNonEmpty(it.DueDate, it.ScheduledDate),
-		DelayBadge:   delay,
-		DelayClass:   delayClass,
-		Urgent:       WorkItemUrgent(it.Urgency),
-		Grouped:      strings.TrimSpace(it.ReceiptGroupID) != "",
-		DaysOverdue:  it.DaysOverdue,
+		ID:            WorkListItemKey(it),
+		RefID:         it.RefID,
+		RefNumber:     it.RefNumber,
+		Title:         it.Title,
+		Href:          it.Href,
+		OrgName:       it.OrgName,
+		Assignee:      it.Assignee,
+		Prefix:        it.Prefix,
+		PrefixLabel:   WorkPrefixLabel(it.Prefix),
+		MappedStatus:  it.MappedStatus,
+		Bucket:        it.Bucket,
+		LeftStyle:     WorkCardColorStyle(it.Assignee, it.ProductType, it.Prefix),
+		SortDate:      WorkItemScheduledDate(it),
+		DueDate:       firstNonEmpty(it.DueDate, it.ScheduledDate),
+		DelayBadge:    delay,
+		DelayClass:    delayClass,
+		Urgent:        WorkItemUrgent(it.Urgency),
+		Grouped:       strings.TrimSpace(it.ReceiptGroupID) != "",
+		DaysOverdue:   days,
+		Tentative:     it.Tentative,
+		EditLocked:    it.EditLocked,
+		AssigneeOther: it.AssigneeOther,
 	}
 }
 

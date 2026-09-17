@@ -29,12 +29,11 @@ func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, 
 	return &StatsHandler{repo: repo, userRepo: userRepo, wbRepo: wbRepo, workBoard: workBoard, mntRepo: mntRepo}
 }
 
-func metricsViewData(repo *repository.StatsRepo) (base, scopeLabel, hint string) {
+func metricsViewData(repo *repository.StatsRepo) (base string) {
 	if repo == nil {
-		return "", "", model.ProgressScopeRevertHint
+		return ""
 	}
-	p := repo.MetricsPolicy()
-	return p.BaseDate, model.ProgressScopeLabel(p.ProgressScope), model.ProgressScopeRevertHint
+	return repo.MetricsPolicy().BaseDate
 }
 
 func applyPlanningToKPI(workBoard *repository.WorkBoardRepo, kpi *model.StatsKPICard) {
@@ -51,7 +50,6 @@ func applyPlanningToKPI(workBoard *repository.WorkBoardRepo, kpi *model.StatsKPI
 	kpi.PlanningPlanned = pc.Planned
 	kpi.HasPlanning = pc.HasPlanningRate()
 	kpi.PlanDisplay = model.StatsReliability(pc.Open, !pc.HasPlanningRate(), kpi.PlanningRate)
-	kpi.ExecDisplay = kpi.ExecDisplay.CapIfLowPlanning(pc.HasPlanningRate(), rate)
 }
 
 func normalizeStatsMetric(m string) string {
@@ -241,7 +239,7 @@ func weekOptions(now time.Time) []struct{ Value, Label string } {
 // Overview 일일/주간/월간 KPI·차트·예정·접수·처리 요약
 func (h *StatsHandler) Overview(c echo.Context) error {
 	now := time.Now()
-	metricsBase, metricsScope, metricsHint := metricsViewData(h.repo)
+	metricsBase := metricsViewData(h.repo)
 	lb := parseLookback(c, metricsBase, now)
 	filter := repository.ParseMeetingFilter(c.QueryParam("scope"), c.QueryParam("key"), c.QueryParam("project"))
 	filter.IncludeImport = c.QueryParam("import") == "1"
@@ -257,6 +255,10 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		return err
 	}
 	applyPlanningToKPI(h.workBoard, &kpi)
+	var missingComplete repository.MissingCompleteDates
+	if h.wbRepo != nil {
+		missingComplete, _ = h.wbRepo.CountMissingCompleteDates()
+	}
 	series, err := h.repo.LoadStatsChartSeriesWindow(lb.View, fromIncl, toIncl, filter)
 	if err != nil {
 		return err
@@ -303,39 +305,41 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 
 	anchor := now
 	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
-		"Title":            "통계",
-		"Active":           NavStats,
-		"View":             lb.View,
-		"ViewLabel":        viewLabel,
-		"Lookback":         lb,
-		"LookbackQS":       template.URL(lb.QueryValues()),
-		"LookbackViewID":   "statsLookbackView",
-		"Columns":          cols,
-		"KPI":              kpi,
-		"SeriesJSON":       template.JS(seriesJSON),
-		"CompletedRows":    completedRows,
-		"CompletedRange":   completedRange,
-		"Analysis":         analysis,
-		"Spotlight":        spotlight,
-		"ExecTarget":       model.StatsExecTargetPct,
-		"VisitTarget":      model.StatsVisitTargetDays,
-		"CompleteTarget":   model.StatsCompleteTargetDays,
-		"PlanTarget":       model.StatsPlanTargetPct,
-		"Filter":           filter,
-		"Assignees":        assignees,
-		"Projects":         projects,
-		"ProductOptions":   repository.StatsProductOptions(),
-		"FilterQ":            statsMeetingFilterQuery(filter),
-		"MetricsBaseDate":    metricsBase,
-		"ProgressScopeLabel": metricsScope,
-		"ProgressScopeHint":  metricsHint,
-		"AnchorDate":       anchor.Format("2006-01-02"),
-		"AnchorMonth":      anchor.Format("2006-01"),
-		"AnchorMonthLabel": anchor.Format("2006년 01월"),
-		"Today":            now.Format("2006-01-02"),
-		"CurrentMonth":     now.Format("2006-01"),
-		"RangeFrom":        lb.From,
-		"RangeTo":          lb.To,
+		"Title":             "통계",
+		"Active":            NavStats,
+		"View":              lb.View,
+		"ViewLabel":         viewLabel,
+		"Lookback":          lb,
+		"LookbackQS":        template.URL(lb.QueryValues()),
+		"LookbackViewID":    "statsLookbackView",
+		"Columns":           cols,
+		"KPI":               kpi,
+		"SeriesJSON":        template.JS(string(seriesJSON)),
+		"CompletedRows":     completedRows,
+		"CompletedRange":    completedRange,
+		"Analysis":          analysis,
+		"Spotlight":         spotlight,
+		"VisitTarget":       model.StatsVisitTargetDays,
+		"VisitLeadHint":     model.StatsVisitLeadHint,
+		"MetricScopeAS":     model.StatsMetricScopeASOnly,
+		"MetricScopeCounts": model.StatsMetricScopeCounts,
+		"CompleteTarget":    model.StatsCompleteTargetDays,
+		"PlanTarget":        model.StatsPlanTargetPct,
+		"ChartBucketNote":   model.ChartBucketNote(lb.View),
+		"Filter":            filter,
+		"Assignees":         assignees,
+		"Projects":          projects,
+		"ProductOptions":    repository.StatsProductOptions(),
+		"FilterQ":           statsMeetingFilterQuery(filter),
+		"MetricsBaseDate":   metricsBase,
+		"AnchorDate":        anchor.Format("2006-01-02"),
+		"AnchorMonth":       anchor.Format("2006-01"),
+		"AnchorMonthLabel":  anchor.Format("2006년 01월"),
+		"Today":             now.Format("2006-01-02"),
+		"CurrentMonth":      now.Format("2006-01"),
+		"RangeFrom":         lb.From,
+		"RangeTo":           lb.To,
+		"MissingComplete":   missingComplete,
 	})
 }
 
@@ -395,7 +399,7 @@ func (h *StatsHandler) List(c echo.Context) error {
 	// 담당자별: 사람 단위로 건 리스트 그룹핑
 	groups := groupStatsByAssignee(rows)
 
-	metricsBase, metricsScope, metricsHint := metricsViewData(h.repo)
+	metricsBase := metricsViewData(h.repo)
 
 	periodOptions := []struct{ Value, Label string }{
 		{model.StatsPeriodDay, "일별"},
@@ -419,34 +423,32 @@ func (h *StatsHandler) List(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "stats/list.html", map[string]interface{}{
-		"Title":          "통계 상세",
-		"Active":         NavStatsDetail,
-		"Query":          q,
-		"QueryString":    statsQueryString(q),
-		"Metric":         q.Metric,
-		"MetricLabel":    statsMetricLabel(q.Metric),
-		"MetricOptions":  metricOptions,
-		"Scope":          q.Scope,
-		"ScopeLabel":     statsScopeLabel(q.Scope),
-		"ScopeOptions":   scopeOptions,
-		"Period":         q.Period,
-		"PeriodLabel":    statsPeriodLabel(q.Period),
-		"PeriodOptions":  periodOptions,
-		"RangeLabel":     rangeLabel,
-		"MonthOptions":   monthOptions(now),
-		"WeekOptions":    weekOptions(now),
-		"QuarterOptions": quarterOptions(now),
-		"Rows":           rows,
-		"Assignees":      assignees,
-		"AssigneeGroups": groups,
-		"AssigneeTotal":  total,
-		"RowCount":       len(rows),
-		"ShowTeam":       q.Scope == model.StatsScopeTeam,
-		"ShowAssignee":   q.Scope == model.StatsScopeAssignee,
-		"OverdueNote":    q.Metric == model.StatsMetricOverdue,
-		"MetricsBaseDate":    metricsBase,
-		"ProgressScopeLabel": metricsScope,
-		"ProgressScopeHint":  metricsHint,
+		"Title":           "통계 상세",
+		"Active":          NavStatsDetail,
+		"Query":           q,
+		"QueryString":     statsQueryString(q),
+		"Metric":          q.Metric,
+		"MetricLabel":     statsMetricLabel(q.Metric),
+		"MetricOptions":   metricOptions,
+		"Scope":           q.Scope,
+		"ScopeLabel":      statsScopeLabel(q.Scope),
+		"ScopeOptions":    scopeOptions,
+		"Period":          q.Period,
+		"PeriodLabel":     statsPeriodLabel(q.Period),
+		"PeriodOptions":   periodOptions,
+		"RangeLabel":      rangeLabel,
+		"MonthOptions":    monthOptions(now),
+		"WeekOptions":     weekOptions(now),
+		"QuarterOptions":  quarterOptions(now),
+		"Rows":            rows,
+		"Assignees":       assignees,
+		"AssigneeGroups":  groups,
+		"AssigneeTotal":   total,
+		"RowCount":        len(rows),
+		"ShowTeam":        q.Scope == model.StatsScopeTeam,
+		"ShowAssignee":    q.Scope == model.StatsScopeAssignee,
+		"OverdueNote":     q.Metric == model.StatsMetricOverdue,
+		"MetricsBaseDate": metricsBase,
 	})
 }
 

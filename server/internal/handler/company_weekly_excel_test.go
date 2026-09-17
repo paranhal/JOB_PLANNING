@@ -251,4 +251,3 @@ func indexOfSheet(names []string, want string) int {
 	}
 	return -1
 }
-

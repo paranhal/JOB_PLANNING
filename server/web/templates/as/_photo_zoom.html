@@ -1,0 +1,125 @@
+{{define "photo_lightbox"}}
+<div data-photo-lightbox{{if .}} id="{{.}}"{{end}} class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/80 p-4">
+  <button type="button" data-lightbox-close class="absolute top-4 right-4 text-white text-3xl leading-none">&times;</button>
+  <button type="button" data-lightbox-prev class="absolute left-3 text-white text-4xl px-2">&lsaquo;</button>
+  <figure class="max-w-5xl max-h-[90vh] flex flex-col items-center">
+    <img data-lightbox-img src="" alt="" class="max-h-[80vh] max-w-full object-contain rounded shadow-lg">
+    <figcaption data-lightbox-cap class="mt-3 text-sm text-white/90"></figcaption>
+  </figure>
+  <button type="button" data-lightbox-next class="absolute right-3 text-white text-4xl px-2">&rsaquo;</button>
+</div>
+{{end}}
+
+{{define "photo_zoom_script"}}
+<script>
+(function(){
+  if (window.__photoZoomBound) return;
+  window.__photoZoomBound = true;
+
+  function itemsOf(root){
+    var items = [];
+    root.querySelectorAll('[data-full-url]').forEach(function(btn){
+      items.push({url: btn.getAttribute('data-full-url'), cap: btn.getAttribute('data-cap') || ''});
+    });
+    return items;
+  }
+  function hide(box){
+    box.classList.add('hidden');
+    box.classList.remove('flex');
+  }
+  function currentIdx(box){
+    return parseInt(box.getAttribute('data-idx') || '0', 10) || 0;
+  }
+  function show(root, i){
+    var box = root.querySelector('[data-photo-lightbox]');
+    if (!box) return;
+    var items = itemsOf(root);
+    if (!items.length) return;
+    var idx = (i + items.length) % items.length;
+    box.setAttribute('data-idx', String(idx));
+    var img = box.querySelector('[data-lightbox-img]');
+    var cap = box.querySelector('[data-lightbox-cap]');
+    img.src = items[idx].url;
+    cap.textContent = items[idx].cap;
+    box.classList.remove('hidden');
+    box.classList.add('flex');
+  }
+  function openFromEvent(e){
+    var btn = e.target.closest('[data-full-url]');
+    if (!btn) return;
+    var root = btn.closest('[data-photo-zoom]');
+    if (!root) return;
+    e.preventDefault();
+    var btns = root.querySelectorAll('[data-full-url]');
+    var i = -1;
+    btns.forEach(function(b, n){ if (b === btn) i = n; });
+    if (i < 0) return;
+    show(root, i);
+  }
+  document.addEventListener('click', openFromEvent);
+  document.addEventListener('dblclick', openFromEvent);
+
+  document.addEventListener('click', function(e){
+    var closeBtn = e.target.closest('[data-lightbox-close]');
+    if (closeBtn) {
+      var box = closeBtn.closest('[data-photo-lightbox]');
+      if (box) hide(box);
+      return;
+    }
+    var prev = e.target.closest('[data-lightbox-prev]');
+    if (prev) {
+      var root = prev.closest('[data-photo-zoom]');
+      var box = prev.closest('[data-photo-lightbox]');
+      if (root && box) show(root, currentIdx(box) - 1);
+      return;
+    }
+    var next = e.target.closest('[data-lightbox-next]');
+    if (next) {
+      var root = next.closest('[data-photo-zoom]');
+      var box = next.closest('[data-photo-lightbox]');
+      if (root && box) show(root, currentIdx(box) + 1);
+      return;
+    }
+    if (e.target.hasAttribute && e.target.getAttribute('data-photo-lightbox') !== null) {
+      hide(e.target);
+    }
+  });
+  document.addEventListener('keydown', function(e){
+    var open = document.querySelector('[data-photo-lightbox]:not(.hidden)');
+    if (!open) return;
+    var root = open.closest('[data-photo-zoom]');
+    if (!root) return;
+    if (e.key === 'Escape') hide(open);
+    if (e.key === 'ArrowLeft') show(root, currentIdx(open) - 1);
+    if (e.key === 'ArrowRight') show(root, currentIdx(open) + 1);
+  });
+
+  document.querySelectorAll('[data-action-attach]').forEach(function(root){
+    var kind = root.querySelector('[data-attach-kind]');
+    var file = root.querySelector('[data-attach-file]');
+    if (!kind || !file) return;
+    var formId = file.getAttribute('form');
+    var form = formId ? document.getElementById(formId) : null;
+    if (!form) return;
+    var imgExt = /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i;
+    function syncAccept(){
+      if (kind.value === 'as_action_photo') file.setAttribute('accept', 'image/*');
+      else file.removeAttribute('accept');
+    }
+    kind.addEventListener('change', syncAccept);
+    syncAccept();
+    form.addEventListener('submit', function(e){
+      if (kind.value !== 'as') return;
+      var files = file.files || [];
+      var hasImg = false;
+      for (var i = 0; i < files.length; i++) {
+        if (imgExt.test(files[i].name || '')) { hasImg = true; break; }
+      }
+      if (hasImg && !confirm('이미지 파일인데 종류가 「문서」입니다. 문서(원본 그대로)로 올릴까요?')) {
+        e.preventDefault();
+      }
+    });
+  });
+})();
+</script>
+{{end}}

@@ -14,6 +14,20 @@ func TestParseDisplay(t *testing.T) {
 	}
 }
 
+func TestKanbanCardFromWorkPastDueGetsDelayBadge(t *testing.T) {
+	it := WorkListItem{
+		Prefix: WorkPrefixGeneral, RefID: "late-1", Title: "지연",
+		Status: WBTaskWaiting, ScheduledDate: "2026-01-15", DueDate: "2026-01-15",
+	}
+	if !it.ApplyKanbanMapping() {
+		t.Fatal("매핑 실패")
+	}
+	card := KanbanCardFromWork(it)
+	if card.DelayBadge == "" || card.DaysOverdue < 1 {
+		t.Fatalf("badge=%q days=%d", card.DelayBadge, card.DaysOverdue)
+	}
+}
+
 func TestFillWorkKanbanExclusiveAndCounts(t *testing.T) {
 	items := []WorkListItem{
 		{Prefix: WorkPrefixAS, RefID: "1", RefNumber: "AS-2", Status: "hold", Title: "보류", ScheduledDate: "2026-08-20"},
@@ -114,22 +128,27 @@ func TestFillMeetingKanbanExclusiveOrder(t *testing.T) {
 		{Prefix: WorkPrefixAS, RefID: "y", RefNumber: "Y1", Title: "어제끝", Assignee: "양기헌", Status: "completed", CompleteDate: "2026-08-10"},
 		same,
 	}
+	done := []WorkListItem{
+		{Prefix: WorkPrefixAS, RefID: "d", RefNumber: "D1", Title: "오늘끝", Assignee: "최혜영", Status: "completed", CompleteDate: "2026-08-11"},
+		same,
+	}
 	prog := []WorkListItem{same, {Prefix: WorkPrefixAS, RefID: "p", RefNumber: "P1", Title: "이어짐", Assignee: "최혜영", Status: WBTaskInProgress}}
 	today := []WorkListItem{same, {Prefix: WorkPrefixAS, RefID: "t", RefNumber: "T1", Title: "오늘만", Assignee: "양기헌", Status: "received"}}
 	unpl := []WorkListItem{
 		{Prefix: WorkPrefixAS, RefID: "t", RefNumber: "T1", Title: "오늘만-미계획중복"},
 		{Prefix: WorkPrefixAS, RefID: "u", RefNumber: "U1", Title: "미계획", Assignee: "", Status: "received"},
 	}
-	view := FillMeetingKanban(prev, prog, today, unpl)
-	if len(view.Columns) != 4 {
+	view := FillMeetingKanban(prev, done, prog, today, unpl)
+	if len(view.Columns) != 5 {
 		t.Fatalf("열 %d", len(view.Columns))
 	}
-	if view.Columns[0].Title != "전일 완료" || view.Columns[1].Title != "오늘 예정" ||
-		view.Columns[2].Title != "진행중" || view.Columns[3].Title != "미계획" {
+	if view.Columns[0].Title != "전일 완료" || view.Columns[1].Title != "오늘 완료" ||
+		view.Columns[2].Title != "진행중" || view.Columns[3].Title != "오늘 예정" ||
+		view.Columns[4].Title != "미계획" {
 		t.Fatalf("열 제목 %+v", view.Columns)
 	}
-	if view.Total != 5 {
-		t.Fatalf("배타 합 %d want 5", view.Total)
+	if view.Total != 6 {
+		t.Fatalf("배타 합 %d want 6", view.Total)
 	}
 	seen := map[string]int{}
 	for _, c := range view.Columns {
@@ -140,21 +159,64 @@ func TestFillMeetingKanbanExclusiveOrder(t *testing.T) {
 			}
 		}
 	}
-	if view.Columns[0].Count != 2 || view.Columns[2].Count != 1 || view.Columns[1].Count != 1 || view.Columns[3].Count != 1 {
-		t.Fatalf("배분 전일=%d 예정=%d 진행=%d 미계획=%d",
-			view.Columns[0].Count, view.Columns[1].Count, view.Columns[2].Count, view.Columns[3].Count)
+	if view.Columns[0].Count != 2 || view.Columns[1].Count != 1 ||
+		view.Columns[2].Count != 1 || view.Columns[3].Count != 1 || view.Columns[4].Count != 1 {
+		t.Fatalf("배분 전일=%d 오늘완료=%d 진행=%d 예정=%d 미계획=%d",
+			view.Columns[0].Count, view.Columns[1].Count, view.Columns[2].Count, view.Columns[3].Count, view.Columns[4].Count)
 	}
 	if view.Columns[0].Items[0].ID != "as:x" && view.Columns[0].Items[1].ID != "as:x" {
 		t.Fatal("겹친 건은 전일 완료가 먼저")
 	}
-	if view.Columns[1].Items[0].RefNumber != "T1" {
-		t.Fatal("오늘 예정만 남은 건")
+	if view.Columns[1].Items[0].RefNumber != "D1" {
+		t.Fatal("오늘 완료만 남은 건")
 	}
 	if view.Columns[2].Items[0].RefNumber != "P1" {
 		t.Fatal("진행중만 남은 건")
 	}
-	if view.Columns[3].Count != 1 || view.Columns[3].Items[0].RefNumber != "U1" {
+	if view.Columns[3].Items[0].RefNumber != "T1" {
+		t.Fatal("오늘 예정만 남은 건")
+	}
+	if view.Columns[4].Items[0].RefNumber != "U1" {
 		t.Fatal("미계획만 남은 건")
+	}
+}
+
+func TestFillMeetingKanbanEmptyTodayCompleteStays(t *testing.T) {
+	view := FillMeetingKanban(nil, nil, nil, nil, nil)
+	if len(view.Columns) != 5 {
+		t.Fatalf("열 %d", len(view.Columns))
+	}
+	if view.Columns[1].Title != "오늘 완료" || view.Columns[1].Count != 0 || view.Columns[1].Items == nil {
+		t.Fatalf("빈 오늘 완료 열이 사라졌다 %+v", view.Columns[1])
+	}
+}
+
+func TestFillMeetingKanbanTodayCompleteAndTodaySchedSum(t *testing.T) {
+	done := []WorkListItem{
+		{Prefix: WorkPrefixAS, RefID: "d1", RefNumber: "D1", Title: "끝1", Status: "completed"},
+		{Prefix: WorkPrefixAS, RefID: "d2", RefNumber: "D2", Title: "끝2", Status: "completed"},
+	}
+	remain := []WorkListItem{
+		done[0],
+		done[1],
+		{Prefix: WorkPrefixAS, RefID: "t1", RefNumber: "T1", Title: "남음", Status: "assigned"},
+	}
+	view := FillMeetingKanban(nil, done, nil, remain, nil)
+	if view.Columns[1].Count != 2 {
+		t.Fatalf("오늘 완료 %d", view.Columns[1].Count)
+	}
+	if view.Columns[3].Count != 1 {
+		t.Fatalf("오늘 예정 %d", view.Columns[3].Count)
+	}
+	if MeetingKanbanScheduledSum(view) != 3 {
+		t.Fatalf("예정 합 %d want 3", MeetingKanbanScheduledSum(view))
+	}
+}
+
+func TestKanbanCardFromWorkKeepsTentative(t *testing.T) {
+	card := KanbanCardFromWork(WorkListItem{Prefix: WorkPrefixAS, RefID: "a", Title: "미확정", Tentative: true})
+	if !card.Tentative {
+		t.Fatal("미확정 뱃지가 빠졌다")
 	}
 }
 

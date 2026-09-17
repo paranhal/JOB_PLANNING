@@ -102,8 +102,8 @@ func TestResolveProjectIDSejongTwoLevel(t *testing.T) {
 	}
 	if _, err := db.Exec(`
 		INSERT INTO maintenance_visits (visit_id, plan_id, visit_date, customer_id, product_type)
-		VALUES ('V-SJ','`+plan.PlanID+`','2026-08-10','C_SITE','세종KLAS'),
-		       ('V-AN','`+plan.PlanID+`','2026-08-11','ANR','앤로보틱스')`); err != nil {
+		VALUES ('V-SJ','` + plan.PlanID + `','2026-08-10','C_SITE','세종KLAS'),
+		       ('V-AN','` + plan.PlanID + `','2026-08-11','ANR','앤로보틱스')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`

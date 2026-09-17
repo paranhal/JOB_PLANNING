@@ -139,9 +139,18 @@ func (h *MaintenanceHandler) BulkUpdateAssignees(c echo.Context) error {
 	if err != nil || plan == nil {
 		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
 	}
-	n, err := h.repo.BulkUpdateAssignees(id, plan.PlanYear, parseVisitFilter(c), c.FormValue("assignee"))
+	assignee := c.FormValue("assignee")
+	filt := parseVisitFilter(c)
+	n, err := h.repo.BulkUpdateAssignees(id, plan.PlanYear, filt, assignee)
 	if err != nil {
 		return h.manageErrRedirect(c, id, err.Error())
+	}
+	if n > 0 {
+		if list, err := h.repo.ListVisitsFiltered(id, plan.PlanYear, filt); err == nil {
+			for _, v := range list {
+				h.recordVisitAssign(c, v.VisitID, v.Assignee, "", "", "", "")
+			}
+		}
 	}
 	return h.manageOKRedirect(c, id, fmt.Sprintf("담당자를 %d건 바꿨습니다", n))
 }

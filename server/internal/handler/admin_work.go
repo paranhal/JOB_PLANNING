@@ -17,6 +17,7 @@ type AdminWorkHandler struct {
 	repo         *repository.WBRepo
 	userRepo     *repository.UserRepo
 	customerRepo *repository.CustomerRepo
+	notices      *assignNoticeHook
 }
 
 func NewAdminWorkHandler(repo *repository.WBRepo, userRepo *repository.UserRepo, customerRepo *repository.CustomerRepo) *AdminWorkHandler {
@@ -197,21 +198,21 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		fmtScanInt(p, &progress)
 	}
 	t := &model.WorkTask{
-		WorkType:     workType,
-		ProjectID:    strings.TrimSpace(c.FormValue("project_id")),
-		Title:        title,
-		Description:  strings.TrimSpace(c.FormValue("description")),
-		DueDate:      dueDate,
-		WorkDate:     workDate,
-		StartTime:    strings.TrimSpace(c.FormValue("start_time")),
-		EndTime:      strings.TrimSpace(c.FormValue("end_time")),
-		DurationMin:  30,
-		Status:       status,
-		Priority:     priority,
+		WorkType:       workType,
+		ProjectID:      strings.TrimSpace(c.FormValue("project_id")),
+		Title:          title,
+		Description:    strings.TrimSpace(c.FormValue("description")),
+		DueDate:        dueDate,
+		WorkDate:       workDate,
+		StartTime:      strings.TrimSpace(c.FormValue("start_time")),
+		EndTime:        strings.TrimSpace(c.FormValue("end_time")),
+		DurationMin:    30,
+		Status:         status,
+		Priority:       priority,
 		Assignee:       strings.TrimSpace(c.FormValue("assignee")),
 		AssigneeSource: model.WBAssigneeSourceManual,
 		Progress:       progress,
-		ParentTaskID: parentID,
+		ParentTaskID:   parentID,
 	}
 	if d := strings.TrimSpace(c.FormValue("duration_min")); d != "" {
 		fmtScanInt(d, &t.DurationMin)
@@ -232,6 +233,7 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		}
 		return err
 	}
+	recordTaskNotice(h.notices, c, t, "")
 	if applied, code := applyRecurrenceFromForm(c, h.repo, t, nil); code != "" {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+url.PathEscape(t.TaskID)+"?err="+code)
 	} else if applied {

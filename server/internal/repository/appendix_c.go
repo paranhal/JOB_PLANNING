@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"customer-support/internal/model"
 )
 
 // AppendixCCheck 부록 C 정합성 점검 1항목.
@@ -40,7 +42,7 @@ func RunAppendixC(db *sql.DB, appOnly bool) []AppendixCCheck {
 		runCountCheck(db, "V-1", "예정일 없이 확정된 건", "0",
 			`SELECT COUNT(*) FROM as_receipts WHERE schedule_confirmed=1 AND TRIM(COALESCE(visit_scheduled_date,''))=''`+appAS),
 		runCountCheck(db, "V-2", "미계획 AS (예정일·사유 모두 없음)", "0",
-			`SELECT COUNT(*) FROM as_receipts WHERE status NOT IN ('completed','closed','partial_complete','cancelled')
+			`SELECT COUNT(*) FROM as_receipts WHERE status NOT IN `+model.SQLStatusStatsCompleted+` AND status != 'cancelled'
 			 AND TRIM(COALESCE(visit_scheduled_date,''))='' AND TRIM(COALESCE(schedule_no_date_reason,''))=''`+appAS),
 		runCountCheck(db, "V-3", "조치는 있는데 착수시각 없음", "0",
 			`SELECT COUNT(*) FROM as_receipts r WHERE TRIM(COALESCE(r.start_datetime,''))=''
@@ -49,10 +51,10 @@ func RunAppendixC(db *sql.DB, appOnly bool) []AppendixCCheck {
 			`SELECT COUNT(*) FROM as_processes p JOIN as_receipts r ON r.as_id=p.as_id
 			 WHERE COALESCE(p.time_spent,0)<=0`+appR),
 		runCountCheck(db, "V-5", "근무구분 미입력 완료건", "신규분 0",
-			`SELECT COUNT(*) FROM as_receipts WHERE status IN ('completed','closed','partial_complete')
+			`SELECT COUNT(*) FROM as_receipts WHERE status IN `+model.SQLStatusStatsCompleted+`
 			 AND TRIM(COALESCE(work_place,''))=''`+appAS),
 		runCountCheck(db, "V-6", "원인분류 미입력 완료건", "신규분 0",
-			`SELECT COUNT(*) FROM as_receipts WHERE status IN ('completed','closed','partial_complete')
+			`SELECT COUNT(*) FROM as_receipts WHERE status IN `+model.SQLStatusStatsCompleted+`
 			 AND TRIM(COALESCE(cause_type,''))=''`+appAS),
 		runCountCheck(db, "V-7", "자산 미연결·사유도 없음", "신규분 0",
 			`SELECT COUNT(*) FROM as_receipts WHERE TRIM(COALESCE(asset_id,''))=''

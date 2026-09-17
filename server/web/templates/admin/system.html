@@ -1,0 +1,67 @@
+{{define "title"}}시스템 정보 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">시스템 정보</h2>
+    <p class="text-sm text-gray-500 mt-1">지금 도는 빌드와 배포 이력. 관리자만 봅니다.</p>
+  </div>
+
+  {{if .SchemaMismatch}}
+  <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{{.SchemaMismatch}}</div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 text-sm text-gray-800">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">현재</p>
+    <p class="font-mono text-[13px] leading-relaxed">
+      {{.Version}} · {{.Commit}} · 빌드 {{.Built}} · 기동 {{.Started}} · 스키마 {{.DBSchema}}
+      {{if .SchemaOK}}<span class="text-green-600">✔</span>{{else}}<span class="text-red-600">✖</span>{{end}}
+    </p>
+    <p class="text-xs text-gray-400 mt-1">앱 필요 스키마 {{.AppSchema}}</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-1">
+    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">첨부 총 용량</p>
+    <p class="text-sm {{.UploadClass}}">{{.UploadLabel}} · {{.UploadFiles}}개 파일 · <span class="font-mono text-xs">{{.UploadPath}}</span></p>
+    {{if .UploadWarn}}
+    <p class="text-sm {{.UploadClass}}">{{.UploadWarn}}</p>
+    {{end}}
+    <p class="text-xs text-gray-400">50MB 동영상 100건이면 약 5GB입니다. 백업에 파일을 넣을지 팀이 정합니다.</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700">배포 이력</h3>
+      <p class="text-xs text-gray-400 mt-0.5">최근 20건 · first_started_at 이 배포 시각</p>
+    </div>
+    {{if .History}}
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">날짜</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">버전</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">커밋</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">스키마</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">기동</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .History}}
+        <tr>
+          <td class="px-4 py-3 font-mono text-xs text-gray-700">{{.FirstStartedAt}}</td>
+          <td class="px-4 py-3">{{.Version}}</td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.Commit}}</td>
+          <td class="px-4 py-3 font-mono text-xs">{{printf "%03d" .SchemaVersion}}</td>
+          <td class="px-4 py-3 text-gray-600">
+            {{.StartCount}}회
+            {{if .Rollback}}<span class="ml-2 text-amber-700">🔙 롤백</span>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="px-4 py-6 text-sm text-gray-400">아직 기동 기록이 없습니다.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

@@ -250,6 +250,7 @@ func (h *AdminWorkHandler) Classify(c echo.Context) error {
 	if err := h.repo.UpdateTask(&t); err != nil {
 		return err
 	}
+	recordTaskNotice(h.notices, c, &t, existing.Assignee)
 	persistWaitingAction(h.repo, &t)
 	if t.Status == model.WBTaskComplete && t.CompleteNote != "" {
 		_ = h.repo.CreateActivity(&model.WorkActivity{

@@ -37,6 +37,7 @@ func newMntSyncServer(t *testing.T, name string) (*echo.Echo, *sql.DB) {
 	g.POST("/workboard/unschedule", h.Workboard.Unschedule)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.GET("/work-status", h.WorkStatus.Calendar)
+	g.GET("/sales/:id", h.Sales.Show)
 	return e, db
 }
 

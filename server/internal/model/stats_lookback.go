@@ -221,6 +221,40 @@ func FitStatsView(view string, days int) (fitted, note string, narrowed bool) {
 	return fitted, note, narrowed
 }
 
+// AutoStatsView 대시보드 그래프 단위. 기간 일수로 정한다 (§4.11).
+func AutoStatsView(days int) string {
+	if days <= 31 {
+		return StatsViewDay
+	}
+	if days <= 180 {
+		return StatsViewWeek
+	}
+	return StatsViewMonth
+}
+
+// ChartBucketNote 그래프 축 안내. 예: 「주별로 묶어 표시」
+func ChartBucketNote(view string) string {
+	switch view {
+	case StatsViewWeek:
+		return "주별로 묶어 표시"
+	case StatsViewMonth:
+		return "월별로 묶어 표시"
+	default:
+		return "일별로 묶어 표시"
+	}
+}
+
+// ApplyDashboardChartView 대시보드는 기간에서 단위를 고른다. 수동 view 쿼리는 무시한다 (§4.11).
+func ApplyDashboardChartView(lb *StatsLookback) {
+	if lb == nil {
+		return
+	}
+	lb.View = AutoStatsView(lookbackDays(lb.From, lb.To))
+	lb.ViewRequested = ""
+	lb.ViewNarrowed = false
+	lb.ViewNarrowNote = ""
+}
+
 func viewLabelKo(view string) string {
 	switch view {
 	case StatsViewWeek:
@@ -251,7 +285,7 @@ func unitLabelKo(unit string) string {
 	}
 }
 
-func (lb StatsLookback) QueryValues() string {
+func (lb StatsLookback) PeriodQueryValues() string {
 	q := ""
 	if lb.Custom {
 		q = "from=" + lb.RequestFrom + "&to=" + lb.To
@@ -261,6 +295,11 @@ func (lb StatsLookback) QueryValues() string {
 	} else if lb.RangeParam != "" {
 		q = "range=" + lb.RangeParam
 	}
+	return q
+}
+
+func (lb StatsLookback) QueryValues() string {
+	q := lb.PeriodQueryValues()
 	if lb.ViewRequested != "" && lb.ViewRequested != StatsViewRange {
 		if q != "" {
 			q += "&"

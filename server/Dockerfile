@@ -7,9 +7,14 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# 소스 복사 및 빌드
+# 소스 복사 및 빌드. 버전·커밋·시각은 빌드 스크립트가 ARG 로 넣는다. §40.3
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w -X 'main.buildVersion=${VERSION}' -X 'main.buildCommit=${COMMIT}' -X 'main.buildTime=${BUILD_TIME}'" \
+    -o server ./cmd/server
 
 # ── 2단계: 실행 이미지 (~20MB) ────────────────────────────────────
 FROM alpine:3.19

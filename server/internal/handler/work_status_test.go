@@ -128,6 +128,7 @@ func TestWorkStatusHTTP_TimelineSmoke(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"일일 업무처리현황", "완료", "[AS]현황도서관", "팀전체", "사업 전체", "시각없는완료",
+		"목록 · 전체 기간 · 이관 데이터 포함 (통계 집계와 다름)",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q", want)
@@ -333,5 +334,103 @@ func TestAttachStatusDayCounts(t *testing.T) {
 	}, []model.WorkTask{{WorkDate: "2026-09-05"}})
 	if weeks[0][0].ActionCount != 2 || weeks[0][0].ReceiptCount != 1 {
 		t.Fatalf("%+v", weeks[0][0])
+	}
+}
+
+func TestWorkStatusHTTP_SalesMonthBanners(t *testing.T) {
+	e, db := newMntSyncServer(t, "ws_sales_banner.db")
+	repo := repository.NewSalesRepo(db)
+
+	monthP := &model.SalesProject{
+		Name: "부여군도서관 제안", IsTentativeName: true,
+		ExpectedYM: "2026-09", ExpectedPrecision: model.SalesPrecisionMonth,
+	}
+	if err := repo.Create(monthP); err != nil {
+		t.Fatal(err)
+	}
+	qP := &model.SalesProject{
+		Name: "분기제안사업", IsTentativeName: true,
+		ExpectedYM: "2026-11", ExpectedPrecision: model.SalesPrecisionQuarter,
+	}
+	if err := repo.Create(qP); err != nil {
+		t.Fatal(err)
+	}
+	confP := &model.SalesProject{
+		Name: "확정월사업", IsTentativeName: true,
+		ExpectedYM: "2026-09", ExpectedPrecision: model.SalesPrecisionMonth,
+		ExpectedYMConfirmed: true,
+	}
+	if err := repo.Create(confP); err != nil {
+		t.Fatal(err)
+	}
+	actP := &model.SalesProject{Name: "다음활동사업", IsTentativeName: true}
+	if err := repo.Create(actP); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateActivity(&model.SalesActivity{
+		SalesID: actP.SalesID, ActivityDate: "2026-08-03", ActivityType: "visit",
+		Title: "방문", NextAction: "제안서 초안", NextActionDate: "2026-09",
+	}, "관리자", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	sep := doGet(t, e, "/work-status?view=month&date=2026-09-15")
+	if sep.Code != http.StatusOK {
+		t.Fatalf("status=%d", sep.Code)
+	}
+	body := sep.Body.String()
+	wantTitle := "9월 · 부여군도서관 제안 (월 미정)"
+	if !strings.Contains(body, wantTitle) {
+		t.Fatalf("월 띠 없음: %s", clipBody(body))
+	}
+	if !strings.Contains(body, `data-kind="month-banner"`) || !strings.Contains(body, `data-testid="sales-month-banners"`) {
+		t.Fatal("월 단위 띠 마크가 없다")
+	}
+	if !strings.Contains(body, `href="/sales/`+monthP.SalesID) && !strings.Contains(body, `href="/sales/`+monthP.SalesID+`"`) {
+		t.Fatalf("사업 상세 링크 없음 id=%s", monthP.SalesID)
+	}
+	if !strings.Contains(body, "확정") || !strings.Contains(body, "확정월사업") {
+		t.Fatal("확정 뱃지가 없다")
+	}
+	if !strings.Contains(body, "9월 · 제안서 초안 (월 미정)") {
+		t.Fatal("next_action 월 띠가 없다")
+	}
+	gridAt := strings.Index(body, "divide-y divide-slate-100")
+	if gridAt < 0 {
+		t.Fatal("날짜 칸 그리드가 없다")
+	}
+	grid := body[gridAt:]
+	for _, id := range []string{monthP.SalesID, qP.SalesID, confP.SalesID, actP.SalesID} {
+		if strings.Contains(grid, "/sales/"+id) {
+			t.Fatalf("날짜 칸에 영업 띠가 들어갔다: %s", id)
+		}
+	}
+	if strings.Contains(body, "4분기 중") {
+		t.Fatal("4분기 띠가 9월에 보인다")
+	}
+
+	oct := doGet(t, e, "/work-status?view=month&date=2026-10-05").Body.String()
+	if !strings.Contains(oct, "4분기 중") || !strings.Contains(oct, "10월 · 분기제안사업") {
+		t.Fatalf("10월에 4분기 띠가 없다: %s", clipBody(oct))
+	}
+	if strings.Contains(oct, wantTitle) {
+		t.Fatal("9월 사업이 10월 띠에 있다")
+	}
+	octGrid := oct
+	if i := strings.Index(oct, "divide-y divide-slate-100"); i >= 0 {
+		octGrid = oct[i:]
+	}
+	if strings.Contains(octGrid, "/sales/"+qP.SalesID) {
+		t.Fatal("분기 띠가 날짜 칸에 들어갔다")
+	}
+
+	nov := doGet(t, e, "/work-status?view=month&date=2026-11-01").Body.String()
+	if strings.Contains(nov, "4분기 중") {
+		t.Fatal("분기 첫 달이 아닌 11월에 띠가 보인다")
+	}
+
+	detail := doGet(t, e, "/sales/"+monthP.SalesID)
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "부여군도서관 제안") {
+		t.Fatalf("띠 링크 사업 상세 status=%d", detail.Code)
 	}
 }

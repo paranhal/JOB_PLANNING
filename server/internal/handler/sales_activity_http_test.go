@@ -39,7 +39,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if strings.Contains(eb, "+ 활동 추가") || strings.Contains(eb, "사업 목록") {
 		t.Fatal("빈 화면에 헤더 등록·사업 목록이 남았다")
 	}
-	if strings.Count(eb, `@click="open=true"`) != 1 {
+	if strings.Count(eb, `@click="startCreate()"`) != 1 {
 		t.Fatalf("주황 등록이 하나가 아니다: %s", clipBody(eb))
 	}
 	for _, label := range []string{"방문", "전화", "이메일", "온라인미팅", "내부회의", "정보수집"} {
@@ -98,7 +98,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if !strings.Contains(body, "2시간 30분") || !strings.Contains(body, "90분") || !strings.Contains(body, "60분") {
 		t.Fatalf("요약·카드 분이 다르다: %s", clipBody(body))
 	}
-	if strings.Contains(body, "첫 활동 등록하기") || strings.Count(body, `@click="open=true"`) != 1 {
+	if strings.Contains(body, "첫 활동 등록하기") || strings.Count(body, `@click="startCreate()"`) != 1 {
 		t.Fatal("목록이 있는데 빈 상태 CTA 가 남았거나 등록 버튼이 둘이다")
 	}
 	if !strings.Contains(body, "+ 활동 추가") {
@@ -113,7 +113,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if strings.Contains(sepBody, "아직 등록된 활동이 없습니다") || strings.Contains(sepBody, "첫 활동 등록하기") {
 		t.Fatal("이 달만 비었는데 하나도 없다고 나왔다")
 	}
-	if !strings.Contains(sepBody, "+ 활동 추가") || strings.Count(sepBody, `@click="open=true"`) != 1 {
+	if !strings.Contains(sepBody, "+ 활동 추가") || strings.Count(sepBody, `@click="startCreate()"`) != 1 {
 		t.Fatal("이 달 빈 화면의 등록 버튼이 하나가 아니다")
 	}
 	if !strings.Contains(body, "text-orange-800") || !strings.Contains(body, "다음: 제안서 작성 및 제출 · 2026-09-15") {
@@ -205,5 +205,148 @@ func TestSalesHTTP_ActivityTypesSeeded(t *testing.T) {
 	}
 	if got["quote"] != "견적제출" || got["proposal"] != "제안서제출" || got["bid"] != "입찰" {
 		t.Fatalf("진척 열쇠 유형이 없다 %+v", got)
+	}
+}
+
+func TestSalesHTTP_UpdateActivitySyncsWorkTask(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	rec := doForm(t, e, "/sales", url.Values{"name": {"수정 연동"}, "is_tentative_name": {"1"}})
+	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	js := doFormJSON(t, e, "/sales/activities", url.Values{
+		"sales_id": {id}, "activity_date": {"2026-08-22"}, "start_time": {"10:00"},
+		"duration_min": {"45"}, "activity_type": {"mail"}, "title": {"메일 회신"},
+		"counterparts": {"김담당"},
+	})
+	if js.Code != http.StatusOK {
+		t.Fatalf("등록 status=%d body=%s", js.Code, js.Body.String())
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(js.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	aid, _ := payload["activity_id"].(string)
+	if aid == "" {
+		t.Fatal("activity_id 없음")
+	}
+
+	page := doGet(t, e, "/sales/activities?month=2026-08")
+	body := page.Body.String()
+	if !strings.Contains(body, ">수정</button>") || !strings.Contains(body, ">삭제</button>") {
+		t.Fatal("수정·삭제 버튼이 없다")
+	}
+	if !strings.Contains(body, "되돌릴 수 없습니다") {
+		t.Fatal("삭제 확인 문구가 없다")
+	}
+
+	upd := doFormJSON(t, e, "/sales/activities/"+aid, url.Values{
+		"activity_date": {"2026-08-25"}, "start_time": {"14:00"},
+		"duration_min": {"90"}, "activity_type": {"visit"}, "title": {"방문으로 변경"},
+		"counterparts": {"김담당"},
+	})
+	if upd.Code != http.StatusOK {
+		t.Fatalf("수정 status=%d body=%s", upd.Code, upd.Body.String())
+	}
+	wb := repository.NewWBRepo(db)
+	task, err := wb.GetTaskBySource(model.WBSourceSalesActivity, aid)
+	if err != nil || task == nil {
+		t.Fatalf("일정표 동기화 실패: %v", err)
+	}
+	if task.Title != "방문으로 변경" || task.WorkDate != "2026-08-25" || task.DurationMin != 90 {
+		t.Fatalf("work_tasks 미반영 title=%q date=%s dur=%d", task.Title, task.WorkDate, task.DurationMin)
+	}
+	reg := doGet(t, e, "/workboard/register?view=day&date=2026-08-25")
+	if !strings.Contains(reg.Body.String(), "방문으로 변경") {
+		t.Fatalf("바꾼 날이 일정표에 없다: %s", clipBody(reg.Body.String()))
+	}
+	old := doGet(t, e, "/workboard/register?view=day&date=2026-08-22")
+	if strings.Contains(old.Body.String(), "방문으로 변경") || strings.Contains(old.Body.String(), "메일 회신") {
+		t.Fatal("옛 날짜 일정표에 유령이 남았다")
+	}
+}
+
+func TestSalesHTTP_DeleteActivityRemovesWorkTaskKeepsAutoParty(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	rec := doForm(t, e, "/sales", url.Values{"name": {"삭제 연동"}, "is_tentative_name": {"1"}, "prospect_name": {"세종시립도서관"}})
+	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	js := doFormJSON(t, e, "/sales/activities", url.Values{
+		"sales_id": {id}, "activity_date": {"2026-08-22"},
+		"duration_min": {"30"}, "activity_type": {"visit"}, "title": {"지울 방문"},
+		"counterparts": {"박상대"},
+	})
+	var payload map[string]interface{}
+	if err := json.Unmarshal(js.Body.Bytes(), &payload); err != nil || payload["ok"] != true {
+		t.Fatalf("등록: %s", js.Body.String())
+	}
+	aid, _ := payload["activity_id"].(string)
+	sales := repository.NewSalesRepo(db)
+	before, err := sales.ListParties(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.CustomerPartyHintNames(before)) == 0 {
+		t.Fatal("자동 관계자가 안 생겼다")
+	}
+
+	del := httptestPostAs(t, e, "/sales/activities/"+aid+"/delete", url.Values{}, "admin")
+	if del.Code != http.StatusSeeOther && del.Code != http.StatusOK {
+		t.Fatalf("삭제 status=%d body=%s", del.Code, del.Body.String())
+	}
+	got, err := sales.GetActivity(aid)
+	if err == nil && got != nil {
+		t.Fatal("활동이 남아 있다")
+	}
+	task, err := repository.NewWBRepo(db).GetTaskBySource(model.WBSourceSalesActivity, aid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task != nil {
+		t.Fatal("일정표 유령이 남았다")
+	}
+	after, _ := sales.ListParties(id, true)
+	if len(model.CustomerPartyHintNames(after)) == 0 {
+		t.Fatal("자동 생성 관계자가 지워졌다")
+	}
+	var auto bool
+	for _, p := range after {
+		if p.PersonName == "박상대" && p.IsAuto {
+			auto = true
+		}
+	}
+	if !auto {
+		t.Fatalf("is_auto 관계자가 없다: %+v", after)
+	}
+	reg := doGet(t, e, "/workboard/register?view=day&date=2026-08-22")
+	if strings.Contains(reg.Body.String(), "지울 방문") {
+		t.Fatal("삭제한 활동이 일정표에 남았다")
+	}
+}
+
+func TestSalesHTTP_ForeignActivityMutationsForbidden(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	rec := doForm(t, e, "/sales", url.Values{"name": {"남의 활동"}, "is_tentative_name": {"1"}})
+	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	js := doFormJSON(t, e, "/sales/activities", url.Values{
+		"sales_id": {id}, "activity_date": {"2026-08-22"},
+		"duration_min": {"30"}, "activity_type": {"call"}, "title": {"관리자 통화"},
+	})
+	var payload map[string]interface{}
+	if err := json.Unmarshal(js.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	aid, _ := payload["activity_id"].(string)
+	upd := httptestPostAs(t, e, "/sales/activities/"+aid, url.Values{
+		"activity_date": {"2026-08-23"}, "duration_min": {"60"},
+		"activity_type": {"call"}, "title": {"가로채기"},
+	}, "sales")
+	if upd.Code != http.StatusForbidden {
+		t.Fatalf("남의 수정 status=%d want 403", upd.Code)
+	}
+	del := httptestPostAs(t, e, "/sales/activities/"+aid+"/delete", url.Values{}, "sales")
+	if del.Code != http.StatusForbidden {
+		t.Fatalf("남의 삭제 status=%d want 403", del.Code)
+	}
+	got, err := repository.NewSalesRepo(db).GetActivity(aid)
+	if err != nil || got == nil || got.Title != "관리자 통화" {
+		t.Fatalf("403 인데 내용이 바뀌었다: %+v err=%v", got, err)
 	}
 }

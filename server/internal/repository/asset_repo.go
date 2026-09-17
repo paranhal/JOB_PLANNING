@@ -8,9 +8,18 @@ import (
 	"customer-support/internal/model"
 )
 
-type AssetRepo struct{ db *sql.DB }
+type AssetRepo struct {
+	db      *sql.DB
+	locCopy bool
+}
 
-func NewAssetRepo(db *sql.DB) *AssetRepo { return &AssetRepo{db: db} }
+func NewAssetRepo(db *sql.DB) *AssetRepo {
+	return &AssetRepo{db: db, locCopy: tableHasColumn(db, "assets", "loc_building_name")}
+}
+
+func (r *AssetRepo) locNameSQL(alias, locCol, joinExpr string) string {
+	return assetLocNameSQL(alias, locCol, joinExpr, r.locCopy)
+}
 
 func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir string, page, pageSize int) ([]model.Asset, int, error) {
 	offset := 0
@@ -29,9 +38,9 @@ func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir stri
 		       COALESCE(a.management_type,''), a.is_managed,
 		       COALESCE(a.maint_contract_type,''), COALESCE(a.maint_cycle,''),
 		       c.org_name,
-		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,'') AS bname,
-		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,'') AS fname,
-		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,'') AS rname,
+		       ` + r.locNameSQL("a", "loc_building_name", "b.building_name") + ` AS bname,
+		       ` + r.locNameSQL("a", "loc_floor_name", "f.floor_name") + ` AS fname,
+		       ` + r.locNameSQL("a", "loc_room_name", "rm.room_name") + ` AS rname,
 		       COALESCE(a.install_location,''),
 		       COALESCE(a.project_id,''),
 		       COALESCE(NULLIF(TRIM(p.short_name),''), p.name, '') AS project_name,
@@ -113,6 +122,9 @@ func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir stri
 			return nil, 0, err
 		}
 		a.IsManaged = managed == 1
+		a.LocBuildingName = a.BuildingName
+		a.LocFloorName = a.FloorName
+		a.LocRoomName = a.RoomName
 		items = append(items, a)
 	}
 	return items, total, rows.Err()
@@ -179,15 +191,14 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		       COALESCE(a.requester_type,''), COALESCE(a.requester_name,''),
 		       COALESCE(a.customer_contact_id,''), COALESCE(a.our_contact,''),
 		       COALESCE(a.building_id,''), COALESCE(a.floor_id,''), COALESCE(a.room_id,''),
-		       COALESCE(a.loc_building_name,''), COALESCE(a.loc_floor_name,''), COALESCE(a.loc_room_name,''),
 		       COALESCE(a.install_location,''),
 		       COALESCE(a.location_detail,''), COALESCE(a.notes,''),
 		       COALESCE(a.project_id,''), COALESCE(a.sales_order_id,''),
 		       a.created_at, a.updated_at,
 		       c.org_name,
-		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
-		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,''),
-		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,''),
+		       ` + r.locNameSQL("a", "loc_building_name", "b.building_name") + `,
+		       ` + r.locNameSQL("a", "loc_floor_name", "f.floor_name") + `,
+		       ` + r.locNameSQL("a", "loc_room_name", "rm.room_name") + `,
 		       COALESCE(NULLIF(TRIM(p.short_name),''), p.name, '')
 		FROM assets a
 		JOIN customers c ON c.customer_id=a.customer_id
@@ -214,7 +225,6 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 		&a.RequesterType, &a.RequesterName,
 		&a.CustomerContactID, &a.OurContact,
 		&a.BuildingID, &a.FloorID, &a.RoomID,
-		&a.LocBuildingName, &a.LocFloorName, &a.LocRoomName,
 		&a.InstallLocation,
 		&a.LocationDetail, &a.Notes,
 		&a.ProjectID, &a.SalesOrderID,
@@ -231,6 +241,9 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 	a.IsManaged = managed == 1
 	a.CreatedAt = parseTime(createdAt)
 	a.UpdatedAt = parseTime(updatedAt)
+	a.LocBuildingName = a.BuildingName
+	a.LocFloorName = a.FloorName
+	a.LocRoomName = a.RoomName
 	return &a, nil
 }
 
@@ -240,6 +253,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		return err
 	}
 	a.AssetID = id
+	r.resolveLocIDs(a)
 	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err = r.db.Exec(`
 		INSERT INTO assets (
@@ -252,10 +266,9 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 			requester_type, requester_name,
 			customer_contact_id, our_contact,
 			building_id, floor_id, room_id,
-			loc_building_name, loc_floor_name, loc_room_name,
 			install_location, location_detail, notes, project_id, sales_order_id,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
 		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
@@ -265,7 +278,6 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		a.RequesterType, a.RequesterName,
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
-		a.LocBuildingName, a.LocFloorName, a.LocRoomName,
 		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), a.SalesOrderID, now, now,
 	)
 	if err != nil {
@@ -277,6 +289,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 
 func (r *AssetRepo) Update(a *model.Asset) error {
 	return touchUpdate(r.db, "assets", "asset_id", a.AssetID, a.ProductName+" "+a.ModelName, func() error {
+		r.resolveLocIDs(a)
 		now := time.Now().Format("2006-01-02 15:04:05")
 		_, err := r.db.Exec(`
 		UPDATE assets SET
@@ -289,7 +302,6 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			requester_type=?, requester_name=?,
 			customer_contact_id=?, our_contact=?,
 			building_id=?, floor_id=?, room_id=?,
-			loc_building_name=?, loc_floor_name=?, loc_room_name=?,
 			install_location=?, location_detail=?, notes=?, project_id=?,
 			updated_at=?
 		WHERE asset_id=?`,
@@ -302,11 +314,48 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			a.RequesterType, a.RequesterName,
 			a.CustomerContactID, a.OurContact,
 			nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
-			a.LocBuildingName, a.LocFloorName, a.LocRoomName,
 			a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), now, a.AssetID,
 		)
 		return err
 	})
+}
+
+// resolveLocIDs 이름만 있고 ID 가 비면 건물·층·실 ID 를 채운다. 40-F
+func (r *AssetRepo) resolveLocIDs(a *model.Asset) {
+	if a == nil || r.db == nil {
+		return
+	}
+	if strings.TrimSpace(a.BuildingID) == "" && strings.TrimSpace(a.LocBuildingName) != "" {
+		var id string
+		_ = r.db.QueryRow(`
+			SELECT building_id FROM customer_buildings
+			 WHERE customer_id=? AND TRIM(building_name)=TRIM(?) LIMIT 1`,
+			a.CustomerID, a.LocBuildingName).Scan(&id)
+		a.BuildingID = id
+	}
+	if strings.TrimSpace(a.FloorID) == "" && strings.TrimSpace(a.LocFloorName) != "" {
+		var id string
+		_ = r.db.QueryRow(`
+			SELECT f.floor_id FROM customer_floors f
+			 JOIN customer_buildings b ON b.building_id=f.building_id
+			 WHERE b.customer_id=? AND TRIM(f.floor_name)=TRIM(?)
+			   AND (TRIM(COALESCE(?,''))='' OR f.building_id=?)
+			 LIMIT 1`,
+			a.CustomerID, a.LocFloorName, a.BuildingID, a.BuildingID).Scan(&id)
+		a.FloorID = id
+	}
+	if strings.TrimSpace(a.RoomID) == "" && strings.TrimSpace(a.LocRoomName) != "" {
+		var id string
+		_ = r.db.QueryRow(`
+			SELECT r.room_id FROM customer_rooms r
+			 JOIN customer_floors f ON f.floor_id=r.floor_id
+			 JOIN customer_buildings b ON b.building_id=f.building_id
+			 WHERE b.customer_id=? AND TRIM(r.room_name)=TRIM(?)
+			   AND (TRIM(COALESCE(?,''))='' OR r.floor_id=?)
+			 LIMIT 1`,
+			a.CustomerID, a.LocRoomName, a.FloorID, a.FloorID).Scan(&id)
+		a.RoomID = id
+	}
 }
 
 func (r *AssetRepo) UpdateOperationStatus(id, status string) error {
@@ -342,16 +391,21 @@ func (r *AssetRepo) Delete(id string) error {
 // ListForTab 고객 상세 탭 전용 — 화면 표시에 필요한 컬럼 포함
 func (r *AssetRepo) ListForTab(customerID string) ([]model.Asset, error) {
 	rows, err := r.db.Query(`
-		SELECT asset_id, COALESCE(product_name,''), COALESCE(product_type,''),
-		       COALESCE(product_category,''),
-		       COALESCE(model_name,''), COALESCE(serial_number,''),
-		       COALESCE(install_date,''), COALESCE(operation_status,'operating'),
-		       COALESCE(maint_contract_type,''), COALESCE(maint_cycle,''),
-		       COALESCE(install_location,''),
-		       TRIM(COALESCE(loc_building_name,'') || ' ' || COALESCE(loc_floor_name,'') || ' ' ||
-		            COALESCE(loc_room_name,'') || ' ' || COALESCE(location_detail,''))
-		FROM assets
-		WHERE customer_id = ?
+		SELECT a.asset_id, COALESCE(a.product_name,''), COALESCE(a.product_type,''),
+		       COALESCE(a.product_category,''),
+		       COALESCE(a.model_name,''), COALESCE(a.serial_number,''),
+		       COALESCE(a.install_date,''), COALESCE(a.operation_status,'operating'),
+		       COALESCE(a.maint_contract_type,''), COALESCE(a.maint_cycle,''),
+		       COALESCE(a.install_location,''),
+		       TRIM(` + r.locNameSQL("a", "loc_building_name", "b.building_name") + ` || ' ' ||
+		            ` + r.locNameSQL("a", "loc_floor_name", "f.floor_name") + ` || ' ' ||
+		            ` + r.locNameSQL("a", "loc_room_name", "rm.room_name") + ` || ' ' ||
+		            COALESCE(a.location_detail,''))
+		FROM assets a
+		LEFT JOIN customer_buildings b ON b.building_id=a.building_id
+		LEFT JOIN customer_floors f ON f.floor_id=a.floor_id
+		LEFT JOIN customer_rooms rm ON rm.room_id=a.room_id
+		WHERE a.customer_id = ?
 		ORDER BY install_date DESC, product_name`, customerID)
 	if err != nil {
 		return nil, err
@@ -380,9 +434,9 @@ func (r *AssetRepo) ListByCustomer(customerID string) ([]model.Asset, error) {
 	rows, err := r.db.Query(
 		`SELECT a.asset_id, a.product_name, COALESCE(a.product_type,''), COALESCE(a.product_category,''), COALESCE(a.model_name,''), COALESCE(a.serial_number,''),
 		        COALESCE(a.operation_status,'operating'),
-		        COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
-		        COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,''),
-		        COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,''),
+		        ` + r.locNameSQL("a", "loc_building_name", "b.building_name") + `,
+		        ` + r.locNameSQL("a", "loc_floor_name", "f.floor_name") + `,
+		        ` + r.locNameSQL("a", "loc_room_name", "rm.room_name") + `,
 		        COALESCE(a.install_location,'')
 		 FROM assets a
 		 LEFT JOIN customer_buildings b ON b.building_id=a.building_id
@@ -431,9 +485,9 @@ func (r *AssetRepo) ListMaintExport(customerIDs []string) ([]model.Asset, error)
 		       COALESCE(a.maint_start_date,''), COALESCE(a.maint_end_date,''),
 		       COALESCE(a.maint_billing_party,''), COALESCE(a.maint_billing_cycle,''),
 		       COALESCE(a.install_location,''),
-		       COALESCE(NULLIF(TRIM(a.loc_building_name),''), b.building_name,''),
-		       COALESCE(NULLIF(TRIM(a.loc_floor_name),''), f.floor_name,''),
-		       COALESCE(NULLIF(TRIM(a.loc_room_name),''), rm.room_name,''),
+		       ` + r.locNameSQL("a", "loc_building_name", "b.building_name") + `,
+		       ` + r.locNameSQL("a", "loc_floor_name", "f.floor_name") + `,
+		       ` + r.locNameSQL("a", "loc_room_name", "rm.room_name") + `,
 		       COALESCE(a.notes,'')
 		FROM assets a
 		JOIN customers c ON c.customer_id = a.customer_id

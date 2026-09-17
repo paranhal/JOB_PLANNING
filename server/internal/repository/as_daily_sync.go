@@ -19,7 +19,7 @@ func backfillASPlannedDailyTasks(db *sql.DB) {
 		       COALESCE(ar.assigned_to,''), ar.visit_scheduled_date
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
-		WHERE ar.status IN ` + model.SQLStatusOpenIncomplete + `
+		WHERE ar.status IN `+model.SQLStatusOpenIncomplete+`
 		  AND TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
 		  AND NOT EXISTS (
 			SELECT 1 FROM work_tasks t

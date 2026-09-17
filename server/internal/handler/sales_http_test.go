@@ -41,6 +41,8 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/sales/activities", h.Sales.Activities)
 	g.POST("/sales/activities", h.Sales.CreateActivity)
 	g.POST("/sales/activities/:aid/move", h.Sales.MoveActivity)
+	g.POST("/sales/activities/:aid/delete", h.Sales.DeleteActivity)
+	g.POST("/sales/activities/:aid", h.Sales.UpdateActivity)
 	g.POST("/sales/from-task", h.Sales.FromTask)
 	g.GET("/sales/pipeline", h.Sales.Pipeline)
 	g.GET("/sales/:id/promote", h.Sales.PromoteForm)
@@ -258,12 +260,65 @@ func TestSalesHTTP_ActivityAppearsOnRegisterAndEmptySalesColumn(t *testing.T) {
 		t.Fatalf("상세 타임라인에 활동 없음: %d", show.Code)
 	}
 
+	var n, emptyDate, emptyAssignee int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM work_tasks WHERE source_type='sales_activity'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM work_tasks
+		WHERE source_type='sales_activity' AND TRIM(COALESCE(work_date,''))=''`).Scan(&emptyDate); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM work_tasks
+		WHERE source_type='sales_activity' AND TRIM(COALESCE(assignee,''))=''`).Scan(&emptyAssignee); err != nil {
+		t.Fatal(err)
+	}
+	unplaced, err := repository.NewWBRepo(db).ListUnplacedAdminTasks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paletteSales := 0
+	for _, tk := range unplaced {
+		if tk.SourceType == model.WBSourceSalesActivity {
+			paletteSales++
+		}
+	}
+	t.Logf("§39.6 (1) source_type=sales_activity COUNT=%d", n)
+	t.Logf("§39.6 (2) empty work_date COUNT=%d", emptyDate)
+	t.Logf("§39.6 (3) empty assignee COUNT=%d", emptyAssignee)
+	t.Logf("§39.6 (4) WBCategory(sales)=%q label=%q; WBCategory(sales_activity)=%q label=%q",
+		model.WBCategory(model.WorkPrefixSales), model.WBCategoryLabel(model.WBCategory(model.WorkPrefixSales)),
+		model.WBCategory(model.WBSourceSalesActivity), model.WBCategoryLabel(model.WBCategory(model.WBSourceSalesActivity)))
+	t.Logf("§39.6 (5) ListUnplacedAdminTasks sales_activity COUNT=%d (source_type!='' 제외)", paletteSales)
+
+	if n == 0 {
+		t.Fatal("(1) work_tasks 에 sales_activity 가 없다 — syncWorkTask 가 안 불린다")
+	}
+	if emptyDate != 0 {
+		t.Fatalf("(2) work_date 빈 행 %d건 — 일정표에 자리가 없다", emptyDate)
+	}
+	if emptyAssignee != 0 {
+		t.Fatalf("(3) assignee 빈 행 %d건 — 담당자 열에 안 들어간다", emptyAssignee)
+	}
+	if model.WBCategoryLabel(model.WBCategory(model.WorkPrefixSales)) != "영업" {
+		t.Fatalf("(4) WBCategory(sales) 가 행정으로 떨어진다: %q", model.WBCategory(model.WorkPrefixSales))
+	}
+	if paletteSales != 0 {
+		t.Fatalf("(5) 팔레트에 sales_activity 가 %d건 있다 — 일정표가 아니라 대기 목록 쪽", paletteSales)
+	}
+
 	reg := doGet(t, e, "/workboard/register?view=day&date=2026-08-19")
 	if reg.Code != http.StatusOK {
 		t.Fatalf("일정표 status=%d", reg.Code)
 	}
-	if !strings.Contains(reg.Body.String(), "방문미팅 · 세종 RFID") {
-		t.Fatalf("일일 업무 등록 일정표에 활동이 없다: %s", clipBody(reg.Body.String()))
+	regBody := reg.Body.String()
+	if !strings.Contains(regBody, "방문미팅 · 세종 RFID") {
+		t.Fatalf("일일 업무 등록 일정표에 활동이 없다: %s", clipBody(regBody))
+	}
+	if !strings.Contains(regBody, "[영업]") {
+		t.Fatalf("일정표에 「영업」 라벨이 없다(행정으로 보인다): %s", clipBody(regBody))
+	}
+	if !strings.Contains(regBody, `data-assignee="최혜영"`) {
+		t.Fatalf("담당자 열(최혜영)에 안 들어갔다: %s", clipBody(regBody))
 	}
 
 	act := doGet(t, e, "/sales/activities?date=2026-08-19")
@@ -811,12 +866,12 @@ func TestSalesHTTP_TechCannotPromote(t *testing.T) {
 func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 	e := newSalesServer(t)
 	rec := doForm(t, e, "/sales", url.Values{
-		"name":                {"세종 RFID 증설"},
-		"is_tentative_name":   {"1"},
-		"expected_amount":     {"30000000"},
-		"expected_ym":         {"2026-09"},
-		"prospect_name":       {"세종시립도서관"},
-		"sales_owner":         {"최혜영"},
+		"name":              {"세종 RFID 증설"},
+		"is_tentative_name": {"1"},
+		"expected_amount":   {"30000000"},
+		"expected_ym":       {"2026-09"},
+		"prospect_name":     {"세종시립도서관"},
+		"sales_owner":       {"최혜영"},
 	})
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 
@@ -872,8 +927,8 @@ func TestSalesHTTP_ActivityAutoParty(t *testing.T) {
 	e, db := newSalesServerDB(t)
 
 	rec := doForm(t, e, "/sales", url.Values{
-		"name":           {"세종 RFID 증설"},
-		"prospect_name":  {"세종시립도서관"},
+		"name":              {"세종 RFID 증설"},
+		"prospect_name":     {"세종시립도서관"},
 		"is_tentative_name": {"1"},
 	})
 	if rec.Code != http.StatusSeeOther {

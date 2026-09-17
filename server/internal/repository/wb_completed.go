@@ -15,8 +15,8 @@ type MissingCompleteDates struct {
 
 func (s MissingCompleteDates) Total() int { return s.AS + s.Mnt + s.Admin }
 
-// ListCompletedForStatusPeriod 업무처리현황「조치」용 완료 실적.
-// 통계 처리와 같은 날짜를 쓴다. 완료일이 있는 건만.
+// ListCompletedForStatusPeriod 업무처리현황「조치」용 완료 목록.
+// 통계 집계가 아니다 — 기준일·이관 제외를 걸지 않는다. 완료일이 있는 건만.
 //
 //	AS: 완료·종료·부분완료 + complete_datetime
 //	정기점검: completed=1 + completed_date
@@ -56,10 +56,10 @@ func (r *WBRepo) completedASBetween(from, toEx string) ([]model.WorkTask, error)
 		LEFT JOIN work_tasks t ON t.source_type='as' AND t.source_id=ar.as_id
 		  AND COALESCE(t.parent_task_id,'')=''
 		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
-		  AND ` + asCompleteDateSQL + ` >= date(?)
-		  AND ` + asCompleteDateSQL + ` < date(?)
+		  AND ` + asCompleteDT + ` >= ?
+		  AND ` + asCompleteDT + ` < ?
 		ORDER BY ` + asCompleteDateSQL + `, ar.as_number`
-	rows, err := r.db.Query(q, from, toEx)
+	rows, err := r.db.Query(q, dayTimeStart(from), dayTimeStart(toEx))
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil

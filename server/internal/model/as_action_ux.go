@@ -43,18 +43,19 @@ func CauseCat2HasChildren(cats []CauseCategory, cat2 string) bool {
 }
 
 const (
-	ProcessTypeRemote  = "remote"
-	ProcessTypeVisit   = "visit"
-	ProcessTypeInquiry = "inquiry"
+	ProcessTypeRemote       = "remote"
+	ProcessTypeVisit        = "visit"
+	ProcessTypeInquiry      = "inquiry"
+	ProcessTypeUndetermined = "undetermined" // §4.7 미정+사유
 )
 
 // ProcessTypesForWorkPlace 근무구분에 허용되는 처리유형. 첫 항목이 기본값. §34.3.2
 func ProcessTypesForWorkPlace(place string) []string {
 	switch NormalizeWorkPlace(place) {
 	case WorkPlaceOffice:
-		return []string{ProcessTypeRemote, ProcessTypeInquiry}
+		return []string{ProcessTypeRemote, ProcessTypeInquiry, ProcessTypeUndetermined}
 	case WorkPlaceField:
-		return []string{ProcessTypeVisit, ProcessTypeInquiry}
+		return []string{ProcessTypeVisit, ProcessTypeInquiry, ProcessTypeUndetermined}
 	default:
 		return nil
 	}
@@ -81,7 +82,7 @@ func ProcessTypePlaces(code string) string {
 		return WorkPlaceOffice
 	case ProcessTypeVisit:
 		return WorkPlaceField
-	case ProcessTypeInquiry:
+	case ProcessTypeInquiry, ProcessTypeUndetermined:
 		return WorkPlaceOffice + " " + WorkPlaceField
 	default:
 		return ""

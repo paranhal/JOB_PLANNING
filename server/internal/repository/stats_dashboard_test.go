@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -8,6 +9,15 @@ import (
 
 	"customer-support/internal/model"
 )
+
+func setMetricsPolicy(t *testing.T, db *sql.DB, base, scope string) {
+	t.Helper()
+	s := NewSettingsRepo(db)
+	if err := s.Set(SettingMetricsBaseDate, base); err != nil {
+		t.Fatal(err)
+	}
+	_ = scope
+}
 
 func TestBuildStatsChartBuckets(t *testing.T) {
 	anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
@@ -51,10 +61,10 @@ func TestLoadStatsKPIAndSeries(t *testing.T) {
 	}
 	setMetricsPolicy(t, db, "2026-08-01", "as,maintenance")
 	_, err = db.Exec(`
-		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date, start_datetime, status, assigned_to, complete_datetime)
+		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date, start_datetime, status, assigned_to, complete_datetime, process_type, visit_date)
 		VALUES
-		('a1','R1','c1','2026-08-01','2026-08-03','2026-08-03','completed','양기헌','2026-08-05'),
-		('a2','R2','c1','2026-08-02','2026-08-06',NULL,'in_progress','이해진',NULL)`)
+		('a1','R1','c1','2026-08-01','2026-08-03','2026-08-03','completed','양기헌','2026-08-05','visit','2026-08-03'),
+		('a2','R2','c1','2026-08-02','2026-08-06',NULL,'in_progress','이해진',NULL,NULL,NULL)`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,16 +139,21 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 	_, err = db.Exec(`
 		INSERT INTO as_receipts (
 			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
-			start_datetime, complete_datetime, status, assigned_to, data_origin, updated_at
+			start_datetime, complete_datetime, status, assigned_to, data_origin, updated_at,
+			process_type, visit_date
 		) VALUES
 		('ok','R-OK','c1','2026-08-01','2026-08-10',
-		 '2026-08-03','2026-08-05','completed','양기헌','app','2026-08-20'),
+		 '2026-08-03','2026-08-05','completed','양기헌','app','2026-08-20',
+		 'visit','2026-08-03'),
 		('sched','R-SCHED','c1','2026-08-01','2026-08-06',
-		 NULL,'2026-08-06','completed','양기헌','app','2026-08-06'),
+		 NULL,'2026-08-06','completed','양기헌','app','2026-08-06',
+		 'visit',''),
 		('open','R-OPEN','c1','2026-08-01','2026-08-04',
-		 '2026-08-04',NULL,'in_progress','양기헌','app','2026-08-04'),
+		 '2026-08-04',NULL,'in_progress','양기헌','app','2026-08-04',
+		 'visit','2026-08-04'),
 		('late','R-LATE','c1','2026-08-01','2026-08-02',
-		 '2026-08-10 18:00:00','2026-08-05 12:00:00','completed','양기헌','app','2026-08-05')`)
+		 '2026-08-10 18:00:00','2026-08-05 12:00:00','completed','양기헌','app','2026-08-05',
+		 '','')`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,12 +168,17 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if nV != nC || nV != 2 {
-		t.Fatalf("표본 visit=%d complete=%d want 2 (예정일만·미완료는 제외)", nV, nC)
+	if nV != 1 {
+		t.Fatalf("방문 표본=%d want 1 (visit_date 있는 visit 완료만)", nV)
 	}
-	// ok: 2일/4일, late: 9일/4일 → 방문 5.5, 완료 4.0
-	if visit <= comp {
-		t.Fatalf("뒤집힌 픽스처인데 방문=%.2f 완료=%.2f", visit, comp)
+	if nC != 2 {
+		t.Fatalf("완료 표본=%d want 2 (착수·완료 있는 완료 건)", nC)
+	}
+	if visit < 1.9 || visit > 2.1 {
+		t.Fatalf("방문 평균=%.2f want 2 (visit_date 8/3 − 접수 8/1)", visit)
+	}
+	if comp < 3.9 || comp > 4.1 {
+		t.Fatalf("완료 평균=%.2f want 4", comp)
 	}
 
 	anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
@@ -170,14 +190,17 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kpi.VisitSample != kpi.CompleteSample {
-		t.Fatalf("KPI n 불일치 visit=%d complete=%d", kpi.VisitSample, kpi.CompleteSample)
+	if kpi.VisitSample != 1 || kpi.CompleteSample != 2 {
+		t.Fatalf("KPI n visit=%d complete=%d (산식이 달라 n이 갈라지는 것이 정직)", kpi.VisitSample, kpi.CompleteSample)
 	}
-	if kpi.LeadTimeWarn == "" || !strings.Contains(kpi.LeadTimeWarn, "방문") {
-		t.Fatalf("불변식 경고 없음: %q", kpi.LeadTimeWarn)
+	if kpi.LeadTimeWarn != "" {
+		t.Fatalf("n이 다른데 방문>완료 경고가 나왔다: %q", kpi.LeadTimeWarn)
 	}
-	if kpi.VisitDisplay.ShowValue || kpi.CompleteDisplay.ShowValue {
-		t.Fatal("표본 2건은 측정불가여야 한다")
+	if kpi.VisitDisplay.GradeLabel != "판단 보류" || kpi.VisitDisplay.GradeMark != "⚪" {
+		t.Fatalf("방문 표본 1건은 판단 보류여야 한다: %+v", kpi.VisitDisplay)
+	}
+	if kpi.CompleteDisplay.ShowValue {
+		t.Fatal("완료 표본 2건은 측정불가여야 한다")
 	}
 
 	checks := RunAppendixC(db, false)
@@ -189,6 +212,56 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 	}
 	if v12 == nil || v12.Count != 1 || v12.OK {
 		t.Fatalf("V-12=%+v", v12)
+	}
+}
+
+func TestCompleteDateIgnoresUpdatedAt(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "cdate.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('c1','도서관','도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	setMetricsPolicy(t, db, "2026-08-01", "as,maintenance")
+	_, err = db.Exec(`
+		INSERT INTO as_receipts (
+			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
+			start_datetime, complete_datetime, status, assigned_to, data_origin, updated_at
+		) VALUES
+		('miss','R-MISS','c1','2026-08-01','2026-08-03',
+		 '2026-08-03',NULL,'completed','양기헌','app','2026-08-20'),
+		('ok','R-OK','c1','2026-08-01','2026-08-03',
+		 '2026-08-03','2026-08-05','completed','양기헌','app','2026-08-20')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewStatsRepo(db)
+	f := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
+	cols := BuildStatsPeriodColumns(model.StatsViewMonth, anchor)
+	if err := repo.FillPeriodOverview(cols, f); err != nil {
+		t.Fatal(err)
+	}
+	if cols[1].Counts.AS.Process != 1 {
+		t.Fatalf("처리=%d want 1 (updated_at 으로 빈 완료일을 채우면 안 됨)", cols[1].Counts.AS.Process)
+	}
+	_, n, err := repo.avgASDays("2026-08-01", "2026-09-01", f, "complete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("리드타임 표본=%d want 1 (처리 건수와 같은 완료일 축)", n)
+	}
+	miss, err := NewWBRepo(db).CountMissingCompleteDates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if miss.AS != 1 {
+		t.Fatalf("완료일 미기록=%d want 1", miss.AS)
 	}
 }
 
@@ -244,4 +317,70 @@ func TestPartialCompleteWorkInChartReceivedOpen(t *testing.T) {
 	if thisWeek.Open < 1 {
 		t.Fatalf("open work item should count as open, got open=%d", thisWeek.Open)
 	}
+}
+
+func TestAdminWorkCountsInReceiptNotProcess(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "exec-admin.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('c1','도서관','도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	setMetricsPolicy(t, db, "2026-08-01", "")
+	_, err = db.Exec(`
+		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date, start_datetime, complete_datetime, status, assigned_to, data_origin)
+		VALUES ('a1','R1','c1','2026-08-04','2026-08-05','2026-08-05','2026-08-05','completed','양기헌','app')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewStatsRepo(db)
+	f := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
+	cols := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
+	if err := repo.FillPeriodOverview(cols, f); err != nil {
+		t.Fatal(err)
+	}
+	receiptBefore := cols[1].Counts.ReceiptTotal()
+	processBefore := cols[1].Counts.ProcessTotal()
+	_, err = db.Exec(`
+		INSERT INTO work_tasks (task_id, work_type, title, due_date, work_date, receipt_date, status, source_type, assignee)
+		VALUES ('t-admin','admin','행정','2026-08-05','2026-08-05','2026-08-05','waiting','','양기헌')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols2 := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
+	if err := repo.FillPeriodOverview(cols2, f); err != nil {
+		t.Fatal(err)
+	}
+	if cols2[1].Counts.ReceiptTotal() != receiptBefore+1 {
+		t.Fatalf("접수는 행정 포함되어야 함: %d → %d", receiptBefore, cols2[1].Counts.ReceiptTotal())
+	}
+	if cols2[1].Counts.ProcessTotal() != processBefore {
+		t.Fatalf("처리 건수는 미완료 행정으로 늘면 안 됨: %d → %d", processBefore, cols2[1].Counts.ProcessTotal())
+	}
+	kpi, err := repo.LoadStatsKPI(model.StatsViewWeek, cols2, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	series, err := repo.LoadStatsChartSeries(model.StatsViewWeek, anchor, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cur *model.StatsChartPoint
+	for i := range series {
+		if strings.HasPrefix(series[i].Label, "이번주") {
+			cur = &series[i]
+			break
+		}
+	}
+	if cur == nil {
+		t.Fatal("이번주 차트 없음")
+	}
+	if cur.Received != cols2[1].Counts.ReceiptTotal() {
+		t.Fatalf("차트 접수 %d 열 %d", cur.Received, cols2[1].Counts.ReceiptTotal())
+	}
+	_ = kpi
 }

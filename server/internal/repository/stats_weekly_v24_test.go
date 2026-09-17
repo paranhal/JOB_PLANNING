@@ -103,12 +103,6 @@ func TestWeeklyReportTeamNotSumAndDayMaxTie(t *testing.T) {
 	if hye.Completed != 3 || ki.Completed != 1 {
 		t.Fatalf("완료 최혜경=%d 양기헌=%d", hye.Completed, ki.Completed)
 	}
-	if hye.ExecDisplay.Value != 100 || ki.ExecDisplay.Value != 0 {
-		t.Fatalf("개인 실행률 최혜경=%.1f 양기헌=%.1f", hye.ExecDisplay.Value, ki.ExecDisplay.Value)
-	}
-	if team.ExecDisplay.Value != 75 {
-		t.Fatalf("팀 실행률=%.1f want 75 (3/4, 개인 평균 50이 아님)", team.ExecDisplay.Value)
-	}
 	if hye.HasDayAvg && hye.DayAvg != 0.6 {
 		t.Fatalf("최혜경 일평균=%.1f want 0.6", hye.DayAvg)
 	}

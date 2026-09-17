@@ -573,8 +573,7 @@ func (r *ASRepo) SearchKnowledge(f model.ASSearchFilter) ([]model.ASSearchHit, i
 				cp := h
 				meta = &cp
 			} else if as, err := r.GetByID(e.ASID); err == nil && as != nil {
-				org := model.KBDash
-				_ = r.db.QueryRow(`SELECT COALESCE(org_name,'') FROM customers WHERE customer_id=?`, as.CustomerID).Scan(&org)
+				org := CustomerName(r.db, as.CustomerID)
 				if org == "" {
 					org = model.KBDash
 				}

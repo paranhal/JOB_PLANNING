@@ -72,7 +72,7 @@ func salesActivityKanbanColumns(acts []model.SalesActivity, group string, types 
 				ID: a.ActivityID, RefID: a.ActivityID, Title: title,
 				Href: "/sales/" + a.SalesID, OrgName: a.SalesName,
 				Assignee: a.OurMembers, TypeLabel: a.TypeLabel,
-				Extra: strings.TrimSpace(a.ActivityDate + " " + a.StartTime),
+				Extra:  strings.TrimSpace(a.ActivityDate + " " + a.StartTime),
 				Bucket: c.Key, Stage: c.Key,
 			})
 		}
@@ -217,6 +217,8 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"SalesOptions":    projects,
 		"Today":           time.Now().Format("2006-01-02"),
 		"CanWrite":        canWriteSales(c),
+		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
+		"CurrentUser":     ctxString(c, "user_name"),
 		"FormAction":      "/sales/activities",
 		"FixedSalesID":    "",
 		"DefaultOwner":    ctxString(c, "user_name"),

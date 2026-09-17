@@ -110,12 +110,12 @@ func recurrenceYears(from, to string) []int {
 }
 
 func (h *WorkboardHandler) PreviewRecurrence(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	t, err := h.repo.GetTask(c.Param("id"))
 	if err != nil || t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	if t.ParentTaskID != "" || t.SourceType != "" {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"/edit?err=rec_parent")
@@ -138,12 +138,12 @@ func (h *WorkboardHandler) RegenerateRecurrence(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) runOccurrenceWrite(c echo.Context, regenerate bool) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	t, err := h.repo.GetTask(c.Param("id"))
 	if err != nil || t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	loc := "/workboard/tasks/" + t.TaskID + "/edit"
 	if t.ParentTaskID != "" {
@@ -254,14 +254,14 @@ func (h *WorkboardHandler) saveOccurrenceStatus(existing, t *model.WorkTask, c e
 }
 
 func (h *WorkboardHandler) UpdateOccurrence(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	parentID := c.Param("id")
 	oid := c.Param("oid")
 	occ, err := h.repo.GetTask(oid)
 	if err != nil || occ == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, occ); err != nil {
+		return err
 	}
 	loc := "/workboard/tasks/" + parentID
 	if occ.ParentTaskID != parentID || occ.RecurrenceRole != model.RecurrenceRoleOccurrence {
@@ -285,13 +285,13 @@ func (h *WorkboardHandler) UpdateOccurrence(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) SaveRecurrenceSettings(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := c.Param("id")
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	loc := "/workboard/tasks/" + id + "/edit"
 	if t.ParentTaskID != "" {
@@ -308,13 +308,13 @@ func (h *WorkboardHandler) SaveRecurrenceSettings(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) ArchiveRecurrence(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := c.Param("id")
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	loc := "/workboard/tasks/" + id
 	if t.ParentTaskID != "" {
@@ -332,13 +332,13 @@ func (h *WorkboardHandler) ArchiveRecurrence(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) DeleteRecurrenceParent(c echo.Context) error {
-	if !canWriteWorkboard(c) {
-		return echo.ErrForbidden
-	}
 	id := c.Param("id")
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
 	}
 	loc := "/workboard/tasks/" + id
 	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {

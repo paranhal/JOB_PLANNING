@@ -4,11 +4,11 @@ import "testing"
 
 func TestProcessTypesForWorkPlace(t *testing.T) {
 	office := ProcessTypesForWorkPlace(WorkPlaceOffice)
-	if len(office) != 2 || office[0] != ProcessTypeRemote || office[1] != ProcessTypeInquiry {
+	if len(office) != 3 || office[0] != ProcessTypeRemote || office[1] != ProcessTypeInquiry || office[2] != ProcessTypeUndetermined {
 		t.Fatalf("내근: %v", office)
 	}
 	field := ProcessTypesForWorkPlace(WorkPlaceField)
-	if len(field) != 2 || field[0] != ProcessTypeVisit || field[1] != ProcessTypeInquiry {
+	if len(field) != 3 || field[0] != ProcessTypeVisit || field[1] != ProcessTypeInquiry || field[2] != ProcessTypeUndetermined {
 		t.Fatalf("외근: %v", field)
 	}
 	if ProcessTypesForWorkPlace("") != nil {
@@ -25,5 +25,8 @@ func TestProcessTypesForWorkPlace(t *testing.T) {
 	}
 	if ProcessTypePlaces(ProcessTypeInquiry) != WorkPlaceOffice+" "+WorkPlaceField {
 		t.Fatal(ProcessTypePlaces(ProcessTypeInquiry))
+	}
+	if ProcessTypePlaces(ProcessTypeUndetermined) != WorkPlaceOffice+" "+WorkPlaceField {
+		t.Fatal(ProcessTypePlaces(ProcessTypeUndetermined))
 	}
 }

@@ -252,20 +252,6 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 	cur := cols[1]
 	prev := cols[0]
 
-	curRate := cur.Counts.ExecutionRatePct()
-	prevRate := prev.Counts.ExecutionRatePct()
-	out.ExecutionRate = math.Round(curRate*10) / 10
-	out.ExecutionSample = cur.Counts.ExecPlanned()
-	out.HasExecution = cur.Counts.HasExecutionRate()
-	out.ExecDisplay = model.StatsReliability(out.ExecutionSample, !out.HasExecution, out.ExecutionRate).
-		CapGradeIfImport(f.IncludeImport)
-	prevExec := model.StatsReliability(prev.Counts.ExecPlanned(), !prev.Counts.HasExecutionRate(), prevRate)
-	if out.ExecDisplay.ShowDelta && prevExec.ShowDelta {
-		out.ExecutionDelta = math.Round((curRate-prevRate)*10) / 10
-	} else {
-		out.ExecDisplay.ShowDelta = false
-	}
-
 	visitCur, nVisitCur, err := r.avgASDays(cur.From, cur.ToExclusive, f, "visit")
 	if err != nil {
 		return out, err
@@ -279,7 +265,8 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 	out.VisitAvgDays = math.Round(visitCur*10) / 10
 	out.VisitDisplay = model.StatsReliability(nVisitCur, nVisitCur == 0, out.VisitAvgDays).
 		CapGradeIfImport(f.IncludeImport).
-		WithReason("해당 기간 방문 데이터 없음")
+		WithReason("해당 기간 방문 데이터 없음").
+		WithHoldJudgment()
 	prevVisit := model.StatsReliability(nVisitPrev, nVisitPrev == 0, visitPrev)
 	if out.VisitDisplay.ShowDelta && prevVisit.ShowDelta {
 		out.VisitDelta = math.Round((visitCur-visitPrev)*10) / 10
@@ -307,14 +294,14 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 	} else {
 		out.CompleteDisplay.ShowDelta = false
 	}
-	if nVisitCur > 0 && nCompCur > 0 && out.VisitAvgDays > out.CompleteAvgDays {
+	if nVisitCur > 0 && nCompCur > 0 && nVisitCur == nCompCur && out.VisitAvgDays > out.CompleteAvgDays {
 		out.LeadTimeWarn = fmt.Sprintf("지표 계산 오류: 방문(%.1f일)이 완료(%.1f일)보다 큽니다",
 			out.VisitAvgDays, out.CompleteAvgDays)
 	}
 	return out, nil
 }
 
-// LoadStatsChartSeries 기간축 접수·미완료·완료 + 실행률 (일/주/월 버킷 집계)
+// LoadStatsChartSeries 기간축 접수·미완료·완료 (일/주/월 버킷 집계)
 func (r *StatsRepo) LoadStatsChartSeries(view string, anchor time.Time, f model.StatsMeetingFilter) ([]model.StatsChartPoint, error) {
 	f = normalizeMeetingFilter(f)
 	from, toEx, buckets := BuildStatsChartBuckets(view, anchor)
@@ -382,10 +369,6 @@ func (r *StatsRepo) chartSeriesFromBuckets(view, from, toEx string, buckets []St
 	if err != nil {
 		return nil, err
 	}
-	plannedMap, onPlanMap, err := r.mapDayPlannedOnPlan(from, toEx, f)
-	if err != nil {
-		return nil, err
-	}
 
 	sumRange := func(m map[string]int, bFrom, bToEx string) int {
 		n := 0
@@ -400,12 +383,6 @@ func (r *StatsRepo) chartSeriesFromBuckets(view, from, toEx string, buckets []St
 
 	out := make([]model.StatsChartPoint, 0, len(buckets))
 	for _, b := range buckets {
-		planned := sumRange(plannedMap, b.From, b.ToEx)
-		onPlan := sumRange(onPlanMap, b.From, b.ToEx)
-		if onPlan > planned {
-			onPlan = planned
-		}
-		rate := math.Round(model.StatsWorkSlice{Planned: planned, OnPlan: onPlan}.ExecutionRatePct()*10) / 10
 		rangeLbl := chartRangeLabel(b.From, b.ToEx, monthMode)
 		if view == model.StatsViewDay || (view == model.StatsViewRange && b.ToEx == nextDay(b.From)) {
 			rangeLbl = b.From
@@ -415,9 +392,6 @@ func (r *StatsRepo) chartSeriesFromBuckets(view, from, toEx string, buckets []St
 			Received:  sumRange(recMap, b.From, b.ToEx) + sumRange(mntRec, b.From, b.ToEx) + sumRange(adminRec, b.From, b.ToEx),
 			Open:      sumRange(openAS, b.From, b.ToEx) + sumRange(mntOpen, b.From, b.ToEx) + sumRange(adminOpen, b.From, b.ToEx),
 			Completed: sumRange(doneAS, b.From, b.ToEx) + sumRange(mntDone, b.From, b.ToEx) + sumRange(adminDone, b.From, b.ToEx),
-			Planned:   planned,
-			Process:   onPlan,
-			ExecRate:  rate,
 		})
 	}
 	return out, nil
@@ -430,21 +404,21 @@ func (r *StatsRepo) ListCompletedDetail(from, toEx string, f model.StatsMeetingF
 	q := `
 		SELECT ar.as_id, ar.as_number,
 		       COALESCE(ar.receipt_datetime,''),
-		       COALESCE(date(COALESCE(ar.complete_datetime, ar.updated_at)),''),
+		       COALESCE(` + asCompleteDateSQL + `,''),
 		       COALESCE(a.product_category,''), COALESCE(a.product_type,''),
 		       COALESCE(a.model_name,''), COALESCE(a.product_name,''),
 		       COALESCE(ar.receipt_channel,''), COALESCE(ar.requester_type,''),
 		       COALESCE(c.org_name,''),
 		       COALESCE(ar.assigned_to,''),
-		       COALESCE(ar.symptom,''), COALESCE(ar.action_taken,''),
+		       COALESCE(ar.symptom,''), COALESCE(` + asActionTakenSQL("ar") + `,''),
 		       COALESCE(ar.status,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)` + asSQL + `
-		ORDER BY date(COALESCE(ar.complete_datetime, ar.updated_at)) DESC, ar.as_number DESC
+		  AND ` + asCompleteDT + ` >= ?
+		  AND ` + asCompleteDT + ` < ?` + asSQL + `
+		ORDER BY ` + asCompleteDateSQL + ` DESC, ar.as_number DESC
 		LIMIT 200`
 	rows, err := r.db.Query(q, append([]interface{}{from, toEx}, asArgs...)...)
 	if err != nil {
@@ -523,14 +497,43 @@ func nextDay(d string) string {
 }
 
 func (r *StatsRepo) avgASDays(from, toEx string, f model.StatsMeetingFilter, kind string) (avg float64, n int, err error) {
-	visit, complete, n, err := r.avgASLeadTimes(from, toEx, f)
+	if kind == "visit" {
+		return r.avgASVisitLeadTime(from, toEx, f)
+	}
+	return r.avgASCompleteLeadTime(from, toEx, f)
+}
+
+// avgASVisitLeadTime §4.7 — process_type=visit 이고 visit_date 있는 완료 건만.
+func (r *StatsRepo) avgASVisitLeadTime(from, toEx string, f model.StatsMeetingFilter) (avg float64, n int, err error) {
+	asSQL, extra := r.filterAS(f)
+	q := `
+		SELECT AVG(julianday(date(ar.visit_date)) - julianday(date(ar.receipt_datetime))),
+		       COUNT(*)
+		FROM as_receipts ar
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
+		  AND ar.process_type = 'visit'
+		  AND TRIM(COALESCE(ar.visit_date,'')) != ''
+		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
+		  AND ar.complete_datetime >= ?
+		  AND ar.complete_datetime < ?` + asSQL
+	args := append([]interface{}{from, toEx}, extra...)
+	var avgNull interface{}
+	var cnt int
+	err = r.db.QueryRow(q, args...).Scan(&avgNull, &cnt)
 	if err != nil {
 		return 0, 0, err
 	}
-	if kind == "visit" {
-		return visit, n, nil
+	if cnt == 0 {
+		return 0, 0, nil
 	}
-	return complete, n, nil
+	return scanAvgDays(avgNull), cnt, nil
+}
+
+// avgASCompleteLeadTime §4.6 — 완료 건, complete_datetime 기간축, 착수·완료 둘 다 있는 모집단.
+func (r *StatsRepo) avgASCompleteLeadTime(from, toEx string, f model.StatsMeetingFilter) (avg float64, n int, err error) {
+	_, complete, n, err := r.avgASLeadTimes(from, toEx, f)
+	return complete, n, err
 }
 
 // avgASLeadTimes §4.6 — 완료 건만, complete_datetime 기간축, 착수·완료 둘 다 있는 같은 모집단.
@@ -545,8 +548,8 @@ func (r *StatsRepo) avgASLeadTimes(from, toEx string, f model.StatsMeetingFilter
 		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
 		  AND TRIM(COALESCE(ar.start_datetime,'')) != ''
 		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
-		  AND date(ar.complete_datetime) >= date(?)
-		  AND date(ar.complete_datetime) < date(?)` + asSQL
+		  AND ar.complete_datetime >= ?
+		  AND ar.complete_datetime < ?` + asSQL
 	args = append([]interface{}{from, toEx}, args...)
 	var visitNull, compNull interface{}
 	var cnt int
@@ -581,26 +584,27 @@ func scanAvgDays(v interface{}) float64 {
 
 func (r *StatsRepo) mapDayCountsAS(from, toEx string, f model.StatsMeetingFilter, kind string) (map[string]int, error) {
 	asSQL, asArgs := r.filterAS(f)
-	var dateExpr, where string
+	var dateExpr, rangeExpr, where string
 	switch kind {
 	case "open":
-		// 미완료: 접수·담당자 배정·진행중·보류·이관 (접수일 기준)
 		dateExpr = `date(ar.receipt_datetime)`
-		// 통계 미완료: 부분완료는 완료로 잡히므로 제외(하위업무는 mapDayCountsASWork)
+		rangeExpr = `ar.receipt_datetime`
 		where = `ar.status IN ` + model.SQLStatusStatsOpen
 	case "completed":
 		dateExpr = asCompleteDateSQL
+		rangeExpr = asCompleteDT
 		where = `ar.status IN ` + model.SQLStatusStatsCompleted
 	default:
 		dateExpr = `date(ar.receipt_datetime)`
+		rangeExpr = `ar.receipt_datetime`
 		where = `1=1`
 	}
 	q := fmt.Sprintf(`
 		SELECT %s AS d, COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		WHERE %s AND %s >= date(?) AND %s < date(?)`+asSQL+`
-		GROUP BY d`, dateExpr, where, dateExpr, dateExpr)
-	return r.scanDayCountMap(q, append([]interface{}{from, toEx}, asArgs...)...)
+		WHERE %s AND %s >= ? AND %s < ?`+asSQL+`
+		GROUP BY d`, dateExpr, where, rangeExpr, rangeExpr)
+	return r.scanDayCountMap(q, append([]interface{}{dayTimeStart(from), dayTimeStart(toEx)}, asArgs...)...)
 }
 
 // mapDayCountsASWork 부분완료 접수의 하위업무(확인·재방문)를 통계 접수/미완료로 집계한다.
@@ -617,9 +621,9 @@ func (r *StatsRepo) mapDayCountsASWork(from, toEx string, f model.StatsMeetingFi
 		JOIN as_receipts ar ON ar.as_id = w.as_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = 'partial_complete'
-		  AND date(w.created_at) >= date(?) AND date(w.created_at) < date(?)` + statusFilter + asSQL + `
+		  AND w.created_at >= ? AND w.created_at < ?` + statusFilter + asSQL + `
 		GROUP BY d`
-	return r.scanDayCountMap(q, append([]interface{}{from, toEx}, asArgs...)...)
+	return r.scanDayCountMap(q, append([]interface{}{dayTimeStart(from), dayTimeStart(toEx)}, asArgs...)...)
 }
 
 func (r *StatsRepo) mapDayCountsMnt(from, toEx string, f model.StatsMeetingFilter, completed bool) (map[string]int, error) {
@@ -682,99 +686,6 @@ func (r *StatsRepo) mapDayCountsAdminOpen(from, toEx string, f model.StatsMeetin
 		  AND ` + base + ` >= ? AND ` + base + ` < ?` + adminSQL + `
 		GROUP BY d`
 	return r.scanDayCountMap(q, append([]interface{}{from, toEx}, adminArgs...)...)
-}
-
-// mapDayPlannedOnPlan 일자별 예정 건수 · 계획대로(예정일 당일) 완료 건수
-func (r *StatsRepo) mapDayPlannedOnPlan(from, toEx string, f model.StatsMeetingFilter) (planned, onPlan map[string]int, err error) {
-	planned = map[string]int{}
-	onPlan = map[string]int{}
-	f = r.attachMetrics(f)
-	asSQL, asArgs := r.filterAS(f)
-	if f.Scope != model.StatsScopeWorkType || f.Key == "" || f.Key == "as" {
-		m, e := r.scanDayCountMap(`
-			SELECT ar.visit_scheduled_date AS d, COUNT(*) FROM as_receipts ar
-			LEFT JOIN assets a ON a.asset_id = ar.asset_id
-			WHERE TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
-			  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
-			  AND ar.status NOT IN ('cancelled')`+asSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, asArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(planned, m)
-		m, e = r.scanDayCountMap(`
-			SELECT ar.visit_scheduled_date AS d, COUNT(*) FROM as_receipts ar
-			LEFT JOIN assets a ON a.asset_id = ar.asset_id
-			WHERE TRIM(COALESCE(ar.visit_scheduled_date,'')) != ''
-			  AND ar.visit_scheduled_date >= ? AND ar.visit_scheduled_date < ?
-			  AND ar.status IN `+model.SQLStatusStatsCompleted+`
-			  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) = date(ar.visit_scheduled_date)`+asSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, asArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(onPlan, m)
-	}
-	mntSQL, mntArgs := r.filterMnt(f)
-	if f.Scope != model.StatsScopeWorkType || f.Key == "" || f.Key == "maintenance" {
-		m, e := r.scanDayCountMap(`
-			SELECT v.visit_date AS d, COUNT(*) FROM maintenance_visits v
-			WHERE v.visit_date >= ? AND v.visit_date < ?`+mntSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, mntArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(planned, m)
-		m, e = r.scanDayCountMap(`
-			SELECT v.visit_date AS d, COUNT(*) FROM maintenance_visits v
-			WHERE v.visit_date >= ? AND v.visit_date < ?
-			  AND COALESCE(v.completed,0)=1
-			  AND (TRIM(COALESCE(v.completed_date,'')) = '' OR v.completed_date = v.visit_date)`+mntSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, mntArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(onPlan, m)
-	}
-	adminSQL, adminArgs := r.filterAdmin(f)
-	if model.ProgressScopeIncludes(f.ProgressScope, "admin") && (f.Scope != model.StatsScopeWorkType || f.Key == "" || f.Key == "admin") {
-		m, e := r.scanDayCountMap(`
-			SELECT COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') AS d, COUNT(*)
-			FROM work_tasks t
-			WHERE t.work_type IN ('admin','support')
-			  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') >= ?
-			  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') < ?`+adminSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, adminArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(planned, m)
-		m, e = r.scanDayCountMap(`
-			SELECT t.work_date AS d, COUNT(*) FROM work_tasks t
-			WHERE t.work_type IN ('admin','support') AND t.status='complete'
-			  AND COALESCE(t.recurrence_role,'')='occurrence'
-			  AND TRIM(COALESCE(t.work_date,'')) != ''
-			  AND t.work_date >= ? AND t.work_date < ?
-			  AND `+adminTaskCompleteDateSQL+` = t.work_date`+adminSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, adminArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(onPlan, m)
-		m, e = r.scanDayCountMap(`
-			SELECT t.due_date AS d, COUNT(*) FROM work_tasks t
-			WHERE t.work_type IN ('admin','support') AND t.status='complete'
-			  AND COALESCE(t.recurrence_role,'') != 'occurrence'
-			  AND TRIM(COALESCE(t.due_date,'')) != ''
-			  AND t.due_date >= ? AND t.due_date < ?
-			  AND (TRIM(COALESCE(t.work_date,'')) = '' OR t.work_date = t.due_date)`+adminSQL+` GROUP BY d`,
-			append([]interface{}{from, toEx}, adminArgs...)...)
-		if e != nil {
-			return nil, nil, e
-		}
-		addMaps(onPlan, m)
-	}
-	return planned, onPlan, nil
 }
 
 func addMaps(dst, src map[string]int) {
@@ -840,8 +751,8 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND COALESCE(ar.data_origin,'app') != 'import'`)
 	}
 	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
-		b.WriteString(` AND date(ar.receipt_datetime) >= date(?)`)
-		args = append(args, d)
+		b.WriteString(` AND ar.receipt_datetime >= ?`)
+		args = append(args, dayTimeStart(d))
 	}
 	return b.String(), args
 }
@@ -875,7 +786,7 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND COALESCE(v.data_origin,'app') != 'import'`)
 	}
 	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
-		b.WriteString(` AND date(v.visit_date) >= date(?)`)
+		b.WriteString(` AND v.visit_date >= ?`)
 		args = append(args, d)
 	}
 	return b.String(), args

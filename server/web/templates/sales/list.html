@@ -84,15 +84,19 @@
     </table>
   </div>
   {{else}}
+  {{$sort := .Sort}}{{$dir := .Dir}}{{$href := .SortHref}}
+  {{if .SortSelect}}
+  <div class="md:hidden mb-2">{{template "sort_select" (dict "Options" .SortSelect "ID" "sales-sort")}}</div>
+  {{end}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">
         <tr>
-          <th class="px-4 py-3 font-medium text-left">사업명</th>
-          <th class="px-4 py-3 font-medium text-left">단계</th>
-          <th class="px-4 py-3 font-medium text-left">고객</th>
-          <th class="px-4 py-3 font-medium text-left">시기</th>
-          <th class="px-4 py-3 font-medium text-left">금액</th>
+          {{template "sort_th" (dict "Label" "사업명" "Key" "name" "Cur" $sort "Dir" $dir "Href" (index $href "name"))}}
+          {{template "sort_th" (dict "Label" "단계" "Key" "stage" "Cur" $sort "Dir" $dir "Href" (index $href "stage"))}}
+          {{template "sort_th" (dict "Label" "고객" "Key" "customer" "Cur" $sort "Dir" $dir "Href" (index $href "customer"))}}
+          {{template "sort_th" (dict "Label" "시기" "Key" "period" "Cur" $sort "Dir" $dir "Href" (index $href "period"))}}
+          {{template "sort_th" (dict "Label" "금액" "Key" "amount" "Cur" $sort "Dir" $dir "Href" (index $href "amount"))}}
           <th class="px-4 py-3 font-medium text-left">확정도</th>
         </tr>
       </thead>

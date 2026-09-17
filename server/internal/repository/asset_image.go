@@ -56,6 +56,11 @@ func ActionPhotoDir(uploadRoot, asID string) string {
 	return filepath.Join(uploadRoot, "as", asID, "action")
 }
 
+// KBAttachDir 지식 첨부. data/uploads/as_kb/{kbID}/
+func KBAttachDir(uploadRoot, kbID string) string {
+	return filepath.Join(uploadRoot, "as_kb", kbID)
+}
+
 // AssetImageRelPath uploads 아래 공개 URL용 상대 경로
 func AssetImageRelPath(assetID string, slot int, origName string) string {
 	safe := SanitizeAssetIDForPath(assetID)

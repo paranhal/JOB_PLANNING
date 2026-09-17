@@ -62,3 +62,38 @@ func TestDefaultPermissionsUnknownNil(t *testing.T) {
 		t.Fatalf("DefaultPermissions(\"unknown\")=%v want nil", p)
 	}
 }
+
+func TestSalesDefaultHasNoAS(t *testing.T) {
+	p := DefaultPermissions(RoleSales)
+	if HasPermission(p, PermASReceive) || HasPermission(p, PermASProcess) {
+		t.Fatalf("영업 기본값에 AS가 있으면 안 된다: %v", p)
+	}
+	if !HasPermission(p, PermAnalysis) || !HasPermission(p, PermStats) {
+		t.Fatalf("영업 기본값: %v", p)
+	}
+}
+
+func TestSalesStoredReceiveOnly(t *testing.T) {
+	p := EffectivePermissions(RoleSales, "analysis,stats,as_receive")
+	if !HasPermission(p, PermASReceive) {
+		t.Fatal("저장된 as_receive 가 없다")
+	}
+	if HasPermission(p, PermASProcess) {
+		t.Fatal("접수만 줬는데 as_process 가 있다")
+	}
+}
+
+func TestAllPermissionsListsReceiveAndProcessSeparately(t *testing.T) {
+	var recv, proc bool
+	for _, d := range AllPermissions {
+		if d.Key == PermASReceive {
+			recv = true
+		}
+		if d.Key == PermASProcess {
+			proc = true
+		}
+	}
+	if !recv || !proc {
+		t.Fatal("사용자 관리 체크박스에 AS 접수·조치가 따로 있어야 한다")
+	}
+}

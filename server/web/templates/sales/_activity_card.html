@@ -1,6 +1,7 @@
 {{define "sales_activity_card"}}
 {{$hide := .HideSalesName}}
 {{$a := .Activity}}
+{{$canEdit := .CanEdit}}
 <article class="rounded-xl border border-slate-200 bg-white p-3 space-y-1.5">
   <div class="flex items-start justify-between gap-2">
     <div class="min-w-0 flex items-start gap-2">
@@ -11,7 +12,10 @@
       <p class="text-sm font-semibold text-gray-800 truncate">{{$a.Title}}</p>
       {{end}}
     </div>
-    <span class="shrink-0 text-xs text-slate-500 tabular-nums">{{$a.CardDuration}}</span>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-xs text-slate-500 tabular-nums">{{$a.CardDuration}}</span>
+      {{template "sales_activity_actions" (dict "ID" $a.ActivityID "SalesID" $a.SalesID "Date" $a.ActivityDate "Type" $a.ActivityType "Start" $a.StartTime "Duration" $a.DurationMin "Title" $a.Title "Place" $a.Place "Counterparts" $a.Counterparts "Members" $a.OurMembers "Content" $a.Content "Next" $a.NextAction "NextDate" $a.NextActionDate "CanEdit" $canEdit "ShowLock" .ShowLock)}}
+    </div>
   </div>
   {{if not $hide}}
   {{if and $a.Title $a.SalesName}}<p class="text-xs text-gray-700 truncate">{{$a.Title}}</p>{{end}}
@@ -39,7 +43,12 @@
       <p class="text-sm font-semibold text-gray-800 truncate">{{$e.Title}}</p>
       {{end}}
     </div>
-    {{if $e.CardDuration}}<span class="shrink-0 text-xs text-slate-500 tabular-nums">{{$e.CardDuration}}</span>{{end}}
+    <div class="flex items-center gap-2 shrink-0">
+      {{if $e.CardDuration}}<span class="text-xs text-slate-500 tabular-nums">{{$e.CardDuration}}</span>{{end}}
+      {{if eq $e.Kind "activity"}}
+      {{template "sales_activity_actions" (dict "ID" $e.ActivityID "SalesID" $e.SalesID "Date" $e.Date "Type" $e.Type "Start" $e.Time "Duration" $e.DurationMin "Title" $e.Title "Place" $e.Place "Counterparts" $e.Counterparts "Members" $e.Members "Content" $e.Summary "Next" $e.NextAction "NextDate" $e.NextActionDate "CanEdit" .CanEdit "ShowLock" .ShowLock)}}
+      {{end}}
+    </div>
   </div>
   {{if and (eq $e.Kind "activity") (not $hide) $e.Title $e.SalesName}}<p class="text-xs text-gray-700 truncate">{{$e.Title}}</p>{{end}}
   {{if eq $e.Kind "activity"}}
@@ -55,4 +64,23 @@
   {{if $e.By}}<p class="text-[11px] text-gray-400">{{$e.By}}</p>{{end}}
   {{end}}
 </article>
+{{end}}
+
+{{define "sales_activity_actions"}}
+{{if .CanEdit}}
+<div class="flex items-center gap-1">
+  <button type="button" class="text-[11px] text-blue-700 hover:underline"
+          data-id="{{.ID}}" data-sales-id="{{.SalesID}}" data-date="{{.Date}}" data-type="{{.Type}}"
+          data-start="{{.Start}}" data-duration="{{.Duration}}" data-title="{{.Title}}" data-place="{{.Place}}"
+          data-counterparts="{{.Counterparts}}" data-members="{{.Members}}" data-content="{{.Content}}"
+          data-next="{{.Next}}" data-next-date="{{.NextDate}}"
+          @click="editFrom($el)">수정</button>
+  <form method="post" action="/sales/activities/{{.ID}}/delete" class="inline"
+        onsubmit="return confirm('이 활동을 삭제할까요? 되돌릴 수 없습니다.');">
+    <button type="submit" class="text-[11px] text-red-700 hover:underline">삭제</button>
+  </form>
+</div>
+{{else if .ShowLock}}
+<span title="읽기 전용" aria-label="읽기 전용" class="text-slate-400 text-xs">🔒</span>
+{{end}}
 {{end}}

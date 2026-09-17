@@ -1,0 +1,39 @@
+{{define "meeting_summary_cards"}}
+{{$prev := .PrevCol}}
+{{$cur := .CurCol}}
+<div id="meeting-summary-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-3"
+     {{if not .OverviewReady}}hx-get="{{.OverviewURL}}" hx-trigger="load" hx-swap="outerHTML"{{end}}>
+  <div class="rounded-xl border border-gray-200 bg-white p-4">
+    <div class="flex items-baseline justify-between gap-2">
+      <h3 class="text-sm font-semibold text-gray-700">전일 {{if $prev}}{{$prev.RangeLabel}}{{else}}{{.PrevDate}}{{end}}</h3>
+      <span class="text-xs text-gray-400">실적 {{.YesterdayN}}건</span>
+    </div>
+    {{if $prev}}
+    <p class="mt-2 text-2xl font-bold tabular-nums text-emerald-700">처리 {{$prev.Counts.ProcessTotal}}</p>
+    <p class="mt-1 text-xs text-gray-500">예정 {{$prev.Counts.PlannedTotal}} · 접수 {{$prev.Counts.ReceiptTotal}}</p>
+    {{else}}
+    <p class="mt-2 text-2xl font-bold text-gray-300">—</p>
+    {{end}}
+  </div>
+  <div class="rounded-xl border border-gray-200 bg-white p-4">
+    <div class="flex items-baseline justify-between gap-2">
+      <h3 class="text-sm font-semibold text-gray-700">오늘 {{if $cur}}{{$cur.RangeLabel}}{{else}}{{.Date}}{{end}}</h3>
+      <span class="text-xs text-gray-400">예정 {{.PlannedN}}건</span>
+    </div>
+    {{if $cur}}
+    <p class="mt-2 text-2xl font-bold tabular-nums text-sky-700">예정 {{.PlannedN}}</p>
+    <p class="mt-1 text-xs text-gray-500">처리 {{$cur.Counts.ProcessTotal}} · 접수 {{$cur.Counts.ReceiptTotal}}</p>
+    {{else}}
+    <p class="mt-2 text-2xl font-bold tabular-nums text-sky-700">예정 {{.PlannedN}}</p>
+    {{end}}
+  </div>
+  <a href="{{.UnplannedHref}}" class="rounded-xl border border-rose-200 bg-white p-4 hover:border-rose-400 transition-all block">
+    <div class="flex items-baseline justify-between gap-2">
+      <h3 class="text-sm font-semibold text-rose-800">미계획</h3>
+      <span class="text-xs text-gray-400">빠짐 방지</span>
+    </div>
+    <p class="mt-2 text-2xl font-bold tabular-nums text-rose-700">{{.UnplannedN}}건</p>
+    <p class="mt-1 text-xs text-gray-500">미계획 업무함으로 이동</p>
+  </a>
+</div>
+{{end}}

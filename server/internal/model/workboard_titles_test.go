@@ -11,6 +11,36 @@ func TestFormatASWorkTitle(t *testing.T) {
 	}
 }
 
+func TestFormatSalesWorkTitle(t *testing.T) {
+	if got := FormatSalesWorkTitle("방문미팅 · 세종 RFID"); got != "[영업]방문미팅 · 세종 RFID" {
+		t.Fatalf("sales: %q", got)
+	}
+	if got := FormatSalesWorkTitle("[영업]이미있음"); got != "[영업]이미있음" {
+		t.Fatalf("already: %q", got)
+	}
+}
+
+func TestWBCategorySalesNotAdmin(t *testing.T) {
+	if got := WBCategory(WBSourceSalesActivity); got != WBSourceSalesActivity {
+		t.Fatalf("sales_activity → %q", got)
+	}
+	if got := WBCategory(WorkPrefixSales); got != WBSourceSalesActivity {
+		t.Fatalf("sales 접두어가 admin 으로 떨어졌다: %q", got)
+	}
+	if got := WBCategoryLabel(WBCategory(WorkPrefixSales)); got != "영업" {
+		t.Fatalf("sales 라벨: %q", got)
+	}
+	if got := WBCategoryLabel(WBCategory(WBSourceSalesActivity)); got != "영업" {
+		t.Fatalf("sales_activity 라벨: %q", got)
+	}
+	if got := WBCategory(""); got != WBWorkAdmin {
+		t.Fatalf("빈 source: %q", got)
+	}
+	if got := (WBCard{Category: WBSourceSalesActivity}).Label(); got != "[영업]" {
+		t.Fatalf("카드 라벨: %q", got)
+	}
+}
+
 func TestFormatMaintenance(t *testing.T) {
 	if got := FormatMaintenanceWorkTitle("새롬동도서관", "2026-08-05 · KLAS"); got != "[점검]새롬동도서관_2026-08-05 · KLAS" {
 		t.Fatalf("title: %q", got)

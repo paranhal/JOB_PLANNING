@@ -1,4 +1,4 @@
-{{define "title"}}오늘 내 업무 · 고객지원시스템{{end}}
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
 {{define "content"}}
 <div class="space-y-4">
   {{if .RoleUnresolved}}
@@ -9,35 +9,40 @@
 
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">오늘 내 업무</h2>
-      <p class="text-sm text-gray-500 mt-1">{{.ScopeNote}} · {{.Total}}건</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
+        {{if .ShowAssigneePicker}}
+        <form method="GET" action="/work" class="inline-flex items-center gap-2">
+          {{if .View}}<input type="hidden" name="display" value="{{.View}}">{{end}}
+          {{if and .Sort (or (ne .Sort "due_date") (ne .Dir "asc"))}}
+          <input type="hidden" name="sort" value="{{.Sort}}">
+          <input type="hidden" name="dir" value="{{.Dir}}">
+          {{end}}
+          <label class="text-sm text-gray-600" for="work-assignee">담당자</label>
+          <select id="work-assignee" name="assignee" onchange="this.form.submit()"
+                  class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+            {{range .Users}}
+            {{if .FullName}}
+            <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
+            {{end}}
+            {{end}}
+          </select>
+        </form>
+        {{end}}
+      </div>
+      <p class="text-sm text-gray-500 mt-1">{{if .AllWork}}{{.ScopeNote}} · {{if and .HasFilters (gt .Universe .Total)}}전체 {{.Universe}}건 중 {{.Total}}건{{else}}전체 {{.Total}}건{{end}}{{if and (gt .Total .Shown)}} · 표시 {{.Shown}}건{{end}}{{else}}{{.ScopeNote}}{{end}}</p>
+      {{if and (not .AllWork) .DelayWarn}}
+      <p class="text-sm text-red-700 mt-1">⚠ {{.DelayWarn}}
+        {{if not .ReviewMode}}
+        <a href="{{.ReviewHref}}" class="ml-2 inline-flex items-center px-2 py-0.5 rounded border border-red-300 bg-white text-red-800 text-xs font-semibold hover:bg-red-50">정리하기</a>
+        {{end}}
+      </p>
+      {{end}}
+      {{if .ReviewMode}}
+      <p class="text-xs text-gray-500 mt-1">지연 건만 모았습니다. 날짜를 다시 잡거나, 넘기거나, 막힌 이유를 적으세요. <a href="/work" class="text-blue-700 hover:underline">목록으로</a></p>
+      {{end}}
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      {{if or (eq .Role "tech") (eq .Role "sales")}}
-      {{if .ScopeAll}}
-      <a href="{{.MineHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">내 배정만</a>
-      {{else}}
-      <a href="{{.TeamHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100">팀 전체 보기</a>
-      {{end}}
-      {{end}}
-      {{if and .Assignees (or (eq .Role "admin") (eq .Role "office"))}}
-      <form method="GET" action="/work" class="inline-flex items-center">
-        <input type="hidden" name="display" value="{{.View}}">
-        <input type="hidden" name="view" value="{{.View}}">
-        {{if and .Sort (or (ne .Sort "due_date") (ne .Dir "asc"))}}
-        <input type="hidden" name="sort" value="{{.Sort}}">
-        <input type="hidden" name="dir" value="{{.Dir}}">
-        {{end}}
-        <label class="sr-only" for="work-assignee">담당자</label>
-        <select id="work-assignee" name="assignee" onchange="this.form.submit()"
-                class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 bg-white min-w-[7.5rem]">
-          <option value="" {{if eq .AssigneeFilter ""}}selected{{end}}>팀전체</option>
-          {{range .Assignees}}
-          <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
-          {{end}}
-        </select>
-      </form>
-      {{end}}
       <a href="{{.KanbanHref}}"
          class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
       <a href="{{.ListHref}}"
@@ -45,27 +50,34 @@
     </div>
   </div>
 
+  {{if .AllWork}}
+  {{template "work_filters" .}}
+  {{end}}
+
   {{if eq .View "list"}}
   {{$sort := .Sort}}{{$dir := .Dir}}{{$href := .SortHref}}
+  {{if .SortSelect}}
+  <div class="md:hidden">{{template "sort_select" (dict "Options" .SortSelect "ID" "work-sort")}}</div>
+  {{end}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b">
           <tr>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "task_id"}}" class="hover:text-blue-700">번호{{if eq $sort "task_id"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">구분</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "title"}}" class="hover:text-blue-700">업무명{{if eq $sort "title"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "customer"}}" class="hover:text-blue-700">거래처{{if eq $sort "customer"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-            {{if .ShowAssignee}}<th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "assignee"}}" class="hover:text-blue-700">담당자{{if eq $sort "assignee"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>{{end}}
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "work_date"}}" class="hover:text-blue-700">시작일{{if eq $sort "work_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "due_date"}}" class="hover:text-blue-700">종료일{{if eq $sort "due_date"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500"><a href="{{index $href "status"}}" class="hover:text-blue-700">상태{{if eq $sort "status"}}{{if eq $dir "asc"}} ▲{{else}} ▼{{end}}{{end}}</a></th>
+            {{template "sort_th" (dict "Label" "번호" "Key" "task_id" "Cur" $sort "Dir" $dir "Href" (index $href "task_id"))}}
+            {{template "sort_th" (dict "Label" "구분" "Key" "prefix" "Cur" $sort "Dir" $dir "Href" (index $href "prefix"))}}
+            {{template "sort_th" (dict "Label" "업무명" "Key" "title" "Cur" $sort "Dir" $dir "Href" (index $href "title"))}}
+            {{template "sort_th" (dict "Label" "거래처" "Key" "customer" "Cur" $sort "Dir" $dir "Href" (index $href "customer"))}}
+            {{if .ShowAssignee}}{{template "sort_th" (dict "Label" "담당자" "Key" "assignee" "Cur" $sort "Dir" $dir "Href" (index $href "assignee"))}}{{end}}
+            {{template "sort_th" (dict "Label" "시작일" "Key" "work_date" "Cur" $sort "Dir" $dir "Href" (index $href "work_date"))}}
+            {{template "sort_th" (dict "Label" "종료일" "Key" "due_date" "Cur" $sort "Dir" $dir "Href" (index $href "due_date"))}}
+            {{template "sort_th" (dict "Label" "상태" "Key" "status" "Cur" $sort "Dir" $dir "Href" (index $href "status"))}}
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           {{if .Items}}
           {{range .Items}}
-          <tr class="hover:bg-gray-50">
+          <tr class="hover:bg-gray-50 {{if .BlockedReason}}bg-amber-50/70{{end}}">
             <td class="px-4 py-3 font-mono text-blue-600 whitespace-nowrap"><a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a></td>
             <td class="px-4 py-3 whitespace-nowrap">
               <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
@@ -73,14 +85,85 @@
             </td>
             <td class="px-4 py-3"><a href="{{.Href}}" class="font-medium text-gray-800 hover:underline">{{.Title}}</a></td>
             <td class="px-4 py-3 text-gray-700">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</td>
-            {{if $.ShowAssignee}}<td class="px-4 py-3 whitespace-nowrap text-gray-700">{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>{{end}}
+            {{if $.ShowAssignee}}<td class="px-4 py-3 whitespace-nowrap {{if .AssigneeOther}}font-bold text-gray-900{{else}}text-gray-700{{end}}">{{if .EditLocked}}<span title="읽기 전용">🔒</span> {{end}}{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>{{end}}
             <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{if .WorkDate}}{{.WorkDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
             <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
             <td class="px-4 py-3 whitespace-nowrap">
               <span class="text-xs text-gray-600">{{.StatusLabel}}</span>
               {{if wbKanbanBadge .MappedStatus}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold {{wbKanbanBadgeClass .MappedStatus}}">{{wbKanbanBadge .MappedStatus}}</span>{{end}}
+              {{if .BlockedReason}}
+              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">기다리는 중 · {{.BlockedReason}}</span>
+              {{else if gt .DaysOverdue 0}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-800">{{if eq .Bucket "in_progress"}}진행중 D+{{.DaysOverdue}}{{else}}D+{{.DaysOverdue}}{{end}}</span>{{end}}
             </td>
           </tr>
+          {{if and $.ReviewMode $.CanWrite}}
+          <tr class="bg-slate-50/80">
+            <td colspan="{{if $.ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-3">
+              <div class="flex flex-col gap-2 text-xs text-gray-700">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="font-semibold text-gray-800">날짜 다시 잡기</span>
+                  <form method="POST" action="/work/review/reschedule" class="inline-flex items-center gap-1">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="hidden" name="back" value="/work?review=1">
+                    <input type="hidden" name="work_date" value="{{$.TodayDate}}">
+                    <button type="submit" class="px-2 py-1 rounded border border-sky-300 bg-white text-sky-800 hover:bg-sky-50">오늘</button>
+                  </form>
+                  <form method="POST" action="/work/review/reschedule" class="inline-flex items-center gap-1">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="hidden" name="back" value="/work?review=1">
+                    <input type="hidden" name="work_date" value="{{$.TomorrowDate}}">
+                    <button type="submit" class="px-2 py-1 rounded border border-sky-300 bg-white text-sky-800 hover:bg-sky-50">내일</button>
+                  </form>
+                  <form method="POST" action="/work/review/reschedule" class="inline-flex items-center gap-1">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="hidden" name="back" value="/work?review=1">
+                    <input type="date" name="work_date" required class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                    <button type="submit" class="px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50">직접</button>
+                  </form>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="font-semibold text-gray-800">넘기기</span>
+                  <form method="POST" action="/work/review/transfer" class="inline-flex items-center gap-1">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="hidden" name="back" value="/work?review=1">
+                    <select name="assignee" required class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                      <option value="">담당자</option>
+                      {{range $.Users}}
+                      {{if .FullName}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+                      {{end}}
+                    </select>
+                    <button type="submit" class="px-2 py-1 rounded border border-violet-300 bg-white text-violet-800 hover:bg-violet-50">넘기기</button>
+                  </form>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="font-semibold text-gray-800">막힌 이유 적기</span>
+                  <form method="POST" action="/work/review/block" class="inline">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="hidden" name="blocked_reason" value="부품 대기">
+                    <button type="submit" class="px-2 py-1 rounded border border-amber-300 bg-white text-amber-900 hover:bg-amber-50">부품 대기</button>
+                  </form>
+                  <form method="POST" action="/work/review/block" class="inline">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="hidden" name="blocked_reason" value="고객 연락 두절">
+                    <button type="submit" class="px-2 py-1 rounded border border-amber-300 bg-white text-amber-900 hover:bg-amber-50">고객 연락 두절</button>
+                  </form>
+                  <form method="POST" action="/work/review/block" class="inline-flex items-center gap-1">
+                    <input type="hidden" name="prefix" value="{{.Prefix}}">
+                    <input type="hidden" name="ref_id" value="{{.RefID}}">
+                    <input type="text" name="blocked_reason" placeholder="직접 입력" required class="border border-gray-300 rounded px-2 py-1 text-xs w-32 bg-white">
+                    <button type="submit" class="px-2 py-1 rounded border border-amber-300 bg-white text-amber-900 hover:bg-amber-50">적기</button>
+                  </form>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {{end}}
           {{end}}
           {{else}}
           <tr><td colspan="{{if .ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-10 text-center text-gray-400">표시할 업무가 없습니다.</td></tr>
@@ -91,6 +174,11 @@
   </div>
   {{else}}
   {{template "kanban_board" .}}
+  {{end}}
+  {{if .HasMore}}
+  <div class="text-center">
+    <a href="{{.MoreHref}}" class="inline-block px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">더 보기</a>
+  </div>
   {{end}}
 </div>
 {{end}}

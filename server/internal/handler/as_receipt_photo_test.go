@@ -84,13 +84,12 @@ func TestASReceiptPhotoStoredSeparatelyAndResized(t *testing.T) {
 		t.Fatalf("업로드 실패: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	items, err := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+	items, err := attachRepo.ListReceiptPhotos(asID)
 	if err != nil || len(items) != 1 {
 		t.Fatalf("접수 사진 n=%d err=%v", len(items), err)
 	}
-	asItems, _ := attachRepo.ListByRef(model.RefTypeAS, asID)
-	if len(asItems) != 0 {
-		t.Fatalf("조치 첨부에 섞이면 안 된다: n=%d", len(asItems))
+	if items[0].RefType != model.AttachRefAS {
+		t.Fatalf("DB ref_type=%q want as", items[0].RefType)
 	}
 	att := items[0]
 	if att.Keywords != "오류 화면" {
@@ -168,7 +167,7 @@ func TestASReceiptPhotoPDFKeepsName(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	items, _ := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+	items, _ := attachRepo.ListReceiptPhotos(asID)
 	if len(items) != 1 || items[0].FileName != "접수서_스캔.pdf" {
 		t.Fatalf("pdf: %+v", items)
 	}
@@ -222,7 +221,7 @@ func TestASReceiptPhotoPromoteCopiesToAsset(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("업로드 status=%d", rec.Code)
 	}
-	photos, _ := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+	photos, _ := attachRepo.ListReceiptPhotos(asID)
 	if len(photos) != 1 {
 		t.Fatalf("사진 n=%d", len(photos))
 	}
@@ -246,7 +245,7 @@ func TestASReceiptPhotoPromoteCopiesToAsset(t *testing.T) {
 	if assets[0].SlotNo < 1 || assets[0].SlotNo > 3 {
 		t.Fatalf("슬롯: %d", assets[0].SlotNo)
 	}
-	remain, _ := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+	remain, _ := attachRepo.ListReceiptPhotos(asID)
 	if len(remain) != 1 {
 		t.Fatal("승격은 복사여야 한다")
 	}
@@ -263,12 +262,12 @@ func TestASReceiptPhotoMaxTen(t *testing.T) {
 	}
 	rec := postReceiptPhoto(t, e, asID, "overflow.png", small)
 	if rec.Code == http.StatusSeeOther {
-		items, _ := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+		items, _ := attachRepo.ListReceiptPhotos(asID)
 		if len(items) > 10 {
 			t.Fatalf("11장 저장됨: %d", len(items))
 		}
 	}
-	items, _ := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+	items, _ := attachRepo.ListReceiptPhotos(asID)
 	if len(items) != 10 {
 		t.Fatalf("최대 10장: n=%d", len(items))
 	}
@@ -351,12 +350,11 @@ func TestASCreateUploadsReceiptPhoto(t *testing.T) {
 	if asID == "" || strings.Contains(asID, "/") {
 		t.Fatalf("redirect: %s", loc)
 	}
-	items, _ := attachRepo.ListByRef(model.RefTypeASReceipt, asID)
+	items, _ := attachRepo.ListReceiptPhotos(asID)
 	if len(items) != 1 {
 		t.Fatalf("접수 사진 n=%d loc=%s", len(items), loc)
 	}
-	asItems, _ := attachRepo.ListByRef(model.RefTypeAS, asID)
-	if len(asItems) != 0 {
-		t.Fatalf("조치 첨부에 섞임 n=%d", len(asItems))
+	if items[0].RefType != model.AttachRefAS {
+		t.Fatalf("DB ref_type=%q want as", items[0].RefType)
 	}
 }

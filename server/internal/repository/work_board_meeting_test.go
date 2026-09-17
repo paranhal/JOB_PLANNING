@@ -84,6 +84,66 @@ func TestListCompletedOnAndScheduledOnMeeting(t *testing.T) {
 	}
 }
 
+func TestListScheduledOnIncludesCompleteAndUnconfirmed(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "meeting-sched.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	today := "2026-09-07"
+	mustExecMeeting(t, db, `INSERT INTO customers (customer_id, org_name, official_name, is_active)
+		VALUES ('c-38','회의도서관','회의도서관',1)`)
+	mustExecMeeting(t, db, `INSERT INTO as_receipts (
+		as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
+		schedule_confirmed, status, assigned_to, complete_datetime, symptom, updated_at
+	) VALUES
+		('as-done-today','R2609-D01','c-38','2026-09-01','`+today+`',1,'completed','최혜영',
+		 '`+today+` 16:00:00','오늘 완료','`+today+` 16:00:00'),
+		('as-open-unconf','R2609-U01','c-38','2026-09-01','`+today+`',0,'assigned','최혜영',
+		 NULL,'미확정 예정','`+today+` 09:00:00')`)
+
+	repo := NewWorkBoardRepo(db)
+	sched, err := repo.ListScheduledOn(today, "", nil, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasWorkRef(sched, "as-done-today") {
+		t.Fatalf("완료 건이 예정에 없음: %+v", refsOf(sched))
+	}
+	if !hasWorkRef(sched, "as-open-unconf") {
+		t.Fatalf("미확정 건이 예정에 없음: %+v", refsOf(sched))
+	}
+	var sawUnconf bool
+	for _, it := range sched {
+		if it.RefID == "as-open-unconf" {
+			if !it.Tentative {
+				t.Fatal("미확정 뱃지 플래그가 없다")
+			}
+			sawUnconf = true
+		}
+		if it.RefID == "as-done-today" && it.Tentative {
+			t.Fatal("확정 완료 건에 미확정이 붙었다")
+		}
+	}
+	if !sawUnconf {
+		t.Fatal("미확정 건 스캔 실패")
+	}
+
+	cols := BuildStatsPeriodColumns(model.StatsViewDay, time.Date(2026, 9, 7, 0, 0, 0, 0, time.Local))
+	if err := NewStatsRepo(db).FillPeriodOverview(cols, ParseMeetingFilter(model.StatsScopeAssignee, "최혜영", "")); err != nil {
+		t.Fatal(err)
+	}
+	planned := cols[1].Counts.PlannedTotal()
+	if planned != 2 {
+		t.Fatalf("통계 예정=%d want 2", planned)
+	}
+	if len(sched) != planned {
+		t.Fatalf("목록 %d 통계 %d", len(sched), planned)
+	}
+}
+
 func mustExecMeeting(t *testing.T, db *sql.DB, q string) {
 	t.Helper()
 	if _, err := db.Exec(q); err != nil {

@@ -49,7 +49,7 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 		return redirectAttachErr(c, redirect, "attach_file", http.StatusBadRequest)
 	}
 
-	if refType == model.RefTypeASReceipt {
+	if refType == model.AttachFormReceipt {
 		if err := h.guardReceiptPhotoWrite(c, refID); err != nil {
 			return redirectAttachFailure(c, redirect, err)
 		}
@@ -64,6 +64,13 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 			return redirectAttachFailure(c, redirect, err)
 		}
 		if err := h.saveActionPhotos(refID, keywords, headers); err != nil {
+			return redirectAttachFailure(c, redirect, err)
+		}
+		return c.Redirect(http.StatusSeeOther, redirect)
+	}
+
+	if refType == model.RefTypeASKB {
+		if err := h.saveKBFiles(refID, keywords, headers); err != nil {
 			return redirectAttachFailure(c, redirect, err)
 		}
 		return c.Redirect(http.StatusSeeOther, redirect)
@@ -124,7 +131,7 @@ func nonemptyUploadHeaders(files []*multipart.FileHeader) []*multipart.FileHeade
 }
 
 func (h *AttachmentHandler) saveAssetFile(refID, keywords string, file *multipart.FileHeader, slotOverride int) error {
-	n, _ := h.repo.CountByRef("asset", refID)
+	n, _ := h.repo.CountByRef(model.AttachRefAsset, refID)
 	if n >= 3 {
 		return echo.NewHTTPError(http.StatusBadRequest, "설치자산 이미지는 최대 3장까지입니다")
 	}
@@ -138,7 +145,7 @@ func (h *AttachmentHandler) saveAssetFile(refID, keywords string, file *multipar
 	if slotNo == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "설치자산 이미지는 최대 3장까지입니다")
 	}
-	existing, _ := h.repo.ListByRef("asset", refID)
+	existing, _ := h.repo.ListByRef(model.AttachRefAsset, refID)
 	for _, a := range existing {
 		if a.SlotNo == slotNo {
 			return echo.NewHTTPError(http.StatusBadRequest, "해당 슬롯에 이미 이미지가 있습니다")
@@ -154,7 +161,7 @@ func (h *AttachmentHandler) saveAssetFile(refID, keywords string, file *multipar
 		return err
 	}
 	return h.repo.Create(&model.Attachment{
-		RefType:  "asset",
+		RefType:  model.AttachRefAsset,
 		RefID:    refID,
 		FileName: filename,
 		FilePath: filepath.ToSlash(dstPath),
@@ -189,7 +196,7 @@ func (h *AttachmentHandler) saveGenericFile(refType, refID, keywords string, fil
 
 func (h *AttachmentHandler) saveReceiptPhotos(asID, keywords string, files []*multipart.FileHeader) error {
 	return h.saveProcessedPhotos(processedPhotoOpts{
-		refType: model.RefTypeASReceipt, asID: asID, keywords: keywords,
+		refType: model.AttachRefAS, asID: asID, keywords: keywords,
 		max: model.MaxReceiptPhotos, dir: repository.ReceiptPhotoDir(h.uploadDir, asID),
 		errMax: fmt.Sprintf("접수 사진은 최대 %d장입니다", model.MaxReceiptPhotos),
 	}, files)
@@ -204,6 +211,111 @@ func (h *AttachmentHandler) saveActionPhotos(asID, keywords string, files []*mul
 	}, files)
 }
 
+func (h *AttachmentHandler) saveKBFiles(kbID, keywords string, files []*multipart.FileHeader) error {
+	kbID = strings.TrimSpace(kbID)
+	if kbID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "잘못된 대상입니다")
+	}
+	existing, err := h.repo.ListByRef(model.RefTypeASKB, kbID)
+	if err != nil {
+		return err
+	}
+	videos := 0
+	for _, a := range existing {
+		if a.IsVideo() {
+			videos++
+		}
+	}
+	dir := repository.KBAttachDir(h.uploadDir, kbID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	opt := processedPhotoOpts{
+		refType: model.RefTypeASKB, asID: kbID, keywords: keywords, dir: dir,
+	}
+	for i, fh := range files {
+		if fh == nil {
+			continue
+		}
+		name := safeUploadBaseName(fh.Filename)
+		mime := fh.Header.Get("Content-Type")
+		if msg := model.KBAttachReject(name, mime, fh.Size, videos); msg != "" {
+			return echo.NewHTTPError(http.StatusBadRequest, msg)
+		}
+		if model.LooksLikeVideo(name, mime) {
+			if err := h.saveKBVideo(opt, fh, i); err != nil {
+				return err
+			}
+			videos++
+			continue
+		}
+		if imageproc.LooksLikeImage(name, mime) {
+			if err := h.saveOneProcessedPhoto(opt, fh, i); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := h.saveKBDocument(opt, fh, i); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *AttachmentHandler) saveKBVideo(opt processedPhotoOpts, file *multipart.FileHeader, seq int) error {
+	origName := safeUploadBaseName(file.Filename)
+	stored := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), seq, origName)
+	dstPath := filepath.Join(opt.dir, stored)
+	if err := copyUploadFile(file, dstPath); err != nil {
+		return err
+	}
+	st, err := os.Stat(dstPath)
+	if err != nil {
+		os.Remove(dstPath)
+		return err
+	}
+	if st.Size() > model.MaxKBVideoBytes {
+		os.Remove(dstPath)
+		return echo.NewHTTPError(http.StatusBadRequest, model.SizeLimitMessage(model.MaxKBVideoBytes, st.Size()))
+	}
+	return h.repo.Create(&model.Attachment{
+		RefType:  opt.refType,
+		RefID:    opt.asID,
+		FileName: origName,
+		FilePath: filepath.ToSlash(dstPath),
+		FileSize: st.Size(),
+		MIMEType: model.VideoMIME(origName),
+		Keywords: opt.keywords,
+	})
+}
+
+func (h *AttachmentHandler) saveKBDocument(opt processedPhotoOpts, file *multipart.FileHeader, seq int) error {
+	origName := safeUploadBaseName(file.Filename)
+	stored := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), seq, origName)
+	dstPath := filepath.Join(opt.dir, stored)
+	if err := copyUploadFile(file, dstPath); err != nil {
+		return err
+	}
+	st, _ := os.Stat(dstPath)
+	size := file.Size
+	if st != nil {
+		size = st.Size()
+	}
+	mime := file.Header.Get("Content-Type")
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	return h.repo.Create(&model.Attachment{
+		RefType:  opt.refType,
+		RefID:    opt.asID,
+		FileName: origName,
+		FilePath: filepath.ToSlash(dstPath),
+		FileSize: size,
+		MIMEType: mime,
+		Keywords: opt.keywords,
+	})
+}
+
 type processedPhotoOpts struct {
 	refType   string
 	asID      string
@@ -215,7 +327,12 @@ type processedPhotoOpts struct {
 }
 
 func (h *AttachmentHandler) saveProcessedPhotos(opt processedPhotoOpts, files []*multipart.FileHeader) error {
-	n, err := h.repo.CountByRef(opt.refType, opt.asID)
+	n, err := 0, error(nil)
+	if opt.refType == model.AttachRefAS {
+		n, err = h.repo.CountReceiptPhotos(opt.asID)
+	} else {
+		n, err = h.repo.CountByRef(opt.refType, opt.asID)
+	}
 	if err != nil {
 		return err
 	}
@@ -343,6 +460,20 @@ func safeUploadBaseName(orig string) string {
 	return name
 }
 
+func isReceiptPhoto(att *model.Attachment) bool {
+	if att == nil {
+		return false
+	}
+	if att.RefType == model.AttachFormReceipt {
+		return true
+	}
+	if model.CanonicalAttachRef(att.RefType) != model.AttachRefAS {
+		return false
+	}
+	p := filepath.ToSlash(att.FilePath)
+	return strings.Contains(p, "/receipt/")
+}
+
 func canUploadAttachment(c echo.Context, refType string) bool {
 	switch strings.TrimSpace(refType) {
 	case model.RefTypeAS:
@@ -352,6 +483,8 @@ func canUploadAttachment(c echo.Context, refType string) bool {
 	case model.RefTypeASReceipt:
 		return canReceiveAS(c) || canWriteMaster(c) || canProcessAS(c)
 	case model.RefTypeASActionPhoto:
+		return canProcessAS(c) || canWriteMaster(c)
+	case model.RefTypeASKB:
 		return canProcessAS(c) || canWriteMaster(c)
 	case model.RefTypeWorkActivity:
 		return canWriteWorkboard(c)
@@ -481,7 +614,7 @@ func (h *AttachmentHandler) UpdateKeywords(c echo.Context) error {
 	if att == nil {
 		return echo.ErrNotFound
 	}
-	if att.RefType == model.RefTypeASReceipt {
+	if isReceiptPhoto(att) {
 		if err := h.guardReceiptPhotoWrite(c, att.RefID); err != nil {
 			return err
 		}
@@ -504,6 +637,9 @@ func (h *AttachmentHandler) Download(c echo.Context) error {
 	if err != nil || att == nil {
 		return echo.ErrNotFound
 	}
+	if att.IsVideo() {
+		return c.Inline(att.FilePath, att.DisplayName())
+	}
 	return c.Attachment(att.FilePath, att.DisplayName())
 }
 
@@ -512,7 +648,7 @@ func (h *AttachmentHandler) Delete(c echo.Context) error {
 	if att == nil {
 		return echo.ErrNotFound
 	}
-	if att.RefType == model.RefTypeASReceipt {
+	if isReceiptPhoto(att) {
 		if err := h.guardReceiptPhotoWrite(c, att.RefID); err != nil {
 			return err
 		}
@@ -552,7 +688,10 @@ func (h *AttachmentHandler) PromoteToAsset(c echo.Context) error {
 	if err != nil || att == nil {
 		return echo.ErrNotFound
 	}
-	if att.RefType != model.RefTypeASReceipt {
+	if att.RefType != model.AttachRefAS && att.RefType != model.AttachFormReceipt {
+		return echo.NewHTTPError(http.StatusBadRequest, "접수 사진만 자산 사진으로 옮길 수 있습니다")
+	}
+	if !isReceiptPhoto(att) {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 사진만 자산 사진으로 옮길 수 있습니다")
 	}
 	if h.asRepo == nil {

@@ -21,9 +21,9 @@ func (r *WBRepo) ListASReceivedBetween(from, to string) ([]model.WorkTask, error
 		       ),'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
-		WHERE date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?)
+		WHERE ar.receipt_datetime >= ? AND ar.receipt_datetime < ?
 		ORDER BY ar.receipt_datetime, ar.as_number`
-	rows, err := r.db.Query(q, from, toEx)
+	rows, err := r.db.Query(q, dayTimeStart(from), dayTimeStart(toEx))
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil

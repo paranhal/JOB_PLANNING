@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -71,8 +75,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("DB 초기화 실패: %v", err)
 	}
-	defer db.Close()
-	repository.RunWorkListHousekeeping(db)
 
 	host, _ := os.Hostname()
 	startedClock := startedAt.In(backup.SeoulLocation()).Format("2006-01-02 15:04")
@@ -137,6 +139,14 @@ func main() {
 		Format: "[${time_rfc3339}] ${method} ${uri} → ${status} (${latency_human})\n",
 	}))
 	e.Use(middleware.Recover())
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if strings.HasPrefix(c.Request().URL.Path, "/static/") {
+				c.Response().Header().Set("Cache-Control", "public, max-age=86400")
+			}
+			return next(c)
+		}
+	})
 
 	e.Renderer = handler.NewRenderer()
 	e.Static("/static", "web/static")
@@ -164,10 +174,18 @@ func main() {
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.Use(h.Auth.RequireActiveRole)
+	g.Use(h.InjectAssignNotices)
 
 	g.GET("/", h.Dashboard)
+	g.POST("/dashboard/week-review/dismiss", h.DismissWeekReview)
 	g.GET("/work/all", h.Work.ListAll)
 	g.GET("/work", h.Work.List)
+	g.POST("/work/review/reschedule", h.Work.ReviewReschedule)
+	g.POST("/work/review/transfer", h.Work.ReviewTransfer)
+	g.POST("/work/review/block", h.Work.ReviewBlock)
+	g.POST("/work/assign-notices/later", h.Work.AssignNoticeLater)
+	g.POST("/work/assign-notices/add", h.Work.AssignNoticeAdd)
+	g.POST("/work/assign-notices/transfer", h.Work.AssignNoticeTransfer)
 	g.GET("/plan/unplanned", h.Work.UnplannedList)
 	g.POST("/plan/unplanned/assign", h.Work.UnplannedAssign)
 	g.POST("/plan/unplanned/no-date", h.Work.UnplannedNoDate)
@@ -261,6 +279,7 @@ func main() {
 	as.GET("/search", h.AS.Search)
 	as.GET("/knowledge", h.AS.Knowledge)
 	as.GET("/knowledge.xlsx", h.AS.KnowledgeExcel)
+	as.GET("/knowledge/gaps", h.AS.KnowledgeGaps)
 	as.POST("/knowledge", h.AS.CreateKnowledge, processAS)
 	as.GET("/kb/:kb_id/history", h.AS.KnowledgeHistory)
 	as.POST("/kb/:kb_id/revise", h.AS.ReviseKnowledge, processAS)
@@ -455,6 +474,7 @@ func main() {
 	g.POST("/admin/holidays/leaves/delete", h.Holiday.DeleteLeave)
 
 	g.GET("/admin/data", h.Backup.Page, adminOnly)
+	g.GET("/admin/data/process-conflicts.xlsx", h.Backup.ProcessConflictsExcel, adminOnly)
 	g.GET("/admin/system", h.System.Page, h.Auth.RequireAdminOnly)
 	g.POST("/admin/data/save", h.Backup.Save, adminOnly)
 	g.POST("/admin/data/metrics", h.Backup.SaveMetrics, adminOnly)
@@ -468,9 +488,36 @@ func main() {
 	g.GET("/admin/backup", h.Backup.RedirectLegacy, adminOnly)
 	g.POST("/admin/backup", h.Backup.Save, adminOnly)
 
+	// 일일업무 정리는 조회 GET 이 아니라 기동·백업에서만 돈다. §38.9.1 · §42.4
+	// 리슨 전에 돌리면 Apache 가 타임아웃 나고, 로그인 화면까지 SQLite 잠금에 걸린다.
+	go repository.RunWorkListHousekeeping(db)
+	repository.StartWALAutocheckpoint(db)
+
 	log.Printf("고객지원시스템 서버 시작: http://localhost:%s  version=%s commit=%s built=%s started=%s",
 		cfg.Port, buildVersion, buildCommit, buildTime, startedAt.In(backup.SeoulLocation()).Format("2006-01-02 15:04"))
-	if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+	go func() {
+		if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+	log.Println("종료 신호 수신. 정리 중...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := e.Shutdown(ctx); err != nil {
+		log.Printf("HTTP 종료 오류: %v", err)
 	}
+
+	// WAL 을 본체로 합치고 파일을 되감는다. 이게 있어야 다음 기동이 깨끗하다. §44.5 ①
+	if _, err := db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+		log.Printf("종료 체크포인트 실패: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		log.Printf("DB 종료 오류: %v", err)
+	}
+	log.Println("정상 종료")
 }

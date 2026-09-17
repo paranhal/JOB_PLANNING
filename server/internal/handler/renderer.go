@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -16,9 +17,14 @@ import (
 	"customer-support/internal/model"
 )
 
-type TemplateRenderer struct{}
+type TemplateRenderer struct {
+	mu    sync.Mutex
+	cache map[string]*template.Template
+}
 
-func NewRenderer() *TemplateRenderer { return &TemplateRenderer{} }
+func NewRenderer() *TemplateRenderer {
+	return &TemplateRenderer{cache: map[string]*template.Template{}}
+}
 
 func appendExisting(files []string, paths ...string) []string {
 	for _, p := range paths {
@@ -29,10 +35,13 @@ func appendExisting(files []string, paths ...string) []string {
 	return files
 }
 
-func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+func templateFiles(name string) []string {
 	files := []string{
 		"web/templates/layout/base.html",
 		filepath.Join("web/templates", name),
+	}
+	if name == "auth/login.html" {
+		return files
 	}
 	if strings.HasPrefix(name, "meeting/") {
 		if partials, err := filepath.Glob("web/templates/meeting/_*.html"); err == nil {
@@ -99,7 +108,28 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	if spartials, err := filepath.Glob("web/templates/sort/_*.html"); err == nil {
 		files = append(files, spartials...)
 	}
-	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	return files
+}
+
+func (t *TemplateRenderer) lookup(name string) (*template.Template, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if tmpl, ok := t.cache[name]; ok {
+		return tmpl, nil
+	}
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(templateFiles(name)...)
+	if err != nil {
+		return nil, err
+	}
+	if t.cache == nil {
+		t.cache = map[string]*template.Template{}
+	}
+	t.cache[name] = tmpl
+	return tmpl, nil
+}
+
+func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	tmpl, err := t.lookup(name)
 	if err != nil {
 		return err
 	}
@@ -123,6 +153,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
 			dataMap["UserPerms"] = currentPerms(c)
+			injectAssignNoticeView(c, dataMap)
 			if v := c.Get("auth_unconfirmed"); v != nil {
 				if b, ok := v.(bool); ok && b {
 					dataMap["AuthUnconfirmed"] = true
@@ -513,6 +544,7 @@ func funcMap() template.FuncMap {
 		"wbWorkTypeClass":       model.WBWorkTypeClass,
 		"workPlaceLabel":        model.WorkPlaceLabel,
 		"attDisplayName":        func(a model.Attachment) string { return a.DisplayName() },
+		"formatBytes":           model.FormatByteSize,
 		"wbCategoryLabel":       model.WBCategoryLabel,
 		"wbCategoryClass":       model.WBCategoryClass,
 		"wbProjectStatusLabel":  model.WBProjectStatusLabel,

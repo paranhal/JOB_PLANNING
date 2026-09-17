@@ -61,6 +61,7 @@ type ASSearchHit struct {
 	OriginalAction string
 	ChangeNote    string
 	Past          []ASKBEntry
+	Attachments   []Attachment
 }
 
 // ASKnowledgeSite 사이트 탭 한 줄. 건수는 ar.customer_id 기준. §41.1.1 · §41.3.2

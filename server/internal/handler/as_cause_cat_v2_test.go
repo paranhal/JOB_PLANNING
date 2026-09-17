@@ -32,7 +32,6 @@ func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
 		"cause_cat1":   {"server"},
 		"cause_cat2":   {"server.patch"},
 		"action_taken": {"보안 패치"},
-		"result_code":  {model.ResultDone},
 	})
 	loc := rec.Header().Get("Location")
 	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
@@ -55,7 +54,6 @@ func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
 		"cause_cat1":   {"web"},
 		"cause_cat2":   {"web.post_edit"},
 		"action_taken": {"게시물 수정"},
-		"result_code":  {model.ResultDone},
 	})
 	if empty.Code != http.StatusSeeOther || strings.Contains(empty.Header().Get("Location"), "err=") {
 		t.Fatalf("매핑 없는 2차 저장 실패: %s", empty.Header().Get("Location"))

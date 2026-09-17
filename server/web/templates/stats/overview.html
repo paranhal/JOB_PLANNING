@@ -1,11 +1,9 @@
 {{define "title"}}{{.Title}} · 고객지원시스템{{end}}
 {{define "content"}}
 {{$kpi := .KPI}}
-{{$ex := $kpi.ExecDisplay}}
 {{$vis := $kpi.VisitDisplay}}
 {{$cmp := $kpi.CompleteDisplay}}
 {{$pl := $kpi.PlanDisplay}}
-{{$execOK := and $ex.ShowTarget (ge $ex.Value $.ExecTarget)}}
 {{$visitOK := and $vis.ShowTarget (le $vis.Value $.VisitTarget)}}
 {{$completeOK := and $cmp.ShowTarget (le $cmp.Value $.CompleteTarget)}}
 {{$planOK := and $pl.ShowValue (ge $pl.Value $.PlanTarget)}}
@@ -15,7 +13,7 @@
   <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">통계</h2>
-      <p class="text-sm text-gray-500 mt-1">관리 단위(기간·담당·사업) 기준 · 실행율 90% · 방문 3일 · 완료 7일</p>
+      <p class="text-sm text-gray-500 mt-1">관리 단위(기간·담당·사업) 기준 · 방문 3일 · 완료 7일</p>
       {{if .MetricsBaseDate}}
       <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
       {{end}}
@@ -35,38 +33,26 @@
     </div>
   </div>
 
+  {{if $kpi.LeadTimeWarn}}
+  <div id="stats-lead-time-warn" role="alert" class="rounded-xl border-2 border-rose-500 bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-900 shadow-sm">
+    {{$kpi.LeadTimeWarn}}
+  </div>
+  {{end}}
+  {{if and .MissingComplete (gt .MissingComplete.AS 0)}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+    완료일 미기록 {{.MissingComplete.AS}}건 제외
+    <a href="/work-status?missing=complete" class="ml-2 text-amber-800 underline">목록</a>
+  </div>
+  {{end}}
   {{/* KPI 카드 */}}
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div class="flex items-start justify-between gap-2">
-        <p class="text-sm font-medium text-gray-600">계획대비 실행율</p>
-        <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
-          {{if $.ProgressScopeLabel}}<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700" title="{{$.ProgressScopeHint}}">{{$.ProgressScopeLabel}}</span>{{end}}
-          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$ex.Reason}}">{{$ex.GradeMark}} {{$ex.GradeLabel}}</span>
-          {{if $ex.ShowTarget}}
-          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $execOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $execOK}}기준충족{{else}}기준미충족{{end}}</span>
-          {{end}}
-        </span>
-      </div>
-      {{if $ex.ShowValue}}
-      <p class="mt-2 text-3xl font-bold tabular-nums {{if $ex.ShowTarget}}{{if $execOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $ex.Value}}%</p>
-      {{if $ex.ShowDelta}}
-      <p class="mt-1 text-[11px] {{if ge $kpi.ExecutionDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
-        {{if ge $kpi.ExecutionDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.ExecutionDelta}}%p 이전 기간 대비
-      </p>
-      {{end}}
-      {{else}}
-      <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$ex.Reason}}">—</p>
-      <p class="mt-1 text-[11px] text-gray-400">{{$ex.Reason}}</p>
-      {{end}}
-      <p class="mt-1 text-[11px] text-gray-500">표본 {{$ex.Sample}}건</p>
-      {{if $.ProgressScopeHint}}<p class="mt-1 text-[10px] text-gray-400 leading-snug">{{$.ProgressScopeHint}}</p>{{end}}
-    </div>
-
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
     <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div class="flex items-start justify-between gap-2">
         <p class="text-sm font-medium text-gray-600">접수 후 방문까지 기간</p>
         <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800" title="{{$.VisitLeadHint}}">[참고]</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$vis.Sample}}건</span>
           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$vis.Reason}}">{{$vis.GradeMark}} {{$vis.GradeLabel}}</span>
           {{if $vis.ShowTarget}}
           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $visitOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $visitOK}}기준충족{{else}}기준미충족{{end}}</span>
@@ -84,13 +70,16 @@
       <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$vis.Reason}}">—</p>
       <p class="mt-1 text-[11px] text-gray-400">{{$vis.Reason}}</p>
       {{end}}
-      <p class="mt-1 text-[11px] text-gray-500">표본 {{$vis.Sample}}건 · 목표 {{printf "%.0f" .VisitTarget}}일 · 완료 표본 {{$cmp.Sample}}건</p>
+      <p class="mt-1 text-[11px] text-gray-500">목표 {{printf "%.0f" .VisitTarget}}일 · [{{.MetricScopeAS}}]</p>
+      <p class="mt-1 text-[11px] text-amber-800 leading-snug">{{.VisitLeadHint}}</p>
     </div>
 
     <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div class="flex items-start justify-between gap-2">
         <p class="text-sm font-medium text-gray-600">접수 후 조치 완료까지 기간</p>
         <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$cmp.Sample}}건</span>
           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$cmp.Reason}}">{{$cmp.GradeMark}} {{$cmp.GradeLabel}}</span>
           {{if $cmp.ShowTarget}}
           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $completeOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $completeOK}}기준충족{{else}}기준미충족{{end}}</span>
@@ -108,7 +97,7 @@
       <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$cmp.Reason}}">—</p>
       <p class="mt-1 text-[11px] text-gray-400">{{$cmp.Reason}}</p>
       {{end}}
-      <p class="mt-1 text-[11px] text-gray-500">표본 {{$cmp.Sample}}건 · 목표 {{printf "%.0f" .CompleteTarget}}일 · 방문 표본 {{$vis.Sample}}건</p>
+      <p class="mt-1 text-[11px] text-gray-500">목표 {{printf "%.0f" .CompleteTarget}}일 · [{{.MetricScopeAS}}]</p>
     </div>
 
     <a href="/plan/unplanned" class="rounded-xl border border-rose-200 bg-white p-4 shadow-sm hover:border-rose-400 transition-all block">
@@ -130,9 +119,6 @@
       <p class="mt-1 text-[11px] text-gray-500">예정+미정 {{$kpi.PlanningPlanned}} / 미완료 {{$kpi.PlanningOpen}} · 목표 {{printf "%.0f" .PlanTarget}}%</p>
     </a>
   </div>
-  {{if $kpi.LeadTimeWarn}}
-  <div class="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{$kpi.LeadTimeWarn}}</div>
-  {{end}}
 
   {{/* 필터 바 — 드롭다운 즉시 표시, 선택 시 자동 조회 */}}
   <form method="GET" action="/stats" id="statsFilterForm"
@@ -347,6 +333,7 @@
   <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
       <h3 class="text-sm font-bold text-gray-800">{{if eq .View "week"}}주별{{else if eq .View "month"}}월별{{else if eq .View "range"}}기간별{{else}}일자별{{end}} 업무 현황</h3>
+      {{if .ChartBucketNote}}<p class="text-[11px] text-gray-500">{{.ChartBucketNote}}</p>{{end}}
       <div class="flex flex-wrap items-center gap-3 text-[11px] text-gray-600">
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>접수</span>
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-sky-400"></span>미완료</span>
@@ -408,27 +395,42 @@
     </div>
   </div>
 
-  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-sm font-bold text-gray-800">실행률 추이</h3>
-      <span class="text-[11px] text-gray-500">계획대비 실행율(%) · 목표 {{printf "%.0f" .ExecTarget}}%</span>
-    </div>
-    <div class="h-56"><canvas id="statsLineChart"></canvas></div>
-  </div>
-
   <div>
     <h3 class="text-sm font-bold text-gray-800 mb-1">예정 · 접수 · 처리 요약</h3>
-    <p class="text-[11px] text-gray-500 mb-2">정기점검 건수는 <span class="font-medium text-gray-700">사이트×점검대상</span>(KLAS·RFID 각각 1건). 접수=그 기간 방문 예약, 처리=조치 완료. 예정 칸의 <span class="font-medium text-sky-700">(누적/남은)</span>은 그 달 1일부터 해당 기간 종료일까지 완료 건 / 월 목표−누적.</p>
-    {{template "stats_period_table" .Columns}}
+    <p class="text-[11px] text-gray-500 mb-2">[{{.MetricScopeCounts}}] · 정기점검은 사이트×점검대상. 접수=그 기간 방문 예약, 처리=조치 완료.</p>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead><tr class="bg-gray-50 text-gray-600 border-b border-gray-200">
+          <th class="px-3 py-2.5 text-left font-medium sticky left-0 bg-gray-50 z-10">업무</th>
+          <th class="px-3 py-2.5 text-left font-medium">구분</th>
+          {{range .Columns}}<th class="px-3 py-2.5 text-center font-medium min-w-[6.5rem]"><div>{{.Label}}</div><div class="text-[11px] font-normal text-gray-400 mt-0.5">{{.RangeLabel}}</div></th>{{end}}
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          <tr class="hover:bg-rose-50/40"><td class="px-3 py-2 font-medium text-rose-800 sticky left-0 bg-white" rowspan="3">AS</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.AS.Planned}}</td>{{end}}</tr>
+          <tr class="hover:bg-rose-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.AS.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-rose-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.AS.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-sky-50/40"><td class="px-3 py-2 font-medium text-sky-800 sticky left-0 bg-white" rowspan="3">정기점검</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Mnt.Planned}}{{if gt .Counts.Mnt.Quota 0}}<div class="text-[11px] font-normal text-sky-700 mt-0.5">({{.Counts.Mnt.Cumulative}}/{{.Counts.Mnt.Remaining}})</div>{{end}}</td>{{end}}</tr>
+          <tr class="hover:bg-sky-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Mnt.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-sky-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Mnt.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-violet-50/40"><td class="px-3 py-2 font-medium text-violet-800 sticky left-0 bg-white" rowspan="3">행정·지원</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Admin.Planned}}</td>{{end}}</tr>
+          <tr class="hover:bg-violet-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Admin.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-violet-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Admin.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="bg-slate-50 font-semibold border-t-2 border-slate-200"><td class="px-3 py-2.5 sticky left-0 bg-slate-50" rowspan="4">합계</td><td class="px-3 py-2.5">예정업무</td>{{range .Columns}}<td class="px-3 py-2.5 text-center tabular-nums">{{.Counts.PlannedTotal}}</td>{{end}}</tr>
+          <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5">접수 <span class="text-[10px] font-normal text-slate-500">[AS · 정기점검 · 행정지원]</span></td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-blue-800">{{.Counts.ReceiptTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5">처리 <span class="text-[10px] font-normal text-slate-500">[AS · 정기점검 · 행정지원]</span></td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-emerald-800">{{.Counts.ProcessTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5">계획수정</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-amber-800">{{.Counts.ModifiedTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-600 space-y-1">
-    <p><span class="font-medium text-gray-800">실행율</span> = 계획대로 완료÷예정×100 (예정일 당일 완료. 일정 변경 분은 제외, 최대 100%. 목표 {{printf "%.0f" .ExecTarget}}%) · <span class="font-medium text-gray-800">방문기간</span> = 접수일→방문(조치시작, 없으면 방문예정일) 평균(목표 {{printf "%.0f" .VisitTarget}}일)</p>
-    <p><span class="font-medium text-gray-800">조치완료기간</span> = 접수일→완료일 평균(목표 {{printf "%.0f" .CompleteTarget}}일) · <span class="font-medium text-gray-800">계획 수립률</span> = (예정일 있는 건 + 미정 사유)÷미완료×100 (목표 {{printf "%.0f" .PlanTarget}}%. 이 값이 낮으면 실행율은 ⚪ 측정불가)</p>
+    <p><span class="font-medium text-gray-800">방문기간</span> = 접수일→방문일 평균(현장방문이고 방문일이 있는 완료 건만. 목표 {{printf "%.0f" .VisitTarget}}일. [{{.MetricScopeAS}}])</p>
+    <p><span class="font-medium text-gray-800">조치완료기간</span> = 접수일→완료일 평균(목표 {{printf "%.0f" .CompleteTarget}}일) · <span class="font-medium text-gray-800">계획 수립률</span> = (예정일 있는 건 + 미정 사유)÷미완료×100 (목표 {{printf "%.0f" .PlanTarget}}%)</p>
   </div>
 </div>
 
-<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/vendor/chart.umd.min.js?v={{.AssetQuery}}"></script>
 <script>
 function statsDashboard(){ return {}; }
 (function(){
@@ -459,7 +461,7 @@ function statsDashboard(){ return {}; }
           ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
-          var text = (chart.config.type === 'line') ? (v + '%') : String(v);
+          var text = String(v);
           ctx.fillText(text, pos.x, pos.y - 3);
           ctx.restore();
         });
@@ -490,40 +492,6 @@ function statsDashboard(){ return {}; }
         scales: {
           x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, font: { size: 11 } } },
           y: { beginAtZero: true, grace: '8%', ticks: { precision: 0, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
-        }
-      },
-      plugins: [valueLabelsPlugin]
-    });
-  }
-  var line = document.getElementById('statsLineChart');
-  if (line) {
-    new Chart(line, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: '실행률',
-          data: series.map(function(p){ return (p.planned >= 5) ? p.exec_rate : null; }),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.12)',
-          borderDash: [5, 4],
-          tension: 0.25,
-          pointRadius: 3,
-          pointBackgroundColor: '#3b82f6',
-          fill: false,
-          spanGaps: true
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 14 } },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { title: tipTitle } }
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, font: { size: 11 } } },
-          y: { min: 0, max: 100, ticks: { callback: function(v){ return v + '%'; }, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
         }
       },
       plugins: [valueLabelsPlugin]

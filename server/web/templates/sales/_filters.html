@@ -12,6 +12,7 @@
   {{if .View}}<input type="hidden" name="display" value="{{.View}}"><input type="hidden" name="view" value="{{.View}}">{{end}}
   {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
   {{if eq .DealType "supply"}}<input type="hidden" name="deal" value="supply">{{end}}
+  {{if .Sort}}<input type="hidden" name="sort" value="{{.Sort}}"><input type="hidden" name="dir" value="{{.Dir}}">{{end}}
   <div class="flex-1 min-w-[10rem]">
     <label class="block text-xs text-gray-500 mb-1">검색</label>
     <input type="text" name="search" value="{{.Search}}" placeholder="사업명"

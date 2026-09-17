@@ -266,12 +266,13 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 		return err
 	}
 	logCreate(r.db, "customers", "customer_id", c.CustomerID, c.OrgName)
+	rememberCustomerName(c.CustomerID, c.OrgName)
 	return nil
 }
 
 // Update 고객 수정
 func (r *CustomerRepo) Update(c *model.Customer) error {
-	return touchUpdate(r.db, "customers", "customer_id", c.CustomerID, c.OrgName, func() error {
+	err := touchUpdate(r.db, "customers", "customer_id", c.CustomerID, c.OrgName, func() error {
 		c.SyncCombinedAddress()
 		now := time.Now().Format("2006-01-02 15:04:05")
 		_, err := r.db.Exec(`
@@ -292,6 +293,10 @@ func (r *CustomerRepo) Update(c *model.Customer) error {
 		)
 		return err
 	})
+	if err == nil {
+		rememberCustomerName(c.CustomerID, c.OrgName)
+	}
+	return err
 }
 
 // Delete 고객 비활성화 (실제 삭제 안 함)

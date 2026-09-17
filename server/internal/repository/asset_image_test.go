@@ -102,7 +102,7 @@ func TestUpdateKeywords(t *testing.T) {
 
 func mkAtt(assetID string, slot int) *model.Attachment {
 	return &model.Attachment{
-		RefType:  "asset",
+		RefType:  model.AttachRefAsset,
 		RefID:    assetID,
 		FileName: AssetImageFileName(assetID, slot, "x.jpg"),
 		FilePath: filepath.Join("data/uploads/assets", assetID, AssetImageFileName(assetID, slot, "x.jpg")),

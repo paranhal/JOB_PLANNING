@@ -160,3 +160,40 @@ func TestReconcileASDailyTasksDoesNotNeedGET(t *testing.T) {
 		t.Fatalf("정리 후 일일업무 없음: %+v", task)
 	}
 }
+
+func TestReconcileASDailyTasksSkipsBadDateAndContinues(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "as_hk_bad.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C1','유구도서관','유구도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, symptom, status, assigned_to, visit_scheduled_date)
+		VALUES
+		 ('R-BAD','R-BAD','C1','2026-09-01 10:00:00','잘못된날짜','assigned','양기헌','0206-08-12'),
+		 ('R-OK','R-OK','C1','2026-09-01 10:00:00','정상','assigned','태자운','2026-09-10')`); err != nil {
+		t.Fatal(err)
+	}
+	n, err := ReconcileASDailyTasks(db)
+	if err != nil {
+		t.Fatalf("한 건 때문에 정리가 멈추면 안 된다: n=%d err=%v", n, err)
+	}
+	if n < 2 {
+		t.Fatalf("두 건 모두 맞춰야 한다 n=%d", n)
+	}
+	wb := NewWBRepo(db)
+	bad, _ := wb.GetTaskBySource(model.WBSourceAS, "R-BAD")
+	if bad == nil {
+		t.Fatal("잘못된 예정일이어도 일일업무는 있어야 한다")
+	}
+	if strings.TrimSpace(bad.DueDate) != "" || strings.TrimSpace(bad.WorkDate) != "" {
+		t.Fatalf("잘못된 예정일은 비워야 한다 due=%s work=%s", bad.DueDate, bad.WorkDate)
+	}
+	ok, _ := wb.GetTaskBySource(model.WBSourceAS, "R-OK")
+	if ok == nil || ok.Assignee != "태자운" || ok.DueDate != "2026-09-10" {
+		t.Fatalf("정상 건이 안 맞춰졌다: %+v", ok)
+	}
+}

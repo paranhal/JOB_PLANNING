@@ -82,8 +82,8 @@ func TestApplyActionResult_TransferWaitingAndDone(t *testing.T) {
 	if _, err := ApplyActionResult(as3, ActionApplyInput{}, now); err != nil {
 		t.Fatal(err)
 	}
-	if as3.Status != "completed" {
-		t.Fatalf("done: %s", as3.Status)
+	if as3.Status != "completed" || as3.CompleteDatetime == nil {
+		t.Fatalf("done: status=%s complete=%v", as3.Status, as3.CompleteDatetime)
 	}
 
 	as4 := &ASReceipt{ResultCode: ResultTransfer}

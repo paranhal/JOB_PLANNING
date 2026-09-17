@@ -13,7 +13,7 @@ func NewASProcessRepo(db *sql.DB) *ASProcessRepo { return &ASProcessRepo{db: db}
 
 const asProcessSelect = `
 		SELECT process_id, COALESCE(process_number,''), as_id, COALESCE(process_datetime,''),
-		       COALESCE(worker,''), COALESCE(work_type,''),
+		       COALESCE(worker,''), COALESCE(work_type,''), COALESCE(cause_type,''),
 		       COALESCE(work_content,''), COALESCE(parts_used,''),
 		       COALESCE(time_spent,0), COALESCE(notes,''),
 		       COALESCE(result_code,''), COALESCE(transfer_detail,''),
@@ -26,7 +26,7 @@ func scanASProcesses(rows *sql.Rows) ([]model.ASProcess, error) {
 		var p model.ASProcess
 		var dt string
 		if err := rows.Scan(&p.ProcessID, &p.ProcessNumber, &p.ASID, &dt,
-			&p.Worker, &p.WorkType, &p.WorkContent,
+			&p.Worker, &p.WorkType, &p.CauseType, &p.WorkContent,
 			&p.PartsUsed, &p.TimeSpent, &p.Notes,
 			&p.ResultCode, &p.TransferDetail, &p.NextActionDate, &p.WaitReason, &p.PrepNotes); err != nil {
 			return nil, err
@@ -65,13 +65,16 @@ func (r *ASProcessRepo) Create(p *model.ASProcess) error {
 	}
 	p.ProcessNumber = procNum
 	p.ProcessID = procNum
+	worker, workerUID := bindStaff(r.db, p.Worker, "")
+	p.Worker = worker
+	p.TimeSpent = model.NormalizeDurationMin(p.TimeSpent)
 	_, err = r.db.Exec(`
 		INSERT INTO as_processes
-		(process_id,process_number,as_id,process_datetime,worker,work_type,work_content,parts_used,time_spent,notes,
+		(process_id,process_number,as_id,process_datetime,worker,worker_user_id,work_type,cause_type,work_content,parts_used,time_spent,notes,
 		 result_code,transfer_detail,next_action_date,wait_reason,prep_notes)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProcessID, p.ProcessNumber, p.ASID, at.Format("2006-01-02 15:04:05"),
-		p.Worker, p.WorkType, p.WorkContent, p.PartsUsed, p.TimeSpent, p.Notes,
+		p.Worker, workerUID, p.WorkType, p.CauseType, p.WorkContent, p.PartsUsed, p.TimeSpent, p.Notes,
 		nullIfEmpty(p.ResultCode), nullIfEmpty(p.TransferDetail), nullIfEmpty(p.NextActionDate),
 		nullIfEmpty(p.WaitReason), nullIfEmpty(p.PrepNotes))
 	if err != nil {

@@ -37,13 +37,13 @@ func TestSaveSiteConfigStoresFixedDays(t *testing.T) {
 	g.GET("/maintenance/sites/:customer_id/edit", h.Maintenance.EditSiteConfigPage)
 
 	form := url.Values{
-		"customer_id":       {"c1"},
-		"short_name":        {"세종"},
-		"region":            {"세종"},
-		"inspection_cycle":  {"monthly"},
-		"has_klas":          {"1"},
-		"entry_category":    {"normal"},
-		"fixed_day":         {"5", "15"},
+		"customer_id":      {"c1"},
+		"short_name":       {"세종"},
+		"region":           {"세종"},
+		"inspection_cycle": {"monthly"},
+		"has_klas":         {"1"},
+		"entry_category":   {"normal"},
+		"fixed_day":        {"5", "15"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/maintenance/sites", strings.NewReader(form.Encode()))

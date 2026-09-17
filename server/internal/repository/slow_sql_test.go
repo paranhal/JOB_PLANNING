@@ -25,3 +25,24 @@ func TestLogSlowSQLRecordsOver200ms(t *testing.T) {
 		t.Fatalf("200ms 초과 로그 없음: %s", got)
 	}
 }
+
+func TestSlowSQLPathsCoverMeetingAndAS(t *testing.T) {
+	files := []string{"as_repo.go", "stats_overview.go", "work_board_repo.go", "work_board_unplanned.go"}
+	joined := ""
+	for _, name := range files {
+		b, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		joined += string(b)
+	}
+	for _, want := range []string{
+		`"as.listFiltered"`, `"as.getByID"`, `"as.listHistoryByAsset"`,
+		`"stats.FillPeriodOverview"`, `"work.ListCompletedOn"`, `"work.ListScheduledOn"`,
+		`"work.ListUnplanned"`, `"work.ListBucketOn.`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("slow sql 경로 %s 가 없다", want)
+		}
+	}
+}

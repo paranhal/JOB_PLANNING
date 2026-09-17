@@ -43,7 +43,7 @@
     {{else}}
     <p class="text-sm text-gray-600">아직 등록된 활동이 없습니다</p>
     {{if .CanWrite}}
-    <button type="button" class="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm" @click="open=true">첫 활동 등록하기</button>
+    <button type="button" class="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm" @click="startCreate()">첫 활동 등록하기</button>
     {{end}}
     {{end}}
   </div>
@@ -54,7 +54,8 @@
       <h3 class="text-sm font-semibold mb-2" style="{{.DayStyle}}">{{.Heading}}</h3>
       <div class="space-y-2">
         {{range .Items}}
-        {{template "sales_activity_card" (dict "Activity" . "HideSalesName" false)}}
+        {{$canEdit := or $.CanEditOthers (eq .CreatedBy $.CurrentUser)}}
+        {{template "sales_activity_card" (dict "Activity" . "HideSalesName" false "CanEdit" $canEdit "ShowLock" (and $.CanWrite (not $canEdit)))}}
         {{end}}
       </div>
     </section>

@@ -1,67 +1,23 @@
 {{define "as_list_table"}}
 {{$isHold := .IsHoldList}}
 {{$canUnhold := and .IsHoldList (or .CanProcess .CanReceive)}}
+{{$sort := .Sort}}{{$dir := .Dir}}{{$href := .SortLinks}}
+{{if .SortSelect}}
+<div class="md:hidden mb-2">{{template "sort_select" (dict "Options" .SortSelect "ID" "as-sort")}}</div>
+{{end}}
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
           <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">!</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <a href="{{index .SortLinks "as_number"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
-              접수번호
-              <span class="inline-flex flex-col leading-none text-base">
-                <span class="{{if and (eq .Sort "as_number") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
-                <span class="{{if and (eq .Sort "as_number") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
-              </span>
-            </a>
-          </th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <a href="{{index .SortLinks "org_name"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
-              기관(고객명)
-              <span class="inline-flex flex-col leading-none text-base">
-                <span class="{{if and (eq .Sort "org_name") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
-                <span class="{{if and (eq .Sort "org_name") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
-              </span>
-            </a>
-          </th>
+          {{template "sort_th" (dict "Label" "접수번호" "Key" "as_number" "Cur" $sort "Dir" $dir "Href" (index $href "as_number"))}}
+          {{template "sort_th" (dict "Label" "기관(고객명)" "Key" "org_name" "Cur" $sort "Dir" $dir "Href" (index $href "org_name"))}}
           <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">증상</th>
-          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <a href="{{index .SortLinks "status"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
-              상태
-              <span class="inline-flex flex-col leading-none text-base">
-                <span class="{{if and (eq .Sort "status") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
-                <span class="{{if and (eq .Sort "status") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
-              </span>
-            </a>
-          </th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
-            <a href="{{index .SortLinks "visit"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
-              예정일
-              <span class="inline-flex flex-col leading-none text-base">
-                <span class="{{if and (eq .Sort "visit") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
-                <span class="{{if and (eq .Sort "visit") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
-              </span>
-            </a>
-          </th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
-            <a href="{{index .SortLinks "assigned"}}" class="inline-flex items-center gap-1 hover:text-gray-800">
-              담당
-              <span class="inline-flex flex-col leading-none text-base">
-                <span class="{{if and (eq .Sort "assigned") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
-                <span class="{{if and (eq .Sort "assigned") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
-              </span>
-            </a>
-          </th>
-          <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <a href="{{index .SortLinks "days"}}" class="inline-flex items-center gap-1 hover:text-gray-800 justify-end w-full">
-              경과
-              <span class="inline-flex flex-col leading-none text-base">
-                <span class="{{if and (eq .Sort "days") (eq .Dir "asc")}}text-blue-600{{else}}text-gray-300{{end}}">▲</span>
-                <span class="{{if and (eq .Sort "days") (eq .Dir "desc")}}text-blue-600{{else}}text-gray-300{{end}}">▼</span>
-              </span>
-            </a>
-          </th>
+          {{template "sort_th" (dict "Label" "상태" "Key" "status" "Cur" $sort "Dir" $dir "Href" (index $href "status") "Align" "center")}}
+          {{template "sort_th" (dict "Label" "예정일" "Key" "visit" "Cur" $sort "Dir" $dir "Href" (index $href "visit"))}}
+          {{template "sort_th" (dict "Label" "담당" "Key" "assigned" "Cur" $sort "Dir" $dir "Href" (index $href "assigned") "ThClass" "hidden md:table-cell")}}
+          {{template "sort_th" (dict "Label" "경과" "Key" "days" "Cur" $sort "Dir" $dir "Href" (index $href "days") "Align" "right")}}
           {{if $isHold}}
           <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">삭제</th>
           {{end}}

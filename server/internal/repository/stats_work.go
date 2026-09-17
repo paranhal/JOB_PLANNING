@@ -114,7 +114,7 @@ func (r *StatsRepo) countASVisit(from, toEx string, f model.StatsMeetingFilter) 
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status != 'cancelled'`+asSQL+`
 		  AND TRIM(COALESCE(ar.start_datetime,'')) != ''
-		  AND date(ar.start_datetime) >= date(?) AND date(ar.start_datetime) < date(?)`, args...)
+		  AND ar.start_datetime >= ? AND ar.start_datetime < ?`, args...)
 }
 
 func (r *StatsRepo) countASCarry(receiptBefore, stillOpenAt string, f model.StatsMeetingFilter) (int, error) {
@@ -124,10 +124,10 @@ func (r *StatsRepo) countASCarry(receiptBefore, stillOpenAt string, f model.Stat
 		SELECT COUNT(*) FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status != 'cancelled'`+asSQL+`
-		  AND date(ar.receipt_datetime) < date(?)
+		  AND ar.receipt_datetime < ?
 		  AND ar.status IN `+model.SQLStatusStatsOpen+`
 		  AND (TRIM(COALESCE(ar.complete_datetime,'')) = ''
-		       OR date(ar.complete_datetime) >= date(?))`, args...)
+		       OR ar.complete_datetime >= ?)`, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -138,7 +138,7 @@ func (r *StatsRepo) countASCarry(receiptBefore, stillOpenAt string, f model.Stat
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = 'partial_complete'
 		  AND COALESCE(w.status,'open') = 'open'
-		  AND date(w.created_at) < date(?)`+asSQL, wArgs...)
+		  AND w.created_at < ?`+asSQL, wArgs...)
 	return n + w, err
 }
 
@@ -153,7 +153,7 @@ func (r *StatsRepo) countAdminVisit(from, toEx string, f model.StatsMeetingFilte
 			GROUP BY task_id
 		) y ON y.task_id = t.task_id
 		WHERE t.work_type IN ('admin','support')
-		  AND date(y.first_at) >= date(?) AND date(y.first_at) < date(?)`+adminSQL, args...)
+		  AND y.first_at >= ? AND y.first_at < ?`+adminSQL, args...)
 }
 
 func (r *StatsRepo) countMntCarry(visitBefore, notDoneBefore string, f model.StatsMeetingFilter) (int, error) {
@@ -263,10 +263,10 @@ func (r *StatsRepo) listStatsCases(from, toEx string, f model.StatsMeetingFilter
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status != 'cancelled'` + asSQL
 	touched := `
-		  AND date(ar.receipt_datetime) < date(?)
+		  AND ar.receipt_datetime < ?
 		  AND (TRIM(COALESCE(ar.complete_datetime,'')) = ''
-		       OR date(ar.complete_datetime) >= date(?)
-		       OR date(ar.receipt_datetime) >= date(?))`
+		       OR ar.complete_datetime >= ?
+		       OR ar.receipt_datetime >= ?)`
 	order := "date(ar.receipt_datetime) DESC, ar.as_number DESC"
 	extra := ""
 	var extraArgs []interface{}
@@ -274,8 +274,8 @@ func (r *StatsRepo) listStatsCases(from, toEx string, f model.StatsMeetingFilter
 	switch kind {
 	case statsCaseLongest, statsCaseOverHour:
 		extra = `
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) >= date(?)
-		  AND date(COALESCE(ar.complete_datetime, ar.updated_at)) < date(?)
+		  AND ` + asCompleteDT + ` >= ?
+		  AND ` + asCompleteDT + ` < ?
 		  AND (` + statsDurationMinSQL + `) IS NOT NULL`
 		if kind == statsCaseOverHour {
 			extra += fmt.Sprintf(` AND (`+statsDurationMinSQL+`) > %d`, model.StatsDurationOverMin)
@@ -292,9 +292,9 @@ func (r *StatsRepo) listStatsCases(from, toEx string, f model.StatsMeetingFilter
 	default:
 		extra = `
 		  AND (
-		    (date(ar.receipt_datetime) >= date(?) AND date(ar.receipt_datetime) < date(?))
-		    OR (TRIM(COALESCE(ar.start_datetime,'')) != '' AND date(ar.start_datetime) >= date(?) AND date(ar.start_datetime) < date(?))
-		    OR (TRIM(COALESCE(ar.complete_datetime,'')) != '' AND date(ar.complete_datetime) >= date(?) AND date(ar.complete_datetime) < date(?))
+		    (ar.receipt_datetime >= ? AND ar.receipt_datetime < ?)
+		    OR (TRIM(COALESCE(ar.start_datetime,'')) != '' AND ar.start_datetime >= ? AND ar.start_datetime < ?)
+		    OR (TRIM(COALESCE(ar.complete_datetime,'')) != '' AND ar.complete_datetime >= ? AND ar.complete_datetime < ?)
 		  )`
 		extraArgs = []interface{}{from, toEx, from, toEx, from, toEx}
 	}

@@ -4,17 +4,17 @@
   <div class="absolute inset-0 bg-slate-900/20" @click="open=false"></div>
   <aside class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-xl border-l border-slate-200 overflow-y-auto"
          @click.stop>
-    <form method="post" action="{{.FormAction}}" class="p-5 space-y-5" @submit.prevent="submit($event)">
+    <form method="post" action="{{.FormAction}}" class="p-5 space-y-5" x-ref="actForm" @submit.prevent="submit($event)">
       {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask.TaskID}}">{{end}}
       {{if .FixedSalesID}}<input type="hidden" name="sales_id" value="{{.FixedSalesID}}">{{end}}
       <div class="flex items-center justify-between">
-        <h3 class="font-semibold text-gray-800">활동 등록</h3>
+        <h3 class="font-semibold text-gray-800" x-text="editingId ? '활동 수정' : '활동 등록'">활동 등록</h3>
         <button type="button" class="text-sm text-gray-500" @click="open=false">닫기</button>
       </div>
       {{if not .FixedSalesID}}
       <div>
         <label class="block text-xs text-gray-500 mb-1">사업 *</label>
-        <select name="sales_id" required class="w-full border rounded-lg px-3 py-2 text-sm" @change="loadPartyHints($event.target.value)">
+        <select name="sales_id" required class="w-full border rounded-lg px-3 py-2 text-sm" :disabled="!!editingId" @change="loadPartyHints($event.target.value)">
           <option value="">사업을 선택하세요</option>
           {{range .SalesOptions}}
           <option value="{{.SalesID}}">{{.Name}}</option>
@@ -125,7 +125,7 @@
       </div>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" class="px-3 py-2 border rounded-lg text-sm" @click="open=false">취소</button>
-        <button type="submit" class="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm">활동 저장</button>
+        <button type="submit" class="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm" x-text="editingId ? '수정 저장' : '활동 저장'">활동 저장</button>
       </div>
     </form>
   </aside>
