@@ -183,11 +183,29 @@ func (r *ASRepo) KBGapProgress() (filledMonth, openQueries int) {
 	return
 }
 
+const gapNoPublishedKBSQL = `NOT EXISTS (SELECT 1 FROM as_kb_entries k
+	WHERE k.as_id=ar.as_id AND k.is_current=1 AND k.status='published')`
+
+const gapLatestActionSQL = `COALESCE((SELECT p.work_content FROM as_processes p
+	WHERE p.as_id=ar.as_id ORDER BY p.process_datetime DESC LIMIT 1), '')`
+
+const gapHasProcessSQL = `EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.as_id)`
+
+func classifyGapKind(action string, hasProcess bool) (kind, short string) {
+	action = strings.TrimSpace(action)
+	if !hasProcess || action == "" {
+		return "none", ""
+	}
+	return "short", action
+}
+
 func (r *ASRepo) ListMissingActionSymptoms() ([]model.ASMissingAction, error) {
 	rows, err := r.db.Query(`
-		SELECT ar.as_id, COALESCE(ar.symptom,'')
+		SELECT ar.as_id, COALESCE(ar.symptom,''), ` + gapLatestActionSQL + `,
+		       CASE WHEN ` + gapHasProcessSQL + ` THEN 1 ELSE 0 END
 		  FROM as_receipts ar
 		 WHERE NOT (` + knowledgeWorkSQL + `)
+		   AND ` + gapNoPublishedKBSQL + `
 		 ORDER BY ar.receipt_datetime DESC`)
 	if err != nil {
 		return nil, err
@@ -196,9 +214,11 @@ func (r *ASRepo) ListMissingActionSymptoms() ([]model.ASMissingAction, error) {
 	var out []model.ASMissingAction
 	for rows.Next() {
 		var row model.ASMissingAction
-		if err := rows.Scan(&row.ASID, &row.Symptom); err != nil {
+		var has int
+		if err := rows.Scan(&row.ASID, &row.Symptom, &row.Action, &has); err != nil {
 			return nil, err
 		}
+		row.Kind, row.Action = classifyGapKind(row.Action, has == 1)
 		out = append(out, row)
 	}
 	return out, rows.Err()
@@ -206,8 +226,200 @@ func (r *ASRepo) ListMissingActionSymptoms() ([]model.ASMissingAction, error) {
 
 func (r *ASRepo) MissingActionCount() int {
 	var n int
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar WHERE NOT (` + knowledgeWorkSQL + `)`).Scan(&n)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar WHERE NOT (` + knowledgeWorkSQL + `) AND ` + gapNoPublishedKBSQL).Scan(&n)
 	return n
+}
+
+func (r *ASRepo) KeywordLinkCount() int {
+	var n int
+	if r == nil || r.db == nil {
+		return 0
+	}
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_keyword_links`).Scan(&n)
+	return n
+}
+
+func (r *ASRepo) ReceiptCount() int {
+	var n int
+	if r == nil || r.db == nil {
+		return 0
+	}
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts`).Scan(&n)
+	return n
+}
+
+const gapEmptyActionSQL = `(NOT (` + gapHasProcessSQL + `) OR TRIM(` + gapLatestActionSQL + `)='')`
+
+// ListGapKeywordGroups 묶음 건수를 목록과 같은 SQL 로 센다. §41.17 · §38
+func (r *ASRepo) ListGapKeywordGroups() ([]model.ASGapSymptomGroup, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
+	where := `NOT (` + knowledgeWorkSQL + `) AND ` + gapNoPublishedKBSQL
+	q := `
+		SELECT k.keyword_id, k.keyword,
+		       COUNT(DISTINCT ar.as_id) AS total,
+		       COUNT(DISTINCT CASE WHEN ` + gapEmptyActionSQL + ` THEN ar.as_id END) AS none_count
+		  FROM as_receipts ar
+		  JOIN as_keyword_links kl ON kl.as_id = ar.as_id
+		  JOIN as_keywords k ON k.keyword_id = kl.keyword_id AND k.is_active = 1
+		 WHERE ` + where + `
+		 GROUP BY k.keyword_id, k.keyword
+		 ORDER BY total DESC, k.keyword`
+	rows, err := r.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.ASGapSymptomGroup
+	for rows.Next() {
+		var g model.ASGapSymptomGroup
+		if err := rows.Scan(&g.KeywordID, &g.Keyword, &g.Count, &g.NoneCount); err != nil {
+			return nil, err
+		}
+		g.ShortCount = g.Count - g.NoneCount
+		if g.ShortCount < 0 {
+			g.ShortCount = 0
+		}
+		out = append(out, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var other model.ASGapSymptomGroup
+	other.Keyword = "그 외"
+	other.Other = true
+	err = r.db.QueryRow(`
+		SELECT COUNT(DISTINCT ar.as_id),
+		       COUNT(DISTINCT CASE WHEN `+gapEmptyActionSQL+` THEN ar.as_id END)
+		  FROM as_receipts ar
+		 WHERE `+where+`
+		   AND NOT EXISTS (SELECT 1 FROM as_keyword_links kl WHERE kl.as_id=ar.as_id)`).
+		Scan(&other.Count, &other.NoneCount)
+	if err != nil {
+		return nil, err
+	}
+	other.ShortCount = other.Count - other.NoneCount
+	if other.ShortCount < 0 {
+		other.ShortCount = 0
+	}
+	if other.Count > 0 {
+		out = append(out, other)
+	}
+	return out, nil
+}
+
+// GapReceiptRow 지식 보완 묶음을 펼친 접수 한 줄. §41.16.3
+type GapReceiptRow struct {
+	ASID, ASNumber, ReceiptDate string
+	CustomerName                string
+	Symptom                     string
+	ShortAction                 string
+	Kind                        string // "none" | "short"
+}
+
+type GapReceiptSite struct {
+	CustomerID, Name string
+}
+
+// ListGapReceipts 키워드(또는 그 외) 묶음의 접수 목록. LIMIT 없이 부르지 않는다. §41.16.6
+func (r *ASRepo) ListGapReceipts(keywordID string, other bool, site string,
+	sort, dir string, offset, limit int) ([]GapReceiptRow, int, error) {
+	if limit <= 0 || limit > 20 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	where, args := gapReceiptsWhere(keywordID, other, site)
+	from := `
+		FROM as_receipts ar
+		LEFT JOIN customers cu ON cu.customer_id = ar.customer_id
+		WHERE ` + where
+	var total int
+	if err := r.db.QueryRow(`SELECT COUNT(*) `+from, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	order := gapReceiptsOrder(sort, dir)
+	q := `SELECT ar.as_id, COALESCE(ar.as_number,''), SUBSTR(ar.receipt_datetime,1,10),
+		COALESCE(cu.org_name,''), COALESCE(ar.symptom,''), ` + gapLatestActionSQL + `,
+		CASE WHEN ` + gapHasProcessSQL + ` THEN 1 ELSE 0 END
+		` + from + ` ORDER BY ` + order + ` LIMIT ? OFFSET ?`
+	args = append(append([]any{}, args...), limit, offset)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []GapReceiptRow
+	for rows.Next() {
+		var row GapReceiptRow
+		var action string
+		var has int
+		if err := rows.Scan(&row.ASID, &row.ASNumber, &row.ReceiptDate, &row.CustomerName, &row.Symptom, &action, &has); err != nil {
+			return nil, 0, err
+		}
+		row.Kind, row.ShortAction = classifyGapKind(action, has == 1)
+		out = append(out, row)
+	}
+	return out, total, rows.Err()
+}
+
+func (r *ASRepo) ListGapReceiptSites(keywordID string, other bool) ([]GapReceiptSite, error) {
+	where, args := gapReceiptsWhere(keywordID, other, "")
+	rows, err := r.db.Query(`
+		SELECT ar.customer_id, COALESCE(cu.org_name,'')
+		  FROM as_receipts ar
+		  LEFT JOIN customers cu ON cu.customer_id = ar.customer_id
+		 WHERE `+where+`
+		   AND TRIM(COALESCE(ar.customer_id,'')) != ''
+		 GROUP BY ar.customer_id
+		 ORDER BY cu.org_name`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []GapReceiptSite
+	for rows.Next() {
+		var s GapReceiptSite
+		if err := rows.Scan(&s.CustomerID, &s.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func gapReceiptsWhere(keywordID string, other bool, site string) (string, []any) {
+	where := `NOT (` + knowledgeWorkSQL + `) AND ` + gapNoPublishedKBSQL
+	var args []any
+	if other {
+		where += ` AND NOT EXISTS (SELECT 1 FROM as_keyword_links kl WHERE kl.as_id=ar.as_id)`
+	} else {
+		where += ` AND EXISTS (SELECT 1 FROM as_keyword_links kl WHERE kl.as_id=ar.as_id AND kl.keyword_id=?)`
+		args = append(args, strings.TrimSpace(keywordID))
+	}
+	if site = strings.TrimSpace(site); site != "" {
+		where += ` AND ar.customer_id=?`
+		args = append(args, site)
+	}
+	return where, args
+}
+
+func gapReceiptsOrder(sort, dir string) string {
+	col := "ar.receipt_datetime"
+	switch sort {
+	case "as_number":
+		col = "ar.as_number"
+	case "customer":
+		col = "cu.org_name"
+	case "symptom":
+		col = "ar.symptom"
+	}
+	if dir != "asc" {
+		dir = "desc"
+	}
+	return col + " " + dir + ", ar.as_id " + dir
 }
 
 func GroupMissingActionByKeyword(dict []model.ASKeyword, rows []model.ASMissingAction) []model.ASGapSymptomGroup {
@@ -222,6 +434,11 @@ func GroupMissingActionByKeyword(dict []model.ASKeyword, rows []model.ASMissingA
 		kw := pickKeywordForSymptom(dict, row.Symptom)
 		if kw == nil {
 			other.Count++
+			if row.Kind == "short" {
+				other.ShortCount++
+			} else {
+				other.NoneCount++
+			}
 			if other.SampleASID == "" {
 				other.SampleASID = row.ASID
 				other.SampleSymptom = row.Symptom
@@ -236,6 +453,11 @@ func GroupMissingActionByKeyword(dict []model.ASKeyword, rows []model.ASMissingA
 			byID[kw.KeywordID] = a
 		}
 		a.g.Count++
+		if row.Kind == "short" {
+			a.g.ShortCount++
+		} else {
+			a.g.NoneCount++
+		}
 		if a.g.SampleASID == "" {
 			a.g.SampleASID = row.ASID
 			a.g.SampleSymptom = row.Symptom

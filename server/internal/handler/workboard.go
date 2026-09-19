@@ -836,6 +836,9 @@ func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err
 		if t.WorkType == model.WBWorkSupport {
 			cat = model.WBWorkSupport
 		}
+		if t.WorkType == model.WBWorkSales || t.SourceType == model.WBSourceSalesActivity {
+			cat = model.WBSourceSalesActivity
+		}
 		admin = append(admin, model.WBCard{
 			Kind:         "task",
 			RefID:        t.TaskID,
@@ -1279,6 +1282,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		model.WBWorkMaintenance: {},
 		model.WBWorkAS:          {},
 		model.WBWorkAdmin:       {},
+		model.WBWorkSales:       {},
 	}
 	byStatus := map[string][]model.WorkTask{
 		model.WBTaskWaiting:    {},
@@ -1309,6 +1313,8 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 				summary.AS++
 			case model.WBWorkMaintenance:
 				summary.Maintenance++
+			case model.WBWorkSales:
+				summary.Sales++
 			default:
 				summary.Admin++
 			}
@@ -1446,9 +1452,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if progress > 100 {
 		progress = 100
 	}
-	if workType != model.WBWorkSupport {
-		workType = model.WBWorkAdmin
-	}
+	workType = model.NormalizeDirectWorkType(workType)
 	if dueDate == "" && !dueUndeterminedFromForm(c) {
 		dueDate = workDate
 	}
@@ -1603,10 +1607,7 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		if existing.SourceType == model.WBSourceMaintenance {
 			projectID = strings.TrimSpace(c.FormValue("project_id"))
 		} else if existing.SourceType == "" {
-			workType = strings.TrimSpace(c.FormValue("work_type"))
-			if workType != model.WBWorkSupport {
-				workType = model.WBWorkAdmin
-			}
+			workType = model.NormalizeDirectWorkType(c.FormValue("work_type"))
 			projectID = strings.TrimSpace(c.FormValue("project_id"))
 			if workType == model.WBWorkSupport && projectID == "" {
 				return c.Redirect(http.StatusSeeOther,

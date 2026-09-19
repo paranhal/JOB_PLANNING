@@ -234,6 +234,23 @@ func OrderStatusLabel(s string) string {
 	}
 }
 
+// OrderScheduleLabel 진행중/완료/지연. 저장하지 않는다. §46.8
+func OrderScheduleLabel(o SalesOrder, today string) string {
+	st := NormalizeOrderStatus(o.Status)
+	if st == OrderStatusDelivered || st == OrderStatusClosed {
+		return "완료"
+	}
+	today = strings.TrimSpace(today)
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+	due := strings.TrimSpace(o.DueDate)
+	if due != "" && due < today {
+		return "지연"
+	}
+	return "진행중"
+}
+
 func OrderKanbanBucket(s string) string {
 	switch NormalizeOrderStatus(s) {
 	case OrderStatusPurchasing:

@@ -1,0 +1,67 @@
+{{define "title"}}계약 관리 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">계약 관리</h2>
+    <p class="text-sm text-gray-500">계약은 사업 1건입니다. <code class="text-xs">work_projects</code> 를 봅니다.</p>
+  </div>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">총 계약건</p><p class="text-2xl font-bold">{{.KPITotal}}</p></div>
+    <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">총 계약금액</p><p class="text-2xl font-bold">{{.KPIAmount}}</p></div>
+    <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">유효 계약</p><p class="text-2xl font-bold">{{.KPIValid}}</p></div>
+    <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">만료임박(30일)</p><p class="text-2xl font-bold">{{.KPISoon}}</p></div>
+  </div>
+  <p class="text-xs text-gray-400">평균 기간 {{.KPIAvgDays}}</p>
+  <form method="get" action="/contracts" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[12rem]">
+      <label class="block text-xs text-gray-500 mb-1">검색</label>
+      <input type="text" name="search" value="{{.Search}}" placeholder="계약명, 발주처"
+             class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg">검색</button>
+  </form>
+  <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500">
+        <tr>
+          <th class="px-4 py-2 text-left">계약번호</th>
+          <th class="px-4 py-2 text-left">계약명</th>
+          <th class="px-4 py-2 text-left">고객사</th>
+          <th class="px-4 py-2 text-right">계약금액</th>
+          <th class="px-4 py-2 text-left">계약일</th>
+          <th class="px-4 py-2 text-left">만료일</th>
+          <th class="px-4 py-2 text-left">상태</th>
+          <th class="px-4 py-2 text-left">담당</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Projects}}
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2 font-mono text-xs">{{.ContractNoLabel}}</td>
+          <td class="px-4 py-2"><a href="/contracts/{{.ProjectID}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
+          <td class="px-4 py-2 text-gray-600">{{if .CustomerOrParty}}{{.CustomerOrParty}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{if gt .ContractAmount 0}}{{.ContractAmount}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-gray-600">{{if .StartDate}}{{.StartDate}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-gray-600">{{if .EndDate}}{{.EndDate}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2">{{.ContractLifeStatus $.Today}}</td>
+          <td class="px-4 py-2 text-gray-600">{{if .ContactName}}{{.ContactName}}{{else}}—{{end}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">등록된 계약(사업)이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="md:hidden space-y-2">
+    {{range .Projects}}
+    <a href="/contracts/{{.ProjectID}}" class="block bg-white rounded-xl border p-3">
+      <p class="text-xs font-mono text-gray-400">{{.ContractNoLabel}}</p>
+      <p class="font-medium text-gray-800">{{.Name}}</p>
+      <p class="text-xs text-gray-500 mt-1">만료 {{if .EndDate}}{{.EndDate}}{{else}}—{{end}} · {{.ContractLifeStatus $.Today}}</p>
+    </a>
+    {{else}}
+    <p class="text-center text-gray-400 py-8">등록된 계약이 없습니다.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

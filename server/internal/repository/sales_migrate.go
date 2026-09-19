@@ -82,9 +82,9 @@ func seedSalesStageCodes(db *sql.DB) {
 		return
 	}
 	if _, err := db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order, is_active) VALUES
-		('SST01','sales_stage','lead','정보 입수',1,1),
-		('SST02','sales_stage','contact','담당자 접촉',2,1),
-		('SST03','sales_stage','proposal','제안 진행',3,1),
+		('SST01','sales_stage','lead','검토',1,1),
+		('SST02','sales_stage','contact','발굴',2,1),
+		('SST03','sales_stage','proposal','견적',3,1),
 		('SST04','sales_stage','quote','견적 요청',4,1),
 		('SST05','sales_stage','rfp','RFP 제안',5,1),
 		('SST06','sales_stage','submit','제안서 제출',6,1),

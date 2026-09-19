@@ -87,6 +87,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 		"KindUnassigned": u(model.UnplannedUnassigned, display),
 		"KindSales":      u(model.UnplannedSalesFollow, display),
 		"KindUnsigned":   u(model.UnplannedSalesUnsigned, display),
+		"KindSalesNext":  u(model.UnplannedSalesNext, display),
 		"KindDelayed":    u(model.UnplannedDelayed, display),
 		"KindNext":       u(model.UnplannedNext, display),
 		"KindReview":     u(model.UnplannedReview, display),

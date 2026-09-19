@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +19,15 @@ func (h *ASHandler) saveKeywordChecks(c echo.Context, asID, field string) {
 	checked := params["kw_"+field]
 	suggested := model.SplitCommaList(c.FormValue("kw_suggested_" + field))
 	_ = h.kwRepo.ReplaceLinks(asID, field, checked, suggested)
+}
+
+func (h *ASHandler) rebuildDictKeywordLinks(asID string) {
+	if h == nil || h.repo == nil || strings.TrimSpace(asID) == "" {
+		return
+	}
+	if _, err := h.repo.RebuildKeywordLinks([]string{asID}); err != nil {
+		log.Printf("as_keyword_links rebuild %s: %v", asID, err)
+	}
 }
 
 func (h *ASHandler) keywordChecks(asID, field, text string) []model.ASKeyword {
@@ -75,9 +85,15 @@ func (h *ASHandler) KeywordList(c echo.Context) error {
 		return err
 	}
 	cands, _ := h.kwRepo.FrequencyCandidates(40)
+	linkN, receiptN := 0, 0
+	if h.repo != nil {
+		linkN = h.repo.KeywordLinkCount()
+		receiptN = h.repo.ReceiptCount()
+	}
 	return c.Render(http.StatusOK, "as/keywords.html", map[string]interface{}{
 		"Title": "AS 키워드 사전", "Active": NavAS,
 		"Items": items, "Candidates": cands, "Groups": model.KWGroups(),
+		"LinkTotal": linkN, "ReceiptTotal": receiptN,
 		"CanEdit": canReceiveAS(c) || canProcessAS(c) || isAdminRole(c),
 		"Err":     c.QueryParam("err"), "OK": c.QueryParam("ok"),
 	})
@@ -134,6 +150,16 @@ func (h *ASHandler) KeywordDelete(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/as/keywords?ok=1")
+}
+
+func (h *ASHandler) KeywordRebuild(c echo.Context) error {
+	if !canReceiveAS(c) && !canProcessAS(c) && !isAdminRole(c) {
+		return echo.ErrForbidden
+	}
+	if _, err := h.repo.RebuildKeywordLinks(nil); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/as/keywords?ok=relink")
 }
 
 // KeywordSuggest 본문 대조 후보 JSON. 쓰지 않으면 붙지 않는다.

@@ -222,20 +222,26 @@ func (h *SalesHandler) replyStage(c echo.Context, err error, id, okPath string) 
 
 type salesKanbanCol = model.KanbanColumn
 
-func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef, fromTask string, lastAct map[string]string, showAmount bool) []model.KanbanColumn {
+func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef, fromTask string, lastAct map[string]string, next map[string]model.SalesActivity, today string, showAmount bool) []model.KanbanColumn {
 	proc, lost := model.SalesKanbanStages(stages)
 	cols := make([]model.KanbanColumn, 0, len(proc)+1)
 	index := map[string]int{}
 	for _, st := range proc {
 		index[st.Code] = len(cols)
-		cols = append(cols, model.KanbanColumn{Key: st.Code, Title: st.Label, Sort: st.SortOrder, Border: "border-slate-200", CountUnit: "건", Items: []model.KanbanCard{}})
+		cols = append(cols, model.KanbanColumn{Key: st.Code, Title: st.Label, Sort: st.SortOrder, Border: "border-slate-200", Stripe: model.SalesStageStripeClass(st.Code), CountUnit: "건", Items: []model.KanbanCard{}})
 	}
 	if lost != nil {
 		index[lost.Code] = len(cols)
-		cols = append(cols, model.KanbanColumn{Key: lost.Code, Title: lost.Label, Sort: lost.SortOrder, IsLost: true, Border: "border-slate-200", CountUnit: "건", Items: []model.KanbanCard{}})
+		cols = append(cols, model.KanbanColumn{Key: lost.Code, Title: lost.Label, Sort: lost.SortOrder, IsLost: true, Border: "border-slate-200", Stripe: model.SalesStageStripeClass(lost.Code), CountUnit: "건", Items: []model.KanbanCard{}})
 	}
 	if lastAct == nil {
 		lastAct = map[string]string{}
+	}
+	if next == nil {
+		next = map[string]model.SalesActivity{}
+	}
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
 	}
 	seen := map[string]bool{}
 	amounts := make([]int64, len(cols))
@@ -267,6 +273,23 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 			last = "—"
 		}
 		amounts[idx] += int64(p.ExpectedAmount)
+		nx := next[p.SalesID]
+		nextTitle := strings.TrimSpace(nx.NextAction)
+		dn := model.SalesDnLabel(nx.NextActionDate, today)
+		delay := ""
+		delayClass := ""
+		if model.SalesNextIsDelayed(nx, today) {
+			delay = "지연"
+			delayClass = "bg-red-100 text-red-800"
+		} else if dn != "" {
+			delay = dn
+			delayClass = "bg-slate-100 text-slate-700"
+			dn = ""
+		}
+		prob := ""
+		if !p.IsSupply() && p.Stage != model.SalesStageWon && p.Stage != model.SalesStageLost {
+			prob = fmt.Sprintf("%d%%", p.EffectiveProbability())
+		}
 		cols[idx].Items = append(cols[idx].Items, model.KanbanCard{
 			ID: p.SalesID, RefID: p.SalesID, Title: title, Href: href,
 			OrgName: p.CustomerValue(), Extra: amt,
@@ -274,7 +297,9 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 			LeftStyle: model.WorkCardColorStyle(p.SalesOwner, "", "sales"),
 			SortDate:  model.NormalizeSalesYM(p.ExpectedYM), DueDate: p.PeriodLabel(),
 			AmountUnconfirmed: !p.ExpectedAmountConfirmed, LastActivity: last,
-			AmountDesc: p.ExpectedAmount,
+			AmountDesc: p.ExpectedAmount, Tentative: p.IsTentativeName,
+			NextLabel: nextTitle, ProbLabel: prob, DnLabel: dn,
+			DelayBadge: delay, DelayClass: delayClass,
 		})
 	}
 	for i := range cols {

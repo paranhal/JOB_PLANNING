@@ -125,6 +125,7 @@ func (h *QuotesHandler) List(c echo.Context) error {
 		filter.Set("display", "kanban")
 	}
 	hrefs := sortLinkHrefs("/quotes", filter, []string{"quote_no", "quote_date", "recipient", "title", "total", "status"}, sortKey, dir)
+	nQ, nO, nC := h.repo.CountPeerDocs()
 	return c.Render(http.StatusOK, "quotes/list.html", map[string]interface{}{
 		"Title": "견적", "Active": NavQuotes,
 		"Items": items, "Total": len(items),
@@ -142,6 +143,8 @@ func (h *QuotesHandler) List(c echo.Context) error {
 		"Dir":          dir,
 		"SortHref":     hrefs,
 		"SortSelect":   sortSelectOptions(quoteListSortCols(), hrefs, sortKey, dir),
+		"KPI":          model.BuildQuoteListKPI(items, time.Now().Format("2006-01")),
+		"DocQuotes":    nQ, "DocOrders": nO, "DocContracts": nC, "DocAll": nQ + nO + nC,
 	})
 }
 

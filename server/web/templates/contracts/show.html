@@ -1,0 +1,37 @@
+{{define "title"}}{{.Project.Name}} · 계약{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <a href="/contracts" class="text-sm text-gray-500 hover:underline">← 계약 목록</a>
+    <h2 class="text-xl font-bold text-gray-800 mt-1">{{.Project.Name}}</h2>
+    <p class="text-sm text-gray-500">{{.Project.ContractNoLabel}} · {{.Life}}</p>
+  </div>
+  <div class="bg-white rounded-xl border p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+    <div><span class="text-gray-500">계약기간</span> <span>{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</span></div>
+    <div><span class="text-gray-500">금액</span> <span>{{if gt .Project.ContractAmount 0}}{{.Project.ContractAmount}}원{{else}}—{{end}}</span></div>
+    <div><span class="text-gray-500">유상/무상</span> <span>{{if .Project.IsPaid}}유상{{else}}무상{{end}}</span></div>
+    <div><span class="text-gray-500">담당</span> <span>{{if .Project.ContactName}}{{.Project.ContactName}}{{else}}—{{end}}</span></div>
+    <div class="sm:col-span-2"><a href="/projects/{{.Project.ProjectID}}" class="text-blue-700 hover:underline text-xs">사업관리에서 수정</a></div>
+  </div>
+  <div class="bg-white rounded-xl border p-4">
+    <h3 class="font-semibold text-gray-800 mb-2">과업 범위</h3>
+    <ul class="text-sm space-y-1">
+      {{range .Rules}}
+      <li>{{if .ParentOrgName}}{{.ParentOrgName}} · {{end}}{{.ProductKeys}} {{if .WorkKinds}}· {{.WorkKinds}}{{end}}</li>
+      {{else}}
+      <li class="text-gray-400">범위 규칙이 없습니다.</li>
+      {{end}}
+    </ul>
+  </div>
+  <div class="bg-white rounded-xl border p-4">
+    <h3 class="font-semibold text-gray-800 mb-2">대상 장비</h3>
+    <ul class="text-sm space-y-1">
+      {{range .Assets}}
+      <li>{{.ProductName}}{{if .ModelName}} · {{.ModelName}}{{end}}</li>
+      {{else}}
+      <li class="text-gray-400">연결된 장비가 없습니다.</li>
+      {{end}}
+    </ul>
+  </div>
+</div>
+{{end}}

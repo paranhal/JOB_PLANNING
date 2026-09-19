@@ -585,6 +585,13 @@ func scanQuotes(rows *sql.Rows) ([]model.SalesQuote, error) {
 	return items, rows.Err()
 }
 
+func (r *QuoteRepo) CountPeerDocs() (quotes, orders, contracts int) {
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM sales_quotes`).Scan(&quotes)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM sales_orders`).Scan(&orders)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_projects`).Scan(&contracts)
+	return
+}
+
 func (r *QuoteRepo) Company() model.QuoteCompany {
 	return LoadQuoteCompany(r.db)
 }

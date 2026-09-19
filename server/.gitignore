@@ -1,0 +1,14 @@
+# 환경 변수 (비밀값)
+.env
+
+# SQLite DB (런타임 생성)
+data/*.db
+data/*.db-*
+
+# Go 빌드 산출물
+server
+*.exe
+dist/
+
+# Air 핫리로드
+tmp/

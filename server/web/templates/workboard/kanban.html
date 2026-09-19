@@ -32,10 +32,11 @@
   </div>
 
   <p class="text-xs text-gray-500">유형별 · 완료 건은 완료 열에만 표시합니다. 보류·이관·회신대기는 진행중에 뱃지로 둡니다. 취소는 칸반에 올리지 않습니다.</p>
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
     {{template "wb_kanban_col" (kanbanCol . "정기점검" "border-sky-200" "maintenance")}}
     {{template "wb_kanban_col" (kanbanCol . "AS" "border-rose-200" "as")}}
     {{template "wb_kanban_col" (kanbanCol . "행정/사업지원" "border-violet-200" "admin")}}
+    {{template "wb_kanban_col" (kanbanCol . "영업활동" "border-orange-200" "sales")}}
     {{template "wb_kanban_col" (kanbanCol . "완료" "border-emerald-200" "complete")}}
   </div>
 </div>

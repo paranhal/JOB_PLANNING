@@ -71,7 +71,7 @@ func TestVersionHasNoHistory(t *testing.T) {
 			t.Fatalf("/version 에 %s 가 있다: %s", ban, raw)
 		}
 	}
-	var got map[string]string
+	var got map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}

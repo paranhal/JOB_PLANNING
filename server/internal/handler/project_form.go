@@ -53,6 +53,10 @@ func ParseWorkProjectForm(c echo.Context) *model.WorkProject {
 		ContactID:       contactID,
 		Color:           strings.TrimSpace(c.FormValue("color")),
 		Status:          strings.TrimSpace(c.FormValue("status")),
+		ContractNo:      strings.TrimSpace(c.FormValue("contract_no")),
+	}
+	if n, err := strconv.Atoi(strings.TrimSpace(strings.ReplaceAll(c.FormValue("contract_amount"), ",", ""))); err == nil {
+		p.ContractAmount = n
 	}
 	if p.Color == "" {
 		p.Color = "#3B82F6"

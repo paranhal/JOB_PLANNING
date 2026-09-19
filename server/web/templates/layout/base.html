@@ -53,6 +53,23 @@
       {{$canPlanExec := or $isAdmin $isOffice $isTech}}
       {{$canAS := or $isAdmin $isOffice $isTech (hasUserPerm $perms "as_receive") (hasUserPerm $perms "as_process")}}
 
+      {{$canSalesMenu := or $isAdmin $isOffice $isSales $isTech $isObserver}}
+
+      {{if .SalesNav}}
+      <a href="/work" class="text-gray-300 hover:bg-gray-800 flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium">← 업무로</a>
+      <div class="mx-3 my-2 border-t border-gray-700"></div>
+      {{if $canSalesMenu}}
+      <a href="/sales/dashboard" class="{{if eq $a "sales_dashboard"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 대시보드</a>
+      <a href="/sales" class="{{if or (eq $a "sales") (eq $a "sales_pipeline")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 사업</a>
+      <a href="/sales/activities" class="{{if eq $a "sales_activities"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 활동</a>
+      <a href="/quotes" class="{{if eq $a "quotes"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">견적 관리</a>
+      <a href="/orders" class="{{if eq $a "orders"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">수주 관리</a>
+      <a href="/contracts" class="{{if eq $a "contracts"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">계약 관리</a>
+      <a href="/customers?view=sales" class="{{if eq $a "customers"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">고객·파트너</a>
+      {{end}}
+      <a href="/account" class="{{if eq $a "account"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">내 계정</a>
+      {{else}}
+
       {{if $roleKnown}}
       <p class="px-3 pt-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">홈</p>
       <a href="/" class="{{if eq $a "dashboard"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">대시보드</a>
@@ -92,6 +109,7 @@
       <a href="/sales" class="{{if eq $a "sales"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 사업</a>
       <a href="/sales/activities" class="{{if eq $a "sales_activities"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 활동</a>
       <a href="/sales/pipeline" class="{{if eq $a "sales_pipeline"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 파이프라인</a>
+      <a href="/items" class="{{if eq $a "sales_items"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">품목 마스터</a>
       {{end}}
 
       {{if or $canPlanExec $isSales $isObserver (hasUserPerm $perms "stats") (hasUserPerm $perms "analysis")}}
@@ -142,6 +160,7 @@
       {{end}}
       {{end}}
       <a href="/account" class="{{if eq $a "account"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">내 계정</a>
+      {{end}}
     </nav>
 
     <div class="shrink-0 px-4 py-3 border-t border-gray-700 space-y-2">

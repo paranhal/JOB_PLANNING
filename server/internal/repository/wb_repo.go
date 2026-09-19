@@ -19,7 +19,7 @@ const workTaskSelect = `
 		       COALESCE(t.duration_min,30),
 		       COALESCE(t.status,'waiting'), COALESCE(t.priority,'normal'),
 		       COALESCE(t.assignee,''), COALESCE(t.assignee_user_id,''), COALESCE(t.assignee_source,''), COALESCE(t.tags,''), COALESCE(t.progress,0),
-		       COALESCE(t.source_type,''), COALESCE(t.source_id,''), COALESCE(t.parent_task_id,''),
+		       COALESCE(t.source_type,''), COALESCE(t.source_id,''), COALESCE(t.source_role,''), COALESCE(t.parent_task_id,''),
 		       COALESCE(t.customer_id,''), COALESCE(t.customer_name,''),
 		       COALESCE(t.hold_reason,''), COALESCE(t.review_date,''), COALESCE(t.cancel_reason,''),
 		       COALESCE(t.wait_party_kind,''), COALESCE(t.wait_party,''), COALESCE(t.wait_request,''),
@@ -420,13 +420,28 @@ func (r *WBRepo) CountAdminWorkStats() (AdminWorkStats, error) {
 	return s, err
 }
 
-func (r *WBRepo) GetTaskBySource(sourceType, sourceID string) (*model.WorkTask, error) {
+func (r *WBRepo) GetTaskBySource(sourceType, sourceID string, sourceRole ...string) (*model.WorkTask, error) {
+	role := ""
+	if len(sourceRole) > 0 {
+		role = strings.TrimSpace(sourceRole[0])
+	}
 	all, err := r.ListTasks()
 	if err != nil {
 		return nil, err
 	}
 	for _, t := range all {
-		if t.SourceType == sourceType && t.SourceID == sourceID {
+		if t.SourceType != sourceType || t.SourceID != sourceID {
+			continue
+		}
+		got := strings.TrimSpace(t.SourceRole)
+		if role != "" {
+			if got == role {
+				task := t
+				return &task, nil
+			}
+			continue
+		}
+		if got == "" || got == model.WBSourceRoleDone {
 			task := t
 			return &task, nil
 		}
@@ -694,14 +709,14 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	_, err := r.db.Exec(`
 		INSERT INTO work_tasks (task_id, work_type, project_id, title, description, due_date,
 			work_date, start_time, end_time, duration_min, status, priority, assignee, assignee_user_id, assignee_source, tags, progress,
-			source_type, source_id, parent_task_id, customer_id, customer_name,
+			source_type, source_id, source_role, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
 			recurrence_role, occurrence_seq, occurrence_status, not_done_reason)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
-		t.SourceType, t.SourceID, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
+		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
@@ -843,8 +858,8 @@ func normalizeWorkTask(t *model.WorkTask) {
 	}
 	t.DurationMin = model.NormalizeDurationMin(t.DurationMin)
 	switch t.WorkType {
-	case model.WBWorkSupport, model.WBWorkAdmin:
-		// 행정·지원 모두 사업명 연결 가능(지원은 화면에서 필수)
+	case model.WBWorkSupport, model.WBWorkAdmin, model.WBWorkSales:
+		// 행정·지원·영업은 사업명 연결 가능(지원은 화면에서 필수)
 	case model.WBWorkAS, model.WBWorkMaintenance:
 		t.ProjectID = ""
 	default:
@@ -956,7 +971,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&t.TaskID, &t.WorkType, &t.ProjectID, &t.Title, &t.Description,
 			&t.DueDate, &t.WorkDate, &t.StartTime, &t.EndTime, &t.DurationMin,
 			&t.Status, &t.Priority, &t.Assignee, &t.AssigneeUserID, &t.AssigneeSource, &t.Tags, &t.Progress,
-			&t.SourceType, &t.SourceID, &t.ParentTaskID,
+			&t.SourceType, &t.SourceID, &t.SourceRole, &t.ParentTaskID,
 			&t.CustomerID, &t.CustomerName,
 			&t.HoldReason, &t.ReviewDate, &t.CancelReason,
 			&t.WaitPartyKind, &t.WaitParty, &t.WaitRequest,

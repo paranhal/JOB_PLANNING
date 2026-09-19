@@ -4,11 +4,19 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-gray-800">수주 <span class="text-sm font-normal text-gray-400">({{.Total}}건)</span></h2>
-      <p class="text-sm text-gray-500">견적 라인을 복사해 넘깁니다. 수량·단가가 달라지면 「견적과 다름」이 붙습니다.</p>
+      <p class="text-sm text-gray-500">견적 라인을 복사해 넘깁니다. 합계는 <span class="font-medium">확정 금액 기준</span>입니다.</p>
     </div>
     <div class="flex flex-wrap gap-2">
       <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
       <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="bg-white rounded-xl border p-4">
+      <p class="text-xs text-gray-500">총 수주금액</p>
+      <p class="text-2xl font-bold">{{.ConfirmedAmt}}</p>
+      <p class="text-[11px] text-gray-400">확정 금액 기준</p>
     </div>
   </div>
 
@@ -42,7 +50,18 @@
   {{if eq .Display "kanban"}}
   {{template "kanban_board" .}}
   {{else}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+  <div class="md:hidden space-y-2">
+    {{range .Items}}
+    <a href="/orders/{{.OrderID}}" class="block bg-white rounded-xl border p-3">
+      <p class="text-xs font-mono text-gray-400">{{.DisplayNo}}</p>
+      <p class="font-medium text-gray-800">{{if .Title}}{{.Title}}{{else}}—{{end}}</p>
+      <p class="text-xs text-gray-500 mt-1">납기 {{if .DueDate}}{{.DueDate}}{{else}}—{{end}} · {{orderScheduleLabel . $.Today}} · {{orderStatusLabel .Status}}</p>
+    </a>
+    {{else}}
+    <p class="text-center text-gray-400 py-8">수주가 없습니다.</p>
+    {{end}}
+  </div>
+  <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b"><tr>
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">번호</th>
@@ -50,9 +69,11 @@
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">수신</th>
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">건명</th>
         <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">합계</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">납기일</th>
         {{if .CanSeeMargin}}
         <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">마진</th>
         {{end}}
+        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">진행</th>
         <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">상태</th>
       </tr></thead>
       <tbody class="divide-y divide-gray-100">
@@ -66,13 +87,15 @@
           <td class="px-4 py-2 text-gray-600">{{if .RecipientName}}{{.RecipientName}}{{else}}—{{end}}</td>
           <td class="px-4 py-2">{{if .Title}}{{.Title}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Total}}원</td>
+          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>
           {{if $.CanSeeMargin}}
           <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Margin}}원</td>
           {{end}}
+          <td class="px-4 py-2">{{orderScheduleLabel . $.Today}}</td>
           <td class="px-4 py-2 text-gray-600">{{orderStatusLabel .Status}}</td>
         </tr>
         {{else}}
-        <tr><td colspan="{{if .CanSeeMargin}}7{{else}}6{{end}}" class="px-4 py-8 text-center text-gray-400">수주가 없습니다. 견적 상세에서 넘기면 여기 나타납니다.</td></tr>
+        <tr><td colspan="{{if .CanSeeMargin}}9{{else}}8{{end}}" class="px-4 py-8 text-center text-gray-400">수주가 없습니다. 견적 상세에서 넘기면 여기 나타납니다.</td></tr>
         {{end}}
       </tbody>
     </table>

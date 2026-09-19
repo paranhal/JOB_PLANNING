@@ -10,6 +10,7 @@ const (
 
 	KWSourceAuto   = "auto"
 	KWSourceManual = "manual"
+	KWSourceDict   = "dict"
 	KWFieldSymptom = "symptom"
 	KWFieldAction  = "action"
 )

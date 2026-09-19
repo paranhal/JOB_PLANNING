@@ -505,7 +505,7 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 		t.Fatalf("단품 단계 n=%d err=%v", len(supply), err)
 	}
 	for _, st := range supply {
-		if st.Code == model.SalesStageProposal || strings.Contains(st.Label, "제안 진행") {
+		if st.Code == model.SalesStageProposal {
 			t.Fatalf("단품 단계에 구축 단계가 섞였다: %+v", st)
 		}
 	}

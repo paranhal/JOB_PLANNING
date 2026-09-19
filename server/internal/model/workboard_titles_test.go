@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestFormatASWorkTitle(t *testing.T) {
 	if got := FormatASWorkTitle("가나도서관", "R2608-001"); got != "[AS]가나도서관_R2608-001" {
@@ -38,6 +41,25 @@ func TestWBCategorySalesNotAdmin(t *testing.T) {
 	}
 	if got := (WBCard{Category: WBSourceSalesActivity}).Label(); got != "[영업]" {
 		t.Fatalf("카드 라벨: %q", got)
+	}
+}
+
+func TestWBWorkTypeSalesBucketAndLabel(t *testing.T) {
+	if got := WBWorkTypeBucket(WBWorkSales); got != WBWorkSales {
+		t.Fatalf("bucket sales → %q", got)
+	}
+	if WBWorkTypeBucket(WBWorkSales) == WBWorkAdmin {
+		t.Fatal("sales 가 admin 으로 빨려 들어갔다")
+	}
+	if got := WBWorkTypeLabel(WBWorkSales); got != "영업활동" {
+		t.Fatalf("label: %q", got)
+	}
+	badge := WBCategoryLabel(WBCategory(WBSourceSalesActivity))
+	if !strings.Contains(badge, "영업") || badge == "행정" {
+		t.Fatalf("목록 배지: %q", badge)
+	}
+	if WBWorkTypeLabel(WBWorkSales) == "행정업무" {
+		t.Fatal("상세 업무 구분이 행정업무다")
 	}
 }
 

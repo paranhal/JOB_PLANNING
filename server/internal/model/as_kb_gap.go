@@ -20,10 +20,12 @@ type ASKBGap struct {
 	RecentLabel  string
 }
 
-// ASMissingAction 조치 본문이 없는 접수. 화면에는 묶음만 낸다.
+// ASMissingAction 조치 본문이 없거나 10자 미만인 접수. 화면에는 묶음만 낸다. §41.16.5
 type ASMissingAction struct {
 	ASID    string
 	Symptom string
+	Action  string
+	Kind    string // "none" | "short"
 }
 
 // ASGapSymptomGroup 조치 없는 AS 를 사전 낱말로 묶은 줄. §41.13.2
@@ -31,6 +33,8 @@ type ASGapSymptomGroup struct {
 	Keyword       string
 	KeywordID     string
 	Count         int
+	NoneCount     int
+	ShortCount    int
 	SampleASID    string
 	SampleSymptom string
 	Other         bool

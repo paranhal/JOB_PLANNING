@@ -153,6 +153,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
 			dataMap["UserPerms"] = currentPerms(c)
+			dataMap["SalesNav"] = IsSalesNav(c.Request().URL.Path, c.Request().URL.RawQuery)
 			injectAssignNoticeView(c, dataMap)
 			if v := c.Get("auth_unconfirmed"); v != nil {
 				if b, ok := v.(bool); ok && b {
@@ -215,8 +216,37 @@ func funcMap() template.FuncMap {
 			}
 			return m
 		},
-		"sub": func(a, b int) int { return a - b },
-		"mul": func(a, b int) int { return a * b },
+		"percent": func(part, max interface{}) float64 {
+			to := func(v interface{}) float64 {
+				switch n := v.(type) {
+				case int:
+					return float64(n)
+				case int64:
+					return float64(n)
+				case float64:
+					return n
+				default:
+					return 0
+				}
+			}
+			m := to(max)
+			if m <= 0 {
+				return 0
+			}
+			p := to(part) * 100 / m
+			if p > 100 {
+				p = 100
+			}
+			if p < 0 {
+				return 0
+			}
+			return p
+		},
+		"salesStageStripe":   model.SalesStageStripeClass,
+		"salesActBadgeClass": model.SalesActivityTypeBadgeClass,
+		"salesActBadgeLabel": model.SalesActivityBadgeLabel,
+		"sub":                func(a, b int) int { return a - b },
+		"mul":                func(a, b int) int { return a * b },
 		"min": func(a, b int) int {
 			if a < b {
 				return a
@@ -230,8 +260,8 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
-		"contains": func(s, sub string) bool { return strings.Contains(s, sub) },
-		"upper":    strings.ToUpper,
+		"contains":      func(s, sub string) bool { return strings.Contains(s, sub) },
+		"upper":         strings.ToUpper,
 		"displayPerson": model.DisplayPerson,
 		"ymd": func(t time.Time) string {
 			d, _ := model.KnowledgeWhen(t)
@@ -621,6 +651,7 @@ func funcMap() template.FuncMap {
 		"quoteExpiryLabel":    quoteExpiryLabelNow,
 		"quoteExpiredRow":     quoteExpiredRowClass,
 		"orderStatusLabel":    model.OrderStatusLabel,
+		"orderScheduleLabel":  model.OrderScheduleLabel,
 		"purchaseStatusLabel": model.PurchaseStatusLabel,
 	}
 }

@@ -595,3 +595,84 @@ func scanSalesRows(rows *sql.Rows) ([]model.SalesProject, error) {
 	}
 	return items, rows.Err()
 }
+
+// FillCustomerSalesView 고객 목록에 진행 중 사업 수·누적 수주액·마지막 활동일. §46.3
+func (r *SalesRepo) FillCustomerSalesView(items []model.CustomerListItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(items))
+	idx := map[string][]int{}
+	for i, it := range items {
+		id := strings.TrimSpace(it.CustomerID)
+		if id == "" {
+			continue
+		}
+		if _, ok := idx[id]; !ok {
+			ids = append(ids, id)
+		}
+		idx[id] = append(idx[id], i)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	ph := strings.Repeat("?,", len(ids))
+	ph = ph[:len(ph)-1]
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	q := `
+		SELECT customer_id,
+		       SUM(CASE WHEN status='active' AND stage NOT IN ('won','lost') THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN stage='won' THEN COALESCE(expected_amount,0) ELSE 0 END)
+		  FROM sales_projects
+		 WHERE customer_id IN (` + ph + `)
+		 GROUP BY customer_id`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var open, won int
+		if err := rows.Scan(&id, &open, &won); err != nil {
+			return err
+		}
+		for _, i := range idx[id] {
+			items[i].SalesOpenCount = open
+			items[i].SalesWonAmount = won
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	actQ := `
+		SELECT s.customer_id, MAX(a.activity_date)
+		  FROM sales_activities a
+		  JOIN sales_projects s ON s.sales_id = a.sales_id
+		 WHERE s.customer_id IN (` + ph + `)
+		 GROUP BY s.customer_id`
+	arows, err := r.db.Query(actQ, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	defer arows.Close()
+	for arows.Next() {
+		var id, day string
+		if err := arows.Scan(&id, &day); err != nil {
+			return err
+		}
+		for _, i := range idx[id] {
+			items[i].SalesLastActivity = strings.TrimSpace(day)
+		}
+	}
+	return arows.Err()
+}

@@ -183,6 +183,9 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if task.DurationMin != 45 {
 		t.Fatalf("소요 시간 불일치 duration=%d", task.DurationMin)
 	}
+	if task.WorkType != model.WBWorkSales || model.WBWorkTypeLabel(task.WorkType) != "영업활동" {
+		t.Fatalf("업무 구분 %s / %s", task.WorkType, model.WBWorkTypeLabel(task.WorkType))
+	}
 	reg := doGet(t, e, "/workboard/register?view=day&date=2026-08-22")
 	if !strings.Contains(reg.Body.String(), "메일 회신") {
 		t.Fatalf("일정표에 활동 없음: %s", clipBody(reg.Body.String()))

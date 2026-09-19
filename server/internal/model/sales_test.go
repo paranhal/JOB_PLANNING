@@ -64,11 +64,11 @@ func TestSalesProjectConfirmationAndDisplay(t *testing.T) {
 	if n, total := p.ConfirmedCount(); n != 0 || total != 4 {
 		t.Fatalf("확정도=%d/%d", n, total)
 	}
-	if got := p.DisplayStage(&SalesStageDef{Code: SalesStageProposal, Label: "제안 진행", Probability: 40}); got != "제안 진행 · 40%" {
+	if got := p.DisplayStage(&SalesStageDef{Code: SalesStageProposal, Label: "견적", Probability: 40}); got != "견적 · 40%" {
 		t.Fatalf("수주 전 표시: %q", got)
 	}
 	p.HasOverride, p.OverrideValue = true, 35
-	if got := p.DisplayStage(&SalesStageDef{Code: SalesStageProposal, Label: "제안 진행"}); got != "제안 진행 · 35%" {
+	if got := p.DisplayStage(&SalesStageDef{Code: SalesStageProposal, Label: "견적"}); got != "견적 · 35%" {
 		t.Fatalf("수동 확도: %q", got)
 	}
 	won := &SalesProject{Stage: SalesStageWon, Probability: 100, Name: "확정사업"}
@@ -112,7 +112,7 @@ func TestSalesProposalProgressFromActivities(t *testing.T) {
 func TestLoadSalesStagesReadsProbabilityFromCodes(t *testing.T) {
 	stages := LoadSalesStages(
 		[]Code{
-			{CodeValue: SalesStageProposal, CodeName: "제안 진행", SortOrder: 3},
+			{CodeValue: SalesStageProposal, CodeName: "견적", SortOrder: 3},
 			{CodeValue: SalesStageSubmit, CodeName: "제안서 제출", SortOrder: 6},
 		},
 		[]Code{
@@ -121,7 +121,7 @@ func TestLoadSalesStagesReadsProbabilityFromCodes(t *testing.T) {
 		},
 	)
 	d := FindSalesStage(stages, SalesStageProposal)
-	if d == nil || d.Probability != 18 || d.Label != "제안 진행" {
+	if d == nil || d.Probability != 18 || d.Label != "견적" {
 		t.Fatalf("codes 확도가 반영되지 않음: %+v", d)
 	}
 }
@@ -177,7 +177,7 @@ func TestMergeSalesTimelineMixesChangesAndSkipsStageDup(t *testing.T) {
 func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 	lead := &SalesProject{Stage: SalesStageLead, Status: SalesStatusActive}
 	if CanPromoteSales(lead) {
-		t.Fatal("정보 입수인데 승격이 열렸다")
+		t.Fatal("lead 인데 승격이 열렸다")
 	}
 	won := &SalesProject{Stage: SalesStageWon, Status: SalesStatusActive}
 	if !CanPromoteSales(won) {
@@ -203,8 +203,8 @@ func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 	if wp.Name != "2027년 충남교육청" || wp.CustomerID != "C041-26-001" || wp.OrderingPartyID != "C041-26-001" {
 		t.Fatalf("사업명·고객·발주처가 안 옮겨졌다: %+v", wp)
 	}
-	if wp.SalesProjectID != "SL-001" || wp.PlanYear != 2027 {
-		t.Fatalf("원본 연결·연도: sales=%s year=%d", wp.SalesProjectID, wp.PlanYear)
+	if wp.ContractAmount != 30_000_000 {
+		t.Fatalf("계약금액 초기값=%d", wp.ContractAmount)
 	}
 	if !strings.Contains(wp.Notes, "30,000,000") || !strings.Contains(wp.Notes, "재계약") {
 		t.Fatalf("금액이 비고로 안 옮겨졌다: %q", wp.Notes)

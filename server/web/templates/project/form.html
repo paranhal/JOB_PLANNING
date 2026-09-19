@@ -82,6 +82,16 @@
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약번호</label>
+          <input type="text" name="contract_no" value="{{.Project.ContractNo}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="비우면 사업번호">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">계약금액</label>
+          <input type="number" name="contract_amount" value="{{.Project.ContractAmount}}" class="w-full border rounded-lg px-3 py-2 text-sm" min="0">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">계약방식</label>
           <select name="contract_type" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>

@@ -158,19 +158,20 @@ type StatsBucketCounts struct {
 	AS    StatsWorkSlice
 	Mnt   StatsWorkSlice
 	Admin StatsWorkSlice
+	Sales StatsWorkSlice
 }
 
 func (b StatsBucketCounts) PlannedTotal() int {
-	return b.AS.Planned + b.Mnt.Planned + b.Admin.Planned
+	return b.AS.Planned + b.Mnt.Planned + b.Admin.Planned + b.Sales.Planned
 }
 func (b StatsBucketCounts) ReceiptTotal() int {
-	return b.AS.Receipt + b.Mnt.Receipt + b.Admin.Receipt
+	return b.AS.Receipt + b.Mnt.Receipt + b.Admin.Receipt + b.Sales.Receipt
 }
 func (b StatsBucketCounts) ProcessTotal() int {
-	return b.AS.Process + b.Mnt.Process + b.Admin.Process
+	return b.AS.Process + b.Mnt.Process + b.Admin.Process + b.Sales.Process
 }
 func (b StatsBucketCounts) ModifiedTotal() int {
-	return b.AS.Modified + b.Mnt.Modified + b.Admin.Modified
+	return b.AS.Modified + b.Mnt.Modified + b.Admin.Modified + b.Sales.Modified
 }
 
 // StatsGrade §4.4 신뢰도 등급

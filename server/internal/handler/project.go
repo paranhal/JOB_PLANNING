@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -74,6 +75,50 @@ func (h *ProjectHandler) List(c echo.Context) error {
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+	})
+}
+
+func (h *ProjectHandler) Contracts(c echo.Context) error {
+	if !canViewSales(c) {
+		return echo.ErrForbidden
+	}
+	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
+	status := strings.TrimSpace(c.QueryParam("status"))
+	search := strings.TrimSpace(c.QueryParam("search"))
+	items, err := h.repo.ListFiltered(search, year, status)
+	if err != nil {
+		return err
+	}
+	years, _ := h.repo.ListYears()
+	today := time.Now().Format("2006-01-02")
+	totalN, validN, soonN, totalAmt, avgDays := model.ContractKPI(items, today)
+	return c.Render(http.StatusOK, "contracts/list.html", map[string]interface{}{
+		"Title": "계약 관리", "Active": NavContracts,
+		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
+		"Today":    today,
+		"KPITotal": totalN, "KPIValid": validN, "KPISoon": soonN,
+		"KPIAmount": model.FormatSalesMoney(totalAmt), "KPIAvgDays": avgDays,
+	})
+}
+
+func (h *ProjectHandler) ContractShow(c echo.Context) error {
+	if !canViewSales(c) {
+		return echo.ErrForbidden
+	}
+	p, err := h.repo.Get(c.Param("id"))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err=notfound")
+	}
+	rules, _ := h.repo.ListRules(p.ProjectID)
+	var assets []model.Asset
+	if h.assetRepo != nil {
+		assets, _, _ = h.assetRepo.List("", "", p.ProjectID, "", "", "", 1, 200)
+	}
+	today := time.Now().Format("2006-01-02")
+	return c.Render(http.StatusOK, "contracts/show.html", map[string]interface{}{
+		"Title": p.Name, "Active": NavContracts,
+		"Project": p, "Rules": rules, "Assets": assets, "Today": today,
+		"Life": p.ContractLifeStatus(today),
 	})
 }
 

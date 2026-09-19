@@ -42,7 +42,7 @@ func AssignUnplannedKanbanColumn(it UnplannedItem) string {
 	if it.HasKind(UnplannedNext) {
 		return UnplannedNext
 	}
-	if it.HasKind(UnplannedUnassigned) || it.HasKind(UnplannedSalesFollow) || it.HasKind(UnplannedSalesUnsigned) {
+	if it.HasKind(UnplannedUnassigned) || it.HasKind(UnplannedSalesFollow) || it.HasKind(UnplannedSalesUnsigned) || it.HasKind(UnplannedSalesNext) {
 		return UnplannedUnassigned
 	}
 	if it.HasKind(UnplannedAssetSerial) {
@@ -179,6 +179,7 @@ type KanbanColumn struct {
 	Key       string
 	Title     string
 	Border    string
+	Stripe    string
 	Count     int
 	CountUnit string
 	Subtitle  string
@@ -224,6 +225,9 @@ type KanbanCard struct {
 	AmountDesc        int
 	EditLocked        bool
 	AssigneeOther     bool
+	NextLabel         string
+	ProbLabel         string
+	DnLabel           string
 }
 
 // KanbanView 화면이 열 정의와 카드를 넘기면 배타 배정·건수·정렬을 채운다. §35.1

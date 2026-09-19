@@ -101,7 +101,7 @@ func TestSchemaMismatchMessages(t *testing.T) {
 	if msg != want {
 		t.Fatalf("stale=%q want=%q", msg, want)
 	}
-	if err := SetAppliedSchemaVersionForTest(db, 50); err != nil {
+	if err := SetAppliedSchemaVersionForTest(db, AppSchemaVersion+1); err != nil {
 		t.Fatal(err)
 	}
 	msg = SchemaMismatchMessage(db)

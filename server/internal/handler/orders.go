@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -57,6 +58,11 @@ func (h *OrdersHandler) List(c echo.Context) error {
 	kq := cloneURLValues(qv)
 	kq.Set("display", "kanban")
 	see := canSeeMargin(c)
+	today := time.Now().Format("2006-01-02")
+	var confirmed int64
+	for i := range items {
+		confirmed += int64(items[i].Total)
+	}
 	return c.Render(http.StatusOK, "orders/list.html", map[string]interface{}{
 		"Title": "수주", "Active": NavOrders,
 		"Items": items, "Total": len(items),
@@ -68,6 +74,8 @@ func (h *OrdersHandler) List(c echo.Context) error {
 		"CanWrite":     canWriteSales(c),
 		"CanSeeMargin": see,
 		"Statuses":     model.OrderStatusDefs(),
+		"Today":        today,
+		"ConfirmedAmt": model.FormatSalesMoney(confirmed),
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }

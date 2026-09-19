@@ -18,7 +18,24 @@ var (
 	buildCommit  = "unknown"
 	buildTime    = "unknown"
 	startedAt    time.Time
+	indexStatsFn func() map[string]int
 )
+
+func setKeywordIndexStats(fn func() map[string]int) {
+	buildMu.Lock()
+	defer buildMu.Unlock()
+	indexStatsFn = fn
+}
+
+func currentIndexStats() map[string]int {
+	buildMu.RLock()
+	fn := indexStatsFn
+	buildMu.RUnlock()
+	if fn == nil {
+		return map[string]int{"as_keyword_links": 0, "as_receipts": 0}
+	}
+	return fn()
+}
 
 func SetBuildInfo(version, commit, built string, started time.Time) {
 	buildMu.Lock()
@@ -99,10 +116,11 @@ func injectBuildInfo(data map[string]interface{}) {
 func VersionJSON(c echo.Context) error {
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	version, commit, built, started := currentBuild()
-	return c.JSON(http.StatusOK, map[string]string{
+	return c.JSON(http.StatusOK, map[string]any{
 		"version": version,
 		"commit":  commit,
 		"built":   built,
 		"started": formatClock(started),
+		"index":   currentIndexStats(),
 	})
 }

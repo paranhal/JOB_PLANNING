@@ -53,7 +53,7 @@ func TestSalesHTTP_SupplyDealTypeListAndAutoStage(t *testing.T) {
 		t.Fatalf("구축 상세 status=%d", buildShow.Code)
 	}
 	bb := buildShow.Body.String()
-	if !strings.Contains(bb, "25%") || !strings.Contains(bb, "제안 진행") {
+	if !strings.Contains(bb, "25%") || !strings.Contains(bb, "발굴") {
 		t.Fatalf("구축 상세가 달라졌다: %s", clipBody(bb))
 	}
 
@@ -68,8 +68,8 @@ func TestSalesHTTP_SupplyDealTypeListAndAutoStage(t *testing.T) {
 	if strings.Contains(sl, "세종 RFID") {
 		t.Fatal("단품 탭에 구축 건이 보였다")
 	}
-	if strings.Contains(sl, "제안 진행") {
-		t.Fatal("단품 단계에 제안 진행이 나왔다")
+	if strings.Contains(sl, "발굴") {
+		t.Fatal("단품 단계에 구축 단계가 나왔다")
 	}
 	if !strings.Contains(sl, "문의 접수") || !strings.Contains(sl, "견적 제출") ||
 		!strings.Contains(sl, "납품 완료") || !strings.Contains(sl, "취소·실주") {
@@ -99,8 +99,8 @@ func TestSalesHTTP_SupplyDealTypeListAndAutoStage(t *testing.T) {
 	if !strings.Contains(sb, "정보 확정도") {
 		t.Fatal("정보 확정도가 없다")
 	}
-	if strings.Contains(sb, "제안 진행") {
-		t.Fatal("단품 pill 에 제안 진행이 있다")
+	if strings.Contains(sb, "발굴") {
+		t.Fatal("단품 pill 에 구축 단계가 있다")
 	}
 	if strings.Contains(sb, "사업관리로 등록") {
 		t.Fatal("단품에 승격 버튼이 있다")
@@ -111,7 +111,7 @@ func TestSalesHTTP_SupplyDealTypeListAndAutoStage(t *testing.T) {
 		t.Fatalf("단품 등록 폼 status=%d", form.Code)
 	}
 	fb := form.Body.String()
-	if strings.Contains(fb, "확도 %") || strings.Contains(fb, "제안 진행") {
+	if strings.Contains(fb, "확도 %") || strings.Contains(fb, "발굴") {
 		t.Fatalf("단품 폼에 구축 단계/확도가 있다: %s", clipBody(fb))
 	}
 	if !strings.Contains(fb, "견적 금액") {

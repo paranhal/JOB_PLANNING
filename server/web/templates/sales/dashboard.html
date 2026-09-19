@@ -1,0 +1,96 @@
+{{define "title"}}영업 대시보드 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">영업 대시보드</h2>
+  <p class="text-sm text-gray-500">숫자는 파이프라인과 같습니다. 오늘 활동은 영업 활동 로그입니다.</p>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="col-span-2 lg:col-span-1 order-first bg-white rounded-xl border border-orange-200 p-4">
+      <p class="text-xs text-gray-500">가중 파이프라인</p>
+      <p class="text-2xl font-bold text-orange-800">{{.Pipe.WeightedLabel}}</p>
+      <p class="text-[11px] text-gray-400 mt-1">금액 × 확도</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs text-gray-500">예상 매출</p>
+      <p class="text-2xl font-bold text-gray-800">{{.Pipe.TotalAmountLabel}}</p>
+      <p class="text-[11px] text-gray-400 mt-1">수주 전 합</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs text-gray-500">진행 사업</p>
+      <p class="text-2xl font-bold text-gray-800">{{.OpenCount}}건</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs text-gray-500">이번 달 수주</p>
+      <p class="text-2xl font-bold text-gray-800">{{.MonthWon}}</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <h3 class="font-semibold text-gray-800">파이프라인</h3>
+    {{$max := .StageMax}}
+    {{range .Pipe.Stages}}
+    <div class="space-y-1">
+      <div class="flex justify-between text-xs text-gray-600">
+        <span>{{.Label}} · {{.Count}}건</span>
+        <span class="tabular-nums">{{.AmountLabel}}</span>
+      </div>
+      <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div class="h-2 {{salesStageStripe .Code}} rounded-full" style="width: {{if gt $max 0}}{{printf "%.0f" (percent .Amount $max)}}%{{else}}0%{{end}}"></div>
+      </div>
+    </div>
+    {{else}}
+    <p class="text-sm text-gray-400">진행 중인 사업이 없습니다.</p>
+    {{end}}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <h3 class="font-semibold text-gray-800 mb-3">오늘의 영업 활동</h3>
+      <ul class="divide-y divide-gray-100 text-sm">
+        {{range .TodayActs}}
+        <li class="py-2 flex items-start gap-2">
+          <span class="text-xs text-gray-500 tabular-nums w-12 shrink-0">{{if .StartTime}}{{.StartTime}}{{else}}—{{end}}</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{salesActBadgeClass .ActivityType}}">{{salesActBadgeLabel .ActivityType $.ActivityTypes}}</span>
+          <div class="min-w-0">
+            <a href="/sales/{{.SalesID}}" class="font-medium text-gray-800 hover:text-blue-700">{{.Title}}</a>
+            {{if .SalesName}}<p class="text-xs text-gray-400 truncate">{{.SalesName}}</p>{{end}}
+          </div>
+        </li>
+        {{else}}
+        <li class="py-6 text-center text-gray-400">오늘 등록된 활동이 없습니다.</li>
+        {{end}}
+      </ul>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-semibold text-gray-800">주요 사업기회</h3>
+        <a href="/sales" class="text-xs text-blue-700 hover:underline">전체 보기 →</a>
+      </div>
+      <table class="w-full text-sm">
+        <thead class="text-xs text-gray-500"><tr>
+          <th class="text-left py-1">사업명</th>
+          <th class="text-left py-1">고객</th>
+          <th class="text-left py-1">단계</th>
+          <th class="text-right py-1">금액</th>
+          <th class="text-right py-1">가능성</th>
+          <th class="text-left py-1">다음 액션</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .Opps}}
+          <tr>
+            <td class="py-1.5"><a href="{{.Href}}" class="text-blue-700 hover:underline">{{.Name}}</a></td>
+            <td class="py-1.5 text-gray-600">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+            <td class="py-1.5">{{.StageLabel}}</td>
+            <td class="py-1.5 text-right tabular-nums">{{.Amount}}</td>
+            <td class="py-1.5 text-right">{{if .Prob}}{{.Prob}}{{else}}—{{end}}</td>
+            <td class="py-1.5 text-gray-600">{{.Next}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6" class="py-6 text-center text-gray-400">진행 사업이 없습니다.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

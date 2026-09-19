@@ -72,7 +72,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 	sortBase := salesListFilterValues(f, view, fromTask)
 	hrefs := sortLinkHrefs("/sales", sortBase, []string{"name", "stage", "customer", "period", "amount"}, sortKey, dir)
 	lastAct, _ := h.repo.LatestActivityDateBySales()
-	kanbanCols := salesProjectKanban(items, stages, fromTask, lastAct, false)
+	kanbanCols := salesProjectKanban(items, stages, fromTask, lastAct, nil, "", false)
 	kanbanTotal := 0
 	for _, col := range kanbanCols {
 		kanbanTotal += col.Count
@@ -107,6 +107,45 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"Dir":                 dir,
 		"SortHref":            hrefs,
 		"SortSelect":          sortSelectOptions(salesListSortCols(), hrefs, sortKey, dir),
+	})
+}
+
+func (h *SalesHandler) Dashboard(c echo.Context) error {
+	if !canViewSales(c) {
+		return echo.ErrForbidden
+	}
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	ym := now.Format("2006-01")
+	items, err := h.repo.List("", model.SalesStatusActive, "")
+	if err != nil {
+		return err
+	}
+	pipe, err := h.repo.Pipeline(now, nil)
+	if err != nil {
+		return err
+	}
+	stages, _ := h.repo.Stages()
+	acts, _ := h.repo.ListActivitiesByDate(today)
+	types, _ := h.repo.ActivityTypes()
+	nextBy, _ := h.repo.LatestNextBySales()
+	rows := model.BuildSalesDashRows(items, stages, nextBy, 8)
+	maxAmt := int64(0)
+	for _, st := range pipe.Stages {
+		if st.Amount > maxAmt {
+			maxAmt = st.Amount
+		}
+	}
+	return c.Render(http.StatusOK, "sales/dashboard.html", map[string]interface{}{
+		"Title":         "영업 대시보드",
+		"Active":        NavSalesDashboard,
+		"Pipe":          pipe,
+		"OpenCount":     model.CountOpenSales(items),
+		"MonthWon":      model.FormatSalesMoney(model.SumMonthWon(items, ym)),
+		"TodayActs":     acts,
+		"ActivityTypes": types,
+		"Opps":          rows,
+		"StageMax":      maxAmt,
 	})
 }
 
@@ -164,6 +203,16 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		contacts, _ = h.contactRepo.ListByCustomer(p.CustomerID)
 	}
 	timeline := model.MergeSalesTimeline(acts, hist, changes)
+	memos, _ := h.repo.ListMemos(p.SalesID)
+	var nextTask *model.WorkTask
+	var nextActions []model.WorkAction
+	nextBy, _ := h.repo.LatestNextBySales()
+	if nx, ok := nextBy[p.SalesID]; ok && h.wbRepo != nil {
+		if t, err := h.wbRepo.GetTaskBySource(model.WBSourceSalesActivity, nx.ActivityID, model.WBSourceRoleNext); err == nil && t != nil {
+			nextTask = t
+			nextActions, _ = h.wbRepo.ListActions(t.TaskID)
+		}
+	}
 	tab := strings.TrimSpace(c.QueryParam("tab"))
 	if tab != "parties" {
 		tab = "timeline"
@@ -222,11 +271,14 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"PartyHints":      model.CustomerPartyHintNames(parties),
 		"Today":           time.Now().Format("2006-01-02"),
 		"CanWrite":        canWriteSales(c), "CanDelete": canDeleteSales(c),
-		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
-		"CurrentUser":     ctxString(c, "user_name"),
-		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"FormError": querySalesErr(c.QueryParam("err")),
-		"FromTask":  fromTask,
+		"CanEditOthers": isAdminRole(c) || isOfficeRole(c),
+		"CurrentUser":   ctxString(c, "user_name"),
+		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"FormError":   querySalesErr(c.QueryParam("err")),
+		"FromTask":    fromTask,
+		"Memos":       memos,
+		"NextTask":    nextTask,
+		"NextActions": nextActions,
 		"ListBack": func() string {
 			if p.IsSupply() {
 				return "/sales?deal=supply"
@@ -476,7 +528,10 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 	}
 	stages, _ := h.repo.StagesFor(f.DealType)
 	lastAct, _ := h.repo.LatestActivityDateBySales()
-	kanbanCols := salesProjectKanban(items, stages, "", lastAct, true)
+	nextBy, _ := h.repo.LatestNextBySales()
+	today := time.Now().Format("2006-01-02")
+	ym := time.Now().Format("2006-01")
+	kanbanCols := salesProjectKanban(items, stages, "", lastAct, nextBy, today, true)
 	kanbanTotal := 0
 	for _, col := range kanbanCols {
 		kanbanTotal += col.Count
@@ -488,6 +543,9 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 		"Projects": items, "Stages": stages,
 		"KanbanColumns": kanbanCols,
 		"KanbanTotal":   kanbanTotal,
+		"OpenCount":     model.CountOpenSales(items),
+		"MonthClose":    model.CountMonthClose(items, ym),
+		"DelayedCount":  model.CountSalesDelayed(nextBy, today),
 		"KanbanDrag":    canWriteSales(c),
 		"KanbanDrop":    "sales",
 		"KanbanHint":    "열 = 단계. 실주 열은 기본으로 접혀 있습니다.",
@@ -989,6 +1047,34 @@ func parseSalesAmount(s string) int {
 		return 0
 	}
 	return n
+}
+
+func (h *SalesHandler) CreateMemo(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	m := &model.SalesMemo{
+		SalesID:    id,
+		Content:    strings.TrimSpace(c.FormValue("content")),
+		AuthorID:   ctxString(c, "user_id"),
+		AuthorName: ctxString(c, "user_name"),
+	}
+	if err := h.repo.CreateMemo(m); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=memo")
+	}
+	return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?ok=memo")
+}
+
+func (h *SalesHandler) DeleteMemo(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	if err := h.repo.DeleteMemo(c.Param("mid"), id); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=memo")
+	}
+	return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?ok=memo")
 }
 
 func salesErrCode(err error) string {

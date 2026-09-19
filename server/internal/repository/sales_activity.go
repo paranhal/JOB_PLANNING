@@ -358,15 +358,28 @@ func (r *SalesRepo) syncWorkTask(a *model.SalesActivity, p *model.SalesProject, 
 		if customerName != "" && strings.TrimSpace(t.CustomerName) == "" {
 			t.CustomerName = customerName
 		}
+		t.WorkType = model.WBWorkSales
 		if err := wb.UpdateTask(t); err != nil {
 			return err
 		}
-		return r.replaceActivitySupports(wb, t.TaskID, names)
+		if err := r.replaceActivitySupports(wb, t.TaskID, names); err != nil {
+			return err
+		}
+		return r.syncNextActionTask(wb, a, owner, customerName)
 	}
 
-	existing, err := wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID)
+	// 활동 로그는 「한 일」이다. 다만 미래 날짜는 아직 안 한 일이다. §45.3
+	today := time.Now().Format("2006-01-02")
+
+	existing, err := wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID, model.WBSourceRoleDone)
 	if err != nil {
 		return err
+	}
+	if existing == nil {
+		existing, err = wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID)
+		if err != nil {
+			return err
+		}
 	}
 	if existing != nil {
 		existing.Title = title
@@ -378,14 +391,35 @@ func (r *SalesRepo) syncWorkTask(a *model.SalesActivity, p *model.SalesProject, 
 		existing.DurationMin = a.DurationMin
 		existing.Assignee = owner
 		existing.CustomerName = customerName
+		existing.WorkType = model.WBWorkSales
+		// 날짜를 옮기면 상태도 따라간다. 다만 사람이 손으로 바꾼 것은 덮지 않는다. §45.3
+		if existing.Status == model.WBTaskWaiting || existing.Status == model.WBTaskComplete {
+			if a.ActivityDate <= today {
+				existing.Status = model.WBTaskComplete
+				existing.Progress = 100
+				existing.CompleteDate = a.ActivityDate
+			} else {
+				existing.Status = model.WBTaskWaiting
+				existing.Progress = 0
+				existing.CompleteDate = ""
+			}
+		}
 		if err := wb.UpdateTask(existing); err != nil {
 			return err
 		}
-		return r.replaceActivitySupports(wb, existing.TaskID, names)
+		if err := r.replaceActivitySupports(wb, existing.TaskID, names); err != nil {
+			return err
+		}
+		return r.syncNextActionTask(wb, a, owner, customerName)
+	}
+
+	status, progress, completeDate := model.WBTaskWaiting, 0, ""
+	if a.ActivityDate <= today {
+		status, progress, completeDate = model.WBTaskComplete, 100, a.ActivityDate
 	}
 
 	t := &model.WorkTask{
-		WorkType:     model.WBWorkAdmin,
+		WorkType:     model.WBWorkSales,
 		Title:        title,
 		Description:  a.Content,
 		DueDate:      a.ActivityDate,
@@ -393,17 +427,160 @@ func (r *SalesRepo) syncWorkTask(a *model.SalesActivity, p *model.SalesProject, 
 		StartTime:    a.StartTime,
 		EndTime:      end,
 		DurationMin:  a.DurationMin,
-		Status:       model.WBTaskWaiting,
+		Status:       status,
+		Progress:     progress,
+		CompleteDate: completeDate,
 		Priority:     model.WBPriorityNormal,
 		Assignee:     owner,
 		SourceType:   model.WBSourceSalesActivity,
 		SourceID:     a.ActivityID,
+		SourceRole:   model.WBSourceRoleDone,
 		CustomerName: customerName,
 	}
 	if err := wb.CreateTask(t); err != nil {
 		return err
 	}
-	return r.replaceActivitySupports(wb, t.TaskID, names)
+	if err := r.replaceActivitySupports(wb, t.TaskID, names); err != nil {
+		return err
+	}
+	return r.syncNextActionTask(wb, a, owner, customerName)
+}
+
+func (r *SalesRepo) syncNextActionTask(wb *WBRepo, a *model.SalesActivity, owner, customerName string) error {
+	if a == nil || wb == nil {
+		return nil
+	}
+	nextTitle := strings.TrimSpace(a.NextAction)
+	nextDate := strings.TrimSpace(a.NextActionDate)
+	existing, err := wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID, model.WBSourceRoleNext)
+	if err != nil {
+		return err
+	}
+	want := nextTitle != "" && nextDate != "" && !model.IsSalesMonthOnly(nextDate) && model.RequireAppDateYear(nextDate) == nil
+	if !want {
+		if existing != nil && existing.Status != model.WBTaskComplete {
+			return wb.DeleteTask(existing.TaskID)
+		}
+		return nil
+	}
+	return r.CreateNextActionTask(a.ActivityID, nextDate, owner, "")
+}
+
+// CreateNextActionTask 활동의 「다음 할 일」 업무. 미계획함 날짜 지정과 활동 저장이 같은 모양을 쓴다. §45.7·§45.9
+func (r *SalesRepo) CreateNextActionTask(activityID, date, assignee, assigneeUID string) error {
+	a, err := r.GetActivity(activityID)
+	if err != nil {
+		return err
+	}
+	date = strings.TrimSpace(date)
+	if date == "" || model.IsSalesMonthOnly(date) {
+		return fmt.Errorf("날짜가 필요합니다")
+	}
+	if err := model.RequireAppDateYear(date); err != nil {
+		return err
+	}
+	owner := strings.TrimSpace(assignee)
+	if owner == "" {
+		if names := a.OurMemberNames(); len(names) > 0 {
+			owner = names[0]
+		}
+	}
+	title := strings.TrimSpace(a.NextAction)
+	if title == "" {
+		title = strings.TrimSpace(a.Title)
+	}
+	wb := NewWBRepo(r.db)
+	existing, err := wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID, model.WBSourceRoleNext)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		if existing.Status == model.WBTaskComplete {
+			return nil
+		}
+		existing.Title = title
+		existing.DueDate = date
+		existing.WorkDate = date
+		existing.Assignee = owner
+		if strings.TrimSpace(assigneeUID) != "" {
+			existing.AssigneeUserID = assigneeUID
+		}
+		existing.CustomerName = a.CustomerName
+		existing.WorkType = model.WBWorkSales
+		existing.Status = model.WBTaskWaiting
+		existing.Progress = 0
+		existing.CompleteDate = ""
+		return wb.UpdateTask(existing)
+	}
+	t := &model.WorkTask{
+		WorkType:       model.WBWorkSales,
+		Title:          title,
+		DueDate:        date,
+		WorkDate:       date,
+		Status:         model.WBTaskWaiting,
+		Progress:       0,
+		Priority:       model.WBPriorityNormal,
+		Assignee:       owner,
+		AssigneeUserID: strings.TrimSpace(assigneeUID),
+		SourceType:     model.WBSourceSalesActivity,
+		SourceID:       a.ActivityID,
+		SourceRole:     model.WBSourceRoleNext,
+		CustomerName:   a.CustomerName,
+	}
+	return wb.CreateTask(t)
+}
+
+// ListNextActionYMGaps 다음행동이 월만 지정됐고, 그 달이 되었는데 아직 업무가 없는 활동. §45.9
+func (r *SalesRepo) ListNextActionYMGaps(todayYM string) ([]model.SalesNextGap, error) {
+	todayYM = strings.TrimSpace(todayYM)
+	if len(todayYM) > 7 {
+		todayYM = todayYM[:7]
+	}
+	if todayYM == "" {
+		todayYM = time.Now().Format("2006-01")
+	}
+	rows, err := r.db.Query(`
+		SELECT a.activity_id, a.sales_id, COALESCE(s.name,''),
+		       COALESCE(a.next_action,''), COALESCE(a.next_action_date,''),
+		       COALESCE(a.our_members,''), COALESCE(s.customer_id,''), COALESCE(cu.org_name,'')
+		  FROM sales_activities a
+		  JOIN sales_projects s ON s.sales_id = a.sales_id
+		  LEFT JOIN customers cu ON cu.customer_id = s.customer_id
+		 WHERE TRIM(COALESCE(a.next_action,'')) <> ''
+		   AND LENGTH(TRIM(COALESCE(a.next_action_date,''))) = 7
+		   AND TRIM(a.next_action_date) <= ?
+		   AND NOT EXISTS (
+		         SELECT 1 FROM work_tasks t
+		          WHERE t.source_type = 'sales_activity'
+		            AND t.source_id   = a.activity_id
+		            AND t.source_role = 'next')`, todayYM)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.SalesNextGap
+	for rows.Next() {
+		var g model.SalesNextGap
+		var members string
+		if err := rows.Scan(&g.ActivityID, &g.SalesID, &g.SalesName, &g.NextAction, &g.NextActionYM,
+			&members, &g.CustomerID, &g.CustomerName); err != nil {
+			return nil, err
+		}
+		g.NextAction = strings.TrimSpace(g.NextAction)
+		g.NextActionYM = strings.TrimSpace(g.NextActionYM)
+		if names := model.SplitSalesPeople(members); len(names) > 0 {
+			g.OwnerName = names[0]
+		}
+		g.CustomerName = strings.TrimSpace(g.CustomerName)
+		if g.CustomerName == "" {
+			g.CustomerName = strings.TrimSpace(g.SalesName)
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
 }
 
 func (r *SalesRepo) replaceActivitySupports(wb *WBRepo, taskID string, names []string) error {
@@ -498,6 +675,31 @@ func (r *SalesRepo) latestActivityBySales() (map[string]model.SalesActivity, err
 	return out, nil
 }
 
+func (r *SalesRepo) LatestNextBySales() (map[string]model.SalesActivity, error) {
+	rows, err := r.db.Query(salesActivitySelect + `
+		WHERE TRIM(COALESCE(a.next_action,'')) != '' OR TRIM(COALESCE(a.next_action_date,'')) != ''
+		ORDER BY a.activity_date DESC, a.activity_id DESC`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return map[string]model.SalesActivity{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	all, err := r.scanActivityRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]model.SalesActivity{}
+	for _, a := range all {
+		if _, ok := out[a.SalesID]; ok {
+			continue
+		}
+		out[a.SalesID] = a
+	}
+	return out, nil
+}
+
 func (r *SalesRepo) fillActivityLabels(a *model.SalesActivity, types []model.Code) {
 	if a == nil {
 		return
@@ -552,9 +754,12 @@ func (r *WBRepo) AttachTaskSource(taskID, sourceType, sourceID string) error {
 		return fmt.Errorf("원본 연결 값이 비었습니다")
 	}
 	_, err := r.db.Exec(`
-		UPDATE work_tasks SET source_type=?, source_id=?, updated_at=CURRENT_TIMESTAMP
+		UPDATE work_tasks SET source_type=?, source_id=?,
+			work_type=CASE WHEN ? = 'sales_activity' THEN 'sales' ELSE work_type END,
+			source_role=CASE WHEN ? = 'sales_activity' THEN 'done' ELSE COALESCE(source_role,'') END,
+			updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=? AND TRIM(COALESCE(source_type,''))=''`,
-		sourceType, sourceID, taskID)
+		sourceType, sourceID, sourceType, sourceType, taskID)
 	return err
 }
 

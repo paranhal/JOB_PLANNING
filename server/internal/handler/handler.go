@@ -101,6 +101,7 @@ func New(db *sql.DB) *Handler {
 			assetRepo:   assetRepo,
 			contactRepo: contactRepo,
 			asRepo:      asRepo,
+			salesRepo:   repository.NewSalesRepo(db),
 		},
 		Space: &SpaceHandler{repo: spaceRepo, customerRepo: customerRepo},
 		Contact: &ContactHandler{
@@ -186,6 +187,12 @@ func New(db *sql.DB) *Handler {
 	h.Work.notices = noticeHook
 	h.AdminWork.notices = noticeHook
 	bindSchemaDB(db)
+	setKeywordIndexStats(func() map[string]int {
+		return map[string]int{
+			"as_keyword_links": asRepo.KeywordLinkCount(),
+			"as_receipts":      asRepo.ReceiptCount(),
+		}
+	})
 	return h
 }
 

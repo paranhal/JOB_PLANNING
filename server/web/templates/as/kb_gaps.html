@@ -5,7 +5,7 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-lg font-bold text-slate-800">지식 보완 목록</h2>
-      <p class="text-sm text-slate-600 mt-1">이번 달에 채운 지식 {{.FilledMonth}}건 · 아직 못 채운 검색어 {{.OpenQueries}}건</p>
+      <p class="text-sm text-slate-600 mt-1">이번 달에 채운 지식 <span id="gap-filled-month">{{.FilledMonth}}</span>건 · 아직 못 채운 검색어 {{.OpenQueries}}건</p>
     </div>
     <a href="/as/knowledge" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">사례 검색</a>
   </div>
@@ -46,30 +46,37 @@
   <section class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="px-4 py-3 border-b border-gray-100">
       <h3 class="text-sm font-semibold text-slate-800">조치 기록이 없는 AS</h3>
-      <p class="text-xs text-slate-500 mt-0.5">{{.MissingCount}}건 · 키워드 사전으로 증상별 묶음. 하나씩 보지 않습니다.</p>
+      <p class="text-xs text-slate-500 mt-0.5"><span id="gap-missing-total">{{.MissingCount}}</span>건 · 키워드 사전으로 증상별 묶음. 저장은 접수 건 단위입니다. 한 건이 여러 묶음에 들어갈 수 있어 합계가 총계보다 큽니다.</p>
     </div>
+    {{if eq .Err "bulk_limit"}}
+    <p class="mx-4 mt-3 text-sm text-red-700">한 번에 50건까지만 넣을 수 있습니다. 전체가 아니라 증상을 확인한 건만 고르세요.</p>
+    {{else if eq .Err "bulk_none"}}
+    <p class="mx-4 mt-3 text-sm text-red-700">접수를 선택하세요.</p>
+    {{else if eq .Err "bulk_action"}}
+    <p class="mx-4 mt-3 text-sm text-red-700">조치 내용을 입력하세요.</p>
+    {{else if eq .OK "bulk"}}
+    <p class="mx-4 mt-3 text-sm text-green-800">선택한 건에 지식을 넣었습니다.</p>
+    {{end}}
     {{if .Groups}}
     <ul class="divide-y divide-gray-100">
       {{range .Groups}}
       <li class="px-4 py-3 space-y-2">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          {{if .Other}}
-          <p class="text-sm text-slate-800">그 외 {{.Count}}건</p>
-          {{else}}
-          <p class="text-sm text-slate-800">{{.Keyword}} 관련 {{.Count}}건 ▸</p>
-          {{end}}
-        </div>
-        {{if $.CanProcess}}
-        <details class="text-sm">
-          <summary class="cursor-pointer text-blue-700">지식 쓰기</summary>
-          <form method="POST" action="/as/knowledge" class="mt-2 space-y-2">
-            <input type="hidden" name="from" value="gaps">
-            <input type="hidden" name="as_id" value="{{.SampleASID}}">
-            <input type="hidden" name="symptom_text" value="{{if .SampleSymptom}}{{.SampleSymptom}}{{else}}{{.Keyword}}{{end}}">
-            <textarea name="action_text" required rows="3" placeholder="이 증상 묶음에 대한 조치·지식" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
-            <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">저장</button>
-          </form>
-        </details>
+        {{if .Other}}
+        <button type="button" id="gap-btn-other" data-count="{{.Count}}" class="text-sm text-slate-800 hover:text-blue-700 text-left"
+                hx-get="/as/knowledge/gaps/group?other=1"
+                hx-target="#grp-other" hx-swap="innerHTML">
+          그 외 <span data-gap-count>{{.Count}}</span>건
+          <span class="text-xs text-slate-500">(기록 없음 {{.NoneCount}} · 10자 미만 {{.ShortCount}})</span>
+        </button>
+        <div id="grp-other"></div>
+        {{else}}
+        <button type="button" id="gap-btn-{{.KeywordID}}" data-count="{{.Count}}" class="text-sm text-slate-800 hover:text-blue-700 text-left"
+                hx-get="/as/knowledge/gaps/group?keyword_id={{.KeywordID}}"
+                hx-target="#grp-{{.KeywordID}}" hx-swap="innerHTML">
+          {{.Keyword}} 관련 <span data-gap-count>{{.Count}}</span>건
+          <span class="text-xs text-slate-500">(기록 없음 {{.NoneCount}} · 10자 미만 {{.ShortCount}})</span>
+        </button>
+        <div id="grp-{{.KeywordID}}"></div>
         {{end}}
       </li>
       {{end}}
@@ -79,4 +86,59 @@
     {{end}}
   </section>
 </div>
+<script>
+function gapSelect() {
+  return {
+    picked: {},
+    open: false,
+    err: '',
+    get ids() { return Object.keys(this.picked); },
+    get n() { return this.ids.length; },
+    onCheck: function (ev, id, symptom) {
+      this.err = '';
+      if (ev.target.checked) {
+        if (this.n >= 50) {
+          ev.target.checked = false;
+          this.err = '한 번에 50건까지만 고를 수 있습니다. 전체가 아니라 증상을 확인한 건만 고르세요.';
+          return;
+        }
+        this.picked[id] = symptom;
+      } else {
+        delete this.picked[id];
+        if (this.n === 0) this.open = false;
+      }
+    },
+    clear: function () {
+      this.picked = {};
+      this.open = false;
+      this.err = '';
+      this.$root.querySelectorAll('input[data-gap-check]').forEach(function (el) { el.checked = false; });
+    }
+  };
+}
+document.body.addEventListener('htmx:afterSwap', function (ev) {
+  if (window.Alpine && ev.detail && ev.detail.target) {
+    window.Alpine.initTree(ev.detail.target);
+  }
+});
+document.body.addEventListener('gapFilled', function (ev) {
+  var d = ev.detail || {};
+  var n = d.n || 1;
+  var total = document.getElementById('gap-missing-total');
+  if (total) {
+    total.textContent = String(Math.max(0, (parseInt(total.textContent, 10) || 0) - n));
+  }
+  var filled = document.getElementById('gap-filled-month');
+  if (filled) {
+    filled.textContent = String((parseInt(filled.textContent, 10) || 0) + n);
+  }
+  if (!d.key) return;
+  var btn = document.getElementById('gap-btn-' + d.key);
+  if (!btn) return;
+  var c = Math.max(0, (parseInt(btn.getAttribute('data-count'), 10) || 0) - n);
+  btn.setAttribute('data-count', String(c));
+  var label = btn.querySelector('[data-gap-count]');
+  if (label) label.textContent = String(c);
+});
+</script>
 {{end}}

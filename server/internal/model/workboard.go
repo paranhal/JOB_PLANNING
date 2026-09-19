@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,12 +29,19 @@ const (
 	WBProjectArchived = "archived"
 )
 
-// 업무 구분: 행정/지원은 직접 등록, AS·정기점검은 원본 배치 시 자동 등록
+// 업무 구분: 행정/지원·영업은 직접 등록, AS·정기점검은 원본 배치 시 자동 등록
 const (
 	WBWorkAdmin       = "admin"
 	WBWorkSupport     = "support"
 	WBWorkAS          = "as"
 	WBWorkMaintenance = "maintenance"
+	WBWorkSales       = "sales" // 영업활동
+)
+
+// work_tasks.source_role. 같은 활동이 「한 일」과 「다음 할 일」 두 업무를 만들 때 가른다. §45
+const (
+	WBSourceRoleDone = "done"
+	WBSourceRoleNext = "next"
 )
 
 // 업무 등록 일정표에 올리는 카드의 출처. 빈 값은 행정관련 업무(직접 등록).
@@ -179,6 +187,8 @@ func WBWorkTypeLabel(s string) string {
 		return "AS"
 	case WBWorkMaintenance: // = WBSourceMaintenance
 		return "정기점검"
+	case WBWorkSales:
+		return "영업활동"
 	default:
 		return s
 	}
@@ -194,6 +204,8 @@ func WBWorkTypeClass(s string) string {
 		return "bg-rose-100 text-rose-700"
 	case WBWorkMaintenance:
 		return "bg-sky-100 text-sky-700"
+	case WBWorkSales:
+		return "bg-orange-100 text-orange-700"
 	default:
 		return "bg-gray-100 text-gray-600"
 	}
@@ -379,7 +391,9 @@ type WorkProject struct {
 	ContactID       string    `json:"contact_id"`        // 고객 담당자
 	Color           string    `json:"color"`
 	Status          string    `json:"status"`
-	SalesProjectID  string    `json:"sales_project_id,omitempty"` // 승격 원본 (§32.10). 승격 외에 쓰지 않는다.
+	SalesProjectID  string    `json:"sales_project_id,omitempty"`
+	ContractAmount  int       `json:"contract_amount,omitempty"`
+	ContractNo      string    `json:"contract_no,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 
@@ -544,9 +558,75 @@ func (p WorkProject) OrderingPartyLabel() string {
 	return p.OrderingParty
 }
 
+func (p WorkProject) ContractNoLabel() string {
+	if s := strings.TrimSpace(p.ContractNo); s != "" {
+		return s
+	}
+	return p.ProjectID
+}
+
+func (p WorkProject) CustomerOrParty() string {
+	if s := strings.TrimSpace(p.CustomerName); s != "" {
+		return s
+	}
+	return p.OrderingPartyLabel()
+}
+
+// ContractLifeStatus 저장하지 않는다. 만료·만료임박(30일)·유효. §46.10
+func (p WorkProject) ContractLifeStatus(today string) string {
+	end := strings.TrimSpace(p.EndDate)
+	today = strings.TrimSpace(today)
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+	if end == "" {
+		return "유효"
+	}
+	if end < today {
+		return "만료"
+	}
+	due, err1 := time.ParseInLocation("2006-01-02", end, time.Local)
+	now, err2 := time.ParseInLocation("2006-01-02", today, time.Local)
+	if err1 != nil || err2 != nil {
+		return "유효"
+	}
+	if !due.After(now.AddDate(0, 0, 30)) {
+		return "만료임박"
+	}
+	return "유효"
+}
+
+func ContractKPI(items []WorkProject, today string) (totalN, validN, soonN int, totalAmt int64, avgDays string) {
+	totalN = len(items)
+	var daySum, dayN int
+	for i := range items {
+		st := items[i].ContractLifeStatus(today)
+		if st == "유효" || st == "만료임박" {
+			validN++
+		}
+		if st == "만료임박" {
+			soonN++
+		}
+		totalAmt += int64(items[i].ContractAmount)
+		s, e := strings.TrimSpace(items[i].StartDate), strings.TrimSpace(items[i].EndDate)
+		stt, err1 := time.ParseInLocation("2006-01-02", s, time.Local)
+		en, err2 := time.ParseInLocation("2006-01-02", e, time.Local)
+		if err1 == nil && err2 == nil && !en.Before(stt) {
+			daySum += int(en.Sub(stt).Hours()/24) + 1
+			dayN++
+		}
+	}
+	if dayN == 0 {
+		avgDays = "—"
+	} else {
+		avgDays = strconv.Itoa(daySum/dayN) + "일"
+	}
+	return
+}
+
 type WorkTask struct {
 	TaskID           string    `json:"task_id"`
-	WorkType         string    `json:"work_type"` // admin / support / as / maintenance
+	WorkType         string    `json:"work_type"` // admin / support / as / maintenance / sales
 	ProjectID        string    `json:"project_id"`
 	Title            string    `json:"title"`
 	Description      string    `json:"description"`
@@ -562,8 +642,9 @@ type WorkTask struct {
 	AssigneeSource   string    `json:"assignee_source,omitempty"` // as | manual. §42.3
 	Tags             string    `json:"tags"`
 	Progress         int       `json:"progress"`
-	SourceType       string    `json:"source_type"` // as / maintenance / 빈 값
-	SourceID         string    `json:"source_id"`   // as_id / visit_id
+	SourceType       string    `json:"source_type"`           // as / maintenance / sales_activity / 빈 값
+	SourceID         string    `json:"source_id"`             // as_id / visit_id / activity_id
+	SourceRole       string    `json:"source_role,omitempty"` // done | next
 	ParentTaskID     string    `json:"parent_task_id"`
 	CustomerID       string    `json:"customer_id"`   // 거래처(고객마스터)
 	CustomerName     string    `json:"customer_name"` // 거래처 직접입력
@@ -655,6 +736,9 @@ func WBCardAsWaitingTask(c WBCard) WorkTask {
 		sourceType = WBSourceMaintenance
 	case WBWorkSupport:
 		workType = WBWorkSupport
+	case WBSourceSalesActivity:
+		workType = WBWorkSales
+		sourceType = WBSourceSalesActivity
 	}
 	taskID := strings.TrimSpace(c.TaskID)
 	if taskID == "" {
@@ -686,6 +770,7 @@ type WBSummary struct {
 	AS           int // 오늘 예정 AS
 	Maintenance  int // 오늘 예정 정기점검
 	Admin        int // 오늘 예정 행정·사업지원
+	Sales        int // 오늘 예정 영업활동
 	Waiting      int // 상태별(하위호환)
 	InProgress   int
 	Review       int
@@ -694,14 +779,28 @@ type WBSummary struct {
 	ProjectCount int
 }
 
-// WBWorkTypeBucket 일일 업무 현황 열 키: as / maintenance / admin(행정·지원)
+// WBWorkTypeBucket 일일 업무 현황 열 키: as / maintenance / sales / admin(행정·지원)
 func WBWorkTypeBucket(workType string) string {
 	switch workType {
 	case WBWorkAS:
 		return WBWorkAS
 	case WBWorkMaintenance:
 		return WBWorkMaintenance
+	case WBWorkSales:
+		return WBWorkSales
 	default:
 		return WBWorkAdmin // admin + support
+	}
+}
+
+// NormalizeDirectWorkType 직접 등록 업무 구분. AS·점검은 원본에서만 온다.
+func NormalizeDirectWorkType(s string) string {
+	switch strings.TrimSpace(s) {
+	case WBWorkSupport:
+		return WBWorkSupport
+	case WBWorkSales:
+		return WBWorkSales
+	default:
+		return WBWorkAdmin
 	}
 }

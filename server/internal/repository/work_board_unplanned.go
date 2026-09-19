@@ -160,6 +160,9 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	if err := r.addSalesUnplanned(add, mineUserID, mineKeys); err != nil {
 		return nil, model.UnplannedKindCounts{}, err
 	}
+	if err := r.addSalesNextYMUnplanned(add, mineUserID, mineKeys); err != nil {
+		return nil, model.UnplannedKindCounts{}, err
+	}
 	if err := r.addAssetSerialUnplanned(add); err != nil {
 		return nil, model.UnplannedKindCounts{}, err
 	}
@@ -340,6 +343,51 @@ func (r *WorkBoardRepo) addSalesUnplanned(add func(model.UnplannedItem, string),
 		}
 		for _, k := range kinds[p.SalesID] {
 			add(it, k)
+		}
+	}
+	return nil
+}
+
+func (r *WorkBoardRepo) addSalesNextYMUnplanned(add func(model.UnplannedItem, string), mineUserID string, mineKeys []string) error {
+	todayYM := time.Now().Format("2006-01")
+	gaps, err := NewSalesRepo(r.db).ListNextActionYMGaps(todayYM)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	mine := strings.TrimSpace(mineUserID) != "" || len(mineKeys) > 0
+	mineSet := map[string]bool{}
+	for _, k := range mineKeys {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			mineSet[k] = true
+		}
+	}
+	for _, g := range gaps {
+		if mine && !mineSet[strings.TrimSpace(g.OwnerName)] {
+			continue
+		}
+		it := model.UnplannedItem{
+			WorkListItem: model.WorkListItem{
+				Prefix:        model.WorkPrefixSales,
+				RefID:         g.ActivityID,
+				RefNumber:     g.ActivityID,
+				Title:         g.NextAction,
+				OrgName:       g.CustomerName,
+				Assignee:      g.OwnerName,
+				ScheduledDate: g.NextActionYM,
+				Href:          "/sales/" + g.SalesID,
+			},
+			ItemKey:       "salesact:" + g.ActivityID,
+			CanAssignDate: true,
+			CanNoDate:     false,
+			CustomerID:    g.CustomerID,
+		}
+		add(it, model.UnplannedSalesNext)
+		if g.NextActionYM < todayYM {
+			add(it, model.UnplannedReview)
 		}
 	}
 	return nil
@@ -621,6 +669,8 @@ func (r *WorkBoardRepo) AssignUnplannedDate(key, date, assignee, assigneeUID str
 	case "gen":
 		_, err := r.db.Exec(`UPDATE work_other SET work_date=? WHERE other_id=?`, date, id)
 		return err
+	case "salesact":
+		return NewSalesRepo(r.db).CreateNextActionTask(id, date, assignee, assigneeUID)
 	default:
 		return fmt.Errorf("알 수 없는 업무")
 	}

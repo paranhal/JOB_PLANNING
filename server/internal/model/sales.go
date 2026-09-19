@@ -10,16 +10,16 @@ import (
 
 // 영업 사업 단계 코드값. 라벨·확도는 codes 에서 읽는다 (§32.3.1).
 const (
-	SalesStageLead         = "lead"
-	SalesStageContact      = "contact"
-	SalesStageProposal     = "proposal"
-	SalesStageNegotiation  = "negotiation"
-	SalesStageQuote        = "quote"       // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageRFP          = "rfp"         // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageSubmit       = "submit"      // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageWon          = "won"
-	SalesStageContracted   = "contracted"  // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageLost         = "lost"
+	SalesStageLead        = "lead"
+	SalesStageContact     = "contact"
+	SalesStageProposal    = "proposal"
+	SalesStageNegotiation = "negotiation"
+	SalesStageQuote       = "quote"  // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageRFP         = "rfp"    // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageSubmit      = "submit" // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageWon         = "won"
+	SalesStageContracted  = "contracted" // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageLost        = "lost"
 )
 
 const (
@@ -253,6 +253,7 @@ func WorkProjectFromSales(s *SalesProject) *WorkProject {
 		Status:          WBProjectActive,
 		Color:           "#3B82F6",
 		SalesProjectID:  s.SalesID,
+		ContractAmount:  s.ExpectedAmount,
 	}
 	if ym := NormalizeSalesYM(s.ExpectedYM); len(ym) >= 4 {
 		if y, err := strconv.Atoi(ym[:4]); err == nil {
@@ -338,29 +339,18 @@ func CurrentSalesStage(code string) string {
 }
 
 func SalesLegacyStageLabel(code string) string {
+	// 폐 8단계 이력 원문만 둔다. 현행 6단계 이름은 codes 를 본다. §32.3.5·§46.2
 	switch strings.TrimSpace(code) {
-	case SalesStageLead:
-		return "정보 입수"
-	case SalesStageContact:
-		return "담당자 접촉"
-	case SalesStageProposal:
-		return "제안 진행"
-	case SalesStageNegotiation:
-		return "협상"
 	case SalesStageQuote:
 		return "견적 요청"
 	case SalesStageRFP:
 		return "RFP 제안"
 	case SalesStageSubmit:
 		return "제안서 제출"
-	case SalesStageWon:
-		return "수주"
 	case SalesStageContracted:
 		return "계약완료"
-	case SalesStageLost:
-		return "실주"
 	default:
-		return strings.TrimSpace(code)
+		return ""
 	}
 }
 
@@ -378,7 +368,7 @@ func SalesStageDisplayLabel(code string, stages []SalesStageDef) string {
 	return code
 }
 
-// SalesProposalProgress §32.3.2 제안 진행 진척. 활동 유형으로만 판정한다.
+// SalesProposalProgress §32.3.2 견적 단계 진척. 활동 유형으로만 판정한다.
 type SalesProposalProgress struct {
 	Quote    bool
 	RFP      bool
@@ -714,12 +704,12 @@ func LoadSalesStages(stageCodes, probCodes []Code) []SalesStageDef {
 
 func fallbackSalesStages() []SalesStageDef {
 	return []SalesStageDef{
-		{Code: SalesStageContact, Label: "담당자 접촉", Probability: 10, SortOrder: 1},
-		{Code: SalesStageLead, Label: "정보 입수", Probability: 25, SortOrder: 2},
-		{Code: SalesStageProposal, Label: "제안 진행", Probability: 40, SortOrder: 3},
-		{Code: SalesStageNegotiation, Label: "협상", Probability: 70, SortOrder: 4},
-		{Code: SalesStageWon, Label: "수주", Probability: 100, SortOrder: 5},
-		{Code: SalesStageLost, Label: "실주", Probability: 0, SortOrder: 6},
+		{Code: SalesStageContact, Probability: 10, SortOrder: 1},
+		{Code: SalesStageLead, Probability: 25, SortOrder: 2},
+		{Code: SalesStageProposal, Probability: 40, SortOrder: 3},
+		{Code: SalesStageNegotiation, Probability: 70, SortOrder: 4},
+		{Code: SalesStageWon, Probability: 100, SortOrder: 5},
+		{Code: SalesStageLost, Probability: 0, SortOrder: 6},
 	}
 }
 
@@ -888,6 +878,18 @@ func SalesStageIsOpen(stage string) bool {
 	}
 }
 
+// SalesNextGap 다음행동이 월만 지정됐고 그 달이 되었는데 아직 업무가 없는 활동. §45.9
+type SalesNextGap struct {
+	ActivityID   string
+	SalesID      string
+	SalesName    string
+	NextAction   string
+	NextActionYM string
+	OwnerName    string
+	CustomerID   string
+	CustomerName string
+}
+
 // SalesActivity 영업 활동 로그 (§32.8)
 type SalesActivity struct {
 	ActivityID     string
@@ -911,6 +913,17 @@ type SalesActivity struct {
 
 	SalesName    string
 	CustomerName string
+}
+
+// SalesMemo 핵심 전략 메모. 한 줄 = 한 행 (§46.4)
+type SalesMemo struct {
+	MemoID     string
+	SalesID    string
+	Content    string
+	SortOrder  int
+	AuthorID   string
+	AuthorName string
+	CreatedAt  string
 }
 
 func (a SalesActivity) CardDuration() string {

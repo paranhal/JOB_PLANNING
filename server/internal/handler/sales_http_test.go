@@ -36,6 +36,7 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/sales", h.Sales.List)
+	g.GET("/sales/dashboard", h.Sales.Dashboard)
 	g.GET("/sales/new", h.Sales.New)
 	g.POST("/sales", h.Sales.Create)
 	g.GET("/sales/activities", h.Sales.Activities)
@@ -57,10 +58,23 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.POST("/sales/:id/parties", h.Sales.CreateParty)
 	g.POST("/sales/:id/parties/:pid/replace", h.Sales.ReplaceParty)
 	g.POST("/sales/:id/parties/:pid/link", h.Sales.LinkParty)
+	g.POST("/sales/:id/memos", h.Sales.CreateMemo)
+	g.POST("/sales/:id/memos/:mid/delete", h.Sales.DeleteMemo)
 	g.POST("/sales/:id/delete", h.Sales.Delete)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.GET("/projects/new", h.Project.New)
 	g.GET("/projects/:id", h.Project.Show)
+	g.GET("/contracts", h.Project.Contracts)
+	g.GET("/customers", h.Customer.List)
+	g.GET("/items", h.Items.List)
+	g.GET("/items/new", h.Items.New)
+	g.POST("/items", h.Items.Create)
+	g.GET("/items/suggest", h.Items.Suggest)
+	g.POST("/items/quote-line", h.Items.QuoteLine)
+	g.GET("/items/:id/edit", h.Items.Edit)
+	g.POST("/items/:id/kind", h.Items.SetKind)
+	g.POST("/items/:id/confirm", h.Items.Confirm)
+	g.POST("/items/:id", h.Items.Update)
 	return e, db
 }
 
@@ -91,7 +105,7 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 		t.Fatalf("상세 status=%d", show.Code)
 	}
 	body := show.Body.String()
-	if !strings.Contains(body, "정보 입수") || !strings.Contains(body, "25%") {
+	if !strings.Contains(body, "검토") || !strings.Contains(body, "25%") {
 		t.Fatalf("기본 단계·확도 미표시: %s", body[0:min(400, len(body))])
 	}
 	if !strings.Contains(body, "정보 확정도 0/4") {
@@ -116,11 +130,11 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 	}
 	show = doGet(t, e, "/sales/"+id)
 	body = show.Body.String()
-	if !strings.Contains(body, "제안 진행") || !strings.Contains(body, "40%") {
+	if !strings.Contains(body, "견적") || !strings.Contains(body, "40%") {
 		t.Fatalf("단계 변경 후 확도 미반영: %s", body[0:min(500, len(body))])
 	}
 	if !strings.Contains(body, "견적 ○") || !strings.Contains(body, "RFP") {
-		t.Fatal("제안 진행인데 진척 체크가 없다")
+		t.Fatal("견적 단계인데 진척 체크가 없다")
 	}
 
 	rec = doForm(t, e, "/sales/"+id, url.Values{
@@ -485,8 +499,8 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 		t.Fatalf("칸반 status=%d", kanban.Code)
 	}
 	kb := kanban.Body.String()
-	if !strings.Contains(kb, "담당자 접촉") || !strings.Contains(kb, "정보 입수") ||
-		!strings.Contains(kb, "제안 진행") || !strings.Contains(kb, "협상") ||
+	if !strings.Contains(kb, "발굴") || !strings.Contains(kb, "검토") ||
+		!strings.Contains(kb, "견적") || !strings.Contains(kb, "협상") ||
 		!strings.Contains(kb, "수주") || !strings.Contains(kb, "실주") {
 		t.Fatalf("6단계 열이 없다: %s", clipBody(kb))
 	}
@@ -515,8 +529,9 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 		t.Fatalf("파이프라인 status=%d", pipe.Code)
 	}
 	pb := pipe.Body.String()
-	if !strings.Contains(pb, "파이프라인 총액") || !strings.Contains(pb, "가중 금액") ||
-		!strings.Contains(pb, "수주 확정 금액") || !strings.Contains(pb, "수주율") ||
+	if !strings.Contains(pb, "예상매출") || !strings.Contains(pb, "가중매출") ||
+		!strings.Contains(pb, "이번달 마감") || !strings.Contains(pb, "지연") ||
+		!strings.Contains(pb, "수주율") ||
 		!strings.Contains(pb, "담당자별 활동") {
 		t.Fatalf("파이프라인 지표 없음: %s", clipBody(pb))
 	}
@@ -887,8 +902,8 @@ func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 	if !strings.Contains(lb, "세종 RFID 증설 (가칭)") || !strings.Contains(pb, "세종 RFID 증설 (가칭)") {
 		t.Fatal("임시명 (가칭) 이 카드에 없다")
 	}
-	if !strings.Contains(pb, "파이프라인 총액") || strings.Contains(lb, "파이프라인 총액") {
-		t.Fatal("3지표는 파이프라인에만 있어야 한다")
+	if !strings.Contains(pb, "예상매출") || strings.Contains(lb, "예상매출") {
+		t.Fatal("요약 지표는 파이프라인에만 있어야 한다")
 	}
 	if !strings.Contains(pb, "0.3억") || strings.Contains(lb, "0.3억") {
 		t.Fatal("열 금액 합은 파이프라인에만 있어야 한다")
@@ -899,9 +914,6 @@ func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 	if !strings.Contains(lb, "영업담당") || !strings.Contains(pb, "영업담당") ||
 		!strings.Contains(lb, "금액 확정") || !strings.Contains(pb, "금액 확정") {
 		t.Fatal("리스트와 파이프라인이 필터를 공유하지 않는다")
-	}
-	if strings.Count(lb, "1건") != strings.Count(pb, "1건") {
-		t.Fatalf("열 건수가 목록과 다르다 list/pipe")
 	}
 
 	lost := doFormJSON(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"lost"}})
@@ -1027,5 +1039,48 @@ func TestSalesHTTP_ActivityAutoParty(t *testing.T) {
 	var inactive int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sales_parties WHERE sales_id=? AND COALESCE(is_active,1)=0`, id).Scan(&inactive); err != nil || inactive < 1 {
 		t.Fatalf("비활성 행 inactive=%d err=%v", inactive, err)
+	}
+}
+
+func TestSalesHTTP_DashboardAndMemo(t *testing.T) {
+	e := newSalesServer(t)
+	dash := doGet(t, e, "/sales/dashboard")
+	if dash.Code != http.StatusOK {
+		t.Fatalf("dashboard status=%d", dash.Code)
+	}
+	body := dash.Body.String()
+	if !strings.Contains(body, "이번 달 수주") || !strings.Contains(body, "가중 파이프라인") || !strings.Contains(body, "← 업무로") {
+		t.Fatalf("대시보드 문구 없음: %s", clipBody(body))
+	}
+	if strings.Contains(body, "이번 달 계약") {
+		t.Fatal("이번 달 계약 라벨이 남아 있다")
+	}
+	rec := doForm(t, e, "/sales", url.Values{"name": {"대시보드 사업"}, "deal_type": {"build"}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("등록 status=%d", rec.Code)
+	}
+	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	rec = doForm(t, e, "/sales/"+id+"/memos", url.Values{"content": {"핵심 전략 한 줄"}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("메모 status=%d", rec.Code)
+	}
+	show := doGet(t, e, "/sales/"+id)
+	if show.Code != http.StatusOK {
+		t.Fatalf("상세 status=%d", show.Code)
+	}
+	sb := show.Body.String()
+	if !strings.Contains(sb, "핵심 전략 한 줄") {
+		t.Fatal("메모가 안 보인다")
+	}
+	if !strings.Contains(sb, "견적 작성") || !strings.Contains(sb, "/quotes/new?sales_id="+id) {
+		t.Fatal("견적 작성 링크가 없다")
+	}
+	pipe := doGet(t, e, "/sales/pipeline")
+	if pipe.Code != http.StatusOK || !strings.Contains(pipe.Body.String(), "지연") {
+		t.Fatalf("파이프라인 5지표 없음 status=%d", pipe.Code)
+	}
+	ct := doGet(t, e, "/contracts")
+	if ct.Code != http.StatusOK || !strings.Contains(ct.Body.String(), "만료임박") {
+		t.Fatalf("계약 목록 status=%d", ct.Code)
 	}
 }

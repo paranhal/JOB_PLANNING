@@ -13,7 +13,8 @@
        {{if and $drag (eq $drop "el")}}@dragover.prevent @drop.prevent="dropKanban($event.currentTarget)"{{end}}
        {{if and $drag (eq $drop "sales")}}@dragover.prevent @drop.prevent="dropProject($event, '{{.Key}}', {{.Sort}}, {{if .IsLost}}true{{else}}false{{end}})"{{end}}
        {{if and $drag (eq $drop "act")}}@dragover.prevent @drop.prevent="dropAct($event, '{{.Key}}')"{{end}}>
-    <div class="px-3 py-2.5 border-b bg-white/90 rounded-t-xl {{if .IsLost}}cursor-pointer{{end}}"
+    {{if .Stripe}}<div class="h-1 {{.Stripe}} rounded-t-xl"></div>{{end}}
+    <div class="px-3 py-2.5 border-b bg-white/90 {{if not .Stripe}}rounded-t-xl{{end}} {{if .IsLost}}cursor-pointer{{end}}"
          {{if .IsLost}}@click="lostOpen=!lostOpen"{{end}}>
       <div class="flex justify-between items-center gap-2">
         <h3 class="font-semibold text-sm text-slate-800 truncate">{{.Title}}{{if .IsLost}} <span class="text-[10px] font-normal text-slate-400" x-text="lostOpen ? '▾' : '▸'"></span>{{end}}</h3>
@@ -70,8 +71,9 @@
   {{else if not $c.TypeLabel}}
   <p class="text-[11px] text-slate-500 mt-1">기관 미입력</p>
   {{end}}
-  {{if $c.Extra}}<p class="text-[11px] mt-0.5 {{if $c.AmountUnconfirmed}}text-gray-400{{else}}text-slate-500{{end}}">{{$c.Extra}}{{if $c.AmountUnconfirmed}} 미확정{{end}}</p>{{end}}
-  {{if $c.Assignee}}<p class="text-[11px] mt-0.5 {{if $c.AssigneeOther}}font-bold text-slate-800{{else}}text-slate-600{{end}}">{{if $c.EditLocked}}<span title="읽기 전용">🔒</span> {{end}}{{$c.Assignee}}</p>{{else if eq $c.Prefix "as"}}<p class="text-[11px] text-amber-600 mt-0.5">{{if $c.EditLocked}}<span title="읽기 전용">🔒</span> {{end}}미배정</p>{{else if $c.EditLocked}}<p class="text-[11px] text-slate-400 mt-0.5" title="읽기 전용">🔒 읽기 전용</p>{{end}}
+  {{if or $c.Extra $c.ProbLabel}}<p class="text-[11px] mt-0.5 {{if $c.AmountUnconfirmed}}text-gray-400{{else}}text-slate-500{{end}}">{{$c.Extra}}{{if and $c.Extra $c.ProbLabel}} · {{end}}{{if $c.ProbLabel}}{{$c.ProbLabel}}{{end}}{{if $c.AmountUnconfirmed}} 미확정{{end}}</p>{{end}}
+  {{if $c.NextLabel}}<p class="text-[11px] text-slate-600 mt-0.5 truncate">다음: {{$c.NextLabel}}</p>{{end}}
+  {{if $c.Assignee}}<p class="text-[11px] mt-0.5 {{if $c.AssigneeOther}}font-bold text-slate-800{{else}}text-slate-600{{end}}">{{if $c.EditLocked}}<span title="읽기 전용">🔒</span> {{end}}{{$c.Assignee}}{{if $c.DnLabel}} · {{$c.DnLabel}}{{end}}</p>{{else if $c.DnLabel}}<p class="text-[11px] text-slate-500 mt-0.5">{{$c.DnLabel}}</p>{{else if eq $c.Prefix "as"}}<p class="text-[11px] text-amber-600 mt-0.5">{{if $c.EditLocked}}<span title="읽기 전용">🔒</span> {{end}}미배정</p>{{else if $c.EditLocked}}<p class="text-[11px] text-slate-400 mt-0.5" title="읽기 전용">🔒 읽기 전용</p>{{end}}
   {{if $c.LastActivity}}<p class="text-[11px] text-slate-400">마지막 활동 {{$c.LastActivity}}</p>{{end}}
   {{if and $.CanWrite (not $c.EditLocked) (or $c.ActionHref $c.EditHref)}}
   <div class="mt-1.5 flex gap-1">

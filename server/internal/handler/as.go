@@ -657,6 +657,7 @@ func (h *ASHandler) Create(c echo.Context) error {
 				}
 			}
 		}
+		h.rebuildDictKeywordLinks(as.ASID)
 	}
 	if first == nil {
 		return c.Redirect(http.StatusSeeOther, "/as/new?err="+url.QueryEscape("증상을 입력하세요"))
@@ -746,6 +747,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 		h.notices.Record(c, model.AssignNoticeSourceAS, id, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)
 	}
 	h.saveKeywordChecks(c, id, model.KWFieldSymptom)
+	h.rebuildDictKeywordLinks(id)
 	return c.Redirect(http.StatusSeeOther, "/as/"+id)
 }
 
@@ -1301,6 +1303,10 @@ func (h *ASHandler) Update(c echo.Context) error {
 			}
 		}
 	}
+	h.rebuildDictKeywordLinks(as.ASID)
+	if followupChild != nil {
+		h.rebuildDictKeywordLinks(followupChild.ASID)
+	}
 	loc := "/as/" + id + "/action"
 	q := url.Values{}
 	if followupChild != nil {
@@ -1790,6 +1796,7 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 	if err := h.processRepo.Create(p); err != nil {
 		return err
 	}
+	h.rebuildDictKeywordLinks(asID)
 	return c.Redirect(http.StatusSeeOther, "/as/"+asID)
 }
 
@@ -1835,6 +1842,7 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 	if err := h.repo.Create(as); err != nil {
 		return err
 	}
+	h.rebuildDictKeywordLinks(as.ASID)
 	// 원 접수에도 재접수 사실을 이력으로 남긴다.
 	h.appendReopenProcess(src, as, reason, c)
 	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID)

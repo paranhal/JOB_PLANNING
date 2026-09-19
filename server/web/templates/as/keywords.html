@@ -4,9 +4,15 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-lg font-bold text-slate-800">AS 키워드 사전</h2>
-      <p class="text-xs text-slate-500 mt-0.5">빈도 추출은 후보만 보여 줍니다. 사람이 고른 것만 사전에 들어갑니다. 인사말·조사·URL 조각은 후보에서 뺍니다.</p>
+      <p class="text-xs text-slate-500 mt-0.5">빈도 추출은 후보만 보여 줍니다. 사람이 고른 것만 사전에 들어갑니다. 인사말·조사·URL 조각은 후보에서 뺍니다.
+        연결 총 {{.LinkTotal}}건 · 접수 {{.ReceiptTotal}}건</p>
     </div>
     <div class="flex gap-2">
+      {{if .CanEdit}}
+      <form method="POST" action="/as/keywords/rebuild">
+        <button type="submit" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50">다시 묶기</button>
+      </form>
+      {{end}}
       <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
       <a href="/as" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">목록</a>
     </div>
@@ -16,6 +22,8 @@
   <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">불용어(인사말 등)는 키워드로 넣을 수 없습니다.</div>
   {{else if eq .Err "keyword"}}
   <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">키워드와 구분을 입력하세요.</div>
+  {{else if eq .OK "relink"}}
+  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">증상·조치 글을 사전으로 다시 묶었습니다.</div>
   {{else if .OK}}
   <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">저장했습니다.</div>
   {{end}}

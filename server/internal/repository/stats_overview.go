@@ -210,6 +210,11 @@ func (r *StatsRepo) countBucket(from, toEx string, f model.StatsMeetingFilter) (
 			return b, err
 		}
 	}
+	if wt == "" || wt == "sales" {
+		if b.Sales, err = r.countSalesSlice(from, toEx, f); err != nil {
+			return b, err
+		}
+	}
 	return b, nil
 }
 
@@ -439,6 +444,47 @@ func (r *StatsRepo) countAdminSlice(from, toEx string, f model.StatsMeetingFilte
 	if s.Modified, err = r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
+		  AND (
+		    (COALESCE(t.recurrence_role,'')='occurrence'
+		     AND t.status='complete'
+		     AND TRIM(COALESCE(t.work_date,'')) != ''
+		     AND t.work_date >= ? AND t.work_date < ?
+		     AND `+adminTaskCompleteDateSQL+` != t.work_date)
+		    OR
+		    (COALESCE(t.recurrence_role,'') != 'occurrence'
+		     AND TRIM(COALESCE(t.due_date,'')) != '' AND TRIM(COALESCE(t.work_date,'')) != ''
+		     AND t.due_date != t.work_date
+		     AND ((t.work_date >= ? AND t.work_date < ?) OR (t.due_date >= ? AND t.due_date < ?)))
+		  )`+adminSQL, append([]interface{}{from, toEx, from, toEx, from, toEx}, adminArgs...)...); err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+func (r *StatsRepo) countSalesSlice(from, toEx string, f model.StatsMeetingFilter) (model.StatsWorkSlice, error) {
+	var s model.StatsWorkSlice
+	adminSQL, adminArgs := r.filterAdmin(f)
+	args := append([]interface{}{from, toEx}, adminArgs...)
+	n, err := r.countSQL(`
+		SELECT COUNT(*) FROM work_tasks t
+		WHERE t.work_type = 'sales'
+		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') >= ?
+		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') < ?`+adminSQL, args...)
+	if err != nil {
+		return s, err
+	}
+	s.Planned = n
+	s.Receipt = n
+	if s.Process, err = r.countSQL(`
+		SELECT COUNT(*) FROM work_tasks t
+		WHERE t.work_type = 'sales' AND t.status = 'complete'
+		  AND `+adminTaskCompleteDateSQL+` >= ?
+		  AND `+adminTaskCompleteDateSQL+` < ?`+adminSQL, args...); err != nil {
+		return s, err
+	}
+	if s.Modified, err = r.countSQL(`
+		SELECT COUNT(*) FROM work_tasks t
+		WHERE t.work_type = 'sales'
 		  AND (
 		    (COALESCE(t.recurrence_role,'')='occurrence'
 		     AND t.status='complete'

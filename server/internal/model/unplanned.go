@@ -7,13 +7,14 @@ import (
 
 // UnplannedKind §8.1 미계획 유형
 const (
-	UnplannedNoDate     = "no_date"    // 예정없음
-	UnplannedDelayed    = "delayed"    // 예정일경과
-	UnplannedNext       = "next"       // 다음일정미정
-	UnplannedUnassigned = "unassigned" // 담당자미배정
-	UnplannedReview     = "review"     // 미정사유만료 · 영업 예정월 경과
-	UnplannedSalesFollow   = "sales_nofollow"   // 영업 후속없음 (§32.9)
+	UnplannedNoDate        = "no_date"        // 예정없음
+	UnplannedDelayed       = "delayed"        // 예정일경과
+	UnplannedNext          = "next"           // 다음일정미정
+	UnplannedUnassigned    = "unassigned"     // 담당자미배정
+	UnplannedReview        = "review"         // 미정사유만료 · 영업 예정월 경과
+	UnplannedSalesFollow   = "sales_nofollow" // 영업 후속없음 (§32.9)
 	UnplannedSalesUnsigned = "sales_unsigned" // 계약 미체결 (§32.10)
+	UnplannedSalesNext     = "sales_next_ym"  // 영업 다음행동 날짜미정 (§45.9)
 	UnplannedAssetSerial   = "asset_serial"   // 납품 자산 시리얼 미입력 (§36.10)
 )
 
@@ -80,6 +81,8 @@ func UnplannedKindLabel(kind string) string {
 		return "영업 후속없음"
 	case UnplannedSalesUnsigned:
 		return "계약 미체결"
+	case UnplannedSalesNext:
+		return "영업 다음행동"
 	case UnplannedAssetSerial:
 		return UnplannedAssetSerialTitle
 	default:
@@ -126,6 +129,8 @@ func UnplannedBadgeOfStarted(kind string, daysOverdue int, started bool) Unplann
 		return UnplannedBadge{Kind: kind, Label: "영업 후속없음", Class: "bg-orange-100 text-orange-800"}
 	case UnplannedSalesUnsigned:
 		return UnplannedBadge{Kind: kind, Label: "계약 미체결", Class: "bg-orange-100 text-orange-800"}
+	case UnplannedSalesNext:
+		return UnplannedBadge{Kind: kind, Label: "날짜미정", Class: "bg-orange-100 text-orange-800"}
 	case UnplannedAssetSerial:
 		return UnplannedBadge{Kind: kind, Label: UnplannedAssetSerialTitle, Class: "bg-amber-100 text-amber-800"}
 	default:
@@ -164,7 +169,7 @@ func (it UnplannedItem) NeedPlanKind() bool {
 	if it.HasKind(UnplannedUnassigned) {
 		return true
 	}
-	if (it.HasKind(UnplannedSalesFollow) || it.HasKind(UnplannedSalesUnsigned)) && !it.HasKind(UnplannedReview) {
+	if (it.HasKind(UnplannedSalesFollow) || it.HasKind(UnplannedSalesUnsigned) || it.HasKind(UnplannedSalesNext)) && !it.HasKind(UnplannedReview) {
 		return true
 	}
 	return it.HasKind(UnplannedNoDate) && !it.HasKind(UnplannedReview)
@@ -177,16 +182,17 @@ func (it UnplannedItem) OverdueKind() bool {
 
 // UnplannedKindCounts 유형별 건수(한 건이 여러 유형이면 각각 센다)
 type UnplannedKindCounts struct {
-	NoDate       int
-	Delayed      int
-	Next         int
-	Unassigned   int
-	Review       int
-	SalesFollow    int
-	SalesUnsigned  int
-	NeedPlan       int // 고유: 계획이 없는 건
-	Overdue      int // 고유: 밀린 건
-	Total        int // 고유 건수
+	NoDate        int
+	Delayed       int
+	Next          int
+	Unassigned    int
+	Review        int
+	SalesFollow   int
+	SalesUnsigned int
+	SalesNext     int
+	NeedPlan      int // 고유: 계획이 없는 건
+	Overdue       int // 고유: 밀린 건
+	Total         int // 고유 건수
 }
 
 func (c *UnplannedKindCounts) AddItem(it UnplannedItem) {
@@ -213,6 +219,8 @@ func (c *UnplannedKindCounts) AddItem(it UnplannedItem) {
 			c.SalesFollow++
 		case UnplannedSalesUnsigned:
 			c.SalesUnsigned++
+		case UnplannedSalesNext:
+			c.SalesNext++
 		case UnplannedAssetSerial:
 			// 시리얼 미입력은 예정없음 열에 둔다. 별도 카운트 칸은 없다.
 		}

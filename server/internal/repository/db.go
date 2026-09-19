@@ -545,6 +545,7 @@ CREATE TABLE IF NOT EXISTS work_tasks (
     progress        INTEGER NOT NULL DEFAULT 0,
     source_type     TEXT,
     source_id       TEXT,
+    source_role     TEXT NOT NULL DEFAULT '',
     parent_task_id  TEXT,
     customer_id     TEXT,
     customer_name   TEXT,
@@ -782,7 +783,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE work_tasks ADD COLUMN parent_task_id TEXT`,
 		`CREATE INDEX IF NOT EXISTS idx_work_tasks_work_date ON work_tasks(work_date)`,
 		`CREATE INDEX IF NOT EXISTS idx_work_tasks_parent ON work_tasks(parent_task_id)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_work_tasks_source ON work_tasks(source_type, source_id)
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_work_tasks_source_role ON work_tasks(source_type, source_id, source_role)
 			WHERE source_type IS NOT NULL AND source_type != ''`,
 		`ALTER TABLE work_tasks ADD COLUMN customer_id TEXT`,
 		`ALTER TABLE work_tasks ADD COLUMN customer_name TEXT`,
@@ -1124,6 +1125,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyMetricsSettings(db)
 	applyASSearch(db)
 	applyASKeywords(db)
+	seedKeywordLinksIfNeeded(db)
 	applyASImport(db)
 	applyASReceiptGroup(db)
 	applyAS34ReceiptUX(db)
@@ -1144,6 +1146,10 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASProcessTruth(db)
 	applyNF1(db)
 	applyAppVersions(db)
+	applySalesTaskType(db)
+	applySalesStageLabels(db)
+	applySalesMemos(db)
+	applyWorkProjectContract(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
 	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&

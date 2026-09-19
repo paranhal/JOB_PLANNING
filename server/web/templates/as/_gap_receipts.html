@@ -1,0 +1,179 @@
+{{$rowsOnly := .RowsOnly}}
+{{$key := or .GroupKey "other"}}
+{{$empty := false}}{{if .IndexEmpty}}{{$empty = true}}{{end}}
+{{if not $rowsOnly}}
+{{$sort := or .Sort ""}}{{$dir := or .Dir ""}}{{$href := .SortLinks}}
+<div class="mt-3 space-y-2" x-data="gapSelect()" hx-boost="true" hx-target="#grp-{{$key}}" hx-swap="innerHTML">
+  <form class="flex flex-wrap items-center gap-2" method="GET" action="/as/knowledge/gaps/group">
+    {{if .Other}}
+    <input type="hidden" name="other" value="1">
+    {{else}}
+    <input type="hidden" name="keyword_id" value="{{.KeywordID}}">
+    {{end}}
+    <input type="hidden" name="sort" value="{{$sort}}">
+    <input type="hidden" name="dir" value="{{$dir}}">
+    <label class="text-xs text-slate-500">사이트
+      <select name="site" class="ml-1 border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white"
+              onchange="this.form.requestSubmit()">
+        <option value="">전체</option>
+        {{range .Sites}}
+        <option value="{{.CustomerID}}" {{if eq $.Site .CustomerID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+    {{if gt .Total 0}}
+    <p class="text-xs text-slate-500">{{.Total}}건 중 {{.From}}–{{.To}}</p>
+    {{end}}
+  </form>
+
+  {{if $.CanProcess}}
+  <div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 space-y-2" x-show="n > 0" x-cloak>
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <span class="font-medium text-blue-900"><span x-text="n"></span>건 선택됨</span>
+      <button type="button" class="px-2 py-1 rounded bg-blue-600 text-white" @click="open = true">선택한 <span x-text="n"></span>건에 같은 지식 넣기</button>
+      <button type="button" class="px-2 py-1 rounded border border-blue-200 text-blue-800" @click="clear()">선택 해제</button>
+    </div>
+    <p class="text-xs text-red-700" x-text="err" x-show="err"></p>
+    <div id="gap-bulk-err-{{$key}}"></div>
+    <form method="POST" action="/as/knowledge/bulk" class="space-y-2" x-show="open"
+          hx-boost="false"
+          hx-post="/as/knowledge/bulk"
+          hx-target="#gap-bulk-err-{{$key}}"
+          hx-swap="innerHTML">
+      {{if .Other}}<input type="hidden" name="other" value="1">{{else}}<input type="hidden" name="keyword_id" value="{{.KeywordID}}">{{end}}
+      <input type="hidden" name="group_key" value="{{$key}}">
+      <input type="hidden" name="site" value="{{.Site}}">
+      <input type="hidden" name="sort" value="{{$sort}}">
+      <input type="hidden" name="dir" value="{{$dir}}">
+      <template x-for="id in ids" :key="id">
+        <input type="hidden" name="as_id" :value="id">
+      </template>
+      <p class="text-xs font-medium text-slate-700">선택한 건의 증상</p>
+      <ul class="text-xs text-slate-700 space-y-1 max-h-32 overflow-y-auto">
+        <template x-for="id in ids" :key="'s-'+id">
+          <li>· <span x-text="picked[id]"></span></li>
+        </template>
+      </ul>
+      <label class="block text-xs text-slate-600">조치
+        <textarea name="action_text" required rows="3" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="이 건들에 넣을 조치"></textarea>
+      </label>
+      <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs"><span x-text="n"></span>건 모두에 저장</button>
+    </form>
+  </div>
+  {{end}}
+
+  {{if $empty}}
+  <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+    <p class="font-medium">묶음 색인이 비어 있습니다.</p>
+    <p class="text-xs mt-1">증상을 키워드로 묶은 표가 아직 만들어지지 않아 목록을 찾을 수 없습니다.</p>
+    {{if $.CanProcess}}
+    <form method="POST" action="/as/keywords/rebuild" class="mt-2">
+      <button type="submit" class="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs">지금 다시 묶기</button>
+    </form>
+    {{end}}
+  </div>
+  {{else if not .Items}}
+  <p class="px-3 py-4 text-sm text-slate-400">이 조건에 해당하는 접수가 없습니다.</p>
+  {{else}}
+  {{if .SortSelect}}
+  <div class="md:hidden">{{template "sort_select" (dict "Options" .SortSelect "ID" (printf "gap-sort-%s" $key))}}</div>
+  {{end}}
+  <div class="overflow-x-auto border border-gray-100 rounded-lg">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="w-8 px-2 py-2"></th>
+          {{template "sort_th" (dict "Label" "접수번호" "Key" "as_number" "Cur" $sort "Dir" $dir "Href" (index $href "as_number") "PadClass" "px-2 py-2")}}
+          {{template "sort_th" (dict "Label" "접수일" "Key" "receipt_date" "Cur" $sort "Dir" $dir "Href" (index $href "receipt_date") "PadClass" "px-2 py-2")}}
+          {{template "sort_th" (dict "Label" "사이트" "Key" "customer" "Cur" $sort "Dir" $dir "Href" (index $href "customer") "PadClass" "px-2 py-2")}}
+          {{template "sort_th" (dict "Label" "증상" "Key" "symptom" "Cur" $sort "Dir" $dir "Href" (index $href "symptom") "PadClass" "px-2 py-2")}}
+          <th class="px-2 py-2 text-xs font-semibold text-left text-gray-500">상태</th>
+          <th class="px-2 py-2 w-14"></th>
+        </tr>
+      </thead>
+  {{end}}
+{{end}}
+{{if and (not $empty) .Items}}
+{{range .Items}}
+      <tbody id="gap-as-{{.ASID}}">
+        <tr class="border-t border-gray-50 align-top">
+          <td class="px-2 py-2">
+            <input type="checkbox" value="{{.ASID}}" data-gap-check data-symptom="{{.Symptom}}"
+                   class="rounded border-gray-300"
+                   @change="onCheck($event, $el.value, $el.dataset.symptom)">
+          </td>
+          <td class="px-2 py-2 font-mono text-xs"><a href="/as/{{.ASID}}" class="text-blue-700 hover:underline" hx-boost="false">{{.ASNumber}}</a></td>
+          <td class="px-2 py-2 text-xs text-slate-600 whitespace-nowrap">{{.ReceiptDate}}</td>
+          <td class="px-2 py-2 text-xs">{{.CustomerName}}</td>
+          <td class="px-2 py-2">
+            <button type="button" class="text-left text-sm text-slate-800 line-clamp-2" onclick="this.classList.toggle('line-clamp-2')">{{.Symptom}}</button>
+            {{if eq .Kind "short"}}
+            <p class="text-xs text-amber-700 mt-1">기존 기록: 「{{.ShortAction}}」 — 보완해 주세요</p>
+            {{end}}
+          </td>
+          <td class="px-2 py-2 whitespace-nowrap">
+            {{if eq .Kind "short"}}
+            <span class="text-xs text-amber-800">10자 미만</span>
+            {{else}}
+            <span class="text-xs text-slate-500">조치 없음</span>
+            {{end}}
+          </td>
+          <td class="px-2 py-2">
+            {{if $.CanProcess}}
+            <button type="button" class="text-xs text-blue-700 hover:underline"
+                    onclick="document.getElementById('gap-write-{{.ASID}}').classList.toggle('hidden')">쓰기</button>
+            {{end}}
+          </td>
+        </tr>
+        {{if $.CanProcess}}
+        <tr id="gap-write-{{.ASID}}" class="hidden">
+          <td colspan="7" class="px-2 pb-3">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <p class="text-xs font-medium text-slate-800">{{.ASNumber}} · {{.CustomerName}} · {{.ReceiptDate}}</p>
+              <p class="text-sm text-slate-800 whitespace-pre-wrap">증상: {{.Symptom}}</p>
+              <form method="POST" action="/as/knowledge" enctype="multipart/form-data" class="space-y-2"
+                    hx-boost="false"
+                    hx-post="/as/knowledge"
+                    hx-encoding="multipart/form-data"
+                    hx-target="#gap-as-{{.ASID}}"
+                    hx-swap="outerHTML">
+                <input type="hidden" name="from" value="gaps">
+                <input type="hidden" name="as_id" value="{{.ASID}}">
+                <input type="hidden" name="symptom_text" value="{{.Symptom}}">
+                <input type="hidden" name="group_key" value="{{$key}}">
+                <label class="block text-xs text-slate-600">조치
+                  <textarea name="action_text" required rows="3" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="이 건에 대한 조치">{{if eq .Kind "short"}}{{.ShortAction}}{{end}}</textarea>
+                </label>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">저장</button>
+                  <label class="text-xs text-slate-600">사진 첨부
+                    <input type="file" name="file" accept="image/*" multiple class="block text-xs mt-0.5">
+                  </label>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+{{end}}
+{{if .HasMore}}
+      <tbody id="gap-more-{{$key}}">
+        <tr>
+          <td colspan="7" class="px-2 py-2 text-center">
+            <button type="button" class="text-xs text-blue-700 hover:underline"
+                    hx-get="{{.MoreURL}}"
+                    hx-target="#gap-more-{{$key}}"
+                    hx-swap="outerHTML">더 보기</button>
+          </td>
+        </tr>
+      </tbody>
+{{end}}
+{{end}}
+{{if not $rowsOnly}}
+  {{if and (not $empty) .Items}}
+    </table>
+  </div>
+  {{end}}
+</div>
+{{end}}

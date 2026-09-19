@@ -143,7 +143,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("칸반: status=%d", kanban.Code)
 	}
 	body := kanban.Body.String()
-	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%", "할 일", "진행중"} {
+	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "영업활동", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%", "할 일", "진행중"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("칸반 화면에 %q 없음", want)
 		}

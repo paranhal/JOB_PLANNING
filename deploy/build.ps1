@@ -41,11 +41,16 @@ Write-Host "=======================================================" -Foreground
 Write-Host ""
 
 # ── 2. 도커 이미지를 만든다 ──────────────────────────────────────
+$env:BUILDX_NO_DEFAULT_ATTESTATIONS = '1'
 docker build `
+    --platform linux/amd64 `
+    --provenance=false `
+    --sbom=false `
     --build-arg "VERSION=$Version" `
     --build-arg "COMMIT=$Commit" `
     --build-arg "BUILD_TIME=$BuildTime" `
     -t server-app:latest `
+    -f (Join-Path $Root 'server\Dockerfile') `
     (Join-Path $Root 'server')
 if ($LASTEXITCODE -ne 0) { throw "docker build 실패" }
 

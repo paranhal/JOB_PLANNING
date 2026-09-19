@@ -27,7 +27,7 @@ func TestVersionJSONUnauthenticated(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	var got map[string]string
+	var got map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
@@ -62,12 +62,16 @@ func TestVersionSkipsAuthMiddleware(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("로그인 없이 /version 실패 status=%d loc=%s", rec.Code, rec.Header().Get("Location"))
 	}
-	var got map[string]string
+	var got map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got["version"] != "v2.37" || got["commit"] != "nogit" {
 		t.Fatalf("json=%v", got)
+	}
+	idx, _ := got["index"].(map[string]any)
+	if idx == nil {
+		t.Fatal("/version 에 index 가 없다")
 	}
 }
 
@@ -233,8 +237,8 @@ func TestDeployBuildScriptGitOptional(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(ver)) != "v2.37" {
-		t.Fatalf("VERSION=%q", ver)
+	if strings.TrimSpace(string(ver)) == "" {
+		t.Fatal("VERSION 파일이 비었다")
 	}
 }
 

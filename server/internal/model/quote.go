@@ -692,3 +692,48 @@ func (q SalesQuote) expiryDate() string {
 	}
 	return t.AddDate(0, 0, 14).Format("2006-01-02")
 }
+
+type QuoteListKPI struct {
+	WaitSend    int
+	MonthQuotes int
+	AvgDiscount string
+	WinRate     string
+}
+
+func BuildQuoteListKPI(items []SalesQuote, ym string) QuoteListKPI {
+	ym = strings.TrimSpace(ym)
+	if ym == "" {
+		ym = time.Now().Format("2006-01")
+	}
+	k := QuoteListKPI{AvgDiscount: "—", WinRate: "—"}
+	won, lost := 0, 0
+	var discSum float64
+	discN := 0
+	for i := range items {
+		q := items[i]
+		st := NormalizeQuoteStatus(q.Status)
+		if st == QuoteStatusDraft {
+			k.WaitSend++
+		}
+		if len(q.QuoteDate) >= 7 && q.QuoteDate[:7] == ym {
+			k.MonthQuotes++
+		}
+		if st == QuoteStatusWon {
+			won++
+		}
+		if st == QuoteStatusLost {
+			lost++
+		}
+		for _, ln := range q.Lines {
+			if ln.DiscountRate > 0 {
+				discSum += ln.DiscountRate
+				discN++
+			}
+		}
+	}
+	k.WinRate = FormatSalesRate(won, won+lost)
+	if discN > 0 {
+		k.AvgDiscount = fmt.Sprintf("%.1f%%", discSum/float64(discN))
+	}
+	return k
+}

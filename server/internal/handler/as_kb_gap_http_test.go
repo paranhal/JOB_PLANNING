@@ -39,6 +39,9 @@ func TestKnowledgeGapHTTPRecordWriteResolve(t *testing.T) {
 	if err := asRepo.Create(as); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := asRepo.RebuildKeywordLinks([]string{as.ASID}); err != nil {
+		t.Fatal(err)
+	}
 
 	e := echo.New()
 	e.Renderer = NewRenderer()

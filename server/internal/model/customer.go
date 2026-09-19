@@ -5,14 +5,14 @@ import "time"
 // Customer 고객 마스터 (기획서 §5.1)
 type Customer struct {
 	CustomerID       string    `json:"customer_id"`
-	OrgName          string    `json:"org_name"`           // 기관명 (실무 명칭)
-	OfficialName     string    `json:"official_name"`      // 공식명칭 (계약서 기준)
+	OrgName          string    `json:"org_name"`      // 기관명 (실무 명칭)
+	OfficialName     string    `json:"official_name"` // 공식명칭 (계약서 기준)
 	OrgEmail         string    `json:"org_email"`
 	MainPhone        string    `json:"main_phone"`
 	Website          string    `json:"website"`
-	BusinessNumber   string    `json:"business_number"`    // 사업자번호
-	Representative   string    `json:"representative"`     // 대표자
-	Industry         string    `json:"industry"`           // 업종 코드
+	BusinessNumber   string    `json:"business_number"` // 사업자번호
+	Representative   string    `json:"representative"`  // 대표자
+	Industry         string    `json:"industry"`        // 업종 코드
 	HasParent        bool      `json:"has_parent"`
 	ParentCustomerID string    `json:"parent_customer_id"` // 상위기관 ID
 	PostalCode       string    `json:"postal_code"`        // 우편번호
@@ -63,12 +63,12 @@ type CustomerFloor struct {
 
 // CustomerRoom 고객 실
 type CustomerRoom struct {
-	RoomID    string    `json:"room_id"`
-	FloorID   string    `json:"floor_id"`
-	RoomName  string    `json:"room_name"`
-	RoomNumber string   `json:"room_number"`
-	Purpose   string    `json:"purpose"`
-	CreatedAt time.Time `json:"created_at"`
+	RoomID     string    `json:"room_id"`
+	FloorID    string    `json:"floor_id"`
+	RoomName   string    `json:"room_name"`
+	RoomNumber string    `json:"room_number"`
+	Purpose    string    `json:"purpose"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // Contact 고객 담당자 (기획서 §5.3)
@@ -135,28 +135,31 @@ type ContactHistoryListItem struct {
 
 // CustomerListItem 목록 표시용 (집계 포함)
 type CustomerListItem struct {
-	CustomerID       string `json:"customer_id"`
-	OrgName          string `json:"org_name"`
-	OfficialName     string `json:"official_name"`
-	Industry         string `json:"industry"`
-	MainPhone        string `json:"main_phone"`
-	IsActive         bool   `json:"is_active"`
-	AssetCount       int    `json:"asset_count"`
-	AsCount          int    `json:"as_count"`
-	ParentCustomerID string `json:"parent_customer_id"`
-	ParentOrgName    string `json:"parent_org_name"`
-	HasParent        bool   `json:"has_parent"`
-	Address          string `json:"address,omitempty"`      // 엑셀·지역필터용(조합 또는 구주소)
-	AddrSido         string `json:"addr_sido,omitempty"`    // 시도(구조화)
-	SiteRegion       string `json:"site_region,omitempty"` // 점검사이트 지역
-	NeedsReview      bool   `json:"needs_review,omitempty"`
-	ReviewReason     string `json:"review_reason,omitempty"`
-	PartyKind        string `json:"party_kind,omitempty"`
+	CustomerID        string `json:"customer_id"`
+	OrgName           string `json:"org_name"`
+	OfficialName      string `json:"official_name"`
+	Industry          string `json:"industry"`
+	MainPhone         string `json:"main_phone"`
+	IsActive          bool   `json:"is_active"`
+	AssetCount        int    `json:"asset_count"`
+	AsCount           int    `json:"as_count"`
+	ParentCustomerID  string `json:"parent_customer_id"`
+	ParentOrgName     string `json:"parent_org_name"`
+	HasParent         bool   `json:"has_parent"`
+	Address           string `json:"address,omitempty"`     // 엑셀·지역필터용(조합 또는 구주소)
+	AddrSido          string `json:"addr_sido,omitempty"`   // 시도(구조화)
+	SiteRegion        string `json:"site_region,omitempty"` // 점검사이트 지역
+	NeedsReview       bool   `json:"needs_review,omitempty"`
+	ReviewReason      string `json:"review_reason,omitempty"`
+	PartyKind         string `json:"party_kind,omitempty"`
+	SalesOpenCount    int    `json:"sales_open_count,omitempty"`
+	SalesWonAmount    int    `json:"sales_won_amount,omitempty"`
+	SalesLastActivity string `json:"sales_last_activity,omitempty"`
 }
 
 // CustomerCategory 고객현황 상위기관 카테고리(콤보)
 type CustomerCategory struct {
-	ParentID   string `json:"parent_id"`   // 빈값=전체, "none"=상위기관 없음
+	ParentID   string `json:"parent_id"` // 빈값=전체, "none"=상위기관 없음
 	Name       string `json:"name"`
 	ChildCount int    `json:"child_count"`
 }
@@ -166,4 +169,3 @@ type CustomerIndustryStat struct {
 	Industry string `json:"industry"`
 	Count    int    `json:"count"`
 }
-

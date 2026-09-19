@@ -2,6 +2,7 @@ services:
   app:
     container_name: server-app-1
     image: server-app:latest
+    platform: linux/amd64
     ports:
       - "8888:8080"
     volumes:

@@ -37,6 +37,7 @@
         <a href="{{.KindUnassigned}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "unassigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">담당자미배정 {{.Counts.Unassigned}}</a>
         <a href="{{.KindSales}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "sales_nofollow"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">영업 후속없음 {{.Counts.SalesFollow}}</a>
         <a href="{{.KindUnsigned}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "sales_unsigned"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">계약 미체결 {{.Counts.SalesUnsigned}}</a>
+        <a href="{{.KindSalesNext}}" class="px-3 py-1.5 rounded-lg border {{if eq .Kind "sales_next_ym"}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">영업 다음행동 {{.Counts.SalesNext}}</a>
       </div>
     </div>
     <div class="border-t border-gray-200 pt-3">

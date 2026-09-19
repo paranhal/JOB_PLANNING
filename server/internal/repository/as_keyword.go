@@ -130,6 +130,41 @@ func applyASKeywords(db *sql.DB) {
 		WHERE id_sequences.last_no < excluded.last_no`); err != nil {
 		log.Printf("021 as_keyword seq: %v", err)
 	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_as_keyword_links_kw ON as_keyword_links(keyword_id, as_id)`); err != nil {
+		log.Printf("051 idx_as_keyword_links_kw: %v", err)
+	}
+}
+
+// seedKeywordLinksIfNeeded 덮은 비율이 절반 미만이면 전체를 한 번 채운다. 기동마다 다시 만들지 않는다. §41.17.1.1
+func seedKeywordLinksIfNeeded(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	var links, receipts, kws, covered int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM as_keyword_links`).Scan(&links)
+	_ = db.QueryRow(`SELECT COUNT(*) FROM as_receipts`).Scan(&receipts)
+	_ = db.QueryRow(`SELECT COUNT(*) FROM as_keywords WHERE is_active=1`).Scan(&kws)
+	_ = db.QueryRow(`SELECT COUNT(DISTINCT as_id) FROM as_keyword_links`).Scan(&covered)
+
+	if receipts == 0 || kws == 0 {
+		log.Printf("as_keyword_links 시드 건너뜀: 접수 %d건 · 활성 키워드 %d개", receipts, kws)
+		return
+	}
+	if covered*2 >= receipts {
+		return
+	}
+	log.Printf("as_keyword_links 색인 부족: 접수 %d건 중 %d건만 덮음(링크 %d). 다시 만든다", receipts, covered, links)
+
+	n, err := NewASRepo(db).RebuildKeywordLinks(nil)
+	if err != nil {
+		log.Printf("as_keyword_links 시드 실패: %v", err)
+		return
+	}
+	if n == 0 {
+		log.Printf("as_keyword_links 시드 경고: 접수 %d건 · 키워드 %d개인데 링크가 0건 만들어졌다. 매칭을 확인하라", receipts, kws)
+		return
+	}
+	log.Printf("as_keyword_links 시드 완료: %d건", n)
 }
 
 type ASKeywordRepo struct{ db *sql.DB }
@@ -462,7 +497,7 @@ func (r *ASKeywordRepo) ReplaceLinks(asID, field string, checked, suggested []st
 		seen[id] = true
 		ids = append(ids, id)
 	}
-	if _, err := r.db.Exec(`DELETE FROM as_keyword_links WHERE as_id=? AND field=?`, asID, field); err != nil {
+	if _, err := r.db.Exec(`DELETE FROM as_keyword_links WHERE as_id=? AND field=? AND source IN ('manual','auto')`, asID, field); err != nil {
 		return err
 	}
 	for _, id := range ids {
@@ -642,4 +677,145 @@ func stripTrailingJosa(s string) string {
 		}
 	}
 	return s
+}
+
+// RebuildKeywordLinks 증상·조치 글을 키워드 사전으로 훑어 as_keyword_links 를 다시 만든다.
+// asIDs 가 비면 전체를 다시 만든다. source='dict' 만 지운다. §41.16.6 · §41.17
+func (r *ASRepo) RebuildKeywordLinks(asIDs []string) (int, error) {
+	if r == nil || r.db == nil {
+		return 0, nil
+	}
+	ids := uniqueASKeywordIDs(asIDs)
+	dict, err := NewASKeywordRepo(r.db).List(true)
+	if err != nil {
+		return 0, err
+	}
+
+	q := `SELECT ar.as_id, COALESCE(ar.symptom,''),
+		TRIM(COALESCE(ar.action_taken,'') || char(10) || COALESCE((
+			SELECT GROUP_CONCAT(TRIM(COALESCE(p.work_content,'') || char(10) || COALESCE(p.notes,'')), char(10))
+			FROM as_processes p WHERE p.as_id = ar.as_id
+		), ''))
+		FROM as_receipts ar`
+	var args []any
+	if len(ids) > 0 {
+		ph := strings.Repeat("?,", len(ids))
+		q += ` WHERE ar.as_id IN (` + ph[:len(ph)-1] + `)`
+		args = make([]any, len(ids))
+		for i, id := range ids {
+			args[i] = id
+		}
+	}
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return 0, err
+	}
+	type srcRow struct{ asID, symptom, action string }
+	var src []srcRow
+	for rows.Next() {
+		var s srcRow
+		if err := rows.Scan(&s.asID, &s.symptom, &s.action); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		src = append(src, s)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, err
+	}
+	rows.Close()
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	if len(ids) == 0 {
+		if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE source='dict'`); err != nil {
+			return 0, err
+		}
+	} else {
+		ph := strings.Repeat("?,", len(ids))
+		delArgs := make([]any, len(ids))
+		for i, id := range ids {
+			delArgs[i] = id
+		}
+		if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE source='dict' AND as_id IN (`+ph[:len(ph)-1]+`)`, delArgs...); err != nil {
+			return 0, err
+		}
+	}
+
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO as_keyword_links(as_id, keyword_id, source, field) VALUES (?,?,?,?)`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	n := 0
+	unmatched := 0
+	for _, s := range src {
+		hits := 0
+		for _, k := range dictKeywordHits(dict, s.symptom) {
+			if _, err := stmt.Exec(s.asID, k.KeywordID, model.KWSourceDict, model.KWFieldSymptom); err != nil {
+				return 0, err
+			}
+			n++
+			hits++
+		}
+		for _, k := range dictKeywordHits(dict, s.action) {
+			if _, err := stmt.Exec(s.asID, k.KeywordID, model.KWSourceDict, model.KWFieldAction); err != nil {
+				return 0, err
+			}
+			n++
+			hits++
+		}
+		if hits == 0 {
+			unmatched++
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	log.Printf("as_keyword_links: 링크 %d건 · 접수 %d건 중 %d건은 키워드 없음", n, len(src), unmatched)
+	return n, nil
+}
+
+func uniqueASKeywordIDs(asIDs []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, id := range asIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+// dictKeywordHits 사전 매칭. 대표 키워드(pickKeywordForSymptom)를 포함하고, 같은 글에 걸린 나머지도 모두 남긴다.
+func dictKeywordHits(dict []model.ASKeyword, text string) []model.ASKeyword {
+	text = strings.TrimSpace(text)
+	if text == "" || len(dict) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []model.ASKeyword
+	add := func(k *model.ASKeyword) {
+		if k == nil || k.KeywordID == "" || seen[k.KeywordID] {
+			return
+		}
+		seen[k.KeywordID] = true
+		out = append(out, *k)
+	}
+	add(pickKeywordForSymptom(dict, text))
+	for i := range dict {
+		if keywordMatchesText(text, dict[i]) {
+			add(&dict[i])
+		}
+	}
+	return out
 }

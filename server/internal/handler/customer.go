@@ -19,6 +19,7 @@ type CustomerHandler struct {
 	assetRepo   *repository.AssetRepo
 	contactRepo *repository.ContactRepo
 	asRepo      *repository.ASRepo
+	salesRepo   *repository.SalesRepo
 }
 
 // TabAssets HTMX: 고객별 설치자산 탭 부분 렌더링
@@ -84,6 +85,12 @@ func (h *CustomerHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	salesView := c.QueryParam("view") == "sales"
+	if salesView && h.salesRepo != nil {
+		if err := h.salesRepo.FillCustomerSalesView(items); err != nil {
+			return err
+		}
+	}
 
 	cats, noneCount, err := h.repo.ListCategories()
 	if err != nil {
@@ -106,9 +113,17 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		return "asc"
 	}
 
+	title := "고객현황"
+	salesQ := ""
+	if salesView {
+		title = "고객·파트너"
+		salesQ = "&view=sales"
+	}
 	return c.Render(http.StatusOK, "customer/list.html", map[string]interface{}{
-		"Title":         "고객현황",
+		"Title":         title,
 		"Active":        NavCustomers,
+		"SalesView":     salesView,
+		"SalesQ":        salesQ,
 		"Items":         items,
 		"Total":         total,
 		"Page":          page,
