@@ -14,6 +14,9 @@ func applySalesStagesV227(db *sql.DB) {
 	if db == nil {
 		return
 	}
+	if metaDone(db, sales4StageMetaKey) {
+		return
+	}
 	addSalesProjectColumn(db, "legacy_stage", `ALTER TABLE sales_projects ADD COLUMN legacy_stage TEXT NOT NULL DEFAULT ''`)
 	addSalesProjectColumn(db, "won_at", `ALTER TABLE sales_projects ADD COLUMN won_at TEXT NOT NULL DEFAULT ''`)
 	addSalesProjectColumn(db, "contracted_at", `ALTER TABLE sales_projects ADD COLUMN contracted_at TEXT NOT NULL DEFAULT ''`)

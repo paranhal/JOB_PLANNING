@@ -11,6 +11,10 @@ func applySalesDealTypeV228(db *sql.DB) {
 	if db == nil {
 		return
 	}
+	applySalesItems(db)
+	if metaDone(db, sales4StageMetaKey) {
+		return
+	}
 	addSalesDealTypeColumn(db, "deal_type", `ALTER TABLE sales_projects ADD COLUMN deal_type TEXT NOT NULL DEFAULT 'build'`)
 	addSalesDealTypeColumn(db, "po_no", `ALTER TABLE sales_projects ADD COLUMN po_no TEXT NOT NULL DEFAULT ''`)
 	addSalesDealTypeColumn(db, "delivered_at", `ALTER TABLE sales_projects ADD COLUMN delivered_at TEXT NOT NULL DEFAULT ''`)
@@ -36,7 +40,6 @@ func applySalesDealTypeV228(db *sql.DB) {
 			log.Printf("034 sales deal_type: %v", err)
 		}
 	}
-	applySalesItems(db)
 }
 
 func addSalesDealTypeColumn(db *sql.DB, name, ddl string) {

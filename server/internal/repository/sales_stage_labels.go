@@ -11,6 +11,9 @@ func applySalesStageLabels(db *sql.DB) {
 	if db == nil {
 		return
 	}
+	if metaDone(db, sales4StageMetaKey) {
+		return
+	}
 	for _, q := range []string{
 		`UPDATE codes SET code_name='발굴' WHERE code_id='SST02' AND code_value='contact'`,
 		`UPDATE codes SET code_name='검토' WHERE code_id='SST01' AND code_value='lead'`,
