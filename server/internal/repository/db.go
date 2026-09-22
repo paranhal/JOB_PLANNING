@@ -1150,7 +1150,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applySalesStageLabels(db)
 	applySalesMemos(db)
 	applyWorkProjectContract(db)
-	applySales4StageSchema(db)
+	applySales4Stage(db)
 
 	// 미정+사유 등록일(§8.1 재검토). 부록 B.1 컬럼을 바꾸지 않고 기존 테이블에만 추가한다.
 	if _, err := db.Exec(`ALTER TABLE as_receipts ADD COLUMN schedule_no_date_at TEXT`); err != nil &&

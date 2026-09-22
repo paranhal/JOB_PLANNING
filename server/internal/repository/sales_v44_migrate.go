@@ -2,8 +2,13 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 // sales4StageMetaKey 44-C 이관이 끝나면 031·034·053 이 옛 단계를 되살리지 못하게 한다. §47.15.1
@@ -109,4 +114,322 @@ func addNamedColumn(db *sql.DB, table, name, ddl string) {
 		!strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 		log.Printf("44-B %s.%s: %v", table, name, err)
 	}
+}
+
+func applySales4Stage(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	applySales4StageSchema(db)
+	if metaDone(db, sales4StageMetaKey) {
+		return
+	}
+	if err := migrateSales4Stage(db); err != nil {
+		log.Printf("44-C sales 4stage: %v", err)
+		return
+	}
+	markMetaDone(db, sales4StageMetaKey)
+}
+
+type sales4MigIn struct {
+	stage, status, dealType, contractedAt, wonAt, lostReason string
+	probOverride                                             sql.NullInt64
+	contractAmount, wpAmount                                 int
+	wpStart                                                  string
+	hasWP                                                    bool
+}
+
+type sales4MigOut struct {
+	stage, bidStatus, closeReason, status string
+	contractedAt, wonAt                   string
+	contractAmount                        int
+	dropCode, dropReason, dropFrom        string
+	winProb, probFinal                    sql.NullInt64
+	rfpAt                                 string
+	probability                           int
+	detail                                string
+	fromDead, fromNegotiation             bool
+}
+
+func clampWinProb(n int) int {
+	if n < 10 {
+		return 10
+	}
+	if n > 90 {
+		return 90
+	}
+	return n
+}
+
+func mapSales4Stage(in sales4MigIn, migrateDay string) sales4MigOut {
+	st := strings.TrimSpace(in.stage)
+	out := sales4MigOut{
+		status:         strings.TrimSpace(in.status),
+		contractedAt:   strings.TrimSpace(in.contractedAt),
+		wonAt:          strings.TrimSpace(in.wonAt),
+		contractAmount: in.contractAmount,
+	}
+	switch st {
+	case "quote", "rfp", "submit":
+		out.fromDead = true
+		st = "proposal"
+	case "contracted":
+		out.fromDead = true
+		st = "won"
+	}
+	promoted := out.status == "promoted" || in.hasWP
+	switch {
+	case st == "contact" || st == "lead":
+		out.stage, out.status = "discover", "active"
+	case st == "proposal":
+		out.stage, out.status = "propose", "active"
+	case st == "negotiation":
+		out.stage, out.bidStatus, out.status = "bid", "pending", "active"
+		out.fromNegotiation = true
+	case st == "won" && promoted:
+		out.stage, out.closeReason, out.status = "closed", "contracted", "promoted"
+		if out.contractedAt == "" {
+			if s := strings.TrimSpace(in.wpStart); s != "" {
+				out.contractedAt = s
+			} else {
+				out.contractedAt = out.wonAt
+			}
+		}
+		if out.contractAmount == 0 && in.wpAmount > 0 {
+			out.contractAmount = in.wpAmount
+		}
+	case st == "won" && out.contractedAt == "" && !promoted:
+		out.stage, out.bidStatus, out.status = "bid", "won", "active"
+	case st == "won" && out.contractedAt != "":
+		out.stage, out.closeReason = "closed", "contracted"
+		if out.status == "promoted" {
+			out.status = "promoted"
+		} else {
+			out.status = "contracted"
+		}
+	case st == "lost":
+		out.stage, out.closeReason, out.status = "closed", "lost", "lost"
+	case st == "inquiry":
+		out.stage, out.status = "discover", "active"
+	case st == "quoted":
+		out.stage, out.status = "propose", "active"
+	case st == "ordered":
+		out.stage, out.bidStatus, out.status = "bid", "won", "active"
+	case st == "delivered":
+		out.stage, out.closeReason = "closed", "contracted"
+		if out.status == "promoted" {
+			out.status = "promoted"
+		} else {
+			out.status = "contracted"
+		}
+	case st == "dropped":
+		out.stage, out.closeReason, out.status = "closed", "dropped", "dropped"
+		out.dropCode, out.dropReason, out.dropFrom = "etc", strings.TrimSpace(in.lostReason), "discover"
+	default:
+		out.stage, out.status = "discover", "active"
+	}
+
+	switch {
+	case out.stage == "discover":
+		out.probability = 10
+	case out.stage == "propose":
+		out.probability = 20
+		if in.probOverride.Valid {
+			w := clampWinProb(int(in.probOverride.Int64))
+			out.winProb = sql.NullInt64{Int64: int64(w), Valid: true}
+			out.rfpAt = migrateDay
+			out.probability = w
+		}
+	case out.stage == "bid" && out.bidStatus == "pending":
+		if in.probOverride.Valid {
+			w := clampWinProb(int(in.probOverride.Int64))
+			out.probFinal = sql.NullInt64{Int64: int64(w), Valid: true}
+			out.probability = w
+		} else {
+			out.probFinal = sql.NullInt64{Int64: 70, Valid: true}
+			out.winProb = sql.NullInt64{Int64: 70, Valid: true}
+			out.probability = 70
+		}
+	case out.stage == "bid":
+		out.probability = 100
+	case out.stage == "closed" && out.closeReason == "contracted":
+		out.probability = 100
+	default:
+		out.probability = 0
+	}
+	if out.bidStatus != "" {
+		out.detail = out.bidStatus
+	} else {
+		out.detail = out.closeReason
+	}
+	return out
+}
+
+func remapSalesLeadSource(v string) string {
+	switch strings.TrimSpace(v) {
+	case "existing":
+		return "customer_request"
+	case "referral":
+		return "internal_contact"
+	case "bid":
+		return "self_found"
+	default:
+		return strings.TrimSpace(v)
+	}
+}
+
+func nullIntArg(n sql.NullInt64) interface{} {
+	if !n.Valid {
+		return nil
+	}
+	return n.Int64
+}
+
+func migrateSales4Stage(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.Query(`
+		SELECT p.sales_id, p.name, COALESCE(p.stage,''), COALESCE(p.status,''), COALESCE(p.deal_type,'build'),
+			COALESCE(p.legacy_stage,''), COALESCE(p.contracted_at,''), COALESCE(p.won_at,''),
+			COALESCE(p.lost_reason,''), COALESCE(p.lead_source,''), COALESCE(p.probability,0),
+			p.probability_override, COALESCE(p.expected_amount,0), COALESCE(p.contract_amount,0),
+			COALESCE((SELECT w.start_date FROM work_projects w WHERE w.sales_project_id=p.sales_id AND TRIM(COALESCE(w.sales_project_id,''))!='' LIMIT 1), ''),
+			COALESCE((SELECT w.contract_amount FROM work_projects w WHERE w.sales_project_id=p.sales_id AND TRIM(COALESCE(w.sales_project_id,''))!='' LIMIT 1), 0),
+			CASE WHEN EXISTS(SELECT 1 FROM work_projects w WHERE w.sales_project_id=p.sales_id AND TRIM(COALESCE(w.sales_project_id,''))!='') THEN 1 ELSE 0 END
+		FROM sales_projects p`)
+	if err != nil {
+		return err
+	}
+
+	type item struct {
+		id, name, stage, status, deal, legacy, contractedAt, wonAt, lost, lead string
+		prob, expected, contractAmount, wpAmount                               int
+		override                                                               sql.NullInt64
+		wpStart                                                                string
+		hasWP                                                                  bool
+	}
+	var items []item
+	for rows.Next() {
+		var it item
+		var hasWP int
+		if err := rows.Scan(&it.id, &it.name, &it.stage, &it.status, &it.deal, &it.legacy, &it.contractedAt, &it.wonAt,
+			&it.lost, &it.lead, &it.prob, &it.override, &it.expected, &it.contractAmount, &it.wpStart, &it.wpAmount, &hasWP); err != nil {
+			rows.Close()
+			return err
+		}
+		it.hasWP = hasWP == 1
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	migrateDay := time.Now().In(time.Local).Format("2006-01-02")
+	now := time.Now().Format("2006-01-02 15:04:05")
+	var dead, pendingFromNeg, weightedBefore, weightedAfter int
+	var nDiscover, nPropose, nBidPending, nBidWon, nClosedC, nClosedL, nClosedD int
+
+	for _, it := range items {
+		weightedBefore += it.expected * it.prob / 100
+		out := mapSales4Stage(sales4MigIn{
+			stage: it.stage, status: it.status, dealType: it.deal,
+			contractedAt: it.contractedAt, wonAt: it.wonAt, lostReason: it.lost,
+			probOverride: it.override, contractAmount: it.contractAmount,
+			wpAmount: it.wpAmount, wpStart: it.wpStart, hasWP: it.hasWP,
+		}, migrateDay)
+		if out.fromDead {
+			dead++
+		}
+		if out.fromNegotiation {
+			pendingFromNeg++
+		}
+		legacy := strings.TrimSpace(it.legacy)
+		if legacy == "" {
+			legacy = it.stage
+		}
+		lead := remapSalesLeadSource(it.lead)
+		beforeB, _ := json.Marshal(map[string]any{
+			"stage": it.stage, "status": it.status, "probability": it.prob, "lead_source": it.lead,
+		})
+		afterB, _ := json.Marshal(map[string]any{
+			"stage": out.stage, "bid_status": out.bidStatus, "close_reason": out.closeReason,
+			"status": out.status, "probability": out.probability, "lead_source": lead,
+		})
+		if _, err := tx.Exec(`
+			UPDATE sales_projects SET
+				legacy_stage=?, stage=?, bid_status=?, close_reason=?, status=?,
+				contracted_at=?, won_at=?, contract_amount=?,
+				drop_reason_code=?, drop_reason=?, dropped_from_stage=?,
+				contract_target=CASE WHEN deal_type='supply' AND TRIM(COALESCE(contract_target,''))='' THEN 'goods_buy' ELSE contract_target END,
+				lead_source=?, win_prob=?, probability_final=?, rfp_received_at=?, probability=?,
+				updated_at=CURRENT_TIMESTAMP
+			WHERE sales_id=?`,
+			legacy, out.stage, out.bidStatus, out.closeReason, out.status,
+			out.contractedAt, out.wonAt, out.contractAmount,
+			out.dropCode, out.dropReason, out.dropFrom,
+			lead, nullIntArg(out.winProb), nullIntArg(out.probFinal), out.rfpAt, out.probability,
+			it.id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO sales_stage_history (history_id, sales_id, from_stage, to_stage, detail, reason, changed_by, changed_by_id)
+			VALUES (?,?,?,?,?,?,?,?)`,
+			fmt.Sprintf("SH44-%s", it.id), it.id, it.stage, out.stage, out.detail, "44단계 이관", "system", ""); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO data_change_logs (
+				log_id, occurred_at, user_id, username, user_name,
+				action, table_name, pk_column, entity_id, entity_label, summary,
+				before_json, after_json, rolled_back, reason)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
+			"L"+uuid.New().String(), now, "", "system", "system",
+			"update", "sales_projects", "sales_id", it.id, it.name, "44단계 이관",
+			string(beforeB), string(afterB), "44단계 이관"); err != nil {
+			return err
+		}
+		weightedAfter += it.expected * out.probability / 100
+		switch {
+		case out.stage == "discover":
+			nDiscover++
+		case out.stage == "propose":
+			nPropose++
+		case out.stage == "bid" && out.bidStatus == "pending":
+			nBidPending++
+		case out.stage == "bid":
+			nBidWon++
+		case out.stage == "closed" && out.closeReason == "contracted":
+			nClosedC++
+		case out.stage == "closed" && out.closeReason == "lost":
+			nClosedL++
+		case out.stage == "closed" && out.closeReason == "dropped":
+			nClosedD++
+		}
+	}
+
+	if dead > 0 {
+		log.Printf("44 이관: 폐 코드 quote/rfp/submit/contracted %d건 → proposal/won 규칙", dead)
+	}
+	for _, q := range []string{
+		`UPDATE codes SET is_active=0 WHERE code_group IN ('sales_stage','sales_stage_prob','sales_supply_stage')`,
+		`UPDATE codes SET is_active=0 WHERE code_group='sales_lead_source' AND code_value IN ('exhibition','other')`,
+	} {
+		if _, err := tx.Exec(q); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	log.Printf("44 이관: 총 %d건 | discover %d · propose %d · bid(pending %d · won %d) · closed(contracted %d · lost %d · dropped %d)\n         | 가중 파이프라인 전 %d원 → 후 %d원 | negotiation→pending 확인 필요 %d건",
+		len(items), nDiscover, nPropose, nBidPending, nBidWon, nClosedC, nClosedL, nClosedD,
+		weightedBefore, weightedAfter, pendingFromNeg)
+	return nil
 }

@@ -17,6 +17,9 @@ func TestSalesStagesV227MigrateKeepsLegacyAndRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	reopenSalesLegacyMigrations(db)
+	applySalesStagesV227(db)
+	LoadLookupCache(db)
 
 	if _, err := db.Exec(`
 		INSERT INTO sales_projects (sales_id, name, stage, probability, status)

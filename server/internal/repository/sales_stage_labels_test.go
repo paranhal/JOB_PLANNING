@@ -13,6 +13,10 @@ func TestSalesStageLabelsRenameKeepsCodesAndProbability(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	reopenSalesLegacyMigrations(db)
+	applySalesStagesV227(db)
+	applySalesStageLabels(db)
+	LoadLookupCache(db)
 
 	repo := NewSalesRepo(db)
 	p := &model.SalesProject{Name: "이름만 바뀌는 건", IsTentativeName: true, Stage: model.SalesStageContact}
