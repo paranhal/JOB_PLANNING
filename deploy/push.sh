@@ -6,7 +6,8 @@ set -e
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
-HOST=${DEPLOY_HOST:-visionit}          # ~/.ssh/config 의 Host 이름. 없으면 sys2@112.216.128.139
+HOST=${DEPLOY_HOST:-visionit}         # ~/.ssh/config 의 Host 이름 (Tailscale 주소·계정은 거기에)
+PORT=${DEPLOY_PORT:-11800}            # SSH. 앱 HTTP는 8888. 호스트에 :11800 을 붙이지 말 것
 REMOTE=${DEPLOY_DIR:-/home/sys2/deploy}
 
 if [ "$1" != "--no-build" ]; then
@@ -22,10 +23,10 @@ SIZE=$(wc -c < "$TAR" | tr -d ' ')
 echo "로컬 tar: $SIZE 바이트"
 
 echo "== 2/4 전송 (tar 한 파일만) =="
-scp "$TAR" "$HOST:$REMOTE/server-app.tar"
+scp -P "$PORT" "$TAR" "$HOST:$REMOTE/server-app.tar"
 
 echo "== 3/4 서버에서 교체 =="
-ssh "$HOST" "
+ssh -p "$PORT" "$HOST" "
   set -e
   cd '$REMOTE'
   REMOTE_SIZE=\$(wc -c < server-app.tar | tr -d ' ')
@@ -40,7 +41,7 @@ ssh "$HOST" "
 
 echo "== 4/4 확인 =="
 sleep 6
-ssh "$HOST" "curl -s localhost:8888/version" ; echo
+ssh -p "$PORT" "$HOST" "curl -s localhost:8888/version" ; echo
 echo
 echo "version 이 VERSION 파일($(cat VERSION 2>/dev/null))과 같고,"
 echo "index.as_receipts 가 1175 근처면 운영 DB가 그대로인 것이다."
