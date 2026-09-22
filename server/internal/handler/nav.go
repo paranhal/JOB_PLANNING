@@ -1,9 +1,5 @@
 package handler
 
-import (
-	"strings"
-)
-
 // 사이드바 Active 키. base.html 의 $a 와 값이 같아야 한다. v2.0 §33.8
 const (
 	NavDashboard        = "dashboard"
@@ -22,11 +18,11 @@ const (
 	NavSales            = "sales"
 	NavSalesDashboard   = "sales_dashboard"
 	NavSalesActivities  = "sales_activities"
-	NavSalesPipeline    = "sales_pipeline"
 	NavSalesItems       = "sales_items"
 	NavQuotes           = "quotes"
 	NavOrders           = "orders"
 	NavContracts        = "contracts"
+	NavSalesLogs        = "sales_logs"
 	NavWorkStatus       = "work_status"
 	NavStats            = "stats"
 	NavStatsReports     = "stats_reports"
@@ -70,11 +66,11 @@ func navSidebarKeys() []string {
 		NavSales,
 		NavSalesDashboard,
 		NavSalesActivities,
-		NavSalesPipeline,
 		NavSalesItems,
 		NavQuotes,
 		NavOrders,
 		NavContracts,
+		NavSalesLogs,
 		NavWorkStatus,
 		NavStats,
 		NavStatsReports,
@@ -97,28 +93,4 @@ func navSidebarKeys() []string {
 		NavSystem,
 		NavAccount,
 	}
-}
-
-// IsSalesNav 영업 전용 사이드바. /sales* · /quotes* · /orders* · /contracts* · 고객 영업 보기. §46.3
-func IsSalesNav(path, rawQuery string) bool {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		path = "/"
-	}
-	if path == "/sales" || strings.HasPrefix(path, "/sales/") {
-		return true
-	}
-	if path == "/quotes" || strings.HasPrefix(path, "/quotes/") {
-		return true
-	}
-	if path == "/orders" || strings.HasPrefix(path, "/orders/") {
-		return true
-	}
-	if path == "/contracts" || strings.HasPrefix(path, "/contracts/") {
-		return true
-	}
-	if path == "/customers" && strings.Contains(rawQuery, "view=sales") {
-		return true
-	}
-	return false
 }

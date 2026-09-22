@@ -507,8 +507,11 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 	if strings.Contains(kb, "제안서 제출") || strings.Contains(kb, "계약완료") {
 		t.Fatal("폐 8단계 열이 남았다")
 	}
-	if !strings.Contains(kb, "세종 RFID") {
-		t.Fatal("칸반에 사업 카드가 없다")
+	if !strings.Contains(kb, "data-collapsed=\"1\"") {
+		t.Fatal("실주 열이 기본 접힘이 아니다")
+	}
+	if !strings.Contains(kb, "min-w-[260px]") {
+		t.Fatal("칸반 최소 폭 260px 가 없다")
 	}
 
 	tl := doGet(t, e, "/sales?view=timeline")
@@ -525,27 +528,11 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 	}
 
 	pipe := doGet(t, e, "/sales/pipeline")
-	if pipe.Code != http.StatusOK {
-		t.Fatalf("파이프라인 status=%d", pipe.Code)
+	if pipe.Code != http.StatusMovedPermanently {
+		t.Fatalf("파이프라인 리다이렉트 status=%d", pipe.Code)
 	}
-	pb := pipe.Body.String()
-	if !strings.Contains(pb, "예상매출") || !strings.Contains(pb, "가중매출") ||
-		!strings.Contains(pb, "이번달 마감") || !strings.Contains(pb, "지연") ||
-		!strings.Contains(pb, "수주율") ||
-		!strings.Contains(pb, "담당자별 활동") {
-		t.Fatalf("파이프라인 지표 없음: %s", clipBody(pb))
-	}
-	if !strings.Contains(pb, "—") {
-		t.Fatal("수주율 분모 0인데 — 가 없다")
-	}
-	if strings.Count(pb, `data-col="`) < 6 || strings.Count(pb, "flex-1 basis-0") != 6 {
-		t.Fatalf("파이프라인 열이 6개가 아니다: %s", clipBody(pb))
-	}
-	if !strings.Contains(pb, "data-collapsed=\"1\"") {
-		t.Fatal("실주 열이 기본 접힘이 아니다")
-	}
-	if !strings.Contains(pb, "min-w-[260px]") || !strings.Contains(pb, "flex-1 basis-0") {
-		t.Fatal("칸반 최소 폭 260px · 균등 폭이 없다")
+	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "view=kanban") {
+		t.Fatalf("파이프라인 Location=%q", loc)
 	}
 
 	rec = doForm(t, e, "/sales/"+id+"/activities", url.Values{
@@ -892,23 +879,24 @@ func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 
 	list := doGet(t, e, "/sales?display=kanban")
 	pipe := doGet(t, e, "/sales/pipeline")
-	lb, pb := list.Body.String(), pipe.Body.String()
-	if list.Code != http.StatusOK || pipe.Code != http.StatusOK {
-		t.Fatalf("status list=%d pipe=%d", list.Code, pipe.Code)
+	if list.Code != http.StatusOK {
+		t.Fatalf("status list=%d", list.Code)
 	}
+	if pipe.Code != http.StatusMovedPermanently {
+		t.Fatalf("파이프라인 리다이렉트 status=%d", pipe.Code)
+	}
+	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "/sales") || !strings.Contains(loc, "view=kanban") {
+		t.Fatalf("파이프라인 Location=%q", loc)
+	}
+	pb := doGet(t, e, "/sales?view=kanban").Body.String()
+	lb := list.Body.String()
 	if strings.Count(lb, "flex-1 basis-0") != 6 || strings.Count(pb, "flex-1 basis-0") != 6 {
 		t.Fatalf("열 수가 다르다 list=%d pipe=%d", strings.Count(lb, "flex-1 basis-0"), strings.Count(pb, "flex-1 basis-0"))
 	}
 	if !strings.Contains(lb, "세종 RFID 증설 (가칭)") || !strings.Contains(pb, "세종 RFID 증설 (가칭)") {
 		t.Fatal("임시명 (가칭) 이 카드에 없다")
 	}
-	if !strings.Contains(pb, "예상매출") || strings.Contains(lb, "예상매출") {
-		t.Fatal("요약 지표는 파이프라인에만 있어야 한다")
-	}
-	if !strings.Contains(pb, "0.3억") || strings.Contains(lb, "0.3억") {
-		t.Fatal("열 금액 합은 파이프라인에만 있어야 한다")
-	}
-	if !strings.Contains(pb, "0건") {
+	if !strings.Contains(lb, "0건") {
 		t.Fatal("빈 열이 사라졌다")
 	}
 	if !strings.Contains(lb, "영업담당") || !strings.Contains(pb, "영업담당") ||
@@ -1049,7 +1037,7 @@ func TestSalesHTTP_DashboardAndMemo(t *testing.T) {
 		t.Fatalf("dashboard status=%d", dash.Code)
 	}
 	body := dash.Body.String()
-	if !strings.Contains(body, "이번 달 수주") || !strings.Contains(body, "가중 파이프라인") || !strings.Contains(body, "← 업무로") {
+	if !strings.Contains(body, "이번 달 수주") || !strings.Contains(body, "가중 파이프라인") || !strings.Contains(body, "오늘 내 업무") {
 		t.Fatalf("대시보드 문구 없음: %s", clipBody(body))
 	}
 	if strings.Contains(body, "이번 달 계약") {
@@ -1076,8 +1064,8 @@ func TestSalesHTTP_DashboardAndMemo(t *testing.T) {
 		t.Fatal("견적 작성 링크가 없다")
 	}
 	pipe := doGet(t, e, "/sales/pipeline")
-	if pipe.Code != http.StatusOK || !strings.Contains(pipe.Body.String(), "지연") {
-		t.Fatalf("파이프라인 5지표 없음 status=%d", pipe.Code)
+	if pipe.Code != http.StatusMovedPermanently {
+		t.Fatalf("파이프라인 리다이렉트 status=%d", pipe.Code)
 	}
 	ct := doGet(t, e, "/contracts")
 	if ct.Code != http.StatusOK || !strings.Contains(ct.Body.String(), "만료임박") {

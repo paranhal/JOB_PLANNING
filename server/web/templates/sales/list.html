@@ -15,8 +15,6 @@
          class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">단계 칸반</a>
       <a href="/sales?display=timeline{{if .FilterQ}}&{{.FilterQ}}{{end}}"
          class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "timeline"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">예정월 타임라인</a>
-      <a href="/sales/pipeline{{if .FilterQ}}?{{.FilterQ}}{{end}}"
-         class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">파이프라인</a>
       {{if .CanWrite}}
       <a href="{{.NewHref}}"
          class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">

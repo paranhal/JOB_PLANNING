@@ -156,10 +156,18 @@ func TestSalesHTTP_SupplyDealTypeListAndAutoStage(t *testing.T) {
 	}
 
 	pipe := doGet(t, e, "/sales/pipeline?deal=supply")
-	if pipe.Code != http.StatusOK {
-		t.Fatalf("단품 파이프라인 status=%d", pipe.Code)
+	if pipe.Code != http.StatusMovedPermanently {
+		t.Fatalf("단품 파이프라인 리다이렉트 status=%d", pipe.Code)
 	}
-	if strings.Count(pipe.Body.String(), "flex-1 basis-0") != 5 {
-		t.Fatalf("단품 파이프라인 열=%d", strings.Count(pipe.Body.String(), "flex-1 basis-0"))
+	loc := pipe.Header().Get("Location")
+	if !strings.Contains(loc, "deal=supply") || !strings.Contains(loc, "view=kanban") {
+		t.Fatalf("단품 파이프라인 Location=%q", loc)
+	}
+	kanban = doGet(t, e, loc)
+	if kanban.Code != http.StatusOK {
+		t.Fatalf("단품 칸반 status=%d loc=%s", kanban.Code, loc)
+	}
+	if strings.Count(kanban.Body.String(), "flex-1 basis-0") != 5 {
+		t.Fatalf("단품 칸반 열=%d", strings.Count(kanban.Body.String(), "flex-1 basis-0"))
 	}
 }

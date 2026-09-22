@@ -153,7 +153,6 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
 			dataMap["UserPerms"] = currentPerms(c)
-			dataMap["SalesNav"] = IsSalesNav(c.Request().URL.Path, c.Request().URL.RawQuery)
 			injectAssignNoticeView(c, dataMap)
 			if v := c.Get("auth_unconfirmed"); v != nil {
 				if b, ok := v.(bool); ok && b {

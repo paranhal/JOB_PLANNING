@@ -507,63 +507,15 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
 	}
-	f := parseSalesListFilter(c)
-	items, err := h.repo.ListFilter(f)
-	if err != nil {
-		return err
+	q := c.QueryParams()
+	if q.Get("view") == "" && q.Get("display") == "" {
+		q.Set("view", "kanban")
 	}
-	var extra []string
-	var users []model.User
-	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
-		for _, u := range users {
-			if u.Role == model.RoleSales && strings.TrimSpace(u.FullName) != "" {
-				extra = append(extra, u.FullName)
-			}
-		}
+	loc := "/sales"
+	if enc := q.Encode(); enc != "" {
+		loc += "?" + enc
 	}
-	pipe, err := h.repo.PipelineFilter(time.Now(), extra, f)
-	if err != nil {
-		return err
-	}
-	stages, _ := h.repo.StagesFor(f.DealType)
-	lastAct, _ := h.repo.LatestActivityDateBySales()
-	nextBy, _ := h.repo.LatestNextBySales()
-	today := time.Now().Format("2006-01-02")
-	ym := time.Now().Format("2006-01")
-	kanbanCols := salesProjectKanban(items, stages, "", lastAct, nextBy, today, true)
-	kanbanTotal := 0
-	for _, col := range kanbanCols {
-		kanbanTotal += col.Count
-	}
-	dealType, buildHref, supplyHref, _, resetHref, filterQ := salesDealBoardLinks("/sales/pipeline", "", f, "")
-	return c.Render(http.StatusOK, "sales/pipeline.html", map[string]interface{}{
-		"Title": "영업 파이프라인", "Active": NavSalesPipeline,
-		"Pipe": pipe, "CanWrite": canWriteSales(c),
-		"Projects": items, "Stages": stages,
-		"KanbanColumns": kanbanCols,
-		"KanbanTotal":   kanbanTotal,
-		"OpenCount":     model.CountOpenSales(items),
-		"MonthClose":    model.CountMonthClose(items, ym),
-		"DelayedCount":  model.CountSalesDelayed(nextBy, today),
-		"KanbanDrag":    canWriteSales(c),
-		"KanbanDrop":    "sales",
-		"KanbanHint":    "열 = 단계. 실주 열은 기본으로 접혀 있습니다.",
-		"FilterQ":       filterQ,
-		"Filter":        f,
-		"DealType":      dealType,
-		"DealBuildHref": buildHref, "DealSupplyHref": supplyHref,
-		"FilterReset": resetHref,
-		"Search":      f.Search, "Status": f.Status, "Stage": f.Stage,
-		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
-		"PeriodOptions":       salesPeriodOptions(time.Now()),
-		"Users":               users,
-		"FilterAction":        "/sales/pipeline",
-		"View":                "kanban",
-		"ShowPipelineMetrics": true,
-		"FlashOK":             c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"FormError": querySalesErr(c.QueryParam("err")),
-	})
+	return c.Redirect(http.StatusMovedPermanently, loc)
 }
 
 func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit bool, formErr string) error {
