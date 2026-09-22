@@ -8,7 +8,6 @@
       <h2 class="text-xl font-bold text-gray-800 mt-1 {{if not .Project.NameConfirmed}}text-gray-400{{end}}">{{.Project.Name}}</h2>
       <p class="text-sm text-gray-500 mt-1 flex flex-wrap gap-2 items-center">
         <span class="font-medium text-gray-800">{{.Project.DisplayStage}}</span>
-        {{if and .Project.HasOverride (not .Project.IsSupply)}}<span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">수동 조정</span>{{end}}
         {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">미확정</span>{{end}}
         <span>{{.Project.ConfirmationLabel}}</span>
       </p>
@@ -27,11 +26,8 @@
       <button type="button" class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-lg" @click="startCreate()">+ 활동 추가</button>
       <a href="/quotes/new?sales_id={{.Project.SalesID}}" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">견적 작성</a>
       <a href="/sales/{{.Project.SalesID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
-      {{if .CanDelete}}
-      <form method="post" action="/sales/{{.Project.SalesID}}/delete"
-            onsubmit="return confirm('이 영업 사업을 삭제할까요?');">
-        <button type="submit" class="px-4 py-2 text-sm border border-red-200 text-red-700 rounded-lg hover:bg-red-50">삭제</button>
-      </form>
+      {{if .CanDrop}}
+      <button type="button" class="px-4 py-2 text-sm border border-rose-200 text-rose-700 rounded-lg" @click="openDrop()">사업 드롭</button>
       {{end}}
     </div>
     {{end}}
@@ -65,32 +61,87 @@
 
   {{$fromSort := 0}}
   {{range .Stages}}{{if eq .Code $.Project.Stage}}{{$fromSort = .SortOrder}}{{end}}{{end}}
-  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3" data-freeze-prob="{{.Project.EffectiveProb}}">
     <h3 class="font-semibold text-gray-800">영업 단계</h3>
+    {{if eq .Project.Stage "closed"}}
+    <p class="text-sm font-medium text-gray-800">{{.Project.DisplayStage}}</p>
+    {{if or (eq .Project.CloseReason "lost") (eq .Project.CloseReason "dropped")}}
+    <a href="/sales/new?prev={{.Project.SalesID}}" class="inline-block px-3 py-1.5 text-sm border rounded-lg">이 사업으로 새 사업 만들기</a>
+    {{end}}
+    {{else}}
     <div class="flex flex-wrap items-center gap-1">
       {{range .Stages}}
-        {{if not .IsLost}}
         <button type="button"
                 class="px-2 py-1.5 rounded-lg text-sm border {{if eq $.Project.Stage .Code}}bg-gray-800 text-white border-gray-800{{else}}bg-white text-gray-700 border-gray-200 hover:bg-gray-50{{end}} {{if not $.CanWrite}}pointer-events-none{{end}}"
                 {{if $.CanWrite}}@click="pickStage('{{$.Project.SalesID}}', '{{$.Project.Stage}}', {{$fromSort}}, '{{.Code}}', {{.SortOrder}}, false)"{{end}}>
-          {{.SortOrder}}.{{.Label}}{{if eq $.Project.Stage .Code}} ●{{end}}
+          {{.Label}}{{if and (eq .Code "bid") (eq $.Project.Stage "bid")}} · {{if eq $.Project.BidStatus "pending"}}결과 대기 {{$.Project.EffectiveProb}}%{{else if eq $.Project.BidStatus "won"}}수주{{else if eq $.Project.BidStatus "negotiating"}}협상 중{{end}}{{end}}{{if eq $.Project.Stage .Code}} ●{{end}}
         </button>
         <span class="text-gray-300 hidden sm:inline">─</span>
-        {{end}}
-      {{end}}
-      {{range .Stages}}
-        {{if .IsLost}}
-        <button type="button"
-                class="px-2 py-1.5 rounded-lg text-sm border {{if eq $.Project.Stage .Code}}bg-rose-700 text-white border-rose-700{{else}}bg-white text-gray-600 border-gray-200 hover:border-red-300 hover:text-red-700{{end}} {{if not $.CanWrite}}pointer-events-none{{end}}"
-                {{if $.CanWrite}}@click="pickStage('{{$.Project.SalesID}}', '{{$.Project.Stage}}', {{$fromSort}}, '{{.Code}}', {{.SortOrder}}, true)"{{end}}>
-          {{.Label}}
-        </button>
-        {{end}}
       {{end}}
     </div>
-    <p class="text-sm text-gray-600">현재 단계: {{.Project.DisplayStage}}{{if and (not .Project.IsSupply) (ne .Project.Stage "won") (ne .Project.Stage "lost")}} · 수주 가능성 {{.Project.EffectiveProb}}%{{end}}
-      {{if and .Project.HasOverride (not .Project.IsSupply)}}<span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">수동 조정</span>{{end}}
-    </p>
+    {{if and .CanWrite (eq .Project.Stage "bid")}}
+    <div class="flex flex-wrap gap-2">
+      {{if eq .Project.BidStatus "pending"}}
+      <form method="post" action="/sales/{{.Project.SalesID}}/bid-result" class="inline" onsubmit="var a=prompt('낙찰 금액(선택)'); if(a) this.amount.value=a; return true;">
+        <input type="hidden" name="result" value="won"><input type="hidden" name="amount">
+        <button class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg">수주</button>
+      </form>
+      <form method="post" action="/sales/{{.Project.SalesID}}/bid-result" class="inline" onsubmit="var r=prompt('실주 사유'); if(!r) return false; this.reason.value=r;">
+        <input type="hidden" name="result" value="lost"><input type="hidden" name="reason">
+        <button class="px-3 py-1.5 text-sm border border-rose-300 text-rose-700 rounded-lg">실주</button>
+      </form>
+      <form method="post" action="/sales/{{.Project.SalesID}}/migrated-checked" class="inline">
+        <button class="px-3 py-1.5 text-sm border rounded-lg">이관 확인</button>
+      </form>
+      {{else if eq .Project.BidStatus "won"}}
+      <form method="post" action="/sales/{{.Project.SalesID}}/negotiate"><button class="px-3 py-1.5 text-sm border rounded-lg">협상 시작</button></form>
+      <form method="post" action="/sales/{{.Project.SalesID}}/close-contract" class="inline-flex gap-1 items-center" onsubmit="if(!this.contracted_at.value||!this.contract_amount.value){alert('계약일과 계약금액이 필요합니다');return false;}">
+        <input type="date" name="contracted_at" required class="border rounded px-2 py-1 text-sm">
+        <input name="contract_amount" required placeholder="계약금액" class="border rounded px-2 py-1 text-sm w-28">
+        <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg">계약으로 종료</button>
+      </form>
+      <form method="post" action="/sales/{{.Project.SalesID}}/close-failed" onsubmit="var r=prompt('결렬 사유'); if(!r) return false; this.reason.value=r;">
+        <input type="hidden" name="reason"><button class="px-3 py-1.5 text-sm border border-rose-300 text-rose-700 rounded-lg">협상 결렬</button>
+      </form>
+      {{else if eq .Project.BidStatus "negotiating"}}
+      <form method="post" action="/sales/{{.Project.SalesID}}/close-contract" class="inline-flex gap-1 items-center" onsubmit="if(!this.contracted_at.value||!this.contract_amount.value){alert('계약일과 계약금액이 필요합니다');return false;}">
+        <input type="date" name="contracted_at" required class="border rounded px-2 py-1 text-sm">
+        <input name="contract_amount" required placeholder="계약금액" class="border rounded px-2 py-1 text-sm w-28">
+        <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg">계약으로 종료</button>
+      </form>
+      <form method="post" action="/sales/{{.Project.SalesID}}/close-failed" onsubmit="var r=prompt('결렬 사유'); if(!r) return false; this.reason.value=r;">
+        <input type="hidden" name="reason"><button class="px-3 py-1.5 text-sm border border-rose-300 text-rose-700 rounded-lg">협상 결렬</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+    {{if and .CanWrite (eq .Project.Stage "propose")}}
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      {{if not .Project.RFPReceivedAt}}
+      <span>20%</span>
+      <form method="post" action="/sales/{{.Project.SalesID}}/rfp" class="inline-flex gap-1">
+        <input type="date" name="rfp_received_at" value="{{.Today}}" class="border rounded px-2 py-1">
+        <button class="px-3 py-1.5 bg-gray-800 text-white rounded-lg">RFP 접수</button>
+      </form>
+      {{else}}
+      <form method="post" action="/sales/{{.Project.SalesID}}/win-prob">
+        <select name="win_prob" class="border rounded px-2 py-1" onchange="this.form.submit()">
+          {{range $p := $.WinProbChoices}}
+          <option value="{{$p}}" {{if eq $.Project.EffectiveProb $p}}selected{{end}}>{{$p}}%</option>
+          {{end}}
+        </select>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+    {{if and .CanWrite (or (eq .Project.Stage "discover") (eq .Project.Stage "propose"))}}
+    <form method="post" action="/sales/{{.Project.SalesID}}/stage" onsubmit="return confirm('입찰 없이 수주로 기록합니다');">
+      <input type="hidden" name="stage" value="direct_won">
+      <button class="px-3 py-1.5 text-sm border rounded-lg">바로 수주</button>
+    </form>
+    {{end}}
+    <p class="text-sm text-gray-600">현재: {{.Project.DisplayStage}}</p>
+    {{end}}
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -153,7 +204,7 @@
           </dd>
         </div>
         <div>
-          <dt class="text-gray-500">{{if .Project.IsSupply}}견적 금액{{else}}예상 금액{{end}}</dt>
+          <dt class="text-gray-500">예상 금액</dt>
           <dd class="{{if not .Project.ExpectedAmountConfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
             {{if .Project.Amount}}{{.Project.Amount}}{{else}}—{{end}}
             {{if not .Project.ExpectedAmountConfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
@@ -167,22 +218,14 @@
           <dt class="text-gray-500">경쟁사</dt>
           <dd class="text-gray-800">{{if .Project.Competitor}}{{.Project.Competitor}}{{else}}—{{end}}</dd>
         </div>
-        {{if and (not .Project.IsSupply) (ne .Project.Stage "won") (ne .Project.Stage "lost")}}
         <div>
           <dt class="text-gray-500">확률</dt>
           <dd class="text-gray-800">{{.Project.EffectiveProb}}%</dd>
         </div>
-        {{end}}
-        {{if .Project.IsSupply}}
         <div>
-          <dt class="text-gray-500">발주번호</dt>
-          <dd class="text-gray-800">{{if .Project.PONo}}{{.Project.PONo}}{{else}}—{{end}}</dd>
+          <dt class="text-gray-500">수주</dt>
+          <dd><a class="text-blue-700 hover:underline" href="/orders?sales_id={{.Project.SalesID}}">수주 관리에서 보기</a></dd>
         </div>
-        <div>
-          <dt class="text-gray-500">납품일</dt>
-          <dd class="text-gray-800">{{if .Project.DeliveredAt}}{{.Project.DeliveredAt}}{{else}}—{{end}}</dd>
-        </div>
-        {{end}}
         {{if or .Project.WonAt .Project.ContractedAt}}
         <div>
           <dt class="text-gray-500">수주일</dt>

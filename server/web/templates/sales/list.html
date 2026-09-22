@@ -5,8 +5,7 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-gray-800">영업 사업</h2>
-      <p class="text-sm text-gray-500">수주 전 영업 건. 사업명만 있으면 등록됩니다.</p>
-      {{template "sales_deal_tabs" .}}
+      <p class="text-sm text-gray-500">발굴 · 제안 · 입찰 · 사업 종료.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <a href="/sales?display=list{{if .FilterQ}}&{{.FilterQ}}{{end}}"
@@ -24,9 +23,7 @@
     </div>
   </div>
 
-  {{if eq .FlashOK "deleted"}}
-  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">삭제했습니다.</div>
-  {{else if eq .FlashOK "stage"}}
+  {{if eq .FlashOK "stage"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">단계를 변경했습니다.</div>
   {{end}}
   {{if .FromTask}}
@@ -105,9 +102,10 @@
             <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.Name}}</a>
             {{if .IsTentativeName}}<span class="ml-1 text-xs text-gray-400">미확정</span>{{end}}
           </td>
-          <td class="px-4 py-3">
+          <td class="px-4 py-3 {{if or (eq .CloseReason "lost") (eq .CloseReason "dropped")}}text-gray-400{{end}}">
             {{.DisplayStage}}
-            {{if .HasOverride}}<span class="ml-1 text-xs text-amber-700">수동 조정</span>{{end}}
+            {{if eq .CloseReason "lost"}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">실주</span>{{end}}
+            {{if eq .CloseReason "dropped"}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">포기</span>{{end}}
           </td>
           <td class="px-4 py-3 {{if not .CustomerConfirmed}}text-gray-400{{end}}">
             {{if .Customer}}{{.Customer}}{{else}}—{{end}}
@@ -121,10 +119,14 @@
             {{if .Amount}}{{.Amount}}{{else}}—{{end}}
             {{if not .ExpectedAmountConfirmed}}<span class="text-xs">미확정</span>{{end}}
           </td>
-          <td class="px-4 py-3 text-gray-600">{{.ConfirmedCount}}/{{.ConfirmedTotal}}</td>
+          <td class="px-4 py-3 text-gray-600">{{.EffectiveProb}}%</td>
         </tr>
         {{else}}
-        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">등록된 영업 사업이 없습니다.</td></tr>
+        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">등록된 영업 사업이 없습니다.
+          {{if and (not .IncludeClosed) (gt .HiddenClosed 0)}}
+          <p class="mt-2">실주·포기 사업 {{.HiddenClosed}}건이 더 있습니다 — <a class="text-blue-700 underline" href="/sales?closed=1{{if .FilterQ}}&{{.FilterQ}}{{end}}">보기</a></p>
+          {{end}}
+        </td></tr>
         {{end}}
       </tbody>
     </table>

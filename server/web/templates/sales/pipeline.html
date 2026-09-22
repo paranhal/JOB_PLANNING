@@ -5,8 +5,7 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-gray-800">영업 파이프라인</h2>
-      <p class="text-sm text-gray-500">단계 칸반입니다. 실주 열은 접혀 있습니다. 열 너비 하한 260px.</p>
-      {{template "sales_deal_tabs" .}}
+      <p class="text-sm text-gray-500">단계 칸반입니다. 사업 종료 열은 상세에서만 끝냅니다.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <a href="/sales?display=kanban{{if .FilterQ}}&{{.FilterQ}}{{end}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">단계 칸반</a>
@@ -29,7 +28,7 @@
     <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
       <h3 class="font-semibold text-gray-800">수주율</h3>
       <p class="text-3xl font-bold text-gray-800">{{.Pipe.WinRateLabel}}</p>
-      <p class="text-xs text-gray-500">{{.Pipe.WinSampleLabel}} · won / (won + lost). 분모 0이면 —.</p>
+      <p class="text-xs text-gray-500">{{.Pipe.WinSampleLabel}}</p>
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
       <h3 class="font-semibold text-gray-800">담당자별 활동 건수</h3>

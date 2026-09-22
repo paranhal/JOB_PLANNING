@@ -63,6 +63,9 @@ func parseSalesListFilter(c echo.Context) repository.SalesListFilter {
 		Period:          strings.TrimSpace(c.QueryParam("period")),
 		Customer:        strings.TrimSpace(c.QueryParam("customer")),
 		AmountConfirmed: strings.TrimSpace(c.QueryParam("amount_confirmed")),
+		IncludeClosed:   c.QueryParam("closed") == "1",
+		CloseReason:     strings.TrimSpace(c.QueryParam("close")),
+		ContractTarget:  strings.TrimSpace(c.QueryParam("contract_target")),
 		DealType:        deal,
 	}
 }
@@ -92,6 +95,15 @@ func salesFilterEncode(f repository.SalesListFilter, extra string) string {
 	}
 	if strings.TrimSpace(f.DealType) == model.SalesDealSupply {
 		q.Set("deal", model.SalesDealSupply)
+	}
+	if f.IncludeClosed {
+		q.Set("closed", "1")
+	}
+	if f.CloseReason != "" {
+		q.Set("close", f.CloseReason)
+	}
+	if f.ContractTarget != "" {
+		q.Set("contract_target", f.ContractTarget)
 	}
 	s := q.Encode()
 	if extra == "" {
@@ -234,6 +246,11 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 		index[lost.Code] = len(cols)
 		cols = append(cols, model.KanbanColumn{Key: lost.Code, Title: lost.Label, Sort: lost.SortOrder, IsLost: true, Border: "border-slate-200", Stripe: model.SalesStageStripeClass(lost.Code), CountUnit: "건", Items: []model.KanbanCard{}})
 	}
+	for i := range cols {
+		if cols[i].Key == model.SalesStage4Closed {
+			cols[i].IsLost = true
+		}
+	}
 	if lastAct == nil {
 		lastAct = map[string]string{}
 	}
@@ -287,15 +304,42 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 			dn = ""
 		}
 		prob := ""
-		if !p.IsSupply() && p.Stage != model.SalesStageWon && p.Stage != model.SalesStageLost {
+		if p.Stage != model.SalesStage4Closed {
 			prob = fmt.Sprintf("%d%%", p.EffectiveProbability())
+		}
+		badge := ""
+		if p.Stage == model.SalesStage4Bid {
+			switch p.BidStatus {
+			case model.SalesBidPending:
+				badge = "결과 대기 " + prob
+			case model.SalesBidWon:
+				badge = "수주"
+			case model.SalesBidNegotiating:
+				badge = "협상 중"
+			}
+		}
+		if p.Stage == model.SalesStage4Propose && strings.TrimSpace(p.RFPReceivedAt) != "" {
+			badge = "RFP ✔ " + prob
+		}
+		if badge != "" {
+			prob = badge
+		}
+		sortKey := model.NormalizeSalesYM(p.ExpectedYM)
+		if p.Stage == model.SalesStage4Bid {
+			rank := "3"
+			if p.BidStatus == model.SalesBidNegotiating {
+				rank = "1"
+			} else if p.BidStatus == model.SalesBidWon {
+				rank = "2"
+			}
+			sortKey = rank + sortKey
 		}
 		cols[idx].Items = append(cols[idx].Items, model.KanbanCard{
 			ID: p.SalesID, RefID: p.SalesID, Title: title, Href: href,
 			OrgName: p.CustomerValue(), Extra: amt,
 			Assignee: p.SalesOwner, Bucket: key, Stage: key,
 			LeftStyle: model.WorkCardColorStyle(p.SalesOwner, "", "sales"),
-			SortDate:  model.NormalizeSalesYM(p.ExpectedYM), DueDate: p.PeriodLabel(),
+			SortDate:  sortKey, DueDate: p.PeriodLabel(),
 			AmountUnconfirmed: !p.ExpectedAmountConfirmed, LastActivity: last,
 			AmountDesc: p.ExpectedAmount, Tentative: p.IsTentativeName,
 			NextLabel: nextTitle, ProbLabel: prob, DnLabel: dn,

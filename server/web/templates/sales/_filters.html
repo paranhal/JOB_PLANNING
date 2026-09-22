@@ -11,7 +11,6 @@
 <form method="get" action="{{.FilterAction}}" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
   {{if .View}}<input type="hidden" name="display" value="{{.View}}"><input type="hidden" name="view" value="{{.View}}">{{end}}
   {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
-  {{if eq .DealType "supply"}}<input type="hidden" name="deal" value="supply">{{end}}
   {{if .Sort}}<input type="hidden" name="sort" value="{{.Sort}}"><input type="hidden" name="dir" value="{{.Dir}}">{{end}}
   <div class="flex-1 min-w-[10rem]">
     <label class="block text-xs text-gray-500 mb-1">검색</label>
@@ -64,13 +63,36 @@
     <select name="status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
       <option value="" {{if eq .Status ""}}selected{{end}}>전체</option>
       <option value="active" {{if eq .Status "active"}}selected{{end}}>진행</option>
-      <option value="lost" {{if eq .Status "lost"}}selected{{end}}>실주</option>
-      <option value="promoted" {{if eq .Status "promoted"}}selected{{end}}>승격완료</option>
+      <option value="contracted" {{if eq .Status "contracted"}}selected{{end}}>계약(승격 전)</option>
+      <option value="promoted" {{if eq .Status "promoted"}}selected{{end}}>승격 완료</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">계약 대상</label>
+    <select name="contract_target" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .ContractTargets}}
+      <option value="{{.CodeValue}}" {{if eq $.ContractTarget .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+      {{end}}
+    </select>
+  </div>
+  <label class="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
+    <input type="checkbox" name="closed" value="1" {{if .IncludeClosed}}checked{{end}} onchange="this.form.submit()">
+    실주·포기 사업 보기
+  </label>
+  {{if .IncludeClosed}}
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">종료 사유</label>
+    <select name="close" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]" onchange="this.form.submit()">
+      <option value="" {{if eq .CloseReason ""}}selected{{end}}>전체</option>
+      <option value="lost" {{if eq .CloseReason "lost"}}selected{{end}}>실주</option>
+      <option value="dropped" {{if eq .CloseReason "dropped"}}selected{{end}}>포기</option>
     </select>
   </div>
   {{end}}
+  {{end}}
   <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed}}
+  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed .IncludeClosed .ContractTarget}}
   <a href="{{if .FilterReset}}{{.FilterReset}}{{else}}{{.FilterAction}}{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
   {{end}}
 </form>

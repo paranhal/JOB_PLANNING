@@ -45,7 +45,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
 	}
-	f := parseSalesListFilter(c)
+	f := salesListFilterFromRequest(c)
 	view := salesListView(c.QueryParam("display"), c.QueryParam("view"))
 	items, err := h.repo.ListFilter(f)
 	if err != nil {
@@ -78,6 +78,8 @@ func (h *SalesHandler) List(c echo.Context) error {
 		kanbanTotal += col.Count
 	}
 	users, _ := h.userRepo.ListAssignable()
+	hidden, _ := h.repo.CountHiddenClosed(f)
+	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")
 	return c.Render(http.StatusOK, "sales/list.html", map[string]interface{}{
 		"Title": "영업 사업", "Active": NavSales,
 		"Projects": rows, "Stages": stages,
@@ -85,7 +87,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"KanbanTotal":   kanbanTotal,
 		"KanbanDrag":    canWriteSales(c),
 		"KanbanDrop":    "sales",
-		"KanbanHint":    "열 = 단계. 카드를 끌어 단계를 옮깁니다. 뒤로 가거나 실주로 보낼 때는 사유가 필요합니다.",
+		"KanbanHint":    "열 = 단계. 사업 종료는 상세에서만 합니다.",
 		"Timeline":      model.BuildSalesTimelineAxis(items, stages, time.Now()),
 		"View":          view,
 		"FilterQ":       filterQ,
@@ -95,6 +97,8 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"NewHref": newHref, "FilterReset": resetHref,
 		"Search": f.Search, "Status": f.Status, "Stage": f.Stage,
 		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
+		"IncludeClosed": f.IncludeClosed, "CloseReason": f.CloseReason, "HiddenClosed": hidden,
+		"ContractTarget": f.ContractTarget, "ContractTargets": targets,
 		"PeriodOptions": salesPeriodOptions(time.Now()),
 		"Users":         users,
 		"FilterAction":  "/sales",
@@ -136,6 +140,7 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 			maxAmt = st.Amount
 		}
 	}
+	migrated, _ := h.repo.ListMigratedUnchecked()
 	return c.Render(http.StatusOK, "sales/dashboard.html", map[string]interface{}{
 		"Title":         "영업 대시보드",
 		"Active":        NavSalesDashboard,
@@ -146,6 +151,8 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		"ActivityTypes": types,
 		"Opps":          rows,
 		"StageMax":      maxAmt,
+		"Migrated":      migrated,
+		"MigratedN":     len(migrated),
 	})
 }
 
@@ -155,8 +162,23 @@ func (h *SalesHandler) New(c echo.Context) error {
 	}
 	p := &model.SalesProject{
 		IsTentativeName: true,
-		DealType:        model.NormalizeSalesDealType(c.QueryParam("deal")),
 		Status:          model.SalesStatusActive,
+	}
+	if prevID := strings.TrimSpace(c.QueryParam("prev")); prevID != "" {
+		if prev, err := h.repo.Get(prevID); err == nil && prev != nil {
+			p.CustomerID = prev.CustomerID
+			p.ProspectName = prev.ProspectName
+			p.Name = prev.Name
+			p.SalesOwner = prev.SalesOwner
+			p.SalesOwnerID = prev.SalesOwnerID
+			p.ContractTarget = prev.ContractTarget
+			p.ProcurementRoute = prev.ProcurementRoute
+			p.ContractMethod = prev.ContractMethod
+			p.BidEvalMethod = prev.BidEvalMethod
+			p.MallContractType = prev.MallContractType
+			p.PrevSalesID = prev.SalesID
+			p.IsTentativeName = true
+		}
 	}
 	p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
 	return h.renderForm(c, p, false, "")
@@ -270,15 +292,17 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"DefaultOwner":    ctxString(c, "user_name"),
 		"PartyHints":      model.CustomerPartyHintNames(parties),
 		"Today":           time.Now().Format("2006-01-02"),
-		"CanWrite":        canWriteSales(c), "CanDelete": canDeleteSales(c),
-		"CanEditOthers": isAdminRole(c) || isOfficeRole(c),
-		"CurrentUser":   ctxString(c, "user_name"),
-		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"FormError":   querySalesErr(c.QueryParam("err")),
-		"FromTask":    fromTask,
-		"Memos":       memos,
-		"NextTask":    nextTask,
-		"NextActions": nextActions,
+		"CanWrite":        canWriteSales(c),
+		"CanDrop":         canDropSales(c, p) && p.Status == model.SalesStatusActive,
+		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
+		"CurrentUser":     ctxString(c, "user_name"),
+		"FlashOK":         c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"FormError":      querySalesErr(c.QueryParam("err")),
+		"FromTask":       fromTask,
+		"Memos":          memos,
+		"NextTask":       nextTask,
+		"NextActions":    nextActions,
+		"WinProbChoices": []int{10, 20, 30, 40, 50, 60, 70, 80, 90},
 		"ListBack": func() string {
 			if p.IsSupply() {
 				return "/sales?deal=supply"
@@ -325,18 +349,6 @@ func (h *SalesHandler) Update(c echo.Context) error {
 		return h.renderForm(c, p, true, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?ok=updated")
-}
-
-func (h *SalesHandler) ChangeStage(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
-	}
-	id := c.Param("id")
-	to := strings.TrimSpace(c.FormValue("stage"))
-	reason := strings.TrimSpace(c.FormValue("reason"))
-	keep := c.FormValue("keep_override") == "1"
-	err := h.repo.ChangeStage(id, to, reason, currentUserID(c), ctxString(c, "user_name"), keep)
-	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 
 func (h *SalesHandler) Delete(c echo.Context) error {
@@ -522,27 +534,28 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 	stages, _ := h.repo.StagesFor(p.DealType)
 	customers, _ := h.customerRepo.ListAll()
 	users, _ := h.userRepo.ListAssignable()
-	sources, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupLeadSource)
+	sources, _ := h.codeRepo.ListByGroup(model.SalesCodeGroupLeadSource)
+	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")
+	routes, _ := h.codeRepo.ActiveByGroup("sales_procurement_route")
+	methods, _ := h.codeRepo.ActiveByGroup("sales_contract_method")
+	evals, _ := h.codeRepo.ActiveByGroup("sales_bid_eval_method")
+	malls, _ := h.codeRepo.ActiveByGroup("sales_mall_contract_type")
 	title := "영업 사업 등록"
 	if isEdit {
 		title = "영업 사업 수정"
 	}
 	def := model.FindSalesStage(stages, p.Stage)
-	if def != nil && !p.HasOverride && !p.IsSupply() {
-		p.Probability = def.Probability
-	}
 	fromTask := strings.TrimSpace(c.QueryParam("from_task"))
 	if fromTask == "" {
 		fromTask = strings.TrimSpace(c.FormValue("from_task"))
 	}
 	listBack := "/sales"
-	if p.IsSupply() {
-		listBack = "/sales?deal=supply"
-	}
 	return c.Render(http.StatusOK, "sales/form.html", map[string]interface{}{
 		"Title": title, "Active": NavSales,
 		"Project": p, "IsEdit": isEdit, "FormError": formErr,
 		"Stages": stages, "Customers": customers, "Users": users, "LeadSources": sources,
+		"ContractTargets": targets, "ProcurementRoutes": routes, "ContractMethods": methods,
+		"BidEvalMethods": evals, "MallContractTypes": malls,
 		"DisplayStage": p.DisplayStage(def),
 		"FromTask":     fromTask,
 		"ListBack":     listBack,
@@ -553,7 +566,7 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 	p := &model.SalesProject{
 		Name:                    strings.TrimSpace(c.FormValue("name")),
 		IsTentativeName:         c.FormValue("is_tentative_name") == "1",
-		DealType:                model.NormalizeSalesDealType(c.FormValue("deal_type")),
+		DealType:                "",
 		Stage:                   strings.TrimSpace(c.FormValue("stage")),
 		CustomerID:              strings.TrimSpace(c.FormValue("customer_id")),
 		ProspectName:            strings.TrimSpace(c.FormValue("prospect_name")),
@@ -571,8 +584,12 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		LostReason:              strings.TrimSpace(c.FormValue("lost_reason")),
 		Notes:                   strings.TrimSpace(c.FormValue("notes")),
 		ContractedAt:            strings.TrimSpace(c.FormValue("contracted_at")),
-		PONo:                    strings.TrimSpace(c.FormValue("po_no")),
-		DeliveredAt:             strings.TrimSpace(c.FormValue("delivered_at")),
+		ContractTarget:          strings.TrimSpace(c.FormValue("contract_target")),
+		ProcurementRoute:        strings.TrimSpace(c.FormValue("procurement_route")),
+		ContractMethod:          strings.TrimSpace(c.FormValue("contract_method")),
+		BidEvalMethod:           strings.TrimSpace(c.FormValue("bid_eval_method")),
+		MallContractType:        strings.TrimSpace(c.FormValue("mall_contract_type")),
+		PrevSalesID:             strings.TrimSpace(c.FormValue("prev_sales_id")),
 		Status:                  model.SalesStatusActive,
 	}
 	if p.SalesOwnerID != "" && p.SalesOwner == "" && h.userRepo != nil {
@@ -654,8 +671,23 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"Stage":                   p.Stage,
 		"StageLabel":              stageLabel(def, p.Stage),
 		"DisplayStage":            p.DisplayStage(def),
-		"HasOverride":             p.HasOverride,
+		"HasOverride":             false,
 		"EffectiveProb":           p.EffectiveProbability(),
+		"BidStatus":               p.BidStatus,
+		"CloseReason":             p.CloseReason,
+		"RFPReceivedAt":           p.RFPReceivedAt,
+		"WinProb":                 p.WinProb,
+		"ProbabilityFinal":        p.ProbabilityFinal,
+		"AwardedAmount":           p.AwardedAmount,
+		"ContractAmount":          p.ContractAmount,
+		"ContractTarget":          p.ContractTarget,
+		"ProcurementRoute":        p.ProcurementRoute,
+		"ContractMethod":          p.ContractMethod,
+		"BidEvalMethod":           p.BidEvalMethod,
+		"MallContractType":        p.MallContractType,
+		"DropReason":              p.DropReason,
+		"PrevSalesID":             p.PrevSalesID,
+		"SalesNo":                 p.SalesNo,
 		"Customer":                customer,
 		"CustomerConfirmed":       p.CustomerConfirmed,
 		"Period":                  period,

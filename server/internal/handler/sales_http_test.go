@@ -54,13 +54,21 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/sales/:id/edit", h.Sales.Edit)
 	g.POST("/sales/:id", h.Sales.Update)
 	g.POST("/sales/:id/stage", h.Sales.ChangeStage)
+	g.POST("/sales/:id/bid-result", h.Sales.SetBidResult)
+	g.POST("/sales/:id/negotiate", h.Sales.StartNegotiation)
+	g.POST("/sales/:id/close-contract", h.Sales.CloseContracted)
+	g.POST("/sales/:id/close-failed", h.Sales.CloseNegotiationFailed)
+	g.POST("/sales/:id/win-prob", h.Sales.SetWinProb)
+	g.POST("/sales/:id/rfp", h.Sales.SetRFPReceived)
+	g.POST("/sales/:id/migrated-checked", h.Sales.MarkMigratedChecked)
+	g.GET("/sales/:id/drop.json", h.Sales.DropForm)
+	g.POST("/sales/:id/drop", h.Sales.Drop)
 	g.POST("/sales/:id/activities", h.Sales.CreateActivity)
 	g.POST("/sales/:id/parties", h.Sales.CreateParty)
 	g.POST("/sales/:id/parties/:pid/replace", h.Sales.ReplaceParty)
 	g.POST("/sales/:id/parties/:pid/link", h.Sales.LinkParty)
 	g.POST("/sales/:id/memos", h.Sales.CreateMemo)
 	g.POST("/sales/:id/memos/:mid/delete", h.Sales.DeleteMemo)
-	g.POST("/sales/:id/delete", h.Sales.Delete)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.GET("/projects/new", h.Project.New)
 	g.GET("/projects/:id", h.Project.Show)
@@ -105,7 +113,7 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 		t.Fatalf("상세 status=%d", show.Code)
 	}
 	body := show.Body.String()
-	if !strings.Contains(body, "검토") || !strings.Contains(body, "25%") {
+	if !strings.Contains(body, "발굴") || !strings.Contains(body, "10%") {
 		t.Fatalf("기본 단계·확도 미표시: %s", body[0:min(400, len(body))])
 	}
 	if !strings.Contains(body, "정보 확정도 0/4") {
@@ -114,48 +122,32 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 	if !strings.Contains(body, "영업 단계") || !strings.Contains(body, "pickStage(") {
 		t.Fatal("단계 pill 이 없다")
 	}
-	if strings.Contains(body, "단계 저장") || strings.Contains(body, "단계 이력") {
-		t.Fatal("폐기된 단계 변경·이력 카드가 남았다")
-	}
-	if !strings.Contains(body, "+ 활동 추가") || strings.Contains(body, "한 번 적으면 일일 업무 일정표에도") {
-		t.Fatal("활동 추가가 헤더가 아니다")
+	if strings.Contains(body, "삭제") && strings.Contains(body, "/sales/"+id+"/delete") {
+		t.Fatal("삭제 버튼이 남았다")
 	}
 	if !strings.Contains(body, "사업 정보") || !strings.Contains(body, ">확률<") {
 		t.Fatal("사업 정보·확률 행이 없다")
 	}
 
-	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"proposal"}})
+	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"propose"}})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=stage") {
 		t.Fatalf("단계 변경: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 	show = doGet(t, e, "/sales/"+id)
 	body = show.Body.String()
-	if !strings.Contains(body, "견적") || !strings.Contains(body, "40%") {
+	if !strings.Contains(body, "제안") || !strings.Contains(body, "20%") {
 		t.Fatalf("단계 변경 후 확도 미반영: %s", body[0:min(500, len(body))])
 	}
-	if !strings.Contains(body, "견적 ○") || !strings.Contains(body, "RFP") {
-		t.Fatal("견적 단계인데 진척 체크가 없다")
+	if strings.Contains(body, "수동 조정") {
+		t.Fatal("수동 조정 UI가 남았다")
 	}
 
-	rec = doForm(t, e, "/sales/"+id, url.Values{
-		"name":              {"세종시 도서관 RFID 증설(가칭)"},
-		"is_tentative_name": {"1"},
-		"probability":       {"35"},
-	})
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("확도 수동 저장 status=%d", rec.Code)
-	}
-	show = doGet(t, e, "/sales/"+id)
-	if !strings.Contains(show.Body.String(), "수동 조정") {
-		t.Fatal("수동 조정 표시가 없다")
-	}
-
-	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"lead"}})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=reason") {
+	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"discover"}})
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("후퇴 사유 없음: loc=%q", rec.Header().Get("Location"))
 	}
 	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{
-		"stage":  {"lead"},
+		"stage":  {"discover"},
 		"reason": {"내년으로 이연"},
 	})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=stage") {
@@ -166,36 +158,19 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 		t.Fatal("후퇴 사유가 이력에 없다")
 	}
 
-	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"won"}})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=won") {
-		t.Fatalf("미확정 수주: loc=%q", rec.Header().Get("Location"))
-	}
-	rec = doForm(t, e, "/sales/"+id, url.Values{
-		"name":                      {"세종시 도서관 RFID 증설"},
-		"customer_confirmed":        {"1"},
-		"expected_ym_confirmed":     {"1"},
-		"expected_amount_confirmed": {"1"},
-		"probability":               {"10"},
-	})
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("확정 플래그 저장 status=%d", rec.Code)
-	}
-	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"won"}})
+	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"direct_won"}})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=stage") {
-		t.Fatalf("수주 실패: loc=%q", rec.Header().Get("Location"))
+		t.Fatalf("바로 수주 실패: loc=%q", rec.Header().Get("Location"))
 	}
 	show = doGet(t, e, "/sales/"+id)
 	body = show.Body.String()
-	if !strings.Contains(body, ">수주<") && !strings.Contains(body, "font-medium text-gray-800\">수주<") {
-		if !strings.Contains(body, "수주") || strings.Contains(body, "수주확정") {
-			t.Fatal("수주 단계명이 없다")
-		}
+	if !strings.Contains(body, "수주") {
+		t.Fatal("수주 상태가 없다")
 	}
-	if strings.Contains(body, "수주 · ") {
-		t.Fatal("수주 후인데 확도 % 가 앞에 붙었다")
-	}
-	if strings.Contains(body, "견적 ○") {
-		t.Fatal("수주 단계인데 진척 체크가 남았다")
+
+	del := doForm(t, e, "/sales/"+id+"/delete", url.Values{})
+	if del.Code != http.StatusNotFound && del.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("삭제 라우트 status=%d", del.Code)
 	}
 
 	list := doGet(t, e, "/sales")
@@ -499,10 +474,9 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 		t.Fatalf("칸반 status=%d", kanban.Code)
 	}
 	kb := kanban.Body.String()
-	if !strings.Contains(kb, "발굴") || !strings.Contains(kb, "검토") ||
-		!strings.Contains(kb, "견적") || !strings.Contains(kb, "협상") ||
-		!strings.Contains(kb, "수주") || !strings.Contains(kb, "실주") {
-		t.Fatalf("6단계 열이 없다: %s", clipBody(kb))
+	if !strings.Contains(kb, "발굴") || !strings.Contains(kb, "제안") ||
+		!strings.Contains(kb, "입찰") || !strings.Contains(kb, "사업 종료") {
+		t.Fatalf("4단계 열이 없다: %s", clipBody(kb))
 	}
 	if strings.Contains(kb, "제안서 제출") || strings.Contains(kb, "계약완료") {
 		t.Fatal("폐 8단계 열이 남았다")
@@ -651,9 +625,16 @@ func createContractedSales(t *testing.T, e *echo.Echo, vals url.Values) string {
 		t.Fatalf("영업 등록 status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
-	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"won"}})
+	rec = doForm(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"direct_won"}})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=stage") {
-		t.Fatalf("수주: loc=%q", rec.Header().Get("Location"))
+		t.Fatalf("바로 수주: loc=%q", rec.Header().Get("Location"))
+	}
+	rec = doForm(t, e, "/sales/"+id+"/close-contract", url.Values{
+		"contracted_at":    {"2026-09-01"},
+		"contract_amount":  {"30000000"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("계약 종료: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 	return id
 }
@@ -890,7 +871,7 @@ func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 	}
 	pb := doGet(t, e, "/sales?view=kanban").Body.String()
 	lb := list.Body.String()
-	if strings.Count(lb, "flex-1 basis-0") != 6 || strings.Count(pb, "flex-1 basis-0") != 6 {
+	if strings.Count(lb, "flex-1 basis-0") != 4 || strings.Count(pb, "flex-1 basis-0") != 4 {
 		t.Fatalf("열 수가 다르다 list=%d pipe=%d", strings.Count(lb, "flex-1 basis-0"), strings.Count(pb, "flex-1 basis-0"))
 	}
 	if !strings.Contains(lb, "세종 RFID 증설 (가칭)") || !strings.Contains(pb, "세종 RFID 증설 (가칭)") {
@@ -904,13 +885,13 @@ func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 		t.Fatal("리스트와 파이프라인이 필터를 공유하지 않는다")
 	}
 
-	lost := doFormJSON(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"lost"}})
-	if lost.Code != http.StatusBadRequest || !strings.Contains(lost.Body.String(), "실패 사유") {
-		t.Fatalf("실주 사유 없이 옮겨졌다: %d %s", lost.Code, lost.Body.String())
+	lost := doFormJSON(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"closed"}})
+	if lost.Code != http.StatusBadRequest {
+		t.Fatalf("종료 끌어놓기: %d %s", lost.Code, lost.Body.String())
 	}
 	won := doFormJSON(t, e, "/sales/"+id+"/stage", url.Values{"stage": {"won"}})
-	if won.Code != http.StatusBadRequest || !strings.Contains(won.Body.String(), "사업명") {
-		t.Fatalf("수주 미확정 안내가 없다: %d %s", won.Code, won.Body.String())
+	if won.Code != http.StatusBadRequest {
+		t.Fatalf("옛 수주 단계: %d %s", won.Code, won.Body.String())
 	}
 }
 

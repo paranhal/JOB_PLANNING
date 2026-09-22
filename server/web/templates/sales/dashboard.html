@@ -2,6 +2,16 @@
 {{define "content"}}
 <div class="space-y-4">
   <h2 class="text-xl font-bold text-gray-800">영업 대시보드</h2>
+  {{if gt .MigratedN 0}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
+    <p class="font-semibold text-amber-900">이관 확인 필요 {{.MigratedN}}건</p>
+    <ul class="text-sm space-y-1">
+      {{range .Migrated}}
+      <li><a class="text-amber-900 underline" href="/sales/{{.SalesID}}">{{.Name}}</a></li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
   <p class="text-sm text-gray-500">숫자는 파이프라인과 같습니다. 오늘 활동은 영업 활동 로그입니다.</p>
 
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">

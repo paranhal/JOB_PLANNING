@@ -16,7 +16,7 @@
 
   <form method="post" action="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}/sales{{end}}" class="space-y-4">
     {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
-    {{if .IsEdit}}<input type="hidden" name="deal_type" value="{{.Project.DealType}}">{{end}}
+    {{if .Project.PrevSalesID}}<input type="hidden" name="prev_sales_id" value="{{.Project.PrevSalesID}}">{{end}}
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500">*</span></label>
@@ -26,87 +26,14 @@
           임시 사업명
         </label>
       </div>
-      {{if not .IsEdit}}
-      <div>
-        <p class="block text-sm font-medium text-gray-700 mb-2">유형</p>
-        <div class="flex flex-wrap gap-4 text-sm text-gray-700">
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="deal_type" value="build" {{if not .Project.IsSupply}}checked{{end}}
-                   onchange="location='/sales/new{{if .FromTask}}?from_task={{.FromTask}}{{end}}'">
-            구축·입찰
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="deal_type" value="supply" {{if .Project.IsSupply}}checked{{end}}
-                   onchange="location='/sales/new?deal=supply{{if .FromTask}}&from_task={{.FromTask}}{{end}}'">
-            단품·납품
-          </label>
-        </div>
-      </div>
-      {{else}}
-      <p class="text-sm text-gray-500">유형: {{if .Project.IsSupply}}단품·납품{{else}}구축·입찰{{end}}</p>
+      {{if .Project.PrevSalesID}}
+      <p class="text-sm text-gray-500">이전 사업에서 이어 등록합니다.</p>
       {{end}}
     </div>
 
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <h3 class="font-semibold text-gray-800">아래는 전부 나중에 채워도 됩니다</h3>
-      {{if not .IsEdit}}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">단계</label>
-          <select name="stage" class="w-full border rounded-lg px-3 py-2 text-sm">
-            {{range .Stages}}
-            <option value="{{.Code}}" {{if eq $.Project.Stage .Code}}selected{{end}}>{{.Label}}{{if not $.Project.IsSupply}} ({{.Probability}}%){{end}}</option>
-            {{end}}
-          </select>
-        </div>
-        {{if not .Project.IsSupply}}
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">확도 %</label>
-          <input type="number" name="probability" min="0" max="100" value="{{if .Project.HasOverride}}{{.Project.OverrideValue}}{{else}}{{.Project.Probability}}{{end}}"
-                 class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="비우면 단계 기본값">
-          <p class="text-xs text-gray-400 mt-1">단계 기본값과 다르면 「수동 조정」으로 저장됩니다.</p>
-        </div>
-        {{end}}
-      </div>
-      {{if .Project.IsSupply}}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">발주번호</label>
-          <input name="po_no" value="{{.Project.PONo}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주서를 받으면 수주로 올라갑니다">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">납품일</label>
-          <input type="date" name="delivered_at" value="{{.Project.DeliveredAt}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
-      {{end}}
-      {{else}}
-      <p class="text-sm text-gray-500">단계는 상세 화면에서 바꿉니다. 현재 {{.DisplayStage}}{{if and .Project.HasOverride (not .Project.IsSupply)}} · 수동 조정{{end}}</p>
-      <input type="hidden" name="stage" value="{{.Project.Stage}}">
-      {{if not .Project.IsSupply}}
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">확도 % (수동 조정)</label>
-        <input type="number" name="probability" min="0" max="100" value="{{if .Project.HasOverride}}{{.Project.OverrideValue}}{{else}}{{.Project.Probability}}{{end}}"
-               class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">계약서 날인일</label>
-        <input type="date" name="contracted_at" value="{{.Project.ContractedAt}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        <p class="text-xs text-gray-400 mt-1">선택. 비어 있어도 수주 단계에서 사업관리로 등록할 수 있습니다.</p>
-      </div>
-      {{else}}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">발주번호</label>
-          <input name="po_no" value="{{.Project.PONo}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주서를 받으면 수주로 올라갑니다">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">납품일</label>
-          <input type="date" name="delivered_at" value="{{.Project.DeliveredAt}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
-      {{end}}
-      {{end}}
+      <p class="text-sm text-gray-500">단계는 등록 때 발굴로 시작합니다. 이후에는 상세 화면에서 바꿉니다.{{if .IsEdit}} 현재 {{.DisplayStage}}{{end}}</p>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -176,15 +103,67 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">유입 경로</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">정보 입수 경로</label>
           <select name="lead_source" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .LeadSources}}
+            {{if or .IsActive (eq $.Project.LeadSource .CodeValue)}}
             <option value="{{.CodeValue}}" {{if eq $.Project.LeadSource .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
             {{end}}
           </select>
         </div>
       </div>
+      <details class="rounded-lg border border-gray-200 p-3">
+        <summary class="text-sm font-medium text-gray-800 cursor-pointer">계약 분류</summary>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">계약 대상</label>
+            <select name="contract_target" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— 선택 —</option>
+              {{range .ContractTargets}}
+              <option value="{{.CodeValue}}" {{if eq $.Project.ContractTarget .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">조달 경로</label>
+            <select name="procurement_route" id="proc_route" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— 선택 —</option>
+              {{range .ProcurementRoutes}}
+              <option value="{{.CodeValue}}" {{if eq $.Project.ProcurementRoute .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">계약 방법</label>
+            <select name="contract_method" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— 선택 —</option>
+              {{range .ContractMethods}}
+              <option value="{{.CodeValue}}" {{if eq $.Project.ContractMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">입찰 평가방법</label>
+            <select name="bid_eval_method" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— 선택 —</option>
+              {{range .BidEvalMethods}}
+              <option value="{{.CodeValue}}" {{if eq $.Project.BidEvalMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">쇼핑몰 계약 형태</label>
+            <select name="mall_contract_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— 선택 —</option>
+              {{range .MallContractTypes}}
+              <option value="{{.CodeValue}}" {{if eq $.Project.MallContractType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+              {{end}}
+            </select>
+          </div>
+        </div>
+      </details>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">경쟁사</label>
         <input name="competitor" value="{{.Project.Competitor}}" class="w-full border rounded-lg px-3 py-2 text-sm">
