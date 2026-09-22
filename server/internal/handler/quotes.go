@@ -506,11 +506,11 @@ func (h *QuotesHandler) afterSave(c echo.Context, q *model.SalesQuote) {
 		return
 	}
 	p, err := h.sales.Get(q.SalesID)
-	if err != nil || p == nil || !p.IsSupply() {
+	if err != nil || p == nil {
 		return
 	}
-	if p.Stage == model.SalesStageInquiry || p.Stage == "" {
-		_ = h.sales.ChangeStage(p.SalesID, model.SalesStageQuoted, "", ctxString(c, "user_id"), ctxString(c, "user_name"), false)
+	if p.Stage == model.SalesStage4Discover {
+		_ = h.sales.ChangeStage(p.SalesID, model.SalesStage4Propose, "", ctxString(c, "user_id"), ctxString(c, "user_name"), false)
 	}
 }
 

@@ -179,25 +179,26 @@ func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 	if CanPromoteSales(lead) {
 		t.Fatal("lead 인데 승격이 열렸다")
 	}
-	won := &SalesProject{Stage: SalesStageWon, Status: SalesStatusActive}
+	won := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Status: SalesStatusActive}
 	if !CanPromoteSales(won) {
-		t.Fatal("수주인데 승격이 안 열린다")
+		t.Fatal("계약 종료인데 승격이 안 열린다")
 	}
-	done := &SalesProject{Stage: SalesStageWon, Status: SalesStatusPromoted}
+	done := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Status: SalesStatusPromoted}
 	if CanPromoteSales(done) {
 		t.Fatal("이미 승격완료인데 버튼이 열렸다")
 	}
 	ok := &SalesProject{
-		SalesID: "SL-001", Name: "2027년 충남교육청", Stage: SalesStageWon,
-		Status: SalesStatusActive, CustomerID: "C041-26-001",
-		ExpectedYM: "2027-03", ExpectedAmount: 30_000_000, Notes: "재계약",
+		SalesID: "SL-001", Name: "2027년 충남교육청", Stage: SalesStage4Closed, CloseReason: SalesCloseContracted,
+		Status: SalesStatusContracted, CustomerID: "C041-26-001",
+		ExpectedYM: "2027-03", ExpectedAmount: 30_000_000, ContractAmount: 30_000_000, Notes: "재계약",
+		ContractedAt: "2027-03-01",
 	}
 	if !CanPromoteSales(ok) {
-		t.Fatal("수주인데 승격이 안 열린다")
+		t.Fatal("계약인데 승격이 안 열린다")
 	}
-	supply := &SalesProject{Stage: SalesStageOrdered, Status: SalesStatusActive, DealType: SalesDealSupply}
-	if CanPromoteSales(supply) {
-		t.Fatal("단품인데 사업관리 승격이 열렸다")
+	supply := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Status: SalesStatusContracted, DealType: SalesDealSupply}
+	if !CanPromoteSales(supply) {
+		t.Fatal("단품 계약도 승격해야 한다")
 	}
 	wp := WorkProjectFromSales(ok)
 	if wp.Name != "2027년 충남교육청" || wp.CustomerID != "C041-26-001" || wp.OrderingPartyID != "C041-26-001" {
@@ -209,7 +210,10 @@ func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 	if !strings.Contains(wp.Notes, "30,000,000") || !strings.Contains(wp.Notes, "재계약") {
 		t.Fatalf("금액이 비고로 안 옮겨졌다: %q", wp.Notes)
 	}
-	if wp.ContractType != "" || wp.BillingType != "" || wp.StartDate != "" {
-		t.Fatal("계약 조건은 승격 화면에서 처음 입력해야 한다")
+	if wp.ContractType != "" || wp.BillingType != "" {
+		t.Fatal("계약 유형은 승격 화면에서 처음 입력해야 한다")
+	}
+	if wp.StartDate != "2027-03-01" {
+		t.Fatalf("시작일=%q", wp.StartDate)
 	}
 }

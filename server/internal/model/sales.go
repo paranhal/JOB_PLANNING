@@ -5,21 +5,21 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // 영업 사업 단계 코드값. 라벨·확도는 codes 에서 읽는다 (§32.3.1).
 const (
+	// 44 이전. legacy_stage·이력 표시 전용
 	SalesStageLead        = "lead"
 	SalesStageContact     = "contact"
 	SalesStageProposal    = "proposal"
 	SalesStageNegotiation = "negotiation"
-	SalesStageQuote       = "quote"  // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageRFP         = "rfp"    // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageSubmit      = "submit" // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageWon         = "won"
+	SalesStageQuote       = "quote"      // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageRFP         = "rfp"        // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageSubmit      = "submit"     // 폐 8단계. 이력·legacy_stage 전용
+	SalesStageWon         = "won"        // 44 이전. legacy_stage·이력 표시 전용
 	SalesStageContracted  = "contracted" // 폐 8단계. 이력·legacy_stage 전용
-	SalesStageLost        = "lost"
+	SalesStageLost        = "lost"       // 44 이전. legacy_stage·이력 표시 전용
 )
 
 const (
@@ -130,6 +130,26 @@ type SalesProject struct {
 	CreatedAt               string
 	UpdatedAt               string
 
+	SalesNo          string
+	BidStatus        string
+	CloseReason      string
+	RFPReceivedAt    string
+	WinProb          *int
+	ProbabilityFinal *int
+	AwardedAmount    int
+	ContractAmount   int
+	ContractTarget   string
+	ProcurementRoute string
+	ContractMethod   string
+	BidEvalMethod    string
+	MallContractType string
+	DropReasonCode   string
+	DropReason       string
+	DroppedAt        string
+	DroppedBy        string
+	DroppedFromStage string
+	PrevSalesID      string
+
 	CustomerName string
 	StageLabel   string
 }
@@ -149,13 +169,7 @@ type SalesStageHistory struct {
 }
 
 func (p *SalesProject) EffectiveProbability() int {
-	if p == nil {
-		return 0
-	}
-	if p.HasOverride {
-		return p.OverrideValue
-	}
-	return p.Probability
+	return SalesProbability(p)
 }
 
 func (p *SalesProject) NameConfirmed() bool {
@@ -228,15 +242,7 @@ func (p *SalesProject) RequireWonConfirmation() error {
 	return fmt.Errorf("수주로 넘기려면 %s을(를) 모두 확정해야 합니다", strings.Join(items, "·"))
 }
 
-// CanPromoteSales 수주 단계이고 아직 사업관리로 올리지 않은 건만 승격한다 (§32.10).
-// contracted_at 이 비어 있어도 승격할 수 있다.
-func CanPromoteSales(p *SalesProject) bool {
-	if p == nil || p.IsSupply() {
-		return false
-	}
-	return CurrentSalesStage(p.Stage) == SalesStageWon &&
-		strings.TrimSpace(p.Status) != SalesStatusPromoted
-}
+// CanPromoteSales 는 sales_stage4.go 에 있다.
 
 // WorkProjectFromSales 승격 폼에 사업명·고객·발주처·금액을 옮긴다.
 // 계약기간·계약방식·청구방식·유상무상·범위 규칙은 비워 두고 §22.1에서 처음 입력한다.
@@ -253,7 +259,11 @@ func WorkProjectFromSales(s *SalesProject) *WorkProject {
 		Status:          WBProjectActive,
 		Color:           "#3B82F6",
 		SalesProjectID:  s.SalesID,
-		ContractAmount:  s.ExpectedAmount,
+		ContractAmount:  s.ContractAmount,
+		StartDate:       strings.TrimSpace(s.ContractedAt),
+	}
+	if p.ContractAmount == 0 {
+		p.ContractAmount = s.ExpectedAmount
 	}
 	if ym := NormalizeSalesYM(s.ExpectedYM); len(ym) >= 4 {
 		if y, err := strconv.Atoi(ym[:4]); err == nil {
@@ -305,6 +315,54 @@ func (p *SalesProject) DisplayStage(def *SalesStageDef) string {
 		label = p.StageLabel
 	}
 	stage := CurrentSalesStage(p.Stage)
+	if IsSalesStage4(p.Stage) {
+		if p.Stage == SalesStage4Closed {
+			extra := ""
+			switch p.CloseReason {
+			case SalesCloseContracted:
+				extra = "계약"
+				if strings.TrimSpace(p.ContractedAt) != "" {
+					extra += " " + p.ContractedAt
+				}
+				if p.ContractAmount > 0 {
+					extra += " · " + formatSalesAmount(p.ContractAmount) + "원"
+				}
+			case SalesCloseLost:
+				extra = "실주"
+				if r := strings.TrimSpace(p.LostReason); r != "" {
+					extra += " · " + r
+				}
+			case SalesCloseDropped:
+				extra = "포기"
+				if r := strings.TrimSpace(p.DropReason); r != "" {
+					extra += " · " + r
+				} else if r := strings.TrimSpace(p.LostReason); r != "" {
+					extra += " · " + r
+				}
+			}
+			if extra != "" {
+				return extra
+			}
+			return label
+		}
+		pct := SalesProbability(p)
+		if p.Stage == SalesStage4Bid {
+			st := knownSalesStageLabel(p.BidStatus)
+			if st == "" {
+				st = p.BidStatus
+			}
+			if st != "" {
+				if pct > 0 && pct < 100 {
+					return label + " · " + st + " " + strconv.Itoa(pct) + "%"
+				}
+				return label + " · " + st
+			}
+		}
+		if pct >= 100 {
+			return label
+		}
+		return fmt.Sprintf("%s · %d%%", label, pct)
+	}
 	if stage == SalesStageLost || stage == SalesStageDropped || (def != nil && def.IsLost()) {
 		if r := strings.TrimSpace(p.LostReason); r != "" {
 			return label + " · " + r
@@ -323,7 +381,13 @@ func (p *SalesProject) DisplayStage(def *SalesStageDef) string {
 	if stage == SalesStageWon || stage == SalesStageContracted {
 		return label
 	}
-	return fmt.Sprintf("%s · %d%%", label, p.EffectiveProbability())
+	prob := p.Probability
+	if p.HasOverride {
+		prob = p.OverrideValue
+	} else if def != nil && def.Probability > 0 && p.Probability == 0 {
+		prob = def.Probability
+	}
+	return fmt.Sprintf("%s · %d%%", label, prob)
 }
 
 // CurrentSalesStage 폐 8단계 코드를 현행 6단계로 옮긴다 (§32.3.5). 이력 원문은 바꾸지 않는다.
@@ -361,6 +425,9 @@ func SalesStageDisplayLabel(code string, stages []SalesStageDef) string {
 	}
 	if d := FindSalesStage(stages, code); d != nil && d.Label != "" {
 		return d.Label
+	}
+	if s := knownSalesStageLabel(code); s != "" {
+		return s
 	}
 	if s := SalesLegacyStageLabel(code); s != "" {
 		return s
@@ -415,29 +482,7 @@ func SalesMigratedActivity(legacy string) (actType, title string, ok bool) {
 	}
 }
 
-// SalesContractUnsigned 수주 후 날인일이 30일을 넘도록 비면 미계획함 (§32.10).
-func SalesContractUnsigned(p *SalesProject, today time.Time) bool {
-	if p == nil || CurrentSalesStage(p.Stage) != SalesStageWon {
-		return false
-	}
-	if strings.TrimSpace(p.Status) == SalesStatusPromoted {
-		return false
-	}
-	if strings.TrimSpace(p.ContractedAt) != "" {
-		return false
-	}
-	start := parseSalesAt(p.WonAt)
-	if start.IsZero() {
-		start = parseSalesAt(p.CreatedAt)
-	}
-	if start.IsZero() {
-		return false
-	}
-	a := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, time.UTC)
-	b := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
-	days := int(b.Sub(a).Hours() / 24)
-	return days > SalesContractUnsignedDays
-}
+// SalesContractUnsigned 는 sales_stage4.go 에 있다.
 
 func NormalizeSalesPrecision(p string) string {
 	switch strings.TrimSpace(p) {
@@ -704,16 +749,14 @@ func LoadSalesStages(stageCodes, probCodes []Code) []SalesStageDef {
 
 func fallbackSalesStages() []SalesStageDef {
 	return []SalesStageDef{
-		{Code: SalesStageContact, Probability: 10, SortOrder: 1},
-		{Code: SalesStageLead, Probability: 25, SortOrder: 2},
-		{Code: SalesStageProposal, Probability: 40, SortOrder: 3},
-		{Code: SalesStageNegotiation, Probability: 70, SortOrder: 4},
-		{Code: SalesStageWon, Probability: 100, SortOrder: 5},
-		{Code: SalesStageLost, Probability: 0, SortOrder: 6},
+		{Code: SalesStage4Discover, Label: "발굴", Probability: 10, SortOrder: 1},
+		{Code: SalesStage4Propose, Label: "제안", Probability: 20, SortOrder: 2},
+		{Code: SalesStage4Bid, Label: "입찰", Probability: 0, SortOrder: 3},
+		{Code: SalesStage4Closed, Label: "사업 종료", Probability: 0, SortOrder: 4},
 	}
 }
 
-func DefaultSalesStageCode() string { return SalesStageLead }
+func DefaultSalesStageCode() string { return SalesStage4Discover }
 
 const (
 	SalesPartyOwn      = "own"

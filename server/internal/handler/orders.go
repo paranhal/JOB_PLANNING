@@ -320,27 +320,21 @@ func (h *OrdersHandler) afterOrder(c echo.Context, o *model.SalesOrder) {
 		return
 	}
 	p, err := h.sales.Get(o.SalesID)
-	if err != nil || p == nil || !p.IsSupply() {
+	if err != nil || p == nil {
 		return
 	}
-	switch p.Stage {
-	case model.SalesStageInquiry, model.SalesStageQuoted, "":
-		_ = h.sales.ChangeStage(p.SalesID, model.SalesStageOrdered, "", ctxString(c, "user_id"), ctxString(c, "user_name"), false)
+	uid, uname := ctxString(c, "user_id"), ctxString(c, "user_name")
+	switch {
+	case p.Stage == model.SalesStage4Bid && p.BidStatus == model.SalesBidPending:
+		_ = h.sales.SetBidResult(p.SalesID, model.SalesBidWon, "", "", uid, uname)
+	case p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose:
+		_ = h.sales.ChangeStage(p.SalesID, model.SalesDirectWin, "", uid, uname, false)
 	}
 }
 
 func (h *OrdersHandler) afterDelivery(c echo.Context, o *model.SalesOrder) {
-	if o == nil || o.SalesID == "" || h.sales == nil {
-		return
-	}
-	p, err := h.sales.Get(o.SalesID)
-	if err != nil || p == nil || !p.IsSupply() {
-		return
-	}
-	switch p.Stage {
-	case model.SalesStageInquiry, model.SalesStageQuoted, model.SalesStageOrdered, "":
-		_ = h.sales.ChangeStage(p.SalesID, model.SalesStageDelivered, "", ctxString(c, "user_id"), ctxString(c, "user_name"), false)
-	}
+	_ = c
+	_ = o
 }
 
 func exposeOrder(c echo.Context, o *model.SalesOrder) *model.SalesOrder {

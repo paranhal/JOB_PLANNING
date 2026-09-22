@@ -12,7 +12,7 @@ func CountOpenSales(projects []SalesProject) int {
 	n := 0
 	for i := range projects {
 		st := CurrentSalesStage(projects[i].Stage)
-		if st == SalesStageWon || st == SalesStageLost || st == SalesStageDropped || st == SalesStageDelivered {
+		if st == SalesStage4Closed || st == SalesStageWon || st == SalesStageLost || st == SalesStageDropped || st == SalesStageDelivered {
 			continue
 		}
 		n++

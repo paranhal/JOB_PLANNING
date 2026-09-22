@@ -19,12 +19,12 @@ func TestSalesProjectNameOnlyAndStageRules(t *testing.T) {
 	repo := NewSalesRepo(db)
 
 	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_stage'`).Scan(&n); err != nil || n < 8 {
-		t.Fatalf("sales_stage codes n=%d err=%v", n, err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_stage4'`).Scan(&n); err != nil || n < 4 {
+		t.Fatalf("sales_stage4 codes n=%d err=%v", n, err)
 	}
 	var active int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_stage' AND is_active=1`).Scan(&active); err != nil || active != 6 {
-		t.Fatalf("active sales_stage=%d err=%v", active, err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_stage4' AND is_active=1`).Scan(&active); err != nil || active != 4 {
+		t.Fatalf("active sales_stage4=%d err=%v", active, err)
 	}
 
 	p := &model.SalesProject{Name: "세종 RFID 증설(가칭)", IsTentativeName: true}
@@ -35,7 +35,7 @@ func TestSalesProjectNameOnlyAndStageRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Stage != model.SalesStageLead || got.Probability != 25 {
+	if got.Stage != model.SalesStage4Discover || got.Probability != 10 {
 		t.Fatalf("기본 단계/확도: stage=%s prob=%d", got.Stage, got.Probability)
 	}
 	if got.DealType != model.SalesDealBuild {
@@ -45,27 +45,18 @@ func TestSalesProjectNameOnlyAndStageRules(t *testing.T) {
 		t.Fatalf("빈 칸이 채워졌다: %+v", got)
 	}
 
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageProposal, "", "u1", "최혜영", false); err != nil {
+	if err := repo.ChangeStage(p.SalesID, model.SalesStage4Propose, "", "u1", "최혜영", false); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = repo.Get(p.SalesID)
-	if got.Probability != 40 || got.HasOverride {
-		t.Fatalf("단계 변경 후 확도: prob=%d override=%v", got.Probability, got.HasOverride)
+	if got.Probability != 20 || got.Stage != model.SalesStage4Propose {
+		t.Fatalf("단계 변경 후 확도: stage=%s prob=%d", got.Stage, got.Probability)
 	}
 
-	got.HasOverride, got.OverrideValue = true, 35
-	if err := repo.Update(got, "최혜영"); err != nil {
-		t.Fatal(err)
-	}
-	got, _ = repo.Get(p.SalesID)
-	if !got.HasOverride || got.EffectiveProbability() != 35 {
-		t.Fatalf("수동 조정 미반영: %+v", got)
-	}
-
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageLead, "", "u1", "최혜영", false); err == nil {
+	if err := repo.ChangeStage(p.SalesID, model.SalesStage4Discover, "", "u1", "최혜영", false); err == nil {
 		t.Fatal("후퇴에 사유 없이 통과했다")
 	}
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageLead, "내년으로 이연", "u1", "최혜영", false); err != nil {
+	if err := repo.ChangeStage(p.SalesID, model.SalesStage4Discover, "내년으로 이연", "u1", "최혜영", false); err != nil {
 		t.Fatal(err)
 	}
 	hist, err := repo.ListHistory(p.SalesID)
@@ -74,7 +65,7 @@ func TestSalesProjectNameOnlyAndStageRules(t *testing.T) {
 	}
 	found := false
 	for _, h := range hist {
-		if h.ToStage == model.SalesStageLead && strings.Contains(h.Reason, "내년으로 이연") {
+		if h.ToStage == model.SalesStage4Discover && strings.Contains(h.Reason, "내년으로 이연") {
 			found = true
 		}
 	}
@@ -82,23 +73,12 @@ func TestSalesProjectNameOnlyAndStageRules(t *testing.T) {
 		t.Fatalf("후퇴 이력이 없다: %+v", hist)
 	}
 
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageWon, "", "u1", "최혜영", false); err == nil {
-		t.Fatal("미확정인데 수주가 통과했다")
-	}
-	got, _ = repo.Get(p.SalesID)
-	got.IsTentativeName = false
-	got.CustomerConfirmed = true
-	got.ExpectedYMConfirmed = true
-	got.ExpectedAmountConfirmed = true
-	if err := repo.Update(got, "최혜영"); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageWon, "", "u1", "최혜영", false); err != nil {
+	if err := repo.ChangeStage(p.SalesID, model.SalesDirectWin, "", "u1", "최혜영", false); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = repo.Get(p.SalesID)
-	if got.Stage != model.SalesStageWon || got.Probability != 100 {
-		t.Fatalf("수주: stage=%s prob=%d", got.Stage, got.Probability)
+	if got.Stage != model.SalesStage4Bid || got.BidStatus != model.SalesBidWon || got.Probability != 100 {
+		t.Fatalf("바로 수주: stage=%s bid=%s prob=%d", got.Stage, got.BidStatus, got.Probability)
 	}
 	if strings.TrimSpace(got.WonAt) == "" {
 		t.Fatal("won_at 이 비었다")
@@ -301,14 +281,15 @@ func TestSalesStageProbabilityReadsFromCodes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if _, err := db.Exec(`UPDATE codes SET code_name='18' WHERE code_group='sales_stage_prob' AND code_value='proposal'`); err != nil {
+	if _, err := db.Exec(`UPDATE codes SET code_name='18' WHERE code_group='sales_stage4_prob' AND code_value='propose'`); err != nil {
 		t.Fatal(err)
 	}
+	LoadLookupCache(db)
 	stages, err := NewSalesRepo(db).Stages()
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := model.FindSalesStage(stages, model.SalesStageProposal)
+	d := model.FindSalesStage(stages, model.SalesStage4Propose)
 	if d == nil || d.Probability != 18 {
 		t.Fatalf("codes 확도 미반영: %+v", d)
 	}
@@ -422,14 +403,20 @@ func TestSalesPipelineAndActivityMove(t *testing.T) {
 	}
 	won := &model.SalesProject{
 		Name: "계약", ExpectedAmount: 100_000_000, ExpectedYM: "2026-10",
-		Stage: model.SalesStageWon, CustomerConfirmed: true,
-		ExpectedYMConfirmed: true, ExpectedAmountConfirmed: true,
+		CustomerConfirmed: true, ExpectedYMConfirmed: true, ExpectedAmountConfirmed: true,
 	}
 	if err := repo.Create(won); err != nil {
 		t.Fatal(err)
 	}
-	lost := &model.SalesProject{Name: "실패", IsTentativeName: true, Stage: model.SalesStageLost, LostReason: "예산"}
+	if err := repo.ChangeStage(won.SalesID, model.SalesDirectWin, "", "u1", "t", false); err != nil {
+		t.Fatal(err)
+	}
+	lost := &model.SalesProject{Name: "실패", IsTentativeName: true, LostReason: "예산"}
 	if err := repo.Create(lost); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, status=? WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseLost, model.SalesStatusLost, lost.SalesID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -471,15 +458,15 @@ func TestSalesPipelineAndActivityMove(t *testing.T) {
 	if err != nil || got.ActivityType != "call" {
 		t.Fatalf("유형 이동: %+v err=%v", got, err)
 	}
-	if err := repo.MoveActivity(act.ActivityID, "stage", model.SalesStageProposal, "최혜영"); err != nil {
+	if err := repo.MoveActivity(act.ActivityID, "stage", model.SalesStage4Propose, "최혜영"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = repo.GetActivity(act.ActivityID)
-	if got.StageAtTime != model.SalesStageProposal {
+	if got.StageAtTime != model.SalesStage4Propose {
 		t.Fatalf("단계 스냅샷=%s", got.StageAtTime)
 	}
 	leadGot, _ := repo.Get(lead.SalesID)
-	if leadGot.Stage != model.SalesStageLead {
+	if leadGot.Stage != model.SalesStage4Discover {
 		t.Fatalf("활동 칸반이 사업 단계를 바꿨다: %s", leadGot.Stage)
 	}
 }
@@ -493,21 +480,16 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 	repo := NewSalesRepo(db)
 
 	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_supply_stage' AND is_active=1`).Scan(&n); err != nil || n != 5 {
-		t.Fatalf("단품 단계 codes n=%d err=%v", n, err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='sales_stage4' AND is_active=1`).Scan(&n); err != nil || n != 4 {
+		t.Fatalf("4단계 codes n=%d err=%v", n, err)
 	}
 	build, err := repo.Stages()
-	if err != nil || len(build) != 6 {
-		t.Fatalf("구축 단계 n=%d err=%v", len(build), err)
+	if err != nil || len(build) != 4 {
+		t.Fatalf("단계 n=%d err=%v", len(build), err)
 	}
 	supply, err := repo.StagesFor(model.SalesDealSupply)
-	if err != nil || len(supply) != 5 {
-		t.Fatalf("단품 단계 n=%d err=%v", len(supply), err)
-	}
-	for _, st := range supply {
-		if st.Code == model.SalesStageProposal {
-			t.Fatalf("단품 단계에 구축 단계가 섞였다: %+v", st)
-		}
+	if err != nil || len(supply) != 4 {
+		t.Fatalf("단품도 4단계 n=%d err=%v", len(supply), err)
 	}
 
 	buildP := &model.SalesProject{Name: "구축 건", IsTentativeName: true}
@@ -522,11 +504,11 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.DealType != model.SalesDealSupply || got.Stage != model.SalesStageQuoted || got.Probability != 0 {
-		t.Fatalf("견적 저장 후: deal=%s stage=%s prob=%d", got.DealType, got.Stage, got.Probability)
+	if got.DealType != model.SalesDealSupply || got.Stage != model.SalesStage4Discover || got.Probability != 10 {
+		t.Fatalf("등록 후: deal=%s stage=%s prob=%d", got.DealType, got.Stage, got.Probability)
 	}
 
-	onlyBuild, err := repo.ListFilter(SalesListFilter{})
+	onlyBuild, err := repo.ListFilter(SalesListFilter{DealType: model.SalesDealBuild})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,7 +523,7 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 	}
 
 	if err := repo.ChangeStage(p.SalesID, model.SalesStageProposal, "", "u1", "최혜영", false); err == nil {
-		t.Fatal("단품에 구축 단계를 넣었다")
+		t.Fatal("옛 단계 코드로 옮겼다")
 	}
 
 	got.PONo = "PO-2026-01"
@@ -549,24 +531,18 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ = repo.Get(p.SalesID)
-	if got.Stage != model.SalesStageOrdered {
-		t.Fatalf("발주 후 단계=%s", got.Stage)
+	if got.Stage != model.SalesStage4Discover {
+		t.Fatalf("발주 저장이 단계를 바꿨다=%s", got.Stage)
 	}
 	got.DeliveredAt = "2026-09-04"
 	if err := repo.Update(got, "최혜영"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = repo.Get(p.SalesID)
-	if got.Stage != model.SalesStageDelivered {
-		t.Fatalf("납품 후 단계=%s", got.Stage)
+	if got.Stage != model.SalesStage4Discover {
+		t.Fatalf("납품일 저장이 단계를 바꿨다=%s", got.Stage)
 	}
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageInquiry, "", "u1", "최혜영", false); err == nil {
-		t.Fatal("후퇴에 사유 없이 통과했다")
-	}
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageDropped, "", "u1", "최혜영", false); err == nil {
-		t.Fatal("실주에 사유 없이 통과했다")
-	}
-	if err := repo.ChangeStage(p.SalesID, model.SalesStageDropped, "고객 취소", "u1", "최혜영", false); err != nil {
-		t.Fatal(err)
+	if err := repo.ChangeStage(p.SalesID, model.SalesStage4Closed, "끝", "u1", "최혜영", false); err == nil {
+		t.Fatal("ChangeStage 로 종료됐다")
 	}
 }

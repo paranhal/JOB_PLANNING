@@ -30,9 +30,6 @@ func (p *SalesProject) IsSupply() bool {
 }
 
 func DefaultSalesStageCodeFor(dealType string) string {
-	if NormalizeSalesDealType(dealType) == SalesDealSupply {
-		return SalesStageInquiry
-	}
 	return DefaultSalesStageCode()
 }
 

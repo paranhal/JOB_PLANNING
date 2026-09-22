@@ -23,18 +23,12 @@ func (r *SalesRepo) Stages() ([]model.SalesStageDef, error) {
 }
 
 func (r *SalesRepo) StagesFor(dealType string) ([]model.SalesStageDef, error) {
-	if model.NormalizeSalesDealType(dealType) == model.SalesDealSupply {
-		codes, err := r.codeRepo.ActiveByGroup(model.SalesCodeGroupSupplyStage)
-		if err != nil {
-			return model.LoadSalesSupplyStages(nil), err
-		}
-		return model.LoadSalesSupplyStages(codes), nil
-	}
-	stageCodes, err := r.codeRepo.ActiveByGroup(model.SalesCodeGroupStage)
+	_ = dealType
+	stageCodes, err := r.codeRepo.ActiveByGroup(model.SalesCodeGroupStage4)
 	if err != nil {
 		return model.LoadSalesStages(nil, nil), err
 	}
-	probCodes, err := r.codeRepo.ActiveByGroup(model.SalesCodeGroupProb)
+	probCodes, err := r.codeRepo.ActiveByGroup(model.SalesCodeGroupStage4Prob)
 	if err != nil {
 		return model.LoadSalesStages(stageCodes, nil), err
 	}
@@ -42,9 +36,10 @@ func (r *SalesRepo) StagesFor(dealType string) ([]model.SalesStageDef, error) {
 }
 
 func (r *SalesRepo) allStageDefs() []model.SalesStageDef {
-	build, _ := r.StagesFor(model.SalesDealBuild)
-	supply, _ := r.StagesFor(model.SalesDealSupply)
-	return append(build, supply...)
+	cur, _ := r.StagesFor("")
+	old, _ := r.codeRepo.ListByGroup(model.SalesCodeGroupStage)
+	supply, _ := r.codeRepo.ListByGroup(model.SalesCodeGroupSupplyStage)
+	return append(append(cur, model.LoadSalesStages(old, nil)...), model.LoadSalesSupplyStages(supply)...)
 }
 
 const salesSelect = `
@@ -59,6 +54,13 @@ const salesSelect = `
 		COALESCE(s.status,'active'), COALESCE(s.notes,''),
 		COALESCE(s.legacy_stage,''), COALESCE(s.won_at,''), COALESCE(s.contracted_at,''),
 		COALESCE(s.deal_type,'build'), COALESCE(s.po_no,''), COALESCE(s.delivered_at,''),
+		COALESCE(s.sales_no,''), COALESCE(s.bid_status,''), COALESCE(s.close_reason,''),
+		COALESCE(s.rfp_received_at,''), s.win_prob, s.probability_final,
+		COALESCE(s.awarded_amount,0), COALESCE(s.contract_amount,0),
+		COALESCE(s.contract_target,''), COALESCE(s.procurement_route,''), COALESCE(s.contract_method,''),
+		COALESCE(s.bid_eval_method,''), COALESCE(s.mall_contract_type,''),
+		COALESCE(s.drop_reason_code,''), COALESCE(s.drop_reason,''), COALESCE(s.dropped_at,''),
+		COALESCE(s.dropped_by,''), COALESCE(s.dropped_from_stage,''), COALESCE(s.prev_sales_id,''),
 		COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
 		COALESCE(cu.org_name,'')
 	FROM sales_projects s
@@ -76,16 +78,29 @@ type SalesListFilter struct {
 	Period          string
 	Customer        string
 	AmountConfirmed string
+	IncludeClosed   bool
+	CloseReason     string
+	ContractTarget  string
 	DealType        string
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
 	q := salesSelect + ` WHERE 1=1`
 	var args []interface{}
-	if strings.TrimSpace(f.DealType) != model.SalesDealAll {
-		deal := model.NormalizeSalesDealType(f.DealType)
+	if s := strings.TrimSpace(f.DealType); s != "" && s != model.SalesDealAll {
+		deal := model.NormalizeSalesDealType(s)
 		q += ` AND COALESCE(NULLIF(TRIM(s.deal_type),''),'build')=?`
 		args = append(args, deal)
+	}
+	if s := strings.TrimSpace(f.ContractTarget); s != "" {
+		q += ` AND s.contract_target=?`
+		args = append(args, s)
+	}
+	if !f.IncludeClosed {
+		q += ` AND COALESCE(s.status,'active') IN ('active','contracted','promoted')`
+	} else if s := strings.TrimSpace(f.CloseReason); s != "" {
+		q += ` AND s.close_reason=?`
+		args = append(args, s)
 	}
 	if s := strings.TrimSpace(f.Status); s != "" {
 		q += ` AND s.status=?`
@@ -192,12 +207,10 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		return err
 	}
 	normalizeSalesProject(p, stages)
-	applySupplyAutoStage(p, stages)
-	if !p.IsSupply() && model.StageNeedsFullConfirm(p.Stage) {
-		if err := p.RequireWonConfirmation(); err != nil {
-			return err
-		}
+	if strings.TrimSpace(p.Stage) == "" || !model.IsSalesStage4(p.Stage) {
+		p.Stage = model.SalesStage4Discover
 	}
+	p.Probability = model.SalesProbability(p)
 	id, err := NextSeq(r.db, "sales_project")
 	if err != nil {
 		return err
@@ -224,19 +237,25 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			expected_amount, expected_amount_confirmed,
 			sales_owner, sales_owner_id, competitor, lead_source, lost_reason,
 			status, notes, legacy_stage, won_at, contracted_at,
-			deal_type, po_no, delivered_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			deal_type, po_no, delivered_at,
+			bid_status, close_reason, rfp_received_at, win_prob, probability_final,
+			awarded_amount, contract_amount, contract_target, procurement_route, contract_method,
+			bid_eval_method, mall_contract_type, prev_sales_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.SalesID, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
 		p.ExpectedAmount, boolToInt(p.ExpectedAmountConfirmed),
 		p.SalesOwner, nullStr(p.SalesOwnerID), p.Competitor, p.LeadSource, p.LostReason,
 		p.Status, p.Notes, p.LegacyStage, p.WonAt, p.ContractedAt,
-		p.DealType, p.PONo, p.DeliveredAt)
+		p.DealType, p.PONo, p.DeliveredAt,
+		p.BidStatus, p.CloseReason, p.RFPReceivedAt, nullIntPtr(p.WinProb), nullIntPtr(p.ProbabilityFinal),
+		p.AwardedAmount, p.ContractAmount, p.ContractTarget, p.ProcurementRoute, p.ContractMethod,
+		p.BidEvalMethod, p.MallContractType, p.PrevSalesID)
 	if err != nil {
 		return err
 	}
-	if err := insertSalesHistory(tx, fmt.Sprintf("SH-%03d", histN), p.SalesID, "", p.Stage, "등록", "", ""); err != nil {
+	if err := insertSalesHistory(tx, fmt.Sprintf("SH-%03d", histN), p.SalesID, "", p.Stage, "등록", "", "", ""); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -258,26 +277,38 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 		return err
 	}
 	p.DealType = model.NormalizeSalesDealType(old.DealType)
+	p.Stage = old.Stage
+	p.BidStatus = old.BidStatus
+	p.CloseReason = old.CloseReason
+	p.WonAt = old.WonAt
+	p.WinProb = old.WinProb
+	p.ProbabilityFinal = old.ProbabilityFinal
+	p.RFPReceivedAt = old.RFPReceivedAt
 	stages, _ := r.StagesFor(p.DealType)
 	normalizeSalesProject(p, stages)
-	applySupplyAutoStage(p, stages)
+	p.Stage = old.Stage
+	p.Probability = model.SalesProbability(p)
 	p.SalesOwner, p.SalesOwnerID = bindStaff(r.db, p.SalesOwner, p.SalesOwnerID)
 	err = touchUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, func() error {
 		_, err := r.db.Exec(`
 			UPDATE sales_projects SET
-				name=?, is_tentative_name=?, probability=?, probability_override=?,
+				name=?, is_tentative_name=?, probability=?,
 				customer_id=?, prospect_name=?, prospect_region=?, customer_confirmed=?,
 				expected_ym=?, expected_precision=?, expected_ym_confirmed=?,
 				expected_amount=?, expected_amount_confirmed=?,
 				sales_owner=?, sales_owner_id=?, competitor=?, lead_source=?, lost_reason=?,
-				status=?, notes=?, contracted_at=?, po_no=?, delivered_at=?, updated_at=CURRENT_TIMESTAMP
+				notes=?, contracted_at=?, po_no=?, delivered_at=?,
+				contract_target=?, procurement_route=?, contract_method=?, bid_eval_method=?, mall_contract_type=?,
+				prev_sales_id=?, updated_at=CURRENT_TIMESTAMP
 			WHERE sales_id=?`,
-			p.Name, boolToInt(p.IsTentativeName), p.Probability, overrideArg(p),
+			p.Name, boolToInt(p.IsTentativeName), p.Probability,
 			nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 			p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
 			p.ExpectedAmount, boolToInt(p.ExpectedAmountConfirmed),
 			p.SalesOwner, nullStr(p.SalesOwnerID), p.Competitor, p.LeadSource, p.LostReason,
-			p.Status, p.Notes, p.ContractedAt, p.PONo, p.DeliveredAt, p.SalesID)
+			p.Notes, p.ContractedAt, p.PONo, p.DeliveredAt,
+			p.ContractTarget, p.ProcurementRoute, p.ContractMethod, p.BidEvalMethod, p.MallContractType,
+			p.PrevSalesID, p.SalesID)
 		return err
 	})
 	if err != nil {
@@ -285,9 +316,6 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 	}
 	if err := r.recordProjectChanges(old, p, byName); err != nil {
 		return err
-	}
-	if p.IsSupply() && p.Stage != old.Stage {
-		return r.ChangeStage(p.SalesID, p.Stage, "자동", "", byName, true)
 	}
 	return nil
 }
@@ -355,87 +383,6 @@ func (r *SalesRepo) MarkPromoted(salesID string) error {
 	})
 }
 
-func (r *SalesRepo) ChangeStage(id, toStage, reason, byID, byName string, keepOverride bool) error {
-	p, err := r.Get(id)
-	if err != nil {
-		return err
-	}
-	stages, err := r.StagesFor(p.DealType)
-	if err != nil && len(stages) == 0 {
-		return err
-	}
-	toStage = strings.TrimSpace(toStage)
-	from := model.FindSalesStage(stages, p.Stage)
-	to := model.FindSalesStage(stages, toStage)
-	if to == nil || !model.SalesStageAllowedForDeal(p.DealType, toStage) {
-		return fmt.Errorf("알 수 없는 단계입니다")
-	}
-	if p.Stage == toStage {
-		return nil
-	}
-	if to.IsLost() && strings.TrimSpace(reason) == "" {
-		return fmt.Errorf("실주할 때는 실패 사유가 필요합니다")
-	}
-	if model.IsSalesStageBackward(from, to) && strings.TrimSpace(reason) == "" {
-		return fmt.Errorf("단계를 되돌릴 때는 사유가 필요합니다")
-	}
-	if !p.IsSupply() && model.StageNeedsFullConfirm(toStage) {
-		if err := p.RequireWonConfirmation(); err != nil {
-			return err
-		}
-	}
-	p.Stage = toStage
-	p.Probability = to.Probability
-	if toStage == model.SalesStageWon && strings.TrimSpace(p.WonAt) == "" {
-		p.WonAt = time.Now().Format("2006-01-02")
-	}
-	if !keepOverride {
-		p.HasOverride = false
-		p.OverrideValue = 0
-	}
-	if to.IsLost() {
-		p.Status = model.SalesStatusLost
-		p.LostReason = strings.TrimSpace(reason)
-	} else if p.Status == model.SalesStatusLost {
-		p.Status = model.SalesStatusActive
-	}
-	before := rowJSON(r.db, "sales_projects", "sales_id", p.SalesID)
-	histN, err := NextSeq(r.db, "sales_stage_history")
-	if err != nil {
-		return err
-	}
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec(`
-			UPDATE sales_projects SET
-				stage=?, probability=?, probability_override=?,
-				status=?, lost_reason=?, won_at=?, updated_at=CURRENT_TIMESTAMP
-			WHERE sales_id=?`,
-		p.Stage, p.Probability, overrideArg(p), p.Status, p.LostReason, p.WonAt, p.SalesID)
-	if err != nil {
-		return err
-	}
-	if err := insertSalesHistory(tx, fmt.Sprintf("SH-%03d", histN), p.SalesID, fromCode(from), toStage, reason, byID, byName); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	fromLbl, toLbl := fromCode(from), toStage
-	if from != nil && from.Label != "" {
-		fromLbl = from.Label
-	}
-	if to != nil && to.Label != "" {
-		toLbl = to.Label
-	}
-	_ = r.insertChange(p.SalesID, model.SalesChangeStage, fromLbl, toLbl, byName, reason)
-	logUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, before)
-	return nil
-}
-
 func (r *SalesRepo) ListHistory(salesID string) ([]model.SalesStageHistory, error) {
 	rows, err := r.db.Query(`
 		SELECT history_id, sales_id, COALESCE(from_stage,''), to_stage, COALESCE(reason,''),
@@ -465,11 +412,11 @@ func (r *SalesRepo) ListHistory(salesID string) ([]model.SalesStageHistory, erro
 	return items, rows.Err()
 }
 
-func insertSalesHistory(tx *sql.Tx, historyID, salesID, from, to, reason, byID, byName string) error {
+func insertSalesHistory(tx *sql.Tx, historyID, salesID, from, to, reason, detail, byID, byName string) error {
 	_, err := tx.Exec(`
-		INSERT INTO sales_stage_history (history_id, sales_id, from_stage, to_stage, reason, changed_by, changed_by_id)
-		VALUES (?,?,?,?,?,?,?)`,
-		historyID, salesID, from, to, strings.TrimSpace(reason), strings.TrimSpace(byName), strings.TrimSpace(byID))
+		INSERT INTO sales_stage_history (history_id, sales_id, from_stage, to_stage, reason, detail, changed_by, changed_by_id)
+		VALUES (?,?,?,?,?,?,?,?)`,
+		historyID, salesID, from, to, strings.TrimSpace(reason), strings.TrimSpace(detail), strings.TrimSpace(byName), strings.TrimSpace(byID))
 	return err
 }
 
@@ -489,35 +436,15 @@ func normalizeSalesProject(p *model.SalesProject, stages []model.SalesStageDef) 
 	p.DealType = model.NormalizeSalesDealType(p.DealType)
 	p.ExpectedYM = model.NormalizeSalesYM(p.ExpectedYM)
 	p.ExpectedPrecision = model.NormalizeSalesPrecision(p.ExpectedPrecision)
-	if p.Stage == "" {
+	if p.Stage == "" || !model.IsSalesStage4(p.Stage) {
 		p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
-	}
-	if !p.IsSupply() {
-		p.Stage = model.CurrentSalesStage(p.Stage)
 	}
 	if def := model.FindSalesStage(stages, p.Stage); def != nil {
-		if !p.IsSupply() {
-			p.Probability = def.Probability
-		} else {
-			p.Probability = 0
-			p.HasOverride = false
-			p.OverrideValue = 0
-		}
 		p.StageLabel = def.Label
-	} else {
-		p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
-		if def := model.FindSalesStage(stages, p.Stage); def != nil {
-			p.StageLabel = def.Label
-			if !p.IsSupply() {
-				p.Probability = def.Probability
-			}
-		}
 	}
+	p.Probability = model.SalesProbability(p)
 	if p.Status == "" {
 		p.Status = model.SalesStatusActive
-	}
-	if p.Stage == model.SalesStageLost || p.Stage == model.SalesStageDropped {
-		p.Status = model.SalesStatusLost
 	}
 }
 
@@ -558,7 +485,7 @@ type salesScanner interface {
 
 func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 	var p model.SalesProject
-	var override sql.NullInt64
+	var override, winProb, probFinal sql.NullInt64
 	var tentative, custConf, ymConf, amtConf int
 	err := row.Scan(
 		&p.SalesID, &p.Name, &tentative, &p.Stage, &p.Probability, &override,
@@ -568,6 +495,10 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 		&p.SalesOwner, &p.SalesOwnerID, &p.Competitor, &p.LeadSource, &p.LostReason,
 		&p.Status, &p.Notes, &p.LegacyStage, &p.WonAt, &p.ContractedAt,
 		&p.DealType, &p.PONo, &p.DeliveredAt,
+		&p.SalesNo, &p.BidStatus, &p.CloseReason, &p.RFPReceivedAt, &winProb, &probFinal,
+		&p.AwardedAmount, &p.ContractAmount,
+		&p.ContractTarget, &p.ProcurementRoute, &p.ContractMethod, &p.BidEvalMethod, &p.MallContractType,
+		&p.DropReasonCode, &p.DropReason, &p.DroppedAt, &p.DroppedBy, &p.DroppedFromStage, &p.PrevSalesID,
 		&p.CreatedAt, &p.UpdatedAt, &p.CustomerName,
 	)
 	if err != nil {
@@ -580,6 +511,14 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 	if override.Valid {
 		p.HasOverride = true
 		p.OverrideValue = int(override.Int64)
+	}
+	if winProb.Valid {
+		n := int(winProb.Int64)
+		p.WinProb = &n
+	}
+	if probFinal.Valid {
+		n := int(probFinal.Int64)
+		p.ProbabilityFinal = &n
 	}
 	return &p, nil
 }

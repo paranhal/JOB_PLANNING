@@ -99,8 +99,8 @@ func TestSalesStagesV227MigrateKeepsLegacyAndRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stages) != 6 || stages[0].Code != model.SalesStageContact || stages[1].Code != model.SalesStageLead {
-		t.Fatalf("6단계 순서: %+v", stages)
+	if len(stages) != 4 || stages[0].Code != model.SalesStage4Discover || stages[1].Code != model.SalesStage4Propose {
+		t.Fatalf("4단계 순서: %+v", stages)
 	}
 
 	_, thisFile, _, _ := runtime.Caller(0)
@@ -154,9 +154,12 @@ func TestSalesContractUnsignedUnplanned(t *testing.T) {
 	repo := NewSalesRepo(db)
 	p := &model.SalesProject{
 		Name: "날인 없는 수주", CustomerConfirmed: true,
-		ExpectedYMConfirmed: true, ExpectedAmountConfirmed: true, Stage: model.SalesStageWon,
+		ExpectedYMConfirmed: true, ExpectedAmountConfirmed: true,
 	}
 	if err := repo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ChangeStage(p.SalesID, model.SalesDirectWin, "", "u1", "t", false); err != nil {
 		t.Fatal(err)
 	}
 	old := time.Now().AddDate(0, 0, -40).Format("2006-01-02")

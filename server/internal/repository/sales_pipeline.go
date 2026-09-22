@@ -17,6 +17,12 @@ func (r *SalesRepo) PipelineFilter(now time.Time, extraPeople []string, f SalesL
 	if err != nil {
 		return model.SalesPipeline{}, err
 	}
+	winF := f
+	winF.IncludeClosed = true
+	winItems, err := r.ListFilter(winF)
+	if err != nil {
+		winItems = items
+	}
 	skip, err := NewQuoteRepo(r.db).NonDealQuoteSalesIDs()
 	if err != nil {
 		return model.SalesPipeline{}, err
@@ -46,7 +52,10 @@ func (r *SalesRepo) PipelineFilter(now time.Time, extraPeople []string, f SalesL
 	}
 	hist = filterSalesHistoryByID(hist, ids)
 	acts = filterSalesActivitiesByID(acts, ids)
-	return model.BuildSalesPipeline(items, stages, hist, acts, now, extraPeople), nil
+	pipe := model.BuildSalesPipeline(items, stages, hist, acts, now, extraPeople)
+	pipe.WinContracted, pipe.WinLost = model.SalesWinSample(winItems)
+	pipe.WinRateLabel = model.FormatSalesRate(pipe.WinContracted, pipe.WinContracted+pipe.WinLost)
+	return pipe, nil
 }
 
 func (r *SalesRepo) ListAllHistory() ([]model.SalesStageHistory, error) {

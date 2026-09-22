@@ -74,7 +74,7 @@ func TestSalesItemsSeedFromAssetsDistinctAndReview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.DealType != model.SalesDealBuild || got.Stage != model.SalesStageLead {
+	if got.DealType != model.SalesDealBuild || got.Stage != model.SalesStage4Discover {
 		t.Fatalf("영업 기본값이 바뀌었다: deal=%s stage=%s", got.DealType, got.Stage)
 	}
 

@@ -9,15 +9,15 @@ func TestBuildSalesPipelineMetrics(t *testing.T) {
 	stages := fallbackSalesStages()
 	now := time.Date(2026, 8, 21, 0, 0, 0, 0, time.Local)
 	projects := []SalesProject{
-		{SalesID: "a", Name: "리드", Stage: SalesStageLead, Probability: 10, ExpectedAmount: 30_000_000, ExpectedYM: "2026-09", CreatedAt: "2026-08-01 00:00:00"},
-		{SalesID: "b", Name: "계약", Stage: SalesStageWon, Probability: 100, ExpectedAmount: 180_000_000, ExpectedYM: "2026-10", CreatedAt: "2026-07-01 00:00:00"},
-		{SalesID: "c", Name: "실패", Stage: SalesStageLost, Probability: 0, ExpectedAmount: 50_000_000, ExpectedYM: "2026-09", CreatedAt: "2026-07-01 00:00:00"},
+		{SalesID: "a", Name: "리드", Stage: SalesStage4Discover, Probability: 10, ExpectedAmount: 30_000_000, ExpectedYM: "2026-09", CreatedAt: "2026-08-01 00:00:00"},
+		{SalesID: "b", Name: "계약", Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Probability: 100, ExpectedAmount: 180_000_000, ExpectedYM: "2026-10", WonAt: "2026-07-11", CreatedAt: "2026-07-01 00:00:00"},
+		{SalesID: "c", Name: "실패", Stage: SalesStage4Closed, CloseReason: SalesCloseLost, Probability: 0, ExpectedAmount: 50_000_000, ExpectedYM: "2026-09", CreatedAt: "2026-07-01 00:00:00"},
 	}
 	hist := []SalesStageHistory{
-		{HistoryID: "1", SalesID: "a", ToStage: SalesStageLead, ChangedAt: "2026-08-01 00:00:00"},
-		{HistoryID: "2", SalesID: "b", ToStage: SalesStageLead, ChangedAt: "2026-07-01 00:00:00"},
-		{HistoryID: "3", SalesID: "b", ToStage: SalesStageWon, ChangedAt: "2026-07-11 00:00:00"},
-		{HistoryID: "4", SalesID: "c", ToStage: SalesStageLost, ChangedAt: "2026-07-01 00:00:00"},
+		{HistoryID: "1", SalesID: "a", ToStage: SalesStage4Discover, ChangedAt: "2026-08-01 00:00:00"},
+		{HistoryID: "2", SalesID: "b", ToStage: SalesStage4Discover, ChangedAt: "2026-07-01 00:00:00"},
+		{HistoryID: "3", SalesID: "b", ToStage: SalesStage4Closed, ChangedAt: "2026-07-11 00:00:00"},
+		{HistoryID: "4", SalesID: "c", ToStage: SalesStage4Closed, ChangedAt: "2026-07-01 00:00:00"},
 	}
 	acts := []SalesActivity{
 		{OurMembers: "최혜영, 양기헌"},
@@ -37,20 +37,20 @@ func TestBuildSalesPipelineMetrics(t *testing.T) {
 	if empty.WinRateLabel != "—" {
 		t.Fatalf("분모 0 수주율=%s", empty.WinRateLabel)
 	}
-	var lead, wonSt SalesPipelineStage
+	var disc, closed SalesPipelineStage
 	for _, s := range p.Stages {
-		if s.Code == SalesStageLead {
-			lead = s
+		if s.Code == SalesStage4Discover {
+			disc = s
 		}
-		if s.Code == SalesStageWon {
-			wonSt = s
+		if s.Code == SalesStage4Closed {
+			closed = s
 		}
 	}
-	if lead.Count != 1 || lead.Amount != 30_000_000 {
-		t.Fatalf("리드 단계: %+v", lead)
+	if disc.Count != 1 || disc.Amount != 30_000_000 {
+		t.Fatalf("발굴 단계: %+v", disc)
 	}
-	if wonSt.DwellLabel == "—" || wonSt.DwellSamples < 1 {
-		t.Fatalf("수주 체류일이 없다: %+v", wonSt)
+	if closed.DwellLabel == "—" || closed.DwellSamples < 1 {
+		t.Fatalf("종료 체류일이 없다: %+v", closed)
 	}
 	if len(p.Months) < 2 {
 		t.Fatalf("예정월 분포=%d", len(p.Months))
@@ -75,8 +75,8 @@ func TestBuildSalesPipelineMetrics(t *testing.T) {
 func TestBuildSalesTimelineAxisAndKanbanStages(t *testing.T) {
 	now := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
 	axis := BuildSalesTimelineAxis([]SalesProject{
-		{SalesID: "a", Name: "A", ExpectedYM: "2026-09", Stage: SalesStageLead, Probability: 10},
-		{SalesID: "b", Name: "B", ExpectedYM: "", Stage: SalesStageProposal, Probability: 40},
+		{SalesID: "a", Name: "A", ExpectedYM: "2026-09", Stage: SalesStage4Discover, Probability: 10},
+		{SalesID: "b", Name: "B", ExpectedYM: "", Stage: SalesStage4Propose, Probability: 20},
 	}, fallbackSalesStages(), now)
 	if len(axis.Months) < 2 {
 		t.Fatalf("월 축=%v", axis.Months)
@@ -88,13 +88,13 @@ func TestBuildSalesTimelineAxisAndKanbanStages(t *testing.T) {
 		t.Fatal("시기 없는 사업이 미정으로 안 갔다")
 	}
 	proc, lost := SalesKanbanStages(fallbackSalesStages())
-	if len(proc) != 5 {
-		t.Fatalf("수주 전+수주 열=%d want 5", len(proc))
+	if len(proc) != 4 {
+		t.Fatalf("열=%d want 4", len(proc))
 	}
-	if lost == nil || lost.Code != SalesStageLost {
-		t.Fatalf("실주 열: %+v", lost)
+	if lost != nil {
+		t.Fatalf("실주 열을 빼지 않는다: %+v", lost)
 	}
-	if proc[0].Code != SalesStageContact || proc[1].Code != SalesStageLead {
+	if proc[0].Code != SalesStage4Discover || proc[1].Code != SalesStage4Propose {
 		t.Fatalf("순서=%s,%s", proc[0].Code, proc[1].Code)
 	}
 }

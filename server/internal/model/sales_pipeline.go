@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -151,7 +150,7 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 		st := &out.Stages[si]
 		st.Count++
 		st.Amount += int64(p.ExpectedAmount)
-		w := weightedAmount(p.ExpectedAmount, p.EffectiveProbability())
+		w := weightedAmount(p.ExpectedAmount, SalesProbability(&p))
 		if p.IsSupply() && p.ExpectedAmount > 0 {
 			w = int64(p.ExpectedAmount)
 		}
@@ -160,18 +159,10 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 		out.TotalAmount += int64(p.ExpectedAmount)
 		out.WeightedTotal += w
 		switch {
-		case p.IsSupply() && p.Stage == SalesStageDelivered:
-			out.WonAmount += int64(p.ExpectedAmount)
-			out.WinContracted++
-		case p.IsSupply() && p.Stage == SalesStageDropped:
-			out.WinLost++
-		case !p.IsSupply() && CurrentSalesStage(p.Stage) == SalesStageWon:
-			out.WonAmount += int64(p.ExpectedAmount)
-			out.WinContracted++
-		case !p.IsSupply() && CurrentSalesStage(p.Stage) == SalesStageLost:
-			out.WinLost++
 		default:
-			out.PreWonAmount += int64(p.ExpectedAmount)
+			if strings.TrimSpace(p.Stage) != SalesStage4Closed {
+				out.PreWonAmount += int64(p.ExpectedAmount)
+			}
 		}
 		ym := NormalizeSalesYM(p.ExpectedYM)
 		key := ym
@@ -188,6 +179,7 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 		b.Count++
 		b.Amount += int64(p.ExpectedAmount)
 	}
+	out.WinContracted, out.WinLost = SalesWinSample(projects)
 	out.WinRateLabel = FormatSalesRate(out.WinContracted, out.WinContracted+out.WinLost)
 
 	for i := range out.Stages {
@@ -380,15 +372,8 @@ func SalesKanbanStages(stages []SalesStageDef) (process []SalesStageDef, lost *S
 	if len(stages) == 0 {
 		stages = fallbackSalesStages()
 	}
-	for i := range stages {
-		if stages[i].IsLost() {
-			cp := stages[i]
-			lost = &cp
-			continue
-		}
-		process = append(process, stages[i])
-	}
-	return process, lost
+	process = append(process, stages...)
+	return process, nil
 }
 
 func SalesActivityColumnKey(a SalesActivity, group string) string {
@@ -417,5 +402,5 @@ func (p SalesPipeline) WonAmountLabel() string {
 }
 
 func (p SalesPipeline) WinSampleLabel() string {
-	return fmt.Sprintf("수주 %d · 실주 %d", p.WinContracted, p.WinLost)
+	return SalesWinSampleLabel()
 }
