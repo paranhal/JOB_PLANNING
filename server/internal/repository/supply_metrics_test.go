@@ -66,7 +66,7 @@ func TestSupplyDealDoesNotChangeExecVisitCompleteAndBudgetOutOfConversion(t *tes
 	budget := &model.SalesQuote{
 		FormType: model.QuoteFormA, VATMode: model.QuoteVATExcluded, RoundRule: model.QuoteRoundNone,
 		QuoteDate: time.Now().Format("2006-01-02"), Title: "예산", OwnerName: "최혜영", OwnerPhone: "010",
-		CustomerID: "c1", RecipientName: "세종시교육청", Purpose: model.QuotePurposeBudget, BudgetYear: 2027,
+		CustomerID: "c1", RecipientName: "세종시교육청", SalesID: p.SalesID, Purpose: model.QuotePurposeBudget, BudgetYear: 2027,
 		Status: model.QuoteStatusSent,
 		Lines:  []model.SalesQuoteLine{{Name: "출입통제", Qty: 1, Unit: "식", UnitPrice: 37_950_000}},
 	}

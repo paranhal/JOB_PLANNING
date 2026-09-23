@@ -36,7 +36,7 @@ func TestDeliveryCreatesAssetsBySerialSkipsConsumableLaborAndUnplanned(t *testin
 	q := &model.SalesQuote{
 		FormType: model.QuoteFormA, VATMode: model.QuoteVATExcluded, RoundRule: model.QuoteRoundNone,
 		QuoteDate: time.Now().Format("2006-01-02"), Title: "납품", OwnerName: "최혜영", OwnerPhone: "010",
-		CustomerID: "c1", RecipientName: "세종시교육청",
+		CustomerID: "c1", RecipientName: "세종시교육청", SalesID: mustSalesForQuote(t, db),
 		Lines: []model.SalesQuoteLine{
 			{ItemID: gate.ItemID, Name: gate.Name, Qty: 3, Unit: "EA", UnitPrice: 1000},
 			{ItemID: paper.ItemID, Name: paper.Name, Qty: 10, Unit: "EA", UnitPrice: 100},

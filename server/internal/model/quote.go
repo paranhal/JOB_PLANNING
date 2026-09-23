@@ -33,6 +33,11 @@ const (
 	QuoteRecipientCustomer = "customer"
 	QuoteRecipientPartner  = "partner"
 
+	QuoteKindMaint        = "maint_service"
+	QuoteKindDev          = "dev_service"
+	QuoteKindConstruction = "construction"
+	QuoteKindSolution     = "solution"
+
 	QuoteNoPrefix = "VI-견적-"
 	QuoteDocNoA1  = "QEP-710-01"
 )
@@ -42,6 +47,7 @@ var (
 	ErrQuoteNoDuplicate   = fmt.Errorf("같은 견적번호가 이미 있습니다")
 	ErrQuoteReadOnly      = fmt.Errorf("이전 개정은 수정할 수 없습니다")
 	ErrQuoteRevReason     = fmt.Errorf("개정 사유가 필요합니다")
+	ErrQuoteSalesRequired = fmt.Errorf("사업을 먼저 고르세요")
 	ErrQuoteLineSum       = fmt.Errorf("라인 합계와 소계가 다릅니다")
 )
 
@@ -49,6 +55,7 @@ type SalesQuote struct {
 	QuoteID        string
 	SalesID        string
 	SalesNo        string
+	QuoteKind      string
 	QuoteNo        string
 	Rev            int
 	FormType       string
@@ -85,6 +92,8 @@ type SalesQuote struct {
 	CreatedAt      string
 	UpdatedAt      string
 	Lines          []SalesQuoteLine
+	Prev           []SalesQuote
+	MissingSales   bool
 }
 
 type SalesQuoteLine struct {
@@ -455,6 +464,77 @@ func FillQuoteKanban(items []SalesQuote) KanbanView {
 	return v
 }
 
+func NormalizeQuoteKind(s string) string {
+	switch strings.TrimSpace(s) {
+	case QuoteKindDev, QuoteKindConstruction, QuoteKindSolution, QuoteKindMaint:
+		return strings.TrimSpace(s)
+	default:
+		return ""
+	}
+}
+
+func QuoteKindForm(kind string) string {
+	if NormalizeQuoteKind(kind) == QuoteKindDev {
+		return QuoteFormA2
+	}
+	if kind == "" {
+		return ""
+	}
+	return QuoteFormA
+}
+
+func QuoteKindFromContractTarget(target string) string {
+	switch strings.TrimSpace(target) {
+	case "construction":
+		return QuoteKindConstruction
+	case "goods_make", "goods_buy":
+		return QuoteKindSolution
+	case "service":
+		return QuoteKindMaint
+	default:
+		return QuoteKindMaint
+	}
+}
+
+func GroupLatestQuotes(items []SalesQuote) []SalesQuote {
+	best := map[string]int{}
+	for i := range items {
+		no := strings.TrimSpace(items[i].QuoteNo)
+		if no == "" {
+			no = items[i].QuoteID
+		}
+		j, ok := best[no]
+		if !ok || items[i].Rev > items[j].Rev {
+			best[no] = i
+		}
+	}
+	var out []SalesQuote
+	seen := map[string]bool{}
+	for i := range items {
+		no := strings.TrimSpace(items[i].QuoteNo)
+		if no == "" {
+			no = items[i].QuoteID
+		}
+		if best[no] != i || seen[no] {
+			continue
+		}
+		seen[no] = true
+		q := items[i]
+		q.MissingSales = strings.TrimSpace(q.SalesID) == ""
+		for j := range items {
+			jn := strings.TrimSpace(items[j].QuoteNo)
+			if jn == "" {
+				jn = items[j].QuoteID
+			}
+			if jn == no && items[j].Rev < q.Rev {
+				q.Prev = append(q.Prev, items[j])
+			}
+		}
+		out = append(out, q)
+	}
+	return out
+}
+
 func NormalizeQuotePurpose(s string) string {
 	switch strings.TrimSpace(s) {
 	case QuotePurposeBudget, QuotePurposeReference:
@@ -509,8 +589,8 @@ func (q *SalesQuote) DisplayNo() string {
 		return ""
 	}
 	no := strings.TrimSpace(q.QuoteNo)
-	if q.Rev > 0 {
-		return fmt.Sprintf("%s (r%d)", no, q.Rev)
+	if q.Rev > 0 && no != "" {
+		return fmt.Sprintf("%s-%d", no, q.Rev)
 	}
 	return no
 }

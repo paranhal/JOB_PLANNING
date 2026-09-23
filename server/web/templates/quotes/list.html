@@ -95,7 +95,9 @@
         <tr class="hover:bg-slate-50 {{quoteExpiredRow .}}">
           <td class="px-4 py-2 font-mono text-xs">
             <a href="/quotes/{{.QuoteID}}" class="font-medium text-blue-700 hover:underline">{{if .SalesDisplayNo}}{{.SalesDisplayNo}} / {{end}}{{.DisplayNo}}</a>
+            {{if .MissingSales}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-800">사업 없음</span>{{end}}
             <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold {{quotePurposeClass .Purpose}}">{{quotePurposeLabel .Purpose}}</span>
+            {{if .MissingSales}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-800">사업 없음</span>{{end}}
             {{if .IsReverseCalc}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800">역산</span>{{end}}
             {{if .IsLegacy}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600">옛 번호</span>{{end}}
             {{if quoteExpiryLabel .}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-50 text-orange-800">{{quoteExpiryLabel .}}</span>{{end}}
@@ -105,7 +107,13 @@
           <td class="px-4 py-2">{{if .Title}}{{.Title}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Total}}원</td>
           <td class="px-4 py-2 text-gray-600">{{quoteStatusLabel .Status}}</td>
-          <td class="px-4 py-2 text-gray-500">{{.Rev}}회</td>
+          <td class="px-4 py-2 text-gray-500">{{.Rev}}회
+            {{if gt (len .Prev) 0}}
+            <details class="mt-1"><summary class="cursor-pointer text-[11px] text-blue-700">이전 {{len .Prev}}차</summary>
+              <ul class="mt-1 space-y-0.5">{{range .Prev}}<li><a class="text-[11px] text-gray-600 hover:underline" href="/quotes/{{.QuoteID}}">{{.DisplayNo}}</a></li>{{end}}</ul>
+            </details>
+            {{end}}
+          </td>
         </tr>
         {{else}}
         <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">견적이 없습니다.</td></tr>

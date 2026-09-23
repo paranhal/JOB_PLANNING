@@ -17,10 +17,17 @@ import (
 	"customer-support/internal/repository"
 )
 
+var quoteTestSalesID string
+
 func newQuoteServer(t *testing.T) (*echo.Echo, *repository.QuoteRepo) {
 	t.Helper()
 	e, db := newSalesServerDB(t)
 	h := New(db)
+	p := &model.SalesProject{Name: "견적연결"}
+	if err := repository.NewSalesRepo(db).Create(p); err != nil {
+		t.Fatal(err)
+	}
+	quoteTestSalesID = p.SalesID
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/quotes", h.Quotes.List)
@@ -69,6 +76,7 @@ func quoteLineForm(names []string, prices []int) url.Values {
 		"vat_mode":       {"excluded"},
 		"round_rule":     {"none"},
 		"recipient_name": {"세종시교육청"},
+		"sales_id":       {quoteTestSalesID},
 	}
 	for i, name := range names {
 		v.Add("line_name", name)
@@ -98,8 +106,14 @@ func TestQuotesHTTP_CreateElevenLinesAndFormGuards(t *testing.T) {
 		t.Fatalf("/quotes/new status=%d %s", page.Code, clipBody(page.Body.String()))
 	}
 	body := page.Body.String()
-	if strings.Contains(body, `name="quote_no"`) || strings.Contains(body, `name="quote_date"`) {
-		t.Fatal("견적번호·견적일 입력칸이 있다")
+	if strings.Contains(body, `name="quote_no"`) {
+		t.Fatal("견적번호 입력칸이 있다")
+	}
+	if !strings.Contains(body, `name="quote_date"`) {
+		t.Fatal("견적일 칸이 없다")
+	}
+	if !strings.Contains(body, `name="sales_id"`) {
+		t.Fatal("사업 선택이 없다")
 	}
 	if strings.Contains(body, `name="subtotal"`) {
 		t.Fatal("소계 입력칸이 있다")
@@ -198,6 +212,7 @@ func TestQuotesHTTP_OwnerRequiredAndDuplicateBlocked(t *testing.T) {
 
 	err := repo.Create(&model.SalesQuote{
 		QuoteNo: q.QuoteNo, QuoteDate: q.QuoteDate, IsLegacy: true,
+		SalesID: quoteTestSalesID,
 		OwnerName: "a", OwnerPhone: "1",
 		Lines: []model.SalesQuoteLine{{Name: "x", Qty: 1, UnitPrice: 1}},
 	})
@@ -496,7 +511,7 @@ func TestQuotesHTTP_FormB2GroupLaborRevisePurposeReverse(t *testing.T) {
 	if newQ.QuoteNo != oldQ.QuoteNo || newQ.Rev != oldQ.Rev+1 {
 		t.Fatalf("번호/rev old=%s r%d new=%s r%d", oldQ.QuoteNo, oldQ.Rev, newQ.QuoteNo, newQ.Rev)
 	}
-	if !strings.Contains(newQ.DisplayNo(), "(r") {
+	if !strings.HasSuffix(newQ.DisplayNo(), "-1") {
 		t.Fatalf("화면 번호=%s", newQ.DisplayNo())
 	}
 	oldQ.Title = "고치면 안 됨"

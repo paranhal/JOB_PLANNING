@@ -30,13 +30,35 @@
   {{end}}
 
   <form method="post" action="{{if .IsNew}}/quotes{{else}}/quotes/{{.Quote.QuoteID}}{{end}}" class="space-y-4" @submit="syncHidden()">
-    <input type="hidden" name="sales_id" value="{{.Quote.SalesID}}">
     <input type="hidden" name="status" value="{{if .Quote.Status}}{{.Quote.Status}}{{else}}draft{{end}}">
     <input type="hidden" name="vat_mode" :value="vat">
     <input type="hidden" name="round_rule" :value="round">
     <input type="hidden" name="is_reverse_calc" value="{{if .Quote.IsReverseCalc}}1{{end}}">
 
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">사업 <span class="text-red-500">*</span></label>
+        {{if and (not .IsNew) .Quote.SalesID}}
+        <input type="hidden" name="sales_id" value="{{.Quote.SalesID}}">
+        <p class="text-sm text-gray-800">{{if .Quote.SalesDisplayNo}}{{.Quote.SalesDisplayNo}} · {{end}}연결됨</p>
+        {{else}}
+        <select name="sales_id" required class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="">사업을 먼저 고르세요</option>
+          {{range .OpenSales}}
+          <option value="{{.SalesID}}" {{if eq $.Quote.SalesID .SalesID}}selected{{end}}>{{.DisplayNo}} · {{.Name}}</option>
+          {{end}}
+        </select>
+        {{end}}
+      </div>
+      <div>
+        <p class="block text-sm font-medium text-gray-700 mb-2">견적 유형</p>
+        <div class="flex flex-wrap gap-4 text-sm">
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="maint_service" {{if or (eq .Quote.QuoteKind "maint_service") (eq .Quote.QuoteKind "")}}checked{{end}}>유지보수 용역</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="dev_service" {{if eq .Quote.QuoteKind "dev_service"}}checked{{end}}>개발 용역</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="construction" {{if eq .Quote.QuoteKind "construction"}}checked{{end}}>공사 용역</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="solution" {{if eq .Quote.QuoteKind "solution"}}checked{{end}}>솔루션(제품) 납품</label>
+        </div>
+      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">견적번호</label>
@@ -46,9 +68,11 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">견적일</label>
-          <p class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-            {{if .IsNew}}저장 시 오늘 날짜{{else}}{{.Quote.QuoteDate}}{{end}}
-          </p>
+          {{if .IsNew}}
+          <input type="date" name="quote_date" value="{{.Quote.QuoteDate}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+          {{else}}
+          <p class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">{{.Quote.QuoteDate}}</p>
+          {{end}}
         </div>
       </div>
 

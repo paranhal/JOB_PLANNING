@@ -18,6 +18,7 @@ func TestOrderRepoCreateFromQuoteCopiesLinesThenDiffers(t *testing.T) {
 
 	quotes := NewQuoteRepo(db)
 	q := &model.SalesQuote{
+		SalesID:       mustSalesForQuote(t, db),
 		FormType:      model.QuoteFormA,
 		VATMode:       model.QuoteVATExcluded,
 		RoundRule:     model.QuoteRoundNone,

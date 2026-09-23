@@ -19,6 +19,7 @@ func TestQuoteRepoNumberDateDuplicateAndCopy(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 
 	q := &model.SalesQuote{
+		SalesID:       mustSalesForQuote(t, db),
 		FormType:      model.QuoteFormA,
 		VATMode:       model.QuoteVATExcluded,
 		RoundRule:     model.QuoteRoundNone,
@@ -122,6 +123,7 @@ func TestQuoteRepoReviseLaborSeedRatesFrozenBudgetPipeline(t *testing.T) {
 	}
 
 	q := &model.SalesQuote{
+		SalesID: mustSalesForQuote(t, db),
 		FormType: model.QuoteFormB2, VATMode: model.QuoteVATIncluded,
 		OwnerName: "a", OwnerPhone: "1", Title: "그룹",
 		Lines: []model.SalesQuoteLine{
@@ -154,6 +156,7 @@ func TestQuoteRepoReviseLaborSeedRatesFrozenBudgetPipeline(t *testing.T) {
 	}
 
 	labor := &model.SalesQuote{
+		SalesID: mustSalesForQuote(t, db),
 		FormType: model.QuoteFormA2, VATMode: model.QuoteVATExcluded,
 		OwnerName: "a", OwnerPhone: "1", OverheadRate: 110, TechFeeRate: 20,
 		Lines: []model.SalesQuoteLine{
@@ -216,6 +219,7 @@ func TestQuoteRepoRejectsLineSumMismatch(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewQuoteRepo(db)
 	q := &model.SalesQuote{
+		SalesID: mustSalesForQuote(t, db),
 		OwnerName: "a", OwnerPhone: "1",
 		Lines: []model.SalesQuoteLine{
 			{Name: "A", Qty: 1, UnitPrice: 100},
@@ -235,5 +239,40 @@ func TestQuoteRepoRejectsLineSumMismatch(t *testing.T) {
 	_ = db.QueryRow(`SELECT SUM(amount) FROM sales_quote_lines WHERE quote_id=?`, q.QuoteID).Scan(&sum)
 	if sum == q.Subtotal {
 		t.Fatal("검산 전제를 못 만들었다")
+	}
+}
+
+func TestQuoteRepoSalesRequiredAndQuoteDateInNumber(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "quotes_sales.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repo := NewQuoteRepo(db)
+	q := &model.SalesQuote{
+		OwnerName: "a", OwnerPhone: "1",
+		QuoteDate: "2026-09-10",
+		Lines:     []model.SalesQuoteLine{{Name: "A", Qty: 1, UnitPrice: 100}},
+	}
+	if err := repo.Create(q); err != model.ErrQuoteSalesRequired {
+		t.Fatalf("사업 필수: %v", err)
+	}
+	q.SalesID = mustSalesForQuote(t, db)
+	if err := repo.Create(q); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(q.QuoteNo, "20260910") {
+		t.Fatalf("견적일 번호=%s", q.QuoteNo)
+	}
+	rev, err := repo.Revise(q.QuoteID, "")
+	if err != model.ErrQuoteRevReason {
+		t.Fatalf("개정 사유: %v", err)
+	}
+	rev, err = repo.Revise(q.QuoteID, "단가 조정")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev.QuoteNo != q.QuoteNo || rev.Rev != 1 || rev.DisplayNo() != q.QuoteNo+"-1" {
+		t.Fatalf("개정 표시=%s no=%s r%d", rev.DisplayNo(), rev.QuoteNo, rev.Rev)
 	}
 }

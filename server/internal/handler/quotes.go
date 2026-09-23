@@ -83,6 +83,7 @@ func (h *QuotesHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	items = model.GroupLatestQuotes(items)
 	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "quote_no,quote_date,recipient,title,total,status")
 	if display != "kanban" && sortKey != "" {
 		sortQuotes(items, sortKey, dir)
@@ -175,7 +176,14 @@ func (h *QuotesHandler) New(c echo.Context) error {
 	if q.SalesID != "" && h.sales != nil {
 		if p, err := h.sales.Get(q.SalesID); err == nil && p != nil {
 			q.RecipientName = p.CustomerValue()
+			q.CustomerID = p.CustomerID
 			q.Title = p.Name
+			if strings.TrimSpace(p.SalesOwner) != "" {
+				q.OwnerName = p.SalesOwner
+				q.OwnerUserID = p.SalesOwnerID
+			}
+			q.QuoteKind = model.QuoteKindFromContractTarget(p.ContractTarget)
+			q.FormType = model.QuoteKindForm(q.QuoteKind)
 		}
 	}
 	return h.renderForm(c, q, true, "")
@@ -186,9 +194,11 @@ func (h *QuotesHandler) Create(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	q := h.parseQuoteForm(c)
-	q.QuoteDate = time.Now().Format("2006-01-02")
 	q.QuoteNo = ""
 	q.IsLegacy = false
+	if strings.TrimSpace(q.QuoteDate) == "" {
+		q.QuoteDate = time.Now().Format("2006-01-02")
+	}
 	if err := h.repo.Create(q); err != nil {
 		return h.renderForm(c, q, true, err.Error())
 	}
@@ -373,6 +383,10 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 		year = time.Now().Year()
 	}
 	rates, _ := h.repo.ListLaborRates(year)
+	var openSales []model.SalesProject
+	if h.sales != nil {
+		openSales, _ = h.sales.ListFilter(repository.SalesListFilter{})
+	}
 	return c.Render(http.StatusOK, "quotes/form.html", map[string]interface{}{
 		"Title": title, "Active": NavQuotes, "IsNew": isNew, "Quote": q,
 		"Totals": tot, "FormError": formErr, "Users": users,
@@ -386,6 +400,7 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 		"OverheadDiff": model.RateDiffLabel(q.OverheadRate, oh),
 		"TechDiff":     model.RateDiffLabel(q.TechFeeRate, tech),
 		"QuoteYear":    year,
+		"OpenSales":    openSales,
 	})
 }
 
@@ -407,6 +422,8 @@ func (h *QuotesHandler) parseQuoteForm(c echo.Context) *model.SalesQuote {
 		AttnName:       strings.TrimSpace(c.FormValue("attn_name")),
 		AttnTitle:      strings.TrimSpace(c.FormValue("attn_title")),
 		Title:          strings.TrimSpace(c.FormValue("title")),
+		QuoteDate:      strings.TrimSpace(c.FormValue("quote_date")),
+		QuoteKind:      model.NormalizeQuoteKind(c.FormValue("quote_kind")),
 		ValidUntilText: strings.TrimSpace(c.FormValue("valid_until_text")),
 		DueText:        strings.TrimSpace(c.FormValue("due_text")),
 		PlaceText:      strings.TrimSpace(c.FormValue("place_text")),

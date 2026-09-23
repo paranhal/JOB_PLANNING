@@ -2,6 +2,25 @@ package model
 
 import "testing"
 
+func TestQuoteDisplayNoRevAndLatestGroup(t *testing.T) {
+	q := SalesQuote{QuoteNo: "VI-견적-20260910-001", Rev: 2}
+	if q.DisplayNo() != "VI-견적-20260910-001-2" {
+		t.Fatalf("DisplayNo=%s", q.DisplayNo())
+	}
+	if q.QuoteNo != "VI-견적-20260910-001" {
+		t.Fatal("저장 번호가 바뀌면 안 된다")
+	}
+	items := []SalesQuote{
+		{QuoteID: "1", QuoteNo: "A", Rev: 0, Title: "old"},
+		{QuoteID: "2", QuoteNo: "A", Rev: 2, Title: "new"},
+		{QuoteID: "3", QuoteNo: "B", Rev: 0, Title: "b"},
+	}
+	got := GroupLatestQuotes(items)
+	if len(got) != 2 || got[0].Rev != 2 || len(got[0].Prev) != 1 {
+		t.Fatalf("%+v", got)
+	}
+}
+
 func TestQuoteVATIncluded5700000(t *testing.T) {
 	lines := []SalesQuoteLine{{Name: "장서점검기", Qty: 1, UnitPrice: 5_700_000}}
 	tot := ComputeQuoteTotals(lines, QuoteVATIncluded, QuoteRoundNone)
