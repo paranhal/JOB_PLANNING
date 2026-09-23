@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,9 @@ func salesListView(display, view string) string {
 	}
 	if d == "timeline" || v == "timeline" {
 		return "timeline"
+	}
+	if d == "pipeline" || v == "pipeline" {
+		return "pipeline"
 	}
 	return "list"
 }
@@ -99,11 +103,26 @@ func salesFilterEncode(f repository.SalesListFilter, extra string) string {
 	if f.IncludeClosed {
 		q.Set("closed", "1")
 	}
+	if f.IncludeDormant {
+		q.Set("dormant", "1")
+	}
 	if f.CloseReason != "" {
 		q.Set("close", f.CloseReason)
 	}
 	if f.ContractTarget != "" {
 		q.Set("contract_target", f.ContractTarget)
+	}
+	if f.BizType != "" {
+		q.Set("biz_type", f.BizType)
+	}
+	if f.BudgetYear > 0 {
+		q.Set("budget_year", strconv.Itoa(f.BudgetYear))
+	}
+	if f.BudgetStatus != "" {
+		q.Set("budget_status", f.BudgetStatus)
+	}
+	if f.GroupID != "" {
+		q.Set("group_id", f.GroupID)
 	}
 	s := q.Encode()
 	if extra == "" {

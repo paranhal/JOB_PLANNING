@@ -17,6 +17,21 @@ function salesDnd(opts) {
         reason = prompt('상세 사유');
         if (!reason) return;
       }
+      if (code === 'postponed') {
+        if (confirm('휴면으로 두시겠습니까?')) {
+          const until = prompt('다시 볼 연월 (YYYY-MM)', d.dormant_until || '');
+          if (!until) return;
+          const why = prompt('휴면 사유') || reason || '고객 사업 무기한 연기';
+          const body = new URLSearchParams({ reason_code: code, reason: why, as_dormant: '1', until: until });
+          const post = await fetch('/sales/' + encodeURIComponent(id) + '/drop', {
+            method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: body
+          });
+          const out = await post.json().catch(function(){ return { ok:false }; });
+          if (!out.ok) { alert(out.error || '저장 실패'); return; }
+          location.reload();
+          return;
+        }
+      }
       const body = new URLSearchParams({ reason_code: code, reason: reason || '' });
       const post = await fetch('/sales/' + encodeURIComponent(id) + '/drop', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: body

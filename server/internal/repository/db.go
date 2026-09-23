@@ -738,6 +738,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE maintenance_visits ADD COLUMN completed INTEGER DEFAULT 0`,
 		`ALTER TABLE maintenance_visits ADD COLUMN completed_date TEXT`,
 		`ALTER TABLE maintenance_visits ADD COLUMN project_id TEXT`,
+		`ALTER TABLE maintenance_visits ADD COLUMN dup_reason TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS idx_maintenance_visits_project ON maintenance_visits(project_id)`,
 		// 같은 날 같은 기관이라도 KLAS·앤로보틱스처럼 점검 대상이 다르면 별도 방문으로 둔다.
 		`DROP INDEX IF EXISTS idx_maintenance_visit_dedup`,
@@ -833,7 +834,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 			before_json TEXT,
 			after_json TEXT,
 			rolled_back INTEGER DEFAULT 0,
-			rolled_back_at TEXT
+			rolled_back_at TEXT,
+			reason TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_data_change_logs_at ON data_change_logs(occurred_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_data_change_logs_entity ON data_change_logs(table_name, entity_id)`,

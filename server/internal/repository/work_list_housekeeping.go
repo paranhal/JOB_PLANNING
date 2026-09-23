@@ -40,6 +40,11 @@ func RunWorkListHousekeeping(db *sql.DB) {
 	} else if n3 > 0 {
 		log.Printf("AS 일일업무 정리: %d건", n3)
 	}
+	if n4, err := NewSalesRepo(db).EnsureDormantReviewTasks(time.Now()); err != nil {
+		log.Printf("휴면 해제 검토 업무: %v", err)
+	} else if n4 > 0 {
+		log.Printf("휴면 해제 검토 업무: %d건", n4)
+	}
 	if _, err := db.Exec(`PRAGMA wal_checkpoint(PASSIVE)`); err != nil {
 		log.Printf("WAL checkpoint: %v", err)
 	}

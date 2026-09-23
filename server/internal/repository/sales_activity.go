@@ -182,6 +182,8 @@ func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, lin
 		return err
 	}
 	replaceSalesMembers(r.db, a.ActivityID, a.OurMembers)
+	logCreate(r.db, "sales_activities", "activity_id", a.ActivityID, a.Title)
+	r.fillRFPFromActivity(a, p)
 	return nil
 }
 
@@ -254,6 +256,7 @@ func (r *SalesRepo) UpdateActivity(a *model.SalesActivity) error {
 	if a.StartTime == "" {
 		a.StartTime = "09:00"
 	}
+	before := rowJSON(r.db, "sales_activities", "activity_id", a.ActivityID)
 	if _, err := r.db.Exec(`
 		UPDATE sales_activities SET
 			activity_date=?, start_time=?, duration_min=?, activity_type=?,
@@ -275,6 +278,8 @@ func (r *SalesRepo) UpdateActivity(a *model.SalesActivity) error {
 		return err
 	}
 	replaceSalesMembers(r.db, a.ActivityID, a.OurMembers)
+	logUpdate(r.db, "sales_activities", "activity_id", a.ActivityID, a.Title, before)
+	r.fillRFPFromActivity(a, p)
 	return nil
 }
 
@@ -290,6 +295,7 @@ func (r *SalesRepo) DeleteActivity(id string) error {
 		}
 		return err
 	}
+	before := rowJSON(r.db, "sales_activities", "activity_id", a.ActivityID)
 	wb := NewWBRepo(r.db)
 	if t, err := wb.GetTaskBySource(model.WBSourceSalesActivity, a.ActivityID); err == nil && t != nil {
 		_, _ = r.db.Exec(`DELETE FROM work_task_members WHERE task_id=?`, t.TaskID)
@@ -304,6 +310,7 @@ func (r *SalesRepo) DeleteActivity(id string) error {
 	if salesActivitySearchHasFTS(r.db) {
 		_, _ = r.db.Exec(`DELETE FROM sales_activity_search WHERE activity_id=?`, a.ActivityID)
 	}
+	logDelete(r.db, "sales_activities", "activity_id", a.ActivityID, a.Title, before)
 	return nil
 }
 
@@ -713,6 +720,29 @@ func (r *SalesRepo) fillActivityLabels(a *model.SalesActivity, types []model.Cod
 			a.StageLabel = model.SalesStageDisplayLabel(a.StageAtTime, stages)
 		}
 	}
+}
+
+func (r *SalesRepo) fillRFPFromActivity(a *model.SalesActivity, p *model.SalesProject) {
+	if a == nil || p == nil {
+		return
+	}
+	if strings.TrimSpace(a.ActivityType) != model.SalesActTypeRFPReceived {
+		return
+	}
+	if strings.TrimSpace(p.RFPReceivedAt) != "" {
+		return
+	}
+	day := strings.TrimSpace(a.ActivityDate)
+	if day == "" {
+		day = todayYMD()
+	}
+	before := rowJSON(r.db, "sales_projects", "sales_id", p.SalesID)
+	if _, err := r.db.Exec(`UPDATE sales_projects SET rfp_received_at=?, updated_at=CURRENT_TIMESTAMP WHERE sales_id=? AND TRIM(COALESCE(rfp_received_at,''))=''`,
+		day, p.SalesID); err != nil {
+		return
+	}
+	p.RFPReceivedAt = day
+	logUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, before)
 }
 
 func (r *SalesRepo) scanActivityRows(rows *sql.Rows) ([]model.SalesActivity, error) {

@@ -51,6 +51,7 @@ type ChangeLog struct {
 	Summary      string
 	BeforeJSON   string
 	AfterJSON    string
+	Reason       string
 	RolledBack   bool
 	RolledBackAt string
 }
@@ -70,6 +71,11 @@ func actionLabel(a string) string {
 
 // Log 변경 이력을 남긴다. 감사 테이블 자신은 기록하지 않는다.
 func Log(action, table, pk, id, label, before, after string) {
+	LogWithReason(action, table, pk, id, label, before, after, "")
+}
+
+// LogWithReason 변경 이력에 사유를 함께 남긴다.
+func LogWithReason(action, table, pk, id, label, before, after, reason string) {
 	if dbRef == nil || table == "data_change_logs" || table == "data_backups" || table == "data_log_archives" {
 		return
 	}
@@ -85,13 +91,13 @@ func Log(action, table, pk, id, label, before, after string) {
 		INSERT INTO data_change_logs (
 			log_id, occurred_at, user_id, username, user_name,
 			action, table_name, pk_column, entity_id, entity_label, summary,
-			before_json, after_json, rolled_back
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+			before_json, after_json, rolled_back, reason
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
 		"L"+uuid.New().String(),
 		time.Now().Format("2006-01-02 15:04:05"),
 		a.UserID, a.Username, a.Name,
 		action, table, pk, id, label, sum,
-		nullEmpty(before), nullEmpty(after),
+		nullEmpty(before), nullEmpty(after), strings.TrimSpace(reason),
 	)
 	if err != nil {
 		log.Printf("data_change_logs 기록 실패 (%s %s %s): %v", action, table, id, err)
@@ -343,6 +349,16 @@ func TableLabel(t string) string {
 		return "영업 관계자"
 	case "sales_changes":
 		return "영업 변경 이력"
+	case "sales_quotes":
+		return "영업 견적"
+	case "sales_memos":
+		return "영업 메모"
+	case "sales_groups":
+		return "사업 대분류"
+	case "sales_group_members":
+		return "대분류 구성"
+	case "labor_rates":
+		return "노임단가"
 	case "work_tasks":
 		return "일일업무"
 	case "work_actions":

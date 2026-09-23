@@ -31,11 +31,21 @@ func TestRollbackUpdateAndDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	logs, err := audit.ListLogs(10)
+	logs, err := audit.ListLogs(50)
 	if err != nil || len(logs) == 0 {
 		t.Fatalf("이력: %+v err=%v", logs, err)
 	}
-	if err := audit.Rollback(logs[0].LogID); err != nil {
+	var logID string
+	for _, l := range logs {
+		if l.EntityID == "C1" && l.Action == audit.ActionUpdate {
+			logID = l.LogID
+			break
+		}
+	}
+	if logID == "" {
+		t.Fatalf("고객 수정 이력 없음 %+v", logs)
+	}
+	if err := audit.Rollback(logID); err != nil {
 		t.Fatal(err)
 	}
 	var name string

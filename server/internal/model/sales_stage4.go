@@ -119,6 +119,9 @@ func SalesContractUnsigned(p *SalesProject, today time.Time) bool {
 func SalesWinSample(projects []SalesProject) (won, lost int) {
 	for i := range projects {
 		p := projects[i]
+		if strings.TrimSpace(p.Status) == SalesStatusDormant {
+			continue
+		}
 		if strings.TrimSpace(p.WonAt) != "" {
 			won++
 		}

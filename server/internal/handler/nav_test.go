@@ -117,11 +117,14 @@ func TestSalesUnifiedSidebar(t *testing.T) {
 	}
 	if !strings.Contains(salesBody, "영업 대시보드") || !strings.Contains(salesBody, "견적 관리") ||
 		!strings.Contains(salesBody, "수주 관리") || !strings.Contains(salesBody, "계약 관리") ||
-		!strings.Contains(salesBody, "품목 마스터") {
+		!strings.Contains(salesBody, "품목 마스터") || !strings.Contains(salesBody, "사업 대분류") {
 		t.Fatal("/sales 영업 메뉴가 빠졌다")
 	}
-	if strings.Contains(salesBody, "영업 파이프라인") || strings.Contains(salesBody, "고객·파트너") {
+	if strings.Contains(salesBody, "고객·파트너") {
 		t.Fatal("없애야 할 영업 메뉴가 남아 있다")
+	}
+	if !strings.Contains(salesBody, "영업 파이프라인") {
+		t.Fatal("영업 파이프라인 메뉴가 없다")
 	}
 	if strings.Contains(salesBody, "사업 발굴") {
 		t.Fatal("메뉴 이름이 사업 발굴이다")
@@ -144,7 +147,7 @@ func TestSalesUnifiedSidebar(t *testing.T) {
 	if pipe.Code != http.StatusMovedPermanently {
 		t.Fatalf("/sales/pipeline status=%d want 301", pipe.Code)
 	}
-	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "/sales") || !strings.Contains(loc, "view=kanban") {
+	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "/sales") || !strings.Contains(loc, "view=pipeline") {
 		t.Fatalf("/sales/pipeline Location=%q", loc)
 	}
 

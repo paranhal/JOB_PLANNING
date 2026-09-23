@@ -129,8 +129,10 @@ func (r *SalesRepo) MoveActivity(id, group, value, byName string) error {
 		if a.StageAtTime == value {
 			return nil
 		}
-		_, err = r.db.Exec(`UPDATE sales_activities SET stage_at_time=? WHERE activity_id=?`, value, a.ActivityID)
-		return err
+		return touchUpdate(r.db, "sales_activities", "activity_id", a.ActivityID, a.Title, func() error {
+			_, err = r.db.Exec(`UPDATE sales_activities SET stage_at_time=? WHERE activity_id=?`, value, a.ActivityID)
+			return err
+		})
 	default:
 		types, _ := r.ActivityTypes()
 		ok := false
@@ -147,12 +149,14 @@ func (r *SalesRepo) MoveActivity(id, group, value, byName string) error {
 		if a.ActivityType == value {
 			return nil
 		}
-		a.ActivityType = value
-		if _, err := r.db.Exec(`UPDATE sales_activities SET activity_type=? WHERE activity_id=?`, value, a.ActivityID); err != nil {
-			return err
-		}
-		p, _ := r.Get(a.SalesID)
-		return r.syncWorkTask(a, p, nil)
+		return touchUpdate(r.db, "sales_activities", "activity_id", a.ActivityID, a.Title, func() error {
+			a.ActivityType = value
+			if _, err := r.db.Exec(`UPDATE sales_activities SET activity_type=? WHERE activity_id=?`, value, a.ActivityID); err != nil {
+				return err
+			}
+			p, _ := r.Get(a.SalesID)
+			return r.syncWorkTask(a, p, nil)
+		})
 	}
 }
 

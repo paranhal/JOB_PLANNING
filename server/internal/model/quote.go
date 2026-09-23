@@ -483,6 +483,21 @@ func QuoteKindForm(kind string) string {
 	return QuoteFormA
 }
 
+func QuoteKindFromBizType(biz string) string {
+	switch strings.TrimSpace(biz) {
+	case "maintenance":
+		return QuoteKindMaint
+	case "develop":
+		return QuoteKindDev
+	case "construction":
+		return QuoteKindConstruction
+	case "build", "goods":
+		return QuoteKindSolution
+	default:
+		return ""
+	}
+}
+
 func QuoteKindFromContractTarget(target string) string {
 	switch strings.TrimSpace(target) {
 	case "construction":

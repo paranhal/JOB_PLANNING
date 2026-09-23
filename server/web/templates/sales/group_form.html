@@ -1,0 +1,75 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-3xl mx-auto space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
+  {{if .FormError}}<div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border">{{.FormError}}</div>{{end}}
+  <form method="post" action="{{if .IsNew}}/sales/groups{{else}}/sales/groups/{{.Group.GroupID}}{{end}}" class="bg-white rounded-xl border p-5 space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">대분류명</label>
+      <input name="name" required value="{{.Group.Name}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-1">연도</label>
+        <input name="year" type="number" value="{{if .Group.Year}}{{.Group.Year}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">담당</label>
+        <select name="owner_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">—</option>
+          {{range .Users}}
+          <option value="{{.UserID}}" {{if eq $.Group.OwnerID .UserID}}selected{{end}}>{{.FullName}}</option>
+          {{end}}
+        </select>
+        <input type="hidden" name="owner_name" value="{{.Group.OwnerName}}">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">종류</label>
+      <label class="mr-4 text-sm"><input type="radio" name="group_kind" value="manual" {{if ne .Group.GroupKind "filter"}}checked{{end}}> 수동</label>
+      <label class="text-sm"><input type="radio" name="group_kind" value="filter" {{if eq .Group.GroupKind "filter"}}checked{{end}}> 조건형</label>
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="pinned" value="1" {{if .Group.Pinned}}checked{{end}}> 대시보드에 고정</label>
+    <details class="border rounded-lg p-3" {{if eq .Group.GroupKind "filter"}}open{{end}}>
+      <summary class="text-sm font-medium cursor-pointer">조건 (조건형)</summary>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 text-sm">
+        <div>사업 유형 <input name="biz_type" value="{{.Filter.BizType}}" class="w-full border rounded px-2 py-1"></div>
+        <div>예산 연도 <input name="budget_year" type="number" value="{{if .Filter.BudgetYear}}{{.Filter.BudgetYear}}{{end}}" class="w-full border rounded px-2 py-1"></div>
+        <div>예산 상태 <input name="budget_status" value="{{.Filter.BudgetStatus}}" class="w-full border rounded px-2 py-1"></div>
+        <div>담당 <input name="owner" value="{{.Filter.Owner}}" class="w-full border rounded px-2 py-1"></div>
+        <div>단계 <input name="stage" value="{{.Filter.Stage}}" class="w-full border rounded px-2 py-1"></div>
+        <div>계약 대상 <input name="contract_target" value="{{.Filter.ContractTarget}}" class="w-full border rounded px-2 py-1"></div>
+        <div>조달 경로 <input name="procurement_route" value="{{.Filter.ProcurementRoute}}" class="w-full border rounded px-2 py-1"></div>
+        <div>계약 방법 <input name="contract_method" value="{{.Filter.ContractMethod}}" class="w-full border rounded px-2 py-1"></div>
+        <div>평가방법 <input name="bid_eval_method" value="{{.Filter.BidEvalMethod}}" class="w-full border rounded px-2 py-1"></div>
+        <div>쇼핑몰 형태 <input name="mall_contract_type" value="{{.Filter.MallContractType}}" class="w-full border rounded px-2 py-1"></div>
+        <div>시기 from <input name="expected_from" type="month" value="{{.Filter.ExpectedFrom}}" class="w-full border rounded px-2 py-1"></div>
+        <div>시기 to <input name="expected_to" type="month" value="{{.Filter.ExpectedTo}}" class="w-full border rounded px-2 py-1"></div>
+      </div>
+      <p class="text-sm text-gray-600 mt-2">지금 <span id="preview-n">{{.PreviewN}}</span>건이 잡힙니다.</p>
+    </details>
+    <div>
+      <label class="block text-sm font-medium mb-1">메모</label>
+      <textarea name="notes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">{{.Group.Notes}}</textarea>
+    </div>
+    <div class="flex justify-end gap-2">
+      <a href="/sales/groups" class="px-4 py-2 border rounded-lg text-sm">취소</a>
+      <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">저장</button>
+    </div>
+  </form>
+</div>
+<script>
+(function(){
+  const form = document.querySelector('form');
+  if (!form) return;
+  const nEl = document.getElementById('preview-n');
+  const keys = ['biz_type','budget_year','budget_status','owner','stage','contract_target','procurement_route','contract_method','bid_eval_method','mall_contract_type','expected_from','expected_to'];
+  function refresh() {
+    const q = new URLSearchParams();
+    keys.forEach(function(k){ const el = form.querySelector('[name="'+k+'"]'); if (el && el.value) q.set(k, el.value); });
+    fetch('/sales/groups/preview.json?' + q.toString()).then(function(r){ return r.json(); }).then(function(d){ if (nEl) nEl.textContent = d.count || 0; }).catch(function(){});
+  }
+  form.addEventListener('change', refresh);
+})();
+</script>
+{{end}}

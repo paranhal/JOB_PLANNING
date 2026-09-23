@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -108,10 +109,11 @@ func (h *SalesHandler) DropForm(c echo.Context) error {
 	}
 	prev, _ := h.repo.DropPreview(id)
 	codes, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupDropReason)
+	until := model.DefaultDormantUntil(time.Now(), h.repo.DormantDefaultMonth())
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"ok": true, "sales_id": p.SalesID, "name": p.Name, "stage": p.Stage,
 		"prob": model.SalesProbability(p), "open_tasks": prev.OpenTasks, "quotes": prev.Quotes,
-		"reasons": codes,
+		"reasons": codes, "dormant_until": until,
 	})
 }
 
@@ -124,7 +126,17 @@ func (h *SalesHandler) Drop(c echo.Context) error {
 	if !canDropSales(c, p) {
 		return echo.ErrForbidden
 	}
-	err = h.repo.Drop(id, c.FormValue("reason_code"), c.FormValue("reason"), currentUserID(c), ctxString(c, "user_name"))
+	code := strings.TrimSpace(c.FormValue("reason_code"))
+	if code == "postponed" && (c.FormValue("as_dormant") == "1" || c.FormValue("sleep") == "1") {
+		until := strings.TrimSpace(c.FormValue("until"))
+		reason := strings.TrimSpace(c.FormValue("reason"))
+		if reason == "" {
+			reason = "고객 사업 무기한 연기"
+		}
+		err = h.repo.Sleep(id, until, reason, currentUserID(c), ctxString(c, "user_name"), false)
+		return h.replyStage(c, err, id, "/sales/"+id+"?ok=dormant")
+	}
+	err = h.repo.Drop(id, code, c.FormValue("reason"), currentUserID(c), ctxString(c, "user_name"))
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 
@@ -159,5 +171,5 @@ func salesListFilterFromRequest(c echo.Context) repository.SalesListFilter {
 	f.IncludeClosed = c.QueryParam("closed") == "1"
 	f.CloseReason = strings.TrimSpace(c.QueryParam("close"))
 	f.ContractTarget = strings.TrimSpace(c.QueryParam("contract_target"))
-	return f
+	return parseSalesListFilterQ(c, f)
 }

@@ -159,3 +159,31 @@ func TestSyncAdminActionProgressAndResume(t *testing.T) {
 		t.Fatalf("status=%s want in_progress", got.Status)
 	}
 }
+
+func TestBlockingActionsAndStuckList(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "gtd_stuck.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	wb := NewWBRepo(db)
+	task := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "오래 막힘", DueDate: "2026-07-01", Status: model.WBTaskInProgress}
+	if err := wb.CreateTask(task); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.CreateAction(&model.WorkAction{TaskID: task.TaskID, Title: "서류", Required: true}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := wb.BlockingActions(task.TaskID)
+	if err != nil || len(list) != 1 || list[0].Title != "서류" {
+		t.Fatalf("blocking %+v err=%v", list, err)
+	}
+	if _, err := db.Exec(`UPDATE work_actions SET created_at=datetime('now','-31 days') WHERE task_id=?`, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	items, err := wb.ListAdminWork("stuck", "")
+	if err != nil || len(items) != 1 || items[0].Title != "오래 막힘" {
+		t.Fatalf("stuck %+v err=%v", items, err)
+	}
+}

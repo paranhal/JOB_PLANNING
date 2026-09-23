@@ -52,7 +52,11 @@ func (r *SalesRepo) CreateMemo(m *model.SalesMemo) error {
 	m.SortOrder = max + 1
 	_, err = r.db.Exec(`INSERT INTO sales_memos (memo_id, sales_id, content, sort_order, author_id, author_name)
 		VALUES (?,?,?,?,?,?)`, m.MemoID, m.SalesID, m.Content, m.SortOrder, m.AuthorID, m.AuthorName)
-	return err
+	if err != nil {
+		return err
+	}
+	logCreate(r.db, "sales_memos", "memo_id", m.MemoID, m.Content)
+	return nil
 }
 
 func (r *SalesRepo) DeleteMemo(id, salesID string) error {
@@ -60,6 +64,8 @@ func (r *SalesRepo) DeleteMemo(id, salesID string) error {
 	if id == "" || salesID == "" {
 		return fmt.Errorf("메모가 필요합니다")
 	}
-	_, err := r.db.Exec(`DELETE FROM sales_memos WHERE memo_id=? AND sales_id=?`, id, salesID)
-	return err
+	return touchDelete(r.db, "sales_memos", "memo_id", id, id, func() error {
+		_, err := r.db.Exec(`DELETE FROM sales_memos WHERE memo_id=? AND sales_id=?`, id, salesID)
+		return err
+	})
 }

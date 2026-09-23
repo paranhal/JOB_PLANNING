@@ -41,6 +41,20 @@ func (r *WBRepo) CountSubtasks(parentID string) (int, error) {
 	return n, err
 }
 
+func (r *WBRepo) CountOpenSubtasks(parentID string) (int, error) {
+	items, err := r.ListSubtasks(parentID)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, t := range items {
+		if t.Status != model.WBTaskComplete && t.Status != model.WBTaskCancelled {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (r *WBRepo) TaskDepth(taskID string) int {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {

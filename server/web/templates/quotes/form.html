@@ -25,8 +25,8 @@
   {{if eq .FlashOK "revised"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">개정했습니다. 번호는 그대로이고 이전 회차는 읽기 전용입니다.</div>
   {{end}}
-  {{if .FormError}}
-  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  {{if .LaborYearNote}}
+  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">{{.LaborYearNote}}</div>
   {{end}}
 
   <form method="post" action="{{if .IsNew}}/quotes{{else}}/quotes/{{.Quote.QuoteID}}{{end}}" class="space-y-4" @submit="syncHidden()">
@@ -182,7 +182,7 @@
         </select>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="isLabor()">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="isLabor() && (num(overhead)||num(tech))">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">제경비율 (%)</label>
           <input name="overhead_rate" x-model="overhead" class="w-full border rounded-lg px-3 py-2 text-sm">
@@ -193,11 +193,11 @@
           <input name="tech_fee_rate" x-model="tech" class="w-full border rounded-lg px-3 py-2 text-sm">
           <p class="text-xs text-amber-700 mt-1" x-show="techDiff()" x-text="techDiff()"></p>
         </div>
-        <label class="inline-flex items-center gap-2 text-sm sm:col-span-2">
-          <input type="checkbox" name="maint_block" value="1" {{if .Quote.MaintBlock}}checked{{end}}>
-          유지보수부분 블록 넣기
-        </label>
       </div>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="maint_block" value="1" {{if .Quote.MaintBlock}}checked{{end}}>
+        유지보수부분 블록 넣기
+      </label>
       <template x-if="!isLabor()">
         <span>
           <input type="hidden" name="overhead_rate" :value="overhead">
@@ -361,8 +361,8 @@ function quoteForm(init){
     round: init.round || 'none',
     formType: init.formType || 'A1',
     purpose: '{{if .Quote.Purpose}}{{.Quote.Purpose}}{{else}}deal{{end}}',
-    overhead: init.overhead || 110,
-    tech: init.tech || 20,
+    overhead: init.overhead == null ? 0 : init.overhead,
+    tech: init.tech == null ? 0 : init.tech,
     stdOH: init.stdOH || 110,
     stdTech: init.stdTech || 20,
     quoteYear: init.quoteYear || 0,
@@ -380,6 +380,7 @@ function quoteForm(init){
     setForm(t){
       this.formType = t;
       this.vat = (t==='B1' || t==='B2' || t==='B') ? 'included' : 'excluded';
+      if(t==='A2'){ this.overhead=0; this.tech=0; }
     },
     ohDiff(){
       const u=this.num(this.overhead), s=this.num(this.stdOH);
@@ -430,9 +431,9 @@ function quoteForm(init){
       this.lines.forEach(ln => { sum += this.lineAmt(ln); });
       let direct=sum, overhead=0, tech=0;
       if(this.isLabor()){
-        const ohPct=this.num(this.overhead)||110, techPct=this.num(this.tech)||20;
-        overhead = Math.floor(Math.floor(direct * ohPct / 100) / 100) * 100;
-        tech = Math.floor(overhead * techPct / 100);
+        const ohPct=this.num(this.overhead), techPct=this.num(this.tech);
+        overhead = Math.floor(direct * ohPct / 100);
+        tech = Math.floor((direct+overhead) * techPct / 100);
         sum = direct + overhead + tech;
       }
       if(this.vat==='included'){

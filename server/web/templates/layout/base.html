@@ -91,7 +91,9 @@
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">영업</p>
       <a href="/sales/dashboard" class="{{if eq $a "sales_dashboard"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 대시보드</a>
       <a href="/sales" class="{{if eq $a "sales"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 사업</a>
+      <a href="/sales/groups" class="{{if eq $a "sales_groups"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사업 대분류</a>
       <a href="/sales/activities" class="{{if eq $a "sales_activities"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 활동</a>
+      <a href="/sales?view=pipeline" class="{{if eq $a "sales"}}{{end}} text-gray-300 hover:bg-gray-800 flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 파이프라인</a>
       <a href="/quotes" class="{{if eq $a "quotes"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">견적 관리</a>
       <a href="/orders" class="{{if eq $a "orders"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">수주 관리</a>
       <a href="/contracts" class="{{if eq $a "contracts"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">계약 관리</a>
@@ -143,7 +145,7 @@
       {{if $isAdmin}}
       <a href="/admin/data" class="{{if or (eq $a "data") (eq $a "backup")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">데이터 관리</a>
       <a href="/admin/system" class="{{if eq $a "system"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">시스템 정보</a>
-      {{if false}}<a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>{{end}}
+      <a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>
       {{end}}
       {{end}}
       <a href="/account" class="{{if eq $a "account"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">내 계정</a>

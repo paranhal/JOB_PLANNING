@@ -1,0 +1,55 @@
+{{define "title"}}사업 대분류 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">사업 대분류</h2>
+      <p class="text-sm text-gray-500">단위 사업은 그대로 두고, 잇는 표로만 묶습니다.</p>
+    </div>
+    {{if .CanWrite}}
+    <a href="/sales/groups/new" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">대분류 등록</a>
+    {{end}}
+  </div>
+  <form method="get" class="text-sm">
+    <label class="inline-flex items-center gap-2"><input type="checkbox" name="closed" value="1" {{if .IncludeClosed}}checked{{end}} onchange="this.form.submit()">종료 포함</label>
+  </form>
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium">번호</th>
+          <th class="px-4 py-3 text-left font-medium">대분류명</th>
+          <th class="px-4 py-3 text-left font-medium">연도</th>
+          <th class="px-4 py-3 text-left font-medium">담당</th>
+          <th class="px-4 py-3 text-right font-medium">사업수</th>
+          <th class="px-4 py-3 text-right font-medium">총액</th>
+          <th class="px-4 py-3 text-right font-medium">가중금액</th>
+          <th class="px-4 py-3 text-left font-medium">단계</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {{range .Rows}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono text-xs"><a class="text-blue-700 hover:underline" href="/sales/groups/{{.Group.GroupID}}">{{.Group.GroupNo}}</a></td>
+          <td class="px-4 py-3"><a class="font-medium text-blue-700 hover:underline" href="/sales/groups/{{.Group.GroupID}}">{{.Group.Name}}</a>
+            {{if eq .Group.GroupKind "filter"}}<span class="ml-1 text-[11px] text-gray-400">조건</span>{{end}}
+            {{if .Group.Pinned}}<span class="ml-1 text-[11px] text-orange-700">고정</span>{{end}}
+            {{if eq .Group.Status "closed"}}<span class="ml-1 text-[11px] text-gray-400">종료</span>{{end}}
+          </td>
+          <td class="px-4 py-3">{{if .Group.Year}}{{.Group.Year}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3">{{if .Group.OwnerName}}{{.Group.OwnerName}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-right tabular-nums">{{.Count}}</td>
+          <td class="px-4 py-3 text-right tabular-nums">{{.Amount}}</td>
+          <td class="px-4 py-3 text-right tabular-nums">{{.Weighted}}</td>
+          <td class="px-4 py-3 text-xs text-gray-500">
+            {{range $k,$v := .StageCounts}}<span class="mr-2">{{$k}} {{$v}}</span>{{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">대분류가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

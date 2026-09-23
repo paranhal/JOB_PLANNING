@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // 영업 사업 단계 코드값. 라벨·확도는 codes 에서 읽는다 (§32.3.1).
@@ -35,6 +36,8 @@ const (
 	SalesActTypeRFP      = "rfp"
 	SalesActTypeBid      = "bid"
 	SalesActTypeOther    = "other"
+	SalesActTypeRequirement = "requirement"
+	SalesActTypeRFPReceived = "rfp_received"
 )
 
 // SalesActivityChipCodes 목록 칩 6개. 순서 고정 (§32.8.2).
@@ -69,6 +72,26 @@ const (
 	SalesStatusActive   = "active"
 	SalesStatusLost     = "lost"
 	SalesStatusPromoted = "promoted"
+	SalesStatusDormant  = "dormant"
+)
+
+const (
+	SalesBizBuild        = "build"
+	SalesBizMaintenance  = "maintenance"
+	SalesBizGoods        = "goods"
+	SalesBizDevelop      = "develop"
+	SalesBizConstruction = "construction"
+	SalesBizEtc          = "etc"
+
+	SalesBudgetUnknown      = "unknown"
+	SalesBudgetNotReflected = "not_reflected"
+	SalesBudgetRequesting   = "requesting"
+	SalesBudgetConfirmed    = "confirmed"
+	SalesBudgetNoPlan       = "no_plan"
+
+	SalesCodeGroupBizType      = "sales_biz_type"
+	SalesCodeGroupBudgetStatus = "sales_budget_status"
+	SettingSalesDormantMonth   = "sales_dormant_default_month"
 )
 
 const (
@@ -149,6 +172,22 @@ type SalesProject struct {
 	DroppedBy        string
 	DroppedFromStage string
 	PrevSalesID      string
+
+	BizType       string
+	BudgetYear    int
+	BudgetStatus  string
+	DormantUntil  string
+	DormantReason string
+	DormantAt     string
+	DormantBy     string
+
+	BidYM              string
+	RevenueYM          string
+	RevenueFrom        string
+	RevenueTo          string
+	BillingCycle       string
+	AmountVATIncluded  bool
+	ForecastGroups     []string
 
 	CustomerName string
 	StageLabel   string
@@ -1252,4 +1291,91 @@ func splitDateTime(s string) (date, tm string) {
 		tm = strings.TrimSpace(s[11:16])
 	}
 	return date, tm
+}
+
+func NormalizeSalesBizType(s string) string {
+	switch strings.TrimSpace(s) {
+	case SalesBizBuild, SalesBizMaintenance, SalesBizGoods, SalesBizDevelop, SalesBizConstruction, SalesBizEtc:
+		return strings.TrimSpace(s)
+	default:
+		return ""
+	}
+}
+
+func NormalizeSalesBudgetStatus(s string) string {
+	switch strings.TrimSpace(s) {
+	case SalesBudgetUnknown, SalesBudgetNotReflected, SalesBudgetRequesting, SalesBudgetConfirmed, SalesBudgetNoPlan:
+		return strings.TrimSpace(s)
+	default:
+		return ""
+	}
+}
+
+func NormalizeDormantYM(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 7 && s[4] == '-' {
+		return s[:7]
+	}
+	return ""
+}
+
+func DefaultDormantUntil(now time.Time, month int) string {
+	if month < 1 || month > 12 {
+		month = 6
+	}
+	y := now.Year() + 1
+	return fmt.Sprintf("%04d-%02d", y, month)
+}
+
+func (p *SalesProject) IsDormant() bool {
+	return p != nil && strings.TrimSpace(p.Status) == SalesStatusDormant
+}
+
+func SalesBizTypeLabel(s string) string {
+	switch strings.TrimSpace(s) {
+	case SalesBizBuild:
+		return "구축"
+	case SalesBizMaintenance:
+		return "유지보수"
+	case SalesBizGoods:
+		return "물품 납품"
+	case SalesBizDevelop:
+		return "개발"
+	case SalesBizConstruction:
+		return "공사"
+	case SalesBizEtc:
+		return "기타"
+	default:
+		return ""
+	}
+}
+
+func SalesBudgetStatusLabel(s string) string {
+	switch strings.TrimSpace(s) {
+	case SalesBudgetUnknown:
+		return "미확인"
+	case SalesBudgetNotReflected:
+		return "미반영"
+	case SalesBudgetRequesting:
+		return "요청·협의 중"
+	case SalesBudgetConfirmed:
+		return "반영 확정"
+	case SalesBudgetNoPlan:
+		return "예산 계획 없음"
+	default:
+		return ""
+	}
+}
+
+func DormantSummary(items []SalesProject, quotes map[string][]SalesQuote) (count, amount int) {
+	for i := range items {
+		p := items[i]
+		if p.Status != SalesStatusDormant {
+			continue
+		}
+		ApplySalesPipelineAmount(&p, quotes[p.SalesID])
+		count++
+		amount += p.PipeAmount
+	}
+	return
 }

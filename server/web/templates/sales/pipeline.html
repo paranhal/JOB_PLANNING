@@ -1,48 +1,99 @@
 {{define "title"}}영업 파이프라인 · 고객지원시스템{{end}}
-
 {{define "content"}}
-<div class="space-y-4" x-data="salesDnd({kind:'project'})">
-  <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+<div class="space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">영업 파이프라인</h2>
-      <p class="text-sm text-gray-500">단계 칸반입니다. 사업 종료 열은 상세에서만 끝냅니다.</p>
+      <p class="text-sm text-gray-500">기준 {{.BasisLabel}} · {{.From}}~{{.To}}</p>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <a href="/sales?display=kanban{{if .FilterQ}}&{{.FilterQ}}{{end}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">단계 칸반</a>
-      <a href="/sales{{if .FilterQ}}?{{.FilterQ}}{{end}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">사업 목록</a>
-    </div>
+    <a href="/sales/pipeline.xlsx?{{.FilterQ}}&view=pipeline&basis={{.Basis}}&from={{.From}}&to={{.To}}&group={{.GroupBy}}&cell={{.Cell}}{{if .Spread}}&spread=1{{end}}" class="px-3 py-1.5 text-sm border rounded-lg">엑셀</a>
   </div>
-
-  {{if eq .FlashOK "stage"}}
-  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">단계를 변경했습니다.</div>
-  {{end}}
-  {{if .FormError}}
-  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
-  {{end}}
-
-  {{template "sales_pipeline_metrics" .}}
-  {{template "sales_list_filters" .}}
-  {{template "kanban_board" .}}
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
-      <h3 class="font-semibold text-gray-800">수주율</h3>
-      <p class="text-3xl font-bold text-gray-800">{{.Pipe.WinRateLabel}}</p>
-      <p class="text-xs text-gray-500">{{.Pipe.WinSampleLabel}}</p>
-    </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
-      <h3 class="font-semibold text-gray-800">담당자별 활동 건수</h3>
-      <ul class="text-sm divide-y divide-gray-100">
-        {{range .Pipe.People}}
-        <li class="flex justify-between py-1.5"><span>{{.Name}}</span><span class="font-medium">{{.Count}}</span></li>
+  {{template "sales_filters" .}}
+  <form method="get" action="/sales" class="flex flex-wrap items-end gap-2 text-sm bg-white border rounded-xl p-3">
+    <input type="hidden" name="view" value="pipeline">
+    <label>기준
+      <select name="basis" class="border rounded-lg px-2 py-1.5">
+        <option value="revenue" {{if eq .Basis "revenue"}}selected{{end}}>매출</option>
+        <option value="contract" {{if eq .Basis "contract"}}selected{{end}}>계약</option>
+        <option value="won" {{if eq .Basis "won"}}selected{{end}}>수주</option>
+        <option value="bid" {{if eq .Basis "bid"}}selected{{end}}>입찰</option>
+        <option value="plan" {{if eq .Basis "plan"}}selected{{end}}>사업</option>
+      </select>
+    </label>
+    <label>부터 <input type="month" name="from" value="{{.From}}" class="border rounded-lg px-2 py-1.5"></label>
+    <label>까지 <input type="month" name="to" value="{{.To}}" class="border rounded-lg px-2 py-1.5"></label>
+    <label>묶음
+      <select name="group" class="border rounded-lg px-2 py-1.5">
+        <option value="stage" {{if eq .GroupBy "stage"}}selected{{end}}>단계</option>
+        <option value="owner" {{if eq .GroupBy "owner"}}selected{{end}}>담당</option>
+        <option value="target" {{if eq .GroupBy "target"}}selected{{end}}>계약 대상</option>
+        <option value="group" {{if eq .GroupBy "group"}}selected{{end}}>대분류</option>
+      </select>
+    </label>
+    <label>칸
+      <select name="cell" class="border rounded-lg px-2 py-1.5">
+        <option value="amount" {{if eq .Cell "amount"}}selected{{end}}>금액</option>
+        <option value="weighted" {{if eq .Cell "weighted"}}selected{{end}}>가중</option>
+      </select>
+    </label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="spread" value="1" {{if .Spread}}checked{{end}}> 기간 분할</label>
+    <label class="flex items-center gap-1"><input type="checkbox" name="all_ym" value="1" {{if .ShowAllYM}}checked{{end}}> 시기 모두 보기</label>
+    <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg">적용</button>
+  </form>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border rounded-xl p-3"><div class="text-xs text-gray-500">진행</div><div class="text-lg font-semibold">{{.Summary.OpenN}}건 · {{.Summary.OpenAmtLabel}}</div></div>
+    <div class="bg-white border rounded-xl p-3"><div class="text-xs text-gray-500">가중</div><div class="text-lg font-semibold">{{won .Summary.Weighted}}</div></div>
+    <div class="bg-white border rounded-xl p-3"><div class="text-xs text-gray-500">계약 확정</div><div class="text-lg font-semibold">{{won .Summary.ContractAmt}}</div></div>
+    <div class="bg-white border rounded-xl p-3"><div class="text-xs text-gray-500">시기 미정</div><div class="text-lg font-semibold">{{.Summary.UnschedN}}건 · {{won .Summary.UnschedAmt}}</div></div>
+  </div>
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500 border-b"><tr>
+        <th class="text-left px-3 py-2">번호</th><th class="text-left px-3 py-2">사업</th><th class="text-left px-3 py-2">고객</th>
+        <th class="text-left px-3 py-2">담당</th><th class="text-left px-3 py-2">단계</th><th class="text-left px-3 py-2">확도</th>
+        <th class="text-left px-3 py-2">기준 시기</th><th class="text-right px-3 py-2">금액</th><th class="text-right px-3 py-2">가중</th>
+      </tr></thead>
+      <tbody class="divide-y">
+        {{range .Rows}}
+        <tr>
+          <td class="px-3 py-2 font-mono text-xs"><a href="/sales/{{.SalesID}}" class="text-blue-700">{{.DisplayNo}}</a></td>
+          <td class="px-3 py-2">{{.Name}}</td>
+          <td class="px-3 py-2">{{.Customer}}</td>
+          <td class="px-3 py-2">{{.Owner}}</td>
+          <td class="px-3 py-2">{{.DisplayStage}}</td>
+          <td class="px-3 py-2">{{.EffectiveProb}}%</td>
+          <td class="px-3 py-2">{{if .Unsched}}미정{{else}}{{.BasisYM}}{{end}}</td>
+          <td class="px-3 py-2 text-right">{{.Amount}} <span class="text-[11px] text-gray-400">{{.VATLabel}}</span></td>
+          <td class="px-3 py-2 text-right">{{.Weighted}}</td>
+        </tr>
         {{else}}
-        <li class="text-gray-400">활동이 없습니다.</li>
+        <tr><td colspan="9" class="px-3 py-8 text-center text-gray-400">건이 없습니다.</td></tr>
         {{end}}
-      </ul>
-    </div>
+      </tbody>
+    </table>
   </div>
-
-  {{template "sales_stage_reason" .}}
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead class="bg-gray-50 border-b"><tr>
+        <th class="text-left px-2 py-2">구분</th>
+        {{range .Matrix.Months}}<th class="px-2 py-2">{{.}}</th>{{end}}
+        <th class="px-2 py-2">미정</th>
+      </tr></thead>
+      <tbody class="divide-y">
+        {{range .Matrix.Rows}}
+        <tr>
+          <td class="px-2 py-2">{{.Label}}</td>
+          {{if eq $.Cell "weighted"}}{{range .WCells}}<td class="px-2 py-2 text-right tabular-nums">{{won .}}</td>{{end}}<td class="px-2 py-2 text-right">{{won .WUnsched}}</td>
+          {{else}}{{range .Cells}}<td class="px-2 py-2 text-right tabular-nums">{{won .}}</td>{{end}}<td class="px-2 py-2 text-right">{{won .Unsched}}</td>{{end}}
+        </tr>
+        {{end}}
+        <tr class="font-semibold bg-gray-50">
+          <td class="px-2 py-2">합계</td>
+          {{range .Matrix.Totals}}<td class="px-2 py-2 text-right">{{won .}}</td>{{end}}
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
-{{template "sales_dnd" .}}
 {{end}}

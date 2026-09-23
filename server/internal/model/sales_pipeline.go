@@ -170,6 +170,9 @@ func SalesPipelineAmount(p *SalesProject, quotes []SalesQuote) (amount int, sour
 	if p == nil {
 		return 0, ""
 	}
+	if p.Status == SalesStatusDormant {
+		return 0, ""
+	}
 	qsum, qn := ValidQuoteSum(quotes)
 	stage := strings.TrimSpace(p.Stage)
 	if stage == SalesStage4Closed || stage == SalesStageLost || stage == SalesStageDropped || stage == SalesStageWon {
@@ -282,6 +285,9 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 	monthMap := map[string]*SalesMonthBucket{}
 	for i := range projects {
 		p := projects[i]
+		if p.Status == SalesStatusDormant {
+			continue
+		}
 		if p.PipeSource == "" && p.PipeAmount == 0 {
 			ApplySalesPipelineAmount(&p, nil)
 			projects[i] = p

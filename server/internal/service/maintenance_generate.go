@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -10,6 +11,8 @@ import (
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
+
+var errMonthSkip = errors.New("month_skip")
 
 const (
 	GenerateOrderPrevMonth = "prev_month"
@@ -44,23 +47,24 @@ func NormalizeGenerateOrder(s string) string {
 
 // AutoGenerateMaintenance 기획서 §23.5 · §34.4 자동 초안. 기본 순서는 전월.
 func AutoGenerateMaintenance(repo *repository.MaintenanceRepo, planID string) error {
-	return AutoGenerateMaintenanceWithOrder(repo, planID, GenerateOrderPrevMonth, 0, 0)
+	_, err := AutoGenerateMaintenanceWithOrder(repo, planID, GenerateOrderPrevMonth, 0, 0)
+	return err
 }
 
 // AutoGenerateMaintenanceWithOrder 주기 도래 사이트만, 점검대상별로 방문을 나누고
 // 고정 규칙을 먼저 넣은 뒤 나머지를 선택한 순서로 25일 이전 평일에 나열한다.
 // year·month 가 있으면 그 달만. month=0 이면 12개월(기존 연 단위). §34.4.5
-func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, order string, year, month int) error {
+func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, order string, year, month int) (int, error) {
 	plan, err := repo.GetPlan(planID)
 	if err != nil || plan == nil {
-		return fmt.Errorf("계획을 찾을 수 없습니다")
+		return 0, fmt.Errorf("계획을 찾을 수 없습니다")
 	}
 	configs, err := repo.ListSiteConfigs()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if len(configs) == 0 {
-		return fmt.Errorf("정기점검 사이트 설정이 없습니다. 먼저 「점검 사이트 설정」에서 등록하세요")
+		return 0, fmt.Errorf("정기점검 사이트 설정이 없습니다. 먼저 「점검 사이트 설정」에서 등록하세요")
 	}
 	order = NormalizeGenerateOrder(order)
 	dist, _ := repo.ListRegionDistanceOrder()
@@ -75,16 +79,17 @@ func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, 
 		now = repo.Now()
 	}
 
+	skipped := 0
 	if month >= 1 && month <= 12 {
 		if model.IsPastGenerateMonth(y, month, now) {
-			return model.ErrGeneratePastMonth
+			return 0, model.ErrGeneratePastMonth
 		}
 		if _, _, err := repo.DeleteAutoVisitsInMonth(planID, y, month); err != nil {
-			return err
+			return 0, err
 		}
 	} else {
 		if _, _, err := repo.DeleteAutoVisits(planID); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -109,7 +114,7 @@ func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, 
 		sortFlexSlots(flex, order, distMap, prevForSort)
 		existing, err := repo.ListVisitsByMonth(planID, y, m)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		dayCount := map[string]int{}
 		for _, v := range existing {
@@ -121,6 +126,7 @@ func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, 
 
 		for _, it := range fixed {
 			if repo.HasVisitInMonth(planID, it.cfg.CustomerID, y, m, it.slot.ProductType) {
+				skipped++
 				continue
 			}
 			dates := fixedDatesForMonth(y, m, it.cfg.FixedRule, loc, cal)
@@ -131,10 +137,14 @@ func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, 
 			if monthScoped && !dateAfterToday(ds, today) {
 				continue
 			}
-			if err := insertGeneratedVisit(repo, planID, ds, dayCount[ds], it); err != nil {
-				return err
+			n, err := insertGeneratedOrSkip(repo, planID, ds, dayCount[ds], it)
+			skipped += n
+			if err != nil {
+				return 0, err
 			}
-			dayCount[ds]++
+			if n == 0 {
+				dayCount[ds]++
+			}
 		}
 
 		workdays := workdaysBefore25(y, m, loc, cal)
@@ -147,29 +157,38 @@ func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, 
 		}
 		for _, it := range flex {
 			if repo.HasVisitInMonth(planID, it.cfg.CustomerID, y, m, it.slot.ProductType) {
+				skipped++
 				continue
 			}
 			ds, sortOrd, fromPrev := mappedPrevDate(it, prevRefs, y, m, loc, cal)
 			if fromPrev && (!monthScoped || dateAfterToday(ds, today)) {
-				if err := insertGeneratedVisit(repo, planID, ds, sortOrd, it); err != nil {
-					return err
+				n, err := insertGeneratedOrSkip(repo, planID, ds, sortOrd, it)
+				skipped += n
+				if err != nil {
+					return 0, err
 				}
-				dayCount[ds]++
+				if n == 0 {
+					dayCount[ds]++
+				}
 				continue
 			}
 			ds, ok := nextOpenWorkday(workdays, dayCount, perDay)
 			if !ok {
 				continue
 			}
-			if err := insertGeneratedVisit(repo, planID, ds, dayCount[ds], it); err != nil {
-				return err
+			n, err := insertGeneratedOrSkip(repo, planID, ds, dayCount[ds], it)
+			skipped += n
+			if err != nil {
+				return 0, err
 			}
-			dayCount[ds]++
+			if n == 0 {
+				dayCount[ds]++
+			}
 		}
 	}
 
 	repo.TouchPlanUpdated(planID)
-	return nil
+	return skipped, nil
 }
 
 func dueSlotsForMonth(configs []model.MaintenanceSiteConfig, month int) (fixed, flex []generateSlot) {
@@ -481,7 +500,20 @@ func UnregisteredRegionCount(configs []model.MaintenanceSiteConfig, dist []model
 	return n
 }
 
+func insertGeneratedOrSkip(repo *repository.MaintenanceRepo, planID, date string, sortOrder int, it generateSlot) (skipped int, err error) {
+	err = insertGeneratedVisit(repo, planID, date, sortOrder, it)
+	if errors.Is(err, errMonthSkip) {
+		return 1, nil
+	}
+	return 0, err
+}
+
 func insertGeneratedVisit(repo *repository.MaintenanceRepo, planID, date string, sortOrder int, it generateSlot) error {
+	if dup, err := repo.MonthDuplicate(planID, it.cfg.CustomerID, it.slot.ProductType, date, ""); err != nil {
+		return err
+	} else if dup != nil {
+		return errMonthSkip
+	}
 	cat := it.cfg.EntryCategory
 	if cat == "" {
 		if it.fixed {

@@ -91,8 +91,45 @@
   </div>
   {{end}}
   {{end}}
+  {{if eq .FilterAction "/sales"}}
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">사업 유형</label>
+    <select name="biz_type" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .BizTypes}}
+      <option value="{{.CodeValue}}" {{if eq $.BizType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">예산 연도</label>
+    <input type="number" name="budget_year" value="{{if .BudgetYear}}{{.BudgetYear}}{{end}}" class="border rounded-lg px-3 py-2 text-sm w-24">
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">예산 상태</label>
+    <select name="budget_status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .BudgetStatuses}}
+      <option value="{{.CodeValue}}" {{if eq $.BudgetStatus .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">대분류</label>
+    <select name="group_id" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
+      <option value="">전체</option>
+      {{range .Groups}}
+      <option value="{{.GroupID}}" {{if eq $.GroupID .GroupID}}selected{{end}}>{{.GroupNo}} {{.Name}}</option>
+      {{end}}
+    </select>
+  </div>
+  <label class="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
+    <input type="checkbox" name="dormant" value="1" {{if .IncludeDormant}}checked{{end}} onchange="this.form.submit()">
+    휴면 보기
+  </label>
+  {{end}}
   <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed .IncludeClosed .ContractTarget}}
+  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed .IncludeClosed .IncludeDormant .ContractTarget .BizType .BudgetYear .BudgetStatus .GroupID}}
   <a href="{{if .FilterReset}}{{.FilterReset}}{{else}}{{.FilterAction}}{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
   {{end}}
 </form>

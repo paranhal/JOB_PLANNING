@@ -57,6 +57,9 @@ func (h *SalesHandler) List(c echo.Context) error {
 	}
 	quotes, _ := h.repo.QuotesBySalesIDs(ids)
 	model.ApplySalesPipelineAmounts(items, quotes)
+	if view == "pipeline" {
+		return h.renderSalesPipeline(c, f, items)
+	}
 	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "name,stage,customer,period,amount")
 	if view == "list" && sortKey != "" {
 		sortSalesProjects(items, sortKey, dir)
@@ -85,7 +88,16 @@ func (h *SalesHandler) List(c echo.Context) error {
 	}
 	users, _ := h.userRepo.ListAssignable()
 	hidden, _ := h.repo.CountHiddenClosed(f)
+	hiddenDormant, _ := h.repo.CountHiddenDormant(f)
 	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")
+	bizTypes, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBizType)
+	budgetSt, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBudgetStatus)
+	groups, _ := h.repo.ListGroups(false)
+	groupBy := strings.TrimSpace(c.QueryParam("group_by"))
+	var groupSections []map[string]interface{}
+	if groupBy == "category" {
+		groupSections = h.salesGroupSections(items, rows, quotes, groups)
+	}
 	return c.Render(http.StatusOK, "sales/list.html", map[string]interface{}{
 		"Title": "영업 사업", "Active": NavSales,
 		"Projects": rows, "Stages": stages,
@@ -103,8 +115,11 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"NewHref": newHref, "FilterReset": resetHref,
 		"Search": f.Search, "Status": f.Status, "Stage": f.Stage,
 		"Owner": f.Owner, "Period": f.Period, "Customer": f.Customer, "AmountConfirmed": f.AmountConfirmed,
-		"IncludeClosed": f.IncludeClosed, "CloseReason": f.CloseReason, "HiddenClosed": hidden,
+		"IncludeClosed": f.IncludeClosed, "IncludeDormant": f.IncludeDormant, "CloseReason": f.CloseReason, "HiddenClosed": hidden,
+		"HiddenDormant":  hiddenDormant,
 		"ContractTarget": f.ContractTarget, "ContractTargets": targets,
+		"BizType": f.BizType, "BizTypes": bizTypes, "BudgetYear": f.BudgetYear, "BudgetStatus": f.BudgetStatus, "BudgetStatuses": budgetSt,
+		"GroupID": f.GroupID, "Groups": groups, "GroupBy": groupBy, "GroupSections": groupSections,
 		"PeriodOptions": salesPeriodOptions(time.Now()),
 		"Users":         users,
 		"FilterAction":  "/sales",
@@ -155,6 +170,37 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 	migrated, _ := h.repo.ListMigratedUnchecked()
 	closed, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true})
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
+	dormant, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeDormant: true, Status: model.SalesStatusDormant})
+	dQuotes, _ := h.repo.QuotesBySalesIDs(func() []string {
+		ids := make([]string, 0, len(dormant))
+		for i := range dormant {
+			ids = append(ids, dormant[i].SalesID)
+		}
+		return ids
+	}())
+	dN, dAmt := model.DormantSummary(dormant, model.GroupQuotesBySales(dQuotes))
+	due, _ := h.repo.ListDormantDue(ym)
+	pinned, _ := h.repo.ListPinnedGroups()
+	pinRows := make([]map[string]interface{}, 0, len(pinned))
+	pinIDs := []string{}
+	pinBy := map[string][]model.SalesProject{}
+	for i := range pinned {
+		ps, _ := h.repo.ResolveGroupProjects(&pinned[i])
+		pinBy[pinned[i].GroupID] = ps
+		for _, p := range ps {
+			pinIDs = append(pinIDs, p.SalesID)
+		}
+	}
+	pinQ, _ := h.repo.QuotesBySalesIDs(pinIDs)
+	pinQM := model.GroupQuotesBySales(pinQ)
+	for i := range pinned {
+		g := pinned[i]
+		cnt, amt, w := model.SalesGroupTotalsAllowDup(pinBy[g.GroupID], pinQM)
+		pinRows = append(pinRows, map[string]interface{}{
+			"Group": g, "Count": cnt, "Amount": model.FormatSalesMoney(int64(amt)), "Weighted": model.FormatSalesMoney(int64(w)),
+			"Href": "/sales?group_id=" + g.GroupID,
+		})
+	}
 	return c.Render(http.StatusOK, "sales/dashboard.html", map[string]interface{}{
 		"Title":         "영업 대시보드",
 		"Active":        NavSalesDashboard,
@@ -169,6 +215,9 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		"MigratedN":     len(migrated),
 		"Drop":          model.BuildSalesDropDash(closed, yearStart, today),
 		"Judge":         model.BuildSalesJudgeAccuracy(closed),
+		"DormantN":      dN, "DormantAmount": model.FormatSalesMoney(int64(dAmt)),
+		"DormantDueN":  len(due),
+		"PinnedGroups": pinRows,
 	})
 }
 
@@ -179,6 +228,7 @@ func (h *SalesHandler) New(c echo.Context) error {
 	p := &model.SalesProject{
 		IsTentativeName: true,
 		Status:          model.SalesStatusActive,
+		BudgetStatus:    model.SalesBudgetUnknown,
 	}
 	if prevID := strings.TrimSpace(c.QueryParam("prev")); prevID != "" {
 		if prev, err := h.repo.Get(prevID); err == nil && prev != nil {
@@ -208,6 +258,7 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	if err := h.repo.Create(p); err != nil {
 		return h.renderForm(c, p, false, err.Error())
 	}
+	_ = h.repo.ReplaceSalesGroups(p.SalesID, c.Request().Form["group_id"], ctxString(c, "user_name"))
 	loc := "/sales/" + p.SalesID + "?ok=created"
 	if from := strings.TrimSpace(c.FormValue("from_task")); from != "" {
 		loc = "/sales/" + p.SalesID + "?tab=timeline&from_task=" + url.QueryEscape(from) + "&ok=created"
@@ -276,45 +327,56 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	}
 	quotes, _ := h.repo.QuotesBySalesIDs([]string{p.SalesID})
 	model.ApplySalesPipelineAmount(p, quotes)
+	allGroups, _ := h.repo.ListGroups(false)
+	selGroups, _ := h.repo.GroupsContaining(p)
+	stageProg := model.BuildSalesStageProgress(p, acts, quotes, time.Now().Format("2006-01-02"))
+	showStageProg := !p.IsSupply() && (p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose)
 	return c.Render(http.StatusOK, "sales/show.html", map[string]interface{}{
 		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSales,
-		"Project":         h.viewProject(p, def),
-		"Raw":             p,
-		"WorkProjectID":   workProjectID,
-		"CanPromote":      model.CanPromoteSales(p) && workProjectID == "",
-		"ShowProgress":    !p.IsSupply() && p.Stage == model.SalesStageProposal,
-		"Progress":        model.SalesProposalProgressFrom(acts),
-		"Stages":          stages,
-		"History":         hist,
-		"Activities":      acts,
-		"Changes":         changes,
-		"Timeline":        timeline,
-		"ActivityTypes":   types,
-		"Users":           users,
-		"PartyTypes":      partyTypes,
-		"PartyRoles":      partyRoles,
-		"Parties":         parties,
-		"ActiveParties":   activeParties,
-		"InactiveParties": inactiveParties,
-		"Contacts":        contacts,
-		"Tab":             tab,
-		"ActView":         salesActView(c.QueryParam("actview")),
-		"ActGroup":        salesActGroup(c.QueryParam("group")),
-		"ActCols":         salesActivityKanban(acts, c.QueryParam("group"), types, stages),
-		"KanbanColumns":   salesActivityKanbanColumns(acts, c.QueryParam("group"), types, stages),
-		"KanbanDrag":      canWriteSales(c),
-		"KanbanDrop":      "act",
-		"KanbanHint":      "열 = 활동 유형. 카드를 끌어 옮깁니다.",
-		"FormAction":      "/sales/" + p.SalesID + "/activities",
-		"FixedSalesID":    p.SalesID,
-		"DefaultOwner":    ctxString(c, "user_name"),
-		"PartyHints":      model.CustomerPartyHintNames(parties),
-		"Today":           time.Now().Format("2006-01-02"),
-		"CanWrite":        canWriteSales(c),
-		"CanDrop":         canDropSales(c, p) && p.Status == model.SalesStatusActive,
-		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
-		"CurrentUser":     ctxString(c, "user_name"),
-		"FlashOK":         c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Project":             h.viewProject(p, def),
+		"Raw":                 p,
+		"WorkProjectID":       workProjectID,
+		"CanPromote":          model.CanPromoteSales(p) && workProjectID == "",
+		"ShowProgress":        showStageProg,
+		"Progress":            model.SalesProposalProgressFrom(acts),
+		"StageProgress":       stageProg,
+		"Stages":              stages,
+		"History":             hist,
+		"Activities":          acts,
+		"Changes":             changes,
+		"Timeline":            timeline,
+		"ActivityTypes":       types,
+		"Users":               users,
+		"PartyTypes":          partyTypes,
+		"PartyRoles":          partyRoles,
+		"Parties":             parties,
+		"ActiveParties":       activeParties,
+		"InactiveParties":     inactiveParties,
+		"Contacts":            contacts,
+		"Tab":                 tab,
+		"ActView":             salesActView(c.QueryParam("actview")),
+		"ActGroup":            salesActGroup(c.QueryParam("group")),
+		"ActCols":             salesActivityKanban(acts, c.QueryParam("group"), types, stages),
+		"KanbanColumns":       salesActivityKanbanColumns(acts, c.QueryParam("group"), types, stages),
+		"KanbanDrag":          canWriteSales(c),
+		"KanbanDrop":          "act",
+		"KanbanHint":          "열 = 활동 유형. 카드를 끌어 옮깁니다.",
+		"FormAction":          "/sales/" + p.SalesID + "/activities",
+		"FixedSalesID":        p.SalesID,
+		"DefaultOwner":        ctxString(c, "user_name"),
+		"PartyHints":          model.CustomerPartyHintNames(parties),
+		"Today":               time.Now().Format("2006-01-02"),
+		"CanWrite":            canWriteSales(c),
+		"CanDrop":             canDropSales(c, p) && p.Status == model.SalesStatusActive && !p.IsDormant(),
+		"CanSleep":            canWriteSales(c) && p.Status == model.SalesStatusActive && p.Stage != model.SalesStage4Closed,
+		"CanWake":             canWriteSales(c) && p.IsDormant(),
+		"DormantUntilDefault": model.DefaultDormantUntil(time.Now(), h.repo.DormantDefaultMonth()),
+		"SalesGroups":         selGroups,
+		"AllGroups":           allGroups,
+		"CanEditOthers":       isAdminRole(c) || isOfficeRole(c),
+		"CurrentUser":         ctxString(c, "user_name"),
+		"FlashOK":             c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Warn":           c.QueryParam("warn"),
 		"FormError":      querySalesErr(c.QueryParam("err")),
 		"FromTask":       fromTask,
 		"Memos":          memos,
@@ -366,6 +428,7 @@ func (h *SalesHandler) Update(c echo.Context) error {
 		p.SalesID = cur.SalesID
 		return h.renderForm(c, p, true, err.Error())
 	}
+	_ = h.repo.ReplaceSalesGroups(p.SalesID, c.Request().Form["group_id"], ctxString(c, "user_name"))
 	return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?ok=updated")
 }
 
@@ -388,10 +451,23 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	pageView := salesActivitiesPageView(c)
-	if pageView == "log" {
+	if pageView == "log" || pageView == "project" {
 		data, err := h.renderActivitiesLogData(c)
 		if err != nil {
 			return err
+		}
+		if pageView == "project" {
+			projects, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true})
+			acts, _ := data["Activities"].([]model.SalesActivity)
+			if acts == nil {
+				if groups, ok := data["DayGroups"].([]model.SalesActivityDayGroup); ok {
+					for _, g := range groups {
+						acts = append(acts, g.Items...)
+					}
+				}
+			}
+			data["View"] = "project"
+			data["ProjectGroups"] = model.GroupSalesActivitiesByProject(acts, projects)
 		}
 		if strings.TrimSpace(c.QueryParam("partial")) == "1" {
 			return h.renderSalesActMain(c, data)
@@ -539,7 +615,7 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 	}
 	q := c.QueryParams()
 	if q.Get("view") == "" && q.Get("display") == "" {
-		q.Set("view", "kanban")
+		q.Set("view", "pipeline")
 	}
 	loc := "/sales"
 	if enc := q.Encode(); enc != "" {
@@ -558,6 +634,16 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 	methods, _ := h.codeRepo.ActiveByGroup("sales_contract_method")
 	evals, _ := h.codeRepo.ActiveByGroup("sales_bid_eval_method")
 	malls, _ := h.codeRepo.ActiveByGroup("sales_mall_contract_type")
+	bizTypes, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBizType)
+	budgetSt, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBudgetStatus)
+	groups, _ := h.repo.ListGroups(false)
+	sel := map[string]bool{}
+	if p.SalesID != "" {
+		got, _ := h.repo.GroupsContaining(p)
+		for _, g := range got {
+			sel[g.GroupID] = true
+		}
+	}
 	title := "영업 사업 등록"
 	if isEdit {
 		title = "영업 사업 수정"
@@ -574,6 +660,7 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		"Stages": stages, "Customers": customers, "Users": users, "LeadSources": sources,
 		"ContractTargets": targets, "ProcurementRoutes": routes, "ContractMethods": methods,
 		"BidEvalMethods": evals, "MallContractTypes": malls,
+		"BizTypes": bizTypes, "BudgetStatuses": budgetSt, "Groups": groups, "SelectedGroups": sel,
 		"DisplayStage": p.DisplayStage(def),
 		"FromTask":     fromTask,
 		"ListBack":     listBack,
@@ -595,6 +682,12 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		ExpectedYMConfirmed:     c.FormValue("expected_ym_confirmed") == "1",
 		ExpectedAmount:          parseSalesAmount(c.FormValue("expected_amount")),
 		ExpectedAmountConfirmed: c.FormValue("expected_amount_confirmed") == "1",
+		AmountVATIncluded:       c.FormValue("amount_vat_included") == "1",
+		BidYM:                   strings.TrimSpace(c.FormValue("bid_ym")),
+		RevenueYM:               strings.TrimSpace(c.FormValue("revenue_ym")),
+		RevenueFrom:             strings.TrimSpace(c.FormValue("revenue_from")),
+		RevenueTo:               strings.TrimSpace(c.FormValue("revenue_to")),
+		BillingCycle:            strings.TrimSpace(c.FormValue("billing_cycle")),
 		SalesOwnerID:            strings.TrimSpace(c.FormValue("sales_owner_id")),
 		SalesOwner:              strings.TrimSpace(c.FormValue("sales_owner")),
 		Competitor:              strings.TrimSpace(c.FormValue("competitor")),
@@ -608,7 +701,16 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		BidEvalMethod:           strings.TrimSpace(c.FormValue("bid_eval_method")),
 		MallContractType:        strings.TrimSpace(c.FormValue("mall_contract_type")),
 		PrevSalesID:             strings.TrimSpace(c.FormValue("prev_sales_id")),
+		BizType:                 strings.TrimSpace(c.FormValue("biz_type")),
+		BudgetStatus:            strings.TrimSpace(c.FormValue("budget_status")),
 		Status:                  model.SalesStatusActive,
+	}
+	_ = c.Request().ParseForm()
+	if p.BudgetStatus == "" {
+		p.BudgetStatus = model.SalesBudgetUnknown
+	}
+	if y, err := strconv.Atoi(strings.TrimSpace(c.FormValue("budget_year"))); err == nil {
+		p.BudgetYear = y
 	}
 	if p.SalesOwnerID != "" && p.SalesOwner == "" && h.userRepo != nil {
 		if u, err := h.userRepo.GetByID(p.SalesOwnerID); err == nil && u != nil {
@@ -720,6 +822,7 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"AmountSource":            srcLabel,
 		"ExpectedAmountConfirmed": p.ExpectedAmountConfirmed,
 		"AmountUnconfirmed":       amountUnc,
+		"VATIncluded":             p.AmountVATIncluded,
 		"Owner":                   p.SalesOwner,
 		"Status":                  p.Status,
 		"LostReason":              p.LostReason,
@@ -736,6 +839,14 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"ConfirmedTotal":          total,
 		"ConfirmationLabel":       p.ConfirmationLabel(),
 		"Unconfirmed":             p.UnconfirmedItems(),
+		"BizType":                 p.BizType,
+		"BizTypeLabel":            model.SalesBizTypeLabel(p.BizType),
+		"BudgetYear":              p.BudgetYear,
+		"BudgetStatus":            p.BudgetStatus,
+		"BudgetStatusLabel":       model.SalesBudgetStatusLabel(p.BudgetStatus),
+		"DormantUntil":            p.DormantUntil,
+		"DormantReason":           p.DormantReason,
+		"IsDormant":               p.IsDormant(),
 	}
 }
 

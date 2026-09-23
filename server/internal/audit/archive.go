@@ -90,7 +90,11 @@ func ArchiveLogs(dataDir string) (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	st, err := tx.Prepare(`INSERT INTO data_change_logs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	st, err := tx.Prepare(`INSERT INTO data_change_logs (
+			log_id, occurred_at, user_id, username, user_name,
+			action, table_name, pk_column, entity_id, entity_label, summary,
+			before_json, after_json, rolled_back, rolled_back_at, reason
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		tx.Rollback()
 		return "", 0, err
@@ -98,7 +102,7 @@ func ArchiveLogs(dataDir string) (string, int, error) {
 	for _, r := range all {
 		if _, err := st.Exec(r.LogID, r.OccurredAt, r.UserID, r.Username, r.UserName,
 			r.Action, r.TableName, r.PKColumn, r.EntityID, r.EntityLabel, r.Summary,
-			r.BeforeJSON, r.AfterJSON, r.RolledBack, r.RolledBackAt); err != nil {
+			r.BeforeJSON, r.AfterJSON, r.RolledBack, r.RolledBackAt, ""); err != nil {
 			st.Close()
 			tx.Rollback()
 			return "", 0, err

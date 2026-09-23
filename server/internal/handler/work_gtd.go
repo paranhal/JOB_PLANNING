@@ -190,6 +190,11 @@ func (h *AdminWorkHandler) MoveKanban(c echo.Context) error {
 		strings.TrimSpace(c.FormValue("force_reason"))); code != "" {
 		return c.Redirect(http.StatusSeeOther, back+"&err="+code)
 	}
+	if to == model.WBTaskComplete {
+		if n, _ := h.repo.CountOpenSubtasks(t.TaskID); n > 0 {
+			return c.Redirect(http.StatusSeeOther, back+"&err=has_subtasks&n="+fmt.Sprintf("%d", n))
+		}
+	}
 	if err := h.repo.UpdateTask(&t); err != nil {
 		return err
 	}
@@ -363,6 +368,43 @@ func (h *WorkboardHandler) UpdateAction(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, back+"ok=action")
 }
 
+func (h *WorkboardHandler) CompleteRemainingActions(c echo.Context) error {
+	id := strings.TrimSpace(c.Param("id"))
+	t, err := h.repo.GetTask(id)
+	if err != nil || t == nil || !model.IsAdminGTDTask(*t) {
+		return echo.ErrNotFound
+	}
+	if err := denyUnlessCanEditTask(c, t); err != nil {
+		return err
+	}
+	back := actionBack(c, id)
+	if n, _ := h.repo.CountOpenSubtasks(id); n > 0 {
+		return c.Redirect(http.StatusSeeOther, back+"err=has_subtasks&n="+fmt.Sprintf("%d", n))
+	}
+	note := strings.TrimSpace(c.FormValue("complete_note"))
+	if note == "" {
+		note = "부모 완료와 함께 완료"
+	}
+	if err := h.repo.CompleteOpenRequiredActions(id, note, ctxString(c, "user_name")); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.FormValue("complete_parent")) == "1" {
+		t.Status = model.WBTaskComplete
+		t.CompleteNote = note
+		if code := model.AdminGTDErr(t.Status, t.HoldReason, t.ReviewDate, t.CancelReason,
+			t.WaitParty, t.WaitRequest, t.ReplyDueDate, t.NextCheckDate, t.CompleteNote,
+			0, 0, isAdminRole(c), false, ""); code != "" {
+			return c.Redirect(http.StatusSeeOther, back+"err="+code)
+		}
+		if err := h.repo.UpdateTask(t); err != nil {
+			return err
+		}
+		h.addCompleteActivity(id, note, ctxString(c, "user_name"))
+		return c.Redirect(http.StatusSeeOther, back+"ok=task")
+	}
+	return c.Redirect(http.StatusSeeOther, back+"ok=action")
+}
+
 func (h *WorkboardHandler) CreateActivity(c echo.Context) error {
 	id := strings.TrimSpace(c.Param("id"))
 	t, err := h.repo.GetTask(id)
@@ -439,7 +481,7 @@ func gtdFlashMsg(err, n string) string {
 	case "complete_note":
 		return "완료 시 최종 조치 내용을 입력하세요."
 	case "complete_block":
-		return "미완료 필수 다음 행동 또는 미확인 회신 대기가 있어 완료할 수 없습니다."
+		return "완료할 수 없습니다. 아래가 남아 있습니다."
 	case "force_reason":
 		return "관리자 강제 완료 사유를 입력하세요."
 	case "cancel_reason":
@@ -509,6 +551,9 @@ func (h *WorkboardHandler) renderTaskGTD(c echo.Context, data map[string]interfa
 	actions, _ := h.repo.ListActions(t.TaskID)
 	acts, _ := h.repo.ListActivities(t.TaskID)
 	openReq, unconf, _ := h.repo.AdminCompleteBlockers(t.TaskID)
+	blockers, _ := h.repo.BlockingActions(t.TaskID)
+	openSub, _ := h.repo.CountOpenSubtasks(t.TaskID)
+	subN, _ := h.repo.CountSubtasks(t.TaskID)
 	doneReq, reqTotal, _ := h.repo.CountActionProgress(t.TaskID)
 	pct, pctOK := model.ActionProgressPct(doneReq, reqTotal)
 	today := time.Now().Format("2006-01-02")
@@ -533,6 +578,10 @@ func (h *WorkboardHandler) renderTaskGTD(c echo.Context, data map[string]interfa
 	data["OpenRequired"] = openReq
 	data["UnconfirmedWait"] = unconf
 	data["CompleteBlocked"] = openReq > 0 || unconf > 0
+	data["BlockingActions"] = blockers
+	data["OpenSubtasks"] = openSub
+	data["SubtaskCount"] = subN
+	data["SubtasksAllDone"] = subN > 0 && openSub == 0
 	data["MissingNextAction"] = t.Status == model.WBTaskInProgress && len(actions) == 0
 	data["ProgressDone"] = doneReq
 	data["ProgressRequired"] = reqTotal

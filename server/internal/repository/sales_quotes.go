@@ -316,7 +316,7 @@ func (r *QuoteRepo) Revise(id, reason string) (*model.SalesQuote, error) {
 	if err := r.replaceLines(&dst); err != nil {
 		return nil, err
 	}
-	logCreate(r.db, "sales_quotes", "quote_id", dst.QuoteID, dst.DisplayNo())
+	logCreateWithReason(r.db, "sales_quotes", "quote_id", dst.QuoteID, dst.DisplayNo(), reason)
 	return &dst, nil
 }
 
@@ -392,7 +392,13 @@ func (r *QuoteRepo) SetStatus(id, status string) error {
 		return err
 	}
 	q.Status = model.NormalizeQuoteStatus(status)
-	return r.Update(q)
+	if err := r.Update(q); err != nil {
+		return err
+	}
+	if strings.TrimSpace(q.SalesID) != "" && model.NormalizeVATMode(q.VATMode) == model.QuoteVATIncluded {
+		_, _ = r.db.Exec(`UPDATE sales_projects SET amount_vat_included=1 WHERE sales_id=?`, q.SalesID)
+	}
+	return nil
 }
 
 func (r *QuoteRepo) QuoteNoTaken(no string, rev int, exceptID string) (bool, error) {
@@ -505,7 +511,17 @@ func (r *QuoteRepo) prepareSave(q *model.SalesQuote, allocNo bool) error {
 		if q.Lines[i].LaborYear == 0 {
 			q.Lines[i].LaborYear = rate.Year
 		}
-		q.Lines[i].MarkPriceOverride(rate.Monthly)
+		cmp := rate
+		if q.Lines[i].LaborYear > 0 && q.Lines[i].LaborYear != rate.Year {
+			if yr, err := r.GetLaborRateByYearJob(q.Lines[i].LaborYear, rate.JobCode); err == nil && yr != nil {
+				cmp = yr
+			}
+		} else if q.Lines[i].LaborYear > 0 {
+			if yr, err := r.GetLaborRateByYearJob(q.Lines[i].LaborYear, rate.JobCode); err == nil && yr != nil {
+				cmp = yr
+			}
+		}
+		q.Lines[i].MarkPriceOverride(cmp.Monthly)
 	}
 	if err := model.ApplyQuoteTotals(q, q.Lines); err != nil {
 		return err

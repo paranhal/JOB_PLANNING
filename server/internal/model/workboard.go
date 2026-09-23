@@ -49,6 +49,7 @@ const (
 	WBSourceAS            = "as"
 	WBSourceMaintenance   = "maintenance"
 	WBSourceSalesActivity = "sales_activity"
+	WBSourceSales         = "sales"
 )
 
 // work_tasks.assignee_source. AS 동기화는 'as' 만 덮어쓰고, 일일 업무에서 직접 바꾼 'manual' 은 유지한다. §42.3
@@ -71,7 +72,7 @@ func WBCategory(sourceType string) string {
 		return WBSourceAS
 	case WBSourceMaintenance:
 		return WBSourceMaintenance
-	case WBSourceSalesActivity, WorkPrefixSales:
+	case WBSourceSalesActivity, WBSourceSales:
 		return WBSourceSalesActivity
 	default:
 		return WBWorkAdmin
@@ -84,7 +85,7 @@ func WBCategoryLabel(cat string) string {
 		return "AS"
 	case WBSourceMaintenance:
 		return "점검"
-	case WBSourceSalesActivity, WorkPrefixSales:
+	case WBSourceSalesActivity, WBSourceSales:
 		return "영업"
 	default:
 		return "행정"

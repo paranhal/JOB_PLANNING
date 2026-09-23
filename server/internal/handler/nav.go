@@ -18,6 +18,7 @@ const (
 	NavSales            = "sales"
 	NavSalesDashboard   = "sales_dashboard"
 	NavSalesActivities  = "sales_activities"
+	NavSalesGroups      = "sales_groups"
 	NavSalesItems       = "sales_items"
 	NavQuotes           = "quotes"
 	NavOrders           = "orders"
@@ -66,6 +67,7 @@ func navSidebarKeys() []string {
 		NavSales,
 		NavSalesDashboard,
 		NavSalesActivities,
+		NavSalesGroups,
 		NavSalesItems,
 		NavQuotes,
 		NavOrders,

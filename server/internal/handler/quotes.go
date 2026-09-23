@@ -171,8 +171,12 @@ func (h *QuotesHandler) New(c echo.Context) error {
 		PaymentText:    h.setting(repository.SettingQuotePayment),
 		Lines:          []model.SalesQuoteLine{{Unit: "EA", Qty: 1}, {Unit: "EA"}, {Unit: "EA"}},
 	}
-	oh, tech := h.repo.StandardRates()
-	q.OverheadRate, q.TechFeeRate = oh, tech
+	if model.QuoteFormIsLabor(q.FormType) {
+		q.OverheadRate, q.TechFeeRate = 0, 0
+	} else {
+		oh, tech := h.repo.StandardRates()
+		q.OverheadRate, q.TechFeeRate = oh, tech
+	}
 	if q.SalesID != "" && h.sales != nil {
 		if p, err := h.sales.Get(q.SalesID); err == nil && p != nil {
 			q.RecipientName = p.CustomerValue()
@@ -182,8 +186,14 @@ func (h *QuotesHandler) New(c echo.Context) error {
 				q.OwnerName = p.SalesOwner
 				q.OwnerUserID = p.SalesOwnerID
 			}
-			q.QuoteKind = model.QuoteKindFromContractTarget(p.ContractTarget)
+			q.QuoteKind = model.QuoteKindFromBizType(p.BizType)
+			if q.QuoteKind == "" {
+				q.QuoteKind = model.QuoteKindFromContractTarget(p.ContractTarget)
+			}
 			q.FormType = model.QuoteKindForm(q.QuoteKind)
+			if model.QuoteFormIsLabor(q.FormType) {
+				q.OverheadRate, q.TechFeeRate = 0, 0
+			}
 		}
 	}
 	return h.renderForm(c, q, true, "")
@@ -382,7 +392,9 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 	if year <= 0 {
 		year = time.Now().Year()
 	}
-	rates, _ := h.repo.ListLaborRates(year)
+	use, missing, note := h.repo.ResolveLaborYear(year)
+	rates, _ := h.repo.ListLaborRates(use)
+	years, _ := h.repo.ListLaborYears()
 	var openSales []model.SalesProject
 	if h.sales != nil {
 		openSales, _ = h.sales.ListFilter(repository.SalesListFilter{})
@@ -395,11 +407,14 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 		"Units":        model.SalesItemUnits(),
 		"FlashOK":      c.QueryParam("ok"),
 		"LaborRates":   rates,
+		"LaborYearNote": note,
+		"LaborYearMissing": missing,
+		"LaborYears":   years,
+		"QuoteYear":    year,
 		"StandardOH":   oh,
 		"StandardTech": tech,
 		"OverheadDiff": model.RateDiffLabel(q.OverheadRate, oh),
 		"TechDiff":     model.RateDiffLabel(q.TechFeeRate, tech),
-		"QuoteYear":    year,
 		"OpenSales":    openSales,
 	})
 }
@@ -578,14 +593,25 @@ func (h *QuotesHandler) LaborRates(c echo.Context) error {
 	if year <= 0 {
 		year = time.Now().Year()
 	}
-	items, err := h.repo.ListLaborRates(year)
+	use, missing, note := h.repo.ResolveLaborYear(year)
+	items, err := h.repo.ListLaborRates(use)
 	if err != nil {
 		return err
 	}
-	if len(items) == 0 {
-		items, _ = h.repo.ListLaborRates(2026)
-		if year != 2026 && len(items) > 0 {
-			year = 2026
+	years, _ := h.repo.ListLaborYears()
+	nowY := time.Now().Year()
+	seen := map[int]bool{}
+	var yearOpts []int
+	for _, y := range years {
+		if !seen[y] {
+			yearOpts = append(yearOpts, y)
+			seen[y] = true
+		}
+	}
+	for _, y := range []int{nowY, nowY + 1, year} {
+		if y > 0 && !seen[y] {
+			yearOpts = append(yearOpts, y)
+			seen[y] = true
 		}
 	}
 	oh, tech := h.repo.StandardRates()
@@ -593,9 +619,12 @@ func (h *QuotesHandler) LaborRates(c echo.Context) error {
 		return c.JSON(http.StatusOK, items)
 	}
 	return c.Render(http.StatusOK, "quotes/labor_rates.html", map[string]interface{}{
-		"Title": "노임단가", "Active": NavQuotes, "Year": year, "Items": items,
-		"Overhead": oh, "TechFee": tech, "CanWrite": canWriteSales(c),
-		"FlashOK": c.QueryParam("ok"),
+		"Title": "노임단가", "Active": NavQuotes, "Year": year, "UseYear": use,
+		"MissingNote": note, "Missing": missing, "Items": items, "Years": yearOpts,
+		"Overhead": oh, "TechFee": tech, "CanWrite": canWriteSales(c) || isAdminRole(c),
+		"FlashOK": c.QueryParam("ok"), "Copied": c.QueryParam("copied"),
+		"Added": c.QueryParam("added"), "Changed": c.QueryParam("changed"),
+		"PrevYear": year - 1,
 	})
 }
 

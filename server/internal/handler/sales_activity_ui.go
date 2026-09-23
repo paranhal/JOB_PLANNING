@@ -29,6 +29,8 @@ func salesActivitiesPageView(c echo.Context) string {
 		return "kanban"
 	case "day":
 		return "day"
+	case "project":
+		return "project"
 	case "log", "list":
 		return "log"
 	}
@@ -207,6 +209,7 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"TypeChips":       chips,
 		"ChipTotal":       len(chipActs),
 		"DayGroups":       groups,
+		"Activities":      acts,
 		"HasAnyActivity":  hasAny,
 		"ShowHeaderAdd":   showHeaderAdd,
 		"MonthEmptyLabel": salesMonthEmptyLabel(month),

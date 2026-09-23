@@ -80,6 +80,35 @@
           시기 확정
         </label>
       </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">입찰 시기</label>
+          <input type="month" name="bid_ym" value="{{.Project.BidYM}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">매출 시기</label>
+          <input type="month" name="revenue_ym" value="{{.Project.RevenueYM}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">대금 주기</label>
+          <select name="billing_cycle" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">—</option>
+            <option value="once" {{if eq .Project.BillingCycle "once"}}selected{{end}}>일시</option>
+            <option value="month" {{if eq .Project.BillingCycle "month"}}selected{{end}}>월</option>
+            <option value="quarter" {{if eq .Project.BillingCycle "quarter"}}selected{{end}}>분기</option>
+            <option value="half" {{if eq .Project.BillingCycle "half"}}selected{{end}}>반기</option>
+            <option value="year" {{if eq .Project.BillingCycle "year"}}selected{{end}}>연</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">대금 시작</label>
+          <input type="month" name="revenue_from" value="{{.Project.RevenueFrom}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">대금 종료</label>
+          <input type="month" name="revenue_to" value="{{.Project.RevenueTo}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -89,6 +118,10 @@
         <label class="flex items-end gap-2 text-sm text-gray-600 pb-2">
           <input type="checkbox" name="expected_amount_confirmed" value="1" {{if .Project.ExpectedAmountConfirmed}}checked{{end}}>
           금액 확정
+        </label>
+        <label class="flex items-end gap-2 text-sm text-gray-600 pb-2">
+          <input type="checkbox" name="amount_vat_included" value="1" {{if .Project.AmountVATIncluded}}checked{{end}}>
+          VAT 포함
         </label>
       </div>
 
@@ -164,6 +197,43 @@
           </div>
         </div>
       </details>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">사업 유형</label>
+          <select name="biz_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">— 선택 —</option>
+            {{range .BizTypes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.BizType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">예산 연도</label>
+          <input name="budget_year" type="number" value="{{if .Project.BudgetYear}}{{.Project.BudgetYear}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">예산 상태</label>
+          <select name="budget_status" class="w-full border rounded-lg px-3 py-2 text-sm">
+            {{range .BudgetStatuses}}
+            <option value="{{.CodeValue}}" {{if or (eq $.Project.BudgetStatus .CodeValue) (and (eq $.Project.BudgetStatus "") (eq .CodeValue "unknown"))}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+      </div>
+      {{if .Groups}}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">사업 대분류</label>
+        <p class="text-xs text-gray-500 mb-2">저장해도 사업 칸은 바뀌지 않고 잇는 표만 바뀝니다.</p>
+        <div class="flex flex-wrap gap-2 text-sm">
+          {{range .Groups}}
+          <label class="inline-flex items-center gap-1 border rounded-lg px-2 py-1">
+            <input type="checkbox" name="group_id" value="{{.GroupID}}" {{if index $.SelectedGroups .GroupID}}checked{{end}}>
+            {{.GroupNo}} {{.Name}}
+          </label>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">경쟁사</label>
         <input name="competitor" value="{{.Project.Competitor}}" class="w-full border rounded-lg px-3 py-2 text-sm">

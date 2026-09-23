@@ -1,0 +1,66 @@
+{{define "title"}}영업 로그 관리 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-6xl mx-auto space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-gray-800">영업 로그 관리</h2>
+      <p class="text-sm text-gray-500 mt-1">사업·활동·견적·메모·관계자 변경. 이전 기록은 읽기 전용입니다.</p>
+    </div>
+    <a href="/admin/sales-logs.xlsx?{{with .Filter}}from={{.From}}&to={{.To}}&q={{.Search}}&user={{.User}}&kind={{.Kind}}{{end}}" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">엑셀</a>
+  </div>
+  <form method="get" action="/admin/sales-logs" class="bg-white rounded-xl border p-4 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end text-sm">
+    <div><label class="block text-xs text-gray-500 mb-1">시작</label><input type="date" name="from" value="{{.From}}" class="w-full border rounded-lg px-2 py-1.5"></div>
+    <div><label class="block text-xs text-gray-500 mb-1">끝</label><input type="date" name="to" value="{{.To}}" class="w-full border rounded-lg px-2 py-1.5"></div>
+    <div><label class="block text-xs text-gray-500 mb-1">사업</label><input name="q" value="{{.Search}}" placeholder="번호·이름" class="w-full border rounded-lg px-2 py-1.5"></div>
+    <div><label class="block text-xs text-gray-500 mb-1">담당자</label><input name="user" value="{{.User}}" class="w-full border rounded-lg px-2 py-1.5"></div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">종류</label>
+      <select name="kind" class="w-full border rounded-lg px-2 py-1.5">
+        <option value="">전체</option>
+        <option value="project" {{if eq .Kind "project"}}selected{{end}}>사업</option>
+        <option value="activity" {{if eq .Kind "activity"}}selected{{end}}>활동</option>
+        <option value="quote" {{if eq .Kind "quote"}}selected{{end}}>견적</option>
+        <option value="memo" {{if eq .Kind "memo"}}selected{{end}}>메모</option>
+        <option value="party" {{if eq .Kind "party"}}selected{{end}}>관계자</option>
+        <option value="legacy" {{if eq .Kind "legacy"}}selected{{end}}>이전 기록</option>
+      </select>
+    </div>
+    <button class="px-3 py-2 bg-blue-600 text-white rounded-lg">조회</button>
+  </form>
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b text-xs text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">언제</th>
+          <th class="text-left px-3 py-2">누가</th>
+          <th class="text-left px-3 py-2">무엇</th>
+          <th class="text-left px-3 py-2">항목 · 전 → 후</th>
+          <th class="text-left px-3 py-2">사유</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {{range .Rows}}
+        <tr class="align-top">
+          <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{{.OccurredAt}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.UserName}}</td>
+          <td class="px-3 py-2">
+            <div class="text-xs text-gray-500">{{.KindLabel}} · {{.ActionLabel}}</div>
+            <div class="font-medium">{{if .WhatNo}}{{.WhatNo}} {{end}}{{.WhatName}}</div>
+          </td>
+          <td class="px-3 py-2">
+            {{range .Diffs}}
+            <div class="text-xs"><span class="text-gray-500">{{.Field}}</span> {{.From}} → {{.To}}</div>
+            {{else}}
+            <div class="text-xs text-gray-400">{{.Summary}}</div>
+            {{end}}
+          </td>
+          <td class="px-3 py-2 text-xs">{{.Reason}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="px-3 py-8 text-center text-gray-400">기록이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

@@ -34,7 +34,7 @@
      }">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <p class="text-sm text-gray-500">
-      {{if eq .Status "waiting"}}할 일{{else if eq .Status "waiting_for"}}회신 대기{{else if eq .Status "in_progress"}}진행중{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "review"}}검토중{{else if eq .Status "complete"}}완료{{else if eq .Status "cancelled"}}취소{{else if eq .Status "open"}}미완료{{else if eq .Status "overdue"}}기한 초과{{else if eq .Status "today"}}오늘{{else}}전체{{end}}
+      {{if eq .Status "waiting"}}할 일{{else if eq .Status "waiting_for"}}회신 대기{{else if eq .Status "in_progress"}}진행중{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관{{else if eq .Status "review"}}검토중{{else if eq .Status "complete"}}완료{{else if eq .Status "cancelled"}}취소{{else if eq .Status "open"}}미완료{{else if eq .Status "overdue"}}기한 초과{{else if eq .Status "today"}}오늘{{else if eq .Status "stuck"}}완료 막힘 30일+{{else}}전체{{end}}
       {{.Total}}건
     </p>
     <div class="flex flex-wrap items-center gap-2">
@@ -87,6 +87,7 @@
         <option value="cancelled" {{if eq .Status "cancelled"}}selected{{end}}>취소</option>
         <option value="overdue" {{if eq .Status "overdue"}}selected{{end}}>기한 초과</option>
         <option value="today" {{if eq .Status "today"}}selected{{end}}>오늘</option>
+        <option value="stuck" {{if eq .Status "stuck"}}selected{{end}}>완료를 막는 항목이 30일 이상 남은 업무</option>
       </select>
       <input type="text" name="search" value="{{.Search}}"
              placeholder="거래처, 업무명, 담당자, 번호 검색..."

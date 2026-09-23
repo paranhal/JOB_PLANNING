@@ -61,6 +61,10 @@ const salesSelect = `
 		COALESCE(s.bid_eval_method,''), COALESCE(s.mall_contract_type,''),
 		COALESCE(s.drop_reason_code,''), COALESCE(s.drop_reason,''), COALESCE(s.dropped_at,''),
 		COALESCE(s.dropped_by,''), COALESCE(s.dropped_from_stage,''), COALESCE(s.prev_sales_id,''),
+		COALESCE(s.biz_type,''), COALESCE(s.budget_year,0), COALESCE(s.budget_status,''),
+		COALESCE(s.dormant_until,''), COALESCE(s.dormant_reason,''), COALESCE(s.dormant_at,''), COALESCE(s.dormant_by,''),
+		COALESCE(s.bid_ym,''), COALESCE(s.revenue_ym,''), COALESCE(s.revenue_from,''), COALESCE(s.revenue_to,''),
+		COALESCE(s.billing_cycle,''), COALESCE(s.amount_vat_included,0),
 		COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
 		COALESCE(cu.org_name,'')
 	FROM sales_projects s
@@ -71,17 +75,28 @@ func (r *SalesRepo) List(search, status, stage string) ([]model.SalesProject, er
 }
 
 type SalesListFilter struct {
-	Search          string
-	Status          string
-	Stage           string
-	Owner           string
-	Period          string
-	Customer        string
-	AmountConfirmed string
-	IncludeClosed   bool
-	CloseReason     string
-	ContractTarget  string
-	DealType        string
+	Search             string
+	Status             string
+	Stage              string
+	Owner              string
+	Period             string
+	Customer           string
+	AmountConfirmed    string
+	IncludeClosed      bool
+	IncludeDormant     bool
+	CloseReason        string
+	ContractTarget     string
+	ProcurementRoute   string
+	ContractMethod     string
+	BidEvalMethod      string
+	MallContractType   string
+	DealType           string
+	BizType            string
+	BudgetYear         int
+	BudgetStatus       string
+	ExpectedFrom       string
+	ExpectedTo         string
+	GroupID            string
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
@@ -96,11 +111,54 @@ func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) 
 		q += ` AND s.contract_target=?`
 		args = append(args, s)
 	}
-	if !f.IncludeClosed {
+	if s := strings.TrimSpace(f.ProcurementRoute); s != "" {
+		q += ` AND s.procurement_route=?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.ContractMethod); s != "" {
+		q += ` AND s.contract_method=?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.BidEvalMethod); s != "" {
+		q += ` AND s.bid_eval_method=?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.MallContractType); s != "" {
+		q += ` AND s.mall_contract_type=?`
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(f.BizType); s != "" {
+		q += ` AND s.biz_type=?`
+		args = append(args, s)
+	}
+	if f.BudgetYear > 0 {
+		q += ` AND s.budget_year=?`
+		args = append(args, f.BudgetYear)
+	}
+	if s := strings.TrimSpace(f.BudgetStatus); s != "" {
+		q += ` AND s.budget_status=?`
+		args = append(args, s)
+	}
+	if from := model.NormalizeSalesYM(f.ExpectedFrom); from != "" {
+		q += ` AND COALESCE(s.expected_ym,'') >= ?`
+		args = append(args, from)
+	}
+	if to := model.NormalizeSalesYM(f.ExpectedTo); to != "" {
+		q += ` AND COALESCE(s.expected_ym,'') <= ?`
+		args = append(args, to)
+	}
+	if gid := strings.TrimSpace(f.GroupID); gid != "" {
+		q += ` AND EXISTS (SELECT 1 FROM sales_group_members m WHERE m.group_id=? AND m.sales_id=s.sales_id)`
+		args = append(args, gid)
+	}
+	if !f.IncludeClosed && strings.TrimSpace(f.Status) != model.SalesStatusDormant {
 		q += ` AND COALESCE(s.status,'active') IN ('active','contracted','promoted')`
-	} else if s := strings.TrimSpace(f.CloseReason); s != "" {
+	} else if s := strings.TrimSpace(f.CloseReason); s != "" && f.IncludeClosed {
 		q += ` AND s.close_reason=?`
 		args = append(args, s)
+	}
+	if !f.IncludeDormant && strings.TrimSpace(f.Status) != model.SalesStatusDormant {
+		q += ` AND COALESCE(s.status,'active') != 'dormant'`
 	}
 	if s := strings.TrimSpace(f.Status); s != "" {
 		q += ` AND s.status=?`
@@ -208,6 +266,11 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		return err
 	}
 	normalizeSalesProject(p, stages)
+	p.BizType = model.NormalizeSalesBizType(p.BizType)
+	p.BudgetStatus = model.NormalizeSalesBudgetStatus(p.BudgetStatus)
+	if p.BudgetStatus == "" {
+		p.BudgetStatus = model.SalesBudgetUnknown
+	}
 	if strings.TrimSpace(p.Stage) == "" || !model.IsSalesStage4(p.Stage) {
 		p.Stage = model.SalesStage4Discover
 	}
@@ -248,8 +311,10 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			deal_type, po_no, delivered_at,
 			bid_status, close_reason, rfp_received_at, win_prob, probability_final,
 			awarded_amount, contract_amount, contract_target, procurement_route, contract_method,
-			bid_eval_method, mall_contract_type, prev_sales_id
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			bid_eval_method, mall_contract_type, prev_sales_id,
+			biz_type, budget_year, budget_status,
+			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
@@ -259,7 +324,9 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		p.DealType, p.PONo, p.DeliveredAt,
 		p.BidStatus, p.CloseReason, p.RFPReceivedAt, nullIntPtr(p.WinProb), nullIntPtr(p.ProbabilityFinal),
 		p.AwardedAmount, p.ContractAmount, p.ContractTarget, p.ProcurementRoute, p.ContractMethod,
-		p.BidEvalMethod, p.MallContractType, p.PrevSalesID)
+		p.BidEvalMethod, p.MallContractType, p.PrevSalesID,
+		p.BizType, p.BudgetYear, p.BudgetStatus,
+		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded))
 	if err != nil {
 		return err
 	}
@@ -296,6 +363,11 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 	normalizeSalesProject(p, stages)
 	p.Stage = old.Stage
 	p.Probability = model.SalesProbability(p)
+	p.BizType = model.NormalizeSalesBizType(p.BizType)
+	p.BudgetStatus = model.NormalizeSalesBudgetStatus(p.BudgetStatus)
+	if p.BudgetStatus == "" {
+		p.BudgetStatus = model.SalesBudgetUnknown
+	}
 	p.SalesOwner, p.SalesOwnerID = bindStaff(r.db, p.SalesOwner, p.SalesOwnerID)
 	err = touchUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, func() error {
 		_, err := r.db.Exec(`
@@ -306,8 +378,10 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 				expected_amount=?, expected_amount_confirmed=?,
 				sales_owner=?, sales_owner_id=?, competitor=?, lead_source=?, lost_reason=?,
 				notes=?, contracted_at=?, po_no=?, delivered_at=?,
-				contract_target=?, procurement_route=?, contract_method=?, bid_eval_method=?, mall_contract_type=?,
-				prev_sales_id=?, updated_at=CURRENT_TIMESTAMP
+				contract_target=?, procurement_route=?, contract_method=?, 				bid_eval_method=?, mall_contract_type=?,
+				prev_sales_id=?, biz_type=?, budget_year=?, budget_status=?,
+				bid_ym=?, revenue_ym=?, revenue_from=?, revenue_to=?, billing_cycle=?, amount_vat_included=?,
+				updated_at=CURRENT_TIMESTAMP
 			WHERE sales_id=?`,
 			p.Name, boolToInt(p.IsTentativeName), p.Probability,
 			nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
@@ -316,7 +390,8 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 			p.SalesOwner, nullStr(p.SalesOwnerID), p.Competitor, p.LeadSource, p.LostReason,
 			p.Notes, p.ContractedAt, p.PONo, p.DeliveredAt,
 			p.ContractTarget, p.ProcurementRoute, p.ContractMethod, p.BidEvalMethod, p.MallContractType,
-			p.PrevSalesID, p.SalesID)
+			p.PrevSalesID, p.BizType, p.BudgetYear, p.BudgetStatus,
+			p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded), p.SalesID)
 		return err
 	})
 	if err != nil {
@@ -494,7 +569,7 @@ type salesScanner interface {
 func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 	var p model.SalesProject
 	var override, winProb, probFinal sql.NullInt64
-	var tentative, custConf, ymConf, amtConf int
+	var tentative, custConf, ymConf, amtConf, vatInc int
 	err := row.Scan(
 		&p.SalesID, &p.Name, &tentative, &p.Stage, &p.Probability, &override,
 		&p.CustomerID, &p.ProspectName, &p.ProspectRegion, &custConf,
@@ -507,6 +582,8 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 		&p.AwardedAmount, &p.ContractAmount,
 		&p.ContractTarget, &p.ProcurementRoute, &p.ContractMethod, &p.BidEvalMethod, &p.MallContractType,
 		&p.DropReasonCode, &p.DropReason, &p.DroppedAt, &p.DroppedBy, &p.DroppedFromStage, &p.PrevSalesID,
+		&p.BizType, &p.BudgetYear, &p.BudgetStatus, &p.DormantUntil, &p.DormantReason, &p.DormantAt, &p.DormantBy,
+		&p.BidYM, &p.RevenueYM, &p.RevenueFrom, &p.RevenueTo, &p.BillingCycle, &vatInc,
 		&p.CreatedAt, &p.UpdatedAt, &p.CustomerName,
 	)
 	if err != nil {
@@ -516,6 +593,7 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 	p.CustomerConfirmed = custConf != 0
 	p.ExpectedYMConfirmed = ymConf != 0
 	p.ExpectedAmountConfirmed = amtConf != 0
+	p.AmountVATIncluded = vatInc != 0
 	if override.Valid {
 		p.HasOverride = true
 		p.OverrideValue = int(override.Int64)

@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"customer-support/internal/model"
 )
@@ -108,6 +109,121 @@ func (r *QuoteRepo) ListLaborRates(year int) ([]model.LaborRate, error) {
 		out = append(out, it)
 	}
 	return out, rows.Err()
+}
+
+func (r *QuoteRepo) ListLaborYears() ([]int, error) {
+	rows, err := r.db.Query(`SELECT DISTINCT year FROM labor_rates ORDER BY year DESC`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int
+	for rows.Next() {
+		var y int
+		if err := rows.Scan(&y); err != nil {
+			return nil, err
+		}
+		out = append(out, y)
+	}
+	return out, rows.Err()
+}
+
+func (r *QuoteRepo) ResolveLaborYear(want int) (use int, missing bool, note string) {
+	if want <= 0 {
+		want = time.Now().Year()
+	}
+	items, _ := r.ListLaborRates(want)
+	if len(items) > 0 {
+		return want, false, ""
+	}
+	years, _ := r.ListLaborYears()
+	if len(years) == 0 {
+		return want, true, fmt.Sprintf("%d년 단가 없음", want)
+	}
+	return years[0], true, fmt.Sprintf("%d년 단가 없음 — %d년 기준", want, years[0])
+}
+
+func (r *QuoteRepo) GetLaborRateByYearJob(year int, jobCode string) (*model.LaborRate, error) {
+	var it model.LaborRate
+	err := r.db.QueryRow(`
+		SELECT rate_id, year, job_code, job_name, monthly, daily, hourly,
+			COALESCE(effective_from,''), COALESCE(effective_to,''), COALESCE(source_note,'')
+		FROM labor_rates WHERE year=? AND job_code=?`, year, strings.TrimSpace(jobCode)).Scan(
+		&it.RateID, &it.Year, &it.JobCode, &it.JobName, &it.Monthly, &it.Daily, &it.Hourly,
+		&it.EffectiveFrom, &it.EffectiveTo, &it.SourceNote)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &it, nil
+}
+
+func (r *QuoteRepo) SaveLaborRates(year int, items []model.LaborRate) (added, changed int, err error) {
+	if year < 2000 {
+		return 0, 0, fmt.Errorf("연도가 필요합니다")
+	}
+	for _, it := range items {
+		code := strings.TrimSpace(it.JobCode)
+		name := strings.TrimSpace(it.JobName)
+		if code == "" || name == "" {
+			continue
+		}
+		id := fmt.Sprintf("LR%d-%s", year, code)
+		cur, _ := r.GetLaborRateByYearJob(year, code)
+		from := fmt.Sprintf("%d-01-01", year)
+		to := fmt.Sprintf("%d-12-31", year)
+		if cur == nil {
+			_, err = r.db.Exec(`
+				INSERT INTO labor_rates (rate_id, year, job_code, job_name, monthly, daily, hourly, effective_from, effective_to, source_note)
+				VALUES (?,?,?,?,?,?,?,?,?,?)`,
+				id, year, code, name, it.Monthly, it.Daily, it.Hourly, from, to, it.SourceNote)
+			if err != nil {
+				return added, changed, err
+			}
+			added++
+			continue
+		}
+		if cur.JobName == name && cur.Monthly == it.Monthly && cur.Daily == it.Daily && cur.Hourly == it.Hourly {
+			continue
+		}
+		_, err = r.db.Exec(`
+			UPDATE labor_rates SET job_name=?, monthly=?, daily=?, hourly=?, source_note=CASE WHEN TRIM(?)!='' THEN ? ELSE source_note END
+			WHERE year=? AND job_code=?`,
+			name, it.Monthly, it.Daily, it.Hourly, it.SourceNote, it.SourceNote, year, code)
+		if err != nil {
+			return added, changed, err
+		}
+		changed++
+	}
+	if added+changed > 0 {
+		logCreate(r.db, "labor_rates", "rate_id", fmt.Sprintf("LR%d", year),
+			fmt.Sprintf("노임단가 %d년 %d건 반영(추가 %d · 변경 %d)", year, added+changed, added, changed))
+	}
+	return added, changed, nil
+}
+
+func (r *QuoteRepo) CopyLaborRates(from, to int) (copied int, err error) {
+	src, err := r.ListLaborRates(from)
+	if err != nil {
+		return 0, err
+	}
+	var neu []model.LaborRate
+	for _, it := range src {
+		exist, _ := r.GetLaborRateByYearJob(to, it.JobCode)
+		if exist != nil {
+			continue
+		}
+		it.Year = to
+		it.RateID = ""
+		neu = append(neu, it)
+	}
+	added, _, err := r.SaveLaborRates(to, neu)
+	return added, err
 }
 
 func (r *QuoteRepo) GetLaborRate(id string) (*model.LaborRate, error) {

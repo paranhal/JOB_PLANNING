@@ -321,25 +321,22 @@ func TestQuotesHTTP_XlsxValuesMatchScreenNoFormula(t *testing.T) {
 	}
 	defer f.Close()
 	sheet := f.GetSheetName(0)
-	shift := 11 - 2
-	subRow := 19 + shift
-	vatRow := 20 + shift
-	totRow := 21 + shift
-	footRow := 31 + shift
+	visN := 11
+	subRow, vatRow, totRow := QuotePSumRows(visN)
 	gotSupply, _ := f.GetCellValue(sheet, cellI(subRow))
 	gotVAT, _ := f.GetCellValue(sheet, cellI(vatRow))
-	gotTotal, _ := f.GetCellValue(sheet, cellI(totRow))
+	gotTotal, _ := f.GetCellValue(sheet, "H"+strconv.Itoa(totRow))
 	if atoiCell(gotSupply) != tot.Supply || atoiCell(gotVAT) != tot.VAT || atoiCell(gotTotal) != tot.Total {
 		t.Fatalf("xlsx 공급가=%s 부가세=%s 합계=%s 화면=%d/%d/%d", gotSupply, gotVAT, gotTotal, tot.Supply, tot.VAT, tot.Total)
 	}
-	for _, addr := range []string{cellI(subRow), cellI(vatRow), cellI(totRow), "B13"} {
+	for _, addr := range []string{cellI(subRow), cellI(vatRow), "H" + strconv.Itoa(totRow), "B13"} {
 		formula, _ := f.GetCellFormula(sheet, addr)
 		if strings.TrimSpace(formula) != "" {
 			t.Fatalf("%s 에 산식이 있다: %s", addr, formula)
 		}
 	}
-	foot, _ := f.GetCellValue(sheet, "A"+strconv.Itoa(footRow))
-	if foot != model.QuoteDocNoA1 {
+	foot, _ := f.GetCellValue(sheet, "A"+strconv.Itoa(quoteFormP.footerRow()+(visN-quoteFormP.DefaultLines)))
+	if !strings.Contains(foot, "QEP-710-01") {
 		t.Fatalf("푸터=%q", foot)
 	}
 }
@@ -383,7 +380,11 @@ func cellI(row int) string {
 }
 
 func atoiCell(s string) int {
-	s = strings.TrimSpace(strings.ReplaceAll(s, ",", ""))
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, ",", "")
+	s = strings.ReplaceAll(s, "₩", "")
+	s = strings.ReplaceAll(s, "원", "")
+	s = strings.ReplaceAll(s, " ", "")
 	n, _ := strconv.Atoi(s)
 	return n
 }

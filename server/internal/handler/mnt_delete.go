@@ -125,7 +125,8 @@ func (h *MaintenanceHandler) GenerateAuto(c echo.Context) error {
 		return h.planErrRedirect(c, id, model.ErrGeneratePastMonth.Error())
 	}
 	st, _ := h.repo.AutoAssignMonthStats(id, year, month)
-	if err := service.AutoGenerateMaintenanceWithOrder(h.repo, id, order, year, month); err != nil {
+	skipped, err := service.AutoGenerateMaintenanceWithOrder(h.repo, id, order, year, month)
+	if err != nil {
 		return h.planErrRedirect(c, id, err.Error())
 	}
 	if st.DeleteCount > 0 {
@@ -144,7 +145,11 @@ func (h *MaintenanceHandler) GenerateAuto(c echo.Context) error {
 	if h.wbRepo != nil {
 		h.wbRepo.SyncMaintenanceBoard()
 	}
-	return h.planOKRedirect(c, id, "자동 배정을 반영했습니다")
+	msg := "자동 배정을 반영했습니다"
+	if skipped > 0 {
+		msg = fmt.Sprintf("자동 배정을 반영했습니다. 이미 그달에 있어 건너뜀 %d건", skipped)
+	}
+	return h.planOKRedirect(c, id, msg)
 }
 
 const planDeleteDisabledMsg = "계획은 삭제할 수 없습니다. 보관만 가능합니다."

@@ -39,6 +39,19 @@ func applySales4StageSchema(db *sql.DB) {
 		{"dropped_by", `ALTER TABLE sales_projects ADD COLUMN dropped_by TEXT NOT NULL DEFAULT ''`},
 		{"dropped_from_stage", `ALTER TABLE sales_projects ADD COLUMN dropped_from_stage TEXT NOT NULL DEFAULT ''`},
 		{"prev_sales_id", `ALTER TABLE sales_projects ADD COLUMN prev_sales_id TEXT NOT NULL DEFAULT ''`},
+		{"biz_type", `ALTER TABLE sales_projects ADD COLUMN biz_type TEXT NOT NULL DEFAULT ''`},
+		{"budget_year", `ALTER TABLE sales_projects ADD COLUMN budget_year INTEGER NOT NULL DEFAULT 0`},
+		{"budget_status", `ALTER TABLE sales_projects ADD COLUMN budget_status TEXT NOT NULL DEFAULT ''`},
+		{"dormant_until", `ALTER TABLE sales_projects ADD COLUMN dormant_until TEXT NOT NULL DEFAULT ''`},
+		{"dormant_reason", `ALTER TABLE sales_projects ADD COLUMN dormant_reason TEXT NOT NULL DEFAULT ''`},
+		{"dormant_at", `ALTER TABLE sales_projects ADD COLUMN dormant_at TEXT NOT NULL DEFAULT ''`},
+		{"dormant_by", `ALTER TABLE sales_projects ADD COLUMN dormant_by TEXT NOT NULL DEFAULT ''`},
+		{"bid_ym", `ALTER TABLE sales_projects ADD COLUMN bid_ym TEXT NOT NULL DEFAULT ''`},
+		{"revenue_ym", `ALTER TABLE sales_projects ADD COLUMN revenue_ym TEXT NOT NULL DEFAULT ''`},
+		{"revenue_from", `ALTER TABLE sales_projects ADD COLUMN revenue_from TEXT NOT NULL DEFAULT ''`},
+		{"revenue_to", `ALTER TABLE sales_projects ADD COLUMN revenue_to TEXT NOT NULL DEFAULT ''`},
+		{"billing_cycle", `ALTER TABLE sales_projects ADD COLUMN billing_cycle TEXT NOT NULL DEFAULT ''`},
+		{"amount_vat_included", `ALTER TABLE sales_projects ADD COLUMN amount_vat_included INTEGER NOT NULL DEFAULT 0`},
 	} {
 		addSalesProjectColumn(db, col.name, col.ddl)
 	}
@@ -93,9 +106,26 @@ func applySales4StageSchema(db *sql.DB) {
 			('SMC01','sales_mall_contract_type','third_party','제3자 단가계약',1,1),
 			('SMC02','sales_mall_contract_type','mas','다수공급자계약(MAS)',2,1),
 			('SMC03','sales_mall_contract_type','mas_two_stage','MAS 2단계경쟁',3,1),
+			('SBT01','sales_biz_type','build','구축',1,1),
+			('SBT02','sales_biz_type','maintenance','유지보수',2,1),
+			('SBT03','sales_biz_type','goods','물품 납품',3,1),
+			('SBT04','sales_biz_type','develop','개발',4,1),
+			('SBT05','sales_biz_type','construction','공사',5,1),
+			('SBT06','sales_biz_type','etc','기타',6,1),
+			('SBSU1','sales_budget_status','unknown','미확인',1,1),
+			('SBSU2','sales_budget_status','not_reflected','미반영',2,1),
+			('SBSU3','sales_budget_status','requesting','요청·협의 중',3,1),
+			('SBSU4','sales_budget_status','confirmed','반영 확정',4,1),
+			('SBSU5','sales_budget_status','no_plan','예산 계획 없음',5,1),
 			('SAT13','sales_activity_type','requirement','요구사항 파악',13,1),
-			('SAT14','sales_activity_type','rfp_received','RFP 접수',14,1)`,
+			('SAT14','sales_activity_type','rfp_received','RFP 접수',14,1),
+			('SBC01','sales_billing_cycle','once','일시',1,1),
+			('SBC02','sales_billing_cycle','month','월',2,1),
+			('SBC03','sales_billing_cycle','quarter','분기',3,1),
+			('SBC04','sales_billing_cycle','half','반기',4,1),
+			('SBC05','sales_billing_cycle','year','연',5,1)`,
 		`UPDATE codes SET code_name='제안서 제출' WHERE code_group='sales_activity_type' AND code_value='rfp'`,
+		`INSERT OR IGNORE INTO app_settings(setting_key, setting_value, updated_at) VALUES ('sales_dormant_default_month','6', datetime('now'))`,
 	} {
 		if _, err := db.Exec(q); err != nil {
 			if strings.Contains(err.Error(), "no such table") {
@@ -129,6 +159,7 @@ func applySales4Stage(db *sql.DB) {
 		}
 	}
 	applySalesNoV1(db)
+	applySalesGroupsSchema(db)
 }
 
 // applySalesNoV1 기존 사업에 S{YYMM}-{NNN} 을 채우고 시퀀스를 달 최댓값에 맞춘다. §47.10.3

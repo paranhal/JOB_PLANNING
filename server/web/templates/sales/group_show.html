@@ -1,0 +1,100 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-start justify-between gap-3">
+    <div>
+      <a href="/sales/groups" class="text-sm text-gray-500 hover:underline">← 대분류 목록</a>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{.Group.GroupNo}} <span class="font-sans">{{.Group.Name}}</span></h2>
+      <p class="text-sm text-gray-500">{{if .Group.Year}}{{.Group.Year}}년 · {{end}}{{if eq .Group.GroupKind "filter"}}조건형{{else}}수동{{end}} · {{.Count}}건 · {{.Amount}} · 가중 {{.Weighted}} · 평균 확도 {{.Avg}}</p>
+      {{if eq .Group.GroupKind "filter"}}
+      <p class="text-sm text-gray-600 mt-1">조건: {{.FilterN}}건 · 뺌 {{.ExcludeN}} · 넣음 {{.IncludeN}} → {{.Count}}건</p>
+      {{end}}
+    </div>
+    {{if .CanWrite}}
+    <div class="flex gap-2">
+      <a href="/sales/groups/{{.Group.GroupID}}/edit" class="px-3 py-2 border rounded-lg text-sm">수정</a>
+      {{if eq .Group.Status "active"}}
+      <form method="post" action="/sales/groups/{{.Group.GroupID}}/close" onsubmit="return confirm('종료합니다. 사업과 잇는 표는 남습니다.');">
+        <button class="px-3 py-2 border rounded-lg text-sm">종료</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+
+  {{if .CanWrite}}
+  <form method="post" action="/sales/groups/{{.Group.GroupID}}/members" class="bg-white rounded-xl border p-4 space-y-2">
+    <p class="text-sm font-medium">사업 넣기</p>
+    <p class="text-xs text-gray-500">다른 대분류에 있어도 그냥 넣습니다. 옮기는 것이 아닙니다.</p>
+    <input type="hidden" name="member_kind" value="{{if eq .Group.GroupKind "filter"}}include{{else}}manual{{end}}">
+    <div class="flex gap-2">
+      <input id="gsearch" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="사업번호·이름">
+      <button type="button" class="px-3 py-2 border rounded-lg text-sm" onclick="searchG()">검색</button>
+    </div>
+    <div id="gresults" class="text-sm space-y-1"></div>
+    <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">선택한 사업 넣기</button>
+  </form>
+  {{end}}
+
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="px-3 py-2 text-left">사업번호</th>
+          <th class="px-3 py-2 text-left">이름</th>
+          <th class="px-3 py-2 text-left">고객</th>
+          <th class="px-3 py-2 text-left">단계·상태</th>
+          <th class="px-3 py-2 text-right">확도</th>
+          <th class="px-3 py-2 text-right">금액</th>
+          <th class="px-3 py-2 text-left">매출 시기</th>
+          <th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {{range .Projects}}
+        <tr>
+          <td class="px-3 py-2 font-mono text-xs"><a class="text-blue-700 hover:underline" href="/sales/{{.SalesID}}">{{.DisplayNo}}</a></td>
+          <td class="px-3 py-2">{{.Name}}
+            {{$oid := .SalesID}}{{with index $.Others $oid}}<p class="text-[11px] text-gray-400">{{.}}</p>{{end}}
+          </td>
+          <td class="px-3 py-2">{{.CustomerValue}}</td>
+          <td class="px-3 py-2">{{.Stage}} · {{.Status}}</td>
+          <td class="px-3 py-2 text-right">{{.EffectiveProbability}}%</td>
+          <td class="px-3 py-2 text-right">{{.PipelineAmountLabel}}</td>
+          <td class="px-3 py-2">{{.PeriodLabel}}</td>
+          <td class="px-3 py-2">
+            {{if $.CanWrite}}
+            <form method="post" action="/sales/groups/{{$.Group.GroupID}}/members/{{.SalesID}}/remove" onsubmit="return confirm('이 대분류에서만 뺍니다. 사업은 그대로 남습니다.');">
+              <button class="text-xs text-rose-700">빼기</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">속한 사업이 없습니다.</td></tr>
+        {{end}}
+        <tr class="bg-gray-50 font-medium">
+          <td colspan="3" class="px-3 py-2">합계</td>
+          <td class="px-3 py-2">{{.Count}}건</td>
+          <td class="px-3 py-2 text-right">{{.Avg}}</td>
+          <td class="px-3 py-2 text-right">{{.Amount}} / 가중 {{.Weighted}}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function searchG(){
+  const q = document.getElementById('gsearch').value;
+  fetch('/sales/groups/{{.Group.GroupID}}/search-projects?q=' + encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(rows){
+      const box = document.getElementById('gresults');
+      box.innerHTML = (rows||[]).map(function(p){
+        return '<label class="flex items-center gap-2"><input type="checkbox" name="sales_id" value="'+p.sales_id+'"> '+p.sales_no+' '+p.name+'</label>';
+      }).join('') || '<p class="text-gray-400">없음</p>';
+    });
+}
+</script>
+{{end}}

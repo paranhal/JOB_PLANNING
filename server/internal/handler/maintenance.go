@@ -305,6 +305,13 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if strings.TrimSpace(v.DupReason) == "" {
+		if dup, err := h.repo.MonthDuplicate(v.PlanID, v.CustomerID, v.ProductType, v.VisitDate, v.VisitID); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		} else if dup != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, repository.ErrMonthDuplicate(dup).Error())
+		}
+	}
 	if err := h.repo.InsertVisitFull(v); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -335,6 +342,9 @@ func (h *MaintenanceHandler) AssignUnassignedSlot(c echo.Context) error {
 		PlanID: planID, VisitDate: date, CustomerID: cust,
 		ProductType: product, ProjectID: strings.TrimSpace(c.FormValue("project_id")),
 		Assignee: strings.TrimSpace(c.FormValue("assignee")), EntryCategory: "normal",
+	}
+	if err := applyVisitDupForm(c, &v); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if err := h.repo.AssignSlot(v); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -423,7 +433,25 @@ func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVi
 	if v.Completed {
 		v.CompletedDate = strings.TrimSpace(c.FormValue("completed_date"))
 	}
+	if err := applyVisitDupForm(c, &v); err != nil {
+		return v, err
+	}
 	return v, nil
+}
+
+func applyVisitDupForm(c echo.Context, v *model.MaintenanceVisit) error {
+	if v == nil {
+		return nil
+	}
+	if strings.TrimSpace(c.FormValue("confirm_dup")) != "1" {
+		return nil
+	}
+	reason := strings.TrimSpace(c.FormValue("dup_reason"))
+	if reason == "" {
+		return fmt.Errorf("그래도 추가하려면 사유를 입력하세요")
+	}
+	v.DupReason = reason
+	return nil
 }
 
 // CompleteVisit 방문 완료 표시를 켜고 끈다.

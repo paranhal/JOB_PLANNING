@@ -68,13 +68,21 @@ func auditIdent(s string) bool {
 }
 
 func logCreate(db *sql.DB, table, pk, id, label string) {
+	logCreateWithReason(db, table, pk, id, label, "")
+}
+
+func logCreateWithReason(db *sql.DB, table, pk, id, label, reason string) {
 	audit.Use(db)
-	audit.Log(audit.ActionCreate, table, pk, id, label, "", rowJSON(db, table, pk, id))
+	audit.LogWithReason(audit.ActionCreate, table, pk, id, label, "", rowJSON(db, table, pk, id), reason)
 }
 
 func logUpdate(db *sql.DB, table, pk, id, label, before string) {
+	logUpdateWithReason(db, table, pk, id, label, before, "")
+}
+
+func logUpdateWithReason(db *sql.DB, table, pk, id, label, before, reason string) {
 	audit.Use(db)
-	audit.Log(audit.ActionUpdate, table, pk, id, label, before, rowJSON(db, table, pk, id))
+	audit.LogWithReason(audit.ActionUpdate, table, pk, id, label, before, rowJSON(db, table, pk, id), reason)
 }
 
 func logDelete(db *sql.DB, table, pk, id, label, before string) {

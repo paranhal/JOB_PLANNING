@@ -235,6 +235,9 @@ func (h *MaintenanceHandler) AssignUnassignedSlots(c echo.Context) error {
 			PlanID: id, VisitDate: date, CustomerID: strings.TrimSpace(custs[i]),
 			ProductType: product, Assignee: assignee, ProjectID: project, EntryCategory: "normal",
 		}
+		if err := applyVisitDupForm(c, &v); err != nil {
+			return h.manageErrRedirect(c, id, err.Error())
+		}
 		if err := h.repo.AssignSlot(v); err != nil {
 			return h.manageErrRedirect(c, id, err.Error())
 		}

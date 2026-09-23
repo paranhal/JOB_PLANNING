@@ -20,6 +20,8 @@
         영업 사업 등록
       </a>
       {{end}}
+      <a href="/sales?group_by=category{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .GroupBy "category"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600{{end}}">대분류로 묶기</a>
     </div>
   </div>
 
@@ -39,6 +41,21 @@
   {{end}}
 
   {{template "sales_list_filters" .}}
+
+  {{if and .CanWrite (eq .View "list")}}
+  <form method="post" class="flex flex-wrap gap-2 items-end text-sm" id="bulk-form">
+    <select name="biz_type" class="border rounded-lg px-2 py-1">
+      <option value="">사업 유형</option>
+      {{range .BizTypes}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+    </select>
+    <button formaction="/sales/bulk-biz" class="px-3 py-1.5 border rounded-lg">사업 유형 한 번에 지정</button>
+    <select name="budget_status" class="border rounded-lg px-2 py-1">
+      <option value="">예산 상태</option>
+      {{range .BudgetStatuses}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
+    </select>
+    <button formaction="/sales/bulk-budget" class="px-3 py-1.5 border rounded-lg">예산 상태 한 번에 지정</button>
+  </form>
+  {{end}}
 
   {{if eq .View "kanban"}}
   {{template "kanban_board" .}}
@@ -87,6 +104,7 @@
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">
         <tr>
+          {{if $.CanWrite}}<th class="px-2 py-3"></th>{{end}}
           {{template "sort_th" (dict "Label" "사업명" "Key" "name" "Cur" $sort "Dir" $dir "Href" (index $href "name"))}}
           {{template "sort_th" (dict "Label" "단계" "Key" "stage" "Cur" $sort "Dir" $dir "Href" (index $href "stage"))}}
           {{template "sort_th" (dict "Label" "고객" "Key" "customer" "Cur" $sort "Dir" $dir "Href" (index $href "customer"))}}
@@ -96,8 +114,32 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
+        {{if $.GroupSections}}
+        {{range $.GroupSections}}
+        <tr class="bg-slate-50">
+          <td colspan="7" class="px-4 py-2 font-medium text-gray-800">
+            ▼ {{.Title}}
+            {{if not .Grand}} {{.Count}}건 · 총액 {{.Amount}} · 가중 {{.Weighted}} · 평균 확도 {{.Avg}}{{else}} {{.Count}}건 · 총액 {{.Amount}} · 가중 {{.Weighted}} · {{.DupNote}}{{end}}
+          </td>
+        </tr>
+        {{range .Rows}}
+        <tr class="hover:bg-gray-50 {{if .IsDormant}}text-gray-400{{end}}">
+          {{if $.CanWrite}}<td class="px-2 py-3"><input type="checkbox" name="sales_id" value="{{.SalesID}}" form="bulk-form"></td>{{end}}
+          <td class="px-4 py-3">
+            <a href="/sales/{{.SalesID}}" class="font-medium text-blue-700 hover:underline">{{.DisplayNo}} {{.Name}}</a>
+          </td>
+          <td class="px-4 py-3">{{.DisplayStage}}</td>
+          <td class="px-4 py-3">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3">{{if .Period}}{{.Period}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3">{{if .Amount}}{{.Amount}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-gray-600">{{.EffectiveProb}}%</td>
+        </tr>
+        {{end}}
+        {{end}}
+        {{else}}
         {{range .Projects}}
-        <tr class="hover:bg-gray-50">
+        <tr class="hover:bg-gray-50 {{if .IsDormant}}text-gray-400{{end}}">
+          {{if $.CanWrite}}<td class="px-2 py-3"><input type="checkbox" name="sales_id" value="{{.SalesID}}" form="bulk-form"></td>{{end}}
           <td class="px-4 py-3">
             <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.DisplayNo}} {{.Name}}</a>
             {{if .IsTentativeName}}<span class="ml-1 text-xs text-gray-400">미확정</span>{{end}}
@@ -118,6 +160,7 @@
           <td class="px-4 py-3 {{if .AmountUnconfirmed}}text-gray-400{{end}}">
             {{if .Amount}}{{.Amount}}{{else}}—{{end}}
             {{if .AmountSource}}<span class="ml-1 text-[11px] text-gray-500">{{.AmountSource}}</span>{{end}}
+            {{if .VATIncluded}}<span class="ml-1 text-[11px] text-gray-500">VAT 포함</span>{{else}}<span class="ml-1 text-[11px] text-gray-400">VAT 별도</span>{{end}}
             {{if .AmountUnconfirmed}}<span class="text-xs">미확정</span>{{end}}
           </td>
           <td class="px-4 py-3 text-gray-600">{{.EffectiveProb}}%</td>
@@ -128,6 +171,7 @@
           <p class="mt-2">실주·포기 사업 {{.HiddenClosed}}건이 더 있습니다 — <a class="text-blue-700 underline" href="/sales?closed=1{{if .FilterQ}}&{{.FilterQ}}{{end}}">보기</a></p>
           {{end}}
         </td></tr>
+        {{end}}
         {{end}}
       </tbody>
     </table>

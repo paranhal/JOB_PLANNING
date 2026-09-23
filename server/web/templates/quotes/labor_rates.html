@@ -1,14 +1,24 @@
 {{define "title"}}노임단가 · 고객지원시스템{{end}}
 {{define "content"}}
 <div class="max-w-4xl mx-auto space-y-4">
-  <div>
-    <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 견적</a>
-    <h2 class="text-xl font-bold text-gray-800 mt-1">SW기술자 노임단가 {{.Year}}</h2>
-    <p class="text-sm text-gray-500">한국소프트웨어산업협회 공표. 견적 화면은 이 표의 표준 요율로 시작합니다.</p>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 견적</a>
+      <h2 class="text-xl font-bold text-gray-800 mt-1">SW기술자 노임단가 {{.Year}}</h2>
+      <p class="text-sm text-gray-500">연도별로 저장합니다. 다른 연도 값은 건드리지 않습니다.</p>
+    </div>
+    <a href="/labor-rates/upload?year={{.Year}}" class="px-3 py-1.5 text-sm border rounded-lg">엑셀 올리기</a>
   </div>
-  {{if eq .FlashOK "saved"}}
-  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">표준 요율을 저장했습니다. 이미 만든 견적 금액은 바뀌지 않습니다.</div>
+  {{if .MissingNote}}<div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">{{.MissingNote}}</div>{{end}}
+  {{if or (eq .FlashOK "saved") (eq .FlashOK "rows") (eq .FlashOK "copy") (eq .FlashOK "upload")}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.{{if .Added}} 추가 {{.Added}}{{end}}{{if .Changed}} · 변경 {{.Changed}}{{end}}{{if .Copied}} · 복사 {{.Copied}}{{end}}</div>
   {{end}}
+  <form method="get" action="/labor-rates" class="flex items-center gap-2 text-sm">
+    <label>연도</label>
+    <select name="year" class="border rounded-lg px-2 py-1.5" onchange="this.form.submit()">
+      {{range .Years}}<option value="{{.}}" {{if eq $.Year .}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+  </form>
   {{if .CanWrite}}
   <form method="post" action="/labor-rates" class="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
     <div>
@@ -21,8 +31,16 @@
     </div>
     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">표준 요율 저장</button>
   </form>
+  <form method="post" action="/labor-rates/copy" class="flex flex-wrap items-end gap-2 text-sm">
+    <input type="hidden" name="to" value="{{.Year}}">
+    <label>전년 복사</label>
+    <input name="from" value="{{.PrevYear}}" class="w-24 border rounded-lg px-2 py-1.5">
+    <button class="px-3 py-1.5 border rounded-lg">복사</button>
+    <span class="text-xs text-gray-500">이미 있는 직무는 덮지 않습니다.</span>
+  </form>
   {{end}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+  <form method="post" action="/labor-rates/rows" class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <input type="hidden" name="year" value="{{.Year}}">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b"><tr>
         <th class="text-left px-4 py-2 text-xs text-gray-500">코드</th>
@@ -34,17 +52,27 @@
       <tbody class="divide-y">
         {{range .Items}}
         <tr>
-          <td class="px-4 py-2 font-mono text-xs">{{.JobCode}}</td>
-          <td class="px-4 py-2">{{.JobName}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{won .Monthly}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{won .Daily}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{won .Hourly}}</td>
+          <td class="px-4 py-2"><input name="job_code" value="{{.JobCode}}" class="w-16 font-mono text-xs border rounded px-1 py-1" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2"><input name="job_name" value="{{.JobName}}" class="w-full border rounded px-2 py-1" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 text-right"><input name="monthly" value="{{.Monthly}}" class="w-32 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 text-right"><input name="daily" value="{{.Daily}}" class="w-28 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 text-right"><input name="hourly" value="{{.Hourly}}" class="w-24 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
         </tr>
         {{else}}
-        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">해당 연도 표가 없습니다.</td></tr>
+        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">해당 연도 표가 없습니다. 전년 복사 또는 엑셀 올리기를 하세요.</td></tr>
+        {{end}}
+        {{if .CanWrite}}
+        <tr>
+          <td class="px-4 py-2"><input name="job_code" placeholder="18" class="w-16 font-mono text-xs border rounded px-1 py-1"></td>
+          <td class="px-4 py-2"><input name="job_name" placeholder="새 직무" class="w-full border rounded px-2 py-1"></td>
+          <td class="px-4 py-2"><input name="monthly" class="w-32 text-right border rounded px-2 py-1"></td>
+          <td class="px-4 py-2"><input name="daily" class="w-28 text-right border rounded px-2 py-1"></td>
+          <td class="px-4 py-2"><input name="hourly" class="w-24 text-right border rounded px-2 py-1"></td>
+        </tr>
         {{end}}
       </tbody>
     </table>
-  </div>
+    {{if .CanWrite}}<div class="p-3 border-t"><button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">이 연도 저장</button></div>{{end}}
+  </form>
 </div>
 {{end}}

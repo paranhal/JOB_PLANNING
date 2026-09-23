@@ -1666,6 +1666,12 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther,
 				"/workboard/tasks/"+id+"?err="+code+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 		}
+		if t.Status == model.WBTaskComplete {
+			if n, _ := h.repo.CountOpenSubtasks(id); n > 0 {
+				return c.Redirect(http.StatusSeeOther,
+					"/workboard/tasks/"+id+"?err=has_subtasks&n="+fmt.Sprintf("%d", n)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+			}
+		}
 	} else {
 		copyAdminGTDFields(t, existing)
 	}

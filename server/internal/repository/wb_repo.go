@@ -371,6 +371,17 @@ func (r *WBRepo) ListAdminWorkSorted(status, search, sort, dir string) ([]model.
 		today := time.Now().Format("2006-01-02")
 		q += ` AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') = ?`
 		args = append(args, today)
+	case "stuck":
+		q += ` AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+			AND EXISTS (
+				SELECT 1 FROM work_actions a
+				WHERE a.task_id = t.task_id
+				  AND (
+					(COALESCE(a.required,1)=1 AND COALESCE(a.status,'todo') NOT IN ('complete','cancelled'))
+					OR (COALESCE(a.status,'')='waiting' AND COALESCE(a.confirmed,0)=0)
+				  )
+				  AND datetime(COALESCE(a.created_at, a.updated_at)) <= datetime('now','-30 days')
+			)`
 	}
 	search = strings.TrimSpace(search)
 	if search != "" {

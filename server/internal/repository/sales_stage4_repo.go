@@ -67,6 +67,9 @@ func (r *SalesRepo) ChangeStage(id, toStage, reason, byID, byName string, keepOv
 		p.Stage = model.SalesStage4Bid
 		p.BidStatus = model.SalesBidPending
 		p.ProbabilityFinal = model.IntPtr(freeze)
+		if strings.TrimSpace(p.BidYM) == "" {
+			p.BidYM = time.Now().Format("2006-01")
+		}
 	case from == model.SalesStage4Propose && toStage == model.SalesStage4Discover:
 		if reason == "" {
 			return fmt.Errorf("단계를 되돌릴 때는 사유가 필요합니다")
@@ -161,6 +164,13 @@ func (r *SalesRepo) CloseContracted(id, contractedAt string, amount int, byID, b
 	p.Status = model.SalesStatusContracted
 	p.ContractedAt = contractedAt
 	p.ContractAmount = amount
+	if strings.TrimSpace(p.RevenueYM) == "" {
+		if ym := model.NormalizeSalesYM(p.RevenueFrom); ym != "" {
+			p.RevenueYM = ym
+		} else if len(contractedAt) >= 7 {
+			p.RevenueYM = contractedAt[:7]
+		}
+	}
 	p.Probability = model.SalesProbability(p)
 	return r.commitSalesStage(p, from, p.Stage, "", model.SalesCloseContracted, byID, byName)
 }
@@ -272,7 +282,7 @@ func (r *SalesRepo) commitSalesStage(p *model.SalesProject, from, to, reason, de
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	logUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, before)
+	logUpdateWithReason(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, before, reason)
 	return nil
 }
 
@@ -282,12 +292,12 @@ func updateSalesStageRow(tx *sql.Tx, p *model.SalesProject) error {
 			stage=?, bid_status=?, close_reason=?, status=?, probability=?,
 			win_prob=?, probability_final=?, rfp_received_at=?,
 			won_at=?, contracted_at=?, awarded_amount=?, contract_amount=?,
-			lost_reason=?, updated_at=CURRENT_TIMESTAMP
+			lost_reason=?, bid_ym=?, revenue_ym=?, updated_at=CURRENT_TIMESTAMP
 		WHERE sales_id=?`,
 		p.Stage, p.BidStatus, p.CloseReason, p.Status, p.Probability,
 		nullIntPtr(p.WinProb), nullIntPtr(p.ProbabilityFinal), p.RFPReceivedAt,
 		p.WonAt, p.ContractedAt, p.AwardedAmount, p.ContractAmount,
-		p.LostReason, p.SalesID)
+		p.LostReason, p.BidYM, p.RevenueYM, p.SalesID)
 	return err
 }
 

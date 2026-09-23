@@ -32,10 +32,12 @@
            class="px-3 py-1.5 {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
       </div>
       {{if ne .View "kanban"}}
+      <a href="/sales/activities?view=project{{if .LogQuery}}&{{.LogQuery}}{{end}}"
+         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "project"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">사업별</a>
       <a href="/sales/activities{{if .LogQuery}}?{{.LogQuery}}{{end}}"
-         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "log"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">로그</a>
+         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "log"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">일자별</a>
       <a href="/sales/activities?view=day{{if .Date}}&date={{.Date}}{{end}}{{.FilterQ}}"
-         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "day"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">일일</a>
+         class="px-2.5 py-1 text-xs rounded-lg {{if eq .View "day"}}bg-gray-800 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">담당자별</a>
       {{end}}
       {{if and .CanWrite .ShowHeaderAdd}}
       <button type="button" class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg" @click="startCreate()">+ 활동 추가</button>
@@ -63,6 +65,30 @@
     {{template "kanban_board" .}}
   </div>
   {{template "sales_dnd" .}}
+  {{else if eq .View "project"}}
+  <div class="space-y-2">
+    {{range .ProjectGroups}}
+    <details class="bg-white rounded-xl border">
+      <summary class="cursor-pointer px-4 py-3 flex flex-wrap items-center gap-2 text-sm">
+        <span class="font-mono text-xs text-gray-500">{{.SalesNo}}</span>
+        <span class="font-medium">{{.Name}}</span>
+        <span class="text-xs text-gray-500">{{.StageLabel}}{{if not .StageLabel}}{{.Stage}}{{end}}</span>
+        <span class="text-xs text-gray-400 ml-auto">마지막 {{.LastDate}} · {{.Count}}건</span>
+      </summary>
+      <div class="border-t divide-y">
+        {{range .Items}}
+        <div class="px-4 py-2 text-sm flex gap-3">
+          <span class="text-xs text-gray-500 w-28 shrink-0">{{.ActivityDate}} {{.StartTime}}</span>
+          <span class="text-xs text-gray-500 w-16 shrink-0">{{.TypeLabel}}</span>
+          <span>{{.Title}}</span>
+        </div>
+        {{end}}
+      </div>
+    </details>
+    {{else}}
+    <p class="text-sm text-gray-400 py-8 text-center">활동이 없습니다.</p>
+    {{end}}
+  </div>
   {{else if eq .View "day"}}
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
     {{if eq (len .DayColumns) 0}}

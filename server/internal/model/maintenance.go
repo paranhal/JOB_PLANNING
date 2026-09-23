@@ -49,6 +49,7 @@ type MaintenanceVisit struct {
 	ProjectName   string // JOIN work_projects
 	Completed     bool   // 방문 완료 여부
 	CompletedDate string // 실제 방문일 (미입력 시 예정일)
+	DupReason     string
 }
 
 // DoneOn 완료 표시에 쓸 날짜 — 실제 방문일이 없으면 예정일을 쓴다.

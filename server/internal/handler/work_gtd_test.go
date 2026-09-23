@@ -41,6 +41,7 @@ func newGTDServer(t *testing.T) (*echo.Echo, *repository.WBRepo) {
 	wb.GET("/tasks/:id/edit", h.Workboard.EditTask)
 	wb.GET("/tasks/:id", h.Workboard.ShowTask)
 	wb.POST("/tasks/:id/update", h.Workboard.UpdateTask)
+	wb.POST("/tasks/:id/complete-remaining", h.Workboard.CompleteRemainingActions)
 	wb.POST("/tasks/:id/actions", h.Workboard.CreateAction)
 	wb.POST("/tasks/:id/actions/:aid/update", h.Workboard.UpdateAction)
 	wb.POST("/tasks/:id/activities", h.Workboard.CreateActivity)
@@ -153,8 +154,11 @@ func TestAdminWorkCompleteBlockedByRequiredAction(t *testing.T) {
 		t.Fatalf("상세 status=%d", show.Code)
 	}
 	body := show.Body.String()
-	if strings.Contains(body, "다음 행동") {
-		t.Fatal("조치 화면에 다음 행동이 남아 있음")
+	if !strings.Contains(body, "완료할 수 없습니다. 아래가 남아 있습니다.") {
+		t.Fatal("막는 목록 안내 없음")
+	}
+	if !strings.Contains(body, "「초안」") {
+		t.Fatal("남은 다음 행동 제목 없음")
 	}
 	if !strings.Contains(body, "조치 이력") {
 		t.Fatal("조치 이력 없음")
@@ -550,5 +554,52 @@ func TestSection336ActionVsEdit(t *testing.T) {
 	got, _ = repo.GetTask(task.TaskID)
 	if got == nil || got.Title != "등록에서수정" {
 		t.Fatalf("등록 수정 실패 %+v", got)
+	}
+}
+
+func TestAdminWorkCompleteRemainingAndParent(t *testing.T) {
+	e, repo := newGTDServer(t)
+	parent := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "부모", DueDate: "2026-08-20",
+		WorkDate: "2026-08-20", StartTime: "09:00", EndTime: "09:30", Status: model.WBTaskInProgress}
+	if err := repo.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	child := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "하위", DueDate: "2026-08-21",
+		Status: model.WBTaskComplete, ParentTaskID: parent.TaskID}
+	if err := repo.CreateTask(child); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateAction(&model.WorkAction{TaskID: parent.TaskID, Title: "청구 서류 검토", Required: true}); err != nil {
+		t.Fatal(err)
+	}
+	block := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/update", url.Values{
+		"title": {parent.Title}, "due_date": {parent.DueDate}, "work_date": {parent.WorkDate},
+		"start_time": {parent.StartTime}, "end_time": {parent.EndTime},
+		"status": {"complete"}, "complete_note": {"마무리"}, "work_type": {"admin"}, "priority": {"normal"},
+	})
+	if block.Code != http.StatusSeeOther || !strings.Contains(block.Header().Get("Location"), "err=complete_block") {
+		t.Fatalf("막힘 loc=%q", block.Header().Get("Location"))
+	}
+	show := doGet(t, e, "/workboard/tasks/"+parent.TaskID)
+	if show.Code != http.StatusOK || !strings.Contains(show.Body.String(), "하위 업무 1건이 모두 끝났습니다") {
+		t.Fatalf("하위 완료 안내 없음 status=%d body=%s", show.Code, show.Body.String())
+	}
+	if !strings.Contains(show.Body.String(), "「청구 서류 검토」") {
+		t.Fatal("막는 목록 없음")
+	}
+	done := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/complete-remaining", url.Values{
+		"complete_parent": {"1"},
+		"complete_note":   {"마무리"},
+	})
+	if done.Code != http.StatusSeeOther || strings.Contains(done.Header().Get("Location"), "err=") {
+		t.Fatalf("한 번에 완료 loc=%q", done.Header().Get("Location"))
+	}
+	got, _ := repo.GetTask(parent.TaskID)
+	if got == nil || got.Status != model.WBTaskComplete {
+		t.Fatalf("부모 미완료 %+v", got)
+	}
+	acts, _ := repo.ListActions(parent.TaskID)
+	if len(acts) != 1 || acts[0].Status != model.WBActionComplete {
+		t.Fatalf("다음 행동 미완료 %+v", acts)
 	}
 }

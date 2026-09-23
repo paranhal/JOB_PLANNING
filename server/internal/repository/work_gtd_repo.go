@@ -201,7 +201,45 @@ func (r *WBRepo) CreateActivity(a *model.WorkActivity) error {
 	return nil
 }
 
-// AdminCompleteBlockers 미완료 필수 다음 행동·미확인 회신 대기 건수.
+func (r *WBRepo) BlockingActions(taskID string) ([]model.WorkAction, error) {
+	actions, err := r.ListActions(taskID)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.WorkAction
+	for _, a := range actions {
+		openReq := a.Required && a.Status != model.WBActionComplete && a.Status != model.WBActionCancelled
+		unconf := a.Status == model.WBActionWaiting && !a.Confirmed && a.Status != model.WBActionCancelled
+		if openReq || unconf {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (r *WBRepo) CompleteOpenRequiredActions(taskID, note, actor string) error {
+	acts, err := r.BlockingActions(taskID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(note) == "" {
+		note = "부모 완료와 함께 완료"
+	}
+	for i := range acts {
+		a := acts[i]
+		a.Status = model.WBActionComplete
+		a.Confirmed = true
+		if err := r.UpdateAction(&a); err != nil {
+			return err
+		}
+		_ = r.CreateActivity(&model.WorkActivity{
+			TaskID: taskID, ActionID: a.ActionID, ActivityType: model.WBActivityDone,
+			Content: note, Actor: actor, SpentMinutes: model.WBActivityDefaultSpent,
+		})
+	}
+	return r.SyncAdminActionProgress(taskID)
+}
+
 func (r *WBRepo) AdminCompleteBlockers(taskID string) (openRequired, unconfirmedWait int, err error) {
 	openRequired, err = r.CountOpenRequiredActions(taskID)
 	if err != nil {

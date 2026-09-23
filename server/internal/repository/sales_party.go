@@ -151,12 +151,10 @@ func (r *SalesRepo) CreateParty(p *model.SalesParty, byName string) error {
 		return err
 	}
 	r.fillPartyLabels(p)
-	if err := insertSalesChangeTx(tx, p.SalesID, model.SalesChangeParty, "", p.ChangeLabel(), byName, ""); err != nil {
-		return err
-	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	logCreate(r.db, "sales_parties", "party_id", p.PartyID, p.ChangeLabel())
 	return nil
 }
 
@@ -217,10 +215,12 @@ func (r *SalesRepo) ReplaceParty(oldID string, neu *model.SalesParty, reason, by
 	}
 	r.fillPartyLabels(old)
 	r.fillPartyLabels(neu)
-	if err := insertSalesChangeTx(tx, old.SalesID, model.SalesChangeParty, old.ChangeLabel(), neu.ChangeLabel(), byName, reason); err != nil {
+	if err := tx.Commit(); err != nil {
 		return err
 	}
-	return tx.Commit()
+	logUpdateWithReason(r.db, "sales_parties", "party_id", neu.PartyID, neu.ChangeLabel(),
+		rowJSON(r.db, "sales_parties", "party_id", old.PartyID), reason)
+	return nil
 }
 
 func (r *SalesRepo) LinkPartyContact(partyID, contactID, byName string) error {
@@ -252,11 +252,13 @@ func (r *SalesRepo) LinkPartyContact(partyID, contactID, byName string) error {
 	if p.OrgName == "" {
 		p.OrgName = ct.OrgName
 	}
-	_, err = r.db.Exec(`
-		UPDATE sales_parties SET contact_id=?, person_name=?, title=?, phone=?, email=?, org_name=?, is_auto=0
-		WHERE party_id=?`,
-		contactID, p.PersonName, p.Title, p.Phone, p.Email, p.OrgName, p.PartyID)
-	return err
+	return touchUpdate(r.db, "sales_parties", "party_id", p.PartyID, p.ChangeLabel(), func() error {
+		_, err = r.db.Exec(`
+			UPDATE sales_parties SET contact_id=?, person_name=?, title=?, phone=?, email=?, org_name=?, is_auto=0
+			WHERE party_id=?`,
+			contactID, p.PersonName, p.Title, p.Phone, p.Email, p.OrgName, p.PartyID)
+		return err
+	})
 }
 
 func (r *SalesRepo) ListChanges(salesID string) ([]model.SalesChange, error) {
@@ -332,25 +334,14 @@ func (r *SalesRepo) insertChange(salesID, field, oldV, newV, by, note string) er
 }
 
 func insertSalesChangeTx(tx *sql.Tx, salesID, field, oldV, newV, by, note string) error {
-	if strings.TrimSpace(oldV) == strings.TrimSpace(newV) {
-		return nil
-	}
-	n, err := nextSeqTx(tx, "sales_change")
-	if err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return nil
-		}
-		return err
-	}
-	id := fmt.Sprintf("SC-%03d", n)
-	_, err = tx.Exec(`
-		INSERT INTO sales_changes (change_id, sales_id, field_key, old_value, new_value, changed_by, note)
-		VALUES (?,?,?,?,?,?,?)`,
-		id, salesID, field, strings.TrimSpace(oldV), strings.TrimSpace(newV), strings.TrimSpace(by), strings.TrimSpace(note))
-	if err != nil && strings.Contains(err.Error(), "no such table") {
-		return nil
-	}
-	return err
+	_ = tx
+	_ = salesID
+	_ = field
+	_ = oldV
+	_ = newV
+	_ = by
+	_ = note
+	return nil
 }
 
 func normalizeSalesParty(p *model.SalesParty) {

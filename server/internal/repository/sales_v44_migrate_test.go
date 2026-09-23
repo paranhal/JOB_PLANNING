@@ -22,6 +22,8 @@ func TestSales4StageSchemaAddsColumnsAndCodes(t *testing.T) {
 		"awarded_amount", "contract_amount", "contract_target", "procurement_route", "contract_method",
 		"bid_eval_method", "mall_contract_type", "drop_reason_code", "drop_reason", "dropped_at",
 		"dropped_by", "dropped_from_stage", "prev_sales_id",
+		"biz_type", "budget_year", "budget_status",
+		"dormant_until", "dormant_reason", "dormant_at", "dormant_by",
 	} {
 		if !salesProjectsHasColumn(db, col) {
 			t.Fatalf("sales_projects.%s 없음", col)
