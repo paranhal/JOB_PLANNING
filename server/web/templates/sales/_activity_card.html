@@ -7,7 +7,7 @@
     <div class="min-w-0 flex items-start gap-2">
       <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold {{$a.TypeBadgeClass}}">{{if $a.TypeLabel}}{{$a.TypeLabel}}{{else}}{{$a.ActivityType}}{{end}}</span>
       {{if not $hide}}
-      <a href="/sales/{{$a.SalesID}}" class="text-sm font-semibold text-blue-700 hover:underline truncate">{{if $a.SalesName}}{{$a.SalesName}}{{else}}{{$a.Title}}{{end}}</a>
+      <a href="/sales/{{$a.SalesID}}" class="text-sm font-semibold text-blue-700 hover:underline truncate">{{if $a.SalesNo}}{{$a.SalesNo}} {{end}}{{if $a.SalesName}}{{$a.SalesName}}{{else}}{{$a.Title}}{{end}}</a>
       {{else}}
       <p class="text-sm font-semibold text-gray-800 truncate">{{$a.Title}}</p>
       {{end}}

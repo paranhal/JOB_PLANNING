@@ -48,6 +48,7 @@ var (
 type SalesQuote struct {
 	QuoteID        string
 	SalesID        string
+	SalesNo        string
 	QuoteNo        string
 	Rev            int
 	FormType       string
@@ -436,8 +437,12 @@ func FillQuoteKanban(items []SalesQuote) KanbanView {
 			continue
 		}
 		seen[id] = true
+		ref := q.DisplayNo()
+		if s := q.SalesDisplayNo(); s != "" {
+			ref = s + " / " + ref
+		}
 		cols[j].Items = append(cols[j].Items, KanbanCard{
-			ID: id, RefID: id, RefNumber: q.DisplayNo(), Title: q.Title,
+			ID: id, RefID: id, RefNumber: ref, Title: q.Title,
 			Href: "/quotes/" + id, EditHref: "/quotes/" + id + "/edit",
 			OrgName: q.RecipientName, Extra: formatSalesAmount(q.Total) + "원",
 			Bucket: b, AmountDesc: q.Total,
@@ -508,6 +513,16 @@ func (q *SalesQuote) DisplayNo() string {
 		return fmt.Sprintf("%s (r%d)", no, q.Rev)
 	}
 	return no
+}
+
+func (q *SalesQuote) SalesDisplayNo() string {
+	if q == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(q.SalesNo); s != "" {
+		return s
+	}
+	return strings.TrimSpace(q.SalesID)
 }
 
 func (q *SalesQuote) QuoteYear() int {

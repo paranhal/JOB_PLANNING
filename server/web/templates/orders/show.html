@@ -4,7 +4,7 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <a href="/orders" class="text-sm text-gray-500 hover:underline">← 목록</a>
-      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{.Order.DisplayNo}}</h2>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{if .Order.SalesDisplayNo}}{{.Order.SalesDisplayNo}} / {{end}}{{.Order.DisplayNo}}</h2>
       <p class="text-sm text-gray-500 mt-1">{{.Order.OrderDate}} · {{orderStatusLabel .Order.Status}} · {{vatModeLabel .Order.VATMode}}</p>
       {{if .Differs}}
       <p class="mt-2"><span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800">견적과 다름</span></p>

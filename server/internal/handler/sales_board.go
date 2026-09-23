@@ -273,9 +273,13 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 			continue
 		}
 		seen[p.SalesID] = true
-		title := p.Name
+		title := p.DisplayNo()
+		if title != "" {
+			title += " · "
+		}
+		title += p.Name
 		if p.IsTentativeName {
-			title = p.Name + " (가칭)"
+			title = title + " (가칭)"
 		}
 		href := "/sales/" + p.SalesID
 		if fromTask != "" {

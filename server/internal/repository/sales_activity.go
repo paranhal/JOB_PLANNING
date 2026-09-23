@@ -16,7 +16,7 @@ const salesActivitySelect = `
 		COALESCE(a.our_members,''), COALESCE(a.counterparts,''),
 		COALESCE(a.next_action,''), COALESCE(a.next_action_date,''),
 		COALESCE(a.stage_at_time,''), COALESCE(a.created_by,''), COALESCE(a.created_at,''),
-		COALESCE(s.name,''),
+		COALESCE(s.name,''), COALESCE(s.sales_no,''),
 		COALESCE(NULLIF(TRIM(cu.org_name),''), NULLIF(TRIM(s.prospect_name),''), '')
 	FROM sales_activities a
 	LEFT JOIN sales_projects s ON s.sales_id = a.sales_id
@@ -739,7 +739,7 @@ func scanSalesActivity(sc activityScanner) (*model.SalesActivity, error) {
 		&a.ActivityID, &a.SalesID, &a.ActivityDate, &a.StartTime, &a.DurationMin, &a.ActivityType,
 		&a.Title, &a.Content, &a.Place, &a.OurMembers, &a.Counterparts,
 		&a.NextAction, &a.NextActionDate, &a.StageAtTime, &a.CreatedBy, &a.CreatedAt,
-		&a.SalesName, &a.CustomerName)
+		&a.SalesName, &a.SalesNo, &a.CustomerName)
 	if err != nil {
 		return nil, err
 	}

@@ -55,6 +55,7 @@ type SalesTimelineAxis struct {
 
 type SalesTimelineRow struct {
 	SalesID     string
+	DisplayNo   string
 	Name        string
 	YM          string
 	Period      string
@@ -354,6 +355,7 @@ func BuildSalesTimelineAxis(projects []SalesProject, stages []SalesStageDef, now
 		def := FindSalesStage(stages, p.Stage)
 		row := SalesTimelineRow{
 			SalesID:    p.SalesID,
+			DisplayNo:  p.DisplayNo(),
 			Name:       p.Name,
 			YM:         NormalizeSalesYM(p.ExpectedYM),
 			Period:     p.PeriodLabel(),

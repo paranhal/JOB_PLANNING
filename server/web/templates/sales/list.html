@@ -59,7 +59,7 @@
         {{range .Timeline.Rows}}
         <tr>
           <td class="px-3 py-2 sticky left-0 bg-white z-10">
-            <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.Name}}</a>
+            <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.DisplayNo}} {{.Name}}</a>
             <p class="text-[11px] text-gray-400">{{.StageLabel}}</p>
           </td>
           <td class="px-3 py-2 text-center">
@@ -99,7 +99,7 @@
         {{range .Projects}}
         <tr class="hover:bg-gray-50">
           <td class="px-4 py-3">
-            <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.Name}}</a>
+            <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.DisplayNo}} {{.Name}}</a>
             {{if .IsTentativeName}}<span class="ml-1 text-xs text-gray-400">미확정</span>{{end}}
           </td>
           <td class="px-4 py-3 {{if or (eq .CloseReason "lost") (eq .CloseReason "dropped")}}text-gray-400{{end}}">

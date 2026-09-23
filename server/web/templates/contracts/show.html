@@ -4,7 +4,7 @@
   <div>
     <a href="/contracts" class="text-sm text-gray-500 hover:underline">← 계약 목록</a>
     <h2 class="text-xl font-bold text-gray-800 mt-1">{{.Project.Name}}</h2>
-    <p class="text-sm text-gray-500">{{.Project.ContractNoLabel}} · {{.Life}}</p>
+    <p class="text-sm text-gray-500">{{if .Project.SalesNo}}{{.Project.SalesNo}} · {{end}}{{.Project.ContractNoLabel}} · {{.Life}}</p>
   </div>
   <div class="bg-white rounded-xl border p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
     <div><span class="text-gray-500">계약기간</span> <span>{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</span></div>

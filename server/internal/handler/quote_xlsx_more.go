@@ -67,7 +67,7 @@ func fillQuoteHeaderA(f *excelize.File, sheet string, q *model.SalesQuote, compa
 		recipient += " 귀중"
 	}
 	_ = f.SetCellValue(sheet, "A4", recipient)
-	_ = f.SetCellValue(sheet, "E4", "견적번호 : "+q.DisplayNo())
+	_ = f.SetCellValue(sheet, "E4", "견적번호 : "+quoteSheetNo(q))
 	attn := strings.TrimSpace(q.AttnName)
 	if attn != "" {
 		_ = f.SetCellValue(sheet, "A5", "▷ 수     신 : "+attn+" 귀하")
@@ -219,7 +219,7 @@ func FillQuoteFormB1(q *model.SalesQuote, company model.QuoteCompany) ([]byte, e
 	defer f.Close()
 	sheet := quoteA1Sheet(f)
 	_ = f.SetCellValue(sheet, "B3", q.RecipientName)
-	_ = f.SetCellValue(sheet, "H3", q.DisplayNo())
+	_ = f.SetCellValue(sheet, "H3", quoteSheetNo(q))
 	_ = f.SetCellValue(sheet, "B4", model.FormatQuoteDateKorean(q.QuoteDate))
 	_ = f.SetCellValue(sheet, "B5", q.Title)
 	_ = f.SetCellValue(sheet, "J3", q.OwnerName)
@@ -294,7 +294,7 @@ func FillQuoteFormB2(q *model.SalesQuote, company model.QuoteCompany) ([]byte, e
 	defer f.Close()
 	sheet := quoteA1Sheet(f)
 	_ = f.SetCellValue(sheet, "B3", q.RecipientName)
-	_ = f.SetCellValue(sheet, "H3", q.DisplayNo())
+	_ = f.SetCellValue(sheet, "H3", quoteSheetNo(q))
 	_ = f.SetCellValue(sheet, "B4", model.FormatQuoteDateKorean(q.QuoteDate))
 	_ = f.SetCellValue(sheet, "B5", q.Title)
 	groups := model.GroupSubtotals(q.Lines)

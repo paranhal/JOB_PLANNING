@@ -154,6 +154,7 @@ func SalesActivityBadgeLabel(code string, types []Code) string {
 
 type SalesDashRow struct {
 	SalesID    string
+	DisplayNo  string
 	Name       string
 	Customer   string
 	Stage      string
@@ -207,7 +208,7 @@ func BuildSalesDashRows(projects []SalesProject, stages []SalesStageDef, next ma
 			amt = "—"
 		}
 		out = append(out, SalesDashRow{
-			SalesID: p.SalesID, Name: p.Name, Customer: p.CustomerValue(),
+			SalesID: p.SalesID, DisplayNo: p.DisplayNo(), Name: p.Name, Customer: p.CustomerValue(),
 			Stage: p.Stage, StageLabel: label, Amount: amt, Prob: prob,
 			Next: nextTxt, Href: "/sales/" + p.SalesID,
 		})

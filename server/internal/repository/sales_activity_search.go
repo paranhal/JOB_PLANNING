@@ -55,7 +55,8 @@ func RebuildSalesActivitySearch(db *sql.DB) error {
 	}
 	_, err := db.Exec(`
 		INSERT INTO sales_activity_search(activity_id, title, sales_name, customer_name)
-		SELECT a.activity_id, COALESCE(a.title,''), COALESCE(s.name,''),
+		SELECT a.activity_id, COALESCE(a.title,''),
+			TRIM(COALESCE(s.sales_no,'') || ' ' || COALESCE(s.name,'')),
 			COALESCE(NULLIF(TRIM(cu.org_name),''), NULLIF(TRIM(s.prospect_name),''), '')
 		FROM sales_activities a
 		LEFT JOIN sales_projects s ON s.sales_id = a.sales_id
@@ -71,7 +72,8 @@ func reindexSalesActivitySearch(db *sql.DB, activityID string) {
 	_, _ = db.Exec(`DELETE FROM sales_activity_search WHERE activity_id=?`, activityID)
 	_, _ = db.Exec(`
 		INSERT INTO sales_activity_search(activity_id, title, sales_name, customer_name)
-		SELECT a.activity_id, COALESCE(a.title,''), COALESCE(s.name,''),
+		SELECT a.activity_id, COALESCE(a.title,''),
+			TRIM(COALESCE(s.sales_no,'') || ' ' || COALESCE(s.name,'')),
 			COALESCE(NULLIF(TRIM(cu.org_name),''), NULLIF(TRIM(s.prospect_name),''), '')
 		FROM sales_activities a
 		LEFT JOIN sales_projects s ON s.sales_id = a.sales_id
@@ -182,11 +184,11 @@ func (r *SalesRepo) activitySearchLike(q string) []string {
 		SELECT a.activity_id FROM sales_activities a
 		LEFT JOIN sales_projects s ON s.sales_id = a.sales_id
 		LEFT JOIN customers cu ON cu.customer_id = s.customer_id
-		WHERE a.title LIKE ? OR COALESCE(s.name,'') LIKE ?
+		WHERE a.title LIKE ? OR COALESCE(s.name,'') LIKE ? OR COALESCE(s.sales_no,'') LIKE ?
 		   OR COALESCE(cu.org_name,'') LIKE ? OR COALESCE(s.prospect_name,'') LIKE ?
 		   OR EXISTS (SELECT 1 FROM sales_activity_members sm
 		              WHERE sm.activity_id=a.activity_id AND (sm.member=? OR sm.member LIKE ?))`,
-		like, like, like, like, q, like)
+		like, like, like, like, like, q, like)
 	if err != nil {
 		return []string{}
 	}

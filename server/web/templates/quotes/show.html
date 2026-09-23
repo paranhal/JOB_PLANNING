@@ -4,7 +4,7 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 목록</a>
-      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{.Quote.DisplayNo}}</h2>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{if .Quote.SalesDisplayNo}}{{.Quote.SalesDisplayNo}} / {{end}}{{.Quote.DisplayNo}}</h2>
       <p class="text-sm text-gray-500 mt-1">{{.Quote.QuoteDate}} · {{quoteStatusLabel .Quote.Status}} · {{vatModeLabel .Quote.VATMode}}</p>
       <p class="mt-2 flex flex-wrap gap-1">
         <span class="px-1.5 py-0.5 rounded text-[11px] font-semibold {{quotePurposeClass .Quote.Purpose}}">{{quotePurposeLabel .Quote.Purpose}}</span>

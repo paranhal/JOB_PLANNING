@@ -259,7 +259,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		fromTask, _ = h.wbRepo.GetTask(fromTaskID)
 	}
 	return c.Render(http.StatusOK, "sales/show.html", map[string]interface{}{
-		"Title": p.Name, "Active": NavSales,
+		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSales,
 		"Project":         h.viewProject(p, def),
 		"Raw":             p,
 		"WorkProjectID":   workProjectID,
@@ -663,6 +663,8 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 	amount := p.AmountLabel()
 	return map[string]interface{}{
 		"SalesID":                 p.SalesID,
+		"SalesNo":                 p.SalesNo,
+		"DisplayNo":               p.DisplayNo(),
 		"Name":                    p.Name,
 		"IsTentativeName":         p.IsTentativeName,
 		"NameConfirmed":           p.NameConfirmed(),
@@ -687,7 +689,6 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"MallContractType":        p.MallContractType,
 		"DropReason":              p.DropReason,
 		"PrevSalesID":             p.PrevSalesID,
-		"SalesNo":                 p.SalesNo,
 		"Customer":                customer,
 		"CustomerConfirmed":       p.CustomerConfirmed,
 		"Period":                  period,

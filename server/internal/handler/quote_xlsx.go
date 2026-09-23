@@ -20,6 +20,17 @@ const (
 	quoteA1SheetName    = "견적서"
 )
 
+func quoteSheetNo(q *model.SalesQuote) string {
+	if q == nil {
+		return ""
+	}
+	no := q.DisplayNo()
+	if s := q.SalesDisplayNo(); s != "" {
+		return s + " / " + no
+	}
+	return no
+}
+
 func quoteA1Sheet(f *excelize.File) string {
 	if f == nil {
 		return quoteA1SheetName
@@ -164,7 +175,7 @@ func FillQuoteFormA1(q *model.SalesQuote, company model.QuoteCompany) ([]byte, e
 		recipient += " 귀중"
 	}
 	_ = f.SetCellValue(sheet, "A4", recipient)
-	_ = f.SetCellValue(sheet, "E4", "견적번호 : "+q.DisplayNo())
+	_ = f.SetCellValue(sheet, "E4", "견적번호 : "+quoteSheetNo(q))
 	attn := strings.TrimSpace(q.AttnName)
 	if attn != "" {
 		_ = f.SetCellValue(sheet, "A5", "▷ 수     신 : "+attn+" 귀하")

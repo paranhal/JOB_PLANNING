@@ -94,7 +94,7 @@
         {{range .Items}}
         <tr class="hover:bg-slate-50 {{quoteExpiredRow .}}">
           <td class="px-4 py-2 font-mono text-xs">
-            <a href="/quotes/{{.QuoteID}}" class="font-medium text-blue-700 hover:underline">{{.DisplayNo}}</a>
+            <a href="/quotes/{{.QuoteID}}" class="font-medium text-blue-700 hover:underline">{{if .SalesDisplayNo}}{{.SalesDisplayNo}} / {{end}}{{.DisplayNo}}</a>
             <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold {{quotePurposeClass .Purpose}}">{{quotePurposeLabel .Purpose}}</span>
             {{if .IsReverseCalc}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800">역산</span>{{end}}
             {{if .IsLegacy}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600">옛 번호</span>{{end}}

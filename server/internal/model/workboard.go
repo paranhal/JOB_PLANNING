@@ -392,6 +392,7 @@ type WorkProject struct {
 	Color           string    `json:"color"`
 	Status          string    `json:"status"`
 	SalesProjectID  string    `json:"sales_project_id,omitempty"`
+	SalesNo         string    `json:"sales_no,omitempty"`
 	ContractAmount  int       `json:"contract_amount,omitempty"`
 	ContractNo      string    `json:"contract_no,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`

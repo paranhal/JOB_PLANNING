@@ -24,7 +24,8 @@ const salesOrderSelect = `
 		COALESCE(vat_mode,'excluded'), COALESCE(amount,0), COALESCE(vat,0), COALESCE(total,0),
 		COALESCE(status,'open'), COALESCE(billing_status,''), COALESCE(invoice_no,''),
 		COALESCE(invoiced_at,''), COALESCE(paid_at,''), COALESCE(paid_amount,0),
-		COALESCE(remarks,''), COALESCE(created_at,''), COALESCE(updated_at,'')
+		COALESCE(remarks,''), COALESCE(created_at,''), COALESCE(updated_at,''),
+		COALESCE((SELECT sales_no FROM sales_projects p WHERE p.sales_id=sales_orders.sales_id),'')
 	FROM sales_orders`
 
 type OrderFilter struct {
@@ -37,8 +38,10 @@ func (r *OrderRepo) List(f OrderFilter) ([]model.SalesOrder, error) {
 	var args []interface{}
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
-		q += ` AND (order_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ? OR COALESCE(po_no,'') LIKE ?)`
-		args = append(args, like, like, like, like)
+		q += ` AND (order_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ? OR COALESCE(po_no,'') LIKE ?
+			OR COALESCE(sales_id,'') LIKE ?
+			OR EXISTS (SELECT 1 FROM sales_projects p WHERE p.sales_id=sales_orders.sales_id AND p.sales_no LIKE ?))`
+		args = append(args, like, like, like, like, like, like)
 	}
 	if s := strings.TrimSpace(f.Status); s != "" {
 		q += ` AND status=?`
@@ -387,7 +390,7 @@ func scanOrder(row orderScanner) (*model.SalesOrder, error) {
 		&o.PONo, &o.PODate, &o.CustomerID, &o.RecipientName, &o.Title, &o.DueDate,
 		&o.VATMode, &o.Amount, &o.VAT, &o.Total, &o.Status,
 		&o.BillingStatus, &o.InvoiceNo, &o.InvoicedAt, &o.PaidAt, &o.PaidAmount,
-		&o.Remarks, &o.CreatedAt, &o.UpdatedAt,
+		&o.Remarks, &o.CreatedAt, &o.UpdatedAt, &o.SalesNo,
 	)
 	if err != nil {
 		return nil, err

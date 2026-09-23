@@ -26,11 +26,13 @@ const projectSelect = `
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
 		COALESCE(p.sales_project_id,''), COALESCE(p.contract_amount,0), COALESCE(p.contract_no,''),
 		p.created_at, p.updated_at,
-		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,'')
+		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
+		COALESCE(sp.sales_no,'')
 	FROM work_projects p
 	LEFT JOIN customers cu ON cu.customer_id = p.customer_id
 	LEFT JOIN contacts ct ON ct.contact_id = p.contact_id
-	LEFT JOIN customers op ON op.customer_id = p.ordering_party_id`
+	LEFT JOIN customers op ON op.customer_id = p.ordering_party_id
+	LEFT JOIN sales_projects sp ON sp.sales_id = p.sales_project_id`
 
 func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error) {
 	return r.ListFiltered("", year, status)
@@ -54,8 +56,9 @@ func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]mo
 			p.name LIKE ? OR COALESCE(p.short_name,'') LIKE ?
 			OR COALESCE(p.ordering_party,'') LIKE ? OR COALESCE(op.org_name,'') LIKE ?
 			OR COALESCE(cu.org_name,'') LIKE ?
+			OR COALESCE(sp.sales_no,'') LIKE ? OR COALESCE(p.sales_project_id,'') LIKE ?
 		)`
-		args = append(args, like, like, like, like, like)
+		args = append(args, like, like, like, like, like, like, like)
 	}
 	q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
 	rows, err := r.db.Query(q, args...)
@@ -636,7 +639,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.Notes, &p.ContactID,
 		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo,
 		&created, &updated,
-		&p.CustomerName, &p.ContactName, &p.OrderingPartyName,
+		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo,
 	)
 	if err != nil {
 		return nil, err

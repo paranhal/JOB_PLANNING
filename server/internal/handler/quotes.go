@@ -227,7 +227,7 @@ func (h *QuotesHandler) Show(c echo.Context) error {
 		linked, _ = h.orders.ListByQuote(q.QuoteID)
 	}
 	return c.Render(http.StatusOK, "quotes/show.html", map[string]interface{}{
-		"Title": q.DisplayNo(), "Active": NavQuotes, "Quote": q, "Totals": tot,
+		"Title": quoteSheetNo(q), "Active": NavQuotes, "Quote": q, "Totals": tot,
 		"CanWrite":     canWriteSales(c),
 		"FlashOK":      c.QueryParam("ok"),
 		"AskNames":     ask,

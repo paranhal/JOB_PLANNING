@@ -112,8 +112,9 @@ func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) 
 	}
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
-		q += ` AND (s.name LIKE ? OR COALESCE(s.prospect_name,'') LIKE ? OR COALESCE(cu.org_name,'') LIKE ?)`
-		args = append(args, like, like, like)
+		q += ` AND (s.name LIKE ? OR COALESCE(s.prospect_name,'') LIKE ? OR COALESCE(cu.org_name,'') LIKE ?
+			OR COALESCE(s.sales_no,'') LIKE ? OR s.sales_id LIKE ?)`
+		args = append(args, like, like, like, like, like)
 	}
 	if s := strings.TrimSpace(f.Owner); s != "" {
 		q += ` AND (s.sales_owner=? OR s.sales_owner_id=?)`
@@ -216,6 +217,13 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		return err
 	}
 	p.SalesID = fmt.Sprintf("SP-%03d", id)
+	if strings.TrimSpace(p.SalesNo) == "" {
+		no, err := NextSalesNo(r.db, time.Now())
+		if err != nil {
+			return err
+		}
+		p.SalesNo = no
+	}
 	if p.Stage == model.SalesStageWon && strings.TrimSpace(p.WonAt) == "" {
 		p.WonAt = time.Now().Format("2006-01-02")
 	}
@@ -231,7 +239,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 	defer tx.Rollback()
 	_, err = tx.Exec(`
 		INSERT INTO sales_projects (
-			sales_id, name, is_tentative_name, stage, probability, probability_override,
+			sales_id, sales_no, name, is_tentative_name, stage, probability, probability_override,
 			customer_id, prospect_name, prospect_region, customer_confirmed,
 			expected_ym, expected_precision, expected_ym_confirmed,
 			expected_amount, expected_amount_confirmed,
@@ -241,8 +249,8 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			bid_status, close_reason, rfp_received_at, win_prob, probability_final,
 			awarded_amount, contract_amount, contract_target, procurement_route, contract_method,
 			bid_eval_method, mall_contract_type, prev_sales_id
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		p.SalesID, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
 		p.ExpectedAmount, boolToInt(p.ExpectedAmountConfirmed),

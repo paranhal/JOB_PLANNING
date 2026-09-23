@@ -55,6 +55,22 @@ func TestIDFormats(t *testing.T) {
 		t.Fatalf("as number: %s", asNum)
 	}
 
+	s1, err := NextSalesNo(db, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := NextSalesNo(db, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := NextSalesNo(db, time.Date(2026, 8, 1, 0, 0, 0, 0, time.Local))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s1 != "S2607-001" || s2 != "S2607-002" || s3 != "S2608-001" {
+		t.Fatalf("sales no: %s %s %s", s1, s2, s3)
+	}
+
 	p1, err := NextProcessNumber(db, asNum, at)
 	if err != nil {
 		t.Fatal(err)

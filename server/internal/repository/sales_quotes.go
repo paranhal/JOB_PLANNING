@@ -32,7 +32,8 @@ const salesQuoteSelect = `
 		COALESCE(status,'draft'), COALESCE(is_legacy,0),
 		COALESCE(rev_reason,''), COALESCE(is_reverse_calc,0), COALESCE(target_total,0),
 		COALESCE(maint_block,0),
-		COALESCE(created_at,''), COALESCE(updated_at,'')
+		COALESCE(created_at,''), COALESCE(updated_at,''),
+		COALESCE((SELECT sales_no FROM sales_projects p WHERE p.sales_id=sales_quotes.sales_id),'')
 	FROM sales_quotes`
 
 type QuoteFilter struct {
@@ -47,8 +48,10 @@ func (r *QuoteRepo) List(f QuoteFilter) ([]model.SalesQuote, error) {
 	var args []interface{}
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
-		q += ` AND (quote_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ?)`
-		args = append(args, like, like, like)
+		q += ` AND (quote_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ?
+			OR COALESCE(sales_id,'') LIKE ?
+			OR EXISTS (SELECT 1 FROM sales_projects p WHERE p.sales_id=sales_quotes.sales_id AND (p.sales_no LIKE ? OR p.name LIKE ?)))`
+		args = append(args, like, like, like, like, like, like)
 	}
 	if s := strings.TrimSpace(f.Status); s != "" {
 		q += ` AND status=?`
@@ -560,7 +563,7 @@ func scanQuote(row quoteScanner) (*model.SalesQuote, error) {
 		&q.Subtotal, &q.VAT, &q.Total, &q.OwnerUserID, &q.OwnerName, &q.OwnerPhone, &q.Remarks,
 		&q.Purpose, &q.BudgetYear, &q.OverheadRate, &q.TechFeeRate, &q.Status, &legacy,
 		&q.RevReason, &revCalc, &q.TargetTotal, &maint,
-		&q.CreatedAt, &q.UpdatedAt,
+		&q.CreatedAt, &q.UpdatedAt, &q.SalesNo,
 	)
 	if err != nil {
 		return nil, err

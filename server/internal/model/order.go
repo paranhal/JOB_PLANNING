@@ -25,6 +25,7 @@ var ErrOrderNoLines = fmt.Errorf("넘길 라인이 없습니다")
 type SalesOrder struct {
 	OrderID       string
 	SalesID       string
+	SalesNo       string
 	QuoteID       string
 	OrderNo       string
 	OrderDate     string
@@ -289,15 +290,19 @@ func FillOrderKanban(items []SalesOrder) KanbanView {
 			continue
 		}
 		seen[id] = true
+		ref := o.DisplayNo()
+		if s := o.SalesDisplayNo(); s != "" {
+			ref = s + " / " + ref
+		}
 		card := KanbanCard{
 			ID:         id,
 			RefID:      id,
-			RefNumber:  o.OrderNo,
+			RefNumber:  ref,
 			Title:      o.Title,
 			Href:       "/orders/" + id,
 			EditHref:   "/orders/" + id + "/edit",
 			OrgName:    o.RecipientName,
-			Extra:      o.OrderNo + " · " + formatSalesAmount(o.Total) + "원",
+			Extra:      ref + " · " + formatSalesAmount(o.Total) + "원",
 			Bucket:     b,
 			AmountDesc: o.Total,
 		}
@@ -345,4 +350,14 @@ func (o *SalesOrder) DisplayNo() string {
 		return ""
 	}
 	return strings.TrimSpace(o.OrderNo)
+}
+
+func (o *SalesOrder) SalesDisplayNo() string {
+	if o == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(o.SalesNo); s != "" {
+		return s
+	}
+	return strings.TrimSpace(o.SalesID)
 }

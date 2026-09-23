@@ -306,6 +306,17 @@ func (p *SalesProject) AmountLabel() string {
 	return formatSalesAmount(p.ExpectedAmount) + "원"
 }
 
+// DisplayNo 화면에 보이는 사업번호. 없으면 내부 키 sales_id. §47.10.3
+func (p *SalesProject) DisplayNo() string {
+	if p == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(p.SalesNo); s != "" {
+		return s
+	}
+	return strings.TrimSpace(p.SalesID)
+}
+
 func (p *SalesProject) DisplayStage(def *SalesStageDef) string {
 	label := strings.TrimSpace(p.Stage)
 	if def != nil && def.Label != "" {
@@ -955,6 +966,7 @@ type SalesActivity struct {
 	CreatedAt      string
 
 	SalesName    string
+	SalesNo      string
 	CustomerName string
 }
 

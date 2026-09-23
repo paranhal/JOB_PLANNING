@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	salesNoMetaKey                    = "__meta:sales_no_v1"
 	idFormatV2MetaKey                 = "__meta:id_format_v2"
 	assetCategoryBackfillMetaKey      = "__meta:asset_category_backfill"
 	assetIDASCIIMetaKey               = "__meta:asset_id_ascii"
@@ -179,6 +180,23 @@ func NextASNumber(db *sql.DB, at time.Time) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("R%s-%s", ym, fmtSeq3(n)), nil
+}
+
+// NextSalesNo 사업번호: S{YYMM}-{NNN}  (§47.10.3). 키 sales_no:2609
+func NextSalesNo(db *sql.DB, t time.Time) (string, error) {
+	if t.IsZero() {
+		t = time.Now()
+	}
+	ym := t.Format("0601")
+	n, err := NextSeq(db, salesNoSeqKey(ym))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("S%s-%s", ym, fmtSeq3(n)), nil
+}
+
+func salesNoSeqKey(ym string) string {
+	return "sales_no:" + ym
 }
 
 // NextProcessNumber 처리번호: {접수번호}-P{NN}

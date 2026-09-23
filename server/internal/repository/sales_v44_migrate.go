@@ -121,14 +121,124 @@ func applySales4Stage(db *sql.DB) {
 		return
 	}
 	applySales4StageSchema(db)
-	if metaDone(db, sales4StageMetaKey) {
+	if !metaDone(db, sales4StageMetaKey) {
+		if err := migrateSales4Stage(db); err != nil {
+			log.Printf("44-C sales 4stage: %v", err)
+		} else {
+			markMetaDone(db, sales4StageMetaKey)
+		}
+	}
+	applySalesNoV1(db)
+}
+
+// applySalesNoV1 기존 사업에 S{YYMM}-{NNN} 을 채우고 시퀀스를 달 최댓값에 맞춘다. §47.10.3
+func applySalesNoV1(db *sql.DB) {
+	if db == nil {
 		return
 	}
-	if err := migrateSales4Stage(db); err != nil {
-		log.Printf("44-C sales 4stage: %v", err)
+	applySales4StageSchema(db)
+	rows, err := db.Query(`
+		SELECT sales_id, COALESCE(created_at,'')
+		FROM sales_projects
+		WHERE TRIM(COALESCE(sales_no,''))=''
+		ORDER BY created_at, sales_id`)
+	if err != nil {
+		log.Printf("44-G sales_no list: %v", err)
+	} else {
+		defer rows.Close()
+		monthN := map[string]int{}
+		exist, e2 := db.Query(`SELECT sales_no FROM sales_projects WHERE TRIM(COALESCE(sales_no,''))!=''`)
+		if e2 == nil {
+			for exist.Next() {
+				var no string
+				if exist.Scan(&no) == nil {
+					if ym, n, ok := parseSalesNo(no); ok && n > monthN[ym] {
+						monthN[ym] = n
+					}
+				}
+			}
+			exist.Close()
+		}
+		for rows.Next() {
+			var id, created string
+			if err := rows.Scan(&id, &created); err != nil {
+				continue
+			}
+			t := parseSalesCreatedAt(created)
+			ym := t.Format("0601")
+			monthN[ym]++
+			no := fmt.Sprintf("S%s-%03d", ym, monthN[ym])
+			if _, err := db.Exec(`UPDATE sales_projects SET sales_no=? WHERE sales_id=?`, no, id); err != nil {
+				log.Printf("44-G sales_no %s: %v", id, err)
+			}
+		}
+	}
+	alignSalesNoSequences(db)
+	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_projects_sales_no ON sales_projects(sales_no) WHERE sales_no != ''`); err != nil {
+		log.Printf("44-G idx_sales_projects_sales_no: %v", err)
+	}
+	markMetaDone(db, salesNoMetaKey)
+}
+
+func parseSalesNo(no string) (ym string, n int, ok bool) {
+	no = strings.TrimSpace(no)
+	var seq int
+	if _, err := fmt.Sscanf(no, "S%4s-%d", &ym, &seq); err != nil {
+		return "", 0, false
+	}
+	if len(ym) != 4 || seq < 1 {
+		return "", 0, false
+	}
+	return ym, seq, true
+}
+
+func parseSalesCreatedAt(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Now()
+	}
+	if len(s) > 19 && s[10] == ' ' {
+		s = s[:19]
+	}
+	for _, layout := range []string{"2006-01-02 15:04:05", time.RFC3339, "2006-01-02T15:04:05", "2006-01-02"} {
+		if t, err := time.ParseInLocation(layout, s, time.Local); err == nil {
+			return t
+		}
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Now()
+}
+
+func alignSalesNoSequences(db *sql.DB) {
+	rows, err := db.Query(`SELECT sales_no FROM sales_projects WHERE TRIM(COALESCE(sales_no,''))!=''`)
+	if err != nil {
 		return
 	}
-	markMetaDone(db, sales4StageMetaKey)
+	defer rows.Close()
+	maxN := map[string]int{}
+	for rows.Next() {
+		var no string
+		if rows.Scan(&no) != nil {
+			continue
+		}
+		if ym, n, ok := parseSalesNo(no); ok && n > maxN[ym] {
+			maxN[ym] = n
+		}
+	}
+	for ym, n := range maxN {
+		key := salesNoSeqKey(ym)
+		var last int
+		err := db.QueryRow(`SELECT last_no FROM id_sequences WHERE seq_key=?`, key).Scan(&last)
+		if err == sql.ErrNoRows {
+			_, _ = db.Exec(`INSERT INTO id_sequences(seq_key, last_no) VALUES(?,?)`, key, n)
+			continue
+		}
+		if err == nil && n > last {
+			_, _ = db.Exec(`UPDATE id_sequences SET last_no=? WHERE seq_key=?`, n, key)
+		}
+	}
 }
 
 type sales4MigIn struct {

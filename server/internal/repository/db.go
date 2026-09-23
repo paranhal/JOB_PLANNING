@@ -1114,6 +1114,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWorkTaskMembers(db)
 	applyV214ProjectKindRollback(db)
 	applySalesProjects(db)
+	applySales4StageSchema(db)
 	applySalesActivities(db)
 	applySalesParties(db)
 	applySalesPromote(db)

@@ -4,7 +4,7 @@
 <div class="max-w-3xl mx-auto space-y-4">
   <div class="flex items-center justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
+      <h2 class="text-xl font-bold text-gray-800">{{if .Project.DisplayNo}}{{.Project.DisplayNo}} · {{end}}{{.Title}}</h2>
       <p class="text-sm text-gray-500">사업명만 필수입니다. 나머지 칸은 비워도 저장됩니다.</p>
     </div>
     <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="text-sm text-gray-500 hover:underline">← 돌아가기</a>

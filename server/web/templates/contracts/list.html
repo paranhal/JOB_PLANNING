@@ -37,7 +37,7 @@
       <tbody>
         {{range .Projects}}
         <tr class="border-t border-gray-100">
-          <td class="px-4 py-2 font-mono text-xs">{{.ContractNoLabel}}</td>
+          <td class="px-4 py-2 font-mono text-xs">{{if .SalesNo}}{{.SalesNo}} / {{end}}{{.ContractNoLabel}}</td>
           <td class="px-4 py-2"><a href="/contracts/{{.ProjectID}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
           <td class="px-4 py-2 text-gray-600">{{if .CustomerOrParty}}{{.CustomerOrParty}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-right tabular-nums">{{if gt .ContractAmount 0}}{{.ContractAmount}}{{else}}—{{end}}</td>

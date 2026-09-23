@@ -5,7 +5,7 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <a href="{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}" class="text-sm text-gray-500 hover:underline">← 목록</a>
-      <h2 class="text-xl font-bold text-gray-800 mt-1 {{if not .Project.NameConfirmed}}text-gray-400{{end}}">{{.Project.Name}}</h2>
+      <h2 class="text-xl font-bold text-gray-800 mt-1 {{if not .Project.NameConfirmed}}text-gray-400{{end}}"><span class="font-mono text-base text-gray-600">{{.Project.DisplayNo}}</span> {{.Project.Name}}</h2>
       <p class="text-sm text-gray-500 mt-1 flex flex-wrap gap-2 items-center">
         <span class="font-medium text-gray-800">{{.Project.DisplayStage}}</span>
         {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">미확정</span>{{end}}
