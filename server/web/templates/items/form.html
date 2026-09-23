@@ -68,9 +68,66 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">모델</label>
           <input type="text" name="model" value="{{.Item.Model}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
         </div>
-        <div>
+        <div x-data="{
+          q: {{printf "%q" .Item.ManufacturerLabel}},
+          id: {{printf "%q" .Item.ManufacturerID}},
+          text: {{printf "%q" .Item.Manufacturer}},
+          hits: [], open: false, making: false, newName: '',
+          async search(){
+            const q=this.q.trim();
+            if(!q){ this.hits=[]; this.open=false; return; }
+            try {
+              const r=await fetch('/customers/search?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
+              this.hits=await r.json()||[];
+              this.open=true;
+            } catch(e){ this.hits=[]; }
+          },
+          pick(it){
+            this.id=it.customer_id; this.q=it.org_name; this.text=this.text||it.org_name; this.open=false; this.making=false;
+          },
+          async create(){
+            const name=(this.newName||this.q).trim();
+            if(!name) return;
+            const post=async (extra)=>{
+              const b=new URLSearchParams({name});
+              if(extra){ for(const k in extra) b.set(k, extra[k]); }
+              const r=await fetch('/items/partners',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:b});
+              return r.json();
+            };
+            let d=await post();
+            if(d && d.ask_confirm){
+              if(!confirm(d.prompt||'같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?')) return;
+              d=await post({confirm:'1'});
+            }
+            if(d && d.customer) this.pick(d.customer);
+          }
+        }">
           <label class="block text-sm font-medium text-gray-700 mb-1">제조사</label>
-          <input type="text" name="manufacturer" value="{{.Item.Manufacturer}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <input type="hidden" name="manufacturer_id" :value="id">
+          <input type="hidden" name="manufacturer" :value="text">
+          <input type="text" x-model="q" @input.debounce.200ms="search()" @focus="search()" autocomplete="off"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="고객현황에서 검색">
+          <ul x-show="open" x-cloak class="mt-1 border rounded-lg bg-white max-h-40 overflow-auto text-sm">
+            <template x-for="it in hits" :key="it.customer_id">
+              <li><button type="button" class="w-full text-left px-3 py-1.5 hover:bg-blue-50" @click="pick(it)">
+                <span x-text="it.org_name"></span>
+                <span class="text-xs text-gray-400 ml-1" x-text="it.customer_id"></span>
+              </button></li>
+            </template>
+          </ul>
+          <p class="text-xs mt-1" x-show="id">
+            <a class="text-blue-700 hover:underline" :href="'/customers/'+id">고객번호 <span x-text="id"></span></a>
+          </p>
+          {{if and .Item.Manufacturer (not .Item.ManufacturerID)}}
+          <p class="text-xs text-rose-700 mt-1">연결 필요 · 글자값 {{.Item.Manufacturer}}</p>
+          {{end}}
+          {{if $.CanWrite}}
+          <button type="button" class="mt-1 text-xs text-blue-700 hover:underline" @click="making=true; newName=q">+ 새 거래처</button>
+          <div x-show="making" x-cloak class="mt-1 flex gap-2">
+            <input type="text" x-model="newName" placeholder="고객사명만" class="flex-1 border rounded px-2 py-1 text-sm">
+            <button type="button" class="text-xs px-2 border rounded" @click="create()">만들기</button>
+          </div>
+          {{end}}
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -85,31 +142,71 @@
           <input type="text" name="gov_item_no" value="{{.Item.GovItemNo}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">소비자가·조달단가</label>
-          <input type="text" name="list_price" value="{{if .Item.ListPrice}}{{.Item.ListPrice}}{{end}}" inputmode="numeric"
-                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">최근 견적 단가</label>
-          <input type="text" name="last_price" value="{{if .Item.LastPrice}}{{.Item.LastPrice}}{{end}}" inputmode="numeric"
-                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums">
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">최근 견적일</label>
-          <input type="date" name="last_quoted_at" value="{{.Item.LastQuotedAt}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">최근 견적 고객</label>
-          <input type="text" name="last_customer" value="{{.Item.LastCustomer}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
       <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">소비자가·조달단가</label>
+        <input type="text" name="list_price" value="{{if .Item.ListPrice}}{{.Item.ListPrice}}{{end}}" inputmode="numeric"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums">
+      </div>
+      <div x-data="{
+        q: {{printf "%q" .Item.SupplierLabel}},
+        id: {{printf "%q" .Item.SupplierID}},
+        text: {{printf "%q" .Item.DefaultSupplier}},
+        hits: [], open: false, making: false, newName: '',
+        async search(){
+          const q=this.q.trim();
+          if(!q){ this.hits=[]; this.open=false; return; }
+          try {
+            const r=await fetch('/customers/search?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
+            this.hits=await r.json()||[];
+            this.open=true;
+          } catch(e){ this.hits=[]; }
+        },
+        pick(it){
+          this.id=it.customer_id; this.q=it.org_name; this.text=this.text||it.org_name; this.open=false; this.making=false;
+        },
+        async create(){
+          const name=(this.newName||this.q).trim();
+          if(!name) return;
+          const post=async (extra)=>{
+            const b=new URLSearchParams({name});
+            if(extra){ for(const k in extra) b.set(k, extra[k]); }
+            const r=await fetch('/items/partners',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:b});
+            return r.json();
+          };
+          let d=await post();
+          if(d && d.ask_confirm){
+            if(!confirm(d.prompt||'같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?')) return;
+            d=await post({confirm:'1'});
+          }
+          if(d && d.customer) this.pick(d.customer);
+        }
+      }">
         <label class="block text-sm font-medium text-gray-700 mb-1">기본 공급사</label>
-        <input type="text" name="default_supplier" value="{{.Item.DefaultSupplier}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <input type="hidden" name="supplier_id" :value="id">
+        <input type="hidden" name="default_supplier" :value="text">
+        <input type="text" x-model="q" @input.debounce.200ms="search()" @focus="search()" autocomplete="off"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="고객현황에서 검색">
+        <ul x-show="open" x-cloak class="mt-1 border rounded-lg bg-white max-h-40 overflow-auto text-sm">
+          <template x-for="it in hits" :key="it.customer_id">
+            <li><button type="button" class="w-full text-left px-3 py-1.5 hover:bg-blue-50" @click="pick(it)">
+              <span x-text="it.org_name"></span>
+              <span class="text-xs text-gray-400 ml-1" x-text="it.customer_id"></span>
+            </button></li>
+          </template>
+        </ul>
+        <p class="text-xs mt-1" x-show="id">
+          <a class="text-blue-700 hover:underline" :href="'/customers/'+id">고객번호 <span x-text="id"></span></a>
+        </p>
+        {{if and .Item.DefaultSupplier (not .Item.SupplierID)}}
+        <p class="text-xs text-rose-700 mt-1">연결 필요 · 글자값 {{.Item.DefaultSupplier}}</p>
+        {{end}}
+        {{if $.CanWrite}}
+        <button type="button" class="mt-1 text-xs text-blue-700 hover:underline" @click="making=true; newName=q">+ 새 거래처</button>
+        <div x-show="making" x-cloak class="mt-1 flex gap-2">
+          <input type="text" x-model="newName" placeholder="고객사명만" class="flex-1 border rounded px-2 py-1 text-sm">
+          <button type="button" class="text-xs px-2 border rounded" @click="create()">만들기</button>
+        </div>
+        {{end}}
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">메모</label>
@@ -128,5 +225,33 @@
     </div>
     {{end}}
   </form>
+
+  {{if not .IsNew}}
+  <div class="bg-white rounded-xl border border-gray-200 p-6">
+    <h3 class="font-semibold text-gray-800 mb-3">이 품목이 들어간 견적</h3>
+    {{if .Quotes}}
+    <table class="w-full text-sm">
+      <thead class="text-xs text-gray-500 border-b"><tr>
+        <th class="text-left py-2">견적번호</th>
+        <th class="text-left py-2">견적일</th>
+        <th class="text-left py-2">고객</th>
+        <th class="text-right py-2">단가</th>
+      </tr></thead>
+      <tbody class="divide-y">
+        {{range .Quotes}}
+        <tr>
+          <td class="py-2"><a href="/quotes/{{.QuoteID}}" class="text-blue-700 hover:underline">{{if .QuoteNo}}{{.QuoteNo}}{{else}}{{.QuoteID}}{{end}}</a></td>
+          <td class="py-2 text-gray-600">{{if .QuoteDate}}{{.QuoteDate}}{{else}}—{{end}}</td>
+          <td class="py-2 text-gray-600">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+          <td class="py-2 text-right tabular-nums">{{.UnitPrice}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="text-sm text-gray-400">아직 이 품목이 들어간 견적이 없습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
 </div>
 {{end}}

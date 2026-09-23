@@ -15,7 +15,7 @@
        pick(it){
          this.itemId=it.item_id; this.q=it.name; this.picked=it.name;
          this.spec=it.spec||''; this.unit=it.unit||'EA';
-         this.price=(it.fill_price||it.last_price||it.list_price||'');
+         this.price=(it.fill_price||it.list_price||'');
          this.open=false;
        },
        onName(){
@@ -42,19 +42,19 @@
                d=await post({register:'1'});
                if(!d||d.ok===false){ this.msg=(d&&d.error)||'등록에 실패했습니다'; return; }
                this.itemId=(d.item&&d.item.item_id)||'';
-               this.msg='품목으로 등록하고 최근 단가를 남겼습니다.';
+               this.msg='품목으로 등록했습니다.';
                return;
              }
              this.msg='견적 라인을 저장했습니다. 품목 마스터에는 넣지 않았습니다.';
              return;
            }
            this.itemId=(d.item&&d.item.item_id)||this.itemId;
-           this.msg='최근 단가를 갱신했습니다.';
+           this.msg='품목을 골랐습니다.';
          } catch(e){ this.msg='저장에 실패했습니다'; }
        }
      }">
   <h3 class="font-semibold text-gray-800">견적 라인</h3>
-  <p class="text-xs text-gray-500">목록에서 고르면 규격·단위·최근 단가가 채워집니다. 없는 품목은 그대로 쳐도 됩니다.</p>
+  <p class="text-xs text-gray-500">목록에서 고르면 규격·단위·소비자가가 채워집니다. 없는 품목은 그대로 쳐도 됩니다.</p>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     <div class="relative sm:col-span-2">
       <label class="block text-xs text-gray-500 mb-1">품명</label>

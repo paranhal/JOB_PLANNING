@@ -524,13 +524,6 @@ func (h *QuotesHandler) afterSave(c echo.Context, q *model.SalesQuote) {
 	if q == nil {
 		return
 	}
-	cust := q.RecipientName
-	for _, ln := range q.Lines {
-		if strings.TrimSpace(ln.ItemID) == "" || h.items == nil {
-			continue
-		}
-		_ = h.items.TouchLastQuoted(ln.ItemID, ln.UnitPrice, cust, q.QuoteDate)
-	}
 	if q.SalesID == "" || h.sales == nil {
 		return
 	}

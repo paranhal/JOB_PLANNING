@@ -203,6 +203,7 @@ func main() {
 	// 고객 관리
 	cust := g.Group("/customers")
 	cust.GET("", h.Customer.List)
+	cust.GET("/search", h.Customer.SearchJSON)
 	cust.GET("/export.xlsx", h.Customer.ExportExcel)
 	cust.GET("/new", h.Customer.New, masterWrite)
 	cust.POST("", h.Customer.Create, masterWrite)
@@ -482,6 +483,7 @@ func main() {
 	items.POST("", h.Items.Create)
 	items.GET("/suggest", h.Items.Suggest)
 	items.POST("/quote-line", h.Items.QuoteLine)
+	items.POST("/partners", h.Items.CreatePartner)
 	items.GET("/:id/edit", h.Items.Edit)
 	items.POST("/:id/kind", h.Items.SetKind)
 	items.POST("/:id/confirm", h.Items.Confirm)

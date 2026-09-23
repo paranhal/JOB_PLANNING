@@ -653,3 +653,33 @@ func (r *QuoteRepo) CountPeerDocs() (quotes, orders, contracts int) {
 func (r *QuoteRepo) Company() model.QuoteCompany {
 	return LoadQuoteCompany(r.db)
 }
+
+func (r *QuoteRepo) ListByItemID(itemID string) ([]model.ItemQuoteUse, error) {
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return nil, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT q.quote_id, COALESCE(q.quote_no,''), COALESCE(q.quote_date,''),
+			COALESCE(q.recipient_name,''), COALESCE(l.name,''), COALESCE(l.unit_price,0)
+		FROM sales_quote_lines l
+		JOIN sales_quotes q ON q.quote_id = l.quote_id
+		WHERE l.item_id=?
+		ORDER BY COALESCE(q.quote_date,'') DESC, q.quote_id DESC`, itemID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.ItemQuoteUse
+	for rows.Next() {
+		var it model.ItemQuoteUse
+		if err := rows.Scan(&it.QuoteID, &it.QuoteNo, &it.QuoteDate, &it.Customer, &it.LineName, &it.UnitPrice); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}

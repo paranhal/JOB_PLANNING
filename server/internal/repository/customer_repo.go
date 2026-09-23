@@ -539,6 +539,51 @@ func (r *CustomerRepo) CountActive(count *int) {
 
 // ReviewReasonImportedCustomer AS 엑셀 적재 중 기관명이 매칭되지 않아 새로 만든 고객에 붙는 사유
 const ReviewReasonImportedCustomer = "AS 완료내역 엑셀 적재 중 기관명이 기존 고객과 매칭되지 않아 자동 생성됨 — 기관 정보 확인 필요"
+const ReviewReasonEmptyBasics = "기본 정보 미입력"
+
+func (r *CustomerRepo) FindByExactOrgName(name string) (*model.Customer, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, nil
+	}
+	c, err := scanCustomerAPI(r.db.QueryRow(customerAPISelect+`
+		WHERE lower(trim(org_name))=lower(?) OR lower(trim(official_name))=lower(?)
+		ORDER BY customer_id LIMIT 1`, name, name))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// CreatePartnerNameOnly 품목 제조사·공급사용. 이름만 받고 파트너로 만든다. §47.20.4
+func (r *CustomerRepo) CreatePartnerNameOnly(name string) (*model.Customer, bool, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, false, fmt.Errorf("고객사명을 입력하세요")
+	}
+	if exist, err := r.FindByExactOrgName(name); err != nil {
+		return nil, false, err
+	} else if exist != nil {
+		return exist, true, nil
+	}
+	c := &model.Customer{
+		OrgName:      name,
+		OfficialName: name,
+		IsActive:     true,
+		PartyKind:    model.PartyKindPartner,
+		Notes:        "기본 정보가 비어 있습니다",
+	}
+	if err := r.Create(c); err != nil {
+		return nil, false, err
+	}
+	_ = r.SetNeedsReview(c.CustomerID, true, ReviewReasonEmptyBasics)
+	c.NeedsReview = true
+	c.ReviewReason = ReviewReasonEmptyBasics
+	return c, false, nil
+}
 
 // SetNeedsReview 확인 필요 표식을 켜거나 끈다. 끌 때는 사유도 함께 지운다.
 func (r *CustomerRepo) SetNeedsReview(id string, on bool, reason string) error {

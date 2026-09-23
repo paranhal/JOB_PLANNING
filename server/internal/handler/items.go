@@ -15,11 +15,13 @@ import (
 )
 
 type ItemsHandler struct {
-	repo *repository.SalesItemRepo
+	repo      *repository.SalesItemRepo
+	customers *repository.CustomerRepo
+	quotes    *repository.QuoteRepo
 }
 
-func NewItemsHandler(repo *repository.SalesItemRepo) *ItemsHandler {
-	return &ItemsHandler{repo: repo}
+func NewItemsHandler(repo *repository.SalesItemRepo, customers *repository.CustomerRepo, quotes *repository.QuoteRepo) *ItemsHandler {
+	return &ItemsHandler{repo: repo, customers: customers, quotes: quotes}
 }
 
 func (h *ItemsHandler) List(c echo.Context) error {
@@ -178,11 +180,6 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 		unit = "EA"
 	}
 	price := parseItemMoney(c.FormValue("unit_price"))
-	customer := strings.TrimSpace(c.FormValue("customer"))
-	quotedAt := strings.TrimSpace(c.FormValue("quoted_at"))
-	if quotedAt == "" {
-		quotedAt = time.Now().Format("2006-01-02")
-	}
 	register := c.FormValue("register") == "1"
 
 	var it *model.SalesItem
@@ -199,15 +196,8 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 	}
 
 	if it != nil {
-		if err := h.repo.TouchLastQuoted(it.ItemID, price, customer, quotedAt); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
-		}
-		fresh, _ := h.repo.Get(it.ItemID)
-		if fresh == nil {
-			fresh = it
-		}
 		return c.JSON(http.StatusOK, map[string]interface{}{
-			"ok": true, "ask_register": false, "item": salesItemAPI(fresh),
+			"ok": true, "ask_register": false, "item": salesItemAPI(it),
 		})
 	}
 
@@ -216,15 +206,13 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 	}
 	if register {
 		it = &model.SalesItem{
-			ItemKind:     model.SalesItemKindGoods,
-			Name:         name,
-			Spec:         spec,
-			Unit:         unit,
-			LastPrice:    price,
-			LastCustomer: customer,
-			LastQuotedAt: quotedAt,
-			IsActive:     true,
-			NeedsReview:  false,
+			ItemKind:    model.SalesItemKindGoods,
+			Name:        name,
+			Spec:        spec,
+			Unit:        unit,
+			ListPrice:   price,
+			IsActive:    true,
+			NeedsReview: false,
 		}
 		if err := h.repo.Create(it); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
@@ -245,10 +233,60 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 	})
 }
 
+func (h *ItemsHandler) CreatePartner(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	if h.customers == nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "고객 저장소를 쓸 수 없습니다"})
+	}
+	name := strings.TrimSpace(c.FormValue("name"))
+	if name == "" {
+		name = strings.TrimSpace(c.QueryParam("name"))
+	}
+	confirm := c.FormValue("confirm") == "1"
+	exist, err := h.customers.FindByExactOrgName(name)
+	if err != nil {
+		return err
+	}
+	if exist != nil && !confirm {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"ok": true, "existed": true, "ask_confirm": true,
+			"prompt":   "같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?",
+			"customer": customerBrief(exist),
+		})
+	}
+	if exist != nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"ok": true, "existed": true, "customer": customerBrief(exist),
+		})
+	}
+	created, _, err := h.customers.CreatePartnerNameOnly(name)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"ok": true, "existed": false, "created": true, "customer": customerBrief(created),
+	})
+}
+
+func customerBrief(c *model.Customer) map[string]interface{} {
+	if c == nil {
+		return map[string]interface{}{}
+	}
+	return map[string]interface{}{
+		"customer_id": c.CustomerID, "org_name": c.OrgName, "party_kind": c.PartyKind,
+	}
+}
+
 func (h *ItemsHandler) renderForm(c echo.Context, p *model.SalesItem, isNew bool, formErr string) error {
 	title := "품목 등록"
 	if !isNew {
 		title = "품목 수정"
+	}
+	var uses []model.ItemQuoteUse
+	if !isNew && h.quotes != nil && p != nil {
+		uses, _ = h.quotes.ListByItemID(p.ItemID)
 	}
 	return c.Render(http.StatusOK, "items/form.html", map[string]interface{}{
 		"Title": title, "Active": NavSalesItems, "IsNew": isNew,
@@ -257,6 +295,7 @@ func (h *ItemsHandler) renderForm(c echo.Context, p *model.SalesItem, isNew bool
 		"Units":    model.SalesItemUnits(),
 		"CanWrite": canWriteSales(c),
 		"FlashOK":  c.QueryParam("ok"),
+		"Quotes":   uses,
 	})
 }
 
@@ -268,12 +307,11 @@ func parseSalesItemForm(c echo.Context) *model.SalesItem {
 		Spec:            strings.TrimSpace(c.FormValue("spec")),
 		Model:           strings.TrimSpace(c.FormValue("model")),
 		Manufacturer:    strings.TrimSpace(c.FormValue("manufacturer")),
+		ManufacturerID:  strings.TrimSpace(c.FormValue("manufacturer_id")),
+		SupplierID:      strings.TrimSpace(c.FormValue("supplier_id")),
 		Unit:            strings.TrimSpace(c.FormValue("unit")),
 		GovItemNo:       strings.TrimSpace(c.FormValue("gov_item_no")),
 		ListPrice:       parseItemMoney(c.FormValue("list_price")),
-		LastPrice:       parseItemMoney(c.FormValue("last_price")),
-		LastQuotedAt:    strings.TrimSpace(c.FormValue("last_quoted_at")),
-		LastCustomer:    strings.TrimSpace(c.FormValue("last_customer")),
 		DefaultSupplier: strings.TrimSpace(c.FormValue("default_supplier")),
 		IsActive:        c.FormValue("is_active") == "1",
 		Notes:           strings.TrimSpace(c.FormValue("notes")),
@@ -296,28 +334,30 @@ func salesItemAPI(p *model.SalesItem) map[string]interface{} {
 	if p == nil {
 		return map[string]interface{}{}
 	}
-	fill := p.LastPrice
+	fill := p.ListPrice
 	if fill <= 0 {
-		fill = p.ListPrice
+		fill = p.LastPrice
 	}
 	return map[string]interface{}{
-		"item_id":        p.ItemID,
-		"item_kind":      p.ItemKind,
-		"kind_label":     p.KindLabel(),
-		"category":       p.Category,
-		"name":           p.Name,
-		"spec":           p.Spec,
-		"model":          p.Model,
-		"manufacturer":   p.Manufacturer,
-		"unit":           p.Unit,
-		"gov_item_no":    p.GovItemNo,
-		"list_price":     p.ListPrice,
-		"last_price":     p.LastPrice,
-		"fill_price":     fill,
-		"last_quoted_at": p.LastQuotedAt,
-		"last_customer":  p.LastCustomer,
-		"is_active":      p.IsActive,
-		"needs_review":   p.NeedsReview,
+		"item_id":          p.ItemID,
+		"item_kind":        p.ItemKind,
+		"kind_label":       p.KindLabel(),
+		"category":         p.Category,
+		"name":             p.Name,
+		"spec":             p.Spec,
+		"model":            p.Model,
+		"manufacturer":     p.ManufacturerLabel(),
+		"manufacturer_id":  p.ManufacturerID,
+		"supplier_id":      p.SupplierID,
+		"unit":             p.Unit,
+		"gov_item_no":      p.GovItemNo,
+		"list_price":       p.ListPrice,
+		"last_price":       p.LastPrice,
+		"fill_price":       fill,
+		"last_quoted_at":   p.LastQuotedAt,
+		"last_customer":    p.LastCustomer,
+		"is_active":        p.IsActive,
+		"needs_review":     p.NeedsReview,
 	}
 }
 

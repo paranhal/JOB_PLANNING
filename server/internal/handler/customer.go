@@ -391,6 +391,27 @@ func excelMaintBillingCycleLabel(s string) string {
 	}
 }
 
+// SearchJSON 품목 제조사·공급사 고르기용. GET /customers/search?q=
+func (h *CustomerHandler) SearchJSON(c echo.Context) error {
+	if !canViewSales(c) && !canWriteMaster(c) {
+		return echo.ErrForbidden
+	}
+	q := strings.TrimSpace(c.QueryParam("q"))
+	items, _, err := h.repo.List(q, "", "", "org_name", "asc", 1, 20, false, "")
+	if err != nil {
+		return err
+	}
+	out := make([]map[string]interface{}, 0, len(items))
+	for _, it := range items {
+		out = append(out, map[string]interface{}{
+			"customer_id": it.CustomerID,
+			"org_name":    it.OrgName,
+			"party_kind":  it.PartyKind,
+		})
+	}
+	return c.JSON(http.StatusOK, out)
+}
+
 // New 고객 등록 폼
 func (h *CustomerHandler) New(c echo.Context) error {
 	customers, _ := h.repo.ListAll()

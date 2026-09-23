@@ -17,14 +17,18 @@ func NewSalesItemRepo(db *sql.DB) *SalesItemRepo {
 }
 
 const salesItemSelect = `
-	SELECT item_id, COALESCE(item_kind,'goods'), COALESCE(category,''), name,
-		COALESCE(spec,''), COALESCE(model,''), COALESCE(manufacturer,''),
-		COALESCE(unit,'EA'), COALESCE(gov_item_no,''),
-		COALESCE(list_price,0), COALESCE(last_price,0),
-		COALESCE(last_quoted_at,''), COALESCE(last_customer,''),
-		COALESCE(default_supplier,''), COALESCE(is_active,1), COALESCE(needs_review,0),
-		COALESCE(notes,''), COALESCE(created_at,''), COALESCE(updated_at,'')
-	FROM sales_items`
+	SELECT i.item_id, COALESCE(i.item_kind,'goods'), COALESCE(i.category,''), i.name,
+		COALESCE(i.spec,''), COALESCE(i.model,''), COALESCE(i.manufacturer,''),
+		COALESCE(i.unit,'EA'), COALESCE(i.gov_item_no,''),
+		COALESCE(i.list_price,0), COALESCE(i.last_price,0),
+		COALESCE(i.last_quoted_at,''), COALESCE(i.last_customer,''),
+		COALESCE(i.default_supplier,''), COALESCE(i.is_active,1), COALESCE(i.needs_review,0),
+		COALESCE(i.notes,''), COALESCE(i.created_at,''), COALESCE(i.updated_at,''),
+		COALESCE(i.manufacturer_id,''), COALESCE(i.supplier_id,''),
+		COALESCE(m.org_name,''), COALESCE(s.org_name,'')
+	FROM sales_items i
+	LEFT JOIN customers m ON m.customer_id = i.manufacturer_id
+	LEFT JOIN customers s ON s.customer_id = i.supplier_id`
 
 type SalesItemFilter struct {
 	Search   string
@@ -39,30 +43,32 @@ func (r *SalesItemRepo) List(f SalesItemFilter) ([]model.SalesItem, error) {
 	var args []interface{}
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
-		q += ` AND (name LIKE ? OR COALESCE(spec,'') LIKE ? OR COALESCE(model,'') LIKE ? OR COALESCE(manufacturer,'') LIKE ?)`
-		args = append(args, like, like, like, like)
+		q += ` AND (i.name LIKE ? OR COALESCE(i.spec,'') LIKE ? OR COALESCE(i.model,'') LIKE ?
+			OR COALESCE(i.manufacturer,'') LIKE ? OR COALESCE(i.default_supplier,'') LIKE ?
+			OR COALESCE(m.org_name,'') LIKE ? OR COALESCE(s.org_name,'') LIKE ?)`
+		args = append(args, like, like, like, like, like, like, like)
 	}
 	if s := strings.TrimSpace(f.Kind); s != "" {
-		q += ` AND item_kind=?`
+		q += ` AND i.item_kind=?`
 		args = append(args, model.NormalizeSalesItemKind(s))
 	}
 	if s := strings.TrimSpace(f.Category); s != "" {
-		q += ` AND category=?`
+		q += ` AND i.category=?`
 		args = append(args, s)
 	}
 	switch strings.TrimSpace(f.Review) {
 	case "1", "yes", "true":
-		q += ` AND COALESCE(needs_review,0)=1`
+		q += ` AND COALESCE(i.needs_review,0)=1`
 	case "0", "no", "false":
-		q += ` AND COALESCE(needs_review,0)=0`
+		q += ` AND COALESCE(i.needs_review,0)=0`
 	}
 	switch strings.TrimSpace(f.Active) {
 	case "1", "yes", "true":
-		q += ` AND COALESCE(is_active,0)=1`
+		q += ` AND COALESCE(i.is_active,0)=1`
 	case "0", "no", "false":
-		q += ` AND COALESCE(is_active,0)=0`
+		q += ` AND COALESCE(i.is_active,0)=0`
 	}
-	q += ` ORDER BY COALESCE(needs_review,0) DESC, name COLLATE NOCASE, item_id`
+	q += ` ORDER BY COALESCE(i.needs_review,0) DESC, i.name COLLATE NOCASE, i.item_id`
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
@@ -79,7 +85,7 @@ func (r *SalesItemRepo) Get(id string) (*model.SalesItem, error) {
 	if id == "" {
 		return nil, sql.ErrNoRows
 	}
-	row := r.db.QueryRow(salesItemSelect+` WHERE item_id=?`, id)
+	row := r.db.QueryRow(salesItemSelect+` WHERE i.item_id=?`, id)
 	return scanSalesItem(row)
 }
 
@@ -89,8 +95,8 @@ func (r *SalesItemRepo) FindByName(name string) (*model.SalesItem, error) {
 		return nil, sql.ErrNoRows
 	}
 	row := r.db.QueryRow(salesItemSelect+`
-		WHERE lower(name)=lower(?)
-		ORDER BY COALESCE(is_active,0) DESC, item_id LIMIT 1`, name)
+		WHERE lower(i.name)=lower(?)
+		ORDER BY COALESCE(i.is_active,0) DESC, i.item_id LIMIT 1`, name)
 	return scanSalesItem(row)
 }
 
@@ -103,10 +109,12 @@ func (r *SalesItemRepo) Suggest(q string, limit int) ([]model.SalesItem, error) 
 	var args []interface{}
 	if q != "" {
 		like := "%" + q + "%"
-		sqlQ += ` AND (name LIKE ? OR COALESCE(spec,'') LIKE ? OR COALESCE(model,'') LIKE ? OR COALESCE(manufacturer,'') LIKE ?)`
-		args = append(args, like, like, like, like)
+		sqlQ += ` AND (i.name LIKE ? OR COALESCE(i.spec,'') LIKE ? OR COALESCE(i.model,'') LIKE ?
+			OR COALESCE(i.manufacturer,'') LIKE ? OR COALESCE(i.default_supplier,'') LIKE ?
+			OR COALESCE(m.org_name,'') LIKE ? OR COALESCE(s.org_name,'') LIKE ?)`
+		args = append(args, like, like, like, like, like, like, like)
 	}
-	sqlQ += ` ORDER BY COALESCE(is_active,0) DESC, COALESCE(needs_review,0) ASC, name COLLATE NOCASE LIMIT ?`
+	sqlQ += ` ORDER BY COALESCE(i.is_active,0) DESC, COALESCE(i.needs_review,0) ASC, i.name COLLATE NOCASE LIMIT ?`
 	args = append(args, limit)
 	rows, err := r.db.Query(sqlQ, args...)
 	if err != nil {
@@ -134,11 +142,11 @@ func (r *SalesItemRepo) Create(p *model.SalesItem) error {
 	p.ItemID = fmt.Sprintf("SI-%03d", n)
 	_, err = r.db.Exec(`
 		INSERT INTO sales_items (
-			item_id, item_kind, category, name, spec, model, manufacturer, unit, gov_item_no,
+			item_id, item_kind, category, name, spec, model, manufacturer, manufacturer_id, supplier_id, unit, gov_item_no,
 			list_price, last_price, last_quoted_at, last_customer, default_supplier,
 			is_active, needs_review, notes
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		p.ItemID, p.ItemKind, p.Category, p.Name, p.Spec, p.Model, p.Manufacturer, p.Unit, p.GovItemNo,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.ItemID, p.ItemKind, p.Category, p.Name, p.Spec, p.Model, p.Manufacturer, p.ManufacturerID, p.SupplierID, p.Unit, p.GovItemNo,
 		p.ListPrice, p.LastPrice, p.LastQuotedAt, p.LastCustomer, p.DefaultSupplier,
 		boolToInt(p.IsActive), boolToInt(p.NeedsReview), p.Notes)
 	if err != nil {
@@ -159,12 +167,12 @@ func (r *SalesItemRepo) Update(p *model.SalesItem) error {
 	return touchUpdate(r.db, "sales_items", "item_id", p.ItemID, p.Name, func() error {
 		_, err := r.db.Exec(`
 			UPDATE sales_items SET
-				item_kind=?, category=?, name=?, spec=?, model=?, manufacturer=?, unit=?, gov_item_no=?,
-				list_price=?, last_price=?, last_quoted_at=?, last_customer=?, default_supplier=?,
+				item_kind=?, category=?, name=?, spec=?, model=?, manufacturer=?, manufacturer_id=?, supplier_id=?, unit=?, gov_item_no=?,
+				list_price=?, default_supplier=?,
 				is_active=?, needs_review=?, notes=?, updated_at=CURRENT_TIMESTAMP
 			WHERE item_id=?`,
-			p.ItemKind, p.Category, p.Name, p.Spec, p.Model, p.Manufacturer, p.Unit, p.GovItemNo,
-			p.ListPrice, p.LastPrice, p.LastQuotedAt, p.LastCustomer, p.DefaultSupplier,
+			p.ItemKind, p.Category, p.Name, p.Spec, p.Model, p.Manufacturer, p.ManufacturerID, p.SupplierID, p.Unit, p.GovItemNo,
+			p.ListPrice, p.DefaultSupplier,
 			boolToInt(p.IsActive), boolToInt(p.NeedsReview), p.Notes, p.ItemID)
 		return err
 	})
@@ -197,27 +205,13 @@ func (r *SalesItemRepo) Confirm(id string) error {
 	return r.Update(p)
 }
 
-func (r *SalesItemRepo) TouchLastQuoted(id string, price int, customer, quotedAt string) error {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return fmt.Errorf("item_id 필요")
-	}
-	if _, err := r.Get(id); err != nil {
-		return err
-	}
-	customer = strings.TrimSpace(customer)
-	quotedAt = strings.TrimSpace(quotedAt)
-	_, err := r.db.Exec(`
-		UPDATE sales_items SET last_price=?, last_quoted_at=?, last_customer=?, updated_at=CURRENT_TIMESTAMP
-		WHERE item_id=?`, price, quotedAt, customer, id)
-	return err
-}
-
 func normalizeSalesItem(p *model.SalesItem) {
 	p.Name = strings.TrimSpace(p.Name)
 	p.Spec = strings.TrimSpace(p.Spec)
 	p.Model = strings.TrimSpace(p.Model)
 	p.Manufacturer = strings.TrimSpace(p.Manufacturer)
+	p.ManufacturerID = strings.TrimSpace(p.ManufacturerID)
+	p.SupplierID = strings.TrimSpace(p.SupplierID)
 	p.GovItemNo = strings.TrimSpace(p.GovItemNo)
 	p.DefaultSupplier = strings.TrimSpace(p.DefaultSupplier)
 	p.Notes = strings.TrimSpace(p.Notes)
@@ -243,6 +237,7 @@ func scanSalesItem(row salesItemScanner) (*model.SalesItem, error) {
 		&p.Spec, &p.Model, &p.Manufacturer, &p.Unit, &p.GovItemNo,
 		&p.ListPrice, &p.LastPrice, &p.LastQuotedAt, &p.LastCustomer, &p.DefaultSupplier,
 		&active, &review, &p.Notes, &p.CreatedAt, &p.UpdatedAt,
+		&p.ManufacturerID, &p.SupplierID, &p.MfrPartyName, &p.SupPartyName,
 	)
 	if err != nil {
 		return nil, err

@@ -31,6 +31,10 @@ type SalesItem struct {
 	Spec            string
 	Model           string
 	Manufacturer    string
+	ManufacturerID  string
+	SupplierID      string
+	MfrPartyName    string
+	SupPartyName    string
 	Unit            string
 	GovItemNo       string
 	ListPrice       int
@@ -113,6 +117,49 @@ func (p *SalesItem) KindLabel() string {
 	return SalesItemKindLabel(p.ItemKind)
 }
 
+func (p *SalesItem) ManufacturerLabel() string {
+	if p == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(p.MfrPartyName); s != "" {
+		return s
+	}
+	return strings.TrimSpace(p.Manufacturer)
+}
+
+func (p *SalesItem) SupplierLabel() string {
+	if p == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(p.SupPartyName); s != "" {
+		return s
+	}
+	return strings.TrimSpace(p.DefaultSupplier)
+}
+
+func (p *SalesItem) NeedsPartyLink() bool {
+	if p == nil {
+		return false
+	}
+	if strings.TrimSpace(p.Manufacturer) != "" && strings.TrimSpace(p.ManufacturerID) == "" {
+		return true
+	}
+	if strings.TrimSpace(p.DefaultSupplier) != "" && strings.TrimSpace(p.SupplierID) == "" {
+		return true
+	}
+	return false
+}
+
+// ItemQuoteUse 품목이 들어간 견적 한 줄. 품목 표에 복사하지 않는다. §47.20.3
+type ItemQuoteUse struct {
+	QuoteID   string
+	QuoteNo   string
+	QuoteDate string
+	Customer  string
+	LineName  string
+	UnitPrice int
+}
+
 func (p *SalesItem) LastPriceLabel() string {
 	if p == nil || p.LastPrice <= 0 {
 		return ""
@@ -143,7 +190,7 @@ func FillSalesItemKanban(items []SalesItem) KanbanView {
 			continue
 		}
 		seen[id] = true
-		extra := it.LastPriceLabel()
+		extra := it.ListPriceLabel()
 		if extra == "" {
 			extra = it.Unit
 		}
@@ -154,12 +201,16 @@ func FillSalesItemKanban(items []SalesItem) KanbanView {
 			Title:      it.Name,
 			Href:       "/items/" + id + "/edit",
 			EditHref:   "/items/" + id + "/edit",
-			OrgName:    it.Manufacturer,
+			OrgName:    it.ManufacturerLabel(),
 			Extra:      extra,
 			Bucket:     b,
 			DelayBadge: "",
 			DelayClass: "",
-			AmountDesc: it.LastPrice,
+			AmountDesc: it.ListPrice,
+		}
+		if it.NeedsPartyLink() {
+			card.DelayBadge = "연결 필요"
+			card.DelayClass = "bg-rose-100 text-rose-800"
 		}
 		if it.NeedsReview {
 			card.DelayBadge = "확인 필요"

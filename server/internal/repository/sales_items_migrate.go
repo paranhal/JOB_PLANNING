@@ -23,6 +23,8 @@ func applySalesItems(db *sql.DB) {
 			spec              TEXT NOT NULL DEFAULT '',
 			model             TEXT NOT NULL DEFAULT '',
 			manufacturer      TEXT NOT NULL DEFAULT '',
+			manufacturer_id   TEXT NOT NULL DEFAULT '',
+			supplier_id       TEXT NOT NULL DEFAULT '',
 			unit              TEXT NOT NULL DEFAULT 'EA',
 			gov_item_no       TEXT NOT NULL DEFAULT '',
 			list_price        INTEGER NOT NULL DEFAULT 0,
@@ -42,10 +44,14 @@ func applySalesItems(db *sql.DB) {
 		log.Printf("035 sales_items: %v", err)
 		return
 	}
+	addNamedColumn(db, "sales_items", "manufacturer_id", `ALTER TABLE sales_items ADD COLUMN manufacturer_id TEXT NOT NULL DEFAULT ''`)
+	addNamedColumn(db, "sales_items", "supplier_id", `ALTER TABLE sales_items ADD COLUMN supplier_id TEXT NOT NULL DEFAULT ''`)
 	for _, q := range []string{
 		`CREATE INDEX IF NOT EXISTS idx_sales_items_kind ON sales_items(item_kind)`,
 		`CREATE INDEX IF NOT EXISTS idx_sales_items_name ON sales_items(name)`,
 		`CREATE INDEX IF NOT EXISTS idx_sales_items_active ON sales_items(is_active, needs_review)`,
+		`CREATE INDEX IF NOT EXISTS idx_sales_items_mfr ON sales_items(manufacturer_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sales_items_sup ON sales_items(supplier_id)`,
 		`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order, is_active) VALUES
 			('SIK01','sales_item_kind','goods','물품',1,1),
 			('SIK02','sales_item_kind','service','AS·작업',2,1),
@@ -69,6 +75,7 @@ func applySalesItems(db *sql.DB) {
 	if err := SeedSalesItemsFromAssets(db); err != nil {
 		log.Printf("035 sales_items from assets: %v", err)
 	}
+	linkSalesItemParties(db)
 	applySalesQuotes(db)
 }
 
@@ -129,4 +136,64 @@ func seedSalesItemsFromAssets(db *sql.DB) error {
 		}
 	}
 	return rows.Err()
+}
+
+func linkSalesItemParties(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	mfr, err := db.Exec(`
+		UPDATE sales_items SET manufacturer_id=(
+			SELECT c.customer_id FROM customers c
+			WHERE TRIM(c.org_name)!='' AND (
+				lower(trim(c.org_name))=lower(trim(sales_items.manufacturer))
+				OR lower(trim(c.official_name))=lower(trim(sales_items.manufacturer))
+			)
+			LIMIT 1
+		)
+		WHERE COALESCE(manufacturer_id,'')='' AND TRIM(COALESCE(manufacturer,''))!=''
+		  AND EXISTS (
+			SELECT 1 FROM customers c
+			WHERE TRIM(c.org_name)!='' AND (
+				lower(trim(c.org_name))=lower(trim(sales_items.manufacturer))
+				OR lower(trim(c.official_name))=lower(trim(sales_items.manufacturer))
+			)
+		)`)
+	if err != nil {
+		log.Printf("sales_items link manufacturer: %v", err)
+		return
+	}
+	sup, err := db.Exec(`
+		UPDATE sales_items SET supplier_id=(
+			SELECT c.customer_id FROM customers c
+			WHERE TRIM(c.org_name)!='' AND (
+				lower(trim(c.org_name))=lower(trim(sales_items.default_supplier))
+				OR lower(trim(c.official_name))=lower(trim(sales_items.default_supplier))
+			)
+			LIMIT 1
+		)
+		WHERE COALESCE(supplier_id,'')='' AND TRIM(COALESCE(default_supplier,''))!=''
+		  AND EXISTS (
+			SELECT 1 FROM customers c
+			WHERE TRIM(c.org_name)!='' AND (
+				lower(trim(c.org_name))=lower(trim(sales_items.default_supplier))
+				OR lower(trim(c.official_name))=lower(trim(sales_items.default_supplier))
+			)
+		)`)
+	if err != nil {
+		log.Printf("sales_items link supplier: %v", err)
+		return
+	}
+	nm, ns := int64(0), int64(0)
+	if mfr != nil {
+		nm, _ = mfr.RowsAffected()
+	}
+	if sup != nil {
+		ns, _ = sup.RowsAffected()
+	}
+	if nm+ns > 0 {
+		log.Printf("sales_items party link: manufacturer=%d supplier=%d", nm, ns)
+		logCreate(db, "sales_items", "item_id", "party-link",
+			fmt.Sprintf("제조사 연결 %d건 · 공급사 연결 %d건", nm, ns))
+	}
 }

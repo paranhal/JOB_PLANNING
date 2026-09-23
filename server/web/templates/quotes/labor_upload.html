@@ -16,9 +16,37 @@
     </label>
     {{end}}
     <input type="file" name="file" accept=".xlsx" class="block">
+    {{if or .NeedPick .Preview}}
+    <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
+      {{if .Reason}}<p class="text-sm text-amber-900">{{.Reason}}</p>{{end}}
+      <p class="text-xs text-gray-600">직무·금액 열을 직접 고를 수 있습니다. 파일을 다시 선택한 뒤 미리보기를 누르세요.</p>
+      <div class="flex flex-wrap gap-3 items-end">
+        <label>직무 열
+          <select name="job_col" class="border rounded-lg px-2 py-1.5">
+            {{range .ColLetters}}<option value="{{.}}" {{if eq $.JobCol .}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </label>
+        <label>월평균
+          <select name="monthly_col" class="border rounded-lg px-2 py-1.5">
+            {{range .ColLetters}}<option value="{{.}}" {{if eq $.MonthlyCol .}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </label>
+        <label>일평균
+          <select name="daily_col" class="border rounded-lg px-2 py-1.5">
+            {{range .ColLetters}}<option value="{{.}}" {{if eq $.DailyCol .}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </label>
+        <label>시간평균
+          <select name="hourly_col" class="border rounded-lg px-2 py-1.5">
+            {{range .ColLetters}}<option value="{{.}}" {{if eq $.HourlyCol .}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </label>
+      </div>
+    </div>
+    {{end}}
     <button class="px-4 py-2 bg-blue-600 text-white rounded-lg">미리보기</button>
   </form>
-  {{if .Preview}}
+  {{if and .Preview (not .NeedPick)}}
   <form method="post" action="/labor-rates/upload/apply" class="bg-white rounded-xl border overflow-x-auto">
     <input type="hidden" name="year" value="{{.Year}}">
     <input type="hidden" name="file_name" value="{{.FileName}}">

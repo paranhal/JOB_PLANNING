@@ -44,6 +44,7 @@ func applyQuoteLabor(db *sql.DB) {
 	}
 	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_labor_rates_year_job ON labor_rates(year, job_code)`)
 	seedLaborRates2026(db)
+	cleanLaborJobNames(db)
 	if v, _ := NewSettingsRepo(db).Get(SettingQuoteOverhead); strings.TrimSpace(v) == "" {
 		_ = NewSettingsRepo(db).Set(SettingQuoteOverhead, "110")
 	}
@@ -84,6 +85,62 @@ func seedLaborRates2026(db *sql.DB) {
 		if err != nil {
 			log.Printf("037 labor seed %s: %v", j.code, err)
 		}
+	}
+}
+
+func cleanLaborJobNames(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	rows, err := db.Query(`SELECT rate_id, year, job_code, job_name FROM labor_rates ORDER BY year, job_code, rate_id`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return
+		}
+		log.Printf("labor CleanJobName: %v", err)
+		return
+	}
+	defer rows.Close()
+	type row struct {
+		id, code, name string
+		year           int
+	}
+	var all []row
+	for rows.Next() {
+		var it row
+		if err := rows.Scan(&it.id, &it.year, &it.code, &it.name); err != nil {
+			log.Printf("labor CleanJobName scan: %v", err)
+			return
+		}
+		all = append(all, it)
+	}
+	seen := map[string]string{}
+	renamed, merged := 0, 0
+	for _, it := range all {
+		cleaned := model.CleanJobName(it.name)
+		key := fmt.Sprintf("%d\x00%s", it.year, cleaned)
+		if prev, ok := seen[key]; ok {
+			if _, err := db.Exec(`DELETE FROM labor_rates WHERE rate_id=?`, it.id); err != nil {
+				log.Printf("labor CleanJobName merge %s: %v", it.id, err)
+				continue
+			}
+			merged++
+			_ = prev
+			continue
+		}
+		seen[key] = it.id
+		if cleaned != it.name {
+			if _, err := db.Exec(`UPDATE labor_rates SET job_name=? WHERE rate_id=?`, cleaned, it.id); err != nil {
+				log.Printf("labor CleanJobName rename %s: %v", it.id, err)
+				continue
+			}
+			renamed++
+		}
+	}
+	if renamed+merged > 0 {
+		log.Printf("labor CleanJobName: renamed=%d merged=%d", renamed, merged)
+		logCreate(db, "labor_rates", "rate_id", "clean-job-name",
+			fmt.Sprintf("직무명 번호 제거 %d건 · 같은 이름 합침 %d건", renamed, merged))
 	}
 }
 
@@ -169,7 +226,7 @@ func (r *QuoteRepo) SaveLaborRates(year int, items []model.LaborRate) (added, ch
 	}
 	for _, it := range items {
 		code := strings.TrimSpace(it.JobCode)
-		name := strings.TrimSpace(it.JobName)
+		name := model.CleanJobName(it.JobName)
 		if code == "" || name == "" {
 			continue
 		}
