@@ -24,7 +24,7 @@
        chmod +x update.sh
        ./update.sh
        curl -s localhost:8888/version
-  3. version 이 44-A 이고 built·started 가 방금이어야 성공
+  3. version 이 45-C 이고 built·started 가 방금이어야 성공
      index.as_keyword_links 가 접수 건수에 가깝게 올라가야 색인이 채워진 것이다
   4. http://공인IP:8888
 
