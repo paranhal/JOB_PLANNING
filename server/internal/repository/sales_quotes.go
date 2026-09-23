@@ -84,6 +84,37 @@ func (r *QuoteRepo) List(f QuoteFilter) ([]model.SalesQuote, error) {
 	return items, nil
 }
 
+func (r *QuoteRepo) ListBySalesIDs(ids []string) ([]model.SalesQuote, error) {
+	seen := map[string]bool{}
+	var uniq []string
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		uniq = append(uniq, id)
+	}
+	if len(uniq) == 0 {
+		return nil, nil
+	}
+	ph := strings.Repeat("?,", len(uniq))
+	q := salesQuoteSelect + ` WHERE sales_id IN (` + strings.TrimSuffix(ph, ",") + `)`
+	args := make([]interface{}, len(uniq))
+	for i := range uniq {
+		args[i] = uniq[i]
+	}
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	return scanQuotes(rows)
+}
+
 func (r *QuoteRepo) Get(id string) (*model.SalesQuote, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {

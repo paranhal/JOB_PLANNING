@@ -10,7 +10,7 @@ func TestBuildSalesPipelineMetrics(t *testing.T) {
 	now := time.Date(2026, 8, 21, 0, 0, 0, 0, time.Local)
 	projects := []SalesProject{
 		{SalesID: "a", Name: "리드", Stage: SalesStage4Discover, Probability: 10, ExpectedAmount: 30_000_000, ExpectedYM: "2026-09", CreatedAt: "2026-08-01 00:00:00"},
-		{SalesID: "b", Name: "계약", Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Probability: 100, ExpectedAmount: 180_000_000, ExpectedYM: "2026-10", WonAt: "2026-07-11", CreatedAt: "2026-07-01 00:00:00"},
+		{SalesID: "b", Name: "계약", Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Probability: 100, ExpectedAmount: 180_000_000, ContractAmount: 180_000_000, ExpectedYM: "2026-10", WonAt: "2026-07-11", CreatedAt: "2026-07-01 00:00:00"},
 		{SalesID: "c", Name: "실패", Stage: SalesStage4Closed, CloseReason: SalesCloseLost, Probability: 0, ExpectedAmount: 50_000_000, ExpectedYM: "2026-09", CreatedAt: "2026-07-01 00:00:00"},
 	}
 	hist := []SalesStageHistory{
@@ -117,5 +117,35 @@ func TestFormatSalesRateDash(t *testing.T) {
 	}
 	if FormatSalesDwell(1.5, 0) != "—" {
 		t.Fatal("체류 표본 0은 —")
+	}
+}
+
+func TestSalesPipelineAmountQuotes(t *testing.T) {
+	p := &SalesProject{Stage: SalesStage4Propose, ExpectedAmount: 1_000_000}
+	quotes := []SalesQuote{
+		{QuoteNo: "A", Rev: 0, Total: 100, Status: QuoteStatusSent},
+		{QuoteNo: "A", Rev: 1, Total: 200, Status: QuoteStatusSent},
+		{QuoteNo: "A", Rev: 2, Total: 300, Status: QuoteStatusSent},
+		{QuoteNo: "B", Rev: 0, Total: 50, Status: QuoteStatusSent},
+		{QuoteNo: "C", Rev: 0, Total: 999, Status: QuoteStatusLost},
+		{QuoteNo: "D", Rev: 0, Total: 1, Status: QuoteStatusExpired},
+	}
+	sum, n := ValidQuoteSum(quotes)
+	if sum != 350 || n != 2 {
+		t.Fatalf("sum=%d n=%d want 350, 2", sum, n)
+	}
+	amt, src := SalesPipelineAmount(p, quotes)
+	if amt != 350 || src != "quote" {
+		t.Fatalf("propose amt=%d src=%s", amt, src)
+	}
+	lost := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseLost, ExpectedAmount: 9_000_000, ContractAmount: 9_000_000}
+	amt, src = SalesPipelineAmount(lost, quotes)
+	if amt != 0 || src != "" {
+		t.Fatalf("lost amt=%d src=%s", amt, src)
+	}
+	drop := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseDropped, ExpectedAmount: 8_000_000}
+	amt, _ = SalesPipelineAmount(drop, quotes)
+	if amt != 0 {
+		t.Fatalf("drop amt=%d", amt)
 	}
 }

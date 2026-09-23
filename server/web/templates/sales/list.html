@@ -115,9 +115,10 @@
             {{if .Period}}{{.Period}}{{else}}—{{end}}
             {{if not .ExpectedYMConfirmed}}<span class="text-xs">미확정</span>{{end}}
           </td>
-          <td class="px-4 py-3 {{if not .ExpectedAmountConfirmed}}text-gray-400{{end}}">
+          <td class="px-4 py-3 {{if .AmountUnconfirmed}}text-gray-400{{end}}">
             {{if .Amount}}{{.Amount}}{{else}}—{{end}}
-            {{if not .ExpectedAmountConfirmed}}<span class="text-xs">미확정</span>{{end}}
+            {{if .AmountSource}}<span class="ml-1 text-[11px] text-gray-500">{{.AmountSource}}</span>{{end}}
+            {{if .AmountUnconfirmed}}<span class="text-xs">미확정</span>{{end}}
           </td>
           <td class="px-4 py-3 text-gray-600">{{.EffectiveProb}}%</td>
         </tr>

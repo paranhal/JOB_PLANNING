@@ -51,6 +51,12 @@ func (h *SalesHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	ids := make([]string, 0, len(items))
+	for i := range items {
+		ids = append(ids, items[i].SalesID)
+	}
+	quotes, _ := h.repo.QuotesBySalesIDs(ids)
+	model.ApplySalesPipelineAmounts(items, quotes)
 	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "name,stage,customer,period,amount")
 	if view == "list" && sortKey != "" {
 		sortSalesProjects(items, sortKey, dir)
@@ -125,6 +131,12 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	ids := make([]string, 0, len(items))
+	for i := range items {
+		ids = append(ids, items[i].SalesID)
+	}
+	quotes, _ := h.repo.QuotesBySalesIDs(ids)
+	model.ApplySalesPipelineAmounts(items, quotes)
 	pipe, err := h.repo.Pipeline(now, nil)
 	if err != nil {
 		return err
@@ -141,6 +153,8 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		}
 	}
 	migrated, _ := h.repo.ListMigratedUnchecked()
+	closed, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true})
+	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
 	return c.Render(http.StatusOK, "sales/dashboard.html", map[string]interface{}{
 		"Title":         "영업 대시보드",
 		"Active":        NavSalesDashboard,
@@ -153,6 +167,8 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		"StageMax":      maxAmt,
 		"Migrated":      migrated,
 		"MigratedN":     len(migrated),
+		"Drop":          model.BuildSalesDropDash(closed, yearStart, today),
+		"Judge":         model.BuildSalesJudgeAccuracy(closed),
 	})
 }
 
@@ -258,6 +274,8 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	if fromTaskID != "" && h.wbRepo != nil {
 		fromTask, _ = h.wbRepo.GetTask(fromTaskID)
 	}
+	quotes, _ := h.repo.QuotesBySalesIDs([]string{p.SalesID})
+	model.ApplySalesPipelineAmount(p, quotes)
 	return c.Render(http.StatusOK, "sales/show.html", map[string]interface{}{
 		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSales,
 		"Project":         h.viewProject(p, def),
@@ -639,7 +657,7 @@ func sortSalesProjects(items []model.SalesProject, sortKey, dir string) {
 		case "customer":
 			return strings.ToLower(p.CustomerValue())
 		case "amount":
-			return fmt.Sprintf("%020d", p.ExpectedAmount)
+			return fmt.Sprintf("%020d", p.PipeAmount)
 		default:
 			return p.ExpectedYM
 		}
@@ -660,7 +678,12 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 	n, total := p.ConfirmedCount()
 	customer := p.CustomerValue()
 	period := p.PeriodLabel()
-	amount := p.AmountLabel()
+	if p.PipeSource == "" {
+		model.ApplySalesPipelineAmount(p, nil)
+	}
+	amount := p.PipelineAmountLabel()
+	amountUnc := p.AmountUnconfirmed()
+	srcLabel := model.SalesAmountSourceLabel(p.PipeSource, p.PipeQuoteN)
 	return map[string]interface{}{
 		"SalesID":                 p.SalesID,
 		"SalesNo":                 p.SalesNo,
@@ -694,7 +717,9 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"Period":                  period,
 		"ExpectedYMConfirmed":     p.ExpectedYMConfirmed,
 		"Amount":                  amount,
+		"AmountSource":            srcLabel,
 		"ExpectedAmountConfirmed": p.ExpectedAmountConfirmed,
+		"AmountUnconfirmed":       amountUnc,
 		"Owner":                   p.SalesOwner,
 		"Status":                  p.Status,
 		"LostReason":              p.LostReason,

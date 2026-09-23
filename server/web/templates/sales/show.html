@@ -205,9 +205,10 @@
         </div>
         <div>
           <dt class="text-gray-500">예상 금액</dt>
-          <dd class="{{if not .Project.ExpectedAmountConfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
+          <dd class="{{if .Project.AmountUnconfirmed}}text-gray-400{{else}}text-gray-800{{end}}">
             {{if .Project.Amount}}{{.Project.Amount}}{{else}}—{{end}}
-            {{if not .Project.ExpectedAmountConfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
+            {{if .Project.AmountSource}}<span class="ml-1 text-[11px] text-gray-500">{{.Project.AmountSource}}</span>{{end}}
+            {{if .Project.AmountUnconfirmed}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100">미확정</span>{{end}}
           </dd>
         </div>
         <div>

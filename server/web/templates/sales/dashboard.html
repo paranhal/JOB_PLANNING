@@ -102,5 +102,46 @@
       </table>
     </div>
   </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <h3 class="font-semibold text-gray-800 mb-1">포기</h3>
+      <p class="text-2xl font-bold text-gray-800">{{.Drop.Count}}건</p>
+      <p class="text-[11px] text-gray-400 mb-3">올해 · 사유별</p>
+      {{range .Drop.ByCode}}
+      <div class="flex justify-between text-sm py-0.5"><span>{{.Label}}</span><span class="tabular-nums">{{.Count}}</span></div>
+      {{else}}
+      <p class="text-sm text-gray-400">올해 포기 건이 없습니다.</p>
+      {{end}}
+      <p class="text-[11px] text-gray-400 mt-3 mb-1">어느 단계에서 그만뒀나</p>
+      {{range .Drop.ByStage}}
+      <div class="flex justify-between text-sm py-0.5"><span>{{.Label}}</span><span class="tabular-nums">{{.Count}}</span></div>
+      {{end}}
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
+      <h3 class="font-semibold text-gray-800 mb-1">판단 정확도</h3>
+      <p class="text-[11px] text-gray-400 mb-3">동결 확도 구간별 실제 수주 비율 · 5건 미만은 —</p>
+      <table class="w-full text-sm">
+        <thead class="text-xs text-gray-500"><tr>
+          <th class="text-left py-1">영업대표</th>
+          <th class="text-right py-1">10~30</th>
+          <th class="text-right py-1">40~60</th>
+          <th class="text-right py-1">70~90</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .Judge}}
+          <tr>
+            <td class="py-1.5">{{.Owner}}</td>
+            <td class="py-1.5 text-right tabular-nums">{{.Low}}</td>
+            <td class="py-1.5 text-right tabular-nums">{{.Mid}}</td>
+            <td class="py-1.5 text-right tabular-nums">{{.High}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4" class="py-6 text-center text-gray-400">집계할 종료 건이 없습니다.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {{end}}

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -123,6 +124,143 @@ func weightedAmount(amount int, prob int) int64 {
 	return int64(amount) * int64(prob) / 100
 }
 
+// LatestValidQuotes 실주·만료가 아닌 견적 중 quote_no 별 가장 큰 rev 만. §47.7
+func LatestValidQuotes(quotes []SalesQuote) []SalesQuote {
+	best := map[string]SalesQuote{}
+	order := []string{}
+	for _, q := range quotes {
+		st := NormalizeQuoteStatus(q.Status)
+		if st == QuoteStatusLost || st == QuoteStatusExpired {
+			continue
+		}
+		key := strings.TrimSpace(q.QuoteNo)
+		if key == "" {
+			key = strings.TrimSpace(q.QuoteID)
+		}
+		if key == "" {
+			continue
+		}
+		cur, ok := best[key]
+		if !ok {
+			order = append(order, key)
+			best[key] = q
+			continue
+		}
+		if q.Rev > cur.Rev {
+			best[key] = q
+		}
+	}
+	out := make([]SalesQuote, 0, len(order))
+	for _, k := range order {
+		out = append(out, best[k])
+	}
+	return out
+}
+
+func ValidQuoteSum(quotes []SalesQuote) (sum, n int) {
+	got := LatestValidQuotes(quotes)
+	for i := range got {
+		sum += got[i].Total
+	}
+	return sum, len(got)
+}
+
+// SalesPipelineAmount §47.7 단계별 파이프라인 금액.
+func SalesPipelineAmount(p *SalesProject, quotes []SalesQuote) (amount int, source string) {
+	if p == nil {
+		return 0, ""
+	}
+	qsum, qn := ValidQuoteSum(quotes)
+	stage := strings.TrimSpace(p.Stage)
+	if stage == SalesStage4Closed || stage == SalesStageLost || stage == SalesStageDropped || stage == SalesStageWon {
+		switch p.CloseReason {
+		case SalesCloseContracted:
+			return p.ContractAmount, "contract"
+		case SalesCloseLost, SalesCloseDropped:
+			return 0, ""
+		}
+		if stage == SalesStageWon {
+			if p.AwardedAmount > 0 {
+				return p.AwardedAmount, "awarded"
+			}
+			if qn > 0 {
+				return qsum, "quote"
+			}
+			return p.ExpectedAmount, "expected"
+		}
+		return 0, ""
+	}
+	if stage == SalesStage4Discover || stage == SalesStageLead {
+		return p.ExpectedAmount, "expected"
+	}
+	if stage == SalesStage4Bid {
+		if p.BidStatus == SalesBidWon || p.BidStatus == SalesBidNegotiating {
+			if p.AwardedAmount > 0 {
+				return p.AwardedAmount, "awarded"
+			}
+			if qn > 0 {
+				return qsum, "quote"
+			}
+			return 0, "awarded"
+		}
+		if qn > 0 {
+			return qsum, "quote"
+		}
+		return p.ExpectedAmount, "expected"
+	}
+	if qn > 0 {
+		return qsum, "quote"
+	}
+	return p.ExpectedAmount, "expected"
+}
+
+func SalesAmountSourceLabel(source string, quoteN int) string {
+	switch source {
+	case "quote":
+		if quoteN <= 0 {
+			quoteN = 1
+		}
+		return fmt.Sprintf("견적 %d건", quoteN)
+	case "expected":
+		return "예상"
+	case "awarded":
+		return "낙찰"
+	case "contract":
+		return "계약"
+	default:
+		return ""
+	}
+}
+
+func ApplySalesPipelineAmount(p *SalesProject, quotes []SalesQuote) {
+	if p == nil {
+		return
+	}
+	amt, src := SalesPipelineAmount(p, quotes)
+	p.PipeAmount = amt
+	p.PipeSource = src
+	_, p.PipeQuoteN = ValidQuoteSum(quotes)
+}
+
+func GroupQuotesBySales(quotes []SalesQuote) map[string][]SalesQuote {
+	out := map[string][]SalesQuote{}
+	for i := range quotes {
+		id := strings.TrimSpace(quotes[i].SalesID)
+		if id == "" {
+			continue
+		}
+		out[id] = append(out[id], quotes[i])
+	}
+	return out
+}
+
+func ApplySalesPipelineAmounts(projects []SalesProject, quotes []SalesQuote) {
+	by := GroupQuotesBySales(quotes)
+	for i := range projects {
+		ApplySalesPipelineAmount(&projects[i], by[projects[i].SalesID])
+	}
+}
+
 // BuildSalesPipeline 단계별 건수·금액·가중 파이프라인·예정월·수주율·체류일·담당자 활동.
 func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []SalesStageHistory, acts []SalesActivity, now time.Time, extraPeople []string) SalesPipeline {
 	if now.IsZero() {
@@ -144,26 +282,31 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 	monthMap := map[string]*SalesMonthBucket{}
 	for i := range projects {
 		p := projects[i]
+		if p.PipeSource == "" && p.PipeAmount == 0 {
+			ApplySalesPipelineAmount(&p, nil)
+			projects[i] = p
+		}
 		si, ok := idx[p.Stage]
 		if !ok {
 			continue
 		}
 		st := &out.Stages[si]
 		st.Count++
-		st.Amount += int64(p.ExpectedAmount)
-		w := weightedAmount(p.ExpectedAmount, SalesProbability(&p))
-		if p.IsSupply() && p.ExpectedAmount > 0 {
-			w = int64(p.ExpectedAmount)
+		amt := int64(p.PipeAmount)
+		st.Amount += amt
+		w := weightedAmount(p.PipeAmount, SalesProbability(&p))
+		if p.IsSupply() && p.PipeAmount > 0 {
+			w = amt
 		}
 		st.Weighted += w
 		out.TotalCount++
-		out.TotalAmount += int64(p.ExpectedAmount)
+		out.TotalAmount += amt
 		out.WeightedTotal += w
-		switch {
-		default:
-			if strings.TrimSpace(p.Stage) != SalesStage4Closed {
-				out.PreWonAmount += int64(p.ExpectedAmount)
-			}
+		if strings.TrimSpace(p.Stage) != SalesStage4Closed && p.CloseReason != SalesCloseLost && p.CloseReason != SalesCloseDropped {
+			out.PreWonAmount += amt
+		}
+		if p.CloseReason == SalesCloseContracted {
+			out.WonAmount += amt
 		}
 		ym := NormalizeSalesYM(p.ExpectedYM)
 		key := ym
@@ -178,7 +321,7 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 			monthMap[key] = b
 		}
 		b.Count++
-		b.Amount += int64(p.ExpectedAmount)
+		b.Amount += amt
 	}
 	out.WinContracted, out.WinLost = SalesWinSample(projects)
 	out.WinRateLabel = FormatSalesRate(out.WinContracted, out.WinContracted+out.WinLost)

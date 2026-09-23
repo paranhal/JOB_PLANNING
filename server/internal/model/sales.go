@@ -152,6 +152,10 @@ type SalesProject struct {
 
 	CustomerName string
 	StageLabel   string
+
+	PipeAmount int
+	PipeSource string
+	PipeQuoteN int
 }
 
 // SalesStageHistory 단계 변경 이력 (§32.3.3)
@@ -304,6 +308,17 @@ func (p *SalesProject) AmountLabel() string {
 		return ""
 	}
 	return formatSalesAmount(p.ExpectedAmount) + "원"
+}
+
+func (p *SalesProject) PipelineAmountLabel() string {
+	if p == nil || p.PipeAmount <= 0 {
+		return ""
+	}
+	return formatSalesAmount(p.PipeAmount) + "원"
+}
+
+func (p *SalesProject) AmountUnconfirmed() bool {
+	return p != nil && p.PipeSource == "expected" && !p.ExpectedAmountConfirmed
 }
 
 // DisplayNo 화면에 보이는 사업번호. 없으면 내부 키 sales_id. §47.10.3

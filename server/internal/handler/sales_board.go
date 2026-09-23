@@ -285,15 +285,18 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 		if fromTask != "" {
 			href += "?tab=timeline&from_task=" + url.QueryEscape(fromTask)
 		}
-		amt := p.AmountLabel()
+		amt := p.PipelineAmountLabel()
 		if amt == "" {
 			amt = "0원"
+		}
+		if src := model.SalesAmountSourceLabel(p.PipeSource, p.PipeQuoteN); src != "" {
+			amt += " · " + src
 		}
 		last := lastAct[p.SalesID]
 		if last == "" {
 			last = "—"
 		}
-		amounts[idx] += int64(p.ExpectedAmount)
+		amounts[idx] += int64(p.PipeAmount)
 		nx := next[p.SalesID]
 		nextTitle := strings.TrimSpace(nx.NextAction)
 		dn := model.SalesDnLabel(nx.NextActionDate, today)
@@ -344,8 +347,8 @@ func salesProjectKanban(items []model.SalesProject, stages []model.SalesStageDef
 			Assignee: p.SalesOwner, Bucket: key, Stage: key,
 			LeftStyle: model.WorkCardColorStyle(p.SalesOwner, "", "sales"),
 			SortDate:  sortKey, DueDate: p.PeriodLabel(),
-			AmountUnconfirmed: !p.ExpectedAmountConfirmed, LastActivity: last,
-			AmountDesc: p.ExpectedAmount, Tentative: p.IsTentativeName,
+			AmountUnconfirmed: p.AmountUnconfirmed(), LastActivity: last,
+			AmountDesc: p.PipeAmount, Tentative: p.IsTentativeName,
 			NextLabel: nextTitle, ProbLabel: prob, DnLabel: dn,
 			DelayBadge: delay, DelayClass: delayClass,
 		})

@@ -8,6 +8,10 @@ import (
 	"customer-support/internal/model"
 )
 
+func (r *SalesRepo) QuotesBySalesIDs(ids []string) ([]model.SalesQuote, error) {
+	return NewQuoteRepo(r.db).ListBySalesIDs(ids)
+}
+
 func (r *SalesRepo) Pipeline(now time.Time, extraPeople []string) (model.SalesPipeline, error) {
 	return r.PipelineFilter(now, extraPeople, SalesListFilter{})
 }
@@ -37,6 +41,15 @@ func (r *SalesRepo) PipelineFilter(now time.Time, extraPeople []string, f SalesL
 		}
 		items = kept
 	}
+	idList := make([]string, 0, len(items))
+	for i := range items {
+		idList = append(idList, items[i].SalesID)
+	}
+	quotes, err := NewQuoteRepo(r.db).ListBySalesIDs(idList)
+	if err != nil {
+		return model.SalesPipeline{}, err
+	}
+	model.ApplySalesPipelineAmounts(items, quotes)
 	stages, _ := r.StagesFor(f.DealType)
 	hist, err := r.ListAllHistory()
 	if err != nil {
