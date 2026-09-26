@@ -453,6 +453,7 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,''),
 		       COALESCE(ar.cause_cat1,''), COALESCE(ar.cause_cat2,''), COALESCE(ar.cause_cat3,''),
 		       COALESCE(ar.visit_date,''), COALESCE(ar.process_type_reason,''),
+		       COALESCE(ar.moved_task_id,''),
 		       c.org_name, COALESCE(a.product_name,''), COALESCE(a.install_location,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -486,6 +487,7 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		&as.UrgencyReason, &as.UrgencyReasonNote,
 		&as.CauseCat1, &as.CauseCat2, &as.CauseCat3,
 		&as.VisitDate, &as.ProcessTypeReason,
+		&as.MovedTaskID,
 		&as.OrgName, &as.ProductName, &as.InstallLocation,
 	)
 	if err == sql.ErrNoRows {
@@ -608,7 +610,7 @@ func (r *ASRepo) listByParent(asID string, reopenOnly bool) ([]model.ASHistoryIt
 		SELECT ar.as_id, ar.as_number, date(ar.receipt_datetime),
 		       COALESCE(ar.visit_scheduled_date,''), COALESCE(date(ar.complete_datetime),''),
 		       COALESCE(ar.assigned_to,''), COALESCE(ar.symptom,''),
-		       COALESCE(` + asActionTakenSQL("ar") + `,''), ar.status
+		       COALESCE(`+asActionTakenSQL("ar")+`,''), ar.status
 		FROM as_receipts ar
 		WHERE ar.parent_as_id = ? AND COALESCE(ar.is_reopen,0) = ?
 		ORDER BY ar.receipt_datetime DESC`, asID, flag)

@@ -47,6 +47,16 @@
       <button type="button" @click="dailyOpen=true"
               class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">일일 업무 등록</button>
       {{end}}
+      {{if .CanMoveAdminWork}}
+      <form method="POST" action="/as/{{.AS.ASID}}/to-admin-work" class="flex flex-wrap items-center gap-2"
+            onsubmit="var r=this.reason.value.trim(); if(!r){alert('사유를 입력하세요.'); return false;} return confirm('이 접수를 행정/지원 업무로 옮길까요? AS 번호는 남고 상태는 행정/지원 이관으로 닫힙니다.');">
+        <input name="reason" required placeholder="이관 사유" class="px-2 py-1.5 border rounded-lg text-sm w-40">
+        <button type="submit" class="px-3 py-1.5 border border-violet-300 rounded-lg text-sm font-medium text-violet-800 hover:bg-violet-50">행정/지원으로 옮기기</button>
+      </form>
+      {{end}}
+      {{if .AS.MovedTaskID}}
+      <a href="/workboard/tasks/{{.AS.MovedTaskID}}" class="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700">{{.AS.MovedTaskID}} 로 옮김</a>
+      {{end}}
       {{if .CanDelete}}
       <form method="POST" action="/as/{{.AS.ASID}}/delete" onsubmit="return confirm('이 AS 접수를 삭제할까요?
 관련 처리 기록도 함께 삭제됩니다.');">
@@ -62,7 +72,7 @@
   </div>
 
   {{if .ActionOK}}
-  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.ActionOK}}</div>
+  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{if eq .ActionOK "moved"}}행정/지원 업무로 옮겼습니다.{{else}}{{.ActionOK}}{{end}}</div>
   {{end}}
   {{if .ActionErr}}
   <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErr}}</div>

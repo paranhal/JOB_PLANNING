@@ -21,6 +21,7 @@
       </div>
     </div>
   </div>
+  {{if .IsNew}}{{template "classify_hint" .}}{{end}}
 
   {{if eq .Err "schedule_date"}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">일정 확정 시 예정업무일을 먼저 입력하세요.</div>

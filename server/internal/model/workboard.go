@@ -326,7 +326,7 @@ func MapASStatusToWB(asStatus string) string {
 		return WBTaskWaitingFor
 	case WBTaskReview:
 		return WBTaskReview
-	case "completed", "closed", WBTaskComplete, "done":
+	case "completed", "closed", WBTaskComplete, "done", StatusAdminWork:
 		return WBTaskComplete
 	case "received", WBTaskWaiting, WBTaskInbox, "planned", "open":
 		return WBTaskWaiting
@@ -670,14 +670,15 @@ type WorkTask struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 
-	ProjectName        string `json:"project_name,omitempty"`
-	ProjectColor       string `json:"project_color,omitempty"`
-	OrgName            string `json:"org_name,omitempty"` // 거래처 표시명(기관명 또는 직접입력)
-	DaysLeft           int    `json:"days_left"`
-	ChildCount         int    `json:"child_count,omitempty"`
-	Depth              int    `json:"depth,omitempty"`                // 목록 들여쓰기(1=상위)
-	BoardHref          string `json:"board_href,omitempty"`           // 칸반·목록 링크(원본 AS/점검 등)
-	WaitingActionCount int    `json:"waiting_action_count,omitempty"` // 목록 뱃지: 회신 대기 n건
+	ProjectName        string  `json:"project_name,omitempty"`
+	ProjectColor       string  `json:"project_color,omitempty"`
+	OrgName            string  `json:"org_name,omitempty"` // 거래처 표시명(기관명 또는 직접입력)
+	DaysLeft           int     `json:"days_left"`
+	ChildCount         int     `json:"child_count,omitempty"`
+	Depth              int     `json:"depth,omitempty"`                // 목록 들여쓰기(1=상위)
+	BoardHref          string  `json:"board_href,omitempty"`           // 칸반·목록 링크(원본 AS/점검 등)
+	WaitingActionCount int     `json:"waiting_action_count,omitempty"` // 목록 뱃지: 회신 대기 n건
+	LinkedAssets       []Asset `json:"linked_assets,omitempty"`        // work_task_assets. §48.4
 }
 
 // WorkTaskMember 업무 참여자 1명. work_task_members (§7.7.2).

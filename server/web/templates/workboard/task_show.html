@@ -28,6 +28,7 @@
       </div>
       <p class="text-sm text-gray-500 mt-1">업무 고유번호 <span class="font-mono text-gray-800">{{$t.TaskID}}</span>
         {{if .Parent}} · 상위 <a href="/workboard/tasks/{{.Parent.TaskID}}" class="text-blue-600 hover:underline">{{.Parent.Title}}</a>{{end}}
+        {{if .MovedFromAS}} · <a href="/as/{{.MovedFromAS.ASID}}" class="text-violet-700 hover:underline">{{.MovedFromAS.ASNumber}} 에서 옮겨옴</a>{{end}}
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
@@ -260,6 +261,16 @@
       </div>
       {{end}}
       <div><dt class="text-xs text-gray-500">거래처</dt><dd>{{if $t.CustomerLabel}}{{$t.CustomerLabel}}{{else}}—{{end}}</dd></div>
+      {{if $t.LinkedAssets}}
+      <div class="sm:col-span-2">
+        <dt class="text-xs text-gray-500">설치자산</dt>
+        <dd class="space-y-0.5">
+          {{range $t.LinkedAssets}}
+          <div><a href="/assets/{{.AssetID}}" class="text-blue-700 hover:underline">{{.ProductName}}</a>{{if .ModelName}} · {{.ModelName}}{{end}}{{if .InstallLocation}} · {{.InstallLocation}}{{end}}</div>
+          {{end}}
+        </dd>
+      </div>
+      {{end}}
       <div class="sm:col-span-2"><dt class="text-xs text-gray-500">업무명</dt><dd class="font-medium">{{$t.Title}}</dd></div>
       {{if $t.Description}}
       <div class="sm:col-span-2"><dt class="text-xs text-gray-500">{{if $isAS}}접수 내용{{else if $isMnt}}점검 내용{{else}}업무 내용{{end}}</dt><dd class="whitespace-pre-wrap">{{$t.Description}}</dd></div>
@@ -328,6 +339,18 @@
       </select>
       <input name="customer_name" value="{{if not $t.CustomerID}}{{$t.CustomerName}}{{end}}"
              class="mt-2 w-full border rounded-lg px-3 py-2" placeholder="목록에 없으면 직접입력 (예: 충남교육청)">
+    </div>
+    {{if $.EditMode}}{{template "task_asset_picker" .}}{{end}}
+    {{end}}
+
+    {{if and (not $.EditMode) $t.LinkedAssets}}
+    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+      <p class="text-xs font-medium text-slate-600 mb-1">설치자산</p>
+      <ul class="space-y-0.5">
+        {{range $t.LinkedAssets}}
+        <li><a href="/assets/{{.AssetID}}" class="text-blue-700 hover:underline">{{.ProductName}}</a>{{if .ModelName}} · {{.ModelName}}{{end}}{{if .InstallLocation}} · {{.InstallLocation}}{{end}}</li>
+        {{end}}
+      </ul>
     </div>
     {{end}}
 

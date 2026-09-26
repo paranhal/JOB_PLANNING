@@ -12,6 +12,8 @@
     {{end}}
   </div>
 
+  {{template "classify_hint" .}}
+
   {{if .FlashErr}}
   <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
     {{if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.
@@ -63,6 +65,7 @@
       </select>
       <input name="customer_name" class="mt-2 w-full border rounded-lg px-3 py-2" placeholder="목록에 없으면 직접입력 (예: 충남교육청)" value="{{if and $p (eq $p.CustomerID "")}}{{$p.CustomerName}}{{end}}">
     </div>
+    {{template "task_asset_picker" .}}
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">업무명 <span class="text-red-500">*</span></label>

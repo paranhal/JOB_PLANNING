@@ -43,6 +43,7 @@ func TestMapASStatusToWB(t *testing.T) {
 		WBTaskWaitingFor:   WBTaskWaitingFor,
 		WBTaskReview:       WBTaskReview,
 		"cancelled":        "",
+		StatusAdminWork:    WBTaskComplete,
 	}
 	for in, want := range cases {
 		if got := MapASStatusToWB(in); got != want {

@@ -298,6 +298,10 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 		out.LeadTimeWarn = fmt.Sprintf("지표 계산 오류: 방문(%.1f일)이 완료(%.1f일)보다 큽니다",
 			out.VisitAvgDays, out.CompleteAvgDays)
 	}
+	out.AdminMovedN, err = r.CountASAdminMoved(cur.From, cur.ToExclusive, f)
+	if err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
@@ -516,7 +520,7 @@ func (r *StatsRepo) avgASVisitLeadTime(from, toEx string, f model.StatsMeetingFi
 		  AND TRIM(COALESCE(ar.visit_date,'')) != ''
 		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
 		  AND ar.complete_datetime >= ?
-		  AND ar.complete_datetime < ?` + asSQL
+		  AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL
 	args := append([]interface{}{from, toEx}, extra...)
 	var avgNull interface{}
 	var cnt int
@@ -549,7 +553,7 @@ func (r *StatsRepo) avgASLeadTimes(from, toEx string, f model.StatsMeetingFilter
 		  AND TRIM(COALESCE(ar.start_datetime,'')) != ''
 		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
 		  AND ar.complete_datetime >= ?
-		  AND ar.complete_datetime < ?` + asSQL
+		  AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL
 	args = append([]interface{}{from, toEx}, args...)
 	var visitNull, compNull interface{}
 	var cnt int

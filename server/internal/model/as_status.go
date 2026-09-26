@@ -30,6 +30,7 @@ func IsASWorkflowStatus(status string) bool {
 // AS 상태값
 const (
 	StatusPartialComplete = "partial_complete" // 부분완료: 통계=완료, 운영=진행중
+	StatusAdminWork       = "admin_work"       // 행정/지원 이관. 리드타임 제외. §48.4
 )
 
 // SQL IN 절용 상태 집합
@@ -39,7 +40,7 @@ const (
 	// SQLStatusStatsOpen 통계 미완료(부분완료 제외 — 하위업무는 별도 집계)
 	SQLStatusStatsOpen = "('received','assigned','in_progress','hold','transfer')"
 	// SQLStatusFullyClosed 완전 종료(읽기전용·재접수 대상)
-	SQLStatusFullyClosed = "('completed','closed')"
+	SQLStatusFullyClosed = "('completed','closed','admin_work')"
 	// SQLStatusOpenIncomplete 담당자 미완료(운영)
 	SQLStatusOpenIncomplete = "('received','assigned','in_progress','hold','transfer','partial_complete')"
 	// SQLStatusOpsInProgress 운영상 진행중(방문일정 버킷 등)
@@ -350,7 +351,7 @@ func IsStatsCompletedStatus(status string) bool {
 // CanReopenAS 재접수할 수 있는 상태인지 — 이미 끝난 건만 다시 접수한다.
 // 부분완료·진행 중인 건은 재접수 대신 조치로 이어간다.
 func CanReopenAS(status string) bool {
-	return status == "completed" || status == "closed"
+	return status == "completed" || status == "closed" || status == StatusAdminWork
 }
 
 // CanIssueASReport 조치완료보고서 발급 가능 상태. 완료·종료·부분완료. §12.10.5

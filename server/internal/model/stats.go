@@ -66,7 +66,7 @@ const (
 	StatsDurationOverMin    = 60   // 최장 소요 시간 기준(분)
 	StatsPlanTargetPct      = 95.0 // 계획 수립률 목표(%). §8.4
 	// StatsVisitLeadHint §4.7 접수→방문 카드 설명. 착수일시가 아니라 방문일.
-	StatsVisitLeadHint = "착수일시가 아니라 방문일 기준입니다. 현장방문이고 방문일이 있는 완료 건만 셉니다. 방문일이 없는 옛 데이터는 빠져 표본이 작을 수 있습니다."
+	StatsVisitLeadHint     = "착수일시가 아니라 방문일 기준입니다. 현장방문이고 방문일이 있는 완료 건만 셉니다. 방문일이 없는 옛 데이터는 빠져 표본이 작을 수 있습니다."
 	StatsMetricScopeASOnly = "AS만"
 	StatsMetricScopeCounts = "AS · 정기점검 · 행정지원"
 )
@@ -313,12 +313,12 @@ type StatsPeriodColumn struct {
 
 // StatsMeetingFilter 팀전체 / 담당자별 / 업무구분·업무(제품)별 + 사업
 type StatsMeetingFilter struct {
-	Scope         string // team | assignee | work_type | product
-	Key           string // 담당자명 · as|maintenance|admin · 제품명
-	ProjectID     string // 사업(work_projects) 선택 시
-	IncludeImport         bool // true면 data_origin=import 포함. 기본은 제외(§4.3)
-	ExcludeSalesActivity  bool // true면 source_type=sales_activity 를 집계에서 뺀다. 기본은 포함(§32.11)
-	MetricsBaseDate       string // 집계 하한 YYYY-MM-DD. 설정에서 채운다. 토글로 풀리지 않는다 (§4.5.3)
+	Scope                string // team | assignee | work_type | product
+	Key                  string // 담당자명 · as|maintenance|admin · 제품명
+	ProjectID            string // 사업(work_projects) 선택 시
+	IncludeImport        bool   // true면 data_origin=import 포함. 기본은 제외(§4.3)
+	ExcludeSalesActivity bool   // true면 source_type=sales_activity 를 집계에서 뺀다. 기본은 포함(§32.11)
+	MetricsBaseDate      string // 집계 하한 YYYY-MM-DD. 설정에서 채운다. 토글로 풀리지 않는다 (§4.5.3)
 }
 
 // StatsKPICard 상단 중요 통계 카드
@@ -339,6 +339,7 @@ type StatsKPICard struct {
 	PlanningPlanned int
 	HasPlanning     bool
 	PlanDisplay     StatsValue
+	AdminMovedN     int // 행정/지원으로 이관한 AS 건수(기간). §48.4
 }
 
 // StatsWorkAnalysis 선택 기간 업무 분석(접수·방문·완료·이월). AS+정기점검+행정 합산.
@@ -452,33 +453,33 @@ type StatsSpotlight struct {
 
 // StatsChartPoint 기간 축 1점(막대·추이)
 type StatsChartPoint struct {
-	Label      string  `json:"label"`       // 축 표시: 일=01/02, 주=전전주…, 월=전전월…
-	RangeLabel string  `json:"range_label"` // 실제 구간(툴팁): 07/20~07/26 또는 2026-06
-	Date       string  `json:"date"`        // 버킷 시작일 YYYY-MM-DD
-	Received   int     `json:"received"`    // 접수
-	Open       int     `json:"open"`        // 미완료(접수·배정·진행중·보류·이관 등)
-	Completed int `json:"completed"` // 완료
-	Planned   int `json:"planned"`
+	Label      string `json:"label"`       // 축 표시: 일=01/02, 주=전전주…, 월=전전월…
+	RangeLabel string `json:"range_label"` // 실제 구간(툴팁): 07/20~07/26 또는 2026-06
+	Date       string `json:"date"`        // 버킷 시작일 YYYY-MM-DD
+	Received   int    `json:"received"`    // 접수
+	Open       int    `json:"open"`        // 미완료(접수·배정·진행중·보류·이관 등)
+	Completed  int    `json:"completed"`   // 완료
+	Planned    int    `json:"planned"`
 }
 
 // DailyMeetingStat 일 단위 저장
 type DailyMeetingStat struct {
-	StatDate string
-	Scope    string
-	ScopeKey string
-	Planned  int
-	Receipt  int
-	Process  int
-	Modified int
-	ASPlanned     int
-	ASReceipt     int
-	ASProcess     int
-	MntPlanned    int
-	MntReceipt    int
-	MntProcess    int
-	AdminPlanned  int
-	AdminReceipt  int
-	AdminProcess  int
+	StatDate     string
+	Scope        string
+	ScopeKey     string
+	Planned      int
+	Receipt      int
+	Process      int
+	Modified     int
+	ASPlanned    int
+	ASReceipt    int
+	ASProcess    int
+	MntPlanned   int
+	MntReceipt   int
+	MntProcess   int
+	AdminPlanned int
+	AdminReceipt int
+	AdminProcess int
 }
 
 const (

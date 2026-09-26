@@ -473,6 +473,7 @@ func statsStatusLabel(s string) string {
 		"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "보류",
 		"transfer": "이관", "cancelled": "접수취소",
 		"completed": "완료", "closed": "종료", "partial_complete": "부분완료",
+		"admin_work": "행정/지원 이관",
 	}
 	if l, ok := m[s]; ok {
 		return l

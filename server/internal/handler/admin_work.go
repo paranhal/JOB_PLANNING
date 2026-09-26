@@ -17,11 +17,13 @@ type AdminWorkHandler struct {
 	repo         *repository.WBRepo
 	userRepo     *repository.UserRepo
 	customerRepo *repository.CustomerRepo
+	codeRepo     *repository.CodeRepo
+	assetRepo    *repository.AssetRepo
 	notices      *assignNoticeHook
 }
 
-func NewAdminWorkHandler(repo *repository.WBRepo, userRepo *repository.UserRepo, customerRepo *repository.CustomerRepo) *AdminWorkHandler {
-	return &AdminWorkHandler{repo: repo, userRepo: userRepo, customerRepo: customerRepo}
+func NewAdminWorkHandler(repo *repository.WBRepo, userRepo *repository.UserRepo, customerRepo *repository.CustomerRepo, codeRepo *repository.CodeRepo, assetRepo *repository.AssetRepo) *AdminWorkHandler {
+	return &AdminWorkHandler{repo: repo, userRepo: userRepo, customerRepo: customerRepo, codeRepo: codeRepo, assetRepo: assetRepo}
 }
 
 func (h *AdminWorkHandler) List(c echo.Context) error {
@@ -120,13 +122,16 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 	assignees, _ := h.userRepo.ListAssignable()
 	customers, _ := h.customerRepo.ListAll()
 	data := map[string]interface{}{
-		"Title":     "행정관련업무 등록",
-		"Active":    NavAdminWork,
-		"Projects":  projects,
-		"Assignees": assignees,
-		"Customers": customers,
-		"Today":     time.Now().Format("2006-01-02"),
-		"FlashErr":  c.QueryParam("err"),
+		"Title":            "행정관련업무 등록",
+		"Active":           NavAdminWork,
+		"Projects":         projects,
+		"Assignees":        assignees,
+		"Customers":        customers,
+		"Today":            time.Now().Format("2006-01-02"),
+		"FlashErr":         c.QueryParam("err"),
+		"ClassifyHint":     classifyHint(h.codeRepo),
+		"CustomerAssets":   []model.Asset{},
+		"SelectedAssetIDs": map[string]bool{},
 	}
 	parentID := strings.TrimSpace(c.QueryParam("parent"))
 	if parentID != "" {
@@ -137,6 +142,10 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 			data["FlashErr"] = subtaskErrQuery(err)
 		} else {
 			data["Parent"] = parent
+			if h.assetRepo != nil && parent.CustomerID != "" {
+				assets, _ := h.assetRepo.ListByCustomer(parent.CustomerID)
+				data["CustomerAssets"] = assets
+			}
 		}
 	} else {
 		choices, _ := h.repo.ListSubtaskParentCandidates("")
@@ -233,6 +242,7 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		}
 		return err
 	}
+	_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
 	recordTaskNotice(h.notices, c, t, "")
 	if applied, code := applyRecurrenceFromForm(c, h.repo, t, nil); code != "" {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+url.PathEscape(t.TaskID)+"?err="+code)

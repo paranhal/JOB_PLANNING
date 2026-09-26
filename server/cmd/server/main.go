@@ -320,6 +320,7 @@ func main() {
 	as.POST("/:id/process", h.AS.AddProcess, processAS)
 	as.POST("/:id/process/:process_id/delete", h.AS.DeleteProcess, adminOnly)
 	as.POST("/:id/delete", h.AS.Delete, adminOnly)
+	as.POST("/:id/to-admin-work", h.AS.ToAdminWork)
 
 	ms := g.Group("/maintenance/sites", adminOnly)
 	ms.GET("", h.Maintenance.ListSiteConfigs)

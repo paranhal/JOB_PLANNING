@@ -160,10 +160,12 @@ func (h *AssetHandler) Show(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	slots, filled := buildAssetImageSlots(h.attachRepo, id)
+	history, _ := h.wbRepo.ListAssetSupportHistory(id, 80)
 	return c.Render(http.StatusOK, "asset/show.html", map[string]interface{}{
 		"Title": a.ProductName, "Active": NavAssets, "Asset": a,
 		"Images": slots, "ImageCount": filled, "CanUpload": filled < 3,
 		"CanWrite": canWriteMaster(c), "CanReceive": canReceiveAS(c),
+		"SupportHistory": history,
 	})
 }
 

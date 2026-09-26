@@ -1721,6 +1721,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
 	}
+	if existing.SourceType == "" && registerScope {
+		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+	}
 	recordTaskNotice(h.notices, c, t, existing.Assignee)
 	if err := h.saveOccurrenceStatus(existing, t, c); err != nil {
 		code := "rec_rule"
@@ -1906,6 +1909,21 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"BackURL":        back,
 		"Subtasks":       subtasks,
 		"CanAddSubtask":  canWrite && t.SourceType == "" && t.RecurrenceRole != model.RecurrenceRoleOccurrence && h.repo.CanAttachSubtask(t.TaskID) == nil,
+	}
+	sel := map[string]bool{}
+	for _, a := range t.LinkedAssets {
+		sel[a.AssetID] = true
+	}
+	data["SelectedAssetIDs"] = sel
+	data["CustomerAssets"] = []model.Asset{}
+	if t.CustomerID != "" {
+		assets, _ := h.repo.ListCustomerAssets(t.CustomerID)
+		data["CustomerAssets"] = assets
+	}
+	if t.SourceType == "" && h.asRepo != nil {
+		if src, _ := h.asRepo.GetByMovedTaskID(t.TaskID); src != nil {
+			data["MovedFromAS"] = src
+		}
 	}
 	rule := defaultRecurrenceForm(t, data["Today"].(string))
 	archived := false

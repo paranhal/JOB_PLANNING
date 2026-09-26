@@ -1,0 +1,42 @@
+{{define "classify_hint"}}
+{{if .ClassifyHint}}
+<div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-line leading-relaxed">{{.ClassifyHint}}</div>
+{{end}}
+{{end}}
+
+{{define "task_asset_picker"}}
+<div id="task-asset-picker" class="space-y-1"
+     x-data="{
+       cid: '{{if .Task}}{{.Task.CustomerID}}{{else if .Parent}}{{.Parent.CustomerID}}{{end}}',
+       assets: [],
+       selected: { {{range $id, $on := .SelectedAssetIDs}}{{if $on}}'{{$id}}': true,{{end}}{{end}} },
+       load() {
+         const id = this.cid;
+         if (!id) { this.assets = []; return; }
+         fetch('/api/assets/' + encodeURIComponent(id)).then(r => r.json()).then(list => {
+           this.assets = Array.isArray(list) ? list : [];
+         }).catch(() => { this.assets = []; });
+       }
+     }"
+     x-init="load()"
+     @change.window="if ($event.target && $event.target.name === 'customer_id') { cid = $event.target.value; selected = {}; load(); }">
+  <label class="block text-sm font-medium text-gray-700">설치자산</label>
+  <p class="text-[11px] text-gray-400">거래처를 고르면 그 고객의 자산만 나옵니다. 여러 대 선택할 수 있고, 안 골라도 됩니다.</p>
+  <template x-if="!cid">
+    <p class="text-xs text-gray-400">거래처를 먼저 선택하세요.</p>
+  </template>
+  <div class="max-h-44 overflow-y-auto border rounded-lg divide-y" x-show="cid">
+    <template x-for="a in assets" :key="a.asset_id">
+      <label class="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+        <input type="checkbox" name="asset_id" :value="a.asset_id" class="mt-0.5"
+               :checked="selected[a.asset_id]" @change="selected[a.asset_id] = $event.target.checked">
+        <span>
+          <span x-text="a.product_name"></span>
+          <span class="text-xs text-gray-500" x-text="(a.model_name ? ' · ' + a.model_name : '') + (a.install_location ? ' · ' + a.install_location : '')"></span>
+        </span>
+      </label>
+    </template>
+    <p class="px-3 py-2 text-xs text-gray-400" x-show="assets.length === 0">이 거래처에 등록된 자산이 없습니다.</p>
+  </div>
+</div>
+{{end}}

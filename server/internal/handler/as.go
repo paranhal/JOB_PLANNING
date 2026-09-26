@@ -395,6 +395,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		"CanReceive":       true,
 		"KeywordChecks":    h.keywordChecks("", model.KWFieldSymptom, as.Symptom),
 		"KeywordField":     model.KWFieldSymptom,
+		"ClassifyHint":     classifyHint(h.codeRepo),
 		"Err":              c.QueryParam("err"),
 	})
 }
@@ -833,6 +834,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"TransferFollowups": followups,
 		"Assignees":         assignees,
 		"DailyTask":         dailyTask,
+		"CanMoveAdminWork":  !embed && canMoveASToAdminWork(c, as),
 		"CanReopen":         closed && canReceiveAS(c) && !embed,
 		"CanReceive":        canReceiveAS(c),
 		"CanProcess":        canProcessAS(c) && (!closed || canMod),
@@ -1421,8 +1423,12 @@ func attachErrMessage(raw string) string {
 
 func actionErrMessage(code string) string {
 	switch strings.TrimSpace(code) {
-	case "action_required":
-		return "조치내용을 입력하세요."
+	case "move_reason":
+		return "행정/지원으로 옮기려면 사유를 입력하세요."
+	case "move_done":
+		return "이미 행정/지원으로 옮긴 접수입니다."
+	case "move_admin":
+		return "행정/지원으로 옮길 수 없습니다."
 	case "action_na_reason":
 		return "해당 없음이면 사유를 입력하세요."
 	case "action_short":

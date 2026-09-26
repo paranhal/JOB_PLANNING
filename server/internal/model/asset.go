@@ -208,8 +208,8 @@ const (
 	MaxKBPhotoBytes  = 10 << 20 // 10MB 사진·문서
 	MaxKBVideoBytes  = 50 << 20 // 50MB 동영상
 	MaxKBVideos      = 2
-	UploadWarnBytes  = 1 << 30  // 1GB 경고
-	UploadAlertBytes = 5 << 30  // 5GB 위험 (50MB×100)
+	UploadWarnBytes  = 1 << 30 // 1GB 경고
+	UploadAlertBytes = 5 << 30 // 5GB 위험 (50MB×100)
 )
 
 // IsImage 접수 사진 썸네일 대상. HEIC는 업로드 시 JPEG로 바뀌지만 원본명으로도 판별한다.
@@ -354,6 +354,19 @@ type Code struct {
 	CodeName  string `json:"code_name"`
 	SortOrder int    `json:"sort_order"`
 	IsActive  bool   `json:"is_active"`
+}
+
+// AssetSupportEvent 자산 상세 「지원 이력」 한 줄. AS와 행정/지원을 시간순으로. §48.4
+type AssetSupportEvent struct {
+	Kind        string `json:"kind"` // as | admin
+	ID          string `json:"id"`
+	Number      string `json:"number"`
+	Date        string `json:"date"`
+	Title       string `json:"title"`
+	Href        string `json:"href"`
+	Status      string `json:"status"`
+	StatusLabel string `json:"status_label"`
+	SortAt      string `json:"-"`
 }
 
 // User 사용자 (기획서 §10)

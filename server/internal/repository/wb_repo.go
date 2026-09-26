@@ -146,6 +146,7 @@ func (r *WBRepo) GetTask(id string) (*model.WorkTask, error) {
 		return nil, err
 	}
 	t := items[0]
+	r.fillTaskAssets(&t)
 	return &t, nil
 }
 

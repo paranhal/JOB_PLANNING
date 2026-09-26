@@ -108,6 +108,7 @@ func templateFiles(name string) []string {
 	if spartials, err := filepath.Glob("web/templates/sort/_*.html"); err == nil {
 		files = append(files, spartials...)
 	}
+	files = appendExisting(files, "web/templates/_classify_hint.html")
 	return files
 }
 
@@ -277,6 +278,7 @@ func funcMap() template.FuncMap {
 				"transfer": "이관", "cancelled": "접수취소",
 				"partial_complete": "부분완료",
 				"completed":        "완료", "closed": "종료",
+				"admin_work": "행정/지원 이관",
 			}
 			if l, ok := m[s]; ok {
 				return l
@@ -289,6 +291,7 @@ func funcMap() template.FuncMap {
 				"received": "접수", "assigned": "담당자 배정", "in_progress": "진행중", "hold": "대기",
 				"transfer": "이관", "cancelled": "접수취소",
 				"partial_complete": "부분완료", "completed": "완료", "closed": "종료",
+				"admin_work": "행정/지원 이관",
 			}[s]
 			if label == "" {
 				label = s
@@ -303,6 +306,7 @@ func funcMap() template.FuncMap {
 				"partial_complete": "bg-teal-100 text-teal-800",
 				"completed":        "bg-green-100 text-green-800",
 				"closed":           "bg-gray-100 text-gray-500",
+				"admin_work":       "bg-violet-100 text-violet-800",
 			}[s]
 			if color == "" {
 				color = "bg-gray-100 text-gray-800"
