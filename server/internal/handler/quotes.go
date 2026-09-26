@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"sort"
@@ -416,7 +418,83 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 		"OverheadDiff": model.RateDiffLabel(q.OverheadRate, oh),
 		"TechDiff":     model.RateDiffLabel(q.TechFeeRate, tech),
 		"OpenSales":    openSales,
+		"InitJSON":     quoteFormInitJSON(q, oh, tech, year),
 	})
+}
+
+type quoteFormInitLine struct {
+	ItemID     string  `json:"itemId"`
+	Group      string  `json:"group"`
+	Name       string  `json:"name"`
+	Spec       string  `json:"spec"`
+	Qty        float64 `json:"qty"`
+	Unit       string  `json:"unit"`
+	Price      int     `json:"price"`
+	MM         float64 `json:"mm"`
+	Disc       float64 `json:"disc"`
+	Note       string  `json:"note"`
+	Gov        int     `json:"gov"`
+	RateID     string  `json:"rateId"`
+	LaborYear  int     `json:"laborYear"`
+	Overridden string  `json:"overridden"`
+}
+
+type quoteFormInit struct {
+	Lines     []quoteFormInitLine `json:"lines"`
+	VAT       string              `json:"vat"`
+	Round     string              `json:"round"`
+	FormType  string              `json:"formType"`
+	Purpose   string              `json:"purpose"`
+	Overhead  float64             `json:"overhead"`
+	Tech      float64             `json:"tech"`
+	StdOH     float64             `json:"stdOH"`
+	StdTech   float64             `json:"stdTech"`
+	QuoteYear int                 `json:"quoteYear"`
+}
+
+func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int) template.JS {
+	init := quoteFormInit{
+		Lines:     []quoteFormInitLine{},
+		VAT:       model.QuoteVATExcluded,
+		Round:     model.QuoteRoundNone,
+		FormType:  model.QuoteFormA,
+		Purpose:   model.QuotePurposeDeal,
+		StdOH:     stdOH,
+		StdTech:   stdTech,
+		QuoteYear: year,
+	}
+	if q != nil {
+		if q.VATMode != "" {
+			init.VAT = q.VATMode
+		}
+		if q.RoundRule != "" {
+			init.Round = q.RoundRule
+		}
+		if q.FormType != "" {
+			init.FormType = q.FormType
+		}
+		if q.Purpose != "" {
+			init.Purpose = q.Purpose
+		}
+		init.Overhead = q.OverheadRate
+		init.Tech = q.TechFeeRate
+		for _, ln := range q.Lines {
+			over := ""
+			if ln.PriceOverridden {
+				over = "1"
+			}
+			init.Lines = append(init.Lines, quoteFormInitLine{
+				ItemID: ln.ItemID, Group: ln.GroupLabel, Name: ln.Name, Spec: ln.Spec,
+				Qty: ln.Qty, Unit: ln.Unit, Price: ln.UnitPrice, MM: ln.MMRate, Disc: ln.DiscountRate,
+				Note: ln.Note, Gov: ln.GovPrice, RateID: ln.RateID, LaborYear: ln.LaborYear, Overridden: over,
+			})
+		}
+	}
+	b, err := json.Marshal(init)
+	if err != nil {
+		return template.JS(`{"lines":[],"vat":"excluded","round":"none","formType":"A1","purpose":"deal","overhead":0,"tech":0,"stdOH":0,"stdTech":0,"quoteYear":0}`)
+	}
+	return template.JS(b)
 }
 
 func (h *QuotesHandler) parseQuoteForm(c echo.Context) *model.SalesQuote {

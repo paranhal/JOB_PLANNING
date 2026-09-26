@@ -3,8 +3,13 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
+	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -549,4 +554,102 @@ func TestQuotesHTTP_FormB2GroupLaborRevisePurposeReverse(t *testing.T) {
 	if !strings.Contains(page.Body.String(), "6,901,660") || !strings.Contains(page.Body.String(), "7,754,124") {
 		t.Fatal("2026 시드 금액이 없다")
 	}
+}
+
+func TestQuoteFormInitJSON_ZeroAndThreeLines(t *testing.T) {
+	js := quoteFormInitJSON(&model.SalesQuote{}, 110, 20, 2026)
+	var init quoteFormInit
+	if err := json.Unmarshal([]byte(js), &init); err != nil {
+		t.Fatal(err)
+	}
+	if init.Lines == nil {
+		t.Fatal("lines 가 null")
+	}
+	if len(init.Lines) != 0 {
+		t.Fatalf("빈 줄=%d", len(init.Lines))
+	}
+	q := &model.SalesQuote{Lines: []model.SalesQuoteLine{{Name: "a"}, {Name: "b"}, {Name: "c"}}}
+	js = quoteFormInitJSON(q, 110, 20, 2026)
+	if err := json.Unmarshal([]byte(js), &init); err != nil {
+		t.Fatal(err)
+	}
+	if len(init.Lines) != 3 {
+		t.Fatalf("세 줄=%d", len(init.Lines))
+	}
+}
+
+func TestQuotesHTTP_FormScriptIsValidJS(t *testing.T) {
+	e, _ := newQuoteServer(t)
+	assertQuoteFormPage(t, doGet(t, e, "/quotes/new"))
+	assertQuoteFormPage(t, doGet(t, e, "/quotes/new?sales_id="+quoteTestSalesID))
+	rec := doForm(t, e, "/quotes", quoteLineForm([]string{"품목1", "품목2", "품목3"}, []int{1000, 2000, 3000}))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("저장 status=%d", rec.Code)
+	}
+	id := quoteIDFromRedirect(t, rec.Header().Get("Location"))
+	assertQuoteFormPage(t, doGet(t, e, "/quotes/"+id+"/edit"))
+}
+
+func assertQuoteFormPage(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("form status=%d %s", rec.Code, clipBody(rec.Body.String()))
+	}
+	body := rec.Body.String()
+	for _, bad := range []string{"ZgotmplZ", "<no value>"} {
+		if strings.Contains(body, bad) {
+			t.Fatalf("깨진 템플릿 %s", bad)
+		}
+	}
+	if !strings.Contains(body, `id="quote-init"`) || !strings.Contains(body, "alpine:init") {
+		t.Fatal("quote-init 또는 alpine:init 이 없다")
+	}
+	reJSON := regexp.MustCompile(`(?s)<script type="application/json" id="quote-init">(.*?)</script>`)
+	m := reJSON.FindStringSubmatch(body)
+	if m == nil {
+		t.Fatal("quote-init 블록이 없다")
+	}
+	var init quoteFormInit
+	if err := json.Unmarshal([]byte(strings.TrimSpace(m[1])), &init); err != nil {
+		t.Fatalf("quote-init JSON: %v", err)
+	}
+	re := regexp.MustCompile(`(?s)<script(?:\s[^>]*)?>(.*?)</script>`)
+	for _, sm := range re.FindAllStringSubmatch(body, -1) {
+		if strings.Contains(sm[0], `type="application/json"`) {
+			continue
+		}
+		inner := sm[1]
+		for _, bad := range []string{"= ;", "= ,", "= }"} {
+			if strings.Contains(inner, bad) {
+				t.Fatalf("script 문법 깨짐 %q", bad)
+			}
+		}
+		if err := nodeCheckJS(inner); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func nodeCheckJS(src string) error {
+	if _, err := exec.LookPath("node"); err != nil {
+		return nil
+	}
+	f, err := os.CreateTemp("", "quote-form-*.js")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(src); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	cmd := exec.Command("node", "--check", f.Name())
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("node --check: %s", out)
+	}
+	return nil
 }

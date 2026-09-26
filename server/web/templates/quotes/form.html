@@ -1,16 +1,6 @@
 {{define "title"}}{{.Title}} · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="max-w-6xl mx-auto space-y-4"
-     x-data="quoteForm({
-       vat: '{{.Quote.VATMode}}',
-       round: '{{.Quote.RoundRule}}',
-       formType: '{{.Quote.FormType}}',
-       overhead: {{printf "%g" .Quote.OverheadRate}},
-       tech: {{printf "%g" .Quote.TechFeeRate}},
-       stdOH: {{printf "%g" .StandardOH}},
-       stdTech: {{printf "%g" .StandardTech}},
-       quoteYear: {{.QuoteYear}}
-     })">
+<div class="max-w-6xl mx-auto space-y-4" x-data="quoteForm">
   <div class="flex items-center justify-between gap-3">
     <div>
       <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 목록</a>
@@ -343,24 +333,45 @@
     </div>
   </form>
 </div>
+<script type="application/json" id="quote-init">{{.InitJSON}}</script>
 <script>
-function quoteForm(init){
-  const seed = {{if .Quote.Lines}}{{else}}true{{end}};
-  const serverLines = [
-    {{range .Quote.Lines}}
-    {key: Math.random(), itemId: {{printf "%q" .ItemID}}, group: {{printf "%q" .GroupLabel}}, name: {{printf "%q" .Name}}, spec: {{printf "%q" .Spec}}, qty: {{printf "%g" .Qty}}, unit: {{printf "%q" .Unit}}, price: {{.UnitPrice}}, mm: {{printf "%g" .MMRate}}, disc: {{printf "%g" .DiscountRate}}, note: {{printf "%q" .Note}}, gov: {{.GovPrice}}, rateId: {{printf "%q" .RateID}}, laborYear: {{.LaborYear}}, overridden: {{if .PriceOverridden}}'1'{{else}}''{{end}}, hits:[], open:false},
-    {{end}}
-  ];
-  if(serverLines.length===0){
-    serverLines.push({key:1,itemId:'',group:'',name:'',spec:'',qty:1,unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
-    serverLines.push({key:2,itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
-    serverLines.push({key:3,itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
-  }
-  return {
+document.addEventListener('alpine:init', () => {
+  Alpine.data('quoteForm', () => {
+    const raw = document.getElementById('quote-init');
+    let init = {};
+    try { init = JSON.parse((raw && raw.textContent) || '{}') || {}; } catch (e) { init = {}; }
+    const emptyLine = (qty) => ({key: Date.now()+Math.random(), itemId:'', group:'', name:'', spec:'', qty: qty, unit:'EA', price:'', mm:'', disc:'', note:'', gov:0, rateId:'', laborYear:0, overridden:'', hits:[], open:false});
+    const asLine = (ln) => {
+      ln = ln || {};
+      return {
+        key: Date.now()+Math.random(),
+        itemId: ln.itemId || '',
+        group: ln.group || '',
+        name: ln.name || '',
+        spec: ln.spec || '',
+        qty: ln.qty == null ? '' : ln.qty,
+        unit: ln.unit || 'EA',
+        price: ln.price == null ? '' : ln.price,
+        mm: ln.mm == null ? '' : ln.mm,
+        disc: ln.disc == null ? '' : ln.disc,
+        note: ln.note || '',
+        gov: ln.gov || 0,
+        rateId: ln.rateId || '',
+        laborYear: ln.laborYear || 0,
+        overridden: ln.overridden || '',
+        hits: [],
+        open: false
+      };
+    };
+    let serverLines = Array.isArray(init.lines) ? init.lines.map(asLine) : [];
+    if(serverLines.length===0){
+      serverLines = [emptyLine(1), emptyLine(''), emptyLine('')];
+    }
+    return {
     vat: init.vat || 'excluded',
     round: init.round || 'none',
     formType: init.formType || 'A1',
-    purpose: '{{if .Quote.Purpose}}{{.Quote.Purpose}}{{else}}deal{{end}}',
+    purpose: init.purpose || 'deal',
     overhead: init.overhead == null ? 0 : init.overhead,
     tech: init.tech == null ? 0 : init.tech,
     stdOH: init.stdOH || 110,
@@ -368,7 +379,6 @@ function quoteForm(init){
     quoteYear: init.quoteYear || 0,
     lines: serverLines,
     previewMsg: '',
-    seed: seed,
     addLine(){
       this.lines.push({key:Date.now()+Math.random(),itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
     },
@@ -479,7 +489,8 @@ function quoteForm(init){
         this.previewMsg='공급가 '+this.fmt(d.supply)+' · 부가세 '+this.fmt(d.vat)+' · 합계 '+this.fmt(d.total)+' · '+d.round_label;
       } catch(e){ this.previewMsg='미리보기에 실패했습니다'; }
     }
-  };
-}
+    };
+  });
+});
 </script>
 {{end}}
