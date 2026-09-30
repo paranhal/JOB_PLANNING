@@ -1127,6 +1127,9 @@ func TestSalesHTTP_DashboardAndMemo(t *testing.T) {
 	if ct.Code != http.StatusOK || !strings.Contains(ct.Body.String(), "만료임박") {
 		t.Fatalf("계약 목록 status=%d", ct.Code)
 	}
+	if !strings.Contains(ct.Body.String(), "계약 정보 없는 사업 포함") {
+		t.Fatal("포함 체크박스가 없다")
+	}
 }
 
 func TestSalesHTTP_FormBizTypePrecisionQuickQuote(t *testing.T) {

@@ -18,6 +18,10 @@
       <input type="text" name="search" value="{{.Search}}" placeholder="계약명, 발주처"
              class="w-full border rounded-lg px-3 py-2 text-sm">
     </div>
+    <label class="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
+      <input type="checkbox" name="all" value="1" {{if .IncludeAll}}checked{{end}}>
+      계약 정보 없는 사업 포함
+    </label>
     <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg">검색</button>
   </form>
   <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">

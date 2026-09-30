@@ -151,3 +151,50 @@ func TestDedupeWorkProjectsByName(t *testing.T) {
 		t.Fatal("중복 WP-004가 남아 있음")
 	}
 }
+
+func TestListContractsHidesNonContractUnlessAll(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "contracts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewProjectRepo(db)
+	plain := &model.WorkProject{Name: "수행만사업", PlanYear: 2026, Status: model.WBProjectActive}
+	if err := repo.Create(plain); err != nil {
+		t.Fatal(err)
+	}
+	withAmt := &model.WorkProject{Name: "금액있는계약", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1_000_000}
+	if err := repo.Create(withAmt); err != nil {
+		t.Fatal(err)
+	}
+	def, err := repo.ListContracts("", 0, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, p := range def {
+		names[p.Name] = true
+	}
+	if names["수행만사업"] {
+		t.Fatal("계약 없는 사업이 기본 목록에 있다")
+	}
+	if !names["금액있는계약"] {
+		t.Fatal("계약 금액 있는 사업이 없다")
+	}
+	all, err := repo.ListContracts("", 0, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	allNames := map[string]bool{}
+	for _, p := range all {
+		allNames[p.Name] = true
+	}
+	if !allNames["수행만사업"] {
+		t.Fatal("포함 체크 때 수행 사업이 없다")
+	}
+	kpiN, _, _, kpiAmt, _ := model.ContractKPI(def, "2026-09-30")
+	if kpiN != len(def) || kpiAmt < 1_000_000 {
+		t.Fatalf("KPI n=%d amt=%d", kpiN, kpiAmt)
+	}
+}

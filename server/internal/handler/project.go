@@ -85,7 +85,8 @@ func (h *ProjectHandler) Contracts(c echo.Context) error {
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	items, err := h.repo.ListFiltered(search, year, status)
+	includeAll := strings.TrimSpace(c.QueryParam("all")) == "1"
+	items, err := h.repo.ListContracts(search, year, status, includeAll)
 	if err != nil {
 		return err
 	}
@@ -95,8 +96,9 @@ func (h *ProjectHandler) Contracts(c echo.Context) error {
 	return c.Render(http.StatusOK, "contracts/list.html", map[string]interface{}{
 		"Title": "계약 관리", "Active": NavContracts,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
-		"Today":    today,
-		"KPITotal": totalN, "KPIValid": validN, "KPISoon": soonN,
+		"IncludeAll": includeAll,
+		"Today":      today,
+		"KPITotal":   totalN, "KPIValid": validN, "KPISoon": soonN,
 		"KPIAmount": model.FormatSalesMoney(totalAmt), "KPIAvgDays": avgDays,
 	})
 }

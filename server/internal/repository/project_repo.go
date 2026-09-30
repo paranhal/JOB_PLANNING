@@ -38,8 +38,16 @@ func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error)
 	return r.ListFiltered("", year, status)
 }
 
-// ListFiltered 사업명·발주처·고객 검색 + 연도·상태 필터
 func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]model.WorkProject, error) {
+	return r.listProjects(search, year, status, true)
+}
+
+// ListContracts 계약 정보가 있는 사업만. includeAll 이면 수행 사업까지. §49.6
+func (r *ProjectRepo) ListContracts(search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
+	return r.listProjects(search, year, status, includeAll)
+}
+
+func (r *ProjectRepo) listProjects(search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
 	q := projectSelect + ` WHERE 1=1`
 	var args []interface{}
 	if year > 0 {
@@ -59,6 +67,17 @@ func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]mo
 			OR COALESCE(sp.sales_no,'') LIKE ? OR COALESCE(p.sales_project_id,'') LIKE ?
 		)`
 		args = append(args, like, like, like, like, like, like, like)
+	}
+	if !includeAll {
+		q += ` AND (
+			COALESCE(p.contract_amount,0) > 0
+			OR TRIM(COALESCE(p.contract_no,'')) != ''
+			OR (
+				TRIM(COALESCE(p.sales_project_id,'')) != ''
+				AND COALESCE(sp.stage,'')='closed'
+				AND COALESCE(sp.close_reason,'')='contracted'
+			)
+		)`
 	}
 	q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
 	rows, err := r.db.Query(q, args...)
