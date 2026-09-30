@@ -794,6 +794,9 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 		return err
 	}
 	replaceTaskTags(r.db, t.TaskID, t.Tags)
+	if t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
+		_ = NewAssignNoticeRepo(r.db).MarkSourceClosed(model.AssignNoticeSourceTask, t.TaskID)
+	}
 	return nil
 }
 

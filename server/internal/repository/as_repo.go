@@ -965,6 +965,7 @@ func (r *ASRepo) CompleteTransfer(asID, resultCode, completeDate string) error {
 		return err
 	}
 	_ = NewASWorkRepo(r.db).CloseOpenByAS(asID)
+	_ = NewAssignNoticeRepo(r.db).MarkSourceClosed(model.AssignNoticeSourceAS, asID)
 	return nil
 }
 
@@ -987,6 +988,7 @@ func (r *ASRepo) SetCancelled(asID, cancelDate string) error {
 		return err
 	}
 	_ = NewASWorkRepo(r.db).CloseOpenByAS(asID)
+	_ = NewAssignNoticeRepo(r.db).MarkSourceClosed(model.AssignNoticeSourceAS, asID)
 	return nil
 }
 

@@ -94,14 +94,24 @@ func (r *AssignNoticeRepo) nextID() (string, error) {
 	return fmt.Sprintf("WAN-%03d", n), nil
 }
 
+func assignNoticeOpenSQL() string {
+	return `
+	  AND NOT (
+	    (n.source_type='task' AND COALESCE(wt.status,'') IN ('complete','cancelled'))
+	    OR (n.source_type='as' AND COALESCE(ar.status,'') IN ('completed','closed','cancelled'))
+	  )`
+}
+
 func (r *AssignNoticeRepo) CountUnseen(userID string) (int, error) {
 	if r == nil || r.db == nil || strings.TrimSpace(userID) == "" {
 		return 0, nil
 	}
 	var n int
 	err := r.db.QueryRow(`
-		SELECT COUNT(*) FROM work_assign_notices
-		 WHERE user_id=? AND seen_at IS NULL`, strings.TrimSpace(userID)).Scan(&n)
+		SELECT COUNT(*) FROM work_assign_notices n
+		  LEFT JOIN as_receipts ar ON n.source_type='as' AND ar.as_id=n.source_id
+		  LEFT JOIN work_tasks wt ON n.source_type='task' AND wt.task_id=n.source_id
+		 WHERE n.user_id=? AND n.seen_at IS NULL`+assignNoticeOpenSQL(), strings.TrimSpace(userID)).Scan(&n)
 	if err != nil {
 		return 0, ignoreNoTable(err)
 	}
@@ -138,7 +148,7 @@ func (r *AssignNoticeRepo) ListUnseen(userID string) ([]model.AssignNotice, erro
 		  LEFT JOIN customers c2 ON c2.customer_id=mv.customer_id
 		  LEFT JOIN work_tasks wt ON n.source_type='task' AND wt.task_id=n.source_id
 		  LEFT JOIN customers c3 ON c3.customer_id=wt.customer_id
-		 WHERE n.user_id=? AND n.seen_at IS NULL
+		 WHERE n.user_id=? AND n.seen_at IS NULL`+assignNoticeOpenSQL()+`
 		 ORDER BY n.assigned_at, n.notice_id`, strings.TrimSpace(userID))
 	if err != nil {
 		return nil, ignoreNoTable(err)
@@ -198,6 +208,23 @@ func (r *AssignNoticeRepo) MarkSeenAndActed(noticeIDs []string, userID string) e
 		}
 	}
 	return nil
+}
+
+func (r *AssignNoticeRepo) MarkSourceClosed(sourceType, sourceID string) error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	sourceType = strings.TrimSpace(sourceType)
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceType == "" || sourceID == "" {
+		return nil
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_, err := r.db.Exec(`
+		UPDATE work_assign_notices
+		   SET seen_at=CASE WHEN seen_at IS NULL THEN ? ELSE seen_at END
+		 WHERE source_type=? AND source_id=? AND seen_at IS NULL`, now, sourceType, sourceID)
+	return ignoreNoTable(err)
 }
 
 func ignoreNoTable(err error) error {

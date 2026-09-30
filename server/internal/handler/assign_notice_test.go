@@ -219,3 +219,61 @@ func TestAssignNoticeSelfSkippedAndOtherCreated(t *testing.T) {
 		t.Fatal("배정받은 로그인에 모달이 없다")
 	}
 }
+
+func TestAssignNoticeHidesCompletedAndCancelledTasks(t *testing.T) {
+	e, db, choi := newAssignNoticeServer(t)
+	day := time.Now().Format("2006-01-02")
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, due_date, status, assignee, assignee_user_id)
+		VALUES ('T-open','admin','열린일',?,?, 'waiting','최혜영',?)`, day, day, choi.UserID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, due_date, status, assignee, assignee_user_id)
+		VALUES ('T-done','admin','끝난일',?,?, 'complete','최혜영',?)`, day, day, choi.UserID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_assign_notices (notice_id, user_id, source_type, source_id, assigned_by, assigned_at)
+		VALUES ('WAN-open',?, 'task','T-open','U-admin',?),
+		       ('WAN-done',?, 'task','T-done','U-admin',?)`,
+		choi.UserID, now, choi.UserID, now); err != nil {
+		t.Fatal(err)
+	}
+
+	page := doGetWith(t, e, "/work", jwtCookieUser(t, choi))
+	if page.Code != http.StatusOK {
+		t.Fatalf("status=%d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, "새로 배정된 업무 1건") {
+		t.Fatalf("열린 건만 떠야 한다: %s", body)
+	}
+	if strings.Contains(body, "끝난일") {
+		t.Fatal("완료된 업무가 팝업에 있다")
+	}
+	if !strings.Contains(body, "열린일") {
+		t.Fatal("안 끝난 업무가 팝업에 없다")
+	}
+
+	wb := repository.NewWBRepo(db)
+	open, err := wb.GetTask("T-open")
+	if err != nil || open == nil {
+		t.Fatal(err)
+	}
+	open.Status = model.WBTaskComplete
+	open.CompleteNote = "처리 완료"
+	if err := wb.UpdateTask(open); err != nil {
+		t.Fatal(err)
+	}
+	var seen string
+	if err := db.QueryRow(`SELECT COALESCE(seen_at,'') FROM work_assign_notices WHERE notice_id='WAN-open'`).Scan(&seen); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(seen) == "" {
+		t.Fatal("완료 후 안 읽은 알림이 읽음 처리되지 않았다")
+	}
+
+	page2 := doGetWith(t, e, "/work", jwtCookieUser(t, choi))
+	if strings.Contains(page2.Body.String(), "새로 배정된 업무") {
+		t.Fatal("완료 후 팝업이 남았다")
+	}
+}
