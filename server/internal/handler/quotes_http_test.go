@@ -323,6 +323,14 @@ func TestQuotesHTTP_XlsxValuesMatchScreenNoFormula(t *testing.T) {
 	if dl.Code != http.StatusOK {
 		t.Fatalf("xlsx status=%d", dl.Code)
 	}
+	cd := dl.Header().Get("Content-Disposition")
+	if !strings.Contains(cd, "filename*=UTF-8''") {
+		t.Fatalf("RFC5987 없음: %s", cd)
+	}
+	unesc, _ := url.PathUnescape(cd)
+	if !strings.Contains(unesc, "세종시교육청") || !strings.Contains(unesc, "견적연결") {
+		t.Fatalf("파일 이름 조각 없음: %s", cd)
+	}
 	ct := dl.Header().Get("Content-Type")
 	if !strings.Contains(ct, "spreadsheetml") {
 		t.Fatalf("content-type=%s", ct)

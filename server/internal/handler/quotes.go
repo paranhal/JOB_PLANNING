@@ -198,6 +198,12 @@ func (h *QuotesHandler) New(c echo.Context) error {
 			}
 		}
 	}
+	if q.QuoteKind == "" {
+		q.QuoteKind = model.QuoteKindMaint
+	}
+	if f := model.QuoteKindForm(q.QuoteKind); f != "" {
+		q.FormType = f
+	}
 	return h.renderForm(c, q, true, "")
 }
 
@@ -251,7 +257,9 @@ func (h *QuotesHandler) Show(c echo.Context) error {
 	return c.Render(http.StatusOK, "quotes/show.html", map[string]interface{}{
 		"Title": quoteSheetNo(q), "Active": NavQuotes, "Quote": q, "Totals": tot,
 		"CanWrite":     canWriteSales(c),
+		"CanDelete":    canDeleteQuote(c, q) && latest && len(linked) == 0 && model.NormalizeQuoteStatus(q.Status) == model.QuoteStatusDraft,
 		"FlashOK":      c.QueryParam("ok"),
+		"FlashErr":     c.QueryParam("err"),
 		"AskNames":     ask,
 		"RoundLabel":   model.RoundRuleLabel(q.RoundRule),
 		"VATLabel":     model.VATModeLabel(q.VATMode),
@@ -262,6 +270,7 @@ func (h *QuotesHandler) Show(c echo.Context) error {
 		"TechDiff":     model.RateDiffLabel(q.TechFeeRate, stdTech),
 		"QuoteYear":    q.QuoteYear(),
 		"Orders":       linked,
+		"Statuses":     model.QuoteStatusDefs(),
 	})
 }
 
@@ -291,6 +300,7 @@ func (h *QuotesHandler) Update(c echo.Context) error {
 	q.QuoteID = cur.QuoteID
 	if err := h.repo.Update(q); err != nil {
 		q.QuoteNo, q.QuoteDate = cur.QuoteNo, cur.QuoteDate
+		q.SalesID = cur.SalesID
 		return h.renderForm(c, q, false, err.Error())
 	}
 	h.afterSave(c, q)
@@ -333,7 +343,35 @@ func (h *QuotesHandler) SetStatus(c echo.Context) error {
 	if wantsJSON(c) {
 		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true})
 	}
+	if ret := strings.TrimSpace(c.FormValue("return")); ret != "" && strings.HasPrefix(ret, "/") {
+		return c.Redirect(http.StatusSeeOther, ret)
+	}
 	return c.Redirect(http.StatusSeeOther, "/quotes?display=kanban")
+}
+
+func (h *QuotesHandler) Delete(c echo.Context) error {
+	q, err := h.repo.Get(c.Param("id"))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/quotes?err=notfound")
+	}
+	if !canDeleteQuote(c, q) {
+		return echo.ErrForbidden
+	}
+	if err := h.repo.Delete(q.QuoteID); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/quotes/"+q.QuoteID+"?err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, "/quotes?ok=deleted")
+}
+
+func canDeleteQuote(c echo.Context, q *model.SalesQuote) bool {
+	if q == nil || !canWriteSales(c) {
+		return false
+	}
+	if isAdminRole(c) {
+		return true
+	}
+	uid := strings.TrimSpace(ctxString(c, "user_id"))
+	return uid != "" && uid == strings.TrimSpace(q.OwnerUserID)
 }
 
 func (h *QuotesHandler) Download(c echo.Context) error {
@@ -348,8 +386,14 @@ func (h *QuotesHandler) Download(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	name := strings.ReplaceAll(q.DisplayNo(), "/", "-") + ".xlsx"
-	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="`+name+`"`)
+	salesName := ""
+	if h.sales != nil && strings.TrimSpace(q.SalesID) != "" {
+		if p, err := h.sales.Get(q.SalesID); err == nil && p != nil {
+			salesName = p.Name
+		}
+	}
+	base := model.QuoteXLSXBaseName(q.DisplayNo(), q.RecipientName, salesName)
+	c.Response().Header().Set(echo.HeaderContentDisposition, model.QuoteXLSXContentDisposition(base))
 	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", raw)
 }
 
@@ -400,25 +444,54 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 	var openSales []model.SalesProject
 	if h.sales != nil {
 		openSales, _ = h.sales.ListFilter(repository.SalesListFilter{})
+		if sid := strings.TrimSpace(q.SalesID); sid != "" {
+			found := false
+			for i := range openSales {
+				if openSales[i].SalesID == sid {
+					found = true
+					break
+				}
+			}
+			if !found {
+				if p, err := h.sales.Get(sid); err == nil && p != nil {
+					openSales = append([]model.SalesProject{*p}, openSales...)
+				}
+			}
+		}
+	}
+	var linked []model.SalesOrder
+	salesLocked := false
+	lockOrder := ""
+	if !isNew && h.orders != nil {
+		linked, _ = h.orders.ListByQuote(q.QuoteID)
+		if len(linked) > 0 {
+			salesLocked = true
+			lockOrder = linked[0].DisplayNo()
+			if lockOrder == "" {
+				lockOrder = linked[0].OrderID
+			}
+		}
 	}
 	return c.Render(http.StatusOK, "quotes/form.html", map[string]interface{}{
 		"Title": title, "Active": NavQuotes, "IsNew": isNew, "Quote": q,
 		"Totals": tot, "FormError": formErr, "Users": users,
-		"CanWrite":     canWriteSales(c),
-		"RoundOptions": [][]string{{"none", "절사 없음"}, {"hundred", "100원 단위 절사"}, {"thousand", "1,000원 단위 절사"}},
-		"Units":        model.SalesItemUnits(),
-		"FlashOK":      c.QueryParam("ok"),
-		"LaborRates":   rates,
-		"LaborYearNote": note,
+		"CanWrite":         canWriteSales(c),
+		"RoundOptions":     [][]string{{"none", "절사 없음"}, {"hundred", "100원 단위 절사"}, {"thousand", "1,000원 단위 절사"}},
+		"Units":            model.SalesItemUnits(),
+		"FlashOK":          c.QueryParam("ok"),
+		"LaborRates":       rates,
+		"LaborYearNote":    note,
 		"LaborYearMissing": missing,
-		"LaborYears":   years,
-		"QuoteYear":    year,
-		"StandardOH":   oh,
-		"StandardTech": tech,
-		"OverheadDiff": model.RateDiffLabel(q.OverheadRate, oh),
-		"TechDiff":     model.RateDiffLabel(q.TechFeeRate, tech),
-		"OpenSales":    openSales,
-		"InitJSON":     quoteFormInitJSON(q, oh, tech, year),
+		"LaborYears":       years,
+		"QuoteYear":        year,
+		"StandardOH":       oh,
+		"StandardTech":     tech,
+		"OverheadDiff":     model.RateDiffLabel(q.OverheadRate, oh),
+		"TechDiff":         model.RateDiffLabel(q.TechFeeRate, tech),
+		"OpenSales":        openSales,
+		"SalesLocked":      salesLocked,
+		"LockOrderNo":      lockOrder,
+		"InitJSON":         quoteFormInitJSON(q, oh, tech, year, salesLocked),
 	})
 }
 
@@ -427,6 +500,7 @@ type quoteFormInitLine struct {
 	Group      string  `json:"group"`
 	Name       string  `json:"name"`
 	Spec       string  `json:"spec"`
+	SpecID     string  `json:"specId"`
 	Qty        float64 `json:"qty"`
 	Unit       string  `json:"unit"`
 	Price      int     `json:"price"`
@@ -440,30 +514,38 @@ type quoteFormInitLine struct {
 }
 
 type quoteFormInit struct {
-	Lines     []quoteFormInitLine `json:"lines"`
-	VAT       string              `json:"vat"`
-	Round     string              `json:"round"`
-	FormType  string              `json:"formType"`
-	Purpose   string              `json:"purpose"`
-	Overhead  float64             `json:"overhead"`
-	Tech      float64             `json:"tech"`
-	StdOH     float64             `json:"stdOH"`
-	StdTech   float64             `json:"stdTech"`
-	QuoteYear int                 `json:"quoteYear"`
+	Lines       []quoteFormInitLine `json:"lines"`
+	VAT         string              `json:"vat"`
+	Round       string              `json:"round"`
+	FormType    string              `json:"formType"`
+	QuoteKind   string              `json:"quoteKind"`
+	Purpose     string              `json:"purpose"`
+	Overhead    float64             `json:"overhead"`
+	Tech        float64             `json:"tech"`
+	StdOH       float64             `json:"stdOH"`
+	StdTech     float64             `json:"stdTech"`
+	QuoteYear   int                 `json:"quoteYear"`
+	PrevSalesID string              `json:"prevSalesId"`
+	PrevSalesNo string              `json:"prevSalesNo"`
+	SalesLocked bool                `json:"salesLocked"`
 }
 
-func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int) template.JS {
+func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int, locked bool) template.JS {
 	init := quoteFormInit{
-		Lines:     []quoteFormInitLine{},
-		VAT:       model.QuoteVATExcluded,
-		Round:     model.QuoteRoundNone,
-		FormType:  model.QuoteFormA,
-		Purpose:   model.QuotePurposeDeal,
-		StdOH:     stdOH,
-		StdTech:   stdTech,
-		QuoteYear: year,
+		Lines:       []quoteFormInitLine{},
+		VAT:         model.QuoteVATExcluded,
+		Round:       model.QuoteRoundNone,
+		FormType:    model.QuoteFormA,
+		QuoteKind:   model.QuoteKindMaint,
+		Purpose:     model.QuotePurposeDeal,
+		StdOH:       stdOH,
+		StdTech:     stdTech,
+		QuoteYear:   year,
+		SalesLocked: locked,
 	}
 	if q != nil {
+		init.PrevSalesID = q.SalesID
+		init.PrevSalesNo = q.SalesDisplayNo()
 		if q.VATMode != "" {
 			init.VAT = q.VATMode
 		}
@@ -472,6 +554,14 @@ func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int) te
 		}
 		if q.FormType != "" {
 			init.FormType = q.FormType
+		}
+		if k := model.NormalizeQuoteKind(q.QuoteKind); k != "" {
+			init.QuoteKind = k
+			if f := model.QuoteKindForm(k); f != "" {
+				init.FormType = f
+			}
+		} else if model.QuoteFormIsLabor(init.FormType) {
+			init.QuoteKind = model.QuoteKindDev
 		}
 		if q.Purpose != "" {
 			init.Purpose = q.Purpose
@@ -484,7 +574,7 @@ func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int) te
 				over = "1"
 			}
 			init.Lines = append(init.Lines, quoteFormInitLine{
-				ItemID: ln.ItemID, Group: ln.GroupLabel, Name: ln.Name, Spec: ln.Spec,
+				ItemID: ln.ItemID, Group: ln.GroupLabel, Name: ln.Name, Spec: ln.Spec, SpecID: ln.SpecID,
 				Qty: ln.Qty, Unit: ln.Unit, Price: ln.UnitPrice, MM: ln.MMRate, Disc: ln.DiscountRate,
 				Note: ln.Note, Gov: ln.GovPrice, RateID: ln.RateID, LaborYear: ln.LaborYear, Overridden: over,
 			})
@@ -492,7 +582,7 @@ func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int) te
 	}
 	b, err := json.Marshal(init)
 	if err != nil {
-		return template.JS(`{"lines":[],"vat":"excluded","round":"none","formType":"A1","purpose":"deal","overhead":0,"tech":0,"stdOH":0,"stdTech":0,"quoteYear":0}`)
+		return template.JS(`{"lines":[],"vat":"excluded","round":"none","formType":"A","quoteKind":"maint_service","purpose":"deal","overhead":0,"tech":0,"stdOH":0,"stdTech":0,"quoteYear":0}`)
 	}
 	return template.JS(b)
 }
@@ -501,7 +591,11 @@ func (h *QuotesHandler) parseQuoteForm(c echo.Context) *model.SalesQuote {
 	if c.Request().Form == nil {
 		_ = c.Request().ParseForm()
 	}
+	kind := model.NormalizeQuoteKind(c.FormValue("quote_kind"))
 	form := model.NormalizeQuoteForm(c.FormValue("form_type"))
+	if f := model.QuoteKindForm(kind); f != "" {
+		form = f
+	}
 	vat := strings.TrimSpace(c.FormValue("vat_mode"))
 	if vat == "" {
 		vat = model.DefaultVATMode(form)
@@ -583,6 +677,7 @@ func parseQuoteLines(c echo.Context) []model.SalesQuoteLine {
 			GroupLabel:      strings.TrimSpace(get("line_group", i)),
 			Name:            strings.TrimSpace(get("line_name", i)),
 			Spec:            strings.TrimSpace(get("line_spec", i)),
+			SpecID:          strings.TrimSpace(get("line_spec_id", i)),
 			Qty:             qty,
 			Unit:            strings.TrimSpace(get("line_unit", i)),
 			UnitPrice:       parseItemMoney(get("line_price", i)),

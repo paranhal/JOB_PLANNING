@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -20,11 +21,12 @@ const (
 	QuoteFormB1 = "B1"
 	QuoteFormB2 = "B2"
 
-	QuoteStatusDraft   = "draft"
-	QuoteStatusSent    = "sent"
-	QuoteStatusWon     = "won"
-	QuoteStatusLost    = "lost"
-	QuoteStatusExpired = "expired"
+	QuoteStatusDraft     = "draft"
+	QuoteStatusSent      = "sent"
+	QuoteStatusWon       = "won"
+	QuoteStatusLost      = "lost"
+	QuoteStatusExpired   = "expired"
+	QuoteStatusCancelled = "cancelled"
 
 	QuotePurposeDeal      = "deal"
 	QuotePurposeBudget    = "budget"
@@ -43,12 +45,15 @@ const (
 )
 
 var (
-	ErrQuoteOwnerRequired = fmt.Errorf("담당자와 연락처가 필요합니다")
-	ErrQuoteNoDuplicate   = fmt.Errorf("같은 견적번호가 이미 있습니다")
-	ErrQuoteReadOnly      = fmt.Errorf("이전 개정은 수정할 수 없습니다")
-	ErrQuoteRevReason     = fmt.Errorf("개정 사유가 필요합니다")
-	ErrQuoteSalesRequired = fmt.Errorf("사업을 먼저 고르세요")
-	ErrQuoteLineSum       = fmt.Errorf("라인 합계와 소계가 다릅니다")
+	ErrQuoteOwnerRequired  = fmt.Errorf("담당자와 연락처가 필요합니다")
+	ErrQuoteNoDuplicate    = fmt.Errorf("같은 견적번호가 이미 있습니다")
+	ErrQuoteReadOnly       = fmt.Errorf("이전 개정은 수정할 수 없습니다")
+	ErrQuoteRevReason      = fmt.Errorf("개정 사유가 필요합니다")
+	ErrQuoteSalesRequired  = fmt.Errorf("사업을 먼저 고르세요")
+	ErrQuoteLineSum        = fmt.Errorf("라인 합계와 소계가 다릅니다")
+	ErrQuoteDeleteNotDraft = fmt.Errorf("발송된 견적은 지울 수 없습니다. 「취소」로 바꾸세요.")
+	ErrQuoteDeleteHasRev   = fmt.Errorf("개정본이 있는 견적은 지울 수 없습니다.")
+	ErrQuoteDeleteHasOrder = fmt.Errorf("수주로 이어진 견적은 지울 수 없습니다.")
 )
 
 type SalesQuote struct {
@@ -112,6 +117,7 @@ type SalesQuoteLine struct {
 	MMRate          float64
 	DiscountRate    float64
 	Note            string
+	SpecID          string
 	RateID          string
 	LaborYear       int
 	PriceOverridden bool
@@ -398,7 +404,7 @@ func QuoteFormLabel(form string) string {
 
 func NormalizeQuoteStatus(s string) string {
 	switch strings.TrimSpace(s) {
-	case QuoteStatusSent, QuoteStatusWon, QuoteStatusLost, QuoteStatusExpired:
+	case QuoteStatusSent, QuoteStatusWon, QuoteStatusLost, QuoteStatusExpired, QuoteStatusCancelled:
 		return strings.TrimSpace(s)
 	default:
 		return QuoteStatusDraft
@@ -415,12 +421,14 @@ func QuoteStatusLabel(s string) string {
 		return "실주"
 	case QuoteStatusExpired:
 		return "만료"
+	case QuoteStatusCancelled:
+		return "취소"
 	default:
 		return "작성중"
 	}
 }
 
-func QuoteStatusDefs() []KanbanColumnDef {
+func QuoteKanbanDefs() []KanbanColumnDef {
 	return []KanbanColumnDef{
 		{Key: QuoteStatusDraft, Title: "작성중", Border: "border-slate-200"},
 		{Key: QuoteStatusSent, Title: "제출", Border: "border-sky-200"},
@@ -430,8 +438,12 @@ func QuoteStatusDefs() []KanbanColumnDef {
 	}
 }
 
+func QuoteStatusDefs() []KanbanColumnDef {
+	return append(QuoteKanbanDefs(), KanbanColumnDef{Key: QuoteStatusCancelled, Title: "취소", Border: "border-gray-300"})
+}
+
 func FillQuoteKanban(items []SalesQuote) KanbanView {
-	cols := emptyKanbanColumns(QuoteStatusDefs())
+	cols := emptyKanbanColumns(QuoteKanbanDefs())
 	idx := indexKanbanColumns(cols)
 	seen := map[string]bool{}
 	for i := range items {
@@ -608,6 +620,62 @@ func (q *SalesQuote) DisplayNo() string {
 		return fmt.Sprintf("%s-%d", no, q.Rev)
 	}
 	return no
+}
+
+// QuoteXLSXBaseName 견적번호_수신기관_사업명. 빈 조각은 밑줄까지 뺀다. §49.4
+func QuoteXLSXBaseName(quoteNo, recipient, salesName string) string {
+	parts := make([]string, 0, 3)
+	if p := sanitizeQuoteFilePart(quoteNo, 80); p != "" {
+		parts = append(parts, p)
+	}
+	if p := sanitizeQuoteFilePart(recipient, 20); p != "" {
+		parts = append(parts, p)
+	}
+	if p := sanitizeQuoteFilePart(salesName, 40); p != "" {
+		parts = append(parts, p)
+	}
+	if len(parts) == 0 {
+		return "quote"
+	}
+	return strings.Join(parts, "_")
+}
+
+func QuoteXLSXContentDisposition(base string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "quote"
+	}
+	file := base + ".xlsx"
+	ascii := quoteFileASCIIFallback(file)
+	return fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, ascii, url.PathEscape(file))
+}
+
+func sanitizeQuoteFilePart(s string, maxRunes int) string {
+	s = strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(s), "\n", ""), "\r", "")
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	out := strings.TrimSpace(b.String())
+	rs := []rune(out)
+	if maxRunes > 0 && len(rs) > maxRunes {
+		out = string(rs[:maxRunes])
+	}
+	return strings.TrimSpace(out)
+}
+
+func quoteFileASCIIFallback(file string) string {
+	for i := 0; i < len(file); i++ {
+		if file[i] > 127 || file[i] < 32 {
+			return "quote.xlsx"
+		}
+	}
+	return strings.ReplaceAll(file, `"`, "")
 }
 
 func (q *SalesQuote) SalesDisplayNo() string {

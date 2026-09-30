@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestQuoteDisplayNoRevAndLatestGroup(t *testing.T) {
 	q := SalesQuote{QuoteNo: "VI-견적-20260910-001", Rev: 2}
@@ -143,5 +146,29 @@ func TestQuoteKanbanFiveStatus(t *testing.T) {
 func TestParseQuoteDateRejectsDay74(t *testing.T) {
 	if _, err := ParseQuoteDateISO("2026-07-74"); err == nil {
 		t.Fatal("74일이 통과했다")
+	}
+}
+
+func TestQuoteXLSXBaseNamePartsAndSanitize(t *testing.T) {
+	got := QuoteXLSXBaseName("VI-견적-20260929-003", "한국기술교육대학교", "무인반납기 전원스위치 교체")
+	want := "VI-견적-20260929-003_한국기술교육대학교_무인반납기 전원스위치 교체"
+	if got != want {
+		t.Fatalf("got=%s", got)
+	}
+	if QuoteXLSXBaseName("Q-1", "", "") != "Q-1" {
+		t.Fatal("빈 조각에 밑줄이 남았다")
+	}
+	if QuoteXLSXBaseName("A/B:C", `a*b?"c`, "x<>y|z") != "ABC_abc_xyz" {
+		t.Fatalf("특수문자=%s", QuoteXLSXBaseName("A/B:C", `a*b?"c`, "x<>y|z"))
+	}
+	longOrg := strings.Repeat("가", 25)
+	longBiz := strings.Repeat("나", 45)
+	cut := QuoteXLSXBaseName("N", longOrg, longBiz)
+	if !strings.HasPrefix(cut, "N_") || len([]rune(strings.Split(cut, "_")[1])) != 20 {
+		t.Fatalf("기관 자름=%s", cut)
+	}
+	disp := QuoteXLSXContentDisposition("한글파일")
+	if !strings.Contains(disp, "filename*=UTF-8''") || !strings.Contains(disp, `filename="quote.xlsx"`) {
+		t.Fatalf("disposition=%s", disp)
 	}
 }
