@@ -194,7 +194,7 @@ func assigneeKeys(c echo.Context) []string {
 
 // assigneeIsMine 현재 사용자 이름·아이디가 담당자와 같으면 true. assigneeKeys 를 쓴다.
 func assigneeIsMine(c echo.Context, assignee, assignedUserID string) bool {
-	uid := strings.TrimSpace(currentUserID(c))
+	uid := strings.TrimSpace(identityUserID(c))
 	if uid != "" && strings.TrimSpace(assignedUserID) == uid {
 		return true
 	}
@@ -202,7 +202,7 @@ func assigneeIsMine(c echo.Context, assignee, assignedUserID string) bool {
 	if name == "" {
 		return false
 	}
-	for _, k := range assigneeKeys(c) {
+	for _, k := range identityKeys(c) {
 		if strings.TrimSpace(k) != "" && strings.TrimSpace(k) == name {
 			return true
 		}
@@ -265,7 +265,7 @@ func (h *AuthHandler) RequireActiveRole(next echo.HandlerFunc) echo.HandlerFunc 
 			return next(c)
 		}
 		// 계정 프로필·비밀번호 변경만 POST 허용
-		if strings.HasPrefix(path, "/account/") {
+		if strings.HasPrefix(path, "/account/") || strings.HasPrefix(path, "/view-as") {
 			return next(c)
 		}
 		return c.Redirect(http.StatusSeeOther, path)

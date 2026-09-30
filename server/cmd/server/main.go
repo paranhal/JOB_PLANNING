@@ -173,7 +173,9 @@ func main() {
 	// 인증 미들웨어 적용 그룹
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.Auth.InjectViewAs)
 	g.Use(h.Auth.RequireActiveRole)
+	g.Use(h.Auth.GuardViewAsWrite)
 	g.Use(h.InjectAssignNotices)
 
 	g.GET("/", h.Dashboard)
@@ -194,6 +196,8 @@ func main() {
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
+	g.POST("/view-as", h.Auth.SetViewAs)
+	g.POST("/view-as/clear", h.Auth.ClearViewAs)
 
 	adminOnly := h.Auth.RequireAdminMW
 	masterWrite := h.Auth.RequireMasterWrite

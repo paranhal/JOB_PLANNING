@@ -203,8 +203,11 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	}
 	userName := ctxString(c, "user_name")
 	username := ctxString(c, "username")
-	userID := ctxString(c, "user_id")
-	mineKeys := []string{userName, username}
+	userID := identityUserID(c)
+	mineKeys := identityKeys(c)
+	if len(mineKeys) == 0 {
+		mineKeys = []string{userName, username}
+	}
 
 	role = model.NormalizeRole(role)
 

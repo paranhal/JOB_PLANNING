@@ -154,6 +154,20 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
 			dataMap["UserPerms"] = currentPerms(c)
+			if vid := strings.TrimSpace(ctxString(c, "view_as_user_id")); vid != "" {
+				dataMap["ViewAsActive"] = true
+				dataMap["ViewAsName"] = ctxString(c, "view_as_name")
+				dataMap["ViewAsUserID"] = vid
+				dataMap["CanWrite"] = false
+				dataMap["CanDeleteSales"] = false
+				dataMap["CanDrop"] = false
+				dataMap["KanbanDrag"] = false
+			}
+			if canUseViewAs(c) {
+				if v := c.Get("view_as_users"); v != nil {
+					dataMap["ViewAsUsers"] = v
+				}
+			}
 			injectAssignNoticeView(c, dataMap)
 			if v := c.Get("auth_unconfirmed"); v != nil {
 				if b, ok := v.(bool); ok && b {

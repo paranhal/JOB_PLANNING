@@ -16,6 +16,29 @@
 </head>
 <body class="h-full" x-data="{ sidebarOpen: false }">
 
+{{if .ViewAsActive}}
+<div class="bg-violet-800 text-white text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-3 z-50">
+  <span>지금 <strong>{{.ViewAsName}}</strong> 시점으로 보고 있습니다. 저장·완료는 할 수 없습니다.</span>
+  <form method="post" action="/view-as/clear" class="inline">
+    <input type="hidden" name="return" value="/">
+    <button type="submit" class="underline">돌아가기</button>
+  </form>
+</div>
+{{else if .ViewAsUsers}}
+<div class="bg-slate-800 text-slate-100 text-xs px-4 py-1.5 flex flex-wrap items-center justify-end gap-2">
+  <form method="post" action="/view-as" class="flex items-center gap-2">
+    <label>누구 시점으로 보기</label>
+    <select name="user_id" class="text-gray-900 rounded px-2 py-0.5 text-xs">
+      <option value="">나</option>
+      {{range .ViewAsUsers}}
+      <option value="{{.UserID}}">{{.FullName}}</option>
+      {{end}}
+    </select>
+    <button type="submit" class="underline">보기</button>
+  </form>
+</div>
+{{end}}
+
 {{if .SchemaNotice}}
 <div id="schema-mismatch-banner" class="bg-red-700 text-white text-sm px-4 py-2 text-center z-50">{{.SchemaNotice}}</div>
 {{end}}

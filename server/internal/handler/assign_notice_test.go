@@ -48,9 +48,13 @@ func newAssignNoticeServer(t *testing.T) (*echo.Echo, *sql.DB, *model.User) {
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.Auth.InjectViewAs)
+	g.Use(h.Auth.GuardViewAsWrite)
 	g.Use(h.InjectAssignNotices)
 	g.GET("/work", h.Work.List)
 	g.POST("/as", h.AS.Create)
+	g.POST("/view-as", h.Auth.SetViewAs)
+	g.POST("/view-as/clear", h.Auth.ClearViewAs)
 	g.POST("/work/assign-notices/later", h.Work.AssignNoticeLater)
 	g.POST("/work/assign-notices/add", h.Work.AssignNoticeAdd)
 	g.POST("/work/assign-notices/transfer", h.Work.AssignNoticeTransfer)
@@ -275,5 +279,58 @@ func TestAssignNoticeHidesCompletedAndCancelledTasks(t *testing.T) {
 	page2 := doGetWith(t, e, "/work", jwtCookieUser(t, choi))
 	if strings.Contains(page2.Body.String(), "새로 배정된 업무") {
 		t.Fatal("완료 후 팝업이 남았다")
+	}
+}
+
+func TestViewAsBannerWriteForbiddenAndLog(t *testing.T) {
+	e, db, choi := newAssignNoticeServer(t)
+	admin, err := repository.NewUserRepo(db).GetByUsername("admin")
+	if err != nil || admin == nil {
+		t.Fatal(err)
+	}
+	set := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/view-as", strings.NewReader(url.Values{
+		"user_id": {choi.UserID}, "return": {"/work"},
+	}.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUser(t, admin))
+	e.ServeHTTP(set, req)
+	if set.Code != http.StatusSeeOther {
+		t.Fatalf("set status=%d", set.Code)
+	}
+	ck := cookieNamed(set, viewAsCookie)
+	if ck == nil || ck.Value != choi.UserID {
+		t.Fatal("view_as 쿠키가 없다")
+	}
+	page := doGetWith(t, e, "/work", jwtCookieUser(t, admin), ck)
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "시점으로 보고 있습니다") {
+		t.Fatalf("띠 없음 status=%d", page.Code)
+	}
+	if !strings.Contains(page.Body.String(), "돌아가기") {
+		t.Fatal("돌아가기가 없다")
+	}
+	write := httptest.NewRecorder()
+	wreq := httptest.NewRequest(http.MethodPost, "http://localhost/as", strings.NewReader(url.Values{
+		"customer_id": {"C1"}, "symptom": {"막힘"},
+	}.Encode()))
+	wreq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	wreq.AddCookie(jwtCookieUser(t, admin))
+	wreq.AddCookie(ck)
+	e.ServeHTTP(write, wreq)
+	if write.Code != http.StatusForbidden {
+		t.Fatalf("쓰기 status=%d", write.Code)
+	}
+	var reason string
+	if err := db.QueryRow(`SELECT reason FROM data_change_logs WHERE reason LIKE '시점 보기%' ORDER BY occurred_at DESC LIMIT 1`).Scan(&reason); err != nil {
+		t.Fatal(err)
+	}
+	clr := httptest.NewRecorder()
+	creq := httptest.NewRequest(http.MethodPost, "http://localhost/view-as/clear", strings.NewReader(url.Values{"return": {"/"}}.Encode()))
+	creq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	creq.AddCookie(jwtCookieUser(t, admin))
+	creq.AddCookie(ck)
+	e.ServeHTTP(clr, creq)
+	if clr.Code != http.StatusSeeOther {
+		t.Fatalf("clear status=%d", clr.Code)
 	}
 }
