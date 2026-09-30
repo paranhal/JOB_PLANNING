@@ -81,6 +81,12 @@ func TestSalesStoredReceiveOnly(t *testing.T) {
 	if HasPermission(p, PermASProcess) {
 		t.Fatal("접수만 줬는데 as_process 가 있다")
 	}
+	if PermissionSourceLabel(RoleSales, "stats") != "저장된 권한" {
+		t.Fatal("저장된 권한 출처")
+	}
+	if PermissionSourceLabel(RoleSales, "") != "역할 기본값" {
+		t.Fatal("빈 값 출처")
+	}
 }
 
 func TestAllPermissionsListsReceiveAndProcessSeparately(t *testing.T) {

@@ -547,6 +547,7 @@ func main() {
 	g.POST("/users/mnt-delete-password", h.Auth.UpdateMaintenanceDeletePassword, adminOnly)
 	g.POST("/users", h.Auth.UserCreate, adminOnly)
 	g.POST("/users/:id/update", h.Auth.UserUpdate, adminOnly)
+	g.POST("/users/:id/reset-permissions", h.Auth.UserResetPermissions, adminOnly)
 	g.POST("/users/:id/password", h.Auth.UserChangePassword, adminOnly)
 
 	g.GET("/admin/holidays", h.Holiday.List)

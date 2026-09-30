@@ -221,6 +221,8 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		msg = "비밀번호가 변경되었습니다."
 	case "saved":
 		msg = "사용자 정보가 저장되었습니다."
+	case "reset_perms":
+		msg = "역할 기본 권한으로 되돌렸습니다."
 	}
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
@@ -334,6 +336,21 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 	}
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
+}
+
+func (h *AuthHandler) UserResetPermissions(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return h.forbidden(c)
+	}
+	u, _ := h.userRepo.GetByID(c.Param("id"))
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	u.Permissions = ""
+	if err := h.userRepo.Update(u); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/users?ok=reset_perms")
 }
 
 // UserChangePassword 관리자: 다른 사용자 비밀번호 변경

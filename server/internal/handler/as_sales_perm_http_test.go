@@ -73,6 +73,7 @@ func newSalesASPermApp(t *testing.T) (*echo.Echo, *repository.UserRepo, *reposit
 	g.GET("/sales", h.Sales.List)
 	g.GET("/users", h.Auth.UserList)
 	g.POST("/users/:id/update", h.Auth.UserUpdate)
+	g.POST("/users/:id/reset-permissions", h.Auth.UserResetPermissions)
 	g.GET("/as", h.AS.List)
 	g.GET("/as/new", h.AS.New, receiveAS)
 	g.POST("/as", h.AS.Create, receiveAS)
@@ -258,5 +259,38 @@ func TestSalesAccountCanGrantReceiveSeparately(t *testing.T) {
 	body := users.Body.String()
 	if !strings.Contains(body, `value="as_receive"`) || !strings.Contains(body, `value="as_process"`) {
 		t.Fatal("사용자 관리에 AS 접수·조치 체크박스가 없다")
+	}
+}
+
+func TestUserResetPermissionsToRoleDefault(t *testing.T) {
+	e, users, _, _ := newSalesASPermApp(t)
+	u := &model.User{
+		Username: "obj", PasswordHash: HashPassword("x"), FullName: "obj",
+		Role: model.RoleTech, Permissions: "stats", IsActive: true,
+	}
+	if err := users.Create(u); err != nil {
+		t.Fatal(err)
+	}
+	page := salesASGet(t, e, "/users", jwtCookie(t))
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "저장된 권한") {
+		t.Fatalf("출처 표시 없음 status=%d", page.Code)
+	}
+	if !strings.Contains(page.Body.String(), "역할 기본값으로 되돌리기") {
+		t.Fatal("되돌리기 버튼이 없다")
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/users/"+u.UserID+"/reset-permissions", nil)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("reset status=%d", rec.Code)
+	}
+	got, err := users.GetByID(u.UserID)
+	if err != nil || got == nil || strings.TrimSpace(got.Permissions) != "" {
+		t.Fatalf("권한이 비지 않았다: %+v", got)
+	}
+	if !got.HasPerm(model.PermWorkboard) {
+		t.Fatal("역할 기본값에 일일업무가 없다")
 	}
 }

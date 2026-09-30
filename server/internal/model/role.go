@@ -16,15 +16,15 @@ const (
 
 // 권한 키 (체크박스)
 const (
-	PermASReceive        = "as_receive"        // AS 접수
-	PermASProcess        = "as_process"        // AS 조치
-	PermWorkboard        = "workboard"         // 일일업무
-	PermMaintenance      = "maintenance"       // 정기점검 조회
-	PermMaintenanceEdit  = "maintenance_edit"  // 정기점검 수정
-	PermMasterWrite      = "master_write"      // 기준정보 쓰기
-	PermCodesUsers       = "codes_users"       // 코드·사용자 관리
-	PermAnalysis         = "analysis"          // 분석/영업
-	PermStats            = "stats"             // 통계
+	PermASReceive       = "as_receive"       // AS 접수
+	PermASProcess       = "as_process"       // AS 조치
+	PermWorkboard       = "workboard"        // 일일업무
+	PermMaintenance     = "maintenance"      // 정기점검 조회
+	PermMaintenanceEdit = "maintenance_edit" // 정기점검 수정
+	PermMasterWrite     = "master_write"     // 기준정보 쓰기
+	PermCodesUsers      = "codes_users"      // 코드·사용자 관리
+	PermAnalysis        = "analysis"         // 분석/영업
+	PermStats           = "stats"            // 통계
 )
 
 // AllPermissions 사용자 관리 화면 체크박스 순서
@@ -183,4 +183,16 @@ func EffectivePermissions(role, stored string) []string {
 		return p
 	}
 	return DefaultPermissions(role)
+}
+
+// PermissionSourceLabel 저장된 값이 쓰이는지 역할 기본값인지. §49.10
+func PermissionSourceLabel(role, stored string) string {
+	role = NormalizeRole(role)
+	if role == RoleAdmin {
+		return "역할 기본값"
+	}
+	if len(ParsePermissions(stored)) > 0 {
+		return "저장된 권한"
+	}
+	return "역할 기본값"
 }

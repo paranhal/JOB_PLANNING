@@ -541,6 +541,9 @@ func funcMap() template.FuncMap {
 		"userPermList": func(u model.User) []string {
 			return u.PermList()
 		},
+		"userPermSource": func(u model.User) string {
+			return model.PermissionSourceLabel(u.Role, u.Permissions)
+		},
 		"initial": func(s string) string {
 			for _, r := range s {
 				return string(r)
@@ -645,6 +648,7 @@ func funcMap() template.FuncMap {
 		},
 		"printf":              fmt.Sprintf,
 		"won":                 formatSalesWon,
+		"salesPeriodLabel":    model.SalesPeriodLabel,
 		"quoteStatusLabel":    model.QuoteStatusLabel,
 		"vatModeLabel":        model.VATModeLabel,
 		"roundRuleLabel":      model.RoundRuleLabel,
