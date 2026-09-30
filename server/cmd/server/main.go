@@ -434,6 +434,7 @@ func main() {
 	sales.POST("/:id/migrated-checked", h.Sales.MarkMigratedChecked)
 	sales.GET("/:id/drop.json", h.Sales.DropForm)
 	sales.POST("/:id/drop", h.Sales.Drop)
+	sales.POST("/:id/delete", h.Sales.Delete)
 	sales.POST("/:id/sleep", h.Sales.Sleep)
 	sales.GET("/:id/wake", h.Sales.WakeForm)
 	sales.POST("/:id/wake", h.Sales.Wake)

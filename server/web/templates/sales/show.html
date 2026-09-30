@@ -43,6 +43,13 @@
       {{if .CanDrop}}
       <button type="button" class="px-4 py-2 text-sm border border-rose-200 text-rose-700 rounded-lg" @click="openDrop()">사업 드롭</button>
       {{end}}
+      {{if .CanDeleteSales}}
+      <form method="post" action="/sales/{{.Project.SalesID}}/delete" class="flex items-center gap-2"
+            onsubmit="return confirm({{printf "%q" .DeleteWarn}})">
+        <input name="reason" required placeholder="삭제 사유" class="border rounded-lg px-2 py-2 text-sm w-40">
+        <button type="submit" class="px-4 py-2 text-sm border border-red-300 text-red-700 rounded-lg">삭제</button>
+      </form>
+      {{end}}
     </div>
     {{end}}
   </div>

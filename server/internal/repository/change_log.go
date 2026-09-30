@@ -44,6 +44,45 @@ func rowJSON(db *sql.DB, table, pkCol, id string) string {
 	return string(b)
 }
 
+func rowsJSON(db *sql.DB, table, whereCol, id string) string {
+	if db == nil || id == "" || !auditIdent(table) || !auditIdent(whereCol) {
+		return "[]"
+	}
+	rows, err := db.Query(`SELECT * FROM `+table+` WHERE `+whereCol+`=?`, id)
+	if err != nil {
+		return "[]"
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return "[]"
+	}
+	var out []map[string]any
+	for rows.Next() {
+		raw := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range raw {
+			ptrs[i] = &raw[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		m := map[string]any{}
+		for i, c := range cols {
+			m[c] = sqlVal(raw[i])
+		}
+		out = append(out, m)
+	}
+	if out == nil {
+		out = []map[string]any{}
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
 func sqlVal(v any) any {
 	switch t := v.(type) {
 	case nil:
@@ -86,8 +125,12 @@ func logUpdateWithReason(db *sql.DB, table, pk, id, label, before, reason string
 }
 
 func logDelete(db *sql.DB, table, pk, id, label, before string) {
+	logDeleteWithReason(db, table, pk, id, label, before, "")
+}
+
+func logDeleteWithReason(db *sql.DB, table, pk, id, label, before, reason string) {
 	audit.Use(db)
-	audit.Log(audit.ActionDelete, table, pk, id, label, before, "")
+	audit.LogWithReason(audit.ActionDelete, table, pk, id, label, before, "", reason)
 }
 
 func touchUpdate(db *sql.DB, table, pk, id, label string, fn func() error) error {

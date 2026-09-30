@@ -76,6 +76,7 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.POST("/sales/:id/migrated-checked", h.Sales.MarkMigratedChecked)
 	g.GET("/sales/:id/drop.json", h.Sales.DropForm)
 	g.POST("/sales/:id/drop", h.Sales.Drop)
+	g.POST("/sales/:id/delete", h.Sales.Delete)
 	g.POST("/sales/:id/sleep", h.Sales.Sleep)
 	g.GET("/sales/:id/wake", h.Sales.WakeForm)
 	g.POST("/sales/:id/wake", h.Sales.Wake)
@@ -141,8 +142,11 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 	if !strings.Contains(body, "영업 단계") || !strings.Contains(body, "pickStage(") {
 		t.Fatal("단계 pill 이 없다")
 	}
-	if strings.Contains(body, "삭제") && strings.Contains(body, "/sales/"+id+"/delete") {
-		t.Fatal("삭제 버튼이 남았다")
+	if !strings.Contains(body, "/sales/"+id+"/delete") {
+		t.Fatal("관리자 삭제 버튼이 없다")
+	}
+	if !strings.Contains(body, "openDrop()") {
+		t.Fatal("드롭 버튼이 없다")
 	}
 	if !strings.Contains(body, "사업 정보") || !strings.Contains(body, ">확률<") {
 		t.Fatal("사업 정보·확률 행이 없다")
@@ -188,8 +192,8 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 	}
 
 	del := doForm(t, e, "/sales/"+id+"/delete", url.Values{})
-	if del.Code != http.StatusNotFound && del.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("삭제 라우트 status=%d", del.Code)
+	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "err=delete_reason") {
+		t.Fatalf("사유 없는 삭제 loc=%s status=%d", del.Header().Get("Location"), del.Code)
 	}
 
 	list := doGet(t, e, "/sales")
@@ -222,6 +226,55 @@ func TestSalesHTTP_TechCannotWrite(t *testing.T) {
 	rec := httptestPostAs(t, e, "/sales", url.Values{"name": {"기술은 조회만"}}, "tech")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("기술 등록 status=%d", rec.Code)
+	}
+}
+
+func TestSalesHTTP_AdminDeleteReasonLogAndPromotedBlock(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	rec := doForm(t, e, "/sales", url.Values{"name": {"지울사업"}, "is_tentative_name": {"1"}})
+	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	if rec := doForm(t, e, "/sales/"+id+"/activities", url.Values{
+		"activity_date": {"2026-09-01"},
+		"start_time":    {"10:00"},
+		"duration_min":  {"60"},
+		"activity_type": {"visit"},
+		"title":         {"방문"},
+	}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("활동 status=%d %s", rec.Code, rec.Body.String())
+	}
+
+	denied := httptestPostAs(t, e, "/sales/"+id+"/delete", url.Values{"reason": {"영업이 지움"}}, "sales")
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("영업 삭제 status=%d", denied.Code)
+	}
+
+	ok := doForm(t, e, "/sales/"+id+"/delete", url.Values{"reason": {"중복 등록"}})
+	if ok.Code != http.StatusSeeOther || !strings.Contains(ok.Header().Get("Location"), "ok=deleted") {
+		t.Fatalf("삭제 loc=%s status=%d", ok.Header().Get("Location"), ok.Code)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sales_projects WHERE sales_id=?`, id).Scan(&n); err != nil || n != 0 {
+		t.Fatal("사업이 남았다")
+	}
+	var reason, before string
+	if err := db.QueryRow(`SELECT COALESCE(reason,''), COALESCE(before_json,'') FROM data_change_logs
+		WHERE table_name='sales_projects' AND entity_id=? AND action='delete'
+		ORDER BY occurred_at DESC LIMIT 1`, id).Scan(&reason, &before); err != nil {
+		t.Fatal(err)
+	}
+	if reason != "중복 등록" || !strings.Contains(before, "지울사업") || !strings.Contains(before, "activities") {
+		t.Fatalf("로그 reason=%s before=%s", reason, before)
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{"name": {"승격사업"}})
+	pid := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	pr := repository.NewProjectRepo(db)
+	if err := pr.Create(&model.WorkProject{Name: "계약사업", SalesProjectID: pid}); err != nil {
+		t.Fatal(err)
+	}
+	blocked := doForm(t, e, "/sales/"+pid+"/delete", url.Values{"reason": {"지우려다"}})
+	if blocked.Code != http.StatusSeeOther || !strings.Contains(blocked.Header().Get("Location"), "err=delete_promoted") {
+		t.Fatalf("승격 삭제 loc=%s", blocked.Header().Get("Location"))
 	}
 }
 

@@ -382,6 +382,8 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"Today":               time.Now().Format("2006-01-02"),
 		"CanWrite":            canWriteSales(c),
 		"CanDrop":             canDropSales(c, p) && p.Status == model.SalesStatusActive && !p.IsDormant(),
+		"CanDeleteSales":      canDeleteSales(c) && workProjectID == "",
+		"DeleteWarn":          salesDeleteWarn(p.SalesID, h.repo),
 		"CanSleep":            canWriteSales(c) && p.Status == model.SalesStatusActive && p.Stage != model.SalesStage4Closed,
 		"CanWake":             canWriteSales(c) && p.IsDormant(),
 		"DormantUntilDefault": model.DefaultDormantUntil(time.Now(), h.repo.DormantDefaultMonth()),
@@ -454,13 +456,36 @@ func (h *SalesHandler) Delete(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	if err := h.repo.Delete(id); err != nil {
+	reason := strings.TrimSpace(c.FormValue("reason"))
+	if reason == "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=delete_reason")
+	}
+	if h.projectRepo != nil {
+		if wp, err := h.projectRepo.GetBySalesID(id); err == nil && wp != nil {
+			return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=delete_promoted")
+		}
+	}
+	if err := h.repo.Delete(id, reason); err != nil {
 		if err == sql.ErrNoRows {
 			return c.Redirect(http.StatusSeeOther, "/sales?err=notfound")
+		}
+		if err.Error() == "promoted" {
+			return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=delete_promoted")
+		}
+		if err.Error() == "reason" {
+			return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=delete_reason")
 		}
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/sales?ok=deleted")
+}
+
+func salesDeleteWarn(id string, repo *repository.SalesRepo) string {
+	if repo == nil {
+		return ""
+	}
+	nQ, nA, nO, _ := repo.CountDependents(id)
+	return fmt.Sprintf("견적 %d건 · 활동 %d건 · 수주 %d건이 함께 지워집니다", nQ, nA, nO)
 }
 
 func (h *SalesHandler) Activities(c echo.Context) error {
@@ -1271,6 +1296,10 @@ func querySalesErr(code string) string {
 		return "관계자를 저장할 수 없습니다. 이름 또는 기관명을 확인하세요."
 	case "stage":
 		return "단계를 바꿀 수 없습니다."
+	case "delete_reason":
+		return "삭제할 때는 사유가 필요합니다."
+	case "delete_promoted":
+		return "계약(사업관리)이 연결돼 있어 지울 수 없습니다"
 	case "notfound":
 		return "영업 사업을 찾을 수 없습니다."
 	case "not_contracted":

@@ -75,28 +75,28 @@ func (r *SalesRepo) List(search, status, stage string) ([]model.SalesProject, er
 }
 
 type SalesListFilter struct {
-	Search             string
-	Status             string
-	Stage              string
-	Owner              string
-	Period             string
-	Customer           string
-	AmountConfirmed    string
-	IncludeClosed      bool
-	IncludeDormant     bool
-	CloseReason        string
-	ContractTarget     string
-	ProcurementRoute   string
-	ContractMethod     string
-	BidEvalMethod      string
-	MallContractType   string
-	DealType           string
-	BizType            string
-	BudgetYear         int
-	BudgetStatus       string
-	ExpectedFrom       string
-	ExpectedTo         string
-	GroupID            string
+	Search           string
+	Status           string
+	Stage            string
+	Owner            string
+	Period           string
+	Customer         string
+	AmountConfirmed  string
+	IncludeClosed    bool
+	IncludeDormant   bool
+	CloseReason      string
+	ContractTarget   string
+	ProcurementRoute string
+	ContractMethod   string
+	BidEvalMethod    string
+	MallContractType string
+	DealType         string
+	BizType          string
+	BudgetYear       int
+	BudgetStatus     string
+	ExpectedFrom     string
+	ExpectedTo       string
+	GroupID          string
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
@@ -403,12 +403,38 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 	return nil
 }
 
-func (r *SalesRepo) Delete(id string) error {
+func (r *SalesRepo) CountDependents(id string) (quotes, acts, orders int, err error) {
 	id = strings.TrimSpace(id)
+	if id == "" {
+		return 0, 0, 0, fmt.Errorf("sales_id 필요")
+	}
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM sales_quotes WHERE sales_id=?`, id).Scan(&quotes)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM sales_activities WHERE sales_id=?`, id).Scan(&acts)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM sales_orders WHERE sales_id=?`, id).Scan(&orders)
+	return quotes, acts, orders, nil
+}
+
+func (r *SalesRepo) Delete(id, reason string) error {
+	id = strings.TrimSpace(id)
+	reason = strings.TrimSpace(reason)
 	if id == "" {
 		return fmt.Errorf("sales_id 필요")
 	}
-	before := rowJSON(r.db, "sales_projects", "sales_id", id)
+	if reason == "" {
+		return fmt.Errorf("reason")
+	}
+	var linked int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_projects WHERE TRIM(COALESCE(sales_project_id,''))=?`, id).Scan(&linked)
+	if linked > 0 {
+		return fmt.Errorf("promoted")
+	}
+	nQ, nA, nO, _ := r.CountDependents(id)
+	bundle := fmt.Sprintf(`{"sales":%s,"quotes":%s,"activities":%s,"orders":%s,"counts":{"quotes":%d,"activities":%d,"orders":%d}}`,
+		rowJSON(r.db, "sales_projects", "sales_id", id),
+		rowsJSON(r.db, "sales_quotes", "sales_id", id),
+		rowsJSON(r.db, "sales_activities", "sales_id", id),
+		rowsJSON(r.db, "sales_orders", "sales_id", id),
+		nQ, nA, nO)
 	_, _ = r.db.Exec(`DELETE FROM work_task_tags WHERE task_id IN (
 		SELECT task_id FROM work_tasks WHERE source_type=? AND source_id IN (SELECT activity_id FROM sales_activities WHERE sales_id=?))`,
 		model.WBSourceSalesActivity, id)
@@ -417,6 +443,18 @@ func (r *SalesRepo) Delete(id string) error {
 		DELETE FROM work_tasks
 		WHERE source_type=? AND source_id IN (SELECT activity_id FROM sales_activities WHERE sales_id=?)`,
 		model.WBSourceSalesActivity, id); err != nil && !strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	if _, err := r.db.Exec(`DELETE FROM sales_quote_lines WHERE quote_id IN (SELECT quote_id FROM sales_quotes WHERE sales_id=?)`, id); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	if _, err := r.db.Exec(`DELETE FROM sales_quotes WHERE sales_id=?`, id); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	if _, err := r.db.Exec(`DELETE FROM sales_orders WHERE sales_id=?`, id); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
 		return err
 	}
 	if _, err := r.db.Exec(`DELETE FROM sales_activities WHERE sales_id=?`, id); err != nil &&
@@ -442,7 +480,7 @@ func (r *SalesRepo) Delete(id string) error {
 	if n == 0 {
 		return sql.ErrNoRows
 	}
-	logDelete(r.db, "sales_projects", "sales_id", id, "영업 사업", before)
+	logDeleteWithReason(r.db, "sales_projects", "sales_id", id, "영업 사업", bundle, reason)
 	return nil
 }
 
@@ -519,6 +557,8 @@ func normalizeSalesProject(p *model.SalesProject, stages []model.SalesStageDef) 
 	p.DealType = model.NormalizeSalesDealType(p.DealType)
 	p.ExpectedYM = model.NormalizeSalesYM(p.ExpectedYM)
 	p.ExpectedPrecision = model.NormalizeSalesPrecision(p.ExpectedPrecision)
+	p.BizType = model.NormalizeSalesBizType(p.BizType)
+	model.ApplySalesPeriodAndBilling(p)
 	if p.Stage == "" || !model.IsSalesStage4(p.Stage) {
 		p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
 	}
