@@ -404,11 +404,16 @@ type WorkProject struct {
 	OrderingPartyName string `json:"ordering_party_name,omitempty"`
 
 	// 상세·목록 보조
-	ScopeRules []ProjectScopeRule `json:"scope_rules,omitempty"`
-	ASCount    int                `json:"as_count,omitempty"`
-	MntCount   int                `json:"mnt_count,omitempty"`
-	TaskCount  int                `json:"task_count,omitempty"`
-	AssetCount int                `json:"asset_count,omitempty"`
+	ScopeRules  []ProjectScopeRule `json:"scope_rules,omitempty"`
+	ASCount     int                `json:"as_count,omitempty"`
+	MntCount    int                `json:"mnt_count,omitempty"`
+	TaskCount   int                `json:"task_count,omitempty"`
+	AssetCount  int                `json:"asset_count,omitempty"`
+	OrderAmount int                `json:"order_amount,omitempty"` // 연결된 수주 합계. §49.9
+}
+
+func (p WorkProject) OrderContractLabel() string {
+	return AmountPairLabel(p.OrderAmount, p.ContractAmount)
 }
 
 // 범위 규칙 제품키 · 업무유형

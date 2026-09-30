@@ -8,7 +8,7 @@
   </div>
   <div class="bg-white rounded-xl border p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
     <div><span class="text-gray-500">계약기간</span> <span>{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</span></div>
-    <div><span class="text-gray-500">금액</span> <span>{{if gt .Project.ContractAmount 0}}{{.Project.ContractAmount}}원{{else}}—{{end}}</span></div>
+    <div><span class="text-gray-500">금액</span> <span>{{if .Project.OrderContractLabel}}{{.Project.OrderContractLabel}}{{else if gt .Project.ContractAmount 0}}{{.Project.ContractAmount}}원{{else}}—{{end}}</span></div>
     <div><span class="text-gray-500">유상/무상</span> <span>{{if .Project.IsPaid}}유상{{else}}무상{{end}}</span></div>
     <div><span class="text-gray-500">담당</span> <span>{{if .Project.ContactName}}{{.Project.ContactName}}{{else}}—{{end}}</span></div>
     <div class="sm:col-span-2"><a href="/projects/{{.Project.ProjectID}}" class="text-blue-700 hover:underline text-xs">사업관리에서 수정</a></div>

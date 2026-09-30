@@ -172,7 +172,15 @@ func (r *SalesRepo) CloseContracted(id, contractedAt string, amount int, byID, b
 		}
 	}
 	p.Probability = model.SalesProbability(p)
-	return r.commitSalesStage(p, from, p.Stage, "", model.SalesCloseContracted, byID, byName)
+	if err := r.commitSalesStage(p, from, p.Stage, "", model.SalesCloseContracted, byID, byName); err != nil {
+		return err
+	}
+	_ = NewOrderRepo(r.db).EnsureForSales(p)
+	return nil
+}
+
+func (r *SalesRepo) EnsureOrderForSales(p *model.SalesProject) error {
+	return NewOrderRepo(r.db).EnsureForSales(p)
 }
 
 func (r *SalesRepo) CloseNegotiationFailed(id, reason, byID, byName string) error {

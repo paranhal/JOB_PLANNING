@@ -65,6 +65,7 @@ func (r *OrderRepo) List(f OrderFilter) ([]model.SalesOrder, error) {
 		items[i].Purchases, _ = r.listPurchases(items[i].OrderID)
 		items[i].ApplyCosts()
 	}
+	r.attachContractAmounts(items)
 	return items, nil
 }
 
@@ -89,6 +90,9 @@ func (r *OrderRepo) Get(id string) (*model.SalesOrder, error) {
 	o.Deliveries, _ = r.listDeliveries(o.OrderID)
 	o.Assets, _ = NewAssetRepo(r.db).ListBySalesOrder(o.OrderID)
 	o.ApplyCosts()
+	tmp := []model.SalesOrder{*o}
+	r.attachContractAmounts(tmp)
+	o.ContractAmount = tmp[0].ContractAmount
 	return o, nil
 }
 
@@ -134,6 +138,57 @@ func (r *OrderRepo) CreateFromQuote(q *model.SalesQuote) (*model.SalesOrder, err
 		return nil, err
 	}
 	return o, nil
+}
+
+func (r *OrderRepo) EnsureForSales(p *model.SalesProject) error {
+	if r == nil || r.db == nil || p == nil || strings.TrimSpace(p.SalesID) == "" {
+		return nil
+	}
+	var n int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM sales_orders WHERE sales_id=?`, p.SalesID).Scan(&n)
+	if n > 0 {
+		return nil
+	}
+	amt := p.AwardedAmount
+	if amt <= 0 {
+		amt = p.ContractAmount
+	}
+	if amt < 0 {
+		amt = 0
+	}
+	o := &model.SalesOrder{
+		SalesID:       p.SalesID,
+		CustomerID:    p.CustomerID,
+		RecipientName: p.CustomerValue(),
+		Title:         p.Name,
+		VATMode:       model.QuoteVATIncluded,
+		Status:        model.OrderStatusOpen,
+		Lines: []model.SalesOrderLine{{
+			Name: "수주", Qty: 1, Unit: "식", UnitPrice: amt,
+		}},
+	}
+	return r.insertOrder(o)
+}
+
+func (r *OrderRepo) attachContractAmounts(items []model.SalesOrder) {
+	if r == nil || r.db == nil || len(items) == 0 {
+		return
+	}
+	amts := map[string]int{}
+	rows, err := r.db.Query(`SELECT TRIM(COALESCE(sales_project_id,'')), COALESCE(contract_amount,0) FROM work_projects WHERE TRIM(COALESCE(sales_project_id,'')) != ''`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var sid string
+			var amt int
+			if rows.Scan(&sid, &amt) == nil && sid != "" {
+				amts[sid] = amt
+			}
+		}
+	}
+	for i := range items {
+		items[i].ContractAmount = amts[items[i].SalesID]
+	}
 }
 
 func (r *OrderRepo) insertOrder(o *model.SalesOrder) error {

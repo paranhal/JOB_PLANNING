@@ -88,7 +88,34 @@ func (r *ProjectRepo) listProjects(search string, year int, status string, inclu
 		return nil, err
 	}
 	defer rows.Close()
-	return scanProjectRows(rows)
+	items, err := scanProjectRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	r.attachOrderAmounts(items)
+	return items, nil
+}
+
+func (r *ProjectRepo) attachOrderAmounts(items []model.WorkProject) {
+	if r == nil || r.db == nil || len(items) == 0 {
+		return
+	}
+	amts := map[string]int{}
+	rows, err := r.db.Query(`SELECT sales_id, COALESCE(SUM(total),0) FROM sales_orders GROUP BY sales_id`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sid string
+		var amt int
+		if rows.Scan(&sid, &amt) == nil && sid != "" {
+			amts[sid] = amt
+		}
+	}
+	for i := range items {
+		items[i].OrderAmount = amts[items[i].SalesProjectID]
+	}
 }
 
 // SetStatus 사업 상태만 변경(보관/재개/완료 등)
@@ -134,6 +161,9 @@ func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
 	}
 	rules, _ := r.ListRules(id)
 	p.ScopeRules = rules
+	tmp := []model.WorkProject{*p}
+	r.attachOrderAmounts(tmp)
+	p.OrderAmount = tmp[0].OrderAmount
 	return p, nil
 }
 

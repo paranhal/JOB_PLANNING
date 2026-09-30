@@ -23,37 +23,42 @@ var ErrOrderQuoteRequired = fmt.Errorf("견적이 필요합니다")
 var ErrOrderNoLines = fmt.Errorf("넘길 라인이 없습니다")
 
 type SalesOrder struct {
-	OrderID       string
-	SalesID       string
-	SalesNo       string
-	QuoteID       string
-	OrderNo       string
-	OrderDate     string
-	PONo          string
-	PODate        string
-	CustomerID    string
-	RecipientName string
-	Title         string
-	DueDate       string
-	VATMode       string
-	Amount        int
-	VAT           int
-	Total         int
-	Status        string
-	BillingStatus string
-	InvoiceNo     string
-	InvoicedAt    string
-	PaidAt        string
-	PaidAmount    int
-	Remarks       string
-	CreatedAt     string
-	UpdatedAt     string
-	Lines         []SalesOrderLine
-	Purchases     []SalesPurchase
-	Deliveries    []SalesDelivery
-	Assets        []Asset
-	CostTotal     int
-	Margin        int
+	OrderID        string
+	SalesID        string
+	SalesNo        string
+	QuoteID        string
+	OrderNo        string
+	OrderDate      string
+	PONo           string
+	PODate         string
+	CustomerID     string
+	RecipientName  string
+	Title          string
+	DueDate        string
+	VATMode        string
+	Amount         int
+	VAT            int
+	Total          int
+	Status         string
+	BillingStatus  string
+	InvoiceNo      string
+	InvoicedAt     string
+	PaidAt         string
+	PaidAmount     int
+	Remarks        string
+	CreatedAt      string
+	UpdatedAt      string
+	Lines          []SalesOrderLine
+	Purchases      []SalesPurchase
+	Deliveries     []SalesDelivery
+	Assets         []Asset
+	CostTotal      int
+	Margin         int
+	ContractAmount int // 연결된 계약 금액. 수주 표와 다름. §49.9
+}
+
+func (o SalesOrder) OrderContractLabel() string {
+	return AmountPairLabel(o.Total, o.ContractAmount)
 }
 
 type SalesOrderLine struct {

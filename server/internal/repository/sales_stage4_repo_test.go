@@ -107,6 +107,26 @@ func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 	if err := repo.CloseContracted(p.SalesID, "2026-09-01", 1500000, "u1", "t"); err != nil {
 		t.Fatal(err)
 	}
+	var ordN, ordTot int
+	if err := db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(total),0) FROM sales_orders WHERE sales_id=?`, p.SalesID).Scan(&ordN, &ordTot); err != nil {
+		t.Fatal(err)
+	}
+	if ordN != 1 || ordTot != 1200000 {
+		t.Fatalf("수주 자동생성 n=%d tot=%d", ordN, ordTot)
+	}
+	if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, sales_project_id, contract_amount)
+		VALUES ('WP-t1','계약사업','active',?, 1500000)`, p.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE work_projects SET contract_amount=1185000 WHERE project_id='WP-t1'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COALESCE(SUM(total),0) FROM sales_orders WHERE sales_id=?`, p.SalesID).Scan(&ordTot); err != nil {
+		t.Fatal(err)
+	}
+	if ordTot != 1200000 {
+		t.Fatalf("계약 금액 수정이 수주를 바꿨다 tot=%d", ordTot)
+	}
 	done, _ := repo.Get(p.SalesID)
 	if !model.CanPromoteSales(done) || done.DealType == model.SalesDealSupply && !model.CanPromoteSales(done) {
 		t.Fatal("계약 종료 후 승격 불가")

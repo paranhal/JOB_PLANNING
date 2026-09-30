@@ -85,6 +85,19 @@ func FormatSalesMoney(n int64) string {
 	return formatSalesAmount(int(n)) + "원"
 }
 
+// AmountPairLabel 수주·계약 금액을 같이 보여 준다. 차이는 표시만. §49.9
+func AmountPairLabel(orderAmt, contractAmt int) string {
+	if orderAmt == 0 && contractAmt == 0 {
+		return ""
+	}
+	diff := int64(contractAmt) - int64(orderAmt)
+	sign := ""
+	if diff > 0 {
+		sign = "+"
+	}
+	return "수주 " + FormatSalesMoney(int64(orderAmt)) + " · 계약 " + FormatSalesMoney(int64(contractAmt)) + " (" + sign + FormatSalesMoney(diff) + ")"
+}
+
 // FormatSalesMoneyShort 열 머리글·헤더용. 억/천만으로 줄인다 (§32.11.1).
 func FormatSalesMoneyShort(n int64) string {
 	if n < 0 {
@@ -124,13 +137,13 @@ func weightedAmount(amount int, prob int) int64 {
 	return int64(amount) * int64(prob) / 100
 }
 
-// LatestValidQuotes 실주·만료가 아닌 견적 중 quote_no 별 가장 큰 rev 만. §47.7
+// LatestValidQuotes 실주·만료·취소가 아닌 견적 중 quote_no 별 가장 큰 rev 만. §47.7
 func LatestValidQuotes(quotes []SalesQuote) []SalesQuote {
 	best := map[string]SalesQuote{}
 	order := []string{}
 	for _, q := range quotes {
 		st := NormalizeQuoteStatus(q.Status)
-		if st == QuoteStatusLost || st == QuoteStatusExpired {
+		if st == QuoteStatusLost || st == QuoteStatusExpired || st == QuoteStatusCancelled {
 			continue
 		}
 		key := strings.TrimSpace(q.QuoteNo)

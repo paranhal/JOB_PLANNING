@@ -139,6 +139,7 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 	if err := h.repo.MarkPromoted(p.SalesID); err != nil {
 		return err
 	}
+	_ = h.repo.EnsureOrderForSales(p)
 	return c.Redirect(http.StatusSeeOther, "/projects/"+proj.ProjectID+"?ok=promoted")
 }
 

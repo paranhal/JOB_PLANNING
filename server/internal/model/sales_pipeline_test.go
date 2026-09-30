@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -186,5 +187,12 @@ func TestSalesGroupFilterJSONEmptyOrLegacy(t *testing.T) {
 	g.FilterJSON = `{"owner":"최혜영"}`
 	if g.Filter().Owner != "최혜영" {
 		t.Fatalf("정상 JSON: %+v", g.Filter())
+	}
+}
+
+func TestAmountPairLabelShowsDiffOnly(t *testing.T) {
+	got := AmountPairLabel(120_000_000, 118_500_000)
+	if !strings.Contains(got, "수주") || !strings.Contains(got, "계약") || !strings.Contains(got, "-") {
+		t.Fatalf("%s", got)
 	}
 }
