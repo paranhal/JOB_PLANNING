@@ -91,6 +91,7 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/contracts", h.Project.Contracts)
 	g.GET("/customers", h.Customer.List)
 	g.GET("/customers/search", h.Customer.SearchJSON)
+	g.POST("/customers/quick", h.Customer.CreateNameJSON)
 	g.GET("/items", h.Items.List)
 	g.GET("/items/new", h.Items.New)
 	g.POST("/items", h.Items.Create)

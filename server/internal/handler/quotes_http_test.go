@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,6 +26,11 @@ import (
 var quoteTestSalesID string
 
 func newQuoteServer(t *testing.T) (*echo.Echo, *repository.QuoteRepo) {
+	e, repo, _ := newQuoteServerDB(t)
+	return e, repo
+}
+
+func newQuoteServerDB(t *testing.T) (*echo.Echo, *repository.QuoteRepo, *sql.DB) {
 	t.Helper()
 	e, db := newSalesServerDB(t)
 	h := New(db)
@@ -46,6 +52,7 @@ func newQuoteServer(t *testing.T) (*echo.Echo, *repository.QuoteRepo) {
 	g.POST("/quotes/:id/revise", h.Quotes.Revise)
 	g.POST("/quotes/:id/order", h.Orders.FromQuote)
 	g.POST("/quotes/:id/status", h.Quotes.SetStatus)
+	g.POST("/quotes/:id/delete", h.Quotes.Delete)
 	g.GET("/quotes/:id/xlsx", h.Quotes.Download)
 	g.GET("/labor-rates", h.Quotes.LaborRates)
 	g.POST("/labor-rates", h.Quotes.SaveStandardRates)
@@ -58,7 +65,7 @@ func newQuoteServer(t *testing.T) (*echo.Echo, *repository.QuoteRepo) {
 	g.POST("/orders/:id/purchases", h.Orders.AddPurchase)
 	g.POST("/orders/:id/deliveries", h.Orders.AddDelivery)
 	g.GET("/plan/unplanned", h.Work.UnplannedList)
-	return e, repository.NewQuoteRepo(db)
+	return e, repository.NewQuoteRepo(db), db
 }
 
 func quoteIDFromRedirect(t *testing.T, loc string) string {
@@ -217,7 +224,7 @@ func TestQuotesHTTP_OwnerRequiredAndDuplicateBlocked(t *testing.T) {
 
 	err := repo.Create(&model.SalesQuote{
 		QuoteNo: q.QuoteNo, QuoteDate: q.QuoteDate, IsLegacy: true,
-		SalesID: quoteTestSalesID,
+		SalesID:   quoteTestSalesID,
 		OwnerName: "a", OwnerPhone: "1",
 		Lines: []model.SalesQuoteLine{{Name: "x", Qty: 1, UnitPrice: 1}},
 	})
@@ -557,7 +564,7 @@ func TestQuotesHTTP_FormB2GroupLaborRevisePurposeReverse(t *testing.T) {
 }
 
 func TestQuoteFormInitJSON_ZeroAndThreeLines(t *testing.T) {
-	js := quoteFormInitJSON(&model.SalesQuote{}, 110, 20, 2026)
+	js := quoteFormInitJSON(&model.SalesQuote{}, 110, 20, 2026, false)
 	var init quoteFormInit
 	if err := json.Unmarshal([]byte(js), &init); err != nil {
 		t.Fatal(err)
@@ -569,7 +576,7 @@ func TestQuoteFormInitJSON_ZeroAndThreeLines(t *testing.T) {
 		t.Fatalf("빈 줄=%d", len(init.Lines))
 	}
 	q := &model.SalesQuote{Lines: []model.SalesQuoteLine{{Name: "a"}, {Name: "b"}, {Name: "c"}}}
-	js = quoteFormInitJSON(q, 110, 20, 2026)
+	js = quoteFormInitJSON(q, 110, 20, 2026, false)
 	if err := json.Unmarshal([]byte(js), &init); err != nil {
 		t.Fatal(err)
 	}
@@ -590,6 +597,237 @@ func TestQuotesHTTP_FormScriptIsValidJS(t *testing.T) {
 	assertQuoteFormPage(t, doGet(t, e, "/quotes/"+id+"/edit"))
 }
 
+func TestQuotesHTTP_KindLocksFormAndLineHeaders(t *testing.T) {
+	e, repo := newQuoteServer(t)
+	page := doGet(t, e, "/quotes/new")
+	body := page.Body.String()
+	if !strings.Contains(body, `x-model="quoteKind"`) || !strings.Contains(body, "setKind(") {
+		t.Fatal("견적 유형이 양식과 안 묶여 있다")
+	}
+	if !strings.Contains(body, "formLabel()") || !strings.Contains(body, "P형") {
+		t.Fatal("P/D 양식 표시가 없다")
+	}
+	if strings.Contains(body, `name="form_type" value="A1"`) {
+		t.Fatal("옛 A-1 양식 라디오가 남아 있다")
+	}
+	if !strings.Contains(body, `x-show="isLabor()"`) || !strings.Contains(body, "w-[46%]") {
+		t.Fatal("라인 열이 양식에 따라 안 바뀌거나 품명 열이 좁다")
+	}
+	if !strings.Contains(body, `x-text="isLabor() ? '품명' : '품명 · 내용'"`) {
+		t.Fatal("라인 제목행이 양식에 따라 안 바뀐다")
+	}
+
+	dev := quoteLineForm([]string{"응용SW개발자"}, []int{7_754_124})
+	dev.Set("quote_kind", "dev_service")
+	dev.Set("form_type", "A")
+	rec := doForm(t, e, "/quotes", dev)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("개발 저장 status=%d", rec.Code)
+	}
+	id := quoteIDFromRedirect(t, rec.Header().Get("Location"))
+	q, err := repo.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.QuoteKind != model.QuoteKindDev {
+		t.Fatalf("kind=%s", q.QuoteKind)
+	}
+	if q.FormType != model.QuoteFormA2 {
+		t.Fatalf("form=%s want A2", q.FormType)
+	}
+	edit := doGet(t, e, "/quotes/"+id+"/edit")
+	eb := edit.Body.String()
+	if !strings.Contains(eb, `"quoteKind":"dev_service"`) && !strings.Contains(eb, `"quoteKind": "dev_service"`) {
+		t.Fatalf("수정 화면에 개발 유형이 없다: %s", clipBody(eb))
+	}
+}
+
+func TestQuotesHTTP_DraftDeleteCancelAndMoveSales(t *testing.T) {
+	e, repo, db := newQuoteServerDB(t)
+
+	rec := doForm(t, e, "/quotes", quoteLineForm([]string{"초안품"}, []int{1000}))
+	id := quoteIDFromRedirect(t, rec.Header().Get("Location"))
+	show := doGet(t, e, "/quotes/"+id)
+	if !strings.Contains(show.Body.String(), "/quotes/"+id+"/delete") {
+		t.Fatal("삭제 버튼이 없다")
+	}
+	del := doForm(t, e, "/quotes/"+id+"/delete", url.Values{})
+	if del.Code != http.StatusSeeOther {
+		t.Fatalf("삭제 status=%d", del.Code)
+	}
+	if _, err := repo.Get(id); err == nil {
+		t.Fatal("견적이 남아 있다")
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sales_quote_lines WHERE quote_id=?`, id).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("라인 n=%d err=%v", n, err)
+	}
+	var before string
+	if err := db.QueryRow(`SELECT before_json FROM data_change_logs WHERE entity_id=? AND action='delete' ORDER BY occurred_at DESC LIMIT 1`, id).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(before, "초안품") {
+		t.Fatalf("삭제 로그에 라인 없음: %s", before)
+	}
+
+	sent := doForm(t, e, "/quotes", quoteLineForm([]string{"발송품"}, []int{2000}))
+	sid := quoteIDFromRedirect(t, sent.Header().Get("Location"))
+	if rec := doForm(t, e, "/quotes/"+sid+"/status", url.Values{"status": {"sent"}, "return": {"/quotes/" + sid}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("발송 status=%d", rec.Code)
+	}
+	bad := doForm(t, e, "/quotes/"+sid+"/delete", url.Values{})
+	if !strings.Contains(bad.Header().Get("Location"), "err=") {
+		t.Fatalf("발송 삭제가 거부되지 않음 loc=%s", bad.Header().Get("Location"))
+	}
+	if _, err := repo.Get(sid); err != nil {
+		t.Fatal("발송 견적이 지워졌다")
+	}
+
+	src := doForm(t, e, "/quotes", quoteLineForm([]string{"개정원본"}, []int{3000}))
+	srcID := quoteIDFromRedirect(t, src.Header().Get("Location"))
+	if rec := doForm(t, e, "/quotes/"+srcID+"/revise", url.Values{"rev_reason": {"단가"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("개정 status=%d", rec.Code)
+	}
+	bad = doForm(t, e, "/quotes/"+srcID+"/delete", url.Values{})
+	if !strings.Contains(bad.Header().Get("Location"), "err=") {
+		t.Fatal("개정 원본 삭제가 막히지 않음")
+	}
+
+	ordQ := doForm(t, e, "/quotes", quoteLineForm([]string{"수주품"}, []int{4000}))
+	oid := quoteIDFromRedirect(t, ordQ.Header().Get("Location"))
+	if rec := doForm(t, e, "/quotes/"+oid+"/order", url.Values{}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("수주 전환 status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	bad = doForm(t, e, "/quotes/"+oid+"/delete", url.Values{})
+	if !strings.Contains(bad.Header().Get("Location"), "err=") {
+		t.Fatal("수주 연결 삭제가 막히지 않음")
+	}
+	ed := doGet(t, e, "/quotes/"+oid+"/edit")
+	if !strings.Contains(ed.Body.String(), "바꿀 수 없습니다") {
+		t.Fatalf("사업 잠금 문구 없음: %s", clipBody(ed.Body.String()))
+	}
+
+	pipe := doForm(t, e, "/quotes", quoteLineForm([]string{"파이프"}, []int{5000}))
+	pid := quoteIDFromRedirect(t, pipe.Header().Get("Location"))
+	pq, _ := repo.Get(pid)
+	sum, _ := model.ValidQuoteSum([]model.SalesQuote{*pq})
+	if sum != pq.Total {
+		t.Fatalf("초안 파이프라인=%d total=%d", sum, pq.Total)
+	}
+	doForm(t, e, "/quotes/"+pid+"/status", url.Values{"status": {"cancelled"}})
+	pq, _ = repo.Get(pid)
+	if pq.Status != model.QuoteStatusCancelled {
+		t.Fatalf("status=%s", pq.Status)
+	}
+	sum, _ = model.ValidQuoteSum([]model.SalesQuote{*pq})
+	if sum != 0 {
+		t.Fatalf("취소 후 파이프라인=%d", sum)
+	}
+	doForm(t, e, "/quotes/"+pid+"/status", url.Values{"status": {"draft"}})
+	pq, _ = repo.Get(pid)
+	sum, _ = model.ValidQuoteSum([]model.SalesQuote{*pq})
+	if sum != pq.Total || sum == 0 {
+		t.Fatalf("초안 복귀 파이프라인=%d", sum)
+	}
+
+	p2 := &model.SalesProject{Name: "옮길사업"}
+	if err := repository.NewSalesRepo(db).Create(p2); err != nil {
+		t.Fatal(err)
+	}
+	move := doForm(t, e, "/quotes", quoteLineForm([]string{"이사품"}, []int{6000}))
+	mid := quoteIDFromRedirect(t, move.Header().Get("Location"))
+	form := quoteLineForm([]string{"이사품"}, []int{6000})
+	form.Set("sales_id", p2.SalesID)
+	if rec := doForm(t, e, "/quotes/"+mid, form); rec.Code != http.StatusSeeOther {
+		t.Fatalf("사업 이동 status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	mq, _ := repo.Get(mid)
+	if mq.SalesID != p2.SalesID {
+		t.Fatalf("sales=%s want=%s", mq.SalesID, p2.SalesID)
+	}
+	var reason string
+	if err := db.QueryRow(`SELECT COALESCE(reason,'') FROM data_change_logs WHERE entity_id=? AND action='update' AND COALESCE(reason,'') LIKE '사업 %' ORDER BY occurred_at DESC LIMIT 1`, mid).Scan(&reason); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(reason, "→") {
+		t.Fatalf("사유=%s", reason)
+	}
+
+	dorm := &model.SalesProject{Name: "휴면사업"}
+	if err := repository.NewSalesRepo(db).Create(dorm); err != nil {
+		t.Fatal(err)
+	}
+	df := quoteLineForm([]string{"휴면품"}, []int{7000})
+	df.Set("sales_id", dorm.SalesID)
+	did := quoteIDFromRedirect(t, doForm(t, e, "/quotes", df).Header().Get("Location"))
+	if _, err := db.Exec(`UPDATE sales_projects SET status=? WHERE sales_id=?`, model.SalesStatusDormant, dorm.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	dedit := doGet(t, e, "/quotes/"+did+"/edit")
+	if !strings.Contains(dedit.Body.String(), dorm.SalesID) {
+		t.Fatal("휴면 사업이 수정 목록에 없다")
+	}
+	if !strings.Contains(dedit.Body.String(), `name="sales_id"`) {
+		t.Fatal("사업 선택 칸이 없다")
+	}
+}
+
+func TestQuotesHTTP_RecipientSearchAndInlineNewSales(t *testing.T) {
+	e, _, db := newQuoteServerDB(t)
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, party_kind)
+		VALUES ('C-edu','한국기술교육대학교','한국기술교육대학교',1,'customer')`); err != nil {
+		t.Fatal(err)
+	}
+	page := doGet(t, e, "/quotes/new")
+	if page.Code != http.StatusOK {
+		t.Fatalf("/quotes/new status=%d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, "/customers/search") || !strings.Contains(body, "/customers/quick") {
+		t.Fatal("수신기관 검색이 없다")
+	}
+	if !strings.Contains(body, "+ 새 사업") || !strings.Contains(body, "saveNewSales") {
+		t.Fatal("그 자리 새 사업 모달이 없다")
+	}
+	if strings.Contains(body, `action="/sales/new"`) {
+		t.Fatal("견적 화면을 떠나는 새 사업 링크가 있다")
+	}
+
+	created := doFormJSON(t, e, "/customers/quick", url.Values{"name": {"일회성수신처"}})
+	if created.Code != http.StatusOK {
+		t.Fatalf("quick status=%d %s", created.Code, created.Body.String())
+	}
+	var cj map[string]interface{}
+	if err := json.Unmarshal(created.Body.Bytes(), &cj); err != nil {
+		t.Fatal(err)
+	}
+	cust, _ := cj["customer"].(map[string]interface{})
+	if cj["created"] != true || cust["party_kind"] != "customer" || cust["customer_id"] == "" {
+		t.Fatalf("새 거래처 JSON=%v", cj)
+	}
+
+	search := doGet(t, e, "/customers/search?q="+url.QueryEscape("한국기술"))
+	if search.Code != http.StatusOK || !strings.Contains(search.Body.String(), "한국기술교육대학교") {
+		t.Fatalf("검색 실패 %d %s", search.Code, search.Body.String())
+	}
+
+	js := doFormJSON(t, e, "/sales", url.Values{"name": {"모달사업"}, "is_tentative_name": {"1"}})
+	if js.Code != http.StatusOK {
+		t.Fatalf("sales json status=%d loc=%s body=%s", js.Code, js.Header().Get("Location"), js.Body.String())
+	}
+	var sj map[string]interface{}
+	if err := json.Unmarshal(js.Body.Bytes(), &sj); err != nil {
+		t.Fatal(err)
+	}
+	if sj["ok"] != true || sj["sales_id"] == "" || sj["name"] != "모달사업" {
+		t.Fatalf("sales json=%v", sj)
+	}
+	stay := doGet(t, e, "/quotes/new")
+	if stay.Code != http.StatusOK || !strings.Contains(stay.Body.String(), `name="title"`) {
+		t.Fatal("새 사업 JSON 저장 후 견적 폼이 깨졌다")
+	}
+}
+
 func assertQuoteFormPage(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	if rec.Code != http.StatusOK {
@@ -603,6 +841,9 @@ func assertQuoteFormPage(t *testing.T, rec *httptest.ResponseRecorder) {
 	}
 	if !strings.Contains(body, `id="quote-init"`) || !strings.Contains(body, "alpine:init") {
 		t.Fatal("quote-init 또는 alpine:init 이 없다")
+	}
+	if !strings.Contains(body, "규격 고르기") || !strings.Contains(body, "applySpec") {
+		t.Fatal("견적 규격 고르기가 없다")
 	}
 	reJSON := regexp.MustCompile(`(?s)<script type="application/json" id="quote-init">(.*?)</script>`)
 	m := reJSON.FindStringSubmatch(body)

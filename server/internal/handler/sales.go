@@ -256,9 +256,23 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	}
 	p := h.parseForm(c)
 	if err := h.repo.Create(p); err != nil {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+		}
 		return h.renderForm(c, p, false, err.Error())
 	}
-	_ = h.repo.ReplaceSalesGroups(p.SalesID, c.Request().Form["group_id"], ctxString(c, "user_name"))
+	quick := strings.TrimSpace(c.FormValue("quick_quote")) == "1"
+	if !quick {
+		_ = h.repo.ReplaceSalesGroups(p.SalesID, c.Request().Form["group_id"], ctxString(c, "user_name"))
+	}
+	if wantsJSON(c) {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"ok": true, "sales_id": p.SalesID, "sales_no": p.DisplayNo(), "name": p.Name,
+		})
+	}
+	if quick {
+		return c.Redirect(http.StatusSeeOther, "/quotes/new?sales_id="+url.QueryEscape(p.SalesID))
+	}
 	loc := "/sales/" + p.SalesID + "?ok=created"
 	if from := strings.TrimSpace(c.FormValue("from_task")); from != "" {
 		loc = "/sales/" + p.SalesID + "?tab=timeline&from_task=" + url.QueryEscape(from) + "&ok=created"
@@ -418,6 +432,9 @@ func (h *SalesHandler) Update(c echo.Context) error {
 	p.Status = cur.Status
 	p.LegacyStage = cur.LegacyStage
 	p.WonAt = cur.WonAt
+	if p.BudgetYear == 0 {
+		p.BudgetYear = cur.BudgetYear
+	}
 	if p.ContractedAt == "" {
 		p.ContractedAt = cur.ContractedAt
 	}
@@ -654,6 +671,7 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		fromTask = strings.TrimSpace(c.FormValue("from_task"))
 	}
 	listBack := "/sales"
+	parts := model.SalesPeriodInputParts(p.ExpectedYM, p.ExpectedPrecision)
 	return c.Render(http.StatusOK, "sales/form.html", map[string]interface{}{
 		"Title": title, "Active": NavSales,
 		"Project": p, "IsEdit": isEdit, "FormError": formErr,
@@ -661,13 +679,17 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		"ContractTargets": targets, "ProcurementRoutes": routes, "ContractMethods": methods,
 		"BidEvalMethods": evals, "MallContractTypes": malls,
 		"BizTypes": bizTypes, "BudgetStatuses": budgetSt, "Groups": groups, "SelectedGroups": sel,
-		"DisplayStage": p.DisplayStage(def),
-		"FromTask":     fromTask,
-		"ListBack":     listBack,
+		"DisplayStage":  p.DisplayStage(def),
+		"FromTask":      fromTask,
+		"ListBack":      listBack,
+		"PeriodYear":    parts.Year,
+		"PeriodQuarter": parts.Quarter,
+		"PeriodHalf":    parts.Half,
 	})
 }
 
 func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
+	_ = c.Request().ParseForm()
 	p := &model.SalesProject{
 		Name:                    strings.TrimSpace(c.FormValue("name")),
 		IsTentativeName:         c.FormValue("is_tentative_name") == "1",
@@ -677,7 +699,6 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		ProspectName:            strings.TrimSpace(c.FormValue("prospect_name")),
 		ProspectRegion:          strings.TrimSpace(c.FormValue("prospect_region")),
 		CustomerConfirmed:       c.FormValue("customer_confirmed") == "1",
-		ExpectedYM:              strings.TrimSpace(c.FormValue("expected_ym")),
 		ExpectedPrecision:       strings.TrimSpace(c.FormValue("expected_precision")),
 		ExpectedYMConfirmed:     c.FormValue("expected_ym_confirmed") == "1",
 		ExpectedAmount:          parseSalesAmount(c.FormValue("expected_amount")),
@@ -705,12 +726,17 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		BudgetStatus:            strings.TrimSpace(c.FormValue("budget_status")),
 		Status:                  model.SalesStatusActive,
 	}
-	_ = c.Request().ParseForm()
+	p.ExpectedYM = model.SalesYMFromParts(p.ExpectedPrecision,
+		c.FormValue("expected_year"), c.FormValue("expected_quarter"),
+		c.FormValue("expected_half"), c.FormValue("expected_ym"))
 	if p.BudgetStatus == "" {
 		p.BudgetStatus = model.SalesBudgetUnknown
 	}
 	if y, err := strconv.Atoi(strings.TrimSpace(c.FormValue("budget_year"))); err == nil {
 		p.BudgetYear = y
+	}
+	if strings.TrimSpace(c.FormValue("quick_quote")) == "1" {
+		model.ApplyQuickQuoteClear(p)
 	}
 	if p.SalesOwnerID != "" && p.SalesOwner == "" && h.userRepo != nil {
 		if u, err := h.userRepo.GetByID(p.SalesOwnerID); err == nil && u != nil {

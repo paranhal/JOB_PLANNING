@@ -412,6 +412,45 @@ func (h *CustomerHandler) SearchJSON(c echo.Context) error {
 	return c.JSON(http.StatusOK, out)
 }
 
+// CreateNameJSON 견적 수신처 등에서 이름만으로 거래처를 만든다. §49.2
+func (h *CustomerHandler) CreateNameJSON(c echo.Context) error {
+	if !canWriteSales(c) && !canWriteMaster(c) {
+		return echo.ErrForbidden
+	}
+	name := strings.TrimSpace(c.FormValue("name"))
+	if name == "" {
+		name = strings.TrimSpace(c.QueryParam("name"))
+	}
+	kind := model.PartyKindCustomer
+	if strings.TrimSpace(c.FormValue("party_kind")) != "" {
+		kind = model.NormalizePartyKind(c.FormValue("party_kind"))
+	}
+	confirm := c.FormValue("confirm") == "1"
+	exist, err := h.repo.FindByExactOrgName(name)
+	if err != nil {
+		return err
+	}
+	if exist != nil && !confirm {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"ok": true, "existed": true, "ask_confirm": true,
+			"prompt":   "같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?",
+			"customer": customerBrief(exist),
+		})
+	}
+	if exist != nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"ok": true, "existed": true, "customer": customerBrief(exist),
+		})
+	}
+	created, _, err := h.repo.CreatePartyNameOnly(name, kind)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"ok": true, "existed": false, "created": true, "customer": customerBrief(created),
+	})
+}
+
 // New 고객 등록 폼
 func (h *CustomerHandler) New(c echo.Context) error {
 	customers, _ := h.repo.ListAll()

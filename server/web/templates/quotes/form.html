@@ -19,34 +19,43 @@
   <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">{{.LaborYearNote}}</div>
   {{end}}
 
-  <form method="post" action="{{if .IsNew}}/quotes{{else}}/quotes/{{.Quote.QuoteID}}{{end}}" class="space-y-4" @submit="syncHidden()">
+  <form method="post" action="{{if .IsNew}}/quotes{{else}}/quotes/{{.Quote.QuoteID}}{{end}}" class="space-y-4" @submit="onSubmit($event)">
     <input type="hidden" name="status" value="{{if .Quote.Status}}{{.Quote.Status}}{{else}}draft{{end}}">
     <input type="hidden" name="vat_mode" :value="vat">
     <input type="hidden" name="round_rule" :value="round">
+    <input type="hidden" name="form_type" :value="formType">
     <input type="hidden" name="is_reverse_calc" value="{{if .Quote.IsReverseCalc}}1{{end}}">
 
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">사업 <span class="text-red-500">*</span></label>
-        {{if and (not .IsNew) .Quote.SalesID}}
+        {{if .SalesLocked}}
         <input type="hidden" name="sales_id" value="{{.Quote.SalesID}}">
-        <p class="text-sm text-gray-800">{{if .Quote.SalesDisplayNo}}{{.Quote.SalesDisplayNo}} · {{end}}연결됨</p>
-        {{else}}
-        <select name="sales_id" required class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-          <option value="">사업을 먼저 고르세요</option>
+        <select disabled class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700">
           {{range .OpenSales}}
           <option value="{{.SalesID}}" {{if eq $.Quote.SalesID .SalesID}}selected{{end}}>{{.DisplayNo}} · {{.Name}}</option>
           {{end}}
         </select>
+        <p class="text-xs text-amber-800 mt-1">수주 {{.LockOrderNo}} 와 연결돼 있어 사업을 바꿀 수 없습니다.</p>
+        {{else}}
+        <div class="flex gap-2 items-start">
+          <select name="sales_id" x-ref="salesSel" required class="flex-1 border rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="">사업을 먼저 고르세요</option>
+            {{range .OpenSales}}
+            <option value="{{.SalesID}}" {{if eq $.Quote.SalesID .SalesID}}selected{{end}}>{{.DisplayNo}} · {{.Name}}</option>
+            {{end}}
+          </select>
+          <button type="button" class="shrink-0 px-3 py-2 text-sm border rounded-lg text-blue-700 hover:bg-blue-50" @click="openSales=true; nsMsg=''">+ 새 사업</button>
+        </div>
         {{end}}
       </div>
       <div>
         <p class="block text-sm font-medium text-gray-700 mb-2">견적 유형</p>
         <div class="flex flex-wrap gap-4 text-sm">
-          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="maint_service" {{if or (eq .Quote.QuoteKind "maint_service") (eq .Quote.QuoteKind "")}}checked{{end}}>유지보수 용역</label>
-          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="dev_service" {{if eq .Quote.QuoteKind "dev_service"}}checked{{end}}>개발 용역</label>
-          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="construction" {{if eq .Quote.QuoteKind "construction"}}checked{{end}}>공사 용역</label>
-          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="solution" {{if eq .Quote.QuoteKind "solution"}}checked{{end}}>솔루션(제품) 납품</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="maint_service" x-model="quoteKind" @change="setKind('maint_service')">유지보수 용역</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="dev_service" x-model="quoteKind" @change="setKind('dev_service')">개발 용역</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="construction" x-model="quoteKind" @change="setKind('construction')">공사 용역</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="quote_kind" value="solution" x-model="quoteKind" @change="setKind('solution')">솔루션(제품) 납품</label>
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -67,25 +76,9 @@
       </div>
 
       <div>
-        <p class="block text-sm font-medium text-gray-700 mb-2">양식</p>
-        <div class="flex flex-wrap gap-4 text-sm">
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="form_type" value="A1" {{if eq .Quote.FormType "A1"}}checked{{end}} @change="setForm('A1')">
-            A-1 · 물품·작업
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="form_type" value="A2" {{if eq .Quote.FormType "A2"}}checked{{end}} @change="setForm('A2')">
-            A-2 · 개발 용역
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="form_type" value="B1" {{if eq .Quote.FormType "B1"}}checked{{end}} @change="setForm('B1')">
-            B-1 · 조달 단순
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="form_type" value="B2" {{if eq .Quote.FormType "B2"}}checked{{end}} @change="setForm('B2')">
-            B-2 · 조달 그룹
-          </label>
-        </div>
+        <p class="block text-sm font-medium text-gray-700 mb-1">양식</p>
+        <p class="text-sm text-gray-800" x-text="formLabel()"></p>
+        <p class="text-xs text-gray-500 mt-1">견적 유형을 바꾸면 양식과 라인 열이 같이 바뀝니다. 개발 용역은 D형, 나머지는 P형입니다.</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -104,9 +97,56 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
+        <div class="relative" x-data="{
+          q: {{printf "%q" .Quote.RecipientName}},
+          id: {{printf "%q" .Quote.CustomerID}},
+          hits: [], open: false, making: false, newName: '',
+          async search(){
+            const q=this.q.trim();
+            if(!q){ this.hits=[]; this.open=false; return; }
+            try {
+              const r=await fetch('/customers/search?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
+              this.hits=await r.json()||[];
+              this.open=true;
+            } catch(e){ this.hits=[]; }
+          },
+          pick(it){
+            this.id=it.customer_id; this.q=it.org_name; this.open=false; this.making=false;
+          },
+          async create(){
+            const name=(this.newName||this.q).trim();
+            if(!name) return;
+            const post=async (extra)=>{
+              const b=new URLSearchParams({name, party_kind:'customer'});
+              if(extra){ for(const k in extra) b.set(k, extra[k]); }
+              const r=await fetch('/customers/quick',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:b});
+              return r.json();
+            };
+            let d=await post();
+            if(d && d.ask_confirm){
+              if(!confirm(d.prompt||'같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?')) return;
+              d=await post({confirm:'1'});
+            }
+            if(d && d.customer) this.pick(d.customer);
+          }
+        }">
           <label class="block text-sm font-medium text-gray-700 mb-1">수신</label>
-          <input name="recipient_name" value="{{.Quote.RecipientName}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="기관명">
+          <input type="hidden" name="customer_id" :value="id">
+          <input name="recipient_name" x-model="q" @input.debounce.200ms="search()" @focus="search()" autocomplete="off"
+                 class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="기관명 검색 또는 직접 입력">
+          <ul x-show="open" x-cloak class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-sm max-h-40 overflow-auto text-sm">
+            <template x-for="it in hits" :key="it.customer_id">
+              <li><button type="button" class="w-full text-left px-3 py-1.5 hover:bg-blue-50" @click="pick(it)">
+                <span x-text="it.org_name"></span>
+                <span class="text-xs text-gray-400 ml-1" x-text="it.customer_id"></span>
+              </button></li>
+            </template>
+          </ul>
+          <button type="button" class="mt-1 text-xs text-blue-700 hover:underline" @click="making=true; newName=q">+ 새 거래처</button>
+          <div x-show="making" x-cloak class="mt-1 flex gap-2">
+            <input type="text" x-model="newName" placeholder="고객사명만" class="flex-1 border rounded px-2 py-1 text-sm">
+            <button type="button" class="text-xs px-2 border rounded" @click="create()">만들기</button>
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">수신 구분</label>
@@ -208,29 +248,49 @@
         <button type="button" class="text-sm text-blue-700 hover:underline" @click="addLine()">+ 줄 추가</button>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm min-w-[56rem]">
+        <table class="w-full text-sm table-fixed min-w-[48rem]">
           <thead class="bg-gray-50 border-b"><tr>
-            <th class="text-left px-2 py-2 text-xs text-gray-500">구분</th>
-            <th class="text-left px-2 py-2 text-xs text-gray-500">품명 · 내용</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500">수량</th>
-            <th class="text-left px-2 py-2 text-xs text-gray-500">단위</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500">단가</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500">투입율</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500">할인율</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500">금액</th>
-            <th></th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 w-24">구분</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'" x-text="isLabor() ? '품명' : '품명 · 내용'">품명 · 내용</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 w-[16%]" x-show="isLabor()">규격</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20">수량</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 w-24">단위</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-24" x-text="isLabor() ? '공급단가' : '단가'">단가</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20" x-show="isLabor()">투입율</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20" x-show="isLabor()">할인율</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-28" x-text="isLabor() ? '공급금액' : '공급가'">금액</th>
+            <th class="w-12"></th>
           </tr></thead>
           <tbody>
             <template x-for="(ln, i) in lines" :key="ln.key">
               <tr class="border-b border-gray-100 align-top">
-                <td class="px-2 py-2">
-                  <input type="hidden" :name="'line_item_id'" :value="ln.itemId">
-                  <input name="line_group" x-model="ln.group" class="w-24 border rounded px-2 py-1 text-sm">
+                <td class="px-2 py-2 w-24">
+                  <input type="hidden" name="line_item_id" :value="ln.itemId">
+                  <input type="hidden" name="line_spec_id" :value="ln.specId">
+                  <template x-if="isLabor()">
+                    <select name="line_group" x-model="ln.group" class="w-full border rounded px-2 py-1 text-sm bg-white">
+                      <option value="인건비">인건비</option>
+                      <option value="경비">경비</option>
+                    </select>
+                  </template>
+                  <template x-if="!isLabor()">
+                    <input name="line_group" x-model="ln.group" class="w-full border rounded px-2 py-1 text-sm" placeholder="구분">
+                  </template>
                 </td>
-                <td class="px-2 py-2 relative">
+                <td class="px-2 py-2 relative" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'">
                   <input name="line_name" x-model="ln.name" @input.debounce.200ms="search(i)" autocomplete="off"
-                         class="w-full border rounded px-2 py-1 text-sm" placeholder="품명">
-                  <textarea name="line_spec" x-model="ln.spec" rows="2" class="mt-1 w-full border rounded px-2 py-1 text-xs" placeholder="규격·내용"></textarea>
+                         class="w-full min-w-0 border rounded px-2 py-1 text-sm" placeholder="품명">
+                  <template x-if="!isLabor()">
+                    <div>
+                      <select x-show="(ln.specs||[]).length" class="mt-1 w-full border rounded px-2 py-1 text-xs bg-white" x-model="ln.specId" @change="applySpec(i, ln.specId)">
+                        <option value="">규격 고르기</option>
+                        <template x-for="sp in (ln.specs||[])" :key="sp.spec_id">
+                          <option :value="sp.spec_id" x-text="sp.spec || '(이름 없음)'"></option>
+                        </template>
+                      </select>
+                      <textarea name="line_spec" x-model="ln.spec" rows="2" class="mt-1 w-full min-w-0 border rounded px-2 py-1 text-xs" placeholder="규격·내용"></textarea>
+                    </div>
+                  </template>
                   <ul x-show="ln.open" x-cloak class="absolute z-20 mt-1 w-full bg-white border rounded shadow max-h-40 overflow-auto text-sm">
                     <template x-for="it in ln.hits" :key="it.item_id">
                       <li><button type="button" class="w-full text-left px-2 py-1 hover:bg-blue-50" @click="pick(i, it)" x-text="it.name + ' · ' + (it.unit||'')"></button></li>
@@ -242,18 +302,23 @@
                     <option value="{{.RateID}}" data-year="{{.Year}}" data-monthly="{{.Monthly}}" data-name="{{.JobName}}">{{.JobCode}} {{.JobName}}</option>
                     {{end}}
                   </select>
-                  <input name="line_note" x-model="ln.note" class="mt-1 w-full border rounded px-2 py-1 text-xs" placeholder="비고 · 물품식별번호">
+                  <input name="line_note" x-show="!isLabor()" x-model="ln.note" class="mt-1 w-full border rounded px-2 py-1 text-xs" placeholder="비고 · 물품식별번호">
                   <input type="hidden" name="line_gov" :value="ln.gov">
                 </td>
-                <td class="px-2 py-2"><input name="line_qty" x-model="ln.qty" inputmode="decimal" class="w-20 border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
+                <td class="px-2 py-2" x-show="isLabor()">
+                  <template x-if="isLabor()">
+                    <textarea name="line_spec" x-model="ln.spec" rows="2" class="w-full min-w-0 border rounded px-2 py-1 text-xs" placeholder="규격"></textarea>
+                  </template>
+                </td>
+                <td class="px-2 py-2"><input name="line_qty" x-model="ln.qty" inputmode="decimal" class="w-full border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
                 <td class="px-2 py-2">
-                  <select name="line_unit" x-model="ln.unit" class="border rounded px-2 py-1 text-sm bg-white">
+                  <select name="line_unit" x-model="ln.unit" class="w-full border rounded px-2 py-1 text-sm bg-white">
                     {{range .Units}}<option value="{{.}}">{{.}}</option>{{end}}
                   </select>
                 </td>
-                <td class="px-2 py-2"><input name="line_price" x-model="ln.price" @input="ln.overridden='1'" inputmode="numeric" class="w-28 border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
-                <td class="px-2 py-2"><input name="line_mm" x-model="ln.mm" class="w-16 border rounded px-2 py-1 text-sm text-right"></td>
-                <td class="px-2 py-2"><input name="line_disc" x-model="ln.disc" class="w-16 border rounded px-2 py-1 text-sm text-right"></td>
+                <td class="px-2 py-2"><input name="line_price" x-model="ln.price" @input="ln.overridden='1'" inputmode="numeric" class="w-full border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
+                <td class="px-2 py-2" x-show="isLabor()"><input name="line_mm" x-model="ln.mm" class="w-full border rounded px-2 py-1 text-sm text-right" placeholder="1"></td>
+                <td class="px-2 py-2" x-show="isLabor()"><input name="line_disc" x-model="ln.disc" class="w-full border rounded px-2 py-1 text-sm text-right" placeholder="%"></td>
                 <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-gray-800">
                   <span x-text="fmt(lineAmt(ln))"></span>
                   <div class="text-[10px] text-amber-700" x-show="yearBadge(ln)" x-text="yearBadge(ln)"></div>
@@ -273,15 +338,15 @@
     <details class="bg-white rounded-xl border border-gray-200 p-5 lg:pointer-events-none" open>
       <summary class="lg:hidden cursor-pointer text-sm font-medium text-gray-800">합계 · 접기/펴기</summary>
     <div class="mt-3 lg:mt-0 grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div x-show="isLabor()">
+      <div x-show="isLabor() && (num(overhead)||num(tech))">
         <p class="text-xs text-gray-500">직접인건비</p>
         <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().direct)+'원'"></p>
       </div>
-      <div x-show="isLabor()">
+      <div x-show="isLabor() && (num(overhead)||num(tech))">
         <p class="text-xs text-gray-500">제경비</p>
         <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().overhead)+'원'"></p>
       </div>
-      <div x-show="isLabor()">
+      <div x-show="isLabor() && (num(overhead)||num(tech))">
         <p class="text-xs text-gray-500">기술료</p>
         <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().tech)+'원'"></p>
       </div>
@@ -332,6 +397,47 @@
       <p class="text-xs text-gray-500" x-text="previewMsg"></p>
     </div>
   </form>
+
+  <div x-show="openSales" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" @keydown.escape.window="openSales=false">
+    <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5 space-y-3" @click.outside="openSales=false">
+      <h3 class="font-semibold text-gray-800">새 사업</h3>
+      <p class="text-xs text-gray-500">견적 화면을 떠나지 않습니다. 필수 칸만 적고 나머지는 나중에 채웁니다.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">사업명</label>
+        <input x-model="nsName" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="사업명">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">영업담당</label>
+        <select x-model="nsOwner" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="">— 선택 —</option>
+          {{range .Users}}
+          <option value="{{.UserID}}">{{.FullName}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">사업 유형</label>
+        <select x-model="nsBiz" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="">— 선택 —</option>
+          <option value="build">구축</option>
+          <option value="maintenance">유지보수</option>
+          <option value="goods">물품 납품</option>
+          <option value="develop">개발</option>
+          <option value="construction">공사</option>
+          <option value="etc">기타</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">고객</label>
+        <input x-model="nsCustomer" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="기관명 (직접 입력)">
+      </div>
+      <p class="text-xs text-red-600" x-text="nsMsg"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-2 text-sm border rounded-lg" @click="openSales=false">취소</button>
+        <button type="button" class="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg" @click="saveNewSales()">저장</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script type="application/json" id="quote-init">{{.InitJSON}}</script>
 <script>
@@ -340,12 +446,13 @@ document.addEventListener('alpine:init', () => {
     const raw = document.getElementById('quote-init');
     let init = {};
     try { init = JSON.parse((raw && raw.textContent) || '{}') || {}; } catch (e) { init = {}; }
-    const emptyLine = (qty) => ({key: Date.now()+Math.random(), itemId:'', group:'', name:'', spec:'', qty: qty, unit:'EA', price:'', mm:'', disc:'', note:'', gov:0, rateId:'', laborYear:0, overridden:'', hits:[], open:false});
+    const emptyLine = (qty) => ({key: Date.now()+Math.random(), itemId:'', specId:'', group:'', name:'', spec:'', qty: qty, unit:'EA', price:'', mm:'', disc:'', note:'', gov:0, rateId:'', laborYear:0, overridden:'', hits:[], open:false, specs:[]});
     const asLine = (ln) => {
       ln = ln || {};
       return {
         key: Date.now()+Math.random(),
         itemId: ln.itemId || '',
+        specId: ln.specId || '',
         group: ln.group || '',
         name: ln.name || '',
         spec: ln.spec || '',
@@ -360,7 +467,8 @@ document.addEventListener('alpine:init', () => {
         laborYear: ln.laborYear || 0,
         overridden: ln.overridden || '',
         hits: [],
-        open: false
+        open: false,
+        specs: []
       };
     };
     let serverLines = Array.isArray(init.lines) ? init.lines.map(asLine) : [];
@@ -370,27 +478,72 @@ document.addEventListener('alpine:init', () => {
     return {
     vat: init.vat || 'excluded',
     round: init.round || 'none',
-    formType: init.formType || 'A1',
+    formType: init.formType || 'A',
+    quoteKind: init.quoteKind || 'maint_service',
     purpose: init.purpose || 'deal',
     overhead: init.overhead == null ? 0 : init.overhead,
     tech: init.tech == null ? 0 : init.tech,
     stdOH: init.stdOH || 110,
     stdTech: init.stdTech || 20,
     quoteYear: init.quoteYear || 0,
+    prevSalesId: init.prevSalesId || '',
+    prevSalesNo: init.prevSalesNo || '',
+    salesLocked: !!init.salesLocked,
     lines: serverLines,
     previewMsg: '',
+    openSales: false,
+    nsName: '',
+    nsOwner: '',
+    nsBiz: '',
+    nsCustomer: '',
+    nsMsg: '',
+    async saveNewSales(){
+      this.nsMsg='';
+      const name=(this.nsName||'').trim();
+      if(!name){ this.nsMsg='사업명을 입력하세요'; return; }
+      const body=new URLSearchParams({name, sales_owner_id:this.nsOwner||'', biz_type:this.nsBiz||'', prospect_name:this.nsCustomer||''});
+      try {
+        const r=await fetch('/sales',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body});
+        const d=await r.json();
+        if(!d||!d.ok||!d.sales_id){ this.nsMsg=(d&&d.error)||'저장에 실패했습니다'; return; }
+        const sel=this.$refs.salesSel;
+        if(sel){
+          const opt=document.createElement('option');
+          opt.value=d.sales_id;
+          opt.textContent=(d.sales_no||d.sales_id)+' · '+(d.name||name);
+          opt.selected=true;
+          sel.appendChild(opt);
+        }
+        this.openSales=false;
+        this.nsName=''; this.nsOwner=''; this.nsBiz=''; this.nsCustomer='';
+      } catch(e){ this.nsMsg='저장에 실패했습니다'; }
+    },
     addLine(){
-      this.lines.push({key:Date.now()+Math.random(),itemId:'',group:'',name:'',spec:'',qty:'',unit:'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false});
+      const g = this.isLabor() ? '인건비' : '';
+      this.lines.push({key:Date.now()+Math.random(),itemId:'',specId:'',group:g,name:'',spec:'',qty:'',unit: this.isLabor() ? 'M/M' : 'EA',price:'',mm:'',disc:'',note:'',gov:0,rateId:'',laborYear:0,overridden:'',hits:[],open:false,specs:[]});
     },
     remove(i){
       this.lines.splice(i,1);
       if(this.lines.length===0) this.addLine();
     },
-    isLabor(){ return this.formType==='A2'; },
+    isLabor(){ return this.formType==='A2' || this.formType==='D' || this.quoteKind==='dev_service'; },
+    formLabel(){ return this.isLabor() ? 'D형 · 개발 용역' : 'P형 · 물품·작업'; },
+    setKind(k){
+      this.quoteKind = k || 'maint_service';
+      if(this.quoteKind==='dev_service'){
+        this.formType = 'A2';
+        this.overhead = 0;
+        this.tech = 0;
+        this.lines.forEach(ln => { if(!ln.group) ln.group='인건비'; });
+      } else {
+        this.formType = 'A';
+      }
+      this.vat = 'excluded';
+    },
     setForm(t){
       this.formType = t;
       this.vat = (t==='B1' || t==='B2' || t==='B') ? 'included' : 'excluded';
-      if(t==='A2'){ this.overhead=0; this.tech=0; }
+      if(t==='A2' || t==='D'){ this.overhead=0; this.tech=0; }
     },
     ohDiff(){
       const u=this.num(this.overhead), s=this.num(this.stdOH);
@@ -471,11 +624,41 @@ document.addEventListener('alpine:init', () => {
     },
     pick(i, it){
       const ln=this.lines[i];
-      ln.itemId=it.item_id; ln.name=it.name; ln.spec=it.spec||ln.spec; ln.unit=it.unit||'EA';
-      ln.price=it.fill_price||it.last_price||it.list_price||ln.price;
+      ln.itemId=it.item_id; ln.name=it.name;
+      ln.specs=it.specs||[];
       ln.open=false;
+      if(ln.specs.length===1){ this.applySpec(i, ln.specs[0].spec_id); return; }
+      if(ln.specs.length===0){
+        ln.specId=''; ln.spec=it.spec||ln.spec; ln.unit=it.unit||'EA';
+        ln.price=it.fill_price||it.last_price||it.list_price||ln.price;
+        return;
+      }
+      ln.specId=''; ln.spec=''; ln.unit=it.unit||'EA'; ln.price='';
+    },
+    applySpec(i, specId){
+      const ln=this.lines[i];
+      const sp=(ln.specs||[]).find(s=>s.spec_id===specId);
+      if(!sp){ ln.specId=''; return; }
+      ln.specId=sp.spec_id;
+      ln.spec=sp.spec||'';
+      ln.unit=sp.unit||'EA';
+      ln.price=sp.price||0;
     },
     syncHidden(){},
+    confirmSalesMove(ev){
+      if(this.salesLocked) return true;
+      const sel = ev.target.querySelector('select[name="sales_id"]');
+      if(!sel) return true;
+      const next = sel.value;
+      if(!next || !this.prevSalesId || next === this.prevSalesId) return true;
+      const nextNo = (sel.options[sel.selectedIndex].text || '').split(' · ')[0];
+      const prevNo = this.prevSalesNo || this.prevSalesId;
+      return confirm(prevNo + ' → ' + nextNo + ' 로 옮깁니다. 두 사업의 금액이 다시 계산됩니다.');
+    },
+    onSubmit(ev){
+      this.syncHidden();
+      if(!this.confirmSalesMove(ev)){ ev.preventDefault(); }
+    },
     async preview(ev){
       const form = ev.target.closest('form');
       const body = new FormData(form);

@@ -560,6 +560,11 @@ func (r *CustomerRepo) FindByExactOrgName(name string) (*model.Customer, error) 
 
 // CreatePartnerNameOnly 품목 제조사·공급사용. 이름만 받고 파트너로 만든다. §47.20.4
 func (r *CustomerRepo) CreatePartnerNameOnly(name string) (*model.Customer, bool, error) {
+	return r.CreatePartyNameOnly(name, model.PartyKindPartner)
+}
+
+// CreatePartyNameOnly 이름만으로 거래처를 만든다. §49.2
+func (r *CustomerRepo) CreatePartyNameOnly(name, partyKind string) (*model.Customer, bool, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, false, fmt.Errorf("고객사명을 입력하세요")
@@ -573,7 +578,7 @@ func (r *CustomerRepo) CreatePartnerNameOnly(name string) (*model.Customer, bool
 		OrgName:      name,
 		OfficialName: name,
 		IsActive:     true,
-		PartyKind:    model.PartyKindPartner,
+		PartyKind:    model.NormalizePartyKind(partyKind),
 		Notes:        "기본 정보가 비어 있습니다",
 	}
 	if err := r.Create(c); err != nil {
