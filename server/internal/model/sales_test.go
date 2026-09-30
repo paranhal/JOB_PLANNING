@@ -6,20 +6,67 @@ import (
 )
 
 func TestFormatSalesPeriod(t *testing.T) {
-	if got := FormatSalesPeriod("2027-03", SalesPrecisionMonth); got != "2027-03" {
+	if got := SalesPeriodLabel("2027-03", SalesPrecisionMonth); got != "2027-03" {
 		t.Fatalf("month: %q", got)
 	}
-	if got := FormatSalesPeriod("2027-03", SalesPrecisionQuarter); got != "2027년 1분기" {
+	if got := SalesPeriodLabel("2027-04", SalesPrecisionQuarter); got != "2027년 2분기" {
 		t.Fatalf("quarter: %q", got)
 	}
-	if got := FormatSalesPeriod("2027-08", SalesPrecisionHalf); got != "2027년 하반기" {
+	if got := SalesPeriodLabel("2027-08", SalesPrecisionHalf); got != "2027년 하반기" {
 		t.Fatalf("half: %q", got)
 	}
-	if got := FormatSalesPeriod("2027-01", SalesPrecisionYear); got != "2027년" {
+	if got := SalesPeriodLabel("2027-01", SalesPrecisionYear); got != "2027년" {
 		t.Fatalf("year: %q", got)
 	}
-	if got := FormatSalesPeriod("", SalesPrecisionMonth); got != "" {
+	if got := SalesPeriodLabel("", SalesPrecisionMonth); got != "" {
 		t.Fatalf("empty: %q", got)
+	}
+	if got := SalesPeriodLabel("2027", SalesPrecisionMonth); got != "" {
+		t.Fatalf("short year: %q", got)
+	}
+	if got := SalesPeriodLabel("bad", SalesPrecisionMonth); got != "" {
+		t.Fatalf("invalid: %q", got)
+	}
+	if got := FormatSalesPeriod("2027-03", SalesPrecisionQuarter); got != "2027년 1분기" {
+		t.Fatalf("alias: %q", got)
+	}
+}
+
+func TestSalesYMFromParts(t *testing.T) {
+	if got := SalesYMFromParts(SalesPrecisionQuarter, "2027", "2", "", ""); got != "2027-04" {
+		t.Fatalf("Q2: %q", got)
+	}
+	if got := SalesYMFromParts(SalesPrecisionHalf, "2027", "", "1", ""); got != "2027-01" {
+		t.Fatalf("H1: %q", got)
+	}
+	if got := SalesYMFromParts(SalesPrecisionYear, "2027", "", "", ""); got != "2027-01" {
+		t.Fatalf("year: %q", got)
+	}
+	if got := SalesYMFromParts(SalesPrecisionMonth, "", "", "", "2027-03"); got != "2027-03" {
+		t.Fatalf("month: %q", got)
+	}
+	parts := SalesPeriodInputParts("2027-04", SalesPrecisionQuarter)
+	if parts.Year != 2027 || parts.Quarter != 2 {
+		t.Fatalf("parts=%+v", parts)
+	}
+}
+
+func TestApplySalesPeriodAndBilling(t *testing.T) {
+	p := &SalesProject{BizType: SalesBizBuild, BillingCycle: "month", RevenueFrom: "2027-01", RevenueTo: "2027-12", ExpectedYM: "2027-05", ExpectedPrecision: SalesPrecisionQuarter}
+	ApplySalesPeriodAndBilling(p)
+	if p.BillingCycle != "" || p.RevenueFrom != "" || p.RevenueTo != "" {
+		t.Fatalf("구축 대금=%q %q %q", p.BillingCycle, p.RevenueFrom, p.RevenueTo)
+	}
+	if p.ExpectedYM != "2027-04" {
+		t.Fatalf("분기 첫 달=%s", p.ExpectedYM)
+	}
+	if p.BudgetYear != 2027 {
+		t.Fatalf("budget_year=%d", p.BudgetYear)
+	}
+	m := &SalesProject{BizType: SalesBizMaintenance, BillingCycle: "once", RevenueFrom: "2027-03", RevenueTo: "2027-12"}
+	ApplySalesPeriodAndBilling(m)
+	if m.RevenueFrom != "2027-03" || m.RevenueTo != "" {
+		t.Fatalf("일시 대금 from=%s to=%s", m.RevenueFrom, m.RevenueTo)
 	}
 }
 

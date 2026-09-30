@@ -523,7 +523,7 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 	if pipe.Code != http.StatusMovedPermanently {
 		t.Fatalf("파이프라인 리다이렉트 status=%d", pipe.Code)
 	}
-	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "view=kanban") {
+	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "view=pipeline") {
 		t.Fatalf("파이프라인 Location=%q", loc)
 	}
 
@@ -648,8 +648,8 @@ func createContractedSales(t *testing.T, e *echo.Echo, vals url.Values) string {
 		t.Fatalf("바로 수주: loc=%q", rec.Header().Get("Location"))
 	}
 	rec = doForm(t, e, "/sales/"+id+"/close-contract", url.Values{
-		"contracted_at":    {"2026-09-01"},
-		"contract_amount":  {"30000000"},
+		"contracted_at":   {"2026-09-01"},
+		"contract_amount": {"30000000"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("계약 종료: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
@@ -884,15 +884,18 @@ func TestSalesHTTP_PipelineKanbanSharedWithList(t *testing.T) {
 	if pipe.Code != http.StatusMovedPermanently {
 		t.Fatalf("파이프라인 리다이렉트 status=%d", pipe.Code)
 	}
-	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "/sales") || !strings.Contains(loc, "view=kanban") {
+	if loc := pipe.Header().Get("Location"); !strings.Contains(loc, "/sales") || !strings.Contains(loc, "view=pipeline") {
 		t.Fatalf("파이프라인 Location=%q", loc)
 	}
-	pb := doGet(t, e, "/sales?view=kanban").Body.String()
+	pb := doGet(t, e, "/sales?view=pipeline").Body.String()
 	lb := list.Body.String()
-	if strings.Count(lb, "flex-1 basis-0") != 4 || strings.Count(pb, "flex-1 basis-0") != 4 {
-		t.Fatalf("열 수가 다르다 list=%d pipe=%d", strings.Count(lb, "flex-1 basis-0"), strings.Count(pb, "flex-1 basis-0"))
+	if strings.Count(lb, "flex-1 basis-0") != 4 {
+		t.Fatalf("칸반 열 수=%d", strings.Count(lb, "flex-1 basis-0"))
 	}
-	if !strings.Contains(lb, "세종 RFID 증설 (가칭)") || !strings.Contains(pb, "세종 RFID 증설 (가칭)") {
+	if !strings.Contains(pb, "영업 파이프라인") || !strings.Contains(pb, "세종 RFID 증설") {
+		t.Fatalf("파이프라인 목록 없음: %s", clipBody(pb))
+	}
+	if !strings.Contains(lb, "세종 RFID 증설 (가칭)") {
 		t.Fatal("임시명 (가칭) 이 카드에 없다")
 	}
 	if !strings.Contains(lb, "0건") {
@@ -1069,5 +1072,198 @@ func TestSalesHTTP_DashboardAndMemo(t *testing.T) {
 	ct := doGet(t, e, "/contracts")
 	if ct.Code != http.StatusOK || !strings.Contains(ct.Body.String(), "만료임박") {
 		t.Fatalf("계약 목록 status=%d", ct.Code)
+	}
+}
+
+func TestSalesHTTP_FormBizTypePrecisionQuickQuote(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	repo := repository.NewSalesRepo(db)
+
+	page := doGet(t, e, "/sales/new")
+	if page.Code != http.StatusOK {
+		t.Fatalf("new status=%d", page.Code)
+	}
+	body := page.Body.String()
+	iName := strings.Index(body, `name="name"`)
+	iOwner := strings.Index(body, `name="sales_owner_id"`)
+	iBiz := strings.Index(body, `name="biz_type"`)
+	if iName < 0 || iOwner < 0 || iBiz < 0 || !(iName < iOwner && iOwner < iBiz) {
+		t.Fatalf("필드 순서 name=%d owner=%d biz=%d", iName, iOwner, iBiz)
+	}
+	if strings.Contains(body, `name="budget_year"`) {
+		t.Fatal("예산 연도 칸이 남아 있다")
+	}
+	iContract := strings.Index(body, "계약 분류")
+	iLead := strings.Index(body, `name="lead_source"`)
+	if iContract < 0 || iLead < iContract {
+		t.Fatal("정보 입수 경로가 계약 분류 묶음에 없다")
+	}
+
+	rec := doForm(t, e, "/sales", url.Values{
+		"name":          {"구축사업"},
+		"biz_type":      {"build"},
+		"billing_cycle": {"month"},
+		"revenue_from":  {"2027-01"},
+		"revenue_to":    {"2027-12"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("구축 저장 status=%d", rec.Code)
+	}
+	buildID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, err := repo.Get(buildID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.BillingCycle != "" || p.RevenueFrom != "" || p.RevenueTo != "" {
+		t.Fatalf("구축 대금 cycle=%s from=%s to=%s", p.BillingCycle, p.RevenueFrom, p.RevenueTo)
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":          {"유지사업"},
+		"biz_type":      {"maintenance"},
+		"billing_cycle": {"month"},
+		"revenue_from":  {"2027-01"},
+		"revenue_to":    {"2027-12"},
+	})
+	maintID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, _ = repo.Get(maintID)
+	if p.BillingCycle != "month" || p.RevenueFrom != "2027-01" || p.RevenueTo != "2027-12" {
+		t.Fatalf("유지보수 대금 cycle=%s from=%s to=%s", p.BillingCycle, p.RevenueFrom, p.RevenueTo)
+	}
+
+	rec = doForm(t, e, "/sales/"+maintID, url.Values{
+		"name":     {"유지사업"},
+		"biz_type": {"build"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("유형 변경 status=%d", rec.Code)
+	}
+	p, _ = repo.Get(maintID)
+	if p.BizType != "build" || p.BillingCycle != "" || p.RevenueFrom != "" || p.RevenueTo != "" {
+		t.Fatalf("구축 전환 후 cycle=%s from=%s to=%s type=%s", p.BillingCycle, p.RevenueFrom, p.RevenueTo, p.BizType)
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":          {"일시사업"},
+		"biz_type":      {"maintenance"},
+		"billing_cycle": {"once"},
+		"revenue_from":  {"2027-03"},
+	})
+	onceID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, _ = repo.Get(onceID)
+	if p.BillingCycle != "once" || p.RevenueFrom != "2027-03" || p.RevenueTo != "" {
+		t.Fatalf("일시 cycle=%s from=%s to=%s", p.BillingCycle, p.RevenueFrom, p.RevenueTo)
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":               {"분기사업"},
+		"expected_precision": {"quarter"},
+		"expected_year":      {"2027"},
+		"expected_quarter":   {"2"},
+	})
+	qID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, _ = repo.Get(qID)
+	if p.ExpectedYM != "2027-04" {
+		t.Fatalf("분기 ym=%s", p.ExpectedYM)
+	}
+	edit := doGet(t, e, "/sales/"+qID+"/edit")
+	eb := edit.Body.String()
+	if !strings.Contains(eb, "2027") || !strings.Contains(eb, `quarter: '2'`) {
+		t.Fatalf("수정 화면 분기 복원 실패: %s", clipBody(eb))
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":               {"연간사업"},
+		"expected_precision": {"year"},
+		"expected_year":      {"2027"},
+	})
+	yID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, _ = repo.Get(yID)
+	if p.ExpectedYM != "2027-01" {
+		t.Fatalf("년 ym=%s", p.ExpectedYM)
+	}
+	show := doGet(t, e, "/sales/"+yID)
+	if !strings.Contains(show.Body.String(), "2027년") {
+		t.Fatalf("년 표시 없음: %s", clipBody(show.Body.String()))
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":            {"즉시견적사업"},
+		"quick_quote":     {"1"},
+		"expected_amount": {"999999"},
+		"contract_target": {"public"},
+		"competitor":      {"타사"},
+		"lead_source":     {"existing"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("즉시 견적 status=%d", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.Contains(loc, "/quotes/new?sales_id=") {
+		t.Fatalf("견적 이동 loc=%s", loc)
+	}
+	qqID := strings.TrimPrefix(strings.Split(loc, "sales_id=")[1], "")
+	if i := strings.Index(qqID, "&"); i >= 0 {
+		qqID = qqID[:i]
+	}
+	p, _ = repo.Get(qqID)
+	if p == nil || p.ExpectedAmount != 0 || p.ContractTarget != "" || p.Competitor != "" || p.LeadSource != "" {
+		t.Fatalf("즉시 견적 잔여값 amount=%d target=%s comp=%s lead=%s", p.ExpectedAmount, p.ContractTarget, p.Competitor, p.LeadSource)
+	}
+	if p.Stage != model.SalesStage4Discover {
+		t.Fatalf("단계=%s", p.Stage)
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":               {"예산연도사업"},
+		"expected_precision": {"month"},
+		"expected_ym":        {"2027-03"},
+	})
+	bID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, _ = repo.Get(bID)
+	if p.BudgetYear != 2027 {
+		t.Fatalf("budget_year=%d", p.BudgetYear)
+	}
+
+	rec = doForm(t, e, "/sales", url.Values{
+		"name":        {"입수경로사업"},
+		"lead_source": {"existing"},
+	})
+	lID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	p, _ = repo.Get(lID)
+	if p.LeadSource != "existing" {
+		t.Fatalf("lead_source=%s", p.LeadSource)
+	}
+}
+
+func TestSalesHTTP_PipelineRendersBrokenRows(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	rec := doForm(t, e, "/sales", url.Values{"name": {"빈시기사업"}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("빈시기 등록 status=%d", rec.Code)
+	}
+	rec = doForm(t, e, "/sales", url.Values{"name": {"짧은시기"}, "expected_ym": {"2026-09"}})
+	shortID := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	if _, err := db.Exec(`UPDATE sales_projects SET expected_ym='2027' WHERE sales_id=?`, shortID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO sales_groups (group_id, group_no, name, group_kind, filter_json, status)
+		VALUES ('SG-bad','G-1','깨진조건','filter','not-json','active')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO sales_quotes (quote_id, quote_no, quote_date, title, owner_name, owner_phone, status, sales_id)
+		VALUES ('Q-orphan','VI-견적-x','2026-09-01','고아','a','b','draft','')`); err != nil {
+		t.Fatal(err)
+	}
+	page := doGet(t, e, "/sales?view=pipeline")
+	if page.Code != http.StatusOK {
+		t.Fatalf("pipeline status=%d %s", page.Code, clipBody(page.Body.String()))
+	}
+	body := page.Body.String()
+	if strings.Contains(body, "no such template") {
+		t.Fatal("sales_filters 템플릿 오류")
+	}
+	if !strings.Contains(body, "영업 파이프라인") || !strings.Contains(body, "빈시기사업") || !strings.Contains(body, "짧은시기") {
+		t.Fatalf("목록이 없다: %s", clipBody(body))
 	}
 }

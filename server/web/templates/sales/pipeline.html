@@ -8,7 +8,7 @@
     </div>
     <a href="/sales/pipeline.xlsx?{{.FilterQ}}&view=pipeline&basis={{.Basis}}&from={{.From}}&to={{.To}}&group={{.GroupBy}}&cell={{.Cell}}{{if .Spread}}&spread=1{{end}}" class="px-3 py-1.5 text-sm border rounded-lg">엑셀</a>
   </div>
-  {{template "sales_filters" .}}
+  {{template "sales_list_filters" .}}
   <form method="get" action="/sales" class="flex flex-wrap items-end gap-2 text-sm bg-white border rounded-xl p-3">
     <input type="hidden" name="view" value="pipeline">
     <label>기준
@@ -62,7 +62,7 @@
           <td class="px-3 py-2">{{.Owner}}</td>
           <td class="px-3 py-2">{{.DisplayStage}}</td>
           <td class="px-3 py-2">{{.EffectiveProb}}%</td>
-          <td class="px-3 py-2">{{if .Unsched}}미정{{else}}{{.BasisYM}}{{end}}</td>
+          <td class="px-3 py-2">{{if .Unsched}}—{{else}}{{if .BasisYM}}{{.BasisYM}}{{else}}—{{end}}{{end}}</td>
           <td class="px-3 py-2 text-right">{{.Amount}} <span class="text-[11px] text-gray-400">{{.VATLabel}}</span></td>
           <td class="px-3 py-2 text-right">{{.Weighted}}</td>
         </tr>

@@ -19,11 +19,11 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 	if b := strings.TrimSpace(c.QueryParam("basis")); b != "" {
 		opts.Basis = b
 	}
-	if from := strings.TrimSpace(c.QueryParam("from")); from != "" {
-		opts.From = model.NormalizeSalesYM(from)
+	if ym := model.NormalizeSalesYM(c.QueryParam("from")); ym != "" {
+		opts.From = ym
 	}
-	if to := strings.TrimSpace(c.QueryParam("to")); to != "" {
-		opts.To = model.NormalizeSalesYM(to)
+	if ym := model.NormalizeSalesYM(c.QueryParam("to")); ym != "" {
+		opts.To = ym
 	}
 	if g := strings.TrimSpace(c.QueryParam("group")); g != "" {
 		opts.Group = g
@@ -39,9 +39,16 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 	rows := make([]map[string]interface{}, 0, len(fc.Rows))
 	for i := range fc.Rows {
 		r := fc.Rows[i]
+		if strings.TrimSpace(r.Project.SalesID) == "" {
+			continue
+		}
 		def := model.FindSalesStage(stages, r.Project.Stage)
 		vp := h.viewProject(&r.Project, def)
-		vp["BasisYM"] = r.BasisYM
+		ym := r.BasisYM
+		if ym == "" {
+			ym = "—"
+		}
+		vp["BasisYM"] = ym
 		vp["Unsched"] = r.Unsched
 		vp["Weighted"] = model.FormatSalesMoney(int64(r.Weighted))
 		vp["VATLabel"] = r.VATLabel
@@ -79,6 +86,7 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 		"ContractTarget": f.ContractTarget, "ContractTargets": targets,
 		"BizType": f.BizType, "BizTypes": bizTypes, "BudgetYear": f.BudgetYear, "BudgetStatus": f.BudgetStatus, "BudgetStatuses": budgetSt,
 		"GroupID": f.GroupID, "Groups": groups, "Users": users, "PeriodOptions": salesPeriodOptions(now),
+		"Stages":   stages,
 		"CanWrite": canWriteSales(c), "Forecast": fc, "Rows": rows,
 		"Basis": opts.Basis, "From": opts.From, "To": opts.To, "GroupBy": opts.Group, "Cell": opts.Cell,
 		"Spread": opts.Spread, "ShowAllYM": showAll, "BasisLabel": model.ForecastBasisLabel(opts.Basis),

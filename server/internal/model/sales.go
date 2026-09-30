@@ -24,18 +24,18 @@ const (
 )
 
 const (
-	SalesActTypeResearch = "research"
-	SalesActTypeCall     = "call"
-	SalesActTypeVisit    = "visit"
-	SalesActTypeOnline   = "online"
-	SalesActTypeMail     = "mail"
-	SalesActTypeInternal = "internal"
-	SalesActTypeMaterial = "material"
-	SalesActTypeQuote    = "quote"
-	SalesActTypeProposal = "proposal"
-	SalesActTypeRFP      = "rfp"
-	SalesActTypeBid      = "bid"
-	SalesActTypeOther    = "other"
+	SalesActTypeResearch    = "research"
+	SalesActTypeCall        = "call"
+	SalesActTypeVisit       = "visit"
+	SalesActTypeOnline      = "online"
+	SalesActTypeMail        = "mail"
+	SalesActTypeInternal    = "internal"
+	SalesActTypeMaterial    = "material"
+	SalesActTypeQuote       = "quote"
+	SalesActTypeProposal    = "proposal"
+	SalesActTypeRFP         = "rfp"
+	SalesActTypeBid         = "bid"
+	SalesActTypeOther       = "other"
 	SalesActTypeRequirement = "requirement"
 	SalesActTypeRFPReceived = "rfp_received"
 )
@@ -181,13 +181,13 @@ type SalesProject struct {
 	DormantAt     string
 	DormantBy     string
 
-	BidYM              string
-	RevenueYM          string
-	RevenueFrom        string
-	RevenueTo          string
-	BillingCycle       string
-	AmountVATIncluded  bool
-	ForecastGroups     []string
+	BidYM             string
+	RevenueYM         string
+	RevenueFrom       string
+	RevenueTo         string
+	BillingCycle      string
+	AmountVATIncluded bool
+	ForecastGroups    []string
 
 	CustomerName string
 	StageLabel   string
@@ -339,7 +339,7 @@ func (p *SalesProject) PeriodLabel() string {
 	if p == nil {
 		return ""
 	}
-	return FormatSalesPeriod(p.ExpectedYM, p.ExpectedPrecision)
+	return SalesPeriodLabel(p.ExpectedYM, p.ExpectedPrecision)
 }
 
 func (p *SalesProject) AmountLabel() string {
@@ -564,28 +564,35 @@ func NormalizeSalesYM(s string) string {
 		return ""
 	}
 	s = strings.ReplaceAll(s, "/", "-")
-	if len(s) >= 7 && s[4] == '-' {
-		year := s[:4]
-		month := s[5:7]
-		if _, err := strconv.Atoi(year); err != nil {
-			return ""
-		}
-		m, err := strconv.Atoi(month)
-		if err != nil || m < 1 || m > 12 {
-			return ""
-		}
-		return fmt.Sprintf("%s-%02d", year, m)
+	if len(s) < 7 || s[4] != '-' {
+		return ""
 	}
-	return ""
+	year := s[:4]
+	month := s[5:7]
+	if _, err := strconv.Atoi(year); err != nil {
+		return ""
+	}
+	m, err := strconv.Atoi(month)
+	if err != nil || m < 1 || m > 12 {
+		return ""
+	}
+	return fmt.Sprintf("%s-%02d", year, m)
 }
 
 func FormatSalesPeriod(ym, precision string) string {
+	return SalesPeriodLabel(ym, precision)
+}
+
+func SalesPeriodLabel(ym, precision string) string {
 	ym = NormalizeSalesYM(ym)
-	if ym == "" {
+	if ym == "" || len(ym) < 7 {
 		return ""
 	}
-	year, _ := strconv.Atoi(ym[:4])
-	month, _ := strconv.Atoi(ym[5:7])
+	year, errY := strconv.Atoi(ym[:4])
+	month, errM := strconv.Atoi(ym[5:7])
+	if errY != nil || errM != nil || month < 1 || month > 12 {
+		return ""
+	}
 	switch NormalizeSalesPrecision(precision) {
 	case SalesPrecisionQuarter:
 		q := (month-1)/3 + 1
@@ -600,6 +607,115 @@ func FormatSalesPeriod(ym, precision string) string {
 	default:
 		return ym
 	}
+}
+
+func SalesHasBilling(bizType string) bool {
+	switch NormalizeSalesBizType(bizType) {
+	case SalesBizMaintenance, SalesBizDevelop, SalesBizConstruction:
+		return true
+	default:
+		return false
+	}
+}
+
+type SalesPeriodParts struct {
+	Year    int
+	Quarter int
+	Half    int
+}
+
+func SalesPeriodInputParts(ym, precision string) SalesPeriodParts {
+	ym = NormalizeSalesYM(ym)
+	if ym == "" {
+		return SalesPeriodParts{}
+	}
+	year, _ := strconv.Atoi(ym[:4])
+	month, _ := strconv.Atoi(ym[5:7])
+	half := 1
+	if month > 6 {
+		half = 2
+	}
+	return SalesPeriodParts{
+		Year:    year,
+		Quarter: (month-1)/3 + 1,
+		Half:    half,
+	}
+}
+
+func SalesYMFromParts(precision, year, quarter, half, monthYM string) string {
+	prec := NormalizeSalesPrecision(precision)
+	y, _ := strconv.Atoi(strings.TrimSpace(year))
+	switch prec {
+	case SalesPrecisionQuarter:
+		q, _ := strconv.Atoi(strings.TrimSpace(quarter))
+		if y < 1 || q < 1 || q > 4 {
+			return ""
+		}
+		return fmt.Sprintf("%04d-%02d", y, (q-1)*3+1)
+	case SalesPrecisionHalf:
+		h, _ := strconv.Atoi(strings.TrimSpace(half))
+		if y < 1 || (h != 1 && h != 2) {
+			return ""
+		}
+		m := 1
+		if h == 2 {
+			m = 7
+		}
+		return fmt.Sprintf("%04d-%02d", y, m)
+	case SalesPrecisionYear:
+		if y < 1 {
+			return ""
+		}
+		return fmt.Sprintf("%04d-01", y)
+	default:
+		return NormalizeSalesYM(monthYM)
+	}
+}
+
+func ApplySalesPeriodAndBilling(p *SalesProject) {
+	if p == nil {
+		return
+	}
+	p.ExpectedPrecision = NormalizeSalesPrecision(p.ExpectedPrecision)
+	p.ExpectedYM = SalesPeriodFirstYM(NormalizeSalesYM(p.ExpectedYM), p.ExpectedPrecision)
+	p.BidYM = NormalizeSalesYM(p.BidYM)
+	p.RevenueYM = NormalizeSalesYM(p.RevenueYM)
+	p.RevenueFrom = NormalizeSalesYM(p.RevenueFrom)
+	p.RevenueTo = NormalizeSalesYM(p.RevenueTo)
+	p.BillingCycle = strings.TrimSpace(p.BillingCycle)
+	if !SalesHasBilling(p.BizType) {
+		p.BillingCycle = ""
+		p.RevenueFrom = ""
+		p.RevenueTo = ""
+	} else if p.BillingCycle == "once" {
+		p.RevenueTo = ""
+	}
+	if p.BudgetYear <= 0 {
+		if ym := p.ExpectedYM; len(ym) >= 4 {
+			if y, err := strconv.Atoi(ym[:4]); err == nil {
+				p.BudgetYear = y
+			}
+		}
+	}
+}
+
+func ApplyQuickQuoteClear(p *SalesProject) {
+	if p == nil {
+		return
+	}
+	p.ExpectedAmount = 0
+	p.ExpectedAmountConfirmed = false
+	p.AmountVATIncluded = false
+	p.BillingCycle = ""
+	p.RevenueFrom = ""
+	p.RevenueTo = ""
+	p.ContractTarget = ""
+	p.ProcurementRoute = ""
+	p.ContractMethod = ""
+	p.BidEvalMethod = ""
+	p.MallContractType = ""
+	p.Competitor = ""
+	p.LeadSource = ""
 }
 
 // SalesMonthBanner 월별 캘린더 맨 위 띠. 날짜 칸에 넣지 않는다 (§39.7).

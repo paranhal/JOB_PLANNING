@@ -1,6 +1,9 @@
 package model
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 const (
 	SalesGroupManual = "manual"
@@ -41,10 +44,16 @@ type SalesGroupMember struct {
 
 func (g *SalesGroup) Filter() SalesListFilterJSON {
 	var f SalesListFilterJSON
-	if g == nil || g.FilterJSON == "" {
+	raw := ""
+	if g != nil {
+		raw = strings.TrimSpace(g.FilterJSON)
+	}
+	if raw == "" || raw == "{}" || raw == "null" {
 		return f
 	}
-	_ = json.Unmarshal([]byte(g.FilterJSON), &f)
+	if err := json.Unmarshal([]byte(raw), &f); err != nil {
+		return SalesListFilterJSON{}
+	}
 	return f
 }
 

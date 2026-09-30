@@ -19,13 +19,9 @@ func SalesSupplyAmount(amount int, vatIncluded bool) int {
 func SalesYMOf(p SalesProject, basis string) string {
 	switch strings.TrimSpace(basis) {
 	case "contract":
-		if len(p.ContractedAt) >= 7 {
-			return p.ContractedAt[:7]
-		}
+		return NormalizeSalesYM(p.ContractedAt)
 	case "won":
-		if len(p.WonAt) >= 7 {
-			return p.WonAt[:7]
-		}
+		return NormalizeSalesYM(p.WonAt)
 	case "bid":
 		return NormalizeSalesYM(p.BidYM)
 	case "plan":
@@ -33,7 +29,6 @@ func SalesYMOf(p SalesProject, basis string) string {
 	default:
 		return NormalizeSalesYM(p.RevenueYM)
 	}
-	return ""
 }
 
 type SalesForecastOpts struct {

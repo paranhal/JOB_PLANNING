@@ -129,6 +129,7 @@ func TestSalesPipelineAmountQuotes(t *testing.T) {
 		{QuoteNo: "B", Rev: 0, Total: 50, Status: QuoteStatusSent},
 		{QuoteNo: "C", Rev: 0, Total: 999, Status: QuoteStatusLost},
 		{QuoteNo: "D", Rev: 0, Total: 1, Status: QuoteStatusExpired},
+		{QuoteNo: "E", Rev: 0, Total: 800, Status: QuoteStatusCancelled},
 	}
 	sum, n := ValidQuoteSum(quotes)
 	if sum != 350 || n != 2 {
@@ -147,5 +148,43 @@ func TestSalesPipelineAmountQuotes(t *testing.T) {
 	amt, _ = SalesPipelineAmount(drop, quotes)
 	if amt != 0 {
 		t.Fatalf("drop amt=%d", amt)
+	}
+}
+
+func TestBuildSalesForecastToleratesBadYMAndOrphanQuote(t *testing.T) {
+	now := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	projects := []SalesProject{
+		{SalesID: "a", Name: "빈시기", Stage: SalesStage4Discover, ExpectedYM: "", ExpectedAmount: 1000},
+		{SalesID: "b", Name: "짧은값", Stage: SalesStage4Discover, ExpectedYM: "2027", ExpectedAmount: 2000, ContractedAt: "2027", WonAt: "x"},
+		{SalesID: "c", Name: "정상", Stage: SalesStage4Propose, ExpectedYM: "2026-09", ExpectedAmount: 3000, RevenueYM: "2026-09"},
+	}
+	ApplySalesPipelineAmounts(projects, []SalesQuote{
+		{SalesID: "", QuoteNo: "orphan", Total: 999, Status: QuoteStatusSent},
+		{SalesID: "c", QuoteNo: "Q1", Total: 5000, Status: QuoteStatusSent},
+	})
+	fc := BuildSalesForecast(projects, DefaultForecastOpts(now))
+	if len(fc.Rows) != 3 {
+		t.Fatalf("rows=%d", len(fc.Rows))
+	}
+	if !fc.Rows[0].Unsched || !fc.Rows[1].Unsched {
+		t.Fatalf("빈·짧은 시기가 미정이 아니다: %+v %+v", fc.Rows[0], fc.Rows[1])
+	}
+	if fc.Rows[2].Unsched || fc.Rows[2].Amount != 5000 {
+		t.Fatalf("정상 행: %+v", fc.Rows[2])
+	}
+}
+
+func TestSalesGroupFilterJSONEmptyOrLegacy(t *testing.T) {
+	empty := SalesGroup{}
+	if empty.Filter().BizType != "" {
+		t.Fatal("빈 JSON")
+	}
+	g := SalesGroup{FilterJSON: `not-json`}
+	if g.Filter().Owner != "" {
+		t.Fatal("깨진 JSON 이 패닉나거나 값이 남았다")
+	}
+	g.FilterJSON = `{"owner":"최혜영"}`
+	if g.Filter().Owner != "최혜영" {
+		t.Fatalf("정상 JSON: %+v", g.Filter())
 	}
 }
