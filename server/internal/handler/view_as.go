@@ -7,12 +7,14 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/audit"
+	"customer-support/internal/model"
 )
 
 const viewAsCookie = "view_as_user_id"
 
 func canUseViewAs(c echo.Context) bool {
-	return isAdminRole(c) || isObserverRole(c)
+	r := loginRole(c)
+	return model.IsAdminGrade(r) || r == model.RoleObserver
 }
 
 func identityUserID(c echo.Context) string {
@@ -29,29 +31,75 @@ func identityKeys(c echo.Context) []string {
 	return assigneeKeys(c)
 }
 
+func applySimulation(c echo.Context, role, storedPerms, orgID string) {
+	role = model.NormalizeRole(role)
+	c.Set("sim_role", role)
+	c.Set("sim_permissions", model.EffectivePermissions(role, storedPerms))
+	c.Set("sim_org_id", strings.TrimSpace(orgID))
+}
+
+func applyObserverOrgAdminSim(c echo.Context) {
+	applySimulation(c, model.RoleOrgAdmin, "", ctxString(c, "org_id"))
+}
+
+func applyUserSimulation(c echo.Context, u *model.User) {
+	if u == nil {
+		return
+	}
+	applySimulation(c, u.Role, u.Permissions, u.OrgID)
+	c.Set("view_as_user_id", u.UserID)
+	c.Set("view_as_name", u.FullName)
+	c.Set("view_as_username", u.Username)
+}
+
+func viewAsCandidates(users []model.User, selfID string) []model.User {
+	out := make([]model.User, 0, len(users))
+	selfID = strings.TrimSpace(selfID)
+	for _, u := range users {
+		if !u.IsActive {
+			continue
+		}
+		if strings.TrimSpace(u.UserID) == selfID {
+			continue
+		}
+		switch model.NormalizeRole(u.Role) {
+		case model.RoleObserver:
+			continue
+		}
+		out = append(out, u)
+	}
+	return out
+}
+
 func (h *AuthHandler) InjectViewAs(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if !canUseViewAs(c) {
 			return next(c)
 		}
-		if list, err := h.userRepo.ListAssignable(); err == nil {
-			c.Set("view_as_users", list)
+		if h.userRepo != nil {
+			if list, err := h.userRepo.ListAll(); err == nil {
+				c.Set("view_as_users", viewAsCandidates(list, ctxString(c, "user_id")))
+			}
 		}
 		var uid string
 		if ck, err := c.Cookie(viewAsCookie); err == nil && ck != nil {
 			uid = strings.TrimSpace(ck.Value)
 		}
 		if uid == "" || uid == ctxString(c, "user_id") {
+			if isObserverRole(c) {
+				applyObserverOrgAdminSim(c)
+			}
 			return next(c)
 		}
 		u, err := h.userRepo.GetByID(uid)
 		if err != nil || u == nil || !u.IsActive {
 			c.SetCookie(&http.Cookie{Name: viewAsCookie, Value: "", Path: "/", MaxAge: -1})
+			if isObserverRole(c) {
+				applyObserverOrgAdminSim(c)
+			}
 			return next(c)
 		}
-		c.Set("view_as_user_id", u.UserID)
-		c.Set("view_as_name", u.FullName)
-		c.Set("view_as_username", u.Username)
+		applyUserSimulation(c, u)
 		return next(c)
 	}
 }

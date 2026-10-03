@@ -78,7 +78,7 @@ func (r *UserRepo) ListTechActive() ([]model.User, error) {
 
 func (r *UserRepo) ListAssignable() ([]model.User, error) {
 	rows, err := r.db.Query(userSelect + `
-		WHERE is_active=1 AND role IN ('admin','tech','office','receipt','sales')
+		WHERE is_active=1 AND role IN ('admin','org_admin','tech','office','support','receipt','sales')
 		ORDER BY full_name`)
 	if err != nil {
 		return nil, err

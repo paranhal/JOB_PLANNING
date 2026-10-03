@@ -15,11 +15,23 @@ func statsOrgFilter(c echo.Context, f model.StatsMeetingFilter) model.StatsMeeti
 	return f
 }
 
-func currentRole(c echo.Context) string {
+func loginRole(c echo.Context) string {
 	return model.NormalizeRole(ctxString(c, "role"))
 }
 
+func currentRole(c echo.Context) string {
+	if v := strings.TrimSpace(ctxString(c, "sim_role")); v != "" {
+		return model.NormalizeRole(v)
+	}
+	return loginRole(c)
+}
+
 func currentPerms(c echo.Context) []string {
+	if v := c.Get("sim_permissions"); v != nil {
+		if p, ok := v.([]string); ok {
+			return p
+		}
+	}
 	if v := c.Get("permissions"); v != nil {
 		if p, ok := v.([]string); ok {
 			return p
@@ -57,7 +69,10 @@ func orgAdminInHome(c echo.Context) bool {
 	if view == repository.OrgAll {
 		return false
 	}
-	home := strings.TrimSpace(ctxString(c, "org_id"))
+	home := strings.TrimSpace(ctxString(c, "sim_org_id"))
+	if home == "" {
+		home = strings.TrimSpace(ctxString(c, "org_id"))
+	}
 	if home == "" {
 		return true
 	}
@@ -85,7 +100,7 @@ func isOfficeRole(c echo.Context) bool {
 }
 
 func isObserverRole(c echo.Context) bool {
-	return currentRole(c) == model.RoleObserver
+	return loginRole(c) == model.RoleObserver
 }
 
 func isSalesRole(c echo.Context) bool {

@@ -151,7 +151,8 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		injectBuildInfo(dataMap)
 		if _, exists := dataMap["HideNav"]; !exists {
 			dataMap["UserName"] = ctxString(c, "user_name")
-			dataMap["UserRole"] = model.NormalizeRole(ctxString(c, "role"))
+			dataMap["UserRole"] = currentRole(c)
+			dataMap["LoginRole"] = loginRole(c)
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
 			dataMap["UserPerms"] = currentPerms(c)

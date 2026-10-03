@@ -37,7 +37,7 @@ func isAdminSectionPath(path string) bool {
 }
 
 func skipsAdminSectionUnlock(c echo.Context) bool {
-	r := currentRole(c)
+	r := loginRole(c)
 	return r == model.RoleObserver || r == model.RoleTester
 }
 

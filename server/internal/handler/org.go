@@ -26,11 +26,20 @@ func NewOrgHandler(db *sql.DB, repo *repository.OrgRepo, auth *AuthHandler, sett
 }
 
 func canSwitchOrg(c echo.Context) bool {
-	role := currentRole(c)
+	role := loginRole(c)
 	return role == model.RoleOrgAdmin || role == model.RoleVisionAdmin
 }
 
 func currentOrg(c echo.Context) string {
+	if strings.TrimSpace(ctxString(c, "sim_role")) != "" {
+		if currentRole(c) == model.RoleVisionAdmin {
+			return repository.OrgAll
+		}
+		if sim := strings.TrimSpace(ctxString(c, "sim_org_id")); sim != "" {
+			return sim
+		}
+		return model.OrgIDLibrary
+	}
 	if canSwitchOrg(c) {
 		view := strings.TrimSpace(ctxString(c, "view_org_id"))
 		if view == repository.OrgAll {
@@ -40,7 +49,7 @@ func currentOrg(c echo.Context) string {
 			return view
 		}
 	}
-	if strings.TrimSpace(ctxString(c, "role")) == "vision_admin" {
+	if loginRole(c) == model.RoleVisionAdmin {
 		return repository.OrgAll
 	}
 	org := strings.TrimSpace(ctxString(c, "org_id"))
