@@ -232,6 +232,7 @@ func TestSalesAccountCanGrantReceiveSeparately(t *testing.T) {
 
 	rec := salesASPost(t, e, "/users/"+u.UserID+"/update", url.Values{
 		"full_name": {"기술영업"}, "role": {model.RoleSales}, "is_active": {"1"},
+		"mobile": {"010-0000-2222"}, "org_id": {model.OrgIDLibrary},
 		"perm": {model.PermSalesView, model.PermStatsView, model.PermASCreate},
 	}, jwtCookie(t))
 	if rec.Code != http.StatusSeeOther && rec.Code != http.StatusOK {
@@ -301,7 +302,7 @@ func TestUserUpdateSameAsDefaultStoresEmpty(t *testing.T) {
 	if err := users.Create(u); err != nil {
 		t.Fatal(err)
 	}
-	form := url.Values{"full_name": {"기본"}, "role": {model.RoleSales}, "is_active": {"1"}}
+	form := url.Values{"full_name": {"기본"}, "role": {model.RoleSales}, "is_active": {"1"}, "mobile": {"010-0000-0001"}, "org_id": {model.OrgIDLibrary}}
 	for _, k := range model.DefaultPermissions(model.RoleSales) {
 		form.Add("perm", k)
 	}
@@ -326,7 +327,7 @@ func TestUserUpdateRoleChangeClearsWhenAsked(t *testing.T) {
 	}
 	rec := salesASPost(t, e, "/users/"+u.UserID+"/update", url.Values{
 		"full_name": {"변경"}, "prev_role": {model.RoleSales}, "role": {model.RoleTech},
-		"is_active": {"1"}, "clear_custom_perms": {"1"}, "perm": {model.PermASCreate},
+		"is_active": {"1"}, "clear_custom_perms": {"1"}, "perm": {model.PermASCreate}, "mobile": {"010-0000-0002"}, "org_id": {model.OrgIDLibrary},
 	}, jwtCookie(t))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status=%d", rec.Code)

@@ -103,6 +103,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if user.NeedsProfileFill() {
 		return c.Redirect(http.StatusSeeOther, "/account/complete")
 	}
+	if h.visionPasswordMustChange(user) {
+		return c.Redirect(http.StatusSeeOther, "/account/vision-password")
+	}
 	return c.Redirect(http.StatusSeeOther, "/")
 }
 
@@ -119,14 +122,22 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 }
 
 func (h *AuthHandler) clearTokenCookie(c echo.Context) {
-	c.SetCookie(&http.Cookie{
+	c.SetCookie(tokenCookie("", -1))
+}
+
+func tokenCookie(value string, maxAge int) *http.Cookie {
+	ck := &http.Cookie{
 		Name:     "token",
-		Value:    "",
+		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
+		MaxAge:   maxAge,
+	}
+	if appEnvProduction() {
+		ck.Secure = true
+	}
+	return ck
 }
 
 // AccountPage 내 계정(프로필·비밀번호 변경)
@@ -148,6 +159,8 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 		msg = "사인을 저장했습니다."
 	} else if c.QueryParam("ok") == "signature_cleared" {
 		msg = "사인을 지웠습니다."
+	} else if c.QueryParam("ok") == "vision" {
+		msg = "비젼관리자 비밀번호가 변경되었습니다."
 	}
 	var orgs []model.Org
 	if h.orgRepo != nil {
@@ -310,8 +323,8 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 	if pw == "" {
 		return renderErr("새 비밀번호를 입력하세요.")
 	}
-	if len(pw) < 4 {
-		return renderErr("비밀번호는 4자 이상이어야 합니다.")
+	if passwordTooShort(pw) {
+		return renderErr(passwordMinLenMsg())
 	}
 	if pw != confirm {
 		return renderErr("새 비밀번호와 확인 입력이 일치하지 않습니다.")
@@ -365,6 +378,8 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		msg = "아이디를 바꿨습니다. 그 사람은 다시 로그인해야 합니다."
 	case "renamed":
 		msg = fmt.Sprintf("이름을 바꿨습니다. 담당 글자 %s건을 함께 고쳤습니다.", strings.TrimSpace(c.QueryParam("n")))
+	case "deleted":
+		msg = "계정을 지웠습니다."
 	}
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
@@ -376,6 +391,16 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		"Title": "사용자 관리", "Active": NavUsers, "Users": users, "OK": msg, "Error": errMsg,
 		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit,
 		"RoleGroups": model.GroupUsersByRole(users), "Orgs": orgs,
+		"PasswordMinLen": passwd.MinLen, "VisionAdminCount": 0,
+		"WorkCounts": map[string]int{},
+	}
+	if h.userRepo != nil {
+		data["VisionAdminCount"] = h.userRepo.CountRole(model.RoleVisionAdmin)
+		wc := map[string]int{}
+		for _, u := range users {
+			wc[u.UserID] = h.userRepo.AssignedWorkCount(u.UserID)
+		}
+		data["WorkCounts"] = wc
 	}
 	if canEdit {
 		data["HashMig"] = h.passwordMigrationStatus()
@@ -420,6 +445,9 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	if role != model.RoleTester {
 		baseRole = ""
 	}
+	if passwordTooShort(c.FormValue("password")) {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
+	}
 	form, _ := c.FormParams()
 	var selected []string
 	if form != nil {
@@ -443,6 +471,17 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	if err := h.userRepo.Create(u); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 만들지 못했습니다."))
 	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionCreate,
+		Result:      auditlog.ResultOK,
+		TargetTable: "users",
+		TargetID:    u.UserID,
+		SubjectType: "user",
+		SubjectID:   u.UserID,
+		SubjectName: u.FullName,
+		Detail:      "계정 생성",
+		AfterJSON:   toJSON(userPublic(u)),
+	})
 	return c.Redirect(http.StatusSeeOther, "/users")
 }
 
@@ -501,20 +540,10 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	if pw := strings.TrimSpace(c.FormValue("password")); pw != "" {
 		confirm := strings.TrimSpace(c.FormValue("password_confirm"))
 		if confirm != "" && pw != confirm {
-			users, _ := h.userRepo.ListAll()
-			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-				"Title": "사용자 관리", "Active": NavUsers, "Users": users,
-				"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "PermDefs": model.AllPermissions, "CanEditUsers": true,
-				"RoleGroups": model.GroupUsersByRole(users),
-			})
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호와 확인 입력이 일치하지 않습니다."))
 		}
-		if len(pw) < 4 {
-			users, _ := h.userRepo.ListAll()
-			return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-				"Title": "사용자 관리", "Active": NavUsers, "Users": users,
-				"Error": "비밀번호는 4자 이상이어야 합니다.", "PermDefs": model.AllPermissions, "CanEditUsers": true,
-				"RoleGroups": model.GroupUsersByRole(users),
-			})
+		if passwordTooShort(pw) {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 		}
 		h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
 		return c.Redirect(http.StatusSeeOther, "/users?ok=password")
@@ -594,30 +623,55 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	}
 	pw := strings.TrimSpace(c.FormValue("password"))
 	confirm := strings.TrimSpace(c.FormValue("password_confirm"))
-	users, _ := h.userRepo.ListAll()
 	if pw == "" {
-		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-			"Title": "사용자 관리", "Active": NavUsers, "Users": users,
-			"Error": "새 비밀번호를 입력하세요.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
-			"RoleGroups": model.GroupUsersByRole(users),
-		})
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호를 입력하세요."))
 	}
 	if pw != confirm {
-		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-			"Title": "사용자 관리", "Active": NavUsers, "Users": users,
-			"Error": "비밀번호와 확인 입력이 일치하지 않습니다.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
-			"RoleGroups": model.GroupUsersByRole(users),
-		})
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호와 확인 입력이 일치하지 않습니다."))
 	}
-	if len(pw) < 4 {
-		return c.Render(http.StatusOK, "auth/users.html", map[string]interface{}{
-			"Title": "사용자 관리", "Active": NavUsers, "Users": users,
-			"Error": "비밀번호는 4자 이상이어야 합니다.", "FocusUser": u.UserID, "PermDefs": model.AllPermissions, "CanEditUsers": true,
-			"RoleGroups": model.GroupUsersByRole(users),
-		})
+	if passwordTooShort(pw) {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 	}
 	h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
 	return c.Redirect(http.StatusSeeOther, "/users?ok=password")
+}
+
+func (h *AuthHandler) UserDelete(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return h.forbidden(c)
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" || id == ctxString(c, "user_id") {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이 계정은 지울 수 없습니다."))
+	}
+	u, _ := h.userRepo.GetByID(id)
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	if !h.verifyVisionAdminPassword(c, c.FormValue("vision_password")) {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비젼관리자 비밀번호가 올바르지 않습니다."))
+	}
+	n := h.userRepo.AssignedWorkCount(id)
+	if n > 0 {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(fmt.Sprintf("담당 업무 %d건이 있습니다. 이관 후에 지우세요.", n)))
+	}
+	before := userPublic(u)
+	if err := h.userRepo.Delete(id); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 지우지 못했습니다."))
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionDelete,
+		Result:      auditlog.ResultOK,
+		TargetTable: "users",
+		TargetID:    id,
+		SubjectType: "user",
+		SubjectID:   id,
+		SubjectName: u.FullName,
+		Detail:      "계정 삭제",
+		Reason:      accessReason(c, "계정 삭제"),
+		BeforeJSON:  toJSON(before),
+	})
+	return c.Redirect(http.StatusSeeOther, "/users?ok=deleted")
 }
 
 // AuthMiddleware JWT 인증 미들웨어
@@ -665,7 +719,7 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				h.writeSessionCookie(c, sessionClaimsFromContext(c, true))
 			} else if u != nil {
 				if !u.IsActive {
-					c.SetCookie(&http.Cookie{Name: "token", Value: "", Path: "/", MaxAge: -1})
+					c.SetCookie(tokenCookie("", -1))
 					return c.Redirect(http.StatusSeeOther, "/login")
 				}
 				viewOrg := ctxString(c, "view_org_id")
@@ -684,6 +738,11 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				return c.Redirect(http.StatusSeeOther, "/account/complete")
 			}
 		}
+		if h.settingsRepo != nil && h.settingsRepo.VisionAdminMustChange() && loginRole(c) == model.RoleVisionAdmin {
+			if !visionPasswordExempt(path) {
+				return c.Redirect(http.StatusSeeOther, "/account/vision-password")
+			}
+		}
 		pop := audit.Push(audit.Actor{
 			UserID:   ctxString(c, "user_id"),
 			Username: ctxString(c, "username"),
@@ -697,7 +756,12 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 func profileCompleteExempt(path string) bool {
 	p := strings.TrimSpace(path)
-	return p == "/account/complete" || p == "/logout" || strings.HasPrefix(p, "/static")
+	return p == "/account/complete" || p == "/logout" || strings.HasPrefix(p, "/static") || p == "/account/vision-password"
+}
+
+func visionPasswordExempt(path string) bool {
+	p := strings.TrimSpace(path)
+	return p == "/account/vision-password" || p == "/logout" || strings.HasPrefix(p, "/static") || p == "/account/complete"
 }
 
 const authRevalidateInterval = 5 * time.Minute
@@ -748,14 +812,7 @@ func (h *AuthHandler) writeSessionCookie(c echo.Context, claims jwt.MapClaims) s
 	if err != nil {
 		return ""
 	}
-	c.SetCookie(&http.Cookie{
-		Name:     "token",
-		Value:    tokenStr,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400,
-	})
+	c.SetCookie(tokenCookie(tokenStr, 86400))
 	return tokenStr
 }
 

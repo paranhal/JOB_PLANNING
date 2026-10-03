@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"customer-support/internal/passwd"
 	"customer-support/internal/repository"
 )
@@ -8,6 +10,14 @@ import (
 // HashPassword bcrypt 해시를 만든다. 기존 SHA-256 단독 해시를 대체한다.
 func HashPassword(pw string) string {
 	return passwd.Hash(pw)
+}
+
+func passwordTooShort(pw string) bool {
+	return passwd.TooShort(pw)
+}
+
+func passwordMinLenMsg() string {
+	return fmt.Sprintf("비밀번호는 %d자 이상이어야 합니다.", passwd.MinLen)
 }
 
 func verifyPassword(hash, pw string) bool {

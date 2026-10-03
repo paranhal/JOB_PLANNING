@@ -213,6 +213,24 @@ func (r *UserRepo) UpdateSignaturePath(userID, path string) error {
 	})
 }
 
+func (r *UserRepo) CountRole(role string) int {
+	if r == nil || r.db == nil {
+		return 0
+	}
+	var n int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role=? AND is_active=1`, model.NormalizeRole(role)).Scan(&n)
+	return n
+}
+
+func (r *UserRepo) Delete(userID string) error {
+	userID = strings.TrimSpace(userID)
+	if r == nil || r.db == nil || userID == "" {
+		return fmt.Errorf("계정이 없습니다")
+	}
+	_, err := r.db.Exec(`DELETE FROM users WHERE user_id=?`, userID)
+	return err
+}
+
 func (r *UserRepo) UpdatePassword(id, hash string) error {
 	return touchUpdate(r.db, "users", "user_id", id, "비밀번호", func() error {
 		_, err := r.db.Exec(`UPDATE users SET password_hash=? WHERE user_id=?`, hash, id)

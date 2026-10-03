@@ -28,21 +28,7 @@ func (h *OrgHandler) checkVisionPassword(c echo.Context, pw string) bool {
 			return verifyAndUpgradeSetting(h.settings, repository.SettingVisionAdminPassword, pw)
 		}
 	}
-	// TODO(49): vision_admin_password_hash 가 생기면 그것만 쓴다. 지금은 로그인 비밀번호.
-	if h.users == nil {
-		return false
-	}
-	u, err := h.users.GetByID(identityUserID(c))
-	if err != nil {
-		return false
-	}
-	if u == nil {
-		u, err = h.users.GetByUsername(ctxString(c, "username"))
-		if err != nil || u == nil {
-			return false
-		}
-	}
-	return verifyPassword(u.PasswordHash, pw)
+	return false
 }
 
 func (h *OrgHandler) snapshotOrg(orgID, prefix, kind string) (string, error) {

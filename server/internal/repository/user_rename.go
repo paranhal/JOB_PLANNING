@@ -166,3 +166,20 @@ func unmatchedAfterNameChange(db *sql.DB, oldName string) []UnmatchedAssignee {
 	}
 	return out
 }
+
+func (r *UserRepo) AssignedWorkCount(userID string) int {
+	userID = strings.TrimSpace(userID)
+	if r == nil || r.db == nil || userID == "" {
+		return 0
+	}
+	var n int
+	for _, t := range assigneeNameTargets {
+		if !sqliteTableExists(r.db, t.table) || !tableHasColumn(r.db, t.table, t.idCol) {
+			continue
+		}
+		var c int
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM "`+t.table+`" WHERE TRIM(COALESCE("`+t.idCol+`",''))=?`, userID).Scan(&c)
+		n += c
+	}
+	return n
+}

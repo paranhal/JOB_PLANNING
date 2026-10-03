@@ -112,6 +112,12 @@ func main() {
 	} else if pw != "" {
 		log.Printf("정기점검 계획 삭제 비밀번호 초기값: %s (관리 > 사용자에서 변경하세요)", pw)
 	}
+	settingsRepo := repository.NewSettingsRepo(db)
+	if note, err := repository.ApplyVisionAdminPassword(settingsRepo, os.Getenv("VISION_ADMIN_INIT_PASSWORD"), os.Getenv("VISION_ADMIN_RESET_PASSWORD"), handler.HashPassword); err != nil {
+		log.Printf("비젼관리자 비밀번호 설정 실패: %v", err)
+	} else if note != "" {
+		log.Printf("%s", note)
+	}
 
 	backupCfg := backup.Config{
 		DataDir: filepath.Dir(cfg.DBPath),
@@ -198,6 +204,8 @@ func main() {
 	g.POST("/account/complete", h.Auth.AccountComplete)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
+	g.GET("/account/vision-password", h.Auth.AccountVisionPasswordForm)
+	g.POST("/account/vision-password", h.Auth.AccountVisionPassword)
 	g.POST("/account/username", h.Auth.AccountRenameUsername)
 	g.POST("/account/signature", h.Auth.AccountSignature)
 	g.GET("/account/signature.png", h.Auth.AccountSignatureImage)
@@ -561,6 +569,7 @@ func main() {
 	g.POST("/users/:id/reset-permissions", h.Auth.UserResetPermissions, adminSec, adminOnly)
 	g.POST("/users/:id/password", h.Auth.UserChangePassword, adminSec, adminOnly)
 	g.POST("/users/:id/username", h.Auth.UserRenameUsername, adminSec, adminOnly)
+	g.POST("/users/:id/delete", h.Auth.UserDelete, adminSec, adminOnly)
 
 	g.GET("/admin/unlock", h.Auth.AdminUnlockForm)
 	g.POST("/admin/unlock", h.Auth.AdminUnlock)

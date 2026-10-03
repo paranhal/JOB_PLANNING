@@ -88,8 +88,8 @@ func (h *ASHandler) UpdateCompletedEditPassword(c echo.Context) error {
 	cur := strings.TrimSpace(c.FormValue("current_password"))
 	nw := strings.TrimSpace(c.FormValue("new_password"))
 	confirm := strings.TrimSpace(c.FormValue("confirm_password"))
-	if nw == "" || len(nw) < 4 {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호는 4자 이상이어야 합니다"))
+	if nw == "" || passwordTooShort(nw) {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 	}
 	if nw != confirm {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호 확인이 일치하지 않습니다"))
@@ -115,8 +115,8 @@ func (h *AuthHandler) UpdateMaintenanceDeletePassword(c echo.Context) error {
 	cur := strings.TrimSpace(c.FormValue("current_password"))
 	nw := strings.TrimSpace(c.FormValue("new_password"))
 	confirm := strings.TrimSpace(c.FormValue("confirm_password"))
-	if nw == "" || len(nw) < 4 {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호는 4자 이상이어야 합니다"))
+	if nw == "" || passwordTooShort(nw) {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 	}
 	if nw != confirm {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("새 비밀번호 확인이 일치하지 않습니다"))

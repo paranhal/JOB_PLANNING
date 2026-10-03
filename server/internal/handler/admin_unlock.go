@@ -112,23 +112,7 @@ func (h *AuthHandler) verifyVisionAdminPassword(c echo.Context, pw string) bool 
 			return verifyAndUpgradeSetting(h.settingsRepo, repository.SettingVisionAdminPassword, pw)
 		}
 	}
-	if h.userRepo == nil {
-		return false
-	}
-	u, err := h.userRepo.GetByID(currentUserID(c))
-	if err != nil {
-		return false
-	}
-	if u == nil {
-		u, err = h.userRepo.GetByUsername(ctxString(c, "username"))
-		if err != nil || u == nil {
-			return false
-		}
-	}
-	if !verifyPassword(u.PasswordHash, pw) {
-		return false
-	}
-	return true
+	return false
 }
 
 func safeAdminReturn(raw string) string {

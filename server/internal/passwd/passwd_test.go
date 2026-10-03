@@ -55,6 +55,9 @@ func TestEmptyRejected(t *testing.T) {
 	if Verify("", "x") || Verify(Hash("x"), "") || Verify("  ", "x") {
 		t.Fatal("빈 값 통과")
 	}
+	if !TooShort("123456789") || TooShort("1234567890") {
+		t.Fatal("최소 길이 10자")
+	}
 	if IsBcrypt("") || NeedsRehash("") {
 		t.Fatal("빈 해시는 bcrypt도 재해시 대상도 아님")
 	}

@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 const cost = bcrypt.DefaultCost
+
+// MinLen 계정·확인 비밀번호 최소 길이. §55.3
+const MinLen = 10
+
+func TooShort(password string) bool {
+	return utf8.RuneCountInString(password) < MinLen
+}
 
 // Hash bcrypt 해시를 만든다. 솔트·키 스트레칭 포함.
 func Hash(password string) string {

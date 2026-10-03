@@ -222,8 +222,8 @@ func TestUpdateASEditPasswordAcceptsLegacyHash(t *testing.T) {
 	e, _, _, _, settings := passwordTestApp(t)
 	rec := postForm(t, e, "/users/as-edit-password", url.Values{
 		"current_password": {"as-edit"},
-		"new_password":     {"new-edit"},
-		"confirm_password": {"new-edit"},
+		"new_password":     {"new-edit-ok"},
+		"confirm_password": {"new-edit-ok"},
 	}, jwtCookie(t))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("변경: status=%d", rec.Code)
@@ -233,7 +233,7 @@ func TestUpdateASEditPasswordAcceptsLegacyHash(t *testing.T) {
 		t.Fatalf("현재 비밀번호 거부: %s", loc)
 	}
 	got, _ := settings.Get(repository.SettingASCompletedEditPassword)
-	if !passwd.IsBcrypt(got) || !passwd.Verify(got, "new-edit") {
+	if !passwd.IsBcrypt(got) || !passwd.Verify(got, "new-edit-ok") {
 		t.Fatalf("변경 후 해시: %q", got)
 	}
 }
@@ -242,8 +242,8 @@ func TestUpdateMaintenanceDeletePassword(t *testing.T) {
 	e, _, _, _, settings := passwordTestApp(t)
 	rec := postForm(t, e, "/users/mnt-delete-password", url.Values{
 		"current_password": {"mnt-del"},
-		"new_password":     {"new-del"},
-		"confirm_password": {"new-del"},
+		"new_password":     {"new-del-ok1"},
+		"confirm_password": {"new-del-ok1"},
 	}, jwtCookie(t))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("변경: status=%d", rec.Code)
@@ -253,7 +253,7 @@ func TestUpdateMaintenanceDeletePassword(t *testing.T) {
 		t.Fatalf("현재 비밀번호 거부: %s", loc)
 	}
 	got, _ := settings.Get(repository.SettingMaintenanceDeletePassword)
-	if !passwd.IsBcrypt(got) || !passwd.Verify(got, "new-del") {
+	if !passwd.IsBcrypt(got) || !passwd.Verify(got, "new-del-ok1") {
 		t.Fatalf("변경 후 해시: %q", got)
 	}
 }

@@ -166,6 +166,9 @@ func TestOrgDeleteRestoreBlockedAndSplit(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repository.NewUserRepo(db).EnsureAdmin(HashPassword("admin"))
+	if err := repository.NewSettingsRepo(db).Set(repository.SettingVisionAdminPassword, HashPassword("vision-lock1")); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, org_id) VALUES ('C1','고객','고객','O01')`); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +206,7 @@ func TestOrgDeleteRestoreBlockedAndSplit(t *testing.T) {
 		t.Fatalf("delete form %d %s", del.Code, del.Body.String())
 	}
 	if rec := post("/admin/orgs/O02/delete", url.Values{
-		"org_id": {"O02"}, "confirm_name": {"분리팀"}, "vision_password": {"admin"},
+		"org_id": {"O02"}, "confirm_name": {"분리팀"}, "vision_password": {"vision-lock1"},
 	}); rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("hide %d loc=%s", rec.Code, rec.Header().Get("Location"))
 	}
@@ -226,17 +229,17 @@ func TestOrgDeleteRestoreBlockedAndSplit(t *testing.T) {
 	if org == nil || org.IsActive {
 		t.Fatal("숨기지 못했다")
 	}
-	rec := post("/admin/orgs/restore", url.Values{"folder": {folder}, "vision_password": {"admin"}})
+	rec := post("/admin/orgs/restore", url.Values{"folder": {folder}, "vision_password": {"vision-lock1"}})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("살아 있는 복구가 막히지 않음 loc=%s", rec.Header().Get("Location"))
 	}
 
 	if rec := post("/admin/orgs/O02/purge", url.Values{
-		"org_id": {"O02"}, "confirm_name": {"분리팀"}, "vision_password": {"admin"},
+		"org_id": {"O02"}, "confirm_name": {"분리팀"}, "vision_password": {"vision-lock1"},
 	}); rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("purge %s", rec.Header().Get("Location"))
 	}
-	if rec := post("/admin/orgs/restore", url.Values{"folder": {folder}, "vision_password": {"admin"}}); rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+	if rec := post("/admin/orgs/restore", url.Values{"folder": {folder}, "vision_password": {"vision-lock1"}}); rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("restore %s", rec.Header().Get("Location"))
 	}
 
@@ -250,7 +253,7 @@ func TestOrgDeleteRestoreBlockedAndSplit(t *testing.T) {
 		t.Fatalf("preview %d %s", prev.Code, prev.Body.String())
 	}
 	if rec := post("/admin/orgs/O01/split", url.Values{
-		"org_id": {"O01"}, "to_org_id": {"O03"}, "customer_id": {"C1"}, "vision_password": {"admin"},
+		"org_id": {"O01"}, "to_org_id": {"O03"}, "customer_id": {"C1"}, "vision_password": {"vision-lock1"},
 	}); rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("split %s", rec.Header().Get("Location"))
 	}

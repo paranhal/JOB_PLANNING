@@ -181,6 +181,8 @@ func TestAccessLogUserDeactivate(t *testing.T) {
 		"full_name": {"기술원"},
 		"role":      {"tech"},
 		"is_active": {"0"},
+		"mobile":    {"010-0000-1111"},
+		"org_id":    {model.OrgIDLibrary},
 	}, jwtCookie(t))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("비활성: status=%d body=%s", rec.Code, rec.Body.String())

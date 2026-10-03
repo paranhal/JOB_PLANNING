@@ -95,17 +95,25 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">새 비밀번호</label>
-        <input type="password" name="password" required minlength="4" autocomplete="new-password"
+        <input type="password" name="password" required minlength="10" autocomplete="new-password"
                class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">새 비밀번호 확인</label>
-        <input type="password" name="password_confirm" required minlength="4" autocomplete="new-password"
+        <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password"
                class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">비밀번호 변경</button>
     </form>
   </div>
+
+  {{if eq .User.Role "vision_admin"}}
+  <div class="bg-white rounded-xl border border-indigo-200 p-6">
+    <h3 class="text-sm font-semibold text-gray-800 mb-2">비젼관리자 비밀번호</h3>
+    <p class="text-xs text-gray-500 mb-3">관리 섹션·조직 삭제·데이터 초기화·계정 삭제에 씁니다. 로그인 비밀번호와 다릅니다.</p>
+    <a href="/account/vision-password" class="inline-block px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">비젼관리자 비밀번호 변경</a>
+  </div>
+  {{end}}
 
   <div class="flex justify-end">
     <a href="/logout" class="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium">로그아웃</a>
