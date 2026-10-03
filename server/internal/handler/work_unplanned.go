@@ -50,7 +50,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
 	kanban := model.FillUnplannedKanban(items)
 	mineOn := mineUID != ""
-	showAssignee := role == model.RoleAdmin || role == model.RoleOffice || scopeAll
+	showAssignee := model.IsAdminGrade(role) || role == model.RoleSupport || scopeAll
 	canWrite := canWriteUnplanned(c)
 	u := func(k, d string) string {
 		return planUnplannedURLFull(mineOn, role, k, d, sortKey, dir)
@@ -161,7 +161,7 @@ func canWriteUnplanned(c echo.Context) bool {
 		return false
 	}
 	role := currentRole(c)
-	return role == model.RoleAdmin || role == model.RoleOffice || role == model.RoleTech
+	return model.IsAdminGrade(role) || role == model.RoleSupport || role == model.RoleTech
 }
 
 func unplannedBack(c echo.Context) string {

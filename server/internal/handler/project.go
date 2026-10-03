@@ -40,7 +40,7 @@ func NewProjectHandler(
 
 func canViewProjects(c echo.Context) bool {
 	r := currentRole(c)
-	return r == model.RoleAdmin || r == model.RoleOffice || r == model.RoleTech ||
+	return model.IsAdminGrade(r) || r == model.RoleSupport || r == model.RoleTech ||
 		r == model.RoleObserver || hasPerm(c, model.PermWorkboard)
 }
 
@@ -50,7 +50,7 @@ func canWriteProjects(c echo.Context) bool {
 		return false
 	}
 	r := currentRole(c)
-	return r == model.RoleAdmin || r == model.RoleOffice || r == model.RoleTech ||
+	return model.IsAdminGrade(r) || r == model.RoleSupport || r == model.RoleTech ||
 		hasPerm(c, model.PermWorkboard)
 }
 

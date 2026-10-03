@@ -227,7 +227,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	}
 
 	var teamDelayed []model.WorkListItem
-	if mine && (role == model.RoleAdmin || role == model.RoleOffice) {
+	if mine && (model.IsAdminGrade(role) || role == model.RoleSupport) {
 		teamDelayed, _ = h.workBoard.ListBucket(model.WorkBucketDelayed, "", nil, 8)
 	}
 
@@ -261,8 +261,8 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		missingComplete, _ = h.workBoard.CountMissingCompleteDates()
 	}
 
-	showAssignee := !mine && (role == model.RoleAdmin || role == model.RoleOffice)
-	canToggleTeam := role == model.RoleAdmin || role == model.RoleOffice || role == model.RoleSales
+	showAssignee := !mine && (model.IsAdminGrade(role) || role == model.RoleSupport)
+	canToggleTeam := model.IsAdminGrade(role) || role == model.RoleSupport || role == model.RoleSales
 	data := map[string]interface{}{
 		"Title":             "대시보드",
 		"Active":            NavDashboard,
@@ -308,7 +308,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	}
 
 	switch role {
-	case model.RoleAdmin:
+	case model.RoleVisionAdmin, model.RoleOrgAdmin:
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
 			{Href: "/work", Label: "오늘 예정", Tone: "sky"},
@@ -316,7 +316,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 			{Href: "/maintenance", Label: "정기점검", Tone: "slate"},
 			{Href: "/as", Label: "AS 목록", Tone: "indigo"},
 		}
-	case model.RoleOffice:
+	case model.RoleSupport:
 		data["QuickLinks"] = []dashLink{
 			{Href: "/as/new", Label: "AS 접수", Tone: "blue"},
 			{Href: "/work", Label: "오늘 예정", Tone: "sky"},

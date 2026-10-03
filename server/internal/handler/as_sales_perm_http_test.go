@@ -107,7 +107,7 @@ func hasASMenu(body string) bool {
 	return strings.Contains(body, "AS 접수·조치")
 }
 
-func TestSalesWithoutASPermsUnchanged(t *testing.T) {
+func TestSalesDefaultSeesWorkMenusAndCanReceive(t *testing.T) {
 	e, _, _, asID := newSalesASPermApp(t)
 	ck := jwtCookieRole(t, "sales")
 
@@ -115,24 +115,21 @@ func TestSalesWithoutASPermsUnchanged(t *testing.T) {
 	if home.Code != http.StatusOK {
 		t.Fatalf("영업 홈 status=%d", home.Code)
 	}
-	if hasASMenu(home.Body.String()) {
-		t.Fatal("권한 없는 영업담당에게 AS 메뉴가 보인다")
+	if !hasASMenu(home.Body.String()) || !strings.Contains(home.Body.String(), "오늘 내 업무") {
+		t.Fatal("영업 기본 직급에 업무 섹션 메뉴가 없다")
 	}
 
-	if rec := salesASGet(t, e, "/as/new", ck); rec.Code != http.StatusForbidden {
-		t.Fatalf("접수 화면: status=%d want 403", rec.Code)
+	if rec := salesASGet(t, e, "/as/new", ck); rec.Code != http.StatusOK {
+		t.Fatalf("접수 화면: status=%d", rec.Code)
 	}
 	if rec := salesASPost(t, e, "/as", url.Values{
 		"customer_id": {"cust_a"}, "symptom": {"게이트"}, "received_by": {"영업"},
 		"receipt_datetime": {time.Now().Format("2006-01-02T15:04")},
-	}, ck); rec.Code != http.StatusForbidden {
-		t.Fatalf("접수 POST: status=%d want 403", rec.Code)
+	}, ck); rec.Code != http.StatusSeeOther {
+		t.Fatalf("접수 POST: status=%d", rec.Code)
 	}
-	if rec := salesASPost(t, e, "/as/"+asID+"/process", url.Values{"work_content": {"조치"}}, ck); rec.Code != http.StatusForbidden {
-		t.Fatalf("조치 POST: status=%d want 403", rec.Code)
-	}
-	if rec := salesASPost(t, e, "/as/"+asID+"/update", url.Values{"status": {"in_progress"}}, ck); rec.Code != http.StatusForbidden {
-		t.Fatalf("조치 저장 POST: status=%d want 403", rec.Code)
+	if rec := salesASPost(t, e, "/as/"+asID+"/process", url.Values{"work_content": {"조치"}}, ck); rec.Code == http.StatusForbidden {
+		t.Fatal("영업 기본값으로 조치를 못한다")
 	}
 }
 
@@ -147,8 +144,8 @@ func TestSalesReceiveOnlyCanReceiveButNotProcess(t *testing.T) {
 	if !hasASMenu(home.Body.String()) {
 		t.Fatal("접수 권한을 받은 영업담당에게 AS 메뉴가 없다")
 	}
-	if strings.Contains(home.Body.String(), "오늘 내 업무") {
-		t.Fatal("AS 권한만으로 오늘 내 업무 메뉴가 열리면 안 된다")
+	if !strings.Contains(home.Body.String(), "오늘 내 업무") {
+		t.Fatal("업무 섹션 메뉴가 없다")
 	}
 
 	newPage := salesASGet(t, e, "/as/new", ck)
@@ -235,7 +232,7 @@ func TestSalesAccountCanGrantReceiveSeparately(t *testing.T) {
 
 	rec := salesASPost(t, e, "/users/"+u.UserID+"/update", url.Values{
 		"full_name": {"기술영업"}, "role": {model.RoleSales}, "is_active": {"1"},
-		"perm": {model.PermAnalysis, model.PermStats, model.PermASReceive},
+		"perm": {model.PermSalesView, model.PermStatsView, model.PermASCreate},
 	}, jwtCookie(t))
 	if rec.Code != http.StatusSeeOther && rec.Code != http.StatusOK {
 		t.Fatalf("사용자 저장: status=%d body=%s", rec.Code, rec.Body.String())
@@ -257,7 +254,7 @@ func TestSalesAccountCanGrantReceiveSeparately(t *testing.T) {
 		t.Fatalf("사용자 관리: status=%d", users.Code)
 	}
 	body := users.Body.String()
-	if !strings.Contains(body, `value="as_receive"`) || !strings.Contains(body, `value="as_process"`) {
+	if !strings.Contains(body, `value="as.create"`) || !strings.Contains(body, `value="as.process"`) {
 		t.Fatal("사용자 관리에 AS 접수·조치 체크박스가 없다")
 	}
 }
@@ -272,10 +269,10 @@ func TestUserResetPermissionsToRoleDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := salesASGet(t, e, "/users", jwtCookie(t))
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "저장된 권한") {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "개별 지정") {
 		t.Fatalf("출처 표시 없음 status=%d", page.Code)
 	}
-	if !strings.Contains(page.Body.String(), "역할 기본값으로 되돌리기") {
+	if !strings.Contains(page.Body.String(), "직급 기본값으로 되돌리기") {
 		t.Fatal("되돌리기 버튼이 없다")
 	}
 	rec := httptest.NewRecorder()
@@ -290,7 +287,7 @@ func TestUserResetPermissionsToRoleDefault(t *testing.T) {
 	if err != nil || got == nil || strings.TrimSpace(got.Permissions) != "" {
 		t.Fatalf("권한이 비지 않았다: %+v", got)
 	}
-	if !got.HasPerm(model.PermWorkboard) {
-		t.Fatal("역할 기본값에 일일업무가 없다")
+	if !got.HasPerm(model.PermAdminCreate) {
+		t.Fatal("직급 기본값에 행정이 없다")
 	}
 }

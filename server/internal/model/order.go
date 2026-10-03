@@ -215,7 +215,7 @@ func (o *SalesOrder) StripCost() {
 
 func CanSeeMargin(role string) bool {
 	r := NormalizeRole(role)
-	return r == RoleAdmin || r == RoleSales
+	return r == RoleOrgAdmin || r == RoleVisionAdmin || r == RoleSales || r == RoleSupport
 }
 
 func NormalizeOrderStatus(s string) string {

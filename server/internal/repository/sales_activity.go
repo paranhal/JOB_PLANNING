@@ -160,15 +160,16 @@ func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, lin
 		return err
 	}
 	a.ActivityID = fmt.Sprintf("SA-%03d", n)
+	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO sales_activities (
 			activity_id, sales_id, activity_date, start_time, duration_min, activity_type,
 			title, content, place, our_members, counterparts,
-			next_action, next_action_date, stage_at_time, created_by)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			next_action, next_action_date, stage_at_time, created_by, created_by_user_id, created_by_name)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.ActivityID, a.SalesID, a.ActivityDate, a.StartTime, a.DurationMin, a.ActivityType,
 		a.Title, a.Content, a.Place, a.OurMembers, a.Counterparts,
-		a.NextAction, a.NextActionDate, a.StageAtTime, a.CreatedBy)
+		a.NextAction, a.NextActionDate, a.StageAtTime, a.CreatedBy, byID, byName)
 	if err != nil {
 		return err
 	}

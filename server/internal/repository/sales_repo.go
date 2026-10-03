@@ -315,6 +315,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		return err
 	}
 	defer tx.Rollback()
+	byID, byName := stampCreatedBy()
 	_, err = tx.Exec(`
 		INSERT INTO sales_projects (
 			sales_id, sales_no, name, is_tentative_name, stage, probability, probability_override,
@@ -328,8 +329,9 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			awarded_amount, contract_amount, contract_target, procurement_route, contract_method,
 			bid_eval_method, mall_contract_type, prev_sales_id,
 			biz_type, budget_year, budget_status,
-			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included, org_id
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included, org_id,
+			created_by_user_id, created_by_name
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
@@ -341,7 +343,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		p.AwardedAmount, p.ContractAmount, p.ContractTarget, p.ProcurementRoute, p.ContractMethod,
 		p.BidEvalMethod, p.MallContractType, p.PrevSalesID,
 		p.BizType, p.BudgetYear, p.BudgetStatus,
-		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded), p.OrgID)
+		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded), p.OrgID, byID, byName)
 	if err != nil {
 		return err
 	}

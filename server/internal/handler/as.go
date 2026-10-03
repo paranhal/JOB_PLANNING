@@ -669,13 +669,13 @@ func (h *ASHandler) Create(c echo.Context) error {
 }
 
 func (h *ASHandler) Edit(c echo.Context) error {
-	if !canReceiveAS(c) {
-		return echo.ErrForbidden
-	}
 	id := c.Param("id")
 	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
+	}
+	if !canEditASContent(c, as.CreatedByUserID) {
+		return echo.ErrForbidden
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "show")
@@ -715,13 +715,13 @@ func (h *ASHandler) Edit(c echo.Context) error {
 }
 
 func (h *ASHandler) UpdateReceipt(c echo.Context) error {
-	if !canReceiveAS(c) {
-		return echo.ErrForbidden
-	}
 	id := c.Param("id")
 	existing, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
+	}
+	if !canEditASContent(c, existing.CreatedByUserID) {
+		return echo.ErrForbidden
 	}
 	prevTo, prevUID := existing.AssignedTo, existing.AssignedUserID
 	if isASClosedStatus(existing.Status) && !h.canModifyAS(c, existing) {
@@ -1479,8 +1479,8 @@ func actionErrMessage(code string) string {
 		return "대기 후속(조치/이관/접수취소)을 선택하세요."
 	case "result_code":
 		return "처리결과코드를 선택하세요."
-	case "action":
-		return "조치 내용을 확인 후 다시 저장하세요."
+	case "action_required":
+		return "조치내용을 입력하세요"
 	case "date_year":
 		return "날짜 연도는 2000~2100 사이여야 합니다."
 	case "schedule_date":

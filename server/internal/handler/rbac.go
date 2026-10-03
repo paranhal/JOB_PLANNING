@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 
 	"github.com/labstack/echo/v4"
 )
@@ -28,14 +29,47 @@ func currentPerms(c echo.Context) []string {
 }
 
 func hasPerm(c echo.Context, key string) bool {
-	if currentRole(c) == model.RoleAdmin {
+	role := currentRole(c)
+	key = model.CanonicalPerm(key)
+	if role == model.RoleVisionAdmin {
 		return true
 	}
-	return model.HasPermission(currentPerms(c), key)
+	if role == model.RoleOrgAdmin {
+		if !orgAdminInHome(c) {
+			return strings.HasSuffix(key, ".view")
+		}
+		a := model.PermAccess(role, key)
+		return a == model.AccessFull || a == model.AccessOwn || a == model.AccessView
+	}
+	stored := currentPerms(c)
+	if model.HasPermission(stored, key) {
+		return true
+	}
+	if len(stored) > 0 {
+		return false
+	}
+	a := model.PermAccess(role, key)
+	return a == model.AccessFull || a == model.AccessOwn || a == model.AccessView
+}
+
+func orgAdminInHome(c echo.Context) bool {
+	view := currentOrg(c)
+	if view == repository.OrgAll {
+		return false
+	}
+	home := strings.TrimSpace(ctxString(c, "org_id"))
+	if home == "" {
+		return true
+	}
+	return view == home
 }
 
 func isAdminRole(c echo.Context) bool {
-	return currentRole(c) == model.RoleAdmin
+	return model.IsAdminGrade(currentRole(c))
+}
+
+func isVisionRole(c echo.Context) bool {
+	return currentRole(c) == model.RoleVisionAdmin
 }
 
 func isTechRole(c echo.Context) bool {
@@ -43,12 +77,11 @@ func isTechRole(c echo.Context) bool {
 }
 
 func isReceiptRole(c echo.Context) bool {
-	// 행정 등급이 기존 접수담당 역할 대체
-	return currentRole(c) == model.RoleOffice
+	return currentRole(c) == model.RoleSupport
 }
 
 func isOfficeRole(c echo.Context) bool {
-	return currentRole(c) == model.RoleOffice
+	return currentRole(c) == model.RoleSupport
 }
 
 func isObserverRole(c echo.Context) bool {
@@ -60,9 +93,7 @@ func isSalesRole(c echo.Context) bool {
 }
 
 func canViewSales(c echo.Context) bool {
-	r := currentRole(c)
-	return r == model.RoleAdmin || r == model.RoleSales || r == model.RoleOffice ||
-		r == model.RoleTech || r == model.RoleObserver
+	return hasPerm(c, model.PermSalesView) || hasPerm(c, model.PermSalesActView)
 }
 
 // canEditSalesActivity §39.5 · §37.3 — 본인 등록은 본인, 남의 것은 관리자·행정만.
@@ -76,12 +107,21 @@ func canEditSalesActivity(c echo.Context, createdBy string) bool {
 	return assigneeIsMine(c, createdBy, "")
 }
 
+func canWriteSalesDeal(c echo.Context) bool {
+	if isObserverRole(c) {
+		return false
+	}
+	if currentRole(c) == model.RoleVisionAdmin || (currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)) {
+		return true
+	}
+	return model.PermAccess(currentRole(c), model.PermSalesCreate) == model.AccessFull
+}
+
 func canWriteSales(c echo.Context) bool {
 	if isObserverRole(c) {
 		return false
 	}
-	r := currentRole(c)
-	return r == model.RoleAdmin || r == model.RoleSales || r == model.RoleOffice
+	return hasPerm(c, model.PermSalesCreate) || hasPerm(c, model.PermSalesActCreate)
 }
 
 func canSeeMargin(c echo.Context) bool {
@@ -89,7 +129,13 @@ func canSeeMargin(c echo.Context) bool {
 }
 
 func canDeleteSales(c echo.Context) bool {
-	return isAdminRole(c)
+	if isObserverRole(c) {
+		return false
+	}
+	if currentRole(c) == model.RoleVisionAdmin || (currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)) {
+		return true
+	}
+	return model.PermAccess(currentRole(c), model.PermSalesDelete) == model.AccessFull
 }
 
 // isSuspendedRole 옵저버는 쓰기 메뉴·작업 제한(조회·계정만)
@@ -126,7 +172,7 @@ func canReceiveAS(c echo.Context) bool {
 	if isObserverRole(c) {
 		return false
 	}
-	return hasPerm(c, model.PermASReceive)
+	return hasPerm(c, model.PermASCreate)
 }
 
 func canProcessAS(c echo.Context) bool {
@@ -134,6 +180,28 @@ func canProcessAS(c echo.Context) bool {
 		return false
 	}
 	return hasPerm(c, model.PermASProcess)
+}
+
+func canEditASContent(c echo.Context, createdByUserID string) bool {
+	if isObserverRole(c) {
+		return false
+	}
+	a := model.PermAccess(currentRole(c), model.PermASEdit)
+	if currentRole(c) == model.RoleVisionAdmin || (currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)) {
+		a = model.AccessFull
+	}
+	if a == model.AccessFull {
+		return true
+	}
+	if a != model.AccessOwn {
+		return false
+	}
+	uid := strings.TrimSpace(identityUserID(c))
+	cb := strings.TrimSpace(createdByUserID)
+	if cb == "" || uid == "" {
+		return true
+	}
+	return cb == uid
 }
 
 // isASClosedStatus 완료·종료 — 기본 읽기 전용

@@ -24,6 +24,7 @@ const (
 	assetProductTypeUpperMetaKey      = "__meta:asset_product_type_upper_v1"
 	asPlannedDailyTaskMetaKey         = "__meta:as_planned_daily_task_v1"
 	orgSplitMetaKey                   = "__meta:org_split_v266"
+	permKeysV49MetaKey                = "__meta:perm_keys_v49"
 )
 
 // 시드 사업 ID

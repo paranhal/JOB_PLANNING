@@ -395,7 +395,7 @@ func (u *User) HasPerm(key string) bool {
 	if u == nil {
 		return false
 	}
-	if NormalizeRole(u.Role) == RoleAdmin {
+	if IsAdminGrade(u.Role) {
 		return true
 	}
 	return HasPermission(u.PermList(), key)

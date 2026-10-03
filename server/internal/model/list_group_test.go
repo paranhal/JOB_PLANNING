@@ -23,16 +23,16 @@ func TestGroupCustomersByParent(t *testing.T) {
 func TestGroupUsersByRole(t *testing.T) {
 	g := GroupUsersByRole([]User{
 		{UserID: "1", FullName: "가", Role: RoleTech},
-		{UserID: "2", FullName: "나", Role: RoleAdmin},
+		{UserID: "2", FullName: "나", Role: RoleOrgAdmin},
 		{UserID: "3", FullName: "다", Role: RoleTech},
 	})
 	if len(g) != 2 {
 		t.Fatalf("빈 소속은 숨긴다 %d", len(g))
 	}
-	if g[0].Key != RoleTech || len(g[0].Items) != 2 || g[0].Label != "기술 소속" {
+	if g[0].Key != RoleOrgAdmin || len(g[0].Items) != 1 || g[0].Label != "조직관리자 소속" {
 		t.Fatalf("%+v", g[0])
 	}
-	if g[1].Key != RoleAdmin {
+	if g[1].Key != RoleTech || len(g[1].Items) != 2 || g[1].Label != "기술 소속" {
 		t.Fatalf("%+v", g[1])
 	}
 }

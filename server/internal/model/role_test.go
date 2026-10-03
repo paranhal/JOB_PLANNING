@@ -6,26 +6,32 @@ func TestNormalizeRoleKnownAliases(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{RoleAdmin, RoleAdmin},
-		{"관리자", RoleAdmin},
+		{RoleAdmin, RoleOrgAdmin},
+		{"관리자", RoleOrgAdmin},
+		{RoleOrgAdmin, RoleOrgAdmin},
+		{RoleVisionAdmin, RoleVisionAdmin},
+		{"비젼관리자", RoleVisionAdmin},
 		{RoleTech, RoleTech},
 		{"기술", RoleTech},
 		{"기술담당", RoleTech},
 		{RoleSales, RoleSales},
 		{"영업", RoleSales},
 		{"영업담당", RoleSales},
-		{RoleOffice, RoleOffice},
-		{"행정", RoleOffice},
-		{"receipt", RoleOffice},
-		{"접수", RoleOffice},
-		{"접수담당", RoleOffice},
-		{"user", RoleOffice},
+		{RoleOffice, RoleSupport},
+		{"행정", RoleSupport},
+		{"receipt", RoleSupport},
+		{"접수", RoleSupport},
+		{"접수담당", RoleSupport},
+		{"user", RoleSupport},
+		{RoleSupport, RoleSupport},
 		{RoleObserver, RoleObserver},
 		{"옵저버", RoleObserver},
 		{"viewer", RoleObserver},
 		{"열람", RoleObserver},
 		{"열람사용자", RoleObserver},
-		{" admin ", RoleAdmin},
+		{RoleTester, RoleTester},
+		{"테스터", RoleTester},
+		{" admin ", RoleOrgAdmin},
 	}
 	for _, tc := range cases {
 		if got := NormalizeRole(tc.in); got != tc.want {
@@ -61,30 +67,36 @@ func TestDefaultPermissionsUnknownNil(t *testing.T) {
 	if p := DefaultPermissions("unknown"); p != nil {
 		t.Fatalf("DefaultPermissions(\"unknown\")=%v want nil", p)
 	}
+	if p := DefaultPermissions(RoleTester); p != nil {
+		t.Fatalf("테스터 기본값 %v", p)
+	}
 }
 
-func TestSalesDefaultHasNoAS(t *testing.T) {
+func TestSalesDefaultHasASReceive(t *testing.T) {
 	p := DefaultPermissions(RoleSales)
-	if HasPermission(p, PermASReceive) || HasPermission(p, PermASProcess) {
-		t.Fatalf("영업 기본값에 AS가 있으면 안 된다: %v", p)
+	if !HasPermission(p, PermASCreate) || !HasPermission(p, PermASProcess) {
+		t.Fatalf("영업 기본값에 AS 접수·조치가 없다: %v", p)
 	}
-	if !HasPermission(p, PermAnalysis) || !HasPermission(p, PermStats) {
+	if HasPermission(p, PermASDelete) {
+		t.Fatalf("영업이 AS 삭제 전권: %v", p)
+	}
+	if !HasPermission(p, PermSalesView) || !HasPermission(p, PermStatsView) {
 		t.Fatalf("영업 기본값: %v", p)
 	}
 }
 
 func TestSalesStoredReceiveOnly(t *testing.T) {
 	p := EffectivePermissions(RoleSales, "analysis,stats,as_receive")
-	if !HasPermission(p, PermASReceive) {
+	if !HasPermission(p, PermASCreate) {
 		t.Fatal("저장된 as_receive 가 없다")
 	}
 	if HasPermission(p, PermASProcess) {
-		t.Fatal("접수만 줬는데 as_process 가 있다")
+		t.Fatal("접수만 줬는데 as.process 가 있다")
 	}
-	if PermissionSourceLabel(RoleSales, "stats") != "저장된 권한" {
+	if PermissionSourceLabel(RoleSales, "stats") != "개별 지정" {
 		t.Fatal("저장된 권한 출처")
 	}
-	if PermissionSourceLabel(RoleSales, "") != "역할 기본값" {
+	if PermissionSourceLabel(RoleSales, "") != "직급 기본값" {
 		t.Fatal("빈 값 출처")
 	}
 }
@@ -92,7 +104,7 @@ func TestSalesStoredReceiveOnly(t *testing.T) {
 func TestAllPermissionsListsReceiveAndProcessSeparately(t *testing.T) {
 	var recv, proc bool
 	for _, d := range AllPermissions {
-		if d.Key == PermASReceive {
+		if d.Key == PermASCreate {
 			recv = true
 		}
 		if d.Key == PermASProcess {
@@ -101,5 +113,14 @@ func TestAllPermissionsListsReceiveAndProcessSeparately(t *testing.T) {
 	}
 	if !recv || !proc {
 		t.Fatal("사용자 관리 체크박스에 AS 접수·조치가 따로 있어야 한다")
+	}
+}
+
+func TestCanonicalPermLegacyKeys(t *testing.T) {
+	if CanonicalPerm(PermASReceive) != PermASCreate {
+		t.Fatal("as_receive")
+	}
+	if CanonicalPerm(PermAnalysis) != PermSalesView {
+		t.Fatal("analysis")
 	}
 }

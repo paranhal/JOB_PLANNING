@@ -1194,6 +1194,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 
 	// migrateBusinessIDsV2 가 id_sequences 를 비운 뒤에 가드를 세운다 (§52.6).
 	applyOrgs(db)
+	applyCreatedByColumns(db)
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)
@@ -1205,10 +1206,20 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 // migrateUserRolesAndPermissions 등급 체계·권한 CSV 컬럼 보강
 func migrateUserRolesAndPermissions(db *sql.DB) {
 	db.Exec(`ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT ''`)
-	// 레거시 역할 명칭 정리
-	db.Exec(`UPDATE users SET role='office' WHERE role IN ('receipt','user','접수','접수담당')`)
+	migratePermKeysV49(db)
+	db.Exec(`UPDATE users SET role='org_admin' WHERE role='admin'`)
+	db.Exec(`UPDATE users SET role='support' WHERE role IN ('office','receipt','user','접수','접수담당')`)
 	db.Exec(`UPDATE users SET role='observer' WHERE role IN ('viewer','열람','열람사용자')`)
-	// 권한이 비어 있으면 등급 기본값 채움
+}
+
+func migratePermKeysV49(db *sql.DB) {
+	if db == nil || metaDone(db, permKeysV49MetaKey) {
+		return
+	}
+	// 옛 9키 → 새 키. 직급 기본값과 같으면 저장값을 비운다 (§53.5).
+	// as_receive→as.create  as_process→as.process  workboard→admin.create
+	// maintenance→mnt.view  maintenance_edit→mnt.edit  master_write→master.edit
+	// codes_users→codes.edit  analysis→sales.view  stats→stats.view
 	rows, err := db.Query(`SELECT user_id, role, COALESCE(permissions,'') FROM users`)
 	if err != nil {
 		return
@@ -1223,20 +1234,24 @@ func migrateUserRolesAndPermissions(db *sql.DB) {
 		}
 	}
 	for _, r := range list {
-		role := model.NormalizeRole(r.role)
-		perms := strings.TrimSpace(r.perms)
-		// 옵저버: 통계만/빈 값 → 전체 조회 기본 권한
-		if role == model.RoleObserver && (perms == "" || perms == "stats") {
-			db.Exec(`UPDATE users SET role=?, permissions=? WHERE user_id=?`,
-				role, model.FormatPermissions(model.ObserverViewPermissions()), r.id)
+		oldRole := strings.TrimSpace(r.role)
+		newRole := model.NormalizeRole(oldRole)
+		if newRole == "" {
 			continue
 		}
-		if perms != "" {
+		stored := strings.TrimSpace(r.perms)
+		legacyDef := model.LegacyDefaultPermissions(oldRole)
+		if stored == "" || model.SamePermSet(model.ParsePermissions(strings.Join(legacyDef, ",")), model.ParsePermissions(stored)) || model.SamePermSet(strings.Split(stored, ","), legacyDef) {
+			db.Exec(`UPDATE users SET role=?, permissions='' WHERE user_id=?`, newRole, r.id)
 			continue
 		}
-		db.Exec(`UPDATE users SET role=?, permissions=? WHERE user_id=?`,
-			role, model.FormatPermissions(model.DefaultPermissions(role)), r.id)
+		mapped := model.FormatPermissions(model.ParsePermissions(stored))
+		if mapped == model.FormatPermissions(model.DefaultPermissions(newRole)) {
+			mapped = ""
+		}
+		db.Exec(`UPDATE users SET role=?, permissions=? WHERE user_id=?`, newRole, mapped, r.id)
 	}
+	markMetaDone(db, permKeysV49MetaKey)
 }
 
 // migrateCustomerStructuredAddresses 구 address → 우편번호/시도/군구/동/상세 분해 이관

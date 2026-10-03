@@ -86,15 +86,19 @@
       {{$a := .Active}}
       {{$role := .UserRole}}
       {{$perms := .UserPerms}}
-      {{$isAdmin := eq $role "admin"}}
-      {{$isOffice := or (eq $role "office") (eq $role "receipt")}}
+      {{$isVision := eq $role "vision_admin"}}
+      {{$isOrgAdmin := or (eq $role "org_admin") (eq $role "admin")}}
+      {{$isAdmin := or $isVision $isOrgAdmin}}
+      {{$isOffice := or (eq $role "support") (eq $role "office") (eq $role "receipt")}}
       {{$isTech := eq $role "tech"}}
       {{$isSales := eq $role "sales"}}
       {{$isObserver := eq $role "observer"}}
-      {{$roleKnown := or $isAdmin $isOffice $isTech $isSales $isObserver}}
-      {{$canPlanExec := or $isAdmin $isOffice $isTech}}
-      {{$canAS := or $isAdmin $isOffice $isTech (hasUserPerm $perms "as_receive") (hasUserPerm $perms "as_process")}}
-      {{$canSalesMenu := or $isAdmin $isOffice $isSales $isTech $isObserver}}
+      {{$isTester := eq $role "tester"}}
+      {{$roleKnown := or $isAdmin $isOffice $isTech $isSales $isObserver $isTester}}
+      {{$canPlanExec := $roleKnown}}
+      {{$canAS := $roleKnown}}
+      {{$canSalesMenu := $roleKnown}}
+      {{$canAdminMenu := or $isAdmin $isObserver}}
 
       {{if $roleKnown}}
       <p class="px-3 pt-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">홈</p>
@@ -105,7 +109,7 @@
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">계획</p>
       <a href="/workboard/register" class="{{if eq $a "work_register"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">일일 업무 등록</a>
       <a href="/plan/unplanned" class="{{if eq $a "plan_unplanned"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">미계획 업무함</a>
-      {{if or $isAdmin $isTech (hasUserPerm $perms "maintenance") (hasUserPerm $perms "maintenance_edit")}}
+      {{if or $isAdmin $isTech $isOffice $isSales $isObserver $isTester (hasUserPerm $perms "mnt.view") (hasUserPerm $perms "maintenance")}}
       <a href="/maintenance" class="{{if eq $a "maintenance"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">정기점검 일정</a>
       {{end}}
       <a href="/meeting" class="{{if eq $a "meeting"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">일일 업무 회의</a>
@@ -142,16 +146,16 @@
       <a href="/items" class="{{if eq $a "sales_items"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">품목 마스터</a>
       {{end}}
 
-      {{if or $canPlanExec $isSales $isObserver (hasUserPerm $perms "stats") (hasUserPerm $perms "analysis")}}
+      {{if or $canPlanExec $isSales $isObserver (hasUserPerm $perms "stats.view") (hasUserPerm $perms "sales.view") (hasUserPerm $perms "stats") (hasUserPerm $perms "analysis")}}
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">확인</p>
       {{if $canPlanExec}}
       <a href="/work-status" class="{{if eq $a "work_status"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">업무처리현황</a>
       {{end}}
-      {{if and (not $isSales) (or $canPlanExec $isObserver (hasUserPerm $perms "stats"))}}
+      {{if or $canPlanExec $isObserver (hasUserPerm $perms "stats.view") (hasUserPerm $perms "stats")}}
       <a href="/stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">통계</a>
       <a href="/stats/reports" class="{{if or (eq $a "stats_reports") (eq $a "stats_detail")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">보고서</a>
       {{end}}
-      {{if or $isAdmin $isSales $isObserver (hasUserPerm $perms "analysis")}}
+      {{if or $isAdmin $isSales $isObserver $isOffice $isTech (hasUserPerm $perms "sales.view") (hasUserPerm $perms "analysis")}}
       <a href="/analysis" class="{{if eq $a "analysis"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">교체대상현황</a>
       {{end}}
       {{end}}
@@ -159,27 +163,27 @@
       {{if $roleKnown}}
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">기준정보</p>
       <a href="/customers" class="{{if eq $a "customers"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">고객현황</a>
-      {{if or $isAdmin $isObserver (hasUserPerm $perms "master_write")}}
+      {{if or $isAdmin $isObserver $isOffice $isTech $isSales $isTester (hasUserPerm $perms "master.edit") (hasUserPerm $perms "master_write")}}
       <a href="/spaces" class="{{if eq $a "spaces"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">공간관리</a>
       <a href="/contacts" class="{{if eq $a "contacts"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">담당자관리</a>
       <a href="/contact-history" class="{{if eq $a "contact_history"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">담당자이력</a>
       {{end}}
       <a href="/assets" class="{{if eq $a "assets"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">설치자산</a>
-      {{if or $isAdmin $isObserver (hasUserPerm $perms "master_write")}}
+      {{if or $isAdmin $isObserver $isOffice $isTech $isSales $isTester (hasUserPerm $perms "master.edit") (hasUserPerm $perms "master_write")}}
       <a href="/relations" class="{{if eq $a "relations"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">수행관계</a>
       {{end}}
-      {{if or $canPlanExec $isObserver (hasUserPerm $perms "workboard")}}
+      {{if or $canPlanExec $isObserver (hasUserPerm $perms "admin.create") (hasUserPerm $perms "workboard")}}
       <a href="/projects" class="{{if eq $a "projects"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사업(프로젝트)관리</a>
       {{end}}
-      {{if or $isAdmin $isObserver (hasUserPerm $perms "codes_users")}}
+      {{if or $isAdmin $isObserver (hasUserPerm $perms "codes.edit") (hasUserPerm $perms "codes_users")}}
       <a href="/maintenance/sites" class="{{if eq $a "maintenance_sites"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">점검 사이트 설정</a>
       <a href="/maintenance/sites/distance" class="{{if eq $a "region_order"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">지역 거리 순서</a>
       {{end}}
       {{end}}
 
-      {{if $roleKnown}}
+      {{if $canAdminMenu}}
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">관리</p>
-      {{if or $isAdmin (hasUserPerm $perms "codes_users")}}
+      {{if or $isAdmin $isObserver (hasUserPerm $perms "codes.edit") (hasUserPerm $perms "codes_users")}}
       <a href="/codes" class="{{if eq $a "codes"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">코드관리</a>
       <a href="/users" class="{{if eq $a "users"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사용자/권한</a>
       {{end}}

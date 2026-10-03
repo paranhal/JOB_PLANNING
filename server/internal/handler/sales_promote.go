@@ -12,7 +12,7 @@ import (
 )
 
 func (h *SalesHandler) PromoteForm(c echo.Context) error {
-	if !canWriteSales(c) {
+	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
 	p, wp, err := h.promoteState(c)
@@ -35,7 +35,7 @@ func (h *SalesHandler) PromoteForm(c echo.Context) error {
 }
 
 func (h *SalesHandler) PromoteCustomer(c echo.Context) error {
-	if !canWriteSales(c) {
+	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
 	p, wp, err := h.promoteState(c)
@@ -89,7 +89,7 @@ func (h *SalesHandler) PromoteCustomer(c echo.Context) error {
 }
 
 func (h *SalesHandler) PromoteSave(c echo.Context) error {
-	if !canWriteSales(c) {
+	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
 	p, wp, err := h.promoteState(c)

@@ -27,7 +27,7 @@ func NewOrgHandler(db *sql.DB, repo *repository.OrgRepo, auth *AuthHandler, sett
 
 func canSwitchOrg(c echo.Context) bool {
 	role := currentRole(c)
-	return role == model.RoleAdmin || role == "vision_admin"
+	return role == model.RoleOrgAdmin || role == model.RoleVisionAdmin
 }
 
 func currentOrg(c echo.Context) string {
@@ -132,7 +132,12 @@ func (h *OrgHandler) Switch(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, back)
 }
 
-// RequireVisionOnly 비젼관리자만. 49-A 의 vision_admin 이 생기면 역할 검사로 교체. TODO(49-A)
+// RequireVisionOnly 비젼관리자만.
 func (h *AuthHandler) RequireVisionOnly(next echo.HandlerFunc) echo.HandlerFunc {
-	return h.RequireAdminOnly(next)
+	return func(c echo.Context) error {
+		if currentRole(c) != model.RoleVisionAdmin {
+			return echo.ErrForbidden
+		}
+		return next(c)
+	}
 }

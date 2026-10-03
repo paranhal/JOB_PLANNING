@@ -222,7 +222,7 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 }
 
 func (h *SalesHandler) New(c echo.Context) error {
-	if !canWriteSales(c) {
+	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
 	p := &model.SalesProject{
@@ -251,7 +251,7 @@ func (h *SalesHandler) New(c echo.Context) error {
 }
 
 func (h *SalesHandler) Create(c echo.Context) error {
-	if !canWriteSales(c) {
+	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
 	p := h.parseForm(c)

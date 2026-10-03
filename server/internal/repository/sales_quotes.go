@@ -166,6 +166,7 @@ func (r *QuoteRepo) Create(q *model.SalesQuote) error {
 		return err
 	}
 	q.QuoteID = fmt.Sprintf("Q-%03d", n)
+	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO sales_quotes (
 			quote_id, sales_id, quote_no, rev, form_type, recipient_kind,
@@ -173,14 +174,15 @@ func (r *QuoteRepo) Create(q *model.SalesQuote) error {
 			valid_until_text, due_text, place_text, payment_text, vat_mode, round_rule,
 			subtotal, vat, total, owner_user_id, owner_name, owner_phone, remarks,
 			purpose, budget_year, overhead_rate, tech_fee_rate, status, is_legacy,
-			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id,
+			created_by_user_id, created_by_name
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		q.QuoteID, q.SalesID, q.QuoteNo, q.Rev, q.FormType, q.RecipientKind,
 		q.CustomerID, q.RecipientName, q.AttnName, q.AttnTitle, q.QuoteDate, q.Title,
 		q.ValidUntilText, q.DueText, q.PlaceText, q.PaymentText, q.VATMode, q.RoundRule,
 		q.Subtotal, q.VAT, q.Total, q.OwnerUserID, q.OwnerName, q.OwnerPhone, q.Remarks,
 		q.Purpose, q.BudgetYear, q.OverheadRate, q.TechFeeRate, q.Status, boolToInt(q.IsLegacy),
-		q.RevReason, boolToInt(q.IsReverseCalc), q.TargetTotal, boolToInt(q.MaintBlock), q.QuoteKind, q.OrgID)
+		q.RevReason, boolToInt(q.IsReverseCalc), q.TargetTotal, boolToInt(q.MaintBlock), q.QuoteKind, q.OrgID, byID, byName)
 	if err != nil {
 		if isUniqueErr(err) {
 			return model.ErrQuoteNoDuplicate

@@ -205,7 +205,7 @@ func (h *AuthHandler) refreshSession(c echo.Context, user *model.User) {
 }
 
 func (h *AuthHandler) isAdmin(c echo.Context) bool {
-	return currentRole(c) == model.RoleAdmin
+	return isAdminRole(c)
 }
 
 func (h *AuthHandler) forbidden(c echo.Context) error {

@@ -63,11 +63,11 @@ func TestOrderStripCostClearsValues(t *testing.T) {
 }
 
 func TestCanSeeMarginAdminSalesOnly(t *testing.T) {
-	if !CanSeeMargin(RoleAdmin) || !CanSeeMargin(RoleSales) {
-		t.Fatal("관리자·영업이 못 본다")
+	if !CanSeeMargin(RoleAdmin) || !CanSeeMargin(RoleOrgAdmin) || !CanSeeMargin(RoleVisionAdmin) || !CanSeeMargin(RoleSales) || !CanSeeMargin(RoleSupport) {
+		t.Fatal("관리자·영업·지원이 못 본다")
 	}
-	if CanSeeMargin(RoleTech) || CanSeeMargin(RoleOffice) || CanSeeMargin(RoleObserver) {
-		t.Fatal("기술·행정·옵저버에게 마진이 열린다")
+	if CanSeeMargin(RoleTech) || CanSeeMargin(RoleObserver) {
+		t.Fatal("기술·옵저버에게 마진이 열린다")
 	}
 }
 

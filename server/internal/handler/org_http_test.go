@@ -8,11 +8,30 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
+
+func jwtVisionCookie(t *testing.T) *http.Cookie {
+	t.Helper()
+	ck := jwtCookie(t)
+	secret := []byte("cs-system-jwt-secret-2026")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "admin-id", "username": "admin", "role": model.RoleVisionAdmin,
+		"name": "관리자", "exp": time.Now().Add(time.Hour).Unix(),
+	})
+	s, err := token.SignedString(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ck.Value = s
+	return ck
+}
 
 func TestOrgAdminListCreateUpdateAndSwitch(t *testing.T) {
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "org-http.db"))
@@ -32,7 +51,7 @@ func TestOrgAdminListCreateUpdateAndSwitch(t *testing.T) {
 	g.POST("/admin/orgs/update", h.Org.Update, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/switch", h.Org.Switch, h.Auth.RequireVisionOnly)
 
-	ck := jwtCookie(t)
+	ck := jwtVisionCookie(t)
 	get := func() *httptest.ResponseRecorder {
 		t.Helper()
 		rec := httptest.NewRecorder()
@@ -156,7 +175,7 @@ func TestOrgDeleteRestoreBlockedAndSplit(t *testing.T) {
 	h := New(db)
 	h.Org.dataDir = root
 	mountOrgAdmin(e, h)
-	ck := jwtCookie(t)
+	ck := jwtVisionCookie(t)
 
 	post := func(path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()

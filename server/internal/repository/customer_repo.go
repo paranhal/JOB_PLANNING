@@ -264,6 +264,7 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 	c.CustomerID = id
 	c.SyncCombinedAddress()
 	now := time.Now().Format("2006-01-02 15:04:05")
+	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO customers (
 			customer_id, org_name, official_name, org_email, main_phone,
@@ -271,14 +272,14 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 			has_parent, parent_customer_id,
 			postal_code, addr_sido, addr_sigungu, addr_dong,
 			address, address_detail,
-			is_active, notes, party_kind, org_id, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			is_active, notes, party_kind, org_id, created_by_user_id, created_by_name, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.CustomerID, c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
 		c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
 		boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
 		c.PostalCode, c.AddrSido, c.AddrSigungu, c.AddrDong,
 		c.Address, c.AddressDetail,
-		boolToInt(c.IsActive), c.Notes, model.NormalizePartyKind(c.PartyKind), c.OrgID, now, now,
+		boolToInt(c.IsActive), c.Notes, model.NormalizePartyKind(c.PartyKind), c.OrgID, byID, byName, now, now,
 	)
 	if err != nil {
 		return err

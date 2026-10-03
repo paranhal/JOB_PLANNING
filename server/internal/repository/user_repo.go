@@ -193,7 +193,7 @@ func (r *UserRepo) PasswordHashStats() (total, bcryptN int, err error) {
 // EnsureAdmin 최초 관리자 계정이 없으면 생성
 func (r *UserRepo) EnsureAdmin(hash string) error {
 	var count int
-	r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role='admin'`).Scan(&count)
+	r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role IN ('admin','org_admin','vision_admin') OR username='admin'`).Scan(&count)
 	if count > 0 {
 		return nil
 	}
@@ -201,8 +201,8 @@ func (r *UserRepo) EnsureAdmin(hash string) error {
 		Username:     "admin",
 		PasswordHash: hash,
 		FullName:     "관리자",
-		Role:         model.RoleAdmin,
-		Permissions:  model.FormatPermissions(model.DefaultPermissions(model.RoleAdmin)),
+		Role:         model.RoleOrgAdmin,
+		Permissions:  "",
 		IsActive:     true,
 	}
 	return r.Create(admin)

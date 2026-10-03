@@ -255,6 +255,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 	a.AssetID = id
 	r.resolveLocIDs(a)
 	now := time.Now().Format("2006-01-02 15:04:05")
+	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO assets (
 			asset_id, customer_id, product_name, product_type, product_category, model_name,
@@ -267,8 +268,8 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 			customer_contact_id, our_contact,
 			building_id, floor_id, room_id,
 			install_location, location_detail, notes, project_id, sales_order_id,
-			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			created_by_user_id, created_by_name, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
 		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
@@ -278,7 +279,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		a.RequesterType, a.RequesterName,
 		a.CustomerContactID, a.OurContact,
 		nullStr(a.BuildingID), nullStr(a.FloorID), nullStr(a.RoomID),
-		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), a.SalesOrderID, now, now,
+		a.InstallLocation, a.LocationDetail, a.Notes, nullStr(a.ProjectID), a.SalesOrderID, byID, byName, now, now,
 	)
 	if err != nil {
 		return err

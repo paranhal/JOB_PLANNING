@@ -297,7 +297,7 @@ func workStatusResolveScope(c echo.Context, role string, unresolved bool) (assig
 	if unresolved {
 		return
 	}
-	if role == model.RoleAdmin || role == model.RoleOffice {
+	if model.IsAdminGrade(role) || role == model.RoleSupport {
 		scopeAll = assignee == ""
 		return
 	}

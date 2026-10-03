@@ -68,15 +68,16 @@ func (r *ASProcessRepo) Create(p *model.ASProcess) error {
 	worker, workerUID := bindStaff(r.db, p.Worker, "")
 	p.Worker = worker
 	p.TimeSpent = model.NormalizeDurationMin(p.TimeSpent)
+	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO as_processes
 		(process_id,process_number,as_id,process_datetime,worker,worker_user_id,work_type,cause_type,work_content,parts_used,time_spent,notes,
-		 result_code,transfer_detail,next_action_date,wait_reason,prep_notes)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 result_code,transfer_detail,next_action_date,wait_reason,prep_notes,created_by_user_id,created_by_name)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProcessID, p.ProcessNumber, p.ASID, at.Format("2006-01-02 15:04:05"),
 		p.Worker, workerUID, p.WorkType, p.CauseType, p.WorkContent, p.PartsUsed, p.TimeSpent, p.Notes,
 		nullIfEmpty(p.ResultCode), nullIfEmpty(p.TransferDetail), nullIfEmpty(p.NextActionDate),
-		nullIfEmpty(p.WaitReason), nullIfEmpty(p.PrepNotes))
+		nullIfEmpty(p.WaitReason), nullIfEmpty(p.PrepNotes), byID, byName)
 	if err != nil {
 		return err
 	}

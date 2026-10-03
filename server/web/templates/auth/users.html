@@ -6,7 +6,7 @@
   <div class="flex items-center justify-between gap-3 flex-wrap">
     <div>
       <h2 class="text-xl font-bold text-gray-800">사용자 / 권한 관리</h2>
-      <p class="text-sm text-gray-500 mt-1">등급을 고르고, 체크박스로 세부 권한을 지정합니다. 등급: 기술·영업·행정·관리자·옵저버{{if not $canEdit}} (조회 전용){{end}}</p>
+      <p class="text-sm text-gray-500 mt-1">직급을 고르고, 체크박스로 세부 권한을 지정합니다. 직급: 비젼관리자·조직관리자·지원·기술·영업·옵저버·테스터{{if not $canEdit}} (조회 전용){{end}}</p>
     </div>
     {{if $canEdit}}
     <button type="button" @click="showForm=!showForm" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ 사용자 추가</button>
@@ -41,13 +41,15 @@
         <div><label class="block text-xs font-medium text-gray-600 mb-1">아이디</label><input type="text" name="username" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
         <div><label class="block text-xs font-medium text-gray-600 mb-1">비밀번호</label><input type="password" name="password" required minlength="4" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
         <div><label class="block text-xs font-medium text-gray-600 mb-1">이름</label><input type="text" name="full_name" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">등급</label>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">직급</label>
           <select name="role" id="create-role" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="tech">기술</option>
             <option value="sales">영업</option>
-            <option value="office">행정</option>
-            <option value="admin">관리자</option>
+            <option value="support">지원</option>
+            <option value="org_admin">조직관리자</option>
+            <option value="vision_admin">비젼관리자</option>
             <option value="observer" selected>옵저버</option>
+            <option value="tester">테스터</option>
           </select>
         </div>
       </div>
@@ -60,7 +62,7 @@
           </label>
           {{end}}
         </div>
-        <p class="text-[11px] text-gray-400 mt-1">등급을 바꾸면 기본 권한이 채워집니다. 이후 체크를 조정할 수 있습니다. 영업담당 기본값에는 AS가 없습니다. 기술영업이면 AS 접수와 조치를 따로 켜세요.</p>
+        <p class="text-[11px] text-gray-400 mt-1">직급을 바꾸면 기본 권한이 채워집니다. 체크를 비우면 직급 기본값으로 저장됩니다.</p>
       </div>
       <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium">등록</button>
     </form>
@@ -146,9 +148,11 @@
             <select name="role" class="border rounded px-2 py-1 text-xs role-select">
               <option value="tech" {{if eq .Role "tech"}}selected{{end}}>기술</option>
               <option value="sales" {{if eq .Role "sales"}}selected{{end}}>영업</option>
-              <option value="office" {{if eq .Role "office"}}selected{{end}}>행정</option>
-              <option value="admin" {{if eq .Role "admin"}}selected{{end}}>관리자</option>
+              <option value="support" {{if or (eq .Role "support") (eq .Role "office")}}selected{{end}}>지원</option>
+              <option value="org_admin" {{if or (eq .Role "org_admin") (eq .Role "admin")}}selected{{end}}>조직관리자</option>
+              <option value="vision_admin" {{if eq .Role "vision_admin"}}selected{{end}}>비젼관리자</option>
               <option value="observer" {{if eq .Role "observer"}}selected{{end}}>옵저버</option>
+              <option value="tester" {{if eq .Role "tester"}}selected{{end}}>테스터</option>
             </select>
             <select name="is_active" class="border rounded px-2 py-1 text-xs">
               <option value="1" {{if .IsActive}}selected{{end}}>활성</option>
@@ -164,7 +168,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-600 mb-2">권한{{if $canEdit}} (체크){{end}}</p>
-          <p class="text-[11px] text-gray-400 mb-2">AS 접수와 조치는 따로 줍니다. 영업담당은 기본으로 둘 다 꺼져 있습니다.</p>
+          <p class="text-[11px] text-gray-400 mb-2">비어 있으면 직급 기본값입니다. 체크하면 개별 지정입니다.</p>
           <div class="flex flex-wrap gap-3">
             {{range $permDefs}}
             <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
@@ -184,7 +188,7 @@
       {{if $canEdit}}</form>{{else}}</div>{{end}}
       {{if $canEdit}}
       <form method="POST" action="/users/{{.UserID}}/reset-permissions" class="mt-2">
-        <button type="submit" class="text-xs text-blue-700 hover:underline">역할 기본값으로 되돌리기</button>
+        <button type="submit" class="text-xs text-blue-700 hover:underline">직급 기본값으로 되돌리기</button>
       </form>
       {{end}}
 
@@ -219,11 +223,13 @@
 <script>
 (function () {
   var defaults = {
-    tech: ['as_receive','as_process','workboard','maintenance','maintenance_edit','stats'],
-    sales: ['analysis','stats'],
-    office: ['as_receive','workboard','stats'],
-    admin: ['as_receive','as_process','workboard','maintenance','maintenance_edit','master_write','codes_users','analysis','stats'],
-    observer: ['workboard','maintenance','analysis','stats']
+    tech: [],
+    sales: [],
+    support: [],
+    org_admin: [],
+    vision_admin: [],
+    observer: [],
+    tester: []
   };
   var roleSel = document.getElementById('create-role');
   if (!roleSel) return;
