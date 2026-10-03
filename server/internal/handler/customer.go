@@ -81,7 +81,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 	pageSize := 20
 	reviewOnly := c.QueryParam("review") == "1"
 
-	items, total, err := h.repo.List(search, category, industry, sort, dir, page, pageSize, reviewOnly, partyKind)
+	items, total, err := h.repo.List(currentOrg(c), search, category, industry, sort, dir, page, pageSize, reviewOnly, partyKind)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (h *CustomerHandler) ExportExcel(c echo.Context) error {
 	if dir != "asc" && dir != "desc" {
 		dir = "asc"
 	}
-	items, err := h.repo.ListExport(search, category, industry, sort, dir, region, siteID)
+	items, err := h.repo.ListExport(currentOrg(c), search, category, industry, sort, dir, region, siteID)
 	if err != nil {
 		return err
 	}
@@ -397,7 +397,7 @@ func (h *CustomerHandler) SearchJSON(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	q := strings.TrimSpace(c.QueryParam("q"))
-	items, _, err := h.repo.List(q, "", "", "org_name", "asc", 1, 20, false, "")
+	items, _, err := h.repo.List(currentOrg(c), q, "", "", "org_name", "asc", 1, 20, false, "")
 	if err != nil {
 		return err
 	}
@@ -591,5 +591,6 @@ func bindCustomer(c echo.Context) *model.Customer {
 		IsActive:         c.FormValue("is_active") != "0",
 		Notes:            c.FormValue("notes"),
 		PartyKind:        model.NormalizePartyKind(c.FormValue("party_kind")),
+		OrgID:            currentOrg(c),
 	}
 }

@@ -61,6 +61,10 @@ func nthMondayOfMonth(mon time.Time) int {
 
 // BuildCompanyWeeklyDraft 전사 주간업무보고 20~25행 F·G 초안. §16.6.5~7
 func (r *StatsRepo) BuildCompanyWeeklyDraft(anchor time.Time) (model.CompanyWeeklyDraft, error) {
+	return r.BuildCompanyWeeklyDraftOrg(anchor, OrgAll)
+}
+
+func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (model.CompanyWeeklyDraft, error) {
 	p := CompanyWeeklyPeriod(anchor)
 	mapRows, err := r.listWeeklyReportRows()
 	if err != nil {
@@ -91,27 +95,27 @@ func (r *StatsRepo) BuildCompanyWeeklyDraft(anchor time.Time) (model.CompanyWeek
 			item.MissingProject = true
 		}
 		if pid := strings.TrimSpace(row.ProjectID); pid != "" {
-			item.MntDoneSites, err = r.countCompanyMntSitesDone(pid, p.PrevFrom, p.PrevToEx)
+			item.MntDoneSites, err = r.countCompanyMntSitesDone(pid, p.PrevFrom, p.PrevToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			item.ASDoneCount, err = r.countCompanyASDone(pid, p.PrevFrom, p.PrevToEx)
+			item.ASDoneCount, err = r.countCompanyASDone(pid, p.PrevFrom, p.PrevToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			item.MntPlanSites, err = r.countCompanyMntSitesPlanned(pid, p.ThisFrom, p.ThisToEx)
+			item.MntPlanSites, err = r.countCompanyMntSitesPlanned(pid, p.ThisFrom, p.ThisToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			adminDone, err := r.listCompanyAdminDone(pid, p.PrevFrom, p.PrevToEx)
+			adminDone, err := r.listCompanyAdminDone(pid, p.PrevFrom, p.PrevToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			adminPlan, err := r.listCompanyAdminPlan(pid, p.ThisFrom, p.ThisToEx)
+			adminPlan, err := r.listCompanyAdminPlan(pid, p.ThisFrom, p.ThisToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			carry, err := r.listCompanyAdminCarry(pid, p.PrevFrom, p.PrevToEx)
+			carry, err := r.listCompanyAdminCarry(pid, p.PrevFrom, p.PrevToEx, orgID)
 			if err != nil {
 				return out, err
 			}
@@ -208,8 +212,8 @@ func collapseCompanyAdminLines(lines []adminLine) []adminLine {
 	return out
 }
 
-func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx string) (int, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
+func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx, orgID string) (int, error) {
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
@@ -220,8 +224,8 @@ func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx string) (int,
 	return n, err
 }
 
-func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx string) (int, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
+func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx, orgID string) (int, error) {
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
@@ -231,8 +235,8 @@ func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx string) (i
 	return n, err
 }
 
-func (r *StatsRepo) countCompanyASDone(projectID, from, toEx string) (int, error) {
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
+func (r *StatsRepo) countCompanyASDone(projectID, from, toEx, orgID string) (int, error) {
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, asArgs...)
 	err := r.db.QueryRow(`
@@ -244,8 +248,8 @@ func (r *StatsRepo) countCompanyASDone(projectID, from, toEx string) (int, error
 	return n, err
 }
 
-func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx string) ([]adminLine, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([]adminLine, error) {
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
@@ -268,9 +272,9 @@ func companyAdminPlanDateSQL() string {
 		ELSE NULLIF(TRIM(t.due_date),'') END`
 }
 
-func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx string) ([]adminLine, error) {
+func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([]adminLine, error) {
 	d := companyAdminPlanDateSQL()
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
@@ -288,8 +292,8 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx string) ([]adminL
 	return collapseCompanyAdminLines(lines), nil
 }
 
-func (r *StatsRepo) listCompanyAdminCarry(projectID, from, toEx string) ([]adminLine, error) {
-	return r.listCompanyAdminPlan(projectID, from, toEx)
+func (r *StatsRepo) listCompanyAdminCarry(projectID, from, toEx, orgID string) ([]adminLine, error) {
+	return r.listCompanyAdminPlan(projectID, from, toEx, orgID)
 }
 
 func (r *StatsRepo) queryAdminLines(q string, args ...interface{}) ([]adminLine, error) {

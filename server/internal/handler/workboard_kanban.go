@@ -356,7 +356,7 @@ func (h *WorkboardHandler) kanbanForceDate(key, date, assignee string) error {
 			return errKanban("place")
 		}
 		if assignee != "" {
-			if as, err := h.asRepo.GetByID(id); err == nil && as != nil && strings.TrimSpace(as.AssignedTo) == "" {
+			if as, err := h.asRepo.GetByID(repository.OrgAll, id); err == nil && as != nil && strings.TrimSpace(as.AssignedTo) == "" {
 				as.AssignedTo = assignee
 				as.AssignedUserID = h.assigneeUserID(assignee)
 				_ = h.asRepo.Update(as)
@@ -408,7 +408,7 @@ func (h *WorkboardHandler) syncASPlannedFromKanban(asID string) {
 	if h.repo == nil || h.asRepo == nil || strings.TrimSpace(asID) == "" {
 		return
 	}
-	as, err := h.asRepo.GetByID(asID)
+	as, err := h.asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		return
 	}
@@ -426,7 +426,7 @@ func (h *WorkboardHandler) kanbanSetProgress(key string, start bool) error {
 		if h.asRepo == nil {
 			return errKanban("place")
 		}
-		as, err := h.asRepo.GetByID(id)
+		as, err := h.asRepo.GetByID(repository.OrgAll, id)
 		if err != nil || as == nil {
 			return echo.ErrNotFound
 		}
@@ -469,7 +469,7 @@ func (h *WorkboardHandler) kanbanComplete(key, date, note string) error {
 		if h.asRepo == nil {
 			return errKanban("place")
 		}
-		as, err := h.asRepo.GetByID(id)
+		as, err := h.asRepo.GetByID(repository.OrgAll, id)
 		if err != nil || as == nil {
 			return echo.ErrNotFound
 		}
@@ -520,7 +520,7 @@ func (h *WorkboardHandler) kanbanReopen(key, to, date, assignee string) error {
 	kind, id := splitKanbanKey(key)
 	switch kind {
 	case "as":
-		as, err := h.asRepo.GetByID(id)
+		as, err := h.asRepo.GetByID(repository.OrgAll, id)
 		if err != nil || as == nil {
 			return echo.ErrNotFound
 		}
@@ -593,7 +593,7 @@ func (h *WorkboardHandler) kanbanCurrentAssignee(key string) string {
 	switch kind {
 	case "as":
 		if h.asRepo != nil {
-			if as, err := h.asRepo.GetByID(id); err == nil && as != nil {
+			if as, err := h.asRepo.GetByID(repository.OrgAll, id); err == nil && as != nil {
 				return strings.TrimSpace(as.AssignedTo)
 			}
 		}

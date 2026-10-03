@@ -504,7 +504,7 @@ func (h *AttachmentHandler) guardReceiptPhotoWrite(c echo.Context, asID string) 
 	if h.asRepo == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
 	}
-	as, err := h.asRepo.GetByID(asID)
+	as, err := h.asRepo.GetByID(currentOrg(c), asID)
 	if err != nil || as == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수를 찾을 수 없습니다")
 	}
@@ -521,7 +521,7 @@ func (h *AttachmentHandler) guardActionPhotoWrite(c echo.Context, asID string) e
 	if h.asRepo == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
 	}
-	as, err := h.asRepo.GetByID(asID)
+	as, err := h.asRepo.GetByID(currentOrg(c), asID)
 	if err != nil || as == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수를 찾을 수 없습니다")
 	}
@@ -697,7 +697,7 @@ func (h *AttachmentHandler) PromoteToAsset(c echo.Context) error {
 	if h.asRepo == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
 	}
-	as, err := h.asRepo.GetByID(att.RefID)
+	as, err := h.asRepo.GetByID(currentOrg(c), att.RefID)
 	if err != nil || as == nil || strings.TrimSpace(as.AssetID) == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "연결된 설치자산이 없습니다")
 	}

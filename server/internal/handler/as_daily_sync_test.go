@@ -205,7 +205,7 @@ func TestASAssigneeChangeFollowsUntilManual(t *testing.T) {
 		"receipt_datetime": {"2026-08-10T10:00"},
 	})
 	asID := strings.TrimPrefix(rec.Header().Get("Location"), "/as/")
-	as, err := h.AS.repo.GetByID(asID)
+	as, err := h.AS.repo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		t.Fatal(err)
 	}

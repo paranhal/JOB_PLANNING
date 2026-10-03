@@ -20,7 +20,7 @@ func (h *StatsHandler) ExportDailyAssigneeReport(c echo.Context) error {
 	now := time.Now()
 	base := metricsViewData(h.repo)
 	p := parseLookbackReportPeriod(c, now, base)
-	rep, err := h.repo.BuildDailyAssigneeReport(p.FromStr, p.ToExStr, p.FileDay)
+	rep, err := h.repo.BuildDailyAssigneeReportOrg(p.FromStr, p.ToExStr, p.FileDay, currentOrg(c))
 	if err != nil {
 		return err
 	}

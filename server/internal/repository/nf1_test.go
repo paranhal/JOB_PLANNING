@@ -214,7 +214,7 @@ func TestNF1_TaskTagsSearch(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM work_task_tags WHERE task_id=?`, t1.TaskID).Scan(&n); err != nil || n != 3 {
 		t.Fatalf("tags 행 %d err=%v", n, err)
 	}
-	found, err := wb.ListAdminWork("", "꿀벌도서관")
+	found, err := wb.ListAdminWork(OrgAll, "", "꿀벌도서관")
 	if err != nil || len(found) != 1 {
 		t.Fatalf("태그 검색 n=%d err=%v", len(found), err)
 	}

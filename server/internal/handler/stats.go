@@ -133,6 +133,7 @@ func parseStatsQuery(c echo.Context) model.StatsQuery {
 		Quarter: strings.TrimSpace(c.QueryParam("quarter")),
 		From:    strings.TrimSpace(c.QueryParam("from")),
 		To:      strings.TrimSpace(c.QueryParam("to")),
+		OrgID:   currentOrg(c),
 	}
 	// 기본값 채우기
 	if q.Date == "" {
@@ -244,6 +245,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 	filter := repository.ParseMeetingFilter(c.QueryParam("scope"), c.QueryParam("key"), c.QueryParam("project"))
 	filter.IncludeImport = c.QueryParam("import") == "1"
 	filter.ExcludeSalesActivity = c.QueryParam("sales") == "0"
+	filter = statsOrgFilter(c, filter)
 	fromIncl, toIncl := lookbackTimes(lb, now)
 
 	cols := repository.BuildStatsRangeColumns(fromIncl, toIncl)

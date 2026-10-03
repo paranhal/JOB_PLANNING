@@ -106,7 +106,7 @@ func TestAdminWorkCreateSeparatesCustomerAndTitle(t *testing.T) {
 		t.Fatalf("등록: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 
-	items, err := repo.ListAdminWork("", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("ListAdminWork len=%d err=%v", len(items), err)
 	}
@@ -134,7 +134,7 @@ func TestAdminWorkCreateSeparatesCustomerAndTitle(t *testing.T) {
 	if rec2.Code != http.StatusSeeOther || strings.Contains(rec2.Header().Get("Location"), "err=") {
 		t.Fatalf("담당자 등록 loc=%q", rec2.Header().Get("Location"))
 	}
-	items, err = repo.ListAdminWork("", "")
+	items, err = repo.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestAdminWorkCreateKeepsProjectForAdmin(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("행정+사업명 등록 loc=%q", rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("len=%d err=%v", len(items), err)
 	}
@@ -236,7 +236,7 @@ func TestAdminWorkCreateDefaultsStatusPriority(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("등록 loc=%q", rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("len=%d err=%v", len(items), err)
 	}
@@ -260,7 +260,7 @@ func TestAdminWorkCreateUndeterminedClearsDueDate(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("미정 등록 loc=%q", rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("len=%d err=%v", len(items), err)
 	}
@@ -304,7 +304,7 @@ func TestAdminWorkCreateSubtaskPrefillAndDepth(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("parent loc=%q", rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("len=%d err=%v", len(items), err)
 	}

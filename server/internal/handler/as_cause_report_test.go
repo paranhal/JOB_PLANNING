@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASActionCauseReportFieldsOnPage(t *testing.T) {
@@ -91,7 +92,7 @@ func TestASActionDoneEmptyCauseReportWarnsButSaves(t *testing.T) {
 	if !strings.Contains(loc, "warn=cause_report") {
 		t.Fatalf("경고 없음: %s", loc)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil || got.Status != "completed" {
 		t.Fatalf("완료 저장 실패: %+v err=%v", got, err)
 	}
@@ -128,7 +129,7 @@ func TestASActionDoneSavesCauseDetailIgnoresConclusion(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") || strings.Contains(loc, "warn=") {
 		t.Fatalf("저장 실패: status=%d loc=%s", rec.Code, loc)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -145,7 +146,7 @@ func TestASActionDoneSavesCauseDetailIgnoresConclusion(t *testing.T) {
 
 func TestASActionRevisitDoesNotClearCauseReport(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
-	cur, err := asRepo.GetByID(asID)
+	cur, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || cur == nil {
 		t.Fatal(err)
 	}
@@ -174,7 +175,7 @@ func TestASActionRevisitDoesNotClearCauseReport(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("추가조치 저장 실패: %s", rec.Header().Get("Location"))
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got.CauseDetail != "전원 불량" || got.Conclusion != "이미 적어 둔 결론" {
 		t.Fatalf("재방문이 서술을 지움: detail=%q conclusion=%q", got.CauseDetail, got.Conclusion)
 	}
@@ -202,7 +203,7 @@ func TestASActionPartialSavesCauseDetailIgnoresConclusion(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
 		t.Fatalf("저장 실패: status=%d loc=%s", rec.Code, loc)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -227,7 +228,7 @@ func TestASActionPartialSavesCauseDetailIgnoresConclusion(t *testing.T) {
 
 func TestASActionDoneShowsCauseReportWrap(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
-	cur, err := asRepo.GetByID(asID)
+	cur, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || cur == nil {
 		t.Fatal(err)
 	}
@@ -252,7 +253,7 @@ func TestASActionCauseDetailAlwaysVisible(t *testing.T) {
 		code := code
 		t.Run(code, func(t *testing.T) {
 			e, _, asRepo, _, asID := newASActionFixture(t)
-			cur, err := asRepo.GetByID(asID)
+			cur, err := asRepo.GetByID(repository.OrgAll, asID)
 			if err != nil || cur == nil {
 				t.Fatal(err)
 			}

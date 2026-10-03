@@ -591,5 +591,5 @@ func ParseStatsAnchor(view, dateStr, monthStr string, now time.Time) time.Time {
 
 // ParseMeetingFilter 쿼리 → 필터
 func ParseMeetingFilter(scope, key, projectID string) model.StatsMeetingFilter {
-	return normalizeMeetingFilter(model.StatsMeetingFilter{Scope: scope, Key: key, ProjectID: projectID})
+	return normalizeMeetingFilter(model.StatsMeetingFilter{Scope: scope, Key: key, ProjectID: projectID, OrgID: OrgAll})
 }

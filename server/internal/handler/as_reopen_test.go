@@ -87,7 +87,7 @@ func TestASReopenCreatesLinkedReceipt(t *testing.T) {
 		t.Fatalf("새 접수번호가 발급되지 않았다: %q", loc)
 	}
 
-	got, err := asRepo.GetByID(newID)
+	got, err := asRepo.GetByID(repository.OrgAll, newID)
 	if err != nil || got == nil {
 		t.Fatalf("새 접수 조회 실패: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestASReopenCreatesLinkedReceipt(t *testing.T) {
 	}
 
 	// 원 건은 완료 상태 그대로 남고, 재접수 목록에서 새 건이 보여야 한다.
-	src, _ := asRepo.GetByID(srcID)
+	src, _ := asRepo.GetByID(repository.OrgAll, srcID)
 	if src.Status != "completed" {
 		t.Fatalf("원 건 상태가 바뀌었다: %q", src.Status)
 	}

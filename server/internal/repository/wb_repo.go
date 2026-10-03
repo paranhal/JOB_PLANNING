@@ -332,16 +332,17 @@ type AdminWorkStats struct {
 }
 
 // ListAdminWork 행정·지원 업무 목록(검색·상태).
-func (r *WBRepo) ListAdminWork(status, search string) ([]model.WorkTask, error) {
-	return r.ListAdminWorkSorted(status, search, "", "")
+func (r *WBRepo) ListAdminWork(orgID, status, search string) ([]model.WorkTask, error) {
+	return r.ListAdminWorkSorted(orgID, status, search, "", "")
 }
 
-func (r *WBRepo) ListAdminWorkSorted(status, search, sort, dir string) ([]model.WorkTask, error) {
+func (r *WBRepo) ListAdminWorkSorted(orgID, status, search, sort, dir string) ([]model.WorkTask, error) {
 	q := workTaskSelect + `
 		WHERE t.work_type IN ('admin','support')
 		  AND TRIM(COALESCE(t.source_type,'')) = ''
 		  AND COALESCE(t.recurrence_role,'') != 'occurrence'`
 	args := []interface{}{}
+	q, args = appendOrg(q, args, "t", orgID)
 	switch strings.TrimSpace(status) {
 	case "inbox":
 		q += ` AND COALESCE(t.status,'waiting') = 'waiting'`
@@ -706,6 +707,16 @@ func (r *WBRepo) ListProjectsFiltered(search, status string) ([]model.WorkProjec
 }
 
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {
+	orgID, err := RequireInsertOrg(t.OrgID)
+	if err != nil {
+		if t.OrgID == "" {
+			t.OrgID = model.OrgIDLibrary
+		} else {
+			return err
+		}
+	} else {
+		t.OrgID = orgID
+	}
 	if err := model.RequireAppDateYear(t.DueDate); err != nil {
 		return err
 	}
@@ -718,14 +729,14 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	normalizeWorkTask(t)
 	t.Assignee, t.AssigneeUserID = bindStaff(r.db, t.Assignee, t.AssigneeUserID)
 	stampNewWorkTaskDates(t)
-	_, err := r.db.Exec(`
+	_, err = r.db.Exec(`
 		INSERT INTO work_tasks (task_id, work_type, project_id, title, description, due_date,
 			work_date, start_time, end_time, duration_min, status, priority, assignee, assignee_user_id, assignee_source, tags, progress,
 			source_type, source_id, source_role, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
-			recurrence_role, occurrence_seq, occurrence_status, not_done_reason)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
@@ -733,7 +744,7 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
 		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate),
-		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason))
+		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), t.OrgID)
 	if err != nil {
 		return err
 	}

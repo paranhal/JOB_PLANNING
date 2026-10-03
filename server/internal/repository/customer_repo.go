@@ -20,7 +20,7 @@ func NewCustomerRepo(db *sql.DB) *CustomerRepo {
 // List 고객 목록 조회 (검색, 상위기관·업종 필터, 정렬, 페이징)
 // category: ""=전체, "none"=상위기관 없음, 그 외=상위기관 customer_id
 // sort: ""=기본(카테고리), customer_id|org_name|parent|industry|phone|assets|as|status
-func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, pageSize int, reviewOnly bool, partyKind string) ([]model.CustomerListItem, int, error) {
+func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string, page, pageSize int, reviewOnly bool, partyKind string) ([]model.CustomerListItem, int, error) {
 	offset := (page - 1) * pageSize
 
 	baseQuery := `
@@ -38,10 +38,18 @@ func (r *CustomerRepo) List(search, category, industry, sort, dir string, page, 
 		LEFT JOIN assets a ON a.customer_id = c.customer_id
 		LEFT JOIN as_receipts ar ON ar.customer_id = c.customer_id
 		WHERE 1=1`
+	orgFrag, orgArgs, err := AppendOrgSQL("c", orgID)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	countQuery := `SELECT COUNT(*) FROM customers c WHERE 1=1`
+	baseQuery += orgFrag
+	countQuery += orgFrag
 	args := []interface{}{}
 	countArgs := []interface{}{}
+	args = append(args, orgArgs...)
+	countArgs = append(countArgs, orgArgs...)
 
 	switch category {
 	case "":
@@ -239,6 +247,16 @@ func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 
 // Create 고객 등록
 func (r *CustomerRepo) Create(c *model.Customer) error {
+	orgID, err := RequireInsertOrg(c.OrgID)
+	if err != nil {
+		if c.OrgID == "" {
+			c.OrgID = model.OrgIDLibrary
+		} else {
+			return err
+		}
+	} else {
+		c.OrgID = orgID
+	}
 	id, err := NextCustomerID(r.db, c.MainPhone)
 	if err != nil {
 		return err
@@ -253,14 +271,14 @@ func (r *CustomerRepo) Create(c *model.Customer) error {
 			has_parent, parent_customer_id,
 			postal_code, addr_sido, addr_sigungu, addr_dong,
 			address, address_detail,
-			is_active, notes, party_kind, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			is_active, notes, party_kind, org_id, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.CustomerID, c.OrgName, c.OfficialName, c.OrgEmail, c.MainPhone,
 		c.Website, nullStr(strings.TrimSpace(c.BusinessNumber)), c.Representative, c.Industry,
 		boolToInt(c.HasParent), nullStr(c.ParentCustomerID),
 		c.PostalCode, c.AddrSido, c.AddrSigungu, c.AddrDong,
 		c.Address, c.AddressDetail,
-		boolToInt(c.IsActive), c.Notes, model.NormalizePartyKind(c.PartyKind), now, now,
+		boolToInt(c.IsActive), c.Notes, model.NormalizePartyKind(c.PartyKind), c.OrgID, now, now,
 	)
 	if err != nil {
 		return err
@@ -454,8 +472,8 @@ func (r *CustomerRepo) ListForAPI(search string, active *bool, limit, offset int
 }
 
 // ListExport 엑셀용 전체 목록 (주소·점검사이트 지역 포함, 페이징 없음)
-func (r *CustomerRepo) ListExport(search, category, industry, sort, dir, region, siteID string) ([]model.CustomerListItem, error) {
-	items, _, err := r.List(search, category, industry, sort, dir, 1, 0, false, "")
+func (r *CustomerRepo) ListExport(orgID, search, category, industry, sort, dir, region, siteID string) ([]model.CustomerListItem, error) {
+	items, _, err := r.List(orgID, search, category, industry, sort, dir, 1, 0, false, "")
 	if err != nil {
 		return nil, err
 	}

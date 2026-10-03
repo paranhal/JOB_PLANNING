@@ -27,7 +27,7 @@ func TestSalesSleepWakeAndReviewTask(t *testing.T) {
 	if got.Status != model.SalesStatusDormant || got.Stage != stage || got.BidStatus != bid {
 		t.Fatalf("sleep 후 단계가 바뀜 status=%s stage=%s bid=%s", got.Status, got.Stage, got.BidStatus)
 	}
-	hidden, err := repo.ListFilter(SalesListFilter{})
+	hidden, err := repo.ListFilter(SalesListFilter{OrgID: OrgAll})
 	if err != nil {
 		t.Fatal(err)
 	}

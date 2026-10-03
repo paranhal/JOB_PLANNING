@@ -73,7 +73,7 @@ func TestApplyAS34ReceiptUXSeedsPartyKindAndCodes(t *testing.T) {
 		t.Fatalf("채널 prime=%d internal=%d", prime, internal)
 	}
 
-	ownItems, total, err := NewCustomerRepo(db).List("", "", "", "", "", 1, 20, false, "own")
+	ownItems, total, err := NewCustomerRepo(db).List(OrgAll, "", "", "", "", "", 1, 20, false, "own")
 	if err != nil {
 		t.Fatal(err)
 	}

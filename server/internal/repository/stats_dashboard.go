@@ -758,6 +758,9 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND ar.receipt_datetime >= ?`)
 		args = append(args, dayTimeStart(d))
 	}
+	frag, a := mustOrgSQL("ar", f.OrgID)
+	b.WriteString(frag)
+	args = append(args, a...)
 	return b.String(), args
 }
 
@@ -793,6 +796,11 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND v.visit_date >= ?`)
 		args = append(args, d)
 	}
+	frag, a := mustOrgSQL("mp", f.OrgID)
+	b.WriteString(` AND EXISTS (SELECT 1 FROM maintenance_plans mp WHERE mp.plan_id=v.plan_id`)
+	b.WriteString(frag)
+	b.WriteString(`)`)
+	args = append(args, a...)
 	return b.String(), args
 }
 
@@ -831,6 +839,9 @@ func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND date(` + adminTaskReceiptDateSQL + `) >= date(?)`)
 		args = append(args, d)
 	}
+	frag, a := mustOrgSQL("t", f.OrgID)
+	b.WriteString(frag)
+	args = append(args, a...)
 	return b.String(), args
 }
 

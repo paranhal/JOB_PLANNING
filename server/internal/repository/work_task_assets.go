@@ -191,7 +191,7 @@ func (r *ASRepo) GetByMovedTaskID(taskID string) (*model.ASReceipt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.GetByID(asID)
+	return r.GetByID(OrgAll, asID)
 }
 
 func (r *StatsRepo) CountASAdminMoved(from, toEx string, f model.StatsMeetingFilter) (int, error) {

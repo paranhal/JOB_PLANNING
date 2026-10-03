@@ -64,7 +64,7 @@ func TestAdminWorkQuickRegisterAndStats(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=waiting") {
 		t.Fatalf("quick: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("waiting", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "waiting", "")
 	if err != nil || len(items) != 1 || items[0].Status != model.WBTaskWaiting {
 		t.Fatalf("waiting items %+v err=%v", items, err)
 	}
@@ -91,7 +91,7 @@ func TestAdminWorkClassifyRejectsWaiting(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("quick status=%d", rec.Code)
 	}
-	items, err := repo.ListAdminWork("waiting", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "waiting", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("waiting %+v err=%v", items, err)
 	}
@@ -193,7 +193,7 @@ func TestAdminWorkWaitingForAndActivity(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("회신 대기 등록 loc=%q", rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("waiting_for", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "waiting_for", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("waiting_for list len=%d err=%v", len(items), err)
 	}
@@ -231,7 +231,7 @@ func TestIRMCaseNextActionsAndTimeline(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("업무 등록 loc=%q", rec.Header().Get("Location"))
 	}
-	items, err := repo.ListAdminWork("in_progress", "")
+	items, err := repo.ListAdminWork(repository.OrgAll, "in_progress", "")
 	if err != nil || len(items) != 1 {
 		t.Fatalf("list %+v err=%v", items, err)
 	}

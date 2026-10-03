@@ -192,7 +192,7 @@ type SupplyMetrics struct {
 }
 
 func (r *SalesRepo) LoadSupplyMetrics(_ time.Time, _ bool) (SupplyMetrics, error) {
-	items, err := NewQuoteRepo(r.db).List(QuoteFilter{Purpose: model.QuotePurposeDeal})
+	items, err := NewQuoteRepo(r.db).List(QuoteFilter{Purpose: model.QuotePurposeDeal, OrgID: OrgAll})
 	if err != nil {
 		return SupplyMetrics{}, err
 	}

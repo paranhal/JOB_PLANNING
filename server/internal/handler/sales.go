@@ -168,9 +168,9 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		}
 	}
 	migrated, _ := h.repo.ListMigratedUnchecked()
-	closed, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true})
+	closed, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true, OrgID: currentOrg(c)})
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	dormant, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeDormant: true, Status: model.SalesStatusDormant})
+	dormant, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeDormant: true, Status: model.SalesStatusDormant, OrgID: currentOrg(c)})
 	dQuotes, _ := h.repo.QuotesBySalesIDs(func() []string {
 		ids := make([]string, 0, len(dormant))
 		for i := range dormant {
@@ -499,7 +499,7 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 			return err
 		}
 		if pageView == "project" {
-			projects, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true})
+			projects, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true, OrgID: currentOrg(c)})
 			acts, _ := data["Activities"].([]model.SalesActivity)
 			if acts == nil {
 				if groups, ok := data["DayGroups"].([]model.SalesActivityDayGroup); ok {
@@ -717,6 +717,7 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 	_ = c.Request().ParseForm()
 	p := &model.SalesProject{
 		Name:                    strings.TrimSpace(c.FormValue("name")),
+		OrgID:                   currentOrg(c),
 		IsTentativeName:         c.FormValue("is_tentative_name") == "1",
 		DealType:                "",
 		Stage:                   strings.TrimSpace(c.FormValue("stage")),

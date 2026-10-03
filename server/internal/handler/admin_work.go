@@ -34,7 +34,7 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 		view = "list"
 	}
 	sort, dir := model.NormalizeAdminWorkSort(c.QueryParam("sort"), c.QueryParam("dir"))
-	items, err := h.repo.ListAdminWorkSorted(status, search, sort, dir)
+	items, err := h.repo.ListAdminWorkSorted(currentOrg(c), status, search, sort, dir)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 		status = "all"
 	}
 	sort, dir := model.NormalizeAdminWorkSort(c.QueryParam("sort"), c.QueryParam("dir"))
-	items, err := h.repo.ListAdminWorkSorted(status, "", sort, dir)
+	items, err := h.repo.ListAdminWorkSorted(currentOrg(c), status, "", sort, dir)
 	if err != nil {
 		return err
 	}

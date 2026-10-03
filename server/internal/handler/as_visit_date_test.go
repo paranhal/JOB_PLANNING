@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASActionPageShowsVisitDateWrap(t *testing.T) {
@@ -38,7 +39,7 @@ func TestASActionRemoteHidesVisitDateAndSavesWithoutIt(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("원격 저장 거절: loc=%s", rec.Header().Get("Location"))
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func TestASActionVisitRequiresVisitDate(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.Contains(loc, "err=visit_date") {
 		t.Fatalf("방문일 누락이 거절되지 않았다: loc=%s", loc)
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got != nil && got.Status == "completed" {
 		t.Fatal("방문일 없이 완료 저장")
 	}
@@ -106,7 +107,7 @@ func TestASActionUndeterminedNeedsReason(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("미정+사유 저장 거절: loc=%s", rec.Header().Get("Location"))
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -135,7 +136,7 @@ func TestASActionKeepsStartDatetimeWhenVisitDateSaved(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("저장 실패: loc=%s", rec.Header().Get("Location"))
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}

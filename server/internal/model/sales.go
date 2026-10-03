@@ -152,6 +152,7 @@ type SalesProject struct {
 	ContractedAt            string
 	CreatedAt               string
 	UpdatedAt               string
+	OrgID                   string
 
 	SalesNo          string
 	BidStatus        string

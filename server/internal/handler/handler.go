@@ -244,7 +244,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	if h.statsRepo != nil {
 		fromIncl, toIncl := lookbackTimes(lb, now)
 		cols := repository.BuildStatsRangeColumns(fromIncl, toIncl)
-		f := model.StatsMeetingFilter{Scope: model.StatsScopeTeam}
+		f := statsOrgFilter(c, model.StatsMeetingFilter{Scope: model.StatsScopeTeam})
 		// FillPeriodOverview 는 회의 요약·통계 화면용. 대시보드는 KPI·차트만 쓴다.
 		weekKPI, _ = h.statsRepo.LoadStatsKPI(model.StatsViewRange, cols, f)
 		applyPlanningToKPI(h.workBoard, &weekKPI)

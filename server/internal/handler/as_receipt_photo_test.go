@@ -185,7 +185,7 @@ func TestASReceiptPhotoPDFKeepsName(t *testing.T) {
 
 func TestASReceiptPhotoClosedLocked(t *testing.T) {
 	e, _, asRepo, _, asID := newReceiptPhotoFixture(t)
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	got.Status = "completed"
 	now := time.Now()
 	got.CompleteDatetime = &now
@@ -211,7 +211,7 @@ func TestASReceiptPhotoPromoteCopiesToAsset(t *testing.T) {
 	if err := h.AS.assetRepo.Create(asset); err != nil {
 		t.Fatal(err)
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	got.AssetID = asset.AssetID
 	if err := asRepo.UpdateReceipt(got); err != nil {
 		t.Fatal(err)

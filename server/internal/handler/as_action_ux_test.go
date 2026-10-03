@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASActionFormDropsStatusPartsFollowupAndWorkList(t *testing.T) {
@@ -76,7 +77,7 @@ func TestASActionRejectsProcessTypeMismatchAndBannedResults(t *testing.T) {
 		t.Fatalf("대기 결과가 거절되지 않음: %s", rec.Header().Get("Location"))
 	}
 
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got.Status == "completed" || got.Status == "hold" {
 		t.Fatalf("거절된 저장이 반영됨: %+v", got)
 	}
@@ -98,7 +99,7 @@ func TestASActionSavesCauseCat1(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
 		t.Fatalf("저장 실패: %s", loc)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -115,7 +116,7 @@ func TestASActionSavesCauseCat1(t *testing.T) {
 
 func TestASActionKeepsPartsUsedWhenFormOmitsIt(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
-	cur, err := asRepo.GetByID(asID)
+	cur, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || cur == nil {
 		t.Fatal(err)
 	}
@@ -138,7 +139,7 @@ func TestASActionKeepsPartsUsedWhenFormOmitsIt(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("저장 실패: %s", rec.Header().Get("Location"))
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got.PartsUsed != "기존부품" || got.FollowupAction != "기존후속" {
 		t.Fatalf("컬럼이 지워짐: parts=%q followup=%q", got.PartsUsed, got.FollowupAction)
 	}

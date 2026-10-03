@@ -461,6 +461,7 @@ func sessionClaims(user *model.User, unconfirmed bool) jwt.MapClaims {
 		"username":    user.Username,
 		"role":        role,
 		"name":        user.FullName,
+		"org_id":      strings.TrimSpace(user.OrgID),
 		"permissions": model.FormatPermissions(user.PermList()),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -478,6 +479,7 @@ func sessionClaimsFromContext(c echo.Context, unconfirmed bool) jwt.MapClaims {
 		"username":    ctxString(c, "username"),
 		"role":        role,
 		"name":        ctxString(c, "user_name"),
+		"org_id":      ctxString(c, "org_id"),
 		"permissions": model.FormatPermissions(currentPerms(c)),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -511,6 +513,7 @@ func applySessionClaims(c echo.Context, claims jwt.MapClaims) string {
 	c.Set("username", claimString(claims, "username"))
 	c.Set("role", role)
 	c.Set("user_name", claimString(claims, "name"))
+	c.Set("org_id", claimString(claims, "org_id"))
 	c.Set("permissions", model.EffectivePermissions(role, claimString(claims, "permissions")))
 	if claimBool(claims, "auth_unconfirmed") {
 		c.Set("auth_unconfirmed", true)
@@ -522,6 +525,7 @@ func applyUserSession(c echo.Context, u *model.User) {
 	c.Set("username", u.Username)
 	c.Set("role", model.NormalizeRole(u.Role))
 	c.Set("user_name", u.FullName)
+	c.Set("org_id", strings.TrimSpace(u.OrgID))
 	c.Set("permissions", u.PermList())
 	c.Set("auth_unconfirmed", false)
 }

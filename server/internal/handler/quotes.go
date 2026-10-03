@@ -79,6 +79,7 @@ func (h *QuotesHandler) List(c echo.Context) error {
 		Status:  strings.TrimSpace(c.QueryParam("status")),
 		SalesID: strings.TrimSpace(c.QueryParam("sales_id")),
 		Purpose: strings.TrimSpace(c.QueryParam("purpose")),
+		OrgID:   currentOrg(c),
 	}
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
 	items, err := h.repo.List(f)
@@ -443,7 +444,7 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 	years, _ := h.repo.ListLaborYears()
 	var openSales []model.SalesProject
 	if h.sales != nil {
-		openSales, _ = h.sales.ListFilter(repository.SalesListFilter{})
+		openSales, _ = h.sales.ListFilter(repository.SalesListFilter{OrgID: currentOrg(c)})
 		if sid := strings.TrimSpace(q.SalesID); sid != "" {
 			found := false
 			for i := range openSales {

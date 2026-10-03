@@ -26,9 +26,9 @@ func (h *StatsHandler) ExportWeeklyReport(c echo.Context) error {
 		err error
 	)
 	if p.Period == model.StatsPeriodWeek {
-		rep, err = h.repo.BuildWeeklyReport(p.From)
+		rep, err = h.repo.BuildWeeklyReportOrg(p.From, currentOrg(c))
 	} else {
-		rep, err = h.repo.BuildWeeklyReportRange(p.FromStr, p.ToExStr)
+		rep, err = h.repo.BuildWeeklyReportRangeOrg(p.FromStr, p.ToExStr, currentOrg(c))
 	}
 	if err != nil {
 		return err

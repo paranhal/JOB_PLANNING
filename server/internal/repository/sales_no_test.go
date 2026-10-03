@@ -33,7 +33,7 @@ func TestSalesNoCreateAndSearch(t *testing.T) {
 	if got.SalesNo != p1.SalesNo {
 		t.Fatalf("Get sales_no=%s want %s", got.SalesNo, p1.SalesNo)
 	}
-	list, err := repo.ListFilter(SalesListFilter{Search: p1.SalesNo, IncludeClosed: true})
+	list, err := repo.ListFilter(SalesListFilter{Search: p1.SalesNo, IncludeClosed: true, OrgID: OrgAll})
 	if err != nil || len(list) != 1 || list[0].SalesID != p1.SalesID {
 		t.Fatalf("검색 %s: n=%d err=%v", p1.SalesNo, len(list), err)
 	}

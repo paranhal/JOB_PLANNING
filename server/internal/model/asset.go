@@ -378,6 +378,7 @@ type User struct {
 	Role         string    `json:"role"`        // admin, tech, sales, office, observer
 	Permissions  string    `json:"permissions"` // CSV 권한 키
 	IsActive     bool      `json:"is_active"`
+	OrgID        string    `json:"org_id,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 

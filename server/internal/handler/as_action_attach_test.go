@@ -82,7 +82,7 @@ func TestASActionSavesWorkPlace(t *testing.T) {
 		t.Fatalf("저장 실패: status=%d loc=%s body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
 
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatalf("조회 실패: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestASActionStoresProcessResultAndWait(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("추가조치 저장 status=%d", rec.Code)
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got.Status != model.StatusPartialComplete {
 		t.Fatalf("상태=%s want partial_complete", got.Status)
 	}
@@ -378,7 +378,7 @@ func TestASActionStoresProcessResultAndWait(t *testing.T) {
 	if hold.Code != http.StatusSeeOther {
 		t.Fatalf("대기 저장 status=%d loc=%s", hold.Code, hold.Header().Get("Location"))
 	}
-	got, _ = asRepo.GetByID(asID)
+	got, _ = asRepo.GetByID(repository.OrgAll, asID)
 	if got.Status != "hold" || got.HoldReason != "SSD 입고 대기" {
 		t.Fatalf("대기 상태: %+v", got)
 	}
@@ -417,7 +417,7 @@ func TestASActionTransferWaitingKeepsProcessDetail(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("이관 저장 status=%d loc=%s", rec.Code, rec.Header().Get("Location"))
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got.Status != "completed" {
 		t.Fatalf("체크 없이 이관하면 원 건이 완료되어야 한다: 상태=%s", got.Status)
 	}
@@ -445,7 +445,7 @@ func TestASActionTransferFollowupCreatesChild(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("이관후속 저장 status=%d loc=%s", rec.Code, rec.Header().Get("Location"))
 	}
-	src, _ := asRepo.GetByID(asID)
+	src, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if src.Status != "completed" {
 		t.Fatalf("원 건 상태=%s want completed", src.Status)
 	}
@@ -456,7 +456,7 @@ func TestASActionTransferFollowupCreatesChild(t *testing.T) {
 	if err != nil || len(kids) != 1 {
 		t.Fatalf("이관후속 %d건 err=%v", len(kids), err)
 	}
-	child, _ := asRepo.GetByID(kids[0].ASID)
+	child, _ := asRepo.GetByID(repository.OrgAll, kids[0].ASID)
 	if child == nil || child.IsReopen || !child.IsTransferFollowup() {
 		t.Fatalf("후속 건: %+v", child)
 	}
@@ -507,7 +507,7 @@ func TestASActionTransferFollowupRequiresNote(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "followup_note") {
 		t.Fatalf("추가 접수 내용 없이 저장됨: loc=%s", rec.Header().Get("Location"))
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got.Status == "completed" {
 		t.Fatal("내용 없이 원 건이 완료되면 안 된다")
 	}

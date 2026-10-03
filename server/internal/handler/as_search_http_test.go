@@ -90,7 +90,7 @@ func TestASSimilarJSONSameAsset(t *testing.T) {
 		t.Fatalf("seed: %v n=%d", err, len(src))
 	}
 	done := src[0]
-	got, _ := asRepo.GetByID(done.ASID)
+	got, _ := asRepo.GetByID(repository.OrgAll, done.ASID)
 	got.Status = "completed"
 	_ = asRepo.Update(got)
 
@@ -153,7 +153,7 @@ func TestASSimilarPanelAutoFromSymptom(t *testing.T) {
 	if err != nil || len(src) == 0 {
 		t.Fatalf("seed: %v n=%d", err, len(src))
 	}
-	done, _ := asRepo.GetByID(src[0].ASID)
+	done, _ := asRepo.GetByID(repository.OrgAll, src[0].ASID)
 	done.Status = "completed"
 	if err := asRepo.Update(done); err != nil {
 		t.Fatal(err)

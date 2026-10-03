@@ -158,7 +158,7 @@ func (h *ASHandler) loadSimilarCases(as *model.ASReceipt, userID string) []model
 // SimilarPanel 조치 화면의 비슷한 사례 HTML. 첫 페인트 뒤에 채운다. §39.2
 func (h *ASHandler) SimilarPanel(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -177,7 +177,7 @@ func (h *ASHandler) VoteCase(c echo.Context) error {
 	if uid == "" || id == "" {
 		return echo.ErrForbidden
 	}
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}

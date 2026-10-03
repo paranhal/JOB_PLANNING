@@ -13,9 +13,9 @@ type UserRepo struct{ db *sql.DB }
 func NewUserRepo(db *sql.DB) *UserRepo { return &UserRepo{db: db} }
 
 const userSelect = `SELECT user_id, username, full_name, role,
-	COALESCE(permissions,''), is_active, created_at FROM users`
+	COALESCE(permissions,''), is_active, COALESCE(org_id,''), created_at FROM users`
 const userSelectAuth = `SELECT user_id, username, password_hash, full_name, role,
-	COALESCE(permissions,''), is_active, created_at FROM users`
+	COALESCE(permissions,''), is_active, COALESCE(org_id,''), created_at FROM users`
 
 func scanUser(rows interface {
 	Scan(dest ...interface{}) error
@@ -26,10 +26,10 @@ func scanUser(rows interface {
 	var err error
 	if withPassword {
 		err = rows.Scan(&u.UserID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role,
-			&u.Permissions, &active, &createdStr)
+			&u.Permissions, &active, &u.OrgID, &createdStr)
 	} else {
 		err = rows.Scan(&u.UserID, &u.Username, &u.FullName, &u.Role,
-			&u.Permissions, &active, &createdStr)
+			&u.Permissions, &active, &u.OrgID, &createdStr)
 	}
 	if err != nil {
 		return u, err
@@ -145,10 +145,10 @@ func (r *UserRepo) Create(u *model.User) error {
 		u.Permissions = model.FormatPermissions(model.DefaultPermissions(u.Role))
 	}
 	_, err := r.db.Exec(`
-		INSERT INTO users (user_id,username,password_hash,full_name,role,permissions,is_active,created_at)
-		VALUES (?,?,?,?,?,?,?,?)`,
+		INSERT INTO users (user_id,username,password_hash,full_name,role,permissions,is_active,org_id,created_at)
+		VALUES (?,?,?,?,?,?,?,?,?)`,
 		u.UserID, u.Username, u.PasswordHash, u.FullName, u.Role, u.Permissions,
-		boolToInt(u.IsActive), time.Now().Format("2006-01-02 15:04:05"))
+		boolToInt(u.IsActive), u.OrgID, time.Now().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return err
 	}

@@ -90,7 +90,7 @@ func TestASUpdateClosesOpenWorkItems(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	as, err := NewASRepo(db).GetByID("AS-X")
+	as, err := NewASRepo(db).GetByID(OrgAll, "AS-X")
 	if err != nil || as == nil {
 		t.Fatalf("get: %v", err)
 	}

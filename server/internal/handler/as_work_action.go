@@ -17,7 +17,7 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 	if err != nil || w == nil {
 		return echo.ErrNotFound
 	}
-	as, err := h.repo.GetByID(w.ASID)
+	as, err := h.repo.GetByID(currentOrg(c), w.ASID)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}

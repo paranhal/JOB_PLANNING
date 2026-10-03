@@ -143,7 +143,7 @@ func TestParentAssigneeChangeDoesNotOverwriteWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	as, err := NewASRepo(db).GetByID("AS-B")
+	as, err := NewASRepo(db).GetByID(OrgAll, "AS-B")
 	if err != nil || as == nil {
 		t.Fatalf("get: %v", err)
 	}

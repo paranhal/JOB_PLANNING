@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -42,11 +43,16 @@ type QuoteFilter struct {
 	Status  string
 	SalesID string
 	Purpose string
+	OrgID   string
 }
 
 func (r *QuoteRepo) List(f QuoteFilter) ([]model.SalesQuote, error) {
+	if strings.TrimSpace(f.OrgID) == "" {
+		f.OrgID = OrgAll
+	}
 	q := salesQuoteSelect + ` WHERE 1=1`
 	var args []interface{}
+	q, args = appendOrg(q, args, "sales_quotes", f.OrgID)
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
 		q += ` AND (quote_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ?
@@ -142,6 +148,16 @@ func (r *QuoteRepo) Create(q *model.SalesQuote) error {
 	if q == nil {
 		return fmt.Errorf("견적이 필요합니다")
 	}
+	orgID, err := RequireInsertOrg(q.OrgID)
+	if err != nil {
+		if q.OrgID == "" {
+			q.OrgID = model.OrgIDLibrary
+		} else {
+			return err
+		}
+	} else {
+		q.OrgID = orgID
+	}
 	if err := r.prepareSave(q, true); err != nil {
 		return err
 	}
@@ -157,14 +173,14 @@ func (r *QuoteRepo) Create(q *model.SalesQuote) error {
 			valid_until_text, due_text, place_text, payment_text, vat_mode, round_rule,
 			subtotal, vat, total, owner_user_id, owner_name, owner_phone, remarks,
 			purpose, budget_year, overhead_rate, tech_fee_rate, status, is_legacy,
-			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		q.QuoteID, q.SalesID, q.QuoteNo, q.Rev, q.FormType, q.RecipientKind,
 		q.CustomerID, q.RecipientName, q.AttnName, q.AttnTitle, q.QuoteDate, q.Title,
 		q.ValidUntilText, q.DueText, q.PlaceText, q.PaymentText, q.VATMode, q.RoundRule,
 		q.Subtotal, q.VAT, q.Total, q.OwnerUserID, q.OwnerName, q.OwnerPhone, q.Remarks,
 		q.Purpose, q.BudgetYear, q.OverheadRate, q.TechFeeRate, q.Status, boolToInt(q.IsLegacy),
-		q.RevReason, boolToInt(q.IsReverseCalc), q.TargetTotal, boolToInt(q.MaintBlock), q.QuoteKind)
+		q.RevReason, boolToInt(q.IsReverseCalc), q.TargetTotal, boolToInt(q.MaintBlock), q.QuoteKind, q.OrgID)
 	if err != nil {
 		if isUniqueErr(err) {
 			return model.ErrQuoteNoDuplicate
@@ -208,7 +224,13 @@ func (r *QuoteRepo) Update(q *model.SalesQuote) error {
 	if err := r.prepareSave(q, false); err != nil {
 		return err
 	}
-	return touchUpdate(r.db, "sales_quotes", "quote_id", q.QuoteID, q.QuoteNo, func() error {
+	if cur.SalesID != q.SalesID {
+		if nos := r.orderNosForQuote(q.QuoteID); len(nos) > 0 {
+			return fmt.Errorf("수주 %s 와 연결돼 있어 사업을 바꿀 수 없습니다.", nos[0])
+		}
+	}
+	before := rowJSON(r.db, "sales_quotes", "quote_id", q.QuoteID)
+	err = func() error {
 		_, err := r.db.Exec(`
 			UPDATE sales_quotes SET
 				sales_id=?, form_type=?, recipient_kind=?, customer_id=?, recipient_name=?,
@@ -232,7 +254,16 @@ func (r *QuoteRepo) Update(q *model.SalesQuote) error {
 		}
 		_ = NewSettingsRepo(r.db).Set(SettingQuoteLastRound, q.RoundRule)
 		return nil
-	})
+	}()
+	if err != nil {
+		return err
+	}
+	reason := ""
+	if cur.SalesID != q.SalesID {
+		reason = "사업 " + r.salesDisplayNo(cur.SalesID) + " → " + r.salesDisplayNo(q.SalesID)
+	}
+	logUpdateWithReason(r.db, "sales_quotes", "quote_id", q.QuoteID, q.QuoteNo, before, reason)
+	return nil
 }
 
 func (r *QuoteRepo) CopyAsNew(id, today string) (*model.SalesQuote, error) {
@@ -299,14 +330,14 @@ func (r *QuoteRepo) Revise(id, reason string) (*model.SalesQuote, error) {
 			valid_until_text, due_text, place_text, payment_text, vat_mode, round_rule,
 			subtotal, vat, total, owner_user_id, owner_name, owner_phone, remarks,
 			purpose, budget_year, overhead_rate, tech_fee_rate, status, is_legacy,
-			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		dst.QuoteID, dst.SalesID, dst.QuoteNo, dst.Rev, dst.FormType, dst.RecipientKind,
 		dst.CustomerID, dst.RecipientName, dst.AttnName, dst.AttnTitle, dst.QuoteDate, dst.Title,
 		dst.ValidUntilText, dst.DueText, dst.PlaceText, dst.PaymentText, dst.VATMode, dst.RoundRule,
 		dst.Subtotal, dst.VAT, dst.Total, dst.OwnerUserID, dst.OwnerName, dst.OwnerPhone, dst.Remarks,
 		dst.Purpose, dst.BudgetYear, dst.OverheadRate, dst.TechFeeRate, dst.Status, boolToInt(dst.IsLegacy),
-		dst.RevReason, boolToInt(dst.IsReverseCalc), dst.TargetTotal, boolToInt(dst.MaintBlock), dst.QuoteKind)
+		dst.RevReason, boolToInt(dst.IsReverseCalc), dst.TargetTotal, boolToInt(dst.MaintBlock), dst.QuoteKind, dst.OrgID)
 	if err != nil {
 		if isUniqueErr(err) {
 			return nil, model.ErrQuoteNoDuplicate
@@ -373,7 +404,7 @@ func (r *QuoteRepo) NonDealQuoteSalesIDs() (map[string]bool, error) {
 }
 
 func (r *QuoteRepo) ListBudgetFollowups(today time.Time) ([]model.SalesQuote, error) {
-	items, err := r.List(QuoteFilter{Purpose: model.QuotePurposeBudget})
+	items, err := r.List(QuoteFilter{Purpose: model.QuotePurposeBudget, OrgID: OrgAll})
 	if err != nil {
 		return nil, err
 	}
@@ -399,6 +430,94 @@ func (r *QuoteRepo) SetStatus(id, status string) error {
 		_, _ = r.db.Exec(`UPDATE sales_projects SET amount_vat_included=1 WHERE sales_id=?`, q.SalesID)
 	}
 	return nil
+}
+
+func (r *QuoteRepo) Delete(id string) error {
+	q, err := r.Get(id)
+	if err != nil {
+		return err
+	}
+	if model.NormalizeQuoteStatus(q.Status) != model.QuoteStatusDraft {
+		return model.ErrQuoteDeleteNotDraft
+	}
+	latest, err := r.IsLatest(q)
+	if err != nil {
+		return err
+	}
+	if !latest {
+		return model.ErrQuoteDeleteHasRev
+	}
+	if nos := r.orderNosForQuote(q.QuoteID); len(nos) > 0 {
+		return model.ErrQuoteDeleteHasOrder
+	}
+	before := quoteDeleteBeforeJSON(r.db, q)
+	logDelete(r.db, "sales_quotes", "quote_id", q.QuoteID, q.DisplayNo(), before)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM sales_quote_lines WHERE quote_id=?`, q.QuoteID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM sales_quotes WHERE quote_id=?`, q.QuoteID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *QuoteRepo) orderNosForQuote(id string) []string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+	rows, err := r.db.Query(`SELECT order_no FROM sales_orders WHERE quote_id=? ORDER BY order_no`, id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var no string
+		if err := rows.Scan(&no); err != nil {
+			return out
+		}
+		if strings.TrimSpace(no) != "" {
+			out = append(out, no)
+		}
+	}
+	return out
+}
+
+func (r *QuoteRepo) salesDisplayNo(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ""
+	}
+	var no string
+	err := r.db.QueryRow(`SELECT COALESCE(NULLIF(TRIM(sales_no),''), sales_id) FROM sales_projects WHERE sales_id=?`, id).Scan(&no)
+	if err != nil || strings.TrimSpace(no) == "" {
+		return id
+	}
+	return no
+}
+
+func quoteDeleteBeforeJSON(db *sql.DB, q *model.SalesQuote) string {
+	if q == nil {
+		return "{}"
+	}
+	payload := map[string]any{
+		"quote": json.RawMessage(rowJSON(db, "sales_quotes", "quote_id", q.QuoteID)),
+		"lines": q.Lines,
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return rowJSON(db, "sales_quotes", "quote_id", q.QuoteID)
+	}
+	return string(b)
 }
 
 func (r *QuoteRepo) QuoteNoTaken(no string, rev int, exceptID string) (bool, error) {
@@ -545,11 +664,11 @@ func (r *QuoteRepo) replaceLines(q *model.SalesQuote) error {
 		ln.Amount = model.LineAmount(*ln)
 		if _, err := r.db.Exec(`
 			INSERT INTO sales_quote_lines (
-				line_id, quote_id, seq, item_id, group_label, name, spec, qty, unit,
+				line_id, quote_id, seq, item_id, group_label, name, spec, spec_id, qty, unit,
 				unit_price, amount, gov_price, mm_rate, discount_rate, note,
 				rate_id, labor_year, price_overridden
-			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			ln.LineID, ln.QuoteID, ln.Seq, ln.ItemID, ln.GroupLabel, ln.Name, ln.Spec,
+			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			ln.LineID, ln.QuoteID, ln.Seq, ln.ItemID, ln.GroupLabel, ln.Name, ln.Spec, ln.SpecID,
 			ln.Qty, ln.Unit, ln.UnitPrice, ln.Amount, ln.GovPrice, ln.MMRate, ln.DiscountRate, ln.Note,
 			ln.RateID, ln.LaborYear, boolToInt(ln.PriceOverridden)); err != nil {
 			return err
@@ -580,7 +699,7 @@ func (r *QuoteRepo) replaceLines(q *model.SalesQuote) error {
 func (r *QuoteRepo) listLines(quoteID string) ([]model.SalesQuoteLine, error) {
 	rows, err := r.db.Query(`
 		SELECT line_id, quote_id, seq, COALESCE(item_id,''), COALESCE(group_label,''),
-			name, COALESCE(spec,''), COALESCE(qty,0), COALESCE(unit,'EA'),
+			name, COALESCE(spec,''), COALESCE(spec_id,''), COALESCE(qty,0), COALESCE(unit,'EA'),
 			COALESCE(unit_price,0), COALESCE(amount,0), COALESCE(gov_price,0),
 			COALESCE(mm_rate,0), COALESCE(discount_rate,0), COALESCE(note,''),
 			COALESCE(rate_id,''), COALESCE(labor_year,0), COALESCE(price_overridden,0)
@@ -594,7 +713,7 @@ func (r *QuoteRepo) listLines(quoteID string) ([]model.SalesQuoteLine, error) {
 		var ln model.SalesQuoteLine
 		var over int
 		if err := rows.Scan(&ln.LineID, &ln.QuoteID, &ln.Seq, &ln.ItemID, &ln.GroupLabel,
-			&ln.Name, &ln.Spec, &ln.Qty, &ln.Unit, &ln.UnitPrice, &ln.Amount, &ln.GovPrice,
+			&ln.Name, &ln.Spec, &ln.SpecID, &ln.Qty, &ln.Unit, &ln.UnitPrice, &ln.Amount, &ln.GovPrice,
 			&ln.MMRate, &ln.DiscountRate, &ln.Note, &ln.RateID, &ln.LaborYear, &over); err != nil {
 			return nil, err
 		}

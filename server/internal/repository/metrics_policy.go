@@ -52,6 +52,9 @@ func normalizeMetricsDate(s string) string {
 
 func (r *StatsRepo) attachMetrics(f model.StatsMeetingFilter) model.StatsMeetingFilter {
 	f = normalizeMeetingFilter(f)
+	if strings.TrimSpace(f.OrgID) == "" {
+		f.OrgID = OrgAll
+	}
 	p := r.MetricsPolicy()
 	f.MetricsBaseDate = p.BaseDate
 	return f

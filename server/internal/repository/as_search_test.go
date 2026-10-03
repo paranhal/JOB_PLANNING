@@ -114,7 +114,7 @@ func completeWithWork(t *testing.T, repo *ASRepo, proc *ASProcessRepo, as *model
 	if err := proc.Create(&model.ASProcess{ASID: as.ASID, WorkContent: work, TimeSpent: 20}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := repo.GetByID(as.ASID)
+	got, err := repo.GetByID(OrgAll, as.ASID)
 	if err != nil {
 		t.Fatal(err)
 	}

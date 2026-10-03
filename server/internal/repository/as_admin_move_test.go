@@ -71,7 +71,7 @@ func TestWorkTaskAssetsAndASMove(t *testing.T) {
 	if err != nil || moved == nil || moved.SourceType != "" {
 		t.Fatalf("move %+v err=%v", moved, err)
 	}
-	as2, _ := asRepo.GetByID("R2")
+	as2, _ := asRepo.GetByID(OrgAll, "R2")
 	if as2.Status != model.StatusAdminWork || as2.MovedTaskID != moved.TaskID {
 		t.Fatalf("as after move %+v", as2)
 	}

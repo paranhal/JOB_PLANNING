@@ -37,11 +37,11 @@ func TestListReopensExcludesTransferFollowup(t *testing.T) {
 	if err != nil || len(follow) != 1 || follow[0].ASID != child.ASID {
 		t.Fatalf("이관후속 목록: %+v err=%v", follow, err)
 	}
-	got, _ := repo.GetByID(child.ASID)
+	got, _ := repo.GetByID(OrgAll, child.ASID)
 	if got == nil || got.FollowupNote != "추가 확인" || got.IsReopen {
 		t.Fatalf("GetByID followup: %+v", got)
 	}
-	items, _, err := repo.ListFiltered("", "", "", nil, "", "", 1, 20)
+	items, _, err := repo.ListFiltered(OrgAll, "", "", "", nil, "", "", 1, 20)
 	if err != nil {
 		t.Fatal(err)
 	}

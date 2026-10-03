@@ -10,6 +10,10 @@ import (
 
 // BuildDailyAssigneeReport §16.4 담당자별 일일업무. 완료 건수·소요분 매트릭스 + 일일 상세.
 func (r *StatsRepo) BuildDailyAssigneeReport(from, toEx, fileDay string) (model.DailyAssigneeReport, error) {
+	return r.BuildDailyAssigneeReportOrg(from, toEx, fileDay, OrgAll)
+}
+
+func (r *StatsRepo) BuildDailyAssigneeReportOrg(from, toEx, fileDay, orgID string) (model.DailyAssigneeReport, error) {
 	toInc := exclusiveToInclusive(toEx)
 	wd, yearMissing, err := r.CountWorkingDays(from, toEx)
 	if err != nil {
@@ -47,11 +51,11 @@ func (r *StatsRepo) BuildDailyAssigneeReport(from, toEx, fileDay string) (model.
 		})
 	}
 
-	counts, err := r.listCompletedByAssigneeDate(from, toEx)
+	counts, err := r.listCompletedByAssigneeDate(from, toEx, orgID)
 	if err != nil {
 		return out, err
 	}
-	minutes, err := r.listMinutesByAssigneeDate(from, toEx)
+	minutes, err := r.listMinutesByAssigneeDate(from, toEx, orgID)
 	if err != nil {
 		return out, err
 	}
@@ -244,7 +248,7 @@ func (r *StatsRepo) listLeavesByAssigneeDate(from, toEx string) (map[string]map[
 	return out, rows.Err()
 }
 
-func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]map[string]int, error) {
+func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx, orgID string) (map[string]map[string]int, error) {
 	out := map[string]map[string]int{}
 	add := func(name, date string, n int) {
 		name = weeklyAssigneeLabel(name)
@@ -257,7 +261,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 		}
 		out[name][date] += n
 	}
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	qAS := `
 		SELECT TRIM(COALESCE(ar.assigned_to,'')), ` + asCompleteDateSQL + `, COUNT(*)
 		FROM as_receipts ar
@@ -269,7 +273,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 	if err := r.scanNamedDayCounts(qAS, from, toEx, add, asArgs...); err != nil {
 		return out, err
 	}
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	qMnt := `
 		SELECT TRIM(COALESCE(v.assignee,'')), COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date), COUNT(*)
 		FROM maintenance_visits v
@@ -280,7 +284,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 	if err := r.scanNamedDayCounts(qMnt, from, toEx, add, mntArgs...); err != nil {
 		return out, err
 	}
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	qAdmin := `
 		SELECT TRIM(COALESCE(t.assignee,'')), ` + adminTaskCompleteDateSQL + `, COUNT(*)
 		FROM work_tasks t
@@ -294,7 +298,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx string) (map[string]m
 	return out, nil
 }
 
-func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map[string]int, error) {
+func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx, orgID string) (map[string]map[string]int, error) {
 	out := map[string]map[string]int{}
 	add := func(name, date string, n int) {
 		name = weeklyAssigneeLabel(name)
@@ -307,7 +311,7 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 		}
 		out[name][date] += n
 	}
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	qAS := `
 		SELECT TRIM(COALESCE(NULLIF(TRIM(p.worker),''), ar.assigned_to, '')), date(p.process_datetime), SUM(COALESCE(p.time_spent,0))
 		FROM as_processes p
@@ -320,7 +324,7 @@ func (r *StatsRepo) listMinutesByAssigneeDate(from, toEx string) (map[string]map
 	if err := r.scanNamedDayCounts(qAS, from, toEx, add, asArgs...); err != nil {
 		return out, err
 	}
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
 	qAct := `
 		SELECT TRIM(COALESCE(NULLIF(TRIM(a.actor),''), t.assignee, '')),
 		       date(a.created_at),

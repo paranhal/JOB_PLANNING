@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASActionNAReasonSavesAndEmptyBlocked(t *testing.T) {
@@ -53,7 +54,7 @@ func TestASActionNAReasonSavesAndEmptyBlocked(t *testing.T) {
 	if strings.Contains(ok.Header().Get("Location"), "err=") {
 		t.Fatalf("해당 없음+사유가 거절: %s", ok.Header().Get("Location"))
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil || !strings.HasPrefix(got.ActionTaken, model.ActionNAPrefix) {
 		t.Fatalf("저장 본문: %+v err=%v", got, err)
 	}
@@ -79,7 +80,7 @@ func TestASActionShortAsksOnceThenSaves(t *testing.T) {
 	if !strings.Contains(ask.Header().Get("Location"), "err=action_short") {
 		t.Fatalf("짧은 조치 되묻기 없음: %s", ask.Header().Get("Location"))
 	}
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got != nil && got.Status == "completed" {
 		t.Fatal("되묻기 전에 완료 저장")
 	}
@@ -89,7 +90,7 @@ func TestASActionShortAsksOnceThenSaves(t *testing.T) {
 	if strings.Contains(save.Header().Get("Location"), "err=") {
 		t.Fatalf("되묻기 후 저장 거절: %s", save.Header().Get("Location"))
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil || got.ActionTaken != "재시작" {
 		t.Fatalf("짧은 본문 저장: %+v err=%v", got, err)
 	}

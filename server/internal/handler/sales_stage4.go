@@ -171,5 +171,6 @@ func salesListFilterFromRequest(c echo.Context) repository.SalesListFilter {
 	f.IncludeClosed = c.QueryParam("closed") == "1"
 	f.CloseReason = strings.TrimSpace(c.QueryParam("close"))
 	f.ContractTarget = strings.TrimSpace(c.QueryParam("contract_target"))
+	f.OrgID = currentOrg(c)
 	return parseSalesListFilterQ(c, f)
 }

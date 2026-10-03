@@ -755,7 +755,7 @@ func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err
 	}
 
 	if h.asRepo != nil {
-		items, _, e := h.asRepo.ListFiltered("open", "", "", nil, "", "", 1, 200)
+		items, _, e := h.asRepo.ListFiltered(repository.OrgAll, "open", "", "", nil, "", "", 1, 200)
 		if e != nil {
 			return nil, nil, nil, e
 		}
@@ -960,6 +960,7 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+		t.OrgID = currentOrg(c)
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
@@ -988,7 +989,7 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 func (h *WorkboardHandler) sourceAssignee(kind, refID string) string {
 	switch kind {
 	case model.WBSourceAS:
-		if as, err := h.asRepo.GetByID(refID); err == nil && as != nil {
+		if as, err := h.asRepo.GetByID(repository.OrgAll, refID); err == nil && as != nil {
 			return strings.TrimSpace(as.AssignedTo)
 		}
 	case model.WBSourceMaintenance:
@@ -1015,7 +1016,7 @@ func (h *WorkboardHandler) buildSourceTask(kind, refID, date, start, end string,
 	switch kind {
 	case model.WBSourceAS:
 		t.WorkType = model.WBWorkAS
-		as, err := h.asRepo.GetByID(refID)
+		as, err := h.asRepo.GetByID(repository.OrgAll, refID)
 		if err != nil || as == nil {
 			return nil, echo.ErrNotFound
 		}
@@ -1437,6 +1438,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		if msg := h.firstParticipantOverlap(workDate, start, end, "", occupancyNames(t.Assignee, parseSupportMembers(c, t.Assignee))); msg != "" {
 			return overlapRedirect(c, msg)
 		}
+		t.OrgID = currentOrg(c)
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
@@ -1494,6 +1496,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, "", occupancyNames(t.Assignee, supports)); msg != "" {
 		return overlapRedirect(c, msg)
 	}
+	t.OrgID = currentOrg(c)
 	if err := h.repo.CreateTask(t); err != nil {
 		if q := subtaskErrQuery(err); q != "" {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+q))
@@ -1799,7 +1802,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		actionLabel = "조치"
 		// 쓰기 가능한 경우만 「조치/조치 완료」버튼 (옵저버는 can* 가 false)
 		canAction = canWrite && (canProcessAS(c) || canReceiveAS(c) || canWriteWorkboard(c))
-		if as, _ := h.asRepo.GetByID(t.SourceID); as != nil {
+		if as, _ := h.asRepo.GetByID(repository.OrgAll, t.SourceID); as != nil {
 			asSource = as
 			if as.ASNumber != "" {
 				sourceLabel = as.ASNumber

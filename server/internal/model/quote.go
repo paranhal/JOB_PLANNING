@@ -96,6 +96,7 @@ type SalesQuote struct {
 	MaintBlock     bool
 	CreatedAt      string
 	UpdatedAt      string
+	OrgID          string
 	Lines          []SalesQuoteLine
 	Prev           []SalesQuote
 	MissingSales   bool

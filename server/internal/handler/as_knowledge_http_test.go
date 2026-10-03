@@ -50,7 +50,7 @@ func TestASKnowledgePageSection416(t *testing.T) {
 	if err := proc.Create(&model.ASProcess{ASID: a.ASID, WorkContent: "VNC 원격 접속 후 서비스 재시작 완료", TimeSpent: 40}); err != nil {
 		t.Fatal(err)
 	}
-	done, _ := asRepo.GetByID(a.ASID)
+	done, _ := asRepo.GetByID(repository.OrgAll, a.ASID)
 	done.Status = "completed"
 	ct := time.Date(2026, 8, 14, 16, 0, 0, 0, time.Local)
 	done.CompleteDatetime = &ct

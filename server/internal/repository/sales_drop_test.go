@@ -52,13 +52,13 @@ func TestSalesDropAndClosedFilter(t *testing.T) {
 		t.Fatal("사유 없이 드롭")
 	}
 
-	vis, _ := repo.ListFilter(SalesListFilter{})
+	vis, _ := repo.ListFilter(SalesListFilter{OrgID: OrgAll})
 	for _, it := range vis {
 		if it.CloseReason == model.SalesCloseDropped {
 			t.Fatal("기본 목록에 포기가 있다")
 		}
 	}
-	all, _ := repo.ListFilter(SalesListFilter{IncludeClosed: true, CloseReason: model.SalesCloseDropped})
+	all, _ := repo.ListFilter(SalesListFilter{IncludeClosed: true, CloseReason: model.SalesCloseDropped, OrgID: OrgAll})
 	if len(all) < 3 {
 		t.Fatalf("포기 보기 n=%d", len(all))
 	}

@@ -116,7 +116,7 @@ func (r *WBRepo) SubtaskDescendantIDs(rootID string) (map[string]bool, error) {
 
 // ListSubtaskParentCandidates 부모 후보. excludeID(자기)와 그 자손은 뺀다(§33.3.2).
 func (r *WBRepo) ListSubtaskParentCandidates(excludeID string) ([]model.WorkTask, error) {
-	items, err := r.ListAdminWork("", "")
+	items, err := r.ListAdminWork(OrgAll, "", "")
 	if err != nil {
 		return nil, err
 	}

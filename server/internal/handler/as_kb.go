@@ -139,7 +139,7 @@ func (h *ASHandler) CreateKnowledgeBulk(c echo.Context) error {
 	authorID := ctxString(c, "user_id")
 	authorName := ctxString(c, "user_name")
 	for _, id := range ids {
-		as, err := h.repo.GetByID(id)
+		as, err := h.repo.GetByID(currentOrg(c), id)
 		if err != nil || as == nil {
 			return fmt.Errorf("접수를 찾을 수 없습니다")
 		}

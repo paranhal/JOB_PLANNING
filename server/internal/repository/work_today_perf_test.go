@@ -182,7 +182,7 @@ func TestMeetingAndAS_AppDBTiming(t *testing.T) {
 	meetingDur := listDur + ovDur
 
 	asStart := time.Now()
-	items, total, err := asRepo.ListFiltered("", "", "", nil, "receipt", "desc", 1, 20)
+	items, total, err := asRepo.ListFiltered(OrgAll, "", "", "", nil, "receipt", "desc", 1, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestMeetingAndAS_AppDBTiming(t *testing.T) {
 		t.Fatal(err)
 	}
 	showStart := time.Now()
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatalf("GetByID: %v", err)
 	}

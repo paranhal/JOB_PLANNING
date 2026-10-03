@@ -99,6 +99,10 @@ func (h *BackupHandler) Page(c echo.Context) error {
 	if tab == "processes" && h.cfg.DB != nil {
 		processConflicts = repository.ListActionConflicts(h.cfg.DB)
 	}
+	var orgEmpty []repository.OrgEmptyCount
+	if tab == "org_empty" && h.cfg.DB != nil {
+		orgEmpty, _ = repository.ListEmptyOrgRows(h.cfg.DB)
+	}
 	return c.Render(http.StatusOK, "admin/data.html", map[string]interface{}{
 		"Title":           "데이터 관리",
 		"Active":          NavData,
@@ -112,6 +116,7 @@ func (h *BackupHandler) Page(c echo.Context) error {
 		"Checks":          checks,
 		"UnmatchedAssignees": unmatched,
 		"ProcessConflicts": processConflicts,
+		"OrgEmpty":        orgEmpty,
 		"OK":              ok,
 		"Error":           errMsg,
 		"DataPath":        filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),
@@ -172,4 +177,14 @@ func (h *BackupHandler) SaveMetrics(c echo.Context) error {
 		return redirect("", fmt.Sprintf("기준일 저장 실패: %v", err))
 	}
 	return redirect("지표 기준을 저장했습니다. 통계·보고서·대시보드 KPI가 함께 바뀝니다.", "")
+}
+
+func (h *BackupHandler) AssignEmptyOrg(c echo.Context) error {
+	if h.cfg.DB == nil {
+		return c.Redirect(http.StatusSeeOther, "/admin/data?tab=org_empty&err="+url.QueryEscape("DB 없음"))
+	}
+	if err := repository.AssignEmptyOrgToO01(h.cfg.DB); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/admin/data?tab=org_empty&err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, "/admin/data?tab=org_empty&ok="+url.QueryEscape("미지정 행을 O01 도서관사업팀으로 지정했습니다."))
 }

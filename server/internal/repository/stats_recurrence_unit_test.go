@@ -161,7 +161,7 @@ func TestRecurrenceAggregationUnits(t *testing.T) {
 	if len(week.PersonRows) == 0 || week.PersonRows[0].Completed != weekAn.Completed {
 		t.Fatalf("주간 팀 완료 행이 analysis 와 다름")
 	}
-	fcol, err := stats.listCompanyAdminDone("", from, toEx)
+	fcol, err := stats.listCompanyAdminDone("", from, toEx, OrgAll)
 	if err != nil {
 		t.Fatal(err)
 	}

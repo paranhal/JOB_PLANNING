@@ -103,7 +103,9 @@ func (h *SalesHandler) GroupShow(c echo.Context) error {
 	}
 	filterN := 0
 	if g.GroupKind == model.SalesGroupFilter {
-		got, _ := h.repo.ListFilter(repository.FilterJSONToList(g.Filter()))
+		ff := repository.FilterJSONToList(g.Filter())
+		ff.OrgID = currentOrg(c)
+		got, _ := h.repo.ListFilter(ff)
 		filterN = len(got)
 	}
 	others := map[string]string{}
@@ -187,7 +189,7 @@ func (h *SalesHandler) GroupSearchProjects(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	q := strings.TrimSpace(c.QueryParam("q"))
-	items, err := h.repo.ListFilter(repository.SalesListFilter{Search: q})
+	items, err := h.repo.ListFilter(repository.SalesListFilter{Search: q, OrgID: currentOrg(c)})
 	if err != nil {
 		return c.JSON(http.StatusOK, []interface{}{})
 	}
@@ -207,7 +209,7 @@ func (h *SalesHandler) GroupPreview(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
 	}
-	f := parseSalesListFilterQ(c, repository.SalesListFilter{})
+	f := parseSalesListFilterQ(c, repository.SalesListFilter{OrgID: currentOrg(c)})
 	items, err := h.repo.ListFilter(f)
 	if err != nil {
 		return c.JSON(http.StatusOK, map[string]int{"count": 0})
@@ -302,7 +304,9 @@ func (h *SalesHandler) renderGroupForm(c echo.Context, g *model.SalesGroup, isNe
 	users, _ := h.userRepo.ListAssignable()
 	preview := 0
 	if g.GroupKind == model.SalesGroupFilter {
-		ps, _ := h.repo.ListFilter(repository.FilterJSONToList(g.Filter()))
+		ff := repository.FilterJSONToList(g.Filter())
+		ff.OrgID = currentOrg(c)
+		ps, _ := h.repo.ListFilter(ff)
 		preview = len(ps)
 	}
 	title := "대분류 등록"

@@ -11,6 +11,10 @@ import (
 
 // BuildWeeklyReport §16.1 주간업무보고서. 선택 주(월~일) 한 주, 팀+담당자 행, 이벤트 리스트.
 func (r *StatsRepo) BuildWeeklyReport(anchor time.Time) (model.WeeklyReport, error) {
+	return r.BuildWeeklyReportOrg(anchor, OrgAll)
+}
+
+func (r *StatsRepo) BuildWeeklyReportOrg(anchor time.Time, orgID string) (model.WeeklyReport, error) {
 	cols := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
 	if len(cols) < 2 {
 		return model.WeeklyReport{}, fmt.Errorf("주간 기간 열 없음")
@@ -19,11 +23,14 @@ func (r *StatsRepo) BuildWeeklyReport(anchor time.Time) (model.WeeklyReport, err
 	from, toEx := cur.From, cur.ToExclusive
 	weekTo := exclusiveToInclusive(toEx)
 	friday := mondayToFriday(from)
-	return r.buildWeeklyReportCore(from, weekTo, toEx, friday)
+	return r.buildWeeklyReportCore(from, weekTo, toEx, friday, orgID)
 }
 
-// BuildWeeklyReportRange §16.1 구조를 임의 기간에 적용. 보고서 화면의 월·기간 선택과 공유한다.
 func (r *StatsRepo) BuildWeeklyReportRange(from, toEx string) (model.WeeklyReport, error) {
+	return r.BuildWeeklyReportRangeOrg(from, toEx, OrgAll)
+}
+
+func (r *StatsRepo) BuildWeeklyReportRangeOrg(from, toEx, orgID string) (model.WeeklyReport, error) {
 	weekTo := exclusiveToInclusive(toEx)
 	friday := weekTo
 	if t, err := time.ParseInLocation("2006-01-02", from, time.Local); err == nil {
@@ -32,7 +39,7 @@ func (r *StatsRepo) BuildWeeklyReportRange(from, toEx string) (model.WeeklyRepor
 			friday = t.AddDate(0, 0, 4).Format("2006-01-02")
 		}
 	}
-	return r.buildWeeklyReportCore(from, weekTo, toEx, friday)
+	return r.buildWeeklyReportCore(from, weekTo, toEx, friday, orgID)
 }
 
 func exclusiveToInclusive(toEx string) string {
@@ -49,7 +56,7 @@ func mondayToFriday(from string) string {
 	return from
 }
 
-func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday string) (model.WeeklyReport, error) {
+func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday, orgID string) (model.WeeklyReport, error) {
 	wd, yearMissing, err := r.CountWorkingDays(from, toEx)
 	if err != nil {
 		return model.WeeklyReport{}, err
@@ -68,7 +75,7 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday string) (mo
 		return out, err
 	}
 
-	team, err := r.buildWeeklyPersonRow(from, toEx, wd, "", true, unplanned)
+	team, err := r.buildWeeklyPersonRow(from, toEx, wd, "", true, unplanned, orgID)
 	if err != nil {
 		return out, err
 	}
@@ -80,7 +87,7 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday string) (mo
 	}
 	var people []model.WeeklyPersonRow
 	for _, name := range names {
-		row, err := r.buildWeeklyPersonRow(from, toEx, wd, name, false, unplanned)
+		row, err := r.buildWeeklyPersonRow(from, toEx, wd, name, false, unplanned, orgID)
 		if err != nil {
 			return out, err
 		}
@@ -109,6 +116,9 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday string) (mo
 	}
 
 	teamF := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	if strings.TrimSpace(orgID) != "" {
+		teamF.OrgID = orgID
+	}
 	b, err := r.countBucket(from, toEx, teamF)
 	if err != nil {
 		return out, err
@@ -134,14 +144,20 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday string) (mo
 	return out, nil
 }
 
-func weeklyFilter(assignee string) model.StatsMeetingFilter {
+func weeklyFilter(assignee, orgID string) model.StatsMeetingFilter {
+	var f model.StatsMeetingFilter
 	if assignee == "" {
-		return ParseMeetingFilter(model.StatsScopeTeam, "", "")
+		f = ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	} else {
+		f = ParseMeetingFilter(model.StatsScopeAssignee, assignee, "")
 	}
-	return ParseMeetingFilter(model.StatsScopeAssignee, assignee, "")
+	if strings.TrimSpace(orgID) != "" {
+		f.OrgID = orgID
+	}
+	return f
 }
 
-func (r *StatsRepo) buildWeeklyPersonRow(from, toEx string, workingDays int, assignee string, isTeam bool, unplanned map[string]int) (model.WeeklyPersonRow, error) {
+func (r *StatsRepo) buildWeeklyPersonRow(from, toEx string, workingDays int, assignee string, isTeam bool, unplanned map[string]int, orgID string) (model.WeeklyPersonRow, error) {
 	label := model.StatsTeamLabel
 	if !isTeam {
 		label = assignee
@@ -151,7 +167,7 @@ func (r *StatsRepo) buildWeeklyPersonRow(from, toEx string, workingDays int, ass
 		IsTeam:     isTeam,
 		Unassigned: assignee == model.StatsUnassignedLabel,
 	}
-	f := weeklyFilter(assignee)
+	f := weeklyFilter(assignee, orgID)
 
 	an, err := r.LoadStatsWorkAnalysis(from, toEx, f)
 	if err != nil {
@@ -630,7 +646,7 @@ func weeklyEventKindOrder(kind string) int {
 
 func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
 	var out []model.WeeklyEventRow
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: OrgAll})
 	base := `
 		SELECT COALESCE(ar.as_number,''), COALESCE(c.org_name,''),
 		       COALESCE(a.product_category,''), COALESCE(a.product_name,''), COALESCE(a.model_name,''),
@@ -719,7 +735,7 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 
 func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
 	doneDate := `COALESCE(NULLIF(TRIM(v.completed_date),''), CASE WHEN COALESCE(v.completed,0)=1 THEN v.visit_date ELSE '' END)`
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: OrgAll})
 	q := `
 		SELECT COALESCE(v.visit_id,''), COALESCE(c.org_name,''), COALESCE(v.product_type,''),
 		       COALESCE(NULLIF(TRIM(v.assignee),''), ''),
@@ -763,7 +779,7 @@ func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventR
 }
 
 func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: OrgAll})
 	q := `
 		SELECT COALESCE(t.task_id,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),

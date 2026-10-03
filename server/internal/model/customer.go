@@ -26,6 +26,7 @@ type Customer struct {
 	NeedsReview      bool      `json:"needs_review"`  // 자동 생성·미매칭 등으로 사람이 확인해야 하는 기관
 	ReviewReason     string    `json:"review_reason"` // 확인이 필요한 이유
 	PartyKind        string    `json:"party_kind"`    // customer|partner|own|vendor. §34.2.5
+	OrgID            string    `json:"org_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 

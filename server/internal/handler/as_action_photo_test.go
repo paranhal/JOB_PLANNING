@@ -14,6 +14,7 @@ import (
 
 	"customer-support/internal/imageproc"
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func postActionPhotoEcho(t *testing.T, e interface {
@@ -158,7 +159,7 @@ func TestASActionPhotoRejectsPDFAndCapsAtThree(t *testing.T) {
 
 func TestASActionPhotoClosedLocked(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
-	got, _ := asRepo.GetByID(asID)
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	got.Status = "completed"
 	now := time.Now()
 	got.CompleteDatetime = &now

@@ -69,7 +69,7 @@ func TestASUpdateFillsCompleteDatetimeOnComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	as, err := NewASRepo(db).GetByID("AS-CD")
+	as, err := NewASRepo(db).GetByID(OrgAll, "AS-CD")
 	if err != nil || as == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestASUpdateFillsCompleteDatetimeOnComplete(t *testing.T) {
 	if err := NewASRepo(db).Update(as); err != nil {
 		t.Fatal(err)
 	}
-	got, err := NewASRepo(db).GetByID("AS-CD")
+	got, err := NewASRepo(db).GetByID(OrgAll, "AS-CD")
 	if err != nil || got == nil {
 		t.Fatalf("reload: %v", err)
 	}

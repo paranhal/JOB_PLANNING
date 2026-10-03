@@ -71,6 +71,7 @@ func parseSalesListFilter(c echo.Context) repository.SalesListFilter {
 		CloseReason:     strings.TrimSpace(c.QueryParam("close")),
 		ContractTarget:  strings.TrimSpace(c.QueryParam("contract_target")),
 		DealType:        deal,
+		OrgID:           currentOrg(c),
 	}
 }
 

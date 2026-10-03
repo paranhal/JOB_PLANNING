@@ -21,7 +21,7 @@ func (r *ASRepo) MoveToAdminWork(asID, reason string) (*model.WorkTask, error) {
 	if reason == "" {
 		return nil, ErrASMoveReason
 	}
-	as, err := r.GetByID(asID)
+	as, err := r.GetByID(OrgAll, asID)
 	if err != nil {
 		return nil, err
 	}

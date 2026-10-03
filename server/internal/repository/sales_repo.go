@@ -71,7 +71,7 @@ const salesSelect = `
 	LEFT JOIN customers cu ON cu.customer_id = s.customer_id`
 
 func (r *SalesRepo) List(search, status, stage string) ([]model.SalesProject, error) {
-	return r.ListFilter(SalesListFilter{Search: search, Status: status, Stage: stage, DealType: model.SalesDealAll})
+	return r.ListFilter(SalesListFilter{Search: search, Status: status, Stage: stage, DealType: model.SalesDealAll, OrgID: OrgAll})
 }
 
 type SalesListFilter struct {
@@ -97,11 +97,16 @@ type SalesListFilter struct {
 	ExpectedFrom     string
 	ExpectedTo       string
 	GroupID          string
+	OrgID            string
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
+	if strings.TrimSpace(f.OrgID) == "" {
+		f.OrgID = OrgAll
+	}
 	q := salesSelect + ` WHERE 1=1`
 	var args []interface{}
+	q, args = appendOrg(q, args, "s", f.OrgID)
 	if s := strings.TrimSpace(f.DealType); s != "" && s != model.SalesDealAll {
 		deal := model.NormalizeSalesDealType(s)
 		q += ` AND COALESCE(NULLIF(TRIM(s.deal_type),''),'build')=?`
@@ -257,6 +262,16 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 	if p == nil {
 		return fmt.Errorf("sales project 필요")
 	}
+	orgID, err := RequireInsertOrg(p.OrgID)
+	if err != nil {
+		if p.OrgID == "" {
+			p.OrgID = model.OrgIDLibrary
+		} else {
+			return err
+		}
+	} else {
+		p.OrgID = orgID
+	}
 	if strings.TrimSpace(p.Name) == "" {
 		return fmt.Errorf("사업명을 입력하세요")
 	}
@@ -313,8 +328,8 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			awarded_amount, contract_amount, contract_target, procurement_route, contract_method,
 			bid_eval_method, mall_contract_type, prev_sales_id,
 			biz_type, budget_year, budget_status,
-			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included, org_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
@@ -326,7 +341,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		p.AwardedAmount, p.ContractAmount, p.ContractTarget, p.ProcurementRoute, p.ContractMethod,
 		p.BidEvalMethod, p.MallContractType, p.PrevSalesID,
 		p.BizType, p.BudgetYear, p.BudgetStatus,
-		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded))
+		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded), p.OrgID)
 	if err != nil {
 		return err
 	}

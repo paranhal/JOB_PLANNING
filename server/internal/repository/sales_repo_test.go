@@ -508,7 +508,7 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 		t.Fatalf("등록 후: deal=%s stage=%s prob=%d", got.DealType, got.Stage, got.Probability)
 	}
 
-	onlyBuild, err := repo.ListFilter(SalesListFilter{DealType: model.SalesDealBuild})
+	onlyBuild, err := repo.ListFilter(SalesListFilter{DealType: model.SalesDealBuild, OrgID: OrgAll})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +517,7 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 			t.Fatal("기본 목록에 단품이 보였다")
 		}
 	}
-	onlySupply, err := repo.ListFilter(SalesListFilter{DealType: model.SalesDealSupply})
+	onlySupply, err := repo.ListFilter(SalesListFilter{DealType: model.SalesDealSupply, OrgID: OrgAll})
 	if err != nil || len(onlySupply) != 1 || onlySupply[0].SalesID != p.SalesID {
 		t.Fatalf("단품 목록: n=%d", len(onlySupply))
 	}

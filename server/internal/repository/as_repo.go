@@ -30,8 +30,8 @@ func (r *ASRepo) touchReceipt(asID string, fn func() error) error {
 // List AS 목록 조회
 // status: overdue / today / visit_past|visit_today|visit_upcoming / open|in_progress / done|completed / completed_today / 일반상태
 // mineUserID / mineKeys: 본인 배정 필터 (user_id 우선, 이름·아이디 보조)
-func (r *ASRepo) List(status, search string, page, pageSize int) ([]model.ASListItem, int, error) {
-	return r.ListFiltered(status, search, "", nil, "", "", page, pageSize)
+func (r *ASRepo) List(orgID, status, search string, page, pageSize int) ([]model.ASListItem, int, error) {
+	return r.ListFiltered(orgID, status, search, "", nil, "", "", page, pageSize)
 }
 
 const visitDateToday = `date('now','localtime')`
@@ -54,7 +54,7 @@ func visitAlreadyDone(alias string) string {
 		  AND p.process_datetime >= ` + alias + `visit_scheduled_date)`
 }
 
-func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []string, sort, dir string, page, pageSize int) ([]model.ASListItem, int, error) {
+func (r *ASRepo) ListFiltered(orgID, status, search, mineUserID string, mineKeys []string, sort, dir string, page, pageSize int) ([]model.ASListItem, int, error) {
 	offset := (page - 1) * pageSize
 
 	baseQuery := `
@@ -77,10 +77,18 @@ func (r *ASRepo) ListFiltered(status, search, mineUserID string, mineKeys []stri
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE 1=1`
+	orgFrag, orgArgs, err := AppendOrgSQL("ar", orgID)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	countQuery := `SELECT COUNT(*) FROM as_receipts ar JOIN customers c ON c.customer_id=ar.customer_id WHERE 1=1`
+	baseQuery += orgFrag
+	countQuery += orgFrag
 	args := []interface{}{}
 	countArgs := []interface{}{}
+	args = append(args, orgArgs...)
+	countArgs = append(countArgs, orgArgs...)
 	visitBucket := false
 
 	switch status {
@@ -425,7 +433,7 @@ func (r *ASRepo) AssigneeDashboardStats() ([]model.AssigneeDashStats, error) {
 }
 
 // GetByID AS 단건 조회
-func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
+func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 	query := `
 		SELECT ar.as_id, ar.as_number, ar.receipt_datetime,
 		       ar.customer_id, COALESCE(ar.asset_id,''),
@@ -460,11 +468,18 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.as_id = ?`
 
+	orgFrag, orgArgs, err := AppendOrgSQL("ar", orgID)
+	if err != nil {
+		return nil, err
+	}
+	query += orgFrag
+
 	var as model.ASReceipt
 	var receiptStr, startStr, completeStr, confirmStr, cancelStr string
 	var isRecurrence, isReopen, replaceReview, scheduleConfirmed int
 
-	err := queryRowTimed(r.db, "as.getByID", query, id).Scan(
+	qargs := append([]interface{}{id}, orgArgs...)
+	err = queryRowTimed(r.db, "as.getByID", query, qargs...).Scan(
 		&as.ASID, &as.ASNumber, &receiptStr,
 		&as.CustomerID, &as.AssetID,
 		&as.ReceiptChannel, &as.Requester,
@@ -523,6 +538,16 @@ func (r *ASRepo) GetByID(id string) (*model.ASReceipt, error) {
 
 // Create AS 접수 등록
 func (r *ASRepo) Create(as *model.ASReceipt) error {
+	orgID, err := RequireInsertOrg(as.OrgID)
+	if err != nil {
+		if as.OrgID == "" {
+			as.OrgID = model.OrgIDLibrary
+		} else {
+			return err
+		}
+	} else {
+		as.OrgID = orgID
+	}
 	if err := model.RequireAppDateYear(as.VisitScheduledDate); err != nil {
 		return err
 	}
@@ -555,8 +580,8 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			visit_scheduled_date, schedule_confirmed, status,
 			is_recurrence, is_reopen, parent_as_id, reopen_reason, followup_note,
 			project_id, receipt_group_id, confirm_contact,
-			urgency_reason, urgency_reason_note, external_assignee, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			urgency_reason, urgency_reason_note, external_assignee, org_id, created_at, updated_at
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
 			as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 			as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
@@ -565,7 +590,7 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			boolToInt(as.IsRecurrence), boolToInt(as.IsReopen),
 			nullStr(as.ParentASID), nullStr(as.ReopenReason), nullStr(as.FollowupNote),
 			nullStr(as.ProjectID), nullStr(as.ReceiptGroupID), nullStr(as.ConfirmContact),
-			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), nullIfEmpty(as.ExternalAssignee), now, now,
+			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), nullIfEmpty(as.ExternalAssignee), as.OrgID, now, now,
 		)
 		if err == nil {
 			// §25.2 AS 접수 등록은 이력 미기록(○)
@@ -1173,13 +1198,13 @@ func (r *ASRepo) Delete(asID string) error {
 }
 
 // ListOverdue 지연 AS 목록 (3일 초과 미처리)
-func (r *ASRepo) ListOverdue(page, pageSize int) ([]model.ASListItem, int, error) {
-	return r.List("overdue", "", page, pageSize)
+func (r *ASRepo) ListOverdue(orgID string, page, pageSize int) ([]model.ASListItem, int, error) {
+	return r.List(orgID, "overdue", "", page, pageSize)
 }
 
 // ListAssignedOpen 배정자(이름 또는 아이디)의 미완료 AS
-func (r *ASRepo) ListAssignedOpen(mineUserID string, mineKeys []string, page, pageSize int) ([]model.ASListItem, int, error) {
-	return r.ListFiltered("open", "", mineUserID, mineKeys, "", "", page, pageSize)
+func (r *ASRepo) ListAssignedOpen(orgID, mineUserID string, mineKeys []string, page, pageSize int) ([]model.ASListItem, int, error) {
+	return r.ListFiltered(orgID, "open", "", mineUserID, mineKeys, "", "", page, pageSize)
 }
 
 // ListByCustomer 고객별 AS 이력 목록 (최신순, 최대 50건)

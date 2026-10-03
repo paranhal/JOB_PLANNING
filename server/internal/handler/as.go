@@ -92,7 +92,7 @@ func (h *ASHandler) List(c echo.Context) error {
 		return h.renderASKanban(c, status, search, mineUserID, mineKeys, mine, role, sort, dir, assigneeID, assigneeName)
 	}
 
-	items, total, err := h.repo.ListFiltered(status, search, mineUserID, mineKeys, sort, dir, page, 20)
+	items, total, err := h.repo.ListFiltered(currentOrg(c), status, search, mineUserID, mineKeys, sort, dir, page, 20)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func (h *ASHandler) List(c echo.Context) error {
 }
 
 func (h *ASHandler) renderASKanban(c echo.Context, status, search, mineUserID string, mineKeys []string, mine bool, role, sort, dir, assigneeID, assigneeName string) error {
-	items, listTotal, err := h.repo.ListFiltered(status, search, mineUserID, mineKeys, sort, dir, 1, 2000)
+	items, listTotal, err := h.repo.ListFiltered(currentOrg(c), status, search, mineUserID, mineKeys, sort, dir, 1, 2000)
 	if err != nil {
 		return err
 	}
@@ -366,6 +366,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		UrgencyReason:   model.UrgencyReasonNone,
 		ReceivedBy:      ctxString(c, "user_name"),
 		ReceiptDatetime: now,
+		OrgID:           currentOrg(c),
 	}
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		as.CustomerID = cid
@@ -455,6 +456,7 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 		ConfirmContact:     strings.TrimSpace(c.FormValue("confirm_contact")),
 		UrgencyReason:      strings.TrimSpace(c.FormValue("urgency_reason")),
 		UrgencyReasonNote:  strings.TrimSpace(c.FormValue("urgency_reason_note")),
+		OrgID:              currentOrg(c),
 	}
 	if as.ReceivedBy == "" {
 		as.ReceivedBy = ctxString(c, "user_name")
@@ -671,7 +673,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -717,7 +719,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	existing, err := h.repo.GetByID(id)
+	existing, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
 	}
@@ -755,7 +757,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 // UpdateVisitDate 상세에서 방문 예정일만 수정 (관리자·배정담당자)
 func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -780,7 +782,7 @@ func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 	if h.wbRepo == nil || strings.TrimSpace(asID) == "" {
 		return
 	}
-	as, err := h.repo.GetByID(asID)
+	as, err := h.repo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		return
 	}
@@ -791,7 +793,7 @@ func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 
 func (h *ASHandler) Show(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -808,7 +810,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 	followups, _ := h.repo.ListTransferFollowups(as.ASID)
 	var parent *model.ASReceipt
 	if as.ParentASID != "" {
-		parent, _ = h.repo.GetByID(as.ParentASID)
+		parent, _ = h.repo.GetByID(currentOrg(c), as.ParentASID)
 	}
 	assignees, _ := h.userRepo.ListAssignable()
 
@@ -904,7 +906,7 @@ func (h *ASHandler) mergeReceiptPhotoData(c echo.Context, as *model.ASReceipt, d
 // Action 조치 전용 화면 — 쓰기 권한 없으면 조회 전용(버튼·저장 숨김)
 func (h *ASHandler) Action(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -936,7 +938,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 
 	var parent *model.ASReceipt
 	if as.ParentASID != "" {
-		parent, _ = h.repo.GetByID(as.ParentASID)
+		parent, _ = h.repo.GetByID(currentOrg(c), as.ParentASID)
 	}
 	followups, _ := h.repo.ListTransferFollowups(as.ASID)
 
@@ -1070,7 +1072,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1618,7 +1620,7 @@ func (h *ASHandler) Hold(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1651,7 +1653,7 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1677,7 +1679,7 @@ func (h *ASHandler) Transfer(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1696,7 +1698,7 @@ func (h *ASHandler) CompleteTransfer(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1720,7 +1722,7 @@ func (h *ASHandler) Cancel(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1813,7 +1815,7 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	src, err := h.repo.GetByID(id)
+	src, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || src == nil {
 		return echo.ErrNotFound
 	}
@@ -1878,7 +1880,7 @@ func (h *ASHandler) Delete(c echo.Context) error {
 		})
 		return echo.ErrForbidden
 	}
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -1934,7 +1936,7 @@ func (h *ASHandler) DeleteProcess(c echo.Context) error {
 	}
 	asID := c.Param("id")
 	processID := c.Param("process_id")
-	as, err := h.repo.GetByID(asID)
+	as, err := h.repo.GetByID(currentOrg(c), asID)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
@@ -2027,7 +2029,7 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 	if page < 1 {
 		page = 1
 	}
-	items, listTotal, _ := h.repo.ListFiltered(filterStatus, "", mineUserID, mineKeys, sort, dir, page, 20)
+	items, listTotal, _ := h.repo.ListFiltered(currentOrg(c), filterStatus, "", mineUserID, mineKeys, sort, dir, page, 20)
 	listTotalPages := (listTotal + 19) / 20
 	listBase := asStatsListBaseQuery(listStatus, sort, dir)
 	listQ := asListQuerySuffix(listBase)

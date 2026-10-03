@@ -74,7 +74,7 @@ func (h *WorkHandler) ensureReviewTask(prefix, refID string) (*model.WorkTask, e
 		if h.asRepo == nil {
 			return nil, nil
 		}
-		as, err := h.asRepo.GetByID(refID)
+		as, err := h.asRepo.GetByID(repository.OrgAll, refID)
 		if err != nil || as == nil {
 			return nil, err
 		}

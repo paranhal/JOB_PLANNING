@@ -323,7 +323,7 @@ func (h *WorkHandler) applyNoticeTransfer(c echo.Context, n *model.AssignNotice,
 		if h.asRepo == nil {
 			return nil
 		}
-		as, err := h.asRepo.GetByID(n.SourceID)
+		as, err := h.asRepo.GetByID(currentOrg(c), n.SourceID)
 		if err != nil || as == nil {
 			return err
 		}

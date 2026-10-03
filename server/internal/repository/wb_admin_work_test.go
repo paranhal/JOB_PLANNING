@@ -59,7 +59,7 @@ func TestAdminWorkCustomerOnWeeklyAndList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items, err := wb.ListAdminWork("", "")
+	items, err := wb.ListAdminWork(OrgAll, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestAdminWorkCustomerOnWeeklyAndList(t *testing.T) {
 		t.Fatal("등록 건이 목록에 없음")
 	}
 
-	searched, err := wb.ListAdminWork("", "충남교육청")
+	searched, err := wb.ListAdminWork(OrgAll, "", "충남교육청")
 	if err != nil || len(searched) != 2 {
 		t.Fatalf("거래처 검색 len=%d err=%v", len(searched), err)
 	}

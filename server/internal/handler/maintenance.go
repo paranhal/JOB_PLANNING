@@ -126,7 +126,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if showScopeToggle && !scopeAll {
 		visits = filterVisitsByAssignee(visits, assigneeKeys(c))
 	}
-	customers, _, err := h.customerRepo.List("", "", "", "", "", 1, 2000, false, model.PartyKindCustomer)
+	customers, _, err := h.customerRepo.List(currentOrg(c), "", "", "", "", "", 1, 2000, false, model.PartyKindCustomer)
 	if err != nil {
 		return err
 	}

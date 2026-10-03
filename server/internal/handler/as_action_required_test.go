@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASActionRejectsEmptyActionTakenOnDone(t *testing.T) {
@@ -32,7 +33,7 @@ func TestASActionRejectsEmptyActionTakenOnDone(t *testing.T) {
 		}
 	}
 
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -84,7 +85,7 @@ func TestASActionDoneRequiresWorkPlaceCauseProcessType(t *testing.T) {
 		if rec.Code != http.StatusSeeOther || !strings.Contains(loc, "err="+tc.wantErr) {
 			t.Fatalf("%s 누락이 거절되지 않았다: status=%d loc=%s", tc.drop, rec.Code, loc)
 		}
-		got, _ := asRepo.GetByID(asID)
+		got, _ := asRepo.GetByID(repository.OrgAll, asID)
 		if got != nil && got.Status == "completed" {
 			t.Fatalf("%s 누락인데 completed 저장", tc.drop)
 		}
@@ -112,7 +113,7 @@ func TestASActionDoneWithRequiredFieldsCompletes(t *testing.T) {
 	if strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("필수값을 채웠는데 거절: loc=%s", rec.Header().Get("Location"))
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil || got.Status != "completed" {
 		t.Fatalf("완료 상태: %+v err=%v", got, err)
 	}

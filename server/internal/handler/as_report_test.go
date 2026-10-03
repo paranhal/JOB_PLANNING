@@ -33,7 +33,7 @@ func newASReportFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 
 func completeASForReport(t *testing.T, asRepo *repository.ASRepo, asID, symptom, cause, conclusion string) {
 	t.Helper()
-	as, err := asRepo.GetByID(asID)
+	as, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func completeASForReport(t *testing.T, asRepo *repository.ASRepo, asID, symptom,
 	if err := asRepo.UpdateReceipt(as); err != nil {
 		t.Fatal(err)
 	}
-	as, _ = asRepo.GetByID(asID)
+	as, _ = asRepo.GetByID(repository.OrgAll, asID)
 	as.Status = "completed"
 	as.CauseDetail = cause
 	as.Conclusion = conclusion
@@ -146,7 +146,7 @@ func TestASReportIssueSpecialCharsThreeProcessesAndNoPlaceholder(t *testing.T) {
 	completeASForReport(t, asRepo, asID, symptom, "전원부 불량", "교체 후 정상")
 	addReportProcesses(t, h, asID, []string{"1차 점검", "부품 교체", "정상 확인"})
 
-	as, _ := asRepo.GetByID(asID)
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
 	draft := h.AS.buildASReportDraft(as, time.Date(2026, 8, 18, 12, 0, 0, 0, time.Local))
 	if !strings.Contains(draft.Actions, "1차 점검") || !strings.Contains(draft.Actions, "부품 교체") || !strings.Contains(draft.Actions, "정상 확인") {
 		t.Fatalf("초안에 조치 3건이 없다: %q", draft.Actions)
@@ -211,7 +211,7 @@ func TestASReportIssueIncludesSelectedActionPhoto(t *testing.T) {
 		t.Fatal("미리보기에 사진 선택이 없다")
 	}
 
-	as, _ := asRepo.GetByID(asID)
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
 	draft := h.AS.buildASReportDraft(as, time.Now())
 	form := url.Values{
 		"customer_name": {draft.CustomerName},
@@ -265,7 +265,7 @@ func TestASReportIssueIncludesSelectedActionPhoto(t *testing.T) {
 func TestASReportPreviewEditDoesNotWriteBack(t *testing.T) {
 	e, h, asRepo, _, asID := newASReportFixture(t)
 	completeASForReport(t, asRepo, asID, "게이트 오작동", "원본원인", "원본결론")
-	as, _ := asRepo.GetByID(asID)
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
 	draft := h.AS.buildASReportDraft(as, time.Now())
 	draft.CauseDetail = "다듬은 원인"
 	draft.Conclusion = "다듬은 결론"
@@ -273,7 +273,7 @@ func TestASReportPreviewEditDoesNotWriteBack(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d", rec.Code)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -298,7 +298,7 @@ func TestASReportIssueRejectedWhenNotComplete(t *testing.T) {
 func TestASShowListsReportHistory(t *testing.T) {
 	e, h, asRepo, _, asID := newASReportFixture(t)
 	completeASForReport(t, asRepo, asID, "게이트 오작동", "원인", "결론")
-	as, _ := asRepo.GetByID(asID)
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
 	draft := h.AS.buildASReportDraft(as, time.Now())
 	if rec := postASReport(t, e, asID, draft); rec.Code != http.StatusOK {
 		t.Fatalf("발급 실패 %d", rec.Code)
@@ -334,7 +334,7 @@ func TestASActionReportButtonAndPartialIssue(t *testing.T) {
 		t.Fatal("조치 화면 비활성 사유가 없다")
 	}
 
-	as, _ := asRepo.GetByID(asID)
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
 	as.Status = model.StatusPartialComplete
 	as.CauseDetail = "전원부 불량"
 	as.Conclusion = "임시 조치 후 재방문"
@@ -369,7 +369,7 @@ func TestASActionReportButtonAndPartialIssue(t *testing.T) {
 		t.Fatal("HWPX 버튼이 없다")
 	}
 
-	as, _ = asRepo.GetByID(asID)
+	as, _ = asRepo.GetByID(repository.OrgAll, asID)
 	draft := h.AS.buildASReportDraft(as, time.Now())
 	rec := postASReport(t, e, asID, draft)
 	if rec.Code != http.StatusOK {
@@ -409,7 +409,7 @@ func TestASActionSaveOffersReportButton(t *testing.T) {
 func TestASReportDocxIssueAndHwpxWithoutDocxTemplate(t *testing.T) {
 	e, h, asRepo, _, asID := newASReportFixture(t)
 	completeASForReport(t, asRepo, asID, `게이트 <고장> & "소음"`, "전원부 불량", "교체 후 정상")
-	as, _ := asRepo.GetByID(asID)
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
 	draft := h.AS.buildASReportDraft(as, time.Now())
 
 	h.AS.reportDocxBytes = docx.BuildSplitPlaceholderTemplate(true)

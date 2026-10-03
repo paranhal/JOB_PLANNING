@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"customer-support/internal/repository"
 )
 
 func TestASActionFillsStartDatetimeFromFirstProcess(t *testing.T) {
 	e, h, asRepo, _, asID := newASActionFixture(t)
 
-	before, err := asRepo.GetByID(asID)
+	before, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || before == nil {
 		t.Fatalf("조회 실패: %v", err)
 	}
@@ -32,7 +34,7 @@ func TestASActionFillsStartDatetimeFromFirstProcess(t *testing.T) {
 		t.Fatalf("저장 실패: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatalf("저장 후 조회 실패: %v", err)
 	}
@@ -55,7 +57,7 @@ func TestASActionDoesNotOverwriteStartDatetimeOrCopyToProcess(t *testing.T) {
 	e, h, asRepo, _, asID := newASActionFixture(t)
 
 	existing := time.Date(2026, 8, 1, 10, 0, 0, 0, time.Local)
-	as, err := asRepo.GetByID(asID)
+	as, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		t.Fatal(err)
 	}
@@ -78,7 +80,7 @@ func TestASActionDoesNotOverwriteStartDatetimeOrCopyToProcess(t *testing.T) {
 		t.Fatalf("저장 실패: status=%d", rec.Code)
 	}
 
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil || got.StartDatetime == nil {
 		t.Fatalf("조회 실패: %+v err=%v", got, err)
 	}
@@ -128,7 +130,7 @@ func TestASShowDisplaysStartDatetimeReadOnly(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("저장 실패: status=%d", rec.Code)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil || got.StartDatetime == nil {
 		t.Fatalf("start_datetime 미기록: %+v err=%v", got, err)
 	}

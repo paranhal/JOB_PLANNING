@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 // UnplannedList GET /plan/unplanned — §8 미계획 업무함
@@ -270,7 +271,7 @@ func (h *WorkHandler) recordUnplannedAssignNotice(c echo.Context, key, date, ass
 		asID := strings.TrimPrefix(key, "as:")
 		h.syncASPlannedFromUnplanned(asID)
 		if h.asRepo != nil {
-			if as, err := h.asRepo.GetByID(asID); err == nil && as != nil {
+			if as, err := h.asRepo.GetByID(repository.OrgAll, asID); err == nil && as != nil {
 				h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, "", "")
 			}
 		}
@@ -313,7 +314,7 @@ func (h *WorkHandler) syncASPlannedFromUnplanned(asID string) {
 	if h.wbRepo == nil || h.asRepo == nil || strings.TrimSpace(asID) == "" {
 		return
 	}
-	as, err := h.asRepo.GetByID(asID)
+	as, err := h.asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		return
 	}

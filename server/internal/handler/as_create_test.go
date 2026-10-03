@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASCreateThenShow(t *testing.T) {
@@ -33,7 +34,7 @@ func TestASCreateThenShow(t *testing.T) {
 	if !strings.HasPrefix(loc, "/as/R") {
 		t.Fatalf("redirect: %s", loc)
 	}
-	got, err := asRepo.GetByID(strings.TrimPrefix(loc, "/as/"))
+	got, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(loc, "/as/"))
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -158,7 +159,7 @@ func TestASCreateMultiEquipmentGroup(t *testing.T) {
 	if !strings.HasPrefix(loc, "/as/R") {
 		t.Fatalf("redirect: %s", loc)
 	}
-	first, err := asRepo.GetByID(strings.TrimPrefix(loc, "/as/"))
+	first, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(loc, "/as/"))
 	if err != nil || first == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -239,7 +240,7 @@ func TestASCreateUrgencyReasonSetsHighAndConfirmsDate(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	got, err := asRepo.GetByID(strings.TrimPrefix(rec.Header().Get("Location"), "/as/"))
+	got, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(rec.Header().Get("Location"), "/as/"))
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -284,7 +285,7 @@ func TestASCreateNoneReasonLeavesNormalUnconfirmed(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status=%d", rec.Code)
 	}
-	got, err := asRepo.GetByID(strings.TrimPrefix(rec.Header().Get("Location"), "/as/"))
+	got, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(rec.Header().Get("Location"), "/as/"))
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}

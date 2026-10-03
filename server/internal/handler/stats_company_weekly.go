@@ -60,7 +60,7 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 	if t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(c.FormValue("company_date")), now.Location()); err == nil {
 		anchor = t
 	}
-	draft, err := h.repo.BuildCompanyWeeklyDraft(anchor)
+	draft, err := h.repo.BuildCompanyWeeklyDraftOrg(anchor, currentOrg(c))
 	if err != nil {
 		return err
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
@@ -37,7 +38,7 @@ func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
 		t.Fatalf("저장 실패: %s", loc)
 	}
-	got, err := asRepo.GetByID(asID)
+	got, err := asRepo.GetByID(repository.OrgAll, asID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
 	if empty.Code != http.StatusSeeOther || strings.Contains(empty.Header().Get("Location"), "err=") {
 		t.Fatalf("매핑 없는 2차 저장 실패: %s", empty.Header().Get("Location"))
 	}
-	got, _ = asRepo.GetByID(asID)
+	got, _ = asRepo.GetByID(repository.OrgAll, asID)
 	if got.CauseType != "" {
 		t.Fatalf("매핑 없으면 cause_type 빈값이어야 한다: %q", got.CauseType)
 	}

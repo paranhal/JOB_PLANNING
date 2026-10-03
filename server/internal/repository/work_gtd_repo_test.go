@@ -84,7 +84,7 @@ func TestInboxNormalizedToWaitingOnCreate(t *testing.T) {
 		t.Fatalf("palette len=%d %+v", len(items), items)
 	}
 
-	listed, err := wb.ListAdminWork("waiting", "")
+	listed, err := wb.ListAdminWork(OrgAll, "waiting", "")
 	if err != nil || len(listed) != 2 {
 		t.Fatalf("waiting list len=%d err=%v", len(listed), err)
 	}
@@ -110,7 +110,7 @@ func TestInboxNormalizedToWaitingOnCreate(t *testing.T) {
 	if err != nil || st.Hold != 1 || st.Transfer != 1 {
 		t.Fatalf("hold/transfer stats %+v err=%v", st, err)
 	}
-	holds, err := wb.ListAdminWork("hold", "")
+	holds, err := wb.ListAdminWork(OrgAll, "hold", "")
 	if err != nil || len(holds) != 1 || holds[0].Title != "보류건" {
 		t.Fatalf("hold list %+v err=%v", holds, err)
 	}
@@ -182,7 +182,7 @@ func TestBlockingActionsAndStuckList(t *testing.T) {
 	if _, err := db.Exec(`UPDATE work_actions SET created_at=datetime('now','-31 days') WHERE task_id=?`, task.TaskID); err != nil {
 		t.Fatal(err)
 	}
-	items, err := wb.ListAdminWork("stuck", "")
+	items, err := wb.ListAdminWork(OrgAll, "stuck", "")
 	if err != nil || len(items) != 1 || items[0].Title != "오래 막힘" {
 		t.Fatalf("stuck %+v err=%v", items, err)
 	}

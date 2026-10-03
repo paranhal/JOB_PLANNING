@@ -42,7 +42,7 @@ func TestASReceiptGroupCreateAndList(t *testing.T) {
 	if err := repo.Create(b); err != nil {
 		t.Fatal(err)
 	}
-	got, err := repo.GetByID(a.ASID)
+	got, err := repo.GetByID(OrgAll, a.ASID)
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestASReceiptGroupCreateAndList(t *testing.T) {
 	if len(mates) != 2 {
 		t.Fatalf("mates=%d", len(mates))
 	}
-	items, _, err := repo.ListFiltered("", "", "", nil, "", "", 1, 20)
+	items, _, err := repo.ListFiltered(OrgAll, "", "", "", nil, "", "", 1, 20)
 	if err != nil {
 		t.Fatal(err)
 	}

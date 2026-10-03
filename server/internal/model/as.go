@@ -62,6 +62,7 @@ type ASReceipt struct {
 	UrgencyReason      string     `json:"urgency_reason"`   // 긴급 사유 코드. §34.2.2
 	UrgencyReasonNote  string     `json:"urgency_reason_note"`
 	MovedTaskID        string     `json:"moved_task_id,omitempty"` // 행정/지원으로 옮긴 업무. §48.4
+	OrgID              string     `json:"org_id,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 

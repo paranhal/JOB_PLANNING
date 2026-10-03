@@ -569,6 +569,7 @@ func main() {
 	g.GET("/admin/system", h.System.Page, h.Auth.RequireAdminOnly)
 	g.POST("/admin/data/save", h.Backup.Save, adminOnly)
 	g.POST("/admin/data/metrics", h.Backup.SaveMetrics, adminOnly)
+	g.POST("/admin/data/org-assign", h.Backup.AssignEmptyOrg, adminOnly)
 	g.POST("/admin/data/rollback", h.Backup.Rollback, adminOnly)
 	g.POST("/admin/data/archive", h.Backup.Archive, adminOnly)
 	g.POST("/admin/data/import", h.Backup.ImportUpload, adminOnly)

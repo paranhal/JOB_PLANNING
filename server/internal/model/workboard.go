@@ -672,6 +672,7 @@ type WorkTask struct {
 	NotDoneReason    string    `json:"not_done_reason,omitempty"`
 	BlockedReason    string    `json:"blocked_reason,omitempty"` // §42.7
 	BlockedAt        string    `json:"blocked_at,omitempty"`
+	OrgID            string    `json:"org_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 

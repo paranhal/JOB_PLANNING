@@ -51,7 +51,7 @@ func TestListFiltered_VisitBuckets(t *testing.T) {
 			stats.VisitPast, stats.VisitToday, stats.VisitUpcoming, stats.InProgress)
 	}
 
-	pastItems, n, err := repo.ListFiltered("visit_past", "", "", nil, "visit", "asc", 1, 20)
+	pastItems, n, err := repo.ListFiltered(OrgAll, "visit_past", "", "", nil, "visit", "asc", 1, 20)
 	if err != nil || n != 1 || len(pastItems) != 1 || pastItems[0].ASNumber != "R2607-P01" {
 		t.Fatalf("visit_past: n=%d items=%v err=%v", n, pastItems, err)
 	}
@@ -59,12 +59,12 @@ func TestListFiltered_VisitBuckets(t *testing.T) {
 		t.Fatalf("expected overdue days >0 got %d", pastItems[0].VisitDaysOverdue)
 	}
 
-	todayItems, n, err := repo.ListFiltered("visit_today", "", "", nil, "visit", "asc", 1, 20)
+	todayItems, n, err := repo.ListFiltered(OrgAll, "visit_today", "", "", nil, "visit", "asc", 1, 20)
 	if err != nil || n != 1 || todayItems[0].ASNumber != "R2607-T01" || todayItems[0].VisitDaysOverdue != 0 {
 		t.Fatalf("visit_today: n=%d item=%+v err=%v", n, todayItems, err)
 	}
 
-	upItems, n, err := repo.ListFiltered("visit_upcoming", "", "", nil, "visit", "asc", 1, 20)
+	upItems, n, err := repo.ListFiltered(OrgAll, "visit_upcoming", "", "", nil, "visit", "asc", 1, 20)
 	if err != nil || n != 1 || upItems[0].ASNumber != "R2607-U01" || upItems[0].VisitDaysOverdue >= 0 {
 		t.Fatalf("visit_upcoming: n=%d item=%+v err=%v", n, upItems, err)
 	}
@@ -76,7 +76,7 @@ func TestListFiltered_VisitBuckets(t *testing.T) {
 	} else if stats2.TransferOverdue < 1 {
 		t.Fatalf("transfer overdue want >=1 got %d", stats2.TransferOverdue)
 	}
-	overItems, n, err := repo.ListFiltered("transfer_overdue", "", "", nil, "visit", "asc", 1, 20)
+	overItems, n, err := repo.ListFiltered(OrgAll, "transfer_overdue", "", "", nil, "visit", "asc", 1, 20)
 	if err != nil || n < 1 {
 		t.Fatalf("transfer_overdue: n=%d err=%v", n, err)
 	}
@@ -140,12 +140,12 @@ func TestVisitPastExcludesAlreadyVisited(t *testing.T) {
 		t.Fatalf("다음 일정 미정 = %d, want 1", stats.VisitDoneOpen)
 	}
 
-	pastItems, n, err := repo.ListFiltered("visit_past", "", "", nil, "visit", "asc", 1, 20)
+	pastItems, n, err := repo.ListFiltered(OrgAll, "visit_past", "", "", nil, "visit", "asc", 1, 20)
 	if err != nil || n != 1 || pastItems[0].ASNumber != "R2605-002" {
 		t.Fatalf("visit_past: n=%d items=%+v err=%v", n, pastItems, err)
 	}
 
-	doneItems, n, err := repo.ListFiltered("visit_done_open", "", "", nil, "visit", "asc", 1, 20)
+	doneItems, n, err := repo.ListFiltered(OrgAll, "visit_done_open", "", "", nil, "visit", "asc", 1, 20)
 	if err != nil || n != 1 || doneItems[0].ASNumber != "R2605-001" {
 		t.Fatalf("visit_done_open: n=%d items=%+v err=%v", n, doneItems, err)
 	}
@@ -201,7 +201,7 @@ func TestListFiltered_PageDoesNotLoadAll(t *testing.T) {
 		}
 	}
 	repo := NewASRepo(db)
-	items, total, err := repo.ListFiltered("", "", "", nil, "receipt", "desc", 1, 20)
+	items, total, err := repo.ListFiltered(OrgAll, "", "", "", nil, "receipt", "desc", 1, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestListFiltered_PageDoesNotLoadAll(t *testing.T) {
 	if len(items) != 20 {
 		t.Fatalf("page rows=%d want 20 (전체를 읽어 자르면 안 된다)", len(items))
 	}
-	page2, total2, err := repo.ListFiltered("", "", "", nil, "receipt", "desc", 2, 20)
+	page2, total2, err := repo.ListFiltered(OrgAll, "", "", "", nil, "receipt", "desc", 2, 20)
 	if err != nil {
 		t.Fatal(err)
 	}

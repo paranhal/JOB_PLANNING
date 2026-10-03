@@ -74,7 +74,7 @@ func TestASProcessTruth_ConflictsAndReadPreferProcess(t *testing.T) {
 		t.Fatalf("어긋남 내용: %+v", items[0])
 	}
 
-	got, err := NewASRepo(db).GetByID("as-conflict")
+	got, err := NewASRepo(db).GetByID(OrgAll, "as-conflict")
 	if err != nil || got == nil {
 		t.Fatalf("GetByID: %v %#v", err, got)
 	}

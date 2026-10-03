@@ -14,6 +14,7 @@ import (
 	docxpkg "customer-support/internal/docx"
 	"customer-support/internal/hwpx"
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func (h *ASHandler) mergeASReportData(c echo.Context, as *model.ASReceipt, data map[string]interface{}) {
@@ -170,7 +171,7 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 }
 
 func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
-	as, err := h.repo.GetByID(id)
+	as, err := h.repo.GetByID(repository.OrgAll, id)
 	if err != nil || as == nil {
 		return nil, echo.ErrNotFound
 	}

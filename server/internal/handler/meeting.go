@@ -135,6 +135,7 @@ func (h *MeetingHandler) Overview(c echo.Context) error {
 	if selected != "" {
 		filter = repository.ParseMeetingFilter(model.StatsScopeAssignee, selected, "")
 	}
+	filter = statsOrgFilter(c, filter)
 	_ = h.stats.FillPeriodOverview(cols, filter)
 
 	var prevCol, curCol *model.StatsPeriodColumn

@@ -213,7 +213,7 @@ func (r *ASRepo) PublishKB(in KBWrite) (*model.ASKBEntry, error) {
 	symptom := strings.TrimSpace(in.Symptom)
 	orig := ""
 	if in.ASID != "" {
-		if as, err := r.GetByID(in.ASID); err == nil && as != nil {
+		if as, err := r.GetByID(OrgAll, in.ASID); err == nil && as != nil {
 			if symptom == "" {
 				symptom = strings.TrimSpace(as.Symptom)
 			}
@@ -572,7 +572,7 @@ func (r *ASRepo) SearchKnowledge(f model.ASSearchFilter) ([]model.ASSearchHit, i
 			if h, ok := asByID[e.ASID]; ok {
 				cp := h
 				meta = &cp
-			} else if as, err := r.GetByID(e.ASID); err == nil && as != nil {
+			} else if as, err := r.GetByID(OrgAll, e.ASID); err == nil && as != nil {
 				org := CustomerName(r.db, as.CustomerID)
 				if org == "" {
 					org = model.KBDash

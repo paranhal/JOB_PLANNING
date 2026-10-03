@@ -71,7 +71,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 	}
 	var companyDraft model.CompanyWeeklyDraft
 	if h.repo != nil {
-		companyDraft, _ = h.repo.BuildCompanyWeeklyDraft(companyAnchor)
+		companyDraft, _ = h.repo.BuildCompanyWeeklyDraftOrg(companyAnchor, currentOrg(c))
 	}
 	sheetName := strings.TrimSpace(c.QueryParam("sheet_name"))
 	if sheetName == "" {

@@ -81,7 +81,7 @@ func TestAdminWorkAssetLinkAndASMoveHTTP(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("create status=%d loc=%s", rec.Code, rec.Header().Get("Location"))
 	}
-	items, err := wb.ListAdminWork("", "")
+	items, err := wb.ListAdminWork(repository.OrgAll, "", "")
 	if err != nil || len(items) == 0 {
 		t.Fatalf("list %+v err=%v", items, err)
 	}
@@ -113,7 +113,7 @@ func TestAdminWorkAssetLinkAndASMoveHTTP(t *testing.T) {
 	if ok.Code != http.StatusSeeOther || !strings.Contains(ok.Header().Get("Location"), "ok=moved") {
 		t.Fatalf("move loc=%s", ok.Header().Get("Location"))
 	}
-	as, _ := asRepo.GetByID("R9")
+	as, _ := asRepo.GetByID(repository.OrgAll, "R9")
 	if as == nil || as.Status != model.StatusAdminWork || as.MovedTaskID == "" {
 		t.Fatalf("as %+v", as)
 	}
