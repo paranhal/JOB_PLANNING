@@ -113,6 +113,11 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	}
 	h.fillActorFromTokenCookie(c, &rec)
 	accessLog(c, rec)
+	h.clearTokenCookie(c)
+	return c.Redirect(http.StatusSeeOther, "/login")
+}
+
+func (h *AuthHandler) clearTokenCookie(c echo.Context) {
 	c.SetCookie(&http.Cookie{
 		Name:     "token",
 		Value:    "",
@@ -121,7 +126,6 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
-	return c.Redirect(http.StatusSeeOther, "/login")
 }
 
 // AccountPage 내 계정(프로필·비밀번호 변경)
@@ -136,6 +140,9 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 		msg = "비밀번호가 변경되었습니다."
 	} else if c.QueryParam("ok") == "profile" {
 		msg = "계정 정보가 저장되었습니다."
+		if n := strings.TrimSpace(c.QueryParam("n")); n != "" && n != "0" {
+			msg = fmt.Sprintf("계정 정보가 저장되었습니다. 담당 글자 %s건을 함께 고쳤습니다.", n)
+		}
 	}
 	var orgs []model.Org
 	if h.orgRepo != nil {
@@ -159,6 +166,7 @@ func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
 			"Error": "이름을 입력하세요.",
 		})
 	}
+	oldName := strings.TrimSpace(u.FullName)
 	u.FullName = name
 	bindUserContact(c, u)
 	if err := u.ProfileFieldError(); err != "" {
@@ -167,8 +175,41 @@ func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
 		})
 	}
 	h.userRepo.Update(u)
+	n, _, _ := h.rewriteNamesIfChanged(u.UserID, oldName, u.FullName)
 	h.refreshSession(c, u)
-	return c.Redirect(http.StatusSeeOther, "/account?ok=profile")
+	loc := "/account?ok=profile"
+	if oldName != strings.TrimSpace(u.FullName) {
+		loc = fmt.Sprintf("/account?ok=profile&n=%d", n)
+	}
+	return c.Redirect(http.StatusSeeOther, loc)
+}
+
+func (h *AuthHandler) AccountRenameUsername(c echo.Context) error {
+	uid := ctxString(c, "user_id")
+	newUsername := strings.TrimSpace(c.FormValue("username"))
+	if newUsername == "" {
+		u, _ := h.userRepo.GetByID(uid)
+		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
+			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": "아이디를 입력하세요.",
+		})
+	}
+	if err := h.userRepo.RenameUsername(uid, newUsername); err != nil {
+		u, _ := h.userRepo.GetByID(uid)
+		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
+			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": err.Error(),
+		})
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionUpdate,
+		Result:      auditlog.ResultOK,
+		TargetTable: "users",
+		TargetID:    uid,
+		SubjectType: "user",
+		SubjectID:   uid,
+		Detail:      "아이디 변경",
+	})
+	h.clearTokenCookie(c)
+	return c.Redirect(http.StatusSeeOther, "/login")
 }
 
 func (h *AuthHandler) AccountCompleteForm(c echo.Context) error {
@@ -314,6 +355,10 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		msg = "사용자 정보가 저장되었습니다."
 	case "reset_perms":
 		msg = "직급 기본 권한으로 되돌렸습니다."
+	case "username":
+		msg = "아이디를 바꿨습니다. 그 사람은 다시 로그인해야 합니다."
+	case "renamed":
+		msg = fmt.Sprintf("이름을 바꿨습니다. 담당 글자 %s건을 함께 고쳤습니다.", strings.TrimSpace(c.QueryParam("n")))
 	}
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
@@ -328,6 +373,9 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	}
 	if canEdit {
 		data["HashMig"] = h.passwordMigrationStatus()
+	}
+	if old := strings.TrimSpace(c.QueryParam("old")); old != "" && h.userRepo != nil {
+		data["Unmatched"] = h.userRepo.UnmatchedAfterNameChange(old)
 	}
 	return c.Render(http.StatusOK, "auth/users.html", data)
 }
@@ -402,7 +450,8 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	}
 	before := userPublic(u)
 	wasActive := u.IsActive
-	u.FullName = c.FormValue("full_name")
+	oldName := strings.TrimSpace(u.FullName)
+	u.FullName = strings.TrimSpace(c.FormValue("full_name"))
 	prevRole := model.NormalizeRole(c.FormValue("prev_role"))
 	u.Role = model.NormalizeRole(c.FormValue("role"))
 	if u.Role == model.RoleTester {
@@ -464,7 +513,53 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
 		return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 	}
+	n, _, _ := h.rewriteNamesIfChanged(u.UserID, oldName, u.FullName)
+	if oldName != strings.TrimSpace(u.FullName) {
+		loc := fmt.Sprintf("/users?ok=renamed&n=%d&old=%s", n, url.QueryEscape(oldName))
+		return c.Redirect(http.StatusSeeOther, loc)
+	}
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
+}
+
+func (h *AuthHandler) rewriteNamesIfChanged(userID, oldName, newName string) (int, []repository.UnmatchedAssignee, error) {
+	if h == nil || h.userRepo == nil {
+		return 0, nil, nil
+	}
+	return h.userRepo.RewriteAssigneeNames(userID, oldName, newName)
+}
+
+func (h *AuthHandler) UserRenameUsername(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return h.forbidden(c)
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	newUsername := strings.TrimSpace(c.FormValue("username"))
+	if newUsername == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("아이디를 입력하세요."))
+	}
+	if err := h.userRepo.RenameUsername(id, newUsername); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
+	}
+	u, _ := h.userRepo.GetByID(id)
+	name := newUsername
+	if u != nil {
+		name = u.FullName
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionUpdate,
+		Result:      auditlog.ResultOK,
+		TargetTable: "users",
+		TargetID:    id,
+		SubjectType: "user",
+		SubjectID:   id,
+		SubjectName: name,
+		Detail:      "아이디 변경",
+	})
+	if ctxString(c, "user_id") == id {
+		h.clearTokenCookie(c)
+		return c.Redirect(http.StatusSeeOther, "/login")
+	}
+	return c.Redirect(http.StatusSeeOther, "/users?ok=username")
 }
 
 func (h *AuthHandler) UserResetPermissions(c echo.Context) error {

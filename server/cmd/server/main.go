@@ -198,6 +198,7 @@ func main() {
 	g.POST("/account/complete", h.Auth.AccountComplete)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
+	g.POST("/account/username", h.Auth.AccountRenameUsername)
 	g.POST("/view-as", h.Auth.SetViewAs)
 	g.POST("/view-as/clear", h.Auth.ClearViewAs)
 
@@ -556,6 +557,7 @@ func main() {
 	g.POST("/users/:id/update", h.Auth.UserUpdate, adminSec, adminOnly)
 	g.POST("/users/:id/reset-permissions", h.Auth.UserResetPermissions, adminSec, adminOnly)
 	g.POST("/users/:id/password", h.Auth.UserChangePassword, adminSec, adminOnly)
+	g.POST("/users/:id/username", h.Auth.UserRenameUsername, adminSec, adminOnly)
 
 	g.GET("/admin/unlock", h.Auth.AdminUnlockForm)
 	g.POST("/admin/unlock", h.Auth.AdminUnlock)

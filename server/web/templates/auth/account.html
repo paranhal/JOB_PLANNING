@@ -47,6 +47,20 @@
     </form>
   </div>
 
+  <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+    <h3 class="text-sm font-semibold text-gray-800">아이디 변경</h3>
+    <p class="text-xs text-gray-500">아이디를 바꾸면 바로 다시 로그인해야 합니다. 과거 업무는 그대로 내 것입니다.</p>
+    <form method="POST" action="/account/username" class="flex flex-wrap items-end gap-2"
+          onsubmit="return confirm(this.dataset.old+' → '+this.username.value+' 으로 바꿉니다. 이 사람은 다시 로그인해야 합니다');"
+          data-old="{{.User.Username}}">
+      <div class="flex-1 min-w-[10rem]">
+        <label class="block text-xs font-medium text-gray-600 mb-1">새 아이디</label>
+        <input type="text" name="username" required value="{{.User.Username}}" class="w-full border rounded-lg px-3 py-2 text-sm font-mono">
+      </div>
+      <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">아이디 변경</button>
+    </form>
+  </div>
+
   <div class="bg-white rounded-xl border border-gray-200 p-6">
     <h3 class="text-sm font-semibold text-gray-800 mb-4">비밀번호 변경</h3>
     <form method="POST" action="/account/password" class="space-y-3">
