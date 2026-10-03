@@ -22,6 +22,7 @@ type AuthHandler struct {
 	userRepo     *repository.UserRepo
 	orgRepo      *repository.OrgRepo
 	settingsRepo *repository.SettingsRepo
+	adminUnlock  *repository.AdminUnlockRepo
 	jwtSecret    []byte
 }
 

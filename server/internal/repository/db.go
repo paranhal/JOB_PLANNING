@@ -817,7 +817,20 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 			ip_address  TEXT,
 			created_at  TEXT NOT NULL
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_as_edit_unlock_log_as ON as_edit_unlock_log(as_id, created_at)`,
+		`CREATE TABLE IF NOT EXISTS admin_unlocks (
+			user_id     TEXT PRIMARY KEY,
+			unlocked_at TEXT NOT NULL,
+			expires_at  TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS admin_unlock_log (
+			log_id      TEXT PRIMARY KEY,
+			user_id     TEXT NOT NULL,
+			username    TEXT,
+			success     INTEGER NOT NULL DEFAULT 0,
+			ip_address  TEXT,
+			created_at  TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_admin_unlock_log_user ON admin_unlock_log(user_id, created_at)`,
 		// 일일 업무회의 변경 이력
 		`CREATE TABLE IF NOT EXISTS data_change_logs (
 			log_id TEXT PRIMARY KEY,

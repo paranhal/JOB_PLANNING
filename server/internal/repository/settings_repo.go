@@ -175,3 +175,54 @@ func (r *ASUnlockRepo) LogAttempt(asID, userID, username, ip string, success boo
 		"ULG-"+uuid.New().String()[:12], asID, userID, username, ok, ip, time.Now().Format(time.RFC3339))
 	return err
 }
+
+const adminUnlockTTL = 30 * time.Minute
+
+type AdminUnlockRepo struct {
+	db *sql.DB
+}
+
+func NewAdminUnlockRepo(db *sql.DB) *AdminUnlockRepo {
+	return &AdminUnlockRepo{db: db}
+}
+
+func (r *AdminUnlockRepo) HasActive(userID string) (bool, time.Time, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(userID) == "" {
+		return false, time.Time{}, nil
+	}
+	var expStr string
+	err := r.db.QueryRow(`
+		SELECT expires_at FROM admin_unlocks
+		WHERE user_id=? AND expires_at > ?
+		LIMIT 1`,
+		userID, time.Now().Format(time.RFC3339)).Scan(&expStr)
+	if err == sql.ErrNoRows {
+		return false, time.Time{}, nil
+	}
+	if err != nil {
+		return false, time.Time{}, err
+	}
+	exp, _ := time.Parse(time.RFC3339, expStr)
+	return true, exp, nil
+}
+
+func (r *AdminUnlockRepo) Grant(userID string) (time.Time, error) {
+	now := time.Now()
+	exp := now.Add(adminUnlockTTL)
+	_, err := r.db.Exec(`
+		INSERT INTO admin_unlocks(user_id, unlocked_at, expires_at) VALUES(?,?,?)
+		ON CONFLICT(user_id) DO UPDATE SET unlocked_at=excluded.unlocked_at, expires_at=excluded.expires_at`,
+		userID, now.Format(time.RFC3339), exp.Format(time.RFC3339))
+	return exp, err
+}
+
+func (r *AdminUnlockRepo) LogAttempt(userID, username, ip string, success bool) error {
+	ok := 0
+	if success {
+		ok = 1
+	}
+	_, err := r.db.Exec(`INSERT INTO admin_unlock_log(log_id, user_id, username, success, ip_address, created_at)
+		VALUES(?,?,?,?,?,?)`,
+		"AUL-"+uuid.New().String()[:12], userID, username, ok, ip, time.Now().Format(time.RFC3339))
+	return err
+}
