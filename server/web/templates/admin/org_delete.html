@@ -1,0 +1,26 @@
+{{define "title"}}조직 숨기기 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-xl space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">조직 숨기기</h2>
+  <p class="text-sm text-gray-600">행을 지우지 않습니다. 백업을 만든 뒤 화면에서만 숨깁니다.</p>
+  {{if .FlashErr}}<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>{{end}}
+  <div class="bg-white rounded-xl border p-4 text-sm space-y-1">
+    <p><span class="text-gray-500">번호</span> <span class="font-mono">{{.Org.OrgNo}}</span></p>
+    <p><span class="text-gray-500">이름</span> <strong>{{.Org.OrgName}}</strong></p>
+    <p>계정 {{.Counts.Users}} · 고객 {{.Counts.Customers}} · 자산 {{.Counts.Assets}} · AS {{.Counts.AS}} · 사업 {{.Counts.Sales}} · 업무 {{.Counts.Work}}</p>
+  </div>
+  <form method="POST" action="/admin/orgs/{{.Org.OrgID}}/delete" class="bg-white rounded-xl border p-4 space-y-3">
+    <input type="hidden" name="org_id" value="{{.Org.OrgID}}">
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">조직명을 그대로 입력</label>
+      <input type="text" name="confirm_name" required class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="off">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">확인 비밀번호</label>
+      <input type="password" name="vision_password" required class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-amber-700 text-white rounded-lg text-sm">백업 후 숨기기</button>
+    <a href="/admin/orgs" class="ml-2 text-sm text-gray-500">취소</a>
+  </form>
+</div>
+{{end}}

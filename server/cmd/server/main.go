@@ -562,6 +562,21 @@ func main() {
 	g.POST("/admin/holidays/leaves", h.Holiday.CreateLeave)
 	g.POST("/admin/holidays/leaves/delete", h.Holiday.DeleteLeave)
 
+	// TODO(49-A): RequireVisionOnly 를 vision_admin 전용으로 교체
+	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs", h.Org.Create, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/update", h.Org.Update, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/switch", h.Org.Switch, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs/restore", h.Org.RestoreForm, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/restore", h.Org.Restore, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs/:id/delete", h.Org.DeleteForm, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/:id/delete", h.Org.Delete, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs/:id/purge", h.Org.PurgeForm, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/:id/purge", h.Org.Purge, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs/:id/split", h.Org.SplitForm, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/:id/split/preview", h.Org.SplitPreview, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/:id/split", h.Org.Split, h.Auth.RequireVisionOnly)
+
 	g.GET("/admin/data", h.Backup.Page, adminOnly)
 	g.GET("/admin/sales-logs", h.Sales.SalesLogs, adminOnly)
 	g.GET("/admin/sales-logs.xlsx", h.Sales.SalesLogs, adminOnly)

@@ -244,6 +244,9 @@ func List(dataDir string) ([]Info, error) {
 		if !e.IsDir() || strings.HasSuffix(e.Name(), ".tmp") {
 			continue
 		}
+		if IsOrgSnapshotDir(e.Name()) {
+			continue
+		}
 		dir := filepath.Join(root, e.Name())
 		if !backupComplete(dir) {
 			continue
@@ -307,6 +310,16 @@ func readManifest(dir string) (kind, at string) {
 	return kind, at
 }
 
+// VacuumCopy SQLite VACUUM INTO 로 dest 파일을 만든다.
+func VacuumCopy(db *sql.DB, dest string) error {
+	return vacuumInto(db, dest)
+}
+
+// PromoteDir tmp 폴더를 dest 로 확정한다.
+func PromoteDir(tmp, dest string) error {
+	return promoteDir(tmp, dest)
+}
+
 func vacuumInto(db *sql.DB, dest string) error {
 	abs, err := filepath.Abs(dest)
 	if err != nil {
@@ -368,7 +381,7 @@ func prune(root string, keepDays int, now time.Time, loc *time.Location) error {
 			_ = os.RemoveAll(filepath.Join(root, name))
 			continue
 		}
-		if strings.HasPrefix(name, "관리로그_") {
+		if strings.HasPrefix(name, "관리로그_") || IsOrgSnapshotDir(name) {
 			continue
 		}
 		day, ok := folderDate(name, loc)

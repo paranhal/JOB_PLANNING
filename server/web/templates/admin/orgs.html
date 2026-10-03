@@ -3,7 +3,8 @@
 <div class="space-y-5">
   <div>
     <h2 class="text-xl font-bold text-gray-800">조직 관리</h2>
-    <p class="text-sm text-gray-500 mt-1">조직명·짧은이름·활성 여부를 다룹니다. 삭제·분리는 다음 단계입니다. 번호(<code>O01</code>)는 자동입니다.</p>
+    <p class="text-sm text-gray-500 mt-1">숨기기는 데이터를 남깁니다. 지우기와 분리는 백업 뒤에만 됩니다. 번호(<code>O01</code>)는 자동입니다.</p>
+    <p class="mt-2"><a href="/admin/orgs/restore" class="text-sm text-blue-700 underline">조직 백업에서 복구하기</a></p>
   </div>
 
   {{if .FlashErr}}
@@ -80,7 +81,7 @@
                 <a href="/admin/orgs" class="px-3 py-1.5 border rounded text-xs">취소</a>
               </div>
             </form>
-            <p class="text-[11px] text-gray-400 mt-1">계정 {{.UserCount}} · 고객 {{.CustomerCount}} · AS {{.ASCount}} · 사업 {{.SalesCount}} — 삭제는 숫자 확인 후 다음 단계에서 합니다.</p>
+            <p class="text-[11px] text-gray-400 mt-1">계정 {{.UserCount}} · 고객 {{.CustomerCount}} · AS {{.ASCount}} · 사업 {{.SalesCount}}</p>
           </td>
           {{else}}
           <td class="px-3 py-2 font-mono">{{.OrgNo}}</td>
@@ -92,7 +93,15 @@
           <td class="px-3 py-2 text-right">{{.SalesCount}}</td>
           <td class="px-3 py-2">{{if .IsActive}}활성{{else}}숨김{{end}}</td>
           <td class="px-3 py-2 text-gray-500">{{.Note}}</td>
-          <td class="px-3 py-2"><a href="/admin/orgs?edit={{.OrgID}}" class="text-blue-700 text-xs underline">수정</a></td>
+          <td class="px-3 py-2 whitespace-nowrap">
+            <a href="/admin/orgs?edit={{.OrgID}}" class="text-blue-700 text-xs underline">수정</a>
+            {{if .IsActive}}
+            <a href="/admin/orgs/{{.OrgID}}/delete" class="text-amber-800 text-xs underline ml-2">숨기기</a>
+            <a href="/admin/orgs/{{.OrgID}}/split" class="text-gray-700 text-xs underline ml-2">분리</a>
+            {{else}}
+            <a href="/admin/orgs/{{.OrgID}}/purge" class="text-red-700 text-xs underline ml-2">완전삭제</a>
+            {{end}}
+          </td>
           {{end}}
         </tr>
         {{else}}

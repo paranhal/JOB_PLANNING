@@ -174,7 +174,7 @@ func New(db *sql.DB) *Handler {
 		),
 		Items:       NewItemsHandler(repository.NewSalesItemRepo(db), customerRepo, repository.NewQuoteRepo(db)),
 		AdminWork:   NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo, codeRepo, assetRepo),
-		Org:         NewOrgHandler(repository.NewOrgRepo(db), authH),
+		Org:         NewOrgHandler(db, repository.NewOrgRepo(db), authH, settingsRepo, userRepo, dataDirFromEnv()),
 		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),
 		System:      &SystemHandler{db: db, auth: authH, uploadDir: attachH.uploadDir},
 

@@ -1,0 +1,25 @@
+{{define "title"}}조직 완전 삭제 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-xl space-y-4">
+  <h2 class="text-xl font-bold text-red-800">조직 완전 삭제</h2>
+  <p class="text-sm text-gray-600">숨긴 조직만 지울 수 있습니다. 백업 파일이 있어야 합니다. 되돌리려면 복구 화면을 씁니다.</p>
+  {{if .FlashErr}}<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>{{end}}
+  <div class="bg-white rounded-xl border p-4 text-sm space-y-1">
+    <p><span class="font-mono">{{.Org.OrgNo}}</span> <strong>{{.Org.OrgName}}</strong> {{if not .Org.IsActive}}(숨김){{end}}</p>
+    <p>계정 {{.Counts.Users}} · 고객 {{.Counts.Customers}} · AS {{.Counts.AS}} · 사업 {{.Counts.Sales}} · 업무 {{.Counts.Work}}</p>
+  </div>
+  <form method="POST" action="/admin/orgs/{{.Org.OrgID}}/purge" class="bg-white rounded-xl border border-red-200 p-4 space-y-3">
+    <input type="hidden" name="org_id" value="{{.Org.OrgID}}">
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">조직명을 그대로 입력</label>
+      <input type="text" name="confirm_name" required class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="off">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">확인 비밀번호</label>
+      <input type="password" name="vision_password" required class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-red-700 text-white rounded-lg text-sm">데이터를 지운다</button>
+    <a href="/admin/orgs" class="ml-2 text-sm text-gray-500">취소</a>
+  </form>
+</div>
+{{end}}

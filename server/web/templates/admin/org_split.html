@@ -1,0 +1,57 @@
+{{define "title"}}조직 분리 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-3xl space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">조직 분리</h2>
+  <p class="text-sm text-gray-600">고른 고객과 그에 딸린 자산·AS·사업·업무를 한 트랜잭션으로 옮깁니다. 담당자 계정은 따라가지 않습니다.</p>
+  {{if .FlashErr}}<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>{{end}}
+  <p class="text-sm">출발: <strong>{{.Org.OrgNo}} {{.Org.OrgName}}</strong></p>
+
+  {{if .Preview}}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+    고객 {{.Preview.Customers}} · 자산 {{.Preview.Assets}} · AS {{.Preview.AS}} · 사업 {{.Preview.Sales}} · 업무 {{.Preview.Work}} · 점검 {{.Preview.Visits}}을 옮깁니다.
+  </div>
+  {{end}}
+
+  <form method="POST" action="/admin/orgs/{{.Org.OrgID}}/split/preview" class="bg-white rounded-xl border p-4 space-y-3">
+    <input type="hidden" name="org_id" value="{{.Org.OrgID}}">
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">옮길 곳</label>
+      <select name="to_org_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        {{range .Orgs}}
+        {{if ne .OrgID $.Org.OrgID}}
+        <option value="{{.OrgID}}" {{if eq $.ToOrg .OrgID}}selected{{end}}>{{.OrgNo}} {{.OrgName}}</option>
+        {{end}}
+        {{end}}
+      </select>
+    </div>
+    <div class="max-h-64 overflow-y-auto border rounded-lg">
+      {{range .Customers}}
+      <label class="flex items-center gap-2 px-3 py-1.5 text-sm border-b last:border-0">
+        <input type="checkbox" name="customer_id" value="{{.CustomerID}}" {{if index $.Selected .CustomerID}}checked{{end}}>
+        {{if .OfficialName}}{{.OfficialName}}{{else}}{{.OrgName}}{{end}}
+        <span class="text-xs text-gray-400 font-mono">{{.CustomerID}}</span>
+      </label>
+      {{else}}
+      <p class="px-3 py-4 text-sm text-gray-400">이 조직에 고객이 없습니다.</p>
+      {{end}}
+    </div>
+    <button type="submit" class="px-4 py-2 border rounded-lg text-sm">옮길 건수 보기</button>
+  </form>
+
+  {{if .Preview}}
+  <form method="POST" action="/admin/orgs/{{.Org.OrgID}}/split" class="bg-white rounded-xl border p-4 space-y-3">
+    <input type="hidden" name="org_id" value="{{.Org.OrgID}}">
+    <input type="hidden" name="to_org_id" value="{{.ToOrg}}">
+    {{range .Preview.CustomerIDs}}
+    <input type="hidden" name="customer_id" value="{{.}}">
+    {{end}}
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">확인 비밀번호</label>
+      <input type="password" name="vision_password" required class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">백업 후 옮기기</button>
+  </form>
+  {{end}}
+  <a href="/admin/orgs" class="text-sm text-gray-500">목록</a>
+</div>
+{{end}}

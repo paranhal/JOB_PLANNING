@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,12 +13,16 @@ import (
 )
 
 type OrgHandler struct {
-	repo *repository.OrgRepo
-	auth *AuthHandler
+	repo     *repository.OrgRepo
+	auth     *AuthHandler
+	db       *sql.DB
+	dataDir  string
+	settings *repository.SettingsRepo
+	users    *repository.UserRepo
 }
 
-func NewOrgHandler(repo *repository.OrgRepo, auth *AuthHandler) *OrgHandler {
-	return &OrgHandler{repo: repo, auth: auth}
+func NewOrgHandler(db *sql.DB, repo *repository.OrgRepo, auth *AuthHandler, settings *repository.SettingsRepo, users *repository.UserRepo, dataDir string) *OrgHandler {
+	return &OrgHandler{db: db, repo: repo, auth: auth, settings: settings, users: users, dataDir: dataDir}
 }
 
 func canSwitchOrg(c echo.Context) bool {

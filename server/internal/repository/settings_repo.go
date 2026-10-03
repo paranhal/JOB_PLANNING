@@ -14,6 +14,9 @@ import (
 
 const SettingASCompletedEditPassword = "as_completed_edit_password_hash"
 
+// SettingVisionAdminPassword 비젼관리자 확인 비밀번호. 시드는 49단계. TODO(49)
+const SettingVisionAdminPassword = "vision_admin_password_hash"
+
 // SettingMaintenanceDeletePassword 정기점검 계획 삭제 전용 비밀번호 (§23.11).
 const SettingMaintenanceDeletePassword = "maintenance_delete_password_hash"
 

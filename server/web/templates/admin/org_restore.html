@@ -1,0 +1,26 @@
+{{define "title"}}조직 복구 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-2xl space-y-4">
+  <h2 class="text-xl font-bold text-gray-800">조직 복구</h2>
+  <p class="text-sm text-gray-600">같은 조직번호가 살아 있으면 덮어쓰지 않습니다.</p>
+  {{if .FlashErr}}<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>{{end}}
+  <form method="POST" action="/admin/orgs/restore" class="bg-white rounded-xl border p-4 space-y-3">
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">백업 폴더</label>
+      <select name="folder" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        {{range .Items}}
+        <option value="{{.Name}}">{{.Name}}</option>
+        {{else}}
+        <option value="" disabled>백업이 없습니다</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-600 mb-1">확인 비밀번호</label>
+      <input type="password" name="vision_password" required class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">복구하기</button>
+    <a href="/admin/orgs" class="ml-2 text-sm text-gray-500">목록</a>
+  </form>
+</div>
+{{end}}
