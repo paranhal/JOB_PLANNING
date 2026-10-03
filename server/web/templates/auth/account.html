@@ -61,6 +61,30 @@
     </form>
   </div>
 
+  <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+    <h3 class="text-sm font-semibold text-gray-800">사인</h3>
+    <p class="text-xs text-gray-500">이미지로 올리거나 아래에 그립니다. 흰 배경은 투명으로 저장합니다. 본인만 올릴 수 있습니다.</p>
+    {{if .HasSignature}}
+    <img src="/account/signature.png" alt="내 사인" class="h-20 w-auto border border-gray-100 rounded bg-white">
+    <form method="POST" action="/account/signature/delete" class="inline">
+      <button type="submit" class="text-xs text-red-600 hover:underline">사인 지우기</button>
+    </form>
+    {{end}}
+    <form method="POST" action="/account/signature" enctype="multipart/form-data" class="space-y-3" id="sig-form">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">이미지 올리기 (PNG·JPG, 1MB 이하)</label>
+        <input type="file" name="file" accept="image/png,image/jpeg" class="w-full text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">직접 그리기</label>
+        <canvas id="sig-pad" width="400" height="160" class="w-full border rounded-lg bg-white cursor-crosshair"></canvas>
+        <input type="hidden" name="drawn" id="sig-drawn">
+        <button type="button" id="sig-clear" class="mt-1 text-xs text-gray-500 hover:underline">그림 지우기</button>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium">사인 저장</button>
+    </form>
+  </div>
+
   <div class="bg-white rounded-xl border border-gray-200 p-6">
     <h3 class="text-sm font-semibold text-gray-800 mb-4">비밀번호 변경</h3>
     <form method="POST" action="/account/password" class="space-y-3">
@@ -87,4 +111,41 @@
     <a href="/logout" class="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium">로그아웃</a>
   </div>
 </div>
+<script>
+(function () {
+  var canvas = document.getElementById('sig-pad');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  var drawing = false, dirty = false;
+  function pos(e) {
+    var r = canvas.getBoundingClientRect();
+    var x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    var y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    return {x: x * canvas.width / r.width, y: y * canvas.height / r.height};
+  }
+  function start(e) { e.preventDefault(); drawing = true; var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+  function move(e) { if (!drawing) return; e.preventDefault(); var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); dirty = true; }
+  function end() { drawing = false; }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', move, {passive:false});
+  canvas.addEventListener('touchend', end);
+  var clearBtn = document.getElementById('sig-clear');
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); dirty = false;
+    document.getElementById('sig-drawn').value = '';
+  });
+  var form = document.getElementById('sig-form');
+  if (form) form.addEventListener('submit', function () {
+    if (dirty) document.getElementById('sig-drawn').value = canvas.toDataURL('image/png');
+  });
+})();
+</script>
 {{end}}

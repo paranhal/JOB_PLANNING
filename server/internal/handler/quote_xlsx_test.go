@@ -9,6 +9,7 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
+	"customer-support/internal/imageproc"
 	"customer-support/internal/model"
 )
 
@@ -227,6 +228,40 @@ func TestEnsureQuoteTemplatesAndOtherFormsNoFormula(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertXlsxNoFormula(t, raw, "I18")
+}
+
+func TestStampQuoteSignatureAddsPNGWithoutFailingEmpty(t *testing.T) {
+	q := &model.SalesQuote{
+		QuoteNo: "VI-견적-20260816-001", QuoteDate: "2026-08-16",
+		OwnerName: "최혜영", OwnerPhone: "010",
+		Lines: []model.SalesQuoteLine{{Name: "감열지", Qty: 1, UnitPrice: 1000}},
+	}
+	raw, err := FillQuoteFormP(q, model.QuoteCompany{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stampQuoteSignature(raw, nil, "P"); !bytes.Equal(got, raw) {
+		t.Fatal("사인 없으면 원본을 유지해야 한다")
+	}
+	png, err := imageproc.ProcessSignature(bytes.NewReader(inkPNG(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := stampQuoteSignature(raw, png, "P")
+	zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, f := range zr.File {
+		if strings.Contains(strings.ToLower(f.Name), ".png") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("견적서에 사인 PNG가 없다")
+	}
 }
 
 func assertXlsxNoFormula(t *testing.T, raw []byte, addr string) {

@@ -121,6 +121,11 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
+		if png := h.loadActorSignature(c); len(png) > 0 {
+			if out, err := docxpkg.AppendPNG(data, png); err == nil {
+				data = out
+			}
+		}
 		mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 		asciiName = "as_report.docx"
 	} else {
@@ -136,6 +141,11 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 			data, err = hwpx.AppendJPEGs(data, photos)
 			if err != nil {
 				return h.redirectReportErr(c, as.ASID, "보고서 사진을 넣지 못했습니다: "+err.Error())
+			}
+		}
+		if png := h.loadActorSignature(c); len(png) > 0 {
+			if out, err := hwpx.AppendImages(data, []hwpx.EmbeddedImage{{Data: png, MIME: "image/png"}}); err == nil {
+				data = out
 			}
 		}
 		mime = "application/hwp+zip"
@@ -318,6 +328,13 @@ func reportDraftFromForm(c echo.Context) model.ASReportDraft {
 		WorkDates:    c.FormValue("work_dates"),
 		Actions:      c.FormValue("actions"),
 	}
+}
+
+func (h *ASHandler) loadActorSignature(c echo.Context) []byte {
+	if h == nil || h.userRepo == nil {
+		return nil
+	}
+	return readUserSignaturePNG(h.userRepo, ctxString(c, "user_id"))
 }
 
 func (h *ASHandler) redirectReportErr(c echo.Context, asID, msg string) error {

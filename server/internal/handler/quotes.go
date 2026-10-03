@@ -387,6 +387,7 @@ func (h *QuotesHandler) Download(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	raw = stampQuoteSignature(raw, readUserSignaturePNG(h.users, q.OwnerUserID), QuoteOutputForm(q.FormType))
 	salesName := ""
 	if h.sales != nil && strings.TrimSpace(q.SalesID) != "" {
 		if p, err := h.sales.Get(q.SalesID); err == nil && p != nil {

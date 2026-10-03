@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -131,6 +132,32 @@ func EnsureQuoteFormA1(path string) error {
 
 func FillQuoteFormA1(q *model.SalesQuote, company model.QuoteCompany) ([]byte, error) {
 	return FillQuoteFormP(q, company)
+}
+
+func stampQuoteSignature(raw, png []byte, form string) []byte {
+	if len(raw) == 0 || len(png) == 0 {
+		return raw
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(raw))
+	if err != nil {
+		return raw
+	}
+	defer f.Close()
+	sheet := quoteA1Sheet(f)
+	cell := "F9"
+	if form == "D" {
+		cell = "J36"
+	}
+	_ = f.AddPictureFromBytes(sheet, cell, &excelize.Picture{
+		Extension: ".png",
+		File:      png,
+		Format:    &excelize.GraphicOptions{LockAspectRatio: true, ScaleX: 0.35, ScaleY: 0.35, OffsetX: 10, OffsetY: 8},
+	})
+	out, err := writeWorkbook(f)
+	if err != nil || len(out) == 0 {
+		return raw
+	}
+	return out
 }
 
 func formatSalesWon(n int) string {

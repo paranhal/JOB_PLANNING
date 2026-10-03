@@ -93,7 +93,7 @@ func New(db *sql.DB) *Handler {
 	wbH.attach = attachH
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
-	authH := &AuthHandler{userRepo: userRepo, orgRepo: repository.NewOrgRepo(db), settingsRepo: settingsRepo, adminUnlock: repository.NewAdminUnlockRepo(db), jwtSecret: jwtSecret}
+	authH := &AuthHandler{userRepo: userRepo, orgRepo: repository.NewOrgRepo(db), settingsRepo: settingsRepo, adminUnlock: repository.NewAdminUnlockRepo(db), jwtSecret: jwtSecret, uploadDir: attachH.uploadDir}
 	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)
 	wbH.notices = noticeHook
 

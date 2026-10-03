@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ import (
 
 	"customer-support/internal/docx"
 	"customer-support/internal/hwpx"
+	"customer-support/internal/imageproc"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -545,4 +547,74 @@ func zipFileBytes(t *testing.T, zipped []byte, name string) []byte {
 	}
 	t.Fatalf("%s 없음", name)
 	return nil
+}
+
+func TestASReportWithoutSignatureStillIssues(t *testing.T) {
+	e, h, asRepo, _, asID := newASReportFixture(t)
+	completeASForReport(t, asRepo, asID, "증상", "원인", "결론")
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
+	draft := h.AS.buildASReportDraft(as, time.Now())
+	rec := postASReport(t, e, asID, draft)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("사인 없이 발급 실패 %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestASReportEmbedsActorSignaturePNG(t *testing.T) {
+	e, h, asRepo, _, asID := newASReportFixture(t)
+	completeASForReport(t, asRepo, asID, "증상", "원인", "결론")
+	as, _ := asRepo.GetByID(repository.OrgAll, asID)
+	draft := h.AS.buildASReportDraft(as, time.Now())
+	admin, err := h.AS.userRepo.GetByUsername("admin")
+	if err != nil || admin == nil {
+		t.Fatal(err)
+	}
+	up := filepath.Join(t.TempDir(), "uploads")
+	h.Auth.uploadDir = up
+	dir := filepath.Join(up, "signatures")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	png, err := imageproc.ProcessSignature(bytes.NewReader(inkPNG(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, admin.UserID+".png")
+	if err := os.WriteFile(path, png, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.AS.userRepo.UpdateSignaturePath(admin.UserID, path); err != nil {
+		t.Fatal(err)
+	}
+
+	form := url.Values{
+		"customer_name": {draft.CustomerName}, "department": {draft.Department},
+		"manager": {draft.Manager}, "phone": {draft.Phone}, "service": {draft.Service},
+		"symptom": {draft.Symptom}, "cause_detail": {draft.CauseDetail},
+		"conclusion": {draft.Conclusion}, "report_date": {draft.ReportDate},
+		"inspector": {draft.Inspector}, "confirmer": {draft.Confirmer},
+		"work_dates": {draft.WorkDates}, "actions": {draft.Actions}, "format": {"hwpx"},
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report", strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUserClaims(t, admin))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("발급 %d %s", rec.Code, rec.Body.String())
+	}
+	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, f := range zr.File {
+		if strings.HasSuffix(strings.ToLower(f.Name), ".png") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("보고서에 사인 PNG가 없다")
+	}
 }

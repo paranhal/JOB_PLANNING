@@ -199,6 +199,9 @@ func main() {
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
 	g.POST("/account/username", h.Auth.AccountRenameUsername)
+	g.POST("/account/signature", h.Auth.AccountSignature)
+	g.GET("/account/signature.png", h.Auth.AccountSignatureImage)
+	g.POST("/account/signature/delete", h.Auth.AccountSignatureDelete)
 	g.POST("/view-as", h.Auth.SetViewAs)
 	g.POST("/view-as/clear", h.Auth.ClearViewAs)
 

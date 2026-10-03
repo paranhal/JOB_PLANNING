@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
@@ -199,6 +200,17 @@ func (r *UserRepo) Update(u *model.User) error {
 		rememberUserName(u.UserID, u.FullName)
 	}
 	return err
+}
+
+func (r *UserRepo) UpdateSignaturePath(userID, path string) error {
+	userID = strings.TrimSpace(userID)
+	if r == nil || r.db == nil || userID == "" {
+		return fmt.Errorf("계정이 없습니다")
+	}
+	return touchUpdate(r.db, "users", "user_id", userID, "사인", func() error {
+		_, err := r.db.Exec(`UPDATE users SET signature_path=? WHERE user_id=?`, strings.TrimSpace(path), userID)
+		return err
+	})
 }
 
 func (r *UserRepo) UpdatePassword(id, hash string) error {

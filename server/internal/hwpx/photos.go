@@ -19,15 +19,31 @@ type JPEGPhoto struct {
 	Caption string
 }
 
+// EmbeddedImage HWPX에 붙일 그림. PNG 사인·JPEG 조치 사진.
+type EmbeddedImage struct {
+	Data    []byte
+	Caption string
+	MIME    string
+}
+
 type jpegAdd struct {
-	id, href string
-	jpeg     []byte
-	w, h     int
-	caption  string
+	id, href, mime string
+	blob           []byte
+	w, h           int
+	caption        string
 }
 
 // AppendJPEGs 치환이 끝난 HWPX 끝에 사진을 붙인다. 원본 바이트는 건드리지 않는다.
 func AppendJPEGs(doc []byte, photos []JPEGPhoto) ([]byte, error) {
+	var imgs []EmbeddedImage
+	for _, p := range photos {
+		imgs = append(imgs, EmbeddedImage{Data: p.JPEG, Caption: p.Caption, MIME: "image/jpeg"})
+	}
+	return AppendImages(doc, imgs)
+}
+
+// AppendImages JPEG·PNG를 HWPX 끝에 붙인다. 빈 목록이면 원본을 돌려준다.
+func AppendImages(doc []byte, photos []EmbeddedImage) ([]byte, error) {
 	if len(photos) == 0 {
 		return doc, nil
 	}
@@ -61,23 +77,31 @@ func AppendJPEGs(doc []byte, photos []JPEGPhoto) ([]byte, error) {
 
 	var added []jpegAdd
 	for i, p := range photos {
-		if len(p.JPEG) == 0 {
+		if len(p.Data) == 0 {
 			continue
 		}
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(p.JPEG))
+		cfg, _, err := image.DecodeConfig(bytes.NewReader(p.Data))
 		if err != nil {
 			return nil, fmt.Errorf("보고서 사진 %d를 읽지 못했습니다: %w", i+1, err)
 		}
+		mime := strings.ToLower(strings.TrimSpace(p.MIME))
+		ext := ".jpg"
+		if mime == "image/png" || strings.HasPrefix(mime, "image/png") {
+			ext = ".png"
+			mime = "image/png"
+		} else {
+			mime = "image/jpeg"
+		}
 		id := fmt.Sprintf("actionphoto%d", i+1)
-		href := "BinData/" + id + ".jpg"
-		added = append(added, jpegAdd{id: id, href: href, jpeg: p.JPEG, w: cfg.Width, h: cfg.Height, caption: p.Caption})
+		href := "BinData/" + id + ext
+		added = append(added, jpegAdd{id: id, href: href, mime: mime, blob: p.Data, w: cfg.Width, h: cfg.Height, caption: p.Caption})
 	}
 	if len(added) == 0 {
 		return doc, nil
 	}
 
 	for _, a := range added {
-		parts = append(parts, part{name: "Contents/" + a.href, body: a.jpeg, store: false})
+		parts = append(parts, part{name: "Contents/" + a.href, body: a.blob, store: false})
 	}
 
 	lastSec := -1
@@ -127,7 +151,7 @@ func injectManifestItems(raw []byte, added []jpegAdd) []byte {
 	s := string(raw)
 	var b strings.Builder
 	for _, a := range added {
-		b.WriteString(fmt.Sprintf(`    <opf:item id="%s" href="%s" media-type="image/jpeg"/>`+"\n", a.id, a.href))
+		b.WriteString(fmt.Sprintf(`    <opf:item id="%s" href="%s" media-type="%s"/>`+"\n", a.id, a.href, a.mime))
 	}
 	if i := strings.LastIndex(s, "</opf:manifest>"); i >= 0 {
 		return []byte(s[:i] + b.String() + s[i:])
@@ -139,7 +163,7 @@ func injectODFEntries(raw []byte, added []jpegAdd) []byte {
 	s := string(raw)
 	var b strings.Builder
 	for _, a := range added {
-		b.WriteString(fmt.Sprintf(`  <odf:file-entry odf:full-path="Contents/%s" odf:media-type="image/jpeg"/>`+"\n", a.href))
+		b.WriteString(fmt.Sprintf(`  <odf:file-entry odf:full-path="Contents/%s" odf:media-type="%s"/>`+"\n", a.href, a.mime))
 	}
 	if i := strings.LastIndex(s, "</odf:manifest>"); i >= 0 {
 		return []byte(s[:i] + b.String() + s[i:])

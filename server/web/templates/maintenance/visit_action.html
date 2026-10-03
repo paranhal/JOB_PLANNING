@@ -105,9 +105,21 @@
   {{else}}
   <section class="bg-white rounded-xl border border-slate-200 p-5 text-sm space-y-2">
     <p>담당: {{if .Visit.Assignee}}{{.Visit.Assignee}}{{else}}—{{end}}</p>
+    {{if .SignatureDataURL}}
+    <img src="{{.SignatureDataURL}}" alt="사인" class="h-16 w-auto">
+    {{end}}
     <p>점검 대상: {{if .Visit.ProductType}}{{.Visit.ProductType}}{{else}}—{{end}}</p>
     {{if .Visit.Notes}}<p class="whitespace-pre-wrap text-slate-600">{{.Visit.Notes}}</p>{{end}}
   </section>
   {{end}}
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <p class="text-xs text-slate-500">담당 · 결과서</p>
+    <p class="text-sm font-medium text-slate-800 mt-1">{{if .Visit.Assignee}}{{.Visit.Assignee}}{{else}}이름만 적습니다{{end}}</p>
+    {{if .SignatureDataURL}}
+    <img src="{{.SignatureDataURL}}" alt="사인" class="mt-2 h-16 w-auto">
+    {{else}}
+    <p class="text-xs text-slate-400 mt-1">사인이 없으면 이름만 적습니다.</p>
+    {{end}}
+  </div>
 </div>
 {{end}}

@@ -25,6 +25,7 @@ type AuthHandler struct {
 	settingsRepo *repository.SettingsRepo
 	adminUnlock  *repository.AdminUnlockRepo
 	jwtSecret    []byte
+	uploadDir    string
 }
 
 func (h *AuthHandler) LoginPage(c echo.Context) error {
@@ -143,6 +144,10 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 		if n := strings.TrimSpace(c.QueryParam("n")); n != "" && n != "0" {
 			msg = fmt.Sprintf("계정 정보가 저장되었습니다. 담당 글자 %s건을 함께 고쳤습니다.", n)
 		}
+	} else if c.QueryParam("ok") == "signature" {
+		msg = "사인을 저장했습니다."
+	} else if c.QueryParam("ok") == "signature_cleared" {
+		msg = "사인을 지웠습니다."
 	}
 	var orgs []model.Org
 	if h.orgRepo != nil {
@@ -150,6 +155,7 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
 		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg, "Orgs": orgs,
+		"HasSignature": strings.TrimSpace(u.SignaturePath) != "" && signatureFileExists(u.SignaturePath),
 	})
 }
 
