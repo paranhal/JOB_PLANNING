@@ -268,45 +268,107 @@
 {{end}}
 
 {{if .ShowAssignNoticeModal}}
-<div id="assign-notice-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
-  <div class="w-full max-w-lg rounded-xl bg-white shadow-xl">
-    <form method="post" class="p-5 space-y-4">
-      <h2 class="text-base font-bold text-gray-900">새로 배정된 업무 {{len .AssignNotices}}건</h2>
-      <ul class="max-h-64 space-y-2 overflow-y-auto text-sm">
-        {{range .AssignNotices}}
-        <li>
-          <label class="flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50">
-            <input type="checkbox" name="notice_id" value="{{.NoticeID}}" checked class="mt-1">
-            <span>
-              <span class="font-medium text-gray-800">{{.Number}}</span>
-              <span class="text-gray-600"> {{.OrgName}}</span>
-              <span class="block text-gray-500">{{.Title}}</span>
-            </span>
-          </label>
-        </li>
+<div id="assign-notice-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4"
+     x-data="{ open:'', assigned:true, unassigned: {{if .ExpandUnassigned}}true{{else}}false{{end}} }">
+  <div class="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl p-5 space-y-4">
+    <h2 class="text-base font-bold text-gray-900">손봐야 할 업무 {{add (len .AssignNotices) (len .AssignUnassigned)}}건</h2>
+
+    {{if .AssignNotices}}
+    <div>
+      <button type="button" class="text-sm font-semibold text-gray-800" @click="assigned=!assigned">새로 배정된 업무 {{len .AssignNotices}}건</button>
+      <div x-show="assigned" class="mt-2 space-y-2">
+        <form method="post" class="space-y-3">
+          <ul class="max-h-56 space-y-2 overflow-y-auto text-sm">
+            {{range .AssignNotices}}
+            {{$key := noticeKey .}}
+            <li class="rounded-lg border border-gray-200">
+              <div class="flex items-start gap-2 px-3 py-2">
+                <input type="checkbox" name="notice_id" value="{{.NoticeID}}" checked class="mt-1">
+                <button type="button" class="flex-1 text-left" @click="open = (open==='n-{{.NoticeID}}' ? '' : 'n-{{.NoticeID}}')">
+                  <span class="font-medium text-gray-800">{{.Number}}</span>
+                  <span class="text-gray-600"> {{.OrgName}}</span>
+                  <span class="block text-gray-500">{{.Title}}</span>
+                </button>
+              </div>
+              <div class="flex flex-wrap items-end gap-1 px-3 pb-2">
+                <input type="hidden" name="key" value="{{$key}}">
+                <input type="date" name="work_date" value="{{$.AssignNoticeDate}}" class="rounded border px-1 py-0.5 text-xs">
+                <select name="assignee" class="rounded border px-1 py-0.5 text-xs">
+                  <option value="">담당자</option>
+                  {{range $.AssignNoticeAssignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+                </select>
+                <button formaction="/work/assign/one" class="rounded bg-blue-600 px-2 py-0.5 text-xs text-white">배정</button>
+                <button formaction="/work/transfer/one" class="rounded border px-2 py-0.5 text-xs">이관</button>
+                <input type="text" name="hold_reason" placeholder="보류 사유" class="rounded border px-1 py-0.5 text-xs w-28">
+                <button formaction="/work/hold/one" class="rounded border px-2 py-0.5 text-xs">보류</button>
+                <button formaction="/work/notice/dismiss" class="rounded border px-2 py-0.5 text-xs text-gray-500">✕</button>
+              </div>
+              <div x-show="open==='n-{{.NoticeID}}'" x-cloak class="px-3 pb-3">
+                <iframe :src="open==='n-{{.NoticeID}}' ? '{{noticeEmbed .}}' : ''" class="w-full h-64 rounded border"></iframe>
+              </div>
+            </li>
+            {{end}}
+          </ul>
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="text-sm text-gray-600">날짜
+              <input type="date" name="work_date" value="{{.AssignNoticeDate}}" min="2000-01-01" max="2100-12-31"
+                     class="ml-1 rounded border border-gray-300 px-2 py-1 text-sm">
+            </label>
+            <select name="assignee" class="rounded border border-gray-300 px-2 py-1 text-sm">
+              <option value="">담당자</option>
+              {{range .AssignNoticeAssignees}}
+              <option value="{{.FullName}}">{{.FullName}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div class="flex flex-wrap gap-2 pt-1">
+            <button type="submit" formaction="/work/assign-notices/add" class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">일일 업무에 추가</button>
+            <button type="submit" formaction="/work/assign-notices/later" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">나중에</button>
+            <button type="submit" formaction="/work/assign-notices/transfer" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">다른 사람에게</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {{end}}
+
+    {{if and .CanAssignWork .AssignUnassigned}}
+    <div>
+      <button type="button" class="text-sm font-semibold text-gray-800" @click="unassigned=!unassigned">담당자 미배정 {{len .AssignUnassigned}}건</button>
+      <div x-show="unassigned" class="mt-2 space-y-2">
+        {{range .AssignUnassigned}}
+        {{$key := workAssignKey .}}
+        <div class="rounded-lg border border-orange-200">
+          <button type="button" class="w-full text-left px-3 py-2 text-sm" @click="open = (open==='{{$key}}' ? '' : '{{$key}}')">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+            <span class="font-medium">{{.OrgName}}</span>
+            <span class="text-gray-500"> {{.RefNumber}} · {{.Title}}</span>
+          </button>
+          <form method="post" class="flex flex-wrap items-end gap-1 px-3 pb-2">
+            <input type="hidden" name="key" value="{{$key}}">
+            <input type="hidden" name="back" value="/">
+            <input type="date" name="work_date" value="{{$.AssignNoticeDate}}" class="rounded border px-1 py-0.5 text-xs">
+            <select name="assignee" class="rounded border px-1 py-0.5 text-xs">
+              <option value="">담당자</option>
+              {{range $.AssignNoticeAssignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+            </select>
+            <button formaction="/work/assign/one" class="rounded bg-blue-600 px-2 py-0.5 text-xs text-white">배정</button>
+            <button formaction="/work/transfer/one" class="rounded border px-2 py-0.5 text-xs">이관</button>
+            <input type="text" name="hold_reason" placeholder="보류 사유" class="rounded border px-1 py-0.5 text-xs w-28">
+            <button formaction="/work/hold/one" class="rounded border px-2 py-0.5 text-xs">보류</button>
+            <button formaction="/work/notice/dismiss" class="rounded border px-2 py-0.5 text-xs text-gray-500">✕</button>
+          </form>
+          <div x-show="open==='{{$key}}'" x-cloak class="px-3 pb-3">
+            <iframe :src="open==='{{$key}}' ? '{{workEmbedHref .}}' : ''" class="w-full h-64 rounded border"></iframe>
+          </div>
+        </div>
         {{end}}
-      </ul>
-      <div class="flex flex-wrap items-end gap-3">
-        <label class="text-sm text-gray-600">날짜
-          <input type="date" name="work_date" value="{{.AssignNoticeDate}}" min="2000-01-01" max="2100-12-31"
-                 class="ml-1 rounded border border-gray-300 px-2 py-1 text-sm">
-        </label>
-        <select name="assignee" class="rounded border border-gray-300 px-2 py-1 text-sm">
-          <option value="">담당자</option>
-          {{range .AssignNoticeAssignees}}
-          <option value="{{.FullName}}">{{.FullName}}</option>
-          {{end}}
-        </select>
       </div>
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button type="submit" formaction="/work/assign-notices/add" class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">일일 업무에 추가</button>
-        <button type="submit" formaction="/work/assign-notices/later" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">나중에</button>
-        <button type="submit" formaction="/work/assign-notices/transfer" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">다른 사람에게</button>
-      </div>
-    </form>
+    </div>
+    {{end}}
   </div>
 </div>
 {{end}}
+
 
 <button type="button" id="build-badge"
         class="fixed bottom-2 right-2 z-20 rounded px-1.5 py-0.5 text-[10px] leading-none text-gray-400/80 hover:text-gray-600 hover:bg-white/80 cursor-pointer select-none"

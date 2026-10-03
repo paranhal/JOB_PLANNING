@@ -743,10 +743,18 @@
 
     {{/* 우측: 일일 업무 미확정(일자 미배정) 대기 목록 — 왼쪽 확정 건과 겹치지 않음 */}}
     <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-2 min-w-0">
-      <p class="sm:col-span-3 xl:col-span-1 text-[11px] text-slate-500 px-0.5">단위 업무별 대기 · 미확정만 표시</p>
+      <div class="sm:col-span-3 xl:col-span-1 flex items-center justify-between gap-2 px-0.5">
+        <p class="text-[11px] text-slate-500">단위 업무별 대기 · {{if .PaletteAll}}전체{{else}}미확정만{{end}}</p>
+        <div class="inline-flex rounded border border-slate-200 text-[10px] overflow-hidden">
+          <a href="/workboard/register?view={{.View}}&date={{.Date}}{{.FilterQ}}" class="px-2 py-0.5 {{if not .PaletteAll}}bg-slate-700 text-white{{else}}bg-white text-slate-600{{end}}">미배치</a>
+          <a href="/workboard/register?view={{.View}}&date={{.Date}}{{.FilterQ}}&palette=all" class="px-2 py-0.5 {{if .PaletteAll}}bg-slate-700 text-white{{else}}bg-white text-slate-600{{end}}">전체</a>
+        </div>
+      </div>
       {{template "wb_palette" (wbPalette "AS" "border-rose-200" "text-rose-700" "bg-rose-50" .ASCards .CanWrite)}}
       {{template "wb_palette" (wbPalette "정기점검" "border-sky-200" "text-sky-700" "bg-sky-50" .MntCards .CanWrite)}}
       {{template "wb_palette" (wbPalette "행정관련업무" "border-violet-200" "text-violet-700" "bg-violet-50" .AdminCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "영업" "border-orange-200" "text-orange-700" "bg-orange-50" .SalesCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "미배정" "border-amber-200" "text-amber-800" "bg-amber-50" .UnassignedCards .CanWrite)}}
     </div>
 
   </div>

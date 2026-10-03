@@ -40,6 +40,7 @@ type WorkPrefixCounts struct {
 	Maintenance int `json:"maintenance"`
 	Confirm     int `json:"confirm"`
 	General     int `json:"general"`
+	Sales       int `json:"sales"`
 	Total       int `json:"total"`
 }
 
@@ -53,6 +54,8 @@ func (c *WorkPrefixCounts) Add(prefix string, n int) {
 		c.Confirm += n
 	case WorkPrefixGeneral:
 		c.General += n
+	case WorkPrefixSales:
+		c.Sales += n
 	}
 	c.Total += n
 }
@@ -108,6 +111,8 @@ type WorkListItem struct {
 	ProductType    string `json:"product_type,omitempty"`
 	EditLocked     bool   `json:"edit_locked,omitempty"`    // §37.3 읽기 전용
 	AssigneeOther  bool   `json:"assignee_other,omitempty"` // 내 배정이 아님
+	AssignedAt     string `json:"assigned_at,omitempty"`
+	AssignedBy     string `json:"assigned_by,omitempty"`
 	CustomerID     string `json:"customer_id,omitempty"`    // §37.4 기관 필터
 	ProjectID      string `json:"project_id,omitempty"`     // §37.4 사업 필터
 	Content        string `json:"content,omitempty"`        // 제목·기관 외 본문(검색)

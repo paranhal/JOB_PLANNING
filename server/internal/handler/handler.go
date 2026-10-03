@@ -227,7 +227,7 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		mine = true
 	}
 
-	stats, todayList, delayedList, pendingList, unassignedList, err := h.workBoard.DashHome(mineUID, mineK, 10, 8, 8, 8)
+	stats, todayList, delayedList, pendingList, unassignedList, err := h.workBoard.DashHomeOrg(mineUID, mineK, currentOrg(c), 10, 8, 8, 8)
 	if err != nil {
 		return err
 	}
@@ -269,6 +269,12 @@ func (h *Handler) Dashboard(c echo.Context) error {
 
 	showAssignee := !mine && (model.IsAdminGrade(role) || role == model.RoleSupport)
 	canToggleTeam := model.IsAdminGrade(role) || role == model.RoleSupport || role == model.RoleSales
+	canAssign := canWriteWorkboard(c)
+	teamAssigned := canAssign && strings.TrimSpace(c.QueryParam("assigned")) == "org"
+	var todayAssigned []model.WorkListItem
+	if h.workBoard != nil {
+		todayAssigned, _ = h.workBoard.CollectTodayAssigned(currentOrg(c), mineUID, mineK, teamAssigned)
+	}
 	data := map[string]interface{}{
 		"Title":             "대시보드",
 		"Active":            NavDashboard,
@@ -302,6 +308,12 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		"DelayedList":       delayedList,
 		"PendingList":       pendingList,
 		"UnassignedList":    unassignedList,
+		"TodayAssigned":     todayAssigned,
+		"TeamAssigned":      teamAssigned,
+		"CanAssignWork":     canAssign,
+		"AssignedOrgHref":   "/?assigned=org",
+		"AssignedMineHref":  "/",
+		"AssignOpenHref":    "/?assign=1",
 		"TeamDelayedList":   teamDelayed,
 		"ShowAssignee":      showAssignee,
 		"ScopeMine":         mine,

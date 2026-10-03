@@ -293,19 +293,49 @@ func (r *WBRepo) ASStatusesByIDs(ids []string) (map[string]string, error) {
 // ListUnplacedAdminTasks 일자가 확정되지 않은(WorkDate 없음) 행정/지원 실행 작업. 반복 상위는 제외.
 // WorkDate가 있으면 왼쪽 일정표 쪽이며 우측 대기 목록에는 두지 않는다.
 func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
+	return r.ListUnplacedTasks(OrgAll, []string{model.WBWorkAdmin, model.WBWorkSupport})
+}
+
+func (r *WBRepo) ListUnplacedTasks(orgID string, kinds []string) ([]model.WorkTask, error) {
 	all, err := r.ListTasks()
 	if err != nil {
 		return nil, err
 	}
+	kindOK := map[string]bool{}
+	for _, k := range kinds {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			kindOK[k] = true
+		}
+	}
+	keepOrg := map[string]bool{}
+	filterOrg := strings.TrimSpace(orgID) != "" && orgID != OrgAll
+	if filterOrg {
+		q := `SELECT t.task_id FROM work_tasks t WHERE 1=1`
+		q, args := appendOrg(q, nil, "t", orgID)
+		rows, qerr := r.db.Query(q, args...)
+		if qerr == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id string
+				if rows.Scan(&id) == nil {
+					keepOrg[id] = true
+				}
+			}
+		}
+	}
 	var items []model.WorkTask
 	for _, t := range all {
-		if t.SourceType != "" || t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
+		if t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
 			continue
 		}
-		if t.WorkType != model.WBWorkAdmin && t.WorkType != model.WBWorkSupport {
+		if len(kindOK) > 0 && !kindOK[t.WorkType] {
 			continue
 		}
 		if t.RecurrenceRole == model.RecurrenceRoleParent {
+			continue
+		}
+		if filterOrg && !keepOrg[t.TaskID] {
 			continue
 		}
 		if strings.TrimSpace(t.WorkDate) == "" {
@@ -583,8 +613,12 @@ func (r *WBRepo) PlaceTask(taskID, workDate, startTime, endTime string) error {
 // 사람이 일일 업무에서 직접 바꾼 것이므로 assignee_source='manual'. §42.3
 func (r *WBRepo) SetTaskAssignee(taskID, assignee string) error {
 	name, uid := bindStaff(r.db, assignee, "")
+	oldName, oldUID := readAssigneePair(r.db, "work_tasks", "task_id", taskID, "assignee", "assignee_user_id")
 	_, err := r.db.Exec(`UPDATE work_tasks SET assignee=?, assignee_user_id=?, assignee_source=?, updated_at=CURRENT_TIMESTAMP WHERE task_id=?`,
 		name, uid, model.WBAssigneeSourceManual, taskID)
+	if err == nil {
+		stampAssignedIfChanged(r.db, "work_tasks", "task_id", taskID, oldName, oldUID, name, uid)
+	}
 	return err
 }
 

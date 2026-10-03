@@ -195,16 +195,19 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		placed = filterTasksByAssignee(placed, assigneeFilter)
 	}
 	placed = filterTasksByProject(placed, projectFilter)
-	asCards, mntCards, adminCards, err := h.registerPalette()
+	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(currentOrg(c), strings.TrimSpace(c.QueryParam("palette")) == "all")
 	if err != nil {
 		return err
 	}
 	asCards = filterCardsByAssignee(asCards, assigneeFilter)
 	mntCards = filterCardsByAssignee(mntCards, assigneeFilter)
 	adminCards = filterCardsByAssignee(adminCards, assigneeFilter)
+	salesCards = filterCardsByAssignee(salesCards, assigneeFilter)
 	asCards = filterCardsByProject(asCards, projectFilter)
 	mntCards = filterCardsByProject(mntCards, projectFilter)
 	adminCards = filterCardsByProject(adminCards, projectFilter)
+	salesCards = filterCardsByProject(salesCards, projectFilter)
+	unassignedCards = filterCardsByProject(unassignedCards, projectFilter)
 
 	undatedTasks, err := h.repo.ListUndatedASTasks()
 	if err != nil {
@@ -285,7 +288,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	}
 	// 드롭 존용 빈 행(카드는 DayColumns.Blocks에 절대 배치)
 	rows := h.buildRegisterRows(period.Columns, nil)
-	assigneeLegend := buildAssigneeLegend(placed, assignees, asCards, mntCards, adminCards)
+	assigneeLegend := buildAssigneeLegend(placed, assignees, asCards, mntCards, adminCards, salesCards, unassignedCards)
 	gridHeightStyle, slotTopStyles := registerGridStyles(len(slotTimes))
 	var monthWeeks [][]RegisterMonthDay
 	if view == regViewMonth {
@@ -361,6 +364,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"ASCards":         asCards,
 		"MntCards":        mntCards,
 		"AdminCards":      adminCards,
+		"SalesCards":      salesCards,
+		"UnassignedCards": unassignedCards,
+		"PaletteAll":      strings.TrimSpace(c.QueryParam("palette")) == "all",
 		"UndatedCards":    undatedCards,
 		"PlacedCount":     len(placed),
 		"Projects":        projects,
@@ -740,38 +746,41 @@ func (h *WorkboardHandler) syncVisitDateFromTask(sourceType, sourceID, workDate 
 	}
 }
 
-// registerPalette 아직 일정표에 올리지 않은 AS·정기점검·행정관련 업무 카드
-func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err error) {
+// registerPalette 아직 일정표에 올리지 않은 AS·정기점검·행정·영업·미배정 카드
+func (h *WorkboardHandler) registerPalette(orgID string, showAll bool) (as, mnt, admin, sales, unassigned []model.WBCard, err error) {
+	if strings.TrimSpace(orgID) == "" {
+		orgID = repository.OrgAll
+	}
 	tasks, err := h.repo.ListTasks()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	usedSource := map[string]bool{}
 	for _, t := range tasks {
-		// 일일업무 행이 있으면 우측 대기 목록에서 뺀다. 예정일 없는 건은 「날짜 미정」 줄로 간다. §42.2
-		if t.SourceType != "" && t.SourceID != "" {
+		if t.SourceType != "" && t.SourceID != "" && strings.TrimSpace(t.WorkDate) != "" {
 			usedSource[t.SourceType+":"+t.SourceID] = true
 		}
 	}
 
 	if h.asRepo != nil {
-		items, _, e := h.asRepo.ListFiltered(repository.OrgAll, "open", "", "", nil, "", "", 1, 200)
-		if e != nil {
-			return nil, nil, nil, e
+		status := "open"
+		if showAll {
+			status = ""
 		}
-		// 이미 배치된 건은 빼고, 같은 고객·예정일 건수로 점(.)을 붙인다.
+		items, _, e := h.asRepo.ListFiltered(orgID, status, "", "", nil, "", "", 1, 400)
+		if e != nil {
+			return nil, nil, nil, nil, nil, e
+		}
 		var open []model.ASListItem
 		for _, it := range items {
-			if usedSource[model.WBSourceAS+":"+it.ASID] {
-				continue
-			}
-			if strings.TrimSpace(it.AssignedTo) == "" {
+			if usedSource[model.WBSourceAS+":"+it.ASID] && !showAll {
 				continue
 			}
 			open = append(open, it)
 		}
 		titles := buildASTitleMap(open)
 		for _, it := range open {
+			closed := it.Status == "completed" || it.Status == "closed" || it.Status == "cancelled"
 			as = append(as, model.WBCard{
 				Kind:         model.WBSourceAS,
 				RefID:        it.ASID,
@@ -783,6 +792,9 @@ func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err
 				Assignee:     it.AssignedTo,
 				PlannedDay:   it.VisitScheduledDate,
 				DurationMin:  30,
+				Unassigned:   strings.TrimSpace(it.AssignedTo) == "",
+				Dimmed:       closed,
+				Status:       it.Status,
 			})
 		}
 	}
@@ -792,10 +804,13 @@ func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err
 		visits, e := h.mntRepo.ListVisitsBetween(
 			now.AddDate(0, 0, -7).Format(dateLayout), now.AddDate(0, 0, 45).Format(dateLayout))
 		if e != nil {
-			return nil, nil, nil, e
+			return nil, nil, nil, nil, nil, e
 		}
 		for _, v := range visits {
-			if v.Completed || usedSource[model.WBSourceMaintenance+":"+v.VisitID] {
+			if usedSource[model.WBSourceMaintenance+":"+v.VisitID] && !showAll {
+				continue
+			}
+			if v.Completed && !showAll {
 				continue
 			}
 			name := v.ShortName
@@ -811,50 +826,104 @@ func (h *WorkboardHandler) registerPalette() (as, mnt, admin []model.WBCard, err
 				SubTitle:     model.FormatMaintenanceDescription(v.ProductType, name),
 				ProductType:  v.ProductType,
 				SourceNumber: num,
-				SourceHref:   mntVisitHref(v),
+				SourceHref:   "/maintenance/visits/" + v.VisitID,
 				Assignee:     v.Assignee,
 				PlannedDay:   v.VisitDate,
 				DurationMin:  30,
+				Unassigned:   strings.TrimSpace(v.Assignee) == "",
+				Dimmed:       v.Completed,
 			})
 		}
 	}
 
-	adminTasks, err := h.repo.ListUnplacedAdminTasks()
+	adminTasks, err := h.repo.ListUnplacedTasks(orgID, []string{model.WBWorkAdmin, model.WBWorkSupport})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
+	}
+	salesTasks, err := h.repo.ListUnplacedTasks(orgID, []string{model.WBWorkSales})
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 	for _, t := range adminTasks {
-		planned := t.DueDate
-		if t.WorkDate != "" {
-			planned = t.WorkDate
-		}
-		title := t.Title
-		if t.ParentTaskID != "" {
-			title = "└ " + title
-		}
-		cat := model.WBWorkAdmin
-		if t.WorkType == model.WBWorkSupport {
-			cat = model.WBWorkSupport
-		}
-		if t.WorkType == model.WBWorkSales || t.SourceType == model.WBSourceSalesActivity {
-			cat = model.WBSourceSalesActivity
-		}
-		admin = append(admin, model.WBCard{
-			Kind:         "task",
-			RefID:        t.TaskID,
-			TaskID:       t.TaskID,
-			Category:     cat,
-			Title:        title,
-			SubTitle:     t.Description,
-			SourceNumber: t.TaskID,
-			SourceHref:   "/workboard/tasks/" + t.TaskID,
-			Assignee:     t.Assignee,
-			PlannedDay:   planned,
-			DurationMin:  t.DurationMin,
-			ParentTaskID: t.ParentTaskID,
-		})
+		admin = append(admin, paletteTaskCard(t, false))
 	}
-	return as, mnt, admin, nil
+	for _, t := range salesTasks {
+		sales = append(sales, paletteTaskCard(t, false))
+	}
+
+	if h.workBoard != nil {
+		items, e := h.workBoard.CollectUnassigned(orgID)
+		if e != nil {
+			return nil, nil, nil, nil, nil, e
+		}
+		for _, it := range items {
+			unassigned = append(unassigned, model.WBCard{
+				Kind:         paletteKindFromPrefix(it.Prefix, it.Href),
+				RefID:        it.RefID,
+				Category:     model.WBCategory(it.Prefix),
+				Title:        it.Title,
+				SubTitle:     it.OrgName,
+				SourceNumber: it.RefNumber,
+				SourceHref:   it.Href,
+				Assignee:     it.Assignee,
+				PlannedDay:   it.ScheduledDate,
+				DurationMin:  30,
+				Unassigned:   true,
+			})
+		}
+	}
+	return as, mnt, admin, sales, unassigned, nil
+}
+
+func paletteTaskCard(t model.WorkTask, dimmed bool) model.WBCard {
+	planned := t.DueDate
+	if t.WorkDate != "" {
+		planned = t.WorkDate
+	}
+	title := t.Title
+	if t.ParentTaskID != "" {
+		title = "└ " + title
+	}
+	cat := model.WBWorkAdmin
+	if t.WorkType == model.WBWorkSupport {
+		cat = model.WBWorkSupport
+	}
+	if t.WorkType == model.WBWorkSales || t.SourceType == model.WBSourceSalesActivity {
+		cat = model.WBSourceSalesActivity
+	}
+	return model.WBCard{
+		Kind:         "task",
+		RefID:        t.TaskID,
+		TaskID:       t.TaskID,
+		Category:     cat,
+		Title:        title,
+		SubTitle:     t.Description,
+		SourceNumber: t.TaskID,
+		SourceHref:   "/workboard/tasks/" + t.TaskID,
+		Assignee:     t.Assignee,
+		PlannedDay:   planned,
+		DurationMin:  t.DurationMin,
+		ParentTaskID: t.ParentTaskID,
+		Unassigned:   strings.TrimSpace(t.Assignee) == "",
+		Dimmed:       dimmed || t.Status == model.WBTaskComplete,
+		Status:       t.Status,
+	}
+}
+
+func paletteKindFromPrefix(prefix, href string) string {
+	switch prefix {
+	case model.WorkPrefixAS:
+		if strings.Contains(href, "/as/work/") {
+			return "wi"
+		}
+		return model.WBSourceAS
+	case model.WorkPrefixMaintenance:
+		return model.WBSourceMaintenance
+	case model.WorkPrefixSales:
+		return "task"
+	default:
+		return "task"
+	}
 }
 
 // Schedule 카드를 일정표의 날짜·시각에 배치한다. AS·정기점검 카드는 업무로 복사해 원본과 연결한다.
@@ -1138,7 +1207,7 @@ func addMinutesHHMM(hhmm string, add int) string {
 }
 
 // todayWaitingFromPalette 오늘 예정일(PlannedDay)인 AS·정기점검·행정/지원을 오늘예정업무로 합친다.
-func todayWaitingFromPalette(today string, as, mnt, admin []model.WBCard, seenSource, seenTask map[string]bool) []model.WorkTask {
+func todayWaitingFromPalette(today string, as, mnt, admin []model.WBCard, seenSource, seenTask map[string]bool, extra ...[]model.WBCard) []model.WorkTask {
 	var out []model.WorkTask
 	add := func(c model.WBCard) {
 		if strings.TrimSpace(c.PlannedDay) != today {
@@ -1174,6 +1243,11 @@ func todayWaitingFromPalette(today string, as, mnt, admin []model.WBCard, seenSo
 	}
 	for _, c := range admin {
 		add(c)
+	}
+	for _, group := range extra {
+		for _, c := range group {
+			add(c)
+		}
 	}
 	return out
 }
@@ -1266,11 +1340,11 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	}
 
 	// 오늘 예정인데 아직 work_tasks에 없거나 날짜가 비어 빠진 AS·정기점검·행정/지원 합치기
-	asCards, mntCards, adminCards, err := h.registerPalette()
+	asCards, mntCards, adminCards, salesCards, _, err := h.registerPalette(currentOrg(c), false)
 	if err != nil {
 		return nil, err
 	}
-	board = append(board, todayWaitingFromPalette(today, asCards, mntCards, adminCards, seenSource, seenTask)...)
+	board = append(board, todayWaitingFromPalette(today, asCards, mntCards, adminCards, seenSource, seenTask, salesCards)...)
 	board = append(board, waitingActionChecks(today, h.repo, seenTask)...)
 
 	projects, err := h.repo.ListProjects(false)
@@ -2015,6 +2089,12 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		salesList, _ := h.salesRepo.List("", model.SalesStatusActive, "")
 		data["CanConvertSales"] = true
 		data["ConvertSalesHref"] = convertSalesHref(t.TaskID, salesList)
+	}
+	embed := c.QueryParam("embed") == "1"
+	if embed {
+		data["Embed"] = true
+		data["HideNav"] = true
+		data["CanWrite"] = false
 	}
 	h.renderTaskGTD(c, data, t)
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)

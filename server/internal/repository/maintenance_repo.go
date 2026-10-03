@@ -335,6 +335,9 @@ func (r *MaintenanceRepo) InsertVisitFull(v model.MaintenanceVisit) error {
 		id, v.PlanID, v.VisitDate, v.CustomerID, v.SortOrder, auto, v.EntryCategory, nullIfEmpty(v.Notes),
 		nullIfEmpty(v.Assignee), nullIfEmpty(uid), nullIfEmpty(v.ProductType), completed, nullIfEmpty(completedDate),
 		nullIfEmpty(v.ProjectID), v.DupReason, stampIsTest())
+	if err == nil && strings.TrimSpace(v.Assignee) != "" {
+		stampAssigned(r.db, "maintenance_visits", "visit_id", id)
+	}
 	return err
 }
 
@@ -371,6 +374,7 @@ func (r *MaintenanceRepo) UpdateVisit(v model.MaintenanceVisit) error {
 	name, uid := bindStaff(r.db, v.Assignee, "")
 	v.Assignee = name
 	before := rowJSON(r.db, "maintenance_visits", "visit_id", v.VisitID)
+	oldName, oldUID := readAssigneePair(r.db, "maintenance_visits", "visit_id", v.VisitID, "assignee", "assignee_user_id")
 	res, err := r.db.Exec(`
 		UPDATE maintenance_visits SET
 			visit_date=?, customer_id=?, entry_category=?, notes=?,
@@ -387,6 +391,7 @@ func (r *MaintenanceRepo) UpdateVisit(v model.MaintenanceVisit) error {
 		return fmt.Errorf("방문을 찾을 수 없습니다")
 	}
 	logUpdate(r.db, "maintenance_visits", "visit_id", v.VisitID, v.VisitDate, before)
+	stampAssignedIfChanged(r.db, "maintenance_visits", "visit_id", v.VisitID, oldName, oldUID, v.Assignee, uid)
 	return nil
 }
 

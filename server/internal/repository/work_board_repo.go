@@ -20,7 +20,7 @@ func NewWorkBoardRepo(db *sql.DB) *WorkBoardRepo {
 }
 
 func (r *WorkBoardRepo) DashStats(mineUserID string, mineKeys []string) (*model.WorkDashStats, error) {
-	page, err := r.loadDash(mineUserID, mineKeys)
+	page, err := r.loadDash(mineUserID, mineKeys, OrgAll)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,13 @@ type dashPage struct {
 func (r *WorkBoardRepo) DashHome(mineUserID string, mineKeys []string, todayN, delayedN, pendingN, unassignedN int) (
 	*model.WorkDashStats, []model.WorkListItem, []model.WorkListItem, []model.WorkListItem, []model.WorkListItem, error,
 ) {
-	page, err := r.loadDash(mineUserID, mineKeys)
+	return r.DashHomeOrg(mineUserID, mineKeys, OrgAll, todayN, delayedN, pendingN, unassignedN)
+}
+
+func (r *WorkBoardRepo) DashHomeOrg(mineUserID string, mineKeys []string, orgID string, todayN, delayedN, pendingN, unassignedN int) (
+	*model.WorkDashStats, []model.WorkListItem, []model.WorkListItem, []model.WorkListItem, []model.WorkListItem, error,
+) {
+	page, err := r.loadDash(mineUserID, mineKeys, orgID)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -51,7 +57,7 @@ func (r *WorkBoardRepo) DashHome(mineUserID string, mineKeys []string, todayN, d
 		nil
 }
 
-func (r *WorkBoardRepo) loadDash(mineUserID string, mineKeys []string) (*dashPage, error) {
+func (r *WorkBoardRepo) loadDash(mineUserID string, mineKeys []string, orgID string) (*dashPage, error) {
 	s := &model.WorkDashStats{}
 	today := time.Now().Format("2006-01-02")
 
@@ -94,7 +100,7 @@ func (r *WorkBoardRepo) loadDash(mineUserID string, mineKeys []string) (*dashPag
 	s.SchedulePending = len(pending)
 	s.PendingByAssignee = buildAssigneePrefixStats(pending)
 
-	unassigned, err := r.collectUnassigned()
+	unassigned, err := r.CollectUnassigned(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +199,7 @@ func (r *WorkBoardRepo) ListBucketOn(bucket, date, mineUserID string, mineKeys [
 	case model.WorkBucketSchedulePending:
 		items, err = r.collectSchedulePending(mineUserID, mineKeys)
 	case model.WorkBucketUnassigned:
-		items, err = r.collectUnassigned()
+		items, err = r.CollectUnassigned(OrgAll)
 	default: // open
 		items, err = r.collectOpen(mineUserID, mineKeys)
 	}
@@ -422,7 +428,7 @@ func (r *WorkBoardRepo) collectWorkTodayOpen(mineUserID string, mineKeys []strin
 	out = append(out, gItems...)
 
 	tItems, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support')
+		`t.work_type IN ('admin','support','sales')
 		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 		 AND TRIM(COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')) != ''
 		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') <= ?`,
@@ -767,11 +773,122 @@ func (r *WorkBoardRepo) collectSchedulePending(mineUserID string, mineKeys []str
 		mineUserID, mineKeys, []interface{}{time.Now().Format("2006-01-02")})
 }
 
-func (r *WorkBoardRepo) collectUnassigned() ([]model.WorkListItem, error) {
-	return r.queryAS(
+func (r *WorkBoardRepo) CollectUnassigned(orgID string) ([]model.WorkListItem, error) {
+	orgID = orgIDOrAll(orgID)
+	var out []model.WorkListItem
+	asWhere, asArgs := applyOrgWhere(
 		`ar.status IN ('received','assigned','in_progress','hold','transfer')
 		 AND COALESCE(ar.assigned_to,'') = '' AND COALESCE(ar.assigned_user_id,'') = ''`,
-		"", nil, nil)
+		"ar", orgID, nil)
+	asItems, err := r.queryAS(asWhere, "", nil, asArgs)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, asItems...)
+
+	wiWhere, wiArgs := applyOrgWhere(
+		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
+		 AND TRIM(COALESCE(w.assigned_to,''))='' AND TRIM(COALESCE(w.assigned_user_id,''))=''`,
+		"ar", orgID, nil)
+	wi, err := r.queryWorkItems(wiWhere, "", nil, wiArgs)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, wi...)
+
+	mWhere, mArgs := applyOrgWhere(
+		`COALESCE(mv.completed,0)=0 AND TRIM(COALESCE(mv.assignee,''))=''`,
+		"c", orgID, nil)
+	mItems, err := r.queryMaintenance(mWhere, mArgs, 500)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, mItems...)
+
+	tWhere, tArgs := applyOrgWhere(
+		`t.work_type IN ('admin','support','sales')
+		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		 AND TRIM(COALESCE(t.assignee,''))=''`,
+		"t", orgID, nil)
+	tItems, err := r.queryWorkTasks(tWhere, "", nil, tArgs)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tItems...)
+	return out, nil
+}
+
+func (r *WorkBoardRepo) CollectTodayAssigned(orgID, mineUserID string, mineKeys []string, team bool) ([]model.WorkListItem, error) {
+	orgID = orgIDOrAll(orgID)
+	today := time.Now().Format("2006-01-02")
+	uid, keys := mineUserID, mineKeys
+	if team {
+		uid, keys = "", nil
+	}
+	var out []model.WorkListItem
+	asWhere, asArgs := applyOrgWhere(
+		`TRIM(COALESCE(ar.assigned_to,'')) != '' AND date(COALESCE(ar.assigned_at,'')) = ?`,
+		"ar", orgID, []interface{}{today})
+	asItems, err := r.queryAS(asWhere, uid, keys, asArgs)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, asItems...)
+
+	mWhere, mArgs := applyOrgWhere(
+		`TRIM(COALESCE(mv.assignee,'')) != '' AND date(COALESCE(mv.assigned_at,'')) = ?`,
+		"c", orgID, []interface{}{today})
+	mItems, err := r.queryMaintenance(mWhere, mArgs, 500)
+	if err != nil {
+		return nil, err
+	}
+	if !team && uid == "" && len(keys) > 0 {
+		mItems = filterItemsByAssigneeKeys(mItems, keys)
+	} else if !team && uid != "" {
+		mItems = filterItemsByAssigneeKeys(mItems, mergeAssigneeKeys(uid, "", keys...))
+	}
+	out = append(out, mItems...)
+
+	tWhere, tArgs := applyOrgWhere(
+		`t.work_type IN ('admin','support','sales')
+		 AND TRIM(COALESCE(t.assignee,'')) != ''
+		 AND date(COALESCE(t.assigned_at,'')) = ?`,
+		"t", orgID, []interface{}{today})
+	tItems, err := r.queryWorkTasks(tWhere, uid, keys, tArgs)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tItems...)
+	return out, nil
+}
+
+func filterItemsByAssigneeKeys(items []model.WorkListItem, keys []string) []model.WorkListItem {
+	want := map[string]bool{}
+	for _, k := range keys {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			want[k] = true
+		}
+	}
+	if len(want) == 0 {
+		return items
+	}
+	var out []model.WorkListItem
+	for _, it := range items {
+		if want[strings.TrimSpace(it.Assignee)] {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+func applyOrgWhere(where, alias, orgID string, args []interface{}) (string, []interface{}) {
+	frag, extra := mustOrgSQL(alias, orgID)
+	if len(extra) == 0 {
+		return where, args
+	}
+	out := append([]interface{}{}, args...)
+	return where + frag, append(out, extra...)
 }
 
 func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string, extraArgs []interface{}) ([]model.WorkListItem, error) {
@@ -780,7 +897,8 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		       COALESCE(ar.assigned_to,''), COALESCE(ar.visit_scheduled_date,''), ar.status,
 		       COALESCE(ar.urgency,''), COALESCE(ar.receipt_group_id,''),
 		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,''),
-		       COALESCE(ar.schedule_confirmed,0)
+		       COALESCE(ar.schedule_confirmed,0),
+		       COALESCE(ar.assigned_at,''), COALESCE(ar.assigned_by,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		WHERE ` + extraWhere
@@ -800,7 +918,7 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		var it model.WorkListItem
 		var status string
 		var confirmed int
-		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID, &it.CustomerID, &it.ProjectID, &confirmed); err != nil {
+		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID, &it.CustomerID, &it.ProjectID, &confirmed, &it.AssignedAt, &it.AssignedBy); err != nil {
 			return nil, err
 		}
 		it.Content = it.Title
@@ -900,7 +1018,8 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		SELECT mv.visit_id, mv.visit_date, COALESCE(cfg.short_name, c.org_name), c.org_name,
 		       COALESCE(mv.entry_category,''), mv.plan_id,
 		       COALESCE(mv.completed,0), COALESCE(mv.assignee,''), COALESCE(mv.product_type,''),
-		       mv.customer_id, COALESCE(mv.project_id,'')
+		       mv.customer_id, COALESCE(mv.project_id,''),
+		       COALESCE(mv.assigned_at,''), COALESCE(mv.assigned_by,'')
 		FROM maintenance_visits mv
 		JOIN customers c ON c.customer_id = mv.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = mv.customer_id
@@ -921,7 +1040,7 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		var planID, cat, product string
 		var completed int
 		if err := rows.Scan(&it.RefID, &it.ScheduledDate, &it.Title, &it.OrgName, &cat, &planID,
-			&completed, &it.Assignee, &product, &it.CustomerID, &it.ProjectID); err != nil {
+			&completed, &it.Assignee, &product, &it.CustomerID, &it.ProjectID, &it.AssignedAt, &it.AssignedBy); err != nil {
 			return nil, err
 		}
 		it.Prefix = model.WorkPrefixMaintenance
@@ -935,7 +1054,8 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 			it.Status = "planned"
 			it.StatusLabel = "예정"
 		}
-		it.Href = "/maintenance/" + planID
+		it.Href = "/maintenance/visits/" + it.RefID
+		_ = planID
 		it.ProductType = product
 		if product != "" {
 			it.SubLabel = product
@@ -990,7 +1110,8 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		       COALESCE(NULLIF(TRIM(t.due_date),''), ''),
 		       t.title, COALESCE(t.assignee,''), t.status, t.work_type,
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), COALESCE(p.short_name, p.name, '')),
-		       COALESCE(t.source_type,''), COALESCE(t.customer_id,''), COALESCE(t.project_id,''), COALESCE(t.description,'')
+		       COALESCE(t.source_type,''), COALESCE(t.customer_id,''), COALESCE(t.project_id,''), COALESCE(t.description,''),
+		       COALESCE(t.assigned_at,''), COALESCE(t.assigned_by,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
@@ -1013,7 +1134,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 	for rows.Next() {
 		var it model.WorkListItem
 		var workType, sourceType string
-		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType, &it.CustomerID, &it.ProjectID, &it.Content); err != nil {
+		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType, &it.CustomerID, &it.ProjectID, &it.Content, &it.AssignedAt, &it.AssignedBy); err != nil {
 			return nil, err
 		}
 		it.ScheduledDate = it.WorkDate
@@ -1021,7 +1142,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 			it.ScheduledDate = it.DueDate
 		}
 		it.Prefix = model.WorkPrefixGeneral
-		if sourceType == model.WBSourceSalesActivity {
+		if workType == model.WBWorkSales || sourceType == model.WBSourceSalesActivity {
 			it.Prefix = model.WorkPrefixSales
 		}
 		it.RefNumber = it.RefID
@@ -1186,6 +1307,9 @@ func formatBracketPrefixCounts(c model.WorkPrefixCounts) string {
 	}
 	if c.General > 0 {
 		parts = append(parts, fmt.Sprintf("[일반업무] %d", c.General))
+	}
+	if c.Sales > 0 {
+		parts = append(parts, fmt.Sprintf("[영업] %d", c.Sales))
 	}
 	if len(parts) == 0 {
 		return "—"

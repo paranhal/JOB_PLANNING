@@ -127,6 +127,8 @@ type WBCard struct {
 	Status       string `json:"status,omitempty"`       // 업무처리현황 등 표시용
 	StatusLabel  string `json:"status_label,omitempty"` // 완료·부분완료 등
 	ProjectID    string `json:"project_id,omitempty"`
+	Unassigned   bool   `json:"unassigned,omitempty"`
+	Dimmed       bool   `json:"dimmed,omitempty"`
 }
 
 // Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [영업] / [행정]

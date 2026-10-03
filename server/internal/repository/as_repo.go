@@ -674,6 +674,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 		return model.ErrAppDateYear
 	}
 	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
+	oldName, oldUID := readAssigneePair(r.db, "as_receipts", "as_id", as.ASID, "assigned_to", "assigned_user_id")
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05")
 
@@ -745,6 +746,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	if err != nil {
 		return err
 	}
+	stampAssignedIfChanged(r.db, "as_receipts", "as_id", as.ASID, oldName, oldUID, as.AssignedTo, as.AssignedUserID)
 	// 접수 완료·종료·취소 시 확인·재방문 하부업무도 함께 닫아 지연 목록에 남지 않게 한다.
 	if as.Status == "completed" || as.Status == "closed" || as.Status == "cancelled" {
 		_ = NewASWorkRepo(r.db).CloseOpenByAS(as.ASID)
@@ -775,6 +777,7 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 
 	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
 	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
+	oldName, oldUID := readAssigneePair(r.db, "as_receipts", "as_id", as.ASID, "assigned_to", "assigned_user_id")
 	q := `UPDATE as_receipts SET
 			receipt_datetime=?, customer_id=?, asset_id=?,
 			receipt_channel=?, requester=?, symptom=?, urgency=?, priority=?,
@@ -803,6 +806,7 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	if err != nil {
 		return err
 	}
+	stampAssignedIfChanged(r.db, "as_receipts", "as_id", as.ASID, oldName, oldUID, as.AssignedTo, as.AssignedUserID)
 	reindexASSearch(r.db, as.ASID)
 	return nil
 }
@@ -843,6 +847,7 @@ func (r *ASRepo) AssignUnplanned(asID, date, assignee, assigneeUID string) error
 	assigneeUID = strings.TrimSpace(assigneeUID)
 	if assignee != "" || assigneeUID != "" {
 		assignee, assigneeUID, ext := bindStaffExternal(r.db, assignee, assigneeUID)
+		oldName, oldUID := readAssigneePair(r.db, "as_receipts", "as_id", asID, "assigned_to", "assigned_user_id")
 		now := time.Now().Format("2006-01-02 15:04:05")
 		if err := r.touchReceipt(asID, func() error {
 			_, err := r.db.Exec(`UPDATE as_receipts SET assigned_to=?, assigned_user_id=?, external_assignee=?, updated_at=? WHERE as_id=?`,
@@ -851,6 +856,7 @@ func (r *ASRepo) AssignUnplanned(asID, date, assignee, assigneeUID string) error
 		}); err != nil {
 			return err
 		}
+		stampAssignedIfChanged(r.db, "as_receipts", "as_id", asID, oldName, oldUID, assignee, assigneeUID)
 	}
 	return r.UpdateVisitScheduledDate(asID, date, true)
 }

@@ -109,7 +109,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 
 	scopeNote := kindNote + " · " + registerScopeNote(role, scopeAll, assigneeFilter, roleUnresolved)
 
-	var asCards, mntCards, adminCards []model.WBCard
+	var asCards, mntCards, adminCards, salesCards []model.WBCard
 	for _, t := range tasks {
 		card := cardFn(t)
 		switch {
@@ -117,6 +117,8 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 			asCards = append(asCards, card)
 		case t.SourceType == model.WBSourceMaintenance || t.WorkType == model.WBWorkMaintenance:
 			mntCards = append(mntCards, card)
+		case t.SourceType == model.WBSourceSalesActivity || t.WorkType == model.WBWorkSales:
+			salesCards = append(salesCards, card)
 		default:
 			adminCards = append(adminCards, card)
 		}
@@ -139,6 +141,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	asStats := buildCardStats(asCards, today)
 	mntStats := buildCardStats(mntCards, today)
 	adminStats := buildCardStats(adminCards, today)
+	salesStats := buildCardStats(salesCards, today)
 
 	var monthBanners []model.SalesMonthBanner
 	if view == regViewMonth && h.sales != nil {
@@ -148,13 +151,19 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	dateStr := base.Format(dateLayout)
 	queryAssignee := assigneeFilter
 	mineForQuery := ""
-	if showScopeToggle {
+	if mineParam == "1" {
+		mineForQuery = "1"
+	} else if showScopeToggle {
 		queryAssignee = ""
 		if mineParam == "0" {
 			mineForQuery = "0"
 		}
 	}
+	embed := c.QueryParam("embed") == "1"
 	filterQ := workStatusFilterQuery(queryAssignee, projectFilter, kind, mineForQuery)
+	if embed {
+		filterQ += "&embed=1"
+	}
 	plannedURL := registerURLWithProject(view, dateStr, queryAssignee, projectFilter)
 	if mineForQuery != "" {
 		plannedURL += "&mine=" + url.QueryEscape(mineForQuery)
@@ -195,10 +204,14 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"ASCards":         asCards,
 		"MntCards":        mntCards,
 		"AdminCards":      adminCards,
+		"SalesCards":      salesCards,
 		"ASStats":         asStats,
 		"MntStats":        mntStats,
 		"AdminStats":      adminStats,
-		"TotalStats":      asStats.add(mntStats).add(adminStats),
+		"SalesStats":      salesStats,
+		"TotalStats":      asStats.add(mntStats).add(adminStats).add(salesStats),
+		"Embed":           embed,
+		"HideNav":         embed,
 		"PlacedCount":     len(tasks),
 		"CompleteCount":   len(tasks),
 		"Projects":        projects,
@@ -295,6 +308,14 @@ func workStatusResolveScope(c echo.Context, role string, unresolved bool) (assig
 	assignee = normalizeAssigneeFilter(c.QueryParam("assignee"))
 	scopeAll = true
 	if unresolved {
+		return
+	}
+	if mineParam == "1" {
+		showToggle = true
+		scopeAll = false
+		if assignee == "" {
+			assignee = currentUserDisplayName(c)
+		}
 		return
 	}
 	if model.IsAdminGrade(role) || role == model.RoleSupport {

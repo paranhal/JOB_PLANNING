@@ -149,18 +149,42 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 			return next(c)
 		}
 		c.Set("assign_notice_unread", n)
-		showModal := n > 0 && c.Request().Method == http.MethodGet &&
-			c.Request().Header.Get("HX-Request") != "true" && !assignNoticeShownToday(c)
-		if showModal {
-			items, err := h.notices.repo.ListUnseen(uid)
-			if err == nil && len(items) > 0 {
-				c.Set("assign_notices", items)
-				c.Set("show_assign_notice_modal", true)
-				if h.notices.users != nil {
-					if users, e := h.notices.users.ListAssignable(); e == nil {
-						c.Set("assign_notice_assignees", users)
+		var unassigned []model.WorkListItem
+		canAssign := canWriteWorkboard(c)
+		if canAssign && h.workBoard != nil {
+			if items, e := h.workBoard.CollectUnassigned(currentOrg(c)); e == nil {
+				skip := dismissedKeys(c)
+				for _, it := range items {
+					if skip[workAssignKey(it)] {
+						continue
 					}
+					unassigned = append(unassigned, it)
 				}
+			}
+		}
+		c.Set("assign_unassigned", unassigned)
+		c.Set("can_assign_work", canAssign)
+		force := c.QueryParam("assign") == "1"
+		if force {
+			c.Set("expand_unassigned", true)
+		}
+		showModal := c.Request().Method == http.MethodGet &&
+			c.Request().Header.Get("HX-Request") != "true" &&
+			(force || ((n > 0 || len(unassigned) > 0) && !assignNoticeShownToday(c)))
+		if showModal {
+			if n > 0 {
+				items, err := h.notices.repo.ListUnseen(uid)
+				if err == nil {
+					c.Set("assign_notices", items)
+				}
+			}
+			if h.notices.users != nil {
+				if users, e := h.notices.users.ListAssignable(); e == nil {
+					c.Set("assign_notice_assignees", filterSameOrgUsers(users, currentOrg(c)))
+				}
+			}
+			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0)
+			if show, _ := c.Get("show_assign_notice_modal").(bool); show && !force {
 				setAssignNoticeShownCookie(c)
 			}
 		}
@@ -185,6 +209,15 @@ func injectAssignNoticeView(c echo.Context, data map[string]interface{}) {
 	}
 	if v := c.Get("assign_notice_assignees"); v != nil {
 		data["AssignNoticeAssignees"] = v
+	}
+	if v := c.Get("assign_unassigned"); v != nil {
+		data["AssignUnassigned"] = v
+	}
+	if v := c.Get("can_assign_work"); v != nil {
+		data["CanAssignWork"] = v
+	}
+	if v := c.Get("expand_unassigned"); v != nil {
+		data["ExpandUnassigned"] = v
 	}
 	if _, ok := data["AssignNoticeDate"]; !ok {
 		data["AssignNoticeDate"] = time.Now().Format("2006-01-02")

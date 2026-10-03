@@ -359,6 +359,53 @@
       {{else}}<p class="text-sm text-gray-400 text-center py-8">해당 업무가 없습니다.</p>{{end}}
     </div>
   </div>
+
+  {{if .CanAssignWork}}
+  <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden">
+    <div class="px-5 py-3 border-b border-indigo-100 flex flex-wrap items-center justify-between gap-2 bg-indigo-50/50">
+      <h3 class="font-semibold text-indigo-800 text-sm">오늘 배정 {{len .TodayAssigned}}건</h3>
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="{{.AssignedMineHref}}" class="text-xs {{if not .TeamAssigned}}font-semibold text-indigo-800{{else}}text-indigo-700{{end}}">내 것</a>
+        <a href="{{.AssignedOrgHref}}" class="text-xs {{if .TeamAssigned}}font-semibold text-indigo-800{{else}}text-indigo-700{{end}}">조직 전체</a>
+        <a href="{{.AssignOpenHref}}" class="rounded bg-indigo-600 px-2 py-1 text-xs text-white">업무 배정</a>
+      </div>
+    </div>
+    {{if .TodayAssigned}}
+    <div class="divide-y divide-gray-50">
+      {{range .TodayAssigned}}
+      <div class="flex items-center justify-between gap-3 px-5 py-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-1.5 text-sm">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+            <span class="font-medium text-blue-600 truncate">{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</span>
+          </div>
+          <p class="text-xs text-gray-500 truncate mt-0.5">{{.Title}} · 배정 {{.AssignedBy}}</p>
+        </div>
+        <form method="post" action="/work/assign/one" class="flex items-center gap-1 shrink-0">
+          <input type="hidden" name="key" value="{{workAssignKey .}}">
+          <input type="hidden" name="back" value="/">
+          <input type="date" name="work_date" value="{{if .ScheduledDate}}{{.ScheduledDate}}{{else}}{{$.AssignNoticeDate}}{{end}}" class="rounded border px-1 py-0.5 text-xs">
+          <button class="rounded border px-2 py-0.5 text-xs">바꾸기</button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+    {{else}}<p class="text-sm text-gray-400 text-center py-8">오늘 새로 배정된 업무가 없습니다.</p>{{end}}
+    <form method="post" action="/work/assign/create" class="px-5 py-3 border-t border-indigo-100 flex flex-wrap items-end gap-2 bg-indigo-50/30">
+      <p class="w-full text-xs font-medium text-indigo-800">새 업무 만들어 배정</p>
+      <select name="kind" class="rounded border px-2 py-1 text-sm">
+        <option value="admin">행정</option>
+        <option value="support">지원</option>
+        <option value="sales">영업</option>
+        <option value="as">AS (접수 화면)</option>
+      </select>
+      <input type="text" name="title" placeholder="제목" class="rounded border px-2 py-1 text-sm flex-1 min-w-[8rem]">
+      <input type="text" name="assignee" placeholder="담당자" class="rounded border px-2 py-1 text-sm w-28">
+      <input type="date" name="work_date" class="rounded border px-2 py-1 text-sm">
+      <button class="rounded bg-indigo-600 px-3 py-1 text-sm text-white">만들기</button>
+    </form>
+  </div>
+  {{end}}
 </div>
 <script src="/static/vendor/chart.umd.min.js?v={{.AssetQuery}}"></script>
 <script>

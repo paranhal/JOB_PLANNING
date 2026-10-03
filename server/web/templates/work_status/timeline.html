@@ -102,6 +102,7 @@
           AS <span class="font-semibold text-rose-700">{{len .ASCards}}</span>
           · 정기점검 <span class="font-semibold text-sky-700">{{len .MntCards}}</span>
           · 행정관련업무 <span class="font-semibold text-violet-700">{{len .AdminCards}}</span>
+          · 영업 <span class="font-semibold text-orange-700">{{len .SalesCards}}</span>
           · {{.ScopeNote}}
         </p>
         <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-600">
@@ -221,6 +222,7 @@
       {{template "ws_status_palette" dict "Title" "AS" "Border" "border-rose-200" "Text" "text-rose-700" "HeadBg" "bg-rose-50" "Cards" .ASCards "Stats" .ASStats}}
       {{template "ws_status_palette" dict "Title" "정기점검" "Border" "border-sky-200" "Text" "text-sky-700" "HeadBg" "bg-sky-50" "Cards" .MntCards "Stats" .MntStats}}
       {{template "ws_status_palette" dict "Title" "행정관련업무" "Border" "border-violet-200" "Text" "text-violet-700" "HeadBg" "bg-violet-50" "Cards" .AdminCards "Stats" .AdminStats}}
+      {{template "ws_status_palette" dict "Title" "영업" "Border" "border-orange-200" "Text" "text-orange-700" "HeadBg" "bg-orange-50" "Cards" .SalesCards "Stats" .SalesStats}}
     </div>
   </div>
 </div>

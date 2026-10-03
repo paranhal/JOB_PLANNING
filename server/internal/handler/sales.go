@@ -947,6 +947,24 @@ func (h *SalesHandler) CreateActivity(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?ok=activity")
 }
 
+func (h *SalesHandler) ShowActivity(c echo.Context) error {
+	if !canViewSales(c) {
+		return echo.ErrForbidden
+	}
+	a, err := h.repo.GetActivity(c.Param("aid"))
+	if err != nil || a == nil {
+		return echo.ErrNotFound
+	}
+	embed := c.QueryParam("embed") == "1"
+	return c.Render(http.StatusOK, "sales/activity_show.html", map[string]interface{}{
+		"Title":    a.Title,
+		"Active":   NavSales,
+		"Activity": a,
+		"Embed":    embed,
+		"HideNav":  embed,
+	})
+}
+
 func (h *SalesHandler) UpdateActivity(c echo.Context) error {
 	if !canWriteSales(c) {
 		return echo.ErrForbidden

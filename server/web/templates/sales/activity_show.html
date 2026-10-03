@@ -1,0 +1,11 @@
+{{define "title"}}{{.Title}} · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="p-4 space-y-2 text-sm">
+  <p class="text-xs text-orange-700 font-semibold">영업 활동</p>
+  <h2 class="text-lg font-bold">{{.Activity.Title}}</h2>
+  <p class="text-gray-600">{{.Activity.ActivityDate}} {{.Activity.StartTime}}</p>
+  {{if .Activity.Content}}<p class="whitespace-pre-wrap text-gray-800">{{.Activity.Content}}</p>{{end}}
+  {{if .Activity.CustomerName}}<p class="text-gray-500">{{.Activity.CustomerName}}</p>{{end}}
+  <a href="/sales/{{.Activity.SalesID}}" class="text-blue-700 text-xs hover:underline">사업으로</a>
+</div>
+{{end}}

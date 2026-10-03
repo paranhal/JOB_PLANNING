@@ -954,6 +954,12 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE weekly_report_rows ADD COLUMN org_id TEXT DEFAULT ''`,
 		`ALTER TABLE labor_rates ADD COLUMN org_id TEXT DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE work_tasks ADD COLUMN assigned_at DATETIME`,
+		`ALTER TABLE work_tasks ADD COLUMN assigned_by TEXT DEFAULT ''`,
+		`ALTER TABLE as_receipts ADD COLUMN assigned_at DATETIME`,
+		`ALTER TABLE as_receipts ADD COLUMN assigned_by TEXT DEFAULT ''`,
+		`ALTER TABLE maintenance_visits ADD COLUMN assigned_at DATETIME`,
+		`ALTER TABLE maintenance_visits ADD COLUMN assigned_by TEXT DEFAULT ''`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시

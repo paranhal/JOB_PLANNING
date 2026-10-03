@@ -363,6 +363,30 @@ func funcMap() template.FuncMap {
 		"workPrefixLabel": func(s string) string {
 			return model.WorkPrefixLabel(s)
 		},
+		"workAssignKey": workAssignKey,
+		"workEmbedHref": workEmbedHref,
+		"noticeEmbed": func(n model.AssignNotice) string {
+			id := strings.TrimSpace(n.SourceID)
+			switch n.SourceType {
+			case model.AssignNoticeSourceAS:
+				return "/as/" + id + "?embed=1"
+			case model.AssignNoticeSourceMaintenance:
+				return "/maintenance/visits/" + id + "?embed=1"
+			default:
+				return "/workboard/tasks/" + id + "?embed=1"
+			}
+		},
+		"noticeKey": func(n model.AssignNotice) string {
+			id := strings.TrimSpace(n.SourceID)
+			switch n.SourceType {
+			case model.AssignNoticeSourceAS:
+				return "as:" + id
+			case model.AssignNoticeSourceMaintenance:
+				return "mnt:" + id
+			default:
+				return "task:" + id
+			}
+		},
 		"workPrefixClass": func(s string) string {
 			switch s {
 			case model.WorkPrefixAS:

@@ -74,7 +74,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 		if err != nil {
 			return nil, model.UnplannedKindCounts{}, err
 		}
-		unassigned, err = r.collectUnassigned()
+		unassigned, err = r.CollectUnassigned(OrgAll)
 		if err != nil {
 			return nil, model.UnplannedKindCounts{}, err
 		}
@@ -659,12 +659,18 @@ func (r *WorkBoardRepo) AssignUnplannedDate(key, date, assignee, assigneeUID str
 		return NewMaintenanceRepo(r.db).InsertVisitFull(v)
 	case "task":
 		wb := NewWBRepo(r.db)
+		oldName, oldUID := readAssigneePair(r.db, "work_tasks", "task_id", id, "assignee", "assignee_user_id")
 		if err := wb.SetTaskDueDate(id, date); err != nil {
 			return err
 		}
+		name, uid := bindStaff(r.db, assignee, assigneeUID)
 		_, err := r.db.Exec(`UPDATE work_tasks SET work_date=CASE WHEN TRIM(COALESCE(work_date,''))='' THEN ? ELSE work_date END,
 			assignee=CASE WHEN TRIM(?)!='' AND TRIM(COALESCE(assignee,''))='' THEN ? ELSE assignee END,
-			updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, date, assignee, assignee, id)
+			assignee_user_id=CASE WHEN TRIM(?)!='' AND TRIM(COALESCE(assignee_user_id,''))='' THEN ? ELSE assignee_user_id END,
+			updated_at=CURRENT_TIMESTAMP WHERE task_id=?`, date, name, name, uid, uid, id)
+		if err == nil && strings.TrimSpace(name) != "" {
+			stampAssignedIfChanged(r.db, "work_tasks", "task_id", id, oldName, oldUID, name, uid)
+		}
 		return err
 	case "gen":
 		_, err := r.db.Exec(`UPDATE work_other SET work_date=? WHERE other_id=?`, date, id)

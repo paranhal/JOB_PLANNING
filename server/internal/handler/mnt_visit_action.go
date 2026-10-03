@@ -45,7 +45,13 @@ func (h *MaintenanceHandler) VisitAction(c echo.Context) error {
 		"BackURL":          back,
 		"PlanHref":         mntVisitHref(*v),
 		"SignatureDataURL": signatureDataURL(signaturePNGForName(h.userRepo, v.Assignee)),
+		"Embed":            c.QueryParam("embed") == "1",
+		"HideNav":          c.QueryParam("embed") == "1",
 	})
+}
+
+func (h *MaintenanceHandler) ShowVisit(c echo.Context) error {
+	return h.VisitAction(c)
 }
 
 // UpdateVisitAction 방문 조치 저장(완료·실제방문일·비고·담당). 연간 목록으로 보내지 않는다.
