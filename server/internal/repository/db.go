@@ -922,6 +922,25 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 			computed_at     TEXT NOT NULL,
 			PRIMARY KEY (stat_date, scope, scope_key)
 		)`,
+		// §52.3 뿌리 17개 + users. 표가 아직 없으면 오류 무시, applyOrgs 가 다시 더한다.
+		`ALTER TABLE customers ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE assets ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE work_projects ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE work_tasks ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE work_other ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE as_receipts ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE maintenance_plans ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE maintenance_site_config ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE sales_projects ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE sales_quotes ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE sales_orders ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE sales_items ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE sales_groups ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE holidays ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE staff_leaves ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE weekly_report_rows ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE labor_rates ADD COLUMN org_id TEXT DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN org_id TEXT DEFAULT ''`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시
@@ -1172,6 +1191,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	if err := migrateAssetIDsToASCII(db); err != nil {
 		log.Printf("warning: asset id ascii migrate: %v", err)
 	}
+
+	// migrateBusinessIDsV2 가 id_sequences 를 비운 뒤에 가드를 세운다 (§52.6).
+	applyOrgs(db)
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)

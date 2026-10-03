@@ -23,6 +23,7 @@ const (
 	projectDedupeByNameMetaKey        = "__meta:project_dedupe_by_name_v1"
 	assetProductTypeUpperMetaKey      = "__meta:asset_product_type_upper_v1"
 	asPlannedDailyTaskMetaKey         = "__meta:as_planned_daily_task_v1"
+	orgSplitMetaKey                   = "__meta:org_split_v266"
 )
 
 // 시드 사업 ID
