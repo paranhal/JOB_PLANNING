@@ -41,6 +41,7 @@ func TestBackupPageAndSave(t *testing.T) {
 	g.GET("/admin/data", h.Backup.Page)
 	g.POST("/admin/data/save", h.Backup.Save)
 	g.POST("/admin/data/metrics", h.Backup.SaveMetrics)
+	g.POST("/admin/data/business-days", h.Backup.RebuildBusinessDays)
 	g.POST("/admin/backup", h.Backup.Save)
 
 	show := httptest.NewRecorder()
@@ -108,6 +109,9 @@ func TestBackupPageAndSave(t *testing.T) {
 	mb := met.Body.String()
 	if !strings.Contains(mb, "name=\"metrics_base_date\"") {
 		t.Error("지표 설정 폼이 없다")
+	}
+	if !strings.Contains(mb, "영업일 표 다시 만들기") {
+		t.Error("영업일 표 다시 만들기 버튼이 없다")
 	}
 
 	form := url.Values{}

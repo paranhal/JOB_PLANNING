@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -108,19 +109,14 @@ func (c *Calendar) IsHoliday(date string) (bool, string) {
 	return hit, name
 }
 
-// IsWorkingDay 평일이고 휴일이 아니면 true. §23.13.7
+// IsWorkingDay 평일이고 휴일이 아니면 true. §23.13.7 · §4.14.2
 func (c *Calendar) IsWorkingDay(date string) bool {
 	t, key, ok := parseHolidayDate(date)
 	if !ok {
 		return false
 	}
-	if t.Weekday() == time.Saturday || t.Weekday() == time.Sunday {
-		return false
-	}
-	if _, hit := c.namesForYear(t.Year())[key]; hit {
-		return false
-	}
-	return true
+	_, hit := c.namesForYear(t.Year())[key]
+	return model.DateIsWorkingDay(date, hit)
 }
 
 // WorkingDaysBetween from~to 포함 근무일 수. §23.13.7

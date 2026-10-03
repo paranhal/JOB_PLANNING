@@ -1242,6 +1242,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWeeklyReportRows(db)
 	applyASReceiptsCauseReport(db)
 	applyHolidaySource(db)
+	applyBusinessDays(db)
 	applyStaffLeaves(db)
 	applyWorkTaskMembers(db)
 	applyV214ProjectKindRollback(db)

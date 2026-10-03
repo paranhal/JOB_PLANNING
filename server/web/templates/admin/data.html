@@ -299,6 +299,19 @@
       </div>
       <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장</button>
     </form>
+    <form method="POST" action="/admin/data/business-days" class="pt-2 border-t border-gray-100 space-y-2"
+          onsubmit="return confirm('선택한 해부터 영업일 표를 다시 만들까요?');">
+      <p class="text-sm font-semibold text-gray-700">영업일 표 다시 만들기</p>
+      <p class="text-xs text-gray-500">공휴일을 넣은 뒤 리드타임이 안 바뀌면 그 해부터 다시 계산합니다.</p>
+      <div class="flex flex-wrap items-end gap-2">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">연도</label>
+          <input type="number" name="year" min="2000" max="2100" placeholder="비우면 전체"
+                 class="w-36 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <button type="submit" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-800 rounded-lg text-sm font-medium">다시 만들기</button>
+      </div>
+    </form>
   </div>
   {{end}}
 

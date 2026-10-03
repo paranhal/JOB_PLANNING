@@ -41,13 +41,17 @@
       <a href="/stats?{{.LookbackQS}}" class="text-xs text-blue-700 hover:underline">통계에서 보기 →</a>
     </div>
     {{template "stats_lookback" .}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    {{if $kpi.HolidayMissingLine}}
+    <div class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">{{$kpi.HolidayMissingLine}}</div>
+    {{end}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" title="{{$.BusinessDaysHint}}">
         <div class="flex items-center justify-between gap-1">
           <p class="text-sm font-medium text-gray-600">접수→방문</p>
           <span class="inline-flex items-center gap-0.5 flex-wrap justify-end">
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
-            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800" title="{{$.VisitLeadHint}}">[참고]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800">영업일 기준</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800">[현장방문 건만]</span>
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$vis.Sample}}건</span>
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$vis.Reason}}">{{$vis.GradeMark}} {{$vis.GradeLabel}}</span>
             {{if $vis.ShowTarget}}
@@ -57,7 +61,7 @@
         </div>
         {{if $vis.ShowValue}}
         <div class="mt-2 flex items-end justify-between gap-2">
-          <p class="text-3xl font-bold tabular-nums leading-none {{if $vis.ShowTarget}}{{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $vis.Value}}일</p>
+          <p class="text-3xl font-bold tabular-nums leading-none {{if $vis.ShowTarget}}{{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $vis.Value}}영업일</p>
           {{if $vis.ShowDelta}}
           <p class="text-[10px] {{if le $kpi.VisitDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
             {{if gt $kpi.VisitDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.VisitDelta}}일
@@ -68,14 +72,43 @@
         <p class="mt-2 text-3xl font-bold text-gray-300 leading-none" title="{{$vis.Reason}}">—</p>
         <p class="text-[10px] text-gray-400 mt-0.5">{{$vis.Reason}}</p>
         {{end}}
-        <p class="text-[10px] text-amber-800/90 mt-1 leading-snug">목표 {{printf "%.0f" $.VisitTarget}}일 · {{$.VisitLeadHint}}</p>
+        <p class="text-[10px] text-amber-800/90 mt-1 leading-snug">목표 {{printf "%.0f" $.VisitTarget}}영업일 · {{$.VisitLeadHint}}</p>
       </div>
 
-      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+      {{$vtd := $kpi.VisitToDoneDisplay}}
+      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" title="{{$.BusinessDaysHint}}">
+        <div class="flex items-center justify-between gap-1">
+          <p class="text-sm font-medium text-gray-600">방문→조치완료</p>
+          <span class="inline-flex items-center gap-0.5 flex-wrap justify-end">
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800">영업일 기준</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800">[현장방문 건만]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$vtd.Sample}}건</span>
+          </span>
+        </div>
+        {{if $vtd.ShowValue}}
+        <div class="mt-2 flex items-end justify-between gap-2">
+          <p class="text-3xl font-bold tabular-nums leading-none text-gray-800">{{printf "%.1f" $vtd.Value}}영업일</p>
+          {{if $vtd.ShowDelta}}
+          <p class="text-[10px] {{if le $kpi.VisitToDoneDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
+            {{if gt $kpi.VisitToDoneDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.VisitToDoneDelta}}일
+          </p>
+          {{end}}
+        </div>
+        {{else}}
+        <p class="mt-2 text-3xl font-bold text-gray-300 leading-none" title="{{$vtd.Reason}}">—</p>
+        <p class="text-[10px] text-gray-400 mt-0.5">{{$vtd.Reason}}</p>
+        {{end}}
+        <p class="text-[10px] text-amber-800/90 mt-1 leading-snug">{{$.VisitToDoneHint}}</p>
+      </div>
+
+      <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" title="{{$.BusinessDaysHint}}">
         <div class="flex items-center justify-between gap-1">
           <p class="text-sm font-medium text-gray-600">접수→조치완료</p>
           <span class="inline-flex items-center gap-0.5 flex-wrap justify-end">
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800">영업일 기준</span>
+            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-800">[전화·원격 포함]</span>
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$cmp.Sample}}건</span>
             <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$cmp.Reason}}">{{$cmp.GradeMark}} {{$cmp.GradeLabel}}</span>
             {{if $cmp.ShowTarget}}
@@ -85,7 +118,7 @@
         </div>
         {{if $cmp.ShowValue}}
         <div class="mt-2 flex items-end justify-between gap-2">
-          <p class="text-3xl font-bold tabular-nums leading-none {{if $cmp.ShowTarget}}{{if $completeOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $cmp.Value}}일</p>
+          <p class="text-3xl font-bold tabular-nums leading-none {{if $cmp.ShowTarget}}{{if $completeOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $cmp.Value}}영업일</p>
           {{if $cmp.ShowDelta}}
           <p class="text-[10px] {{if le $kpi.CompleteDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
             {{if gt $kpi.CompleteDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.CompleteDelta}}일
@@ -96,9 +129,15 @@
         <p class="mt-2 text-3xl font-bold text-gray-300 leading-none" title="{{$cmp.Reason}}">—</p>
         <p class="text-[10px] text-gray-400 mt-0.5">{{$cmp.Reason}}</p>
         {{end}}
-        <p class="text-[10px] text-gray-400 mt-1">목표 {{printf "%.0f" $.CompleteTarget}}일 · AS만</p>
+        <p class="text-[10px] text-gray-500 mt-1">목표 {{printf "%.0f" $.CompleteTarget}}영업일 · {{$.CompleteLeadHint}}</p>
       </div>
     </div>
+    {{if $kpi.HasVisit}}
+    <p class="text-[11px] text-gray-600">합 {{printf "%.1f" $kpi.VisitPlusDoneAvg}}영업일 (같은 {{$kpi.VisitSample}}건) · ③은 방문하지 않은 건까지 포함하므로 ①+②와 다릅니다</p>
+    {{end}}
+    {{if gt $kpi.NegativeSpanN 0}}
+    <p class="text-[11px] text-rose-800">입력 확인 필요 {{$kpi.NegativeSpanN}}건 <a href="/stats?{{.LookbackQS}}" class="underline">목록</a></p>
+    {{end}}
     {{if and .MissingComplete (gt .MissingComplete.AS 0)}}
     <div class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
       완료일 미기록 {{.MissingComplete.AS}}건 제외

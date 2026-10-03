@@ -251,34 +251,55 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 	}
 	cur := cols[1]
 	prev := cols[0]
+	var err error
 
-	visitCur, nVisitCur, err := r.avgASDays(cur.From, cur.ToExclusive, f, "visit")
+	out.AdminMovedN, err = r.CountASAdminMoved(cur.From, cur.ToExclusive, f)
 	if err != nil {
 		return out, err
 	}
-	visitPrev, nVisitPrev, err := r.avgASDays(prev.From, prev.ToExclusive, f, "visit")
+
+	visitCur, visitToDoneCur, nVisitCur, err := r.avgASVisitSpans(cur.From, cur.ToExclusive, f)
+	if err != nil {
+		return out, err
+	}
+	visitPrev, visitToDonePrev, nVisitPrev, err := r.avgASVisitSpans(prev.From, prev.ToExclusive, f)
 	if err != nil {
 		return out, err
 	}
 	out.VisitSample = nVisitCur
 	out.HasVisit = nVisitCur > 0
 	out.VisitAvgDays = math.Round(visitCur*10) / 10
+	out.VisitToDoneSample = nVisitCur
+	out.HasVisitToDone = nVisitCur > 0
+	out.VisitToDoneAvgDays = math.Round(visitToDoneCur*10) / 10
+	out.VisitPlusDoneAvg = math.Round((visitCur+visitToDoneCur)*10) / 10
 	out.VisitDisplay = model.StatsReliability(nVisitCur, nVisitCur == 0, out.VisitAvgDays).
 		CapGradeIfImport(f.IncludeImport).
 		WithReason("해당 기간 방문 데이터 없음").
 		WithHoldJudgment()
+	out.VisitToDoneDisplay = model.StatsReliability(nVisitCur, nVisitCur == 0, out.VisitToDoneAvgDays).
+		CapGradeIfImport(f.IncludeImport).
+		WithReason("해당 기간 방문 데이터 없음").
+		WithHoldJudgment()
+	hideDelta := leadDeltaHidden(prev.From, cur.From)
 	prevVisit := model.StatsReliability(nVisitPrev, nVisitPrev == 0, visitPrev)
-	if out.VisitDisplay.ShowDelta && prevVisit.ShowDelta {
+	if !hideDelta && out.VisitDisplay.ShowDelta && prevVisit.ShowDelta {
 		out.VisitDelta = math.Round((visitCur-visitPrev)*10) / 10
 	} else {
 		out.VisitDisplay.ShowDelta = false
 	}
+	prevVisitToDone := model.StatsReliability(nVisitPrev, nVisitPrev == 0, visitToDonePrev)
+	if !hideDelta && out.VisitToDoneDisplay.ShowDelta && prevVisitToDone.ShowDelta {
+		out.VisitToDoneDelta = math.Round((visitToDoneCur-visitToDonePrev)*10) / 10
+	} else {
+		out.VisitToDoneDisplay.ShowDelta = false
+	}
 
-	compCur, nCompCur, err := r.avgASDays(cur.From, cur.ToExclusive, f, "complete")
+	compCur, nCompCur, err := r.avgASCompleteLeadTime(cur.From, cur.ToExclusive, f)
 	if err != nil {
 		return out, err
 	}
-	compPrev, nCompPrev, err := r.avgASDays(prev.From, prev.ToExclusive, f, "complete")
+	compPrev, nCompPrev, err := r.avgASCompleteLeadTime(prev.From, prev.ToExclusive, f)
 	if err != nil {
 		return out, err
 	}
@@ -289,19 +310,25 @@ func (r *StatsRepo) LoadStatsKPI(view string, cols []model.StatsPeriodColumn, f 
 		CapGradeIfImport(f.IncludeImport).
 		WithReason("해당 기간 완료 데이터 없음")
 	prevComp := model.StatsReliability(nCompPrev, nCompPrev == 0, compPrev)
-	if out.CompleteDisplay.ShowDelta && prevComp.ShowDelta {
+	if !hideDelta && out.CompleteDisplay.ShowDelta && prevComp.ShowDelta {
 		out.CompleteDelta = math.Round((compCur-compPrev)*10) / 10
 	} else {
 		out.CompleteDisplay.ShowDelta = false
 	}
-	if nVisitCur > 0 && nCompCur > 0 && nVisitCur == nCompCur && out.VisitAvgDays > out.CompleteAvgDays {
-		out.LeadTimeWarn = fmt.Sprintf("지표 계산 오류: 방문(%.1f일)이 완료(%.1f일)보다 큽니다",
-			out.VisitAvgDays, out.CompleteAvgDays)
-	}
-	out.AdminMovedN, err = r.CountASAdminMoved(cur.From, cur.ToExclusive, f)
+
+	out.NegativeSpanN, err = r.countNegativeLeadSpans(cur.From, cur.ToExclusive, f)
 	if err != nil {
 		return out, err
 	}
+	out.HolidayMissingYears = yearsMissingHolidays(r.db, cur.From, cur.ToExclusive)
+	if len(out.HolidayMissingYears) > 0 {
+		var parts []string
+		for _, y := range out.HolidayMissingYears {
+			parts = append(parts, model.PublicHolidayWeekendOnlyBanner(y))
+		}
+		out.HolidayMissingLine = strings.Join(parts, " · ")
+	}
+	out.LeadTimeWarn = leadTimeInvariantWarn(out.VisitAvgDays, out.VisitToDoneAvgDays, nVisitCur, nVisitCur)
 	return out, nil
 }
 
@@ -502,23 +529,65 @@ func nextDay(d string) string {
 
 func (r *StatsRepo) avgASDays(from, toEx string, f model.StatsMeetingFilter, kind string) (avg float64, n int, err error) {
 	if kind == "visit" {
-		return r.avgASVisitLeadTime(from, toEx, f)
+		a, _, n, err := r.avgASVisitSpans(from, toEx, f)
+		return a, n, err
 	}
 	return r.avgASCompleteLeadTime(from, toEx, f)
 }
 
-// avgASVisitLeadTime §4.7 — process_type=visit 이고 visit_date 있는 완료 건만.
-func (r *StatsRepo) avgASVisitLeadTime(from, toEx string, f model.StatsMeetingFilter) (avg float64, n int, err error) {
-	asSQL, extra := r.filterAS(f)
-	q := `
-		SELECT AVG(julianday(date(ar.visit_date)) - julianday(date(ar.receipt_datetime))),
-		       COUNT(*)
-		FROM as_receipts ar
-		LEFT JOIN assets a ON a.asset_id = ar.asset_id
-		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
+func sqlASLeadPopVisit() string {
+	return ` ar.status IN ` + model.SQLStatusStatsCompleted + `
 		  AND ar.process_type = 'visit'
 		  AND TRIM(COALESCE(ar.visit_date,'')) != ''
 		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
+		  AND date(ar.visit_date) >= date(ar.receipt_datetime)
+		  AND date(ar.complete_datetime) >= date(ar.visit_date)`
+}
+
+func sqlASLeadPopAll() string {
+	return ` ar.status IN ` + model.SQLStatusStatsCompleted + `
+		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
+		  AND date(ar.complete_datetime) >= date(ar.receipt_datetime)`
+}
+
+// avgASVisitSpans ①접수→방문 · ②방문→조치완료. 한 조회. §4.15.2
+func (r *StatsRepo) avgASVisitSpans(from, toEx string, f model.StatsMeetingFilter) (avg1, avg2 float64, n int, err error) {
+	asSQL, extra := r.filterAS(f)
+	q := `
+		SELECT AVG(cv.bd_index - cr.next_bd_index),
+		       AVG(cc.bd_index - cv.next_bd_index),
+		       COUNT(*)
+		FROM as_receipts ar
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		JOIN business_days cr ON cr.d = date(ar.receipt_datetime)
+		JOIN business_days cv ON cv.d = date(ar.visit_date)
+		JOIN business_days cc ON cc.d = date(ar.complete_datetime)
+		WHERE ` + sqlASLeadPopVisit() + `
+		  AND ar.complete_datetime >= ?
+		  AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL
+	args := append([]interface{}{from, toEx}, extra...)
+	var a1, a2 interface{}
+	var cnt int
+	err = r.db.QueryRow(q, args...).Scan(&a1, &a2, &cnt)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if cnt == 0 {
+		return 0, 0, 0, nil
+	}
+	return scanAvgDays(a1), scanAvgDays(a2), cnt, nil
+}
+
+func (r *StatsRepo) avgASCompleteLeadTime(from, toEx string, f model.StatsMeetingFilter) (avg float64, n int, err error) {
+	asSQL, extra := r.filterAS(f)
+	q := `
+		SELECT AVG(cc.bd_index - cr.next_bd_index),
+		       COUNT(*)
+		FROM as_receipts ar
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		JOIN business_days cr ON cr.d = date(ar.receipt_datetime)
+		JOIN business_days cc ON cc.d = date(ar.complete_datetime)
+		WHERE ` + sqlASLeadPopAll() + `
 		  AND ar.complete_datetime >= ?
 		  AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL
 	args := append([]interface{}{from, toEx}, extra...)
@@ -534,40 +603,101 @@ func (r *StatsRepo) avgASVisitLeadTime(from, toEx string, f model.StatsMeetingFi
 	return scanAvgDays(avgNull), cnt, nil
 }
 
-// avgASCompleteLeadTime §4.6 — 완료 건, complete_datetime 기간축, 착수·완료 둘 다 있는 모집단.
-func (r *StatsRepo) avgASCompleteLeadTime(from, toEx string, f model.StatsMeetingFilter) (avg float64, n int, err error) {
-	_, complete, n, err := r.avgASLeadTimes(from, toEx, f)
-	return complete, n, err
+// avgASLeadTimes ③ 접수→조치완료 (POP_ALL). 첫 반환값은 쓰지 않는다.
+func (r *StatsRepo) avgASLeadTimes(from, toEx string, f model.StatsMeetingFilter) (visit, complete float64, n int, err error) {
+	complete, n, err = r.avgASCompleteLeadTime(from, toEx, f)
+	return 0, complete, n, err
 }
 
-// avgASLeadTimes §4.6 — 완료 건만, complete_datetime 기간축, 착수·완료 둘 다 있는 같은 모집단.
-func (r *StatsRepo) avgASLeadTimes(from, toEx string, f model.StatsMeetingFilter) (visit, complete float64, n int, err error) {
-	asSQL, args := r.filterAS(f)
+func (r *StatsRepo) countNegativeLeadSpans(from, toEx string, f model.StatsMeetingFilter) (int, error) {
+	asSQL, extra := r.filterAS(f)
 	q := `
-		SELECT AVG(julianday(date(ar.start_datetime)) - julianday(date(ar.receipt_datetime))),
-		       AVG(julianday(date(ar.complete_datetime)) - julianday(date(ar.receipt_datetime))),
-		       COUNT(*)
+		SELECT COUNT(*)
 		FROM as_receipts ar
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
-		  AND TRIM(COALESCE(ar.start_datetime,'')) != ''
+		  AND ar.process_type = 'visit'
+		  AND TRIM(COALESCE(ar.visit_date,'')) != ''
 		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
+		  AND (date(ar.visit_date) < date(ar.receipt_datetime)
+		    OR date(ar.complete_datetime) < date(ar.visit_date))
 		  AND ar.complete_datetime >= ?
 		  AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL
-	args = append([]interface{}{from, toEx}, args...)
-	var visitNull, compNull interface{}
-	var cnt int
-	err = r.db.QueryRow(q, args...).Scan(&visitNull, &compNull, &cnt)
+	args := append([]interface{}{from, toEx}, extra...)
+	var n int
+	err := r.db.QueryRow(q, args...).Scan(&n)
+	return n, err
+}
+
+func (r *StatsRepo) ListNegativeLeadSpans(from, toEx string, f model.StatsMeetingFilter) ([]model.StatsRow, error) {
+	asSQL, extra := r.filterAS(f)
+	q := `
+		SELECT ar.as_id, ar.as_number,
+		       COALESCE(ar.receipt_datetime,''),
+		       COALESCE(ar.visit_date,''),
+		       COALESCE(ar.complete_datetime,''),
+		       COALESCE(c.org_name,''),
+		       COALESCE(ar.assigned_to,''),
+		       COALESCE(ar.status,'')
+		FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.status IN ` + model.SQLStatusStatsCompleted + `
+		  AND ar.process_type = 'visit'
+		  AND TRIM(COALESCE(ar.visit_date,'')) != ''
+		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
+		  AND (date(ar.visit_date) < date(ar.receipt_datetime)
+		    OR date(ar.complete_datetime) < date(ar.visit_date))
+		  AND ar.complete_datetime >= ?
+		  AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL + `
+		ORDER BY ar.as_number DESC
+		LIMIT 200`
+	args := append([]interface{}{from, toEx}, extra...)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
-		return 0, 0, 0, err
+		return nil, err
 	}
-	n = cnt
-	if cnt == 0 {
-		return 0, 0, 0, nil
+	defer rows.Close()
+	var items []model.StatsRow
+	for rows.Next() {
+		var it model.StatsRow
+		var receipt, visit, complete, status string
+		if err := rows.Scan(&it.ASID, &it.ASNumber, &receipt, &visit, &complete, &it.CustomerName, &it.Assignee, &status); err != nil {
+			return nil, err
+		}
+		if t := parseTime(receipt); !t.IsZero() {
+			it.ReceiptDate = t.Format("2006-01-02")
+		}
+		it.VisitDate = strings.TrimSpace(visit)
+		if len(it.VisitDate) > 10 {
+			it.VisitDate = it.VisitDate[:10]
+		}
+		it.CompleteDate = strings.TrimSpace(complete)
+		if len(it.CompleteDate) > 10 {
+			it.CompleteDate = it.CompleteDate[:10]
+		}
+		it.WorkForm = "AS"
+		it.Href = "/as/" + it.ASID + "/action"
+		it.Status = status
+		it.StatusLabel = statsStatusLabel(status)
+		items = append(items, it)
 	}
-	visit = scanAvgDays(visitNull)
-	complete = scanAvgDays(compNull)
-	return visit, complete, n, nil
+	return items, rows.Err()
+}
+
+func leadDeltaHidden(prevFrom, curFrom string) bool {
+	since := model.StatsBusinessDaysSince
+	return strings.TrimSpace(prevFrom) < since || strings.TrimSpace(curFrom) < since
+}
+
+func leadTimeInvariantWarn(avg1, avg2 float64, n1, n2 int) string {
+	if n1 != n2 {
+		return fmt.Sprintf("지표 계산 오류: 접수→방문 표본(%d)과 방문→조치완료 표본(%d)이 다릅니다", n1, n2)
+	}
+	if n1 > 0 && (avg1 < 0 || avg2 < 0) {
+		return fmt.Sprintf("지표 계산 오류: 영업일 평균이 음수입니다 (① %.1f · ② %.1f)", avg1, avg2)
+	}
+	return ""
 }
 
 func scanAvgDays(v interface{}) float64 {

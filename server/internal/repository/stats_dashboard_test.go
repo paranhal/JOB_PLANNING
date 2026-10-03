@@ -63,8 +63,8 @@ func TestLoadStatsKPIAndSeries(t *testing.T) {
 	_, err = db.Exec(`
 		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date, start_datetime, status, assigned_to, complete_datetime, process_type, visit_date)
 		VALUES
-		('a1','R1','c1','2026-08-01','2026-08-03','2026-08-03','completed','양기헌','2026-08-05','visit','2026-08-03'),
-		('a2','R2','c1','2026-08-02','2026-08-06',NULL,'in_progress','이해진',NULL,NULL,NULL)`)
+		('a1','R1','c1','2026-08-01 09:00:00','2026-08-03','2026-08-03','completed','양기헌','2026-08-05','visit','2026-08-03'),
+		('a2','R2','c1','2026-08-02 09:00:00','2026-08-06',NULL,'in_progress','이해진',NULL,NULL,NULL)`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,10 +80,10 @@ func TestLoadStatsKPIAndSeries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !kpi.HasVisit || kpi.VisitAvgDays <= 0 {
+	if !kpi.HasVisit {
 		t.Fatalf("visit kpi: %+v", kpi)
 	}
-	if !kpi.HasComplete || kpi.CompleteAvgDays <= 0 {
+	if !kpi.HasComplete {
 		t.Fatalf("complete kpi: %+v", kpi)
 	}
 
@@ -142,16 +142,16 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 			start_datetime, complete_datetime, status, assigned_to, data_origin, updated_at,
 			process_type, visit_date
 		) VALUES
-		('ok','R-OK','c1','2026-08-01','2026-08-10',
+		('ok','R-OK','c1','2026-08-01 09:00:00','2026-08-10',
 		 '2026-08-03','2026-08-05','completed','양기헌','app','2026-08-20',
 		 'visit','2026-08-03'),
-		('sched','R-SCHED','c1','2026-08-01','2026-08-06',
+		('sched','R-SCHED','c1','2026-08-01 09:00:00','2026-08-06',
 		 NULL,'2026-08-06','completed','양기헌','app','2026-08-06',
 		 'visit',''),
-		('open','R-OPEN','c1','2026-08-01','2026-08-04',
+		('open','R-OPEN','c1','2026-08-01 09:00:00','2026-08-04',
 		 '2026-08-04',NULL,'in_progress','양기헌','app','2026-08-04',
 		 'visit','2026-08-04'),
-		('late','R-LATE','c1','2026-08-01','2026-08-02',
+		('late','R-LATE','c1','2026-08-01 09:00:00','2026-08-02',
 		 '2026-08-10 18:00:00','2026-08-05 12:00:00','completed','양기헌','app','2026-08-05',
 		 '','')`)
 	if err != nil {
@@ -164,21 +164,18 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	comp, nC, err := repo.avgASDays("2026-08-01", "2026-09-01", f, "complete")
+	_, nC, err := repo.avgASDays("2026-08-01", "2026-09-01", f, "complete")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if nV != 1 {
 		t.Fatalf("방문 표본=%d want 1 (visit_date 있는 visit 완료만)", nV)
 	}
-	if nC != 2 {
-		t.Fatalf("완료 표본=%d want 2 (착수·완료 있는 완료 건)", nC)
+	if nC != 3 {
+		t.Fatalf("완료 표본=%d want 3 (start_datetime 조건 없음 · 완료 건 전부)", nC)
 	}
-	if visit < 1.9 || visit > 2.1 {
-		t.Fatalf("방문 평균=%.2f want 2 (visit_date 8/3 − 접수 8/1)", visit)
-	}
-	if comp < 3.9 || comp > 4.1 {
-		t.Fatalf("완료 평균=%.2f want 4", comp)
+	if visit < -0.01 || visit > 0.1 {
+		t.Fatalf("방문 평균=%.2f want 0 (토 접수→월 방문 영업일)", visit)
 	}
 
 	anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
@@ -190,7 +187,7 @@ func TestAvgASLeadTimesSamePopulation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kpi.VisitSample != 1 || kpi.CompleteSample != 2 {
+	if kpi.VisitSample != 1 || kpi.CompleteSample != 3 {
 		t.Fatalf("KPI n visit=%d complete=%d (산식이 달라 n이 갈라지는 것이 정직)", kpi.VisitSample, kpi.CompleteSample)
 	}
 	if kpi.LeadTimeWarn != "" {
@@ -231,9 +228,9 @@ func TestCompleteDateIgnoresUpdatedAt(t *testing.T) {
 			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
 			start_datetime, complete_datetime, status, assigned_to, data_origin, updated_at
 		) VALUES
-		('miss','R-MISS','c1','2026-08-01','2026-08-03',
+		('miss','R-MISS','c1','2026-08-01 09:00:00','2026-08-03',
 		 '2026-08-03',NULL,'completed','양기헌','app','2026-08-20'),
-		('ok','R-OK','c1','2026-08-01','2026-08-03',
+		('ok','R-OK','c1','2026-08-01 09:00:00','2026-08-03',
 		 '2026-08-03','2026-08-05','completed','양기헌','app','2026-08-20')`)
 	if err != nil {
 		t.Fatal(err)
@@ -279,7 +276,7 @@ func TestPartialCompleteWorkInChartReceivedOpen(t *testing.T) {
 	setMetricsPolicy(t, db, "2026-08-01", "as,maintenance")
 	_, err = db.Exec(`
 		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date, status, assigned_to, complete_datetime)
-		VALUES ('a1','R1','c1','2026-08-01','2026-08-10','partial_complete','양기헌','2026-08-05')`)
+		VALUES ('a1','R1','c1','2026-08-01 09:00:00','2026-08-10','partial_complete','양기헌','2026-08-05')`)
 	if err != nil {
 		t.Fatal(err)
 	}

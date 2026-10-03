@@ -642,6 +642,7 @@ func main() {
 	g.POST("/admin/login-help/:id/handle", h.HandleLoginHelp, adminSec)
 	g.POST("/admin/data/save", h.Backup.Save, adminSec, adminOnly)
 	g.POST("/admin/data/metrics", h.Backup.SaveMetrics, adminSec, adminOnly)
+	g.POST("/admin/data/business-days", h.Backup.RebuildBusinessDays, adminSec, adminOnly)
 	g.POST("/admin/data/org-assign", h.Backup.AssignEmptyOrg, adminSec, adminOnly)
 	g.POST("/admin/data/rollback", h.Backup.Rollback, adminSec, adminOnly)
 	g.POST("/admin/data/archive", h.Backup.Archive, adminSec, adminOnly)

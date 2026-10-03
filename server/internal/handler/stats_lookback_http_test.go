@@ -37,8 +37,8 @@ func TestStatsLookbackSection15_7(t *testing.T) {
 	monthAgo := now.AddDate(0, -1, 1).Format("2006-01-02")
 
 	d := doLookbackGet(t, e, "/")
-	if !strings.Contains(d, "[참고]") || !strings.Contains(d, "착수일시가 아니라 방문일 기준") {
-		t.Fatal("대시보드 접수→방문 [참고] 없음")
+	if !strings.Contains(d, "[현장방문 건만]") || !strings.Contains(d, "영업일 기준") {
+		t.Fatal("대시보드 접수→방문 라벨이 없다")
 	}
 	ov := doLookbackGet(t, e, "/stats")
 	if !strings.Contains(ov, "최근 1개월") {
@@ -141,12 +141,12 @@ func TestStatsLeadTimeWarnBannerVisible(t *testing.T) {
 	_, err = db.Exec(`
 		INSERT INTO as_receipts (
 			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
-			start_datetime, complete_datetime, status, assigned_to, data_origin, process_type, visit_date
+			start_datetime, complete_datetime, status, assigned_to, data_origin, process_type, visit_date, org_id
 		) VALUES
-		('v1','R-V1','c1','2026-08-10','2026-08-12',
-		 '2026-08-12 10:00:00','2026-08-12 18:00:00','completed','관리자','app','visit','2026-08-20'),
-		('v2','R-V2','c1','2026-08-10','2026-08-12',
-		 '2026-08-12 10:00:00','2026-08-12 18:00:00','completed','관리자','app','visit','2026-08-20')`)
+		('v1','R-V1','c1','2026-08-10 09:00:00','2026-08-12',
+		 '2026-08-12 10:00:00','2026-08-12 18:00:00','completed','관리자','app','visit','2026-08-20','O01'),
+		('v2','R-V2','c1','2026-08-10 09:00:00','2026-08-12',
+		 '2026-08-12 10:00:00','2026-08-12 18:00:00','completed','관리자','app','visit','2026-08-20','O01')`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,9 +156,12 @@ func TestStatsLeadTimeWarnBannerVisible(t *testing.T) {
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/stats", h.Stats.Overview)
-	body := doLookbackGet(t, e, "/stats")
-	if !strings.Contains(body, "id=\"stats-lead-time-warn\"") || !strings.Contains(body, "방문") || !strings.Contains(body, "완료") {
-		t.Fatal("방문>완료 경고 배너가 없다")
+	body := doLookbackGet(t, e, "/stats?from=2026-08-01&to=2026-08-31")
+	if !strings.Contains(body, "입력 확인 필요") {
+		t.Fatal("방문일>완료일 입력 오류 안내가 없다")
+	}
+	if strings.Contains(body, "지표 계산 오류: 방문") {
+		t.Fatal("③<① 을 오류로 경고하면 안 된다")
 	}
 }
 
@@ -207,8 +210,8 @@ func TestDashboardKPIScopeBadges(t *testing.T) {
 	if !strings.Contains(body, "일별로 묶어 표시") {
 		t.Fatal("1개월 기본에서 일별 묶음 안내가 없다")
 	}
-	if !strings.Contains(body, "접수→방문") || !strings.Contains(body, "접수→조치완료") {
-		t.Fatal("대시보드 KPI 2칸이 없다")
+	if !strings.Contains(body, "접수→방문") || !strings.Contains(body, "방문→조치완료") || !strings.Contains(body, "접수→조치완료") {
+		t.Fatal("대시보드 KPI 3칸이 없다")
 	}
 	m6 := doLookbackGet(t, e, "/?range=6m")
 	if !strings.Contains(m6, "주별로 묶어 표시") {

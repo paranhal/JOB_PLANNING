@@ -264,6 +264,10 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		return err
 	}
 	applyPlanningToKPI(h.workBoard, &kpi)
+	var negativeRows []model.StatsRow
+	if kpi.NegativeSpanN > 0 && len(cols) >= 2 {
+		negativeRows, _ = h.repo.ListNegativeLeadSpans(cols[1].From, cols[1].ToExclusive, filter)
+	}
 	var missingComplete repository.MissingCompleteDates
 	if h.wbRepo != nil {
 		missingComplete, _ = h.wbRepo.CountMissingCompleteDates()
@@ -334,6 +338,9 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"Spotlight":         spotlight,
 		"VisitTarget":       model.StatsVisitTargetDays,
 		"VisitLeadHint":     model.StatsVisitLeadHint,
+		"VisitToDoneHint":   model.StatsVisitToDoneHint,
+		"CompleteLeadHint":  model.StatsCompleteLeadHint,
+		"BusinessDaysHint":  model.StatsBusinessDaysHint,
 		"MetricScopeAS":     model.StatsMetricScopeASOnly,
 		"MetricScopeCounts": model.StatsMetricScopeCounts,
 		"CompleteTarget":    model.StatsCompleteTargetDays,
@@ -354,6 +361,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"RangeTo":           lb.To,
 		"MissingComplete":   missingComplete,
 		"CanTestStats":      canSeeTestStats(c),
+		"NegativeRows":      negativeRows,
 	})
 }
 

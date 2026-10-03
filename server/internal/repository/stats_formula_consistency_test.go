@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -79,6 +80,33 @@ func TestDashboardStatsWeeklySameFormula(t *testing.T) {
 	}
 	if kpi.CompleteAvgDays != team.CompleteDisplay.Value || kpi.CompleteSample != team.CompleteDisplay.Sample {
 		t.Fatalf("완료 KPI=%.1f/%d 주간=%.1f/%d", kpi.CompleteAvgDays, kpi.CompleteSample, team.CompleteDisplay.Value, team.CompleteDisplay.Sample)
+	}
+
+	a1, a2, n12, err := repo.avgASVisitSpans(cur.From, cur.ToExclusive, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n12 > 0 {
+		sum := a1 + a2
+		var telescoped float64
+		var nTel int
+		asSQL, extra := repo.filterAS(f)
+		q := `
+			SELECT AVG((cv.bd_index - cr.next_bd_index) + (cc.bd_index - cv.next_bd_index)), COUNT(*)
+			FROM as_receipts ar
+			LEFT JOIN assets a ON a.asset_id = ar.asset_id
+			JOIN business_days cr ON cr.d = date(ar.receipt_datetime)
+			JOIN business_days cv ON cv.d = date(ar.visit_date)
+			JOIN business_days cc ON cc.d = date(ar.complete_datetime)
+			WHERE ` + sqlASLeadPopVisit() + `
+			  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?` + sqlExcludeASAdminMoved() + asSQL
+		args := append([]interface{}{cur.From, cur.ToExclusive}, extra...)
+		if err := db.QueryRow(q, args...).Scan(&telescoped, &nTel); err != nil {
+			t.Fatal(err)
+		}
+		if nTel != n12 || math.Abs(sum-telescoped) > 0.01 {
+			t.Fatalf("①+②=%.3f 같은 모집단 합=%.3f n=%d/%d", sum, telescoped, n12, nTel)
+		}
 	}
 
 	// 토글 켜면 import 1건이 합산된다.

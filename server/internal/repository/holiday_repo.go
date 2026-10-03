@@ -198,6 +198,7 @@ func (r *HolidayRepo) Create(h model.Holiday) error {
 	}
 	logCreate(r.db, "holidays", "holiday_date", h.Date, h.Name)
 	BumpHolidayData()
+	rebuildBusinessDaysFrom(r.db, h.Year)
 	return nil
 }
 
@@ -214,7 +215,7 @@ func (r *HolidayRepo) Update(oldDate string, h model.Holiday) error {
 	h.Source = model.HolidaySourceManual
 	label := h.Name
 	if oldDate == h.Date {
-		return touchUpdate(r.db, "holidays", "holiday_date", h.Date, label, func() error {
+		err := touchUpdate(r.db, "holidays", "holiday_date", h.Date, label, func() error {
 			res, err := r.db.Exec(
 				`UPDATE holidays SET name=?, kind=?, holiday_year=?, source=? WHERE holiday_date=?`,
 				h.Name, h.Kind, h.Year, h.Source, h.Date)
@@ -228,6 +229,11 @@ func (r *HolidayRepo) Update(oldDate string, h model.Holiday) error {
 			BumpHolidayData()
 			return nil
 		})
+		if err != nil {
+			return err
+		}
+		rebuildBusinessDaysFrom(r.db, h.Year)
+		return nil
 	}
 	exists, err := r.HasDate(h.Date)
 	if err != nil {
@@ -263,6 +269,11 @@ func (r *HolidayRepo) Update(oldDate string, h model.Holiday) error {
 	}
 	logUpdate(r.db, "holidays", "holiday_date", h.Date, label, before)
 	BumpHolidayData()
+	fromY := h.Year
+	if t, _, ok := model.ParseYMD(oldDate); ok && t.Year() < fromY {
+		fromY = t.Year()
+	}
+	rebuildBusinessDaysFrom(r.db, fromY)
 	return nil
 }
 
@@ -276,13 +287,21 @@ func (r *HolidayRepo) Delete(date string) error {
 	if h != nil && h.Name != "" {
 		label = h.Name
 	}
-	return touchDelete(r.db, "holidays", "holiday_date", date, label, func() error {
+	year := 0
+	if h != nil {
+		year = h.Year
+	}
+	err := touchDelete(r.db, "holidays", "holiday_date", date, label, func() error {
 		_, err := r.db.Exec(`DELETE FROM holidays WHERE holiday_date=?`, date)
 		if err == nil {
 			BumpHolidayData()
 		}
 		return err
 	})
+	if err == nil {
+		rebuildBusinessDaysFrom(r.db, year)
+	}
+	return err
 }
 
 // SeedBuiltinIfEmpty 테이블이 비어 있을 때만 넣는다. InitDB 시드 이후에는 0건이다.
@@ -353,6 +372,7 @@ func (r *HolidayRepo) ReplaceAPIYear(year int, items []model.Holiday, syncedAt s
 		}
 	}
 	BumpHolidayData()
+	rebuildBusinessDaysFrom(r.db, year)
 	return upserted, nil
 }
 

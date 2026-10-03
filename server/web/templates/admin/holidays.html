@@ -44,6 +44,11 @@
       <input type="hidden" name="year" value="{{$year}}">
       <button type="submit" class="px-4 py-2 border border-indigo-300 text-indigo-800 rounded-lg text-sm font-medium hover:bg-indigo-50">공휴일 불러오기</button>
     </form>
+    <form method="POST" action="/admin/data/business-days" class="flex items-center gap-2"
+          onsubmit="return confirm('{{$year}}년 이후 영업일 표를 다시 만들까요?');">
+      <input type="hidden" name="year" value="{{$year}}">
+      <button type="submit" class="px-4 py-2 border border-gray-300 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50">영업일 표 다시 만들기</button>
+    </form>
     <p class="text-[11px] text-gray-400">
       {{if .LastSynced}}마지막 동기화 {{.LastSynced}}{{else}}아직 API 동기화 없음 (저장된 목록만 표시){{end}}
     </p>

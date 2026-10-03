@@ -119,7 +119,7 @@ func TestOccurrenceKPIUnchangedForAugustView(t *testing.T) {
 	}
 	_, err = db.Exec(`
 		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date, status, assigned_to, complete_datetime)
-		VALUES ('a1','R1','c1','2026-08-01','2026-08-03','completed','양기헌','2026-08-05')`)
+		VALUES ('a1','R1','c1','2026-08-01 09:00:00','2026-08-03','completed','양기헌','2026-08-05')`)
 	if err != nil {
 		t.Fatal(err)
 	}

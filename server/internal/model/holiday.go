@@ -64,6 +64,14 @@ func HolidayMissingBanner(year int) string {
 	return fmt.Sprintf("%d년 휴무일 미등록 — 주말만 제외됩니다", year)
 }
 
+// PublicHolidayWeekendOnlyBanner 리드타임 영업일 집계용. §4.14.4
+func PublicHolidayWeekendOnlyBanner(year int) string {
+	if year <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d년 공휴일 미등록 — 주말만 반영", year)
+}
+
 // HolidaySyncFailBanner API 동기화 실패. 테이블은 비우지 않는다. §23.13.2
 func HolidaySyncFailBanner(year int, lastSync string) string {
 	lastSync = strings.TrimSpace(lastSync)

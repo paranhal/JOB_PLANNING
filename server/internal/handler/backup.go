@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -104,30 +105,30 @@ func (h *BackupHandler) Page(c echo.Context) error {
 		orgEmpty, _ = repository.ListEmptyOrgRows(h.cfg.DB)
 	}
 	return c.Render(http.StatusOK, "admin/data.html", map[string]interface{}{
-		"Title":           "데이터 관리",
-		"Active":          NavData,
-		"Tab":             tab,
-		"Items":           items,
-		"Logs":            logs,
-		"LogCount":        logCount,
-		"OldestLog":       oldest,
-		"Stats":           stats,
-		"Unresolved":      unresolved,
-		"Checks":          checks,
+		"Title":              "데이터 관리",
+		"Active":             NavData,
+		"Tab":                tab,
+		"Items":              items,
+		"Logs":               logs,
+		"LogCount":           logCount,
+		"OldestLog":          oldest,
+		"Stats":              stats,
+		"Unresolved":         unresolved,
+		"Checks":             checks,
 		"UnmatchedAssignees": unmatched,
-		"ProcessConflicts": processConflicts,
-		"OrgEmpty":        orgEmpty,
-		"OK":              ok,
-		"Error":           errMsg,
-		"DataPath":        filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),
-		"Due":             audit.DueForArchive(),
-		"MetricsBaseDate": metricsBase,
-		"ImportBatches":   importBatches,
-		"ImportBatch":     importBatch,
-		"ImportRows":      importRows,
-		"ImportErrors":    importIssueRows(importRows, true),
-		"ImportReady":     importIssueRows(importRows, false),
-		"ImportCustomers": importCustomers,
+		"ProcessConflicts":   processConflicts,
+		"OrgEmpty":           orgEmpty,
+		"OK":                 ok,
+		"Error":              errMsg,
+		"DataPath":           filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),
+		"Due":                audit.DueForArchive(),
+		"MetricsBaseDate":    metricsBase,
+		"ImportBatches":      importBatches,
+		"ImportBatch":        importBatch,
+		"ImportRows":         importRows,
+		"ImportErrors":       importIssueRows(importRows, true),
+		"ImportReady":        importIssueRows(importRows, false),
+		"ImportCustomers":    importCustomers,
 	})
 }
 
@@ -177,6 +178,38 @@ func (h *BackupHandler) SaveMetrics(c echo.Context) error {
 		return redirect("", fmt.Sprintf("기준일 저장 실패: %v", err))
 	}
 	return redirect("지표 기준을 저장했습니다. 통계·보고서·대시보드 KPI가 함께 바뀝니다.", "")
+}
+
+func (h *BackupHandler) RebuildBusinessDays(c echo.Context) error {
+	year, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("year")))
+	redirect := func(ok, errMsg string) error {
+		ref := c.Request().Referer()
+		if strings.Contains(ref, "/admin/holidays") {
+			q := "/admin/holidays?year=" + strconv.Itoa(year)
+			if year <= 0 {
+				q = "/admin/holidays"
+			}
+			if errMsg != "" {
+				return c.Redirect(http.StatusSeeOther, q+"&err="+url.QueryEscape(errMsg))
+			}
+			return c.Redirect(http.StatusSeeOther, q+"&ok="+url.QueryEscape(ok))
+		}
+		q := "/admin/data?tab=metrics"
+		if errMsg != "" {
+			return c.Redirect(http.StatusSeeOther, q+"&err="+url.QueryEscape(errMsg))
+		}
+		return c.Redirect(http.StatusSeeOther, q+"&ok="+url.QueryEscape(ok))
+	}
+	if h.cfg.DB == nil {
+		return redirect("", "DB 없음")
+	}
+	if err := repository.RebuildBusinessDays(h.cfg.DB, year); err != nil {
+		return redirect("", err.Error())
+	}
+	if year > 0 {
+		return redirect(fmt.Sprintf("%d년 이후 영업일 표를 다시 만들었습니다", year), "")
+	}
+	return redirect("영업일 표를 다시 만들었습니다", "")
 }
 
 func (h *BackupHandler) AssignEmptyOrg(c echo.Context) error {

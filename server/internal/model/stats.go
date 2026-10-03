@@ -61,14 +61,21 @@ const (
 
 // 중요 KPI 기준값 (사업팀 관리 목표)
 const (
-	StatsVisitTargetDays    = 3.0  // 접수→방문(조치시작) 목표(일)
-	StatsCompleteTargetDays = 7.0  // 접수→조치완료 목표(일, 1주일)
-	StatsDurationOverMin    = 60   // 최장 소요 시간 기준(분)
-	StatsPlanTargetPct      = 95.0 // 계획 수립률 목표(%). §8.4
-	// StatsVisitLeadHint §4.7 접수→방문 카드 설명. 착수일시가 아니라 방문일.
-	StatsVisitLeadHint     = "착수일시가 아니라 방문일 기준입니다. 현장방문이고 방문일이 있는 완료 건만 셉니다. 방문일이 없는 옛 데이터는 빠져 표본이 작을 수 있습니다."
+	StatsVisitTargetDays    = 3.0 // 접수→방문 목표(영업일)
+	StatsCompleteTargetDays = 7.0 // 접수→조치완료 목표(영업일)
+	StatsDurationOverMin    = 60  // 최장 소요 시간 기준(분)
+	StatsPlanTargetPct      = 95.0
+	// StatsBusinessDaysSince 영업일 산식 전환일. 이전 기간과는 증감을 표시하지 않는다. §4.14.5
+	StatsBusinessDaysSince = "2026-09-13"
+	StatsVisitLeadHint     = "현장방문 건만. 영업일 기준. 착수일시가 아니라 방문일이 있는 완료 건만 셉니다."
+	StatsVisitToDoneHint   = "현장방문 건만. 방문일부터 조치완료까지 영업일. 목표는 두지 않습니다."
+	StatsCompleteLeadHint  = "전화·원격 포함. 완료된 건 전부. 영업일 기준."
 	StatsMetricScopeASOnly = "AS만"
 	StatsMetricScopeCounts = "AS · 정기점검 · 행정지원"
+	StatsLeadVisitOnly     = "현장방문 건만"
+	StatsLeadAllComplete   = "전화·원격 포함"
+	StatsLeadBusinessLabel = "영업일 기준"
+	StatsBusinessDaysHint  = "주말·공휴일 제외. 2026-09-13부터 이 기준"
 )
 
 // StatsLongestTopN 기간 건수에 따른 최장 소요 표시 건수. 기본 1, 10건↑ 2, 20건↑ 3.
@@ -327,23 +334,32 @@ type StatsMeetingFilter struct {
 
 // StatsKPICard 상단 중요 통계 카드
 type StatsKPICard struct {
-	VisitAvgDays    float64
-	VisitDelta      float64
-	VisitSample     int
-	CompleteAvgDays float64
-	CompleteDelta   float64
-	CompleteSample  int
-	HasVisit        bool
-	HasComplete     bool
-	LeadTimeWarn    string // §4.6.5 방문 > 완료이면 화면 경고
-	VisitDisplay    StatsValue
-	CompleteDisplay StatsValue
-	PlanningRate    float64
-	PlanningOpen    int
-	PlanningPlanned int
-	HasPlanning     bool
-	PlanDisplay     StatsValue
-	AdminMovedN     int // 행정/지원으로 이관한 AS 건수(기간). §48.4
+	VisitAvgDays        float64
+	VisitDelta          float64
+	VisitSample         int
+	VisitToDoneAvgDays  float64
+	VisitToDoneDelta    float64
+	VisitToDoneSample   int
+	CompleteAvgDays     float64
+	CompleteDelta       float64
+	CompleteSample      int
+	HasVisit            bool
+	HasVisitToDone      bool
+	HasComplete         bool
+	LeadTimeWarn        string
+	VisitDisplay        StatsValue
+	VisitToDoneDisplay  StatsValue
+	CompleteDisplay     StatsValue
+	VisitPlusDoneAvg    float64
+	NegativeSpanN       int
+	HolidayMissingYears []int
+	HolidayMissingLine  string
+	PlanningRate        float64
+	PlanningOpen        int
+	PlanningPlanned     int
+	HasPlanning         bool
+	PlanDisplay         StatsValue
+	AdminMovedN         int
 }
 
 // StatsWorkAnalysis 선택 기간 업무 분석(접수·방문·완료·이월). AS+정기점검+행정 합산.
