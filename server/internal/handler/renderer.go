@@ -578,6 +578,9 @@ func funcMap() template.FuncMap {
 		"userPermSource": func(u model.User) string {
 			return model.PermissionSourceLabel(u.Role, u.Permissions)
 		},
+		"permGroups": func() []model.PermGroup {
+			return model.PermissionGroups()
+		},
 		"initial": func(s string) string {
 			for _, r := range s {
 				return string(r)

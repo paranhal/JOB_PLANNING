@@ -291,3 +291,63 @@ func TestUserResetPermissionsToRoleDefault(t *testing.T) {
 		t.Fatal("직급 기본값에 행정이 없다")
 	}
 }
+
+func TestUserUpdateSameAsDefaultStoresEmpty(t *testing.T) {
+	e, users, _, _ := newSalesASPermApp(t)
+	u := &model.User{
+		Username: "defperm", PasswordHash: HashPassword("x"), FullName: "기본",
+		Role: model.RoleSales, Permissions: model.PermASCreate, IsActive: true,
+	}
+	if err := users.Create(u); err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"full_name": {"기본"}, "role": {model.RoleSales}, "is_active": {"1"}}
+	for _, k := range model.DefaultPermissions(model.RoleSales) {
+		form.Add("perm", k)
+	}
+	rec := salesASPost(t, e, "/users/"+u.UserID+"/update", form, jwtCookie(t))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	got, _ := users.GetByID(u.UserID)
+	if got == nil || strings.TrimSpace(got.Permissions) != "" {
+		t.Fatalf("기본값인데 저장됐다: %+v", got)
+	}
+}
+
+func TestUserUpdateRoleChangeClearsWhenAsked(t *testing.T) {
+	e, users, _, _ := newSalesASPermApp(t)
+	u := &model.User{
+		Username: "chg", PasswordHash: HashPassword("x"), FullName: "변경",
+		Role: model.RoleSales, Permissions: model.PermASCreate, IsActive: true,
+	}
+	if err := users.Create(u); err != nil {
+		t.Fatal(err)
+	}
+	rec := salesASPost(t, e, "/users/"+u.UserID+"/update", url.Values{
+		"full_name": {"변경"}, "prev_role": {model.RoleSales}, "role": {model.RoleTech},
+		"is_active": {"1"}, "clear_custom_perms": {"1"}, "perm": {model.PermASCreate},
+	}, jwtCookie(t))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	got, _ := users.GetByID(u.UserID)
+	if got == nil || got.Role != model.RoleTech || strings.TrimSpace(got.Permissions) != "" {
+		t.Fatalf("직급 변경 후 저장값이 남았다: %+v", got)
+	}
+}
+
+func TestUsersPageGroupsPermsAndAsksOnRoleChange(t *testing.T) {
+	e, _, _, _ := newSalesASPermApp(t)
+	page := salesASGet(t, e, "/users", jwtCookie(t))
+	body := page.Body.String()
+	if !strings.Contains(body, "영업활동") || !strings.Contains(body, "기준정보") {
+		t.Fatal("권한 체크박스가 도메인별로 안 묶였다")
+	}
+	if !strings.Contains(body, "직급을 바꿉니다. 저장된 개별 권한을 비우고") {
+		t.Fatal("직급 변경 확인이 없다")
+	}
+	if !strings.Contains(body, "name=\"prev_role\"") {
+		t.Fatal("prev_role 이 없다")
+	}
+}

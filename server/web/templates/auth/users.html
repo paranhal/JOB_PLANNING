@@ -54,15 +54,22 @@
         </div>
       </div>
       <div>
-        <p class="text-xs font-medium text-gray-600 mb-2">권한 (체크)</p>
-        <div class="flex flex-wrap gap-3" id="create-perms">
-          {{range $permDefs}}
-          <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-            <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600 create-perm"> {{.Label}}
-          </label>
+        <p class="text-xs font-medium text-gray-600 mb-2">권한 (체크 · 비우면 직급 기본값)</p>
+        <div class="space-y-3" id="create-perms">
+          {{range permGroups}}
+          <div>
+            <p class="text-[11px] font-semibold text-gray-500 mb-1">{{.Label}}</p>
+            <div class="flex flex-wrap gap-3">
+              {{range .Items}}
+              <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600 create-perm"> {{.Label}}
+              </label>
+              {{end}}
+            </div>
+          </div>
           {{end}}
         </div>
-        <p class="text-[11px] text-gray-400 mt-1">직급을 바꾸면 기본 권한이 채워집니다. 체크를 비우면 직급 기본값으로 저장됩니다.</p>
+        <p class="text-[11px] text-gray-400 mt-1">직급 기본값과 같으면 저장하지 않습니다. 직급을 바꾸면 개별 권한을 비울지 묻습니다.</p>
       </div>
       <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium">등록</button>
     </form>
@@ -128,7 +135,7 @@
     {{$uperms := userPermList .}}
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       {{if $canEdit}}
-      <form method="POST" action="/users/{{.UserID}}/update" class="space-y-3">
+      <form method="POST" action="/users/{{.UserID}}/update" class="space-y-3 user-update-form">
       {{else}}
       <div class="space-y-3">
       {{end}}
@@ -154,6 +161,7 @@
               <option value="observer" {{if eq .Role "observer"}}selected{{end}}>옵저버</option>
               <option value="tester" {{if eq .Role "tester"}}selected{{end}}>테스터</option>
             </select>
+            <input type="hidden" name="prev_role" value="{{.Role}}">
             <select name="is_active" class="border rounded px-2 py-1 text-xs">
               <option value="1" {{if .IsActive}}selected{{end}}>활성</option>
               <option value="0" {{if not .IsActive}}selected{{end}}>비활성</option>
@@ -168,13 +176,20 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-600 mb-2">권한{{if $canEdit}} (체크){{end}}</p>
-          <p class="text-[11px] text-gray-400 mb-2">비어 있으면 직급 기본값입니다. 체크하면 개별 지정입니다.</p>
-          <div class="flex flex-wrap gap-3">
-            {{range $permDefs}}
-            <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
-              <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600"
-                     {{if hasUserPerm $uperms .Key}}checked{{end}} {{if not $canEdit}}disabled{{end}}> {{.Label}}
-            </label>
+          <p class="text-[11px] text-gray-400 mb-2">직급 기본값과 같으면 비워 저장합니다. 적용 중 표시가 출처입니다.</p>
+          <div class="space-y-3">
+            {{range permGroups}}
+            <div>
+              <p class="text-[11px] font-semibold text-gray-500 mb-1">{{.Label}}</p>
+              <div class="flex flex-wrap gap-3">
+                {{range .Items}}
+                <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
+                  <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600"
+                         {{if hasUserPerm $uperms .Key}}checked{{end}} {{if not $canEdit}}disabled{{end}}> {{.Label}}
+                </label>
+                {{end}}
+              </div>
+            </div>
             {{end}}
           </div>
         </div>
@@ -222,25 +237,20 @@
 {{if $canEdit}}
 <script>
 (function () {
-  var defaults = {
-    tech: [],
-    sales: [],
-    support: [],
-    org_admin: [],
-    vision_admin: [],
-    observer: [],
-    tester: []
-  };
-  var roleSel = document.getElementById('create-role');
-  if (!roleSel) return;
-  function applyDefaults() {
-    var keys = defaults[roleSel.value] || [];
-    document.querySelectorAll('.create-perm').forEach(function (cb) {
-      cb.checked = keys.indexOf(cb.value) >= 0;
+  document.querySelectorAll('.user-update-form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      var sel = form.querySelector('.role-select');
+      var prev = form.querySelector('input[name="prev_role"]');
+      if (!sel || !prev || sel.value === prev.value) return;
+      if (window.confirm('직급을 바꿉니다. 저장된 개별 권한을 비우고 새 직급 기본값을 쓸까요?')) {
+        var h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = 'clear_custom_perms';
+        h.value = '1';
+        form.appendChild(h);
+      }
     });
-  }
-  roleSel.addEventListener('change', applyDefaults);
-  applyDefaults();
+  });
 })();
 </script>
 {{end}}

@@ -227,7 +227,7 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	case "saved":
 		msg = "사용자 정보가 저장되었습니다."
 	case "reset_perms":
-		msg = "역할 기본 권한으로 되돌렸습니다."
+		msg = "직급 기본 권한으로 되돌렸습니다."
 	}
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
@@ -272,10 +272,12 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	role := model.NormalizeRole(c.FormValue("role"))
-	perms := parsePermForm(c)
-	if perms == "" {
-		perms = model.FormatPermissions(model.DefaultPermissions(role))
+	form, _ := c.FormParams()
+	var selected []string
+	if form != nil {
+		selected = form["perm"]
 	}
+	perms := model.CompactStoredPermissions(role, selected)
 	u := &model.User{
 		Username:     c.FormValue("username"),
 		PasswordHash: HashPassword(c.FormValue("password")),
@@ -299,8 +301,18 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	before := userPublic(u)
 	wasActive := u.IsActive
 	u.FullName = c.FormValue("full_name")
+	prevRole := model.NormalizeRole(c.FormValue("prev_role"))
 	u.Role = model.NormalizeRole(c.FormValue("role"))
-	u.Permissions = parsePermForm(c)
+	if prevRole != "" && prevRole != u.Role && c.FormValue("clear_custom_perms") == "1" {
+		u.Permissions = ""
+	} else {
+		form, _ := c.FormParams()
+		var selected []string
+		if form != nil {
+			selected = form["perm"]
+		}
+		u.Permissions = model.CompactStoredPermissions(u.Role, selected)
+	}
 	u.IsActive = c.FormValue("is_active") != "0"
 	h.userRepo.Update(u)
 	if wasActive && !u.IsActive {

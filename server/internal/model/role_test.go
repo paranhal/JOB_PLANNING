@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeRoleKnownAliases(t *testing.T) {
 	cases := []struct {
@@ -93,11 +96,45 @@ func TestSalesStoredReceiveOnly(t *testing.T) {
 	if HasPermission(p, PermASProcess) {
 		t.Fatal("접수만 줬는데 as.process 가 있다")
 	}
-	if PermissionSourceLabel(RoleSales, "stats") != "개별 지정" {
-		t.Fatal("저장된 권한 출처")
-	}
 	if PermissionSourceLabel(RoleSales, "") != "직급 기본값" {
 		t.Fatal("빈 값 출처")
+	}
+	got := PermissionSourceLabel(RoleSales, "stats.view")
+	if got == "직급 기본값" || !strings.HasPrefix(got, "개별 지정(") {
+		t.Fatalf("출처 %q", got)
+	}
+}
+
+func TestCompactStoredPermissionsMatchesDefaultEmpty(t *testing.T) {
+	def := DefaultPermissions(RoleSales)
+	if CompactStoredPermissions(RoleSales, def) != "" {
+		t.Fatal("기본값과 같으면 비어야 한다")
+	}
+	if CompactStoredPermissions(RoleSales, []string{PermASCreate}) == "" {
+		t.Fatal("예외는 남겨야 한다")
+	}
+	if CompactStoredPermissions(RoleVisionAdmin, def) != "" {
+		t.Fatal("비젼관리자는 저장하지 않는다")
+	}
+}
+
+func TestPermissionGroupsCoverAllKeys(t *testing.T) {
+	seen := map[string]bool{}
+	n := 0
+	for _, g := range PermissionGroups() {
+		if g.Label == "" || len(g.Items) == 0 {
+			t.Fatalf("%+v", g)
+		}
+		for _, d := range g.Items {
+			if seen[d.Key] {
+				t.Fatalf("중복 %s", d.Key)
+			}
+			seen[d.Key] = true
+			n++
+		}
+	}
+	if n != len(AllPermissions) {
+		t.Fatalf("그룹 %d All %d", n, len(AllPermissions))
 	}
 }
 

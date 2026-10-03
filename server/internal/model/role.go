@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"log"
 	"strings"
 )
@@ -211,6 +212,88 @@ func ParsePermissions(s string) []string {
 	return out
 }
 
+type PermGroup struct {
+	Label string
+	Items []PermDef
+}
+
+func PermissionGroups() []PermGroup {
+	type g = PermGroup
+	order := []struct {
+		prefix, label string
+	}{
+		{"sales_act.", "영업활동"},
+		{"as.", "AS"},
+		{"mnt.", "정기점검"},
+		{"admin.", "행정"},
+		{"sales.", "영업사업"},
+		{"master.", "기준정보"},
+		{"stats.", "통계"},
+		{"org.", "조직"},
+		{"users.", "계정"},
+		{"codes.", "코드"},
+		{"data.", "데이터"},
+	}
+	idx := make([]g, len(order))
+	for i, o := range order {
+		idx[i].Label = o.label
+	}
+	for _, d := range AllPermissions {
+		for i, o := range order {
+			if strings.HasPrefix(d.Key, o.prefix) {
+				idx[i].Items = append(idx[i].Items, d)
+				break
+			}
+		}
+	}
+	out := make([]g, 0, len(idx))
+	for _, x := range idx {
+		if len(x.Items) > 0 {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func CompactStoredPermissions(role string, selected []string) string {
+	role = NormalizeRole(role)
+	if role == RoleVisionAdmin {
+		return ""
+	}
+	got := ParsePermissions(FormatPermissions(selected))
+	if SamePermSet(got, DefaultPermissions(role)) {
+		return ""
+	}
+	return FormatPermissions(got)
+}
+
+func PermissionDiffCounts(role, stored string) (add, del int) {
+	role = NormalizeRole(role)
+	got := ParsePermissions(stored)
+	if len(got) == 0 {
+		return 0, 0
+	}
+	def := DefaultPermissions(role)
+	dm := map[string]bool{}
+	for _, k := range def {
+		dm[CanonicalPerm(k)] = true
+	}
+	gm := map[string]bool{}
+	for _, k := range got {
+		k = CanonicalPerm(k)
+		gm[k] = true
+		if !dm[k] {
+			add++
+		}
+	}
+	for _, k := range def {
+		if !gm[CanonicalPerm(k)] {
+			del++
+		}
+	}
+	return add, del
+}
+
 func FormatPermissions(perms []string) string {
 	seen := map[string]bool{}
 	var out []string
@@ -251,10 +334,14 @@ func PermissionSourceLabel(role, stored string) string {
 	if role == RoleVisionAdmin {
 		return "직급 기본값"
 	}
-	if len(ParsePermissions(stored)) > 0 {
-		return "개별 지정"
+	if len(ParsePermissions(stored)) == 0 {
+		return "직급 기본값"
 	}
-	return "직급 기본값"
+	add, del := PermissionDiffCounts(role, stored)
+	if add == 0 && del == 0 {
+		return "직급 기본값"
+	}
+	return fmt.Sprintf("개별 지정(+%d −%d)", add, del)
 }
 
 func ObserverViewPermissions() []string {
