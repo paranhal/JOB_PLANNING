@@ -194,6 +194,8 @@ func main() {
 	g.GET("/meeting", h.Meeting.Show)
 	g.GET("/meeting/overview", h.Meeting.Overview)
 	g.GET("/account", h.Auth.AccountPage)
+	g.GET("/account/complete", h.Auth.AccountCompleteForm)
+	g.POST("/account/complete", h.Auth.AccountComplete)
 	g.POST("/account/profile", h.Auth.AccountUpdateProfile)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
 	g.POST("/view-as", h.Auth.SetViewAs)

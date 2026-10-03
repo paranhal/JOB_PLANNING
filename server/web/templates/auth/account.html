@@ -31,7 +31,19 @@
         <input type="text" name="full_name" required value="{{.User.FullName}}"
                class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
-      <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium">이름 저장</button>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">핸드폰</label>
+        <input type="text" name="mobile" value="{{.User.Mobile}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">전화</label>
+        <input type="text" name="tel" value="{{.User.Tel}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">이메일</label>
+        <input type="email" name="email" value="{{.User.Email}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium">저장</button>
     </form>
   </div>
 

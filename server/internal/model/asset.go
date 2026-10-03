@@ -380,6 +380,13 @@ type User struct {
 	Permissions  string    `json:"permissions"` // CSV 권한 키
 	IsActive     bool      `json:"is_active"`
 	OrgID        string    `json:"org_id,omitempty"`
+	Mobile       string    `json:"mobile,omitempty"`
+	Tel          string    `json:"tel,omitempty"`
+	Email        string    `json:"email,omitempty"`
+	SignaturePath string   `json:"signature_path,omitempty"`
+	ProfileDone  bool      `json:"profile_done,omitempty"`
+	UsernameChangedAt string `json:"username_changed_at,omitempty"`
+	IsTest       bool      `json:"is_test,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 

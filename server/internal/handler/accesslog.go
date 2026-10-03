@@ -86,7 +86,10 @@ func userPublic(u *model.User) map[string]any {
 		"full_name":   u.FullName,
 		"role":        u.Role,
 		"permissions": u.Permissions,
-		"is_active":   u.IsActive,
+		"org_id":      u.OrgID,
+		"mobile":      u.Mobile,
+		"tel":         u.Tel,
+		"email":       u.Email,
 	}
 }
 

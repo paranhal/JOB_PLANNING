@@ -1,0 +1,38 @@
+{{define "title"}}내 정보 채우기 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="max-w-md mx-auto space-y-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">내 정보 채우기</h2>
+    <p class="text-sm text-gray-500 mt-1">비어 있는 필수 칸만 넣으면 됩니다. 비밀번호는 다시 묻지 않습니다.</p>
+  </div>
+  {{if .Error}}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
+  {{end}}
+  <form method="POST" action="/account/complete" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+    {{if .NeedMobile}}
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">핸드폰</label>
+      <input type="text" name="mobile" required value="{{.User.Mobile}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    {{end}}
+    {{if .NeedEmail}}
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">이메일</label>
+      <input type="email" name="email" required value="{{.User.Email}}" class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    {{end}}
+    {{if .NeedOrg}}
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">조직</label>
+      <select name="org_id" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        <option value="">선택</option>
+        {{range .Orgs}}
+        <option value="{{.OrgID}}" {{if eq $.User.OrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>
+        {{end}}
+      </select>
+    </div>
+    {{end}}
+    <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장하고 시작</button>
+  </form>
+</div>
+{{end}}

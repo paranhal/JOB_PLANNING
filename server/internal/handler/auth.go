@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -98,6 +99,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		TargetTable: "users",
 		TargetID:    user.UserID,
 	})
+	if user.NeedsProfileFill() {
+		return c.Redirect(http.StatusSeeOther, "/account/complete")
+	}
 	return c.Redirect(http.StatusSeeOther, "/")
 }
 
@@ -131,10 +135,14 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 	if c.QueryParam("ok") == "password" {
 		msg = "비밀번호가 변경되었습니다."
 	} else if c.QueryParam("ok") == "profile" {
-		msg = "이름이 저장되었습니다."
+		msg = "계정 정보가 저장되었습니다."
+	}
+	var orgs []model.Org
+	if h.orgRepo != nil {
+		orgs, _ = h.orgRepo.ListActive()
 	}
 	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg,
+		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg, "Orgs": orgs,
 	})
 }
 
@@ -152,10 +160,87 @@ func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
 		})
 	}
 	u.FullName = name
+	bindUserContact(c, u)
+	if err := u.ProfileFieldError(); err != "" {
+		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
+			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": err,
+		})
+	}
 	h.userRepo.Update(u)
-	// JWT에 이름이 남아 있으므로 재로그인 권장 — 쿠키를 갱신해 즉시 반영
 	h.refreshSession(c, u)
 	return c.Redirect(http.StatusSeeOther, "/account?ok=profile")
+}
+
+func (h *AuthHandler) AccountCompleteForm(c echo.Context) error {
+	u, err := h.currentAccountUser(c)
+	if err != nil {
+		return err
+	}
+	if !u.NeedsProfileFill() {
+		return c.Redirect(http.StatusSeeOther, "/")
+	}
+	return h.renderProfileComplete(c, u, "")
+}
+
+func (h *AuthHandler) AccountComplete(c echo.Context) error {
+	u, err := h.currentAccountUser(c)
+	if err != nil {
+		return err
+	}
+	miss := u.MissingProfileFields()
+	for _, f := range miss {
+		switch f {
+		case "mobile":
+			u.Mobile = strings.TrimSpace(c.FormValue("mobile"))
+		case "email":
+			u.Email = strings.TrimSpace(c.FormValue("email"))
+		case "org":
+			u.OrgID = strings.TrimSpace(c.FormValue("org_id"))
+		}
+	}
+	if msg := u.ProfileFieldError(); msg != "" {
+		return h.renderProfileComplete(c, u, msg)
+	}
+	u.ProfileDone = true
+	if err := h.userRepo.Update(u); err != nil {
+		return err
+	}
+	h.refreshSession(c, u)
+	return c.Redirect(http.StatusSeeOther, "/")
+}
+
+func (h *AuthHandler) currentAccountUser(c echo.Context) (*model.User, error) {
+	uid := ctxString(c, "user_id")
+	u, _ := h.userRepo.GetByID(uid)
+	if u == nil {
+		return nil, c.Redirect(http.StatusSeeOther, "/logout")
+	}
+	return u, nil
+}
+
+func (h *AuthHandler) renderProfileComplete(c echo.Context, u *model.User, errMsg string) error {
+	var orgs []model.Org
+	if h.orgRepo != nil {
+		orgs, _ = h.orgRepo.ListActive()
+	}
+	miss := map[string]bool{}
+	for _, f := range u.MissingProfileFields() {
+		miss[f] = true
+	}
+	return c.Render(http.StatusOK, "auth/profile_complete.html", map[string]interface{}{
+		"Title": "내 정보 채우기", "Active": NavAccount, "HideNav": true, "User": u,
+		"NeedMobile": miss["mobile"], "NeedEmail": miss["email"], "NeedOrg": miss["org"],
+		"Orgs": orgs, "Error": errMsg,
+	})
+}
+
+func bindUserContact(c echo.Context, u *model.User) {
+	if u == nil {
+		return
+	}
+	u.Mobile = strings.TrimSpace(c.FormValue("mobile"))
+	u.Tel = strings.TrimSpace(c.FormValue("tel"))
+	u.Email = strings.TrimSpace(c.FormValue("email"))
 }
 
 func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
@@ -232,10 +317,14 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	}
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
+	var orgs []model.Org
+	if h.orgRepo != nil {
+		orgs, _ = h.orgRepo.ListActive()
+	}
 	data := map[string]interface{}{
 		"Title": "사용자 관리", "Active": NavUsers, "Users": users, "OK": msg, "Error": errMsg,
 		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit,
-		"RoleGroups": model.GroupUsersByRole(users),
+		"RoleGroups": model.GroupUsersByRole(users), "Orgs": orgs,
 	}
 	if canEdit {
 		data["HashMig"] = h.passwordMigrationStatus()
@@ -284,15 +373,22 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	}
 	perms := model.CompactStoredPermissions(model.EffectiveRole(role, baseRole), selected)
 	u := &model.User{
-		Username:     c.FormValue("username"),
+		Username:     strings.TrimSpace(c.FormValue("username")),
 		PasswordHash: HashPassword(c.FormValue("password")),
-		FullName:     c.FormValue("full_name"),
+		FullName:     strings.TrimSpace(c.FormValue("full_name")),
 		Role:         role,
 		BaseRole:     baseRole,
 		Permissions:  perms,
 		IsActive:     true,
+		OrgID:        strings.TrimSpace(c.FormValue("org_id")),
 	}
-	h.userRepo.Create(u)
+	bindUserContact(c, u)
+	if msg := u.ProfileFieldError(); msg != "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(msg))
+	}
+	if err := h.userRepo.Create(u); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 만들지 못했습니다."))
+	}
 	return c.Redirect(http.StatusSeeOther, "/users")
 }
 
@@ -313,6 +409,11 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		u.BaseRole = model.NormalizeRole(c.FormValue("base_role"))
 	} else {
 		u.BaseRole = ""
+	}
+	u.OrgID = strings.TrimSpace(c.FormValue("org_id"))
+	bindUserContact(c, u)
+	if msg := u.ProfileFieldError(); msg != "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(msg))
 	}
 	if prevRole != "" && prevRole != u.Role && c.FormValue("clear_custom_perms") == "1" {
 		u.Permissions = ""
@@ -477,6 +578,11 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				c.Set("org_switch_list", orgs)
 			}
 		}
+		if _, has := claims["profile_ok"]; has && !claimBool(claims, "profile_ok") {
+			if !profileCompleteExempt(path) {
+				return c.Redirect(http.StatusSeeOther, "/account/complete")
+			}
+		}
 		pop := audit.Push(audit.Actor{
 			UserID:   ctxString(c, "user_id"),
 			Username: ctxString(c, "username"),
@@ -486,6 +592,11 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		defer pop()
 		return next(c)
 	}
+}
+
+func profileCompleteExempt(path string) bool {
+	p := strings.TrimSpace(path)
+	return p == "/account/complete" || p == "/logout" || strings.HasPrefix(p, "/static")
 }
 
 const authRevalidateInterval = 5 * time.Minute
@@ -502,6 +613,7 @@ func sessionClaims(user *model.User, unconfirmed bool) jwt.MapClaims {
 		"permissions": model.FormatPermissions(user.PermList()),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
+		"profile_ok":  !user.NeedsProfileFill(),
 	}
 	if unconfirmed {
 		claims["auth_unconfirmed"] = true

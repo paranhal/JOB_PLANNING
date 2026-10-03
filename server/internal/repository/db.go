@@ -1209,6 +1209,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyOrgs(db)
 	applyCreatedByColumns(db)
 	applyIsTestColumns(db)
+	applyUserProfileColumns(db)
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)

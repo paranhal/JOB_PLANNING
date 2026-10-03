@@ -52,6 +52,17 @@
             <option value="tester">테스터</option>
           </select>
         </div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">핸드폰 <span class="text-gray-400">(관리자 외 필수)</span></label><input type="text" name="mobile" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">전화</label><input type="text" name="tel" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">이메일 <span class="text-gray-400">(관리자 필수)</span></label><input type="email" name="email" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">조직 <span class="text-gray-400">(비젼관리자만 생략)</span></label>
+          <select name="org_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">선택</option>
+            {{range $.Orgs}}
+            <option value="{{.OrgID}}" {{if eq .OrgID "O01"}}selected{{end}}>{{.OrgName}}</option>
+            {{end}}
+          </select>
+        </div>
         <div><label class="block text-xs font-medium text-gray-600 mb-1">테스터가 물려받을 직급</label>
           <select name="base_role" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="tech">기술</option>
@@ -140,6 +151,7 @@
       </button>
       <div class="space-y-3" x-show="open">
     {{range .Items}}
+    {{$u := .}}
     {{$uperms := userPermList .}}
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       {{if $canEdit}}
@@ -181,6 +193,15 @@
               <option value="0" {{if not .IsActive}}selected{{end}}>비활성</option>
             </select>
             <input type="hidden" name="full_name" value="{{.FullName}}">
+            <input type="text" name="mobile" value="{{.Mobile}}" placeholder="핸드폰" class="border rounded px-2 py-1 text-xs w-32" title="핸드폰">
+            <input type="text" name="tel" value="{{.Tel}}" placeholder="전화" class="border rounded px-2 py-1 text-xs w-28" title="전화">
+            <input type="email" name="email" value="{{.Email}}" placeholder="이메일" class="border rounded px-2 py-1 text-xs w-40" title="이메일">
+            <select name="org_id" class="border rounded px-2 py-1 text-xs" title="조직">
+              <option value="">조직 없음</option>
+              {{range $.Orgs}}
+              <option value="{{.OrgID}}" {{if eq $u.OrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>
+              {{end}}
+            </select>
             <button type="button" @click="pwUser = (pwUser==='{{.UserID}}' ? '' : '{{.UserID}}')"
                     class="text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50">
               비밀번호 변경
