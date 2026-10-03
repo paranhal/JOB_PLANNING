@@ -1,0 +1,13 @@
+{{define "title"}}마일스톤 근거{{end}}
+{{define "content"}}
+<div class="p-3 text-sm space-y-2">
+  <p class="font-semibold">{{.Week}} · {{.Domain}} · {{.Metric}} {{len .Items}}건</p>
+  <ul class="space-y-1">
+    {{range .Items}}
+    <li><a href="{{.Href}}" class="text-blue-700">{{.Date}} {{.Number}} {{.Title}}</a></li>
+    {{else}}
+    <li class="text-gray-400">목록이 없습니다.</li>
+    {{end}}
+  </ul>
+</div>
+{{end}}

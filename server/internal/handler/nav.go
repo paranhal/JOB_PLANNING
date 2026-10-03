@@ -28,6 +28,7 @@ const (
 	NavStats            = "stats"
 	NavStatsReports     = "stats_reports"
 	NavStatsDetail      = "stats_detail"
+	NavStatsMilestones  = "stats_milestones"
 	NavAnalysis         = "analysis"
 	NavCustomers        = "customers"
 	NavSpaces           = "spaces"
@@ -80,6 +81,7 @@ func navSidebarKeys() []string {
 		NavStats,
 		NavStatsReports,
 		NavStatsDetail,
+		NavStatsMilestones,
 		NavAnalysis,
 		NavCustomers,
 		NavSpaces,

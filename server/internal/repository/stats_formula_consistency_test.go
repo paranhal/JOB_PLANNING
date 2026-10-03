@@ -230,3 +230,48 @@ func TestTesterRowsZeroInAllAggregations(t *testing.T) {
 		t.Fatalf("테스터만 보기 sample=%d", kpiT.CompleteSample)
 	}
 }
+
+func TestMilestoneTotalsMatchStatsScreen(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "ms-formula.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('c1','도서관','도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`
+		INSERT INTO as_receipts (
+			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
+			complete_datetime, status, assigned_to, data_origin, org_id
+		) VALUES
+		('app1','R-APP1','c1','2026-08-04 09:00:00','2026-08-05',
+		 '2026-08-05 16:00:00','completed','양기헌','app','O01'),
+		('app2','R-APP2','c1','2026-08-04 09:00:00','2026-08-06',
+		 '2026-08-07 16:00:00','completed','양기헌','app','O01')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewStatsRepo(db)
+	anchor := time.Date(2026, 8, 3, 0, 0, 0, 0, time.Local)
+	f := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	f.OrgID = model.OrgIDLibrary
+	cols := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
+	if err := repo.FillPeriodOverview(cols, f); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ComputeMilestones(anchor, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	ms, err := repo.ListMilestones("2026-08-03", model.OrgIDLibrary, model.MilestoneDomainAS, model.MilestoneScopeOrg)
+	if err != nil || len(ms) != 1 {
+		t.Fatal(err)
+	}
+	if ms[0].Received != cols[1].Counts.AS.Receipt {
+		t.Fatalf("마일스톤 접수 %d != 통계 %d", ms[0].Received, cols[1].Counts.AS.Receipt)
+	}
+	if ms[0].Processed != cols[1].Counts.AS.Process {
+		t.Fatalf("마일스톤 조치 %d != 통계 %d", ms[0].Processed, cols[1].Counts.AS.Process)
+	}
+}

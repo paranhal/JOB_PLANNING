@@ -129,9 +129,9 @@ type StatsQuery struct {
 	// quarter: YYYY-Qn (예: 2026-Q3)
 	Quarter string
 	// range
-	From string // YYYY-MM-DD
-	To   string // YYYY-MM-DD inclusive
-	OrgID string
+	From         string // YYYY-MM-DD
+	To           string // YYYY-MM-DD inclusive
+	OrgID        string
 	TestDataOnly bool
 }
 
@@ -388,26 +388,34 @@ const (
 
 // WeeklyReport 주간업무보고서 엑셀 데이터 (§16.1 시트 2개)
 type WeeklyReport struct {
-	WeekFrom           string // 월요일 YYYY-MM-DD
-	WeekTo             string // 일요일 YYYY-MM-DD (포함)
-	WeekToEx           string
-	Friday             string // 파일명 기준일(그 주 금요일)
-	WorkingDays        int
-	HolidayYearMissing bool
-	PersonRows         []WeeklyPersonRow // 첫 행 팀 전체, 아래 담당자(완료 내림차순, 미배정 맨 아래)
-	PlanningRate       float64
-	PlanningOpen       int
-	PlanningPlanned    int
-	HasPlanning        bool
-	PlanDisplay        StatsValue
-	MntQuota           int
-	MntReceipt         int
-	MntDone            int
-	MntCumulative      int
-	MntRemaining       int
-	MntMonthLabel      string
-	AdminLead          AdminLeadBreakdown // §13.10 행정/지원 평균 리드타임·외부 대기 비중
-	Events             []WeeklyEventRow
+	WeekFrom             string // 월요일 YYYY-MM-DD
+	WeekTo               string // 일요일 YYYY-MM-DD (포함)
+	WeekToEx             string
+	Friday               string // 파일명 기준일(그 주 금요일)
+	WorkingDays          int
+	HolidayYearMissing   bool
+	PersonRows           []WeeklyPersonRow // 첫 행 팀 전체, 아래 담당자(완료 내림차순, 미배정 맨 아래)
+	PlanningRate         float64
+	PlanningOpen         int
+	PlanningPlanned      int
+	HasPlanning          bool
+	PlanDisplay          StatsValue
+	MntQuota             int
+	MntReceipt           int
+	MntDone              int
+	MntCumulative        int
+	MntRemaining         int
+	MntMonthLabel        string
+	AdminLead            AdminLeadBreakdown // §13.10 행정/지원 평균 리드타임·외부 대기 비중
+	Events               []WeeklyEventRow
+	SalesNew             int
+	SalesInfo            int
+	SalesAct             int
+	SalesQuote           int
+	SalesOrder           int
+	SalesContract        int
+	MilestoneState       string // draft | fixed | ""
+	MilestoneProvisional bool
 }
 
 // WeeklyPersonRow 통계 시트 1행 (팀 또는 담당자). 소요일은 팀/담당자 기준으로 각각 재계산.

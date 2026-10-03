@@ -156,6 +156,7 @@
       {{end}}
       {{if or $canPlanExec $isObserver (hasUserPerm $perms "stats.view") (hasUserPerm $perms "stats")}}
       <a href="/stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">통계</a>
+      <a href="/stats/milestones" class="{{if eq $a "stats_milestones"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">마일스톤</a>
       <a href="/stats/reports" class="{{if or (eq $a "stats_reports") (eq $a "stats_detail")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">보고서</a>
       {{end}}
       {{if or $isAdmin $isSales $isObserver $isOffice $isTech (hasUserPerm $perms "sales.view") (hasUserPerm $perms "analysis")}}

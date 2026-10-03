@@ -179,7 +179,19 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 		}
 	}
 
-	leadStart := 4 + len(rep.PersonRows) + 2
+	if rep.MilestoneProvisional {
+		_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", 4+len(rep.PersonRows)), "임시 집계 (마일스톤 미확정)")
+	}
+	salesRow := 5 + len(rep.PersonRows)
+	if rep.MilestoneProvisional {
+		salesRow++
+	}
+	_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", salesRow), "영업")
+	_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("B%d", salesRow),
+		fmt.Sprintf("신규 %d · 정보 %d · 활동 %d · 견적 %d · 수주 %d · 계약 %d",
+			rep.SalesNew, rep.SalesInfo, rep.SalesAct, rep.SalesQuote, rep.SalesOrder, rep.SalesContract))
+
+	leadStart := salesRow + 2
 	_ = f.SetCellValue(weeklyStatsSheet, fmt.Sprintf("A%d", leadStart),
 		fmt.Sprintf("접수→방문 평균일수(목표 %.0f일) · 접수→완료 평균일수(목표 %.0f일)",
 			model.StatsVisitTargetDays, model.StatsCompleteTargetDays))

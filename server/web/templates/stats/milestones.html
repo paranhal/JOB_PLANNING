@@ -1,0 +1,133 @@
+{{define "title"}}마일스톤 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-5" x-data="{ open:'' }">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">마일스톤</h2>
+    <p class="text-sm text-gray-500 mt-1">주 마감 {{.Deadline}}에 숫자를 얼립니다.{{if .HolidayMissing}} 공휴일 미등록{{end}}</p>
+  </div>
+  <form method="get" class="flex flex-wrap gap-2 items-end">
+    <label class="text-sm">주
+      <select name="week" class="ml-1 rounded border px-2 py-1 text-sm">
+        {{range .Weeks}}
+        <option value="{{.Value}}" {{if eq $.Week .Value}}selected{{end}}>{{.Label}} {{if eq .State "fixed"}}확정{{else if eq .State "draft"}}임시{{end}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label class="text-sm">영역
+      <select name="domain" class="ml-1 rounded border px-2 py-1 text-sm">
+        <option value="as" {{if eq .Domain "as"}}selected{{end}}>기술·AS</option>
+        <option value="mnt" {{if eq .Domain "mnt"}}selected{{end}}>기술·정기점검</option>
+        <option value="admin" {{if eq .Domain "admin"}}selected{{end}}>행정·지원</option>
+        <option value="sales" {{if eq .Domain "sales"}}selected{{end}}>영업</option>
+      </select>
+    </label>
+    <label class="text-sm">축
+      <select name="scope" class="ml-1 rounded border px-2 py-1 text-sm">
+        <option value="org" {{if eq .Scope "org"}}selected{{end}}>주간</option>
+        <option value="assignee" {{if eq .Scope "assignee"}}selected{{end}}>담당자</option>
+        <option value="date" {{if eq .Scope "date"}}selected{{end}}>일자</option>
+      </select>
+    </label>
+    <button class="rounded border px-3 py-1 text-sm">보기</button>
+  </form>
+
+  <div class="flex flex-wrap gap-2">
+    {{if and .CanFix (ne .State "fixed")}}
+    <form method="post" action="/stats/milestones/recompute">
+      <input type="hidden" name="week" value="{{.Week}}">
+      <button class="rounded border px-3 py-1.5 text-sm">다시 찍기</button>
+    </form>
+    <form method="post" action="/stats/milestones/fix">
+      <input type="hidden" name="week" value="{{.Week}}">
+      <button class="rounded bg-blue-600 text-white px-3 py-1.5 text-sm">확정</button>
+    </form>
+    {{end}}
+    {{if and .CanFix (eq .State "fixed")}}
+    <form method="post" action="/stats/milestones/unfix" onsubmit="return confirm('확정을 되돌립니다. 기록이 남습니다.');">
+      <input type="hidden" name="week" value="{{.Week}}">
+      <button class="rounded border px-3 py-1.5 text-sm">확정 되돌리기</button>
+    </form>
+    {{end}}
+    <a href="/stats/milestones.xlsx?week={{.Week}}" class="rounded border px-3 py-1.5 text-sm">엑셀</a>
+    <span class="text-sm text-gray-500 self-center">상태 {{if eq .State "fixed"}}확정{{else}}임시{{end}}</span>
+  </div>
+
+  {{if .Trend}}
+  <div class="bg-white rounded-xl border p-4">
+    <p class="text-sm font-semibold mb-2">추이 (접수·조치·이월)</p>
+    <div class="space-y-1 text-xs">
+      {{range .Trend}}
+      <div class="flex items-center gap-2">
+        <span class="w-24 font-mono text-gray-500">{{.WeekStart}}</span>
+        <span class="text-blue-700">접 {{.Received}}</span>
+        <span class="text-green-700">조 {{.Processed}}</span>
+        <span class="text-amber-700">이 {{.Carried}}</span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">키</th>
+          <th class="text-right px-3 py-2">접수</th>
+          <th class="text-right px-3 py-2">조치</th>
+          <th class="text-right px-3 py-2">이월</th>
+          {{if eq .Domain "sales"}}
+          <th class="text-right px-3 py-2">신규</th>
+          <th class="text-right px-3 py-2">정보</th>
+          <th class="text-right px-3 py-2">활동</th>
+          <th class="text-right px-3 py-2">견적</th>
+          <th class="text-right px-3 py-2">수주</th>
+          <th class="text-right px-3 py-2">계약</th>
+          <th class="text-right px-3 py-2">발굴잔</th>
+          <th class="text-right px-3 py-2">제안잔</th>
+          <th class="text-right px-3 py-2">입찰잔</th>
+          {{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr class="border-t">
+          <td class="px-3 py-2">{{if .ScopeKey}}{{.ScopeKey}}{{else}}주간{{end}}</td>
+          <td class="px-3 py-2 text-right">
+            <button type="button" class="text-blue-700" @click="open = (open==='r-{{.Domain}}-{{.ScopeKey}}' ? '' : 'r-{{.Domain}}-{{.ScopeKey}}')">{{.Received}}</button>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <button type="button" class="text-blue-700" @click="open = (open==='p-{{.Domain}}-{{.ScopeKey}}' ? '' : 'p-{{.Domain}}-{{.ScopeKey}}')">{{.Processed}}</button>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <button type="button" class="text-amber-700" @click="open = (open==='c-{{.Domain}}-{{.ScopeKey}}' ? '' : 'c-{{.Domain}}-{{.ScopeKey}}')">{{.Carried}}</button>
+          </td>
+          {{if eq $.Domain "sales"}}
+          <td class="px-3 py-2 text-right">{{.SalesNew}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesInfo}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesAct}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesQuote}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesOrder}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesContract}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesOpenDiscover}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesOpenPropose}}</td>
+          <td class="px-3 py-2 text-right">{{.SalesOpenBid}}</td>
+          {{end}}
+        </tr>
+        <tr x-show="open==='r-{{.Domain}}-{{.ScopeKey}}'" x-cloak>
+          <td colspan="12" class="px-3 pb-3"><iframe src="/stats/milestones/items?week={{$.Week}}&domain={{.Domain}}&metric=received&embed=1" class="w-full h-48 rounded border"></iframe></td>
+        </tr>
+        <tr x-show="open==='p-{{.Domain}}-{{.ScopeKey}}'" x-cloak>
+          <td colspan="12" class="px-3 pb-3"><iframe src="/stats/milestones/items?week={{$.Week}}&domain={{.Domain}}&metric=processed&embed=1" class="w-full h-48 rounded border"></iframe></td>
+        </tr>
+        <tr x-show="open==='c-{{.Domain}}-{{.ScopeKey}}'" x-cloak>
+          <td colspan="12" class="px-3 pb-3"><iframe src="/stats/milestones/items?week={{$.Week}}&domain={{.Domain}}&metric=carried&embed=1" class="w-full h-48 rounded border"></iframe></td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4" class="px-3 py-6 text-gray-400">이 주 숫자가 없습니다. 다시 찍기를 누르세요.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

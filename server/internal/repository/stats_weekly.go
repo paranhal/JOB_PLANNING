@@ -141,6 +141,8 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday, orgID stri
 		return out, err
 	}
 	out.Events = r.collapseWeeklyReportEvents(out.Events)
+	r.applyFixedMilestoneToWeekly(&out, orgID)
+	r.fillLiveSalesWeekly(&out, orgID)
 	return out, nil
 }
 

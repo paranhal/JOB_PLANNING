@@ -26,6 +26,7 @@ import (
 	"customer-support/internal/mailer"
 	"customer-support/internal/notify"
 	"customer-support/internal/repository"
+	"customer-support/internal/service"
 )
 
 // Dockerfile -ldflags 로 주입. 로컬 go run 은 기본값(dev). v2.0 §40.3
@@ -138,6 +139,7 @@ func main() {
 	}
 	mailer.Start(db, mailer.FromApp(cfg))
 	notify.Start(db, notify.FromApp(cfg))
+	service.StartMilestones(db)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -410,6 +412,12 @@ func main() {
 	stats.GET("/export.xlsx", h.Stats.ExportExcel)
 	stats.GET("/weekly-report.xlsx", h.Stats.ExportWeeklyReport)
 	stats.GET("/daily-assignee.xlsx", h.Stats.ExportDailyAssigneeReport)
+	stats.GET("/milestones", h.Stats.Milestones)
+	stats.GET("/milestones/items", h.Stats.MilestoneItems)
+	stats.GET("/milestones.xlsx", h.Stats.ExportMilestones)
+	stats.POST("/milestones/recompute", h.Stats.RecomputeMilestone)
+	stats.POST("/milestones/fix", h.Stats.FixMilestone)
+	stats.POST("/milestones/unfix", h.Stats.UnfixMilestone)
 
 	g.GET("/work-status", h.WorkStatus.Calendar)
 

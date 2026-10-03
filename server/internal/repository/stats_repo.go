@@ -13,6 +13,13 @@ type StatsRepo struct{ db *sql.DB }
 
 func NewStatsRepo(db *sql.DB) *StatsRepo { return &StatsRepo{db: db} }
 
+func (r *StatsRepo) DB() *sql.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 // NormalizeStatsOffset 0~2 로 제한 (하위호환)
 func NormalizeStatsOffset(n int) int {
 	if n < 0 {
