@@ -211,4 +211,22 @@ func TestTesterRowsZeroInAllAggregations(t *testing.T) {
 			t.Fatal("담당자 UNION에 테스터가 있다")
 		}
 	}
+
+	only := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	only.OrgID = model.OrgIDLibrary
+	only.TestDataOnly = true
+	colsT := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
+	if err := repo.FillPeriodOverview(colsT, only); err != nil {
+		t.Fatal(err)
+	}
+	if colsT[1].Counts.AS.Planned != 1 {
+		t.Fatalf("테스터만 보기 planned=%d", colsT[1].Counts.AS.Planned)
+	}
+	kpiT, err := repo.LoadStatsKPI(model.StatsViewWeek, colsT, only)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kpiT.CompleteSample != 1 {
+		t.Fatalf("테스터만 보기 sample=%d", kpiT.CompleteSample)
+	}
 }

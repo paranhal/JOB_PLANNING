@@ -12,7 +12,7 @@
 <div class="space-y-5" x-data="statsDashboard()">
   <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">통계</h2>
+      <h2 class="text-xl font-bold text-gray-800">{{if .Filter.TestDataOnly}}통계 · 테스터만{{else}}통계{{end}}</h2>
       <p class="text-sm text-gray-500 mt-1">관리 단위(기간·담당·사업) 기준 · 방문 3일 · 완료 7일</p>
       {{if .MetricsBaseDate}}
       <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
@@ -26,6 +26,7 @@
           {{range .Projects}}{{if eq .ProjectID $.Filter.ProjectID}} · 사업 {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}{{end}}{{end}}
         {{end}}
         {{if .Filter.IncludeImport}}<span class="ml-1 text-amber-700">· 이관 데이터 포함</span>{{else}}<span class="ml-1 text-gray-500">· 이관 데이터 제외</span>{{end}}
+        {{if .Filter.TestDataOnly}}<span class="ml-1 text-violet-800">· 테스터만 보기</span>{{end}}
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2 shrink-0">
@@ -142,6 +143,14 @@
              onchange="document.getElementById('statsSalesField').value=this.checked?'':'0'; this.form.submit()">
       영업 활동 포함
     </label>
+    {{if .CanTestStats}}
+    <label class="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-900 cursor-pointer">
+      <input type="checkbox" name="test" value="1" class="rounded border-violet-300 text-violet-700"
+             {{if .Filter.TestDataOnly}}checked{{end}}
+             onchange="this.form.submit()">
+      테스터만 보기
+    </label>
+    {{end}}
 
     <div class="w-full sm:w-auto flex-1 min-w-[16rem]">
       {{template "stats_lookback" .}}

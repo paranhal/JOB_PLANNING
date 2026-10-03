@@ -135,6 +135,9 @@ func parseStatsQuery(c echo.Context) model.StatsQuery {
 		To:      strings.TrimSpace(c.QueryParam("to")),
 		OrgID:   currentOrg(c),
 	}
+	if canSeeTestStats(c) && c.QueryParam("test") == "1" {
+		q.TestDataOnly = true
+	}
 	// 기본값 채우기
 	if q.Date == "" {
 		q.Date = now.Format("2006-01-02")
@@ -179,6 +182,9 @@ func statsQueryString(q model.StatsQuery) string {
 	case model.StatsPeriodRange:
 		v.Set("from", q.From)
 		v.Set("to", q.To)
+	}
+	if q.TestDataOnly {
+		v.Set("test", "1")
 	}
 	return v.Encode()
 }
@@ -246,6 +252,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 	filter.IncludeImport = c.QueryParam("import") == "1"
 	filter.ExcludeSalesActivity = c.QueryParam("sales") == "0"
 	filter = statsOrgFilter(c, filter)
+	filter = applyStatsTestFilter(c, filter)
 	fromIncl, toIncl := lookbackTimes(lb, now)
 
 	cols := repository.BuildStatsRangeColumns(fromIncl, toIncl)
@@ -305,9 +312,13 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		projects, _ = h.wbRepo.ListProjects(true)
 	}
 
+	title := "통계"
+	if filter.TestDataOnly {
+		title = "통계 · 테스터만"
+	}
 	anchor := now
 	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
-		"Title":             "통계",
+		"Title":             title,
 		"Active":            NavStats,
 		"View":              lb.View,
 		"ViewLabel":         viewLabel,
@@ -342,6 +353,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"RangeFrom":         lb.From,
 		"RangeTo":           lb.To,
 		"MissingComplete":   missingComplete,
+		"CanTestStats":      canSeeTestStats(c),
 	})
 }
 
@@ -362,11 +374,43 @@ func statsMeetingFilterQuery(f model.StatsMeetingFilter) string {
 	if f.ExcludeSalesActivity {
 		q.Set("sales", "0")
 	}
+	if f.TestDataOnly {
+		q.Set("test", "1")
+	}
 	s := q.Encode()
 	if s == "" {
 		return ""
 	}
 	return "&" + s
+}
+
+func canSeeTestStats(c echo.Context) bool {
+	if isObserverRole(c) {
+		return true
+	}
+	return canResetData(c)
+}
+
+func applyStatsTestFilter(c echo.Context, f model.StatsMeetingFilter) model.StatsMeetingFilter {
+	if canSeeTestStats(c) && c.QueryParam("test") == "1" {
+		f.TestDataOnly = true
+	}
+	return f
+}
+
+func (h *AuthHandler) RequireTestStatsMW(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if canSeeTestStats(c) {
+			return next(c)
+		}
+		return h.forbidden(c)
+	}
+}
+
+func (h *StatsHandler) TestStatsRedirect(c echo.Context) error {
+	v, _ := url.ParseQuery(c.QueryString())
+	v.Set("test", "1")
+	return c.Redirect(http.StatusSeeOther, "/stats?"+v.Encode())
 }
 
 func statsOverviewShift(view string, anchor time.Time, dir int) time.Time {

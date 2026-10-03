@@ -205,6 +205,14 @@ func metricStatusCond(metric string) string {
 	}
 }
 
+func statsQueryFilter(q model.StatsQuery) model.StatsMeetingFilter {
+	orgID := q.OrgID
+	if orgID == "" {
+		orgID = OrgAll
+	}
+	return model.StatsMeetingFilter{OrgID: orgID, TestDataOnly: q.TestDataOnly}
+}
+
 // ListDetail 통계 상세
 func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 	now := time.Now()
@@ -225,11 +233,7 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 	args := []interface{}{}
 
 	sqlQ += metricStatusCond(q.Metric)
-	orgID := q.OrgID
-	if orgID == "" {
-		orgID = OrgAll
-	}
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID})
+	asSQL, asArgs := r.filterAS(statsQueryFilter(q))
 	sqlQ += asSQL
 	args = append(args, asArgs...)
 
@@ -308,11 +312,7 @@ func (r *StatsRepo) listPartialWorkDetail(q model.StatsQuery, now time.Time) ([]
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = 'partial_complete'`
-	orgID := q.OrgID
-	if orgID == "" {
-		orgID = OrgAll
-	}
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID})
+	asSQL, asArgs := r.filterAS(statsQueryFilter(q))
 	sqlQ += asSQL
 	args := append([]interface{}{}, asArgs...)
 	if q.Metric == model.StatsMetricProgress {

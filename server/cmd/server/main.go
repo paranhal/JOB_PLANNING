@@ -585,6 +585,7 @@ func main() {
 	g.POST("/admin/data/reset/preview", h.DataReset.Preview, adminSec, h.Auth.RequireDataResetMW)
 	g.POST("/admin/data/reset", h.DataReset.Execute, adminSec, h.Auth.RequireDataResetMW)
 	g.POST("/admin/data/reset/restore", h.DataReset.Restore, adminSec, h.Auth.RequireDataResetMW)
+	g.GET("/admin/test-stats", h.Stats.TestStatsRedirect, adminSec, h.Auth.RequireTestStatsMW)
 	g.GET("/admin/sales-logs", h.Sales.SalesLogs, adminSec, adminOnly)
 	g.GET("/admin/sales-logs.xlsx", h.Sales.SalesLogs, adminSec, adminOnly)
 	g.GET("/admin/data/process-conflicts.xlsx", h.Backup.ProcessConflictsExcel, adminSec, adminOnly)

@@ -194,9 +194,14 @@
       {{if or $isAdmin $loginObserver}}
       <a href="/admin/orgs" class="{{if eq $a "orgs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">조직 관리</a>
       <a href="/admin/data" class="{{if or (eq $a "data") (eq $a "backup")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">데이터 관리</a>
+      <a href="/admin/test-stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">테스터 통계</a>
       <a href="/admin/system" class="{{if eq $a "system"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">시스템 정보</a>
       <a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>
       {{end}}
+      {{end}}
+      {{if eq $login "tester"}}
+      <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">관리</p>
+      <a href="/admin/test-stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">테스터 통계</a>
       {{end}}
       <a href="/account" class="{{if eq $a "account"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">내 계정</a>
     </nav>

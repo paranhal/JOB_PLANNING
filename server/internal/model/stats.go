@@ -132,6 +132,7 @@ type StatsQuery struct {
 	From string // YYYY-MM-DD
 	To   string // YYYY-MM-DD inclusive
 	OrgID string
+	TestDataOnly bool
 }
 
 // 일일/주간/월간/기간지정 요약 뷰
