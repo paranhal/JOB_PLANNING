@@ -139,6 +139,55 @@ const visitSelectColumns = `
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id`
 
+// ListOpenByCustomer 그 기관의 미완료 정기점검 방문. §64.2
+func (r *MaintenanceRepo) ListOpenByCustomer(orgID, customerID string) ([]model.MaintenanceVisit, error) {
+	customerID = strings.TrimSpace(customerID)
+	if customerID == "" {
+		return nil, nil
+	}
+	orgFrag, orgArgs, err := AppendOrgSQL("c", orgID)
+	if err != nil {
+		return nil, err
+	}
+	q := visitSelectColumns + `
+		WHERE v.customer_id=? AND COALESCE(v.completed,0)=0` + orgFrag + `
+		ORDER BY v.visit_date, v.sort_order`
+	args := append([]interface{}{customerID}, orgArgs...)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanVisits(rows)
+}
+
+// AssignOpenVisit 미완료 방문의 날짜·담당자를 넣는다. §64.5
+func (r *MaintenanceRepo) AssignOpenVisit(visitID, date, assignee string) error {
+	visitID = strings.TrimSpace(visitID)
+	if visitID == "" {
+		return fmt.Errorf("방문 ID가 없습니다")
+	}
+	date = strings.TrimSpace(date)
+	if date != "" {
+		if err := r.SetVisitDate(visitID, date); err != nil {
+			return err
+		}
+	}
+	assignee = strings.TrimSpace(assignee)
+	if assignee == "" {
+		return nil
+	}
+	name, uid := bindStaff(r.db, assignee, "")
+	oldName, oldUID := readAssigneePair(r.db, "maintenance_visits", "visit_id", visitID, "assignee", "assignee_user_id")
+	_, err := r.db.Exec(`UPDATE maintenance_visits SET assignee=?, assignee_user_id=? WHERE visit_id=? AND COALESCE(completed,0)=0`,
+		name, uid, visitID)
+	if err != nil {
+		return err
+	}
+	stampAssignedIfChanged(r.db, "maintenance_visits", "visit_id", visitID, oldName, oldUID, name, uid)
+	return nil
+}
+
 func (r *MaintenanceRepo) ListVisits(planID string) ([]model.MaintenanceVisit, error) {
 	rows, err := r.db.Query(visitSelectColumns+`
 		WHERE v.plan_id = ?

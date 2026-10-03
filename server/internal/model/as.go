@@ -89,6 +89,19 @@ type ASHistoryItem struct {
 	StatusLabel  string `json:"status_label,omitempty"`
 }
 
+// CustomerOpenItem 접수 화면 미완료 띠 한 줄. AS와 정기점검 방문을 함께 담는다. §64.2
+type CustomerOpenItem struct {
+	Kind      string `json:"kind"` // as | mnt
+	ItemKey   string `json:"item_key"`
+	ID        string `json:"id"`
+	Number    string `json:"number"`
+	Title     string `json:"title"`
+	Assignee  string `json:"assignee"`
+	VisitDate string `json:"visit_date"`
+	Status    string `json:"status"`
+	Href      string `json:"href"`
+}
+
 // ASProcess AS 처리 이력 (접수 1건에 N개 처리 기록 가능)
 type ASProcess struct {
 	ProcessID       string    `json:"process_id"`
@@ -107,6 +120,23 @@ type ASProcess struct {
 	NextActionDate  string    `json:"next_action_date"` // 다음 작업 예정일
 	WaitReason      string    `json:"wait_reason"`      // 대기·재방문 사유
 	PrepNotes       string    `json:"prep_notes"`       // 재방문 준비사항
+	ActedByUserID   string    `json:"acted_by_user_id,omitempty"`
+	ActedByName     string    `json:"acted_by_name,omitempty"`
+	OnBehalf        bool      `json:"on_behalf,omitempty"`
+}
+
+// ActorLabel 조치 이력 표시. 대신 처리면 「주인 (대신: 실제)」. §65.4
+func (p ASProcess) ActorLabel() string {
+	w := strings.TrimSpace(p.Worker)
+	if p.OnBehalf {
+		if a := strings.TrimSpace(p.ActedByName); a != "" {
+			if w == "" {
+				return "(대신: " + a + ")"
+			}
+			return w + " (대신: " + a + ")"
+		}
+	}
+	return w
 }
 
 // ASListItem AS 목록 표시용

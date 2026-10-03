@@ -17,7 +17,8 @@ const asProcessSelect = `
 		       COALESCE(work_content,''), COALESCE(parts_used,''),
 		       COALESCE(time_spent,0), COALESCE(notes,''),
 		       COALESCE(result_code,''), COALESCE(transfer_detail,''),
-		       COALESCE(next_action_date,''), COALESCE(wait_reason,''), COALESCE(prep_notes,'')
+		       COALESCE(next_action_date,''), COALESCE(wait_reason,''), COALESCE(prep_notes,''),
+		       COALESCE(acted_by_user_id,''), COALESCE(acted_by_name,''), COALESCE(on_behalf,0)
 		FROM as_processes`
 
 func scanASProcesses(rows *sql.Rows) ([]model.ASProcess, error) {
@@ -25,12 +26,15 @@ func scanASProcesses(rows *sql.Rows) ([]model.ASProcess, error) {
 	for rows.Next() {
 		var p model.ASProcess
 		var dt string
+		var onBehalf int
 		if err := rows.Scan(&p.ProcessID, &p.ProcessNumber, &p.ASID, &dt,
 			&p.Worker, &p.WorkType, &p.CauseType, &p.WorkContent,
 			&p.PartsUsed, &p.TimeSpent, &p.Notes,
-			&p.ResultCode, &p.TransferDetail, &p.NextActionDate, &p.WaitReason, &p.PrepNotes); err != nil {
+			&p.ResultCode, &p.TransferDetail, &p.NextActionDate, &p.WaitReason, &p.PrepNotes,
+			&p.ActedByUserID, &p.ActedByName, &onBehalf); err != nil {
 			return nil, err
 		}
+		p.OnBehalf = onBehalf == 1
 		p.ProcessDatetime = parseTime(dt)
 		items = append(items, p)
 	}
@@ -67,17 +71,26 @@ func (r *ASProcessRepo) Create(p *model.ASProcess) error {
 	p.ProcessID = procNum
 	worker, workerUID := bindStaff(r.db, p.Worker, "")
 	p.Worker = worker
+	actedName, actedUID := bindStaff(r.db, p.ActedByName, p.ActedByUserID)
+	p.ActedByName = actedName
+	p.ActedByUserID = actedUID
+	onBehalf := 0
+	if p.OnBehalf {
+		onBehalf = 1
+	}
 	p.TimeSpent = model.NormalizeDurationMin(p.TimeSpent)
 	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO as_processes
 		(process_id,process_number,as_id,process_datetime,worker,worker_user_id,work_type,cause_type,work_content,parts_used,time_spent,notes,
-		 result_code,transfer_detail,next_action_date,wait_reason,prep_notes,created_by_user_id,created_by_name)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 result_code,transfer_detail,next_action_date,wait_reason,prep_notes,created_by_user_id,created_by_name,
+		 acted_by_user_id,acted_by_name,on_behalf)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProcessID, p.ProcessNumber, p.ASID, at.Format("2006-01-02 15:04:05"),
 		p.Worker, workerUID, p.WorkType, p.CauseType, p.WorkContent, p.PartsUsed, p.TimeSpent, p.Notes,
 		nullIfEmpty(p.ResultCode), nullIfEmpty(p.TransferDetail), nullIfEmpty(p.NextActionDate),
-		nullIfEmpty(p.WaitReason), nullIfEmpty(p.PrepNotes), byID, byName)
+		nullIfEmpty(p.WaitReason), nullIfEmpty(p.PrepNotes), byID, byName,
+		p.ActedByUserID, p.ActedByName, onBehalf)
 	if err != nil {
 		return err
 	}

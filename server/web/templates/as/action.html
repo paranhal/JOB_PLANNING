@@ -69,6 +69,11 @@
   </div>
 
 
+  {{if and .OnBehalf .AS.AssignedTo (not .ReadOnly)}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+    지금 {{.AS.AssignedTo}}님 담당 건을 대신 처리합니다.
+  </div>
+  {{end}}
   {{if .ActionOK}}
   <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.ActionOK}}</div>
   {{end}}
@@ -422,7 +427,7 @@
         <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
           {{if .ProcessNumber}}<span class="font-mono text-blue-600">{{.ProcessNumber}}</span>{{end}}
           <span>{{if .ProcessDatetime.IsZero}}—{{else}}{{.ProcessDatetime.Format "2006-01-02 15:04"}}{{end}}</span>
-          <span>{{.Worker}}</span>
+          <span>{{.ActorLabel}}</span>
           {{if .ResultCode}}<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">{{actionResultLabel .ResultCode}}</span>{{end}}
           {{if and (eq .ResultCode "transfer") .TransferDetail}}<span class="text-purple-700">{{transferDetailLabel .TransferDetail}}</span>{{end}}
           {{if .WorkType}}<span class="bg-gray-100 px-1.5 rounded">{{.WorkType}}</span>{{end}}

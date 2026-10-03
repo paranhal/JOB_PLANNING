@@ -90,6 +90,13 @@
           <a href="{{.TeamHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100">팀 전체 보기</a>
           {{end}}
           {{end}}
+          {{if and (not .ScopeAll) (ne .Kind "receipt")}}
+          {{if .IncludeBehalf}}
+          <a href="{{.BehalfOffHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-indigo-200 text-indigo-800 bg-indigo-50">대신한 건 포함</a>
+          {{else}}
+          <a href="{{.BehalfOnHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 text-slate-600">대신한 건 숨김</a>
+          {{end}}
+          {{end}}
           <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
             <a href="/work-status?view={{.View}}&date={{.Date}}&kind=receipt{{if .AssigneeFilter}}{{if not .ShowScopeToggle}}&assignee={{urlquery .AssigneeFilter}}{{end}}{{end}}{{if .ProjectFilter}}&project={{urlquery .ProjectFilter}}{{end}}{{if eq .MineParam "0"}}&mine=0{{end}}"
                class="px-3 py-1.5 text-xs font-semibold {{if eq .Kind "receipt"}}bg-amber-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">접수</a>

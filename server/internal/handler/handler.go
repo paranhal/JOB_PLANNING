@@ -128,6 +128,7 @@ func New(db *sql.DB) *Handler {
 		SWDetail: &SWDetailHandler{repo: swDetailRepo},
 		Relation: &RelationHandler{repo: relationRepo, customerRepo: customerRepo, codeRepo: codeRepo},
 		AS: &ASHandler{
+			db:   db,
 			repo: asRepo, processRepo: asProcessRepo, workRepo: asWorkRepo,
 			wbRepo:       repository.NewWBRepo(db),
 			settingsRepo: settingsRepo,
@@ -139,6 +140,7 @@ func New(db *sql.DB) *Handler {
 			attach:     attachH,
 			kwRepo:     repository.NewASKeywordRepo(db),
 			notices:    noticeHook,
+			maintRepo:  maintRepo,
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,

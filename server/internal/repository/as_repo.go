@@ -1093,6 +1093,51 @@ func (r *ASRepo) ListPastHistory(customerID, excludeASID string, limit int) ([]m
 	return items, rows.Err()
 }
 
+// ListOpenByCustomer 그 기관의 안 끝난 AS. 상태는 SQLStatusOpenIncomplete(부분완료 포함). §64.2
+func (r *ASRepo) ListOpenByCustomer(orgID, customerID string) ([]model.ASListItem, error) {
+	customerID = strings.TrimSpace(customerID)
+	if customerID == "" {
+		return nil, nil
+	}
+	orgFrag, orgArgs, err := AppendOrgSQL("ar", orgID)
+	if err != nil {
+		return nil, err
+	}
+	q := `
+		SELECT ar.as_id, ar.as_number, ar.receipt_datetime,
+		       c.org_name, COALESCE(a.product_name,'') AS product_name,
+		       ar.symptom, ar.urgency, ar.status, COALESCE(ar.assigned_to,''),
+		       COALESCE(ar.visit_scheduled_date,'')
+		FROM as_receipts ar
+		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		WHERE ar.customer_id=?
+		  AND ar.status IN ` + model.SQLStatusOpenIncomplete + orgFrag + `
+		ORDER BY ar.receipt_datetime DESC`
+	args := append([]interface{}{customerID}, orgArgs...)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.ASListItem
+	for rows.Next() {
+		var it model.ASListItem
+		var receiptStr string
+		if err := rows.Scan(
+			&it.ASID, &it.ASNumber, &receiptStr,
+			&it.OrgName, &it.ProductName,
+			&it.Symptom, &it.Urgency, &it.Status, &it.AssignedTo,
+			&it.VisitScheduledDate,
+		); err != nil {
+			return nil, err
+		}
+		it.ReceiptDatetime = parseTime(receiptStr)
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
 // ListHistoryByAsset 동일 자산의 AS 이력 (현재 건 제외 가능)
 func (r *ASRepo) ListHistoryByAsset(assetID, excludeASID string, limit int) ([]model.ASHistoryItem, error) {
 	if assetID == "" {

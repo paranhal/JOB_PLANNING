@@ -273,6 +273,7 @@ func main() {
 	api.GET("/assets/:customer_id", h.Asset.APIAssetsByCustomer)
 	api.GET("/contacts/:customer_id", h.Contact.APIContactsByCustomer)
 	api.GET("/as/history/:customer_id", h.AS.APIHistory)
+	api.GET("/as/open/:customer_id", h.AS.APIOpenByCustomer)
 	api.GET("/as/asset-history/:asset_id", h.AS.APIAssetHistory)
 
 	contact := g.Group("/contacts")
@@ -332,6 +333,8 @@ func main() {
 	as.POST("/keywords/:id/delete", h.AS.KeywordDelete)
 	as.GET("/new", h.AS.New, receiveAS)
 	as.POST("", h.AS.Create, receiveAS)
+	as.POST("/open/pull", h.AS.PullOpen, processAS)
+	as.POST("/open/assign", h.AS.AssignOpenDates, processAS)
 	as.GET("/stats", h.AS.StatsDashboard)
 	// 하부업무 조치(원 접수와 독립) — /:id 보다 먼저 등록
 	as.GET("/work/:work_id/action", h.AS.WorkAction)

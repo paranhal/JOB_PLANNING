@@ -21,6 +21,7 @@ import (
 )
 
 type ASHandler struct {
+	db           *sql.DB
 	repo         *repository.ASRepo
 	processRepo  *repository.ASProcessRepo
 	workRepo     *repository.ASWorkRepo
@@ -37,6 +38,7 @@ type ASHandler struct {
 	attach       *AttachmentHandler
 	kwRepo       *repository.ASKeywordRepo
 	notices      *assignNoticeHook
+	maintRepo    *repository.MaintenanceRepo
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
@@ -398,6 +400,8 @@ func (h *ASHandler) New(c echo.Context) error {
 		"KeywordField":     model.KWFieldSymptom,
 		"ClassifyHint":     classifyHint(h.codeRepo),
 		"Err":              c.QueryParam("err"),
+		"TodayLocal":       now.Format("2006-01-02"),
+		"WorkerDefault":    ctxString(c, "user_name"),
 	})
 }
 
@@ -1014,6 +1018,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CancelLocal":          cancelLocal,
 		"TodayLocal":           now.Format("2006-01-02"),
 		"WorkerDefault":        ctxString(c, "user_name"),
+		"OnBehalf":             !sessionOwnsAS(c, as),
 		"ActionErr":            c.QueryParam("err"),
 		"ActionErrMsg":         actionErrMessage(c.QueryParam("err")),
 		"AttachErrMsg":         attachErrMessage(c.QueryParam("err")),
@@ -1611,7 +1616,34 @@ func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, res
 		TimeSpent:       timeSpent,
 		ProcessDatetime: time.Now(),
 	}
+	h.stampActedBy(c, p, as)
 	return h.processRepo.Create(p)
+}
+
+func (h *ASHandler) stampActedBy(c echo.Context, p *model.ASProcess, as *model.ASReceipt) {
+	if p == nil {
+		return
+	}
+	p.ActedByUserID = strings.TrimSpace(ctxString(c, "user_id"))
+	p.ActedByName = strings.TrimSpace(ctxString(c, "user_name"))
+	if p.ActedByName == "" {
+		p.ActedByName = strings.TrimSpace(ctxString(c, "username"))
+	}
+	owner, ownerUID := "", ""
+	if as != nil {
+		owner, ownerUID = strings.TrimSpace(as.AssignedTo), strings.TrimSpace(as.AssignedUserID)
+	}
+	p.OnBehalf = owner != "" && !isSelfAssign(p.ActedByUserID, p.ActedByName, ctxString(c, "username"), ownerUID, owner, "")
+}
+
+func sessionOwnsAS(c echo.Context, as *model.ASReceipt) bool {
+	if as == nil {
+		return true
+	}
+	if strings.TrimSpace(as.AssignedTo) == "" && strings.TrimSpace(as.AssignedUserID) == "" {
+		return true
+	}
+	return isSelfAssign(ctxString(c, "user_id"), ctxString(c, "user_name"), ctxString(c, "username"), as.AssignedUserID, as.AssignedTo, "")
 }
 
 // Hold 보류 처리 — 후속(조치/이관/접수취소) 선택 후 사유 입력
@@ -1799,7 +1831,16 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 		p.ProcessDatetime = time.Now()
 	}
 	if strings.TrimSpace(p.Worker) == "" {
-		p.Worker = ctxString(c, "user_name")
+		if as, err := h.repo.GetByID(currentOrg(c), asID); err == nil && as != nil && strings.TrimSpace(as.AssignedTo) != "" {
+			p.Worker = as.AssignedTo
+		} else {
+			p.Worker = ctxString(c, "user_name")
+		}
+	}
+	if as, err := h.repo.GetByID(currentOrg(c), asID); err == nil {
+		h.stampActedBy(c, p, as)
+	} else {
+		h.stampActedBy(c, p, nil)
 	}
 	if err := h.processRepo.Create(p); err != nil {
 		return err

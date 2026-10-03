@@ -116,6 +116,79 @@ func (r *WBRepo) completedASBetween(from, toEx string) ([]model.WorkTask, error)
 	return out, rows.Err()
 }
 
+// ListOnBehalfASBetween 내가 대신 조치한 AS. 내 활동 보기 기본 포함. §65.4
+func (r *WBRepo) ListOnBehalfASBetween(from, toEx, userID, userName, username string) ([]model.WorkTask, error) {
+	q := `
+		SELECT ar.as_id, ar.as_number, date(p.process_datetime),
+		       COALESCE(p.acted_by_name,''), ar.status,
+		       c.org_name, COALESCE(ar.symptom,''), COALESCE(p.acted_by_user_id,'')
+		FROM as_processes p
+		JOIN as_receipts ar ON ar.as_id = p.as_id
+		JOIN customers c ON c.customer_id = ar.customer_id
+		WHERE COALESCE(p.on_behalf,0)=1
+		  AND date(p.process_datetime) >= date(?) AND date(p.process_datetime) < date(?)`
+	args := []interface{}{from, toEx}
+	var conds []string
+	if strings.TrimSpace(userID) != "" {
+		conds = append(conds, "p.acted_by_user_id=?")
+		args = append(args, userID)
+	}
+	if strings.TrimSpace(userName) != "" {
+		conds = append(conds, "p.acted_by_name=?")
+		args = append(args, userName)
+	}
+	if strings.TrimSpace(username) != "" {
+		conds = append(conds, "p.acted_by_name=?")
+		args = append(args, username)
+	}
+	if len(conds) == 0 {
+		return nil, nil
+	}
+	q += ` AND (` + strings.Join(conds, " OR ") + `)
+		ORDER BY p.process_datetime`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such column") || strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	var out []model.WorkTask
+	for rows.Next() {
+		var asID, asNum, day, actor, status, org, symptom, actorUID string
+		if err := rows.Scan(&asID, &asNum, &day, &actor, &status, &org, &symptom, &actorUID); err != nil {
+			return nil, err
+		}
+		if seen[asID+"|"+day] {
+			continue
+		}
+		seen[asID+"|"+day] = true
+		if len(day) > 10 {
+			day = day[:10]
+		}
+		title := model.FormatASWorkTitle(org, asNum) + " (대신)"
+		out = append(out, model.WorkTask{
+			TaskID:      "behalf:" + asID + ":" + day,
+			WorkType:    model.WBWorkAS,
+			Title:       title,
+			Description: symptom,
+			DueDate:     day,
+			WorkDate:    day,
+			StartTime:   "09:00",
+			EndTime:     "09:30",
+			Status:      status,
+			Assignee:    actor,
+			Tags:        asNum,
+			SourceType:  model.WBSourceAS,
+			SourceID:    asID,
+			BoardHref:   "/as/" + asID + "/action",
+		})
+	}
+	return out, rows.Err()
+}
+
 func (r *WBRepo) completedMntBetween(from, toEx string) ([]model.WorkTask, error) {
 	doneExpr := mntCompleteDateSQL
 	q := `

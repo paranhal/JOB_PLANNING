@@ -1049,6 +1049,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE milestones ADD COLUMN sales_open_discover INTEGER DEFAULT 0`,
 		`ALTER TABLE milestones ADD COLUMN sales_open_propose INTEGER DEFAULT 0`,
 		`ALTER TABLE milestones ADD COLUMN sales_open_bid INTEGER DEFAULT 0`,
+		`ALTER TABLE as_processes ADD COLUMN acted_by_user_id TEXT DEFAULT ''`,
+		`ALTER TABLE as_processes ADD COLUMN acted_by_name TEXT DEFAULT ''`,
+		`ALTER TABLE as_processes ADD COLUMN on_behalf INTEGER DEFAULT 0`,
 	}
 	for _, q := range alters {
 		db.Exec(q) // 이미 있으면 오류 무시

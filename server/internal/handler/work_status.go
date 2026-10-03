@@ -85,6 +85,16 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 
 	actionTasks = filterTasksByAssignee(actionTasks, assigneeFilter)
 	actionTasks = filterTasksByProject(actionTasks, projectFilter)
+	includeBehalf := c.QueryParam("behalf") != "0"
+	if includeBehalf && kind != wsKindReceipt && assigneeFilter != "" {
+		toEx := period.To
+		if t, err := time.ParseInLocation(dateLayout, period.To, time.Local); err == nil {
+			toEx = t.AddDate(0, 0, 1).Format(dateLayout)
+		}
+		extra, _ := h.wb.ListOnBehalfASBetween(period.From, toEx, currentUserID(c), ctxString(c, "user_name"), ctxString(c, "username"))
+		extra = filterTasksByAssignee(extra, assigneeFilter)
+		actionTasks = append(actionTasks, extra...)
+	}
 	receiptTasks = filterTasksByAssignee(receiptTasks, assigneeFilter)
 	receiptTasks = filterTasksByProject(receiptTasks, projectFilter)
 
@@ -164,6 +174,9 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	if embed {
 		filterQ += "&embed=1"
 	}
+	baseStatus := "/work-status?view=" + view + "&date=" + dateStr + filterQ
+	behalfOnHref := baseStatus
+	behalfOffHref := baseStatus + "&behalf=0"
 	plannedURL := registerURLWithProject(view, dateStr, queryAssignee, projectFilter)
 	if mineForQuery != "" {
 		plannedURL += "&mine=" + url.QueryEscape(mineForQuery)
@@ -226,6 +239,9 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"ShowScopeToggle": showScopeToggle,
 		"ScopeAll":        scopeAll,
 		"MineParam":       mineParam,
+		"IncludeBehalf":   includeBehalf,
+		"BehalfOnHref":    behalfOnHref,
+		"BehalfOffHref":   behalfOffHref,
 		"TeamHref":        workStatusURL(view, dateStr, kind, "", projectFilter, "0"),
 		"MineHref":        workStatusURL(view, dateStr, kind, "", projectFilter, ""),
 		"MissingComplete": missing,

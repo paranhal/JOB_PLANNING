@@ -1,6 +1,6 @@
 {{define "title"}}{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}} · 고객지원시스템{{end}}
 {{define "content"}}
-<div class="max-w-7xl mx-auto" id="as-form-root">
+<div class="max-w-7xl mx-auto" id="as-form-root" x-data="{ viewOpen:false, viewSrc:'' }">
   <div class="lg:flex lg:gap-5 lg:items-start">
   <div class="min-w-0 flex-1 space-y-5">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -86,6 +86,24 @@
                  placeholder="그날만 다른 번호일 때" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           <p class="mt-1 text-xs text-slate-400">담당자 기준정보는 바꾸지 않습니다.</p>
         </div>
+      </div>
+    </section>
+
+    <section id="as-open-banner" class="hidden rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <p id="as-open-title" class="text-sm font-semibold text-amber-950"></p>
+        <button type="button" id="as-open-toggle" class="text-xs text-amber-800 underline">펼치기 ▾</button>
+      </div>
+      <div id="as-open-body" class="hidden space-y-2">
+        <div id="as-open-rows" class="space-y-1 text-sm"></div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <input type="text" id="as-open-reason" placeholder="남의 담당이면 사유" class="rounded border px-2 py-1 text-xs w-48">
+          <button type="button" id="as-open-pull" class="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-xs">내 업무로 가져오기</button>
+          <button type="button" id="as-open-dates" class="px-3 py-1.5 rounded-lg border border-amber-400 text-amber-900 text-xs">날짜 따로 정하기</button>
+          <button type="button" id="as-open-same" class="hidden px-3 py-1.5 rounded-lg border text-xs">전부 같은 날로</button>
+          <button type="button" id="as-open-assign" class="hidden px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs">배정</button>
+        </div>
+        <p id="as-open-msg" class="text-xs text-amber-900"></p>
       </div>
     </section>
 
@@ -500,6 +518,145 @@
       });
     }
 
+    var openItems = [];
+    var dateMode = false;
+    var TODAY = {{if .TodayLocal}}'{{.TodayLocal}}'{{else}}''{{end}};
+    function checkedKeys() {
+      return [].slice.call(document.querySelectorAll('.as-open-ck:checked')).map(function(el){ return el.value; });
+    }
+    function renderOpenRows() {
+      var box = document.getElementById('as-open-rows');
+      if (!box) return;
+      box.innerHTML = openItems.map(function(it, i){
+        var key = it.item_key || it.ItemKey || '';
+        var kind = it.kind || it.Kind || 'as';
+        var tag = kind === 'mnt' ? '점검' : 'AS';
+        var num = it.number || it.Number || '';
+        var title = it.title || it.Title || '';
+        var who = it.assignee || it.Assignee || '';
+        var day = it.visit_date || it.VisitDate || '';
+        var href = it.href || it.Href || '';
+        var dateInp = dateMode
+          ? '<input type="date" class="as-open-date ml-2 rounded border px-1 py-0.5 text-xs" min="'+TODAY+'" value="">'
+          : '';
+        var whoInp = dateMode
+          ? '<input type="text" class="as-open-who ml-1 rounded border px-1 py-0.5 text-xs w-20" value="{{if .WorkerDefault}}{{.WorkerDefault}}{{end}}">'
+          : '';
+        return '<label class="flex flex-wrap items-center gap-2 py-1">' +
+          '<input type="checkbox" class="as-open-ck" value="'+esc(key)+'" data-i="'+i+'">' +
+          '<span class="text-[11px] px-1 rounded bg-white border">'+esc(tag)+'</span>' +
+          '<span class="font-mono text-xs">'+esc(num)+'</span>' +
+          '<span class="flex-1 truncate">'+esc(title)+'</span>' +
+          '<span class="text-xs text-slate-500">담당 '+esc(who)+'</span>' +
+          (day ? '<span class="text-xs">방문 '+esc(day)+'</span>' : '') +
+          dateInp + whoInp +
+          '<button type="button" class="text-xs text-blue-700 as-open-view" data-href="'+esc(href)+'">보기</button>' +
+          '</label>';
+      }).join('');
+    }
+    function loadOpen(cid) {
+      var banner = document.getElementById('as-open-banner');
+      if (!banner) return;
+      if (!cid) { banner.classList.add('hidden'); return; }
+      fetch('/api/as/open/' + encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(list){
+        openItems = list || [];
+        if (!openItems.length) { banner.classList.add('hidden'); return; }
+        document.getElementById('as-open-title').textContent =
+          '이 기관에 안 끝난 건이 ' + openItems.length + '건 있습니다.';
+        dateMode = false;
+        document.getElementById('as-open-same').classList.add('hidden');
+        document.getElementById('as-open-assign').classList.add('hidden');
+        renderOpenRows();
+        banner.classList.remove('hidden');
+      }).catch(function(){ banner.classList.add('hidden'); });
+    }
+    function postOpen(url, fd) {
+      var msg = document.getElementById('as-open-msg');
+      return fetch(url, { method: 'POST', body: fd }).then(function(r){ return r.json(); }).then(function(res){
+        if (res && res.need_reason) {
+          if (msg) msg.textContent = '남의 담당 건입니다. 사유를 입력하세요.';
+          return res;
+        }
+        var parts = [];
+        if (res && res.message) parts.push(res.message);
+        if (res && res.failed && res.failed.length) {
+          parts.push('실패 ' + res.failed.length + '건');
+        }
+        if (msg) msg.textContent = parts.join(' · ');
+        if (res && res.ask_close && confirm('같은 건이니 새로 접수하지 않겠습니다. 이 화면을 닫을까요?')) {
+          window.location.href = '/as';
+        } else if (custSel && custSel.value) {
+          loadOpen(custSel.value);
+        }
+        return res;
+      }).catch(function(){ if (msg) msg.textContent = '저장에 실패했습니다.'; });
+    }
+    document.addEventListener('click', function(e){
+      var viewBtn = e.target.closest('.as-open-view');
+      if (viewBtn) {
+        var root = document.getElementById('as-form-root');
+        if (root && root.__x) { /* alpine 1 */ }
+        if (typeof Alpine !== 'undefined') {
+          var d = Alpine.$data(document.getElementById('as-form-root'));
+          if (d) { d.viewSrc = viewBtn.getAttribute('data-href'); d.viewOpen = true; }
+        }
+        var modal = document.getElementById('as-open-modal');
+        var ifr = document.getElementById('as-open-iframe');
+        if (ifr) ifr.src = viewBtn.getAttribute('data-href');
+        if (modal) modal.classList.remove('hidden');
+      }
+    });
+    var closeM = document.getElementById('as-open-modal-close');
+    if (closeM) closeM.addEventListener('click', function(){
+      var modal = document.getElementById('as-open-modal');
+      if (modal) modal.classList.add('hidden');
+    });
+    var tog = document.getElementById('as-open-toggle');
+    if (tog) tog.addEventListener('click', function(){
+      var body = document.getElementById('as-open-body');
+      if (!body) return;
+      body.classList.toggle('hidden');
+      tog.textContent = body.classList.contains('hidden') ? '펼치기 ▾' : '접기 ▴';
+    });
+    var pullBtn = document.getElementById('as-open-pull');
+    if (pullBtn) pullBtn.addEventListener('click', function(){
+      var keys = checkedKeys();
+      if (!keys.length) return;
+      var fd = new FormData();
+      keys.forEach(function(k){ fd.append('item_key', k); });
+      var reason = document.getElementById('as-open-reason');
+      if (reason) fd.append('takeover_reason', reason.value || '');
+      postOpen('/as/open/pull', fd);
+    });
+    var datesBtn = document.getElementById('as-open-dates');
+    if (datesBtn) datesBtn.addEventListener('click', function(){
+      dateMode = true;
+      document.getElementById('as-open-same').classList.remove('hidden');
+      document.getElementById('as-open-assign').classList.remove('hidden');
+      document.getElementById('as-open-body').classList.remove('hidden');
+      renderOpenRows();
+    });
+    var sameBtn = document.getElementById('as-open-same');
+    if (sameBtn) sameBtn.addEventListener('click', function(){
+      var first = document.querySelector('.as-open-date');
+      var v = first ? first.value : TODAY;
+      [].slice.call(document.querySelectorAll('.as-open-date')).forEach(function(el){ el.value = v; });
+    });
+    var asgBtn = document.getElementById('as-open-assign');
+    if (asgBtn) asgBtn.addEventListener('click', function(){
+      var fd = new FormData();
+      var reason = document.getElementById('as-open-reason');
+      if (reason) fd.append('takeover_reason', reason.value || '');
+      [].slice.call(document.querySelectorAll('.as-open-ck')).forEach(function(ck){
+        if (!ck.checked) return;
+        var row = ck.closest('label');
+        fd.append('item_key', ck.value);
+        fd.append('visit_date', row && row.querySelector('.as-open-date') ? row.querySelector('.as-open-date').value : '');
+        fd.append('assignee', row && row.querySelector('.as-open-who') ? row.querySelector('.as-open-who').value : '');
+      });
+      postOpen('/as/open/assign', fd);
+    });
+
     function assetLabel(a) {
       var id = a.asset_id || a.AssetID || '';
       var t = a.product_name || a.ProductName || '';
@@ -608,6 +765,7 @@
     custSel.addEventListener('change', function(){
       loadAssetsAndContacts(custSel.value, '', '');
       loadHistory(custSel.value);
+      loadOpen(custSel.value);
       fetchSimilar();
     });
     if (assetSel) assetSel.addEventListener('change', function(){
@@ -804,8 +962,10 @@
     if (custSel.value) {
       loadAssetsAndContacts(custSel.value, initAsset, initRequester);
       loadHistory(custSel.value);
+      loadOpen(custSel.value);
     } else {
       loadHistory('');
+      loadOpen('');
     }
 
     (function bindEq(){
@@ -888,6 +1048,16 @@
     })();
   })();
   </script>
+  <div id="as-open-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b shrink-0">
+        <h3 class="font-semibold text-gray-800">보기</h3>
+        <button type="button" id="as-open-modal-close"
+                class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">닫기</button>
+      </div>
+      <iframe id="as-open-iframe" class="flex-1 w-full border-0 bg-white" title="미완료 건"></iframe>
+    </div>
+  </div>
 {{template "photo_zoom_script"}}
 </div>
 {{end}}
