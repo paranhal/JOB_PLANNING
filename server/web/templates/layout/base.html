@@ -39,6 +39,25 @@
 </div>
 {{end}}
 
+{{if .CanSwitchOrg}}
+<div class="{{if .OrgViewAll}}bg-amber-600{{else}}bg-blue-800{{end}} text-white text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-3 z-40">
+  <span>지금 보는 조직: <strong>{{.OrgViewLabel}}</strong>{{if .OrgViewAll}} (전 조직){{end}}</span>
+  {{if .OrgSwitchList}}
+  <form method="post" action="/admin/orgs/switch" class="flex items-center gap-2">
+    <input type="hidden" name="return" value="{{if .ReturnPath}}{{.ReturnPath}}{{else}}/{{end}}">
+    <label class="sr-only" for="view_org_id">조직 전환</label>
+    <select name="view_org_id" id="view_org_id" class="text-gray-900 rounded px-2 py-0.5 text-xs">
+      <option value="*" {{if .OrgViewAll}}selected{{end}}>전 조직</option>
+      {{range .OrgSwitchList}}
+      <option value="{{.OrgID}}" {{if eq $.OrgViewID .OrgID}}selected{{end}}>{{.OrgNo}} {{.OrgName}}</option>
+      {{end}}
+    </select>
+    <button type="submit" class="underline">전환</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
 {{if .SchemaNotice}}
 <div id="schema-mismatch-banner" class="bg-red-700 text-white text-sm px-4 py-2 text-center z-50">{{.SchemaNotice}}</div>
 {{end}}
@@ -166,6 +185,7 @@
       {{end}}
       <a href="/admin/holidays" class="{{if eq $a "holidays"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">휴무일 관리</a>
       {{if $isAdmin}}
+      <a href="/admin/orgs" class="{{if eq $a "orgs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">조직 관리</a>
       <a href="/admin/data" class="{{if or (eq $a "data") (eq $a "backup")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">데이터 관리</a>
       <a href="/admin/system" class="{{if eq $a "system"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">시스템 정보</a>
       <a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>

@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 type TemplateRenderer struct {
@@ -169,6 +170,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 				}
 			}
 			injectAssignNoticeView(c, dataMap)
+			injectOrgView(c, dataMap)
 			if v := c.Get("auth_unconfirmed"); v != nil {
 				if b, ok := v.(bool); ok && b {
 					dataMap["AuthUnconfirmed"] = true
@@ -178,6 +180,24 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	}
 
 	return tmpl.ExecuteTemplate(w, blockName, data)
+}
+
+func injectOrgView(c echo.Context, dataMap map[string]interface{}) {
+	var orgs []model.Org
+	if v := c.Get("org_switch_list"); v != nil {
+		if list, ok := v.([]model.Org); ok {
+			orgs = list
+			dataMap["OrgSwitchList"] = list
+		}
+	}
+	dataMap["CanSwitchOrg"] = canSwitchOrg(c)
+	id := currentOrg(c)
+	dataMap["OrgViewID"] = id
+	dataMap["OrgViewAll"] = id == repository.OrgAll
+	dataMap["OrgViewLabel"] = orgViewLabel(c, orgs)
+	if c.Request() != nil && c.Request().URL != nil {
+		dataMap["ReturnPath"] = c.Request().URL.RequestURI()
+	}
 }
 
 func ctxString(c echo.Context, key string) string {

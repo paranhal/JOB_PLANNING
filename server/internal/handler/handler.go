@@ -45,6 +45,7 @@ type Handler struct {
 	AdminWork      *AdminWorkHandler
 	Integration    *IntegrationHandler
 	System         *SystemHandler
+	Org            *OrgHandler
 	notices        *assignNoticeHook
 
 	customerRepo *repository.CustomerRepo
@@ -91,7 +92,7 @@ func New(db *sql.DB) *Handler {
 	wbH.attach = attachH
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
-	authH := &AuthHandler{userRepo: userRepo, settingsRepo: settingsRepo, jwtSecret: jwtSecret}
+	authH := &AuthHandler{userRepo: userRepo, orgRepo: repository.NewOrgRepo(db), settingsRepo: settingsRepo, jwtSecret: jwtSecret}
 	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)
 	wbH.notices = noticeHook
 
@@ -173,6 +174,7 @@ func New(db *sql.DB) *Handler {
 		),
 		Items:       NewItemsHandler(repository.NewSalesItemRepo(db), customerRepo, repository.NewQuoteRepo(db)),
 		AdminWork:   NewAdminWorkHandler(repository.NewWBRepo(db), userRepo, customerRepo, codeRepo, assetRepo),
+		Org:         NewOrgHandler(repository.NewOrgRepo(db), authH),
 		Integration: NewIntegrationHandler(customerRepo, contactRepo, codeRepo),
 		System:      &SystemHandler{db: db, auth: authH, uploadDir: attachH.uploadDir},
 

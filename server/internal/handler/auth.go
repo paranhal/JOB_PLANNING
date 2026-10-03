@@ -20,6 +20,7 @@ import (
 
 type AuthHandler struct {
 	userRepo     *repository.UserRepo
+	orgRepo      *repository.OrgRepo
 	settingsRepo *repository.SettingsRepo
 	jwtSecret    []byte
 }
@@ -196,7 +197,11 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 }
 
 func (h *AuthHandler) refreshSession(c echo.Context, user *model.User) {
-	h.writeSessionCookie(c, sessionClaims(user, false))
+	claims := sessionClaims(user, false)
+	if v := strings.TrimSpace(ctxString(c, "view_org_id")); v != "" {
+		claims["view_org_id"] = v
+	}
+	h.writeSessionCookie(c, claims)
 }
 
 func (h *AuthHandler) isAdmin(c echo.Context) bool {
@@ -438,8 +443,15 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 					c.SetCookie(&http.Cookie{Name: "token", Value: "", Path: "/", MaxAge: -1})
 					return c.Redirect(http.StatusSeeOther, "/login")
 				}
+				viewOrg := ctxString(c, "view_org_id")
 				applyUserSession(c, u)
+				c.Set("view_org_id", viewOrg)
 				h.refreshSession(c, u)
+			}
+		}
+		if canSwitchOrg(c) && h.orgRepo != nil {
+			if orgs, err := h.orgRepo.ListActive(); err == nil {
+				c.Set("org_switch_list", orgs)
 			}
 		}
 		pop := audit.Push(audit.Actor{
@@ -480,6 +492,7 @@ func sessionClaimsFromContext(c echo.Context, unconfirmed bool) jwt.MapClaims {
 		"role":        role,
 		"name":        ctxString(c, "user_name"),
 		"org_id":      ctxString(c, "org_id"),
+		"view_org_id": ctxString(c, "view_org_id"),
 		"permissions": model.FormatPermissions(currentPerms(c)),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -514,6 +527,7 @@ func applySessionClaims(c echo.Context, claims jwt.MapClaims) string {
 	c.Set("role", role)
 	c.Set("user_name", claimString(claims, "name"))
 	c.Set("org_id", claimString(claims, "org_id"))
+	c.Set("view_org_id", claimString(claims, "view_org_id"))
 	c.Set("permissions", model.EffectivePermissions(role, claimString(claims, "permissions")))
 	if claimBool(claims, "auth_unconfirmed") {
 		c.Set("auth_unconfirmed", true)

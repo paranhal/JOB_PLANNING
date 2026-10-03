@@ -5,22 +5,9 @@ import (
 	"strings"
 
 	"customer-support/internal/model"
-	"customer-support/internal/repository"
 
 	"github.com/labstack/echo/v4"
 )
-
-// Role helpers
-func currentOrg(c echo.Context) string {
-	if strings.TrimSpace(ctxString(c, "role")) == "vision_admin" {
-		return repository.OrgAll
-	}
-	org := strings.TrimSpace(ctxString(c, "org_id"))
-	if org == "" {
-		return model.OrgIDLibrary
-	}
-	return org
-}
 
 func statsOrgFilter(c echo.Context, f model.StatsMeetingFilter) model.StatsMeetingFilter {
 	f.OrgID = currentOrg(c)
