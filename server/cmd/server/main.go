@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -22,6 +23,8 @@ import (
 	"customer-support/internal/config"
 	"customer-support/internal/handler"
 	"customer-support/internal/hwpx"
+	"customer-support/internal/mailer"
+	"customer-support/internal/notify"
 	"customer-support/internal/repository"
 )
 
@@ -130,6 +133,11 @@ func main() {
 	}
 	backup.Start(backupCfg)
 	audit.StartArchiveScheduler(filepath.Dir(cfg.DBPath))
+	mailer.PurgeHandledLoginHelpBridge = func(db *sql.DB) (int, error) {
+		return repository.PurgeHandledLoginHelp(db, 90*24*time.Hour)
+	}
+	mailer.Start(db, mailer.FromApp(cfg))
+	notify.Start(db, notify.FromApp(cfg))
 
 	e := echo.New()
 	e.HideBanner = true
@@ -166,6 +174,7 @@ func main() {
 	// 인증
 	e.GET("/login", h.Auth.LoginPage)
 	e.POST("/login", h.Auth.Login)
+	e.POST("/login/help", h.Auth.LoginHelp)
 	e.GET("/logout", h.Auth.Logout)
 
 	v1 := e.Group("/api/v1", h.Integration.RequireAPIKey)
@@ -613,6 +622,13 @@ func main() {
 	g.GET("/admin/sales-logs.xlsx", h.Sales.SalesLogs, adminSec, adminOnly)
 	g.GET("/admin/data/process-conflicts.xlsx", h.Backup.ProcessConflictsExcel, adminSec, adminOnly)
 	g.GET("/admin/system", h.System.Page, adminSec, h.Auth.RequireAdminOnly)
+	g.GET("/admin/mail", h.Mail.Page, adminSec, h.Auth.RequireAdminOnly)
+	g.POST("/admin/mail/test", h.Mail.Test, adminSec, h.Auth.RequireAdminOnly)
+	g.POST("/admin/mail/:id/retry", h.Mail.Retry, adminSec, h.Auth.RequireAdminOnly)
+	g.GET("/admin/notify", h.Notify.Page, adminSec, h.Auth.RequireAdminOnly)
+	g.POST("/admin/notify", h.Notify.Save, adminSec, h.Auth.RequireAdminOnly)
+	g.POST("/admin/notify/:id/retry", h.Notify.Retry, adminSec, h.Auth.RequireAdminOnly)
+	g.POST("/admin/login-help/:id/handle", h.HandleLoginHelp, adminSec)
 	g.POST("/admin/data/save", h.Backup.Save, adminSec, adminOnly)
 	g.POST("/admin/data/metrics", h.Backup.SaveMetrics, adminSec, adminOnly)
 	g.POST("/admin/data/org-assign", h.Backup.AssignEmptyOrg, adminSec, adminOnly)

@@ -13,6 +13,7 @@ const (
 	ActionLogin      = "로그인"
 	ActionLogout     = "로그아웃"
 	ActionLoginFail  = "로그인실패"
+	ActionLoginHelp  = "계정문의"
 	ActionPermChange = "권한변경"
 
 	ResultOK   = "성공"

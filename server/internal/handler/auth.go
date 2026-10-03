@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,6 +15,7 @@ import (
 
 	"customer-support/internal/audit"
 	"customer-support/internal/auditlog"
+	"customer-support/internal/config"
 	"customer-support/internal/model"
 	"customer-support/internal/passwd"
 	"customer-support/internal/repository"
@@ -24,14 +26,12 @@ type AuthHandler struct {
 	orgRepo      *repository.OrgRepo
 	settingsRepo *repository.SettingsRepo
 	adminUnlock  *repository.AdminUnlockRepo
+	helpRepo     *repository.LoginHelpRepo
+	wbRepo       *repository.WBRepo
+	db           *sql.DB
+	cfg          *config.Config
 	jwtSecret    []byte
 	uploadDir    string
-}
-
-func (h *AuthHandler) LoginPage(c echo.Context) error {
-	return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
-		"Title": "로그인", "Active": NavLogin, "HideNav": true,
-	})
 }
 
 func (h *AuthHandler) Login(c echo.Context) error {
@@ -53,10 +53,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			rec.Role = user.Role
 		}
 		accessLog(c, rec)
-		return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
-			"Title": "로그인", "Active": NavLogin, "HideNav": true,
+		return c.Render(http.StatusOK, "auth/login.html", h.loginPageData(map[string]interface{}{
 			"Error": "아이디 또는 비밀번호가 잘못되었습니다.",
-		})
+		}))
 	}
 
 	user, err := h.userRepo.GetByUsername(username)
@@ -69,10 +68,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			Detail:   "로그인 조회 실패",
 			Username: username,
 		})
-		return c.Render(http.StatusOK, "auth/login.html", map[string]interface{}{
-			"Title": "로그인", "Active": NavLogin, "HideNav": true,
+		return c.Render(http.StatusOK, "auth/login.html", h.loginPageData(map[string]interface{}{
 			"Error": "일시적으로 로그인할 수 없습니다. 서버를 재시작한 뒤 다시 시도하세요.",
-		})
+		}))
 	}
 	if user == nil {
 		return fail(nil, "비밀번호오류")

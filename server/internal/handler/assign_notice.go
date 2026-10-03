@@ -164,13 +164,21 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 		c.Set("assign_unassigned", unassigned)
 		c.Set("can_assign_work", canAssign)
+		var helps []repository.LoginHelpRequest
+		if canSwitchOrg(c) && h.help != nil {
+			org := currentOrg(c)
+			if list, e := h.help.ListOpen(org); e == nil {
+				helps = list
+			}
+		}
+		c.Set("login_helps", helps)
 		force := c.QueryParam("assign") == "1"
 		if force {
 			c.Set("expand_unassigned", true)
 		}
 		showModal := c.Request().Method == http.MethodGet &&
 			c.Request().Header.Get("HX-Request") != "true" &&
-			(force || ((n > 0 || len(unassigned) > 0) && !assignNoticeShownToday(c)))
+			(force || ((n > 0 || len(unassigned) > 0 || len(helps) > 0) && !assignNoticeShownToday(c)))
 		if showModal {
 			if n > 0 {
 				items, err := h.notices.repo.ListUnseen(uid)
@@ -183,12 +191,25 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 					c.Set("assign_notice_assignees", filterSameOrgUsers(users, currentOrg(c)))
 				}
 			}
-			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0)
+			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0 || len(helps) > 0)
 			if show, _ := c.Get("show_assign_notice_modal").(bool); show && !force {
 				setAssignNoticeShownCookie(c)
 			}
 		}
 		return next(c)
+	}
+}
+
+func sliceLen(v interface{}) int {
+	switch t := v.(type) {
+	case []model.AssignNotice:
+		return len(t)
+	case []model.WorkListItem:
+		return len(t)
+	case []repository.LoginHelpRequest:
+		return len(t)
+	default:
+		return 0
 	}
 }
 
@@ -219,6 +240,10 @@ func injectAssignNoticeView(c echo.Context, data map[string]interface{}) {
 	if v := c.Get("expand_unassigned"); v != nil {
 		data["ExpandUnassigned"] = v
 	}
+	if v := c.Get("login_helps"); v != nil {
+		data["LoginHelps"] = v
+	}
+	data["AssignNoticeTotal"] = sliceLen(data["AssignNotices"]) + sliceLen(data["AssignUnassigned"]) + sliceLen(data["LoginHelps"])
 	if _, ok := data["AssignNoticeDate"]; !ok {
 		data["AssignNoticeDate"] = time.Now().Format("2006-01-02")
 	}

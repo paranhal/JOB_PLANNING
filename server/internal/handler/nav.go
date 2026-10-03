@@ -45,6 +45,8 @@ const (
 	NavData             = "data"
 	NavBackup           = "backup"
 	NavSystem           = "system"
+	NavMail             = "mail"
+	NavNotify           = "notify"
 	NavAccount          = "account"
 	NavLogin            = "login"
 	NavNone             = ""
@@ -95,6 +97,8 @@ func navSidebarKeys() []string {
 		NavData,
 		NavBackup,
 		NavSystem,
+		NavMail,
+		NavNotify,
 		NavAccount,
 	}
 }

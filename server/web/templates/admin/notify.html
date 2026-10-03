@@ -1,0 +1,63 @@
+{{define "title"}}알림 설정 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">알림 설정</h2>
+    <p class="text-sm text-gray-500 mt-1">환경 스위치와 조직 체크박스가 둘 다 켜져야 보냅니다.</p>
+  </div>
+
+  <form method="post" action="/admin/notify" class="bg-white rounded-xl border p-4 space-y-3 text-sm">
+    <p class="text-xs text-gray-500">환경: 메일 {{if .EnvMail}}켜짐{{else}}꺼짐{{end}} · 문자 {{if .EnvSMS}}켜짐{{else}}꺼짐{{end}} · 알림톡 {{if .EnvKakao}}켜짐{{else}}꺼짐{{end}}</p>
+    <label class="flex items-center gap-2"><input type="checkbox" name="mail_org" value="1" {{if .OrgMail}}checked{{end}}> 이 조직에서 메일 사용</label>
+    {{if .EnvSMS}}
+    <label class="flex items-center gap-2"><input type="checkbox" name="sms_org" value="1" {{if .OrgSMS}}checked{{end}}> 이 조직에서 문자 사용</label>
+    {{end}}
+    {{if .EnvKakao}}
+    <label class="flex items-center gap-2"><input type="checkbox" name="kakao_org" value="1" {{if .OrgKakao}}checked{{end}}> 이 조직에서 알림톡 사용</label>
+    {{end}}
+    <p class="font-medium pt-2">목적</p>
+    <label class="flex items-center gap-2"><input type="checkbox" name="p_login" value="1" {{if .PLogin}}checked{{end}}> 계정 문의 처리</label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="p_as" value="1" {{if .PAS}}checked{{end}}> 긴급 AS 배정</label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="p_day" value="1" {{if .PDay}}checked{{end}}> 당일 일정 변경</label>
+    <button class="rounded bg-blue-600 text-white px-3 py-1.5">저장</button>
+  </form>
+
+  <form method="get" class="bg-white rounded-xl border p-4 text-sm space-y-2">
+    <label>글자 수 확인
+      <input name="sample" value="{{.Sample}}" class="ml-1 rounded border px-2 py-1 w-80">
+    </label>
+    <button class="rounded border px-2 py-1">재기</button>
+    {{if .SampleKind}}<p class="text-gray-700">이 내용은 <strong>{{.SampleKind}}</strong> 입니다.</p>{{end}}
+  </form>
+
+  {{if .SMSOn}}
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <p class="px-3 py-2 text-sm font-semibold">문자 보낸 함</p>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">시각</th>
+          <th class="text-left px-3 py-2">번호</th>
+          <th class="text-left px-3 py-2">종류</th>
+          <th class="text-left px-3 py-2">상태</th>
+          <th class="text-left px-3 py-2">오류</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t">
+          <td class="px-3 py-2 font-mono text-xs">{{.CreatedAt}}</td>
+          <td class="px-3 py-2">{{.ToAddr}}</td>
+          <td class="px-3 py-2">{{.SMSKind}}</td>
+          <td class="px-3 py-2">{{.Status}}</td>
+          <td class="px-3 py-2 text-red-700">{{.LastError}}{{if .KakaoFallback}} · 알림톡 대체{{end}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="px-3 py-6 text-gray-400">보낸 문자가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+</div>
+{{end}}

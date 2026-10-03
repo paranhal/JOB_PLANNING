@@ -1,0 +1,53 @@
+{{define "title"}}메일 보낸 함 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">메일 보낸 함</h2>
+    <p class="text-sm text-gray-500 mt-1">큐에 넣은 뒤 1분마다 보냅니다. 화면은 기다리지 않습니다.</p>
+  </div>
+
+  {{if .MailEnabled}}
+  <form method="post" action="/admin/mail/test" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-2 items-end">
+    <label class="text-sm">받는 주소
+      <input type="email" name="to" required class="ml-1 rounded border px-2 py-1 text-sm">
+    </label>
+    <button class="rounded bg-blue-600 text-white px-3 py-1.5 text-sm">테스트 메일 보내기</button>
+  </form>
+  {{else}}
+  <p class="text-sm text-gray-500">메일 기능이 꺼져 있습니다. MAIL_ENABLED 를 켜세요.</p>
+  {{end}}
+
+  <div class="bg-white rounded-xl border overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">시각</th>
+          <th class="text-left px-3 py-2">받는 사람</th>
+          <th class="text-left px-3 py-2">제목</th>
+          <th class="text-left px-3 py-2">상태</th>
+          <th class="text-left px-3 py-2">오류</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t">
+          <td class="px-3 py-2 font-mono text-xs">{{.CreatedAt}}</td>
+          <td class="px-3 py-2">{{.ToAddr}}</td>
+          <td class="px-3 py-2">{{.Subject}}</td>
+          <td class="px-3 py-2">{{.Status}}</td>
+          <td class="px-3 py-2 text-red-700">{{.LastError}}</td>
+          <td class="px-3 py-2">
+            {{if eq .Status "failed"}}
+            <form method="post" action="/admin/mail/{{.MailID}}/retry"><button class="text-xs text-blue-700">다시 보내기</button></form>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6" class="px-3 py-6 text-gray-400">보낸 메일이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

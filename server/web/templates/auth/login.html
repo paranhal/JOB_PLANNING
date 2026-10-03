@@ -10,6 +10,8 @@
   </div>
 
   {{if .Error}}<div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">{{.Error}}</div>{{end}}
+  {{if .HelpOK}}<div class="bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg p-3 mb-4">{{.HelpOK}}</div>{{end}}
+  {{if .HelpError}}<div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">{{.HelpError}}</div>{{end}}
 
   <form method="POST" action="/login" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
     <div>
@@ -26,5 +28,37 @@
       로그인
     </button>
   </form>
+
+  <div class="mt-4 bg-white rounded-xl border border-gray-200 p-4" x-data="{ open: {{if .HelpOpen}}true{{else}}false{{end}} }">
+    <button type="button" class="text-sm text-blue-700 hover:underline" @click="open=!open">아이디·비밀번호를 잊으셨나요?</button>
+    <form x-show="open" x-cloak method="POST" action="/login/help" class="mt-3 space-y-3">
+      <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+        <input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">핸드폰번호</label>
+        <input type="text" name="mobile" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">소속 조직</label>
+        <select name="org_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">선택 안 함</option>
+          {{range .Orgs}}<option value="{{.OrgID}}">{{.OrgName}}</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">문의 내용</label>
+        <select name="kind" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="unknown_id">아이디를 모름</option>
+          <option value="reset_pw">비밀번호 초기화</option>
+          <option value="other">직접 입력</option>
+        </select>
+        <textarea name="message" rows="2" class="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="추가로 알려 주실 내용"></textarea>
+      </div>
+      <button type="submit" class="w-full border border-gray-300 rounded-lg py-2 text-sm">문의하기</button>
+    </form>
+  </div>
 </div>
 {{end}}

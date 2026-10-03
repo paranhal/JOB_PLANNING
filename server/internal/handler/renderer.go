@@ -14,6 +14,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/config"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -149,6 +150,10 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	// 로그인 상태·빌드 값 주입. 사이드바와 배지가 같은 값을 쓴다. §40.4
 	if dataMap, ok := data.(map[string]interface{}); ok {
 		injectBuildInfo(dataMap)
+		cfg := config.Load()
+		dataMap["NavMail"] = cfg.MailEnabled
+		dataMap["NavSMS"] = cfg.SMSEnabled
+		dataMap["NavKakao"] = cfg.KakaoEnabled
 		if _, exists := dataMap["HideNav"]; !exists {
 			dataMap["UserName"] = ctxString(c, "user_name")
 			dataMap["UserRole"] = currentRole(c)

@@ -196,6 +196,10 @@
       <a href="/admin/data" class="{{if or (eq $a "data") (eq $a "backup")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">데이터 관리</a>
       <a href="/admin/test-stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">테스터 통계</a>
       <a href="/admin/system" class="{{if eq $a "system"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">시스템 정보</a>
+      {{if .NavMail}}
+      <a href="/admin/mail" class="{{if eq $a "mail"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">메일 보낸 함</a>
+      {{end}}
+      <a href="/admin/notify" class="{{if eq $a "notify"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">알림 설정</a>
       <a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>
       {{end}}
       {{end}}
@@ -271,7 +275,27 @@
 <div id="assign-notice-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4"
      x-data="{ open:'', assigned:true, unassigned: {{if .ExpandUnassigned}}true{{else}}false{{end}} }">
   <div class="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl p-5 space-y-4">
-    <h2 class="text-base font-bold text-gray-900">손봐야 할 업무 {{add (len .AssignNotices) (len .AssignUnassigned)}}건</h2>
+    <h2 class="text-base font-bold text-gray-900">손봐야 할 업무 {{.AssignNoticeTotal}}건</h2>
+
+    {{if .LoginHelps}}
+    <div>
+      <p class="text-sm font-semibold text-gray-800">계정 문의 {{len .LoginHelps}}건</p>
+      <ul class="mt-2 space-y-2 text-sm">
+        {{range .LoginHelps}}
+        <li class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <p class="font-medium text-gray-800">{{.Name}} · {{.Mobile}}</p>
+          <p class="text-gray-600">{{.Kind}} {{.Message}}</p>
+          <form method="post" action="/admin/login-help/{{.RequestID}}/handle" class="mt-2 flex flex-wrap gap-1">
+            <input type="hidden" name="back" value="/">
+            <input type="text" name="handle_note" placeholder="처리 방법" class="rounded border px-1 py-0.5 text-xs flex-1">
+            <button name="status" value="done" class="rounded bg-blue-600 px-2 py-0.5 text-xs text-white">처리</button>
+            <button name="status" value="ignored" class="rounded border px-2 py-0.5 text-xs">무시</button>
+          </form>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
 
     {{if .AssignNotices}}
     <div>
