@@ -34,6 +34,7 @@ type Handler struct {
 	Code           *CodeHandler
 	Attachment     *AttachmentHandler
 	Backup         *BackupHandler
+	DataReset      *DataResetHandler
 	Holiday        *HolidayHandler
 	Auth           *AuthHandler
 	Maintenance    *MaintenanceHandler
@@ -145,6 +146,11 @@ func New(db *sql.DB) *Handler {
 			settings:   settingsRepo,
 			importRepo: repository.NewASImportRepo(db),
 			customers:  customerRepo,
+		},
+		DataReset: &DataResetHandler{
+			cfg:  backup.Config{DataDir: dataDirFromEnv(), DB: db},
+			auth: authH,
+			orgs: repository.NewOrgRepo(db),
 		},
 		Auth: authH,
 		Holiday: &HolidayHandler{

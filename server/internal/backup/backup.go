@@ -181,6 +181,94 @@ func Snapshot(cfg Config, kind string) (string, error) {
 	return name, nil
 }
 
+var snapshotIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// Restore 스냅샷 폴더의 app.db·uploads 를 현재 data 로 되돌린다. 현재 데이터는 사라진다.
+func Restore(cfg Config, name string) error {
+	name = strings.TrimSpace(name)
+	if strings.TrimSpace(cfg.DataDir) == "" {
+		return fmt.Errorf("data 폴더가 비어 있습니다")
+	}
+	if cfg.DB == nil {
+		return fmt.Errorf("DB 연결이 없습니다")
+	}
+	if name == "" || strings.Contains(name, "..") || strings.ContainsAny(name, `/\`) {
+		return fmt.Errorf("백업 이름이 올바르지 않습니다")
+	}
+	src := filepath.Join(cfg.DataDir, "backups", name, "app.db")
+	abs, err := filepath.Abs(src)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return fmt.Errorf("백업 DB 없음: %w", err)
+	}
+
+	attach := filepath.ToSlash(abs)
+	if _, err := cfg.DB.Exec(`ATTACH DATABASE ? AS restore_src`, attach); err != nil {
+		return fmt.Errorf("백업 연결: %w", err)
+	}
+	defer func() { _, _ = cfg.DB.Exec(`DETACH DATABASE restore_src`) }()
+
+	rows, err := cfg.DB.Query(`SELECT name FROM restore_src.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+	if err != nil {
+		return err
+	}
+	var tables []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			rows.Close()
+			return err
+		}
+		if snapshotIdent.MatchString(t) {
+			tables = append(tables, t)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	if _, err := cfg.DB.Exec(`PRAGMA foreign_keys=OFF`); err != nil {
+		return err
+	}
+	defer func() { _, _ = cfg.DB.Exec(`PRAGMA foreign_keys=ON`) }()
+
+	tx, err := cfg.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, t := range tables {
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, t).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			continue
+		}
+		if _, err := tx.Exec(`DELETE FROM "` + t + `"`); err != nil {
+			return fmt.Errorf("%s 비우기: %w", t, err)
+		}
+		if _, err := tx.Exec(`INSERT INTO "` + t + `" SELECT * FROM restore_src."` + t + `"`); err != nil {
+			return fmt.Errorf("%s 복구: %w", t, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	upSrc := filepath.Join(cfg.DataDir, "backups", name, "uploads")
+	if info, err := os.Stat(upSrc); err == nil && info.IsDir() {
+		upDst := filepath.Join(cfg.DataDir, "uploads")
+		_ = os.RemoveAll(upDst)
+		if err := copyDir(upSrc, upDst); err != nil {
+			return fmt.Errorf("uploads 복구: %w", err)
+		}
+	}
+	return nil
+}
+
 // SyncIndex 백업 폴더를 스캔해 data_backups에 없는 행을 보정한다. 추가한 건수를 반환한다.
 func SyncIndex(cfg Config) (int, error) {
 	audit.Use(cfg.DB)

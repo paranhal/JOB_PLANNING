@@ -240,3 +240,31 @@ func mustExist(t *testing.T, p string) {
 		t.Fatalf("있어야 함: %s (%v)", p, err)
 	}
 }
+
+func TestRestorePutsRowsBack(t *testing.T) {
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	db, err := repository.InitDB(filepath.Join(dataDir, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	audit.Init(db)
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('C1','테스트','테스트',1)`); err != nil {
+		t.Fatal(err)
+	}
+	name, err := Snapshot(Config{DataDir: dataDir, DB: db}, KindManual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM customers WHERE customer_id='C1'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Restore(Config{DataDir: dataDir, DB: db}, name); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM customers WHERE customer_id='C1'`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("복구 후 n=%d err=%v", n, err)
+	}
+}
