@@ -12,6 +12,7 @@ type Actor struct {
 	UserID   string
 	Username string
 	Name     string
+	Role     string
 }
 
 var actors sync.Map // goroutine id → Actor

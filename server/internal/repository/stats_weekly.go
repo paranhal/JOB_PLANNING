@@ -330,6 +330,7 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			FROM as_receipts ar
 			WHERE ar.status != 'cancelled'
 			  AND COALESCE(ar.data_origin,'app') != 'import'` + asBase + `
+			  AND COALESCE(ar.is_test,0)=0
 			  AND (
 			    (ar.receipt_datetime >= ? AND ar.receipt_datetime < ?)
 			    OR (TRIM(COALESCE(ar.complete_datetime,'')) != ''
@@ -337,12 +338,13 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			    OR (ar.status IN ` + model.SQLStatusStatsOpen + `
 			        AND ar.receipt_datetime < ?
 			        AND (TRIM(COALESCE(ar.complete_datetime,'')) = ''
-			             OR ar.complete_datetime >= ?)))
+			             OR ar.complete_datetime >= ?))
 			  )
 			UNION
 			SELECT TRIM(COALESCE(v.assignee,''))
 			FROM maintenance_visits v
 			WHERE COALESCE(v.data_origin,'app') != 'import'` + mntBase + `
+			  AND COALESCE(v.is_test,0)=0
 			  AND (
 			    (v.visit_date >= ? AND v.visit_date < ?)
 			    OR (COALESCE(v.completed,0)=1
@@ -355,6 +357,7 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			FROM work_tasks t
 			WHERE t.work_type IN ('admin','support')
 			  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + SQLRecurrenceWorkUnit + adminBase + `
+			  AND COALESCE(t.is_test,0)=0
 			  AND (
 			    (` + adminTaskReceiptDateSQL + ` >= ? AND ` + adminTaskReceiptDateSQL + ` < ?)
 			    OR (t.status='complete' AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?)

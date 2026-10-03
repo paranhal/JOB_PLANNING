@@ -1208,6 +1208,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	// migrateBusinessIDsV2 가 id_sequences 를 비운 뒤에 가드를 세운다 (§52.6).
 	applyOrgs(db)
 	applyCreatedByColumns(db)
+	applyIsTestColumns(db)
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)

@@ -56,12 +56,12 @@ func (r *ASWorkRepo) Create(w *model.ASWorkItem) error {
 	_, err = r.db.Exec(`INSERT INTO as_work_items (
 		work_id, work_number, as_id, work_kind, scheduled_date, schedule_confirmed,
 		confirm_target, confirm_contact, assigned_to, assigned_user_id,
-		status, notes, created_at, updated_at
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		status, notes, created_at, updated_at, is_test
+	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		w.WorkID, w.WorkNumber, w.ASID, w.WorkKind, w.ScheduledDate, boolToInt(w.ScheduleConfirmed),
 		w.ConfirmTarget, w.ConfirmContact, w.AssignedTo, w.AssignedUserID,
 		w.Status, w.Notes,
-		w.CreatedAt.Format("2006-01-02 15:04:05"), w.UpdatedAt.Format("2006-01-02 15:04:05"),
+		w.CreatedAt.Format("2006-01-02 15:04:05"), w.UpdatedAt.Format("2006-01-02 15:04:05"), stampIsTest(),
 	)
 	if err != nil {
 		return err

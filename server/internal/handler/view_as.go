@@ -31,22 +31,24 @@ func identityKeys(c echo.Context) []string {
 	return assigneeKeys(c)
 }
 
-func applySimulation(c echo.Context, role, storedPerms, orgID string) {
+func applySimulation(c echo.Context, role, storedPerms, orgID, baseRole string) {
 	role = model.NormalizeRole(role)
+	baseRole = model.NormalizeRole(baseRole)
 	c.Set("sim_role", role)
-	c.Set("sim_permissions", model.EffectivePermissions(role, storedPerms))
+	c.Set("sim_base_role", baseRole)
+	c.Set("sim_permissions", model.EffectivePermissions(model.EffectiveRole(role, baseRole), storedPerms))
 	c.Set("sim_org_id", strings.TrimSpace(orgID))
 }
 
 func applyObserverOrgAdminSim(c echo.Context) {
-	applySimulation(c, model.RoleOrgAdmin, "", ctxString(c, "org_id"))
+	applySimulation(c, model.RoleOrgAdmin, "", ctxString(c, "org_id"), "")
 }
 
 func applyUserSimulation(c echo.Context, u *model.User) {
 	if u == nil {
 		return
 	}
-	applySimulation(c, u.Role, u.Permissions, u.OrgID)
+	applySimulation(c, u.Role, u.Permissions, u.OrgID, u.BaseRole)
 	c.Set("view_as_user_id", u.UserID)
 	c.Set("view_as_name", u.FullName)
 	c.Set("view_as_username", u.Username)

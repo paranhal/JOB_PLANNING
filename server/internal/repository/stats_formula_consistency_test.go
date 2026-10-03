@@ -139,3 +139,76 @@ func TestIncludeImportToggleDoesNotAffectWeeklyByDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestTesterRowsZeroInAllAggregations(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "tester-stats.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id) VALUES ('c1','도서관','도서관',1,'O01')`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`
+		INSERT INTO as_receipts (
+			as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
+			start_datetime, complete_datetime, status, assigned_to, data_origin, org_id, is_test
+		) VALUES
+		('app1','R-APP1','c1','2026-08-04 09:00:00','2026-08-05',
+		 '2026-08-05 10:00:00','2026-08-05 16:00:00','completed','양기헌','app','O01',0),
+		('tst1','R-TST1','c1','2026-08-04 09:00:00','2026-08-05',
+		 '2026-08-05 10:00:00','2026-08-05 16:00:00','completed','테스터','app','O01',1)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO work_tasks (task_id, work_type, title, status, assignee, work_date, due_date, complete_date, org_id, is_test)
+		VALUES ('T-TST','admin','테스터행정','complete','테스터','2026-08-05','2026-08-05','2026-08-05','O01',1)`); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewStatsRepo(db)
+	anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
+	f := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	f.OrgID = model.OrgIDLibrary
+	cols := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
+	if err := repo.FillPeriodOverview(cols, f); err != nil {
+		t.Fatal(err)
+	}
+	if cols[1].Counts.AS.Planned != 1 {
+		t.Fatalf("테스터 AS가 섞였다 planned=%d", cols[1].Counts.AS.Planned)
+	}
+	kpi, err := repo.LoadStatsKPI(model.StatsViewWeek, cols, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kpi.CompleteSample != 1 {
+		t.Fatalf("테스터 완료가 섞였다 sample=%d", kpi.CompleteSample)
+	}
+	rep, err := repo.BuildWeeklyReport(anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.PersonRows) == 0 {
+		t.Fatal("주간보고서 없음")
+	}
+	team := rep.PersonRows[0]
+	if team.Receipt != 1 {
+		t.Fatalf("주간 접수에 테스터가 섞였다 %d", team.Receipt)
+	}
+	for _, ev := range rep.Events {
+		if ev.WorkNo == "R-TST1" {
+			t.Fatal("테스터 AS가 주간 목록에 있다")
+		}
+	}
+	names, err := repo.weeklyActiveAssignees("2026-08-03", "2026-08-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range names {
+		if n == "테스터" {
+			t.Fatal("담당자 UNION에 테스터가 있다")
+		}
+	}
+}

@@ -20,10 +20,18 @@ func loginRole(c echo.Context) string {
 }
 
 func currentRole(c echo.Context) string {
+	role := loginRole(c)
 	if v := strings.TrimSpace(ctxString(c, "sim_role")); v != "" {
-		return model.NormalizeRole(v)
+		role = model.NormalizeRole(v)
 	}
-	return loginRole(c)
+	if role == model.RoleTester {
+		base := ctxString(c, "sim_base_role")
+		if strings.TrimSpace(base) == "" {
+			base = ctxString(c, "base_role")
+		}
+		return model.EffectiveRole(role, base)
+	}
+	return role
 }
 
 func currentPerms(c echo.Context) []string {

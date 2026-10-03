@@ -376,6 +376,7 @@ type User struct {
 	PasswordHash string    `json:"password_hash"`
 	FullName     string    `json:"full_name"`
 	Role         string    `json:"role"`        // admin, tech, sales, office, observer
+	BaseRole     string    `json:"base_role,omitempty"`
 	Permissions  string    `json:"permissions"` // CSV 권한 키
 	IsActive     bool      `json:"is_active"`
 	OrgID        string    `json:"org_id,omitempty"`
@@ -387,7 +388,7 @@ func (u *User) PermList() []string {
 	if u == nil {
 		return nil
 	}
-	return EffectivePermissions(u.Role, u.Permissions)
+	return EffectivePermissions(EffectiveRole(u.Role, u.BaseRole), u.Permissions)
 }
 
 // HasPerm 권한 체크
@@ -395,7 +396,7 @@ func (u *User) HasPerm(key string) bool {
 	if u == nil {
 		return false
 	}
-	if IsAdminGrade(u.Role) {
+	if IsAdminGrade(EffectiveRole(u.Role, u.BaseRole)) {
 		return true
 	}
 	return HasPermission(u.PermList(), key)

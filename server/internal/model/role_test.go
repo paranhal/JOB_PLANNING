@@ -63,6 +63,22 @@ func TestRoleLabelUnauthenticated(t *testing.T) {
 	}
 }
 
+func TestEffectiveRoleTesterUsesBase(t *testing.T) {
+	if got := EffectiveRole(RoleTester, RoleSales); got != RoleSales {
+		t.Fatalf("tester sales=%s", got)
+	}
+	if got := EffectiveRole(RoleTech, RoleSales); got != RoleTech {
+		t.Fatalf("tech stays=%s", got)
+	}
+	u := User{Role: RoleTester, BaseRole: RoleSales}
+	if !HasPermission(u.PermList(), PermSalesCreate) {
+		t.Fatal("영업 테스터가 사업 등록 권한이 없다")
+	}
+	if PermAccess(RoleTester, PermSalesCreate) != AccessNone {
+		t.Fatal("테스터 자체 권한표가 생겼다")
+	}
+}
+
 func TestDefaultPermissionsUnknownNil(t *testing.T) {
 	if p := DefaultPermissions(""); p != nil {
 		t.Fatalf("DefaultPermissions(\"\")=%v want nil", p)

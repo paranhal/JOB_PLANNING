@@ -321,6 +321,7 @@ type StatsMeetingFilter struct {
 	ExcludeSalesActivity bool   // true면 source_type=sales_activity 를 집계에서 뺀다. 기본은 포함(§32.11)
 	MetricsBaseDate      string // 집계 하한 YYYY-MM-DD. 설정에서 채운다. 토글로 풀리지 않는다 (§4.5.3)
 	OrgID                string // 세션 조직. 빈 값은 전 조직이 아니다 (§52.4)
+	TestDataOnly         bool   // true면 is_test=1 만. 기본은 테스터 행 제외 (§53.8.2)
 }
 
 // StatsKPICard 상단 중요 통계 카드

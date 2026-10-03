@@ -754,6 +754,7 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	if !f.IncludeImport {
 		b.WriteString(` AND COALESCE(ar.data_origin,'app') != 'import'`)
 	}
+	b.WriteString(statsTestSQL("ar", f))
 	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
 		b.WriteString(` AND ar.receipt_datetime >= ?`)
 		args = append(args, dayTimeStart(d))
@@ -792,6 +793,7 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	if !f.IncludeImport {
 		b.WriteString(` AND COALESCE(v.data_origin,'app') != 'import'`)
 	}
+	b.WriteString(statsTestSQL("v", f))
 	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
 		b.WriteString(` AND v.visit_date >= ?`)
 		args = append(args, d)
@@ -842,7 +844,16 @@ func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	frag, a := mustOrgSQL("t", f.OrgID)
 	b.WriteString(frag)
 	args = append(args, a...)
+	b.WriteString(statsTestSQL("t", f))
 	return b.String(), args
+}
+
+func statsTestSQL(alias string, f model.StatsMeetingFilter) string {
+	col := alias + ".is_test"
+	if f.TestDataOnly {
+		return ` AND COALESCE(` + col + `,0)=1`
+	}
+	return ` AND COALESCE(` + col + `,0)=0`
 }
 
 func productMatchSQL(assetAlias, asAlias, product string) (string, []interface{}) {

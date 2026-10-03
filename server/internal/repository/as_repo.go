@@ -585,8 +585,8 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			visit_scheduled_date, schedule_confirmed, status,
 			is_recurrence, is_reopen, parent_as_id, reopen_reason, followup_note,
 			project_id, receipt_group_id, confirm_contact,
-			urgency_reason, urgency_reason_note, external_assignee, org_id, created_by_user_id, created_by_name, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			urgency_reason, urgency_reason_note, external_assignee, org_id, created_by_user_id, created_by_name, created_at, updated_at, is_test
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
 			as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 			as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
@@ -596,7 +596,7 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			nullStr(as.ParentASID), nullStr(as.ReopenReason), nullStr(as.FollowupNote),
 			nullStr(as.ProjectID), nullStr(as.ReceiptGroupID), nullStr(as.ConfirmContact),
 			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), nullIfEmpty(as.ExternalAssignee), as.OrgID,
-			as.CreatedByUserID, as.CreatedByName, now, now,
+			as.CreatedByUserID, as.CreatedByName, now, now, stampIsTest(),
 		)
 		if err == nil {
 			// §25.2 AS 접수 등록은 이력 미기록(○)

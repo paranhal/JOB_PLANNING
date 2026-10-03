@@ -330,11 +330,11 @@ func (r *MaintenanceRepo) InsertVisitFull(v model.MaintenanceVisit) error {
 	_, err := r.db.Exec(`
 		INSERT INTO maintenance_visits
 		(visit_id, plan_id, visit_date, customer_id, sort_order, auto_generated, entry_category, notes,
-		 assignee, assignee_user_id, product_type, completed, completed_date, project_id, dup_reason)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 assignee, assignee_user_id, product_type, completed, completed_date, project_id, dup_reason, is_test)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		id, v.PlanID, v.VisitDate, v.CustomerID, v.SortOrder, auto, v.EntryCategory, nullIfEmpty(v.Notes),
 		nullIfEmpty(v.Assignee), nullIfEmpty(uid), nullIfEmpty(v.ProductType), completed, nullIfEmpty(completedDate),
-		nullIfEmpty(v.ProjectID), v.DupReason)
+		nullIfEmpty(v.ProjectID), v.DupReason, stampIsTest())
 	return err
 }
 

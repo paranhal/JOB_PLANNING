@@ -52,6 +52,14 @@
             <option value="tester">테스터</option>
           </select>
         </div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">테스터가 물려받을 직급</label>
+          <select name="base_role" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="tech">기술</option>
+            <option value="sales" selected>영업</option>
+            <option value="support">지원</option>
+            <option value="org_admin">조직관리자</option>
+          </select>
+        </div>
       </div>
       <div>
         <p class="text-xs font-medium text-gray-600 mb-2">권한 (체크 · 비우면 직급 기본값)</p>
@@ -160,6 +168,12 @@
               <option value="vision_admin" {{if eq .Role "vision_admin"}}selected{{end}}>비젼관리자</option>
               <option value="observer" {{if eq .Role "observer"}}selected{{end}}>옵저버</option>
               <option value="tester" {{if eq .Role "tester"}}selected{{end}}>테스터</option>
+            </select>
+            <select name="base_role" class="border rounded px-2 py-1 text-xs" title="테스터가 물려받을 직급">
+              <option value="tech" {{if eq .BaseRole "tech"}}selected{{end}}>기술</option>
+              <option value="sales" {{if or (eq .BaseRole "sales") (eq .BaseRole "")}}selected{{end}}>영업</option>
+              <option value="support" {{if eq .BaseRole "support"}}selected{{end}}>지원</option>
+              <option value="org_admin" {{if eq .BaseRole "org_admin"}}selected{{end}}>조직관리자</option>
             </select>
             <input type="hidden" name="prev_role" value="{{.Role}}">
             <select name="is_active" class="border rounded px-2 py-1 text-xs">

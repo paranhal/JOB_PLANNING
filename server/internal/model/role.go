@@ -169,6 +169,19 @@ func IsAdminGrade(role string) bool {
 	return r == RoleVisionAdmin || r == RoleOrgAdmin
 }
 
+// EffectiveRole 테스터는 base_role 권한표를 쓴다. 권한표를 두 번 적지 않는다 (§53.8.1).
+func EffectiveRole(role, baseRole string) string {
+	role = NormalizeRole(role)
+	if role != RoleTester {
+		return role
+	}
+	b := NormalizeRole(baseRole)
+	if b == "" || b == RoleTester {
+		return RoleTester
+	}
+	return b
+}
+
 func RoleLabel(role string) string {
 	switch NormalizeRole(role) {
 	case RoleVisionAdmin:

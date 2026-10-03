@@ -273,17 +273,22 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	role := model.NormalizeRole(c.FormValue("role"))
+	baseRole := model.NormalizeRole(c.FormValue("base_role"))
+	if role != model.RoleTester {
+		baseRole = ""
+	}
 	form, _ := c.FormParams()
 	var selected []string
 	if form != nil {
 		selected = form["perm"]
 	}
-	perms := model.CompactStoredPermissions(role, selected)
+	perms := model.CompactStoredPermissions(model.EffectiveRole(role, baseRole), selected)
 	u := &model.User{
 		Username:     c.FormValue("username"),
 		PasswordHash: HashPassword(c.FormValue("password")),
 		FullName:     c.FormValue("full_name"),
 		Role:         role,
+		BaseRole:     baseRole,
 		Permissions:  perms,
 		IsActive:     true,
 	}
@@ -304,6 +309,11 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	u.FullName = c.FormValue("full_name")
 	prevRole := model.NormalizeRole(c.FormValue("prev_role"))
 	u.Role = model.NormalizeRole(c.FormValue("role"))
+	if u.Role == model.RoleTester {
+		u.BaseRole = model.NormalizeRole(c.FormValue("base_role"))
+	} else {
+		u.BaseRole = ""
+	}
 	if prevRole != "" && prevRole != u.Role && c.FormValue("clear_custom_perms") == "1" {
 		u.Permissions = ""
 	} else {
@@ -312,7 +322,7 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		if form != nil {
 			selected = form["perm"]
 		}
-		u.Permissions = model.CompactStoredPermissions(u.Role, selected)
+		u.Permissions = model.CompactStoredPermissions(model.EffectiveRole(u.Role, u.BaseRole), selected)
 	}
 	u.IsActive = c.FormValue("is_active") != "0"
 	h.userRepo.Update(u)
@@ -471,6 +481,7 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			UserID:   ctxString(c, "user_id"),
 			Username: ctxString(c, "username"),
 			Name:     ctxString(c, "user_name"),
+			Role:     loginRole(c),
 		})
 		defer pop()
 		return next(c)
@@ -487,6 +498,7 @@ func sessionClaims(user *model.User, unconfirmed bool) jwt.MapClaims {
 		"role":        role,
 		"name":        user.FullName,
 		"org_id":      strings.TrimSpace(user.OrgID),
+		"base_role":   strings.TrimSpace(user.BaseRole),
 		"permissions": model.FormatPermissions(user.PermList()),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -506,6 +518,7 @@ func sessionClaimsFromContext(c echo.Context, unconfirmed bool) jwt.MapClaims {
 		"name":        ctxString(c, "user_name"),
 		"org_id":      ctxString(c, "org_id"),
 		"view_org_id": ctxString(c, "view_org_id"),
+		"base_role":   ctxString(c, "base_role"),
 		"permissions": model.FormatPermissions(currentPerms(c)),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -541,7 +554,8 @@ func applySessionClaims(c echo.Context, claims jwt.MapClaims) string {
 	c.Set("user_name", claimString(claims, "name"))
 	c.Set("org_id", claimString(claims, "org_id"))
 	c.Set("view_org_id", claimString(claims, "view_org_id"))
-	c.Set("permissions", model.EffectivePermissions(role, claimString(claims, "permissions")))
+	c.Set("base_role", model.NormalizeRole(claimString(claims, "base_role")))
+	c.Set("permissions", model.EffectivePermissions(model.EffectiveRole(role, claimString(claims, "base_role")), claimString(claims, "permissions")))
 	if claimBool(claims, "auth_unconfirmed") {
 		c.Set("auth_unconfirmed", true)
 	}
@@ -553,6 +567,7 @@ func applyUserSession(c echo.Context, u *model.User) {
 	c.Set("role", model.NormalizeRole(u.Role))
 	c.Set("user_name", u.FullName)
 	c.Set("org_id", strings.TrimSpace(u.OrgID))
+	c.Set("base_role", strings.TrimSpace(u.BaseRole))
 	c.Set("permissions", u.PermList())
 	c.Set("auth_unconfirmed", false)
 }

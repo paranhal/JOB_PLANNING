@@ -13,9 +13,9 @@ type UserRepo struct{ db *sql.DB }
 func NewUserRepo(db *sql.DB) *UserRepo { return &UserRepo{db: db} }
 
 const userSelect = `SELECT user_id, username, full_name, role,
-	COALESCE(permissions,''), is_active, COALESCE(org_id,''), created_at FROM users`
+	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''), created_at FROM users`
 const userSelectAuth = `SELECT user_id, username, password_hash, full_name, role,
-	COALESCE(permissions,''), is_active, COALESCE(org_id,''), created_at FROM users`
+	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''), created_at FROM users`
 
 func scanUser(rows interface {
 	Scan(dest ...interface{}) error
@@ -26,10 +26,10 @@ func scanUser(rows interface {
 	var err error
 	if withPassword {
 		err = rows.Scan(&u.UserID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role,
-			&u.Permissions, &active, &u.OrgID, &createdStr)
+			&u.Permissions, &active, &u.OrgID, &u.BaseRole, &createdStr)
 	} else {
 		err = rows.Scan(&u.UserID, &u.Username, &u.FullName, &u.Role,
-			&u.Permissions, &active, &u.OrgID, &createdStr)
+			&u.Permissions, &active, &u.OrgID, &u.BaseRole, &createdStr)
 	}
 	if err != nil {
 		return u, err
@@ -37,6 +37,11 @@ func scanUser(rows interface {
 	u.Role = model.NormalizeRole(u.Role)
 	u.IsActive = active == 1
 	u.CreatedAt = parseTime(createdStr)
+	if u.Role == model.RoleTester {
+		u.BaseRole = model.NormalizeRole(u.BaseRole)
+	} else {
+		u.BaseRole = ""
+	}
 	return u, nil
 }
 
@@ -141,14 +146,18 @@ func (r *UserRepo) GetByID(id string) (*model.User, error) {
 func (r *UserRepo) Create(u *model.User) error {
 	u.UserID = newID("USR")
 	u.Role = model.NormalizeRole(u.Role)
+	u.BaseRole = model.NormalizeRole(u.BaseRole)
+	if u.Role != model.RoleTester {
+		u.BaseRole = ""
+	}
 	if strings.TrimSpace(u.Permissions) == "" {
-		u.Permissions = model.FormatPermissions(model.DefaultPermissions(u.Role))
+		u.Permissions = model.FormatPermissions(model.DefaultPermissions(model.EffectiveRole(u.Role, u.BaseRole)))
 	}
 	_, err := r.db.Exec(`
-		INSERT INTO users (user_id,username,password_hash,full_name,role,permissions,is_active,org_id,created_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`,
+		INSERT INTO users (user_id,username,password_hash,full_name,role,permissions,is_active,org_id,base_role,created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?)`,
 		u.UserID, u.Username, u.PasswordHash, u.FullName, u.Role, u.Permissions,
-		boolToInt(u.IsActive), u.OrgID, time.Now().Format("2006-01-02 15:04:05"))
+		boolToInt(u.IsActive), u.OrgID, u.BaseRole, time.Now().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return err
 	}
@@ -159,10 +168,14 @@ func (r *UserRepo) Create(u *model.User) error {
 
 func (r *UserRepo) Update(u *model.User) error {
 	u.Role = model.NormalizeRole(u.Role)
+	u.BaseRole = model.NormalizeRole(u.BaseRole)
+	if u.Role != model.RoleTester {
+		u.BaseRole = ""
+	}
 	err := touchUpdate(r.db, "users", "user_id", u.UserID, u.FullName, func() error {
 		_, err := r.db.Exec(`
-		UPDATE users SET full_name=?,role=?,permissions=?,is_active=? WHERE user_id=?`,
-			u.FullName, u.Role, u.Permissions, boolToInt(u.IsActive), u.UserID)
+		UPDATE users SET full_name=?,role=?,permissions=?,is_active=?,base_role=? WHERE user_id=?`,
+			u.FullName, u.Role, u.Permissions, boolToInt(u.IsActive), u.BaseRole, u.UserID)
 		return err
 	})
 	if err == nil {
