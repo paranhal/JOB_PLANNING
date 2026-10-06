@@ -14,7 +14,7 @@ var KoreaSidoOptions = []string{
 }
 
 var (
-	reLegacyPostal = regexp.MustCompile(`\(\s*우?\s*(\d{5})\s*\)?`)
+	reLegacyPostal      = regexp.MustCompile(`\(\s*우?\s*(\d{5})\s*\)?`)
 	reLegacyPostalLoose = regexp.MustCompile(`(?:^|[^\d])(\d{5})(?:[^\d]|$)`)
 )
 

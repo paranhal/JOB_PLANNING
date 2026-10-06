@@ -67,14 +67,14 @@ func TestASActionNAReasonSavesAndEmptyBlocked(t *testing.T) {
 func TestASActionShortAsksOnceThenSaves(t *testing.T) {
 	e, _, asRepo, _, asID := newASActionFixture(t)
 	form := url.Values{
-		"status":           {"in_progress"},
-		"work_place":       {"field"},
-		"process_type":     {"visit"},
-		"cause_type":       {"hw"},
-		"action_taken":     {"재시작"},
-		"time_spent":       {"30"},
-		"result_code":      {model.ResultDone},
-		"action_short_ok":  {"0"},
+		"status":          {"in_progress"},
+		"work_place":      {"field"},
+		"process_type":    {"visit"},
+		"cause_type":      {"hw"},
+		"action_taken":    {"재시작"},
+		"time_spent":      {"30"},
+		"result_code":     {model.ResultDone},
+		"action_short_ok": {"0"},
 	}
 	ask := postASAction(t, e, asID, form)
 	if !strings.Contains(ask.Header().Get("Location"), "err=action_short") {

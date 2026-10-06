@@ -6,6 +6,7 @@
     <div>
       <a href="/projects" class="text-sm text-gray-500 hover:underline">← 목록</a>
       <h2 class="text-xl font-bold text-gray-800 mt-1">{{.Project.Name}}</h2>
+      <p class="text-xs font-mono text-gray-400 mt-0.5">{{.Project.ProjectID}}</p>
       <p class="text-sm text-gray-500 mt-0.5 flex flex-wrap gap-2 items-center">
         {{if .Project.PlanYear}}<span>{{.Project.PlanYear}}년</span>{{end}}
         {{if .Project.IsPaid}}
@@ -20,6 +21,9 @@
     <div class="flex flex-wrap gap-2">
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">일일 업무 현황</a>
       <a href="/projects/{{.Project.ProjectID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
+      {{if .CanMerge}}
+      <a href="/projects/{{.Project.ProjectID}}/merge" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">합치기</a>
+      {{end}}
       {{if eq .Project.Status "archived"}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/activate">
         <button type="submit" class="px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">재개</button>
@@ -68,7 +72,13 @@
         {{if .Project.SalesProjectID}}
         <div class="sm:col-span-2">
           <dt class="text-gray-500">원본 영업 사업</dt>
-          <dd><a href="/sales/{{.Project.SalesProjectID}}" class="text-blue-700 hover:underline">{{.Project.SalesProjectID}}</a></dd>
+          <dd>
+            {{if .SalesMissing}}
+            <span class="text-gray-500">(없음)</span>
+            {{else}}
+            <a href="/sales/{{.Project.SalesProjectID}}" class="text-blue-700 hover:underline">{{.Project.SalesProjectID}}</a>
+            {{end}}
+          </dd>
         </div>
         {{end}}
       </dl>

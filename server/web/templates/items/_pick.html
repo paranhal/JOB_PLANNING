@@ -1,7 +1,7 @@
 {{define "items_quote_line"}}
 <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3"
      x-data="{
-       q:'', itemId:'', spec:'', unit:'EA', price:'', customer: {{printf "%q" .QuoteCustomer}}, quotedAt: {{printf "%q" .Today}},
+       q:'', itemId:'', spec:'', specId:'', specs:[], unit:'EA', price:'', customer: {{printf "%q" .QuoteCustomer}}, quotedAt: {{printf "%q" .Today}},
        hits:[], open:false, picked:'', msg:'',
        async search(){
          const q=this.q.trim();
@@ -12,10 +12,19 @@
            this.open=this.hits.length>0;
          } catch(e){ this.hits=[]; this.open=false; }
        },
+       applySpec(id){
+         const sp=(this.specs||[]).find(s=>s.spec_id===id);
+         if(!sp){ this.specId=''; return; }
+         this.specId=sp.spec_id; this.spec=sp.spec||''; this.unit=sp.unit||'EA'; this.price=sp.price||'';
+       },
        pick(it){
          this.itemId=it.item_id; this.q=it.name; this.picked=it.name;
-         this.spec=it.spec||''; this.unit=it.unit||'EA';
-         this.price=(it.fill_price||it.list_price||'');
+         this.specs=it.specs||[];
+         if(this.specs.length===1){ this.applySpec(this.specs[0].spec_id); }
+         else if(this.specs.length===0){
+           this.specId=''; this.spec=it.spec||''; this.unit=it.unit||'EA';
+           this.price=(it.fill_price||it.list_price||'');
+         } else { this.specId=''; this.spec=''; this.unit=it.unit||'EA'; this.price=''; }
          this.open=false;
        },
        onName(){
@@ -71,6 +80,15 @@
           </li>
         </template>
       </ul>
+    </div>
+    <div class="sm:col-span-2" x-show="specs.length">
+      <label class="block text-xs text-gray-500 mb-1">규격 고르기</label>
+      <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" x-model="specId" @change="applySpec(specId)">
+        <option value="">선택</option>
+        <template x-for="sp in specs" :key="sp.spec_id">
+          <option :value="sp.spec_id" x-text="(sp.spec||'')+' · '+(sp.unit||'')+' · '+(sp.price||0)"></option>
+        </template>
+      </select>
     </div>
     <div class="sm:col-span-2">
       <label class="block text-xs text-gray-500 mb-1">규격</label>

@@ -248,23 +248,23 @@
         <button type="button" class="text-sm text-blue-700 hover:underline" @click="addLine()">+ 줄 추가</button>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm table-fixed min-w-[48rem]">
+        <table class="w-full min-w-[1200px] text-sm break-keep">
           <thead class="bg-gray-50 border-b"><tr>
-            <th class="text-left px-2 py-2 text-xs text-gray-500 w-24">구분</th>
-            <th class="text-left px-2 py-2 text-xs text-gray-500" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'" x-text="isLabor() ? '품명' : '품명 · 내용'">품명 · 내용</th>
-            <th class="text-left px-2 py-2 text-xs text-gray-500 w-[16%]" x-show="isLabor()">규격</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20">수량</th>
-            <th class="text-left px-2 py-2 text-xs text-gray-500 w-24">단위</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500 w-24" x-text="isLabor() ? '공급단가' : '단가'">단가</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20" x-show="isLabor()">투입율</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20" x-show="isLabor()">할인율</th>
-            <th class="text-right px-2 py-2 text-xs text-gray-500 w-28" x-text="isLabor() ? '공급금액' : '공급가'">금액</th>
-            <th class="w-12"></th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 w-24 whitespace-nowrap">구분</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 whitespace-nowrap" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'" x-text="isLabor() ? '품명' : '품명 · 내용'">품명 · 내용</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 w-[16%] whitespace-nowrap" x-show="isLabor()">규격</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20 whitespace-nowrap">수량</th>
+            <th class="text-left px-2 py-2 text-xs text-gray-500 w-24 whitespace-nowrap">단위</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-24 whitespace-nowrap" x-text="isLabor() ? '공급단가' : '단가'">단가</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20 whitespace-nowrap" x-show="isLabor()">투입율</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-20 whitespace-nowrap" x-show="isLabor()">할인율</th>
+            <th class="text-right px-2 py-2 text-xs text-gray-500 w-28 whitespace-nowrap" x-text="isLabor() ? '공급금액' : '공급가'">금액</th>
+            <th class="w-12 whitespace-nowrap"></th>
           </tr></thead>
           <tbody>
             <template x-for="(ln, i) in lines" :key="ln.key">
               <tr class="border-b border-gray-100 align-top">
-                <td class="px-2 py-2 w-24">
+                <td class="px-2 py-2 w-24 whitespace-nowrap">
                   <input type="hidden" name="line_item_id" :value="ln.itemId">
                   <input type="hidden" name="line_spec_id" :value="ln.specId">
                   <template x-if="isLabor()">
@@ -277,7 +277,7 @@
                     <input name="line_group" x-model="ln.group" class="w-full border rounded px-2 py-1 text-sm" placeholder="구분">
                   </template>
                 </td>
-                <td class="px-2 py-2 relative" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'">
+                <td class="px-2 py-2 relative whitespace-nowrap" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'">
                   <input name="line_name" x-model="ln.name" @input.debounce.200ms="search(i)" autocomplete="off"
                          class="w-full min-w-0 border rounded px-2 py-1 text-sm" placeholder="품명">
                   <template x-if="!isLabor()">
@@ -305,20 +305,20 @@
                   <input name="line_note" x-show="!isLabor()" x-model="ln.note" class="mt-1 w-full border rounded px-2 py-1 text-xs" placeholder="비고 · 물품식별번호">
                   <input type="hidden" name="line_gov" :value="ln.gov">
                 </td>
-                <td class="px-2 py-2" x-show="isLabor()">
+                <td class="px-2 py-2 whitespace-nowrap" x-show="isLabor()">
                   <template x-if="isLabor()">
                     <textarea name="line_spec" x-model="ln.spec" rows="2" class="w-full min-w-0 border rounded px-2 py-1 text-xs" placeholder="규격"></textarea>
                   </template>
                 </td>
-                <td class="px-2 py-2"><input name="line_qty" x-model="ln.qty" inputmode="decimal" class="w-full border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
-                <td class="px-2 py-2">
+                <td class="px-2 py-2 whitespace-nowrap"><input name="line_qty" x-model="ln.qty" inputmode="decimal" class="w-full border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
+                <td class="px-2 py-2 whitespace-nowrap">
                   <select name="line_unit" x-model="ln.unit" class="w-full border rounded px-2 py-1 text-sm bg-white">
                     {{range .Units}}<option value="{{.}}">{{.}}</option>{{end}}
                   </select>
                 </td>
-                <td class="px-2 py-2"><input name="line_price" x-model="ln.price" @input="ln.overridden='1'" inputmode="numeric" class="w-full border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
-                <td class="px-2 py-2" x-show="isLabor()"><input name="line_mm" x-model="ln.mm" class="w-full border rounded px-2 py-1 text-sm text-right" placeholder="1"></td>
-                <td class="px-2 py-2" x-show="isLabor()"><input name="line_disc" x-model="ln.disc" class="w-full border rounded px-2 py-1 text-sm text-right" placeholder="%"></td>
+                <td class="px-2 py-2 whitespace-nowrap"><input name="line_price" x-model="ln.price" @input="ln.overridden='1'" inputmode="numeric" class="w-full border rounded px-2 py-1 text-sm text-right tabular-nums"></td>
+                <td class="px-2 py-2 whitespace-nowrap" x-show="isLabor()"><input name="line_mm" x-model="ln.mm" class="w-full border rounded px-2 py-1 text-sm text-right" placeholder="1"></td>
+                <td class="px-2 py-2 whitespace-nowrap" x-show="isLabor()"><input name="line_disc" x-model="ln.disc" class="w-full border rounded px-2 py-1 text-sm text-right" placeholder="%"></td>
                 <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-gray-800">
                   <span x-text="fmt(lineAmt(ln))"></span>
                   <div class="text-[10px] text-amber-700" x-show="yearBadge(ln)" x-text="yearBadge(ln)"></div>
@@ -327,7 +327,7 @@
                   <input type="hidden" name="line_labor_year" :value="ln.laborYear">
                   <input type="hidden" name="line_price_overridden" :value="ln.overridden">
                 </td>
-                <td class="px-2 py-2"><button type="button" class="text-xs text-red-600 hover:underline" @click="remove(i)">삭제</button></td>
+                <td class="px-2 py-2 whitespace-nowrap"><button type="button" class="text-xs text-red-600 hover:underline" @click="remove(i)">삭제</button></td>
               </tr>
             </template>
           </tbody>

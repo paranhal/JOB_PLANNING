@@ -30,6 +30,7 @@ func TestCreateCompanyWeeklyPreservesOriginalAndDeletesUpload(t *testing.T) {
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)
+	h.Stats.dataDir = dir
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.POST("/stats/company-weekly", h.Stats.CreateCompanyWeekly)
@@ -119,8 +120,8 @@ func TestCreateCompanyWeeklyPreservesOriginalAndDeletesUpload(t *testing.T) {
 	areq := httptest.NewRequest(http.MethodGet, "http://localhost/stats/company-weekly/download?token="+token, nil)
 	areq.AddCookie(jwtCookie(t))
 	e.ServeHTTP(again, areq)
-	if again.Code == http.StatusOK && strings.Contains(again.Header().Get("Content-Type"), "spreadsheet") {
-		t.Fatal("토큰을 두 번 쓰면 안 된다")
+	if again.Code != http.StatusOK {
+		t.Fatalf("같은 주소로 다시 받아야 한다 status=%d", again.Code)
 	}
 }
 

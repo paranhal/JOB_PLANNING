@@ -552,6 +552,8 @@ func sqlASLeadPopAll() string {
 
 // avgASVisitSpans ①접수→방문 · ②방문→조치완료. 한 조회. §4.15.2
 func (r *StatsRepo) avgASVisitSpans(from, toEx string, f model.StatsMeetingFilter) (avg1, avg2 float64, n int, err error) {
+	f.DateBasis = model.BasisReceipt
+	f.AlsoBases = []model.DateBasis{model.BasisVisit, model.BasisComplete}
 	asSQL, extra := r.filterAS(f)
 	q := `
 		SELECT AVG(cv.bd_index - cr.next_bd_index),
@@ -579,6 +581,8 @@ func (r *StatsRepo) avgASVisitSpans(from, toEx string, f model.StatsMeetingFilte
 }
 
 func (r *StatsRepo) avgASCompleteLeadTime(from, toEx string, f model.StatsMeetingFilter) (avg float64, n int, err error) {
+	f.DateBasis = model.BasisReceipt
+	f.AlsoBases = []model.DateBasis{model.BasisComplete}
 	asSQL, extra := r.filterAS(f)
 	q := `
 		SELECT AVG(cc.bd_index - cr.next_bd_index),
@@ -885,10 +889,9 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND COALESCE(ar.data_origin,'app') != 'import'`)
 	}
 	b.WriteString(statsTestSQL("ar", f))
-	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
-		b.WriteString(` AND ar.receipt_datetime >= ?`)
-		args = append(args, dayTimeStart(d))
-	}
+	fragB, argsB := asMetricsBaseSQL(f)
+	b.WriteString(fragB)
+	args = append(args, argsB...)
 	frag, a := mustOrgSQL("ar", f.OrgID)
 	b.WriteString(frag)
 	args = append(args, a...)
@@ -924,10 +927,9 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND COALESCE(v.data_origin,'app') != 'import'`)
 	}
 	b.WriteString(statsTestSQL("v", f))
-	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
-		b.WriteString(` AND v.visit_date >= ?`)
-		args = append(args, d)
-	}
+	fragB, argsB := mntMetricsBaseSQL(f)
+	b.WriteString(fragB)
+	args = append(args, argsB...)
 	frag, a := mustOrgSQL("mp", f.OrgID)
 	b.WriteString(` AND EXISTS (SELECT 1 FROM maintenance_plans mp WHERE mp.plan_id=v.plan_id`)
 	b.WriteString(frag)
@@ -967,14 +969,108 @@ func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		args = append(args, f.ProjectID)
 	}
 	b.WriteString(SQLRecurrenceWorkUnit)
-	if d := strings.TrimSpace(f.MetricsBaseDate); d != "" {
-		b.WriteString(` AND date(` + adminTaskReceiptDateSQL + `) >= date(?)`)
-		args = append(args, d)
-	}
+	fragB, argsB := adminMetricsBaseSQL(f)
+	b.WriteString(fragB)
+	args = append(args, argsB...)
 	frag, a := mustOrgSQL("t", f.OrgID)
 	b.WriteString(frag)
 	args = append(args, a...)
 	b.WriteString(statsTestSQL("t", f))
+	return b.String(), args
+}
+
+func dateBasesOf(f model.StatsMeetingFilter, fallback model.DateBasis) []model.DateBasis {
+	seen := map[model.DateBasis]bool{}
+	var out []model.DateBasis
+	add := func(b model.DateBasis) {
+		if b == model.BasisUnspecified || seen[b] {
+			return
+		}
+		seen[b] = true
+		out = append(out, b)
+	}
+	if f.DateBasis == model.BasisUnspecified {
+		add(fallback)
+	} else {
+		add(f.DateBasis)
+	}
+	for _, b := range f.AlsoBases {
+		add(b)
+	}
+	return out
+}
+
+func asMetricsBaseSQL(f model.StatsMeetingFilter) (string, []interface{}) {
+	var b strings.Builder
+	var args []interface{}
+	for _, basis := range dateBasesOf(f, model.BasisReceipt) {
+		switch basis {
+		case model.BasisComplete:
+			if d := strings.TrimSpace(f.MetricsBaseComplete); d != "" {
+				b.WriteString(` AND ar.complete_datetime >= ?`)
+				args = append(args, dayTimeStart(d))
+			}
+		case model.BasisVisit:
+			if d := strings.TrimSpace(f.MetricsBaseVisit); d != "" {
+				b.WriteString(` AND date(NULLIF(TRIM(ar.visit_date),'')) >= date(?)`)
+				args = append(args, d)
+			}
+		default:
+			if d := strings.TrimSpace(f.MetricsBaseReceipt); d != "" {
+				b.WriteString(` AND ar.receipt_datetime >= ?`)
+				args = append(args, dayTimeStart(d))
+			}
+		}
+	}
+	return b.String(), args
+}
+
+func mntMetricsBaseSQL(f model.StatsMeetingFilter) (string, []interface{}) {
+	bases := dateBasesOf(f, model.BasisVisit)
+	var b strings.Builder
+	var args []interface{}
+	for _, basis := range bases {
+		switch basis {
+		case model.BasisComplete:
+			complete := strings.TrimSpace(f.MetricsBaseComplete)
+			visit := strings.TrimSpace(f.MetricsBaseVisit)
+			if complete == "" && visit == "" {
+				continue
+			}
+			b.WriteString(` AND ` + mntDoneDateSQL + ` >= CASE WHEN TRIM(COALESCE(v.completed_date,'')) <> '' THEN ? ELSE ? END`)
+			args = append(args, complete, visit)
+		default:
+			if d := strings.TrimSpace(f.MetricsBaseVisit); d != "" {
+				b.WriteString(` AND v.visit_date >= ?`)
+				args = append(args, d)
+			}
+		}
+	}
+	return b.String(), args
+}
+
+func adminMetricsBaseSQL(f model.StatsMeetingFilter) (string, []interface{}) {
+	var b strings.Builder
+	var args []interface{}
+	for _, basis := range dateBasesOf(f, model.BasisReceipt) {
+		switch basis {
+		case model.BasisComplete:
+			if d := strings.TrimSpace(f.MetricsBaseComplete); d != "" {
+				b.WriteString(` AND date(` + adminTaskCompleteDateSQL + `) >= date(?)`)
+				args = append(args, d)
+			}
+		case model.BasisVisit:
+			if d := strings.TrimSpace(f.MetricsBaseVisit); d != "" {
+				b.WriteString(` AND date(COALESCE(` + companyAdminPlanDateSQL() + `, ` + adminTaskReceiptDateSQL + `)) >= date(?)`)
+				args = append(args, d)
+			}
+		default:
+			if d := strings.TrimSpace(f.MetricsBaseReceipt); d != "" {
+				b.WriteString(` AND date(` + adminTaskReceiptDateSQL + `) >= date(?)`)
+				args = append(args, d)
+			}
+		}
+	}
 	return b.String(), args
 }
 

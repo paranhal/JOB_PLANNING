@@ -161,6 +161,12 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			dataMap["Username"] = ctxString(c, "username")
 			dataMap["UserID"] = ctxString(c, "user_id")
 			dataMap["UserPerms"] = currentPerms(c)
+			dataMap["IsReadOnly"] = isReadOnly(c)
+			dataMap["IsTestUser"] = ctxBool(c, "is_test")
+			if isReadOnly(c) {
+				dataMap["CanWrite"] = false
+				dataMap["KanbanDrag"] = false
+			}
 			if vid := strings.TrimSpace(ctxString(c, "view_as_user_id")); vid != "" {
 				dataMap["ViewAsActive"] = true
 				dataMap["ViewAsName"] = ctxString(c, "view_as_name")
@@ -196,6 +202,7 @@ func injectOrgView(c echo.Context, dataMap map[string]interface{}) {
 			dataMap["OrgSwitchList"] = list
 		}
 	}
+	dataMap["CanViewOrgs"] = canViewOrgs(c)
 	dataMap["CanSwitchOrg"] = canSwitchOrg(c)
 	id := currentOrg(c)
 	dataMap["OrgViewID"] = id
@@ -215,6 +222,11 @@ func ctxString(c echo.Context, key string) string {
 		return s
 	}
 	return ""
+}
+
+func ctxBool(c echo.Context, key string) bool {
+	v, _ := c.Get(key).(bool)
+	return v
 }
 
 // RenderPartial HTMX 부분 응답용 — base.html 없이 템플릿 파일만 직접 렌더링
@@ -592,6 +604,14 @@ func funcMap() template.FuncMap {
 		"roleLabel": func(s string) string {
 			return model.RoleLabel(s)
 		},
+		"canViewOrgs": func(data interface{}) bool {
+			m, ok := data.(map[string]interface{})
+			if !ok || m == nil {
+				return false
+			}
+			b, _ := m["CanViewOrgs"].(bool)
+			return b
+		},
 		"hasUserPerm": func(perms interface{}, key string) bool {
 			switch v := perms.(type) {
 			case []string:
@@ -610,6 +630,15 @@ func funcMap() template.FuncMap {
 		},
 		"permGroups": func() []model.PermGroup {
 			return model.PermissionGroups()
+		},
+		"permAccess": func(role, key string) int {
+			return int(model.PermAccess(role, key))
+		},
+		"builtinAccess": func(role, key string) int {
+			return int(model.BuiltinAccess(role, key))
+		},
+		"accessLabel": func(v int) string {
+			return model.AccessLabel(model.Access(v))
 		},
 		"initial": func(s string) string {
 			for _, r := range s {

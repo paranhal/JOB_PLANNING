@@ -98,10 +98,10 @@ func TestKnowledgeGapHTTPRecordWriteResolve(t *testing.T) {
 	}
 
 	if rec := post(url.Values{
-		"from":        {"gaps"},
-		"gap_id":      {open[0].GapID},
+		"from":         {"gaps"},
+		"gap_id":       {open[0].GapID},
 		"symptom_text": {open[0].Query},
-		"action_text": {"리더기 재시작 후 태그를 다시 등록합니다"},
+		"action_text":  {"리더기 재시작 후 태그를 다시 등록합니다"},
 	}); rec.Code != http.StatusSeeOther {
 		t.Fatalf("write %d loc=%s", rec.Code, rec.Header().Get("Location"))
 	}

@@ -88,6 +88,21 @@
   <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>
   {{end}}
 
+  {{if .IncompleteVisits}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+    <p class="font-semibold">완료 표시 안 된 방문 {{len .IncompleteVisits}}건</p>
+    <p class="text-xs mt-1">조치는 했는데 완료 표시가 없으면 주간보고 사이트 수에 안 들어갑니다. 완료 표시를 채워 주세요.</p>
+    <ul class="mt-2 space-y-1">
+      {{range .IncompleteVisits}}
+      <li>
+        <a href="/maintenance/visits/{{.VisitID}}" class="text-blue-800 hover:underline">{{if .OrgName}}{{.OrgName}}{{else}}{{.VisitID}}{{end}}</a>
+        <span class="text-xs text-amber-800">{{.VisitDate}}</span>
+      </li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+
   {{if .HolidayMissing}}
   <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-center justify-between gap-2">
     <p>{{.HolidayMissing}}</p>

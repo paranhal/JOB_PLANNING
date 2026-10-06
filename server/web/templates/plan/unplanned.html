@@ -82,18 +82,18 @@
   {{end}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[1200px] text-sm break-keep">
         <thead class="bg-gray-50 border-b">
           <tr>
-            {{if .CanWrite}}<th class="px-3 py-3 text-xs font-semibold text-gray-500 w-8"></th>{{end}}
+            {{if .CanWrite}}<th class="px-3 py-3 text-xs font-semibold text-gray-500 w-8 whitespace-nowrap"></th>{{end}}
             {{if .ShowAssignee}}{{template "sort_th" (dict "Label" "담당자" "Key" "assignee" "Cur" $sort "Dir" $dir "Href" (index $href "assignee") "PadClass" "px-3 py-3")}}{{end}}
             {{template "sort_th" (dict "Label" "구분" "Key" "prefix" "Cur" $sort "Dir" $dir "Href" (index $href "prefix") "PadClass" "px-3 py-3")}}
             {{template "sort_th" (dict "Label" "번호" "Key" "task_id" "Cur" $sort "Dir" $dir "Href" (index $href "task_id") "PadClass" "px-3 py-3")}}
             {{template "sort_th" (dict "Label" "기관 / 제목" "Key" "customer" "Cur" $sort "Dir" $dir "Href" (index $href "customer") "PadClass" "px-3 py-3")}}
-            <th class="px-3 py-3 text-xs font-semibold text-gray-500">유형</th>
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">유형</th>
             {{template "sort_th" (dict "Label" "예정일" "Key" "due_date" "Cur" $sort "Dir" $dir "Href" (index $href "due_date") "PadClass" "px-3 py-3")}}
-            {{if .CanWrite}}<th class="px-3 py-3 text-xs font-semibold text-gray-500">즉시 배정</th>{{end}}
-            <th class="px-3 py-3 text-xs font-semibold text-gray-500">원본</th>
+            {{if .CanWrite}}<th class="px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">즉시 배정</th>{{end}}
+            <th class="px-3 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">원본</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -101,7 +101,7 @@
           {{range .Items}}
           <tr class="hover:bg-gray-50 {{if and (.HasKind "delayed") .Started}}bg-amber-50/40{{else if .HasKind "delayed"}}bg-red-50/30{{end}}">
             {{if $.CanWrite}}
-            <td class="px-3 py-2 text-center">
+            <td class="px-3 py-2 text-center whitespace-nowrap">
               {{if .CanAssignDate}}
               <input form="bulk" type="checkbox" name="item_key" value="{{.ItemKey}}" class="rounded border-gray-300">
               {{end}}
@@ -114,17 +114,17 @@
               <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
               {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
             </td>
-            <td class="px-3 py-2 font-mono text-blue-600">
+            <td class="px-3 py-2 font-mono text-blue-600 whitespace-nowrap">
               <a href="{{.Href}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}}{{else}}—{{end}}</a>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2 whitespace-nowrap">
               <a href="{{.Href}}" class="block hover:underline">
                 <span class="font-medium text-gray-800">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</span>
                 <p class="text-xs text-gray-500 mt-0.5 truncate max-w-md">{{.Title}}</p>
               </a>
               {{if .NoDateReason}}<p class="text-[11px] text-amber-800 mt-0.5">미정 · {{.NoDateReason}}{{if .NoDateAt}} · {{.NoDateAt}}{{end}}</p>{{end}}
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2 whitespace-nowrap">
               <div class="flex flex-wrap gap-1">
                 {{range .Badges}}
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{.Class}}">{{.Label}}</span>
@@ -158,7 +158,7 @@
           </tr>
           {{end}}
           {{else}}
-          <tr><td colspan="9" class="px-4 py-10 text-center text-gray-400">미계획 업무가 없습니다.</td></tr>
+          <tr><td colspan="9" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">미계획 업무가 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>

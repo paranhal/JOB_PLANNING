@@ -131,20 +131,20 @@
     </p>
     {{end}}
     {{if .ASReports}}
-    <table class="w-full text-sm">
+    <table class="w-full text-sm break-keep">
       <thead>
         <tr class="text-left text-xs text-slate-500">
-          <th class="py-1 font-medium">발급일시</th>
-          <th class="py-1 font-medium">발급자</th>
-          <th class="py-1 font-medium">파일</th>
+          <th class="py-1 font-medium whitespace-nowrap">발급일시</th>
+          <th class="py-1 font-medium whitespace-nowrap">발급자</th>
+          <th class="py-1 font-medium whitespace-nowrap">파일</th>
         </tr>
       </thead>
       <tbody>
         {{range .ASReports}}
         <tr class="border-t border-slate-100">
-          <td class="py-1.5">{{.UploadedAt.Format "2006-01-02 15:04"}}</td>
-          <td class="py-1.5">{{if .ReportIssuer}}{{.ReportIssuer}}{{else}}—{{end}}</td>
-          <td class="py-1.5"><a href="/attachments/{{.AttachmentID}}" class="text-blue-700 hover:underline">내려받기</a></td>
+          <td class="py-1.5 whitespace-nowrap">{{.UploadedAt.Format "2006-01-02 15:04"}}</td>
+          <td class="py-1.5 whitespace-nowrap">{{if .ReportIssuer}}{{.ReportIssuer}}{{else}}—{{end}}</td>
+          <td class="py-1.5 whitespace-nowrap"><a href="/attachments/{{.AttachmentID}}" class="text-blue-700 hover:underline">내려받기</a></td>
         </tr>
         {{end}}
       </tbody>

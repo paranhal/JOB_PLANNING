@@ -14,7 +14,8 @@ services:
       - PORT=8080
       - DB_TYPE=sqlite
       - DB_PATH=/app/data/app.db
-      - APP_ENV=production
+      - APP_ENV=production      # 운영 보호용. 되돌린다
+      - COOKIE_SECURE=false     # HTTP 로 서비스하는 동안 false. HTTPS 도입 시 COOKIE_SECURE=true. HTTP 에서 켜면 로그인이 불가능해진다(§24.2)
       - TZ=Asia/Seoul
     restart: unless-stopped
     stop_grace_period: 30s

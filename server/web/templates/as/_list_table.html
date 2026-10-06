@@ -7,19 +7,19 @@
 {{end}}
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[1200px] text-sm break-keep">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">!</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8 whitespace-nowrap">!</th>
           {{template "sort_th" (dict "Label" "접수번호" "Key" "as_number" "Cur" $sort "Dir" $dir "Href" (index $href "as_number"))}}
           {{template "sort_th" (dict "Label" "기관(고객명)" "Key" "org_name" "Cur" $sort "Dir" $dir "Href" (index $href "org_name"))}}
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">증상</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">증상</th>
           {{template "sort_th" (dict "Label" "상태" "Key" "status" "Cur" $sort "Dir" $dir "Href" (index $href "status") "Align" "center")}}
           {{template "sort_th" (dict "Label" "예정일" "Key" "visit" "Cur" $sort "Dir" $dir "Href" (index $href "visit"))}}
           {{template "sort_th" (dict "Label" "담당" "Key" "assigned" "Cur" $sort "Dir" $dir "Href" (index $href "assigned") "ThClass" "hidden md:table-cell")}}
           {{template "sort_th" (dict "Label" "경과" "Key" "days" "Cur" $sort "Dir" $dir "Href" (index $href "days") "Align" "right")}}
           {{if $isHold}}
-          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">삭제</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 whitespace-nowrap">삭제</th>
           {{end}}
         </tr>
       </thead>
@@ -27,12 +27,12 @@
         {{if .Items}}
           {{range .Items}}
           <tr class="hover:bg-gray-50 transition-colors {{if and (gt .VisitDaysOverdue 0) (not .VisitDone)}}bg-red-50/40{{else if gt .DaysElapsed 3}}bg-red-50/20{{end}}">
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 whitespace-nowrap">
               {{if eq .Urgency "high"}}
               <span class="text-xs font-bold text-red-600" title="{{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
               {{end}}
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 whitespace-nowrap">
               <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
               {{if gt .GroupSize 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 text-[10px] align-middle" title="함께 접수된 건 {{.GroupSize}}건">🔗</span>{{end}}
               {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
@@ -40,14 +40,14 @@
               {{if gt .PhotoCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 text-[10px] align-middle" title="증상 사진">📷 {{.PhotoCount}}</span>{{end}}
               <p class="text-xs text-gray-400 mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 whitespace-nowrap">
               <span class="font-medium text-gray-800">{{.OrgName}}</span>
               {{if .ProductName}}
               <p class="text-xs text-gray-400 mt-0.5">{{.ProductName}}</p>
               {{end}}
             </td>
-            <td class="px-4 py-3 hidden lg:table-cell text-gray-600 max-w-xs truncate">{{.Symptom}}</td>
-            <td class="px-4 py-3 text-center">
+            <td class="px-4 py-3 hidden lg:table-cell text-gray-600 max-w-[18rem]">{{.Symptom}}</td>
+            <td class="px-4 py-3 text-center whitespace-nowrap">
               {{statusBadge .Status}}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
@@ -64,10 +64,10 @@
               <span class="text-gray-300">—</span>
               {{end}}
             </td>
-            <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{.AssignedTo}}</td>
-            <td class="px-4 py-3 text-right text-gray-500">{{.DaysElapsed}}일</td>
+            <td class="px-4 py-3 hidden md:table-cell text-gray-600 whitespace-nowrap">{{.AssignedTo}}</td>
+            <td class="px-4 py-3 text-right text-gray-500 whitespace-nowrap">{{.DaysElapsed}}일</td>
             {{if $isHold}}
-            <td class="px-4 py-3 text-center">
+            <td class="px-4 py-3 text-center whitespace-nowrap">
               {{if $canUnhold}}
               <form method="POST" action="/as/{{.ASID}}/hold-release"
                     onsubmit="return confirm('보류를 삭제하고 접수 상태로 되돌릴까요?');">
@@ -82,19 +82,19 @@
           </tr>
           {{range .WorkChildren}}
           <tr class="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
-            <td class="px-4 py-2"></td>
-            <td class="px-4 py-2 pl-8">
+            <td class="px-4 py-2 whitespace-nowrap"></td>
+            <td class="px-4 py-2 pl-8 whitespace-nowrap">
               <a href="/as/work/{{.WorkID}}/action" class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-700 hover:underline">
                 <span class="text-gray-300">└</span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if eq .WorkKind "confirm"}}bg-purple-100 text-purple-800{{else}}bg-sky-100 text-sky-800{{end}}">[{{workKindLabel .WorkKind}}]</span>
                 <span>{{.WorkNumber}}</span>
               </a>
             </td>
-            <td class="px-4 py-2 text-xs text-gray-500" colspan="1">
+            <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap" colspan="1">
               {{if .ConfirmTarget}}{{.ConfirmTarget}}{{if .ConfirmContact}} · {{.ConfirmContact}}{{end}}{{else}}—{{end}}
             </td>
-            <td class="px-4 py-2 hidden lg:table-cell text-xs text-gray-400">{{if .Notes}}{{.Notes}}{{else}}—{{end}}</td>
-            <td class="px-4 py-2 text-center">
+            <td class="px-4 py-2 hidden lg:table-cell text-xs text-gray-400 whitespace-nowrap">{{if .Notes}}{{.Notes}}{{else}}—{{end}}</td>
+            <td class="px-4 py-2 text-center whitespace-nowrap">
               {{if eq .Status "done"}}
               <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-700">완료</span>
               {{else if .ScheduleConfirmed}}
@@ -104,14 +104,14 @@
               {{end}}
             </td>
             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{{if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
-            <td class="px-4 py-2 hidden md:table-cell text-gray-600 text-xs">{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td>
-            <td class="px-4 py-2 text-right text-gray-300 text-xs">—</td>
-            {{if $isHold}}<td class="px-4 py-2"></td>{{end}}
+            <td class="px-4 py-2 hidden md:table-cell text-gray-600 text-xs whitespace-nowrap">{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td>
+            <td class="px-4 py-2 text-right text-gray-300 text-xs whitespace-nowrap">—</td>
+            {{if $isHold}}<td class="px-4 py-2 whitespace-nowrap"></td>{{end}}
           </tr>
           {{end}}
           {{end}}
         {{else}}
-          <tr><td colspan="{{if $isHold}}9{{else}}8{{end}}" class="px-4 py-10 text-center text-gray-400">표시할 AS가 없습니다.</td></tr>
+          <tr><td colspan="{{if $isHold}}9{{else}}8{{end}}" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">표시할 AS가 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>

@@ -7,7 +7,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -37,8 +36,11 @@ func isAdminSectionPath(path string) bool {
 }
 
 func skipsAdminSectionUnlock(c echo.Context) bool {
-	r := loginRole(c)
-	return r == model.RoleObserver || r == model.RoleTester
+	if isReadOnly(c) {
+		return true
+	}
+	v, _ := c.Get("is_test").(bool)
+	return v
 }
 
 func (h *AuthHandler) adminSectionOpen(c echo.Context) bool {

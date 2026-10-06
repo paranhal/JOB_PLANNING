@@ -77,7 +77,7 @@ func (h *ASHandler) APIOpenByCustomer(c echo.Context) error {
 
 // PullOpen POST /as/open/pull — 담당=나, 수행일=오늘. §64.4
 func (h *ASHandler) PullOpen(c echo.Context) error {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return echo.ErrForbidden
 	}
 	_ = c.Request().ParseForm()
@@ -98,7 +98,7 @@ func (h *ASHandler) PullOpen(c echo.Context) error {
 
 // AssignOpenDates POST /as/open/assign — 줄마다 날짜·담당자. §64.5
 func (h *ASHandler) AssignOpenDates(c echo.Context) error {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return echo.ErrForbidden
 	}
 	_ = c.Request().ParseForm()

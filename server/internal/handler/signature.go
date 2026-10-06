@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,6 +77,42 @@ func (h *AuthHandler) AccountSignatureImage(c echo.Context) error {
 	return c.Blob(http.StatusOK, "image/png", raw)
 }
 
+func (h *AuthHandler) storeSignaturePNG(userID string, raw []byte) (string, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return "", errPlain("계정이 없습니다.")
+	}
+	png, err := imageproc.ProcessSignature(bytes.NewReader(raw))
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(h.uploadsRoot(), "signatures")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", errPlain("저장 폴더를 만들지 못했습니다.")
+	}
+	path := signatureStoredPath(h.uploadsRoot(), userID)
+	if err := os.WriteFile(path, png, 0644); err != nil {
+		return "", errPlain("사인을 저장하지 못했습니다.")
+	}
+	if err := h.userRepo.UpdateSignaturePath(userID, path); err != nil {
+		return "", errPlain("경로를 기록하지 못했습니다.")
+	}
+	return path, nil
+}
+
+func (h *AuthHandler) clearSignaturePNG(userID string) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return
+	}
+	u, _ := h.userRepo.GetByID(userID)
+	if u != nil && strings.TrimSpace(u.SignaturePath) != "" {
+		_ = os.Remove(u.SignaturePath)
+	}
+	_ = os.Remove(signatureStoredPath(h.uploadsRoot(), userID))
+	_ = h.userRepo.UpdateSignaturePath(userID, "")
+}
+
 func (h *AuthHandler) AccountSignature(c echo.Context) error {
 	uid := ctxString(c, "user_id")
 	if uid == "" {
@@ -88,20 +125,8 @@ func (h *AuthHandler) AccountSignature(c echo.Context) error {
 	if err != nil {
 		return h.renderAccountErr(c, uid, err.Error())
 	}
-	png, err := imageproc.ProcessSignature(bytes.NewReader(raw))
-	if err != nil {
+	if _, err := h.storeSignaturePNG(uid, raw); err != nil {
 		return h.renderAccountErr(c, uid, err.Error())
-	}
-	dir := filepath.Join(h.uploadsRoot(), "signatures")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return h.renderAccountErr(c, uid, "저장 폴더를 만들지 못했습니다.")
-	}
-	path := signatureStoredPath(h.uploadsRoot(), uid)
-	if err := os.WriteFile(path, png, 0644); err != nil {
-		return h.renderAccountErr(c, uid, "사인을 저장하지 못했습니다.")
-	}
-	if err := h.userRepo.UpdateSignaturePath(uid, path); err != nil {
-		return h.renderAccountErr(c, uid, "경로를 기록하지 못했습니다.")
 	}
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionUpdate,
@@ -120,13 +145,65 @@ func (h *AuthHandler) AccountSignatureDelete(c echo.Context) error {
 	if uid == "" {
 		return c.Redirect(http.StatusSeeOther, "/logout")
 	}
-	u, _ := h.userRepo.GetByID(uid)
-	if u != nil && strings.TrimSpace(u.SignaturePath) != "" {
-		_ = os.Remove(u.SignaturePath)
-	}
-	_ = os.Remove(signatureStoredPath(h.uploadsRoot(), uid))
-	_ = h.userRepo.UpdateSignaturePath(uid, "")
+	h.clearSignaturePNG(uid)
 	return c.Redirect(http.StatusSeeOther, "/account?ok=signature_cleared")
+}
+
+func (h *AuthHandler) UserSignature(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return h.forbidden(c)
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	u, _ := h.userRepo.GetByID(id)
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	raw, err := readSignatureUpload(c)
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
+	}
+	if _, err := h.storeSignaturePNG(id, raw); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionUpdate,
+		Result:      auditlog.ResultOK,
+		TargetTable: "users",
+		TargetID:    id,
+		SubjectType: "user",
+		SubjectID:   id,
+		SubjectName: u.FullName,
+		Detail:      "사인 저장",
+	})
+	return c.Redirect(http.StatusSeeOther, "/users?ok=signature")
+}
+
+func (h *AuthHandler) UserSignatureDelete(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return h.forbidden(c)
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	u, _ := h.userRepo.GetByID(id)
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	h.clearSignaturePNG(id)
+	return c.Redirect(http.StatusSeeOther, "/users?ok=signature_cleared")
+}
+
+func (h *AuthHandler) UserSignatureImage(c echo.Context) error {
+	if !h.isAdmin(c) {
+		return h.forbidden(c)
+	}
+	u, _ := h.userRepo.GetByID(c.Param("id"))
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	raw := readSignaturePNG(u.SignaturePath)
+	if len(raw) == 0 {
+		return echo.ErrNotFound
+	}
+	return c.Blob(http.StatusOK, "image/png", raw)
 }
 
 func (h *AuthHandler) renderAccountErr(c echo.Context, uid, msg string) error {

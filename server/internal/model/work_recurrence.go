@@ -492,7 +492,7 @@ func QuarterMonths(startMonth int) []int {
 	}
 	out := make([]int, 4)
 	for i := 0; i < 4; i++ {
-		out[i] = ((startMonth-1+i*3)%12)+1
+		out[i] = ((startMonth - 1 + i*3) % 12) + 1
 	}
 	return out
 }

@@ -13,30 +13,53 @@ type UserRepo struct{ db *sql.DB }
 
 func NewUserRepo(db *sql.DB) *UserRepo { return &UserRepo{db: db} }
 
+func foldLegacyRole(u *model.User) {
+	if u == nil {
+		return
+	}
+	u.Role = model.NormalizeRole(u.Role)
+	if u.Role == model.RoleObserver {
+		u.Role = model.RoleOrgAdmin
+		u.IsReadOnly = true
+	}
+	if u.Role == model.RoleTester {
+		u.IsTest = true
+		b := model.NormalizeRole(u.BaseRole)
+		if b == model.RoleSales || b == model.RoleTech || b == model.RoleSupport {
+			u.Role = b
+		} else {
+			u.Role = model.RoleSupport
+		}
+	}
+	u.BaseRole = ""
+}
+
 const userSelect = `SELECT user_id, username, full_name, role,
 	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''),
 	COALESCE(mobile,''), COALESCE(tel,''), COALESCE(email,''), COALESCE(signature_path,''),
-	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0), created_at FROM users`
+	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0),
+	COALESCE(is_readonly,0), created_at FROM users`
 const userSelectAuth = `SELECT user_id, username, password_hash, full_name, role,
 	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''),
 	COALESCE(mobile,''), COALESCE(tel,''), COALESCE(email,''), COALESCE(signature_path,''),
-	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0), created_at FROM users`
+	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0),
+	COALESCE(is_readonly,0), created_at FROM users`
 
 func scanUser(rows interface {
 	Scan(dest ...interface{}) error
 }, withPassword bool) (model.User, error) {
 	var u model.User
-	var active, profileDone, isTest int
+	var active, profileDone, isTest, isRO int
 	var createdStr string
 	var err error
 	if withPassword {
 		err = rows.Scan(&u.UserID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role,
 			&u.Permissions, &active, &u.OrgID, &u.BaseRole,
-			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &profileDone, &u.UsernameChangedAt, &isTest, &createdStr)
+			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
 	} else {
 		err = rows.Scan(&u.UserID, &u.Username, &u.FullName, &u.Role,
 			&u.Permissions, &active, &u.OrgID, &u.BaseRole,
-			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &profileDone, &u.UsernameChangedAt, &isTest, &createdStr)
+			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
 	}
 	if err != nil {
 		return u, err
@@ -45,12 +68,9 @@ func scanUser(rows interface {
 	u.IsActive = active == 1
 	u.ProfileDone = profileDone == 1
 	u.IsTest = isTest == 1
+	u.IsReadOnly = isRO == 1
 	u.CreatedAt = parseTime(createdStr)
-	if u.Role == model.RoleTester {
-		u.BaseRole = model.NormalizeRole(u.BaseRole)
-	} else {
-		u.BaseRole = ""
-	}
+	u.BaseRole = ""
 	return u, nil
 }
 
@@ -110,7 +130,7 @@ func (r *UserRepo) ListAssignable() ([]model.User, error) {
 }
 
 func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
-	row := r.db.QueryRow(userSelectAuth+` WHERE username=?`, username)
+	row := r.db.QueryRow(userSelectAuth+` WHERE username = ? COLLATE NOCASE`, username)
 	u, err := scanUser(row, true)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -155,22 +175,32 @@ func (r *UserRepo) GetByID(id string) (*model.User, error) {
 func (r *UserRepo) Create(u *model.User) error {
 	u.UserID = newID("USR")
 	u.Role = model.NormalizeRole(u.Role)
-	u.BaseRole = model.NormalizeRole(u.BaseRole)
-	if u.Role != model.RoleTester {
-		u.BaseRole = ""
+	if u.Role == model.RoleObserver {
+		u.Role = model.RoleOrgAdmin
+		u.IsReadOnly = true
 	}
-	if strings.TrimSpace(u.Permissions) == "" {
-		u.Permissions = model.FormatPermissions(model.DefaultPermissions(model.EffectiveRole(u.Role, u.BaseRole)))
+	if u.Role == model.RoleTester {
+		u.IsTest = true
+		b := model.NormalizeRole(u.BaseRole)
+		if b == model.RoleSales || b == model.RoleTech || b == model.RoleSupport {
+			u.Role = b
+		} else {
+			u.Role = model.RoleSupport
+		}
 	}
-	u.IsTest = u.Role == model.RoleTester
+	u.BaseRole = ""
+	if model.IsAdminGrade(u.Role) {
+		u.IsTest = false
+	}
 	u.MarkProfileDoneIfComplete()
 	_, err := r.db.Exec(`
 		INSERT INTO users (user_id,username,password_hash,full_name,role,permissions,is_active,org_id,base_role,
-			mobile,tel,email,signature_path,profile_done,is_test,created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			mobile,tel,email,signature_path,profile_done,is_test,is_readonly,created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		u.UserID, u.Username, u.PasswordHash, u.FullName, u.Role, u.Permissions,
 		boolToInt(u.IsActive), u.OrgID, u.BaseRole,
 		u.Mobile, u.Tel, u.Email, u.SignaturePath, boolToInt(u.ProfileDone), boolToInt(u.IsTest),
+		boolToInt(u.IsReadOnly),
 		time.Now().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return err
@@ -182,18 +212,30 @@ func (r *UserRepo) Create(u *model.User) error {
 
 func (r *UserRepo) Update(u *model.User) error {
 	u.Role = model.NormalizeRole(u.Role)
-	u.BaseRole = model.NormalizeRole(u.BaseRole)
-	if u.Role != model.RoleTester {
-		u.BaseRole = ""
+	if u.Role == model.RoleObserver {
+		u.Role = model.RoleOrgAdmin
+		u.IsReadOnly = true
 	}
-	u.IsTest = u.Role == model.RoleTester
+	if u.Role == model.RoleTester {
+		u.IsTest = true
+		b := model.NormalizeRole(u.BaseRole)
+		if b == model.RoleSales || b == model.RoleTech || b == model.RoleSupport {
+			u.Role = b
+		} else {
+			u.Role = model.RoleSupport
+		}
+	}
+	u.BaseRole = ""
+	if model.IsAdminGrade(u.Role) {
+		u.IsTest = false
+	}
 	u.MarkProfileDoneIfComplete()
 	err := touchUpdate(r.db, "users", "user_id", u.UserID, u.FullName, func() error {
 		_, err := r.db.Exec(`
 		UPDATE users SET full_name=?,role=?,permissions=?,is_active=?,base_role=?,org_id=?,
-			mobile=?,tel=?,email=?,profile_done=?,is_test=? WHERE user_id=?`,
+			mobile=?,tel=?,email=?,profile_done=?,is_test=?,is_readonly=? WHERE user_id=?`,
 			u.FullName, u.Role, u.Permissions, boolToInt(u.IsActive), u.BaseRole, u.OrgID,
-			u.Mobile, u.Tel, u.Email, boolToInt(u.ProfileDone), boolToInt(u.IsTest), u.UserID)
+			u.Mobile, u.Tel, u.Email, boolToInt(u.ProfileDone), boolToInt(u.IsTest), boolToInt(u.IsReadOnly), u.UserID)
 		return err
 	})
 	if err == nil {
@@ -271,26 +313,23 @@ func (r *UserRepo) EnsureAdmin(hash string) error {
 	return r.Create(admin)
 }
 
-// EnsureObserver 옵저버 계정 obs (없으면 생성, 있으면 조회 권한 보강)
+// EnsureObserver 읽기전용 조직관리자 obs (없으면 생성)
 func (r *UserRepo) EnsureObserver(hash string) error {
-	viewPerms := model.FormatPermissions(model.ObserverViewPermissions())
 	var n int
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username='obs'`).Scan(&n)
 	if n > 0 {
-		// 예전 기본값(통계만)이면 전체 조회 권한으로 승격
 		_, _ = r.db.Exec(`
-			UPDATE users SET role=?, permissions=?
-			WHERE username='obs' AND role IN ('observer','viewer')
-			  AND (TRIM(COALESCE(permissions,''))='' OR permissions='stats')`,
-			model.RoleObserver, viewPerms)
+			UPDATE users SET role=?, is_readonly=1, base_role='', permissions=''
+			WHERE username='obs' AND role IN ('observer','viewer')`,
+			model.RoleOrgAdmin)
 		return nil
 	}
 	u := &model.User{
 		Username:     "obs",
 		PasswordHash: hash,
 		FullName:     "옵저버",
-		Role:         model.RoleObserver,
-		Permissions:  viewPerms,
+		Role:         model.RoleOrgAdmin,
+		IsReadOnly:   true,
 		IsActive:     true,
 		OrgID:        model.OrgIDLibrary,
 		Mobile:       "010-0000-0000",

@@ -69,6 +69,10 @@ func (h *OrgHandler) DeleteForm(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if counts.Users > 0 {
+		return c.Redirect(http.StatusSeeOther, "/admin/orgs?err="+url.QueryEscape(
+			"소속 인원이 "+strconv.Itoa(counts.Users)+"명 남아 있어 지울 수 없습니다. 먼저 인원을 옮기거나 지우세요."))
+	}
 	return c.Render(http.StatusOK, "admin/org_delete.html", map[string]interface{}{
 		"Title": "조직 숨기기", "Active": NavOrgs, "Org": org, "Counts": counts,
 		"FlashErr": strings.TrimSpace(c.QueryParam("err")),

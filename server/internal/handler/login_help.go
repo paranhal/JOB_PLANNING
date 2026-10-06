@@ -34,6 +34,11 @@ func (h *AuthHandler) loginPageData(extra map[string]interface{}) map[string]int
 }
 
 func (h *AuthHandler) LoginPage(c echo.Context) error {
+	if c.QueryParam("err") == "cookie" {
+		return c.Render(http.StatusOK, "auth/login.html", h.loginPageData(map[string]interface{}{
+			"CookieErr": true,
+		}))
+	}
 	return c.Render(http.StatusOK, "auth/login.html", h.loginPageData(nil))
 }
 

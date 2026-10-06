@@ -159,10 +159,20 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 
 	doneCount := 0
+	var incomplete []model.MaintenanceVisit
 	for _, v := range visits {
 		if v.Completed {
 			doneCount++
 		}
+	}
+	for _, v := range shown {
+		if v.Completed {
+			continue
+		}
+		if v.VisitDate != "" && v.VisitDate > today {
+			continue
+		}
+		incomplete = append(incomplete, v)
 	}
 	board := buildVisitBoard(shown, today)
 	var assignees []model.User
@@ -216,6 +226,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"Board":           board,
 		"DoneCount":       doneCount,
 		"OpenCount":       len(visits) - doneCount,
+		"IncompleteVisits": incomplete,
 		"FlashDone":       c.QueryParam("done"),
 		"FlashOK":         c.QueryParam("ok"),
 		"FlashErr":        c.QueryParam("err"),

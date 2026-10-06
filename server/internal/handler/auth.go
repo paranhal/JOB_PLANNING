@@ -86,6 +86,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	})
 
 	tokenStr := h.writeSessionCookie(c, sessionClaims(user, false))
+	h.clearViewAsCookie(c)
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionLogin,
 		Result:      auditlog.ResultOK,
@@ -99,12 +100,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		TargetID:    user.UserID,
 	})
 	if user.NeedsProfileFill() {
-		return c.Redirect(http.StatusSeeOther, "/account/complete")
+		return c.Redirect(http.StatusSeeOther, "/account/complete?ok=1")
 	}
 	if h.visionPasswordMustChange(user) {
-		return c.Redirect(http.StatusSeeOther, "/account/vision-password")
+		return c.Redirect(http.StatusSeeOther, "/account/vision-password?ok=1")
 	}
-	return c.Redirect(http.StatusSeeOther, "/")
+	return c.Redirect(http.StatusSeeOther, "/?ok=1")
 }
 
 func (h *AuthHandler) Logout(c echo.Context) error {
@@ -116,6 +117,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	h.fillActorFromTokenCookie(c, &rec)
 	accessLog(c, rec)
 	h.clearTokenCookie(c)
+	h.clearViewAsCookie(c)
 	return c.Redirect(http.StatusSeeOther, "/login")
 }
 
@@ -123,16 +125,26 @@ func (h *AuthHandler) clearTokenCookie(c echo.Context) {
 	c.SetCookie(tokenCookie("", -1))
 }
 
+func (h *AuthHandler) clearViewAsCookie(c echo.Context) {
+	c.SetCookie(sessionCookie(viewAsCookie, "", -1))
+}
+
 func tokenCookie(value string, maxAge int) *http.Cookie {
+	return sessionCookie("token", value, maxAge)
+}
+
+func sessionCookie(name, value string, maxAge int) *http.Cookie {
 	ck := &http.Cookie{
-		Name:     "token",
+		Name:     name,
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
 	}
-	if appEnvProduction() {
+	// HTTPS 도입 시 COOKIE_SECURE=true. HTTP 에서 켜면 로그인이 불가능해진다(§24.2).
+	// APP_ENV / appEnvProduction() 으로 판단하지 않는다 — 그 값은 데이터 초기화 보호용이다.
+	if config.Load().CookieSecure {
 		ck.Secure = true
 	}
 	return ck
@@ -301,6 +313,21 @@ func bindUserContact(c echo.Context, u *model.User) {
 	u.Email = strings.TrimSpace(c.FormValue("email"))
 }
 
+// resolveAdminRole 관리 화면 저장. 업무·조직·연락처가 비어도 기존 값을 유지하거나 지원으로 둔다.
+func resolveAdminRole(c echo.Context, fallback string) string {
+	role, err := model.RoleFromAdminGrade(c.FormValue("admin_grade"), c.FormValue("job"))
+	if err == nil && model.IsKnownRole(role) {
+		return role
+	}
+	if r := model.NormalizeRole(c.FormValue("role")); model.IsKnownRole(r) {
+		return r
+	}
+	if model.IsKnownRole(fallback) {
+		return fallback
+	}
+	return model.RoleSupport
+}
+
 func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 	uid := ctxString(c, "user_id")
 	u, _ := h.userRepo.GetByID(uid)
@@ -360,7 +387,7 @@ func (h *AuthHandler) forbidden(c echo.Context) error {
 
 // UserList 사용자 관리 화면 (옵저버는 조회만)
 func (h *AuthHandler) UserList(c echo.Context) error {
-	if !h.isAdmin(c) && !isObserverRole(c) && !hasPerm(c, model.PermCodesUsers) {
+	if !h.isAdmin(c) && !isReadOnly(c) && !hasPerm(c, model.PermCodesUsers) {
 		return h.forbidden(c)
 	}
 	users, _ := h.userRepo.ListAll()
@@ -374,6 +401,10 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		msg = "직급 기본 권한으로 되돌렸습니다."
 	case "username":
 		msg = "아이디를 바꿨습니다. 그 사람은 다시 로그인해야 합니다."
+	case "signature":
+		msg = "사인을 저장했습니다."
+	case "signature_cleared":
+		msg = "사인을 지웠습니다."
 	case "renamed":
 		msg = fmt.Sprintf("이름을 바꿨습니다. 담당 글자 %s건을 함께 고쳤습니다.", strings.TrimSpace(c.QueryParam("n")))
 	case "deleted":
@@ -392,6 +423,11 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		"PasswordMinLen": passwd.MinLen, "VisionAdminCount": 0,
 		"WorkCounts": map[string]int{},
 	}
+	orgNames := map[string]string{}
+	for _, o := range orgs {
+		orgNames[o.OrgID] = o.OrgName
+	}
+	data["OrgNames"] = orgNames
 	if h.userRepo != nil {
 		data["VisionAdminCount"] = h.userRepo.CountRole(model.RoleVisionAdmin)
 		wc := map[string]int{}
@@ -438,11 +474,7 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
 	}
-	role := model.NormalizeRole(c.FormValue("role"))
-	baseRole := model.NormalizeRole(c.FormValue("base_role"))
-	if role != model.RoleTester {
-		baseRole = ""
-	}
+	role := resolveAdminRole(c, "")
 	if passwordTooShort(c.FormValue("password")) {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 	}
@@ -451,20 +483,33 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	if form != nil {
 		selected = form["perm"]
 	}
-	perms := model.CompactStoredPermissions(model.EffectiveRole(role, baseRole), selected)
+	perms := model.CompactStoredPermissions(role, selected)
+	orgID := strings.TrimSpace(c.FormValue("org_id"))
+	if role == model.RoleVisionAdmin {
+		orgID = ""
+	}
 	u := &model.User{
 		Username:     strings.TrimSpace(c.FormValue("username")),
 		PasswordHash: HashPassword(c.FormValue("password")),
 		FullName:     strings.TrimSpace(c.FormValue("full_name")),
 		Role:         role,
-		BaseRole:     baseRole,
 		Permissions:  perms,
 		IsActive:     true,
-		OrgID:        strings.TrimSpace(c.FormValue("org_id")),
+		OrgID:        orgID,
+		IsReadOnly:   c.FormValue("is_readonly") == "1",
+		IsTest:       c.FormValue("is_test") == "1" && !model.IsAdminGrade(role),
 	}
 	bindUserContact(c, u)
-	if msg := u.ProfileFieldError(); msg != "" {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(msg))
+	if strings.TrimSpace(u.Username) == "" || strings.TrimSpace(u.FullName) == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이름과 아이디를 입력하세요."))
+	}
+	if taken, err := h.userRepo.UsernameTaken(u.Username, ""); err != nil || taken {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이미 있는 아이디입니다."))
+	}
+	if currentRole(c) == model.RoleOrgAdmin {
+		if home := strings.TrimSpace(ctxString(c, "org_id")); home != "" {
+			u.OrgID = home
+		}
 	}
 	if err := h.userRepo.Create(u); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 만들지 못했습니다."))
@@ -494,19 +539,27 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	before := userPublic(u)
 	wasActive := u.IsActive
 	oldName := strings.TrimSpace(u.FullName)
-	u.FullName = strings.TrimSpace(c.FormValue("full_name"))
+	if name := strings.TrimSpace(c.FormValue("full_name")); name != "" {
+		u.FullName = name
+	}
 	prevRole := model.NormalizeRole(c.FormValue("prev_role"))
-	u.Role = model.NormalizeRole(c.FormValue("role"))
-	if u.Role == model.RoleTester {
-		u.BaseRole = model.NormalizeRole(c.FormValue("base_role"))
-	} else {
-		u.BaseRole = ""
-	}
+	u.Role = resolveAdminRole(c, u.Role)
+	u.BaseRole = ""
 	u.OrgID = strings.TrimSpace(c.FormValue("org_id"))
-	bindUserContact(c, u)
-	if msg := u.ProfileFieldError(); msg != "" {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(msg))
+	if currentRole(c) == model.RoleOrgAdmin {
+		if home := strings.TrimSpace(ctxString(c, "org_id")); home != "" {
+			u.OrgID = home
+		}
 	}
+	if u.Role == model.RoleVisionAdmin {
+		u.OrgID = ""
+	}
+	u.IsReadOnly = c.FormValue("is_readonly") == "1"
+	u.IsTest = c.FormValue("is_test") == "1" && !model.IsAdminGrade(u.Role)
+	if v := c.FormValue("is_active"); v != "" {
+		u.IsActive = v == "1"
+	}
+	bindUserContact(c, u)
 	if prevRole != "" && prevRole != u.Role && c.FormValue("clear_custom_perms") == "1" {
 		u.Permissions = ""
 	} else {
@@ -515,7 +568,9 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		if form != nil {
 			selected = form["perm"]
 		}
-		u.Permissions = model.CompactStoredPermissions(model.EffectiveRole(u.Role, u.BaseRole), selected)
+		if len(selected) > 0 {
+			u.Permissions = model.CompactStoredPermissions(u.Role, selected)
+		}
 	}
 	u.IsActive = c.FormValue("is_active") != "0"
 	h.userRepo.Update(u)
@@ -672,6 +727,13 @@ func (h *AuthHandler) UserDelete(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/users?ok=deleted")
 }
 
+func redirectLogin(c echo.Context) error {
+	if c.QueryParam("ok") == "1" {
+		return c.Redirect(http.StatusSeeOther, "/login?err=cookie")
+	}
+	return c.Redirect(http.StatusSeeOther, "/login")
+}
+
 // AuthMiddleware JWT 인증 미들웨어
 func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -682,7 +744,7 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		cookie, err := c.Cookie("token")
 		if err != nil || cookie.Value == "" {
-			return c.Redirect(http.StatusSeeOther, "/login")
+			return redirectLogin(c)
 		}
 
 		token, err := jwt.Parse(cookie.Value, func(t *jwt.Token) (interface{}, error) {
@@ -693,19 +755,19 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		})
 		if err != nil {
 			log.Printf("JWT 파싱 오류: %v", err)
-			return c.Redirect(http.StatusSeeOther, "/login")
+			return redirectLogin(c)
 		}
 		if !token.Valid {
-			return c.Redirect(http.StatusSeeOther, "/login")
+			return redirectLogin(c)
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			return c.Redirect(http.StatusSeeOther, "/login")
+			return redirectLogin(c)
 		}
 		role := applySessionClaims(c, claims)
 		if !model.IsKnownRole(role) {
-			return c.Redirect(http.StatusSeeOther, "/login")
+			return redirectLogin(c)
 		}
 
 		uid := ctxString(c, "user_id")
@@ -718,7 +780,7 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			} else if u != nil {
 				if !u.IsActive {
 					c.SetCookie(tokenCookie("", -1))
-					return c.Redirect(http.StatusSeeOther, "/login")
+					return redirectLogin(c)
 				}
 				viewOrg := ctxString(c, "view_org_id")
 				applyUserSession(c, u)
@@ -746,6 +808,7 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			Username: ctxString(c, "username"),
 			Name:     ctxString(c, "user_name"),
 			Role:     loginRole(c),
+			IsTest:   ctxBool(c, "is_test"),
 		})
 		defer pop()
 		return next(c)
@@ -772,8 +835,9 @@ func sessionClaims(user *model.User, unconfirmed bool) jwt.MapClaims {
 		"role":        role,
 		"name":        user.FullName,
 		"org_id":      strings.TrimSpace(user.OrgID),
-		"base_role":   strings.TrimSpace(user.BaseRole),
 		"permissions": model.FormatPermissions(user.PermList()),
+		"is_readonly": user.IsReadOnly,
+		"is_test":     user.IsTest,
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
 		"profile_ok":  !user.NeedsProfileFill(),
@@ -793,8 +857,9 @@ func sessionClaimsFromContext(c echo.Context, unconfirmed bool) jwt.MapClaims {
 		"name":        ctxString(c, "user_name"),
 		"org_id":      ctxString(c, "org_id"),
 		"view_org_id": ctxString(c, "view_org_id"),
-		"base_role":   ctxString(c, "base_role"),
 		"permissions": model.FormatPermissions(currentPerms(c)),
+		"is_readonly": isReadOnly(c),
+		"is_test":     ctxBool(c, "is_test"),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
 	}
@@ -816,17 +881,52 @@ func (h *AuthHandler) writeSessionCookie(c echo.Context, claims jwt.MapClaims) s
 
 func applySessionClaims(c echo.Context, claims jwt.MapClaims) string {
 	role := model.NormalizeRole(claimString(claims, "role"))
+	role = interpretLegacyRoleFlags(c, claims, role)
 	c.Set("user_id", claimString(claims, "user_id"))
 	c.Set("username", claimString(claims, "username"))
 	c.Set("role", role)
 	c.Set("user_name", claimString(claims, "name"))
 	c.Set("org_id", claimString(claims, "org_id"))
 	c.Set("view_org_id", claimString(claims, "view_org_id"))
-	c.Set("base_role", model.NormalizeRole(claimString(claims, "base_role")))
-	c.Set("permissions", model.EffectivePermissions(model.EffectiveRole(role, claimString(claims, "base_role")), claimString(claims, "permissions")))
+	c.Set("permissions", model.EffectivePermissions(role, claimString(claims, "permissions")))
 	if claimBool(claims, "auth_unconfirmed") {
 		c.Set("auth_unconfirmed", true)
 	}
+	return role
+}
+
+func interpretLegacyRoleFlags(c echo.Context, claims jwt.MapClaims, role string) string {
+	_, hasRO := claims["is_readonly"]
+	ro := claimBool(claims, "is_readonly")
+	test := claimBool(claims, "is_test")
+	base := model.NormalizeRole(claimString(claims, "base_role"))
+	job := func() string {
+		if base == model.RoleSales || base == model.RoleTech || base == model.RoleSupport {
+			return base
+		}
+		return ""
+	}
+	if role == model.RoleObserver {
+		if !hasRO {
+			log.Printf("[v57] 옛 observer 토큰 username=%s — 읽기전용으로 해석", claimString(claims, "username"))
+		}
+		ro = true
+		if j := job(); j != "" {
+			role = j
+		} else {
+			role = model.RoleOrgAdmin
+		}
+	}
+	if role == model.RoleTester {
+		test = true
+		if j := job(); j != "" {
+			role = j
+		} else {
+			role = model.RoleSupport
+		}
+	}
+	c.Set("is_readonly", ro)
+	c.Set("is_test", test)
 	return role
 }
 
@@ -835,8 +935,9 @@ func applyUserSession(c echo.Context, u *model.User) {
 	c.Set("role", model.NormalizeRole(u.Role))
 	c.Set("user_name", u.FullName)
 	c.Set("org_id", strings.TrimSpace(u.OrgID))
-	c.Set("base_role", strings.TrimSpace(u.BaseRole))
 	c.Set("permissions", u.PermList())
+	c.Set("is_readonly", u.IsReadOnly)
+	c.Set("is_test", u.IsTest)
 	c.Set("auth_unconfirmed", false)
 }
 

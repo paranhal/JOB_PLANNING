@@ -24,14 +24,14 @@ const (
 
 // 조치 이력 유형
 const (
-	WBActivityWrite   = "write"
-	WBActivityEdit    = "edit"
-	WBActivityReview  = "review_request"
-	WBActivityReply   = "reply"
-	WBActivitySend    = "send"
-	WBActivityFollow  = "followup"
-	WBActivityDone    = "complete"
-	WBActivityOther   = "other"
+	WBActivityWrite  = "write"
+	WBActivityEdit   = "edit"
+	WBActivityReview = "review_request"
+	WBActivityReply  = "reply"
+	WBActivitySend   = "send"
+	WBActivityFollow = "followup"
+	WBActivityDone   = "complete"
+	WBActivityOther  = "other"
 )
 
 // 회신 대기 대상 구분
@@ -44,35 +44,35 @@ const (
 
 // WorkAction 행정/지원 다음 행동 (업무 1:N)
 type WorkAction struct {
-	ActionID       string `json:"action_id"`
-	TaskID         string `json:"task_id"`
-	Title          string `json:"title"`
-	Status         string `json:"status"`
-	Required       bool   `json:"required"`
-	ScheduledDate  string `json:"scheduled_date"`
-	DueDate        string `json:"due_date"`
-	Assignee       string `json:"assignee"`
-	WaitPartyKind  string `json:"wait_party_kind"`
-	WaitParty      string `json:"wait_party"`
-	WaitRequest    string `json:"wait_request"`
-	ReplyDueDate   string `json:"reply_due_date"`
-	NextCheckDate  string `json:"next_check_date"`
-	Confirmed      bool   `json:"confirmed"`
-	SortOrder      int    `json:"sort_order"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	ActionID      string `json:"action_id"`
+	TaskID        string `json:"task_id"`
+	Title         string `json:"title"`
+	Status        string `json:"status"`
+	Required      bool   `json:"required"`
+	ScheduledDate string `json:"scheduled_date"`
+	DueDate       string `json:"due_date"`
+	Assignee      string `json:"assignee"`
+	WaitPartyKind string `json:"wait_party_kind"`
+	WaitParty     string `json:"wait_party"`
+	WaitRequest   string `json:"wait_request"`
+	ReplyDueDate  string `json:"reply_due_date"`
+	NextCheckDate string `json:"next_check_date"`
+	Confirmed     bool   `json:"confirmed"`
+	SortOrder     int    `json:"sort_order"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
 }
 
 // WorkActivity 행정/지원 조치 이력 (덮어쓰지 않고 추가)
 type WorkActivity struct {
-	ActivityID    string `json:"activity_id"`
-	TaskID        string `json:"task_id"`
-	ActionID      string `json:"action_id"`
-	ActivityType  string `json:"activity_type"`
-	Content       string `json:"content"`
-	Actor         string `json:"actor"`
-	SpentMinutes  int    `json:"spent_minutes"`
-	CreatedAt     string `json:"created_at"`
+	ActivityID   string `json:"activity_id"`
+	TaskID       string `json:"task_id"`
+	ActionID     string `json:"action_id"`
+	ActivityType string `json:"activity_type"`
+	Content      string `json:"content"`
+	Actor        string `json:"actor"`
+	SpentMinutes int    `json:"spent_minutes"`
+	CreatedAt    string `json:"created_at"`
 }
 
 // IsAdminGTDTask 행정·지원 직접 등록 건만 GTD 규칙을 적용한다.
@@ -358,13 +358,13 @@ func ExternalWaitSharePct(waitDays, leadDays float64) (pct float64, ok bool) {
 
 // AdminLeadBreakdown 행정·지원 리드타임 분리(§13.10).
 type AdminLeadBreakdown struct {
-	Sample         int
-	LeadDaysAvg    float64
-	LeadDaysSum    float64
-	WorkMinutes    int
-	WaitDaysSum    float64
-	IdleMinutes    int
-	LeadDisplay    StatsValue
+	Sample           int
+	LeadDaysAvg      float64
+	LeadDaysSum      float64
+	WorkMinutes      int
+	WaitDaysSum      float64
+	IdleMinutes      int
+	LeadDisplay      StatsValue
 	WaitShareDisplay StatsValue
 }
 

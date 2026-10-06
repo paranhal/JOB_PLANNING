@@ -14,37 +14,37 @@
 
   {{if .Assets}}
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[1200px] text-sm break-keep">
       <thead>
         <tr class="border-b border-gray-200">
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">자산번호</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">제품명</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">제품분류</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">종류</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">모델명</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">시리얼</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">설치일</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">계약</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">설치위치</th>
-          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">위치</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">자산번호</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">제품명</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">제품분류</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">종류</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">모델명</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">시리얼</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">설치일</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">계약</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">상태</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">설치위치</th>
+          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">위치</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Assets}}
         <tr class="hover:bg-gray-50 transition-colors">
-          <td class="py-2.5 pr-4 font-mono text-xs text-gray-600">
+          <td class="py-2.5 pr-4 font-mono text-xs text-gray-600 whitespace-nowrap">
             <a href="/assets/{{.AssetID}}" class="hover:text-blue-600">{{.AssetID}}</a>
           </td>
-          <td class="py-2.5 pr-4 font-medium text-gray-800">
+          <td class="py-2.5 pr-4 font-medium text-gray-800 whitespace-nowrap">
             <a href="/assets/{{.AssetID}}" class="hover:text-blue-600">{{.ProductName}}</a>
           </td>
-          <td class="py-2.5 pr-4 text-gray-700">{{productCategoryLabel .ProductCategory}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.ProductType}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.ModelName}}</td>
-          <td class="py-2.5 pr-4 text-gray-500 font-mono text-xs">{{.SerialNumber}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.InstallDate}}</td>
-          <td class="py-2.5 pr-4 text-xs">
+          <td class="py-2.5 pr-4 text-gray-700 whitespace-nowrap">{{productCategoryLabel .ProductCategory}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.ProductType}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.ModelName}}</td>
+          <td class="py-2.5 pr-4 text-gray-500 font-mono text-xs whitespace-nowrap">{{.SerialNumber}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.InstallDate}}</td>
+          <td class="py-2.5 pr-4 text-xs whitespace-nowrap">
             {{if .MaintContractType}}
               <span class="px-2 py-0.5 rounded-full font-medium
                 {{if eq .MaintContractType "paid"}}bg-blue-100 text-blue-700
@@ -56,7 +56,7 @@
               <span class="text-gray-300">—</span>
             {{end}}
           </td>
-          <td class="py-2.5 pr-4">
+          <td class="py-2.5 pr-4 whitespace-nowrap">
             {{if eq .OperationStatus "operating"}}
               <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">운영중</span>
             {{else if eq .OperationStatus "maintenance"}}
@@ -69,8 +69,8 @@
               <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{.OperationStatus}}</span>
             {{end}}
           </td>
-          <td class="py-2.5 pr-4 text-gray-800 text-xs font-medium">{{if .InstallLocation}}{{.InstallLocation}}{{else}}—{{end}}</td>
-          <td class="py-2.5 text-gray-500 text-xs">{{.LocationDetail}}</td>
+          <td class="py-2.5 pr-4 text-gray-800 text-xs font-medium whitespace-nowrap">{{if .InstallLocation}}{{.InstallLocation}}{{else}}—{{end}}</td>
+          <td class="py-2.5 text-gray-500 text-xs whitespace-nowrap">{{.LocationDetail}}</td>
         </tr>
         {{end}}
       </tbody>

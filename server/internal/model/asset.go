@@ -371,23 +371,24 @@ type AssetSupportEvent struct {
 
 // User 사용자 (기획서 §10)
 type User struct {
-	UserID       string    `json:"user_id"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"password_hash"`
-	FullName     string    `json:"full_name"`
-	Role         string    `json:"role"`        // admin, tech, sales, office, observer
-	BaseRole     string    `json:"base_role,omitempty"`
-	Permissions  string    `json:"permissions"` // CSV 권한 키
-	IsActive     bool      `json:"is_active"`
-	OrgID        string    `json:"org_id,omitempty"`
-	Mobile       string    `json:"mobile,omitempty"`
-	Tel          string    `json:"tel,omitempty"`
-	Email        string    `json:"email,omitempty"`
-	SignaturePath string   `json:"signature_path,omitempty"`
-	ProfileDone  bool      `json:"profile_done,omitempty"`
-	UsernameChangedAt string `json:"username_changed_at,omitempty"`
-	IsTest       bool      `json:"is_test,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	UserID            string    `json:"user_id"`
+	Username          string    `json:"username"`
+	PasswordHash      string    `json:"password_hash"`
+	FullName          string    `json:"full_name"`
+	Role              string    `json:"role"` // admin, tech, sales, office, observer
+	BaseRole          string    `json:"base_role,omitempty"`
+	Permissions       string    `json:"permissions"` // CSV 권한 키
+	IsActive          bool      `json:"is_active"`
+	OrgID             string    `json:"org_id,omitempty"`
+	Mobile            string    `json:"mobile,omitempty"`
+	Tel               string    `json:"tel,omitempty"`
+	Email             string    `json:"email,omitempty"`
+	SignaturePath     string    `json:"signature_path,omitempty"`
+	ProfileDone       bool      `json:"profile_done,omitempty"`
+	UsernameChangedAt string    `json:"username_changed_at,omitempty"`
+	IsTest            bool      `json:"is_test,omitempty"`
+	IsReadOnly        bool      `json:"is_readonly,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 // PermList EffectivePermissions 편의
@@ -395,7 +396,7 @@ func (u *User) PermList() []string {
 	if u == nil {
 		return nil
 	}
-	return EffectivePermissions(EffectiveRole(u.Role, u.BaseRole), u.Permissions)
+	return EffectivePermissions(u.Role, u.Permissions)
 }
 
 // HasPerm 권한 체크
@@ -403,7 +404,7 @@ func (u *User) HasPerm(key string) bool {
 	if u == nil {
 		return false
 	}
-	if IsAdminGrade(EffectiveRole(u.Role, u.BaseRole)) {
+	if IsAdminGrade(u.Role) {
 		return true
 	}
 	return HasPermission(u.PermList(), key)

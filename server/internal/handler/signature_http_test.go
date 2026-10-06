@@ -39,6 +39,9 @@ func newSignatureApp(t *testing.T) (*echo.Echo, *repository.UserRepo, *Handler, 
 	g.POST("/account/signature", h.Auth.AccountSignature)
 	g.GET("/account/signature.png", h.Auth.AccountSignatureImage)
 	g.POST("/account/signature/delete", h.Auth.AccountSignatureDelete)
+	g.POST("/users/:id/signature", h.Auth.UserSignature)
+	g.GET("/users/:id/signature.png", h.Auth.UserSignatureImage)
+	g.POST("/users/:id/signature/delete", h.Auth.UserSignatureDelete)
 	return e, users, h, up
 }
 
@@ -147,5 +150,39 @@ func TestAccountSignatureMissingIsNotErrorOnPage(t *testing.T) {
 	}
 	if strings.Contains(page.Body.String(), "오류") && strings.Contains(page.Body.String(), "사인") {
 		t.Fatal("사인 없음이 오류로 보인다")
+	}
+}
+
+func TestAdminUserSignatureStoresPathNotBytes(t *testing.T) {
+	e, users, _, up := newSignatureApp(t)
+	u := &model.User{
+		Username: "techs2", PasswordHash: HashPassword("pw"), FullName: "기술사인2",
+		Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, Mobile: "010-1",
+	}
+	if err := users.Create(u); err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	fw, err := w.CreateFormFile("file", "sign.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fw.Write(inkPNG(t))
+	_ = w.Close()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/users/"+u.UserID+"/signature", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("관리자 사인 저장 code=%d %s", rec.Code, rec.Body.String())
+	}
+	got, _ := users.GetByID(u.UserID)
+	if got == nil || !strings.Contains(got.SignaturePath, u.UserID+".png") {
+		t.Fatalf("경로 %q", got.SignaturePath)
+	}
+	if _, err := os.Stat(filepath.Join(up, "signatures", u.UserID+".png")); err != nil {
+		t.Fatal(err)
 	}
 }

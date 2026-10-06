@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>품목 등록</title>
+<style>
+  :root{ --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --ink:#1e293b; --muted:#64748b; --accent:#2563eb; --soft:#f1f5f9; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0f172a; --card:#1e293b; --line:#334155; --ink:#e2e8f0; --muted:#94a3b8; --soft:#0f172a; } }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 16px;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .note{color:var(--muted);font-size:13px;margin:0 0 18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .specrow{display:grid;grid-template-columns:2.2fr 0.8fr 1fr 34px;gap:10px;align-items:end;margin-bottom:8px}
+  @media (max-width:640px){ .grid3{grid-template-columns:1fr} .specrow{grid-template-columns:1fr 1fr;} }
+  label{display:block;font-size:12px;color:var(--muted);margin:0 0 4px}
+  input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:14px}
+  .sup{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--soft)}
+  .bar{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
+  button{padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;cursor:pointer}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;padding:10px 18px;font-size:14px}
+  button.x{border:0;background:none;color:var(--muted);font-size:16px;padding:6px}
+  .hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+  .profit{font-size:12px;color:var(--muted);margin-top:8px}
+  pre{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>품목 등록 — 화면 시늉</h1>
+  <p class="note">§47.23 대로 규격을 여러 줄 넣고, 공급사마다 매입 단가를 답니다. 저장은 되지 않고 맨 아래에 저장될 모양이 보입니다.</p>
+
+  <div class="card">
+    <h2>품목</h2>
+    <div class="grid3">
+      <div><label>성격</label><select id="kind"><option value="goods">물품</option><option value="service">AS·작업</option><option value="labor">개발 용역</option><option value="etc">기타</option></select></div>
+      <div><label>분류</label><select id="cat"><option value="RFID장비">RFID장비</option><option value="소모품">소모품</option><option value="SW">SW</option><option value="공사">공사</option></select></div>
+      <div><label>제조사 <span style="font-weight:400">(고객현황)</span></label>
+        <select id="maker"><option value="">— 검색해서 고름 —</option><option value="C천안-24-003">EVOLIS</option><option value="C충남-23-011">앤로보틱스</option></select></div>
+    </div>
+    <div class="grid3" style="margin-top:10px">
+      <div><label>품명</label><input id="name" value="무인회원증발급기 클리닝 카드"></div>
+      <div><label>모델명</label><input id="model" value="Primacy / Zenius"></div>
+      <div></div>
+    </div>
+
+    <h2 style="margin:16px 0 8px">규격 · 단위 · 판매 단가</h2>
+    <div id="specs"></div>
+    <div class="bar"><span></span><button type="button" id="addSpec">+ 규격 추가</button></div>
+  </div>
+
+  <div class="card">
+    <h2>공급사별 단가 <span style="font-weight:400;color:var(--muted)">(매입)</span></h2>
+    <div id="sups"></div>
+    <div class="bar"><button type="button" id="addSup">+ 공급사 추가</button><span></span></div>
+    <p class="profit" id="profit"></p>
+  </div>
+
+  <button type="button" class="primary" id="save">저장</button>
+
+  <p class="note" style="margin-top:18px">저장될 모양</p>
+  <pre id="out"></pre>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const UNITS = ['EA','SET','개','대','식','매'];
+  let sid = 0, uid = 0;
+  const state = {
+    specs: [ {key:++sid, spec:'A.D형 1매(short)', unit:'SET', price:24000, used:true},
+             {key:++sid, spec:'T형 1매(long)',    unit:'SET', price:26000, used:false} ],
+    sups:  [ {key:++uid, supplierId:'C충남-23-011', rows:[ {key:++sid, specKey:1, unit:'', price:18000} ]} ],
+  };
+  const SUPPLIERS = {'':'— 고름 —','C충남-23-011':'앤로보틱스','C천안-24-003':'EVOLIS'};
+
+  const opt = (v,t,sel) => `<option value="${v}" ${sel?'selected':''}>${t}</option>`;
+  const units = u => UNITS.map(x => opt(x,x,x===u)).join('');
+  const specOpts = k => state.specs.map(s => opt(s.key, s.spec || '(이름 없음)', String(s.key)===String(k))).join('');
+
+  function render(){
+    $('specs').innerHTML = state.specs.map((s,i) => `
+      <div class="specrow" data-i="${i}">
+        <div><label>규격</label><input data-f="spec" value="${s.spec}"></div>
+        <div><label>단위</label><select data-f="unit">${units(s.unit)}</select></div>
+        <div><label>판매 단가</label><input data-f="price" inputmode="numeric" value="${s.price||''}"></div>
+        <button class="x" data-del="spec" title="삭제">✕</button>
+      </div>`).join('') || '<p class="hint">규격이 없어도 저장됩니다. 나중에 채우면 됩니다.</p>';
+
+    $('sups').innerHTML = state.sups.map((u,ui) => `
+      <div class="sup" data-u="${ui}">
+        <div class="specrow" style="grid-template-columns:1fr 34px">
+          <div><label>공급사 <span style="font-weight:400">(고객현황)</span></label>
+            <select data-f="supplierId">${Object.entries(SUPPLIERS).map(([v,t]) => opt(v,t,v===u.supplierId)).join('')}</select></div>
+          <button class="x" data-del="sup" title="공급사 삭제">✕</button>
+        </div>
+        ${u.rows.map((r,ri) => `
+        <div class="specrow" data-r="${ri}">
+          <div><label>규격</label><select data-f="specKey">${specOpts(r.specKey)}</select></div>
+          <div><label>단위</label><select data-f="unit">${opt('','규격 따름',!r.unit)}${units(r.unit)}</select></div>
+          <div><label>매입 단가</label><input data-f="price" inputmode="numeric" value="${r.price||''}"></div>
+          <button class="x" data-del="row" title="삭제">✕</button>
+        </div>`).join('')}
+        <div class="bar"><span></span><button type="button" data-add="row">+ 규격 추가</button></div>
+      </div>`).join('');
+    dump();
+  }
+
+  function dump(){
+    const specs = state.specs.map((s,i) => ({spec:s.spec, unit:s.unit, price:Number(s.price)||0, sort_order:i}));
+    const prices = [];
+    state.sups.forEach((u,ui) => u.rows.forEach((r,ri) => {
+      const s = state.specs.find(x => String(x.key) === String(r.specKey));
+      prices.push({supplier_id:u.supplierId, spec:s ? s.spec : '', unit:r.unit || (s ? '(규격 따름) '+s.unit : ''), price:Number(r.price)||0, sort_order:ri});
+    }));
+    $('out').textContent = JSON.stringify({
+      sales_items:{item_kind:$('kind').value, category:$('cat').value, manufacturer_id:$('maker').value, name:$('name').value, model:$('model').value},
+      sales_item_specs: specs,
+      sales_item_supplier_prices: prices,
+    }, null, 2);
+
+    // 규격별 이익 (보여 주기만 한다)
+    const lines = state.specs.map(s => {
+      const buys = prices.filter(p => p.spec === s.spec && p.price > 0).map(p => p.price);
+      if (!buys.length || !s.price) return null;
+      const low = Math.min(...buys), gain = s.price - low;
+      return `${s.spec}: 판매 ${(+s.price).toLocaleString()} · 매입 ${low.toLocaleString()} · 이익 ${gain.toLocaleString()}(${Math.round(gain/s.price*100)}%)`;
+    }).filter(Boolean);
+    $('profit').textContent = lines.length ? '규격별 이익 — ' + lines.join('  |  ') : '';
+  }
+
+  document.addEventListener('input', e => {
+    const f = e.target.dataset.f; if (!f) return;
+    const supBox = e.target.closest('.sup');
+    if (supBox) {
+      const u = state.sups[+supBox.dataset.u];
+      const row = e.target.closest('[data-r]');
+      if (row) u.rows[+row.dataset.r][f] = e.target.value;
+      else u[f] = e.target.value;
+    } else {
+      const row = e.target.closest('[data-i]');
+      if (row) state.specs[+row.dataset.i][f] = e.target.value;
+    }
+    if (f === 'spec') render(); else dump();   // 규격 이름을 고치면 아래 선택지도 바뀐다
+  });
+
+  document.addEventListener('click', e => {
+    const del = e.target.dataset.del, add = e.target.dataset.add;
+    if (del === 'spec'){
+      const i = +e.target.closest('[data-i]').dataset.i;
+      if (state.specs[i].used){ alert('견적에 쓰인 규격입니다. 지우지 않고 끕니다.'); }
+      else state.specs.splice(i,1);
+      render();
+    }
+    if (del === 'sup'){ state.sups.splice(+e.target.closest('.sup').dataset.u,1); render(); }
+    if (del === 'row'){
+      const u = state.sups[+e.target.closest('.sup').dataset.u];
+      u.rows.splice(+e.target.closest('[data-r]').dataset.r,1); render();
+    }
+    if (add === 'row'){
+      const u = state.sups[+e.target.closest('.sup').dataset.u];
+      u.rows.push({key:++sid, specKey: state.specs[0] ? state.specs[0].key : '', unit:'', price:''}); render();
+    }
+    if (e.target.id === 'addSpec'){ state.specs.push({key:++sid, spec:'', unit:'EA', price:'', used:false}); render(); }
+    if (e.target.id === 'addSup'){ state.sups.push({key:++uid, supplierId:'', rows:[]}); render(); }
+  });
+  document.addEventListener('change', dump);
+  render();
+})();
+</script>
+</body>
+</html>

@@ -19,16 +19,16 @@ const (
 )
 
 type quoteCells struct {
-	Recipient, QuoteNo, Attn, Ref, Date     string
-	Owner, Phone                            string
-	Title, Due, Place                       string
-	Amount, VATLabel, Valid, Payment        string
-	LineStart, DefaultLines                 int
-	SubtotalRow, VATRow, TotalRow           int
-	MaintStart, MaintEnd                    int
-	Remarks, Footer                         string
-	PrintFirst, PrintLastCol                string
-	ColStart, ColEnd                        int
+	Recipient, QuoteNo, Attn, Ref, Date string
+	Owner, Phone                        string
+	Title, Due, Place                   string
+	Amount, VATLabel, Valid, Payment    string
+	LineStart, DefaultLines             int
+	SubtotalRow, VATRow, TotalRow       int
+	MaintStart, MaintEnd                int
+	Remarks, Footer                     string
+	PrintFirst, PrintLastCol            string
+	ColStart, ColEnd                    int
 }
 
 var quoteFormP = quoteCells{

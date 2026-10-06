@@ -231,4 +231,3 @@ func TestASAssigneeChangeFollowsUntilManual(t *testing.T) {
 		t.Fatalf("일일 업무에서 손으로 바꾼 담당자가 덮였다: %+v", task)
 	}
 }
-

@@ -24,31 +24,31 @@
     </label>
     <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg">검색</button>
   </form>
-  <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <table class="w-full text-sm">
+  <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <table class="w-full min-w-[1200px] text-sm break-keep">
       <thead class="bg-gray-50 text-xs text-gray-500">
         <tr>
-          <th class="px-4 py-2 text-left">계약번호</th>
-          <th class="px-4 py-2 text-left">계약명</th>
-          <th class="px-4 py-2 text-left">고객사</th>
-          <th class="px-4 py-2 text-right">계약금액</th>
-          <th class="px-4 py-2 text-left">계약일</th>
-          <th class="px-4 py-2 text-left">만료일</th>
-          <th class="px-4 py-2 text-left">상태</th>
-          <th class="px-4 py-2 text-left">담당</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">계약번호</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">계약명</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">고객사</th>
+          <th class="px-4 py-2 text-right whitespace-nowrap">계약금액</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">계약일</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">만료일</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">상태</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">담당</th>
         </tr>
       </thead>
       <tbody>
         {{range .Projects}}
         <tr class="border-t border-gray-100">
-          <td class="px-4 py-2 font-mono text-xs">{{if .SalesNo}}{{.SalesNo}} / {{end}}{{.ContractNoLabel}}</td>
-          <td class="px-4 py-2"><a href="/contracts/{{.ProjectID}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
-          <td class="px-4 py-2 text-gray-600">{{if .CustomerOrParty}}{{.CustomerOrParty}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{if .OrderContractLabel}}{{.OrderContractLabel}}{{else if gt .ContractAmount 0}}{{.ContractAmount}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-gray-600">{{if .StartDate}}{{.StartDate}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-gray-600">{{if .EndDate}}{{.EndDate}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2">{{.ContractLifeStatus $.Today}}</td>
-          <td class="px-4 py-2 text-gray-600">{{if .ContactName}}{{.ContactName}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 font-mono text-xs whitespace-nowrap">{{if .SalesNo}}{{.SalesNo}} / {{end}}{{.ContractNoLabel}}</td>
+          <td class="px-4 py-2 max-w-[18rem]"><a href="/contracts/{{.ProjectID}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
+          <td class="px-4 py-2 text-gray-600 max-w-[18rem]">{{if .CustomerOrParty}}{{.CustomerOrParty}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{if .OrderContractLabel}}{{.OrderContractLabel}}{{else if gt .ContractAmount 0}}{{.ContractAmount}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .StartDate}}{{.StartDate}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .EndDate}}{{.EndDate}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 whitespace-nowrap">{{.ContractLifeStatus $.Today}}</td>
+          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .ContactName}}{{.ContactName}}{{else}}—{{end}}</td>
         </tr>
         {{else}}
         <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">등록된 계약(사업)이 없습니다.</td></tr>

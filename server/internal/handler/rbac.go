@@ -24,13 +24,6 @@ func currentRole(c echo.Context) string {
 	if v := strings.TrimSpace(ctxString(c, "sim_role")); v != "" {
 		role = model.NormalizeRole(v)
 	}
-	if role == model.RoleTester {
-		base := ctxString(c, "sim_base_role")
-		if strings.TrimSpace(base) == "" {
-			base = ctxString(c, "base_role")
-		}
-		return model.EffectiveRole(role, base)
-	}
 	return role
 }
 
@@ -107,8 +100,9 @@ func isOfficeRole(c echo.Context) bool {
 	return currentRole(c) == model.RoleSupport
 }
 
-func isObserverRole(c echo.Context) bool {
-	return loginRole(c) == model.RoleObserver
+func isReadOnly(c echo.Context) bool {
+	v, _ := c.Get("is_readonly").(bool)
+	return v
 }
 
 func isSalesRole(c echo.Context) bool {
@@ -121,7 +115,7 @@ func canViewSales(c echo.Context) bool {
 
 // canEditSalesActivity §39.5 · §37.3 — 본인 등록은 본인, 남의 것은 관리자·행정만.
 func canEditSalesActivity(c echo.Context, createdBy string) bool {
-	if !canWriteSales(c) || isObserverRole(c) {
+	if !canWriteSales(c) || isReadOnly(c) {
 		return false
 	}
 	if isAdminRole(c) || isOfficeRole(c) {
@@ -131,7 +125,7 @@ func canEditSalesActivity(c echo.Context, createdBy string) bool {
 }
 
 func canWriteSalesDeal(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	if currentRole(c) == model.RoleVisionAdmin || (currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)) {
@@ -141,7 +135,7 @@ func canWriteSalesDeal(c echo.Context) bool {
 }
 
 func canWriteSales(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	return hasPerm(c, model.PermSalesCreate) || hasPerm(c, model.PermSalesActCreate)
@@ -152,7 +146,7 @@ func canSeeMargin(c echo.Context) bool {
 }
 
 func canDeleteSales(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	if currentRole(c) == model.RoleVisionAdmin || (currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)) {
@@ -163,7 +157,7 @@ func canDeleteSales(c echo.Context) bool {
 
 // isSuspendedRole 옵저버는 쓰기 메뉴·작업 제한(조회·계정만)
 func isSuspendedRole(c echo.Context) bool {
-	return isObserverRole(c)
+	return isReadOnly(c)
 }
 
 func canEditVisitDate(c echo.Context, as *model.ASReceipt) bool {
@@ -192,21 +186,21 @@ func normalizeVisitDate(s string) string {
 }
 
 func canReceiveAS(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	return hasPerm(c, model.PermASCreate)
 }
 
 func canProcessAS(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	return hasPerm(c, model.PermASProcess)
 }
 
 func canEditASContent(c echo.Context, createdByUserID string) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	a := model.PermAccess(currentRole(c), model.PermASEdit)
@@ -232,11 +226,15 @@ func isASClosedStatus(status string) bool {
 	return model.CanReopenAS(status)
 }
 
+func canViewMaster(c echo.Context) bool {
+	return hasPerm(c, model.PermMasterView)
+}
+
 func canWriteMaster(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
-	return hasPerm(c, model.PermMasterWrite)
+	return hasPerm(c, model.PermMasterWrite) || hasPerm(c, model.PermMasterEdit)
 }
 
 func canManageCodes(c echo.Context) bool {
@@ -253,7 +251,7 @@ func canViewMaintenance(c echo.Context) bool {
 
 // canEditMaintenanceSchedule 정기점검 방문 일정 수정
 func canEditMaintenanceSchedule(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	return hasPerm(c, model.PermMaintenanceEdit)
@@ -308,7 +306,7 @@ func assigneeIsMine(c echo.Context, assignee, assignedUserID string) bool {
 // canEditTask §37.3 — 보는 것과 고치는 것을 나눈다.
 // canWriteWorkboard 로 쓰기 권한을 열고, 기술·영업은 assigneeKeys 로 내 배정만 허용한다.
 func canEditTask(c echo.Context, assignee, assignedUserID string) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	if isAdminRole(c) || isOfficeRole(c) {
@@ -373,7 +371,7 @@ func (h *AuthHandler) RequireAdminMW(next echo.HandlerFunc) echo.HandlerFunc {
 			return next(c)
 		}
 		// 옵저버: 관리 메뉴도 조회(GET)만
-		if isObserverRole(c) && (c.Request().Method == http.MethodGet || c.Request().Method == http.MethodHead) {
+		if isReadOnly(c) && (c.Request().Method == http.MethodGet || c.Request().Method == http.MethodHead) {
 			return next(c)
 		}
 		return h.forbidden(c)
@@ -402,6 +400,15 @@ func (h *AuthHandler) RequireReceiveAS(next echo.HandlerFunc) echo.HandlerFunc {
 func (h *AuthHandler) RequireProcessAS(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if !canProcessAS(c) {
+			return h.forbidden(c)
+		}
+		return next(c)
+	}
+}
+
+func (h *AuthHandler) RequireMasterView(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if !canViewMaster(c) {
 			return h.forbidden(c)
 		}
 		return next(c)

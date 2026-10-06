@@ -48,7 +48,7 @@ func TestSystemPageAdminOnly(t *testing.T) {
 
 	obs := httptest.NewRecorder()
 	oreq := httptest.NewRequest(http.MethodGet, "/admin/system", nil)
-	oreq.AddCookie(jwtCookieRole(t, "observer"))
+	oreq.AddCookie(jwtCookieReadOnly(t, "tech"))
 	e.ServeHTTP(obs, oreq)
 	if obs.Code != http.StatusForbidden {
 		t.Fatalf("observer status=%d body=%s", obs.Code, obs.Body.String())

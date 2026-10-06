@@ -21,50 +21,50 @@ const (
 )
 
 const (
-	PermASView       = "as.view"
-	PermASCreate     = "as.create"
-	PermASProcess    = "as.process"
-	PermASEdit       = "as.edit"
-	PermASDelete     = "as.delete"
-	PermMntView      = "mnt.view"
-	PermMntCreate    = "mnt.create"
-	PermMntEdit      = "mnt.edit"
-	PermMntProcess   = "mnt.process"
-	PermMntDelete    = "mnt.delete"
-	PermAdminView    = "admin.view"
-	PermAdminCreate  = "admin.create"
-	PermAdminEdit    = "admin.edit"
-	PermAdminProcess = "admin.process"
-	PermAdminDelete  = "admin.delete"
-	PermSalesView    = "sales.view"
-	PermSalesCreate  = "sales.create"
-	PermSalesEdit    = "sales.edit"
-	PermSalesDelete  = "sales.delete"
+	PermASView         = "as.view"
+	PermASCreate       = "as.create"
+	PermASProcess      = "as.process"
+	PermASEdit         = "as.edit"
+	PermASDelete       = "as.delete"
+	PermMntView        = "mnt.view"
+	PermMntCreate      = "mnt.create"
+	PermMntEdit        = "mnt.edit"
+	PermMntProcess     = "mnt.process"
+	PermMntDelete      = "mnt.delete"
+	PermAdminView      = "admin.view"
+	PermAdminCreate    = "admin.create"
+	PermAdminEdit      = "admin.edit"
+	PermAdminProcess   = "admin.process"
+	PermAdminDelete    = "admin.delete"
+	PermSalesView      = "sales.view"
+	PermSalesCreate    = "sales.create"
+	PermSalesEdit      = "sales.edit"
+	PermSalesDelete    = "sales.delete"
 	PermSalesActView   = "sales_act.view"
 	PermSalesActCreate = "sales_act.create"
 	PermSalesActEdit   = "sales_act.edit"
 	PermSalesActDelete = "sales_act.delete"
-	PermMasterView   = "master.view"
-	PermMasterCreate = "master.create"
-	PermMasterEdit   = "master.edit"
-	PermMasterDelete = "master.delete"
-	PermStatsView    = "stats.view"
-	PermOrgView      = "org.view"
-	PermOrgCreate    = "org.create"
-	PermOrgEdit      = "org.edit"
-	PermOrgDelete    = "org.delete"
-	PermUsersView    = "users.view"
-	PermUsersCreate  = "users.create"
-	PermUsersEdit    = "users.edit"
-	PermUsersDelete  = "users.delete"
-	PermCodesView    = "codes.view"
-	PermCodesCreate  = "codes.create"
-	PermCodesEdit    = "codes.edit"
-	PermCodesDelete  = "codes.delete"
-	PermDataView     = "data.view"
-	PermDataCreate   = "data.create"
-	PermDataEdit     = "data.edit"
-	PermDataDelete   = "data.delete"
+	PermMasterView     = "master.view"
+	PermMasterCreate   = "master.create"
+	PermMasterEdit     = "master.edit"
+	PermMasterDelete   = "master.delete"
+	PermStatsView      = "stats.view"
+	PermOrgView        = "org.view"
+	PermOrgCreate      = "org.create"
+	PermOrgEdit        = "org.edit"
+	PermOrgDelete      = "org.delete"
+	PermUsersView      = "users.view"
+	PermUsersCreate    = "users.create"
+	PermUsersEdit      = "users.edit"
+	PermUsersDelete    = "users.delete"
+	PermCodesView      = "codes.view"
+	PermCodesCreate    = "codes.create"
+	PermCodesEdit      = "codes.edit"
+	PermCodesDelete    = "codes.delete"
+	PermDataView       = "data.view"
+	PermDataCreate     = "data.create"
+	PermDataEdit       = "data.edit"
+	PermDataDelete     = "data.delete"
 
 	// 옛 9키. hasPerm·화면 호환. 새 키로 읽는다.
 	PermASReceive       = "as_receive"
@@ -157,7 +157,7 @@ func NormalizeRole(role string) string {
 
 func IsKnownRole(role string) bool {
 	switch NormalizeRole(role) {
-	case RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales, RoleObserver, RoleTester:
+	case RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales:
 		return true
 	default:
 		return false
@@ -169,7 +169,53 @@ func IsAdminGrade(role string) bool {
 	return r == RoleVisionAdmin || r == RoleOrgAdmin
 }
 
-// EffectiveRole 테스터는 base_role 권한표를 쓴다. 권한표를 두 번 적지 않는다 (§53.8.1).
+// AdminGrade vision | org | none  (§66.3)
+func AdminGrade(role string) string {
+	switch NormalizeRole(role) {
+	case RoleVisionAdmin:
+		return "vision"
+	case RoleOrgAdmin:
+		return "org"
+	default:
+		return "none"
+	}
+}
+
+// JobRole 일반일 때만 업무. 관리자면 "".
+func JobRole(role string) string {
+	switch r := NormalizeRole(role); r {
+	case RoleSales, RoleTech, RoleSupport:
+		return r
+	default:
+		return ""
+	}
+}
+
+// RoleFromAdminGrade 화면의 등급+업무를 role 한 칸으로 접는다 (§67.6).
+func RoleFromAdminGrade(grade, job string) (string, error) {
+	switch strings.TrimSpace(grade) {
+	case "vision", RoleVisionAdmin:
+		return RoleVisionAdmin, nil
+	case "org", RoleOrgAdmin:
+		return RoleOrgAdmin, nil
+	case "none", "user":
+		j := NormalizeRole(job)
+		if j != RoleSales && j != RoleTech && j != RoleSupport {
+			return "", fmt.Errorf("일반은 업무를 하나 고르세요.")
+		}
+		return j, nil
+	default:
+		if r := NormalizeRole(grade); IsKnownRole(r) {
+			return r, nil
+		}
+		if r := NormalizeRole(job); r == RoleSales || r == RoleTech || r == RoleSupport {
+			return r, nil
+		}
+		return "", fmt.Errorf("관리 등급을 고르세요.")
+	}
+}
+
+// EffectiveRole 테스터는 base_role 권한표를 쓴다. 호출은 걷어냈다. 함수는 남긴다 (§66).
 func EffectiveRole(role, baseRole string) string {
 	role = NormalizeRole(role)
 	if role != RoleTester {
@@ -369,11 +415,50 @@ func HasAccess(role, key string, need Access) bool {
 	return permAtLeast(PermAccess(role, key), need)
 }
 
+var accessOverrides map[string]map[string]Access
+
+func SetAccessOverrides(m map[string]map[string]Access) {
+	accessOverrides = m
+}
+
+func AccessLabel(a Access) string {
+	switch a {
+	case AccessView:
+		return "조회"
+	case AccessOwn:
+		return "본인 것만"
+	case AccessFull:
+		return "전부"
+	default:
+		return "없음"
+	}
+}
+
+func BuiltinAccess(role, key string) Access {
+	role = NormalizeRole(role)
+	key = CanonicalPerm(key)
+	if role == RoleTester {
+		return AccessNone
+	}
+	if role == RoleVisionAdmin {
+		if key == "" {
+			return AccessNone
+		}
+		return AccessFull
+	}
+	return defaultAccess(role, key)
+}
+
 func PermAccess(role, key string) Access {
 	role = NormalizeRole(role)
 	key = CanonicalPerm(key)
 	if role == RoleTester {
 		return AccessNone
+	}
+	if m, ok := accessOverrides[role]; ok {
+		if a, ok := m[key]; ok {
+			return a
+		}
 	}
 	if role == RoleVisionAdmin {
 		if key == "" {
@@ -421,11 +506,6 @@ func defaultAccess(role, key string) Access {
 		return techAccess(key)
 	case RoleSales:
 		return salesAccess(key)
-	case RoleObserver:
-		if strings.HasSuffix(key, ".view") {
-			return AccessView
-		}
-		return AccessNone
 	default:
 		return AccessNone
 	}

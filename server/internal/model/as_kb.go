@@ -21,21 +21,21 @@ const (
 
 // ASKBEntry 지식 한 행. 고치면 덮어쓰지 않고 새 행. §41.8 · §41.10
 type ASKBEntry struct {
-	KBID          string
-	ASID          string
-	SymptomText   string
-	ActionText    string
-	Origin        string
-	Rev           int
-	IsCurrent     bool
-	PrevKBID      string
-	AuthorID      string
-	AuthorName    string
-	CreatedAt     time.Time
-	ChangeNote    string
-	Status        string
-	HelpfulCount  int
-	Past          []ASKBEntry
+	KBID         string
+	ASID         string
+	SymptomText  string
+	ActionText   string
+	Origin       string
+	Rev          int
+	IsCurrent    bool
+	PrevKBID     string
+	AuthorID     string
+	AuthorName   string
+	CreatedAt    time.Time
+	ChangeNote   string
+	Status       string
+	HelpfulCount int
+	Past         []ASKBEntry
 }
 
 func DisplayPerson(name string) string {

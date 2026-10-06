@@ -9,6 +9,7 @@
     <p class="text-sm text-gray-500 mt-1">CS Management System</p>
   </div>
 
+  {{if .CookieErr}}<div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4"><strong>로그인은 되었지만 브라우저가 쿠키를 저장하지 못했습니다.</strong> 관리자에게 알려 주세요. (HTTPS 설정 또는 COOKIE_SECURE 확인)</div>{{end}}
   {{if .Error}}<div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">{{.Error}}</div>{{end}}
   {{if .HelpOK}}<div class="bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg p-3 mb-4">{{.HelpOK}}</div>{{end}}
   {{if .HelpError}}<div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">{{.HelpError}}</div>{{end}}

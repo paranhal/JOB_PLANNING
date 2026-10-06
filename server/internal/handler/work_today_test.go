@@ -253,7 +253,7 @@ func TestWorkTodayAdminAssigneePicker(t *testing.T) {
 	if strings.Contains(sales.Body.String(), `id="work-assignee"`) {
 		t.Fatal("영업담당에게 담당자 드롭다운이 있다")
 	}
-	obs := workTodayGet(t, e, "/work", jwtCookieRole(t, "observer"))
+	obs := workTodayGet(t, e, "/work", jwtCookieReadOnly(t, "tech"))
 	if obs.Code != http.StatusOK {
 		t.Fatalf("observer status=%d", obs.Code)
 	}

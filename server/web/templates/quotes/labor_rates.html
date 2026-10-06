@@ -41,33 +41,33 @@
   {{end}}
   <form method="post" action="/labor-rates/rows" class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
     <input type="hidden" name="year" value="{{.Year}}">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b"><tr>
-        <th class="text-left px-4 py-2 text-xs text-gray-500">코드</th>
-        <th class="text-left px-4 py-2 text-xs text-gray-500">직군</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">월 (M/M)</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">일 (M/D)</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">시 (M/H)</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">코드</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">직군</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">월 (M/M)</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">일 (M/D)</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">시 (M/H)</th>
       </tr></thead>
       <tbody class="divide-y">
         {{range .Items}}
         <tr>
-          <td class="px-4 py-2"><input name="job_code" value="{{.JobCode}}" class="w-16 font-mono text-xs border rounded px-1 py-1" {{if not $.CanWrite}}readonly{{end}}></td>
-          <td class="px-4 py-2"><input name="job_name" value="{{.JobName}}" class="w-full border rounded px-2 py-1" {{if not $.CanWrite}}readonly{{end}}></td>
-          <td class="px-4 py-2 text-right"><input name="monthly" value="{{.Monthly}}" class="w-32 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
-          <td class="px-4 py-2 text-right"><input name="daily" value="{{.Daily}}" class="w-28 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
-          <td class="px-4 py-2 text-right"><input name="hourly" value="{{.Hourly}}" class="w-24 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="job_code" value="{{.JobCode}}" class="w-16 font-mono text-xs border rounded px-1 py-1" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="job_name" value="{{.JobName}}" class="w-full border rounded px-2 py-1" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 text-right whitespace-nowrap"><input name="monthly" value="{{.Monthly}}" class="w-32 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 text-right whitespace-nowrap"><input name="daily" value="{{.Daily}}" class="w-28 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
+          <td class="px-4 py-2 text-right whitespace-nowrap"><input name="hourly" value="{{.Hourly}}" class="w-24 text-right border rounded px-2 py-1 tabular-nums" {{if not $.CanWrite}}readonly{{end}}></td>
         </tr>
         {{else}}
-        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">해당 연도 표가 없습니다. 전년 복사 또는 엑셀 올리기를 하세요.</td></tr>
+        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400 whitespace-nowrap">해당 연도 표가 없습니다. 전년 복사 또는 엑셀 올리기를 하세요.</td></tr>
         {{end}}
         {{if .CanWrite}}
         <tr>
-          <td class="px-4 py-2"><input name="job_code" placeholder="18" class="w-16 font-mono text-xs border rounded px-1 py-1"></td>
-          <td class="px-4 py-2"><input name="job_name" placeholder="새 직무" class="w-full border rounded px-2 py-1"></td>
-          <td class="px-4 py-2"><input name="monthly" class="w-32 text-right border rounded px-2 py-1"></td>
-          <td class="px-4 py-2"><input name="daily" class="w-28 text-right border rounded px-2 py-1"></td>
-          <td class="px-4 py-2"><input name="hourly" class="w-24 text-right border rounded px-2 py-1"></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="job_code" placeholder="18" class="w-16 font-mono text-xs border rounded px-1 py-1"></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="job_name" placeholder="새 직무" class="w-full border rounded px-2 py-1"></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="monthly" class="w-32 text-right border rounded px-2 py-1"></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="daily" class="w-28 text-right border rounded px-2 py-1"></td>
+          <td class="px-4 py-2 whitespace-nowrap"><input name="hourly" class="w-24 text-right border rounded px-2 py-1"></td>
         </tr>
         {{end}}
       </tbody>

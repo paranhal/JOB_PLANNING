@@ -82,13 +82,13 @@
   {{end}}
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <table class="w-full text-sm">
+    <table class="w-full text-sm break-keep">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">날짜</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">이름</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">구분</th>
-          {{if $admin}}<th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">작업</th>{{end}}
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">날짜</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">이름</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">구분</th>
+          {{if $admin}}<th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">작업</th>{{end}}
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
@@ -124,9 +124,9 @@
         </tr>
         {{else}}
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-2.5 font-mono text-xs text-gray-800">{{dateLabelMDW .Date}}</td>
-          <td class="px-4 py-2.5 font-medium text-gray-800">{{.Name}}</td>
-          <td class="px-4 py-2.5">
+          <td class="px-4 py-2.5 font-mono text-xs text-gray-800 whitespace-nowrap">{{dateLabelMDW .Date}}</td>
+          <td class="px-4 py-2.5 font-medium text-gray-800 max-w-[18rem]">{{.Name}}</td>
+          <td class="px-4 py-2.5 whitespace-nowrap">
             {{if eq .Kind "substitute"}}<span class="px-2 py-0.5 rounded-full text-xs bg-violet-100 text-violet-800">대체공휴일</span>
             {{else if eq .Kind "company"}}<span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">회사 휴무일</span>
             {{else}}<span class="px-2 py-0.5 rounded-full text-xs bg-sky-100 text-sky-800">공휴일</span>{{end}}
@@ -219,23 +219,23 @@
   {{end}}
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <table class="w-full text-sm">
+    <table class="w-full text-sm break-keep">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">날짜</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">직원</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">종류</th>
-          {{if $admin}}<th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">작업</th>{{end}}
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">날짜</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">직원</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">종류</th>
+          {{if $admin}}<th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">작업</th>{{end}}
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Leaves}}
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-2.5 text-gray-800">{{dateLabelMDW .Date}}</td>
-          <td class="px-4 py-2.5 font-medium text-gray-800">{{.UserName}}</td>
-          <td class="px-4 py-2.5">{{leaveKindLabel .Kind}}</td>
+          <td class="px-4 py-2.5 text-gray-800 whitespace-nowrap">{{dateLabelMDW .Date}}</td>
+          <td class="px-4 py-2.5 font-medium text-gray-800 whitespace-nowrap">{{.UserName}}</td>
+          <td class="px-4 py-2.5 whitespace-nowrap">{{leaveKindLabel .Kind}}</td>
           {{if $admin}}
-          <td class="px-4 py-2.5 text-right">
+          <td class="px-4 py-2.5 text-right whitespace-nowrap">
             <form method="POST" action="/admin/holidays/leaves/delete" class="inline"
                   onsubmit="return confirm('{{.UserName}} {{dateLabelMDW .Date}} 연차를 삭제할까요?')">
               <input type="hidden" name="year" value="{{$year}}">

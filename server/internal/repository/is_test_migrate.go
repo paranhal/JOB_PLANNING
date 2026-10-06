@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"customer-support/internal/audit"
-	"customer-support/internal/model"
 )
 
 func applyIsTestColumns(db *sql.DB) {
@@ -47,7 +46,7 @@ func applyUserProfileColumns(db *sql.DB) {
 }
 
 func stampIsTest() int {
-	if model.NormalizeRole(audit.Current().Role) == model.RoleTester {
+	if audit.Current().IsTest {
 		return 1
 	}
 	return 0

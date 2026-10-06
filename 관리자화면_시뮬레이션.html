@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 화면 4종</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: {
+    brand:{DEFAULT:'#3768e5', soft:'#eef3ff', deep:'#315fcf'},
+    ink:'#172033', muted:'#737e92', line:'#e2e6ec', shell:'#f5f6f8',
+    pos:'#398254', neg:'#b0525e'
+  },
+  fontFamily:{ sans:['Inter','Pretendard','-apple-system','BlinkMacSystemFont','Segoe UI','Apple SD Gothic Neo','sans-serif'] }
+}}};
+</script>
+<style>
+  body{word-break:keep-all}
+  .fld{height:40px;border:1px solid #dde2e9;border-radius:9px;background:#fff;padding:0 12px;outline:none;color:#536077}
+  .fld:focus{border-color:#7d9ceb;box-shadow:0 0 0 3px #eef3ff}
+  .btn{height:40px;border-radius:9px;border:1px solid #dde2e9;background:#fff;padding:0 16px;font-weight:700;color:#566176}
+  .btn:hover{background:#f7f8fa}
+  .btn-pri{border-color:#3768e5;background:#3768e5;color:#fff}
+  .btn-pri:hover{background:#2d59c9}
+  .icon-btn{height:32px;border:0;border-radius:8px;background:transparent;color:#738096;font-size:12px;padding:0 8px}
+  .icon-btn:hover{background:#eef3ff;color:#315fcf}
+  .wsel{height:32px;border:1px solid #dde2e9;border-radius:7px;color:#486bb8;background:#fff;padding:0 8px;font-size:13px}
+  .asel{height:28px;border:1px solid #dde2e9;border-radius:7px;background:#fff;padding:0 6px;font-size:12px;color:#486bb8}
+  .asel[data-v="0"]{color:#9aa3b2}
+  .asel[data-v="2"]{color:#315fcf;font-weight:700}
+  .asel:disabled{background:#f3f5f8;color:#9aa3b2}
+  th{padding:13px 16px;background:#fafbfc;color:#8c96a8;font-size:11px;letter-spacing:.04em;text-align:left;font-weight:600;white-space:nowrap}
+  td{padding:14px 16px;border-top:1px solid #edf0f4;color:#566176}
+  tbody tr:hover{background:#fafbfd}
+  .bdg{display:inline-block;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+  .bdg-on{background:#eaf7ef;color:#398254} .bdg-off{background:#f0f2f5;color:#6e788a}
+  .bdg-ro{background:#eef1f6;color:#4a566e}
+  .bdg-ts{background:#fff5de;color:#987027}
+  .tgl{position:relative;width:36px;height:20px;border:0;border-radius:999px;background:#d8dde5}
+  .tgl.on{background:#3768e5}
+  .tgl:after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+  .tgl.on:after{left:18px}
+  .tgl.locked{opacity:.55;cursor:not-allowed}
+  .tab{border:0;border-bottom:2px solid transparent;background:none;padding:0 14px 12px;color:#7b8598;font-weight:700}
+  .tab.active{border-color:#3768e5;color:#315fcf}
+</style>
+</head>
+<body class="bg-shell text-ink font-sans text-[14px] m-0 min-w-[320px]">
+
+<div class="min-h-screen">
+  <aside class="fixed inset-y-0 left-0 w-[248px] p-6 px-4 bg-white border-r border-[#e5e8ee] flex flex-col z-10 max-[900px]:-translate-x-full">
+    <div class="flex items-center gap-2.5 px-2 mb-9 text-[19px] font-extrabold">
+      <span class="w-8 h-8 rounded-[10px] bg-brand shadow-[0_5px_12px_#3768e540] relative
+                   after:content-[''] after:absolute after:inset-[9px] after:border-[3px] after:border-white after:rounded"></span>
+      비젼아이티
+    </div>
+    <p class="mx-3 mb-2 text-[#9aa3b5] text-[11px] font-bold tracking-[.08em]">관리 섹션</p>
+    <nav id="nav" class="flex flex-col"></nav>
+    <div class="mt-auto border-t border-[#edf0f4] pt-4 px-2 flex gap-2.5 items-center">
+      <span class="w-9 h-9 rounded-full grid place-items-center bg-[#202c46] text-white text-[11px] font-bold">김민</span>
+      <div><strong class="block">김민서</strong><small class="block text-[#929bad] mt-0.5">비젼관리자</small></div>
+    </div>
+  </aside>
+
+  <main class="ml-[248px] min-h-screen max-[900px]:ml-0">
+    <header class="h-[72px] bg-white border-b border-[#e5e8ee] flex items-center justify-between px-10 text-[#8a94a7] max-[900px]:px-5">
+      <span>관리 &nbsp;/&nbsp; <strong id="crumb" class="text-[#3d485d]"></strong></span>
+      <span class="text-[13px]">로그인: 비젼관리자</span>
+    </header>
+    <div id="view"></div>
+  </main>
+</div>
+<div id="modal"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// 권한 44키 — internal/model/role.go AllPermissions 와 같은 순서
+// ─────────────────────────────────────────────────────────────
+var PERMS = [
+  ['sales_act.view','영업활동 조회'],['sales_act.create','영업활동 등록'],['sales_act.edit','영업활동 수정'],['sales_act.delete','영업활동 삭제'],
+  ['as.view','AS 조회'],['as.create','AS 접수'],['as.process','AS 조치'],['as.edit','AS 수정'],['as.delete','AS 삭제'],
+  ['mnt.view','정기점검 조회'],['mnt.create','정기점검 등록'],['mnt.edit','정기점검 수정'],['mnt.process','정기점검 조치'],['mnt.delete','정기점검 삭제'],
+  ['admin.view','행정 조회'],['admin.create','행정 등록'],['admin.edit','행정 수정'],['admin.process','행정 조치'],['admin.delete','행정 삭제'],
+  ['sales.view','영업사업 조회'],['sales.create','영업사업 등록'],['sales.edit','영업사업 수정'],['sales.delete','영업사업 삭제'],
+  ['master.view','기준정보 조회'],['master.create','기준정보 등록'],['master.edit','기준정보 수정'],['master.delete','기준정보 삭제'],
+  ['stats.view','통계 조회'],
+  ['org.view','조직 조회'],['org.create','조직 생성'],['org.edit','조직 수정'],['org.delete','조직 삭제'],
+  ['users.view','계정 조회'],['users.create','계정 생성'],['users.edit','계정 수정'],['users.delete','계정 삭제'],
+  ['codes.view','코드 조회'],['codes.create','코드 등록'],['codes.edit','코드 수정'],['codes.delete','코드 삭제'],
+  ['data.view','데이터 조회'],['data.create','데이터 등록'],['data.edit','데이터 수정'],['data.delete','데이터 삭제']
+];
+var GROUPS = [['sales_act.','영업활동'],['as.','AS'],['mnt.','정기점검'],['admin.','행정'],['sales.','영업사업'],
+              ['master.','기준정보'],['stats.','통계'],['org.','조직'],['users.','계정'],['codes.','코드'],['data.','데이터']];
+
+// defaultAccess(role.go:403) 를 그대로 옮긴 것 — 0 없음 · 1 조회 · 2 본인 것만 · 3 전부
+var TECH_FULL = ['as.view','as.create','as.process','as.edit','as.delete','mnt.view','mnt.create','mnt.edit',
+  'mnt.process','mnt.delete','admin.view','admin.create','admin.process','admin.edit','sales.view',
+  'sales_act.view','sales_act.create','sales_act.edit','master.view','master.create','master.edit','stats.view'];
+var TECH_OWN = ['admin.delete','sales_act.delete'];
+var SALES_FULL = ['as.view','as.create','as.process','mnt.view','admin.view','admin.create','admin.process','admin.edit',
+  'sales.view','sales.create','sales.edit','sales.delete','sales_act.view','sales_act.create','sales_act.edit',
+  'sales_act.delete','master.view','master.create','master.edit','stats.view'];
+var SALES_OWN = ['as.edit','admin.delete'];
+function isAdminSectionPerm(k){ return /^(org|users|codes|data)\./.test(k); }
+function defaultAccess(role, k){
+  if (role === 'vision') return 3;
+  if (role === 'org')    return /^org\./.test(k) ? (k === 'org.view' ? 1 : 0) : 3;
+  if (role === 'support')return isAdminSectionPerm(k) ? 0 : 3;
+  if (role === 'tech')   return TECH_FULL.indexOf(k)>=0 ? 3 : (TECH_OWN.indexOf(k)>=0 ? 2 : 0);
+  if (role === 'sales')  return SALES_FULL.indexOf(k)>=0 ? 3 : (SALES_OWN.indexOf(k)>=0 ? 2 : 0);
+  return 0;
+}
+// 저장소(DB)가 될 값. 처음에는 코드 기본값으로 채운다.
+var GRADE_COLS = [['vision','비젼관리자'],['org','조직관리자'],['support','일반(기본)']];
+var WORK_COLS  = [['sales','영업'],['tech','기술'],['support','지원']];
+var matrix = {};
+['vision','org','support','tech','sales'].forEach(function(r){
+  matrix[r] = {}; PERMS.forEach(function(p){ matrix[r][p[0]] = defaultAccess(r, p[0]); });
+});
+var dirty = {};
+
+// ─────────────────────────────────────────────────────────────
+// 데모 데이터
+// ─────────────────────────────────────────────────────────────
+var ORGS = [
+  {id:'O01', no:'O01', name:'도서관사업팀', users:24, customers:310, active:true},
+  {id:'O02', no:'O02', name:'서울사업본부', users:18, customers:142, active:true},
+  {id:'O03', no:'O03', name:'대전기술센터', users:11, customers:66,  active:true},
+  {id:'O04', no:'O04', name:'광주지원센터', users:0,  customers:0,   active:false}
+];
+// grade: vision|org|none · job: sales|tech|support (일반만) · ro/test: 깃발
+var USERS = [
+  {id:'U1', name:'김민서', login:'vsadmin',  mobile:'010-3214-5678', email:'minseo@vision.kr', grade:'vision', org:'',    job:'',        ro:false, test:false, on:true},
+  {id:'U2', name:'이준호', login:'junho01',  mobile:'010-4521-8890', email:'junho@vision.kr',  grade:'org',    org:'O02', job:'',        ro:false, test:false, on:true},
+  {id:'U3', name:'박서연', login:'seoyeon12',mobile:'',              email:'seoyeon@vision.kr',grade:'none',   org:'O02', job:'sales',   ro:false, test:false, on:true},
+  {id:'U4', name:'최도윤', login:'doyoon77', mobile:'',              email:'',                 grade:'none',   org:'O02', job:'tech',    ro:false, test:false, on:true, tel:'02-6200-1234'},
+  {id:'U5', name:'한지우', login:'jiwoo24',  mobile:'',              email:'',                 grade:'none',   org:'O03', job:'support', ro:false, test:false, on:false},
+  {id:'U6', name:'임채원', login:'chaewon',  mobile:'010-7788-1122', email:'chaewon@vision.kr',grade:'org',    org:'O01', job:'',        ro:true,  test:false, on:true},
+  {id:'U7', name:'한도현', login:'dohyun',   mobile:'010-2211-9090', email:'',                 grade:'none',   org:'O01', job:'tech',    ro:true,  test:false, on:true},
+  {id:'U8', name:'윤지호', login:'jiho_t',   mobile:'010-5050-3030', email:'',                 grade:'none',   org:'O01', job:'sales',   ro:false, test:true,  on:true}
+];
+var ME_ORG = 'O02';   // 소속 인원 관리 화면의 「내 조직」
+
+var GRADE = {vision:'비젼관리자', org:'조직관리자', none:'일반 이용자'};
+var JOB   = {sales:'영업', tech:'기술', support:'지원'};
+var PAGES = [['users','사용자 관리'],['orgs','전체 조직 관리'],['members','소속 인원 관리'],['perms','역할 및 권한']];
+
+var esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]; }); };
+var $ = function(s){ return document.querySelector(s); };
+var orgName = function(id){ var o=ORGS.filter(function(x){return x.id===id;})[0]; return o?o.name:'전체 조직'; };
+function managerOf(orgID){   // 조직관리자는 orgs 에 저장하지 않는다 — users 에서 끌어낸다
+  var m = USERS.filter(function(u){ return u.grade==='org' && u.org===orgID && u.on; });
+  return m.length ? m : null;
+}
+function flags(u){
+  var s='';
+  if (u.ro)   s += '<span class="bdg bdg-ro">읽기전용</span> ';
+  if (u.test) s += '<span class="bdg bdg-ts">테스터</span> ';
+  return s || '<span class="text-[#b3bac7]">—</span>';
+}
+function avatar(n){ return '<span class="w-9 h-9 rounded-full grid place-items-center bg-[#dde9ff] text-[#2957a4] text-[11px] font-extrabold shrink-0">'+esc(n.slice(0,2))+'</span>'; }
+function whoCell(u){
+  var sub = '@'+esc(u.login) + (u.mobile ? ' · '+esc(u.mobile) : '');
+  return '<div class="flex items-center gap-3">'+avatar(u.name)+
+    '<div><strong class="block text-[#263248]">'+esc(u.name)+'</strong>'+
+    '<small class="block mt-0.5 text-[#8a94a7]">'+sub+'</small></div></div>';
+}
+function head(t, p, btn){
+  return '<div class="flex justify-between items-end gap-5 mb-7 max-[900px]:flex-col max-[900px]:items-stretch">'+
+    '<div><h1 class="text-[28px] tracking-[-.04em] m-0">'+t+'</h1>'+
+    '<p class="text-muted mt-2 mb-0">'+p+'</p></div>'+(btn||'')+'</div>';
+}
+function notice(label, text){
+  return '<div class="border border-[#dde5f5] bg-[#f7f9fe] rounded-[13px] p-[15px] mb-5 text-[#64718a]">'+
+    '<strong class="text-[#34415a] mr-2">'+label+'</strong>'+text+'</div>';
+}
+var WRAP = function(inner){ return '<div class="max-w-[1320px] mx-auto px-10 py-[38px] max-[900px]:px-5 max-[900px]:py-7">'+inner+'</div>'; };
+var PANEL = function(inner){ return '<section class="bg-white border border-line rounded-[14px] overflow-hidden">'+inner+'</section>'; };
+
+// ── 화면 1 · 사용자 관리 ───────────────────────────────────────
+function viewUsers(){
+  var cards = [
+    ['비젼관리자','전체 조직 관리','모든 조직과 관리자를 설정할 수 있습니다.','orgs','전체 조직 관리',true],
+    ['조직관리자','소속 인원 관리','아이디, 비밀번호, 업무와 인원을 관리합니다.','members','소속 인원 관리',false],
+    ['일반 이용자','업무별 서비스 이용','영업 · 기술 · 지원 중 하나를 가집니다.','perms','업무별 권한 확인',false]
+  ].map(function(c){
+    return '<div class="p-4 bg-'+(c[5]?'[#f8faff]':'white')+' border border-'+(c[5]?'[#dfe5f1]':'line')+' rounded-[13px]">'+
+      '<span class="text-[12px] font-bold text-brand-deep">'+c[0]+'</span>'+
+      '<h3 class="my-2.5 mb-1.5 text-[14px]">'+c[1]+'</h3>'+
+      '<p class="m-0 text-[#7b8598] text-[12px] leading-relaxed">'+c[2]+'</p>'+
+      '<button class="border-0 bg-transparent pt-3 text-brand-deep text-[12px] font-bold" data-go="'+c[3]+'">'+c[4]+'</button></div>';
+  }).join('');
+
+  var rows = USERS.map(function(u){
+    var jobCell = u.grade === 'none'
+      ? '<select class="wsel" data-job="'+u.id+'">'+
+        Object.keys(JOB).map(function(k){ return '<option value="'+k+'"'+(u.job===k?' selected':'')+'>'+JOB[k]+'</option>'; }).join('')+
+        '</select>'
+      : '<span class="text-[#8a94a7]" title="관리 등급은 업무를 따로 두지 않습니다">전체</span>';
+    return '<tr>'+
+      '<td>'+whoCell(u)+'</td>'+
+      '<td><strong class="'+(u.grade==='vision'?'text-brand-deep':(u.grade==='org'?'text-pos':'text-[#566176]'))+'">'+GRADE[u.grade]+'</strong></td>'+
+      '<td>'+jobCell+'</td>'+
+      '<td>'+flags(u)+'</td>'+
+      '<td>'+esc(orgName(u.org))+'</td>'+
+      '<td><span class="bdg '+(u.on?'bdg-on':'bdg-off')+'">'+(u.on?'활성':'비활성')+'</span></td>'+
+      '<td><div class="flex justify-end gap-1">'+
+        '<button class="icon-btn" data-edit="'+u.id+'">수정</button>'+
+        (u.grade!=='vision' ? '<button class="icon-btn" data-del="'+u.id+'">삭제</button>' : '')+
+      '</div></td></tr>';
+  }).join('');
+
+  return WRAP(
+    head('사용자 관리','조직별 사용자 아이디와 업무 권한을 관리하세요.',
+         '<button class="btn btn-pri" data-new="user">아이디 생성</button>')+
+    '<div class="grid grid-cols-3 gap-3 mb-5 max-[900px]:grid-cols-1">'+cards+'</div>'+
+    notice('관리 등급과 업무','관리자는 업무 칸이 <b>「전체」</b>로 비고, <b>일반만</b> 업무를 하나 가집니다. 깃발(읽기전용·테스터)은 등급·업무와 <b>따로</b> 붙습니다.')+
+    PANEL(
+      '<div class="p-4 border-b border-[#e7eaf0] flex justify-between gap-2.5 max-[900px]:flex-col">'+
+        '<input class="fld w-[340px] max-[900px]:w-full" id="q" placeholder="이름, 아이디, 조직 검색">'+
+        '<div class="flex gap-2 overflow-auto">'+
+          '<select class="fld" id="fOrg"><option value="">전체 조직</option>'+
+            ORGS.map(function(o){ return '<option value="'+o.id+'">'+esc(o.name)+'</option>'; }).join('')+'</select>'+
+          '<select class="fld" id="fGrade"><option value="">전체 역할</option>'+
+            '<option value="vision">비젼관리자</option><option value="org">조직관리자</option><option value="none">일반 이용자</option>'+
+            '<option value="f:ro">읽기전용만</option><option value="f:test">테스터만</option></select>'+
+        '</div>'+
+      '</div>'+
+      '<div class="overflow-auto"><table class="w-full min-w-[1040px] border-collapse">'+
+        '<thead><tr><th>사용자</th><th>관리 등급</th><th>업무 선택</th><th>깃발</th><th>조직</th><th>상태</th><th class="text-right">관리</th></tr></thead>'+
+        '<tbody id="tb">'+rows+'</tbody></table></div>'
+    )
+  );
+}
+
+// ── 화면 2 · 전체 조직 관리 ───────────────────────────────────
+function viewOrgs(){
+  var stats = [
+    ['전체 조직', ORGS.length+'개'],
+    ['운영 중',   ORGS.filter(function(o){return o.active;}).length+'개'],
+    ['전체 사용자', ORGS.reduce(function(s,o){return s+o.users;},0)+'명']
+  ].map(function(s){
+    return '<div class="p-[17px] bg-white border border-line rounded-[13px]">'+
+      '<span class="text-[#8590a3] text-[12px]">'+s[0]+'</span>'+
+      '<strong class="block mt-2 text-[24px]">'+s[1]+'</strong></div>';
+  }).join('');
+
+  var rows = ORGS.map(function(o){
+    var mgr = managerOf(o.id);
+    var mgrCell = mgr
+      ? esc(mgr.map(function(u){return u.name;}).join(', '))+
+        ' <button class="border-0 bg-transparent p-0 pl-1 text-[12px] font-bold text-neg" data-revoke="'+o.id+'">권한 박탈</button>'
+      : '<span class="text-[#9aa3b2]">미지정</span>'+
+        ' <button class="border-0 bg-transparent p-0 pl-1 text-[12px] font-bold text-brand-deep" data-assign="'+o.id+'">관리자 지정</button>';
+    return '<tr>'+
+      '<td><strong class="text-[#263248]">'+esc(o.name)+'</strong></td>'+
+      '<td class="font-mono text-[13px]">'+esc(o.no)+'</td>'+
+      '<td>'+mgrCell+'</td>'+
+      '<td class="whitespace-nowrap">'+o.users+'명</td>'+
+      '<td><span class="bdg '+(o.active?'bdg-on':'bdg-off')+'">'+(o.active?'운영 중':'중지')+'</span></td>'+
+      '<td><div class="flex justify-end gap-1">'+
+        '<button class="icon-btn" data-eorg="'+o.id+'">수정</button>'+
+        '<button class="icon-btn" data-torg="'+o.id+'">'+(o.active?'중지':'재개')+'</button>'+
+        '<button class="icon-btn" data-dorg="'+o.id+'">삭제</button>'+
+      '</div></td></tr>';
+  }).join('');
+
+  return WRAP(
+    '<button class="border-0 bg-transparent text-[#748096] p-0 mb-5 font-semibold" data-go="users">‹ 사용자 관리로 돌아가기</button>'+
+    head('전체 조직 관리','조직 생성·수정·삭제와 조직관리자 권한을 통합 관리하세요.',
+         '<button class="btn btn-pri" data-new="org">조직 추가</button>')+
+    '<div class="grid grid-cols-3 gap-3 mb-5 max-[900px]:grid-cols-1">'+stats+'</div>'+
+    notice('조직관리자는 조직에 저장하지 않습니다','그 조직에 <b>관리 등급이 「조직관리자」인 사용자</b>가 있으면 그 사람이 조직관리자입니다. 「관리자 지정」은 그 사람의 <b>관리 등급을 바꾸는 일</b>입니다.')+
+    PANEL(
+      '<div class="p-4 border-b border-[#e7eaf0]"><input class="fld w-[340px] max-[900px]:w-full" placeholder="조직명, 코드, 관리자 검색"></div>'+
+      '<div class="overflow-auto"><table class="w-full min-w-[900px] border-collapse">'+
+        '<thead><tr><th>조직명</th><th>조직 코드</th><th>조직관리자</th><th>소속 인원</th><th>상태</th><th class="text-right">관리</th></tr></thead>'+
+        '<tbody>'+rows+'</tbody></table></div>'
+    )
+  );
+}
+
+// ── 화면 3 · 소속 인원 관리 ───────────────────────────────────
+function viewMembers(){
+  var mine = USERS.filter(function(u){ return u.org===ME_ORG && u.grade==='none'; });
+  var rows = mine.length ? mine.map(function(u){
+    return '<tr>'+
+      '<td>'+whoCell(u)+'</td>'+
+      '<td><select class="wsel" data-job="'+u.id+'">'+
+        Object.keys(JOB).map(function(k){ return '<option value="'+k+'"'+(u.job===k?' selected':'')+'>'+JOB[k]+'</option>'; }).join('')+
+        '</select><div class="mt-2">'+flags(u)+'</div></td>'+
+      '<td><span class="bdg '+(u.on?'bdg-on':'bdg-off')+'">'+(u.on?'활성':'비활성')+'</span></td>'+
+      '<td><div class="flex justify-end gap-1">'+
+        '<button class="icon-btn" data-reset="'+u.id+'">비밀번호 초기화</button>'+
+        '<button class="icon-btn" data-edit="'+u.id+'">수정</button>'+
+        '<button class="icon-btn" data-del="'+u.id+'">삭제</button>'+
+      '</div></td></tr>';
+  }).join('') : '<tr><td colspan="4" class="p-[50px] text-center text-[#929bad]">소속 인원이 없습니다.</td></tr>';
+
+  return WRAP(
+    '<button class="border-0 bg-transparent text-[#748096] p-0 mb-5 font-semibold" data-go="users">‹ 사용자 관리로 돌아가기</button>'+
+    '<div class="flex justify-between items-end gap-5 mb-7 max-[900px]:flex-col max-[900px]:items-stretch">'+
+      '<div><span class="bdg bdg-on">'+esc(orgName(ME_ORG))+'</span>'+
+      '<h1 class="text-[28px] tracking-[-.04em] mt-2.5 mb-0">소속 인원 관리</h1>'+
+      '<p class="text-muted mt-2 mb-0">소속 이용자의 아이디, 비밀번호, 업무를 관리하세요.</p></div>'+
+      '<button class="btn btn-pri" data-new="member">소속 인원 추가</button></div>'+
+    notice('관리 범위','조직관리자는 자신의 소속 조직 이용자만 추가·수정·삭제할 수 있습니다. 조직은 <b>서버가 세션에서 정합니다</b> — 화면이 보낸 조직 번호는 믿지 않습니다.')+
+    PANEL('<div class="overflow-auto"><table class="w-full min-w-[820px] border-collapse">'+
+      '<thead><tr><th>이용자</th><th>업무 지정</th><th>상태</th><th class="text-right">아이디 관리</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></div>')
+  );
+}
+
+// ── 화면 4 · 역할 및 권한 ─────────────────────────────────────
+var permTab = 'work';
+var LV = [[0,'없음'],[1,'조회'],[2,'본인 것만'],[3,'전부']];
+function cell(role, key, locked){
+  var v = matrix[role][key], d = defaultAccess(role, key);
+  var opts = LV.map(function(l){ return '<option value="'+l[0]+'"'+(v===l[0]?' selected':'')+'>'+l[1]+'</option>'; }).join('');
+  return '<div class="text-center">'+
+    '<select class="asel" data-v="'+v+'" data-cell="'+role+'|'+key+'"'+(locked?' disabled':'')+'>'+opts+'</select>'+
+    (v!==d && !locked ? '<div class="text-[10px] text-[#b45309] mt-0.5">기본값 '+LV[d][1]+'</div>' : '')+
+  '</div>';
+}
+function viewPerms(){
+  var cols = permTab === 'work' ? WORK_COLS : GRADE_COLS;
+  var n = cols.length;
+  var gridCls = 'grid items-center px-5 py-[15px] border-t border-[#edf0f4] gap-2';
+  var gridStyle = 'grid-template-columns:minmax(260px,1fr) repeat('+n+',120px)';
+
+  var body = GROUPS.map(function(g){
+    var items = PERMS.filter(function(p){ return p[0].indexOf(g[0])===0; });
+    if (!items.length) return '';
+    var rows = items.map(function(p){
+      return '<div class="'+gridCls+'" style="'+gridStyle+'">'+
+        '<div><strong class="block text-[#334058]">'+p[1]+'</strong>'+
+        '<small class="block text-[#8993a5] mt-1 font-mono text-[11px]">'+p[0]+'</small></div>'+
+        cols.map(function(c){ return cell(c[0], p[0], c[0]==='vision'); }).join('')+
+      '</div>';
+    }).join('');
+    return '<div class="px-5 py-2.5 bg-[#fafbfc] border-t border-[#edf0f4] text-[11px] font-bold text-[#8c96a8] tracking-[.04em]">'+g[1]+'</div>'+rows;
+  }).join('');
+
+  var headRow = '<div class="'+gridCls+' bg-[#fafbfc] border-0 text-[#8c96a8] text-[11px] font-bold" style="'+gridStyle+'">'+
+    '<span>기능 권한 ('+PERMS.length+'개)</span>'+
+    cols.map(function(c){ return '<span class="text-center">'+c[1]+'</span>'; }).join('')+'</div>';
+
+  var nDirty = Object.keys(dirty).length;
+  return WRAP(
+    head('역할 및 권한','관리 등급과 업무 유형별로 서비스 접근 권한을 설정하세요.',
+      '<button class="btn btn-pri" id="savePerm">변경사항 저장'+(nDirty?' ('+nDirty+')':'')+'</button>')+
+    notice('권한은 켜고 끄는 값이 아닙니다',
+      '코드의 권한표는 <b>없음 · 조회 · 본인 것만 · 전부</b> 네 단계입니다(<span class="font-mono text-[12px]">Access</span>). '+
+      '토글 두 값으로는 <b>「본인 것만」을 표현할 수 없어</b> 네 단계 선택으로 바꿨습니다. '+
+      '비젼관리자 열은 <b>항상 전부</b>이므로 잠겨 있습니다.')+
+    PANEL(
+      '<div class="flex gap-1 px-5 pt-3.5 border-b border-[#e7eaf0]">'+
+        '<button class="tab'+(permTab==='grade'?' active':'')+'" data-tab="grade">관리 등급별 권한</button>'+
+        '<button class="tab'+(permTab==='work'?' active':'')+'" data-tab="work">업무별 권한</button>'+
+      '</div>'+
+      '<div class="overflow-auto min-w-0">'+headRow+body+'</div>'
+    )
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 모달
+// ─────────────────────────────────────────────────────────────
+function closeModal(){ $('#modal').innerHTML = ''; }
+function shell(title, sub, inner){
+  return '<div class="fixed inset-0 z-30 grid place-items-center p-4 bg-[#17203366] backdrop-blur-[2px]" data-scrim="1">'+
+    '<div class="w-[min(480px,100%)] max-h-[calc(100vh-32px)] overflow-auto bg-white rounded-2xl p-[26px] shadow-[0_24px_70px_#121d3533]">'+
+      '<div class="flex justify-between gap-4 mb-5"><div><h2 class="m-0 text-[20px]">'+title+'</h2>'+
+      '<p class="mt-1.5 mb-0 text-[#7b8598]">'+sub+'</p></div>'+
+      '<button class="border-0 bg-transparent text-[#7c8799] text-[20px]" data-x="1">×</button></div>'+
+      inner+'</div></div>';
+}
+function userModal(u){
+  u = u || {grade:'none', job:'', ro:false, test:false, on:true, org:ME_ORG};
+  var isNew = !u.id;
+  var g = function(name,label,val,extra,opt){
+    return '<div class="mb-4"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">'+label+
+      (opt?' <span class="font-normal text-[#9aa3b2]">(선택)</span>':'')+'</label>'+
+      '<input class="fld w-full" name="'+name+'" value="'+esc(val||'')+'" '+(extra||'')+'></div>';
+  };
+  $('#modal').innerHTML = shell(isNew?'사용자 아이디 생성':'사용자 정보 수정',
+    '이름과 아이디만 필수입니다. 연락처는 선택입니다.',
+    '<form id="uf"><input type="hidden" name="id" value="'+(u.id||'')+'">'+
+    g('name','이름',u.name,'required')+
+    g('login','아이디',u.login,'required placeholder="고유 아이디 — 대소문자 구분 없이 중복 검사"')+
+    '<div class="grid grid-cols-2 gap-3">'+g('mobile','휴대폰번호',u.mobile,'',1)+g('tel','전화번호',u.tel,'',1)+'</div>'+
+    g('email','이메일',u.email,'type="email"',1)+
+    '<div class="grid grid-cols-2 gap-3">'+
+      '<div class="mb-4"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">관리 등급</label>'+
+      '<select class="fld w-full" name="grade" id="mGrade">'+
+        Object.keys(GRADE).map(function(k){ return '<option value="'+k+'"'+(u.grade===k?' selected':'')+'>'+GRADE[k]+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="mb-4" id="wJob"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">업무 <span class="text-neg">*</span></label>'+
+      '<select class="fld w-full" name="job" id="mJob"><option value="">— 고르세요 —</option>'+
+        Object.keys(JOB).map(function(k){ return '<option value="'+k+'"'+(u.job===k?' selected':'')+'>'+JOB[k]+'</option>'; }).join('')+
+      '</select></div>'+
+    '</div>'+
+    '<div class="mb-4" id="wOrg"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">조직</label>'+
+      '<select class="fld w-full" name="org" id="mOrg">'+
+        ORGS.map(function(o){ return '<option value="'+o.id+'"'+(u.org===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')+
+      '</select></div>'+
+    '<div class="border-t border-line pt-4 mb-4">'+
+      '<div class="text-[12px] font-bold text-muted mb-2.5">깃발</div>'+
+      '<label class="flex items-start gap-2.5 mb-3 text-[14px]"><input type="checkbox" name="ro" id="mRO" class="mt-1 w-4 h-4 accent-brand"'+(u.ro?' checked':'')+'>'+
+        '<span>읽기전용<span class="block text-[12px] text-muted" id="roHint">볼 수는 있고 아무것도 바꿀 수 없습니다.</span></span></label>'+
+      '<label class="flex items-start gap-2.5 text-[14px]'+(u.grade==='none'?'':' hidden')+'" id="wTest"><input type="checkbox" name="test" id="mTest" class="mt-1 w-4 h-4 accent-brand"'+(u.test?' checked':'')+'>'+
+        '<span>테스터<span class="block text-[12px] text-muted">이 사람이 만든 자료를 지표에서 뺍니다.</span></span></label>'+
+    '</div>'+
+    '<div id="mWhy" class="hidden text-[12px] rounded-lg px-3 py-2.5 mb-4"></div>'+
+    '<label class="flex items-center gap-2.5 text-[14px] mb-1"><input type="checkbox" name="on" class="w-4 h-4 accent-brand"'+(u.on?' checked':'')+'> 활성</label>'+
+    '<div class="flex justify-end gap-2 mt-5">'+
+      '<button type="button" class="btn" data-x="1">취소</button>'+
+      '<button class="btn btn-pri">저장</button></div></form>');
+  syncUserForm();
+}
+function syncUserForm(){
+  var g = $('#mGrade').value;
+  // 관리 등급은 업무가 없다 · 비젼관리자는 조직이 없다 (상호 배타)
+  toggleBox($('#wJob'), g === 'none');
+  toggleBox($('#wOrg'), g !== 'vision');
+  $('#wTest').className = $('#wTest').className.replace(' hidden','') + (g === 'none' ? '' : ' hidden');
+  if (g !== 'none') $('#mTest').checked = false;
+  $('#roHint').textContent = g === 'none' ? '고른 업무의 화면을 그대로 보되 아무것도 바꿀 수 없습니다.'
+    : (g === 'org' ? '소속 조직 전부를 보되 아무것도 바꿀 수 없습니다. 옛 「옵저버」와 같습니다.'
+                   : '전 조직을 보되 아무것도 바꿀 수 없습니다. 감사용 계정입니다.');
+  var w = $('#mWhy'), msg = '', cls = '';
+  if (g !== 'none') { msg = GRADE[g] + '는 업무를 따로 두지 않습니다. 목록에서 업무 칸이 「전체」로 보입니다.'; cls = 'bg-[#f7f9fe] text-[#64718a] border border-[#dde5f5]'; }
+  if (g === 'none' && $('#mRO').checked && $('#mTest').checked) {
+    msg = '읽기전용과 테스터를 함께 켜면 테스터 깃발은 효과가 없습니다 — 쓰기가 막혀 자료를 만들지 않습니다.';
+    cls = 'bg-[#fff5de] text-[#987027]';
+  }
+  w.className = (msg ? '' : 'hidden ') + 'text-[12px] rounded-lg px-3 py-2.5 mb-4 ' + cls;
+  w.textContent = msg;
+}
+// 숨긴 칸은 값을 비우고 전송에서 뺀다 (§43-J 교훈)
+function toggleBox(box, on){
+  box.className = box.className.replace(/\s*hidden/,'') + (on ? '' : ' hidden');
+  if (!on) Array.prototype.forEach.call(box.querySelectorAll('select,input'), function(f){
+    if (f.type === 'checkbox') f.checked = false; else f.value = '';
+  });
+}
+function orgModal(o){
+  o = o || {};
+  $('#modal').innerHTML = shell(o.id?'조직 정보 수정':'새 조직 추가',
+    '조직 번호(O01)는 서버가 자동으로 매깁니다.',
+    '<form id="of"><input type="hidden" name="id" value="'+(o.id||'')+'">'+
+    '<div class="mb-4"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">조직명</label>'+
+      '<input class="fld w-full" name="name" required value="'+esc(o.name||'')+'"></div>'+
+    '<div class="mb-4"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">조직 번호</label>'+
+      '<input class="fld w-full bg-[#f3f5f8] text-[#9aa3b2]" value="'+esc(o.no||'(저장할 때 자동)')+'" disabled></div>'+
+    '<div class="flex justify-end gap-2 mt-5"><button type="button" class="btn" data-x="1">취소</button>'+
+      '<button class="btn btn-pri">저장</button></div></form>');
+}
+function assignModal(orgID){
+  var cands = USERS.filter(function(u){ return u.org===orgID && u.grade==='none' && u.on; });
+  var inner = cands.length
+    ? '<form id="af"><input type="hidden" name="org" value="'+orgID+'">'+
+      '<div class="mb-4"><label class="block mb-1.5 text-[#465168] text-[13px] font-bold">조직관리자로 올릴 사람</label>'+
+      '<select class="fld w-full" name="uid">'+cands.map(function(u){
+        return '<option value="'+u.id+'">'+esc(u.name)+' · @'+esc(u.login)+' · '+JOB[u.job]+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="text-[12px] rounded-lg px-3 py-2.5 mb-4 bg-[#fff5de] text-[#987027]">'+
+      '올리면 그 사람의 <b>업무가 없어집니다</b> — 관리 등급과 업무는 함께 가질 수 없습니다.</div>'+
+      '<div class="flex justify-end gap-2 mt-5"><button type="button" class="btn" data-x="1">취소</button>'+
+      '<button class="btn btn-pri">지정</button></div></form>'
+    : '<div class="text-[#7b8598] mb-5">이 조직에 올릴 수 있는 활성 일반 이용자가 없습니다. 먼저 아이디를 만드세요.</div>'+
+      '<div class="flex justify-end"><button type="button" class="btn" data-x="1">닫기</button></div>';
+  $('#modal').innerHTML = shell('조직관리자 지정', esc(orgName(orgID))+' 의 조직관리자를 정합니다.', inner);
+}
+function resetModal(u){
+  $('#modal').innerHTML = shell('비밀번호 초기화', esc(u.name)+' (@'+esc(u.login)+')',
+    '<div class="text-[13px] text-[#566176] space-y-3 mb-5">'+
+      '<label class="flex items-start gap-2.5"><input type="radio" name="how" value="temp" checked class="mt-1 accent-brand">'+
+      '<span><b>임시 비밀번호 발급</b><span class="block text-[12px] text-muted">화면에 한 번만 보여 줍니다. 다음 로그인에서 반드시 바꾸게 합니다.</span></span></label>'+
+      '<label class="flex items-start gap-2.5"><input type="radio" name="how" value="link" class="mt-1 accent-brand">'+
+      '<span><b>초기화 링크 발송</b><span class="block text-[12px] text-muted">이메일이 있어야 합니다.'+
+      (u.email?'':' <b class="text-neg">이 사람은 이메일이 없어 고를 수 없습니다.</b>')+'</span></span></label>'+
+    '</div>'+
+    '<div class="text-[12px] rounded-lg px-3 py-2.5 mb-4 bg-[#f7f9fe] text-[#64718a] border border-[#dde5f5]">'+
+      '최소 10자입니다. 누가 누구의 비밀번호를 언제 초기화했는지 <b>감사 기록에 남습니다.</b></div>'+
+    '<div class="flex justify-end gap-2"><button type="button" class="btn" data-x="1">취소</button>'+
+    '<button class="btn btn-pri" data-doreset="'+u.id+'">초기화</button></div>');
+}
+
+// ─────────────────────────────────────────────────────────────
+// 라우팅 · 이벤트
+// ─────────────────────────────────────────────────────────────
+var page = 'users';
+var VIEWS = { users:viewUsers, orgs:viewOrgs, members:viewMembers, perms:viewPerms };
+function setPage(p){
+  page = p;
+  $('#nav').innerHTML = PAGES.map(function(x){
+    var on = x[0]===p;
+    return '<button data-go="'+x[0]+'" class="w-full border-0 px-3 py-[11px] my-0.5 rounded-[10px] text-left font-semibold '+
+      (on ? 'bg-brand-soft text-brand-deep' : 'bg-transparent text-[#606a7e] hover:bg-brand-soft hover:text-brand-deep')+'">'+x[1]+'</button>';
+  }).join('');
+  $('#crumb').textContent = PAGES.filter(function(x){return x[0]===p;})[0][1];
+  $('#view').innerHTML = VIEWS[p]();
+  if (p === 'users') filterRows();
+}
+function byId(id){ return USERS.filter(function(u){ return u.id===id; })[0]; }
+function filterRows(){
+  var q = ($('#q')||{value:''}).value.trim();
+  var fo = ($('#fOrg')||{value:''}).value, fg = ($('#fGrade')||{value:''}).value;
+  Array.prototype.forEach.call($('#tb').children, function(tr, i){
+    var u = USERS[i], ok = true;
+    if (q && (u.name+u.login+orgName(u.org)).indexOf(q) < 0) ok = false;
+    if (fo && u.org !== fo) ok = false;
+    if (fg === 'f:ro')        ok = ok && u.ro;
+    else if (fg === 'f:test') ok = ok && u.test;
+    else if (fg)              ok = ok && u.grade === fg;
+    tr.style.display = ok ? '' : 'none';
+  });
+}
+
+document.addEventListener('input', function(e){
+  if (['q','fOrg','fGrade'].indexOf(e.target.id) >= 0) filterRows();
+});
+document.addEventListener('change', function(e){
+  var t = e.target;
+  if (t.id === 'mGrade' || t.id === 'mRO' || t.id === 'mTest') { syncUserForm(); return; }
+  if (t.dataset.job) {   // 표 안에서 바로 업무를 바꾼다
+    var u = byId(t.dataset.job); u.job = t.value;
+    log('POST /admin/users/'+u.id+'/work', {job:u.value||t.value});
+    return;
+  }
+  if (t.dataset.cell) {  // 권한 한 칸
+    var p = t.dataset.cell.split('|'), role = p[0], key = p[1], v = Number(t.value);
+    matrix[role][key] = v; t.dataset.v = v;
+    if (v === defaultAccess(role, key)) delete dirty[t.dataset.cell]; else dirty[t.dataset.cell] = v;
+    setPage('perms');
+    return;
+  }
+  if (['q','fOrg','fGrade'].indexOf(t.id) >= 0) filterRows();
+});
+
+document.addEventListener('click', function(e){
+  var t = e.target, d = t.dataset;
+  if (d.scrim || d.x) { closeModal(); return; }
+  if (d.go)  { setPage(d.go); return; }
+  if (d.tab) { permTab = d.tab; setPage('perms'); return; }
+
+  if (d.new === 'user' || d.new === 'member') { userModal(null); return; }
+  if (d.new === 'org')  { orgModal(null); return; }
+  if (d.edit)  { userModal(byId(d.edit)); return; }
+  if (d.del)   { var u = byId(d.del);
+    if (confirm('아이디 「'+u.name+'」 을 삭제하시겠습니까?')) {
+      USERS = USERS.filter(function(x){ return x.id !== u.id; });
+      log('POST /admin/users/'+u.id+'/delete', {}); setPage(page); } return; }
+  if (d.reset) { resetModal(byId(d.reset)); return; }
+  if (d.doreset){ var ru = byId(d.doreset);
+    var how = (document.querySelector('input[name="how"]:checked')||{value:'temp'}).value;
+    if (how === 'link' && !ru.email) { alert('이메일이 없어 링크를 보낼 수 없습니다.'); return; }
+    closeModal(); log('POST /admin/users/'+ru.id+'/reset-password', {how:how});
+    alert(how === 'temp' ? '임시 비밀번호를 한 번만 보여 줍니다 (시늉).' : '초기화 링크를 보냈습니다 (시늉).'); return; }
+
+  if (d.eorg) { orgModal(ORGS.filter(function(o){return o.id===d.eorg;})[0]); return; }
+  if (d.torg) { var o = ORGS.filter(function(x){return x.id===d.torg;})[0];
+    o.active = !o.active; log('POST /admin/orgs/'+o.id+'/status', {is_active:o.active}); setPage('orgs'); return; }
+  if (d.dorg) { var od = ORGS.filter(function(x){return x.id===d.dorg;})[0];
+    if (od.users > 0) { alert('소속 인원이 '+od.users+'명 남아 있어 지울 수 없습니다.\n먼저 인원을 옮기거나 지우세요.'); return; }
+    if (confirm('조직 「'+od.name+'」 을 삭제하시겠습니까?')) {
+      ORGS = ORGS.filter(function(x){ return x.id !== od.id; });
+      log('POST /admin/orgs/'+od.id+'/delete', {}); setPage('orgs'); } return; }
+  if (d.assign) { assignModal(d.assign); return; }
+  if (d.revoke) { var mg = managerOf(d.revoke);
+    if (!mg) return;
+    if (confirm(mg.map(function(x){return x.name;}).join(', ')+' 의 조직관리자 권한을 박탈하시겠습니까?\n관리 등급이 「일반」이 되고 업무를 다시 골라야 합니다.')) {
+      mg.forEach(function(x){ x.grade = 'none'; x.job = ''; });
+      log('POST /admin/orgs/'+d.revoke+'/manager/revoke', {}); setPage('orgs'); } return; }
+
+  if (t.id === 'savePerm') {
+    var n = Object.keys(dirty).length;
+    if (!n) { alert('기본값과 다른 칸이 없습니다. 저장할 것이 없습니다.'); return; }
+    log('POST /admin/permissions/' + (permTab === 'work' ? 'work-types' : 'roles'),
+        { changes: Object.keys(dirty).map(function(k){
+            var p = k.split('|'); return { role:p[0], perm:p[1], access:dirty[k] }; }) });
+    t.textContent = '저장 완료'; setTimeout(function(){ setPage('perms'); }, 900);
+    return;
+  }
+});
+
+document.addEventListener('submit', function(e){
+  e.preventDefault();
+  var f = e.target, d = {};
+  Array.prototype.forEach.call(new FormData(f).entries ? [] : [], function(){});
+  new FormData(f).forEach(function(v,k){ d[k] = v; });
+
+  if (f.id === 'uf') {
+    var grade = d.grade;
+    if (grade === 'none' && !d.job) { alert('일반 이용자는 업무를 하나 골라야 합니다.'); return; }
+    var dup = USERS.filter(function(u){
+      return u.login.toLowerCase() === String(d.login).toLowerCase() && u.id !== d.id; });
+    if (dup.length) { alert('이미 사용 중인 아이디입니다. (대소문자를 구분하지 않습니다)'); return; }
+    var body = { name:d.name, login_id:d.login, mobile:d.mobile||'', tel:d.tel||'', email:d.email||'',
+                 admin_grade:grade, is_readonly:!!d.ro, is_active:!!d.on };
+    if (grade !== 'vision') body.org_id = d.org;
+    if (grade === 'none')   { body.job = d.job; body.is_tester = !!d.test; }
+    var u = d.id ? byId(d.id) : {id:'U'+(USERS.length+1)};
+    u.name=d.name; u.login=d.login; u.mobile=d.mobile||''; u.tel=d.tel||''; u.email=d.email||'';
+    u.grade=grade; u.org=(grade==='vision'?'':d.org); u.job=(grade==='none'?d.job:'');
+    u.ro=!!d.ro; u.test=(grade==='none'?!!d.test:false); u.on=!!d.on;
+    if (!d.id) USERS.push(u);
+    closeModal();
+    log('POST /admin/users' + (d.id ? '/'+d.id : ''), body);
+    setPage(page); return;
+  }
+  if (f.id === 'of') {
+    var o = d.id ? ORGS.filter(function(x){return x.id===d.id;})[0] : {id:'O0'+(ORGS.length+1), no:'(자동)', users:0, customers:0, active:true};
+    o.name = d.name; if (!d.id) ORGS.push(o);
+    closeModal(); log('POST /admin/orgs' + (d.id ? '/'+d.id : ''), {org_name:d.name}); setPage('orgs'); return;
+  }
+  if (f.id === 'af') {
+    var au = byId(d.uid); au.grade = 'org'; au.job = '';
+    closeModal(); log('POST /admin/orgs/'+d.org+'/manager', {user_id:d.uid}); setPage('orgs'); return;
+  }
+});
+
+function log(line, body){
+  var box = $('#log');
+  if (!box) {
+    box = document.createElement('pre');
+    box.id = 'log';
+    box.className = 'fixed bottom-0 left-[248px] right-0 max-h-[34vh] overflow-auto m-0 '+
+      'bg-[#0f172a] text-[#cbd5e1] text-[11px] leading-relaxed p-3 px-10 whitespace-pre-wrap z-20 max-[900px]:left-0 max-[900px]:px-5';
+    document.body.appendChild(box);
+  }
+  box.textContent = '서버로 보낼 값 — ' + line + '\n' + JSON.stringify(body, null, 2);
+  box.scrollTop = 0;
+}
+
+setPage('users');
+</script>
+</body>
+</html>

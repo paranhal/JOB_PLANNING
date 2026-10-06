@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -94,7 +96,12 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		if row.Kind == "project" && strings.TrimSpace(row.ProjectID) == "" {
 			item.MissingProject = true
 		}
-		if pid := strings.TrimSpace(row.ProjectID); pid != "" {
+		if row.Kind == "activity" {
+			item.PrevText, item.PlanText, err = r.composeActivityTexts(row, p, mapped)
+			if err != nil {
+				return out, err
+			}
+		} else if pid := strings.TrimSpace(row.ProjectID); pid != "" {
 			item.MntDoneSites, err = r.countCompanyMntSitesDone(pid, p.PrevFrom, p.PrevToEx, orgID)
 			if err != nil {
 				return out, err
@@ -104,6 +111,14 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 				return out, err
 			}
 			item.MntPlanSites, err = r.countCompanyMntSitesPlanned(pid, p.ThisFrom, p.ThisToEx, orgID)
+			if err != nil {
+				return out, err
+			}
+			doneNames, doneCust, err := r.listCompanyMntSiteNames(pid, p.PrevFrom, p.PrevToEx, orgID, false)
+			if err != nil {
+				return out, err
+			}
+			planNames, planCust, err := r.listCompanyMntSiteNames(pid, p.ThisFrom, p.ThisToEx, orgID, true)
 			if err != nil {
 				return out, err
 			}
@@ -119,8 +134,9 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 			if err != nil {
 				return out, err
 			}
-			item.PrevText = composePrevText(item.MntDoneSites, item.ASDoneCount, adminDone)
-			item.PlanText = composePlanText(item.MntPlanSites, adminPlan, carry)
+			mntCust := mergeCustSet(doneCust, planCust)
+			item.PrevText = composePrevText(item.MntDoneSites, doneNames, item.ASDoneCount, dropDupMntAdmin(adminDone, doneCust))
+			item.PlanText = composePlanText(item.MntPlanSites, planNames, dropDupMntAdmin(adminPlan, mntCust), dropDupMntAdmin(carry, mntCust))
 		}
 		out.Rows = append(out.Rows, item)
 	}
@@ -130,15 +146,21 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		return out, err
 	}
 	out.Unassigned = unassigned
+	incomplete, err := r.listIncompleteMntVisits(p.PrevFrom, p.PrevToEx)
+	if err != nil {
+		return out, err
+	}
+	out.IncompleteMnt = incomplete
 	return out, nil
 }
 
-func composePrevText(mntSites, asCount int, admin []adminLine) string {
+func composePrevText(mntSites int, names []string, asCount int, admin []adminLine) string {
 	var lines []string
-	if mntSites > 0 && asCount > 0 {
-		lines = append(lines, fmt.Sprintf("·정기점검 %d사이트, AS %d건 처리완료", mntSites, asCount))
-	} else if mntSites > 0 {
-		lines = append(lines, fmt.Sprintf("·정기점검 %d사이트", mntSites))
+	core := formatMntSitesCore(mntSites, names)
+	if core != "" && asCount > 0 {
+		lines = append(lines, "·"+core+fmt.Sprintf(", AS %d건 처리완료", asCount))
+	} else if core != "" {
+		lines = append(lines, "·"+core)
 	} else if asCount > 0 {
 		lines = append(lines, fmt.Sprintf("·AS %d건 처리완료", asCount))
 	}
@@ -152,10 +174,10 @@ func composePrevText(mntSites, asCount int, admin []adminLine) string {
 	return strings.Join(lines, "\n")
 }
 
-func composePlanText(mntSites int, plan, carry []adminLine) string {
+func composePlanText(mntSites int, names []string, plan, carry []adminLine) string {
 	var lines []string
-	if mntSites > 0 {
-		lines = append(lines, fmt.Sprintf("·정기점검 %d사이트", mntSites))
+	if core := formatMntSitesCore(mntSites, names); core != "" {
+		lines = append(lines, "·"+core)
 	}
 	for _, a := range plan {
 		lines = append(lines, "·"+a.Title)
@@ -164,6 +186,73 @@ func composePlanText(mntSites int, plan, carry []adminLine) string {
 		lines = append(lines, "·"+a.Title+"(이월)")
 	}
 	return strings.Join(lines, "\n")
+}
+
+func formatMntSitesCore(n int, names []string) string {
+	if n <= 0 {
+		return ""
+	}
+	names = uniqSortedNames(names)
+	core := fmt.Sprintf("정기점검 %d사이트", n)
+	if len(names) == 0 {
+		return core
+	}
+	shown := names
+	extra := 0
+	if len(shown) > 5 {
+		extra = len(shown) - 5
+		shown = shown[:5]
+	}
+	core += "(" + strings.Join(shown, "·")
+	if extra > 0 {
+		core += fmt.Sprintf(" 외 %d곳", extra)
+	}
+	core += ")"
+	return core
+}
+
+func uniqSortedNames(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s == "" || seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func dropDupMntAdmin(lines []adminLine, mntCust map[string]bool) []adminLine {
+	if len(mntCust) == 0 {
+		return lines
+	}
+	var out []adminLine
+	for _, a := range lines {
+		if strings.Contains(a.Title, "정기점검") && mntCust[strings.TrimSpace(a.CustomerID)] {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+func mergeCustSet(a, b map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	for k, v := range a {
+		if v {
+			out[k] = true
+		}
+	}
+	for k, v := range b {
+		if v {
+			out[k] = true
+		}
+	}
+	return out
 }
 
 func slashMD(iso string) string {
@@ -175,7 +264,7 @@ func slashMD(iso string) string {
 }
 
 type adminLine struct {
-	ID, Title, Date, ProjectID, ParentID, Role string
+	ID, Title, Date, ProjectID, ParentID, Role, CustomerID string
 }
 
 func collapseCompanyAdminLines(lines []adminLine) []adminLine {
@@ -213,7 +302,7 @@ func collapseCompanyAdminLines(lines []adminLine) []adminLine {
 }
 
 func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx, orgID string) (int, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
@@ -225,7 +314,7 @@ func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx, orgID string
 }
 
 func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx, orgID string) (int, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
@@ -235,8 +324,83 @@ func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx, orgID str
 	return n, err
 }
 
+func (r *StatsRepo) listCompanyMntSiteNames(projectID, from, toEx, orgID string, planned bool) ([]string, map[string]bool, error) {
+	cust := map[string]bool{}
+	var names []string
+	var rows *sql.Rows
+	var err error
+	if planned {
+		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+		args := append([]interface{}{from, toEx, projectID}, mntArgs...)
+		rows, err = r.db.Query(`
+			SELECT DISTINCT v.customer_id, COALESCE(NULLIF(TRIM(c.org_name),''), v.customer_id)
+			FROM maintenance_visits v
+			LEFT JOIN customers c ON c.customer_id = v.customer_id
+			WHERE v.visit_date >= ? AND v.visit_date < ?
+			  AND TRIM(COALESCE(v.project_id,'')) = ?`+mntSQL+`
+			ORDER BY 2`, args...)
+	} else {
+		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+		args := append([]interface{}{from, toEx, projectID}, mntArgs...)
+		rows, err = r.db.Query(`
+			SELECT DISTINCT v.customer_id, COALESCE(NULLIF(TRIM(c.org_name),''), v.customer_id)
+			FROM maintenance_visits v
+			LEFT JOIN customers c ON c.customer_id = v.customer_id
+			WHERE COALESCE(v.completed,0)=1
+			  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?
+			  AND TRIM(COALESCE(v.project_id,'')) = ?`+mntSQL+`
+			ORDER BY 2`, args...)
+	}
+	if err != nil {
+		return nil, cust, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, cust, err
+		}
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		cust[id] = true
+		names = append(names, name)
+	}
+	return names, cust, rows.Err()
+}
+
+func (r *StatsRepo) listIncompleteMntVisits(from, toEx string) ([]model.IncompleteMntVisit, error) {
+	rows, err := r.db.Query(`
+		SELECT v.visit_id, COALESCE(c.org_name,''), v.visit_date,
+		       COALESCE(v.plan_id,''), COALESCE(v.project_id,'')
+		FROM maintenance_visits v
+		LEFT JOIN customers c ON c.customer_id = v.customer_id
+		WHERE COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
+		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?
+		  AND COALESCE(v.completed,0)=0
+		ORDER BY v.visit_date, c.org_name`, from, toEx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.IncompleteMntVisit
+	for rows.Next() {
+		var v model.IncompleteMntVisit
+		if err := rows.Scan(&v.VisitID, &v.OrgName, &v.VisitDate, &v.PlanID, &v.ProjectID); err != nil {
+			return nil, err
+		}
+		v.Href = "/maintenance"
+		if v.PlanID != "" {
+			v.Href = "/maintenance/" + v.PlanID
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
 func (r *StatsRepo) countCompanyASDone(projectID, from, toEx, orgID string) (int, error) {
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, asArgs...)
 	err := r.db.QueryRow(`
@@ -249,10 +413,10 @@ func (r *StatsRepo) countCompanyASDone(projectID, from, toEx, orgID string) (int
 }
 
 func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([]adminLine, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
-		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,'')
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
 		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
@@ -274,10 +438,10 @@ func companyAdminPlanDateSQL() string {
 
 func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([]adminLine, error) {
 	d := companyAdminPlanDateSQL()
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID)})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
-		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,'')
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
 		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
@@ -305,7 +469,7 @@ func (r *StatsRepo) queryAdminLines(q string, args ...interface{}) ([]adminLine,
 	var out []adminLine
 	for rows.Next() {
 		var a adminLine
-		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role, &a.CustomerID); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

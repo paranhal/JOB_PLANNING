@@ -65,7 +65,7 @@
   {{end}}
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[1200px] text-sm break-keep">
         <thead class="bg-gray-50 border-b">
           <tr>
             {{template "sort_th" (dict "Label" "번호" "Key" "task_id" "Cur" $sort "Dir" $dir "Href" (index $href "task_id"))}}
@@ -87,8 +87,8 @@
               <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
               {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
             </td>
-            <td class="px-4 py-3"><a href="{{.Href}}" class="font-medium text-gray-800 hover:underline">{{.Title}}</a></td>
-            <td class="px-4 py-3 text-gray-700">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</td>
+            <td class="px-4 py-3 max-w-[18rem]"><a href="{{.Href}}" class="font-medium text-gray-800 hover:underline">{{.Title}}</a></td>
+            <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</td>
             {{if $.ShowAssignee}}<td class="px-4 py-3 whitespace-nowrap {{if .AssigneeOther}}font-bold text-gray-900{{else}}text-gray-700{{end}}">{{if .EditLocked}}<span title="읽기 전용">🔒</span> {{end}}{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>{{end}}
             <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{if .WorkDate}}{{.WorkDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
             <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{if .DueDate}}{{.DueDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
@@ -102,7 +102,7 @@
           </tr>
           {{if and $.ReviewMode $.CanWrite}}
           <tr class="bg-slate-50/80">
-            <td colspan="{{if $.ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-3">
+            <td colspan="{{if $.ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-3 whitespace-nowrap">
               <div class="flex flex-col gap-2 text-xs text-gray-700">
                 <div class="flex flex-wrap items-center gap-1.5">
                   <span class="font-semibold text-gray-800">날짜 다시 잡기</span>
@@ -170,7 +170,7 @@
           {{end}}
           {{end}}
           {{else}}
-          <tr><td colspan="{{if .ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-10 text-center text-gray-400">표시할 업무가 없습니다.</td></tr>
+          <tr><td colspan="{{if .ShowAssignee}}8{{else}}7{{end}}" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">표시할 업무가 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>

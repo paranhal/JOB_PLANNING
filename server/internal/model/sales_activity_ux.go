@@ -89,12 +89,12 @@ func SalesActivityTypeBadgeClass(code string) string {
 }
 
 type SalesActivitySummary struct {
-	Count          int
-	Minutes        int
-	DurationLabel  string
-	TopType        string
-	TopLabel       string
-	TopCount       int
+	Count         int
+	Minutes       int
+	DurationLabel string
+	TopType       string
+	TopLabel      string
+	TopCount      int
 }
 
 func BuildSalesActivitySummary(acts []SalesActivity, types []Code) SalesActivitySummary {

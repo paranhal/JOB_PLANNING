@@ -7,10 +7,10 @@ import (
 )
 
 type SalesProgressStep struct {
-	Code    string
-	Label   string
-	Done    bool
-	Mark    string
+	Code  string
+	Label string
+	Done  bool
+	Mark  string
 }
 
 type SalesStageProgress struct {

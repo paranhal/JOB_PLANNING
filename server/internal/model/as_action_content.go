@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	ActionNAPrefix     = "해당 없음:"
-	ActionContentMin   = 10
-	ActionErrRequired  = "action_required"
-	ActionErrNAReason  = "action_na_reason"
-	ActionErrShort     = "action_short"
+	ActionNAPrefix    = "해당 없음:"
+	ActionContentMin  = 10
+	ActionErrRequired = "action_required"
+	ActionErrNAReason = "action_na_reason"
+	ActionErrShort    = "action_short"
 )
 
 // ResolveActionContent 조치 본문. 해당 없음+사유 회피 경로. §5 · §41.4

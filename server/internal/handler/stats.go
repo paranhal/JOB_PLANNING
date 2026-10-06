@@ -23,6 +23,7 @@ type StatsHandler struct {
 	wbRepo    *repository.WBRepo
 	workBoard *repository.WorkBoardRepo
 	mntRepo   *repository.MaintenanceRepo
+	dataDir   string
 }
 
 func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, wbRepo *repository.WBRepo, workBoard *repository.WorkBoardRepo, mntRepo *repository.MaintenanceRepo) *StatsHandler {
@@ -393,7 +394,7 @@ func statsMeetingFilterQuery(f model.StatsMeetingFilter) string {
 }
 
 func canSeeTestStats(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return true
 	}
 	return canResetData(c)

@@ -36,12 +36,21 @@ func TestNormalizeRoleKnownAliases(t *testing.T) {
 		{"테스터", RoleTester},
 		{" admin ", RoleOrgAdmin},
 	}
+	known := map[string]bool{
+		RoleAdmin: true, "관리자": true, RoleOrgAdmin: true, RoleVisionAdmin: true, "비젼관리자": true,
+		RoleTech: true, "기술": true, "기술담당": true, RoleSales: true, "영업": true, "영업담당": true,
+		RoleOffice: true, "행정": true, "receipt": true, "접수": true, "접수담당": true, "user": true,
+		RoleSupport: true, " admin ": true,
+	}
 	for _, tc := range cases {
 		if got := NormalizeRole(tc.in); got != tc.want {
 			t.Fatalf("NormalizeRole(%q)=%q want %q", tc.in, got, tc.want)
 		}
-		if !IsKnownRole(tc.in) {
+		if known[tc.in] && !IsKnownRole(tc.in) {
 			t.Fatalf("IsKnownRole(%q)=false", tc.in)
+		}
+		if !known[tc.in] && IsKnownRole(tc.in) {
+			t.Fatalf("IsKnownRole(%q)=true (깃발 옛 값)", tc.in)
 		}
 	}
 }
@@ -70,7 +79,7 @@ func TestEffectiveRoleTesterUsesBase(t *testing.T) {
 	if got := EffectiveRole(RoleTech, RoleSales); got != RoleTech {
 		t.Fatalf("tech stays=%s", got)
 	}
-	u := User{Role: RoleTester, BaseRole: RoleSales}
+	u := User{Role: RoleSales, IsTest: true}
 	if !HasPermission(u.PermList(), PermSalesCreate) {
 		t.Fatal("영업 테스터가 사업 등록 권한이 없다")
 	}

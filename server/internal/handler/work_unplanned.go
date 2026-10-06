@@ -157,7 +157,7 @@ func unplannedMineQuery(role string, mine bool) string {
 }
 
 func canWriteUnplanned(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	role := currentRole(c)

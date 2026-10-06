@@ -96,27 +96,27 @@
         <h3 class="font-semibold text-gray-800">주요 사업기회</h3>
         <a href="/sales" class="text-xs text-blue-700 hover:underline">전체 보기 →</a>
       </div>
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[900px] text-sm break-keep">
         <thead class="text-xs text-gray-500"><tr>
-          <th class="text-left py-1">사업명</th>
-          <th class="text-left py-1">고객</th>
-          <th class="text-left py-1">단계</th>
-          <th class="text-right py-1">금액</th>
-          <th class="text-right py-1">가능성</th>
-          <th class="text-left py-1">다음 액션</th>
+          <th class="text-left py-1 whitespace-nowrap">사업명</th>
+          <th class="text-left py-1 whitespace-nowrap">고객</th>
+          <th class="text-left py-1 whitespace-nowrap">단계</th>
+          <th class="text-right py-1 whitespace-nowrap">금액</th>
+          <th class="text-right py-1 whitespace-nowrap">가능성</th>
+          <th class="text-left py-1 whitespace-nowrap">다음 액션</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
           {{range .Opps}}
           <tr>
-            <td class="py-1.5"><a href="{{.Href}}" class="text-blue-700 hover:underline">{{if .DisplayNo}}{{.DisplayNo}} {{end}}{{.Name}}</a></td>
-            <td class="py-1.5 text-gray-600">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
-            <td class="py-1.5">{{.StageLabel}}</td>
-            <td class="py-1.5 text-right tabular-nums">{{.Amount}}</td>
-            <td class="py-1.5 text-right">{{if .Prob}}{{.Prob}}{{else}}—{{end}}</td>
-            <td class="py-1.5 text-gray-600">{{.Next}}</td>
+            <td class="py-1.5 whitespace-nowrap"><a href="{{.Href}}" class="text-blue-700 hover:underline">{{if .DisplayNo}}{{.DisplayNo}} {{end}}{{.Name}}</a></td>
+            <td class="py-1.5 text-gray-600 whitespace-nowrap">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+            <td class="py-1.5 whitespace-nowrap">{{.StageLabel}}</td>
+            <td class="py-1.5 text-right tabular-nums whitespace-nowrap">{{.Amount}}</td>
+            <td class="py-1.5 text-right whitespace-nowrap">{{if .Prob}}{{.Prob}}{{else}}—{{end}}</td>
+            <td class="py-1.5 text-gray-600 whitespace-nowrap">{{.Next}}</td>
           </tr>
           {{else}}
-          <tr><td colspan="6" class="py-6 text-center text-gray-400">진행 사업이 없습니다.</td></tr>
+          <tr><td colspan="6" class="py-6 text-center text-gray-400 whitespace-nowrap">진행 사업이 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>
@@ -141,23 +141,23 @@
     <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
       <h3 class="font-semibold text-gray-800 mb-1">판단 정확도</h3>
       <p class="text-[11px] text-gray-400 mb-3">동결 확도 구간별 실제 수주 비율 · 5건 미만은 —</p>
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[900px] text-sm break-keep">
         <thead class="text-xs text-gray-500"><tr>
-          <th class="text-left py-1">영업대표</th>
-          <th class="text-right py-1">10~30</th>
-          <th class="text-right py-1">40~60</th>
-          <th class="text-right py-1">70~90</th>
+          <th class="text-left py-1 whitespace-nowrap">영업대표</th>
+          <th class="text-right py-1 whitespace-nowrap">10~30</th>
+          <th class="text-right py-1 whitespace-nowrap">40~60</th>
+          <th class="text-right py-1 whitespace-nowrap">70~90</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
           {{range .Judge}}
           <tr>
-            <td class="py-1.5">{{.Owner}}</td>
-            <td class="py-1.5 text-right tabular-nums">{{.Low}}</td>
-            <td class="py-1.5 text-right tabular-nums">{{.Mid}}</td>
-            <td class="py-1.5 text-right tabular-nums">{{.High}}</td>
+            <td class="py-1.5 whitespace-nowrap">{{.Owner}}</td>
+            <td class="py-1.5 text-right tabular-nums whitespace-nowrap">{{.Low}}</td>
+            <td class="py-1.5 text-right tabular-nums whitespace-nowrap">{{.Mid}}</td>
+            <td class="py-1.5 text-right tabular-nums whitespace-nowrap">{{.High}}</td>
           </tr>
           {{else}}
-          <tr><td colspan="4" class="py-6 text-center text-gray-400">집계할 종료 건이 없습니다.</td></tr>
+          <tr><td colspan="4" class="py-6 text-center text-gray-400 whitespace-nowrap">집계할 종료 건이 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>

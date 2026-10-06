@@ -300,13 +300,13 @@ func TestASActionAttachSilentErrorsShowBanner(t *testing.T) {
 		t.Error("파일 필요 배너 없음")
 	}
 
-	obs := postActionPhotoEchoCookie(t, e, jwtCookieRole(t, "observer"), asID, "p.png", "", makePNG(t, 40, 20))
+	obs := postActionPhotoEchoCookie(t, e, jwtCookieReadOnly(t, "tech"), asID, "p.png", "", makePNG(t, 40, 20))
 	if obs.Code != http.StatusSeeOther || !strings.Contains(obs.Header().Get("Location"), "attach_forbidden") {
 		t.Fatalf("옵저버: status=%d loc=%s", obs.Code, obs.Header().Get("Location"))
 	}
 	page2 := httptest.NewRecorder()
 	reqO := httptest.NewRequest(http.MethodGet, "http://localhost"+obs.Header().Get("Location"), nil)
-	reqO.AddCookie(jwtCookieRole(t, "observer"))
+	reqO.AddCookie(jwtCookieReadOnly(t, "tech"))
 	e.ServeHTTP(page2, reqO)
 	if !strings.Contains(page2.Body.String(), "권한이 없습니다") {
 		t.Error("권한 배너 없음")

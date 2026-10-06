@@ -20,24 +20,34 @@ type CompanyWeeklyPeriod struct {
 
 // CompanyWeeklyRow 엑셀 20~25행 초안. §16.6.5
 type CompanyWeeklyRow struct {
-	RowKey          string
-	SheetRow        int
-	Division        string
-	Team            string
-	NoLabel         string
-	DisplayName     string
-	ProjectID       string
-	RowKind         string // project | manual
-	Highlight       bool
-	IsActive        bool
-	MissingProject  bool // 404행처럼 대응 사업이 없음
-	PrevText        string // F열
-	PlanText        string // G열
-	HelpText        string // H열 — 화면 직접 입력
-	DecisionText    string // I열 — 화면 직접 입력
-	MntDoneSites    int
-	ASDoneCount     int
-	MntPlanSites    int
+	RowKey         string
+	SheetRow       int
+	Division       string
+	Team           string
+	NoLabel        string
+	DisplayName    string
+	ProjectID      string
+	RowKind        string // project | manual
+	Highlight      bool
+	IsActive       bool
+	MissingProject bool   // 404행처럼 대응 사업이 없음
+	PrevText       string // F열
+	PlanText       string // G열
+	HelpText       string // H열 — 화면 직접 입력
+	DecisionText   string // I열 — 화면 직접 입력
+	MntDoneSites   int
+	ASDoneCount    int
+	MntPlanSites   int
+}
+
+// IncompleteMntVisit 완료 표시가 없는 정기점검 방문. §68.6
+type IncompleteMntVisit struct {
+	VisitID   string
+	OrgName   string
+	VisitDate string
+	PlanID    string
+	ProjectID string
+	Href      string
 }
 
 // CompanyWeeklyUnassigned 어느 행에도 안 붙은 활동. §16.6.5 · §16.6.9
@@ -56,7 +66,8 @@ type CompanyWeeklyUnassigned struct {
 
 // CompanyWeeklyDraft 전사 주간업무보고 초안 (시트 쓰기 전). §16.6.5~7
 type CompanyWeeklyDraft struct {
-	Period     CompanyWeeklyPeriod
-	Rows       []CompanyWeeklyRow
-	Unassigned []CompanyWeeklyUnassigned
+	Period           CompanyWeeklyPeriod
+	Rows             []CompanyWeeklyRow
+	Unassigned       []CompanyWeeklyUnassigned
+	IncompleteMnt    []IncompleteMntVisit
 }

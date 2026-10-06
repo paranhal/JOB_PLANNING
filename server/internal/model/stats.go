@@ -320,6 +320,16 @@ type StatsPeriodColumn struct {
 	Counts      StatsBucketCounts
 }
 
+// DateBasis 이 집계가 기간을 재는 날짜 (§68.3.3).
+type DateBasis int
+
+const (
+	BasisUnspecified DateBasis = iota
+	BasisReceipt
+	BasisVisit
+	BasisComplete
+)
+
 // StatsMeetingFilter 팀전체 / 담당자별 / 업무구분·업무(제품)별 + 사업
 type StatsMeetingFilter struct {
 	Scope                string // team | assignee | work_type | product
@@ -327,7 +337,12 @@ type StatsMeetingFilter struct {
 	ProjectID            string // 사업(work_projects) 선택 시
 	IncludeImport        bool   // true면 data_origin=import 포함. 기본은 제외(§4.3)
 	ExcludeSalesActivity bool   // true면 source_type=sales_activity 를 집계에서 뺀다. 기본은 포함(§32.11)
-	MetricsBaseDate      string // 집계 하한 YYYY-MM-DD. 설정에서 채운다. 토글로 풀리지 않는다 (§4.5.3)
+	MetricsBaseDate      string // 옛 한 칸. 표시·되돌리기용. 필터는 아래 셋을 쓴다 (§68.3)
+	MetricsBaseReceipt   string
+	MetricsBaseVisit     string
+	MetricsBaseComplete  string
+	DateBasis            DateBasis
+	AlsoBases            []DateBasis // 리드타임: 기준일 두 개(또는 셋)를 모두 넘긴 건만 (§4.15 · §68.3.3)
 	OrgID                string // 세션 조직. 빈 값은 전 조직이 아니다 (§52.4)
 	TestDataOnly         bool   // true면 is_test=1 만. 기본은 테스터 행 제외 (§53.8.2)
 }

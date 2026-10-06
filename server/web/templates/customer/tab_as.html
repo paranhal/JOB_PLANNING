@@ -12,38 +12,38 @@
 
   {{if .Items}}
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[900px] text-sm break-keep">
       <thead>
         <tr class="border-b border-gray-200">
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">접수번호</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">접수일시</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">제품</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">증상</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">긴급</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
-          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">담당자</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">접수번호</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">접수일시</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">제품</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48 whitespace-nowrap">증상</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">긴급</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">상태</th>
+          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">담당자</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Items}}
         <tr class="hover:bg-gray-50 transition-colors">
-          <td class="py-2.5 pr-4">
+          <td class="py-2.5 pr-4 whitespace-nowrap">
             <a href="/as/{{.ASID}}" class="font-mono text-xs text-blue-600 hover:underline">{{.ASNumber}}</a>
           </td>
-          <td class="py-2.5 pr-4 text-gray-600 text-xs">
+          <td class="py-2.5 pr-4 text-gray-600 text-xs whitespace-nowrap">
             {{.ReceiptDatetime.Format "2006-01-02 15:04"}}
           </td>
-          <td class="py-2.5 pr-4 text-gray-600 text-xs">{{.ProductName}}</td>
-          <td class="py-2.5 pr-4 text-gray-700 max-w-xs truncate" title="{{.Symptom}}">{{.Symptom}}</td>
-          <td class="py-2.5 pr-4">
+          <td class="py-2.5 pr-4 text-gray-600 text-xs whitespace-nowrap">{{.ProductName}}</td>
+          <td class="py-2.5 pr-4 text-gray-700 max-w-xs truncate whitespace-nowrap" title="{{.Symptom}}">{{.Symptom}}</td>
+          <td class="py-2.5 pr-4 whitespace-nowrap">
             {{if eq .Urgency "high"}}
               <span class="text-red-600 font-bold text-xs">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
             {{end}}
           </td>
-          <td class="py-2.5 pr-4">
+          <td class="py-2.5 pr-4 whitespace-nowrap">
             {{statusBadge .Status}}
           </td>
-          <td class="py-2.5 text-gray-600 text-xs">{{.AssignedTo}}</td>
+          <td class="py-2.5 text-gray-600 text-xs whitespace-nowrap">{{.AssignedTo}}</td>
         </tr>
         {{end}}
       </tbody>

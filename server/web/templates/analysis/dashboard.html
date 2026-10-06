@@ -32,23 +32,23 @@
     </button>
     <div x-show="open" class="border-t border-gray-100">
       <div class="overflow-x-auto px-6 pt-2">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[900px] text-sm break-keep">
           <thead class="text-xs text-gray-500 border-b"><tr>
-            <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th><th class="text-left py-2">구분</th>
-            <th class="text-left py-2">제조사</th><th class="text-center py-2">설치연수</th><th class="text-center py-2">AS건수</th>
+            <th class="text-left py-2 whitespace-nowrap">기관</th><th class="text-left py-2 whitespace-nowrap">제품명</th><th class="text-left py-2 whitespace-nowrap">구분</th>
+            <th class="text-left py-2 whitespace-nowrap">제조사</th><th class="text-center py-2 whitespace-nowrap">설치연수</th><th class="text-center py-2 whitespace-nowrap">AS건수</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-50">
             {{range .Aging}}
             <tr>
-              <td class="py-2">{{.CustomerName}}</td>
+              <td class="py-2 whitespace-nowrap">{{.CustomerName}}</td>
               <td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
-              <td class="text-xs text-gray-500">{{.ProductType}}</td>
-              <td class="text-xs text-gray-500">{{.Manufacturer}}</td>
-              <td class="text-center text-red-600 font-bold">{{.InstallYears}}년</td>
-              <td class="text-center">{{.ASCount}}</td>
+              <td class="text-xs text-gray-500 whitespace-nowrap">{{.ProductType}}</td>
+              <td class="text-xs text-gray-500 whitespace-nowrap">{{.Manufacturer}}</td>
+              <td class="text-center text-red-600 font-bold whitespace-nowrap">{{.InstallYears}}년</td>
+              <td class="text-center whitespace-nowrap">{{.ASCount}}</td>
             </tr>
             {{else}}
-            <tr><td colspan="6" class="py-8 text-center text-gray-400">해당 자산이 없습니다.</td></tr>
+            <tr><td colspan="6" class="py-8 text-center text-gray-400 whitespace-nowrap">해당 자산이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>
@@ -81,21 +81,21 @@
     </button>
     <div x-show="open" class="border-t border-gray-100">
       <div class="overflow-x-auto px-6 pt-2">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[900px] text-sm break-keep">
           <thead class="text-xs text-gray-500 border-b"><tr>
-            <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th>
-            <th class="text-center py-2">AS건수</th><th class="text-center py-2">설치연수</th>
+            <th class="text-left py-2 whitespace-nowrap">기관</th><th class="text-left py-2 whitespace-nowrap">제품명</th>
+            <th class="text-center py-2 whitespace-nowrap">AS건수</th><th class="text-center py-2 whitespace-nowrap">설치연수</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-50">
             {{range .Frequent}}
             <tr>
-              <td class="py-2">{{.CustomerName}}</td>
+              <td class="py-2 whitespace-nowrap">{{.CustomerName}}</td>
               <td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
-              <td class="text-center font-bold text-orange-600">{{.ASCount}}</td>
-              <td class="text-center">{{.InstallYears}}년</td>
+              <td class="text-center font-bold text-orange-600 whitespace-nowrap">{{.ASCount}}</td>
+              <td class="text-center whitespace-nowrap">{{.InstallYears}}년</td>
             </tr>
             {{else}}
-            <tr><td colspan="4" class="py-8 text-center text-gray-400">해당 자산이 없습니다.</td></tr>
+            <tr><td colspan="4" class="py-8 text-center text-gray-400 whitespace-nowrap">해당 자산이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>
@@ -128,22 +128,22 @@
     </button>
     <div x-show="open" class="border-t border-gray-100">
       <div class="overflow-x-auto px-6 pt-2">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[900px] text-sm break-keep">
           <thead class="text-xs text-gray-500 border-b"><tr>
-            <th class="text-left py-2">기관</th><th class="text-left py-2">제품명</th>
-            <th class="text-left py-2">설치주체</th><th class="text-center py-2">설치연수</th><th class="text-center py-2">AS</th>
+            <th class="text-left py-2 whitespace-nowrap">기관</th><th class="text-left py-2 whitespace-nowrap">제품명</th>
+            <th class="text-left py-2 whitespace-nowrap">설치주체</th><th class="text-center py-2 whitespace-nowrap">설치연수</th><th class="text-center py-2 whitespace-nowrap">AS</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-50">
             {{range .Other}}
             <tr>
-              <td class="py-2">{{.CustomerName}}</td>
+              <td class="py-2 whitespace-nowrap">{{.CustomerName}}</td>
               <td><a href="/assets/{{.AssetID}}" class="text-blue-600 hover:underline">{{.ProductName}}</a></td>
-              <td class="text-xs text-gray-500">{{.InstallerType}}</td>
-              <td class="text-center">{{.InstallYears}}년</td>
-              <td class="text-center">{{.ASCount}}</td>
+              <td class="text-xs text-gray-500 whitespace-nowrap">{{.InstallerType}}</td>
+              <td class="text-center whitespace-nowrap">{{.InstallYears}}년</td>
+              <td class="text-center whitespace-nowrap">{{.ASCount}}</td>
             </tr>
             {{else}}
-            <tr><td colspan="5" class="py-8 text-center text-gray-400">해당 자산이 없습니다.</td></tr>
+            <tr><td colspan="5" class="py-8 text-center text-gray-400 whitespace-nowrap">해당 자산이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>

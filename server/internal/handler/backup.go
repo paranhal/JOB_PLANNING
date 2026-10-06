@@ -75,8 +75,12 @@ func (h *BackupHandler) Page(c echo.Context) error {
 		checks = repository.RunAppendixC(h.cfg.DB, true)
 	}
 	metricsBase := ""
+	metricsReceipt, metricsVisit, metricsComplete := "", "", ""
 	if h.settings != nil {
 		metricsBase, _ = h.settings.Get(repository.SettingMetricsBaseDate)
+		metricsReceipt, _ = h.settings.Get(repository.SettingMetricsBaseReceipt)
+		metricsVisit, _ = h.settings.Get(repository.SettingMetricsBaseVisit)
+		metricsComplete, _ = h.settings.Get(repository.SettingMetricsBaseComplete)
 	}
 	var importBatches []model.ASImportBatch
 	var importBatch *model.ASImportBatch
@@ -122,7 +126,10 @@ func (h *BackupHandler) Page(c echo.Context) error {
 		"Error":              errMsg,
 		"DataPath":           filepath.ToSlash(filepath.Join(h.cfg.DataDir, "backups")),
 		"Due":                audit.DueForArchive(),
-		"MetricsBaseDate":    metricsBase,
+		"MetricsBaseDate":     metricsBase,
+		"MetricsBaseReceipt":  metricsReceipt,
+		"MetricsBaseVisit":    metricsVisit,
+		"MetricsBaseComplete": metricsComplete,
 		"ImportBatches":      importBatches,
 		"ImportBatch":        importBatch,
 		"ImportRows":         importRows,
@@ -168,14 +175,26 @@ func (h *BackupHandler) SaveMetrics(c echo.Context) error {
 	if h.settings == nil {
 		return redirect("", "설정 저장소를 쓸 수 없습니다")
 	}
-	base := strings.TrimSpace(c.FormValue("metrics_base_date"))
-	if base != "" {
-		if _, err := time.Parse("2006-01-02", base); err != nil {
-			return redirect("", "기준일은 YYYY-MM-DD 형식이어야 합니다")
+	save := func(key, raw string) error {
+		raw = strings.TrimSpace(raw)
+		if raw != "" {
+			if _, err := time.Parse("2006-01-02", raw); err != nil {
+				return fmt.Errorf("기준일은 YYYY-MM-DD 형식이어야 합니다")
+			}
 		}
+		return h.settings.Set(key, raw)
 	}
-	if err := h.settings.Set(repository.SettingMetricsBaseDate, base); err != nil {
-		return redirect("", fmt.Sprintf("기준일 저장 실패: %v", err))
+	if err := save(repository.SettingMetricsBaseDate, c.FormValue("metrics_base_date")); err != nil {
+		return redirect("", err.Error())
+	}
+	if err := save(repository.SettingMetricsBaseReceipt, c.FormValue("metrics_base_receipt")); err != nil {
+		return redirect("", err.Error())
+	}
+	if err := save(repository.SettingMetricsBaseVisit, c.FormValue("metrics_base_visit")); err != nil {
+		return redirect("", err.Error())
+	}
+	if err := save(repository.SettingMetricsBaseComplete, c.FormValue("metrics_base_complete")); err != nil {
+		return redirect("", err.Error())
 	}
 	return redirect("지표 기준을 저장했습니다. 통계·보고서·대시보드 KPI가 함께 바뀝니다.", "")
 }

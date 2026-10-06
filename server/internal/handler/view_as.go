@@ -13,8 +13,7 @@ import (
 const viewAsCookie = "view_as_user_id"
 
 func canUseViewAs(c echo.Context) bool {
-	r := loginRole(c)
-	return model.IsAdminGrade(r) || r == model.RoleObserver
+	return model.IsAdminGrade(loginRole(c))
 }
 
 func identityUserID(c echo.Context) string {
@@ -36,12 +35,8 @@ func applySimulation(c echo.Context, role, storedPerms, orgID, baseRole string) 
 	baseRole = model.NormalizeRole(baseRole)
 	c.Set("sim_role", role)
 	c.Set("sim_base_role", baseRole)
-	c.Set("sim_permissions", model.EffectivePermissions(model.EffectiveRole(role, baseRole), storedPerms))
+	c.Set("sim_permissions", model.EffectivePermissions(role, storedPerms))
 	c.Set("sim_org_id", strings.TrimSpace(orgID))
-}
-
-func applyObserverOrgAdminSim(c echo.Context) {
-	applySimulation(c, model.RoleOrgAdmin, "", ctxString(c, "org_id"), "")
 }
 
 func applyUserSimulation(c echo.Context, u *model.User) {
@@ -64,8 +59,7 @@ func viewAsCandidates(users []model.User, selfID string) []model.User {
 		if strings.TrimSpace(u.UserID) == selfID {
 			continue
 		}
-		switch model.NormalizeRole(u.Role) {
-		case model.RoleObserver:
+		if u.IsReadOnly {
 			continue
 		}
 		out = append(out, u)
@@ -88,17 +82,11 @@ func (h *AuthHandler) InjectViewAs(next echo.HandlerFunc) echo.HandlerFunc {
 			uid = strings.TrimSpace(ck.Value)
 		}
 		if uid == "" || uid == ctxString(c, "user_id") {
-			if isObserverRole(c) {
-				applyObserverOrgAdminSim(c)
-			}
 			return next(c)
 		}
 		u, err := h.userRepo.GetByID(uid)
 		if err != nil || u == nil || !u.IsActive {
-			c.SetCookie(&http.Cookie{Name: viewAsCookie, Value: "", Path: "/", MaxAge: -1})
-			if isObserverRole(c) {
-				applyObserverOrgAdminSim(c)
-			}
+			c.SetCookie(sessionCookie(viewAsCookie, "", -1))
 			return next(c)
 		}
 		applyUserSimulation(c, u)
@@ -135,7 +123,7 @@ func (h *AuthHandler) SetViewAs(c echo.Context) error {
 	if err != nil || u == nil {
 		return echo.ErrNotFound
 	}
-	c.SetCookie(&http.Cookie{Name: viewAsCookie, Value: u.UserID, Path: "/", HttpOnly: true})
+	c.SetCookie(sessionCookie(viewAsCookie, u.UserID, 86400))
 	audit.LogWithReason(audit.ActionUpdate, "users", "user_id", u.UserID, u.FullName, "", "", "시점 보기 시작")
 	ret := strings.TrimSpace(c.FormValue("return"))
 	if !strings.HasPrefix(ret, "/") {
@@ -152,7 +140,7 @@ func (h *AuthHandler) ClearViewAs(c echo.Context) error {
 	if ck, err := c.Cookie(viewAsCookie); err == nil && ck != nil {
 		prev = strings.TrimSpace(ck.Value)
 	}
-	c.SetCookie(&http.Cookie{Name: viewAsCookie, Value: "", Path: "/", MaxAge: -1})
+	c.SetCookie(sessionCookie(viewAsCookie, "", -1))
 	if prev != "" {
 		audit.LogWithReason(audit.ActionUpdate, "users", "user_id", prev, "시점 보기", "", "", "시점 보기 종료")
 	}

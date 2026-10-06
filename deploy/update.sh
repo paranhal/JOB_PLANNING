@@ -14,6 +14,15 @@ echo "== 이전 버전 =========================================="
 curl -s localhost:8888/version || echo "  (응답 없음)"
 echo ""
 
+# 지금 도는 이미지를 남겨 두면 ./rollback.sh 로 앱만 되돌릴 수 있다.
+if docker image inspect server-app:latest >/dev/null 2>&1; then
+  echo "== 직전 이미지 보관 (server-app:prev) ================="
+  docker tag server-app:latest server-app:prev
+  docker save server-app:prev -o server-app.tar.prev
+  echo "  저장: server-app.tar.prev"
+  echo ""
+fi
+
 echo "== 내리기 ============================================="
 docker compose down
 
@@ -38,3 +47,6 @@ echo ""
 echo "  built 가 방금 빌드한 시각인지,"
 echo "  started 가 방금인지 확인하세요."
 echo "  둘 다 맞아야 배포가 끝난 것입니다."
+echo "  앱만 되돌리기: ./rollback.sh"
+echo "  (WinSCP로 tar 를 덮기 전에 update.sh 를 한 번 돌려야 prev 가 생깁니다."
+echo "   이미 덮었다면 이번엔 이미지 원복이 안 됩니다. 다음 배포부터 됩니다.)"

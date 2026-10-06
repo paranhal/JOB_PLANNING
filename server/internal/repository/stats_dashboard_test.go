@@ -16,6 +16,9 @@ func setMetricsPolicy(t *testing.T, db *sql.DB, base, scope string) {
 	if err := s.Set(SettingMetricsBaseDate, base); err != nil {
 		t.Fatal(err)
 	}
+	_ = s.Set(SettingMetricsBaseReceipt, base)
+	_ = s.Set(SettingMetricsBaseVisit, base)
+	_ = s.Set(SettingMetricsBaseComplete, base)
 	_ = scope
 }
 

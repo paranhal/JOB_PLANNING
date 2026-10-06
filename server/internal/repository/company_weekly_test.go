@@ -119,8 +119,8 @@ func TestCompanyWeeklyDraftAugust2CompleteBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(draft.Rows) != 6 {
-		t.Fatalf("행 수=%d want 6", len(draft.Rows))
+	if len(draft.Rows) != 7 {
+		t.Fatalf("행 수=%d want 7", len(draft.Rows))
 	}
 	byKey := map[string]model.CompanyWeeklyRow{}
 	for _, row := range draft.Rows {
@@ -138,14 +138,14 @@ func TestCompanyWeeklyDraftAugust2CompleteBaseline(t *testing.T) {
 	if byKey["X01"].MntDoneSites != 6 || byKey["X01"].ASDoneCount != 4 {
 		t.Fatalf("앤로 F24 mnt=%d as=%d want 6/4", byKey["X01"].MntDoneSites, byKey["X01"].ASDoneCount)
 	}
-	wantF20 := "·정기점검 5사이트, AS 5건 처리완료\n·계약변경 회신(8/12)"
+	wantF20 := "·정기점검 5사이트(CN-1·CN-2·CN-3·CN-4·CN-5), AS 5건 처리완료\n·계약변경 회신(8/12)"
 	if byKey["401"].PrevText != wantF20 {
 		t.Fatalf("F20=%q want %q", byKey["401"].PrevText, wantF20)
 	}
-	if byKey["403"].PrevText != "·정기점검 2사이트" {
+	if byKey["403"].PrevText != "·정기점검 2사이트(SJ-1·SJ-2)" {
 		t.Fatalf("F22=%q", byKey["403"].PrevText)
 	}
-	if byKey["X01"].PrevText != "·정기점검 6사이트, AS 4건 처리완료" {
+	if byKey["X01"].PrevText != "·정기점검 6사이트(AN-1·AN-2·AN-3·AN-4·AN-5 외 1곳), AS 4건 처리완료" {
 		t.Fatalf("F24=%q", byKey["X01"].PrevText)
 	}
 	if byKey["402"].PrevText != "" || byKey["404"].PrevText != "" || byKey["X02"].PrevText != "" {
@@ -154,7 +154,7 @@ func TestCompanyWeeklyDraftAugust2CompleteBaseline(t *testing.T) {
 	if !byKey["404"].MissingProject {
 		t.Fatal("404행은 대응 사업 없음으로 표시")
 	}
-	if !strings.Contains(byKey["401"].PlanText, "·정기점검 1사이트") || !strings.Contains(byKey["401"].PlanText, "·현장점검 준비") {
+	if !strings.Contains(byKey["401"].PlanText, "·정기점검 1사이트(PLAN-CN)") || !strings.Contains(byKey["401"].PlanText, "·현장점검 준비") {
 		t.Fatalf("G20 금주=%q", byKey["401"].PlanText)
 	}
 	if !strings.Contains(byKey["401"].PlanText, "·세금계산서(이월)") {
@@ -189,11 +189,11 @@ func TestWeeklyReportRowsSeeded(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM weekly_report_rows`).Scan(&n); err != nil || n != 6 {
-		t.Fatalf("초기 행=%d err=%v want 6", n, err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM weekly_report_rows`).Scan(&n); err != nil || n != 7 {
+		t.Fatalf("초기 행=%d err=%v want 7", n, err)
 	}
 	applyWeeklyReportRows(db)
-	if err := db.QueryRow(`SELECT COUNT(*) FROM weekly_report_rows`).Scan(&n); err != nil || n != 6 {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM weekly_report_rows`).Scan(&n); err != nil || n != 7 {
 		t.Fatalf("시드 재실행 후=%d", n)
 	}
 }

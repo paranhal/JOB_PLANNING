@@ -1,36 +1,26 @@
 {{define "title"}}사용자 관리 · 고객지원시스템{{end}}
 {{define "content"}}
-{{$permDefs := .PermDefs}}
 {{$canEdit := .CanEditUsers}}
-<div class="space-y-6" x-data="{ showForm: false, pwUser: '{{.FocusUser}}' }">
-  <div class="flex items-center justify-between gap-3 flex-wrap">
+{{$orgNames := .OrgNames}}
+<div class="space-y-5">
+  <div class="flex items-start justify-between gap-3 flex-wrap">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">사용자 / 권한 관리</h2>
-      <p class="text-sm text-gray-500 mt-1">직급을 고르고, 체크박스로 세부 권한을 지정합니다. 직급: 비젼관리자·조직관리자·지원·기술·영업·옵저버·테스터{{if not $canEdit}} (조회 전용){{end}}</p>
+      <h2 class="text-2xl font-extrabold text-slate-800">사용자 관리</h2>
+      <p class="text-sm text-slate-500 mt-1">조직별 사용자 아이디와 업무 권한을 관리하세요.</p>
     </div>
     {{if $canEdit}}
-    <button type="button" @click="showForm=!showForm" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">+ 사용자 추가</button>
+    <button type="button" id="btn-new" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">＋ 아이디 생성</button>
     {{end}}
   </div>
 
-  {{if .OK}}
-  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>
-  {{end}}
-  {{if .Error}}
-  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
-  {{end}}
+  {{if .OK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>{{end}}
 
   {{if .Unmatched}}
   <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
     <p class="font-medium mb-2">user_id 가 없어 이름 글자를 못 고친 행입니다. 사람이 확인하세요.</p>
-    <table class="w-full text-xs">
-      <thead><tr class="text-left text-amber-800"><th class="py-1">표</th><th>칸</th><th>이름</th><th class="text-right">건수</th></tr></thead>
-      <tbody>
-      {{range .Unmatched}}
-        <tr><td class="py-0.5 font-mono">{{.Table}}</td><td class="font-mono">{{.Column}}</td><td>{{.Name}}</td><td class="text-right">{{.Count}}</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <table class="w-full text-xs break-keep"><thead><tr class="text-left"><th class="py-1">표</th><th>칸</th><th>이름</th><th class="text-right">건수</th></tr></thead>
+    <tbody>{{range .Unmatched}}<tr><td class="font-mono">{{.Table}}</td><td class="font-mono">{{.Column}}</td><td>{{.Name}}</td><td class="text-right">{{.Count}}</td></tr>{{end}}</tbody></table>
   </div>
   {{end}}
 
@@ -40,332 +30,512 @@
     {{else}}
     <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       비밀번호 해시 전환 진행 중 — 사용자 {{.HashMig.UserBcrypt}}/{{.HashMig.UserTotal}}명이 bcrypt입니다. 나머지 계정은 다음 로그인 시 자동 전환됩니다.
-      AS 수정 비밀번호:
-      {{if .HashMig.ASBcrypt}}전환됨{{else if .HashMig.ASSet}}미전환 (다음 잠금 해제 시 자동 전환){{else}}미설정{{end}}
-      · 정기점검 삭제 비밀번호:
-      {{if .HashMig.DelBcrypt}}전환됨{{else if .HashMig.DelSet}}미전환{{else}}미설정{{end}}
+      AS 수정 비밀번호: {{if .HashMig.ASBcrypt}}전환됨{{else if .HashMig.ASSet}}미전환 (다음 잠금 해제 시 자동 전환){{else}}미설정{{end}}
+      · 정기점검 삭제 비밀번호: {{if .HashMig.DelBcrypt}}전환됨{{else if .HashMig.DelSet}}미전환{{else}}미설정{{end}}
     </div>
     {{end}}
   {{end}}
 
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="/admin/orgs" class="rounded-2xl border border-transparent bg-blue-50 p-5 hover:border-blue-200">
+      <p class="text-sm font-bold text-blue-600 mb-2">비젼관리자</p>
+      <p class="font-bold text-slate-800">전체 조직 관리</p>
+      <p class="text-sm text-slate-500 mt-1">모든 조직과 관리자를 설정할 수 있습니다.</p>
+      <p class="text-xs font-bold text-blue-700 mt-3">전체 조직 관리 →</p>
+    </a>
+    <a href="/admin/my-org/members" class="rounded-2xl border border-gray-200 bg-white p-5 hover:border-green-200">
+      <p class="text-sm font-bold text-green-600 mb-2">조직관리자</p>
+      <p class="font-bold text-slate-800">소속 조직 인원 관리</p>
+      <p class="text-sm text-slate-500 mt-1">아이디, 비밀번호, 업무와 인원을 관리합니다.</p>
+      <p class="text-xs font-bold text-green-700 mt-3">소속 인원 관리 →</p>
+    </a>
+    <a href="/admin/permissions?tab=work" class="rounded-2xl border border-gray-200 bg-white p-5 hover:border-slate-300">
+      <p class="text-sm font-bold text-slate-500 mb-2">일반 이용자</p>
+      <p class="font-bold text-slate-800">업무별 서비스 이용</p>
+      <p class="text-sm text-slate-500 mt-1">영업 · 기술 · 지원 중 하나를 가집니다.</p>
+      <p class="text-xs font-bold text-slate-600 mt-3">업무별 권한 확인 →</p>
+    </a>
+  </div>
+
+  <div class="rounded-2xl border border-gray-200 bg-white px-5 py-3.5 text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-2 items-center">
+    <b class="text-slate-800">깃발</b>
+    <span><span class="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs">읽기전용</span> 등급·업무는 그대로 두고 <b class="text-slate-700">쓰기만</b> 막습니다. 어느 등급에나 붙습니다.</span>
+    <span><span class="inline-block px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-xs">테스터</span> 이 사람이 만든 자료를 <b class="text-slate-700">지표에서 뺍니다.</b> 일반에만 붙습니다.</span>
+  </div>
+
+  <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+    <div class="p-5 space-y-3">
+      <div class="relative">
+        <input id="q" type="search" placeholder="이름, 아이디, 조직 검색" class="w-full border rounded-lg pl-10 pr-3 py-2.5 text-sm">
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <select id="fOrg" class="border rounded-lg px-3 py-2.5 text-sm">
+          <option value="">전체 조직</option>
+          {{range .Orgs}}<option value="{{.OrgID}}">{{.OrgName}}</option>{{end}}
+        </select>
+        <select id="fState" class="border rounded-lg px-3 py-2.5 text-sm">
+          <option value="">전체 상태</option>
+          <option value="1">활성</option>
+          <option value="0">비활성</option>
+        </select>
+        <select id="fRole" class="border rounded-lg px-3 py-2.5 text-sm">
+          <option value="">전체 역할</option>
+          <optgroup label="관리 등급"><option value="g:vision">비젼관리자</option><option value="g:org">조직관리자</option><option value="g:none">일반</option></optgroup>
+          <optgroup label="업무"><option value="j:sales">영업</option><option value="j:tech">기술</option><option value="j:support">지원</option></optgroup>
+          <optgroup label="깃발"><option value="f:ro">읽기전용만</option><option value="f:test">테스터만</option></optgroup>
+        </select>
+      </div>
+    </div>
+
+    {{if $canEdit}}
+    <form id="bulk" method="POST" class="hidden items-center gap-2 flex-wrap px-5 py-3 bg-blue-50 border-y border-gray-200">
+      <span class="text-sm font-bold text-blue-700" id="bulkN">0명 선택</span>
+      <select name="org_id" class="border rounded px-2 py-1 text-xs"><option value="">조직</option>{{range .Orgs}}<option value="{{.OrgID}}">{{.OrgName}}</option>{{end}}</select>
+      <button type="submit" formaction="/users/bulk/org" class="px-3 py-1.5 border rounded-lg text-xs bg-white">조직 옮기기</button>
+      <select name="job" class="border rounded px-2 py-1 text-xs"><option value="">업무</option><option value="sales">영업</option><option value="tech">기술</option><option value="support">지원</option></select>
+      <button type="submit" formaction="/users/bulk/job" class="px-3 py-1.5 border rounded-lg text-xs bg-white">업무 바꾸기</button>
+      <input name="reason" placeholder="읽기전용 사유" class="border rounded px-2 py-1 text-xs w-40">
+      <button type="submit" formaction="/users/bulk/readonly" class="px-3 py-1.5 border rounded-lg text-xs bg-white">읽기전용 켜기</button>
+      <button type="submit" formaction="/users/bulk/deactivate" class="px-3 py-1.5 border rounded-lg text-xs bg-white">비활성화</button>
+      <button type="button" id="bulk-clear" class="ml-auto px-3 py-1.5 border rounded-lg text-xs bg-white">선택 해제</button>
+      <div id="bulk-ids"></div>
+    </form>
+    {{end}}
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[1240px] text-sm">
+        <thead>
+          <tr class="bg-slate-50 text-left text-xs font-bold text-slate-500">
+            <th class="px-4 py-3 w-11">{{if $canEdit}}<input type="checkbox" id="all">{{end}}</th>
+            <th class="px-4 py-3">사용자</th>
+            <th class="px-4 py-3 whitespace-nowrap">관리 등급</th>
+            <th class="px-4 py-3 whitespace-nowrap">조직</th>
+            <th class="px-4 py-3 whitespace-nowrap">업무</th>
+            <th class="px-4 py-3 whitespace-nowrap">깃발</th>
+            <th class="px-4 py-3 whitespace-nowrap">상태</th>
+            <th class="px-4 py-3 whitespace-nowrap">최근 활동</th>
+            <th class="px-4 py-3 w-16"></th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+        {{range .Users}}
+        {{$grade := "none"}}{{if eq .Role "vision_admin"}}{{$grade = "vision"}}{{else if or (eq .Role "org_admin") (eq .Role "admin")}}{{$grade = "org"}}{{end}}
+        {{$job := ""}}{{if or (eq .Role "sales") (eq .Role "tech") (eq .Role "support")}}{{$job = .Role}}{{end}}
+        {{$orgLabel := "전체 조직"}}{{if .OrgID}}{{$orgLabel = .OrgID}}{{end}}
+        {{if and .OrgID $orgNames}}{{with index $orgNames .OrgID}}{{$orgLabel = .}}{{end}}{{end}}
+        <tr class="border-t border-gray-100 hover:bg-slate-50{{if .IsReadOnly}} bg-slate-50{{end}}"
+            data-id="{{.UserID}}" data-name="{{.FullName}}" data-user="{{.Username}}" data-email="{{.Email}}"
+            data-org="{{.OrgID}}" data-org-name="{{$orgLabel}}" data-grade="{{$grade}}" data-job="{{$job}}"
+            data-on="{{if .IsActive}}1{{else}}0{{end}}" data-ro="{{if .IsReadOnly}}1{{else}}0{{end}}" data-test="{{if .IsTest}}1{{else}}0{{end}}"
+            data-mobile="{{.Mobile}}" data-tel="{{.Tel}}" data-active="{{if .IsActive}}1{{else}}0{{end}}"
+            data-sig="{{if .SignaturePath}}1{{else}}0{{end}}"
+            data-perms="{{range userPermList .}}{{.}} {{end}}">
+          <td class="px-4 py-3">{{if $canEdit}}<input type="checkbox" class="row-ck" data-id="{{.UserID}}">{{end}}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-800 text-xs font-bold grid place-items-center shrink-0">{{if .Username}}{{slice .Username 0 1}}{{end}}</div>
+              <div>
+                <div class="font-bold text-slate-800">{{.FullName}}</div>
+                <div class="text-xs text-slate-500">{{if .Email}}{{.Email}}{{else}}@{{.Username}}{{end}}{{if .Mobile}} · {{.Mobile}}{{end}} · <span class="perm-src">{{userPermSource .}}</span></div>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap font-bold {{if eq $grade "vision"}}text-blue-600{{else if eq $grade "org"}}text-green-600{{else}}text-slate-400{{end}}">
+            {{if eq $grade "vision"}}비젼관리자{{else if eq $grade "org"}}조직관리자{{else}}일반{{end}}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">{{$orgLabel}}</td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            {{if eq $grade "none"}}
+              {{if $canEdit}}
+              <form method="POST" action="/users/{{.UserID}}/work">
+                <select name="job" class="border rounded-md px-2 py-1 text-xs" onchange="this.form.submit()">
+                  <option value="sales" {{if eq $job "sales"}}selected{{end}}>영업</option>
+                  <option value="tech" {{if eq $job "tech"}}selected{{end}}>기술</option>
+                  <option value="support" {{if eq $job "support"}}selected{{end}}>지원</option>
+                </select>
+              </form>
+              {{else}}
+                {{if eq $job "sales"}}영업{{else if eq $job "tech"}}기술{{else if eq $job "support"}}지원{{else}}<span class="text-slate-400">미지정</span>{{end}}
+              {{end}}
+            {{else}}<span class="text-slate-300" title="관리 등급은 업무를 따로 두지 않습니다">전체</span>{{end}}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            {{if .IsReadOnly}}<span class="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs mr-1">읽기전용</span>{{end}}
+            {{if .IsTest}}<span class="inline-block px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-xs">테스터</span>{{end}}
+            {{if and (not .IsReadOnly) (not .IsTest)}}<span class="text-slate-300">—</span>{{end}}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            {{if .IsActive}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-green-50 text-green-600 text-xs font-semibold">활성</span>
+            {{else}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 text-xs font-semibold">비활성</span>{{end}}
+          </td>
+          <td class="px-4 py-3 text-slate-500 whitespace-nowrap">{{.CreatedAt.Format "2006-01-02"}}</td>
+          <td class="px-4 py-3">{{if $canEdit}}<button type="button" class="edit px-3 py-1 border rounded-md text-xs" data-edit="{{.UserID}}">수정</button>{{end}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-5 py-3 text-xs text-slate-500 flex justify-between flex-wrap gap-2">
+      <span id="count"></span>
+      <span><b class="text-slate-700">관리 등급과 업무는 함께 가질 수 없습니다.</b> 관리자는 업무 칸이 비고, 일반만 업무를 갖습니다.</span>
+    </div>
+  </div>
+
   {{if $canEdit}}
-  <div x-show="showForm" x-cloak class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-    <form method="POST" action="/users" class="space-y-4" id="user-create-form"
-          data-vision-count="{{.VisionAdminCount}}"
-          onsubmit="return confirmUserCreate(this)">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">아이디</label><input type="text" name="username" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">비밀번호</label><input type="password" name="password" required minlength="10" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">이름</label><input type="text" name="full_name" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">직급</label>
-          <select name="role" id="create-role" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="tech">기술</option>
-            <option value="sales">영업</option>
-            <option value="support">지원</option>
-            <option value="org_admin">조직관리자</option>
-            <option value="vision_admin">비젼관리자</option>
-            <option value="observer" selected>옵저버</option>
-            <option value="tester">테스터</option>
-          </select>
+  <div class="bg-white rounded-xl border border-amber-200 p-5 space-y-3">
+    <h3 class="font-semibold text-gray-800 text-sm">완료·종료 AS 수정 비밀번호</h3>
+    <p class="text-xs text-gray-500">로그인 비밀번호와 별도입니다. 최초 기본값: <code class="font-mono bg-gray-100 px-1 rounded">as-edit</code></p>
+    <form method="POST" action="/users/as-edit-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+          onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
+      <div><label class="block text-xs text-gray-500 mb-1">현재 수정 비밀번호</label><input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-500 mb-1">새 수정 비밀번호</label><input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label><input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">변경</button>
+    </form>
+  </div>
+  <div class="bg-white rounded-xl border border-rose-200 p-5 space-y-3">
+    <h3 class="font-semibold text-gray-800 text-sm">정기점검 계획 삭제 비밀번호</h3>
+    <p class="text-xs text-gray-500">로그인·AS 수정 비밀번호와 별도입니다.</p>
+    <form method="POST" action="/users/mnt-delete-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+          onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
+      <div><label class="block text-xs text-gray-500 mb-1">현재 삭제 비밀번호</label><input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-500 mb-1">새 삭제 비밀번호</label><input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label><input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <button type="submit" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm">변경</button>
+    </form>
+  </div>
+  {{end}}
+</div>
+
+{{if $canEdit}}
+<div id="scrim" class="hidden fixed inset-0 bg-slate-900/40 z-40"></div>
+<aside id="drawer" class="fixed top-0 right-0 bottom-0 w-[430px] max-w-[94vw] bg-white border-l z-50 translate-x-full transition-transform overflow-y-auto flex flex-col">
+	<form id="edit-form" method="POST" action="/users" novalidate class="flex flex-col min-h-full">
+    <div class="p-5 border-b flex justify-between gap-3 sticky top-0 bg-white">
+      <div>
+        <div class="text-lg font-extrabold" id="dTitle">아이디 생성</div>
+        <div class="text-xs text-slate-500" id="dSub"></div>
+      </div>
+      <button type="button" id="dClose" class="px-3 py-1 border rounded-lg text-sm">닫기</button>
+    </div>
+    <div class="p-5 space-y-4 flex-1">
+      <input type="hidden" name="prev_role" id="dPrev">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">이름</label>
+        <input name="full_name" id="dName" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div id="wUser">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">아이디</label>
+        <input name="username" id="dUser" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div id="wPass">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">비밀번호</label>
+        <input type="password" name="password" id="dPass" minlength="10" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div id="wSig" class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+        <p class="text-xs font-bold text-slate-700">사인</p>
+        <p class="text-[11px] text-slate-500">이미지 파일이거나 아래에 그립니다. 파일은 서버에 두고 DB에는 경로만 저장합니다. 보고서·견적서에 씁니다.</p>
+        <p id="dSigLink" class="hidden font-mono text-[11px] text-blue-700 break-all"></p>
+        <img id="dSigImg" alt="사인 미리보기" class="hidden h-16 w-auto border border-gray-200 rounded bg-white">
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-500 mb-1">이미지 올리기 (PNG·JPG)</label>
+          <input type="file" id="dSigFile" accept="image/png,image/jpeg" class="w-full text-sm bg-white border rounded-lg px-2 py-1.5">
         </div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">핸드폰 <span class="text-gray-400">(관리자 외 필수)</span></label><input type="text" name="mobile" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">전화</label><input type="text" name="tel" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">이메일 <span class="text-gray-400">(관리자 필수)</span></label><input type="email" name="email" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">조직 <span class="text-gray-400">(비젼관리자만 생략)</span></label>
-          <select name="org_id" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="">선택</option>
-            {{range $.Orgs}}
-            <option value="{{.OrgID}}" {{if eq .OrgID "O01"}}selected{{end}}>{{.OrgName}}</option>
-            {{end}}
-          </select>
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-500 mb-1">직접 그리기</label>
+          <canvas id="dSigPad" width="380" height="140" class="w-full border rounded-lg bg-white cursor-crosshair"></canvas>
+          <button type="button" id="dSigClear" class="mt-1 text-[11px] text-slate-500 hover:underline">그림 지우기</button>
         </div>
-        <div><label class="block text-xs font-medium text-gray-600 mb-1">테스터가 물려받을 직급</label>
-          <select name="base_role" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="tech">기술</option>
-            <option value="sales" selected>영업</option>
-            <option value="support">지원</option>
-            <option value="org_admin">조직관리자</option>
-          </select>
+        <p id="dSigHint" class="hidden text-[11px] text-amber-700">계정을 먼저 저장한 뒤 사인을 올릴 수 있습니다.</p>
+        <div class="flex gap-2">
+          <button type="button" id="btn-sig" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold">사인 저장</button>
+          <button type="button" id="btn-sig-del" class="hidden px-3 py-1.5 border rounded-lg text-xs text-red-600">사인 지우기</button>
         </div>
       </div>
       <div>
-        <p class="text-xs font-medium text-gray-600 mb-2">권한 (체크 · 비우면 직급 기본값)</p>
-        <div class="space-y-3" id="create-perms">
+        <label class="block text-xs font-semibold text-slate-500 mb-2">관리 등급</label>
+        <div class="space-y-2" id="dGrade">
+          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="vision"> <span>비젼관리자<span class="block text-xs text-slate-500">전 조직. 업무와 조직을 두지 않습니다.</span></span></label>
+          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="org"> <span>조직관리자<span class="block text-xs text-slate-500">소속 조직 전부. 업무를 두지 않습니다.</span></span></label>
+          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="none" checked> <span>일반<span class="block text-xs text-slate-500">업무를 하나 고릅니다.</span></span></label>
+        </div>
+      </div>
+      <div id="wOrg">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">조직</label>
+        <select name="org_id" id="dOrg" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">선택</option>
+          {{range $.Orgs}}<option value="{{.OrgID}}">{{.OrgName}}</option>{{end}}
+        </select>
+      </div>
+      <div id="wJob">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">업무</label>
+        <select name="job" id="dJob" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <option value="">— 고르세요 —</option>
+          <option value="sales">영업</option><option value="tech">기술</option><option value="support">지원</option>
+        </select>
+      </div>
+      <div class="border-t pt-4 space-y-3">
+        <p class="text-xs font-bold text-slate-500">권한 (체크 · 비우면 직급 기본값)</p>
+        <p class="text-[11px] text-slate-400">적용 중: <span id="dPermSrc"></span></p>
+        <div class="space-y-3" id="dPerms">
           {{range permGroups}}
           <div>
-            <p class="text-[11px] font-semibold text-gray-500 mb-1">{{.Label}}</p>
+            <p class="text-[11px] font-semibold text-slate-500 mb-1">{{.Label}}</p>
             <div class="flex flex-wrap gap-3">
               {{range .Items}}
-              <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600 create-perm"> {{.Label}}
+              <label class="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                <input type="checkbox" name="perm" value="{{.Key}}" class="d-perm rounded border-gray-300 text-blue-600"> {{.Label}}
               </label>
               {{end}}
             </div>
           </div>
           {{end}}
         </div>
-        <p class="text-[11px] text-gray-400 mt-1">직급 기본값과 같으면 저장하지 않습니다. 직급을 바꾸면 개별 권한을 비울지 묻습니다.</p>
+        <p class="text-[11px] text-slate-400">직급 기본값과 같으면 저장하지 않습니다. 직급을 바꾸면 개별 권한을 비울지 묻습니다.</p>
+        <button type="button" id="btn-reset-perms" class="hidden text-xs text-blue-700 hover:underline">직급 기본값으로 되돌리기</button>
       </div>
-      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium">등록</button>
-    </form>
-  </div>
-  {{end}}
+      <div class="border-t pt-4 space-y-3">
+        <p class="text-xs font-bold text-slate-500">깃발</p>
+        <label class="flex gap-2 text-sm"><input type="checkbox" name="is_readonly" value="1" id="dRO"> <span>읽기전용<span class="block text-xs text-slate-500" id="roHint">볼 수는 있고 아무것도 바꿀 수 없습니다.</span></span></label>
+        <label class="flex gap-2 text-sm" id="wTest"><input type="checkbox" name="is_test" value="1" id="dTest"> <span>테스터<span class="block text-xs text-slate-500">이 사람이 만든 자료를 지표에서 뺍니다.</span></span></label>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">핸드폰</label>
+        <input name="mobile" id="dMobile" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">전화</label>
+        <input name="tel" id="dTel" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">이메일</label>
+        <input type="text" name="email" id="dEmail" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <label class="flex gap-2 text-sm"><input type="checkbox" id="dOn" checked> 활성</label>
+      <div id="wRename" class="hidden border-t pt-4">
+        <p class="text-xs font-bold text-slate-500 mb-2">아이디 변경</p>
+        <div class="flex gap-2">
+          <input id="dRename" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="새 아이디">
+          <button type="button" id="btn-rename" class="px-3 py-2 border rounded-lg text-sm">변경</button>
+        </div>
+      </div>
+    </div>
+    <div class="p-4 border-t flex gap-2 sticky bottom-0 bg-white">
+      <button type="submit" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold">저장</button>
+      <button type="button" id="dCancel" class="px-4 border rounded-lg text-sm">취소</button>
+    </div>
+  </form>
+  <form id="rename-form" method="POST" class="hidden"></form>
+  <form id="reset-form" method="POST" class="hidden"></form>
+</aside>
+{{end}}
 
-  {{if $canEdit}}
-  <div class="bg-white rounded-xl border border-amber-200 p-5 space-y-3">
-    <div>
-      <h3 class="font-semibold text-gray-800 text-sm">완료·종료 AS 수정 비밀번호</h3>
-      <p class="text-xs text-gray-500 mt-1">로그인 비밀번호와 별도입니다. 완료 건에서 「수정」을 누를 때 사용합니다. 최초 기본값: <code class="font-mono bg-gray-100 px-1 rounded">as-edit</code></p>
-    </div>
-    <form method="POST" action="/users/as-edit-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
-          onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">현재 수정 비밀번호</label>
-        <input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">새 수정 비밀번호</label>
-        <input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label>
-        <input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium">변경</button>
-    </form>
-  </div>
-  <div class="bg-white rounded-xl border border-rose-200 p-5 space-y-3">
-    <div>
-      <h3 class="font-semibold text-gray-800 text-sm">정기점검 계획 삭제 비밀번호</h3>
-      <p class="text-xs text-gray-500 mt-1">로그인·AS 수정 비밀번호와 별도입니다. 기동 시 임의 생성된 값은 서버 로그에 1회만 남습니다.</p>
-    </div>
-    <form method="POST" action="/users/mnt-delete-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
-          onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">현재 삭제 비밀번호</label>
-        <input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">새 삭제 비밀번호</label>
-        <input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label>
-        <input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium">변경</button>
-    </form>
-  </div>
-  {{end}}
-
-  <div class="space-y-4">
-    {{range .RoleGroups}}
-    <div class="space-y-2" x-data="{open:true}">
-      <button type="button" class="w-full flex items-center justify-between px-1 py-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900" @click="open=!open">
-        <span>{{.Label}} <span class="font-normal text-slate-400">{{len .Items}}명</span></span>
-        <span class="text-xs text-slate-400 font-normal" x-text="open ? '접기' : '펼치기'"></span>
-      </button>
-      <div class="space-y-3" x-show="open">
-    {{range .Items}}
-    {{$u := .}}
-    {{$uperms := userPermList .}}
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      {{if $canEdit}}
-      <form method="POST" action="/users/{{.UserID}}/update" class="space-y-3 user-update-form"
-            data-name="{{.FullName}}" data-role="{{.Role}}" data-active="{{if .IsActive}}1{{else}}0{{end}}"
-            data-org="{{.OrgID}}" data-mobile="{{.Mobile}}" data-tel="{{.Tel}}" data-email="{{.Email}}">
-      {{else}}
-      <div class="space-y-3">
-      {{end}}
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p class="font-medium text-gray-800">{{.FullName}}
-              <span class="ml-2 font-mono text-xs text-gray-500">{{.Username}}</span>
-            </p>
-            <p class="text-xs text-gray-500 mt-0.5">
-              {{roleLabel .Role}}
-              · {{if .IsActive}}<span class="text-green-600">활성</span>{{else}}<span class="text-gray-400">비활성</span>{{end}}
-              · 적용 중: <span class="font-medium text-gray-700">{{userPermSource .}}</span>
-            </p>
-          </div>
-          {{if $canEdit}}
-          <div class="flex flex-wrap items-center gap-2">
-            <select name="role" class="border rounded px-2 py-1 text-xs role-select">
-              <option value="tech" {{if eq .Role "tech"}}selected{{end}}>기술</option>
-              <option value="sales" {{if eq .Role "sales"}}selected{{end}}>영업</option>
-              <option value="support" {{if or (eq .Role "support") (eq .Role "office")}}selected{{end}}>지원</option>
-              <option value="org_admin" {{if or (eq .Role "org_admin") (eq .Role "admin")}}selected{{end}}>조직관리자</option>
-              <option value="vision_admin" {{if eq .Role "vision_admin"}}selected{{end}}>비젼관리자</option>
-              <option value="observer" {{if eq .Role "observer"}}selected{{end}}>옵저버</option>
-              <option value="tester" {{if eq .Role "tester"}}selected{{end}}>테스터</option>
-            </select>
-            <select name="base_role" class="border rounded px-2 py-1 text-xs" title="테스터가 물려받을 직급">
-              <option value="tech" {{if eq .BaseRole "tech"}}selected{{end}}>기술</option>
-              <option value="sales" {{if or (eq .BaseRole "sales") (eq .BaseRole "")}}selected{{end}}>영업</option>
-              <option value="support" {{if eq .BaseRole "support"}}selected{{end}}>지원</option>
-              <option value="org_admin" {{if eq .BaseRole "org_admin"}}selected{{end}}>조직관리자</option>
-            </select>
-            <input type="hidden" name="prev_role" value="{{.Role}}">
-            <select name="is_active" class="border rounded px-2 py-1 text-xs">
-              <option value="1" {{if .IsActive}}selected{{end}}>활성</option>
-              <option value="0" {{if not .IsActive}}selected{{end}}>비활성</option>
-            </select>
-            <input type="text" name="full_name" value="{{.FullName}}" required placeholder="이름" class="border rounded px-2 py-1 text-xs w-28" title="이름">
-            <input type="text" name="mobile" value="{{.Mobile}}" placeholder="핸드폰" class="border rounded px-2 py-1 text-xs w-32" title="핸드폰">
-            <input type="text" name="tel" value="{{.Tel}}" placeholder="전화" class="border rounded px-2 py-1 text-xs w-28" title="전화">
-            <input type="email" name="email" value="{{.Email}}" placeholder="이메일" class="border rounded px-2 py-1 text-xs w-40" title="이메일">
-            <select name="org_id" class="border rounded px-2 py-1 text-xs" title="조직">
-              <option value="">조직 없음</option>
-              {{range $.Orgs}}
-              <option value="{{.OrgID}}" {{if eq $u.OrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>
-              {{end}}
-            </select>
-            <button type="button" @click="pwUser = (pwUser==='{{.UserID}}' ? '' : '{{.UserID}}')"
-                    class="text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50">
-              비밀번호 변경
-            </button>
-          </div>
-          {{end}}
-        </div>
-        <div>
-          <p class="text-xs font-medium text-gray-600 mb-2">권한{{if $canEdit}} (체크){{end}}</p>
-          <p class="text-[11px] text-gray-400 mb-2">직급 기본값과 같으면 비워 저장합니다. 적용 중 표시가 출처입니다.</p>
-          <div class="space-y-3">
-            {{range permGroups}}
-            <div>
-              <p class="text-[11px] font-semibold text-gray-500 mb-1">{{.Label}}</p>
-              <div class="flex flex-wrap gap-3">
-                {{range .Items}}
-                <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
-                  <input type="checkbox" name="perm" value="{{.Key}}" class="rounded border-gray-300 text-blue-600"
-                         {{if hasUserPerm $uperms .Key}}checked{{end}} {{if not $canEdit}}disabled{{end}}> {{.Label}}
-                </label>
-                {{end}}
-              </div>
-            </div>
-            {{end}}
-          </div>
-        </div>
-        {{if $canEdit}}
-        <div class="flex justify-end pt-1">
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
-            저장
-          </button>
-        </div>
-        {{end}}
-      {{if $canEdit}}</form>{{else}}</div>{{end}}
-      {{if $canEdit}}
-      <form method="POST" action="/users/{{.UserID}}/reset-permissions" class="mt-2">
-        <button type="submit" class="text-xs text-blue-700 hover:underline">직급 기본값으로 되돌리기</button>
-      </form>
-      <form method="POST" action="/users/{{.UserID}}/username" class="mt-2 flex flex-wrap items-end gap-2"
-            onsubmit="return confirm(this.dataset.old+' → '+this.username.value+' 으로 바꿉니다. 이 사람은 다시 로그인해야 합니다');"
-            data-old="{{.Username}}">
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">아이디</label>
-          <input type="text" name="username" value="{{.Username}}" required class="border rounded px-2 py-1 text-xs w-36 font-mono">
-        </div>
-        <button type="submit" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">아이디 변경</button>
-      </form>
-      {{$wc := index $.WorkCounts .UserID}}
-      <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 space-y-2">
-        <p>담당 업무 <span class="font-medium text-gray-800">{{$wc}}</span>건. 기본은 사용 중지입니다.</p>
-        {{if gt $wc 0}}
-        <p class="text-amber-800">담당 이관을 먼저 하세요. 업무가 있으면 계정을 지울 수 없습니다.</p>
-        {{else}}
-        <form method="POST" action="/users/{{.UserID}}/delete" class="flex flex-wrap items-end gap-2"
-              onsubmit="return confirm('{{.FullName}} 계정을 지웁니다. 담당 업무가 0건입니다.');">
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">비젼관리자 비밀번호</label>
-            <input type="password" name="vision_password" required autocomplete="off" class="border rounded px-2 py-1 text-xs w-40">
-          </div>
-          <button type="submit" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">계정 삭제</button>
-        </form>
-        {{end}}
-      </div>
-      {{end}}
-
-      {{if $canEdit}}
-      <div x-show="pwUser==='{{.UserID}}'" x-cloak class="mt-3 pt-3 border-t border-gray-100">
-        <form method="POST" action="/users/{{.UserID}}/password" class="flex flex-wrap gap-2 items-end"
-              onsubmit="if(this.password.value!==this.password_confirm.value){alert('비밀번호 확인이 일치하지 않습니다.');return false;}">
-          <div class="flex-1 min-w-[10rem] max-w-xs">
-            <label class="block text-xs text-gray-500 mb-1">새 비밀번호</label>
-            <input type="password" name="password" required minlength="10" autocomplete="new-password"
-                   class="w-full border rounded-lg px-3 py-2 text-sm">
-          </div>
-          <div class="flex-1 min-w-[10rem] max-w-xs">
-            <label class="block text-xs text-gray-500 mb-1">비밀번호 확인</label>
-            <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password"
-                   class="w-full border rounded-lg px-3 py-2 text-sm">
-          </div>
-          <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">변경</button>
-          <button type="button" @click="pwUser=''" class="px-4 py-2 rounded-lg text-sm border border-gray-300 text-gray-600">취소</button>
-        </form>
-        <p class="text-xs text-gray-400 mt-2">10자 이상 입력하세요.</p>
-      </div>
-      {{end}}
-    </div>
-    {{end}}
-      </div>
-    </div>
-    {{end}}
-  </div>
-</div>
-{{if $canEdit}}
 <script>
-function confirmUserCreate(form) {
-  var roleSel = form.role;
-  var orgSel = form.org_id;
-  var role = roleSel.options[roleSel.selectedIndex].text;
-  var org = orgSel.options[orgSel.selectedIndex].text;
-  if (!window.confirm('아이디 ' + form.username.value + ' · 이름 ' + form.full_name.value + ' · 조직 ' + org + ' · 직급 ' + role + ' 계정을 만듭니다.')) {
-    return false;
-  }
-  var n = parseInt(form.getAttribute('data-vision-count') || '0', 10);
-  if (form.role.value === 'vision_admin' && n > 0) {
-    return window.confirm('비젼관리자가 이미 있습니다. 하나 더 만듭니다.');
-  }
-  return true;
-}
-(function () {
-  document.querySelectorAll('.user-update-form').forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      var sel = form.querySelector('.role-select');
-      var prev = form.querySelector('input[name="prev_role"]');
-      var lines = [];
-      function add(label, before, after, hot) {
-        if (String(before) === String(after)) return;
-        lines.push((hot ? '[중요] ' : '') + label + ': ' + (before || '(없음)') + ' → ' + (after || '(없음)'));
+(function(){
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#rows tr'));
+  function vis(){
+    var q = (document.getElementById('q').value||'').trim();
+    var fo = document.getElementById('fOrg').value, fs = document.getElementById('fState').value, fr = document.getElementById('fRole').value;
+    var n = 0;
+    rows.forEach(function(tr){
+      var hay = (tr.dataset.name||'')+(tr.dataset.user||'')+(tr.dataset.email||'')+(tr.dataset.orgName||'');
+      var ok = true;
+      if (q && hay.indexOf(q) < 0) ok = false;
+      if (fo && tr.dataset.org !== fo) ok = false;
+      if (fs !== '' && tr.dataset.on !== fs) ok = false;
+      if (fr) {
+        var k = fr.slice(0,1), v = fr.slice(2);
+        if (k==='g' && tr.dataset.grade !== v) ok = false;
+        if (k==='j' && tr.dataset.job !== v) ok = false;
+        if (k==='f' && v==='ro' && tr.dataset.ro !== '1') ok = false;
+        if (k==='f' && v==='test' && tr.dataset.test !== '1') ok = false;
       }
-      var nameEl = form.querySelector('input[name="full_name"]');
-      var actEl = form.querySelector('select[name="is_active"]');
-      var orgEl = form.querySelector('select[name="org_id"]');
-      var mob = form.querySelector('input[name="mobile"]');
-      var tel = form.querySelector('input[name="tel"]');
-      var em = form.querySelector('input[name="email"]');
-      add('이름', form.dataset.name, nameEl ? nameEl.value : '', false);
-      add('직급', form.dataset.role, sel ? sel.value : '', true);
-      add('활성', form.dataset.active, actEl ? actEl.value : '', true);
-      add('조직', form.dataset.org, orgEl ? orgEl.value : '', true);
-      add('핸드폰', form.dataset.mobile, mob ? mob.value : '', false);
-      add('전화', form.dataset.tel, tel ? tel.value : '', false);
-      add('이메일', form.dataset.email, em ? em.value : '', false);
-      if (lines.length && !window.confirm(lines.join('\n'))) {
-        e.preventDefault();
-        return;
-      }
-      if (!sel || !prev || sel.value === prev.value) return;
-      if (window.confirm('직급을 바꿉니다. 저장된 개별 권한을 비우고 새 직급 기본값을 쓸까요?')) {
-        var h = document.createElement('input');
-        h.type = 'hidden';
-        h.name = 'clear_custom_perms';
-        h.value = '1';
-        form.appendChild(h);
-      }
+      tr.style.display = ok ? '' : 'none';
+      if (ok) n++;
     });
+    var el = document.getElementById('count');
+    if (el) el.textContent = '전체 '+rows.length+'명 중 '+n+'명';
+  }
+  ['q','fOrg','fState','fRole'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.addEventListener('input', vis);
+  });
+  vis();
+
+  var bulk = document.getElementById('bulk');
+  function syncBulk(){
+    if (!bulk) return;
+    var ids = [];
+    document.querySelectorAll('.row-ck:checked').forEach(function(ck){
+      if (ck.closest('tr').style.display === 'none') return;
+      ids.push(ck.getAttribute('data-id'));
+    });
+    bulk.classList.toggle('hidden', ids.length===0);
+    bulk.classList.toggle('flex', ids.length>0);
+    var n = document.getElementById('bulkN'); if (n) n.textContent = ids.length+'명 선택';
+    var box = document.getElementById('bulk-ids');
+    if (box) box.innerHTML = ids.map(function(id){ return '<input type="hidden" name="user_ids" value="'+id+'">'; }).join('');
+  }
+  document.addEventListener('change', function(e){
+    if (e.target.id==='all') {
+      document.querySelectorAll('.row-ck').forEach(function(ck){
+        if (ck.closest('tr').style.display !== 'none') ck.checked = e.target.checked;
+      });
+    }
+    if (e.target.classList.contains('row-ck') || e.target.id==='all') syncBulk();
+  });
+  var clr = document.getElementById('bulk-clear');
+  if (clr) clr.addEventListener('click', function(){ document.querySelectorAll('.row-ck').forEach(function(ck){ ck.checked=false; }); syncBulk(); });
+
+  var drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim'), form = document.getElementById('edit-form');
+  function openD(){ if(drawer){ drawer.style.transform='translateX(0)'; } if(scrim){ scrim.classList.remove('hidden'); } }
+  function closeD(){ if(drawer){ drawer.style.transform='translateX(100%)'; } if(scrim){ scrim.classList.add('hidden'); } }
+  function grade(){ var r=form && form.querySelector('input[name="admin_grade"]:checked'); return r?r.value:'none'; }
+  function syncGrade(){
+    var g = grade();
+    var wOrg=document.getElementById('wOrg'), wJob=document.getElementById('wJob'), wTest=document.getElementById('wTest');
+    var dOrg=document.getElementById('dOrg'), dJob=document.getElementById('dJob'), dTest=document.getElementById('dTest');
+    var roHint=document.getElementById('roHint');
+    if (g==='vision'){ wOrg.classList.add('hidden'); wJob.classList.add('hidden'); wTest.classList.add('hidden'); dOrg.disabled=true; dJob.disabled=true; dTest.disabled=true; dOrg.value=''; dJob.value=''; dTest.checked=false; }
+    else if (g==='org'){ wOrg.classList.remove('hidden'); wJob.classList.add('hidden'); wTest.classList.add('hidden'); dOrg.disabled=false; dJob.disabled=true; dTest.disabled=true; dJob.value=''; dTest.checked=false; if(roHint) roHint.textContent='옛 옵저버와 같습니다.'; }
+    else { wOrg.classList.remove('hidden'); wJob.classList.remove('hidden'); wTest.classList.remove('hidden'); dOrg.disabled=false; dJob.disabled=false; dTest.disabled=false; if(roHint) roHint.textContent='볼 수는 있고 아무것도 바꿀 수 없습니다.'; }
+  }
+  function roleFromForm(){
+    var g = grade();
+    if (g==='vision') return 'vision_admin';
+    if (g==='org') return 'org_admin';
+    return (document.getElementById('dJob').value||'');
+  }
+  if (form) form.addEventListener('submit', function(e){
+    var h=document.createElement('input'); h.type='hidden'; h.name='is_active'; h.value=document.getElementById('dOn').checked?'1':'0'; form.appendChild(h);
+    var ro=document.createElement('input'); ro.type='hidden'; ro.name='is_readonly'; ro.value=document.getElementById('dRO').checked?'1':'0'; form.appendChild(ro);
+    var prev = document.getElementById('dPrev').value;
+    var next = roleFromForm();
+    if (prev && next && prev !== next) {
+      if (window.confirm('직급을 바꿉니다. 저장된 개별 권한을 비우고 새 직급 기본값을 쓸까요?')) {
+        var c=document.createElement('input'); c.type='hidden'; c.name='clear_custom_perms'; c.value='1'; form.appendChild(c);
+      }
+    }
+  });
+  function setPerms(csv){
+    var set = {};
+    (csv||'').split(/\s+/).forEach(function(k){ if(k) set[k]=true; });
+    document.querySelectorAll('.d-perm').forEach(function(ck){ ck.checked = !!set[ck.value]; });
+  }
+  function fillNew(){
+    form.action='/users'; document.getElementById('dTitle').textContent='아이디 생성'; document.getElementById('dSub').textContent='';
+    form.reset(); document.getElementById('dPass').required=true; document.getElementById('wUser').classList.remove('hidden');
+    document.getElementById('wPass').classList.remove('hidden'); document.getElementById('wRename').classList.add('hidden');
+    form.removeAttribute('data-id');
+    document.getElementById('btn-reset-perms').classList.add('hidden');
+    document.getElementById('dPrev').value='';
+    var src=document.getElementById('dPermSrc'); if(src) src.textContent='직급 기본값';
+    setPerms('');
+    resetSigPad();
+    document.getElementById('dSigImg').classList.add('hidden');
+    document.getElementById('dSigLink').classList.add('hidden');
+    document.getElementById('btn-sig-del').classList.add('hidden');
+    document.getElementById('dSigHint').classList.remove('hidden');
+    form.querySelector('input[name="admin_grade"][value="none"]').checked=true; syncGrade(); openD();
+  }
+  function fillEdit(tr){
+    form.action='/users/'+tr.dataset.id+'/update';
+    form.setAttribute('data-id', tr.dataset.id);
+    document.getElementById('dTitle').textContent=tr.dataset.name;
+    document.getElementById('dSub').textContent='@'+tr.dataset.user;
+    document.getElementById('dName').value=tr.dataset.name;
+    document.getElementById('dPrev').value=tr.dataset.grade==='vision'?'vision_admin':(tr.dataset.grade==='org'?'org_admin':tr.dataset.job);
+    document.getElementById('dPass').required=false; document.getElementById('dPass').value='';
+    document.getElementById('wUser').classList.add('hidden'); document.getElementById('wPass').classList.add('hidden');
+    document.getElementById('wRename').classList.remove('hidden'); document.getElementById('dRename').value=tr.dataset.user;
+    document.getElementById('rename-form').action='/users/'+tr.dataset.id+'/username';
+    var g=tr.dataset.grade||'none'; form.querySelector('input[name="admin_grade"][value="'+g+'"]').checked=true;
+    document.getElementById('dOrg').value=tr.dataset.org||''; document.getElementById('dJob').value=tr.dataset.job||'';
+    document.getElementById('dRO').checked=tr.dataset.ro==='1'; document.getElementById('dTest').checked=tr.dataset.test==='1';
+    document.getElementById('dOn').checked=tr.dataset.on==='1';
+    document.getElementById('dMobile').value=tr.dataset.mobile||''; document.getElementById('dTel').value=tr.dataset.tel||'';
+    document.getElementById('dEmail').value=tr.dataset.email||'';
+    document.getElementById('btn-reset-perms').classList.remove('hidden');
+    document.getElementById('reset-form').action='/users/'+tr.dataset.id+'/reset-permissions';
+    var src=document.getElementById('dPermSrc'); if(src) src.textContent=tr.querySelector('.perm-src') ? tr.querySelector('.perm-src').textContent : '';
+    setPerms(tr.dataset.perms||'');
+    resetSigPad();
+    document.getElementById('dSigHint').classList.add('hidden');
+    var img=document.getElementById('dSigImg'), link=document.getElementById('dSigLink'), del=document.getElementById('btn-sig-del');
+    var has = tr.dataset.sig==='1';
+    var href='/users/'+tr.dataset.id+'/signature.png';
+    if (has) {
+      img.classList.remove('hidden'); img.src=href+'?t='+Date.now();
+      link.classList.remove('hidden'); link.textContent=href;
+      del.classList.remove('hidden');
+    } else {
+      img.classList.add('hidden'); img.removeAttribute('src');
+      link.classList.add('hidden'); link.textContent='';
+      del.classList.add('hidden');
+    }
+    syncGrade(); openD();
+  }
+  var bn=document.getElementById('btn-new'); if(bn) bn.addEventListener('click', fillNew);
+  document.querySelectorAll('.edit').forEach(function(btn){ btn.addEventListener('click', function(){ var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-edit')+'"]'); if(tr) fillEdit(tr); }); });
+  function closeAll(){ closeD(); }
+  var dc=document.getElementById('dClose'), dx=document.getElementById('dCancel');
+  if(dc) dc.addEventListener('click', closeAll); if(dx) dx.addEventListener('click', closeAll); if(scrim) scrim.addEventListener('click', closeAll);
+  var br=document.getElementById('btn-rename');
+  if(br) br.addEventListener('click', function(){
+    var rf=document.getElementById('rename-form'); rf.innerHTML='<input type="hidden" name="username" value="'+document.getElementById('dRename').value+'">';
+    rf.submit();
+  });
+  var rp=document.getElementById('btn-reset-perms');
+  if(rp) rp.addEventListener('click', function(){ document.getElementById('reset-form').submit(); });
+  var pad=document.getElementById('dSigPad'), sigDirty=false;
+  function resetSigPad(){
+    sigDirty=false;
+    var fileEl=document.getElementById('dSigFile'); if(fileEl) fileEl.value='';
+    if(!pad) return;
+    var ctx=pad.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,pad.width,pad.height);
+  }
+  if(pad){
+    var ctx=pad.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,pad.width,pad.height);
+    ctx.strokeStyle='#111'; ctx.lineWidth=2; ctx.lineCap='round';
+    var drawing=false;
+    function pos(e){
+      var r=pad.getBoundingClientRect();
+      var x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+      var y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+      return {x:x*pad.width/r.width, y:y*pad.height/r.height};
+    }
+    function start(e){ e.preventDefault(); drawing=true; var p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+    function move(e){ if(!drawing) return; e.preventDefault(); var p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); sigDirty=true; }
+    function end(){ drawing=false; }
+    pad.addEventListener('mousedown', start);
+    pad.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    pad.addEventListener('touchstart', start, {passive:false});
+    pad.addEventListener('touchmove', move, {passive:false});
+    pad.addEventListener('touchend', end);
+    var clr=document.getElementById('dSigClear');
+    if(clr) clr.addEventListener('click', resetSigPad);
+  }
+  var bs=document.getElementById('btn-sig');
+  if(bs) bs.addEventListener('click', function(){
+    var id=form && form.getAttribute('data-id');
+    var fileEl=document.getElementById('dSigFile');
+    var file=fileEl && fileEl.files[0];
+    if(!id){ alert('계정을 먼저 저장한 뒤 사인을 올리세요.'); return; }
+    var fd=new FormData();
+    if(file) fd.append('file', file);
+    else if(sigDirty && pad) fd.append('drawn', pad.toDataURL('image/png'));
+    else { alert('사인 이미지를 고르거나 칸에 그려 주세요.'); return; }
+    fetch('/users/'+id+'/signature', {method:'POST', body:fd, credentials:'same-origin'}).then(function(){ location.href='/users?ok=signature'; });
+  });
+  var bd=document.getElementById('btn-sig-del');
+  if(bd) bd.addEventListener('click', function(){
+    var id=form && form.getAttribute('data-id');
+    if(!id) return;
+    if(!confirm('사인을 지울까요?')) return;
+    fetch('/users/'+id+'/signature/delete', {method:'POST', credentials:'same-origin'}).then(function(){ location.href='/users?ok=signature_cleared'; });
   });
 })();
 </script>
-{{end}}
 {{end}}

@@ -45,8 +45,9 @@ func (r *SalesItemRepo) List(f SalesItemFilter) ([]model.SalesItem, error) {
 		like := "%" + s + "%"
 		q += ` AND (i.name LIKE ? OR COALESCE(i.spec,'') LIKE ? OR COALESCE(i.model,'') LIKE ?
 			OR COALESCE(i.manufacturer,'') LIKE ? OR COALESCE(i.default_supplier,'') LIKE ?
-			OR COALESCE(m.org_name,'') LIKE ? OR COALESCE(s.org_name,'') LIKE ?)`
-		args = append(args, like, like, like, like, like, like, like)
+			OR COALESCE(m.org_name,'') LIKE ? OR COALESCE(s.org_name,'') LIKE ?
+			OR EXISTS (SELECT 1 FROM sales_item_specs sp WHERE sp.item_id=i.item_id AND COALESCE(sp.spec,'') LIKE ?))`
+		args = append(args, like, like, like, like, like, like, like, like)
 	}
 	if s := strings.TrimSpace(f.Kind); s != "" {
 		q += ` AND i.item_kind=?`
@@ -111,8 +112,9 @@ func (r *SalesItemRepo) Suggest(q string, limit int) ([]model.SalesItem, error) 
 		like := "%" + q + "%"
 		sqlQ += ` AND (i.name LIKE ? OR COALESCE(i.spec,'') LIKE ? OR COALESCE(i.model,'') LIKE ?
 			OR COALESCE(i.manufacturer,'') LIKE ? OR COALESCE(i.default_supplier,'') LIKE ?
-			OR COALESCE(m.org_name,'') LIKE ? OR COALESCE(s.org_name,'') LIKE ?)`
-		args = append(args, like, like, like, like, like, like, like)
+			OR COALESCE(m.org_name,'') LIKE ? OR COALESCE(s.org_name,'') LIKE ?
+			OR EXISTS (SELECT 1 FROM sales_item_specs sp WHERE sp.item_id=i.item_id AND COALESCE(sp.spec,'') LIKE ?))`
+		args = append(args, like, like, like, like, like, like, like, like)
 	}
 	sqlQ += ` ORDER BY COALESCE(i.is_active,0) DESC, COALESCE(i.needs_review,0) ASC, i.name COLLATE NOCASE LIMIT ?`
 	args = append(args, limit)
@@ -153,6 +155,7 @@ func (r *SalesItemRepo) Create(p *model.SalesItem) error {
 		return err
 	}
 	logCreate(r.db, "sales_items", "item_id", p.ItemID, p.Name)
+	r.insertDefaultSpecIfNeeded(p)
 	return nil
 }
 
@@ -223,6 +226,30 @@ func normalizeSalesItem(p *model.SalesItem) {
 	if p.Unit == "" {
 		p.Unit = "EA"
 	}
+}
+
+func (r *SalesItemRepo) insertDefaultSpecIfNeeded(p *model.SalesItem) {
+	if r == nil || p == nil || strings.TrimSpace(p.ItemID) == "" {
+		return
+	}
+	if strings.TrimSpace(p.Spec) == "" && p.ListPrice == 0 {
+		return
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM sales_item_specs WHERE item_id=?`, p.ItemID).Scan(&n); err != nil || n > 0 {
+		return
+	}
+	seq, err := NextSeq(r.db, "sales_item_specs")
+	if err != nil {
+		return
+	}
+	unit := strings.TrimSpace(p.Unit)
+	if unit == "" {
+		unit = "EA"
+	}
+	_, _ = r.db.Exec(`
+		INSERT INTO sales_item_specs (spec_id, item_id, spec, unit, price, sort_order, is_active)
+		VALUES (?,?,?,?,?,0,1)`, fmt.Sprintf("SS-%03d", seq), p.ItemID, strings.TrimSpace(p.Spec), unit, p.ListPrice)
 }
 
 type salesItemScanner interface {

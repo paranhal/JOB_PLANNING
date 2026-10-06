@@ -107,8 +107,11 @@ func TestBackupPageAndSave(t *testing.T) {
 		t.Fatalf("지표 탭: status=%d", met.Code)
 	}
 	mb := met.Body.String()
-	if !strings.Contains(mb, "name=\"metrics_base_date\"") {
-		t.Error("지표 설정 폼이 없다")
+	if !strings.Contains(mb, `name="metrics_base_date"`) {
+		t.Error("옛 지표 설정 폼이 없다")
+	}
+	if !strings.Contains(mb, `name="metrics_base_receipt"`) || !strings.Contains(mb, `name="metrics_base_visit"`) || !strings.Contains(mb, `name="metrics_base_complete"`) {
+		t.Error("접수·방문·완료 기준일 칸이 없다")
 	}
 	if !strings.Contains(mb, "영업일 표 다시 만들기") {
 		t.Error("영업일 표 다시 만들기 버튼이 없다")
@@ -116,6 +119,9 @@ func TestBackupPageAndSave(t *testing.T) {
 
 	form := url.Values{}
 	form.Set("metrics_base_date", "2026-08-10")
+	form.Set("metrics_base_receipt", "2026-08-10")
+	form.Set("metrics_base_visit", "2026-08-10")
+	form.Set("metrics_base_complete", "")
 	recM := httptest.NewRecorder()
 	reqSave := httptest.NewRequest(http.MethodPost, "http://localhost/admin/data/metrics", strings.NewReader(form.Encode()))
 	reqSave.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -127,6 +133,10 @@ func TestBackupPageAndSave(t *testing.T) {
 	got, _ := repository.NewSettingsRepo(db).Get(repository.SettingMetricsBaseDate)
 	if got != "2026-08-10" {
 		t.Fatalf("기준일 저장=%q", got)
+	}
+	gotC, _ := repository.NewSettingsRepo(db).Get(repository.SettingMetricsBaseComplete)
+	if gotC != "" {
+		t.Fatalf("완료 기준일을 비워야 한다=%q", gotC)
 	}
 
 	rec := httptest.NewRecorder()

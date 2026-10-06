@@ -139,6 +139,27 @@ func TestOrgCrossNoLeak(t *testing.T) {
 		t.Fatalf("stats as filter O01=%d O02=%d", n1, n2)
 	}
 
+	space := NewSpaceRepo(db)
+	mustExec(`INSERT INTO customer_buildings (building_id,customer_id,building_name,is_active) VALUES ('B-O1','C-O1','일팀본관',1)`)
+	mustExec(`INSERT INTO customer_buildings (building_id,customer_id,building_name,is_active) VALUES ('B-O2','C-O2','이팀본관',1)`)
+	b1, err := space.ListBuildings("O01", "C-O1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b1) != 1 || b1[0].BuildingID != "B-O1" {
+		t.Fatalf("space O01 buildings=%d", len(b1))
+	}
+	cross, err := space.GetBuilding("O01", "B-O2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cross != nil {
+		t.Fatal("O02 건물이 O01 Get 에 보였다")
+	}
+	if _, err := space.ListBuildings("", "C-O1"); err == nil {
+		t.Fatal("빈 org 공간 조회가 통과했다")
+	}
+
 	empty, err := ListEmptyOrgRows(db)
 	if err != nil {
 		t.Fatal(err)

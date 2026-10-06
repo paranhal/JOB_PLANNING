@@ -29,7 +29,7 @@
   <form method="post" action="/view-as" class="flex items-center gap-2">
     <label>누구 시점으로 보기</label>
     <select name="user_id" class="text-gray-900 rounded px-2 py-0.5 text-xs">
-      <option value="">{{if eq .LoginRole "observer"}}조직관리자 (기본){{else}}나{{end}}</option>
+      <option value="">나</option>
       {{range .ViewAsUsers}}
       <option value="{{.UserID}}">{{.FullName}}</option>
       {{end}}
@@ -94,9 +94,9 @@
       {{$isOffice := or (eq $role "support") (eq $role "office") (eq $role "receipt")}}
       {{$isTech := eq $role "tech"}}
       {{$isSales := eq $role "sales"}}
-      {{$isObserver := eq $role "observer"}}
-      {{$loginObserver := eq $login "observer"}}
-      {{$isTester := eq $role "tester"}}
+      {{$isObserver := or (eq $role "observer") .IsReadOnly}}
+      {{$loginObserver := or (eq $login "observer") .IsReadOnly}}
+      {{$isTester := or (eq $role "tester") .IsTestUser}}
       {{$roleKnown := or $isAdmin $isOffice $isTech $isSales $isObserver $isTester}}
       {{$canPlanExec := $roleKnown}}
       {{$canAS := $roleKnown}}
@@ -167,7 +167,7 @@
       {{if $roleKnown}}
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">기준정보</p>
       <a href="/customers" class="{{if eq $a "customers"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">고객현황</a>
-      {{if or $isAdmin $isObserver $isOffice $isTech $isSales $isTester (hasUserPerm $perms "master.edit") (hasUserPerm $perms "master_write")}}
+      {{if or $isAdmin $isObserver $isOffice $isTech $isSales $isTester (hasUserPerm $perms "master.view") (hasUserPerm $perms "master.edit") (hasUserPerm $perms "master_write")}}
       <a href="/spaces" class="{{if eq $a "spaces"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">공간관리</a>
       <a href="/contacts" class="{{if eq $a "contacts"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">담당자관리</a>
       <a href="/contact-history" class="{{if eq $a "contact_history"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">담당자이력</a>
@@ -192,15 +192,25 @@
       <a href="/users" class="{{if eq $a "users"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사용자/권한</a>
       {{end}}
       <a href="/admin/holidays" class="{{if eq $a "holidays"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">휴무일 관리</a>
+      {{if canViewOrgs .}}
+      <a href="/admin/orgs" class="{{if eq $a "orgs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">전체 조직 관리</a>
+      {{end}}
+      {{if $isAdmin}}
+      <a href="/admin/my-org/members" class="{{if eq $a "members"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">소속 인원 관리</a>
+      {{end}}
+      {{if eq $role "vision_admin"}}
+      <a href="/admin/permissions" class="{{if eq $a "permissions"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">역할 및 권한</a>
+      {{end}}
       {{if or $isAdmin $loginObserver}}
-      <a href="/admin/orgs" class="{{if eq $a "orgs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">조직 관리</a>
       <a href="/admin/data" class="{{if or (eq $a "data") (eq $a "backup")}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">데이터 관리</a>
       <a href="/admin/test-stats" class="{{if eq $a "stats"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">테스터 통계</a>
+      {{if $isAdmin}}
       <a href="/admin/system" class="{{if eq $a "system"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">시스템 정보</a>
       {{if .NavMail}}
       <a href="/admin/mail" class="{{if eq $a "mail"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">메일 보낸 함</a>
       {{end}}
       <a href="/admin/notify" class="{{if eq $a "notify"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">알림 설정</a>
+      {{end}}
       <a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>
       {{end}}
       {{end}}

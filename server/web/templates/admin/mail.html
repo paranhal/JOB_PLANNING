@@ -17,27 +17,27 @@
   <p class="text-sm text-gray-500">메일 기능이 꺼져 있습니다. MAIL_ENABLED 를 켜세요.</p>
   {{end}}
 
-  <div class="bg-white rounded-xl border overflow-hidden">
-    <table class="w-full text-sm">
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 text-xs text-gray-500">
         <tr>
-          <th class="text-left px-3 py-2">시각</th>
-          <th class="text-left px-3 py-2">받는 사람</th>
-          <th class="text-left px-3 py-2">제목</th>
-          <th class="text-left px-3 py-2">상태</th>
-          <th class="text-left px-3 py-2">오류</th>
-          <th></th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">시각</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">받는 사람</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">제목</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">상태</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">오류</th>
+          <th class="whitespace-nowrap"></th>
         </tr>
       </thead>
       <tbody>
         {{range .Items}}
         <tr class="border-t">
-          <td class="px-3 py-2 font-mono text-xs">{{.CreatedAt}}</td>
-          <td class="px-3 py-2">{{.ToAddr}}</td>
-          <td class="px-3 py-2">{{.Subject}}</td>
-          <td class="px-3 py-2">{{.Status}}</td>
-          <td class="px-3 py-2 text-red-700">{{.LastError}}</td>
-          <td class="px-3 py-2">
+          <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">{{.CreatedAt}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.ToAddr}}</td>
+          <td class="px-3 py-2 max-w-[18rem]">{{.Subject}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.Status}}</td>
+          <td class="px-3 py-2 text-red-700 max-w-[18rem]">{{.LastError}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">
             {{if eq .Status "failed"}}
             <form method="post" action="/admin/mail/{{.MailID}}/retry"><button class="text-xs text-blue-700">다시 보내기</button></form>
             {{end}}

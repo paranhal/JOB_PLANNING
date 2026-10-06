@@ -45,15 +45,15 @@
       <h3 class="text-sm font-semibold text-gray-700">지워질 건수</h3>
     </div>
     {{if .Counts}}
-    <table class="w-full text-sm">
+    <table class="w-full text-sm break-keep">
       <thead class="bg-gray-50 text-left text-xs text-gray-500">
-        <tr><th class="px-4 py-2">표</th><th class="px-4 py-2">건수</th></tr>
+        <tr><th class="px-4 py-2 whitespace-nowrap">표</th><th class="px-4 py-2 whitespace-nowrap">건수</th></tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Counts}}
         <tr>
-          <td class="px-4 py-2 font-mono text-xs">{{.Table}}</td>
-          <td class="px-4 py-2">{{.N}}</td>
+          <td class="px-4 py-2 font-mono text-xs whitespace-nowrap">{{.Table}}</td>
+          <td class="px-4 py-2 whitespace-nowrap">{{.N}}</td>
         </tr>
         {{end}}
       </tbody>

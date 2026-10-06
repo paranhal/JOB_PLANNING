@@ -418,6 +418,52 @@ func (p WorkProject) OrderContractLabel() string {
 	return AmountPairLabel(p.OrderAmount, p.ContractAmount)
 }
 
+// DuplicateProjectNameGroup 같은 이름·같은 고객의 사업이 둘 이상. §68.8
+type DuplicateProjectNameGroup struct {
+	Name         string
+	CustomerID   string
+	CustomerName string
+	Count        int
+	IDs          []string
+}
+
+func DuplicateProjectNameGroups(items []WorkProject) []DuplicateProjectNameGroup {
+	type bag struct {
+		g DuplicateProjectNameGroup
+	}
+	order := []string{}
+	m := map[string]*bag{}
+	for _, p := range items {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			continue
+		}
+		key := name + "\x00" + strings.TrimSpace(p.CustomerID)
+		b, ok := m[key]
+		if !ok {
+			b = &bag{g: DuplicateProjectNameGroup{
+				Name: name, CustomerID: p.CustomerID, CustomerName: p.CustomerName,
+			}}
+			m[key] = b
+			order = append(order, key)
+		}
+		b.g.Count++
+		b.g.IDs = append(b.g.IDs, p.ProjectID)
+		if b.g.CustomerName == "" {
+			b.g.CustomerName = p.CustomerName
+		}
+	}
+	var out []DuplicateProjectNameGroup
+	for _, key := range order {
+		g := m[key].g
+		if g.Count < 2 {
+			continue
+		}
+		out = append(out, g)
+	}
+	return out
+}
+
 // 범위 규칙 제품키 · 업무유형
 const (
 	ProductKeyKLAS       = "klas"

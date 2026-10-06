@@ -39,36 +39,36 @@
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b"><tr>
-        <th class="text-left px-4 py-2 text-xs text-gray-500">내용</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">수량</th>
-        <th class="text-left px-4 py-2 text-xs text-gray-500">단위</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">단가</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">금액</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">내용</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">수량</th>
+        <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">단위</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">단가</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">금액</th>
         {{if .CanSeeMargin}}
-        <th class="text-right px-4 py-2 text-xs text-gray-500">매입가</th>
-        <th class="text-right px-4 py-2 text-xs text-gray-500">마진</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">매입가</th>
+        <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">마진</th>
         {{end}}
       </tr></thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Order.Lines}}
         <tr>
-          <td class="px-4 py-2 whitespace-pre-wrap">
+          <td class="px-4 py-2 whitespace-pre-wrap whitespace-nowrap">
             {{.Name}}{{if .Spec}}<br><span class="text-xs text-gray-500">{{.Spec}}</span>{{end}}
             {{if .DiffersFromQuote}}<div class="text-[10px] text-amber-700 font-semibold">견적과 다름</div>{{end}}
           </td>
-          <td class="px-4 py-2 text-right tabular-nums">{{.Qty}}</td>
-          <td class="px-4 py-2">{{.Unit}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{won .UnitPrice}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{won .Amount}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{.Qty}}</td>
+          <td class="px-4 py-2 whitespace-nowrap">{{.Unit}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .UnitPrice}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Amount}}</td>
           {{if $.CanSeeMargin}}
-          <td class="px-4 py-2 text-right tabular-nums">{{won .Cost}}</td>
-          <td class="px-4 py-2 text-right tabular-nums">{{won .Margin}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Cost}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Margin}}</td>
           {{end}}
         </tr>
         {{else}}
-        <tr><td colspan="{{if .CanSeeMargin}}7{{else}}5{{end}}" class="px-4 py-6 text-center text-gray-400">라인이 없습니다.</td></tr>
+        <tr><td colspan="{{if .CanSeeMargin}}7{{else}}5{{end}}" class="px-4 py-6 text-center text-gray-400 whitespace-nowrap">라인이 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -104,26 +104,26 @@
     <p class="text-xs text-gray-500">재고·수량 잔고는 계산하지 않습니다. 라인별 발주 기록만 남깁니다.</p>
     {{if .Order.Purchases}}
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[900px] text-sm break-keep">
         <thead class="bg-gray-50 border-b"><tr>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">공급사</th>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">발주일</th>
-          <th class="text-right px-3 py-2 text-xs text-gray-500">수량</th>
-          {{if .CanSeeMargin}}<th class="text-right px-3 py-2 text-xs text-gray-500">매입가</th>{{end}}
-          <th class="text-left px-3 py-2 text-xs text-gray-500">입고예정</th>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">입고일</th>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">상태</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">공급사</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">발주일</th>
+          <th class="text-right px-3 py-2 text-xs text-gray-500 whitespace-nowrap">수량</th>
+          {{if .CanSeeMargin}}<th class="text-right px-3 py-2 text-xs text-gray-500 whitespace-nowrap">매입가</th>{{end}}
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">입고예정</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">입고일</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">상태</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
           {{range .Order.Purchases}}
           <tr>
-            <td class="px-3 py-2">{{.SupplierName}}</td>
-            <td class="px-3 py-2">{{.PurchaseDate}}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{{.Qty}}</td>
-            {{if $.CanSeeMargin}}<td class="px-3 py-2 text-right tabular-nums">{{won .CostPrice}}</td>{{end}}
-            <td class="px-3 py-2">{{if .EtaDate}}{{.EtaDate}}{{else}}—{{end}}</td>
-            <td class="px-3 py-2">{{if .ArrivedDate}}{{.ArrivedDate}}{{else}}—{{end}}</td>
-            <td class="px-3 py-2">{{purchaseStatusLabel .Status}}</td>
+            <td class="px-3 py-2 whitespace-nowrap">{{.SupplierName}}</td>
+            <td class="px-3 py-2 whitespace-nowrap">{{.PurchaseDate}}</td>
+            <td class="px-3 py-2 text-right tabular-nums whitespace-nowrap">{{.Qty}}</td>
+            {{if $.CanSeeMargin}}<td class="px-3 py-2 text-right tabular-nums whitespace-nowrap">{{won .CostPrice}}</td>{{end}}
+            <td class="px-3 py-2 whitespace-nowrap">{{if .EtaDate}}{{.EtaDate}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 whitespace-nowrap">{{if .ArrivedDate}}{{.ArrivedDate}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 whitespace-nowrap">{{purchaseStatusLabel .Status}}</td>
           </tr>
           {{end}}
         </tbody>

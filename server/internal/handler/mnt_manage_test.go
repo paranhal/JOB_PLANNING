@@ -32,6 +32,20 @@ func jwtCookieRole(t *testing.T, role string) *http.Cookie {
 	return &http.Cookie{Name: "token", Value: s, Path: "/"}
 }
 
+func jwtCookieReadOnly(t *testing.T, role string) *http.Cookie {
+	t.Helper()
+	secret := []byte("cs-system-jwt-secret-2026")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": role + "-ro-id", "username": role + "-ro", "role": role,
+		"name": role, "is_readonly": true, "exp": time.Now().Add(time.Hour).Unix(),
+	})
+	s, err := token.SignedString(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &http.Cookie{Name: "token", Value: s, Path: "/"}
+}
+
 func newMntManageApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRepo, *model.MaintenancePlan) {
 	t.Helper()
 	dir := t.TempDir()

@@ -14,24 +14,24 @@
 
   {{if .Contacts}}
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[1200px] text-sm break-keep">
       <thead>
         <tr class="border-b border-gray-200">
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">이름</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">소속</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">직급</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">직책</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">직위</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">전화</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">휴대폰</th>
-          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">이메일</th>
-          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">이름</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">소속</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">직급</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">직책</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">직위</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">전화</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">휴대폰</th>
+          <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">이메일</th>
+          <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">상태</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Contacts}}
         <tr class="hover:bg-gray-50 transition-colors">
-          <td class="py-2.5 pr-4">
+          <td class="py-2.5 pr-4 whitespace-nowrap">
             <div class="flex items-center gap-2">
               <a href="/contacts/{{.ContactID}}" class="font-medium text-gray-800 hover:text-blue-600">{{.FullName}}</a>
               {{if .IsPrimary}}
@@ -39,14 +39,14 @@
               {{end}}
             </div>
           </td>
-          <td class="py-2.5 pr-4 text-gray-600 text-xs">{{affiliationLabel .Affiliation}}</td>
-          <td class="py-2.5 pr-4 text-gray-600 text-xs">{{if .JobGrade}}{{jobGradeLabel .JobGrade}}{{else}}—{{end}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.JobRole}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.Title}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.Phone}}</td>
-          <td class="py-2.5 pr-4 text-gray-600">{{.Mobile}}</td>
-          <td class="py-2.5 pr-4 text-gray-500 text-xs">{{.Email}}</td>
-          <td class="py-2.5">
+          <td class="py-2.5 pr-4 text-gray-600 text-xs whitespace-nowrap">{{affiliationLabel .Affiliation}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 text-xs whitespace-nowrap">{{if .JobGrade}}{{jobGradeLabel .JobGrade}}{{else}}—{{end}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.JobRole}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.Title}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.Phone}}</td>
+          <td class="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{{.Mobile}}</td>
+          <td class="py-2.5 pr-4 text-gray-500 text-xs whitespace-nowrap">{{.Email}}</td>
+          <td class="py-2.5 whitespace-nowrap">
             {{if eq .Status "active"}}
               <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">재직</span>
             {{else if eq .Status "resigned"}}

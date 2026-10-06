@@ -71,26 +71,26 @@
   {{end}}
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b text-xs text-slate-500">
         <tr>
-          <th class="text-left px-3 py-2">키워드</th>
-          <th class="text-left px-3 py-2">구분</th>
-          <th class="text-left px-3 py-2">동의어</th>
-          <th class="text-right px-3 py-2">연결</th>
-          <th class="px-3 py-2"></th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">키워드</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">구분</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">동의어</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">연결</th>
+          <th class="px-3 py-2 whitespace-nowrap"></th>
         </tr>
       </thead>
       <tbody class="divide-y">
         {{range .Items}}
         <tr class="{{if not .IsActive}}opacity-50{{end}}">
-          <td class="px-3 py-2">
+          <td class="px-3 py-2 whitespace-nowrap">
             <a href="/as/search?keyword_id={{.KeywordID}}" class="font-medium text-blue-700 hover:underline">{{.Keyword}}</a>
           </td>
-          <td class="px-3 py-2 text-slate-500">{{.Group}}</td>
-          <td class="px-3 py-2 text-slate-500">{{if .Synonyms}}{{.Synonyms}}{{else}}—{{end}}</td>
-          <td class="px-3 py-2 text-right">{{.LinkCount}}</td>
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 text-slate-500 whitespace-nowrap">{{.Group}}</td>
+          <td class="px-3 py-2 text-slate-500 whitespace-nowrap">{{if .Synonyms}}{{.Synonyms}}{{else}}—{{end}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.LinkCount}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
             <form method="POST" action="/as/keywords/{{.KeywordID}}/delete" class="inline" onsubmit="return confirm('사전에서 지울까요? 건별 연결도 함께 지워집니다.');">
               <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
             </form>

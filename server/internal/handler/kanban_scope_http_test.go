@@ -161,7 +161,7 @@ func TestUsersGroupedByRoleNoKanban(t *testing.T) {
 	if strings.Contains(body, ">칸반<") {
 		t.Fatal("/users 에 칸반 버튼")
 	}
-	if !strings.Contains(body, "관리자 소속") {
-		t.Fatal("소속별 그룹 없음")
+	if !strings.Contains(body, "관리 등급과 업무는 함께 가질 수 없습니다") {
+		t.Fatal("2축 안내가 없다")
 	}
 }

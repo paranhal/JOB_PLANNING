@@ -2,6 +2,8 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -40,6 +42,7 @@ func (h *ItemsHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	items = h.repo.AttachSpecSummaries(items)
 	kanban := model.FillSalesItemKanban(items)
 	q := itemsListQuery(f, "")
 	listHref := "/items"
@@ -78,9 +81,16 @@ func (h *ItemsHandler) Create(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	p := parseSalesItemForm(c)
+	specs, prices := parseItemCatalog(c)
+	applyFirstSpecToItem(p, specs)
 	p.NeedsReview = false
 	if err := h.repo.Create(p); err != nil {
+		p.Specs, p.Suppliers = specs, groupPricesForForm(prices)
 		return h.renderForm(c, p, true, err.Error())
+	}
+	if _, err := h.repo.ReplaceSpecsAndPrices(p.ItemID, specs, prices); err != nil {
+		p.Specs, p.Suppliers = specs, groupPricesForForm(prices)
+		return h.renderForm(c, p, false, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, "/items?ok=created")
 }
@@ -96,6 +106,7 @@ func (h *ItemsHandler) Edit(c echo.Context) error {
 		}
 		return err
 	}
+	_ = h.repo.LoadCatalog(p)
 	return h.renderForm(c, p, false, "")
 }
 
@@ -109,6 +120,9 @@ func (h *ItemsHandler) Update(c echo.Context) error {
 	}
 	p := parseSalesItemForm(c)
 	p.ItemID = cur.ItemID
+	p.Spec, p.Unit, p.ListPrice = cur.Spec, cur.Unit, cur.ListPrice
+	specs, prices := parseItemCatalog(c)
+	applyFirstSpecToItem(p, specs)
 	if c.FormValue("confirm_review") == "1" {
 		p.NeedsReview = false
 		p.IsActive = true
@@ -116,7 +130,16 @@ func (h *ItemsHandler) Update(c echo.Context) error {
 		p.NeedsReview = cur.NeedsReview
 	}
 	if err := h.repo.Update(p); err != nil {
+		p.Specs, p.Suppliers = specs, groupPricesForForm(prices)
 		return h.renderForm(c, p, false, err.Error())
+	}
+	off, err := h.repo.ReplaceSpecsAndPrices(p.ItemID, specs, prices)
+	if err != nil {
+		p.Specs, p.Suppliers = specs, groupPricesForForm(prices)
+		return h.renderForm(c, p, false, err.Error())
+	}
+	if len(off) > 0 {
+		return c.Redirect(http.StatusSeeOther, "/items/"+p.ItemID+"/edit?ok=spec_off")
 	}
 	return c.Redirect(http.StatusSeeOther, "/items/"+p.ItemID+"/edit?ok=updated")
 }
@@ -163,6 +186,7 @@ func (h *ItemsHandler) Suggest(c echo.Context) error {
 	}
 	out := make([]map[string]interface{}, 0, len(items))
 	for i := range items {
+		_ = h.repo.LoadCatalog(&items[i])
 		out = append(out, salesItemAPI(&items[i]))
 	}
 	return c.JSON(http.StatusOK, out)
@@ -196,6 +220,7 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 	}
 
 	if it != nil {
+		_ = h.repo.LoadCatalog(it)
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"ok": true, "ask_register": false, "item": salesItemAPI(it),
 		})
@@ -217,6 +242,7 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 		if err := h.repo.Create(it); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 		}
+		_ = h.repo.LoadCatalog(it)
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"ok": true, "ask_register": false, "registered": true, "item": salesItemAPI(it),
 			"prompt": "",
@@ -288,14 +314,34 @@ func (h *ItemsHandler) renderForm(c echo.Context, p *model.SalesItem, isNew bool
 	if !isNew && h.quotes != nil && p != nil {
 		uses, _ = h.quotes.ListByItemID(p.ItemID)
 	}
+	var margins []model.SalesItemSpecMargin
+	var inactive []model.SalesItemSpec
+	if p != nil {
+		if len(p.Specs) == 0 && !isNew {
+			_ = h.repo.LoadCatalog(p)
+		}
+		var prices []model.SalesItemSupplierPrice
+		for _, b := range p.Suppliers {
+			prices = append(prices, b.Rows...)
+		}
+		margins = model.SpecMargins(p.Specs, prices)
+		for _, sp := range p.Specs {
+			if !sp.IsActive {
+				inactive = append(inactive, sp)
+			}
+		}
+	}
 	return c.Render(http.StatusOK, "items/form.html", map[string]interface{}{
 		"Title": title, "Active": NavSalesItems, "IsNew": isNew,
 		"Item": p, "FormError": formErr,
 		"Kinds": model.SalesItemKindDefs(), "Categories": model.SalesItemCategories(),
-		"Units":    model.SalesItemUnits(),
-		"CanWrite": canWriteSales(c),
-		"FlashOK":  c.QueryParam("ok"),
-		"Quotes":   uses,
+		"Units":         model.SalesItemUnits(),
+		"CanWrite":      canWriteSales(c),
+		"FlashOK":       c.QueryParam("ok"),
+		"Quotes":        uses,
+		"Margins":       margins,
+		"InactiveSpecs": inactive,
+		"CatalogJSON":   itemCatalogJSON(p),
 	})
 }
 
@@ -304,18 +350,147 @@ func parseSalesItemForm(c echo.Context) *model.SalesItem {
 		ItemKind:        model.NormalizeSalesItemKind(c.FormValue("item_kind")),
 		Category:        strings.TrimSpace(c.FormValue("category")),
 		Name:            strings.TrimSpace(c.FormValue("name")),
-		Spec:            strings.TrimSpace(c.FormValue("spec")),
 		Model:           strings.TrimSpace(c.FormValue("model")),
 		Manufacturer:    strings.TrimSpace(c.FormValue("manufacturer")),
 		ManufacturerID:  strings.TrimSpace(c.FormValue("manufacturer_id")),
 		SupplierID:      strings.TrimSpace(c.FormValue("supplier_id")),
-		Unit:            strings.TrimSpace(c.FormValue("unit")),
 		GovItemNo:       strings.TrimSpace(c.FormValue("gov_item_no")),
-		ListPrice:       parseItemMoney(c.FormValue("list_price")),
 		DefaultSupplier: strings.TrimSpace(c.FormValue("default_supplier")),
 		IsActive:        c.FormValue("is_active") == "1",
 		Notes:           strings.TrimSpace(c.FormValue("notes")),
 	}
+}
+
+func parseItemCatalog(c echo.Context) ([]model.SalesItemSpec, []model.SalesItemSupplierPrice) {
+	if c.Request().Form == nil {
+		_ = c.Request().ParseForm()
+	}
+	form := c.Request().Form
+	n := len(form["spec"])
+	if len(form["spec_id"]) > n {
+		n = len(form["spec_id"])
+	}
+	get := func(key string, i int) string {
+		vals := form[key]
+		if i < len(vals) {
+			return vals[i]
+		}
+		return ""
+	}
+	var specs []model.SalesItemSpec
+	for i := 0; i < n; i++ {
+		specs = append(specs, model.SalesItemSpec{
+			SpecID: strings.TrimSpace(get("spec_id", i)),
+			Spec:   strings.TrimSpace(get("spec", i)),
+			Unit:   strings.TrimSpace(get("spec_unit", i)),
+			Price:  parseItemMoney(get("spec_price", i)),
+		})
+	}
+	supIDs := form["sup_id"]
+	var prices []model.SalesItemSupplierPrice
+	for i := range form["sp_spec_id"] {
+		gi := atoiQuiet(get("sp_group", i))
+		sid := ""
+		if gi >= 0 && gi < len(supIDs) {
+			sid = strings.TrimSpace(supIDs[gi])
+		}
+		if sid == "" {
+			sid = strings.TrimSpace(get("sp_supplier_id", i))
+		}
+		prices = append(prices, model.SalesItemSupplierPrice{
+			SupplierID: sid,
+			SpecID:     strings.TrimSpace(get("sp_spec_id", i)),
+			Unit:       strings.TrimSpace(get("sp_unit", i)),
+			Price:      parseItemMoney(get("sp_price", i)),
+		})
+	}
+	return specs, prices
+}
+
+func applyFirstSpecToItem(p *model.SalesItem, specs []model.SalesItemSpec) {
+	if p == nil || len(specs) == 0 {
+		return
+	}
+	sp := specs[0]
+	if strings.TrimSpace(p.Spec) == "" {
+		p.Spec = strings.TrimSpace(sp.Spec)
+	}
+	if strings.TrimSpace(p.Unit) == "" {
+		p.Unit = sp.EffectiveUnit()
+	}
+	if p.ListPrice == 0 {
+		p.ListPrice = sp.Price
+	}
+}
+
+func groupPricesForForm(prices []model.SalesItemSupplierPrice) []model.SalesItemSupplierBlock {
+	idx := map[string]int{}
+	var blocks []model.SalesItemSupplierBlock
+	for _, p := range prices {
+		sid := strings.TrimSpace(p.SupplierID)
+		if sid == "" {
+			continue
+		}
+		i, ok := idx[sid]
+		if !ok {
+			idx[sid] = len(blocks)
+			blocks = append(blocks, model.SalesItemSupplierBlock{SupplierID: sid})
+			i = len(blocks) - 1
+		}
+		blocks[i].Rows = append(blocks[i].Rows, p)
+	}
+	return blocks
+}
+
+type itemCatalogInitSpec struct {
+	ID     string `json:"id"`
+	Spec   string `json:"spec"`
+	Unit   string `json:"unit"`
+	Price  int    `json:"price"`
+	Active bool   `json:"active"`
+}
+
+type itemCatalogInitRow struct {
+	SpecID string `json:"specId"`
+	Unit   string `json:"unit"`
+	Price  int    `json:"price"`
+}
+
+type itemCatalogInitSup struct {
+	SupplierID   string               `json:"supplierId"`
+	SupplierName string               `json:"supplierName"`
+	Rows         []itemCatalogInitRow `json:"rows"`
+}
+
+func itemCatalogJSON(p *model.SalesItem) template.JS {
+	init := struct {
+		Specs     []itemCatalogInitSpec `json:"specs"`
+		Suppliers []itemCatalogInitSup  `json:"suppliers"`
+	}{Specs: []itemCatalogInitSpec{}, Suppliers: []itemCatalogInitSup{}}
+	if p != nil {
+		for _, sp := range p.Specs {
+			if !sp.IsActive {
+				continue
+			}
+			init.Specs = append(init.Specs, itemCatalogInitSpec{
+				ID: sp.SpecID, Spec: sp.Spec, Unit: sp.EffectiveUnit(), Price: sp.Price, Active: true,
+			})
+		}
+		for _, b := range p.Suppliers {
+			rows := make([]itemCatalogInitRow, 0, len(b.Rows))
+			for _, r := range b.Rows {
+				rows = append(rows, itemCatalogInitRow{SpecID: r.SpecID, Unit: r.Unit, Price: r.Price})
+			}
+			init.Suppliers = append(init.Suppliers, itemCatalogInitSup{
+				SupplierID: b.SupplierID, SupplierName: b.SupplierName, Rows: rows,
+			})
+		}
+	}
+	b, err := json.Marshal(init)
+	if err != nil {
+		return template.JS(`{"specs":[],"suppliers":[]}`)
+	}
+	return template.JS(b)
 }
 
 func parseItemMoney(s string) int {
@@ -338,26 +513,44 @@ func salesItemAPI(p *model.SalesItem) map[string]interface{} {
 	if fill <= 0 {
 		fill = p.LastPrice
 	}
+	var specs []map[string]interface{}
+	for _, sp := range p.Specs {
+		if !sp.IsActive {
+			continue
+		}
+		specs = append(specs, map[string]interface{}{
+			"spec_id": sp.SpecID, "spec": sp.Spec, "unit": sp.EffectiveUnit(), "price": sp.Price,
+		})
+		if fill <= 0 && sp.Price > 0 {
+			fill = sp.Price
+		}
+	}
+	if fill <= 0 && len(specs) > 0 {
+		if pr, ok := specs[0]["price"].(int); ok {
+			fill = pr
+		}
+	}
 	return map[string]interface{}{
-		"item_id":          p.ItemID,
-		"item_kind":        p.ItemKind,
-		"kind_label":       p.KindLabel(),
-		"category":         p.Category,
-		"name":             p.Name,
-		"spec":             p.Spec,
-		"model":            p.Model,
-		"manufacturer":     p.ManufacturerLabel(),
-		"manufacturer_id":  p.ManufacturerID,
-		"supplier_id":      p.SupplierID,
-		"unit":             p.Unit,
-		"gov_item_no":      p.GovItemNo,
-		"list_price":       p.ListPrice,
-		"last_price":       p.LastPrice,
-		"fill_price":       fill,
-		"last_quoted_at":   p.LastQuotedAt,
-		"last_customer":    p.LastCustomer,
-		"is_active":        p.IsActive,
-		"needs_review":     p.NeedsReview,
+		"item_id":         p.ItemID,
+		"item_kind":       p.ItemKind,
+		"kind_label":      p.KindLabel(),
+		"category":        p.Category,
+		"name":            p.Name,
+		"spec":            p.Spec,
+		"model":           p.Model,
+		"manufacturer":    p.ManufacturerLabel(),
+		"manufacturer_id": p.ManufacturerID,
+		"supplier_id":     p.SupplierID,
+		"unit":            p.Unit,
+		"gov_item_no":     p.GovItemNo,
+		"list_price":      p.ListPrice,
+		"last_price":      p.LastPrice,
+		"fill_price":      fill,
+		"last_quoted_at":  p.LastQuotedAt,
+		"last_customer":   p.LastCustomer,
+		"is_active":       p.IsActive,
+		"needs_review":    p.NeedsReview,
+		"specs":           specs,
 	}
 }
 

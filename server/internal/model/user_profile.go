@@ -3,18 +3,18 @@ package model
 import "strings"
 
 // NeedsMobile 관리자 외 핸드폰 필수 (§54.2).
-func NeedsMobile(role, baseRole string) bool {
-	return !IsAdminGrade(EffectiveRole(role, baseRole))
+func NeedsMobile(role string) bool {
+	return !IsAdminGrade(role)
 }
 
 // NeedsEmail 조직관리자·비젼관리자는 이메일 필수 (§54.2).
-func NeedsEmail(role, baseRole string) bool {
-	return IsAdminGrade(EffectiveRole(role, baseRole))
+func NeedsEmail(role string) bool {
+	return IsAdminGrade(role)
 }
 
 // NeedsOrg 비젼관리자만 조직 빈 값 허용 (§54.2).
-func NeedsOrg(role, baseRole string) bool {
-	return EffectiveRole(role, baseRole) != RoleVisionAdmin
+func NeedsOrg(role string) bool {
+	return NormalizeRole(role) != RoleVisionAdmin
 }
 
 func (u *User) MissingProfileFields() []string {
@@ -22,13 +22,13 @@ func (u *User) MissingProfileFields() []string {
 		return nil
 	}
 	var miss []string
-	if NeedsMobile(u.Role, u.BaseRole) && strings.TrimSpace(u.Mobile) == "" {
+	if NeedsMobile(u.Role) && strings.TrimSpace(u.Mobile) == "" {
 		miss = append(miss, "mobile")
 	}
-	if NeedsEmail(u.Role, u.BaseRole) && strings.TrimSpace(u.Email) == "" {
+	if NeedsEmail(u.Role) && strings.TrimSpace(u.Email) == "" {
 		miss = append(miss, "email")
 	}
-	if NeedsOrg(u.Role, u.BaseRole) && strings.TrimSpace(u.OrgID) == "" {
+	if NeedsOrg(u.Role) && strings.TrimSpace(u.OrgID) == "" {
 		miss = append(miss, "org")
 	}
 	return miss

@@ -3,9 +3,9 @@ package model
 import "strings"
 
 const (
-	ImportStatusReported   = "reported"
-	ImportStatusApplied    = "applied"
-	ImportStatusCancelled  = "cancelled"
+	ImportStatusReported  = "reported"
+	ImportStatusApplied   = "applied"
+	ImportStatusCancelled = "cancelled"
 
 	ImportIssueMissing   = "missing"
 	ImportIssueDate      = "date"

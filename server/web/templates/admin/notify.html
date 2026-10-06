@@ -31,26 +31,26 @@
   </form>
 
   {{if .SMSOn}}
-  <div class="bg-white rounded-xl border overflow-hidden">
+  <div class="bg-white rounded-xl border overflow-x-auto">
     <p class="px-3 py-2 text-sm font-semibold">문자 보낸 함</p>
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 text-xs text-gray-500">
         <tr>
-          <th class="text-left px-3 py-2">시각</th>
-          <th class="text-left px-3 py-2">번호</th>
-          <th class="text-left px-3 py-2">종류</th>
-          <th class="text-left px-3 py-2">상태</th>
-          <th class="text-left px-3 py-2">오류</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">시각</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">번호</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">종류</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">상태</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">오류</th>
         </tr>
       </thead>
       <tbody>
         {{range .Items}}
         <tr class="border-t">
-          <td class="px-3 py-2 font-mono text-xs">{{.CreatedAt}}</td>
-          <td class="px-3 py-2">{{.ToAddr}}</td>
-          <td class="px-3 py-2">{{.SMSKind}}</td>
-          <td class="px-3 py-2">{{.Status}}</td>
-          <td class="px-3 py-2 text-red-700">{{.LastError}}{{if .KakaoFallback}} · 알림톡 대체{{end}}</td>
+          <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">{{.CreatedAt}}</td>
+          <td class="px-3 py-2 font-mono whitespace-nowrap">{{.ToAddr}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.SMSKind}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.Status}}</td>
+          <td class="px-3 py-2 text-red-700 max-w-[18rem]">{{.LastError}}{{if .KakaoFallback}} · 알림톡 대체{{end}}</td>
         </tr>
         {{else}}
         <tr><td colspan="5" class="px-3 py-6 text-gray-400">보낸 문자가 없습니다.</td></tr>

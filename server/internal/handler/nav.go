@@ -43,6 +43,8 @@ const (
 	NavUsers            = "users"
 	NavHolidays         = "holidays"
 	NavOrgs             = "orgs"
+	NavMembers          = "members"
+	NavPermissions      = "permissions"
 	NavData             = "data"
 	NavBackup           = "backup"
 	NavSystem           = "system"
@@ -96,6 +98,8 @@ func navSidebarKeys() []string {
 		NavUsers,
 		NavHolidays,
 		NavOrgs,
+		NavMembers,
+		NavPermissions,
 		NavData,
 		NavBackup,
 		NavSystem,

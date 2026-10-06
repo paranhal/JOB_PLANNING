@@ -94,10 +94,10 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		"WithAction": withAction, "TotalAll": totalAll, "Classified": classified,
 		"Customers": customers, "Products": products, "CauseCats": catL1,
 		"Sites": sites, "CanReceive": canReceiveAS(c),
-		"CanProcess": canProcessAS(c),
-		"DisplayName": ctxString(c, "user_name"),
+		"CanProcess":   canProcessAS(c),
+		"DisplayName":  ctxString(c, "user_name"),
 		"AttachErrMsg": attachErrMessage(c.QueryParam("err")),
-		"KBRedirect": c.Request().URL.RequestURI(),
+		"KBRedirect":   c.Request().URL.RequestURI(),
 	}
 
 	if tab == "site" {

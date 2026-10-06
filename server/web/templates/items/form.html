@@ -16,11 +16,14 @@
   {{if eq .FlashOK "updated"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">저장했습니다.</div>
   {{end}}
+  {{if eq .FlashOK "spec_off"}}
+  <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-2 border border-amber-200">견적에 쓰여 끕니다.</div>
+  {{end}}
   {{if .FormError}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
 
-  <form method="POST" action="{{if .IsNew}}/items{{else}}/items/{{.Item.ItemID}}{{end}}" class="space-y-6">
+  <form method="POST" action="{{if .IsNew}}/items{{else}}/items/{{.Item.ItemID}}{{end}}" class="space-y-6" x-data="itemCatalog()">
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       {{if not .IsNew}}
       <div>
@@ -59,13 +62,9 @@
         <input type="text" name="name" value="{{.Item.Name}}" required
                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">규격</label>
-        <textarea name="spec" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{.Item.Spec}}</textarea>
-      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">모델</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">모델명</label>
           <input type="text" name="model" value="{{.Item.Model}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
         </div>
         <div x-data="{
@@ -130,83 +129,34 @@
           {{end}}
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">단위</label>
-          <select name="unit" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-            {{range .Units}}<option value="{{.}}" {{if eq $.Item.Unit .}}selected{{end}}>{{.}}</option>{{end}}
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">조달 물품식별번호</label>
-          <input type="text" name="gov_item_no" value="{{.Item.GovItemNo}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
+
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">소비자가·조달단가</label>
-        <input type="text" name="list_price" value="{{if .Item.ListPrice}}{{.Item.ListPrice}}{{end}}" inputmode="numeric"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums">
+        <p class="text-sm font-medium text-gray-700 mb-2">규격</p>
+        <template x-for="(sp, i) in specs" :key="sp.id">
+          <div class="grid grid-cols-12 gap-2 items-end mb-2">
+            <input type="hidden" name="spec_id" :value="sp.id">
+            <div class="col-span-5">
+              <input name="spec" x-model="sp.spec" class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="규격">
+            </div>
+            <div class="col-span-2">
+              <select name="spec_unit" x-model="sp.unit" class="w-full border rounded-lg px-2 py-1.5 text-sm bg-white">
+                {{range .Units}}<option value="{{.}}">{{.}}</option>{{end}}
+              </select>
+            </div>
+            <div class="col-span-3">
+              <input name="spec_price" x-model="sp.price" inputmode="numeric" class="w-full border rounded-lg px-2 py-1.5 text-sm tabular-nums" placeholder="단가">
+            </div>
+            <div class="col-span-2 text-right">
+              <button type="button" class="text-xs text-red-600 hover:underline" @click="removeSpec(i)">삭제</button>
+            </div>
+          </div>
+        </template>
+        <button type="button" class="text-xs text-blue-700 hover:underline" @click="addSpec()">+ 규격 추가</button>
       </div>
-      <div x-data="{
-        q: {{printf "%q" .Item.SupplierLabel}},
-        id: {{printf "%q" .Item.SupplierID}},
-        text: {{printf "%q" .Item.DefaultSupplier}},
-        hits: [], open: false, making: false, newName: '',
-        async search(){
-          const q=this.q.trim();
-          if(!q){ this.hits=[]; this.open=false; return; }
-          try {
-            const r=await fetch('/customers/search?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
-            this.hits=await r.json()||[];
-            this.open=true;
-          } catch(e){ this.hits=[]; }
-        },
-        pick(it){
-          this.id=it.customer_id; this.q=it.org_name; this.text=this.text||it.org_name; this.open=false; this.making=false;
-        },
-        async create(){
-          const name=(this.newName||this.q).trim();
-          if(!name) return;
-          const post=async (extra)=>{
-            const b=new URLSearchParams({name});
-            if(extra){ for(const k in extra) b.set(k, extra[k]); }
-            const r=await fetch('/items/partners',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:b});
-            return r.json();
-          };
-          let d=await post();
-          if(d && d.ask_confirm){
-            if(!confirm(d.prompt||'같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?')) return;
-            d=await post({confirm:'1'});
-          }
-          if(d && d.customer) this.pick(d.customer);
-        }
-      }">
-        <label class="block text-sm font-medium text-gray-700 mb-1">기본 공급사</label>
-        <input type="hidden" name="supplier_id" :value="id">
-        <input type="hidden" name="default_supplier" :value="text">
-        <input type="text" x-model="q" @input.debounce.200ms="search()" @focus="search()" autocomplete="off"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="고객현황에서 검색">
-        <ul x-show="open" x-cloak class="mt-1 border rounded-lg bg-white max-h-40 overflow-auto text-sm">
-          <template x-for="it in hits" :key="it.customer_id">
-            <li><button type="button" class="w-full text-left px-3 py-1.5 hover:bg-blue-50" @click="pick(it)">
-              <span x-text="it.org_name"></span>
-              <span class="text-xs text-gray-400 ml-1" x-text="it.customer_id"></span>
-            </button></li>
-          </template>
-        </ul>
-        <p class="text-xs mt-1" x-show="id">
-          <a class="text-blue-700 hover:underline" :href="'/customers/'+id">고객번호 <span x-text="id"></span></a>
-        </p>
-        {{if and .Item.DefaultSupplier (not .Item.SupplierID)}}
-        <p class="text-xs text-rose-700 mt-1">연결 필요 · 글자값 {{.Item.DefaultSupplier}}</p>
-        {{end}}
-        {{if $.CanWrite}}
-        <button type="button" class="mt-1 text-xs text-blue-700 hover:underline" @click="making=true; newName=q">+ 새 거래처</button>
-        <div x-show="making" x-cloak class="mt-1 flex gap-2">
-          <input type="text" x-model="newName" placeholder="고객사명만" class="flex-1 border rounded px-2 py-1 text-sm">
-          <button type="button" class="text-xs px-2 border rounded" @click="create()">만들기</button>
-        </div>
-        {{end}}
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">조달 물품식별번호</label>
+        <input type="text" name="gov_item_no" value="{{.Item.GovItemNo}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">메모</label>
@@ -217,6 +167,77 @@
         사용
       </label>
     </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h3 class="font-semibold text-gray-800">공급사별 단가(매입)</h3>
+      <template x-for="(g, gi) in suppliers" :key="gi">
+        <div class="border border-gray-100 rounded-lg p-3 space-y-2">
+          <input type="hidden" name="sup_id" :value="g.supplierId">
+          <input type="hidden" name="sup_name" :value="g.supplierName">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex-1 relative">
+              <label class="block text-xs text-gray-500 mb-1">공급사</label>
+              <input type="text" x-model="g.q" @input.debounce.200ms="searchSup(gi)" @focus="searchSup(gi)" autocomplete="off"
+                     class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="고객현황에서 검색">
+              <ul x-show="g.open" x-cloak class="absolute z-10 mt-1 w-full border rounded-lg bg-white max-h-40 overflow-auto text-sm">
+                <template x-for="it in g.hits" :key="it.customer_id">
+                  <li><button type="button" class="w-full text-left px-3 py-1.5 hover:bg-blue-50" @click="pickSup(gi, it)"
+                    x-text="it.org_name"></button></li>
+                </template>
+              </ul>
+              {{if $.CanWrite}}
+              <button type="button" class="mt-1 text-xs text-blue-700 hover:underline" @click="g.making=true; g.newName=g.q">+ 새 거래처</button>
+              <div x-show="g.making" x-cloak class="mt-1 flex gap-2">
+                <input type="text" x-model="g.newName" placeholder="고객사명만" class="flex-1 border rounded px-2 py-1 text-sm">
+                <button type="button" class="text-xs px-2 border rounded" @click="createSup(gi)">만들기</button>
+              </div>
+              {{end}}
+            </div>
+            <button type="button" class="text-xs text-red-600 hover:underline mt-6" @click="removeSup(gi)">삭제</button>
+          </div>
+          <template x-for="(row, ri) in g.rows" :key="ri">
+            <div class="grid grid-cols-12 gap-2 items-end">
+              <input type="hidden" name="sp_group" :value="gi">
+              <div class="col-span-5">
+                <select name="sp_spec_id" x-model="row.specId" class="w-full border rounded-lg px-2 py-1.5 text-sm bg-white">
+                  <option value="">규격 고르기</option>
+                  <template x-for="sp in specs" :key="sp.id">
+                    <option :value="sp.id" x-text="sp.spec || '(이름 없음)'"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="col-span-2">
+                <input name="sp_unit" x-model="row.unit" class="w-full border rounded-lg px-2 py-1.5 text-sm" :placeholder="specUnit(row.specId)">
+              </div>
+              <div class="col-span-3">
+                <input name="sp_price" x-model="row.price" inputmode="numeric" class="w-full border rounded-lg px-2 py-1.5 text-sm tabular-nums" placeholder="매입 단가">
+              </div>
+              <div class="col-span-2 text-right">
+                <button type="button" class="text-xs text-red-600 hover:underline" @click="removeSupRow(gi, ri)">삭제</button>
+              </div>
+            </div>
+          </template>
+          <button type="button" class="text-xs text-blue-700 hover:underline" @click="addSupRow(gi)">+ 규격 추가</button>
+        </div>
+      </template>
+      <button type="button" class="text-sm text-blue-700 hover:underline" @click="addSup()">+ 공급사 추가</button>
+    </div>
+
+    {{if .Margins}}
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 class="font-semibold text-gray-800 mb-2">규격별 이익</h3>
+      <p class="text-xs text-gray-500 mb-3">계산만 보여 줍니다. 저장하지 않습니다.</p>
+      <ul class="text-sm space-y-1">
+        {{range .Margins}}
+        <li>{{.Spec.Spec}}: 판매 {{.Spec.Price}} · 매입 {{if .BuyMin}}{{.BuyMin}}{{else}}—{{end}}{{if .Percent}} · 이익 {{.Profit}}({{.Percent}}){{end}}</li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
+
+    {{if .InactiveSpecs}}
+    <p class="text-xs text-amber-800">견적에 쓰여 끈 규격이 있습니다.</p>
+    {{end}}
 
     {{if .CanWrite}}
     <div class="flex justify-end gap-2">
@@ -230,20 +251,20 @@
   <div class="bg-white rounded-xl border border-gray-200 p-6">
     <h3 class="font-semibold text-gray-800 mb-3">이 품목이 들어간 견적</h3>
     {{if .Quotes}}
-    <table class="w-full text-sm">
+    <table class="w-full text-sm break-keep">
       <thead class="text-xs text-gray-500 border-b"><tr>
-        <th class="text-left py-2">견적번호</th>
-        <th class="text-left py-2">견적일</th>
-        <th class="text-left py-2">고객</th>
-        <th class="text-right py-2">단가</th>
+        <th class="text-left py-2 whitespace-nowrap">견적번호</th>
+        <th class="text-left py-2 whitespace-nowrap">견적일</th>
+        <th class="text-left py-2 whitespace-nowrap">고객</th>
+        <th class="text-right py-2 whitespace-nowrap">단가</th>
       </tr></thead>
       <tbody class="divide-y">
         {{range .Quotes}}
         <tr>
-          <td class="py-2"><a href="/quotes/{{.QuoteID}}" class="text-blue-700 hover:underline">{{if .QuoteNo}}{{.QuoteNo}}{{else}}{{.QuoteID}}{{end}}</a></td>
-          <td class="py-2 text-gray-600">{{if .QuoteDate}}{{.QuoteDate}}{{else}}—{{end}}</td>
-          <td class="py-2 text-gray-600">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
-          <td class="py-2 text-right tabular-nums">{{.UnitPrice}}</td>
+          <td class="py-2 font-mono whitespace-nowrap"><a href="/quotes/{{.QuoteID}}" class="text-blue-700 hover:underline">{{if .QuoteNo}}{{.QuoteNo}}{{else}}{{.QuoteID}}{{end}}</a></td>
+          <td class="py-2 text-gray-600 whitespace-nowrap">{{if .QuoteDate}}{{.QuoteDate}}{{else}}—{{end}}</td>
+          <td class="py-2 text-gray-600 max-w-[18rem]">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+          <td class="py-2 text-right tabular-nums whitespace-nowrap">{{.UnitPrice}}</td>
         </tr>
         {{end}}
       </tbody>
@@ -254,4 +275,64 @@
   </div>
   {{end}}
 </div>
+<script type="application/json" id="item-catalog-init">{{.CatalogJSON}}</script>
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('itemCatalog', () => {
+    const raw = document.getElementById('item-catalog-init');
+    let init = {specs:[], suppliers:[]};
+    try { init = JSON.parse((raw && raw.textContent) || '{}') || init; } catch(e) {}
+    const specs = (init.specs||[]).map(sp => ({id: sp.id, spec: sp.spec||'', unit: sp.unit||'EA', price: sp.price||''}));
+    const suppliers = (init.suppliers||[]).map(g => ({
+      supplierId: g.supplierId||'', supplierName: g.supplierName||'', q: g.supplierName||'',
+      hits:[], open:false, making:false, newName:'',
+      rows: (g.rows||[]).map(r => ({specId: r.specId||'', unit: r.unit||'', price: r.price||''}))
+    }));
+    return {
+      specs, suppliers, tmp: 1,
+      addSpec(){ this.specs.push({id:'tmp-'+(this.tmp++), spec:'', unit:'EA', price:''}); },
+      removeSpec(i){ this.specs.splice(i,1); },
+      addSup(){ this.suppliers.push({supplierId:'', supplierName:'', q:'', hits:[], open:false, making:false, newName:'', rows:[{specId:'', unit:'', price:''}]}); },
+      removeSup(i){ this.suppliers.splice(i,1); },
+      addSupRow(gi){ this.suppliers[gi].rows.push({specId:'', unit:'', price:''}); },
+      removeSupRow(gi, ri){ this.suppliers[gi].rows.splice(ri,1); },
+      specUnit(id){
+        const sp = this.specs.find(s => s.id===id);
+        return sp && sp.unit ? sp.unit : 'EA';
+      },
+      async searchSup(gi){
+        const g=this.suppliers[gi];
+        const q=(g.q||'').trim();
+        if(!q){ g.hits=[]; g.open=false; return; }
+        try {
+          const r=await fetch('/customers/search?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}});
+          g.hits=await r.json()||[];
+          g.open=true;
+        } catch(e){ g.hits=[]; }
+      },
+      pickSup(gi, it){
+        const g=this.suppliers[gi];
+        g.supplierId=it.customer_id; g.supplierName=it.org_name; g.q=it.org_name; g.open=false; g.making=false;
+      },
+      async createSup(gi){
+        const g=this.suppliers[gi];
+        const name=(g.newName||g.q||'').trim();
+        if(!name) return;
+        const post=async (extra)=>{
+          const b=new URLSearchParams({name});
+          if(extra){ for(const k in extra) b.set(k, extra[k]); }
+          const r=await fetch('/items/partners',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:b});
+          return r.json();
+        };
+        let d=await post();
+        if(d && d.ask_confirm){
+          if(!confirm(d.prompt||'같은 이름의 거래처가 있습니다 — 이것을 쓰시겠습니까?')) return;
+          d=await post({confirm:'1'});
+        }
+        if(d && d.customer) this.pickSup(gi, d.customer);
+      }
+    };
+  });
+});
+</script>
 {{end}}

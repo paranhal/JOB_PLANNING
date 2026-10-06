@@ -24,7 +24,7 @@ type DataResetHandler struct {
 }
 
 func canResetData(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	switch loginRole(c) {

@@ -7,15 +7,15 @@ const ASActionMissing = "조치 기록 없음"
 
 // ASSearchFilter 접수·조치 본문 검색. §4.5 기준일은 넣지 않는다. §12.11.4
 type ASSearchFilter struct {
-	Query       string
-	DateFrom    string
-	DateTo      string
-	CustomerID  string
-	Product     string
-	CauseType   string
-	ProcessType string
-	Assigned    string
-	Sort        string // relevance | newest
+	Query         string
+	DateFrom      string
+	DateTo        string
+	CustomerID    string
+	Product       string
+	CauseType     string
+	ProcessType   string
+	Assigned      string
+	Sort          string // relevance | newest
 	KeywordID     string // 키워드 모아보기. §12.11.6
 	CauseCat      string // §34.3.3 cause_cat*
 	RequireAction bool   // 조치 기록 있는 건만. §41.1.2
@@ -25,43 +25,43 @@ type ASSearchFilter struct {
 
 // ASSearchHit 검색 한 줄. 증상·조치를 나란히 보여 주기 위한 원문.
 type ASSearchHit struct {
-	ASID         string
-	ASNumber     string
-	OrgName      string
-	ReceiptDate  string
-	Symptom      string
-	Action       string
-	CauseName    string
-	HasAction     bool
-	SymptomHTML   template.HTML
-	ActionHTML    template.HTML
-	AssignedTo    string
-	CompleteDate  string
-	CustomerID    string
-	MatchSymptom  bool
-	MatchAction   bool
-	SymptomLong   bool
-	LeadDays      int
-	LeadLabel     string
-	VoteCount     int
-	Voted         bool
-	KBID          string
-	IsKnowledge   bool
-	Origin        string
-	OriginLabel   string
-	Rev           int
-	RevLabel      string
-	HistoryCount  int
-	AuthorName    string
-	AuthorDate    string
-	AuthorFull    string
-	SourceName    string
-	SourceDate    string
-	SourceFull    string
+	ASID           string
+	ASNumber       string
+	OrgName        string
+	ReceiptDate    string
+	Symptom        string
+	Action         string
+	CauseName      string
+	HasAction      bool
+	SymptomHTML    template.HTML
+	ActionHTML     template.HTML
+	AssignedTo     string
+	CompleteDate   string
+	CustomerID     string
+	MatchSymptom   bool
+	MatchAction    bool
+	SymptomLong    bool
+	LeadDays       int
+	LeadLabel      string
+	VoteCount      int
+	Voted          bool
+	KBID           string
+	IsKnowledge    bool
+	Origin         string
+	OriginLabel    string
+	Rev            int
+	RevLabel       string
+	HistoryCount   int
+	AuthorName     string
+	AuthorDate     string
+	AuthorFull     string
+	SourceName     string
+	SourceDate     string
+	SourceFull     string
 	OriginalAction string
-	ChangeNote    string
-	Past          []ASKBEntry
-	Attachments   []Attachment
+	ChangeNote     string
+	Past           []ASKBEntry
+	Attachments    []Attachment
 }
 
 // ASKnowledgeSite 사이트 탭 한 줄. 건수는 ar.customer_id 기준. §41.1.1 · §41.3.2

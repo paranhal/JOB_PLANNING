@@ -27,6 +27,21 @@ func TestFillSalesItemKanbanFourKinds(t *testing.T) {
 	}
 }
 
+func TestSpecRangeLabelAndMargins(t *testing.T) {
+	it := SalesItem{SpecCount: 3, PriceMin: 24000, PriceMax: 79200}
+	if it.SpecRangeLabel() != "3개 규격 · 24,000~79,200원" {
+		t.Fatalf("라벨=%q", it.SpecRangeLabel())
+	}
+	specs := []SalesItemSpec{
+		{SpecID: "SS-1", Spec: "A.D형", Price: 24000, IsActive: true},
+	}
+	prices := []SalesItemSupplierPrice{{SpecID: "SS-1", Price: 18000}}
+	m := SpecMargins(specs, prices)
+	if len(m) != 1 || m[0].Profit != 6000 || m[0].Percent != "25%" {
+		t.Fatalf("이익=%+v", m)
+	}
+}
+
 func TestMapAssetProductToSalesItem(t *testing.T) {
 	kind, cat := MapAssetProductToSalesItem("materials")
 	if kind != SalesItemKindGoods || cat != SalesItemCatConsumable {

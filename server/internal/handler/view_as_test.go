@@ -20,12 +20,14 @@ func jwtCookieUserClaims(t *testing.T, u *model.User) *http.Cookie {
 	t.Helper()
 	secret := []byte("cs-system-jwt-secret-2026")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  u.UserID,
-		"username": u.Username,
-		"role":     u.Role,
-		"name":     u.FullName,
-		"org_id":   strings.TrimSpace(u.OrgID),
-		"exp":      time.Now().Add(time.Hour).Unix(),
+		"user_id":     u.UserID,
+		"username":    u.Username,
+		"role":        u.Role,
+		"name":        u.FullName,
+		"org_id":      strings.TrimSpace(u.OrgID),
+		"is_readonly": u.IsReadOnly,
+		"is_test":     u.IsTest,
+		"exp":         time.Now().Add(time.Hour).Unix(),
 	})
 	s, err := token.SignedString(secret)
 	if err != nil {
@@ -117,9 +119,6 @@ func TestObserverDefaultSeesHomeOrgLikeOrgAdmin(t *testing.T) {
 		t.Fatal("타 조직 고객이 보인다")
 	}
 	body := home.Body.String()
-	if !strings.Contains(body, "조직관리자 (기본)") {
-		t.Fatal("기본 시점 선택이 없다")
-	}
 	if strings.Contains(body, "시점으로 보고 있습니다") {
 		t.Fatal("대상 없이 사람 시점 띠가 떴다")
 	}

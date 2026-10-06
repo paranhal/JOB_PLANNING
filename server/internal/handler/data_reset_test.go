@@ -74,8 +74,8 @@ func liveTestCounts(t *testing.T, h *Handler) (live, test int) {
 func TestDataResetRequiresPassword(t *testing.T) {
 	e, h, _ := newDataResetApp(t)
 	form := url.Values{
-		"scope":         {"test"},
-		"confirm_name":  {model.OrgNameLibrary},
+		"scope":           {"test"},
+		"confirm_name":    {model.OrgNameLibrary},
 		"vision_password": {""},
 	}
 	rec := postReset(t, e, form)

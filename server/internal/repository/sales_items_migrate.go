@@ -77,6 +77,7 @@ func applySalesItems(db *sql.DB) {
 	}
 	linkSalesItemParties(db)
 	applySalesQuotes(db)
+	applySalesItemSpecs(db)
 }
 
 // SeedSalesItemsFromAssets assets 의 품명·모델·제조사를 distinct 로 모아 초안을 넣는다.
@@ -196,4 +197,100 @@ func linkSalesItemParties(db *sql.DB) {
 		logCreate(db, "sales_items", "item_id", "party-link",
 			fmt.Sprintf("제조사 연결 %d건 · 공급사 연결 %d건", nm, ns))
 	}
+}
+
+const itemSpecsMetaKey = "__meta:sales_item_specs_v1"
+
+func applySalesItemSpecs(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS sales_item_specs (
+			spec_id    TEXT PRIMARY KEY,
+			item_id    TEXT NOT NULL,
+			spec       TEXT NOT NULL DEFAULT '',
+			unit       TEXT NOT NULL DEFAULT 'EA',
+			price      INTEGER NOT NULL DEFAULT 0,
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			is_active  INTEGER NOT NULL DEFAULT 1
+		)`); err != nil {
+		log.Printf("sales_item_specs: %v", err)
+		return
+	}
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS sales_item_supplier_prices (
+			sp_id       TEXT PRIMARY KEY,
+			item_id     TEXT NOT NULL,
+			supplier_id TEXT NOT NULL,
+			spec_id     TEXT NOT NULL DEFAULT '',
+			unit        TEXT NOT NULL DEFAULT '',
+			price       INTEGER NOT NULL DEFAULT 0,
+			sort_order  INTEGER NOT NULL DEFAULT 0
+		)`); err != nil {
+		log.Printf("sales_item_supplier_prices: %v", err)
+		return
+	}
+	for _, q := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_sales_item_specs_item ON sales_item_specs(item_id, sort_order)`,
+		`CREATE INDEX IF NOT EXISTS idx_sales_item_prices_item ON sales_item_supplier_prices(item_id, supplier_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sales_item_prices_spec ON sales_item_supplier_prices(spec_id)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			log.Printf("sales_item_specs idx: %v", err)
+		}
+	}
+	addNamedColumn(db, "sales_quote_lines", "spec_id", `ALTER TABLE sales_quote_lines ADD COLUMN spec_id TEXT NOT NULL DEFAULT ''`)
+	if metaDone(db, itemSpecsMetaKey) {
+		return
+	}
+	n, err := migrateSalesItemSpecsFromCatalog(db)
+	if err != nil {
+		log.Printf("sales_item_specs migrate: %v", err)
+		return
+	}
+	log.Printf("sales_item_specs 이관: %d건", n)
+	markMetaDone(db, itemSpecsMetaKey)
+}
+
+func migrateSalesItemSpecsFromCatalog(db *sql.DB) (int, error) {
+	rows, err := db.Query(`
+		SELECT item_id, COALESCE(spec,''), COALESCE(unit,'EA'), COALESCE(list_price,0)
+		FROM sales_items
+		WHERE TRIM(COALESCE(spec,'')) != '' OR COALESCE(list_price,0) != 0`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var itemID, spec, unit string
+		var price int
+		if err := rows.Scan(&itemID, &spec, &unit, &price); err != nil {
+			return n, err
+		}
+		var exists int
+		_ = db.QueryRow(`SELECT COUNT(*) FROM sales_item_specs WHERE item_id=?`, itemID).Scan(&exists)
+		if exists > 0 {
+			continue
+		}
+		seq, err := NextSeq(db, "sales_item_specs")
+		if err != nil {
+			return n, err
+		}
+		if strings.TrimSpace(unit) == "" {
+			unit = "EA"
+		}
+		if _, err := db.Exec(`
+			INSERT INTO sales_item_specs (spec_id, item_id, spec, unit, price, sort_order, is_active)
+			VALUES (?,?,?,?,?,0,1)`,
+			fmt.Sprintf("SS-%03d", seq), itemID, spec, unit, price); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, rows.Err()
 }

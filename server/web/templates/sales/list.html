@@ -36,8 +36,8 @@
   {{if .FormError}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
-  {{if eq .FlashErr "notfound"}}
-  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">영업 사업을 찾을 수 없습니다.</div>
+  {{if or (eq .FlashErr "notfound") (eq .FlashErr "sales_missing")}}
+    <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">원본 영업 사업을 찾을 수 없습니다.</div>
   {{end}}
 
   {{template "sales_list_filters" .}}

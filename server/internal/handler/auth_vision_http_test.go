@@ -46,6 +46,8 @@ func visionAuthApp(t *testing.T) (*echo.Echo, *sql.DB, *repository.UserRepo, *re
 	g.POST("/account/vision-password", h.Auth.AccountVisionPassword)
 	g.POST("/users", h.Auth.UserCreate)
 	g.POST("/users/:id/delete", h.Auth.UserDelete)
+	g.GET("/logout", h.Auth.Logout)
+	g.POST("/view-as", h.Auth.SetViewAs)
 	return e, db, users, settings
 }
 
@@ -76,8 +78,112 @@ func TestLoginPageHidesDefaultAccount(t *testing.T) {
 	}
 }
 
-func TestLoginCookieSecureInProduction(t *testing.T) {
+func TestLoginCookieSecureFollowsCookieSecureNotAppEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
+	t.Setenv("COOKIE_SECURE", "")
+	e, _, _, _ := visionAuthApp(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(url.Values{
+		"username": {"admin"}, "password": {"admin"},
+	}.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("로그인 status=%d", rec.Code)
+	}
+	if rec.Header().Get("Location") != "/?ok=1" {
+		t.Fatalf("로그인 목적지 %s", rec.Header().Get("Location"))
+	}
+	found := false
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == "token" {
+			found = true
+			if ck.Secure {
+				t.Fatal("COOKIE_SECURE 없이 production 쿠키에 Secure가 켜졌다")
+			}
+		}
+		if ck.Name == viewAsCookie && ck.Value != "" && ck.MaxAge != -1 {
+			t.Fatal("로그인 뒤 view_as 가 남았다")
+		}
+	}
+	if !found {
+		t.Fatal("token 쿠키가 없다")
+	}
+}
+
+func TestLoginCookieSecureWhenCookieSecure(t *testing.T) {
+	t.Setenv("COOKIE_SECURE", "true")
+	e, _, _, _ := visionAuthApp(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(url.Values{
+		"username": {"admin"}, "password": {"admin"},
+	}.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	e.ServeHTTP(rec, req)
+	found := false
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == "token" {
+			found = true
+			if !ck.Secure {
+				t.Fatal("COOKIE_SECURE=true 인데 Secure가 없다")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("token 쿠키가 없다")
+	}
+}
+
+func TestLogoutClearsViewAsCookie(t *testing.T) {
+	e, _, users, _ := visionAuthApp(t)
+	admin, _ := users.GetByUsername("admin")
+	if admin == nil {
+		t.Fatal("admin")
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/logout", nil)
+	req.AddCookie(visionCookie(t, admin))
+	req.AddCookie(&http.Cookie{Name: viewAsCookie, Value: "someone", Path: "/"})
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("logout %d", rec.Code)
+	}
+	cleared := false
+	tokenGone := false
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == viewAsCookie && (ck.MaxAge < 0 || ck.Value == "") {
+			cleared = true
+			if ck.Path != "/" || !ck.HttpOnly {
+				t.Fatalf("view_as 쿠키 속성 %+v", ck)
+			}
+		}
+		if ck.Name == "token" && (ck.MaxAge < 0 || ck.Value == "") {
+			tokenGone = true
+		}
+	}
+	if !cleared || !tokenGone {
+		t.Fatalf("로그아웃 쿠키 token=%v view_as=%v", tokenGone, cleared)
+	}
+}
+
+func TestAuthMiddlewareCookieFailShowsLoginHint(t *testing.T) {
+	e, _, _, _ := visionAuthApp(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/?ok=1", nil)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login?err=cookie" {
+		t.Fatalf("status=%d loc=%s", rec.Code, rec.Header().Get("Location"))
+	}
+	page := httptest.NewRecorder()
+	preq := httptest.NewRequest(http.MethodGet, "/login?err=cookie", nil)
+	e.ServeHTTP(page, preq)
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "쿠키를 저장하지 못했습니다") {
+		t.Fatalf("안내 없음 %d %s", page.Code, page.Body.String())
+	}
+}
+
+func TestLoginCookieSecureInProduction(t *testing.T) {
+	t.Setenv("COOKIE_SECURE", "true")
 	e, _, _, _ := visionAuthApp(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(url.Values{
@@ -93,7 +199,7 @@ func TestLoginCookieSecureInProduction(t *testing.T) {
 		if ck.Name == "token" {
 			found = true
 			if !ck.Secure {
-				t.Fatal("production 쿠키에 Secure가 없다")
+				t.Fatal("COOKIE_SECURE=true 쿠키에 Secure가 없다")
 			}
 		}
 	}

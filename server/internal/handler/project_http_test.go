@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,6 +27,8 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)
+	h.Project.backup.DataDir = filepath.Join(dir, "data")
+	_ = os.MkdirAll(h.Project.backup.DataDir, 0755)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/projects", h.Project.List)
@@ -36,6 +39,9 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.POST("/projects/:id", h.Project.Update)
 	g.POST("/projects/:id/archive", h.Project.Archive)
 	g.POST("/projects/:id/activate", h.Project.Activate)
+	g.GET("/projects/:id/merge", h.Project.MergeForm, h.Auth.RequireVisionOnly)
+	g.POST("/projects/:id/merge", h.Project.MergeSave, h.Auth.RequireVisionOnly)
+	g.POST("/projects/:id/merge/undo", h.Project.MergeUndo, h.Auth.RequireVisionOnly)
 	g.POST("/projects/:id/delete", h.Project.Delete)
 	return e, repository.NewProjectRepo(db), repository.NewWBRepo(db)
 }
@@ -160,5 +166,42 @@ func TestWBRepoProjectHelpers(t *testing.T) {
 	}
 	if err := wb.DeleteProject(p.ProjectID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestProjectListNumberAndDuplicateBanner(t *testing.T) {
+	e, _, _ := newProjectServer(t)
+	for i := 0; i < 2; i++ {
+		rec := doForm(t, e, "/projects", url.Values{
+			"name": {"중복사업"}, "status": {"active"}, "is_paid": {"1"},
+		})
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("등록 %d", rec.Code)
+		}
+	}
+	list := doGet(t, e, "/projects")
+	body := list.Body.String()
+	if !strings.Contains(body, "번호") || !strings.Contains(body, "min-w-[1100px]") {
+		t.Fatalf("번호 열/§35.8 없음")
+	}
+	if !strings.Contains(body, "이름이 같은 사업이 2건") {
+		t.Fatalf("중복 띠 없음: %s", body)
+	}
+}
+
+func TestProjectMergeHTTPArchivesDrop(t *testing.T) {
+	e, repo, _ := newProjectServer(t)
+	vision := jwtCookieRole(t, model.RoleVisionAdmin)
+	keepRec := doForm(t, e, "/projects", url.Values{"name": {"남길사업"}, "status": {"active"}, "is_paid": {"1"}})
+	dropRec := doForm(t, e, "/projects", url.Values{"name": {"없앨사업"}, "status": {"active"}, "is_paid": {"1"}})
+	keepID := strings.TrimPrefix(strings.Split(keepRec.Header().Get("Location"), "?")[0], "/projects/")
+	dropID := strings.TrimPrefix(strings.Split(dropRec.Header().Get("Location"), "?")[0], "/projects/")
+	form := workFormCookie(t, e, "/projects/"+keepID+"/merge", url.Values{"drop_id": {dropID}}, vision)
+	if form.Code != http.StatusSeeOther || !strings.Contains(form.Header().Get("Location"), "ok=merged") {
+		t.Fatalf("merge status=%d loc=%s body=%s", form.Code, form.Header().Get("Location"), form.Body.String())
+	}
+	drop, err := repo.Get(dropID)
+	if err != nil || drop.Status != model.WBProjectArchived {
+		t.Fatalf("보관되지 않음 %+v err=%v", drop, err)
 	}
 }

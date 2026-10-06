@@ -24,6 +24,7 @@ import (
 	"customer-support/internal/handler"
 	"customer-support/internal/hwpx"
 	"customer-support/internal/mailer"
+	"customer-support/internal/model"
 	"customer-support/internal/notify"
 	"customer-support/internal/repository"
 	"customer-support/internal/service"
@@ -78,6 +79,11 @@ func main() {
 	db, err := repository.InitDB(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("DB 초기화 실패: %v", err)
+	}
+	if m, err := repository.NewRolePermRepo(db).Load(); err != nil {
+		log.Printf("role_permissions 읽기 실패: %v", err)
+	} else {
+		model.SetAccessOverrides(m)
 	}
 
 	host, _ := os.Hostname()
@@ -231,6 +237,7 @@ func main() {
 
 	adminOnly := h.Auth.RequireAdminMW
 	adminSec := h.Auth.RequireAdminSection
+	masterView := h.Auth.RequireMasterView
 	masterWrite := h.Auth.RequireMasterWrite
 	receiveAS := h.Auth.RequireReceiveAS
 	processAS := h.Auth.RequireProcessAS
@@ -252,19 +259,21 @@ func main() {
 	cust.GET("/:id/tab/contacts", h.Customer.TabContacts)
 	cust.GET("/:id/tab/as", h.Customer.TabAS)
 
-	// 공간 관리
-	space := g.Group("/spaces", adminOnly)
-	space.GET("", h.Space.List)
-	space.POST("/buildings", h.Space.CreateBuilding)
-	space.POST("/buildings/:id/update", h.Space.UpdateBuilding)
-	space.POST("/buildings/:id/delete", h.Space.DeleteBuilding)
-	space.POST("/floors", h.Space.CreateFloor)
-	space.POST("/floors/:id/update", h.Space.UpdateFloor)
-	space.POST("/floors/:id/delete", h.Space.DeleteFloor)
-	space.POST("/rooms", h.Space.CreateRoom)
-	space.POST("/rooms/batch", h.Space.BatchUpdateRooms)
-	space.POST("/rooms/:id/update", h.Space.UpdateRoom)
-	space.POST("/rooms/:id/delete", h.Space.DeleteRoom)
+	// 공간 관리 — 리스트·통계·엑셀은 master.view, 편집은 master.edit (§50.10.1 · §53.4.1)
+	space := g.Group("/spaces")
+	space.GET("", h.Space.List, masterView)
+	space.GET("/export.xlsx", h.Space.ExportExcel, masterView)
+	space.GET("/edit", h.Space.Edit, masterWrite)
+	space.POST("/buildings", h.Space.CreateBuilding, masterWrite)
+	space.POST("/buildings/:id/update", h.Space.UpdateBuilding, masterWrite)
+	space.POST("/buildings/:id/delete", h.Space.DeleteBuilding, masterWrite)
+	space.POST("/floors", h.Space.CreateFloor, masterWrite)
+	space.POST("/floors/:id/update", h.Space.UpdateFloor, masterWrite)
+	space.POST("/floors/:id/delete", h.Space.DeleteFloor, masterWrite)
+	space.POST("/rooms", h.Space.CreateRoom, masterWrite)
+	space.POST("/rooms/batch", h.Space.BatchUpdateRooms, masterWrite)
+	space.POST("/rooms/:id/update", h.Space.UpdateRoom, masterWrite)
+	space.POST("/rooms/:id/delete", h.Space.DeleteRoom, masterWrite)
 
 	api := g.Group("/api")
 	api.GET("/buildings/:customer_id", h.Space.APIBuildings)
@@ -434,6 +443,9 @@ func main() {
 	proj.POST("/:id/update", h.Project.Update)
 	proj.POST("/:id/archive", h.Project.Archive)
 	proj.POST("/:id/activate", h.Project.Activate)
+	proj.GET("/:id/merge", h.Project.MergeForm, h.Auth.RequireVisionOnly)
+	proj.POST("/:id/merge", h.Project.MergeSave, h.Auth.RequireVisionOnly)
+	proj.POST("/:id/merge/undo", h.Project.MergeUndo, h.Auth.RequireVisionOnly)
 	proj.POST("/:id/delete", h.Project.Delete)
 
 	sales := g.Group("/sales")
@@ -556,6 +568,7 @@ func main() {
 	wb.GET("/register", h.Workboard.Register)
 	wb.POST("/register/kanban-move", h.Workboard.RegisterKanbanMove)
 	wb.POST("/register/unlock-past", h.Workboard.UnlockPastRegister, adminOnly)
+	wb.GET("/mnt-month-hint", h.Workboard.MntMonthHint)
 	wb.POST("/projects", h.Workboard.CreateProject)
 	wb.POST("/tasks", h.Workboard.CreateTask)
 	wb.GET("/tasks/:id/edit", h.Workboard.EditTask)
@@ -591,8 +604,16 @@ func main() {
 	g.GET("/users", h.Auth.UserList, adminSec, adminOnly)
 	g.POST("/users/as-edit-password", h.AS.UpdateCompletedEditPassword, adminSec, adminOnly)
 	g.POST("/users/mnt-delete-password", h.Auth.UpdateMaintenanceDeletePassword, adminSec, adminOnly)
+	g.POST("/users/bulk/org", h.Auth.UsersBulkOrg, adminSec, adminOnly)
+	g.POST("/users/bulk/job", h.Auth.UsersBulkJob, adminSec, adminOnly)
+	g.POST("/users/bulk/readonly", h.Auth.UsersBulkReadonly, adminSec, adminOnly)
+	g.POST("/users/bulk/deactivate", h.Auth.UsersBulkDeactivate, adminSec, adminOnly)
 	g.POST("/users", h.Auth.UserCreate, adminSec, adminOnly)
 	g.POST("/users/:id/update", h.Auth.UserUpdate, adminSec, adminOnly)
+	g.POST("/users/:id/signature", h.Auth.UserSignature, adminSec, adminOnly)
+	g.GET("/users/:id/signature.png", h.Auth.UserSignatureImage, adminSec, adminOnly)
+	g.POST("/users/:id/signature/delete", h.Auth.UserSignatureDelete, adminSec, adminOnly)
+	g.POST("/users/:id/work", h.Auth.UserSetWork, adminSec, adminOnly)
 	g.POST("/users/:id/reset-permissions", h.Auth.UserResetPermissions, adminSec, adminOnly)
 	g.POST("/users/:id/password", h.Auth.UserChangePassword, adminSec, adminOnly)
 	g.POST("/users/:id/username", h.Auth.UserRenameUsername, adminSec, adminOnly)
@@ -609,10 +630,12 @@ func main() {
 	g.POST("/admin/holidays/leaves", h.Holiday.CreateLeave, adminSec)
 	g.POST("/admin/holidays/leaves/delete", h.Holiday.DeleteLeave, adminSec)
 
-	g.GET("/admin/orgs", h.Org.List, adminSec, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs", h.Org.List, adminSec, h.Auth.RequireCanViewOrgs)
 	g.POST("/admin/orgs", h.Org.Create, adminSec, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/update", h.Org.Update, adminSec, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/switch", h.Org.Switch, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/:id/manager", h.Org.AssignManager, adminSec, h.Auth.RequireVisionOnly)
+	g.POST("/admin/orgs/:id/manager/revoke", h.Org.RevokeManager, adminSec, h.Auth.RequireVisionOnly)
 	g.GET("/admin/orgs/restore", h.Org.RestoreForm, adminSec, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/restore", h.Org.Restore, adminSec, h.Auth.RequireVisionOnly)
 	g.GET("/admin/orgs/:id/delete", h.Org.DeleteForm, adminSec, h.Auth.RequireVisionOnly)
@@ -622,6 +645,15 @@ func main() {
 	g.GET("/admin/orgs/:id/split", h.Org.SplitForm, adminSec, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/:id/split/preview", h.Org.SplitPreview, adminSec, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/:id/split", h.Org.Split, adminSec, h.Auth.RequireVisionOnly)
+
+	g.GET("/admin/my-org/members", h.Auth.MembersList, adminSec, adminOnly)
+	g.POST("/admin/my-org/members", h.Auth.MemberCreate, adminSec, adminOnly)
+	g.POST("/admin/my-org/members/:id", h.Auth.MemberUpdate, adminSec, adminOnly)
+	g.POST("/admin/my-org/members/:id/work", h.Auth.MemberSetWork, adminSec, adminOnly)
+	g.POST("/admin/my-org/members/:id/reset-password", h.Auth.MemberResetPassword, adminSec, adminOnly)
+	g.POST("/admin/my-org/members/:id/delete", h.Auth.MemberDelete, adminSec, adminOnly)
+	g.GET("/admin/permissions", h.Auth.PermissionsPage, adminSec, h.Auth.RequireVisionOnly)
+	g.POST("/admin/permissions/save", h.Auth.PermissionsSave, adminSec, h.Auth.RequireVisionOnly)
 
 	g.GET("/admin/data", h.Backup.Page, adminSec, adminOnly)
 	g.GET("/admin/data/reset", h.DataReset.Page, adminSec, h.Auth.RequireDataResetMW)

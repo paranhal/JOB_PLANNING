@@ -171,7 +171,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		scopeAll = true
 	} else if model.IsAdminGrade(role) || role == model.RoleSupport {
 		scopeAll = assigneeFilter == ""
-	} else if role == model.RoleTech || role == model.RoleSales || role == model.RoleObserver {
+	} else if role == model.RoleTech || role == model.RoleSales {
 		showScopeToggle = true
 		if mineParam == "0" {
 			scopeAll = true
@@ -469,7 +469,7 @@ func registerScopeNote(role string, scopeAll bool, assignee string, unresolved b
 	if assignee != "" && (model.IsAdminGrade(role) || role == model.RoleSupport) {
 		return assignee + " 배정 업무"
 	}
-	if (role == model.RoleTech || role == model.RoleSales || role == model.RoleObserver) && !scopeAll {
+	if (role == model.RoleTech || role == model.RoleSales) && !scopeAll {
 		return "내 배정 업무"
 	}
 	return "팀 전체"
@@ -2140,7 +2140,7 @@ func applyCustomerForm(t *model.WorkTask, c echo.Context) {
 }
 
 func canWriteWorkboard(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	return hasPerm(c, model.PermWorkboard)

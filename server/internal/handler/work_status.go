@@ -338,7 +338,7 @@ func workStatusResolveScope(c echo.Context, role string, unresolved bool) (assig
 		scopeAll = assignee == ""
 		return
 	}
-	if role == model.RoleTech || role == model.RoleSales || role == model.RoleObserver {
+	if role == model.RoleTech || role == model.RoleSales {
 		showToggle = true
 		if mineParam == "0" {
 			scopeAll = true

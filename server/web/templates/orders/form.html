@@ -38,24 +38,24 @@
     </div>
 
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[900px] text-sm break-keep">
         <thead class="bg-gray-50 border-b"><tr>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">내용</th>
-          <th class="text-right px-3 py-2 text-xs text-gray-500">수량</th>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">단위</th>
-          <th class="text-right px-3 py-2 text-xs text-gray-500">단가</th>
-          <th class="text-left px-3 py-2 text-xs text-gray-500">견적</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">내용</th>
+          <th class="text-right px-3 py-2 text-xs text-gray-500 whitespace-nowrap">수량</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">단위</th>
+          <th class="text-right px-3 py-2 text-xs text-gray-500 whitespace-nowrap">단가</th>
+          <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">견적</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
           {{range .Order.Lines}}
           <tr>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2 whitespace-nowrap">
               {{.Name}}
               <input type="hidden" name="line_id" value="{{.LineID}}">
             </td>
-            <td class="px-3 py-2"><input name="line_qty" value="{{.Qty}}" class="w-24 border rounded-lg px-2 py-1 text-sm text-right"></td>
-            <td class="px-3 py-2"><input name="line_unit" value="{{.Unit}}" class="w-16 border rounded-lg px-2 py-1 text-sm"></td>
-            <td class="px-3 py-2"><input name="line_price" value="{{.UnitPrice}}" class="w-32 border rounded-lg px-2 py-1 text-sm text-right"></td>
+            <td class="px-3 py-2 whitespace-nowrap"><input name="line_qty" value="{{.Qty}}" class="w-24 border rounded-lg px-2 py-1 text-sm text-right"></td>
+            <td class="px-3 py-2 whitespace-nowrap"><input name="line_unit" value="{{.Unit}}" class="w-16 border rounded-lg px-2 py-1 text-sm"></td>
+            <td class="px-3 py-2 whitespace-nowrap"><input name="line_price" value="{{.UnitPrice}}" class="w-32 border rounded-lg px-2 py-1 text-sm text-right"></td>
             <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{{.QuoteQty}} × {{won .QuoteUnitPrice}}</td>
           </tr>
           {{end}}

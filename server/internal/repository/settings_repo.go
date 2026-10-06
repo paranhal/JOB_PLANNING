@@ -26,6 +26,15 @@ const SettingMaintenanceAutoDailyLimit = "maintenance_auto_daily_limit"
 // SettingMetricsBaseDate 지표 집계 하한일 (§4.5). 값은 app_settings, 코드에 박지 않는다.
 const SettingMetricsBaseDate = "metrics_base_date"
 
+// SettingMetricsBaseReceipt 접수일 기준. 옛 metrics_base_date 를 지우지 않는다 (§68.3).
+const SettingMetricsBaseReceipt = "metrics_base_receipt"
+
+// SettingMetricsBaseVisit 방문일 기준 (§68.3).
+const SettingMetricsBaseVisit = "metrics_base_visit"
+
+// SettingMetricsBaseComplete 완료일 기준 (§68.3).
+const SettingMetricsBaseComplete = "metrics_base_complete"
+
 // DefaultASCompletedEditPassword 완료·종료 AS 수정 잠금 해제 기본 비밀번호 (최초 시드).
 // 관리자는 /users 화면에서 변경할 수 있다.
 const DefaultASCompletedEditPassword = "as-edit"

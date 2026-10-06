@@ -28,7 +28,7 @@ func (r *UserRepo) UsernameTaken(username, exceptUserID string) (bool, error) {
 		return false, fmt.Errorf("아이디가 비었습니다")
 	}
 	var n int
-	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username=? AND user_id!=?`, username, strings.TrimSpace(exceptUserID)).Scan(&n)
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username=? COLLATE NOCASE AND user_id!=?`, username, strings.TrimSpace(exceptUserID)).Scan(&n)
 	return n > 0, err
 }
 

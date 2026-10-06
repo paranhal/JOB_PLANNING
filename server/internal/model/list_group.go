@@ -34,7 +34,7 @@ func GroupCustomersByParent(items []CustomerListItem) []NamedGroup[CustomerListI
 }
 
 func GroupUsersByRole(users []User) []NamedGroup[User] {
-	order := []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales, RoleObserver, RoleTester}
+	order := []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales}
 	idx := map[string]int{}
 	groups := make([]NamedGroup[User], 0, len(order)+1)
 	for _, role := range order {

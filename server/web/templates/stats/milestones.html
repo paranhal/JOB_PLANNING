@@ -68,50 +68,50 @@
   </div>
   {{end}}
 
-  <div class="bg-white rounded-xl border overflow-hidden">
-    <table class="w-full text-sm">
+  <div class="bg-white rounded-xl border overflow-x-auto">
+    <table class="w-full {{if eq .Domain "sales"}}min-w-[1500px] {{end}}text-sm break-keep">
       <thead class="bg-gray-50 text-xs text-gray-500">
         <tr>
-          <th class="text-left px-3 py-2">키</th>
-          <th class="text-right px-3 py-2">접수</th>
-          <th class="text-right px-3 py-2">조치</th>
-          <th class="text-right px-3 py-2">이월</th>
+          <th class="text-left px-3 py-2 whitespace-nowrap">키</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">접수</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">조치</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">이월</th>
           {{if eq .Domain "sales"}}
-          <th class="text-right px-3 py-2">신규</th>
-          <th class="text-right px-3 py-2">정보</th>
-          <th class="text-right px-3 py-2">활동</th>
-          <th class="text-right px-3 py-2">견적</th>
-          <th class="text-right px-3 py-2">수주</th>
-          <th class="text-right px-3 py-2">계약</th>
-          <th class="text-right px-3 py-2">발굴잔</th>
-          <th class="text-right px-3 py-2">제안잔</th>
-          <th class="text-right px-3 py-2">입찰잔</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">신규</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">정보</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">활동</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">견적</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">수주</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">계약</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">발굴잔</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">제안잔</th>
+          <th class="text-right px-3 py-2 whitespace-nowrap">입찰잔</th>
           {{end}}
         </tr>
       </thead>
       <tbody>
         {{range .Rows}}
         <tr class="border-t">
-          <td class="px-3 py-2">{{if .ScopeKey}}{{.ScopeKey}}{{else}}주간{{end}}</td>
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 font-mono whitespace-nowrap">{{if .ScopeKey}}{{.ScopeKey}}{{else}}주간{{end}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
             <button type="button" class="text-blue-700" @click="open = (open==='r-{{.Domain}}-{{.ScopeKey}}' ? '' : 'r-{{.Domain}}-{{.ScopeKey}}')">{{.Received}}</button>
           </td>
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 text-right whitespace-nowrap">
             <button type="button" class="text-blue-700" @click="open = (open==='p-{{.Domain}}-{{.ScopeKey}}' ? '' : 'p-{{.Domain}}-{{.ScopeKey}}')">{{.Processed}}</button>
           </td>
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 text-right whitespace-nowrap">
             <button type="button" class="text-amber-700" @click="open = (open==='c-{{.Domain}}-{{.ScopeKey}}' ? '' : 'c-{{.Domain}}-{{.ScopeKey}}')">{{.Carried}}</button>
           </td>
           {{if eq $.Domain "sales"}}
-          <td class="px-3 py-2 text-right">{{.SalesNew}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesInfo}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesAct}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesQuote}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesOrder}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesContract}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesOpenDiscover}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesOpenPropose}}</td>
-          <td class="px-3 py-2 text-right">{{.SalesOpenBid}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesNew}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesInfo}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesAct}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesQuote}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesOrder}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesContract}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesOpenDiscover}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesOpenPropose}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.SalesOpenBid}}</td>
           {{end}}
         </tr>
         <tr x-show="open==='r-{{.Domain}}-{{.ScopeKey}}'" x-cloak>

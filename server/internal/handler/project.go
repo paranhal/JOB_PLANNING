@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/auditlog"
+	"customer-support/internal/backup"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -21,6 +23,8 @@ type ProjectHandler struct {
 	contactRepo  *repository.ContactRepo
 	codeRepo     *repository.CodeRepo
 	assetRepo    *repository.AssetRepo
+	salesRepo    *repository.SalesRepo
+	backup       backup.Config
 }
 
 func NewProjectHandler(
@@ -41,12 +45,12 @@ func NewProjectHandler(
 func canViewProjects(c echo.Context) bool {
 	r := currentRole(c)
 	return model.IsAdminGrade(r) || r == model.RoleSupport || r == model.RoleTech ||
-		r == model.RoleObserver || hasPerm(c, model.PermWorkboard)
+		hasPerm(c, model.PermWorkboard)
 }
 
 // canWriteProjects 등록·수정·보관/재개 — 일일업무와 동일
 func canWriteProjects(c echo.Context) bool {
-	if isObserverRole(c) {
+	if isReadOnly(c) {
 		return false
 	}
 	r := currentRole(c)
@@ -74,6 +78,8 @@ func (h *ProjectHandler) List(c echo.Context) error {
 		"Title": "사업(프로젝트)관리", "Active": NavProjects,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
+		"CanMerge": currentRole(c) == model.RoleVisionAdmin,
+		"DupNames": model.DuplicateProjectNameGroups(items),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
@@ -162,12 +168,21 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	taskRows, taskTotal, _ := h.repo.MatchAdminTasks(id, 20)
 	assetTotal, _ := h.assetRepo.CountByProject(id)
 	p.ASCount, p.MntCount, p.TaskCount, p.AssetCount = asTotal, mntTotal, taskTotal, assetTotal
+	salesMissing := false
+	if sid := strings.TrimSpace(p.SalesProjectID); sid != "" && h.salesRepo != nil {
+		if _, err := h.salesRepo.Get(sid); err != nil {
+			log.Printf("project show sales %s: %v", sid, err)
+			salesMissing = true
+		}
+	}
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
-		"CanWrite":  canWriteProjects(c),
-		"CanDelete": canDeleteProjects(c),
-		"FlashOK":   c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"CanWrite":      canWriteProjects(c),
+		"CanDelete":     canDeleteProjects(c),
+		"CanMerge":      currentRole(c) == model.RoleVisionAdmin,
+		"SalesMissing":  salesMissing,
+		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 

@@ -11,7 +11,7 @@ func TestRoleMatrixRules(t *testing.T) {
 	}
 
 	t.Run("1_모든직급이_업무화면을_본다", func(t *testing.T) {
-		for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales, RoleObserver} {
+		for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales} {
 			for _, key := range workView {
 				if PermAccess(role, key) < AccessView {
 					t.Fatalf("%s %s = %d", role, key, PermAccess(role, key))
@@ -20,15 +20,9 @@ func TestRoleMatrixRules(t *testing.T) {
 		}
 	})
 
-	t.Run("2_옵저버는_쓰기가_없다", func(t *testing.T) {
-		for _, d := range AllPermissions {
-			a := PermAccess(RoleObserver, d.Key)
-			if a > AccessView {
-				t.Fatalf("옵저버 %s = %d", d.Key, a)
-			}
-			if a == AccessView && !hasSuffixView(d.Key) {
-				t.Fatalf("옵저버 조회가 아닌 키 %s", d.Key)
-			}
+	t.Run("2_읽기전용은_권한표가_아니라_깃발", func(t *testing.T) {
+		if PermAccess(RoleOrgAdmin, PermASCreate) < AccessView {
+			t.Fatal("조직관리자 조회")
 		}
 	})
 

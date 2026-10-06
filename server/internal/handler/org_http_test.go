@@ -46,7 +46,7 @@ func TestOrgAdminListCreateUpdateAndSwitch(t *testing.T) {
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
-	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireCanViewOrgs)
 	g.POST("/admin/orgs", h.Org.Create, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/update", h.Org.Update, h.Auth.RequireVisionOnly)
 	g.POST("/admin/orgs/switch", h.Org.Switch, h.Auth.RequireVisionOnly)
@@ -65,11 +65,11 @@ func TestOrgAdminListCreateUpdateAndSwitch(t *testing.T) {
 		t.Fatalf("list %d %s", list.Code, list.Body.String())
 	}
 	body := list.Body.String()
-	if !strings.Contains(body, "도서관사업팀") || !strings.Contains(body, "계정") {
+	if !strings.Contains(body, "도서관사업팀") || !strings.Contains(body, "소속 인원") {
 		t.Fatalf("목록에 건수가 없다: %s", body)
 	}
-	if !strings.Contains(body, "조직 관리") {
-		t.Fatal("사이드바 조직 관리가 없다")
+	if !strings.Contains(body, "전체 조직 관리") {
+		t.Fatal("사이드바 전체 조직 관리가 없다")
 	}
 
 	form := url.Values{"org_name": {"다른팀"}, "short_name": {"이팀"}}
@@ -130,7 +130,7 @@ func TestOrgAdminForbiddenForTech(t *testing.T) {
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
-	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireVisionOnly)
+	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireCanViewOrgs)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
@@ -145,7 +145,7 @@ func mountOrgAdmin(e *echo.Echo, h *Handler) {
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	v := h.Auth.RequireVisionOnly
-	g.GET("/admin/orgs", h.Org.List, v)
+	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireCanViewOrgs)
 	g.POST("/admin/orgs", h.Org.Create, v)
 	g.GET("/admin/orgs/restore", h.Org.RestoreForm, v)
 	g.POST("/admin/orgs/restore", h.Org.Restore, v)
@@ -260,5 +260,71 @@ func TestOrgDeleteRestoreBlockedAndSplit(t *testing.T) {
 	var orgID string
 	if err := db.QueryRow(`SELECT org_id FROM customers WHERE customer_id='C1'`).Scan(&orgID); err != nil || orgID != "O03" {
 		t.Fatalf("split org=%s err=%v", orgID, err)
+	}
+}
+
+func jwtOrgAdminCookie(t *testing.T, orgID string) *http.Cookie {
+	t.Helper()
+	secret := []byte("cs-system-jwt-secret-2026")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "oa-id", "username": "oa", "role": model.RoleOrgAdmin,
+		"name": "조직관리자", "org_id": orgID, "exp": time.Now().Add(time.Hour).Unix(),
+	})
+	s, err := token.SignedString(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &http.Cookie{Name: "token", Value: s, Path: "/"}
+}
+
+func TestOrgAdminSeesOwnOrgReadOnly(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "org-oa.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repository.NewUserRepo(db).EnsureAdmin(HashPassword("admin"))
+	if _, err := repository.NewOrgRepo(db).Create("다른팀", "이팀", "", "t"); err != nil {
+		t.Fatal(err)
+	}
+
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	h := New(db)
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/admin/orgs", h.Org.List, h.Auth.RequireCanViewOrgs)
+	g.POST("/admin/orgs", h.Org.Create, h.Auth.RequireVisionOnly)
+
+	ck := jwtOrgAdminCookie(t, model.OrgIDLibrary)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/orgs", nil)
+	req.AddCookie(ck)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list %d %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "도서관사업팀") {
+		t.Fatalf("자기 조직이 없다: %s", body)
+	}
+	if strings.Contains(body, "다른팀") {
+		t.Fatalf("다른 조직이 보인다: %s", body)
+	}
+	if !strings.Contains(body, "조직을 만들고 지우는 것은 비젼관리자만 할 수 있습니다") {
+		t.Fatal("안내 문구가 없다")
+	}
+	if !strings.Contains(body, "조직 관리") {
+		t.Fatal("사이드바 조직 관리가 없다")
+	}
+
+	form := url.Values{"org_name": {"몰래만들기"}}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/orgs", strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(ck)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("조직관리자 생성이 %d", rec.Code)
 	}
 }

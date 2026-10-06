@@ -55,20 +55,20 @@
         <span class="text-xs text-gray-500">{{.PrevDate}} · {{.YesterdayN}}건</span>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[900px] text-sm break-keep">
           <thead class="bg-white border-b">
             <tr>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">구분</th>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">번호</th>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">기관 / 제목</th>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">상태</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">구분</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">번호</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">기관 / 제목</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">상태</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             {{if .YesterdayGroups}}
             {{range .YesterdayGroups}}
             <tr class="bg-slate-50">
-              <td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-700">{{.Label}} · {{.Count}}건</td>
+              <td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap">{{.Label}} · {{.Count}}건</td>
             </tr>
             {{range .Items}}
             <tr class="hover:bg-gray-50">
@@ -77,21 +77,21 @@
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
                 {{if .Tentative}}<span class="ml-1 text-[10px] text-gray-400">미확정</span>{{end}}
               </td>
-              <td class="px-3 py-2 font-mono text-blue-600">
+              <td class="px-3 py-2 font-mono text-blue-600 whitespace-nowrap">
                 <a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a>
               </td>
-              <td class="px-3 py-2">
+              <td class="px-3 py-2 whitespace-nowrap">
                 <a href="{{.Href}}" class="block hover:underline">
                   <span class="font-medium text-gray-800">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</span>
                   <p class="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{{.Title}}</p>
                 </a>
               </td>
-              <td class="px-3 py-2 text-xs text-gray-600">{{.StatusLabel}}</td>
+              <td class="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">{{.StatusLabel}}</td>
             </tr>
             {{end}}
             {{end}}
             {{else}}
-            <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400">전일 실적이 없습니다.</td></tr>
+            <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">전일 실적이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>
@@ -104,20 +104,20 @@
         <span class="text-xs text-gray-500">{{.Date}} · {{.PlannedN}}건</span>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[900px] text-sm break-keep">
           <thead class="bg-white border-b">
             <tr>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">구분</th>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">번호</th>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">기관 / 제목</th>
-              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">상태</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">구분</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">번호</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">기관 / 제목</th>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">상태</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             {{if .TodayGroups}}
             {{range .TodayGroups}}
             <tr class="bg-slate-50">
-              <td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-700">{{.Label}} · {{.Count}}건</td>
+              <td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap">{{.Label}} · {{.Count}}건</td>
             </tr>
             {{range .Items}}
             <tr class="hover:bg-gray-50">
@@ -126,21 +126,21 @@
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
                 {{if .Tentative}}<span class="ml-1 text-[10px] text-gray-400">미확정</span>{{end}}
               </td>
-              <td class="px-3 py-2 font-mono text-blue-600">
+              <td class="px-3 py-2 font-mono text-blue-600 whitespace-nowrap">
                 <a href="{{.Href}}" class="hover:underline">{{.RefNumber}}</a>
               </td>
-              <td class="px-3 py-2">
+              <td class="px-3 py-2 whitespace-nowrap">
                 <a href="{{.Href}}" class="block hover:underline">
                   <span class="font-medium text-gray-800">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</span>
                   <p class="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{{.Title}}</p>
                 </a>
               </td>
-              <td class="px-3 py-2 text-xs text-gray-600">{{.StatusLabel}}</td>
+              <td class="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">{{.StatusLabel}}</td>
             </tr>
             {{end}}
             {{end}}
             {{else}}
-            <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400">오늘 예정이 없습니다.</td></tr>
+            <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">오늘 예정이 없습니다.</td></tr>
             {{end}}
           </tbody>
         </table>

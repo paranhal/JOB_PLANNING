@@ -32,6 +32,33 @@ func applyWeeklyReportRows(db *sql.DB) {
 		return
 	}
 	seedWeeklyReportRows(db)
+	applyWeeklyReportActivityV59(db)
+}
+
+const weeklyReportActivityV59MetaKey = "weekly_report_rows_v59_activity"
+
+// applyWeeklyReportActivityV59 X02 를 activity 로, X03 기술영업 행을 넣는다. 옛 시드 키는 건드리지 않는다. §68.9
+func applyWeeklyReportActivityV59(db *sql.DB) {
+	if db == nil || metaDone(db, weeklyReportActivityV59MetaKey) {
+		return
+	}
+	if _, err := db.Exec(`
+		UPDATE weekly_report_rows
+		   SET row_kind='activity'
+		 WHERE row_key='X02'
+		   AND display_name='##자산관리활동'
+		   AND COALESCE(row_kind,'')='manual'`); err != nil {
+		log.Printf("weekly_report_rows v59 X02: %v", err)
+		return
+	}
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO weekly_report_rows
+		(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active)
+		VALUES ('X03', 26, '', '도서관사업부', '', '##기술영업활동', NULL, 'activity', 1, 1)`); err != nil {
+		log.Printf("weekly_report_rows v59 X03: %v", err)
+		return
+	}
+	markMetaDone(db, weeklyReportActivityV59MetaKey)
 }
 
 func seedWeeklyReportRows(db *sql.DB) {

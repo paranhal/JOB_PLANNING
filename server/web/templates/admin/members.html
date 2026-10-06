@@ -1,0 +1,158 @@
+{{define "title"}}소속 인원 관리 · 고객지원시스템{{end}}
+{{define "content"}}
+{{$can := .CanEdit}}
+<div class="space-y-5">
+  <a href="/users" class="text-sm font-semibold text-slate-500">‹ 사용자 관리로 돌아가기</a>
+  <div class="flex items-end justify-between gap-4 flex-wrap">
+    <div>
+      {{if .OrgName}}<span class="inline-block px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-semibold">{{.OrgName}}</span>{{end}}
+      <h2 class="text-2xl font-extrabold text-slate-800 mt-2">소속 인원 관리</h2>
+      <p class="text-sm text-slate-500 mt-1">소속 이용자의 아이디, 비밀번호, 업무를 관리하세요.</p>
+    </div>
+    {{if and $can .OrgID}}
+    <button type="button" id="btn-new-m" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold">소속 인원 추가</button>
+    {{end}}
+  </div>
+  {{if .FlashOK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}{{if .TempPW}} <code class="font-mono bg-white px-2 py-0.5 rounded">{{.TempPW}}</code>{{end}}</div>{{end}}
+  {{if .FlashErr}}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.FlashErr}}</div>{{end}}
+  {{if not .OrgID}}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">세션에 조직이 없습니다. 조직관리자로 로그인하거나 사용자 관리에서 다룹니다.</div>
+  {{else}}
+  <div class="rounded-xl border border-blue-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+    <b class="text-slate-800">관리 범위</b> 조직관리자는 자신의 소속 조직 이용자만 추가·수정·삭제할 수 있습니다. 조직은 <b>서버가 세션에서 정합니다</b> — 화면이 보낸 조직 번호는 믿지 않습니다.
+  </div>
+  <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[820px] text-sm">
+        <thead><tr class="bg-slate-50 text-left text-xs font-bold text-slate-500">
+          <th class="px-4 py-3">이용자</th><th class="px-4 py-3">업무 지정</th><th class="px-4 py-3">상태</th><th class="px-4 py-3 text-right">아이디 관리</th>
+        </tr></thead>
+        <tbody>
+        {{if not .Members}}
+        <tr><td colspan="4" class="px-4 py-16 text-center text-slate-400">소속 인원이 없습니다.</td></tr>
+        {{end}}
+        {{range .Members}}
+        <tr class="border-t border-gray-100" data-id="{{.UserID}}" data-name="{{.FullName}}" data-user="{{.Username}}"
+            data-job="{{.Role}}" data-email="{{.Email}}" data-mobile="{{.Mobile}}" data-tel="{{.Tel}}"
+            data-ro="{{if .IsReadOnly}}1{{else}}0{{end}}" data-test="{{if .IsTest}}1{{else}}0{{end}}" data-on="{{if .IsActive}}1{{else}}0{{end}}">
+          <td class="px-4 py-3">
+            <div class="font-bold text-slate-800">{{.FullName}}</div>
+            <div class="text-xs text-slate-500">@{{.Username}}{{if .Email}} · {{.Email}}{{end}}</div>
+          </td>
+          <td class="px-4 py-3">
+            {{if $can}}
+            <form method="POST" action="/admin/my-org/members/{{.UserID}}/work">
+              <select name="job" class="border rounded-md px-2 py-1 text-xs" onchange="this.form.submit()">
+                <option value="sales" {{if eq .Role "sales"}}selected{{end}}>영업</option>
+                <option value="tech" {{if eq .Role "tech"}}selected{{end}}>기술</option>
+                <option value="support" {{if eq .Role "support"}}selected{{end}}>지원</option>
+              </select>
+            </form>
+            {{else}}{{roleLabel .Role}}{{end}}
+            <div class="mt-1">
+              {{if .IsReadOnly}}<span class="text-xs px-2 py-0.5 rounded bg-slate-100">읽기전용</span>{{end}}
+              {{if .IsTest}}<span class="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700">테스터</span>{{end}}
+            </div>
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">{{if .IsActive}}<span class="text-xs font-semibold text-green-600">활성</span>{{else}}<span class="text-xs text-slate-400">비활성</span>{{end}}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            {{if $can}}
+            <button type="button" class="m-reset text-xs px-2 py-1 border rounded-md" data-reset="{{.UserID}}">비밀번호 초기화</button>
+            <button type="button" class="m-edit text-xs px-2 py-1 border rounded-md" data-edit="{{.UserID}}">수정</button>
+            <form method="POST" action="/admin/my-org/members/{{.UserID}}/delete" class="inline" onsubmit="return confirm('아이디 「{{.FullName}}」을 삭제하시겠습니까?');">
+              <button class="text-xs px-2 py-1 border rounded-md">삭제</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+</div>
+
+{{if and $can .OrgID}}
+<div id="mScrim" class="hidden fixed inset-0 bg-slate-900/40 z-40"></div>
+<aside id="mDrawer" class="fixed top-0 right-0 bottom-0 w-[400px] max-w-[94vw] bg-white border-l z-50 translate-x-full transition-transform overflow-y-auto">
+  <form id="mForm" method="POST" action="/admin/my-org/members" novalidate class="p-5 space-y-3">
+    <div class="flex justify-between"><h3 class="text-lg font-extrabold" id="mTitle">소속 인원 추가</h3><button type="button" id="mClose" class="px-3 py-1 border rounded-lg text-sm">닫기</button></div>
+    <p class="text-xs text-slate-500">조직 칸이 없습니다. 서버가 세션 조직으로 넣습니다.</p>
+    <div><label class="block text-xs font-semibold mb-1">이름</label><input name="full_name" id="mName" required class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    <div id="mUserWrap"><label class="block text-xs font-semibold mb-1">아이디</label><input name="username" id="mUser" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    <div id="mPassWrap"><label class="block text-xs font-semibold mb-1">비밀번호</label><input type="password" name="password" id="mPass" minlength="10" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    <div><label class="block text-xs font-semibold mb-1">업무</label>
+      <select name="job" id="mJob" class="w-full border rounded-lg px-3 py-2 text-sm">
+        <option value="">— 고르세요 —</option>
+        <option value="sales">영업</option><option value="tech">기술</option><option value="support">지원</option>
+      </select>
+    </div>
+    <div><label class="block text-xs font-semibold mb-1">핸드폰</label><input name="mobile" id="mMobile" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    <div><label class="block text-xs font-semibold mb-1">이메일</label><input type="text" name="email" id="mEmail" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+    <label class="flex gap-2 text-sm"><input type="checkbox" name="is_readonly" value="1" id="mRO"> 읽기전용</label>
+    <label class="flex gap-2 text-sm"><input type="checkbox" name="is_test" value="1" id="mTest"> 테스터</label>
+    <label class="flex gap-2 text-sm"><input type="checkbox" id="mOn" checked> 활성</label>
+    <button class="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold">저장</button>
+  </form>
+  <form id="resetForm" method="POST" class="hidden p-5 space-y-3">
+    <h3 class="font-bold">비밀번호 초기화</h3>
+    <p class="text-sm text-slate-500" id="resetWho"></p>
+    <label class="flex gap-2 text-sm"><input type="radio" name="how" value="temp" checked> 임시 비밀번호 발급</label>
+    <label class="flex gap-2 text-sm" id="linkLab"><input type="radio" name="how" value="link" id="howLink"> 초기화 링크 발송</label>
+    <p class="text-xs text-slate-500">최소 10자입니다. 감사 기록에 방법이 남습니다.</p>
+    <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">초기화</button>
+  </form>
+</aside>
+<script>
+(function(){
+  var d=document.getElementById('mDrawer'), s=document.getElementById('mScrim'), f=document.getElementById('mForm'), rf=document.getElementById('resetForm');
+  function open(){ if(d) d.style.transform='translateX(0)'; if(s) s.classList.remove('hidden'); }
+  function close(){ if(d) d.style.transform='translateX(100%)'; if(s) s.classList.add('hidden'); }
+  document.getElementById('mClose').addEventListener('click', close);
+  if(s) s.addEventListener('click', close);
+  document.getElementById('btn-new-m').addEventListener('click', function(){
+    rf.classList.add('hidden'); f.classList.remove('hidden'); f.action='/admin/my-org/members';
+    f.reset(); document.getElementById('mTitle').textContent='소속 인원 추가';
+    document.getElementById('mPass').required=true; document.getElementById('mUser').required=true;
+    document.getElementById('mPass').required=true; document.getElementById('mUserWrap').classList.remove('hidden');
+    document.getElementById('mPassWrap').classList.remove('hidden'); open();
+  });
+  document.querySelectorAll('.m-edit').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-edit')+'"]'); if(!tr) return;
+      rf.classList.add('hidden'); f.classList.remove('hidden');
+      f.action='/admin/my-org/members/'+tr.dataset.id;
+      document.getElementById('mTitle').textContent=tr.dataset.name;
+      document.getElementById('mName').value=tr.dataset.name;
+      document.getElementById('mJob').value=tr.dataset.job;
+      document.getElementById('mEmail').value=tr.dataset.email||'';
+      document.getElementById('mMobile').value=tr.dataset.mobile||'';
+      document.getElementById('mRO').checked=tr.dataset.ro==='1';
+      document.getElementById('mTest').checked=tr.dataset.test==='1';
+      document.getElementById('mOn').checked=tr.dataset.on==='1';
+	document.getElementById('mPass').required=false; document.getElementById('mUserWrap').classList.add('hidden');
+      document.getElementById('mUser').required=false;
+      document.getElementById('mPassWrap').classList.add('hidden');
+      open();
+    });
+  });
+  f.addEventListener('submit', function(){
+    var h=document.createElement('input'); h.type='hidden'; h.name='is_active'; h.value=document.getElementById('mOn').checked?'1':'0'; f.appendChild(h);
+  });
+  document.querySelectorAll('.m-reset').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-reset')+'"]'); if(!tr) return;
+      f.classList.add('hidden'); rf.classList.remove('hidden');
+      rf.action='/admin/my-org/members/'+tr.dataset.id+'/reset-password';
+      document.getElementById('resetWho').textContent=tr.dataset.name+' (@'+tr.dataset.user+')';
+      var link=document.getElementById('howLink');
+      if(!(tr.dataset.email||'')){ link.disabled=true; document.getElementById('linkLab').classList.add('text-slate-400'); }
+      else { link.disabled=false; document.getElementById('linkLab').classList.remove('text-slate-400'); }
+      open();
+    });
+  });
+})();
+</script>
+{{end}}
+{{end}}

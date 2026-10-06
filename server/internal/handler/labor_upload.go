@@ -154,7 +154,7 @@ func (h *QuotesHandler) LaborUploadPreview(c echo.Context) error {
 		"CanWrite": true, "Preview": true, "Existing": existing,
 		"NeedPick": parsed.NeedPick, "Reason": parsed.Reason,
 		"ColLetters": parsed.ColLetters,
-		"JobCol": parsed.JobLetter, "MonthlyCol": parsed.MonthlyLetter,
+		"JobCol":     parsed.JobLetter, "MonthlyCol": parsed.MonthlyLetter,
 		"DailyCol": parsed.DailyLetter, "HourlyCol": parsed.HourlyLetter,
 	})
 }
@@ -218,14 +218,14 @@ type laborCols struct {
 }
 
 type laborParseResult struct {
-	Rows           []laborUploadRow
-	NeedPick       bool
-	Reason         string
-	ColLetters     []string
-	JobLetter      string
-	MonthlyLetter  string
-	DailyLetter    string
-	HourlyLetter   string
+	Rows          []laborUploadRow
+	NeedPick      bool
+	Reason        string
+	ColLetters    []string
+	JobLetter     string
+	MonthlyLetter string
+	DailyLetter   string
+	HourlyLetter  string
 }
 
 func parseLaborExcel(xf *excelize.File, sheet string, existing []model.LaborRate, override *laborCols) laborParseResult {

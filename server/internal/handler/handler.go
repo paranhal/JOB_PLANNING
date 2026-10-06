@@ -207,6 +207,9 @@ func New(db *sql.DB) *Handler {
 	}
 	h.Work.notices = noticeHook
 	h.AdminWork.notices = noticeHook
+	h.Project.salesRepo = repository.NewSalesRepo(db)
+	h.Project.backup = backup.Config{DataDir: dataDirFromEnv(), DB: db}
+	h.Stats.dataDir = dataDirFromEnv()
 	bindSchemaDB(db)
 	setKeywordIndexStats(func() map[string]int {
 		return map[string]int{
@@ -220,7 +223,7 @@ func New(db *sql.DB) *Handler {
 func (h *Handler) Dashboard(c echo.Context) error {
 	role := ctxString(c, "role")
 	if role == "" {
-		role = model.RoleObserver
+		return redirectLogin(c)
 	}
 	userName := ctxString(c, "user_name")
 	username := ctxString(c, "username")

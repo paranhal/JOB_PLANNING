@@ -17,6 +17,9 @@ sed -i 's/\r$//' "$0" 2>/dev/null || true
 sed -i 's/\r$//' stop.sh 2>/dev/null || true
 
 echo "[1/3] Docker 이미지 로드 중..."
+if docker image inspect server-app:latest >/dev/null 2>&1; then
+  docker tag server-app:latest server-app:prev
+fi
 docker load -i server-app.tar
 echo ""
 

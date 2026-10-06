@@ -117,10 +117,10 @@
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[1500px] text-sm break-keep">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
               <a href="/customers?sort=customer_id&dir={{.SortDirID}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}{{.SalesQ}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">고객번호
                 <span class="inline-flex flex-col leading-none text-base">
@@ -129,7 +129,7 @@
                 </span>
               </a>
             </th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
               <a href="/customers?sort=org_name&dir={{.SortDirOrg}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}{{.SalesQ}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">기관명
                 <span class="inline-flex flex-col leading-none text-base">
@@ -138,8 +138,8 @@
                 </span>
               </a>
             </th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">구분</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">구분</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">
               <a href="/customers?sort=parent&dir={{.SortDirParent}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}{{.SalesQ}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">상위기관
                 <span class="inline-flex flex-col leading-none text-base">
@@ -148,7 +148,7 @@
                 </span>
               </a>
             </th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">
               <a href="/customers?sort=industry&dir={{.SortDirInd}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}{{.SalesQ}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">업종
                 <span class="inline-flex flex-col leading-none text-base">
@@ -157,7 +157,7 @@
                 </span>
               </a>
             </th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">
               <a href="/customers?sort=phone&dir={{.SortDirPhone}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}{{.SalesQ}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800">대표전화
                 <span class="inline-flex flex-col leading-none text-base">
@@ -167,11 +167,11 @@
               </a>
             </th>
             {{if $.SalesView}}
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">진행 중 사업</th>
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">누적 수주액</th>
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">마지막 활동</th>
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">진행 중 사업</th>
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">누적 수주액</th>
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">마지막 활동</th>
             {{else}}
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
               <a href="/customers?sort=assets&dir={{.SortDirAst}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">자산
                 <span class="inline-flex flex-col leading-none text-base">
@@ -180,7 +180,7 @@
                 </span>
               </a>
             </th>
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
               <a href="/customers?sort=as&dir={{.SortDirAS}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">AS
                 <span class="inline-flex flex-col leading-none text-base">
@@ -190,7 +190,7 @@
               </a>
             </th>
             {{end}}
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
               <a href="/customers?sort=status&dir={{.SortDirStatus}}&search={{urlquery .Search}}&category={{urlquery .Category}}&industry={{urlquery .Industry}}{{if .PartyKind}}&party_kind={{urlquery .PartyKind}}{{end}}{{if .ReviewOnly}}&review=1{{end}}{{.SalesQ}}"
                  class="inline-flex items-center gap-1 hover:text-gray-800 justify-center">상태
                 <span class="inline-flex flex-col leading-none text-base">
@@ -199,14 +199,14 @@
                 </span>
               </a>
             </th>
-            <th class="px-4 py-3"></th>
+            <th class="px-4 py-3 whitespace-nowrap"></th>
           </tr>
         </thead>
           {{if .ParentGroups}}
             {{range .ParentGroups}}
             <tbody x-data="{open:true}" class="border-b border-slate-100">
             <tr class="bg-slate-50 cursor-pointer hover:bg-slate-100" @click="open=!open">
-              <td colspan="{{if $.SalesView}}11{{else}}10{{end}}" class="px-4 py-2 text-xs font-semibold text-slate-700">
+              <td colspan="{{if $.SalesView}}11{{else}}10{{end}}" class="px-4 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
                 <span class="inline-block w-4 text-slate-400" x-text="open ? '▼' : '▶'"></span>
                 {{.Label}}
                 <span class="font-normal text-slate-400 ml-1">{{len .Items}}건</span>
@@ -214,8 +214,8 @@
             </tr>
             {{range .Items}}
             <tr class="hover:bg-gray-50 transition-colors" x-show="open">
-              <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.CustomerID}}</td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">{{.CustomerID}}</td>
+              <td class="px-4 py-3 max-w-[18rem]">
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <a href="/customers/{{.CustomerID}}" class="font-medium text-gray-800 hover:text-blue-600">
                     {{.OrgName}}
@@ -232,39 +232,39 @@
                 <p class="text-xs text-amber-700 mt-1">{{.ReviewReason}}</p>
                 {{end}}
               </td>
-              <td class="px-4 py-3 text-xs">
+              <td class="px-4 py-3 text-xs whitespace-nowrap">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">{{partyKindLabel .PartyKind}}</span>
               </td>
-              <td class="px-4 py-3 text-gray-600 hidden md:table-cell text-xs">
+              <td class="px-4 py-3 text-gray-600 hidden md:table-cell text-xs max-w-[18rem]">
                 {{if .ParentOrgName}}
                   <a href="/customers?category={{.ParentCustomerID}}" class="text-blue-600 hover:underline">{{.ParentOrgName}}</a>
                 {{else}}
                   <span class="text-gray-300">—</span>
                 {{end}}
               </td>
-              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell">
+              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell whitespace-nowrap">
                 {{if .Industry}}
                   <a href="/customers?industry={{.Industry}}" class="hover:text-blue-600 hover:underline">{{.Industry}}</a>
                 {{else}}
                   <span class="text-gray-300">—</span>
                 {{end}}
               </td>
-              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell">{{.MainPhone}}</td>
+              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell whitespace-nowrap">{{.MainPhone}}</td>
               {{if $.SalesView}}
-              <td class="px-4 py-3 text-center">{{.SalesOpenCount}}</td>
-              <td class="px-4 py-3 text-center text-gray-700">{{if gt .SalesWonAmount 0}}{{.SalesWonAmount}}{{else}}—{{end}}</td>
-              <td class="px-4 py-3 text-center text-gray-600">{{if .SalesLastActivity}}{{.SalesLastActivity}}{{else}}—{{end}}</td>
+              <td class="px-4 py-3 text-center whitespace-nowrap">{{.SalesOpenCount}}</td>
+              <td class="px-4 py-3 text-center text-gray-700 whitespace-nowrap">{{if gt .SalesWonAmount 0}}{{.SalesWonAmount}}{{else}}—{{end}}</td>
+              <td class="px-4 py-3 text-center text-gray-600 whitespace-nowrap">{{if .SalesLastActivity}}{{.SalesLastActivity}}{{else}}—{{end}}</td>
               {{else}}
-              <td class="px-4 py-3 text-center">
+              <td class="px-4 py-3 text-center whitespace-nowrap">
                 <span class="text-gray-700 font-medium">{{.AssetCount}}</span>
               </td>
-              <td class="px-4 py-3 text-center">
+              <td class="px-4 py-3 text-center whitespace-nowrap">
                 <span class="{{if gt .AsCount 0}}text-blue-600 font-medium{{else}}text-gray-400{{end}}">
                   {{.AsCount}}
                 </span>
               </td>
               {{end}}
-              <td class="px-4 py-3 text-center">
+              <td class="px-4 py-3 text-center whitespace-nowrap">
                 {{if .IsActive}}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">활성</span>
                 {{else}}
@@ -307,7 +307,7 @@
           {{else}}
           <tbody>
             <tr>
-              <td colspan="{{if $.SalesView}}11{{else}}10{{end}}" class="px-4 py-12 text-center text-gray-400">
+              <td colspan="{{if $.SalesView}}11{{else}}10{{end}}" class="px-4 py-12 text-center text-gray-400 whitespace-nowrap">
                 {{if or .Search .Category .Industry .PartyKind}}
                   조건에 맞는 고객이 없습니다.
                 {{else}}

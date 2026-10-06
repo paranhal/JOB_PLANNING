@@ -47,49 +47,49 @@
     <div class="bg-white border rounded-xl p-3"><div class="text-xs text-gray-500">시기 미정</div><div class="text-lg font-semibold">{{.Summary.UnschedN}}건 · {{won .Summary.UnschedAmt}}</div></div>
   </div>
   <div class="bg-white rounded-xl border overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full min-w-[1200px] text-sm break-keep">
       <thead class="bg-gray-50 text-xs text-gray-500 border-b"><tr>
-        <th class="text-left px-3 py-2">번호</th><th class="text-left px-3 py-2">사업</th><th class="text-left px-3 py-2">고객</th>
-        <th class="text-left px-3 py-2">담당</th><th class="text-left px-3 py-2">단계</th><th class="text-left px-3 py-2">확도</th>
-        <th class="text-left px-3 py-2">기준 시기</th><th class="text-right px-3 py-2">금액</th><th class="text-right px-3 py-2">가중</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">번호</th><th class="text-left px-3 py-2 whitespace-nowrap">사업</th><th class="text-left px-3 py-2 whitespace-nowrap">고객</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">담당</th><th class="text-left px-3 py-2 whitespace-nowrap">단계</th><th class="text-left px-3 py-2 whitespace-nowrap">확도</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">기준 시기</th><th class="text-right px-3 py-2 whitespace-nowrap">금액</th><th class="text-right px-3 py-2 whitespace-nowrap">가중</th>
       </tr></thead>
       <tbody class="divide-y">
         {{range .Rows}}
         <tr>
-          <td class="px-3 py-2 font-mono text-xs"><a href="/sales/{{.SalesID}}" class="text-blue-700">{{.DisplayNo}}</a></td>
-          <td class="px-3 py-2">{{.Name}}</td>
-          <td class="px-3 py-2">{{.Customer}}</td>
-          <td class="px-3 py-2">{{.Owner}}</td>
-          <td class="px-3 py-2">{{.DisplayStage}}</td>
-          <td class="px-3 py-2">{{.EffectiveProb}}%</td>
-          <td class="px-3 py-2">{{if .Unsched}}—{{else}}{{if .BasisYM}}{{.BasisYM}}{{else}}—{{end}}{{end}}</td>
-          <td class="px-3 py-2 text-right">{{.Amount}} <span class="text-[11px] text-gray-400">{{.VATLabel}}</span></td>
-          <td class="px-3 py-2 text-right">{{.Weighted}}</td>
+          <td class="px-3 py-2 font-mono text-xs whitespace-nowrap"><a href="/sales/{{.SalesID}}" class="text-blue-700">{{.DisplayNo}}</a></td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.Name}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.Customer}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.Owner}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.DisplayStage}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.EffectiveProb}}%</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{if .Unsched}}—{{else}}{{if .BasisYM}}{{.BasisYM}}{{else}}—{{end}}{{end}}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.Amount}} <span class="text-[11px] text-gray-400">{{.VATLabel}}</span></td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">{{.Weighted}}</td>
         </tr>
         {{else}}
-        <tr><td colspan="9" class="px-3 py-8 text-center text-gray-400">건이 없습니다.</td></tr>
+        <tr><td colspan="9" class="px-3 py-8 text-center text-gray-400 whitespace-nowrap">건이 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
   </div>
   <div class="bg-white rounded-xl border overflow-x-auto">
-    <table class="w-full text-xs">
+    <table class="w-full min-w-[900px] text-xs break-keep">
       <thead class="bg-gray-50 border-b"><tr>
-        <th class="text-left px-2 py-2">구분</th>
-        {{range .Matrix.Months}}<th class="px-2 py-2">{{.}}</th>{{end}}
-        <th class="px-2 py-2">미정</th>
+        <th class="text-left px-2 py-2 whitespace-nowrap">구분</th>
+        {{range .Matrix.Months}}<th class="px-2 py-2 whitespace-nowrap">{{.}}</th>{{end}}
+        <th class="px-2 py-2 whitespace-nowrap">미정</th>
       </tr></thead>
       <tbody class="divide-y">
         {{range .Matrix.Rows}}
         <tr>
-          <td class="px-2 py-2">{{.Label}}</td>
-          {{if eq $.Cell "weighted"}}{{range .WCells}}<td class="px-2 py-2 text-right tabular-nums">{{won .}}</td>{{end}}<td class="px-2 py-2 text-right">{{won .WUnsched}}</td>
-          {{else}}{{range .Cells}}<td class="px-2 py-2 text-right tabular-nums">{{won .}}</td>{{end}}<td class="px-2 py-2 text-right">{{won .Unsched}}</td>{{end}}
+          <td class="px-2 py-2 whitespace-nowrap">{{.Label}}</td>
+          {{if eq $.Cell "weighted"}}{{range .WCells}}<td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{won .}}</td>{{end}}<td class="px-2 py-2 text-right whitespace-nowrap">{{won .WUnsched}}</td>
+          {{else}}{{range .Cells}}<td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{won .}}</td>{{end}}<td class="px-2 py-2 text-right whitespace-nowrap">{{won .Unsched}}</td>{{end}}
         </tr>
         {{end}}
         <tr class="font-semibold bg-gray-50">
-          <td class="px-2 py-2">합계</td>
-          {{range .Matrix.Totals}}<td class="px-2 py-2 text-right">{{won .}}</td>{{end}}
+          <td class="px-2 py-2 whitespace-nowrap">합계</td>
+          {{range .Matrix.Totals}}<td class="px-2 py-2 text-right whitespace-nowrap">{{won .}}</td>{{end}}
           <td></td>
         </tr>
       </tbody>

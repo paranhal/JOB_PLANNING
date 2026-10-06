@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -220,5 +221,134 @@ func TestItemsHTTP_ManufacturerSearchAndPartner(t *testing.T) {
 	form := doGet(t, e, "/items/"+itemID+"/edit")
 	if !strings.Contains(form.Body.String(), "C00-26-010") {
 		t.Fatalf("상세에 고객번호 없음: %s", clipBody(form.Body.String()))
+	}
+}
+
+func TestItemsHTTP_SpecsCatalogRangeAndQuoteGuard(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES
+		('SUP1','공급A','공급A',1),('SUP2','공급B','공급B',1)`); err != nil {
+		t.Fatal(err)
+	}
+	rec := doForm(t, e, "/items", url.Values{
+		"name":       {"클리너카드"},
+		"item_kind":  {"goods"},
+		"is_active":  {"1"},
+		"spec":       {"A.D형", "T형", "Box"},
+		"spec_unit":  {"EA", "EA", "Box"},
+		"spec_price": {"24000", "39600", "79200"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("3규격 저장 status=%d %s", rec.Code, rec.Body.String())
+	}
+	var itemID string
+	_ = db.QueryRow(`SELECT item_id FROM sales_items WHERE name='클리너카드'`).Scan(&itemID)
+	if itemID == "" {
+		t.Fatal("품목 없음")
+	}
+	edit := doGet(t, e, "/items/"+itemID+"/edit")
+	eb := edit.Body.String()
+	if !strings.Contains(eb, "A.D형") || !strings.Contains(eb, "T형") || !strings.Contains(eb, "Box") {
+		t.Fatalf("규격이 다시 안 열림: %s", clipBody(eb))
+	}
+	if !strings.Contains(eb, "공급사별 단가(매입)") || !strings.Contains(eb, "+ 규격 추가") {
+		t.Fatalf("카탈로그 화면이 없다: %s", clipBody(eb))
+	}
+
+	zero := doForm(t, e, "/items", url.Values{"name": {"빈규격"}, "item_kind": {"goods"}, "is_active": {"1"}})
+	if zero.Code != http.StatusSeeOther {
+		t.Fatalf("0규격 저장 status=%d", zero.Code)
+	}
+
+	list := doGet(t, e, "/items?search="+url.QueryEscape("A.D형"))
+	lb := list.Body.String()
+	if !strings.Contains(lb, "클리너카드") || !strings.Contains(lb, "3개 규격 · 24,000~79,200원") {
+		t.Fatalf("목록 범위/검색: %s", clipBody(lb))
+	}
+
+	var specIDs []string
+	rows, err := db.Query(`SELECT spec_id FROM sales_item_specs WHERE item_id=? ORDER BY sort_order`, itemID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id string
+		_ = rows.Scan(&id)
+		specIDs = append(specIDs, id)
+	}
+	rows.Close()
+	if len(specIDs) != 3 {
+		t.Fatalf("spec_id=%v", specIDs)
+	}
+	supForm := url.Values{
+		"name": {"클리너카드"}, "item_kind": {"goods"}, "is_active": {"1"},
+		"spec_id": {specIDs[0], specIDs[1], specIDs[2]},
+		"spec":    {"A.D형", "T형", "Box"}, "spec_unit": {"EA", "EA", "Box"},
+		"spec_price": {"24000", "39600", "79200"},
+		"sup_id":     {"SUP1", "SUP2"},
+		"sp_group":   {"0", "0", "1", "1"},
+		"sp_spec_id": {specIDs[0], specIDs[1], specIDs[0], specIDs[1]},
+		"sp_unit":    {"", "", "", ""},
+		"sp_price":   {"18000", "25000", "19000", "26000"},
+	}
+	upd := doForm(t, e, "/items/"+itemID, supForm)
+	if upd.Code != http.StatusSeeOther {
+		t.Fatalf("공급사 저장 status=%d %s", upd.Code, upd.Body.String())
+	}
+	var nPrice int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM sales_item_supplier_prices WHERE item_id=?`, itemID).Scan(&nPrice)
+	if nPrice != 4 {
+		t.Fatalf("공급사 줄=%d", nPrice)
+	}
+	detail := doGet(t, e, "/items/"+itemID+"/edit")
+	if !strings.Contains(detail.Body.String(), "규격별 이익") {
+		t.Fatalf("이익이 없다: %s", clipBody(detail.Body.String()))
+	}
+
+	sug := doGet(t, e, "/items/suggest?q="+url.QueryEscape("클리너"))
+	var hits []map[string]interface{}
+	if err := json.Unmarshal(sug.Body.Bytes(), &hits); err != nil || len(hits) < 1 {
+		t.Fatalf("suggest: %s", sug.Body.String())
+	}
+	specs, _ := hits[0]["specs"].([]interface{})
+	if len(specs) != 3 {
+		t.Fatalf("suggest specs=%v", hits[0]["specs"])
+	}
+
+	sales := repository.NewSalesRepo(db)
+	p := &model.SalesProject{Name: "견적연결"}
+	if err := sales.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	q := &model.SalesQuote{
+		SalesID: p.SalesID, FormType: model.QuoteFormA, VATMode: model.QuoteVATExcluded,
+		RoundRule: model.QuoteRoundNone, QuoteDate: "2026-09-27",
+		Title: "클리너", OwnerName: "최혜영", OwnerPhone: "010-1111-2222", RecipientName: "도서관",
+		Lines: []model.SalesQuoteLine{
+			{Name: "클리너카드", SpecID: specIDs[0], Qty: 1, Unit: "EA", UnitPrice: 24000},
+		},
+	}
+	if err := repository.NewQuoteRepo(db).Create(q); err != nil {
+		t.Fatal(err)
+	}
+	offForm := url.Values{
+		"name": {"클리너카드"}, "item_kind": {"goods"}, "is_active": {"1"},
+		"spec_id": {specIDs[1], specIDs[2]},
+		"spec":    {"T형", "Box"}, "spec_unit": {"EA", "Box"},
+		"spec_price": {"39600", "79200"},
+	}
+	off := doForm(t, e, "/items/"+itemID, offForm)
+	loc := off.Header().Get("Location")
+	if off.Code != http.StatusSeeOther || !strings.Contains(loc, "ok=spec_off") {
+		t.Fatalf("끄기 안내: status=%d loc=%s body=%s", off.Code, loc, off.Body.String())
+	}
+	flash := doGet(t, e, loc)
+	if !strings.Contains(flash.Body.String(), "견적에 쓰여 끕니다") {
+		t.Fatalf("안내 문구 없음: %s", clipBody(flash.Body.String()))
+	}
+	var active int
+	_ = db.QueryRow(`SELECT COALESCE(is_active,1) FROM sales_item_specs WHERE spec_id=?`, specIDs[0]).Scan(&active)
+	if active != 0 {
+		t.Fatalf("견적 규격 is_active=%d", active)
 	}
 }

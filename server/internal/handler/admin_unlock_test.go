@@ -98,7 +98,7 @@ func TestAdminSectionObserverSkipsUnlock(t *testing.T) {
 	e, _ := newAdminUnlockApp(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/users", nil)
-	req.AddCookie(jwtCookieRole(t, "observer"))
+	req.AddCookie(jwtCookieReadOnly(t, "tech"))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("옵저버가 잠긴다 %d loc=%s", rec.Code, rec.Header().Get("Location"))

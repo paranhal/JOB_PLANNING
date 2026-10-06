@@ -83,6 +83,7 @@ func applySalesQuotes(db *sql.DB) {
 			log.Printf("036 sales_quotes: %v", err)
 		}
 	}
+	addNamedColumn(db, "sales_quote_lines", "spec_id", `ALTER TABLE sales_quote_lines ADD COLUMN spec_id TEXT NOT NULL DEFAULT ''`)
 	applyQuoteLabor(db)
 	applySalesOrders(db)
 }

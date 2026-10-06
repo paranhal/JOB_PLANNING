@@ -39,25 +39,25 @@
   <!-- 테이블 -->
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="w-full min-w-[1200px] text-sm break-keep">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">담당자명</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">소속</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">직급</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">연결 기관</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">직장전화</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">핸드폰</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">이메일</th>
-            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">상태</th>
-            <th class="px-4 py-3"></th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">담당자명</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell whitespace-nowrap">소속</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell whitespace-nowrap">직급</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">연결 기관</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">직장전화</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">핸드폰</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">이메일</th>
+            <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">상태</th>
+            <th class="px-4 py-3 whitespace-nowrap"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           {{if .Items}}
             {{range .Items}}
             <tr class="hover:bg-gray-50 transition-colors">
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <a href="/contacts/{{.ContactID}}" class="font-medium text-gray-800 hover:text-blue-600">
                   {{.FullName}}
                 </a>
@@ -65,21 +65,21 @@
                 <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-700">주담당</span>
                 {{end}}
               </td>
-              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs">
+              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs whitespace-nowrap">
                 {{affiliationLabel .Affiliation}}
               </td>
-              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs">
+              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell text-xs whitespace-nowrap">
                 {{if .JobGrade}}{{jobGradeLabel .JobGrade}}{{else}}—{{end}}
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <a href="/customers?search={{.OrgName}}" class="text-gray-600 hover:text-blue-600">{{.OrgName}}</a>
               </td>
-              <td class="px-4 py-3 text-gray-600 hidden md:table-cell">{{.Phone}}</td>
-              <td class="px-4 py-3 text-gray-600 hidden md:table-cell">{{.Mobile}}</td>
-              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell">
+              <td class="px-4 py-3 text-gray-600 hidden md:table-cell whitespace-nowrap">{{.Phone}}</td>
+              <td class="px-4 py-3 text-gray-600 hidden md:table-cell whitespace-nowrap">{{.Mobile}}</td>
+              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell whitespace-nowrap">
                 {{if .Email}}<a href="mailto:{{.Email}}" class="hover:text-blue-600">{{.Email}}</a>{{end}}
               </td>
-              <td class="px-4 py-3 text-center">
+              <td class="px-4 py-3 text-center whitespace-nowrap">
                 {{if eq .Status "active"}}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">재직</span>
                 {{else if eq .Status "transferred"}}
@@ -88,7 +88,7 @@
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">퇴직</span>
                 {{end}}
               </td>
-              <td class="px-4 py-3 text-right">
+              <td class="px-4 py-3 text-right whitespace-nowrap">
                 <div class="flex items-center gap-2 justify-end">
                   <a href="/contacts/{{.ContactID}}" class="text-xs text-blue-600 hover:underline">상세</a>
                   <a href="/contacts/{{.ContactID}}/edit" class="text-xs text-gray-500 hover:text-gray-700">수정</a>
@@ -98,7 +98,7 @@
             {{end}}
           {{else}}
             <tr>
-              <td colspan="8" class="px-4 py-12 text-center text-gray-400">
+              <td colspan="8" class="px-4 py-12 text-center text-gray-400 whitespace-nowrap">
                 {{if .Search}}
                   "{{.Search}}" 검색 결과가 없습니다.
                 {{else}}

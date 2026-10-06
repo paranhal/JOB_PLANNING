@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +53,6 @@ func takeCompanyWeeklyDownload(token string) (companyWeeklyDownload, bool) {
 		delete(companyWeeklyOut.items, token)
 		return companyWeeklyDownload{}, false
 	}
-	delete(companyWeeklyOut.items, token)
 	return item, true
 }
 
@@ -102,6 +105,9 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 		ASCIIName: result.ASCIIName,
 		UTF8Name:  result.UTF8Name,
 	})
+	persistCompanyWeeklyFile(h.dataDir, token, companyWeeklyDownload{
+		Data: result.Data, ASCIIName: result.ASCIIName, UTF8Name: result.UTF8Name,
+	})
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionDownload,
 		TargetTable: "company_weekly_report",
@@ -120,6 +126,9 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 func (h *StatsHandler) DownloadCompanyWeekly(c echo.Context) error {
 	token := strings.TrimSpace(c.QueryParam("token"))
 	item, ok := takeCompanyWeeklyDownload(token)
+	if !ok {
+		item, ok = loadCompanyWeeklyFile(h.dataDir, token)
+	}
 	if !ok {
 		return c.Render(http.StatusGone, "stats/company_weekly_result.html", map[string]interface{}{
 			"Title":  "보고서",
@@ -187,4 +196,54 @@ func companyWeeklyResultData(draft interface{}, sheetName, token string, result 
 		data["SheetAdded"] = result.Mode == companyWeeklyModeSheetAdd
 	}
 	return data
+}
+
+func companyWeeklyPersistDir(dataDir string) string {
+	if strings.TrimSpace(dataDir) == "" {
+		dataDir = "data"
+	}
+	return filepath.Join(dataDir, "uploads", "company_weekly")
+}
+
+func persistCompanyWeeklyFile(dataDir, token string, item companyWeeklyDownload) {
+	token = strings.TrimSpace(token)
+	if token == "" || len(item.Data) == 0 {
+		return
+	}
+	dir := companyWeeklyPersistDir(dataDir)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Printf("company weekly persist mkdir: %v", err)
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, token+".xlsx"), item.Data, 0644); err != nil {
+		log.Printf("company weekly persist xlsx: %v", err)
+		return
+	}
+	meta, _ := json.Marshal(map[string]string{"ascii": item.ASCIIName, "utf8": item.UTF8Name})
+	_ = os.WriteFile(filepath.Join(dir, token+".json"), meta, 0644)
+}
+
+func loadCompanyWeeklyFile(dataDir, token string) (companyWeeklyDownload, bool) {
+	token = strings.TrimSpace(token)
+	if token == "" || strings.ContainsAny(token, `/\`) {
+		return companyWeeklyDownload{}, false
+	}
+	path := filepath.Join(companyWeeklyPersistDir(dataDir), token+".xlsx")
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) == 0 {
+		return companyWeeklyDownload{}, false
+	}
+	item := companyWeeklyDownload{Data: data, ASCIIName: "company-weekly.xlsx", UTF8Name: "전사주간업무보고.xlsx"}
+	if raw, err := os.ReadFile(filepath.Join(companyWeeklyPersistDir(dataDir), token+".json")); err == nil {
+		var meta map[string]string
+		if json.Unmarshal(raw, &meta) == nil {
+			if meta["ascii"] != "" {
+				item.ASCIIName = meta["ascii"]
+			}
+			if meta["utf8"] != "" {
+				item.UTF8Name = meta["utf8"]
+			}
+		}
+	}
+	return item, true
 }

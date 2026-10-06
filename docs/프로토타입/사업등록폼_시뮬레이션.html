@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사업 등록 폼</title>
+<style>
+  :root{ --bg:#f8fafc; --card:#fff; --line:#e2e8f0; --ink:#1e293b; --muted:#64748b; --accent:#2563eb; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0f172a; --card:#1e293b; --line:#334155; --ink:#e2e8f0; --muted:#94a3b8; } }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 16px;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .note{color:var(--muted);font-size:13px;margin:0 0 20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row > div{flex:1 1 220px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:14px}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--ink)}
+  .chk input{width:auto}
+  [hidden]{display:none !important}
+  .sec-title{font-weight:600;margin:0 0 6px}
+  button{padding:10px 18px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>영업 사업 등록 — 화면 시늉</h1>
+  <p class="note">§47.22 규칙대로 칸이 나타나고 사라지는지 보는 모형입니다. 저장은 되지 않고, 맨 아래에 실제로 전송될 값이 보입니다.</p>
+
+  <form id="f">
+    <div class="card">
+      <label for="name">사업명 *</label>
+      <input id="name" name="name" value="">
+      <div class="chk"><input type="checkbox" id="tentative" name="is_tentative_name"><label for="tentative" style="margin:0">가칭</label></div>
+
+      <label for="owner">영업담당</label>
+      <select id="owner" name="sales_owner_id">
+        <option value="">— 선택 —</option><option value="u1">홍길동</option><option value="u2">김영업</option>
+      </select>
+
+      <label for="biz">사업 유형</label>
+      <select id="biz" name="biz_type">
+        <option value="">— 선택 —</option>
+        <option value="build">구축</option>
+        <option value="maintenance">유지보수</option>
+        <option value="goods">물품 납품</option>
+        <option value="develop">개발</option>
+        <option value="construction">공사</option>
+        <option value="etc">기타</option>
+      </select>
+    </div>
+
+    <div class="card" id="sec-customer">
+      <p class="sec-title">고객</p>
+      <div class="row">
+        <div><label for="cust">고객 (등록)</label><select id="cust" name="customer_id"><option value="">— 선택 —</option><option value="c1">○○도서관</option></select></div>
+        <div><label for="prospect">기관명 직접입력</label><input id="prospect" name="prospect_name"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="sec-title">사업 시기</p>
+      <div class="row">
+        <div><label for="prec">정밀도</label>
+          <select id="prec" name="expected_precision">
+            <option value="month">월</option><option value="quarter">분기</option>
+            <option value="half">반기</option><option value="year">년</option>
+          </select>
+        </div>
+        <div id="w-month"><label for="ym">사업 시기 (년/월)</label><input type="month" id="ym"></div>
+        <div id="w-year" hidden><label for="yy">년</label><input type="number" id="yy" min="2020" max="2100" placeholder="2027"></div>
+        <div id="w-quarter" hidden><label for="qq">분기</label><select id="qq"><option value="1">1분기</option><option value="2">2분기</option><option value="3">3분기</option><option value="4">4분기</option></select></div>
+        <div id="w-half" hidden><label for="hh">반기</label><select id="hh"><option value="1">상반기</option><option value="2">하반기</option></select></div>
+      </div>
+      <input type="hidden" id="expected_ym" name="expected_ym">
+      <div class="chk"><input type="checkbox" id="quick" name="quick_quote"><label for="quick" style="margin:0"><b>즉시 견적</b> — 바로 견적을 쓸 때</label></div>
+    </div>
+
+    <div class="card" id="sec-billing" hidden>
+      <p class="sec-title">대금</p>
+      <label for="cycle">대금 주기</label>
+      <select id="cycle" name="billing_cycle">
+        <option value="">— 선택 —</option><option value="once">일시</option><option value="month">월</option>
+        <option value="quarter">분기</option><option value="half">반기</option><option value="year">연</option>
+      </select>
+      <div class="row">
+        <div id="w-from" hidden><label for="rfrom">대금 시작</label><input type="month" id="rfrom" name="revenue_from"></div>
+        <div id="w-to" hidden><label for="rto">대금 종료</label><input type="month" id="rto" name="revenue_to"></div>
+      </div>
+    </div>
+
+    <div class="card" id="sec-when">
+      <p class="sec-title">입찰 · 매출 시기</p>
+      <div class="row">
+        <div><label for="bid">입찰 시기</label><input type="month" id="bid" name="bid_ym"></div>
+        <div><label for="rev">매출 시기</label><input type="month" id="rev" name="revenue_ym"></div>
+      </div>
+    </div>
+
+    <div class="card" id="sec-amount">
+      <p class="sec-title">금액</p>
+      <label for="amt">예상 금액 (원)</label>
+      <input id="amt" name="expected_amount" inputmode="numeric">
+      <div class="chk"><input type="checkbox" id="amtok" name="expected_amount_confirmed"><label for="amtok" style="margin:0">금액 확정</label></div>
+      <div class="chk"><input type="checkbox" id="vat" name="amount_vat_included"><label for="vat" style="margin:0">VAT 포함</label></div>
+    </div>
+
+    <div class="card" id="sec-contract">
+      <p class="sec-title">계약 분류</p>
+      <div class="row">
+        <div><label for="lead">정보 입수 경로</label><select id="lead" name="lead_source"><option value="">— 선택 —</option><option value="customer_request">고객 요청</option><option value="self_found">자체 발굴</option></select></div>
+        <div><label for="target">계약 대상</label><select id="target" name="contract_target"><option value="">— 선택 —</option><option value="service">용역</option><option value="goods_buy">물품 구매</option></select></div>
+        <div><label for="budget">예산 상태</label><select id="budget" name="budget_status"><option value="unknown">미확인</option><option value="confirmed">반영 확정</option><option value="no_plan">예산 계획 없음</option></select></div>
+      </div>
+    </div>
+
+    <div class="card" id="sec-etc">
+      <p class="sec-title">그 밖에</p>
+      <label for="grp">사업 대분류</label>
+      <select id="grp" name="group_id"><option value="">— 선택 —</option><option value="SG-001">2027년 예산 영업</option></select>
+      <label for="comp">경쟁사</label><input id="comp" name="competitor">
+    </div>
+
+    <button type="button" id="save">저장</button>
+  </form>
+
+  <p class="note" style="margin-top:18px">전송될 값</p>
+  <pre id="out"></pre>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const BILLING_TYPES = ['maintenance','develop','construction'];
+  const show = (el, on) => {
+    el.hidden = !on;
+    el.querySelectorAll('input,select').forEach(f => { f.disabled = !on; });
+  };
+  const clear = ids => ids.forEach(id => { $(id).value = ''; });
+
+  function periodValue(){
+    const p = $('prec').value;
+    if (p === 'month') return $('ym').value || '';
+    const y = ($('yy').value || '').trim();
+    if (!y) return '';
+    if (p === 'quarter') return y + '-' + String((parseInt($('qq').value,10)-1)*3 + 1).padStart(2,'0');
+    if (p === 'half')    return y + '-' + ($('hh').value === '2' ? '07' : '01');
+    return y + '-01';
+  }
+
+  function sync(){
+    const biz = $('biz').value, quick = $('quick').checked, prec = $('prec').value;
+
+    // 사업 시기 입력 모양
+    show($('w-month'),   prec === 'month');
+    show($('w-year'),    prec !== 'month');
+    show($('w-quarter'), prec === 'quarter');
+    show($('w-half'),    prec === 'half');
+    $('expected_ym').value = periodValue();
+
+    // 대금: 유형이 정하고, 주기가 시작·종료를 연다
+    const canBill = BILLING_TYPES.includes(biz) && !quick;
+    if (!canBill) clear(['cycle','rfrom','rto']);
+    show($('sec-billing'), canBill);
+    const cyc = canBill ? $('cycle').value : '';
+    show($('w-from'), !!cyc);
+    show($('w-to'),   !!cyc && cyc !== 'once');
+    if (cyc === 'once') clear(['rto']);
+
+    // 즉시 견적: 입찰·매출 시기만 남긴다
+    show($('sec-amount'),   !quick);
+    show($('sec-contract'), !quick);
+    show($('sec-etc'),      !quick);
+    $('save').textContent = quick ? '저장하고 견적 작성' : '저장';
+    dump();
+  }
+
+  function dump(){
+    const data = {};
+    new FormData($('f')).forEach((v,k) => { if (v !== '') data[k] = v; });
+    data.expected_ym = $('expected_ym').value;
+    if (!data.expected_ym) delete data.expected_ym;
+    data['(이동)'] = $('quick').checked ? '/quotes/new?sales_id=<새 사업>' : '/sales/<새 사업>';
+    $('out').textContent = JSON.stringify(data, null, 2);
+  }
+
+  $('f').addEventListener('input', sync);
+  $('f').addEventListener('change', sync);
+  sync();
+})();
+</script>
+</body>
+</html>

@@ -22,6 +22,11 @@ func echoCtxRole(role, name string) echo.Context {
 	c.Set("user_name", name)
 	c.Set("username", role)
 	c.Set("permissions", model.DefaultPermissions(role))
+	if role == model.RoleObserver {
+		c.Set("is_readonly", true)
+		c.Set("role", model.RoleOrgAdmin)
+		c.Set("permissions", model.DefaultPermissions(model.RoleOrgAdmin))
+	}
 	return c
 }
 

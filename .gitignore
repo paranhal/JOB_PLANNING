@@ -36,3 +36,10 @@ server/server
 deploy/server-app.tar.prev
 docs/_schema_dump.txt
 server/docs/figma_register_ref/
+cursor-chat-export.cursor-chat.json
+*.cursor-chat.json
+.codex_tmp/
+_to_delete/
+outputs/
+tmp/
+Claude outputs/

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -47,6 +48,44 @@ type SalesItem struct {
 	Notes           string
 	CreatedAt       string
 	UpdatedAt       string
+	SpecCount       int
+	PriceMin        int
+	PriceMax        int
+	Specs           []SalesItemSpec
+	Suppliers       []SalesItemSupplierBlock
+}
+
+type SalesItemSpec struct {
+	SpecID    string
+	ItemID    string
+	Spec      string
+	Unit      string
+	Price     int
+	SortOrder int
+	IsActive  bool
+}
+
+type SalesItemSupplierPrice struct {
+	SPID       string
+	ItemID     string
+	SupplierID string
+	SpecID     string
+	Unit       string
+	Price      int
+	SortOrder  int
+}
+
+type SalesItemSupplierBlock struct {
+	SupplierID   string
+	SupplierName string
+	Rows         []SalesItemSupplierPrice
+}
+
+type SalesItemSpecMargin struct {
+	Spec    SalesItemSpec
+	BuyMin  int
+	Profit  int
+	Percent string
 }
 
 func NormalizeSalesItemKind(s string) string {
@@ -174,6 +213,67 @@ func (p *SalesItem) ListPriceLabel() string {
 	return formatSalesAmount(p.ListPrice) + "원"
 }
 
+func (p *SalesItem) SpecRangeLabel() string {
+	if p == nil || p.SpecCount <= 0 {
+		return ""
+	}
+	head := formatSalesAmount(p.SpecCount) + "개 규격"
+	if p.SpecCount < 1000 {
+		head = strconv.Itoa(p.SpecCount) + "개 규격"
+	}
+	if p.PriceMin <= 0 && p.PriceMax <= 0 {
+		return head
+	}
+	if p.PriceMin == p.PriceMax {
+		return head + " · " + formatSalesAmount(p.PriceMin) + "원"
+	}
+	return head + " · " + formatSalesAmount(p.PriceMin) + "~" + formatSalesAmount(p.PriceMax) + "원"
+}
+
+func (sp SalesItemSpec) EffectiveUnit() string {
+	u := strings.TrimSpace(sp.Unit)
+	if u == "" {
+		return "EA"
+	}
+	return u
+}
+
+func SupplierRowUnit(row SalesItemSupplierPrice, spec SalesItemSpec) string {
+	if u := strings.TrimSpace(row.Unit); u != "" {
+		return u
+	}
+	return spec.EffectiveUnit()
+}
+
+func SpecMargins(specs []SalesItemSpec, prices []SalesItemSupplierPrice) []SalesItemSpecMargin {
+	buy := map[string]int{}
+	for _, p := range prices {
+		id := strings.TrimSpace(p.SpecID)
+		if id == "" || p.Price <= 0 {
+			continue
+		}
+		if cur, ok := buy[id]; !ok || p.Price < cur {
+			buy[id] = p.Price
+		}
+	}
+	var out []SalesItemSpecMargin
+	for _, sp := range specs {
+		if !sp.IsActive {
+			continue
+		}
+		m := SalesItemSpecMargin{Spec: sp, BuyMin: buy[sp.SpecID]}
+		if sp.Price > 0 && m.BuyMin > 0 {
+			m.Profit = sp.Price - m.BuyMin
+			if sp.Price > 0 {
+				pct := m.Profit * 100 / sp.Price
+				m.Percent = strconv.Itoa(pct) + "%"
+			}
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
 func FillSalesItemKanban(items []SalesItem) KanbanView {
 	cols := emptyKanbanColumns(SalesItemKindDefs())
 	idx := indexKanbanColumns(cols)
@@ -190,7 +290,10 @@ func FillSalesItemKanban(items []SalesItem) KanbanView {
 			continue
 		}
 		seen[id] = true
-		extra := it.ListPriceLabel()
+		extra := it.SpecRangeLabel()
+		if extra == "" {
+			extra = it.ListPriceLabel()
+		}
 		if extra == "" {
 			extra = it.Unit
 		}

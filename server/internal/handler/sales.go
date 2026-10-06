@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -286,10 +287,8 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	}
 	p, err := h.repo.Get(c.Param("id"))
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.Redirect(http.StatusSeeOther, "/sales?err=notfound")
-		}
-		return err
+		log.Printf("sales Show %s: %v", c.Param("id"), err)
+		return c.Redirect(http.StatusSeeOther, "/sales?err=sales_missing")
 	}
 	stages, _ := h.repo.StagesFor(p.DealType)
 	def := model.FindSalesStage(stages, p.Stage)

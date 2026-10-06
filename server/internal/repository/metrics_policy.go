@@ -24,15 +24,50 @@ func applyMetricsSettings(db *sql.DB) {
 	}
 }
 
+const metricsBasesV59MetaKey = "metrics_bases_v59"
+
+func applyMetricsBasesV59(db *sql.DB) {
+	if db == nil || metaDone(db, metricsBasesV59MetaKey) {
+		return
+	}
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO app_settings(setting_key, setting_value, updated_at)
+		SELECT k, (SELECT setting_value FROM app_settings WHERE setting_key='metrics_base_date'),
+		       datetime('now','localtime')
+		  FROM (SELECT 'metrics_base_receipt' AS k
+		        UNION ALL SELECT 'metrics_base_visit'
+		        UNION ALL SELECT 'metrics_base_complete')`); err != nil {
+		log.Printf("metrics_bases_v59: %v", err)
+		return
+	}
+	markMetaDone(db, metricsBasesV59MetaKey)
+}
+
 func (r *StatsRepo) MetricsPolicy() model.MetricsPolicy {
 	var out model.MetricsPolicy
 	if r == nil || r.db == nil {
 		return out
 	}
 	s := NewSettingsRepo(r.db)
-	base, _ := s.Get(SettingMetricsBaseDate)
-	out.BaseDate = normalizeMetricsDate(base)
+	legacy, _ := s.Get(SettingMetricsBaseDate)
+	legacy = normalizeMetricsDate(legacy)
+	out.BaseDate = legacy
+	out.BaseReceipt = metricsOrLegacy(s, SettingMetricsBaseReceipt, legacy)
+	out.BaseVisit = metricsOrLegacy(s, SettingMetricsBaseVisit, legacy)
+	out.BaseComplete = metricsOrLegacy(s, SettingMetricsBaseComplete, legacy)
 	return out
+}
+
+func metricsOrLegacy(s *SettingsRepo, key, legacy string) string {
+	if s == nil {
+		return legacy
+	}
+	v, _ := s.Get(key)
+	v = normalizeMetricsDate(v)
+	if v != "" {
+		return v
+	}
+	return legacy
 }
 
 func normalizeMetricsDate(s string) string {
@@ -57,6 +92,9 @@ func (r *StatsRepo) attachMetrics(f model.StatsMeetingFilter) model.StatsMeeting
 	}
 	p := r.MetricsPolicy()
 	f.MetricsBaseDate = p.BaseDate
+	f.MetricsBaseReceipt = p.BaseReceipt
+	f.MetricsBaseVisit = p.BaseVisit
+	f.MetricsBaseComplete = p.BaseComplete
 	return f
 }
 
