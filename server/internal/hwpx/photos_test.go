@@ -86,6 +86,7 @@ func TestAppendJPEGsAddsBinDataAndPicture(t *testing.T) {
 	if !strings.Contains(sec, "교체 후") {
 		t.Fatal("캡션이 없다")
 	}
+	assertHangulZIP(t, out)
 }
 
 func TestAppendJPEGsEmptyIsNoop(t *testing.T) {

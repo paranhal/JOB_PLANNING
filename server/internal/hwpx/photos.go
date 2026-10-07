@@ -1,16 +1,13 @@
 package hwpx
 
 import (
-	"archive/zip"
 	"bytes"
 	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
-	"io"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // JPEGPhoto 조치완료보고서에 붙일 JPEG. §12.9.8 · §12.10
@@ -50,29 +47,9 @@ func AppendImages(doc []byte, photos []EmbeddedImage) ([]byte, error) {
 	if len(doc) == 0 {
 		return nil, fmt.Errorf("HWPX가 비어 있습니다")
 	}
-	zr, err := zip.NewReader(bytes.NewReader(doc), int64(len(doc)))
+	parts, err := unzipEntries(doc)
 	if err != nil {
 		return nil, fmt.Errorf("HWPX를 열 수 없습니다: %w", err)
-	}
-
-	type part struct {
-		name     string
-		body     []byte
-		store    bool
-		modified time.Time
-	}
-	var parts []part
-	for _, f := range zr.File {
-		rc, err := f.Open()
-		if err != nil {
-			return nil, fmt.Errorf("%s 를 읽지 못했습니다: %w", f.Name, err)
-		}
-		raw, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil {
-			return nil, err
-		}
-		parts = append(parts, part{name: f.Name, body: raw, store: f.Method == zip.Store || f.Name == "mimetype", modified: f.Modified})
 	}
 
 	var added []jpegAdd
@@ -101,50 +78,30 @@ func AppendImages(doc []byte, photos []EmbeddedImage) ([]byte, error) {
 	}
 
 	for _, a := range added {
-		parts = append(parts, part{name: "Contents/" + a.href, body: a.blob, store: false})
+		parts = append(parts, hwpxEntry{Name: "Contents/" + a.href, Body: a.blob})
 	}
 
 	lastSec := -1
 	for i := range parts {
-		n := filepath.ToSlash(parts[i].name)
+		n := filepath.ToSlash(parts[i].Name)
 		switch {
 		case n == "Contents/content.hpf":
-			parts[i].body = injectManifestItems(parts[i].body, added)
+			parts[i].Body = injectManifestItems(parts[i].Body, added)
 		case n == "META-INF/manifest.xml":
-			parts[i].body = injectODFEntries(parts[i].body, added)
+			parts[i].Body = injectODFEntries(parts[i].Body, added)
 		case strings.HasPrefix(n, "Contents/section") && strings.HasSuffix(strings.ToLower(n), ".xml"):
 			lastSec = i
 		}
 	}
 	if lastSec >= 0 {
-		parts[lastSec].body = appendPhotoParagraphs(parts[lastSec].body, added)
+		parts[lastSec].Body = appendPhotoParagraphs(parts[lastSec].Body, added)
 	}
 
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, p := range parts {
-		method := zip.Deflate
-		if p.store || p.name == "mimetype" {
-			method = zip.Store
-		}
-		hdr := &zip.FileHeader{Name: p.name, Method: method}
-		if !p.modified.IsZero() {
-			hdr.SetModTime(p.modified)
-		}
-		w, err := zw.CreateHeader(hdr)
-		if err != nil {
-			_ = zw.Close()
-			return nil, err
-		}
-		if _, err := w.Write(p.body); err != nil {
-			_ = zw.Close()
-			return nil, err
-		}
-	}
-	if err := zw.Close(); err != nil {
+	packed, err := packHWPX(parts)
+	if err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	return packed, nil
 }
 
 func injectManifestItems(raw []byte, added []jpegAdd) []byte {

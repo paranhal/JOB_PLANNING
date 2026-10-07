@@ -18,7 +18,7 @@ type ASReportDraft struct {
 	Service      string // {{서비스}}
 	Symptom      string // {{장애사항}}
 	CauseDetail  string // {{장애원인}} — cause_type 코드가 아님
-	Conclusion   string // {{결론}}
+	Conclusion   string // 미리보기·필수검사. 보고서에는 조치내용 뒤에 붙인다. §70.3
 	ReportDate   string // {{보고일자}}
 	Inspector    string // {{점검자}}
 	Confirmer    string // {{확인자}}
@@ -29,19 +29,34 @@ type ASReportDraft struct {
 // Values 자리표시자 → 값. 빈 칸도 키를 넣어 {{ 가 남지 않게 한다. §12.10.6
 func (d ASReportDraft) Values() map[string]string {
 	return map[string]string{
-		"고객명":  d.CustomerName,
-		"부서":   d.Department,
-		"담당자":  d.Manager,
-		"연락처":  d.Phone,
-		"서비스":  d.Service,
-		"장애사항": d.Symptom,
-		"장애원인": d.CauseDetail,
-		"결론":   d.Conclusion,
-		"보고일자": d.ReportDate,
-		"점검자":  d.Inspector,
-		"확인자":  d.Confirmer,
-		"작업일자": d.WorkDates,
-		"조치내용": d.Actions,
+		"고객명":   d.CustomerName,
+		"부서":    d.Department,
+		"담당자":   d.Manager,
+		"연락처":   d.Phone,
+		"서비스":   d.Service,
+		"장애사항":  d.Symptom,
+		"장애원인":  d.CauseDetail,
+		"보고일자":  d.ReportDate,
+		"점검자":   d.Inspector,
+		"점검자사인": "(사인)",
+		"확인자":   d.Confirmer,
+		"확인자사인": "(사인)",
+		"작업일자":  d.WorkDates,
+		"조치내용":  joinReportLines(d.Actions, d.Conclusion),
+	}
+}
+
+// joinReportLines 조치내용·결론을 한 칸에 실을 때 빈 줄을 남기지 않는다. §70.3
+func joinReportLines(a, b string) string {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	switch {
+	case a != "" && b != "":
+		return a + "\n" + b
+	case a != "":
+		return a
+	default:
+		return b
 	}
 }
 
@@ -88,8 +103,8 @@ func BuildASReportDraft(as *ASReceipt, processes []ASProcess, customer *Customer
 	if now.IsZero() {
 		now = time.Now()
 	}
-	d.ReportDate = now.Format("2006-01-02")
 	if as == nil {
+		d.ReportDate = defaultReportDate("", now)
 		return d
 	}
 
@@ -130,7 +145,30 @@ func BuildASReportDraft(as *ASReceipt, processes []ASProcess, customer *Customer
 	}
 
 	d.WorkDates, d.Actions = formatReportProcesses(processes)
+	d.ReportDate = defaultReportDate(d.WorkDates, now)
 	return d
+}
+
+// defaultReportDate 작업일자 중 가장 늦은 날. 없으면 오늘. §70.3-1
+func defaultReportDate(workDates string, now time.Time) string {
+	latest := ""
+	for _, line := range strings.Split(workDates, "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) < 10 {
+			continue
+		}
+		day := line[:10]
+		if _, err := time.Parse("2006-01-02", day); err != nil {
+			continue
+		}
+		if day > latest {
+			latest = day
+		}
+	}
+	if latest == "" {
+		return now.Format("2006-01-02")
+	}
+	return latest
 }
 
 func formatReportProcesses(processes []ASProcess) (dates, actions string) {

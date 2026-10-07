@@ -13,13 +13,10 @@ import (
 )
 
 func TestReplaceEscapesXMLAndKeepsQuotes(t *testing.T) {
-	vals := map[string]string{
-		"고객명": "가나", "부서": "", "담당자": "", "연락처": "", "서비스": "",
-		"장애사항": `게이트 <고장> & "소음"`,
-		"장애원인": "전원", "결론": "정상",
-		"보고일자": "2026-08-18", "점검자": "", "확인자": "",
-		"작업일자": "", "조치내용": "",
-	}
+	vals := emptyValues()
+	vals["고객명"] = "가나"
+	vals["장애사항"] = `게이트 <고장> & "소음"`
+	vals["장애원인"] = "전원"
 	out, err := Replace(BuildPlaceholderTemplate(), vals)
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +59,7 @@ func TestReplaceMultilineBecomesParagraphs(t *testing.T) {
 func TestReplaceLeftoverPlaceholderErrors(t *testing.T) {
 	tpl := BuildPlaceholderTemplate()
 	vals := emptyValues()
-	delete(vals, "결론")
+	delete(vals, "고객명")
 	_, err := Replace(tpl, vals)
 	if !errors.Is(err, ErrLeftoverPlaceholder) {
 		t.Fatalf("남은 {{ 를 에러로 안 막음: %v", err)

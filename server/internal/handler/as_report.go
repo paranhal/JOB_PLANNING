@@ -133,7 +133,16 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, err.Error())
 		}
-		data, err = hwpx.Replace(tpl, draft.Values())
+		inspPNG := h.loadActorSignature(c)
+		data, err = hwpx.InlineImageAt(tpl, "점검자사인", inspPNG, hwpx.DefaultSignatureSideHWPUNIT, "(사인)")
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+		}
+		data, err = hwpx.InlineImageAt(data, "확인자사인", nil, hwpx.DefaultSignatureSideHWPUNIT, "(사인)")
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+		}
+		data, err = hwpx.Replace(data, draft.Values())
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
@@ -143,12 +152,8 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 				return h.redirectReportErr(c, as.ASID, "보고서 사진을 넣지 못했습니다: "+err.Error())
 			}
 		}
-		if png := h.loadActorSignature(c); len(png) > 0 {
-			if out, err := hwpx.AppendImages(data, []hwpx.EmbeddedImage{{Data: png, MIME: "image/png"}}); err == nil {
-				data = out
-			}
-		}
-		mime = "application/hwp+zip"
+		// octet-stream: Chrome이 application/hwp+zip + nosniff 를 위험 파일로 막는다.
+		mime = "application/octet-stream"
 		asciiName = "as_report.hwpx"
 	}
 	now := time.Now()
@@ -190,6 +195,9 @@ func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
 
 func (h *ASHandler) loadASReportTemplate() ([]byte, error) {
 	if len(h.reportTemplateBytes) > 0 {
+		if !hwpx.IsUserSuppliedTemplate(h.reportTemplateBytes) {
+			return nil, fmt.Errorf("한글 서식이 등록되지 않았습니다. 관리자에게 알리세요.")
+		}
 		return append([]byte(nil), h.reportTemplateBytes...), nil
 	}
 	path := h.reportTemplatePath
@@ -197,9 +205,8 @@ func (h *ASHandler) loadASReportTemplate() ([]byte, error) {
 		path = hwpx.DefaultTemplatePath()
 	}
 	data, err := os.ReadFile(path)
-	if err != nil || len(data) == 0 {
-		// 한글 서식 템플릿이 아직 없으면 자리표시자만 있는 최소 HWPX 를 쓴다. 원본 경로는 덮어쓰지 않는다.
-		return hwpx.BuildPlaceholderTemplate(), nil
+	if err != nil || len(data) == 0 || !hwpx.IsUserSuppliedTemplate(data) {
+		return nil, fmt.Errorf("한글 서식이 등록되지 않았습니다. 관리자에게 알리세요.")
 	}
 	return data, nil
 }

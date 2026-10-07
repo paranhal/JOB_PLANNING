@@ -1,12 +1,9 @@
 package hwpx
 
 import (
-	"archive/zip"
-	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 )
@@ -22,64 +19,31 @@ func Replace(template []byte, values map[string]string) ([]byte, error) {
 	if len(template) == 0 {
 		return nil, fmt.Errorf("HWPX 템플릿이 비어 있습니다")
 	}
-	zr, err := zip.NewReader(bytes.NewReader(template), int64(len(template)))
+	entries, err := unzipEntries(template)
 	if err != nil {
 		return nil, fmt.Errorf("HWPX 템플릿을 열 수 없습니다: %w", err)
 	}
-
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, f := range zr.File {
-		rc, err := f.Open()
-		if err != nil {
-			_ = zw.Close()
-			return nil, fmt.Errorf("%s 를 읽지 못했습니다: %w", f.Name, err)
-		}
-		raw, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil {
-			_ = zw.Close()
-			return nil, err
-		}
-
-		out := raw
+	for i, e := range entries {
+		out := e.Body
 		switch {
-		case isXMLName(f.Name):
-			out, err = replaceXML(raw, values)
+		case isXMLName(e.Name):
+			out, err = replaceXML(e.Body, values)
 			if err != nil {
-				_ = zw.Close()
-				return nil, fmt.Errorf("%s: %w", f.Name, err)
+				return nil, fmt.Errorf("%s: %w", e.Name, err)
 			}
-		case isPlainPreview(f.Name):
-			out, err = replacePlain(raw, values)
+		case isPlainPreview(e.Name):
+			out, err = replacePlain(e.Body, values)
 			if err != nil {
-				_ = zw.Close()
-				return nil, fmt.Errorf("%s: %w", f.Name, err)
+				return nil, fmt.Errorf("%s: %w", e.Name, err)
 			}
 		}
-
-		method := f.Method
-		if f.Name == "mimetype" {
-			method = zip.Store
-		}
-		hdr := &zip.FileHeader{Name: f.Name, Method: method}
-		if !f.Modified.IsZero() {
-			hdr.SetModTime(f.Modified)
-		}
-		w, err := zw.CreateHeader(hdr)
-		if err != nil {
-			_ = zw.Close()
-			return nil, err
-		}
-		if _, err := w.Write(out); err != nil {
-			_ = zw.Close()
-			return nil, err
-		}
+		entries[i].Body = out
 	}
-	if err := zw.Close(); err != nil {
+	packed, err := packHWPX(entries)
+	if err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	return packed, nil
 }
 
 func isXMLName(name string) bool {

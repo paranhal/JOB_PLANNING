@@ -17,7 +17,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/docx"
-	"customer-support/internal/hwpx"
 	"customer-support/internal/imageproc"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -26,7 +25,7 @@ import (
 func newASReportFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo, *repository.AttachmentRepo, string) {
 	t.Helper()
 	e, h, asRepo, attachRepo, asID := newASActionFixture(t)
-	h.AS.reportTemplateBytes = hwpx.BuildPlaceholderTemplate()
+	h.AS.reportTemplateBytes = officialASReportTemplate(t)
 	e.GET("/as/:id", h.AS.Show, h.Auth.AuthMiddleware)
 	e.GET("/as/:id/report", h.AS.ReportPreview, h.Auth.AuthMiddleware)
 	e.POST("/as/:id/report", h.AS.ReportIssue, h.Auth.AuthMiddleware)
@@ -488,6 +487,15 @@ func assertXMLBytes(t *testing.T, data []byte) {
 
 func assertHWPXXML(t *testing.T, data []byte) {
 	t.Helper()
+	if len(data) < 38 || string(data[0:2]) != "PK" {
+		t.Fatal("HWPX ZIP 시그니처 없음")
+	}
+	if data[8] != 0 || data[9] != 0 {
+		t.Fatal("첫 엔트리(mimetype)가 Store가 아니다")
+	}
+	if data[6]&0x8 != 0 {
+		t.Fatal("data descriptor 플래그 — 한글에서 손상된 파일")
+	}
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		t.Fatalf("unzip 실패: %v", err)

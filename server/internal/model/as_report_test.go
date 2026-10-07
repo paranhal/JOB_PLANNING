@@ -28,7 +28,7 @@ func TestBuildASReportDraftMappingAndProcessLines(t *testing.T) {
 	if d.Service != "게이트" || d.Symptom != "오작동" || d.CauseDetail != "센서 불량" || d.Conclusion != "교체 후 정상" {
 		t.Fatalf("본문 매핑: %+v", d)
 	}
-	if d.Inspector != "양기헌" || d.Confirmer != "박확인" || d.ReportDate != "2026-08-18" {
+	if d.Inspector != "양기헌" || d.Confirmer != "박확인" || d.ReportDate != "2026-08-10" {
 		t.Fatalf("보고/점검/확인: %+v", d)
 	}
 	for _, want := range []string{"2026-08-01", "2026-08-05", "2026-08-10"} {
@@ -97,15 +97,51 @@ func TestASReportFilenameSanitizesAndClips(t *testing.T) {
 }
 
 func TestASReportDraftValuesCoverAllKeys(t *testing.T) {
-	d := ASReportDraft{}
+	d := ASReportDraft{Actions: "점검", Conclusion: "정상"}
 	vals := d.Values()
 	for _, k := range []string{
 		"고객명", "부서", "담당자", "연락처", "서비스",
-		"장애사항", "장애원인", "결론", "보고일자", "점검자", "확인자", "작업일자", "조치내용",
+		"장애사항", "장애원인", "보고일자", "점검자", "점검자사인", "확인자", "확인자사인", "작업일자", "조치내용",
 	} {
 		if _, ok := vals[k]; !ok {
 			t.Fatalf("키 없음: %s", k)
 		}
+	}
+	if _, ok := vals["결론"]; ok {
+		t.Fatal("결론 키가 보고서에 나가면 안 된다")
+	}
+	if _, ok := vals["지원유형"]; ok {
+		t.Fatal("지원유형 키를 넣으면 발급이 막힌다")
+	}
+	if vals["점검자사인"] != "(사인)" || vals["확인자사인"] != "(사인)" {
+		t.Fatal("사인 없을 때 (사인) 글자가 키 값이어야 한다")
+	}
+	if vals["조치내용"] != "점검\n정상" {
+		t.Fatalf("조치내용에 결론이 안 붙음: %q", vals["조치내용"])
+	}
+	onlyAct := ASReportDraft{Actions: "점검", Conclusion: "  "}.Values()["조치내용"]
+	if onlyAct != "점검" {
+		t.Fatalf("결론 빈데 빈 줄: %q", onlyAct)
+	}
+	onlyCon := ASReportDraft{Actions: "", Conclusion: "정상"}.Values()["조치내용"]
+	if onlyCon != "정상" {
+		t.Fatalf("조치만 빈데 빈 줄: %q", onlyCon)
+	}
+}
+
+func TestDefaultReportDateFromWorkDates(t *testing.T) {
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.Local)
+	as := &ASReceipt{OrgName: "가", CauseDetail: "원인", Conclusion: "결론"}
+	d := BuildASReportDraft(as, []ASProcess{
+		{ProcessDatetime: time.Date(2026, 10, 5, 9, 0, 0, 0, time.Local), WorkContent: "1"},
+		{ProcessDatetime: time.Date(2026, 10, 7, 9, 0, 0, 0, time.Local), WorkContent: "2"},
+	}, nil, nil, nil, now)
+	if d.ReportDate != "2026-10-07" {
+		t.Fatalf("여러 줄 작업일자 보고일=%q", d.ReportDate)
+	}
+	empty := BuildASReportDraft(as, nil, nil, nil, nil, now)
+	if empty.ReportDate != "2026-10-20" {
+		t.Fatalf("작업일자 없으면 오늘이어야 함: %q", empty.ReportDate)
 	}
 }
 
