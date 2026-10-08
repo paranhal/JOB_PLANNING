@@ -145,6 +145,9 @@ func assertHangulZIP(t *testing.T, data []byte) {
 		t.Fatalf("zip 순서 첫 파일이 %s", zr.File[0].Name)
 	}
 	for _, f := range zr.File {
+		if f.Modified.Month() < 1 || f.Modified.Day() < 1 {
+			t.Fatalf("%s ZIP 날짜가 달력에 없다 %v", f.Name, f.Modified)
+		}
 		if f.Flags&0x8 != 0 {
 			t.Fatalf("%s data descriptor 플래그", f.Name)
 		}

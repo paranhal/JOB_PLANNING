@@ -178,7 +178,8 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
 		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg, "Orgs": orgs,
-		"HasSignature": strings.TrimSpace(u.SignaturePath) != "" && signatureFileExists(u.SignaturePath),
+		"HasSignature":  strings.TrimSpace(u.SignaturePath) != "" && signatureFileExists(u.SignaturePath),
+		"HasSignature2": strings.TrimSpace(u.SignaturePath2) != "" && signatureFileExists(u.SignaturePath2),
 	})
 }
 

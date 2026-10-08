@@ -52,18 +52,32 @@ func (h *ASHandler) ReportPreview(c echo.Context) error {
 	}
 	ready := canIssueASReportStatus(as.Status)
 	draft := h.buildASReportDraft(as, time.Now())
+	applyASReportPeople(as, &draft)
+	inspID, confID := h.reportPeopleIDs(as, draft)
+	insp := h.reportSlotUserID("inspector", inspID, draft.Inspector, "")
+	conf := h.reportSlotUserID("confirmer", confID, draft.Confirmer, "")
 	data := map[string]interface{}{
-		"Title":             "조치완료보고서",
-		"Active":            NavAS,
-		"AS":                as,
-		"Draft":             draft,
-		"ReportReady":       ready,
-		"ReportPartial":     as.Status == model.StatusPartialComplete,
-		"ReportBlockReason": "",
-		"ReportMissing":     draft.MissingReportFields(),
-		"ActionErr":         c.QueryParam("err"),
-		"ActionPhotos":      h.listActionPhotos(as.ASID),
-		"HasDocxTemplate":   h.hasDocxTemplate(),
+		"Title":               "조치완료보고서",
+		"Active":              NavAS,
+		"AS":                  as,
+		"Draft":               draft,
+		"ReportReady":         ready,
+		"ReportPartial":       as.Status == model.StatusPartialComplete,
+		"ReportBlockReason":   "",
+		"ReportMissing":       draft.MissingReportFields(),
+		"ActionErr":           c.QueryParam("err"),
+		"ActionPhotos":        h.listActionPhotos(as.ASID),
+		"HasDocxTemplate":     h.hasDocxTemplate(),
+		"InspectorHasAccount": insp != nil,
+		"ConfirmerHasAccount": conf != nil,
+		"InspectorUserID":     reportUserID(insp),
+		"ConfirmerUserID":     reportUserID(conf),
+		"InspectorSigPreview": "",
+		"ConfirmerSigPreview": "",
+		"InspectorSigSource":  "",
+		"ConfirmerSigSource":  "",
+		"InspectorSigSavedAt": "",
+		"ConfirmerSigSavedAt": "",
 	}
 	if !ready {
 		data["ReportBlockReason"] = "조치를 저장하면 발급됩니다"
@@ -84,6 +98,8 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 	}
 
 	draft := reportDraftFromForm(c)
+	applyASReportPeople(as, &draft)
+	inspID, confID := h.reportPeopleIDs(as, draft)
 	if miss := draft.MissingReportFields(); len(miss) > 0 {
 		return h.redirectReportErr(c, as.ASID, strings.Join(miss, "·")+"이(가) 비어 있습니다. 미리보기에서 입력하세요.")
 	}
@@ -121,7 +137,7 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
-		if png := h.loadActorSignature(c); len(png) > 0 {
+		if png := h.loadInspectorSignature(c, inspID, draft.Inspector); len(png) > 0 {
 			if out, err := docxpkg.AppendPNG(data, png); err == nil {
 				data = out
 			}
@@ -133,12 +149,28 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, err.Error())
 		}
-		inspPNG := h.loadActorSignature(c)
-		data, err = hwpx.InlineImageAt(tpl, "점검자사인", inspPNG, hwpx.DefaultSignatureSideHWPUNIT, "(사인)")
+		tpl, err = hwpx.FitASReportTables(tpl)
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
-		data, err = hwpx.InlineImageAt(data, "확인자사인", nil, hwpx.DefaultSignatureSideHWPUNIT, "(사인)")
+		inspPNG := h.loadInspectorSignature(c, inspID, draft.Inspector)
+		confPNG := h.loadConfirmerSignature(c, confID, draft.Confirmer)
+		h.logSavedSignatureIfUsed(c, "inspector", draft.Inspector, inspPNG)
+		h.logSavedSignatureIfUsed(c, "confirmer", draft.Confirmer, confPNG)
+		orgBox := h.reportSignatureOrgBox()
+		inspBox := orgBox
+		if u := h.reportSlotUserID("inspector", inspID, draft.Inspector, ""); u != nil {
+			inspBox = model.ParseReportSignatureBox(u.SignatureBox, orgBox)
+		}
+		confBox := orgBox
+		if u := h.reportSlotUserID("confirmer", confID, draft.Confirmer, ""); u != nil {
+			confBox = model.ParseReportSignatureBox(u.SignatureBox, orgBox)
+		}
+		data, err = hwpx.InlineImageAt(tpl, "점검자사인", inspPNG, toHWPXSigBox(inspBox), "(사인)")
+		if err != nil {
+			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
+		}
+		data, err = hwpx.InlineImageAt(data, "확인자사인", confPNG, toHWPXSigBox(confBox), "(사인)")
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
@@ -182,7 +214,10 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		}
 	}
 
-	return writeDownloadBytes(c, data, mime, asciiName, utf8Name)
+	if strings.TrimSpace(c.FormValue("return_file")) == "1" {
+		return writeDownloadBytes(c, data, mime, asciiName, utf8Name)
+	}
+	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?ok=report_saved")
 }
 
 func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
@@ -319,6 +354,33 @@ func (h *ASHandler) loadSelectedActionJPEGs(asID string, ids []string) ([]hwpx.J
 	return out, nil
 }
 
+func applyASReportPeople(as *model.ASReceipt, d *model.ASReportDraft) {
+	if as == nil || d == nil {
+		return
+	}
+	if n := strings.TrimSpace(as.AssignedTo); n != "" {
+		d.Inspector = n
+	}
+	if n := strings.TrimSpace(as.CustomerConfirmer); n != "" {
+		d.Confirmer = n
+	} else if n := strings.TrimSpace(as.ConfirmTarget); n != "" {
+		d.Confirmer = n
+	}
+}
+
+func (h *ASHandler) reportPeopleIDs(as *model.ASReceipt, d model.ASReportDraft) (inspID, confID string) {
+	if as != nil {
+		inspID = strings.TrimSpace(as.AssignedUserID)
+	}
+	if u := resolveAssignableUser(h.userRepo, inspID, d.Inspector); u != nil {
+		inspID = u.UserID
+	}
+	if u := resolveAssignableUser(h.userRepo, "", d.Confirmer); u != nil {
+		confID = u.UserID
+	}
+	return inspID, confID
+}
+
 func reportDraftFromForm(c echo.Context) model.ASReportDraft {
 	return model.ASReportDraft{
 		CustomerName: c.FormValue("customer_name"),
@@ -337,11 +399,15 @@ func reportDraftFromForm(c echo.Context) model.ASReportDraft {
 	}
 }
 
-func (h *ASHandler) loadActorSignature(c echo.Context) []byte {
-	if h == nil || h.userRepo == nil {
-		return nil
+func (h *ASHandler) reportSignatureOrgBox() model.ReportSignatureBox {
+	if h != nil && h.settingsRepo != nil {
+		return h.settingsRepo.ReportSignatureBox()
 	}
-	return readUserSignaturePNG(h.userRepo, ctxString(c, "user_id"))
+	return model.DefaultReportSignatureBox()
+}
+
+func toHWPXSigBox(b model.ReportSignatureBox) hwpx.SignatureBox {
+	return hwpx.SignatureBox{Size: b.Size, RightGap: b.Gap, NudgeY: b.NY}
 }
 
 func (h *ASHandler) redirectReportErr(c echo.Context, asID, msg string) error {

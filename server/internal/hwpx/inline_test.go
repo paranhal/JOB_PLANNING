@@ -13,10 +13,32 @@ import (
 	"testing"
 )
 
+func confirmedSigBox() SignatureBox {
+	return SignatureBox{Size: 4600, RightGap: 900, NudgeY: 0}
+}
+
+func TestSignatureOffsetUsesCellGeometryNotRunText(t *testing.T) {
+	h1, v1 := SignatureOffset(SigCellInspHWPUNIT, 4600, 900, 0)
+	h2, v2 := SignatureOffset(SigCellConfHWPUNIT, 4600, 900, 0)
+	if h1 != 14190 || v1 != -1093 {
+		t.Fatalf("점검자 %d,%d", h1, v1)
+	}
+	if h2 != 8935 || v2 != -1093 {
+		t.Fatalf("확인자 %d,%d", h2, v2)
+	}
+	if h1 == h2 {
+		t.Fatal("두 칸에 같은 horzOffset 을 쓰면 안 된다")
+	}
+	again, _ := SignatureOffset(SigCellInspHWPUNIT, 4600, 900, 0)
+	if again != h1 {
+		t.Fatal("칸 기하가 아닌 값에 의존한다")
+	}
+}
+
 func TestInlineImageAtFallbackLeavesText(t *testing.T) {
 	vals := emptyValues()
 	tpl := BuildPlaceholderTemplate()
-	out, err := InlineImageAt(tpl, "점검자사인", nil, DefaultSignatureSideHWPUNIT, "(사인)")
+	out, err := InlineImageAt(tpl, "점검자사인", nil, confirmedSigBox(), "(사인)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,11 +61,11 @@ func TestInlineImageAtFallbackLeavesText(t *testing.T) {
 func TestInlineImageAtFloatsInFrontOfText(t *testing.T) {
 	png := inkPNG(t)
 	tpl := BuildPlaceholderTemplate()
-	out, err := InlineImageAt(tpl, "점검자사인", png, DefaultSignatureSideHWPUNIT, "(사인)")
+	out, err := InlineImageAt(tpl, "점검자사인", png, confirmedSigBox(), "(사인)")
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err = InlineImageAt(out, "확인자사인", png, DefaultSignatureSideHWPUNIT, "(사인)")
+	out, err = InlineImageAt(out, "확인자사인", png, confirmedSigBox(), "(사인)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,62 +79,98 @@ func TestInlineImageAtFloatsInFrontOfText(t *testing.T) {
 		t.Fatal("자리표시자가 남았다")
 	}
 	if !strings.Contains(sec, `textWrap="IN_FRONT_OF_TEXT"`) {
-		t.Fatal("글 앞으로가 없다")
+		t.Fatal("글 앞으로가 아니다")
 	}
 	if !strings.Contains(sec, `treatAsChar="0"`) {
-		t.Fatal("treatAsChar=0 이 없다")
+		t.Fatal("글자처럼 취급되면 칸이 늘어난다")
 	}
-	if strings.Contains(sec, `treatAsChar="1"`) {
-		t.Fatal("treatAsChar=1 이면 배치가 무시된다")
+	if !strings.Contains(sec, `horzOffset="14190"`) || !strings.Contains(sec, `horzOffset="8935"`) {
+		t.Fatal("두 칸 가로 자리가 다르다")
 	}
-	if !strings.Contains(sec, `allowOverlap="1"`) || !strings.Contains(sec, `flowWithText="1"`) {
-		t.Fatal("겹침·문단 따라가기가 없다")
-	}
-	if !strings.Contains(sec, `vertRelTo="PARA"`) || !strings.Contains(sec, `horzRelTo="PARA"`) {
-		t.Fatal("문단 기준이 없다")
-	}
-	if !strings.Contains(sec, `orgSz width="4600" height="4600"`) {
-		t.Fatal("46pt 정사각형이 아니다")
+	if !strings.Contains(sec, `vertOffset="-1093"`) {
+		t.Fatal("세로 자리가 틀리다")
 	}
 	if strings.Count(sec, "<hp:pic") != 2 {
-		t.Fatalf("그림 수=%d", strings.Count(sec, "<hp:pic"))
+		t.Fatal("사인 그림이 둘이 아니다")
 	}
-	end := strings.LastIndex(sec, "</hs:sec>")
-	if end < 0 {
-		t.Fatal("section 끝 없음")
+	if strings.Contains(sec, "</hp:tbl>") && !strings.Contains(sec[strings.LastIndex(sec, "</hp:tbl>"):], "<hp:pic") {
+		t.Fatal("표가 있으면 그림은 표 뒤에 떠야 한다")
 	}
-	tail := sec[end-80 : end]
-	if strings.Contains(tail, "<hp:pic") {
-		t.Fatal("문서 끝에 사인을 붙였다")
+	hdr := string(mustZipFile(t, out, "Contents/header.xml"))
+	if !strings.Contains(hdr, `BinData="sig1.png"`) {
+		t.Fatal("header.xml 에 그림 항목이 없다")
 	}
+	if mustZipFile(t, out, "Contents/BinData/sig1.png") == nil {
+		t.Fatal("PNG가 없다")
+	}
+	if !strings.Contains(sec, `orgSz width="30000"`) {
+		t.Fatal("orgSz 는 PNG 원본 크기여야 한다")
+	}
+	if !strings.Contains(sec, `curSz width="4600"`) || !strings.Contains(sec, `hp:sz width="4600"`) {
+		t.Fatal("상자 크기는 hp:sz 4600 이다")
+	}
+}
 
-	inspH, inspV := signatureOffsets("점검자사인", 4600)
-	confH, confV := signatureOffsets("확인자사인", 4600)
-	if inspH == confH {
-		t.Fatalf("두 칸 horzOffset 이 같다: %d", inspH)
-	}
-	if inspH != 13460 || confH != 8205 {
-		t.Fatalf("horzOffset 점검자=%d 확인자=%d", inspH, confH)
-	}
-	if inspV != -1393 || confV != -1393 {
-		t.Fatalf("vertOffset 점검자=%d 확인자=%d", inspV, confV)
-	}
-	if !strings.Contains(sec, `horzOffset="13460"`) || !strings.Contains(sec, `horzOffset="8205"`) {
-		t.Fatalf("칸별 offset 이 XML에 없다")
-	}
-
-	zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
+func TestInlineImageAtOfficialPicFloatsOutsideLastTable(t *testing.T) {
+	png := inkPNG(t)
+	tpl, err := FitASReportTables(readOfficialReportTemplate(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var pngs int
-	for _, f := range zr.File {
-		if strings.HasSuffix(strings.ToLower(f.Name), ".png") && strings.Contains(strings.ToLower(f.Name), "bindata") {
-			pngs++
+	out, err := InlineImageAt(tpl, "점검자사인", png, confirmedSigBox(), "(사인)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = InlineImageAt(out, "확인자사인", png, confirmedSigBox(), "(사인)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = Replace(out, emptyValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec := string(mustZipFile(t, out, "Contents/section0.xml"))
+	lastTbl := strings.LastIndex(sec, "</hp:tbl>")
+	if lastTbl < 0 {
+		t.Fatal("표가 없다")
+	}
+	if strings.Count(sec, "<hp:pic") != 2 {
+		t.Fatal("사인 그림이 둘이 아니다")
+	}
+	if strings.Contains(sec[:lastTbl], "<hp:pic") {
+		t.Fatal("그림이 표 칸 안에 남아 있다")
+	}
+	after := sec[lastTbl:]
+	if !strings.Contains(after, `binaryItemIDRef="sig1"`) || !strings.Contains(after, `binaryItemIDRef="sig2"`) {
+		t.Fatal("그림이 마지막 표 뒤에 없다")
+	}
+	if strings.Contains(after, "<hp:p ") {
+		t.Fatal("표 뒤에 문단을 더 붙이면 한글이 페이지를 버린다")
+	}
+	if !strings.Contains(sec, `horzOffset="22580"`) || !strings.Contains(sec, `horzOffset="44259"`) {
+		t.Fatal("표 밖 가로 자리가 틀리다")
+	}
+	if !strings.Contains(sec, `vertOffset="3298"`) {
+		t.Fatal("표 밖 세로 자리가 틀리다")
+	}
+	if !strings.Contains(sec, "(사인)") {
+		t.Fatal("칸의 (사인) 글자가 지워졌다")
+	}
+	if !strings.Contains(sec, `flowWithText="0"`) || !strings.Contains(sec, `holdAnchorAndSO="1"`) {
+		t.Fatal("끌면 문단·표에 다시 붙는다")
+	}
+	tbl := sec[strings.LastIndex(sec, "<hp:tbl"):lastTbl]
+	if pos := strings.Index(tbl, "<hp:pos "); pos >= 0 {
+		end := strings.Index(tbl[pos:], "/>")
+		if end >= 0 {
+			tbl = tbl[pos : pos+end]
 		}
 	}
-	if pngs < 2 {
-		t.Fatalf("BinData PNG=%d", pngs)
+	if !strings.Contains(tbl, `allowOverlap="1"`) {
+		t.Fatal("표가 겹침을 막으면 사인이 한 점으로 밀린다")
+	}
+	if !strings.Contains(sec, `id="1001"`) || !strings.Contains(sec, `id="1002"`) {
+		t.Fatal("그림 id 가 겹치면 한글이 한 자리로 모은다")
 	}
 }
 

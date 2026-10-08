@@ -34,10 +34,10 @@
       {{if .CanIssueReport}}
         {{if .ReportReady}}
         <a href="/as/{{.AS.ASID}}/report" id="btn-as-report"
-           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">보고서 재발급</a>
+           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}}</a>
         {{else}}
         <span id="btn-as-report-disabled" title="{{.ReportBlockReason}}"
-              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">보고서 재발급</span>
+              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}}</span>
         {{end}}
       {{end}}
       {{if .DailyTask}}
@@ -117,7 +117,7 @@
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-sm font-semibold text-emerald-800">조치완료보고서 발급 이력</h3>
       {{if .ReportReady}}
-      <a href="/as/{{.AS.ASID}}/report" class="text-xs font-medium text-blue-700 hover:underline">미리보기 · 발급 →</a>
+      <a href="/as/{{.AS.ASID}}/report" class="text-xs font-medium text-blue-700 hover:underline">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}} →</a>
       {{end}}
     </div>
     {{if not .ReportReady}}

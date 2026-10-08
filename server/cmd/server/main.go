@@ -349,7 +349,9 @@ func main() {
 	as.GET("/work/:work_id/action", h.AS.WorkAction)
 	as.POST("/work/:work_id/action", h.AS.UpdateWorkAction)
 	as.GET("/:id", h.AS.Show)
+	as.GET("/:id/report/signatures", h.AS.ReportSignatures)
 	as.GET("/:id/report", h.AS.ReportPreview)
+	as.POST("/:id/report/signature", h.AS.ReportApplySignature, processAS)
 	as.POST("/:id/report", h.AS.ReportIssue)
 	as.GET("/:id/action", h.AS.Action) // 조회: 접수·업무 역할 / 수정은 핸들러·POST에서 제한
 	as.GET("/:id/similar-panel", h.AS.SimilarPanel)

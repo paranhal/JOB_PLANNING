@@ -37,11 +37,15 @@ func foldLegacyRole(u *model.User) {
 const userSelect = `SELECT user_id, username, full_name, role,
 	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''),
 	COALESCE(mobile,''), COALESCE(tel,''), COALESCE(email,''), COALESCE(signature_path,''),
+	COALESCE(signature_path2,''),
+	COALESCE(signature_box,''),
 	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0),
 	COALESCE(is_readonly,0), created_at FROM users`
 const userSelectAuth = `SELECT user_id, username, password_hash, full_name, role,
 	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''),
 	COALESCE(mobile,''), COALESCE(tel,''), COALESCE(email,''), COALESCE(signature_path,''),
+	COALESCE(signature_path2,''),
+	COALESCE(signature_box,''),
 	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0),
 	COALESCE(is_readonly,0), created_at FROM users`
 
@@ -55,11 +59,11 @@ func scanUser(rows interface {
 	if withPassword {
 		err = rows.Scan(&u.UserID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role,
 			&u.Permissions, &active, &u.OrgID, &u.BaseRole,
-			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
+			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &u.SignaturePath2, &u.SignatureBox, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
 	} else {
 		err = rows.Scan(&u.UserID, &u.Username, &u.FullName, &u.Role,
 			&u.Permissions, &active, &u.OrgID, &u.BaseRole,
-			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
+			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &u.SignaturePath2, &u.SignatureBox, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
 	}
 	if err != nil {
 		return u, err
@@ -244,6 +248,17 @@ func (r *UserRepo) Update(u *model.User) error {
 	return err
 }
 
+func (r *UserRepo) UpdateSignatureBox(userID, box string) error {
+	userID = strings.TrimSpace(userID)
+	if r == nil || r.db == nil || userID == "" {
+		return fmt.Errorf("계정이 없습니다")
+	}
+	return touchUpdate(r.db, "users", "user_id", userID, "사인칸", func() error {
+		_, err := r.db.Exec(`UPDATE users SET signature_box=? WHERE user_id=?`, strings.TrimSpace(box), userID)
+		return err
+	})
+}
+
 func (r *UserRepo) UpdateSignaturePath(userID, path string) error {
 	userID = strings.TrimSpace(userID)
 	if r == nil || r.db == nil || userID == "" {
@@ -251,6 +266,17 @@ func (r *UserRepo) UpdateSignaturePath(userID, path string) error {
 	}
 	return touchUpdate(r.db, "users", "user_id", userID, "사인", func() error {
 		_, err := r.db.Exec(`UPDATE users SET signature_path=? WHERE user_id=?`, strings.TrimSpace(path), userID)
+		return err
+	})
+}
+
+func (r *UserRepo) UpdateSignaturePath2(userID, path string) error {
+	userID = strings.TrimSpace(userID)
+	if r == nil || r.db == nil || userID == "" {
+		return fmt.Errorf("계정이 없습니다")
+	}
+	return touchUpdate(r.db, "users", "user_id", userID, "사인2", func() error {
+		_, err := r.db.Exec(`UPDATE users SET signature_path2=? WHERE user_id=?`, strings.TrimSpace(path), userID)
 		return err
 	})
 }

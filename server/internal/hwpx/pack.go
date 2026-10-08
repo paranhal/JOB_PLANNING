@@ -7,7 +7,10 @@ import (
 	"hash/crc32"
 	"io"
 	"strings"
+	"time"
 )
+
+var zipDOSEpoch = time.Date(1980, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 type hwpxEntry struct {
 	Name string
@@ -68,7 +71,9 @@ func packHWPX(entries []hwpxEntry) ([]byte, error) {
 			CreatorVersion:     20,
 			ReaderVersion:      20,
 			Flags:              flags,
+			Modified:           zipDOSEpoch,
 		}
+		hdr.SetModTime(zipDOSEpoch)
 		w, err := zw.CreateRaw(hdr)
 		if err != nil {
 			_ = zw.Close()

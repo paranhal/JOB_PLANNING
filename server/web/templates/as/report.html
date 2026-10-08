@@ -32,6 +32,7 @@
   {{end}}
 
   <form method="POST" action="/as/{{.AS.ASID}}/report" class="space-y-4" id="as-report-form">
+    <input type="hidden" name="use_saved_sig" id="use_saved_sig" value="">
     <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
       <h3 class="text-sm font-semibold text-slate-800">고객 · 서비스</h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -82,14 +83,40 @@
           <span class="text-xs text-slate-500">보고일자</span>
           <input name="report_date" value="{{.Draft.ReportDate}}" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
         </label>
-        <label class="block text-sm">
+        <div class="block text-sm">
           <span class="text-xs text-slate-500">점검자</span>
-          <input name="inspector" value="{{.Draft.Inspector}}" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-        </label>
-        <label class="block text-sm">
+          <div class="mt-1 flex gap-2 items-center">
+            <p class="min-w-0 flex-1 border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm">{{if .Draft.Inspector}}{{.Draft.Inspector}}{{else}}—{{end}}</p>
+            <button type="button" id="btn-report-sig-inspector" data-slot="inspector" data-has-account="{{if .InspectorHasAccount}}1{{else}}0{{end}}"
+                    class="shrink-0 px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">사인</button>
+          </div>
+          <input type="hidden" name="inspector" id="report-inspector-name" value="{{.Draft.Inspector}}">
+          <input type="hidden" name="inspector_id" id="report-inspector-id" value="{{.InspectorUserID}}">
+          <input type="hidden" name="inspector_sig_slot" id="inspector_sig_slot" value="1">
+          <input type="hidden" name="inspector_sig" id="inspector_sig" value="">
+          <div class="mt-1 flex items-center gap-2 min-h-[1.5rem]">
+            <img id="inspector-sig-preview" alt="" class="h-10 w-10 object-contain {{if not .InspectorSigPreview}}hidden{{end}}"
+                 src="{{.InspectorSigPreview}}" data-saved-url="{{.InspectorSigPreview}}" data-saved-at="{{.InspectorSigSavedAt}}">
+            <span id="inspector-sig-source" class="text-xs text-slate-500">{{.InspectorSigSource}}</span>
+          </div>
+        </div>
+        <div class="block text-sm">
           <span class="text-xs text-slate-500">확인자</span>
-          <input name="confirmer" value="{{.Draft.Confirmer}}" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-        </label>
+          <div class="mt-1 flex gap-2 items-center">
+            <p class="min-w-0 flex-1 border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm">{{if .Draft.Confirmer}}{{.Draft.Confirmer}}{{else}}—{{end}}</p>
+            <button type="button" id="btn-report-sig-confirmer" data-slot="confirmer" data-has-account="{{if .ConfirmerHasAccount}}1{{else}}0{{end}}"
+                    class="shrink-0 px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">사인</button>
+          </div>
+          <input type="hidden" name="confirmer" id="report-confirmer-name" value="{{.Draft.Confirmer}}">
+          <input type="hidden" name="confirmer_id" id="report-confirmer-id" value="{{.ConfirmerUserID}}">
+          <input type="hidden" name="confirmer_sig_slot" id="confirmer_sig_slot" value="1">
+          <input type="hidden" name="confirmer_sig" id="confirmer_sig" value="">
+          <div class="mt-1 flex items-center gap-2 min-h-[1.5rem]">
+            <img id="confirmer-sig-preview" alt="" class="h-10 w-10 object-contain {{if not .ConfirmerSigPreview}}hidden{{end}}"
+                 src="{{.ConfirmerSigPreview}}" data-saved-url="{{.ConfirmerSigPreview}}" data-saved-at="{{.ConfirmerSigSavedAt}}">
+            <span id="confirmer-sig-source" class="text-xs text-slate-500">{{.ConfirmerSigSource}}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -132,11 +159,12 @@
       <a href="/as/{{.AS.ASID}}/action" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</a>
       {{if .ReportReady}}
       {{if .HasDocxTemplate}}
-      <button type="submit" name="format" value="docx" id="btn-as-report-docx"
-              class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">DOCX 내려받기</button>
+      <button type="button" name="format" value="docx" id="btn-as-report-docx"
+              class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">미리보기</button>
       {{end}}
-      <button type="submit" name="format" value="hwpx" id="btn-as-report-hwpx"
-              class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800">HWPX 내려받기</button>
+      <button type="button" id="btn-as-report-preview"
+              class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800">미리보기</button>
+      <button type="submit" name="format" value="hwpx" id="btn-as-report-hwpx" class="hidden">HWPX</button>
       {{else}}
       <button type="button" disabled id="btn-as-report-issue-disabled"
               class="px-4 py-2 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">발급</button>
@@ -144,4 +172,526 @@
     </div>
   </form>
 </div>
+
+<div id="report-sig-ask" class="hidden fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-gray-900/50"></div>
+  <div class="relative mx-auto mt-12 w-[min(36rem,calc(100%-2rem))] rounded-xl bg-white p-4 shadow-lg space-y-3">
+    <p class="text-sm font-semibold text-slate-800">저장된 사인이 있습니다.</p>
+    <p class="text-xs text-slate-500">넣을까요?</p>
+    <div id="ask-panel-inspector" class="rounded-lg border border-slate-200 p-3 space-y-2">
+      <p class="text-sm"><span class="text-slate-500">점검자</span> <span id="ask-inspector-name" class="font-medium"></span></p>
+      <div id="ask-inspector-items" class="flex flex-wrap gap-2"></div>
+      <p id="ask-inspector-none" class="hidden text-xs text-slate-500">저장된 사인이 없습니다</p>
+      <div id="ask-inspector-pick" class="flex flex-wrap gap-3 text-sm"></div>
+    </div>
+    <div id="ask-panel-confirmer" class="rounded-lg border border-slate-200 p-3 space-y-2">
+      <p class="text-sm"><span class="text-slate-500">확인자</span> <span id="ask-confirmer-name" class="font-medium"></span></p>
+      <div id="ask-confirmer-items" class="flex flex-wrap gap-2"></div>
+      <p id="ask-confirmer-none" class="hidden text-xs text-slate-500">저장된 사인이 없습니다</p>
+      <div id="ask-confirmer-pick" class="flex flex-wrap gap-3 text-sm"></div>
+    </div>
+    <div class="flex flex-wrap justify-end gap-2 pt-1">
+      <button type="button" id="ask-with" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium">이 사인으로</button>
+      <button type="button" id="ask-draw" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium">새로 그리기</button>
+      <button type="button" id="ask-without" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium">사인 없이</button>
+    </div>
+  </div>
+</div>
+
+<div id="report-preview" class="hidden fixed inset-0 z-40 overflow-auto bg-slate-100/95">
+  <div class="max-w-4xl mx-auto my-8 px-4 space-y-4">
+    <div class="flex flex-wrap justify-end gap-2">
+      <button type="button" id="preview-save" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium">이대로 저장</button>
+      <button type="button" id="preview-edit" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium bg-white">고치기</button>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6 overflow-x-auto">
+      <h2 class="text-center tracking-[0.4em] text-sm font-semibold mb-4">조 치 완 료 보 고 서</h2>
+      <table class="border-collapse text-[11px]" style="table-layout:fixed">
+        <colgroup>
+          <col style="width:111.86px"><col style="width:245.73px"><col style="width:113.38px"><col style="width:175.66px">
+        </colgroup>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">고객명</td>
+          <td class="border border-slate-400 px-1" id="pv-customer"></td>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">부서</td>
+          <td class="border border-slate-400 px-1" id="pv-dept"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">담당자</td>
+          <td class="border border-slate-400 px-1" id="pv-manager"></td>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">연락처</td>
+          <td class="border border-slate-400 px-1" id="pv-phone"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">서비스</td>
+          <td class="border border-slate-400 px-1" colspan="3" id="pv-service"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">장애사항</td>
+          <td class="border border-slate-400 px-1 align-top whitespace-pre-wrap" colspan="3" id="pv-symptom"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">장애원인</td>
+          <td class="border border-slate-400 px-1 align-top whitespace-pre-wrap" colspan="3" id="pv-cause"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">작업일자</td>
+          <td class="border border-slate-400 px-1 align-top whitespace-pre-wrap font-mono" id="pv-dates"></td>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">조치내용</td>
+          <td class="border border-slate-400 px-1 align-top whitespace-pre-wrap" id="pv-actions"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">결론</td>
+          <td class="border border-slate-400 px-1 align-top whitespace-pre-wrap" colspan="3" id="pv-concl"></td>
+        </tr>
+        <tr>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">보고일자</td>
+          <td class="border border-slate-400 px-1" colspan="3" id="pv-rdate"></td>
+        </tr>
+        <tr style="height:32.19px">
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">점검자</td>
+          <td class="border border-slate-400 relative text-right px-1 overflow-visible" style="height:32.19px" id="pv-insp-cell">
+            <span id="pv-insp-name"></span>
+            <span class="text-slate-400" id="pv-insp-anchor">(사인)</span>
+            <img id="pv-insp-sig" alt="" class="hidden absolute pointer-events-none" style="width:61.33px;height:61.33px;left:189.19px;top:-14.57px">
+          </td>
+          <td class="border border-slate-400 bg-slate-50 text-center font-semibold px-1">확 인 자</td>
+          <td class="border border-slate-400 relative text-right px-1 overflow-visible" style="height:32.19px" id="pv-conf-cell">
+            <span id="pv-conf-name"></span>
+            <span class="text-slate-400" id="pv-conf-anchor">(사인)</span>
+            <img id="pv-conf-sig" alt="" class="hidden absolute pointer-events-none" style="width:61.33px;height:61.33px;left:119.13px;top:-14.57px">
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="report-sig-modal" class="hidden fixed inset-0 z-50">
+  <div id="report-sig-backdrop" class="absolute inset-0 bg-gray-900/50"></div>
+  <div class="relative mx-auto mt-16 w-[min(32rem,calc(100%-2rem))] rounded-xl bg-white p-4 shadow-lg">
+    <p id="report-sig-title" class="text-sm font-semibold text-slate-800">사인</p>
+    <p id="report-sig-hint" class="mt-1 text-xs text-slate-500"></p>
+    <canvas id="report-sig-pad" width="400" height="160" class="mt-3 w-full border border-slate-300 rounded-lg cursor-crosshair" style="touch-action:none;background:transparent"></canvas>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <button type="button" id="report-sig-clear" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">지우기</button>
+      <button type="button" id="report-sig-undo" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">한 획 되돌리기</button>
+      <button type="button" id="report-sig-load" class="hidden px-3 py-1.5 border border-slate-300 rounded-lg text-sm">저장된 사인 불러오기</button>
+    </div>
+    <div class="mt-3 flex flex-wrap justify-end gap-2">
+      <button type="button" id="report-sig-save" disabled class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">저장</button>
+      <button type="button" id="report-sig-apply" disabled class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">적용</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var modal = document.getElementById('report-sig-modal');
+  var canvas = document.getElementById('report-sig-pad');
+  if (!modal || !canvas) return;
+  var ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  var strokes = [];
+  var cur = null;
+  var slot = '';
+  var drawing = false;
+  var loaded = false;
+  var asID = {{printf "%q" .AS.ASID}};
+
+  function hasInk() { return strokes.length > 0 || loaded; }
+  function canSave() {
+    var btn = document.getElementById('btn-report-sig-' + slot);
+    return btn && btn.getAttribute('data-has-account') === '1';
+  }
+  function syncButtons() {
+    var ink = hasInk();
+    document.getElementById('report-sig-apply').disabled = !ink;
+    document.getElementById('report-sig-save').disabled = !ink || !canSave();
+  }
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (var i = 0; i < strokes.length; i++) {
+      var s = strokes[i];
+      if (!s.length) continue;
+      ctx.beginPath();
+      ctx.moveTo(s[0].x, s[0].y);
+      for (var j = 1; j < s.length; j++) ctx.lineTo(s[j].x, s[j].y);
+      ctx.stroke();
+    }
+  }
+  function pos(e) {
+    var r = canvas.getBoundingClientRect();
+    var src = e.touches && e.touches[0] ? e.touches[0] : e;
+    return {
+      x: (src.clientX - r.left) * canvas.width / r.width,
+      y: (src.clientY - r.top) * canvas.height / r.height
+    };
+  }
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    cur = [pos(e)];
+    strokes.push(cur);
+  }
+  function move(e) {
+    if (!drawing || !cur) return;
+    e.preventDefault();
+    cur.push(pos(e));
+    redraw();
+  }
+  function end() {
+    drawing = false;
+    cur = null;
+    syncButtons();
+  }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive: false});
+  canvas.addEventListener('touchmove', move, {passive: false});
+  canvas.addEventListener('touchend', end);
+  canvas.addEventListener('touchcancel', end);
+
+  function cropSquare() {
+    var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var w = canvas.width, h = canvas.height;
+    var minX = w, minY = h, maxX = 0, maxY = 0, found = false;
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        if (data.data[(y * w + x) * 4 + 3] < 8) continue;
+        found = true;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (!found) return '';
+    var bw = maxX - minX + 1, bh = maxY - minY + 1;
+    var side = Math.max(bw, bh);
+    var out = document.createElement('canvas');
+    out.width = side;
+    out.height = side;
+    var octx = out.getContext('2d');
+    octx.drawImage(canvas, minX, minY, bw, bh, Math.floor((side - bw) / 2), Math.floor((side - bh) / 2), bw, bh);
+    return out.toDataURL('image/png');
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    strokes = [];
+    loaded = false;
+    drawing = false;
+    cur = null;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    syncButtons();
+  }
+  function savedURL(s) {
+    var img = document.getElementById(s + '-sig-preview');
+    return img ? (img.getAttribute('data-saved-url') || '') : '';
+  }
+  function openModal(s) {
+    slot = s;
+    document.getElementById('report-sig-title').textContent = s === 'confirmer' ? '확인자 사인' : '점검자 사인';
+    document.getElementById('report-sig-hint').textContent = canSave()
+      ? '저장은 다음 보고서에도, 적용은 이번만'
+      : '계정이 없어 이 보고서에만 쓸 수 있습니다';
+    strokes = [];
+    loaded = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var loadBtn = document.getElementById('report-sig-load');
+    if (loadBtn) {
+      if (savedURL(s)) loadBtn.classList.remove('hidden');
+      else loadBtn.classList.add('hidden');
+    }
+    modal.classList.remove('hidden');
+    syncButtons();
+  }
+  function loadSavedOntoPad() {
+    var url = savedURL(slot);
+    if (!url) return;
+    var img = new Image();
+    img.onload = function () {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      strokes = [];
+      loaded = true;
+      syncButtons();
+    };
+    img.src = url;
+  }
+  function setSlot(dataUrl, source) {
+    var hid = document.getElementById(slot + '_sig');
+    var img = document.getElementById(slot + '-sig-preview');
+    var src = document.getElementById(slot + '-sig-source');
+    if (hid) hid.value = dataUrl;
+    if (img) {
+      img.src = dataUrl;
+      img.classList.remove('hidden');
+    }
+    if (src) src.textContent = source || '이 보고서만';
+  }
+  function send(intent) {
+    var dataUrl = cropSquare();
+    if (!dataUrl) return;
+    var nameEl = document.getElementById(slot === 'confirmer' ? 'report-confirmer-name' : 'report-inspector-name');
+    var body = new URLSearchParams();
+    body.set('slot', slot);
+    body.set('intent', intent);
+    body.set('drawn', dataUrl);
+    body.set('name', nameEl ? nameEl.value : '');
+    var idEl = document.getElementById(slot === 'confirmer' ? 'report-confirmer-id' : 'report-inspector-id');
+    if (idEl && idEl.value) body.set('user_id', idEl.value);
+    fetch('/as/' + asID + '/report/signature', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body.toString()
+    }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); })
+      .then(function (res) {
+        if (!res.ok) {
+          alert((res.j && res.j.error) || '사인을 넣지 못했습니다');
+          return;
+        }
+        setSlot(res.j.data_url, res.j.source);
+        closeModal();
+        if (typeof maybeAskNext === 'function') maybeAskNext();
+      }).catch(function () { alert('사인을 넣지 못했습니다'); });
+  }
+
+  document.getElementById('btn-report-sig-inspector').addEventListener('click', function () { openModal('inspector'); });
+  document.getElementById('btn-report-sig-confirmer').addEventListener('click', function () { openModal('confirmer'); });
+  document.getElementById('report-sig-clear').addEventListener('click', function () {
+    strokes = [];
+    loaded = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    syncButtons();
+  });
+  document.getElementById('report-sig-load').addEventListener('click', loadSavedOntoPad);
+  document.getElementById('report-sig-undo').addEventListener('click', function () {
+    strokes.pop();
+    redraw();
+    syncButtons();
+  });
+  document.getElementById('report-sig-apply').addEventListener('click', function () { send('apply'); });
+  document.getElementById('report-sig-save').addEventListener('click', function () { send('save'); });
+  document.getElementById('report-sig-backdrop').addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    if (e.key === 'Escape' && askBox && !askBox.classList.contains('hidden')) askBox.classList.add('hidden');
+    if (e.key === 'Escape' && previewBox && !previewBox.classList.contains('hidden')) previewBox.classList.add('hidden');
+  });
+
+  var form = document.getElementById('as-report-form');
+  var askBox = document.getElementById('report-sig-ask');
+  var previewBox = document.getElementById('report-preview');
+  var savedSets = {inspector: {has: false, items: []}, confirmer: {has: false, items: []}};
+  var asked = {inspector: false, confirmer: false};
+  var askSlot = '';
+  var previewOK = false;
+  var useSaved = document.getElementById('use_saved_sig');
+  if (useSaved) useSaved.value = '0';
+
+  function slotApplied(s) {
+    var hid = document.getElementById(s + '_sig');
+    return !!(hid && hid.value);
+  }
+  function val(name) {
+    var el = form && form.querySelector('[name="'+name+'"]');
+    return el ? el.value : '';
+  }
+  function applySaved(s, item) {
+    var hid = document.getElementById(s + '_sig');
+    var slotEl = document.getElementById(s + '_sig_slot');
+    var img = document.getElementById(s + '-sig-preview');
+    var src = document.getElementById(s + '-sig-source');
+    if (hid) hid.value = item.data_url || '';
+    if (slotEl) slotEl.value = String(item.slot || 1);
+    if (img) {
+      img.src = item.data_url || '';
+      img.setAttribute('data-saved-url', item.data_url || '');
+      img.setAttribute('data-saved-at', item.saved_at || '');
+      img.classList.toggle('hidden', !item.data_url);
+    }
+    if (src) src.textContent = item.data_url ? '계정에 저장됨' : '';
+  }
+  function clearSlot(s) {
+    var hid = document.getElementById(s + '_sig');
+    if (hid) hid.value = '';
+    var img = document.getElementById(s + '-sig-preview');
+    if (img) {
+      img.removeAttribute('src');
+      img.classList.add('hidden');
+    }
+    var src = document.getElementById(s + '-sig-source');
+    if (src) src.textContent = '';
+  }
+  function fillAsk(s) {
+    askSlot = s;
+    var set = savedSets[s] || {has: false, items: []};
+    var nameEl = document.getElementById(s === 'confirmer' ? 'report-confirmer-name' : 'report-inspector-name');
+    var nm = document.getElementById('ask-' + s + '-name');
+    if (nm) nm.textContent = nameEl ? nameEl.value : '';
+    var items = document.getElementById('ask-' + s + '-items');
+    var pick = document.getElementById('ask-' + s + '-pick');
+    var none = document.getElementById('ask-' + s + '-none');
+    var other = s === 'inspector' ? 'confirmer' : 'inspector';
+    document.getElementById('ask-panel-' + s).classList.remove('hidden');
+    document.getElementById('ask-panel-' + other).classList.add('hidden');
+    if (items) items.innerHTML = '';
+    if (pick) pick.innerHTML = '';
+    if (!set.has || !set.items || !set.items.length) {
+      if (none) none.classList.remove('hidden');
+      return;
+    }
+    if (none) none.classList.add('hidden');
+    set.items.forEach(function (it, i) {
+      var box = document.createElement('label');
+      box.className = 'flex items-center gap-2 text-sm border border-slate-200 rounded-lg p-2';
+      box.innerHTML = '<input type="radio" name="ask-slot-'+s+'" value="'+it.slot+'"'+(i===0?' checked':'')+'>'
+        + '<img src="'+it.data_url+'" alt="" class="h-10 w-10 object-contain">'
+        + '<span class="text-xs text-slate-500">'+(it.saved_at||'')+' 저장</span>';
+      if (items) items.appendChild(box);
+    });
+    if (pick) {
+      pick.innerHTML = '<label class="flex items-center gap-1"><input type="radio" name="ask-mode-'+s+'" value="use" checked> ①번 사용</label>';
+    }
+  }
+  function selectedAskItem(s) {
+    var set = savedSets[s] || {items: []};
+    var picked = document.querySelector('input[name="ask-slot-'+s+'"]:checked');
+    var n = picked ? parseInt(picked.value, 10) : 1;
+    for (var i = 0; i < set.items.length; i++) {
+      if (set.items[i].slot === n) return set.items[i];
+    }
+    return set.items[0];
+  }
+  function showAsk(s) {
+    if (!askBox) return;
+    fillAsk(s);
+    askBox.classList.remove('hidden');
+  }
+  function hideAsk() {
+    if (askBox) askBox.classList.add('hidden');
+  }
+  function maybeAskNext() {
+    var order = ['inspector', 'confirmer'];
+    for (var i = 0; i < order.length; i++) {
+      var s = order[i];
+      if (asked[s] || slotApplied(s)) continue;
+      var set = savedSets[s];
+      asked[s] = true;
+      if (set && set.has) {
+        showAsk(s);
+        return;
+      }
+    }
+  }
+  function loadSignatures() {
+    var q = new URLSearchParams();
+    var iid = document.getElementById('report-inspector-id');
+    var cid = document.getElementById('report-confirmer-id');
+    var iname = document.getElementById('report-inspector-name');
+    var cname = document.getElementById('report-confirmer-name');
+    if (iid && iid.value) q.set('inspector_id', iid.value);
+    else if (iname) q.set('inspector_id', iname.value);
+    if (cid && cid.value) q.set('confirmer_id', cid.value);
+    else if (cname) q.set('confirmer_id', cname.value);
+    if (iname) q.set('inspector', iname.value);
+    if (cname) q.set('confirmer', cname.value);
+    fetch('/as/' + asID + '/report/signatures?' + q.toString(), {credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        savedSets.inspector = j.inspector || savedSets.inspector;
+        savedSets.confirmer = j.confirmer || savedSets.confirmer;
+        [['inspector', j.inspector], ['confirmer', j.confirmer]].forEach(function (pair) {
+          var s = pair[0], set = pair[1] || {};
+          var idEl = document.getElementById(s === 'confirmer' ? 'report-confirmer-id' : 'report-inspector-id');
+          var btn = document.getElementById('btn-report-sig-' + s);
+          if (idEl && set.user_id) idEl.value = set.user_id;
+          if (btn) btn.setAttribute('data-has-account', set.user_id ? '1' : '0');
+        });
+        maybeAskNext();
+      }).catch(function () {});
+  }
+  function fillPreview() {
+    var map = {
+      'pv-customer':'customer_name','pv-dept':'department','pv-manager':'manager','pv-phone':'phone',
+      'pv-service':'service','pv-symptom':'symptom','pv-cause':'cause_detail','pv-dates':'work_dates',
+      'pv-actions':'actions','pv-concl':'conclusion','pv-rdate':'report_date'
+    };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = val(map[id]);
+    });
+    document.getElementById('pv-insp-name').textContent = val('inspector') + ' ';
+    document.getElementById('pv-conf-name').textContent = val('confirmer') + ' ';
+    ['inspector','confirmer'].forEach(function (s) {
+      var img = document.getElementById(s === 'confirmer' ? 'pv-conf-sig' : 'pv-insp-sig');
+      var hid = document.getElementById(s + '_sig');
+      if (!img) return;
+      if (hid && hid.value) {
+        img.src = hid.value;
+        img.classList.remove('hidden');
+      } else {
+        img.classList.add('hidden');
+      }
+    });
+  }
+  function openPreview() {
+    fillPreview();
+    if (previewBox) previewBox.classList.remove('hidden');
+  }
+  if (document.getElementById('ask-with')) {
+    document.getElementById('ask-with').addEventListener('click', function () {
+      var item = selectedAskItem(askSlot);
+      if (item) applySaved(askSlot, item);
+      hideAsk();
+      maybeAskNext();
+    });
+  }
+  if (document.getElementById('ask-draw')) {
+    document.getElementById('ask-draw').addEventListener('click', function () {
+      hideAsk();
+      openModal(askSlot || 'inspector');
+    });
+  }
+  if (document.getElementById('ask-without')) {
+    document.getElementById('ask-without').addEventListener('click', function () {
+      clearSlot(askSlot);
+      hideAsk();
+      maybeAskNext();
+    });
+  }
+  if (document.getElementById('btn-as-report-preview')) {
+    document.getElementById('btn-as-report-preview').addEventListener('click', openPreview);
+  }
+  if (document.getElementById('btn-as-report-docx')) {
+    document.getElementById('btn-as-report-docx').addEventListener('click', openPreview);
+  }
+  if (document.getElementById('preview-edit')) {
+    document.getElementById('preview-edit').addEventListener('click', function () {
+      if (previewBox) previewBox.classList.add('hidden');
+    });
+  }
+  if (document.getElementById('preview-save') && form) {
+    document.getElementById('preview-save').addEventListener('click', function () {
+      previewOK = true;
+      if (useSaved) useSaved.value = '0';
+      form.requestSubmit(document.getElementById('btn-as-report-hwpx'));
+    });
+  }
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      if (previewOK) return;
+      e.preventDefault();
+      openPreview();
+    });
+  }
+  loadSignatures();
+})();
+</script>
 {{end}}

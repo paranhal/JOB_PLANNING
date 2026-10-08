@@ -129,6 +129,7 @@
             data-on="{{if .IsActive}}1{{else}}0{{end}}" data-ro="{{if .IsReadOnly}}1{{else}}0{{end}}" data-test="{{if .IsTest}}1{{else}}0{{end}}"
             data-mobile="{{.Mobile}}" data-tel="{{.Tel}}" data-active="{{if .IsActive}}1{{else}}0{{end}}"
             data-sig="{{if .SignaturePath}}1{{else}}0{{end}}"
+            data-sig2="{{if .SignaturePath2}}1{{else}}0{{end}}"
             data-perms="{{range userPermList .}}{{.}} {{end}}">
           <td class="px-4 py-3">{{if $canEdit}}<input type="checkbox" class="row-ck" data-id="{{.UserID}}">{{end}}</td>
           <td class="px-4 py-3">
@@ -236,7 +237,20 @@
         <p class="text-xs font-bold text-slate-700">사인</p>
         <p class="text-[11px] text-slate-500">이미지 파일이거나 아래에 그립니다. 파일은 서버에 두고 DB에는 경로만 저장합니다. 보고서·견적서에 씁니다.</p>
         <p id="dSigLink" class="hidden font-mono text-[11px] text-blue-700 break-all"></p>
-        <img id="dSigImg" alt="사인 미리보기" class="hidden h-16 w-auto border border-gray-200 rounded bg-white">
+        <div class="flex flex-wrap gap-4">
+          <div>
+            <p class="text-[11px] text-slate-500">1번</p>
+            <img id="dSigImg" alt="1번 사인" class="hidden h-16 w-auto border border-gray-200 rounded bg-white">
+          </div>
+          <div>
+            <p class="text-[11px] text-slate-500">2번</p>
+            <img id="dSigImg2" alt="2번 사인" class="hidden h-16 w-auto border border-gray-200 rounded bg-white">
+          </div>
+        </div>
+        <div class="flex gap-3 text-xs">
+          <label class="flex items-center gap-1"><input type="radio" name="dSigSlot" value="1" checked> 1번에 저장</label>
+          <label class="flex items-center gap-1"><input type="radio" name="dSigSlot" value="2"> 2번에 저장</label>
+        </div>
         <div>
           <label class="block text-[11px] font-semibold text-slate-500 mb-1">이미지 올리기 (PNG·JPG)</label>
           <input type="file" id="dSigFile" accept="image/png,image/jpeg" class="w-full text-sm bg-white border rounded-lg px-2 py-1.5">
@@ -249,7 +263,8 @@
         <p id="dSigHint" class="hidden text-[11px] text-amber-700">계정을 먼저 저장한 뒤 사인을 올릴 수 있습니다.</p>
         <div class="flex gap-2">
           <button type="button" id="btn-sig" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold">사인 저장</button>
-          <button type="button" id="btn-sig-del" class="hidden px-3 py-1.5 border rounded-lg text-xs text-red-600">사인 지우기</button>
+          <button type="button" id="btn-sig-del" class="hidden px-3 py-1.5 border rounded-lg text-xs text-red-600">1번 지우기</button>
+          <button type="button" id="btn-sig-del2" class="hidden px-3 py-1.5 border rounded-lg text-xs text-red-600">2번 지우기</button>
         </div>
       </div>
       <div>
@@ -432,8 +447,10 @@
     setPerms('');
     resetSigPad();
     document.getElementById('dSigImg').classList.add('hidden');
+    document.getElementById('dSigImg2').classList.add('hidden');
     document.getElementById('dSigLink').classList.add('hidden');
     document.getElementById('btn-sig-del').classList.add('hidden');
+    document.getElementById('btn-sig-del2').classList.add('hidden');
     document.getElementById('dSigHint').classList.remove('hidden');
     form.querySelector('input[name="admin_grade"][value="none"]').checked=true; syncGrade(); openD();
   }
@@ -460,17 +477,27 @@
     setPerms(tr.dataset.perms||'');
     resetSigPad();
     document.getElementById('dSigHint').classList.add('hidden');
-    var img=document.getElementById('dSigImg'), link=document.getElementById('dSigLink'), del=document.getElementById('btn-sig-del');
-    var has = tr.dataset.sig==='1';
+    var img=document.getElementById('dSigImg'), img2=document.getElementById('dSigImg2'), link=document.getElementById('dSigLink');
+    var del=document.getElementById('btn-sig-del'), del2=document.getElementById('btn-sig-del2');
     var href='/users/'+tr.dataset.id+'/signature.png';
-    if (has) {
+    if (tr.dataset.sig==='1') {
       img.classList.remove('hidden'); img.src=href+'?t='+Date.now();
-      link.classList.remove('hidden'); link.textContent=href;
       del.classList.remove('hidden');
     } else {
       img.classList.add('hidden'); img.removeAttribute('src');
-      link.classList.add('hidden'); link.textContent='';
       del.classList.add('hidden');
+    }
+    if (tr.dataset.sig2==='1') {
+      img2.classList.remove('hidden'); img2.src=href+'?slot=2&t='+Date.now();
+      del2.classList.remove('hidden');
+    } else {
+      img2.classList.add('hidden'); img2.removeAttribute('src');
+      del2.classList.add('hidden');
+    }
+    if (tr.dataset.sig==='1' || tr.dataset.sig2==='1') {
+      link.classList.remove('hidden'); link.textContent=href;
+    } else {
+      link.classList.add('hidden'); link.textContent='';
     }
     syncGrade(); openD();
   }
@@ -527,15 +554,21 @@
     if(file) fd.append('file', file);
     else if(sigDirty && pad) fd.append('drawn', pad.toDataURL('image/png'));
     else { alert('사인 이미지를 고르거나 칸에 그려 주세요.'); return; }
+    var slotEl=document.querySelector('input[name="dSigSlot"]:checked');
+    if(slotEl) fd.append('slot', slotEl.value);
     fetch('/users/'+id+'/signature', {method:'POST', body:fd, credentials:'same-origin'}).then(function(){ location.href='/users?ok=signature'; });
   });
-  var bd=document.getElementById('btn-sig-del');
-  if(bd) bd.addEventListener('click', function(){
+  function delSlot(slot){
     var id=form && form.getAttribute('data-id');
     if(!id) return;
-    if(!confirm('사인을 지울까요?')) return;
-    fetch('/users/'+id+'/signature/delete', {method:'POST', credentials:'same-origin'}).then(function(){ location.href='/users?ok=signature_cleared'; });
-  });
+    if(!confirm(slot+'번 사인을 지울까요?')) return;
+    var fd=new FormData(); fd.append('slot', String(slot));
+    fetch('/users/'+id+'/signature/delete', {method:'POST', body:fd, credentials:'same-origin'}).then(function(){ location.href='/users?ok=signature_cleared'; });
+  }
+  var bd=document.getElementById('btn-sig-del');
+  if(bd) bd.addEventListener('click', function(){ delSlot(1); });
+  var bd2=document.getElementById('btn-sig-del2');
+  if(bd2) bd2.addEventListener('click', function(){ delSlot(2); });
 })();
 </script>
 {{end}}

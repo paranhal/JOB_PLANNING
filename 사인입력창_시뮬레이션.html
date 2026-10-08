@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>사인 배치 시뮬레이션</title>
+<style>
+:root{--line:#d8dce3;--ink:#1f2328;--sub:#6b7280;--bg:#f3f4f6;
+      --blue:#2563eb;--red:#dc2626;--green:#15803d;--amber:#b45309}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+     font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+     font-size:14px;line-height:1.5}
+.wrap{max-width:1220px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:19px;margin:4px 0 2px}
+.lead{color:var(--sub);font-size:13px;margin:0 0 14px}
+
+.real{background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);
+      border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:14px}
+.real b{color:var(--blue)}
+.real table{border-collapse:collapse;margin-top:7px;font-size:12px}
+.real td,.real th{border:1px solid var(--line);padding:3px 8px;text-align:right}
+.real th{background:#f8fafc;text-align:center;font-weight:600}
+.real td:first-child{text-align:left}
+
+.modebar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.mode{flex:1 1 230px;text-align:left;cursor:pointer;border:2px solid var(--line);
+      background:#fff;border-radius:10px;padding:10px 12px;font:inherit}
+.mode b{display:block;font-size:14px;margin-bottom:2px}
+.mode span{display:block;font-size:12px;color:var(--sub)}
+.mode.on{border-color:var(--blue);background:#eff6ff}
+.mode.on.bad{border-color:var(--red);background:#fef2f2}
+
+.verdict{border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;border:1px solid}
+.verdict.good{background:#f0fdf4;border-color:#bbf7d0;color:var(--green)}
+.verdict.bad{background:#fef2f2;border-color:#fecaca;color:var(--red)}
+
+.cols{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.left{flex:1 1 690px;min-width:340px}
+.right{flex:0 1 300px;min-width:280px}
+
+.scroll{overflow-x:auto;overflow-y:visible;padding-bottom:4px}
+.sheet{position:relative;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.12);
+       padding:22px 18px 46px;overflow:visible;width:min-content}
+.sheet h2{font-size:14px;text-align:center;letter-spacing:5px;margin:0 0 14px}
+table.rep{border-collapse:collapse;table-layout:fixed;font-size:11px}
+table.rep td{border:1px solid #8b939e;padding:0 4px;vertical-align:middle;overflow:visible}
+td.lbl{background:#f1f3f6;text-align:center;font-weight:600;letter-spacing:2px}
+td.sigcell{position:relative;text-align:right}
+td.big{vertical-align:top;padding-top:4px;text-align:left}
+.anchor{color:#9ca3af}
+
+.layer{position:absolute;inset:0;pointer-events:none;z-index:5}
+.layer.off{display:none}
+.sig{position:absolute;pointer-events:auto;cursor:grab;touch-action:none;
+     border:1px dashed transparent;border-radius:4px}
+.sig.sel{border-color:var(--blue);background:rgba(37,99,235,.06)}
+.sig svg{display:block;width:100%;height:100%}
+.sig .tag{position:absolute;left:0;top:-15px;font-size:10px;color:var(--blue);white-space:nowrap}
+.sig .grip{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border-radius:3px;
+           background:var(--blue);border:2px solid #fff;cursor:nwse-resize;display:none}
+.sig.sel .grip{display:block}
+.inline-sig{display:none;vertical-align:middle}
+.inline-sig.on{display:inline-block}
+.inline-sig svg{display:block;width:100%;height:100%}
+
+.panel{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.12);padding:14px}
+.panel h3{font-size:13px;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.pick{display:flex;gap:6px;margin-bottom:12px}
+.pick button{flex:1;padding:7px 0;border:1px solid var(--line);background:#fff;border-radius:7px;
+             font:inherit;font-size:12px;cursor:pointer}
+.pick button.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.fld{margin-bottom:12px}
+.fld label{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:4px}
+.fld label b{color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%}
+.nums{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+.num{background:#f8fafc;border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.num i{display:block;font-style:normal;color:var(--sub);font-size:11px}
+.num b{font-variant-numeric:tabular-nums}
+.meter{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:9px 10px;
+       font-size:12px;margin:12px 0}
+.meter .row{display:flex;justify-content:space-between;margin:2px 0}
+.meter .row b{font-variant-numeric:tabular-nums}
+.ok{color:var(--green);font-weight:700}.ng{color:var(--red);font-weight:700}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+.btn{flex:1 1 auto;padding:8px 10px;border-radius:7px;border:1px solid var(--line);
+     background:#fff;font:inherit;font-size:12px;cursor:pointer}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+pre.out{margin:12px 0 0;background:#0f172a;color:#d8e3f2;border-radius:8px;padding:11px 12px;
+        font-size:11.5px;line-height:1.5;overflow:auto;max-height:280px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
+.hint{font-size:12px;color:var(--sub);margin-top:10px}
+
+/* ===== 보고서 화면 흉내 + 사인 입력창 ===== */
+.signbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;
+         background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.signbar .t{font-size:12px;color:var(--sub);margin-right:4px}
+.sbtn{padding:7px 12px;border:1px solid var(--blue);background:#fff;color:var(--blue);
+      border-radius:7px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.sbtn:hover{background:#eff6ff}
+.sbtn .st{font-weight:400;color:var(--sub);margin-left:5px}
+.toggles{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-left:auto}
+.toggles label{display:flex;gap:4px;align-items:center;cursor:pointer}
+
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;
+       align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal.on{display:flex}
+.box{background:#fff;border-radius:12px;width:100%;max-width:400px;padding:16px;
+     box-shadow:0 14px 40px rgba(0,0,0,.3);max-height:94vh;overflow:auto}
+.box h4{margin:0 0 3px;font-size:15px}
+.box .sub{font-size:12px;color:var(--sub);margin:0 0 12px}
+.saved{border:1px solid var(--line);background:#f8fafc;border-radius:9px;
+       padding:9px 10px;margin-bottom:12px;display:flex;gap:10px;align-items:center}
+.saved.none{display:block;color:var(--sub);font-size:12px;text-align:center;padding:12px}
+.saved .thumb{width:54px;height:54px;border:1px solid var(--line);border-radius:6px;
+   background:repeating-conic-gradient(#eef1f5 0 25%,#fff 0 50%) 0/12px 12px;flex:none}
+.saved .thumb svg{width:100%;height:100%}
+.saved .meta{flex:1;font-size:12px;line-height:1.4}
+.saved .meta b{display:block;font-size:12.5px}
+.saved .meta i{font-style:normal;color:var(--sub)}
+.pad{border:1px solid var(--line);border-radius:9px;
+     background:repeating-conic-gradient(#f1f4f8 0 25%,#fff 0 50%) 0/14px 14px;
+     touch-action:none;display:block;width:100%;height:auto;cursor:crosshair}
+.padnote{font-size:11.5px;color:var(--sub);margin:6px 0 12px;text-align:center}
+.row2{display:flex;gap:7px;margin-bottom:8px}
+.row2 .btn{flex:1}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
+.state{font-size:12px;text-align:center;margin-top:9px;min-height:17px;color:var(--green);font-weight:600}
+.warnbox{display:none;background:#fffbeb;border:1px solid #fde68a;color:var(--amber);
+         border-radius:8px;padding:9px 10px;font-size:12px;margin-bottom:12px}
+.warnbox.on{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>사인 배치 시뮬레이션 — 실제 양식 치수 그대로</h1>
+<p class="lead">「장애처리보고서_사인.hwpx」 의 <code>section0.xml</code> 에서 <b>실제 칸 폭·줄 높이·글자 크기·정렬</b>을 읽어 그렸습니다.
+   사인을 끌어 옮기고 파란 점으로 크기를 조절해 보십시오.</p>
+
+<div class="real">
+  <b>실제 양식에서 읽은 값</b> — 점검자·확인자는 <b>같은 한 줄</b>에 있고, 그 줄은 <b>표의 마지막 줄</b>입니다. 사인 칸 문단은 <b>오른쪽 정렬</b>이라 「(사인)」 글자가 칸 오른쪽 끝에 붙습니다.
+  <table>
+    <tr><th>마지막 줄의 네 칸</th><th>폭 (HWPUNIT)</th><th>pt</th></tr>
+    <tr><td>점검자 (라벨)</td><td>8,390</td><td>83.9</td></tr>
+    <tr><td>{{점검자}} {{점검자사인}}</td><td>18,430</td><td>184.3</td></tr>
+    <tr><td>확 인 자 (라벨)</td><td>8,504</td><td>85.0</td></tr>
+    <tr><td>{{확인자}} {{확인자사인}}</td><td>13,175</td><td>131.8</td></tr>
+    <tr><td>줄 높이 · 글자 · 안쪽 여백</td><td>2,414 / 1,100 / 540</td><td>24.1 / 11 / 5.4</td></tr>
+  </table>
+</div>
+
+<div class="modebar">
+  <button class="mode bad" id="m-inchar" onclick="setMode('inchar')">
+    <b>① 글자처럼 — 지금 코드</b>
+    <span>칸 안에 자리를 차지한다 · 줄이 늘어난다 · 옮길 수 없다</span>
+  </button>
+  <button class="mode on" id="m-front" onclick="setMode('front')">
+    <b>② 글 앞으로 — 바꿀 것</b>
+    <span>칸 위에 떠 있다 · 줄 높이 그대로 · 끌어 옮기고 크기 조절</span>
+  </button>
+</div>
+
+<div class="verdict good" id="verdict"></div>
+
+<div class="cols">
+  <div class="left">
+    <div class="scroll">
+      <div class="sheet" id="sheet">
+        <h2>조 치 완 료 보 고 서</h2>
+        <table class="rep" id="rep">
+          <colgroup>
+            <col id="col1"><col id="col2"><col id="col3"><col id="col4">
+          </colgroup>
+          <tr id="row-head">
+            <td class="lbl" id="c-a1">작업일자</td>
+            <td class="lbl" id="c-a2" colspan="3">조치 사항 및 결과</td>
+          </tr>
+          <tr id="row-body">
+            <td class="big" id="c-b1">2026-10-07</td>
+            <td class="big" id="c-b2" colspan="3">무인대출반납기 바코드 인식 불량.<br>스캐너 교체 후 정상 동작 확인.</td>
+          </tr>
+          <tr id="row-date">
+            <td class="lbl" id="c-d1">보 고 일 자</td>
+            <td id="c-d2" colspan="3" style="padding-left:6px">2026-10-07</td>
+          </tr>
+          <tr id="row-sig">
+            <td class="lbl" id="c-s1">점검자</td>
+            <td class="sigcell" id="cell-insp">홍길동 <span class="anchor" id="anc-insp">(사인)</span><span class="inline-sig" id="inl-insp"></span></td>
+            <td class="lbl" id="c-s3">확 인 자</td>
+            <td class="sigcell" id="cell-conf">김철수 <span class="anchor" id="anc-conf">(사인)</span><span class="inline-sig" id="inl-conf"></span></td>
+          </tr>
+        </table>
+        <div class="layer" id="layer"></div>
+      </div>
+    </div>
+    <p class="hint">점선과 파란 점은 <b>화면에서만</b> 보이는 조절 손잡이입니다. 발급되는 한글 문서에는 사인 그림만 남습니다.</p>
+
+    <div class="signbar">
+      <span class="t">보고서 화면 흉내 —</span>
+      <button class="sbtn" onclick="openPad('insp')">점검자 사인<span class="st" id="st-insp"></span></button>
+      <button class="sbtn" onclick="openPad('conf')">확인자 사인<span class="st" id="st-conf"></span></button>
+      <span class="toggles">
+        <label><input type="checkbox" id="t-saved-insp" checked onchange="refreshBar()"> 점검자 사인 저장됨</label>
+        <label><input type="checkbox" id="t-saved-conf" onchange="refreshBar()"> 확인자 사인 저장됨</label>
+        <label><input type="checkbox" id="t-acct-conf" onchange="refreshBar()"> 확인자 계정 있음</label>
+      </span>
+    </div>
+    <p class="hint">오른쪽 체크로 <b>네 가지 경우</b>를 다 보실 수 있습니다 — 저장된 사인이 있을 때/없을 때, 계정이 있을 때/없을 때.</p>
+  </div>
+
+  <div class="right">
+    <div class="panel">
+      <h3>크기와 자리</h3>
+      <div class="warnbox" id="warn">「글자처럼」 에서는 <b>끌어 옮길 수 없습니다.</b> 칸이 자리를 정하기 때문입니다.</div>
+      <div class="pick">
+        <button id="p-insp" class="on" onclick="pick('insp')">점검자</button>
+        <button id="p-conf" onclick="pick('conf')">확인자</button>
+      </div>
+      <div class="fld">
+        <label>크기 (정사각형) <b><span id="lb-size">46</span>pt</b></label>
+        <input type="range" id="sl-size" min="16" max="120" step="1" value="46" oninput="onSize(this.value)">
+      </div>
+      <div class="nums">
+        <div class="num"><i>크기 HWPUNIT</i><b id="n-size">4,600</b></div>
+        <div class="num"><i>글자(11pt) 대비</i><b id="n-ratio">4.2배</b></div>
+        <div class="num"><i>가로 offset</i><b id="n-x">0</b></div>
+        <div class="num"><i>세로 offset</i><b id="n-y">0</b></div>
+        <div class="num"><i>가로 보정</i><b id="n-nx">0</b></div>
+        <div class="num"><i>세로 보정</i><b id="n-ny">0</b></div>
+      </div>
+      <div class="meter" id="meter"></div>
+      <div class="btns">
+        <button class="btn" onclick="reset()">기본값</button>
+        <button class="btn pri" onclick="dump()">이 값으로 정한다</button>
+      </div>
+      <pre class="out" id="out">[이 값으로 정한다] 를 누르면 Cursor 에 넘길 숫자가 나옵니다.</pre>
+      <div class="btns" style="margin-top:8px"><button class="btn" onclick="copyOut()">복사</button></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== 사인 입력창 ===== -->
+<div class="modal" id="modal" onclick="if(event.target===this)closePad()">
+  <div class="box">
+    <h4 id="pad-title">점검자 사인</h4>
+    <p class="sub" id="pad-sub">홍길동 · 비젼아이티</p>
+
+    <div class="saved" id="saved-box"></div>
+
+    <canvas class="pad" id="pad" width="640" height="640"></canvas>
+    <p class="padnote">손가락이나 마우스로 그립니다 · 바탕은 <b>칠하지 않습니다</b> (투명으로 남습니다)</p>
+
+    <div class="row2">
+      <button class="btn" id="b-undo" onclick="undo()">한 획 되돌리기</button>
+      <button class="btn" id="b-clear" onclick="clearPad()">지우기</button>
+    </div>
+    <div class="row2">
+      <button class="btn" id="b-apply" onclick="finish('apply')">적용 (이 보고서만)</button>
+      <button class="btn pri" id="b-save" onclick="finish('save')">저장 (계정에)</button>
+    </div>
+    <div class="state" id="pad-state"></div>
+    <div class="row2" style="margin-top:8px">
+      <button class="btn" onclick="closePad()">닫기 (ESC)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== 실제 양식 치수 (HWPUNIT) — section0.xml 에서 읽음 ===== */
+var FORM = {
+  rowSig:  2414,  rowDate: 2414,  rowHead: 2414,  rowBody: 16172,
+  font:    1100,  margin:  540,
+  col:   {s1:8390, insp:18430, s3:8504, conf:13175},
+  colHead:{a1:6503, a2:42162}
+};
+var U = 0.013334;                // 1 HWPUNIT → px (1pt = 1.3334px)
+var ANCHOR_PT = FORM.font/100;   // 11pt
+var DEF = 46;                    // 확정 46pt = 4600 HWPUNIT
+var SIG = {
+  insp:{name:'점검자', cell:'insp', sizePt:DEF, x:0, y:0, el:null, placed:false},
+  conf:{name:'확인자', cell:'conf', sizePt:DEF, x:0, y:0, el:null, placed:false}
+};
+var mode='front', cur='insp', baseH=0;
+
+function px(h){ return h*U; }
+
+var SIGN_PATH = {
+  insp:'M14 70 C26 24, 38 22, 40 52 C42 80, 52 82, 58 56 C63 34, 74 36, 72 60 C70 80, 84 76, 96 44',
+  conf:'M16 62 C22 30, 36 26, 38 56 C40 84, 54 80, 60 50 C66 24, 80 30, 78 58 M48 72 L104 56'
+};
+var PERSON = {
+  insp:{name:'홍길동', org:'비젼아이티', acct:true,  savedAt:'2026-09-12'},
+  conf:{name:'김철수', org:'신성대학교', acct:false, savedAt:'2026-08-30'}
+};
+function svgSign(k){
+  return '<svg viewBox="0 0 120 100"><path d="'+SIGN_PATH[k]+'" fill="none" stroke="#111827" '+
+         'stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+/* ---- 표를 실제 치수로 깐다 ---- */
+function layout(){
+  var f=FORM;
+  // 열 폭은 colgroup 이 정한다 — 마지막 줄의 네 칸이 기준이다
+  document.getElementById('col1').style.width = px(f.col.s1)+'px';
+  document.getElementById('col2').style.width = px(f.col.insp)+'px';
+  document.getElementById('col3').style.width = px(f.col.s3)+'px';
+  document.getElementById('col4').style.width = px(f.col.conf)+'px';
+  document.getElementById('rep').style.width =
+    px(f.col.s1+f.col.insp+f.col.s3+f.col.conf)+'px';
+  document.getElementById('row-sig').style.height  = px(f.rowSig)+'px';
+  document.getElementById('row-date').style.height = px(f.rowDate)+'px';
+  document.getElementById('row-head').style.height = px(f.rowHead)+'px';
+  document.getElementById('row-body').style.height = px(f.rowBody)+'px';
+  document.getElementById('rep').style.fontSize = px(f.font)+'px';
+  ['cell-insp','cell-conf','c-d2'].forEach(function(id){
+    document.getElementById(id).style.paddingRight = px(f.margin)+'px';
+  });
+}
+
+function build(){
+  var layer=document.getElementById('layer'); layer.innerHTML='';
+  Object.keys(SIG).forEach(function(k){
+    var el=document.createElement('div');
+    el.className='sig'+(k===cur?' sel':''); el.id='sig-'+k;
+    el.innerHTML='<span class="tag">'+SIG[k].name+' 사인</span>'+svgSign(k)+'<span class="grip"></span>';
+    el.addEventListener('pointerdown',function(e){startDrag(e,k);});
+    el.querySelector('.grip').addEventListener('pointerdown',function(e){startResize(e,k);});
+    layer.appendChild(el); SIG[k].el=el;
+    document.getElementById('inl-'+k).innerHTML=svgSign(k);
+  });
+}
+
+/* 기본 자리 = 「(사인)」 글자 중앙 */
+function defaultPos(k){
+  var sheet=document.getElementById('sheet').getBoundingClientRect();
+  var a=document.getElementById('anc-'+k).getBoundingClientRect();
+  var p=SIG[k].sizePt*1.3334;
+  return {x:(a.left-sheet.left)+a.width/2-p/2, y:(a.top-sheet.top)+a.height/2-p/2};
+}
+/* 그 사인의 칸 왼쪽 위 모서리 기준 offset (HWPUNIT) */
+function offsets(k,x,y){
+  var sheet=document.getElementById('sheet').getBoundingClientRect();
+  var c=document.getElementById('cell-'+SIG[k].cell).getBoundingClientRect();
+  return {ox:Math.round(((x!==undefined?x:SIG[k].x)-(c.left-sheet.left))/U),
+          oy:Math.round(((y!==undefined?y:SIG[k].y)-(c.top -sheet.top ))/U)};
+}
+
+function measureBase(){
+  var keep=mode; mode='none'; paint(true);
+  baseH=document.getElementById('row-sig').getBoundingClientRect().height;
+  mode=keep;
+}
+
+function paint(skip){
+  document.getElementById('layer').classList.toggle('off', mode!=='front');
+  Object.keys(SIG).forEach(function(k){
+    var s=SIG[k], p=s.sizePt*1.3334;
+    if(!s.placed){var d=defaultPos(k); s.x=d.x; s.y=d.y; s.placed=true;}
+    if(s.el){
+      s.el.style.width=p+'px'; s.el.style.height=p+'px';
+      s.el.style.left=s.x+'px'; s.el.style.top=s.y+'px';
+      s.el.classList.toggle('sel', k===cur && mode==='front');
+    }
+    var inl=document.getElementById('inl-'+k);
+    inl.classList.toggle('on', mode==='inchar');
+    inl.style.width=p+'px'; inl.style.height=p+'px';
+  });
+  document.getElementById('m-inchar').classList.toggle('on', mode==='inchar');
+  document.getElementById('m-front').classList.toggle('on', mode==='front');
+  document.getElementById('warn').classList.toggle('on', mode==='inchar');
+
+  var v=document.getElementById('verdict');
+  if(mode==='inchar'){
+    v.className='verdict bad';
+    v.innerHTML='<b>① 글자처럼 (지금 코드).</b> 사인이 칸 안에서 <b>자리를 차지해</b> 마지막 줄이 통째로 늘어납니다. '+
+      '원인은 <code>photos.go:175</code> 의 <code>photoParagraph</code> 에 <code>&lt;hp:pos&gt;</code> 가 <b>없어서</b> 한글이 기본값(글자처럼)으로 읽는 것입니다.';
+  }else{
+    v.className='verdict good';
+    v.innerHTML='<b>② 글 앞으로 (바꿀 것).</b> 두 사인이 <b>같은 줄</b> 위에 떠 있어 줄 높이가 변하지 않습니다. '+
+      '<code>treatAsChar="0"</code> + <code>textWrap="IN_FRONT_OF_TEXT"</code> 가 이것을 만듭니다.';
+  }
+  if(!skip) meter();
+  nums();
+}
+
+function meter(){
+  var h=document.getElementById('row-sig').getBoundingClientRect().height;
+  var grown=h-baseH>1.5;
+  var sz=SIG[cur].sizePt*100, c=FORM.col[SIG[cur].cell];
+  var o=offsets(cur);
+  var over = (o.ox<0) || (o.ox+sz > c);
+  var gap  = o.ox + sz - (c - FORM.margin);          // 글자 영역 오른쪽 끝에서 더 나간 양
+  var up   = -o.oy, down = o.oy+sz-FORM.rowSig;
+  document.getElementById('meter').innerHTML=
+    '<div class="row"><span>사인 없을 때 줄 높이</span><b>'+baseH.toFixed(0)+'px</b></div>'+
+    '<div class="row"><span>지금 사인 줄</span><b>'+h.toFixed(0)+'px</b></div>'+
+    '<div class="row"><span>표가 망가졌나</span>'+(grown?'<span class="ng">★ 늘어났다</span>':'<span class="ok">✓ 그대로</span>')+'</div>'+
+    '<div class="row"><span>오른쪽 여유 (right_gap)</span><b>'+Math.round(gap).toLocaleString()+'</b></div>'+
+    '<div class="row"><span>칸 선 밖으로</span>'+(over?'<span class="ng">★ '+((o.ox+sz-c)/100).toFixed(1)+'pt 넘는다</span>':'<span class="ok">✓ 안 넘는다</span>')+'</div>'+
+    '<div class="row"><span>위로 넘침 (보고일자 줄)</span><b>'+(up/100).toFixed(1)+'pt</b></div>'+
+    '<div class="row"><span>아래로 넘침 (표 밖)</span><b>'+(down/100).toFixed(1)+'pt</b></div>';
+}
+
+function nums(){
+  var s=SIG[cur], o=offsets(cur), d=defaultPos(cur), b=offsets(cur,d.x,d.y);
+  s._ox=o.ox; s._oy=o.oy; s._nx=o.ox-b.ox; s._ny=o.oy-b.oy; s._bx=b.ox; s._by=b.oy;
+  document.getElementById('lb-size').textContent=s.sizePt;
+  document.getElementById('sl-size').value=s.sizePt;
+  document.getElementById('n-size').textContent=(s.sizePt*100).toLocaleString();
+  document.getElementById('n-ratio').textContent=(s.sizePt/ANCHOR_PT).toFixed(1)+'배';
+  document.getElementById('n-x').textContent=o.ox.toLocaleString();
+  document.getElementById('n-y').textContent=o.oy.toLocaleString();
+  document.getElementById('n-nx').textContent=s._nx.toLocaleString();
+  document.getElementById('n-ny').textContent=s._ny.toLocaleString();
+}
+
+function setMode(m){mode=m;paint();}
+function pick(k){cur=k;
+  document.getElementById('p-insp').classList.toggle('on',k==='insp');
+  document.getElementById('p-conf').classList.toggle('on',k==='conf');paint();}
+function onSize(v){var s=SIG[cur],o=s.sizePt*1.3334;s.sizePt=parseInt(v,10);
+  var n=s.sizePt*1.3334;s.x-=(n-o)/2;s.y-=(n-o)/2;paint();}
+function reset(){Object.keys(SIG).forEach(function(k){SIG[k].sizePt=DEF;SIG[k].placed=false;});paint();}
+
+var drag=null;
+function startDrag(e,k){if(mode!=='front')return;if(e.target.classList.contains('grip'))return;
+  pick(k);drag={k:k,mx:e.clientX,my:e.clientY,x:SIG[k].x,y:SIG[k].y,kind:'move'};e.preventDefault();}
+function startResize(e,k){if(mode!=='front')return;pick(k);
+  drag={k:k,mx:e.clientX,my:e.clientY,size:SIG[k].sizePt,kind:'size'};e.preventDefault();e.stopPropagation();}
+window.addEventListener('pointermove',function(e){
+  if(!drag)return;var s=SIG[drag.k];
+  if(drag.kind==='move'){s.x=drag.x+(e.clientX-drag.mx);s.y=drag.y+(e.clientY-drag.my);}
+  else{var d=Math.max(e.clientX-drag.mx,e.clientY-drag.my);
+       s.sizePt=Math.min(120,Math.max(16,Math.round((drag.size*1.3334+d)/1.3334)));}
+  paint();});
+window.addEventListener('pointerup',function(){drag=null;});
+
+function one(k){
+  var s=SIG[k], c=cur; cur=k; nums(); cur=c;
+  return {"크기_pt":s.sizePt,
+          "orgSz_curSz":{"width":s.sizePt*100,"height":s.sizePt*100},
+          "칸_폭":FORM.col[s.cell],
+          "글자중앙_맞춤_기본값":{"horzOffset":s._bx,"vertOffset":s._by},
+          "끌어_정한_자리":{"horzOffset":s._ox,"vertOffset":s._oy},
+          "보정값":{"nudge_x":s._nx,"nudge_y":s._ny},
+          "오른쪽_여유_right_gap":s._ox + s.sizePt*100 - (FORM.col[s.cell]-FORM.margin),
+          "칸_밖으로":{"왼쪽":Math.min(0,s._ox),"오른쪽":Math.max(0,s._ox+s.sizePt*100-FORM.col[s.cell])}};
+}
+function dump(){
+  var o={"양식":"장애처리보고서_사인.hwpx · 마지막 줄 네 칸 (점검자·확인자 같은 줄)",
+         "배치":mode==='front'?"글 앞으로 (treatAsChar=0 · IN_FRONT_OF_TEXT)":"글자처럼 — 쓰지 않는다",
+         "단위":"HWPUNIT (1pt = 100)",
+         "점검자사인":one('insp'), "확인자사인":one('conf'),
+         "셈법_가로":"horzOffset = 칸폭 − 540 − 크기 + right_gap   (글자 폭을 몰라도 된다)",
+         "셈법_세로":"vertOffset = 2414/2 − 크기/2 + nudge_y",
+         "설정키":{"report.signature.size_hwpunit":SIG.insp.sizePt*100,
+                   "report.signature.right_gap_hwpunit":
+                     Math.round(((SIG.insp._ox+SIG.insp.sizePt*100-(FORM.col.insp-FORM.margin))+
+                                 (SIG.conf._ox+SIG.conf.sizePt*100-(FORM.col.conf-FORM.margin)))/2),
+                   "report.signature.nudge_y_hwpunit":Math.round((SIG.insp._ny+SIG.conf._ny)/2)}};
+  document.getElementById('out').textContent=JSON.stringify(o,null,2);
+  nums();
+}
+function copyOut(){var t=document.getElementById('out').textContent;
+  navigator.clipboard&&navigator.clipboard.writeText(t);}
+
+/* ===================== 사인 입력창 ===================== */
+var pad, pctx, padKey=null, strokes=[], loaded=false, drawing=null;
+
+function hasSaved(k){
+  if(k==='conf' && !document.getElementById('t-acct-conf').checked) return false;  // 계정 없으면 저장된 것도 없다
+  return document.getElementById('t-saved-'+k).checked;
+}
+function hasAcct(k){ return k==='insp' ? true : document.getElementById('t-acct-conf').checked; }
+
+function refreshBar(){
+  ['insp','conf'].forEach(function(k){
+    document.getElementById('st-'+k).textContent = hasSaved(k) ? '· 저장된 사인 있음' : '· 없음';
+  });
+  if(padKey) buildSaved();
+}
+
+function buildSaved(){
+  var k=padKey, box=document.getElementById('saved-box');
+  if(hasSaved(k)){
+    box.className='saved';
+    box.innerHTML='<div class="thumb">'+svgSign(k)+'</div>'+
+      '<div class="meta"><b>저장된 사인이 있습니다</b><i>'+PERSON[k].savedAt+' 저장 · 계정에 보관</i></div>'+
+      '<button class="btn pri" style="flex:none" onclick="loadSaved()">불러오기</button>';
+  }else{
+    box.className='saved none';
+    box.innerHTML=hasAcct(k)
+      ? '저장된 사인이 없습니다. 아래에 그려 주세요.'
+      : '계정이 없어 저장된 사인이 없습니다. 아래에 그려 주세요.';
+  }
+}
+
+function openPad(k){
+  padKey=k; strokes=[]; loaded=false; drawing=null;
+  pad=document.getElementById('pad'); pctx=pad.getContext('2d');
+  pctx.clearRect(0,0,pad.width,pad.height);
+  pctx.lineCap='round'; pctx.lineJoin='round'; pctx.strokeStyle='#111827'; pctx.lineWidth=14;
+  document.getElementById('pad-title').textContent=PERSON[k].name ? (k==='insp'?'점검자':'확인자')+' 사인' : '사인';
+  document.getElementById('pad-sub').textContent=PERSON[k].name+' · '+PERSON[k].org+
+    (hasAcct(k)?'':' (계정 없음)');
+  document.getElementById('pad-state').textContent='';
+  buildSaved(); gate();
+  document.getElementById('modal').classList.add('on');
+}
+function closePad(){ document.getElementById('modal').classList.remove('on'); padKey=null; }
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') closePad(); });
+
+function gate(){
+  var ok = strokes.length>0 || loaded;
+  document.getElementById('b-apply').disabled = !ok;
+  document.getElementById('b-save').disabled  = !ok || !hasAcct(padKey);
+  document.getElementById('b-undo').disabled  = strokes.length===0;
+  document.getElementById('b-clear').disabled = !ok;
+  document.getElementById('b-save').title = hasAcct(padKey)
+    ? '계정에 저장한다 — 다음 보고서부터 자동으로 붙는다'
+    : '계정이 없어 이 보고서에만 쓸 수 있습니다';
+}
+
+function redraw(){
+  pctx.clearRect(0,0,pad.width,pad.height);
+  if(loaded) drawSavedOnPad();
+  strokes.forEach(function(s){
+    pctx.beginPath();
+    s.forEach(function(p,i){ i?pctx.lineTo(p[0],p[1]):pctx.moveTo(p[0],p[1]); });
+    pctx.stroke();
+  });
+}
+function drawSavedOnPad(){
+  var p=new Path2D(SIGN_PATH[padKey]);
+  pctx.save();
+  pctx.translate(pad.width*0.08, pad.height*0.2);
+  pctx.scale(pad.width*0.84/120, pad.height*0.6/100);
+  pctx.lineWidth=5.5; pctx.stroke(p);
+  pctx.restore();
+  pctx.lineWidth=14;
+}
+function loadSaved(){
+  loaded=true; strokes=[]; redraw(); gate();
+  document.getElementById('pad-state').textContent='저장된 사인을 불러왔습니다. 고쳐 그려도 됩니다.';
+}
+function undo(){ strokes.pop(); redraw(); gate(); }
+function clearPad(){ strokes=[]; loaded=false; redraw(); gate();
+  document.getElementById('pad-state').textContent=''; }
+
+function padXY(e){
+  var r=pad.getBoundingClientRect();
+  return [(e.clientX-r.left)*pad.width/r.width, (e.clientY-r.top)*pad.height/r.height];
+}
+document.addEventListener('DOMContentLoaded',function(){});
+function padDown(e){ if(!padKey)return; drawing=[padXY(e)]; strokes.push(drawing);
+  pad.setPointerCapture&&pad.setPointerCapture(e.pointerId); redraw(); gate(); e.preventDefault(); }
+function padMove(e){ if(!drawing)return; drawing.push(padXY(e)); redraw(); }
+function padUp(){ drawing=null; }
+
+/* 획이 있는 곳만 잘라 정사각형으로 — 바탕은 칠하지 않는다 */
+function cropSquare(){
+  var d=pctx.getImageData(0,0,pad.width,pad.height).data;
+  var x0=pad.width,y0=pad.height,x1=-1,y1=-1;
+  for(var y=0;y<pad.height;y++)for(var x=0;x<pad.width;x++){
+    if(d[(y*pad.width+x)*4+3]>8){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  }
+  if(x1<0) return null;
+  var w=x1-x0+1, h=y1-y0+1, s=Math.max(w,h), pad2=Math.round(s*0.08), n=s+pad2*2;
+  var c=document.createElement('canvas'); c.width=c.height=n;
+  c.getContext('2d').drawImage(pad, x0,y0,w,h, pad2+(s-w)/2, pad2+(s-h)/2, w,h);
+  return c.toDataURL('image/png');
+}
+
+function finish(mode){
+  var url=cropSquare();
+  if(!url){ document.getElementById('pad-state').textContent='그린 것이 없습니다.'; return; }
+  var s=SIG[padKey];
+  s.el.innerHTML='<span class="tag">'+s.name+' 사인</span>'+
+    '<img src="'+url+'" style="display:block;width:100%;height:100%">'+
+    '<span class="grip"></span>';
+  s.el.querySelector('.grip').addEventListener('pointerdown',function(e){startResize(e,padKey);});
+  document.getElementById('inl-'+padKey).innerHTML='<img src="'+url+'" style="display:block;width:100%;height:100%">';
+  document.getElementById('pad-state').textContent =
+    mode==='save' ? '계정에 저장됨 — 다음 보고서부터 자동으로 붙습니다'
+                  : '이 보고서만 — 계정에는 남지 않습니다';
+  if(mode==='save'){ document.getElementById('t-saved-'+padKey).checked=true; refreshBar(); }
+  setTimeout(closePad, 700);
+  paint();
+}
+
+layout(); build();
+refreshBar();
+(function(){
+  var p=document.getElementById('pad');
+  p.addEventListener('pointerdown',padDown);
+  p.addEventListener('pointermove',padMove);
+  window.addEventListener('pointerup',padUp);
+})();
+requestAnimationFrame(function(){ measureBase(); reset(); dump(); });
+window.addEventListener('resize',function(){
+  Object.keys(SIG).forEach(function(k){SIG[k].placed=false;});paint();});
+</script>
+</body>
+</html>

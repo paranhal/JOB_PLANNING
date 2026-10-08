@@ -384,6 +384,8 @@ type User struct {
 	Tel               string    `json:"tel,omitempty"`
 	Email             string    `json:"email,omitempty"`
 	SignaturePath     string    `json:"signature_path,omitempty"`
+	SignaturePath2    string    `json:"signature_path2,omitempty"`
+	SignatureBox      string    `json:"signature_box,omitempty"`
 	ProfileDone       bool      `json:"profile_done,omitempty"`
 	UsernameChangedAt string    `json:"username_changed_at,omitempty"`
 	IsTest            bool      `json:"is_test,omitempty"`

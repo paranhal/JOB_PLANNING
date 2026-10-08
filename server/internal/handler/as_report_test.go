@@ -27,7 +27,9 @@ func newASReportFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 	e, h, asRepo, attachRepo, asID := newASActionFixture(t)
 	h.AS.reportTemplateBytes = officialASReportTemplate(t)
 	e.GET("/as/:id", h.AS.Show, h.Auth.AuthMiddleware)
+	e.GET("/as/:id/report/signatures", h.AS.ReportSignatures, h.Auth.AuthMiddleware)
 	e.GET("/as/:id/report", h.AS.ReportPreview, h.Auth.AuthMiddleware)
+	e.POST("/as/:id/report/signature", h.AS.ReportApplySignature, h.Auth.AuthMiddleware)
 	e.POST("/as/:id/report", h.AS.ReportIssue, h.Auth.AuthMiddleware)
 	return e, h, asRepo, attachRepo, asID
 }
@@ -85,6 +87,7 @@ func postASReport(t *testing.T, e *echo.Echo, asID string, d model.ASReportDraft
 		"work_dates":    {d.WorkDates},
 		"actions":       {d.Actions},
 		"format":        {"hwpx"},
+		"return_file":   {"1"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
@@ -230,6 +233,7 @@ func TestASReportIssueIncludesSelectedActionPhoto(t *testing.T) {
 		"actions":       {draft.Actions},
 		"include_photo": {photos[0].AttachmentID},
 		"format":        {"hwpx"},
+		"return_file":   {"1"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
@@ -429,6 +433,7 @@ func TestASReportDocxIssueAndHwpxWithoutDocxTemplate(t *testing.T) {
 		"work_dates":    {draft.WorkDates},
 		"actions":       {draft.Actions},
 		"format":        {"docx"},
+		"return_file":   {"1"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report",
@@ -594,14 +599,19 @@ func TestASReportEmbedsActorSignaturePNG(t *testing.T) {
 	if err := h.AS.userRepo.UpdateSignaturePath(admin.UserID, path); err != nil {
 		t.Fatal(err)
 	}
+	as.AssignedTo = admin.FullName
+	as.AssignedUserID = admin.UserID
+	if err := asRepo.Update(as); err != nil {
+		t.Fatal(err)
+	}
 
 	form := url.Values{
 		"customer_name": {draft.CustomerName}, "department": {draft.Department},
 		"manager": {draft.Manager}, "phone": {draft.Phone}, "service": {draft.Service},
 		"symptom": {draft.Symptom}, "cause_detail": {draft.CauseDetail},
 		"conclusion": {draft.Conclusion}, "report_date": {draft.ReportDate},
-		"inspector": {draft.Inspector}, "confirmer": {draft.Confirmer},
-		"work_dates": {draft.WorkDates}, "actions": {draft.Actions}, "format": {"hwpx"},
+		"inspector": {admin.FullName}, "confirmer": {draft.Confirmer},
+		"work_dates": {draft.WorkDates}, "actions": {draft.Actions}, "format": {"hwpx"}, "return_file": {"1"},
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/report", strings.NewReader(form.Encode()))
@@ -611,18 +621,11 @@ func TestASReportEmbedsActorSignaturePNG(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("발급 %d %s", rec.Code, rec.Body.String())
 	}
-	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
-	if err != nil {
-		t.Fatal(err)
+	sec := string(zipFileBytes(t, rec.Body.Bytes(), "Contents/section0.xml"))
+	if !strings.Contains(sec, "<hp:pic") {
+		t.Fatal("점검자 사인 그림이 없다")
 	}
-	found := false
-	for _, f := range zr.File {
-		if strings.HasSuffix(strings.ToLower(f.Name), ".png") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatal("보고서에 사인 PNG가 없다")
+	if !strings.Contains(sec, `textWrap="IN_FRONT_OF_TEXT"`) {
+		t.Fatal("글 앞으로가 아니다")
 	}
 }

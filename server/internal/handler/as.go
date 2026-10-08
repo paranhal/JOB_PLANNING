@@ -853,7 +853,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"CanWriteDaily":     !embed && canWriteWorkboard(c) && !closed,
 		"TodayLocal":        now.Format("2006-01-02"),
 		"ActionErr":         actionErrMessage(c.QueryParam("err")),
-		"ActionOK":          c.QueryParam("ok"),
+		"ActionOK":          asShowOK(c.QueryParam("ok")),
 		"OpenDaily":         !embed && c.QueryParam("daily") == "1",
 		"Embed":             embed,
 	}
@@ -1426,6 +1426,15 @@ func attachErrMessage(raw string) string {
 		return s
 	}
 	return ""
+}
+
+func asShowOK(ok string) string {
+	switch strings.TrimSpace(ok) {
+	case "report_saved":
+		return "저장했습니다"
+	default:
+		return ok
+	}
 }
 
 func actionErrMessage(code string) string {

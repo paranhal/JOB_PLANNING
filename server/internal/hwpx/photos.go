@@ -18,9 +18,11 @@ type JPEGPhoto struct {
 
 // EmbeddedImage HWPX에 붙일 그림. PNG 사인·JPEG 조치 사진.
 type EmbeddedImage struct {
-	Data    []byte
-	Caption string
-	MIME    string
+	Data      []byte
+	Caption   string
+	MIME      string
+	SizeHWP   int
+	PageBreak bool
 }
 
 type jpegAdd struct {
@@ -28,6 +30,8 @@ type jpegAdd struct {
 	blob           []byte
 	w, h           int
 	caption        string
+	sizeHWP        int
+	pageBreak      bool
 }
 
 // AppendJPEGs 치환이 끝난 HWPX 끝에 사진을 붙인다. 원본 바이트는 건드리지 않는다.
@@ -69,9 +73,9 @@ func AppendImages(doc []byte, photos []EmbeddedImage) ([]byte, error) {
 		} else {
 			mime = "image/jpeg"
 		}
-		id := fmt.Sprintf("actionphoto%d", i+1)
+		id := nextActionPhotoID(parts, added)
 		href := "BinData/" + id + ext
-		added = append(added, jpegAdd{id: id, href: href, mime: mime, blob: p.Data, w: cfg.Width, h: cfg.Height, caption: p.Caption})
+		added = append(added, jpegAdd{id: id, href: href, mime: mime, blob: p.Data, w: cfg.Width, h: cfg.Height, caption: p.Caption, sizeHWP: p.SizeHWP, pageBreak: p.PageBreak})
 	}
 	if len(added) == 0 {
 		return doc, nil
@@ -87,8 +91,10 @@ func AppendImages(doc []byte, photos []EmbeddedImage) ([]byte, error) {
 		switch {
 		case n == "Contents/content.hpf":
 			parts[i].Body = injectManifestItems(parts[i].Body, added)
+		case n == "Contents/header.xml":
+			parts[i].Body = injectHeaderBinItems(parts[i].Body, added)
 		case n == "META-INF/manifest.xml":
-			parts[i].Body = injectODFEntries(parts[i].Body, added)
+			parts[i].Body = injectODFEntriesLoose(parts[i].Body, added)
 		case strings.HasPrefix(n, "Contents/section") && strings.HasSuffix(strings.ToLower(n), ".xml"):
 			lastSec = i
 		}
@@ -104,16 +110,85 @@ func AppendImages(doc []byte, photos []EmbeddedImage) ([]byte, error) {
 	return packed, nil
 }
 
+func nextActionPhotoID(parts []hwpxEntry, added []jpegAdd) string {
+	used := map[string]bool{}
+	mark := func(s string) {
+		for i := 1; i < 1000; i++ {
+			id := fmt.Sprintf("actionphoto%d", i)
+			if strings.Contains(s, id) {
+				used[id] = true
+			}
+		}
+	}
+	for _, e := range parts {
+		mark(filepath.ToSlash(e.Name))
+		mark(string(e.Body))
+	}
+	for _, a := range added {
+		used[a.id] = true
+	}
+	for i := 1; i < 1000; i++ {
+		id := fmt.Sprintf("actionphoto%d", i)
+		if !used[id] {
+			return id
+		}
+	}
+	return "actionphoto999"
+}
+
+func opfItemHref(href string) string {
+	href = strings.TrimPrefix(strings.ReplaceAll(href, "\\", "/"), "/")
+	if strings.HasPrefix(href, "Contents/") {
+		return href
+	}
+	return "Contents/" + href
+}
+
 func injectManifestItems(raw []byte, added []jpegAdd) []byte {
 	s := string(raw)
 	var b strings.Builder
 	for _, a := range added {
-		b.WriteString(fmt.Sprintf(`    <opf:item id="%s" href="%s" media-type="%s"/>`+"\n", a.id, a.href, a.mime))
+		b.WriteString(fmt.Sprintf(`    <opf:item id="%s" href="%s" media-type="%s" isEmbeded="1"/>`+"\n", a.id, opfItemHref(a.href), a.mime))
 	}
 	if i := strings.LastIndex(s, "</opf:manifest>"); i >= 0 {
 		return []byte(s[:i] + b.String() + s[i:])
 	}
 	return raw
+}
+
+func injectHeaderBinItems(raw []byte, added []jpegAdd) []byte {
+	if len(added) == 0 {
+		return raw
+	}
+	s := string(raw)
+	var b strings.Builder
+	startID := strings.Count(s, "<hh:binItem") + 1
+	for i, a := range added {
+		name := filepath.Base(strings.ReplaceAll(a.href, "\\", "/"))
+		format := "png"
+		if strings.Contains(a.mime, "jpeg") || strings.HasSuffix(strings.ToLower(name), ".jpg") {
+			format = "jpg"
+		}
+		b.WriteString(fmt.Sprintf(`<hh:binItem id="%d" Type="Embedding" BinData="%s" Format="%s"/>`, startID+i, name, format))
+	}
+	chunk := b.String()
+	if i := strings.Index(s, "</hh:binData>"); i >= 0 {
+		s = s[:i] + chunk + s[i:]
+	} else if k := strings.LastIndex(s, "</hh:refList>"); k >= 0 {
+		n := startID + len(added) - 1
+		s = s[:k] + fmt.Sprintf(`<hh:binData itemCnt="%d">%s</hh:binData>`, n, chunk) + s[k:]
+	} else {
+		return raw
+	}
+	cnt := strings.Count(s, "<hh:binItem")
+	if p := strings.Index(s, `<hh:binData itemCnt="`); p >= 0 {
+		q := p + len(`<hh:binData itemCnt="`)
+		r := strings.Index(s[q:], `"`)
+		if r >= 0 {
+			s = s[:q] + fmt.Sprintf("%d", cnt) + s[q+r:]
+		}
+	}
+	return []byte(s)
 }
 
 func injectODFEntries(raw []byte, added []jpegAdd) []byte {
@@ -136,7 +211,14 @@ func appendPhotoParagraphs(raw []byte, added []jpegAdd) []byte {
 	var b strings.Builder
 	for _, a := range added {
 		wu, hu := hwpSize(a.w, a.h)
-		b.WriteString(photoParagraph(a.id, wu, hu, a.caption))
+		if a.sizeHWP > 0 {
+			wu, hu = a.sizeHWP, a.sizeHWP
+		}
+		pb := "0"
+		if a.pageBreak {
+			pb = "1"
+		}
+		b.WriteString(photoParagraph(a.id, wu, hu, a.caption, pb))
 	}
 	if i := strings.LastIndex(s, "</hs:sec>"); i >= 0 {
 		return []byte(s[:i] + b.String() + s[i:])
@@ -170,9 +252,12 @@ func hwpSize(w, h int) (int, int) {
 	return wu, hu
 }
 
-func photoParagraph(id string, w, h int, caption string) string {
+func photoParagraph(id string, w, h int, caption string, pageBreak string) string {
+	if pageBreak == "" {
+		pageBreak = "0"
+	}
 	cap := xmlEscape(sanitizeValue(caption))
-	return fmt.Sprintf(`  <hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:pic id="0" zOrder="1" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0"><hp:offset x="0" y="0"/><hp:orgSz width="%d" height="%d"/><hp:curSz width="%d" height="%d"/><hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0" centerX="0" centerY="0"/><hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="%d" y="0"/><hc:pt2 x="%d" y="%d"/><hc:pt3 x="0" y="%d"/></hp:imgRect><hp:imgClip left="0" right="0" top="0" bottom="0"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:img binaryItemIDRef="%s" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/></hp:pic></hp:run></hp:p>
+	return fmt.Sprintf(`  <hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="%s" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:pic id="0" zOrder="1" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0"><hp:offset x="0" y="0"/><hp:orgSz width="%d" height="%d"/><hp:curSz width="%d" height="%d"/><hp:flip horizontal="0" vertical="0"/><hp:rotationInfo angle="0" centerX="0" centerY="0"/><hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="%d" y="0"/><hc:pt2 x="%d" y="%d"/><hc:pt3 x="0" y="%d"/></hp:imgRect><hp:imgClip left="0" right="0" top="0" bottom="0"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:img binaryItemIDRef="%s" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/></hp:pic></hp:run></hp:p>
   <hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>%s</hp:t></hp:run></hp:p>
-`, w, h, w, h, w, w, h, h, id, cap)
+`, pageBreak, w, h, w, h, w, w, h, h, id, cap)
 }

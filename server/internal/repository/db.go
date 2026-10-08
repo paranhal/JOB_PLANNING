@@ -1311,6 +1311,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyCreatedByColumns(db)
 	applyIsTestColumns(db)
 	applyUserProfileColumns(db)
+	applyReportSignatureV62(db)
+	applyReportSignaturePath2(db)
 	applyRoleFlagsV57(db)
 	applyRolePermissionsV58(db)
 	applyUsernameNocaseV58(db)

@@ -63,14 +63,43 @@
 
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
     <h3 class="text-sm font-semibold text-gray-800">사인</h3>
-    <p class="text-xs text-gray-500">이미지로 올리거나 아래에 그립니다. 흰 배경은 투명으로 저장합니다. 본인만 올릴 수 있습니다.</p>
-    {{if .HasSignature}}
-    <img src="/account/signature.png" alt="내 사인" class="h-20 w-auto border border-gray-100 rounded bg-white">
-    <form method="POST" action="/account/signature/delete" class="inline">
-      <button type="submit" class="text-xs text-red-600 hover:underline">사인 지우기</button>
-    </form>
+    <p class="text-xs text-gray-500">사람당 두 개까지 둡니다. 흰 배경은 투명으로 저장합니다. 본인만 올릴 수 있습니다.</p>
+    <div class="flex flex-wrap gap-6">
+      <div class="space-y-1">
+        <p class="text-xs font-medium text-gray-600">1번</p>
+        {{if .HasSignature}}
+        <img src="/account/signature.png" alt="1번 사인" class="h-20 w-auto border border-gray-100 rounded bg-white">
+        <form method="POST" action="/account/signature/delete" class="inline">
+          <input type="hidden" name="slot" value="1">
+          <button type="submit" class="text-xs text-red-600 hover:underline">1번 지우기</button>
+        </form>
+        {{else}}
+        <p class="text-xs text-gray-400">없음</p>
+        {{end}}
+      </div>
+      <div class="space-y-1">
+        <p class="text-xs font-medium text-gray-600">2번</p>
+        {{if .HasSignature2}}
+        <img src="/account/signature.png?slot=2" alt="2번 사인" class="h-20 w-auto border border-gray-100 rounded bg-white">
+        <form method="POST" action="/account/signature/delete" class="inline">
+          <input type="hidden" name="slot" value="2">
+          <button type="submit" class="text-xs text-red-600 hover:underline">2번 지우기</button>
+        </form>
+        {{else}}
+        <p class="text-xs text-gray-400">없음</p>
+        {{end}}
+      </div>
+    </div>
+    {{if and .HasSignature .HasSignature2}}
+    <p class="text-xs text-amber-800">둘 다 있습니다. 저장할 때 어느 칸을 바꿀지 고르세요.</p>
     {{end}}
     <form method="POST" action="/account/signature" enctype="multipart/form-data" class="space-y-3" id="sig-form">
+      {{if and .HasSignature .HasSignature2}}
+      <div class="flex gap-4 text-sm">
+        <label class="flex items-center gap-1"><input type="radio" name="slot" value="1" required> 1번 바꾸기</label>
+        <label class="flex items-center gap-1"><input type="radio" name="slot" value="2"> 2번 바꾸기</label>
+      </div>
+      {{end}}
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">이미지 올리기 (PNG·JPG, 1MB 이하)</label>
         <input type="file" name="file" accept="image/png,image/jpeg" class="w-full text-sm">
