@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"customer-support/internal/audit"
 	"customer-support/internal/model"
 )
 
@@ -218,6 +219,41 @@ func (r *UserRepo) Update(u *model.User) error {
 		rememberUserName(u.UserID, u.FullName)
 	}
 	return err
+}
+
+// UpdateAudited 사용자 한 줄과 감사 한 줄을 같은 트랜잭션으로 남긴다. 감사 실패 시 변경을 되돌린다.
+func (r *UserRepo) UpdateAudited(u *model.User, reason, summary, beforeJSON, afterJSON string) error {
+	if r == nil || r.db == nil || u == nil {
+		return fmt.Errorf("계정이 없습니다")
+	}
+	foldLegacyRole(u)
+	if model.IsAdminGrade(u.Role) {
+		u.IsTest = false
+	}
+	u.MarkProfileDoneIfComplete()
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
+		UPDATE users SET full_name=?,role=?,permissions=?,is_active=?,base_role=?,org_id=?,
+			mobile=?,tel=?,email=?,profile_done=?,is_test=?,is_readonly=? WHERE user_id=?`,
+		u.FullName, u.Role, u.Permissions, boolToInt(u.IsActive), u.BaseRole, u.OrgID,
+		u.Mobile, u.Tel, u.Email, boolToInt(u.ProfileDone), boolToInt(u.IsTest), boolToInt(u.IsReadOnly), u.UserID)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := audit.InsertTx(tx, audit.ActionUpdate, "users", "user_id", u.UserID, u.FullName,
+		beforeJSON, afterJSON, reason, summary); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	rememberUserName(u.UserID, u.FullName)
+	return nil
 }
 
 func (r *UserRepo) UpdateSignatureBox(userID, box string) error {

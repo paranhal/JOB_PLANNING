@@ -96,6 +96,7 @@
       <button type="submit" formaction="/users/bulk/job" class="px-3 py-1.5 border rounded-lg text-xs bg-white">업무 바꾸기</button>
       <input name="reason" placeholder="읽기전용 사유" class="border rounded px-2 py-1 text-xs w-40">
       <button type="submit" formaction="/users/bulk/readonly" class="px-3 py-1.5 border rounded-lg text-xs bg-white">읽기전용 켜기</button>
+      <button type="submit" formaction="/users/bulk/readonly" name="on" value="0" class="px-3 py-1.5 border rounded-lg text-xs bg-white">읽기전용 끄기</button>
       <button type="submit" formaction="/users/bulk/deactivate" class="px-3 py-1.5 border rounded-lg text-xs bg-white">비활성화</button>
       <button type="button" id="bulk-clear" class="ml-auto px-3 py-1.5 border rounded-lg text-xs bg-white">선택 해제</button>
       <div id="bulk-ids"></div>
@@ -313,6 +314,9 @@
         <p class="text-xs font-bold text-slate-500">깃발</p>
         <label class="flex gap-2 text-sm"><input type="checkbox" name="is_readonly" value="1" id="dRO"> <span>읽기전용<span class="block text-xs text-slate-500" id="roHint">볼 수는 있고 아무것도 바꿀 수 없습니다.</span></span></label>
         <label class="flex gap-2 text-sm" id="wTest"><input type="checkbox" name="is_test" value="1" id="dTest"> <span>테스터<span class="block text-xs text-slate-500">이 사람이 만든 자료를 지표에서 뺍니다.</span></span></label>
+        <label class="block text-xs font-semibold text-slate-500">깃발 사유
+          <input name="reason" id="dReason" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="읽기전용을 끄면 필수">
+        </label>
       </div>
       <div>
         <label class="block text-xs font-semibold text-slate-500 mb-1">핸드폰</label>

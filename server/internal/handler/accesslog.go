@@ -87,10 +87,48 @@ func userPublic(u *model.User) map[string]any {
 		"role":        u.Role,
 		"permissions": u.Permissions,
 		"org_id":      u.OrgID,
+		"is_readonly": u.IsReadOnly,
+		"is_test":     u.IsTest,
 		"mobile":      u.Mobile,
 		"tel":         u.Tel,
 		"email":       u.Email,
 	}
+}
+
+func orgLabel(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "(없음)"
+	}
+	return id
+}
+
+func userChangeDetails(before, after *model.User) []string {
+	if before == nil || after == nil {
+		return nil
+	}
+	var out []string
+	if model.NormalizeRole(before.Role) != model.NormalizeRole(after.Role) {
+		out = append(out, fmt.Sprintf("등급·업무 %s → %s", model.RoleLabel(before.Role), model.RoleLabel(after.Role)))
+	}
+	if strings.TrimSpace(before.OrgID) != strings.TrimSpace(after.OrgID) {
+		out = append(out, fmt.Sprintf("조직 %s → %s", orgLabel(before.OrgID), orgLabel(after.OrgID)))
+	}
+	if before.IsReadOnly != after.IsReadOnly {
+		if after.IsReadOnly {
+			out = append(out, "읽기전용 끄기 → 켜기")
+		} else {
+			out = append(out, "읽기전용 켜기 → 끄기")
+		}
+	}
+	if before.IsTest != after.IsTest {
+		if after.IsTest {
+			out = append(out, "테스터 끄기 → 켜기")
+		} else {
+			out = append(out, "테스터 켜기 → 끄기")
+		}
+	}
+	return out
 }
 
 func (h *AuthHandler) fillActorFromTokenCookie(c echo.Context, rec *auditlog.Record) {

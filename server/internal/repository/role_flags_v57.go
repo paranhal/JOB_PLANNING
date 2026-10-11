@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	"customer-support/internal/audit"
@@ -57,25 +58,43 @@ func migrateRoleFlagsV57(db *sql.DB) error {
 	pop := audit.Push(audit.Actor{Name: "시스템", Role: "system"})
 	defer pop()
 
-	r1, err := db.Exec(`UPDATE users SET
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	r1, err := tx.Exec(`UPDATE users SET
 		role = CASE WHEN TRIM(COALESCE(base_role,'')) IN ('sales','tech','support')
 			THEN base_role ELSE 'org_admin' END,
 		is_readonly = 1, base_role = '', permissions = ''
 		WHERE role='observer'`)
 	if err != nil {
+		_ = tx.Rollback()
 		return err
 	}
-	r2, err := db.Exec(`UPDATE users SET
+	r2, err := tx.Exec(`UPDATE users SET
 		role = CASE WHEN TRIM(COALESCE(base_role,'')) IN ('sales','tech','support')
 			THEN base_role ELSE 'support' END,
 		is_test = 1, base_role = ''
 		WHERE role='tester'`)
 	if err != nil {
+		_ = tx.Rollback()
 		return err
 	}
 	n1, _ := r1.RowsAffected()
 	n2, _ := r2.RowsAffected()
+	sum := fmt.Sprintf("시스템 전환 옵저버 %d줄 · 테스터 %d줄", n1, n2)
+	if err := audit.InsertTx(tx, audit.ActionUpdate, "users", "user_id", "v57", "시스템 전환",
+		"{}", "{}", "깃발 이관", sum); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err := tx.Exec(`INSERT OR REPLACE INTO id_sequences(seq_key,last_no) VALUES(?,1)`, roleFlagsV57MetaKey); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	log.Printf("[v57] 옵저버 %d줄 · 테스터 %d줄 을 깃발로 옮겼다", n1, n2)
-	markMetaDone(db, roleFlagsV57MetaKey)
 	return nil
 }

@@ -82,12 +82,52 @@ func LogWithReason(action, table, pk, id, label, before, after, reason string) {
 	if strings.TrimSpace(id) == "" && strings.TrimSpace(before) == "" && strings.TrimSpace(after) == "" {
 		return
 	}
+	if err := InsertStrict(action, table, pk, id, label, before, after, reason, ""); err != nil {
+		log.Printf("data_change_logs 기록 실패 (%s %s %s): %v", action, table, id, err)
+	}
+}
+
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// InsertStrict 감사 한 줄을 남긴다. 실패하면 에러를 돌려 호출 쪽에서 변경을 되돌리게 한다.
+// 행위자가 비면 이름을 "시스템" 으로 적는다. 비밀번호·해시·토큰 칸은 JSON 에서 뺀다.
+func InsertStrict(action, table, pk, id, label, before, after, reason, summary string) error {
+	if dbRef == nil {
+		return fmt.Errorf("감사 DB 가 없다")
+	}
+	return insertChange(dbRef, action, table, pk, id, label, before, after, reason, summary)
+}
+
+// InsertTx 같은 트랜잭션 안에서 감사 한 줄을 남긴다. 실패하면 롤백한다.
+func InsertTx(tx *sql.Tx, action, table, pk, id, label, before, after, reason, summary string) error {
+	if tx == nil {
+		return fmt.Errorf("감사 트랜잭션이 없다")
+	}
+	return insertChange(tx, action, table, pk, id, label, before, after, reason, summary)
+}
+
+func insertChange(ex execer, action, table, pk, id, label, before, after, reason, summary string) error {
+	if ex == nil || table == "data_change_logs" || table == "data_backups" || table == "data_log_archives" {
+		return fmt.Errorf("감사 대상이 아니다")
+	}
+	if strings.TrimSpace(id) == "" && strings.TrimSpace(before) == "" && strings.TrimSpace(after) == "" {
+		return fmt.Errorf("감사 내용이 비었다")
+	}
 	a := Current()
+	name := strings.TrimSpace(a.Name)
+	if name == "" {
+		name = "시스템"
+	}
 	if label == "" {
 		label = table
 	}
-	sum := fmt.Sprintf("%s %s (%s)", actionLabel(action), label, id)
-	_, err := dbRef.Exec(`
+	sum := strings.TrimSpace(summary)
+	if sum == "" {
+		sum = fmt.Sprintf("%s %s (%s)", actionLabel(action), label, id)
+	}
+	_, err := ex.Exec(`
 		INSERT INTO data_change_logs (
 			log_id, occurred_at, user_id, username, user_name,
 			action, table_name, pk_column, entity_id, entity_label, summary,
@@ -95,13 +135,28 @@ func LogWithReason(action, table, pk, id, label, before, after, reason string) {
 		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
 		"L"+uuid.New().String(),
 		time.Now().Format("2006-01-02 15:04:05"),
-		a.UserID, a.Username, a.Name,
+		a.UserID, a.Username, name,
 		action, table, pk, id, label, sum,
-		nullEmpty(before), nullEmpty(after), strings.TrimSpace(reason),
+		scrubSecrets(nullEmpty(before)), scrubSecrets(nullEmpty(after)), strings.TrimSpace(reason),
 	)
-	if err != nil {
-		log.Printf("data_change_logs 기록 실패 (%s %s %s): %v", action, table, id, err)
+	return err
+}
+
+func scrubSecrets(s string) string {
+	var m map[string]any
+	if json.Unmarshal([]byte(s), &m) != nil {
+		return s
 	}
+	for _, k := range []string{"password", "password_hash", "token", "jwt", "secret"} {
+		if _, ok := m[k]; ok {
+			m[k] = "***"
+		}
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }
 
 func nullEmpty(s string) string {
@@ -123,7 +178,7 @@ func ListLogs(limit int) ([]ChangeLog, error) {
 		SELECT log_id, occurred_at, COALESCE(user_id,''), COALESCE(username,''), COALESCE(user_name,''),
 		       action, table_name, COALESCE(pk_column,''), COALESCE(entity_id,''), COALESCE(entity_label,''),
 		       COALESCE(summary,''), COALESCE(before_json,''), COALESCE(after_json,''),
-		       COALESCE(rolled_back,0), COALESCE(rolled_back_at,'')
+		       COALESCE(rolled_back,0), COALESCE(rolled_back_at,''), COALESCE(reason,'')
 		FROM data_change_logs
 		ORDER BY occurred_at DESC, log_id DESC
 		LIMIT ?`, limit)
@@ -137,7 +192,7 @@ func ListLogs(limit int) ([]ChangeLog, error) {
 		var rb int
 		if err := rows.Scan(&l.LogID, &l.OccurredAt, &l.UserID, &l.Username, &l.UserName,
 			&l.Action, &l.TableName, &l.PKColumn, &l.EntityID, &l.EntityLabel,
-			&l.Summary, &l.BeforeJSON, &l.AfterJSON, &rb, &l.RolledBackAt); err != nil {
+			&l.Summary, &l.BeforeJSON, &l.AfterJSON, &rb, &l.RolledBackAt, &l.Reason); err != nil {
 			return nil, err
 		}
 		l.RolledBack = rb == 1

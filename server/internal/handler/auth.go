@@ -557,6 +557,7 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	orig := *u
 	before := userPublic(u)
 	wasActive := u.IsActive
 	oldName := strings.TrimSpace(u.FullName)
@@ -594,7 +595,26 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		}
 	}
 	u.IsActive = c.FormValue("is_active") != "0"
-	h.userRepo.Update(u)
+	reason := strings.TrimSpace(c.FormValue("reason"))
+	if orig.IsReadOnly && !u.IsReadOnly && reason == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("읽기전용을 끄려면 사유가 필요합니다."))
+	}
+	details := userChangeDetails(&orig, u)
+	if len(details) > 0 {
+		sum := strings.Join(details, " · ")
+		if err := h.userRepo.UpdateAudited(u, reason, sum, toJSON(before), toJSON(userPublic(u))); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("감사 기록을 남기지 못해 저장을 되돌렸습니다."))
+		}
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+			TargetTable: "users", TargetID: u.UserID, SubjectType: "user",
+			SubjectID: u.UserID, SubjectName: u.FullName,
+			Detail: sum, Reason: reason,
+			BeforeJSON: toJSON(before), AfterJSON: toJSON(userPublic(u)),
+		})
+	} else if err := h.userRepo.Update(u); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("저장하지 못했습니다."))
+	}
 	if wasActive && !u.IsActive {
 		accessLog(c, auditlog.Record{
 			Action:      auditlog.ActionDelete,

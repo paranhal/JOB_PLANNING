@@ -28,16 +28,17 @@ func (h *AuthHandler) UserSetWork(c echo.Context) error {
 	if job != model.RoleSales && job != model.RoleTech && job != model.RoleSupport {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("업무를 고르세요."))
 	}
-	before := u.Role
+	orig := *u
 	u.Role = job
-	if err := h.userRepo.Update(u); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("저장하지 못했습니다."))
+	sum := fmt.Sprintf("등급·업무 %s → %s", model.RoleLabel(orig.Role), model.RoleLabel(job))
+	if err := h.userRepo.UpdateAudited(u, "", sum, toJSON(userPublic(&orig)), toJSON(userPublic(u))); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("감사 기록을 남기지 못해 저장을 되돌렸습니다."))
 	}
 	accessLog(c, auditlog.Record{
 		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
 		TargetTable: "users", TargetID: u.UserID, SubjectType: "user",
 		SubjectID: u.UserID, SubjectName: u.FullName,
-		Detail: fmt.Sprintf("업무 %s → %s", model.RoleLabel(before), model.RoleLabel(job)),
+		Detail: sum, BeforeJSON: toJSON(userPublic(&orig)), AfterJSON: toJSON(userPublic(u)),
 	})
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
 }
@@ -49,7 +50,7 @@ func (h *AuthHandler) UsersBulkOrg(c echo.Context) error {
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
 	orgID := strings.TrimSpace(c.FormValue("org_id"))
-	users, names, err := h.usersForBulk(c, ids)
+	users, _, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
@@ -67,13 +68,18 @@ func (h *AuthHandler) UsersBulkOrg(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("조직을 고르세요."))
 	}
 	for i := range users {
+		orig := users[i]
 		users[i].OrgID = orgID
-		_ = h.userRepo.Update(&users[i])
+		sum := fmt.Sprintf("조직 %s → %s (%s)", orgLabel(orig.OrgID), orgLabel(orgID), orig.FullName)
+		if err := h.userRepo.UpdateAudited(&users[i], "", sum, toJSON(userPublic(&orig)), toJSON(userPublic(&users[i]))); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("감사 기록을 남기지 못해 저장을 되돌렸습니다: "+orig.FullName))
+		}
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+			TargetTable: "users", TargetID: orig.UserID, SubjectType: "user",
+			SubjectID: orig.UserID, SubjectName: orig.FullName, Detail: sum,
+		})
 	}
-	accessLog(c, auditlog.Record{
-		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
-		TargetTable: "users", Detail: "일괄 조직 옮기기 " + strings.Join(names, ", "),
-	})
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
 }
 
@@ -84,7 +90,7 @@ func (h *AuthHandler) UsersBulkJob(c echo.Context) error {
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
 	job := model.NormalizeRole(c.FormValue("job"))
-	users, names, err := h.usersForBulk(c, ids)
+	users, _, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
@@ -103,13 +109,18 @@ func (h *AuthHandler) UsersBulkJob(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("업무를 고르세요."))
 	}
 	for i := range users {
+		orig := users[i]
 		users[i].Role = job
-		_ = h.userRepo.Update(&users[i])
+		sum := fmt.Sprintf("등급·업무 %s → %s (%s)", model.RoleLabel(orig.Role), model.RoleLabel(job), orig.FullName)
+		if err := h.userRepo.UpdateAudited(&users[i], "", sum, toJSON(userPublic(&orig)), toJSON(userPublic(&users[i]))); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("감사 기록을 남기지 못해 저장을 되돌렸습니다: "+orig.FullName))
+		}
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+			TargetTable: "users", TargetID: orig.UserID, SubjectType: "user",
+			SubjectID: orig.UserID, SubjectName: orig.FullName, Detail: sum,
+		})
 	}
-	accessLog(c, auditlog.Record{
-		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
-		TargetTable: "users", Detail: "일괄 업무 바꾸기 " + strings.Join(names, ", "),
-	})
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
 }
 
@@ -120,19 +131,37 @@ func (h *AuthHandler) UsersBulkReadonly(c echo.Context) error {
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
 	reason := strings.TrimSpace(c.FormValue("reason"))
-	users, names, err := h.usersForBulk(c, ids)
+	on := c.FormValue("on") != "0"
+	users, _, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
-	for i := range users {
-		users[i].IsReadOnly = true
-		_ = h.userRepo.Update(&users[i])
+	if !on && reason == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("읽기전용을 끄려면 사유가 필요합니다."))
 	}
-	accessLog(c, auditlog.Record{
-		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
-		TargetTable: "users", Detail: "읽기전용 켜기 " + strings.Join(names, ", "),
-		Reason: reason,
-	})
+	if on && reason == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("읽기전용을 켜려면 사유가 필요합니다."))
+	}
+	verb := "읽기전용 끄기 → 켜기"
+	if !on {
+		verb = "읽기전용 켜기 → 끄기"
+	}
+	for i := range users {
+		orig := users[i]
+		if orig.IsReadOnly == on {
+			continue
+		}
+		users[i].IsReadOnly = on
+		sum := verb + " (" + orig.FullName + ")"
+		if err := h.userRepo.UpdateAudited(&users[i], reason, sum, toJSON(userPublic(&orig)), toJSON(userPublic(&users[i]))); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("감사 기록을 남기지 못해 저장을 되돌렸습니다: "+orig.FullName))
+		}
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+			TargetTable: "users", TargetID: orig.UserID, SubjectType: "user",
+			SubjectID: orig.UserID, SubjectName: orig.FullName, Detail: sum, Reason: reason,
+		})
+	}
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
 }
 

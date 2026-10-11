@@ -164,7 +164,7 @@ func TestAccessLogUserDeactivate(t *testing.T) {
 	userRepo.EnsureAdmin(HashPassword("admin"))
 	tech := &model.User{
 		Username: "tech1", PasswordHash: HashPassword("pw"), FullName: "기술원",
-		Role: model.RoleTech, IsActive: true,
+		Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary,
 	}
 	if err := userRepo.Create(tech); err != nil {
 		t.Fatal(err)

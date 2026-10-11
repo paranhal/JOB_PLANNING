@@ -50,7 +50,7 @@ func ArchiveLogs(dataDir string) (string, int, error) {
 			occurred_at TEXT, user_id TEXT, username TEXT, user_name TEXT,
 			action TEXT, table_name TEXT, pk_column TEXT, entity_id TEXT,
 			entity_label TEXT, summary TEXT, before_json TEXT, after_json TEXT,
-			rolled_back INTEGER DEFAULT 0, rolled_back_at TEXT
+			rolled_back INTEGER DEFAULT 0, rolled_back_at TEXT, reason TEXT NOT NULL DEFAULT ''
 		)`); err != nil {
 		return "", 0, err
 	}
@@ -58,7 +58,7 @@ func ArchiveLogs(dataDir string) (string, int, error) {
 	rows, err := dbRef.Query(`
 		SELECT log_id, occurred_at, user_id, username, user_name,
 		       action, table_name, pk_column, entity_id, entity_label, summary,
-		       before_json, after_json, rolled_back, rolled_back_at
+		       before_json, after_json, rolled_back, rolled_back_at, COALESCE(reason,'')
 		FROM data_change_logs`)
 	if err != nil {
 		return "", 0, err
@@ -68,20 +68,20 @@ func ArchiveLogs(dataDir string) (string, int, error) {
 	type rec struct {
 		LogID, OccurredAt, UserID, Username, UserName string
 		Action, TableName, PKColumn, EntityID, EntityLabel, Summary string
-		BeforeJSON, AfterJSON, RolledBackAt string
+		BeforeJSON, AfterJSON, RolledBackAt, Reason string
 		RolledBack int
 	}
 	var all []rec
 	for rows.Next() {
 		var r rec
-		var uid, un, um, pk, eid, el, sm, bj, aj, rbat sql.NullString
+		var uid, un, um, pk, eid, el, sm, bj, aj, rbat, reason sql.NullString
 		if err := rows.Scan(&r.LogID, &r.OccurredAt, &uid, &un, &um,
-			&r.Action, &r.TableName, &pk, &eid, &el, &sm, &bj, &aj, &r.RolledBack, &rbat); err != nil {
+			&r.Action, &r.TableName, &pk, &eid, &el, &sm, &bj, &aj, &r.RolledBack, &rbat, &reason); err != nil {
 			return "", 0, err
 		}
 		r.UserID, r.Username, r.UserName = uid.String, un.String, um.String
 		r.PKColumn, r.EntityID, r.EntityLabel, r.Summary = pk.String, eid.String, el.String, sm.String
-		r.BeforeJSON, r.AfterJSON, r.RolledBackAt = bj.String, aj.String, rbat.String
+		r.BeforeJSON, r.AfterJSON, r.RolledBackAt, r.Reason = bj.String, aj.String, rbat.String, reason.String
 		all = append(all, r)
 	}
 	rows.Close()
@@ -102,7 +102,7 @@ func ArchiveLogs(dataDir string) (string, int, error) {
 	for _, r := range all {
 		if _, err := st.Exec(r.LogID, r.OccurredAt, r.UserID, r.Username, r.UserName,
 			r.Action, r.TableName, r.PKColumn, r.EntityID, r.EntityLabel, r.Summary,
-			r.BeforeJSON, r.AfterJSON, r.RolledBack, r.RolledBackAt, ""); err != nil {
+			r.BeforeJSON, r.AfterJSON, r.RolledBack, r.RolledBackAt, r.Reason); err != nil {
 			st.Close()
 			tx.Rollback()
 			return "", 0, err
