@@ -5,6 +5,7 @@
        taskOpen: false,
        projectOpen: false,
        dailyKind: '',
+       workType: 'admin',
        preselect: '',
        preDue: '{{.Date}}',
        preWork: '{{.Date}}',
@@ -102,12 +103,14 @@
            this.preEnd = '09:30';
            this.preAssignee = '';
          }
-         this.dailyKind = kind === 'as' || kind === 'maintenance' ? kind : '';
+         this.dailyKind = kind === 'as' || kind === 'maintenance' || kind === 'sales' ? kind : '';
+         this.workType = kind === 'sales' ? 'sales' : 'admin';
          this.preselect = ref || '';
          this.taskOpen = true;
        },
        openTaskModal() {
          this.dailyKind = '';
+         this.workType = 'admin';
          this.preselect = '';
          this.preDue = '{{.Date}}';
          this.preWork = '{{.Date}}';

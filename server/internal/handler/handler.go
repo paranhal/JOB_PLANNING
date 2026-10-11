@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"html/template"
+	"net/http"
 	"strings"
 	"time"
 
@@ -220,10 +221,40 @@ func New(db *sql.DB) *Handler {
 	return h
 }
 
+const pathSalesDashboard = "/sales/dashboard"
+
+// isSalesHomeRedirect 영업 첫 화면은 영업 대시보드다. §73
+func isSalesHomeRedirect(c echo.Context) bool {
+	if c == nil || c.Request() == nil || c.Request().URL == nil {
+		return false
+	}
+	if c.Request().URL.Path != "/" {
+		return false
+	}
+	if strings.TrimSpace(c.QueryParam("home")) == "tech" {
+		return false
+	}
+	if currentRole(c) != model.RoleSales {
+		return false
+	}
+	return canViewSales(c)
+}
+
+func redirectSalesHome(c echo.Context) error {
+	if c.Request().Header.Get("HX-Request") == "true" {
+		c.Response().Header().Set("HX-Redirect", pathSalesDashboard)
+		return c.NoContent(http.StatusOK)
+	}
+	return c.Redirect(http.StatusFound, pathSalesDashboard)
+}
+
 func (h *Handler) Dashboard(c echo.Context) error {
 	role := ctxString(c, "role")
 	if role == "" {
 		return redirectLogin(c)
+	}
+	if isSalesHomeRedirect(c) {
+		return redirectSalesHome(c)
 	}
 	userName := ctxString(c, "user_name")
 	username := ctxString(c, "username")

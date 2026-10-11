@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
   <title>{{block "title" .}}고객지원시스템{{end}}</title>
   <link rel="stylesheet" href="/static/vendor/tailwind.css?v={{.AssetQuery}}">
   <script src="/static/vendor/htmx.min.js?v={{.AssetQuery}}"></script>
@@ -283,24 +284,57 @@
 {{end}}
 
 {{if .ShowAssignNoticeModal}}
-<div id="assign-notice-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4"
-     x-data="{ open:'', assigned:true, unassigned: {{if .ExpandUnassigned}}true{{else}}false{{end}} }">
-  <div class="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl p-5 space-y-4">
-    <h2 class="text-base font-bold text-gray-900">손봐야 할 업무 {{.AssignNoticeTotal}}건</h2>
+<div id="assign-notice-modal" class="modal-backdrop flex items-center justify-center p-4"
+     x-data="{
+       visible: true,
+       open: '',
+       assigned: true,
+       unassigned: {{if .ExpandUnassigned}}true{{else}}false{{end}},
+       async closeNotice() {
+         if (!this.visible) return;
+         this.visible = false;
+         try {
+           await fetch('/work/assign-notices/later', { method: 'POST', credentials: 'same-origin', headers: { 'X-Assign-Notice': 'close' } });
+         } catch (e) {}
+         if (location.search.indexOf('assign=') !== -1) {
+           const u = new URL(location.href);
+           u.searchParams.delete('assign');
+           history.replaceState({}, '', u.pathname + (u.search || '') + u.hash);
+         }
+       }
+     }"
+     x-show="visible"
+     x-init="if (location.search.indexOf('assign=1') !== -1) { const u = new URL(location.href); u.searchParams.delete('assign'); history.replaceState({}, '', u.pathname + (u.search || '') + u.hash); }"
+     @keydown.escape.window="closeNotice()"
+     @click.self="closeNotice()">
+  <div class="modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden p-0 shadow-pop" @click.stop>
+    <div class="sticky top-0 z-10 flex min-h-[44px] items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
+      <h2 class="text-ui font-bold text-ink">손봐야 할 업무 {{.AssignNoticeTotal}}건</h2>
+      <button type="button" class="btn btn-ghost min-h-[44px] min-w-[44px] px-3" @click="closeNotice()" aria-label="닫기" title="닫기">&times;</button>
+    </div>
+    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+    {{if or .AssignNoticeErr .AssignNoticeFailN}}
+    <div class="flash-danger rounded-control" role="alert">
+      {{if eq .AssignNoticeErr "assignee"}}담당자를 선택하세요.{{else if eq .AssignNoticeErr "date"}}날짜를 입력하세요.{{else if eq .AssignNoticeErr "hold_reason"}}보류 사유를 입력하세요.{{else if eq .AssignNoticeErr "org"}}조직 범위 밖의 담당자입니다.{{else if eq .AssignNoticeErr "unsupported"}}이 유형은 해당 처리를 지원하지 않습니다.{{else if eq .AssignNoticeErr "select"}}처리할 항목을 고르세요.{{else if .AssignNoticeErr}}처리하지 못했습니다.{{end}}
+      {{if .AssignNoticeFailN}}성공 {{.AssignNoticeOKN}}건 · 실패 {{.AssignNoticeFailN}}건{{end}}
+    </div>
+    {{else if .AssignNoticeOK}}
+    <div class="flash-success rounded-control">처리했습니다{{if .AssignNoticeOKN}} ({{.AssignNoticeOKN}}건){{end}}</div>
+    {{end}}
 
     {{if .LoginHelps}}
     <div>
-      <p class="text-sm font-semibold text-gray-800">계정 문의 {{len .LoginHelps}}건</p>
-      <ul class="mt-2 space-y-2 text-sm">
+      <p class="text-ui font-semibold text-ink">계정 문의 {{len .LoginHelps}}건</p>
+      <ul class="mt-2 space-y-2 text-ui">
         {{range .LoginHelps}}
-        <li class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-          <p class="font-medium text-gray-800">{{.Name}} · {{.Mobile}}</p>
-          <p class="text-gray-600">{{.Kind}} {{.Message}}</p>
-          <form method="post" action="/admin/login-help/{{.RequestID}}/handle" class="mt-2 flex flex-wrap gap-1">
+        <li class="card card-body">
+          <p class="font-medium text-ink">{{.Name}} · {{.Mobile}}</p>
+          <p class="text-ink-muted">{{.Kind}} {{.Message}}</p>
+          <form method="post" action="/admin/login-help/{{.RequestID}}/handle" class="mt-2 flex min-h-[44px] flex-wrap items-center gap-2">
             <input type="hidden" name="back" value="/">
-            <input type="text" name="handle_note" placeholder="처리 방법" class="rounded border px-1 py-0.5 text-xs flex-1">
-            <button name="status" value="done" class="rounded bg-blue-600 px-2 py-0.5 text-xs text-white">처리</button>
-            <button name="status" value="ignored" class="rounded border px-2 py-0.5 text-xs">무시</button>
+            <input type="text" name="handle_note" placeholder="처리 방법" class="input min-h-[44px] flex-1">
+            <button name="status" value="done" class="btn btn-primary min-h-[44px]">처리</button>
+            <button name="status" value="ignored" class="btn btn-secondary min-h-[44px]">무시</button>
           </form>
         </li>
         {{end}}
@@ -310,56 +344,56 @@
 
     {{if .AssignNotices}}
     <div>
-      <button type="button" class="text-sm font-semibold text-gray-800" @click="assigned=!assigned">새로 배정된 업무 {{len .AssignNotices}}건</button>
+      <button type="button" class="text-ui font-semibold text-ink" @click="assigned=!assigned">새로 배정된 업무 {{len .AssignNotices}}건</button>
       <div x-show="assigned" class="mt-2 space-y-2">
         <form method="post" class="space-y-3">
-          <ul class="max-h-56 space-y-2 overflow-y-auto text-sm">
+          <ul class="space-y-2 text-ui">
             {{range .AssignNotices}}
             {{$key := noticeKey .}}
-            <li class="rounded-lg border border-gray-200">
+            <li class="card">
               <div class="flex items-start gap-2 px-3 py-2">
-                <input type="checkbox" name="notice_id" value="{{.NoticeID}}" checked class="mt-1">
-                <button type="button" class="flex-1 text-left" @click="open = (open==='n-{{.NoticeID}}' ? '' : 'n-{{.NoticeID}}')">
-                  <span class="font-medium text-gray-800">{{.Number}}</span>
-                  <span class="text-gray-600"> {{.OrgName}}</span>
-                  <span class="block text-gray-500">{{.Title}}</span>
+                <input type="checkbox" name="notice_id" value="{{.NoticeID}}" checked class="mt-2 min-h-[44px] min-w-[44px]">
+                <button type="button" class="min-h-[44px] flex-1 text-left" @click="open = (open==='n-{{.NoticeID}}' ? '' : 'n-{{.NoticeID}}')">
+                  <span class="font-medium text-ink">{{.Number}}</span>
+                  <span class="text-ink-muted"> {{.OrgName}}</span>
+                  <span class="block text-ink-muted">{{.Title}}</span>
                 </button>
               </div>
-              <div class="flex flex-wrap items-end gap-1 px-3 pb-2">
+              <div class="flex flex-col gap-2 px-3 pb-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <input type="hidden" name="key" value="{{$key}}">
-                <input type="date" name="work_date" value="{{$.AssignNoticeDate}}" class="rounded border px-1 py-0.5 text-xs">
-                <select name="assignee" class="rounded border px-1 py-0.5 text-xs">
+                <input type="date" name="work_date" value="{{$.AssignNoticeDate}}" class="input min-h-[44px] w-full sm:w-auto">
+                <select name="assignee" class="select min-h-[44px] w-full sm:w-auto">
                   <option value="">담당자</option>
                   {{range $.AssignNoticeAssignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
                 </select>
-                <button formaction="/work/assign/one" class="rounded bg-blue-600 px-2 py-0.5 text-xs text-white">배정</button>
-                <button formaction="/work/transfer/one" class="rounded border px-2 py-0.5 text-xs">이관</button>
-                <input type="text" name="hold_reason" placeholder="보류 사유" class="rounded border px-1 py-0.5 text-xs w-28">
-                <button formaction="/work/hold/one" class="rounded border px-2 py-0.5 text-xs">보류</button>
-                <button formaction="/work/notice/dismiss" class="rounded border px-2 py-0.5 text-xs text-gray-500">✕</button>
+                <button formaction="/work/assign/one" class="btn btn-primary min-h-[44px] w-full sm:w-auto">배정</button>
+                <button formaction="/work/transfer/one" class="btn btn-secondary min-h-[44px] w-full sm:w-auto">이관</button>
+                <input type="text" name="hold_reason" placeholder="보류 사유" class="input min-h-[44px] w-full sm:min-w-[10rem] sm:flex-1">
+                <button formaction="/work/hold/one" class="btn btn-secondary min-h-[44px] w-full sm:w-auto">보류</button>
+                <button formaction="/work/notice/dismiss" class="btn btn-ghost min-h-[44px] min-w-[44px]" title="이번엔 제외" aria-label="이번엔 제외">✕</button>
               </div>
               <div x-show="open==='n-{{.NoticeID}}'" x-cloak class="px-3 pb-3">
-                <iframe :src="open==='n-{{.NoticeID}}' ? '{{noticeEmbed .}}' : ''" class="w-full h-64 rounded border"></iframe>
+                <iframe :src="open==='n-{{.NoticeID}}' ? '{{noticeEmbed .}}' : ''" class="h-64 w-full rounded-control border border-line"></iframe>
               </div>
             </li>
             {{end}}
           </ul>
-          <div class="flex flex-wrap items-end gap-3">
-            <label class="text-sm text-gray-600">날짜
+          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            <label class="text-ui text-ink-muted">날짜
               <input type="date" name="work_date" value="{{.AssignNoticeDate}}" min="2000-01-01" max="2100-12-31"
-                     class="ml-1 rounded border border-gray-300 px-2 py-1 text-sm">
+                     class="input mt-1 min-h-[44px]">
             </label>
-            <select name="assignee" class="rounded border border-gray-300 px-2 py-1 text-sm">
+            <select name="assignee" class="select min-h-[44px] sm:w-auto">
               <option value="">담당자</option>
               {{range .AssignNoticeAssignees}}
               <option value="{{.FullName}}">{{.FullName}}</option>
               {{end}}
             </select>
           </div>
-          <div class="flex flex-wrap gap-2 pt-1">
-            <button type="submit" formaction="/work/assign-notices/add" class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">일일 업무에 추가</button>
-            <button type="submit" formaction="/work/assign-notices/later" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">나중에</button>
-            <button type="submit" formaction="/work/assign-notices/transfer" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">다른 사람에게</button>
+          <div class="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap">
+            <button type="submit" formaction="/work/assign-notices/add" class="btn btn-primary min-h-[44px]">일일 업무에 추가</button>
+            <button type="submit" formaction="/work/assign-notices/later" class="btn btn-secondary min-h-[44px]">나중에</button>
+            <button type="submit" formaction="/work/assign-notices/transfer" class="btn btn-secondary min-h-[44px]">다른 사람에게</button>
           </div>
         </form>
       </div>
@@ -368,38 +402,42 @@
 
     {{if and .CanAssignWork .AssignUnassigned}}
     <div>
-      <button type="button" class="text-sm font-semibold text-gray-800" @click="unassigned=!unassigned">담당자 미배정 {{len .AssignUnassigned}}건</button>
+      <button type="button" class="text-ui font-semibold text-ink" @click="unassigned=!unassigned">담당자 미배정 {{len .AssignUnassigned}}건</button>
       <div x-show="unassigned" class="mt-2 space-y-2">
         {{range .AssignUnassigned}}
         {{$key := workAssignKey .}}
-        <div class="rounded-lg border border-orange-200">
-          <button type="button" class="w-full text-left px-3 py-2 text-sm" @click="open = (open==='{{$key}}' ? '' : '{{$key}}')">
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
+        <div class="card">
+          <button type="button" class="min-h-[44px] w-full px-3 py-2 text-left text-ui" @click="open = (open==='{{$key}}' ? '' : '{{$key}}')">
+            <span class="rounded-control px-1.5 py-0.5 text-ui-xs font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
             <span class="font-medium">{{.OrgName}}</span>
-            <span class="text-gray-500"> {{.RefNumber}} · {{.Title}}</span>
+            <span class="text-ink-muted"> {{.RefNumber}} · {{.Title}}</span>
           </button>
-          <form method="post" class="flex flex-wrap items-end gap-1 px-3 pb-2">
+          <form method="post" class="flex flex-col gap-2 px-3 pb-3 sm:flex-row sm:flex-wrap sm:items-end">
             <input type="hidden" name="key" value="{{$key}}">
             <input type="hidden" name="back" value="/">
-            <input type="date" name="work_date" value="{{$.AssignNoticeDate}}" class="rounded border px-1 py-0.5 text-xs">
-            <select name="assignee" class="rounded border px-1 py-0.5 text-xs">
+            <input type="date" name="work_date" value="{{$.AssignNoticeDate}}" class="input min-h-[44px] w-full sm:w-auto">
+            <select name="assignee" class="select min-h-[44px] w-full sm:w-auto">
               <option value="">담당자</option>
               {{range $.AssignNoticeAssignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
             </select>
-            <button formaction="/work/assign/one" class="rounded bg-blue-600 px-2 py-0.5 text-xs text-white">배정</button>
-            <button formaction="/work/transfer/one" class="rounded border px-2 py-0.5 text-xs">이관</button>
-            <input type="text" name="hold_reason" placeholder="보류 사유" class="rounded border px-1 py-0.5 text-xs w-28">
-            <button formaction="/work/hold/one" class="rounded border px-2 py-0.5 text-xs">보류</button>
-            <button formaction="/work/notice/dismiss" class="rounded border px-2 py-0.5 text-xs text-gray-500">✕</button>
+            <button formaction="/work/assign/one" class="btn btn-primary min-h-[44px] w-full sm:w-auto">배정</button>
+            <button formaction="/work/transfer/one" class="btn btn-secondary min-h-[44px] w-full sm:w-auto">이관</button>
+            <input type="text" name="hold_reason" placeholder="보류 사유" class="input min-h-[44px] w-full sm:min-w-[10rem] sm:flex-1">
+            <button formaction="/work/hold/one" class="btn btn-secondary min-h-[44px] w-full sm:w-auto">보류</button>
+            <button formaction="/work/notice/dismiss" class="btn btn-ghost min-h-[44px] min-w-[44px]" title="이번엔 제외" aria-label="이번엔 제외">✕</button>
           </form>
           <div x-show="open==='{{$key}}'" x-cloak class="px-3 pb-3">
-            <iframe :src="open==='{{$key}}' ? '{{workEmbedHref .}}' : ''" class="w-full h-64 rounded border"></iframe>
+            <iframe :src="open==='{{$key}}' ? '{{workEmbedHref .}}' : ''" class="h-64 w-full rounded-control border border-line"></iframe>
           </div>
         </div>
         {{end}}
       </div>
     </div>
     {{end}}
+    </div>
+    <div class="sticky bottom-0 flex min-h-[44px] justify-end border-t border-line bg-surface px-4 py-3">
+      <button type="button" class="btn btn-secondary min-h-[44px]" @click="closeNotice()">닫기</button>
+    </div>
   </div>
 </div>
 {{end}}

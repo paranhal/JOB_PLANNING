@@ -7,7 +7,7 @@
   - Windows: Docker Desktop
 
 ■ 폴더 구성
-  server-app.tar     : Docker 이미지 (지금 59-G)
+  server-app.tar     : Docker 이미지 (지금 66)
   docker-compose.yml : 호스트 8888 → 컨테이너 8080
   data/              : SQLite DB·업로드  (운영 서버에 이미 있으면 올리지 말 것)
   start.sh / stop.sh : Linux
@@ -34,7 +34,7 @@
        chmod +x update.sh rollback.sh backup-db.sh
        ./update.sh
        curl -s localhost:8888/version
-  3. version 이 59-G 이고 built·started 가 방금이어야 성공
+  3. version 이 66 이고 built·started 가 방금이어야 성공
   4. http://공인IP:8888
 
 ■ 앱만 원복 (이번 배포가 이상할 때)

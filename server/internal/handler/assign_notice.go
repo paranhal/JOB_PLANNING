@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -144,11 +146,14 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 		if path == "/login" || path == "/logout" || path == "/version" || strings.HasPrefix(path, "/static") || strings.HasPrefix(path, "/api") {
 			return next(c)
 		}
+		// 302 로 나가는 GET / 에서는 팝업을 계산하지 않는다. 쿠키를 소비하면 도착 화면에서 안 뜬다. §73
+		if isSalesHomeRedirect(c) {
+			return next(c)
+		}
 		n, err := h.notices.repo.CountUnseen(uid)
 		if err != nil {
 			return next(c)
 		}
-		c.Set("assign_notice_unread", n)
 		var unassigned []model.WorkListItem
 		canAssign := canWriteWorkboard(c)
 		if canAssign && h.workBoard != nil {
@@ -172,13 +177,15 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 		c.Set("login_helps", helps)
+		c.Set("assign_notice_unread", n+len(unassigned)+len(helps))
 		force := c.QueryParam("assign") == "1"
 		if force {
 			c.Set("expand_unassigned", true)
 		}
+		home := path == "/" || path == "/work" || path == pathSalesDashboard
 		showModal := c.Request().Method == http.MethodGet &&
 			c.Request().Header.Get("HX-Request") != "true" &&
-			(force || ((n > 0 || len(unassigned) > 0 || len(helps) > 0) && !assignNoticeShownToday(c)))
+			(force || (home && (n > 0 || len(unassigned) > 0 || len(helps) > 0) && !assignNoticeShownToday(c)))
 		if showModal {
 			if n > 0 {
 				items, err := h.notices.repo.ListUnseen(uid)
@@ -192,9 +199,6 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 				}
 			}
 			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0 || len(helps) > 0)
-			if show, _ := c.Get("show_assign_notice_modal").(bool); show && !force {
-				setAssignNoticeShownCookie(c)
-			}
 		}
 		return next(c)
 	}
@@ -243,9 +247,25 @@ func injectAssignNoticeView(c echo.Context, data map[string]interface{}) {
 	if v := c.Get("login_helps"); v != nil {
 		data["LoginHelps"] = v
 	}
-	data["AssignNoticeTotal"] = sliceLen(data["AssignNotices"]) + sliceLen(data["AssignUnassigned"]) + sliceLen(data["LoginHelps"])
+	total := sliceLen(data["AssignNotices"]) + sliceLen(data["AssignUnassigned"]) + sliceLen(data["LoginHelps"])
+	if unread, ok := data["AssignNoticeUnread"].(int); ok && unread > total {
+		total = unread
+	}
+	data["AssignNoticeTotal"] = total
 	if _, ok := data["AssignNoticeDate"]; !ok {
 		data["AssignNoticeDate"] = time.Now().Format("2006-01-02")
+	}
+	if err := strings.TrimSpace(c.QueryParam("err")); err != "" {
+		data["AssignNoticeErr"] = err
+	}
+	if ok := strings.TrimSpace(c.QueryParam("ok")); ok != "" {
+		data["AssignNoticeOK"] = ok
+	}
+	if n := strings.TrimSpace(c.QueryParam("ok_n")); n != "" {
+		data["AssignNoticeOKN"] = n
+	}
+	if n := strings.TrimSpace(c.QueryParam("fail_n")); n != "" {
+		data["AssignNoticeFailN"] = n
 	}
 }
 
@@ -287,7 +307,10 @@ func assignNoticeIDs(c echo.Context) []string {
 // AssignNoticeLater 「나중에」— 그날 모달을 다시 띄우지 않는다. 안 본 건수는 남긴다. §42.5
 func (h *WorkHandler) AssignNoticeLater(c echo.Context) error {
 	setAssignNoticeShownCookie(c)
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	if c.Request().Header.Get("HX-Request") == "true" || c.Request().Header.Get("X-Assign-Notice") == "close" {
+		return c.NoContent(http.StatusNoContent)
+	}
+	return c.Redirect(http.StatusSeeOther, stripAssignOpen(assignNoticeBack(c)))
 }
 
 // AssignNoticeAdd 고른 알림을 일일 업무에 넣는다. §42.5
@@ -301,19 +324,34 @@ func (h *WorkHandler) AssignNoticeAdd(c echo.Context) error {
 	}
 	uid := h.notices.viewerID(c)
 	var done []string
-	for _, id := range assignNoticeIDs(c) {
+	fail := 0
+	ids := assignNoticeIDs(c)
+	if len(ids) == 0 {
+		return h.finishAssignNotice(c, "select", "")
+	}
+	for _, id := range ids {
 		n, err := h.notices.repo.GetOwned(id, uid)
 		if err != nil || n == nil {
+			fail++
 			continue
 		}
 		if err := h.applyNoticeAdd(n, date); err != nil {
+			fail++
 			continue
 		}
 		done = append(done, id)
 	}
 	_ = h.notices.repo.MarkSeenAndActed(done, uid)
+	back := assignNoticeKeepPath(c)
+	q := "ok=add&ok_n=" + itoaLen(len(done)) + "&fail_n=" + itoaLen(fail)
+	if fail > 0 && len(done) == 0 {
+		return h.finishAssignNotice(c, "assign", "")
+	}
+	if h.assignNoticeStillOpen(c, "") {
+		return c.Redirect(http.StatusSeeOther, back+qjoin(back, "assign=1&"+q))
+	}
 	setAssignNoticeShownCookie(c)
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	return c.Redirect(http.StatusSeeOther, stripAssignOpen(back)+qjoin(stripAssignOpen(back), q))
 }
 
 // AssignNoticeTransfer 고른 알림을 다른 담당자에게 넘긴다. 이력 표는 §42.6. §42.5
@@ -327,19 +365,34 @@ func (h *WorkHandler) AssignNoticeTransfer(c echo.Context) error {
 	}
 	uid := h.notices.viewerID(c)
 	var done []string
-	for _, id := range assignNoticeIDs(c) {
+	fail := 0
+	ids := assignNoticeIDs(c)
+	if len(ids) == 0 {
+		return h.finishAssignNotice(c, "select", "")
+	}
+	for _, id := range ids {
 		n, err := h.notices.repo.GetOwned(id, uid)
 		if err != nil || n == nil {
+			fail++
 			continue
 		}
 		if err := h.applyNoticeTransfer(c, n, to); err != nil {
+			fail++
 			continue
 		}
 		done = append(done, id)
 	}
 	_ = h.notices.repo.MarkSeenAndActed(done, uid)
+	back := assignNoticeKeepPath(c)
+	q := "ok=transfer&ok_n=" + itoaLen(len(done)) + "&fail_n=" + itoaLen(fail)
+	if fail > 0 && len(done) == 0 {
+		return h.finishAssignNotice(c, "transfer", "")
+	}
+	if h.assignNoticeStillOpen(c, "") {
+		return c.Redirect(http.StatusSeeOther, back+qjoin(back, "assign=1&"+q))
+	}
 	setAssignNoticeShownCookie(c)
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	return c.Redirect(http.StatusSeeOther, stripAssignOpen(back)+qjoin(stripAssignOpen(back), q))
 }
 
 func (h *WorkHandler) applyNoticeAdd(n *model.AssignNotice, date string) error {
@@ -355,7 +408,7 @@ func (h *WorkHandler) applyNoticeAdd(n *model.AssignNotice, date string) error {
 	case model.AssignNoticeSourceTask:
 		key = "task:" + n.SourceID
 	default:
-		return nil
+		return fmt.Errorf("지원하지 않는 유형입니다")
 	}
 	if err := h.repo.AssignUnplannedDate(key, date, "", ""); err != nil {
 		return err
@@ -379,7 +432,7 @@ func (h *WorkHandler) applyNoticeTransfer(c echo.Context, n *model.AssignNotice,
 	switch n.SourceType {
 	case model.AssignNoticeSourceAS:
 		if h.asRepo == nil {
-			return nil
+			return fmt.Errorf("지원하지 않는 유형입니다")
 		}
 		as, err := h.asRepo.GetByID(currentOrg(c), n.SourceID)
 		if err != nil || as == nil {
@@ -394,7 +447,7 @@ func (h *WorkHandler) applyNoticeTransfer(c echo.Context, n *model.AssignNotice,
 		h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, to.FullName, to.UserID, n.UserID, n.UserID)
 	case model.AssignNoticeSourceMaintenance:
 		if h.mntRepo == nil {
-			return nil
+			return fmt.Errorf("지원하지 않는 유형입니다")
 		}
 		v, err := h.mntRepo.GetVisit(n.SourceID)
 		if err != nil || v == nil {
@@ -410,12 +463,18 @@ func (h *WorkHandler) applyNoticeTransfer(c echo.Context, n *model.AssignNotice,
 		h.notices.Record(c, model.AssignNoticeSourceMaintenance, v.VisitID, to.FullName, to.UserID, n.UserID, n.UserID)
 	case model.AssignNoticeSourceTask:
 		if h.wbRepo == nil {
-			return nil
+			return fmt.Errorf("지원하지 않는 유형입니다")
 		}
 		if err := h.wbRepo.SetTaskAssignee(n.SourceID, to.FullName); err != nil {
 			return err
 		}
 		h.notices.Record(c, model.AssignNoticeSourceTask, n.SourceID, to.FullName, to.UserID, n.UserID, n.UserID)
+	default:
+		return fmt.Errorf("지원하지 않는 유형입니다")
 	}
 	return nil
+}
+
+func itoaLen(n int) string {
+	return strconv.Itoa(n)
 }

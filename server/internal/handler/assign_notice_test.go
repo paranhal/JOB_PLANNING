@@ -51,13 +51,23 @@ func newAssignNoticeServer(t *testing.T) (*echo.Echo, *sql.DB, *model.User) {
 	g.Use(h.Auth.InjectViewAs)
 	g.Use(h.Auth.GuardViewAsWrite)
 	g.Use(h.InjectAssignNotices)
+	g.GET("/", h.Dashboard)
 	g.GET("/work", h.Work.List)
+	g.GET("/sales/dashboard", h.Sales.Dashboard)
+	g.GET("/plan/unplanned", h.Work.UnplannedList)
 	g.POST("/as", h.AS.Create)
 	g.POST("/view-as", h.Auth.SetViewAs)
 	g.POST("/view-as/clear", h.Auth.ClearViewAs)
 	g.POST("/work/assign-notices/later", h.Work.AssignNoticeLater)
 	g.POST("/work/assign-notices/add", h.Work.AssignNoticeAdd)
 	g.POST("/work/assign-notices/transfer", h.Work.AssignNoticeTransfer)
+	g.POST("/work/assign/one", h.Work.AssignOne)
+	g.POST("/work/transfer/one", h.Work.TransferOne)
+	g.POST("/work/hold/one", h.Work.HoldOne)
+	g.POST("/work/notice/dismiss", h.Work.DismissOne)
+	g.POST("/work/assign/create", h.Work.CreateAssign)
+	g.GET("/workboard/register", h.Workboard.Register)
+	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	return e, db, choi
 }
 
@@ -66,7 +76,8 @@ func jwtCookieUser(t *testing.T, u *model.User) *http.Cookie {
 	secret := []byte("cs-system-jwt-secret-2026")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": u.UserID, "username": u.Username, "role": u.Role,
-		"name": u.FullName, "exp": time.Now().Add(time.Hour).Unix(),
+		"name": u.FullName, "org_id": u.OrgID, "is_readonly": u.IsReadOnly,
+		"exp": time.Now().Add(time.Hour).Unix(),
 	})
 	s, err := token.SignedString(secret)
 	if err != nil {
@@ -136,9 +147,11 @@ func TestAssignNoticeModalAndBadge(t *testing.T) {
 	if !strings.Contains(body, "bg-red-500") || !strings.Contains(body, ">2</span>") {
 		t.Fatal("사이드바 안 본 건수 뱃지가 없다")
 	}
-	shown := cookieNamed(first, assignNoticeShownCookie)
-	if shown == nil || shown.Value != time.Now().Format("2006-01-02") {
-		t.Fatal("모달 표시 쿠키가 없다")
+	if !strings.Contains(body, `aria-label="닫기"`) || !strings.Contains(body, ">닫기</button>") {
+		t.Fatal("닫기 버튼이 없다")
+	}
+	if cookieNamed(first, assignNoticeShownCookie) != nil {
+		t.Fatal("표시만으로 오늘 봤음 쿠키가 생겼다")
 	}
 	var seen int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM work_assign_notices WHERE user_id=? AND seen_at IS NOT NULL`, choi.UserID).Scan(&seen); err != nil {
@@ -148,29 +161,25 @@ func TestAssignNoticeModalAndBadge(t *testing.T) {
 		t.Fatal("조회가 seen_at 을 채웠다")
 	}
 
-	second := doGetWith(t, e, "/work", ck, shown)
+	second := doGetWith(t, e, "/work", ck)
 	if second.Code != http.StatusOK {
 		t.Fatalf("second status=%d", second.Code)
 	}
-	if strings.Contains(second.Body.String(), "새로 배정된 업무") {
-		t.Fatal("같은 날 모달이 다시 떴다")
-	}
-	if !strings.Contains(second.Body.String(), "bg-red-500") {
-		t.Fatal("모달을 닫아도 뱃지가 사라졌다")
+	if !strings.Contains(second.Body.String(), "새로 배정된 업무") {
+		t.Fatal("닫기 전에 모달이 사라졌다")
 	}
 
 	later := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/work/assign-notices/later", nil)
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	req.AddCookie(ck)
-	req.AddCookie(shown)
 	e.ServeHTTP(later, req)
 	if later.Code != http.StatusSeeOther {
 		t.Fatalf("later status=%d", later.Code)
 	}
 	laterCk := cookieNamed(later, assignNoticeShownCookie)
 	if laterCk == nil {
-		laterCk = shown
+		t.Fatal("나중에 후에도 오늘 봤음 쿠키가 없다")
 	}
 	third := doGetWith(t, e, "/work", ck, laterCk)
 	if strings.Contains(third.Body.String(), "새로 배정된 업무") {

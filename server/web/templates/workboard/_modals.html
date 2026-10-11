@@ -11,7 +11,7 @@
     <!-- 1단계: 업무 종류 선택 -->
     <div class="p-5 space-y-3" x-show="!dailyKind" x-cloak>
       <p class="text-sm text-gray-600">등록할 일일 업무 종류를 선택하세요.</p>
-      <button type="button" @click="dailyKind='admin'"
+      <button type="button" @click="dailyKind='admin'; workType='admin'"
               class="w-full text-left border border-violet-200 rounded-xl px-4 py-3 hover:bg-violet-50">
         <p class="font-medium text-gray-800">행정 / 지원업무</p>
         <p class="text-xs text-gray-500 mt-0.5">사업·행정 관련 일일 업무를 직접 입력합니다.</p>
@@ -26,14 +26,19 @@
         <p class="font-medium text-gray-800">정기점검 일일업무</p>
         <p class="text-xs text-gray-500 mt-0.5">정기점검 번호를 골라 업무 고유번호를 부여합니다.</p>
       </button>
+      <button type="button" @click="dailyKind='sales'; workType='sales'"
+              class="w-full text-left border border-orange-200 rounded-xl px-4 py-3 hover:bg-orange-50">
+        <p class="font-medium text-gray-800">영업 활동</p>
+        <p class="text-xs text-gray-500 mt-0.5">영업 사업·활동 관련 일일 업무를 등록합니다.</p>
+      </button>
       <div class="flex justify-end pt-1">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
       </div>
     </div>
 
-    <!-- 행정/지원 -->
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='admin'" x-cloak
-          x-data="{ workType: 'admin', memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
+    <!-- 행정/지원 · 영업 활동 -->
+    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
+          x-data="{ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
             async checkMnt() {
               const title = this.$refs.adminTitle ? this.$refs.adminTitle.value : '';
               const cid = this.$refs.adminCust ? this.$refs.adminCust.value : '';
@@ -49,7 +54,7 @@
             }
           }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''">← 종류 선택</button>
+      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; workType='admin'">← 종류 선택</button>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">업무 구분 <span class="text-red-500">*</span></label>
         <div class="grid grid-cols-3 gap-2">

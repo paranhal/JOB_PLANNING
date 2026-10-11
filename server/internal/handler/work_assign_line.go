@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -11,6 +14,9 @@ import (
 )
 
 const workDismissCookie = "work_notice_dismiss"
+
+// 브라우저 쿠키 한도는 보통 4096바이트. 오늘 하루만 제외한 키를 이 한도 안에서 보관한다.
+const workDismissCookieMaxBytes = 3500
 
 func workAssignKey(it model.WorkListItem) string {
 	id := strings.TrimSpace(it.RefID)
@@ -61,13 +67,22 @@ func addDismissedKey(c echo.Context, key string) {
 	}
 	seen := dismissedKeys(c)
 	seen[key] = true
-	var parts []string
+	parts := make([]string, 0, len(seen))
 	for k := range seen {
 		parts = append(parts, k)
 	}
+	sort.Strings(parts)
+	val := strings.Join(parts, ",")
+	for len(val) > workDismissCookieMaxBytes && len(parts) > 1 {
+		parts = parts[1:]
+		val = strings.Join(parts, ",")
+	}
+	today := time.Now()
+	tomorrow := time.Date(today.Year(), today.Month(), today.Day()+1, 0, 0, 0, 0, today.Location())
 	http.SetCookie(c.Response(), &http.Cookie{
-		Name: workDismissCookie, Value: strings.Join(parts, ","), Path: "/",
-		MaxAge: 86400, SameSite: http.SameSiteLaxMode,
+		Name: workDismissCookie, Value: val, Path: "/",
+		Expires: tomorrow, MaxAge: int(time.Until(tomorrow).Seconds()),
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -93,16 +108,20 @@ func (h *WorkHandler) AssignOne(c echo.Context) error {
 	date := strings.TrimSpace(c.FormValue("work_date"))
 	assignee := strings.TrimSpace(c.FormValue("assignee"))
 	uid := strings.TrimSpace(c.FormValue("assignee_user_id"))
-	if key == "" || date == "" {
-		return c.Redirect(http.StatusSeeOther, assignNoticeBack(c)+qjoin(assignNoticeBack(c), "err=date"))
+	if key == "" {
+		return h.finishAssignNotice(c, "assign", "")
+	}
+	if date == "" {
+		return h.finishAssignNotice(c, "date", "")
+	}
+	if err := h.requireAssigneeInOrg(c, assignee, uid); err != nil {
+		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
 	if err := h.repo.AssignUnplannedDate(key, date, assignee, uid); err != nil {
-		return c.Redirect(http.StatusSeeOther, assignNoticeBack(c)+qjoin(assignNoticeBack(c), "err=assign"))
+		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
-	if nid := strings.TrimSpace(c.FormValue("notice_id")); nid != "" && h.notices != nil && h.notices.repo != nil {
-		_ = h.notices.repo.MarkSeenAndActed([]string{nid}, h.notices.viewerID(c))
-	}
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	h.markNoticeActed(c)
+	return h.finishAssignNotice(c, "", "")
 }
 
 func (h *WorkHandler) TransferOne(c echo.Context) error {
@@ -110,22 +129,19 @@ func (h *WorkHandler) TransferOne(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	key := strings.TrimSpace(c.FormValue("key"))
-	to := h.notices.resolveUser(c.FormValue("assignee_user_id"), c.FormValue("assignee"))
-	if to == nil || key == "" {
-		return c.Redirect(http.StatusSeeOther, assignNoticeBack(c)+qjoin(assignNoticeBack(c), "err=assignee"))
+	assignee := strings.TrimSpace(c.FormValue("assignee"))
+	uid := strings.TrimSpace(c.FormValue("assignee_user_id"))
+	if key == "" {
+		return h.finishAssignNotice(c, "assign", "")
 	}
-	org := currentOrg(c)
-	if org != repository.OrgAll && strings.TrimSpace(to.OrgID) != "" && strings.TrimSpace(to.OrgID) != org && to.Role != model.RoleVisionAdmin {
-		return c.Redirect(http.StatusSeeOther, assignNoticeBack(c)+qjoin(assignNoticeBack(c), "err=org"))
+	if err := h.requireAssigneeInOrg(c, assignee, uid); err != nil {
+		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
-	kind, id := parseAssignKey(key)
-	if err := h.transferByKey(c, kind, id, to); err != nil {
-		return c.Redirect(http.StatusSeeOther, assignNoticeBack(c)+qjoin(assignNoticeBack(c), "err=transfer"))
+	if err := h.repo.TransferUnplanned(key, assignee, uid, c.FormValue("work_date")); err != nil {
+		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
-	if nid := strings.TrimSpace(c.FormValue("notice_id")); nid != "" && h.notices != nil && h.notices.repo != nil {
-		_ = h.notices.repo.MarkSeenAndActed([]string{nid}, h.notices.viewerID(c))
-	}
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	h.markNoticeActed(c)
+	return h.finishAssignNotice(c, "", "")
 }
 
 func parseAssignKey(key string) (kind, id string) {
@@ -137,39 +153,10 @@ func parseAssignKey(key string) (kind, id string) {
 }
 
 func (h *WorkHandler) transferByKey(c echo.Context, kind, id string, to *model.User) error {
-	switch kind {
-	case "as":
-		if h.asRepo == nil {
-			return nil
-		}
-		as, err := h.asRepo.GetByID(currentOrg(c), id)
-		if err != nil || as == nil {
-			return err
-		}
-		as.AssignedTo = to.FullName
-		as.AssignedUserID = to.UserID
-		return h.asRepo.Update(as)
-	case "mnt":
-		if h.mntRepo == nil {
-			return nil
-		}
-		v, err := h.mntRepo.GetVisit(id)
-		if err != nil || v == nil {
-			return err
-		}
-		v.Assignee = to.FullName
-		return h.mntRepo.UpdateVisit(*v)
-	case "task", "wi":
-		if kind == "wi" {
-			return nil
-		}
-		if h.wbRepo == nil {
-			return nil
-		}
-		return h.wbRepo.SetTaskAssignee(id, to.FullName)
-	default:
-		return nil
+	if to == nil {
+		return fmt.Errorf("담당자가 필요합니다")
 	}
+	return h.repo.TransferUnplanned(kind+":"+id, to.FullName, to.UserID, c.FormValue("work_date"))
 }
 
 func (h *WorkHandler) HoldOne(c echo.Context) error {
@@ -178,56 +165,29 @@ func (h *WorkHandler) HoldOne(c echo.Context) error {
 	}
 	key := strings.TrimSpace(c.FormValue("key"))
 	reason := strings.TrimSpace(c.FormValue("hold_reason"))
-	if key == "" || reason == "" {
-		return c.Redirect(http.StatusSeeOther, assignNoticeBack(c)+qjoin(assignNoticeBack(c), "err=hold"))
+	if key == "" {
+		return h.finishAssignNotice(c, "assign", "")
 	}
-	kind, id := parseAssignKey(key)
-	switch kind {
-	case "as":
-		if h.asRepo != nil {
-			as, err := h.asRepo.GetByID(currentOrg(c), id)
-			if err == nil && as != nil {
-				as.Status = "hold"
-				_ = h.asRepo.Update(as)
-			}
-		}
-	case "task":
-		if h.wbRepo != nil {
-			t, err := h.wbRepo.GetTask(id)
-			if err == nil && t != nil {
-				t.Status = model.WBTaskHold
-				t.HoldReason = reason
-				t.WorkDate = ""
-				_ = h.wbRepo.UpdateTask(t)
-			}
-		}
-	case "mnt":
-		if h.mntRepo != nil {
-			v, err := h.mntRepo.GetVisit(id)
-			if err == nil && v != nil {
-				if v.Notes != "" {
-					v.Notes = v.Notes + "\n"
-				}
-				v.Notes += "보류: " + reason
-				_ = h.mntRepo.UpdateVisit(*v)
-			}
-		}
+	if reason == "" {
+		return h.finishAssignNotice(c, "hold_reason", "")
 	}
-	if nid := strings.TrimSpace(c.FormValue("notice_id")); nid != "" && h.notices != nil && h.notices.repo != nil {
-		_ = h.notices.repo.MarkSeenAndActed([]string{nid}, h.notices.viewerID(c))
+	if err := h.repo.HoldUnplanned(key, reason, c.FormValue("work_date")); err != nil {
+		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	h.markNoticeActed(c)
+	return h.finishAssignNotice(c, "", "")
 }
 
 func (h *WorkHandler) DismissOne(c echo.Context) error {
-	key := strings.TrimSpace(c.FormValue("key"))
-	if nid := strings.TrimSpace(c.FormValue("notice_id")); nid != "" && h.notices != nil && h.notices.repo != nil {
-		_ = h.notices.repo.MarkSeenAndActed([]string{nid}, h.notices.viewerID(c))
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
 	}
+	key := strings.TrimSpace(c.FormValue("key"))
+	h.markNoticeActed(c)
 	if key != "" {
 		addDismissedKey(c, key)
 	}
-	return c.Redirect(http.StatusSeeOther, assignNoticeBack(c))
+	return h.finishAssignNotice(c, "", key)
 }
 
 func (h *WorkHandler) CreateAssign(c echo.Context) error {
@@ -243,6 +203,12 @@ func (h *WorkHandler) CreateAssign(c echo.Context) error {
 	date := strings.TrimSpace(c.FormValue("work_date"))
 	if title == "" {
 		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err=title"))
+	}
+	if date == "" {
+		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err=date"))
+	}
+	if err := h.requireAssigneeInOrg(c, assignee, ""); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err="+unplannedErrQuery(err)))
 	}
 	wt := model.WBWorkAdmin
 	if kind == "sales" || kind == model.WorkPrefixSales {
@@ -261,11 +227,128 @@ func (h *WorkHandler) CreateAssign(c echo.Context) error {
 		Status:   model.WBTaskWaiting,
 		OrgID:    currentOrg(c),
 	}
-	if h.wbRepo != nil {
-		_ = h.wbRepo.CreateTask(t)
-		if t.TaskID != "" && assignee != "" {
-			_ = h.wbRepo.SetTaskAssignee(t.TaskID, assignee)
+	if h.wbRepo == nil {
+		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err=assign"))
+	}
+	if err := h.wbRepo.CreateTask(t); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err=task"))
+	}
+	return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "ok=task"))
+}
+
+func (h *WorkHandler) requireAssigneeInOrg(c echo.Context, name, uid string) error {
+	name, uid = strings.TrimSpace(name), strings.TrimSpace(uid)
+	if name == "" && uid == "" {
+		return fmt.Errorf("담당자가 필요합니다")
+	}
+	if h.userRepo == nil && (h.notices == nil || h.notices.users == nil) {
+		return nil
+	}
+	var u *model.User
+	if h.notices != nil {
+		u = h.notices.resolveUser(uid, name)
+	}
+	if u == nil && h.userRepo != nil {
+		u = h.userRepo.FindAssignable(uid)
+		if u == nil {
+			u = h.userRepo.FindAssignable(name)
 		}
 	}
-	return c.Redirect(http.StatusSeeOther, "/")
+	if u == nil {
+		return fmt.Errorf("담당자가 필요합니다")
+	}
+	org := currentOrg(c)
+	if org == "" || org == repository.OrgAll {
+		return nil
+	}
+	uo := strings.TrimSpace(u.OrgID)
+	if uo == "" || uo == org || u.Role == model.RoleVisionAdmin {
+		return nil
+	}
+	return fmt.Errorf("조직 범위 밖의 담당자입니다")
+}
+
+func (h *WorkHandler) markNoticeActed(c echo.Context) {
+	nid := strings.TrimSpace(c.FormValue("notice_id"))
+	if nid == "" || h.notices == nil || h.notices.repo == nil {
+		return
+	}
+	_ = h.notices.repo.MarkSeenAndActed([]string{nid}, h.notices.viewerID(c))
+}
+
+func unplannedErrQuery(err error) string {
+	if err == nil {
+		return "assign"
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "날짜"):
+		return "date"
+	case strings.Contains(msg, "보류 사유"):
+		return "hold_reason"
+	case strings.Contains(msg, "조직"):
+		return "org"
+	case strings.Contains(msg, "담당자"):
+		return "assignee"
+	case strings.Contains(msg, "지원하지"):
+		return "unsupported"
+	default:
+		return "assign"
+	}
+}
+
+func (h *WorkHandler) finishAssignNotice(c echo.Context, errCode, extraDismiss string) error {
+	back := assignNoticeKeepPath(c)
+	if errCode != "" {
+		return c.Redirect(http.StatusSeeOther, back+qjoin(back, "assign=1&err="+errCode))
+	}
+	if h.assignNoticeStillOpen(c, extraDismiss) {
+		return c.Redirect(http.StatusSeeOther, back+qjoin(back, "assign=1"))
+	}
+	setAssignNoticeShownCookie(c)
+	return c.Redirect(http.StatusSeeOther, stripAssignOpen(back))
+}
+
+func assignNoticeKeepPath(c echo.Context) string {
+	back := assignNoticeBack(c)
+	if u := strings.TrimSpace(back); strings.Contains(u, "assign=1") {
+		return u
+	}
+	return back
+}
+
+func stripAssignOpen(path string) string {
+	path = strings.ReplaceAll(path, "?assign=1&", "?")
+	path = strings.ReplaceAll(path, "&assign=1", "")
+	path = strings.TrimSuffix(path, "?assign=1")
+	return path
+}
+
+func (h *WorkHandler) assignNoticeStillOpen(c echo.Context, extraDismiss string) bool {
+	if sliceLen(c.Get("login_helps")) > 0 {
+		return true
+	}
+	if h.notices != nil && h.notices.repo != nil {
+		uid := h.notices.viewerID(c)
+		if n, err := h.notices.repo.CountUnseen(uid); err == nil && n > 0 {
+			return true
+		}
+	}
+	if h.repo == nil || !canWriteWorkboard(c) {
+		return false
+	}
+	items, err := h.repo.CollectUnassigned(currentOrg(c))
+	if err != nil {
+		return false
+	}
+	skip := dismissedKeys(c)
+	if extraDismiss != "" {
+		skip[extraDismiss] = true
+	}
+	for _, it := range items {
+		if !skip[workAssignKey(it)] {
+			return true
+		}
+	}
+	return false
 }

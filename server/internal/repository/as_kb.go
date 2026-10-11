@@ -605,7 +605,6 @@ func (r *ASRepo) SearchKnowledge(f model.ASSearchFilter) ([]model.ASSearchHit, i
 	for i := range out {
 		decorateSearchHit(&out[i], q)
 		if out[i].IsKnowledge {
-			out[i].ActionHTML = out[i].ActionHTML
 			if out[i].Origin == "" {
 				out[i].Origin = model.KBOriginAdded
 				out[i].OriginLabel = model.KBOriginLabel(out[i].Origin)

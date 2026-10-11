@@ -578,7 +578,7 @@ func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date
 		tStatus = ``
 	}
 	tItems, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support')
+		`t.work_type IN ('admin','support','sales')
 			 `+tStatus+`
 			 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=?`,
 		mineUserID, mineKeys, []interface{}{date})
@@ -777,7 +777,7 @@ func (r *WorkBoardRepo) CollectUnassigned(orgID string) ([]model.WorkListItem, e
 	orgID = orgIDOrAll(orgID)
 	var out []model.WorkListItem
 	asWhere, asArgs := applyOrgWhere(
-		`ar.status IN ('received','assigned','in_progress','hold','transfer')
+		`ar.status IN ('received','assigned','in_progress','transfer')
 		 AND COALESCE(ar.assigned_to,'') = '' AND COALESCE(ar.assigned_user_id,'') = ''`,
 		"ar", orgID, nil)
 	asItems, err := r.queryAS(asWhere, "", nil, asArgs)
@@ -797,7 +797,8 @@ func (r *WorkBoardRepo) CollectUnassigned(orgID string) ([]model.WorkListItem, e
 	out = append(out, wi...)
 
 	mWhere, mArgs := applyOrgWhere(
-		`COALESCE(mv.completed,0)=0 AND TRIM(COALESCE(mv.assignee,''))=''`,
+		`COALESCE(mv.completed,0)=0 AND TRIM(COALESCE(mv.assignee,''))=''
+		 AND TRIM(COALESCE(mv.notes,'')) NOT LIKE '[보류]%'`,
 		"c", orgID, nil)
 	mItems, err := r.queryMaintenance(mWhere, mArgs, 500)
 	if err != nil {
@@ -807,7 +808,7 @@ func (r *WorkBoardRepo) CollectUnassigned(orgID string) ([]model.WorkListItem, e
 
 	tWhere, tArgs := applyOrgWhere(
 		`t.work_type IN ('admin','support','sales')
-		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled','hold')
 		 AND TRIM(COALESCE(t.assignee,''))=''`,
 		"t", orgID, nil)
 	tItems, err := r.queryWorkTasks(tWhere, "", nil, tArgs)

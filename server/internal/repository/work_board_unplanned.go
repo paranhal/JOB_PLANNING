@@ -119,7 +119,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	}
 
 	tasks, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support') AND t.status != 'complete'
+		`t.work_type IN ('admin','support','sales') AND t.status != 'complete'
 		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=''`,
 		mineUserID, mineKeys, nil)
 	if err != nil {
@@ -644,9 +644,15 @@ func (r *WorkBoardRepo) AssignUnplannedDate(key, date, assignee, assigneeUID str
 	case "as":
 		return NewASRepo(r.db).AssignUnplanned(id, date, assignee, assigneeUID)
 	case "wi":
-		return NewASWorkRepo(r.db).SetScheduledDate(id, date)
+		if err := NewASWorkRepo(r.db).SetScheduledDate(id, date); err != nil {
+			return err
+		}
+		if strings.TrimSpace(assignee) == "" && strings.TrimSpace(assigneeUID) == "" {
+			return nil
+		}
+		return NewASWorkRepo(r.db).SetAssignee(id, assignee, assigneeUID)
 	case "mnt":
-		return NewMaintenanceRepo(r.db).SetVisitDate(id, date)
+		return NewMaintenanceRepo(r.db).AssignOpenVisit(id, date, assignee)
 	case "slot":
 		planID, cust, product := parseSlotKey(id)
 		if planID == "" || cust == "" {
@@ -680,4 +686,111 @@ func (r *WorkBoardRepo) AssignUnplannedDate(key, date, assignee, assigneeUID str
 	default:
 		return fmt.Errorf("알 수 없는 업무")
 	}
+}
+
+const unplannedHoldPrefix = "[보류] "
+
+// TransferUnplanned 미배정·알림 팝업에서 담당자만 바꾼다.
+func (r *WorkBoardRepo) TransferUnplanned(key, assignee, assigneeUID, date string) error {
+	assignee = strings.TrimSpace(assignee)
+	assigneeUID = strings.TrimSpace(assigneeUID)
+	if assignee == "" && assigneeUID == "" {
+		return fmt.Errorf("담당자가 필요합니다")
+	}
+	kind, id := parseUnplannedKey(key)
+	switch kind {
+	case "as":
+		name, uid := bindStaff(r.db, assignee, assigneeUID)
+		oldName, oldUID := readAssigneePair(r.db, "as_receipts", "as_id", id, "assigned_to", "assigned_user_id")
+		now := time.Now().Format("2006-01-02 15:04:05")
+		_, err := r.db.Exec(`UPDATE as_receipts SET assigned_to=?, assigned_user_id=?, updated_at=? WHERE as_id=?`,
+			name, uid, now, id)
+		if err == nil {
+			stampAssignedIfChanged(r.db, "as_receipts", "as_id", id, oldName, oldUID, name, uid)
+		}
+		return err
+	case "wi":
+		return NewASWorkRepo(r.db).SetAssignee(id, assignee, assigneeUID)
+	case "mnt":
+		return NewMaintenanceRepo(r.db).AssignOpenVisit(id, date, assignee)
+	case "slot":
+		if strings.TrimSpace(date) == "" {
+			return fmt.Errorf("날짜가 필요합니다")
+		}
+		return r.AssignUnplannedDate(key, date, assignee, assigneeUID)
+	case "task":
+		return NewWBRepo(r.db).SetTaskAssignee(id, assignee)
+	case "gen":
+		return fmt.Errorf("기타 업무는 이관을 지원하지 않습니다")
+	case "salesact":
+		return NewSalesRepo(r.db).CreateNextActionTask(id, firstFilled(date, time.Now().Format("2006-01-02")), assignee, assigneeUID)
+	default:
+		return fmt.Errorf("이관을 지원하지 않는 유형입니다")
+	}
+}
+
+// HoldUnplanned 보류 상태·사유를 남기고 미배정 팝업에서 뺀다.
+func (r *WorkBoardRepo) HoldUnplanned(key, reason, date string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return fmt.Errorf("보류 사유가 필요합니다")
+	}
+	kind, id := parseUnplannedKey(key)
+	note := unplannedHoldPrefix + reason
+	switch kind {
+	case "as":
+		return NewASRepo(r.db).SetHold(id, reason, "")
+	case "wi":
+		return NewASWorkRepo(r.db).Hold(id, reason)
+	case "mnt":
+		_, err := r.db.Exec(`UPDATE maintenance_visits SET notes=? WHERE visit_id=?`, note, id)
+		return err
+	case "slot":
+		if strings.TrimSpace(date) == "" {
+			date = time.Now().Format("2006-01-02")
+		}
+		planID, cust, product := parseSlotKey(id)
+		if planID == "" || cust == "" {
+			return fmt.Errorf("슬롯 정보가 없습니다")
+		}
+		v := model.MaintenanceVisit{
+			PlanID: planID, VisitDate: date, CustomerID: cust,
+			ProductType: product, Notes: note, EntryCategory: "normal",
+		}
+		return NewMaintenanceRepo(r.db).InsertVisitFull(v)
+	case "task":
+		wb := NewWBRepo(r.db)
+		t, err := wb.GetTask(id)
+		if err != nil || t == nil {
+			return fmt.Errorf("업무가 없습니다")
+		}
+		t.Status = model.WBTaskHold
+		t.HoldReason = reason
+		return wb.UpdateTask(t)
+	case "gen":
+		_, err := r.db.Exec(`UPDATE work_other SET notes=? WHERE other_id=?`, note, id)
+		return err
+	case "salesact":
+		if err := NewSalesRepo(r.db).CreateNextActionTask(id, firstFilled(date, time.Now().Format("2006-01-02")), "", ""); err != nil {
+			return err
+		}
+		t, err := NewWBRepo(r.db).GetTaskBySource(model.WBSourceSalesActivity, id, model.WBSourceRoleNext)
+		if err != nil || t == nil {
+			return fmt.Errorf("영업 활동 업무가 없습니다")
+		}
+		t.Status = model.WBTaskHold
+		t.HoldReason = reason
+		return NewWBRepo(r.db).UpdateTask(t)
+	default:
+		return fmt.Errorf("보류를 지원하지 않는 유형입니다")
+	}
+}
+
+func firstFilled(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

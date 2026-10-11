@@ -4,6 +4,9 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
+      {{if and (eq .UserRole "sales") (or (hasUserPerm .UserPerms "sales.view") (hasUserPerm .UserPerms "sales.act.view"))}}
+      <p class="mt-1"><a href="/sales/dashboard" class="text-xs text-blue-700 hover:underline">영업 대시보드로</a></p>
+      {{end}}
       <p class="text-sm text-gray-500 mt-1">
         {{.RoleLabel}}(<span class="font-medium text-gray-700">{{.DisplayName}}</span> · @{{.LoginID}})
         {{if .ScopeMine}} · <strong>내 업무</strong>{{else}} · 팀 전체{{end}}

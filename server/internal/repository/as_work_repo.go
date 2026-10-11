@@ -142,6 +142,42 @@ func (r *ASWorkRepo) Update(w *model.ASWorkItem) error {
 	})
 }
 
+// SetAssignee 하부업무 담당자만 넣는다.
+func (r *ASWorkRepo) SetAssignee(workID, assignee, assigneeUID string) error {
+	workID = strings.TrimSpace(workID)
+	if workID == "" {
+		return fmt.Errorf("하부업무가 없습니다")
+	}
+	name, uid := bindStaff(r.db, assignee, assigneeUID)
+	if strings.TrimSpace(name) == "" && strings.TrimSpace(uid) == "" {
+		return fmt.Errorf("담당자가 필요합니다")
+	}
+	oldName, oldUID := readAssigneePair(r.db, "as_work_items", "work_id", workID, "assigned_to", "assigned_user_id")
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_, err := r.db.Exec(`UPDATE as_work_items SET assigned_to=?, assigned_user_id=?, updated_at=? WHERE work_id=?`,
+		name, uid, now, workID)
+	if err == nil {
+		stampAssignedIfChanged(r.db, "as_work_items", "work_id", workID, oldName, oldUID, name, uid)
+	}
+	return err
+}
+
+// Hold 하부업무를 보류하고 사유를 남긴다. 미배정 목록(status=open)에서 빠진다.
+func (r *ASWorkRepo) Hold(workID, reason string) error {
+	workID = strings.TrimSpace(workID)
+	reason = strings.TrimSpace(reason)
+	if workID == "" {
+		return fmt.Errorf("하부업무가 없습니다")
+	}
+	if reason == "" {
+		return fmt.Errorf("보류 사유가 필요합니다")
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_, err := r.db.Exec(`UPDATE as_work_items SET status='hold', notes=?, updated_at=? WHERE work_id=?`,
+		reason, now, workID)
+	return err
+}
+
 // SetScheduledDate 미계획 업무함에서 하부업무 예정일만 넣는다.
 func (r *ASWorkRepo) SetScheduledDate(workID, date string) error {
 	workID = strings.TrimSpace(workID)

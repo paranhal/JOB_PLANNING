@@ -1,7 +1,12 @@
 {{define "title"}}영업 대시보드 · 고객지원시스템{{end}}
 {{define "content"}}
 <div class="space-y-4">
-  <h2 class="text-xl font-bold text-gray-800">영업 대시보드</h2>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <h2 class="text-xl font-bold text-gray-800">영업 대시보드</h2>
+    {{if eq .UserRole "sales"}}
+    <a href="/?home=tech" class="text-xs text-blue-700 hover:underline">기술 대시보드 보기</a>
+    {{end}}
+  </div>
   {{if gt .MigratedN 0}}
   <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
     <p class="font-semibold text-amber-900">이관 확인 필요 {{.MigratedN}}건</p>
