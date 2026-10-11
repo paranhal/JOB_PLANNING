@@ -30,6 +30,8 @@ func v68App(t *testing.T) (*echo.Echo, *repository.UserRepo, *repository.Account
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.InjectAssignNotices)
+	g.GET("/", h.Dashboard)
 	sec := h.Auth.RequireAdminSection
 	adminOnly := h.Auth.RequireAdminMW
 	g.GET("/admin/users", h.Auth.UserList, sec, adminOnly)
@@ -49,6 +51,53 @@ func v68App(t *testing.T) (*echo.Echo, *repository.UserRepo, *repository.Account
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
 	return e, users, repository.NewAccountRepo(db), settings
+}
+
+func TestV68AccountRequestPopupOnHome(t *testing.T) {
+	e, users, acc, _ := v68App(t)
+	oa := &model.User{Username: "oa-pop", PasswordHash: HashPassword("password10"), FullName: "요청장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O01", ProfileDone: true}
+	vs := &model.User{Username: "vs-pop", PasswordHash: HashPassword("password10"), FullName: "비젼", Role: model.RoleVisionAdmin, IsActive: true, ProfileDone: true}
+	_ = users.Create(oa)
+	_ = users.Create(vs)
+
+	empty := httptest.NewRecorder()
+	ereq := httptest.NewRequest(http.MethodGet, "/", nil)
+	ereq.AddCookie(visionCookie(t, vs))
+	e.ServeHTTP(empty, ereq)
+	if empty.Code != http.StatusOK {
+		t.Fatalf("빈 홈 %d", empty.Code)
+	}
+	if strings.Contains(empty.Body.String(), "계정 등록 요청") {
+		t.Fatal("0건인데 팝업 문구가 있다")
+	}
+
+	if err := acc.CreateRequest(&model.AccountRequest{
+		OrgID: "O01", RequestedBy: oa.UserID, FullName: "신규", Username: "newpop68", Role: model.RoleTech,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	vis := httptest.NewRecorder()
+	vreq := httptest.NewRequest(http.MethodGet, "/", nil)
+	vreq.AddCookie(visionCookie(t, vs))
+	e.ServeHTTP(vis, vreq)
+	if vis.Code != http.StatusOK {
+		t.Fatalf("비젼 홈 %d loc=%s", vis.Code, vis.Header().Get("Location"))
+	}
+	if !strings.Contains(vis.Body.String(), "계정 등록 요청 1건") {
+		t.Fatal("비젼 홈에 등록 요청이 없다")
+	}
+
+	org := httptest.NewRecorder()
+	oreq := httptest.NewRequest(http.MethodGet, "/", nil)
+	oreq.AddCookie(jwtOrgCookie(t, oa))
+	e.ServeHTTP(org, oreq)
+	if org.Code != http.StatusOK {
+		t.Fatalf("조직장 홈 %d loc=%s", org.Code, org.Header().Get("Location"))
+	}
+	if strings.Contains(org.Body.String(), "계정 등록 요청") {
+		t.Fatal("조직관리자 홈에 등록 요청 팝업이 있다")
+	}
 }
 
 func TestV68UnlockSkippedOnUserOrgPerms(t *testing.T) {
