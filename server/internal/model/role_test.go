@@ -53,6 +53,9 @@ func TestNormalizeRoleKnownAliases(t *testing.T) {
 			t.Fatalf("IsKnownRole(%q)=true (깃발 옛 값)", tc.in)
 		}
 	}
+	if CanSeeMargin(RoleObserver) {
+		t.Fatal("observer 호환값은 마진을 보지 않는다")
+	}
 }
 
 func TestNormalizeRoleUnauthenticated(t *testing.T) {

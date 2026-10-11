@@ -407,6 +407,16 @@ func (h *Handler) Dashboard(c echo.Context) error {
 			{Href: "/customers", Label: "고객현황", Tone: "green"},
 		}
 	}
+	if links, ok := data["QuickLinks"].([]dashLink); ok && !canReceiveAS(c) {
+		filtered := make([]dashLink, 0, len(links))
+		for _, l := range links {
+			if strings.HasPrefix(l.Href, "/as/new") {
+				continue
+			}
+			filtered = append(filtered, l)
+		}
+		data["QuickLinks"] = filtered
+	}
 
 	return c.Render(200, "dashboard.html", data)
 }

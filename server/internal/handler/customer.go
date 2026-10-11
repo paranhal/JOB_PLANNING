@@ -60,6 +60,7 @@ func (h *CustomerHandler) TabAS(c echo.Context) error {
 	return RenderPartial(c, "customer/tab_as.html", map[string]interface{}{
 		"Items":      items,
 		"CustomerID": customerID,
+		"CanReceive": canReceiveAS(c),
 	})
 }
 

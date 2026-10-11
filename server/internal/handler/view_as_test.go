@@ -16,6 +16,24 @@ import (
 	"customer-support/internal/repository"
 )
 
+func jwtCookieLegacyObserver(t *testing.T) *http.Cookie {
+	t.Helper()
+	secret := []byte("cs-system-jwt-secret-2026")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":  "legacy-obs",
+		"username": "legacyobs",
+		"role":     model.RoleObserver,
+		"name":     "옛옵저버",
+		"org_id":   model.OrgIDLibrary,
+		"exp":      time.Now().Add(time.Hour).Unix(),
+	})
+	s, err := token.SignedString(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &http.Cookie{Name: "token", Value: s, Path: "/"}
+}
+
 func jwtCookieUserClaims(t *testing.T, u *model.User) *http.Cookie {
 	t.Helper()
 	secret := []byte("cs-system-jwt-secret-2026")
@@ -51,8 +69,8 @@ func newObserverSimApp(t *testing.T) (*echo.Echo, *observerSimUsers) {
 		t.Fatal(err)
 	}
 	if err := users.Create(&model.User{
-		Username: "obs1", PasswordHash: HashPassword("pw"), FullName: "옵저버",
-		Role: model.RoleObserver, IsActive: true, OrgID: "O01",
+		Username: "obs1", PasswordHash: HashPassword("pw"), FullName: "읽기전용관리",
+		Role: model.RoleOrgAdmin, IsActive: true, IsReadOnly: true, OrgID: "O01",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +190,7 @@ func TestObserverViewAsInheritsRoleOrgAndBlocksWrite(t *testing.T) {
 	hreq.AddCookie(vas)
 	e.ServeHTTP(home, hreq)
 	if home.Code != http.StatusOK || strings.Contains(home.Body.String(), "전체 1개 기관") {
-		t.Fatal("옵저버 홈 조직이 섞였다")
+		t.Fatal("읽기전용 홈 조직이 섞였다")
 	}
 	if !strings.Contains(body, "지금") || !strings.Contains(body, "이해진") || !strings.Contains(body, "시점으로 보고 있습니다") {
 		t.Fatal("시점 띠가 없다")
@@ -186,8 +204,11 @@ func TestObserverViewAsInheritsRoleOrgAndBlocksWrite(t *testing.T) {
 	wreq.AddCookie(ck)
 	wreq.AddCookie(vas)
 	e.ServeHTTP(write, wreq)
-	if write.Code != http.StatusForbidden && write.Code != http.StatusSeeOther {
-		t.Fatalf("쓰기 status=%d", write.Code)
+	if write.Code == http.StatusOK {
+		t.Fatalf("view-as 후 POST 가 통과했다 status=%d", write.Code)
+	}
+	if loc := write.Header().Get("Location"); strings.Contains(loc, "/customers/") && !strings.Contains(loc, "err=") {
+		t.Fatalf("view-as 후 고객이 만들어졌다 loc=%s", loc)
 	}
 
 	users := httptest.NewRecorder()
@@ -199,6 +220,6 @@ func TestObserverViewAsInheritsRoleOrgAndBlocksWrite(t *testing.T) {
 		t.Fatalf("관리 섹션 읽기 %d loc=%s", users.Code, users.Header().Get("Location"))
 	}
 	if strings.Contains(users.Header().Get("Location"), "/admin/unlock") {
-		t.Fatal("옵저버에게 관리 비밀번호를 물었다")
+		t.Fatal("읽기전용 조직관리자에게 관리 비밀번호를 물었다")
 	}
 }

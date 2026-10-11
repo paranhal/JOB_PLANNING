@@ -395,7 +395,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		"ReceiptLocal":     now.Format("2006-01-02T15:04"),
 		"CanEditVisitDate": true, // 신규 접수 시 접수 권한자가 설정 가능
 		"History":          history,
-		"CanReceive":       true,
+		"CanReceive":       canReceiveAS(c),
 		"KeywordChecks":    h.keywordChecks("", model.KWFieldSymptom, as.Symptom),
 		"KeywordField":     model.KWFieldSymptom,
 		"ClassifyHint":     classifyHint(h.codeRepo),

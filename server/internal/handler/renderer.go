@@ -165,6 +165,8 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			dataMap["IsTestUser"] = ctxBool(c, "is_test")
 			if isReadOnly(c) {
 				dataMap["CanWrite"] = false
+				dataMap["CanReceive"] = false
+				dataMap["CanProcess"] = false
 				dataMap["KanbanDrag"] = false
 			}
 			if vid := strings.TrimSpace(ctxString(c, "view_as_user_id")); vid != "" {
@@ -172,6 +174,8 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 				dataMap["ViewAsName"] = ctxString(c, "view_as_name")
 				dataMap["ViewAsUserID"] = vid
 				dataMap["CanWrite"] = false
+				dataMap["CanReceive"] = false
+				dataMap["CanProcess"] = false
 				dataMap["CanDeleteSales"] = false
 				dataMap["CanDrop"] = false
 				dataMap["KanbanDrag"] = false

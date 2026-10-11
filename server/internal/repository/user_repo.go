@@ -178,21 +178,7 @@ func (r *UserRepo) GetByID(id string) (*model.User, error) {
 
 func (r *UserRepo) Create(u *model.User) error {
 	u.UserID = newID("USR")
-	u.Role = model.NormalizeRole(u.Role)
-	if u.Role == model.RoleObserver {
-		u.Role = model.RoleOrgAdmin
-		u.IsReadOnly = true
-	}
-	if u.Role == model.RoleTester {
-		u.IsTest = true
-		b := model.NormalizeRole(u.BaseRole)
-		if b == model.RoleSales || b == model.RoleTech || b == model.RoleSupport {
-			u.Role = b
-		} else {
-			u.Role = model.RoleSupport
-		}
-	}
-	u.BaseRole = ""
+	foldLegacyRole(u)
 	if model.IsAdminGrade(u.Role) {
 		u.IsTest = false
 	}
@@ -215,21 +201,7 @@ func (r *UserRepo) Create(u *model.User) error {
 }
 
 func (r *UserRepo) Update(u *model.User) error {
-	u.Role = model.NormalizeRole(u.Role)
-	if u.Role == model.RoleObserver {
-		u.Role = model.RoleOrgAdmin
-		u.IsReadOnly = true
-	}
-	if u.Role == model.RoleTester {
-		u.IsTest = true
-		b := model.NormalizeRole(u.BaseRole)
-		if b == model.RoleSales || b == model.RoleTech || b == model.RoleSupport {
-			u.Role = b
-		} else {
-			u.Role = model.RoleSupport
-		}
-	}
-	u.BaseRole = ""
+	foldLegacyRole(u)
 	if model.IsAdminGrade(u.Role) {
 		u.IsTest = false
 	}

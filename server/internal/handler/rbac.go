@@ -185,15 +185,19 @@ func normalizeVisitDate(s string) string {
 	return model.NormalizeAppDate(s)
 }
 
+func viewAsActive(c echo.Context) bool {
+	return strings.TrimSpace(ctxString(c, "view_as_user_id")) != ""
+}
+
 func canReceiveAS(c echo.Context) bool {
-	if isReadOnly(c) {
+	if isReadOnly(c) || viewAsActive(c) {
 		return false
 	}
 	return hasPerm(c, model.PermASCreate)
 }
 
 func canProcessAS(c echo.Context) bool {
-	if isReadOnly(c) {
+	if isReadOnly(c) || viewAsActive(c) {
 		return false
 	}
 	return hasPerm(c, model.PermASProcess)

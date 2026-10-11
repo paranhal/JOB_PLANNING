@@ -22,11 +22,12 @@ func echoCtxRole(role, name string) echo.Context {
 	c.Set("user_name", name)
 	c.Set("username", role)
 	c.Set("permissions", model.DefaultPermissions(role))
-	if role == model.RoleObserver {
-		c.Set("is_readonly", true)
-		c.Set("role", model.RoleOrgAdmin)
-		c.Set("permissions", model.DefaultPermissions(model.RoleOrgAdmin))
-	}
+	return c
+}
+
+func echoCtxReadOnly(role, name string) echo.Context {
+	c := echoCtxRole(role, name)
+	c.Set("is_readonly", true)
 	return c
 }
 
@@ -53,9 +54,9 @@ func TestCanEditTaskRoles(t *testing.T) {
 	if canEditTask(sales, "태자운", "") {
 		t.Fatal("영업담당은 남의 업무를 편집하면 안 된다")
 	}
-	obs := echoCtxRole(model.RoleObserver, "관찰")
-	if canEditTask(obs, "관찰", "") || canEditTask(obs, "양기헌", "") {
-		t.Fatal("관찰자는 편집할 수 없다")
+	ro := echoCtxReadOnly(model.RoleTech, "관찰")
+	if canEditTask(ro, "관찰", "") || canEditTask(ro, "양기헌", "") {
+		t.Fatal("읽기전용은 편집할 수 없다")
 	}
 }
 
@@ -75,9 +76,9 @@ func TestCanEditSalesActivityRoles(t *testing.T) {
 	if canEditSalesActivity(sales, "태자운") {
 		t.Fatal("영업담당은 남의 활동을 편집하면 안 된다")
 	}
-	obs := echoCtxRole(model.RoleObserver, "관찰")
-	if canEditSalesActivity(obs, "관찰") || canEditSalesActivity(obs, "양기헌") {
-		t.Fatal("관찰자는 활동을 편집할 수 없다")
+	ro := echoCtxReadOnly(model.RoleSales, "관찰")
+	if canEditSalesActivity(ro, "관찰") || canEditSalesActivity(ro, "양기헌") {
+		t.Fatal("읽기전용은 활동을 편집할 수 없다")
 	}
 }
 

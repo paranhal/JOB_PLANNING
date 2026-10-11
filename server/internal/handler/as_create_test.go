@@ -57,6 +57,61 @@ func TestASCreateThenShow(t *testing.T) {
 	}
 }
 
+func TestASCreateStampsIsTestFromTesterFlag(t *testing.T) {
+	e, h, _, _, _ := newReceiptPhotoFixture(t)
+	tester := &model.User{
+		Username: "flagtester", PasswordHash: HashPassword("password10"), FullName: "깃발테스터",
+		Role: model.RoleTech, IsActive: true, IsTest: true, OrgID: model.OrgIDLibrary, ProfileDone: true,
+	}
+	if err := h.Auth.userRepo.Create(tester); err != nil {
+		t.Fatal(err)
+	}
+	normal := &model.User{
+		Username: "normaltech", PasswordHash: HashPassword("password10"), FullName: "일반기술",
+		Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true,
+	}
+	if err := h.Auth.userRepo.Create(normal); err != nil {
+		t.Fatal(err)
+	}
+
+	post := func(u *model.User) string {
+		t.Helper()
+		form := url.Values{
+			"customer_id":      {"cust_a"},
+			"symptom":          {"테스터 깃발 접수 " + u.Username},
+			"received_by":      {u.FullName},
+			"receipt_datetime": {time.Now().Format("2006-01-02T15:04")},
+		}
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "http://localhost/as", strings.NewReader(form.Encode()))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+		req.AddCookie(jwtCookieUserClaims(t, u))
+		e.ServeHTTP(rec, req)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("%s create status=%d body=%s", u.Username, rec.Code, rec.Body.String())
+		}
+		loc := rec.Header().Get("Location")
+		if !strings.HasPrefix(loc, "/as/R") {
+			t.Fatalf("%s redirect: %s", u.Username, loc)
+		}
+		return strings.TrimPrefix(loc, "/as/")
+	}
+
+	var testerFlag, normalFlag int
+	if err := h.AS.db.QueryRow(`SELECT is_test FROM as_receipts WHERE as_id=?`, post(tester)).Scan(&testerFlag); err != nil {
+		t.Fatal(err)
+	}
+	if testerFlag != 1 {
+		t.Fatalf("테스터 접수 is_test=%d", testerFlag)
+	}
+	if err := h.AS.db.QueryRow(`SELECT is_test FROM as_receipts WHERE as_id=?`, post(normal)).Scan(&normalFlag); err != nil {
+		t.Fatal(err)
+	}
+	if normalFlag != 0 {
+		t.Fatalf("일반 접수 is_test=%d", normalFlag)
+	}
+}
+
 func TestASCreateInvalidCustomerRedirectsNot500(t *testing.T) {
 	e, _, _, _, _ := newReceiptPhotoFixture(t)
 	form := url.Values{

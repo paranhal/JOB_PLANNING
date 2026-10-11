@@ -240,8 +240,6 @@ func RoleLabel(role string) string {
 		return "기술"
 	case RoleSales:
 		return "영업"
-	case RoleObserver:
-		return "옵저버"
 	case RoleTester:
 		return "테스터"
 	default:
@@ -403,10 +401,6 @@ func PermissionSourceLabel(role, stored string) string {
 	return fmt.Sprintf("개별 지정(+%d −%d)", add, del)
 }
 
-func ObserverViewPermissions() []string {
-	return DefaultPermissions(RoleObserver)
-}
-
 func permAtLeast(a Access, need Access) bool {
 	return a >= need
 }
@@ -556,8 +550,6 @@ func LegacyDefaultPermissions(role string) []string {
 		return []string{PermAnalysis, PermStats}
 	case RoleOffice, "행정", "receipt", "접수", "접수담당", "user":
 		return []string{PermASReceive, PermWorkboard, PermStats}
-	case RoleObserver, "옵저버", "viewer", "열람", "열람사용자":
-		return []string{PermWorkboard, PermMaintenance, PermAnalysis, PermStats}
 	default:
 		return nil
 	}

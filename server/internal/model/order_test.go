@@ -66,7 +66,7 @@ func TestCanSeeMarginAdminSalesOnly(t *testing.T) {
 	if !CanSeeMargin(RoleAdmin) || !CanSeeMargin(RoleOrgAdmin) || !CanSeeMargin(RoleVisionAdmin) || !CanSeeMargin(RoleSales) || !CanSeeMargin(RoleSupport) {
 		t.Fatal("관리자·영업·지원이 못 본다")
 	}
-	if CanSeeMargin(RoleTech) || CanSeeMargin(RoleObserver) {
+	if CanSeeMargin(RoleTech) {
 		t.Fatal("기술·옵저버에게 마진이 열린다")
 	}
 }
