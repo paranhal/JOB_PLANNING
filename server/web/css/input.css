@@ -1,6 +1,107 @@
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;            /* 기기 다크 설정이 있어도 라이트 고정 (§2.3) */
+    --c-canvas: 252 252 253;        --c-surface: 255 255 255;
+    --c-sidebar: 246 246 248;       --c-sidebar-text: 60 63 72;
+    --c-hover: 243 243 245;         --c-selected: 238 240 253;
+    --c-border: 228 229 233;        --c-border-strong: 208 210 217;
+    --c-text: 28 29 33;             --c-text-muted: 108 111 122;  --c-text-subtle: 150 153 163;
+    /* ── 회사색 확정 시 교체하는 곳: 아래 4줄 ── */
+    --c-primary: 91 103 214;        --c-primary-hover: 76 88 196;
+    --c-primary-soft: 238 240 253;  --c-on-primary: 255 255 255;
+    /* ──────────────────────────────────────── */
+    --c-success: 34 160 107;        --c-success-soft: 232 247 240;
+    --c-warning: 214 140 20;        --c-warning-soft: 253 244 227;
+    --c-danger: 224 66 66;          --c-danger-soft: 253 236 236;
+    --c-info: 59 130 246;           --c-info-soft: 233 242 254;
+    /* 업무 의미색 (화면설계서: 점검대상/지연) */
+    --c-target-a: 34 160 107;  --c-target-b: 59 130 246;  --c-target-c: 139 92 246;  --c-overdue: 224 66 66;
+    --radius-control: 6px;  --radius-card: 8px;
+    --shadow-pop: 0 8px 24px rgb(0 0 0 / .12);
+  }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-control px-4 py-2 text-ui font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-primary text-primary-fg hover:bg-primary-hover; }
+  .btn-secondary { @apply btn border border-line bg-surface text-ink hover:bg-hover; }
+  .btn-danger { @apply btn bg-danger text-white hover:opacity-90; }
+  .btn-ghost { @apply btn text-ink-muted hover:bg-hover; }
+  .btn-sm { @apply px-3 py-1.5 text-ui-sm; }
+
+  .input { @apply w-full rounded-control border border-line bg-surface px-3 py-2 text-ui text-ink placeholder:text-ink-subtle focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary; }
+  .select { @apply w-full rounded-control border border-line bg-surface px-3 py-2 text-ui text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary; }
+  .textarea { @apply w-full min-h-[6rem] rounded-control border border-line bg-surface px-3 py-2 text-ui text-ink placeholder:text-ink-subtle focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary; }
+  .is-invalid { @apply border-danger focus:border-danger focus:ring-danger; }
+  .label { @apply mb-1 block text-ui-sm font-medium text-ink; }
+  .field-hint { @apply mt-1 text-ui-sm text-ink-muted; }
+  .field-error { @apply mt-1 text-ui-sm text-danger; }
+
+  .card { @apply rounded-card border border-line bg-surface; }
+  .card-header { @apply border-b border-line px-4 py-3 text-ui font-medium text-ink; }
+  .card-body { @apply px-4 py-3 text-ui text-ink; }
+
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-ui-sm font-medium; }
+  .badge-success { @apply badge bg-success-soft text-success; }
+  .badge-warning { @apply badge bg-warning-soft text-warning; }
+  .badge-danger { @apply badge bg-danger-soft text-danger; }
+  .badge-info { @apply badge bg-info-soft text-info; }
+  .badge-neutral { @apply badge bg-hover text-ink-muted; }
+  .badge-target-a { @apply badge bg-success-soft text-target-a; }
+  .badge-target-b { @apply badge bg-info-soft text-target-b; }
+  .badge-target-c { @apply badge bg-primary-soft text-target-c; }
+  .badge-overdue { @apply badge bg-danger-soft text-overdue; }
+
+  .table-base { @apply w-full text-left text-ui text-ink; }
+  .list-row { @apply flex h-9 items-center px-3 text-ui text-ink hover:bg-hover; }
+  .list-row-selected { @apply list-row bg-selected; }
+
+  .flash { @apply px-4 py-2 text-ui; }
+  .flash-success { @apply flash bg-success-soft text-success; }
+  .flash-warning { @apply flash bg-warning-soft text-warning; }
+  .flash-danger { @apply flash bg-danger-soft text-danger; }
+
+  .tab { @apply inline-flex items-center border-b-2 border-transparent px-3 py-2 text-ui text-ink-muted hover:text-ink; }
+  .tab-active { @apply tab border-primary text-ink; }
+
+  .kbd { @apply inline-flex items-center rounded-control border border-line bg-hover px-1.5 py-0.5 text-ui-xs text-ink-muted; }
+
+  .avatar { @apply inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary-soft text-ui font-medium text-primary; }
+  .avatar-sm { @apply h-6 w-6 text-ui-xs; }
+
+  .menu { @apply rounded-control border border-line bg-surface py-1 shadow-pop; }
+  .menu-item { @apply flex items-center gap-2 px-3 py-1.5 text-ui text-ink hover:bg-hover; }
+
+  .modal-backdrop { @apply fixed inset-0 z-50 bg-ink/40; }
+  .modal-panel { @apply rounded-card border border-line bg-surface p-4; }
+  .peek-panel { @apply fixed inset-y-0 right-0 z-40 w-full max-w-md border-l border-line bg-surface shadow-pop; }
+
+  .stepper { @apply flex items-center gap-2; }
+  .stepper-step { @apply flex items-center gap-2 text-ui-sm text-ink-muted; }
+  .stepper-step-done { @apply text-success; }
+  .stepper-step-current { @apply font-medium text-primary; }
+  .stepper-step-pending { @apply text-ink-subtle; }
+  .stepper-step-rejected { @apply text-danger; }
+
+  .toast { @apply rounded-control border border-line bg-surface px-4 py-3 text-ui text-ink shadow-pop; }
+
+  .sidebar-section { @apply px-3 pb-1 pt-4 text-ui-xs font-medium uppercase tracking-wide text-sidebar-text; }
+  .sidebar-item { @apply flex items-center gap-2 rounded-control px-3 py-1.5 text-ui text-sidebar-text hover:bg-hover hover:text-ink; }
+  .sidebar-item-active { @apply sidebar-item bg-hover text-ink; }
+  .sidebar-count { @apply ml-auto text-ui-xs text-ink-muted; }
+}
 
 @layer utilities {
   [x-cloak] {
