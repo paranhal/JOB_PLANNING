@@ -352,14 +352,14 @@
   </form>
   {{if $.IsVision}}
   <form id="del-form" method="POST" class="hidden p-5 space-y-2 border-t" onsubmit="return confirm('이 계정을 삭제(숨김)할까요? 아이디는 다시 쓸 수 없습니다.');">
-    <p class="text-sm font-bold text-red-700">계정 삭제</p>
+    <p class="text-ui font-bold text-danger">계정 삭제</p>
     <input type="password" name="vision_password" placeholder="비젼관리자 비밀번호" class="w-full border rounded-lg px-3 py-2 text-sm" required>
     <input name="reason" placeholder="삭제 사유" class="w-full border rounded-lg px-3 py-2 text-sm" required>
     <select name="transfer_user_id" class="w-full border rounded-lg px-3 py-2 text-sm">
       <option value="">이관 대상 (업무가 있으면 필수)</option>
       {{range .Users}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
     </select>
-    <button class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm">삭제</button>
+    <button class="btn btn-danger">삭제</button>
   </form>
   {{end}}
   <form id="rename-form" method="POST" class="hidden"></form>

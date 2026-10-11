@@ -68,10 +68,10 @@
     </div>
   </div>
   {{if .Requests}}
-  <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-    <p class="px-5 py-3 text-sm font-bold">내 등록 요청</p>
-    <table class="w-full text-sm">
-      <thead><tr class="bg-slate-50 text-xs text-slate-500"><th class="px-4 py-2 text-left">이름</th><th class="px-4 py-2">아이디</th><th class="px-4 py-2">상태</th><th></th></tr></thead>
+  <div class="card overflow-hidden">
+    <p class="px-5 py-3 text-ui font-bold text-ink">내 등록 요청</p>
+    <table class="table-base">
+      <thead><tr class="bg-canvas text-ui-xs text-ink-muted"><th class="px-4 py-2 text-left">이름</th><th class="px-4 py-2">아이디</th><th class="px-4 py-2">상태</th><th></th></tr></thead>
       <tbody>
       {{range .Requests}}
       <tr class="border-t">
