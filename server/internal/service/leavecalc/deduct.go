@@ -9,7 +9,7 @@ import (
 // DeductMinutes is the ledger minutes for one request (0 if type does not deduct).
 // day types: businessDays * work_minutes_per_day
 // half: HalfDayMinutes (240 when work day is 480)
-// early_leave/outing: clockMinutes (조퇴 3h = 180)
+// early_leave/outing: 입력된 clockMinutes (조퇴 3h = DefaultEarlyLeaveMinutes)
 func DeductMinutes(typeKey string, businessDays, clockMinutes int, policy Policy) (int, error) {
 	policy = policy.normalized()
 	td, ok := TypeByKey(typeKey)
@@ -26,7 +26,7 @@ func DeductMinutes(typeKey string, businessDays, clockMinutes int, policy Policy
 		if clockMinutes < 0 {
 			return 0, fmt.Errorf("clock minutes must be >= 0")
 		}
-		return clockMinutes, nil
+		return clockMinutes, nil // Q-07: 시각이 있으면 그 분을 그대로 차감
 	default:
 		if businessDays < 0 {
 			return 0, fmt.Errorf("business days must be >= 0")

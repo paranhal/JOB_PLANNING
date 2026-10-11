@@ -7,8 +7,9 @@ package leavecalc
 
 // Statutory / company policy constants (adjustable; not hardcoded in formulas).
 const (
-	DefaultWorkMinutesPerDay = 480
-	DefaultHalfDayMinutes    = 240 // D-18: 1일=8시간, 반차=4시간
+	DefaultWorkMinutesPerDay   = 480
+	DefaultHalfDayMinutes      = 240 // D-18: 1일=8시간, 반차=4시간
+	DefaultEarlyLeaveMinutes   = 180 // 조퇴 3시간 예시(Q-07). 시각이 있으면 그 분을 쓴다.
 
 	MonthlyGrantDays        = 1
 	MonthlyMaxOccurrences   = 11

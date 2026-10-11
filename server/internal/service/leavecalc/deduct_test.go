@@ -30,8 +30,9 @@ func TestDeductMinutesTable(t *testing.T) {
 		{TypeAnnual, 2, 0, 960},
 		{TypeMonthly, 1, 0, 480},
 		{TypeVacation, 3, 0, 1440},
-		{TypeHalf, 0, 0, 240},
-		{TypeEarlyLeave, 0, 180, 180},
+		{TypeHalf, 0, 0, DefaultHalfDayMinutes},
+		{TypeEarlyLeave, 0, DefaultEarlyLeaveMinutes, DefaultEarlyLeaveMinutes},
+		{TypeEarlyLeave, 0, 45, 45},
 		{TypeOuting, 0, 45, 45},
 		{TypeAbsence, 2, 0, 0},
 		{TypeOther, 1, 120, 0},
@@ -49,8 +50,8 @@ func TestDeductMinutesTable(t *testing.T) {
 }
 
 func TestHoursAndClockMinutes(t *testing.T) {
-	if HoursToMinutes(3) != 180 {
-		t.Fatalf("3h=%d", HoursToMinutes(3))
+	if HoursToMinutes(3) != DefaultEarlyLeaveMinutes {
+		t.Fatalf("3h=%d want %d", HoursToMinutes(3), DefaultEarlyLeaveMinutes)
 	}
 	got, err := ClockRangeMinutes("15:00", "18:00")
 	if err != nil || got != 180 {
