@@ -22,10 +22,10 @@
     --c-primary: 91 103 214;        --c-primary-hover: 76 88 196;
     --c-primary-soft: 238 240 253;  --c-on-primary: 255 255 255;
     /* ──────────────────────────────────────── */
-    --c-success: 34 160 107;        --c-success-soft: 232 247 240;
-    --c-warning: 214 140 20;        --c-warning-soft: 253 244 227;
-    --c-danger: 224 66 66;          --c-danger-soft: 253 236 236;
-    --c-info: 59 130 246;           --c-info-soft: 233 242 254;
+    --c-success: 27 126 85;         --c-success-soft: 232 247 240;
+    --c-warning: 154 101 14;        --c-warning-soft: 253 244 227;
+    --c-danger: 197 58 58;          --c-danger-soft: 253 236 236;
+    --c-info: 48 107 202;           --c-info-soft: 233 242 254;
     /* 업무 의미색 (화면설계서: 점검대상/지연) */
     --c-target-a: 34 160 107;  --c-target-b: 59 130 246;  --c-target-c: 139 92 246;  --c-overdue: 224 66 66;
     --radius-control: 6px;  --radius-card: 8px;
