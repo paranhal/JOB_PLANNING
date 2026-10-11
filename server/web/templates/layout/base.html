@@ -190,7 +190,7 @@
       <p class="px-3 pt-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">관리</p>
       {{if or $isAdmin $isObserver $loginObserver (hasUserPerm $perms "codes.edit") (hasUserPerm $perms "codes_users")}}
       <a href="/codes" class="{{if eq $a "codes"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">코드관리</a>
-      <a href="/admin/users" class="{{if eq $a "users"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사용자/권한</a>
+      <a href="/admin/users" class="{{if eq $a "users"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">사용자/권한{{if $.AccountRequestPending}} <span class="ml-auto text-[10px] bg-rose-600 text-white rounded-full px-1.5">{{$.AccountRequestPending}}</span>{{end}}</a>
       {{end}}
       <a href="/admin/holidays" class="{{if eq $a "holidays"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">휴무일 관리</a>
       {{if canViewOrgs .}}
@@ -320,6 +320,21 @@
     </div>
     {{else if .AssignNoticeOK}}
     <div class="flash-success rounded-control">처리했습니다{{if .AssignNoticeOKN}} ({{.AssignNoticeOKN}}건){{end}}</div>
+    {{end}}
+
+    {{if .AccountRequests}}
+    <div>
+      <p class="text-ui font-semibold text-ink">계정 등록 요청 {{len .AccountRequests}}건</p>
+      <ul class="mt-2 space-y-2 text-ui">
+        {{range .AccountRequests}}
+        <li class="card card-body">
+          <p class="font-medium text-ink">{{.FullName}} · @{{.Username}}</p>
+          <p class="text-ink-muted">{{roleLabel .Role}} · {{.OrgID}}</p>
+          <a href="/admin/users/requests" class="btn btn-primary min-h-[44px] inline-flex items-center mt-2">요청 목록</a>
+        </li>
+        {{end}}
+      </ul>
+    </div>
     {{end}}
 
     {{if .LoginHelps}}

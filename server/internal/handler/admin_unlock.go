@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -43,6 +44,23 @@ func skipsAdminSectionUnlock(c echo.Context) bool {
 	return v
 }
 
+func adminLockExemptForManagers(path string) bool {
+	p := strings.TrimSpace(path)
+	if strings.HasPrefix(p, "/users") || p == "/admin/users" || strings.HasPrefix(p, "/admin/users") {
+		return true
+	}
+	if strings.HasPrefix(p, "/admin/my-org/members") {
+		return true
+	}
+	if strings.HasPrefix(p, "/admin/orgs") {
+		return true
+	}
+	if strings.HasPrefix(p, "/admin/permissions") {
+		return true
+	}
+	return false
+}
+
 func (h *AuthHandler) adminSectionOpen(c echo.Context) bool {
 	if h == nil || h.adminUnlock == nil {
 		return false
@@ -57,6 +75,10 @@ func (h *AuthHandler) RequireAdminSection(next echo.HandlerFunc) echo.HandlerFun
 			return next(c)
 		}
 		if skipsAdminSectionUnlock(c) {
+			return next(c)
+		}
+		role := currentRole(c)
+		if (role == model.RoleVisionAdmin || role == model.RoleOrgAdmin) && adminLockExemptForManagers(c.Request().URL.Path) {
 			return next(c)
 		}
 		if h.adminSectionOpen(c) {

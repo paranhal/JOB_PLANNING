@@ -168,9 +168,6 @@ func pruneSnapshotToOrg(db *sql.DB, orgID string) error {
 			return fmt.Errorf("%s: %w", t, err)
 		}
 	}
-	if _, err := execDelete(db, "users", `DELETE FROM users WHERE TRIM(COALESCE(org_id,'')) != ?`, orgID); err != nil {
-		return err
-	}
 	if _, err := execDelete(db, "orgs", `DELETE FROM orgs WHERE org_id != ?`, orgID); err != nil {
 		return err
 	}

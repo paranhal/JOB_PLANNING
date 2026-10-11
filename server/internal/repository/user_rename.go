@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"customer-support/internal/audit"
+	"customer-support/internal/model"
 )
 
 var assigneeNameTargets = []struct {
@@ -20,16 +21,6 @@ var assigneeNameTargets = []struct {
 	{"work_actions", "assignee", "assignee_user_id"},
 	{"work_activities", "actor", "actor_user_id"},
 	{"as_work_items", "assigned_to", "assigned_user_id"},
-}
-
-func (r *UserRepo) UsernameTaken(username, exceptUserID string) (bool, error) {
-	username = strings.TrimSpace(username)
-	if r == nil || r.db == nil || username == "" {
-		return false, fmt.Errorf("아이디가 비었습니다")
-	}
-	var n int
-	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username=? COLLATE NOCASE AND user_id!=?`, username, strings.TrimSpace(exceptUserID)).Scan(&n)
-	return n > 0, err
 }
 
 func (r *UserRepo) RenameUsername(userID, newUsername string) error {
@@ -61,6 +52,10 @@ func (r *UserRepo) RenameUsername(userID, newUsername string) error {
 	if err != nil {
 		return err
 	}
+	acc := NewAccountRepo(r.db)
+	_ = acc.Reserve(old, userID, model.ReserveRenamedFrom)
+	_ = acc.Reserve(newUsername, userID, model.ReserveCurrent)
+	_ = acc.AddLifecycle(userID, model.LifeRenamed, userID, old+" → "+newUsername, "")
 	audit.Use(r.db)
 	audit.LogWithReason("update", "users", "user_id", userID, u.FullName, old, newUsername, "아이디 변경")
 	return nil

@@ -209,7 +209,11 @@ func TestLoginCookieSecureInProduction(t *testing.T) {
 }
 
 func TestUserCreateRejectsShortPassword(t *testing.T) {
-	e, _, _, _ := visionAuthApp(t)
+	e, _, users, _ := visionAuthApp(t)
+	vs := &model.User{Username: "vs-short", PasswordHash: HashPassword("password10"), FullName: "비젼", Role: model.RoleVisionAdmin, IsActive: true, ProfileDone: true}
+	if err := users.Create(vs); err != nil {
+		t.Fatal(err)
+	}
 	form := url.Values{
 		"username": {"tech1"}, "password": {"short"}, "full_name": {"기술일"},
 		"role": {"tech"}, "org_id": {model.OrgIDLibrary}, "mobile": {"010-1111-2222"},
@@ -217,7 +221,7 @@ func TestUserCreateRejectsShortPassword(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
+	req.AddCookie(visionCookie(t, vs))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("짧은 비밀번호 통과 loc=%s", rec.Header().Get("Location"))
@@ -299,11 +303,19 @@ func TestUserDeleteNeedsVisionPasswordAndZeroWork(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, title, assignee, assignee_user_id) VALUES ('t1','할일','지울사람',?)`, u.UserID); err != nil {
 		t.Fatal(err)
 	}
+	vs := &model.User{
+		Username: "vs-del", PasswordHash: HashPassword("password10"),
+		FullName: "비젼", Role: model.RoleVisionAdmin, IsActive: true, ProfileDone: true,
+	}
+	if err := users.Create(vs); err != nil {
+		t.Fatal(err)
+	}
+	ck := visionCookie(t, vs)
 	blocked := httptest.NewRecorder()
-	form := url.Values{"vision_password": {"vision-lock1"}}
+	form := url.Values{"vision_password": {"vision-lock1"}, "reason": {"퇴사"}}
 	breq := httptest.NewRequest(http.MethodPost, "/users/"+u.UserID+"/delete", strings.NewReader(form.Encode()))
 	breq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	breq.AddCookie(jwtCookie(t))
+	breq.AddCookie(ck)
 	e.ServeHTTP(blocked, breq)
 	if blocked.Code != http.StatusSeeOther || !strings.Contains(blocked.Header().Get("Location"), "err=") {
 		t.Fatalf("업무 있는 계정 삭제 loc=%s", blocked.Header().Get("Location"))
@@ -314,9 +326,9 @@ func TestUserDeleteNeedsVisionPasswordAndZeroWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	badpw := httptest.NewRecorder()
-	breq = httptest.NewRequest(http.MethodPost, "/users/"+u.UserID+"/delete", strings.NewReader(url.Values{"vision_password": {"admin"}}.Encode()))
+	breq = httptest.NewRequest(http.MethodPost, "/users/"+u.UserID+"/delete", strings.NewReader(url.Values{"vision_password": {"admin"}, "reason": {"퇴사"}}.Encode()))
 	breq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	breq.AddCookie(jwtCookie(t))
+	breq.AddCookie(ck)
 	e.ServeHTTP(badpw, breq)
 	if !strings.Contains(badpw.Header().Get("Location"), "err=") {
 		t.Fatal("로그인 비밀번호로 삭제됐다")
@@ -325,12 +337,16 @@ func TestUserDeleteNeedsVisionPasswordAndZeroWork(t *testing.T) {
 	ok := httptest.NewRecorder()
 	oreq := httptest.NewRequest(http.MethodPost, "/users/"+u.UserID+"/delete", strings.NewReader(form.Encode()))
 	oreq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	oreq.AddCookie(jwtCookie(t))
+	oreq.AddCookie(ck)
 	e.ServeHTTP(ok, oreq)
 	if ok.Code != http.StatusSeeOther || !strings.Contains(ok.Header().Get("Location"), "ok=deleted") {
 		t.Fatalf("삭제 실패 loc=%s", ok.Header().Get("Location"))
 	}
-	if got, _ := users.GetByID(u.UserID); got != nil {
-		t.Fatal("계정이 남아 있다")
+	got, _ := users.GetByID(u.UserID)
+	if got == nil || !got.IsDeleted() {
+		t.Fatal("소프트 삭제가 아니다")
+	}
+	if live, _ := users.GetByUsername("gone"); live != nil {
+		t.Fatal("삭제된 아이디로 로그인 조회가 된다")
 	}
 }

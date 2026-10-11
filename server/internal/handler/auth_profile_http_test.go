@@ -38,8 +38,17 @@ func newUserProfileApp(t *testing.T) (*echo.Echo, *repository.UserRepo) {
 	return e, users
 }
 
+func profileVisionCookie(t *testing.T, users *repository.UserRepo) *http.Cookie {
+	t.Helper()
+	vs := &model.User{Username: "vs-prof", PasswordHash: HashPassword("password10"), FullName: "비젼", Role: model.RoleVisionAdmin, IsActive: true, ProfileDone: true}
+	if err := users.Create(vs); err != nil {
+		t.Fatal(err)
+	}
+	return visionCookie(t, vs)
+}
+
 func TestUserCreateAllowsTechWithoutMobile(t *testing.T) {
-	e, _ := newUserProfileApp(t)
+	e, users := newUserProfileApp(t)
 	form := url.Values{
 		"username": {"tech1"}, "password": {"password10"}, "full_name": {"기술일"},
 		"role": {"tech"}, "org_id": {model.OrgIDLibrary},
@@ -47,7 +56,7 @@ func TestUserCreateAllowsTechWithoutMobile(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
+	req.AddCookie(profileVisionCookie(t, users))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("연락처는 첫 로그인에 채운다 loc=%s", rec.Header().Get("Location"))
@@ -55,7 +64,7 @@ func TestUserCreateAllowsTechWithoutMobile(t *testing.T) {
 }
 
 func TestUserCreateAllowsOrgAdminWithoutEmail(t *testing.T) {
-	e, _ := newUserProfileApp(t)
+	e, users := newUserProfileApp(t)
 	form := url.Values{
 		"username": {"adm2"}, "password": {"password10"}, "full_name": {"관리이"},
 		"role": {"org_admin"}, "org_id": {model.OrgIDLibrary},
@@ -63,7 +72,7 @@ func TestUserCreateAllowsOrgAdminWithoutEmail(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
+	req.AddCookie(profileVisionCookie(t, users))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("이메일은 첫 로그인에 채운다 loc=%s", rec.Header().Get("Location"))

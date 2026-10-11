@@ -605,6 +605,10 @@ func main() {
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 
 	g.GET("/admin/users", h.Auth.UserList, adminSec, adminOnly)
+	g.GET("/admin/users/requests", h.Auth.AccountRequestList, adminSec, adminOnly)
+	g.POST("/admin/users/requests/:id/decide", h.Auth.AccountRequestDecide, adminSec, adminOnly)
+	g.GET("/admin/users/deleted", h.Auth.DeletedUsers, adminSec, adminOnly)
+	g.POST("/admin/users/deleted/:id/restore", h.Auth.RestoreUser, adminSec, adminOnly)
 	g.GET("/users", h.Auth.UsersLegacyRedirect, adminSec, adminOnly)
 	g.POST("/users/as-edit-password", h.AS.UpdateCompletedEditPassword, adminSec, adminOnly)
 	g.POST("/users/mnt-delete-password", h.Auth.UpdateMaintenanceDeletePassword, adminSec, adminOnly)
@@ -652,6 +656,7 @@ func main() {
 
 	g.GET("/admin/my-org/members", h.Auth.MembersList, adminSec, adminOnly)
 	g.POST("/admin/my-org/members", h.Auth.MemberCreate, adminSec, adminOnly)
+	g.POST("/admin/my-org/members/requests/:id/cancel", h.Auth.AccountRequestCancel, adminSec, adminOnly)
 	g.POST("/admin/my-org/members/:id", h.Auth.MemberUpdate, adminSec, adminOnly)
 	g.POST("/admin/my-org/members/:id/work", h.Auth.MemberSetWork, adminSec, adminOnly)
 	g.POST("/admin/my-org/members/:id/reset-password", h.Auth.MemberResetPassword, adminSec, adminOnly)

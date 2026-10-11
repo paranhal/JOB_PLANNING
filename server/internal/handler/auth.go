@@ -27,6 +27,7 @@ type AuthHandler struct {
 	settingsRepo *repository.SettingsRepo
 	adminUnlock  *repository.AdminUnlockRepo
 	helpRepo     *repository.LoginHelpRepo
+	accounts     *repository.AccountRepo
 	wbRepo       *repository.WBRepo
 	db           *sql.DB
 	cfg          *config.Config
@@ -75,7 +76,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if user == nil {
 		return fail(nil, "비밀번호오류")
 	}
-	if !user.IsActive {
+	if !user.IsActive || user.IsDeleted() {
 		return fail(user, "권한없음")
 	}
 	if !verifyPassword(user.PasswordHash, password) {
@@ -104,6 +105,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 	if h.visionPasswordMustChange(user) {
 		return c.Redirect(http.StatusSeeOther, "/account/vision-password?ok=1")
+	}
+	if user.MustChangePassword {
+		return c.Redirect(http.StatusSeeOther, "/account?must=1")
 	}
 	return c.Redirect(http.StatusSeeOther, "/?ok=1")
 }
@@ -176,8 +180,13 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 	if h.orgRepo != nil {
 		orgs, _ = h.orgRepo.ListActive()
 	}
+	must := u.MustChangePassword || c.QueryParam("must") == "1"
+	if must && msg == "" {
+		msg = "임시 비밀번호입니다. 지금 바꿔 주세요."
+	}
 	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
 		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg, "Orgs": orgs,
+		"MustChange":    must,
 		"HasSignature":  strings.TrimSpace(u.SignaturePath) != "" && signatureFileExists(u.SignaturePath),
 		"HasSignature2": strings.TrimSpace(u.SignaturePath2) != "" && signatureFileExists(u.SignaturePath2),
 	})
@@ -433,13 +442,15 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	}
 	errMsg := c.QueryParam("err")
 	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
+	canCreate := currentRole(c) == model.RoleVisionAdmin
 	var orgs []model.Org
 	if h.orgRepo != nil {
 		orgs, _ = h.orgRepo.ListActive()
 	}
 	data := map[string]interface{}{
 		"Title": "사용자 관리", "Active": NavUsers, "Users": users, "OK": msg, "Error": errMsg,
-		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit,
+		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit, "CanCreateUser": canCreate,
+		"IsVision": currentRole(c) == model.RoleVisionAdmin,
 		"RoleGroups": model.GroupUsersByRole(users), "Orgs": orgs,
 		"PasswordMinLen": passwd.MinLen, "VisionAdminCount": 0,
 		"WorkCounts": map[string]int{},
@@ -492,7 +503,7 @@ func (h *AuthHandler) passwordMigrationStatus() map[string]interface{} {
 }
 
 func (h *AuthHandler) UserCreate(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if currentRole(c) != model.RoleVisionAdmin {
 		return h.forbidden(c)
 	}
 	role := resolveAdminRole(c, "")
@@ -525,12 +536,7 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이름과 아이디를 입력하세요."))
 	}
 	if taken, err := h.userRepo.UsernameTaken(u.Username, ""); err != nil || taken {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이미 있는 아이디입니다."))
-	}
-	if currentRole(c) == model.RoleOrgAdmin {
-		if home := strings.TrimSpace(ctxString(c, "org_id")); home != "" {
-			u.OrgID = home
-		}
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(model.UsernameReservedMsg))
 	}
 	if err := h.userRepo.Create(u); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 만들지 못했습니다."))
@@ -733,9 +739,8 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 }
 
-// UserDelete 계정 삭제. 68에서 교체: DeleteUserAccount → 소프트 삭제.
 func (h *AuthHandler) UserDelete(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if currentRole(c) != model.RoleVisionAdmin {
 		return h.forbidden(c)
 	}
 	id := strings.TrimSpace(c.Param("id"))
@@ -749,12 +754,21 @@ func (h *AuthHandler) UserDelete(c echo.Context) error {
 	if !h.verifyVisionAdminPassword(c, c.FormValue("vision_password")) {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비젼관리자 비밀번호가 올바르지 않습니다."))
 	}
+	reason := strings.TrimSpace(c.FormValue("reason"))
+	if reason == "" {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("삭제 사유가 필요합니다."))
+	}
+	if to := strings.TrimSpace(c.FormValue("transfer_user_id")); to != "" {
+		if err := h.userRepo.TransferAssignedWork(id, to); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
+		}
+	}
 	n := h.userRepo.AssignedWorkCount(id)
 	if n > 0 {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(fmt.Sprintf("담당 업무 %d건이 있습니다. 이관 후에 지우세요.", n)))
 	}
 	before := userPublic(u)
-	if err := h.userRepo.DeleteUserAccount(id); err != nil {
+	if err := h.userRepo.SoftDelete(id, ctxString(c, "user_id"), reason); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 지우지 못했습니다."))
 	}
 	accessLog(c, auditlog.Record{
@@ -765,8 +779,8 @@ func (h *AuthHandler) UserDelete(c echo.Context) error {
 		SubjectType: "user",
 		SubjectID:   id,
 		SubjectName: u.FullName,
-		Detail:      "계정 삭제",
-		Reason:      accessReason(c, "계정 삭제"),
+		Detail:      "소프트 삭제",
+		Reason:      reason,
 		BeforeJSON:  toJSON(before),
 	})
 	return c.Redirect(http.StatusSeeOther, "/users?ok=deleted")
@@ -823,7 +837,7 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				c.Set("auth_unconfirmed", true)
 				h.writeSessionCookie(c, sessionClaimsFromContext(c, true))
 			} else if u != nil {
-				if !u.IsActive {
+				if !u.IsActive || u.IsDeleted() {
 					c.SetCookie(tokenCookie("", -1))
 					return redirectLogin(c)
 				}
@@ -848,6 +862,13 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				return c.Redirect(http.StatusSeeOther, "/account/vision-password")
 			}
 		}
+		if uid != "" && h.userRepo != nil {
+			if u, _ := h.userRepo.GetByID(uid); u != nil && u.MustChangePassword {
+				if !mustChangePasswordExempt(path) {
+					return c.Redirect(http.StatusSeeOther, "/account?must=1")
+				}
+			}
+		}
 		pop := audit.Push(audit.Actor{
 			UserID:   ctxString(c, "user_id"),
 			Username: ctxString(c, "username"),
@@ -863,6 +884,11 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 func profileCompleteExempt(path string) bool {
 	p := strings.TrimSpace(path)
 	return p == "/account/complete" || p == "/logout" || strings.HasPrefix(p, "/static") || p == "/account/vision-password"
+}
+
+func mustChangePasswordExempt(path string) bool {
+	p := strings.TrimSpace(path)
+	return p == "/account" || p == "/account/password" || p == "/logout" || strings.HasPrefix(p, "/static")
 }
 
 func visionPasswordExempt(path string) bool {

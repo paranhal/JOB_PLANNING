@@ -98,9 +98,13 @@ func New(db *sql.DB) *Handler {
 	wbH.attach = attachH
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
+	if m, err := repository.NewRolePermRepo(db).Load(); err == nil {
+		model.SetAccessOverrides(m)
+	}
 	authH := &AuthHandler{
 		userRepo: userRepo, orgRepo: repository.NewOrgRepo(db), settingsRepo: settingsRepo,
 		adminUnlock: repository.NewAdminUnlockRepo(db), helpRepo: repository.NewLoginHelpRepo(db),
+		accounts: repository.NewAccountRepo(db),
 		wbRepo: repository.NewWBRepo(db), db: db, cfg: config.Load(), jwtSecret: jwtSecret, uploadDir: attachH.uploadDir,
 	}
 	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)

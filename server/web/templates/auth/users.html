@@ -8,9 +8,15 @@
       <h2 class="text-2xl font-extrabold text-slate-800">사용자 관리</h2>
       <p class="text-sm text-slate-500 mt-1">조직별 사용자 아이디와 업무 권한을 관리하세요.</p>
     </div>
-    {{if $canEdit}}
+    <div class="flex gap-2 flex-wrap">
+    {{if .IsVision}}
+    <a href="/admin/users/requests" class="px-4 py-2 border rounded-lg text-sm">등록 요청</a>
+    <a href="/admin/users/deleted" class="px-4 py-2 border rounded-lg text-sm">삭제 내역</a>
+    {{end}}
+    {{if .CanCreateUser}}
     <button type="button" id="btn-new" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">＋ 아이디 생성</button>
     {{end}}
+    </div>
   </div>
 
   {{if .OK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>{{end}}
@@ -344,6 +350,18 @@
       <button type="button" id="dCancel" class="px-4 border rounded-lg text-sm">취소</button>
     </div>
   </form>
+  {{if $.IsVision}}
+  <form id="del-form" method="POST" class="hidden p-5 space-y-2 border-t" onsubmit="return confirm('이 계정을 삭제(숨김)할까요? 아이디는 다시 쓸 수 없습니다.');">
+    <p class="text-sm font-bold text-red-700">계정 삭제</p>
+    <input type="password" name="vision_password" placeholder="비젼관리자 비밀번호" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+    <input name="reason" placeholder="삭제 사유" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+    <select name="transfer_user_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+      <option value="">이관 대상 (업무가 있으면 필수)</option>
+      {{range .Users}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
+    </select>
+    <button class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm">삭제</button>
+  </form>
+  {{end}}
   <form id="rename-form" method="POST" class="hidden"></form>
   <form id="reset-form" method="POST" class="hidden"></form>
 </aside>
@@ -445,6 +463,7 @@
     form.reset(); document.getElementById('dPass').required=true; document.getElementById('wUser').classList.remove('hidden');
     document.getElementById('wPass').classList.remove('hidden'); document.getElementById('wRename').classList.add('hidden');
     form.removeAttribute('data-id');
+    var df=document.getElementById('del-form'); if(df) df.classList.add('hidden');
     document.getElementById('btn-reset-perms').classList.add('hidden');
     document.getElementById('dPrev').value='';
     var src=document.getElementById('dPermSrc'); if(src) src.textContent='직급 기본값';
@@ -504,6 +523,8 @@
       link.classList.add('hidden'); link.textContent='';
     }
     syncGrade(); openD();
+    var df=document.getElementById('del-form');
+    if(df){ df.classList.remove('hidden'); df.action='/users/'+tr.dataset.id+'/delete'; }
   }
   var bn=document.getElementById('btn-new'); if(bn) bn.addEventListener('click', fillNew);
   document.querySelectorAll('.edit').forEach(function(btn){ btn.addEventListener('click', function(){ var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-edit')+'"]'); if(tr) fillEdit(tr); }); });

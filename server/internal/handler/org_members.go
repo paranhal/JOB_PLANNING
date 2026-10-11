@@ -2,7 +2,6 @@ package handler
 
 import (
 	"crypto/rand"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -73,59 +72,26 @@ func (h *AuthHandler) MembersList(c echo.Context) error {
 			}
 		}
 	}
+	var reqs []model.AccountRequest
+	if h.accounts != nil {
+		reqs, _ = h.accounts.ListRequests("", home, ctxString(c, "user_id"))
+	}
 	return c.Render(http.StatusOK, "admin/members.html", map[string]interface{}{
 		"Title":    "소속 인원 관리",
 		"Active":   NavMembers,
 		"OrgID":    home,
 		"OrgName":  orgName,
 		"Members":  members,
+		"Requests": reqs,
 		"CanEdit":  !isReadOnly(c),
 		"FlashOK":  strings.TrimSpace(c.QueryParam("ok")),
 		"FlashErr": strings.TrimSpace(c.QueryParam("err")),
-		"TempPW":   strings.TrimSpace(c.QueryParam("pw")),
+		"TempPW":   takeOncePassword(c.QueryParam("once")),
 	})
 }
 
-// MemberCreate 소속 인원 추가. 68에서 교체: AddOrgMember → 등록 요청.
 func (h *AuthHandler) MemberCreate(c echo.Context) error {
-	if !h.isAdmin(c) || isReadOnly(c) {
-		return h.forbidden(c)
-	}
-	home := sessionHomeOrgID(c)
-	if home == "" {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("세션에 조직이 없습니다."))
-	}
-	role := resolveAdminRole(c, "")
-	if passwordTooShort(c.FormValue("password")) {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape(passwordMinLenMsg()))
-	}
-	u := &model.User{
-		Username:     strings.TrimSpace(c.FormValue("username")),
-		PasswordHash: HashPassword(c.FormValue("password")),
-		FullName:     strings.TrimSpace(c.FormValue("full_name")),
-		Role:         role,
-		IsActive:     true,
-		OrgID:        home,
-		IsReadOnly:   c.FormValue("is_readonly") == "1",
-		IsTest:       c.FormValue("is_test") == "1",
-	}
-	bindUserContact(c, u)
-	if u.Username == "" || u.FullName == "" {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("이름과 아이디를 입력하세요."))
-	}
-	if taken, err := h.userRepo.UsernameTaken(u.Username, ""); err != nil || taken {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("이미 있는 아이디입니다."))
-	}
-	if err := h.userRepo.AddOrgMember(u); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("계정을 만들지 못했습니다."))
-	}
-	accessLog(c, auditlog.Record{
-		Action: auditlog.ActionCreate, Result: auditlog.ResultOK,
-		TargetTable: "users", TargetID: u.UserID, SubjectType: "user",
-		SubjectID: u.UserID, SubjectName: u.FullName,
-		Detail: "소속 인원 추가 조직=" + home,
-	})
-	return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?ok=saved")
+	return h.MembersRequestCreate(c)
 }
 
 func (h *AuthHandler) MemberUpdate(c echo.Context) error {
@@ -193,6 +159,7 @@ func (h *AuthHandler) MemberResetPassword(c echo.Context) error {
 	if err := h.userRepo.UpdatePassword(u.UserID, HashPassword(pw)); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("비밀번호를 바꾸지 못했습니다."))
 	}
+	_ = h.userRepo.SetMustChangePassword(u.UserID, true)
 	if how == "link" && h.db != nil {
 		_, _ = mailer.Enqueue(h.db, mailer.FromApp(h.cfg), mailer.Item{
 			ToAddr:    u.Email,
@@ -208,25 +175,12 @@ func (h *AuthHandler) MemberResetPassword(c echo.Context) error {
 		TargetTable: "users", TargetID: u.UserID, SubjectName: u.FullName,
 		Detail: "비밀번호 초기화 방법=" + how,
 	})
-	return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?ok="+url.QueryEscape("임시 비밀번호를 한 번만 보여 줍니다.")+"&pw="+url.QueryEscape(pw))
+	tok := putOncePassword(pw)
+	return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?ok="+url.QueryEscape("임시 비밀번호를 한 번만 보여 줍니다.")+"&once="+url.QueryEscape(tok))
 }
 
 func (h *AuthHandler) MemberDelete(c echo.Context) error {
-	if !h.isAdmin(c) || isReadOnly(c) {
-		return h.forbidden(c)
-	}
-	u, err := h.loadAdminScopedUser(c, c.Param("id"))
-	if err != nil || !h.memberInHomeOrg(c, u) {
-		return echo.ErrNotFound
-	}
-	n := h.userRepo.AssignedWorkCount(u.UserID)
-	if n > 0 {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape(fmt.Sprintf("담당 업무 %d건이 있습니다.", n)))
-	}
-	if err := h.userRepo.DeleteUserAccount(u.UserID); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("지우지 못했습니다."))
-	}
-	return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?ok=deleted")
+	return h.forbidden(c)
 }
 
 func randomTempPassword() (string, error) {

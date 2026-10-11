@@ -1,0 +1,42 @@
+{{define "title"}}등록 요청 · 고객지원시스템{{end}}
+{{define "content"}}
+<div class="space-y-5">
+  <a href="/admin/users" class="text-sm font-semibold text-slate-500">‹ 사용자 관리</a>
+  <h2 class="text-2xl font-extrabold text-slate-800">등록 요청</h2>
+  {{if .OK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}{{if .TempPW}} <code class="font-mono bg-white px-2 py-0.5 rounded">{{.TempPW}}</code> <span class="text-xs">이 화면을 새로고침하면 다시 보이지 않습니다.</span>{{end}}</div>{{end}}
+  {{if .Error}}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>{{end}}
+  <div class="rounded-2xl border bg-white overflow-hidden">
+    <table class="w-full text-sm">
+      <thead><tr class="bg-slate-50 text-xs text-slate-500 text-left">
+        <th class="px-4 py-3">이름</th><th class="px-4 py-3">희망 아이디</th><th class="px-4 py-3">업무</th><th class="px-4 py-3">조직</th><th class="px-4 py-3">상태</th><th class="px-4 py-3"></th>
+      </tr></thead>
+      <tbody>
+      {{if not .Items}}<tr><td colspan="6" class="px-4 py-12 text-center text-slate-400">대기 중인 요청이 없습니다.</td></tr>{{end}}
+      {{range .Items}}
+      <tr class="border-t">
+        <td class="px-4 py-3">{{.FullName}}{{if .Mobile}}<div class="text-xs text-slate-500">{{.Mobile}}</div>{{end}}</td>
+        <td class="px-4 py-3 font-mono">{{.Username}}</td>
+        <td class="px-4 py-3">{{roleLabel .Role}}</td>
+        <td class="px-4 py-3">{{.OrgID}}</td>
+        <td class="px-4 py-3">{{.Status}}</td>
+        <td class="px-4 py-3 text-right">
+          {{if eq .Status "pending"}}
+          <form method="POST" action="/admin/users/requests/{{.RequestID}}/decide" class="inline" onsubmit="return confirm('승인할까요?');">
+            <input type="hidden" name="how" value="approve">
+            {{if .RestoreUserID}}<input type="hidden" name="restore_user_id" value="{{.RestoreUserID}}">{{end}}
+            <button class="text-xs px-2 py-1 bg-blue-600 text-white rounded">승인</button>
+          </form>
+          <form method="POST" action="/admin/users/requests/{{.RequestID}}/decide" class="inline mt-1" onsubmit="return confirm('반려할까요?');">
+            <input type="hidden" name="how" value="reject">
+            <input name="decision_note" placeholder="반려 사유" class="border rounded px-2 py-1 text-xs" required>
+            <button class="text-xs px-2 py-1 border rounded">반려</button>
+          </form>
+          {{end}}
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

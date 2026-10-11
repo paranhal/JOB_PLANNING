@@ -154,19 +154,16 @@ func TestMemberCreateAndDeleteUseSingleAccountFuncs(t *testing.T) {
 		t.Fatalf("create loc=%s", rec.Header().Get("Location"))
 	}
 	got, _ := users.GetByUsername("newmem58")
-	if got == nil || got.OrgID != "O01" || got.Role != model.RoleTech {
-		t.Fatalf("created %+v", got)
+	if got != nil {
+		t.Fatal("조직관리자가 계정을 바로 만들었다")
 	}
 
 	del := httptest.NewRecorder()
-	dreq := httptest.NewRequest(http.MethodPost, "/admin/my-org/members/"+got.UserID+"/delete", nil)
+	dreq := httptest.NewRequest(http.MethodPost, "/admin/my-org/members/x/delete", nil)
 	dreq.AddCookie(ck)
 	e.ServeHTTP(del, dreq)
-	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "ok=deleted") {
-		t.Fatalf("delete loc=%s code=%d", del.Header().Get("Location"), del.Code)
-	}
-	if still, _ := users.GetByID(got.UserID); still != nil {
-		t.Fatal("삭제 후 계정이 있다")
+	if del.Code != http.StatusForbidden && del.Code != http.StatusOK {
+		t.Fatalf("삭제는 막혀야 한다 code=%d", del.Code)
 	}
 }
 

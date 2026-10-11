@@ -388,9 +388,13 @@ type User struct {
 	SignatureBox      string    `json:"signature_box,omitempty"`
 	ProfileDone       bool      `json:"profile_done,omitempty"`
 	UsernameChangedAt string    `json:"username_changed_at,omitempty"`
-	IsTest            bool      `json:"is_test,omitempty"`
-	IsReadOnly        bool      `json:"is_readonly,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
+	IsTest              bool      `json:"is_test,omitempty"`
+	IsReadOnly          bool      `json:"is_readonly,omitempty"`
+	DeletedAt           string    `json:"deleted_at,omitempty"`
+	DeletedBy           string    `json:"deleted_by,omitempty"`
+	DeleteReason        string    `json:"delete_reason,omitempty"`
+	MustChangePassword  bool      `json:"must_change_password,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // PermList EffectivePermissions 편의

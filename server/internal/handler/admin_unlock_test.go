@@ -42,6 +42,8 @@ func newAdminUnlockApp(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.POST("/admin/unlock", h.Auth.AdminUnlock)
 	g.GET("/users", h.Auth.UserList, sec, adminOnly)
 	g.GET("/codes", h.Code.List, sec, adminOnly)
+	g.GET("/admin/orgs", h.Org.List, sec)
+	g.GET("/admin/data", h.Backup.Page, sec, adminOnly)
 	return e, db
 }
 
@@ -50,7 +52,7 @@ func TestAdminSectionLockedUntilVisionPassword(t *testing.T) {
 	ck := jwtCookie(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/users", nil)
+	req := httptest.NewRequest(http.MethodGet, "/codes", nil)
 	req.AddCookie(ck)
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "/admin/unlock") {

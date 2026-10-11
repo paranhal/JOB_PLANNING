@@ -177,7 +177,13 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 		c.Set("login_helps", helps)
-		c.Set("assign_notice_unread", n+len(unassigned)+len(helps))
+		var accReqs []model.AccountRequest
+		if loginRole(c) == model.RoleVisionAdmin && h.Auth != nil && h.Auth.accounts != nil {
+			accReqs, _ = h.Auth.accounts.ListRequests(model.AccountReqPending, "", "")
+		}
+		c.Set("account_requests", accReqs)
+		c.Set("account_request_pending", len(accReqs))
+		c.Set("assign_notice_unread", n+len(unassigned)+len(helps)+len(accReqs))
 		force := c.QueryParam("assign") == "1"
 		if force {
 			c.Set("expand_unassigned", true)
@@ -185,7 +191,7 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 		home := path == "/" || path == "/work" || path == pathSalesDashboard
 		showModal := c.Request().Method == http.MethodGet &&
 			c.Request().Header.Get("HX-Request") != "true" &&
-			(force || (home && (n > 0 || len(unassigned) > 0 || len(helps) > 0) && !assignNoticeShownToday(c)))
+			(force || (home && (n > 0 || len(unassigned) > 0 || len(helps) > 0 || len(accReqs) > 0) && !assignNoticeShownToday(c)))
 		if showModal {
 			if n > 0 {
 				items, err := h.notices.repo.ListUnseen(uid)
@@ -198,7 +204,7 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 					c.Set("assign_notice_assignees", filterSameOrgUsers(users, currentOrg(c)))
 				}
 			}
-			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0 || len(helps) > 0)
+			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0 || len(helps) > 0 || len(accReqs) > 0)
 		}
 		return next(c)
 	}
@@ -247,7 +253,13 @@ func injectAssignNoticeView(c echo.Context, data map[string]interface{}) {
 	if v := c.Get("login_helps"); v != nil {
 		data["LoginHelps"] = v
 	}
-	total := sliceLen(data["AssignNotices"]) + sliceLen(data["AssignUnassigned"]) + sliceLen(data["LoginHelps"])
+	if v := c.Get("account_requests"); v != nil {
+		data["AccountRequests"] = v
+	}
+	if v := c.Get("account_request_pending"); v != nil {
+		data["AccountRequestPending"] = v
+	}
+	total := sliceLen(data["AssignNotices"]) + sliceLen(data["AssignUnassigned"]) + sliceLen(data["LoginHelps"]) + sliceLen(data["AccountRequests"])
 	if unread, ok := data["AssignNoticeUnread"].(int); ok && unread > total {
 		total = unread
 	}

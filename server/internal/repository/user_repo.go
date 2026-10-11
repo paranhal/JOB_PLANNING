@@ -41,30 +41,34 @@ const userSelect = `SELECT user_id, username, full_name, role,
 	COALESCE(signature_path2,''),
 	COALESCE(signature_box,''),
 	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0),
-	COALESCE(is_readonly,0), created_at FROM users`
+	COALESCE(is_readonly,0), created_at,
+	COALESCE(deleted_at,''), COALESCE(deleted_by,''), COALESCE(delete_reason,''), COALESCE(must_change_password,0) FROM users`
 const userSelectAuth = `SELECT user_id, username, password_hash, full_name, role,
 	COALESCE(permissions,''), is_active, COALESCE(org_id,''), COALESCE(base_role,''),
 	COALESCE(mobile,''), COALESCE(tel,''), COALESCE(email,''), COALESCE(signature_path,''),
 	COALESCE(signature_path2,''),
 	COALESCE(signature_box,''),
 	COALESCE(profile_done,0), COALESCE(username_changed_at,''), COALESCE(is_test,0),
-	COALESCE(is_readonly,0), created_at FROM users`
+	COALESCE(is_readonly,0), created_at,
+	COALESCE(deleted_at,''), COALESCE(deleted_by,''), COALESCE(delete_reason,''), COALESCE(must_change_password,0) FROM users`
 
 func scanUser(rows interface {
 	Scan(dest ...interface{}) error
 }, withPassword bool) (model.User, error) {
 	var u model.User
-	var active, profileDone, isTest, isRO int
+	var active, profileDone, isTest, isRO, mustCh int
 	var createdStr string
 	var err error
 	if withPassword {
 		err = rows.Scan(&u.UserID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role,
 			&u.Permissions, &active, &u.OrgID, &u.BaseRole,
-			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &u.SignaturePath2, &u.SignatureBox, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
+			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &u.SignaturePath2, &u.SignatureBox, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr,
+			&u.DeletedAt, &u.DeletedBy, &u.DeleteReason, &mustCh)
 	} else {
 		err = rows.Scan(&u.UserID, &u.Username, &u.FullName, &u.Role,
 			&u.Permissions, &active, &u.OrgID, &u.BaseRole,
-			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &u.SignaturePath2, &u.SignatureBox, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr)
+			&u.Mobile, &u.Tel, &u.Email, &u.SignaturePath, &u.SignaturePath2, &u.SignatureBox, &profileDone, &u.UsernameChangedAt, &isTest, &isRO, &createdStr,
+			&u.DeletedAt, &u.DeletedBy, &u.DeleteReason, &mustCh)
 	}
 	if err != nil {
 		return u, err
@@ -74,13 +78,14 @@ func scanUser(rows interface {
 	u.ProfileDone = profileDone == 1
 	u.IsTest = isTest == 1
 	u.IsReadOnly = isRO == 1
+	u.MustChangePassword = mustCh == 1
 	u.CreatedAt = parseTime(createdStr)
 	u.BaseRole = ""
 	return u, nil
 }
 
 func (r *UserRepo) ListAll() ([]model.User, error) {
-	rows, err := r.db.Query(userSelect + ` ORDER BY full_name`)
+	rows, err := r.db.Query(userSelect + ` WHERE TRIM(COALESCE(deleted_at,''))='' ORDER BY full_name`)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +103,7 @@ func (r *UserRepo) ListAll() ([]model.User, error) {
 
 func (r *UserRepo) ListTechActive() ([]model.User, error) {
 	rows, err := r.db.Query(userSelect + `
-		WHERE is_active=1 AND role IN ('tech','admin')
+		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND role IN ('tech','admin')
 		ORDER BY full_name`)
 	if err != nil {
 		return nil, err
@@ -117,7 +122,7 @@ func (r *UserRepo) ListTechActive() ([]model.User, error) {
 
 func (r *UserRepo) ListAssignable() ([]model.User, error) {
 	rows, err := r.db.Query(userSelect + `
-		WHERE is_active=1 AND role IN ('admin','org_admin','tech','office','support','receipt','sales')
+		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND role IN ('admin','org_admin','tech','office','support','receipt','sales')
 		ORDER BY full_name`)
 	if err != nil {
 		return nil, err
@@ -142,6 +147,9 @@ func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if u.IsDeleted() {
+		return nil, nil
 	}
 	return &u, nil
 }
@@ -198,6 +206,11 @@ func (r *UserRepo) Create(u *model.User) error {
 	}
 	logCreate(r.db, "users", "user_id", u.UserID, u.FullName)
 	rememberUserName(u.UserID, u.FullName)
+	_ = NewAccountRepo(r.db).Reserve(u.Username, u.UserID, model.ReserveCurrent)
+	_ = NewAccountRepo(r.db).AddLifecycle(u.UserID, model.LifeCreated, u.UserID, "계정 생성", "")
+	if u.MustChangePassword {
+		_ = r.SetMustChangePassword(u.UserID, true)
+	}
 	return nil
 }
 
@@ -294,22 +307,12 @@ func (r *UserRepo) CountRole(role string) int {
 		return 0
 	}
 	var n int
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role=? AND is_active=1`, model.NormalizeRole(role)).Scan(&n)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role=? AND is_active=1 AND TRIM(COALESCE(deleted_at,''))=''`, model.NormalizeRole(role)).Scan(&n)
 	return n
 }
 
-func (r *UserRepo) Delete(userID string) error {
-	userID = strings.TrimSpace(userID)
-	if r == nil || r.db == nil || userID == "" {
-		return fmt.Errorf("계정이 없습니다")
-	}
-	_, err := r.db.Exec(`DELETE FROM users WHERE user_id=?`, userID)
-	return err
-}
-
-// DeleteUserAccount 계정 삭제. 68에서 교체: 하드 삭제 → 소프트 삭제.
 func (r *UserRepo) DeleteUserAccount(userID string) error {
-	return r.Delete(userID)
+	return r.SoftDelete(userID, "", "")
 }
 
 // AddOrgMember 소속 인원 추가. 68에서 교체: 직접 생성 → 등록 요청.
@@ -319,7 +322,7 @@ func (r *UserRepo) AddOrgMember(u *model.User) error {
 
 func (r *UserRepo) UpdatePassword(id, hash string) error {
 	return touchUpdate(r.db, "users", "user_id", id, "비밀번호", func() error {
-		_, err := r.db.Exec(`UPDATE users SET password_hash=? WHERE user_id=?`, hash, id)
+		_, err := r.db.Exec(`UPDATE users SET password_hash=?, must_change_password=0 WHERE user_id=?`, hash, id)
 		return err
 	})
 }
