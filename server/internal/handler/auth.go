@@ -386,12 +386,32 @@ func (h *AuthHandler) forbidden(c echo.Context) error {
 	})
 }
 
+// UsersLegacyRedirect 북마크 /users → /admin/users. 질의문자열을 유지한다.
+func (h *AuthHandler) UsersLegacyRedirect(c echo.Context) error {
+	loc := "/admin/users"
+	if q := c.QueryString(); q != "" {
+		loc += "?" + q
+	}
+	return c.Redirect(http.StatusFound, loc)
+}
+
 // UserList 사용자 관리 화면 (옵저버는 조회만)
 func (h *AuthHandler) UserList(c echo.Context) error {
 	if !h.isAdmin(c) && !isReadOnly(c) && !hasPerm(c, model.PermCodesUsers) {
 		return h.forbidden(c)
 	}
 	users, _ := h.userRepo.ListAll()
+	if currentRole(c) == model.RoleOrgAdmin {
+		if home := sessionHomeOrgID(c); home != "" {
+			var scoped []model.User
+			for _, u := range users {
+				if u.OrgID == home {
+					scoped = append(scoped, u)
+				}
+			}
+			users = scoped
+		}
+	}
 	msg := c.QueryParam("ok")
 	switch msg {
 	case "password":
@@ -533,9 +553,9 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
 	}
-	u, _ := h.userRepo.GetByID(c.Param("id"))
-	if u == nil {
-		return echo.ErrNotFound
+	u, err := h.loadAdminScopedUser(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	before := userPublic(u)
 	wasActive := u.IsActive
@@ -622,6 +642,9 @@ func (h *AuthHandler) UserRenameUsername(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	id := strings.TrimSpace(c.Param("id"))
+	if _, err := h.loadAdminScopedUser(c, id); err != nil {
+		return err
+	}
 	newUsername := strings.TrimSpace(c.FormValue("username"))
 	if newUsername == "" {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("아이디를 입력하세요."))
@@ -655,9 +678,9 @@ func (h *AuthHandler) UserResetPermissions(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
 	}
-	u, _ := h.userRepo.GetByID(c.Param("id"))
-	if u == nil {
-		return echo.ErrNotFound
+	u, err := h.loadAdminScopedUser(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	u.Permissions = ""
 	if err := h.userRepo.Update(u); err != nil {
@@ -671,9 +694,9 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
 	}
-	u, _ := h.userRepo.GetByID(c.Param("id"))
-	if u == nil {
-		return echo.ErrNotFound
+	u, err := h.loadAdminScopedUser(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	pw := strings.TrimSpace(c.FormValue("password"))
 	confirm := strings.TrimSpace(c.FormValue("password_confirm"))
@@ -690,6 +713,7 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 }
 
+// UserDelete 계정 삭제. 68에서 교체: DeleteUserAccount → 소프트 삭제.
 func (h *AuthHandler) UserDelete(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
@@ -698,9 +722,9 @@ func (h *AuthHandler) UserDelete(c echo.Context) error {
 	if id == "" || id == ctxString(c, "user_id") {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이 계정은 지울 수 없습니다."))
 	}
-	u, _ := h.userRepo.GetByID(id)
-	if u == nil {
-		return echo.ErrNotFound
+	u, err := h.loadAdminScopedUser(c, id)
+	if err != nil {
+		return err
 	}
 	if !h.verifyVisionAdminPassword(c, c.FormValue("vision_password")) {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비젼관리자 비밀번호가 올바르지 않습니다."))
@@ -710,7 +734,7 @@ func (h *AuthHandler) UserDelete(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(fmt.Sprintf("담당 업무 %d건이 있습니다. 이관 후에 지우세요.", n)))
 	}
 	before := userPublic(u)
-	if err := h.userRepo.Delete(id); err != nil {
+	if err := h.userRepo.DeleteUserAccount(id); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 지우지 못했습니다."))
 	}
 	accessLog(c, auditlog.Record{

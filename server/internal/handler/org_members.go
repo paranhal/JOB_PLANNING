@@ -30,6 +30,29 @@ func (h *AuthHandler) memberInHomeOrg(c echo.Context, u *model.User) bool {
 	return true
 }
 
+// adminVisibleUser D-32: 조직관리자(세션 조직이 있을 때)는 자기 조직원만. 비젼관리자는 전체.
+func (h *AuthHandler) adminVisibleUser(c echo.Context, u *model.User) bool {
+	if u == nil {
+		return false
+	}
+	if currentRole(c) != model.RoleOrgAdmin {
+		return true
+	}
+	home := sessionHomeOrgID(c)
+	if home == "" {
+		return true
+	}
+	return strings.TrimSpace(u.OrgID) == home
+}
+
+func (h *AuthHandler) loadAdminScopedUser(c echo.Context, id string) (*model.User, error) {
+	u, _ := h.userRepo.GetByID(strings.TrimSpace(id))
+	if u == nil || !h.adminVisibleUser(c, u) {
+		return nil, echo.ErrNotFound
+	}
+	return u, nil
+}
+
 func (h *AuthHandler) MembersList(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
@@ -63,6 +86,7 @@ func (h *AuthHandler) MembersList(c echo.Context) error {
 	})
 }
 
+// MemberCreate 소속 인원 추가. 68에서 교체: AddOrgMember → 등록 요청.
 func (h *AuthHandler) MemberCreate(c echo.Context) error {
 	if !h.isAdmin(c) || isReadOnly(c) {
 		return h.forbidden(c)
@@ -92,7 +116,7 @@ func (h *AuthHandler) MemberCreate(c echo.Context) error {
 	if taken, err := h.userRepo.UsernameTaken(u.Username, ""); err != nil || taken {
 		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("이미 있는 아이디입니다."))
 	}
-	if err := h.userRepo.Create(u); err != nil {
+	if err := h.userRepo.AddOrgMember(u); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("계정을 만들지 못했습니다."))
 	}
 	accessLog(c, auditlog.Record{
@@ -191,15 +215,15 @@ func (h *AuthHandler) MemberDelete(c echo.Context) error {
 	if !h.isAdmin(c) || isReadOnly(c) {
 		return h.forbidden(c)
 	}
-	u, _ := h.userRepo.GetByID(c.Param("id"))
-	if !h.memberInHomeOrg(c, u) {
+	u, err := h.loadAdminScopedUser(c, c.Param("id"))
+	if err != nil || !h.memberInHomeOrg(c, u) {
 		return echo.ErrNotFound
 	}
 	n := h.userRepo.AssignedWorkCount(u.UserID)
 	if n > 0 {
 		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape(fmt.Sprintf("담당 업무 %d건이 있습니다.", n)))
 	}
-	if err := h.userRepo.Delete(u.UserID); err != nil {
+	if err := h.userRepo.DeleteUserAccount(u.UserID); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("지우지 못했습니다."))
 	}
 	return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?ok=deleted")

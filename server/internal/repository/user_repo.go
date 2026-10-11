@@ -271,6 +271,16 @@ func (r *UserRepo) Delete(userID string) error {
 	return err
 }
 
+// DeleteUserAccount 계정 삭제. 68에서 교체: 하드 삭제 → 소프트 삭제.
+func (r *UserRepo) DeleteUserAccount(userID string) error {
+	return r.Delete(userID)
+}
+
+// AddOrgMember 소속 인원 추가. 68에서 교체: 직접 생성 → 등록 요청.
+func (r *UserRepo) AddOrgMember(u *model.User) error {
+	return r.Create(u)
+}
+
 func (r *UserRepo) UpdatePassword(id, hash string) error {
 	return touchUpdate(r.db, "users", "user_id", id, "비밀번호", func() error {
 		_, err := r.db.Exec(`UPDATE users SET password_hash=? WHERE user_id=?`, hash, id)

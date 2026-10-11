@@ -244,9 +244,9 @@ func (h *AuthHandler) UserSignature(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	id := strings.TrimSpace(c.Param("id"))
-	u, _ := h.userRepo.GetByID(id)
-	if u == nil {
-		return echo.ErrNotFound
+	u, errU := h.loadAdminScopedUser(c, id)
+	if errU != nil {
+		return errU
 	}
 	raw, err := readSignatureUpload(c)
 	if err != nil {
@@ -273,9 +273,8 @@ func (h *AuthHandler) UserSignatureDelete(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	id := strings.TrimSpace(c.Param("id"))
-	u, _ := h.userRepo.GetByID(id)
-	if u == nil {
-		return echo.ErrNotFound
+	if _, err := h.loadAdminScopedUser(c, id); err != nil {
+		return err
 	}
 	slot, _ := signatureSlotHint(c)
 	h.clearSignaturePNG(id, slot)
@@ -286,9 +285,9 @@ func (h *AuthHandler) UserSignatureImage(c echo.Context) error {
 	if !h.isAdmin(c) {
 		return h.forbidden(c)
 	}
-	u, _ := h.userRepo.GetByID(c.Param("id"))
-	if u == nil {
-		return echo.ErrNotFound
+	u, err := h.loadAdminScopedUser(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	slot, _ := signatureSlotHint(c)
 	raw := readSignaturePNG(signaturePathOf(u, slot))

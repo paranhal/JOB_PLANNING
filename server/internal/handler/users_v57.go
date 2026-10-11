@@ -16,9 +16,9 @@ func (h *AuthHandler) UserSetWork(c echo.Context) error {
 	if !h.isAdmin(c) || isReadOnly(c) {
 		return h.forbidden(c)
 	}
-	u, _ := h.userRepo.GetByID(c.Param("id"))
-	if u == nil {
-		return echo.ErrNotFound
+	u, err := h.loadAdminScopedUser(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	if model.IsAdminGrade(u.Role) {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(
@@ -49,7 +49,7 @@ func (h *AuthHandler) UsersBulkOrg(c echo.Context) error {
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
 	orgID := strings.TrimSpace(c.FormValue("org_id"))
-	users, names, err := h.usersForBulk(ids)
+	users, names, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
@@ -84,7 +84,7 @@ func (h *AuthHandler) UsersBulkJob(c echo.Context) error {
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
 	job := model.NormalizeRole(c.FormValue("job"))
-	users, names, err := h.usersForBulk(ids)
+	users, names, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
@@ -120,7 +120,7 @@ func (h *AuthHandler) UsersBulkReadonly(c echo.Context) error {
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
 	reason := strings.TrimSpace(c.FormValue("reason"))
-	users, names, err := h.usersForBulk(ids)
+	users, names, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
@@ -142,7 +142,7 @@ func (h *AuthHandler) UsersBulkDeactivate(c echo.Context) error {
 	}
 	_ = c.Request().ParseForm()
 	ids := c.Request().PostForm["user_ids"]
-	users, names, err := h.usersForBulk(ids)
+	users, names, err := h.usersForBulk(c, ids)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))
 	}
@@ -157,7 +157,7 @@ func (h *AuthHandler) UsersBulkDeactivate(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/users?ok=saved")
 }
 
-func (h *AuthHandler) usersForBulk(ids []string) ([]model.User, []string, error) {
+func (h *AuthHandler) usersForBulk(c echo.Context, ids []string) ([]model.User, []string, error) {
 	if len(ids) == 0 {
 		return nil, nil, fmt.Errorf("사람을 고르세요.")
 	}
@@ -165,7 +165,7 @@ func (h *AuthHandler) usersForBulk(ids []string) ([]model.User, []string, error)
 	var names []string
 	for _, id := range ids {
 		u, _ := h.userRepo.GetByID(strings.TrimSpace(id))
-		if u == nil {
+		if u == nil || !h.adminVisibleUser(c, u) {
 			continue
 		}
 		out = append(out, *u)

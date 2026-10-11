@@ -603,7 +603,8 @@ func main() {
 	g.POST("/attachments/:id/promote-asset", h.Attachment.PromoteToAsset)
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 
-	g.GET("/users", h.Auth.UserList, adminSec, adminOnly)
+	g.GET("/admin/users", h.Auth.UserList, adminSec, adminOnly)
+	g.GET("/users", h.Auth.UsersLegacyRedirect, adminSec, adminOnly)
 	g.POST("/users/as-edit-password", h.AS.UpdateCompletedEditPassword, adminSec, adminOnly)
 	g.POST("/users/mnt-delete-password", h.Auth.UpdateMaintenanceDeletePassword, adminSec, adminOnly)
 	g.POST("/users/bulk/org", h.Auth.UsersBulkOrg, adminSec, adminOnly)

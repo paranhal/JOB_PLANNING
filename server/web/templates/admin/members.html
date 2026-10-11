@@ -2,7 +2,7 @@
 {{define "content"}}
 {{$can := .CanEdit}}
 <div class="space-y-5">
-  <a href="/users" class="text-sm font-semibold text-slate-500">‹ 사용자 관리로 돌아가기</a>
+  <a href="/admin/users" class="text-sm font-semibold text-slate-500">‹ 사용자 관리로 돌아가기</a>
   <div class="flex items-end justify-between gap-4 flex-wrap">
     <div>
       {{if .OrgName}}<span class="inline-block px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-semibold">{{.OrgName}}</span>{{end}}
