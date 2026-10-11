@@ -35,7 +35,7 @@ func reviewUnplannedKey(prefix, refID string) string {
 		return "as:" + refID
 	case model.WorkPrefixMaintenance:
 		return "mnt:" + refID
-	case model.WorkPrefixConfirm:
+	case model.WorkPrefixConfirm, model.WorkPrefixSupport:
 		return "wi:" + refID
 	default:
 		return "task:" + refID

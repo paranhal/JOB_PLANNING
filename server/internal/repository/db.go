@@ -1286,6 +1286,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applySalesStageLabels(db)
 	applySalesMemos(db)
 	applyWorkProjectContract(db)
+	applyASSupportDetails(db)
 	applySales4Stage(db)
 	applyWorkTaskAssets(db)
 

@@ -10,6 +10,9 @@ import (
 	"customer-support/internal/model"
 )
 
+// sqlWorkVisibleWithParent 확인·재방문은 원 접수가 열려 있을 때만, 지원은 완료된 AS에도 남긴다(D-37).
+const sqlWorkVisibleWithParent = `(ar.status NOT IN ('completed','closed','cancelled') OR w.work_kind='support')`
+
 // WorkBoardRepo 담당자 대시보드·통합 업무 리스트
 type WorkBoardRepo struct {
 	db *sql.DB
@@ -397,7 +400,7 @@ func (r *WorkBoardRepo) collectWorkTodayOpen(mineUserID string, mineKeys []strin
 	out = append(out, asItems...)
 
 	wItems, err := r.queryWorkItems(
-		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
+		`w.status='open' AND `+sqlWorkVisibleWithParent+`
 		 AND TRIM(COALESCE(w.scheduled_date,'')) != ''
 		 AND w.scheduled_date <= ?`,
 		mineUserID, mineKeys, []interface{}{today})
@@ -496,7 +499,7 @@ func (r *WorkBoardRepo) collectOpen(mineUserID string, mineKeys []string) ([]mod
 	out = append(out, asItems...)
 
 	wItems, err := r.queryWorkItems(
-		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')`,
+		`w.status='open' AND `+sqlWorkVisibleWithParent,
 		mineUserID, mineKeys, nil)
 	if err != nil {
 		return nil, err
@@ -538,7 +541,7 @@ func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date
 	}
 	out = append(out, asItems...)
 
-	wStatus := `w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')`
+	wStatus := `w.status='open' AND ` + sqlWorkVisibleWithParent
 	if includeComplete {
 		wStatus = `ar.status NOT IN ('cancelled')`
 	}
@@ -608,7 +611,7 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 
 	// 원 접수가 이미 완료·종료면 하부 확인/재방문은 지연으로 세지 않는다.
 	wItems, err := r.queryWorkItems(
-		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
+		`w.status='open' AND `+sqlWorkVisibleWithParent+`
 		 AND COALESCE(w.scheduled_date,'') != ''
 		 AND COALESCE(w.schedule_confirmed,0)=1
 		 AND w.scheduled_date < ?`,
@@ -787,7 +790,7 @@ func (r *WorkBoardRepo) CollectUnassigned(orgID string) ([]model.WorkListItem, e
 	out = append(out, asItems...)
 
 	wiWhere, wiArgs := applyOrgWhere(
-		`w.status='open' AND ar.status NOT IN ('completed','closed','cancelled')
+		`w.status='open' AND `+sqlWorkVisibleWithParent+`
 		 AND TRIM(COALESCE(w.assigned_to,''))='' AND TRIM(COALESCE(w.assigned_user_id,''))=''`,
 		"ar", orgID, nil)
 	wi, err := r.queryWorkItems(wiWhere, "", nil, wiArgs)
@@ -942,10 +945,11 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 		       COALESCE(w.scheduled_date,''), w.status,
 		       COALESCE(w.confirm_target,''), COALESCE(w.notes,''), ar.as_number,
 		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,''),
-		       COALESCE(w.schedule_confirmed,0)
+		       COALESCE(w.schedule_confirmed,0), COALESCE(d.support_type,'')
 		FROM as_work_items w
 		JOIN as_receipts ar ON ar.as_id = w.as_id
 		JOIN customers c ON c.customer_id = ar.customer_id
+		LEFT JOIN as_support_details d ON d.work_id = w.work_id
 		WHERE ` + extraWhere
 	args := append([]interface{}{}, extraArgs...)
 	// 하부업무는 자체 담당자 기준(미배정 시 원 접수 담당자 fallback)
@@ -962,10 +966,10 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 	var items []model.WorkListItem
 	for rows.Next() {
 		var it model.WorkListItem
-		var kind, asID, target, notes, asNum string
+		var kind, asID, target, notes, asNum, supportType string
 		var confirmed int
 		if err := rows.Scan(&it.RefID, &it.RefNumber, &kind, &asID, &it.OrgName,
-			&it.Assignee, &it.ScheduledDate, &it.Status, &target, &notes, &asNum, &it.CustomerID, &it.ProjectID, &confirmed); err != nil {
+			&it.Assignee, &it.ScheduledDate, &it.Status, &target, &notes, &asNum, &it.CustomerID, &it.ProjectID, &confirmed, &supportType); err != nil {
 			return nil, err
 		}
 		it.Tentative = confirmed == 0
@@ -980,8 +984,18 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 				it.Title = "회신·결과 확인"
 			}
 			it.Content = notes
+		} else if kind == model.WorkKindSupport {
+			it.Prefix = model.WorkPrefixSupport
+			it.SubLabel = "지원"
+			it.Title = strings.TrimSpace(notes)
+			if it.Title == "" {
+				it.Title = model.SupportTypeLabel(supportType)
+			}
+			if it.Title == "" {
+				it.Title = "지원업무 · " + asNum
+			}
+			it.Content = notes
 		} else {
-			// 재방문은 AS 계열로 표시
 			it.Prefix = model.WorkPrefixAS
 			it.SubLabel = "재방문"
 			it.Title = notes
@@ -1302,6 +1316,9 @@ func formatBracketPrefixCounts(c model.WorkPrefixCounts) string {
 	}
 	if c.Confirm > 0 {
 		parts = append(parts, fmt.Sprintf("[확인] %d", c.Confirm))
+	}
+	if c.Support > 0 {
+		parts = append(parts, fmt.Sprintf("[지원] %d", c.Support))
 	}
 	if c.Maintenance > 0 {
 		parts = append(parts, fmt.Sprintf("[정기점검] %d", c.Maintenance))

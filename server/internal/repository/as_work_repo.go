@@ -203,18 +203,20 @@ func (r *ASWorkRepo) MarkDone(workID string) error {
 }
 
 func (r *ASWorkRepo) DeleteByAS(asID string) error {
+	_, _ = r.db.Exec(`DELETE FROM as_support_details WHERE work_id IN (SELECT work_id FROM as_work_items WHERE as_id=?)`, asID)
 	_, err := r.db.Exec(`DELETE FROM as_work_items WHERE as_id=?`, asID)
 	return err
 }
 
-// CloseOpenByAS 접수 완료·종료 시 남은 확인·재방문 하부업무를 완료 처리한다.
+// CloseOpenByAS 접수 완료·종료 시 남은 확인·재방문 하부업무를 완료 처리한다. 지원업무(D-37)는 닫지 않는다.
 func (r *ASWorkRepo) CloseOpenByAS(asID string) error {
 	if strings.TrimSpace(asID) == "" {
 		return nil
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(`UPDATE as_work_items SET status='done', updated_at=? WHERE as_id=? AND status='open'`,
-		now, asID)
+	_, err := r.db.Exec(`UPDATE as_work_items SET status='done', updated_at=?
+		WHERE as_id=? AND status='open' AND work_kind != ?`,
+		now, asID, model.WorkKindSupport)
 	return err
 }
 
@@ -225,10 +227,11 @@ func (r *ASWorkRepo) CloseOpenUnderClosedReceipts() (int64, error) {
 		UPDATE as_work_items
 		SET status='done', updated_at=?
 		WHERE status='open'
+		  AND work_kind != ?
 		  AND as_id IN (
 			SELECT as_id FROM as_receipts
 			WHERE status IN ('completed','closed','cancelled')
-		  )`, now)
+		  )`, now, model.WorkKindSupport)
 	if err != nil {
 		return 0, err
 	}

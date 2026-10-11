@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -22,7 +23,7 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	assignees, _ := h.userRepo.ListAssignable()
-	return c.Render(http.StatusOK, "as/work_action.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":        "하부업무 조치 · " + w.WorkNumber,
 		"Active":       NavAS,
 		"Work":         w,
@@ -33,7 +34,16 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 		"FlashErr":     c.QueryParam("err"),
 		"ParentHref":   "/as/" + as.ASID,
 		"ParentAction": "/as/" + as.ASID + "/action",
-	})
+		"SupportTypes": model.SupportTypeOptions(),
+	}
+	if w.WorkKind == model.WorkKindSupport && h.workRepo != nil {
+		d, _ := h.workRepo.GetDetail(w.WorkID)
+		if d == nil {
+			d = &model.ASSupportDetail{WorkID: w.WorkID}
+		}
+		data["Support"] = d
+	}
+	return c.Render(http.StatusOK, "as/work_action.html", data)
 }
 
 // UpdateWorkAction 하부업무만 저장·완료. 원 접수 담당자·상태는 건드리지 않는다.
@@ -56,6 +66,21 @@ func (h *ASHandler) UpdateWorkAction(c echo.Context) error {
 
 	if c.FormValue("mark_done") == "1" {
 		w.Status = "done"
+	}
+
+	if w.WorkKind == model.WorkKindSupport {
+		d := supportDetailFromForm(c)
+		d.WorkID = w.WorkID
+		if err := h.workRepo.UpsertDetail(d); err != nil {
+			return c.Redirect(http.StatusSeeOther,
+				"/as/work/"+workID+"/action?err="+url.QueryEscape(err.Error()))
+		}
+		if strings.TrimSpace(w.ScheduledDate) == "" {
+			w.ScheduledDate = d.DueDate
+		}
+		if strings.TrimSpace(w.Notes) == "" {
+			w.Notes = d.Memo
+		}
 	}
 
 	if err := h.workRepo.Update(w); err != nil {

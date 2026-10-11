@@ -189,7 +189,7 @@ func workPrefixRank(p string) int {
 		return 0
 	case model.WorkPrefixMaintenance:
 		return 1
-	case model.WorkPrefixConfirm:
+	case model.WorkPrefixConfirm, model.WorkPrefixSupport:
 		return 2
 	default:
 		return 3

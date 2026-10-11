@@ -348,6 +348,7 @@ func main() {
 	// 하부업무 조치(원 접수와 독립) — /:id 보다 먼저 등록
 	as.GET("/work/:work_id/action", h.AS.WorkAction)
 	as.POST("/work/:work_id/action", h.AS.UpdateWorkAction)
+	as.POST("/:id/support", h.AS.CreateSupport, processAS)
 	as.GET("/:id", h.AS.Show)
 	as.GET("/:id/report/signatures", h.AS.ReportSignatures)
 	as.GET("/:id/report", h.AS.ReportPreview)

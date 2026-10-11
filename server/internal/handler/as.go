@@ -875,6 +875,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	h.mergeASReportData(c, as, data)
+	h.mergeSupportPageData(c, as, data)
 	return c.Render(http.StatusOK, "as/show.html", data)
 }
 
@@ -1020,7 +1021,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"WorkerDefault":        ctxString(c, "user_name"),
 		"OnBehalf":             !sessionOwnsAS(c, as),
 		"ActionErr":            c.QueryParam("err"),
-		"ActionErrMsg":         actionErrMessage(c.QueryParam("err")),
+		"ActionErrMsg":         actionErrMessageWithSupport(c.QueryParam("err"), parseOpenSupportN(c)),
 		"AttachErrMsg":         attachErrMessage(c.QueryParam("err")),
 		"ActionWarn":           c.QueryParam("warn"),
 		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
@@ -1040,6 +1041,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
 	h.mergeActionPhotoData(as, data, canProcess && !readOnly)
 	h.mergeASReportData(c, as, data)
+	h.mergeSupportPageData(c, as, data)
 	data["OfferReport"] = c.QueryParam("report") == "1" && canIssueASReportStatus(as.Status)
 	return c.Render(http.StatusOK, "as/action.html", data)
 }
@@ -1190,6 +1192,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 		if formResult != "" && !model.IsSelectableActionResult(formResult) {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=result_not_allowed")
 		}
+		if formResult == model.ResultDone && h.workRepo != nil {
+			if n, _ := h.workRepo.CountOpenSupport(id); n > 0 && c.FormValue("confirm_open_support") != "1" {
+				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=open_support&n="+strconv.Itoa(n))
+			}
+		}
 		if code := actionSaveMissingErr(as, formResult); code != "" {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
 		}
@@ -1280,6 +1287,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 	}
 	if err := h.repo.Update(as); err != nil {
 		return err
+	}
+	if formResult == model.ResultDone && c.FormValue("confirm_open_support") == "1" && h.workRepo != nil {
+		if n, _ := h.workRepo.CountOpenSupport(id); n > 0 {
+			h.workRepo.LogOpenSupportCompleteAllow(as.ASID, as.ASNumber, n)
+		}
 	}
 	h.syncASPlannedDailyTask(as.ASID)
 	if h.notices != nil {
@@ -1435,6 +1447,16 @@ func asShowOK(ok string) string {
 	default:
 		return ok
 	}
+}
+
+func actionErrMessageWithSupport(code string, n int) string {
+	if strings.TrimSpace(code) == "open_support" {
+		if n < 1 {
+			n = 1
+		}
+		return model.OpenSupportWarnMessage(n)
+	}
+	return actionErrMessage(code)
 }
 
 func actionErrMessage(code string) string {
@@ -2026,6 +2048,12 @@ func (h *ASHandler) APIAssetHistory(c echo.Context) error {
 	}
 	if items == nil {
 		items = []model.ASHistoryItem{}
+	}
+	if h.workRepo != nil && strings.TrimSpace(assetID) != "" {
+		extra, err := h.workRepo.ListFactoryRepairByAsset(assetID, exclude, 50)
+		if err == nil && len(extra) > 0 {
+			items = append(extra, items...)
+		}
 	}
 	return c.JSON(http.StatusOK, items)
 }

@@ -86,7 +86,7 @@
             <td class="px-4 py-2 pl-8 whitespace-nowrap">
               <a href="/as/work/{{.WorkID}}/action" class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-700 hover:underline">
                 <span class="text-gray-300">└</span>
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if eq .WorkKind "confirm"}}bg-purple-100 text-purple-800{{else}}bg-sky-100 text-sky-800{{end}}">[{{workKindLabel .WorkKind}}]</span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workKindBadgeClass .WorkKind}}">[{{workKindLabel .WorkKind}}]</span>
                 <span>{{.WorkNumber}}</span>
               </a>
             </td>

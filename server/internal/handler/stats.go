@@ -322,6 +322,10 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		title = "통계 · 테스터만"
 	}
 	anchor := now
+	var factoryWait model.FactoryWaitCard
+	if len(cols) >= 2 {
+		factoryWait = h.repo.LoadFactoryWaitCard(cols[1].From, cols[1].ToExclusive)
+	}
 	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
 		"Title":             title,
 		"Active":            NavStats,
@@ -363,6 +367,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"MissingComplete":   missingComplete,
 		"CanTestStats":      canSeeTestStats(c),
 		"NegativeRows":      negativeRows,
+		"FactoryWait":       factoryWait,
 	})
 }
 

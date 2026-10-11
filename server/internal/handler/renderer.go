@@ -379,6 +379,17 @@ func funcMap() template.FuncMap {
 		"workKindLabel": func(s string) string {
 			return model.WorkKindLabel(s)
 		},
+		"supportTypeLabel": model.SupportTypeLabel,
+		"workKindBadgeClass": func(kind string) string {
+			switch kind {
+			case model.WorkKindConfirm:
+				return "bg-purple-100 text-purple-800"
+			case model.WorkKindSupport:
+				return "bg-teal-100 text-teal-800"
+			default:
+				return "bg-sky-100 text-sky-800"
+			}
+		},
 		"actionResultLabel":   model.ActionResultLabel,
 		"transferDetailLabel": model.TransferDetailLabel,
 		"workPrefixLabel": func(s string) string {
@@ -414,6 +425,8 @@ func funcMap() template.FuncMap {
 				return "bg-blue-100 text-blue-800"
 			case model.WorkPrefixConfirm:
 				return "bg-purple-100 text-purple-800"
+			case model.WorkPrefixSupport:
+				return "bg-teal-100 text-teal-800"
 			case model.WorkPrefixMaintenance:
 				return "bg-slate-100 text-slate-800"
 			case model.WorkPrefixGeneral:

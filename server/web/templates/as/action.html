@@ -202,7 +202,8 @@
       </div>
       <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">조치</span>
     </div>
-    <form method="POST" action="/as/{{.AS.ASID}}/update" class="flex-1 min-h-0 overflow-y-auto" id="as-action-form">
+    <form method="POST" action="/as/{{.AS.ASID}}/update" class="flex-1 min-h-0 overflow-y-auto" id="as-action-form"
+          data-open-support="{{if .OpenSupportN}}{{.OpenSupportN}}{{else}}0{{end}}">
 <div class="p-4 sm:p-5 space-y-4">
         {{if and .ActionErr (not .AttachErrMsg)}}
         <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErrMsg}}</div>
@@ -832,6 +833,19 @@
     }
     if (na) { na.addEventListener('change', syncNA); syncNA(); }
     form.addEventListener('submit', function(e){
+      var n = parseInt(form.getAttribute('data-open-support') || '0', 10);
+      var done = form.querySelector('input[name="result_code"]:checked');
+      if (n > 0 && done && done.value === 'done' && !form.querySelector('input[name="confirm_open_support"]')) {
+        if (!confirm('미완료 지원업무 ' + n + '건이 있습니다. 그대로 완료하시겠습니까?')) {
+          e.preventDefault();
+          return;
+        }
+        var hid = document.createElement('input');
+        hid.type = 'hidden';
+        hid.name = 'confirm_open_support';
+        hid.value = '1';
+        form.appendChild(hid);
+      }
       if (na && na.checked) return;
       if (shortOk && shortOk.value === '1') return;
       if (runeLen(ta.value) >= 10) return;

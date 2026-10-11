@@ -11,7 +11,7 @@
           <p class="text-xs font-semibold tracking-wide text-sky-700 mb-1">하부업무 조치</p>
           <div class="flex items-center gap-2 flex-wrap">
             <h2 class="text-xl font-bold text-gray-800 font-mono">{{.Work.WorkNumber}}</h2>
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if eq .Work.WorkKind "confirm"}}bg-purple-100 text-purple-800{{else}}bg-sky-100 text-sky-800{{end}}">[{{workKindLabel .Work.WorkKind}}]</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workKindBadgeClass .Work.WorkKind}}">[{{workKindLabel .Work.WorkKind}}]</span>
             {{if eq .Work.Status "done"}}
             <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-700 text-white">완료</span>
             {{else}}
@@ -90,6 +90,40 @@
         {{else}}
         <input type="hidden" name="confirm_target" value="{{.Work.ConfirmTarget}}">
         <input type="hidden" name="confirm_contact" value="{{.Work.ConfirmContact}}">
+        {{end}}
+        {{if eq .Work.WorkKind "support"}}
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">지원 유형</label>
+          <select name="support_type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            {{range .SupportTypes}}
+            <option value="{{.Value}}" {{if eq $.Support.SupportType .Value}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">제조사</label>
+          <input type="text" name="vendor_name" value="{{.Support.VendorName}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">송장번호</label>
+          <input type="text" name="tracking_no" value="{{.Support.TrackingNo}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">처리일</label>
+          <input type="date" name="action_date" value="{{.Support.ActionDate}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">예정일</label>
+          <input type="date" name="due_date" value="{{.Support.DueDate}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">대상 장비</label>
+          <input type="text" name="asset_id" value="{{if .Support.AssetID}}{{.Support.AssetID}}{{else}}{{.AS.AssetID}}{{end}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-slate-700 mb-1">지원 메모</label>
+          <textarea name="memo" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.Support.Memo}}</textarea>
+        </div>
         {{end}}
         <div class="sm:col-span-2">
           <label class="block text-sm font-medium text-slate-700 mb-1">조치·메모</label>

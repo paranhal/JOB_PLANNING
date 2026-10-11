@@ -16,7 +16,7 @@
           <span class="text-sm font-bold text-red-600">🔴 {{urgencyReasonText .AS.UrgencyReason .AS.UrgencyReasonNote}}</span>
           {{end}}
         </div>
-        <p class="text-sm text-gray-500">{{.AS.OrgName}} · {{.AS.ReceiptDatetime.Format "2006-01-02 15:04"}} 접수{{if .AS.StartDatetime}} · 착수 {{.AS.StartDatetime.Format "2006-01-02 15:04"}}{{end}}</p>
+        <p class="text-sm text-gray-500">{{.AS.OrgName}} · {{.AS.ReceiptDatetime.Format "2006-01-02 15:04"}} 접수{{if .AS.StartDatetime}} · 착수 {{.AS.StartDatetime.Format "2006-01-02 15:04"}}{{end}}{{if .FactoryWait}} · 제조사 대기 {{.FactoryWait.Label}}{{end}}</p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 justify-end">
@@ -326,6 +326,71 @@
 
   {{template "as_receipt_photos" .}}
 
+  <section class="bg-white rounded-xl border border-teal-200 p-4 sm:p-5 space-y-3">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <h3 class="text-sm font-semibold text-slate-800">지원업무</h3>
+      {{if .CanProcess}}
+      <span class="text-xs text-slate-500">AS를 닫지 않고 제조사 입고·회수 등을 붙입니다</span>
+      {{end}}
+    </div>
+    {{if and .SupportStepper .SupportStepper.Show}}
+    <ol class="flex flex-wrap gap-2 text-xs">
+      {{$st := .SupportStepper.Stage}}
+      <li class="px-2 py-1 rounded-full {{if ge $st 0}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">입고 예정</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 1}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">입고 완료 · 수리 중</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 2}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">회수 예정</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 3}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">회수 완료</li>
+    </ol>
+    {{end}}
+    {{if .SupportItems}}
+    <ul class="divide-y text-sm">
+      {{range .SupportItems}}
+      <li class="py-2 flex flex-wrap items-center justify-between gap-2">
+        <a href="/as/work/{{.Work.WorkID}}/action" class="font-mono text-teal-800 hover:underline">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workKindBadgeClass .Work.WorkKind}}">[{{workKindLabel .Work.WorkKind}}]</span>
+          {{.Work.WorkNumber}} · {{supportTypeLabel .Detail.SupportType}}
+        </a>
+        <span class="text-xs text-slate-500">{{if eq .Work.Status "done"}}완료{{else}}진행 중{{end}}{{if .Detail.DueDate}} · 예정 {{.Detail.DueDate}}{{end}}</span>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-sm text-slate-400">등록된 지원업무가 없습니다.</p>
+    {{end}}
+    {{if .CanProcess}}
+    <form method="POST" action="/as/{{.AS.ASID}}/support" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
+      <input type="hidden" name="asset_id" value="{{.SupportDefaultAsset}}">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">유형</label>
+        <select name="support_type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          {{range .SupportTypes}}
+          <option value="{{.Value}}">{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">제조사</label>
+        <input type="text" name="vendor_name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">예정일</label>
+        <input type="date" name="due_date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">송장번호</label>
+        <input type="text" name="tracking_no" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-medium text-slate-600 mb-1">메모</label>
+        <input type="text" name="memo" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="sm:col-span-2 flex justify-end">
+        <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium">+ 지원업무 추가</button>
+      </div>
+    </form>
+    {{end}}
+  </section>
+
 {{if and .CanWriteDaily (not .DailyTask)}}
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="dailyOpen" x-cloak
      @keydown.escape.window="dailyOpen=false">
@@ -482,9 +547,10 @@
           +'<th class="py-2 pr-3">접수번호</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">완료일</th><th class="py-2">증상</th>'
           +'</tr></thead><tbody class="divide-y">';
         items.forEach(function(it){
+          var extra = it.kind==='factory_repair' ? ' <span class="text-teal-700 text-xs">제조사 수리 중'+(it.duration_text?(' '+it.duration_text):'')+'</span>' : '';
           html+='<tr><td class="py-2 pr-3"><a href="/as/'+it.as_id+'" class="font-mono text-blue-600 hover:underline">'
             +(it.as_number||'')+'</a></td><td class="py-2 pr-3">'+(it.receipt_date||'')+'</td><td class="py-2 pr-3">'
-            +(it.complete_date||'—')+'</td><td class="py-2 truncate max-w-xs">'+(it.symptom||'—')+'</td></tr>';
+            +(it.complete_date||'—')+'</td><td class="py-2 truncate max-w-xs">'+(it.symptom||'—')+extra+'</td></tr>';
         });
         html+='</tbody></table>';
         body.innerHTML=html;

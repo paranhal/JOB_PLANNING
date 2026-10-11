@@ -148,7 +148,7 @@ func filterWorkItemsKinds(items []model.WorkListItem, kinds []string) []model.Wo
 
 func workItemKind(it model.WorkListItem) string {
 	switch it.Prefix {
-	case model.WorkPrefixAS, model.WorkPrefixConfirm:
+	case model.WorkPrefixAS, model.WorkPrefixConfirm, model.WorkPrefixSupport:
 		return workKindAS
 	case model.WorkPrefixMaintenance:
 		return workKindMaintenance
@@ -291,7 +291,7 @@ func filterWorkItemsKeyword(items []model.WorkListItem, q string, asIDs map[stri
 			out = append(out, it)
 			continue
 		}
-		if asIDs[it.RefID] && (it.Prefix == model.WorkPrefixAS || it.Prefix == model.WorkPrefixConfirm) {
+		if asIDs[it.RefID] && (it.Prefix == model.WorkPrefixAS || it.Prefix == model.WorkPrefixConfirm || it.Prefix == model.WorkPrefixSupport) {
 			out = append(out, it)
 		}
 	}

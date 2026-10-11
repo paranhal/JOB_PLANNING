@@ -917,6 +917,8 @@ func paletteKindFromPrefix(prefix, href string) string {
 			return "wi"
 		}
 		return model.WBSourceAS
+	case model.WorkPrefixConfirm, model.WorkPrefixSupport:
+		return "wi"
 	case model.WorkPrefixMaintenance:
 		return model.WBSourceMaintenance
 	case model.WorkPrefixSales:

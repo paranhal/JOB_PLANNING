@@ -87,6 +87,9 @@ type ASHistoryItem struct {
 	DurationText string `json:"duration_text"` // 접수→완료 소요기간
 	Status       string `json:"status,omitempty"`
 	StatusLabel  string `json:"status_label,omitempty"`
+	Kind         string `json:"kind,omitempty"` // as | factory_repair
+	FactoryFrom  string `json:"factory_from,omitempty"`
+	FactoryTo    string `json:"factory_to,omitempty"`
 }
 
 // CustomerOpenItem 접수 화면 미완료 띠 한 줄. AS와 정기점검 방문을 함께 담는다. §64.2
@@ -169,7 +172,7 @@ type ASWorkItem struct {
 	WorkID            string    `json:"work_id"`
 	WorkNumber        string    `json:"work_number"`
 	ASID              string    `json:"as_id"`
-	WorkKind          string    `json:"work_kind"` // confirm | revisit
+	WorkKind          string    `json:"work_kind"` // confirm | revisit | support
 	ScheduledDate     string    `json:"scheduled_date"`
 	ScheduleConfirmed bool      `json:"schedule_confirmed"`
 	ConfirmTarget     string    `json:"confirm_target"`
@@ -194,6 +197,8 @@ func WorkKindLabel(kind string) string {
 		return "확인"
 	case WorkKindRevisit:
 		return "재방문"
+	case WorkKindSupport:
+		return "지원"
 	default:
 		return kind
 	}
