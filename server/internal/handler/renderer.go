@@ -154,43 +154,43 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		dataMap["NavMail"] = cfg.MailEnabled
 		dataMap["NavSMS"] = cfg.SMSEnabled
 		dataMap["NavKakao"] = cfg.KakaoEnabled
-		if _, exists := dataMap["HideNav"]; !exists {
-			dataMap["UserName"] = ctxString(c, "user_name")
-			dataMap["UserRole"] = currentRole(c)
-			dataMap["LoginRole"] = loginRole(c)
-			dataMap["Username"] = ctxString(c, "username")
-			dataMap["UserID"] = ctxString(c, "user_id")
-			dataMap["UserPerms"] = currentPerms(c)
-			dataMap["IsReadOnly"] = isReadOnly(c)
-			dataMap["IsTestUser"] = ctxBool(c, "is_test")
-			if isReadOnly(c) {
-				dataMap["CanWrite"] = false
-				dataMap["CanReceive"] = false
-				dataMap["CanProcess"] = false
-				dataMap["KanbanDrag"] = false
+		// HideNav 는 사이드바 숨김 플래그일 뿐. 키가 있어도 로그인 값은 넣는다.
+		// /work-status 가 HideNav=false 를 넣어도 키가 있어 UserRole 이 빠지고 500 이 났다.
+		dataMap["UserName"] = ctxString(c, "user_name")
+		dataMap["UserRole"] = currentRole(c)
+		dataMap["LoginRole"] = loginRole(c)
+		dataMap["Username"] = ctxString(c, "username")
+		dataMap["UserID"] = ctxString(c, "user_id")
+		dataMap["UserPerms"] = currentPerms(c)
+		dataMap["IsReadOnly"] = isReadOnly(c)
+		dataMap["IsTestUser"] = ctxBool(c, "is_test")
+		if isReadOnly(c) {
+			dataMap["CanWrite"] = false
+			dataMap["CanReceive"] = false
+			dataMap["CanProcess"] = false
+			dataMap["KanbanDrag"] = false
+		}
+		if vid := strings.TrimSpace(ctxString(c, "view_as_user_id")); vid != "" {
+			dataMap["ViewAsActive"] = true
+			dataMap["ViewAsName"] = ctxString(c, "view_as_name")
+			dataMap["ViewAsUserID"] = vid
+			dataMap["CanWrite"] = false
+			dataMap["CanReceive"] = false
+			dataMap["CanProcess"] = false
+			dataMap["CanDeleteSales"] = false
+			dataMap["CanDrop"] = false
+			dataMap["KanbanDrag"] = false
+		}
+		if canUseViewAs(c) {
+			if v := c.Get("view_as_users"); v != nil {
+				dataMap["ViewAsUsers"] = v
 			}
-			if vid := strings.TrimSpace(ctxString(c, "view_as_user_id")); vid != "" {
-				dataMap["ViewAsActive"] = true
-				dataMap["ViewAsName"] = ctxString(c, "view_as_name")
-				dataMap["ViewAsUserID"] = vid
-				dataMap["CanWrite"] = false
-				dataMap["CanReceive"] = false
-				dataMap["CanProcess"] = false
-				dataMap["CanDeleteSales"] = false
-				dataMap["CanDrop"] = false
-				dataMap["KanbanDrag"] = false
-			}
-			if canUseViewAs(c) {
-				if v := c.Get("view_as_users"); v != nil {
-					dataMap["ViewAsUsers"] = v
-				}
-			}
-			injectAssignNoticeView(c, dataMap)
-			injectOrgView(c, dataMap)
-			if v := c.Get("auth_unconfirmed"); v != nil {
-				if b, ok := v.(bool); ok && b {
-					dataMap["AuthUnconfirmed"] = true
-				}
+		}
+		injectAssignNoticeView(c, dataMap)
+		injectOrgView(c, dataMap)
+		if v := c.Get("auth_unconfirmed"); v != nil {
+			if b, ok := v.(bool); ok && b {
+				dataMap["AuthUnconfirmed"] = true
 			}
 		}
 	}
