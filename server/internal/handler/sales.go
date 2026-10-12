@@ -381,7 +381,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"Today":               time.Now().Format("2006-01-02"),
 		"CanWrite":            canWriteSales(c),
 		"CanDrop":             canDropSales(c, p) && p.Status == model.SalesStatusActive && !p.IsDormant(),
-		"CanDeleteSales":      canDeleteSales(c) && workProjectID == "",
+		"CanDeleteSales":      canDeleteThisSales(c, p) && workProjectID == "",
 		"DeleteWarn":          salesDeleteWarn(p.SalesID, h.repo),
 		"CanSleep":            canWriteSales(c) && p.Status == model.SalesStatusActive && p.Stage != model.SalesStage4Closed,
 		"CanWake":             canWriteSales(c) && p.IsDormant(),
@@ -451,10 +451,14 @@ func (h *SalesHandler) Update(c echo.Context) error {
 }
 
 func (h *SalesHandler) Delete(c echo.Context) error {
-	if !canDeleteSales(c) {
+	id := c.Param("id")
+	p, err := h.repo.Get(id)
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/sales?err=notfound")
+	}
+	if !canDeleteThisSales(c, p) {
 		return echo.ErrForbidden
 	}
-	id := c.Param("id")
 	reason := strings.TrimSpace(c.FormValue("reason"))
 	if reason == "" {
 		return c.Redirect(http.StatusSeeOther, "/sales/"+id+"?err=delete_reason")

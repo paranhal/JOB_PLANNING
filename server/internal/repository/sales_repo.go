@@ -66,6 +66,7 @@ const salesSelect = `
 		COALESCE(s.bid_ym,''), COALESCE(s.revenue_ym,''), COALESCE(s.revenue_from,''), COALESCE(s.revenue_to,''),
 		COALESCE(s.billing_cycle,''), COALESCE(s.amount_vat_included,0),
 		COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
+		COALESCE(s.created_by_user_id,''), COALESCE(s.created_by_name,''),
 		COALESCE(cu.org_name,'')
 	FROM sales_projects s
 	LEFT JOIN customers cu ON cu.customer_id = s.customer_id`
@@ -641,7 +642,7 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 		&p.DropReasonCode, &p.DropReason, &p.DroppedAt, &p.DroppedBy, &p.DroppedFromStage, &p.PrevSalesID,
 		&p.BizType, &p.BudgetYear, &p.BudgetStatus, &p.DormantUntil, &p.DormantReason, &p.DormantAt, &p.DormantBy,
 		&p.BidYM, &p.RevenueYM, &p.RevenueFrom, &p.RevenueTo, &p.BillingCycle, &vatInc,
-		&p.CreatedAt, &p.UpdatedAt, &p.CustomerName,
+		&p.CreatedAt, &p.UpdatedAt, &p.CreatedByUserID, &p.CreatedByName, &p.CustomerName,
 	)
 	if err != nil {
 		return nil, err

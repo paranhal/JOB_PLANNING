@@ -155,6 +155,27 @@ func canDeleteSales(c echo.Context) bool {
 	return model.PermAccess(currentRole(c), model.PermSalesDelete) == model.AccessFull
 }
 
+// canDeleteThisSales D-47 · §53.4.1. 관리자 또는 등록자 본인. created_by 가 비면 관리자만.
+func canDeleteThisSales(c echo.Context, p *model.SalesProject) bool {
+	if isReadOnly(c) {
+		return false
+	}
+	if currentRole(c) == model.RoleVisionAdmin || (currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)) {
+		return true
+	}
+	if model.PermAccess(currentRole(c), model.PermSalesDelete) != model.AccessFull {
+		return false
+	}
+	if p == nil {
+		return false
+	}
+	creator := strings.TrimSpace(p.CreatedByUserID)
+	if creator == "" {
+		return false
+	}
+	return creator == strings.TrimSpace(currentUserID(c))
+}
+
 // isSuspendedRole 옵저버는 쓰기 메뉴·작업 제한(조회·계정만)
 func isSuspendedRole(c echo.Context) bool {
 	return isReadOnly(c)

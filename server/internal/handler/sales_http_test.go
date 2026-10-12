@@ -231,6 +231,34 @@ func TestSalesHTTP_TechCannotWrite(t *testing.T) {
 
 func TestSalesHTTP_AdminDeleteReasonLogAndPromotedBlock(t *testing.T) {
 	e, db := newSalesServerDB(t)
+
+	own := httptestPostAs(t, e, "/sales", url.Values{"name": {"본인사업"}, "is_tentative_name": {"1"}}, "sales")
+	if own.Code != http.StatusSeeOther {
+		t.Fatalf("영업 등록 status=%d", own.Code)
+	}
+	ownID := salesIDFromRedirect(t, own.Header().Get("Location"))
+	noReason := httptestPostAs(t, e, "/sales/"+ownID+"/delete", url.Values{}, "sales")
+	if noReason.Code != http.StatusSeeOther || !strings.Contains(noReason.Header().Get("Location"), "err=delete_reason") {
+		t.Fatalf("본인 삭제 사유 없음 loc=%s status=%d", noReason.Header().Get("Location"), noReason.Code)
+	}
+	ownDel := httptestPostAs(t, e, "/sales/"+ownID+"/delete", url.Values{"reason": {"중복 등록"}}, "sales")
+	if ownDel.Code != http.StatusSeeOther || !strings.Contains(ownDel.Header().Get("Location"), "ok=deleted") {
+		t.Fatalf("본인 삭제 loc=%s status=%d", ownDel.Header().Get("Location"), ownDel.Code)
+	}
+	var ownN int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sales_projects WHERE sales_id=?`, ownID).Scan(&ownN); err != nil || ownN != 0 {
+		t.Fatal("본인 사업이 남았다")
+	}
+	var ownReason, ownBefore string
+	if err := db.QueryRow(`SELECT COALESCE(reason,''), COALESCE(before_json,'') FROM data_change_logs
+		WHERE table_name='sales_projects' AND entity_id=? AND action='delete'
+		ORDER BY occurred_at DESC LIMIT 1`, ownID).Scan(&ownReason, &ownBefore); err != nil {
+		t.Fatal(err)
+	}
+	if ownReason != "중복 등록" || !strings.Contains(ownBefore, "본인사업") {
+		t.Fatalf("본인 삭제 로그 reason=%s before=%s", ownReason, ownBefore)
+	}
+
 	rec := doForm(t, e, "/sales", url.Values{"name": {"지울사업"}, "is_tentative_name": {"1"}})
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	if rec := doForm(t, e, "/sales/"+id+"/activities", url.Values{
@@ -245,12 +273,12 @@ func TestSalesHTTP_AdminDeleteReasonLogAndPromotedBlock(t *testing.T) {
 
 	denied := httptestPostAs(t, e, "/sales/"+id+"/delete", url.Values{"reason": {"영업이 지움"}}, "sales")
 	if denied.Code != http.StatusForbidden {
-		t.Fatalf("영업 삭제 status=%d", denied.Code)
+		t.Fatalf("타인 사업 영업 삭제 status=%d", denied.Code)
 	}
 
 	ok := doForm(t, e, "/sales/"+id+"/delete", url.Values{"reason": {"중복 등록"}})
 	if ok.Code != http.StatusSeeOther || !strings.Contains(ok.Header().Get("Location"), "ok=deleted") {
-		t.Fatalf("삭제 loc=%s status=%d", ok.Header().Get("Location"), ok.Code)
+		t.Fatalf("관리자 삭제 loc=%s status=%d", ok.Header().Get("Location"), ok.Code)
 	}
 	var n int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sales_projects WHERE sales_id=?`, id).Scan(&n); err != nil || n != 0 {
@@ -275,6 +303,10 @@ func TestSalesHTTP_AdminDeleteReasonLogAndPromotedBlock(t *testing.T) {
 	blocked := doForm(t, e, "/sales/"+pid+"/delete", url.Values{"reason": {"지우려다"}})
 	if blocked.Code != http.StatusSeeOther || !strings.Contains(blocked.Header().Get("Location"), "err=delete_promoted") {
 		t.Fatalf("승격 삭제 loc=%s", blocked.Header().Get("Location"))
+	}
+	salesPromoted := httptestPostAs(t, e, "/sales/"+pid+"/delete", url.Values{"reason": {"영업이 지움"}}, "sales")
+	if salesPromoted.Code != http.StatusForbidden && (salesPromoted.Code != http.StatusSeeOther || !strings.Contains(salesPromoted.Header().Get("Location"), "err=delete_promoted")) {
+		t.Fatalf("승격 사업 영업 삭제 status=%d loc=%s", salesPromoted.Code, salesPromoted.Header().Get("Location"))
 	}
 }
 
