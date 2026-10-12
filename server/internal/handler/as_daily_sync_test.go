@@ -106,6 +106,7 @@ func newASDailyHTTP(t *testing.T) (*echo.Echo, *Handler, *sql.DB, *repository.WB
 	g.POST("/as/:id/visit-date", h.AS.UpdateVisitDate)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.GET("/plan/unplanned", h.Work.UnplannedList)
+	g.GET("/work", h.Work.List)
 	return e, h, db, repository.NewWBRepo(db)
 }
 
@@ -190,8 +191,22 @@ func TestASUnassignedStaysInUnplannedNotDaily(t *testing.T) {
 		t.Fatal("미계획 업무함에 미배정 접수가 없다")
 	}
 	reg := doGet(t, e, "/workboard/register?view=day")
-	if strings.Contains(reg.Body.String(), "미배정 증상") {
-		t.Fatal("미배정 건이 일일 업무 화면에 보인다")
+	if reg.Code != http.StatusOK {
+		t.Fatalf("register status=%d", reg.Code)
+	}
+	regBody := reg.Body.String()
+	if !strings.Contains(regBody, "미계획업무") {
+		t.Fatal("일일 업무 등록에 미계획업무 열이 없다")
+	}
+	if !strings.Contains(regBody, "미배정 증상") {
+		t.Fatal("미배정 접수가 미계획업무 열에 없다")
+	}
+	today := doGet(t, e, "/work")
+	if today.Code != http.StatusOK {
+		t.Fatalf("오늘 내 업무 status=%d", today.Code)
+	}
+	if strings.Contains(today.Body.String(), "미배정 증상") {
+		t.Fatal("담당 없는 AS가 오늘 내 업무에 나온다")
 	}
 }
 
