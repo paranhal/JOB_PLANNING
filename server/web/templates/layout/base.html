@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>{{block "title" .}}고객지원시스템{{end}}</title>
+  <title>{{block "title" .}}{{appName}}{{end}}</title>
   <link rel="stylesheet" href="/static/vendor/tailwind.css?v={{.AssetQuery}}">
   <script src="/static/vendor/htmx.min.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/vendor/alpine.min.js?v={{.AssetQuery}}"></script>
@@ -77,7 +77,7 @@
       <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       </div>
-      <div><p class="text-sm font-bold">고객지원시스템</p><p class="text-xs text-gray-400">CS Management</p></div>
+      <div><p class="text-sm font-bold">{{appName}}</p><p class="text-xs text-gray-400">Work Management</p></div>
       <button type="button" @click="sidebarOpen=false" class="ml-auto p-1.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white lg:hidden" aria-label="메뉴 닫기">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
@@ -211,6 +211,7 @@
       <a href="/admin/mail" class="{{if eq $a "mail"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">메일 보낸 함</a>
       {{end}}
       <a href="/admin/notify" class="{{if eq $a "notify"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">알림 설정</a>
+      <a href="/admin/approval-settings" class="{{if eq $a "approval_settings"}}bg-white/20 text-white{{else}}text-white/80 hover:bg-white/10{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">결재 설정</a>
       {{end}}
       <a href="/admin/sales-logs" class="{{if eq $a "sales_logs"}}bg-blue-600 text-white{{else}}text-gray-300 hover:bg-gray-800{{end}} flex items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px]">영업 로그 관리</a>
       {{end}}
@@ -228,7 +229,7 @@
           <p class="text-sm text-white truncate">{{if .UserName}}{{.UserName}}{{else}}{{.Username}}{{end}}</p>
           <p class="text-xs text-gray-500 truncate">{{if .Username}}@{{.Username}} · {{end}}{{roleLabel .UserRole}}</p>
         </div>
-        <p class="text-xs text-gray-600 shrink-0">{{.BuildVersion}}</p>
+        <p class="text-sm text-white shrink-0" title="{{.BuildBadgeFull}}">{{.VersionLabel}}</p>
       </div>
       <a href="/logout" class="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-gray-800 hover:bg-red-600 text-gray-200 hover:text-white text-sm font-medium transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>

@@ -6,6 +6,12 @@ cd "$(dirname "$0")/.."
 VERSION=$(cat VERSION 2>/dev/null || echo dev)
 VERSION=$(printf '%s' "$VERSION" | tr -d '\r\n')
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo nogit)
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    echo "경고: 커밋되지 않은 변경이 있어 커밋 해시에 -dirty 를 붙입니다."
+    COMMIT="${COMMIT}-dirty"
+  fi
+fi
 BUILD_TIME=$(date '+%Y-%m-%d %H:%M')
 
 echo "빌드: VERSION=$VERSION COMMIT=$COMMIT BUILD_TIME=$BUILD_TIME platform=linux/amd64"

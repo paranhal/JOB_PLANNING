@@ -100,8 +100,8 @@ func TestBaseHTMLUsesInjectedVersion(t *testing.T) {
 	if strings.Contains(s, ">v2.0<") {
 		t.Fatal("사이드바에 v2.0 이 글자로 박혀 있다")
 	}
-	if !strings.Contains(s, "{{.BuildVersion}}") {
-		t.Fatal("사이드바가 BuildVersion 을 쓰지 않는다")
+	if !strings.Contains(s, "{{.VersionLabel}}") {
+		t.Fatal("사이드바가 VersionLabel 을 쓰지 않는다")
 	}
 	if !strings.Contains(s, "{{.BuildBadgeShort}}") || !strings.Contains(s, "{{.BuildBadgeFull}}") {
 		t.Fatal("배지가 빌드 값을 쓰지 않는다")
@@ -146,6 +146,15 @@ func TestLoginHTMLHasCacheBustAndBadge(t *testing.T) {
 	if !strings.Contains(body, "v2.37 · 09-13 14:22") {
 		t.Fatal("배지 짧은 표시가 없다")
 	}
+	if !strings.Contains(body, "업무관리시스템") {
+		t.Fatal("로그인에 새 시스템 이름이 없다")
+	}
+	if strings.Contains(body, "고객지원시스템") {
+		t.Fatal("로그인에 옛 이름이 남아 있다")
+	}
+	if !strings.Contains(body, "v2.37 · 빌드 2026-09-13 14:22") {
+		t.Fatal("로그인 하단에 버전이 없다")
+	}
 	if !strings.Contains(body, "커밋 a1b2c3d") {
 		t.Fatal("배지 전체(title)에 커밋이 없다")
 	}
@@ -160,7 +169,7 @@ func TestLoginHTMLHasCacheBustAndBadge(t *testing.T) {
 	if rec2.Code != http.StatusOK {
 		t.Fatalf("두 번째 login status=%d", rec2.Code)
 	}
-	if !strings.Contains(rec2.Body.String(), "고객지원시스템") {
+	if !strings.Contains(rec2.Body.String(), "업무관리시스템") {
 		t.Fatal("두 번째 로그인 화면이 비었다")
 	}
 }
@@ -233,6 +242,9 @@ func TestDeployBuildScriptGitOptional(t *testing.T) {
 	if !strings.Contains(s, "--build-arg VERSION=") {
 		t.Fatal("build.sh 가 VERSION 을 안 넣는다")
 	}
+	if !strings.Contains(s, "-dirty") {
+		t.Fatal("build.sh 가 dirty 경고를 하지 않는다")
+	}
 	ver, err := os.ReadFile(filepath.Join(root, "VERSION"))
 	if err != nil {
 		t.Fatal(err)
@@ -271,5 +283,56 @@ func TestSidebarAndBadgeShareOneValue(t *testing.T) {
 	}
 	if strings.Contains(body, ">v2.0<") {
 		t.Fatal("사이드바 v2.0 이 남아 있다")
+	}
+	if !strings.Contains(body, "업무관리시스템") {
+		t.Fatal("로그인 후 화면에 새 이름이 없다")
+	}
+}
+
+func TestTemplatesDropLegacyAppName(t *testing.T) {
+	err := filepath.Walk("web/templates", func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".html") {
+			return err
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(b), "고객지원시스템") {
+			t.Errorf("%s 에 옛 이름", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAccountPageShowsCommitAndNewName(t *testing.T) {
+	SetBuildInfo("v2.37", "deadbee", "2026-09-13 14:22", time.Now())
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "acct.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	users := repository.NewUserRepo(db)
+	users.EnsureAdmin(HashPassword("admin"))
+	admin, _ := users.GetByUsername("admin")
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	h := New(db)
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/account", h.Auth.AccountPage)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/account", nil)
+	req.AddCookie(jwtCookieUserClaims(t, admin))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "업무관리시스템") || !strings.Contains(body, "커밋 deadbee") {
+		t.Fatalf("account body missing name/commit")
 	}
 }

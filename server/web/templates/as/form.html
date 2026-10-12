@@ -1,4 +1,4 @@
-{{define "title"}}{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}} · 고객지원시스템{{end}}
+{{define "title"}}{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}} · {{appName}}{{end}}
 {{define "content"}}
 <div class="max-w-7xl mx-auto" id="as-form-root" x-data="{ viewOpen:false, viewSrc:'' }">
   <div class="lg:flex lg:gap-5 lg:items-start">

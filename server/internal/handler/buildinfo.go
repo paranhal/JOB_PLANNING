@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/backup"
+	"customer-support/internal/model"
 )
 
 // 빌드 값. Dockerfile -ldflags 로 main 에서 SetBuildInfo 한다. v2.0 §40
@@ -99,11 +100,30 @@ func AssetQuery() string {
 	return q
 }
 
+func DisplayVersion(version string) string {
+	v := strings.TrimSpace(version)
+	if v == "" || v == "unknown" {
+		return "dev"
+	}
+	return v
+}
+
+func VersionLabel(version string) string {
+	v := DisplayVersion(version)
+	if strings.HasPrefix(strings.ToLower(v), "v") {
+		return v
+	}
+	return "v" + v
+}
+
 func injectBuildInfo(data map[string]interface{}) {
 	version, commit, built, _ := currentBuild()
+	data["AppName"] = model.AppName
+	data["AppNameEn"] = model.AppNameEn
 	data["BuildVersion"] = version
 	data["BuildCommit"] = commit
 	data["BuildTime"] = built
+	data["VersionLabel"] = VersionLabel(version)
 	data["AssetQuery"] = AssetQuery()
 	data["BuildBadgeShort"] = badgeShort(version, built)
 	data["BuildBadgeFull"] = badgeFull(version, commit, built)

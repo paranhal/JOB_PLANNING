@@ -1,4 +1,4 @@
-{{define "title"}}행정관련업무 등록 · 고객지원시스템{{end}}
+{{define "title"}}행정관련업무 등록 · {{appName}}{{end}}
 {{define "content"}}
 {{$p := .Parent}}
 <div class="max-w-3xl mx-auto space-y-5" x-data="{ workType: '{{if $p}}{{$p.WorkType}}{{else}}admin{{end}}', dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day' }">

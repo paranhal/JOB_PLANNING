@@ -618,6 +618,9 @@ func funcMap() template.FuncMap {
 			}
 			return s
 		},
+		"appName": func() string {
+			return model.AppName
+		},
 		"roleLabel": func(s string) string {
 			return model.RoleLabel(s)
 		},
