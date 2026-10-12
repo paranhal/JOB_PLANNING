@@ -1318,6 +1318,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyRolePermissionsV58(db)
 	applyUsernameNocaseV58(db)
 	applyAccountLifecycleV68(db)
+	applyApprovalEngineV71(db)
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)
