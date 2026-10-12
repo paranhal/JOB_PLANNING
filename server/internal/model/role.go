@@ -65,6 +65,7 @@ const (
 	PermDataCreate     = "data.create"
 	PermDataEdit       = "data.edit"
 	PermDataDelete     = "data.delete"
+	PermApprovalAdmin  = "approval.admin"
 
 	// 옛 9키. hasPerm·화면 호환. 새 키로 읽는다.
 	PermASReceive       = "as_receive"
@@ -104,6 +105,7 @@ var AllPermissions = []PermDef{
 	{PermUsersView, "계정 조회"}, {PermUsersCreate, "계정 생성"}, {PermUsersEdit, "계정 수정"}, {PermUsersDelete, "계정 삭제"},
 	{PermCodesView, "코드 조회"}, {PermCodesCreate, "코드 등록"}, {PermCodesEdit, "코드 수정"}, {PermCodesDelete, "코드 삭제"},
 	{PermDataView, "데이터 조회"}, {PermDataCreate, "데이터 등록"}, {PermDataEdit, "데이터 수정"}, {PermDataDelete, "데이터 삭제"},
+	{PermApprovalAdmin, "결재 설정"},
 }
 
 func CanonicalPerm(key string) string {
@@ -290,6 +292,7 @@ func PermissionGroups() []PermGroup {
 		{"users.", "계정"},
 		{"codes.", "코드"},
 		{"data.", "데이터"},
+		{"approval.", "결재"},
 	}
 	idx := make([]g, len(order))
 	for i, o := range order {
@@ -507,7 +510,8 @@ func defaultAccess(role, key string) Access {
 
 func isAdminSectionPerm(key string) bool {
 	return strings.HasPrefix(key, "org.") || strings.HasPrefix(key, "users.") ||
-		strings.HasPrefix(key, "codes.") || strings.HasPrefix(key, "data.")
+		strings.HasPrefix(key, "codes.") || strings.HasPrefix(key, "data.") ||
+		strings.HasPrefix(key, "approval.")
 }
 
 func techAccess(key string) Access {

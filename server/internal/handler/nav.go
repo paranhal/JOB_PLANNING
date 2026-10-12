@@ -50,6 +50,7 @@ const (
 	NavSystem           = "system"
 	NavMail             = "mail"
 	NavNotify           = "notify"
+	NavApproval         = "approval_settings"
 	NavAccount          = "account"
 	NavLogin            = "login"
 	NavNone             = ""
@@ -105,6 +106,7 @@ func navSidebarKeys() []string {
 		NavSystem,
 		NavMail,
 		NavNotify,
+		NavApproval,
 		NavAccount,
 	}
 }

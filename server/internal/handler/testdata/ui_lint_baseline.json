@@ -6,6 +6,20 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "admin/account_requests.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "admin/approval_settings.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "admin/backup.html": {
     "raw_color": 28,
     "hex": 0,
@@ -106,6 +120,13 @@
   },
   "admin/system.html": {
     "raw_color": 31,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "admin/users_deleted.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -560,7 +581,7 @@
     "cdn": 0
   },
   "layout/base.html": {
-    "raw_color": 202,
+    "raw_color": 201,
     "hex": 0,
     "inline_style": 2,
     "style_tag": 1,

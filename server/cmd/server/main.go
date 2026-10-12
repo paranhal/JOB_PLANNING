@@ -679,6 +679,8 @@ func main() {
 	g.POST("/admin/mail/:id/retry", h.Mail.Retry, adminSec, h.Auth.RequireAdminOnly)
 	g.GET("/admin/notify", h.Notify.Page, adminSec, h.Auth.RequireAdminOnly)
 	g.POST("/admin/notify", h.Notify.Save, adminSec, h.Auth.RequireAdminOnly)
+	g.GET("/admin/approval-settings", h.Approval.Page, adminSec, h.Auth.RequireAdminOnly)
+	g.POST("/admin/approval-settings", h.Approval.Save, adminSec, h.Auth.RequireAdminOnly)
 	g.POST("/admin/notify/:id/retry", h.Notify.Retry, adminSec, h.Auth.RequireAdminOnly)
 	g.POST("/admin/login-help/:id/handle", h.HandleLoginHelp, adminSec)
 	g.POST("/admin/data/save", h.Backup.Save, adminSec, adminOnly)

@@ -1,0 +1,23 @@
+{{define "title"}}결재 설정 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-6 max-w-2xl">
+  <div>
+    <h2 class="text-ui-xl font-extrabold text-ink">결재 설정</h2>
+    <p class="text-ui text-ink-muted mt-1">조직 {{.OrgID}} · 팀장 부재 시 방식은 여러 개를 함께 켤 수 있습니다.</p>
+  </div>
+  {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <form method="post" action="/admin/approval-settings" class="card p-4 space-y-3 text-ui">
+    <p class="font-medium text-ink">팀장 부재 시 대리 결재 방식</p>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="deleg_by_head" value="1" {{if .Policy.DelegByHead}}checked{{end}}> A. 팀장이 직접 대리인을 지정한다</label>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="deleg_by_admin" value="1" {{if .Policy.DelegByAdmin}}checked{{end}}> B. 관리자가 대리인을 지정한다</label>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="deleg_with_leave" value="1" {{if .Policy.DelegWithLeave}}checked{{end}}> C. 팀장이 휴가를 신청할 때 대리 결재자를 함께 지정한다</label>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="admin_emergency_approve" value="1" {{if .Policy.AdminEmergencyApprove}}checked{{end}}> D. 대리인이 없으면 관리자가 직접 승인할 수 있다</label>
+    <p class="font-medium text-ink pt-2">자기 결재</p>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="self_approve_leave" value="1" {{if .Policy.SelfApproveLeave}}checked{{end}}> 휴가 신청은 팀장 본인이 승인한다</label>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="self_approve_quote" value="1" {{if .Policy.SelfApproveQuote}}checked{{end}}> 견적서는 팀장 본인이 승인한다</label>
+    <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="notify_admin_self_approve" value="1" {{if .Policy.NotifyAdminSelfApprove}}checked{{end}}> 자기 결재가 일어나면 관리자에게 알린다</label>
+    <button type="submit" class="btn btn-primary">저장</button>
+  </form>
+</div>
+{{end}}

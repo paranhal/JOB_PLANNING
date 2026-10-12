@@ -16,6 +16,7 @@ import (
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 	"customer-support/internal/service"
+	"customer-support/internal/service/approval"
 )
 
 type Handler struct {
@@ -51,6 +52,7 @@ type Handler struct {
 	Org            *OrgHandler
 	Mail           *MailAdminHandler
 	Notify         *NotifyAdminHandler
+	Approval       *ApprovalSettingsHandler
 	notices        *assignNoticeHook
 	help           *repository.LoginHelpRepo
 
@@ -105,7 +107,7 @@ func New(db *sql.DB) *Handler {
 		userRepo: userRepo, orgRepo: repository.NewOrgRepo(db), settingsRepo: settingsRepo,
 		adminUnlock: repository.NewAdminUnlockRepo(db), helpRepo: repository.NewLoginHelpRepo(db),
 		accounts: repository.NewAccountRepo(db),
-		wbRepo: repository.NewWBRepo(db), db: db, cfg: config.Load(), jwtSecret: jwtSecret, uploadDir: attachH.uploadDir,
+		wbRepo:   repository.NewWBRepo(db), db: db, cfg: config.Load(), jwtSecret: jwtSecret, uploadDir: attachH.uploadDir,
 	}
 	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)
 	wbH.notices = noticeHook
@@ -200,6 +202,7 @@ func New(db *sql.DB) *Handler {
 		System:      &SystemHandler{db: db, auth: authH, uploadDir: attachH.uploadDir},
 		Mail:        &MailAdminHandler{db: db, cfg: authH.cfg},
 		Notify:      &NotifyAdminHandler{db: db, cfg: authH.cfg, settings: settingsRepo},
+		Approval:    &ApprovalSettingsHandler{eng: &approval.Engine{DB: db}},
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
