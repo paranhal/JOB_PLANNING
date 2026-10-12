@@ -334,14 +334,19 @@ func (r *SalesRepo) insertChange(salesID, field, oldV, newV, by, note string) er
 }
 
 func insertSalesChangeTx(tx *sql.Tx, salesID, field, oldV, newV, by, note string) error {
-	_ = tx
-	_ = salesID
-	_ = field
-	_ = oldV
-	_ = newV
-	_ = by
-	_ = note
-	return nil
+	if tx == nil {
+		return fmt.Errorf("tx 필요")
+	}
+	n, err := nextSeqTx(tx, "sales_changes")
+	if err != nil {
+		return err
+	}
+	id := fmt.Sprintf("SC-%s", fmtSeq3(n))
+	_, err = tx.Exec(`
+		INSERT INTO sales_changes (change_id, sales_id, field_key, old_value, new_value, changed_by, note)
+		VALUES (?,?,?,?,?,?,?)`,
+		id, salesID, field, oldV, newV, by, note)
+	return err
 }
 
 func normalizeSalesParty(p *model.SalesParty) {
