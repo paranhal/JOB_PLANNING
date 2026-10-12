@@ -165,8 +165,8 @@ func TestOccurrenceOverdueOnShowAndNextKept(t *testing.T) {
 	for _, ch := range children {
 		byDate[ch.WorkDate] = ch
 	}
-	if byDate[past].OccurrenceStatus != model.OccurrenceOverdue {
-		t.Fatalf("과거=%s", byDate[past].OccurrenceStatus)
+	if byDate[past].OccurrenceStatus != model.OccurrenceScheduled {
+		t.Fatalf("상세 GET이 DB를 바꿨다 과거=%s", byDate[past].OccurrenceStatus)
 	}
 	if byDate[future].OccurrenceStatus != model.OccurrenceScheduled || byDate[future].WorkDate != future {
 		t.Fatalf("미래 회차가 바뀌었다 %+v", byDate[future])
@@ -195,11 +195,54 @@ func TestOccurrenceOverdueOnShowAndNextKept(t *testing.T) {
 		t.Fatalf("상위 상태=%s", got.Status)
 	}
 	left, _ := repo.GetTask(byDate[past].TaskID)
-	if left == nil || left.OccurrenceStatus != model.OccurrenceOverdue {
-		t.Fatalf("미완료 기록이 지워졌다 %+v", left)
+	if left == nil {
+		t.Fatalf("지난 회차가 지워졌다")
+	}
+	if left.OccurrenceStatus != model.OccurrenceScheduled && left.OccurrenceStatus != model.OccurrenceOverdue {
+		t.Fatalf("지난 회차 상태=%s", left.OccurrenceStatus)
 	}
 	if n, _ := repo.CountOccurrences(parent.TaskID); n != 2 {
 		t.Fatalf("실행 작업 수=%d", n)
+	}
+}
+
+func TestOccurrenceShowDoesNotUpdatePastStatus(t *testing.T) {
+	e, repo := newWorkboardServer(t, "occ_show_ro.db")
+	past := time.Now().AddDate(0, 0, -2).Format("2006-01-02")
+	future := time.Now().AddDate(0, 0, 5).Format("2006-01-02")
+	parent := &model.WorkTask{
+		WorkType: model.WBWorkAdmin, Title: "조회만", DueDate: future,
+		Assignee: "관리자", Status: model.WBTaskWaiting,
+	}
+	if err := repo.CreateTask(parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.GenerateOccurrences(parent, model.WorkRecurrence{
+		StartDate: past, EndDate: future, RuleType: model.RecurrenceManual,
+		CompletePolicy: model.CompletePolicyManual,
+	}, []string{past, future}); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := repo.ListChildren(parent.TaskID)
+	show := doGet(t, e, "/workboard/tasks/"+parent.TaskID)
+	if show.Code != http.StatusOK {
+		t.Fatalf("show status=%d", show.Code)
+	}
+	if !strings.Contains(show.Body.String(), "미완료") {
+		t.Fatal("조회 판정에 미완료가 없다")
+	}
+	after, _ := repo.ListChildren(parent.TaskID)
+	if len(before) != len(after) {
+		t.Fatalf("GET이 회차 수를 바꿨다 %d→%d", len(before), len(after))
+	}
+	byBefore := map[string]string{}
+	for _, ch := range before {
+		byBefore[ch.TaskID] = ch.OccurrenceStatus
+	}
+	for _, ch := range after {
+		if byBefore[ch.TaskID] != ch.OccurrenceStatus {
+			t.Fatalf("상세 GET이 occurrence_status 를 바꿨다 %s %s→%s", ch.TaskID, byBefore[ch.TaskID], ch.OccurrenceStatus)
+		}
 	}
 }
 

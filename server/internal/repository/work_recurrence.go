@@ -257,6 +257,10 @@ func (r *WBRepo) deleteIncompleteOccurrences(parentID string, ids []string) (int
 		!strings.Contains(err.Error(), "no such table") {
 		return 0, err
 	}
+	if _, err := r.db.Exec(`DELETE FROM work_task_tags WHERE task_id IN (`+guard+`)`, args...); err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return 0, err
+	}
 	res, err := r.db.Exec(`
 		DELETE FROM work_tasks
 		WHERE parent_task_id=?
@@ -456,7 +460,7 @@ func markPastOccurrencesOverdue(db *sql.DB, today string) (int, error) {
 			 AND work_date < ?)
 			OR
 			(COALESCE(occurrence_status,'')=?
-			 AND (TRIM(COALESCE(next_check_date,''))='' OR next_check_date < ?)))
+			 AND (TRIM(COALESCE(next_check_date,''))='' OR next_check_date < ?))
 		  )`,
 		model.OccurrenceOverdue, model.RecurrenceRoleOccurrence,
 		model.OccurrenceComplete, model.OccurrenceSkipped, model.OccurrenceOverdue,

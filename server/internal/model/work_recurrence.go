@@ -416,6 +416,34 @@ func OccurrenceStatusLabel(s string) string {
 	}
 }
 
+// OccurrenceStatusForDisplay 조회용 판정. DB를 바꾸지 않는다. §38.9.1 · D-50
+func OccurrenceStatusForDisplay(t WorkTask, today string) string {
+	st := NormalizeOccurrenceStatus(t.OccurrenceStatus)
+	if t.RecurrenceRole != RecurrenceRoleOccurrence {
+		return st
+	}
+	today = strings.TrimSpace(today)
+	if today == "" {
+		return st
+	}
+	switch st {
+	case OccurrenceComplete, OccurrenceSkipped, OccurrenceOverdue:
+		return st
+	case OccurrenceDeferred:
+		next := strings.TrimSpace(t.NextCheckDate)
+		if next == "" || next < today {
+			return OccurrenceOverdue
+		}
+		return st
+	default:
+		d := strings.TrimSpace(t.WorkDate)
+		if d != "" && d < today {
+			return OccurrenceOverdue
+		}
+		return st
+	}
+}
+
 func ParseWeekdays(s string) map[int]bool {
 	out := map[int]bool{}
 	for _, p := range strings.Split(s, ",") {

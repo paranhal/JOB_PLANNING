@@ -781,7 +781,7 @@ func (h *WorkboardHandler) registerPalette(orgID string, showAll bool) (as, mnt,
 		titles := buildASTitleMap(open)
 		for _, it := range open {
 			closed := it.Status == "completed" || it.Status == "closed" || it.Status == "cancelled"
-			as = append(as, model.WBCard{
+			card := model.WBCard{
 				Kind:         model.WBSourceAS,
 				RefID:        it.ASID,
 				Category:     model.WBSourceAS,
@@ -795,7 +795,12 @@ func (h *WorkboardHandler) registerPalette(orgID string, showAll bool) (as, mnt,
 				Unassigned:   strings.TrimSpace(it.AssignedTo) == "",
 				Dimmed:       closed,
 				Status:       it.Status,
-			})
+			}
+			if card.Unassigned {
+				unassigned = append(unassigned, card)
+				continue
+			}
+			as = append(as, card)
 		}
 	}
 
@@ -1857,13 +1862,18 @@ func (h *WorkboardHandler) EditTask(c echo.Context) error {
 func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	id := c.Param("id")
 	today := time.Now().Format(dateLayout)
-	_, _ = h.repo.MarkPastOccurrencesOverdue(today)
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
 	canWrite := canEditTask(c, t.Assignee, "")
 	children, _ := h.repo.ListChildren(id)
+	for i := range children {
+		children[i].OccurrenceStatus = model.OccurrenceStatusForDisplay(children[i], today)
+	}
+	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {
+		t.OccurrenceStatus = model.OccurrenceStatusForDisplay(*t, today)
+	}
 	subtasks, _ := h.repo.ListSubtasks(id)
 	var sourceHref, sourceLabel string
 	var actionHref, actionLabel string
