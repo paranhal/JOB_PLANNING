@@ -352,6 +352,51 @@ func (e *Engine) GetRequest(id string) (Request, error) {
 	return loadRequestTx(e.DB, id)
 }
 
+func (e *Engine) ListInbox(orgID, userID, today string) ([]Request, error) {
+	if today == "" {
+		today = e.today()
+	}
+	rows, err := e.DB.Query(`SELECT r.request_id, r.org_id, r.doc_type, r.doc_id, r.revision, r.drafter_id, r.title, r.status,
+		COALESCE(r.snapshot_json,''), COALESCE(r.submitted_at,''), COALESCE(r.completed_at,'')
+		FROM approval_requests r
+		JOIN approval_steps s ON s.request_id=r.request_id AND s.step_type=? AND s.status=?
+		WHERE r.org_id=? AND r.status=?
+		AND (s.approver_id=? OR EXISTS (
+			SELECT 1 FROM approval_delegations d
+			WHERE d.from_user_id=s.approver_id AND d.to_user_id=? AND d.revoked_at IS NULL
+			  AND d.start_date<=? AND d.end_date>=?
+		))
+		ORDER BY r.submitted_at DESC`, TypeApprove, StepPending, orgID, StatusInProgress, userID, userID, today, today)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanRequests(rows)
+}
+
+func (e *Engine) ListSent(orgID, userID string) ([]Request, error) {
+	rows, err := e.DB.Query(`SELECT request_id, org_id, doc_type, doc_id, revision, drafter_id, title, status,
+		COALESCE(snapshot_json,''), COALESCE(submitted_at,''), COALESCE(completed_at,'')
+		FROM approval_requests WHERE org_id=? AND drafter_id=? ORDER BY created_at DESC`, orgID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanRequests(rows)
+}
+
+func scanRequests(rows *sql.Rows) ([]Request, error) {
+	var out []Request
+	for rows.Next() {
+		var r Request
+		if err := rows.Scan(&r.RequestID, &r.OrgID, &r.DocType, &r.DocID, &r.Revision, &r.DrafterID, &r.Title, &r.Status, &r.SnapshotJSON, &r.SubmittedAt, &r.CompletedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 func (e *Engine) ListSteps(requestID string) ([]Step, error) {
 	rows, err := e.DB.Query(`SELECT step_id, request_id, step_no, step_type, approver_id, COALESCE(acted_by,''), COALESCE(act_mode,''), status, COALESCE(comment,''), COALESCE(acted_at,'')
 		FROM approval_steps WHERE request_id=? ORDER BY step_no`, requestID)
