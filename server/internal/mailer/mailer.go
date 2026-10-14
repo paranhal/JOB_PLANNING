@@ -228,6 +228,10 @@ func Requeue(db *sql.DB, id string) error {
 	return err
 }
 
+func smtpImplicitTLS(port string) bool {
+	return strings.TrimSpace(port) == "465"
+}
+
 func SendSMTP(cfg Config, it Item) error {
 	host := strings.TrimSpace(cfg.Host)
 	port := strings.TrimSpace(cfg.Port)
@@ -241,22 +245,11 @@ func SendSMTP(cfg Config, it Item) error {
 	if from == "" {
 		return fmt.Errorf("MAIL_USER 없음")
 	}
-	addr := net.JoinHostPort(host, port)
-	conn, err := net.DialTimeout("tcp", addr, 20*time.Second)
+	client, err := dialSMTP(host, port)
 	if err != nil {
-		return err
-	}
-	client, err := smtp.NewClient(conn, host)
-	if err != nil {
-		_ = conn.Close()
 		return err
 	}
 	defer client.Close()
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			return err
-		}
-	}
 	if cfg.User != "" {
 		if err := client.Auth(smtp.PlainAuth("", cfg.User, cfg.Pass, host)); err != nil {
 			return err
@@ -289,20 +282,79 @@ func SendSMTP(cfg Config, it Item) error {
 	return client.Quit()
 }
 
+func dialSMTP(host, port string) (*smtp.Client, error) {
+	addr := net.JoinHostPort(host, port)
+	tlsCfg := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	if smtpImplicitTLS(port) {
+		d := &net.Dialer{Timeout: 20 * time.Second}
+		conn, err := tls.DialWithDialer(d, "tcp", addr, tlsCfg)
+		if err != nil {
+			return nil, err
+		}
+		c, err := smtp.NewClient(conn, host)
+		if err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return c, nil
+	}
+	conn, err := net.DialTimeout("tcp", addr, 20*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	c, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		if err := c.StartTLS(tlsCfg); err != nil {
+			_ = c.Close()
+			return nil, err
+		}
+	}
+	return c, nil
+}
+
+func encodeHeader(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	for _, r := range s {
+		if r > 127 {
+			return mime.BEncoding.Encode("utf-8", s)
+		}
+	}
+	return s
+}
+
 func writeMessage(w io.Writer, cfg Config, it Item) error {
 	fromName := strings.TrimSpace(cfg.FromName)
 	if fromName == "" {
 		fromName = "고객지원시스템"
 	}
-	fmt.Fprintf(w, "From: %s <%s>\r\n", fromName, cfg.User)
+	from := strings.TrimSpace(cfg.User)
+	now := time.Now()
+	if cfg.Now != nil {
+		now = cfg.Now()
+	}
+	msgid := strings.TrimSpace(it.MailID)
+	if msgid == "" {
+		msgid = "M-" + uuid.NewString()
+	}
+	fmt.Fprintf(w, "From: %s <%s>\r\n", encodeHeader(fromName), from)
 	fmt.Fprintf(w, "To: %s\r\n", it.ToAddr)
 	if strings.TrimSpace(it.CCAddr) != "" {
 		fmt.Fprintf(w, "Cc: %s\r\n", it.CCAddr)
 	}
-	fmt.Fprintf(w, "Subject: %s\r\n", it.Subject)
+	fmt.Fprintf(w, "Subject: %s\r\n", encodeHeader(it.Subject))
+	fmt.Fprintf(w, "Date: %s\r\n", now.Format(time.RFC1123Z))
+	fmt.Fprintf(w, "Message-ID: <%s@visionit.co.kr>\r\n", msgid)
 	fmt.Fprintf(w, "MIME-Version: 1.0\r\n")
 	if strings.TrimSpace(it.AttachPath) == "" {
-		fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n", it.Body)
+		fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n")
+		fmt.Fprintf(w, "Content-Transfer-Encoding: 8bit\r\n\r\n%s\r\n", it.Body)
 		return nil
 	}
 	mw := multipart.NewWriter(w)

@@ -3,6 +3,7 @@ package mailer
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,6 +54,27 @@ func TestEnqueueAndRetry(t *testing.T) {
 	}
 	if by != "tester" {
 		t.Fatalf("created_by=%s", by)
+	}
+}
+
+func TestWriteMessageEncodesKoreanHeaders(t *testing.T) {
+	var buf strings.Builder
+	cfg := Config{User: "hjlee@visionit.co.kr", FromName: "비젼아이티 고객지원시스템"}
+	if err := writeMessage(&buf, cfg, Item{MailID: "M-test", ToAddr: "a@b.c", Subject: "테스트 메일", Body: "본문"}); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	if strings.Contains(got, "From: 비젼") || strings.Contains(got, "Subject: 테스트") {
+		t.Fatalf("한글 헤더가 인코딩되지 않았다:\n%s", got)
+	}
+	if !strings.Contains(got, "=?utf-8?b?") || !strings.Contains(got, "Message-ID: <M-test@visionit.co.kr>") {
+		t.Fatalf("헤더 부족:\n%s", got)
+	}
+}
+
+func TestSMTPImplicitTLSPort(t *testing.T) {
+	if !smtpImplicitTLS("465") || smtpImplicitTLS("587") || smtpImplicitTLS("") {
+		t.Fatal("465 만 암시적 SSL, 587 은 STARTTLS")
 	}
 }
 
