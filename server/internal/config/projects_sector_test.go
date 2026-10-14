@@ -23,19 +23,18 @@ func TestShowProjectsSectorFollowsAppEnv(t *testing.T) {
 	}
 }
 
-func TestShowProjectExampleDataOffInProduction(t *testing.T) {
+func TestShowProjectExampleDataDefaultOff(t *testing.T) {
 	t.Setenv("PROJECT_EXAMPLE_DATA", "")
 	t.Setenv("APP_ENV", "development")
-	if !Load().ShowProjectExampleData() {
-		t.Fatal("개발에서는 예시 데이터가 있어야 한다")
+	if Load().ShowProjectExampleData() {
+		t.Fatal("예시 데이터 기본은 꺼져 있어야 한다")
 	}
 	t.Setenv("APP_ENV", "production")
 	if Load().ShowProjectExampleData() {
-		t.Fatal("운영 서버에는 예시 인명·공정을 올리면 안 된다")
+		t.Fatal("운영에서 예시 데이터가 켜지면 안 된다")
 	}
-	t.Setenv("APP_ENV", "development")
-	t.Setenv("PROJECT_EXAMPLE_DATA", "0")
-	if Load().ShowProjectExampleData() {
-		t.Fatal("PROJECT_EXAMPLE_DATA=0 이면 끈다")
+	t.Setenv("PROJECT_EXAMPLE_DATA", "1")
+	if !Load().ShowProjectExampleData() {
+		t.Fatal("PROJECT_EXAMPLE_DATA=1 이면 켠다")
 	}
 }

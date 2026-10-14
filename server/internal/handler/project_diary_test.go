@@ -7,8 +7,6 @@ import (
 )
 
 func TestProjectWorkMenusAndDiaryStats(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
-	t.Setenv("PROJECT_EXAMPLE_DATA", "1")
 	e, _, _ := newProjectServer(t)
 
 	dash := doGet(t, e, "/projects/dashboard")
@@ -45,8 +43,6 @@ func TestProjectWorkMenusAndDiaryStats(t *testing.T) {
 }
 
 func TestProjectDiaryFigmaLayout(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
-	t.Setenv("PROJECT_EXAMPLE_DATA", "1")
 	e, _, _ := newProjectServer(t)
 	page := doGet(t, e, "/projects/diary")
 	if page.Code != http.StatusOK {
@@ -57,30 +53,19 @@ func TestProjectDiaryFigmaLayout(t *testing.T) {
 		"업무일지·투입관리",
 		"임시저장",
 		"검토 요청",
-		"I-2026-1012",
 		"사업 선택",
-		"A동 골조공사",
-		"데이터센터 네트워크 구축",
-		"ERP 연동 플랫폼 개발",
-		"충남세종 RFID 자동화 장비 유지보수",
 		"금일 수행 업무 및 다음 계획",
-		"전날 데이터 불러오기",
-		"슬래브 타설 120㎡",
 		"참여자·투입 시간",
-		"현장소장",
-		"합계 6명 · 금일 36시간",
 		"자재·장비 / 시스템 자원",
-		"레미콘",
-		"코어 스위치",
 		"작업 결과 및 산출물 첨부",
-		"A동_8층_타설기록_1012.jpg",
-		"화면 설계를 위한 예시",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("화면에 %q 없음", want)
 		}
 	}
-	if strings.Contains(body, "data-node-id") {
-		t.Fatal("Figma 원본 흔적이 렌더에 남았다")
+	for _, leak := range []string{"김현우", "A동 골조공사", "I-2026-1012", "data-node-id"} {
+		if strings.Contains(body, leak) {
+			t.Fatalf("샘플/원본 흔적 %q", leak)
+		}
 	}
 }

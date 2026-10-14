@@ -12,7 +12,6 @@ import (
 
 	"customer-support/internal/auditlog"
 	"customer-support/internal/backup"
-	"customer-support/internal/config"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -69,6 +68,23 @@ func (h *ProjectHandler) List(c echo.Context) error {
 	if !canViewProjects(c) {
 		return echo.ErrForbidden
 	}
+	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
+		"Title":        "사업·업무관리",
+		"Active":       NavProjects,
+		"WorkSeed":     workMgmtSeed{},
+		"Example":      false,
+		"ReportURL":    "/projects/diary",
+		"RegisterURL":  "/workboard/register",
+		"DocsURL":      "/projects/docs",
+		"RegistryURL":  "/projects/registry",
+		"CanWrite":     canWriteProjects(c),
+	})
+}
+
+func (h *ProjectHandler) Registry(c echo.Context) error {
+	if !canViewProjects(c) {
+		return echo.ErrForbidden
+	}
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
@@ -77,44 +93,13 @@ func (h *ProjectHandler) List(c echo.Context) error {
 		return err
 	}
 	years, _ := h.repo.ListYears()
-	data := map[string]interface{}{
-		"Title": "사업·업무관리", "Active": NavProjects,
+	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
+		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
 		"CanMerge": currentRole(c) == model.RoleVisionAdmin,
 		"DupNames": model.DuplicateProjectNameGroups(items),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-	}
-	if config.Load().ShowProjectsSector() {
-		example := config.Load().ShowProjectExampleData()
-		if example {
-			data["WorkSeed"] = sampleWorkMgmt()
-		} else {
-			data["WorkSeed"] = workMgmtSeed{}
-		}
-		data["Example"] = example
-		data["ReportURL"] = "/projects/diary"
-		data["RegisterURL"] = "/workboard/register"
-		data["DocsURL"] = "/projects/docs"
-	}
-	return c.Render(http.StatusOK, "project/list.html", data)
-}
-
-func (h *ProjectHandler) Docs(c echo.Context) error {
-	if !config.Load().ShowProjectsSector() {
-		return echo.ErrNotFound
-	}
-	if !canViewProjects(c) {
-		return echo.ErrForbidden
-	}
-	example := config.Load().ShowProjectExampleData()
-	seed := docsSeed{}
-	if example {
-		seed = sampleProjectDocs()
-	}
-	return c.Render(http.StatusOK, "project/docs.html", map[string]interface{}{
-		"Title": "서류 작성·관리", "Active": NavProjectsDocs,
-		"Seed": seed, "Example": example,
 	})
 }
 
@@ -195,7 +180,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	id := c.Param("id")
 	p, err := h.repo.Get(id)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
 	}
 	asRows, asTotal, _ := h.repo.MatchAS(id, 20)
 	mntRows, mntTotal, _ := h.repo.MatchMaintenance(id, 20)
@@ -226,7 +211,7 @@ func (h *ProjectHandler) Edit(c echo.Context) error {
 	}
 	p, err := h.repo.Get(c.Param("id"))
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
 	}
 	return h.renderForm(c, p, p.ScopeRules, true)
 }
@@ -238,7 +223,7 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	id := c.Param("id")
 	existing, err := h.repo.Get(id)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
 	}
 	p, rules := h.parseForm(c)
 	p.ProjectID = existing.ProjectID
@@ -261,7 +246,7 @@ func (h *ProjectHandler) Archive(c echo.Context) error {
 	}
 	id := c.Param("id")
 	if _, err := h.repo.Get(id); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
 	}
 	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectArchived); err != nil {
 		return err
@@ -275,7 +260,7 @@ func (h *ProjectHandler) Activate(c echo.Context) error {
 	}
 	id := c.Param("id")
 	if _, err := h.repo.Get(id); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
 	}
 	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectActive); err != nil {
 		return err
@@ -338,7 +323,7 @@ func (h *ProjectHandler) Delete(c echo.Context) error {
 		Result:      auditlog.ResultOK,
 		BeforeJSON:  toJSON(p),
 	})
-	return c.Redirect(http.StatusSeeOther, "/projects?ok=deleted")
+	return c.Redirect(http.StatusSeeOther, "/projects/registry?ok=deleted")
 }
 
 func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules []model.ProjectScopeRule, isEdit bool, errs ...string) error {

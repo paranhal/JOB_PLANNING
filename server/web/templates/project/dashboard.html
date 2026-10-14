@@ -155,11 +155,5 @@
     {{if .Example}}<a href="{{.DocsURL}}" class="text-ui-sm text-warning">{{.Seed.ApproveN}}건의 승인 대기 확인 필요</a>{{end}}
   </div>
 
-  {{if .Example}}
-  <div class="flex flex-col sm:flex-row sm:justify-between gap-1 text-ui-xs text-ink-subtle">
-    <p>본 화면의 수치와 현장 이미지는 화면 설계를 위한 예시이며, 실제 연동 데이터가 아닙니다.</p>
-    <p>기준일자 {{.Seed.DateLabel}} · 금액 단위: 억원</p>
-  </div>
-  {{end}}
 </div>
 {{end}}

@@ -6,14 +6,66 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-
-	"customer-support/internal/config"
 )
 
+type diaryPick struct {
+	ID   string
+	Name string
+	Kind string
+}
+
+type diaryWork struct {
+	ID        string
+	Kind      string
+	KindLabel string
+	Name      string
+	Today     string
+	Next      string
+}
+
+type diaryPerson struct {
+	ID      string
+	Kind    string
+	Name    string
+	Role    string
+	Project string
+	Plan    string
+	Prev    string
+	Today   string
+}
+
+type diaryRes struct {
+	ID   string
+	Kind string
+	Name string
+	Sub  string
+	Spec string
+	Qty  string
+	When string
+}
+
+type diaryFile struct {
+	ID        string
+	Kind      string
+	KindLabel string
+	Title     string
+	File      string
+	Meta      string
+}
+
+type diarySeed struct {
+	DateLabel string
+	Weekday   string
+	DocNo     string
+	SavedAt   string
+	Picks     []diaryPick
+	Works     []diaryWork
+	People    []diaryPerson
+	Resources []diaryRes
+	Files     []diaryFile
+}
+
 func (h *ProjectHandler) Diary(c echo.Context) error {
-	if !config.Load().ShowProjectsSector() {
-		return echo.ErrNotFound
-	}
 	if !canViewProjects(c) {
 		return echo.ErrForbidden
 	}
@@ -24,17 +76,12 @@ func (h *ProjectHandler) Diary(c echo.Context) error {
 		}
 	}
 	day := workDate.Format("2006-01-02")
-	example := config.Load().ShowProjectExampleData()
-	seed := diarySeed{}
-	if example {
-		seed = sampleProjectDiary()
-	}
 	return c.Render(http.StatusOK, "project/diary.html", map[string]interface{}{
 		"Title":   "업무일지·투입관리",
 		"Active":  NavProjectsDiary,
 		"Date":    day,
-		"Seed":    seed,
-		"Example": example,
+		"Seed":    diarySeed{},
+		"Example": false,
 	})
 }
 

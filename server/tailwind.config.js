@@ -6,6 +6,10 @@ module.exports = {
     "./web/templates/**/*.html",
     "./internal/**/*.go",
   ],
+  safelist: [
+    "lg:grid-cols-[1fr_16rem]",
+    "lg:grid-cols-[1fr_18rem]",
+  ],
   theme: {
     extend: {
       colors: {

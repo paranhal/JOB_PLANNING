@@ -449,6 +449,7 @@ func main() {
 	proj := g.Group("/projects")
 	proj.GET("", h.Project.List)
 	proj.GET("/new", h.Project.New)
+	proj.GET("/registry", h.Project.Registry)
 	proj.GET("/dashboard", h.Project.Dashboard)
 	proj.GET("/docs", h.Project.Docs)
 	proj.GET("/diary", h.Project.Diary)

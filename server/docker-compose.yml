@@ -19,6 +19,7 @@ services:
       - DB_PATH=/app/data/app.db
       - APP_ENV=development
       - SHOW_PROJECTS_SECTOR=1
+      - PROJECT_EXAMPLE_DATA=0
       - TZ=Asia/Seoul
     restart: unless-stopped
     stop_grace_period: 30s

@@ -40,18 +40,8 @@
       </span>
       <p class="text-ui font-semibold text-ink">{{if .Seed.DateLabel}}{{.Seed.DateLabel}}{{if .Seed.Weekday}} ({{.Seed.Weekday}}){{end}}{{else}}—{{end}}</p>
       {{if .Example}}<span class="badge badge-warning">작성중</span>{{end}}
-      {{if .Example}}<p class="text-ui-sm text-ink-muted">서류 번호 D-2026-104</p>{{end}}
       {{if .Seed.Weather}}<p class="text-ui-sm text-ink-muted">{{.Seed.Weather}}</p>{{end}}
     </div>
-    {{if .Example}}
-    <div class="flex flex-wrap items-center gap-2 xl:ml-auto text-ui-sm">
-      <span class="text-ink font-medium">작성 김현우</span>
-      <span class="text-ink-subtle">›</span>
-      <span class="text-ink-muted">검토 박준석 · 대기</span>
-      <span class="text-ink-subtle">›</span>
-      <span class="text-ink-muted">승인 이정민 · 대기</span>
-    </div>
-    {{end}}
   </div>
 
   <div class="card p-4 space-y-3">
@@ -223,11 +213,5 @@
   </div>
   {{end}}
 
-  {{if .Example}}
-  <div class="flex flex-col sm:flex-row sm:justify-between gap-1 text-ui-xs text-ink-subtle">
-    <p>본 화면의 수치와 서류는 화면 설계를 위한 예시이며, 실제 연동 데이터가 아닙니다.</p>
-    <p>기준일자 {{.Seed.DateLabel}}</p>
-  </div>
-  {{end}}
 </div>
 {{end}}

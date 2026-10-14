@@ -22,7 +22,7 @@ func (h *ProjectHandler) MergeForm(c echo.Context) error {
 	}
 	keep, err := h.repo.Get(c.Param("id"))
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects?err=notfound")
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
 	}
 	others, _ := h.repo.ListOthers(keep.ProjectID)
 	dropID := strings.TrimSpace(c.QueryParam("drop_id"))

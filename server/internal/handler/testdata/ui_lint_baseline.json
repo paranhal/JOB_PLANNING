@@ -777,7 +777,7 @@
     "cdn": 0
   },
   "project/list.html": {
-    "raw_color": 43,
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -785,6 +785,13 @@
   },
   "project/merge.html": {
     "raw_color": 20,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/registry.html": {
+    "raw_color": 45,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,

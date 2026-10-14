@@ -62,9 +62,8 @@ func (c *Config) IsDev() bool {
 	return c.AppEnv == "development"
 }
 
-// ShowProjectsSector 사업관리 메뉴·초안 화면.
-// 로컬(노트북·server/docker-compose)은 기본으로 연다. APP_ENV=production 이어도 끄지 않는다.
-// 운영 서버 배포(deploy/docker-compose)에서만 SHOW_PROJECTS_SECTOR=0 으로 숨긴다.
+// ShowProjectsSector 사이드바 사업관리 메뉴 노출만 정한다.
+// 운영 배포(deploy/docker-compose)는 SHOW_PROJECTS_SECTOR=0. URL /projects 계열은 이 플래그와 무관하게 연다.
 func (c *Config) ShowProjectsSector() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("SHOW_PROJECTS_SECTOR"))) {
 	case "0", "false", "no", "off":
@@ -73,16 +72,14 @@ func (c *Config) ShowProjectsSector() bool {
 	return true
 }
 
-// ShowProjectExampleData 사업관리 화면의 설계용 예시(가상 인명·공정).
-// 노트북 개발에서만 기본으로 켠다. 운영(APP_ENV=production)이나 PROJECT_EXAMPLE_DATA=0 이면 빈 화면.
+// ShowProjectExampleData 설계용 가상 데이터. 기본은 끈다. 명시적으로 1일 때만 켠다.
 func (c *Config) ShowProjectExampleData() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("PROJECT_EXAMPLE_DATA"))) {
-	case "0", "false", "no", "off":
-		return false
 	case "1", "true", "yes", "on":
 		return true
+	default:
+		return false
 	}
-	return !strings.EqualFold(strings.TrimSpace(c.AppEnv), "production")
 }
 
 func getEnv(key, fallback string) string {

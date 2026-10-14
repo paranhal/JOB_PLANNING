@@ -40,6 +40,7 @@ const (
 	NavProjectsDashboard = "projects_dashboard"
 	NavProjectsDocs      = "projects_docs"
 	NavProjectsDiary     = "projects_diary"
+	NavProjectsRegistry  = "projects_registry"
 	NavMaintenanceSites     = "maintenance_sites"
 	NavRegionOrder          = "region_order"
 	NavCodes                = "codes"
