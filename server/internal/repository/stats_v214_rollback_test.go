@@ -65,9 +65,6 @@ func TestV214RollbackDropsLegacyColumns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN project_kind TEXT NOT NULL DEFAULT 'maintenance'`); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN sales_stage TEXT`); err != nil {
 		t.Fatal(err)
 	}
@@ -85,17 +82,10 @@ func TestV214RollbackDropsLegacyColumns(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if workProjectHasColumn(db, "project_kind") {
-		t.Fatal("project_kind 컬럼이 남았다")
+	if !workProjectHasColumn(db, "project_kind") {
+		t.Fatal("72-A2 이후 InitDB 는 project_kind 를 다시 넣어야 한다")
 	}
 	if workProjectHasColumn(db, "sales_stage") {
 		t.Fatal("sales_stage 컬럼이 남았다")
-	}
-	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='project_kind'`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Fatalf("project_kind 코드 n=%d", n)
 	}
 }
