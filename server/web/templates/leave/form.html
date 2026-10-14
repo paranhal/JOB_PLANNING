@@ -1,0 +1,91 @@
+{{define "title"}}근태허가원 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 max-w-3xl">
+  <div>
+    <h2 class="text-ui-xl font-extrabold text-ink">근태허가원</h2>
+    <p class="text-ui text-ink-muted mt-1">구분·기간·사유는 종이 양식과 같습니다. 검토란은 쓰지 않습니다.</p>
+  </div>
+  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <form method="post" action="/leaves" class="card p-4 space-y-4 text-ui">
+    <div>
+      <p class="label">구분</p>
+      <div class="flex flex-wrap gap-2">
+        {{range .Types}}
+        {{if ne .Key "substitute"}}
+        <label class="inline-flex items-center gap-1 border border-line rounded-control px-3 py-1.5">
+          <input type="radio" name="type_key" value="{{.Key}}" {{if eq .Key "annual"}}checked{{end}} required>
+          {{.Label}}
+        </label>
+        {{end}}
+        {{end}}
+      </div>
+      <input class="input mt-2" name="type_note" placeholder="기타 내용">
+    </div>
+    <div>
+      <p class="label">기간</p>
+      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodHours}}"> 시간 (반차·조퇴·외출)</label>
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <input class="input" type="date" name="start_date" required>
+        <div class="flex gap-2">
+          <input class="input" type="time" name="start_time">
+          <input class="input" type="time" name="end_time">
+        </div>
+        <select class="select" name="half_part">
+          <option value="">반차 오전/오후</option>
+          <option value="am">오전</option>
+          <option value="pm">오후</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodDays}}" checked> 일 단위</label>
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <input class="input" type="date" name="end_date">
+      </div>
+      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodSwap}}"> 대체근무</label>
+      <div class="grid grid-cols-2 gap-2">
+        <input class="input" type="date" name="swap_date">
+        <select class="select" name="swap_state">
+          <option value="">선택</option>
+          <option value="worked">旣근무</option>
+          <option value="scheduled">근무예정</option>
+        </select>
+      </div>
+      <p class="field-hint">일 단위는 시작일~종료일, 시간·반차는 시작일만 씁니다.</p>
+    </div>
+    <div>
+      <label class="label" for="reason">사유</label>
+      <input class="input" id="reason" name="reason" required>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label class="label">행선지</label>
+        <input class="input" name="destination">
+      </div>
+      <div>
+        <label class="label">연락처</label>
+        <input class="input" name="contact_phone" value="{{.Phone}}">
+      </div>
+      <div>
+        <label class="label">업무대행자 (선택)</label>
+        <select class="select" name="deputy_user_id">
+          <option value="">없음</option>
+          {{range .Members}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
+        </select>
+      </div>
+    </div>
+    {{if .NeedDeputy}}
+    <div>
+      <label class="label">대리 결재자</label>
+      <select class="select" name="approver_deputy_user_id" required>
+        <option value="">선택</option>
+        {{range .Members}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
+      </select>
+      <p class="field-hint">팀장 휴가 기간 동안 팀원 결재를 대신할 사람입니다. 업무대행자와 다릅니다.</p>
+    </div>
+    {{end}}
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-primary">상신</button>
+      <a href="/leaves" class="btn btn-secondary">목록</a>
+    </div>
+  </form>
+</div>
+{{end}}

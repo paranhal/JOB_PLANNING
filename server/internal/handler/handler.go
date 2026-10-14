@@ -17,6 +17,7 @@ import (
 	"customer-support/internal/repository"
 	"customer-support/internal/service"
 	"customer-support/internal/service/approval"
+	"customer-support/internal/service/leaveapp"
 )
 
 type Handler struct {
@@ -53,6 +54,7 @@ type Handler struct {
 	Mail           *MailAdminHandler
 	Notify         *NotifyAdminHandler
 	Approval       *ApprovalSettingsHandler
+	Leave          *LeaveHandler
 	notices        *assignNoticeHook
 	help           *repository.LoginHelpRepo
 
@@ -111,6 +113,9 @@ func New(db *sql.DB) *Handler {
 	}
 	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)
 	wbH.notices = noticeHook
+	aprEng := &approval.Engine{DB: db}
+	leaveSvc := leaveapp.New(db, aprEng)
+	aprEng.Hooks = leaveSvc
 
 	h := &Handler{
 		Customer: &CustomerHandler{
@@ -202,7 +207,8 @@ func New(db *sql.DB) *Handler {
 		System:      &SystemHandler{db: db, auth: authH, uploadDir: attachH.uploadDir},
 		Mail:        &MailAdminHandler{db: db, cfg: authH.cfg},
 		Notify:      &NotifyAdminHandler{db: db, cfg: authH.cfg, settings: settingsRepo},
-		Approval:    &ApprovalSettingsHandler{eng: &approval.Engine{DB: db}},
+		Approval:    &ApprovalSettingsHandler{eng: aprEng},
+		Leave:       &LeaveHandler{svc: leaveSvc, eng: aprEng},
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,

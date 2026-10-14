@@ -1,0 +1,37 @@
+{{define "title"}}{{.Title}} · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 max-w-3xl">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="text-ui-xl font-extrabold text-ink">{{.Item.DocNo}}</h2>
+    <div class="flex gap-2">
+      <a href="/leaves/{{.Item.LeaveReqID}}/hwpx" class="btn btn-secondary">HWPX</a>
+      <a href="/leaves" class="btn btn-ghost">목록</a>
+    </div>
+  </div>
+  {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <div class="card p-4 text-ui space-y-2">
+    <p><span class="text-ink-muted">구분</span> {{.Type}}</p>
+    <p><span class="text-ink-muted">기간</span> {{.Item.StartDate}} ~ {{.Item.EndDate}} {{.Item.StartTime}} {{.Item.EndTime}}</p>
+    <p><span class="text-ink-muted">사유</span> {{.Item.Reason}}</p>
+    <p><span class="text-ink-muted">행선지</span> {{.Item.Destination}} · <span class="text-ink-muted">연락처</span> {{.Item.Phone}} · <span class="text-ink-muted">업무대행자</span> {{.Item.DeputyName}}</p>
+    <p><span class="text-ink-muted">상태</span> <span class="badge badge-info">{{.Item.Status}}</span></p>
+  </div>
+  <div class="card p-4 text-ui">
+    <p class="font-medium text-ink mb-2">결재란 (작성 / 검토 / 승인)</p>
+    <p class="text-ink-muted mb-2">검토란은 양식 사선 그대로 비웁니다.</p>
+    <ol class="space-y-1">
+      {{range .Steps}}
+      <li>{{.StepNo}}. {{.StepType}} · {{.ApproverID}} · {{.Status}} {{if .ActMode}}({{.ActMode}}){{end}}</li>
+      {{else}}
+      <li class="text-ink-muted">결재 단계 없음</li>
+      {{end}}
+    </ol>
+  </div>
+  {{if .CanWithdraw}}
+  <form method="post" action="/leaves/{{.Item.LeaveReqID}}/withdraw" onsubmit="return confirm('회수할까요?');">
+    <button class="btn btn-secondary" type="submit">회수</button>
+  </form>
+  {{end}}
+</div>
+{{end}}

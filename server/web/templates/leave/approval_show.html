@@ -1,0 +1,33 @@
+{{define "title"}}{{.Title}} · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 max-w-3xl">
+  <h2 class="text-ui-xl font-extrabold text-ink">{{.AR.Title}}</h2>
+  {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  {{if .Leave}}
+  <div class="card p-4 text-ui space-y-1">
+    <p>{{.Leave.DocNo}} · {{.Leave.AuthorName}}</p>
+    <p>{{.Leave.StartDate}} ~ {{.Leave.EndDate}}</p>
+    <p>{{.Leave.Reason}}</p>
+    <a class="btn btn-secondary btn-sm" href="/leaves/{{.Leave.LeaveReqID}}/hwpx">HWPX</a>
+  </div>
+  {{end}}
+  <div class="card p-4 text-ui">
+    {{range .Steps}}
+    <p>{{.StepNo}} {{.Status}} {{if eq .ActMode "delegate"}}<span class="badge badge-info">대리 결재</span>{{end}}</p>
+    {{end}}
+  </div>
+  {{if .CanAct}}
+  <form method="post" action="/approvals/{{.AR.RequestID}}/approve" class="card p-4 space-y-2">
+    {{if .ActLabel}}<p class="text-ink-muted">{{.ActLabel}}</p>{{end}}
+    <label class="label">의견</label>
+    <textarea class="textarea" name="comment"></textarea>
+    <div class="flex gap-2">
+      <button class="btn btn-primary" type="submit">승인</button>
+      <button class="btn btn-danger" type="submit" formmethod="post" formaction="/approvals/{{.AR.RequestID}}/reject">반려</button>
+    </div>
+  </form>
+  {{end}}
+  <a href="/approvals/inbox" class="btn btn-ghost">결재함</a>
+</div>
+{{end}}

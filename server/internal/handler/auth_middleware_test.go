@@ -84,7 +84,7 @@ func TestAuthMiddleware_DBErrorKeepsMenuAndShowsBanner(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, label := range []string{"계획", "실행", "확인", "기준정보", "관리"} {
+	for _, label := range []string{"업무", "기술지원", "영업", "사업관리", "환경설정", "관리"} {
 		if !strings.Contains(body, ">"+label+"<") && !strings.Contains(body, label) {
 			t.Fatalf("메뉴 그룹 %q 가 없다", label)
 		}
@@ -129,7 +129,7 @@ func TestAuthMiddleware_FreshVerifiedAtSkipsDB(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "계획") || !strings.Contains(body, "기준정보") {
+	if !strings.Contains(body, "업무") || !strings.Contains(body, "환경설정") {
 		t.Fatal("메뉴가 유지되지 않았다")
 	}
 	if strings.Contains(body, "권한 정보를 불러오지 못했습니다") {

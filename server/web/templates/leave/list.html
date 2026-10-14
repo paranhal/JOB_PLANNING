@@ -1,0 +1,30 @@
+{{define "title"}}내 휴가 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="text-ui-xl font-extrabold text-ink">내 휴가</h2>
+    <a href="/leaves/new" class="btn btn-primary">근태허가원 작성</a>
+  </div>
+  {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left">
+        <tr><th class="p-3">문서번호</th><th class="p-3">구분</th><th class="p-3">기간</th><th class="p-3">상태</th></tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t border-line">
+          <td class="p-3"><a class="text-primary" href="/leaves/{{.LeaveReqID}}">{{.DocNo}}</a></td>
+          <td class="p-3">{{.TypeKey}}</td>
+          <td class="p-3">{{.StartDate}}{{if ne .EndDate .StartDate}} ~ {{.EndDate}}{{end}}</td>
+          <td class="p-3"><span class="badge badge-neutral">{{.Status}}</span></td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="4">신청이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

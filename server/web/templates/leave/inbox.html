@@ -1,0 +1,26 @@
+{{define "title"}}결재할 문서 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <h2 class="text-ui-xl font-extrabold text-ink">결재할 문서</h2>
+  {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left">
+        <tr><th class="p-3">제목</th><th class="p-3">종류</th><th class="p-3">상태</th></tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t border-line">
+          <td class="p-3"><a class="text-primary" href="/approvals/{{.RequestID}}">{{.Title}}</a></td>
+          <td class="p-3">{{.DocType}}</td>
+          <td class="p-3"><span class="badge badge-warning">{{.Status}}</span></td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="3">대기 문서가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

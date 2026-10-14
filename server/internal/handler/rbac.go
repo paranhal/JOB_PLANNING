@@ -44,6 +44,9 @@ func currentPerms(c echo.Context) []string {
 func hasPerm(c echo.Context, key string) bool {
 	role := currentRole(c)
 	key = model.CanonicalPerm(key)
+	if (key == model.PermSelfLeave || key == model.PermSelfApproval) && role != "" && role != model.RoleTester {
+		return true
+	}
 	if role == model.RoleVisionAdmin {
 		return true
 	}
