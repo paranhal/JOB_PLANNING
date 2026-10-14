@@ -209,15 +209,8 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 func TestSalesHTTP_ProjectFormUnchanged(t *testing.T) {
 	e := newSalesServer(t)
 	rec := doGet(t, e, "/projects/new")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("사업 등록 status=%d", rec.Code)
-	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "유상/무상") || !strings.Contains(body, "계약방식") {
-		t.Fatal("유지보수 사업 등록 화면이 바뀌었다")
-	}
-	if strings.Contains(body, "임시 사업명") {
-		t.Fatal("사업 등록에 영업 필드가 섞였다")
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "/sales/new") {
+		t.Fatalf("사업관리 직접 등록은 영업으로 보내야 한다 status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 }
 
@@ -751,7 +744,7 @@ func TestSalesHTTP_PromoteOnlyWhenContracted(t *testing.T) {
 	}
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	show := doGet(t, e, "/sales/"+id)
-	if strings.Contains(show.Body.String(), "사업관리로 등록") {
+	if strings.Contains(show.Body.String(), "사업관리로 전환") {
 		t.Fatal("수주 전에 승격 버튼이 열렸다")
 	}
 	rec = doGet(t, e, "/sales/"+id+"/promote")
@@ -776,7 +769,7 @@ func TestSalesHTTP_PromoteProspectThenKeepActivities(t *testing.T) {
 	}
 
 	show := doGet(t, e, "/sales/"+id)
-	if !strings.Contains(show.Body.String(), "사업관리로 등록") {
+	if !strings.Contains(show.Body.String(), "사업관리로 전환") {
 		t.Fatal("수주인데 승격 버튼이 없다")
 	}
 
@@ -850,7 +843,7 @@ func TestSalesHTTP_PromoteProspectThenKeepActivities(t *testing.T) {
 
 	after := doGet(t, e, "/sales/"+id)
 	afterBody := after.Body.String()
-	if strings.Contains(afterBody, ">사업관리로 등록<") || strings.Contains(afterBody, "사업관리로 등록</a>") {
+	if strings.Contains(afterBody, "사업관리로 전환") {
 		t.Fatal("승격 후에도 등록 버튼이 남아 있다")
 	}
 	if !strings.Contains(afterBody, "사업관리에서 보기") || !strings.Contains(afterBody, "방문미팅 · 승격 전") {

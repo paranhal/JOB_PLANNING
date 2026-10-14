@@ -15,6 +15,8 @@ services:
       - DB_TYPE=sqlite
       - DB_PATH=/app/data/app.db
       - APP_ENV=production      # 운영 보호용. 되돌린다
+      - SHOW_PROJECTS_SECTOR=0  # 사업관리 초안. 로컬은 기본 표시, 운영 배포에서만 숨김
+      - PROJECT_EXAMPLE_DATA=0  # 설계용 가상 데이터. 운영에는 올리지 않는다
       - COOKIE_SECURE=false     # HTTP 로 서비스하는 동안 false. HTTPS 도입 시 COOKIE_SECURE=true. HTTP 에서 켜면 로그인이 불가능해진다(§24.2)
       - TZ=Asia/Seoul
     restart: unless-stopped

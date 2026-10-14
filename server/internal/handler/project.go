@@ -12,6 +12,7 @@ import (
 
 	"customer-support/internal/auditlog"
 	"customer-support/internal/backup"
+	"customer-support/internal/config"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -45,6 +46,8 @@ func NewProjectHandler(
 func canViewProjects(c echo.Context) bool {
 	r := currentRole(c)
 	return model.IsAdminGrade(r) || r == model.RoleSupport || r == model.RoleTech ||
+		r == model.RoleSales || r == model.RoleOffice ||
+		r == model.RoleObserver || r == model.RoleTester ||
 		hasPerm(c, model.PermWorkboard)
 }
 
@@ -74,13 +77,44 @@ func (h *ProjectHandler) List(c echo.Context) error {
 		return err
 	}
 	years, _ := h.repo.ListYears()
-	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
-		"Title": "사업(프로젝트)관리", "Active": NavProjects,
+	data := map[string]interface{}{
+		"Title": "사업·업무관리", "Active": NavProjects,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
 		"CanMerge": currentRole(c) == model.RoleVisionAdmin,
 		"DupNames": model.DuplicateProjectNameGroups(items),
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+	}
+	if config.Load().ShowProjectsSector() {
+		example := config.Load().ShowProjectExampleData()
+		if example {
+			data["WorkSeed"] = sampleWorkMgmt()
+		} else {
+			data["WorkSeed"] = workMgmtSeed{}
+		}
+		data["Example"] = example
+		data["ReportURL"] = "/projects/diary"
+		data["RegisterURL"] = "/workboard/register"
+		data["DocsURL"] = "/projects/docs"
+	}
+	return c.Render(http.StatusOK, "project/list.html", data)
+}
+
+func (h *ProjectHandler) Docs(c echo.Context) error {
+	if !config.Load().ShowProjectsSector() {
+		return echo.ErrNotFound
+	}
+	if !canViewProjects(c) {
+		return echo.ErrForbidden
+	}
+	example := config.Load().ShowProjectExampleData()
+	seed := docsSeed{}
+	if example {
+		seed = sampleProjectDocs()
+	}
+	return c.Render(http.StatusOK, "project/docs.html", map[string]interface{}{
+		"Title": "서류 작성·관리", "Active": NavProjectsDocs,
+		"Seed": seed, "Example": example,
 	})
 }
 
@@ -134,7 +168,7 @@ func (h *ProjectHandler) New(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	return h.renderForm(c, &model.WorkProject{IsPaid: true, Status: model.WBProjectActive, Color: "#3B82F6"}, nil, false)
+	return c.Redirect(http.StatusSeeOther, "/sales/new?from=projects")
 }
 
 func (h *ProjectHandler) Create(c echo.Context) error {
@@ -178,11 +212,11 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
-		"CanWrite":      canWriteProjects(c),
-		"CanDelete":     canDeleteProjects(c),
-		"CanMerge":      currentRole(c) == model.RoleVisionAdmin,
-		"SalesMissing":  salesMissing,
-		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"CanWrite":     canWriteProjects(c),
+		"CanDelete":    canDeleteProjects(c),
+		"CanMerge":     currentRole(c) == model.RoleVisionAdmin,
+		"SalesMissing": salesMissing,
+		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 

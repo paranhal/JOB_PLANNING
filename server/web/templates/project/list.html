@@ -1,20 +1,212 @@
-{{define "title"}}사업(프로젝트)관리 · {{appName}}{{end}}
+{{define "title"}}사업·업무관리 · {{appName}}{{end}}
 
 {{define "content"}}
+{{if .WorkSeed}}
+<div class="space-y-4" x-data="{
+  sel: { construction: {{if .Example}}true{{else}}false{{end}}, network: {{if .Example}}true{{else}}false{{end}}, dev: {{if .Example}}true{{else}}false{{end}}, maintenance: {{if .Example}}true{{else}}false{{end}} },
+  kind: '',
+  status: '',
+  owner: '',
+  due: 'week',
+  on(k, st, ow) {
+    if (!this.sel[k]) return false;
+    if (this.kind && this.kind !== k) return false;
+    if (this.status && this.status !== st) return false;
+    if (this.owner && this.owner !== ow) return false;
+    return true;
+  },
+  nSel() { return Object.values(this.sel).filter(Boolean).length; }
+}">
+  <p class="text-ui-xs text-ink-subtle">사업 관리 / 사업·업무관리</p>
+
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+    <div class="min-w-0">
+      <h2 class="text-ui-xl font-extrabold text-ink">사업·업무관리</h2>
+      <p class="text-ui-sm text-ink-muted mt-1">공사, 구축, 개발, 유지보수 사업의 단계별 일정과 필요 서류 작성·제출을 중심으로 관리합니다. 각 사업 유형의 단계(공정→기성→준공, 구축→개통→검수, 접수→조치→완료)와 관련 서류 상태를 함께 확인할 수 있습니다.</p>
+    </div>
+    <div class="flex flex-wrap gap-2 shrink-0">
+      <a href="{{.ReportURL}}" class="btn btn-secondary btn-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4-4 4 4M12 8v12"/></svg>
+        업무 리포트
+      </a>
+      <a href="{{.RegisterURL}}" class="btn btn-primary btn-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        업무 등록
+      </a>
+    </div>
+  </div>
+
+  {{if eq .FlashOK "deleted"}}
+  <div class="flash-success rounded-control">사업을 삭제했습니다.</div>
+  {{end}}
+  {{if eq .FlashErr "notfound"}}
+  <div class="flash-danger rounded-control">사업을 찾을 수 없습니다.</div>
+  {{end}}
+  {{if .DupNames}}
+  <div class="flash-warning rounded-control space-y-1">
+    {{range .DupNames}}
+    <p>이름이 같은 사업이 {{.Count}}건 있습니다
+      {{if .CustomerName}}<span class="text-ui-xs">({{.CustomerName}})</span>{{end}}
+      —
+      {{range $i, $id := .IDs}}{{if $i}}, {{end}}<a class="text-primary font-mono" href="/projects/{{$id}}">{{$id}}</a>{{end}}
+    </p>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="grid lg:grid-cols-[1fr_16rem] gap-3">
+    <div class="card p-4 space-y-3">
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-ui font-semibold text-ink">사업 선택</p>
+        <p class="text-ui-sm text-ink-muted" x-text="nSel() + '개 사업'"></p>
+      </div>
+      {{range .WorkSeed.Picks}}
+      <label class="flex items-center gap-3 rounded-control border border-line px-3 py-2">
+        <input type="checkbox" class="rounded-control" x-model="sel.{{.ID}}">
+        <span class="flex-1 text-ui font-medium text-ink">{{.Name}}</span>
+        <span class="badge badge-neutral">{{.Kind}}</span>
+      </label>
+      {{end}}
+    </div>
+    <div class="card p-4 space-y-3">
+      <p class="text-ui font-semibold text-ink">필터</p>
+      <div>
+        <label class="label" for="wm-kind">유형</label>
+        <select id="wm-kind" class="select" x-model="kind">
+          <option value="">전체</option>
+          <option value="construction">공사</option>
+          <option value="network">구축</option>
+          <option value="dev">개발</option>
+          <option value="maintenance">유지보수</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="wm-status">상태</label>
+        <select id="wm-status" class="select" x-model="status">
+          <option value="">전체</option>
+          <option value="진행">진행</option>
+          <option value="대기">대기</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="wm-owner">담당자</label>
+        <select id="wm-owner" class="select" x-model="owner">
+          <option value="">전체</option>
+          {{if .Example}}
+          <option value="김현우">김현우</option>
+          <option value="박준석">박준석</option>
+          <option value="이미진">이미진</option>
+          <option value="최은지">최은지</option>
+          <option value="정우성">정우성</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="label" for="wm-due">마감일</label>
+        <select id="wm-due" class="select" x-model="due">
+          <option value="week">이번 주</option>
+          <option value="month">이번 달</option>
+          <option value="">전체</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div>
+        <h3 class="text-ui font-semibold text-ink">단계별 일정 및 서류 관리</h3>
+        <p class="text-ui-sm text-ink-muted mt-1">선택된 사업의 단계별 일정과 관련 서류 상태를 함께 확인하고, 작성/미작성/완료 등 상태를 관리합니다.</p>
+      </div>
+      <p class="text-ui-sm text-ink-muted shrink-0" x-text="nSel() + '개 사업{{if .Example}} · 12단계{{end}}'"></p>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-line">
+        <p class="text-ui font-medium text-ink">단계별 일정표</p>
+        <p class="text-ui-xs text-ink-muted">계획/실적/담당자/상태를 확인합니다</p>
+      </div>
+      <table class="table-base min-w-[52rem]">
+        <thead>
+          <tr class="bg-canvas text-ui-xs text-ink-muted">
+            <th class="px-4 py-2 font-medium">사업</th>
+            <th class="px-4 py-2 font-medium">단계</th>
+            <th class="px-4 py-2 font-medium">계획 시작</th>
+            <th class="px-4 py-2 font-medium">계획 종료</th>
+            <th class="px-4 py-2 font-medium">실제 처리</th>
+            <th class="px-4 py-2 font-medium">담당자</th>
+            <th class="px-4 py-2 font-medium">상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .WorkSeed.Stages}}
+          <tr class="border-t border-line" x-show="on('{{.ID}}', '{{.Status}}', '{{.Owner}}')">
+            <td class="px-4 py-2.5 text-ink-muted">{{.Kind}}</td>
+            <td class="px-4 py-2.5 font-medium text-ink">{{.Stage}}</td>
+            <td class="px-4 py-2.5 tabular-nums">{{.PlanStart}}</td>
+            <td class="px-4 py-2.5 tabular-nums">{{.PlanEnd}}</td>
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{{.Actual}}</td>
+            <td class="px-4 py-2.5">{{.Owner}}</td>
+            <td class="px-4 py-2.5">
+              {{if eq .Status "진행"}}<span class="badge badge-warning">진행</span>
+              {{else}}<span class="badge badge-neutral">{{.Status}}</span>{{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card p-4 space-y-4">
+    <div class="flex items-center justify-between gap-2">
+      <h3 class="text-ui font-semibold text-ink">단계별 서류 작성</h3>
+      <p class="text-ui-xs text-ink-muted">작성/미작성/완료 등 상태를 관리합니다</p>
+    </div>
+    {{range .WorkSeed.DocGroups}}
+    <div class="rounded-control border border-line p-3 space-y-2" x-show="sel.{{.Kind}} && (!kind || kind === '{{.Kind}}')">
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-ui-sm font-medium text-ink-muted">{{.Label}}</p>
+        <p class="text-ui-xs text-ink-subtle">{{.Count}}</p>
+      </div>
+      {{range .Docs}}
+      <div class="flex flex-wrap items-center gap-2">
+        <p class="flex-1 min-w-[8rem] text-ui font-medium text-ink">{{.Title}}</p>
+        <p class="text-ui-sm text-ink-muted tabular-nums">{{.Date}}</p>
+        {{if eq .Status "작성 중"}}<span class="badge badge-warning">작성 중</span>
+        {{else if eq .Status "완료"}}<span class="badge badge-success">완료</span>
+        {{else}}<span class="badge badge-neutral">{{.Status}}</span>{{end}}
+        {{if eq .Action "view"}}
+        <a href="{{$.DocsURL}}" class="btn btn-secondary btn-sm">상세 확인</a>
+        {{else if eq .Status "작성 중"}}
+        <a href="{{$.DocsURL}}" class="btn btn-primary btn-sm">작성하기</a>
+        {{else}}
+        <a href="{{$.DocsURL}}" class="btn btn-secondary btn-sm">작성하기</a>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+
+  {{if .Example}}
+  <div class="flex flex-col sm:flex-row sm:justify-between gap-1 text-ui-xs text-ink-subtle">
+    <p>본 화면의 수치와 일정·서류는 화면 설계를 위한 예시이며, 실제 연동 데이터가 아닙니다.</p>
+    <p>기준일자 {{.WorkSeed.DateLabel}}</p>
+  </div>
+  {{end}}
+</div>
+{{else}}
 <div class="space-y-4">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">사업(프로젝트)관리</h2>
-      <p class="text-sm text-gray-500">사업 마스터 · 범위 규칙(상위기관×제품×업무유형)</p>
+      <h2 class="text-xl font-bold text-gray-800">{{if .Title}}{{.Title}}{{else}}사업·업무관리{{end}}</h2>
+      <p class="text-sm text-gray-500">계약이 끝난 수행 사업입니다. 신규 등록은 영업에서 하고, 계약 완료 후 여기로 전환됩니다.</p>
     </div>
     <div class="flex flex-wrap gap-2">
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">일일 업무 현황</a>
       {{if .CanWrite}}
-      <a href="/projects/new"
-         class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        사업 등록
-      </a>
+      <a href="/sales/new" class="px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">영업에서 등록</a>
       {{end}}
     </div>
   </div>
@@ -118,4 +310,5 @@
     </table>
   </div>
 </div>
+{{end}}
 {{end}}

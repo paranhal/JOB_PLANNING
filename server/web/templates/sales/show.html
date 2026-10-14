@@ -26,7 +26,7 @@
     {{if .CanWrite}}
     <div class="hidden sm:flex flex-wrap gap-2">
       {{if .CanPromote}}
-      <a href="/sales/{{.Raw.SalesID}}/promote" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">사업관리로 등록</a>
+      <a href="/sales/{{.Raw.SalesID}}/promote" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">사업관리로 전환</a>
       {{end}}
       {{if .WorkProjectID}}
       <a href="/projects/{{.WorkProjectID}}" class="px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">사업관리에서 보기</a>
@@ -528,7 +528,7 @@
     <a href="/quotes/new?sales_id={{.Project.SalesID}}" class="w-full text-center px-4 py-2.5 text-sm bg-emerald-600 text-white rounded-lg">견적 작성</a>
     <a href="/sales/{{.Project.SalesID}}/edit" class="w-full text-center px-4 py-2.5 text-sm border rounded-lg">수정</a>
     {{if .CanPromote}}
-    <a href="/sales/{{.Raw.SalesID}}/promote" class="w-full text-center px-4 py-2.5 text-sm text-white bg-blue-600 rounded-lg">사업관리로 등록</a>
+    <a href="/sales/{{.Raw.SalesID}}/promote" class="w-full text-center px-4 py-2.5 text-sm text-white bg-blue-600 rounded-lg">사업관리로 전환</a>
     {{end}}
     {{if .WorkProjectID}}
     <a href="/projects/{{.WorkProjectID}}" class="w-full text-center px-4 py-2.5 text-sm border border-blue-200 text-blue-700 rounded-lg">사업관리에서 보기</a>

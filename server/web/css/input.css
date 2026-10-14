@@ -97,6 +97,16 @@
 
   .toast { @apply rounded-control border border-line bg-surface px-4 py-3 text-ui text-ink shadow-pop; }
 
+  .dash-trackbar {
+    @apply flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 rounded-card px-4 py-2 text-ui-sm;
+    --tw-bg-opacity: 1;
+    background-color: rgb(var(--c-text) / var(--tw-bg-opacity));
+    --tw-text-opacity: 1;
+    color: rgb(var(--c-on-primary) / var(--tw-text-opacity));
+  }
+  .dash-track-tab { @apply rounded-control px-2 py-1; }
+  .dash-track-tab-on { @apply rounded-control px-2 py-1 font-medium bg-surface text-ink; }
+
   .sidebar-section { @apply px-3 pb-1 pt-4 text-ui-xs font-medium uppercase tracking-wide text-sidebar-text; }
   .sidebar-item { @apply flex items-center gap-2 rounded-control px-3 py-1.5 text-ui text-sidebar-text hover:bg-hover hover:text-ink; }
   .sidebar-item-active { @apply sidebar-item bg-hover text-ink; }

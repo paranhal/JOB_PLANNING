@@ -290,13 +290,16 @@ func (p *SalesProject) RequireWonConfirmation() error {
 
 // CanPromoteSales 는 sales_stage4.go 에 있다.
 
-// WorkProjectFromSales 승격 폼에 사업명·고객·발주처·금액을 옮긴다.
-// 계약기간·계약방식·청구방식·유상무상·범위 규칙은 비워 두고 §22.1에서 처음 입력한다.
+// WorkProjectFromSales 계약 완료 건의 사업명·고객·발주처·금액·기간·계약방식을 수행 사업으로 옮긴다.
 func WorkProjectFromSales(s *SalesProject) *WorkProject {
 	if s == nil {
 		return &WorkProject{IsPaid: true, Status: WBProjectActive, Color: "#3B82F6"}
 	}
 	cust := strings.TrimSpace(s.CustomerID)
+	start := strings.TrimSpace(s.RevenueFrom)
+	if start == "" {
+		start = strings.TrimSpace(s.ContractedAt)
+	}
 	p := &WorkProject{
 		Name:            strings.TrimSpace(s.Name),
 		CustomerID:      cust,
@@ -306,7 +309,14 @@ func WorkProjectFromSales(s *SalesProject) *WorkProject {
 		Color:           "#3B82F6",
 		SalesProjectID:  s.SalesID,
 		ContractAmount:  s.ContractAmount,
-		StartDate:       strings.TrimSpace(s.ContractedAt),
+		ContractNo:      strings.TrimSpace(s.PONo),
+		ContractType:    strings.TrimSpace(s.ContractMethod),
+		BillingType:     strings.TrimSpace(s.BillingCycle),
+		StartDate:       start,
+		EndDate:         strings.TrimSpace(s.RevenueTo),
+	}
+	if p.ContractAmount == 0 {
+		p.ContractAmount = s.AwardedAmount
 	}
 	if p.ContractAmount == 0 {
 		p.ContractAmount = s.ExpectedAmount

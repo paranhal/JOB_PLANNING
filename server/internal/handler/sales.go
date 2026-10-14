@@ -1325,9 +1325,9 @@ func querySalesErr(code string) string {
 	case "notfound":
 		return "영업 사업을 찾을 수 없습니다."
 	case "not_contracted":
-		return "수주 단계에서만 사업관리로 등록할 수 있습니다."
+		return "계약이 완료된 건만 사업관리로 전환할 수 있습니다."
 	case "already_promoted":
-		return "이미 사업관리로 등록된 영업 사업입니다."
+		return "이미 사업관리로 전환된 영업 사업입니다."
 	default:
 		return ""
 	}

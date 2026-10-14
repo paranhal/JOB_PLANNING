@@ -18,6 +18,7 @@ services:
       - DB_TYPE=sqlite
       - DB_PATH=/app/data/app.db
       - APP_ENV=development
+      - SHOW_PROJECTS_SECTOR=1
       - TZ=Asia/Seoul
     restart: unless-stopped
     stop_grace_period: 30s

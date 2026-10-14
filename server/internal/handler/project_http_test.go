@@ -33,6 +33,11 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/projects", h.Project.List)
 	g.GET("/projects/new", h.Project.New)
+	g.GET("/projects/dashboard", h.Project.Dashboard)
+	g.GET("/projects/docs", h.Project.Docs)
+	g.GET("/projects/diary", h.Project.Diary)
+	g.POST("/projects/diary/draft", h.Project.DiaryDraft)
+	g.POST("/projects/diary/review", h.Project.DiaryReview)
 	g.POST("/projects", h.Project.Create)
 	g.GET("/projects/:id", h.Project.Show)
 	g.GET("/projects/:id/edit", h.Project.Edit)
@@ -74,10 +79,16 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 		t.Fatal("project id 없음")
 	}
 
-	// 목록 노출
-	list := doGet(t, e, "/projects?search="+url.QueryEscape("스모크"))
-	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "스모크사업") {
-		t.Fatalf("목록 미노출 status=%d", list.Code)
+	show := doGet(t, e, "/projects/"+id)
+	if show.Code != http.StatusOK || !strings.Contains(show.Body.String(), "스모크사업") {
+		t.Fatalf("상세 미노출 status=%d", show.Code)
+	}
+	list := doGet(t, e, "/projects")
+	if list.Code != http.StatusOK {
+		t.Fatalf("목록 status=%d", list.Code)
+	}
+	if strings.Contains(list.Body.String(), ">사업 등록<") {
+		t.Fatal("사업관리에서 직접 등록 버튼이 남아 있다")
 	}
 
 	// 수정
@@ -181,11 +192,47 @@ func TestProjectListNumberAndDuplicateBanner(t *testing.T) {
 	}
 	list := doGet(t, e, "/projects")
 	body := list.Body.String()
-	if !strings.Contains(body, "번호") || !strings.Contains(body, "min-w-[1100px]") {
-		t.Fatalf("번호 열/§35.8 없음")
-	}
 	if !strings.Contains(body, "이름이 같은 사업이 2건") {
-		t.Fatalf("중복 띠 없음: %s", body)
+		t.Fatalf("중복 띠 없음: %s", clipBody(body))
+	}
+}
+
+func TestProjectWorkMgmtFigmaLayout(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PROJECT_EXAMPLE_DATA", "1")
+	e, _, _ := newProjectServer(t)
+	page := doGet(t, e, "/projects")
+	if page.Code != http.StatusOK {
+		t.Fatalf("status=%d", page.Code)
+	}
+	body := page.Body.String()
+	for _, want := range []string{
+		"사업·업무관리",
+		"업무 리포트",
+		"업무 등록",
+		"사업 선택",
+		"A동 골조공사",
+		"데이터센터 네트워크 구축",
+		"ERP 연동 플랫폼 개발",
+		"충남세종 RFID 자동화 장비 유지보수",
+		"공정→기성→준공",
+		"구축→개통→검수",
+		"접수→조치→완료",
+		"단계별 일정표",
+		"계획 시작",
+		"실제 처리",
+		"공정 착수 승인서",
+		"작성하기",
+		"상세 확인",
+		"구축 착수 승인서",
+		"화면 설계를 위한 예시",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("화면에 %q 없음", want)
+		}
+	}
+	if strings.Contains(body, "data-node-id") {
+		t.Fatal("Figma 원본 흔적이 렌더에 남았다")
 	}
 }
 

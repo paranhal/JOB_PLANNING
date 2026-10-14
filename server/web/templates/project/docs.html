@@ -1,0 +1,233 @@
+{{define "title"}}서류 작성·관리 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4" x-data="{
+  sel: { construction: {{if .Example}}true{{else}}false{{end}}, network: {{if .Example}}true{{else}}false{{end}}, dev: {{if .Example}}true{{else}}false{{end}}, maintenance: {{if .Example}}true{{else}}false{{end}} },
+  kind: 'construction',
+  stage: '공정',
+  formKind: 'new',
+  mode: 'continue',
+  cur: 'd1',
+  statusTab: '작성 중',
+  flash: '',
+  nSel() { return Object.values(this.sel).filter(Boolean).length; },
+  on(k, st) {
+    if (!this.sel[k]) return false;
+    if (this.kind && this.kind !== k) return false;
+    if (this.stage && this.stage !== st) return false;
+    return true;
+  }
+}">
+  <p class="text-ui-xs text-ink-subtle">사업 관리 / 서류 작성·관리</p>
+
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+    <div class="min-w-0">
+      <h2 class="text-ui-xl font-extrabold text-ink">서류 작성·관리</h2>
+      <p class="text-ui-sm text-ink-muted mt-1">공사(공정→기성→준공), 구축·개발(구축→개통→검수), 유지보수(접수→조치→완료) 단계별 필요한 서류를 작성하고, 제출 상태를 한 화면에서 관리합니다.</p>
+    </div>
+    <div class="flex flex-wrap gap-2 shrink-0">
+      <button type="button" class="btn btn-secondary btn-sm" @click="flash='임시저장했습니다.'">임시저장</button>
+      <button type="button" class="btn btn-primary btn-sm" @click="flash='검토를 요청했습니다.'">검토 요청</button>
+      <button type="button" class="btn btn-secondary btn-sm" @click="flash='제출했습니다.'">제출</button>
+    </div>
+  </div>
+
+  <p x-show="flash" x-cloak class="flash-success rounded-control" x-text="flash"></p>
+
+  <div class="card px-4 py-3 flex flex-col xl:flex-row xl:items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2 min-w-0">
+      <span class="inline-flex h-8 w-8 items-center justify-center rounded-control border border-line text-ink-muted" aria-hidden="true">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </span>
+      <p class="text-ui font-semibold text-ink">{{if .Seed.DateLabel}}{{.Seed.DateLabel}}{{if .Seed.Weekday}} ({{.Seed.Weekday}}){{end}}{{else}}—{{end}}</p>
+      {{if .Example}}<span class="badge badge-warning">작성중</span>{{end}}
+      {{if .Example}}<p class="text-ui-sm text-ink-muted">서류 번호 D-2026-104</p>{{end}}
+      {{if .Seed.Weather}}<p class="text-ui-sm text-ink-muted">{{.Seed.Weather}}</p>{{end}}
+    </div>
+    {{if .Example}}
+    <div class="flex flex-wrap items-center gap-2 xl:ml-auto text-ui-sm">
+      <span class="text-ink font-medium">작성 김현우</span>
+      <span class="text-ink-subtle">›</span>
+      <span class="text-ink-muted">검토 박준석 · 대기</span>
+      <span class="text-ink-subtle">›</span>
+      <span class="text-ink-muted">승인 이정민 · 대기</span>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="card p-4 space-y-3">
+    <div class="flex items-center justify-between gap-2">
+      <p class="text-ui font-semibold text-ink">사업 선택</p>
+      <p class="text-ui-sm text-ink-muted" x-text="nSel() + '개 사업'"></p>
+    </div>
+    {{range .Seed.Picks}}
+    <label class="flex items-center gap-3 rounded-control border border-line px-3 py-2">
+      <input type="checkbox" class="rounded-control" x-model="sel.{{.ID}}">
+      <span class="flex-1 text-ui font-medium text-ink">{{.Name}}</span>
+      <span class="badge badge-neutral">{{.Kind}}</span>
+    </label>
+    {{end}}
+  </div>
+
+  <div class="card p-4 space-y-3">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <p class="text-ui font-semibold text-ink">사업 유형 / 단계 선택</p>
+      <p class="text-ui-sm text-ink-muted">선택된 단계의 서류를 작성합니다</p>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div>
+        <label class="label" for="doc-kind">사업 유형</label>
+        <select id="doc-kind" class="select" x-model="kind">
+          <option value="construction">공사</option>
+          <option value="network">구축</option>
+          <option value="dev">개발</option>
+          <option value="maintenance">유지보수</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="doc-stage">단계</label>
+        <select id="doc-stage" class="select" x-model="stage">
+          <option value="공정">공정</option>
+          <option value="기성">기성</option>
+          <option value="준공">준공</option>
+          <option value="구축">구축</option>
+          <option value="개통">개통</option>
+          <option value="검수">검수</option>
+          <option value="접수">접수</option>
+          <option value="조치">조치</option>
+          <option value="완료">완료</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="doc-form">양식</label>
+        <select id="doc-form" class="select" x-model="formKind">
+          <option value="new">신규 작성</option>
+          <option value="reuse">기존 양식</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="doc-mode">작성 모드</label>
+        <select id="doc-mode" class="select" x-model="mode">
+          <option value="continue">이어 쓰기</option>
+          <option value="fresh">새로 작성</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card overflow-x-auto">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 px-4 py-3 border-b border-line">
+      <div>
+        <h3 class="text-ui font-semibold text-ink">단계별 서류 목록</h3>
+        <p class="text-ui-sm text-ink-muted mt-1">선택된 단계에 작성 대상 서류와 제출 기한을 확인합니다.</p>
+      </div>
+      <p class="text-ui-sm text-ink-muted shrink-0">공정 단계 3건</p>
+    </div>
+    <table class="table-base min-w-[52rem]">
+      <thead>
+        <tr class="bg-canvas text-ui-xs text-ink-muted">
+          <th class="px-4 py-2 font-medium">서류명</th>
+          <th class="px-4 py-2 font-medium">단계</th>
+          <th class="px-4 py-2 font-medium">담당자</th>
+          <th class="px-4 py-2 font-medium">제출 기한</th>
+          <th class="px-4 py-2 font-medium">상태</th>
+          <th class="px-4 py-2 font-medium">처리</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Seed.Items}}
+        <tr class="border-t border-line" x-show="on('{{.Kind}}', '{{.Stage}}')">
+          <td class="px-4 py-2.5">
+            <p class="font-medium text-ink">{{.Title}}</p>
+            <p class="text-ui-xs text-ink-muted">{{.Sub}}</p>
+          </td>
+          <td class="px-4 py-2.5 text-ink-muted">{{.Stage}}</td>
+          <td class="px-4 py-2.5 text-primary">{{.Owner}}</td>
+          <td class="px-4 py-2.5 tabular-nums">{{.Due}}</td>
+          <td class="px-4 py-2.5">
+            {{if eq .Status "작성 중"}}<span class="badge badge-warning">작성 중</span>
+            {{else if eq .Status "완료"}}<span class="badge badge-success">완료</span>
+            {{else}}<span class="badge badge-neutral">{{.Status}}</span>{{end}}
+          </td>
+          <td class="px-4 py-2.5">
+            <button type="button" class="btn btn-secondary btn-sm" @click="cur='{{.ID}}'; statusTab='{{.Status}}'">상세 확인</button>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{range .Seed.Items}}
+  <div class="card p-4 space-y-4" x-show="cur === '{{.ID}}'">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+      <div>
+        <h3 class="text-ui font-semibold text-ink">선택된 서류 작성 폼</h3>
+        <p class="text-ui-sm text-ink-muted mt-1">{{.Title}}를 기준으로 기본 정보, 단계 일정, 담당자, 문서 본문, 문서 구체 항목, 결재/검토를 작성합니다.</p>
+      </div>
+      <span class="badge badge-info">편집 가능</span>
+    </div>
+
+    <div class="grid lg:grid-cols-[1fr_18rem] gap-4">
+      <dl class="grid sm:grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-ui">
+        <dt class="text-ink-muted">서류 ID</dt><dd class="font-medium text-ink">{{.DocNo}}</dd>
+        <dt class="text-ink-muted">사업</dt><dd class="text-ink">{{.Project}}</dd>
+        <dt class="text-ink-muted">단계</dt><dd class="text-ink">{{.Stage}}</dd>
+        <dt class="text-ink-muted">담당자</dt><dd class="text-ink">{{.Owner}}</dd>
+        <dt class="text-ink-muted">제출 기한</dt><dd class="tabular-nums">{{.Due}}</dd>
+        <dt class="text-ink-muted">상태</dt><dd>
+          {{if eq .Status "작성 중"}}<span class="badge badge-warning">작성 중</span>
+          {{else if eq .Status "완료"}}<span class="badge badge-success">완료</span>
+          {{else}}<span class="badge badge-neutral">{{.Status}}</span>{{end}}
+        </dd>
+      </dl>
+      <div class="space-y-3">
+        <p class="text-ui-sm font-medium text-ink">작성 상태</p>
+        <div class="flex flex-wrap gap-1">
+          <button type="button" class="btn btn-sm" :class="statusTab==='작성 중' ? 'btn-primary' : 'btn-secondary'" @click="statusTab='작성 중'">작성 중</button>
+          <button type="button" class="btn btn-sm" :class="statusTab==='완료' ? 'btn-primary' : 'btn-secondary'" @click="statusTab='완료'">완료</button>
+          <button type="button" class="btn btn-sm" :class="statusTab==='보류' ? 'btn-primary' : 'btn-secondary'" @click="statusTab='보류'">보류</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" @click="flash='파일을 내보냈습니다.'">파일 내보내기</button>
+          <button type="button" class="btn btn-primary btn-sm" @click="flash='상태를 변경했습니다.'">+ 상태 변경</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-4">
+      <div>
+        <p class="text-ui-sm font-medium text-ink mb-2">연관 단계 일정</p>
+        <ul class="space-y-1 text-ui">
+          {{range .Milestones}}
+          <li class="flex justify-between gap-2"><span class="text-ink-muted">{{.Label}}</span><span class="tabular-nums">{{.When}}</span></li>
+          {{end}}
+        </ul>
+      </div>
+      <div>
+        <p class="text-ui-sm font-medium text-ink mb-2">담당자 및 검토</p>
+        <ul class="space-y-1 text-ui">
+          <li class="flex justify-between gap-2"><span class="text-ink-muted">작성자</span><span>{{.Writer}}</span></li>
+          <li class="flex justify-between gap-2"><span class="text-ink-muted">검토자</span><span>{{.Reviewer}}</span></li>
+          <li class="flex justify-between gap-2"><span class="text-ink-muted">승인자</span><span>{{.Approver}}</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <p class="text-ui-sm font-medium text-ink mb-2">문서 본문</p>
+      <div class="rounded-control border border-line bg-canvas px-3 py-3 text-ui space-y-2">
+        <p>{{.BodyLead}}</p>
+        <p class="text-ink-muted">{{.BodyNote}}</p>
+      </div>
+    </div>
+  </div>
+  {{end}}
+
+  {{if .Example}}
+  <div class="flex flex-col sm:flex-row sm:justify-between gap-1 text-ui-xs text-ink-subtle">
+    <p>본 화면의 수치와 서류는 화면 설계를 위한 예시이며, 실제 연동 데이터가 아닙니다.</p>
+    <p>기준일자 {{.Seed.DateLabel}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

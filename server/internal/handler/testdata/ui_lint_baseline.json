@@ -175,7 +175,7 @@
     "cdn": 0
   },
   "analysis/dashboard.html": {
-    "raw_color": 61,
+    "raw_color": 81,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -581,10 +581,45 @@
     "cdn": 0
   },
   "layout/base.html": {
-    "raw_color": 201,
+    "raw_color": 215,
     "hex": 0,
     "inline_style": 2,
     "style_tag": 1,
+    "cdn": 0
+  },
+  "leave/approval_show.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "leave/form.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "leave/inbox.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "leave/list.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "leave/show.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
     "cdn": 0
   },
   "maintenance/list.html": {
@@ -708,6 +743,27 @@
   },
   "plan/unplanned.html": {
     "raw_color": 105,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/dashboard.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/diary.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/docs.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,

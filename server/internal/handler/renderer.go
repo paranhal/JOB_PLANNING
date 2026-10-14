@@ -154,6 +154,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		dataMap["NavMail"] = cfg.MailEnabled
 		dataMap["NavSMS"] = cfg.SMSEnabled
 		dataMap["NavKakao"] = cfg.KakaoEnabled
+		dataMap["ShowProjectsSector"] = cfg.ShowProjectsSector()
 		// HideNav 는 사이드바 숨김 플래그일 뿐. 키가 있어도 로그인 값은 넣는다.
 		// /work-status 가 HideNav=false 를 넣어도 키가 있어 UserRole 이 빠지고 500 이 났다.
 		dataMap["UserName"] = ctxString(c, "user_name")

@@ -238,7 +238,8 @@ func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 		SalesID: "SL-001", Name: "2027년 충남교육청", Stage: SalesStage4Closed, CloseReason: SalesCloseContracted,
 		Status: SalesStatusContracted, CustomerID: "C041-26-001",
 		ExpectedYM: "2027-03", ExpectedAmount: 30_000_000, ContractAmount: 30_000_000, Notes: "재계약",
-		ContractedAt: "2027-03-01",
+		ContractedAt: "2027-03-01", ContractMethod: "유지보수", BillingCycle: "월정액",
+		RevenueFrom: "2027-01-01", RevenueTo: "2027-12-31", PONo: "PO-27-01",
 	}
 	if !CanPromoteSales(ok) {
 		t.Fatal("계약인데 승격이 안 열린다")
@@ -257,10 +258,10 @@ func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 	if !strings.Contains(wp.Notes, "30,000,000") || !strings.Contains(wp.Notes, "재계약") {
 		t.Fatalf("금액이 비고로 안 옮겨졌다: %q", wp.Notes)
 	}
-	if wp.ContractType != "" || wp.BillingType != "" {
-		t.Fatal("계약 유형은 승격 화면에서 처음 입력해야 한다")
+	if wp.ContractType != "유지보수" || wp.BillingType != "월정액" {
+		t.Fatalf("계약방식·청구가 안 옮겨졌다 type=%q bill=%q", wp.ContractType, wp.BillingType)
 	}
-	if wp.StartDate != "2027-03-01" {
-		t.Fatalf("시작일=%q", wp.StartDate)
+	if wp.StartDate != "2027-01-01" || wp.EndDate != "2027-12-31" || wp.ContractNo != "PO-27-01" {
+		t.Fatalf("기간·계약번호 start=%q end=%q no=%q", wp.StartDate, wp.EndDate, wp.ContractNo)
 	}
 }
