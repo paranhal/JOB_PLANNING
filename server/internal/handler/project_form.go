@@ -54,6 +54,7 @@ func ParseWorkProjectForm(c echo.Context) *model.WorkProject {
 		Color:           strings.TrimSpace(c.FormValue("color")),
 		Status:          strings.TrimSpace(c.FormValue("status")),
 		ContractNo:      strings.TrimSpace(c.FormValue("contract_no")),
+		ProjectKind:     strings.TrimSpace(c.FormValue("project_kind")),
 	}
 	if n, err := strconv.Atoi(strings.TrimSpace(strings.ReplaceAll(c.FormValue("contract_amount"), ",", ""))); err == nil {
 		p.ContractAmount = n

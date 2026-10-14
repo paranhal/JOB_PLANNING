@@ -66,6 +66,7 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 		"start_date":    {"2026-01-01"},
 		"end_date":      {"2026-12-31"},
 		"status":        {"active"},
+		"project_kind":  {"maintenance"},
 		"color":         {"#3B82F6"},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -106,6 +107,7 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 		"plan_year":  {"2026"},
 		"is_paid":    {"1"},
 		"status":     {"active"},
+		"project_kind": {"maintenance"},
 		"color":      {"#10B981"},
 	})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=updated") {
@@ -192,7 +194,7 @@ func TestProjectListNumberAndDuplicateBanner(t *testing.T) {
 	e, _, _ := newProjectServer(t)
 	for i := 0; i < 2; i++ {
 		rec := doForm(t, e, "/projects", url.Values{
-			"name": {"중복사업"}, "status": {"active"}, "is_paid": {"1"},
+			"name": {"중복사업"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"maintenance"},
 		})
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("등록 %d", rec.Code)
@@ -240,8 +242,8 @@ func TestProjectWorkMgmtFigmaLayout(t *testing.T) {
 func TestProjectMergeHTTPArchivesDrop(t *testing.T) {
 	e, repo, _ := newProjectServer(t)
 	vision := jwtCookieRole(t, model.RoleVisionAdmin)
-	keepRec := doForm(t, e, "/projects", url.Values{"name": {"남길사업"}, "status": {"active"}, "is_paid": {"1"}})
-	dropRec := doForm(t, e, "/projects", url.Values{"name": {"없앨사업"}, "status": {"active"}, "is_paid": {"1"}})
+	keepRec := doForm(t, e, "/projects", url.Values{"name": {"남길사업"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"maintenance"}})
+	dropRec := doForm(t, e, "/projects", url.Values{"name": {"없앨사업"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"maintenance"}})
 	keepID := strings.TrimPrefix(strings.Split(keepRec.Header().Get("Location"), "?")[0], "/projects/")
 	dropID := strings.TrimPrefix(strings.Split(dropRec.Header().Get("Location"), "?")[0], "/projects/")
 	form := workFormCookie(t, e, "/projects/"+keepID+"/merge", url.Values{"drop_id": {dropID}}, vision)
@@ -251,5 +253,28 @@ func TestProjectMergeHTTPArchivesDrop(t *testing.T) {
 	drop, err := repo.Get(dropID)
 	if err != nil || drop.Status != model.WBProjectArchived {
 		t.Fatalf("보관되지 않음 %+v err=%v", drop, err)
+	}
+}
+
+func TestProjectCreateRequiresKind(t *testing.T) {
+	e, _, _ := newProjectServer(t)
+	rec := doForm(t, e, "/projects", url.Values{
+		"name": {"유형없음"}, "status": {"active"}, "is_paid": {"1"},
+	})
+	if rec.Code == http.StatusSeeOther {
+		t.Fatal("유형 없이 등록되면 안 된다")
+	}
+	if !strings.Contains(rec.Body.String(), "사업 유형을 선택") {
+		t.Fatalf("안내 없음: %s", clipBody(rec.Body.String()))
+	}
+}
+
+func TestProjectWriteRejectedWhenReadOnly(t *testing.T) {
+	e, _, _ := newProjectServer(t)
+	rec := workFormCookie(t, e, "/projects", url.Values{
+		"name": {"RO"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"maintenance"},
+	}, jwtCookieReadOnly(t, model.RoleAdmin))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rec.Code)
 	}
 }

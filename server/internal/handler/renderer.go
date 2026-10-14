@@ -251,7 +251,10 @@ func funcMap() template.FuncMap {
 		"add":            func(a, b int) int { return a + b },
 		"subtract":       func(a, b int) int { return a - b },
 		"dateLabelMDW":   model.DateLabelMDW,
-		"leaveKindLabel": model.LeaveKindLabel,
+		"leaveKindLabel":     model.LeaveKindLabel,
+		"projectKindLabel":   model.ProjectKindLabel,
+		"projectDutyLabel":   model.ProjectDutyLabel,
+		"assignmentSelected": model.AssignmentSelected,
 		"hasSuffix":      strings.HasSuffix,
 		"urlquery":       url.QueryEscape,
 		"hasString": func(list interface{}, s string) bool {

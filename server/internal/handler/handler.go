@@ -187,7 +187,7 @@ func New(db *sql.DB) *Handler {
 		},
 		Project: NewProjectHandler(
 			repository.NewProjectRepo(db), repository.NewWBRepo(db),
-			customerRepo, contactRepo, codeRepo, assetRepo,
+			customerRepo, contactRepo, codeRepo, assetRepo, userRepo,
 		),
 		Sales: NewSalesHandler(
 			repository.NewSalesRepo(db), repository.NewProjectRepo(db), repository.NewWBRepo(db),

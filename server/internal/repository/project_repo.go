@@ -25,6 +25,7 @@ const projectSelect = `
 		COALESCE(p.notes,''), COALESCE(p.contact_id,''),
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
 		COALESCE(p.sales_project_id,''), COALESCE(p.contract_amount,0), COALESCE(p.contract_no,''),
+		COALESCE(p.project_kind,'maintenance'),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
 		COALESCE(sp.sales_no,'')
@@ -187,17 +188,20 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 	}
 	p.ProjectID = fmt.Sprintf("WP-%03d", id)
 	normalizeProject(p)
+	if !model.ValidProjectKind(p.ProjectKind) {
+		p.ProjectKind = model.ProjectKindMaintenance
+	}
 	_, err = r.db.Exec(`
 		INSERT INTO work_projects (
 			project_id, name, short_name, plan_year, is_paid, sort_order,
 			ordering_party_id, ordering_party, customer_id,
 			contract_type, billing_type, start_date, end_date, notes, contact_id,
-			color, status, sales_project_id, contract_amount, contract_no
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			color, status, sales_project_id, contract_amount, contract_no, project_kind
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo)
+		p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind)
 	if err != nil {
 		return err
 	}
@@ -216,12 +220,12 @@ func (r *ProjectRepo) Update(p *model.WorkProject) error {
 			name=?, short_name=?, plan_year=?, is_paid=?, sort_order=?,
 			ordering_party_id=?, ordering_party=?, customer_id=?,
 			contract_type=?, billing_type=?, start_date=?, end_date=?, notes=?, contact_id=?,
-			color=?, status=?, sales_project_id=?, contract_amount=?, contract_no=?, updated_at=CURRENT_TIMESTAMP
+			color=?, status=?, sales_project_id=?, contract_amount=?, contract_no=?, project_kind=?, updated_at=CURRENT_TIMESTAMP
 		WHERE project_id=?`,
 			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-			p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectID)
+			p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind, p.ProjectID)
 		return err
 	})
 }
@@ -244,6 +248,10 @@ func (r *ProjectRepo) Delete(id string) error {
 			return err
 		}
 		if _, err := tx.Exec(`DELETE FROM project_scope_rules WHERE project_id=?`, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM project_assignments WHERE project_id=?`, id); err != nil &&
+			!strings.Contains(strings.ToLower(err.Error()), "no such table") {
 			return err
 		}
 		if _, err := tx.Exec(`DELETE FROM work_projects WHERE project_id=?`, id); err != nil {
@@ -643,6 +651,7 @@ func normalizeProject(p *model.WorkProject) {
 	if p.Color == "" {
 		p.Color = "#3B82F6"
 	}
+	p.ProjectKind = strings.TrimSpace(p.ProjectKind)
 	if p.PlanYear == 0 && len(p.StartDate) >= 4 {
 		var y int
 		if _, err := fmt.Sscanf(p.StartDate[:4], "%d", &y); err == nil {
@@ -686,7 +695,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.ContractType, &p.BillingType,
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
-		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo,
+		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo,
 	)

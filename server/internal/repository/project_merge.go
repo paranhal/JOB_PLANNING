@@ -140,6 +140,9 @@ func (r *ProjectRepo) MergeProjects(keepID, dropID, backupName string) (string, 
 			}
 		}
 	}
+	if err := moveProjectAssignments(tx, mergeID, keepID, dropID); err != nil {
+		return "", err
+	}
 	if _, err := tx.Exec(`UPDATE work_projects SET status=?, updated_at=CURRENT_TIMESTAMP WHERE project_id=?`,
 		model.WBProjectArchived, dropID); err != nil {
 		return "", err
@@ -148,6 +151,53 @@ func (r *ProjectRepo) MergeProjects(keepID, dropID, backupName string) (string, 
 		return "", err
 	}
 	return mergeID, nil
+}
+
+func moveProjectAssignments(tx *sql.Tx, mergeID, keepID, dropID string) error {
+	rows, err := tx.Query(`SELECT id, user_id, duty FROM project_assignments WHERE project_id=?`, dropID)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return nil
+		}
+		return err
+	}
+	type row struct {
+		id         int64
+		user, duty string
+	}
+	var list []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.user, &r.duty); err != nil {
+			rows.Close()
+			return err
+		}
+		list = append(list, r)
+	}
+	rows.Close()
+	for _, r := range list {
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM project_assignments WHERE project_id=? AND user_id=? AND duty=?`,
+			keepID, r.user, r.duty).Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			if _, err := tx.Exec(`DELETE FROM project_assignments WHERE id=?`, r.id); err != nil {
+				return err
+			}
+			continue
+		}
+		pk := fmt.Sprintf("%d", r.id)
+		if _, err := tx.Exec(`
+			INSERT INTO project_merge_moves (merge_id, table_name, pk, old_project_id, new_project_id)
+			VALUES (?,?,?,?,?)`, mergeID, "project_assignments", pk, dropID, keepID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE project_assignments SET project_id=? WHERE id=?`, keepID, r.id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ProjectRepo) LatestMergeFor(keepID, dropID string) (string, error) {
@@ -200,6 +250,7 @@ func (r *ProjectRepo) UndoMerge(mergeID string) error {
 	pkCol := map[string]string{
 		"as_receipts": "as_id", "maintenance_visits": "visit_id",
 		"work_tasks": "task_id", "assets": "asset_id", "weekly_report_rows": "row_key",
+		"project_assignments": "id",
 	}
 	for _, m := range moves {
 		col := pkCol[m.table]

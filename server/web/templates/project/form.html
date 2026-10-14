@@ -42,6 +42,15 @@
           <input type="number" name="plan_year" value="{{if .Project.PlanYear}}{{.Project.PlanYear}}{{end}}" min="2000" max="2100" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">사업 유형 {{if not .FromSales}}<span class="text-red-500">*</span>{{end}}</label>
+          <select name="project_kind" class="w-full border rounded-lg px-3 py-2 text-sm" {{if not .FromSales}}required{{end}}>
+            <option value="">— 선택 —</option>
+            {{range .KindOptions}}
+            <option value="{{.Value}}" {{if eq $.Project.ProjectKind .Value}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">유상/무상</label>
           <select name="is_paid" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="1" {{if .Project.IsPaid}}selected{{end}}>유상</option>
@@ -126,6 +135,24 @@
       </div>
       <input type="hidden" name="color" value="{{if .Project.Color}}{{.Project.Color}}{{else}}#3B82F6{{end}}">
       <input type="hidden" name="contact_id" value="{{.Project.ContactID}}">
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+      <h3 class="font-semibold text-gray-800">사업 담당자</h3>
+      <p class="text-xs text-gray-500">한 사람이 여러 역할을 맡을 수 있습니다. 같은 역할에 여러 명도 가능합니다.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {{range .DutyOptions}}
+        {{$duty := .Value}}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{.Label}}</label>
+          <select name="assign_{{$duty}}" multiple class="w-full border rounded-lg px-3 py-2 text-sm min-h-[6rem]">
+            {{range $.AssignableUsers}}
+            <option value="{{.UserID}}" {{if assignmentSelected $.Assignments $duty .UserID}}selected{{end}}>{{.FullName}}</option>
+            {{end}}
+          </select>
+        </div>
+        {{end}}
+      </div>
     </div>
 
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">

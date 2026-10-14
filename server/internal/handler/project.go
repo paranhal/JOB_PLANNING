@@ -24,6 +24,7 @@ type ProjectHandler struct {
 	codeRepo     *repository.CodeRepo
 	assetRepo    *repository.AssetRepo
 	salesRepo    *repository.SalesRepo
+	userRepo     *repository.UserRepo
 	backup       backup.Config
 }
 
@@ -34,11 +35,12 @@ func NewProjectHandler(
 	contactRepo *repository.ContactRepo,
 	codeRepo *repository.CodeRepo,
 	assetRepo *repository.AssetRepo,
+	userRepo *repository.UserRepo,
 ) *ProjectHandler {
 	return &ProjectHandler{
 		repo: repo, wbRepo: wbRepo,
 		customerRepo: customerRepo, contactRepo: contactRepo, codeRepo: codeRepo,
-		assetRepo: assetRepo,
+		assetRepo: assetRepo, userRepo: userRepo,
 	}
 }
 
@@ -69,15 +71,15 @@ func (h *ProjectHandler) List(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	return c.Render(http.StatusOK, "project/list.html", map[string]interface{}{
-		"Title":        "사업·업무관리",
-		"Active":       NavProjects,
-		"WorkSeed":     workMgmtSeed{},
-		"Example":      false,
-		"ReportURL":    "/projects/diary",
-		"RegisterURL":  "/workboard/register",
-		"DocsURL":      "/projects/docs",
-		"RegistryURL":  "/projects/registry",
-		"CanWrite":     canWriteProjects(c),
+		"Title":       "사업·업무관리",
+		"Active":      NavProjects,
+		"WorkSeed":    workMgmtSeed{},
+		"Example":     false,
+		"ReportURL":   "/projects/diary",
+		"RegisterURL": "/workboard/register",
+		"DocsURL":     "/projects/docs",
+		"RegistryURL": "/projects/registry",
+		"CanWrite":    canWriteProjects(c),
 	})
 }
 
@@ -164,11 +166,17 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, false, "사업명을 입력하세요.")
 	}
+	if !model.ValidProjectKind(p.ProjectKind) {
+		return h.renderForm(c, p, rules, false, "사업 유형을 선택하세요.")
+	}
 	if err := h.repo.Create(p); err != nil {
 		return err
 	}
 	if err := h.repo.ReplaceRules(p.ProjectID, rules); err != nil {
 		return err
+	}
+	if err := h.saveAssignments(c, p.ProjectID); err != nil {
+		return h.renderForm(c, p, rules, false, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=created")
 }
@@ -187,6 +195,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	taskRows, taskTotal, _ := h.repo.MatchAdminTasks(id, 20)
 	assetTotal, _ := h.assetRepo.CountByProject(id)
 	p.ASCount, p.MntCount, p.TaskCount, p.AssetCount = asTotal, mntTotal, taskTotal, assetTotal
+	assigns, _ := h.repo.ListAssignments(id)
 	salesMissing := false
 	if sid := strings.TrimSpace(p.SalesProjectID); sid != "" && h.salesRepo != nil {
 		if _, err := h.salesRepo.Get(sid); err != nil {
@@ -196,7 +205,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
-		"Project": p, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
+		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
 		"CanWrite":     canWriteProjects(c),
 		"CanDelete":    canDeleteProjects(c),
 		"CanMerge":     currentRole(c) == model.RoleVisionAdmin,
@@ -231,11 +240,17 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
 	}
+	if !model.ValidProjectKind(p.ProjectKind) {
+		return h.renderForm(c, p, rules, true, "사업 유형을 선택하세요.")
+	}
 	if err := h.repo.Update(p); err != nil {
 		return err
 	}
 	if err := h.repo.ReplaceRules(p.ProjectID, rules); err != nil {
 		return err
+	}
+	if err := h.saveAssignments(c, p.ProjectID); err != nil {
+		return h.renderForm(c, p, rules, true, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=updated")
 }
@@ -356,11 +371,19 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 		})
 	}
 	rulesJSON, _ := json.Marshal(jsRules)
+	assigns := parseAssignmentForm(c)
+	if len(assigns) == 0 && isEdit && p != nil && p.ProjectID != "" {
+		assigns, _ = h.repo.ListAssignments(p.ProjectID)
+	}
 	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
 		"Title": title, "Active": NavProjects,
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": isEdit,
 		"Customers": customers, "Parents": parents,
-		"ContractTypes": contractTypes, "BillingTypes": billingTypes,
+		"AssignableUsers": h.assignableUsers(c),
+		"Assignments":     assigns,
+		"DutyOptions":     model.ProjectDutyOptions(),
+		"KindOptions":     model.ProjectKindOptions(),
+		"ContractTypes":   contractTypes, "BillingTypes": billingTypes,
 		"ProductKeys": []map[string]string{
 			{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
 			{"Key": model.ProductKeySejongKLAS, "Label": model.ProductKeyLabel(model.ProductKeySejongKLAS)},
@@ -437,6 +460,50 @@ func parseScopeRules(c echo.Context) []model.ProjectScopeRule {
 			WorkKinds:        kind,
 			Notes:            note,
 		})
+	}
+	return out
+}
+
+func parseAssignmentForm(c echo.Context) []model.ProjectAssignment {
+	_ = c.Request().ParseForm()
+	var out []model.ProjectAssignment
+	for _, d := range model.ProjectDutyOptions() {
+		for _, uid := range c.Request().Form["assign_"+d.Value] {
+			uid = strings.TrimSpace(uid)
+			if uid == "" {
+				continue
+			}
+			out = append(out, model.ProjectAssignment{UserID: uid, Duty: d.Value})
+		}
+	}
+	return out
+}
+
+func (h *ProjectHandler) saveAssignments(c echo.Context, projectID string) error {
+	if h == nil || h.repo == nil {
+		return nil
+	}
+	return h.repo.ReplaceAssignments(projectID, ctxString(c, "user_id"), parseAssignmentForm(c))
+}
+
+func (h *ProjectHandler) assignableUsers(c echo.Context) []model.User {
+	if h == nil || h.userRepo == nil {
+		return nil
+	}
+	list, err := h.userRepo.ListAssignable()
+	if err != nil {
+		return nil
+	}
+	org := currentOrg(c)
+	var out []model.User
+	for _, u := range list {
+		if u.IsDeleted() || !u.IsActive {
+			continue
+		}
+		if org != "" && org != repository.OrgAll && strings.TrimSpace(u.OrgID) != "" && u.OrgID != org {
+			continue
+		}
+		out = append(out, u)
 	}
 	return out
 }

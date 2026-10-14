@@ -8,6 +8,7 @@
       <h2 class="text-xl font-bold text-gray-800 mt-1">{{.Project.Name}}</h2>
       <p class="text-xs font-mono text-gray-400 mt-0.5">{{.Project.ProjectID}}</p>
       <p class="text-sm text-gray-500 mt-0.5 flex flex-wrap gap-2 items-center">
+        <span>{{projectKindLabel .Project.ProjectKind}}</span>
         {{if .Project.PlanYear}}<span>{{.Project.PlanYear}}년</span>{{end}}
         {{if .Project.IsPaid}}
         <span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700">유상</span>
@@ -63,7 +64,13 @@
     <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5 space-y-3">
       <h3 class="font-semibold text-gray-800">기본 정보</h3>
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div><dt class="text-gray-500">사업 유형</dt><dd class="text-gray-800">{{projectKindLabel .Project.ProjectKind}}</dd></div>
         <div><dt class="text-gray-500">짧은 이름</dt><dd class="text-gray-800">{{if .Project.ShortName}}{{.Project.ShortName}}{{else}}—{{end}}</dd></div>
+        <div class="sm:col-span-2"><dt class="text-gray-500">담당자</dt><dd class="text-gray-800">
+          {{if .Assignments}}
+            {{range .Assignments}}<span class="mr-3">{{projectDutyLabel .Duty}} {{.UserName}}</span>{{end}}
+          {{else}}—{{end}}
+        </dd></div>
         <div><dt class="text-gray-500">발주처</dt><dd class="text-gray-800">{{.Project.OrderingPartyLabel}}</dd></div>
         <div><dt class="text-gray-500">고객</dt><dd class="text-gray-800">{{if .Project.CustomerName}}{{.Project.CustomerName}}{{else}}—{{end}}</dd></div>
         <div><dt class="text-gray-500">계약/청구</dt><dd class="text-gray-800">{{if .Project.ContractType}}{{.Project.ContractType}}{{else}}—{{end}} / {{if .Project.BillingType}}{{.Project.BillingType}}{{else}}—{{end}}</dd></div>

@@ -115,7 +115,11 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 		draft.ContractType, draft.BillingType = proj.ContractType, proj.BillingType
 		draft.StartDate, draft.EndDate = proj.StartDate, proj.EndDate
 		draft.IsPaid, draft.Notes = proj.IsPaid, proj.Notes
+		draft.ProjectKind = proj.ProjectKind
 		return h.renderPromoteProjectForm(c, p, draft, rules, "사업명을 입력하세요.")
+	}
+	if !model.ValidProjectKind(proj.ProjectKind) {
+		proj.ProjectKind = model.ProjectKindMaintenance
 	}
 	if strings.TrimSpace(proj.CustomerID) == "" {
 		proj.CustomerID = p.CustomerID
@@ -135,6 +139,9 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 	}
 	if err := h.projectRepo.ReplaceRules(proj.ProjectID, rules); err != nil {
 		return err
+	}
+	if err := h.projectRepo.ReplaceAssignments(proj.ProjectID, ctxString(c, "user_id"), parseAssignmentForm(c)); err != nil {
+		return h.renderPromoteProjectForm(c, p, proj, rules, err.Error())
 	}
 	if err := h.repo.MarkPromoted(p.SalesID); err != nil {
 		return err
@@ -208,7 +215,11 @@ func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesPr
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": false,
 		"FromSales": true, "SalesID": s.SalesID, "SalesAmount": s.AmountLabel(),
 		"Customers": customers, "Parents": parents,
-		"ContractTypes": contractTypes, "BillingTypes": billingTypes,
+		"AssignableUsers": h.promoteAssignableUsers(c),
+		"Assignments":     parseAssignmentForm(c),
+		"DutyOptions":     model.ProjectDutyOptions(),
+		"KindOptions":     model.ProjectKindOptions(),
+		"ContractTypes":   contractTypes, "BillingTypes": billingTypes,
 		"ProductKeys": []map[string]string{
 			{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
 			{"Key": model.ProductKeySejongKLAS, "Label": model.ProductKeyLabel(model.ProductKeySejongKLAS)},
@@ -222,4 +233,12 @@ func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesPr
 		"FormError": errMsg,
 		"CanWrite":  true,
 	})
+}
+
+func (h *SalesHandler) promoteAssignableUsers(c echo.Context) []model.User {
+	if h == nil || h.userRepo == nil {
+		return nil
+	}
+	ph := &ProjectHandler{userRepo: h.userRepo}
+	return ph.assignableUsers(c)
 }
