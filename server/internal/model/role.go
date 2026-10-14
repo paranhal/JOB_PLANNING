@@ -66,6 +66,10 @@ const (
 	PermDataEdit       = "data.edit"
 	PermDataDelete     = "data.delete"
 	PermApprovalAdmin  = "approval.admin"
+	PermSelfLeave      = "self.leave"
+	PermSelfApproval   = "self.approval"
+	PermLeaveTeamView  = "leave.team_view"
+	PermLeaveAdmin     = "leave.admin"
 
 	// 옛 9키. hasPerm·화면 호환. 새 키로 읽는다.
 	PermASReceive       = "as_receive"
@@ -106,6 +110,8 @@ var AllPermissions = []PermDef{
 	{PermCodesView, "코드 조회"}, {PermCodesCreate, "코드 등록"}, {PermCodesEdit, "코드 수정"}, {PermCodesDelete, "코드 삭제"},
 	{PermDataView, "데이터 조회"}, {PermDataCreate, "데이터 등록"}, {PermDataEdit, "데이터 수정"}, {PermDataDelete, "데이터 삭제"},
 	{PermApprovalAdmin, "결재 설정"},
+	{PermSelfLeave, "내 휴가"}, {PermSelfApproval, "내 결재"},
+	{PermLeaveTeamView, "팀 휴가 조회"}, {PermLeaveAdmin, "휴가 관리"},
 }
 
 func CanonicalPerm(key string) string {
@@ -293,6 +299,8 @@ func PermissionGroups() []PermGroup {
 		{"codes.", "코드"},
 		{"data.", "데이터"},
 		{"approval.", "결재"},
+		{"self.", "셀프서비스"},
+		{"leave.", "휴가"},
 	}
 	idx := make([]g, len(order))
 	for i, o := range order {
@@ -483,6 +491,12 @@ func DefaultPermissions(role string) []string {
 }
 
 func defaultAccess(role, key string) Access {
+	if key == PermSelfLeave || key == PermSelfApproval {
+		if role == RoleTester || role == "" {
+			return AccessNone
+		}
+		return AccessOwn
+	}
 	switch role {
 	case RoleOrgAdmin:
 		switch {
@@ -500,6 +514,9 @@ func defaultAccess(role, key string) Access {
 		}
 		return AccessFull
 	case RoleTech:
+		if key == PermLeaveTeamView {
+			return AccessNone
+		}
 		return techAccess(key)
 	case RoleSales:
 		return salesAccess(key)

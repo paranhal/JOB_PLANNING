@@ -146,6 +146,20 @@ func TestCompactStoredPermissionsMatchesDefaultEmpty(t *testing.T) {
 	}
 }
 
+func TestSelfLeaveOnAllRoles(t *testing.T) {
+	for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales, RoleObserver} {
+		if PermAccess(role, PermSelfLeave) < AccessOwn {
+			t.Fatalf("%s self.leave", role)
+		}
+		if PermAccess(role, PermSelfApproval) < AccessOwn {
+			t.Fatalf("%s self.approval", role)
+		}
+	}
+	if PermAccess(RoleTester, PermSelfLeave) != AccessNone {
+		t.Fatal("tester")
+	}
+}
+
 func TestPermissionGroupsCoverAllKeys(t *testing.T) {
 	seen := map[string]bool{}
 	n := 0
