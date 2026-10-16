@@ -99,6 +99,8 @@ type SalesListFilter struct {
 	ExpectedTo       string
 	GroupID          string
 	OrgID            string
+	PersonName       string
+	PersonUserID     string
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
@@ -184,6 +186,7 @@ func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) 
 		q += ` AND (s.sales_owner=? OR s.sales_owner_id=?)`
 		args = append(args, s, s)
 	}
+	q, args = appendSalesPersonSQL(q, args, "s", f.PersonName, f.PersonUserID)
 	if s := strings.TrimSpace(f.Customer); s != "" {
 		like := "%" + s + "%"
 		q += ` AND (COALESCE(s.prospect_name,'') LIKE ? OR COALESCE(cu.org_name,'') LIKE ?)`

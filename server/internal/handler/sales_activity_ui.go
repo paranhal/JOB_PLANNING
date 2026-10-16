@@ -85,12 +85,19 @@ func salesActivityKanbanColumns(acts []model.SalesActivity, group string, types 
 }
 
 func salesActLogQuery(month, q string, types []string) string {
+	return salesActLogQueryOwner(month, q, types, "")
+}
+
+func salesActLogQueryOwner(month, q string, types []string, owner string) string {
 	v := url.Values{}
 	if month != "" {
 		v.Set("month", month)
 	}
 	if q != "" {
 		v.Set("q", q)
+	}
+	if strings.TrimSpace(owner) != "" {
+		v.Set("owner", owner)
 	}
 	for _, t := range types {
 		v.Add("type", t)
@@ -147,15 +154,22 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	if allPeriod {
 		filterMonth = ""
 	}
-	chipActs, err := h.repo.ListActivitiesFilter(repository.SalesActivityFilter{Month: filterMonth, Query: q})
+	baseF := visibleActivityFilter(c)
+	baseF.Query = q
+	chipF := baseF
+	chipF.Month = filterMonth
+	chipActs, err := h.repo.ListActivitiesFilter(chipF)
 	if err != nil {
 		return nil, err
 	}
-	acts, err := h.repo.ListActivitiesFilter(repository.SalesActivityFilter{Month: filterMonth, Query: q, Types: sel})
+	actF := chipF
+	actF.Types = sel
+	acts, err := h.repo.ListActivitiesFilter(actF)
 	if err != nil {
 		return nil, err
 	}
-	allActs, err := h.repo.ListActivitiesFilter(repository.SalesActivityFilter{Query: q})
+	allF := baseF
+	allActs, err := h.repo.ListActivitiesFilter(allF)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +182,7 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	if allPeriod {
 		chipMonth = "all"
 	}
+	owner := SalesVisibilityScope(c).Owner
 	for _, code := range model.SalesActivityChipCodes() {
 		label := code
 		for _, t := range types {
@@ -181,21 +196,22 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 			Label:    label,
 			Count:    counts[code],
 			Selected: containsStr(sel, code),
-			Href:     "/sales/activities?" + salesActLogQuery(chipMonth, q, toggleTypeFilter(sel, code)),
+			Href:     "/sales/activities?" + salesActLogQueryOwner(chipMonth, q, toggleTypeFilter(sel, code), owner),
 		})
 	}
 	groups := model.GroupSalesActivitiesByDate(acts)
 	decorateActivityDayGroups(groups)
-	projects, _ := h.repo.List("", model.SalesStatusActive, "")
+	optF := repository.SalesListFilter{Status: model.SalesStatusActive}
+	applySalesVisibilityToList(c, &optF)
+	projects, _ := h.repo.ListFilter(optF)
 	var users []model.User
 	if h.userRepo != nil {
 		users, _ = h.userRepo.ListAssignable()
 	}
-	typeQ := salesActLogQuery("", q, sel)
+	typeQ := salesActLogQueryOwner("", q, sel, owner)
 	if typeQ != "" {
 		typeQ = "&" + typeQ
 	}
-	logQuery := salesActLogQuery(chipMonth, q, sel)
 	hasAny := len(allActs) > 0
 	showHeaderAdd := canWriteSales(c) && hasAny
 	data := map[string]interface{}{
@@ -213,8 +229,8 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"HasAnyActivity":  hasAny,
 		"ShowHeaderAdd":   showHeaderAdd,
 		"MonthEmptyLabel": salesMonthEmptyLabel(month),
-		"AllPeriodHref":   "/sales/activities?" + salesActLogQuery("all", q, sel),
-		"LogQuery":        logQuery,
+		"AllPeriodHref":   "/sales/activities?" + salesActLogQueryOwner("all", q, sel, owner),
+		"LogQuery":        salesActLogQueryOwner(chipMonth, q, sel, owner),
 		"TypeQuery":       typeQ,
 		"ActivityTypes":   types,
 		"SalesOptions":    projects,
@@ -226,6 +242,8 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"FixedSalesID":    "",
 		"DefaultOwner":    ctxString(c, "user_name"),
 		"Users":           users,
+		"ShowOwnerFilter": SalesVisibilityScope(c).ShowOwnerFilter,
+		"Owner":           SalesVisibilityScope(c).Owner,
 		"PartyHints":      []string{},
 		"ActGroup":        salesActGroup(c.QueryParam("group")),
 		"KanbanDrop":      "act",

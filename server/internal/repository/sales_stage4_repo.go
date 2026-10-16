@@ -369,6 +369,10 @@ func (r *SalesRepo) CountHiddenClosed(f SalesListFilter) (int, error) {
 }
 
 func (r *SalesRepo) ListMigratedUnchecked() ([]model.SalesProject, error) {
+	return r.ListMigratedUncheckedOrg(OrgAll)
+}
+
+func (r *SalesRepo) ListMigratedUncheckedOrg(orgID string) ([]model.SalesProject, error) {
 	q := salesSelect + `
 		WHERE s.stage=? AND s.bid_status=?
 		  AND EXISTS (
@@ -378,9 +382,12 @@ func (r *SalesRepo) ListMigratedUnchecked() ([]model.SalesProject, error) {
 		  AND NOT EXISTS (
 			SELECT 1 FROM sales_stage_history h2
 			WHERE h2.sales_id=s.sales_id AND h2.detail='migrated_checked'
-		  )
+		  )`
+	args := []interface{}{model.SalesStage4Bid, model.SalesBidPending, model.SalesStage4Bid}
+	q, args = appendOrg(q, args, "s", orgIDOrAll(orgID))
+	q += `
 		ORDER BY s.updated_at DESC`
-	rows, err := r.db.Query(q, model.SalesStage4Bid, model.SalesBidPending, model.SalesStage4Bid)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

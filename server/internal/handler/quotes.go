@@ -74,13 +74,12 @@ func (h *QuotesHandler) List(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
 	}
-	f := repository.QuoteFilter{
+	f := visibleQuoteFilter(c, repository.QuoteFilter{
 		Search:  strings.TrimSpace(c.QueryParam("search")),
 		Status:  strings.TrimSpace(c.QueryParam("status")),
 		SalesID: strings.TrimSpace(c.QueryParam("sales_id")),
 		Purpose: strings.TrimSpace(c.QueryParam("purpose")),
-		OrgID:   currentOrg(c),
-	}
+	})
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
 	items, err := h.repo.List(f)
 	if err != nil {

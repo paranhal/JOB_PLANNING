@@ -22,6 +22,7 @@
     <input type="text" name="customer" value="{{.Customer}}" placeholder="고객·가칭"
            class="w-full border rounded-lg px-3 py-2 text-sm">
   </div>
+  {{if .ShowOwnerFilter}}
   <div>
     <label class="block text-xs text-gray-500 mb-1">영업담당</label>
     <select name="owner" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
@@ -31,6 +32,7 @@
       {{end}}
     </select>
   </div>
+  {{end}}
   <div>
     <label class="block text-xs text-gray-500 mb-1">사업 시기</label>
     <select name="period" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">

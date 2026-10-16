@@ -82,15 +82,28 @@ func reindexSalesActivitySearch(db *sql.DB, activityID string) {
 }
 
 type SalesActivityFilter struct {
-	Month  string
-	Types  []string
-	Query  string
-	Member string // 참여한 사람 정확 일치. 40-F
+	Month        string
+	Day          string
+	Types        []string
+	Query        string
+	Member       string // 참여한 사람 정확 일치. 40-F
+	OrgID        string
+	PersonName   string
+	PersonUserID string
 }
 
 func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesActivity, error) {
 	q := salesActivitySelect + ` WHERE 1=1`
 	var args []interface{}
+	if strings.TrimSpace(f.OrgID) == "" {
+		f.OrgID = OrgAll
+	}
+	q, args = appendOrg(q, args, "s", f.OrgID)
+	q, args = appendActivityPersonSQL(q, args, f.PersonName, f.PersonUserID)
+	if d := strings.TrimSpace(f.Day); d != "" {
+		q += ` AND a.activity_date=?`
+		args = append(args, d)
+	}
 	if m := strings.TrimSpace(f.Month); len(m) >= 7 {
 		q += ` AND a.activity_date >= ? AND a.activity_date < date(?, '+1 month')`
 		args = append(args, m+"-01", m+"-01")

@@ -23,6 +23,16 @@
         {{if ne .Month "all"}}
         <input type="month" name="month" value="{{.Month}}" class="border rounded-lg px-2 py-1.5 text-sm" onchange="this.form.submit()">
         {{end}}
+        {{if .ShowOwnerFilter}}
+        <select name="owner" class="border rounded-lg px-2 py-1.5 text-sm bg-white" onchange="this.form.submit()">
+          <option value="">담당자 전체</option>
+          {{range .Users}}
+          {{if or (eq .Role "sales") (eq .Role "org_admin")}}
+          <option value="{{.FullName}}" {{if eq $.Owner .FullName}}selected{{end}}>{{.FullName}}</option>
+          {{end}}
+          {{end}}
+        </select>
+        {{end}}
       </form>
       {{end}}
       <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
@@ -46,14 +56,15 @@
   </div>
 
   {{if eq .View "day"}}
-  {{if .Assignees}}
+  {{if and .ShowOwnerFilter .Assignees}}
   <form method="get" action="/sales/activities" class="flex flex-wrap items-center gap-2 text-xs">
     <input type="hidden" name="date" value="{{.Date}}">
+    <input type="hidden" name="view" value="day">
     <span class="text-gray-500">담당자</span>
-    <a href="/sales/activities?date={{.Date}}" class="px-2 py-1 rounded border {{if eq .AssigneeFilter ""}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">전체</a>
+    <a href="/sales/activities?view=day&date={{.Date}}" class="px-2 py-1 rounded border {{if eq .AssigneeFilter ""}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">전체</a>
     {{range .Assignees}}
     {{if eq .Role "sales"}}
-    <a href="/sales/activities?date={{$.Date}}&assignee={{.FullName}}" class="px-2 py-1 rounded border {{if eq $.AssigneeFilter .FullName}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">{{.FullName}}</a>
+    <a href="/sales/activities?view=day&date={{$.Date}}&assignee={{.FullName}}" class="px-2 py-1 rounded border {{if eq $.AssigneeFilter .FullName}}border-orange-400 bg-orange-50 text-orange-800{{else}}border-gray-200 bg-white{{end}}">{{.FullName}}</a>
     {{end}}
     {{end}}
   </form>

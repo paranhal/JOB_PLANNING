@@ -47,6 +47,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	f := salesListFilterFromRequest(c)
+	applySalesVisibilityToList(c, &f)
 	view := salesListView(c.QueryParam("display"), c.QueryParam("view"))
 	items, err := h.repo.ListFilter(f)
 	if err != nil {
@@ -124,6 +125,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"PeriodOptions": salesPeriodOptions(time.Now()),
 		"Users":         users,
 		"FilterAction":  "/sales",
+		"ShowOwnerFilter": SalesVisibilityScope(c).ShowOwnerFilter,
 		"CanWrite":      canWriteSales(c),
 		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"FormError":           querySalesErr(c.QueryParam("err")),
@@ -143,7 +145,9 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	ym := now.Format("2006-01")
-	items, err := h.repo.List("", model.SalesStatusActive, "")
+	listF := repository.SalesListFilter{Status: model.SalesStatusActive}
+	applySalesVisibilityToList(c, &listF)
+	items, err := h.repo.ListFilter(listF)
 	if err != nil {
 		return err
 	}
@@ -153,12 +157,14 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 	}
 	quotes, _ := h.repo.QuotesBySalesIDs(ids)
 	model.ApplySalesPipelineAmounts(items, quotes)
-	pipe, err := h.repo.Pipeline(now, nil)
+	pipe, err := h.repo.PipelineFilter(now, nil, listF)
 	if err != nil {
 		return err
 	}
 	stages, _ := h.repo.Stages()
-	acts, _ := h.repo.ListActivitiesByDate(today)
+	actF := visibleActivityFilter(c)
+	actF.Day = today
+	acts, _ := h.repo.ListActivitiesFilter(actF)
 	types, _ := h.repo.ActivityTypes()
 	nextBy, _ := h.repo.LatestNextBySales()
 	rows := model.BuildSalesDashRows(items, stages, nextBy, 8)
@@ -168,10 +174,14 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 			maxAmt = st.Amount
 		}
 	}
-	migrated, _ := h.repo.ListMigratedUnchecked()
-	closed, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true, OrgID: currentOrg(c)})
+	migrated, _ := h.repo.ListMigratedUncheckedOrg(listF.OrgID)
+	closedF := repository.SalesListFilter{IncludeClosed: true}
+	applySalesVisibilityToList(c, &closedF)
+	closed, _ := h.repo.ListFilter(closedF)
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	dormant, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeDormant: true, Status: model.SalesStatusDormant, OrgID: currentOrg(c)})
+	dormantF := repository.SalesListFilter{IncludeDormant: true, Status: model.SalesStatusDormant}
+	applySalesVisibilityToList(c, &dormantF)
+	dormant, _ := h.repo.ListFilter(dormantF)
 	dQuotes, _ := h.repo.QuotesBySalesIDs(func() []string {
 		ids := make([]string, 0, len(dormant))
 		for i := range dormant {
@@ -502,7 +512,9 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 			return err
 		}
 		if pageView == "project" {
-			projects, _ := h.repo.ListFilter(repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true, OrgID: currentOrg(c)})
+			projF := repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true}
+			applySalesVisibilityToList(c, &projF)
+			projects, _ := h.repo.ListFilter(projF)
 			acts, _ := data["Activities"].([]model.SalesActivity)
 			if acts == nil {
 				if groups, ok := data["DayGroups"].([]model.SalesActivityDayGroup); ok {
@@ -527,6 +539,10 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 		date = time.Now().Format("2006-01-02")
 	}
 	assigneeFilter := strings.TrimSpace(c.QueryParam("assignee"))
+	vis := SalesVisibilityScope(c)
+	if vis.MineOnly && assigneeFilter == "" {
+		assigneeFilter = vis.UserName
+	}
 	view := pageView
 	group := salesActGroup(c.QueryParam("group"))
 	base, err := time.Parse("2006-01-02", date)
@@ -605,15 +621,17 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 	var kanbanCols []model.KanbanColumn
 	if view == "kanban" {
 		var acts []model.SalesActivity
+		af := visibleActivityFilter(c)
 		if c.QueryParam("scope") == "day" {
-			acts, _ = h.repo.ListActivitiesByDate(date)
-		} else {
-			acts, _ = h.repo.ListAllActivities()
+			af.Day = date
 		}
+		acts, _ = h.repo.ListActivitiesFilter(af)
 		actCols = salesActivityKanban(acts, group, actTypes, stages)
 		kanbanCols = salesActivityKanbanColumns(acts, group, actTypes, stages)
 	}
-	projects, _ := h.repo.List("", model.SalesStatusActive, "")
+	optF := repository.SalesListFilter{Status: model.SalesStatusActive}
+	applySalesVisibilityToList(c, &optF)
+	projects, _ := h.repo.ListFilter(optF)
 
 	return c.Render(http.StatusOK, "sales/activities.html", map[string]interface{}{
 		"Title":           "영업 활동",
@@ -629,6 +647,7 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 		"AssigneeColMin":  registerAssigneeColMinPx,
 		"Assignees":       users,
 		"AssigneeFilter":  assigneeFilter,
+		"ShowOwnerFilter": vis.ShowOwnerFilter,
 		"FilterQ":         filterQ,
 		"CanWrite":        canWriteSales(c),
 		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),

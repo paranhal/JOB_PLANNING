@@ -70,21 +70,7 @@ func (r *SalesRepo) ListActivities(salesID string) ([]model.SalesActivity, error
 }
 
 func (r *SalesRepo) ListActivitiesByDate(date string) ([]model.SalesActivity, error) {
-	date = strings.TrimSpace(date)
-	if date == "" {
-		return nil, nil
-	}
-	rows, err := r.db.Query(salesActivitySelect+`
-		WHERE a.activity_date=?
-		ORDER BY COALESCE(NULLIF(a.start_time,''),'99:99'), a.title`, date)
-	if err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer rows.Close()
-	return r.scanActivityRows(rows)
+	return r.ListActivitiesFilter(SalesActivityFilter{Day: strings.TrimSpace(date)})
 }
 
 func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, linkTask *model.WorkTask) error {

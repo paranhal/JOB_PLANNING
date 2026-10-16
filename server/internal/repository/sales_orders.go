@@ -29,13 +29,18 @@ const salesOrderSelect = `
 	FROM sales_orders`
 
 type OrderFilter struct {
-	Search string
-	Status string
+	Search       string
+	Status       string
+	OrgID        string
+	PersonName   string
+	PersonUserID string
 }
 
 func (r *OrderRepo) List(f OrderFilter) ([]model.SalesOrder, error) {
 	q := salesOrderSelect + ` WHERE 1=1`
 	var args []interface{}
+	q, args = appendOrderOrgSQL(q, args, f.OrgID)
+	q, args = appendOrderPersonSQL(q, args, f.PersonName, f.PersonUserID)
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
 		q += ` AND (order_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ? OR COALESCE(po_no,'') LIKE ?

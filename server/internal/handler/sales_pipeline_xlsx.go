@@ -87,6 +87,7 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 		"BizType": f.BizType, "BizTypes": bizTypes, "BudgetYear": f.BudgetYear, "BudgetStatus": f.BudgetStatus, "BudgetStatuses": budgetSt,
 		"GroupID": f.GroupID, "Groups": groups, "Users": users, "PeriodOptions": salesPeriodOptions(now),
 		"Stages":   stages,
+		"ShowOwnerFilter": SalesVisibilityScope(c).ShowOwnerFilter,
 		"CanWrite": canWriteSales(c), "Forecast": fc, "Rows": rows,
 		"Basis": opts.Basis, "From": opts.From, "To": opts.To, "GroupBy": opts.Group, "Cell": opts.Cell,
 		"Spread": opts.Spread, "ShowAllYM": showAll, "BasisLabel": model.ForecastBasisLabel(opts.Basis),
@@ -99,6 +100,7 @@ func (h *SalesHandler) PipelineXLSX(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	f := salesListFilterFromRequest(c)
+	applySalesVisibilityToList(c, &f)
 	items, err := h.repo.ListFilter(f)
 	if err != nil {
 		return err

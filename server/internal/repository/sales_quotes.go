@@ -39,11 +39,13 @@ const salesQuoteSelect = `
 	FROM sales_quotes`
 
 type QuoteFilter struct {
-	Search  string
-	Status  string
-	SalesID string
-	Purpose string
-	OrgID   string
+	Search       string
+	Status       string
+	SalesID      string
+	Purpose      string
+	OrgID        string
+	PersonName   string
+	PersonUserID string
 }
 
 func (r *QuoteRepo) List(f QuoteFilter) ([]model.SalesQuote, error) {
@@ -53,6 +55,7 @@ func (r *QuoteRepo) List(f QuoteFilter) ([]model.SalesQuote, error) {
 	q := salesQuoteSelect + ` WHERE 1=1`
 	var args []interface{}
 	q, args = appendOrg(q, args, "sales_quotes", f.OrgID)
+	q, args = appendQuotePersonSQL(q, args, f.PersonName, f.PersonUserID)
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + s + "%"
 		q += ` AND (quote_no LIKE ? OR COALESCE(title,'') LIKE ? OR COALESCE(recipient_name,'') LIKE ?

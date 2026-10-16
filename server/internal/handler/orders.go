@@ -33,10 +33,10 @@ func (h *OrdersHandler) List(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
 	}
-	f := repository.OrderFilter{
+	f := visibleOrderFilter(c, repository.OrderFilter{
 		Search: strings.TrimSpace(c.QueryParam("search")),
 		Status: strings.TrimSpace(c.QueryParam("status")),
-	}
+	})
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
 	items, err := h.repo.List(f)
 	if err != nil {

@@ -55,7 +55,9 @@ func (r *SalesRepo) PipelineFilter(now time.Time, extraPeople []string, f SalesL
 	if err != nil {
 		return model.SalesPipeline{}, err
 	}
-	acts, err := r.ListAllActivities()
+	acts, err := r.ListActivitiesFilter(SalesActivityFilter{
+		OrgID: f.OrgID, PersonName: f.PersonName, PersonUserID: f.PersonUserID,
+	})
 	if err != nil {
 		return model.SalesPipeline{}, err
 	}
