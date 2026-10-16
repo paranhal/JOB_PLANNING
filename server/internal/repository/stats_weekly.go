@@ -859,7 +859,7 @@ func (r *StatsRepo) listWeeklyWaitingForEvents(from, toEx string) ([]model.Weekl
 		  AND (
 		    (TRIM(COALESCE(t.reply_due_date,'')) != '' AND t.reply_due_date >= ? AND t.reply_due_date < ?)
 		    OR (TRIM(COALESCE(t.next_check_date,'')) != '' AND t.next_check_date >= ? AND t.next_check_date < ?)
-		  )`
+		  )` + statsProjectKindSQL("t.project_id")
 	rows, err := r.db.Query(q, model.WBTaskWaitingFor, from, toEx, from, toEx)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
@@ -910,7 +910,7 @@ func (r *StatsRepo) listWeeklyWaitingForEvents(from, toEx string) ([]model.Weekl
 		  AND (
 		    (TRIM(COALESCE(a.reply_due_date,'')) != '' AND a.reply_due_date >= ? AND a.reply_due_date < ?)
 		    OR (TRIM(COALESCE(a.next_check_date,'')) != '' AND a.next_check_date >= ? AND a.next_check_date < ?)
-		  )`
+		  )` + statsProjectKindSQL("t.project_id")
 	arows, err := r.db.Query(aq, model.WBTaskWaitingFor, model.WBActionWaiting, from, toEx, from, toEx)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {

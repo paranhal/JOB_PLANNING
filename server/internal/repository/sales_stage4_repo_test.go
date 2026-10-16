@@ -136,8 +136,8 @@ func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 	_ = repo.ChangeStage(supply.SalesID, model.SalesDirectWin, "", "u1", "t", false)
 	_ = repo.CloseContracted(supply.SalesID, "2026-09-02", 100, "u1", "t")
 	sg, _ := repo.Get(supply.SalesID)
-	if !model.CanPromoteSales(sg) {
-		t.Fatal("단품도 승격돼야 한다")
+	if model.CanPromoteSales(sg) {
+		t.Fatal("단품 납품은 사업관리로 넘기지 않는다")
 	}
 
 	fail := &model.SalesProject{Name: "결렬", BidEvalMethod: "lowest"}

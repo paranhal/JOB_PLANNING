@@ -378,7 +378,7 @@ func (r *StatsRepo) listIncompleteMntVisits(from, toEx string) ([]model.Incomple
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		WHERE COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
 		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?
-		  AND COALESCE(v.completed,0)=0
+		  AND COALESCE(v.completed,0)=0` + statsProjectKindSQL("v.project_id") + `
 		ORDER BY v.visit_date, c.org_name`, from, toEx)
 	if err != nil {
 		return nil, err
@@ -493,7 +493,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id
 		WHERE COALESCE(v.completed,0)=1
-		  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?`, p.PrevFrom, p.PrevToEx)
+		  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?` + statsProjectKindSQL("v.project_id"), p.PrevFrom, p.PrevToEx)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +522,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		LEFT JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN work_projects p ON p.project_id = ar.project_id
 		WHERE TRIM(COALESCE(ar.complete_datetime,'')) != ''
-		  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?`, p.PrevFrom, p.PrevToEx)
+		  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?` + statsProjectKindSQL("ar.project_id"), p.PrevFrom, p.PrevToEx)
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +547,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		WHERE t.work_type IN ('admin','support')
 		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+`
 		  AND t.status = 'complete'
-		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)`, p.PrevFrom, p.PrevToEx)
+		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)` + statsProjectKindSQL("t.project_id"), p.PrevFrom, p.PrevToEx)
 	if err != nil {
 		return nil, err
 	}
@@ -570,7 +570,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		FROM maintenance_visits v
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id
-		WHERE v.visit_date >= ? AND v.visit_date < ?`, p.ThisFrom, p.ThisToEx)
+		WHERE v.visit_date >= ? AND v.visit_date < ?` + statsProjectKindSQL("v.project_id"), p.ThisFrom, p.ThisToEx)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +604,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		  AND (
 		        (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
 		     OR (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
-		  )`, p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisToEx, p.PrevFrom, p.PrevToEx)
+		  )` + statsProjectKindSQL("t.project_id"), p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisToEx, p.PrevFrom, p.PrevToEx)
 	if err != nil {
 		return nil, err
 	}

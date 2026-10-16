@@ -885,6 +885,7 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		)`)
 		args = append(args, f.ProjectID, f.ProjectID)
 	}
+	b.WriteString(statsASProjectKindSQL())
 	if !f.IncludeImport {
 		b.WriteString(` AND COALESCE(ar.data_origin,'app') != 'import'`)
 	}
@@ -923,6 +924,7 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND TRIM(COALESCE(v.project_id,'')) = ?`)
 		args = append(args, f.ProjectID)
 	}
+	b.WriteString(statsProjectKindSQL("v.project_id"))
 	if !f.IncludeImport {
 		b.WriteString(` AND COALESCE(v.data_origin,'app') != 'import'`)
 	}
@@ -968,6 +970,7 @@ func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND t.project_id = ?`)
 		args = append(args, f.ProjectID)
 	}
+	b.WriteString(statsProjectKindSQL("t.project_id"))
 	b.WriteString(SQLRecurrenceWorkUnit)
 	fragB, argsB := adminMetricsBaseSQL(f)
 	b.WriteString(fragB)

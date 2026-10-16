@@ -2,7 +2,7 @@
 
 {{define "content"}}
 <div class="space-y-4" x-data="{
-  sel: { construction: {{if .Example}}true{{else}}false{{end}}, network: {{if .Example}}true{{else}}false{{end}}, dev: {{if .Example}}true{{else}}false{{end}}, maintenance: {{if .Example}}true{{else}}false{{end}} },
+  sel: { construction: {{if .Example}}true{{else}}false{{end}}, build: {{if .Example}}true{{else}}false{{end}}, dev: {{if .Example}}true{{else}}false{{end}}, maintenance: {{if .Example}}true{{else}}false{{end}}, other: {{if .Example}}true{{else}}false{{end}} },
   kind: '',
   status: '',
   owner: '',
@@ -21,7 +21,7 @@
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div class="min-w-0">
       <h2 class="text-ui-xl font-extrabold text-ink">사업·업무관리</h2>
-      <p class="text-ui-sm text-ink-muted mt-1">공사, 구축, 개발, 유지보수 사업의 단계별 일정과 필요 서류 작성·제출을 중심으로 관리합니다. 각 사업 유형의 단계(공정→기성→준공, 구축→개통→검수, 접수→조치→완료)와 관련 서류 상태를 함께 확인할 수 있습니다.</p>
+      <p class="text-ui-sm text-ink-muted mt-1">공사, 구축, 개발, 유지보수, 기타 사업의 단계별 일정과 필요 서류 작성·제출을 중심으로 관리합니다. 각 사업 유형의 단계(공정→기성→준공, 구축→개통→검수, 접수→조치→완료, 기타는 수행 기간)와 관련 서류 상태를 함께 확인할 수 있습니다.</p>
     </div>
     <div class="flex flex-wrap gap-2 shrink-0">
       <a href="{{.ReportURL}}" class="btn btn-secondary btn-sm">
@@ -77,9 +77,10 @@
         <select id="wm-kind" class="select" x-model="kind">
           <option value="">전체</option>
           <option value="construction">공사</option>
-          <option value="network">구축</option>
+          <option value="build">구축</option>
           <option value="dev">개발</option>
           <option value="maintenance">유지보수</option>
+          <option value="other">기타</option>
         </select>
       </div>
       <div>
@@ -148,6 +149,15 @@
             </td>
           </tr>
           {{end}}
+          <tr class="border-t border-line" x-show="kind === 'other'">
+            <td class="px-4 py-2.5 text-ink-muted">기타</td>
+            <td class="px-4 py-2.5 font-medium text-ink">수행 기간</td>
+            <td class="px-4 py-2.5 tabular-nums">—</td>
+            <td class="px-4 py-2.5 tabular-nums">—</td>
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">—</td>
+            <td class="px-4 py-2.5">—</td>
+            <td class="px-4 py-2.5"><span class="badge badge-neutral">—</span></td>
+          </tr>
         </tbody>
       </table>
     </div>

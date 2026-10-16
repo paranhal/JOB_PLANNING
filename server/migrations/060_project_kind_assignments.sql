@@ -1,6 +1,5 @@
--- 72-A2 D-53·D-54. 사업 유형(project_kind)과 담당자 4역할.
--- 컬럼 이름은 011에서 쓰던 project_kind. 값 집합은 공사/구축/개발/유지보수로 바꾼다.
--- 예전 코드값(supply·consumable·other, 라벨 신규구축)은 시드하지 않는다.
+-- 72-A2 D-53·D-54·D-57. 사업 유형(project_kind)과 담당자 4역할.
+-- 값 집합은 공사/구축/개발/유지보수/기타. 소모품 납품은 시드하지 않는다.
 
 ALTER TABLE work_projects ADD COLUMN project_kind TEXT NOT NULL DEFAULT 'maintenance';
 
@@ -24,7 +23,14 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
   ('PKC01','project_kind','construction','공사',10),
   ('PKC02','project_kind','build','구축',20),
   ('PKC03','project_kind','dev','개발',30),
-  ('PKC04','project_kind','maintenance','유지보수',40);
+  ('PKC04','project_kind','maintenance','유지보수',40),
+  ('PKC05','project_kind','other','기타',50);
 
 UPDATE codes SET code_name='구축'
  WHERE code_group='project_kind' AND code_value='build' AND code_name='신규구축';
+
+UPDATE work_projects SET project_kind='build'
+ WHERE project_kind IN ('supply','network','신규구축','장비납품');
+
+UPDATE work_projects SET project_kind='other'
+ WHERE project_kind IN ('consumable','소모품납품');

@@ -7,6 +7,7 @@ const (
 	ProjectKindBuild        = "build"
 	ProjectKindDev          = "dev"
 	ProjectKindMaintenance  = "maintenance"
+	ProjectKindOther        = "other"
 )
 
 const (
@@ -17,16 +18,29 @@ const (
 )
 
 func ValidProjectKind(v string) bool {
-	switch strings.TrimSpace(v) {
-	case ProjectKindConstruction, ProjectKindBuild, ProjectKindDev, ProjectKindMaintenance:
+	switch NormalizeProjectKind(v) {
+	case ProjectKindConstruction, ProjectKindBuild, ProjectKindDev, ProjectKindMaintenance, ProjectKindOther:
 		return true
 	default:
 		return false
 	}
 }
 
-func ProjectKindLabel(v string) string {
+// NormalizeProjectKind 011·화면 잔여값을 5종으로 맞춘다.
+// 신규구축·장비납품·supply·network → 구축, 소모품납품·consumable·기타 라벨 → 기타.
+func NormalizeProjectKind(v string) string {
 	switch strings.TrimSpace(v) {
+	case "supply", "network", "신규구축", "장비납품":
+		return ProjectKindBuild
+	case "consumable", "소모품납품", "기타":
+		return ProjectKindOther
+	default:
+		return strings.TrimSpace(v)
+	}
+}
+
+func ProjectKindLabel(v string) string {
+	switch NormalizeProjectKind(v) {
 	case ProjectKindConstruction:
 		return "공사"
 	case ProjectKindBuild:
@@ -35,6 +49,8 @@ func ProjectKindLabel(v string) string {
 		return "개발"
 	case ProjectKindMaintenance:
 		return "유지보수"
+	case ProjectKindOther:
+		return "기타"
 	default:
 		return "—"
 	}
@@ -46,6 +62,7 @@ func ProjectKindOptions() []struct{ Value, Label string } {
 		{ProjectKindBuild, "구축"},
 		{ProjectKindDev, "개발"},
 		{ProjectKindMaintenance, "유지보수"},
+		{ProjectKindOther, "기타"},
 	}
 }
 

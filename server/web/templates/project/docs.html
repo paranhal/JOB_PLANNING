@@ -1,7 +1,7 @@
 {{define "title"}}서류 작성·관리 · {{appName}}{{end}}
 {{define "content"}}
 <div class="space-y-4" x-data="{
-  sel: { construction: {{if .Example}}true{{else}}false{{end}}, network: {{if .Example}}true{{else}}false{{end}}, dev: {{if .Example}}true{{else}}false{{end}}, maintenance: {{if .Example}}true{{else}}false{{end}} },
+  sel: { construction: {{if .Example}}true{{else}}false{{end}}, build: {{if .Example}}true{{else}}false{{end}}, dev: {{if .Example}}true{{else}}false{{end}}, maintenance: {{if .Example}}true{{else}}false{{end}}, other: {{if .Example}}true{{else}}false{{end}} },
   kind: 'construction',
   stage: '공정',
   formKind: 'new',
@@ -22,7 +22,7 @@
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div class="min-w-0">
       <h2 class="text-ui-xl font-extrabold text-ink">서류 작성·관리</h2>
-      <p class="text-ui-sm text-ink-muted mt-1">공사(공정→기성→준공), 구축·개발(구축→개통→검수), 유지보수(접수→조치→완료) 단계별 필요한 서류를 작성하고, 제출 상태를 한 화면에서 관리합니다.</p>
+      <p class="text-ui-sm text-ink-muted mt-1">공사(공정→기성→준공), 구축·개발(구축→개통→검수), 유지보수(접수→조치→완료), 기타(단계 없음) 단계별 필요한 서류를 작성하고, 제출 상태를 한 화면에서 관리합니다.</p>
     </div>
     <div class="flex flex-wrap gap-2 shrink-0">
       <button type="button" class="btn btn-secondary btn-sm" @click="flash='임시저장했습니다.'">임시저장</button>
@@ -66,25 +66,27 @@
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <div>
         <label class="label" for="doc-kind">사업 유형</label>
-        <select id="doc-kind" class="select" x-model="kind">
+        <select id="doc-kind" class="select" x-model="kind" @change="stage = kind === 'other' ? '단계 없음' : (kind === 'construction' ? '공정' : (kind === 'maintenance' ? '접수' : '구축'))">
           <option value="construction">공사</option>
-          <option value="network">구축</option>
+          <option value="build">구축</option>
           <option value="dev">개발</option>
           <option value="maintenance">유지보수</option>
+          <option value="other">기타</option>
         </select>
       </div>
       <div>
         <label class="label" for="doc-stage">단계</label>
         <select id="doc-stage" class="select" x-model="stage">
-          <option value="공정">공정</option>
-          <option value="기성">기성</option>
-          <option value="준공">준공</option>
-          <option value="구축">구축</option>
-          <option value="개통">개통</option>
-          <option value="검수">검수</option>
-          <option value="접수">접수</option>
-          <option value="조치">조치</option>
-          <option value="완료">완료</option>
+          <option value="공정" x-show="kind === 'construction'">공정</option>
+          <option value="기성" x-show="kind === 'construction'">기성</option>
+          <option value="준공" x-show="kind === 'construction'">준공</option>
+          <option value="구축" x-show="kind === 'build' || kind === 'dev'">구축</option>
+          <option value="개통" x-show="kind === 'build' || kind === 'dev'">개통</option>
+          <option value="검수" x-show="kind === 'build' || kind === 'dev'">검수</option>
+          <option value="접수" x-show="kind === 'maintenance'">접수</option>
+          <option value="조치" x-show="kind === 'maintenance'">조치</option>
+          <option value="완료" x-show="kind === 'maintenance'">완료</option>
+          <option value="단계 없음" x-show="kind === 'other'">단계 없음</option>
         </select>
       </div>
       <div>

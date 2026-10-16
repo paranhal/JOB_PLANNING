@@ -57,8 +57,8 @@ func TestSalesWinSampleSkipsDropped(t *testing.T) {
 
 func TestCanPromoteSalesClosedContracted(t *testing.T) {
 	p := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, DealType: SalesDealSupply, Status: SalesStatusContracted}
-	if !CanPromoteSales(p) {
-		t.Fatal("단품 계약도 승격해야 한다")
+	if CanPromoteSales(p) {
+		t.Fatal("단품 납품은 사업관리로 넘기지 않는다")
 	}
 	p.Status = SalesStatusPromoted
 	if CanPromoteSales(p) {

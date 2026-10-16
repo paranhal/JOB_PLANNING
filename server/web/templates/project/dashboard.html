@@ -6,7 +6,7 @@
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div class="min-w-0">
       <h2 class="text-ui-xl font-extrabold text-ink">사업 대시보드</h2>
-      <p class="text-ui-sm text-ink-muted mt-1">공사, 구축, 개발, 유지보수 사업의 단계별 일정과 필요 서류 작성·제출을 중심으로 관리합니다. 각 사업 유형의 단계(공정→기성→준공, 구축→개통→검수, 접수→조치→완료)와 관련 서류 상태를 함께 확인할 수 있습니다.</p>
+      <p class="text-ui-sm text-ink-muted mt-1">공사, 구축, 개발, 유지보수, 기타 사업의 단계별 일정과 필요 서류 작성·제출을 중심으로 관리합니다. 각 사업 유형의 단계(공정→기성→준공, 구축→개통→검수, 접수→조치→완료, 기타는 수행 기간)와 관련 서류 상태를 함께 확인할 수 있습니다.</p>
     </div>
     <div class="flex flex-wrap gap-2 shrink-0">
       <a href="{{.ReportURL}}" class="btn btn-secondary btn-sm">
@@ -18,9 +18,10 @@
         <div x-show="filterOpen" x-cloak @click.outside="filterOpen = false" class="menu absolute right-0 mt-1 z-20 w-48">
           <a href="/projects/dashboard" class="menu-item">사업 운영 현황</a>
           <a href="/projects/dashboard?tab=construction" class="menu-item">공사</a>
-          <a href="/projects/dashboard?tab=network" class="menu-item">구축</a>
+          <a href="/projects/dashboard?tab=build" class="menu-item">구축</a>
           <a href="/projects/dashboard?tab=dev" class="menu-item">개발</a>
           <a href="/projects/dashboard?tab=maintenance" class="menu-item">유지보수</a>
+          <a href="/projects/dashboard?tab=other" class="menu-item">기타</a>
           <a href="{{.FilterURL}}" class="menu-item">사업 목록</a>
         </div>
       </div>
@@ -33,11 +34,13 @@
       {{if .Example}}<span class="badge badge-warning">주의</span>{{end}}
       <a href="/projects/dashboard?tab=construction" class="{{if eq .Tab "construction"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}공사 2개{{else}}공사{{end}}</a>
       <span class="opacity-50">·</span>
-      <a href="/projects/dashboard?tab=network" class="{{if eq .Tab "network"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}구축 1개{{else}}구축{{end}}</a>
+      <a href="/projects/dashboard?tab=build" class="{{if eq .Tab "build"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}구축 1개{{else}}구축{{end}}</a>
       <span class="opacity-50">·</span>
       <a href="/projects/dashboard?tab=dev" class="{{if eq .Tab "dev"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}개발 1개{{else}}개발{{end}}</a>
       <span class="opacity-50">·</span>
       <a href="/projects/dashboard?tab=maintenance" class="{{if eq .Tab "maintenance"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}유지보수 2개{{else}}유지보수{{end}}</a>
+      <span class="opacity-50">·</span>
+      <a href="/projects/dashboard?tab=other" class="{{if eq .Tab "other"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">기타</a>
       {{if .Example}}<span class="opacity-80">· 총 6개 사업</span>{{end}}
     </div>
     <p class="text-ui-xs opacity-80">{{.Seed.StageCounts}}</p>

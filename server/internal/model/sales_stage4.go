@@ -89,6 +89,10 @@ func CanPromoteSales(p *SalesProject) bool {
 	if p == nil {
 		return false
 	}
+	// D-57: 단품(소모품) 납품은 영업관리에서 끝낸다. 장비 납품이 사업이 되면 유형은 구축.
+	if p.IsSupply() {
+		return false
+	}
 	return strings.TrimSpace(p.Stage) == SalesStage4Closed &&
 		strings.TrimSpace(p.CloseReason) == SalesCloseContracted &&
 		strings.TrimSpace(p.Status) != SalesStatusPromoted

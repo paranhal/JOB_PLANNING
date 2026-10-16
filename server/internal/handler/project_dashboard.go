@@ -60,7 +60,9 @@ type dashSeed struct {
 
 func dashboardTab(raw string) string {
 	switch strings.TrimSpace(raw) {
-	case "construction", "network", "dev", "maintenance":
+	case "network":
+		return "build"
+	case "construction", "build", "dev", "maintenance", "other":
 		return strings.TrimSpace(raw)
 	default:
 		return "ops"

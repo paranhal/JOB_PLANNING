@@ -245,8 +245,8 @@ func TestCanPromoteSalesAndWorkProjectFromSales(t *testing.T) {
 		t.Fatal("계약인데 승격이 안 열린다")
 	}
 	supply := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Status: SalesStatusContracted, DealType: SalesDealSupply}
-	if !CanPromoteSales(supply) {
-		t.Fatal("단품 계약도 승격해야 한다")
+	if CanPromoteSales(supply) {
+		t.Fatal("단품 납품은 사업관리로 넘기지 않는다")
 	}
 	wp := WorkProjectFromSales(ok)
 	if wp.Name != "2027년 충남교육청" || wp.CustomerID != "C041-26-001" || wp.OrderingPartyID != "C041-26-001" {

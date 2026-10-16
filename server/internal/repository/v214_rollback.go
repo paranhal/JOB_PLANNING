@@ -8,18 +8,17 @@ import (
 
 const v214ProjectKindRollbackMeta = "__meta:v214_project_kind_rollback_v1"
 
-// applyV214ProjectKindRollback §22.1.1 v2.15 — work_projects.project_kind 와
-// 영업 확장 컬럼을 떼고, 코드를 지운다. 이미 없는 컬럼은 건너뛴다.
+// applyV214ProjectKindRollback §22.1.1 v2.15 — 영업 확장 컬럼만 뗀다.
+// 72-A2 project_kind 와 project_kind 코드는 지우지 않는다.
 func applyV214ProjectKindRollback(db *sql.DB) {
 	if db == nil || metaDone(db, v214ProjectKindRollbackMeta) {
 		return
 	}
 	if _, err := db.Exec(`DELETE FROM codes WHERE code_group IN (
-		'project_kind','weekly_ref_project_kind','sales_stage','sales_lead_source')`); err != nil {
+		'weekly_ref_project_kind','sales_stage','sales_lead_source')`); err != nil {
 		log.Printf("v2.14 rollback codes: %v", err)
 	}
 	cols := []string{
-		"project_kind",
 		"sales_stage", "expected_ym", "expected_precision", "expected_note", "expected_undated_reason",
 		"prospect_name", "prospect_region",
 		"prospect_contact_name", "prospect_contact_title", "prospect_contact_phone", "prospect_contact_email",

@@ -21,6 +21,7 @@ func TestProjectDashboardHasFigmaItems(t *testing.T) {
 		"구축→개통→검수",
 		"접수→조치→완료",
 		"사업 운영 현황",
+		`tab=other`,
 		"오늘 처리할 일",
 		"담당 업무",
 		"승인 대기",

@@ -38,9 +38,14 @@ func applyProjectKindAssignmentsV72(db *sql.DB) {
   ('PKC01','project_kind','construction','공사',10),
   ('PKC02','project_kind','build','구축',20),
   ('PKC03','project_kind','dev','개발',30),
-  ('PKC04','project_kind','maintenance','유지보수',40)`,
+  ('PKC04','project_kind','maintenance','유지보수',40),
+  ('PKC05','project_kind','other','기타',50)`,
 		`UPDATE codes SET code_name='구축'
  WHERE code_group='project_kind' AND code_value='build' AND code_name='신규구축'`,
+		`UPDATE work_projects SET project_kind='build'
+ WHERE project_kind IN ('supply','network','신규구축','장비납품')`,
+		`UPDATE work_projects SET project_kind='other'
+ WHERE project_kind IN ('consumable','소모품납품')`,
 	}
 	for _, q := range stmts {
 		if _, err := db.Exec(q); err != nil {

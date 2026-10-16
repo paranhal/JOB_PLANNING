@@ -166,9 +166,6 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, false, "사업명을 입력하세요.")
 	}
-	if !model.ValidProjectKind(p.ProjectKind) {
-		return h.renderForm(c, p, rules, false, "사업 유형을 선택하세요.")
-	}
 	if err := h.repo.Create(p); err != nil {
 		return err
 	}
@@ -239,9 +236,6 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	p.SalesProjectID = existing.SalesProjectID
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
-	}
-	if !model.ValidProjectKind(p.ProjectKind) {
-		return h.renderForm(c, p, rules, true, "사업 유형을 선택하세요.")
 	}
 	if err := h.repo.Update(p); err != nil {
 		return err

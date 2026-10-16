@@ -118,6 +118,7 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 		draft.ProjectKind = proj.ProjectKind
 		return h.renderPromoteProjectForm(c, p, draft, rules, "사업명을 입력하세요.")
 	}
+	proj.ProjectKind = model.NormalizeProjectKind(proj.ProjectKind)
 	if !model.ValidProjectKind(proj.ProjectKind) {
 		proj.ProjectKind = model.ProjectKindMaintenance
 	}

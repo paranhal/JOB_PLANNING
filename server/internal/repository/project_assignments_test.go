@@ -51,6 +51,22 @@ func TestProjectAssignmentsMultiDutyUniqueAndDeletedReject(t *testing.T) {
 		t.Fatalf("len=%d err=%v", len(list), err)
 	}
 
+	peer := &model.User{Username: "staff2", PasswordHash: "x", FullName: "동료", Role: model.RoleTech, IsActive: true, OrgID: "O01"}
+	if err := users.Create(peer); err != nil {
+		t.Fatal(err)
+	}
+	err = repo.ReplaceAssignments(p.ProjectID, staff.UserID, []model.ProjectAssignment{
+		{UserID: staff.UserID, Duty: model.ProjectDutyExecution},
+		{UserID: peer.UserID, Duty: model.ProjectDutyExecution},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	same, err := repo.ListAssignments(p.ProjectID)
+	if err != nil || len(same) != 2 {
+		t.Fatalf("같은 역할 여러 명 len=%d err=%v", len(same), err)
+	}
+
 	err = repo.ReplaceAssignments(p.ProjectID, staff.UserID, []model.ProjectAssignment{
 		{UserID: gone.UserID, Duty: model.ProjectDutySales},
 	})

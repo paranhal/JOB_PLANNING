@@ -21,6 +21,8 @@ func TestProjectDocsFigmaLayout(t *testing.T) {
 		"사업 선택",
 		"사업 유형 / 단계 선택",
 		"단계별 서류 목록",
+		`value="other"`,
+		"단계 없음",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("화면에 %q 없음", want)

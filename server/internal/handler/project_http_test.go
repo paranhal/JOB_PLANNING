@@ -52,6 +52,25 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	return e, repository.NewProjectRepo(db), repository.NewWBRepo(db)
 }
 
+func TestProjectFormHasOtherKind(t *testing.T) {
+	e, _, _ := newProjectServer(t)
+	rec := doForm(t, e, "/projects", url.Values{
+		"name": {"기타유형"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"other"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("등록 status=%d", rec.Code)
+	}
+	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
+	page := doGet(t, e, "/projects/"+id+"/edit")
+	if page.Code != http.StatusOK {
+		t.Fatalf("수정 status=%d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, `value="other"`) || !strings.Contains(body, "기타") {
+		t.Fatal("수정 화면에 기타 유형이 없다")
+	}
+}
+
 func TestProjectCRUDArchiveSmoke(t *testing.T) {
 	e, repo, wb := newProjectServer(t)
 
@@ -224,6 +243,8 @@ func TestProjectWorkMgmtFigmaLayout(t *testing.T) {
 		"공정→기성→준공",
 		"구축→개통→검수",
 		"접수→조치→완료",
+		`value="other"`,
+		"수행 기간",
 		"단계별 일정표",
 		"계획 시작",
 		"실제 처리",
@@ -256,16 +277,18 @@ func TestProjectMergeHTTPArchivesDrop(t *testing.T) {
 	}
 }
 
-func TestProjectCreateRequiresKind(t *testing.T) {
-	e, _, _ := newProjectServer(t)
+func TestProjectCreateKindOptionalDefaultsMaintenance(t *testing.T) {
+	e, repo, _ := newProjectServer(t)
 	rec := doForm(t, e, "/projects", url.Values{
 		"name": {"유형없음"}, "status": {"active"}, "is_paid": {"1"},
 	})
-	if rec.Code == http.StatusSeeOther {
-		t.Fatal("유형 없이 등록되면 안 된다")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("유형 없이 등록이 막혔다 status=%d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "사업 유형을 선택") {
-		t.Fatalf("안내 없음: %s", clipBody(rec.Body.String()))
+	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
+	got, err := repo.Get(id)
+	if err != nil || got.ProjectKind != model.ProjectKindMaintenance {
+		t.Fatalf("비우면 유지보수 kind=%s err=%v", got.ProjectKind, err)
 	}
 }
 

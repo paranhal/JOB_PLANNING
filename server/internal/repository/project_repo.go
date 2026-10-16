@@ -188,9 +188,6 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 	}
 	p.ProjectID = fmt.Sprintf("WP-%03d", id)
 	normalizeProject(p)
-	if !model.ValidProjectKind(p.ProjectKind) {
-		p.ProjectKind = model.ProjectKindMaintenance
-	}
 	_, err = r.db.Exec(`
 		INSERT INTO work_projects (
 			project_id, name, short_name, plan_year, is_paid, sort_order,
@@ -651,7 +648,10 @@ func normalizeProject(p *model.WorkProject) {
 	if p.Color == "" {
 		p.Color = "#3B82F6"
 	}
-	p.ProjectKind = strings.TrimSpace(p.ProjectKind)
+	p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
+	if !model.ValidProjectKind(p.ProjectKind) {
+		p.ProjectKind = model.ProjectKindMaintenance
+	}
 	if p.PlanYear == 0 && len(p.StartDate) >= 4 {
 		var y int
 		if _, err := fmt.Sscanf(p.StartDate[:4], "%d", &y); err == nil {

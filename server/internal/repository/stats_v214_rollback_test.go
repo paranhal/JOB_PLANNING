@@ -88,4 +88,91 @@ func TestV214RollbackDropsLegacyColumns(t *testing.T) {
 	if workProjectHasColumn(db, "sales_stage") {
 		t.Fatal("sales_stage 컬럼이 남았다")
 	}
+	var pk, pkc int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_id='PK001'`).Scan(&pk); err != nil || pk != 1 {
+		t.Fatalf("project_kind 코드가 롤백에 지워졌다 n=%d err=%v", pk, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_id='PKC05'`).Scan(&pkc); err != nil || pkc != 1 {
+		t.Fatalf("기타 코드 PKC05 n=%d err=%v", pkc, err)
+	}
+}
+
+func TestStatsBuildKindDoesNotChangeMaintenanceKPI(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "kind_stats.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
+		VALUES ('c1','도서관','도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_plans (plan_id, plan_year, title, status) VALUES ('P1',2026,'2026','approved')`); err != nil {
+		t.Fatal(err)
+	}
+	setMetricsPolicy(t, db, "2026-08-01", "as,maintenance")
+	if _, err := db.Exec(`
+		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
+			start_datetime, status, assigned_to, complete_datetime, process_type, visit_date, data_origin)
+		VALUES ('a1','R1','c1','2026-08-03 09:00:00','2026-08-05','2026-08-05','completed','양기헌','2026-08-07','visit','2026-08-05','app')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_visits (visit_id, plan_id, visit_date, customer_id, completed, completed_date, assignee)
+		VALUES ('V1','P1','2026-08-05','c1',1,'2026-08-05','양기헌')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, due_date, duration_min, status, assignee, complete_date, receipt_date)
+		VALUES ('T1','admin','행정','2026-08-06','2026-08-06',30,'complete','양기헌','2026-08-06','2026-08-06')`); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewStatsRepo(db)
+	snap := func() string {
+		t.Helper()
+		anchor := time.Date(2026, 8, 7, 0, 0, 0, 0, time.Local)
+		cols := BuildStatsPeriodColumns(model.StatsViewMonth, anchor)
+		f := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+		if err := repo.FillPeriodOverview(cols, f); err != nil {
+			t.Fatal(err)
+		}
+		kpi, err := repo.LoadStatsKPI(model.StatsViewMonth, cols, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		an, err := repo.LoadStatsWorkAnalysis("2026-08-01", "2026-09-01", f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		events, err := repo.listWeeklyASEvents("2026-08-01", "2026-09-01")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return fmt.Sprintf("visit=%.6f complete=%.6f asR=%d asC=%d mntC=%d adminC=%d events=%d",
+			kpi.VisitAvgDays, kpi.CompleteAvgDays, an.AS.Receipt, an.AS.Completed, an.Mnt.Completed, an.Admin.Completed, len(events))
+	}
+
+	before := snap()
+	if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, project_kind)
+		VALUES ('WP-BUILD','구축시험','active','build')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO as_receipts (as_id, as_number, customer_id, project_id, receipt_datetime, visit_scheduled_date,
+			start_datetime, status, assigned_to, complete_datetime, process_type, visit_date, data_origin)
+		VALUES ('a-build','RB','c1','WP-BUILD','2026-08-03 09:00:00','2026-08-05','2026-08-05','completed','양기헌','2026-08-07','visit','2026-08-05','app')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_visits (visit_id, plan_id, visit_date, customer_id, completed, completed_date, assignee, project_id)
+		VALUES ('V-build','P1','2026-08-06','c1',1,'2026-08-06','양기헌','WP-BUILD')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, due_date, duration_min, status, assignee, complete_date, receipt_date, project_id)
+		VALUES ('T-build','admin','구축행정','2026-08-06','2026-08-06',30,'complete','양기헌','2026-08-06','2026-08-06','WP-BUILD')`); err != nil {
+		t.Fatal(err)
+	}
+	after := snap()
+	if before != after {
+		t.Fatalf("구축 유형 사업 추가 후 유지보수 통계가 변함\n before %s\n after  %s", before, after)
+	}
 }

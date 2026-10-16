@@ -45,6 +45,24 @@ func TestProjectKindMigrationIdempotentAndExistingMaintenance(t *testing.T) {
 	if !workProjectHasColumn(db, "project_kind") {
 		t.Fatal("재적용 후 컬럼 없음")
 	}
+
+	if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, project_kind) VALUES ('WP-t2','납품잔여','active','supply')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, project_kind) VALUES ('WP-t3','소모잔여','active','consumable')`); err != nil {
+		t.Fatal(err)
+	}
+	applyProjectKindAssignmentsV72(db)
+	var k2, k3 string
+	_ = db.QueryRow(`SELECT project_kind FROM work_projects WHERE project_id='WP-t2'`).Scan(&k2)
+	_ = db.QueryRow(`SELECT project_kind FROM work_projects WHERE project_id='WP-t3'`).Scan(&k3)
+	if k2 != "build" || k3 != "other" {
+		t.Fatalf("대응표 build=%s other=%s", k2, k3)
+	}
+	var nOther int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_id='PKC05'`).Scan(&nOther); err != nil || nOther != 1 {
+		t.Fatalf("PKC05 n=%d err=%v", nOther, err)
+	}
 }
 
 func TestProjectKindSQLFilesExist(t *testing.T) {
@@ -52,7 +70,7 @@ func TestProjectKindSQLFilesExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(up, "project_kind") || !strings.Contains(up, "project_assignments") {
+	if !strings.Contains(up, "project_kind") || !strings.Contains(up, "project_assignments") || !strings.Contains(up, "PKC05") {
 		t.Fatal("060 up")
 	}
 	if !strings.Contains(down, "DROP TABLE IF EXISTS project_assignments") {
