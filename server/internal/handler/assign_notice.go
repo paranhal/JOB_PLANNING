@@ -183,7 +183,8 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 		c.Set("account_requests", accReqs)
 		c.Set("account_request_pending", len(accReqs))
-		c.Set("assign_notice_unread", n+len(unassigned)+len(helps)+len(accReqs))
+		// 사이드바 「오늘 내 업무」 뱃지는 나에게 온 안 본 배정만. 미배정·로그인도움·계정요청은 넣지 않는다. §42.5.2
+		c.Set("assign_notice_unread", n)
 		force := c.QueryParam("assign") == "1"
 		if force {
 			c.Set("expand_unassigned", true)

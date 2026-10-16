@@ -343,3 +343,33 @@ func TestViewAsBannerWriteForbiddenAndLog(t *testing.T) {
 		t.Fatalf("clear status=%d", clr.Code)
 	}
 }
+
+func TestSidebarBadgeCountsOnlyOwnUnseenNotices(t *testing.T) {
+	e, db, choi := newAssignNoticeServer(t)
+	day := time.Now().Format("2006-01-02")
+	if _, err := db.Exec(`INSERT INTO work_tasks (task_id, work_type, title, work_date, due_date, status, assignee)
+		VALUES ('T-nobody','admin','담당없음',?,?, 'waiting','')`, day, day); err != nil {
+		t.Fatal(err)
+	}
+	admin, err := repository.NewUserRepo(db).GetByUsername("admin")
+	if err != nil || admin == nil {
+		t.Fatal(err)
+	}
+	page := doGetWith(t, e, "/work", jwtCookieUser(t, admin))
+	if page.Code != http.StatusOK {
+		t.Fatalf("status=%d", page.Code)
+	}
+	if strings.Contains(page.Body.String(), `bg-red-500`) {
+		t.Fatal("미배정 조직 건이 오늘 내 업무 뱃지에 올라갔다")
+	}
+
+	insertUnseenNotice(t, db, choi.UserID, "R2610-own", "본인 AS", time.Now())
+	mine := doGetWith(t, e, "/work", jwtCookieUser(t, choi))
+	if !strings.Contains(mine.Body.String(), "bg-red-500") || !strings.Contains(mine.Body.String(), ">1</span>") {
+		t.Fatal("본인 안 본 배정 뱃지가 없다")
+	}
+	admin2 := doGetWith(t, e, "/work", jwtCookieUser(t, admin))
+	if strings.Contains(admin2.Body.String(), `bg-red-500`) {
+		t.Fatal("다른 사람 배정이 관리자 뱃지에 있다")
+	}
+}
