@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/labstack/echo/v4"
+
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -17,7 +19,7 @@ func TestSalesVisibilityScopeRoles(t *testing.T) {
 	oa.Set("org_id", "O01")
 	oa.Set("user_id", "oa1")
 	v := SalesVisibilityScope(oa)
-	if v.OrgID != "O01" || v.MineOnly || !v.ShowOwnerFilter {
+	if v.OrgID != "O01" || !v.ShowOwnerFilter {
 		t.Fatalf("org_admin %+v", v)
 	}
 
@@ -25,29 +27,29 @@ func TestSalesVisibilityScopeRoles(t *testing.T) {
 	s.Set("org_id", "O01")
 	s.Set("user_id", "s1")
 	v = SalesVisibilityScope(s)
-	if !v.MineOnly || v.ShowOwnerFilter {
-		t.Fatalf("sales %+v", v)
+	if v.OrgID != "O01" || !v.ShowOwnerFilter {
+		t.Fatalf("sales 조직 전체 조회 %+v", v)
 	}
 
 	va := echoCtxRole(model.RoleVisionAdmin, "비전")
 	va.Set("org_id", "O01")
 	v = SalesVisibilityScope(va)
-	if v.OrgID != repository.OrgAll || v.MineOnly || !v.ShowOwnerFilter {
+	if v.OrgID != repository.OrgAll || !v.ShowOwnerFilter {
 		t.Fatalf("vision %+v", v)
 	}
 
 	tech := echoCtxRole(model.RoleTech, "기술")
 	tech.Set("org_id", "O01")
 	v = SalesVisibilityScope(tech)
-	if v.MineOnly || v.ShowOwnerFilter {
+	if v.ShowOwnerFilter {
 		t.Fatalf("tech Q-26 %+v", v)
 	}
 
 	oa.Set("sim_role", model.RoleSales)
 	oa.Set("user_name", "영업하나")
 	v = SalesVisibilityScope(oa)
-	if !v.MineOnly {
-		t.Fatal("view-as sales 는 본인 범위")
+	if !v.ShowOwnerFilter || v.OrgID == "" {
+		t.Fatal("view-as sales 도 조직 전체 조회")
 	}
 }
 
@@ -79,7 +81,7 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 	s1, _ := users.GetByUsername("s1")
 	s2, _ := users.GetByUsername("s2")
 	repo := repository.NewSalesRepo(db)
-	mustSales := func(name, org, owner, ownerID string) string {
+	mustSales := func(name, org, owner, ownerID string) *model.SalesProject {
 		t.Helper()
 		p := &model.SalesProject{Name: name, OrgID: org, SalesOwner: owner, SalesOwnerID: ownerID, Stage: model.SalesStage4Discover, Status: model.SalesStatusActive, DealType: model.SalesDealBuild}
 		if err := repo.Create(p); err != nil {
@@ -90,11 +92,12 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 		}, owner, nil); err != nil {
 			t.Fatal("act", err)
 		}
-		return p.Name
+		return p
 	}
-	mustSales("A1사업", "O01", "영업하나", s1.UserID)
-	mustSales("A2사업", "O01", "영업둘", s2.UserID)
+	a1 := mustSales("A1사업", "O01", "영업하나", s1.UserID)
+	a2 := mustSales("A2사업", "O01", "영업둘", s2.UserID)
 	mustSales("B사업", "O02", "다른영업", "")
+	_ = a1
 
 	g := e.Group("")
 	h := New(db)
@@ -118,11 +121,14 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 
 	s1Page := doGetWith(t, e, "/sales", jwtCookieUser(t, s1))
 	b1 := s1Page.Body.String()
-	if !strings.Contains(b1, "A1사업") {
-		t.Fatal("영업하나 본인 사업 없음")
+	if !strings.Contains(b1, "A1사업") || !strings.Contains(b1, "A2사업") {
+		t.Fatal("영업하나가 같은 조직 동료 사업을 못 본다")
 	}
-	if strings.Contains(b1, "A2사업") || strings.Contains(b1, "B사업") {
-		t.Fatal("영업하나가 남 사업/타 조직을 본다")
+	if strings.Contains(b1, "B사업") {
+		t.Fatal("영업하나가 다른 조직 사업을 본다")
+	}
+	if !strings.Contains(b1, "영업담당") {
+		t.Fatal("영업 담당자에게 담당자 필터가 없다")
 	}
 
 	actOA := doGetWith(t, e, "/sales/activities?month=2026-10", jwtCookieUser(t, oa))
@@ -136,11 +142,41 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 
 	actS1 := doGetWith(t, e, "/sales/activities?month=2026-10", jwtCookieUser(t, s1))
 	as1 := actS1.Body.String()
-	if !strings.Contains(as1, "A1사업방문") {
-		t.Fatal("영업하나 본인 활동 없음")
+	if !strings.Contains(as1, "A1사업방문") || !strings.Contains(as1, "A2사업방문") {
+		t.Fatal("영업하나가 같은 조직 동료 활동을 못 본다")
 	}
-	if strings.Contains(as1, "A2사업방문") {
-		t.Fatal("영업하나가 동료 활동을 본다")
+
+	peerShow := doGetWith(t, e, "/sales/"+a2.SalesID, jwtCookieUser(t, s1))
+	if peerShow.Code != http.StatusOK {
+		t.Fatalf("동료 사업 상세 %d", peerShow.Code)
+	}
+	ps := peerShow.Body.String()
+	if strings.Contains(ps, "삭제 사유") {
+		t.Fatal("동료 사업 삭제 버튼이 영업하나에게 보인다")
+	}
+	acts, err := repo.ListActivities(a2.SalesID)
+	if err != nil || len(acts) == 0 {
+		t.Fatal("A2 활동")
+	}
+	// 로그에서 동료 카드는 잠금, 본인 카드는 수정
+	if !strings.Contains(as1, "읽기 전용") {
+		t.Fatal("동료 활동에 읽기 전용 표시가 없다")
+	}
+	del := doPostWith(t, e, "/sales/activities/"+acts[0].ActivityID+"/delete", jwtCookieUser(t, s1))
+	if del.Code != http.StatusForbidden {
+		t.Fatalf("동료 활동 삭제 status=%d", del.Code)
+	}
+
+	day := doGetWith(t, e, "/sales/activities?view=day&date=2026-10-10", jwtCookieUser(t, s1))
+	if day.Code != http.StatusOK {
+		t.Fatalf("일일 뷰 %d", day.Code)
+	}
+	dbody := day.Body.String()
+	if !strings.Contains(dbody, ">전체<") {
+		t.Fatal("일일 뷰에 담당자 전체 칩이 없다")
+	}
+	if !strings.Contains(dbody, "영업둘") {
+		t.Fatal("일일 뷰 기본이 본인 열만이면 본인 것만 보는 느낌이 난다")
 	}
 
 	onlyA2 := doGetWith(t, e, "/sales?owner=영업둘", jwtCookieUser(t, oa))
@@ -206,6 +242,61 @@ func TestSalesVisibilityDoesNotChangeActivityWriteRule(t *testing.T) {
 	s.Set("user_name", "영업하나")
 	if canEditSalesActivity(s, "영업둘") {
 		t.Fatal("영업 담당자가 남의 활동을 수정하면 안 된다")
+	}
+}
+
+func doPostWith(t *testing.T, e *echo.Echo, path string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost"+path, nil)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	for _, ck := range cookies {
+		if ck != nil {
+			req.AddCookie(ck)
+		}
+	}
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestSalesRoleSeesOrgPeersNotOtherOrg(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	if _, err := db.Exec(`INSERT INTO orgs(org_id,org_no,org_name,sort_order) VALUES('O02','O02','다른팀',2)`); err != nil {
+		t.Fatal(err)
+	}
+	users := repository.NewUserRepo(db)
+	if err := users.Create(&model.User{
+		Username: "s1", PasswordHash: HashPassword("pw"), FullName: "영업하나",
+		Role: model.RoleSales, IsActive: true, OrgID: "O01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := users.Create(&model.User{
+		Username: "s2", PasswordHash: HashPassword("pw"), FullName: "영업둘",
+		Role: model.RoleSales, IsActive: true, OrgID: "O01",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s1, _ := users.GetByUsername("s1")
+	s2, _ := users.GetByUsername("s2")
+	repo := repository.NewSalesRepo(db)
+	for _, row := range []struct{ name, org, owner, oid string }{
+		{"A1사업", "O01", "영업하나", s1.UserID},
+		{"A2사업", "O01", "영업둘", s2.UserID},
+		{"B사업", "O02", "다른영업", ""},
+	} {
+		p := &model.SalesProject{Name: row.name, OrgID: row.org, SalesOwner: row.owner, SalesOwnerID: row.oid, Stage: model.SalesStage4Discover, Status: model.SalesStatusActive, DealType: model.SalesDealBuild}
+		if err := repo.Create(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page := doGetWith(t, e, "/sales", jwtCookieUser(t, s1))
+	body := page.Body.String()
+	if !strings.Contains(body, "A1사업") || !strings.Contains(body, "A2사업") {
+		t.Fatal("O01 동료 사업이 목록에 없다")
+	}
+	if strings.Contains(body, "B사업") {
+		t.Fatal("O02 사업이 0건이어야 한다")
 	}
 }
 

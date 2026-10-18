@@ -540,9 +540,6 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 	}
 	assigneeFilter := strings.TrimSpace(c.QueryParam("assignee"))
 	vis := SalesVisibilityScope(c)
-	if vis.MineOnly && assigneeFilter == "" {
-		assigneeFilter = vis.UserName
-	}
 	view := pageView
 	group := salesActGroup(c.QueryParam("group"))
 	base, err := time.Parse("2006-01-02", date)
