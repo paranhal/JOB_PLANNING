@@ -3,11 +3,15 @@ package model
 import "strings"
 
 const (
-	ProjectKindConstruction = "construction"
-	ProjectKindBuild        = "build"
-	ProjectKindDev          = "dev"
-	ProjectKindMaintenance  = "maintenance"
-	ProjectKindOther        = "other"
+	ProjectKindConstruction  = "construction"
+	ProjectKindBuild         = "build"
+	ProjectKindDev           = "dev"
+	ProjectKindMaintenance   = "maintenance"
+	ProjectKindOther         = "other"
+	ProjectKindUnclassified  = "unclassified"
+	KindSourceConfirmed      = "confirmed"
+	KindSourceInferred       = "inferred"
+	KindSourceUnclassified   = "unclassified"
 )
 
 const (
@@ -51,9 +55,60 @@ func ProjectKindLabel(v string) string {
 		return "유지보수"
 	case ProjectKindOther:
 		return "기타"
+	case ProjectKindUnclassified:
+		return "미분류"
 	default:
 		return "—"
 	}
+}
+
+func KindSourceLabel(src string) string {
+	switch src {
+	case KindSourceConfirmed:
+		return "확정"
+	case KindSourceInferred:
+		return "추정"
+	default:
+		return "미분류"
+	}
+}
+
+// MapSalesBizToProjectKind 영업 biz_type → 사업 유형. 빈 값은 매핑 불가.
+func MapSalesBizToProjectKind(biz string) (kind string, ok bool) {
+	biz = strings.TrimSpace(biz)
+	if biz == "" {
+		return "", false
+	}
+	switch NormalizeSalesBizType(biz) {
+	case SalesBizBuild:
+		return ProjectKindBuild, true
+	case SalesBizDevelop:
+		return ProjectKindDev, true
+	case SalesBizConstruction:
+		return ProjectKindConstruction, true
+	case SalesBizMaintenance:
+		return ProjectKindMaintenance, true
+	default:
+		return ProjectKindOther, true
+	}
+}
+
+type EffectiveKind struct {
+	Kind   string
+	Source string
+}
+
+func (e EffectiveKind) Label() string { return ProjectKindLabel(e.Kind) }
+func (e EffectiveKind) SourceLabel() string { return KindSourceLabel(e.Source) }
+
+func (p WorkProject) EffectiveKind() EffectiveKind {
+	if p.ProjectKindSet == 1 && ValidProjectKind(p.ProjectKind) {
+		return EffectiveKind{Kind: NormalizeProjectKind(p.ProjectKind), Source: KindSourceConfirmed}
+	}
+	if k, ok := MapSalesBizToProjectKind(p.SalesBizType); ok {
+		return EffectiveKind{Kind: k, Source: KindSourceInferred}
+	}
+	return EffectiveKind{Kind: ProjectKindUnclassified, Source: KindSourceUnclassified}
 }
 
 func ProjectKindOptions() []struct{ Value, Label string } {

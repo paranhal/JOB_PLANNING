@@ -25,7 +25,7 @@ const projectSelect = `
 		COALESCE(p.notes,''), COALESCE(p.contact_id,''),
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
 		COALESCE(p.sales_project_id,''), COALESCE(p.contract_amount,0), COALESCE(p.contract_no,''),
-		COALESCE(p.project_kind,'maintenance'),
+		COALESCE(p.project_kind,'maintenance'), COALESCE(p.project_kind_set,0), COALESCE(sp.biz_type,''),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
 		COALESCE(sp.sales_no,'')
@@ -193,12 +193,12 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 			project_id, name, short_name, plan_year, is_paid, sort_order,
 			ordering_party_id, ordering_party, customer_id,
 			contract_type, billing_type, start_date, end_date, notes, contact_id,
-			color, status, sales_project_id, contract_amount, contract_no, project_kind
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			color, status, sales_project_id, contract_amount, contract_no, project_kind, project_kind_set
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind)
+		p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind, p.ProjectKindSet)
 	if err != nil {
 		return err
 	}
@@ -217,12 +217,12 @@ func (r *ProjectRepo) Update(p *model.WorkProject) error {
 			name=?, short_name=?, plan_year=?, is_paid=?, sort_order=?,
 			ordering_party_id=?, ordering_party=?, customer_id=?,
 			contract_type=?, billing_type=?, start_date=?, end_date=?, notes=?, contact_id=?,
-			color=?, status=?, sales_project_id=?, contract_amount=?, contract_no=?, project_kind=?, updated_at=CURRENT_TIMESTAMP
+			color=?, status=?, sales_project_id=?, contract_amount=?, contract_no=?, project_kind=?, project_kind_set=?, updated_at=CURRENT_TIMESTAMP
 		WHERE project_id=?`,
 			p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 			nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 			p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-			p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind, p.ProjectID)
+			p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind, p.ProjectKindSet, p.ProjectID)
 		return err
 	})
 }
@@ -695,7 +695,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.ContractType, &p.BillingType,
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
-		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind,
+		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind, &p.ProjectKindSet, &p.SalesBizType,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo,
 	)
