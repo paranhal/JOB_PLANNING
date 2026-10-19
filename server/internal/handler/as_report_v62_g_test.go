@@ -74,8 +74,11 @@ func TestASReportUseSavedSigZeroSkipsAccountPNG(t *testing.T) {
 	if strings.Contains(sec, "<hp:pic") {
 		t.Fatal("넣지 않고 발급인데 저장본이 들어갔다")
 	}
-	if !strings.Contains(sec, "(사인)") {
-		t.Fatal("(사인) 글자가 없다")
+	if strings.Contains(sec, "(사인)") {
+		t.Fatal("서명 없으면 이름을 써야 한다")
+	}
+	if !strings.Contains(sec, "양기헌") {
+		t.Fatal("점검자 이름이 없다")
 	}
 }
 
@@ -142,4 +145,3 @@ func reportForm(draft model.ASReportDraft) url.Values {
 		"format": {"hwpx"}, "return_file": {"1"},
 	}
 }
-

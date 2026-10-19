@@ -38,9 +38,9 @@ func (d ASReportDraft) Values() map[string]string {
 		"장애원인":  d.CauseDetail,
 		"보고일자":  d.ReportDate,
 		"점검자":   d.Inspector,
-		"점검자사인": "(사인)",
+		"점검자사인": strings.TrimSpace(d.Inspector),
 		"확인자":   d.Confirmer,
-		"확인자사인": "(사인)",
+		"확인자사인": strings.TrimSpace(d.Confirmer),
 		"작업일자":  d.WorkDates,
 		"조치내용":  joinReportLines(d.Actions, d.Conclusion),
 	}

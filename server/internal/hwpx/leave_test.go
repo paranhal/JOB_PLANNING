@@ -160,7 +160,7 @@ func TestLeaveFillGoldenPeriodModesAndStamps(t *testing.T) {
 			if vals["업무대행자"] != tc.in.Deputy {
 				t.Fatal("업무대행자 공백이 유지되지 않는다")
 			}
-			out, err := FillLeavePermit(tpl, vals, tc.stamps, leaveSigBox())
+			out, err := FillLeavePermit(tpl, vals, tc.stamps, nil, leaveSigBox())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -189,6 +189,63 @@ func TestLeaveFillGoldenPeriodModesAndStamps(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLeaveFillNameFallbackPendingAndCorrupt(t *testing.T) {
+	tpl := buildLeaveTpl(t)
+	base := LeavePermitInput{
+		DocNo: "VI-근태-260107-001", WrittenOn: "2026년 01월 07일", Author: "신청자",
+		TypeKey: "annual", PeriodMode: LeavePeriodDays,
+		DayStart: "2026년 01월 08일", DayEnd: "01월 08일", DayCount: "1",
+		Reason: "이름 대체", AuthorStampDate: "01/07",
+	}
+	vals := LeavePermitValues(base)
+	pending, err := FillLeavePermit(tpl, vals, nil, map[string]string{"작성사인": "신청자"}, leaveSigBox())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec := string(mustZipFile(t, pending, "Contents/section0.xml"))
+	if strings.Contains(sec, "{{") {
+		t.Fatal("자리표시자가 남았다")
+	}
+	if !strings.Contains(sec, "신청자") {
+		t.Fatal("작성란 이름이 없다")
+	}
+	if strings.Contains(sec, `binaryItemIDRef="sig`) {
+		t.Fatal("결재 중인데 그림이 들어갔다")
+	}
+	if vals["검토사인"] != "" || strings.Contains(sec, "binaryItemIDRef=\"sig3\"") {
+		t.Fatal("검토란")
+	}
+
+	out, err := FillLeavePermit(tpl, LeavePermitValues(LeavePermitInput{
+		DocNo: "VI-근태-260108-001", WrittenOn: "2026년 01월 08일", Author: "신청자",
+		TypeKey: "annual", PeriodMode: LeavePeriodDays,
+		DayStart: "2026년 01월 09일", DayEnd: "01월 09일", DayCount: "1",
+		Reason: "손상", AuthorStampDate: "01/08", ApproveStampDate: "01/08",
+		ApproveMark: "(대결)",
+	}), map[string][]byte{"작성사인": []byte("not-png"), "승인사인": []byte("not-png")},
+		map[string]string{"작성사인": "신청자", "승인사인": "대리인"}, leaveSigBox())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec = string(mustZipFile(t, out, "Contents/section0.xml"))
+	if strings.Contains(sec, "{{") || strings.Contains(sec, `binaryItemIDRef="sig`) {
+		t.Fatal("손상 서명은 이름이어야 한다")
+	}
+	if !strings.Contains(sec, "신청자") || !strings.Contains(sec, "대리인") || !strings.Contains(sec, "(대결)") {
+		t.Fatal("이름·대결 표기")
+	}
+	long, err := FillLeavePermit(tpl, LeavePermitValues(base), nil, map[string]string{
+		"작성사인": "Alexandria", "승인사인": "남궁민수",
+	}, leaveSigBox())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec = string(mustZipFile(t, long, "Contents/section0.xml"))
+	if !strings.Contains(sec, "Alexandria") || !strings.Contains(sec, "남궁민수") {
+		t.Fatal("긴 이름")
 	}
 }
 
@@ -225,13 +282,14 @@ func TestWriteLeavePermitArtifacts(t *testing.T) {
 		file   string
 		in     LeavePermitInput
 		stamps map[string][]byte
+		names  map[string]string
 	}{
 		{"01_연차_일단위.hwpx", LeavePermitInput{
 			DocNo: "VI-근태-260101-001", WrittenOn: "2026년 01월 01일", Author: "신청자",
 			TypeKey: "annual", PeriodMode: LeavePeriodDays,
 			DayStart: "2026년 01월 02일", DayEnd: "01월 02일", DayCount: "1",
 			Reason: "연차 사용", AuthorStampDate: "01/01", ApproveStampDate: "01/01",
-		}, map[string][]byte{"작성사인": png, "승인사인": png}},
+		}, map[string][]byte{"작성사인": png, "승인사인": png}, nil},
 		{"02_반차_시간.hwpx", LeavePermitInput{
 			DocNo: "VI-근태-260102-001", WrittenOn: "2026년 01월 02일", Author: "신청자",
 			TypeKey: "half", PeriodMode: LeavePeriodHours,
@@ -239,22 +297,34 @@ func TestWriteLeavePermitArtifacts(t *testing.T) {
 			HourStart: "09:00", HourEnd: "13:00", HourCount: "4",
 			Reason: "반차", AuthorStampDate: "01/02", ApproveStampDate: "01/02",
 			ApproveMark: "(대결)",
-		}, map[string][]byte{"작성사인": png, "승인사인": png}},
+		}, map[string][]byte{"작성사인": png, "승인사인": png}, nil},
 		{"03_대체근무.hwpx", LeavePermitInput{
 			DocNo: "VI-근태-260103-001", WrittenOn: "2026년 01월 03일", Author: "신청자",
 			TypeKey: "vacation", PeriodMode: LeavePeriodSwap,
 			SwapDate: "2026년 01월 04일", SwapWorked: true,
 			Reason: "대체근무", AuthorStampDate: "01/03", ApproveStampDate: "01/03",
-		}, map[string][]byte{"작성사인": png, "승인사인": png}},
+		}, map[string][]byte{"작성사인": png, "승인사인": png}, nil},
 		{"04_자기결재.hwpx", LeavePermitInput{
 			DocNo: "VI-근태-260104-001", WrittenOn: "2026년 01월 04일", Author: "신청자",
 			TypeKey: "annual", PeriodMode: LeavePeriodDays,
 			DayStart: "2026년 01월 05일", DayEnd: "01월 05일", DayCount: "1",
 			Reason: "자기 결재", AuthorStampDate: "01/04", ApproveStampDate: "01/04",
-		}, map[string][]byte{"작성사인": png, "승인사인": png}},
+		}, map[string][]byte{"작성사인": png, "승인사인": png}, nil},
+		{"05_서명없음_이름.hwpx", LeavePermitInput{
+			DocNo: "VI-근태-260105-001", WrittenOn: "2026년 01월 05일", Author: "신청자",
+			TypeKey: "annual", PeriodMode: LeavePeriodDays,
+			DayStart: "2026년 01월 06일", DayEnd: "01월 06일", DayCount: "1",
+			Reason: "서명 없음", AuthorStampDate: "01/05", ApproveStampDate: "01/05",
+		}, nil, map[string]string{"작성사인": "신청자", "승인사인": "팀장"}},
+		{"06_자기결재_이름.hwpx", LeavePermitInput{
+			DocNo: "VI-근태-260106-001", WrittenOn: "2026년 01월 06일", Author: "신청자",
+			TypeKey: "annual", PeriodMode: LeavePeriodDays,
+			DayStart: "2026년 01월 07일", DayEnd: "01월 07일", DayCount: "1",
+			Reason: "자기 결재 이름", AuthorStampDate: "01/06", ApproveStampDate: "01/06",
+		}, nil, map[string]string{"작성사인": "신청자", "승인사인": "신청자"}},
 	}
 	for _, s := range samples {
-		out, err := FillLeavePermit(tpl, LeavePermitValues(s.in), s.stamps, leaveSigBox())
+		out, err := FillLeavePermit(tpl, LeavePermitValues(s.in), s.stamps, s.names, leaveSigBox())
 		if err != nil {
 			t.Fatal(err)
 		}

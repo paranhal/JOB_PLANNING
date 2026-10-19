@@ -69,11 +69,13 @@ func InlineImageAt(doc []byte, placeholder string, png []byte, box SignatureBox,
 
 	padded, err := prepareSignaturePNG(png)
 	if err != nil {
-		return nil, err
+		replacePlaceholderText(parts, token, fallback)
+		return packHWPX(parts)
 	}
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(padded))
 	if err != nil {
-		return nil, fmt.Errorf("사인 그림 크기를 읽지 못했습니다: %w", err)
+		replacePlaceholderText(parts, token, fallback)
+		return packHWPX(parts)
 	}
 	orgW, orgH := cfg.Width*75, cfg.Height*75
 	id := nextBinID(parts, "sig")
@@ -252,7 +254,6 @@ func signatureCellWidth(placeholder string) int {
 func SignatureOffset(cellWidth, size, rightGap, nudgeY int) (horz, vert int) {
 	return cellWidth - sigCellPadHWPUNIT - size + rightGap, sigRowHeightHWPUNIT/2 - size/2 + nudgeY
 }
-
 
 func nextShapeID(s string) int {
 	return 1001 + strings.Count(s, "<hp:pic")

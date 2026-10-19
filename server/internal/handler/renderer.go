@@ -51,6 +51,11 @@ func templateFiles(name string) []string {
 			files = append(files, partials...)
 		}
 	}
+	if strings.HasPrefix(name, "leave/") {
+		if partials, err := filepath.Glob("web/templates/leave/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "as/") {
 		if partials, err := filepath.Glob("web/templates/as/_*.html"); err == nil {
 			files = append(files, partials...)
@@ -250,15 +255,15 @@ func RenderPartial(c echo.Context, name string, data interface{}) error {
 
 func funcMap() template.FuncMap {
 	return template.FuncMap{
-		"add":            func(a, b int) int { return a + b },
-		"subtract":       func(a, b int) int { return a - b },
-		"dateLabelMDW":   model.DateLabelMDW,
+		"add":                func(a, b int) int { return a + b },
+		"subtract":           func(a, b int) int { return a - b },
+		"dateLabelMDW":       model.DateLabelMDW,
 		"leaveKindLabel":     model.LeaveKindLabel,
 		"projectKindLabel":   model.ProjectKindLabel,
 		"projectDutyLabel":   model.ProjectDutyLabel,
 		"assignmentSelected": model.AssignmentSelected,
-		"hasSuffix":      strings.HasSuffix,
-		"urlquery":       url.QueryEscape,
+		"hasSuffix":          strings.HasSuffix,
+		"urlquery":           url.QueryEscape,
 		"hasString": func(list interface{}, s string) bool {
 			switch v := list.(type) {
 			case []string:

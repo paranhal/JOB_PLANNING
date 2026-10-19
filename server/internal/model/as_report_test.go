@@ -113,8 +113,12 @@ func TestASReportDraftValuesCoverAllKeys(t *testing.T) {
 	if _, ok := vals["지원유형"]; ok {
 		t.Fatal("지원유형 키를 넣으면 발급이 막힌다")
 	}
-	if vals["점검자사인"] != "(사인)" || vals["확인자사인"] != "(사인)" {
-		t.Fatal("사인 없을 때 (사인) 글자가 키 값이어야 한다")
+	if vals["점검자사인"] != "" || vals["확인자사인"] != "" {
+		t.Fatal("사인 없을 때 점검자 이름이 없으면 서명 칸은 비운다")
+	}
+	named := ASReportDraft{Inspector: "양기헌", Confirmer: "확인자"}.Values()
+	if named["점검자사인"] != "양기헌" || named["확인자사인"] != "확인자" {
+		t.Fatal("서명 없으면 이름")
 	}
 	if vals["조치내용"] != "점검\n정상" {
 		t.Fatalf("조치내용에 결론이 안 붙음: %q", vals["조치내용"])

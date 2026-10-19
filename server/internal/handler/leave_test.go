@@ -73,6 +73,18 @@ func TestLeaveFormSubmitInboxApproveHWPX(t *testing.T) {
 	leavePath := strings.Split(loc, "?")[0]
 
 	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, leavePath, nil)
+	req.AddCookie(jwtCookieUserClaims(t, staff))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `data-stamps`) {
+		t.Fatalf("show stamps %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "직원") || !strings.Contains(body, "승인 공란") {
+		t.Fatalf("결재 중 작성 이름·승인 공란 없음")
+	}
+
+	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/approvals/inbox", nil)
 	req.AddCookie(jwtCookieUserClaims(t, head))
 	e.ServeHTTP(rec, req)
@@ -92,6 +104,21 @@ func TestLeaveFormSubmitInboxApproveHWPX(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("approve %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, leavePath, nil)
+	req.AddCookie(jwtCookieUserClaims(t, staff))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "팀장") || strings.Contains(rec.Body.String(), "승인 공란") {
+		t.Fatalf("승인 후 이름 %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/approvals/"+arID, nil)
+	req.AddCookie(jwtCookieUserClaims(t, head))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "팀장") {
+		t.Fatalf("결재 상세 이름 %d %s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()

@@ -58,6 +58,21 @@ func TestInlineImageAtFallbackLeavesText(t *testing.T) {
 	}
 }
 
+func TestInlineImageAtCorruptPNGFallsBackToName(t *testing.T) {
+	tpl := BuildPlaceholderTemplate()
+	out, err := InlineImageAt(tpl, "점검자사인", []byte("not-png"), confirmedSigBox(), "홍길동")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec := string(mustZipFile(t, out, "Contents/section0.xml"))
+	if !strings.Contains(sec, "홍길동") {
+		t.Fatal("손상 PNG는 이름이어야 한다")
+	}
+	if strings.Contains(sec, "<hp:pic") {
+		t.Fatal("손상 PNG에 그림이 들어갔다")
+	}
+}
+
 func TestInlineImageAtFloatsInFrontOfText(t *testing.T) {
 	png := inkPNG(t)
 	tpl := BuildPlaceholderTemplate()

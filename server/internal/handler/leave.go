@@ -137,6 +137,7 @@ func (h *LeaveHandler) Show(c echo.Context) error {
 		"Type":        typeLabel(req.TypeKey),
 		"AR":          ar,
 		"Steps":       steps,
+		"Stamps":      h.svc.StampCells(req),
 		"OK":          strings.TrimSpace(c.QueryParam("ok")),
 		"Error":       strings.TrimSpace(c.QueryParam("err")),
 		"CanWithdraw": req.UserID == a.UserID && req.Status == "pending" && !a.ReadOnly && !a.ViewAs,
@@ -222,8 +223,10 @@ func (h *LeaveHandler) ApprovalShow(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	var leave *leaveapp.Request
+	var stamps []leaveapp.StampCell
 	if ar.DocType == approval.DocLeave {
 		leave, _ = h.svc.Get(ar.DocID)
+		stamps = h.svc.StampCells(leave)
 	}
 	return c.Render(http.StatusOK, "leave/approval_show.html", map[string]interface{}{
 		"Title":    ar.Title,
@@ -231,6 +234,7 @@ func (h *LeaveHandler) ApprovalShow(c echo.Context) error {
 		"AR":       ar,
 		"Steps":    steps,
 		"Leave":    leave,
+		"Stamps":   stamps,
 		"CanAct":   acc&approval.PermAct != 0 && ar.Status == approval.StatusInProgress,
 		"ActLabel": actLabel,
 		"OK":       strings.TrimSpace(c.QueryParam("ok")),

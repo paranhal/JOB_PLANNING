@@ -13,8 +13,10 @@
   </div>
   {{end}}
   <div class="card p-4 text-ui">
+    <p class="font-medium text-ink mb-2">결재란 (작성 / 검토 / 승인)</p>
+    {{template "leave_stamps" .Stamps}}
     {{range .Steps}}
-    <p>{{.StepNo}} {{.Status}} {{if eq .ActMode "delegate"}}<span class="badge badge-info">대리 결재</span>{{end}}</p>
+    <p class="mt-2">{{.StepNo}} {{.Status}} {{if eq .ActMode "delegate"}}<span class="badge badge-info">대리 결재</span>{{end}}</p>
     {{end}}
   </div>
   {{if .CanAct}}

@@ -20,7 +20,8 @@
   <div class="card p-4 text-ui">
     <p class="font-medium text-ink mb-2">결재란 (작성 / 검토 / 승인)</p>
     <p class="text-ink-muted mb-2">검토란은 양식 사선 그대로 비웁니다.</p>
-    <ol class="space-y-1">
+    {{template "leave_stamps" .Stamps}}
+    <ol class="space-y-1 mt-3">
       {{range .Steps}}
       <li>{{.StepNo}}. {{.StepType}} · {{.ApproverID}} · {{.Status}} {{if .ActMode}}({{.ActMode}}){{end}}</li>
       {{else}}

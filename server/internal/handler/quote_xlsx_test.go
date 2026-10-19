@@ -240,14 +240,18 @@ func TestStampQuoteSignatureAddsPNGWithoutFailingEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := stampQuoteSignature(raw, nil, "P"); !bytes.Equal(got, raw) {
-		t.Fatal("사인 없으면 원본을 유지해야 한다")
+	if got := stampQuoteSignature(raw, model.SignatureMark{}, "P"); !bytes.Equal(got, raw) {
+		t.Fatal("이름·사인 없으면 원본을 유지해야 한다")
+	}
+	named := stampQuoteSignature(raw, model.SignatureOrName(nil, "최혜영", "", ""), "P")
+	if bytes.Equal(named, raw) {
+		t.Fatal("사인 없으면 이름이 들어가야 한다")
 	}
 	png, err := imageproc.ProcessSignature(bytes.NewReader(inkPNG(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := stampQuoteSignature(raw, png, "P")
+	out := stampQuoteSignature(raw, model.SignatureOrName(png, "최혜영", "", ""), "P")
 	zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
 	if err != nil {
 		t.Fatal(err)

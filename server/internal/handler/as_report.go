@@ -158,19 +158,23 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		h.logSavedSignatureIfUsed(c, "inspector", draft.Inspector, inspPNG)
 		h.logSavedSignatureIfUsed(c, "confirmer", draft.Confirmer, confPNG)
 		orgBox := h.reportSignatureOrgBox()
+		inspUser := h.reportSlotUserID("inspector", inspID, draft.Inspector, "")
+		confUser := h.reportSlotUserID("confirmer", confID, draft.Confirmer, "")
 		inspBox := orgBox
-		if u := h.reportSlotUserID("inspector", inspID, draft.Inspector, ""); u != nil {
-			inspBox = model.ParseReportSignatureBox(u.SignatureBox, orgBox)
+		if inspUser != nil {
+			inspBox = model.ParseReportSignatureBox(inspUser.SignatureBox, orgBox)
 		}
 		confBox := orgBox
-		if u := h.reportSlotUserID("confirmer", confID, draft.Confirmer, ""); u != nil {
-			confBox = model.ParseReportSignatureBox(u.SignatureBox, orgBox)
+		if confUser != nil {
+			confBox = model.ParseReportSignatureBox(confUser.SignatureBox, orgBox)
 		}
-		data, err = hwpx.InlineImageAt(tpl, "점검자사인", inspPNG, toHWPXSigBox(inspBox), "(사인)")
+		inspMark := model.SignatureOrName(inspPNG, reportStampName(inspUser, draft.Inspector), "", "")
+		confMark := model.SignatureOrName(confPNG, reportStampName(confUser, draft.Confirmer), "", "")
+		data, err = hwpx.InlineImageAt(tpl, "점검자사인", inspMark.PNG, toHWPXSigBox(inspBox), inspMark.Name)
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
-		data, err = hwpx.InlineImageAt(data, "확인자사인", confPNG, toHWPXSigBox(confBox), "(사인)")
+		data, err = hwpx.InlineImageAt(data, "확인자사인", confMark.PNG, toHWPXSigBox(confBox), confMark.Name)
 		if err != nil {
 			return h.redirectReportErr(c, as.ASID, "보고서를 만들지 못했습니다: "+err.Error())
 		}
@@ -218,6 +222,15 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 		return writeDownloadBytes(c, data, mime, asciiName, utf8Name)
 	}
 	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?ok=report_saved")
+}
+
+func reportStampName(u *model.User, draftName string) string {
+	if u != nil {
+		if n := model.PersonDisplayName(u.FullName, u.Username, u.UserID); n != "" {
+			return n
+		}
+	}
+	return strings.TrimSpace(draftName)
 }
 
 func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {

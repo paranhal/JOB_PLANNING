@@ -134,8 +134,11 @@ func FillQuoteFormA1(q *model.SalesQuote, company model.QuoteCompany) ([]byte, e
 	return FillQuoteFormP(q, company)
 }
 
-func stampQuoteSignature(raw, png []byte, form string) []byte {
-	if len(raw) == 0 || len(png) == 0 {
+func stampQuoteSignature(raw []byte, mark model.SignatureMark, form string) []byte {
+	if len(raw) == 0 {
+		return raw
+	}
+	if len(mark.PNG) == 0 && strings.TrimSpace(mark.Name) == "" {
 		return raw
 	}
 	f, err := excelize.OpenReader(bytes.NewReader(raw))
@@ -148,11 +151,22 @@ func stampQuoteSignature(raw, png []byte, form string) []byte {
 	if form == "D" {
 		cell = "J36"
 	}
-	_ = f.AddPictureFromBytes(sheet, cell, &excelize.Picture{
-		Extension: ".png",
-		File:      png,
-		Format:    &excelize.GraphicOptions{LockAspectRatio: true, ScaleX: 0.35, ScaleY: 0.35, OffsetX: 10, OffsetY: 8},
-	})
+	if model.UsableSignaturePNG(mark.PNG) {
+		_ = f.AddPictureFromBytes(sheet, cell, &excelize.Picture{
+			Extension: ".png",
+			File:      mark.PNG,
+			Format:    &excelize.GraphicOptions{LockAspectRatio: true, ScaleX: 0.35, ScaleY: 0.35, OffsetX: 10, OffsetY: 8},
+		})
+	} else if name := strings.TrimSpace(mark.Name); name != "" {
+		_ = f.SetCellValue(sheet, cell, name)
+		style, err := f.NewStyle(&excelize.Style{
+			Font:      &excelize.Font{Size: model.StampNameFontPt(name)},
+			Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: false},
+		})
+		if err == nil {
+			_ = f.SetCellStyle(sheet, cell, cell, style)
+		}
+	}
 	out, err := writeWorkbook(f)
 	if err != nil || len(out) == 0 {
 		return raw

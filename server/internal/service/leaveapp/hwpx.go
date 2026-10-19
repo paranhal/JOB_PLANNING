@@ -38,16 +38,14 @@ func (s *Service) FillHWPX(leaveID string) ([]byte, string, error) {
 			if approveStamp == "" {
 				approveStamp = sn.AuthorStampDate
 			}
-			steps, _ := s.Eng.ListSteps(ar.RequestID)
-			for _, st := range steps {
-				if st.StepType == approval.TypeApprove && st.ActMode == approval.ModeDelegate {
-					approveMark = "(대결)"
-				}
-			}
 		}
 	}
+	stamps, names, stampMark := s.leaveStamps(req)
+	if stampMark != "" {
+		approveMark = stampMark
+	}
 	vals := hwpx.LeavePermitValues(PermitInput(sn, approveStamp, approveMark))
-	out, err := hwpx.FillLeavePermit(tpl, vals, nil, hwpx.SignatureBox{Size: 4600, RightGap: 900})
+	out, err := hwpx.FillLeavePermit(tpl, vals, stamps, names, hwpx.SignatureBox{Size: 4600, RightGap: 900})
 	if err != nil {
 		return nil, "", err
 	}

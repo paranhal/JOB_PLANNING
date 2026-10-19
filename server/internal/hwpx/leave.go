@@ -9,6 +9,8 @@ import (
 	"unicode"
 
 	"golang.org/x/text/unicode/norm"
+
+	"customer-support/internal/model"
 )
 
 // LeavePermitKeys 근태허가원 §6.2 자리표시자. 빠진 키가 있으면 Replace가 {{ 잔여로 막는다.
@@ -37,9 +39,9 @@ func DefaultLeaveTemplatePath() string {
 
 // LeavePermitInput 출력 채움값. 원장·UI와 무관하다. §6.2
 type LeavePermitInput struct {
-	DocNo, WrittenOn, Author string
-	TypeKey, TypeNote        string
-	PeriodMode               string
+	DocNo, WrittenOn, Author                                    string
+	TypeKey, TypeNote                                           string
+	PeriodMode                                                  string
 	HourYear, HourMonth, HourDay, HourStart, HourEnd, HourCount string
 	DayStart, DayEnd, DayCount                                  string
 	SwapDate                                                    string
@@ -110,15 +112,22 @@ func LeavePermitValues(in LeavePermitInput) map[string]string {
 }
 
 // FillLeavePermit 서명은 InlineImageAt, 본문은 Replace. 검토 서명은 넣지 않는다.
-func FillLeavePermit(tpl []byte, vals map[string]string, stamps map[string][]byte, box SignatureBox) ([]byte, error) {
+// 처리된 칸만 stamps/names를 넘긴다. 둘 다 비면 공란(결재 중). D-94
+func FillLeavePermit(tpl []byte, vals map[string]string, stamps map[string][]byte, names map[string]string, box SignatureBox) ([]byte, error) {
 	out := tpl
 	for _, key := range []string{"작성사인", "승인사인"} {
 		png := stamps[key]
-		if len(png) == 0 {
+		name := strings.TrimSpace(names[key])
+		if len(png) == 0 && name == "" {
 			continue
 		}
+		mark := model.SignatureOrName(png, name, "", "")
+		fallback := mark.Name
+		if fallback == "" {
+			fallback = name
+		}
 		var err error
-		out, err = InlineImageAt(out, key, png, box, "(사인)")
+		out, err = InlineImageAt(out, key, mark.PNG, box, fallback)
 		if err != nil {
 			return nil, err
 		}

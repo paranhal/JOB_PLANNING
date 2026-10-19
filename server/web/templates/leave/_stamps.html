@@ -1,0 +1,19 @@
+{{define "leave_stamps"}}
+<div class="flex gap-3" data-stamps>
+  {{range .}}
+  <div class="flex flex-col items-center w-24">
+    <span class="text-ui-xs text-ink-muted">{{.Label}}</span>
+    <div class="w-20 h-16 border border-line rounded-control flex items-center justify-center overflow-hidden bg-surface"{{if .Tip}} title="{{.Tip}}"{{end}}>
+      {{if .Empty}}
+      <span class="sr-only">{{.Label}} 공란</span>
+      {{else if .HasImage}}
+      <img src="{{.ImageSrc}}" alt="" class="max-w-full max-h-full object-contain">
+      {{else if .Name}}
+      <span class="{{.NameClass}} text-ink font-medium whitespace-nowrap">{{.Name}}</span>
+      {{end}}
+    </div>
+    {{if .Mark}}<span class="text-ui-xs text-ink-muted">{{.Mark}}</span>{{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
