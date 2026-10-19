@@ -28,7 +28,7 @@ const projectSelect = `
 		COALESCE(p.project_kind,'maintenance'), COALESCE(p.project_kind_set,0), COALESCE(sp.biz_type,''),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
-		COALESCE(sp.sales_no,'')
+		COALESCE(sp.sales_no,''), COALESCE(sp.stage,''), COALESCE(sp.close_reason,'')
 	FROM work_projects p
 	LEFT JOIN customers cu ON cu.customer_id = p.customer_id
 	LEFT JOIN contacts ct ON ct.contact_id = p.contact_id
@@ -70,15 +70,7 @@ func (r *ProjectRepo) listProjects(search string, year int, status string, inclu
 		args = append(args, like, like, like, like, like, like, like)
 	}
 	if !includeAll {
-		q += ` AND (
-			COALESCE(p.contract_amount,0) > 0
-			OR TRIM(COALESCE(p.contract_no,'')) != ''
-			OR (
-				TRIM(COALESCE(p.sales_project_id,'')) != ''
-				AND COALESCE(sp.stage,'')='closed'
-				AND COALESCE(sp.close_reason,'')='contracted'
-			)
-		)`
+		q += ` AND` + model.ContractedSQL("p", "sp")
 	}
 	q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
 	rows, err := r.db.Query(q, args...)
@@ -716,7 +708,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.Notes, &p.ContactID,
 		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind, &p.ProjectKindSet, &p.SalesBizType,
 		&created, &updated,
-		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo,
+		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo, &p.SalesStage, &p.SalesCloseReason,
 	)
 	if err != nil {
 		return nil, err

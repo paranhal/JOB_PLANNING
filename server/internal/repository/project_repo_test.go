@@ -197,4 +197,13 @@ func TestListContractsHidesNonContractUnlessAll(t *testing.T) {
 	if kpiN != len(def) || kpiAmt < 1_000_000 {
 		t.Fatalf("KPI n=%d amt=%d", kpiN, kpiAmt)
 	}
+
+	withNo := &model.WorkProject{Name: "번호만계약", PlanYear: 2026, Status: model.WBProjectActive, ContractNo: "CN-1"}
+	if err := repo.Create(withNo); err != nil {
+		t.Fatal(err)
+	}
+	gotNo, err := repo.Get(withNo.ProjectID)
+	if err != nil || !gotNo.IsContracted() {
+		t.Fatal("계약번호 계약")
+	}
 }

@@ -396,6 +396,8 @@ type WorkProject struct {
 	Status          string    `json:"status"`
 	SalesProjectID  string    `json:"sales_project_id,omitempty"`
 	SalesNo         string    `json:"sales_no,omitempty"`
+	SalesStage      string    `json:"sales_stage,omitempty"`
+	SalesCloseReason string   `json:"sales_close_reason,omitempty"`
 	ContractAmount  int       `json:"contract_amount,omitempty"`
 	ContractNo      string    `json:"contract_no,omitempty"`
 	ProjectKind     string    `json:"project_kind,omitempty"`

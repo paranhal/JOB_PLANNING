@@ -91,7 +91,7 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	items, err := h.repo.ListFiltered(search, year, status)
+	items, err := h.repo.ListContracts(search, year, status, false)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (h *ProjectHandler) KindReview(c echo.Context) error {
 	if !canViewProjects(c) {
 		return echo.ErrForbidden
 	}
-	items, err := h.repo.ListFiltered("", 0, "")
+	items, err := h.repo.ListContracts("", 0, "", false)
 	if err != nil {
 		return err
 	}

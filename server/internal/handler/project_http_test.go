@@ -89,6 +89,7 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 		"end_date":      {"2026-12-31"},
 		"status":        {"active"},
 		"project_kind":  {"maintenance"},
+		"contract_amount": {"1000"},
 		"color":         {"#3B82F6"},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -216,7 +217,7 @@ func TestProjectListNumberAndDuplicateBanner(t *testing.T) {
 	e, _, _ := newProjectServer(t)
 	for i := 0; i < 2; i++ {
 		rec := doForm(t, e, "/projects", url.Values{
-			"name": {"중복사업"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"maintenance"},
+			"name": {"중복사업"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"maintenance"}, "contract_amount": {"1000"},
 		})
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("등록 %d", rec.Code)
@@ -289,7 +290,7 @@ func TestProjectCreateKindRequired(t *testing.T) {
 		t.Fatal("유형 없이 등록되면 안 된다")
 	}
 	rec = doForm(t, e, "/projects", url.Values{
-		"name": {"유형있음"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"build"},
+		"name": {"유형있음"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"build"}, "contract_amount": {"1"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("유형 지정 등록 status=%d", rec.Code)
