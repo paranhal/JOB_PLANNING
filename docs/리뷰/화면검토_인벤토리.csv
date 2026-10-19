@@ -1,0 +1,149 @@
+번호,상태,소속시스템,보조소속,메뉴섹션,화면명,라우트,쿼리변형,템플릿,접근역할,주기기,화면종류,비고
+1,사용중,공통·관리,,계정,로그인,/login,,auth/login.html,로그인전,공통,입력,
+2,사용중,공통·관리,,계정,접근거부,/forbidden,,auth/forbidden.html,전역할,공통,안내,
+3,사용중,공통·관리,,계정,비밀번호변경,/account,,auth/account.html,전역할,공통,입력,
+4,사용중,공통·관리,,계정,프로필보완,/account/complete,,auth/profile_complete.html,전역할,공통,입력,
+5,사용중,공통·관리,,대시보드,홈,/,,dashboard.html,전역할,공통,대시보드,
+6,사용중,공통·관리,,업무,내작업,/work,,work/list.html,전역할,공통,목록,칸반 아님
+7,사용중,업무관리,공통·관리,업무보드,업무보드 목록,/workboard,,workboard/list.html,전역할,공통,목록,
+8,사용중,업무관리,공통·관리,업무보드,업무보드 칸반,/workboard/kanban,,workboard/kanban.html,전역할,공통,칸반,상태 축 있음
+9,사용중,업무관리,공통·관리,업무보드,업무 등록·수정,/workboard/register,,workboard/register.html,전역할,공통,입력,view=week|month 레이아웃 다름
+10,사용중,업무관리,공통·관리,업무보드,업무 등록(주),/workboard/register,view=week,workboard/register.html,전역할,공통,입력,쿼리변형
+11,사용중,업무관리,공통·관리,업무보드,업무 등록(월),/workboard/register,view=month,workboard/register.html,전역할,공통,입력,쿼리변형
+12,사용중,업무관리,공통·관리,업무보드,업무 상세,/workboard/tasks/:id,,workboard/task_show.html,전역할,공통,상세,
+13,사용중,업무관리,,업무처리현황,일 타임라인,/work-status,,work_status/timeline.html,전역할,공통,캘린더,기본 view=day
+14,사용중,업무관리,,업무처리현황,주 타임라인,/work-status,view=week,work_status/timeline.html,전역할,공통,캘린더,쿼리변형
+15,사용중,업무관리,,업무처리현황,월 캘린더,/work-status,view=month,work_status/timeline.html,전역할,공통,캘린더,쿼리변형
+16,사용중,업무관리,,미계획,미계획 업무,/plan/unplanned,,plan/unplanned.html,전역할,공통,목록,
+17,사용중,업무관리,,AS,AS 목록,/as,,as/list.html,권한:as,공통,목록,status 필터는 동일 레이아웃
+18,사용중,업무관리,,AS,AS 칸반,/as/kanban,,as/kanban.html,권한:as,공통,칸반,
+19,사용중,업무관리,,AS,AS 접수,/as/new,,as/form.html,권한:as.receive,공통,입력,
+20,사용중,업무관리,,AS,AS 상세,/as/:id,,as/show.html,권한:as,공통,상세,
+21,사용중,업무관리,,AS,AS 수정,/as/:id/edit,,as/form.html,권한:as,공통,입력,
+22,사용중,업무관리,,AS,조치 등록,/as/:id/action,,as/action.html,권한:as.process,공통,입력,
+23,사용중,업무관리,,AS,AS 보고서,/as/:id/report,,as/report.html,권한:as,공통,상세,
+24,사용중,업무관리,,AS,업무일지 조치,/as/work/:id/action,,as/work_action.html,권한:as.process,공통,입력,
+25,사용중,업무관리,,AS,유사사례 패널,/as/:id/similar,,as/similar_panel.html,권한:as,공통,부분,HTMX
+26,사용중,업무관리,,AS,AS 통계,/as/stats,,as/stats.html,권한:as,공통,통계,
+27,사용중,업무관리,,AS,지식 검색,/as/search,,as/search.html,권한:as,공통,검색,
+28,사용중,업무관리,,AS,지식베이스,/as/knowledge,,as/knowledge.html,권한:as,공통,목록,
+29,사용중,업무관리,,AS,지식 공백,/as/knowledge/gaps,,as/kb_gaps.html,권한:as,공통,목록,
+30,사용중,업무관리,,AS,지식 이력,/as/knowledge/history,,as/kb_history.html,권한:as,공통,목록,
+31,사용중,업무관리,,AS,키워드,/as/keywords,,as/keywords.html,권한:as,공통,관리설정,
+32,사용중,업무관리,,점검,점검 목록,/maintenance,,maintenance/list.html,권한:maintenance,공통,목록,
+33,사용중,업무관리,,점검,점검 상세,/maintenance/:id,,maintenance/plan_show.html,권한:maintenance,공통,상세,
+34,사용중,업무관리,,점검,방문 조치,/maintenance/:id/action,,maintenance/visit_action.html,권한:maintenance,공통,입력,
+35,사용중,업무관리,,점검계획,계획 관리,/maintenance/plans,,maintenance/plan_manage.html,권한:maintenance,공통,목록,
+36,사용중,업무관리,,점검계획,계획 신규,/maintenance/plans/new,,maintenance/plan_new.html,권한:maintenance,공통,입력,
+37,사용중,업무관리,,점검계획,계획 생성,/maintenance/plans/generate,,maintenance/plan_generate.html,권한:maintenance,공통,입력,
+38,사용중,업무관리,,점검계획,중복 계획,/maintenance/plans/duplicates,,maintenance/plan_duplicates.html,권한:maintenance,공통,목록,
+39,사용중,업무관리,,점검계획,계획 삭제,/maintenance/plans/:id/delete,,maintenance/plan_delete.html,권한:maintenance,공통,입력,
+40,사용중,업무관리,,점검사이트,사이트 목록,/maintenance/sites,,maintenance/site_list.html,권한:maintenance,공통,목록,
+41,사용중,업무관리,,점검사이트,사이트 신규,/maintenance/sites/new,,maintenance/site_form.html,권한:maintenance,공통,입력,
+42,사용중,업무관리,,점검사이트,사이트 수정,/maintenance/sites/:id/edit,,maintenance/site_form.html,권한:maintenance,공통,입력,
+43,사용중,업무관리,,점검사이트,권역 순서,/maintenance/sites/region-order,,maintenance/region_order.html,권한:maintenance,공통,관리설정,
+44,사용중,업무관리,,회의,회의 개요,/meetings,,meeting/overview.html,전역할,공통,목록,HTMX 카드
+45,사용중,업무관리,,회의,회의 상세,/meetings/:id,,meeting/show.html,전역할,공통,상세,
+46,사용중,업무관리,,분석,업무 분석,/analysis,,analysis/dashboard.html,전역할,공통,대시보드,
+47,사용중,업무관리,,통계,통계 개요,/stats,,stats/overview.html,전역할,공통,통계,view=week|month
+48,사용중,업무관리,,통계,통계 개요(주),/stats,view=week,stats/overview.html,전역할,공통,통계,쿼리변형
+49,사용중,업무관리,,통계,통계 개요(월),/stats,view=month,stats/overview.html,전역할,공통,통계,쿼리변형
+50,사용중,업무관리,,통계,리포트,/stats/reports,,stats/reports.html,전역할,공통,통계,
+51,사용중,업무관리,,통계,상세 목록,/stats/detail,,stats/list.html,전역할,공통,목록,
+52,사용중,업무관리,,통계,마일스톤,/stats/milestones,,stats/milestones.html,전역할,공통,목록,
+53,사용중,업무관리,,통계,마일스톤 항목,/stats/milestones/items,,stats/milestone_items.html,전역할,공통,부분,
+54,사용중,업무관리,,통계,주간실적 결과,/stats (POST 후 표시),,stats/company_weekly_result.html,전역할,공통,상세,다운로드 GET 별도
+55,사용중,업무관리,,총무업무,총무 목록,/admin-work,,admin_work/list.html,권한:admin_work,공통,목록,
+56,사용중,업무관리,,총무업무,총무 통계,/admin-work/stats,,admin_work/stats.html,권한:admin_work,공통,통계,
+57,사용중,업무관리,,총무업무,총무 신규,/admin-work/new,,admin_work/form.html,권한:admin_work,공통,입력,
+58,사용중,업무관리,,총무업무,총무 수정,/admin-work/:id/edit,,admin_work/form.html,권한:admin_work,공통,입력,
+59,사용중,업무관리,공통·관리,휴가,휴가 목록,/leaves,,leave/list.html,전역할(self.leave),공통,목록,72 신규
+60,사용중,업무관리,공통·관리,휴가,휴가 신청,/leaves/new,,leave/form.html,전역할(self.leave),공통,입력,72 신규
+61,사용중,업무관리,공통·관리,휴가,휴가 상세,/leaves/:id,,leave/show.html,전역할(self.leave),공통,상세,72 신규
+62,사용중,업무관리,공통·관리,결재,결재함,/approvals/inbox,,leave/inbox.html,전역할(self.approval),공통,목록,72 신규
+63,사용중,업무관리,공통·관리,결재,결재 상세,/approvals/:id,,leave/approval_show.html,전역할(self.approval),공통,상세,72 신규
+64,사용중,고객관리,,고객,고객 목록,/customers,,customer/list.html,권한:customer,공통,목록,
+65,사용중,고객관리,,고객,고객 신규,/customers/new,,customer/form.html,권한:customer,공통,입력,
+66,사용중,고객관리,,고객,고객 상세,/customers/:id,,customer/show.html,권한:customer,공통,상세,탭 HTMX
+67,사용중,고객관리,,고객,고객 수정,/customers/:id/edit,,customer/form.html,권한:customer,공통,입력,
+68,사용중,고객관리,,고객,자산 탭,/customers/:id/assets,,customer/tab_assets.html,권한:customer,공통,부분,HTMX
+69,사용중,고객관리,,고객,연락처 탭,/customers/:id/contacts,,customer/tab_contacts.html,권한:customer,공통,부분,HTMX
+70,사용중,고객관리,,고객,AS 탭,/customers/:id/as,,customer/tab_as.html,권한:customer,공통,부분,HTMX
+71,사용중,고객관리,,자산,자산 목록,/assets,,asset/list.html,권한:asset,공통,목록,
+72,사용중,고객관리,,자산,자산 신규,/assets/new,,asset/form.html,권한:asset,공통,입력,
+73,사용중,고객관리,,자산,자산 상세,/assets/:id,,asset/show.html,권한:asset,공통,상세,
+74,사용중,고객관리,,자산,자산 수정,/assets/:id/edit,,asset/form.html,권한:asset,공통,입력,
+75,사용중,고객관리,,연락처,연락처 목록,/contacts,,contact/list.html,권한:contact,공통,목록,
+76,사용중,고객관리,,연락처,연락처 신규,/contacts/new,,contact/form.html,권한:contact,공통,입력,
+77,사용중,고객관리,,연락처,연락처 상세,/contacts/:id,,contact/show.html,권한:contact,공통,상세,
+78,사용중,고객관리,,연락처,연락처 수정,/contacts/:id/edit,,contact/form.html,권한:contact,공통,입력,
+79,사용중,고객관리,,연락처,연락 이력,/contact-history,,contact_history/list.html,권한:contact,공통,목록,
+80,사용중,고객관리,,관계,관계 목록,/relations,,relation/list.html,권한:customer,공통,목록,
+81,사용중,고객관리,,관계,관계 신규,/relations/new,,relation/form.html,권한:customer,공통,입력,
+82,사용중,고객관리,,관계,관계 수정,/relations/:id/edit,,relation/form.html,권한:customer,공통,입력,
+83,사용중,고객관리,,SW,SW 목록,/sw-details,,sw_detail/list.html,권한:asset,공통,목록,
+84,사용중,고객관리,,SW,SW 신규,/sw-details/new,,sw_detail/form.html,권한:asset,공통,입력,
+85,사용중,고객관리,,SW,SW 수정,/sw-details/:id/edit,,sw_detail/form.html,권한:asset,공통,입력,
+86,사용중,영업관리,,영업,영업 목록,/sales,,sales/list.html,권한:sales,공통,목록,
+87,사용중,영업관리,,영업,영업 대시보드,/sales/dashboard,,sales/dashboard.html,권한:sales,공통,대시보드,
+88,사용중,영업관리,,영업,영업 신규,/sales/new,,sales/form.html,권한:sales,공통,입력,
+89,사용중,영업관리,,영업,영업 상세,/sales/:id,,sales/show.html,권한:sales,공통,상세,
+90,사용중,영업관리,,영업,영업 수정,/sales/:id/edit,,sales/form.html,권한:sales,공통,입력,
+91,사용중,영업관리,,영업,파이프라인,/sales/pipeline,,sales/pipeline.html,권한:sales,공통,칸반,단계 축
+92,사용중,영업관리,,영업,활동 목록,/sales/activities,,sales/activities.html,권한:sales,공통,목록,
+93,사용중,영업관리,,영업,활동 상세,/sales/activities/:aid,,sales/activity_show.html,권한:sales,공통,상세,
+94,사용중,영업관리,,영업,그룹 목록,/sales/groups,,sales/groups.html,권한:sales,공통,목록,
+95,사용중,영업관리,,영업,그룹 신규,/sales/groups/new,,sales/group_form.html,권한:sales,공통,입력,
+96,사용중,영업관리,,영업,그룹 상세,/sales/groups/:id,,sales/group_show.html,권한:sales,공통,상세,
+97,사용중,영업관리,,영업,그룹 수정,/sales/groups/:id/edit,,sales/group_form.html,권한:sales,공통,입력,
+98,사용중,영업관리,,영업,승격 고객,/sales/:id/promote,,sales/promote_customer.html,권한:sales,공통,입력,
+99,사용중,영업관리,,영업,재개(웨이크),/sales/:id/wake,,sales/wake.html,권한:sales,공통,입력,
+100,사용중,영업관리,사업관리,견적,견적 목록,/quotes,,quotes/list.html,권한:quote,공통,목록,
+101,사용중,영업관리,사업관리,견적,견적 신규,/quotes/new,,quotes/form.html,권한:quote,공통,입력,
+102,사용중,영업관리,사업관리,견적,견적 상세,/quotes/:id,,quotes/show.html,권한:quote,공통,상세,
+103,사용중,영업관리,사업관리,견적,견적 수정,/quotes/:id/edit,,quotes/form.html,권한:quote,공통,입력,
+104,사용중,영업관리,사업관리,견적,노임단가,/labor-rates,,quotes/labor_rates.html,권한:quote,공통,관리설정,
+105,사용중,영업관리,사업관리,견적,노임 업로드,/labor-rates/upload,,quotes/labor_upload.html,권한:quote,공통,입력,
+106,사용중,영업관리,사업관리,발주,발주 목록,/orders,,orders/list.html,권한:order,공통,목록,
+107,사용중,영업관리,사업관리,발주,발주 상세,/orders/:id,,orders/show.html,권한:order,공통,상세,
+108,사용중,영업관리,사업관리,발주,발주 수정,/orders/:id/edit,,orders/form.html,권한:order,공통,입력,
+109,사용중,영업관리,사업관리,품목,품목 목록,/items,,items/list.html,권한:quote,공통,목록,
+110,사용중,영업관리,사업관리,품목,품목 신규,/items/new,,items/form.html,권한:quote,공통,입력,
+111,사용중,영업관리,사업관리,품목,품목 수정,/items/:id/edit,,items/form.html,권한:quote,공통,입력,
+112,사용중,사업관리,영업관리,프로젝트,프로젝트 목록,/projects,,project/list.html,권한:project,공통,목록,
+113,사용중,사업관리,영업관리,프로젝트,프로젝트 신규,/projects/new,,project/form.html,권한:project,공통,입력,
+114,사용중,사업관리,영업관리,프로젝트,프로젝트 상세,/projects/:id,,project/show.html,권한:project,공통,상세,
+115,사용중,사업관리,영업관리,프로젝트,프로젝트 수정,/projects/:id/edit,,project/form.html,권한:project,공통,입력,
+116,사용중,사업관리,영업관리,프로젝트,프로젝트 병합,/projects/:id/merge,,project/merge.html,비젼관리자,공통,입력,
+117,사용중,사업관리,,계약,계약 목록,/contracts,,contracts/list.html,권한:project,공통,목록,
+118,사용중,사업관리,,계약,계약 상세,/contracts/:id,,contracts/show.html,권한:project,공통,상세,
+119,사용중,공통·관리,,코드,코드 관리,/codes,,code/list.html,조직관리자+비젼,공통,관리설정,
+120,사용중,공통·관리,,공간,공간 목록,/spaces,,space/list.html,권한:space,공통,목록,
+121,사용중,공통·관리,,공간,공간 수정,/spaces/:id/edit,,space/edit.html,권한:space,공통,입력,
+122,사용중,공통·관리,,휴일,휴일·휴가설정,/holidays,,admin/holidays.html,조직관리자+비젼,공통,관리설정,tab=leave 변형
+123,사용중,공통·관리,,휴일,휴가설정 탭,/holidays,tab=leave,admin/holidays.html,조직관리자+비젼,공통,관리설정,쿼리변형
+124,사용중,공통·관리,,사용자,사용자 목록,/users,,auth/users.html,조직관리자+비젼,공통,목록,
+125,사용중,공통·관리,,사용자,삭제 사용자,/admin/users/deleted,,admin/users_deleted.html,조직관리자+비젼,공통,목록,
+126,사용중,공통·관리,,조직,조직 목록,/admin/orgs,,admin/orgs.html,비젼관리자,공통,목록,
+127,사용중,공통·관리,,조직,조직 분할,/admin/orgs/:id/split,,admin/org_split.html,비젼관리자,공통,입력,
+128,사용중,공통·관리,,조직,조직 삭제,/admin/orgs/:id/delete,,admin/org_delete.html,비젼관리자,공통,입력,
+129,사용중,공통·관리,,조직,조직 복구,/admin/orgs/:id/restore,,admin/org_restore.html,비젼관리자,공통,입력,
+130,사용중,공통·관리,,조직,조직 완전삭제,/admin/orgs/:id/purge,,admin/org_purge.html,비젼관리자,공통,입력,
+131,사용중,공통·관리,,권한,권한 매트릭스,/admin/permissions,,admin/permissions.html,비젼관리자,공통,관리설정,
+132,사용중,공통·관리,,멤버,멤버 관리,/admin/members,,admin/members.html,조직관리자+비젼,공통,목록,
+133,사용중,공통·관리,,가입,가입 요청,/admin/account-requests,,admin/account_requests.html,조직관리자+비젼,공통,목록,
+134,사용중,공통·관리,,시스템,시스템 설정,/admin/system,,admin/system.html,비젼관리자,공통,관리설정,
+135,사용중,공통·관리,,메일,메일 설정,/admin/mail,,admin/mail.html,비젼관리자,공통,관리설정,
+136,사용중,공통·관리,,알림,알림 설정,/admin/notify,,admin/notify.html,비젼관리자,공통,관리설정,
+137,사용중,공통·관리,,데이터,데이터 관리,/admin/data,,admin/data.html,비젼관리자,공통,관리설정,
+138,사용중,공통·관리,,데이터,데이터 초기화,/admin/data/reset,,admin/data_reset.html,비젼관리자,공통,입력,
+139,사용중,공통·관리,,영업로그,영업 로그,/admin/sales-logs,,admin/sales_logs.html,비젼관리자,공통,목록,
+140,사용중,공통·관리,,결재,결재 설정,/admin/approval-settings,,admin/approval_settings.html,조직관리자+비젼,공통,관리설정,71 신규
+141,사용중,공통·관리,,계정잠금,관리자 잠금해제,/admin/unlock,,auth/admin_unlock.html,비젼관리자,공통,입력,
+142,사용중,공통·관리,,계정,비젼 비밀번호,/admin/vision-password,,auth/vision_password.html,비젼관리자,공통,입력,
+143,죽은템플릿,공통·관리,,계정,커밍순 (미연결),—,,auth/coming_soon.html,—,공통,안내,GET 라우트 없음
+144,죽은템플릿,영업관리,,영업,플레이스홀더 (미연결),—,,sales/placeholder.html,—,공통,안내,GET 라우트 없음
+145,죽은템플릿,공통·관리,,백업,백업 화면 (미연결),—,,admin/backup.html,—,공통,관리설정,레거시. 실제 /admin/backup 는 리다이렉트
+146,죽은템플릿,업무관리,,업무처리현황,구 캘린더 템플릿,—,,work_status/calendar.html,—,공통,캘린더,핸들러는 timeline.html 사용
+147,레이아웃,공통·관리,,레이아웃,베이스 레이아웃,—,,layout/base.html,전역할,공통,레이아웃,단독 화면 아님
+148,부분,공통·관리,,레이아웃,분류 힌트,—,,_classify_hint.html,—,공통,부분,
