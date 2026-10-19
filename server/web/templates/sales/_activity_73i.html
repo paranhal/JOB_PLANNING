@@ -1,0 +1,155 @@
+{{define "sales_activity_73i"}}
+<div id="sales-act-kpi" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+  <div class="card p-4">
+    <p class="text-ui-xs text-ink-muted">전체 활동</p>
+    <p class="text-xl font-bold text-ink mt-1">{{.KPI.Total}}건</p>
+    <p class="text-ui-xs text-ink-muted mt-1">이번 달 신규 {{.KPI.MonthNew}}건</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-ui-xs text-ink-muted">이번 주 예정</p>
+    <p class="text-xl font-bold text-ink mt-1">{{.KPI.WeekPlanned}}건</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-ui-xs text-ink-muted">완료 활동</p>
+    <p class="text-xl font-bold text-ink mt-1">{{.KPI.Done}}건</p>
+    <p class="text-ui-xs text-ink-muted mt-1">완료율 {{.KPI.DoneRate}}</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-ui-xs text-ink-muted">후속 조치 지연</p>
+    <p class="text-xl font-bold text-ink mt-1">{{.KPI.Followup}}건</p>
+  </div>
+</div>
+
+<div id="sales-act-project-filter" class="card p-4 space-y-3"
+     x-data="actProjectFilter()"
+     data-applied="{{.AppliedIDs}}"
+     data-visible="{{.VisibleIDs}}">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h3 class="text-sm font-semibold text-ink">사업별 필터</h3>
+      <p class="text-ui-xs text-ink-muted mt-0.5">전체 선택과 개별 사업을 체크하여 활동 목록을 사업별로 필터링할 수 있습니다.</p>
+    </div>
+    <span class="text-ui-xs px-2 py-1 rounded-full bg-primary-soft text-ink">{{.ProjectBadge}}</span>
+  </div>
+  <div id="sales-act-biz-chips" class="flex flex-wrap gap-2">
+    {{range .BizChips}}
+    <a href="{{.Href}}" class="inline-flex items-center gap-1.5 text-sm {{if .Checked}}text-primary{{else}}text-ink-muted{{end}}">
+      <span class="inline-block w-3.5 h-3.5 border rounded {{if .Checked}}bg-primary border-primary{{else}}border-ink-muted{{end}}"></span>
+      {{.Label}} <span class="text-ui-xs">{{.Count}}</span>
+    </a>
+    {{end}}
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <label class="inline-flex items-center gap-1.5 text-sm text-ink">
+      <input type="checkbox" class="rounded" :checked="selected.length===all.length && all.length>0" @change="toggleAll($event.target.checked)"> 전체 선택
+    </label>
+    <a href="{{.ResetHref}}" class="btn-secondary px-3 py-1.5 text-sm">초기화</a>
+    <form method="get" action="/sales/activities" class="inline">
+      {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
+      {{if .Period}}<input type="hidden" name="period" value="{{.Period}}">{{end}}
+      {{if .Month}}<input type="hidden" name="month" value="{{.Month}}">{{end}}
+      {{if .StatusFilter}}<input type="hidden" name="status" value="{{.StatusFilter}}">{{end}}
+      {{if .BizCSV}}<input type="hidden" name="biz_types" value="{{.BizCSV}}">{{end}}
+      {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+      {{if .Owner}}<input type="hidden" name="owner" value="{{.Owner}}">{{end}}
+      <input type="hidden" name="project_ids" :value="selected.length ? selected.join(',') : 'none'">
+      <button type="submit" class="btn-primary px-3 py-1.5 text-sm">적용</button>
+    </form>
+  </div>
+  <p class="text-ui-xs text-ink-muted" x-show="dirty">선택이 바뀌었습니다. 「적용」을 눌러야 반영됩니다</p>
+  {{if .EmptyClass}}
+  <p class="text-sm text-ink-muted">선택한 분류가 없습니다</p>
+  {{else if .EmptyProject}}
+  <p class="text-sm text-ink-muted">선택한 사업이 없습니다</p>
+  {{end}}
+  <div class="max-h-[170px] overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-2">
+    {{range .ProjectOpts}}
+    <label class="flex items-center gap-2 text-sm text-ink min-w-0" title="{{.Name}}">
+      <input type="checkbox" class="rounded shrink-0" value="{{.SalesID}}"
+             :checked="selected.indexOf('{{.SalesID}}')>=0"
+             @change="toggleOne('{{.SalesID}}', $event.target.checked)">
+      <span class="truncate">{{.Name}}</span>
+    </label>
+    {{end}}
+  </div>
+</div>
+
+{{if .PartialSelect}}
+<p class="text-sm text-ink-muted">{{.ProjectBadge}} · <a href="{{.ResetHref}}" class="text-primary">필터 해제</a></p>
+{{end}}
+
+<form method="get" action="/sales/activities" class="flex flex-wrap gap-2 items-end" id="sales-act-search">
+  {{if .Period}}<input type="hidden" name="period" value="{{.Period}}">{{end}}
+  {{if .Month}}<input type="hidden" name="month" value="{{.Month}}">{{end}}
+  {{if .BizCSV}}<input type="hidden" name="biz_types" value="{{.BizCSV}}">{{end}}
+  {{if .ProjectCSV}}<input type="hidden" name="project_ids" value="{{.ProjectCSV}}">{{end}}
+  {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+  {{if .Owner}}<input type="hidden" name="owner" value="{{.Owner}}">{{end}}
+  <div class="flex-1 min-w-[14rem]">
+    <label class="block text-ui-xs text-ink-muted mb-1">검색</label>
+    <input type="search" name="q" value="{{.Query}}" placeholder="활동명, 사업명, 고객사, 담당자 검색"
+           class="w-full border rounded-lg px-3 py-2 text-sm">
+  </div>
+  <label class="text-ui-xs text-ink-muted">기간
+    <select name="period" class="border rounded-lg px-2 py-2 text-sm">
+      <option value="all" {{if eq .Period "all"}}selected{{end}}>전체</option>
+      <option value="month" {{if eq .Period "month"}}selected{{end}}>이번 달</option>
+      <option value="30" {{if eq .Period "30"}}selected{{end}}>최근 30일</option>
+    </select>
+  </label>
+  <label class="text-ui-xs text-ink-muted">상태
+    <select name="status" class="border rounded-lg px-2 py-2 text-sm">
+      <option value="">전체</option>
+      <option value="planned" {{if eq .StatusFilter "planned"}}selected{{end}}>예정</option>
+      <option value="done" {{if eq .StatusFilter "done"}}selected{{end}}>완료</option>
+      <option value="followup" {{if eq .StatusFilter "followup"}}selected{{end}}>후속 지연</option>
+    </select>
+  </label>
+  <button type="submit" class="btn-primary px-3 py-2 text-sm">검색</button>
+</form>
+
+<div class="card overflow-x-auto">
+  <table class="w-full min-w-[720px] text-sm">
+    <thead class="text-ui-xs text-ink-muted border-b">
+      <tr>
+        <th class="text-left px-3 py-2 whitespace-nowrap">활동일시</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">유형</th>
+        <th class="text-left px-3 py-2">활동명</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">고객사</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">상태</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">담당자</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">후속 일정</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .ActRows}}
+      <tr class="border-t">
+        <td class="px-3 py-2 whitespace-nowrap">{{.Activity.ActivityDate}} {{.Activity.StartTime}}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{.TypeKO}}</td>
+        <td class="px-3 py-2">
+          <a href="/sales/{{.Activity.SalesID}}" class="text-primary">{{.Activity.Title}}</a>
+          <div class="text-ui-xs text-ink-muted">{{.Activity.SalesName}}</div>
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">{{.Activity.CustomerName}}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{.StatusLabel}}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{.Owner}}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{if .Activity.NextActionDate}}{{.Activity.NextActionDate}}{{else}}—{{end}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="7" class="px-3 py-8 text-center text-ink-muted">활동이 없습니다.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{if gt .Pages 1}}
+<nav class="flex flex-wrap gap-1 items-center text-sm">
+  {{range .PageLinks}}
+    {{if .Disabled}}
+    <span class="px-2 py-1 text-ink-muted">{{.Label}}</span>
+    {{else}}
+    <a href="{{.Href}}" class="px-2 py-1 rounded {{if .Current}}btn-primary{{else}}btn-secondary{{end}}">{{.Label}}</a>
+    {{end}}
+  {{end}}
+</nav>
+{{end}}
+{{end}}

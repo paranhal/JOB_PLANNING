@@ -224,6 +224,30 @@ function salesPartyChipsMixin() {
     }
   };
 }
+function actProjectFilter() {
+  const el = document.getElementById('sales-act-project-filter');
+  const applied = ((el && el.dataset.applied) || '').split(',').filter(Boolean);
+  const all = ((el && el.dataset.visible) || '').split(',').filter(Boolean);
+  return {
+    selected: applied.slice(),
+    applied: applied.slice(),
+    all: all,
+    dirty: false,
+    syncDirty() {
+      this.dirty = this.selected.slice().sort().join() !== this.applied.slice().sort().join();
+    },
+    toggleAll(on) {
+      this.selected = on ? this.all.slice() : [];
+      this.syncDirty();
+    },
+    toggleOne(id, on) {
+      const i = this.selected.indexOf(id);
+      if (on && i < 0) this.selected.push(id);
+      if (!on && i >= 0) this.selected.splice(i, 1);
+      this.syncDirty();
+    }
+  };
+}
 function salesActPanel(startOpen) {
   return Object.assign(salesPartyChipsMixin(), {
     open: !!startOpen,

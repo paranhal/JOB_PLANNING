@@ -84,12 +84,16 @@ func reindexSalesActivitySearch(db *sql.DB, activityID string) {
 type SalesActivityFilter struct {
 	Month        string
 	Day          string
+	DateFrom     string
+	DateTo       string
 	Types        []string
 	Query        string
 	Member       string // 참여한 사람 정확 일치. 40-F
 	OrgID        string
 	PersonName   string
 	PersonUserID string
+	SalesIDs     []string
+	SalesIDsSet  bool
 }
 
 func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesActivity, error) {
@@ -100,11 +104,32 @@ func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesAc
 	}
 	q, args = appendOrg(q, args, "s", f.OrgID)
 	q, args = appendActivityPersonSQL(q, args, f.PersonName, f.PersonUserID)
+	if f.SalesIDsSet {
+		if len(f.SalesIDs) == 0 {
+			return nil, nil
+		}
+		if len(f.SalesIDs) > 100 {
+			f.SalesIDs = f.SalesIDs[:100]
+		}
+		ph := strings.Repeat("?,", len(f.SalesIDs))
+		q += ` AND a.sales_id IN (` + strings.TrimSuffix(ph, ",") + `)`
+		for _, id := range f.SalesIDs {
+			args = append(args, id)
+		}
+	}
 	if d := strings.TrimSpace(f.Day); d != "" {
 		q += ` AND a.activity_date=?`
 		args = append(args, d)
 	}
-	if m := strings.TrimSpace(f.Month); len(m) >= 7 {
+	if from := strings.TrimSpace(f.DateFrom); from != "" {
+		q += ` AND a.activity_date >= ?`
+		args = append(args, from)
+	}
+	if to := strings.TrimSpace(f.DateTo); to != "" {
+		q += ` AND a.activity_date <= ?`
+		args = append(args, to)
+	}
+	if m := strings.TrimSpace(f.Month); len(m) >= 7 && f.DateFrom == "" && f.DateTo == "" && strings.TrimSpace(f.Day) == "" {
 		q += ` AND a.activity_date >= ? AND a.activity_date < date(?, '+1 month')`
 		args = append(args, m+"-01", m+"-01")
 	}

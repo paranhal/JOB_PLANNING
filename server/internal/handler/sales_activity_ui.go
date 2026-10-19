@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -154,25 +156,40 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	if allPeriod {
 		filterMonth = ""
 	}
+	period := strings.TrimSpace(c.QueryParam("period"))
+	if period == "" {
+		if allPeriod {
+			period = "all"
+		} else {
+			period = "month"
+		}
+	}
+	today := todayForAct(c)
 	baseF := visibleActivityFilter(c)
-	baseF.Query = q
-	chipF := baseF
-	chipF.Month = filterMonth
-	chipActs, err := h.repo.ListActivitiesFilter(chipF)
+	visActs, err := h.repo.ListActivitiesFilter(baseF)
 	if err != nil {
 		return nil, err
 	}
-	actF := chipF
+	workF := baseF
+	workF.Query = q
+	if period == "30" {
+		from, to := model.PeriodRange("30", today)
+		workF.DateFrom, workF.DateTo = from, to
+	} else if !allPeriod && period != "all" {
+		workF.Month = filterMonth
+	}
+	workActs, err := h.repo.ListActivitiesFilter(workF)
+	if err != nil {
+		return nil, err
+	}
+	chipActs := workActs
+	actF := workF
 	actF.Types = sel
 	acts, err := h.repo.ListActivitiesFilter(actF)
 	if err != nil {
 		return nil, err
 	}
-	allF := baseF
-	allActs, err := h.repo.ListActivitiesFilter(allF)
-	if err != nil {
-		return nil, err
-	}
+	allActs := visActs
 	counts := map[string]int{}
 	for _, a := range chipActs {
 		counts[a.ActivityType]++
@@ -199,11 +216,90 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 			Href:     "/sales/activities?" + salesActLogQueryOwner(chipMonth, q, toggleTypeFilter(sel, code), owner),
 		})
 	}
-	groups := model.GroupSalesActivitiesByDate(acts)
-	decorateActivityDayGroups(groups)
-	optF := repository.SalesListFilter{Status: model.SalesStatusActive}
+	optF := repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true}
 	applySalesVisibilityToList(c, &optF)
 	projects, _ := h.repo.ListFilter(optF)
+	bizCodes, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBizType)
+	validBiz := map[string]bool{}
+	for _, b := range bizCodes {
+		validBiz[b.CodeValue] = true
+	}
+	hasUnset := false
+	projByID := map[string]model.SalesProject{}
+	for i := range projects {
+		projByID[projects[i].SalesID] = projects[i]
+		if strings.TrimSpace(projects[i].BizType) == "" {
+			hasUnset = true
+		}
+	}
+	selBiz, bizAll, bizNone := parseActBizTypes(c, validBiz)
+	wantIDs, idAll, idNone := parseActProjectIDs(c)
+	if idNone {
+		wantIDs = nil
+		idAll = false
+	}
+	visibleOpts, selectedIDs, emptyClass, emptyProj := applyActProjectScope(visActs, projects, bizAll, selBiz, idAll && !idNone, wantIDs)
+	kpiActs := filterActsBySales(workActs, selectedIDs)
+	if emptyClass || emptyProj {
+		kpiActs = nil
+	}
+	latest := model.LatestActivityIDBySales(visActs)
+	kpi := model.BuildSalesActivityKPI(kpiActs, latest, today)
+	statusF := strings.TrimSpace(c.QueryParam("status"))
+	tableActs := kpiActs
+	if len(sel) > 0 {
+		var typed []model.SalesActivity
+		for _, a := range tableActs {
+			if containsStr(sel, a.ActivityType) {
+				typed = append(typed, a)
+			}
+		}
+		tableActs = typed
+	}
+	if statusF != "" && statusF != "all" {
+		var st []model.SalesActivity
+		for _, a := range tableActs {
+			if model.DeriveSalesActivityStatus(a, latest, today) == statusF {
+				st = append(st, a)
+			}
+		}
+		tableActs = st
+	}
+	pageN, _ := strconv.Atoi(c.QueryParam("page"))
+	pageSlice, pageN, pages := paginateActs(tableActs, pageN, actPageSize)
+	groups := model.GroupSalesActivitiesByDate(pageSlice)
+	decorateActivityDayGroups(groups)
+	rows := make([]map[string]interface{}, 0, len(pageSlice))
+	for _, a := range pageSlice {
+		st := model.DeriveSalesActivityStatus(a, latest, today)
+		ownerName := strings.TrimSpace(a.OurMembers)
+		if ownerName == "" {
+			ownerName = a.CreatedBy
+		}
+		rows = append(rows, map[string]interface{}{
+			"Activity":    a,
+			"Status":      st,
+			"StatusLabel": model.SalesActivityStatusLabel(st),
+			"TypeKO":      model.SalesActivityTypeKO(a.ActivityType, a.TypeLabel),
+			"Owner":       ownerName,
+		})
+	}
+	bizCSV := ""
+	if !bizAll && !bizNone {
+		bizCSV = encodeCSV(selBiz)
+	}
+	if bizNone {
+		bizCSV = actProjectNone
+	}
+	pidCSV := ""
+	if emptyProj || idNone {
+		pidCSV = actProjectNone
+	} else if !idAll && len(selectedIDs) > 0 && len(selectedIDs) < len(visibleOpts) {
+		pidCSV = encodeCSV(selectedIDs)
+	}
+	qvals, _ := url.ParseQuery(salesActQuery(chipMonth, q, period, statusF, bizCSV, pidCSV, owner, sel, 0))
+	pageLinks := actPageLinks(qvals, pageN, pages)
+	bizChips := buildActBizChips(c, visActs, projByID, bizCodes, hasUnset, selBiz, bizAll, bizNone, chipMonth, q, period, statusF, pidCSV, owner, sel)
 	var users []model.User
 	if h.userRepo != nil {
 		users, _ = h.userRepo.ListAssignable()
@@ -214,27 +310,43 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	}
 	hasAny := len(allActs) > 0
 	showHeaderAdd := canWriteSales(c) && hasAny
+	appliedIDs := selectedIDs
+	if idAll {
+		appliedIDs = nil
+		for _, o := range visibleOpts {
+			appliedIDs = append(appliedIDs, o.SalesID)
+		}
+	}
+	badge := fmt.Sprintf("%d개 사업", len(visibleOpts))
+	if !idAll || emptyProj {
+		badge = fmt.Sprintf("%d / %d개 사업 선택", len(selectedIDs), len(visibleOpts))
+	}
+	resetHref := "/sales/activities?" + salesActQuery(chipMonth, q, period, statusF, "", "", owner, sel, 0)
 	data := map[string]interface{}{
 		"Title":           "영업 활동",
 		"Active":          NavSalesActivities,
 		"View":            "log",
 		"Month":           chipMonth,
+		"Period":          period,
 		"Query":           q,
+		"StatusFilter":    statusF,
 		"SelectedTypes":   sel,
 		"Summary":         model.BuildSalesActivitySummary(acts, types),
+		"KPI":             kpi,
 		"TypeChips":       chips,
 		"ChipTotal":       len(chipActs),
 		"DayGroups":       groups,
-		"Activities":      acts,
+		"Activities":      pageSlice,
+		"ActRows":         rows,
 		"HasAnyActivity":  hasAny,
 		"ShowHeaderAdd":   showHeaderAdd,
 		"MonthEmptyLabel": salesMonthEmptyLabel(month),
 		"AllPeriodHref":   "/sales/activities?" + salesActLogQueryOwner("all", q, sel, owner),
-		"LogQuery":        salesActLogQueryOwner(chipMonth, q, sel, owner),
+		"LogQuery":        salesActQuery(chipMonth, q, period, statusF, bizCSV, pidCSV, owner, sel, 0),
 		"TypeQuery":       typeQ,
 		"ActivityTypes":   types,
 		"SalesOptions":    projects,
-		"Today":           time.Now().Format("2006-01-02"),
+		"Today":           today,
 		"CanWrite":        canWriteSales(c),
 		"CanEditOthers":   isAdminRole(c) || isOfficeRole(c),
 		"CurrentUser":     ctxString(c, "user_name"),
@@ -250,6 +362,21 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"KanbanDrag":      canWriteSales(c),
 		"KanbanHint":      "열 = 활동 유형. 카드를 끌어 옮깁니다.",
 		"FilterQ":         "",
+		"BizChips":        bizChips,
+		"ProjectOpts":     visibleOpts,
+		"ProjectBadge":    badge,
+		"EmptyClass":      emptyClass,
+		"EmptyProject":    emptyProj,
+		"PartialSelect":   !idAll && !emptyProj && len(selectedIDs) > 0,
+		"ResetHref":       resetHref,
+		"BizCSV":          bizCSV,
+		"ProjectCSV":      pidCSV,
+		"PageLinks":       pageLinks,
+		"Page":            pageN,
+		"Pages":           pages,
+		"TableTotal":      len(tableActs),
+		"AppliedIDs":      strings.Join(appliedIDs, ","),
+		"VisibleIDs":      csvOfOpts(visibleOpts),
 	}
 	return data, nil
 }
