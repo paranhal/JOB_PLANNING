@@ -535,11 +535,11 @@ func (h *AttachmentHandler) guardActionPhotoWrite(c echo.Context, asID string) e
 }
 
 func (h *AttachmentHandler) receiptUnlocked(c echo.Context, as *model.ASReceipt) bool {
-	if as == nil || !isAdminRole(c) || h.unlockRepo == nil {
-		return false
+	ok := false
+	if as != nil && h.unlockRepo != nil {
+		ok, _, _ = h.unlockRepo.HasActive(as.ASID, currentUserID(c))
 	}
-	ok, _, _ := h.unlockRepo.HasActive(as.ASID, currentUserID(c))
-	return ok
+	return asUnlockAllowsClosed(c, as, ok)
 }
 
 func attachmentRedirect(c echo.Context, fallback string) string {

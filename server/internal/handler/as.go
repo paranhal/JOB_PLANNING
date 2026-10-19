@@ -678,7 +678,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
-	if !canEditASContent(c, as.CreatedByUserID) {
+	if !canEditASReceipt(c, as) {
 		return echo.ErrForbidden
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
@@ -724,7 +724,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
 	}
-	if !canEditASContent(c, existing.CreatedByUserID) {
+	if !canEditASReceipt(c, existing) {
 		return echo.ErrForbidden
 	}
 	prevTo, prevUID := existing.AssignedTo, existing.AssignedUserID
@@ -847,8 +847,9 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"IsClosed":          closed,
 		"EditUnlocked":      unlocked,
 		"UnlockExpires":     unlockExpLocal,
-		"CanUnlockEdit":     closed && isAdminRole(c) && !unlocked && !embed,
+		"CanUnlockEdit":     closed && isAdminRole(c) && !unlocked && !embed && !isASOwner(c, as),
 		"CanEditReceipt":    !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
+		"CanOwnerEdit":      closed && canMod,
 		"CanDelete":         !embed && isAdminRole(c) && (!closed || canMod),
 		"CanWriteDaily":     !embed && canWriteWorkboard(c) && !closed,
 		"TodayLocal":        now.Format("2006-01-02"),
@@ -1006,7 +1007,8 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"IsClosed":             closed,
 		"EditUnlocked":         unlocked,
 		"UnlockExpires":        unlockExpLocal,
-		"CanUnlockEdit":        closed && isAdminRole(c) && !unlocked,
+		"CanUnlockEdit":        closed && isAdminRole(c) && !unlocked && !isASOwner(c, as),
+		"CanOwnerEdit":         closed && canMod,
 		"CanProcess":           canProcess,
 		"ReadOnly":             readOnly,
 		"ShowWorkflow":         showWorkflow,

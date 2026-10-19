@@ -12,20 +12,13 @@ import (
 	"customer-support/internal/repository"
 )
 
-// canModifyAS 완료·종료 건은 관리자가 수정 비밀번호로 잠금 해제한 경우에만 수정 가능.
-// 진행 중 건은 기존 권한(접수/조치)을 따른다.
+// canModifyAS 진행 중은 기존 권한. 완료·종료는 본인(등록·배정)은 잠금 없이, 관리자는 기존 비밀번호 잠금.
 func (h *ASHandler) canModifyAS(c echo.Context, as *model.ASReceipt) bool {
-	if as == nil {
-		return false
-	}
-	if !isASClosedStatus(as.Status) {
-		return true
-	}
-	if !isAdminRole(c) {
-		return false
-	}
 	ok, _, _ := h.unlockActive(c, as.ASID)
-	return ok
+	if as != nil && !isASClosedStatus(as.Status) {
+		ok = true
+	}
+	return asUnlockAllowsClosed(c, as, ok)
 }
 
 func (h *ASHandler) unlockActive(c echo.Context, asID string) (bool, time.Time, error) {

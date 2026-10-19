@@ -1866,7 +1866,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	canWrite := canEditTask(c, t.Assignee, "")
+	canWrite := canEditTask(c, t.Assignee, t.AssigneeUserID)
 	children, _ := h.repo.ListChildren(id)
 	for i := range children {
 		children[i].OccurrenceStatus = model.OccurrenceStatusForDisplay(children[i], today)

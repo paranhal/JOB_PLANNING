@@ -249,6 +249,47 @@ func canEditASContent(c echo.Context, createdByUserID string) bool {
 	return cb == uid
 }
 
+// isASOwner D-65. 등록자 또는 배정 담당자. 읽기 전용·시점 보기는 본인으로 보지 않는다.
+func isASOwner(c echo.Context, as *model.ASReceipt) bool {
+	if as == nil || isReadOnly(c) || viewAsActive(c) {
+		return false
+	}
+	uid := strings.TrimSpace(identityUserID(c))
+	if uid != "" && uid == strings.TrimSpace(as.CreatedByUserID) {
+		return true
+	}
+	return assigneeIsMine(c, as.AssignedTo, as.AssignedUserID)
+}
+
+func canEditASReceipt(c echo.Context, as *model.ASReceipt) bool {
+	if as == nil || isReadOnly(c) || viewAsActive(c) {
+		return false
+	}
+	if !canReceiveAS(c) && !canProcessAS(c) {
+		return false
+	}
+	return canEditASContent(c, as.CreatedByUserID) || isASOwner(c, as)
+}
+
+func asUnlockAllowsClosed(c echo.Context, as *model.ASReceipt, unlockOK bool) bool {
+	if as == nil {
+		return false
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return false
+	}
+	if !isASClosedStatus(as.Status) {
+		return true
+	}
+	if isASOwner(c, as) {
+		return true
+	}
+	if isAdminRole(c) {
+		return unlockOK
+	}
+	return false
+}
+
 // isASClosedStatus 완료·종료 — 기본 읽기 전용
 func isASClosedStatus(status string) bool {
 	return model.CanReopenAS(status)
@@ -356,7 +397,7 @@ func denyUnlessCanEditTask(c echo.Context, t *model.WorkTask) error {
 	if t == nil {
 		return echo.ErrNotFound
 	}
-	if !canEditTask(c, t.Assignee, "") {
+	if !canEditTask(c, t.Assignee, t.AssigneeUserID) {
 		return echo.ErrForbidden
 	}
 	return nil
