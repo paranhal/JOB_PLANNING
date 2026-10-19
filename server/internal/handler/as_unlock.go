@@ -28,6 +28,16 @@ func (h *ASHandler) unlockActive(c echo.Context, asID string) (bool, time.Time, 
 	return h.unlockRepo.HasActive(asID, currentUserID(c))
 }
 
+const asReceiptEditDeniedMsg = "접수한 사람, 배정 담당자, 조직관리자만 수정할 수 있습니다"
+
+func redirectASReceiptEditDenied(c echo.Context, id, page string) error {
+	msg := url.QueryEscape(asReceiptEditDeniedMsg)
+	if page == "action" {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+msg)
+	}
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+msg)
+}
+
 func (h *ASHandler) redirectLocked(c echo.Context, id, page string) error {
 	msg := url.QueryEscape("완료·종료 건은 읽기 전용입니다. 관리자는 수정 잠금 해제 후 이용하세요")
 	if page == "action" {

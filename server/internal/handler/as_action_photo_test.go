@@ -166,7 +166,7 @@ func TestASActionPhotoClosedLocked(t *testing.T) {
 	if err := asRepo.Update(got); err != nil {
 		t.Fatal(err)
 	}
-	rec := postActionPhotoEcho(t, e, asID, "x.png", "", makePNG(t, 40, 20))
+	rec := postActionPhotoEchoCookie(t, e, jwtCookieRole(t, model.RoleVisionAdmin), asID, "x.png", "", makePNG(t, 40, 20))
 	if rec.Code == http.StatusSeeOther && !strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatal("완료 건 조치 사진 업로드가 성공하면 안 된다")
 	}

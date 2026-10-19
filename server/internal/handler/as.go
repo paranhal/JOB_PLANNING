@@ -396,6 +396,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		"CanEditVisitDate": true, // 신규 접수 시 접수 권한자가 설정 가능
 		"History":          history,
 		"CanReceive":       canReceiveAS(c),
+		"CanSave":          canReceiveAS(c),
 		"KeywordChecks":    h.keywordChecks("", model.KWFieldSymptom, as.Symptom),
 		"KeywordField":     model.KWFieldSymptom,
 		"ClassifyHint":     classifyHint(h.codeRepo),
@@ -665,8 +666,11 @@ func (h *ASHandler) UpdateCustomerDirect(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
+	if !canEditASReceipt(c, as) {
+		return redirectASReceiptEditDenied(c, id, "action")
+	}
 	if !h.canModifyAS(c, as) {
-		return echo.ErrForbidden
+		return h.redirectLocked(c, id, "action")
 	}
 	if _, err := h.applyDirectCustomer(c, as); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+url.QueryEscape(err.Error()))
@@ -744,7 +748,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if !canEditASReceipt(c, as) {
-		return echo.ErrForbidden
+		return redirectASReceiptEditDenied(c, id, "show")
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "show")
@@ -776,7 +780,8 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		"Err":              c.QueryParam("err"),
 		"KeywordChecks":    h.keywordChecks(as.ASID, model.KWFieldSymptom, as.Symptom),
 		"KeywordField":     model.KWFieldSymptom,
-		"CanReceive":       canEditASReceipt(c, as),
+		"CanReceive":       canReceiveAS(c),
+		"CanSave":          canSaveASReceipt(c, as, h.canModifyAS(c, as)),
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"
@@ -791,7 +796,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if !canEditASReceipt(c, existing) {
-		return echo.ErrForbidden
+		return redirectASReceiptEditDenied(c, id, "show")
 	}
 	prevTo, prevUID := existing.AssignedTo, existing.AssignedUserID
 	if isASClosedStatus(existing.Status) && !h.canModifyAS(c, existing) {
@@ -916,8 +921,8 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"IsClosed":          closed,
 		"EditUnlocked":      unlocked,
 		"UnlockExpires":     unlockExpLocal,
-		"CanUnlockEdit":     closed && isAdminRole(c) && !unlocked && !embed && !isASOwner(c, as),
-		"CanEditReceipt":    !embed && ((!closed && canReceiveAS(c)) || (closed && canMod)),
+		"CanUnlockEdit":     closed && isVisionRole(c) && !unlocked && !embed && !isASOwner(c, as),
+		"CanEditReceipt":    !embed && canSaveASReceipt(c, as, canMod),
 		"CanOwnerEdit":      closed && canMod,
 		"CanDelete":         !embed && isAdminRole(c) && (!closed || canMod),
 		"CanWriteDaily":     !embed && canWriteWorkboard(c) && !closed,
@@ -1076,7 +1081,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"IsClosed":             closed,
 		"EditUnlocked":         unlocked,
 		"UnlockExpires":        unlockExpLocal,
-		"CanUnlockEdit":        closed && isAdminRole(c) && !unlocked && !isASOwner(c, as),
+		"CanUnlockEdit":        closed && isVisionRole(c) && !unlocked && !isASOwner(c, as),
 		"CanOwnerEdit":         closed && canMod,
 		"CanProcess":           canProcess,
 		"ReadOnly":             readOnly,

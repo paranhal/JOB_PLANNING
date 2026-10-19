@@ -33,8 +33,14 @@ func TestASOwnerCanModifyClosedWithoutUnlock(t *testing.T) {
 	}
 	oa := echoCtxRole(model.RoleOrgAdmin, "팀장")
 	oa.Set("user_id", "oa")
-	if h.canModifyAS(oa, as) {
-		t.Fatal("관리자는 잠금 해제 없이는 불가")
+	oa.Set("org_id", "O01")
+	if !h.canModifyAS(oa, as) {
+		t.Fatal("조직관리자는 자기 조직 완료 건을 잠금 없이 수정한다")
+	}
+	vis := echoCtxRole(model.RoleVisionAdmin, "비전")
+	vis.Set("user_id", "vs")
+	if h.canModifyAS(vis, as) {
+		t.Fatal("비전 관리자는 잠금 해제 없이는 불가")
 	}
 	ro := echoCtxReadOnly(model.RoleTech, "기술본인")
 	ro.Set("user_id", "u1")
@@ -183,8 +189,12 @@ func TestASClosedOwnerEditHTTPAndPeers(t *testing.T) {
 	}
 
 	oaShow := doGetWith(t, e, "/as/"+recpt.ASID, oaCK)
-	if !strings.Contains(oaShow.Body.String(), "읽기 전용") && !strings.Contains(oaShow.Body.String(), "잠금") {
-		t.Fatal("관리자 미해제 화면에 잠금 안내가 없다")
+	if !strings.Contains(oaShow.Body.String(), "접수 정보 수정") {
+		t.Fatal("조직관리자에게 완료 건 접수 수정 링크가 없다")
+	}
+	oaEdit := doGetWith(t, e, "/as/"+recpt.ASID+"/edit", oaCK)
+	if oaEdit.Code != http.StatusOK || !strings.Contains(oaEdit.Body.String(), `id="as-submit-btn"`) {
+		t.Fatalf("조직관리자 완료 건 저장 단추 status=%d", oaEdit.Code)
 	}
 
 	ro := jwtCookieReadOnly(t, model.RoleTech)

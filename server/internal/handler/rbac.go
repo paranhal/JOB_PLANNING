@@ -265,10 +265,23 @@ func canEditASReceipt(c echo.Context, as *model.ASReceipt) bool {
 	if as == nil || isReadOnly(c) || viewAsActive(c) {
 		return false
 	}
-	if !canReceiveAS(c) && !canProcessAS(c) {
+	if isASOwner(c, as) {
+		return true
+	}
+	if currentRole(c) == model.RoleVisionAdmin {
+		return true
+	}
+	return currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)
+}
+
+func canSaveASReceipt(c echo.Context, as *model.ASReceipt, canMod bool) bool {
+	if !canEditASReceipt(c, as) {
 		return false
 	}
-	return canEditASContent(c, as.CreatedByUserID) || isASOwner(c, as)
+	if isASClosedStatus(as.Status) {
+		return canMod
+	}
+	return true
 }
 
 func asUnlockAllowsClosed(c echo.Context, as *model.ASReceipt, unlockOK bool) bool {
@@ -282,6 +295,9 @@ func asUnlockAllowsClosed(c echo.Context, as *model.ASReceipt, unlockOK bool) bo
 		return true
 	}
 	if isASOwner(c, as) {
+		return true
+	}
+	if currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c) {
 		return true
 	}
 	if isAdminRole(c) {

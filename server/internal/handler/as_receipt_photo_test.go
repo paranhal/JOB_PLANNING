@@ -193,7 +193,22 @@ func TestASReceiptPhotoClosedLocked(t *testing.T) {
 	if err := asRepo.Update(got); err != nil {
 		t.Fatal(err)
 	}
-	rec := postReceiptPhoto(t, e, asID, "x.png", makePNG(t, 40, 20))
+	rec := httptest.NewRecorder()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	_ = w.WriteField("ref_type", model.RefTypeASReceipt)
+	_ = w.WriteField("ref_id", asID)
+	_ = w.WriteField("redirect", "/as/"+asID)
+	fw, err := w.CreateFormFile("file", "x.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fw.Write(makePNG(t, 40, 20))
+	_ = w.Close()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/attachments", &buf)
+	req.Header.Set(echo.HeaderContentType, w.FormDataContentType())
+	req.AddCookie(jwtCookieRole(t, model.RoleVisionAdmin))
+	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden && rec.Code != http.StatusSeeOther {
 		t.Fatalf("잠금 status=%d body=%s", rec.Code, rec.Body.String())
 	}

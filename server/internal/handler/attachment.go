@@ -494,10 +494,7 @@ func canUploadAttachment(c echo.Context, refType string) bool {
 }
 
 func canManageReceiptPhoto(c echo.Context, as *model.ASReceipt) bool {
-	if canReceiveAS(c) || canWriteMaster(c) {
-		return true
-	}
-	return canEditVisitDate(c, as)
+	return canEditASReceipt(c, as)
 }
 
 func (h *AttachmentHandler) guardReceiptPhotoWrite(c echo.Context, asID string) error {
