@@ -113,20 +113,26 @@ func (h *ProjectHandler) Contracts(c echo.Context) error {
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
 	includeAll := strings.TrimSpace(c.QueryParam("all")) == "1"
-	items, err := h.repo.ListContracts(search, year, status, includeAll)
+	f := repository.ContractUnionFilter{
+		Search: search, Year: year, Status: status, IncludeAll: includeAll,
+		OrgID: SalesVisibilityScope(c).OrgID,
+	}
+	rows, err := h.repo.ListContractUnion(f)
 	if err != nil {
 		return err
 	}
 	years, _ := h.repo.ListYears()
 	today := time.Now().Format("2006-01-02")
-	totalN, validN, soonN, totalAmt, avgDays := model.ContractKPI(items, today)
+	kpi := model.BuildContractUnionKPI(rows, today)
 	return c.Render(http.StatusOK, "contracts/list.html", map[string]interface{}{
 		"Title": "계약 관리", "Active": NavContracts,
-		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
+		"Rows": rows, "Years": years, "Year": year, "Status": status, "Search": search,
 		"IncludeAll": includeAll,
 		"Today":      today,
-		"KPITotal":   totalN, "KPIValid": validN, "KPISoon": soonN,
-		"KPIAmount": model.FormatSalesMoney(totalAmt), "KPIAvgDays": avgDays,
+		"KPITotal":   kpi.TotalN, "KPIValid": kpi.ValidN, "KPISoon": kpi.SoonN,
+		"KPIAmount": model.FormatSalesMoney(kpi.Amount), "KPIAvgDays": kpi.AvgDays,
+		"KPIUnpromoted": kpi.Unpromoted, "KPINeedLink": kpi.NeedLink,
+		"CanWriteSales": canWriteSales(c),
 	})
 }
 

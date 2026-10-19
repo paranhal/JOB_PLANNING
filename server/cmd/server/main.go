@@ -530,6 +530,7 @@ func main() {
 
 	g.GET("/contracts", h.Project.Contracts)
 	g.GET("/contracts/:id", h.Project.ContractShow)
+	g.POST("/sales/:id/contract-amount", h.Sales.SetContractAmount)
 
 	quotes := g.Group("/quotes")
 	quotes.GET("", h.Quotes.List)

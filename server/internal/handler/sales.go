@@ -1169,6 +1169,19 @@ func (h *SalesHandler) fillPartyFromUser(p *model.SalesParty) {
 	}
 }
 
+func (h *SalesHandler) SetContractAmount(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	amt := parseSalesAmount(c.FormValue("contract_amount"))
+	at := strings.TrimSpace(c.FormValue("contracted_at"))
+	if err := h.repo.SetContractAmount(id, amt, at, ctxString(c, "user_name")); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, "/contracts?ok=amount")
+}
+
 func (h *SalesHandler) FromTask(c echo.Context) error {
 	if !canWriteSales(c) {
 		return echo.ErrForbidden

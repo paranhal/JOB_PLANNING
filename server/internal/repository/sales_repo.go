@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -503,6 +504,43 @@ func (r *SalesRepo) Delete(id, reason string) error {
 	}
 	logDeleteWithReason(r.db, "sales_projects", "sales_id", id, "영업 사업", bundle, reason)
 	return nil
+}
+
+func (r *SalesRepo) SetContractAmount(salesID string, amount int, contractedAt, by string) error {
+	salesID = strings.TrimSpace(salesID)
+	if salesID == "" {
+		return fmt.Errorf("sales_id 필요")
+	}
+	if amount < 0 {
+		return fmt.Errorf("금액이 음수입니다")
+	}
+	p, err := r.Get(salesID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(p.Stage) != model.SalesStage4Closed || strings.TrimSpace(p.CloseReason) != model.SalesCloseContracted {
+		return fmt.Errorf("영업 계약 완료 건만 금액을 넣을 수 있습니다")
+	}
+	at := strings.TrimSpace(contractedAt)
+	if at == "" {
+		at = strings.TrimSpace(p.ContractedAt)
+	}
+	oldAmt := strconv.Itoa(p.ContractAmount)
+	return touchUpdate(r.db, "sales_projects", "sales_id", salesID, p.Name, func() error {
+		tx, err := r.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec(`UPDATE sales_projects SET contract_amount=?, contracted_at=?, updated_at=CURRENT_TIMESTAMP WHERE sales_id=?`,
+			amount, at, salesID); err != nil {
+			return err
+		}
+		if err := insertSalesChangeTx(tx, salesID, "contract_amount", oldAmt, strconv.Itoa(amount), by, "계약 관리에서 입력"); err != nil {
+			return err
+		}
+		return tx.Commit()
+	})
 }
 
 func (r *SalesRepo) MarkPromoted(salesID string) error {

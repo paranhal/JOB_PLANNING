@@ -3,25 +3,43 @@
 <div class="space-y-4">
   <div>
     <h2 class="text-xl font-bold text-gray-800">계약 관리</h2>
-    <p class="text-sm text-gray-500">계약은 사업 1건입니다. <code class="text-xs">work_projects</code> 를 봅니다.</p>
+    <p class="text-sm text-gray-500">사업관리 계약과 아직 전환하지 않은 영업 계약 완료를 함께 봅니다.</p>
     <div id="absorb-tabs" class="mt-2 flex flex-wrap gap-2 text-xs">
       <a href="/quotes" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">견적</a>
       <a href="/orders" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">수주</a>
       <a href="/contracts" class="px-2 py-1 rounded-full bg-blue-50 text-blue-800">계약</a>
     </div>
   </div>
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
     <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">총 계약건</p><p class="text-2xl font-bold">{{.KPITotal}}</p></div>
     <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">총 계약금액</p><p class="text-2xl font-bold">{{.KPIAmount}}</p></div>
     <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">유효 계약</p><p class="text-2xl font-bold">{{.KPIValid}}</p></div>
     <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">만료임박(30일)</p><p class="text-2xl font-bold">{{.KPISoon}}</p></div>
+    <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">사업관리 미전환</p><p class="text-2xl font-bold">{{.KPIUnpromoted}}</p></div>
+    <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">연결 확인 필요</p><p class="text-2xl font-bold">{{.KPINeedLink}}</p></div>
   </div>
-  <p class="text-xs text-gray-400">평균 기간 {{.KPIAvgDays}}</p>
+  <p class="text-xs text-gray-400">평균 기간 {{.KPIAvgDays}} · 유효·만료임박·평균 기간은 계약기간이 있는 사업관리 행만 센다</p>
   <form method="get" action="/contracts" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
     <div class="flex-1 min-w-[12rem]">
       <label class="block text-xs text-gray-500 mb-1">검색</label>
-      <input type="text" name="search" value="{{.Search}}" placeholder="계약명, 발주처"
+      <input type="text" name="search" value="{{.Search}}" placeholder="사업명, 고객, 영업번호"
              class="w-full border rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">연도</label>
+      <select name="year" class="border rounded-lg px-3 py-2 text-sm">
+        <option value="">전체</option>
+        {{range .Years}}<option value="{{.}}" {{if eq $.Year .}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">상태</label>
+      <select name="status" class="border rounded-lg px-3 py-2 text-sm">
+        <option value="">전체</option>
+        <option value="active" {{if eq .Status "active"}}selected{{end}}>진행</option>
+        <option value="complete" {{if eq .Status "complete"}}selected{{end}}>완료</option>
+        <option value="archived" {{if eq .Status "archived"}}selected{{end}}>보관</option>
+      </select>
     </div>
     <label class="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
       <input type="checkbox" name="all" value="1" {{if .IncludeAll}}checked{{end}}>
@@ -40,33 +58,55 @@
           <th class="px-4 py-2 text-left whitespace-nowrap">계약일</th>
           <th class="px-4 py-2 text-left whitespace-nowrap">만료일</th>
           <th class="px-4 py-2 text-left whitespace-nowrap">상태</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">담당</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">출처</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">연동</th>
+          <th class="px-4 py-2 text-left whitespace-nowrap">작업</th>
         </tr>
       </thead>
       <tbody>
-        {{range .Projects}}
+        {{range .Rows}}
         <tr class="border-t border-gray-100">
-          <td class="px-4 py-2 font-mono text-xs whitespace-nowrap">{{if .SalesNo}}{{.SalesNo}} / {{end}}{{.ContractNoLabel}}</td>
-          <td class="px-4 py-2 max-w-[18rem]"><a href="/contracts/{{.ProjectID}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
-          <td class="px-4 py-2 text-gray-600 max-w-[18rem]">{{if .CustomerOrParty}}{{.CustomerOrParty}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{if .OrderContractLabel}}{{.OrderContractLabel}}{{else if gt .ContractAmount 0}}{{.ContractAmount}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .StartDate}}{{.StartDate}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 font-mono text-xs whitespace-nowrap">{{.DisplayNo}}</td>
+          <td class="px-4 py-2 max-w-[18rem]"><a href="{{.Href}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
+          <td class="px-4 py-2 text-gray-600 max-w-[18rem]">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+            {{.AmountText}}{{if .ExpectedHint}}<div class="text-[11px] text-gray-400">{{.ExpectedHint}}</div>{{end}}
+          </td>
+          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .ContractedAt}}{{.ContractedAt}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .EndDate}}{{.EndDate}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 whitespace-nowrap">{{.ContractLifeStatus $.Today}}</td>
-          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .ContactName}}{{.ContactName}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 whitespace-nowrap">{{if .StatusChip}}<span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">{{.StatusChip}}</span>{{else}}—{{end}}</td>
+          <td class="px-4 py-2 whitespace-nowrap"><span class="text-xs px-2 py-0.5 rounded-full bg-gray-100">{{.SourceLabel}}</span></td>
+          <td class="px-4 py-2 text-xs whitespace-nowrap">
+            {{if eq .Source "work"}}{{if .SalesNo}}영업과 연결됨 {{.SalesNo}}{{else}}영업 연결 없음{{end}}{{end}}
+            {{if .LinkNeed}}영업 {{.LinkNeed}}와 연결 필요{{end}}
+            {{if .AmountMismatch}}금액 불일치{{end}}
+            {{if .DupLinked}}중복 연결{{end}}
+          </td>
+          <td class="px-4 py-2 whitespace-nowrap text-xs">
+            {{if and $.CanWriteSales (eq .Source "sales")}}
+              {{if .AmountMissing}}
+              <form method="post" action="/sales/{{.SalesID}}/contract-amount" class="inline-flex gap-1">
+                <input type="number" name="contract_amount" min="0" class="w-24 border rounded px-1 py-0.5" required>
+                <input type="date" name="contracted_at" value="{{.ContractedAt}}" class="border rounded px-1 py-0.5">
+                <button class="px-2 py-0.5 border rounded">계약금액 입력</button>
+              </form>
+              {{end}}
+              <a href="/sales/{{.SalesID}}/promote" class="px-2 py-0.5 bg-blue-600 text-white rounded">계약으로 전환</a>
+            {{end}}
+          </td>
         </tr>
         {{else}}
-        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">등록된 계약(사업)이 없습니다.</td></tr>
+        <tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">등록된 계약(사업)이 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
   </div>
   <div class="md:hidden space-y-2">
-    {{range .Projects}}
-    <a href="/contracts/{{.ProjectID}}" class="block bg-white rounded-xl border p-3">
-      <p class="text-xs font-mono text-gray-400">{{.ContractNoLabel}}</p>
+    {{range .Rows}}
+    <a href="{{.Href}}" class="block bg-white rounded-xl border p-3">
+      <p class="text-xs font-mono text-gray-400">{{.DisplayNo}} · {{.SourceLabel}}</p>
       <p class="font-medium text-gray-800">{{.Name}}</p>
-      <p class="text-xs text-gray-500 mt-1">만료 {{if .EndDate}}{{.EndDate}}{{else}}—{{end}} · {{.ContractLifeStatus $.Today}}</p>
+      <p class="text-xs text-gray-500 mt-1">{{.AmountText}}</p>
     </a>
     {{else}}
     <p class="text-center text-gray-400 py-8">등록된 계약이 없습니다.</p>
