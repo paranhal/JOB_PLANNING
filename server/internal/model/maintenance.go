@@ -62,12 +62,14 @@ func (v MaintenanceVisit) DoneOn() string {
 
 // UnassignedMonthSlot 이번 달 주기에 해당하지만 방문일이 아직 없는 사이트×점검대상
 type UnassignedMonthSlot struct {
-	CustomerID  string
-	OrgName     string
-	ShortName   string
-	ProductType string
-	SlotKey     string
-	Cycle       string
+	CustomerID         string
+	OrgName            string
+	ShortName          string
+	ProductType        string
+	SlotKey            string
+	Cycle              string
+	LastAssignee       string
+	UnconfirmedQuarter bool // 분기 마지막 달에 미확인으로 올린 건
 }
 
 // VisitProductSlotKey 방문의 점검대상을 슬롯 키로 정규화한다(klas/rfid/generic).

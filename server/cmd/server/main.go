@@ -428,6 +428,7 @@ func main() {
 	maint.POST("/:id/assign-slots", h.Maintenance.AssignUnassignedSlots, adminOnly)
 	maint.POST("/:id/visits", h.Maintenance.AddVisit, mntEdit)
 	maint.POST("/:id/assign-slot", h.Maintenance.AssignUnassignedSlot, mntEdit)
+	maint.POST("/:id/quarter-confirm", h.Maintenance.ConfirmQuarterSlot, mntEdit)
 	maint.GET("/:id", h.Maintenance.ShowPlan)
 
 	g.GET("/analysis", h.Analysis.Dashboard, adminOnly)

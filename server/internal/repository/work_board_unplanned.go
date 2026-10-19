@@ -231,7 +231,7 @@ func (r *WorkBoardRepo) listUnassignedSlotsAsItems() ([]model.UnplannedItem, err
 	if err != nil || planID == "" {
 		return nil, nil
 	}
-	slots, err := mnt.ListUnassignedMonthSlots(planID, year, month)
+	slots, err := mnt.ListOpenUnassignedSlots(planID, year, month)
 	if err != nil {
 		return nil, err
 	}
@@ -241,12 +241,16 @@ func (r *WorkBoardRepo) listUnassignedSlotsAsItems() ([]model.UnplannedItem, err
 		if title == "" {
 			title = "점검"
 		}
+		slotLabel := "일정 배정안됨"
+		if s.UnconfirmedQuarter {
+			slotLabel = "분기 점검 미확정"
+		}
 		it := model.UnplannedItem{
 			WorkListItem: model.WorkListItem{
 				Prefix:      model.WorkPrefixMaintenance,
 				RefID:       s.CustomerID + ":" + s.SlotKey,
 				RefNumber:   s.ShortName,
-				Title:       title + " · 일정 배정안됨",
+				Title:       title + " · " + slotLabel,
 				OrgName:     s.OrgName,
 				Status:      "unassigned_slot",
 				StatusLabel: "배정안됨",

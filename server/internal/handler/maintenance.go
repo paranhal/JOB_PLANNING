@@ -200,45 +200,55 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 	var unassigned []model.UnassignedMonthSlot
 	if quotaMonth >= 1 && quotaMonth <= 12 {
-		unassigned, _ = h.repo.ListUnassignedMonthSlots(plan.PlanID, plan.PlanYear, quotaMonth)
+		unassigned, _ = h.repo.ListOpenUnassignedSlots(plan.PlanID, plan.PlanYear, quotaMonth)
 	}
 	dupMonth := month
 	if view != mntViewList {
 		dupMonth = quotaMonth
 	}
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, dupMonth)
+	qNum := model.CalendarQuarter(quotaMonth)
+	qFrom, qTo := model.QuarterDateBounds(plan.PlanYear, qNum)
+	var quarterPending []model.UnassignedMonthSlot
+	if qNum >= 1 {
+		quarterPending, _ = h.repo.PendingQuarterSlots(plan.PlanID, plan.PlanYear, qNum)
+	}
 	return c.Render(200, "maintenance/plan_show.html", map[string]interface{}{
-		"Title":           fmt.Sprintf("정기점검 %d년", plan.PlanYear),
-		"Active":          NavMaintenance,
-		"Plan":            plan,
-		"Plans":           plans,
-		"YearQuery":       yearQuery,
-		"Visits":          visits,
-		"Customers":       customers,
-		"Assignees":       assignees,
-		"Projects":        projects,
-		"Unassigned":      unassigned,
-		"QuotaMonth":      quotaMonth,
-		"View":            view,
-		"Month":           month,
-		"MonthVisits":     shown,
-		"Weeks":           decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c)),
-		"Board":           board,
-		"DoneCount":       doneCount,
-		"OpenCount":       len(visits) - doneCount,
+		"Title":            fmt.Sprintf("정기점검 %d년", plan.PlanYear),
+		"Active":           NavMaintenance,
+		"Plan":             plan,
+		"Plans":            plans,
+		"YearQuery":        yearQuery,
+		"Visits":           visits,
+		"Customers":        customers,
+		"Assignees":        assignees,
+		"Projects":         projects,
+		"Unassigned":       unassigned,
+		"QuarterPending":   quarterPending,
+		"QuarterNum":       qNum,
+		"QuarterFrom":      qFrom,
+		"QuarterTo":        qTo,
+		"QuotaMonth":       quotaMonth,
+		"View":             view,
+		"Month":            month,
+		"MonthVisits":      shown,
+		"Weeks":            decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c)),
+		"Board":            board,
+		"DoneCount":        doneCount,
+		"OpenCount":        len(visits) - doneCount,
 		"IncompleteVisits": incomplete,
-		"FlashDone":       c.QueryParam("done"),
-		"FlashOK":         c.QueryParam("ok"),
-		"FlashErr":        c.QueryParam("err"),
-		"DupCount":        dupCount,
-		"DeleteAfter":     model.NextMonthStart(time.Now()).Format("2006-01-02"),
-		"Today":           today,
-		"CanEdit":         canEditMaintenanceSchedule(c),
-		"IsAdmin":         isAdminRole(c),
-		"ScopeAll":        scopeAll,
-		"ShowScopeToggle": showScopeToggle,
-		"ScopeNote":       mntScopeNote(showScopeToggle, scopeAll),
-		"HolidayMissing":  holidayMissingBanner(h.holidayRepo, plan.PlanYear),
+		"FlashDone":        c.QueryParam("done"),
+		"FlashOK":          c.QueryParam("ok"),
+		"FlashErr":         c.QueryParam("err"),
+		"DupCount":         dupCount,
+		"DeleteAfter":      model.NextMonthStart(time.Now()).Format("2006-01-02"),
+		"Today":            today,
+		"CanEdit":          canEditMaintenanceSchedule(c),
+		"IsAdmin":          isAdminRole(c),
+		"ScopeAll":         scopeAll,
+		"ShowScopeToggle":  showScopeToggle,
+		"ScopeNote":        mntScopeNote(showScopeToggle, scopeAll),
+		"HolidayMissing":   holidayMissingBanner(h.holidayRepo, plan.PlanYear),
 	})
 }
 

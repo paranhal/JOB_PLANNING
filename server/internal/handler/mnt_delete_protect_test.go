@@ -44,6 +44,7 @@ func newMntProtectApp(t *testing.T) (*echo.Echo, *sql.DB, *Handler, string) {
 	g.GET("/maintenance/:id/duplicates", h.Maintenance.DuplicatesPreview)
 	g.POST("/maintenance/:id/duplicates", h.Maintenance.CollapseDuplicates)
 	g.POST("/maintenance/visits/:visit_id/delete", h.Maintenance.DeleteVisit)
+	g.POST("/maintenance/:id/quarter-confirm", h.Maintenance.ConfirmQuarterSlot)
 	return e, db, h, dir
 }
 

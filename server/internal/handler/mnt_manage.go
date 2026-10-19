@@ -56,7 +56,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 			um = 1
 		}
 	}
-	unassigned, _ := h.repo.ListUnassignedMonthSlots(plan.PlanID, plan.PlanYear, um)
+	unassigned, _ := h.repo.ListOpenUnassignedSlots(plan.PlanID, plan.PlanYear, um)
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, 0)
 
 	var assignees []model.User
