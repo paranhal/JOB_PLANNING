@@ -85,6 +85,16 @@ func CanEnterBidWithoutEval(p *SalesProject) bool {
 	return route == "private" || method == "private_contract"
 }
 
+func NeedsWorkProject(p *SalesProject, workProjectID string) bool {
+	if p == nil {
+		return false
+	}
+	if strings.TrimSpace(p.Stage) != SalesStage4Closed || strings.TrimSpace(p.CloseReason) != SalesCloseContracted {
+		return false
+	}
+	return strings.TrimSpace(workProjectID) == ""
+}
+
 func CanPromoteSales(p *SalesProject) bool {
 	if p == nil {
 		return false

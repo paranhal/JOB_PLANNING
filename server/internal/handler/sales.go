@@ -212,9 +212,21 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 			"Href": "/sales?group_id=" + g.GroupID,
 		})
 	}
+	var unpromoted []model.ContractRow
+	if h.projectRepo != nil {
+		if urows, err := h.projectRepo.ListContractUnion(repository.ContractUnionFilter{OrgID: listF.OrgID}); err == nil {
+			for _, r := range urows {
+				if r.Source == model.ContractSourceSales {
+					unpromoted = append(unpromoted, r)
+				}
+			}
+		}
+	}
 	return c.Render(http.StatusOK, "sales/dashboard.html", map[string]interface{}{
 		"Title":         "영업 대시보드",
 		"Active":        NavSalesDashboard,
+		"Unpromoted":    unpromoted,
+		"UnpromotedN":   len(unpromoted),
 		"Pipe":          pipe,
 		"OpenCount":     model.CountOpenSales(items),
 		"MonthWon":      model.FormatSalesMoney(model.SumMonthWon(items, ym)),
@@ -359,6 +371,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"Project":             h.viewProject(p, def),
 		"Raw":                 p,
 		"WorkProjectID":       workProjectID,
+		"NeedsWorkProject":    model.NeedsWorkProject(p, workProjectID),
 		"CanPromote":          model.CanPromoteSales(p) && workProjectID == "",
 		"ShowProgress":        showStageProg,
 		"Progress":            model.SalesProposalProgressFrom(acts),

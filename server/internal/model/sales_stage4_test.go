@@ -40,6 +40,20 @@ func TestSalesProbabilityTable(t *testing.T) {
 	}
 }
 
+func TestNeedsWorkProject(t *testing.T) {
+	p := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted}
+	if !NeedsWorkProject(p, "") {
+		t.Fatal("미연결 계약 완료는 미전환")
+	}
+	if NeedsWorkProject(p, "WP-001") {
+		t.Fatal("연결된 건은 미전환이 아니다")
+	}
+	p.CloseReason = SalesCloseLost
+	if NeedsWorkProject(p, "") {
+		t.Fatal("실주는 미전환이 아니다")
+	}
+}
+
 func TestSalesWinSampleSkipsDropped(t *testing.T) {
 	won, lost := SalesWinSample([]SalesProject{
 		{WonAt: "2026-01-01"}, {WonAt: "2026-01-02"}, {WonAt: "2026-01-03"},

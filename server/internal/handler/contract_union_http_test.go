@@ -72,6 +72,27 @@ func TestContractsHTTP_UnionAndAmountInput(t *testing.T) {
 	}
 }
 
+func TestSalesHTTP_UnpromotedBadge(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	srepo := repository.NewSalesRepo(db)
+	p := &model.SalesProject{Name: "배지계약"}
+	if err := srepo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=0 WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, p.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	show := doGet(t, e, "/sales/"+p.SalesID)
+	if !strings.Contains(show.Body.String(), "사업관리 미전환") {
+		t.Fatal("상세 배지 없음")
+	}
+	dash := doGet(t, e, "/sales/dashboard")
+	if !strings.Contains(dash.Body.String(), "사업관리 미전환") || !strings.Contains(dash.Body.String(), "배지계약") {
+		t.Fatal("대시보드 배지 없음")
+	}
+}
+
 func TestContractsHTTP_LinkSuggest(t *testing.T) {
 	e, db := newSalesServerDB(t)
 	srepo := repository.NewSalesRepo(db)

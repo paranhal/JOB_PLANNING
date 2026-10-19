@@ -7,6 +7,16 @@
     <a href="/?home=tech" class="text-xs text-blue-700 hover:underline">기술 대시보드 보기</a>
     {{end}}
   </div>
+  {{if gt .UnpromotedN 0}}
+  <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
+    <p class="font-semibold text-amber-900">사업관리 미전환 {{.UnpromotedN}}건</p>
+    <ul class="text-sm space-y-1">
+      {{range .Unpromoted}}
+      <li><a class="text-amber-900 underline" href="{{.Href}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a></li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
   {{if gt .MigratedN 0}}
   <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
     <p class="font-semibold text-amber-900">이관 확인 필요 {{.MigratedN}}건</p>
