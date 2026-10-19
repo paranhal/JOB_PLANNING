@@ -776,6 +776,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		"Err":              c.QueryParam("err"),
 		"KeywordChecks":    h.keywordChecks(as.ASID, model.KWFieldSymptom, as.Symptom),
 		"KeywordField":     model.KWFieldSymptom,
+		"CanReceive":       canEditASReceipt(c, as),
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"

@@ -132,6 +132,9 @@ func TestASClosedOwnerEditHTTPAndPeers(t *testing.T) {
 	if edit.Code != http.StatusOK {
 		t.Fatalf("본인 접수 수정 화면 %d", edit.Code)
 	}
+	if !strings.Contains(edit.Body.String(), "접수 저장") {
+		t.Fatal("본인 수정 화면에 저장 단추가 없다")
+	}
 	peerEdit := doGetWith(t, e, "/as/"+recpt.ASID+"/edit", peerCK)
 	if peerEdit.Code != http.StatusSeeOther && peerEdit.Code != http.StatusForbidden {
 		t.Fatalf("타인 수정 화면 status=%d", peerEdit.Code)
