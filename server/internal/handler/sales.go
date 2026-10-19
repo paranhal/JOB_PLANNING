@@ -101,7 +101,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 		groupSections = h.salesGroupSections(items, rows, quotes, groups)
 	}
 	return c.Render(http.StatusOK, "sales/list.html", map[string]interface{}{
-		"Title": "영업 사업", "Active": NavSales,
+		"Title": "영업 사업", "Active": NavSalesPipeline,
 		"Projects": rows, "Stages": stages,
 		"KanbanColumns": kanbanCols,
 		"KanbanTotal":   kanbanTotal,
@@ -355,7 +355,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	stageProg := model.BuildSalesStageProgress(p, acts, quotes, time.Now().Format("2006-01-02"))
 	showStageProg := !p.IsSupply() && (p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose)
 	return c.Render(http.StatusOK, "sales/show.html", map[string]interface{}{
-		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSales,
+		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSalesPipeline,
 		"Project":             h.viewProject(p, def),
 		"Raw":                 p,
 		"WorkProjectID":       workProjectID,
@@ -408,12 +408,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"NextTask":       nextTask,
 		"NextActions":    nextActions,
 		"WinProbChoices": []int{10, 20, 30, 40, 50, 60, 70, 80, 90},
-		"ListBack": func() string {
-			if p.IsSupply() {
-				return "/sales?deal=supply"
-			}
-			return "/sales"
-		}(),
+		"ListBack": salesListBack(c, p),
 	})
 }
 

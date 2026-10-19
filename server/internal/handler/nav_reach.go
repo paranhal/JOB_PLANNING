@@ -28,7 +28,7 @@ func oldSidebarCatalog() []oldNavLink {
 		{Href: "/maintenance/sites", Channel: "sidebar"},
 		{Href: "/maintenance/sites/distance", Channel: "sidebar"},
 		{Href: "/sales/dashboard", Channel: "sidebar"},
-		{Href: "/sales", Channel: "sidebar"},
+		{Href: "/sales", Channel: "tab", Via: "/sales?view=pipeline"},
 		{Href: "/sales/groups", Channel: "sidebar"},
 		{Href: "/sales/activities", Channel: "sidebar"},
 		{Href: "/sales?view=pipeline", Channel: "sidebar"},

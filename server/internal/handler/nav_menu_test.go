@@ -61,7 +61,7 @@ func TestNavRoleVisibilityTable(t *testing.T) {
 			name: "영업",
 			ctx: MenuCtx{Role: model.RoleSales, LoginRole: model.RoleSales, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleSales)},
-			want: []string{"/", "/work", "/as", "/sales", "/items"},
+			want: []string{"/", "/work", "/as", "/sales?view=pipeline", "/items"},
 			hide: []string{"/admin/users", "/admin/system"},
 		},
 		{

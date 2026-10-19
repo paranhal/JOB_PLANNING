@@ -88,6 +88,7 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 		"GroupID": f.GroupID, "Groups": groups, "Users": users, "PeriodOptions": salesPeriodOptions(now),
 		"Stages":   stages,
 		"ShowOwnerFilter": SalesVisibilityScope(c).ShowOwnerFilter,
+		"FromTask": fromTask,
 		"CanWrite": canWriteSales(c), "Forecast": fc, "Rows": rows,
 		"Basis": opts.Basis, "From": opts.From, "To": opts.To, "GroupBy": opts.Group, "Cell": opts.Cell,
 		"Spread": opts.Spread, "ShowAllYM": showAll, "BasisLabel": model.ForecastBasisLabel(opts.Basis),

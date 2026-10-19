@@ -8,6 +8,12 @@
     </div>
     <a href="/sales/pipeline.xlsx?{{.FilterQ}}&view=pipeline&basis={{.Basis}}&from={{.From}}&to={{.To}}&group={{.GroupBy}}&cell={{.Cell}}{{if .Spread}}&spread=1{{end}}" class="px-3 py-1.5 text-sm border rounded-lg">엑셀</a>
   </div>
+  {{template "sales_view_switch" .}}
+  {{if .FromTask}}
+  <div class="rounded-lg bg-orange-50 text-orange-900 text-sm px-4 py-2 border border-orange-200">
+    일일 업무를 영업 활동으로 만들 사업을 고르세요. 고른 사업의 활동 등록에서 이 업무가 연결됩니다.
+  </div>
+  {{end}}
   {{template "sales_list_filters" .}}
   <form method="get" action="/sales" class="flex flex-wrap items-end gap-2 text-sm bg-white border rounded-xl p-3">
     <input type="hidden" name="view" value="pipeline">

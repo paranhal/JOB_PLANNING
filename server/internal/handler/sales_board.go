@@ -14,18 +14,34 @@ import (
 	"customer-support/internal/repository"
 )
 
+func salesListBack(c echo.Context, p *model.SalesProject) string {
+	ref := strings.TrimSpace(c.Request().Header.Get("Referer"))
+	if u, err := url.Parse(ref); err == nil && u.Path == "/sales" {
+		if u.RawQuery != "" {
+			return "/sales?" + u.RawQuery
+		}
+		return "/sales"
+	}
+	if p != nil && p.IsSupply() {
+		return "/sales?deal=supply"
+	}
+	return "/sales"
+}
+
 func salesListView(display, view string) string {
-	d, v := strings.TrimSpace(display), strings.TrimSpace(view)
-	if d == "kanban" || v == "kanban" {
-		return "kanban"
+	for _, s := range []string{strings.TrimSpace(display), strings.TrimSpace(view)} {
+		switch s {
+		case "kanban":
+			return "kanban"
+		case "timeline":
+			return "timeline"
+		case "list":
+			return "list"
+		case "pipeline":
+			return "pipeline"
+		}
 	}
-	if d == "timeline" || v == "timeline" {
-		return "timeline"
-	}
-	if d == "pipeline" || v == "pipeline" {
-		return "pipeline"
-	}
-	return "list"
+	return "pipeline"
 }
 
 func salesActView(v string) string {

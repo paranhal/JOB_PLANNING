@@ -248,9 +248,9 @@ func TestSalesListSortIconsKeepDefaultOrderAndSearch(t *testing.T) {
 		t.Fatalf("create a=%d b=%d", a.Code, b.Code)
 	}
 
-	list := doGet(t, e, "/sales")
+	list := doGet(t, e, "/sales?display=list")
 	if list.Code != http.StatusOK {
-		t.Fatalf("/sales status=%d body=%s", list.Code, list.Body.String())
+		t.Fatalf("/sales?display=list status=%d body=%s", list.Code, list.Body.String())
 	}
 	body := list.Body.String()
 	assertSortHeaderChrome(t, body, "sales-sort", false)
@@ -260,12 +260,12 @@ func TestSalesListSortIconsKeepDefaultOrderAndSearch(t *testing.T) {
 		t.Fatalf("영업 기본(시기 내림) 순서가 바뀌었다 hi=%d gi=%d", hi, gi)
 	}
 
-	search := doGet(t, e, "/sales?search="+url.QueryEscape("사업"))
+	search := doGet(t, e, "/sales?display=list&search="+url.QueryEscape("사업"))
 	sb := search.Body.String()
 	if !strings.Contains(sb, "search=") {
 		t.Fatal("영업 정렬 링크가 검색을 풀었다")
 	}
-	sorted := doGet(t, e, "/sales?sort=name&dir=asc")
+	sorted := doGet(t, e, "/sales?display=list&sort=name&dir=asc")
 	st := sorted.Body.String()
 	if strings.Index(st, "가나다사업") > strings.Index(st, "하하하사업") {
 		t.Fatal("사업명 오름차순이 아니다")

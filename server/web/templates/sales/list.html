@@ -8,18 +8,7 @@
       <p class="text-sm text-gray-500">발굴 · 제안 · 입찰 · 사업 종료.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/sales?display=list{{if .FilterQ}}&{{.FilterQ}}{{end}}"
-         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "list"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
-      <a href="/sales?display=kanban{{if .FilterQ}}&{{.FilterQ}}{{end}}"
-         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">단계 칸반</a>
-      <a href="/sales?display=timeline{{if .FilterQ}}&{{.FilterQ}}{{end}}"
-         class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "timeline"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">예정월 타임라인</a>
-      {{if .CanWrite}}
-      <a href="{{.NewHref}}"
-         class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-        영업 사업 등록
-      </a>
-      {{end}}
+      {{template "sales_view_switch" .}}
       <a href="/sales?group_by=category{{if .FilterQ}}&{{.FilterQ}}{{end}}"
          class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .GroupBy "category"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600{{end}}">대분류로 묶기</a>
     </div>

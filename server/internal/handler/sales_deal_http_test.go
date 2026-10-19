@@ -120,11 +120,14 @@ func TestSalesHTTP_SupplyDealTypeListAndAutoStage(t *testing.T) {
 		t.Fatalf("파이프라인 리다이렉트 status=%d", pipe.Code)
 	}
 	loc := pipe.Header().Get("Location")
-	if !strings.Contains(loc, "view=kanban") {
+	if !strings.Contains(loc, "view=pipeline") {
 		t.Fatalf("파이프라인 Location=%q", loc)
 	}
-	kanban = doGet(t, e, loc)
-	if kanban.Code != http.StatusOK {
-		t.Fatalf("칸반 status=%d loc=%s", kanban.Code, loc)
+	if !strings.Contains(loc, "deal=supply") {
+		t.Fatalf("단품 파이프라인 Location=%q", loc)
+	}
+	piped := doGet(t, e, loc)
+	if piped.Code != http.StatusOK {
+		t.Fatalf("파이프라인 보기 status=%d loc=%s", piped.Code, loc)
 	}
 }

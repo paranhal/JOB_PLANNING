@@ -189,8 +189,7 @@ func navDefinition() []navDefGroup {
 			ID: "sales", Label: "영업관리", Show: role,
 			Items: []navDefItem{
 				{ID: "sales_dash", Label: "영업 대시보드", Href: "/sales/dashboard", Active: []string{NavSalesDashboard}, Show: role},
-				{ID: "sales_list", Label: "영업 사업", Href: "/sales", Active: []string{NavSales}, Show: role},
-				{ID: "sales_pipe", Label: "파이프라인", Href: "/sales?view=pipeline", Active: []string{NavSalesPipeline}, Show: role},
+				{ID: "sales_pipe", Label: "파이프라인", Href: "/sales?view=pipeline", Active: []string{NavSalesPipeline, NavSales}, Show: role},
 				{ID: "sales_act", Label: "영업 활동", Href: "/sales/activities", Active: []string{NavSalesActivities}, Show: role},
 				{ID: "docs_hub", Label: "견적·수주·계약", Href: "/quotes", Active: []string{NavQuotes, NavOrders, NavContracts, NavDocsHub}, Show: role},
 				{ID: "sales_groups", Label: "사업 대분류", Href: "/sales/groups", Active: []string{NavSalesGroups}, Show: role, More: true},

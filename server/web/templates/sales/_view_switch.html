@@ -1,0 +1,15 @@
+{{define "sales_view_switch"}}
+<div id="sales-view-switch" class="flex flex-wrap items-center gap-2">
+  <a href="/sales?view=pipeline{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+     class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "pipeline"}}btn-primary{{else}}btn-secondary{{end}}">파이프라인</a>
+  <a href="/sales?display=list{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+     class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "list"}}btn-primary{{else}}btn-secondary{{end}}">리스트</a>
+  <a href="/sales?display=kanban{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+     class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}btn-primary{{else}}btn-secondary{{end}}">단계 칸반</a>
+  <a href="/sales?display=timeline{{if .FilterQ}}&{{.FilterQ}}{{end}}"
+     class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "timeline"}}btn-primary{{else}}btn-secondary{{end}}">예정월 타임라인</a>
+  {{if .CanWrite}}
+  <a href="{{.NewHref}}" class="btn-primary px-4 py-2 text-sm font-medium">영업 사업 등록</a>
+  {{end}}
+</div>
+{{end}}
