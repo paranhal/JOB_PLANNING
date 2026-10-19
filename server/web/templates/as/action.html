@@ -18,6 +18,18 @@
           {{statusBadge .AS.Status}}
         </div>
         <p class="text-sm text-gray-500">{{.AS.OrgName}}{{if .DailyTask}} · 일일업무 <span class="font-mono">{{.DailyTask.TaskID}}</span>{{end}}</p>
+        {{if .CanProcess}}
+        <details class="mt-2 text-xs text-slate-600">
+          <summary class="cursor-pointer text-blue-700">목록에 없음 → 기관 직접입력</summary>
+          <form method="POST" action="/as/{{.AS.ASID}}/customer-direct" class="mt-2 flex flex-wrap gap-2 items-end">
+            <input type="hidden" name="customer_direct" value="1">
+            <input type="text" name="org_name_direct" required placeholder="기관명" class="border border-slate-300 rounded px-2 py-1 text-sm">
+            <input type="text" name="contact_direct" placeholder="담당자(선택)" class="border border-slate-300 rounded px-2 py-1 text-sm">
+            <input type="text" name="phone_direct" placeholder="연락처(선택)" class="border border-slate-300 rounded px-2 py-1 text-sm">
+            <button type="submit" class="px-2 py-1 rounded bg-slate-800 text-white">적용</button>
+          </form>
+        </details>
+        {{end}}
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 justify-end">

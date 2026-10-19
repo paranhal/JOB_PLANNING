@@ -81,8 +81,9 @@ func (h *CustomerHandler) List(c echo.Context) error {
 	}
 	pageSize := 20
 	reviewOnly := c.QueryParam("review") == "1"
+	provisionalOnly := c.QueryParam("provisional") == "1"
 
-	items, total, err := h.repo.List(currentOrg(c), search, category, industry, sort, dir, page, pageSize, reviewOnly, partyKind)
+	items, total, err := h.repo.List(currentOrg(c), search, category, industry, sort, dir, page, pageSize, reviewOnly, partyKind, provisionalOnly)
 	if err != nil {
 		return err
 	}
@@ -115,6 +116,9 @@ func (h *CustomerHandler) List(c echo.Context) error {
 	}
 
 	title := "고객현황"
+	if provisionalOnly {
+		title = "미확정 기관"
+	}
 	salesQ := ""
 	if salesView {
 		title = "고객·파트너"
@@ -152,8 +156,10 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		"ExportSites":   exportSites,
 		"ExportRegion":  "",
 		"ExportSite":    "",
-		"ReviewOnly":    reviewOnly,
-		"ReviewCount":   h.repo.CountNeedsReview(),
+		"ReviewOnly":       reviewOnly,
+		"ReviewCount":      h.repo.CountNeedsReview(),
+		"ProvisionalOnly":  provisionalOnly,
+		"ProvisionalCount": h.repo.CountProvisional(),
 		"ParentGroups":  model.GroupCustomersByParent(items),
 	})
 }
@@ -398,7 +404,7 @@ func (h *CustomerHandler) SearchJSON(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	q := strings.TrimSpace(c.QueryParam("q"))
-	items, _, err := h.repo.List(currentOrg(c), q, "", "", "org_name", "asc", 1, 20, false, "")
+	items, _, err := h.repo.List(currentOrg(c), q, "", "", "org_name", "asc", 1, 20, false, "", false)
 	if err != nil {
 		return err
 	}
@@ -484,13 +490,47 @@ func (h *CustomerHandler) Show(c echo.Context) error {
 	if cust == nil {
 		return echo.ErrNotFound
 	}
+	mergeTargets := []model.CustomerListItem{}
+	if cust.IsProvisional && canWriteMaster(c) {
+		all, _, _ := h.repo.List(currentOrg(c), "", "", "", "org_name", "asc", 1, 200, false, "", false)
+		for _, it := range all {
+			if it.CustomerID == cust.CustomerID || it.IsProvisional || !it.IsActive {
+				continue
+			}
+			mergeTargets = append(mergeTargets, it)
+		}
+	}
 	return c.Render(http.StatusOK, "customer/show.html", map[string]interface{}{
-		"Title":      cust.OrgName,
-		"Active":     NavCustomers,
-		"Customer":   cust,
-		"CanWrite":   canWriteMaster(c),
-		"CanReceive": canReceiveAS(c),
+		"Title":        cust.OrgName,
+		"Active":       NavCustomers,
+		"Customer":     cust,
+		"CanWrite":     canWriteMaster(c),
+		"CanReceive":   canReceiveAS(c),
+		"MergeTargets": mergeTargets,
 	})
+}
+
+func (h *CustomerHandler) Promote(c echo.Context) error {
+	if !canWriteMaster(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	if err := h.repo.PromoteProvisional(id, ctxString(c, "user_name")); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/customers/"+id)
+}
+
+func (h *CustomerHandler) Merge(c echo.Context) error {
+	if !canWriteMaster(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	toID := strings.TrimSpace(c.FormValue("to_customer_id"))
+	if err := h.repo.MergeInto(id, toID, ctxString(c, "user_name")); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/customers/"+id+"?err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, "/customers/"+toID)
 }
 
 // ToggleReview 확인 필요 표식을 켜고 끈다. 수작업 보정이 끝난 기관을 목록에서 걸러내는 용도.

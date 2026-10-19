@@ -501,15 +501,17 @@ func (h *ASHandler) urgencyReasonCodes() []model.Code {
 
 func receiptCustomersJSON(list []model.Customer) template.JS {
 	type row struct {
-		ID        string `json:"id"`
-		OrgName   string `json:"org_name"`
-		ShortName string `json:"short_name"`
-		Region    string `json:"region"`
+		ID          string `json:"id"`
+		OrgName     string `json:"org_name"`
+		ShortName   string `json:"short_name"`
+		Region      string `json:"region"`
+		Provisional bool   `json:"provisional"`
 	}
 	out := make([]row, 0, len(list))
 	for _, c := range list {
 		out = append(out, row{
 			ID: c.CustomerID, OrgName: c.OrgName, ShortName: c.ShortName, Region: c.Region,
+			Provisional: c.IsProvisional,
 		})
 	}
 	b, err := json.Marshal(out)
@@ -615,11 +617,74 @@ func equipmentVisitDateYearErr(c echo.Context) bool {
 	return false
 }
 
+func (h *ASHandler) applyDirectCustomer(c echo.Context, as *model.ASReceipt) (official bool, err error) {
+	if as == nil || strings.TrimSpace(c.FormValue("customer_direct")) != "1" {
+		return false, nil
+	}
+	if h.customerRepo == nil {
+		return false, fmt.Errorf("고객 저장소를 쓸 수 없습니다")
+	}
+	id, official, err := h.customerRepo.ResolveProvisional(
+		currentOrg(c),
+		c.FormValue("org_name_direct"),
+		c.FormValue("contact_direct"),
+		c.FormValue("phone_direct"),
+		ctxString(c, "user_name"),
+	)
+	if err != nil {
+		return false, err
+	}
+	as.CustomerID = id
+	return official, nil
+}
+
+func (h *ASHandler) CustomerMatch(c echo.Context) error {
+	if !canReceiveAS(c) && !canProcessAS(c) {
+		return echo.ErrForbidden
+	}
+	name := strings.TrimSpace(c.QueryParam("name"))
+	if name == "" {
+		return c.JSON(http.StatusOK, map[string]interface{}{"found": false})
+	}
+	exist, err := h.customerRepo.FindByNormalizedOrgName(currentOrg(c), name)
+	if err != nil {
+		return err
+	}
+	if exist == nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{"found": false})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"found": true, "official": !exist.IsProvisional,
+		"customer_id": exist.CustomerID, "org_name": exist.OrgName,
+	})
+}
+
+func (h *ASHandler) UpdateCustomerDirect(c echo.Context) error {
+	id := c.Param("id")
+	as, err := h.repo.GetByID(currentOrg(c), id)
+	if err != nil || as == nil {
+		return echo.ErrNotFound
+	}
+	if !h.canModifyAS(c, as) {
+		return echo.ErrForbidden
+	}
+	if _, err := h.applyDirectCustomer(c, as); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+url.QueryEscape(err.Error()))
+	}
+	if err := h.repo.UpdateReceipt(as); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+}
+
 func (h *ASHandler) Create(c echo.Context) error {
 	if !canReceiveAS(c) {
 		return echo.ErrForbidden
 	}
 	base := h.parseReceiptForm(c)
+	if _, err := h.applyDirectCustomer(c, base); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/as/new?err="+url.QueryEscape(err.Error()))
+	}
 	rows := h.parseEquipmentRows(c, base)
 	if len(rows) == 0 {
 		rows = []*model.ASReceipt{base}
@@ -732,6 +797,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 		return h.redirectLocked(c, id, "show")
 	}
 	as := h.parseReceiptForm(c)
+	if _, err := h.applyDirectCustomer(c, as); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err="+url.QueryEscape(err.Error()))
+	}
 	as.ASID = existing.ASID
 	as.ASNumber = existing.ASNumber
 	if as.ReceiptDatetime.IsZero() {

@@ -1321,6 +1321,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyApprovalEngineV71(db)
 	applyLeaveRequestsV72(db)
 	applyProjectKindAssignmentsV72(db)
+	applyCustomerProvisionalV74(db)
 
 	BackfillAssetImageSlots(db)
 	migrateUserRolesAndPermissions(db)

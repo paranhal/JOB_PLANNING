@@ -51,7 +51,7 @@ func TestOrgCrossNoLeak(t *testing.T) {
 		t.Fatal("빈 org Get 이 통과했다")
 	}
 
-	custs, cn, err := NewCustomerRepo(db).List("O01", "", "", "", "", "", 1, 50, false, "")
+	custs, cn, err := NewCustomerRepo(db).List("O01", "", "", "", "", "", 1, 50, false, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}

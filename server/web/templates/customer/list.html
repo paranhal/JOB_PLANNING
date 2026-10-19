@@ -8,10 +8,10 @@
       <h2 class="text-xl font-bold text-gray-800">{{if .SalesView}}고객·파트너{{else}}고객현황{{end}}</h2>
       <p class="text-sm text-gray-500">
         {{if .SalesView}}진행 중 사업 · 누적 수주액 · 마지막 활동일. 등록·수정은 기준정보에서 합니다.
-        {{else if .ReviewOnly}}확인 필요 {{.Total}}개 기관{{else}}전체 {{.Total}}개 기관{{end}}
+        {{else if .ReviewOnly}}확인 필요 {{.Total}}개 기관{{else if .ProvisionalOnly}}미확정 {{.Total}}개 기관{{else}}전체 {{.Total}}개 기관{{end}}
       </p>
-      {{if .ReviewCount}}
-      <div class="mt-2">
+      <div class="mt-2 flex flex-wrap gap-2">
+        {{if .ReviewCount}}
         {{if .ReviewOnly}}
         <a href="/customers" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
           전체 보기
@@ -21,8 +21,19 @@
           확인 필요 {{.ReviewCount}}건 보기
         </a>
         {{end}}
+        {{end}}
+        {{if .ProvisionalCount}}
+        {{if .ProvisionalOnly}}
+        <a href="/customers" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
+          전체 보기
+        </a>
+        {{else}}
+        <a href="/customers?provisional=1" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-800 hover:bg-violet-200">
+          미확정 기관 {{.ProvisionalCount}}건 보기
+        </a>
+        {{end}}
+        {{end}}
       </div>
-      {{end}}
     </div>
     <div class="flex flex-col items-stretch sm:items-end gap-2">
       <form method="GET" action="/customers/export.xlsx" class="flex flex-wrap items-center gap-2">
@@ -223,6 +234,9 @@
                   {{if .NeedsReview}}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800"
                         title="{{.ReviewReason}}">확인 필요</span>
+                  {{end}}
+                  {{if .IsProvisional}}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 text-violet-800">미확정</span>
                   {{end}}
                 </div>
                 {{if ne .OfficialName .OrgName}}

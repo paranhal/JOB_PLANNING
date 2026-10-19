@@ -28,6 +28,7 @@ func newReceiptPhotoFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASR
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/as", h.AS.List)
+	g.GET("/as/customer-match", h.AS.CustomerMatch)
 	g.GET("/as/new", h.AS.New)
 	g.POST("/as", h.AS.Create)
 	g.GET("/as/:id/edit", h.AS.Edit)

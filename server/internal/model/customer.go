@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+	"unicode"
+)
 
 // Customer 고객 마스터 (기획서 §5.1)
 type Customer struct {
@@ -26,6 +30,9 @@ type Customer struct {
 	NeedsReview      bool      `json:"needs_review"`  // 자동 생성·미매칭 등으로 사람이 확인해야 하는 기관
 	ReviewReason     string    `json:"review_reason"` // 확인이 필요한 이유
 	PartyKind        string    `json:"party_kind"`    // customer|partner|own|vendor. §34.2.5
+	IsProvisional    bool      `json:"is_provisional,omitempty"`
+	ProvisionalBy    string    `json:"provisional_by,omitempty"`
+	ProvisionalAt    string    `json:"provisional_at,omitempty"`
 	OrgID            string    `json:"org_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -153,6 +160,7 @@ type CustomerListItem struct {
 	NeedsReview       bool   `json:"needs_review,omitempty"`
 	ReviewReason      string `json:"review_reason,omitempty"`
 	PartyKind         string `json:"party_kind,omitempty"`
+	IsProvisional     bool   `json:"is_provisional,omitempty"`
 	SalesOpenCount    int    `json:"sales_open_count,omitempty"`
 	SalesWonAmount    int    `json:"sales_won_amount,omitempty"`
 	SalesLastActivity string `json:"sales_last_activity,omitempty"`
@@ -169,4 +177,20 @@ type CustomerCategory struct {
 type CustomerIndustryStat struct {
 	Industry string `json:"industry"`
 	Count    int    `json:"count"`
+}
+
+// NormalizeOrgLookupName 기관명 직접입력 재사용 키. 공백·(주)/㈜/주식회사를 빼고 대소문자를 무시한다. D-66.
+func NormalizeOrgLookupName(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	for _, cut := range []string{"주식회사", "(주)", "㈜", "㈔"} {
+		s = strings.ReplaceAll(s, cut, "")
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsSpace(r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
