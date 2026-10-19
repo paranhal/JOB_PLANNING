@@ -110,7 +110,7 @@ func TestProjectKindRequiredAtHandlerLayerDocumentedByEmptyCreateDefault(t *test
 		t.Fatal(err)
 	}
 	got, _ := repo.Get(p.ProjectID)
-	if got.ProjectKind != model.ProjectKindMaintenance {
-		t.Fatalf("repo 기본 kind=%s (승격·일일업무 경로)", got.ProjectKind)
+	if got.ProjectKindSet != 0 {
+		t.Fatalf("미선택 생성은 미확정이어야 한다 kind=%s set=%d", got.ProjectKind, got.ProjectKindSet)
 	}
 }
