@@ -5,7 +5,7 @@
     <div>
       <h2 class="text-xl font-bold text-gray-800">견적 <span class="text-sm font-normal text-gray-400">({{.Total}}건)</span></h2>
       <p class="text-sm text-gray-500">합계는 프로그램이 계산합니다. 번호를 사람이 넣을 수 없습니다.</p>
-      <div class="mt-2 flex flex-wrap gap-2 text-xs">
+      <div id="absorb-tabs" class="mt-2 flex flex-wrap gap-2 text-xs">
         <a href="/quotes" class="px-2 py-1 rounded-full bg-blue-50 text-blue-800">견적 {{.DocQuotes}}</a>
         <a href="/orders" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">수주 {{.DocOrders}}</a>
         <a href="/contracts" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">계약 {{.DocContracts}}</a>

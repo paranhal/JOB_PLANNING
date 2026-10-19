@@ -231,6 +231,29 @@ func New(db *sql.DB) *Handler {
 			"as_receipts":      asRepo.ReceiptCount(),
 		}
 	})
+	fillApprovalNavBadges = func(c echo.Context, data map[string]interface{}) {
+		if h.Leave == nil || h.Leave.eng == nil || currentUserID(c) == "" {
+			return
+		}
+		items, err := h.Leave.eng.ListInbox(currentOrg(c), currentUserID(c), "")
+		if err == nil {
+			data["ApprovalPendingCount"] = len(items)
+		}
+		if h.Leave.svc == nil {
+			return
+		}
+		mine, err := h.Leave.svc.ListMine(currentOrg(c), currentUserID(c))
+		if err != nil {
+			return
+		}
+		n := 0
+		for _, it := range mine {
+			if it.Status == approval.StatusInProgress {
+				n++
+			}
+		}
+		data["LeavePendingCount"] = n
+	}
 	return h
 }
 

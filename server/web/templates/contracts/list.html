@@ -4,6 +4,11 @@
   <div>
     <h2 class="text-xl font-bold text-gray-800">계약 관리</h2>
     <p class="text-sm text-gray-500">계약은 사업 1건입니다. <code class="text-xs">work_projects</code> 를 봅니다.</p>
+    <div id="absorb-tabs" class="mt-2 flex flex-wrap gap-2 text-xs">
+      <a href="/quotes" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">견적</a>
+      <a href="/orders" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">수주</a>
+      <a href="/contracts" class="px-2 py-1 rounded-full bg-blue-50 text-blue-800">계약</a>
+    </div>
   </div>
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
     <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">총 계약건</p><p class="text-2xl font-bold">{{.KPITotal}}</p></div>

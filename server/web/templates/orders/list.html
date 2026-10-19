@@ -5,6 +5,11 @@
     <div>
       <h2 class="text-xl font-bold text-gray-800">수주 <span class="text-sm font-normal text-gray-400">({{.Total}}건)</span></h2>
       <p class="text-sm text-gray-500">견적 라인을 복사해 넘깁니다. 합계는 <span class="font-medium">확정 금액 기준</span>입니다.</p>
+      <div id="absorb-tabs" class="mt-2 flex flex-wrap gap-2 text-xs">
+        <a href="/quotes" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">견적</a>
+        <a href="/orders" class="px-2 py-1 rounded-full bg-blue-50 text-blue-800">수주</a>
+        <a href="/contracts" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">계약</a>
+      </div>
     </div>
     <div class="flex flex-wrap gap-2">
       <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>

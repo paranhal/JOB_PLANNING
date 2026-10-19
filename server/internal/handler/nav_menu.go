@@ -483,7 +483,12 @@ func jsJSON(v interface{}) template.JS {
 	return template.JS(b)
 }
 
+var fillApprovalNavBadges func(c echo.Context, data map[string]interface{})
+
 func injectNavMenu(c echo.Context, data map[string]interface{}) {
+	if fillApprovalNavBadges != nil {
+		fillApprovalNavBadges(c, data)
+	}
 	active, _ := data["Active"].(string)
 	badges := NavBadges{
 		Assign:     intFromData(data, "AssignNoticeUnread"),
@@ -491,6 +496,8 @@ func injectNavMenu(c echo.Context, data map[string]interface{}) {
 		Approvals:  intFromData(data, "ApprovalPendingCount"),
 		Leaves:     intFromData(data, "LeavePendingCount"),
 	}
+	data["ApprovalPendingCount"] = badges.Approvals
+	data["LeavePendingCount"] = badges.Leaves
 	res := FilterNav(menuCtxFromData(c, data), active, badges)
 	if res.CurMore == nil {
 		res.CurMore = []string{}

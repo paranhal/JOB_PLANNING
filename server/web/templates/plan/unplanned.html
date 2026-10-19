@@ -4,6 +4,10 @@
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">미계획 업무함</h2>
+      <nav id="absorb-tabs" class="mt-2 flex flex-wrap gap-1 text-xs" aria-label="등록 화면">
+        <a href="/workboard/register" class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">일일 업무 등록</a>
+        <a href="/plan/unplanned" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">미계획 업무함</a>
+      </nav>
       <p class="text-sm text-gray-500 mt-1">계획이 없거나, 일정이 지났거나, 다음 일정이 정해지지 않은 업무</p>
       <p class="text-xs text-gray-400 mt-0.5">{{.ScopeNote}} · {{.Counts.Total}}건</p>
     </div>

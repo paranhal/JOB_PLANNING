@@ -2,7 +2,13 @@
 {{define "content"}}
 <div class="space-y-4">
   <div class="flex items-center justify-between gap-3">
+    <div>
+    <nav id="absorb-tabs" class="mb-2 flex flex-wrap gap-1 text-xs" aria-label="결재">
+      <a href="/approvals/inbox" class="px-3 py-1.5 rounded-lg border border-line text-ink hover:bg-surface">결재할 문서{{if gt .ApprovalPendingCount 0}} {{.ApprovalPendingCount}}{{end}}</a>
+      <a href="/leaves" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">휴가 신청{{if gt .LeavePendingCount 0}} {{.LeavePendingCount}}{{end}}</a>
+    </nav>
     <h2 class="text-ui-xl font-extrabold text-ink">내 휴가</h2>
+    </div>
     <a href="/leaves/new" class="btn btn-primary">근태허가원 작성</a>
   </div>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}

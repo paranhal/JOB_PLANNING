@@ -56,6 +56,7 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
 	}
 	visits := append(sampleVisits(), model.MaintenanceVisit{
@@ -120,6 +121,7 @@ func TestMaintenancePlanScopeToggleRender(t *testing.T) {
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
@@ -250,6 +252,7 @@ func TestMaintenanceDupBannerRender(t *testing.T) {
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
@@ -275,6 +278,7 @@ func TestGenerateConfirmMonthCopyRender(t *testing.T) {
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_generate.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)

@@ -201,6 +201,7 @@ func TestManagePlanRender(t *testing.T) {
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_manage.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)

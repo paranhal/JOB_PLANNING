@@ -133,6 +133,7 @@ func registerParseFiles(t *testing.T) []string {
 	root := findTemplateRoot(t)
 	files := []string{
 		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "workboard", "register.html"),
 	}
 	for _, dir := range []string{"workboard", "kanban"} {

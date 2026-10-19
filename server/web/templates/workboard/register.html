@@ -195,6 +195,10 @@
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-xl font-bold text-slate-900 tracking-tight">{{.ViewLabel}}</h2>
+          <nav id="absorb-tabs" class="flex flex-wrap gap-1 text-xs" aria-label="등록 화면">
+            <a href="/workboard/register" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">일일 업무 등록</a>
+            <a href="/plan/unplanned" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">미계획 업무함</a>
+          </nav>
           <form method="GET" action="/workboard/register" class="inline-flex flex-wrap gap-1.5">
             <input type="hidden" name="view" value="{{.View}}">
             <input type="hidden" name="date" value="{{.Date}}">
