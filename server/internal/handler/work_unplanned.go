@@ -33,7 +33,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 		scopeAll = true
 	}
 
-	items, counts, err := h.repo.ListUnplanned(mineUID, mineKeys, kind)
+	items, counts, err := h.repo.ListUnplannedForOrg(mineUID, mineKeys, kind, currentOrg(c))
 	if err != nil {
 		return err
 	}

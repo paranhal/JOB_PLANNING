@@ -11,10 +11,14 @@ import (
 
 // ListUnplanned §8 미계획 업무함. /work 의 collectDelayed·collectSchedulePending·collectUnassigned를 재사용한다.
 func (r *WorkBoardRepo) ListUnplanned(mineUserID string, mineKeys []string, kind string) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
-	return r.listUnplanned(mineUserID, mineKeys, kind, nil)
+	return r.listUnplanned(mineUserID, mineKeys, kind, nil, OrgAll)
 }
 
-func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind string, reuse *unplannedBase) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
+func (r *WorkBoardRepo) ListUnplannedForOrg(mineUserID string, mineKeys []string, kind, orgID string) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
+	return r.listUnplanned(mineUserID, mineKeys, kind, nil, orgID)
+}
+
+func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind string, reuse *unplannedBase, orgID string) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
 	start := time.Now()
 	defer logSlowSQL("work.ListUnplanned", start)
 	today := time.Now().Format("2006-01-02")
@@ -149,7 +153,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 		}
 	}
 
-	slots, err := r.listUnassignedSlotsAsItems()
+	slots, err := r.listUnassignedSlotsAsItems(orgID)
 	if err != nil {
 		return nil, model.UnplannedKindCounts{}, err
 	}
@@ -225,7 +229,7 @@ func (r *WorkBoardRepo) loadASNoDateMeta() map[string]noDateMeta {
 	return out
 }
 
-func (r *WorkBoardRepo) listUnassignedSlotsAsItems() ([]model.UnplannedItem, error) {
+func (r *WorkBoardRepo) listUnassignedSlotsAsItems(orgID string) ([]model.UnplannedItem, error) {
 	mnt := NewMaintenanceRepo(r.db)
 	planID, year, month, err := r.currentMntPlanYM()
 	if err != nil || planID == "" {
@@ -235,35 +239,64 @@ func (r *WorkBoardRepo) listUnassignedSlotsAsItems() ([]model.UnplannedItem, err
 	if err != nil {
 		return nil, err
 	}
+	slots = FilterUnassignedSlotsByOrg(slots, orgID)
 	out := make([]model.UnplannedItem, 0, len(slots))
 	for _, s := range slots {
-		title := s.ProductType
-		if title == "" {
-			title = "점검"
+		out = append(out, unplannedFromMonthSlot(planID, s))
+	}
+	return out, nil
+}
+
+func unplannedFromMonthSlot(planID string, s model.UnassignedMonthSlot) model.UnplannedItem {
+	title := s.ProductType
+	if title == "" {
+		title = "점검"
+	}
+	slotLabel := "일정 배정안됨"
+	if s.UnconfirmedQuarter {
+		slotLabel = "분기 점검 미확정"
+	}
+	return model.UnplannedItem{
+		WorkListItem: model.WorkListItem{
+			Prefix:      model.WorkPrefixMaintenance,
+			RefID:       s.CustomerID + ":" + s.SlotKey,
+			RefNumber:   s.ShortName,
+			Title:       title + " · " + slotLabel,
+			OrgName:     s.OrgName,
+			Status:      "unassigned_slot",
+			StatusLabel: "배정안됨",
+			Href:        "/maintenance/" + planID,
+			SubLabel:    s.ProductType,
+		},
+		ItemKey:       "slot:" + planID + "|" + s.CustomerID + "|" + s.ProductType,
+		CanAssignDate: true,
+		PlanID:        planID,
+		CustomerID:    s.CustomerID,
+		ProductType:   s.ProductType,
+	}
+}
+
+// CollectQuarterUnassignedAlerts 분기 마지막 달의 「분기 점검 미확정」만. 알람·받은편지함 재사용(D-76).
+func (r *WorkBoardRepo) CollectQuarterUnassignedAlerts(orgID string, year, month int) ([]model.WorkListItem, error) {
+	if r == nil || !model.IsLastMonthOfQuarter(month) {
+		return nil, nil
+	}
+	mnt := NewMaintenanceRepo(r.db)
+	p, err := mnt.GetPlanByYear(year)
+	if err != nil || p == nil {
+		return nil, err
+	}
+	slots, err := mnt.ListOpenUnassignedSlots(p.PlanID, year, month)
+	if err != nil {
+		return nil, err
+	}
+	slots = FilterUnassignedSlotsByOrg(slots, orgID)
+	var out []model.WorkListItem
+	for _, s := range slots {
+		if !s.UnconfirmedQuarter {
+			continue
 		}
-		slotLabel := "일정 배정안됨"
-		if s.UnconfirmedQuarter {
-			slotLabel = "분기 점검 미확정"
-		}
-		it := model.UnplannedItem{
-			WorkListItem: model.WorkListItem{
-				Prefix:      model.WorkPrefixMaintenance,
-				RefID:       s.CustomerID + ":" + s.SlotKey,
-				RefNumber:   s.ShortName,
-				Title:       title + " · " + slotLabel,
-				OrgName:     s.OrgName,
-				Status:      "unassigned_slot",
-				StatusLabel: "배정안됨",
-				Href:        "/maintenance/" + planID,
-				SubLabel:    s.ProductType,
-			},
-			ItemKey:       "slot:" + planID + "|" + s.CustomerID + "|" + s.ProductType,
-			CanAssignDate: true,
-			PlanID:        planID,
-			CustomerID:    s.CustomerID,
-			ProductType:   s.ProductType,
-		}
-		out = append(out, it)
+		out = append(out, unplannedFromMonthSlot(p.PlanID, s).WorkListItem)
 	}
 	return out, nil
 }
@@ -462,7 +495,7 @@ func (r *WorkBoardRepo) CountPlanning() (model.PlanningCounts, error) {
 	}
 	add(mntOpen, mntOpen)
 
-	slots, err := r.listUnassignedSlotsAsItems()
+	slots, err := r.listUnassignedSlotsAsItems(OrgAll)
 	if err != nil {
 		return p, err
 	}

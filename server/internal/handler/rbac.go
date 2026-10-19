@@ -336,7 +336,7 @@ func canViewMaintenance(c echo.Context) bool {
 
 // canEditMaintenanceSchedule 정기점검 방문 일정 수정
 func canEditMaintenanceSchedule(c echo.Context) bool {
-	if isReadOnly(c) {
+	if isReadOnly(c) || viewAsActive(c) {
 		return false
 	}
 	return hasPerm(c, model.PermMaintenanceEdit)

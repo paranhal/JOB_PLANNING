@@ -832,7 +832,8 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 		       s.has_klas, s.has_rfid, COALESCE(s.inspection_cycle,'monthly'),
 		       s.entry_category, COALESCE(s.fixed_rule,''),
 		       COALESCE(c.org_name,''),
-		       COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,'')
+		       COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,''),
+		       COALESCE(c.org_id,'')
 		FROM maintenance_site_config s
 		LEFT JOIN customers c ON c.customer_id = s.customer_id
 		ORDER BY s.region, s.short_name`)
@@ -844,7 +845,7 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 	for rows.Next() {
 		var cfg model.MaintenanceSiteConfig
 		var klas, rfid int
-		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName, &cfg.AddrSido, &cfg.AddrSigungu); err != nil {
+		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName, &cfg.AddrSido, &cfg.AddrSigungu, &cfg.OrgID); err != nil {
 			return nil, err
 		}
 		cfg.HasKlas = klas == 1

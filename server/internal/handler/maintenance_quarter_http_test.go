@@ -44,16 +44,30 @@ func TestShowPlanQuarterConfirmBannerAndSkip(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "분기 점검 확인") {
-		t.Fatalf("확인 배너 없음: %s", body)
+	if !strings.Contains(body, "분기 점검 대기") {
+		t.Fatalf("10월 안내 없음: %s", body)
+	}
+	if strings.Contains(body, "분기 점검 확인") {
+		t.Fatal("10월에 확인 3입력 박스가 나오면 안 됨")
 	}
 	if strings.Contains(body, ">분기 점검 미확정<") {
 		t.Fatal("10월 미배정 표에 분기 미확정이 올라오면 안 됨")
 	}
 
-	skip := mntPostWithCookie(t, e, "/maintenance/"+p.PlanID+"/quarter-confirm", url.Values{
+	skipEarly := mntPostWithCookie(t, e, "/maintenance/"+p.PlanID+"/quarter-confirm", url.Values{
 		"action": {"skip"}, "customer_id": {"c_q"}, "product_type": {"KLAS"},
 		"quarter": {"4"}, "reason": {"이번 분기는 방문 안 함"}, "month": {"10"}, "view": {"list"},
+	}, jwtCookieRole(t, model.RoleTech))
+	if skipEarly.Code != http.StatusSeeOther {
+		t.Fatalf("skip-early status=%d loc=%s", skipEarly.Code, skipEarly.Header().Get("Location"))
+	}
+	if !strings.Contains(locText(skipEarly), "err=") {
+		t.Fatalf("10월 건너뜀이 막혀야 함 loc=%s", locText(skipEarly))
+	}
+
+	skip := mntPostWithCookie(t, e, "/maintenance/"+p.PlanID+"/quarter-confirm", url.Values{
+		"action": {"skip"}, "customer_id": {"c_q"}, "product_type": {"KLAS"},
+		"quarter": {"4"}, "reason": {"이번 분기는 방문 안 함"}, "month": {"12"}, "view": {"list"},
 	}, jwtCookieRole(t, model.RoleTech))
 	if skip.Code != http.StatusSeeOther {
 		t.Fatalf("skip status=%d loc=%s", skip.Code, skip.Header().Get("Location"))
@@ -62,7 +76,7 @@ func TestShowPlanQuarterConfirmBannerAndSkip(t *testing.T) {
 		t.Fatalf("skip loc=%s", locText(skip))
 	}
 
-	after := mntGet(t, e, "/maintenance/"+p.PlanID+"?view=list&month=10")
+	after := mntGet(t, e, "/maintenance/"+p.PlanID+"?view=list&month=12")
 	if strings.Contains(after.Body.String(), "분기 점검 확인") && strings.Contains(after.Body.String(), "법제처") {
 		pending, _ := repo.PendingQuarterSlots(p.PlanID, 2026, 4)
 		if len(pending) != 0 {

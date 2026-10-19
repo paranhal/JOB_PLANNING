@@ -166,6 +166,16 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 					unassigned = append(unassigned, it)
 				}
 			}
+			now := time.Now()
+			if alerts, e := h.workBoard.CollectQuarterUnassignedAlerts(currentOrg(c), now.Year(), int(now.Month())); e == nil {
+				skip := dismissedKeys(c)
+				for _, it := range alerts {
+					if skip[workAssignKey(it)] {
+						continue
+					}
+					unassigned = append(unassigned, it)
+				}
+			}
 		}
 		c.Set("assign_unassigned", unassigned)
 		c.Set("can_assign_work", canAssign)

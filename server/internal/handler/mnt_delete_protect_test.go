@@ -36,6 +36,8 @@ func newMntProtectApp(t *testing.T) (*echo.Echo, *sql.DB, *Handler, string) {
 	h.Maintenance.dataDir = dir
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.Auth.InjectViewAs)
+	g.Use(h.Auth.GuardViewAsWrite)
 	g.GET("/maintenance/:id", h.Maintenance.ShowPlan)
 	g.GET("/maintenance/:id/generate", h.Maintenance.GenerateConfirm)
 	g.POST("/maintenance/:id/generate", h.Maintenance.GenerateAuto)

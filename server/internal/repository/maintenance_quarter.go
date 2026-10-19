@@ -158,6 +158,33 @@ func (r *MaintenanceRepo) SkipQuarterSlot(planID, customerID, slotKey, reason, c
 	return err
 }
 
+// FilterUnassignedSlotsByOrg 빈 org_id 행은 레거시로 두고, 값이 있으면 조직만 남긴다.
+func FilterUnassignedSlotsByOrg(slots []model.UnassignedMonthSlot, orgID string) []model.UnassignedMonthSlot {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" || orgID == OrgAll {
+		return slots
+	}
+	var out []model.UnassignedMonthSlot
+	for _, s := range slots {
+		if strings.TrimSpace(s.OrgID) == "" || s.OrgID == orgID {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (r *MaintenanceRepo) CustomerOrgID(customerID string) string {
+	if r == nil || r.db == nil {
+		return ""
+	}
+	var org string
+	err := r.db.QueryRow(`SELECT COALESCE(org_id,'') FROM customers WHERE customer_id=?`, strings.TrimSpace(customerID)).Scan(&org)
+	if err != nil {
+		return ""
+	}
+	return org
+}
+
 func applyMaintenanceQuarterDecisionsV76(db *sql.DB) {
 	if db == nil {
 		return

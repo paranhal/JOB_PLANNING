@@ -2,6 +2,7 @@ package repository
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"customer-support/internal/model"
@@ -167,6 +168,131 @@ func TestListOpenUnassignedSlotsHidesQuarterUntilLastMonth(t *testing.T) {
 
 	applyMaintenanceQuarterDecisionsV76(db)
 	applyMaintenanceQuarterDecisionsV76(db)
+}
+
+func TestQuarterUnassignedDisplayMonthsAndCycles(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "disp.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES ('cq','분기관','분기관',1,'O01'),('cm','월간관','월간관',1,'O01'),
+		       ('cb','격월관','격월관',1,'O01'),('cx','타조직','타조직',1,'O02')`); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewMaintenanceRepo(db)
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "cq", ShortName: "분기관", HasKlas: true, InspectionCycle: "quarterly",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "cm", ShortName: "월간", HasKlas: true, InspectionCycle: "monthly",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "cb", ShortName: "격월", HasKlas: true, InspectionCycle: "odd_bimonthly",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "cx", ShortName: "타조직", HasKlas: true, InspectionCycle: "quarterly",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	p, err := repo.CreatePlan(2026, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wb := NewWorkBoardRepo(db)
+
+	for _, month := range []int{1, 2} {
+		open, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, month)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := countSlotCustomer(open, "cq"); n != 0 {
+			t.Fatalf("%d월 분기 미배정=%d", month, n)
+		}
+		if n := countSlotCustomer(open, "cm"); n != 1 {
+			t.Fatalf("%d월 월별 미배정=%d", month, n)
+		}
+		pending, err := repo.PendingQuarterSlots(p.PlanID, 2026, 1)
+		if err != nil || countSlotCustomer(pending, "cq") != 1 {
+			t.Fatalf("%d월 QuarterPending cq=%v err=%v", month, pending, err)
+		}
+		alerts, err := wb.CollectQuarterUnassignedAlerts("O01", 2026, month)
+		if err != nil || len(alerts) != 0 {
+			t.Fatalf("%d월 알람=%d err=%v", month, len(alerts), err)
+		}
+		oddDue := month%2 == 1
+		if n := countSlotCustomer(open, "cb"); (n == 1) != oddDue {
+			t.Fatalf("%d월 격월 미배정=%d due=%v", month, n, oddDue)
+		}
+	}
+
+	mar, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countSlotCustomer(mar, "cq"); n != 1 {
+		t.Fatalf("3월 분기 미배정=%d", n)
+	}
+	alerts, err := wb.CollectQuarterUnassignedAlerts("O01", 2026, 3)
+	if err != nil || len(alerts) != 1 {
+		t.Fatalf("3월 알람=%d err=%v", len(alerts), err)
+	}
+	if !strings.Contains(alerts[0].Title, "분기 점검 미확정") {
+		t.Fatalf("알람 제목=%s", alerts[0].Title)
+	}
+	otherAlerts, err := wb.CollectQuarterUnassignedAlerts("O01", 2026, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range otherAlerts {
+		if it.RefID == "cx:klas" {
+			t.Fatalf("다른 조직 알람 누수 %+v", it)
+		}
+	}
+	o2, err := wb.CollectQuarterUnassignedAlerts("O02", 2026, 3)
+	if err != nil || len(o2) != 1 {
+		t.Fatalf("O02 알람=%d err=%v", len(o2), err)
+	}
+
+	if err := repo.InsertVisitFull(model.MaintenanceVisit{
+		PlanID: p.PlanID, VisitDate: "2026-01-15", CustomerID: "cq", ProductType: "KLAS",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterVisit, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countSlotCustomer(afterVisit, "cq"); n != 0 {
+		t.Fatalf("1월 방문 후 3월 미배정=%d", n)
+	}
+
+	p2, err := repo.CreatePlan(2027, "t2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SkipQuarterSlot(p2.PlanID, "cq", "klas", "이번 분기 건너뜀", "테스터", 2027, 1); err != nil {
+		t.Fatal(err)
+	}
+	skipped, err := repo.ListOpenUnassignedSlots(p2.PlanID, 2027, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countSlotCustomer(skipped, "cq"); n != 0 {
+		t.Fatalf("건너뜀 후 미배정=%d", n)
+	}
+	skipAlerts, err := wb.CollectQuarterUnassignedAlerts("O01", 2027, 3)
+	if err != nil || len(skipAlerts) != 0 {
+		t.Fatalf("건너뜀 후 알람=%d", len(skipAlerts))
+	}
 }
 
 func countSlotCustomer(slots []model.UnassignedMonthSlot, customerID string) int {

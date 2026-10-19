@@ -19,6 +19,7 @@ type MaintenanceSiteConfig struct {
 	OrgName         string // JOIN customers (목록·엑셀용)
 	AddrSido        string // customers.addr_sido
 	AddrSigungu     string // customers.addr_sigungu
+	OrgID           string // customers.org_id
 }
 
 // MaintenancePlan 연도 단위 점검 계획
@@ -70,6 +71,7 @@ type UnassignedMonthSlot struct {
 	Cycle              string
 	LastAssignee       string
 	UnconfirmedQuarter bool // 분기 마지막 달에 미확인으로 올린 건
+	OrgID              string
 }
 
 // VisitProductSlotKey 방문의 점검대상을 슬롯 키로 정규화한다(klas/rfid/generic).
@@ -101,7 +103,7 @@ func SiteDueProductSlots(cfg MaintenanceSiteConfig, month int) []UnassignedMonth
 		name = cfg.OrgName
 	}
 	base := UnassignedMonthSlot{
-		CustomerID: cfg.CustomerID, OrgName: cfg.OrgName, ShortName: name, Cycle: cfg.InspectionCycle,
+		CustomerID: cfg.CustomerID, OrgName: cfg.OrgName, ShortName: name, Cycle: cfg.InspectionCycle, OrgID: cfg.OrgID,
 	}
 	var out []UnassignedMonthSlot
 	if cfg.HasKlas {

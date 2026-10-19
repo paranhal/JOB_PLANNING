@@ -201,6 +201,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	var unassigned []model.UnassignedMonthSlot
 	if quotaMonth >= 1 && quotaMonth <= 12 {
 		unassigned, _ = h.repo.ListOpenUnassignedSlots(plan.PlanID, plan.PlanYear, quotaMonth)
+		unassigned = repository.FilterUnassignedSlotsByOrg(unassigned, currentOrg(c))
 	}
 	dupMonth := month
 	if view != mntViewList {
@@ -212,7 +213,9 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	var quarterPending []model.UnassignedMonthSlot
 	if qNum >= 1 {
 		quarterPending, _ = h.repo.PendingQuarterSlots(plan.PlanID, plan.PlanYear, qNum)
+		quarterPending = repository.FilterUnassignedSlotsByOrg(quarterPending, currentOrg(c))
 	}
+	quarterLast := model.IsLastMonthOfQuarter(quotaMonth)
 	return c.Render(200, "maintenance/plan_show.html", map[string]interface{}{
 		"Title":            fmt.Sprintf("정기점검 %d년", plan.PlanYear),
 		"Active":           NavMaintenance,
@@ -225,6 +228,8 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"Projects":         projects,
 		"Unassigned":       unassigned,
 		"QuarterPending":   quarterPending,
+		"QuarterLastMonth": quarterLast,
+		"QuarterAlert":     quarterLast && len(quarterPending) > 0,
 		"QuarterNum":       qNum,
 		"QuarterFrom":      qFrom,
 		"QuarterTo":        qTo,

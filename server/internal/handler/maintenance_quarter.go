@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 // ConfirmQuarterSlot 분기 점검 확인(D-71): 일정 정하기 / 이미 점검함 / 건너뜀.
@@ -33,6 +34,14 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 	}
 	year := plan.PlanYear
 	from, to := model.QuarterDateBounds(year, qNum)
+	formMonth, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("month")))
+	if formMonth < 1 || formMonth > 12 {
+		formMonth = int(time.Now().Month())
+	}
+	custOrg := h.repo.CustomerOrgID(cust)
+	if strings.TrimSpace(custOrg) != "" && !repository.VisibleInOrg(custOrg, currentOrg(c)) {
+		return echo.ErrForbidden
+	}
 	redirectErr := func(msg string) error {
 		back := planURLFrom(c, planID, "")
 		sep := "?"
@@ -50,8 +59,12 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, back+sep+"ok="+code)
 	}
 
+	lastOfQuarter := model.IsLastMonthOfQuarter(formMonth) && model.CalendarQuarter(formMonth) == qNum
 	switch action {
 	case "skip":
+		if !lastOfQuarter {
+			return redirectErr("건너뜀은 분기 마지막 달에만 할 수 있습니다")
+		}
 		if err := h.repo.SkipQuarterSlot(planID, cust, slotKey, c.FormValue("reason"), currentUserDisplayName(c), year, qNum); err != nil {
 			return redirectErr(err.Error())
 		}
@@ -75,6 +88,9 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		}
 		if err := applyVisitDupForm(c, &v); err != nil {
 			return redirectErr(err.Error())
+		}
+		if action == "done" && !lastOfQuarter {
+			return redirectErr("이미 점검함은 분기 마지막 달에만 할 수 있습니다")
 		}
 		if err := h.repo.AssignSlot(v); err != nil {
 			return redirectErr(err.Error())

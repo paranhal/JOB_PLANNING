@@ -116,7 +116,7 @@ func (r *WorkBoardRepo) loadDash(mineUserID string, mineKeys []string, orgID str
 
 	unplanned, _, err := r.listUnplanned(mineUserID, mineKeys, "", &unplannedBase{
 		Delayed: delayed, Pending: pending, Open: openItems, Unassigned: unassigned,
-	})
+	}, orgID)
 	if err != nil {
 		return nil, err
 	}
