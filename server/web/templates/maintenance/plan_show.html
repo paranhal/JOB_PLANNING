@@ -126,22 +126,23 @@
   </div>
   {{end}}
 
-  {{if .QuarterAlert}}
+  {{range .PeriodGroups}}
+  {{$g := .}}
+  {{if .LastMonth}}
   <div class="rounded-xl border border-red-400 bg-red-50 px-4 py-3">
-    <p class="text-sm font-bold text-red-900">{{.QuarterNum}}분기 점검이 아직 배정되지 않았습니다 — {{.QuotaMonth}}월 말까지 {{len .QuarterPending}}건</p>
+    <p class="text-sm font-bold text-red-900">{{.LabelShort}} 점검이 아직 배정되지 않았습니다 — {{.EndMonth}}월 말까지 {{len .Slots}}건</p>
   </div>
   {{end}}
 
-  {{if .QuarterPending}}
-  {{if .QuarterLastMonth}}
+  {{if .LastMonth}}
   <div class="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 space-y-3">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h3 class="text-sm font-bold text-indigo-950">분기 점검 확인</h3>
-      <p class="text-xs text-indigo-800">{{.Plan.PlanYear}}년 {{.QuarterNum}}분기 · {{.QuarterFrom}} ~ {{.QuarterTo}} · {{len .QuarterPending}}건</p>
+      <h3 class="text-sm font-bold text-indigo-950">{{$g.ConfirmTitle}}</h3>
+      <p class="text-xs text-indigo-800">{{$.Plan.PlanYear}}년 {{$g.LabelShort}} · {{$g.From}} ~ {{$g.To}} · {{len $g.Slots}}건</p>
     </div>
-    <p class="text-[11px] text-indigo-800">이 분기에 한 번이면 됩니다. 마지막 달까지 확인하지 않으면 미배정에 「분기 점검 미확정」으로 올라갑니다.</p>
+    <p class="text-[11px] text-indigo-800">이 기간에 한 번이면 됩니다. 마지막 달까지 확인하지 않으면 미배정에 올라갑니다.</p>
     <div class="space-y-3">
-      {{range .QuarterPending}}
+      {{range $g.Slots}}
       {{$slot := .}}
       <div class="rounded-lg border border-indigo-200 bg-white px-3 py-2 space-y-2">
         <p class="text-sm font-medium text-indigo-950">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}} · {{if .ProductType}}{{.ProductType}}{{else}}점검{{end}}</p>
@@ -151,12 +152,13 @@
             <input type="hidden" name="action" value="schedule">
             <input type="hidden" name="customer_id" value="{{.CustomerID}}">
             <input type="hidden" name="product_type" value="{{.ProductType}}">
-            <input type="hidden" name="quarter" value="{{$.QuarterNum}}">
+            <input type="hidden" name="cycle" value="{{$g.Cycle}}">
+            <input type="hidden" name="quarter" value="{{$g.Index}}">
             <input type="hidden" name="month" value="{{$.QuotaMonth}}">
             <input type="hidden" name="view" value="{{$.View}}">
             {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
             <p class="text-[11px] font-semibold text-indigo-900">일정 정하기</p>
-            <input type="date" name="visit_date" required min="{{$.QuarterFrom}}" max="{{$.QuarterTo}}" class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
+            <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
             <select name="assignee" required class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
               <option value="">담당자</option>
               {{range $.Assignees}}<option value="{{.FullName}}" {{if eq .FullName $slot.LastAssignee}}selected{{end}}>{{.FullName}}</option>{{end}}
@@ -167,12 +169,13 @@
             <input type="hidden" name="action" value="done">
             <input type="hidden" name="customer_id" value="{{.CustomerID}}">
             <input type="hidden" name="product_type" value="{{.ProductType}}">
-            <input type="hidden" name="quarter" value="{{$.QuarterNum}}">
+            <input type="hidden" name="cycle" value="{{$g.Cycle}}">
+            <input type="hidden" name="quarter" value="{{$g.Index}}">
             <input type="hidden" name="month" value="{{$.QuotaMonth}}">
             <input type="hidden" name="view" value="{{$.View}}">
             {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
             <p class="text-[11px] font-semibold text-indigo-900">이미 점검함</p>
-            <input type="date" name="visit_date" required min="{{$.QuarterFrom}}" max="{{$.QuarterTo}}" class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
+            <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
             <select name="assignee" required class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
               <option value="">담당자</option>
               {{range $.Assignees}}<option value="{{.FullName}}" {{if eq .FullName $slot.LastAssignee}}selected{{end}}>{{.FullName}}</option>{{end}}
@@ -183,11 +186,12 @@
             <input type="hidden" name="action" value="skip">
             <input type="hidden" name="customer_id" value="{{.CustomerID}}">
             <input type="hidden" name="product_type" value="{{.ProductType}}">
-            <input type="hidden" name="quarter" value="{{$.QuarterNum}}">
+            <input type="hidden" name="cycle" value="{{$g.Cycle}}">
+            <input type="hidden" name="quarter" value="{{$g.Index}}">
             <input type="hidden" name="month" value="{{$.QuotaMonth}}">
             <input type="hidden" name="view" value="{{$.View}}">
             {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
-            <p class="text-[11px] font-semibold text-indigo-900">이번 분기 건너뜀</p>
+            <p class="text-[11px] font-semibold text-indigo-900">이번 기간 건너뜀</p>
             <input type="text" name="reason" required maxlength="200" placeholder="사유" class="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white">
             <button type="submit" class="px-2 py-1 rounded-lg border border-indigo-400 text-indigo-900 text-xs font-medium hover:bg-indigo-50">건너뛰기</button>
           </form>
@@ -199,8 +203,8 @@
   </div>
   {{else}}
   <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
-    <p class="text-sm text-slate-800">{{.QuarterNum}}분기 점검 대기: {{range $i, $s := .QuarterPending}}{{if $i}} · {{end}}{{if $s.ShortName}}{{$s.ShortName}}{{else}}{{$s.OrgName}}{{end}}{{end}} — 아직 배정되지 않았습니다 (분기 마지막 달인 {{if eq .QuarterNum 1}}3{{else if eq .QuarterNum 2}}6{{else if eq .QuarterNum 3}}9{{else}}12{{end}}월까지 배정하세요)</p>
-    {{range .QuarterPending}}
+    <p class="text-sm text-slate-800">{{$g.LabelShort}} 점검 대기: {{range $i, $s := $g.Slots}}{{if $i}} · {{end}}{{if $s.ShortName}}{{$s.ShortName}}{{else}}{{$s.OrgName}}{{end}}{{end}} — 아직 배정되지 않았습니다 (마지막 달인 {{$g.EndMonth}}월까지 배정하세요)</p>
+    {{range $g.Slots}}
     {{$slot := .}}
     {{if $.CanEdit}}
     <details class="rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -209,11 +213,12 @@
         <input type="hidden" name="action" value="schedule">
         <input type="hidden" name="customer_id" value="{{.CustomerID}}">
         <input type="hidden" name="product_type" value="{{.ProductType}}">
-        <input type="hidden" name="quarter" value="{{$.QuarterNum}}">
+        <input type="hidden" name="cycle" value="{{$g.Cycle}}">
+        <input type="hidden" name="quarter" value="{{$g.Index}}">
         <input type="hidden" name="month" value="{{$.QuotaMonth}}">
         <input type="hidden" name="view" value="{{$.View}}">
         {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
-        <input type="date" name="visit_date" required min="{{$.QuarterFrom}}" max="{{$.QuarterTo}}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs bg-white">
+        <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs bg-white">
         <select name="assignee" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs bg-white">
           <option value="">담당자</option>
           {{range $.Assignees}}<option value="{{.FullName}}" {{if eq .FullName $slot.LastAssignee}}selected{{end}}>{{.FullName}}</option>{{end}}

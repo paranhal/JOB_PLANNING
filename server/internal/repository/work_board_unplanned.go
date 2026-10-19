@@ -254,7 +254,11 @@ func unplannedFromMonthSlot(planID string, s model.UnassignedMonthSlot) model.Un
 	}
 	slotLabel := "일정 배정안됨"
 	if s.UnconfirmedQuarter {
-		slotLabel = "분기 점검 미확정"
+		if p, ok := model.CyclePeriodOf(s.Cycle, 12); ok {
+			slotLabel = p.UnconfirmedLabel()
+		} else {
+			slotLabel = "분기 점검 미확정"
+		}
 	}
 	return model.UnplannedItem{
 		WorkListItem: model.WorkListItem{

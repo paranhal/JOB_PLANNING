@@ -584,6 +584,19 @@ func (r *MaintenanceRepo) HasVisitInCalendarQuarter(planID, customerID, product 
 	return scanVisitProductMatch(rows, err, product)
 }
 
+func (r *MaintenanceRepo) HasVisitInCyclePeriod(planID, customerID, product string, year int, p model.CyclePeriod) bool {
+	from, to := model.PeriodDateBounds(year, p)
+	if from == "" {
+		return false
+	}
+	rows, err := r.db.Query(`
+		SELECT COALESCE(product_type,'') FROM maintenance_visits
+		WHERE plan_id=? AND customer_id=? AND length(trim(COALESCE(visit_date,'')))>=10
+		  AND visit_date>=? AND visit_date<=?`,
+		planID, customerID, from, to)
+	return scanVisitProductMatch(rows, err, product)
+}
+
 // HasQuarterSkip 해당 분기 슬롯을 건너뛰기로 했는지.
 func (r *MaintenanceRepo) HasQuarterSkip(planID, customerID, slotKey string, year, quarter int) bool {
 	skip, err := r.quarterSkipSet(planID, year, quarter)

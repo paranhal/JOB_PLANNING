@@ -26,6 +26,17 @@ func TestCalendarQuarterHelpers(t *testing.T) {
 	if VisitInCalendarQuarter("", 2026, 3) {
 		t.Fatal("빈 날짜는 미확정")
 	}
+	semi, ok := CyclePeriodOf("semi", 10)
+	if !ok || semi.Index != 2 || semi.EndMonth != 12 {
+		t.Fatalf("하반기 %+v", semi)
+	}
+	yearP, ok := CyclePeriodOf("yearly", 3)
+	if !ok || yearP.EndMonth != 12 {
+		t.Fatalf("연간 %+v", yearP)
+	}
+	if !VisitInCyclePeriod("2026-03-01", 2026, yearP) || VisitInCyclePeriod("2026-03-01", 2026, semi) {
+		t.Fatal("연간/하반기 방문 판정")
+	}
 }
 
 func TestInspectionCycleDue(t *testing.T) {

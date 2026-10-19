@@ -160,6 +160,120 @@ func IsQuarterlyCycle(cycle string) bool {
 	return strings.TrimSpace(cycle) == "quarterly"
 }
 
+// IsPeriodCycle 기간 안 1회 주기(분기·반기·년1회).
+func IsPeriodCycle(cycle string) bool {
+	switch strings.TrimSpace(cycle) {
+	case "quarterly", "semi", "yearly":
+		return true
+	default:
+		return false
+	}
+}
+
+// CyclePeriod 주기 한 구간(분기·반기·연).
+type CyclePeriod struct {
+	Cycle      string
+	Index      int
+	StartMonth int
+	EndMonth   int
+}
+
+// CyclePeriodOf 그 달이 속한 기간. 기간 주기가 아니면 ok=false.
+func CyclePeriodOf(cycle string, month int) (CyclePeriod, bool) {
+	if month < 1 || month > 12 {
+		return CyclePeriod{}, false
+	}
+	switch strings.TrimSpace(cycle) {
+	case "quarterly":
+		q := CalendarQuarter(month)
+		s, e := QuarterMonthRange(q)
+		return CyclePeriod{Cycle: "quarterly", Index: q, StartMonth: s, EndMonth: e}, true
+	case "semi":
+		if month <= 6 {
+			return CyclePeriod{Cycle: "semi", Index: 1, StartMonth: 1, EndMonth: 6}, true
+		}
+		return CyclePeriod{Cycle: "semi", Index: 2, StartMonth: 7, EndMonth: 12}, true
+	case "yearly":
+		return CyclePeriod{Cycle: "yearly", Index: 1, StartMonth: 1, EndMonth: 12}, true
+	default:
+		return CyclePeriod{}, false
+	}
+}
+
+// PeriodDateBounds 기간의 첫째 날과 마지막 날.
+func PeriodDateBounds(year int, p CyclePeriod) (from, to string) {
+	if year < 1 || p.StartMonth < 1 || p.EndMonth < 1 {
+		return "", ""
+	}
+	from = fmt.Sprintf("%04d-%02d-01", year, p.StartMonth)
+	last := time.Date(year, time.Month(p.EndMonth)+1, 0, 0, 0, 0, 0, time.UTC)
+	to = last.Format("2006-01-02")
+	return
+}
+
+// VisitInCyclePeriod 방문일이 그 기간 안인지.
+func VisitInCyclePeriod(visitDate string, year int, p CyclePeriod) bool {
+	d := strings.TrimSpace(visitDate)
+	if len(d) < 10 {
+		return false
+	}
+	d = d[:10]
+	from, to := PeriodDateBounds(year, p)
+	if from == "" {
+		return false
+	}
+	return d >= from && d <= to
+}
+
+func (p CyclePeriod) LabelShort() string {
+	switch p.Cycle {
+	case "semi":
+		if p.Index == 1 {
+			return "상반기"
+		}
+		return "하반기"
+	case "yearly":
+		return "연간"
+	default:
+		return fmt.Sprintf("%d분기", p.Index)
+	}
+}
+
+func (p CyclePeriod) ConfirmTitle() string {
+	switch p.Cycle {
+	case "semi":
+		return "반기 점검 확인"
+	case "yearly":
+		return "연간 점검 확인"
+	default:
+		return "분기 점검 확인"
+	}
+}
+
+func (p CyclePeriod) UnconfirmedLabel() string {
+	switch p.Cycle {
+	case "semi":
+		return "반기 점검 미확정"
+	case "yearly":
+		return "연간 점검 미확정"
+	default:
+		return "분기 점검 미확정"
+	}
+}
+
+// MaintenancePeriodGroup 일정 화면의 기간 점검 대기 묶음.
+type MaintenancePeriodGroup struct {
+	Cycle        string
+	Index        int
+	EndMonth     int
+	LastMonth    bool
+	LabelShort   string
+	ConfirmTitle string
+	From         string
+	To           string
+	Slots        []UnassignedMonthSlot
+}
+
 // QuarterDateBounds 해당 연·분기의 첫째 날과 마지막 날(YYYY-MM-DD).
 func QuarterDateBounds(year, quarter int) (from, to string) {
 	start, end := QuarterMonthRange(quarter)

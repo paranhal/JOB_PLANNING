@@ -210,12 +210,16 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, dupMonth)
 	qNum := model.CalendarQuarter(quotaMonth)
 	qFrom, qTo := model.QuarterDateBounds(plan.PlanYear, qNum)
+	periodGroups := buildPeriodGroups(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c))
 	var quarterPending []model.UnassignedMonthSlot
-	if qNum >= 1 {
-		quarterPending, _ = h.repo.PendingQuarterSlots(plan.PlanID, plan.PlanYear, qNum)
-		quarterPending = repository.FilterUnassignedSlotsByOrg(quarterPending, currentOrg(c))
-	}
 	quarterLast := model.IsLastMonthOfQuarter(quotaMonth)
+	for _, g := range periodGroups {
+		if g.Cycle == "quarterly" {
+			quarterPending = g.Slots
+			quarterLast = g.LastMonth
+			break
+		}
+	}
 	return c.Render(200, "maintenance/plan_show.html", map[string]interface{}{
 		"Title":            fmt.Sprintf("정기점검 %d년", plan.PlanYear),
 		"Active":           NavMaintenance,
@@ -227,6 +231,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"Assignees":        assignees,
 		"Projects":         projects,
 		"Unassigned":       unassigned,
+		"PeriodGroups":     periodGroups,
 		"QuarterPending":   quarterPending,
 		"QuarterLastMonth": quarterLast,
 		"QuarterAlert":     quarterLast && len(quarterPending) > 0,
@@ -732,4 +737,34 @@ func (h *MaintenanceHandler) ExportSiteConfigsExcel(c echo.Context) error {
 		return err
 	}
 	return writeExcelDownload(c, buf.Bytes(), "sites")
+}
+
+func buildPeriodGroups(repo *repository.MaintenanceRepo, planID string, year, month int, orgID string) []model.MaintenancePeriodGroup {
+	if repo == nil || month < 1 {
+		return nil
+	}
+	slots, _ := repo.PendingPeriodSlots(planID, year, month)
+	slots = repository.FilterUnassignedSlotsByOrg(slots, orgID)
+	by := map[string][]model.UnassignedMonthSlot{}
+	order := []string{"quarterly", "semi", "yearly"}
+	for _, s := range slots {
+		by[s.Cycle] = append(by[s.Cycle], s)
+	}
+	var out []model.MaintenancePeriodGroup
+	for _, cycle := range order {
+		p, ok := model.CyclePeriodOf(cycle, month)
+		if !ok {
+			continue
+		}
+		list := by[cycle]
+		if len(list) == 0 {
+			continue
+		}
+		from, to := model.PeriodDateBounds(year, p)
+		out = append(out, model.MaintenancePeriodGroup{
+			Cycle: cycle, Index: p.Index, EndMonth: p.EndMonth, LastMonth: p.EndMonth == month,
+			LabelShort: p.LabelShort(), ConfirmTitle: p.ConfirmTitle(), From: from, To: to, Slots: list,
+		})
+	}
+	return out
 }

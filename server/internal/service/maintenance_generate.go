@@ -500,24 +500,27 @@ func UnregisteredRegionCount(configs []model.MaintenanceSiteConfig, dist []model
 	return n
 }
 
-// skipQuarterAutoDraft 분기 주기는 분기당 자동 초안 1건(첫 달). 확인에서 고른 날이 있거나 건너뛰면 만들지 않는다(D-74).
+// skipQuarterAutoDraft 기간 주기(분기·반기·년1회)는 기간당 자동 초안 1건(첫 달).
 func skipQuarterAutoDraft(repo *repository.MaintenanceRepo, planID, date string, it generateSlot) bool {
-	if repo == nil || !model.IsQuarterlyCycle(it.cfg.InspectionCycle) {
+	if repo == nil || !model.IsPeriodCycle(it.cfg.InspectionCycle) {
 		return false
 	}
 	t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(date), time.Local)
 	if err != nil {
 		return false
 	}
-	q := model.CalendarQuarter(int(t.Month()))
-	if repo.HasVisitInCalendarQuarter(planID, it.cfg.CustomerID, it.slot.ProductType, t.Year(), q) {
+	p, ok := model.CyclePeriodOf(it.cfg.InspectionCycle, int(t.Month()))
+	if !ok {
+		return false
+	}
+	if repo.HasVisitInCyclePeriod(planID, it.cfg.CustomerID, it.slot.ProductType, t.Year(), p) {
 		return true
 	}
 	slotKey := strings.TrimSpace(it.slot.SlotKey)
 	if slotKey == "" {
 		slotKey = model.VisitProductSlotKey(it.slot.ProductType)
 	}
-	return repo.HasQuarterSkip(planID, it.cfg.CustomerID, slotKey, t.Year(), q)
+	return repo.HasQuarterSkip(planID, it.cfg.CustomerID, slotKey, t.Year(), p.Index)
 }
 
 func insertGeneratedOrSkip(repo *repository.MaintenanceRepo, planID, date string, sortOrder int, it generateSlot) (skipped int, err error) {

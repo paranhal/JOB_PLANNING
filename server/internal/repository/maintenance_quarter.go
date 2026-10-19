@@ -11,11 +11,16 @@ import (
 )
 
 // QuarterObligations 분기 주기 사이트의 점검대상 중, 그 달력 분기에
-// 방문(완료 또는 일정 확정)이 아직 없는 슬롯. 월·격월·반기·년1회는 넣지 않는다.
-// 세 호출처(계획 화면·관리 미배정·미계획함)가 공유한다(D-70).
+// 방문(완료 또는 일정 확정)이 아직 없는 슬롯. 월·격월은 넣지 않는다(D-70).
 func (r *MaintenanceRepo) QuarterObligations(planID string, year, quarter int) ([]model.UnassignedMonthSlot, error) {
+	start, _ := model.QuarterMonthRange(quarter)
+	p := model.CyclePeriod{Cycle: "quarterly", Index: quarter, StartMonth: start, EndMonth: start + 2}
+	return r.periodObligations(planID, year, p)
+}
+
+func (r *MaintenanceRepo) periodObligations(planID string, year int, period model.CyclePeriod) ([]model.UnassignedMonthSlot, error) {
 	planID = strings.TrimSpace(planID)
-	if planID == "" || year < 1 || quarter < 1 || quarter > 4 {
+	if planID == "" || year < 1 || period.Index < 1 {
 		return nil, nil
 	}
 	configs, err := r.ListSiteConfigs()
@@ -28,7 +33,7 @@ func (r *MaintenanceRepo) QuarterObligations(planID string, year, quarter int) (
 	}
 	covered := map[string]map[string]bool{}
 	for _, v := range visits {
-		if !model.VisitInCalendarQuarter(v.VisitDate, year, quarter) {
+		if !model.VisitInCyclePeriod(v.VisitDate, year, period) {
 			continue
 		}
 		if covered[v.CustomerID] == nil {
@@ -36,13 +41,12 @@ func (r *MaintenanceRepo) QuarterObligations(planID string, year, quarter int) (
 		}
 		covered[v.CustomerID][model.VisitProductSlotKey(v.ProductType)] = true
 	}
-	startMonth, _ := model.QuarterMonthRange(quarter)
 	var out []model.UnassignedMonthSlot
 	for _, cfg := range configs {
-		if !model.IsQuarterlyCycle(cfg.InspectionCycle) {
+		if strings.TrimSpace(cfg.InspectionCycle) != period.Cycle {
 			continue
 		}
-		slots := model.SiteDueProductSlots(cfg, startMonth)
+		slots := model.SiteDueProductSlots(cfg, period.StartMonth)
 		have := covered[cfg.CustomerID]
 		genericUsed := have["generic"]
 		for _, s := range slots {
@@ -59,8 +63,8 @@ func (r *MaintenanceRepo) QuarterObligations(planID string, year, quarter int) (
 	return out, nil
 }
 
-// ListOpenUnassignedSlots 미배정·미계획함·배지가 공유하는 목록(D-71).
-// 분기 슬롯은 분기 마지막 달에만, 확인·건너뜀이 없는 건을 「분기 점검 미확정」으로 넣는다.
+// ListOpenUnassignedSlots 미배정·미계획함·배지가 공유하는 목록(D-71·D-76).
+// 기간 주기(분기·반기·년1회)는 기간 마지막 달에만 미확정으로 넣는다.
 func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
 	slots, err := r.ListUnassignedMonthSlots(planID, year, month)
 	if err != nil {
@@ -68,20 +72,22 @@ func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int
 	}
 	var out []model.UnassignedMonthSlot
 	for _, s := range slots {
-		if model.IsQuarterlyCycle(s.Cycle) {
+		if model.IsPeriodCycle(s.Cycle) {
 			continue
 		}
 		out = append(out, s)
 	}
-	if model.IsLastMonthOfQuarter(month) {
-		qSlots, err := r.PendingQuarterSlots(planID, year, model.CalendarQuarter(month))
-		if err != nil {
-			return nil, err
+	pending, err := r.PendingPeriodSlots(planID, year, month)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range pending {
+		p, ok := model.CyclePeriodOf(s.Cycle, month)
+		if !ok || p.EndMonth != month {
+			continue
 		}
-		for _, s := range qSlots {
-			s.UnconfirmedQuarter = true
-			out = append(out, s)
-		}
+		s.UnconfirmedQuarter = true
+		out = append(out, s)
 	}
 	return out, nil
 }
@@ -93,6 +99,43 @@ func (r *MaintenanceRepo) PendingQuarterSlots(planID string, year, quarter int) 
 		return nil, err
 	}
 	skip, err := r.quarterSkipSet(planID, year, quarter)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.UnassignedMonthSlot
+	for _, s := range slots {
+		if skip[s.CustomerID+"|"+s.SlotKey] {
+			continue
+		}
+		s.LastAssignee = r.lookupAssignee(planID, s.CustomerID, s.ProductType)
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// PendingPeriodSlots 보는 달이 속한 기간(분기·반기·연)에서 아직 방문·건너뜀이 없는 슬롯.
+func (r *MaintenanceRepo) PendingPeriodSlots(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
+	var out []model.UnassignedMonthSlot
+	for _, cycle := range []string{"quarterly", "semi", "yearly"} {
+		p, ok := model.CyclePeriodOf(cycle, month)
+		if !ok {
+			continue
+		}
+		slots, err := r.pendingForPeriod(planID, year, p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, slots...)
+	}
+	return out, nil
+}
+
+func (r *MaintenanceRepo) pendingForPeriod(planID string, year int, p model.CyclePeriod) ([]model.UnassignedMonthSlot, error) {
+	slots, err := r.periodObligations(planID, year, p)
+	if err != nil {
+		return nil, err
+	}
+	skip, err := r.quarterSkipSet(planID, year, p.Index)
 	if err != nil {
 		return nil, err
 	}

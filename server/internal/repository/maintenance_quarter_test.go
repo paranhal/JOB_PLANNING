@@ -295,6 +295,77 @@ func TestQuarterUnassignedDisplayMonthsAndCycles(t *testing.T) {
 	}
 }
 
+func TestPeriodUnassignedSemiAndYearly(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "period.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES ('cs','반기관','반기관',1,'O01'),('cy','연간관','연간관',1,'O01')`); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewMaintenanceRepo(db)
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "cs", ShortName: "반기관", HasKlas: true, InspectionCycle: "semi",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "cy", ShortName: "연간관", HasKlas: true, InspectionCycle: "yearly",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	p, err := repo.CreatePlan(2026, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	jan, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countSlotCustomer(jan, "cs") != 0 || countSlotCustomer(jan, "cy") != 0 {
+		t.Fatalf("1월 미배정에 반기/연간이 있으면 안 됨: %v", jan)
+	}
+	pend, err := repo.PendingPeriodSlots(p.PlanID, 2026, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countSlotCustomer(pend, "cs") != 1 || countSlotCustomer(pend, "cy") != 1 {
+		t.Fatalf("1월 대기는 보여주기만: %v", pend)
+	}
+	jun, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countSlotCustomer(jun, "cs") != 1 {
+		t.Fatalf("6월 반기 미확정=%v", jun)
+	}
+	if countSlotCustomer(jun, "cy") != 0 {
+		t.Fatalf("6월에 연간이 승격되면 안 됨")
+	}
+	if err := repo.InsertVisitFull(model.MaintenanceVisit{
+		PlanID: p.PlanID, VisitDate: "2026-02-10", CustomerID: "cs", ProductType: "KLAS",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	jun2, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countSlotCustomer(jun2, "cs") != 0 {
+		t.Fatalf("2월 방문이면 상반기 충족: %v", jun2)
+	}
+	dec, err := repo.ListOpenUnassignedSlots(p.PlanID, 2026, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countSlotCustomer(dec, "cy") != 1 {
+		t.Fatalf("12월 연간 미확정=%v", dec)
+	}
+}
+
 func countSlotCustomer(slots []model.UnassignedMonthSlot, customerID string) int {
 	n := 0
 	for _, s := range slots {

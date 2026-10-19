@@ -28,16 +28,24 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 	cust := strings.TrimSpace(c.FormValue("customer_id"))
 	product := strings.TrimSpace(c.FormValue("product_type"))
 	slotKey := model.VisitProductSlotKey(product)
-	qNum, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("quarter")))
-	if qNum < 1 || qNum > 4 {
-		qNum = model.CalendarQuarter(int(time.Now().Month()))
-	}
-	year := plan.PlanYear
-	from, to := model.QuarterDateBounds(year, qNum)
 	formMonth, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("month")))
 	if formMonth < 1 || formMonth > 12 {
 		formMonth = int(time.Now().Month())
 	}
+	cycle := strings.TrimSpace(c.FormValue("cycle"))
+	if cfg, _ := h.repo.GetSiteConfig(cust); cfg != nil && model.IsPeriodCycle(cfg.InspectionCycle) {
+		cycle = cfg.InspectionCycle
+	}
+	period, ok := model.CyclePeriodOf(cycle, formMonth)
+	if !ok {
+		period, ok = model.CyclePeriodOf("quarterly", formMonth)
+	}
+	if !ok {
+		return echo.NewHTTPError(http.StatusBadRequest, "점검 주기를 확인하세요")
+	}
+	qNum := period.Index
+	year := plan.PlanYear
+	from, to := model.PeriodDateBounds(year, period)
 	custOrg := h.repo.CustomerOrgID(cust)
 	if strings.TrimSpace(custOrg) != "" && !repository.VisibleInOrg(custOrg, currentOrg(c)) {
 		return echo.ErrForbidden
@@ -59,11 +67,11 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, back+sep+"ok="+code)
 	}
 
-	lastOfQuarter := model.IsLastMonthOfQuarter(formMonth) && model.CalendarQuarter(formMonth) == qNum
+	lastOfPeriod := formMonth == period.EndMonth
 	switch action {
 	case "skip":
-		if !lastOfQuarter {
-			return redirectErr("건너뜀은 분기 마지막 달에만 할 수 있습니다")
+		if !lastOfPeriod {
+			return redirectErr("건너뜀은 기간 마지막 달에만 할 수 있습니다")
 		}
 		if err := h.repo.SkipQuarterSlot(planID, cust, slotKey, c.FormValue("reason"), currentUserDisplayName(c), year, qNum); err != nil {
 			return redirectErr(err.Error())
@@ -89,8 +97,8 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		if err := applyVisitDupForm(c, &v); err != nil {
 			return redirectErr(err.Error())
 		}
-		if action == "done" && !lastOfQuarter {
-			return redirectErr("이미 점검함은 분기 마지막 달에만 할 수 있습니다")
+		if action == "done" && !lastOfPeriod {
+			return redirectErr("이미 점검함은 기간 마지막 달에만 할 수 있습니다")
 		}
 		if err := h.repo.AssignSlot(v); err != nil {
 			return redirectErr(err.Error())
