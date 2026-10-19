@@ -55,6 +55,19 @@ func applyProjectKindAssignmentsV72(db *sql.DB) {
 	}
 }
 
+func applyProjectKindSetV82(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if workProjectHasColumn(db, "project_kind_set") {
+		return
+	}
+	if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN project_kind_set INTEGER NOT NULL DEFAULT 0`); err != nil &&
+		!strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+		log.Printf("063 project_kind_set: %v", err)
+	}
+}
+
 func projectKindMigrationFiles() (up, down string, err error) {
 	candidates := []string{
 		filepath.Join("..", "..", "migrations"),

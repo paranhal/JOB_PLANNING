@@ -65,6 +65,27 @@ func TestProjectKindMigrationIdempotentAndExistingMaintenance(t *testing.T) {
 	}
 }
 
+func TestProjectKindSetMigrationKeepsExistingKind(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "pkset.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, project_kind) VALUES ('WP-k1','구축잔여','active','build')`); err != nil {
+		t.Fatal(err)
+	}
+	applyProjectKindSetV82(db)
+	applyProjectKindSetV82(db)
+	var kind string
+	var set int
+	if err := db.QueryRow(`SELECT project_kind, project_kind_set FROM work_projects WHERE project_id='WP-k1'`).Scan(&kind, &set); err != nil {
+		t.Fatal(err)
+	}
+	if kind != "build" || set != 0 {
+		t.Fatalf("kind=%s set=%d", kind, set)
+	}
+}
+
 func TestProjectKindSQLFilesExist(t *testing.T) {
 	up, down, err := projectKindMigrationFiles()
 	if err != nil {
