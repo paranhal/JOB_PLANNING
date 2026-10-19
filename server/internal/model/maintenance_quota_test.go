@@ -2,6 +2,32 @@ package model
 
 import "testing"
 
+func TestCalendarQuarterHelpers(t *testing.T) {
+	if CalendarQuarter(9) != 3 || CalendarQuarter(10) != 4 || CalendarQuarter(0) != 0 {
+		t.Fatalf("CalendarQuarter 9/10/0 = %d/%d/%d", CalendarQuarter(9), CalendarQuarter(10), CalendarQuarter(0))
+	}
+	s, e := QuarterMonthRange(3)
+	if s != 7 || e != 9 {
+		t.Fatalf("Q3 months %d-%d", s, e)
+	}
+	if !IsLastMonthOfQuarter(9) || IsLastMonthOfQuarter(10) {
+		t.Fatal("last month of quarter")
+	}
+	from, to := QuarterDateBounds(2026, 3)
+	if from != "2026-07-01" || to != "2026-09-30" {
+		t.Fatalf("Q3 bounds %s %s", from, to)
+	}
+	if !VisitInCalendarQuarter("2026-09-10", 2026, 3) {
+		t.Fatal("9월 방문은 Q3")
+	}
+	if VisitInCalendarQuarter("2026-10-05", 2026, 3) {
+		t.Fatal("10월 방문은 Q3가 아님")
+	}
+	if VisitInCalendarQuarter("", 2026, 3) {
+		t.Fatal("빈 날짜는 미확정")
+	}
+}
+
 func TestInspectionCycleDue(t *testing.T) {
 	cases := []struct {
 		cycle string

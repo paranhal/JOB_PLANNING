@@ -128,8 +128,64 @@ func MonthPrefix(year, month int) string {
 	return fmt.Sprintf("%04d-%02d-", year, month)
 }
 
+// CalendarQuarter 달력 분기(1~4). month 가 1~12가 아니면 0.
+func CalendarQuarter(month int) int {
+	if month < 1 || month > 12 {
+		return 0
+	}
+	return (month-1)/3 + 1
+}
+
+// QuarterMonthRange 분기의 시작·끝 월. quarter 가 1~4가 아니면 0,0.
+func QuarterMonthRange(quarter int) (start, end int) {
+	if quarter < 1 || quarter > 4 {
+		return 0, 0
+	}
+	start = (quarter-1)*3 + 1
+	end = start + 2
+	return
+}
+
+// IsLastMonthOfQuarter 분기 마지막 달(3·6·9·12).
+func IsLastMonthOfQuarter(month int) bool {
+	return month == 3 || month == 6 || month == 9 || month == 12
+}
+
+// IsQuarterlyCycle 점검주기가 분기인지.
+func IsQuarterlyCycle(cycle string) bool {
+	return strings.TrimSpace(cycle) == "quarterly"
+}
+
+// QuarterDateBounds 해당 연·분기의 첫째 날과 마지막 날(YYYY-MM-DD).
+func QuarterDateBounds(year, quarter int) (from, to string) {
+	start, end := QuarterMonthRange(quarter)
+	if start == 0 || year < 1 {
+		return "", ""
+	}
+	from = fmt.Sprintf("%04d-%02d-01", year, start)
+	last := time.Date(year, time.Month(end)+1, 0, 0, 0, 0, 0, time.UTC)
+	to = last.Format("2006-01-02")
+	return
+}
+
+// VisitInCalendarQuarter 방문일(일정 확정)이 그 달력 분기에 속하는지.
+// 날짜가 비어 있거나 형식이 짧으면 미확정으로 본다.
+func VisitInCalendarQuarter(visitDate string, year, quarter int) bool {
+	d := strings.TrimSpace(visitDate)
+	if len(d) < 10 {
+		return false
+	}
+	d = d[:10]
+	from, to := QuarterDateBounds(year, quarter)
+	if from == "" {
+		return false
+	}
+	return d >= from && d <= to
+}
+
 // InspectionCycleDue 점검주기가 해당 월에 도래하는지 (기획서 §17.2).
 // 월=매월, 홀수격월=1·3·5·7·9·11, 짝수격월=2·4·6·8·10·12, 분기=1·4·7·10, 반기=1·7, 년1회=1월.
+// 분기 의무 충족은 InspectionCycleDue가 아니라 QuarterObligations(달력 분기 안 1회)로 판정한다(D-70).
 func InspectionCycleDue(cycle string, month int) bool {
 	if month < 1 || month > 12 {
 		return false
