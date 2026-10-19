@@ -40,12 +40,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <a href="/admin-work?display=list{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
       <a href="/admin-work?display=kanban{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
-      {{if .CanWrite}}
-      <a href="/admin-work/new"
-         class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-        행정관련업무 등록
-      </a>
-      {{end}}
+      <a href="/workboard/register" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">일일 업무 등록에서 추가</a>
     </div>
   </div>
 
@@ -58,13 +53,6 @@
   <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
     {{if .FlashErrText}}{{.FlashErrText}}{{else}}업무명·업무 종료일·거래처를 확인하세요.{{end}}
   </div>
-  {{end}}
-
-  {{if .CanWrite}}
-  <form method="post" action="/admin-work/inbox" class="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col sm:flex-row gap-2">
-    <input name="title" required placeholder="제목만 빠르게 적기 — 할 일로 들어갑니다" class="flex-1 border border-violet-200 rounded-lg px-3 py-2 text-sm bg-white">
-    <button type="submit" class="px-4 py-2 text-sm text-white bg-violet-600 rounded-lg shrink-0">빠른 등록</button>
-  </form>
   {{end}}
 
   <div class="bg-white rounded-xl border border-gray-200 p-4">

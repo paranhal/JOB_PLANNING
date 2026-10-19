@@ -1,0 +1,94 @@
+{{define "title"}}주간 업무 회의{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+    <div>
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-xl font-bold text-ink">주간 업무 회의</h2>
+        <form method="GET" action="/meeting/weekly" class="inline-flex items-center gap-2">
+          <input type="hidden" name="date" value="{{.WeekStart}}">
+          <label class="text-ui-sm text-ink-muted" for="meeting-weekly-assignee">담당자</label>
+          <select id="meeting-weekly-assignee" name="assignee" onchange="this.form.submit()" class="select w-auto">
+            <option value="all" {{if eq .Assignee ""}}selected{{end}}>팀전체</option>
+            {{range .Users}}
+            <option value="{{.FullName}}" {{if eq $.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
+            {{end}}
+          </select>
+        </form>
+      </div>
+      <p class="text-ui-sm text-ink-muted mt-1">{{.ScopeNote}} · {{.WeekStart}} ~ {{.WeekEnd}} (월~금) · 조회 전용</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/meeting/weekly?date={{.PrevWeek}}&{{.NavQ}}" class="btn-secondary btn-sm">← 이전 주</a>
+      <form method="GET" action="/meeting/weekly" class="inline-flex items-center gap-2">
+        <input type="date" name="date" value="{{.WeekStart}}" onchange="this.form.submit()" class="input w-auto">
+        <input type="hidden" name="assignee" value="{{if .Assignee}}{{.Assignee}}{{else}}all{{end}}">
+      </form>
+      <a href="/meeting/weekly?date={{.NextWeek}}&{{.NavQ}}" class="btn-secondary btn-sm">다음 주 →</a>
+      <a href="/meeting/weekly?{{.NavQ}}" class="btn-secondary btn-sm">이번 주</a>
+      <a href="{{.ReportsHref}}" class="btn-secondary btn-sm">주간업무보고 엑셀</a>
+    </div>
+  </div>
+
+  <div id="meeting-weekly-summary" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="card p-4">
+      <h3 class="text-ui font-medium text-ink">완료</h3>
+      <p id="weekly-done-n" class="mt-2 text-2xl font-bold tabular-nums text-success">{{.DoneN}}</p>
+      <p class="mt-1 text-ui-sm text-ink-muted">지난주 완료</p>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-ui font-medium text-ink">진행</h3>
+      <p id="weekly-progress-n" class="mt-2 text-2xl font-bold tabular-nums text-primary">{{.ProgressN}}</p>
+      <p class="mt-1 text-ui-sm text-ink-muted">이번 주 예정 중 진행</p>
+    </div>
+    <div class="card p-4">
+      <h3 class="text-ui font-medium text-ink">미완료·지연</h3>
+      <p id="weekly-overdue-n" class="mt-2 text-2xl font-bold tabular-nums text-warning">{{.OverdueN}}</p>
+      <p class="mt-1 text-ui-sm text-ink-muted">기한 경과</p>
+    </div>
+    <a href="{{.UnplannedHref}}" class="card p-4 hover:bg-hover block">
+      <h3 class="text-ui font-medium text-danger">미배정</h3>
+      <p id="weekly-unplanned-n" class="mt-2 text-2xl font-bold tabular-nums text-danger">{{.UnplannedN}}</p>
+      <p class="mt-1 text-ui-sm text-ink-muted">미계획 업무함</p>
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+    {{template "meeting_weekly_col" dict "Title" "지난주 완료" "Groups" .DoneGroups "Empty" "지난주 완료가 없습니다."}}
+    {{template "meeting_weekly_col" dict "Title" "이번 주 예정" "Groups" .PlanGroups "Empty" "이번 주 예정이 없습니다."}}
+    {{template "meeting_weekly_col" dict "Title" "미완료·기한 경과" "Groups" .OverdueGroups "Empty" "기한 경과 업무가 없습니다."}}
+  </div>
+</div>
+{{end}}
+{{define "meeting_weekly_col"}}
+<div class="card overflow-hidden">
+  <div class="card-header">{{.Title}}</div>
+  <div class="overflow-x-auto">
+    <table class="table-base min-w-[320px] break-keep">
+      <tbody>
+        {{if .Groups}}
+        {{range .Groups}}
+        <tr class="bg-hover">
+          <td colspan="3" class="px-3 py-1.5 text-ui-sm font-medium text-ink">{{.Label}} · {{.Count}}건</td>
+        </tr>
+        {{range .Items}}
+        <tr class="hover:bg-hover">
+          <td class="px-3 py-2 whitespace-nowrap">
+            <span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span>
+          </td>
+          <td class="px-3 py-2">
+            <a href="{{.Href}}" class="hover:underline font-medium text-ink">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</a>
+            <p class="text-ui-sm text-ink-muted truncate max-w-xs">{{.Title}}</p>
+          </td>
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{.StatusLabel}}</td>
+        </tr>
+        {{end}}
+        {{end}}
+        {{else}}
+        <tr><td class="px-4 py-10 text-center text-ink-subtle">{{.Empty}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

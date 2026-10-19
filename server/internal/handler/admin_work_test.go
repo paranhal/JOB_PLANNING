@@ -53,8 +53,11 @@ func TestAdminWorkMenuPagesRender(t *testing.T) {
 	if strings.Contains(body, "수집함") {
 		t.Fatal("목록에 수집함 문구가 남아 있음")
 	}
-	if !strings.Contains(body, "빠른 등록") || !strings.Contains(body, "sort=due_date") {
-		t.Fatal("빠른 등록 또는 정렬 링크 없음")
+	if strings.Contains(body, `href="/admin-work/new"`) || strings.Contains(body, "빠른 등록") {
+		t.Fatal("목록에 행정 등록 진입점이 남아 있다")
+	}
+	if !strings.Contains(body, "sort=due_date") || !strings.Contains(body, "/workboard/register") {
+		t.Fatal("정렬 링크 또는 일일 업무 등록 안내가 없다")
 	}
 	kanban := doGet(t, e, "/admin-work?view=kanban")
 	kb := kanban.Body.String()

@@ -53,8 +53,8 @@ func TestAdminWorkQuickRegisterAndStats(t *testing.T) {
 
 	list := doGet(t, e, "/admin-work")
 	body := list.Body.String()
-	if list.Code != http.StatusOK || !strings.Contains(body, "빠른 등록") {
-		t.Fatalf("목록 빠른 등록 폼 없음 status=%d", list.Code)
+	if list.Code != http.StatusOK {
+		t.Fatalf("목록 status=%d", list.Code)
 	}
 	if strings.Contains(body, "수집함 등록") || strings.Contains(body, "수집함은") {
 		t.Fatal("수집함 문구가 남아 있음")

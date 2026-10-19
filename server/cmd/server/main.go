@@ -230,6 +230,7 @@ func main() {
 	g.POST("/plan/unplanned/assign", h.Work.UnplannedAssign)
 	g.POST("/plan/unplanned/no-date", h.Work.UnplannedNoDate)
 	g.GET("/meeting", h.Meeting.Show)
+	g.GET("/meeting/weekly", h.Meeting.Weekly)
 	g.GET("/meeting/overview", h.Meeting.Overview)
 	g.GET("/account", h.Auth.AccountPage)
 	g.GET("/account/complete", h.Auth.AccountCompleteForm)

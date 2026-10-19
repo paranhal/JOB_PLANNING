@@ -154,6 +154,10 @@ func TestNavAutoExpandCurrentMoreAndParent(t *testing.T) {
 	if work.CurGroup != "work" {
 		t.Fatalf("전체 업무 그룹=%s", work.CurGroup)
 	}
+	meet := FilterNav(ctx, NavMeetingWeekly, NavBadges{})
+	if !containsHref(meet.CurParents, "work_meeting") {
+		t.Fatal("주간 회의는 업무 회의 자동 펼침")
+	}
 }
 
 func TestNavShowProjectsFlagOnlyChangesProjectGroup(t *testing.T) {
