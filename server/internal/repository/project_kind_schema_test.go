@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,6 +84,31 @@ func TestProjectKindSetMigrationKeepsExistingKind(t *testing.T) {
 	}
 	if kind != "build" || set != 0 {
 		t.Fatalf("kind=%s set=%d", kind, set)
+	}
+}
+
+func TestContractConvertV84IdempotentAndSeed(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "c84.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	applyContractConvertV84(db)
+	applyContractConvertV84(db)
+	if !workProjectHasColumn(db, "contract_date") || !workProjectHasColumn(db, "contract_category") || !workProjectHasColumn(db, "amount_vat_included") {
+		t.Fatal("컬럼")
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group='contract_category'`).Scan(&n); err != nil || n != 4 {
+		t.Fatalf("시드 %d %v", n, err)
+	}
+	up, err := os.ReadFile(filepath.Join("migrations", "064_contract_convert.sql"))
+	if err != nil {
+		up, err = os.ReadFile(filepath.Join("..", "..", "migrations", "064_contract_convert.sql"))
+	}
+	if err != nil || !strings.Contains(string(up), "contract_category") || !strings.Contains(string(up), "CCT04") {
+		t.Fatalf("064 up %v", err)
 	}
 }
 

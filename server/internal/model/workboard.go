@@ -400,6 +400,10 @@ type WorkProject struct {
 	SalesCloseReason string   `json:"sales_close_reason,omitempty"`
 	ContractAmount  int       `json:"contract_amount,omitempty"`
 	ContractNo      string    `json:"contract_no,omitempty"`
+	ContractDate       string `json:"contract_date,omitempty"`
+	ContractCategory   string `json:"contract_category,omitempty"`
+	AmountVATKnown     bool   `json:"amount_vat_known,omitempty"`
+	AmountVATIncluded  bool   `json:"amount_vat_included,omitempty"`
 	ProjectKind     string    `json:"project_kind,omitempty"`
 	ProjectKindSet  int       `json:"project_kind_set,omitempty"`
 	SalesBizType    string    `json:"sales_biz_type,omitempty"`

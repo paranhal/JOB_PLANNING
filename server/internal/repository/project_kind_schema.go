@@ -55,6 +55,43 @@ func applyProjectKindAssignmentsV72(db *sql.DB) {
 	}
 }
 
+func applyContractConvertV84(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if !workProjectHasColumn(db, "contract_date") {
+		if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN contract_date TEXT`); err != nil &&
+			!strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			log.Printf("064 contract_date: %v", err)
+		}
+	}
+	if !workProjectHasColumn(db, "contract_category") {
+		if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN contract_category TEXT NOT NULL DEFAULT ''`); err != nil &&
+			!strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			log.Printf("064 contract_category: %v", err)
+		}
+	}
+	if !workProjectHasColumn(db, "amount_vat_included") {
+		if _, err := db.Exec(`ALTER TABLE work_projects ADD COLUMN amount_vat_included INTEGER`); err != nil &&
+			!strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			log.Printf("064 amount_vat_included: %v", err)
+		}
+	}
+	for _, q := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_wp_contract_category ON work_projects(contract_category)`,
+		`CREATE INDEX IF NOT EXISTS idx_wp_contract_date ON work_projects(contract_date)`,
+		`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order, is_active) VALUES
+  ('CCT01','contract_category','bid','입찰에 의한 계약',10,1),
+  ('CCT02','contract_category','pps','조달 물품 구매',20,1),
+  ('CCT03','contract_category','private','수의계약',30,1),
+  ('CCT04','contract_category','etc','기타',40,1)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			log.Printf("064 contract convert: %v", err)
+		}
+	}
+}
+
 func applyProjectKindSetV82(db *sql.DB) {
 	if db == nil {
 		return

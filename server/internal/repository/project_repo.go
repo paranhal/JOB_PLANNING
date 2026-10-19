@@ -26,6 +26,7 @@ const projectSelect = `
 		COALESCE(p.color,'#3B82F6'), COALESCE(p.status,'active'),
 		COALESCE(p.sales_project_id,''), COALESCE(p.contract_amount,0), COALESCE(p.contract_no,''),
 		COALESCE(p.project_kind,'maintenance'), COALESCE(p.project_kind_set,0), COALESCE(sp.biz_type,''),
+		COALESCE(p.contract_date,''), COALESCE(p.contract_category,''), p.amount_vat_included,
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
 		COALESCE(sp.sales_no,''), COALESCE(sp.stage,''), COALESCE(sp.close_reason,'')
@@ -700,6 +701,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 	var p model.WorkProject
 	var created, updated string
 	var paid int
+	var vat sql.NullInt64
 	err := row.Scan(
 		&p.ProjectID, &p.Name, &p.ShortName, &p.PlanYear, &paid, &p.SortOrder,
 		&p.OrderingPartyID, &p.OrderingParty, &p.CustomerID,
@@ -707,6 +709,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
 		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind, &p.ProjectKindSet, &p.SalesBizType,
+		&p.ContractDate, &p.ContractCategory, &vat,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo, &p.SalesStage, &p.SalesCloseReason,
 	)
@@ -714,6 +717,10 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		return nil, err
 	}
 	p.IsPaid = paid != 0
+	if vat.Valid {
+		p.AmountVATKnown = true
+		p.AmountVATIncluded = vat.Int64 != 0
+	}
 	p.CreatedAt = parseTime(created)
 	p.UpdatedAt = parseTime(updated)
 	return &p, nil
