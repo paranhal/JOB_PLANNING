@@ -40,6 +40,7 @@ func appendExisting(files []string, paths ...string) []string {
 func templateFiles(name string) []string {
 	files := []string{
 		"web/templates/layout/base.html",
+		"web/templates/layout/_nav_tree.html",
 		filepath.Join("web/templates", name),
 	}
 	if name == "auth/login.html" {
@@ -189,6 +190,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		}
 		injectAssignNoticeView(c, dataMap)
 		injectOrgView(c, dataMap)
+		injectNavMenu(c, dataMap)
 		if v := c.Get("auth_unconfirmed"); v != nil {
 			if b, ok := v.(bool); ok && b {
 				dataMap["AuthUnconfirmed"] = true

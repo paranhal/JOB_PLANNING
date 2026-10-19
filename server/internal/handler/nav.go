@@ -2,122 +2,68 @@ package handler
 
 // 사이드바 Active 키. base.html 의 $a 와 값이 같아야 한다. v2.0 §33.8
 const (
-	NavDashboard            = "dashboard"
-	NavWorkRegister         = "work_register"
-	NavPlanUnplanned        = "plan_unplanned"
-	NavMaintenance          = "maintenance"
-	NavMeeting              = "meeting"
-	NavWork                 = "work"
-	NavWorkAll              = "work_all"
-	NavWorkPlan             = "work_plan"
-	NavAS                   = "as"
-	NavASStats              = "as_stats"
-	NavASKnowledge          = "as_knowledge"
-	NavAdminWork            = "admin_work"
-	NavAdminWorkStats       = "admin_work_stats"
-	NavSales                = "sales"
-	NavSalesDashboard       = "sales_dashboard"
-	NavSalesActivities      = "sales_activities"
-	NavSalesGroups          = "sales_groups"
-	NavSalesItems           = "sales_items"
-	NavQuotes               = "quotes"
-	NavOrders               = "orders"
-	NavContracts            = "contracts"
-	NavSalesLogs            = "sales_logs"
-	NavWorkStatus           = "work_status"
-	NavStats                = "stats"
-	NavStatsReports         = "stats_reports"
-	NavStatsDetail          = "stats_detail"
-	NavStatsMilestones      = "stats_milestones"
-	NavAnalysis             = "analysis"
-	NavCustomers            = "customers"
-	NavSpaces               = "spaces"
-	NavContacts             = "contacts"
-	NavContactHistory       = "contact_history"
-	NavAssets               = "assets"
-	NavRelations            = "relations"
+	NavDashboard         = "dashboard"
+	NavWorkRegister      = "work_register"
+	NavPlanUnplanned     = "plan_unplanned"
+	NavMaintenance       = "maintenance"
+	NavMeeting           = "meeting"
+	NavWork              = "work"
+	NavWorkAll           = "work_all"
+	NavWorkPlan          = "work_plan"
+	NavAS                = "as"
+	NavASStats           = "as_stats"
+	NavASKnowledge       = "as_knowledge"
+	NavAdminWork         = "admin_work"
+	NavAdminWorkStats    = "admin_work_stats"
+	NavSales             = "sales"
+	NavSalesDashboard    = "sales_dashboard"
+	NavSalesActivities   = "sales_activities"
+	NavSalesGroups       = "sales_groups"
+	NavSalesItems        = "sales_items"
+	NavQuotes            = "quotes"
+	NavOrders            = "orders"
+	NavContracts         = "contracts"
+	NavSalesLogs         = "sales_logs"
+	NavWorkStatus        = "work_status"
+	NavStats             = "stats"
+	NavStatsReports      = "stats_reports"
+	NavStatsDetail       = "stats_detail"
+	NavStatsMilestones   = "stats_milestones"
+	NavAnalysis          = "analysis"
+	NavCustomers         = "customers"
+	NavSpaces            = "spaces"
+	NavContacts          = "contacts"
+	NavContactHistory    = "contact_history"
+	NavAssets            = "assets"
+	NavRelations         = "relations"
 	NavProjects          = "projects"
 	NavProjectsDashboard = "projects_dashboard"
 	NavProjectsDocs      = "projects_docs"
 	NavProjectsDiary     = "projects_diary"
 	NavProjectsRegistry  = "projects_registry"
-	NavMaintenanceSites     = "maintenance_sites"
-	NavRegionOrder          = "region_order"
-	NavCodes                = "codes"
-	NavUsers                = "users"
-	NavHolidays             = "holidays"
-	NavOrgs                 = "orgs"
-	NavMembers              = "members"
-	NavPermissions          = "permissions"
-	NavData                 = "data"
-	NavBackup               = "backup"
-	NavSystem               = "system"
-	NavMail                 = "mail"
-	NavNotify               = "notify"
-	NavApproval             = "approval_settings"
-	NavLeaves               = "leaves"
-	NavApprovalsInbox       = "approvals_inbox"
-	NavAccount              = "account"
-	NavLogin                = "login"
-	NavNone                 = ""
+	NavMaintenanceSites  = "maintenance_sites"
+	NavRegionOrder       = "region_order"
+	NavCodes             = "codes"
+	NavUsers             = "users"
+	NavHolidays          = "holidays"
+	NavOrgs              = "orgs"
+	NavMembers           = "members"
+	NavPermissions       = "permissions"
+	NavData              = "data"
+	NavBackup            = "backup"
+	NavSystem            = "system"
+	NavMail              = "mail"
+	NavNotify            = "notify"
+	NavApproval          = "approval_settings"
+	NavLeaves            = "leaves"
+	NavApprovalsInbox    = "approvals_inbox"
+	NavApprovalsHub      = "approvals_hub"
+	NavSalesPipeline     = "sales_pipeline"
+	NavDocsHub           = "docs_hub"
+	NavMeetingWeekly     = "meeting_weekly"
+	NavTestStats         = "test_stats"
+	NavAccount           = "account"
+	NavLogin             = "login"
+	NavNone              = ""
 )
 
-func navSidebarKeys() []string {
-	return []string{
-		NavDashboard,
-		NavWorkRegister,
-		NavPlanUnplanned,
-		NavMaintenance,
-		NavMeeting,
-		NavWork,
-		NavWorkAll,
-		NavWorkPlan,
-		NavAS,
-		NavASStats,
-		NavASKnowledge,
-		NavAdminWork,
-		NavAdminWorkStats,
-		NavSales,
-		NavSalesDashboard,
-		NavSalesActivities,
-		NavSalesGroups,
-		NavSalesItems,
-		NavQuotes,
-		NavOrders,
-		NavContracts,
-		NavSalesLogs,
-		NavWorkStatus,
-		NavStats,
-		NavStatsReports,
-		NavStatsDetail,
-		NavStatsMilestones,
-		NavAnalysis,
-		NavCustomers,
-		NavSpaces,
-		NavContacts,
-		NavContactHistory,
-		NavAssets,
-		NavRelations,
-		NavProjects,
-		NavProjectsDashboard,
-		NavProjectsDocs,
-		NavProjectsDiary,
-		NavMaintenanceSites,
-		NavRegionOrder,
-		NavCodes,
-		NavUsers,
-		NavHolidays,
-		NavOrgs,
-		NavMembers,
-		NavPermissions,
-		NavData,
-		NavBackup,
-		NavSystem,
-		NavMail,
-		NavNotify,
-		NavApproval,
-		NavLeaves,
-		NavApprovalsInbox,
-		NavAccount,
-	}
-}

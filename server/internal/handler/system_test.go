@@ -140,15 +140,22 @@ func TestSystemHistoryShowsRollback(t *testing.T) {
 }
 
 func TestSidebarHasSystemInfoForAdmin(t *testing.T) {
-	body, err := os.ReadFile("web/templates/layout/base.html")
+	body, err := os.ReadFile("internal/handler/nav_menu.go")
+	if err != nil {
+		body, err = os.ReadFile("nav_menu.go")
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(body)
-	if !strings.Contains(s, `href="/admin/system"`) || !strings.Contains(s, "시스템 정보") {
+	if !strings.Contains(s, `"/admin/system"`) || !strings.Contains(s, "시스템 정보") {
 		t.Fatal("사이드바에 시스템 정보가 없다")
 	}
-	if !strings.Contains(s, `id="schema-mismatch-banner"`) {
+	base, err := os.ReadFile("web/templates/layout/base.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(base), `id="schema-mismatch-banner"`) {
 		t.Fatal("스키마 경고 띠가 없다")
 	}
 }

@@ -115,7 +115,7 @@ func TestSalesDefaultSeesWorkMenusAndCanReceive(t *testing.T) {
 	if home.Code != http.StatusOK {
 		t.Fatalf("영업 홈 status=%d", home.Code)
 	}
-	if !hasASMenu(home.Body.String()) || !strings.Contains(home.Body.String(), "오늘 내 업무") {
+	if !hasASMenu(home.Body.String()) || !strings.Contains(home.Body.String(), "오늘 업무") {
 		t.Fatal("영업 기본 직급에 업무 섹션 메뉴가 없다")
 	}
 
@@ -144,7 +144,7 @@ func TestSalesReceiveOnlyCanReceiveButNotProcess(t *testing.T) {
 	if !hasASMenu(home.Body.String()) {
 		t.Fatal("접수 권한을 받은 영업담당에게 AS 메뉴가 없다")
 	}
-	if !strings.Contains(home.Body.String(), "오늘 내 업무") {
+	if !strings.Contains(home.Body.String(), "오늘 업무") {
 		t.Fatal("업무 섹션 메뉴가 없다")
 	}
 

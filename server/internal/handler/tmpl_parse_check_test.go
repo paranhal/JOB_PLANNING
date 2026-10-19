@@ -12,6 +12,7 @@ import (
 func TestAllTemplatesParse(t *testing.T) {
 	root := findTemplateRoot(t)
 	layout := filepath.Join(root, "layout", "base.html")
+	navTree := filepath.Join(root, "layout", "_nav_tree.html")
 
 	var pages []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -35,7 +36,7 @@ func TestAllTemplatesParse(t *testing.T) {
 	}
 
 	for _, page := range pages {
-		files := []string{layout, page}
+		files := []string{layout, navTree, page}
 		if partials, err := filepath.Glob(filepath.Join(filepath.Dir(page), "_*.html")); err == nil {
 			files = append(files, partials...)
 		}

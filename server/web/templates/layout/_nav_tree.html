@@ -1,0 +1,65 @@
+{{define "nav_tree"}}
+<nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1 text-sm" style="-webkit-overflow-scrolling:touch"
+     x-data="navMenu('{{.NavCurGroup}}', {{.NavCurMoreJSON}}, {{.NavCurParentsJSON}})"
+     @click="if ($event.target.closest('a') && window.innerWidth < 1024) sidebarOpen=false">
+  {{range .NavGroups}}
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:bg-gray-800 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            @click.stop="toggleG('{{.ID}}')"
+            :aria-expanded="openG('{{.ID}}') ? 'true' : 'false'">
+      <span>{{.Label}}</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-gray-500" x-show="!openG('{{.ID}}')" x-cloak>{{.Count}}</span>
+    </button>
+    <div x-show="openG('{{.ID}}')" x-cloak class="space-y-0.5">
+      {{range .Items}}
+      {{if .Children}}
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                @click.stop="toggleP('{{.ID}}')"
+                :aria-expanded="openP('{{.ID}}') ? 'true' : 'false'">
+          <span>{{.Label}}</span>
+          <span class="text-gray-500" x-text="openP('{{.ID}}') ? '▾' : '▸'"></span>
+          {{if gt .Badge 0}}<span class="ml-auto min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-white">{{.Badge}}</span>{{end}}
+        </button>
+        <div x-show="openP('{{.ID}}')" x-cloak class="space-y-0.5">
+          {{range .Children}}
+          <a href="{{.Href}}" class="{{if .Active}}bg-blue-600 text-white nav-active{{else}}text-gray-300 hover:bg-gray-800{{end}} flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span>{{.Label}}</span>
+            {{if gt .Badge 0}}<span class="ml-auto min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-white">{{.Badge}}</span>{{end}}
+          </a>
+          {{end}}
+        </div>
+      </div>
+      {{else}}
+      <a href="{{.Href}}" class="{{if .Active}}bg-blue-600 text-white nav-active{{else}}text-gray-300 hover:bg-gray-800{{end}} flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <span>{{.Label}}</span>
+        {{if gt .Badge 0}}<span class="ml-auto min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-white">{{.Badge}}</span>{{end}}
+      </a>
+      {{end}}
+      {{end}}
+      {{if .More}}
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-gray-400 hover:bg-gray-800 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                @click.stop="toggleM('{{.ID}}')"
+                :aria-expanded="openM('{{.ID}}') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('{{.ID}}') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('{{.ID}}')" x-cloak class="space-y-0.5">
+          {{range .More}}
+          <a href="{{.Href}}" class="{{if .Active}}bg-blue-600 text-white nav-active{{else}}text-gray-300 hover:bg-gray-800{{end}} flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <span>{{.Label}}</span>
+            {{if gt .Badge 0}}<span class="ml-auto min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-white">{{.Badge}}</span>{{end}}
+          </a>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</nav>
+{{end}}

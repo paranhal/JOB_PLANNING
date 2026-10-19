@@ -75,7 +75,7 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 	hidden, _ := h.repo.CountHiddenClosed(f)
 	hiddenDormant, _ := h.repo.CountHiddenDormant(f)
 	return c.Render(http.StatusOK, "sales/pipeline.html", map[string]interface{}{
-		"Title": "영업 파이프라인", "Active": NavSales,
+		"Title": "영업 파이프라인", "Active": NavSalesPipeline,
 		"View": "pipeline", "Filter": f, "FilterQ": filterQ,
 		"DealType": f.DealType, "DealBuildHref": buildHref, "DealSupplyHref": supplyHref,
 		"NewHref": newHref, "FilterReset": resetHref, "FilterAction": "/sales",

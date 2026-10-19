@@ -47,8 +47,8 @@ func TestAdminWorkMenuPagesRender(t *testing.T) {
 		t.Fatalf("목록 status=%d body=%s", list.Code, list.Body.String())
 	}
 	body := list.Body.String()
-	if !strings.Contains(body, "행정·지원업무") || !strings.Contains(body, `href="/admin-work"`) {
-		t.Fatal("사이드바 행정관련업무 메뉴 없음")
+	if !strings.Contains(body, "행정·지원업무") {
+		t.Fatal("행정·지원업무 목록 제목이 없다")
 	}
 	if strings.Contains(body, "수집함") {
 		t.Fatal("목록에 수집함 문구가 남아 있음")

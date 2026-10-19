@@ -15,28 +15,21 @@ import (
 )
 
 func TestNavConstantsMatchSidebar(t *testing.T) {
-	body, err := os.ReadFile("web/templates/layout/base.html")
+	src, err := os.ReadFile("internal/handler/nav.go")
+	if err != nil {
+		src, err = os.ReadFile("nav.go")
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	re := regexp.MustCompile(`eq \$a "([a-z_]+)"`)
-	found := map[string]struct{}{}
-	for _, m := range re.FindAllSubmatch(body, -1) {
-		found[string(m[1])] = struct{}{}
+	re := regexp.MustCompile(`Nav[A-Za-z0-9]+ += "([a-z0-9_]+)"`)
+	declared := map[string]struct{}{}
+	for _, m := range re.FindAllSubmatch(src, -1) {
+		declared[string(m[1])] = struct{}{}
 	}
-	if len(found) == 0 {
-		t.Fatal("사이드바 Active 키가 없다")
-	}
-	have := map[string]struct{}{}
 	for _, k := range navSidebarKeys() {
-		have[k] = struct{}{}
-		if _, ok := found[k]; !ok {
-			t.Errorf("상수 %q 가 base.html 사이드바에 없다", k)
-		}
-	}
-	for k := range found {
-		if _, ok := have[k]; !ok {
-			t.Errorf("사이드바 키 %q 에 대응하는 상수가 없다", k)
+		if _, ok := declared[k]; !ok {
+			t.Errorf("메뉴 Active %q 에 상수가 없다", k)
 		}
 	}
 }
@@ -112,18 +105,17 @@ func TestSalesUnifiedSidebar(t *testing.T) {
 	if strings.Contains(salesBody, "← 업무로") {
 		t.Fatal("/sales 에 ← 업무로 가 남아 있다")
 	}
-	if !strings.Contains(salesBody, "오늘 내 업무") || !strings.Contains(salesBody, "AS 접수·조치") {
+	if !strings.Contains(salesBody, "오늘 업무") || !strings.Contains(salesBody, "AS 접수·조치") {
 		t.Fatal("/sales 에 통합 사이드바(업무·AS)가 없다")
 	}
-	if !strings.Contains(salesBody, "영업 대시보드") || !strings.Contains(salesBody, "견적 관리") ||
-		!strings.Contains(salesBody, "수주 관리") || !strings.Contains(salesBody, "계약 관리") ||
+	if !strings.Contains(salesBody, "영업 대시보드") || !strings.Contains(salesBody, "견적·수주·계약") ||
 		!strings.Contains(salesBody, "품목 마스터") || !strings.Contains(salesBody, "사업 대분류") {
 		t.Fatal("/sales 영업 메뉴가 빠졌다")
 	}
 	if strings.Contains(salesBody, "고객·파트너") {
 		t.Fatal("없애야 할 영업 메뉴가 남아 있다")
 	}
-	if !strings.Contains(salesBody, "영업 파이프라인") {
+	if !strings.Contains(salesBody, "파이프라인") {
 		t.Fatal("영업 파이프라인 메뉴가 없다")
 	}
 	if strings.Contains(salesBody, "사업 발굴") {
@@ -132,7 +124,7 @@ func TestSalesUnifiedSidebar(t *testing.T) {
 
 	for _, path := range []string{"/quotes", "/orders", "/contracts", "/items"} {
 		body := get(path)
-		if !strings.Contains(body, "오늘 내 업무") {
+		if !strings.Contains(body, "오늘 업무") {
 			t.Fatalf("%s 에 통합 사이드바가 없다", path)
 		}
 		if strings.Contains(body, "← 업무로") {
@@ -155,12 +147,12 @@ func TestSalesUnifiedSidebar(t *testing.T) {
 	if strings.Contains(cust, "← 업무로") {
 		t.Fatal("고객 영업 보기가 영업 전용 사이드바다")
 	}
-	if !strings.Contains(cust, "오늘 내 업무") {
+	if !strings.Contains(cust, "오늘 업무") {
 		t.Fatal("고객 영업 보기에 통합 사이드바가 없다")
 	}
 
 	work := get("/work")
-	if !strings.Contains(work, "오늘 내 업무") {
-		t.Fatal("/work 에 오늘 내 업무가 없다")
+	if !strings.Contains(work, "오늘 업무") {
+		t.Fatal("/work 에 오늘 업무가 없다")
 	}
 }

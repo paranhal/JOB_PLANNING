@@ -1118,7 +1118,7 @@ func TestSalesHTTP_DashboardAndMemo(t *testing.T) {
 		t.Fatalf("dashboard status=%d", dash.Code)
 	}
 	body := dash.Body.String()
-	if !strings.Contains(body, "이번 달 수주") || !strings.Contains(body, "가중 파이프라인") || !strings.Contains(body, "오늘 내 업무") {
+	if !strings.Contains(body, "이번 달 수주") || !strings.Contains(body, "가중 파이프라인") || !strings.Contains(body, "오늘 업무") {
 		t.Fatalf("대시보드 문구 없음: %s", clipBody(body))
 	}
 	if strings.Contains(body, "이번 달 계약") {
