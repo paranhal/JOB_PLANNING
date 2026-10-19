@@ -29,8 +29,10 @@ type ContractRow struct {
 	OrgID          string
 	Promoted       bool
 	LinkNeed       string // 제안 영업번호. 80-B
+	LinkSalesID    string
 	LinkAmbiguous  bool
 	AmountMismatch bool
+	SalesAmount    int
 	DupLinked      bool
 }
 

@@ -1,0 +1,25 @@
+{{define "title"}}영업 연결 확인 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <h2 class="text-xl font-bold text-ink">영업 사업과 연결</h2>
+  <p class="text-sm text-ink-muted">이름이 같아 연결을 제안합니다. 저장 전에 금액과 이름을 확인하세요. 금액은 자동으로 맞추지 않습니다.</p>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="card card-body space-y-1">
+      <p class="text-xs text-ink-muted">사업관리</p>
+      <p class="font-medium text-ink">{{.Project.Name}}</p>
+      <p class="text-sm text-ink-muted">금액 {{.Project.ContractAmount}}</p>
+    </div>
+    <div class="card card-body space-y-1">
+      <p class="text-xs text-ink-muted">영업 {{.Sales.DisplayNo}}</p>
+      <p class="font-medium text-ink">{{.Sales.Name}}</p>
+      <p class="text-sm text-ink-muted">금액 {{.Sales.ContractAmount}}</p>
+    </div>
+  </div>
+  <form method="post" action="/contracts/{{.Project.ProjectID}}/link-sales" class="flex flex-wrap gap-2">
+    <input type="hidden" name="sales_id" value="{{.Sales.SalesID}}">
+    <input type="hidden" name="confirm" value="1">
+    <button type="submit" class="btn-primary">연결</button>
+    <a href="/contracts" class="btn-secondary">취소</a>
+  </form>
+</div>
+{{end}}

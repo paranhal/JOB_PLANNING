@@ -148,6 +148,136 @@ func TestListContractUnionSources(t *testing.T) {
 	}
 }
 
+func TestListContractUnionLinkSuggest(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "cu_link.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	prepo := NewProjectRepo(db)
+	srepo := NewSalesRepo(db)
+
+	s1 := &model.SalesProject{Name: "제천 RFID 구축"}
+	if err := srepo.Create(s1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=?, sales_no=? WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, 17869000, "S2609-032", s1.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	w1 := &model.WorkProject{Name: "제천RFID구축", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 17689000}
+	if err := prepo.Create(w1); err != nil {
+		t.Fatal(err)
+	}
+
+	partial := &model.SalesProject{Name: "제천 RFID"}
+	if err := srepo.Create(partial); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=? WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, 100, partial.SalesID); err != nil {
+		t.Fatal(err)
+	}
+
+	sDupA := &model.SalesProject{Name: "동명이인"}
+	sDupB := &model.SalesProject{Name: "동명이인"}
+	if err := srepo.Create(sDupA); err != nil {
+		t.Fatal(err)
+	}
+	if err := srepo.Create(sDupB); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=1 WHERE sales_id IN (?,?)`,
+		model.SalesStage4Closed, model.SalesCloseContracted, sDupA.SalesID, sDupB.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	wDup := &model.WorkProject{Name: "동명이인", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
+	if err := prepo.Create(wDup); err != nil {
+		t.Fatal(err)
+	}
+
+	linkedS := &model.SalesProject{Name: "중복연결영업"}
+	if err := srepo.Create(linkedS); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=9 WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, linkedS.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	wA := &model.WorkProject{Name: "중복A", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 9, SalesProjectID: linkedS.SalesID}
+	if err := prepo.Create(wA); err != nil {
+		t.Fatal(err)
+	}
+	wB := &model.WorkProject{Name: "중복B", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 9, SalesProjectID: linkedS.SalesID}
+	if err := prepo.Create(wB); err == nil {
+		t.Fatal("같은 영업 사업에 사업관리 두 건 연결이 허용됐다")
+	}
+
+	rows, err := prepo.ListContractUnion(ContractUnionFilter{OrgID: OrgAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seed, amb model.ContractRow
+	names := map[string]string{}
+	for _, r := range rows {
+		names[r.Name] = r.Source
+		if r.ProjectID == w1.ProjectID {
+			seed = r
+		}
+		if r.ProjectID == wDup.ProjectID {
+			amb = r
+		}
+	}
+	if seed.LinkNeed != "S2609-032" || seed.LinkSalesID != s1.SalesID {
+		t.Fatalf("연결 제안 %+v", seed)
+	}
+	if !seed.AmountMismatch {
+		t.Fatal("금액 불일치 없음")
+	}
+	if names["제천 RFID 구축"] != "" {
+		t.Fatal("제안 대상이 ② 행으로 나왔다")
+	}
+	if names["제천 RFID"] != model.ContractSourceSales {
+		t.Fatal("부분 일치 영업이 제안으로 빠지거나 ②에 없다")
+	}
+	if !amb.LinkAmbiguous || amb.LinkNeed != "" {
+		t.Fatalf("동명이인 확인 필요 %+v", amb)
+	}
+
+	kpi := model.BuildContractUnionKPI(rows, "2026-10-19")
+	if kpi.NeedLink < 1 {
+		t.Fatal("연결 필요 건수 0")
+	}
+
+	if err := prepo.LinkSalesProject(w1.ProjectID, s1.SalesID, "tester"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := prepo.Get(w1.ProjectID)
+	if err != nil || got.SalesProjectID != s1.SalesID {
+		t.Fatalf("연결 저장 %+v %v", got, err)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM data_change_logs WHERE table_name='work_projects' AND entity_id=?`, w1.ProjectID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n == 0 {
+		t.Fatal("변경 로그 없음")
+	}
+
+	after, err := prepo.ListContractUnion(ContractUnionFilter{OrgID: OrgAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range after {
+		if r.ProjectID == w1.ProjectID && r.AmountMismatch && r.SalesAmount != 17869000 {
+			t.Fatalf("연결 후 영업 금액 %+v", r)
+		}
+		if r.Name == "제천 RFID 구축" && r.Source == model.ContractSourceSales {
+			t.Fatal("연결 후에도 ② 행")
+		}
+	}
+}
+
 func TestContractUnionIsSharedContractQuery(t *testing.T) {
 	// 73-E 계약 탭은 이 함수를 공유한다. 별도 판정 함수를 두지 않는다.
 	var r *ProjectRepo

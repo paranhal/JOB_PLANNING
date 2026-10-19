@@ -71,3 +71,46 @@ func TestContractsHTTP_UnionAndAmountInput(t *testing.T) {
 		t.Fatalf("계약 상세 %d", detail.Code)
 	}
 }
+
+func TestContractsHTTP_LinkSuggest(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	srepo := repository.NewSalesRepo(db)
+	prepo := repository.NewProjectRepo(db)
+	s := &model.SalesProject{Name: "연결확인사업"}
+	if err := srepo.Create(s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=?, sales_no=? WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, 1000, "S2609-099", s.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	w := &model.WorkProject{Name: "연결확인사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 2000}
+	if err := prepo.Create(w); err != nil {
+		t.Fatal(err)
+	}
+	list := doGet(t, e, "/contracts")
+	b := list.Body.String()
+	if !strings.Contains(b, "연결 필요") || !strings.Contains(b, "금액 불일치") {
+		t.Fatalf("제안 칩 없음: %s", clipBody(b))
+	}
+	form := doGet(t, e, "/contracts/"+w.ProjectID+"/link-sales?sales_id="+s.SalesID)
+	if form.Code != http.StatusOK || !strings.Contains(form.Body.String(), "연결확인사업") {
+		t.Fatalf("확인 화면 %d", form.Code)
+	}
+	denied := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/contracts/"+w.ProjectID+"/link-sales", strings.NewReader(url.Values{"sales_id": {s.SalesID}, "confirm": {"1"}}.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieReadOnly(t, model.RoleTech))
+	e.ServeHTTP(denied, req)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("읽기 전용 연결 %d", denied.Code)
+	}
+	saved := doForm(t, e, "/contracts/"+w.ProjectID+"/link-sales", url.Values{"sales_id": {s.SalesID}, "confirm": {"1"}})
+	if saved.Code != http.StatusSeeOther {
+		t.Fatalf("연결 status=%d", saved.Code)
+	}
+	got, err := prepo.Get(w.ProjectID)
+	if err != nil || got.SalesProjectID != s.SalesID {
+		t.Fatalf("연결 결과 %+v %v", got, err)
+	}
+}

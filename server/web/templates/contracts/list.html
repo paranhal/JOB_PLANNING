@@ -78,11 +78,15 @@
           <td class="px-4 py-2 whitespace-nowrap"><span class="text-xs px-2 py-0.5 rounded-full bg-gray-100">{{.SourceLabel}}</span></td>
           <td class="px-4 py-2 text-xs whitespace-nowrap">
             {{if eq .Source "work"}}{{if .SalesNo}}영업과 연결됨 {{.SalesNo}}{{else}}영업 연결 없음{{end}}{{end}}
-            {{if .LinkNeed}}영업 {{.LinkNeed}}와 연결 필요{{end}}
-            {{if .AmountMismatch}}금액 불일치{{end}}
-            {{if .DupLinked}}중복 연결{{end}}
+            {{if .LinkNeed}}<span class="badge-warning">영업 {{.LinkNeed}}와 연결 필요</span>{{end}}
+            {{if .LinkAmbiguous}}<span class="badge-warning">확인 필요</span>{{end}}
+            {{if .AmountMismatch}}<span class="badge-danger">금액 불일치</span>{{if .SalesAmount}} 영업 {{.SalesAmount}}{{end}}{{end}}
+            {{if .DupLinked}}<span class="badge-warning">중복 연결</span>{{end}}
           </td>
           <td class="px-4 py-2 whitespace-nowrap text-xs">
+            {{if and $.CanLink .LinkSalesID}}
+              <a href="/contracts/{{.ProjectID}}/link-sales?sales_id={{.LinkSalesID}}" class="px-2 py-0.5 border rounded">연결</a>
+            {{end}}
             {{if and $.CanWriteSales (eq .Source "sales")}}
               {{if .AmountMissing}}
               <form method="post" action="/sales/{{.SalesID}}/contract-amount" class="inline-flex gap-1">

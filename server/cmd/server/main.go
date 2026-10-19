@@ -529,6 +529,8 @@ func main() {
 	sales.POST("/:id/memos/:mid/delete", h.Sales.DeleteMemo)
 
 	g.GET("/contracts", h.Project.Contracts)
+	g.GET("/contracts/:id/link-sales", h.Project.ContractLinkForm)
+	g.POST("/contracts/:id/link-sales", h.Project.ContractLinkSave)
 	g.GET("/contracts/:id", h.Project.ContractShow)
 	g.POST("/sales/:id/contract-amount", h.Sales.SetContractAmount)
 

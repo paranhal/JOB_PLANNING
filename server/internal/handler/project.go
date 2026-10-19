@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -132,8 +133,46 @@ func (h *ProjectHandler) Contracts(c echo.Context) error {
 		"KPITotal":   kpi.TotalN, "KPIValid": kpi.ValidN, "KPISoon": kpi.SoonN,
 		"KPIAmount": model.FormatSalesMoney(kpi.Amount), "KPIAvgDays": kpi.AvgDays,
 		"KPIUnpromoted": kpi.Unpromoted, "KPINeedLink": kpi.NeedLink,
-		"CanWriteSales": canWriteSales(c),
+		"CanWriteSales":    canWriteSales(c),
+		"CanWriteProjects": canWriteProjects(c),
+		"CanLink":          canWriteSales(c) && canWriteProjects(c),
 	})
+}
+
+func (h *ProjectHandler) ContractLinkForm(c echo.Context) error {
+	if !canWriteSales(c) || !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	p, err := h.repo.Get(c.Param("id"))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err=notfound")
+	}
+	sid := strings.TrimSpace(c.QueryParam("sales_id"))
+	if sid == "" {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err=sales")
+	}
+	s, err := h.salesRepo.Get(sid)
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err=sales")
+	}
+	return c.Render(http.StatusOK, "contracts/link.html", map[string]interface{}{
+		"Title": "영업 연결 확인", "Active": NavContracts, "Project": p, "Sales": s,
+	})
+}
+
+func (h *ProjectHandler) ContractLinkSave(c echo.Context) error {
+	if !canWriteSales(c) || !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	if strings.TrimSpace(c.FormValue("confirm")) != "1" {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err=confirm")
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	sid := strings.TrimSpace(c.FormValue("sales_id"))
+	if err := h.repo.LinkSalesProject(id, sid, ctxString(c, "user_name")); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/contracts?err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, "/contracts?ok=linked")
 }
 
 func (h *ProjectHandler) ContractShow(c echo.Context) error {

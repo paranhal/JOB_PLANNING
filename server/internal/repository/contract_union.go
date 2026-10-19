@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -22,11 +23,34 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 		return nil, err
 	}
 	linked := map[string]int{}
-	var rows []model.ContractRow
+	var salesIDs []string
 	for _, p := range works {
 		if sid := strings.TrimSpace(p.SalesProjectID); sid != "" {
 			linked[sid]++
+			salesIDs = append(salesIDs, sid)
 		}
+	}
+	linkedSales, err := r.salesByIDs(salesIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	candidates, err := r.listUnlinkedContractedSales(ContractUnionFilter{OrgID: f.OrgID})
+	if err != nil {
+		return nil, err
+	}
+	byName := map[string][]model.SalesProject{}
+	for _, s := range candidates {
+		k := model.NormalizeProjectName(s.Name)
+		if k == "" {
+			continue
+		}
+		byName[k] = append(byName[k], s)
+	}
+	exclude := map[string]bool{}
+
+	var rows []model.ContractRow
+	for _, p := range works {
 		amt := p.ContractAmount
 		row := model.ContractRow{
 			Source:       model.ContractSourceWork,
@@ -41,20 +65,39 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 			EndDate:      p.EndDate,
 			Status:       p.Status,
 		}
+		if sid := strings.TrimSpace(p.SalesProjectID); sid != "" {
+			if linked[sid] > 1 {
+				row.DupLinked = true
+			}
+			if sp, ok := linkedSales[sid]; ok {
+				row.SalesAmount = sp.ContractAmount
+				if sp.ContractAmount != amt {
+					row.AmountMismatch = true
+				}
+			}
+		} else {
+			cands := byName[model.NormalizeProjectName(p.Name)]
+			if len(cands) == 1 {
+				row.LinkNeed = cands[0].DisplayNo()
+				row.LinkSalesID = cands[0].SalesID
+				row.SalesAmount = cands[0].ContractAmount
+				if cands[0].ContractAmount != amt {
+					row.AmountMismatch = true
+				}
+				exclude[cands[0].SalesID] = true
+			} else if len(cands) > 1 {
+				row.LinkAmbiguous = true
+			}
+		}
 		rows = append(rows, row)
 	}
 
-	// 상태 필터가 있으면 ② 행은 숨김(80-A.5).
 	if strings.TrimSpace(f.Status) != "" {
 		return rows, nil
 	}
 
-	sales, err := r.listUnlinkedContractedSales(f)
-	if err != nil {
-		return nil, err
-	}
-	for _, s := range sales {
-		if linked[s.SalesID] > 0 {
+	for _, s := range candidates {
+		if linked[s.SalesID] > 0 || exclude[s.SalesID] {
 			continue
 		}
 		amt := s.ContractAmount
@@ -133,6 +176,59 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+func (r *ProjectRepo) salesByIDs(ids []string) (map[string]model.SalesProject, error) {
+	out := map[string]model.SalesProject{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	ph := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		ph[i] = "?"
+		args[i] = id
+	}
+	q := `SELECT sales_id, COALESCE(sales_no,''), COALESCE(name,''), COALESCE(contract_amount,0)
+		FROM sales_projects WHERE sales_id IN (` + strings.Join(ph, ",") + `)`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p model.SalesProject
+		if err := rows.Scan(&p.SalesID, &p.SalesNo, &p.Name, &p.ContractAmount); err != nil {
+			return nil, err
+		}
+		out[p.SalesID] = p
+	}
+	return out, rows.Err()
+}
+
+func (r *ProjectRepo) LinkSalesProject(projectID, salesID, by string) error {
+	projectID = strings.TrimSpace(projectID)
+	salesID = strings.TrimSpace(salesID)
+	if projectID == "" || salesID == "" {
+		return fmt.Errorf("연결할 사업이 없습니다")
+	}
+	p, err := r.Get(projectID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(p.SalesProjectID) != "" {
+		return fmt.Errorf("이미 영업 사업과 연결되어 있습니다")
+	}
+	old := strings.TrimSpace(p.SalesProjectID)
+	p.SalesProjectID = salesID
+	return touchUpdate(r.db, "work_projects", "project_id", projectID, p.Name, func() error {
+		_, err := r.db.Exec(`UPDATE work_projects SET sales_project_id=?, updated_at=CURRENT_TIMESTAMP WHERE project_id=?`, salesID, projectID)
+		if err == nil {
+			_ = by
+			_ = old
+		}
+		return err
+	})
 }
 
 func ParseYearQuery(s string) int {
