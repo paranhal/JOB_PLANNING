@@ -120,6 +120,25 @@ func (r *ProjectRepo) attachOrderAmounts(items []model.WorkProject) {
 }
 
 // SetStatus 사업 상태만 변경(보관/재개/완료 등)
+func (r *ProjectRepo) SetProjectKind(id, kind, by string) error {
+	id = strings.TrimSpace(id)
+	kind = model.NormalizeProjectKind(kind)
+	if id == "" || !model.ValidProjectKind(kind) {
+		return fmt.Errorf("사업 유형을 선택하세요")
+	}
+	p, err := r.Get(id)
+	if err != nil {
+		return err
+	}
+	_ = by
+	p.ProjectKind = kind
+	p.ProjectKindSet = 1
+	return touchUpdate(r.db, "work_projects", "project_id", id, p.Name, func() error {
+		_, err := r.db.Exec(`UPDATE work_projects SET project_kind=?, project_kind_set=1, updated_at=CURRENT_TIMESTAMP WHERE project_id=?`, kind, id)
+		return err
+	})
+}
+
 func (r *ProjectRepo) SetStatus(id, status string) error {
 	id = strings.TrimSpace(id)
 	status = strings.TrimSpace(status)
@@ -649,8 +668,8 @@ func normalizeProject(p *model.WorkProject) {
 		p.Color = "#3B82F6"
 	}
 	p.ProjectKind = model.NormalizeProjectKind(p.ProjectKind)
-	if !model.ValidProjectKind(p.ProjectKind) {
-		p.ProjectKind = model.ProjectKindMaintenance
+	if p.ProjectKind != "" && !model.ValidProjectKind(p.ProjectKind) {
+		p.ProjectKind = ""
 	}
 	if p.PlanYear == 0 && len(p.StartDate) >= 4 {
 		var y int

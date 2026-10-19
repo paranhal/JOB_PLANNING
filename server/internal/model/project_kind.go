@@ -101,6 +101,39 @@ type EffectiveKind struct {
 func (e EffectiveKind) Label() string { return ProjectKindLabel(e.Kind) }
 func (e EffectiveKind) SourceLabel() string { return KindSourceLabel(e.Source) }
 
+func HintProjectKindFromName(name string) string {
+	n := strings.TrimSpace(name)
+	if strings.Contains(n, "유지관리") || strings.Contains(n, "유지보수") {
+		return ProjectKindMaintenance
+	}
+	if strings.Contains(n, "구축") {
+		return ProjectKindBuild
+	}
+	return ""
+}
+
+func (p WorkProject) KindHintConflicts() bool {
+	hint := HintProjectKindFromName(p.Name)
+	sales, ok := MapSalesBizToProjectKind(p.SalesBizType)
+	if hint == "" || !ok {
+		return false
+	}
+	return hint != sales
+}
+
+func (p WorkProject) SuggestedKindForReview() string {
+	if p.KindHintConflicts() {
+		return ""
+	}
+	if h := HintProjectKindFromName(p.Name); h != "" {
+		return h
+	}
+	if k, ok := MapSalesBizToProjectKind(p.SalesBizType); ok {
+		return k
+	}
+	return ""
+}
+
 func (p WorkProject) EffectiveKind() EffectiveKind {
 	if p.ProjectKindSet == 1 && ValidProjectKind(p.ProjectKind) {
 		return EffectiveKind{Kind: NormalizeProjectKind(p.ProjectKind), Source: KindSourceConfirmed}

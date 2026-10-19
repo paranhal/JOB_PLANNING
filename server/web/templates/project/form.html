@@ -43,7 +43,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">사업 유형</label>
-          <select name="project_kind" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <select name="project_kind" required class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .KindOptions}}
             <option value="{{.Value}}" {{if eq $.Project.ProjectKind .Value}}selected{{end}}>{{.Label}}</option>

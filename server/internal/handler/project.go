@@ -101,9 +101,64 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"CanWrite": canWriteProjects(c),
 		"CanMerge": currentRole(c) == model.RoleVisionAdmin,
-		"DupNames": model.DuplicateProjectNameGroups(items),
-		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"DupNames":    model.DuplicateProjectNameGroups(items),
+		"KindOptions": model.ProjectKindOptions(),
+		"FlashOK":     c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
+}
+
+func (h *ProjectHandler) SetKind(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	kind := strings.TrimSpace(c.FormValue("project_kind"))
+	back := strings.TrimSpace(c.FormValue("back"))
+	if back == "" {
+		back = "/projects/registry"
+	}
+	if err := h.repo.SetProjectKind(id, kind, ctxString(c, "user_name")); err != nil {
+		return c.Redirect(http.StatusSeeOther, back+"?err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, back+"?ok=kind")
+}
+
+func (h *ProjectHandler) KindReview(c echo.Context) error {
+	if !canViewProjects(c) {
+		return echo.ErrForbidden
+	}
+	items, err := h.repo.ListFiltered("", 0, "")
+	if err != nil {
+		return err
+	}
+	var rows []model.WorkProject
+	for _, p := range items {
+		if p.EffectiveKind().Source != model.KindSourceConfirmed {
+			rows = append(rows, p)
+		}
+	}
+	return c.Render(http.StatusOK, "project/kind_review.html", map[string]interface{}{
+		"Title": "미분류·추정 유형 정리", "Active": NavProjectsRegistry,
+		"Projects": rows, "KindOptions": model.ProjectKindOptions(),
+		"CanWrite": canWriteProjects(c),
+	})
+}
+
+func (h *ProjectHandler) KindReviewSave(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	if err := c.Request().ParseForm(); err != nil {
+		return err
+	}
+	for _, id := range c.Request().Form["pick"] {
+		kind := strings.TrimSpace(c.FormValue("kind_" + id))
+		if !model.ValidProjectKind(kind) {
+			continue
+		}
+		_ = h.repo.SetProjectKind(id, kind, ctxString(c, "user_name"))
+	}
+	return c.Redirect(http.StatusSeeOther, "/projects/registry?ok=kind")
 }
 
 func (h *ProjectHandler) Contracts(c echo.Context) error {
@@ -211,6 +266,10 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, false, "사업명을 입력하세요.")
 	}
+	if !model.ValidProjectKind(p.ProjectKind) {
+		return h.renderForm(c, p, rules, false, "사업 유형을 선택하세요.")
+	}
+	p.ProjectKindSet = 1
 	if err := h.repo.Create(p); err != nil {
 		return err
 	}
@@ -281,6 +340,12 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	p.SalesProjectID = existing.SalesProjectID
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
+	}
+	if model.ValidProjectKind(p.ProjectKind) {
+		p.ProjectKindSet = 1
+	} else {
+		p.ProjectKind = existing.ProjectKind
+		p.ProjectKindSet = existing.ProjectKindSet
 	}
 	if err := h.repo.Update(p); err != nil {
 		return err

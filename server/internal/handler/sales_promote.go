@@ -119,8 +119,14 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 		return h.renderPromoteProjectForm(c, p, draft, rules, "사업명을 입력하세요.")
 	}
 	proj.ProjectKind = model.NormalizeProjectKind(proj.ProjectKind)
-	if !model.ValidProjectKind(proj.ProjectKind) {
-		proj.ProjectKind = model.ProjectKindMaintenance
+	if model.ValidProjectKind(proj.ProjectKind) {
+		proj.ProjectKindSet = 1
+	} else if k, ok := model.MapSalesBizToProjectKind(p.BizType); ok {
+		proj.ProjectKind = k
+		proj.ProjectKindSet = 1
+	} else {
+		proj.ProjectKind = ""
+		proj.ProjectKindSet = 0
 	}
 	if strings.TrimSpace(proj.CustomerID) == "" {
 		proj.CustomerID = p.CustomerID

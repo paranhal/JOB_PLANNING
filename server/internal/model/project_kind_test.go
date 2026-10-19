@@ -52,4 +52,11 @@ func TestEffectiveKindConfirmedInferredUnclassified(t *testing.T) {
 	if got := empty.EffectiveKind(); got.Kind != ProjectKindUnclassified || got.Source != KindSourceUnclassified {
 		t.Fatalf("연결 없음 %+v", got)
 	}
+	if HintProjectKindFromName("도서관 구축") != ProjectKindBuild {
+		t.Fatal("이름 힌트 구축")
+	}
+	conflict := WorkProject{Name: "RFID 구축", SalesBizType: SalesBizGoods}
+	if !conflict.KindHintConflicts() || conflict.SuggestedKindForReview() != "" {
+		t.Fatal("충돌 행은 선택을 비운다")
+	}
 }

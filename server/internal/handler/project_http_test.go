@@ -34,6 +34,8 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.GET("/projects", h.Project.List)
 	g.GET("/projects/new", h.Project.New)
 	g.GET("/projects/registry", h.Project.Registry)
+	g.GET("/projects/kind-review", h.Project.KindReview)
+	g.POST("/projects/kind-review", h.Project.KindReviewSave)
 	g.GET("/projects/dashboard", h.Project.Dashboard)
 	g.GET("/projects/docs", h.Project.Docs)
 	g.GET("/projects/diary", h.Project.Diary)
@@ -42,6 +44,7 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.POST("/projects", h.Project.Create)
 	g.GET("/projects/:id", h.Project.Show)
 	g.GET("/projects/:id/edit", h.Project.Edit)
+	g.POST("/projects/:id/kind", h.Project.SetKind)
 	g.POST("/projects/:id", h.Project.Update)
 	g.POST("/projects/:id/archive", h.Project.Archive)
 	g.POST("/projects/:id/activate", h.Project.Activate)
@@ -277,18 +280,74 @@ func TestProjectMergeHTTPArchivesDrop(t *testing.T) {
 	}
 }
 
-func TestProjectCreateKindOptionalDefaultsMaintenance(t *testing.T) {
+func TestProjectCreateKindRequired(t *testing.T) {
 	e, repo, _ := newProjectServer(t)
 	rec := doForm(t, e, "/projects", url.Values{
 		"name": {"유형없음"}, "status": {"active"}, "is_paid": {"1"},
 	})
+	if rec.Code == http.StatusSeeOther {
+		t.Fatal("유형 없이 등록되면 안 된다")
+	}
+	rec = doForm(t, e, "/projects", url.Values{
+		"name": {"유형있음"}, "status": {"active"}, "is_paid": {"1"}, "project_kind": {"build"},
+	})
 	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("유형 없이 등록이 막혔다 status=%d", rec.Code)
+		t.Fatalf("유형 지정 등록 status=%d", rec.Code)
 	}
 	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
 	got, err := repo.Get(id)
-	if err != nil || got.ProjectKind != model.ProjectKindMaintenance {
-		t.Fatalf("비우면 유지보수 kind=%s err=%v", got.ProjectKind, err)
+	if err != nil || got.ProjectKind != model.ProjectKindBuild || got.ProjectKindSet != 1 {
+		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+func TestProjectKindInlineAndBulk(t *testing.T) {
+	e, repo, _ := newProjectServer(t)
+	p := &model.WorkProject{Name: "도서관 구축", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
+	if err := repo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	rec := doForm(t, e, "/projects/"+p.ProjectID+"/kind", url.Values{"project_kind": {"build"}, "back": {"/projects/registry"}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("인라인 %d", rec.Code)
+	}
+	got, _ := repo.Get(p.ProjectID)
+	if got.ProjectKind != model.ProjectKindBuild || got.ProjectKindSet != 1 {
+		t.Fatalf("확정 %+v", got)
+	}
+	ro := workFormCookie(t, e, "/projects/"+p.ProjectID+"/kind", url.Values{"project_kind": {"dev"}}, jwtCookieReadOnly(t, model.RoleAdmin))
+	if ro.Code != http.StatusForbidden {
+		t.Fatalf("읽기전용 %d", ro.Code)
+	}
+
+	p2 := &model.WorkProject{Name: "유지보수 힌트", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
+	if err := repo.Create(p2); err != nil {
+		t.Fatal(err)
+	}
+	rev := doGet(t, e, "/projects/kind-review")
+	if !strings.Contains(rev.Body.String(), "유지보수 힌트") {
+		t.Fatal("정리 화면 없음")
+	}
+	skip := doForm(t, e, "/projects/kind-review", url.Values{
+		"kind_" + p2.ProjectID: {model.ProjectKindMaintenance},
+	})
+	if skip.Code != http.StatusSeeOther {
+		t.Fatalf("미체크 저장 %d", skip.Code)
+	}
+	still, _ := repo.Get(p2.ProjectID)
+	if still.ProjectKindSet == 1 {
+		t.Fatal("미체크 행이 저장됐다")
+	}
+	save := doForm(t, e, "/projects/kind-review", url.Values{
+		"pick":                 {p2.ProjectID},
+		"kind_" + p2.ProjectID: {model.ProjectKindMaintenance},
+	})
+	if save.Code != http.StatusSeeOther {
+		t.Fatalf("체크 저장 %d", save.Code)
+	}
+	done, _ := repo.Get(p2.ProjectID)
+	if done.ProjectKind != model.ProjectKindMaintenance || done.ProjectKindSet != 1 {
+		t.Fatalf("일괄 %+v", done)
 	}
 }
 

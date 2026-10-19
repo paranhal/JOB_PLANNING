@@ -11,6 +11,7 @@
       <a href="/projects" class="px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">사업·업무관리</a>
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">일일 업무 현황</a>
       {{if .CanWrite}}
+      <a href="/projects/kind-review" class="px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">미분류·추정 유형 정리</a>
       <a href="/sales/new" class="px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">영업에서 등록</a>
       {{end}}
     </div>
@@ -76,6 +77,7 @@
           <th class="px-4 py-3 font-medium">고객</th>
           <th class="px-4 py-3 font-medium">계약방식</th>
           <th class="px-4 py-3 font-medium">유상</th>
+          <th class="px-4 py-3 font-medium">유형</th>
           <th class="px-4 py-3 font-medium">상태</th>
           <th class="px-4 py-3 font-medium">기간</th>
         </tr>
@@ -99,6 +101,22 @@
             <span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700">유상</span>
             {{else}}
             <span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">무상</span>
+            {{end}}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            {{$ek := .EffectiveKind}}
+            {{if $.CanWrite}}
+            <form method="post" action="/projects/{{.ProjectID}}/kind" class="flex items-center gap-1">
+              <input type="hidden" name="back" value="/projects/registry">
+              <select name="project_kind" class="border rounded px-1 py-0.5 text-xs" onchange="this.form.submit()">
+                {{range $.KindOptions}}
+                <option value="{{.Value}}" {{if eq $ek.Kind .Value}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <span class="text-[11px] text-gray-400">{{$ek.SourceLabel}}</span>
+            </form>
+            {{else}}
+            {{$ek.Label}} <span class="text-[11px] text-gray-400">{{$ek.SourceLabel}}</span>
             {{end}}
           </td>
           <td class="px-4 py-3">{{wbProjectStatusLabel .Status}}</td>
