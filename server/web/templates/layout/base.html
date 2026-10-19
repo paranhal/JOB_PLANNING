@@ -15,7 +15,7 @@
     }
   </style>
 </head>
-<body class="h-full" x-data="{ sidebarOpen: false }">
+<body class="h-full" x-data="{ sidebarOpen: false, moreOpen: false }">
 
 {{if .ViewAsActive}}
 <div class="bg-violet-800 text-white text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-3 z-50">
@@ -140,7 +140,7 @@
         </div>
       </div>
     </header>
-    <main class="flex-1 overflow-y-auto p-6" id="main-content">
+    <main class="flex-1 overflow-y-auto p-6 pb-24 lg:pb-6" id="main-content">
       {{if .AuthUnconfirmed}}
       <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         권한 정보를 불러오지 못했습니다. 새로고침하거나 다시 로그인해 주세요.
@@ -148,6 +148,42 @@
       {{end}}
       {{template "content" .}}
     </main>
+  </div>
+</div>
+
+<nav id="mobile-tab-bar" class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface" aria-label="모바일 바로가기">
+  <ul class="grid grid-cols-5">
+    <li>
+      <a href="/" class="flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs {{if eq .Active "dashboard"}}font-semibold text-primary{{else}}text-ink-muted{{end}}">대시보드</a>
+    </li>
+    <li>
+      <a href="/work" class="flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs {{if or (eq .Active "work") (eq .Active "work_plan")}}font-semibold text-primary{{else}}text-ink-muted{{end}}">내 업무</a>
+    </li>
+    <li>
+      <a href="/approvals/inbox" class="relative flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs {{if or (eq .Active "approvals_inbox") (eq .Active "approvals_hub")}}font-semibold text-primary{{else}}text-ink-muted{{end}}">
+        결재
+        {{if gt .ApprovalPendingCount 0}}<span class="absolute right-2 top-1 min-w-[1.25rem] rounded-full bg-danger px-1 text-center text-[10px] font-semibold text-white">{{.ApprovalPendingCount}}</span>{{end}}
+      </a>
+    </li>
+    <li>
+      <a href="/leaves" class="relative flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs {{if eq .Active "leaves"}}font-semibold text-primary{{else}}text-ink-muted{{end}}">
+        휴가 신청
+        {{if gt .LeavePendingCount 0}}<span class="absolute right-1 top-1 min-w-[1.25rem] rounded-full bg-danger px-1 text-center text-[10px] font-semibold text-white">{{.LeavePendingCount}}</span>{{end}}
+      </a>
+    </li>
+    <li>
+      <button type="button" class="flex min-h-[44px] w-full flex-col items-center justify-center px-1 text-ui-xs text-ink-muted" @click="moreOpen=true" :aria-expanded="moreOpen ? 'true' : 'false'">더보기</button>
+    </li>
+  </ul>
+</nav>
+<div id="mobile-more-sheet" class="lg:hidden" x-show="moreOpen" x-cloak>
+  <div class="fixed inset-0 z-40 bg-gray-900/50" @click="moreOpen=false"></div>
+  <div class="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-xl bg-gray-900 pb-safe" role="dialog" aria-label="전체 메뉴">
+    <div class="flex min-h-[44px] items-center justify-between border-b border-gray-700 px-4 py-2">
+      <p class="text-sm font-semibold text-white">메뉴</p>
+      <button type="button" class="min-h-[44px] min-w-[44px] text-gray-300" @click="moreOpen=false" aria-label="닫기">닫기</button>
+    </div>
+    {{template "nav_tree" .}}
   </div>
 </div>
 {{end}}
