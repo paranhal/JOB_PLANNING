@@ -61,9 +61,9 @@ const (
 	NavSalesPipeline     = "sales_pipeline"
 	NavDocsHub           = "docs_hub"
 	NavMeetingWeekly     = "meeting_weekly"
+	NavMeetingWeeklyMe   = "meeting_weekly_me"
 	NavTestStats         = "test_stats"
 	NavAccount           = "account"
 	NavLogin             = "login"
 	NavNone              = ""
 )
-

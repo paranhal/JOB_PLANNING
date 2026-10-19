@@ -53,7 +53,8 @@ func (c MenuCtx) has(keys ...string) bool {
 	return false
 }
 
-func (c MenuCtx) visRole() bool { return c.roleKnown() }
+func (c MenuCtx) visWeeklyTeam() bool { return c.visRole() }
+func (c MenuCtx) visRole() bool       { return c.roleKnown() }
 func (c MenuCtx) visMnt() bool {
 	return c.isAdmin() || c.isTech() || c.isOffice() || c.isSales() || c.isObserver() || c.isTester() ||
 		c.has(model.PermMntView, model.PermMaintenance)
@@ -161,7 +162,8 @@ func navDefinition() []navDefGroup {
 				}},
 				{ID: "work_meeting", Label: "업무 회의", Show: role, Children: []navDefItem{
 					{ID: "meeting", Label: "일일 업무 회의", Href: "/meeting", Active: []string{NavMeeting}, Show: role},
-					{ID: "meeting_weekly", Label: "주간 업무 회의", Href: "/meeting/weekly", Active: []string{NavMeetingWeekly}, Show: role},
+					{ID: "meeting_weekly", Label: "주간 회의 (팀)", Href: "/meeting/weekly", Active: []string{NavMeetingWeekly}, Show: func(c MenuCtx) bool { return c.visWeeklyTeam() }},
+					{ID: "meeting_weekly_me", Label: "주간 회의 (내 자료)", Href: "/meeting/weekly/me", Active: []string{NavMeetingWeeklyMe}, Show: role},
 				}},
 				{ID: "approval", Label: "결재", Show: role, Badge: "approvals_sum", Children: []navDefItem{
 					{ID: "approvals_inbox", Label: "결재할 문서", Href: "/approvals/inbox", Active: []string{NavApprovalsInbox, NavApprovalsHub}, Show: role, Badge: "approvals"},

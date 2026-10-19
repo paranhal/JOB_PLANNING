@@ -47,34 +47,34 @@ func TestNavRoleVisibilityTable(t *testing.T) {
 		{
 			name: "비전",
 			ctx:  visionMenuCtx(),
-			want: []string{"/", "/work", "/meeting/weekly", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/admin/users", "/admin/system", "/admin/test-stats"},
+			want: []string{"/", "/work", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/admin/users", "/admin/system", "/admin/test-stats"},
 			hide: []string{"/account", "/admin-work", "/plan/unplanned", "/work-status"},
 		},
 		{
 			name: "조직관리자",
 			ctx: MenuCtx{Role: model.RoleOrgAdmin, LoginRole: model.RoleOrgAdmin, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleOrgAdmin)},
-			want: []string{"/", "/work", "/as", "/admin/users", "/admin/holidays"},
+			want: []string{"/", "/work", "/as", "/meeting/weekly", "/meeting/weekly/me", "/admin/users", "/admin/holidays"},
 			hide: []string{"/admin/system", "/admin/data", "/admin/permissions"},
 		},
 		{
 			name: "영업",
 			ctx: MenuCtx{Role: model.RoleSales, LoginRole: model.RoleSales, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleSales)},
-			want: []string{"/", "/work", "/as", "/sales?view=pipeline", "/items"},
+			want: []string{"/", "/work", "/as", "/sales?view=pipeline", "/items", "/meeting/weekly", "/meeting/weekly/me"},
 			hide: []string{"/admin/users", "/admin/system"},
 		},
 		{
 			name: "기술",
 			ctx: MenuCtx{Role: model.RoleTech, LoginRole: model.RoleTech, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleTech)},
-			want: []string{"/", "/work", "/as", "/maintenance"},
+			want: []string{"/", "/work", "/as", "/maintenance", "/meeting/weekly", "/meeting/weekly/me"},
 			hide: []string{"/admin/users", "/maintenance/sites"},
 		},
 		{
 			name: "읽기전용",
 			ctx:  MenuCtx{Role: model.RoleTech, LoginRole: model.RoleTech, IsReadOnly: true, ShowProjects: true},
-			want: []string{"/", "/work", "/as"},
+			want: []string{"/", "/work", "/as", "/meeting/weekly", "/meeting/weekly/me"},
 			hide: []string{"/admin/users"},
 		},
 		{
@@ -157,6 +157,10 @@ func TestNavAutoExpandCurrentMoreAndParent(t *testing.T) {
 	meet := FilterNav(ctx, NavMeetingWeekly, NavBadges{})
 	if !containsHref(meet.CurParents, "work_meeting") {
 		t.Fatal("주간 회의는 업무 회의 자동 펼침")
+	}
+	me := FilterNav(ctx, NavMeetingWeeklyMe, NavBadges{})
+	if !containsHref(me.CurParents, "work_meeting") {
+		t.Fatal("내 자료는 업무 회의 자동 펼침")
 	}
 }
 

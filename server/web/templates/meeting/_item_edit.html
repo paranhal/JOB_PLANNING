@@ -1,0 +1,36 @@
+<div class="modal-backdrop" data-weekly-dialog-root>
+  <div role="dialog" aria-modal="true" aria-labelledby="weekly-edit-title" class="modal-panel mx-auto mt-16 max-w-lg w-full space-y-3">
+    <div class="flex items-start justify-between gap-2">
+      <h2 id="weekly-edit-title" class="text-ui-xl font-extrabold text-ink">업무 수정</h2>
+      <button type="button" class="btn btn-ghost btn-sm" data-close-weekly-edit>닫기</button>
+    </div>
+    {{if .Err}}<p class="text-ui text-danger" data-weekly-edit-err>{{.Err}}</p>{{end}}
+    <p class="text-ui-sm text-ink-muted truncate">{{.Title}}</p>
+    <form method="post" action="/meeting/weekly/item" class="space-y-3" data-weekly-edit-form>
+      <input type="hidden" name="prefix" value="{{.Prefix}}">
+      <input type="hidden" name="ref" value="{{.RefID}}">
+      <input type="hidden" name="return" value="{{.Return}}">
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="weekly-edit-date">일정</label>
+        <input id="weekly-edit-date" type="date" name="work_date" value="{{.Date}}" class="input w-full">
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="weekly-edit-assignee">담당자</label>
+        <select id="weekly-edit-assignee" name="assignee" class="select w-full">
+          {{range .Users}}
+          <option value="{{.FullName}}" {{if eq $.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="weekly-edit-memo">메모</label>
+        <textarea id="weekly-edit-memo" name="memo" rows="3" class="input w-full">{{.Memo}}</textarea>
+      </div>
+      <p class="text-ui-sm text-ink-muted">상태: {{if .Status}}{{.Status}}{{else}}—{{end}} · 복잡한 항목은 상세 화면에서 수정합니다.</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">저장</button>
+        {{if .Detail}}<a href="{{.Detail}}" class="btn btn-secondary btn-sm">상세 화면</a>{{end}}
+      </div>
+    </form>
+  </div>
+</div>

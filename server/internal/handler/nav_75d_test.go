@@ -123,7 +123,7 @@ func TestAdminWorkListAndShowStillOpen(t *testing.T) {
 }
 
 func TestMeetingWeeklyRouteOnMainPattern(t *testing.T) {
-	e, _ := newMeetingWeeklyServer(t)
+	e, _, _, _ := newMeetingWeeklyServer(t)
 	rec := weeklyGet(t, e, "/meeting/weekly", jwtCookie(t))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d", rec.Code)

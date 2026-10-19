@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -11,12 +12,13 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/xuri/excelize/v2"
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
-func newMeetingWeeklyServer(t *testing.T) (*echo.Echo, *sql.DB) {
+func newMeetingWeeklyServer(t *testing.T) (*echo.Echo, *sql.DB, *model.User, *model.User) {
 	t.Helper()
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "meeting_weekly.db"))
 	if err != nil {
@@ -25,17 +27,28 @@ func newMeetingWeeklyServer(t *testing.T) (*echo.Echo, *sql.DB) {
 	t.Cleanup(func() { db.Close() })
 	repository.NewUserRepo(db).EnsureAdmin(HashPassword("admin"))
 	users := repository.NewUserRepo(db)
-	_ = users.Create(&model.User{Username: "yang", PasswordHash: "x", FullName: "양기헌", Role: model.RoleTech, IsActive: true})
-	_ = users.Create(&model.User{Username: "choi", PasswordHash: "x", FullName: "최혜영", Role: model.RoleTech, IsActive: true})
+	yang := &model.User{Username: "yang", PasswordHash: "x", FullName: "양기헌", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary}
+	choi := &model.User{Username: "choi", PasswordHash: "x", FullName: "최혜영", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary}
+	if err := users.Create(yang); err != nil {
+		t.Fatal(err)
+	}
+	if err := users.Create(choi); err != nil {
+		t.Fatal(err)
+	}
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.Auth.InjectViewAs)
 	g.GET("/meeting/weekly", h.Meeting.Weekly)
+	g.GET("/meeting/weekly/me", h.Meeting.WeeklyMe)
+	g.GET("/meeting/weekly/me.xlsx", h.Meeting.WeeklyMeXLSX)
+	g.GET("/meeting/weekly/item", h.Meeting.WeeklyItemForm)
+	g.POST("/meeting/weekly/item", h.Meeting.WeeklyItemSave)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
-	return e, db
+	return e, db, yang, choi
 }
 
 func weeklyGet(t *testing.T, e *echo.Echo, path string, ck *http.Cookie) *httptest.ResponseRecorder {
@@ -50,22 +63,25 @@ func weeklyGet(t *testing.T, e *echo.Echo, path string, ck *http.Cookie) *httpte
 }
 
 func TestMeetingWeeklyHTTP_OKAndReadOnly(t *testing.T) {
-	e, _ := newMeetingWeeklyServer(t)
+	e, _, _, _ := newMeetingWeeklyServer(t)
 	rec := weeklyGet(t, e, "/meeting/weekly", jwtCookie(t))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String()[:minInt(400, rec.Body.Len())])
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "주간 업무 회의") || !strings.Contains(body, "/stats/reports") {
+	if !strings.Contains(body, "주간 업무 회의 — 팀 자료") || !strings.Contains(body, `id="weekly-excel"`) {
 		t.Fatal("제목 또는 주간보고 링크 없음")
 	}
-	if meetingWeeklyHasPost(body) {
-		t.Fatal("주간 회의는 읽기 전용인데 POST 가 있다")
+	if !strings.Contains(body, `id="meeting-weekly-assignee"`) {
+		t.Fatal("팀 자료 담당자 선택 없음")
+	}
+	if !strings.Contains(body, "팀 자료") || !strings.Contains(body, "내 자료") {
+		t.Fatal("탭이 없다")
 	}
 }
 
 func TestMeetingWeeklyEmptyWeek(t *testing.T) {
-	e, _ := newMeetingWeeklyServer(t)
+	e, _, _, _ := newMeetingWeeklyServer(t)
 	rec := weeklyGet(t, e, "/meeting/weekly?date=2026-02-02", jwtCookie(t))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d", rec.Code)
@@ -80,7 +96,7 @@ func TestMeetingWeeklyEmptyWeek(t *testing.T) {
 }
 
 func TestMeetingWeeklyMondayAndYearBoundary(t *testing.T) {
-	e, _ := newMeetingWeeklyServer(t)
+	e, _, _, _ := newMeetingWeeklyServer(t)
 	// 2026-12-31 목요일 → 그 주 월 12-28, 금 2027-01-01
 	rec := weeklyGet(t, e, "/meeting/weekly?date=2026-12-31", jwtCookie(t))
 	if rec.Code != http.StatusOK {
@@ -100,7 +116,7 @@ func TestMeetingWeeklyMondayAndYearBoundary(t *testing.T) {
 }
 
 func TestMeetingWeeklyAssigneeScopeAndSums(t *testing.T) {
-	e, db := newMeetingWeeklyServer(t)
+	e, db, _, _ := newMeetingWeeklyServer(t)
 	weekMon := time.Date(2026, 10, 19, 0, 0, 0, 0, time.Local) // 월요일
 	thisWed := weekMon.AddDate(0, 0, 2).Format("2006-01-02")
 	lastWed := weekMon.AddDate(0, 0, -5).Format("2006-01-02")
@@ -121,6 +137,12 @@ func TestMeetingWeeklyAssigneeScopeAndSums(t *testing.T) {
 		thisWed, thisWed+" 09:00:00",
 		overdue, overdue+" 09:00:00",
 		thisWed, thisWed+" 09:00:00"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE as_receipts SET org_id=? WHERE customer_id='c1'`, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE customers SET org_id=? WHERE customer_id='c1'`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 
@@ -157,7 +179,7 @@ func TestMeetingWeeklyAssigneeScopeAndSums(t *testing.T) {
 }
 
 func TestMeetingWeeklyLoginRequired(t *testing.T) {
-	e, _ := newMeetingWeeklyServer(t)
+	e, _, _, _ := newMeetingWeeklyServer(t)
 	rec := weeklyGet(t, e, "/meeting/weekly", nil)
 	if rec.Code != http.StatusFound && rec.Code != http.StatusSeeOther {
 		t.Fatalf("비로그인 status=%d", rec.Code)
@@ -170,9 +192,238 @@ func TestMeetingWeeklyGroupCountHelper(t *testing.T) {
 	}
 }
 
+func seedWeeklyAS(t *testing.T, db *sql.DB) {
+	t.Helper()
+	weekMon := time.Date(2026, 10, 19, 0, 0, 0, 0, time.Local)
+	thisWed := weekMon.AddDate(0, 0, 2).Format("2006-01-02")
+	lastWed := weekMon.AddDate(0, 0, -5).Format("2006-01-02")
+	overdue := weekMon.AddDate(0, 0, -20).Format("2006-01-02")
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
+		VALUES ('c1','주간도서관','주간도서관',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, customer_id, receipt_datetime, visit_scheduled_date,
+		schedule_confirmed, status, assigned_to, complete_datetime, symptom, updated_at
+	) VALUES
+		('as-d','R2610-D01','c1','2026-10-01',?,1,'completed','양기헌',?,'지난주완료',?),
+		('as-p','R2610-P01','c1','2026-10-05',?,1,'in_progress','양기헌',NULL,'이번주예정',?),
+		('as-o','R2610-O01','c1','2026-09-01',?,1,'in_progress','양기헌',NULL,'기한경과',?),
+		('as-c','R2610-C01','c1','2026-10-05',?,1,'in_progress','최혜영',NULL,'다른담당',?)`,
+		lastWed, lastWed+" 16:00:00", lastWed+" 16:00:00",
+		thisWed, thisWed+" 09:00:00",
+		overdue, overdue+" 09:00:00",
+		thisWed, thisWed+" 09:00:00"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE as_receipts SET org_id=? WHERE as_id IN ('as-d','as-p','as-o','as-c')`, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE customers SET org_id=? WHERE customer_id='c1'`, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMeetingWeeklyRolesAndPersonalOnly(t *testing.T) {
+	e, db, yang, _ := newMeetingWeeklyServer(t)
+	seedWeeklyAS(t, db)
+
+	for _, role := range []string{model.RoleVisionAdmin, model.RoleOrgAdmin, model.RoleAdmin, model.RoleSales, model.RoleSupport, model.RoleTech} {
+		rec := weeklyGet(t, e, "/meeting/weekly?date=2026-10-19&assignee=all", jwtCookieRole(t, role))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s team status=%d", role, rec.Code)
+		}
+	}
+	tech := weeklyGet(t, e, "/meeting/weekly?date=2026-10-19&assignee=all", jwtCookieUserClaims(t, yang))
+	if tech.Code != http.StatusOK {
+		t.Fatalf("tech team status=%d", tech.Code)
+	}
+	tb := tech.Body.String()
+	if !strings.Contains(tb, "R2610-C01") {
+		t.Fatal("일반 팀원 팀 자료에 타인 건이 없다")
+	}
+	if !strings.Contains(tb, "data-weekly-edit") {
+		t.Fatal("본인 건 수정 단추가 없다")
+	}
+
+	me := weeklyGet(t, e, "/meeting/weekly/me?date=2026-10-19&assignee="+url.QueryEscape("최혜영")+"&mine=0", jwtCookieUserClaims(t, yang))
+	if me.Code != http.StatusOK {
+		t.Fatalf("me status=%d", me.Code)
+	}
+	body := me.Body.String()
+	if strings.Contains(body, "R2610-C01") {
+		t.Fatal("내 자료에 타인 건")
+	}
+	if !strings.Contains(body, "R2610-P01") {
+		t.Fatal("본인 예정 없음")
+	}
+	if !strings.Contains(body, `id="weekly-excel"`) || !strings.Contains(body, "내 주간 자료 엑셀") {
+		t.Fatal("개인 자료 엑셀 없음")
+	}
+	if strings.Contains(body, `id="meeting-weekly-assignee"`) {
+		t.Fatal("개인 자료에 담당자 선택")
+	}
+	if !strings.Contains(body, "주간 업무 회의 — 내 자료") {
+		t.Fatal("내 자료 제목")
+	}
+	if !strings.Contains(body, `id="weekly-leave"`) || !strings.Contains(body, `id="weekly-inbox"`) {
+		t.Fatal("휴가·결재 카드 없음")
+	}
+
+	empty := weeklyGet(t, e, "/meeting/weekly/me?date=2026-02-02", jwtCookieUserClaims(t, yang))
+	if empty.Code != http.StatusOK || !strings.Contains(empty.Body.String(), "이번 주 예정이 없습니다") {
+		t.Fatal("빈 주 개인")
+	}
+	bound := weeklyGet(t, e, "/meeting/weekly/me?date=2026-12-31", jwtCookieUserClaims(t, yang))
+	if !strings.Contains(bound.Body.String(), "2026-12-28") {
+		t.Fatal("개인 연말 주")
+	}
+
+	va := jwtCookie(t)
+	view := &http.Cookie{Name: "view_as_user_id", Value: yang.UserID, Path: "/"}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/meeting/weekly/me?date=2026-10-19", nil)
+	req.AddCookie(va)
+	req.AddCookie(view)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("view-as status=%d", rec.Code)
+	}
+	vb := rec.Body.String()
+	if strings.Contains(vb, "R2610-C01") || !strings.Contains(vb, "R2610-P01") {
+		t.Fatal("view-as 는 본 사용자의 개인 자료여야 한다")
+	}
+
+	visMe := weeklyGet(t, e, "/meeting/weekly/me?date=2026-10-19", jwtCookieRole(t, model.RoleVisionAdmin))
+	if visMe.Code != http.StatusOK {
+		t.Fatalf("vision me %d", visMe.Code)
+	}
+	if strings.Contains(visMe.Body.String(), "R2610-P01") {
+		t.Fatal("비전 관리자 개인 자료에 양기헌 건")
+	}
+}
+
+func TestMeetingWeeklyMeLoginRequired(t *testing.T) {
+	e, _, _, _ := newMeetingWeeklyServer(t)
+	rec := weeklyGet(t, e, "/meeting/weekly/me", nil)
+	if rec.Code != http.StatusFound && rec.Code != http.StatusSeeOther {
+		t.Fatalf("비로그인 me status=%d", rec.Code)
+	}
+}
+
+func TestMeetingWeeklyItemEditPermissionAndLog(t *testing.T) {
+	e, db, yang, choi := newMeetingWeeklyServer(t)
+	seedWeeklyAS(t, db)
+
+	yangCK := jwtCookieUserClaims(t, yang)
+	choiCK := jwtCookieUserClaims(t, choi)
+
+	formOK := weeklyGet(t, e, "/meeting/weekly/item?prefix=as&ref=as-p", yangCK)
+	if formOK.Code != http.StatusOK || !strings.Contains(formOK.Body.String(), "data-weekly-edit-form") {
+		t.Fatalf("본인 수정 폼 status=%d", formOK.Code)
+	}
+	formDeny := weeklyGet(t, e, "/meeting/weekly/item?prefix=as&ref=as-p", choiCK)
+	if formDeny.Code != http.StatusForbidden {
+		t.Fatalf("타인 폼 status=%d", formDeny.Code)
+	}
+
+	vals := url.Values{"prefix": {"as"}, "ref": {"as-p"}, "work_date": {"2026-10-22"}, "memo": {"회의중수정"}, "assignee": {"양기헌"}, "return": {"/meeting/weekly?date=2026-10-19"}}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/meeting/weekly/item", strings.NewReader(vals.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(yangCK)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("저장 status=%d", rec.Code)
+	}
+	as, err := repository.NewASRepo(db).GetByID(repository.OrgAll, "as-p")
+	if err != nil || as == nil || as.Symptom != "회의중수정" || as.VisitScheduledDate != "2026-10-22" {
+		t.Fatalf("저장 미반영 %+v err=%v", as, err)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM data_change_logs WHERE table_name='as_receipts' AND entity_id='as-p' AND action='update'`).Scan(&n); err != nil || n < 1 {
+		t.Fatalf("이력 n=%d err=%v", n, err)
+	}
+
+	deny := httptest.NewRecorder()
+	dreq := httptest.NewRequest(http.MethodPost, "http://localhost/meeting/weekly/item", strings.NewReader(vals.Encode()))
+	dreq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	dreq.AddCookie(choiCK)
+	e.ServeHTTP(deny, dreq)
+	if deny.Code != http.StatusForbidden {
+		t.Fatalf("타인 저장 status=%d", deny.Code)
+	}
+
+	anon := httptest.NewRecorder()
+	areq := httptest.NewRequest(http.MethodPost, "http://localhost/meeting/weekly/item", strings.NewReader(vals.Encode()))
+	areq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	e.ServeHTTP(anon, areq)
+	if anon.Code != http.StatusFound && anon.Code != http.StatusSeeOther {
+		t.Fatalf("비로그인 저장 status=%d", anon.Code)
+	}
+
+	closed := weeklyGet(t, e, "/meeting/weekly/item?prefix=as&ref=as-d", jwtCookieRole(t, model.RoleVisionAdmin))
+	if closed.Code == http.StatusOK {
+		t.Fatal("비전 관리자가 완료 건 잠금 없이 수정 폼을 열었다")
+	}
+
+	va := jwtCookie(t)
+	view := &http.Cookie{Name: "view_as_user_id", Value: yang.UserID, Path: "/"}
+	vrec := httptest.NewRecorder()
+	vreq := httptest.NewRequest(http.MethodGet, "http://localhost/meeting/weekly/item?prefix=as&ref=as-p", nil)
+	vreq.AddCookie(va)
+	vreq.AddCookie(view)
+	e.ServeHTTP(vrec, vreq)
+	if vrec.Code == http.StatusOK {
+		t.Fatal("view-as 수정 폼")
+	}
+}
+
+func TestMeetingWeeklyMeExcelSelfOnly(t *testing.T) {
+	e, db, yang, _ := newMeetingWeeklyServer(t)
+	seedWeeklyAS(t, db)
+	rec := weeklyGet(t, e, "/meeting/weekly/me.xlsx?date=2026-10-19&assignee="+url.QueryEscape("최혜영"), jwtCookieUserClaims(t, yang))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("xlsx status=%d", rec.Code)
+	}
+	cd := rec.Header().Get("Content-Disposition")
+	if !strings.Contains(cd, "내주간자료") && !strings.Contains(cd, "filename*") {
+		t.Fatalf("한글 파일명 헤더 없음: %s", cd)
+	}
+	f, err := excelizeOpen(rec.Body.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	rows, err := f.GetRows("전체 리스트")
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob := strings.Join(flattenRows(rows), "\n")
+	if strings.Contains(blob, "R2610-C01") {
+		t.Fatal("엑셀에 타인 건")
+	}
+	anon := weeklyGet(t, e, "/meeting/weekly/me.xlsx", nil)
+	if anon.Code != http.StatusFound && anon.Code != http.StatusSeeOther {
+		t.Fatalf("비로그인 xlsx %d", anon.Code)
+	}
+}
+
 func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
+}
+
+func excelizeOpen(b []byte) (*excelize.File, error) {
+	return excelize.OpenReader(bytes.NewReader(b))
+}
+
+func flattenRows(rows [][]string) []string {
+	var out []string
+	for _, r := range rows {
+		out = append(out, strings.Join(r, " "))
+	}
+	return out
 }

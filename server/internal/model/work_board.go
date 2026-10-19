@@ -125,6 +125,7 @@ type WorkListItem struct {
 	Tentative      bool   `json:"tentative,omitempty"`      // §38.5 미확정 뱃지. 집계에는 안 씀
 	BlockedReason  string `json:"blocked_reason,omitempty"` // §42.7 막힌 이유. 있으면 기다리는 것
 	BlockedAt      string `json:"blocked_at,omitempty"`
+	CanEdit        bool   `json:"can_edit,omitempty"`
 }
 
 // IsWaiting 막힌 이유가 있으면 지연이 아니라 기다리는 것. §42.7

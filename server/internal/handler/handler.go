@@ -156,7 +156,7 @@ func New(db *sql.DB) *Handler {
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,
-		Meeting:    NewMeetingHandler(workBoardRepo, statsRepo, userRepo),
+		Meeting:    NewMeetingHandler(workBoardRepo, statsRepo, userRepo, asRepo),
 		Stats:      NewStatsHandler(statsRepo, userRepo, repository.NewWBRepo(db), workBoardRepo, maintRepo),
 		WorkStatus: NewWorkStatusHandler(repository.NewWBRepo(db), userRepo, holidayRepo, repository.NewSalesRepo(db)),
 		Analysis:   &AnalysisHandler{db: db},
@@ -221,6 +221,8 @@ func New(db *sql.DB) *Handler {
 	}
 	h.Work.notices = noticeHook
 	h.AdminWork.notices = noticeHook
+	h.Meeting.asH = h.AS
+	h.Meeting.leave = h.Leave
 	h.Project.salesRepo = repository.NewSalesRepo(db)
 	h.Project.backup = backup.Config{DataDir: dataDirFromEnv(), DB: db}
 	h.Stats.dataDir = dataDirFromEnv()

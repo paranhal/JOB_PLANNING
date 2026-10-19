@@ -19,10 +19,13 @@ type MeetingHandler struct {
 	work     *repository.WorkBoardRepo
 	stats    *repository.StatsRepo
 	userRepo *repository.UserRepo
+	asRepo   *repository.ASRepo
+	asH      *ASHandler
+	leave    *LeaveHandler
 }
 
-func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo) *MeetingHandler {
-	return &MeetingHandler{work: work, stats: stats, userRepo: userRepo}
+func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo, asRepo *repository.ASRepo) *MeetingHandler {
+	return &MeetingHandler{work: work, stats: stats, userRepo: userRepo, asRepo: asRepo}
 }
 
 // Show GET /meeting?date=YYYY-MM-DD&assignee=

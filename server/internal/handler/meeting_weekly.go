@@ -11,21 +11,49 @@ import (
 	"customer-support/internal/model"
 )
 
-// Weekly GET /meeting/weekly?date=YYYY-MM-DD&assignee=  주 단위 조회 전용(D-77).
+// Weekly GET /meeting/weekly 팀 자료. 로그인한 전원(조직 범위). D-95
 func (h *MeetingHandler) Weekly(c echo.Context) error {
+	return h.renderWeekly(c, true)
+}
+
+// WeeklyMe GET /meeting/weekly/me 본인 자료. assignee/mine 쿼리는 무시. D-95
+func (h *MeetingHandler) WeeklyMe(c echo.Context) error {
+	return h.renderWeekly(c, false)
+}
+
+func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 	anchor := parseMeetingAnchor(c.QueryParam("date"))
 	mon, fri := meetingWeekMonFri(anchor)
 	prevMon := mon.AddDate(0, 0, -7)
 	nextMon := mon.AddDate(0, 0, 7)
-	lastFrom, lastTo := model.LastISOWeekRange(mon) // 직전 주 월~일 (이번 주 월요일 기준)
+	lastFrom, lastTo := model.LastISOWeekRange(mon)
 
 	var users []model.User
 	if h.userRepo != nil {
 		users, _ = h.userRepo.ListAssignable()
 	}
-	selected := resolveMeetingAssignee(c, users)
-	order := assignableNameOrder(users)
-	mineUID, mineKeys := meetingAssigneeKeys(selected, users)
+
+	pagePath := "/meeting/weekly/me"
+	title := "주간 업무 회의 — 내 자료"
+	active := NavMeetingWeeklyMe
+	selected := ""
+	navQ := template.URL("")
+	reports := ""
+	var mineUID string
+	var mineKeys []string
+	if team {
+		pagePath = "/meeting/weekly"
+		title = "주간 업무 회의 — 팀 자료"
+		active = NavMeetingWeekly
+		selected = resolveMeetingAssignee(c, users)
+		mineUID, mineKeys = meetingAssigneeKeys(selected, users)
+		navQ = template.URL(meetingNavQuery(selected, ""))
+		reports = "/stats/reports"
+	} else {
+		mineUID, mineKeys = meetingSelfKeys(c, users)
+		reports = "/meeting/weekly/me.xlsx?date=" + mon.Format("2006-01-02")
+		users = nil
+	}
 
 	lastDone, err := h.collectCompletedRange(lastFrom, lastTo, mineUID, mineKeys)
 	if err != nil {
@@ -54,33 +82,84 @@ func (h *MeetingHandler) Weekly(c echo.Context) error {
 		unplannedNeed = append(unplannedNeed, it)
 	}
 
-	doneGroups := groupWorkItemsByAssignee(lastDone, order)
-	planGroups := groupWorkItemsByAssignee(planned, order)
-	overdueGroups := groupWorkItemsByAssignee(overdue, order)
+	h.markWeeklyCanEdit(c, lastDone)
+	h.markWeeklyCanEdit(c, planned)
+	h.markWeeklyCanEdit(c, overdue)
 
-	return c.Render(http.StatusOK, "meeting/weekly.html", map[string]interface{}{
-		"Title":         "주간 업무 회의",
-		"Active":        NavMeetingWeekly,
+	order := assignableNameOrder(users)
+	if !team {
+		selfName := strings.TrimSpace(ctxString(c, "user_name"))
+		if strings.TrimSpace(ctxString(c, "view_as_user_id")) != "" {
+			selfName = strings.TrimSpace(ctxString(c, "view_as_name"))
+		}
+		if selfName != "" {
+			order = []string{selfName}
+		}
+	}
+
+	data := map[string]interface{}{
+		"Title":         title,
+		"Active":        active,
+		"Team":          team,
+		"CanSeeTeam":    true,
+		"PagePath":      pagePath,
 		"WeekStart":     mon.Format("2006-01-02"),
 		"WeekEnd":       fri.Format("2006-01-02"),
 		"PrevWeek":      prevMon.Format("2006-01-02"),
 		"NextWeek":      nextMon.Format("2006-01-02"),
 		"Users":         users,
 		"Assignee":      selected,
-		"NavQ":          template.URL(meetingNavQuery(selected, "")),
-		"ScopeNote":     meetingScopeNote(selected),
+		"NavQ":          navQ,
+		"ScopeNote":     weeklyScopeNote(team, selected),
 		"DoneN":         len(lastDone),
 		"ProgressN":     len(progress),
 		"OverdueN":      len(overdue),
 		"UnplannedN":    len(unplannedNeed),
 		"UnplannedHref": planUnplannedURL(false, currentRole(c), ""),
-		"ReportsHref":   "/stats/reports",
-		"DoneGroups":    doneGroups,
-		"PlanGroups":    planGroups,
-		"OverdueGroups": overdueGroups,
-		"CanWrite":      false,
+		"ReportsHref":   reports,
+		"ExcelLabel":    weeklyExcelLabel(team),
+		"DoneGroups":    groupWorkItemsByAssignee(lastDone, order),
+		"PlanGroups":    groupWorkItemsByAssignee(planned, order),
+		"OverdueGroups": groupWorkItemsByAssignee(overdue, order),
+		"CanWrite":      !isReadOnly(c) && !viewAsActive(c),
 		"Role":          currentRole(c),
-	})
+		"Notice":        strings.TrimSpace(c.QueryParam("notice")),
+		"ShowLeave":     false,
+		"ShowInbox":     false,
+		"ShowCoop":      false,
+		"LeaveRemain":   "—",
+	}
+	if !team {
+		h.fillWeeklyPersonalCards(c, mon, fri, data)
+	}
+	return c.Render(http.StatusOK, "meeting/weekly.html", data)
+}
+
+func weeklyExcelLabel(team bool) string {
+	if team {
+		return "주간업무보고 엑셀"
+	}
+	return "내 주간 자료 엑셀"
+}
+
+func weeklyScopeNote(team bool, selected string) string {
+	if !team {
+		return "내 담당 업무"
+	}
+	return meetingScopeNote(selected)
+}
+
+func meetingSelfKeys(c echo.Context, users []model.User) (string, []string) {
+	uid := strings.TrimSpace(identityUserID(c))
+	name := strings.TrimSpace(ctxString(c, "user_name"))
+	if strings.TrimSpace(ctxString(c, "view_as_user_id")) != "" {
+		name = strings.TrimSpace(ctxString(c, "view_as_name"))
+	}
+	_, keys := meetingAssigneeKeys(name, users)
+	if uid != "" {
+		return uid, keys
+	}
+	return "", keys
 }
 
 func meetingWeekMonFri(anchor time.Time) (time.Time, time.Time) {
@@ -186,6 +265,10 @@ func meetingGroupCount(groups []meetingAssigneeGroup) int {
 }
 
 func meetingWeeklyHasPost(body string) bool {
+	i := strings.Index(body, `data-weekly-tabs`)
+	if i >= 0 {
+		body = body[i:]
+	}
 	s := strings.ToLower(body)
 	return strings.Contains(s, `method="post"`) || strings.Contains(s, `method='post'`)
 }

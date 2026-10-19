@@ -150,9 +150,11 @@ func main() {
 	e := echo.New()
 	e.HideBanner = true
 
+	handler.AttachHTTPErrorHandler(e)
+	prevErr := e.HTTPErrorHandler
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		log.Printf("오류 [%s %s]: %v", c.Request().Method, c.Request().URL.Path, err)
-		e.DefaultHTTPErrorHandler(err, c)
+		prevErr(err, c)
 	}
 
 	e.Pre(handler.DecodePathMiddleware)
@@ -231,6 +233,10 @@ func main() {
 	g.POST("/plan/unplanned/no-date", h.Work.UnplannedNoDate)
 	g.GET("/meeting", h.Meeting.Show)
 	g.GET("/meeting/weekly", h.Meeting.Weekly)
+	g.GET("/meeting/weekly/me", h.Meeting.WeeklyMe)
+	g.GET("/meeting/weekly/me.xlsx", h.Meeting.WeeklyMeXLSX)
+	g.GET("/meeting/weekly/item", h.Meeting.WeeklyItemForm)
+	g.POST("/meeting/weekly/item", h.Meeting.WeeklyItemSave)
 	g.GET("/meeting/overview", h.Meeting.Overview)
 	g.GET("/account", h.Auth.AccountPage)
 	g.GET("/account/complete", h.Auth.AccountCompleteForm)
