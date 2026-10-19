@@ -155,8 +155,11 @@ func (r *SalesRepo) CloseContracted(id, contractedAt string, amount int, byID, b
 		return fmt.Errorf("수주 또는 협상 중인 건만 계약으로 끝낼 수 있습니다")
 	}
 	contractedAt = strings.TrimSpace(contractedAt)
-	if contractedAt == "" || amount <= 0 {
-		return fmt.Errorf("계약일과 계약금액이 필요합니다")
+	if contractedAt == "" {
+		return fmt.Errorf("계약일이 필요합니다")
+	}
+	if amount < 0 {
+		return fmt.Errorf("계약금액은 0 이상이어야 합니다")
 	}
 	from := p.Stage
 	p.Stage = model.SalesStage4Closed

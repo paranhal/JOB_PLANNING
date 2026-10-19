@@ -85,6 +85,38 @@ func TestSalesChangeStageAllowDenyAndFreeze(t *testing.T) {
 	}
 }
 
+func TestCloseContractedAllowsZeroAmount(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "s44zero.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repo := NewSalesRepo(db)
+	p := &model.SalesProject{Name: "무상계약"}
+	if err := repo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ChangeStage(p.SalesID, model.SalesDirectWin, "", "u1", "t", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CloseContracted(p.SalesID, "", 0, "u1", "t"); err == nil {
+		t.Fatal("계약일 없이 통과")
+	}
+	if err := repo.CloseContracted(p.SalesID, "2026-10-19", -1, "u1", "t"); err == nil {
+		t.Fatal("음수 금액 통과")
+	}
+	if err := repo.CloseContracted(p.SalesID, "2026-10-19", 0, "u1", "t"); err != nil {
+		t.Fatalf("금액 0 거부: %v", err)
+	}
+	got, err := repo.Get(p.SalesID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CloseReason != model.SalesCloseContracted || got.ContractAmount != 0 || got.ContractedAt != "2026-10-19" {
+		t.Fatalf("무상 계약 %+v", got)
+	}
+}
+
 func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 	db, err := InitDB(filepath.Join(t.TempDir(), "s44d2.db"))
 	if err != nil {

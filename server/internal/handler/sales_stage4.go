@@ -49,7 +49,11 @@ func (h *SalesHandler) CloseContracted(c echo.Context) error {
 	}
 	id := c.Param("id")
 	at := strings.TrimSpace(c.FormValue("contracted_at"))
-	amt := parseSalesAmount(c.FormValue("contract_amount"))
+	rawAmt := strings.TrimSpace(strings.ReplaceAll(c.FormValue("contract_amount"), ",", ""))
+	if strings.HasPrefix(rawAmt, "-") {
+		return h.replyStage(c, fmt.Errorf("계약금액은 0 이상이어야 합니다"), id, "/sales/"+id)
+	}
+	amt := parseSalesAmount(rawAmt)
 	err := h.repo.CloseContracted(id, at, amt, currentUserID(c), ctxString(c, "user_name"))
 	if err != nil {
 		return h.replyStage(c, err, id, "/sales/"+id)

@@ -126,18 +126,18 @@
       </form>
       {{else if eq .Project.BidStatus "won"}}
       <form method="post" action="/sales/{{.Project.SalesID}}/negotiate"><button class="px-3 py-1.5 text-sm border rounded-lg">협상 시작</button></form>
-      <form method="post" action="/sales/{{.Project.SalesID}}/close-contract" class="inline-flex gap-1 items-center" onsubmit="if(!this.contracted_at.value||!this.contract_amount.value){alert('계약일과 계약금액이 필요합니다');return false;}">
+      <form method="post" action="/sales/{{.Project.SalesID}}/close-contract" class="inline-flex gap-1 items-center" onsubmit="if(!this.contracted_at.value){alert('계약일이 필요합니다');return false;} if(this.contract_amount.value===''||Number(this.contract_amount.value)<0){alert('계약금액은 0 이상입니다');return false;}">
         <input type="date" name="contracted_at" required class="border rounded px-2 py-1 text-sm">
-        <input name="contract_amount" required placeholder="계약금액" class="border rounded px-2 py-1 text-sm w-28">
+        <input type="number" name="contract_amount" min="0" required placeholder="계약금액(0 가능)" class="border rounded px-2 py-1 text-sm w-28">
         <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg">계약으로 종료</button>
       </form>
       <form method="post" action="/sales/{{.Project.SalesID}}/close-failed" onsubmit="var r=prompt('결렬 사유'); if(!r) return false; this.reason.value=r;">
         <input type="hidden" name="reason"><button class="px-3 py-1.5 text-sm border border-rose-300 text-rose-700 rounded-lg">협상 결렬</button>
       </form>
       {{else if eq .Project.BidStatus "negotiating"}}
-      <form method="post" action="/sales/{{.Project.SalesID}}/close-contract" class="inline-flex gap-1 items-center" onsubmit="if(!this.contracted_at.value||!this.contract_amount.value){alert('계약일과 계약금액이 필요합니다');return false;}">
+      <form method="post" action="/sales/{{.Project.SalesID}}/close-contract" class="inline-flex gap-1 items-center" onsubmit="if(!this.contracted_at.value){alert('계약일이 필요합니다');return false;} if(this.contract_amount.value===''||Number(this.contract_amount.value)<0){alert('계약금액은 0 이상입니다');return false;}">
         <input type="date" name="contracted_at" required class="border rounded px-2 py-1 text-sm">
-        <input name="contract_amount" required placeholder="계약금액" class="border rounded px-2 py-1 text-sm w-28">
+        <input type="number" name="contract_amount" min="0" required placeholder="계약금액(0 가능)" class="border rounded px-2 py-1 text-sm w-28">
         <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg">계약으로 종료</button>
       </form>
       <form method="post" action="/sales/{{.Project.SalesID}}/close-failed" onsubmit="var r=prompt('결렬 사유'); if(!r) return false; this.reason.value=r;">
