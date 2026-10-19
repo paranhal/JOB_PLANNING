@@ -187,6 +187,7 @@ func VisitInCalendarQuarter(visitDate string, year, quarter int) bool {
 
 // InspectionCycleDue 점검주기가 해당 월에 도래하는지 (기획서 §17.2).
 // 월=매월, 홀수격월=1·3·5·7·9·11, 짝수격월=2·4·6·8·10·12, 분기=1·4·7·10, 반기=1·7, 년1회=1월.
+// 분기 자동 초안은 이 첫 달에 1건만 만든다. 확인에서 고른 날이 있으면 초안을 만들지 않는다(D-74).
 // 분기 의무 충족은 InspectionCycleDue가 아니라 QuarterObligations(달력 분기 안 1회)로 판정한다(D-70).
 func InspectionCycleDue(cycle string, month int) bool {
 	if month < 1 || month > 12 {

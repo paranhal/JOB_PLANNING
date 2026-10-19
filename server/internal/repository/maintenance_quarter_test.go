@@ -77,6 +77,12 @@ func TestQuarterObligationsAnyMonthInQuarter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !repo.HasVisitInCalendarQuarter(p.PlanID, "c1", "KLAS", 2026, 4) {
+		t.Fatal("Q4 10월 방문이 분기 방문으로 안 잡힌다")
+	}
+	if repo.HasVisitInCalendarQuarter(p.PlanID, "c1", "KLAS", 2026, 1) {
+		t.Fatal("Q4 방문이 Q1로 잡히면 안 된다")
+	}
 	if len(q4ok) != 0 {
 		t.Fatalf("미완료여도 일정 확정이면 Q4 충족, got %v", q4ok)
 	}
