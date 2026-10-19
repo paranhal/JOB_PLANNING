@@ -47,27 +47,34 @@
     </label>
     <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg">검색</button>
   </form>
-  <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
-    <table class="w-full min-w-[1200px] text-sm break-keep">
+  <div class="flex justify-end">
+    <button type="button" class="btn btn-secondary btn-sm" data-table-cols-reset="contracts">열 너비 초기화</button>
+  </div>
+  <div class="hidden md:block bg-white rounded-xl border border-gray-200 table-scroll">
+    <table class="table-base table-cols text-sm break-keep" data-table-cols="contracts">
+      <colgroup>
+        <col data-col="0"><col data-col="1"><col data-col="2"><col data-col="3"><col data-col="4">
+        <col data-col="5"><col data-col="6"><col data-col="7"><col data-col="8"><col data-col="9">
+      </colgroup>
       <thead class="bg-gray-50 text-xs text-gray-500">
         <tr>
-          <th class="px-4 py-2 text-left whitespace-nowrap">계약번호</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">계약명</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">고객사</th>
-          <th class="px-4 py-2 text-right whitespace-nowrap">계약금액</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">계약일</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">만료일</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">상태</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">출처</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">연동</th>
-          <th class="px-4 py-2 text-left whitespace-nowrap">작업</th>
+          <th class="relative px-4 py-2 whitespace-nowrap">계약번호<span class="col-resize-handle" role="separator" aria-label="계약번호 열 너비 조절" tabindex="0" data-col="0"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">계약명<span class="col-resize-handle" role="separator" aria-label="계약명 열 너비 조절" tabindex="0" data-col="1"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">고객사<span class="col-resize-handle" role="separator" aria-label="고객사 열 너비 조절" tabindex="0" data-col="2"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">계약금액<span class="col-resize-handle" role="separator" aria-label="계약금액 열 너비 조절" tabindex="0" data-col="3"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">계약일<span class="col-resize-handle" role="separator" aria-label="계약일 열 너비 조절" tabindex="0" data-col="4"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">만료일<span class="col-resize-handle" role="separator" aria-label="만료일 열 너비 조절" tabindex="0" data-col="5"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">상태<span class="col-resize-handle" role="separator" aria-label="상태 열 너비 조절" tabindex="0" data-col="6"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">출처<span class="col-resize-handle" role="separator" aria-label="출처 열 너비 조절" tabindex="0" data-col="7"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">연동<span class="col-resize-handle" role="separator" aria-label="연동 열 너비 조절" tabindex="0" data-col="8"></span></th>
+          <th class="relative px-4 py-2 whitespace-nowrap">작업<span class="col-resize-handle" role="separator" aria-label="작업 열 너비 조절" tabindex="0" data-col="9"></span></th>
         </tr>
       </thead>
       <tbody>
         {{range .Rows}}
         <tr class="border-t border-gray-100">
           <td class="px-4 py-2 font-mono text-xs whitespace-nowrap">{{.DisplayNo}}</td>
-          <td class="px-4 py-2 max-w-[18rem]"><a href="{{.Href}}" class="text-blue-600 hover:underline">{{.Name}}</a></td>
+          <td class="px-4 py-2 max-w-[18rem] cell-wrap"><a href="{{.Href}}" class="text-blue-600 hover:underline" data-contract-modal data-id="{{if .ProjectID}}{{.ProjectID}}{{else}}{{.SalesID}}{{end}}">{{.Name}}</a></td>
           <td class="px-4 py-2 text-gray-600 max-w-[18rem]">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">
             {{.AmountText}}{{if .ExpectedHint}}<div class="text-[11px] text-gray-400">{{.ExpectedHint}}</div>{{end}}
@@ -116,5 +123,8 @@
     <p class="text-center text-gray-400 py-8">등록된 계약이 없습니다.</p>
     {{end}}
   </div>
+  <div id="contract-modal-host"></div>
 </div>
+<script src="/static/js/table-cols.js?v={{.AssetQuery}}"></script>
+<script src="/static/js/contract-modal.js?v={{.AssetQuery}}"></script>
 {{end}}

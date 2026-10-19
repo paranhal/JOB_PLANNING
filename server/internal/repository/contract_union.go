@@ -61,9 +61,12 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 			Customer:     p.CustomerOrParty(),
 			Amount:       amt,
 			ContractedAt: firstNonEmptyStr(p.StartDate, p.CreatedAt.Format("2006-01-02")),
-			StartDate:    p.StartDate,
-			EndDate:      p.EndDate,
-			Status:       p.Status,
+			StartDate:      p.StartDate,
+			EndDate:        p.EndDate,
+			Status:         p.Status,
+			ProjectKind:    p.ProjectKind,
+			ProjectKindSet: p.ProjectKindSet,
+			SalesBizType:   p.SalesBizType,
 		}
 		if sid := strings.TrimSpace(p.SalesProjectID); sid != "" {
 			if linked[sid] > 1 {
@@ -113,6 +116,7 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 			ContractedAt:   firstNonEmptyStr(s.ContractedAt, s.CreatedAt),
 			OrgID:          s.OrgID,
 			Promoted:       s.Status == model.SalesStatusPromoted,
+			SalesBizType:   s.BizType,
 		}
 		if f.Year > 0 && row.Year() != f.Year {
 			continue
@@ -144,7 +148,7 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 	q := `
 		SELECT s.sales_id, COALESCE(s.sales_no,''), COALESCE(s.name,''), COALESCE(s.prospect_name,''),
 			COALESCE(s.contract_amount,0), COALESCE(s.expected_amount,0), COALESCE(s.contracted_at,''),
-			COALESCE(s.created_at,''), COALESCE(s.org_id,''), COALESCE(s.status,''),
+			COALESCE(s.created_at,''), COALESCE(s.org_id,''), COALESCE(s.status,''), COALESCE(s.biz_type,''),
 			COALESCE(NULLIF(TRIM(cu.org_name),''), '')
 		FROM sales_projects s
 		LEFT JOIN customers cu ON cu.customer_id = s.customer_id
@@ -170,7 +174,7 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 	for rows.Next() {
 		var p model.SalesProject
 		if err := rows.Scan(&p.SalesID, &p.SalesNo, &p.Name, &p.ProspectName,
-			&p.ContractAmount, &p.ExpectedAmount, &p.ContractedAt, &p.CreatedAt, &p.OrgID, &p.Status, &p.CustomerName); err != nil {
+			&p.ContractAmount, &p.ExpectedAmount, &p.ContractedAt, &p.CreatedAt, &p.OrgID, &p.Status, &p.BizType, &p.CustomerName); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

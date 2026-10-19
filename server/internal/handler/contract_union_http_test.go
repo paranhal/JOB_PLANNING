@@ -84,7 +84,7 @@ func TestSalesHTTP_UnpromotedBadge(t *testing.T) {
 		t.Fatal(err)
 	}
 	show := doGet(t, e, "/sales/"+p.SalesID)
-	if !strings.Contains(show.Body.String(), "사업관리 미전환") {
+	if !strings.Contains(show.Body.String(), "영업 계약 완료 · 계약 전환 필요") {
 		t.Fatal("상세 배지 없음")
 	}
 	dash := doGet(t, e, "/sales/dashboard")

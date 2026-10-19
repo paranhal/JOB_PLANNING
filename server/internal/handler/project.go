@@ -244,11 +244,26 @@ func (h *ProjectHandler) ContractShow(c echo.Context) error {
 		assets, _, _ = h.assetRepo.List("", "", p.ProjectID, "", "", "", 1, 200)
 	}
 	today := time.Now().Format("2006-01-02")
-	return c.Render(http.StatusOK, "contracts/show.html", map[string]interface{}{
+	acts, _ := h.repo.CountProjectActivities()
+	data := map[string]interface{}{
 		"Title": p.Name, "Active": NavContracts,
 		"Project": p, "Rules": rules, "Assets": assets, "Today": today,
-		"Life": p.ContractLifeStatus(today),
-	})
+		"Life":        p.ContractLifeStatus(today),
+		"RunLabel":    model.ContractRunLabel(p.ContractRunStatus(today)),
+		"ASCount":     acts.AS[p.ProjectID],
+		"MntCount":    acts.Mnt[p.ProjectID],
+		"WaitCount":   acts.Wait[p.ProjectID],
+		"ASHref":      "/projects/" + p.ProjectID,
+		"MntHref":     "/projects/" + p.ProjectID,
+		"WaitHref":    "/workboard/tasks?project=" + url.QueryEscape(p.ProjectID),
+		"FullHref":    "/contracts/" + p.ProjectID,
+		"DashHref":    "/projects/dashboard",
+		"CanPromote":  false,
+	}
+	if strings.TrimSpace(c.QueryParam("modal")) == "1" {
+		return RenderPartial(c, "contracts/modal.html", data)
+	}
+	return c.Render(http.StatusOK, "contracts/show.html", data)
 }
 
 func (h *ProjectHandler) New(c echo.Context) error {
@@ -304,6 +319,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 			salesMissing = true
 		}
 	}
+	today := time.Now().Format("2006-01-02")
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
@@ -311,6 +327,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"CanDelete":    canDeleteProjects(c),
 		"CanMerge":     currentRole(c) == model.RoleVisionAdmin,
 		"SalesMissing": salesMissing,
+		"RunLabel":     model.ContractRunLabel(p.ContractRunStatus(today)),
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
@@ -371,6 +388,42 @@ func (h *ProjectHandler) Archive(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=archived")
+}
+
+func (h *ProjectHandler) Complete(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	if _, err := h.repo.Get(id); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+	}
+	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectComplete); err != nil {
+		return err
+	}
+	accessLog(c, auditlog.Record{
+		Action: auditlog.ActionUpdate, TargetTable: "work_projects", TargetID: id,
+		Detail: "사업 완료 처리", Result: auditlog.ResultOK,
+	})
+	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=completed")
+}
+
+func (h *ProjectHandler) CompleteCancel(c echo.Context) error {
+	if !canWriteProjects(c) {
+		return echo.ErrForbidden
+	}
+	id := c.Param("id")
+	if _, err := h.repo.Get(id); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+	}
+	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectActive); err != nil {
+		return err
+	}
+	accessLog(c, auditlog.Record{
+		Action: auditlog.ActionUpdate, TargetTable: "work_projects", TargetID: id,
+		Detail: "사업 완료 취소", Result: auditlog.ResultOK,
+	})
+	return c.Redirect(http.StatusSeeOther, "/projects/"+id+"?ok=complete_cancel")
 }
 
 func (h *ProjectHandler) Activate(c echo.Context) error {

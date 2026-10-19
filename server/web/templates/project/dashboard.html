@@ -1,6 +1,6 @@
 {{define "title"}}사업 대시보드 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-4" x-data="{ filterOpen: false }">
+<div class="space-y-4">
   <p class="text-ui-xs text-ink-subtle">사업 관리 / 사업 대시보드</p>
 
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -9,154 +9,128 @@
       <p class="text-ui-sm text-ink-muted mt-1">공사, 구축, 개발, 유지보수, 기타 사업의 단계별 일정과 필요 서류 작성·제출을 중심으로 관리합니다. 각 사업 유형의 단계(공정→기성→준공, 구축→개통→검수, 접수→조치→완료, 기타는 수행 기간)와 관련 서류 상태를 함께 확인할 수 있습니다.</p>
     </div>
     <div class="flex flex-wrap gap-2 shrink-0">
-      <a href="{{.ReportURL}}" class="btn btn-secondary btn-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4-4 4 4M12 8v12"/></svg>
-        업무 리포트
-      </a>
-      <div class="relative">
-        <button type="button" class="btn btn-primary btn-sm" @click="filterOpen = !filterOpen">사업 필터</button>
-        <div x-show="filterOpen" x-cloak @click.outside="filterOpen = false" class="menu absolute right-0 mt-1 z-20 w-48">
-          <a href="/projects/dashboard" class="menu-item">사업 운영 현황</a>
-          <a href="/projects/dashboard?tab=construction" class="menu-item">공사</a>
-          <a href="/projects/dashboard?tab=build" class="menu-item">구축</a>
-          <a href="/projects/dashboard?tab=dev" class="menu-item">개발</a>
-          <a href="/projects/dashboard?tab=maintenance" class="menu-item">유지보수</a>
-          <a href="/projects/dashboard?tab=other" class="menu-item">기타</a>
-          <a href="{{.FilterURL}}" class="menu-item">사업 목록</a>
-        </div>
-      </div>
+      <a href="{{.ReportURL}}" class="btn btn-secondary btn-sm">업무 리포트</a>
+      <a href="{{.FilterURL}}" class="btn btn-primary btn-sm">사업 목록</a>
     </div>
   </div>
 
   <div class="dash-trackbar">
     <div class="flex flex-wrap items-center gap-2">
-      <a href="/projects/dashboard" class="{{if eq .Tab "ops"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">사업 운영 현황</a>
-      {{if .Example}}<span class="badge badge-warning">주의</span>{{end}}
-      <a href="/projects/dashboard?tab=construction" class="{{if eq .Tab "construction"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}공사 2개{{else}}공사{{end}}</a>
-      <span class="opacity-50">·</span>
-      <a href="/projects/dashboard?tab=build" class="{{if eq .Tab "build"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}구축 1개{{else}}구축{{end}}</a>
-      <span class="opacity-50">·</span>
-      <a href="/projects/dashboard?tab=dev" class="{{if eq .Tab "dev"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}개발 1개{{else}}개발{{end}}</a>
-      <span class="opacity-50">·</span>
-      <a href="/projects/dashboard?tab=maintenance" class="{{if eq .Tab "maintenance"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{if .Example}}유지보수 2개{{else}}유지보수{{end}}</a>
-      <span class="opacity-50">·</span>
-      <a href="/projects/dashboard?tab=other" class="{{if eq .Tab "other"}}dash-track-tab-on{{else}}dash-track-tab{{end}}">기타</a>
-      {{if .Example}}<span class="opacity-80">· 총 6개 사업</span>{{end}}
-    </div>
-    <p class="text-ui-xs opacity-80">{{.Seed.StageCounts}}</p>
-  </div>
-
-  <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
-    <div class="card p-4">
-      <div class="flex items-start justify-between gap-2">
-        <p class="text-ui-sm text-ink-muted">오늘 처리할 일</p>
-        <span class="badge badge-warning">{{if .Example}}{{.Seed.TodayN}}건{{else}}—{{end}}</span>
-      </div>
-      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{if .Example}}{{.Seed.TodayN}}건{{else}}—{{end}}</p>
-      <p class="text-ui-xs text-ink-muted mt-2">{{.Seed.TodayBreak}}</p>
-    </div>
-    <div class="card p-4">
-      <div class="flex items-start justify-between gap-2">
-        <p class="text-ui-sm text-ink-muted">담당 업무</p>
-        <span class="badge badge-warning">{{if .Example}}{{.Seed.PeopleN}}명{{else}}—{{end}}</span>
-      </div>
-      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{if .Example}}{{.Seed.PeopleN}}명{{else}}—{{end}}</p>
-      <p class="text-ui-xs text-ink-muted mt-2">{{.Seed.PeopleBreak}}</p>
-    </div>
-    <div class="card p-4">
-      <div class="flex items-start justify-between gap-2">
-        <p class="text-ui-sm text-ink-muted">승인 대기</p>
-        <span class="badge badge-warning">{{if .Example}}{{.Seed.ApproveN}}건{{else}}—{{end}}</span>
-      </div>
-      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{if .Example}}{{.Seed.ApproveN}}건{{else}}—{{end}}</p>
-      <p class="text-ui-xs text-ink-muted mt-2">{{.Seed.ApproveBreak}}</p>
-    </div>
-    <div class="card p-4">
-      <div class="flex items-start justify-between gap-2">
-        <p class="text-ui-sm text-ink-muted">다가오는 일정</p>
-        <span class="badge badge-success">{{if .Example}}{{.Seed.SoonN}}건{{else}}—{{end}}</span>
-      </div>
-      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{if .Example}}{{.Seed.SoonN}}건{{else}}—{{end}}</p>
-      <p class="text-ui-xs text-ink-muted mt-2">{{.Seed.SoonBreak}}</p>
+      {{range .Tabs}}
+      <a href="{{.Href}}" class="{{if eq $.Kind .Code}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{.Label}} {{.N}}</a>
+      {{end}}
     </div>
   </div>
 
-  <div class="grid lg:grid-cols-2 gap-3">
-    <div class="card p-4 space-y-3">
-      <div class="flex items-center justify-between gap-2">
-        <h3 class="text-ui font-semibold text-ink">할 일 및 담당 업무</h3>
-        <span class="badge badge-neutral">오늘 처리</span>
-      </div>
-      {{range .Seed.Todos}}
-      {{if or (eq $.Tab "ops") (eq .Track $.Tab)}}
-      <div class="flex items-start gap-2">
-        {{if eq .Urgency "긴급"}}<span class="badge badge-danger shrink-0">긴급</span>{{else}}<span class="badge badge-info shrink-0">확인</span>{{end}}
-        <p class="flex-1 text-ui text-ink min-w-0">{{.Title}}</p>
-        <p class="text-ui-sm text-ink-muted shrink-0">{{.Person}}</p>
-        <p class="text-ui-sm shrink-0 {{if .Due}}text-danger{{else}}text-ink-muted{{end}}">{{.When}}</p>
-      </div>
-      {{end}}
-      {{end}}
+  <div class="grid grid-cols-2 xl:grid-cols-5 gap-3">
+    <div class="card p-4">
+      <p class="text-ui-sm text-ink-muted">계약 사업</p>
+      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.KPITotal}}건</p>
+      <p class="text-ui-xs text-ink-muted mt-2">{{.KPIAmount}}</p>
     </div>
-    <div class="card p-4 space-y-3">
-      <div class="flex items-center justify-between gap-2">
-        <h3 class="text-ui font-semibold text-ink">승인 대기 및 일정</h3>
-        <span class="badge badge-warning">{{if .Example}}{{.Seed.ApproveN}}건{{else}}—{{end}}</span>
-      </div>
-      {{range .Seed.Approvals}}
-      {{if or (eq $.Tab "ops") (eq .Track $.Tab)}}
-      <div class="flex items-start gap-2">
-        {{if eq .Urgency "긴급"}}<span class="badge badge-danger shrink-0">긴급</span>{{else}}<span class="badge badge-info shrink-0">확인</span>{{end}}
-        <p class="flex-1 text-ui text-ink min-w-0">{{.Title}}</p>
-        <p class="text-ui-sm text-ink-muted shrink-0">{{.Person}}</p>
-        <p class="text-ui-sm shrink-0 {{if .Due}}text-danger{{else}}text-ink-muted{{end}}">{{.When}}</p>
-      </div>
-      {{end}}
-      {{end}}
-      <div class="rounded-control bg-hover p-3 space-y-2">
-        <p class="text-ui-xs text-ink-muted">다가오는 일정</p>
-        {{range .Seed.Upcoming}}
-        {{if or (eq $.Tab "ops") (eq .Track $.Tab)}}
-        <div class="flex items-center justify-between gap-2">
-          <p class="text-ui text-ink">{{.Title}}</p>
-          <p class="text-ui-sm text-ink-muted tabular-nums">{{.When}}</p>
-        </div>
+    <div class="card p-4">
+      <p class="text-ui-sm text-ink-muted">진행 중 사업</p>
+      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.KPIProgress}}건</p>
+      <p class="text-ui-xs text-ink-muted mt-2">대기 {{.KPIWait}}</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-ui-sm text-ink-muted">완료 확인 필요</p>
+      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.KPINeed}}건</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-ui-sm text-ink-muted">계약 후 활동 합계</p>
+      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.KPIAct}}건</p>
+      <p class="text-ui-xs text-ink-muted mt-2">진행 중 사업의 AS·정기점검·대기 업무</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-ui-sm text-ink-muted">사업 미지정</p>
+      <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.UnspecN}}건</p>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-wrap items-center gap-2 text-ui-sm">
+      <span class="text-ink-muted">보기 조건</span>
+      <a href="{{.ActAll}}" class="{{if eq .Act ""}}tab-active{{else}}tab{{end}}">전체</a>
+      <a href="{{.ActAS}}" class="{{if eq .Act "as"}}tab-active{{else}}tab{{end}}">AS 있음</a>
+      <a href="{{.ActMnt}}" class="{{if eq .Act "mnt"}}tab-active{{else}}tab{{end}}">정기점검 있음</a>
+      <a href="{{.ActTask}}" class="{{if eq .Act "task"}}tab-active{{else}}tab{{end}}">일반 업무 있음</a>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" data-table-cols-reset="projects">열 너비 초기화</button>
+  </div>
+
+  <div class="card table-scroll">
+    <table class="table-base table-cols" data-table-cols="projects">
+      <colgroup>
+        <col data-col="0"><col data-col="1"><col data-col="2"><col data-col="3"><col data-col="4">
+        <col data-col="5"><col data-col="6"><col data-col="7"><col data-col="8"><col data-col="9"><col data-col="10">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="relative px-2 py-2">번호<span class="col-resize-handle" role="separator" aria-label="번호 열 너비 조절" tabindex="0" data-col="0"></span></th>
+          <th class="relative px-2 py-2">사업명<span class="col-resize-handle" role="separator" aria-label="사업명 열 너비 조절" tabindex="0" data-col="1"></span></th>
+          <th class="relative px-2 py-2">사업 분류<span class="col-resize-handle" role="separator" aria-label="사업 분류 열 너비 조절" tabindex="0" data-col="2"></span></th>
+          <th class="relative px-2 py-2">상태<span class="col-resize-handle" role="separator" aria-label="상태 열 너비 조절" tabindex="0" data-col="3"></span></th>
+          <th class="relative px-2 py-2">구분<span class="col-resize-handle" role="separator" aria-label="구분 열 너비 조절" tabindex="0" data-col="4"></span></th>
+          <th class="relative px-2 py-2">계약금액<span class="col-resize-handle" role="separator" aria-label="계약금액 열 너비 조절" tabindex="0" data-col="5"></span></th>
+          <th class="relative px-2 py-2">수행 기간<span class="col-resize-handle" role="separator" aria-label="수행 기간 열 너비 조절" tabindex="0" data-col="6"></span></th>
+          <th class="relative px-2 py-2">AS<span class="col-resize-handle" role="separator" aria-label="AS 열 너비 조절" tabindex="0" data-col="7"></span></th>
+          <th class="relative px-2 py-2">정기점검<span class="col-resize-handle" role="separator" aria-label="정기점검 열 너비 조절" tabindex="0" data-col="8"></span></th>
+          <th class="relative px-2 py-2">대기 업무<span class="col-resize-handle" role="separator" aria-label="대기 업무 열 너비 조절" tabindex="0" data-col="9"></span></th>
+          <th class="relative px-2 py-2">작업<span class="col-resize-handle" role="separator" aria-label="작업 열 너비 조절" tabindex="0" data-col="10"></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr class="border-t border-line">
+          <td class="px-2 py-2 font-mono text-ui-xs cell-ellipsis" title="{{.Row.DisplayNo}}">{{.Row.DisplayNo}}</td>
+          <td class="px-2 py-2 cell-wrap">
+            {{if .CanLink}}
+            <a href="{{.Href}}" class="text-primary hover:underline" data-contract-modal data-id="{{if .Row.ProjectID}}{{.Row.ProjectID}}{{else}}{{.Row.SalesID}}{{end}}">{{.Row.Name}}</a>
+            {{else}}
+            <span>{{.Row.Name}}</span>
+            {{end}}
+          </td>
+          <td class="px-2 py-2">
+            {{$ek := .Kind}}
+            {{if and $.CanWrite (eq .Row.Source "work")}}
+            <form method="post" action="/projects/{{.Row.ProjectID}}/kind" class="flex items-center gap-1">
+              <input type="hidden" name="back" value="{{$.Back}}">
+              <select name="project_kind" class="select text-ui-xs py-0.5 px-1" onchange="this.form.submit()">
+                {{if eq $ek.Kind "unclassified"}}<option value="" selected disabled>미분류</option>{{end}}
+                {{range $.KindOptions}}
+                <option value="{{.Value}}" {{if eq $ek.Kind .Value}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <span class="text-ui-xs text-ink-subtle">{{$ek.SourceLabel}}</span>
+            </form>
+            {{else if eq .Row.Source "sales"}}
+            <span class="text-ink-muted">—</span>
+            {{else}}
+            {{.Kind.Label}} <span class="text-ui-xs text-ink-subtle">{{.Kind.SourceLabel}}</span>
+            {{end}}
+          </td>
+          <td class="px-2 py-2 cell-ellipsis" title="{{.RunLabel}}"><span class="badge badge-neutral">{{.RunLabel}}</span></td>
+          <td class="px-2 py-2 cell-ellipsis" title="{{.Row.SourceLabel}}">{{.Row.SourceLabel}}</td>
+          <td class="px-2 py-2 text-right tabular-nums cell-ellipsis" title="{{.Row.AmountText}}">{{.Row.AmountText}}</td>
+          <td class="px-2 py-2 cell-ellipsis" title="{{.Period}}">{{.Period}}</td>
+          <td class="px-2 py-2 tabular-nums">{{if .ASCount}}<a href="{{.ASHref}}" class="text-primary hover:underline">{{.ASCount}}</a>{{else}}0{{end}}</td>
+          <td class="px-2 py-2 tabular-nums">{{if .MntCount}}<a href="{{.MntHref}}" class="text-primary hover:underline">{{.MntCount}}</a>{{else}}0{{end}}</td>
+          <td class="px-2 py-2 tabular-nums">{{if .WaitCount}}<a href="{{.WaitHref}}" class="text-primary hover:underline">{{.WaitCount}}</a>{{else}}0{{end}}</td>
+          <td class="px-2 py-2">
+            {{if and $.CanWriteSales (eq .Row.Source "sales")}}
+            <a href="/sales/{{.Row.SalesID}}/promote" class="btn btn-primary btn-sm">계약으로 전환</a>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="11" class="px-4 py-8 text-center text-ink-subtle">표시할 계약 사업이 없습니다.</td></tr>
         {{end}}
-        {{end}}
-      </div>
-    </div>
+      </tbody>
+    </table>
   </div>
-
-  <div class="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
-    {{range .Seed.Domains}}
-    {{if or (eq $.Tab "ops") (eq .Track $.Tab)}}
-    <div class="card p-4 space-y-3">
-      <div class="flex items-center justify-between gap-2">
-        <h3 class="text-ui font-semibold text-ink">{{.Title}}</h3>
-        <span class="badge badge-info">{{.Count}}</span>
-      </div>
-      {{range .Programs}}
-      <div class="flex items-center gap-2 rounded-control border border-line px-3 py-2">
-        <span class="badge badge-neutral">{{.Kind}}</span>
-        <p class="flex-1 text-ui text-ink">{{.Name}}</p>
-        <p class="text-ui-sm text-ink-muted">{{.Progress}}</p>
-      </div>
-      {{end}}
-      <div>
-        <p class="text-ui-xs text-ink-muted mb-1">진행 업무</p>
-        <p class="text-ui font-medium text-ink">{{.WorkTitle}}</p>
-        <p class="text-ui-sm text-ink-muted mt-1">{{.WorkNote}}</p>
-      </div>
-    </div>
-    {{end}}
-    {{end}}
-  </div>
-
-  <div class="card px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
-    <p class="text-ui font-medium text-ink">금일 업무 브리핑</p>
-    <p class="text-ui-sm text-ink-muted flex-1">{{.Seed.BriefItems}}</p>
-    {{if .Example}}<a href="{{.DocsURL}}" class="text-ui-sm text-warning">{{.Seed.ApproveN}}건의 승인 대기 확인 필요</a>{{end}}
-  </div>
-
+  <div id="contract-modal-host"></div>
 </div>
+<script src="/static/js/table-cols.js?v={{.AssetQuery}}"></script>
+<script src="/static/js/contract-modal.js?v={{.AssetQuery}}"></script>
 {{end}}

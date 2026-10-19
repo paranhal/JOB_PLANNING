@@ -9,10 +9,13 @@
   </div>
   {{if gt .UnpromotedN 0}}
   <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
-    <p class="font-semibold text-amber-900">사업관리 미전환 {{.UnpromotedN}}건</p>
+    <p class="font-semibold text-amber-900">사업관리 미전환 {{.UnpromotedN}}건 · 영업 계약 완료 · 계약 전환 필요</p>
     <ul class="text-sm space-y-1">
       {{range .Unpromoted}}
-      <li><a class="text-amber-900 underline" href="{{.Href}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a></li>
+      <li class="flex flex-wrap items-center gap-2">
+        <a class="text-amber-900 underline" href="{{.Href}}" data-contract-modal data-id="{{.SalesID}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a>
+        {{if $.CanWriteSales}}<a href="/sales/{{.SalesID}}/promote" class="underline">계약으로 전환</a>{{end}}
+      </li>
       {{end}}
     </ul>
   </div>

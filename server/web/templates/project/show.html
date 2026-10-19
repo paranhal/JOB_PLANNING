@@ -16,6 +16,7 @@
         <span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-800">무상</span>
         {{end}}
         <span>{{wbProjectStatusLabel .Project.Status}}</span>
+        {{if .RunLabel}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">{{.RunLabel}}</span>{{end}}
       </p>
     </div>
     {{if .CanWrite}}
@@ -24,6 +25,16 @@
       <a href="/projects/{{.Project.ProjectID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
       {{if .CanMerge}}
       <a href="/projects/{{.Project.ProjectID}}/merge" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">합치기</a>
+      {{end}}
+      {{if eq .Project.Status "complete"}}
+      <form method="post" action="/projects/{{.Project.ProjectID}}/complete-cancel">
+        <button type="submit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">완료 취소</button>
+      </form>
+      {{else if ne .Project.Status "archived"}}
+      <form method="post" action="/projects/{{.Project.ProjectID}}/complete"
+            onsubmit="return confirm('이 사업을 완료 처리할까요? 종료일이 지나도 자동으로 완료되지 않습니다.');">
+        <button type="submit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">사업 완료 처리</button>
+      </form>
       {{end}}
       {{if eq .Project.Status "archived"}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/activate">
@@ -53,6 +64,10 @@
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">보관 처리했습니다.</div>
   {{else if eq .FlashOK "activated"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">재개했습니다.</div>
+  {{else if eq .FlashOK "completed"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">완료 처리했습니다.</div>
+  {{else if eq .FlashOK "complete_cancel"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">완료를 취소했습니다.</div>
   {{else if eq .FlashOK "promoted"}}
   <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">영업 사업에서 등록했습니다. 활동 로그는 영업 상세에 남아 있습니다.</div>
   {{end}}

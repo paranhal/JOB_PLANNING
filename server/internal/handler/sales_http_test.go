@@ -89,6 +89,7 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.GET("/projects/new", h.Project.New)
 	g.GET("/projects/:id", h.Project.Show)
+	g.GET("/projects/dashboard", h.Project.Dashboard)
 	g.GET("/contracts", h.Project.Contracts)
 	g.GET("/contracts/:id/link-sales", h.Project.ContractLinkForm)
 	g.POST("/contracts/:id/link-sales", h.Project.ContractLinkSave)
@@ -748,7 +749,7 @@ func TestSalesHTTP_PromoteOnlyWhenContracted(t *testing.T) {
 	}
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	show := doGet(t, e, "/sales/"+id)
-	if strings.Contains(show.Body.String(), "사업관리로 전환") {
+	if strings.Contains(show.Body.String(), "계약으로 전환") {
 		t.Fatal("수주 전에 승격 버튼이 열렸다")
 	}
 	rec = doGet(t, e, "/sales/"+id+"/promote")
@@ -773,7 +774,7 @@ func TestSalesHTTP_PromoteProspectThenKeepActivities(t *testing.T) {
 	}
 
 	show := doGet(t, e, "/sales/"+id)
-	if !strings.Contains(show.Body.String(), "사업관리로 전환") {
+	if !strings.Contains(show.Body.String(), "계약으로 전환") {
 		t.Fatal("수주인데 승격 버튼이 없다")
 	}
 
@@ -847,7 +848,7 @@ func TestSalesHTTP_PromoteProspectThenKeepActivities(t *testing.T) {
 
 	after := doGet(t, e, "/sales/"+id)
 	afterBody := after.Body.String()
-	if strings.Contains(afterBody, "사업관리로 전환") {
+	if strings.Contains(afterBody, "계약으로 전환") {
 		t.Fatal("승격 후에도 등록 버튼이 남아 있다")
 	}
 	if !strings.Contains(afterBody, "사업관리에서 보기") || !strings.Contains(afterBody, "방문미팅 · 승격 전") {

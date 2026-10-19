@@ -34,6 +34,20 @@ type ContractRow struct {
 	AmountMismatch bool
 	SalesAmount    int
 	DupLinked      bool
+	ProjectKind    string
+	ProjectKindSet int
+	SalesBizType   string
+}
+
+func (r ContractRow) EffectiveKind() EffectiveKind {
+	p := WorkProject{ProjectKind: r.ProjectKind, ProjectKindSet: r.ProjectKindSet, SalesBizType: r.SalesBizType}
+	if r.Source == ContractSourceSales {
+		if k, ok := MapSalesBizToProjectKind(r.SalesBizType); ok {
+			return EffectiveKind{Kind: k, Source: KindSourceInferred}
+		}
+		return EffectiveKind{Kind: ProjectKindUnclassified, Source: KindSourceUnclassified}
+	}
+	return p.EffectiveKind()
 }
 
 func (r ContractRow) Href() string {
@@ -84,7 +98,7 @@ func (r ContractRow) StatusChip() string {
 	if r.Promoted {
 		return "전환 기록 있음, 연결 없음"
 	}
-	return "사업관리 미전환"
+	return "영업 계약 완료 · 계약 전환 필요"
 }
 
 func (r ContractRow) Year() int {

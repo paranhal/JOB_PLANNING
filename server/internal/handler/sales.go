@@ -240,7 +240,8 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		"Judge":         model.BuildSalesJudgeAccuracy(closed),
 		"DormantN":      dN, "DormantAmount": model.FormatSalesMoney(int64(dAmt)),
 		"DormantDueN":  len(due),
-		"PinnedGroups": pinRows,
+		"PinnedGroups":  pinRows,
+		"CanWriteSales": canWriteSales(c),
 	})
 }
 
@@ -366,7 +367,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	selGroups, _ := h.repo.GroupsContaining(p)
 	stageProg := model.BuildSalesStageProgress(p, acts, quotes, time.Now().Format("2006-01-02"))
 	showStageProg := !p.IsSupply() && (p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose)
-	return c.Render(http.StatusOK, "sales/show.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSalesPipeline,
 		"Project":             h.viewProject(p, def),
 		"Raw":                 p,
@@ -422,7 +423,11 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"NextActions":    nextActions,
 		"WinProbChoices": []int{10, 20, 30, 40, 50, 60, 70, 80, 90},
 		"ListBack": salesListBack(c, p),
-	})
+	}
+	if strings.TrimSpace(c.QueryParam("modal")) == "1" {
+		return RenderPartial(c, "sales/modal.html", data)
+	}
+	return c.Render(http.StatusOK, "sales/show.html", data)
 }
 
 func (h *SalesHandler) Edit(c echo.Context) error {
@@ -1362,9 +1367,9 @@ func querySalesErr(code string) string {
 	case "notfound":
 		return "영업 사업을 찾을 수 없습니다."
 	case "not_contracted":
-		return "계약이 완료된 건만 사업관리로 전환할 수 있습니다."
+		return "계약이 완료된 건만 계약으로 전환할 수 있습니다."
 	case "already_promoted":
-		return "이미 사업관리로 전환된 영업 사업입니다."
+		return "이미 계약으로 전환된 영업 사업입니다."
 	default:
 		return ""
 	}

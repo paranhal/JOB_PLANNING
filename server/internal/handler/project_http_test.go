@@ -37,6 +37,7 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.GET("/projects/kind-review", h.Project.KindReview)
 	g.POST("/projects/kind-review", h.Project.KindReviewSave)
 	g.GET("/projects/dashboard", h.Project.Dashboard)
+	g.GET("/contracts/:id", h.Project.ContractShow)
 	g.GET("/projects/docs", h.Project.Docs)
 	g.GET("/projects/diary", h.Project.Diary)
 	g.POST("/projects/diary/draft", h.Project.DiaryDraft)
@@ -47,6 +48,8 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.POST("/projects/:id/kind", h.Project.SetKind)
 	g.POST("/projects/:id", h.Project.Update)
 	g.POST("/projects/:id/archive", h.Project.Archive)
+	g.POST("/projects/:id/complete", h.Project.Complete)
+	g.POST("/projects/:id/complete-cancel", h.Project.CompleteCancel)
 	g.POST("/projects/:id/activate", h.Project.Activate)
 	g.GET("/projects/:id/merge", h.Project.MergeForm, h.Auth.RequireVisionOnly)
 	g.POST("/projects/:id/merge", h.Project.MergeSave, h.Auth.RequireVisionOnly)
@@ -349,6 +352,42 @@ func TestProjectKindInlineAndBulk(t *testing.T) {
 	done, _ := repo.Get(p2.ProjectID)
 	if done.ProjectKind != model.ProjectKindMaintenance || done.ProjectKindSet != 1 {
 		t.Fatalf("일괄 %+v", done)
+	}
+}
+
+func TestProjectCompleteDoesNotAutoOnEndDate(t *testing.T) {
+	e, repo, _ := newProjectServer(t)
+	p := &model.WorkProject{Name: "종료경과", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1, EndDate: "2020-01-01"}
+	if err := repo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := repo.Get(p.ProjectID)
+	if got.ContractRunStatus("2026-10-19") != model.RunNeedComplete {
+		t.Fatalf("run=%s", got.ContractRunStatus("2026-10-19"))
+	}
+	if got.Status == model.WBProjectComplete {
+		t.Fatal("자동 완료")
+	}
+	show := doGet(t, e, "/projects/"+p.ProjectID)
+	if !strings.Contains(show.Body.String(), "완료 확인 필요") || !strings.Contains(show.Body.String(), "사업 완료 처리") {
+		t.Fatal("완료 확인 필요 표시 없음")
+	}
+	ro := workFormCookie(t, e, "/projects/"+p.ProjectID+"/complete", url.Values{}, jwtCookieReadOnly(t, model.RoleAdmin))
+	if ro.Code != http.StatusForbidden {
+		t.Fatalf("읽기전용 %d", ro.Code)
+	}
+	rec := doForm(t, e, "/projects/"+p.ProjectID+"/complete", url.Values{})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("완료 %d", rec.Code)
+	}
+	got, _ = repo.Get(p.ProjectID)
+	if got.Status != model.WBProjectComplete || got.ContractRunStatus("2026-10-19") != model.RunDone {
+		t.Fatalf("완료 후 %+v", got)
+	}
+	rec = doForm(t, e, "/projects/"+p.ProjectID+"/complete-cancel", url.Values{})
+	got, _ = repo.Get(p.ProjectID)
+	if got.Status != model.WBProjectActive {
+		t.Fatalf("취소 %+v", got)
 	}
 }
 

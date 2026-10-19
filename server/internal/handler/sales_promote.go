@@ -218,7 +218,7 @@ func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesPr
 	}
 	rulesJSON, _ := json.Marshal(jsRules)
 	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
-		"Title": "사업관리로 전환", "Active": NavSales,
+		"Title": "계약으로 전환", "Active": NavSales,
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": false,
 		"FromSales": true, "SalesID": s.SalesID, "SalesAmount": s.AmountLabel(),
 		"Customers": customers, "Parents": parents,

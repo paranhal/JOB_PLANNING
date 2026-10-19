@@ -1,0 +1,25 @@
+<div class="modal-backdrop" data-contract-dialog-root>
+  <div role="dialog" aria-modal="true" aria-labelledby="contract-modal-title" class="modal-panel mx-auto mt-16 max-w-lg w-full space-y-3">
+    <div class="flex items-start justify-between gap-2">
+      <h2 id="contract-modal-title" class="text-ui-xl font-extrabold text-ink">{{.Project.Name}}</h2>
+      <button type="button" class="btn btn-ghost btn-sm" data-close-contract-modal>닫기</button>
+    </div>
+    <dl class="grid grid-cols-2 gap-2 text-ui-sm">
+      <div><dt class="text-ink-muted">계약금액</dt><dd class="text-ink">{{if gt .Project.ContractAmount 0}}{{.Project.ContractAmount}}원{{else}}—{{end}}</dd></div>
+      <div><dt class="text-ink-muted">계약기간</dt><dd class="text-ink">{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</dd></div>
+      <div><dt class="text-ink-muted">유상/무상</dt><dd class="text-ink">{{if .Project.IsPaid}}유상{{else}}무상{{end}}</dd></div>
+      <div><dt class="text-ink-muted">상태</dt><dd class="text-ink">{{.RunLabel}} · {{.Life}}</dd></div>
+      <div class="col-span-2"><dt class="text-ink-muted">영업 연결</dt><dd class="text-ink">{{if .Project.SalesProjectID}}{{.Project.SalesProjectID}}{{else}}없음{{end}}</dd></div>
+    </dl>
+    <p class="text-ui font-medium text-ink">이 사업의 계약 후 활동</p>
+    <ul class="text-ui-sm space-y-1">
+      <li>AS <a class="text-primary hover:underline" href="{{.ASHref}}">{{.ASCount}}건</a></li>
+      <li>정기점검 <a class="text-primary hover:underline" href="{{.MntHref}}">{{.MntCount}}건</a></li>
+      <li>대기 업무 <a class="text-primary hover:underline" href="{{.WaitHref}}">{{.WaitCount}}건</a></li>
+    </ul>
+    <div class="flex flex-wrap gap-2">
+      <a href="{{.FullHref}}" class="btn btn-secondary btn-sm">전체 화면으로 열기</a>
+      <a href="{{.DashHref}}" class="btn btn-ghost btn-sm">사업 대시보드로</a>
+    </div>
+  </div>
+</div>

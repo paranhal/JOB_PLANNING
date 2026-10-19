@@ -1,0 +1,20 @@
+<div class="modal-backdrop" data-contract-dialog-root>
+  <div role="dialog" aria-modal="true" aria-labelledby="contract-modal-title" class="modal-panel mx-auto mt-16 max-w-lg w-full space-y-3">
+    <div class="flex items-start justify-between gap-2">
+      <h2 id="contract-modal-title" class="text-ui-xl font-extrabold text-ink">{{.Raw.Name}}</h2>
+      <button type="button" class="btn btn-ghost btn-sm" data-close-contract-modal>닫기</button>
+    </div>
+    <p class="text-ui-sm"><span class="badge badge-warning">영업 계약 완료 · 계약 전환 필요</span></p>
+    <dl class="grid grid-cols-2 gap-2 text-ui-sm">
+      <div><dt class="text-ink-muted">계약금액</dt><dd class="text-ink">{{.Raw.AmountLabel}}</dd></div>
+      <div><dt class="text-ink-muted">계약일</dt><dd class="text-ink">{{if .Raw.ContractedAt}}{{.Raw.ContractedAt}}{{else}}—{{end}}</dd></div>
+      <div class="col-span-2"><dt class="text-ink-muted">고객</dt><dd class="text-ink">{{if .Raw.ProspectName}}{{.Raw.ProspectName}}{{else}}—{{end}}</dd></div>
+    </dl>
+    <div class="flex flex-wrap gap-2">
+      {{if .CanPromote}}
+      <a href="/sales/{{.Raw.SalesID}}/promote" class="btn btn-primary btn-sm">계약으로 전환</a>
+      {{end}}
+      <a href="/sales/{{.Raw.SalesID}}" class="btn btn-secondary btn-sm">전체 화면으로 열기</a>
+    </div>
+  </div>
+</div>

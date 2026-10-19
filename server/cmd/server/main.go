@@ -470,6 +470,8 @@ func main() {
 	proj.POST("/:id", h.Project.Update)
 	proj.POST("/:id/update", h.Project.Update)
 	proj.POST("/:id/archive", h.Project.Archive)
+	proj.POST("/:id/complete", h.Project.Complete)
+	proj.POST("/:id/complete-cancel", h.Project.CompleteCancel)
 	proj.POST("/:id/activate", h.Project.Activate)
 	proj.GET("/:id/merge", h.Project.MergeForm, h.Auth.RequireVisionOnly)
 	proj.POST("/:id/merge", h.Project.MergeSave, h.Auth.RequireVisionOnly)

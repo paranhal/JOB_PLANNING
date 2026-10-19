@@ -107,6 +107,15 @@
   .dash-track-tab { @apply rounded-control px-2 py-1; }
   .dash-track-tab-on { @apply rounded-control px-2 py-1 font-medium bg-surface text-ink; }
 
+  .table-scroll { @apply w-full overflow-x-auto; }
+  .table-cols { table-layout: fixed; width: max-content; }
+  .col-resize-handle {
+    @apply absolute top-0 right-0 h-full w-2 cursor-col-resize;
+    touch-action: none;
+  }
+  .cell-ellipsis { @apply overflow-hidden text-ellipsis whitespace-nowrap; }
+  .cell-wrap { overflow-wrap: anywhere; }
+
   .sidebar-section { @apply px-3 pb-1 pt-4 text-ui-xs font-medium uppercase tracking-wide text-sidebar-text; }
   .sidebar-item { @apply flex items-center gap-2 rounded-control px-3 py-1.5 text-ui text-sidebar-text hover:bg-hover hover:text-ink; }
   .sidebar-item-active { @apply sidebar-item bg-hover text-ink; }
