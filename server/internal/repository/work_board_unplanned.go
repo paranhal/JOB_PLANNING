@@ -174,8 +174,31 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	var counts model.UnplannedKindCounts
 	all := make([]model.UnplannedItem, 0, len(bag))
 	for _, it := range bag {
-		counts.AddItem(*it)
 		all = append(all, *it)
+	}
+	if strings.TrimSpace(orgID) != "" && orgID != OrgAll {
+		raw := make([]model.WorkListItem, 0, len(all))
+		for _, it := range all {
+			raw = append(raw, it.WorkListItem)
+		}
+		kept, err := r.filterWorkListForOrg(raw, orgID)
+		if err != nil {
+			return nil, model.UnplannedKindCounts{}, err
+		}
+		ok := map[string]bool{}
+		for _, it := range kept {
+			ok[it.Prefix+":"+it.RefID] = true
+		}
+		filt := all[:0]
+		for _, it := range all {
+			if ok[it.Prefix+":"+it.RefID] {
+				filt = append(filt, it)
+			}
+		}
+		all = filt
+	}
+	for _, it := range all {
+		counts.AddItem(it)
 	}
 
 	kind = strings.TrimSpace(kind)

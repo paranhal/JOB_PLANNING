@@ -172,14 +172,21 @@ func (r *WBRepo) ListChildren(parentID string) ([]model.WorkTask, error) {
 // ListTasksBetween 수행일(WorkDate)이 기간 안인 업무 (일일 업무 등록 일정표용).
 // 시각이 비어 있어도 포함하며, 화면에서 표시용 시각을 채운다.
 func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
+	return r.ListTasksBetweenForOrg(from, to, OrgAll)
+}
+
+func (r *WBRepo) ListTasksBetweenForOrg(from, to, orgID string) ([]model.WorkTask, error) {
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
 	if from == "" || to == "" {
 		return nil, nil
 	}
-	return r.listStoredTasks(`
+	where := `
 		WHERE TRIM(COALESCE(t.work_date,'')) != ''
 		  AND t.work_date >= ? AND t.work_date <= ?
-		  AND COALESCE(t.recurrence_role,'') != 'parent'`+workTaskOrder, from, to)
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`
+	args := []interface{}{from, to}
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	return r.listStoredTasks(where+frag+workTaskOrder, append(args, extra...)...)
 }
 
 // ListTasksDatedBetween 배정일(없으면 예정일)이 기간 안인 업무 — 시간 유무 무관(업무처리현황용)
@@ -339,16 +346,23 @@ func (r *WBRepo) PlacedSourceKeys() (map[string]bool, error) {
 
 // ListTasksNeedingAutoPlace 기간 안 배정일은 있고 시각만 비어 있는 미완료 업무.
 func (r *WBRepo) ListTasksNeedingAutoPlace(from, to string) ([]model.WorkTask, error) {
+	return r.ListTasksNeedingAutoPlaceForOrg(from, to, OrgAll)
+}
+
+func (r *WBRepo) ListTasksNeedingAutoPlaceForOrg(from, to, orgID string) ([]model.WorkTask, error) {
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
 	if from == "" || to == "" {
 		return nil, nil
 	}
-	return r.listStoredTasks(`
+	where := `
 		WHERE TRIM(COALESCE(t.start_time,'')) = ''
 		  AND COALESCE(t.status,'') != 'complete'
 		  AND TRIM(COALESCE(t.work_date,'')) != ''
 		  AND t.work_date >= ? AND t.work_date <= ?
-		  AND COALESCE(t.recurrence_role,'') != 'parent'`+workTaskOrder, from, to)
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`
+	args := []interface{}{from, to}
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	return r.listStoredTasks(where+frag+workTaskOrder, append(args, extra...)...)
 }
 
 // AdminWorkStats 행정/지원 업무 현황 건수

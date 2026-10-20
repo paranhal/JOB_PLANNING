@@ -72,3 +72,23 @@ func orgIDOrAll(orgID string) string {
 	}
 	return orgID
 }
+
+// workTaskVisibleOrgSQL 일일업무 조직 판정: 행 org_id → 담당자 소속 → 작성자 소속.
+// 셋 다 비면 조직 지정 조회에서 제외한다. OrgAll이면 조건 없음.
+func workTaskVisibleOrgSQL(alias, orgID string) (string, []interface{}) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" || orgID == OrgAll {
+		return "", nil
+	}
+	a := "t"
+	if strings.TrimSpace(alias) != "" {
+		a = alias
+	}
+	frag := fmt.Sprintf(` AND COALESCE(
+		NULLIF(TRIM(%[1]s.org_id),''),
+		(SELECT NULLIF(TRIM(ua.org_id),'') FROM users ua WHERE ua.user_id=%[1]s.assignee_user_id LIMIT 1),
+		(SELECT NULLIF(TRIM(un.org_id),'') FROM users un WHERE TRIM(%[1]s.assignee)!='' AND TRIM(un.full_name)=TRIM(%[1]s.assignee) LIMIT 1),
+		(SELECT NULLIF(TRIM(uc.org_id),'') FROM users uc WHERE uc.user_id=%[1]s.created_by_user_id LIMIT 1)
+	)=?`, a)
+	return frag, []interface{}{orgID}
+}

@@ -131,16 +131,23 @@ func asDailyTaskUnchanged(a, b *model.WorkTask) bool {
 
 // ListUndatedASTasks 예정일·배정일이 비어 있는 AS 일일업무. 일정표 위 「날짜 미정」 줄. §42.2
 func (r *WBRepo) ListUndatedASTasks() ([]model.WorkTask, error) {
+	return r.ListUndatedASTasksForOrg(OrgAll)
+}
+
+func (r *WBRepo) ListUndatedASTasksForOrg(orgID string) ([]model.WorkTask, error) {
 	if r == nil || r.db == nil {
 		return nil, nil
 	}
-	rows, err := r.db.Query(workTaskSelect+`
+	where := `
 		WHERE t.source_type = ?
 		  AND (TRIM(COALESCE(t.assignee,'')) != '' OR TRIM(COALESCE(t.assignee_user_id,'')) != '')
 		  AND TRIM(COALESCE(t.work_date,'')) = ''
 		  AND TRIM(COALESCE(t.due_date,'')) = ''
-		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
-		ORDER BY t.title, t.task_id`, model.WBSourceAS)
+		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')`
+	args := []interface{}{model.WBSourceAS}
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	rows, err := r.db.Query(workTaskSelect+where+frag+`
+		ORDER BY t.title, t.task_id`, append(args, extra...)...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil

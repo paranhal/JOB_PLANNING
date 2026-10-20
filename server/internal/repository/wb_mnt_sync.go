@@ -87,10 +87,16 @@ func (r *WBRepo) SyncMaintenanceBoard() {
 
 // SyncMaintenanceBoardRange 화면에서 보는 기간(+여유)만 맞춘다. from·to가 비면 전체.
 func (r *WBRepo) SyncMaintenanceBoardRange(from, to string) {
-	_, _ = r.DeleteOrphanMaintenanceTasks()
-	_, _ = r.EnsureMaintenanceTasksBetween(from, to)
+	r.SyncMaintenanceBoardRangeForOrg(from, to, OrgAll)
+}
+
+func (r *WBRepo) SyncMaintenanceBoardRangeForOrg(from, to, orgID string) {
+	if strings.TrimSpace(orgID) == "" || orgID == OrgAll {
+		_, _ = r.DeleteOrphanMaintenanceTasks()
+	}
+	_, _ = r.EnsureMaintenanceTasksBetweenForOrg(from, to, orgID)
 	_ = r.BackfillMaintenanceTaskStatuses()
-	_, _ = r.SyncMaintenanceTaskDatesRange(from, to)
+	_, _ = r.SyncMaintenanceTaskDatesRangeForOrg(from, to, orgID)
 }
 
 // EnsureMaintenanceTasks 아직 일일업무가 없는 방문에 대해 work_tasks 를 만든다.
@@ -101,11 +107,24 @@ func (r *WBRepo) EnsureMaintenanceTasks() (int, error) {
 }
 
 func (r *WBRepo) EnsureMaintenanceTasksBetween(from, to string) (int, error) {
+	return r.EnsureMaintenanceTasksBetweenForOrg(from, to, OrgAll)
+}
+
+func mntSiteOrgSQL(orgID string) (string, []interface{}) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" || orgID == OrgAll {
+		return "", nil
+	}
+	return ` AND COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''))=?`, []interface{}{orgID}
+}
+
+func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (int, error) {
 	q := `
 		SELECT v.visit_id, v.visit_date, COALESCE(v.assignee,''), COALESCE(v.product_type,''),
 		       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
 		       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
-		       COALESCE(v.project_id,'')
+		       COALESCE(v.project_id,''),
+		       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), '')
 		FROM maintenance_visits v
 		JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
@@ -119,6 +138,9 @@ func (r *WBRepo) EnsureMaintenanceTasksBetween(from, to string) (int, error) {
 		q += ` AND v.visit_date >= ? AND v.visit_date <= ?`
 		args = append(args, from, to)
 	}
+	frag, extra := mntSiteOrgSQL(orgID)
+	q += frag
+	args = append(args, extra...)
 	q += ` ORDER BY v.visit_date, v.sort_order`
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
@@ -131,9 +153,9 @@ func (r *WBRepo) EnsureMaintenanceTasksBetween(from, to string) (int, error) {
 
 	n := 0
 	for rows.Next() {
-		var id, date, assignee, product, site, doneDate, projectID string
+		var id, date, assignee, product, site, doneDate, projectID, visitOrg string
 		var completed int
-		if err := rows.Scan(&id, &date, &assignee, &product, &site, &completed, &doneDate, &projectID); err != nil {
+		if err := rows.Scan(&id, &date, &assignee, &product, &site, &completed, &doneDate, &projectID, &visitOrg); err != nil {
 			return n, err
 		}
 		workDate := date
@@ -159,6 +181,7 @@ func (r *WBRepo) EnsureMaintenanceTasksBetween(from, to string) (int, error) {
 			SourceType:  model.WBSourceMaintenance,
 			SourceID:    id,
 			ReceiptDate: date,
+			OrgID:       strings.TrimSpace(visitOrg),
 		}
 		if completed == 1 {
 			t.CompleteDate = workDate
@@ -177,6 +200,10 @@ func (r *WBRepo) SyncMaintenanceTaskDates() (int, error) {
 }
 
 func (r *WBRepo) SyncMaintenanceTaskDatesRange(from, to string) (int, error) {
+	return r.SyncMaintenanceTaskDatesRangeForOrg(from, to, OrgAll)
+}
+
+func (r *WBRepo) SyncMaintenanceTaskDatesRangeForOrg(from, to, orgID string) (int, error) {
 	where := ``
 	args := []interface{}{}
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
@@ -188,6 +215,9 @@ func (r *WBRepo) SyncMaintenanceTaskDatesRange(from, to string) (int, error) {
 		)`
 		args = append(args, from, to, from, to, from, to)
 	}
+	frag, extra := mntSiteOrgSQL(orgID)
+	where += frag
+	args = append(args, extra...)
 	links, err := r.queryMntTaskLinks(where, args...)
 	if err != nil {
 		return 0, err
