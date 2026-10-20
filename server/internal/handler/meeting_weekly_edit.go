@@ -33,6 +33,8 @@ func (h *MeetingHandler) weeklyItemCanEdit(c echo.Context, it model.WorkListItem
 			canMod = h.asH.canModifyAS(c, as)
 		}
 		return canSaveASReceipt(c, as, canMod)
+	case model.WorkPrefixSales:
+		return canEditSalesActivity(c, it.Assignee)
 	default:
 		return canEditTask(c, it.Assignee, "")
 	}
@@ -190,4 +192,3 @@ func weeklyUserIDByName(h *MeetingHandler, c echo.Context, name string) string {
 	}
 	return ""
 }
-

@@ -144,6 +144,148 @@ func TestListScheduledOnIncludesCompleteAndUnconfirmed(t *testing.T) {
 	}
 }
 
+func TestMeeting94_4SalesCompletedAssigneeAndCoop(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "meeting94_4.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	lastDone := "2026-10-14"
+	thisPlan := "2026-10-21"
+	overdue := "2026-10-08"
+	mustExecMeeting(t, db, `INSERT INTO work_tasks (
+		task_id, work_type, title, due_date, work_date, status, assignee, complete_date, source_type, org_id
+	) VALUES
+		('WT-s-done','sales','지난주 영업','`+lastDone+`','`+lastDone+`','complete','양기헌','`+lastDone+`','sales_activity','O01'),
+		('WT-s-plan','sales','이번주 영업','`+thisPlan+`','`+thisPlan+`','waiting','양기헌',NULL,'sales_activity','O01'),
+		('WT-s-over','sales','경과 영업','`+overdue+`','`+overdue+`','waiting','양기헌',NULL,'sales_activity','O01'),
+		('WT-s-other','sales','타인 영업','`+thisPlan+`','`+thisPlan+`','waiting','최혜영',NULL,'sales_activity','O01'),
+		('WT-s-empty','sales','미배정 영업','`+thisPlan+`','`+thisPlan+`','waiting','',NULL,'sales_activity','O01')`)
+
+	repo := NewWorkBoardRepo(db)
+	done, err := repo.ListCompletedOn(lastDone, "yang", []string{"양기헌"}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasWorkRef(done, "WT-s-done") {
+		t.Fatalf("지난주 완료에 영업 없음: %+v", refsOf(done))
+	}
+	if hasWorkRef(done, "WT-s-other") {
+		t.Fatal("본인 완료에 타인 영업")
+	}
+	for _, it := range done {
+		if it.RefID == "WT-s-done" {
+			if it.Prefix != model.WorkPrefixSales {
+				t.Fatalf("prefix %s", it.Prefix)
+			}
+			if it.Assignee == "" {
+				t.Fatal("담당자 열 없음")
+			}
+		}
+	}
+
+	sched, err := repo.ListScheduledOn(thisPlan, "yang", []string{"양기헌"}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasWorkRef(sched, "WT-s-plan") {
+		t.Fatalf("이번 주 예정에 영업 없음: %+v", refsOf(sched))
+	}
+	if hasWorkRef(sched, "WT-s-other") {
+		t.Fatal("본인 예정에 타인 영업")
+	}
+
+	over, err := repo.ListUnified("yang", []string{"양기헌"}, true, "2026-10-19", "2026-10-19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasWorkRef(over, "WT-s-over") {
+		t.Fatalf("미완료에 경과 영업 없음: %+v", refsOf(over))
+	}
+	if hasWorkRef(over, "WT-s-other") {
+		t.Fatal("includeAllSales가 담당자 필터를 무시함")
+	}
+
+	unass, err := repo.CollectUnassigned(model.OrgIDLibrary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasWorkRef(unass, "WT-s-empty") {
+		t.Fatalf("미배정에 영업 없음: %+v", refsOf(unass))
+	}
+
+	mustExecMeeting(t, db, `INSERT OR IGNORE INTO orgs(org_id,org_no,org_name,kind,is_active,sort_order) VALUES('O02','O02','미디어','business',1,20)`)
+	users := NewUserRepo(db)
+	oa := &model.User{Username: "oa94", PasswordHash: "x", FullName: "도서팀장94", Role: model.RoleOrgAdmin, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
+	tech := &model.User{Username: "t94", PasswordHash: "x", FullName: "미디어기술94", Role: model.RoleTech, IsActive: true, OrgID: "O02", ProfileDone: true}
+	oa2 := &model.User{Username: "oa294", PasswordHash: "x", FullName: "미디어팀장94", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O02", ProfileDone: true}
+	for _, u := range []*model.User{oa, tech, oa2} {
+		if err := users.Create(u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	coop := NewCoopRepo(db)
+	row := &model.Cooperation{TargetOrgID: "O02", Kind: model.CoopAdmin, Title: "94-4협조", Body: "내용", WantStart: thisPlan, WantEnd: thisPlan}
+	req := model.CoopActor{UserID: oa.UserID, OrgID: oa.OrgID, Role: oa.Role}
+	if err := coop.Create(req, row); err != nil {
+		t.Fatal(err)
+	}
+	acc := model.CoopActor{UserID: oa2.UserID, OrgID: oa2.OrgID, Role: oa2.Role}
+	if err := coop.Accept(acc, row.CoopID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := coop.Assign(acc, row.CoopID, thisPlan, thisPlan, "지시", "", []string{tech.UserID}); err != nil {
+		t.Fatal(err)
+	}
+	mine, err := repo.ListScheduledOn(thisPlan, tech.UserID, []string{tech.FullName}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, it := range mine {
+		if it.CoopID == row.CoopID {
+			found = true
+			if it.CoopFromOrg == "" {
+				t.Fatal("요청 조직명 없음")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("배정 담당 내 자료에 협조 없음 %+v", refsOf(mine))
+	}
+	other, err := repo.ListScheduledOn(thisPlan, "yang", []string{"양기헌"}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range other {
+		if it.CoopID == row.CoopID {
+			t.Fatal("타 조직 담당에게 협조 업무가 보임")
+		}
+	}
+
+	rep, err := NewStatsRepo(db).BuildWeeklyReportOrg(time.Date(2026, 10, 19, 0, 0, 0, 0, time.Local), OrgAll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawSales, sawCoop bool
+	for _, ev := range rep.Events {
+		if ev.Kind == model.WeeklyEventSales || ev.WorkType == "영업" {
+			sawSales = true
+		}
+		if ev.Kind == model.WeeklyEventCoop {
+			sawCoop = true
+		}
+	}
+	if !sawSales {
+		t.Fatal("주간 엑셀 리스트에 영업 행 없음")
+	}
+	if !sawCoop {
+		t.Fatal("주간 엑셀 리스트에 협조 행 없음")
+	}
+}
+
 func mustExecMeeting(t *testing.T, db *sql.DB, q string) {
 	t.Helper()
 	if _, err := db.Exec(q); err != nil {

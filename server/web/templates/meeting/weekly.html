@@ -158,6 +158,7 @@
         <tr class="hover:bg-hover">
           <td class="px-3 py-2 whitespace-nowrap">
             <span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span>
+            {{if .SubLabel}}<span class="text-ui-sm text-ink-muted">{{.SubLabel}}</span>{{end}}
             {{if .CoopID}}<span class="badge-neutral">협조</span>{{if .CoopFromOrg}}<span class="text-ui-sm text-ink-muted">요청: {{.CoopFromOrg}}</span>{{end}}{{if .WorkGroupName}}<span class="badge-neutral">그룹: {{.WorkGroupName}}</span>{{end}}{{end}}
           </td>
           <td class="meeting-assignee-cell px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}<span class="badge-neutral">미배정</span>{{end}}</td>

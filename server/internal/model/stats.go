@@ -343,8 +343,8 @@ type StatsMeetingFilter struct {
 	MetricsBaseComplete  string
 	DateBasis            DateBasis
 	AlsoBases            []DateBasis // 리드타임: 기준일 두 개(또는 셋)를 모두 넘긴 건만 (§4.15 · §68.3.3)
-	OrgID                string // 세션 조직. 빈 값은 전 조직이 아니다 (§52.4)
-	TestDataOnly         bool   // true면 is_test=1 만. 기본은 테스터 행 제외 (§53.8.2)
+	OrgID                string      // 세션 조직. 빈 값은 전 조직이 아니다 (§52.4)
+	TestDataOnly         bool        // true면 is_test=1 만. 기본은 테스터 행 제외 (§53.8.2)
 }
 
 // StatsKPICard 상단 중요 통계 카드
@@ -415,6 +415,8 @@ const (
 	WeeklyEventComplete  = "완료"
 	WeeklyEventMnt       = "점검"
 	WeeklyEventAdmin     = "행정"
+	WeeklyEventSales     = "영업"
+	WeeklyEventCoop      = "협조"
 )
 
 // WeeklyReport 주간업무보고서 엑셀 데이터 (§16.1 시트 2개)

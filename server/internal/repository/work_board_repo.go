@@ -344,7 +344,7 @@ func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includ
 			 AND (COALESCE(t.status,'')!='complete' OR (` + adminTaskCompleteDateSQL + `>=date(?) AND ` + adminTaskCompleteDateSQL + `<=date(?)))`
 			salesArgs = []interface{}{from, to}
 		}
-		sales, err := r.queryWorkTasks(salesWhere, "", nil, salesArgs)
+		sales, err := r.queryWorkTasks(salesWhere, mineUserID, mineKeys, salesArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -752,7 +752,7 @@ func (r *WorkBoardRepo) collectCompletedRange(mineUserID string, mineKeys []stri
 		tArgs = []interface{}{from, to}
 	}
 	tItems, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support')
+		`t.work_type IN ('admin','support','sales')
 		 AND t.status='complete'
 		 AND `+tPred,
 		mineUserID, mineKeys, tArgs)
@@ -1131,10 +1131,12 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		       t.title, COALESCE(t.assignee,''), t.status, t.work_type,
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), COALESCE(p.short_name, p.name, '')),
 		       COALESCE(t.source_type,''), COALESCE(t.customer_id,''), COALESCE(t.project_id,''), COALESCE(t.description,''),
-		       COALESCE(t.assigned_at,''), COALESCE(t.assigned_by,'')
+		       COALESCE(t.assigned_at,''), COALESCE(t.assigned_by,''),
+		       COALESCE(t.source_id,''), COALESCE(sa.sales_id,''), COALESCE(sa.activity_type,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
+		LEFT JOIN sales_activities sa ON t.source_type='sales_activity' AND sa.activity_id=t.source_id
 		WHERE ` + extraWhere + SQLRecurrenceWorkUnit
 	args := append([]interface{}{}, extraArgs...)
 	if mineCond, mineArgs := mineTaskAssigneeCond(mineUserID, mineKeys); mineCond != "" {
@@ -1153,8 +1155,8 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 	var items []model.WorkListItem
 	for rows.Next() {
 		var it model.WorkListItem
-		var workType, sourceType string
-		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType, &it.CustomerID, &it.ProjectID, &it.Content, &it.AssignedAt, &it.AssignedBy); err != nil {
+		var workType, sourceType, sourceID, salesID, actType string
+		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType, &it.CustomerID, &it.ProjectID, &it.Content, &it.AssignedAt, &it.AssignedBy, &sourceID, &salesID, &actType); err != nil {
 			return nil, err
 		}
 		it.ScheduledDate = it.WorkDate
@@ -1169,12 +1171,22 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		if workType == model.WBWorkSupport {
 			it.SubLabel = "지원"
 		} else if it.Prefix == model.WorkPrefixSales {
-			it.SubLabel = "영업"
+			it.SubLabel = model.SalesActivityTypeKO(actType, "영업")
+			if it.SubLabel == "" {
+				it.SubLabel = "영업"
+			}
 		} else {
 			it.SubLabel = "행정"
 		}
 		it.StatusLabel = workTaskStatusLabel(it.Status)
 		it.Href = "/workboard/tasks/" + it.RefID
+		if it.Prefix == model.WorkPrefixSales {
+			if strings.TrimSpace(salesID) != "" {
+				it.Href = "/sales/" + strings.TrimSpace(salesID)
+			} else if strings.TrimSpace(sourceID) != "" {
+				it.Href = "/sales/activities/" + strings.TrimSpace(sourceID)
+			}
+		}
 		items = append(items, it)
 	}
 	return items, rows.Err()

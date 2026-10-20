@@ -422,6 +422,7 @@ func KanbanCardFromWork(it WorkListItem) KanbanCard {
 		Assignee:      it.Assignee,
 		Prefix:        it.Prefix,
 		PrefixLabel:   WorkPrefixLabel(it.Prefix),
+		TypeLabel:     it.SubLabel,
 		MappedStatus:  it.MappedStatus,
 		Bucket:        it.Bucket,
 		LeftStyle:     WorkCardColorStyle(it.Assignee, it.ProductType, it.Prefix),
@@ -435,7 +436,19 @@ func KanbanCardFromWork(it WorkListItem) KanbanCard {
 		Tentative:     it.Tentative,
 		EditLocked:    it.EditLocked,
 		AssigneeOther: it.AssigneeOther,
+		Extra:         coopKanbanExtra(it),
 	}
+}
+
+func coopKanbanExtra(it WorkListItem) string {
+	if strings.TrimSpace(it.CoopID) == "" {
+		return ""
+	}
+	s := "협조"
+	if org := strings.TrimSpace(it.CoopFromOrg); org != "" {
+		s += " · 요청: " + org
+	}
+	return s
 }
 
 func KanbanCardFromAdminTask(t WorkTask) KanbanCard {

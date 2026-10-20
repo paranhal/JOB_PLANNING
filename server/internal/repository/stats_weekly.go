@@ -606,6 +606,11 @@ func (r *StatsRepo) ListWeeklyEventRows(from, toEx string) ([]model.WeeklyEventR
 		return nil, err
 	}
 	out = append(out, admin...)
+	sales, err := r.listWeeklySalesEvents(from, toEx)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, sales...)
 	waiting, err := r.listWeeklyWaitingForEvents(from, toEx)
 	if err != nil {
 		return nil, err
@@ -644,8 +649,12 @@ func weeklyEventKindOrder(kind string) int {
 		return 2
 	case model.WeeklyEventMnt:
 		return 3
-	default:
+	case model.WeeklyEventSales:
 		return 4
+	case model.WeeklyEventCoop:
+		return 5
+	default:
+		return 6
 	}
 }
 
@@ -799,7 +808,7 @@ func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEven
 		       END,
 		       COALESCE((SELECT SUM(COALESCE(a.spent_minutes,0)) FROM work_activities a WHERE a.task_id=t.task_id), t.duration_min, 0),
 		       COALESCE(t.wait_party,''), COALESCE(t.reply_due_date,''),
-		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,'')
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.cooperation_id,'')
 		FROM work_tasks t
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
 		WHERE t.work_type IN ('admin','support')
@@ -820,14 +829,17 @@ func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEven
 	var items []model.WeeklyEventRow
 	for rows.Next() {
 		var it model.WeeklyEventRow
-		var desc, status, wtype, waitParty, replyDue string
-		if err := rows.Scan(&it.WorkNo, &it.Customer, &it.Assignee, &it.Content, &desc, &status, &wtype, &it.OccurDate, &it.Minutes, &waitParty, &replyDue, &it.ParentTaskID, &it.RecurrenceRole); err != nil {
+		var desc, status, wtype, waitParty, replyDue, coopID string
+		if err := rows.Scan(&it.WorkNo, &it.Customer, &it.Assignee, &it.Content, &desc, &status, &wtype, &it.OccurDate, &it.Minutes, &waitParty, &replyDue, &it.ParentTaskID, &it.RecurrenceRole, &coopID); err != nil {
 			return nil, err
 		}
 		it.Kind = model.WeeklyEventAdmin
 		it.WorkType = "행정"
 		if wtype == "support" {
 			it.WorkType = "지원"
+		}
+		if strings.TrimSpace(coopID) != "" {
+			it.Kind = model.WeeklyEventCoop
 		}
 		it.Assignee = weeklyAssigneeLabel(it.Assignee)
 		it.Result = model.WBTaskStatusLabel(status)
@@ -837,6 +849,60 @@ func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEven
 		if strings.TrimSpace(desc) != "" && !strings.Contains(it.Content, desc) {
 			// 내용은 업무명, 설명은 보조 — 시트 「내용」은 업무명
 		}
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+func (r *StatsRepo) listWeeklySalesEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: OrgAll})
+	q := `
+		SELECT COALESCE(t.task_id,''),
+		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
+		       COALESCE(NULLIF(TRIM(t.assignee),''), ''),
+		       COALESCE(t.title,''), COALESCE(t.status,''),
+		       COALESCE(sa.activity_type,''),
+		       CASE
+		         WHEN t.status='complete' AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?
+		           THEN ` + adminTaskCompleteDateSQL + `
+		         ELSE COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at))
+		       END,
+		       COALESCE((SELECT SUM(COALESCE(a.spent_minutes,0)) FROM work_activities a WHERE a.task_id=t.task_id), t.duration_min, 0),
+		       COALESCE(t.cooperation_id,'')
+		FROM work_tasks t
+		LEFT JOIN customers c ON c.customer_id = t.customer_id
+		LEFT JOIN sales_activities sa ON t.source_type='sales_activity' AND sa.activity_id=t.source_id
+		WHERE (t.work_type='sales' OR t.source_type='sales_activity')
+		  AND COALESCE(t.status,'') NOT IN ('cancelled')` + SQLRecurrenceWorkUnit + adminSQL + `
+		  AND (
+		    (t.status='complete' AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?)
+		    OR (COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') >= ? AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') < ?)
+		  )`
+	args := []interface{}{from, toEx}
+	args = append(args, adminArgs...)
+	args = append(args, from, toEx, from, toEx)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.WeeklyEventRow
+	for rows.Next() {
+		var it model.WeeklyEventRow
+		var status, actType, coopID string
+		if err := rows.Scan(&it.WorkNo, &it.Customer, &it.Assignee, &it.Content, &status, &actType, &it.OccurDate, &it.Minutes, &coopID); err != nil {
+			return nil, err
+		}
+		it.Kind = model.WeeklyEventSales
+		it.WorkType = model.SalesActivityTypeKO(actType, "영업")
+		if strings.TrimSpace(coopID) != "" {
+			it.Kind = model.WeeklyEventCoop
+		}
+		it.Assignee = weeklyAssigneeLabel(it.Assignee)
+		it.Result = model.WBTaskStatusLabel(status)
 		items = append(items, it)
 	}
 	return items, rows.Err()

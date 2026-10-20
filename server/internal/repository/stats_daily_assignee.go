@@ -288,7 +288,7 @@ func (r *StatsRepo) listCompletedByAssigneeDate(from, toEx, orgID string) (map[s
 	qAdmin := `
 		SELECT TRIM(COALESCE(t.assignee,'')), ` + adminTaskCompleteDateSQL + `, COUNT(*)
 		FROM work_tasks t
-		WHERE t.work_type IN ('admin','support') AND t.status='complete'
+		WHERE t.work_type IN ('admin','support','sales') AND t.status='complete'
 		  AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance')` + SQLRecurrenceWorkUnit + adminSQL + `
 		  AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?
 		GROUP BY 1, 2`
