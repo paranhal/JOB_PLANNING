@@ -83,6 +83,9 @@
 
   .menu { @apply rounded-control border border-line bg-surface py-1 shadow-pop; }
   .menu-item { @apply flex items-center gap-2 px-3 py-1.5 text-ui text-ink hover:bg-hover; }
+  .combobox { @apply relative; }
+  .combobox-list { @apply menu absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-auto; }
+  .combobox-option-on { @apply bg-hover; }
 
   .modal-backdrop { @apply fixed inset-0 z-50 bg-ink/40; }
   .modal-panel { @apply rounded-card border border-line bg-surface p-4; }

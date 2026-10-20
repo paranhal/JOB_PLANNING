@@ -13,28 +13,28 @@
       <p class="font-medium text-gray-900">{{.Config.CustomerID}}</p>
     </div>
     {{else}}
-    <div>
-      <label class="block text-gray-600 mb-1">고객 <span class="text-red-500">*</span></label>
-      <select name="customer_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
-        <option value="">선택</option>
-        {{range .Pending}}
-        <option value="{{.ID}}">{{.OrgName}}</option>
-        {{end}}
-      </select>
-      <p class="text-xs text-gray-500 mt-1">이미 설정된 고객은 목록에 나오지 않습니다.</p>
+    <div id="site-customer-combobox" class="combobox" {{if .NeedOrg}}data-need-org="1"{{end}}>
+      <label for="site-customer-q" class="block text-gray-600 mb-1">고객 <span class="text-red-500">*</span></label>
+      <input type="hidden" name="customer_id" id="site-customer-id" value="{{.Draft.CustomerID}}">
+      <input type="text" name="customer_q" id="site-customer-q" value="{{.Draft.CustomerName}}"
+             autocomplete="off" role="combobox" aria-expanded="false" aria-controls="site-customer-list"
+             aria-autocomplete="list" {{if .NeedOrg}}disabled{{end}}
+             class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <ul id="site-customer-list" role="listbox" hidden class="combobox-list"></ul>
+      <p id="site-customer-search-hint" class="text-xs text-gray-500 mt-1">{{if .NeedOrg}}소속 조직을 선택하세요{{else}}이미 설정된 고객은 목록에 나오지 않습니다.{{end}}</p>
     </div>
     {{end}}
 
     <div>
       <label class="block text-gray-600 mb-1">달력·엑셀 표시명 <span class="text-red-500">*</span></label>
       <input type="text" name="short_name" required
-             value="{{with .Config}}{{.ShortName}}{{end}}"
+             value="{{if .Config}}{{.Config.ShortName}}{{else}}{{.Draft.ShortName}}{{end}}"
              placeholder="예: 국립세종"
              class="w-full border border-gray-300 rounded-lg px-3 py-2">
     </div>
     <div>
       <label class="block text-gray-600 mb-1">지역 (자동 배정 묶음용)</label>
-      <input type="text" name="region" value="{{with .Config}}{{.Region}}{{end}}" placeholder="예: 세종, 대전"
+      <input type="text" name="region" value="{{if .Config}}{{.Config.Region}}{{else}}{{.Draft.Region}}{{end}}" placeholder="예: 세종, 대전"
              class="w-full border border-gray-300 rounded-lg px-3 py-2">
     </div>
     <div>
@@ -113,4 +113,77 @@
     </div>
   </form>
 </div>
+{{if not .Config}}
+<script>
+(function () {
+  var wrap = document.getElementById('site-customer-combobox');
+  if (!wrap || wrap.getAttribute('data-need-org') === '1') return;
+  var q = document.getElementById('site-customer-q');
+  var hid = document.getElementById('site-customer-id');
+  var list = document.getElementById('site-customer-list');
+  var hint = document.getElementById('site-customer-search-hint');
+  var timer = null, items = [], idx = -1, open = false;
+  function setOpen(v) {
+    open = v;
+    q.setAttribute('aria-expanded', v ? 'true' : 'false');
+    list.hidden = !v;
+  }
+  function render() {
+    list.innerHTML = '';
+    items.forEach(function (it, i) {
+      var li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      li.id = 'site-cust-opt-' + i;
+      li.className = 'menu-item' + (i === idx ? ' combobox-option-on' : '');
+      li.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+      li.textContent = it.name + (it.region ? ' · ' + it.region : '');
+      li.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it); });
+      list.appendChild(li);
+    });
+    if (idx >= 0 && items[idx]) q.setAttribute('aria-activedescendant', 'site-cust-opt-' + idx);
+    else q.removeAttribute('aria-activedescendant');
+  }
+  function pick(it) {
+    hid.value = it.id;
+    q.value = it.name;
+    items = [];
+    setOpen(false);
+  }
+  function search() {
+    var v = (q.value || '').trim();
+    hid.value = '';
+    var n = Array.from(v).length;
+    if (n < 2) {
+      items = [];
+      if (hint) hint.textContent = n === 0 ? '이미 설정된 고객은 목록에 나오지 않습니다.' : '두 글자 이상 입력하세요';
+      setOpen(false);
+      return;
+    }
+    fetch('/maintenance/sites/customer-search?q=' + encodeURIComponent(v), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        items = data.items || [];
+        if (hint) hint.textContent = data.hint || (items.length ? '이미 설정된 고객은 목록에 나오지 않습니다.' : '해당하는 고객이 없습니다');
+        idx = items.length ? 0 : -1;
+        render();
+        setOpen(true);
+      });
+  }
+  q.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(search, 200);
+  });
+  q.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { setOpen(false); return; }
+    if (!open) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(items.length - 1, idx + 1); render(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(0, idx - 1); render(); }
+    if (e.key === 'Enter' && idx >= 0 && items[idx]) { e.preventDefault(); pick(items[idx]); }
+  });
+  document.addEventListener('click', function (e) {
+    if (!wrap.contains(e.target)) setOpen(false);
+  });
+})();
+</script>
+{{end}}
 {{end}}
