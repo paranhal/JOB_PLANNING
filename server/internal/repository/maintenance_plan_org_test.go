@@ -110,3 +110,29 @@ func TestMaintenancePlanEmptyOrgNotBackfilledOnInit(t *testing.T) {
 		t.Fatalf("empty count %d", n)
 	}
 }
+
+func TestInitDBReopenWithSamePlanYearTwoOrgs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mnt_reopen.db")
+	db, err := InitDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewMaintenanceRepo(db)
+	if _, err := repo.CreatePlanForOrg(model.OrgIDLibrary, 2026, "도서관"); err != nil {
+		t.Fatal(err)
+	}
+	org, err := NewOrgRepo(db).Create("미디어사업팀", "미디어", "", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.CreatePlanForOrg(org.OrgID, 2026, "미디어"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	db2, err := InitDB(path)
+	if err != nil {
+		t.Fatalf("재기동 실패: %v", err)
+	}
+	db2.Close()
+}

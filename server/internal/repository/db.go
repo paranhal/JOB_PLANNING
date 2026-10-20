@@ -444,7 +444,8 @@ CREATE TABLE IF NOT EXISTS maintenance_plans (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_maintenance_plans_year ON maintenance_plans(plan_year);
+-- 연도 단독 UNIQUE 는 쓰지 않는다. 조직별로 같은 해가 있다.
+-- 유니크는 applyMaintenancePlanOrgYearUnique 의 (org_id, plan_year).
 
 CREATE TABLE IF NOT EXISTS maintenance_visits (
     visit_id        TEXT PRIMARY KEY,
