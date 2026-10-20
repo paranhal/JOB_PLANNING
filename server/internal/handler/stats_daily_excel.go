@@ -54,14 +54,14 @@ func writeDailyMatrixSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 	f.SetActiveSheet(idx)
 
 	headSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: "FFFFFFFF"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FF1E3A5F"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF1E3A5F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    weeklyThinBorder(),
 	})
 	offHeadSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: "FF374151"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFE5E7EB"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FF374151")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFE5E7EB")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    weeklyThinBorder(),
 	})
@@ -71,25 +71,25 @@ func writeDailyMatrixSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		Border:    weeklyThinBorder(),
 	})
 	offSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: "FF6B7280"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFE5E7EB"}, Pattern: 1},
+		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FF6B7280")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFE5E7EB")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
 	zeroSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: "FFB91C1C"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFFECACA"}, Pattern: 1},
+		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFB91C1C")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFFECACA")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
 	leaveSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: "FFF97316"},
+		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFF97316")},
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
 	totalSt, _ := f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFDBEAFE"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFDBEAFE")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
@@ -227,8 +227,8 @@ func writeDailyDetailSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		_ = f.SetCellValue(dailyDetailSheet, cell, h)
 	}
 	headSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: "FFFFFFFF"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FF1E3A5F"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF1E3A5F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
 		Border:    weeklyThinBorder(),
 	})
@@ -240,16 +240,16 @@ func writeDailyDetailSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 	})
 	totalSt, _ := f.NewStyle(&excelize.Style{
 		Font:   &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
-		Fill:   excelize.Fill{Type: "pattern", Color: []string{"FFF1F5F9"}, Pattern: 1},
+		Fill:   excelize.Fill{Type: "pattern", Color: []string{xlColor("FFF1F5F9")}, Pattern: 1},
 		Border: weeklyThinBorder(),
 	})
 	breakSt, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Size: 10, Family: "맑은 고딕"},
 		Border: []excelize.Border{
-			{Type: "left", Color: "FFCBD5E1", Style: 1},
-			{Type: "right", Color: "FFCBD5E1", Style: 1},
-			{Type: "top", Color: "FF1E3A5F", Style: 2},
-			{Type: "bottom", Color: "FFCBD5E1", Style: 1},
+			{Type: "left", Color: xlColor("FFCBD5E1"), Style: 1},
+			{Type: "right", Color: xlColor("FFCBD5E1"), Style: 1},
+			{Type: "top", Color: xlColor("FF1E3A5F"), Style: 2},
+			{Type: "bottom", Color: xlColor("FFCBD5E1"), Style: 1},
 		},
 	})
 

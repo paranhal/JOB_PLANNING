@@ -78,6 +78,7 @@ func TestWriteDailyAssigneeTwoSheets(t *testing.T) {
 	if h != "담당자" {
 		t.Fatalf("상세 헤더 A2=%q", h)
 	}
+	assertExcelizeRGB8(t, excelizeFileBytes(t, f))
 }
 
 func TestWriteDailyAssigneeLeaveMark(t *testing.T) {

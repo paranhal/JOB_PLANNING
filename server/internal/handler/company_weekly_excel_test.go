@@ -54,6 +54,7 @@ func TestCompanyWeeklyPreserveFormulasAndHiddenCol(t *testing.T) {
 	if workIdx < 0 || oldIdx < 0 || workIdx != oldIdx-1 {
 		t.Fatalf("삽입 위치 잘못: %v", names)
 	}
+	assertExcelizeRGB8(t, out.Data)
 }
 
 func TestCompanyWeeklyOnlyFillsRows20to25(t *testing.T) {

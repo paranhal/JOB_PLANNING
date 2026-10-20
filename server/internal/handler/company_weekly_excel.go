@@ -177,7 +177,7 @@ func containsSheetName(names []string, want string) bool {
 }
 
 func fillCompanyWeeklySheet(f *excelize.File, sheet string, p model.CompanyWeeklyPeriod, rows []model.CompanyWeeklyRow) error {
-	tab := companyWeeklyTabColor
+	tab := xlColor(companyWeeklyTabColor)
 	if err := f.SetSheetProps(sheet, &excelize.SheetPropsOptions{TabColorRGB: &tab}); err != nil {
 		return err
 	}
@@ -289,18 +289,18 @@ func newCompanyWeeklyStyles(f *excelize.File) (companyWeeklyStyles, error) {
 	var s companyWeeklyStyles
 	var err error
 	dotted := []excelize.Border{
-		{Type: "left", Color: "FF000000", Style: 4},
-		{Type: "right", Color: "FF000000", Style: 4},
-		{Type: "top", Color: "FF000000", Style: 4},
-		{Type: "bottom", Color: "FF000000", Style: 4},
+		{Type: "left", Color: xlColor("FF000000"), Style: 4},
+		{Type: "right", Color: xlColor("FF000000"), Style: 4},
+		{Type: "top", Color: xlColor("FF000000"), Style: 4},
+		{Type: "bottom", Color: xlColor("FF000000"), Style: 4},
 	}
 	thinLR := []excelize.Border{
-		{Type: "left", Color: "FF000000", Style: 1},
-		{Type: "right", Color: "FF000000", Style: 1},
+		{Type: "left", Color: xlColor("FF000000"), Style: 1},
+		{Type: "right", Color: xlColor("FF000000"), Style: 1},
 	}
 	s.row1, err = f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Family: "Century Gothic", Size: 10, Bold: true, Color: "FFFFFFFF"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FF1E3A5F"}, Pattern: 1},
+		Font:      &excelize.Font{Family: "Century Gothic", Size: 10, Bold: true, Color: xlColor("FFFFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF1E3A5F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Vertical: "center", WrapText: true},
 	})
 	if err != nil {
@@ -308,7 +308,7 @@ func newCompanyWeeklyStyles(f *excelize.File) (companyWeeklyStyles, error) {
 	}
 	s.row2, err = f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Family: "Century Gothic", Size: 10, Bold: true},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFD6DCE4"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFD6DCE4")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    thinLR,
 	})
@@ -341,7 +341,7 @@ func newCompanyWeeklyStyles(f *excelize.File) (companyWeeklyStyles, error) {
 	}
 	s.bodyWrapYellow, err = f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Family: "Century Gothic", Size: 10},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFFFFF00"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFFFFF00")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Vertical: "center", WrapText: true},
 		Border:    dotted,
 	})

@@ -56,7 +56,7 @@ func buildSpaceExcelWorkbook(rows []repository.SpaceRow, stats []repository.Spac
 	}
 	hdrStyle, err := f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true, Size: 11, Family: "맑은 고딕"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFDBEAFE"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFDBEAFE")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
 	})
 	if err != nil {

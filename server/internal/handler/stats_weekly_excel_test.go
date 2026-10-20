@@ -119,6 +119,7 @@ func TestWriteWeeklyReportTwoSheetsNoDropdown(t *testing.T) {
 	if strings.Contains(listText, "미계획건") {
 		t.Fatal("전체 리스트에 미계획건 시트 흔적")
 	}
+	assertExcelizeRGB8(t, excelizeFileBytes(t, f))
 }
 
 func weeklySheetJoined(t *testing.T, f *excelize.File, sheet string) string {

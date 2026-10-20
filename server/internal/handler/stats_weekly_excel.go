@@ -127,8 +127,8 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 	}
 
 	if st, err := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: "FFFFFFFF"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FF1E3A5F"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF1E3A5F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    weeklyThinBorder(),
 	}); err == nil {
@@ -136,19 +136,19 @@ func writeWeeklyStatsSheet(f *excelize.File, rep model.WeeklyReport) error {
 	}
 	teamSt, _ := f.NewStyle(&excelize.Style{
 		Font:   &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
-		Fill:   excelize.Fill{Type: "pattern", Color: []string{"FFDBEAFE"}, Pattern: 1},
+		Fill:   excelize.Fill{Type: "pattern", Color: []string{xlColor("FFDBEAFE")}, Pattern: 1},
 		Border: weeklyThinBorder(),
 	})
 	okSt, _ := f.NewStyle(&excelize.Style{
-		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕", Color: "FF166534"},
+		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FF166534")},
 		Border: weeklyThinBorder(),
 	})
 	badSt, _ := f.NewStyle(&excelize.Style{
-		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕", Color: "FFB91C1C"},
+		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFB91C1C")},
 		Border: weeklyThinBorder(),
 	})
 	naSt, _ := f.NewStyle(&excelize.Style{
-		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕", Color: "FF6B7280"},
+		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FF6B7280")},
 		Border: weeklyThinBorder(),
 	})
 	plainSt, _ := f.NewStyle(&excelize.Style{
@@ -289,8 +289,8 @@ func writeWeeklyAllListSheet(f *excelize.File, rep model.WeeklyReport) error {
 		_ = f.SetCellValue(weeklyListSheet, cell, h)
 	}
 	if st, err := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: "FFFFFFFF"},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FF1E3A5F"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF1E3A5F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
 		Border:    weeklyThinBorder(),
 	}); err == nil {
@@ -331,7 +331,7 @@ func writeWeeklyAllListSheet(f *excelize.File, rep model.WeeklyReport) error {
 }
 
 func weeklyThinBorder() []excelize.Border {
-	c := "FFCBD5E1"
+	c := xlColor("FFCBD5E1")
 	return []excelize.Border{
 		{Type: "left", Color: c, Style: 1},
 		{Type: "right", Color: c, Style: 1},
