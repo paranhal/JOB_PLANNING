@@ -32,13 +32,16 @@ func applyASKbEntries(db *sql.DB) {
 			created_at     TEXT NOT NULL DEFAULT '',
 			change_note    TEXT NOT NULL DEFAULT '',
 			status         TEXT NOT NULL DEFAULT 'published',
-			helpful_count  INTEGER NOT NULL DEFAULT 0
+			helpful_count  INTEGER NOT NULL DEFAULT 0,
+			org_id         TEXT NOT NULL DEFAULT ''
 		)`); err != nil {
 		log.Printf("044 as_kb_entries: %v", err)
 		return
 	}
+	addNamedColumn(db, "as_kb_entries", "org_id", `ALTER TABLE as_kb_entries ADD COLUMN org_id TEXT NOT NULL DEFAULT ''`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_as_kb_current ON as_kb_entries(is_current, status)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_as_kb_as ON as_kb_entries(as_id)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_as_kb_org ON as_kb_entries(org_id)`)
 }
 
 type KBWrite struct {
@@ -48,6 +51,7 @@ type KBWrite struct {
 	ChangeNote string
 	AuthorID   string
 	AuthorName string
+	OrgID      string
 }
 
 func (r *ASRepo) ProcessWorkSnapshot(asID string) string {
@@ -135,7 +139,7 @@ func scanKB(s func(dest ...interface{}) error) (*model.ASKBEntry, error) {
 	var created string
 	var cur, helpful int
 	if err := s(&e.KBID, &asID, &e.SymptomText, &e.ActionText, &e.Origin, &e.Rev, &cur, &prev,
-		&e.AuthorID, &e.AuthorName, &created, &e.ChangeNote, &e.Status, &helpful); err != nil {
+		&e.AuthorID, &e.AuthorName, &created, &e.ChangeNote, &e.Status, &helpful, &e.OrgID); err != nil {
 		return nil, err
 	}
 	e.ASID = strings.TrimSpace(asID.String)
@@ -150,7 +154,8 @@ const kbSelect = `
 	SELECT kb_id, as_id, COALESCE(symptom_text,''), COALESCE(action_text,''), COALESCE(origin,''),
 	       COALESCE(rev,1), COALESCE(is_current,0), prev_kb_id,
 	       COALESCE(author_id,''), COALESCE(author_name,''), COALESCE(created_at,''),
-	       COALESCE(change_note,''), COALESCE(status,''), COALESCE(helpful_count,0)
+	       COALESCE(change_note,''), COALESCE(status,''), COALESCE(helpful_count,0),
+	       COALESCE(org_id,'')
 	FROM as_kb_entries`
 
 func (r *ASRepo) GetKB(kbID string) (*model.ASKBEntry, error) {
@@ -199,6 +204,32 @@ func (r *ASRepo) KBHistory(kbID string) []model.ASKBEntry {
 	return out
 }
 
+func kbOrgSQL() string {
+	return `COALESCE(NULLIF(TRIM(as_kb_entries.org_id),''),(SELECT NULLIF(TRIM(u.org_id),'') FROM users u WHERE u.user_id=as_kb_entries.author_id))`
+}
+
+func (r *ASRepo) resolveKBOrg(in KBWrite, asID string) string {
+	if o := strings.TrimSpace(in.OrgID); o != "" && o != OrgAll {
+		return o
+	}
+	asID = strings.TrimSpace(asID)
+	if asID != "" {
+		if as, err := r.GetByID(OrgAll, asID); err == nil && as != nil {
+			if o := strings.TrimSpace(as.OrgID); o != "" && o != OrgAll {
+				return o
+			}
+		}
+	}
+	if aid := strings.TrimSpace(in.AuthorID); aid != "" && r.db != nil {
+		var org string
+		_ = r.db.QueryRow(`SELECT COALESCE(org_id,'') FROM users WHERE user_id=?`, aid).Scan(&org)
+		if o := strings.TrimSpace(org); o != "" && o != OrgAll {
+			return o
+		}
+	}
+	return ""
+}
+
 func (r *ASRepo) PublishKB(in KBWrite) (*model.ASKBEntry, error) {
 	in.ActionText = strings.TrimSpace(in.ActionText)
 	if in.ActionText == "" {
@@ -231,6 +262,7 @@ func (r *ASRepo) PublishKB(in KBWrite) (*model.ASKBEntry, error) {
 		IsCurrent:   true,
 		AuthorID:    strings.TrimSpace(in.AuthorID),
 		AuthorName:  strings.TrimSpace(in.AuthorName),
+		OrgID:       r.resolveKBOrg(in, in.ASID),
 		CreatedAt:   now,
 		ChangeNote:  strings.TrimSpace(in.ChangeNote),
 		Status:      model.KBStatusPublished,
@@ -238,10 +270,10 @@ func (r *ASRepo) PublishKB(in KBWrite) (*model.ASKBEntry, error) {
 	_, err := r.db.Exec(`
 		INSERT INTO as_kb_entries(
 			kb_id, as_id, symptom_text, action_text, origin, rev, is_current, prev_kb_id,
-			author_id, author_name, created_at, change_note, status, helpful_count)
-		VALUES (?,?,?,?,?,?,1,NULL,?,?,?,?,?,0)`,
+			author_id, author_name, created_at, change_note, status, helpful_count, org_id)
+		VALUES (?,?,?,?,?,?,1,NULL,?,?,?,?,?,0,?)`,
 		e.KBID, nullStr(e.ASID), e.SymptomText, e.ActionText, e.Origin, e.Rev,
-		e.AuthorID, e.AuthorName, now.Format("2006-01-02 15:04:05"), e.ChangeNote, e.Status)
+		e.AuthorID, e.AuthorName, now.Format("2006-01-02 15:04:05"), e.ChangeNote, e.Status, e.OrgID)
 	if err != nil {
 		return nil, err
 	}
@@ -287,17 +319,21 @@ func (r *ASRepo) ReviseKB(kbID string, in KBWrite) (*model.ASKBEntry, error) {
 		PrevKBID:    old.KBID,
 		AuthorID:    strings.TrimSpace(in.AuthorID),
 		AuthorName:  strings.TrimSpace(in.AuthorName),
+		OrgID:       r.resolveKBOrg(in, asID),
 		CreatedAt:   now,
 		ChangeNote:  strings.TrimSpace(in.ChangeNote),
 		Status:      model.KBStatusPublished,
 	}
+	if e.OrgID == "" {
+		e.OrgID = strings.TrimSpace(old.OrgID)
+	}
 	if _, err := tx.Exec(`
 		INSERT INTO as_kb_entries(
 			kb_id, as_id, symptom_text, action_text, origin, rev, is_current, prev_kb_id,
-			author_id, author_name, created_at, change_note, status, helpful_count)
-		VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,0)`,
+			author_id, author_name, created_at, change_note, status, helpful_count, org_id)
+		VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,0,?)`,
 		e.KBID, nullStr(e.ASID), e.SymptomText, e.ActionText, e.Origin, e.Rev, e.PrevKBID,
-		e.AuthorID, e.AuthorName, now.Format("2006-01-02 15:04:05"), e.ChangeNote, e.Status); err != nil {
+		e.AuthorID, e.AuthorName, now.Format("2006-01-02 15:04:05"), e.ChangeNote, e.Status, e.OrgID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -327,8 +363,12 @@ func (r *ASRepo) listCurrentKB(q, orgID string) ([]model.ASKBEntry, error) {
 	}
 	orgID = strings.TrimSpace(orgID)
 	if orgID != "" && orgID != OrgAll {
-		where += ` AND EXISTS (SELECT 1 FROM as_receipts ar WHERE ar.as_id=as_kb_entries.as_id AND ar.org_id=?)`
-		args = append(args, orgID)
+		where += ` AND (
+			(TRIM(COALESCE(as_id,''))!='' AND EXISTS (SELECT 1 FROM as_receipts ar WHERE ar.as_id=as_kb_entries.as_id AND ar.org_id=?))
+			OR
+			(TRIM(COALESCE(as_id,''))='' AND ` + kbOrgSQL() + `=?)
+		)`
+		args = append(args, orgID, orgID)
 	}
 	rows, err := r.db.Query(kbSelect+where, args...)
 	if err != nil {

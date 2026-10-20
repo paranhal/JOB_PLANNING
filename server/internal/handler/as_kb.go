@@ -17,6 +17,10 @@ import (
 const maxKnowledgeBulk = 50
 
 func (h *ASHandler) kbWriteFrom(c echo.Context) repository.KBWrite {
+	org := strings.TrimSpace(currentOrg(c))
+	if org == repository.OrgAll {
+		org = ""
+	}
 	return repository.KBWrite{
 		ASID:       strings.TrimSpace(c.FormValue("as_id")),
 		ActionText: strings.TrimSpace(c.FormValue("action_text")),
@@ -24,6 +28,7 @@ func (h *ASHandler) kbWriteFrom(c echo.Context) repository.KBWrite {
 		ChangeNote: strings.TrimSpace(c.FormValue("change_note")),
 		AuthorID:   ctxString(c, "user_id"),
 		AuthorName: ctxString(c, "user_name"),
+		OrgID:      org,
 	}
 }
 

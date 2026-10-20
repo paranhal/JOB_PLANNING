@@ -38,6 +38,19 @@ func (h *LeaveHandler) requireLeave(c echo.Context) error {
 	return nil
 }
 
+func (h *LeaveHandler) requireLeaveWrite(c echo.Context) error {
+	if err := h.requireLeave(c); err != nil {
+		return err
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return echo.ErrForbidden
+	}
+	if currentRole(c) == model.RoleCLevel {
+		return echo.ErrForbidden
+	}
+	return nil
+}
+
 func (h *LeaveHandler) List(c echo.Context) error {
 	if err := h.requireLeave(c); err != nil {
 		return err
@@ -56,7 +69,7 @@ func (h *LeaveHandler) List(c echo.Context) error {
 }
 
 func (h *LeaveHandler) New(c echo.Context) error {
-	if err := h.requireLeave(c); err != nil {
+	if err := h.requireLeaveWrite(c); err != nil {
 		return err
 	}
 	a := h.actor(c)
@@ -81,11 +94,8 @@ func (h *LeaveHandler) New(c echo.Context) error {
 }
 
 func (h *LeaveHandler) Create(c echo.Context) error {
-	if err := h.requireLeave(c); err != nil {
+	if err := h.requireLeaveWrite(c); err != nil {
 		return err
-	}
-	if isReadOnly(c) || viewAsActive(c) {
-		return echo.ErrForbidden
 	}
 	in := leaveapp.Input{
 		TypeKey: c.FormValue("type_key"), TypeNote: c.FormValue("type_note"),
@@ -140,7 +150,7 @@ func (h *LeaveHandler) Show(c echo.Context) error {
 		"Stamps":      h.svc.StampCells(req),
 		"OK":          strings.TrimSpace(c.QueryParam("ok")),
 		"Error":       strings.TrimSpace(c.QueryParam("err")),
-		"CanWithdraw": req.UserID == a.UserID && req.Status == "pending" && !a.ReadOnly && !a.ViewAs,
+		"CanWithdraw": req.UserID == a.UserID && req.Status == "pending" && !a.ReadOnly && !a.ViewAs && currentRole(c) != model.RoleCLevel,
 	})
 }
 
@@ -165,11 +175,8 @@ func (h *LeaveHandler) Download(c echo.Context) error {
 }
 
 func (h *LeaveHandler) Withdraw(c echo.Context) error {
-	if err := h.requireLeave(c); err != nil {
+	if err := h.requireLeaveWrite(c); err != nil {
 		return err
-	}
-	if isReadOnly(c) || viewAsActive(c) {
-		return echo.ErrForbidden
 	}
 	req, err := h.svc.Get(c.Param("id"))
 	if err != nil || req == nil {

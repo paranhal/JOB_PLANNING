@@ -198,13 +198,20 @@ func TestCompactStoredPermissionsMatchesDefaultEmpty(t *testing.T) {
 }
 
 func TestSelfLeaveOnAllRoles(t *testing.T) {
-	for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleCLevel, RoleSupport, RoleTech, RoleSales, RoleObserver} {
+	// 94-2: C-Level은 조회만(AccessView). AccessOwn은 일반·관리 역할. TestCLevelAccessNeverAboveView 와 맞춤.
+	for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales, RoleObserver} {
 		if PermAccess(role, PermSelfLeave) < AccessOwn {
 			t.Fatalf("%s self.leave", role)
 		}
 		if PermAccess(role, PermSelfApproval) < AccessOwn {
 			t.Fatalf("%s self.approval", role)
 		}
+	}
+	if PermAccess(RoleCLevel, PermSelfLeave) != AccessView {
+		t.Fatalf("c_level self.leave %d", PermAccess(RoleCLevel, PermSelfLeave))
+	}
+	if PermAccess(RoleCLevel, PermSelfApproval) != AccessView {
+		t.Fatalf("c_level self.approval %d", PermAccess(RoleCLevel, PermSelfApproval))
 	}
 	if PermAccess(RoleTester, PermSelfLeave) != AccessNone {
 		t.Fatal("tester")

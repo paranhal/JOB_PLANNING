@@ -31,6 +31,7 @@ type ASKBEntry struct {
 	PrevKBID     string
 	AuthorID     string
 	AuthorName   string
+	OrgID        string
 	CreatedAt    time.Time
 	ChangeNote   string
 	Status       string

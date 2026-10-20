@@ -36,8 +36,9 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if !strings.Contains(eb, "아직 등록된 활동이 없습니다") || !strings.Contains(eb, "첫 활동 등록하기") {
 		t.Fatalf("빈 상태 없음: %s", clipBody(eb))
 	}
-	if strings.Contains(eb, "+ 활동 추가") || strings.Contains(eb, "사업 목록") {
-		t.Fatal("빈 화면에 헤더 등록·사업 목록이 남았다")
+	// 「사업 목록」은 사이드바 전역 메뉴(90단계 이후). 빈 활동 화면 단언에서 빼 둔다.
+	if strings.Contains(eb, "+ 활동 추가") {
+		t.Fatal("빈 화면에 헤더 등록이 남았다")
 	}
 	if strings.Count(eb, `@click="startCreate()"`) != 1 {
 		t.Fatalf("주황 등록이 하나가 아니다: %s", clipBody(eb))

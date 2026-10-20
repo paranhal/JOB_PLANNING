@@ -25,7 +25,19 @@ func newWorkboardServer(t *testing.T, name string) (*echo.Echo, *repository.WBRe
 	}
 	t.Cleanup(func() { db.Close() })
 
-	repository.NewUserRepo(db).EnsureAdmin(HashPassword("admin"))
+	users := repository.NewUserRepo(db)
+	users.EnsureAdmin(HashPassword("admin"))
+	// 93-1 이후 CreateTask는 같은 조직의 등록 사용자만 담당자·지원으로 받는다.
+	for _, u := range []model.User{
+		{Username: "choi", PasswordHash: HashPassword("password10"), FullName: "최혜영", Role: model.RoleSupport, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true},
+		{Username: "yang", PasswordHash: HashPassword("password10"), FullName: "양기헌", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true},
+		{Username: "tae", PasswordHash: HashPassword("password10"), FullName: "태자운", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true},
+	} {
+		u := u
+		if err := users.Create(&u); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	e := echo.New()
 	e.Renderer = NewRenderer()

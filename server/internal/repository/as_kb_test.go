@@ -131,6 +131,77 @@ func TestSearchKnowledgeMergesLayers(t *testing.T) {
 	}
 }
 
+func seedKBAuthor(t *testing.T, repo *ASRepo, username, orgID, name string) *model.User {
+	t.Helper()
+	u := &model.User{
+		Username: username, PasswordHash: "x", FullName: name,
+		Role: model.RoleTech, IsActive: true, OrgID: orgID,
+	}
+	if err := NewUserRepo(repo.db).Create(u); err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+func findKBHit(hits []model.ASSearchHit, kbID string) bool {
+	for _, h := range hits {
+		if h.KBID == kbID && h.IsKnowledge {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSearchKnowledgeIndependentKBSurvivesOrgFilter(t *testing.T) {
+	repo, _ := setupASSearch(t)
+	author := seedKBAuthor(t, repo, "kb-o01", model.OrgIDLibrary, "양기헌")
+	pub, err := repo.PublishKB(KBWrite{
+		ActionText: "방화벽 예외를 등록해야 근본 해결", AuthorName: "양기헌",
+		AuthorID:   author.UserID,
+		Symptom:    "예약대출기 투입 목록",
+	})
+	if err != nil || pub == nil {
+		t.Fatalf("publish: %v", err)
+	}
+	hits, total, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: model.OrgIDLibrary, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total < 1 {
+		t.Fatalf("독립 지식이 조직 필터에 가려졌다 total=%d", total)
+	}
+	if !findKBHit(hits, pub.KBID) {
+		t.Fatalf("독립 지식 카드 없음: %+v", hits)
+	}
+}
+
+func TestSearchKnowledgeIndependentKBO01HiddenFromO03(t *testing.T) {
+	repo, _ := setupASSearch(t)
+	author := seedKBAuthor(t, repo, "kb-o01b", model.OrgIDLibrary, "양기헌")
+	pub, err := repo.PublishKB(KBWrite{
+		ActionText: "방화벽 예외를 등록해야 근본 해결", AuthorName: "양기헌",
+		AuthorID:   author.UserID, OrgID: model.OrgIDLibrary,
+		Symptom: "예약대출기 투입 목록",
+	})
+	if err != nil || pub == nil {
+		t.Fatalf("publish: %v", err)
+	}
+	hits, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: "O03", Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findKBHit(hits, pub.KBID) {
+		t.Fatalf("O01 독립 지식이 O03 검색에 나왔다: %+v", hits)
+	}
+	own, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: model.OrgIDLibrary, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !findKBHit(own, pub.KBID) {
+		t.Fatal("O01 검색에는 보여야 한다")
+	}
+}
+
 func TestKBSchemaMigrationFile(t *testing.T) {
 	up, err := os.ReadFile(filepath.Join("..", "..", "migrations", "044_as_kb_entries.sql"))
 	if err != nil {

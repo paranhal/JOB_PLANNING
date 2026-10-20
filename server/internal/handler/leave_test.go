@@ -160,3 +160,64 @@ func TestLeaveReadOnlyBlocked(t *testing.T) {
 		t.Fatalf("ro %d", rec.Code)
 	}
 }
+
+func TestCLevelLeaveWriteForbiddenViewOK(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "leave-clevel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	users := repository.NewUserRepo(db)
+	ceo := &model.User{
+		Username: "ceo-leave", PasswordHash: HashPassword("pw"), FullName: "대표",
+		Role: model.RoleCLevel, IsActive: true, IsReadOnly: false, OrgID: "O01", ProfileDone: true,
+	}
+	if err := users.Create(ceo); err != nil {
+		t.Fatal(err)
+	}
+	h := New(db)
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/leaves", h.Leave.List)
+	g.GET("/leaves/new", h.Leave.New)
+	g.POST("/leaves", h.Leave.Create)
+	g.POST("/leaves/:id/withdraw", h.Leave.Withdraw)
+
+	ck := jwtCookieUserClaims(t, ceo)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/leaves", nil)
+	req.AddCookie(ck)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/leaves/new", nil)
+	req.AddCookie(ck)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("new %d", rec.Code)
+	}
+
+	form := url.Values{"type_key": {"annual"}, "period_mode": {"days"}, "start_date": {"2026-08-10"}, "reason": {"x"}}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/leaves", strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(ck)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("create %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/leaves/LR-none/withdraw", strings.NewReader(""))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(ck)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("withdraw %d", rec.Code)
+	}
+}

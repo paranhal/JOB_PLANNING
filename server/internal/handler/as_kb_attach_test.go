@@ -54,7 +54,8 @@ func TestKBPhotoResizedVideoKeptRaw(t *testing.T) {
 
 	kb, err := asRepo.PublishKB(repository.KBWrite{
 		ActionText: "방화벽 예외를 등록해야 근본 해결", AuthorName: "양기헌",
-		Symptom: "예약대출기 투입 목록",
+		Symptom:    "예약대출기 투입 목록",
+		OrgID:      model.OrgIDLibrary,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +145,7 @@ func TestKBPhotoResizedVideoKeptRaw(t *testing.T) {
 
 func TestKBVideoRejectsOversizeAndThirdAndAVI(t *testing.T) {
 	e, h, asRepo, attachRepo, _ := newASActionFixture(t)
-	kb, err := asRepo.PublishKB(repository.KBWrite{ActionText: "지식 본문 열 글자 이상", AuthorName: "관리자"})
+	kb, err := asRepo.PublishKB(repository.KBWrite{ActionText: "지식 본문 열 글자 이상", AuthorName: "관리자", OrgID: model.OrgIDLibrary})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +245,7 @@ func TestSystemPageShowsUploadSize(t *testing.T) {
 
 func TestKBAttachRejectsPhotoOverHTTP(t *testing.T) {
 	_, h, asRepo, _, _ := newASActionFixture(t)
-	kb, err := asRepo.PublishKB(repository.KBWrite{ActionText: "지식 본문 열 글자 이상", AuthorName: "관리자"})
+	kb, err := asRepo.PublishKB(repository.KBWrite{ActionText: "지식 본문 열 글자 이상", AuthorName: "관리자", OrgID: model.OrgIDLibrary})
 	if err != nil {
 		t.Fatal(err)
 	}
