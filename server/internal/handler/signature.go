@@ -355,15 +355,16 @@ func resolveAssignableUser(users *repository.UserRepo, userID, name string) *mod
 	if users == nil {
 		return nil
 	}
+	// 서명 파일 조회 — 담당자 선택 목록이 아님. 전 조직에서 ID·이름으로 찾는다.
 	if id := strings.TrimSpace(userID); id != "" {
-		if u := users.FindAssignable(id); u != nil {
+		if u := users.FindAssignable(repository.OrgAll, id); u != nil {
 			return u
 		}
 		if u, _ := users.GetByID(id); u != nil {
 			return u
 		}
 	}
-	return users.FindAssignable(name)
+	return users.FindAssignable(repository.OrgAll, name)
 }
 
 func signaturePNGForUser(users *repository.UserRepo, userID, name string, slot int) []byte {

@@ -222,18 +222,18 @@ func (r *ASRepo) PublishKB(in KBWrite) (*model.ASKBEntry, error) {
 	}
 	now := time.Now()
 	e := &model.ASKBEntry{
-		KBID:         newID("KB"),
-		ASID:         in.ASID,
-		SymptomText:  symptom,
-		ActionText:   in.ActionText,
-		Origin:       model.InferKBOrigin(orig, in.ActionText),
-		Rev:          1,
-		IsCurrent:    true,
-		AuthorID:     strings.TrimSpace(in.AuthorID),
-		AuthorName:   strings.TrimSpace(in.AuthorName),
-		CreatedAt:    now,
-		ChangeNote:   strings.TrimSpace(in.ChangeNote),
-		Status:       model.KBStatusPublished,
+		KBID:        newID("KB"),
+		ASID:        in.ASID,
+		SymptomText: symptom,
+		ActionText:  in.ActionText,
+		Origin:      model.InferKBOrigin(orig, in.ActionText),
+		Rev:         1,
+		IsCurrent:   true,
+		AuthorID:    strings.TrimSpace(in.AuthorID),
+		AuthorName:  strings.TrimSpace(in.AuthorName),
+		CreatedAt:   now,
+		ChangeNote:  strings.TrimSpace(in.ChangeNote),
+		Status:      model.KBStatusPublished,
 	}
 	_, err := r.db.Exec(`
 		INSERT INTO as_kb_entries(
@@ -316,7 +316,7 @@ func (r *ASRepo) ArchiveKB(kbID string) error {
 	return err
 }
 
-func (r *ASRepo) listCurrentKB(q string) ([]model.ASKBEntry, error) {
+func (r *ASRepo) listCurrentKB(q, orgID string) ([]model.ASKBEntry, error) {
 	q = strings.TrimSpace(q)
 	where := ` WHERE is_current=1 AND status=?`
 	args := []interface{}{model.KBStatusPublished}
@@ -324,6 +324,11 @@ func (r *ASRepo) listCurrentKB(q string) ([]model.ASKBEntry, error) {
 		like := "%" + q + "%"
 		where += ` AND (symptom_text LIKE ? OR action_text LIKE ?)`
 		args = append(args, like, like)
+	}
+	orgID = strings.TrimSpace(orgID)
+	if orgID != "" && orgID != OrgAll {
+		where += ` AND EXISTS (SELECT 1 FROM as_receipts ar WHERE ar.as_id=as_kb_entries.as_id AND ar.org_id=?)`
+		args = append(args, orgID)
 	}
 	rows, err := r.db.Query(kbSelect+where, args...)
 	if err != nil {
@@ -521,7 +526,7 @@ func (r *ASRepo) SearchKnowledge(f model.ASSearchFilter) ([]model.ASSearchHit, i
 	if err != nil {
 		return nil, 0, err
 	}
-	kbs, err := r.listCurrentKB(q)
+	kbs, err := r.listCurrentKB(q, f.OrgID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -572,7 +577,7 @@ func (r *ASRepo) SearchKnowledge(f model.ASSearchFilter) ([]model.ASSearchHit, i
 			if h, ok := asByID[e.ASID]; ok {
 				cp := h
 				meta = &cp
-			} else if as, err := r.GetByID(OrgAll, e.ASID); err == nil && as != nil {
+			} else if as, err := r.GetByID(orgIDForFilter(f.OrgID), e.ASID); err == nil && as != nil {
 				org := CustomerName(r.db, as.CustomerID)
 				if org == "" {
 					org = model.KBDash

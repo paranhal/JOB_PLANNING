@@ -36,6 +36,19 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 	h.attachForecastGroups(items)
 	fc := model.BuildSalesForecast(items, opts)
 	stages, _ := h.repo.StagesFor(f.DealType)
+	ids := make([]string, 0, len(fc.Rows))
+	for i := range fc.Rows {
+		if id := strings.TrimSpace(fc.Rows[i].Project.SalesID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	wpBy := map[string]string{}
+	if h.projectRepo != nil {
+		if m, err := h.projectRepo.IDsBySalesIDs(ids); err == nil {
+			wpBy = m
+		}
+	}
+	canAct := salesCanShowNextAction(c)
 	rows := make([]map[string]interface{}, 0, len(fc.Rows))
 	for i := range fc.Rows {
 		r := fc.Rows[i]
@@ -44,6 +57,9 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 		}
 		def := model.FindSalesStage(stages, r.Project.Stage)
 		vp := h.viewProject(&r.Project, def)
+		act := model.SalesNextActionOf(&r.Project, wpBy[r.Project.SalesID], canAct)
+		vp["NextAction"] = act
+		vp["WorkProjectID"] = wpBy[r.Project.SalesID]
 		ym := r.BasisYM
 		if ym == "" {
 			ym = "—"
@@ -67,7 +83,7 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 	}
 	fromTask := strings.TrimSpace(c.QueryParam("from_task"))
 	_, buildHref, supplyHref, newHref, resetHref, filterQ := salesDealBoardLinks("/sales", "pipeline", f, fromTask)
-	users, _ := h.userRepo.ListAssignable()
+	users, _ := h.userRepo.ListAssignable(assignableOrgID(c))
 	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")
 	bizTypes, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBizType)
 	budgetSt, _ := h.codeRepo.ActiveByGroup(model.SalesCodeGroupBudgetStatus)
@@ -86,11 +102,14 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 		"ContractTarget": f.ContractTarget, "ContractTargets": targets,
 		"BizType": f.BizType, "BizTypes": bizTypes, "BudgetYear": f.BudgetYear, "BudgetStatus": f.BudgetStatus, "BudgetStatuses": budgetSt,
 		"GroupID": f.GroupID, "Groups": groups, "Users": users, "PeriodOptions": salesPeriodOptions(now),
-		"Stages":   stages,
+		"Stages":          stages,
 		"ShowOwnerFilter": SalesVisibilityScope(c).ShowOwnerFilter,
-		"FromTask": fromTask,
-		"CanWrite": canWriteSales(c), "Forecast": fc, "Rows": rows,
-		"Basis": opts.Basis, "From": opts.From, "To": opts.To, "GroupBy": opts.Group, "Cell": opts.Cell,
+		"FromTask":        fromTask,
+		"CanWrite":        canWriteSales(c), "Forecast": fc, "Rows": rows,
+		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"FormError": querySalesErr(c.QueryParam("err")),
+		"Today":     time.Now().Format("2006-01-02"),
+		"Basis":     opts.Basis, "From": opts.From, "To": opts.To, "GroupBy": opts.Group, "Cell": opts.Cell,
 		"Spread": opts.Spread, "ShowAllYM": showAll, "BasisLabel": model.ForecastBasisLabel(opts.Basis),
 		"Summary": fc.Summary, "Matrix": fc.Matrix,
 	})

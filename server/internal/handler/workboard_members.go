@@ -84,7 +84,26 @@ func (h *WorkboardHandler) firstParticipantOverlap(date, start, end, excludeID s
 }
 
 func (h *WorkboardHandler) saveSupportMembers(c echo.Context, taskID, owner string) error {
-	return h.repo.ReplaceSupportMembers(taskID, parseSupportMembers(c, owner))
+	members := parseSupportMembers(c, owner)
+	org := assignableOrgID(c)
+	var prev []string
+	if t, _ := h.repo.GetTask(taskID); t != nil {
+		org = taskOrgID(c, t)
+		if ms, err := h.repo.ListMembers(taskID); err == nil {
+			for _, m := range ms {
+				prev = append(prev, m.Assignee)
+			}
+		}
+		prev = append(prev, t.Assignee)
+	}
+	var names []string
+	for _, m := range members {
+		names = append(names, m.Assignee)
+	}
+	if err := checkAssigneeNamesInOrg(h.userRepo, org, names, prev); err != nil {
+		return err
+	}
+	return h.repo.ReplaceSupportMembers(taskID, members)
 }
 
 func overlapRedirect(c echo.Context, msg string) error {

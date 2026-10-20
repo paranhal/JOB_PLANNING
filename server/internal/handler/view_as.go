@@ -107,6 +107,9 @@ func (h *AuthHandler) GuardViewAsWrite(next echo.HandlerFunc) echo.HandlerFunc {
 		if strings.HasPrefix(path, "/view-as") {
 			return next(c)
 		}
+		if loginRole(c) == model.RoleVisionAdmin && (path == "/users" || strings.HasPrefix(path, "/users/")) {
+			return next(c)
+		}
 		return echo.ErrForbidden
 	}
 }

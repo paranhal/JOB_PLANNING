@@ -301,7 +301,7 @@ func (h *SalesHandler) parseGroupForm(c echo.Context) *model.SalesGroup {
 }
 
 func (h *SalesHandler) renderGroupForm(c echo.Context, g *model.SalesGroup, isNew bool, formErr string) error {
-	users, _ := h.userRepo.ListAssignable()
+	users := listAssignableForPicker(h.userRepo, c)
 	preview := 0
 	if g.GroupKind == model.SalesGroupFilter {
 		ff := repository.FilterJSONToList(g.Filter())

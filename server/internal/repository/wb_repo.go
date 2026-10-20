@@ -30,7 +30,8 @@ const workTaskSelect = `
 		       COALESCE(t.blocked_reason,''), COALESCE(t.blocked_at,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
 		       t.created_at, t.updated_at,
-		       COALESCE(p.name,''), COALESCE(p.color,'')
+		       COALESCE(p.name,''), COALESCE(p.color,''),
+		       COALESCE(t.org_id,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id`
@@ -115,12 +116,14 @@ func (r *WBRepo) ListProjects(activeOnly bool) ([]model.WorkProject, error) {
 	return scanProjects(rows)
 }
 
-func (r *WBRepo) ListTasks() ([]model.WorkTask, error) {
-	rows, err := r.db.Query(workTaskSelect + `
+const workTaskOrder = `
 		ORDER BY
 		  CASE t.status WHEN 'waiting' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'review' THEN 3 ELSE 4 END,
 		  CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
-		  t.due_date, t.title`)
+		  t.due_date, t.title`
+
+func (r *WBRepo) listStoredTasks(where string, args ...interface{}) ([]model.WorkTask, error) {
+	rows, err := r.db.Query(workTaskSelect+where, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
@@ -133,6 +136,10 @@ func (r *WBRepo) ListTasks() ([]model.WorkTask, error) {
 		return nil, err
 	}
 	return hideArchivedRecurrence(items, r.archivedRecurrenceParents()), nil
+}
+
+func (r *WBRepo) ListTasks() ([]model.WorkTask, error) {
+	return r.listStoredTasks(workTaskOrder)
 }
 
 func (r *WBRepo) GetTask(id string) (*model.WorkTask, error) {
@@ -165,43 +172,25 @@ func (r *WBRepo) ListChildren(parentID string) ([]model.WorkTask, error) {
 // ListTasksBetween 수행일(WorkDate)이 기간 안인 업무 (일일 업무 등록 일정표용).
 // 시각이 비어 있어도 포함하며, 화면에서 표시용 시각을 채운다.
 func (r *WBRepo) ListTasksBetween(from, to string) ([]model.WorkTask, error) {
-	all, err := r.ListTasks()
-	if err != nil {
-		return nil, err
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return nil, nil
 	}
-	var items []model.WorkTask
-	for _, t := range all {
-		if t.WorkDate == "" || t.RecurrenceRole == model.RecurrenceRoleParent {
-			continue
-		}
-		if t.WorkDate >= from && t.WorkDate <= to {
-			items = append(items, t)
-		}
-	}
-	return items, nil
+	return r.listStoredTasks(`
+		WHERE TRIM(COALESCE(t.work_date,'')) != ''
+		  AND t.work_date >= ? AND t.work_date <= ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`+workTaskOrder, from, to)
 }
 
 // ListTasksDatedBetween 배정일(없으면 예정일)이 기간 안인 업무 — 시간 유무 무관(업무처리현황용)
 func (r *WBRepo) ListTasksDatedBetween(from, to string) ([]model.WorkTask, error) {
-	all, err := r.ListTasks()
-	if err != nil {
-		return nil, err
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return nil, nil
 	}
-	var items []model.WorkTask
-	for _, t := range all {
-		d := strings.TrimSpace(t.WorkDate)
-		if d == "" {
-			d = strings.TrimSpace(t.DueDate)
-		}
-		if d == "" || d < from || d > to {
-			continue
-		}
-		if t.RecurrenceRole == model.RecurrenceRoleParent {
-			continue
-		}
-		items = append(items, t)
-	}
-	return items, nil
+	return r.listStoredTasks(`
+		WHERE COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),'')) BETWEEN ? AND ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`+workTaskOrder, from, to)
 }
 
 // MaintenanceCompletedByIDs visit_id → 완료 여부
@@ -297,52 +286,69 @@ func (r *WBRepo) ListUnplacedAdminTasks() ([]model.WorkTask, error) {
 }
 
 func (r *WBRepo) ListUnplacedTasks(orgID string, kinds []string) ([]model.WorkTask, error) {
-	all, err := r.ListTasks()
-	if err != nil {
-		return nil, err
-	}
-	kindOK := map[string]bool{}
+	where := `
+		WHERE TRIM(COALESCE(t.work_date,'')) = ''
+		  AND COALESCE(t.recurrence_role,'') != 'parent'
+		  AND COALESCE(t.status,'') NOT IN ('complete','cancelled')`
+	args := []interface{}{}
+	var kindList []string
 	for _, k := range kinds {
 		k = strings.TrimSpace(k)
 		if k != "" {
-			kindOK[k] = true
+			kindList = append(kindList, k)
 		}
 	}
-	keepOrg := map[string]bool{}
-	filterOrg := strings.TrimSpace(orgID) != "" && orgID != OrgAll
-	if filterOrg {
-		q := `SELECT t.task_id FROM work_tasks t WHERE 1=1`
-		q, args := appendOrg(q, nil, "t", orgID)
-		rows, qerr := r.db.Query(q, args...)
-		if qerr == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var id string
-				if rows.Scan(&id) == nil {
-					keepOrg[id] = true
-				}
-			}
+	if len(kindList) > 0 {
+		ph := make([]string, len(kindList))
+		for i, k := range kindList {
+			ph[i] = "?"
+			args = append(args, k)
 		}
+		where += ` AND t.work_type IN (` + strings.Join(ph, ",") + `)`
 	}
-	var items []model.WorkTask
-	for _, t := range all {
-		if t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
-			continue
-		}
-		if len(kindOK) > 0 && !kindOK[t.WorkType] {
-			continue
-		}
-		if t.RecurrenceRole == model.RecurrenceRoleParent {
-			continue
-		}
-		if filterOrg && !keepOrg[t.TaskID] {
-			continue
-		}
-		if strings.TrimSpace(t.WorkDate) == "" {
-			items = append(items, t)
-		}
+	if strings.TrimSpace(orgID) != "" && orgID != OrgAll {
+		where, args = appendOrg(where, args, "t", orgID)
 	}
-	return items, nil
+	return r.listStoredTasks(where+workTaskOrder, args...)
+}
+
+// PlacedSourceKeys 배정일이 있는 원본(AS·점검 등) 키. 대기열에서 이미 올린 카드를 가릴 때 쓴다.
+func (r *WBRepo) PlacedSourceKeys() (map[string]bool, error) {
+	out := map[string]bool{}
+	rows, err := r.db.Query(`
+		SELECT DISTINCT source_type, source_id FROM work_tasks
+		WHERE TRIM(COALESCE(source_type,'')) != ''
+		  AND TRIM(COALESCE(source_id,'')) != ''
+		  AND TRIM(COALESCE(work_date,'')) != ''`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return out, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var st, sid string
+		if err := rows.Scan(&st, &sid); err != nil {
+			return nil, err
+		}
+		out[st+":"+sid] = true
+	}
+	return out, rows.Err()
+}
+
+// ListTasksNeedingAutoPlace 기간 안 배정일은 있고 시각만 비어 있는 미완료 업무.
+func (r *WBRepo) ListTasksNeedingAutoPlace(from, to string) ([]model.WorkTask, error) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return nil, nil
+	}
+	return r.listStoredTasks(`
+		WHERE TRIM(COALESCE(t.start_time,'')) = ''
+		  AND COALESCE(t.status,'') != 'complete'
+		  AND TRIM(COALESCE(t.work_date,'')) != ''
+		  AND t.work_date >= ? AND t.work_date <= ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`+workTaskOrder, from, to)
 }
 
 // AdminWorkStats 행정/지원 업무 현황 건수
@@ -1043,6 +1049,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&t.OrgName,
 			&created, &updated,
 			&t.ProjectName, &t.ProjectColor,
+			&t.OrgID,
 		); err != nil {
 			return nil, err
 		}

@@ -140,6 +140,27 @@ func TestBuildAssigneeLegendIncludesUsers(t *testing.T) {
 	}
 }
 
+func TestBuildAssigneeLegendUnregisteredGrey(t *testing.T) {
+	users := []model.User{{FullName: "양기헌"}}
+	placed := []model.WorkTask{{Assignee: "이효준"}}
+	leg := buildAssigneeLegend(placed, users)
+	var grey bool
+	for _, l := range leg {
+		if l.Name == "이효준" {
+			if !l.Unregistered || l.Border != "#94a3b8" {
+				t.Fatalf("%+v", l)
+			}
+			grey = true
+		}
+		if l.Name == "양기헌" && l.Unregistered {
+			t.Fatal("registered marked unregistered")
+		}
+	}
+	if !grey {
+		t.Fatal("이효준 없음")
+	}
+}
+
 func TestParseHHMMSeconds(t *testing.T) {
 	m, ok := parseHHMMToMin("09:30:00")
 	if !ok || m != 9*60+30 {

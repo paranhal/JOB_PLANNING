@@ -26,6 +26,7 @@ func knowledgeFilter(c echo.Context) model.ASSearchFilter {
 		CauseCat:      strings.TrimSpace(c.QueryParam("cause_cat")),
 		Sort:          strings.TrimSpace(c.QueryParam("sort")),
 		RequireAction: !all,
+		OrgID:         currentOrg(c),
 		Page:          page,
 		PageSize:      20,
 	}
@@ -73,12 +74,13 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 	}
 	f := knowledgeFilter(c)
 	asRef := strings.TrimSpace(c.QueryParam("as_id"))
-	withAction, totalAll, classified, err := h.repo.KnowledgeCorpus()
+	org := currentOrg(c)
+	withAction, totalAll, classified, err := h.repo.KnowledgeCorpusInOrg(org)
 	if err != nil {
 		return err
 	}
-	customers, _ := h.customerRepo.ListAll()
-	products, _ := h.repo.SearchProductNames()
+	customers, _ := h.customerRepo.ListAllInOrg(org)
+	products, _ := h.repo.SearchProductNamesInOrg(org)
 	cats, _ := h.repo.ListCauseCategories()
 	var catL1 []model.CauseCategory
 	for _, cat := range cats {
@@ -86,7 +88,7 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 			catL1 = append(catL1, cat)
 		}
 	}
-	sites, _ := h.repo.KnowledgeSites()
+	sites, _ := h.repo.KnowledgeSitesInOrg(org)
 
 	data := map[string]interface{}{
 		"Title": "AS 사례 검색", "Active": NavASKnowledge,
@@ -105,7 +107,7 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 		var summary *model.ASKnowledgeSummary
 		var freqs []model.ASKeywordFreq
 		if f.CustomerID != "" {
-			cases, err = h.repo.KnowledgeSiteCases(f.CustomerID, 200)
+			cases, err = h.repo.KnowledgeSiteCasesInOrg(f.CustomerID, 200, org)
 			if err != nil {
 				return err
 			}

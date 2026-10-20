@@ -36,7 +36,7 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 	selected := resolveMeetingAssignee(c, users)
 	order := assignableNameOrder(users)
@@ -129,7 +129,7 @@ func (h *MeetingHandler) Overview(c echo.Context) error {
 
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 	selected := resolveMeetingAssignee(c, users)
 

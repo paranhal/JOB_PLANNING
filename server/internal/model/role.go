@@ -9,6 +9,7 @@ import (
 const (
 	RoleVisionAdmin = "vision_admin"
 	RoleOrgAdmin    = "org_admin"
+	RoleCLevel      = "c_level"
 	RoleSupport     = "support"
 	RoleTech        = "tech"
 	RoleSales       = "sales"
@@ -145,6 +146,8 @@ func NormalizeRole(role string) string {
 		return RoleVisionAdmin
 	case RoleOrgAdmin, RoleAdmin, "관리자":
 		return RoleOrgAdmin
+	case RoleCLevel, "C-Level", "c-level", "경영진", "대표", "임원":
+		return RoleCLevel
 	case RoleSupport, RoleOffice, "행정", "receipt", "접수", "접수담당", "user", "지원":
 		return RoleSupport
 	case RoleTech, "기술", "기술담당":
@@ -165,7 +168,7 @@ func NormalizeRole(role string) string {
 
 func IsKnownRole(role string) bool {
 	switch NormalizeRole(role) {
-	case RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales:
+	case RoleVisionAdmin, RoleOrgAdmin, RoleCLevel, RoleSupport, RoleTech, RoleSales:
 		return true
 	default:
 		return false
@@ -184,6 +187,8 @@ func AdminGrade(role string) string {
 		return "vision"
 	case RoleOrgAdmin:
 		return "org"
+	case RoleCLevel:
+		return "exec"
 	default:
 		return "none"
 	}
@@ -206,6 +211,8 @@ func RoleFromAdminGrade(grade, job string) (string, error) {
 		return RoleVisionAdmin, nil
 	case "org", RoleOrgAdmin:
 		return RoleOrgAdmin, nil
+	case "exec", RoleCLevel, "C-Level", "c-level":
+		return RoleCLevel, nil
 	case "none", "user":
 		j := NormalizeRole(job)
 		if j != RoleSales && j != RoleTech && j != RoleSupport {
@@ -242,6 +249,8 @@ func RoleLabel(role string) string {
 		return "비젼관리자"
 	case RoleOrgAdmin:
 		return "조직관리자"
+	case RoleCLevel:
+		return "C-Level(경영진)"
 	case RoleSupport:
 		return "지원"
 	case RoleTech:
@@ -491,6 +500,16 @@ func DefaultPermissions(role string) []string {
 }
 
 func defaultAccess(role, key string) Access {
+	role = NormalizeRole(role)
+	if role == RoleCLevel {
+		if IsAdminSectionPerm(key) {
+			return AccessNone
+		}
+		if strings.HasSuffix(key, ".view") || key == PermLeaveTeamView || key == PermSelfLeave || key == PermSelfApproval {
+			return AccessView
+		}
+		return AccessNone
+	}
 	if key == PermSelfLeave || key == PermSelfApproval {
 		if role == RoleTester || role == "" {
 			return AccessNone
@@ -509,7 +528,7 @@ func defaultAccess(role, key string) Access {
 			return AccessFull
 		}
 	case RoleSupport:
-		if isAdminSectionPerm(key) {
+		if IsAdminSectionPerm(key) {
 			return AccessNone
 		}
 		return AccessFull
@@ -525,10 +544,25 @@ func defaultAccess(role, key string) Access {
 	}
 }
 
-func isAdminSectionPerm(key string) bool {
+func IsAdminSectionPerm(key string) bool {
 	return strings.HasPrefix(key, "org.") || strings.HasPrefix(key, "users.") ||
 		strings.HasPrefix(key, "codes.") || strings.HasPrefix(key, "data.") ||
 		strings.HasPrefix(key, "approval.")
+}
+
+// ClampCLevelAccess C-Level은 조회 이하만. 관리 섹션은 없음 고정.
+func ClampCLevelAccess(key string, acc Access) Access {
+	key = CanonicalPerm(key)
+	if IsAdminSectionPerm(key) {
+		return AccessNone
+	}
+	if acc > AccessView {
+		return AccessView
+	}
+	if acc < AccessNone {
+		return AccessNone
+	}
+	return acc
 }
 
 func techAccess(key string) Access {

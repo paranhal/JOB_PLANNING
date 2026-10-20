@@ -23,7 +23,7 @@ func (h *MeetingHandler) WeeklyMeXLSX(c echo.Context) error {
 	}
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 	uid, keys := meetingSelfKeys(c, users)
 	name := strings.TrimSpace(ctxString(c, "user_name"))

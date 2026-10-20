@@ -123,6 +123,18 @@ func (r *SalesRepo) MoveActivity(id, group, value, byName string) error {
 	group = strings.TrimSpace(group)
 	value = strings.TrimSpace(value)
 	switch group {
+	case "method":
+		if !model.IsActiveSalesActMethod(value) {
+			return fmt.Errorf("알 수 없는 방법입니다")
+		}
+		if a.ActivityMethod == value {
+			return nil
+		}
+		return touchUpdate(r.db, "sales_activities", "activity_id", a.ActivityID, a.Title, func() error {
+			a.ActivityMethod = value
+			_, err = r.db.Exec(`UPDATE sales_activities SET activity_method=? WHERE activity_id=?`, value, a.ActivityID)
+			return err
+		})
 	case "stage":
 		stages, _ := r.Stages()
 		if model.FindSalesStage(stages, value) == nil {
@@ -145,7 +157,7 @@ func (r *SalesRepo) MoveActivity(id, group, value, byName string) error {
 				break
 			}
 		}
-		if !ok {
+		if !ok || !model.IsActiveSalesActType(value) {
 			return fmt.Errorf("알 수 없는 활동 유형입니다")
 		}
 		if a.ActivityType == value {

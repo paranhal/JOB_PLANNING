@@ -15,15 +15,23 @@ type PlanListItem struct {
 }
 
 func (r *MaintenanceRepo) ListPlansWithCounts() ([]PlanListItem, error) {
-	rows, err := r.db.Query(`
+	return r.ListPlansWithCountsInOrg(OrgAll)
+}
+
+func (r *MaintenanceRepo) ListPlansWithCountsInOrg(orgID string) ([]PlanListItem, error) {
+	q := `
 		SELECT p.plan_id, p.plan_year, COALESCE(p.title,''), p.status,
-		       IFNULL(p.created_at,''), IFNULL(p.updated_at,''),
+		       IFNULL(p.created_at,''), IFNULL(p.updated_at,''), COALESCE(p.org_id,''),
 		       COUNT(CASE WHEN length(trim(COALESCE(v.visit_date,''))) >= 10 THEN 1 END),
 		       COUNT(CASE WHEN COALESCE(v.completed,0)=1 AND length(trim(COALESCE(v.visit_date,''))) >= 10 THEN 1 END)
 		FROM maintenance_plans p
 		LEFT JOIN maintenance_visits v ON v.plan_id = p.plan_id
+		WHERE 1=1`
+	q, args := appendOrg(q, nil, "p", orgIDForFilter(orgID))
+	q += `
 		GROUP BY p.plan_id
-		ORDER BY p.plan_year DESC`)
+		ORDER BY p.plan_year DESC`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +40,7 @@ func (r *MaintenanceRepo) ListPlansWithCounts() ([]PlanListItem, error) {
 	for rows.Next() {
 		var it PlanListItem
 		if err := rows.Scan(&it.PlanID, &it.PlanYear, &it.Title, &it.Status,
-			&it.CreatedAt, &it.UpdatedAt, &it.VisitCount, &it.DoneCount); err != nil {
+			&it.CreatedAt, &it.UpdatedAt, &it.OrgID, &it.VisitCount, &it.DoneCount); err != nil {
 			return nil, err
 		}
 		out = append(out, it)
@@ -52,11 +60,14 @@ func (r *MaintenanceRepo) CopyPlan(sourcePlanID string, destYear int, title stri
 	if destYear == src.PlanYear {
 		return nil, fmt.Errorf("같은 연도로는 복사할 수 없습니다")
 	}
+	if strings.TrimSpace(src.OrgID) == "" {
+		return nil, fmt.Errorf("조직이 없는 계획은 복사할 수 없습니다")
+	}
 	title = strings.TrimSpace(title)
 	if title == "" {
 		title = fmt.Sprintf("%d년 정기점검", destYear)
 	}
-	dest, err := r.CreatePlan(destYear, title)
+	dest, err := r.CreatePlanForOrg(src.OrgID, destYear, title)
 	if err != nil {
 		return nil, err
 	}

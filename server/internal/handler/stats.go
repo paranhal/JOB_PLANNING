@@ -310,7 +310,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 
 	var assignees []model.User
 	if h.userRepo != nil {
-		assignees, _ = h.userRepo.ListAssignable()
+		assignees = listAssignableForPicker(h.userRepo, c)
 	}
 	var projects []model.WorkProject
 	if h.wbRepo != nil {

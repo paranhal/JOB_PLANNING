@@ -137,7 +137,7 @@ func TestAssignTransferHoldByKindHTTP(t *testing.T) {
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}
-	act := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: today, ActivityType: "call", Title: "콜"}
+	act := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: today, ActivityType: "other", ActivityMethod: "call", Title: "콜"}
 	if err := sales.CreateActivity(act, "테스터", nil); err != nil {
 		t.Fatal(err)
 	}

@@ -72,7 +72,7 @@ func (h *HolidayHandler) List(c echo.Context) error {
 		leaves, _ = h.leave.ListByYear(year)
 	}
 	if h.users != nil {
-		users, _ = h.users.ListAssignable()
+		users = listAssignableForPicker(h.users, c)
 	}
 	return c.Render(http.StatusOK, "admin/holidays.html", map[string]interface{}{
 		"Title":         "휴무일 관리",

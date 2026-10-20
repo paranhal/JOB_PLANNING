@@ -77,9 +77,9 @@ func generateConfirmURL(planID string, month int, order string) string {
 
 // GenerateConfirm 자동 배정 전 해당 월 삭제·보호 건수를 보여 준다. §34.4.5
 func (h *MaintenanceHandler) GenerateConfirm(c echo.Context) error {
-	plan, err := h.repo.GetPlan(c.Param("id"))
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	month := parseGenerateMonth(c, plan)
 	st, err := h.repo.AutoAssignMonthStats(plan.PlanID, plan.PlanYear, month)
@@ -107,7 +107,10 @@ func (h *MaintenanceHandler) GenerateConfirm(c echo.Context) error {
 
 func (h *MaintenanceHandler) GenerateAuto(c echo.Context) error {
 	id := c.Param("id")
-	plan, _ := h.repo.GetPlan(id)
+	plan, err := h.requireVisiblePlan(c, id)
+	if err != nil {
+		return err
+	}
 	month := parseGenerateMonth(c, plan)
 	year := 0
 	if plan != nil {
@@ -156,9 +159,9 @@ const planDeleteDisabledMsg = "계획은 삭제할 수 없습니다. 보관만 �
 
 // DeletePlanPage 계획 삭제는 진입만 남기고 실제 삭제는 막는다. §34.4.4 · §23.11
 func (h *MaintenanceHandler) DeletePlanPage(c echo.Context) error {
-	plan, err := h.repo.GetPlan(c.Param("id"))
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	st, err := h.repo.PlanDeleteStats(plan.PlanID)
 	if err != nil {
@@ -173,9 +176,9 @@ func (h *MaintenanceHandler) DeletePlanPage(c echo.Context) error {
 
 func (h *MaintenanceHandler) DeletePlan(c echo.Context) error {
 	id := c.Param("id")
-	plan, err := h.repo.GetPlan(id)
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, id)
+	if err != nil {
+		return err
 	}
 	reason := accessReason(c, "계획 삭제")
 	visits, _ := h.repo.ListVisits(id)
@@ -196,6 +199,9 @@ func (h *MaintenanceHandler) DeletePlan(c echo.Context) error {
 
 func (h *MaintenanceHandler) ArchivePlan(c echo.Context) error {
 	id := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, id); err != nil {
+		return err
+	}
 	if err := h.repo.SetPlanStatus(id, "archived"); err != nil {
 		return err
 	}
@@ -205,9 +211,9 @@ func (h *MaintenanceHandler) ArchivePlan(c echo.Context) error {
 
 // DuplicatesPreview 중복 정리 대상 목록 (§23.12).
 func (h *MaintenanceHandler) DuplicatesPreview(c echo.Context) error {
-	plan, err := h.repo.GetPlan(c.Param("id"))
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	month, _ := strconv.Atoi(c.QueryParam("month"))
 	var drops []repository.DuplicateDrop
@@ -239,9 +245,9 @@ func (h *MaintenanceHandler) CollapseDuplicates(c echo.Context) error {
 		q.Set("view", c.FormValue("view"))
 		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/duplicates?"+q.Encode())
 	}
-	plan, err := h.repo.GetPlan(id)
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, id)
+	if err != nil {
+		return err
 	}
 	month, _ := strconv.Atoi(c.FormValue("month"))
 	deleted, skipped := 0, 0

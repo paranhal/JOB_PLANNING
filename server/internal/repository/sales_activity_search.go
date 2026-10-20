@@ -94,6 +94,7 @@ type SalesActivityFilter struct {
 	PersonUserID string
 	SalesIDs     []string
 	SalesIDsSet  bool
+	Methods      []string
 }
 
 func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesActivity, error) {
@@ -152,6 +153,13 @@ func (r *SalesRepo) ListActivitiesFilter(f SalesActivityFilter) ([]model.SalesAc
 		q += ` AND a.activity_type IN (` + strings.TrimSuffix(ph, ",") + `)`
 		for _, t := range types {
 			args = append(args, t)
+		}
+	}
+	if methods := compactTypes(f.Methods); len(methods) > 0 {
+		ph := strings.Repeat("?,", len(methods))
+		q += ` AND a.activity_method IN (` + strings.TrimSuffix(ph, ",") + `)`
+		for _, m := range methods {
+			args = append(args, m)
 		}
 	}
 	q += ` ORDER BY a.activity_date DESC, COALESCE(NULLIF(a.start_time,''),'00:00') DESC, a.activity_id DESC`

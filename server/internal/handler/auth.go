@@ -109,6 +109,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if user.MustChangePassword {
 		return c.Redirect(http.StatusSeeOther, "/account?must=1")
 	}
+	if model.NormalizeRole(user.Role) == model.RoleCLevel {
+		return c.Redirect(http.StatusSeeOther, "/exec?ok=1")
+	}
 	return c.Redirect(http.StatusSeeOther, "/?ok=1")
 }
 
@@ -414,6 +417,9 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		if home := sessionHomeOrgID(c); home != "" {
 			var scoped []model.User
 			for _, u := range users {
+				if u.Role == model.RoleCLevel {
+					continue
+				}
 				if u.OrgID == home {
 					scoped = append(scoped, u)
 				}
@@ -441,8 +447,8 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		msg = "계정을 지웠습니다."
 	}
 	errMsg := c.QueryParam("err")
-	canEdit := h.isAdmin(c) || hasPerm(c, model.PermCodesUsers)
-	canCreate := currentRole(c) == model.RoleVisionAdmin
+	canEdit := loginRole(c) == model.RoleVisionAdmin || loginRole(c) == model.RoleOrgAdmin || hasPerm(c, model.PermCodesUsers)
+	canCreate := loginRole(c) == model.RoleVisionAdmin
 	var orgs []model.Org
 	if h.orgRepo != nil {
 		orgs, _ = h.orgRepo.ListActive()
@@ -450,8 +456,11 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	data := map[string]interface{}{
 		"Title": "사용자 관리", "Active": NavUsers, "Users": users, "OK": msg, "Error": errMsg,
 		"PermDefs": model.AllPermissions, "CanEditUsers": canEdit, "CanCreateUser": canCreate,
-		"IsVision": currentRole(c) == model.RoleVisionAdmin,
-		"RoleGroups": model.GroupUsersByRole(users), "Orgs": orgs,
+		"IsVision":      loginRole(c) == model.RoleVisionAdmin,
+		"CurrentUserID": ctxString(c, "user_id"),
+		"TempPW":        ctxString(c, "once_temp_pw"),
+		"TempPWName":    ctxString(c, "once_temp_name"),
+		"RoleGroups":    model.GroupUsersByRole(users), "Orgs": orgs,
 		"PasswordMinLen": passwd.MinLen, "VisionAdminCount": 0,
 		"WorkCounts": map[string]int{},
 	}
@@ -503,7 +512,7 @@ func (h *AuthHandler) passwordMigrationStatus() map[string]interface{} {
 }
 
 func (h *AuthHandler) UserCreate(c echo.Context) error {
-	if currentRole(c) != model.RoleVisionAdmin {
+	if loginRole(c) != model.RoleVisionAdmin {
 		return h.forbidden(c)
 	}
 	role := resolveAdminRole(c, "")
@@ -517,7 +526,7 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	}
 	perms := model.CompactStoredPermissions(role, selected)
 	orgID := strings.TrimSpace(c.FormValue("org_id"))
-	if role == model.RoleVisionAdmin {
+	if role == model.RoleVisionAdmin || role == model.RoleCLevel {
 		orgID = ""
 	}
 	u := &model.User{
@@ -528,7 +537,7 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 		Permissions:  perms,
 		IsActive:     true,
 		OrgID:        orgID,
-		IsReadOnly:   c.FormValue("is_readonly") == "1",
+		IsReadOnly:   c.FormValue("is_readonly") == "1" || role == model.RoleCLevel,
 		IsTest:       c.FormValue("is_test") == "1" && !model.IsAdminGrade(role),
 	}
 	bindUserContact(c, u)
@@ -556,7 +565,7 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 }
 
 func (h *AuthHandler) UserUpdate(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if !canManageUserAccounts(c) {
 		return h.forbidden(c)
 	}
 	u, err := h.loadAdminScopedUser(c, c.Param("id"))
@@ -574,15 +583,18 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 	u.Role = resolveAdminRole(c, u.Role)
 	u.BaseRole = ""
 	u.OrgID = strings.TrimSpace(c.FormValue("org_id"))
-	if currentRole(c) == model.RoleOrgAdmin {
+	if loginRole(c) == model.RoleOrgAdmin {
 		if home := strings.TrimSpace(ctxString(c, "org_id")); home != "" {
 			u.OrgID = home
 		}
 	}
-	if u.Role == model.RoleVisionAdmin {
+	if loginRole(c) == model.RoleOrgAdmin && (u.Role == model.RoleCLevel || orig.Role == model.RoleCLevel) {
+		return h.forbidden(c)
+	}
+	if u.Role == model.RoleVisionAdmin || u.Role == model.RoleCLevel {
 		u.OrgID = ""
 	}
-	u.IsReadOnly = c.FormValue("is_readonly") == "1"
+	u.IsReadOnly = c.FormValue("is_readonly") == "1" || u.Role == model.RoleCLevel
 	u.IsTest = c.FormValue("is_test") == "1" && !model.IsAdminGrade(u.Role)
 	if v := c.FormValue("is_active"); v != "" {
 		u.IsActive = v == "1"
@@ -645,7 +657,12 @@ func (h *AuthHandler) UserUpdate(c echo.Context) error {
 		if passwordTooShort(pw) {
 			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 		}
-		h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
+		if err := h.userRepo.ReplacePasswordHash(u.UserID, HashPassword(pw)); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호를 바꾸지 못했습니다."))
+		}
+		if c.FormValue("must_change_password") == "1" {
+			_ = h.userRepo.SetMustChangePassword(u.UserID, true)
+		}
 		return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 	}
 	n, _, _ := h.rewriteNamesIfChanged(u.UserID, oldName, u.FullName)
@@ -664,7 +681,7 @@ func (h *AuthHandler) rewriteNamesIfChanged(userID, oldName, newName string) (in
 }
 
 func (h *AuthHandler) UserRenameUsername(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if !canManageUserAccounts(c) {
 		return h.forbidden(c)
 	}
 	id := strings.TrimSpace(c.Param("id"))
@@ -701,7 +718,7 @@ func (h *AuthHandler) UserRenameUsername(c echo.Context) error {
 }
 
 func (h *AuthHandler) UserResetPermissions(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if !canManageUserAccounts(c) {
 		return h.forbidden(c)
 	}
 	u, err := h.loadAdminScopedUser(c, c.Param("id"))
@@ -717,12 +734,15 @@ func (h *AuthHandler) UserResetPermissions(c echo.Context) error {
 
 // UserChangePassword 관리자: 다른 사용자 비밀번호 변경
 func (h *AuthHandler) UserChangePassword(c echo.Context) error {
-	if !h.isAdmin(c) {
+	if !canManageUserAccounts(c) {
 		return h.forbidden(c)
 	}
 	u, err := h.loadAdminScopedUser(c, c.Param("id"))
 	if err != nil {
 		return err
+	}
+	if loginRole(c) == model.RoleOrgAdmin && (u.Role == model.RoleCLevel || u.Role == model.RoleVisionAdmin) {
+		return h.forbidden(c)
 	}
 	pw := strings.TrimSpace(c.FormValue("password"))
 	confirm := strings.TrimSpace(c.FormValue("password_confirm"))
@@ -735,12 +755,77 @@ func (h *AuthHandler) UserChangePassword(c echo.Context) error {
 	if passwordTooShort(pw) {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(passwordMinLenMsg()))
 	}
-	h.userRepo.UpdatePassword(u.UserID, HashPassword(pw))
+	if err := h.userRepo.ReplacePasswordHash(u.UserID, HashPassword(pw)); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호를 바꾸지 못했습니다."))
+	}
+	if c.FormValue("must_change_password") == "1" {
+		_ = h.userRepo.SetMustChangePassword(u.UserID, true)
+	}
+	accessLog(c, auditlog.Record{
+		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+		TargetTable: "users", TargetID: u.UserID, SubjectType: "user",
+		SubjectID: u.UserID, SubjectName: u.FullName,
+		Detail: "비밀번호 변경",
+	})
 	return c.Redirect(http.StatusSeeOther, "/users?ok=password")
 }
 
+func canManageUserAccounts(c echo.Context) bool {
+	r := loginRole(c)
+	return r == model.RoleVisionAdmin || r == model.RoleOrgAdmin
+}
+
+func (h *AuthHandler) UserResetPassword(c echo.Context) error {
+	if !canManageUserAccounts(c) {
+		return h.forbidden(c)
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	u, _ := h.userRepo.GetByID(id)
+	if u == nil {
+		return echo.ErrNotFound
+	}
+	if id == ctxString(c, "user_id") {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("본인 계정은 초기화할 수 없습니다. 내 계정에서 비밀번호를 바꾸세요."))
+	}
+	if loginRole(c) == model.RoleOrgAdmin {
+		if u.Role == model.RoleCLevel || u.Role == model.RoleVisionAdmin {
+			return h.forbidden(c)
+		}
+		if !h.memberInHomeOrg(c, u) {
+			return echo.ErrNotFound
+		}
+	} else if _, err := h.loadAdminScopedUser(c, id); err != nil {
+		return err
+	}
+	if u.Role == model.RoleVisionAdmin {
+		if loginRole(c) != model.RoleVisionAdmin {
+			return h.forbidden(c)
+		}
+		if h.userRepo.CountRole(model.RoleVisionAdmin) <= 1 {
+			return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("마지막 비젼관리자 비밀번호는 초기화할 수 없습니다."))
+		}
+	}
+	pw, err := randomResetPassword()
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("임시 비밀번호를 만들지 못했습니다."))
+	}
+	if err := h.userRepo.ReplacePasswordHash(u.UserID, HashPassword(pw)); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("비밀번호를 바꾸지 못했습니다."))
+	}
+	_ = h.userRepo.SetMustChangePassword(u.UserID, true)
+	accessLog(c, auditlog.Record{
+		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+		TargetTable: "users", TargetID: u.UserID, SubjectType: "user",
+		SubjectID: u.UserID, SubjectName: u.FullName,
+		Detail: "비밀번호 초기화",
+	})
+	c.Set("once_temp_pw", pw)
+	c.Set("once_temp_name", u.FullName)
+	return h.UserList(c)
+}
+
 func (h *AuthHandler) UserDelete(c echo.Context) error {
-	if currentRole(c) != model.RoleVisionAdmin {
+	if loginRole(c) != model.RoleVisionAdmin {
 		return h.forbidden(c)
 	}
 	id := strings.TrimSpace(c.Param("id"))
@@ -907,7 +992,7 @@ func sessionClaims(user *model.User, unconfirmed bool) jwt.MapClaims {
 		"name":        user.FullName,
 		"org_id":      strings.TrimSpace(user.OrgID),
 		"permissions": model.FormatPermissions(user.PermList()),
-		"is_readonly": user.IsReadOnly,
+		"is_readonly": user.IsReadOnly || role == model.RoleCLevel,
 		"is_test":     user.IsTest,
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -929,7 +1014,7 @@ func sessionClaimsFromContext(c echo.Context, unconfirmed bool) jwt.MapClaims {
 		"org_id":      ctxString(c, "org_id"),
 		"view_org_id": ctxString(c, "view_org_id"),
 		"permissions": model.FormatPermissions(currentPerms(c)),
-		"is_readonly": isReadOnly(c),
+		"is_readonly": isReadOnly(c) || role == model.RoleCLevel,
 		"is_test":     ctxBool(c, "is_test"),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(24 * time.Hour).Unix(),
@@ -988,6 +1073,9 @@ func interpretLegacyRoleFlags(c echo.Context, claims jwt.MapClaims, role string)
 			role = model.RoleOrgAdmin
 		}
 	}
+	if role == model.RoleCLevel {
+		ro = true
+	}
 	if role == model.RoleTester {
 		test = true
 		if j := job(); j != "" {
@@ -1007,7 +1095,7 @@ func applyUserSession(c echo.Context, u *model.User) {
 	c.Set("user_name", u.FullName)
 	c.Set("org_id", strings.TrimSpace(u.OrgID))
 	c.Set("permissions", u.PermList())
-	c.Set("is_readonly", u.IsReadOnly)
+	c.Set("is_readonly", u.IsReadOnly || model.NormalizeRole(u.Role) == model.RoleCLevel)
 	c.Set("is_test", u.IsTest)
 	c.Set("auth_unconfirmed", false)
 }

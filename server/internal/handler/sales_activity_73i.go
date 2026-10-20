@@ -258,6 +258,10 @@ func cloneValues(v url.Values) url.Values {
 }
 
 func salesActQuery(month, q, period, status, biz, pids, owner string, types []string, page int) string {
+	return salesActQuery2(month, q, period, status, biz, pids, owner, types, nil, page)
+}
+
+func salesActQuery2(month, q, period, status, biz, pids, owner string, types, methods []string, page int) string {
 	v := url.Values{}
 	if month != "" {
 		v.Set("month", month)
@@ -282,6 +286,9 @@ func salesActQuery(month, q, period, status, biz, pids, owner string, types []st
 	}
 	for _, t := range types {
 		v.Add("type", t)
+	}
+	for _, m := range methods {
+		v.Add("method", m)
 	}
 	if page > 1 {
 		v.Set("page", strconv.Itoa(page))

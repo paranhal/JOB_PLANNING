@@ -88,7 +88,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 	for _, col := range kanbanCols {
 		kanbanTotal += col.Count
 	}
-	users, _ := h.userRepo.ListAssignable()
+	users := listAssignableForPicker(h.userRepo, c)
 	hidden, _ := h.repo.CountHiddenClosed(f)
 	hiddenDormant, _ := h.repo.CountHiddenDormant(f)
 	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")
@@ -122,12 +122,12 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"ContractTarget": f.ContractTarget, "ContractTargets": targets,
 		"BizType": f.BizType, "BizTypes": bizTypes, "BudgetYear": f.BudgetYear, "BudgetStatus": f.BudgetStatus, "BudgetStatuses": budgetSt,
 		"GroupID": f.GroupID, "Groups": groups, "GroupBy": groupBy, "GroupSections": groupSections,
-		"PeriodOptions": salesPeriodOptions(time.Now()),
-		"Users":         users,
-		"FilterAction":  "/sales",
+		"PeriodOptions":   salesPeriodOptions(time.Now()),
+		"Users":           users,
+		"FilterAction":    "/sales",
 		"ShowOwnerFilter": SalesVisibilityScope(c).ShowOwnerFilter,
-		"CanWrite":      canWriteSales(c),
-		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"CanWrite":        canWriteSales(c),
+		"FlashOK":         c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"FormError":           querySalesErr(c.QueryParam("err")),
 		"FromTask":            fromTask,
 		"ShowPipelineMetrics": false,
@@ -239,7 +239,7 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		"Drop":          model.BuildSalesDropDash(closed, yearStart, today),
 		"Judge":         model.BuildSalesJudgeAccuracy(closed),
 		"DormantN":      dN, "DormantAmount": model.FormatSalesMoney(int64(dAmt)),
-		"DormantDueN":  len(due),
+		"DormantDueN":   len(due),
 		"PinnedGroups":  pinRows,
 		"CanWriteSales": canWriteSales(c),
 	})
@@ -320,7 +320,9 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	changes, _ := h.repo.ListChanges(p.SalesID)
 	parties, _ := h.repo.ListParties(p.SalesID, true)
 	types, _ := h.repo.ActivityTypes()
-	users, _ := h.userRepo.ListAssignable()
+	methods, _ := h.repo.ActivityMethods()
+	typeGroups := model.SalesActTypeGroups(p.Stage, types)
+	users := listAssignableForPicker(h.userRepo, c)
 	partyTypes, _ := h.repo.PartyTypes()
 	partyRoles, _ := h.repo.PartyRoles()
 	var contacts []model.Contact
@@ -366,7 +368,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	allGroups, _ := h.repo.ListGroups(false)
 	selGroups, _ := h.repo.GroupsContaining(p)
 	stageProg := model.BuildSalesStageProgress(p, acts, quotes, time.Now().Format("2006-01-02"))
-	showStageProg := !p.IsSupply() && (p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose)
+	showStageProg := !p.IsSupply() && (p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose || p.Stage == model.SalesStage4Bid)
 	data := map[string]interface{}{
 		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSalesPipeline,
 		"Project":             h.viewProject(p, def),
@@ -383,6 +385,10 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"Changes":             changes,
 		"Timeline":            timeline,
 		"ActivityTypes":       types,
+		"ActivityMethods":     methods,
+		"TypeGroups":          typeGroups,
+		"ProjectStage":        p.Stage,
+		"ProjectStageLabel":   model.SalesActStageLabel(p.Stage),
 		"Users":               users,
 		"PartyTypes":          partyTypes,
 		"PartyRoles":          partyRoles,
@@ -404,6 +410,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"PartyHints":          model.CustomerPartyHintNames(parties),
 		"Today":               time.Now().Format("2006-01-02"),
 		"CanWrite":            canWriteSales(c),
+		"NextAction":          model.SalesNextActionOf(p, workProjectID, salesCanShowNextAction(c)),
 		"CanDrop":             canDropSales(c, p) && p.Status == model.SalesStatusActive && !p.IsDormant(),
 		"CanDeleteSales":      canDeleteThisSales(c, p) && workProjectID == "",
 		"DeleteWarn":          salesDeleteWarn(p.SalesID, h.repo),
@@ -422,7 +429,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"NextTask":       nextTask,
 		"NextActions":    nextActions,
 		"WinProbChoices": []int{10, 20, 30, 40, 50, 60, 70, 80, 90},
-		"ListBack": salesListBack(c, p),
+		"ListBack":       salesListBack(c, p),
 	}
 	if strings.TrimSpace(c.QueryParam("modal")) == "1" {
 		return RenderPartial(c, "sales/modal.html", data)
@@ -578,7 +585,7 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 		}
 	}
 
-	users, _ := h.userRepo.ListAssignable()
+	users := listAssignableForPicker(h.userRepo, c)
 	var salesNames []string
 	var order []string
 	seenName := map[string]bool{}
@@ -626,6 +633,8 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 	model.SetAssigneeColorOrder(colorNames)
 
 	actTypes, _ := h.repo.ActivityTypes()
+	actMethods, _ := h.repo.ActivityMethods()
+	typeGroups := model.SalesActTypeGroups("", actTypes)
 	stages, _ := h.repo.Stages()
 	actCols := []salesActCol{}
 	var kanbanCols []model.KanbanColumn
@@ -673,6 +682,8 @@ func (h *SalesHandler) Activities(c echo.Context) error {
 		"KanbanDrop":      "act",
 		"KanbanHint":      "열 = 활동 유형. 카드를 끌어 옮깁니다.",
 		"ActivityTypes":   actTypes,
+		"ActivityMethods": actMethods,
+		"TypeGroups":      typeGroups,
 		"Today":           time.Now().Format("2006-01-02"),
 		"FormAction":      "/sales/activities",
 		"SalesOptions":    projects,
@@ -701,7 +712,7 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit bool, formErr string) error {
 	stages, _ := h.repo.StagesFor(p.DealType)
 	customers, _ := h.customerRepo.ListAll()
-	users, _ := h.userRepo.ListAssignable()
+	users := listAssignableForPicker(h.userRepo, c)
 	sources, _ := h.codeRepo.ListByGroup(model.SalesCodeGroupLeadSource)
 	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")
 	routes, _ := h.codeRepo.ActiveByGroup("sales_procurement_route")
@@ -1255,6 +1266,7 @@ func (h *SalesHandler) parseActivityForm(c echo.Context) *model.SalesActivity {
 		StartTime:      strings.TrimSpace(c.FormValue("start_time")),
 		DurationMin:    dur,
 		ActivityType:   strings.TrimSpace(c.FormValue("activity_type")),
+		ActivityMethod: strings.TrimSpace(c.FormValue("activity_method")),
 		Title:          strings.TrimSpace(c.FormValue("title")),
 		Content:        strings.TrimSpace(c.FormValue("content")),
 		Place:          strings.TrimSpace(c.FormValue("place")),

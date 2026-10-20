@@ -41,7 +41,7 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 	fillWaitingActionCounts(h.repo, items)
 	h.repo.FillTaskDepth(items)
 	projects, _ := h.repo.ListProjects(true)
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListAll()
 	flashErr := c.QueryParam("err")
 	kanban := model.FillAdminKanban(model.AdminKanbanColumnDefs(), items)
@@ -91,7 +91,7 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 	fillWaitingActionCounts(h.repo, items)
 	h.repo.FillTaskDepth(items)
 	projects, _ := h.repo.ListProjects(true)
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListAll()
 	return c.Render(http.StatusOK, "admin_work/stats.html", map[string]interface{}{
 		"Title":       "행정관련업무현황",
@@ -119,7 +119,7 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	projects, _ := h.repo.ListProjects(true)
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListAll()
 	data := map[string]interface{}{
 		"Title":            "행정관련업무 등록",

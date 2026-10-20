@@ -647,10 +647,7 @@ func (h *ProjectHandler) assignableUsers(c echo.Context) []model.User {
 	if h == nil || h.userRepo == nil {
 		return nil
 	}
-	list, err := h.userRepo.ListAssignable()
-	if err != nil {
-		return nil
-	}
+	list := listAssignableForPicker(h.userRepo, c)
 	org := currentOrg(c)
 	var out []model.User
 	for _, u := range list {

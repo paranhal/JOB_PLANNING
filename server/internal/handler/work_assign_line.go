@@ -115,6 +115,9 @@ func (h *WorkHandler) AssignOne(c echo.Context) error {
 		return h.finishAssignNotice(c, "date", "")
 	}
 	if err := h.requireAssigneeInOrg(c, assignee, uid); err != nil {
+		if he, ok := err.(*echo.HTTPError); ok {
+			return he
+		}
 		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
 	if err := h.repo.AssignUnplannedDate(key, date, assignee, uid); err != nil {
@@ -135,6 +138,9 @@ func (h *WorkHandler) TransferOne(c echo.Context) error {
 		return h.finishAssignNotice(c, "assign", "")
 	}
 	if err := h.requireAssigneeInOrg(c, assignee, uid); err != nil {
+		if he, ok := err.(*echo.HTTPError); ok {
+			return he
+		}
 		return h.finishAssignNotice(c, unplannedErrQuery(err), "")
 	}
 	if err := h.repo.TransferUnplanned(key, assignee, uid, c.FormValue("work_date")); err != nil {
@@ -208,6 +214,9 @@ func (h *WorkHandler) CreateAssign(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err=date"))
 	}
 	if err := h.requireAssigneeInOrg(c, assignee, ""); err != nil {
+		if he, ok := err.(*echo.HTTPError); ok {
+			return he
+		}
 		return c.Redirect(http.StatusSeeOther, "/"+qjoin("/", "err="+unplannedErrQuery(err)))
 	}
 	wt := model.WBWorkAdmin
@@ -241,31 +250,7 @@ func (h *WorkHandler) requireAssigneeInOrg(c echo.Context, name, uid string) err
 	if name == "" && uid == "" {
 		return fmt.Errorf("담당자가 필요합니다")
 	}
-	if h.userRepo == nil && (h.notices == nil || h.notices.users == nil) {
-		return nil
-	}
-	var u *model.User
-	if h.notices != nil {
-		u = h.notices.resolveUser(uid, name)
-	}
-	if u == nil && h.userRepo != nil {
-		u = h.userRepo.FindAssignable(uid)
-		if u == nil {
-			u = h.userRepo.FindAssignable(name)
-		}
-	}
-	if u == nil {
-		return fmt.Errorf("담당자가 필요합니다")
-	}
-	org := currentOrg(c)
-	if org == "" || org == repository.OrgAll {
-		return nil
-	}
-	uo := strings.TrimSpace(u.OrgID)
-	if uo == "" || uo == org || u.Role == model.RoleVisionAdmin {
-		return nil
-	}
-	return fmt.Errorf("조직 범위 밖의 담당자입니다")
+	return checkAssigneeInOrg(h.userRepo, assignableOrgID(c), name, uid, "")
 }
 
 func (h *WorkHandler) markNoticeActed(c echo.Context) {

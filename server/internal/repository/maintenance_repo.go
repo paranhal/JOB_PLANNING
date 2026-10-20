@@ -28,60 +28,72 @@ func randomID(prefix string) string {
 	return prefix + hex.EncodeToString(b)
 }
 
+const maintenancePlanCols = `plan_id, plan_year, COALESCE(title,''), status,
+		       IFNULL(created_at,''), IFNULL(updated_at,''), COALESCE(org_id,'')`
+
+func scanMaintenancePlan(scan func(dest ...any) error) (*model.MaintenancePlan, error) {
+	var p model.MaintenancePlan
+	err := scan(&p.PlanID, &p.PlanYear, &p.Title, &p.Status, &p.CreatedAt, &p.UpdatedAt, &p.OrgID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 func (r *MaintenanceRepo) ListPlans() ([]model.MaintenancePlan, error) {
-	rows, err := r.db.Query(`
-		SELECT plan_id, plan_year, COALESCE(title,''), status,
-		       IFNULL(created_at,''), IFNULL(updated_at,'')
-		FROM maintenance_plans ORDER BY plan_year DESC`)
+	return r.ListPlansInOrg(OrgAll)
+}
+
+func (r *MaintenanceRepo) ListPlansInOrg(orgID string) ([]model.MaintenancePlan, error) {
+	q := `SELECT ` + maintenancePlanCols + ` FROM maintenance_plans WHERE 1=1`
+	q, args := appendOrg(q, nil, "", orgIDForFilter(orgID))
+	q += ` ORDER BY plan_year DESC`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []model.MaintenancePlan
 	for rows.Next() {
-		var p model.MaintenancePlan
-		if err := rows.Scan(&p.PlanID, &p.PlanYear, &p.Title, &p.Status, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		p, err := scanMaintenancePlan(rows.Scan)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, p)
+		out = append(out, *p)
 	}
 	return out, rows.Err()
 }
 
 func (r *MaintenanceRepo) GetPlan(planID string) (*model.MaintenancePlan, error) {
-	var p model.MaintenancePlan
-	err := r.db.QueryRow(`
-		SELECT plan_id, plan_year, COALESCE(title,''), status,
-		       IFNULL(created_at,''), IFNULL(updated_at,'')
-		FROM maintenance_plans WHERE plan_id = ?`, planID).
-		Scan(&p.PlanID, &p.PlanYear, &p.Title, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
+	return scanMaintenancePlan(r.db.QueryRow(`
+		SELECT `+maintenancePlanCols+`
+		FROM maintenance_plans WHERE plan_id = ?`, planID).Scan)
 }
 
 func (r *MaintenanceRepo) GetPlanByYear(year int) (*model.MaintenancePlan, error) {
-	var p model.MaintenancePlan
-	err := r.db.QueryRow(`
-		SELECT plan_id, plan_year, COALESCE(title,''), status,
-		       IFNULL(created_at,''), IFNULL(updated_at,'')
-		FROM maintenance_plans WHERE plan_year = ?`, year).
-		Scan(&p.PlanID, &p.PlanYear, &p.Title, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
+	return r.GetPlanByYearInOrg(model.OrgIDLibrary, year)
+}
+
+func (r *MaintenanceRepo) GetPlanByYearInOrg(orgID string, year int) (*model.MaintenancePlan, error) {
+	q := `SELECT ` + maintenancePlanCols + ` FROM maintenance_plans WHERE plan_year = ?`
+	args := []any{year}
+	q, args = appendOrg(q, args, "", orgIDForFilter(orgID))
+	return scanMaintenancePlan(r.db.QueryRow(q, args...).Scan)
 }
 
 func (r *MaintenanceRepo) CreatePlan(year int, title string) (*model.MaintenancePlan, error) {
-	existing, err := r.GetPlanByYear(year)
+	return r.CreatePlanForOrg(model.OrgIDLibrary, year, title)
+}
+
+func (r *MaintenanceRepo) CreatePlanForOrg(orgID string, year int, title string) (*model.MaintenancePlan, error) {
+	orgID, err := RequireInsertOrg(orgID)
+	if err != nil {
+		return nil, fmt.Errorf("조직을 선택한 뒤 계획을 만드세요")
+	}
+	existing, err := r.GetPlanByYearInOrg(orgID, year)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +102,8 @@ func (r *MaintenanceRepo) CreatePlan(year int, title string) (*model.Maintenance
 	}
 	id := randomID("mpl_")
 	_, err = r.db.Exec(`
-		INSERT INTO maintenance_plans (plan_id, plan_year, title, status, updated_at)
-		VALUES (?, ?, ?, 'draft', CURRENT_TIMESTAMP)`, id, year, title)
+		INSERT INTO maintenance_plans (plan_id, plan_year, title, status, org_id, updated_at)
+		VALUES (?, ?, ?, 'draft', ?, CURRENT_TIMESTAMP)`, id, year, title, orgID)
 	if err != nil {
 		return nil, err
 	}

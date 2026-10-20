@@ -55,6 +55,7 @@ type Handler struct {
 	Notify         *NotifyAdminHandler
 	Approval       *ApprovalSettingsHandler
 	Leave          *LeaveHandler
+	Exec           *ExecHandler
 	notices        *assignNoticeHook
 	help           *repository.LoginHelpRepo
 
@@ -209,6 +210,7 @@ func New(db *sql.DB) *Handler {
 		Notify:      &NotifyAdminHandler{db: db, cfg: authH.cfg, settings: settingsRepo},
 		Approval:    &ApprovalSettingsHandler{eng: aprEng},
 		Leave:       &LeaveHandler{svc: leaveSvc, eng: aprEng},
+		Exec:        NewExecHandler(repository.NewOrgRepo(db)),
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
@@ -290,6 +292,9 @@ func (h *Handler) Dashboard(c echo.Context) error {
 	role := ctxString(c, "role")
 	if role == "" {
 		return redirectLogin(c)
+	}
+	if currentRole(c) == model.RoleCLevel && strings.TrimSpace(c.QueryParam("view_org_id")) == "" {
+		return c.Redirect(http.StatusSeeOther, "/exec")
 	}
 	if isSalesHomeRedirect(c) {
 		return redirectSalesHome(c)

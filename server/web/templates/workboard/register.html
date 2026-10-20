@@ -205,7 +205,7 @@
             {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
             {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
             {{if .ShowScopeToggle}}
-            {{else}}
+            {{else if not .AssigneePickDisabled}}
             <label class="sr-only" for="reg-assignee">담당자</label>
             <select id="reg-assignee" name="assignee" onchange="this.form.submit()"
                     class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[7.5rem]">
@@ -247,8 +247,9 @@
         <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-600">
           <span class="text-slate-400 shrink-0">담당자</span>
           {{range .AssigneeLegend}}
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border" style="background-color:{{.Soft}};border-color:{{.Border}};border-left-width:3px">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border" style="background-color:{{.Soft}};border-color:{{.Border}};border-left-width:3px" {{if .Unregistered}}title="사용자 미등록"{{end}}>
             <span class="font-medium" style="color:{{.Border}}">{{.Name}}</span>
+            {{if .Unregistered}}<span class="text-[9px] text-slate-500">미등록</span>{{end}}
           </span>
           {{end}}
         </div>
@@ -506,6 +507,7 @@
                  title="{{.Label}}{{if .Sub}} · {{.Sub}}{{end}}">
               <p class="text-[11px] font-bold truncate {{if .Unassigned}}text-slate-500{{end}}">{{.Label}}</p>
               <p class="text-[9px] truncate {{if .Unassigned}}text-slate-500{{else}}text-slate-400{{end}}">{{.Sub}}</p>
+              {{if .Unregistered}}<p class="text-[9px] text-slate-500" title="사용자 미등록">미등록</p>{{end}}
               {{if .OnLeave}}<p class="text-[9px] text-orange-700">연차</p>{{end}}
             </div>
             {{end}}

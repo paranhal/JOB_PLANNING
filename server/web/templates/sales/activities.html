@@ -255,6 +255,8 @@ function salesActPanel(startOpen) {
     nextAction: '',
     nextDate: '',
     editingId: '',
+    typeHint: '',
+    typeWarn: '',
     createAction: '{{.FormAction}}',
     init() { this.initPartyChips(); },
     startCreate() {
@@ -270,6 +272,9 @@ function salesActPanel(startOpen) {
       if (form) {
         form.action = this.createAction;
         this.setField(form, 'activity_type', '');
+        this.setField(form, 'activity_method', '');
+        this.typeHint = '';
+        this.typeWarn = '';
         this.setField(form, 'start_time', '');
         this.setField(form, 'title', '');
         this.setField(form, 'place', '');
@@ -297,6 +302,8 @@ function salesActPanel(startOpen) {
         self.setField(form, 'sales_id', d.salesId);
         self.setField(form, 'activity_date', d.date);
         self.setField(form, 'activity_type', d.type);
+        self.setField(form, 'activity_method', d.method);
+        self.onActTypeChange({ target: form.querySelector('[name=activity_type]') });
         self.setField(form, 'start_time', d.start);
         self.setField(form, 'title', d.title);
         self.setField(form, 'place', d.place);
@@ -307,6 +314,21 @@ function salesActPanel(startOpen) {
     setField(form, name, val) {
       const el = form.querySelector('[name="' + name + '"]');
       if (el) el.value = val || '';
+    },
+    onActTypeChange(ev) {
+      const sel = ev && ev.target;
+      if (!sel) { this.typeHint = ''; this.typeWarn = ''; return; }
+      const opt = sel.options[sel.selectedIndex];
+      const stageLabel = opt && opt.dataset ? (opt.dataset.stageLabel || '') : '';
+      const stage = opt && opt.dataset ? (opt.dataset.stage || '') : '';
+      this.typeHint = stageLabel ? (stageLabel + ' 단계 활동') : '';
+      const proj = sel.getAttribute('data-project-stage') || '';
+      const projLabel = sel.getAttribute('data-project-stage-label') || '';
+      if (proj && stage && proj !== stage) {
+        this.typeWarn = '이 사업은 ' + projLabel + ' 단계입니다. ' + (opt.text || '') + '은(는) ' + stageLabel + ' 단계 활동입니다.';
+      } else {
+        this.typeWarn = '';
+      }
     },
     async submit(ev) {
       const form = ev.target;

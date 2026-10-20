@@ -260,6 +260,9 @@ func (r *SalesRepo) Get(id string) (*model.SalesProject, error) {
 	if err != nil {
 		return nil, err
 	}
+	if p != nil && strings.TrimSpace(p.OrgID) == "" {
+		_ = r.db.QueryRow(`SELECT TRIM(COALESCE(org_id,'')) FROM sales_projects WHERE sales_id=?`, p.SalesID).Scan(&p.OrgID)
+	}
 	return p, nil
 }
 

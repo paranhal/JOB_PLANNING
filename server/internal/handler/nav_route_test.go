@@ -51,6 +51,9 @@ func navLeafPaths() []string {
 	for _, g := range navDefinition() {
 		walk(g.Items)
 	}
+	for _, g := range execNavDefinition(sampleExecOrgs()) {
+		walk(g.Items)
+	}
 	return out
 }
 
@@ -79,8 +82,18 @@ func TestNavHrefsHaveGETRoutesInMain(t *testing.T) {
 	src := readServerMain(t)
 	got := mainGETPaths(src)
 	for _, path := range navLeafPaths() {
-		if !got[path] {
+		if !mainHasGET(got, path) {
 			t.Errorf("메뉴 %s 에 대응하는 GET 라우트가 main.go 에 없다", path)
 		}
 	}
+}
+
+func mainHasGET(got map[string]bool, path string) bool {
+	if got[path] {
+		return true
+	}
+	if strings.HasPrefix(path, "/exec/org/") {
+		return got["/exec/org/:id"]
+	}
+	return false
 }

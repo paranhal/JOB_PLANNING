@@ -247,7 +247,7 @@ func (h *WorkboardHandler) RegisterKanbanMove(c echo.Context) error {
 
 	assignee := strings.TrimSpace(c.FormValue("assignee"))
 	note := strings.TrimSpace(c.FormValue("complete_note"))
-	if err := h.applyRegisterKanbanMove(key, from, to, date, assignee, note); err != nil {
+	if err := h.applyRegisterKanbanMove(c, key, from, to, date, assignee, note); err != nil {
 		if km, ok := err.(*kanbanMoveError); ok {
 			code := km.code
 			if code == "complete_note" {
@@ -266,16 +266,22 @@ func (h *WorkboardHandler) RegisterKanbanMove(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=kanban"))
 }
 
-func (h *WorkboardHandler) applyRegisterKanbanMove(key, from, to, date, assignee, note string) error {
+func (h *WorkboardHandler) applyRegisterKanbanMove(c echo.Context, key, from, to, date, assignee, note string) error {
 	needAssignee := (to == model.WorkBucketToday || to == model.WorkBucketInProgress) &&
 		(from == model.WorkBucketUnplanned)
+	cur := h.kanbanCurrentAssignee(key)
 	if needAssignee {
-		cur := h.kanbanCurrentAssignee(key)
 		if strings.TrimSpace(cur) == "" && assignee == "" {
 			return errKanban("assignee")
 		}
 		if assignee == "" {
 			assignee = cur
+		}
+	}
+	org := assignableOrgID(c)
+	if strings.TrimSpace(assignee) != "" {
+		if err := checkAssigneeInOrg(h.userRepo, org, assignee, "", cur); err != nil {
+			return err
 		}
 	}
 
@@ -290,11 +296,11 @@ func (h *WorkboardHandler) applyRegisterKanbanMove(key, from, to, date, assignee
 			return err
 		}
 		if to == model.WorkBucketToday || to == model.WorkBucketInProgress {
-			return h.kanbanApplyOpenMove(key, model.WorkBucketToday, to, date, assignee)
+			return h.kanbanApplyOpenMove(org, key, model.WorkBucketToday, to, date, assignee)
 		}
 		return nil
 	default:
-		return h.kanbanApplyOpenMove(key, from, to, date, assignee)
+		return h.kanbanApplyOpenMove(org, key, from, to, date, assignee)
 	}
 }
 
@@ -306,14 +312,14 @@ type kanbanMoveError struct{ code string }
 
 func (e *kanbanMoveError) Error() string { return e.code }
 
-func (h *WorkboardHandler) kanbanApplyOpenMove(key, from, to, date, assignee string) error {
+func (h *WorkboardHandler) kanbanApplyOpenMove(org, key, from, to, date, assignee string) error {
 	switch {
 	case from == model.WorkBucketUnplanned && to == model.WorkBucketToday:
-		return h.kanbanAssignDate(key, date, assignee, false)
+		return h.kanbanAssignDate(org, key, date, assignee, false)
 	case from == model.WorkBucketUnplanned && to == model.WorkBucketInProgress:
-		return h.kanbanAssignDate(key, date, assignee, true)
+		return h.kanbanAssignDate(org, key, date, assignee, true)
 	case from == model.WorkBucketDelayed && to == model.WorkBucketToday:
-		return h.kanbanAssignDate(key, date, assignee, false)
+		return h.kanbanAssignDate(org, key, date, assignee, false)
 	case from == model.WorkBucketToday && to == model.WorkBucketInProgress:
 		return h.kanbanSetProgress(key, true)
 	case from == model.WorkBucketDelayed && to == model.WorkBucketInProgress:
@@ -323,10 +329,10 @@ func (h *WorkboardHandler) kanbanApplyOpenMove(key, from, to, date, assignee str
 	default:
 		// 같은 열 계열의 날짜·상태만 맞춘다
 		if to == model.WorkBucketToday {
-			return h.kanbanAssignDate(key, date, assignee, false)
+			return h.kanbanAssignDate(org, key, date, assignee, false)
 		}
 		if to == model.WorkBucketInProgress {
-			if err := h.kanbanAssignDate(key, date, assignee, false); err != nil {
+			if err := h.kanbanAssignDate(org, key, date, assignee, false); err != nil {
 				return err
 			}
 			return h.kanbanSetProgress(key, true)
@@ -335,11 +341,11 @@ func (h *WorkboardHandler) kanbanApplyOpenMove(key, from, to, date, assignee str
 	}
 }
 
-func (h *WorkboardHandler) kanbanAssignDate(key, date, assignee string, start bool) error {
+func (h *WorkboardHandler) kanbanAssignDate(org, key, date, assignee string, start bool) error {
 	if h.workBoard != nil {
-		_ = h.workBoard.AssignUnplannedDate(key, date, assignee, h.assigneeUserID(assignee))
+		_ = h.workBoard.AssignUnplannedDate(key, date, assignee, h.assigneeUserID(org, assignee))
 	}
-	if err := h.kanbanForceDate(key, date, assignee); err != nil {
+	if err := h.kanbanForceDate(org, key, date, assignee); err != nil {
 		return err
 	}
 	if start {
@@ -348,7 +354,7 @@ func (h *WorkboardHandler) kanbanAssignDate(key, date, assignee string, start bo
 	return nil
 }
 
-func (h *WorkboardHandler) kanbanForceDate(key, date, assignee string) error {
+func (h *WorkboardHandler) kanbanForceDate(org, key, date, assignee string) error {
 	kind, id := splitKanbanKey(key)
 	switch kind {
 	case "as":
@@ -358,7 +364,7 @@ func (h *WorkboardHandler) kanbanForceDate(key, date, assignee string) error {
 		if assignee != "" {
 			if as, err := h.asRepo.GetByID(repository.OrgAll, id); err == nil && as != nil && strings.TrimSpace(as.AssignedTo) == "" {
 				as.AssignedTo = assignee
-				as.AssignedUserID = h.assigneeUserID(assignee)
+				as.AssignedUserID = h.assigneeUserID(org, assignee)
 				_ = h.asRepo.Update(as)
 			}
 		}
@@ -396,7 +402,7 @@ func (h *WorkboardHandler) kanbanForceDate(key, date, assignee string) error {
 		return h.updateTaskLogged(t)
 	case "wi":
 		if h.workBoard != nil {
-			return h.workBoard.AssignUnplannedDate(key, date, assignee, h.assigneeUserID(assignee))
+			return h.workBoard.AssignUnplannedDate(key, date, assignee, h.assigneeUserID(org, assignee))
 		}
 		return nil
 	default:
@@ -611,19 +617,13 @@ func (h *WorkboardHandler) kanbanCurrentAssignee(key string) string {
 	return ""
 }
 
-func (h *WorkboardHandler) assigneeUserID(name string) string {
+func (h *WorkboardHandler) assigneeUserID(org, name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" || h.userRepo == nil {
 		return ""
 	}
-	users, err := h.userRepo.ListAssignable()
-	if err != nil {
-		return ""
-	}
-	for _, u := range users {
-		if u.FullName == name || u.Username == name {
-			return u.UserID
-		}
+	if u := h.userRepo.FindAssignable(org, name); u != nil {
+		return u.UserID
 	}
 	return ""
 }

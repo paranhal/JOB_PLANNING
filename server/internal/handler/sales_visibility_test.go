@@ -88,7 +88,7 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 			t.Fatal(name, err)
 		}
 		if err := repo.CreateActivity(&model.SalesActivity{
-			SalesID: p.SalesID, ActivityDate: "2026-10-10", ActivityType: "visit", Title: name + "방문",
+			SalesID: p.SalesID, ActivityDate: "2026-10-10", ActivityType: "other", ActivityMethod: "visit", Title: name + "방문",
 		}, owner, nil); err != nil {
 			t.Fatal("act", err)
 		}

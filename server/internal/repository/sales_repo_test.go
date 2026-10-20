@@ -204,7 +204,7 @@ func TestSalesActivityCreatesWorkTaskAndExecToggle(t *testing.T) {
 
 	act := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: "2026-08-19", StartTime: "10:00",
-		DurationMin: 60, ActivityType: "visit", Title: "방문미팅",
+		DurationMin: 60, ActivityType: "other", ActivityMethod: "visit", Title: "방문미팅",
 		OurMembers: "최혜영", NextAction: "견적 요청",
 	}
 	if err := sales.CreateActivity(act, "관리자", nil); err != nil {
@@ -422,7 +422,7 @@ func TestSalesPipelineAndActivityMove(t *testing.T) {
 
 	act := &model.SalesActivity{
 		SalesID: lead.SalesID, ActivityDate: "2026-08-19", StartTime: "10:00",
-		DurationMin: 30, ActivityType: "visit", Title: "방문", OurMembers: "최혜영",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "방문", OurMembers: "최혜영",
 	}
 	if err := repo.CreateActivity(act, "최혜영", nil); err != nil {
 		t.Fatal(err)
@@ -451,12 +451,12 @@ func TestSalesPipelineAndActivityMove(t *testing.T) {
 		t.Fatalf("담당자 활동 최혜영=%d 태자운=%d", hy, tae)
 	}
 
-	if err := repo.MoveActivity(act.ActivityID, "type", "call", "최혜영"); err != nil {
+	if err := repo.MoveActivity(act.ActivityID, "method", "call", "최혜영"); err != nil {
 		t.Fatal(err)
 	}
 	got, err := repo.GetActivity(act.ActivityID)
-	if err != nil || got.ActivityType != "call" {
-		t.Fatalf("유형 이동: %+v err=%v", got, err)
+	if err != nil || got.ActivityMethod != "call" {
+		t.Fatalf("방법 이동: %+v err=%v", got, err)
 	}
 	if err := repo.MoveActivity(act.ActivityID, "stage", model.SalesStage4Propose, "최혜영"); err != nil {
 		t.Fatal(err)

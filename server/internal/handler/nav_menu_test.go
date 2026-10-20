@@ -47,7 +47,7 @@ func TestNavRoleVisibilityTable(t *testing.T) {
 		{
 			name: "비전",
 			ctx:  visionMenuCtx(),
-			want: []string{"/", "/work", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/admin/users", "/admin/system", "/admin/test-stats"},
+			want: []string{"/exec", "/", "/work", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/admin/users", "/admin/system", "/admin/test-stats"},
 			hide: []string{"/account", "/admin-work", "/plan/unplanned", "/work-status"},
 		},
 		{

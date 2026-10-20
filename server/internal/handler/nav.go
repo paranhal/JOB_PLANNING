@@ -64,6 +64,9 @@ const (
 	NavMeetingWeeklyMe   = "meeting_weekly_me"
 	NavTestStats         = "test_stats"
 	NavAccount           = "account"
+	NavExec              = "exec"
+	NavExecWork          = "exec_work"
+	NavExecOrg           = "exec_org"
 	NavLogin             = "login"
 	NavNone              = ""
 )

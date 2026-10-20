@@ -154,6 +154,9 @@ func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFil
 	if f.RequireAction {
 		where += ` AND` + similarHasWorkSQL()
 	}
+	if s := strings.TrimSpace(f.OrgID); s != "" {
+		where, args = appendOrg(where, args, "ar", s)
+	}
 	return where, args
 }
 
@@ -468,6 +471,9 @@ func (r *ASRepo) similarFTS(f model.ASSimilarFilter, key, product string, limit 
 		where += ` AND ar.as_id <> ?`
 		args = append(args, x)
 	}
+	if s := strings.TrimSpace(f.OrgID); s != "" {
+		where, args = appendOrg(where, args, "ar", s)
+	}
 	q := similarSelectSQL() + `
 		JOIN as_search ON as_search.as_id = ar.as_id` + where + similarOrderSQL(true) + ` LIMIT ?`
 	args = append(similarWeightArgs(f), args...)
@@ -507,6 +513,9 @@ func (r *ASRepo) similarLike(f model.ASSimilarFilter, key, product string, limit
 	if x := strings.TrimSpace(f.ExcludeID); x != "" {
 		where += ` AND ar.as_id <> ?`
 		args = append(args, x)
+	}
+	if s := strings.TrimSpace(f.OrgID); s != "" {
+		where, args = appendOrg(where, args, "ar", s)
 	}
 	q := similarSelectSQL() + where + similarOrderSQL(false) + ` LIMIT ?`
 	args = append(similarWeightArgs(f), args...)
@@ -602,11 +611,17 @@ func scanSimilarCases(rows *sql.Rows, f model.ASSimilarFilter, product string) (
 }
 
 func (r *ASRepo) SearchProductNames() ([]string, error) {
-	rows, err := r.db.Query(`
+	return r.SearchProductNamesInOrg(OrgAll)
+}
+
+func (r *ASRepo) SearchProductNamesInOrg(orgID string) ([]string, error) {
+	q := `
 		SELECT DISTINCT a.product_name FROM assets a
 		JOIN as_receipts ar ON ar.asset_id = a.asset_id
-		WHERE TRIM(COALESCE(a.product_name,'')) != ''
-		ORDER BY a.product_name`)
+		WHERE TRIM(COALESCE(a.product_name,'')) != ''`
+	q, args := appendOrg(q, nil, "ar", orgIDForFilter(orgID))
+	q += ` ORDER BY a.product_name`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -626,31 +641,51 @@ const knowledgeWorkSQL = `EXISTS (SELECT 1 FROM as_processes p WHERE p.as_id=ar.
 
 // KnowledgeCorpus 조치 있는 건 / 전체 / 원인분류된 건. 숫자는 화면이 한계를 말할 때 쓴다. §41.1.2
 func (r *ASRepo) KnowledgeCorpus() (withAction, total, classified int, err error) {
-	err = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar`).Scan(&total)
+	return r.KnowledgeCorpusInOrg(OrgAll)
+}
+
+func (r *ASRepo) KnowledgeCorpusInOrg(orgID string) (withAction, total, classified int, err error) {
+	orgID = orgIDForFilter(orgID)
+	count := func(extra string) (int, error) {
+		q := `SELECT COUNT(*) FROM as_receipts ar WHERE 1=1`
+		if extra != "" {
+			q += ` AND (` + extra + `)`
+		}
+		q, args := appendOrg(q, nil, "ar", orgID)
+		var n int
+		e := r.db.QueryRow(q, args...).Scan(&n)
+		return n, e
+	}
+	total, err = count("")
 	if err != nil {
 		return
 	}
-	err = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts ar WHERE ` + knowledgeWorkSQL).Scan(&withAction)
+	withAction, err = count(knowledgeWorkSQL)
 	if err != nil {
 		return
 	}
-	err = r.db.QueryRow(`
-		SELECT COUNT(*) FROM as_receipts ar
-		 WHERE TRIM(COALESCE(ar.cause_cat1,'')) != ''
+	classified, err = count(`TRIM(COALESCE(ar.cause_cat1,'')) != ''
 		    OR TRIM(COALESCE(ar.cause_cat2,'')) != ''
-		    OR TRIM(COALESCE(ar.cause_cat3,'')) != ''`).Scan(&classified)
+		    OR TRIM(COALESCE(ar.cause_cat3,'')) != ''`)
 	return
 }
 
 // KnowledgeSites 사이트 목록. assets 를 거치지 않는다. §41.1.1
 func (r *ASRepo) KnowledgeSites() ([]model.ASKnowledgeSite, error) {
-	rows, err := r.db.Query(`
+	return r.KnowledgeSitesInOrg(OrgAll)
+}
+
+func (r *ASRepo) KnowledgeSitesInOrg(orgID string) ([]model.ASKnowledgeSite, error) {
+	q := `
 		SELECT ar.customer_id, c.org_name, COUNT(*)
 		  FROM as_receipts ar
 		  JOIN customers c ON c.customer_id = ar.customer_id
-		 WHERE TRIM(COALESCE(ar.customer_id,'')) != ''
+		 WHERE TRIM(COALESCE(ar.customer_id,'')) != ''`
+	q, args := appendOrg(q, nil, "ar", orgIDForFilter(orgID))
+	q += `
 		 GROUP BY ar.customer_id
-		 ORDER BY c.org_name`)
+		 ORDER BY c.org_name`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -668,6 +703,10 @@ func (r *ASRepo) KnowledgeSites() ([]model.ASKnowledgeSite, error) {
 
 // KnowledgeSiteCases 한 사이트의 접수. 최신순. ar.customer_id.
 func (r *ASRepo) KnowledgeSiteCases(customerID string, limit int) ([]model.ASSearchHit, error) {
+	return r.KnowledgeSiteCasesInOrg(customerID, limit, OrgAll)
+}
+
+func (r *ASRepo) KnowledgeSiteCasesInOrg(customerID string, limit int, orgID string) ([]model.ASSearchHit, error) {
 	customerID = strings.TrimSpace(customerID)
 	if customerID == "" {
 		return nil, nil
@@ -676,10 +715,14 @@ func (r *ASRepo) KnowledgeSiteCases(customerID string, limit int) ([]model.ASSea
 		limit = 200
 	}
 	q := asSearchHitSQL + `
-		WHERE ar.customer_id = ?
+		WHERE ar.customer_id = ?`
+	args := []any{customerID}
+	q, args = appendOrg(q, args, "ar", orgIDForFilter(orgID))
+	q += `
 		ORDER BY ar.receipt_datetime DESC
 		LIMIT ?`
-	rows, err := r.db.Query(q, customerID, limit)
+	args = append(args, limit)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

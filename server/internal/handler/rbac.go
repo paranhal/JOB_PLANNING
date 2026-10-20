@@ -104,6 +104,9 @@ func isOfficeRole(c echo.Context) bool {
 }
 
 func isReadOnly(c echo.Context) bool {
+	if currentRole(c) == model.RoleCLevel {
+		return true
+	}
 	v, _ := c.Get("is_readonly").(bool)
 	return v
 }
@@ -452,6 +455,9 @@ func (h *AuthHandler) RequireActiveRole(next echo.HandlerFunc) echo.HandlerFunc 
 
 func (h *AuthHandler) RequireAdminMW(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		if currentRole(c) == model.RoleCLevel {
+			return h.forbidden(c)
+		}
 		if isAdminRole(c) || hasPerm(c, model.PermCodesUsers) {
 			return next(c)
 		}

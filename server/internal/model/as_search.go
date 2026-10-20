@@ -19,6 +19,7 @@ type ASSearchFilter struct {
 	KeywordID     string // 키워드 모아보기. §12.11.6
 	CauseCat      string // §34.3.3 cause_cat*
 	RequireAction bool   // 조치 기록 있는 건만. §41.1.2
+	OrgID         string // 현재 조직. 비면 필터 없음(테스트). 화면은 currentOrg.
 	Page          int
 	PageSize      int
 }
@@ -92,6 +93,7 @@ type ASSimilarFilter struct {
 	CustomerID string
 	AssetID    string
 	ExcludeID  string
+	OrgID      string
 	Limit      int
 }
 

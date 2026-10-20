@@ -22,7 +22,7 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	data := map[string]interface{}{
 		"Title":        "하부업무 조치 · " + w.WorkNumber,
 		"Active":       NavAS,
@@ -110,7 +110,7 @@ func resolveAssigneeFormFields(c echo.Context, userRepo *repository.UserRepo, co
 	}
 	if legacyField != "" {
 		if v := strings.TrimSpace(c.FormValue(legacyField)); v != "" {
-			if users, _ := userRepo.ListAssignable(); users != nil {
+			if users := listAssignableForPicker(userRepo, c); len(users) > 0 {
 				for _, u := range users {
 					if strings.TrimSpace(u.FullName) == v || u.Username == v {
 						return u.FullName, u.UserID

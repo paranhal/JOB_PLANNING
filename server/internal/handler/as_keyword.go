@@ -80,15 +80,16 @@ func (h *ASHandler) KeywordList(c echo.Context) error {
 	if !canReceiveAS(c) && !canProcessAS(c) && !isAdminRole(c) {
 		return echo.ErrForbidden
 	}
-	items, err := h.kwRepo.List(false)
+	org := currentOrg(c)
+	items, err := h.kwRepo.ListForOrg(false, org)
 	if err != nil {
 		return err
 	}
-	cands, _ := h.kwRepo.FrequencyCandidates(40)
+	cands, _ := h.kwRepo.FrequencyCandidatesForOrg(40, org)
 	linkN, receiptN := 0, 0
 	if h.repo != nil {
-		linkN = h.repo.KeywordLinkCount()
-		receiptN = h.repo.ReceiptCount()
+		linkN = h.repo.KeywordLinkCountInOrg(org)
+		receiptN = h.repo.ReceiptCountInOrg(org)
 	}
 	return c.Render(http.StatusOK, "as/keywords.html", map[string]interface{}{
 		"Title": "AS 키워드 사전", "Active": NavAS,
@@ -156,7 +157,7 @@ func (h *ASHandler) KeywordRebuild(c echo.Context) error {
 	if !canReceiveAS(c) && !canProcessAS(c) && !isAdminRole(c) {
 		return echo.ErrForbidden
 	}
-	if _, err := h.repo.RebuildKeywordLinks(nil); err != nil {
+	if _, err := h.repo.RebuildKeywordLinksInOrg(nil, currentOrg(c)); err != nil {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/as/keywords?ok=relink")

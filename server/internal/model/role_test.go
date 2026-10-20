@@ -34,10 +34,17 @@ func TestNormalizeRoleKnownAliases(t *testing.T) {
 		{"열람사용자", RoleObserver},
 		{RoleTester, RoleTester},
 		{"테스터", RoleTester},
+		{RoleCLevel, RoleCLevel},
+		{"C-Level", RoleCLevel},
+		{"c-level", RoleCLevel},
+		{"경영진", RoleCLevel},
+		{"대표", RoleCLevel},
+		{"임원", RoleCLevel},
 		{" admin ", RoleOrgAdmin},
 	}
 	known := map[string]bool{
 		RoleAdmin: true, "관리자": true, RoleOrgAdmin: true, RoleVisionAdmin: true, "비젼관리자": true,
+		RoleCLevel: true, "C-Level": true, "c-level": true, "경영진": true, "대표": true, "임원": true,
 		RoleTech: true, "기술": true, "기술담당": true, RoleSales: true, "영업": true, "영업담당": true,
 		RoleOffice: true, "행정": true, "receipt": true, "접수": true, "접수담당": true, "user": true,
 		RoleSupport: true, " admin ": true,
@@ -89,6 +96,50 @@ func TestEffectiveRoleTesterUsesBase(t *testing.T) {
 	if PermAccess(RoleTester, PermSalesCreate) != AccessNone {
 		t.Fatal("테스터 자체 권한표가 생겼다")
 	}
+}
+
+func TestCLevelAccessNeverAboveView(t *testing.T) {
+	for _, d := range AllPermissions {
+		got := PermAccess(RoleCLevel, d.Key)
+		want := ClampCLevelAccess(d.Key, got)
+		if got != want || got > AccessView {
+			t.Fatalf("%s = %d", d.Key, got)
+		}
+		if IsAdminSectionPerm(d.Key) && got != AccessNone {
+			t.Fatalf("관리 권한 %s = %d", d.Key, got)
+		}
+	}
+	if ClampCLevelAccess(PermASCreate, AccessFull) != AccessView {
+		t.Fatal("쓰기 권한은 조회로 내린다")
+	}
+	if ClampCLevelAccess(PermUsersEdit, AccessFull) != AccessNone {
+		t.Fatal("관리 권한은 없음")
+	}
+}
+
+func TestCLevelDefaultPermissionsViewOnly(t *testing.T) {
+	p := DefaultPermissions(RoleCLevel)
+	if !HasPermission(p, PermASView) || !HasPermission(p, PermSalesView) || !HasPermission(p, PermStatsView) {
+		t.Fatalf("조회 권한 없음: %v", p)
+	}
+	if HasPermission(p, PermASCreate) || HasPermission(p, PermUsersEdit) || HasPermission(p, PermDataDelete) {
+		t.Fatalf("쓰기·관리 권한이 있다: %v", p)
+	}
+	if AdminGrade(RoleCLevel) != "exec" || IsAdminGrade(RoleCLevel) {
+		t.Fatal("C-Level 은 exec 등급이고 관리자가 아니다")
+	}
+	if RoleFromAdminGradeMust(t, "exec", "") != RoleCLevel {
+		t.Fatal("exec 등급")
+	}
+}
+
+func RoleFromAdminGradeMust(t *testing.T, grade, job string) string {
+	t.Helper()
+	r, err := RoleFromAdminGrade(grade, job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
 }
 
 func TestDefaultPermissionsUnknownNil(t *testing.T) {
@@ -147,7 +198,7 @@ func TestCompactStoredPermissionsMatchesDefaultEmpty(t *testing.T) {
 }
 
 func TestSelfLeaveOnAllRoles(t *testing.T) {
-	for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleSupport, RoleTech, RoleSales, RoleObserver} {
+	for _, role := range []string{RoleVisionAdmin, RoleOrgAdmin, RoleCLevel, RoleSupport, RoleTech, RoleSales, RoleObserver} {
 		if PermAccess(role, PermSelfLeave) < AccessOwn {
 			t.Fatalf("%s self.leave", role)
 		}

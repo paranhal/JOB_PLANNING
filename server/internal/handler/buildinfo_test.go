@@ -12,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -91,6 +92,23 @@ func TestBuildBadgeCopyAndCacheBust(t *testing.T) {
 	}
 }
 
+func TestVersionNumberLabel(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"75", "version : 75"},
+		{"v75", "version : 75"},
+		{"V75", "version : 75"},
+		{" 75 ", "version : 75"},
+		{"", "version : dev"},
+		{"unknown", "version : dev"},
+		{"dev", "version : dev"},
+	}
+	for _, tc := range cases {
+		if got := VersionNumberLabel(tc.in); got != tc.want {
+			t.Errorf("VersionNumberLabel(%q)=%q want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestBaseHTMLUsesInjectedVersion(t *testing.T) {
 	body, err := os.ReadFile("web/templates/layout/base.html")
 	if err != nil {
@@ -99,6 +117,15 @@ func TestBaseHTMLUsesInjectedVersion(t *testing.T) {
 	s := string(body)
 	if strings.Contains(s, ">v2.0<") {
 		t.Fatal("사이드바에 v2.0 이 글자로 박혀 있다")
+	}
+	if !strings.Contains(s, `id="app-version"`) || !strings.Contains(s, "{{.VersionHeader}}") {
+		t.Fatal("사이드바 상단에 VersionHeader 가 없다")
+	}
+	if !strings.Contains(s, `id="app-version"`) || !strings.Contains(s, "font-bold") {
+		t.Fatal("버전 줄이 굵은 글씨가 아니다")
+	}
+	if strings.Contains(s, "version : 75") {
+		t.Fatal("템플릿에 version : 75 가 직접 적혀 있다")
 	}
 	if !strings.Contains(s, "{{.VersionLabel}}") {
 		t.Fatal("사이드바가 VersionLabel 을 쓰지 않는다")
@@ -114,6 +141,81 @@ func TestBaseHTMLUsesInjectedVersion(t *testing.T) {
 	}
 	if !strings.Contains(s, "/static/vendor/tailwind.css?v={{.AssetQuery}}") {
 		t.Fatal("정적 파일에 빌드 값이 안 붙는다")
+	}
+}
+
+func TestVersionHeaderBetweenBrandAndNav(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "verhead.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	users := repository.NewUserRepo(db)
+	_ = users.EnsureAdmin(HashPassword("adminadmin"))
+	vis := &model.User{Username: "vis1", PasswordHash: HashPassword("password10"), FullName: "비전", Role: model.RoleVisionAdmin, IsActive: true, ProfileDone: true}
+	oa := &model.User{Username: "oa1", PasswordHash: HashPassword("password10"), FullName: "팀장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
+	sales := &model.User{Username: "sa1", PasswordHash: HashPassword("password10"), FullName: "영업", Role: model.RoleSales, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
+	obs := &model.User{Username: "ob1", PasswordHash: HashPassword("password10"), FullName: "열람", Role: model.RoleTech, IsActive: true, IsReadOnly: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
+	ceo := &model.User{Username: "ceo1", PasswordHash: HashPassword("password10"), FullName: "대표", Role: model.RoleCLevel, IsActive: true, IsReadOnly: true, ProfileDone: true}
+	for _, u := range []*model.User{vis, oa, sales, obs, ceo} {
+		if err := users.Create(u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	h := New(db)
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/", h.Dashboard)
+	g.GET("/work", h.Work.List)
+	g.GET("/exec", h.Exec.Dashboard, h.Auth.RequireExecView)
+
+	assertOrder := func(t *testing.T, body, ver string) {
+		t.Helper()
+		want := "version : " + ver
+		iBrand := strings.Index(body, "Work Management")
+		iVer := strings.Index(body, want)
+		iNav := strings.Index(body, `<nav `)
+		if iBrand < 0 || iVer < 0 || iNav < 0 {
+			t.Fatalf("위치 brand=%d ver=%d nav=%d", iBrand, iVer, iNav)
+		}
+		if !(iBrand < iVer && iVer < iNav) {
+			t.Fatalf("순서가 브랜드→버전→메뉴가 아니다 brand=%d ver=%d nav=%d", iBrand, iVer, iNav)
+		}
+		if strings.Count(body, `id="app-version"`) < 1 {
+			t.Fatal("app-version 없음")
+		}
+	}
+
+	SetBuildInfo("75", "deadbee", "2026-10-19 20:00", time.Now())
+	roles := []struct {
+		name, path string
+		u          *model.User
+	}{
+		{"비전", "/work", vis},
+		{"조직관리자", "/work", oa},
+		{"영업", "/work", sales},
+		{"옵저버", "/work", obs},
+		{"C-Level", "/exec", ceo},
+	}
+	for _, r := range roles {
+		t.Run(r.name+"-75", func(t *testing.T) {
+			rec := doGetWith(t, e, r.path, jwtCookieUser(t, r.u))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status=%d", rec.Code)
+			}
+			assertOrder(t, rec.Body.String(), "75")
+		})
+	}
+	SetBuildInfo("76", "deadbee", "2026-10-19 20:00", time.Now())
+	rec := doGetWith(t, e, "/work", jwtCookieUser(t, vis))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("76 status=%d", rec.Code)
+	}
+	assertOrder(t, rec.Body.String(), "76")
+	if strings.Contains(rec.Body.String(), "version : 75") {
+		t.Fatal("76인데 75가 남았다")
 	}
 }
 
@@ -154,6 +256,9 @@ func TestLoginHTMLHasCacheBustAndBadge(t *testing.T) {
 	}
 	if !strings.Contains(body, "v2.37 · 빌드 2026-09-13 14:22") {
 		t.Fatal("로그인 하단에 버전이 없다")
+	}
+	if strings.Contains(body, `id="app-version"`) {
+		t.Fatal("로그인에 사이드바 버전 줄이 있다")
 	}
 	if !strings.Contains(body, "커밋 a1b2c3d") {
 		t.Fatal("배지 전체(title)에 커밋이 없다")

@@ -340,9 +340,14 @@ func (r *CustomerRepo) Delete(id string) error {
 
 // ListAll 전체 고객 목록 (드롭다운용)
 func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
-	rows, err := r.db.Query(
-		`SELECT customer_id, org_name FROM customers WHERE is_active=1 ORDER BY org_name`,
-	)
+	return r.ListAllInOrg(OrgAll)
+}
+
+func (r *CustomerRepo) ListAllInOrg(orgID string) ([]model.Customer, error) {
+	q := `SELECT customer_id, org_name FROM customers WHERE is_active=1`
+	q, args := appendOrg(q, nil, "", orgIDForFilter(orgID))
+	q += ` ORDER BY org_name`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -30,6 +30,7 @@ func (h *ASHandler) Search(c echo.Context) error {
 		Assigned:    strings.TrimSpace(c.QueryParam("assigned")),
 		KeywordID:   strings.TrimSpace(c.QueryParam("keyword_id")),
 		Sort:        strings.TrimSpace(c.QueryParam("sort")),
+		OrgID:       currentOrg(c),
 		Page:        page,
 		PageSize:    20,
 	}
@@ -42,15 +43,15 @@ func (h *ASHandler) Search(c echo.Context) error {
 		return err
 	}
 
-	customers, _ := h.customerRepo.ListAll()
-	products, _ := h.repo.SearchProductNames()
+	customers, _ := h.customerRepo.ListAllInOrg(currentOrg(c))
+	products, _ := h.repo.SearchProductNamesInOrg(currentOrg(c))
 	causeTypes, _ := h.codeRepo.ActiveByGroup("cause_type")
 	procTypes, _ := h.codeRepo.ActiveByGroup("process_type")
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	var keywords []model.ASKeyword
 	var selectedKW *model.ASKeyword
 	if h.kwRepo != nil {
-		keywords, _ = h.kwRepo.List(true)
+		keywords, _ = h.kwRepo.ListForOrg(true, currentOrg(c))
 		if f.KeywordID != "" {
 			selectedKW, _ = h.kwRepo.Get(f.KeywordID)
 		}
@@ -89,6 +90,7 @@ func (h *ASHandler) Similar(c echo.Context) error {
 		CustomerID: strings.TrimSpace(c.QueryParam("customer_id")),
 		AssetID:    strings.TrimSpace(c.QueryParam("asset_id")),
 		ExcludeID:  strings.TrimSpace(c.QueryParam("exclude")),
+		OrgID:      currentOrg(c),
 		Limit:      5,
 	})
 	if err != nil {
@@ -129,7 +131,7 @@ func attachSimilarLead(items []model.ASSimilarCase) {
 	}
 }
 
-func (h *ASHandler) loadSimilarCases(as *model.ASReceipt, userID string) []model.ASSimilarCase {
+func (h *ASHandler) loadSimilarCases(as *model.ASReceipt, userID, orgID string) []model.ASSimilarCase {
 	if as == nil || strings.TrimSpace(as.Symptom) == "" {
 		return nil
 	}
@@ -138,6 +140,7 @@ func (h *ASHandler) loadSimilarCases(as *model.ASReceipt, userID string) []model
 		CustomerID: as.CustomerID,
 		AssetID:    as.AssetID,
 		ExcludeID:  as.ASID,
+		OrgID:      orgID,
 		Limit:      5,
 	})
 	if err != nil || len(items) == 0 {
@@ -164,7 +167,7 @@ func (h *ASHandler) SimilarPanel(c echo.Context) error {
 	}
 	c.Request().Header.Set("HX-Request", "true")
 	return c.Render(http.StatusOK, "as/similar_panel.html", map[string]interface{}{
-		"SimilarCases": h.loadSimilarCases(as, ctxString(c, "user_id")),
+		"SimilarCases": h.loadSimilarCases(as, ctxString(c, "user_id"), currentOrg(c)),
 		"CanReceive":   canReceiveAS(c),
 		"UserID":       ctxString(c, "user_id"),
 	})

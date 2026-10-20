@@ -231,20 +231,37 @@ func (r *ASRepo) MissingActionCount() int {
 }
 
 func (r *ASRepo) KeywordLinkCount() int {
+	return r.KeywordLinkCountInOrg(OrgAll)
+}
+
+func (r *ASRepo) KeywordLinkCountInOrg(orgID string) int {
 	var n int
 	if r == nil || r.db == nil {
 		return 0
 	}
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_keyword_links`).Scan(&n)
+	orgID = orgIDForFilter(orgID)
+	if orgID == OrgAll {
+		_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_keyword_links`).Scan(&n)
+		return n
+	}
+	q := `SELECT COUNT(*) FROM as_keyword_links l JOIN as_receipts ar ON ar.as_id=l.as_id WHERE 1=1`
+	q, args := appendOrg(q, nil, "ar", orgID)
+	_ = r.db.QueryRow(q, args...).Scan(&n)
 	return n
 }
 
 func (r *ASRepo) ReceiptCount() int {
+	return r.ReceiptCountInOrg(OrgAll)
+}
+
+func (r *ASRepo) ReceiptCountInOrg(orgID string) int {
 	var n int
 	if r == nil || r.db == nil {
 		return 0
 	}
-	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts`).Scan(&n)
+	q := `SELECT COUNT(*) FROM as_receipts ar WHERE 1=1`
+	q, args := appendOrg(q, nil, "ar", orgIDForFilter(orgID))
+	_ = r.db.QueryRow(q, args...).Scan(&n)
 	return n
 }
 

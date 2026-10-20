@@ -187,7 +187,7 @@ func (h *ASHandler) assignOpenRows(c echo.Context, keys, dates, assignees []stri
 			continue
 		}
 		foreign := oldName != "" && !isSelfAssign(meUID, me, meUser, oldUID, oldName, "")
-		if err := h.applyOpenAssign(kind, id, date, who); err != nil {
+		if err := h.applyOpenAssign(org, kind, id, date, who); err != nil {
 			fails = append(fails, openAssignFail{Key: key, Error: err.Error()})
 			continue
 		}
@@ -224,12 +224,15 @@ func (h *ASHandler) openOwner(org, key string) (name, uid, label, kind, id strin
 	}
 }
 
-func (h *ASHandler) applyOpenAssign(kind, id, date, who string) error {
+func (h *ASHandler) applyOpenAssign(org, kind, id, date, who string) error {
 	switch kind {
 	case "as":
 		uid := ""
+		if err := checkAssigneeInOrg(h.userRepo, org, who, "", ""); err != nil {
+			return err
+		}
 		if h.userRepo != nil {
-			if u := h.userRepo.FindAssignable(who); u != nil {
+			if u := h.userRepo.FindAssignable(org, who); u != nil {
 				uid = u.UserID
 				who = u.FullName
 			}
@@ -273,7 +276,7 @@ func (h *ASHandler) recordOpenAssign(c echo.Context, kind, id, who, oldName, old
 	if !foreign || h.userRepo == nil || h.settingsRepo == nil {
 		return
 	}
-	u := h.userRepo.FindAssignable(oldName)
+	u := h.userRepo.FindAssignable(repository.OrgAll, oldName)
 	if u == nil && oldUID != "" {
 		u, _ = h.userRepo.GetByID(oldUID)
 	}

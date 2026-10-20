@@ -46,12 +46,13 @@ func orgListHomeID(c echo.Context) string {
 }
 
 func canSwitchOrg(c echo.Context) bool {
-	return currentRole(c) == model.RoleVisionAdmin
+	r := currentRole(c)
+	return r == model.RoleVisionAdmin || r == model.RoleCLevel
 }
 
 func currentOrg(c echo.Context) string {
 	if strings.TrimSpace(ctxString(c, "sim_role")) != "" {
-		if currentRole(c) == model.RoleVisionAdmin {
+		if currentRole(c) == model.RoleVisionAdmin || currentRole(c) == model.RoleCLevel {
 			return repository.OrgAll
 		}
 		if sim := strings.TrimSpace(ctxString(c, "sim_org_id")); sim != "" {
@@ -60,6 +61,9 @@ func currentOrg(c echo.Context) string {
 		return model.OrgIDLibrary
 	}
 	if canSwitchOrg(c) {
+		if q := strings.TrimSpace(c.QueryParam("view_org_id")); q != "" {
+			return q
+		}
 		view := strings.TrimSpace(ctxString(c, "view_org_id"))
 		if view == repository.OrgAll {
 			return repository.OrgAll
@@ -68,7 +72,7 @@ func currentOrg(c echo.Context) string {
 			return view
 		}
 	}
-	if loginRole(c) == model.RoleVisionAdmin {
+	if loginRole(c) == model.RoleVisionAdmin || loginRole(c) == model.RoleCLevel {
 		return repository.OrgAll
 	}
 	org := strings.TrimSpace(ctxString(c, "org_id"))
@@ -278,7 +282,7 @@ func (h *AuthHandler) RequireCanViewOrgs(next echo.HandlerFunc) echo.HandlerFunc
 // RequireVisionOnly 비젼관리자만.
 func (h *AuthHandler) RequireVisionOnly(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if currentRole(c) != model.RoleVisionAdmin {
+		if loginRole(c) != model.RoleVisionAdmin {
 			return echo.ErrForbidden
 		}
 		return next(c)

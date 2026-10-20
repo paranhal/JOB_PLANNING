@@ -120,10 +120,24 @@ func (r *UserRepo) ListTechActive() ([]model.User, error) {
 	return items, rows.Err()
 }
 
-func (r *UserRepo) ListAssignable() ([]model.User, error) {
-	rows, err := r.db.Query(userSelect + `
-		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND role IN ('admin','org_admin','tech','office','support','receipt','sales')
-		ORDER BY full_name`)
+func (r *UserRepo) ListAssignable(orgID string) ([]model.User, error) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return nil, fmt.Errorf("orgID required")
+	}
+	q := userSelect + `
+		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND role IN ('admin','org_admin','tech','office','support','receipt','sales')`
+	var args []any
+	if orgID != OrgAll {
+		if orgID == model.OrgIDLibrary {
+			q += ` AND (org_id=? OR TRIM(COALESCE(org_id,''))='')`
+		} else {
+			q += ` AND org_id=?`
+		}
+		args = append(args, orgID)
+	}
+	q += ` ORDER BY full_name`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -154,13 +168,13 @@ func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
 	return &u, nil
 }
 
-// FindAssignable 사용자 ID·로그인명·표시명으로 배정 대상 사용자를 찾는다. §42.5
-func (r *UserRepo) FindAssignable(idOrName string) *model.User {
+// FindAssignable 사용자 ID·로그인명·표시명으로 배정 대상 사용자를 찾는다. 조직 인자 필수. §42.5 · D-104
+func (r *UserRepo) FindAssignable(orgID, idOrName string) *model.User {
 	idOrName = strings.TrimSpace(idOrName)
 	if r == nil || idOrName == "" {
 		return nil
 	}
-	users, err := r.ListAssignable()
+	users, err := r.ListAssignable(orgID)
 	if err != nil {
 		return nil
 	}
@@ -323,6 +337,14 @@ func (r *UserRepo) AddOrgMember(u *model.User) error {
 func (r *UserRepo) UpdatePassword(id, hash string) error {
 	return touchUpdate(r.db, "users", "user_id", id, "비밀번호", func() error {
 		_, err := r.db.Exec(`UPDATE users SET password_hash=?, must_change_password=0 WHERE user_id=?`, hash, id)
+		return err
+	})
+}
+
+// ReplacePasswordHash 해시만 바꾼다. must_change_password는 건드리지 않는다.
+func (r *UserRepo) ReplacePasswordHash(id, hash string) error {
+	return touchUpdate(r.db, "users", "user_id", id, "비밀번호", func() error {
+		_, err := r.db.Exec(`UPDATE users SET password_hash=? WHERE user_id=?`, hash, id)
 		return err
 	})
 }

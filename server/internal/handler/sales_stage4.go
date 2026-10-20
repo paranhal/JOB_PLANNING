@@ -48,17 +48,34 @@ func (h *SalesHandler) CloseContracted(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
+	p, err := h.repo.Get(id)
+	if err != nil || p == nil {
+		return h.replyWinJSON(c, fmt.Errorf("영업 사업을 찾을 수 없습니다"), id, "id")
+	}
+	if strings.TrimSpace(p.OrgID) != "" && !repository.VisibleInOrg(p.OrgID, currentOrg(c)) {
+		return h.replyWinJSON(c, fmt.Errorf("영업 사업을 찾을 수 없습니다"), id, "id")
+	}
 	at := strings.TrimSpace(c.FormValue("contracted_at"))
+	if at == "" {
+		return h.replyWinJSON(c, fmt.Errorf("계약일이 필요합니다"), id, "contracted_at")
+	}
 	rawAmt := strings.TrimSpace(strings.ReplaceAll(c.FormValue("contract_amount"), ",", ""))
 	if strings.HasPrefix(rawAmt, "-") {
-		return h.replyStage(c, fmt.Errorf("계약금액은 0 이상이어야 합니다"), id, "/sales/"+id)
+		return h.replyWinJSON(c, fmt.Errorf("계약금액은 0 이상이어야 합니다"), id, "contract_amount")
+	}
+	if rawAmt == "" {
+		return h.replyWinJSON(c, fmt.Errorf("계약금액이 필요합니다"), id, "contract_amount")
 	}
 	amt := parseSalesAmount(rawAmt)
-	err := h.repo.CloseContracted(id, at, amt, currentUserID(c), ctxString(c, "user_name"))
+	err = h.repo.CloseContracted(id, at, amt, currentUserID(c), ctxString(c, "user_name"))
 	if err != nil {
-		return h.replyStage(c, err, id, "/sales/"+id)
+		return h.replyWinJSON(c, err, id, "")
 	}
-	return c.Redirect(http.StatusSeeOther, "/sales/"+id+"/promote")
+	next := "/sales/" + id + "/promote"
+	if wantsJSON(c) {
+		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "next": next})
+	}
+	return c.Redirect(http.StatusSeeOther, next)
 }
 
 func (h *SalesHandler) CloseNegotiationFailed(c echo.Context) error {

@@ -18,7 +18,7 @@ func (h *MaintenanceHandler) VisitAction(c echo.Context) error {
 	if err != nil || v == nil {
 		return echo.ErrNotFound
 	}
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	var projects []model.WorkProject
 	if h.wbRepo != nil {
 		projects, _ = h.wbRepo.ListProjects(true)

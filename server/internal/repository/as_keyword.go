@@ -172,14 +172,27 @@ type ASKeywordRepo struct{ db *sql.DB }
 func NewASKeywordRepo(db *sql.DB) *ASKeywordRepo { return &ASKeywordRepo{db: db} }
 
 func (r *ASKeywordRepo) List(activeOnly bool) ([]model.ASKeyword, error) {
+	return r.ListForOrg(activeOnly, OrgAll)
+}
+
+func (r *ASKeywordRepo) ListForOrg(activeOnly bool, orgID string) ([]model.ASKeyword, error) {
+	orgID = orgIDForFilter(orgID)
+	countSQL := `(SELECT COUNT(*) FROM as_keyword_links l WHERE l.keyword_id=k.keyword_id)`
+	var args []any
+	if orgID != OrgAll {
+		countSQL = `(SELECT COUNT(*) FROM as_keyword_links l
+			JOIN as_receipts ar ON ar.as_id=l.as_id
+			WHERE l.keyword_id=k.keyword_id AND ar.org_id=?)`
+		args = append(args, orgID)
+	}
 	q := `SELECT k.keyword_id, k.keyword, k.kw_group, k.synonyms, k.is_active, k.sort_order, k.note,
-	             (SELECT COUNT(*) FROM as_keyword_links l WHERE l.keyword_id=k.keyword_id) AS n
+	             ` + countSQL + ` AS n
 	      FROM as_keywords k`
 	if activeOnly {
 		q += ` WHERE k.is_active=1`
 	}
 	q += ` ORDER BY k.kw_group, k.sort_order, k.keyword`
-	rows, err := r.db.Query(q)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -520,6 +533,10 @@ func (r *ASKeywordRepo) ReplaceLinks(asID, field string, checked, suggested []st
 
 // FrequencyCandidates 본문 빈도 상위. 불용어·숫자·URL 조각·기존 사전 단어는 뺀다. 자동 확정하지 않는다.
 func (r *ASKeywordRepo) FrequencyCandidates(limit int) ([]model.ASKeywordCandidate, error) {
+	return r.FrequencyCandidatesForOrg(limit, OrgAll)
+}
+
+func (r *ASKeywordRepo) FrequencyCandidatesForOrg(limit int, orgID string) ([]model.ASKeywordCandidate, error) {
 	if limit < 1 || limit > 80 {
 		limit = 40
 	}
@@ -547,7 +564,10 @@ func (r *ASKeywordRepo) FrequencyCandidates(limit int) ([]model.ASKeywordCandida
 			}
 		}
 	}
-	rows, err := r.db.Query(`SELECT COALESCE(symptom,''), COALESCE(action_taken,'') FROM as_receipts`)
+	orgID = orgIDForFilter(orgID)
+	rq := `SELECT COALESCE(symptom,''), COALESCE(action_taken,'') FROM as_receipts ar WHERE 1=1`
+	rq, rargs := appendOrg(rq, nil, "ar", orgID)
+	rows, err := r.db.Query(rq, rargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -561,7 +581,10 @@ func (r *ASKeywordRepo) FrequencyCandidates(limit int) ([]model.ASKeywordCandida
 		add(action, model.KWFieldAction)
 	}
 	rows.Close()
-	prows, err := r.db.Query(`SELECT COALESCE(work_content,''), COALESCE(notes,'') FROM as_processes`)
+	pq := `SELECT COALESCE(p.work_content,''), COALESCE(p.notes,'') FROM as_processes p
+		JOIN as_receipts ar ON ar.as_id=p.as_id WHERE 1=1`
+	pq, pargs := appendOrg(pq, nil, "ar", orgID)
+	prows, err := r.db.Query(pq, pargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -682,6 +705,10 @@ func stripTrailingJosa(s string) string {
 // RebuildKeywordLinks 증상·조치 글을 키워드 사전으로 훑어 as_keyword_links 를 다시 만든다.
 // asIDs 가 비면 전체를 다시 만든다. source='dict' 만 지운다. §41.16.6 · §41.17
 func (r *ASRepo) RebuildKeywordLinks(asIDs []string) (int, error) {
+	return r.RebuildKeywordLinksInOrg(asIDs, OrgAll)
+}
+
+func (r *ASRepo) RebuildKeywordLinksInOrg(asIDs []string, orgID string) (int, error) {
 	if r == nil || r.db == nil {
 		return 0, nil
 	}
@@ -696,14 +723,14 @@ func (r *ASRepo) RebuildKeywordLinks(asIDs []string) (int, error) {
 			SELECT GROUP_CONCAT(TRIM(COALESCE(p.work_content,'') || char(10) || COALESCE(p.notes,'')), char(10))
 			FROM as_processes p WHERE p.as_id = ar.as_id
 		), ''))
-		FROM as_receipts ar`
+		FROM as_receipts ar WHERE 1=1`
 	var args []any
+	q, args = appendOrg(q, args, "ar", orgIDForFilter(orgID))
 	if len(ids) > 0 {
 		ph := strings.Repeat("?,", len(ids))
-		q += ` WHERE ar.as_id IN (` + ph[:len(ph)-1] + `)`
-		args = make([]any, len(ids))
-		for i, id := range ids {
-			args[i] = id
+		q += ` AND ar.as_id IN (` + ph[:len(ph)-1] + `)`
+		for _, id := range ids {
+			args = append(args, id)
 		}
 	}
 	rows, err := r.db.Query(q, args...)
@@ -732,18 +759,26 @@ func (r *ASRepo) RebuildKeywordLinks(asIDs []string) (int, error) {
 	}
 	defer tx.Rollback()
 
-	if len(ids) == 0 {
+	if orgIDForFilter(orgID) == OrgAll && len(ids) == 0 {
 		if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE source='dict'`); err != nil {
 			return 0, err
 		}
 	} else {
-		ph := strings.Repeat("?,", len(ids))
-		delArgs := make([]any, len(ids))
-		for i, id := range ids {
-			delArgs[i] = id
+		delIDs := ids
+		if len(delIDs) == 0 {
+			for _, s := range src {
+				delIDs = append(delIDs, s.asID)
+			}
 		}
-		if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE source='dict' AND as_id IN (`+ph[:len(ph)-1]+`)`, delArgs...); err != nil {
-			return 0, err
+		if len(delIDs) > 0 {
+			ph := strings.Repeat("?,", len(delIDs))
+			delArgs := make([]any, len(delIDs))
+			for i, id := range delIDs {
+				delArgs[i] = id
+			}
+			if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE source='dict' AND as_id IN (`+ph[:len(ph)-1]+`)`, delArgs...); err != nil {
+				return 0, err
+			}
 		}
 	}
 

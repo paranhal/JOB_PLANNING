@@ -1323,6 +1323,9 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyProjectKindAssignmentsV72(db)
 	applyProjectKindSetV82(db)
 	applyContractConvertV84(db)
+	applySalesActivitySplit91(db)
+	applyMaintenancePlanOrgYearUnique(db)
+	applyOrgKind(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 

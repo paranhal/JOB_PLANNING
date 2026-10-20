@@ -368,7 +368,7 @@ func TestWorkStatusHTTP_SalesMonthBanners(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := repo.CreateActivity(&model.SalesActivity{
-		SalesID: actP.SalesID, ActivityDate: "2026-08-03", ActivityType: "visit",
+		SalesID: actP.SalesID, ActivityDate: "2026-08-03", ActivityType: "other", ActivityMethod: "visit",
 		Title: "방문", NextAction: "제안서 초안", NextActionDate: "2026-09",
 	}, "관리자", nil); err != nil {
 		t.Fatal(err)

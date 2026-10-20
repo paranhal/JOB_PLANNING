@@ -11,7 +11,7 @@ import (
 
 const salesActivitySelect = `
 	SELECT a.activity_id, a.sales_id, COALESCE(a.activity_date,''), COALESCE(a.start_time,''),
-		COALESCE(a.duration_min,30), COALESCE(a.activity_type,''), COALESCE(a.title,''),
+		COALESCE(a.duration_min,30), COALESCE(a.activity_type,''), COALESCE(a.activity_method,''), COALESCE(a.title,''),
 		COALESCE(a.content,''), COALESCE(a.place,''),
 		COALESCE(a.our_members,''), COALESCE(a.counterparts,''),
 		COALESCE(a.next_action,''), COALESCE(a.next_action_date,''),
@@ -46,7 +46,7 @@ func (r *SalesRepo) GetActivity(id string) (*model.SalesActivity, error) {
 	if err != nil {
 		return nil, err
 	}
-	types, _ := r.ActivityTypes()
+	types, _ := r.codeRepo.ListByGroup(model.SalesCodeGroupActivityType)
 	r.fillActivityLabels(a, types)
 	return a, nil
 }
@@ -102,8 +102,9 @@ func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, lin
 	}
 	types, _ := r.ActivityTypes()
 	a.ActivityType = strings.TrimSpace(a.ActivityType)
-	if a.ActivityType == "" {
-		return fmt.Errorf("활동 유형을 선택하세요")
+	a.ActivityMethod = strings.TrimSpace(a.ActivityMethod)
+	if err := model.ValidateSalesActTypeMethod(a.ActivityType, a.ActivityMethod); err != nil {
+		return err
 	}
 	a.TypeLabel = r.activityTypeLabel(a.ActivityType, types)
 	a.Title = strings.TrimSpace(a.Title)
@@ -149,11 +150,11 @@ func (r *SalesRepo) CreateActivity(a *model.SalesActivity, createdBy string, lin
 	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO sales_activities (
-			activity_id, sales_id, activity_date, start_time, duration_min, activity_type,
+			activity_id, sales_id, activity_date, start_time, duration_min, activity_type, activity_method,
 			title, content, place, our_members, counterparts,
 			next_action, next_action_date, stage_at_time, created_by, created_by_user_id, created_by_name)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		a.ActivityID, a.SalesID, a.ActivityDate, a.StartTime, a.DurationMin, a.ActivityType,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		a.ActivityID, a.SalesID, a.ActivityDate, a.StartTime, a.DurationMin, a.ActivityType, a.ActivityMethod,
 		a.Title, a.Content, a.Place, a.OurMembers, a.Counterparts,
 		a.NextAction, a.NextActionDate, a.StageAtTime, a.CreatedBy, byID, byName)
 	if err != nil {
@@ -216,8 +217,12 @@ func (r *SalesRepo) UpdateActivity(a *model.SalesActivity) error {
 	if a.ActivityType == "" {
 		a.ActivityType = cur.ActivityType
 	}
-	if a.ActivityType == "" {
-		return fmt.Errorf("활동 유형을 선택하세요")
+	a.ActivityMethod = strings.TrimSpace(a.ActivityMethod)
+	if a.ActivityMethod == "" {
+		a.ActivityMethod = cur.ActivityMethod
+	}
+	if err := model.ValidateSalesActTypeMethod(a.ActivityType, a.ActivityMethod); err != nil {
+		return err
 	}
 	a.TypeLabel = r.activityTypeLabel(a.ActivityType, types)
 	a.Title = strings.TrimSpace(a.Title)
@@ -246,11 +251,11 @@ func (r *SalesRepo) UpdateActivity(a *model.SalesActivity) error {
 	before := rowJSON(r.db, "sales_activities", "activity_id", a.ActivityID)
 	if _, err := r.db.Exec(`
 		UPDATE sales_activities SET
-			activity_date=?, start_time=?, duration_min=?, activity_type=?,
+			activity_date=?, start_time=?, duration_min=?, activity_type=?, activity_method=?,
 			title=?, content=?, place=?, our_members=?, counterparts=?,
 			next_action=?, next_action_date=?
 		WHERE activity_id=?`,
-		a.ActivityDate, a.StartTime, a.DurationMin, a.ActivityType,
+		a.ActivityDate, a.StartTime, a.DurationMin, a.ActivityType, a.ActivityMethod,
 		a.Title, a.Content, a.Place, a.OurMembers, a.Counterparts,
 		a.NextAction, a.NextActionDate, a.ActivityID); err != nil {
 		return err
@@ -318,7 +323,14 @@ func (r *SalesRepo) syncWorkTask(a *model.SalesActivity, p *model.SalesProject, 
 	}
 	title := strings.TrimSpace(a.Title)
 	if title == "" {
-		title = a.TypeLabel
+		title = strings.TrimSpace(a.TypeLabel)
+		if a.MethodLabel != "" && a.MethodLabel != a.TypeLabel {
+			if title == "" {
+				title = a.MethodLabel
+			} else {
+				title = title + " · " + a.MethodLabel
+			}
+		}
 	}
 
 	if linkTask != nil && strings.TrimSpace(linkTask.TaskID) != "" {
@@ -699,6 +711,16 @@ func (r *SalesRepo) fillActivityLabels(a *model.SalesActivity, types []model.Cod
 		return
 	}
 	a.TypeLabel = r.activityTypeLabel(a.ActivityType, types)
+	if a.TypeLabel == a.ActivityType && a.ActivityType != "" {
+		if n := model.SalesActTypeDisplayName(a.ActivityType); n != a.ActivityType {
+			a.TypeLabel = n
+		}
+	}
+	methods, _ := r.codeRepo.ListByGroup(model.SalesCodeGroupActivityMethod)
+	a.MethodLabel = r.activityTypeLabel(a.ActivityMethod, methods)
+	if a.MethodLabel == a.ActivityMethod && a.ActivityMethod != "" {
+		a.MethodLabel = model.SalesActMethodDisplayName(a.ActivityMethod)
+	}
 	if a.StageAtTime != "" {
 		stages, _ := r.Stages()
 		if d := model.FindSalesStage(stages, a.StageAtTime); d != nil {
@@ -733,7 +755,7 @@ func (r *SalesRepo) fillRFPFromActivity(a *model.SalesActivity, p *model.SalesPr
 }
 
 func (r *SalesRepo) scanActivityRows(rows *sql.Rows) ([]model.SalesActivity, error) {
-	types, _ := r.ActivityTypes()
+	types, _ := r.codeRepo.ListByGroup(model.SalesCodeGroupActivityType)
 	var out []model.SalesActivity
 	for rows.Next() {
 		a, err := scanSalesActivity(rows)
@@ -753,7 +775,7 @@ type activityScanner interface {
 func scanSalesActivity(sc activityScanner) (*model.SalesActivity, error) {
 	var a model.SalesActivity
 	err := sc.Scan(
-		&a.ActivityID, &a.SalesID, &a.ActivityDate, &a.StartTime, &a.DurationMin, &a.ActivityType,
+		&a.ActivityID, &a.SalesID, &a.ActivityDate, &a.StartTime, &a.DurationMin, &a.ActivityType, &a.ActivityMethod,
 		&a.Title, &a.Content, &a.Place, &a.OurMembers, &a.Counterparts,
 		&a.NextAction, &a.NextActionDate, &a.StageAtTime, &a.CreatedBy, &a.CreatedAt,
 		&a.SalesName, &a.SalesNo, &a.CustomerName)

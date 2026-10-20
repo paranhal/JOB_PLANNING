@@ -34,8 +34,11 @@ func (h *AuthHandler) adminVisibleUser(c echo.Context, u *model.User) bool {
 	if u == nil {
 		return false
 	}
-	if currentRole(c) != model.RoleOrgAdmin {
+	if loginRole(c) != model.RoleOrgAdmin {
 		return true
+	}
+	if u.Role == model.RoleCLevel {
+		return false
 	}
 	home := sessionHomeOrgID(c)
 	if home == "" {

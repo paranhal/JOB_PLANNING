@@ -82,17 +82,26 @@ func (r *WBRepo) SyncMaintenanceTaskFromVisit(visitID string) (bool, error) {
 // SyncMaintenanceBoard 정기점검 방문을 기준으로 일일업무를 정리한다.
 // 끊긴 업무 삭제 → 미생성 방문 보충 → 완료 상태 → 일자·담당자 순으로 맞춘다.
 func (r *WBRepo) SyncMaintenanceBoard() {
+	r.SyncMaintenanceBoardRange("", "")
+}
+
+// SyncMaintenanceBoardRange 화면에서 보는 기간(+여유)만 맞춘다. from·to가 비면 전체.
+func (r *WBRepo) SyncMaintenanceBoardRange(from, to string) {
 	_, _ = r.DeleteOrphanMaintenanceTasks()
-	_, _ = r.EnsureMaintenanceTasks()
+	_, _ = r.EnsureMaintenanceTasksBetween(from, to)
 	_ = r.BackfillMaintenanceTaskStatuses()
-	_, _ = r.SyncMaintenanceTaskDates()
+	_, _ = r.SyncMaintenanceTaskDatesRange(from, to)
 }
 
 // EnsureMaintenanceTasks 아직 일일업무가 없는 방문에 대해 work_tasks 를 만든다.
 // 완료된 방문도 통계 처리와 업무처리현황 조치가 맞도록 보충한다.
 // ×로 내린 건(행이 남아 배정일만 빈 경우)은 다시 만들지 않는다.
 func (r *WBRepo) EnsureMaintenanceTasks() (int, error) {
-	rows, err := r.db.Query(`
+	return r.EnsureMaintenanceTasksBetween("", "")
+}
+
+func (r *WBRepo) EnsureMaintenanceTasksBetween(from, to string) (int, error) {
+	q := `
 		SELECT v.visit_id, v.visit_date, COALESCE(v.assignee,''), COALESCE(v.product_type,''),
 		       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
 		       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
@@ -103,8 +112,15 @@ func (r *WBRepo) EnsureMaintenanceTasks() (int, error) {
 		WHERE NOT EXISTS (
 		    SELECT 1 FROM work_tasks t
 		    WHERE t.source_type = 'maintenance' AND t.source_id = v.visit_id
-		  )
-		ORDER BY v.visit_date, v.sort_order`)
+		  )`
+	args := []interface{}{}
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from != "" && to != "" {
+		q += ` AND v.visit_date >= ? AND v.visit_date <= ?`
+		args = append(args, from, to)
+	}
+	q += ` ORDER BY v.visit_date, v.sort_order`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return 0, nil
@@ -157,7 +173,22 @@ func (r *WBRepo) EnsureMaintenanceTasks() (int, error) {
 
 // SyncMaintenanceTaskDates 방문일과 어긋난 일일업무를 일괄 정렬한다(화면 진입 시 자가 보정).
 func (r *WBRepo) SyncMaintenanceTaskDates() (int, error) {
-	links, err := r.queryMntTaskLinks(``)
+	return r.SyncMaintenanceTaskDatesRange("", "")
+}
+
+func (r *WBRepo) SyncMaintenanceTaskDatesRange(from, to string) (int, error) {
+	where := ``
+	args := []interface{}{}
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from != "" && to != "" {
+		where = ` AND (
+			(v.visit_date >= ? AND v.visit_date <= ?)
+			OR (TRIM(COALESCE(t.work_date,'')) != '' AND t.work_date >= ? AND t.work_date <= ?)
+			OR (TRIM(COALESCE(t.due_date,'')) != '' AND t.due_date >= ? AND t.due_date <= ?)
+		)`
+		args = append(args, from, to, from, to, from, to)
+	}
+	links, err := r.queryMntTaskLinks(where, args...)
 	if err != nil {
 		return 0, err
 	}

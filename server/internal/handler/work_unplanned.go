@@ -44,7 +44,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
@@ -195,16 +195,14 @@ func (h *WorkHandler) UnplannedAssign(c echo.Context) error {
 	}
 	assignee := strings.TrimSpace(c.FormValue("assignee"))
 	assigneeUID := strings.TrimSpace(c.FormValue("assignee_user_id"))
+	if err := checkAssigneeInOrg(h.userRepo, assignableOrgID(c), assignee, assigneeUID, ""); err != nil {
+		return err
+	}
 	if assigneeUID == "" && h.userRepo != nil && assignee != "" {
-		if users, err := h.userRepo.ListAssignable(); err == nil {
-			for _, u := range users {
-				if u.FullName == assignee || u.Username == assignee {
-					assigneeUID = u.UserID
-					if assignee == u.Username {
-						assignee = u.FullName
-					}
-					break
-				}
+		if u := h.userRepo.FindAssignable(assignableOrgID(c), assignee); u != nil {
+			assigneeUID = u.UserID
+			if assignee == u.Username {
+				assignee = u.FullName
 			}
 		}
 	}

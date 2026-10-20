@@ -37,11 +37,11 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 	if !canViewMaintenance(c) {
 		return echo.ErrForbidden
 	}
-	plan, err := h.repo.GetPlan(c.Param("id"))
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
-	plans, err := h.repo.ListPlansWithCounts()
+	plans, err := h.repo.ListPlansWithCountsInOrg(currentOrg(c))
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 
 	var assignees []model.User
 	if h.userRepo != nil {
-		assignees, _ = h.userRepo.ListAssignable()
+		assignees = listAssignableForPicker(h.userRepo, c)
 	}
 
 	var preview []model.MaintenanceVisit
@@ -110,6 +110,9 @@ func distinctRegions(cfgs []model.MaintenanceSiteConfig) []string {
 
 func (h *MaintenanceHandler) CopyPlan(c echo.Context) error {
 	srcID := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, srcID); err != nil {
+		return err
+	}
 	year, _ := strconv.Atoi(c.FormValue("plan_year"))
 	title := strings.TrimSpace(c.FormValue("title"))
 	dest, err := h.repo.CopyPlan(srcID, year, title)
@@ -122,6 +125,9 @@ func (h *MaintenanceHandler) CopyPlan(c echo.Context) error {
 
 func (h *MaintenanceHandler) SetPlanStatus(c echo.Context) error {
 	id := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, id); err != nil {
+		return err
+	}
 	status := strings.TrimSpace(c.FormValue("status"))
 	if err := h.repo.SetPlanStatus(id, status); err != nil {
 		return h.manageErrRedirect(c, id, err.Error())
@@ -135,9 +141,9 @@ func (h *MaintenanceHandler) SetPlanStatus(c echo.Context) error {
 
 func (h *MaintenanceHandler) BulkUpdateAssignees(c echo.Context) error {
 	id := c.Param("id")
-	plan, err := h.repo.GetPlan(id)
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, id)
+	if err != nil {
+		return err
 	}
 	assignee := c.FormValue("assignee")
 	filt := parseVisitFilter(c)
@@ -157,9 +163,9 @@ func (h *MaintenanceHandler) BulkUpdateAssignees(c echo.Context) error {
 
 func (h *MaintenanceHandler) BulkDeleteVisits(c echo.Context) error {
 	id := c.Param("id")
-	plan, err := h.repo.GetPlan(id)
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, id)
+	if err != nil {
+		return err
 	}
 	f := parseVisitFilter(c)
 	q := url.Values{}

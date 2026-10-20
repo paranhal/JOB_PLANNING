@@ -241,7 +241,7 @@ func TestNF1_SalesMembersFindMine(t *testing.T) {
 	}
 	act := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: "2026-09-17", StartTime: "10:00",
-		DurationMin: 30, ActivityType: "visit", Title: "현장 미팅",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "현장 미팅",
 		OurMembers: "최혜영, 양기헌",
 	}
 	if err := sales.CreateActivity(act, "관리자", nil); err != nil {

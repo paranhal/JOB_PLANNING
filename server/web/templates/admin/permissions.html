@@ -4,9 +4,10 @@
 {{$roles := list "sales" "tech" "support"}}
 {{$labels := list "영업" "기술" "지원"}}
 {{if eq $tab "grade"}}
-{{$roles = list "vision_admin" "org_admin" "support"}}
-{{$labels = list "비젼관리자" "조직관리자" "일반(기본)"}}
+{{$roles = list "vision_admin" "c_level" "org_admin" "support"}}
+{{$labels = list "비젼관리자" "C-Level(경영진)" "조직관리자" "일반(기본)"}}
 {{end}}
+{{$colN := add (len $roles) 1}}
 <div class="space-y-5">
   <a href="/admin/users" class="text-sm font-semibold text-slate-500">‹ 사용자 관리로 돌아가기</a>
   <div>
@@ -16,7 +17,7 @@
   {{if .FlashOK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>{{end}}
   {{if .FlashErr}}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.FlashErr}}</div>{{end}}
   <div class="rounded-xl border border-blue-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-    코드의 권한표는 <b>없음 · 조회 · 본인 것만 · 전부</b> 네 단계입니다. 토글 두 값으로는 「본인 것만」을 표현할 수 없어 네 단계 선택으로 바꿨습니다. 비젼관리자 열은 <b>항상 전부</b>이므로 잠겨 있습니다.
+    코드의 권한표는 <b>없음 · 조회 · 본인 것만 · 전부</b> 네 단계입니다. 토글 두 값으로는 「본인 것만」을 표현할 수 없어 네 단계 선택으로 바꿨습니다. 비젼관리자 열은 <b>항상 전부</b>이므로 잠겨 있습니다. <b>C-Level은 조회만 가능합니다.</b> 관리 권한(조직·계정·코드·데이터)은 없음으로 고정됩니다.
   </div>
   <form method="POST" action="/admin/permissions/save" class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
     <input type="hidden" name="tab" value="{{$tab}}">
@@ -35,7 +36,7 @@
         </thead>
         <tbody>
         {{range .Groups}}
-          <tr class="bg-slate-50"><td colspan="4" class="px-5 py-2 text-[11px] font-bold text-slate-400">{{.Label}}</td></tr>
+          <tr class="bg-slate-50"><td colspan="{{$colN}}" class="px-5 py-2 text-[11px] font-bold text-slate-400">{{.Label}}</td></tr>
           {{range .Items}}
           {{$key := .Key}}
           <tr class="border-t border-gray-100">
@@ -47,6 +48,24 @@
             <td class="px-3 py-3 text-center">
               {{if eq $role "vision_admin"}}
               <span class="text-xs text-slate-400">전부</span>
+              {{else if eq $role "c_level"}}
+                {{$ccur := clevelAccess $key}}
+                {{if adminSectionPerm $key}}
+                <input type="hidden" name="role" value="{{$role}}">
+                <input type="hidden" name="perm_key" value="{{$key}}">
+                <input type="hidden" name="access" value="0">
+                <span class="text-xs text-slate-400">없음</span>
+                {{else}}
+                <input type="hidden" name="role" value="{{$role}}">
+                <input type="hidden" name="perm_key" value="{{$key}}">
+                <select name="access" class="border rounded px-2 py-1 text-xs">
+                  <option value="0" {{if eq $ccur 0}}selected{{end}}>없음</option>
+                  <option value="1" {{if eq $ccur 1}}selected{{end}}>조회</option>
+                  <option value="2" disabled>본인 것만</option>
+                  <option value="3" disabled>전부</option>
+                </select>
+                {{if ne $ccur $def}}<div class="text-[10px] text-amber-700 mt-0.5">기본값 {{accessLabel $def}}</div>{{end}}
+                {{end}}
               {{else}}
               <input type="hidden" name="role" value="{{$role}}">
               <input type="hidden" name="perm_key" value="{{$key}}">

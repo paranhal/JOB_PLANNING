@@ -136,8 +136,8 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 
 	period := buildRegisterPeriod(view, base, today)
 
-	// 정기점검 방문 ↔ work_tasks 동기화(기존 데이터 보정)
-	h.syncMaintenanceTasks()
+	// 정기점검 방문 ↔ work_tasks 동기화(보이는 기간+여유만).
+	h.syncMaintenanceTasks(registerSyncWindow(period.From, period.To))
 
 	// 예정일이 있는 미배치 업무를 해당 날짜 07:00부터 차례로 올린다.
 	// 지난날 잠금이 켜진 경우에만 오늘 이후만 자동 배치한다.
@@ -217,7 +217,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	undatedCards := undatedASCards(undatedTasks)
 
 	projects, _ := h.repo.ListProjects(true)
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListAll()
 	var colorNames []string
 	for _, u := range assignees {
@@ -273,10 +273,18 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 			dayLeaveNames = append(dayLeaveNames, b.Name)
 		}
 	}
+	regNames := map[string]bool{}
+	for _, u := range assignees {
+		regNames[strings.TrimSpace(u.FullName)] = true
+	}
 	if view == regViewDay {
 		for i := range dayCols {
-			if leaveHit[strings.TrimSpace(dayCols[i].Assignee)] {
+			n := strings.TrimSpace(dayCols[i].Assignee)
+			if leaveHit[n] {
 				dayCols[i].OnLeave = true
+			}
+			if n != "" && !dayCols[i].Unassigned && !regNames[n] {
+				dayCols[i].Unregistered = true
 			}
 		}
 	} else {
@@ -394,8 +402,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"EditUnlocked":    unlocked && dayPast,
 		"UnlockExpires":   unlockExpLabel,
 		"UnlockRedirect":  regBase,
-		"FlashOK":         c.QueryParam("ok"),
-		"FlashErr":        c.QueryParam("err"),
+		"FlashOK":               c.QueryParam("ok"),
+		"FlashErr":              c.QueryParam("err"),
+		"AssigneePickDisabled":  assigneePickDisabled(c),
 	})
 }
 
@@ -720,13 +729,23 @@ func (h *WorkboardHandler) taskCard(t model.WorkTask) model.WBCard {
 	return card
 }
 
+// registerSyncWindow 일정표 기간에 대기열 점검(−7/+45일)을 덮는 동기화 구간.
+func registerSyncWindow(from, to string) (string, string) {
+	f, err1 := time.ParseInLocation(dateLayout, strings.TrimSpace(from), time.Local)
+	t, err2 := time.ParseInLocation(dateLayout, strings.TrimSpace(to), time.Local)
+	if err1 != nil || err2 != nil {
+		return from, to
+	}
+	return f.AddDate(0, 0, -14).Format(dateLayout), t.AddDate(0, 0, 45).Format(dateLayout)
+}
+
 // syncMaintenanceTasks 정기점검 일정(방문)을 기준으로 일일업무의 상태·일자·담당자를 맞춘다.
 // 점검 일정 화면에서 날짜를 바꿔도 일일 업무 등록에 그대로 보이도록 화면 진입 때마다 보정한다.
-func (h *WorkboardHandler) syncMaintenanceTasks() {
+func (h *WorkboardHandler) syncMaintenanceTasks(from, to string) {
 	if h == nil || h.repo == nil {
 		return
 	}
-	h.repo.SyncMaintenanceBoard()
+	h.repo.SyncMaintenanceBoardRange(from, to)
 }
 
 // syncVisitDateFromTask 일정표에서 카드를 다른 날짜로 옮기면 원본 일정도 함께 옮긴다.
@@ -751,15 +770,9 @@ func (h *WorkboardHandler) registerPalette(orgID string, showAll bool) (as, mnt,
 	if strings.TrimSpace(orgID) == "" {
 		orgID = repository.OrgAll
 	}
-	tasks, err := h.repo.ListTasks()
+	usedSource, err := h.repo.PlacedSourceKeys()
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
-	}
-	usedSource := map[string]bool{}
-	for _, t := range tasks {
-		if t.SourceType != "" && t.SourceID != "" && strings.TrimSpace(t.WorkDate) != "" {
-			usedSource[t.SourceType+":"+t.SourceID] = true
-		}
 	}
 
 	if h.asRepo != nil {
@@ -977,6 +990,21 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 			assignee = h.sourceAssignee(kind, refID)
 		}
 	}
+	prevAssignee, org := "", assignableOrgID(c)
+	if kind == "task" {
+		if existing, _ := h.repo.GetTask(refID); existing != nil {
+			if err := denyOtherOrgTask(c, existing); err != nil {
+				return err
+			}
+			prevAssignee = existing.Assignee
+			org = taskOrgID(c, existing)
+		}
+	} else if kind == model.WBSourceAS || kind == model.WBSourceMaintenance {
+		prevAssignee = h.sourceAssignee(kind, refID)
+	}
+	if err := checkAssigneeInOrg(h.userRepo, org, assignee, "", prevAssignee); err != nil {
+		return err
+	}
 	// 시작시각이 비면 같은 담당자 기준으로 빈 자리에 올린다(일·주 동일).
 	if start == "" {
 		s, e, err := h.repo.NextFreeSlotForAssignee(date, assignee, durFallback, excludeID)
@@ -1142,7 +1170,7 @@ func (h *WorkboardHandler) buildSourceTask(kind, refID, date, start, end string,
 // ×로 배정일을 비운 건·아직 올리지 않은 건은 대기열에 두고 다시 올리지 않는다.
 func (h *WorkboardHandler) autoPlacePlanned(from, to string) (int, error) {
 	n := 0
-	all, err := h.repo.ListTasks()
+	all, err := h.repo.ListTasksNeedingAutoPlace(from, to)
 	if err != nil {
 		return 0, err
 	}
@@ -1410,7 +1438,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 			summary.ProjectCount++
 		}
 	}
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListAll()
 	contractTypes, _ := h.codeRepo.ActiveByGroup("project_contract_type")
 	billingTypes, _ := h.codeRepo.ActiveByGroup("project_billing_type")
@@ -1484,6 +1512,12 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 				owner = strings.TrimSpace(existing.Assignee)
 			}
 			supports := parseSupportMembers(c, owner)
+			if err := denyOtherOrgTask(c, existing); err != nil {
+				return err
+			}
+			if err := checkAssigneeInOrg(h.userRepo, taskOrgID(c, existing), owner, "", existing.Assignee); err != nil {
+				return err
+			}
 			if msg := h.firstParticipantOverlap(workDate, start, end, existing.TaskID, occupancyNames(owner, supports)); msg != "" {
 				return overlapRedirect(c, msg)
 			}
@@ -1520,10 +1554,15 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			return overlapRedirect(c, msg)
 		}
 		t.OrgID = currentOrg(c)
+		if err := checkAssigneeInOrg(h.userRepo, t.OrgID, t.Assignee, "", ""); err != nil {
+			return err
+		}
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
-		_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
+		if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
+			return err
+		}
 		h.syncVisitDateFromTask(kind, sourceID, workDate)
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 	}
@@ -1578,6 +1617,12 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return overlapRedirect(c, msg)
 	}
 	t.OrgID = currentOrg(c)
+	if err := checkAssigneeInOrg(h.userRepo, t.OrgID, t.Assignee, "", ""); err != nil {
+		return err
+	}
+	if err := checkAssigneeNamesInOrg(h.userRepo, t.OrgID, occupancyNames("", supports), nil); err != nil {
+		return err
+	}
 	if err := h.repo.CreateTask(t); err != nil {
 		if q := subtaskErrQuery(err); q != "" {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+q))
@@ -1585,7 +1630,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return err
 	}
 	recordTaskNotice(h.notices, c, t, "")
-	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
+	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
+		return err
+	}
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
 		dates, err := collectDatesFromForm(mode, c.FormValue("daily_from"), c.FormValue("daily_to"), c.FormValue("sub_dates"))
 		if err == nil && len(dates) > 0 {
@@ -1643,6 +1690,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	existing, err := h.repo.GetTask(id)
 	if err != nil || existing == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyOtherOrgTask(c, existing); err != nil {
+		return err
 	}
 	if err := denyUnlessCanEditTask(c, existing); err != nil {
 		return err
@@ -1784,6 +1834,10 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther,
 			taskPagePath(id, registerScope)+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
+	org := taskOrgID(c, existing)
+	if err := checkAssigneeInOrg(h.userRepo, org, t.Assignee, "", existing.Assignee); err != nil {
+		return err
+	}
 	if code := h.recurrenceCompleteErr(existing, t, c); code != "" {
 		loc := taskPagePath(id, registerScope) + "?err=" + code
 		if code == "rec_open" {
@@ -1818,7 +1872,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		}
 		return c.Redirect(http.StatusSeeOther, taskPagePath(id, registerScope)+"?err="+code)
 	}
-	_ = h.saveSupportMembers(c, t.TaskID, t.Assignee)
+	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
+		return err
+	}
 	if adminGTD && !registerScope {
 		h.addActionSaveActivity(existing, t, c)
 		h.ensureWaitingAction(t)
@@ -1865,6 +1921,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	t, err := h.repo.GetTask(id)
 	if err != nil || t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyOtherOrgTask(c, t); err != nil {
+		return err
 	}
 	canWrite := canEditTask(c, t.Assignee, t.AssigneeUserID)
 	children, _ := h.repo.ListChildren(id)
@@ -1933,7 +1992,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	if t.ParentTaskID != "" {
 		parent, _ = h.repo.GetTask(t.ParentTaskID)
 	}
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	projects, _ := h.repo.ListProjects(false)
 	customers, _ := h.customerRepo.ListAll()
 	supportMembers, _ := h.repo.ListMembers(t.TaskID)

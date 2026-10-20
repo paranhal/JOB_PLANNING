@@ -22,7 +22,7 @@ type MaintenanceSiteConfig struct {
 	OrgID           string // customers.org_id
 }
 
-// MaintenancePlan 연도 단위 점검 계획
+// MaintenancePlan 조직+연도 단위 점검 계획
 type MaintenancePlan struct {
 	PlanID    string
 	PlanYear  int
@@ -30,6 +30,7 @@ type MaintenancePlan struct {
 	Status    string // draft | approved
 	CreatedAt string
 	UpdatedAt string
+	OrgID     string
 }
 
 // MaintenanceVisit 일자별 방문 1건

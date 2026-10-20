@@ -32,6 +32,7 @@ func (r *OrgRepo) List() ([]OrgListRow, error) {
 	}
 	rows, err := r.db.Query(`
 		SELECT o.org_id, COALESCE(o.org_no,''), o.org_name, COALESCE(o.short_name,''),
+		       COALESCE(o.kind,'business'),
 		       COALESCE(o.is_active,1), COALESCE(o.sort_order,0), COALESCE(o.note,''),
 		       COALESCE(o.created_at,''), COALESCE(o.created_by,''),
 		       (SELECT COUNT(*) FROM users u WHERE u.org_id=o.org_id AND COALESCE(u.role,'')<>'vision_admin'),
@@ -48,11 +49,13 @@ func (r *OrgRepo) List() ([]OrgListRow, error) {
 	for rows.Next() {
 		var it OrgListRow
 		var active int
-		if err := rows.Scan(&it.OrgID, &it.OrgNo, &it.OrgName, &it.ShortName, &active,
+		var kind string
+		if err := rows.Scan(&it.OrgID, &it.OrgNo, &it.OrgName, &it.ShortName, &kind, &active,
 			&it.SortOrder, &it.Note, &it.CreatedAt, &it.CreatedBy,
 			&it.UserCount, &it.CustomerCount, &it.ASCount, &it.SalesCount); err != nil {
 			return nil, err
 		}
+		it.Kind = scanOrgKind(kind)
 		it.IsActive = active != 0
 		out = append(out, it)
 	}
@@ -80,19 +83,22 @@ func (r *OrgRepo) Get(orgID string) (*model.Org, error) {
 	}
 	var it model.Org
 	var active int
+	var kind string
 	err := r.db.QueryRow(`
 		SELECT org_id, COALESCE(org_no,''), org_name, COALESCE(short_name,''),
+		       COALESCE(kind,'business'),
 		       COALESCE(is_active,1), COALESCE(sort_order,0), COALESCE(note,''),
 		       COALESCE(created_at,''), COALESCE(created_by,'')
 		FROM orgs WHERE org_id=?`, orgID).Scan(
-		&it.OrgID, &it.OrgNo, &it.OrgName, &it.ShortName, &active,
-		&it.SortOrder, &it.Note, &it.CreatedAt, &it.CreatedBy)
+		&it.OrgID, &it.OrgNo, &it.OrgName, &it.ShortName, &kind,
+		&active, &it.SortOrder, &it.Note, &it.CreatedAt, &it.CreatedBy)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	it.Kind = scanOrgKind(kind)
 	it.IsActive = active != 0
 	return &it, nil
 }

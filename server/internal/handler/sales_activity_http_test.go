@@ -42,7 +42,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if strings.Count(eb, `@click="startCreate()"`) != 1 {
 		t.Fatalf("주황 등록이 하나가 아니다: %s", clipBody(eb))
 	}
-	for _, label := range []string{"방문", "전화", "이메일", "온라인미팅", "내부회의", "정보수집"} {
+	for _, label := range []string{"방문", "전화", "이메일", "온라인미팅", "내부회의", "정보 수집"} {
 		if !strings.Contains(eb, label) {
 			t.Fatalf("칩 라벨 없음 %s: %s", label, clipBody(eb))
 		}
@@ -51,8 +51,11 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 		t.Fatal("옛 라벨이 칩에 남았다")
 	}
 	if !strings.Contains(eb, "자료송부") || !strings.Contains(eb, "견적제출") ||
-		!strings.Contains(eb, "제안서제출") || !strings.Contains(eb, "입찰") {
-		t.Fatalf("드롭다운 유형이 없다: %s", clipBody(eb))
+		!strings.Contains(eb, "제안서 제출") || !strings.Contains(eb, "요구사항 파악") {
+		t.Fatalf("유형이 없다: %s", clipBody(eb))
+	}
+	if strings.Contains(eb, `optgroup`) && !strings.Contains(eb, "발굴") {
+		t.Fatal("유형 단계 그룹이 없다")
 	}
 	if !strings.Contains(eb, "max-w-md") || !strings.Contains(eb, "활동 저장") || !strings.Contains(eb, "right-0") {
 		t.Fatalf("슬라이드오버가 아니다: %s", clipBody(eb))
@@ -65,7 +68,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 		"activity_date":    {"2026-08-09"},
 		"start_time":       {"10:00"},
 		"duration_min":     {"90"},
-		"activity_type":    {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":            {"현장 방문"},
 		"place":            {"세종청사"},
 		"counterparts":     {"김담당"},
@@ -80,7 +83,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 		"activity_date": {"2026-08-20"},
 		"start_time":    {"14:00"},
 		"duration_min":  {"60"},
-		"activity_type": {"internal"},
+		"activity_type": {"other"}, "activity_method": {"internal"},
 		"title":         {"내부 검토"},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -126,7 +129,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	past := doForm(t, e, "/sales/"+id+"/activities", url.Values{
 		"activity_date":    {"2026-08-21"},
 		"duration_min":     {"30"},
-		"activity_type":    {"call"},
+		"activity_type": {"other"}, "activity_method": {"call"},
 		"title":            {"지난 다음행동"},
 		"next_action":      {"재통화"},
 		"next_action_date": {"2026-08-01"},
@@ -139,7 +142,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 		t.Fatalf("지난 다음 행동이 빨강이 아니다: %s", clipBody(logPage.Body.String()))
 	}
 
-	visitOnly := doGet(t, e, "/sales/activities?month=2026-08&type=visit")
+	visitOnly := doGet(t, e, "/sales/activities?month=2026-08&method=visit")
 	vb := visitOnly.Body.String()
 	if !strings.Contains(vb, "1시간 30분") || strings.Contains(vb, "내부 검토") {
 		t.Fatalf("유형 칩 필터가 요약을 안 바꾼다: %s", clipBody(vb))
@@ -165,7 +168,7 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 		"sales_id":      {id},
 		"activity_date": {"2026-08-22"},
 		"duration_min":  {"45"},
-		"activity_type": {"mail"},
+		"activity_type": {"other"}, "activity_method": {"mail"},
 		"title":         {"메일 회신"},
 	})
 	if js.Code != http.StatusOK {
@@ -203,11 +206,57 @@ func TestSalesHTTP_ActivityTypesSeeded(t *testing.T) {
 	for _, c := range list {
 		got[c.CodeValue] = c.CodeName
 	}
-	if got["visit"] != "방문" || got["mail"] != "이메일" || got["internal"] != "내부회의" {
+	if got["research"] != "정보 수집" || got["quote"] != "견적제출" || got["proposal"] != "제안서 제출" {
 		t.Fatalf("유형 라벨 %+v", got)
 	}
-	if got["quote"] != "견적제출" || got["proposal"] != "제안서제출" || got["bid"] != "입찰" {
-		t.Fatalf("진척 열쇠 유형이 없다 %+v", got)
+	if _, ok := got["visit"]; ok {
+		t.Fatal("방법이 유형 활성에 남았다")
+	}
+	methods, err := codes.ActiveByGroup(model.SalesCodeGroupActivityMethod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mm := map[string]string{}
+	for _, c := range methods {
+		mm[c.CodeValue] = c.CodeName
+	}
+	if mm["visit"] != "방문" || mm["mail"] != "이메일" {
+		t.Fatalf("방법 라벨 %+v", mm)
+	}
+}
+
+func TestSalesHTTP_ActivityMethodRequiredAndMismatchAllowed(t *testing.T) {
+	e := newSalesServer(t)
+	rec := doForm(t, e, "/sales", url.Values{"name": {"단계경고91"}})
+	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
+	noMethod := doFormJSON(t, e, "/sales/activities", url.Values{
+		"sales_id": {id}, "activity_date": {"2026-10-03"}, "activity_type": {"research"}, "title": {"방법없음"},
+	})
+	if noMethod.Code != http.StatusBadRequest || !strings.Contains(noMethod.Body.String(), "방법") {
+		t.Fatalf("방법 필수 %d %s", noMethod.Code, noMethod.Body.String())
+	}
+	legacy := doFormJSON(t, e, "/sales/activities", url.Values{
+		"sales_id": {id}, "activity_date": {"2026-10-03"}, "activity_type": {"visit"}, "activity_method": {"visit"}, "title": {"옛코드"},
+	})
+	if legacy.Code != http.StatusBadRequest || !strings.Contains(legacy.Body.String(), "예전") {
+		t.Fatalf("옛 코드 %d %s", legacy.Code, legacy.Body.String())
+	}
+	ok := doFormJSON(t, e, "/sales/activities", url.Values{
+		"sales_id": {id}, "activity_date": {"2026-10-03"}, "activity_type": {"research"}, "activity_method": {"visit"}, "title": {"발굴유형"},
+	})
+	if ok.Code != http.StatusOK {
+		t.Fatalf("단계 불일치 저장 %d %s", ok.Code, ok.Body.String())
+	}
+	roRec := httptest.NewRecorder()
+	roReq := httptest.NewRequest(http.MethodPost, "http://localhost/sales/activities", strings.NewReader(url.Values{
+		"sales_id": {id}, "activity_date": {"2026-10-03"}, "activity_type": {"research"}, "activity_method": {"call"}, "title": {"읽기"},
+	}.Encode()))
+	roReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	roReq.Header.Set("Accept", "application/json")
+	roReq.AddCookie(jwtCookieReadOnly(t, "sales"))
+	e.ServeHTTP(roRec, roReq)
+	if roRec.Code != http.StatusForbidden && roRec.Code != http.StatusUnauthorized {
+		t.Fatalf("읽기전용 %d %s", roRec.Code, roRec.Body.String())
 	}
 }
 
@@ -217,7 +266,7 @@ func TestSalesHTTP_UpdateActivitySyncsWorkTask(t *testing.T) {
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	js := doFormJSON(t, e, "/sales/activities", url.Values{
 		"sales_id": {id}, "activity_date": {"2026-08-22"}, "start_time": {"10:00"},
-		"duration_min": {"45"}, "activity_type": {"mail"}, "title": {"메일 회신"},
+		"duration_min": {"45"}, "activity_type": {"other"}, "activity_method": {"mail"}, "title": {"메일 회신"},
 		"counterparts": {"김담당"},
 	})
 	if js.Code != http.StatusOK {
@@ -243,7 +292,7 @@ func TestSalesHTTP_UpdateActivitySyncsWorkTask(t *testing.T) {
 
 	upd := doFormJSON(t, e, "/sales/activities/"+aid, url.Values{
 		"activity_date": {"2026-08-25"}, "start_time": {"14:00"},
-		"duration_min": {"90"}, "activity_type": {"visit"}, "title": {"방문으로 변경"},
+		"duration_min": {"90"}, "activity_type": {"other"}, "activity_method": {"visit"}, "title": {"방문으로 변경"},
 		"counterparts": {"김담당"},
 	})
 	if upd.Code != http.StatusOK {
@@ -273,7 +322,7 @@ func TestSalesHTTP_DeleteActivityRemovesWorkTaskKeepsAutoParty(t *testing.T) {
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	js := doFormJSON(t, e, "/sales/activities", url.Values{
 		"sales_id": {id}, "activity_date": {"2026-08-22"},
-		"duration_min": {"30"}, "activity_type": {"visit"}, "title": {"지울 방문"},
+		"duration_min": {"30"}, "activity_type": {"other"}, "activity_method": {"visit"}, "title": {"지울 방문"},
 		"counterparts": {"박상대"},
 	})
 	var payload map[string]interface{}
@@ -330,7 +379,7 @@ func TestSalesHTTP_ForeignActivityMutationsForbidden(t *testing.T) {
 	id := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	js := doFormJSON(t, e, "/sales/activities", url.Values{
 		"sales_id": {id}, "activity_date": {"2026-08-22"},
-		"duration_min": {"30"}, "activity_type": {"call"}, "title": {"관리자 통화"},
+		"duration_min": {"30"}, "activity_type": {"other"}, "activity_method": {"call"}, "title": {"관리자 통화"},
 	})
 	var payload map[string]interface{}
 	if err := json.Unmarshal(js.Body.Bytes(), &payload); err != nil {
@@ -339,7 +388,7 @@ func TestSalesHTTP_ForeignActivityMutationsForbidden(t *testing.T) {
 	aid, _ := payload["activity_id"].(string)
 	upd := httptestPostAs(t, e, "/sales/activities/"+aid, url.Values{
 		"activity_date": {"2026-08-23"}, "duration_min": {"60"},
-		"activity_type": {"call"}, "title": {"가로채기"},
+		"activity_type": {"other"}, "activity_method": {"call"}, "title": {"가로채기"},
 	}, "sales")
 	if upd.Code != http.StatusForbidden {
 		t.Fatalf("남의 수정 status=%d want 403", upd.Code)

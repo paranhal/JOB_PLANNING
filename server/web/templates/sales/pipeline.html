@@ -14,6 +14,15 @@
     일일 업무를 영업 활동으로 만들 사업을 고르세요. 고른 사업의 활동 등록에서 이 업무가 연결됩니다.
   </div>
   {{end}}
+  {{if eq .FlashOK "won"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">수주로 처리했습니다</div>
+  {{end}}
+  {{if eq .FlashOK "lost"}}
+  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">실주로 처리했습니다</div>
+  {{end}}
+  {{if .FormError}}
+  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  {{end}}
   {{template "sales_list_filters" .}}
   <form method="get" action="/sales" class="flex flex-wrap items-end gap-2 text-sm bg-white border rounded-xl p-3">
     <input type="hidden" name="view" value="pipeline">
@@ -58,11 +67,12 @@
         <th class="text-left px-3 py-2 whitespace-nowrap">번호</th><th class="text-left px-3 py-2 whitespace-nowrap">사업</th><th class="text-left px-3 py-2 whitespace-nowrap">고객</th>
         <th class="text-left px-3 py-2 whitespace-nowrap">담당</th><th class="text-left px-3 py-2 whitespace-nowrap">단계</th><th class="text-left px-3 py-2 whitespace-nowrap">확도</th>
         <th class="text-left px-3 py-2 whitespace-nowrap">기준 시기</th><th class="text-right px-3 py-2 whitespace-nowrap">금액</th><th class="text-right px-3 py-2 whitespace-nowrap">가중</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap w-28">처리</th>
       </tr></thead>
       <tbody class="divide-y">
         {{range .Rows}}
         <tr>
-          <td class="px-3 py-2 font-mono text-xs whitespace-nowrap"><a href="/sales/{{.SalesID}}" class="text-blue-700">{{.DisplayNo}}</a></td>
+          <td class="px-3 py-2 font-mono text-xs whitespace-nowrap"><a href="/sales/{{.SalesID}}" class="text-blue-700" data-sales-row-link>{{.DisplayNo}}</a></td>
           <td class="px-3 py-2 whitespace-nowrap">{{.Name}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.Customer}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.Owner}}</td>
@@ -71,9 +81,22 @@
           <td class="px-3 py-2 whitespace-nowrap">{{if .Unsched}}—{{else}}{{if .BasisYM}}{{.BasisYM}}{{else}}—{{end}}{{end}}</td>
           <td class="px-3 py-2 text-right whitespace-nowrap">{{.Amount}} <span class="text-[11px] text-gray-400">{{.VATLabel}}</span></td>
           <td class="px-3 py-2 text-right whitespace-nowrap">{{.Weighted}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">
+            {{$a := .NextAction}}
+            {{if and $a.Enabled (eq $a.Kind "win")}}
+            <button type="button" class="px-2 py-1 text-xs bg-emerald-600 text-white rounded-lg" data-sales-next="win" data-href="/sales/{{.SalesID}}/win-dialog?return={{$.FilterQ}}" aria-label="{{.Name}} 수주">수주</button>
+            {{else if and $a.Enabled (eq $a.Kind "convert")}}
+            <button type="button" class="px-2 py-1 text-xs bg-blue-600 text-white rounded-lg" data-sales-next="convert" data-href="/sales/{{.SalesID}}/contract-dialog?return={{$.FilterQ}}" aria-label="{{.Name}} 계약으로 전환">계약으로 전환</button>
+            {{else if and $a.Enabled (eq $a.Kind "promote")}}
+            <a href="{{$a.Href}}" class="text-xs text-blue-700 underline" aria-label="{{.Name}} 계약으로 전환">계약으로 전환</a>
+            {{else if and $a.Enabled (eq $a.Kind "view")}}
+            <a href="{{$a.Href}}" class="text-xs text-blue-700 underline" aria-label="{{.Name}} 사업 보기">사업 보기</a>
+            {{else}}—
+            {{end}}
+          </td>
         </tr>
         {{else}}
-        <tr><td colspan="9" class="px-3 py-8 text-center text-gray-400 whitespace-nowrap">건이 없습니다.</td></tr>
+        <tr><td colspan="10" class="px-3 py-8 text-center text-gray-400 whitespace-nowrap">건이 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -101,5 +124,7 @@
       </tbody>
     </table>
   </div>
+  <div id="sales-next-host"></div>
 </div>
+<script src="/static/js/sales-next.js?v={{.AssetQuery}}"></script>
 {{end}}

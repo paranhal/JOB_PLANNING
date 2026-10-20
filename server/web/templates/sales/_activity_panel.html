@@ -30,10 +30,27 @@
             <input type="date" name="activity_date" required value="{{if and .FromTask .FromTask.WorkDate}}{{.FromTask.WorkDate}}{{else}}{{.Today}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">유형 *</label>
-            <select name="activity_type" required class="w-full border rounded-lg px-3 py-2 text-sm">
+            <label class="block text-xs text-gray-500 mb-1">활동 유형 *</label>
+            <select name="activity_type" required class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="활동 유형"
+                    data-project-stage="{{.ProjectStage}}" data-project-stage-label="{{.ProjectStageLabel}}"
+                    @change="onActTypeChange($event)">
               <option value="">선택</option>
-              {{range .ActivityTypes}}
+              {{range $g := .TypeGroups}}
+              <optgroup label="{{$g.Label}}{{if $g.Recommended}} · 권장{{end}}">
+                {{range $g.Types}}
+                <option value="{{.CodeValue}}" data-stage="{{$g.Stage}}" data-stage-label="{{$g.Label}}">{{.CodeName}}</option>
+                {{end}}
+              </optgroup>
+              {{end}}
+            </select>
+            <p class="text-[11px] text-gray-500 mt-1" x-show="typeHint" x-text="typeHint"></p>
+            <p class="text-[11px] text-amber-800 mt-1" role="status" x-show="typeWarn" x-text="typeWarn"></p>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">방법 *</label>
+            <select name="activity_method" required class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="방법">
+              <option value="">선택</option>
+              {{range .ActivityMethods}}
               <option value="{{.CodeValue}}">{{.CodeName}}</option>
               {{end}}
             </select>

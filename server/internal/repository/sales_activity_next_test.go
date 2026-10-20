@@ -26,7 +26,7 @@ func TestSalesActivityNextActionCreatesSecondTask(t *testing.T) {
 
 	act := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "10:00",
-		DurationMin: 30, ActivityType: "visit", Title: "방문",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "방문",
 		OurMembers: "최혜영", NextAction: "제안 방안 협의", NextActionDate: nextDay,
 	}
 	if err := sales.CreateActivity(act, "관리자", nil); err != nil {
@@ -56,7 +56,7 @@ func TestSalesActivityNextActionCreatesSecondTask(t *testing.T) {
 
 	monthAct := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "11:00",
-		DurationMin: 30, ActivityType: "visit", Title: "월만",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "월만",
 		OurMembers: "최혜영", NextAction: "다음달 협의", NextActionDate: "2026-10",
 	}
 	if err := sales.CreateActivity(monthAct, "관리자", nil); err != nil {
@@ -78,7 +78,7 @@ func TestSalesActivityNextActionCreatesSecondTask(t *testing.T) {
 
 	keep := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "14:00",
-		DurationMin: 30, ActivityType: "visit", Title: "완료 유지",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "완료 유지",
 		OurMembers: "최혜영", NextAction: "견적 요청", NextActionDate: nextDay,
 	}
 	if err := sales.CreateActivity(keep, "관리자", nil); err != nil {

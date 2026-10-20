@@ -49,7 +49,7 @@ func (h *MeetingHandler) WeeklyItemForm(c echo.Context) error {
 	}
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 	date := strings.TrimSpace(it.ScheduledDate)
 	if date == "" {
@@ -115,8 +115,11 @@ func (h *MeetingHandler) WeeklyItemSave(c echo.Context) error {
 			as2.Symptom = memo
 		}
 		if name := strings.TrimSpace(c.FormValue("assignee")); name != "" {
+			if err := checkAssigneeInOrg(h.userRepo, as2.OrgID, name, "", as2.AssignedTo); err != nil {
+				return err
+			}
 			as2.AssignedTo = name
-			as2.AssignedUserID = weeklyUserIDByName(h, name)
+			as2.AssignedUserID = weeklyUserIDByName(h, c, name)
 		}
 		if err := h.asRepo.UpdateReceipt(as2); err != nil {
 			return err
@@ -178,18 +181,12 @@ func weeklyItemHref(prefix, ref string) string {
 	}
 }
 
-func weeklyUserIDByName(h *MeetingHandler, name string) string {
+func weeklyUserIDByName(h *MeetingHandler, c echo.Context, name string) string {
 	if h == nil || h.userRepo == nil || strings.TrimSpace(name) == "" {
 		return ""
 	}
-	users, err := h.userRepo.ListAssignable()
-	if err != nil {
-		return ""
-	}
-	for _, u := range users {
-		if u.FullName == name {
-			return u.UserID
-		}
+	if u := h.userRepo.FindAssignable(assignableOrgID(c), name); u != nil {
+		return u.UserID
 	}
 	return ""
 }

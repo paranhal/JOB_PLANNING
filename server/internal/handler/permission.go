@@ -14,7 +14,7 @@ import (
 )
 
 func (h *AuthHandler) PermissionsPage(c echo.Context) error {
-	if currentRole(c) != model.RoleVisionAdmin {
+	if loginRole(c) != model.RoleVisionAdmin {
 		return echo.ErrForbidden
 	}
 	tab := strings.TrimSpace(c.QueryParam("tab"))
@@ -32,7 +32,7 @@ func (h *AuthHandler) PermissionsPage(c echo.Context) error {
 }
 
 func (h *AuthHandler) PermissionsSave(c echo.Context) error {
-	if currentRole(c) != model.RoleVisionAdmin || isReadOnly(c) {
+	if loginRole(c) != model.RoleVisionAdmin || isReadOnly(c) {
 		return echo.ErrForbidden
 	}
 	_ = c.Request().ParseForm()
@@ -55,6 +55,9 @@ func (h *AuthHandler) PermissionsSave(c echo.Context) error {
 			continue
 		}
 		acc := model.Access(ai)
+		if role == model.RoleCLevel {
+			acc = model.ClampCLevelAccess(key, acc)
+		}
 		def := model.BuiltinAccess(role, key)
 		var err error
 		if acc == def {

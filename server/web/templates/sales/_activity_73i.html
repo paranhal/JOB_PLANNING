@@ -51,6 +51,7 @@
       {{if .StatusFilter}}<input type="hidden" name="status" value="{{.StatusFilter}}">{{end}}
       {{if .BizCSV}}<input type="hidden" name="biz_types" value="{{.BizCSV}}">{{end}}
       {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+      {{range .SelectedMethods}}<input type="hidden" name="method" value="{{.}}">{{end}}
       {{if .Owner}}<input type="hidden" name="owner" value="{{.Owner}}">{{end}}
       <input type="hidden" name="project_ids" :value="selected.length ? selected.join(',') : 'none'">
       <button type="submit" class="btn-primary px-3 py-1.5 text-sm">적용</button>
@@ -84,6 +85,7 @@
   {{if .BizCSV}}<input type="hidden" name="biz_types" value="{{.BizCSV}}">{{end}}
   {{if .ProjectCSV}}<input type="hidden" name="project_ids" value="{{.ProjectCSV}}">{{end}}
   {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+  {{range .SelectedMethods}}<input type="hidden" name="method" value="{{.}}">{{end}}
   {{if .Owner}}<input type="hidden" name="owner" value="{{.Owner}}">{{end}}
   <div class="flex-1 min-w-[14rem]">
     <label class="block text-ui-xs text-ink-muted mb-1">검색</label>
@@ -114,6 +116,7 @@
       <tr>
         <th class="text-left px-3 py-2 whitespace-nowrap">활동일시</th>
         <th class="text-left px-3 py-2 whitespace-nowrap">유형</th>
+        <th class="text-left px-3 py-2 whitespace-nowrap">방법</th>
         <th class="text-left px-3 py-2">활동명</th>
         <th class="text-left px-3 py-2 whitespace-nowrap">고객사</th>
         <th class="text-left px-3 py-2 whitespace-nowrap">상태</th>
@@ -126,6 +129,7 @@
       <tr class="border-t">
         <td class="px-3 py-2 whitespace-nowrap">{{.Activity.ActivityDate}} {{.Activity.StartTime}}</td>
         <td class="px-3 py-2 whitespace-nowrap">{{.TypeKO}}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{if .MethodKO}}{{.MethodKO}}{{else}}—{{end}}</td>
         <td class="px-3 py-2">
           <a href="/sales/{{.Activity.SalesID}}" class="text-primary">{{.Activity.Title}}</a>
           <div class="text-ui-xs text-ink-muted">{{.Activity.SalesName}}</div>
@@ -136,7 +140,7 @@
         <td class="px-3 py-2 whitespace-nowrap">{{if .Activity.NextActionDate}}{{.Activity.NextActionDate}}{{else}}—{{end}}</td>
       </tr>
       {{else}}
-      <tr><td colspan="7" class="px-3 py-8 text-center text-ink-muted">활동이 없습니다.</td></tr>
+      <tr><td colspan="8" class="px-3 py-8 text-center text-ink-muted">활동이 없습니다.</td></tr>
       {{end}}
     </tbody>
   </table>

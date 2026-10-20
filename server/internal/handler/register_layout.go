@@ -128,13 +128,15 @@ type RegisterDayColumn struct {
 	DurationMin   int
 	DurationLabel string
 	OnLeave       bool
+	Unregistered  bool
 }
 
 // AssigneeLegend 상단 범례용
 type AssigneeLegend struct {
-	Name   string
-	Border string
-	Soft   string
+	Name         string
+	Border       string
+	Soft         string
+	Unregistered bool
 }
 
 // RegisterMonthDay 월간 캘린더 하루 칸
@@ -516,9 +518,19 @@ func buildAssigneeLegend(placed []model.WorkTask, users []model.User, extraCards
 			add(c.Assignee)
 		}
 	}
+	registered := map[string]bool{}
+	for _, u := range users {
+		if n := strings.TrimSpace(u.FullName); n != "" {
+			registered[n] = true
+		}
+	}
 	sort.Strings(names)
 	out := make([]AssigneeLegend, 0, len(names))
 	for _, n := range names {
+		if !registered[n] {
+			out = append(out, AssigneeLegend{Name: n, Border: "#94a3b8", Soft: "#f1f5f9", Unregistered: true})
+			continue
+		}
 		b, s, _ := model.AssigneeColor(n)
 		out = append(out, AssigneeLegend{Name: n, Border: b, Soft: s})
 	}

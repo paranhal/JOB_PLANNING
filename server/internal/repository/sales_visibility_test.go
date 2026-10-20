@@ -25,10 +25,10 @@ func TestListActivitiesFilterOrgAndPerson(t *testing.T) {
 	if err := repo.Create(b); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.CreateActivity(&model.SalesActivity{SalesID: a.SalesID, ActivityDate: "2026-10-10", ActivityType: "visit", Title: "A방문"}, "영업하나", nil); err != nil {
+	if err := repo.CreateActivity(&model.SalesActivity{SalesID: a.SalesID, ActivityDate: "2026-10-10", ActivityType: "other", ActivityMethod: "visit", Title: "A방문"}, "영업하나", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.CreateActivity(&model.SalesActivity{SalesID: b.SalesID, ActivityDate: "2026-10-10", ActivityType: "visit", Title: "B방문"}, "다른영업", nil); err != nil {
+	if err := repo.CreateActivity(&model.SalesActivity{SalesID: b.SalesID, ActivityDate: "2026-10-10", ActivityType: "other", ActivityMethod: "visit", Title: "B방문"}, "다른영업", nil); err != nil {
 		t.Fatal(err)
 	}
 

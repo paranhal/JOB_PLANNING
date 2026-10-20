@@ -49,7 +49,7 @@ func setupUnplannedActions(t *testing.T) (*WorkBoardRepo, string) {
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}
-	a := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: today, ActivityType: "call", Title: "콜"}
+	a := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: today, ActivityType: "other", ActivityMethod: "call", Title: "콜"}
 	if err := sales.CreateActivity(a, "테스터", nil); err != nil {
 		t.Fatal(err)
 	}

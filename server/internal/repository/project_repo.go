@@ -180,6 +180,45 @@ func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
 	return p, nil
 }
 
+func (r *ProjectRepo) IDsBySalesIDs(salesIDs []string) (map[string]string, error) {
+	out := map[string]string{}
+	if r == nil || r.db == nil || len(salesIDs) == 0 {
+		return out, nil
+	}
+	ph := make([]string, 0, len(salesIDs))
+	args := make([]interface{}, 0, len(salesIDs))
+	for _, id := range salesIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		ph = append(ph, "?")
+		args = append(args, id)
+	}
+	if len(ph) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.Query(`SELECT TRIM(sales_project_id), project_id FROM work_projects
+		WHERE TRIM(COALESCE(sales_project_id,'')) IN (`+strings.Join(ph, ",")+`)`, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return out, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sid, pid string
+		if err := rows.Scan(&sid, &pid); err != nil {
+			return nil, err
+		}
+		if sid != "" && pid != "" {
+			out[sid] = pid
+		}
+	}
+	return out, rows.Err()
+}
+
 func (r *ProjectRepo) GetBySalesID(salesID string) (*model.WorkProject, error) {
 	salesID = strings.TrimSpace(salesID)
 	if salesID == "" {

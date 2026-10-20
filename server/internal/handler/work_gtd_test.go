@@ -203,7 +203,7 @@ func TestAdminWorkWaitingForAndActivity(t *testing.T) {
 	}
 
 	act := doForm(t, e, "/workboard/tasks/"+items[0].TaskID+"/activities", url.Values{
-		"activity_type":    {"send"},
+		"activity_type": {"send"},
 		"activity_content": {"견적 요청 메일 발송"},
 		"spent_minutes":    {"15"},
 		"back":             {"/admin-work"},
@@ -393,7 +393,7 @@ func TestActivitySpentMinutesRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := doForm(t, e, "/workboard/tasks/"+task.TaskID+"/activities", url.Values{
-		"activity_type":    {"write"},
+		"activity_type": {"write"},
 		"activity_content": {"초안"},
 		"back":             {"/admin-work"},
 	})
@@ -401,7 +401,7 @@ func TestActivitySpentMinutesRequired(t *testing.T) {
 		t.Fatalf("소요시간 필수 loc=%q", rec.Header().Get("Location"))
 	}
 	zero := doForm(t, e, "/workboard/tasks/"+task.TaskID+"/activities", url.Values{
-		"activity_type":    {"write"},
+		"activity_type": {"write"},
 		"activity_content": {"초안"},
 		"spent_minutes":    {"0"},
 		"back":             {"/admin-work"},

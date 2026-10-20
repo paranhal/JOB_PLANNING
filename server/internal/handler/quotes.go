@@ -437,7 +437,7 @@ func (h *QuotesHandler) Preview(c echo.Context) error {
 }
 
 func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bool, formErr string) error {
-	users, _ := h.users.ListAssignable()
+	users := listAssignableForPicker(h.users, c)
 	title := "견적 작성"
 	if !isNew {
 		title = "견적 수정"

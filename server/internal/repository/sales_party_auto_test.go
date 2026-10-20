@@ -21,7 +21,7 @@ func TestEnsureCustomerPartiesFromCounterparts(t *testing.T) {
 	}
 
 	act := &model.SalesActivity{
-		SalesID: p.SalesID, ActivityDate: "2026-08-19", ActivityType: "visit",
+		SalesID: p.SalesID, ActivityDate: "2026-08-19", ActivityType: "other", ActivityMethod: "visit",
 		Title: "첫 미팅", Counterparts: "김철수, 이영희", OurMembers: "관리자",
 	}
 	if err := repo.CreateActivity(act, "관리자", nil); err != nil {
@@ -47,7 +47,7 @@ func TestEnsureCustomerPartiesFromCounterparts(t *testing.T) {
 	}
 
 	act2 := &model.SalesActivity{
-		SalesID: p.SalesID, ActivityDate: "2026-08-20", ActivityType: "call",
+		SalesID: p.SalesID, ActivityDate: "2026-08-20", ActivityType: "other", ActivityMethod: "call",
 		Title: "재통화", Counterparts: "김철수", OurMembers: "관리자",
 	}
 	if err := repo.CreateActivity(act2, "관리자", nil); err != nil {
@@ -138,7 +138,7 @@ func TestDeleteActivityKeepsAutoPartiesAndDropsWorkTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	act := &model.SalesActivity{
-		SalesID: p.SalesID, ActivityDate: "2026-08-19", ActivityType: "visit",
+		SalesID: p.SalesID, ActivityDate: "2026-08-19", ActivityType: "other", ActivityMethod: "visit",
 		Title: "지울 미팅", Counterparts: "한상대", OurMembers: "관리자",
 	}
 	if err := repo.CreateActivity(act, "관리자", nil); err != nil {

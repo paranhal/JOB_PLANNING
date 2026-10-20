@@ -38,20 +38,40 @@ const (
 	SalesActTypeOther       = "other"
 	SalesActTypeRequirement = "requirement"
 	SalesActTypeRFPReceived = "rfp_received"
+
+	SalesActMethodVisit    = "visit"
+	SalesActMethodCall     = "call"
+	SalesActMethodMail     = "mail"
+	SalesActMethodOnline   = "online"
+	SalesActMethodInternal = "internal"
+	SalesActMethodOther    = "other"
 )
 
-// SalesActivityChipCodes 목록 칩 6개. 순서 고정 (§32.8.2).
-func SalesActivityChipCodes() []string {
+// SalesActivityTypeChipCodes 내용 유형 칩. 단계 순(D-97).
+func SalesActivityTypeChipCodes() []string {
 	return []string{
-		SalesActTypeVisit, SalesActTypeCall, SalesActTypeMail,
-		SalesActTypeOnline, SalesActTypeInternal, SalesActTypeResearch,
+		SalesActTypeResearch, SalesActTypeMaterial, SalesActTypeQuote,
+		SalesActTypeRequirement, SalesActTypeRFPReceived, SalesActTypeProposal, SalesActTypeOther,
 	}
+}
+
+// SalesActivityMethodChipCodes 방법 칩 6개(D-97).
+func SalesActivityMethodChipCodes() []string {
+	return []string{
+		SalesActMethodVisit, SalesActMethodCall, SalesActMethodMail,
+		SalesActMethodOnline, SalesActMethodInternal, SalesActMethodOther,
+	}
+}
+
+// SalesActivityChipCodes 예전 칩(방법+정보수집). 이력 테스트용.
+func SalesActivityChipCodes() []string {
+	return SalesActivityMethodChipCodes()
 }
 
 func SalesActivityIsChipType(code string) bool {
 	switch strings.TrimSpace(code) {
-	case SalesActTypeVisit, SalesActTypeCall, SalesActTypeMail,
-		SalesActTypeOnline, SalesActTypeInternal, SalesActTypeResearch:
+	case SalesActTypeResearch, SalesActTypeMaterial, SalesActTypeQuote,
+		SalesActTypeRequirement, SalesActTypeRFPReceived, SalesActTypeProposal, SalesActTypeOther:
 		return true
 	default:
 		return false
@@ -95,12 +115,13 @@ const (
 )
 
 const (
-	SalesCodeGroupStage        = "sales_stage"
-	SalesCodeGroupProb         = "sales_stage_prob"
-	SalesCodeGroupLeadSource   = "sales_lead_source"
-	SalesCodeGroupActivityType = "sales_activity_type"
-	SalesCodeGroupPartyType    = "sales_party_type"
-	SalesCodeGroupPartyRole    = "sales_party_role"
+	SalesCodeGroupStage          = "sales_stage"
+	SalesCodeGroupProb           = "sales_stage_prob"
+	SalesCodeGroupLeadSource     = "sales_lead_source"
+	SalesCodeGroupActivityType   = "sales_activity_type"
+	SalesCodeGroupActivityMethod = "sales_activity_method"
+	SalesCodeGroupPartyType      = "sales_party_type"
+	SalesCodeGroupPartyRole      = "sales_party_role"
 )
 
 // SalesStageDef codes 에서 읽은 단계 정의
@@ -1135,7 +1156,9 @@ type SalesActivity struct {
 	StartTime      string
 	DurationMin    int
 	ActivityType   string
+	ActivityMethod string
 	TypeLabel      string
+	MethodLabel    string
 	Title          string
 	Content        string
 	Place          string
@@ -1251,6 +1274,7 @@ type SalesTimelineEvent struct {
 	Date           string
 	Time           string
 	Type           string
+	Method         string
 	TypeLabel      string
 	Title          string
 	Summary        string
@@ -1300,6 +1324,7 @@ func MergeSalesTimeline(acts []SalesActivity, hist []SalesStageHistory, changes 
 			Date:           a.ActivityDate,
 			Time:           tm,
 			Type:           a.ActivityType,
+			Method:         a.ActivityMethod,
 			TypeLabel:      a.TypeLabel,
 			Title:          title,
 			Summary:        a.Content,

@@ -14,17 +14,17 @@ func TestSalesActivity73I_ProjectFilterKPIAndSearchEnter(t *testing.T) {
 	idA := salesIDFromRedirect(t, a.Header().Get("Location"))
 	idB := salesIDFromRedirect(t, b.Header().Get("Location"))
 	if doForm(t, e, "/sales/activities", url.Values{
-		"sales_id": {idA}, "activity_date": {"2026-10-10"}, "activity_type": {"visit"}, "title": {"알파 방문"},
+		"sales_id": {idA}, "activity_date": {"2026-10-10"}, "activity_type": {"other"}, "activity_method": {"visit"}, "title": {"알파 방문"},
 	}).Code != http.StatusSeeOther && doFormJSON(t, e, "/sales/activities", url.Values{
-		"sales_id": {idA}, "activity_date": {"2026-10-10"}, "activity_type": {"visit"}, "title": {"알파 방문"},
+		"sales_id": {idA}, "activity_date": {"2026-10-10"}, "activity_type": {"other"}, "activity_method": {"visit"}, "title": {"알파 방문"},
 	}).Code != http.StatusOK {
 		t.Fatal("알파 활동 등록 실패")
 	}
 	doFormJSON(t, e, "/sales/activities", url.Values{
-		"sales_id": {idA}, "activity_date": {"2026-10-10"}, "activity_type": {"visit"}, "title": {"알파 방문"},
+		"sales_id": {idA}, "activity_date": {"2026-10-10"}, "activity_type": {"other"}, "activity_method": {"visit"}, "title": {"알파 방문"},
 	})
 	doFormJSON(t, e, "/sales/activities", url.Values{
-		"sales_id": {idB}, "activity_date": {"2026-10-11"}, "activity_type": {"call"}, "title": {"베타 전화"},
+		"sales_id": {idB}, "activity_date": {"2026-10-11"}, "activity_type": {"other"}, "activity_method": {"call"}, "title": {"베타 전화"},
 	})
 
 	page := doGet(t, e, "/sales/activities?month=all&period=all")

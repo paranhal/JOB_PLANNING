@@ -21,13 +21,21 @@ func TestSalesActivityTypesV227Labels(t *testing.T) {
 	for _, c := range codes {
 		got[c.CodeValue] = c.CodeName
 	}
-	if got[model.SalesActTypeVisit] != "방문" || got[model.SalesActTypeMail] != "이메일" {
-		t.Fatalf("라벨 유지 실패: visit=%q mail=%q", got["visit"], got["mail"])
+	if got[model.SalesActTypeResearch] != "정보 수집" || got[model.SalesActTypeProposal] != "제안서 제출" {
+		t.Fatalf("유형 라벨 %+v", got)
 	}
-	if got[model.SalesActTypeInternal] != "내부회의" {
-		t.Fatalf("내부회의 없음: %+v", got)
+	if _, ok := got[model.SalesActTypeVisit]; ok {
+		t.Fatal("방법이 유형 활성에 남았다")
 	}
-	if got[model.SalesActTypeQuote] == "" || got[model.SalesActTypeProposal] == "" || got[model.SalesActTypeBid] == "" || got[model.SalesActTypeRFP] == "" {
-		t.Fatalf("진척 열쇠 유형 누락: %+v", got)
+	methods, err := NewCodeRepo(db).ActiveByGroup(model.SalesCodeGroupActivityMethod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mm := map[string]string{}
+	for _, c := range methods {
+		mm[c.CodeValue] = c.CodeName
+	}
+	if mm[model.SalesActMethodVisit] != "방문" || mm[model.SalesActMethodMail] != "이메일" || mm[model.SalesActMethodInternal] != "내부회의" {
+		t.Fatalf("방법 라벨 %+v", mm)
 	}
 }

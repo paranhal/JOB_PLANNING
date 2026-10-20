@@ -73,7 +73,7 @@ func TestSalesDropCancelsOpenTasks(t *testing.T) {
 	repo := NewSalesRepo(db)
 	p := &model.SalesProject{Name: "업무 취소"}
 	_ = repo.Create(p)
-	a1 := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: "2026-09-01", ActivityType: "call", Title: "콜"}
+	a1 := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: "2026-09-01", ActivityType: "other", ActivityMethod: "call", Title: "콜"}
 	_ = repo.CreateActivity(a1, "t", nil)
 	if err := repo.CreateNextActionTask(a1.ActivityID, "2026-09-10", "테스터", "u1"); err != nil {
 		t.Log(err)

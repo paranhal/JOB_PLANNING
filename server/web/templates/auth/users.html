@@ -21,6 +21,14 @@
 
   {{if .OK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>{{end}}
   {{if .Error}}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>{{end}}
+  {{if .TempPW}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+    <p class="font-semibold mb-1">임시 비밀번호를 한 번만 보여 줍니다.{{if .TempPWName}} ({{.TempPWName}}){{end}}</p>
+    <p class="flex flex-wrap items-center gap-2"><code id="temp-pw" class="font-mono bg-white px-2 py-1 rounded border">{{.TempPW}}</code>
+      <button type="button" id="btn-copy-temp" class="px-2 py-1 border rounded text-xs bg-white">복사</button></p>
+    <p class="text-xs mt-1">이 화면을 닫거나 새로고침하면 다시 볼 수 없습니다. 다음 로그인 때 비밀번호 변경을 강제합니다.</p>
+  </div>
+  {{end}}
 
   {{if .Unmatched}}
   <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -86,7 +94,7 @@
         </select>
         <select id="fRole" class="border rounded-lg px-3 py-2.5 text-sm">
           <option value="">전체 역할</option>
-          <optgroup label="관리 등급"><option value="g:vision">비젼관리자</option><option value="g:org">조직관리자</option><option value="g:none">일반</option></optgroup>
+          <optgroup label="관리 등급"><option value="g:vision">비젼관리자</option><option value="g:exec">C-Level(경영진)</option><option value="g:org">조직관리자</option><option value="g:none">일반</option></optgroup>
           <optgroup label="업무"><option value="j:sales">영업</option><option value="j:tech">기술</option><option value="j:support">지원</option></optgroup>
           <optgroup label="깃발"><option value="f:ro">읽기전용만</option><option value="f:test">테스터만</option></optgroup>
         </select>
@@ -126,7 +134,7 @@
         </thead>
         <tbody id="rows">
         {{range .Users}}
-        {{$grade := "none"}}{{if eq .Role "vision_admin"}}{{$grade = "vision"}}{{else if or (eq .Role "org_admin") (eq .Role "admin")}}{{$grade = "org"}}{{end}}
+        {{$grade := "none"}}{{if eq .Role "vision_admin"}}{{$grade = "vision"}}{{else if eq .Role "c_level"}}{{$grade = "exec"}}{{else if or (eq .Role "org_admin") (eq .Role "admin")}}{{$grade = "org"}}{{end}}
         {{$job := ""}}{{if or (eq .Role "sales") (eq .Role "tech") (eq .Role "support")}}{{$job = .Role}}{{end}}
         {{$orgLabel := "전체 조직"}}{{if .OrgID}}{{$orgLabel = .OrgID}}{{end}}
         {{if and .OrgID $orgNames}}{{with index $orgNames .OrgID}}{{$orgLabel = .}}{{end}}{{end}}
@@ -148,8 +156,8 @@
               </div>
             </div>
           </td>
-          <td class="px-4 py-3 whitespace-nowrap font-bold {{if eq $grade "vision"}}text-blue-600{{else if eq $grade "org"}}text-green-600{{else}}text-slate-400{{end}}">
-            {{if eq $grade "vision"}}비젼관리자{{else if eq $grade "org"}}조직관리자{{else}}일반{{end}}
+          <td class="px-4 py-3 whitespace-nowrap font-bold {{if eq $grade "vision"}}text-blue-600{{else if eq $grade "exec"}}text-violet-600{{else if eq $grade "org"}}text-green-600{{else}}text-slate-400{{end}}">
+            {{if eq $grade "vision"}}비젼관리자{{else if eq $grade "exec"}}C-Level(경영진){{else if eq $grade "org"}}조직관리자{{else}}일반{{end}}
           </td>
           <td class="px-4 py-3 whitespace-nowrap">{{$orgLabel}}</td>
           <td class="px-4 py-3 whitespace-nowrap">
@@ -238,7 +246,9 @@
       </div>
       <div id="wPass">
         <label class="block text-xs font-semibold text-slate-500 mb-1">비밀번호</label>
-        <input type="password" name="password" id="dPass" minlength="10" class="w-full border rounded-lg px-3 py-2 text-sm">
+        <input type="password" name="password" id="dPass" minlength="10" class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="new-password">
+        <input type="password" name="password_confirm" id="dPass2" minlength="10" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="비밀번호 확인" autocomplete="new-password">
+        <label id="wMust" class="hidden mt-2 flex gap-2 text-sm"><input type="checkbox" name="must_change_password" value="1" id="dMust"> 다음 로그인 때 변경하게 하기</label>
       </div>
       <div id="wSig" class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
         <p class="text-xs font-bold text-slate-700">사인</p>
@@ -278,6 +288,7 @@
         <label class="block text-xs font-semibold text-slate-500 mb-2">관리 등급</label>
         <div class="space-y-2" id="dGrade">
           <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="vision"> <span>비젼관리자<span class="block text-xs text-slate-500">전 조직. 업무와 조직을 두지 않습니다.</span></span></label>
+          {{if $.IsVision}}<label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="exec"> <span>C-Level(경영진)<span class="block text-xs text-slate-500">전사 조회. 설정·쓰기는 막습니다.</span></span></label>{{end}}
           <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="org"> <span>조직관리자<span class="block text-xs text-slate-500">소속 조직 전부. 업무를 두지 않습니다.</span></span></label>
           <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="none" checked> <span>일반<span class="block text-xs text-slate-500">업무를 하나 고릅니다.</span></span></label>
         </div>
@@ -364,6 +375,9 @@
   {{end}}
   <form id="rename-form" method="POST" class="hidden"></form>
   <form id="reset-form" method="POST" class="hidden"></form>
+  <form id="reset-pw-form" method="POST" class="hidden p-5 border-t shrink-0">
+    <button type="submit" id="btn-reset-pw" class="w-full px-3 py-2 border rounded-lg text-sm text-amber-800">비밀번호 초기화</button>
+  </form>
 </aside>
 {{end}}
 
@@ -432,13 +446,14 @@
     var wOrg=document.getElementById('wOrg'), wJob=document.getElementById('wJob'), wTest=document.getElementById('wTest');
     var dOrg=document.getElementById('dOrg'), dJob=document.getElementById('dJob'), dTest=document.getElementById('dTest');
     var roHint=document.getElementById('roHint');
-    if (g==='vision'){ wOrg.classList.add('hidden'); wJob.classList.add('hidden'); wTest.classList.add('hidden'); dOrg.disabled=true; dJob.disabled=true; dTest.disabled=true; dOrg.value=''; dJob.value=''; dTest.checked=false; }
+    if (g==='vision' || g==='exec'){ wOrg.classList.add('hidden'); wJob.classList.add('hidden'); wTest.classList.add('hidden'); dOrg.disabled=true; dJob.disabled=true; dTest.disabled=true; dOrg.value=''; dJob.value=''; dTest.checked=false; }
     else if (g==='org'){ wOrg.classList.remove('hidden'); wJob.classList.add('hidden'); wTest.classList.add('hidden'); dOrg.disabled=false; dJob.disabled=true; dTest.disabled=true; dJob.value=''; dTest.checked=false; if(roHint) roHint.textContent='옛 옵저버와 같습니다.'; }
     else { wOrg.classList.remove('hidden'); wJob.classList.remove('hidden'); wTest.classList.remove('hidden'); dOrg.disabled=false; dJob.disabled=false; dTest.disabled=false; if(roHint) roHint.textContent='볼 수는 있고 아무것도 바꿀 수 없습니다.'; }
   }
   function roleFromForm(){
     var g = grade();
     if (g==='vision') return 'vision_admin';
+    if (g==='exec') return 'c_level';
     if (g==='org') return 'org_admin';
     return (document.getElementById('dJob').value||'');
   }
@@ -460,10 +475,13 @@
   }
   function fillNew(){
     form.action='/users'; document.getElementById('dTitle').textContent='아이디 생성'; document.getElementById('dSub').textContent='';
-    form.reset(); document.getElementById('dPass').required=true; document.getElementById('wUser').classList.remove('hidden');
+    form.reset(); document.getElementById('dPass').required=true; document.getElementById('dPass2').required=true;
+    document.getElementById('wUser').classList.remove('hidden');
     document.getElementById('wPass').classList.remove('hidden'); document.getElementById('wRename').classList.add('hidden');
+    document.getElementById('wMust').classList.add('hidden');
     form.removeAttribute('data-id');
     var df=document.getElementById('del-form'); if(df) df.classList.add('hidden');
+    var rpw=document.getElementById('reset-pw-form'); if(rpw) rpw.classList.add('hidden');
     document.getElementById('btn-reset-perms').classList.add('hidden');
     document.getElementById('dPrev').value='';
     var src=document.getElementById('dPermSrc'); if(src) src.textContent='직급 기본값';
@@ -483,9 +501,11 @@
     document.getElementById('dTitle').textContent=tr.dataset.name;
     document.getElementById('dSub').textContent='@'+tr.dataset.user;
     document.getElementById('dName').value=tr.dataset.name;
-    document.getElementById('dPrev').value=tr.dataset.grade==='vision'?'vision_admin':(tr.dataset.grade==='org'?'org_admin':tr.dataset.job);
+    document.getElementById('dPrev').value=tr.dataset.grade==='vision'?'vision_admin':(tr.dataset.grade==='exec'?'c_level':(tr.dataset.grade==='org'?'org_admin':tr.dataset.job));
     document.getElementById('dPass').required=false; document.getElementById('dPass').value='';
-    document.getElementById('wUser').classList.add('hidden'); document.getElementById('wPass').classList.add('hidden');
+    document.getElementById('dPass2').required=false; document.getElementById('dPass2').value='';
+    document.getElementById('wUser').classList.add('hidden'); document.getElementById('wPass').classList.remove('hidden');
+    document.getElementById('wMust').classList.remove('hidden');
     document.getElementById('wRename').classList.remove('hidden'); document.getElementById('dRename').value=tr.dataset.user;
     document.getElementById('rename-form').action='/users/'+tr.dataset.id+'/username';
     var g=tr.dataset.grade||'none'; form.querySelector('input[name="admin_grade"][value="'+g+'"]').checked=true;
@@ -525,6 +545,12 @@
     syncGrade(); openD();
     var df=document.getElementById('del-form');
     if(df){ df.classList.remove('hidden'); df.action='/users/'+tr.dataset.id+'/delete'; }
+    var rpw=document.getElementById('reset-pw-form');
+    var selfId={{printf "%q" .CurrentUserID}};
+    if(rpw){
+      if (tr.dataset.id===selfId){ rpw.classList.add('hidden'); }
+      else { rpw.classList.remove('hidden'); rpw.action='/users/'+tr.dataset.id+'/reset-password'; }
+    }
   }
   var bn=document.getElementById('btn-new'); if(bn) bn.addEventListener('click', fillNew);
   document.querySelectorAll('.edit').forEach(function(btn){ btn.addEventListener('click', function(){ var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-edit')+'"]'); if(tr) fillEdit(tr); }); });
@@ -538,6 +564,15 @@
   });
   var rp=document.getElementById('btn-reset-perms');
   if(rp) rp.addEventListener('click', function(){ document.getElementById('reset-form').submit(); });
+  var rpb=document.getElementById('btn-reset-pw');
+  if(rpb) rpb.addEventListener('click', function(e){
+    var name=document.getElementById('dTitle').textContent||'이 사용자';
+    if(!window.confirm(name+' 님의 비밀번호를 초기화합니다. 임시 비밀번호가 한 번만 표시됩니다.')){ e.preventDefault(); }
+  });
+  var copyT=document.getElementById('btn-copy-temp'), tempEl=document.getElementById('temp-pw');
+  if(copyT && tempEl && navigator.clipboard){
+    copyT.addEventListener('click', function(){ navigator.clipboard.writeText(tempEl.textContent||''); });
+  }
   var pad=document.getElementById('dSigPad'), sigDirty=false;
   function resetSigPad(){
     sigDirty=false;

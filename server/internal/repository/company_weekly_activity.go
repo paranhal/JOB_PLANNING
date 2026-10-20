@@ -121,7 +121,7 @@ func (r *StatsRepo) listTechSalesActivityLines(from, toEx, exclProjects string) 
 		FROM sales_activities a
 		LEFT JOIN work_projects wp ON wp.sales_project_id = a.sales_id
 		WHERE a.activity_date >= ? AND a.activity_date < ?
-		  AND a.activity_type IN ('research','proposal','quote','rfp','bid','requirement','material')
+		  AND a.activity_type IN ('research','proposal','quote','rfp','bid','requirement','material','rfp_received')
 		  AND TRIM(COALESCE(wp.project_id,'')) NOT IN (`+exclProjects+`)
 		ORDER BY a.activity_date, a.title`, from, toEx)
 	if err != nil {

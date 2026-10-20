@@ -40,7 +40,8 @@ func salesActivitiesPageView(c echo.Context) string {
 	q := strings.TrimSpace(c.QueryParam("q"))
 	month := strings.TrimSpace(c.QueryParam("month"))
 	types := parseSalesActivityTypeFilter(c)
-	if hasDate && q == "" && month == "" && len(types) == 0 {
+	methods := parseSalesActivityMethodFilter(c)
+	if hasDate && q == "" && month == "" && len(types) == 0 && len(methods) == 0 {
 		return "day"
 	}
 	return "log"
@@ -50,6 +51,22 @@ func parseSalesActivityTypeFilter(c echo.Context) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, raw := range c.QueryParams()["type"] {
+		for _, p := range strings.Split(raw, ",") {
+			p = strings.TrimSpace(p)
+			if p == "" || p == "all" || seen[p] {
+				continue
+			}
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func parseSalesActivityMethodFilter(c echo.Context) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, raw := range c.QueryParams()["method"] {
 		for _, p := range strings.Split(raw, ",") {
 			p = strings.TrimSpace(p)
 			if p == "" || p == "all" || seen[p] {
@@ -91,6 +108,10 @@ func salesActLogQuery(month, q string, types []string) string {
 }
 
 func salesActLogQueryOwner(month, q string, types []string, owner string) string {
+	return salesActLogQueryOwner2(month, q, types, nil, owner)
+}
+
+func salesActLogQueryOwner2(month, q string, types, methods []string, owner string) string {
 	v := url.Values{}
 	if month != "" {
 		v.Set("month", month)
@@ -103,6 +124,9 @@ func salesActLogQueryOwner(month, q string, types []string, owner string) string
 	}
 	for _, t := range types {
 		v.Add("type", t)
+	}
+	for _, m := range methods {
+		v.Add("method", m)
 	}
 	return v.Encode()
 }
@@ -151,7 +175,9 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	}
 	q := strings.TrimSpace(c.QueryParam("q"))
 	sel := parseSalesActivityTypeFilter(c)
+	selM := parseSalesActivityMethodFilter(c)
 	types, _ := h.repo.ActivityTypes()
+	methods, _ := h.repo.ActivityMethods()
 	filterMonth := month
 	if allPeriod {
 		filterMonth = ""
@@ -185,23 +211,27 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	chipActs := workActs
 	actF := workF
 	actF.Types = sel
+	actF.Methods = selM
 	acts, err := h.repo.ListActivitiesFilter(actF)
 	if err != nil {
 		return nil, err
 	}
 	allActs := visActs
-	counts := map[string]int{}
+	typeCounts := map[string]int{}
+	methodCounts := map[string]int{}
 	for _, a := range chipActs {
-		counts[a.ActivityType]++
+		typeCounts[a.ActivityType]++
+		methodCounts[a.ActivityMethod]++
 	}
 	var chips []salesTypeChip
+	var methodChips []salesTypeChip
 	chipMonth := month
 	if allPeriod {
 		chipMonth = "all"
 	}
 	owner := SalesVisibilityScope(c).Owner
-	for _, code := range model.SalesActivityChipCodes() {
-		label := code
+	for _, code := range model.SalesActivityTypeChipCodes() {
+		label := model.SalesActTypeDisplayName(code)
 		for _, t := range types {
 			if t.CodeValue == code {
 				label = t.CodeName
@@ -211,9 +241,25 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		chips = append(chips, salesTypeChip{
 			Code:     code,
 			Label:    label,
-			Count:    counts[code],
+			Count:    typeCounts[code],
 			Selected: containsStr(sel, code),
-			Href:     "/sales/activities?" + salesActLogQueryOwner(chipMonth, q, toggleTypeFilter(sel, code), owner),
+			Href:     "/sales/activities?" + salesActLogQueryOwner2(chipMonth, q, toggleTypeFilter(sel, code), selM, owner),
+		})
+	}
+	for _, code := range model.SalesActivityMethodChipCodes() {
+		label := model.SalesActMethodDisplayName(code)
+		for _, m := range methods {
+			if m.CodeValue == code {
+				label = m.CodeName
+				break
+			}
+		}
+		methodChips = append(methodChips, salesTypeChip{
+			Code:     code,
+			Label:    label,
+			Count:    methodCounts[code],
+			Selected: containsStr(selM, code),
+			Href:     "/sales/activities?" + salesActLogQueryOwner2(chipMonth, q, sel, toggleTypeFilter(selM, code), owner),
 		})
 	}
 	optF := repository.SalesListFilter{IncludeClosed: true, IncludeDormant: true}
@@ -256,6 +302,15 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		}
 		tableActs = typed
 	}
+	if len(selM) > 0 {
+		var typed []model.SalesActivity
+		for _, a := range tableActs {
+			if containsStr(selM, a.ActivityMethod) {
+				typed = append(typed, a)
+			}
+		}
+		tableActs = typed
+	}
 	if statusF != "" && statusF != "all" {
 		var st []model.SalesActivity
 		for _, a := range tableActs {
@@ -281,6 +336,7 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 			"Status":      st,
 			"StatusLabel": model.SalesActivityStatusLabel(st),
 			"TypeKO":      model.SalesActivityTypeKO(a.ActivityType, a.TypeLabel),
+			"MethodKO":    model.SalesActMethodDisplayName(a.ActivityMethod),
 			"Owner":       ownerName,
 		})
 	}
@@ -297,14 +353,14 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	} else if !idAll && len(selectedIDs) > 0 && len(selectedIDs) < len(visibleOpts) {
 		pidCSV = encodeCSV(selectedIDs)
 	}
-	qvals, _ := url.ParseQuery(salesActQuery(chipMonth, q, period, statusF, bizCSV, pidCSV, owner, sel, 0))
+	qvals, _ := url.ParseQuery(salesActQuery2(chipMonth, q, period, statusF, bizCSV, pidCSV, owner, sel, selM, 0))
 	pageLinks := actPageLinks(qvals, pageN, pages)
 	bizChips := buildActBizChips(c, visActs, projByID, bizCodes, hasUnset, selBiz, bizAll, bizNone, chipMonth, q, period, statusF, pidCSV, owner, sel)
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
-	typeQ := salesActLogQueryOwner("", q, sel, owner)
+	typeQ := salesActLogQueryOwner2("", q, sel, selM, owner)
 	if typeQ != "" {
 		typeQ = "&" + typeQ
 	}
@@ -321,7 +377,7 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 	if !idAll || emptyProj {
 		badge = fmt.Sprintf("%d / %d개 사업 선택", len(selectedIDs), len(visibleOpts))
 	}
-	resetHref := "/sales/activities?" + salesActQuery(chipMonth, q, period, statusF, "", "", owner, sel, 0)
+	resetHref := "/sales/activities?" + salesActQuery2(chipMonth, q, period, statusF, "", "", owner, nil, nil, 0)
 	data := map[string]interface{}{
 		"Title":           "영업 활동",
 		"Active":          NavSalesActivities,
@@ -331,9 +387,11 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"Query":           q,
 		"StatusFilter":    statusF,
 		"SelectedTypes":   sel,
+		"SelectedMethods": selM,
 		"Summary":         model.BuildSalesActivitySummary(acts, types),
 		"KPI":             kpi,
 		"TypeChips":       chips,
+		"MethodChips":     methodChips,
 		"ChipTotal":       len(chipActs),
 		"DayGroups":       groups,
 		"Activities":      pageSlice,
@@ -341,10 +399,12 @@ func (h *SalesHandler) renderActivitiesLogData(c echo.Context) (map[string]inter
 		"HasAnyActivity":  hasAny,
 		"ShowHeaderAdd":   showHeaderAdd,
 		"MonthEmptyLabel": salesMonthEmptyLabel(month),
-		"AllPeriodHref":   "/sales/activities?" + salesActLogQueryOwner("all", q, sel, owner),
-		"LogQuery":        salesActQuery(chipMonth, q, period, statusF, bizCSV, pidCSV, owner, sel, 0),
+		"AllPeriodHref":   "/sales/activities?" + salesActLogQueryOwner2("all", q, sel, selM, owner),
+		"LogQuery":        salesActQuery2(chipMonth, q, period, statusF, bizCSV, pidCSV, owner, sel, selM, 0),
 		"TypeQuery":       typeQ,
 		"ActivityTypes":   types,
+		"ActivityMethods": methods,
+		"TypeGroups":      model.SalesActTypeGroups("", types),
 		"SalesOptions":    projects,
 		"Today":           today,
 		"CanWrite":        canWriteSales(c),

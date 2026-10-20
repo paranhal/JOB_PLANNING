@@ -26,7 +26,7 @@ func TestSalesActivityMarksWorkTaskComplete(t *testing.T) {
 
 	todayAct := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "10:00",
-		DurationMin: 60, ActivityType: "visit", Title: "오늘 방문",
+		DurationMin: 60, ActivityType: "other", ActivityMethod: "visit", Title: "오늘 방문",
 		OurMembers: "최혜영",
 	}
 	if err := sales.CreateActivity(todayAct, "관리자", nil); err != nil {
@@ -42,7 +42,7 @@ func TestSalesActivityMarksWorkTaskComplete(t *testing.T) {
 
 	futureAct := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: future, StartTime: "11:00",
-		DurationMin: 30, ActivityType: "visit", Title: "예정 방문",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "예정 방문",
 		OurMembers: "최혜영",
 	}
 	if err := sales.CreateActivity(futureAct, "관리자", nil); err != nil {
@@ -71,7 +71,7 @@ func TestSalesActivityMarksWorkTaskComplete(t *testing.T) {
 
 	manualAct := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: future, StartTime: "14:00",
-		DurationMin: 30, ActivityType: "visit", Title: "진행중 유지",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "진행중 유지",
 		OurMembers: "최혜영",
 	}
 	if err := sales.CreateActivity(manualAct, "관리자", nil); err != nil {

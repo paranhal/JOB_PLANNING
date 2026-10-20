@@ -20,9 +20,9 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	planID := c.Param("id")
-	plan, err := h.repo.GetPlan(planID)
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, planID)
+	if err != nil {
+		return err
 	}
 	action := strings.TrimSpace(c.FormValue("action"))
 	cust := strings.TrimSpace(c.FormValue("customer_id"))

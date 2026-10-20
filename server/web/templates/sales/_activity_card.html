@@ -6,6 +6,8 @@
   <div class="flex items-start justify-between gap-2">
     <div class="min-w-0 flex items-start gap-2">
       <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold {{$a.TypeBadgeClass}}">{{if $a.TypeLabel}}{{$a.TypeLabel}}{{else}}{{$a.ActivityType}}{{end}}</span>
+      {{if $a.MethodLabel}}<span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] bg-slate-50 text-slate-600 border border-slate-200">{{$a.MethodLabel}}</span>{{end}}
+      {{if $a.NeedsTypeReview}}<span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-800">유형 확인 필요</span>{{end}}
       {{if not $hide}}
       <a href="/sales/{{$a.SalesID}}" class="text-sm font-semibold text-blue-700 hover:underline truncate">{{if $a.SalesNo}}{{$a.SalesNo}} {{end}}{{if $a.SalesName}}{{$a.SalesName}}{{else}}{{$a.Title}}{{end}}</a>
       {{else}}
@@ -14,7 +16,7 @@
     </div>
     <div class="flex items-center gap-2 shrink-0">
       <span class="text-xs text-slate-500 tabular-nums">{{$a.CardDuration}}</span>
-      {{template "sales_activity_actions" (dict "ID" $a.ActivityID "SalesID" $a.SalesID "Date" $a.ActivityDate "Type" $a.ActivityType "Start" $a.StartTime "Duration" $a.DurationMin "Title" $a.Title "Place" $a.Place "Counterparts" $a.Counterparts "Members" $a.OurMembers "Content" $a.Content "Next" $a.NextAction "NextDate" $a.NextActionDate "CanEdit" $canEdit "ShowLock" .ShowLock)}}
+      {{template "sales_activity_actions" (dict "ID" $a.ActivityID "SalesID" $a.SalesID "Date" $a.ActivityDate "Type" $a.ActivityType "Method" $a.ActivityMethod "Start" $a.StartTime "Duration" $a.DurationMin "Title" $a.Title "Place" $a.Place "Counterparts" $a.Counterparts "Members" $a.OurMembers "Content" $a.Content "Next" $a.NextAction "NextDate" $a.NextActionDate "CanEdit" $canEdit "ShowLock" .ShowLock)}}
     </div>
   </div>
   {{if not $hide}}
@@ -46,7 +48,7 @@
     <div class="flex items-center gap-2 shrink-0">
       {{if $e.CardDuration}}<span class="text-xs text-slate-500 tabular-nums">{{$e.CardDuration}}</span>{{end}}
       {{if eq $e.Kind "activity"}}
-      {{template "sales_activity_actions" (dict "ID" $e.ActivityID "SalesID" $e.SalesID "Date" $e.Date "Type" $e.Type "Start" $e.Time "Duration" $e.DurationMin "Title" $e.Title "Place" $e.Place "Counterparts" $e.Counterparts "Members" $e.Members "Content" $e.Summary "Next" $e.NextAction "NextDate" $e.NextActionDate "CanEdit" .CanEdit "ShowLock" .ShowLock)}}
+      {{template "sales_activity_actions" (dict "ID" $e.ActivityID "SalesID" $e.SalesID "Date" $e.Date "Type" $e.Type "Method" $e.Method "Start" $e.Time "Duration" $e.DurationMin "Title" $e.Title "Place" $e.Place "Counterparts" $e.Counterparts "Members" $e.Members "Content" $e.Summary "Next" $e.NextAction "NextDate" $e.NextActionDate "CanEdit" .CanEdit "ShowLock" .ShowLock)}}
       {{end}}
     </div>
   </div>
@@ -70,7 +72,7 @@
 {{if .CanEdit}}
 <div class="flex items-center gap-1">
   <button type="button" class="text-[11px] text-blue-700 hover:underline"
-          data-id="{{.ID}}" data-sales-id="{{.SalesID}}" data-date="{{.Date}}" data-type="{{.Type}}"
+          data-id="{{.ID}}" data-sales-id="{{.SalesID}}" data-date="{{.Date}}" data-type="{{.Type}}" data-method="{{.Method}}"
           data-start="{{.Start}}" data-duration="{{.Duration}}" data-title="{{.Title}}" data-place="{{.Place}}"
           data-counterparts="{{.Counterparts}}" data-members="{{.Members}}" data-content="{{.Content}}"
           data-next="{{.Next}}" data-next-date="{{.NextDate}}"

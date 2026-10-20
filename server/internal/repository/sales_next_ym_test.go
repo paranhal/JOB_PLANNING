@@ -32,7 +32,7 @@ func TestSalesNextYMUnplannedInbox(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	act := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "10:00",
-		DurationMin: 30, ActivityType: "visit", Title: "방문",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "방문",
 		OurMembers: "최혜영", NextAction: "협의 계속", NextActionDate: "2026-10",
 	}
 	if err := sales.CreateActivity(act, "관리자", nil); err != nil {
@@ -67,7 +67,7 @@ func TestSalesNextYMUnplannedInbox(t *testing.T) {
 	thisYM := time.Now().Format("2006-01")
 	current := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "10:30",
-		DurationMin: 30, ActivityType: "visit", Title: "이번달",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "이번달",
 		OurMembers: "최혜영", NextAction: "이번달 협의", NextActionDate: thisYM,
 	}
 	if err := sales.CreateActivity(current, "관리자", nil); err != nil {
@@ -93,7 +93,7 @@ func TestSalesNextYMUnplannedInbox(t *testing.T) {
 
 	overdue := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "11:00",
-		DurationMin: 30, ActivityType: "visit", Title: "지난달",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "지난달",
 		OurMembers: "최혜영", NextAction: "재검토 대상", NextActionDate: "2026-08",
 	}
 	if err := sales.CreateActivity(overdue, "관리자", nil); err != nil {
@@ -124,7 +124,7 @@ func TestSalesNextYMUnplannedInbox(t *testing.T) {
 
 	dated := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "12:00",
-		DurationMin: 30, ActivityType: "visit", Title: "날짜 있음",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "날짜 있음",
 		OurMembers: "최혜영", NextAction: "협의 계속", NextActionDate: "2026-09-30",
 	}
 	if err := sales.CreateActivity(dated, "관리자", nil); err != nil {
@@ -136,7 +136,7 @@ func TestSalesNextYMUnplannedInbox(t *testing.T) {
 
 	empty := &model.SalesActivity{
 		SalesID: p.SalesID, ActivityDate: today, StartTime: "13:00",
-		DurationMin: 30, ActivityType: "visit", Title: "다음행동 없음",
+		DurationMin: 30, ActivityType: "other", ActivityMethod: "visit", Title: "다음행동 없음",
 		OurMembers: "최혜영", NextAction: "", NextActionDate: "2026-10",
 	}
 	if err := sales.CreateActivity(empty, "관리자", nil); err != nil {

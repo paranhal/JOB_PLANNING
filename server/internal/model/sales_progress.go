@@ -16,6 +16,7 @@ type SalesProgressStep struct {
 type SalesStageProgress struct {
 	Discover []SalesProgressStep
 	Propose  []SalesProgressStep
+	Bid      []SalesProgressStep
 }
 
 func SalesActivityDone(a SalesActivity, today string) bool {
@@ -34,11 +35,15 @@ func BuildSalesStageProgress(p *SalesProject, acts []SalesActivity, quotes []Sal
 		today = time.Now().Format("2006-01-02")
 	}
 	has := map[string]bool{}
+	contact := false
 	for _, a := range acts {
 		if !SalesActivityDone(a, today) {
 			continue
 		}
 		has[strings.TrimSpace(a.ActivityType)] = true
+		if IsContactSalesActMethod(a.ActivityMethod) {
+			contact = true
+		}
 	}
 	sentQuote := false
 	for _, q := range quotes {
@@ -47,7 +52,6 @@ func BuildSalesStageProgress(p *SalesProject, acts []SalesActivity, quotes []Sal
 			break
 		}
 	}
-	contact := has[SalesActTypeCall] || has[SalesActTypeVisit] || has[SalesActTypeOnline] || has[SalesActTypeMail]
 	quoteSent := has[SalesActTypeQuote] || sentQuote
 	rfp := p != nil && strings.TrimSpace(p.RFPReceivedAt) != ""
 	eval := p != nil && strings.TrimSpace(p.BidEvalMethod) != ""
@@ -62,13 +66,15 @@ func BuildSalesStageProgress(p *SalesProject, acts []SalesActivity, quotes []Sal
 		Discover: []SalesProgressStep{
 			step("info", "정보 입수", has[SalesActTypeResearch]),
 			step("contact", "담당자 접촉", contact),
-			step("req", "요구사항 파악", has[SalesActTypeRequirement]),
 		},
 		Propose: []SalesProgressStep{
-			step("proposal", "1차 제안", has[SalesActTypeProposal]),
+			step("req", "요구사항 파악", has[SalesActTypeRequirement]),
 			step("quote", "견적 발송", quoteSent),
 			step("rfp", "RFP 접수", rfp),
 			step("eval", "평가방법 확정", eval),
+		},
+		Bid: []SalesProgressStep{
+			step("proposal", "제안서 제출", has[SalesActTypeProposal] || has[SalesActTypeRFP]),
 		},
 	}
 }

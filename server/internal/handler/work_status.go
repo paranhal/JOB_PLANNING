@@ -63,13 +63,13 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	assigneeFilter, mineParam, scopeAll, showScopeToggle := workStatusResolveScope(c, role, roleUnresolved)
 	projectFilter := strings.TrimSpace(c.QueryParam("project"))
 
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	var colorNames []string
 	for _, u := range assignees {
 		colorNames = append(colorNames, u.FullName)
 	}
 
-	h.wb.SyncMaintenanceBoard()
+	h.wb.SyncMaintenanceBoardRange(registerSyncWindow(period.From, period.To))
 	actionTasks, err := h.wb.ListCompletedForStatusPeriod(period.From, period.To)
 	if err != nil {
 		return err

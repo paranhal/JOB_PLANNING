@@ -19,6 +19,7 @@
   <form method="get" action="/sales/activities" class="flex flex-wrap gap-2 items-end">
     <input type="hidden" name="month" value="{{.Month}}">
     {{range .SelectedTypes}}<input type="hidden" name="type" value="{{.}}">{{end}}
+    {{range .SelectedMethods}}<input type="hidden" name="method" value="{{.}}">{{end}}
     <div class="flex-1 min-w-[14rem]">
       <label class="block text-xs text-gray-500 mb-1">검색</label>
       <input type="search" name="q" value="{{.Query}}" placeholder="활동명 · 사업명 · 고객명"
@@ -27,13 +28,23 @@
     <button type="submit" class="px-3 py-2 bg-gray-800 text-white rounded-lg text-sm">검색</button>
   </form>
 
-  <div class="flex flex-wrap gap-1.5 items-center">
-    <a href="/sales/activities?month={{.Month}}{{if .Query}}&q={{urlquery .Query}}{{end}}"
-       class="px-2.5 py-1 rounded-full text-xs border {{if eq (len .SelectedTypes) 0}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">전체 {{.ChipTotal}}</a>
-    {{range .TypeChips}}
-    <a href="{{.Href}}"
-       class="px-2.5 py-1 rounded-full text-xs border {{if .Selected}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">{{.Label}} {{.Count}}</a>
-    {{end}}
+  <div class="space-y-1.5">
+    <div class="flex flex-wrap gap-1.5 items-center">
+      <span class="text-[11px] text-gray-500 w-10 shrink-0">유형</span>
+      <a href="/sales/activities?{{.LogQuery}}"
+         class="px-2.5 py-1 rounded-full text-xs border {{if eq (len .SelectedTypes) 0}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">전체 {{.ChipTotal}}</a>
+      {{range .TypeChips}}
+      <a href="{{.Href}}"
+         class="px-2.5 py-1 rounded-full text-xs border {{if .Selected}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">{{.Label}} {{.Count}}</a>
+      {{end}}
+    </div>
+    <div class="flex flex-wrap gap-1.5 items-center">
+      <span class="text-[11px] text-gray-500 w-10 shrink-0">방법</span>
+      {{range .MethodChips}}
+      <a href="{{.Href}}"
+         class="px-2.5 py-1 rounded-full text-xs border {{if .Selected}}bg-orange-50 border-orange-400 text-orange-800{{else}}border-gray-200 bg-white text-gray-600{{end}}">{{.Label}} {{.Count}}</a>
+      {{end}}
+    </div>
   </div>
 
   {{if eq (len .DayGroups) 0}}

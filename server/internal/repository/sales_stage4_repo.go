@@ -186,6 +186,27 @@ func (r *SalesRepo) EnsureOrderForSales(p *model.SalesProject) error {
 	return NewOrderRepo(r.db).EnsureForSales(p)
 }
 
+// ApplyWonMeta 수주일·수주금액만 고친다. 금액이 비거나 0이면 예상금액을 유지한다.
+func (r *SalesRepo) ApplyWonMeta(id, wonAt string, amount int) error {
+	p, err := r.Get(id)
+	if err != nil {
+		return err
+	}
+	wonAt = strings.TrimSpace(wonAt)
+	if wonAt != "" {
+		if _, err := time.Parse("2006-01-02", wonAt); err != nil {
+			return fmt.Errorf("수주일을 확인하세요")
+		}
+		p.WonAt = wonAt
+	}
+	if amount > 0 {
+		p.AwardedAmount = amount
+	}
+	_, err = r.db.Exec(`UPDATE sales_projects SET won_at=?, awarded_amount=?, updated_at=CURRENT_TIMESTAMP WHERE sales_id=?`,
+		p.WonAt, p.AwardedAmount, p.SalesID)
+	return err
+}
+
 func (r *SalesRepo) CloseNegotiationFailed(id, reason, byID, byName string) error {
 	p, err := r.Get(id)
 	if err != nil {

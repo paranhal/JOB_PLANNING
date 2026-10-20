@@ -233,8 +233,8 @@ func TestAssignForbiddenObserverAndForeignOrg(t *testing.T) {
 	freq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	freq.AddCookie(ck)
 	e.ServeHTTP(frec, freq)
-	if !strings.Contains(frec.Header().Get("Location"), "err=org") {
-		t.Fatalf("타 조직 loc=%s", frec.Header().Get("Location"))
+	if frec.Code != http.StatusBadRequest && !strings.Contains(frec.Header().Get("Location"), "err=org") {
+		t.Fatalf("타 조직 status=%d loc=%s body=%s", frec.Code, frec.Header().Get("Location"), frec.Body.String())
 	}
 	var to string
 	_ = db.QueryRow(`SELECT COALESCE(assigned_to,'') FROM as_receipts WHERE as_id='UA1'`).Scan(&to)

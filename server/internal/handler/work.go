@@ -50,11 +50,11 @@ func (h *WorkHandler) List(c echo.Context) error {
 
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 
 	mineUID, mineKeys := uid, keys
-	showPicker := !roleUnresolved && canPickWorkTodayAssignee(c)
+	showPicker := !roleUnresolved && canPickWorkTodayAssignee(c) && !assigneePickDisabled(c)
 	assigneeFilter := currentUserDisplayName(c)
 	assigneeQ := ""
 	viewingOther := false
@@ -215,7 +215,7 @@ func (h *WorkHandler) ListAll(c echo.Context) error {
 
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 	var projList []model.WorkProject
 	if h.wbRepo != nil {

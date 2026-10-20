@@ -26,6 +26,21 @@ type MaintenanceHandler struct {
 	dataDir      string
 }
 
+func (h *MaintenanceHandler) requireVisiblePlan(c echo.Context, planID string) (*model.MaintenancePlan, error) {
+	planID = strings.TrimSpace(planID)
+	if planID == "" {
+		planID = c.Param("id")
+	}
+	plan, err := h.repo.GetPlan(planID)
+	if err != nil {
+		return nil, err
+	}
+	if plan == nil || !repository.VisibleInOrg(plan.OrgID, currentOrg(c)) {
+		return nil, echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	}
+	return plan, nil
+}
+
 func (h *MaintenanceHandler) recordVisitAssign(c echo.Context, visitID, assignee, planID, customerID, product, date string) {
 	if h == nil || h.notices == nil {
 		return
@@ -54,28 +69,37 @@ func (h *MaintenanceHandler) syncVisitTask(visitID string, completed bool) {
 	_, _ = h.wbRepo.SyncMaintenanceTaskFromVisit(visitID)
 }
 
-// ListPlans 연도 목록 화면 없이 현재(또는 최신) 연도 계획으로 바로 이동한다.
+// ListPlans 자기 조직의 올해 계획으로 이동한다. 없으면 「올해 점검 계획 만들기」.
 func (h *MaintenanceHandler) ListPlans(c echo.Context) error {
-	plans, err := h.repo.ListPlans()
+	org := currentOrg(c)
+	nowY := time.Now().Year()
+	if org == repository.OrgAll {
+		return c.Render(http.StatusOK, "maintenance/list.html", map[string]interface{}{
+			"Title":          "정기점검 일정",
+			"Active":         NavMaintenance,
+			"IsAdmin":        isAdminRole(c),
+			"Empty":          true,
+			"NeedOrg":        true,
+			"Year":           nowY,
+			"CreateThisYear": false,
+		})
+	}
+	plan, err := h.repo.GetPlanByYearInOrg(org, nowY)
 	if err != nil {
 		return err
 	}
-	if len(plans) == 0 {
-		return c.Render(http.StatusOK, "maintenance/list.html", map[string]interface{}{
-			"Title":   "정기점검 일정",
-			"Active":  NavMaintenance,
-			"Plans":   plans,
-			"IsAdmin": isAdminRole(c),
-			"Empty":   true,
-		})
+	if plan != nil {
+		return c.Redirect(http.StatusSeeOther, "/maintenance/"+plan.PlanID)
 	}
-	nowY := time.Now().Year()
-	for _, p := range plans {
-		if p.PlanYear == nowY {
-			return c.Redirect(http.StatusSeeOther, "/maintenance/"+p.PlanID)
-		}
-	}
-	return c.Redirect(http.StatusSeeOther, "/maintenance/"+plans[0].PlanID)
+	return c.Render(http.StatusOK, "maintenance/list.html", map[string]interface{}{
+		"Title":          "정기점검 일정",
+		"Active":         NavMaintenance,
+		"IsAdmin":        isAdminRole(c),
+		"Empty":          true,
+		"NeedOrg":        false,
+		"Year":           nowY,
+		"CreateThisYear": true,
+	})
 }
 
 func (h *MaintenanceHandler) NewPlanPage(c echo.Context) error {
@@ -97,7 +121,7 @@ func (h *MaintenanceHandler) CreatePlan(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "연도를 입력하세요")
 	}
 	title := c.FormValue("title")
-	p, err := h.repo.CreatePlan(year, title)
+	p, err := h.repo.CreatePlanForOrg(currentOrg(c), year, title)
 	if err != nil {
 		if next == "manage" && fromID != "" {
 			return h.manageErrRedirect(c, fromID, err.Error())
@@ -111,9 +135,9 @@ func (h *MaintenanceHandler) CreatePlan(c echo.Context) error {
 }
 
 func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
-	plan, err := h.repo.GetPlan(c.Param("id"))
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	visits, err := h.repo.ListVisits(plan.PlanID)
 	if err != nil {
@@ -177,7 +201,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	board := buildVisitBoard(shown, today)
 	var assignees []model.User
 	if h.userRepo != nil {
-		assignees, _ = h.userRepo.ListAssignable()
+		assignees = listAssignableForPicker(h.userRepo, c)
 	}
 	plans, _ := h.repo.ListPlans()
 	yearQ := url.Values{}
@@ -285,6 +309,9 @@ func mntScopeNote(showToggle, scopeAll bool) string {
 
 func (h *MaintenanceHandler) ApprovePlan(c echo.Context) error {
 	id := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, id); err != nil {
+		return err
+	}
 	if err := h.repo.SetPlanStatus(id, "approved"); err != nil {
 		return err
 	}
@@ -294,6 +321,9 @@ func (h *MaintenanceHandler) ApprovePlan(c echo.Context) error {
 
 func (h *MaintenanceHandler) UnapprovePlan(c echo.Context) error {
 	id := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, id); err != nil {
+		return err
+	}
 	if err := h.repo.SetPlanStatus(id, "draft"); err != nil {
 		return err
 	}
@@ -302,9 +332,9 @@ func (h *MaintenanceHandler) UnapprovePlan(c echo.Context) error {
 }
 
 func (h *MaintenanceHandler) ExportExcel(c echo.Context) error {
-	plan, err := h.repo.GetPlan(c.Param("id"))
-	if err != nil || plan == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "계획을 찾을 수 없습니다")
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
 	}
 	visits, err := h.repo.ListVisits(plan.PlanID)
 	if err != nil {
@@ -332,6 +362,9 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	planID := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, planID); err != nil {
+		return err
+	}
 	v, err := parseVisitForm(c, planID, "")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -360,6 +393,9 @@ func (h *MaintenanceHandler) AssignUnassignedSlot(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	planID := c.Param("id")
+	if _, err := h.requireVisiblePlan(c, planID); err != nil {
+		return err
+	}
 	date, err := model.ParseAppDate(c.FormValue("visit_date"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())

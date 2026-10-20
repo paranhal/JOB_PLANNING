@@ -360,7 +360,7 @@ func (h *ASHandler) New(c echo.Context) error {
 	customers, _ := h.customerRepo.ListForReceipt()
 	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
 	urgReasons := h.urgencyReasonCodes()
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 
 	now := time.Now()
 	as := &model.ASReceipt{
@@ -757,7 +757,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 	customers, _ := h.customerRepo.ListForReceiptIncluding(as.CustomerID)
 	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
 	urgReasons := h.urgencyReasonCodes()
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 
 	var assets []model.Asset
 	var contacts []model.Contact
@@ -890,7 +890,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 	if as.ParentASID != "" {
 		parent, _ = h.repo.GetByID(currentOrg(c), as.ParentASID)
 	}
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 
 	var dailyTask *model.WorkTask
 	if h.wbRepo != nil {
@@ -1008,7 +1008,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 			causeCatL1 = append(causeCatL1, cat)
 		}
 	}
-	assignees, _ := h.userRepo.ListAssignable()
+	assignees := listAssignableForPicker(h.userRepo, c)
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
 
 	var dailyTask *model.WorkTask
@@ -1179,7 +1179,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 	} else if v := c.FormValue("assigned_to"); v != "" {
 		as.AssignedTo = v
 		if as.AssignedUserID == "" {
-			if users, _ := h.userRepo.ListAssignable(); users != nil {
+			if users := listAssignableForPicker(h.userRepo, c); users != nil {
 				for _, u := range users {
 					if strings.TrimSpace(u.FullName) == strings.TrimSpace(v) || u.Username == v {
 						as.AssignedUserID = u.UserID
@@ -1189,6 +1189,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 				}
 			}
 		}
+	}
+	if err := checkAssigneeInOrg(h.userRepo, as.OrgID, as.AssignedTo, as.AssignedUserID, prevTo); err != nil {
+		return err
 	}
 	var applyOut *model.ActionApplyResult
 	formResult := ""

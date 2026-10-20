@@ -665,6 +665,12 @@ func funcMap() template.FuncMap {
 		"permAccess": func(role, key string) int {
 			return int(model.PermAccess(role, key))
 		},
+		"adminSectionPerm": func(key string) bool {
+			return model.IsAdminSectionPerm(key)
+		},
+		"clevelAccess": func(key string) int {
+			return int(model.ClampCLevelAccess(key, model.PermAccess(model.RoleCLevel, key)))
+		},
 		"builtinAccess": func(role, key string) int {
 			return int(model.BuiltinAccess(role, key))
 		},

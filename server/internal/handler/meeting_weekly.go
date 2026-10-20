@@ -30,7 +30,7 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 
 	var users []model.User
 	if h.userRepo != nil {
-		users, _ = h.userRepo.ListAssignable()
+		users = listAssignableForPicker(h.userRepo, c)
 	}
 
 	pagePath := "/meeting/weekly/me"

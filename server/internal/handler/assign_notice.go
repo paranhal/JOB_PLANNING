@@ -59,10 +59,11 @@ func (h *assignNoticeHook) resolveUser(uid, name string) *model.User {
 	if h == nil || h.users == nil {
 		return nil
 	}
-	if u := h.users.FindAssignable(uid); u != nil {
+	// 알림 수신자 조회 — 담당자 선택 목록이 아님.
+	if u := h.users.FindAssignable(repository.OrgAll, uid); u != nil {
 		return u
 	}
-	return h.users.FindAssignable(name)
+	return h.users.FindAssignable(repository.OrgAll, name)
 }
 
 func (h *assignNoticeHook) viewerID(c echo.Context) string {
@@ -211,9 +212,7 @@ func (h *Handler) InjectAssignNotices(next echo.HandlerFunc) echo.HandlerFunc {
 				}
 			}
 			if h.notices.users != nil {
-				if users, e := h.notices.users.ListAssignable(); e == nil {
-					c.Set("assign_notice_assignees", filterSameOrgUsers(users, currentOrg(c)))
-				}
+				c.Set("assign_notice_assignees", listAssignableForPicker(h.notices.users, c))
 			}
 			c.Set("show_assign_notice_modal", (n > 0 && c.Get("assign_notices") != nil) || len(unassigned) > 0 || len(helps) > 0 || len(accReqs) > 0)
 		}

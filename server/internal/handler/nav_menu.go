@@ -20,6 +20,7 @@ type MenuCtx struct {
 	ShowProjects bool
 	NavMail      bool
 	CanViewOrgs  bool
+	ExecOrgs     []model.Org
 }
 
 func (c MenuCtx) isVision() bool { return c.Role == model.RoleVisionAdmin }
@@ -285,7 +286,7 @@ func viewItem(it navDefItem, active string, b NavBadges) NavItemView {
 
 func FilterNav(ctx MenuCtx, active string, badges NavBadges) NavFilterResult {
 	var out NavFilterResult
-	for _, g := range navDefinition() {
+	for _, g := range navDefsFor(ctx) {
 		if g.Show != nil && !g.Show(ctx) {
 			continue
 		}
@@ -446,6 +447,11 @@ func menuCtxFromData(c echo.Context, data map[string]interface{}) MenuCtx {
 		ShowProjects: boolFrom(data, "ShowProjectsSector"),
 		CanViewOrgs:  boolFrom(data, "CanViewOrgs"),
 	}
+	if v := c.Get("org_switch_list"); v != nil {
+		if list, ok := v.([]model.Org); ok {
+			ctx.ExecOrgs = list
+		}
+	}
 	if ctx.Role == "" {
 		ctx.Role, _ = data["UserRole"].(string)
 	}
@@ -510,6 +516,7 @@ func injectNavMenu(c echo.Context, data map[string]interface{}) {
 	data["NavCurGroup"] = res.CurGroup
 	data["NavCurMoreJSON"] = jsJSON(res.CurMore)
 	data["NavCurParentsJSON"] = jsJSON(res.CurParents)
+	data["ExecNavFooter"] = currentRole(c) == model.RoleCLevel
 }
 
 func parentNavHrefs() []string {

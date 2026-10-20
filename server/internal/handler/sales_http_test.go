@@ -35,6 +35,7 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.Auth.InjectViewAs)
 	g.GET("/sales", h.Sales.List)
 	g.GET("/sales/dashboard", h.Sales.Dashboard)
 	g.GET("/sales/new", h.Sales.New)
@@ -65,6 +66,9 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/sales/:id/party-hints", h.Sales.PartyHints)
 	g.GET("/sales/:id", h.Sales.Show)
 	g.GET("/sales/:id/edit", h.Sales.Edit)
+	g.GET("/sales/:id/win-dialog", h.Sales.WinDialog)
+	g.GET("/sales/:id/contract-dialog", h.Sales.ContractDialog)
+	g.POST("/sales/:id/win-confirm", h.Sales.ConfirmWin)
 	g.POST("/sales/:id", h.Sales.Update)
 	g.POST("/sales/:id/stage", h.Sales.ChangeStage)
 	g.POST("/sales/:id/bid-result", h.Sales.SetBidResult)
@@ -263,7 +267,7 @@ func TestSalesHTTP_AdminDeleteReasonLogAndPromotedBlock(t *testing.T) {
 		"activity_date": {"2026-09-01"},
 		"start_time":    {"10:00"},
 		"duration_min":  {"60"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {"방문"},
 	}); rec.Code != http.StatusSeeOther {
 		t.Fatalf("활동 status=%d %s", rec.Code, rec.Body.String())
@@ -337,7 +341,7 @@ func TestSalesHTTP_ActivityAppearsOnRegisterAndEmptySalesColumn(t *testing.T) {
 		"activity_date": {"2026-08-19"},
 		"start_time":    {"10:00"},
 		"duration_min":  {"60"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {"방문미팅 · 세종 RFID"},
 		"our_members":   {"최혜영"},
 		"next_action":   {"견적 요청"},
@@ -459,7 +463,7 @@ func TestSalesHTTP_FromTaskLinksExistingWork(t *testing.T) {
 		"activity_date": {"2026-08-19"},
 		"start_time":    {"10:00"},
 		"duration_min":  {"60"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {task.Title},
 		"our_members":   {"최혜영"},
 	})
@@ -615,7 +619,7 @@ func TestSalesHTTP_KanbanTimelinePipelineAndActivityBoard(t *testing.T) {
 		"activity_date": {"2026-08-19"},
 		"start_time":    {"10:00"},
 		"duration_min":  {"30"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {"방문미팅 · 칸반"},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -766,7 +770,7 @@ func TestSalesHTTP_PromoteProspectThenKeepActivities(t *testing.T) {
 	})
 	rec := doForm(t, e, "/sales/"+id+"/activities", url.Values{
 		"activity_date": {"2026-08-19"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {"방문미팅 · 승격 전"},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -1024,7 +1028,7 @@ func TestSalesHTTP_ActivityAutoParty(t *testing.T) {
 
 	rec = doForm(t, e, "/sales/"+id+"/activities", url.Values{
 		"activity_date": {"2026-08-19"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {"담당자 미팅"},
 		"counterparts":  {"김철수"},
 		"our_members":   {"관리자"},
@@ -1051,7 +1055,7 @@ func TestSalesHTTP_ActivityAutoParty(t *testing.T) {
 
 	rec = doForm(t, e, "/sales/"+id+"/activities", url.Values{
 		"activity_date": {"2026-08-20"},
-		"activity_type": {"call"},
+		"activity_type": {"other"}, "activity_method": {"call"},
 		"title":         {"같은 사람 전화"},
 		"counterparts":  {"김철수"},
 		"our_members":   {"관리자"},
@@ -1066,7 +1070,7 @@ func TestSalesHTTP_ActivityAutoParty(t *testing.T) {
 
 	rec = doForm(t, e, "/sales/"+id+"/activities", url.Values{
 		"activity_date": {"2026-08-21"},
-		"activity_type": {"visit"},
+		"activity_type": {"other"}, "activity_method": {"visit"},
 		"title":         {"두 명 미팅"},
 		"counterparts":  {"김철수, 이영희"},
 		"our_members":   {"관리자"},

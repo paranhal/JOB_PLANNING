@@ -1,0 +1,24 @@
+{{define "title"}}업무 관리 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-6">
+  <div>
+    <div class="flex items-center gap-2">
+      <h2 class="text-xl font-bold text-gray-800">업무 관리</h2>
+      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">조직별 업무</span>
+    </div>
+    <p class="mt-1 text-sm text-gray-500">조직을 선택하면 해당 조직의 업무 현황과 구성원별 업무를 확인합니다. (읽기 전용)</p>
+  </div>
+  {{if .Orgs}}
+  <div class="flex flex-wrap gap-2">
+    {{range .Orgs}}
+    <a href="/exec/work?org={{.OrgID}}"
+       class="rounded-lg border px-3 py-1.5 text-sm {{if eq $.OrgID .OrgID}}border-blue-600 bg-blue-50 text-blue-800{{else}}border-gray-200 bg-white text-gray-700 hover:bg-gray-50{{end}}">{{.NavLabel}}</a>
+    {{end}}
+  </div>
+  {{end}}
+  {{if .OrgName}}
+  <p class="text-sm text-slate-600">선택 조직: {{.OrgName}}</p>
+  {{end}}
+  <p class="text-xs text-slate-500">조직별 업무는 해당 조직 소속 업무만 집계합니다 · 경영진은 조회만 가능</p>
+</div>
+{{end}}
