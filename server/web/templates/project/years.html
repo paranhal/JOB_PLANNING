@@ -1,0 +1,56 @@
+{{define "title"}}{{.Project.DisplayName}} · 연차 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <a href="/projects/{{.Project.ProjectID}}" class="text-ui-sm text-primary">← 사업 상세</a>
+    <h2 class="text-ui-xl font-extrabold text-ink mt-1">연차</h2>
+    <p class="text-ui-sm text-ink-muted">{{.Project.Name}} · 연차가 없으면 단일 기간으로 봅니다.</p>
+  </div>
+  {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
+  {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
+  {{if .Warn}}<div class="flash-warning rounded-control">연차 금액 합계({{.Sum}})가 계약 금액과 다릅니다. 경고만 표시합니다.</div>{{end}}
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left">
+        <tr>
+          <th class="p-3">순번</th><th class="p-3">이름</th><th class="p-3">기간</th><th class="p-3">금액</th><th class="p-3">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Years}}
+        <tr class="border-t border-line">
+          <td class="p-3">{{.YearNo}}</td>
+          <td class="p-3">{{if .Label}}{{.Label}}{{else}}{{.YearNo}}차{{end}}{{if .IsCurrent}} <span class="badge badge-info">현재</span>{{end}}</td>
+          <td class="p-3">{{.StartDate}} ~ {{.EndDate}}</td>
+          <td class="p-3">{{.Amount}}</td>
+          <td class="p-3">{{yearStatusLabel .Status}}</td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="5">연차가 없습니다. 없으면 사업 기간을 그대로 씁니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if .CanWrite}}
+  <form method="post" action="/projects/{{.Project.ProjectID}}/years" class="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+    <h3 class="md:col-span-3 font-semibold text-ink">연차 추가·수정</h3>
+    <input type="hidden" name="year_id" value="">
+    <label class="text-ui-sm">순번 <input class="input" type="number" name="year_no" min="1" required></label>
+    <label class="text-ui-sm">이름 <input class="input" name="label" placeholder="2027년 1차"></label>
+    <label class="text-ui-sm">금액 <input class="input" type="number" name="amount" min="0" value="0"></label>
+    <label class="text-ui-sm">시작 <input class="input" type="date" name="start_date" required></label>
+    <label class="text-ui-sm">종료 <input class="input" type="date" name="end_date" required></label>
+    <label class="text-ui-sm">상태
+      <select class="input" name="status">
+        <option value="planned">예정</option>
+        <option value="active">진행</option>
+        <option value="done">완료</option>
+        <option value="cancelled">취소</option>
+      </select>
+    </label>
+    <label class="md:col-span-3 text-ui-sm">비고 <input class="input" name="note"></label>
+    <div class="md:col-span-3"><button type="submit" class="btn btn-primary">저장</button></div>
+  </form>
+  {{end}}
+</div>
+{{end}}

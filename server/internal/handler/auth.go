@@ -1067,6 +1067,7 @@ func interpretLegacyRoleFlags(c echo.Context, claims jwt.MapClaims, role string)
 			log.Printf("[v57] 옛 observer 토큰 username=%s — 읽기전용으로 해석", claimString(claims, "username"))
 		}
 		ro = true
+		c.Set("deny_project_equip", true)
 		if j := job(); j != "" {
 			role = j
 		} else {
@@ -1078,6 +1079,7 @@ func interpretLegacyRoleFlags(c echo.Context, claims jwt.MapClaims, role string)
 	}
 	if role == model.RoleTester {
 		test = true
+		c.Set("deny_project_equip", true)
 		if j := job(); j != "" {
 			role = j
 		} else {

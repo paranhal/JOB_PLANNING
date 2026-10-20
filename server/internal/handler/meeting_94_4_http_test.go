@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"

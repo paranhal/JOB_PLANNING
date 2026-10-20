@@ -270,6 +270,9 @@ func funcMap() template.FuncMap {
 		"dateLabelMDW":       model.DateLabelMDW,
 		"leaveKindLabel":     model.LeaveKindLabel,
 		"projectKindLabel":   model.ProjectKindLabel,
+		"yearStatusLabel":    model.YearStatusLabel,
+		"siteStatusLabel":    model.SiteStatusLabel,
+		"equipStatusLabel":   model.EquipStatusLabel,
 		"projectDutyLabel":   model.ProjectDutyLabel,
 		"assignmentSelected": model.AssignmentSelected,
 		"hasSuffix":          strings.HasSuffix,
@@ -418,8 +421,8 @@ func funcMap() template.FuncMap {
 		},
 		"coopKindLabel":   model.CoopKindLabel,
 		"coopStatusLabel": model.CoopStatusLabel,
-		"workAssignKey": workAssignKey,
-		"workEmbedHref": workEmbedHref,
+		"workAssignKey":   workAssignKey,
+		"workEmbedHref":   workEmbedHref,
 		"noticeEmbed": func(n model.AssignNotice) string {
 			id := strings.TrimSpace(n.SourceID)
 			switch n.SourceType {

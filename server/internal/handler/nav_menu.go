@@ -64,7 +64,7 @@ func (c MenuCtx) visWeeklyTeam() bool {
 	}
 	return meetingTeamRole(c.Role)
 }
-func (c MenuCtx) visRole() bool       { return c.roleKnown() }
+func (c MenuCtx) visRole() bool { return c.roleKnown() }
 func (c MenuCtx) visMnt() bool {
 	return c.isAdmin() || c.isTech() || c.isOffice() || c.isSales() || c.isObserver() || c.isTester() ||
 		c.has(model.PermMntView, model.PermMaintenance)
@@ -250,6 +250,7 @@ func navDefinition() []navDefGroup {
 				{ID: "approval_settings", Label: "결재 설정", Href: "/admin/approval-settings", Active: []string{NavApproval}, Show: func(c MenuCtx) bool { return c.visAdmin() }},
 				{ID: "items", Label: "품목 마스터", Href: "/items", Active: []string{NavSalesItems}, Show: role},
 				{ID: "codes", Label: "코드관리", Href: "/codes", Active: []string{NavCodes}, Show: func(c MenuCtx) bool { return c.visCodes() }},
+				{ID: "equip_cats", Label: "장비 분류", Href: "/projects/equipment-categories", Active: []string{NavEquipCategories}, Show: func(c MenuCtx) bool { return c.visAdmin() }, More: true},
 				{ID: "mail", Label: "메일 보낸 함", Href: "/admin/mail", Active: []string{NavMail}, Show: func(c MenuCtx) bool { return c.visAdmin() && c.visMail() }, More: true},
 				{ID: "notify", Label: "알림 설정", Href: "/admin/notify", Active: []string{NavNotify}, Show: func(c MenuCtx) bool { return c.visAdmin() }, More: true},
 				{ID: "sales_logs", Label: "영업 로그 관리", Href: "/admin/sales-logs", Active: []string{NavSalesLogs}, Show: func(c MenuCtx) bool { return c.visAdmin() }, More: true},

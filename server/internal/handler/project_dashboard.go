@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -182,6 +183,7 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		"KPINeed":       showNeed,
 		"KPIAct":        showAct,
 		"UnspecN":       acts.Unspec,
+		"EquipLine":     h.dashboardEquipLine(rows),
 		"Back":          dashQuery(kind, act),
 		"ActAll":        dashQuery(kind, ""),
 		"ActAS":         dashQuery(kind, model.ActFilterAS),
@@ -216,4 +218,29 @@ func actMatch(act string, r dashRow) bool {
 	default:
 		return true
 	}
+}
+
+func (h *ProjectHandler) dashboardEquipLine(rows []dashRow) string {
+	if h == nil || h.pe == nil {
+		return "—"
+	}
+	yearN, done, tot := 0, 0, 0
+	for _, r := range rows {
+		if r.Row.Source != model.ContractSourceWork || r.Row.ProjectID == "" {
+			continue
+		}
+		if h.pe.CurrentYearLabel(r.Row.ProjectID) != "" {
+			yearN++
+		}
+		d, n := h.pe.InstallRate(r.Row.ProjectID)
+		done += d
+		tot += n
+	}
+	if tot == 0 {
+		if yearN == 0 {
+			return "—"
+		}
+		return fmt.Sprintf("진행 연차 %d건 · 설치율 —", yearN)
+	}
+	return fmt.Sprintf("진행 연차 %d건 · 설치율 %d%%", yearN, done*100/tot)
 }

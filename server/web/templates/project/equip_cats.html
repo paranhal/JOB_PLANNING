@@ -1,0 +1,73 @@
+{{define "title"}}장비 분류 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <h2 class="text-ui-xl font-extrabold text-ink">장비 분류</h2>
+    <p class="text-ui-sm text-ink-muted">조직별 분류표입니다. 초기 분류는 비어 있습니다.</p>
+  </div>
+  {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
+  {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
+  {{if .NeedOrg}}
+  <p class="flash-warning rounded-control">전체 보기입니다. 등록할 조직을 고르세요.</p>
+  {{end}}
+
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left"><tr><th class="p-3">코드</th><th class="p-3">이름</th><th class="p-3">사용</th><th class="p-3">추가 항목</th></tr></thead>
+      <tbody>
+        {{range .Cats}}
+        <tr class="border-t border-line">
+          <td class="p-3">{{.Code}}</td>
+          <td class="p-3">{{.Name}}</td>
+          <td class="p-3">{{if .InUse}}사용 중{{else}}{{if .IsActive}}사용{{else}}비활성{{end}}{{end}}</td>
+          <td class="p-3">
+            {{range .Fields}}<span class="badge badge-neutral mr-1">{{.FieldKey}}</span>{{end}}
+            {{if and $.CanWrite (not .InUse)}}
+            <form method="post" action="/projects/equipment-categories/off" class="inline">
+              <input type="hidden" name="id" value="{{.ID}}">
+              <input type="hidden" name="org_id" value="{{$.OrgID}}">
+              <button class="btn btn-secondary btn-sm" type="submit">비활성</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="4">분류가 없습니다. 장비는 「분류 없음(기타)」로 등록할 수 있습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if .CanWrite}}
+  <form method="post" action="/projects/equipment-categories" class="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+    <h3 class="md:col-span-3 font-semibold text-ink">분류 등록</h3>
+    <input type="hidden" name="org_id" value="{{.OrgID}}">
+    <label class="text-ui-sm">코드 <input class="input" name="code" required></label>
+    <label class="text-ui-sm">이름 <input class="input" name="name" required></label>
+    <label class="text-ui-sm">정렬 <input class="input" type="number" name="sort_order" value="0"></label>
+    <div class="md:col-span-3"><button class="btn btn-primary" type="submit">분류 저장</button></div>
+  </form>
+  <form method="post" action="/projects/equipment-categories/fields" class="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+    <h3 class="md:col-span-3 font-semibold text-ink">추가 항목</h3>
+    <label class="text-ui-sm">분류
+      <select class="input" name="category_id" required>
+        {{range .Cats}}<option value="{{.ID}}">{{.Code}}</option>{{end}}
+      </select>
+    </label>
+    <label class="text-ui-sm">필드키 <input class="input" name="field_key" required></label>
+    <label class="text-ui-sm">표시명 <input class="input" name="label" required></label>
+    <label class="text-ui-sm">형식
+      <select class="input" name="field_type">
+        <option value="text">text</option>
+        <option value="number">number</option>
+        <option value="date">date</option>
+        <option value="select">select</option>
+      </select>
+    </label>
+    <label class="text-ui-sm">필수 <select class="input" name="required"><option value="0">아니오</option><option value="1">예</option></select></label>
+    <label class="md:col-span-3 text-ui-sm">선택지(줄바꿈) <textarea class="input" name="options" rows="3"></textarea></label>
+    <div class="md:col-span-3"><button class="btn btn-primary" type="submit">항목 저장</button></div>
+  </form>
+  {{end}}
+</div>
+{{end}}

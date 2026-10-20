@@ -188,10 +188,14 @@ func New(db *sql.DB) *Handler {
 			holidayRepo: holidayRepo, notices: noticeHook,
 			dataDir: dataDirFromEnv(),
 		},
-		Project: NewProjectHandler(
-			repository.NewProjectRepo(db), repository.NewWBRepo(db),
-			customerRepo, contactRepo, codeRepo, assetRepo, userRepo,
-		),
+		Project: func() *ProjectHandler {
+			ph := NewProjectHandler(
+				repository.NewProjectRepo(db), repository.NewWBRepo(db),
+				customerRepo, contactRepo, codeRepo, assetRepo, userRepo,
+			)
+			ph.pe = repository.NewProjectEquipRepo(db)
+			return ph
+		}(),
 		Sales: NewSalesHandler(
 			repository.NewSalesRepo(db), repository.NewProjectRepo(db), repository.NewWBRepo(db),
 			customerRepo, contactRepo, userRepo, codeRepo,

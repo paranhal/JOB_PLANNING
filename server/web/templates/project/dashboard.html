@@ -22,7 +22,7 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 xl:grid-cols-5 gap-3">
+  <div class="grid grid-cols-2 xl:grid-cols-6 gap-3">
     <div class="card p-4">
       <p class="text-ui-sm text-ink-muted">계약 사업</p>
       <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.KPITotal}}건</p>
@@ -45,6 +45,10 @@
     <div class="card p-4">
       <p class="text-ui-sm text-ink-muted">사업 미지정</p>
       <p class="text-ui-xl font-extrabold text-ink mt-2 tabular-nums">{{.UnspecN}}건</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-ui-sm text-ink-muted">연차·설치율</p>
+      <p class="text-ui-sm font-semibold text-ink mt-2">{{if .EquipLine}}{{.EquipLine}}{{else}}—{{end}}</p>
     </div>
   </div>
 

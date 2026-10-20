@@ -26,6 +26,7 @@ type ProjectHandler struct {
 	assetRepo    *repository.AssetRepo
 	salesRepo    *repository.SalesRepo
 	userRepo     *repository.UserRepo
+	pe           *repository.ProjectEquipRepo
 	backup       backup.Config
 }
 
@@ -49,7 +50,7 @@ func canViewProjects(c echo.Context) bool {
 	r := currentRole(c)
 	return model.IsAdminGrade(r) || r == model.RoleSupport || r == model.RoleTech ||
 		r == model.RoleSales || r == model.RoleOffice ||
-		r == model.RoleObserver || r == model.RoleTester ||
+		r == model.RoleObserver || r == model.RoleTester || r == model.RoleCLevel ||
 		hasPerm(c, model.PermWorkboard)
 }
 
@@ -99,8 +100,8 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
 		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
-		"CanWrite": canWriteProjects(c),
-		"CanMerge": currentRole(c) == model.RoleVisionAdmin,
+		"CanWrite":    canWriteProjects(c),
+		"CanMerge":    currentRole(c) == model.RoleVisionAdmin,
 		"DupNames":    model.DuplicateProjectNameGroups(items),
 		"KindOptions": model.ProjectKindOptions(),
 		"FlashOK":     c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
@@ -248,17 +249,17 @@ func (h *ProjectHandler) ContractShow(c echo.Context) error {
 	data := map[string]interface{}{
 		"Title": p.Name, "Active": NavContracts,
 		"Project": p, "Rules": rules, "Assets": assets, "Today": today,
-		"Life":        p.ContractLifeStatus(today),
-		"RunLabel":    model.ContractRunLabel(p.ContractRunStatus(today)),
-		"ASCount":     acts.AS[p.ProjectID],
-		"MntCount":    acts.Mnt[p.ProjectID],
-		"WaitCount":   acts.Wait[p.ProjectID],
-		"ASHref":      "/projects/" + p.ProjectID,
-		"MntHref":     "/projects/" + p.ProjectID,
-		"WaitHref":    "/workboard/tasks?project=" + url.QueryEscape(p.ProjectID),
-		"FullHref":    "/contracts/" + p.ProjectID,
-		"DashHref":    "/projects/dashboard",
-		"CanPromote":  false,
+		"Life":       p.ContractLifeStatus(today),
+		"RunLabel":   model.ContractRunLabel(p.ContractRunStatus(today)),
+		"ASCount":    acts.AS[p.ProjectID],
+		"MntCount":   acts.Mnt[p.ProjectID],
+		"WaitCount":  acts.Wait[p.ProjectID],
+		"ASHref":     "/projects/" + p.ProjectID,
+		"MntHref":    "/projects/" + p.ProjectID,
+		"WaitHref":   "/workboard/tasks?project=" + url.QueryEscape(p.ProjectID),
+		"FullHref":   "/contracts/" + p.ProjectID,
+		"DashHref":   "/projects/dashboard",
+		"CanPromote": false,
 	}
 	if strings.TrimSpace(c.QueryParam("modal")) == "1" {
 		return RenderPartial(c, "contracts/modal.html", data)

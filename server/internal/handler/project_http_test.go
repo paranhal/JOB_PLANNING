@@ -43,6 +43,20 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.POST("/projects/diary/draft", h.Project.DiaryDraft)
 	g.POST("/projects/diary/review", h.Project.DiaryReview)
 	g.POST("/projects", h.Project.Create)
+	g.GET("/projects/equipment-categories", h.Project.EquipCats)
+	g.POST("/projects/equipment-categories", h.Project.EquipCatSave)
+	g.POST("/projects/equipment-categories/off", h.Project.EquipCatOff)
+	g.POST("/projects/equipment-categories/fields", h.Project.EquipFieldSave)
+	g.GET("/projects/:id/years", h.Project.Years)
+	g.POST("/projects/:id/years", h.Project.YearSave)
+	g.GET("/projects/:id/sites", h.Project.Sites)
+	g.POST("/projects/:id/sites", h.Project.SiteSave)
+	g.GET("/projects/:id/sites/template.xlsx", h.Project.EquipTemplateXLSX)
+	g.POST("/projects/:id/sites/import-preview", h.Project.EquipImportPreview)
+	g.POST("/projects/:id/sites/import-apply", h.Project.EquipImportApply)
+	g.POST("/projects/:id/sites/import-errors.xlsx", h.Project.EquipImportErrors)
+	g.POST("/projects/:id/equipment", h.Project.EquipSave)
+	g.POST("/projects/:id/equipment/link-asset", h.Project.EquipLinkAsset)
 	g.GET("/projects/:id", h.Project.Show)
 	g.GET("/projects/:id/edit", h.Project.Edit)
 	g.POST("/projects/:id/kind", h.Project.SetKind)
@@ -82,18 +96,18 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 
 	// 등록
 	rec := doForm(t, e, "/projects", url.Values{
-		"name":          {"스모크 테스트 사업"},
-		"short_name":    {"스모크사업"},
-		"plan_year":     {"2026"},
-		"is_paid":       {"1"},
-		"contract_type": {"유지보수"},
-		"billing_type":  {"월정액"},
-		"start_date":    {"2026-01-01"},
-		"end_date":      {"2026-12-31"},
-		"status":        {"active"},
-		"project_kind":  {"maintenance"},
+		"name":            {"스모크 테스트 사업"},
+		"short_name":      {"스모크사업"},
+		"plan_year":       {"2026"},
+		"is_paid":         {"1"},
+		"contract_type":   {"유지보수"},
+		"billing_type":    {"월정액"},
+		"start_date":      {"2026-01-01"},
+		"end_date":        {"2026-12-31"},
+		"status":          {"active"},
+		"project_kind":    {"maintenance"},
 		"contract_amount": {"1000"},
-		"color":         {"#3B82F6"},
+		"color":           {"#3B82F6"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("등록 status=%d", rec.Code)
@@ -128,13 +142,13 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 
 	// 수정
 	rec = doForm(t, e, "/projects/"+id, url.Values{
-		"name":       {"스모크 테스트 사업 수정"},
-		"short_name": {"스모크수정"},
-		"plan_year":  {"2026"},
-		"is_paid":    {"1"},
-		"status":     {"active"},
+		"name":         {"스모크 테스트 사업 수정"},
+		"short_name":   {"스모크수정"},
+		"plan_year":    {"2026"},
+		"is_paid":      {"1"},
+		"status":       {"active"},
 		"project_kind": {"maintenance"},
-		"color":      {"#10B981"},
+		"color":        {"#10B981"},
 	})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=updated") {
 		t.Fatalf("수정: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
