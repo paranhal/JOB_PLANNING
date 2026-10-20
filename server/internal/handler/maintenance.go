@@ -688,18 +688,55 @@ func (h *MaintenanceHandler) SyncSiteConfigsFromAssets(c echo.Context) error {
 		fmt.Sprintf("/maintenance/sites?synced=%d&skipped=%d", res.Added, res.Skipped))
 }
 
+const (
+	errNeedSiteCustomer     = "고객을 목록에서 선택해 주세요"
+	errSiteCustomerWrongOrg = "현재 조직의 고객만 등록할 수 있습니다"
+	hintSiteCustomerMinQ    = "두 글자 이상 입력하세요"
+)
+
+type siteFormDraft struct {
+	CustomerID   string
+	CustomerName string
+	ShortName    string
+	Region       string
+}
+
 func (h *MaintenanceHandler) NewSiteConfigPage(c echo.Context) error {
-	pending, err := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
+	return h.renderSiteForm(c, nil, map[int]bool{}, false, "", http.StatusOK, siteFormDraft{})
+}
+
+func (h *MaintenanceHandler) SearchSiteCustomers(c echo.Context) error {
+	q := strings.TrimSpace(c.QueryParam("q"))
+	org := currentOrg(c)
+	if org == "" || org == repository.OrgAll {
+		return c.JSON(http.StatusOK, map[string]any{
+			"items": []repository.SiteCustomerHit{},
+			"hint":  errNeedInsertOrg,
+		})
+	}
+	if len([]rune(q)) < 2 {
+		return c.JSON(http.StatusOK, map[string]any{
+			"items": []repository.SiteCustomerHit{},
+			"hint":  hintSiteCustomerMinQ,
+		})
+	}
+	items, err := h.repo.SearchCustomersWithoutConfig(org, q, 20)
 	if err != nil {
 		return err
 	}
-	return h.renderSiteForm(c, pending, nil, map[int]bool{}, false, "")
+	if items == nil {
+		items = []repository.SiteCustomerHit{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"items": items, "hint": ""})
 }
 
-func (h *MaintenanceHandler) renderSiteForm(c echo.Context, pending []struct{ ID, OrgName string }, cfg *model.MaintenanceSiteConfig, days map[int]bool, lastMon bool, errMsg string) error {
+func (h *MaintenanceHandler) renderSiteForm(c echo.Context, cfg *model.MaintenanceSiteConfig, days map[int]bool, lastMon bool, errMsg string, status int, draft siteFormDraft) error {
 	title := "점검 사이트 등록"
 	if cfg != nil {
 		title = "점검 사이트 수정"
+	}
+	if status == 0 {
+		status = http.StatusOK
 	}
 	org := currentOrg(c)
 	if cfg != nil && strings.TrimSpace(cfg.OrgID) != "" {
@@ -710,11 +747,18 @@ func (h *MaintenanceHandler) renderSiteForm(c echo.Context, pending []struct{ ID
 	if !legacy && products == nil {
 		products = []model.InspectionProduct{}
 	}
-	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
+	needOrg := cfg == nil && (org == "" || org == repository.OrgAll)
+	if draft.CustomerID != "" && draft.CustomerName == "" && h.customerRepo != nil {
+		if cu, _ := h.customerRepo.GetByID(draft.CustomerID); cu != nil {
+			draft.CustomerName = cu.OrgName
+		}
+	}
+	return c.Render(status, "maintenance/site_form.html", map[string]interface{}{
 		"Title":           title,
 		"Active":          NavMaintenanceSites,
-		"Pending":         pending,
 		"Config":          cfg,
+		"Draft":           draft,
+		"NeedOrg":         needOrg,
 		"Products":        products,
 		"Legacy":          legacy,
 		"FixedDaySet":     days,
@@ -730,7 +774,7 @@ func (h *MaintenanceHandler) EditSiteConfigPage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "설정이 없습니다")
 	}
 	_, lastMon := model.ParseFixedRule(cfg.FixedRule)
-	return h.renderSiteForm(c, nil, cfg, model.FixedDaySet(cfg.FixedRule), lastMon, "")
+	return h.renderSiteForm(c, cfg, model.FixedDaySet(cfg.FixedRule), lastMon, "", http.StatusOK, siteFormDraft{})
 }
 
 func parseFixedDayValues(vals []string) []int {
@@ -752,18 +796,49 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 	days := parseFixedDayValues(c.Request().PostForm["fixed_day"])
 	lastMon := c.FormValue("fixed_last_monday") == "1" || c.FormValue("fixed_rule") == model.FixedRuleLastMonday
 	cfg := &model.MaintenanceSiteConfig{
-		CustomerID:      c.FormValue("customer_id"),
-		ShortName:       c.FormValue("short_name"),
-		Region:          c.FormValue("region"),
+		CustomerID:      strings.TrimSpace(c.FormValue("customer_id")),
+		ShortName:       strings.TrimSpace(c.FormValue("short_name")),
+		Region:          strings.TrimSpace(c.FormValue("region")),
 		HasKlas:         c.FormValue("has_klas") == "1",
 		HasRfid:         c.FormValue("has_rfid") == "1",
 		InspectionCycle: c.FormValue("inspection_cycle"),
 		EntryCategory:   c.FormValue("entry_category"),
 		FixedRule:       model.FormatFixedRule(days, lastMon),
 	}
-	if cfg.CustomerID == "" || cfg.ShortName == "" {
-		pending, _ := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
-		return h.renderSiteForm(c, pending, nil, model.FixedDaySet(cfg.FixedRule), lastMon, "고객과 표시명은 필수입니다")
+	draft := siteFormDraft{
+		CustomerID:   cfg.CustomerID,
+		CustomerName: strings.TrimSpace(c.FormValue("customer_q")),
+		ShortName:    cfg.ShortName,
+		Region:       cfg.Region,
+	}
+	existing, _ := h.repo.GetSiteConfig(cfg.CustomerID)
+	creating := existing == nil
+	if cfg.CustomerID == "" {
+		return h.renderSiteForm(c, nil, model.FixedDaySet(cfg.FixedRule), lastMon, errNeedSiteCustomer, http.StatusBadRequest, draft)
+	}
+	if cfg.ShortName == "" {
+		msg := "표시명은 필수입니다"
+		st := http.StatusBadRequest
+		if !creating {
+			st = http.StatusOK
+			msg = "고객과 표시명은 필수입니다"
+		}
+		show := existing
+		if creating {
+			show = nil
+		}
+		return h.renderSiteForm(c, show, model.FixedDaySet(cfg.FixedRule), lastMon, msg, st, draft)
+	}
+	if creating {
+		view := currentOrg(c)
+		if view == "" || view == repository.OrgAll {
+			return h.renderSiteForm(c, nil, model.FixedDaySet(cfg.FixedRule), lastMon, errNeedInsertOrg, http.StatusBadRequest, draft)
+		}
+		custOrg := h.repo.CustomerOrgID(cfg.CustomerID)
+		sameOrg := custOrg == view || (custOrg == "" && view == model.OrgIDLibrary)
+		if !sameOrg {
+			return h.renderSiteForm(c, nil, model.FixedDaySet(cfg.FixedRule), lastMon, errSiteCustomerWrongOrg, http.StatusBadRequest, draft)
+		}
 	}
 	switch cfg.InspectionCycle {
 	case "monthly", "odd_bimonthly", "even_bimonthly", "quarterly", "semi", "yearly":
@@ -775,8 +850,11 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 	}
 	if err := h.repo.UpsertSiteConfig(cfg); err != nil {
 		log.Printf("site config save: %v", err)
-		pending, _ := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
-		return h.renderSiteForm(c, pending, nil, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error())
+		show := existing
+		if creating {
+			show = nil
+		}
+		return h.renderSiteForm(c, show, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error(), http.StatusOK, draft)
 	}
 	if _, ok := c.Request().PostForm["product_id"]; ok {
 		siteOrg := h.repo.CustomerOrgID(cfg.CustomerID)
@@ -787,8 +865,13 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 			if repository.IsOtherOrgInspectionProduct(err) {
 				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			}
-			pending, _ := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
-			return h.renderSiteForm(c, pending, cfg, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error())
+			show := cfg
+			if creating {
+				if got, _ := h.repo.GetSiteConfig(cfg.CustomerID); got != nil {
+					show = got
+				}
+			}
+			return h.renderSiteForm(c, show, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error(), http.StatusOK, draft)
 		}
 	}
 	return c.Redirect(http.StatusSeeOther, "/maintenance/sites")

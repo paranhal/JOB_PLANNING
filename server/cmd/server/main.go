@@ -426,6 +426,7 @@ func main() {
 	ms.GET("", h.Maintenance.ListSiteConfigs)
 	ms.GET("/export.xlsx", h.Maintenance.ExportSiteConfigsExcel)
 	ms.GET("/new", h.Maintenance.NewSiteConfigPage)
+	ms.GET("/customer-search", h.Maintenance.SearchSiteCustomers)
 	ms.POST("/sync", h.Maintenance.SyncSiteConfigsFromAssets)
 	ms.GET("/distance", h.Maintenance.ListRegionOrder)
 	ms.POST("/distance", h.Maintenance.SaveRegionOrder)

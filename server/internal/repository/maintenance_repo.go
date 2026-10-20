@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"customer-support/internal/model"
 )
@@ -996,6 +997,70 @@ func (r *MaintenanceRepo) ListCustomersWithoutConfigOrg(orgID string) ([]struct{
 			return nil, err
 		}
 		out = append(out, struct{ ID, OrgName string }{id, name})
+	}
+	return out, rows.Err()
+}
+
+// SiteCustomerHit 점검 사이트 미등록 고객 검색 한 건. 95-6
+type SiteCustomerHit struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Region string `json:"region"`
+}
+
+func likeContains(q string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + r.Replace(q) + "%"
+}
+
+// SearchCustomersWithoutConfig 사이트 미설정·활성·해당 조직 고객. q 2글자 이상, 최대 20건.
+func (r *MaintenanceRepo) SearchCustomersWithoutConfig(orgID, q string, limit int) ([]SiteCustomerHit, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
+	orgID = strings.TrimSpace(orgID)
+	q = strings.TrimSpace(q)
+	if orgID == "" || orgID == OrgAll || utf8.RuneCountInString(q) < 2 {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 20 {
+		limit = 20
+	}
+	pat := likeContains(q)
+	sqlq := `
+		SELECT c.customer_id, c.org_name, COALESCE(NULLIF(TRIM(c.addr_sido),''), COALESCE(c.addr_sigungu,''))
+		FROM customers c
+		WHERE c.is_active = 1
+		  AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'
+		  AND COALESCE(c.org_id,'') = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM maintenance_site_config s WHERE s.customer_id = c.customer_id
+		  )
+		  AND (
+			c.org_name LIKE ? ESCAPE '\'
+			OR c.official_name LIKE ? ESCAPE '\'
+			OR c.customer_id LIKE ? ESCAPE '\'
+			OR COALESCE(c.addr_sido,'') LIKE ? ESCAPE '\'
+			OR COALESCE(c.addr_sigungu,'') LIKE ? ESCAPE '\'
+			OR COALESCE(c.address,'') LIKE ? ESCAPE '\'
+		  )
+		ORDER BY c.org_name
+		LIMIT ?`
+	rows, err := r.db.Query(sqlq, orgID, pat, pat, pat, pat, pat, pat, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SiteCustomerHit
+	for rows.Next() {
+		var hit SiteCustomerHit
+		if err := rows.Scan(&hit.ID, &hit.Name, &hit.Region); err != nil {
+			return nil, err
+		}
+		out = append(out, hit)
+	}
+	if out == nil {
+		out = []SiteCustomerHit{}
 	}
 	return out, rows.Err()
 }
