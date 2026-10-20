@@ -139,6 +139,50 @@ type EquipImportRow struct {
 	Equip  *ProjectEquipment
 }
 
+type EquipCatImportBatch struct {
+	ID        string
+	OrgScope  string
+	FileName  string
+	RowsTotal int
+	RowsOK    int
+	RowsError int
+	Status    string
+	CreatedBy string
+}
+
+type EquipCatImportPreview struct {
+	NewN     int
+	UpdN     int
+	SameN    int
+	ErrN     int
+	WarnN    int
+	Rows     []EquipCatImportRow
+	FileName string
+	OrgScope string
+}
+
+type EquipCatImportRow struct {
+	Sheet      string
+	Line       int
+	Kind       string // cat|field
+	Action     string // new|upd|same|err
+	Key        string
+	Msg        string
+	OrgID      string
+	Code       string
+	ParentCode string
+	Name       string
+	FieldKey   string
+	Label      string
+	FieldType  string
+	Options    string
+	SortOrder  int
+	IsActive   bool
+	Required   bool
+	Cat        *EquipmentCategory
+	Field      *EquipmentField
+}
+
 func YearStatusLabel(s string) string {
 	switch strings.TrimSpace(s) {
 	case YearPlanned:

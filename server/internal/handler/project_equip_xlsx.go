@@ -8,6 +8,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func (h *ProjectHandler) EquipTemplateXLSX(c echo.Context) error {
@@ -55,6 +56,46 @@ func (h *ProjectHandler) EquipTemplateXLSX(c echo.Context) error {
 }
 
 func buildEquipErrorExcel(prev *model.EquipImportPreview) ([]byte, error) {
+	f := excelize.NewFile()
+	defer func() { _ = f.Close() }()
+	_ = f.SetSheetName(f.GetSheetName(0), "오류")
+	hdrFill, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true, Size: 11, Family: "맑은 고딕", Color: xlColor("FFFFFF")},
+		Fill: excelize.Fill{Type: "pattern", Color: []string{xlColor("B91C1C")}, Pattern: 1},
+	})
+	for i, h := range []string{"시트", "행", "구분", "키", "사유"} {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = f.SetCellValue("오류", cell, h)
+	}
+	_ = f.SetCellStyle("오류", "A1", "E1", hdrFill)
+	r := 2
+	if prev != nil {
+		for _, row := range prev.Rows {
+			if row.Action != "err" {
+				continue
+			}
+			_ = f.SetCellValue("오류", fmt.Sprintf("A%d", r), row.Sheet)
+			_ = f.SetCellValue("오류", fmt.Sprintf("B%d", r), row.Line)
+			_ = f.SetCellValue("오류", fmt.Sprintf("C%d", r), row.Kind)
+			_ = f.SetCellValue("오류", fmt.Sprintf("D%d", r), row.Key)
+			_ = f.SetCellValue("오류", fmt.Sprintf("E%d", r), row.Msg)
+			r++
+		}
+	}
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func buildEquipCatTemplateBytes() ([]byte, error) {
+	cats := [][]string{append([]string{}, []string{"조직코드", "분류코드", "분류명", "상위분류코드", "정렬", "사용"}...)}
+	fields := [][]string{append([]string{}, []string{"조직코드", "분류코드", "필드키", "항목명", "형식", "선택값", "필수", "정렬"}...)}
+	return repository.BuildEquipCatWorkbook(repository.EquipCatGuideLines(), cats, fields, repository.EquipCatSampleRows())
+}
+
+func buildEquipCatErrorExcel(prev *model.EquipCatImportPreview) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 	_ = f.SetSheetName(f.GetSheetName(0), "오류")

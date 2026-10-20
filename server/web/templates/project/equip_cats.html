@@ -8,7 +8,50 @@
   {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
   {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
   {{if .NeedOrg}}
-  <p class="flash-warning rounded-control">전체 보기입니다. 등록할 조직을 고르세요.</p>
+  <p class="flash-warning rounded-control">전체 보기입니다. 등록할 조직을 고르세요. 엑셀의 조직코드로만 넣습니다.</p>
+  {{end}}
+
+  {{if .CanDownload}}
+  <div class="flex flex-wrap gap-2">
+    <a href="/projects/equipment-categories/template.xlsx" class="btn btn-secondary btn-sm">양식 다운로드</a>
+    <a href="/projects/equipment-categories/export.xlsx" class="btn btn-secondary btn-sm">현재 분류표 내려받기</a>
+  </div>
+  {{end}}
+
+  {{if .CanWrite}}
+  <div class="card p-4 space-y-3">
+    <h3 class="font-semibold text-ink">엑셀 일괄 등록</h3>
+    <p class="text-ui-sm text-ink-muted">미리보기는 DB를 바꾸지 않습니다. 적용 시 오류 행은 건너뛰고, 파일에 없는 분류는 지우지 않습니다.</p>
+    <form method="post" action="/projects/equipment-categories/import-preview" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <button type="submit" class="btn btn-secondary">미리보기</button>
+    </form>
+    <form method="post" action="/projects/equipment-categories/import-apply" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <button type="submit" class="btn btn-primary">적용</button>
+    </form>
+    <form method="post" action="/projects/equipment-categories/import-errors.xlsx" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <button type="submit" class="btn btn-secondary btn-sm">오류 목록 엑셀</button>
+    </form>
+  </div>
+  {{end}}
+
+  {{if .Preview}}
+  <div class="card p-4 space-y-2">
+    <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
+    <p class="text-ui-sm">신규 {{.Preview.NewN}} · 수정 {{.Preview.UpdN}} · 변경 없음 {{.Preview.SameN}} · 오류 {{.Preview.ErrN}}</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-ui">
+        <thead class="text-ink-muted text-left"><tr><th class="p-2">시트</th><th class="p-2">행</th><th class="p-2">처리</th><th class="p-2">키</th><th class="p-2">사유</th></tr></thead>
+        <tbody>
+          {{range .Preview.Rows}}
+          <tr class="border-t border-line"><td class="p-2">{{.Sheet}}</td><td class="p-2">{{.Line}}</td><td class="p-2">{{.Action}}</td><td class="p-2">{{.Key}}</td><td class="p-2">{{.Msg}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
   {{end}}
 
   <div class="card overflow-x-auto">

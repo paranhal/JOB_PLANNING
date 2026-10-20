@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -55,6 +56,13 @@ func canWriteEquipCategory(c echo.Context) bool {
 	}
 	r := currentRole(c)
 	return r == model.RoleVisionAdmin || model.IsAdminGrade(r)
+}
+
+func canDownloadEquipCategory(c echo.Context) bool {
+	if currentRole(c) == model.RoleCLevel {
+		return canViewProjectEquip(c)
+	}
+	return canWriteEquipCategory(c)
 }
 
 func (h *ProjectHandler) loadEquipProject(c echo.Context) (*model.WorkProject, string, error) {
@@ -242,6 +250,176 @@ func (h *ProjectHandler) EquipCats(c echo.Context) error {
 	if !canViewProjectEquip(c) {
 		return echo.ErrForbidden
 	}
+	org, needOrg, cats := h.equipCatsList(c)
+	return h.renderEquipCats(c, org, needOrg, cats, nil, false)
+}
+
+func (h *ProjectHandler) renderEquipCats(c echo.Context, org string, needOrg bool, cats []model.EquipmentCategory, prev *model.EquipCatImportPreview, applied bool) error {
+	return c.Render(http.StatusOK, "project/equip_cats.html", map[string]interface{}{
+		"Title": "장비 분류", "Active": NavEquipCategories, "Cats": cats, "OrgID": org,
+		"CanWrite": canWriteEquipCategory(c), "CanDownload": canDownloadEquipCategory(c),
+		"NeedOrg": needOrg, "FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Preview": prev, "Apply": applied,
+	})
+}
+
+func (h *ProjectHandler) catImportScope(c echo.Context) (repository.CatImportScope, error) {
+	allowed := map[string]bool{}
+	role := currentRole(c)
+	if role == model.RoleVisionAdmin {
+		ids, err := h.pe.ListActiveOrgIDs()
+		if err != nil {
+			return repository.CatImportScope{}, err
+		}
+		for _, id := range ids {
+			if id != "" && id != repository.OrgAll {
+				allowed[id] = true
+			}
+		}
+		return repository.CatImportScope{Allowed: allowed}, nil
+	}
+	home := loginHomeOrg(c)
+	if home == "" || home == repository.OrgAll {
+		home = model.OrgIDLibrary
+	}
+	allowed[home] = true
+	return repository.CatImportScope{Allowed: allowed}, nil
+}
+
+func (h *ProjectHandler) catExportOrgIDs(c echo.Context) []string {
+	if currentRole(c) == model.RoleVisionAdmin {
+		if q := strings.TrimSpace(c.QueryParam("org_id")); q != "" && q != repository.OrgAll {
+			return []string{q}
+		}
+		if view := currentOrg(c); view != "" && view != repository.OrgAll {
+			return []string{view}
+		}
+		ids, _ := h.pe.ListActiveOrgIDs()
+		var out []string
+		for _, id := range ids {
+			if id != "" && id != repository.OrgAll {
+				out = append(out, id)
+			}
+		}
+		return out
+	}
+	home := loginHomeOrg(c)
+	if home == "" || home == repository.OrgAll {
+		home = model.OrgIDLibrary
+	}
+	return []string{home}
+}
+
+func (h *ProjectHandler) readCatUpload(c echo.Context) ([]byte, string, error) {
+	fh, err := c.FormFile("file")
+	if err != nil {
+		return nil, "", err
+	}
+	src, err := fh.Open()
+	if err != nil {
+		return nil, "", err
+	}
+	defer src.Close()
+	raw, err := io.ReadAll(io.LimitReader(src, 2<<20+1))
+	if err != nil {
+		return nil, "", err
+	}
+	if len(raw) > 2<<20 {
+		return nil, "", fmt.Errorf("파일은 2MB 이하여야 합니다")
+	}
+	return raw, fh.Filename, nil
+}
+
+func (h *ProjectHandler) EquipCatTemplateXLSX(c echo.Context) error {
+	if !canDownloadEquipCategory(c) {
+		return echo.ErrForbidden
+	}
+	raw, err := buildEquipCatTemplateBytes()
+	if err != nil {
+		return err
+	}
+	return writeExcelFile(c, raw, "equip_cat_template.xlsx", "장비분류표_업로드양식.xlsx")
+}
+
+func (h *ProjectHandler) EquipCatExportXLSX(c echo.Context) error {
+	if !canDownloadEquipCategory(c) {
+		return echo.ErrForbidden
+	}
+	cats, fields, err := h.pe.CurrentCategoryExport(h.catExportOrgIDs(c))
+	if err != nil {
+		return err
+	}
+	raw, err := repository.BuildEquipCatWorkbook(repository.EquipCatGuideLines(), cats, fields, repository.EquipCatSampleRows())
+	if err != nil {
+		return err
+	}
+	return writeExcelFile(c, raw, "equip_cat_current.xlsx", "장비분류표_현재.xlsx")
+}
+
+func (h *ProjectHandler) EquipCatImportPreview(c echo.Context) error {
+	if !canWriteEquipCategory(c) {
+		return echo.ErrForbidden
+	}
+	raw, name, err := h.readCatUpload(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	scope, err := h.catImportScope(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	prev, err := h.pe.PreviewCategoryImport(raw, name, scope)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	org, needOrg, cats := h.equipCatsList(c)
+	return h.renderEquipCats(c, org, needOrg, cats, prev, false)
+}
+
+func (h *ProjectHandler) EquipCatImportApply(c echo.Context) error {
+	if !canWriteEquipCategory(c) {
+		return echo.ErrForbidden
+	}
+	raw, name, err := h.readCatUpload(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	scope, err := h.catImportScope(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	prev, err := h.pe.ApplyCategoryImport(currentUserID(c), name, raw, scope)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	org, needOrg, cats := h.equipCatsList(c)
+	return h.renderEquipCats(c, org, needOrg, cats, prev, true)
+}
+
+func (h *ProjectHandler) EquipCatImportErrors(c echo.Context) error {
+	if !canWriteEquipCategory(c) {
+		return echo.ErrForbidden
+	}
+	raw, name, err := h.readCatUpload(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	scope, err := h.catImportScope(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	prev, err := h.pe.PreviewCategoryImport(raw, name, scope)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/equipment-categories", err.Error())
+	}
+	buf, err := buildEquipCatErrorExcel(prev)
+	if err != nil {
+		return err
+	}
+	return writeExcelFile(c, buf, "equip_cat_errors.xlsx", "장비분류표_오류목록.xlsx")
+}
+
+func (h *ProjectHandler) equipCatsList(c echo.Context) (string, bool, []model.EquipmentCategory) {
 	org := currentOrg(c)
 	if org == "" || org == repository.OrgAll {
 		org = loginHomeOrg(c)
@@ -257,11 +435,7 @@ func (h *ProjectHandler) EquipCats(c echo.Context) error {
 	if org != "" {
 		cats, _ = h.pe.ListCategories(org, true)
 	}
-	return c.Render(http.StatusOK, "project/equip_cats.html", map[string]interface{}{
-		"Title": "장비 분류", "Active": NavEquipCategories, "Cats": cats, "OrgID": org,
-		"CanWrite": canWriteEquipCategory(c), "NeedOrg": needOrg,
-		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-	})
+	return org, needOrg, cats
 }
 
 func (h *ProjectHandler) EquipCatSave(c echo.Context) error {
