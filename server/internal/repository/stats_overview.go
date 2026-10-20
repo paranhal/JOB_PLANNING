@@ -367,26 +367,7 @@ func (r *StatsRepo) countMntScheduledInMonth(year, month int, f model.StatsMeeti
 }
 
 func (r *StatsRepo) listSiteConfigsForQuota() ([]model.MaintenanceSiteConfig, error) {
-	rows, err := r.db.Query(`
-		SELECT customer_id, COALESCE(short_name,''), COALESCE(region,''),
-		       COALESCE(has_klas,0), COALESCE(has_rfid,0), COALESCE(inspection_cycle,'monthly')
-		FROM maintenance_site_config`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []model.MaintenanceSiteConfig
-	for rows.Next() {
-		var c model.MaintenanceSiteConfig
-		var klas, rfid int
-		if err := rows.Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.InspectionCycle); err != nil {
-			return nil, err
-		}
-		c.HasKlas = klas == 1
-		c.HasRfid = rfid == 1
-		out = append(out, c)
-	}
-	return out, rows.Err()
+	return NewMaintenanceRepo(r.db).ListSiteConfigs()
 }
 
 // CountMonthMntQuota 그 달 정기점검 방문 목표. 팀·제품은 사이트 설정, 담당자·사업·세종K-LAS는 그 달 예약 건수.

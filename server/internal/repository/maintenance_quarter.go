@@ -31,6 +31,10 @@ func (r *MaintenanceRepo) periodObligations(planID string, year int, period mode
 	if err != nil {
 		return nil, err
 	}
+	cfgBy := map[string]model.MaintenanceSiteConfig{}
+	for _, cfg := range configs {
+		cfgBy[cfg.CustomerID] = cfg
+	}
 	covered := map[string]map[string]bool{}
 	for _, v := range visits {
 		if !model.VisitInCyclePeriod(v.VisitDate, year, period) {
@@ -39,7 +43,7 @@ func (r *MaintenanceRepo) periodObligations(planID string, year int, period mode
 		if covered[v.CustomerID] == nil {
 			covered[v.CustomerID] = map[string]bool{}
 		}
-		covered[v.CustomerID][model.VisitProductSlotKey(v.ProductType)] = true
+		covered[v.CustomerID][model.VisitProductSlotKeyFor(v.ProductType, cfgBy[v.CustomerID].Products)] = true
 	}
 	var out []model.UnassignedMonthSlot
 	for _, cfg := range configs {

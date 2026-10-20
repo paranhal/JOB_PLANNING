@@ -541,12 +541,17 @@ func (r *MaintenanceRepo) ListUnassignedMonthSlots(planID string, year, month in
 	if err != nil {
 		return nil, err
 	}
+	cfgBy := map[string]model.MaintenanceSiteConfig{}
+	for _, cfg := range configs {
+		cfgBy[cfg.CustomerID] = cfg
+	}
 	covered := map[string]map[string]bool{} // customer -> slotKey
 	for _, v := range visits {
 		if covered[v.CustomerID] == nil {
 			covered[v.CustomerID] = map[string]bool{}
 		}
-		covered[v.CustomerID][model.VisitProductSlotKey(v.ProductType)] = true
+		cat := cfgBy[v.CustomerID].Products
+		covered[v.CustomerID][model.VisitProductSlotKeyFor(v.ProductType, cat)] = true
 	}
 	var out []model.UnassignedMonthSlot
 	for _, cfg := range configs {
@@ -593,7 +598,7 @@ func (r *MaintenanceRepo) HasVisitInCalendarQuarter(planID, customerID, product 
 		WHERE plan_id=? AND customer_id=? AND length(trim(COALESCE(visit_date,'')))>=10
 		  AND visit_date>=? AND visit_date<=?`,
 		planID, customerID, from, to)
-	return scanVisitProductMatch(rows, err, product)
+	return r.scanVisitProductMatch(rows, err, customerID, product)
 }
 
 func (r *MaintenanceRepo) HasVisitInCyclePeriod(planID, customerID, product string, year int, p model.CyclePeriod) bool {
@@ -606,7 +611,7 @@ func (r *MaintenanceRepo) HasVisitInCyclePeriod(planID, customerID, product stri
 		WHERE plan_id=? AND customer_id=? AND length(trim(COALESCE(visit_date,'')))>=10
 		  AND visit_date>=? AND visit_date<=?`,
 		planID, customerID, from, to)
-	return scanVisitProductMatch(rows, err, product)
+	return r.scanVisitProductMatch(rows, err, customerID, product)
 }
 
 // HasQuarterSkip 해당 분기 슬롯을 건너뛰기로 했는지.
@@ -626,18 +631,19 @@ func (r *MaintenanceRepo) HasVisitInMonth(planID, customerID string, year, month
 		SELECT COALESCE(product_type,'') FROM maintenance_visits
 		WHERE plan_id=? AND customer_id=? AND visit_date LIKE ?`,
 		planID, customerID, prefix)
-	return scanVisitProductMatch(rows, err, product)
+	return r.scanVisitProductMatch(rows, err, customerID, product)
 }
 
-func scanVisitProductMatch(rows *sql.Rows, err error, product string) bool {
+func (r *MaintenanceRepo) scanVisitProductMatch(rows *sql.Rows, err error, customerID, product string) bool {
 	if err != nil || rows == nil {
 		return false
 	}
 	defer rows.Close()
+	catalog := r.slotCatalogForCustomer(customerID)
 	want := strings.TrimSpace(product)
 	wantKey := ""
 	if want != "" {
-		wantKey = model.VisitProductSlotKey(want)
+		wantKey = model.VisitProductSlotKeyFor(want, catalog)
 	}
 	any := false
 	for rows.Next() {
@@ -649,7 +655,7 @@ func scanVisitProductMatch(rows *sql.Rows, err error, product string) bool {
 		if wantKey == "" {
 			continue
 		}
-		key := model.VisitProductSlotKey(pt)
+		key := model.VisitProductSlotKeyFor(pt, catalog)
 		if key == wantKey || key == "generic" {
 			return true
 		}
@@ -670,7 +676,8 @@ func (r *MaintenanceRepo) MonthDuplicate(planID, customerID, productType, visitD
 	if err != nil {
 		return nil, err
 	}
-	want := model.VisitProductSlotKey(productType)
+	catalog := r.slotCatalogForCustomer(customerID)
+	want := model.VisitProductSlotKeyFor(productType, catalog)
 	except := strings.TrimSpace(exceptVisitID)
 	ym := visitDate[:7]
 	for i := range visits {
@@ -681,7 +688,7 @@ func (r *MaintenanceRepo) MonthDuplicate(planID, customerID, productType, visitD
 		if len(strings.TrimSpace(v.VisitDate)) < 7 || v.VisitDate[:7] != ym {
 			continue
 		}
-		if model.VisitProductSlotKey(v.ProductType) != want {
+		if model.VisitProductSlotKeyFor(v.ProductType, catalog) != want {
 			continue
 		}
 		return &v, nil
@@ -877,18 +884,26 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 		cfg.HasRfid = rfid == 1
 		out = append(out, cfg)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.hydrateSiteConfigs(out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *MaintenanceRepo) GetSiteConfig(customerID string) (*model.MaintenanceSiteConfig, error) {
 	var c model.MaintenanceSiteConfig
 	var klas, rfid int
 	err := r.db.QueryRow(`
-		SELECT customer_id, short_name, COALESCE(region,''),
-		       has_klas, has_rfid, COALESCE(inspection_cycle,'monthly'),
-		       entry_category, COALESCE(fixed_rule,'')
-		FROM maintenance_site_config WHERE customer_id = ?`, customerID).
-		Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.InspectionCycle, &c.EntryCategory, &c.FixedRule)
+		SELECT s.customer_id, s.short_name, COALESCE(s.region,''),
+		       s.has_klas, s.has_rfid, COALESCE(s.inspection_cycle,'monthly'),
+		       s.entry_category, COALESCE(s.fixed_rule,''), COALESCE(c.org_id,'')
+		FROM maintenance_site_config s
+		LEFT JOIN customers c ON c.customer_id = s.customer_id
+		WHERE s.customer_id = ?`, customerID).
+		Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.InspectionCycle, &c.EntryCategory, &c.FixedRule, &c.OrgID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -897,7 +912,11 @@ func (r *MaintenanceRepo) GetSiteConfig(customerID string) (*model.MaintenanceSi
 	}
 	c.HasKlas = klas == 1
 	c.HasRfid = rfid == 1
-	return &c, nil
+	list := []model.MaintenanceSiteConfig{c}
+	if err := r.hydrateSiteConfigs(list); err != nil {
+		return nil, err
+	}
+	return &list[0], nil
 }
 
 func (r *MaintenanceRepo) UpsertSiteConfig(c *model.MaintenanceSiteConfig) error {
@@ -940,19 +959,32 @@ func nullString(s string) interface{} {
 }
 
 func (r *MaintenanceRepo) DeleteSiteConfig(customerID string) error {
+	_, _ = r.db.Exec(`DELETE FROM site_inspection_products WHERE customer_id = ?`, customerID)
 	_, err := r.db.Exec(`DELETE FROM maintenance_site_config WHERE customer_id = ?`, customerID)
 	return err
 }
 
 // ListCustomersWithoutConfig 점검 설정이 없는 활성 고객 (선택용)
 func (r *MaintenanceRepo) ListCustomersWithoutConfig() ([]struct{ ID, OrgName string }, error) {
-	rows, err := r.db.Query(`
+	return r.ListCustomersWithoutConfigOrg("")
+}
+
+func (r *MaintenanceRepo) ListCustomersWithoutConfigOrg(orgID string) ([]struct{ ID, OrgName string }, error) {
+	q := `
 		SELECT c.customer_id, c.org_name FROM customers c
 		WHERE c.is_active = 1
 		  AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'
 		  AND NOT EXISTS (
 			SELECT 1 FROM maintenance_site_config s WHERE s.customer_id = c.customer_id
-		) ORDER BY c.org_name LIMIT 500`)
+		)`
+	var args []any
+	orgID = strings.TrimSpace(orgID)
+	if orgID != "" && orgID != OrgAll {
+		q += ` AND COALESCE(c.org_id,'') = ?`
+		args = append(args, orgID)
+	}
+	q += ` ORDER BY c.org_name LIMIT 500`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

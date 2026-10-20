@@ -20,6 +20,8 @@ type MaintenanceSiteConfig struct {
 	AddrSido        string // customers.addr_sido
 	AddrSigungu     string // customers.addr_sigungu
 	OrgID           string // customers.org_id
+	// Products nil 이면 레거시(has_klas/has_rfid). 빈 슬라이스면 신 모드(제품 없음=generic).
+	Products []InspectionProduct
 }
 
 // MaintenancePlan 조직+연도 단위 점검 계획
@@ -107,6 +109,24 @@ func SiteDueProductSlots(cfg MaintenanceSiteConfig, month int) []UnassignedMonth
 		CustomerID: cfg.CustomerID, OrgName: cfg.OrgName, ShortName: name, Cycle: cfg.InspectionCycle, OrgID: cfg.OrgID,
 	}
 	var out []UnassignedMonthSlot
+	if cfg.Products != nil {
+		for _, p := range cfg.Products {
+			if !p.IsActive {
+				continue
+			}
+			s := base
+			s.ProductType = p.Name
+			s.SlotKey = p.Code
+			out = append(out, s)
+		}
+		if len(out) == 0 {
+			s := base
+			s.ProductType = ""
+			s.SlotKey = "generic"
+			out = append(out, s)
+		}
+		return out
+	}
 	if cfg.HasKlas {
 		s := base
 		s.ProductType = "KLAS"
@@ -435,8 +455,20 @@ func ProtectedVisitRangeMessage(now time.Time, count int) string {
 	return fmt.Sprintf("%d년 1~%d월 방문 %d건은 삭제할 수 없습니다. %d월 이후만 정리할 수 있습니다.", y, m, count, m+1)
 }
 
-// SiteVisitSlotCount 사이트 1곳의 방문 건수. KLAS·RFID 각각 1건, 둘 다 미지정이면 1건.
+// SiteVisitSlotCount 사이트 1곳의 방문 건수. 레거시는 KLAS·RFID, 신 모드는 연결 제품(없으면 1건).
 func SiteVisitSlotCount(cfg MaintenanceSiteConfig) int {
+	if cfg.Products != nil {
+		n := 0
+		for _, p := range cfg.Products {
+			if p.IsActive {
+				n++
+			}
+		}
+		if n == 0 {
+			return 1
+		}
+		return n
+	}
 	n := 0
 	if cfg.HasKlas {
 		n++
@@ -465,9 +497,10 @@ type MonthVisitQuota struct {
 	MonthLabel string
 	DueSites   int
 	Slots      int
-	KlasSlots  int
-	RfidSlots  int
-	CycleRows  []CycleQuotaRow
+	KlasSlots    int
+	RfidSlots    int
+	ProductRows  []CycleQuotaRow
+	CycleRows    []CycleQuotaRow
 }
 
 var inspectionCycleOrder = []struct{ Key, Label string }{
@@ -488,6 +521,8 @@ func SummarizeMonthVisitQuota(configs []MaintenanceSiteConfig, year, month int) 
 	}
 	cycleSites := map[string]int{}
 	cycleSlots := map[string]int{}
+	prodSlots := map[string]int{}
+	var prodOrder []string
 	for _, c := range configs {
 		if !InspectionCycleDue(c.InspectionCycle, month) {
 			continue
@@ -499,14 +534,27 @@ func SummarizeMonthVisitQuota(configs []MaintenanceSiteConfig, year, month int) 
 		q.DueSites++
 		n := SiteVisitSlotCount(c)
 		q.Slots += n
-		if c.HasKlas {
-			q.KlasSlots++
-		}
-		if c.HasRfid {
-			q.RfidSlots++
+		for _, s := range SiteDueProductSlots(c, month) {
+			switch s.SlotKey {
+			case "klas":
+				q.KlasSlots++
+			case "rfid":
+				q.RfidSlots++
+			}
+			label := strings.TrimSpace(s.ProductType)
+			if label == "" {
+				label = "구분 없음"
+			}
+			if _, ok := prodSlots[label]; !ok {
+				prodOrder = append(prodOrder, label)
+			}
+			prodSlots[label]++
 		}
 		cycleSites[cyc]++
 		cycleSlots[cyc] += n
+	}
+	for _, name := range prodOrder {
+		q.ProductRows = append(q.ProductRows, CycleQuotaRow{Label: name, Slots: prodSlots[name]})
 	}
 	for _, spec := range inspectionCycleOrder {
 		if cycleSites[spec.Key] == 0 {

@@ -118,12 +118,12 @@ func (r *MaintenanceRepo) ListVisitsFiltered(planID string, year int, f VisitFil
 	for _, c := range cfgs {
 		regionOf[c.CustomerID] = strings.TrimSpace(c.Region)
 	}
+	cfgBy := map[string]model.MaintenanceSiteConfig{}
+	for _, c := range cfgs {
+		cfgBy[c.CustomerID] = c
+	}
 	wantRegion := strings.TrimSpace(f.Region)
 	wantProd := strings.TrimSpace(f.Product)
-	wantKey := ""
-	if wantProd != "" {
-		wantKey = model.VisitProductSlotKey(wantProd)
-	}
 	var out []model.MaintenanceVisit
 	for _, v := range visits {
 		date := strings.TrimSpace(v.VisitDate)
@@ -139,8 +139,11 @@ func (r *MaintenanceRepo) ListVisitsFiltered(planID string, year int, f VisitFil
 		if wantRegion != "" && regionOf[v.CustomerID] != wantRegion {
 			continue
 		}
-		if wantKey != "" && model.VisitProductSlotKey(v.ProductType) != wantKey {
-			continue
+		if wantProd != "" {
+			cat := cfgBy[v.CustomerID].Products
+			if model.VisitProductSlotKeyFor(v.ProductType, cat) != model.VisitProductSlotKeyFor(wantProd, cat) {
+				continue
+			}
 		}
 		out = append(out, v)
 	}
@@ -182,7 +185,7 @@ func (r *MaintenanceRepo) FindVisitBySlot(planID, customerID, product, date stri
 	if err != nil {
 		return nil
 	}
-	wantP := model.VisitProductSlotKey(product)
+	wantP := r.visitSlotKey(customerID, product)
 	wantD := strings.TrimSpace(date)
 	var found *model.MaintenanceVisit
 	for i := range visits {
@@ -193,7 +196,7 @@ func (r *MaintenanceRepo) FindVisitBySlot(planID, customerID, product, date stri
 		if strings.TrimSpace(v.VisitDate) != wantD {
 			continue
 		}
-		if model.VisitProductSlotKey(v.ProductType) != wantP {
+		if r.visitSlotKey(customerID, v.ProductType) != wantP {
 			continue
 		}
 		found = &visits[i]

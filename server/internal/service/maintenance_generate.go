@@ -63,6 +63,9 @@ func AutoGenerateMaintenanceWithOrder(repo *repository.MaintenanceRepo, planID, 
 	if err != nil {
 		return 0, err
 	}
+	if plan.OrgID != "" && plan.OrgID != repository.OrgAll {
+		configs = repository.FilterSiteConfigsByOrg(configs, plan.OrgID)
+	}
 	if len(configs) == 0 {
 		return 0, fmt.Errorf("정기점검 사이트 설정이 없습니다. 먼저 「점검 사이트 설정」에서 등록하세요")
 	}
