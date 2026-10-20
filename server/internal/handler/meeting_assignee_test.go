@@ -38,15 +38,15 @@ func TestGroupWorkItemsByAssigneeOrderAndUnassignedLast(t *testing.T) {
 }
 
 func TestMeetingFilterQueryKeepsDateAssigneeDisplay(t *testing.T) {
-	got := meetingFilterQuery("2026-08-11", "양기헌", "kanban")
+	got := meetingFilterQuery("2026-08-11", "양기헌", "kanban", "", false)
 	if !strings.Contains(got, "date=2026-08-11") || !strings.Contains(got, "assignee=") || !strings.Contains(got, "display=kanban") {
 		t.Fatalf("%s", got)
 	}
-	list := meetingFilterQuery("2026-08-11", "양기헌", "list")
+	list := meetingFilterQuery("2026-08-11", "양기헌", "list", "", false)
 	if !strings.Contains(list, "display=list") || !strings.Contains(list, "date=2026-08-11") {
 		t.Fatalf("list %s", list)
 	}
-	nav := meetingNavQuery("양기헌", "kanban")
+	nav := meetingNavQuery("양기헌", "kanban", "", false)
 	if strings.Contains(nav, "date=") || !strings.Contains(nav, "display=kanban") {
 		t.Fatalf("nav %s", nav)
 	}

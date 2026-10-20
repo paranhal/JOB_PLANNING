@@ -3,7 +3,9 @@
 <div class="space-y-4">
   {{if .Notice}}<p class="text-ui text-ink-muted">{{.Notice}}</p>{{end}}
   <div class="flex flex-wrap gap-2" data-weekly-tabs>
+    {{if .CanSeeTeam}}
     <a href="/meeting/weekly?date={{.WeekStart}}" class="{{if .Team}}btn-primary{{else}}btn-secondary{{end}} btn-sm">팀 자료</a>
+    {{end}}
     <a href="/meeting/weekly/me?date={{.WeekStart}}" class="{{if not .Team}}btn-primary{{else}}btn-secondary{{end}} btn-sm">내 자료</a>
   </div>
   <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -11,13 +13,22 @@
       <div class="flex flex-wrap items-center gap-3">
         <h2 class="text-xl font-bold text-ink">{{.Title}}</h2>
         {{if .Team}}
-        <form method="GET" action="{{.PagePath}}" class="inline-flex items-center gap-2">
+        <form method="GET" action="{{.PagePath}}" class="inline-flex items-center gap-2 flex-wrap">
           <input type="hidden" name="date" value="{{.WeekStart}}">
+          {{if .ShowOrgPick}}
+          <label class="text-ui-sm text-ink-muted" for="meeting-weekly-view-org">조직</label>
+          <select id="meeting-weekly-view-org" name="view_org_id" onchange="this.form.submit()" class="select w-auto">
+            <option value="*" {{if eq .ViewOrgID "*"}}selected{{end}}>전체</option>
+            {{range .Orgs}}
+            <option value="{{.OrgID}}" {{if eq $.ViewOrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>
+            {{end}}
+          </select>
+          {{end}}
           <label class="text-ui-sm text-ink-muted" for="meeting-weekly-assignee">담당자</label>
           <select id="meeting-weekly-assignee" name="assignee" onchange="this.form.submit()" class="select w-auto">
             <option value="all" {{if eq .Assignee ""}}selected{{end}}>팀전체</option>
-            {{range .Users}}
-            <option value="{{.FullName}}" {{if eq $.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
+            {{range .Picker}}
+            <option value="{{.Value}}" {{if eq $.Assignee .Value}}selected{{end}}>{{.Label}}{{if .Unregistered}} (미등록){{end}}</option>
             {{end}}
           </select>
         </form>
@@ -114,17 +125,27 @@
   <div class="card-header">{{.Title}}</div>
   <div class="overflow-x-auto">
     <table class="table-base min-w-[320px] break-keep">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">담당자</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">제목</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">상태</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">수정</th>
+        </tr>
+      </thead>
       <tbody>
         {{if .Groups}}
         {{range .Groups}}
         <tr class="bg-hover">
-          <td colspan="4" class="px-3 py-1.5 text-ui-sm font-medium text-ink">{{.Label}} · {{.Count}}건</td>
+          <td colspan="5" class="px-3 py-1.5 text-ui-sm font-medium text-ink">{{.Label}} · {{.Count}}건</td>
         </tr>
         {{range .Items}}
         <tr class="hover:bg-hover">
           <td class="px-3 py-2 whitespace-nowrap">
             <span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span>
           </td>
+          <td class="meeting-assignee-cell px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}<span class="badge-neutral">미배정</span>{{end}}</td>
           <td class="px-3 py-2">
             <a href="{{.Href}}" class="hover:underline font-medium text-ink">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</a>
             <p class="text-ui-sm text-ink-muted truncate max-w-xs">{{.Title}}</p>

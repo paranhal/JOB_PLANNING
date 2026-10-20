@@ -54,7 +54,15 @@ func (c MenuCtx) has(keys ...string) bool {
 	return false
 }
 
-func (c MenuCtx) visWeeklyTeam() bool { return c.visRole() }
+func (c MenuCtx) visWeeklyTeam() bool {
+	if c.Role == model.RoleCLevel {
+		return true
+	}
+	if c.IsReadOnly {
+		return false
+	}
+	return meetingTeamRole(c.Role)
+}
 func (c MenuCtx) visRole() bool       { return c.roleKnown() }
 func (c MenuCtx) visMnt() bool {
 	return c.isAdmin() || c.isTech() || c.isOffice() || c.isSales() || c.isObserver() || c.isTester() ||

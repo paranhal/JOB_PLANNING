@@ -19,14 +19,15 @@ type meetingAssigneeGroup struct {
 	Items      []model.WorkListItem
 }
 
-// resolveMeetingAssignee 드롭다운 선택. 빈 값=팀전체.
-// 쿼리 없으면 기술담당은 본인, 그 외는 팀전체. mine= 은 하위호환.
+// resolveMeetingAssignee 드롭다운 선택. 빈 값=팀전체. 조직원은 항상 본인. D-108(94-3)
 func resolveMeetingAssignee(c echo.Context, users []model.User) string {
+	self := meetingSelfName(c)
+	canTeam, _ := meetingTeamScope(c)
+	if !canTeam {
+		return self
+	}
 	raw := strings.TrimSpace(c.QueryParam("assignee"))
 	mine := strings.TrimSpace(c.QueryParam("mine"))
-	self := strings.TrimSpace(ctxString(c, "user_name"))
-	role := currentRole(c)
-
 	if raw != "" {
 		if raw == meetingAssigneeAll || raw == model.StatsTeamLabel {
 			return ""
@@ -39,14 +40,10 @@ func resolveMeetingAssignee(c echo.Context, users []model.User) string {
 		}
 		return ""
 	}
-
 	if mine == "0" {
 		return ""
 	}
 	if mine == "1" && self != "" {
-		return self
-	}
-	if role == model.RoleTech && self != "" {
 		return self
 	}
 	return ""
@@ -81,10 +78,10 @@ func assignableNameOrder(users []model.User) []string {
 }
 
 func meetingAssigneeQuery(selected string) string {
-	return meetingNavQuery(selected, "")
+	return meetingNavQuery(selected, "", "", false)
 }
 
-func meetingNavQuery(selected, display string) string {
+func meetingNavQuery(selected, display, viewOrg string, includeOrg bool) string {
 	v := url.Values{}
 	if selected == "" {
 		v.Set("assignee", meetingAssigneeAll)
@@ -94,10 +91,13 @@ func meetingNavQuery(selected, display string) string {
 	if display == "kanban" {
 		v.Set("display", "kanban")
 	}
+	if includeOrg && viewOrg != "" {
+		v.Set("view_org_id", viewOrg)
+	}
 	return v.Encode()
 }
 
-func meetingFilterQuery(date, selected, display string) string {
+func meetingFilterQuery(date, selected, display, viewOrg string, includeOrg bool) string {
 	v := url.Values{}
 	if date != "" {
 		v.Set("date", date)
@@ -109,6 +109,9 @@ func meetingFilterQuery(date, selected, display string) string {
 	}
 	if display == "kanban" || display == "list" {
 		v.Set("display", display)
+	}
+	if includeOrg && viewOrg != "" {
+		v.Set("view_org_id", viewOrg)
 	}
 	return v.Encode()
 }

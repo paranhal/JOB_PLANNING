@@ -153,6 +153,49 @@ func (r *UserRepo) ListAssignable(orgID string) ([]model.User, error) {
 	return items, rows.Err()
 }
 
+// AssigneeNamesOnWork 조직 업무에 등장하는 담당자 이름(사용자 목록에 없는 이름 포함). 93-1·94-3
+func (r *UserRepo) AssigneeNamesOnWork(orgID string) []string {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	orgID = strings.TrimSpace(orgID)
+	orgCondAS := ""
+	orgCondTask := ""
+	var argsAS, argsTask []any
+	if orgID != "" && orgID != OrgAll {
+		if orgID == model.OrgIDLibrary {
+			orgCondAS = ` AND (org_id=? OR TRIM(COALESCE(org_id,''))='')`
+			orgCondTask = orgCondAS
+		} else {
+			orgCondAS = ` AND org_id=?`
+			orgCondTask = orgCondAS
+		}
+		argsAS = append(argsAS, orgID)
+		argsTask = append(argsTask, orgID)
+	}
+	q := `
+SELECT DISTINCT name FROM (
+  SELECT TRIM(assigned_to) AS name FROM as_receipts WHERE TRIM(COALESCE(assigned_to,''))<>''` + orgCondAS + `
+  UNION
+  SELECT TRIM(assignee) FROM work_tasks WHERE TRIM(COALESCE(assignee,''))<>''` + orgCondTask + `
+) WHERE name<>'' ORDER BY name`
+	args := append(argsAS, argsTask...)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return out
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
 func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
 	row := r.db.QueryRow(userSelectAuth+` WHERE username = ? COLLATE NOCASE`, username)
 	u, err := scanUser(row, true)

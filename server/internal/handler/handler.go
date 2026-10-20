@@ -157,7 +157,7 @@ func New(db *sql.DB) *Handler {
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,
-		Meeting:    NewMeetingHandler(workBoardRepo, statsRepo, userRepo, asRepo),
+		Meeting:    NewMeetingHandler(workBoardRepo, statsRepo, userRepo, asRepo, repository.NewOrgRepo(db)),
 		Stats:      NewStatsHandler(statsRepo, userRepo, repository.NewWBRepo(db), workBoardRepo, maintRepo),
 		WorkStatus: NewWorkStatusHandler(repository.NewWBRepo(db), userRepo, holidayRepo, repository.NewSalesRepo(db)),
 		Analysis:   &AnalysisHandler{db: db},

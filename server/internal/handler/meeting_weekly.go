@@ -11,8 +11,16 @@ import (
 	"customer-support/internal/model"
 )
 
-// Weekly GET /meeting/weekly 팀 자료. 로그인한 전원(조직 범위). D-95
+// Weekly GET /meeting/weekly 팀 자료. canTeam만. D-108(94-3)
 func (h *MeetingHandler) Weekly(c echo.Context) error {
+	if can, _ := meetingTeamScope(c); !can {
+		q := c.QueryString()
+		loc := "/meeting/weekly/me"
+		if q != "" {
+			loc += "?" + q
+		}
+		return c.Redirect(http.StatusFound, loc)
+	}
 	return h.renderWeekly(c, true)
 }
 
@@ -28,10 +36,7 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 	nextMon := mon.AddDate(0, 0, 7)
 	lastFrom, lastTo := model.LastISOWeekRange(mon)
 
-	var users []model.User
-	if h.userRepo != nil {
-		users = listAssignableForPicker(h.userRepo, c)
-	}
+	opts, users, canTeam, orgScope, showOrgPick, orgs := h.meetingPicker(c)
 
 	pagePath := "/meeting/weekly/me"
 	title := "주간 업무 회의 — 내 자료"
@@ -47,12 +52,15 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 		active = NavMeetingWeekly
 		selected = resolveMeetingAssignee(c, users)
 		mineUID, mineKeys = meetingAssigneeKeys(selected, users)
-		navQ = template.URL(meetingNavQuery(selected, ""))
+		navQ = template.URL(meetingNavQuery(selected, "", orgScope, showOrgPick))
 		reports = "/stats/reports"
 	} else {
 		mineUID, mineKeys = meetingSelfKeys(c, users)
 		reports = "/meeting/weekly/me.xlsx?date=" + mon.Format("2006-01-02")
+		opts = nil
 		users = nil
+		showOrgPick = false
+		orgs = nil
 	}
 
 	lastDone, err := h.collectCompletedRange(lastFrom, lastTo, mineUID, mineKeys)
@@ -82,6 +90,11 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 		unplannedNeed = append(unplannedNeed, it)
 	}
 
+	lastDone = h.filterMeetingOrg(c, lastDone)
+	planned = h.filterMeetingOrg(c, planned)
+	overdue = h.filterMeetingOrg(c, overdue)
+	unplannedNeed = h.filterMeetingOrg(c, unplannedNeed)
+
 	h.markWeeklyCanEdit(c, lastDone)
 	h.markWeeklyCanEdit(c, planned)
 	h.markWeeklyCanEdit(c, overdue)
@@ -101,7 +114,11 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 		"Title":         title,
 		"Active":        active,
 		"Team":          team,
-		"CanSeeTeam":    true,
+		"CanSeeTeam":    canTeam,
+		"Picker":        opts,
+		"ShowOrgPick":   showOrgPick,
+		"ViewOrgID":     orgScope,
+		"Orgs":          orgs,
 		"PagePath":      pagePath,
 		"WeekStart":     mon.Format("2006-01-02"),
 		"WeekEnd":       fri.Format("2006-01-02"),

@@ -19,6 +19,9 @@ const (
 
 // ExportWeeklyReport 주간업무보고서 엑셀 (통계 · 전체 리스트). §16.1
 func (h *StatsHandler) ExportWeeklyReport(c echo.Context) error {
+	if can, _ := meetingTeamScope(c); !can {
+		return echo.ErrForbidden
+	}
 	now := time.Now()
 	p := parseReportPeriod(c, now)
 	var (

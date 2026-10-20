@@ -228,22 +228,24 @@ func TestMeetingWeeklyRolesAndPersonalOnly(t *testing.T) {
 	e, db, yang, _ := newMeetingWeeklyServer(t)
 	seedWeeklyAS(t, db)
 
-	for _, role := range []string{model.RoleVisionAdmin, model.RoleOrgAdmin, model.RoleAdmin, model.RoleSales, model.RoleSupport, model.RoleTech} {
+	for _, role := range []string{model.RoleVisionAdmin, model.RoleOrgAdmin, model.RoleAdmin, model.RoleCLevel} {
 		rec := weeklyGet(t, e, "/meeting/weekly?date=2026-10-19&assignee=all", jwtCookieRole(t, role))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s team status=%d", role, rec.Code)
 		}
 	}
+	for _, role := range []string{model.RoleSales, model.RoleSupport, model.RoleTech} {
+		rec := weeklyGet(t, e, "/meeting/weekly?date=2026-10-19&assignee=all", jwtCookieRole(t, role))
+		if rec.Code != http.StatusFound {
+			t.Fatalf("%s team status=%d want 302", role, rec.Code)
+		}
+		if loc := rec.Header().Get("Location"); !strings.HasPrefix(loc, "/meeting/weekly/me") {
+			t.Fatalf("%s location=%s", role, loc)
+		}
+	}
 	tech := weeklyGet(t, e, "/meeting/weekly?date=2026-10-19&assignee=all", jwtCookieUserClaims(t, yang))
-	if tech.Code != http.StatusOK {
-		t.Fatalf("tech team status=%d", tech.Code)
-	}
-	tb := tech.Body.String()
-	if !strings.Contains(tb, "R2610-C01") {
-		t.Fatal("일반 팀원 팀 자료에 타인 건이 없다")
-	}
-	if !strings.Contains(tb, "data-weekly-edit") {
-		t.Fatal("본인 건 수정 단추가 없다")
+	if tech.Code != http.StatusFound {
+		t.Fatalf("tech team status=%d want 302", tech.Code)
 	}
 
 	me := weeklyGet(t, e, "/meeting/weekly/me?date=2026-10-19&assignee="+url.QueryEscape("최혜영")+"&mine=0", jwtCookieUserClaims(t, yang))

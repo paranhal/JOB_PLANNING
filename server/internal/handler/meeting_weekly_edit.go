@@ -16,7 +16,7 @@ func (h *MeetingHandler) markWeeklyCanEdit(c echo.Context, items []model.WorkLis
 }
 
 func (h *MeetingHandler) weeklyItemCanEdit(c echo.Context, it model.WorkListItem) bool {
-	if h == nil || isReadOnly(c) || viewAsActive(c) {
+	if h == nil || isReadOnly(c) || viewAsActive(c) || currentRole(c) == model.RoleCLevel {
 		return false
 	}
 	switch it.Prefix {

@@ -19,13 +19,31 @@ type MeetingHandler struct {
 	work     *repository.WorkBoardRepo
 	stats    *repository.StatsRepo
 	userRepo *repository.UserRepo
+	orgRepo  *repository.OrgRepo
 	asRepo   *repository.ASRepo
 	asH      *ASHandler
 	leave    *LeaveHandler
 }
 
-func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo, asRepo *repository.ASRepo) *MeetingHandler {
-	return &MeetingHandler{work: work, stats: stats, userRepo: userRepo, asRepo: asRepo}
+func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo, asRepo *repository.ASRepo, orgRepo *repository.OrgRepo) *MeetingHandler {
+	return &MeetingHandler{work: work, stats: stats, userRepo: userRepo, orgRepo: orgRepo, asRepo: asRepo}
+}
+
+func (h *MeetingHandler) meetingPicker(c echo.Context) (opts []meetingPickerOpt, users []model.User, canTeam bool, org string, showOrgPick bool, orgs []model.Org) {
+	canTeam, org = meetingTeamScope(c)
+	if canTeam {
+		opts = listMeetingPicker(h.userRepo, h.orgRepo, c)
+		users = meetingPickerValues(opts)
+		showOrgPick = canSwitchOrg(c)
+		if showOrgPick && h.orgRepo != nil {
+			if rows, err := h.orgRepo.List(); err == nil {
+				for _, row := range rows {
+					orgs = append(orgs, row.Org)
+				}
+			}
+		}
+	}
+	return
 }
 
 // Show GET /meeting?date=YYYY-MM-DD&assignee=
@@ -34,13 +52,10 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 	dateStr := today.Format("2006-01-02")
 	prevStr := today.AddDate(0, 0, -1).Format("2006-01-02")
 
-	var users []model.User
-	if h.userRepo != nil {
-		users = listAssignableForPicker(h.userRepo, c)
-	}
+	opts, users, canTeam, orgScope, showOrgPick, orgs := h.meetingPicker(c)
 	selected := resolveMeetingAssignee(c, users)
 	order := assignableNameOrder(users)
-	assigneeQ := meetingAssigneeQuery(selected)
+	assigneeQ := meetingNavQuery(selected, "", orgScope, showOrgPick)
 	mineUID, mineKeys := meetingAssigneeKeys(selected, users)
 
 	yesterday, err := h.work.ListCompletedOn(prevStr, mineUID, mineKeys, 300)
@@ -78,11 +93,17 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 	}
 	progress = meetingProgressExcludingScheduled(progress, dateStr)
 
+	yesterday = h.filterMeetingOrg(c, yesterday)
+	todayDone = h.filterMeetingOrg(c, todayDone)
+	todayItems = h.filterMeetingOrg(c, todayItems)
+	progress = h.filterMeetingOrg(c, progress)
+	unplannedNeed = h.filterMeetingOrg(c, unplannedNeed)
+
 	kanban := model.FillMeetingKanban(yesterday, todayDone, progress, todayItems, unplannedNeed)
 	plannedN := model.MeetingKanbanScheduledSum(kanban)
 	logMeetingPlannedIdentity(dateStr, selected, plannedN, kanban)
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
-	navQ := meetingNavQuery(selected, display)
+	navQ := meetingNavQuery(selected, display, orgScope, showOrgPick)
 	overviewQ := meetingOverviewQuery(dateStr, selected, len(yesterday), plannedN, len(unplannedRaw))
 
 	return c.Render(http.StatusOK, "meeting/show.html", map[string]interface{}{
@@ -107,8 +128,13 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		"AssigneeQ":       template.URL(assigneeQ),
 		"NavQ":            template.URL(navQ),
 		"Display":         display,
-		"KanbanHref":      "/meeting?" + meetingFilterQuery(dateStr, selected, "kanban"),
-		"ListHref":        "/meeting?" + meetingFilterQuery(dateStr, selected, "list"),
+		"KanbanHref":      "/meeting?" + meetingFilterQuery(dateStr, selected, "kanban", orgScope, showOrgPick),
+		"ListHref":        "/meeting?" + meetingFilterQuery(dateStr, selected, "list", orgScope, showOrgPick),
+		"Picker":          opts,
+		"CanTeam":         canTeam,
+		"ShowOrgPick":     showOrgPick,
+		"ViewOrgID":       orgScope,
+		"Orgs":            orgs,
 		"KanbanColumns":   kanban.Columns,
 		"KanbanTotal":     kanban.Total,
 		"KanbanDrag":      false,
@@ -127,10 +153,7 @@ func (h *MeetingHandler) Overview(c echo.Context) error {
 	dateStr := today.Format("2006-01-02")
 	prevStr := today.AddDate(0, 0, -1).Format("2006-01-02")
 
-	var users []model.User
-	if h.userRepo != nil {
-		users = listAssignableForPicker(h.userRepo, c)
-	}
+	_, users, _, _, _, _ := h.meetingPicker(c)
 	selected := resolveMeetingAssignee(c, users)
 
 	cols := repository.BuildStatsPeriodColumns(model.StatsViewDay, today)
@@ -239,9 +262,50 @@ func parseMeetingAnchor(s string) time.Time {
 	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, n.Location())
 }
 
+func (h *MeetingHandler) filterMeetingOrg(c echo.Context, items []model.WorkListItem) []model.WorkListItem {
+	org := currentOrg(c)
+	if org == "" || org == repository.OrgAll || len(items) == 0 {
+		return items
+	}
+	allow := map[string]bool{}
+	foreign := map[string]bool{}
+	if h.userRepo != nil {
+		if list, err := h.userRepo.ListAssignable(org); err == nil {
+			for _, u := range list {
+				if n := strings.TrimSpace(u.FullName); n != "" {
+					allow[n] = true
+				}
+			}
+		}
+		for _, n := range h.userRepo.AssigneeNamesOnWork(org) {
+			allow[n] = true
+		}
+		if list, err := h.userRepo.ListAssignable(repository.OrgAll); err == nil {
+			for _, u := range list {
+				n := strings.TrimSpace(u.FullName)
+				if n != "" && !allow[n] {
+					foreign[n] = true
+				}
+			}
+		}
+	}
+	var out []model.WorkListItem
+	for _, it := range items {
+		a := strings.TrimSpace(it.Assignee)
+		if foreign[a] {
+			continue
+		}
+		if a != "" && !allow[a] {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
+}
+
 func meetingScopeNote(assignee string) string {
 	if assignee != "" {
-		return assignee + " 기준"
+		return assignee + " 님 자료"
 	}
 	return "전체 업무 기준"
 }
