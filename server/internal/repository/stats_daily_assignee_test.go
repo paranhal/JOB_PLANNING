@@ -53,7 +53,7 @@ func TestBuildDailyAssigneeReportHolidayGrayAndWorkingTotal(t *testing.T) {
 		if d.Date == "2026-08-12" {
 			wed = i
 			if !d.Off {
-				t.Fatal("공휴일 열이 회색(Off)이 아님")
+				t.Fatal("공휴일 열이 Off가 아님")
 			}
 		}
 		if d.Date == "2026-08-13" {

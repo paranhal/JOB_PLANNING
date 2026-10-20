@@ -111,4 +111,106 @@ func TestWriteDailyAssigneeLeaveMark(t *testing.T) {
 	if got != "연차" {
 		t.Fatalf("연차 칸=%q", got)
 	}
+	if cellFillRGB(t, f, dailyMatrixSheet, "E3") != "FF4D4F" {
+		t.Fatalf("연차 바탕=%s", cellFillRGB(t, f, dailyMatrixSheet, "E3"))
+	}
+}
+
+func TestWriteDailyAssigneeHolidayLeaveFills(t *testing.T) {
+	f := excelize.NewFile()
+	defer f.Close()
+	rep := model.DailyAssigneeReport{
+		From: "2026-10-01", To: "2026-10-07", FileDay: "20261007", WorkingDays: 4,
+		HolidayYearMissing: false,
+		Days: []model.DailyAssigneeDay{
+			{Date: "2026-10-01", Label: "10-01(목)"},
+			{Date: "2026-10-02", Label: "10-02(금)", Off: true},
+			{Date: "2026-10-03", Label: "10-03(토)", Off: true},
+			{Date: "2026-10-04", Label: "10-04(일)", Off: true},
+			{Date: "2026-10-05", Label: "10-05(월)"},
+			{Date: "2026-10-06", Label: "10-06(화)"},
+			{Date: "2026-10-07", Label: "10-07(수)"},
+		},
+		People: []model.DailyAssigneePerson{
+			{
+				Label: "A", Counts: []int{2, 0, 0, 0, 0, 0, 0}, Minutes: []int{40, 0, 0, 0, 0, 0, 0},
+				CountTotal: 2, HasCountAvg: true, CountAvg: 0.5, CountMax: 2,
+				MinuteTotal: 40, HasMinuteAvg: true, MinuteAvg: 10, MinuteMax: 40,
+				LeaveMarks: []string{"", "", "", "", "연차", "", ""},
+			},
+			{
+				Label: "B", Counts: []int{0, 0, 0, 0, 1, 0, 1}, Minutes: []int{0, 0, 0, 0, 20, 0, 10},
+				CountTotal: 2, HasCountAvg: true, CountAvg: 0.5, CountMax: 1,
+				MinuteTotal: 30, HasMinuteAvg: true, MinuteAvg: 7.5, MinuteMax: 20,
+				LeaveMarks: []string{"", "", "", "", "", "오전반차", ""},
+			},
+		},
+		TeamCounts: []int{2, 0, 0, 0, 1, 0, 1}, TeamMinutes: []int{40, 0, 0, 0, 20, 0, 10},
+		TeamCountTotal: 4, HasTeamCountAvg: true, TeamCountAvg: 1, TeamCountMax: 2,
+		TeamMinuteTotal: 70, HasTeamMinuteAvg: true, TeamMinuteAvg: 17.5, TeamMinuteMax: 40,
+		Details: []model.DailyAssigneeDetailRow{
+			{Assignee: "A", Date: "2026-10-02", Weekday: "금", Kind: "AS", WorkNo: "R-off", NewPerson: true},
+			{Assignee: "A", Date: "2026-10-02", Weekday: "금", Kind: "합계", IsDayTotal: true},
+			{Assignee: "B", Date: "2026-10-05", Weekday: "월", Kind: "AS", WorkNo: "R-b", NewPerson: true},
+		},
+	}
+	if err := writeDailyMatrixSheet(f, rep); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeDailyDetailSheet(f, rep); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.DeleteSheet("Sheet1")
+	assertExcelizeRGB8(t, excelizeFileBytes(t, f))
+
+	a1, _ := f.GetCellValue(dailyMatrixSheet, "A1")
+	if !strings.Contains(a1, "빨강=토·일·공휴일·휴가") {
+		t.Fatalf("범례 없음: %s", a1)
+	}
+
+	// 열: B=목 C=금공휴 D=토 E=일 F=월 G=화 H=수 / 행2 헤더, 행3 A, 행4 B, 행5 합계
+	for _, cell := range []string{"C2", "C3", "C4", "C5", "D2", "D3", "E2", "E5"} {
+		if got := cellFillRGB(t, f, dailyMatrixSheet, cell); got != "FF4D4F" {
+			t.Fatalf("%s 바탕=%s want FF4D4F", cell, got)
+		}
+	}
+	annual, _ := f.GetCellValue(dailyMatrixSheet, "F3")
+	if annual != "연차" {
+		t.Fatalf("A 연차=%q", annual)
+	}
+	if cellFillRGB(t, f, dailyMatrixSheet, "F3") != "FF4D4F" {
+		t.Fatalf("A 연차 바탕=%s", cellFillRGB(t, f, dailyMatrixSheet, "F3"))
+	}
+	if cellFillRGB(t, f, dailyMatrixSheet, "F4") != "" {
+		t.Fatalf("같은 날 B는 빨강이면 안 됨: %s", cellFillRGB(t, f, dailyMatrixSheet, "F4"))
+	}
+	half, _ := f.GetCellValue(dailyMatrixSheet, "G4")
+	if half != "오전반차" {
+		t.Fatalf("B 반차=%q", half)
+	}
+	if cellFillRGB(t, f, dailyMatrixSheet, "G4") != "FF4D4F" {
+		t.Fatalf("B 반차 바탕=%s", cellFillRGB(t, f, dailyMatrixSheet, "G4"))
+	}
+	zero, _ := f.GetCellValue(dailyMatrixSheet, "H3")
+	if zero != "0" {
+		t.Fatalf("평일 0건 값=%q", zero)
+	}
+	if cellFillRGB(t, f, dailyMatrixSheet, "H3") != cellFillRGB(t, f, dailyMatrixSheet, "B3") {
+		t.Fatalf("0건 바탕=%s 일반=%s", cellFillRGB(t, f, dailyMatrixSheet, "H3"), cellFillRGB(t, f, dailyMatrixSheet, "B3"))
+	}
+	sat, _ := f.GetCellValue(dailyMatrixSheet, "D3")
+	if sat == "연차" {
+		t.Fatal("주말 칸에 휴가 문구")
+	}
+	if cellFillRGB(t, f, dailyDetailSheet, "B3") != "FF4D4F" {
+		t.Fatalf("상세 공휴일 날짜 칸=%s", cellFillRGB(t, f, dailyDetailSheet, "B3"))
+	}
+
+	rep.HolidayYearMissing = true
+	f2 := excelize.NewFile()
+	defer f2.Close()
+	if err := writeDailyMatrixSheet(f2, rep); err != nil {
+		t.Fatal(err)
+	}
+	assertExcelizeRGB8(t, excelizeFileBytes(t, f2))
 }

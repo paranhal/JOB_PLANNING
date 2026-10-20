@@ -51,10 +51,10 @@ func LeaveBadgeText(name, kind string) string {
 	return name + " " + LeaveKindLabel(kind)
 }
 
-// LeaveCellMark §16.4 담당자별 일일업무 칸 표기.
+// LeaveCellMark §16.4 담당자별 일일업무 칸 표기. 연차·반차 구분은 문구(D-112).
 func LeaveCellMark(kind string) string {
 	if strings.TrimSpace(kind) == "" {
 		return ""
 	}
-	return "연차"
+	return LeaveKindLabel(kind)
 }

@@ -560,7 +560,7 @@ type DailyAssigneeReport struct {
 type DailyAssigneeDay struct {
 	Date  string // YYYY-MM-DD
 	Label string // 08-10(월)
-	Off   bool   // 토·일·공휴일 — 회색, 합계 제외
+	Off   bool   // 토·일·공휴일 — 빨강, 합계 제외 (D-112)
 }
 
 // DailyAssigneePerson 매트릭스 한 행.
@@ -577,7 +577,7 @@ type DailyAssigneePerson struct {
 	MinuteAvg    float64
 	HasMinuteAvg bool
 	MinuteMax    int
-	LeaveMarks   []string // 칸마다 "연차" 또는 "". 날짜를 휴일로 칠하지 않는다. §23.13.6
+	LeaveMarks   []string // 칸마다 연차·반차 문구 또는 "". 평일 휴가 칸은 빨강(D-112, 구 §23.13.6 대체)
 }
 
 // DailyAssigneeDetailRow 담당자별 상세 1행. IsDayTotal이면 그날 합계.

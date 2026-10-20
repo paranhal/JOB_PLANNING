@@ -134,23 +134,41 @@ func TestDailyAssigneeStoredFillColors(t *testing.T) {
 	raw := excelizeFileBytes(t, f)
 	assertExcelizeRGB8(t, raw)
 	styles := stylesXML(t, raw)
-	for _, want := range []string{`rgb="FF1E3A5F"`, `rgb="FFE5E7EB"`, `rgb="FFFECACA"`} {
-		if !strings.Contains(styles, want) {
-			t.Fatalf("%s 없음", want)
-		}
+	if !strings.Contains(styles, `rgb="FF1E3A5F"`) {
+		t.Fatal("헤더 남색 FF1E3A5F 없음")
 	}
-	head, err := f.GetCellStyle(dailyMatrixSheet, "A2")
-	if err != nil || head == 0 {
-		t.Fatalf("헤더 A2 스타일=%d err=%v", head, err)
+	if !strings.Contains(styles, `rgb="FFFF4D4F"`) {
+		t.Fatal("휴일 빨강 FFFF4D4F 없음")
 	}
-	off, err := f.GetCellStyle(dailyMatrixSheet, "D2")
-	if err != nil || off == 0 || off == head {
-		t.Fatalf("휴일 헤더 D2 스타일=%d head=%d err=%v", off, head, err)
+	if strings.Contains(styles, `rgb="FFE5E7EB"`) || strings.Contains(styles, `rgb="FFFECACA"`) {
+		t.Fatal("옛 회색·0건 빨강이 남음")
 	}
-	zero, err := f.GetCellStyle(dailyMatrixSheet, "E3")
-	if err != nil || zero == 0 || zero == head || zero == off {
-		t.Fatalf("0건 E3 스타일=%d head=%d off=%d err=%v", zero, head, off, err)
+	if cellFillRGB(t, f, dailyMatrixSheet, "D2") != "FF4D4F" {
+		t.Fatalf("휴일 헤더 D2=%s", cellFillRGB(t, f, dailyMatrixSheet, "D2"))
 	}
+	if cellFillRGB(t, f, dailyMatrixSheet, "E3") != "" {
+		t.Fatalf("평일 0건 E3 바탕=%s want 없음", cellFillRGB(t, f, dailyMatrixSheet, "E3"))
+	}
+}
+
+func cellFillRGB(t *testing.T, f *excelize.File, sheet, cell string) string {
+	t.Helper()
+	idx, err := f.GetCellStyle(sheet, cell)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := f.GetStyle(idx)
+	if err != nil {
+		t.Fatalf("GetStyle(%d) %s: %v", idx, cell, err)
+	}
+	if st == nil || len(st.Fill.Color) == 0 {
+		return ""
+	}
+	rgb := strings.ToUpper(strings.TrimPrefix(st.Fill.Color[0], "#"))
+	if len(rgb) == 8 && strings.HasPrefix(rgb, "FF") {
+		return rgb[2:]
+	}
+	return rgb
 }
 
 func TestExcelizeExportsStyleRGB8(t *testing.T) {

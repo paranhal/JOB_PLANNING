@@ -59,9 +59,9 @@ func writeDailyMatrixSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    weeklyThinBorder(),
 	})
-	offHeadSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FF374151")},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFE5E7EB")}, Pattern: 1},
+	holidayHeadSt, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF4D4F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border:    weeklyThinBorder(),
 	})
@@ -70,20 +70,15 @@ func writeDailyMatrixSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
-	offSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FF6B7280")},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFE5E7EB")}, Pattern: 1},
-		Alignment: &excelize.Alignment{Horizontal: "center"},
-		Border:    weeklyThinBorder(),
-	})
-	zeroSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFB91C1C")},
-		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FFFECACA")}, Pattern: 1},
+	holidaySt, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF4D4F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
 	leaveSt, _ := f.NewStyle(&excelize.Style{
-		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFF97316")},
+		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF4D4F")}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center"},
 		Border:    weeklyThinBorder(),
 	})
@@ -102,18 +97,18 @@ func writeDailyMatrixSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 	if rep.HolidayYearMissing {
 		title += " · 공휴일 미등록"
 	}
-	title += " · 과거 이관 데이터 제외"
+	title += " · 과거 이관 데이터 제외 · 빨강=토·일·공휴일·휴가"
 	_ = f.SetCellValue(dailyMatrixSheet, "A1", title)
 
 	countEnd := writeDailyMatrixBlock(f, dailyMatrixSheet, 2, "담당자", rep, true,
-		headSt, offHeadSt, plainSt, offSt, zeroSt, leaveSt, totalSt, nameSt)
+		headSt, holidayHeadSt, plainSt, holidaySt, leaveSt, totalSt, nameSt)
 
 	minTitleRow := countEnd + 2
 	minTitle := fmt.Sprintf("[일자별]  %s ~ %s · 소요시간(분) 기준", rep.From, shortMD(rep.To))
 	cell, _ := excelize.CoordinatesToCellName(1, minTitleRow)
 	_ = f.SetCellValue(dailyMatrixSheet, cell, minTitle)
 	writeDailyMatrixBlock(f, dailyMatrixSheet, minTitleRow+1, "담당자", rep, false,
-		headSt, offHeadSt, plainSt, offSt, zeroSt, leaveSt, totalSt, nameSt)
+		headSt, holidayHeadSt, plainSt, holidaySt, leaveSt, totalSt, nameSt)
 
 	lastCol, _ := excelize.CoordinatesToCellName(1+len(rep.Days)+3, 1)
 	_ = f.MergeCell(dailyMatrixSheet, "A1", lastCol)
@@ -134,7 +129,7 @@ func writeDailyMatrixSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 }
 
 func writeDailyMatrixBlock(f *excelize.File, sheet string, headerRow int, nameHeader string, rep model.DailyAssigneeReport, counts bool,
-	headSt, offHeadSt, plainSt, offSt, zeroSt, leaveSt, totalSt, nameSt int) int {
+	headSt, holidayHeadSt, plainSt, holidaySt, leaveSt, totalSt, nameSt int) int {
 	headers := []string{nameHeader}
 	for _, d := range rep.Days {
 		headers = append(headers, d.Label)
@@ -145,7 +140,7 @@ func writeDailyMatrixBlock(f *excelize.File, sheet string, headerRow int, nameHe
 		_ = f.SetCellValue(sheet, cell, h)
 		st := headSt
 		if i >= 1 && i <= len(rep.Days) && rep.Days[i-1].Off {
-			st = offHeadSt
+			st = holidayHeadSt
 		}
 		_ = f.SetCellStyle(sheet, cell, cell, st)
 	}
@@ -171,9 +166,7 @@ func writeDailyMatrixBlock(f *excelize.File, sheet string, headerRow int, nameHe
 				st = totalSt
 			}
 			if i < len(rep.Days) && rep.Days[i].Off {
-				st = offSt
-			} else if i < len(rep.Days) && !rep.Days[i].Off && v == 0 {
-				st = zeroSt
+				st = holidaySt
 			}
 			_ = f.SetCellStyle(sheet, cell, cell, st)
 		}
@@ -238,6 +231,12 @@ func writeDailyDetailSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		Font:   &excelize.Font{Size: 10, Family: "맑은 고딕"},
 		Border: weeklyThinBorder(),
 	})
+	holidayDateSt, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Size: 10, Family: "맑은 고딕", Color: xlColor("FFFFFF")},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{xlColor("FF4D4F")}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center"},
+		Border:    weeklyThinBorder(),
+	})
 	totalSt, _ := f.NewStyle(&excelize.Style{
 		Font:   &excelize.Font{Bold: true, Size: 10, Family: "맑은 고딕"},
 		Fill:   excelize.Fill{Type: "pattern", Color: []string{xlColor("FFF1F5F9")}, Pattern: 1},
@@ -253,6 +252,24 @@ func writeDailyDetailSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		},
 	})
 
+	offDate := map[string]bool{}
+	for _, d := range rep.Days {
+		if d.Off {
+			offDate[d.Date] = true
+		}
+	}
+	leaveDate := map[string]map[string]bool{}
+	for _, p := range rep.People {
+		for i, d := range rep.Days {
+			if i < len(p.LeaveMarks) && p.LeaveMarks[i] != "" {
+				if leaveDate[p.Label] == nil {
+					leaveDate[p.Label] = map[string]bool{}
+				}
+				leaveDate[p.Label][d.Date] = true
+			}
+		}
+	}
+
 	for i, row := range rep.Details {
 		r := i + 3
 		vals := []interface{}{
@@ -267,10 +284,15 @@ func writeDailyDetailSheet(f *excelize.File, rep model.DailyAssigneeReport) erro
 		} else if row.NewPerson {
 			st = breakSt
 		}
+		redDate := offDate[row.Date] || leaveDate[row.Assignee][row.Date]
 		for j, v := range vals {
 			cell, _ := excelize.CoordinatesToCellName(j+1, r)
 			_ = f.SetCellValue(dailyDetailSheet, cell, v)
-			_ = f.SetCellStyle(dailyDetailSheet, cell, cell, st)
+			cellSt := st
+			if redDate && (j == 1 || j == 2) {
+				cellSt = holidayDateSt
+			}
+			_ = f.SetCellStyle(dailyDetailSheet, cell, cell, cellSt)
 		}
 	}
 	last := len(rep.Details) + 2
