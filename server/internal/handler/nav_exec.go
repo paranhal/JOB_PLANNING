@@ -34,6 +34,8 @@ func execNavDefinition(orgs []model.Org) []navDefGroup {
 				{ID: "exec_contract", Label: "사업·계약", Show: show, Children: []navDefItem{
 					{ID: "exec_proj_dash", Label: "사업 대시보드", Href: "/projects/dashboard", Active: []string{NavProjectsDashboard}, Show: show},
 					{ID: "exec_projects", Label: "사업 목록", Href: "/projects", Active: []string{NavProjects}, Show: show},
+					{ID: "exec_coop_inbox", Label: "받은 협조", Href: "/cooperations/inbox", Active: []string{NavCoopInbox}, Show: show},
+					{ID: "exec_coop_sent", Label: "보낸 협조", Href: "/cooperations/sent", Active: []string{NavCoopSent}, Show: show},
 					{ID: "exec_quotes", Label: "견적·수주·계약", Href: "/quotes", Active: []string{NavQuotes, NavOrders, NavContracts, NavDocsHub}, Show: show},
 					{ID: "exec_registry", Label: "사업 등록 현황", Href: "/projects/registry", Active: []string{NavProjectsRegistry}, Show: show},
 				}},

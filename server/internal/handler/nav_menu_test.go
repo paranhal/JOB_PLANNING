@@ -182,7 +182,7 @@ func TestNavShowProjectsFlagOnlyChangesProjectGroup(t *testing.T) {
 	for _, h := range ha {
 		if !containsHref(hb, h) {
 			onlyA++
-			if !strings.HasPrefix(h, "/projects") {
+			if !strings.HasPrefix(h, "/projects") && !strings.HasPrefix(h, "/cooperations") {
 				t.Errorf("플래그로 %s 가 사라지면 안 된다", h)
 			}
 		}

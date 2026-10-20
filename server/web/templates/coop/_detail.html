@@ -1,0 +1,96 @@
+<div class="modal-backdrop" data-coop-dialog-root>
+  <div role="dialog" aria-modal="true" aria-labelledby="coop-detail-title" class="modal-panel mx-auto mt-10 max-w-2xl w-full space-y-3 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-start justify-between gap-2">
+      <h2 id="coop-detail-title" class="text-ui-xl font-extrabold text-ink">{{.Title}}</h2>
+      <button type="button" class="btn btn-ghost btn-sm" data-close-coop>닫기</button>
+    </div>
+    <p class="text-ui-sm text-ink-muted">{{.KindLabel}} · {{.Item.ReqOrgName}} → {{.Item.TargetOrgName}} · <span class="badge badge-neutral">{{.StatusLabel}}</span>
+      {{if .Item.Overdue}}<span class="badge badge-warning">지연</span>{{end}}
+      {{if .Item.IncompleteAS}}<span class="badge badge-warning">보완 필요</span>{{end}}
+      {{if .OnBehalf}}<span class="badge badge-neutral">(대결)</span>{{end}}
+    </p>
+    <p class="text-ui whitespace-pre-wrap">{{.Item.Body}}</p>
+    {{if .Files}}
+    <div>
+      {{range .Files}}
+      <a class="text-primary text-ui-sm" href="/cooperations/files/{{.ID}}">{{.FileName}}</a>
+      {{end}}
+    </div>
+    {{end}}
+    {{if .Item.RejectReason}}<p class="text-ui text-danger">거부 사유: {{.Item.RejectReason}}</p>{{end}}
+    {{if .Item.Instruction}}<p class="text-ui">지시: {{.Item.Instruction}}</p>{{end}}
+    {{if and .Item.ProjectID (or (eq .Item.Status "accepted") (eq .Item.Status "assigned"))}}
+    <p class="text-ui-sm"><a class="text-primary" href="/cooperations/{{.Item.CoopID}}/project.json">연결 사업 (읽기 전용)</a> {{.Item.ProjectName}}</p>
+    {{else if .Item.ProjectName}}
+    <p class="text-ui-sm text-ink-muted">연결 사업: {{.Item.ProjectName}}</p>
+    {{end}}
+    {{if .CanCancel}}
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/cancel"><button class="btn btn-secondary btn-sm" type="submit">취소</button></form>
+    {{end}}
+    {{if and .CanRequest (or (eq .Item.Status "rejected") (eq .Item.Status "cancelled") (eq .Item.Status "completed"))}}
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/rerequest"><button class="btn btn-secondary btn-sm" type="submit">재요청</button></form>
+    {{end}}
+    {{if and .CanAct (eq .Item.Status "requested")}}
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/accept"><button class="btn btn-primary btn-sm" type="submit">수락</button></form>
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/reject" class="space-y-1">
+      <label class="text-ui-sm text-ink-muted" for="coop-reject">거부 사유</label>
+      <input id="coop-reject" name="reject_reason" required class="input w-full">
+      <button class="btn btn-secondary btn-sm" type="submit">거부</button>
+    </form>
+    {{end}}
+    {{if and .CanAct (or (eq .Item.Status "accepted") (eq .Item.Status "assigned"))}}
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/assign" class="space-y-2">
+      <p class="text-ui font-medium">배정</p>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-ui-sm text-ink-muted" for="coop-plan-s">확정 시작</label>
+          <input id="coop-plan-s" type="date" name="plan_start" required class="input w-full" value="{{.Item.PlanStart}}">
+        </div>
+        <div>
+          <label class="text-ui-sm text-ink-muted" for="coop-plan-e">확정 종료</label>
+          <input id="coop-plan-e" type="date" name="plan_end" required class="input w-full" value="{{.Item.PlanEnd}}">
+        </div>
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="coop-group">업무 그룹</label>
+        <select id="coop-group" name="work_group_id" class="select w-full">
+          <option value="">개인 배정</option>
+          {{range .Groups}}
+          <option value="{{.GroupID}}" {{if eq $.Item.WorkGroupID .GroupID}}selected{{end}}>{{.Name}}</option>
+          {{end}}
+        </select>
+      </div>
+      <fieldset>
+        <legend class="text-ui-sm text-ink-muted">담당 개인</legend>
+        {{range .Candidates}}
+        <label class="flex items-center gap-2 text-ui"><input type="checkbox" name="user_id" value="{{.UserID}}"> {{.FullName}}</label>
+        {{end}}
+      </fieldset>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="coop-inst">지시</label>
+        <textarea id="coop-inst" name="instruction" rows="2" class="input w-full">{{.Item.Instruction}}</textarea>
+      </div>
+      <button class="btn btn-primary btn-sm" type="submit">배정 저장</button>
+    </form>
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/groups" class="space-y-1" data-coop-new-group>
+      <label class="text-ui-sm text-ink-muted" for="coop-new-g">새 업무 그룹 만들기</label>
+      <input id="coop-new-g" name="name" class="input w-full" required>
+      <button class="btn btn-secondary btn-sm" type="submit">그룹 만들기</button>
+    </form>
+    <form method="post" action="/cooperations/{{.Item.CoopID}}/complete" class="space-y-1">
+      {{if .NeedReason}}<p class="text-ui-sm text-ink-muted">미완료 업무 {{.OpenN}}건. 완료하려면 사유가 필요합니다.</p>{{end}}
+      <label class="text-ui-sm text-ink-muted" for="coop-done">완료 사유</label>
+      <input id="coop-done" name="completed_reason" class="input w-full" {{if .NeedReason}}required{{end}}>
+      <button class="btn btn-secondary btn-sm" type="submit">협조 완료</button>
+    </form>
+    {{end}}
+    <div>
+      <h3 class="text-ui font-medium text-ink">이력</h3>
+      <ul class="text-ui-sm space-y-1">
+        {{range .Events}}
+        <li>{{.At}} · {{.Actor}} · {{.Action}}{{if .OnBehalf}} (대결){{end}} {{.Detail}}</li>
+        {{end}}
+      </ul>
+    </div>
+  </div>
+</div>

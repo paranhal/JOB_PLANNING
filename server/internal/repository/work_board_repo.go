@@ -209,6 +209,7 @@ func (r *WorkBoardRepo) ListBucketOn(bucket, date, mineUserID string, mineKeys [
 	if err != nil {
 		return nil, err
 	}
+	r.fillCoopWorkItems(items)
 	return sortLimitWorkItems(items, limit), nil
 }
 
@@ -242,6 +243,7 @@ func (r *WorkBoardRepo) ListScheduledOn(date, mineUserID string, mineKeys []stri
 	if err != nil {
 		return nil, err
 	}
+	r.fillCoopWorkItems(items)
 	return sortLimitWorkItems(items, limit), nil
 }
 
@@ -253,6 +255,7 @@ func (r *WorkBoardRepo) ListCompletedOn(date, mineUserID string, mineKeys []stri
 	if err != nil {
 		return nil, err
 	}
+	r.fillCoopWorkItems(items)
 	return sortLimitWorkItems(items, limit), nil
 }
 
@@ -347,6 +350,7 @@ func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includ
 		}
 		out = appendUniqueWorkItems(out, sales, seen)
 	}
+	r.fillCoopWorkItems(out)
 	return out, nil
 }
 
@@ -381,6 +385,7 @@ func (r *WorkBoardRepo) ListWorkToday(mineUserID string, mineKeys []string, toda
 
 	stampWorkTodayOverdue(out, today)
 	r.fillBlockedReasons(out)
+	r.fillCoopWorkItems(out)
 	return out, nil
 }
 

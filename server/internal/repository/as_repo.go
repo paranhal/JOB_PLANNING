@@ -673,6 +673,16 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() && !model.AppDateYearOK(*as.CompleteDatetime) {
 		return model.ErrAppDateYear
 	}
+	if model.IsStatsCompletedStatus(as.Status) {
+		var incomplete int
+		_ = r.db.QueryRow(`SELECT COALESCE(coop_incomplete,0) FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&incomplete)
+		if incomplete == 1 {
+			return fmt.Errorf("협조 AS는 보완 후에 완료할 수 있습니다")
+		}
+	}
+	if strings.TrimSpace(as.CustomerID) != "" && strings.TrimSpace(as.VisitScheduledDate) != "" {
+		_, _ = r.db.Exec(`UPDATE as_receipts SET coop_incomplete=0 WHERE as_id=? AND COALESCE(cooperation_id,'')!=''`, as.ASID)
+	}
 	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
 	oldName, oldUID := readAssigneePair(r.db, "as_receipts", "as_id", as.ASID, "assigned_to", "assigned_user_id")
 	now := time.Now()
@@ -992,6 +1002,11 @@ func (r *ASRepo) CompleteTransfer(asID, resultCode, completeDate string) error {
 	}
 	if len(completeDT) == 10 {
 		completeDT = completeDT + " 00:00:00"
+	}
+	var incomplete int
+	_ = r.db.QueryRow(`SELECT COALESCE(coop_incomplete,0) FROM as_receipts WHERE as_id=?`, asID).Scan(&incomplete)
+	if incomplete == 1 {
+		return fmt.Errorf("협조 AS는 보완 후에 완료할 수 있습니다")
 	}
 	err := r.touchReceipt(asID, func() error {
 		_, err := r.db.Exec(`UPDATE as_receipts SET status='completed', result_code=?, complete_datetime=?, updated_at=? WHERE as_id=?`,

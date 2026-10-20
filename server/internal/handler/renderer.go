@@ -56,6 +56,11 @@ func templateFiles(name string) []string {
 			files = append(files, partials...)
 		}
 	}
+	if strings.HasPrefix(name, "coop/") {
+		if partials, err := filepath.Glob("web/templates/coop/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "leave/") {
 		if partials, err := filepath.Glob("web/templates/leave/_*.html"); err == nil {
 			files = append(files, partials...)
@@ -411,6 +416,8 @@ func funcMap() template.FuncMap {
 		"workPrefixLabel": func(s string) string {
 			return model.WorkPrefixLabel(s)
 		},
+		"coopKindLabel":   model.CoopKindLabel,
+		"coopStatusLabel": model.CoopStatusLabel,
 		"workAssignKey": workAssignKey,
 		"workEmbedHref": workEmbedHref,
 		"noticeEmbed": func(n model.AssignNotice) string {

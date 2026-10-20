@@ -143,13 +143,22 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 		"Notice":        strings.TrimSpace(c.QueryParam("notice")),
 		"ShowLeave":     false,
 		"ShowInbox":     false,
-		"ShowCoop":      false,
+		"ShowCoop":      true,
+		"SentCoops":     meetingSentCoops(h.coop, c, team),
+		"SentCoopTitle": weeklyCoopTitle(team),
 		"LeaveRemain":   "—",
 	}
 	if !team {
 		h.fillWeeklyPersonalCards(c, mon, fri, data)
 	}
 	return c.Render(http.StatusOK, "meeting/weekly.html", data)
+}
+
+func weeklyCoopTitle(team bool) string {
+	if team {
+		return "타 조직 지원 요청"
+	}
+	return "내가 보낸 협조"
 }
 
 func weeklyExcelLabel(team bool) string {

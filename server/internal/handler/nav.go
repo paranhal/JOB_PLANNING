@@ -38,6 +38,8 @@ const (
 	NavAssets            = "assets"
 	NavRelations         = "relations"
 	NavProjects          = "projects"
+	NavCoopInbox         = "coop_inbox"
+	NavCoopSent          = "coop_sent"
 	NavProjectsDashboard = "projects_dashboard"
 	NavProjectsDocs      = "projects_docs"
 	NavProjectsDiary     = "projects_diary"

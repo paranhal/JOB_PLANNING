@@ -21,7 +21,7 @@ func TestCLevelMenuHrefsOrder(t *testing.T) {
 	got := collectNavHrefs(res.Groups)
 	want := []string{
 		"/exec",
-		"/projects/dashboard", "/projects", "/quotes", "/projects/registry",
+		"/projects/dashboard", "/projects", "/cooperations/inbox", "/cooperations/sent", "/quotes", "/projects/registry",
 		"/sales/dashboard", "/sales?view=pipeline", "/sales/activities",
 		"/exec/work", "/work/all", "/work-groups", "/meeting/weekly",
 		"/as", "/maintenance", "/customers", "/assets",

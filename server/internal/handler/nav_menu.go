@@ -20,6 +20,7 @@ type MenuCtx struct {
 	ShowProjects bool
 	NavMail      bool
 	CanViewOrgs  bool
+	CoopInboxOK  bool
 	ExecOrgs     []model.Org
 }
 
@@ -81,6 +82,15 @@ func (c MenuCtx) visProjects() bool {
 	}
 	return c.roleKnown() || c.isObserver() || c.has(model.PermAdminCreate, model.PermWorkboard)
 }
+func (c MenuCtx) visCoopInbox() bool {
+	if !c.visProjects() {
+		return false
+	}
+	if c.Role == model.RoleCLevel || c.isAdmin() {
+		return true
+	}
+	return c.CoopInboxOK
+}
 func (c MenuCtx) visStatsGroup() bool {
 	return c.roleKnown() || c.isSales() || c.isObserver() ||
 		c.has(model.PermStatsView, model.PermSalesView, model.PermStats, model.PermAnalysis)
@@ -131,6 +141,7 @@ type NavBadges struct {
 	Approvals  int
 	Leaves     int
 	AccountReq int
+	CoopInbox  int
 }
 
 type NavItemView struct {
@@ -212,7 +223,11 @@ func navDefinition() []navDefGroup {
 			ID: "project", Label: "사업관리", Show: func(c MenuCtx) bool { return c.visProjects() },
 			Items: []navDefItem{
 				{ID: "proj_dash", Label: "사업 대시보드", Href: "/projects/dashboard", Active: []string{NavProjectsDashboard}, Show: func(c MenuCtx) bool { return c.visProjects() }},
-				{ID: "projects", Label: "사업·업무관리", Href: "/projects", Active: []string{NavProjects}, Show: func(c MenuCtx) bool { return c.visProjects() }},
+				{ID: "projects", Label: "사업·업무관리", Show: func(c MenuCtx) bool { return c.visProjects() }, Badge: "coop", Children: []navDefItem{
+					{ID: "proj_list", Label: "사업 목록", Href: "/projects", Active: []string{NavProjects}, Show: func(c MenuCtx) bool { return c.visProjects() }},
+					{ID: "coop_inbox", Label: "받은 협조", Href: "/cooperations/inbox", Active: []string{NavCoopInbox}, Show: func(c MenuCtx) bool { return c.visCoopInbox() }, Badge: "coop"},
+					{ID: "coop_sent", Label: "보낸 협조", Href: "/cooperations/sent", Active: []string{NavCoopSent}, Show: func(c MenuCtx) bool { return c.visProjects() }},
+				}},
 				{ID: "proj_docs", Label: "서류 작성·관리", Href: "/projects/docs", Active: []string{NavProjectsDocs}, Show: func(c MenuCtx) bool { return c.visProjects() }},
 				{ID: "proj_diary", Label: "업무일지·투입관리", Href: "/projects/diary", Active: []string{NavProjectsDiary}, Show: func(c MenuCtx) bool { return c.visProjects() }},
 				{ID: "proj_reg", Label: "사업 등록 관리", Href: "/projects/registry", Active: []string{NavProjectsRegistry}, Show: func(c MenuCtx) bool { return c.visProjects() }},
@@ -277,6 +292,8 @@ func badgeValue(kind string, b NavBadges) int {
 		return b.Approvals + b.Leaves
 	case "account":
 		return b.AccountReq
+	case "coop":
+		return b.CoopInbox
 	}
 	return 0
 }
@@ -455,6 +472,7 @@ func menuCtxFromData(c echo.Context, data map[string]interface{}) MenuCtx {
 		NavMail:      boolFrom(data, "NavMail"),
 		ShowProjects: boolFrom(data, "ShowProjectsSector"),
 		CanViewOrgs:  boolFrom(data, "CanViewOrgs"),
+		CoopInboxOK:  boolFrom(data, "CoopInboxOK"),
 	}
 	if v := c.Get("org_switch_list"); v != nil {
 		if list, ok := v.([]model.Org); ok {
@@ -511,6 +529,7 @@ func injectNavMenu(c echo.Context, data map[string]interface{}) {
 		AccountReq: intFromData(data, "AccountRequestPending"),
 		Approvals:  intFromData(data, "ApprovalPendingCount"),
 		Leaves:     intFromData(data, "LeavePendingCount"),
+		CoopInbox:  intFromData(data, "CoopInboxCount"),
 	}
 	data["ApprovalPendingCount"] = badges.Approvals
 	data["LeavePendingCount"] = badges.Leaves

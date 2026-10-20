@@ -1,0 +1,54 @@
+{{define "title"}}{{.Title}} · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h2 class="text-ui-xl font-extrabold text-ink">{{.Title}}</h2>
+    </div>
+    {{if .CanRequest}}
+    <button type="button" class="btn btn-primary" id="coop-new" data-coop-open data-href="/cooperations/new">새 협조 요청</button>
+    {{end}}
+  </div>
+  {{if .OK}}<div class="flash-success rounded-control">처리했습니다.</div>{{end}}
+  {{if .Err}}<div class="flash-danger rounded-control">{{.Err}}</div>{{end}}
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui min-w-[720px]">
+      <thead class="text-ink-muted text-left">
+        <tr>
+          <th class="p-3">요청</th>
+          <th class="p-3">구분</th>
+          <th class="p-3">요청 팀</th>
+          <th class="p-3">대상 팀</th>
+          <th class="p-3">일정</th>
+          <th class="p-3">담당</th>
+          <th class="p-3">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t border-line">
+          <td class="p-3">
+            <a href="/cooperations/{{.CoopID}}" class="text-primary" data-coop-open data-href="/cooperations/{{.CoopID}}" data-return-focus>{{.Title}}</a>
+            {{if .ProjectName}}<p class="text-ui-sm text-ink-muted">{{.ProjectName}}</p>{{end}}
+          </td>
+          <td class="p-3">{{coopKindLabel .Kind}}</td>
+          <td class="p-3">{{.ReqOrgName}}</td>
+          <td class="p-3">{{.TargetOrgName}}</td>
+          <td class="p-3 text-ui-sm">{{if .PlanStart}}{{.PlanStart}} ~ {{.PlanEnd}}{{else if .WantStart}}희망 {{.WantStart}} ~ {{.WantEnd}}{{else}}—{{end}}</td>
+          <td class="p-3">{{if .WorkGroupName}}그룹: {{.WorkGroupName}}{{else}}{{range .Assignees}}{{.FullName}} {{end}}{{if not .Assignees}}—{{end}}{{end}}</td>
+          <td class="p-3 whitespace-nowrap">
+            <span class="badge badge-neutral">{{coopStatusLabel .Status}}</span>
+            {{if .Overdue}}<span class="badge badge-warning">지연</span>{{end}}
+            {{if .IncompleteAS}}<span class="badge badge-warning">보완 필요</span>{{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="7" class="p-6 text-center text-ink-subtle">협조가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div id="coop-host"></div>
+<script src="/static/js/coop.js"></script>
+{{end}}

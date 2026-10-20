@@ -56,6 +56,7 @@ type Handler struct {
 	Approval       *ApprovalSettingsHandler
 	Leave          *LeaveHandler
 	WorkGroup      *WorkGroupHandler
+	Coop           *CoopHandler
 	Exec           *ExecHandler
 	notices        *assignNoticeHook
 	help           *repository.LoginHelpRepo
@@ -212,7 +213,11 @@ func New(db *sql.DB) *Handler {
 		Approval:    &ApprovalSettingsHandler{eng: aprEng},
 		Leave:       &LeaveHandler{svc: leaveSvc, eng: aprEng},
 		WorkGroup:   NewWorkGroupHandler(repository.NewWorkGroupRepo(db), userRepo),
-		Exec:        NewExecHandler(repository.NewOrgRepo(db)),
+		Coop: NewCoopHandler(
+			repository.NewCoopRepo(db), userRepo, repository.NewOrgRepo(db),
+			repository.NewProjectRepo(db), repository.NewWorkGroupRepo(db), attachH.uploadDir,
+		),
+		Exec: NewExecHandler(repository.NewOrgRepo(db)),
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,
@@ -227,6 +232,7 @@ func New(db *sql.DB) *Handler {
 	h.AdminWork.notices = noticeHook
 	h.Meeting.asH = h.AS
 	h.Meeting.leave = h.Leave
+	h.Meeting.coop = h.Coop.repo
 	h.Project.salesRepo = repository.NewSalesRepo(db)
 	h.Project.backup = backup.Config{DataDir: dataDirFromEnv(), DB: db}
 	h.Stats.dataDir = dataDirFromEnv()
@@ -259,6 +265,13 @@ func New(db *sql.DB) *Handler {
 			}
 		}
 		data["LeavePendingCount"] = n
+		if h.Coop != nil && currentUserID(c) != "" {
+			a := coopActor(c)
+			if h.Coop.repo.CanInbox(a, a.HomeOrg()) {
+				data["CoopInboxOK"] = true
+				data["CoopInboxCount"] = h.Coop.repo.InboxCount(a)
+			}
+		}
 	}
 	return h
 }

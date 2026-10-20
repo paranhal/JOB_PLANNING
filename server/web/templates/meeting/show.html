@@ -62,6 +62,16 @@
   {{template "kanban_board" .}}
   </div><!--meeting-kanban-->
 
+  {{if .SentCoops}}
+  <div class="card p-4 space-y-2" id="meeting-sent-coop">
+    <h3 class="text-ui font-medium text-ink">{{.SentCoopTitle}}</h3>
+    <ul class="text-ui-sm space-y-1">
+      {{range .SentCoops}}
+      <li><a href="/cooperations/{{.CoopID}}" class="hover:underline">{{.Title}}</a> · {{.TargetOrgName}} · {{coopStatusLabel .Status}}</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
   <div id="meeting-list" class="grid grid-cols-1 xl:grid-cols-2 gap-4 {{if eq .Display "kanban"}}hidden{{end}}">
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
@@ -91,6 +101,7 @@
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
                 {{if .Tentative}}<span class="ml-1 text-[10px] text-gray-400">미확정</span>{{end}}
+                {{if .CoopID}}<span class="ml-1 badge-neutral">협조</span>{{if .CoopFromOrg}}<span class="ml-1 text-[10px] text-ink-muted">요청: {{.CoopFromOrg}}</span>{{end}}{{if .WorkGroupName}}<span class="ml-1 badge-neutral">그룹: {{.WorkGroupName}}</span>{{end}}{{end}}
               </td>
               <td class="meeting-assignee-cell px-3 py-2 text-xs text-ink-muted whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}<span class="badge-neutral">미배정</span>{{end}}</td>
               <td class="px-3 py-2 font-mono text-blue-600 whitespace-nowrap">
@@ -142,6 +153,7 @@
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workPrefixClass .Prefix}}">[{{workPrefixLabel .Prefix}}]</span>
                 {{if .SubLabel}}<span class="ml-1 text-[10px] text-gray-400">{{.SubLabel}}</span>{{end}}
                 {{if .Tentative}}<span class="ml-1 text-[10px] text-gray-400">미확정</span>{{end}}
+                {{if .CoopID}}<span class="ml-1 badge-neutral">협조</span>{{if .CoopFromOrg}}<span class="ml-1 text-[10px] text-ink-muted">요청: {{.CoopFromOrg}}</span>{{end}}{{if .WorkGroupName}}<span class="ml-1 badge-neutral">그룹: {{.WorkGroupName}}</span>{{end}}{{end}}
               </td>
               <td class="meeting-assignee-cell px-3 py-2 text-xs text-ink-muted whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}<span class="badge-neutral">미배정</span>{{end}}</td>
               <td class="px-3 py-2 font-mono text-blue-600 whitespace-nowrap">

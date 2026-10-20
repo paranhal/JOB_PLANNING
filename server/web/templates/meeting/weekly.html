@@ -110,6 +110,20 @@
   </div>
   {{end}}
 
+  {{if .ShowCoop}}
+  <div class="card p-4 space-y-2" id="meeting-sent-coop">
+    <h3 class="text-ui font-medium text-ink">{{.SentCoopTitle}}</h3>
+    {{if .SentCoops}}
+    <ul class="text-ui-sm space-y-1">
+      {{range .SentCoops}}
+      <li><a href="/cooperations/{{.CoopID}}" class="hover:underline">{{.Title}}</a> · {{.TargetOrgName}} · {{coopStatusLabel .Status}}</li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-ui-sm text-ink-subtle">보낸 협조가 없습니다.</p>
+    {{end}}
+  </div>
+  {{end}}
   {{$ret := printf "%s?date=%s" .PagePath .WeekStart}}
   <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
     {{template "meeting_weekly_col" dict "Title" "지난주 완료" "Groups" .DoneGroups "Empty" "지난주 완료가 없습니다." "Return" $ret}}
@@ -144,6 +158,7 @@
         <tr class="hover:bg-hover">
           <td class="px-3 py-2 whitespace-nowrap">
             <span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span>
+            {{if .CoopID}}<span class="badge-neutral">협조</span>{{if .CoopFromOrg}}<span class="text-ui-sm text-ink-muted">요청: {{.CoopFromOrg}}</span>{{end}}{{if .WorkGroupName}}<span class="badge-neutral">그룹: {{.WorkGroupName}}</span>{{end}}{{end}}
           </td>
           <td class="meeting-assignee-cell px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}<span class="badge-neutral">미배정</span>{{end}}</td>
           <td class="px-3 py-2">

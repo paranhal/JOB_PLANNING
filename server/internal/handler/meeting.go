@@ -23,6 +23,7 @@ type MeetingHandler struct {
 	asRepo   *repository.ASRepo
 	asH      *ASHandler
 	leave    *LeaveHandler
+	coop     *repository.CoopRepo
 }
 
 func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo, asRepo *repository.ASRepo, orgRepo *repository.OrgRepo) *MeetingHandler {
@@ -144,6 +145,8 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		"Role":            currentRole(c),
 		"ScopeNote":       meetingScopeNote(selected),
 		"HolidayBanner":   meetingHolidayBanner(dateStr),
+		"SentCoops":       meetingSentCoops(h.coop, c, true),
+		"SentCoopTitle":   "타 조직 지원 요청",
 	})
 }
 
@@ -308,4 +311,28 @@ func meetingScopeNote(assignee string) string {
 		return assignee + " 님 자료"
 	}
 	return "전체 업무 기준"
+}
+
+func meetingSentCoops(repo *repository.CoopRepo, c echo.Context, team bool) []model.Cooperation {
+	if repo == nil {
+		return nil
+	}
+	a := coopActor(c)
+	items, err := repo.ListSent(a)
+	if err != nil {
+		return nil
+	}
+	view := currentOrg(c)
+	var out []model.Cooperation
+	for _, it := range items {
+		if team {
+			if view != "" && view != repository.OrgAll && it.ReqOrgID != view {
+				continue
+			}
+		} else if it.ReqUserID != a.UserID {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
