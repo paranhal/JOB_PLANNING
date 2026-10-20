@@ -4,6 +4,7 @@
 <div class="max-w-xl space-y-4">
   <h2 class="text-xl font-bold text-gray-800">{{if .Config}}점검 사이트 수정{{else}}점검 사이트 등록{{end}}</h2>
 
+  {{if .Err}}<p id="site-form-err" class="text-ui text-danger">{{.Err}}</p>{{end}}
   <form method="POST" action="/maintenance/sites" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4 text-sm">
     {{if .Config}}
     <input type="hidden" name="customer_id" value="{{.Config.CustomerID}}">

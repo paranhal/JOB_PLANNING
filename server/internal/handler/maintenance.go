@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -121,7 +122,14 @@ func (h *MaintenanceHandler) CreatePlan(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "연도를 입력하세요")
 	}
 	title := c.FormValue("title")
-	p, err := h.repo.CreatePlanForOrg(currentOrg(c), year, title)
+	org, orgErr := resolveInsertOrg(c)
+	if orgErr != nil {
+		if next == "manage" && fromID != "" {
+			return h.manageErrRedirect(c, fromID, orgErr.Error())
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, orgErr.Error())
+	}
+	p, err := h.repo.CreatePlanForOrg(org, year, title)
 	if err != nil {
 		if next == "manage" && fromID != "" {
 			return h.manageErrRedirect(c, fromID, err.Error())
@@ -679,13 +687,22 @@ func (h *MaintenanceHandler) NewSiteConfigPage(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	return h.renderSiteForm(c, pending, nil, map[int]bool{}, false, "")
+}
+
+func (h *MaintenanceHandler) renderSiteForm(c echo.Context, pending []struct{ ID, OrgName string }, cfg *model.MaintenanceSiteConfig, days map[int]bool, lastMon bool, errMsg string) error {
+	title := "점검 사이트 등록"
+	if cfg != nil {
+		title = "점검 사이트 수정"
+	}
 	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
-		"Title":           "점검 사이트 등록",
+		"Title":           title,
 		"Active":          NavMaintenanceSites,
 		"Pending":         pending,
-		"Config":          (*model.MaintenanceSiteConfig)(nil),
-		"FixedDaySet":     map[int]bool{},
-		"FixedLastMonday": false,
+		"Config":          cfg,
+		"FixedDaySet":     days,
+		"FixedLastMonday": lastMon,
+		"Err":             errMsg,
 	})
 }
 
@@ -696,13 +713,7 @@ func (h *MaintenanceHandler) EditSiteConfigPage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "설정이 없습니다")
 	}
 	_, lastMon := model.ParseFixedRule(cfg.FixedRule)
-	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
-		"Title":           "점검 사이트 수정",
-		"Active":          NavMaintenanceSites,
-		"Config":          cfg,
-		"FixedDaySet":     model.FixedDaySet(cfg.FixedRule),
-		"FixedLastMonday": lastMon,
-	})
+	return h.renderSiteForm(c, nil, cfg, model.FixedDaySet(cfg.FixedRule), lastMon, "")
 }
 
 func parseFixedDayValues(vals []string) []int {
@@ -734,7 +745,8 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 		FixedRule:       model.FormatFixedRule(days, lastMon),
 	}
 	if cfg.CustomerID == "" || cfg.ShortName == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "고객과 표시명은 필수입니다")
+		pending, _ := h.repo.ListCustomersWithoutConfig()
+		return h.renderSiteForm(c, pending, nil, model.FixedDaySet(cfg.FixedRule), lastMon, "고객과 표시명은 필수입니다")
 	}
 	switch cfg.InspectionCycle {
 	case "monthly", "odd_bimonthly", "even_bimonthly", "quarterly", "semi", "yearly":
@@ -745,7 +757,9 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 		cfg.EntryCategory = "normal"
 	}
 	if err := h.repo.UpsertSiteConfig(cfg); err != nil {
-		return err
+		log.Printf("site config save: %v", err)
+		pending, _ := h.repo.ListCustomersWithoutConfig()
+		return h.renderSiteForm(c, pending, nil, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, "/maintenance/sites")
 }

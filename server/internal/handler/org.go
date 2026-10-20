@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -48,6 +49,65 @@ func orgListHomeID(c echo.Context) string {
 func canSwitchOrg(c echo.Context) bool {
 	r := currentRole(c)
 	return r == model.RoleVisionAdmin || r == model.RoleCLevel
+}
+
+const errNeedInsertOrg = "소속 조직을 선택하세요"
+
+func showInsertOrgPick(c echo.Context) bool {
+	return canSwitchOrg(c) && currentOrg(c) == repository.OrgAll && !isReadOnly(c)
+}
+
+func insertOrgChoices(c echo.Context) []model.Org {
+	if v, ok := c.Get("org_switch_list").([]model.Org); ok {
+		return v
+	}
+	return nil
+}
+
+func loginHomeOrg(c echo.Context) string {
+	org := strings.TrimSpace(ctxString(c, "org_id"))
+	if org == "" || org == repository.OrgAll {
+		return ""
+	}
+	return org
+}
+
+// resolveInsertOrg 등록(INSERT)용 조직. "*" 는 쓰지 않는다. 94-7
+func resolveInsertOrg(c echo.Context) (string, error) {
+	id := strings.TrimSpace(c.FormValue("org_id"))
+	if id == repository.OrgAll {
+		id = ""
+	}
+	if id == "" {
+		if view := currentOrg(c); view != "" && view != repository.OrgAll {
+			id = view
+		}
+	}
+	if id == "" {
+		id = loginHomeOrg(c)
+	}
+	if id == "" || id == repository.OrgAll {
+		return "", fmt.Errorf(errNeedInsertOrg)
+	}
+	if !canSwitchOrg(c) {
+		home := loginHomeOrg(c)
+		if home == "" {
+			home = model.OrgIDLibrary
+		}
+		if id != home {
+			return "", fmt.Errorf("자기 조직만 등록할 수 있습니다")
+		}
+		return id, nil
+	}
+	if list := insertOrgChoices(c); len(list) > 0 {
+		for _, o := range list {
+			if o.OrgID == id {
+				return id, nil
+			}
+		}
+		return "", fmt.Errorf(errNeedInsertOrg)
+	}
+	return id, nil
 }
 
 func currentOrg(c echo.Context) string {

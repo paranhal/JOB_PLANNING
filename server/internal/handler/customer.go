@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -458,23 +460,46 @@ func (h *CustomerHandler) CreateNameJSON(c echo.Context) error {
 	})
 }
 
+func (h *CustomerHandler) renderCustomerForm(c echo.Context, isNew bool, cust *model.Customer, errMsg string) error {
+	if cust == nil {
+		cust = &model.Customer{IsActive: true}
+	}
+	customers, _ := h.repo.ListAll()
+	title := "고객 수정"
+	if isNew {
+		title = "고객 등록"
+	}
+	return c.Render(http.StatusOK, "customer/form.html", map[string]interface{}{
+		"Title":        title,
+		"Active":       NavCustomers,
+		"Customer":     cust,
+		"Customers":    customers,
+		"IsNew":        isNew,
+		"SidoOptions":  model.KoreaSidoOptions,
+		"ShowOrgPick":  showInsertOrgPick(c),
+		"InsertOrgs":   insertOrgChoices(c),
+		"FormOrgID":    strings.TrimSpace(cust.OrgID),
+		"Err":          errMsg,
+	})
+}
+
 // New 고객 등록 폼
 func (h *CustomerHandler) New(c echo.Context) error {
-	customers, _ := h.repo.ListAll()
-	return c.Render(http.StatusOK, "customer/form.html", map[string]interface{}{
-		"Title":       "고객 등록",
-		"Active":      NavCustomers,
-		"Customer":    &model.Customer{IsActive: true},
-		"Customers":   customers,
-		"IsNew":       true,
-		"SidoOptions": model.KoreaSidoOptions,
-	})
+	return h.renderCustomerForm(c, true, &model.Customer{IsActive: true}, "")
 }
 
 // Create 고객 등록 처리
 func (h *CustomerHandler) Create(c echo.Context) error {
-	cust := bindCustomer(c)
+	cust, err := bindCustomer(c)
+	if err != nil {
+		log.Printf("customer create org: %v", err)
+		return h.renderCustomerForm(c, true, cust, err.Error())
+	}
 	if err := h.repo.Create(cust); err != nil {
+		if errors.Is(err, repository.ErrEmptyOrgID) {
+			log.Printf("customer create org empty: %v", err)
+			return h.renderCustomerForm(c, true, cust, errNeedInsertOrg)
+		}
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, "/customers")
@@ -571,20 +596,12 @@ func (h *CustomerHandler) Edit(c echo.Context) error {
 	if cust == nil {
 		return echo.ErrNotFound
 	}
-	customers, _ := h.repo.ListAll()
-	return c.Render(http.StatusOK, "customer/form.html", map[string]interface{}{
-		"Title":       "고객 수정",
-		"Active":      NavCustomers,
-		"Customer":    cust,
-		"Customers":   customers,
-		"IsNew":       false,
-		"SidoOptions": model.KoreaSidoOptions,
-	})
+	return h.renderCustomerForm(c, false, cust, "")
 }
 
 // Update 고객 수정 처리
 func (h *CustomerHandler) Update(c echo.Context) error {
-	cust := bindCustomer(c)
+	cust := bindCustomerFields(c)
 	cust.CustomerID = c.Param("id")
 	if err := h.repo.Update(cust); err != nil {
 		return err
@@ -611,8 +628,7 @@ func (h *CustomerHandler) Delete(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, redir)
 }
 
-// bindCustomer 폼 데이터를 Customer 구조체로 변환
-func bindCustomer(c echo.Context) *model.Customer {
+func bindCustomerFields(c echo.Context) *model.Customer {
 	return &model.Customer{
 		OrgName:          c.FormValue("org_name"),
 		OfficialName:     c.FormValue("official_name"),
@@ -632,6 +648,16 @@ func bindCustomer(c echo.Context) *model.Customer {
 		IsActive:         c.FormValue("is_active") != "0",
 		Notes:            c.FormValue("notes"),
 		PartyKind:        model.NormalizePartyKind(c.FormValue("party_kind")),
-		OrgID:            currentOrg(c),
 	}
+}
+
+func bindCustomer(c echo.Context) (*model.Customer, error) {
+	cust := bindCustomerFields(c)
+	org, err := resolveInsertOrg(c)
+	if err != nil {
+		cust.OrgID = strings.TrimSpace(c.FormValue("org_id"))
+		return cust, err
+	}
+	cust.OrgID = org
+	return cust, nil
 }

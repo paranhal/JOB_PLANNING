@@ -20,10 +20,22 @@
   <form method="POST"
         action="{{if .IsNew}}/customers{{else}}/customers/{{.Customer.CustomerID}}/update{{end}}"
         class="space-y-6">
+    {{if .Err}}<p id="customer-org-err" class="text-ui text-danger">{{.Err}}</p>{{end}}
 
     <!-- 기관 기본정보 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">기관 기본정보</h3>
+      {{if and .IsNew .ShowOrgPick}}
+      <div>
+        <label class="block text-sm font-medium text-ink mb-1" for="customer-org-id">소속 조직 <span class="text-danger">*</span></label>
+        <select id="customer-org-id" name="org_id" required class="select w-full">
+          <option value="">선택</option>
+          {{range .InsertOrgs}}
+          <option value="{{.OrgID}}" {{if eq $.FormOrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>
+          {{end}}
+        </select>
+      </div>
+      {{end}}
 
       {{if not .IsNew}}
       <div>
