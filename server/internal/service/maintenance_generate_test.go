@@ -767,3 +767,50 @@ func TestAutoGenerateYearWideStillTwelveMonths(t *testing.T) {
 	}
 }
 
+func TestAutoGenerateNewModeOrgProducts(t *testing.T) {
+	dir := t.TempDir()
+	db, err := repository.InitDB(filepath.Join(dir, "genorg.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT OR IGNORE INTO orgs(org_id,org_no,org_name,kind,is_active,sort_order)
+		VALUES ('O03','O03','SI','business',1,30)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES ('c03','학교','학교',1,'O03')`); err != nil {
+		t.Fatal(err)
+	}
+	repo := repository.NewMaintenanceRepo(db)
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "c03", ShortName: "학교", Region: "서울", InspectionCycle: "monthly",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pnet := &model.InspectionProduct{OrgID: "O03", Code: "NET", Name: "네트워크장비", IsActive: true}
+	if err := repo.CreateInspectionProduct(pnet); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ReplaceSiteProducts("c03", "O03", []string{pnet.ProductID}); err != nil {
+		t.Fatal(err)
+	}
+	p, err := repo.CreatePlanForOrg("O03", 2026, "SI점검")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AutoGenerateMaintenanceWithOrder(repo, p.PlanID, GenerateOrderNear, 2026, 12); err != nil {
+		t.Fatal(err)
+	}
+	visits, err := repo.ListVisitsByMonth(p.PlanID, 2026, 12)
+	if err != nil || len(visits) != 1 {
+		t.Fatalf("visits=%d err=%v", len(visits), err)
+	}
+	if visits[0].ProductType != "네트워크장비" {
+		t.Fatalf("product %q", visits[0].ProductType)
+	}
+	if strings.Contains(visits[0].ProductType, "KLAS") {
+		t.Fatal("KLAS")
+	}
+}
+
