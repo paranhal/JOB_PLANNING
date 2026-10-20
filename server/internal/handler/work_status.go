@@ -69,7 +69,8 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		colorNames = append(colorNames, u.FullName)
 	}
 
-	h.wb.SyncMaintenanceBoardRange(registerSyncWindow(period.From, period.To))
+	syncFrom, syncTo := registerSyncWindow(period.From, period.To)
+	h.wb.SyncMaintenanceBoardRangeForOrg(syncFrom, syncTo, currentOrg(c))
 	actionTasks, err := h.wb.ListCompletedForStatusPeriod(period.From, period.To)
 	if err != nil {
 		return err

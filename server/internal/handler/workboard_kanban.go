@@ -22,7 +22,7 @@ var registerPlanKanbanOrder = []string{
 	model.WorkBucketCompletedToday,
 }
 
-func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter string) ([]RegisterKanbanColumn, int, error) {
+func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter, orgID string) ([]RegisterKanbanColumn, int, error) {
 	today := time.Now().Format(dateLayout)
 	empty := emptyRegisterKanban(date, today)
 	if h.workBoard == nil {
@@ -33,23 +33,23 @@ func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter string) ([]Re
 		mineKeys = []string{assigneeFilter}
 	}
 
-	completed, err := h.workBoard.ListBucketOn(model.WorkBucketCompletedToday, date, "", mineKeys, 0)
+	completed, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketCompletedToday, date, "", mineKeys, 0, orgID)
 	if err != nil {
 		return nil, 0, err
 	}
-	progress, err := h.workBoard.ListBucketOn(model.WorkBucketInProgress, date, "", mineKeys, 0)
+	progress, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketInProgress, date, "", mineKeys, 0, orgID)
 	if err != nil {
 		return nil, 0, err
 	}
-	delayed, err := h.workBoard.ListBucketOn(model.WorkBucketDelayed, date, "", mineKeys, 0)
+	delayed, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketDelayed, date, "", mineKeys, 0, orgID)
 	if err != nil {
 		return nil, 0, err
 	}
-	todayItems, err := h.workBoard.ListBucketOn(model.WorkBucketToday, date, "", mineKeys, 0)
+	todayItems, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketToday, date, "", mineKeys, 0, orgID)
 	if err != nil {
 		return nil, 0, err
 	}
-	unplanned, _, err := h.workBoard.ListUnplanned("", mineKeys, "")
+	unplanned, _, err := h.workBoard.ListUnplannedForOrg("", mineKeys, "", orgID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -247,6 +247,9 @@ func (h *WorkboardHandler) RegisterKanbanMove(c echo.Context) error {
 
 	assignee := strings.TrimSpace(c.FormValue("assignee"))
 	note := strings.TrimSpace(c.FormValue("complete_note"))
+	if err := h.denyKanbanKeyOtherOrg(c, key); err != nil {
+		return err
+	}
 	if err := h.applyRegisterKanbanMove(c, key, from, to, date, assignee, note); err != nil {
 		if km, ok := err.(*kanbanMoveError); ok {
 			code := km.code
@@ -633,6 +636,35 @@ func (h *WorkboardHandler) updateTaskLogged(t *model.WorkTask) error {
 		return nil
 	}
 	return repository.TouchWorkTaskUpdate(h.repo, t)
+}
+
+func (h *WorkboardHandler) denyKanbanKeyOtherOrg(c echo.Context, key string) error {
+	org := currentOrg(c)
+	if org == "" || org == repository.OrgAll {
+		return nil
+	}
+	kind, id := splitKanbanKey(key)
+	switch kind {
+	case "task":
+		t, _ := h.repo.GetTask(id)
+		return denyOtherOrgTask(c, t)
+	case "as":
+		if h.asRepo == nil {
+			return echo.ErrNotFound
+		}
+		as, err := h.asRepo.GetByID(org, id)
+		if err != nil || as == nil {
+			return echo.ErrNotFound
+		}
+		return nil
+	case "mnt":
+		if t, _ := h.repo.GetTaskBySource(model.WBSourceMaintenance, id); t != nil {
+			return denyOtherOrgTask(c, t)
+		}
+		return echo.ErrNotFound
+	default:
+		return nil
+	}
 }
 
 func splitKanbanKey(key string) (kind, id string) {

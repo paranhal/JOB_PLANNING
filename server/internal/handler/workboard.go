@@ -135,9 +135,11 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	base = time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, time.Local)
 
 	period := buildRegisterPeriod(view, base, today)
+	org := currentOrg(c)
 
 	// 정기점검 방문 ↔ work_tasks 동기화(보이는 기간+여유만).
-	h.syncMaintenanceTasks(registerSyncWindow(period.From, period.To))
+	syncFrom, syncTo := registerSyncWindow(period.From, period.To)
+	h.syncMaintenanceTasks(syncFrom, syncTo, org)
 
 	// 예정일이 있는 미배치 업무를 해당 날짜 07:00부터 차례로 올린다.
 	// 지난날 잠금이 켜진 경우에만 오늘 이후만 자동 배치한다.
@@ -147,13 +149,13 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 			autoFrom = today
 		}
 		if autoFrom <= period.To {
-			if _, err := h.autoPlacePlanned(autoFrom, period.To); err != nil {
+			if _, err := h.autoPlacePlanned(autoFrom, period.To, org); err != nil {
 				return err
 			}
 		}
 	}
 
-	placed, err := h.repo.ListTasksBetween(period.From, period.To)
+	placed, err := h.repo.ListTasksBetweenForOrg(period.From, period.To, org)
 	if err != nil {
 		return err
 	}
@@ -195,7 +197,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		placed = filterTasksByAssignee(placed, assigneeFilter)
 	}
 	placed = filterTasksByProject(placed, projectFilter)
-	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(currentOrg(c), strings.TrimSpace(c.QueryParam("palette")) == "all")
+	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(org, strings.TrimSpace(c.QueryParam("palette")) == "all")
 	if err != nil {
 		return err
 	}
@@ -209,7 +211,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	salesCards = filterCardsByProject(salesCards, projectFilter)
 	unassignedCards = filterCardsByProject(unassignedCards, projectFilter)
 
-	undatedTasks, err := h.repo.ListUndatedASTasks()
+	undatedTasks, err := h.repo.ListUndatedASTasksForOrg(org)
 	if err != nil {
 		return err
 	}
@@ -218,7 +220,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 
 	projects, _ := h.repo.ListProjects(true)
 	assignees := listAssignableForPicker(h.userRepo, c)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListAllInOrg(org)
 	var colorNames []string
 	for _, u := range assignees {
 		colorNames = append(colorNames, u.FullName)
@@ -322,7 +324,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	var kanbanCols []RegisterKanbanColumn
 	kanbanTotal := 0
 	if display == "kanban" {
-		cols, total, kErr := h.loadRegisterKanban(dateStr, assigneeFilter)
+		cols, total, kErr := h.loadRegisterKanban(dateStr, assigneeFilter, org)
 		if kErr != nil {
 			return kErr
 		}
@@ -741,11 +743,11 @@ func registerSyncWindow(from, to string) (string, string) {
 
 // syncMaintenanceTasks 정기점검 일정(방문)을 기준으로 일일업무의 상태·일자·담당자를 맞춘다.
 // 점검 일정 화면에서 날짜를 바꿔도 일일 업무 등록에 그대로 보이도록 화면 진입 때마다 보정한다.
-func (h *WorkboardHandler) syncMaintenanceTasks(from, to string) {
+func (h *WorkboardHandler) syncMaintenanceTasks(from, to, orgID string) {
 	if h == nil || h.repo == nil {
 		return
 	}
-	h.repo.SyncMaintenanceBoardRange(from, to)
+	h.repo.SyncMaintenanceBoardRangeForOrg(from, to, orgID)
 }
 
 // syncVisitDateFromTask 일정표에서 카드를 다른 날짜로 옮기면 원본 일정도 함께 옮긴다.
@@ -1168,9 +1170,9 @@ func (h *WorkboardHandler) buildSourceTask(kind, refID, date, start, end string,
 
 // autoPlacePlanned 기간 안 배정일(work_date)이 있고 시간만 비어 있는 업무를 07:00부터 올린다.
 // ×로 배정일을 비운 건·아직 올리지 않은 건은 대기열에 두고 다시 올리지 않는다.
-func (h *WorkboardHandler) autoPlacePlanned(from, to string) (int, error) {
+func (h *WorkboardHandler) autoPlacePlanned(from, to, orgID string) (int, error) {
 	n := 0
-	all, err := h.repo.ListTasksNeedingAutoPlace(from, to)
+	all, err := h.repo.ListTasksNeedingAutoPlaceForOrg(from, to, orgID)
 	if err != nil {
 		return 0, err
 	}
@@ -1211,6 +1213,9 @@ func (h *WorkboardHandler) Unschedule(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=place"))
 	}
 	if t, _ := h.repo.GetTask(taskID); t != nil {
+		if err := denyOtherOrgTask(c, t); err != nil {
+			return err
+		}
 		if err := denyUnlessCanEditTask(c, t); err != nil {
 			return err
 		}

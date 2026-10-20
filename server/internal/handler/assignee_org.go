@@ -61,7 +61,7 @@ func denyOtherOrgTask(c echo.Context, t *model.WorkTask) error {
 		return nil
 	}
 	to := strings.TrimSpace(t.OrgID)
-	if to != "" && to != org {
+	if to == "" || to != org {
 		return echo.ErrNotFound
 	}
 	return nil
