@@ -56,6 +56,8 @@ func newAssigneeOrgServer(t *testing.T) (*echo.Echo, *repository.UserRepo, *repo
 	g.GET("/maintenance", h.Maintenance.ListPlans)
 	g.GET("/sales", h.Sales.List)
 	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
+	g.POST("/workboard/unschedule", h.Workboard.Unschedule)
+	g.POST("/workboard/register/kanban-move", h.Workboard.RegisterKanbanMove)
 	return e, users, h.Workboard.repo
 }
 
