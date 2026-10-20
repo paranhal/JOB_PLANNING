@@ -62,10 +62,12 @@
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">점검 대상</label>
           <input type="text" name="product_type" value="{{.Visit.ProductType}}" list="mnt-action-products"
-                 placeholder="K-LAS / 앤로보틱스 / 세종 K-LAS"
+                 placeholder="점검 제품"
                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           <datalist id="mnt-action-products">
+            {{if .UseOrgProductLegend}}{{range $.OrgProducts}}<option value="{{.Name}}"></option>{{end}}{{else}}
             <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
+            {{end}}
           </datalist>
         </div>
         <div>

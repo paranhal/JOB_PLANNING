@@ -216,7 +216,7 @@ func BuildSiteConfigExcelWorkbook(items []model.MaintenanceSiteConfig) (*exceliz
 
 	headers := []interface{}{
 		"고객ID", "기관명", "표시명", "지역", "점검주기",
-		"KLAS", "RFID", "엑셀유형", "고정규칙",
+		"점검제품", "엑셀유형", "고정규칙",
 	}
 	hdrStyle, err := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
@@ -234,7 +234,7 @@ func BuildSiteConfigExcelWorkbook(items []model.MaintenanceSiteConfig) (*exceliz
 	if err := f.SetSheetRow(sheet, "A1", &headers); err != nil {
 		return nil, err
 	}
-	if err := f.SetCellStyle(sheet, "A1", "I1", hdrStyle); err != nil {
+	if err := f.SetCellStyle(sheet, "A1", "H1", hdrStyle); err != nil {
 		return nil, err
 	}
 	if err := f.SetRowHeight(sheet, 1, 30); err != nil {
@@ -247,8 +247,7 @@ func BuildSiteConfigExcelWorkbook(items []model.MaintenanceSiteConfig) (*exceliz
 			it.ShortName,
 			it.Region,
 			siteInspectionCycleLabel(it.InspectionCycle),
-			boolMark(it.HasKlas),
-			boolMark(it.HasRfid),
+			strings.Join(it.ProductLabels(), ", "),
 			siteEntryCategoryLabel(it.EntryCategory),
 			siteFixedRuleLabel(it.FixedRule),
 		}
@@ -257,7 +256,7 @@ func BuildSiteConfigExcelWorkbook(items []model.MaintenanceSiteConfig) (*exceliz
 			return nil, err
 		}
 	}
-	widths := []float64{22, 28, 16, 12, 12, 8, 8, 14, 22}
+	widths := []float64{22, 28, 16, 12, 12, 22, 14, 22}
 	for i, w := range widths {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		_ = f.SetColWidth(sheet, col, col, w)

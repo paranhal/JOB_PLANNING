@@ -433,6 +433,13 @@ func main() {
 	ms.GET("/:customer_id/edit", h.Maintenance.EditSiteConfigPage)
 	ms.POST("/:customer_id/delete", h.Maintenance.DeleteSiteConfig)
 
+	mp := g.Group("/maintenance/products")
+	mp.GET("", h.Maintenance.ListInspectionProducts)
+	mp.POST("", h.Maintenance.SaveInspectionProduct)
+	mp.POST("/import-legacy", h.Maintenance.ImportLegacyInspectionProducts)
+	mp.POST("/:id/update", h.Maintenance.UpdateInspectionProduct)
+	mp.POST("/:id/toggle", h.Maintenance.ToggleInspectionProduct)
+
 	maint := g.Group("/maintenance")
 	mntEdit := h.Auth.RequireMaintenanceEdit
 	maint.GET("", h.Maintenance.ListPlans)
@@ -501,6 +508,11 @@ func main() {
 	proj.POST("/equipment-categories", h.Project.EquipCatSave)
 	proj.POST("/equipment-categories/off", h.Project.EquipCatOff)
 	proj.POST("/equipment-categories/fields", h.Project.EquipFieldSave)
+	proj.GET("/equipment-categories/template.xlsx", h.Project.EquipCatTemplateXLSX)
+	proj.GET("/equipment-categories/export.xlsx", h.Project.EquipCatExportXLSX)
+	proj.POST("/equipment-categories/import-preview", h.Project.EquipCatImportPreview)
+	proj.POST("/equipment-categories/import-apply", h.Project.EquipCatImportApply)
+	proj.POST("/equipment-categories/import-errors.xlsx", h.Project.EquipCatImportErrors)
 	proj.POST("/equipment-categories/fields/off", h.Project.EquipFieldOff)
 	proj.POST("", h.Project.Create)
 	proj.GET("/:id/years", h.Project.Years)

@@ -1,0 +1,95 @@
+{{define "title"}}점검 제품 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-col sm:flex-row gap-3 justify-between items-start">
+    <div>
+      <h2 class="text-ui-xl font-extrabold text-ink">점검 제품</h2>
+      <p class="text-ui-sm text-ink-muted">이 조직에서 정기점검할 제품만 등록합니다. 삭제는 없고 비활성만 됩니다.</p>
+    </div>
+    <a href="/maintenance/sites" class="btn btn-secondary btn-sm">사이트 설정</a>
+  </div>
+
+  {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
+  {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
+  {{if .NeedOrg}}
+  <p class="flash-warning rounded-control">전체 보기입니다. 위 조직 전환에서 조직을 고른 뒤 제품을 등록하세요.</p>
+  {{end}}
+
+  {{if and .ShowImport .Legacy}}
+  <form method="post" action="/maintenance/products/import-legacy" class="card p-4 space-y-2"
+        onsubmit="return confirm('도서관 기본 제품(KLAS, 앤로보틱스)을 마스터에 넣고, 기존 사이트 체크를 연결합니다. 자동으로 다시 실행되지 않습니다. 진행할까요?');">
+    <p class="text-ui-sm text-ink-muted">지금은 예전처럼 사이트 설정의 KLAS·RFID 체크를 씁니다. 가져오면 이 조직도 제품 마스터를 씁니다.</p>
+    <button type="submit" class="btn btn-secondary">기본 제품 가져오기</button>
+  </form>
+  {{end}}
+
+  {{if and .CanWrite (not .NeedOrg)}}
+  <form method="post" action="/maintenance/products" class="card p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+    <input type="hidden" name="org_id" value="{{.OrgID}}">
+    <div>
+      <label class="text-ui-sm text-ink-muted">제품 이름</label>
+      <input name="name" required class="input w-full" placeholder="제품 이름">
+    </div>
+    <div>
+      <label class="text-ui-sm text-ink-muted">코드</label>
+      <input name="code" class="input w-full" placeholder="비우면 이름에서 제안">
+    </div>
+    <div>
+      <label class="text-ui-sm text-ink-muted">정렬</label>
+      <input name="sort_order" type="number" class="input w-full" value="0">
+    </div>
+    <button type="submit" class="btn btn-primary">추가</button>
+  </form>
+  {{end}}
+
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left">
+        <tr>
+          <th class="p-3">코드</th>
+          <th class="p-3">이름</th>
+          <th class="p-3">정렬</th>
+          <th class="p-3">상태</th>
+          <th class="p-3"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t border-line">
+          <td class="p-3">
+            {{if and $.CanWrite (not .InUse)}}
+            <form method="post" action="/maintenance/products/{{.ProductID}}/update" class="flex flex-wrap gap-2 items-center">
+              <input type="hidden" name="org_id" value="{{$.OrgID}}">
+              <input name="code" value="{{.Code}}" class="input">
+              <input name="name" value="{{.Name}}" class="input">
+              <input name="sort_order" type="number" value="{{.SortOrder}}" class="input w-20">
+              <button class="btn btn-secondary btn-sm" type="submit">저장</button>
+            </form>
+            {{else}}
+            <span class="font-medium">{{.Code}}</span>
+            {{end}}
+          </td>
+          {{if or (not $.CanWrite) .InUse}}
+          <td class="p-3">{{.Name}}</td>
+          <td class="p-3">{{.SortOrder}}</td>
+          {{else}}
+          <td class="p-3 text-ink-muted">사용 중이면 코드 고정</td>
+          <td class="p-3"></td>
+          {{end}}
+          <td class="p-3">{{if .IsActive}}사용{{else}}비활성{{end}}{{if .InUse}} · 사용 중{{end}}</td>
+          <td class="p-3">
+            {{if $.CanWrite}}
+            <form method="post" action="/maintenance/products/{{.ProductID}}/toggle">
+              <button class="btn btn-secondary btn-sm" type="submit">{{if .IsActive}}비활성{{else}}활성{{end}}</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="5">등록된 제품이 없습니다. 비어 있으면 방문은 제품 구분 없이 1건입니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

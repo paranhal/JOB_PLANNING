@@ -294,9 +294,13 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3 text-xs text-gray-700">
+      {{if .UseOrgProductLegend}}
+      {{range .OrgProducts}}<span class="inline-flex items-center gap-1.5">{{.Name}}</span>{{end}}
+      {{else}}
       <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#bbf7d0;border:2px solid #16a34a"></span>초록 · 앤로보틱스</span>
       <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#bfdbfe;border:2px solid #2563eb"></span>파랑 · K-LAS</span>
       <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#e9d5ff;border:2px solid #9333ea"></span>보라 · 세종 K-LAS</span>
+      {{end}}
     </div>
 
     <div class="flex flex-wrap gap-1.5 text-sm">
@@ -342,10 +346,12 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-gray-600 mb-1">점검 대상</label>
-            <input type="text" name="product_type" list="mnt-products" placeholder="K-LAS / 앤로보틱스 / 세종 K-LAS"
+            <input type="text" name="product_type" list="mnt-products" placeholder="점검 제품"
                    class="w-full border border-gray-300 rounded-lg px-3 py-2">
             <datalist id="mnt-products">
+              {{if .UseOrgProductLegend}}{{range $.OrgProducts}}<option value="{{.Name}}"></option>{{end}}{{else}}
               <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
+              {{end}}
             </datalist>
             <p class="text-[11px] text-gray-400 mt-1">같은 사이트라도 점검 대상이 다르면 따로 등록합니다.</p>
           </div>
@@ -427,10 +433,12 @@
           <div>
             <label class="block text-gray-600 mb-1">점검 대상</label>
             <input type="text" name="product_type" x-model="edit.product" list="mnt-products-edit"
-                   placeholder="K-LAS / 앤로보틱스 / 세종 K-LAS"
+                   placeholder="점검 제품"
                    class="w-full border border-gray-300 rounded-lg px-3 py-2">
             <datalist id="mnt-products-edit">
+              {{if .UseOrgProductLegend}}{{range $.OrgProducts}}<option value="{{.Name}}"></option>{{end}}{{else}}
               <option value="앤로보틱스"></option><option value="K-LAS"></option><option value="KLAS"></option><option value="세종 K-LAS"></option>
+              {{end}}
             </datalist>
           </div>
           <div>

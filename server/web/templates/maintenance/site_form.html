@@ -48,6 +48,7 @@
         <option value="yearly" {{if .Config}}{{if eq .Config.InspectionCycle "yearly"}}selected{{end}}{{end}}>년1회</option>
       </select>
     </div>
+    {{if .Legacy}}
     <div class="flex gap-6">
       <label class="inline-flex items-center gap-2">
         <input type="checkbox" name="has_klas" value="1" class="rounded"
@@ -60,6 +61,25 @@
         RFID 자동화 장비
       </label>
     </div>
+    {{else}}
+    <div>
+      <p class="block text-gray-600 mb-1">점검 제품</p>
+      {{if .Products}}
+      <div class="flex flex-wrap gap-4">
+        {{range .Products}}
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox" name="product_id" value="{{.ProductID}}" class="rounded"
+                 {{if $.Config}}{{if $.Config.HasProductID .ProductID}}checked{{end}}{{end}}>
+          {{.Name}}
+        </label>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="text-xs text-gray-500">등록된 제품이 없습니다. <a href="/maintenance/products" class="text-blue-600">점검 제품</a>에서 추가하세요. 비어 있으면 제품 구분 없이 1건입니다.</p>
+      <input type="hidden" name="product_id" value="">
+      {{end}}
+    </div>
+    {{end}}
     <div>
       <label class="block text-gray-600 mb-1">엑셀 글자색 구분</label>
       <select name="entry_category" class="w-full border border-gray-300 rounded-lg px-3 py-2">

@@ -205,6 +205,7 @@ func navDefinition() []navDefGroup {
 				{ID: "spaces", Label: "공간관리", Href: "/spaces", Active: []string{NavSpaces}, Show: func(c MenuCtx) bool { return c.visMasterView() }, More: true},
 				{ID: "relations", Label: "수행관계", Href: "/relations", Active: []string{NavRelations}, Show: func(c MenuCtx) bool { return c.visMasterEdit() }, More: true},
 				{ID: "mnt_sites", Label: "점검 사이트 설정", Href: "/maintenance/sites", Active: []string{NavMaintenanceSites}, Show: func(c MenuCtx) bool { return c.visMntSetup() }, More: true},
+				{ID: "mnt_products", Label: "점검 제품", Href: "/maintenance/products", Active: []string{NavMaintenanceProducts}, Show: func(c MenuCtx) bool { return c.visMntSetup() }, More: true},
 				{ID: "region_order", Label: "지역 거리 순서", Href: "/maintenance/sites/distance", Active: []string{NavRegionOrder}, Show: func(c MenuCtx) bool { return c.visMntSetup() }, More: true},
 			},
 		},

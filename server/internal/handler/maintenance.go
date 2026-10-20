@@ -291,6 +291,8 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"ShowScopeToggle":  showScopeToggle,
 		"ScopeNote":        mntScopeNote(showScopeToggle, scopeAll),
 		"HolidayMissing":   holidayMissingBanner(h.holidayRepo, plan.PlanYear),
+		"OrgProducts":          h.orgProductList(plan.OrgID),
+		"UseOrgProductLegend":  h.useOrgProductLegend(plan.OrgID),
 	})
 }
 
@@ -660,13 +662,17 @@ func (h *MaintenanceHandler) ListSiteConfigs(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	org := currentOrg(c)
+	items = repository.FilterSiteConfigsByOrg(items, org)
 	now := time.Now()
 	quota := model.SummarizeMonthVisitQuota(items, now.Year(), int(now.Month()))
+	legacy := org == model.OrgIDLibrary && h.repo.CountInspectionProducts(org) == 0
 	return c.Render(200, "maintenance/site_list.html", map[string]interface{}{
 		"Title":   "정기점검 사이트 설정",
 		"Active":  NavMaintenanceSites,
 		"Items":   items,
 		"Quota":   quota,
+		"Legacy":  legacy,
 		"Synced":  c.QueryParam("synced"),
 		"Skipped": c.QueryParam("skipped"),
 	})
@@ -683,7 +689,7 @@ func (h *MaintenanceHandler) SyncSiteConfigsFromAssets(c echo.Context) error {
 }
 
 func (h *MaintenanceHandler) NewSiteConfigPage(c echo.Context) error {
-	pending, err := h.repo.ListCustomersWithoutConfig()
+	pending, err := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
 	if err != nil {
 		return err
 	}
@@ -695,11 +701,22 @@ func (h *MaintenanceHandler) renderSiteForm(c echo.Context, pending []struct{ ID
 	if cfg != nil {
 		title = "점검 사이트 수정"
 	}
+	org := currentOrg(c)
+	if cfg != nil && strings.TrimSpace(cfg.OrgID) != "" {
+		org = cfg.OrgID
+	}
+	products := h.orgProductList(org)
+	legacy := products == nil && model.UseLegacyInspectionSlots(org, h.repo.CountInspectionProducts(org))
+	if !legacy && products == nil {
+		products = []model.InspectionProduct{}
+	}
 	return c.Render(200, "maintenance/site_form.html", map[string]interface{}{
 		"Title":           title,
 		"Active":          NavMaintenanceSites,
 		"Pending":         pending,
 		"Config":          cfg,
+		"Products":        products,
+		"Legacy":          legacy,
 		"FixedDaySet":     days,
 		"FixedLastMonday": lastMon,
 		"Err":             errMsg,
@@ -745,7 +762,7 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 		FixedRule:       model.FormatFixedRule(days, lastMon),
 	}
 	if cfg.CustomerID == "" || cfg.ShortName == "" {
-		pending, _ := h.repo.ListCustomersWithoutConfig()
+		pending, _ := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
 		return h.renderSiteForm(c, pending, nil, model.FixedDaySet(cfg.FixedRule), lastMon, "고객과 표시명은 필수입니다")
 	}
 	switch cfg.InspectionCycle {
@@ -758,8 +775,21 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 	}
 	if err := h.repo.UpsertSiteConfig(cfg); err != nil {
 		log.Printf("site config save: %v", err)
-		pending, _ := h.repo.ListCustomersWithoutConfig()
+		pending, _ := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
 		return h.renderSiteForm(c, pending, nil, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error())
+	}
+	if _, ok := c.Request().PostForm["product_id"]; ok {
+		siteOrg := h.repo.CustomerOrgID(cfg.CustomerID)
+		if siteOrg == "" {
+			siteOrg = currentOrg(c)
+		}
+		if err := h.repo.ReplaceSiteProducts(cfg.CustomerID, siteOrg, c.Request().PostForm["product_id"]); err != nil {
+			if repository.IsOtherOrgInspectionProduct(err) {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			}
+			pending, _ := h.repo.ListCustomersWithoutConfigOrg(currentOrg(c))
+			return h.renderSiteForm(c, pending, cfg, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error())
+		}
 	}
 	return c.Redirect(http.StatusSeeOther, "/maintenance/sites")
 }
@@ -776,6 +806,7 @@ func (h *MaintenanceHandler) ExportSiteConfigsExcel(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	items = repository.FilterSiteConfigsByOrg(items, currentOrg(c))
 	f, err := BuildSiteConfigExcelWorkbook(items)
 	if err != nil {
 		return err

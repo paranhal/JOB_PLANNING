@@ -47,6 +47,8 @@ func (h *MaintenanceHandler) VisitAction(c echo.Context) error {
 		"SignatureDataURL": signatureDataURL(signaturePNGForName(h.userRepo, v.Assignee)),
 		"Embed":            c.QueryParam("embed") == "1",
 		"HideNav":          c.QueryParam("embed") == "1",
+		"OrgProducts":         h.orgProductList(h.repo.CustomerOrgID(v.CustomerID)),
+		"UseOrgProductLegend": h.useOrgProductLegend(h.repo.CustomerOrgID(v.CustomerID)),
 	})
 }
 

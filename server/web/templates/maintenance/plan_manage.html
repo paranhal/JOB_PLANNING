@@ -179,8 +179,10 @@
         <label class="block text-[11px] text-gray-500 mb-1">점검대상</label>
         <select name="product_type" class="border rounded-lg px-2 py-1.5 text-sm">
           <option value="">전체</option>
+          {{if $.UseOrgProductLegend}}{{range $.OrgProducts}}<option value="{{.Name}}">{{.Name}}</option>{{end}}{{else}}
           <option value="KLAS">KLAS</option>
           <option value="앤로보틱스">앤로보틱스</option>
+          {{end}}
         </select>
       </div>
       <div>
@@ -216,8 +218,10 @@
         <label class="block text-[11px] text-gray-500 mb-1">점검대상</label>
         <select name="product_type" class="border rounded-lg px-2 py-1.5 text-sm">
           <option value="">전체</option>
+          {{if $.UseOrgProductLegend}}{{range $.OrgProducts}}<option value="{{.Name}}" {{if eq $.FilterProduct .Name}}selected{{end}}>{{.Name}}</option>{{end}}{{else}}
           <option value="KLAS" {{if eq $.FilterProduct "KLAS"}}selected{{end}}>KLAS</option>
           <option value="앤로보틱스" {{if eq $.FilterProduct "앤로보틱스"}}selected{{end}}>앤로보틱스</option>
+          {{end}}
         </select>
       </div>
       <button type="submit" class="px-3 py-1.5 border border-red-300 text-red-700 rounded-lg text-sm">건수 확인</button>

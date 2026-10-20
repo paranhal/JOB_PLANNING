@@ -91,6 +91,8 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		"FilterProduct": c.QueryParam("product_type"),
 		"NewYear":       time.Now().Year() + 1, "CopyYear": plan.PlanYear + 1,
 		"HolidayMissing": holidayMissingBanner(h.holidayRepo, plan.PlanYear),
+		"OrgProducts":         h.orgProductList(plan.OrgID),
+		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
 	})
 }
 
