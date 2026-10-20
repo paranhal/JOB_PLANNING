@@ -356,6 +356,12 @@ func (r *CoopRepo) Complete(a model.CoopActor, id, reason, onBehalf string) erro
 	return nil
 }
 
+func (r *CoopRepo) OrgDeputy(orgID string) string { return r.orgDeputy(orgID, todayYMD()) }
+
+func (r *CoopRepo) RecordEvent(id, actor, action, detail string) {
+	r.event(id, actor, action, detail, "")
+}
+
 func (r *CoopRepo) OpenLinked(id string) int { return r.openLinked(id) }
 
 func (r *CoopRepo) openLinked(id string) int {

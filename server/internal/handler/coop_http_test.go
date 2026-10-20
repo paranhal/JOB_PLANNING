@@ -14,7 +14,7 @@ import (
 	"customer-support/internal/repository"
 )
 
-func newCoopServer(t *testing.T) (*echo.Echo, *repository.CoopRepo, *model.User, *model.User, *model.User, *model.User) {
+func newCoopServer(t *testing.T) (*echo.Echo, *Handler, *repository.CoopRepo, *model.User, *model.User, *model.User, *model.User) {
 	t.Helper()
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "coophttp.db"))
 	if err != nil {
@@ -26,9 +26,9 @@ func newCoopServer(t *testing.T) (*echo.Echo, *repository.CoopRepo, *model.User,
 		t.Fatal(err)
 	}
 	users := repository.NewUserRepo(db)
-	oa1 := &model.User{Username: "oa1", PasswordHash: "x", FullName: "도서팀장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
-	tech1 := &model.User{Username: "t1", PasswordHash: "x", FullName: "도서기술", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
-	oa2 := &model.User{Username: "oa2", PasswordHash: "x", FullName: "미디어팀장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O02", ProfileDone: true}
+	oa1 := &model.User{Username: "oa1", PasswordHash: "x", FullName: "도서팀장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true, Email: "oa1@test.local"}
+	tech1 := &model.User{Username: "t1", PasswordHash: "x", FullName: "도서기술", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true, Email: "t1@test.local"}
+	oa2 := &model.User{Username: "oa2", PasswordHash: "x", FullName: "미디어팀장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O02", ProfileDone: true, Email: "oa2@test.local"}
 	cl := &model.User{Username: "cl", PasswordHash: "x", FullName: "씨레벨", Role: model.RoleCLevel, IsActive: true, IsReadOnly: true, ProfileDone: true}
 	for _, u := range []*model.User{oa1, tech1, oa2, cl} {
 		if err := users.Create(u); err != nil {
@@ -38,6 +38,7 @@ func newCoopServer(t *testing.T) (*echo.Echo, *repository.CoopRepo, *model.User,
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)
+	h.Coop.ncfg.Mail.Enabled = false
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.Use(h.Auth.GuardViewAsWrite)
@@ -50,11 +51,11 @@ func newCoopServer(t *testing.T) (*echo.Echo, *repository.CoopRepo, *model.User,
 	g.POST("/cooperations/:id/accept", h.Coop.Accept)
 	g.POST("/cooperations/:id/reject", h.Coop.Reject)
 	g.POST("/admin/users", func(c echo.Context) error { return c.NoContent(http.StatusOK) })
-	return e, repository.NewCoopRepo(db), oa1, tech1, oa2, cl
+	return e, h, repository.NewCoopRepo(db), oa1, tech1, oa2, cl
 }
 
 func TestCoopHTTPFlow(t *testing.T) {
-	e, repo, oa1, tech1, oa2, cl := newCoopServer(t)
+	e, _, repo, oa1, tech1, oa2, cl := newCoopServer(t)
 	t1 := jwtCookieUserClaims(t, tech1)
 	oa2ck := jwtCookieUserClaims(t, oa2)
 	clck := jwtCookieUserClaims(t, cl)
@@ -128,4 +129,30 @@ func TestCoopNavParentNoHref(t *testing.T) {
 	if dups := navDuplicateHrefs(); len(dups) > 0 {
 		t.Fatalf("중복 href: %v", dups)
 	}
+}
+
+func TestCoopMailRequested(t *testing.T) {
+	e, h, repo, _, tech1, _, _ := newCoopServer(t)
+	h.Coop.ncfg.Mail.Enabled = true
+	t1 := jwtCookieUserClaims(t, tech1)
+	create := postForm947(t, e, "/cooperations", url.Values{
+		"target_org_id": {"O02"}, "kind": {"admin"}, "title": {"메일협조"}, "body": {"비밀본문"},
+	}, t1)
+	if create.Code != http.StatusSeeOther {
+		t.Fatalf("create %d", create.Code)
+	}
+	var n int
+	_ = h.Coop.db.QueryRow(`SELECT COUNT(*) FROM mail_outbox WHERE purpose=?`, "coop_requested").Scan(&n)
+	if n != 1 {
+		t.Fatalf("outbox %d", n)
+	}
+	var sub, body, to string
+	_ = h.Coop.db.QueryRow(`SELECT to_addr, subject, body FROM mail_outbox LIMIT 1`).Scan(&to, &sub, &body)
+	if to != "oa2@test.local" {
+		t.Fatalf("to %s", to)
+	}
+	if strings.Contains(body, "비밀본문") {
+		t.Fatal("본문 전문")
+	}
+	_ = repo
 }

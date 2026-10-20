@@ -103,3 +103,27 @@ func TestChannelRequiresBoth(t *testing.T) {
 		t.Fatal("체크박스 없이 켜지면 안 됨")
 	}
 }
+
+func TestCoopPurposeSkipsSMS(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "coopmail.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	settings := repository.NewSettingsRepo(db)
+	_ = settings.Set("notify.sms.org.*", "1")
+	_ = settings.Set("notify.mail.org.*", "1")
+	cfg := Config{SMSOn: true, Mail: mailer.Config{Enabled: true}}
+	if err := Notify(db, settings, cfg, Message{Purpose: PurposeCoopRequested, ToMobile: "01000001111", ToEmail: "a@b.c", Title: "t", Body: "hello", CreatedBy: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	var sms, mail int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM sms_outbox`).Scan(&sms)
+	_ = db.QueryRow(`SELECT COUNT(*) FROM mail_outbox`).Scan(&mail)
+	if sms != 0 {
+		t.Fatalf("sms=%d", sms)
+	}
+	if mail != 1 {
+		t.Fatalf("mail=%d", mail)
+	}
+}

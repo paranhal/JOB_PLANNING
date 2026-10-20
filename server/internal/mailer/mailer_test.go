@@ -121,3 +121,26 @@ func TestProcessSends(t *testing.T) {
 		t.Fatalf("n=%d sent=%d err=%v", n, sent, err)
 	}
 }
+
+func TestEnqueueRedirectAndAllow(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "mailredir.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	id, err := Enqueue(db, Config{Enabled: true, RedirectTo: "test@example.com"}, Item{ToAddr: "a@b.c", Subject: "제목", Body: "b", CreatedBy: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var to, sub string
+	if err := db.QueryRow(`SELECT to_addr, subject FROM mail_outbox WHERE mail_id=?`, id).Scan(&to, &sub); err != nil {
+		t.Fatal(err)
+	}
+	if to != "test@example.com" || !strings.Contains(sub, "a@b.c") {
+		t.Fatalf("%s %s", to, sub)
+	}
+	_, err = Enqueue(db, Config{Enabled: true, AllowDomains: "corp.local"}, Item{ToAddr: "a@b.c", Subject: "s", Body: "b", CreatedBy: "t"})
+	if err != ErrDisabled {
+		t.Fatalf("allow %v", err)
+	}
+}

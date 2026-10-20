@@ -28,15 +28,17 @@ var ErrDisabled = errors.New("mail disabled")
 var ErrAttachTooLarge = errors.New("첨부 10MB 초과")
 
 type Config struct {
-	Enabled  bool
-	Host     string
-	Port     string
-	User     string
-	Pass     string
-	FromName string
-	AdminTo  string
-	Send     func(Config, Item) error
-	Now      func() time.Time
+	Enabled      bool
+	Host         string
+	Port         string
+	User         string
+	Pass         string
+	FromName     string
+	AdminTo      string
+	AllowDomains string
+	RedirectTo   string
+	Send         func(Config, Item) error
+	Now          func() time.Time
 }
 
 func FromApp(cfg *config.Config) Config {
@@ -44,13 +46,15 @@ func FromApp(cfg *config.Config) Config {
 		return Config{}
 	}
 	return Config{
-		Enabled:  cfg.MailEnabled,
-		Host:     cfg.MailHost,
-		Port:     cfg.MailPort,
-		User:     cfg.MailUser,
-		Pass:     cfg.MailPass,
-		FromName: cfg.MailFromName,
-		AdminTo:  cfg.MailAdminTo,
+		Enabled:      cfg.MailEnabled,
+		Host:         cfg.MailHost,
+		Port:         cfg.MailPort,
+		User:         cfg.MailUser,
+		Pass:         cfg.MailPass,
+		FromName:     cfg.MailFromName,
+		AdminTo:      cfg.MailAdminTo,
+		AllowDomains: cfg.MailAllowDomains,
+		RedirectTo:   cfg.MailRedirectTo,
 	}
 }
 
@@ -83,6 +87,14 @@ func Enqueue(db *sql.DB, cfg Config, it Item) (string, error) {
 	it.ToAddr = strings.TrimSpace(it.ToAddr)
 	if it.ToAddr == "" {
 		return "", fmt.Errorf("받는 주소 없음")
+	}
+	orig := it.ToAddr
+	if redir := strings.TrimSpace(cfg.RedirectTo); redir != "" {
+		it.Subject = "[TEST→" + orig + "] " + it.Subject
+		it.ToAddr = redir
+	} else if !mailDomainAllowed(cfg.AllowDomains, orig) {
+		log.Printf("mail domain blocked %s", maskMail(orig))
+		return "", ErrDisabled
 	}
 	if strings.TrimSpace(it.AttachPath) != "" {
 		st, err := os.Stat(it.AttachPath)
@@ -414,6 +426,33 @@ func nullEmpty(s string) any {
 		return nil
 	}
 	return s
+}
+
+func mailDomainAllowed(allow, addr string) bool {
+	allow = strings.TrimSpace(allow)
+	if allow == "" {
+		return true
+	}
+	at := strings.LastIndex(addr, "@")
+	if at < 0 {
+		return false
+	}
+	dom := strings.ToLower(addr[at+1:])
+	for _, p := range strings.Split(allow, ",") {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if p != "" && p == dom {
+			return true
+		}
+	}
+	return false
+}
+
+func maskMail(addr string) string {
+	at := strings.Index(addr, "@")
+	if at <= 1 {
+		return "***"
+	}
+	return addr[:1] + "***" + addr[at:]
 }
 
 // PurgeHandledLoginHelpBridge 순환 import 없이 repository 호출. mailer 고리에서 같이 돈다.

@@ -21,6 +21,8 @@ type Config struct {
 	MailPass          string
 	MailFromName      string
 	MailAdminTo       string
+	MailAllowDomains  string
+	MailRedirectTo    string
 	SMSEnabled        bool
 	SMSAPIURL         string
 	SMSAPIKey         string
@@ -45,6 +47,8 @@ func Load() *Config {
 		MailPass:          getEnv("MAIL_PASS", ""),
 		MailFromName:      getEnv("MAIL_FROM_NAME", "비젼아이티 고객지원시스템"),
 		MailAdminTo:       getEnv("MAIL_ADMIN_TO", ""),
+		MailAllowDomains:  getEnv("MAIL_ALLOW_DOMAINS", ""),
+		MailRedirectTo:    getEnv("MAIL_REDIRECT_TO", ""),
 		SMSEnabled:        envBool("SMS_ENABLED"),
 		SMSAPIURL:         getEnv("SMS_API_URL", ""),
 		SMSAPIKey:         getEnv("SMS_API_KEY", ""),

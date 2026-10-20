@@ -216,6 +216,7 @@ func New(db *sql.DB) *Handler {
 		Coop: NewCoopHandler(
 			repository.NewCoopRepo(db), userRepo, repository.NewOrgRepo(db),
 			repository.NewProjectRepo(db), repository.NewWorkGroupRepo(db), attachH.uploadDir,
+			db, settingsRepo,
 		),
 		Exec: NewExecHandler(repository.NewOrgRepo(db)),
 

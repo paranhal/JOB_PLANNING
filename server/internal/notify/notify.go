@@ -19,10 +19,13 @@ import (
 )
 
 const (
-	PurposeLoginHelp = "login_help"
-	PurposeASUrgent  = "as_urgent"
-	PurposeSameDay   = "same_day"
-	PurposeTest      = "test"
+	PurposeLoginHelp     = "login_help"
+	PurposeASUrgent      = "as_urgent"
+	PurposeSameDay       = "same_day"
+	PurposeTest          = "test"
+	PurposeCoopRequested = "coop_requested"
+	PurposeCoopDecided   = "coop_decided"
+	PurposeCoopAssigned  = "coop_assigned"
 )
 
 type Config struct {
@@ -125,9 +128,12 @@ func ChannelOn(cfg Config, settings *repository.SettingsRepo, orgID, channel str
 
 func PurposeOn(settings *repository.SettingsRepo, purpose string) bool {
 	defaults := map[string]bool{
-		PurposeLoginHelp: true,
-		PurposeASUrgent:  true,
-		PurposeSameDay:   true,
+		PurposeLoginHelp:     true,
+		PurposeASUrgent:      true,
+		PurposeSameDay:       true,
+		PurposeCoopRequested: true,
+		PurposeCoopDecided:   true,
+		PurposeCoopAssigned:  true,
 	}
 	on := defaults[purpose]
 	if settings == nil {
@@ -182,6 +188,10 @@ func MorningAt(now time.Time) time.Time {
 	return time.Date(d.Year(), d.Month(), d.Day(), 8, 0, 0, 0, loc)
 }
 
+func coopPurpose(p string) bool {
+	return p == PurposeCoopRequested || p == PurposeCoopDecided || p == PurposeCoopAssigned
+}
+
 func Notify(db *sql.DB, settings *repository.SettingsRepo, cfg Config, msg Message) error {
 	if db == nil {
 		return fmt.Errorf("db 없음")
@@ -190,6 +200,9 @@ func Notify(db *sql.DB, settings *repository.SettingsRepo, cfg Config, msg Messa
 		return nil
 	}
 	ch := ActiveChannels(cfg, settings, msg.OrgID)
+	if coopPurpose(msg.Purpose) {
+		ch.SMS, ch.Kakao = false, false
+	}
 	if ch.Mail && strings.TrimSpace(msg.ToEmail) != "" {
 		_, err := mailer.Enqueue(db, cfg.Mail, mailer.Item{
 			OrgID:      msg.OrgID,

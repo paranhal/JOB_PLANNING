@@ -19,6 +19,9 @@
     <label class="flex items-center gap-2"><input type="checkbox" name="p_login" value="1" {{if .PLogin}}checked{{end}}> 계정 문의 처리</label>
     <label class="flex items-center gap-2"><input type="checkbox" name="p_as" value="1" {{if .PAS}}checked{{end}}> 긴급 AS 배정</label>
     <label class="flex items-center gap-2"><input type="checkbox" name="p_day" value="1" {{if .PDay}}checked{{end}}> 당일 일정 변경</label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="p_coop_req" value="1" {{if .PCoopReq}}checked{{end}}> 협조 요청 도착</label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="p_coop_dec" value="1" {{if .PCoopDec}}checked{{end}}> 협조 수락·거부</label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="p_coop_asg" value="1" {{if .PCoopAsg}}checked{{end}}> 협조 배정</label>
     <button class="rounded bg-blue-600 text-white px-3 py-1.5">저장</button>
   </form>
 

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,24 +13,29 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/config"
 	"customer-support/internal/imageproc"
 	"customer-support/internal/model"
+	"customer-support/internal/notify"
 	"customer-support/internal/repository"
 )
 
 const maxCoopPhotos = 5
 
 type CoopHandler struct {
-	repo   *repository.CoopRepo
-	users  *repository.UserRepo
-	orgs   *repository.OrgRepo
-	proj   *repository.ProjectRepo
-	groups *repository.WorkGroupRepo
-	upload string
+	repo     *repository.CoopRepo
+	users    *repository.UserRepo
+	orgs     *repository.OrgRepo
+	proj     *repository.ProjectRepo
+	groups   *repository.WorkGroupRepo
+	upload   string
+	db       *sql.DB
+	settings *repository.SettingsRepo
+	ncfg     notify.Config
 }
 
-func NewCoopHandler(repo *repository.CoopRepo, users *repository.UserRepo, orgs *repository.OrgRepo, proj *repository.ProjectRepo, groups *repository.WorkGroupRepo, upload string) *CoopHandler {
-	return &CoopHandler{repo: repo, users: users, orgs: orgs, proj: proj, groups: groups, upload: upload}
+func NewCoopHandler(repo *repository.CoopRepo, users *repository.UserRepo, orgs *repository.OrgRepo, proj *repository.ProjectRepo, groups *repository.WorkGroupRepo, upload string, db *sql.DB, settings *repository.SettingsRepo) *CoopHandler {
+	return &CoopHandler{repo: repo, users: users, orgs: orgs, proj: proj, groups: groups, upload: upload, db: db, settings: settings, ncfg: notify.FromApp(config.Load())}
 }
 
 func coopActor(c echo.Context) model.CoopActor {
@@ -114,6 +120,9 @@ func (h *CoopHandler) Create(c echo.Context) error {
 	if err := h.saveUploads(c, a, row.CoopID); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/cooperations/sent?err="+err.Error())
 	}
+	if got, _ := h.repo.Get(row.CoopID); got != nil {
+		h.mailRequested(got, a.UserID)
+	}
 	return c.Redirect(http.StatusSeeOther, "/cooperations/sent?ok=1")
 }
 
@@ -165,6 +174,9 @@ func (h *CoopHandler) Accept(c echo.Context) error {
 	if err := h.repo.Accept(a, id, h.behalf(a, got.TargetOrgID)); err != nil {
 		return h.mapErr(c, err)
 	}
+	if got, _ = h.repo.Get(id); got != nil {
+		h.mailDecided(got, a.UserID, "수락되었습니다")
+	}
 	return c.Redirect(http.StatusSeeOther, "/cooperations/inbox?ok=1&open="+id)
 }
 
@@ -181,6 +193,9 @@ func (h *CoopHandler) Reject(c echo.Context) error {
 		}
 		return c.Redirect(http.StatusSeeOther, "/cooperations/inbox?err="+err.Error())
 	}
+	if got, _ = h.repo.Get(id); got != nil {
+		h.mailDecided(got, a.UserID, "거부되었습니다")
+	}
 	return c.Redirect(http.StatusSeeOther, "/cooperations/inbox?ok=1")
 }
 
@@ -191,6 +206,10 @@ func (h *CoopHandler) Assign(c echo.Context) error {
 	if got == nil {
 		return echo.ErrNotFound
 	}
+	prev := map[string]bool{}
+	for _, p := range got.Assignees {
+		prev[p.UserID] = true
+	}
 	vals, _ := c.FormParams()
 	userIDs := vals["user_id"]
 	if err := h.repo.Assign(a, id, c.FormValue("plan_start"), c.FormValue("plan_end"), c.FormValue("instruction"), c.FormValue("work_group_id"), userIDs); err != nil {
@@ -198,6 +217,15 @@ func (h *CoopHandler) Assign(c echo.Context) error {
 			return echo.ErrForbidden
 		}
 		return c.Redirect(http.StatusSeeOther, "/cooperations/inbox?err="+err.Error())
+	}
+	if got, _ = h.repo.Get(id); got != nil {
+		var extra []model.CoopAssignee
+		for _, p := range got.Assignees {
+			if !prev[p.UserID] {
+				extra = append(extra, p)
+			}
+		}
+		h.mailAssigned(got, a.UserID, extra)
 	}
 	return c.Redirect(http.StatusSeeOther, "/cooperations/inbox?ok=1")
 }
@@ -219,9 +247,13 @@ func (h *CoopHandler) Complete(c echo.Context) error {
 }
 
 func (h *CoopHandler) ReRequest(c echo.Context) error {
-	n, err := h.repo.ReRequest(coopActor(c), c.Param("id"))
+	a := coopActor(c)
+	n, err := h.repo.ReRequest(a, c.Param("id"))
 	if err != nil {
 		return h.mapErr(c, err)
+	}
+	if got, _ := h.repo.Get(n.CoopID); got != nil {
+		h.mailRequested(got, a.UserID)
 	}
 	return c.Redirect(http.StatusSeeOther, "/cooperations/sent?ok=1&open="+n.CoopID)
 }

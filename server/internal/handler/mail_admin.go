@@ -94,6 +94,9 @@ func (h *NotifyAdminHandler) Page(c echo.Context) error {
 		"PLogin":     checkboxOn(h.settings, "notify.purpose."+notify.PurposeLoginHelp, true),
 		"PAS":        checkboxOn(h.settings, "notify.purpose."+notify.PurposeASUrgent, true),
 		"PDay":       checkboxOn(h.settings, "notify.purpose."+notify.PurposeSameDay, true),
+		"PCoopReq":   checkboxOn(h.settings, "notify.purpose."+notify.PurposeCoopRequested, true),
+		"PCoopDec":   checkboxOn(h.settings, "notify.purpose."+notify.PurposeCoopDecided, true),
+		"PCoopAsg":   checkboxOn(h.settings, "notify.purpose."+notify.PurposeCoopAssigned, true),
 		"Items":      sms,
 		"Sample":     sample,
 		"SampleKind": kind,
@@ -118,6 +121,9 @@ func (h *NotifyAdminHandler) Save(c echo.Context) error {
 	put("notify.purpose."+notify.PurposeLoginHelp, "p_login")
 	put("notify.purpose."+notify.PurposeASUrgent, "p_as")
 	put("notify.purpose."+notify.PurposeSameDay, "p_day")
+	put("notify.purpose."+notify.PurposeCoopRequested, "p_coop_req")
+	put("notify.purpose."+notify.PurposeCoopDecided, "p_coop_dec")
+	put("notify.purpose."+notify.PurposeCoopAssigned, "p_coop_asg")
 	return c.Redirect(http.StatusSeeOther, "/admin/notify")
 }
 
