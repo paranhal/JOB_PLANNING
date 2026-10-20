@@ -1,0 +1,99 @@
+<div class="modal-backdrop" data-work-group-dialog-root>
+  <div role="dialog" aria-modal="true" aria-labelledby="work-group-title" class="modal-panel mx-auto mt-10 max-w-lg w-full space-y-3 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-start justify-between gap-2">
+      <h2 id="work-group-title" class="text-ui-xl font-extrabold text-ink">{{.Title}}</h2>
+      <button type="button" class="btn btn-ghost btn-sm" data-close-work-group>닫기</button>
+    </div>
+    {{if .Err}}<p class="text-ui text-danger">{{.Err}}</p>{{end}}
+    {{if .Group}}
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/update" class="space-y-3">
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-name">이름</label>
+        <input id="wg-name" name="name" required class="input w-full" value="{{.Group.Name}}" {{if not .CanManage}}readonly{{end}}>
+        {{if not .CanManage}}<p class="text-ui-sm text-ink-muted">이름은 조직관리자·비젼관리자만 바꿉니다.</p>{{end}}
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-purpose">목적</label>
+        <textarea id="wg-purpose" name="purpose" rows="2" class="input w-full" {{if not .CanManage}}readonly{{end}}>{{.Group.Purpose}}</textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-ui-sm text-ink-muted" for="wg-start">시작</label>
+          <input id="wg-start" type="date" name="start_date" class="input w-full" value="{{.Group.StartDate}}" {{if not .CanManage}}readonly{{end}}>
+        </div>
+        <div>
+          <label class="text-ui-sm text-ink-muted" for="wg-end">종료</label>
+          <input id="wg-end" type="date" name="end_date" class="input w-full" value="{{.Group.EndDate}}" {{if not .CanManage}}readonly{{end}}>
+        </div>
+      </div>
+      {{if .CanManage}}<button type="submit" class="btn btn-primary btn-sm">저장</button>{{end}}
+    </form>
+    {{if .CanManage}}
+    {{if eq .Group.Status "active"}}
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/close"><button class="btn btn-secondary btn-sm" type="submit">그룹 종료</button></form>
+    {{else}}
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/reopen"><button class="btn btn-secondary btn-sm" type="submit">다시 열기</button></form>
+    {{end}}
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/leader" class="space-y-1">
+      <label class="text-ui-sm text-ink-muted" for="wg-leader">그룹장</label>
+      <select id="wg-leader" name="user_id" class="select w-full">
+        <option value="">없음</option>
+        {{range .Members}}
+        <option value="{{.UserID}}" {{if eq .Role "leader"}}selected{{end}}>{{.FullName}}</option>
+        {{end}}
+      </select>
+      <button type="submit" class="btn btn-secondary btn-sm">그룹장 지정</button>
+    </form>
+    {{end}}
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left"><tr><th class="p-2">구성원</th><th class="p-2">역할</th><th class="p-2"></th></tr></thead>
+      <tbody>
+        {{range .Members}}
+        <tr class="border-t border-line">
+          <td class="p-2">{{.FullName}}</td>
+          <td class="p-2"><span class="badge badge-neutral">{{if eq .Role "leader"}}그룹장{{else}}구성원{{end}}</span></td>
+          <td class="p-2">
+            {{if and $.CanMembers (ne .UserID $.ActorID)}}
+            <form method="post" action="/work-groups/{{$.Group.GroupID}}/members/{{.UserID}}/remove">
+              <button type="submit" class="btn btn-ghost btn-sm">제거</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{if .CanMembers}}
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/members" class="space-y-1">
+      <label class="text-ui-sm text-ink-muted" for="wg-add">구성원 추가</label>
+      <select id="wg-add" name="user_id" class="select w-full" required>
+        <option value="">선택</option>
+        {{range .Candidates}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">추가</button>
+    </form>
+    {{end}}
+    {{else}}
+    <form method="post" action="/work-groups" class="space-y-3">
+      {{if .ShowOrgPick}}
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-org">소속 조직</label>
+        <select id="wg-org" name="org_id" required class="select w-full">
+          <option value="">선택</option>
+          {{range .InsertOrgs}}<option value="{{.OrgID}}" {{if eq $.FormOrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>{{end}}
+        </select>
+      </div>
+      {{end}}
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-name-new">이름</label>
+        <input id="wg-name-new" name="name" required class="input w-full">
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-purpose-new">목적</label>
+        <textarea id="wg-purpose-new" name="purpose" rows="2" class="input w-full"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">만들기</button>
+    </form>
+    {{end}}
+  </div>
+</div>

@@ -1,0 +1,50 @@
+{{define "title"}}업무 그룹 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h2 class="text-ui-xl font-extrabold text-ink">업무 그룹</h2>
+      <p class="text-ui-sm text-ink-muted">조직 안의 임시 수행 단위입니다. 그룹장은 조직관리자와 다릅니다.</p>
+    </div>
+    {{if .CanManage}}
+    <button type="button" class="btn btn-primary" id="work-group-new" data-work-group-edit data-href="/work-groups/new">새 업무 그룹</button>
+    {{end}}
+  </div>
+  {{if .OK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
+  {{if .Err}}<div class="flash-danger rounded-control">{{.Err}}</div>{{end}}
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left">
+        <tr>
+          <th class="p-3">이름</th>
+          {{if .ShowOrg}}<th class="p-3">조직</th>{{end}}
+          <th class="p-3">그룹장</th>
+          <th class="p-3">구성원</th>
+          <th class="p-3">기간</th>
+          <th class="p-3">사업</th>
+          <th class="p-3">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr class="border-t border-line">
+          <td class="p-3">
+            <button type="button" class="text-primary" data-work-group-edit data-href="/work-groups/{{.GroupID}}" data-return-focus>{{.Name}}</button>
+          </td>
+          {{if $.ShowOrg}}<td class="p-3">{{.OrgID}}</td>{{end}}
+          <td class="p-3">{{if .LeaderName}}{{.LeaderName}}{{else}}—{{end}}</td>
+          <td class="p-3">{{.MemberN}}</td>
+          <td class="p-3">{{if .StartDate}}{{.StartDate}}{{else}}—{{end}}{{if .EndDate}} ~ {{.EndDate}}{{end}}</td>
+          <td class="p-3">{{if .ProjectID}}{{.ProjectID}}{{else}}—{{end}}</td>
+          <td class="p-3"><span class="badge badge-neutral">{{if eq .Status "closed"}}종료{{else}}진행{{end}}</span></td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="7">그룹이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div id="work-group-host"></div>
+<script src="/static/js/work-group.js"></script>
+{{end}}

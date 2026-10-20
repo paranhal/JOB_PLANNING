@@ -169,6 +169,7 @@ func navDefinition() []navDefGroup {
 					{ID: "work_today", Label: "오늘 업무", Href: "/work", Active: []string{NavWork, NavWorkPlan}, Show: role, Badge: "assign"},
 					{ID: "work_all", Label: "전체 업무", Href: "/work/all", Active: []string{NavWorkAll}, Show: role},
 				}},
+				{ID: "work_groups", Label: "업무 그룹", Href: "/work-groups", Active: []string{NavWorkGroups}, Show: role},
 				{ID: "work_meeting", Label: "업무 회의", Show: role, Children: []navDefItem{
 					{ID: "meeting", Label: "일일 업무 회의", Href: "/meeting", Active: []string{NavMeeting}, Show: role},
 					{ID: "meeting_weekly", Label: "주간 회의 (팀)", Href: "/meeting/weekly", Active: []string{NavMeetingWeekly}, Show: func(c MenuCtx) bool { return c.visWeeklyTeam() }},

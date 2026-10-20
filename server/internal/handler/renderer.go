@@ -51,6 +51,11 @@ func templateFiles(name string) []string {
 			files = append(files, partials...)
 		}
 	}
+	if strings.HasPrefix(name, "work_group/") {
+		if partials, err := filepath.Glob("web/templates/work_group/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "leave/") {
 		if partials, err := filepath.Glob("web/templates/leave/_*.html"); err == nil {
 			files = append(files, partials...)

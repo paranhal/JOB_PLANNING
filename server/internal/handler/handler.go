@@ -55,6 +55,7 @@ type Handler struct {
 	Notify         *NotifyAdminHandler
 	Approval       *ApprovalSettingsHandler
 	Leave          *LeaveHandler
+	WorkGroup      *WorkGroupHandler
 	Exec           *ExecHandler
 	notices        *assignNoticeHook
 	help           *repository.LoginHelpRepo
@@ -210,6 +211,7 @@ func New(db *sql.DB) *Handler {
 		Notify:      &NotifyAdminHandler{db: db, cfg: authH.cfg, settings: settingsRepo},
 		Approval:    &ApprovalSettingsHandler{eng: aprEng},
 		Leave:       &LeaveHandler{svc: leaveSvc, eng: aprEng},
+		WorkGroup:   NewWorkGroupHandler(repository.NewWorkGroupRepo(db), userRepo),
 		Exec:        NewExecHandler(repository.NewOrgRepo(db)),
 
 		customerRepo: customerRepo,

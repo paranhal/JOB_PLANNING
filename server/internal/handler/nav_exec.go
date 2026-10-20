@@ -45,6 +45,7 @@ func execNavDefinition(orgs []model.Org) []navDefGroup {
 				{ID: "exec_work", Label: "업무 관리", Show: show, Children: []navDefItem{
 					{ID: "exec_work_org", Label: "조직별 업무", Href: "/exec/work", Active: []string{NavExecWork}, Show: show},
 					{ID: "exec_work_all", Label: "전체 업무", Href: "/work/all", Active: []string{NavWorkAll}, Show: show},
+					{ID: "exec_work_groups", Label: "업무 그룹", Href: "/work-groups", Active: []string{NavWorkGroups}, Show: show},
 					{ID: "exec_weekly", Label: "주간 회의 (팀 자료)", Href: "/meeting/weekly", Active: []string{NavMeetingWeekly}, Show: show},
 				}},
 				{ID: "exec_as", Label: "AS·점검", Show: show, Children: []navDefItem{

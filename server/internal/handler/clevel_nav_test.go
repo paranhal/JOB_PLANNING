@@ -23,7 +23,7 @@ func TestCLevelMenuHrefsOrder(t *testing.T) {
 		"/exec",
 		"/projects/dashboard", "/projects", "/quotes", "/projects/registry",
 		"/sales/dashboard", "/sales?view=pipeline", "/sales/activities",
-		"/exec/work", "/work/all", "/meeting/weekly",
+		"/exec/work", "/work/all", "/work-groups", "/meeting/weekly",
 		"/as", "/maintenance", "/customers", "/assets",
 		"/approvals/inbox", "/leaves",
 		"/stats", "/stats/milestones", "/stats/reports",
@@ -103,7 +103,7 @@ func TestCLevelHiddenPathList(t *testing.T) {
 			t.Errorf("%s 가 숨김이 아니다", p)
 		}
 	}
-	for _, p := range []string{"/exec", "/exec/work", "/work/all", "/meeting/weekly", "/as", "/account"} {
+	for _, p := range []string{"/exec", "/exec/work", "/work/all", "/work-groups", "/meeting/weekly", "/as", "/account"} {
 		if cLevelHiddenPath(p) {
 			t.Errorf("%s 가 숨김으로 막혔다", p)
 		}

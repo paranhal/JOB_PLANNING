@@ -1326,6 +1326,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applySalesActivitySplit91(db)
 	applyMaintenancePlanOrgYearUnique(db)
 	applyOrgKind(db)
+	applyWorkGroups(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 

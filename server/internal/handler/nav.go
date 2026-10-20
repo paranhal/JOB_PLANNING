@@ -9,6 +9,7 @@ const (
 	NavMeeting           = "meeting"
 	NavWork              = "work"
 	NavWorkAll           = "work_all"
+	NavWorkGroups        = "work_groups"
 	NavWorkPlan          = "work_plan"
 	NavAS                = "as"
 	NavASStats           = "as_stats"
