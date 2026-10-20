@@ -45,6 +45,7 @@ func newCustomer947Server(t *testing.T) (*echo.Echo, *sql.DB, *model.User, *mode
 	g.POST("/customers", h.Customer.Create, h.Auth.RequireMasterWrite)
 	g.GET("/maintenance/sites", h.Maintenance.ListSiteConfigs)
 	g.GET("/maintenance/sites/new", h.Maintenance.NewSiteConfigPage)
+	g.GET("/maintenance/sites/customer-search", h.Maintenance.SearchSiteCustomers)
 	g.POST("/maintenance/sites", h.Maintenance.SaveSiteConfig, h.Auth.RequireMasterWrite)
 	g.POST("/maintenance", h.Maintenance.CreatePlan)
 	return e, db, vs, oa, cl
@@ -174,12 +175,15 @@ func TestCustomer947SiteConfigNoOrgOnInsert(t *testing.T) {
 	if miss.Code == http.StatusInternalServerError {
 		t.Fatal("사이트 미입력 500")
 	}
-	if miss.Code != http.StatusOK || !strings.Contains(miss.Body.String(), "고객과 표시명은 필수") {
-		t.Fatalf("사이트 미입력 %d", miss.Code)
+	if miss.Code != http.StatusBadRequest || !strings.Contains(miss.Body.String(), errNeedSiteCustomer) {
+		t.Fatalf("사이트 미입력 %d %s", miss.Code, miss.Body.String()[:minInt(200, miss.Body.Len())])
+	}
+	if !strings.Contains(miss.Body.String(), `value="표시"`) {
+		t.Fatal("표시명 유지 없음")
 	}
 	ok := postForm947(t, e, "/maintenance/sites", url.Values{
 		"customer_id": {"c947"}, "short_name": {"사이트표시"}, "inspection_cycle": {"monthly"},
-	}, ck)
+	}, jwtCookieViewOrg(t, vs, "O02"))
 	if ok.Code != http.StatusSeeOther {
 		t.Fatalf("사이트 저장 %d %s", ok.Code, ok.Body.String()[:minInt(200, ok.Body.Len())])
 	}

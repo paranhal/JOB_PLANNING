@@ -42,6 +42,7 @@ func newInspHTTP(t *testing.T) (*echo.Echo, *sql.DB, *http.Cookie, *http.Cookie,
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/maintenance/sites", h.Maintenance.ListSiteConfigs)
 	g.GET("/maintenance/sites/new", h.Maintenance.NewSiteConfigPage)
+	g.GET("/maintenance/sites/customer-search", h.Maintenance.SearchSiteCustomers)
 	g.POST("/maintenance/sites", h.Maintenance.SaveSiteConfig)
 	g.GET("/maintenance", h.Maintenance.ListPlans)
 	g.GET("/maintenance/:id", h.Maintenance.ShowPlan)
