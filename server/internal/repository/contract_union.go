@@ -53,20 +53,21 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 	for _, p := range works {
 		amt := p.ContractAmount
 		row := model.ContractRow{
-			Source:       model.ContractSourceWork,
-			ProjectID:    p.ProjectID,
-			SalesID:      p.SalesProjectID,
-			SalesNo:      p.SalesNo,
-			Name:         p.Name,
-			Customer:     p.CustomerOrParty(),
-			Amount:       amt,
-			ContractedAt: firstNonEmptyStr(p.StartDate, p.CreatedAt.Format("2006-01-02")),
+			Source:         model.ContractSourceWork,
+			ProjectID:      p.ProjectID,
+			SalesID:        p.SalesProjectID,
+			SalesNo:        p.SalesNo,
+			Name:           p.Name,
+			Customer:       p.CustomerOrParty(),
+			Amount:         amt,
+			ContractedAt:   firstNonEmptyStr(p.StartDate, p.CreatedAt.Format("2006-01-02")),
 			StartDate:      p.StartDate,
 			EndDate:        p.EndDate,
 			Status:         p.Status,
 			ProjectKind:    p.ProjectKind,
 			ProjectKindSet: p.ProjectKindSet,
 			SalesBizType:   p.SalesBizType,
+			Direction:      p.Direction,
 		}
 		if sid := strings.TrimSpace(p.SalesProjectID); sid != "" {
 			if linked[sid] > 1 {

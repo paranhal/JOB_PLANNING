@@ -48,6 +48,10 @@ func newEquipCatHTTP(t *testing.T) (*echo.Echo, *sql.DB, *http.Cookie, *http.Coo
 	g.POST("/projects/equipment-categories/import-preview", h.Project.EquipCatImportPreview)
 	g.POST("/projects/equipment-categories/import-apply", h.Project.EquipCatImportApply)
 	g.POST("/projects/equipment-categories/import-errors.xlsx", h.Project.EquipCatImportErrors)
+	g.GET("/projects/import", h.Project.ContractImport)
+	g.GET("/projects/import/template.xlsx", h.Project.ContractImportTemplateXLSX)
+	g.POST("/projects/import-preview", h.Project.ContractImportPreview)
+	g.POST("/projects/import-apply", h.Project.ContractImportApply)
 	return e, db, jwtCookieUserClaims(t, vs), jwtCookieUserClaims(t, oa), jwtCookieUserClaims(t, cl)
 }
 

@@ -377,38 +377,39 @@ func WBProjectStatusLabel(s string) string {
 }
 
 type WorkProject struct {
-	ProjectID       string    `json:"project_id"`
-	Name            string    `json:"name"`       // 사업명
-	ShortName       string    `json:"short_name"` // 목록용 짧은 이름
-	PlanYear        int       `json:"plan_year"`  // 사업 연도
-	IsPaid          bool      `json:"is_paid"`    // 유상(true)/무상(false)
-	SortOrder       int       `json:"sort_order"`
-	OrderingPartyID string    `json:"ordering_party_id"` // 발주처(고객 마스터 연동)
-	OrderingParty   string    `json:"ordering_party"`    // 발주처 직접입력
-	CustomerID      string    `json:"customer_id"`       // 고객
-	ContractType    string    `json:"contract_type"`     // 계약방식
-	BillingType     string    `json:"billing_type"`      // 청구방식
-	StartDate       string    `json:"start_date"`        // 계약기간 시작
-	EndDate         string    `json:"end_date"`          // 계약기간 마감
-	Notes           string    `json:"notes"`             // 비고
-	ContactID       string    `json:"contact_id"`        // 고객 담당자
-	Color           string    `json:"color"`
-	Status          string    `json:"status"`
-	SalesProjectID  string    `json:"sales_project_id,omitempty"`
-	SalesNo         string    `json:"sales_no,omitempty"`
-	SalesStage      string    `json:"sales_stage,omitempty"`
-	SalesCloseReason string   `json:"sales_close_reason,omitempty"`
-	ContractAmount  int       `json:"contract_amount,omitempty"`
-	ContractNo      string    `json:"contract_no,omitempty"`
-	ContractDate       string `json:"contract_date,omitempty"`
-	ContractCategory   string `json:"contract_category,omitempty"`
-	AmountVATKnown     bool   `json:"amount_vat_known,omitempty"`
-	AmountVATIncluded  bool   `json:"amount_vat_included,omitempty"`
-	ProjectKind     string    `json:"project_kind,omitempty"`
-	ProjectKindSet  int       `json:"project_kind_set,omitempty"`
-	SalesBizType    string    `json:"sales_biz_type,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ProjectID         string    `json:"project_id"`
+	Name              string    `json:"name"`       // 사업명
+	ShortName         string    `json:"short_name"` // 목록용 짧은 이름
+	PlanYear          int       `json:"plan_year"`  // 사업 연도
+	IsPaid            bool      `json:"is_paid"`    // 유상(true)/무상(false)
+	SortOrder         int       `json:"sort_order"`
+	OrderingPartyID   string    `json:"ordering_party_id"` // 발주처(고객 마스터 연동)
+	OrderingParty     string    `json:"ordering_party"`    // 발주처 직접입력
+	CustomerID        string    `json:"customer_id"`       // 고객
+	ContractType      string    `json:"contract_type"`     // 계약방식
+	BillingType       string    `json:"billing_type"`      // 청구방식
+	StartDate         string    `json:"start_date"`        // 계약기간 시작
+	EndDate           string    `json:"end_date"`          // 계약기간 마감
+	Notes             string    `json:"notes"`             // 비고
+	ContactID         string    `json:"contact_id"`        // 고객 담당자
+	Color             string    `json:"color"`
+	Status            string    `json:"status"`
+	SalesProjectID    string    `json:"sales_project_id,omitempty"`
+	SalesNo           string    `json:"sales_no,omitempty"`
+	SalesStage        string    `json:"sales_stage,omitempty"`
+	SalesCloseReason  string    `json:"sales_close_reason,omitempty"`
+	ContractAmount    int       `json:"contract_amount,omitempty"`
+	ContractNo        string    `json:"contract_no,omitempty"`
+	ContractDate      string    `json:"contract_date,omitempty"`
+	ContractCategory  string    `json:"contract_category,omitempty"`
+	AmountVATKnown    bool      `json:"amount_vat_known,omitempty"`
+	AmountVATIncluded bool      `json:"amount_vat_included,omitempty"`
+	ProjectKind       string    `json:"project_kind,omitempty"`
+	ProjectKindSet    int       `json:"project_kind_set,omitempty"`
+	SalesBizType      string    `json:"sales_biz_type,omitempty"`
+	Direction         string    `json:"direction,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 
 	CustomerName      string `json:"customer_name,omitempty"`
 	ContactName       string `json:"contact_name,omitempty"`

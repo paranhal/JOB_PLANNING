@@ -27,6 +27,7 @@ const projectSelect = `
 		COALESCE(p.sales_project_id,''), COALESCE(p.contract_amount,0), COALESCE(p.contract_no,''),
 		COALESCE(p.project_kind,'maintenance'), COALESCE(p.project_kind_set,0), COALESCE(sp.biz_type,''),
 		COALESCE(p.contract_date,''), COALESCE(p.contract_category,''), p.amount_vat_included,
+		COALESCE(p.direction,'revenue'),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
 		COALESCE(sp.sales_no,''), COALESCE(sp.stage,''), COALESCE(sp.close_reason,'')
@@ -748,7 +749,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.StartDate, &p.EndDate,
 		&p.Notes, &p.ContactID,
 		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind, &p.ProjectKindSet, &p.SalesBizType,
-		&p.ContractDate, &p.ContractCategory, &vat,
+		&p.ContractDate, &p.ContractCategory, &vat, &p.Direction,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo, &p.SalesStage, &p.SalesCloseReason,
 	)

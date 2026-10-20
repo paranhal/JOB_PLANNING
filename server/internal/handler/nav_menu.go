@@ -226,6 +226,7 @@ func navDefinition() []navDefGroup {
 				{ID: "proj_dash", Label: "사업 대시보드", Href: "/projects/dashboard", Active: []string{NavProjectsDashboard}, Show: func(c MenuCtx) bool { return c.visProjects() }},
 				{ID: "projects", Label: "사업·업무관리", Show: func(c MenuCtx) bool { return c.visProjects() }, Badge: "coop", Children: []navDefItem{
 					{ID: "proj_list", Label: "사업 목록", Href: "/projects", Active: []string{NavProjects}, Show: func(c MenuCtx) bool { return c.visProjects() }},
+					{ID: "proj_import", Label: "엑셀 등록", Href: "/projects/import", Active: []string{NavProjectsImport}, Show: func(c MenuCtx) bool { return c.visProjects() }},
 					{ID: "coop_inbox", Label: "받은 협조", Href: "/cooperations/inbox", Active: []string{NavCoopInbox}, Show: func(c MenuCtx) bool { return c.visCoopInbox() }, Badge: "coop"},
 					{ID: "coop_sent", Label: "보낸 협조", Href: "/cooperations/sent", Active: []string{NavCoopSent}, Show: func(c MenuCtx) bool { return c.visProjects() }},
 				}},

@@ -37,6 +37,7 @@ type ContractRow struct {
 	ProjectKind    string
 	ProjectKindSet int
 	SalesBizType   string
+	Direction      string
 }
 
 func (r ContractRow) EffectiveKind() EffectiveKind {

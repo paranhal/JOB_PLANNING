@@ -82,6 +82,9 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 	var rows []dashRow
 	unclassN := 0
 	for _, u := range union {
+		if model.NormalizeContractDirection(u.Direction) == model.ContractDirCost {
+			continue
+		}
 		dr := dashRow{Row: u, Href: model.ProjectContractHref(u.ProjectID, u.SalesID, u.Source), CanLink: canSales, Link: canSales}
 		ek := u.EffectiveKind()
 		if u.Source == model.ContractSourceSales {
