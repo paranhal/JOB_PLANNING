@@ -550,11 +550,7 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 		"DutyOptions":     model.ProjectDutyOptions(),
 		"KindOptions":     model.ProjectKindOptions(),
 		"ContractTypes":   contractTypes, "BillingTypes": billingTypes,
-		"ProductKeys": []map[string]string{
-			{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
-			{"Key": model.ProductKeySejongKLAS, "Label": model.ProductKeyLabel(model.ProductKeySejongKLAS)},
-			{"Key": model.ProductKeyAnrobotics, "Label": model.ProductKeyLabel(model.ProductKeyAnrobotics)},
-		},
+		"ProductKeys": productKeysForOrg(currentOrg(c)),
 		"WorkKinds": []map[string]string{
 			{"Key": model.ScopeWorkAS, "Label": model.ScopeWorkKindLabel(model.ScopeWorkAS)},
 			{"Key": model.ScopeWorkMaintenance, "Label": model.ScopeWorkKindLabel(model.ScopeWorkMaintenance)},
@@ -578,6 +574,17 @@ func splitCSVLocal(s string) []string {
 
 func (h *ProjectHandler) parseForm(c echo.Context) (*model.WorkProject, []model.ProjectScopeRule) {
 	return ParseWorkProjectForm(c), parseScopeRules(c)
+}
+
+func productKeysForOrg(orgID string) []map[string]string {
+	if strings.TrimSpace(orgID) != model.OrgIDLibrary {
+		return nil
+	}
+	return []map[string]string{
+		{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
+		{"Key": model.ProductKeySejongKLAS, "Label": model.ProductKeyLabel(model.ProductKeySejongKLAS)},
+		{"Key": model.ProductKeyAnrobotics, "Label": model.ProductKeyLabel(model.ProductKeyAnrobotics)},
+	}
 }
 
 func parseScopeRules(c echo.Context) []model.ProjectScopeRule {
@@ -618,6 +625,9 @@ func parseScopeRules(c echo.Context) []model.ProjectScopeRule {
 		}
 		if parent == "" && prod == "" && kind == "" && note == "" {
 			continue
+		}
+		if currentOrg(c) != model.OrgIDLibrary {
+			prod = ""
 		}
 		out = append(out, model.ProjectScopeRule{
 			RuleID:           rid,

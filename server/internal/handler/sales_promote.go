@@ -227,11 +227,7 @@ func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesPr
 		"DutyOptions":     model.ProjectDutyOptions(),
 		"KindOptions":     model.ProjectKindOptions(),
 		"ContractTypes":   contractTypes, "BillingTypes": billingTypes,
-		"ProductKeys": []map[string]string{
-			{"Key": model.ProductKeyKLAS, "Label": model.ProductKeyLabel(model.ProductKeyKLAS)},
-			{"Key": model.ProductKeySejongKLAS, "Label": model.ProductKeyLabel(model.ProductKeySejongKLAS)},
-			{"Key": model.ProductKeyAnrobotics, "Label": model.ProductKeyLabel(model.ProductKeyAnrobotics)},
-		},
+		"ProductKeys": productKeysForOrg(currentOrg(c)),
 		"WorkKinds": []map[string]string{
 			{"Key": model.ScopeWorkAS, "Label": model.ScopeWorkKindLabel(model.ScopeWorkAS)},
 			{"Key": model.ScopeWorkMaintenance, "Label": model.ScopeWorkKindLabel(model.ScopeWorkMaintenance)},
