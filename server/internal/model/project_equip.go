@@ -8,10 +8,13 @@ const (
 	YearDone      = "done"
 	YearCancelled = "cancelled"
 
-	SitePlanned  = "planned"
-	SiteActive   = "active"
-	SiteDone     = "done"
-	SiteExcluded = "excluded"
+	SitePlanned    = "planned"
+	SiteActive     = "active" // 옛값. 075 이후 in_progress 로 읽는다
+	SiteInProgress = "in_progress"
+	SiteInstalled  = "installed"
+	SiteInspected  = "inspected"
+	SiteDone       = "done" // 옛값. 075 이후 inspected 로 읽는다
+	SiteExcluded   = "excluded"
 
 	EquipPlanned    = "planned"
 	EquipDelivered  = "delivered"
@@ -48,9 +51,12 @@ type ProjectSite struct {
 	SiteName    string
 	Region      string
 	Address     string
-	ContactNote string
-	Status      string
-	SortOrder   int
+	ContactNote    string
+	Status         string
+	InstalledAt    string
+	InspectedAt    string
+	ExcludedReason string
+	SortOrder      int
 	IsActive    bool
 	Note        string
 	OrgID       string
@@ -199,18 +205,42 @@ func YearStatusLabel(s string) string {
 }
 
 func SiteStatusLabel(s string) string {
-	switch strings.TrimSpace(s) {
+	switch NormalizeSiteStatus(s) {
 	case SitePlanned:
 		return "예정"
-	case SiteActive:
-		return "운영"
-	case SiteDone:
-		return "종료"
+	case SiteInProgress:
+		return "진행"
+	case SiteInstalled:
+		return "설치완료"
+	case SiteInspected:
+		return "검수완료"
 	case SiteExcluded:
 		return "제외"
 	default:
 		return s
 	}
+}
+
+func NormalizeSiteStatus(s string) string {
+	switch strings.TrimSpace(s) {
+	case SitePlanned, "예정":
+		return SitePlanned
+	case SiteActive, SiteInProgress, "운영", "진행":
+		return SiteInProgress
+	case SiteInstalled, "설치완료", "설치":
+		return SiteInstalled
+	case SiteDone, SiteInspected, "종료", "검수완료", "검수":
+		return SiteInspected
+	case SiteExcluded, "제외":
+		return SiteExcluded
+	default:
+		return ""
+	}
+}
+
+func SiteStatusCountsAsInstalled(s string) bool {
+	n := NormalizeSiteStatus(s)
+	return n == SiteInstalled || n == SiteInspected
 }
 
 func EquipStatusLabel(s string) string {
@@ -233,25 +263,7 @@ func EquipStatusLabel(s string) string {
 }
 
 func ParseSiteStatus(s string) string {
-	s = strings.TrimSpace(s)
-	switch s {
-	case SitePlanned, SiteActive, SiteDone, SiteExcluded, "예정", "운영", "종료", "제외":
-		if s == "예정" {
-			return SitePlanned
-		}
-		if s == "운영" {
-			return SiteActive
-		}
-		if s == "종료" {
-			return SiteDone
-		}
-		if s == "제외" {
-			return SiteExcluded
-		}
-		return s
-	default:
-		return ""
-	}
+	return NormalizeSiteStatus(s)
 }
 
 func ParseEquipStatus(s string) string {

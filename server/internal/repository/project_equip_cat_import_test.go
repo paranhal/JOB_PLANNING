@@ -239,7 +239,7 @@ func TestEquipCatImportPermAndInUse(t *testing.T) {
 	if _, err := r.db.Exec(`INSERT INTO work_projects(project_id,name,org_id) VALUES('WP95C','x',?)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.db.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id) VALUES('S1','WP95C','s','active',?)`, model.OrgIDLibrary); err != nil {
+	if _, err := r.db.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id) VALUES('S1','WP95C','s','in_progress',?)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.db.Exec(`INSERT INTO project_equipment(id,project_id,site_id,category_id,product_name,qty,status,org_id) VALUES('E1','WP95C','S1',?,'p',1,'planned',?)`, cat.ID, model.OrgIDLibrary); err != nil {

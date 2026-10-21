@@ -206,9 +206,8 @@ func (r *ProjectEquipRepo) SaveSite(s *model.ProjectSite) error {
 	if s.SiteName == "" {
 		return fmt.Errorf("사이트명을 입력하세요")
 	}
-	switch s.Status {
-	case model.SitePlanned, model.SiteActive, model.SiteDone, model.SiteExcluded:
-	default:
+	s.Status = model.NormalizeSiteStatus(s.Status)
+	if s.Status == "" {
 		return fmt.Errorf("상태를 확인하세요")
 	}
 	org, err := r.bindOrg(s.ProjectID, s.OrgID)
@@ -228,6 +227,9 @@ func (r *ProjectEquipRepo) SaveSite(s *model.ProjectSite) error {
 			s.ID, s.ProjectID, cust, s.SiteName, s.Region, s.Address, s.ContactNote, s.Status, s.SortOrder, s.Note, s.OrgID)
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "unique") {
+				if s.CustomerID != "" {
+					return fmt.Errorf("이미 대상입니다")
+				}
 				return fmt.Errorf("같은 사이트명이 있습니다")
 			}
 			return err

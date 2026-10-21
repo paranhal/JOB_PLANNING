@@ -166,11 +166,11 @@ func TestProjectEquipPagingPerf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id) VALUES('PS-0',?,'기준','active',?)`, pid, model.OrgIDLibrary); err != nil {
+	if _, err := tx.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id) VALUES('PS-0',?,'기준','in_progress',?)`, pid, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	for i := 1; i <= 1000; i++ {
-		if _, err := tx.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id,sort_order) VALUES(?,?,?,'active',?,?)`,
+		if _, err := tx.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id,sort_order) VALUES(?,?,?,'in_progress',?,?)`,
 			fmt.Sprintf("PS-%d", i), pid, fmt.Sprintf("사이트%04d", i), model.OrgIDLibrary, i); err != nil {
 			t.Fatal(err)
 		}
