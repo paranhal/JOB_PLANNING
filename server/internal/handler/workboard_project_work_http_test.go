@@ -86,7 +86,18 @@ func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *reposi
 	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
 	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)
 	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
+	g.GET("/workboard/tasks/:id/action", h.Workboard.ShowProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action", h.Workboard.SaveProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action/hold", h.Workboard.HoldProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action/transfer", h.Workboard.TransferProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action/cancel", h.Workboard.CancelProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action/hold/release", h.Workboard.ReleaseProjectWorkHold)
+	g.POST("/workboard/tasks/:id/action/unlock-edit", h.Workboard.UnlockProjectWorkAction)
+	g.POST("/attachments", h.Attachment.Upload)
+	g.GET("/attachments/:id", h.Attachment.Download)
+	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 	g.GET("/projects/:id/sites", h.Project.Sites)
+	h.Attachment.uploadDir = filepath.Join(t.TempDir(), "uploads")
 	return e, repository.NewWBRepo(db), users
 }
 

@@ -133,3 +133,70 @@ func TestFormatProjectWorkLineSites(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestCompanyWeeklyProjectWorkStatusBuckets(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "cw-pw.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO work_projects(project_id,name,status,org_id) VALUES('WP-B','버킷','active',?)`, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	ins := `INSERT INTO work_tasks(task_id,work_type,title,status,project_id,org_id,complete_date,work_date,due_date)
+		VALUES(?,?,?,?,?,?,?,?,?)`
+	if _, err := db.Exec(ins, "T-done", "project_work", "완료건", "complete", "WP-B", model.OrgIDLibrary, "2026-08-12", "2026-08-12", "2026-08-12"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ins, "T-can", "project_work", "취소건", "cancelled", "WP-B", model.OrgIDLibrary, "2026-08-12", "2026-08-12", "2026-08-12"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ins, "T-hold", "project_work", "대기건", "hold", "WP-B", model.OrgIDLibrary, "", "2026-08-18", "2026-08-18"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ins, "T-part", "project_work", "일부건", model.StatusPartialComplete, "WP-B", model.OrgIDLibrary, "", "2026-08-18", "2026-08-18"); err != nil {
+		t.Fatal(err)
+	}
+	r := NewStatsRepo(db)
+	done, err := r.listCompanyAdminDone("WP-B", "2026-08-10", "2026-08-17", model.OrgIDLibrary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawDone, sawCan bool
+	for _, a := range done {
+		if strings.Contains(a.Title, "완료건") {
+			sawDone = true
+		}
+		if strings.Contains(a.Title, "취소건") {
+			sawCan = true
+		}
+	}
+	if !sawDone {
+		t.Fatal("완료 작업이 전주 실적에 없음")
+	}
+	if sawCan {
+		t.Fatal("취소 작업이 전주 실적에 있음")
+	}
+	plan, err := r.listCompanyAdminPlan("WP-B", "2026-08-17", "2026-08-24", model.OrgIDLibrary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawHold, sawPart, sawDonePlan bool
+	for _, a := range plan {
+		if strings.Contains(a.Title, "대기건") {
+			sawHold = true
+		}
+		if strings.Contains(a.Title, "일부건") {
+			sawPart = true
+		}
+		if strings.Contains(a.Title, "완료건") {
+			sawDonePlan = true
+		}
+	}
+	if !sawHold || !sawPart {
+		t.Fatalf("예정에 대기/일부완료 없음 hold=%v part=%v", sawHold, sawPart)
+	}
+	if sawDonePlan {
+		t.Fatal("완료 건이 예정에 있음")
+	}
+}
