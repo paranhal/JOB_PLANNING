@@ -105,7 +105,7 @@
       <button class="btn btn-primary" type="submit">선택 변경</button>
     </div>
     <table class="w-full text-ui">
-      <thead class="text-ink-muted text-left"><tr><th class="p-3"></th><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th></tr></thead>
+      <thead class="text-ink-muted text-left"><tr><th class="p-3"></th><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th><th class="p-3">작업 이력</th></tr></thead>
       <tbody>
         {{range .Sites}}
         <tr class="border-t border-line">
@@ -114,9 +114,13 @@
           <td class="p-3">{{.Region}}</td>
           <td class="p-3">{{siteStatusLabel .Status}}</td>
           <td class="p-3">{{.EquipN}}</td>
+          <td class="p-3 text-ui-sm">
+            {{$works := index $.SiteWorks .ID}}
+            {{range $works}}<div><a class="text-primary" href="/workboard/tasks/{{.TaskID}}/action">{{.Line}}</a></div>{{else}}—{{end}}
+          </td>
         </tr>
         {{else}}
-        <tr><td class="p-3 text-ink-muted" colspan="5">사이트가 없습니다.</td></tr>
+        <tr><td class="p-3 text-ink-muted" colspan="6">사이트가 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -124,7 +128,7 @@
   {{else}}
   <div class="card overflow-x-auto">
     <table class="w-full text-ui">
-      <thead class="text-ink-muted text-left"><tr><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th></tr></thead>
+      <thead class="text-ink-muted text-left"><tr><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th><th class="p-3">작업 이력</th></tr></thead>
       <tbody>
         {{range .Sites}}
         <tr class="border-t border-line">
@@ -132,9 +136,13 @@
           <td class="p-3">{{.Region}}</td>
           <td class="p-3">{{siteStatusLabel .Status}}</td>
           <td class="p-3">{{.EquipN}}</td>
+          <td class="p-3 text-ui-sm">
+            {{$works := index $.SiteWorks .ID}}
+            {{range $works}}<div><a class="text-primary" href="/workboard/tasks/{{.TaskID}}/action">{{.Line}}</a></div>{{else}}—{{end}}
+          </td>
         </tr>
         {{else}}
-        <tr><td class="p-3 text-ink-muted" colspan="4">사이트가 없습니다.</td></tr>
+        <tr><td class="p-3 text-ink-muted" colspan="5">사이트가 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>

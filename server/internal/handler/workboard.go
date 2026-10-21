@@ -1065,7 +1065,7 @@ func paletteTaskCard(t model.WorkTask, dimmed bool) model.WBCard {
 	if t.WorkType == model.WBWorkProjectWork {
 		sub = projectWorkSub(t)
 	}
-	return model.WBCard{
+	card := model.WBCard{
 		Kind:         "task",
 		RefID:        t.TaskID,
 		TaskID:       t.TaskID,
@@ -1082,6 +1082,10 @@ func paletteTaskCard(t model.WorkTask, dimmed bool) model.WBCard {
 		Dimmed:       dimmed || t.Status == model.WBTaskComplete,
 		Status:       t.Status,
 	}
+	if t.WorkType == model.WBWorkProjectWork && t.TaskID != "" {
+		card.ActionHref = projectWorkActionPath(t.TaskID)
+	}
+	return card
 }
 
 func paletteKindFromPrefix(prefix, href string) string {

@@ -157,6 +157,11 @@ func (c WBCard) DetailHref() string {
 	if href := strings.TrimSpace(c.ActionHref); href != "" {
 		return href
 	}
+	if c.Category == WBWorkProjectWork {
+		if id := c.taskID(); id != "" {
+			return "/workboard/tasks/" + id + "/action"
+		}
+	}
 	if c.Category == WBSourceAS {
 		asID := strings.TrimPrefix(c.SourceHref, "/as/")
 		if asID != "" && !strings.Contains(asID, "/") {
@@ -777,6 +782,8 @@ type WorkTask struct {
 	CustomerConfirmer string   `json:"customer_confirmer,omitempty"`
 	HoldNextAction   string    `json:"hold_next_action,omitempty"`
 	TransferTo       string    `json:"transfer_to,omitempty"`
+	TargetCategoryID string    `json:"target_category_id,omitempty"`
+	WorkReason       string    `json:"work_reason,omitempty"`
 	ReceiptDate      string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
 	CompleteDate     string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
 	RecurrenceRole   string    `json:"recurrence_role,omitempty"`
@@ -851,6 +858,9 @@ func (t WorkTask) CustomerLabel() string {
 
 // DetailHref 일일 업무 현황 카드/목록 링크
 func (t WorkTask) DetailHref() string {
+	if t.WorkType == WBWorkProjectWork && t.TaskID != "" && !strings.HasPrefix(t.TaskID, "ext:") {
+		return "/workboard/tasks/" + t.TaskID + "/action"
+	}
 	if strings.TrimSpace(t.BoardHref) != "" {
 		return t.BoardHref
 	}
@@ -889,9 +899,16 @@ func WBCardAsWaitingTask(c WBCard) WorkTask {
 	if taskID == "" {
 		taskID = "ext:" + c.Kind + ":" + c.RefID
 	}
-	href := strings.TrimSpace(c.SourceHref)
+	href := strings.TrimSpace(c.ActionHref)
+	if href == "" {
+		href = strings.TrimSpace(c.SourceHref)
+	}
 	if href == "" && taskID != "" && !strings.HasPrefix(taskID, "ext:") {
-		href = "/workboard/tasks/" + taskID
+		if workType == WBWorkProjectWork {
+			href = "/workboard/tasks/" + taskID + "/action"
+		} else {
+			href = "/workboard/tasks/" + taskID
+		}
 	}
 	return WorkTask{
 		TaskID:      taskID,

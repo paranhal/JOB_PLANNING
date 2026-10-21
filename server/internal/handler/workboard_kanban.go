@@ -192,7 +192,13 @@ func planKanbanHrefs(it model.WorkListItem) (action, edit string) {
 	case it.Prefix == model.WorkPrefixMaintenance:
 		return "/maintenance/visits/" + it.RefID + "/action", ""
 	case strings.HasPrefix(it.Href, "/workboard/tasks/"):
-		return it.Href, it.Href + "/edit"
+		href := it.Href
+		if it.Prefix == model.WBWorkProjectWork || strings.Contains(it.Href, "project_work") {
+			if !strings.HasSuffix(href, "/action") {
+				href = strings.TrimSuffix(href, "/edit") + "/action"
+			}
+		}
+		return href, strings.TrimSuffix(it.Href, "/action") + "/edit"
 	default:
 		return it.Href, ""
 	}

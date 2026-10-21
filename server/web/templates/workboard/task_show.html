@@ -21,7 +21,7 @@
           {{if .EditMode}}
             {{if $isAS}}AS 일일업무 수정{{else if $isMnt}}정기점검 일일업무 수정{{else if $isSales}}영업활동 수정{{else if $isWork}}작업 수정{{else}}행정/지원업무 수정{{end}}
           {{else}}
-            {{if $isAS}}AS 업무 조치{{else if $isMnt}}정기점검 업무 조치{{else if $isSales}}영업활동 조치{{else if $isWork}}작업 조치{{else}}행정/지원업무 조치{{end}}
+            {{if $isAS}}AS 업무 조치{{else if $isMnt}}정기점검 업무 조치{{else if $isSales}}영업활동 조치{{else if $isWork}}작업 상세{{else}}행정/지원업무 조치{{end}}
           {{end}}
         </h2>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbWorkTypeClass $t.WorkType}}">{{wbWorkTypeLabel $t.WorkType}}</span>
@@ -609,13 +609,6 @@
       <label class="block text-sm font-medium text-gray-700 mb-1">태그</label>
       <input name="tags" value="{{$t.Tags}}" placeholder="쉼표로 구분" class="w-full border rounded-lg px-3 py-2">
     </div>
-    {{if $isWork}}
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">결과 메모</label>
-      <textarea name="complete_note" rows="2" class="w-full border rounded-lg px-3 py-2">{{$t.CompleteNote}}</textarea>
-    </div>
-    {{end}}
-
     {{if $.IsAdminGTD}}
     <div x-show="status === 'waiting_for'" x-cloak class="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
       <p class="text-xs font-medium text-indigo-900">회신 대기</p>
@@ -657,8 +650,10 @@
       <input name="cancel_reason" value="{{$t.CancelReason}}" class="w-full border rounded-lg px-3 py-2">
     </div>
     <div x-show="status === 'complete'" x-cloak class="space-y-2">
+      {{if not $isWork}}
       <label class="block text-sm font-medium text-gray-700 mb-1">최종 조치 내용</label>
       <textarea name="complete_note" rows="2" class="w-full border rounded-lg px-3 py-2">{{$t.CompleteNote}}</textarea>
+      {{end}}
       {{if gt $.OpenSubtasks 0}}
       <p class="text-xs text-red-700">하위 업무 {{$.OpenSubtasks}}건을 먼저 처리하세요</p>
       {{else if $.CompleteBlocked}}
