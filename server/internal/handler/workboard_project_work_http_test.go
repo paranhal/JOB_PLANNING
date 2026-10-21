@@ -40,7 +40,10 @@ func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *reposi
 	}
 	if _, err := db.Exec(`INSERT INTO work_projects(project_id,name,status,org_id,project_kind,project_kind_set)
 		VALUES('WP-O01','도서관공사','active',?,'construction',1),
-		      ('WP-O03','SI구축','active','O03','build',1)`, model.OrgIDLibrary); err != nil {
+		      ('WP-O03','SI구축','active','O03','build',1),
+		      ('WP-hold','보류사업','hold','O03','build',1),
+		      ('WP-done','종료사업','complete','O03','build',1),
+		      ('WP-arch','보관사업','archived','O03','build',1)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO customers(customer_id,org_name,official_name,is_active,org_id,has_parent,org_code,addr_sigungu,party_kind)
@@ -80,6 +83,7 @@ func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *reposi
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.GET("/workboard/kanban", h.Workboard.Kanban)
+	g.GET("/workboard/tasks", h.Workboard.List)
 	g.GET("/workboard/project-sites", h.Workboard.SearchProjectWorkSites)
 	g.GET("/workboard/work-sites/search", h.Workboard.SearchWorkTaskSites)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
@@ -93,6 +97,8 @@ func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *reposi
 	g.POST("/workboard/tasks/:id/action/cancel", h.Workboard.CancelProjectWorkAction)
 	g.POST("/workboard/tasks/:id/action/hold/release", h.Workboard.ReleaseProjectWorkHold)
 	g.POST("/workboard/tasks/:id/action/unlock-edit", h.Workboard.UnlockProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action/project", h.Workboard.LinkProjectWorkAction)
+	g.POST("/workboard/tasks/:id/action/sites", h.Workboard.ImportProjectWorkSites)
 	g.POST("/attachments", h.Attachment.Upload)
 	g.GET("/attachments/:id", h.Attachment.Download)
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
@@ -284,7 +290,7 @@ func TestProjectWorkSitesAndSearch(t *testing.T) {
 		"work_type": {"project_work"}, "title": {"타조직"}, "work_subtype": {"other"},
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-O03"},
 	})
-	if cross.Code != http.StatusBadRequest {
+	if cross.Code != http.StatusSeeOther {
 		t.Fatalf("타 조직 사업 status=%d", cross.Code)
 	}
 
@@ -454,8 +460,11 @@ func TestProjectWorkOrgIsolationSearch(t *testing.T) {
 	empty.AddCookie(jwtCookieUser(t, oa04))
 	emptyRec := httptest.NewRecorder()
 	e.ServeHTTP(emptyRec, empty)
-	if emptyRec.Code != http.StatusOK || !strings.Contains(emptyRec.Body.String(), "등록된 사업이 없습니다") {
-		t.Fatalf("빈 사업 안내 status=%d", emptyRec.Code)
+	if emptyRec.Code != http.StatusOK {
+		t.Fatalf("O04 register status=%d", emptyRec.Code)
+	}
+	if strings.Contains(emptyRec.Body.String(), "등록된 사업이 없습니다") {
+		t.Fatal("조직 무관 목록인데 빈 안내")
 	}
 
 	cl := httptest.NewRequest(http.MethodGet, "/workboard/work-sites/search?q="+url.QueryEscape("계룡"), nil)
