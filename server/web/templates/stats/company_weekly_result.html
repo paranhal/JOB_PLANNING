@@ -17,7 +17,7 @@
     {{else}}
     <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
       <p class="font-semibold">원본 보존에 실패해 한 장짜리 파일로 생성했습니다.</p>
-      <p class="mt-1">회사 공통 파일은 그대로 두세요. 이 파일은 도서관사업팀 20~25행만 들어 있습니다.</p>
+      <p class="mt-1">회사 공통 파일은 그대로 두세요. 이 파일은 {{if .OrgName}}{{.OrgName}}{{else}}현재 조직{{end}} {{.RowFrom}}~{{.RowTo}}행만 들어 있습니다.</p>
       {{if .FallbackReason}}<p class="mt-1 text-xs">{{.FallbackReason}}</p>{{end}}
     </div>
     {{end}}

@@ -20,6 +20,7 @@ const (
 	companyWeeklyBizSheet        = "26.8.7(사업)"
 	companyWeeklyTabColor        = "FF0000FF"
 	companyWeeklyMaxUpload       = 20 << 20
+	companyWeeklyFirstRow        = 20
 )
 
 type companyWeeklyBuildInput struct {
@@ -27,6 +28,7 @@ type companyWeeklyBuildInput struct {
 	SheetName string
 	Period    model.CompanyWeeklyPeriod
 	Rows      []model.CompanyWeeklyRow
+	OrgShort  string
 }
 
 type companyWeeklyBuildResult struct {
@@ -51,7 +53,7 @@ func buildCompanyWeeklyWorkbook(in companyWeeklyBuildInput) (companyWeeklyBuildR
 	if err := checkCompanyWeeklySheetName(in.SheetName); err != nil {
 		return companyWeeklyBuildResult{}, err
 	}
-	ascii, utf8 := companyWeeklyFilenames(in.Period)
+	ascii, utf8 := companyWeeklyFilenames(in.Period, in.OrgShort)
 	out := companyWeeklyBuildResult{
 		Mode:      companyWeeklyModeSingleSheet,
 		ASCIIName: ascii,
@@ -120,7 +122,7 @@ func checkCompanyWeeklySheetName(name string) error {
 	return nil
 }
 
-func companyWeeklyFilenames(p model.CompanyWeeklyPeriod) (ascii, utf8 string) {
+func companyWeeklyFilenames(p model.CompanyWeeklyPeriod, orgShort string) (ascii, utf8 string) {
 	day := strings.ReplaceAll(p.Anchor, "-", "")
 	if len(day) == 8 {
 		day = day[2:]
@@ -128,8 +130,12 @@ func companyWeeklyFilenames(p model.CompanyWeeklyPeriod) (ascii, utf8 string) {
 	if day == "" {
 		day = "report"
 	}
+	orgShort = strings.TrimSpace(orgShort)
+	if orgShort == "" {
+		orgShort = "조직"
+	}
 	ascii = day + "_company_weekly.xlsx"
-	utf8 = fmt.Sprintf("%s_주간업무보고_사업관리_%d월%d주차_도서관사업팀.xlsx", day, p.Month, p.WeekN)
+	utf8 = fmt.Sprintf("%s_주간업무보고_사업관리_%d월%d주차_%s.xlsx", day, p.Month, p.WeekN, orgShort)
 	return ascii, utf8
 }
 
@@ -238,10 +244,10 @@ func fillCompanyWeeklySheet(f *excelize.File, sheet string, p model.CompanyWeekl
 		}
 	}
 
-	for _, row := range rows {
+	for i, row := range rows {
 		r := row.SheetRow
-		if r < 20 || r > 25 {
-			continue
+		if r < companyWeeklyFirstRow {
+			r = companyWeeklyFirstRow + i
 		}
 		if err := f.SetRowHeight(sheet, r, 175.5); err != nil {
 			return err
