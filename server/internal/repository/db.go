@@ -1337,6 +1337,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyProjectSitesProgress(db)
 	applyWorkTaskProjectWork(db)
 	applyWorkTaskSitesCustomer(db)
+	applyWeeklyReportOrgV78(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 
