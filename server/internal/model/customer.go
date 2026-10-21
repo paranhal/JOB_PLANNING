@@ -19,6 +19,7 @@ type Customer struct {
 	Industry         string    `json:"industry"`        // 업종 코드
 	HasParent        bool      `json:"has_parent"`
 	ParentCustomerID string    `json:"parent_customer_id"` // 상위기관 ID
+	OrgCode          string    `json:"org_code,omitempty"` // 기관코드(학교). 075
 	PostalCode       string    `json:"postal_code"`        // 우편번호
 	AddrSido         string    `json:"addr_sido"`          // 시도
 	AddrSigungu      string    `json:"addr_sigungu"`       // 시군구(군구)
@@ -44,6 +45,9 @@ type Customer struct {
 	ShortName     string `json:"short_name,omitempty"` // 점검사이트 짧은이름. 접수 검색용
 	Region        string `json:"region,omitempty"`     // 점검사이트 지역. 접수 검색용
 }
+
+// SchoolParentOfficialName 모든 학교·유치원(폐교 포함)의 상위 기관. 사용자 확정 2026-10-21.
+const SchoolParentOfficialName = "충청남도교육청"
 
 // CustomerBuilding 고객 건물 (기획서 §5.2)
 type CustomerBuilding struct {
@@ -154,6 +158,7 @@ type CustomerListItem struct {
 	ParentCustomerID  string `json:"parent_customer_id"`
 	ParentOrgName     string `json:"parent_org_name"`
 	HasParent         bool   `json:"has_parent"`
+	ChildCount        int    `json:"child_count,omitempty"`
 	Address           string `json:"address,omitempty"`     // 엑셀·지역필터용(조합 또는 구주소)
 	AddrSido          string `json:"addr_sido,omitempty"`   // 시도(구조화)
 	SiteRegion        string `json:"site_region,omitempty"` // 점검사이트 지역

@@ -145,14 +145,133 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 	years, _ := h.pe.ListYears(p.ProjectID)
 	cats, _ := h.pe.ListCategories(org, false)
 	smap, emap, pending := h.pe.Summary(p.ProjectID)
+	prog, _ := h.pe.SiteProgress(p.ProjectID)
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 사이트·장비", "Active": NavProjects, "Project": p,
 		"Sites": sites, "SiteTotal": total, "Equips": equips, "EquipTotal": etotal,
 		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
+		"Progress": prog,
 		"Q": q, "Region": region, "Status": st, "CanWrite": canWriteProjectEquip(c, h, p, org),
 		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": nil, "Apply": false,
 	})
+}
+
+func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	if !canWriteProjectEquip(c, h, p, org) {
+		return echo.ErrForbidden
+	}
+	_ = c.Request().ParseForm()
+	ids := c.Request().Form["customer_id"]
+	if _, err := h.pe.AddSitesFromCustomers(p.ProjectID, org, currentUserID(c), ids); err != nil {
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
+	}
+	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"/sites?ok=1")
+}
+
+func (h *ProjectHandler) SitesBulkStatus(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	if !canWriteProjectEquip(c, h, p, org) {
+		return echo.ErrForbidden
+	}
+	_ = c.Request().ParseForm()
+	ids := c.Request().Form["site_id"]
+	if err := h.pe.BulkSiteStatus(p.ProjectID, currentUserID(c), c.FormValue("status"), c.FormValue("event_date"), c.FormValue("reason"), ids); err != nil {
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
+	}
+	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"/sites?ok=1")
+}
+
+func (h *ProjectHandler) SitesPick(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	parentID := strings.TrimSpace(c.QueryParam("parent_id"))
+	q, region := c.QueryParam("q"), c.QueryParam("region")
+	parents, _ := h.pe.ListParentOrgs(org)
+	if parentID == "" && len(parents) > 0 {
+		for _, par := range parents {
+			if par.Name == model.SchoolParentOfficialName {
+				parentID = par.CustomerID
+				break
+			}
+		}
+		if parentID == "" {
+			parentID = parents[0].CustomerID
+		}
+	}
+	picks, total, _ := h.pe.ListSchoolPick(p.ProjectID, org, parentID, q, region, page, 100)
+	return c.Render(http.StatusOK, "project/sites_pick.html", map[string]interface{}{
+		"Title": p.DisplayName() + " · 대상 학교 추가", "Active": NavProjects, "Project": p,
+		"Parents": parents, "ParentID": parentID, "Picks": picks, "Total": total,
+		"Q": q, "Region": region, "Page": page, "CanWrite": canWriteProjectEquip(c, h, p, org),
+		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+	})
+}
+
+func (h *ProjectHandler) SiteSchoolTemplateXLSX(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	_ = org
+	_ = p
+	if !canViewProjectEquip(c) {
+		return echo.ErrForbidden
+	}
+	raw, err := repository.BuildSiteSchoolWorkbook()
+	if err != nil {
+		return err
+	}
+	return writeExcelFile(c, raw, "sites_schools_template.xlsx", "사업사이트_업로드양식.xlsx")
+}
+
+func (h *ProjectHandler) SiteSchoolImportPreview(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	if !canWriteProjectEquip(c, h, p, org) {
+		return echo.ErrForbidden
+	}
+	raw, name, err := h.readEquipUpload(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", "파일을 선택하세요")
+	}
+	prev, err := h.pe.PreviewSiteSchool(p.ProjectID, org, raw, c.FormValue("mode"), c.FormValue("create_missing") == "1")
+	if err != nil {
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
+	}
+	prev.FileName = name
+	return h.renderSitesPreview(c, p, org, prev, false)
+}
+
+func (h *ProjectHandler) SiteSchoolImportApply(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	if !canWriteProjectEquip(c, h, p, org) {
+		return echo.ErrForbidden
+	}
+	raw, name, err := h.readEquipUpload(c)
+	if err != nil {
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", "파일을 선택하세요")
+	}
+	prev, err := h.pe.ApplySiteSchool(p.ProjectID, org, currentUserID(c), name, c.FormValue("mode"), raw, c.FormValue("create_missing") == "1")
+	if err != nil {
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
+	}
+	return h.renderSitesPreview(c, p, org, prev, true)
 }
 
 func (h *ProjectHandler) SiteSave(c echo.Context) error {
@@ -523,10 +642,12 @@ func (h *ProjectHandler) renderSitesPreview(c echo.Context, p *model.WorkProject
 	years, _ := h.pe.ListYears(p.ProjectID)
 	cats, _ := h.pe.ListCategories(org, false)
 	smap, emap, pending := h.pe.Summary(p.ProjectID)
+	prog, _ := h.pe.SiteProgress(p.ProjectID)
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 사이트·장비", "Active": NavProjects, "Project": p,
 		"Sites": sites, "SiteTotal": total, "Equips": equips, "EquipTotal": etotal,
 		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
+		"Progress": prog,
 		"CanWrite": canWriteProjectEquip(c, h, p, org),
 		"Preview":  prev, "Apply": applied,
 	})

@@ -321,6 +321,10 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		}
 	}
 	today := time.Now().Format("2006-01-02")
+	var prog repository.SiteProgress
+	if h.pe != nil {
+		prog, _ = h.pe.SiteProgress(id)
+	}
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
@@ -329,6 +333,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"CanMerge":     currentRole(c) == model.RoleVisionAdmin,
 		"SalesMissing": salesMissing,
 		"RunLabel":     model.ContractRunLabel(p.ContractRunStatus(today)),
+		"Progress":     prog,
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }

@@ -8,7 +8,9 @@
       <p class="text-ui-sm text-ink-muted">{{.Project.Name}}</p>
     </div>
     {{if .CanWrite}}
-    <a href="/projects/{{.Project.ProjectID}}/sites/template.xlsx" class="btn btn-secondary btn-sm">양식 다운로드</a>
+    <a href="/projects/{{.Project.ProjectID}}/sites/pick" class="btn btn-primary btn-sm">대상 학교 추가</a>
+    <a href="/projects/{{.Project.ProjectID}}/sites/schools-template.xlsx" class="btn btn-secondary btn-sm">대상 학교 양식</a>
+    <a href="/projects/{{.Project.ProjectID}}/sites/template.xlsx" class="btn btn-secondary btn-sm">장비 양식</a>
     {{end}}
   </div>
   {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
@@ -18,8 +20,9 @@
     <div class="card p-4"><p class="text-ui-sm text-ink-muted">사이트</p><p class="text-ui-xl font-extrabold">{{.SiteTotal}}</p></div>
     <div class="card p-4"><p class="text-ui-sm text-ink-muted">장비</p><p class="text-ui-xl font-extrabold">{{.EquipTotal}}</p></div>
     <div class="card p-4"><p class="text-ui-sm text-ink-muted">미검수 사이트</p><p class="text-ui-sm mt-2">{{if .Pending}}{{range .Pending}}{{.}} {{end}}{{else}}—{{end}}</p></div>
-    <div class="card p-4"><p class="text-ui-sm text-ink-muted">사이트 상태</p>
-      <p class="text-ui-xs text-ink-muted mt-2">운영 {{index .SiteCounts "active"}} · 예정 {{index .SiteCounts "planned"}}</p>
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">설치/검수</p>
+      <p class="text-ui-xs text-ink-muted mt-2">설치 {{.Progress.Installed}}/{{.Progress.Denom}} · 검수 {{.Progress.Inspected}}/{{.Progress.Denom}}</p>
+      {{if .Progress.AllDone}}<p class="text-ui-sm text-ink mt-2">모든 사이트 검수 완료 — 사업을 완료 처리하시겠습니까?</p>{{end}}
     </div>
   </div>
 
@@ -38,6 +41,19 @@
     <form method="post" action="/projects/{{.Project.ProjectID}}/sites/import-errors.xlsx" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
       <input type="file" name="file" accept=".xlsx" required class="input">
       <button type="submit" class="btn btn-secondary btn-sm">오류 목록 엑셀</button>
+    </form>
+    <h3 class="font-semibold text-ink pt-2">대상 학교 엑셀 (시트 사이트)</h3>
+    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/schools-import-preview" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <select name="mode" class="input"><option value="add">대상 학교 추가</option><option value="status">상태 일괄 갱신</option></select>
+      <label class="text-ui-sm flex items-center gap-1"><input type="checkbox" name="create_missing" value="1"> 마스터에 신규 등록</label>
+      <button type="submit" class="btn btn-secondary">미리보기</button>
+    </form>
+    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/schools-import-apply" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <select name="mode" class="input"><option value="add">대상 학교 추가</option><option value="status">상태 일괄 갱신</option></select>
+      <label class="text-ui-sm flex items-center gap-1"><input type="checkbox" name="create_missing" value="1"> 마스터에 신규 등록</label>
+      <button type="submit" class="btn btn-primary">적용</button>
     </form>
   </div>
   {{end}}
@@ -65,13 +81,47 @@
     <select class="input" name="status">
       <option value="">상태</option>
       <option value="planned" {{if eq .Status "planned"}}selected{{end}}>예정</option>
-      <option value="active" {{if eq .Status "active"}}selected{{end}}>운영</option>
-      <option value="done" {{if eq .Status "done"}}selected{{end}}>종료</option>
+      <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행</option>
+      <option value="installed" {{if eq .Status "installed"}}selected{{end}}>설치완료</option>
+      <option value="inspected" {{if eq .Status "inspected"}}selected{{end}}>검수완료</option>
       <option value="excluded" {{if eq .Status "excluded"}}selected{{end}}>제외</option>
     </select>
     <button class="btn btn-secondary" type="submit">검색</button>
   </form>
 
+  {{if .CanWrite}}
+  <form method="post" action="/projects/{{.Project.ProjectID}}/sites/bulk-status" class="card overflow-x-auto space-y-2">
+    <div class="p-3 flex flex-wrap gap-2 items-end">
+      <label class="text-ui-sm">일괄 상태
+        <select class="input" name="status">
+          <option value="in_progress">진행</option>
+          <option value="installed">설치완료</option>
+          <option value="inspected">검수완료</option>
+          <option value="excluded">제외</option>
+        </select>
+      </label>
+      <label class="text-ui-sm">날짜 <input class="input" type="date" name="event_date"></label>
+      <label class="text-ui-sm">사유 <input class="input" name="reason" placeholder="제외 시 필수"></label>
+      <button class="btn btn-primary" type="submit">선택 변경</button>
+    </div>
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left"><tr><th class="p-3"></th><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th></tr></thead>
+      <tbody>
+        {{range .Sites}}
+        <tr class="border-t border-line">
+          <td class="p-3"><input type="checkbox" name="site_id" value="{{.ID}}"></td>
+          <td class="p-3">{{.SiteName}}</td>
+          <td class="p-3">{{.Region}}</td>
+          <td class="p-3">{{siteStatusLabel .Status}}</td>
+          <td class="p-3">{{.EquipN}}</td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="5">사이트가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </form>
+  {{else}}
   <div class="card overflow-x-auto">
     <table class="w-full text-ui">
       <thead class="text-ink-muted text-left"><tr><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th></tr></thead>
@@ -89,6 +139,7 @@
       </tbody>
     </table>
   </div>
+  {{end}}
 
   {{if .CanWrite}}
   <form method="post" action="/projects/{{.Project.ProjectID}}/sites" class="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -98,8 +149,9 @@
     <label class="text-ui-sm">상태
       <select class="input" name="status">
         <option value="planned">예정</option>
-        <option value="active">운영</option>
-        <option value="done">종료</option>
+        <option value="in_progress">진행</option>
+        <option value="installed">설치완료</option>
+        <option value="inspected">검수완료</option>
         <option value="excluded">제외</option>
       </select>
     </label>

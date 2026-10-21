@@ -73,6 +73,10 @@
         </svg>
         고객 등록
       </a>
+      <a href="/customers/orgs-import"
+         class="flex items-center justify-center gap-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+        하위 기관 일괄 등록
+      </a>
       {{end}}
       {{end}}
     </div>
@@ -231,6 +235,9 @@
                   <a href="/customers/{{.CustomerID}}" class="font-medium text-gray-800 hover:text-blue-600">
                     {{.OrgName}}
                   </a>
+                  {{if gt .ChildCount 0}}
+                  <a href="/customers?category={{.CustomerID}}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800">하위 {{.ChildCount}}</a>
+                  {{end}}
                   {{if .NeedsReview}}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800"
                         title="{{.ReviewReason}}">확인 필요</span>

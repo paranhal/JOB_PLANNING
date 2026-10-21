@@ -31,6 +31,7 @@ func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string,
 		       COALESCE(c.parent_customer_id,''),
 		       COALESCE(p.org_name,''),
 		       CASE WHEN c.has_parent=1 AND COALESCE(c.parent_customer_id,'')!='' THEN 1 ELSE 0 END,
+		       (SELECT COUNT(*) FROM customers ch WHERE ch.parent_customer_id=c.customer_id),
 		       COALESCE(c.needs_review,0), COALESCE(c.review_reason,''),
 		       COALESCE(NULLIF(TRIM(c.party_kind),''),'customer'),
 		       COALESCE(c.is_provisional,0)
@@ -64,6 +65,12 @@ func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string,
 		countQuery += cond
 		args = append(args, category, category)
 		countArgs = append(countArgs, category, category)
+	}
+
+	if category == "" && search == "" && industry == "" && !reviewOnly && !provisionalOnly {
+		cond := ` AND (c.has_parent=0 OR c.parent_customer_id IS NULL OR TRIM(c.parent_customer_id)='')`
+		baseQuery += cond
+		countQuery += cond
 	}
 
 	if industry != "" {
@@ -169,7 +176,7 @@ func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string,
 			&item.CustomerID, &item.OrgName, &item.OfficialName,
 			&item.Industry, &item.MainPhone, &isActive,
 			&item.AssetCount, &item.AsCount,
-			&item.ParentCustomerID, &item.ParentOrgName, &hasParent,
+			&item.ParentCustomerID, &item.ParentOrgName, &hasParent, &item.ChildCount,
 			&needsReview, &item.ReviewReason, &item.PartyKind, &provisional,
 		); err != nil {
 			return nil, 0, err

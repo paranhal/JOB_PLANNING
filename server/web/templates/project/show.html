@@ -120,7 +120,14 @@
         <li class="flex justify-between"><span class="text-gray-600">행정/지원 업무</span>
           <a href="/workboard/tasks" class="font-semibold text-blue-700 hover:underline">{{.Project.TaskCount}}건</a>
         </li>
+        {{if .Progress}}
+        <li class="flex justify-between"><span class="text-gray-600">설치</span><span class="font-semibold">{{.Progress.Installed}}/{{.Progress.Denom}}</span></li>
+        <li class="flex justify-between"><span class="text-gray-600">검수</span><span class="font-semibold">{{.Progress.Inspected}}/{{.Progress.Denom}}</span></li>
+        {{end}}
       </ul>
+      {{if and .Progress.AllDone .CanWrite}}
+      <p class="text-ui-sm text-ink mt-3">모든 사이트 검수 완료 — 사업을 완료 처리하시겠습니까?</p>
+      {{end}}
       <p class="text-xs text-gray-400 mt-3">AS·정기점검은 범위 규칙으로 조회합니다(원본에 사업 ID를 쓰지 않음).</p>
     </div>
   </div>
