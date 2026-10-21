@@ -103,8 +103,8 @@
            this.preEnd = '09:30';
            this.preAssignee = '';
          }
-         this.dailyKind = kind === 'as' || kind === 'maintenance' || kind === 'sales' ? kind : '';
-         this.workType = kind === 'sales' ? 'sales' : 'admin';
+         this.dailyKind = kind === 'as' || kind === 'maintenance' || kind === 'sales' || kind === 'project_work' ? kind : '';
+         this.workType = kind === 'sales' ? 'sales' : (kind === 'project_work' ? 'project_work' : 'admin');
          this.preselect = ref || '';
          this.taskOpen = true;
        },
@@ -763,6 +763,7 @@
       {{template "wb_palette" (wbPalette "정기점검" "border-sky-200" "text-sky-700" "bg-sky-50" .MntCards .CanWrite)}}
       {{template "wb_palette" (wbPalette "행정관련업무" "border-violet-200" "text-violet-700" "bg-violet-50" .AdminCards .CanWrite)}}
       {{template "wb_palette" (wbPalette "영업" "border-orange-200" "text-orange-700" "bg-orange-50" .SalesCards .CanWrite)}}
+      {{if .WorkCards}}{{template "wb_palette" (wbPalette "작업" "border-emerald-200" "text-emerald-800" "bg-emerald-50" .WorkCards .CanWrite)}}{{end}}
       {{template "wb_palette" (wbPalette "미계획업무" "border-amber-200" "text-amber-800" "bg-amber-50" .UnassignedCards .CanWrite)}}
     </div>
 

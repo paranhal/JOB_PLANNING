@@ -12,8 +12,9 @@ var (
 	ColorAnrobotics = colorTriple{"#16a34a", "#bbf7d0", "#14532d"} // 앤로보틱스(RFID)
 	ColorKLAS       = colorTriple{"#2563eb", "#bfdbfe", "#1e3a8a"} // K-LAS
 	ColorSejongKLAS = colorTriple{"#9333ea", "#e9d5ff", "#581c87"} // 세종 K-LAS
-	ColorAdminAS    = colorTriple{"#ea580c", "#ffedd5", "#9a3412"} // 행정·기타
-	ColorUnassigned = colorTriple{"#475569", "#e2e8f0", "#1e293b"}
+	ColorAdminAS     = colorTriple{"#ea580c", "#ffedd5", "#9a3412"} // 행정·기타
+	ColorProjectWork = colorTriple{"#0f766e", "#ccfbf1", "#134e4a"} // 작업(구축·공사)
+	ColorUnassigned  = colorTriple{"#475569", "#e2e8f0", "#1e293b"}
 )
 
 type colorTriple struct {
@@ -115,26 +116,31 @@ func AssigneeColorStyle(name string) string {
 	)
 }
 
-// WorkCardColorStyle 업무 카드 색 — 담당자가 있으면 담당자(제품군) 색, 없으면 제품/구분 색.
-func WorkCardColorStyle(assignee, productType, category string) string {
-	if strings.TrimSpace(assignee) != "" {
-		return AssigneeColorStyle(assignee)
+// WorkCardColorParts 카드 테두리·배경·글자색. 작업(구축·공사)은 담당자 색보다 구분 색.
+func WorkCardColorParts(assignee, productType, category string) (border, soft, text string) {
+	if category == WBWorkProjectWork {
+		p := ColorProjectWork
+		return p.Border, p.Soft, p.Text
 	}
+	if strings.TrimSpace(assignee) != "" {
+		return AssigneeColor(assignee)
+	}
+	var p colorTriple
 	switch {
 	case strings.Contains(strings.ToUpper(productType), "세종"):
-		p := ColorSejongKLAS
-		return fmt.Sprintf("background-color:%s;border-color:%s;border-left:3px solid %s;color:%s", p.Soft, p.Border, p.Border, p.Text)
+		p = ColorSejongKLAS
 	case strings.Contains(strings.ToUpper(productType), "KLAS") || strings.Contains(productType, "케이라스"):
-		p := ColorKLAS
-		return fmt.Sprintf("background-color:%s;border-color:%s;border-left:3px solid %s;color:%s", p.Soft, p.Border, p.Border, p.Text)
+		p = ColorKLAS
 	case strings.Contains(productType, "앤") || strings.Contains(strings.ToUpper(productType), "RFID") || strings.Contains(productType, "로보"):
-		p := ColorAnrobotics
-		return fmt.Sprintf("background-color:%s;border-color:%s;border-left:3px solid %s;color:%s", p.Soft, p.Border, p.Border, p.Text)
-	case category == WBSourceAS:
-		p := ColorAdminAS
-		return fmt.Sprintf("background-color:%s;border-color:%s;border-left:3px solid %s;color:%s", p.Soft, p.Border, p.Border, p.Text)
+		p = ColorAnrobotics
 	default:
-		p := ColorAdminAS
-		return fmt.Sprintf("background-color:%s;border-color:%s;border-left:3px solid %s;color:%s", p.Soft, p.Border, p.Border, p.Text)
+		p = ColorAdminAS
 	}
+	return p.Border, p.Soft, p.Text
+}
+
+// WorkCardColorStyle 업무 카드 색 — 담당자가 있으면 담당자(제품군) 색, 없으면 제품/구분 색.
+func WorkCardColorStyle(assignee, productType, category string) string {
+	border, soft, text := WorkCardColorParts(assignee, productType, category)
+	return fmt.Sprintf("background-color:%s;border-color:%s;border-left:3px solid %s;color:%s", soft, border, border, text)
 }

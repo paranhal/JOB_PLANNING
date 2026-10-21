@@ -378,7 +378,7 @@ func buildRegisterDayColumns(cols []RegisterColumn, placed []model.WorkTask, toC
 		assignAssigneeLanes(evs)
 		blocks := make([]RegisterBlock, 0, len(evs))
 		for _, e := range evs {
-			border, soft, text := model.AssigneeColor(e.assignee)
+			border, soft, text := model.WorkCardColorParts(e.assignee, e.card.ProductType, e.card.Category)
 			topSlots := (e.startMin - dayStart) / 15
 			if topSlots < 0 {
 				topSlots = 0

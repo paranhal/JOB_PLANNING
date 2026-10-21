@@ -3,6 +3,7 @@
 {{$isAS := or (eq .Task.WorkType "as") (eq .Task.SourceType "as")}}
 {{$isMnt := or (eq .Task.WorkType "maintenance") (eq .Task.SourceType "maintenance")}}
 {{$isSales := or (eq .Task.WorkType "sales") (eq .Task.SourceType "sales_activity")}}
+{{$isWork := eq .Task.WorkType "project_work"}}
 {{$t := .Task}}
 <div class="{{if .IsAdminGTD}}max-w-4xl{{else}}max-w-3xl{{end}} mx-auto space-y-5"
      x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo',
@@ -18,9 +19,9 @@
       <div class="flex items-center gap-2 mt-1 flex-wrap">
         <h2 class="text-xl font-bold text-gray-800">
           {{if .EditMode}}
-            {{if $isAS}}AS 일일업무 수정{{else if $isMnt}}정기점검 일일업무 수정{{else if $isSales}}영업활동 수정{{else}}행정/지원업무 수정{{end}}
+            {{if $isAS}}AS 일일업무 수정{{else if $isMnt}}정기점검 일일업무 수정{{else if $isSales}}영업활동 수정{{else if $isWork}}작업 수정{{else}}행정/지원업무 수정{{end}}
           {{else}}
-            {{if $isAS}}AS 업무 조치{{else if $isMnt}}정기점검 업무 조치{{else if $isSales}}영업활동 조치{{else}}행정/지원업무 조치{{end}}
+            {{if $isAS}}AS 업무 조치{{else if $isMnt}}정기점검 업무 조치{{else if $isSales}}영업활동 조치{{else if $isWork}}작업 조치{{else}}행정/지원업무 조치{{end}}
           {{end}}
         </h2>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbWorkTypeClass $t.WorkType}}">{{wbWorkTypeLabel $t.WorkType}}</span>
@@ -292,11 +293,17 @@
     <input type="hidden" name="scope" value="{{if .EditMode}}register{{else}}action{{end}}">
 
     {{if .EditMode}}
-    {{if or $isAS $isMnt $isSales}}
+    {{if or $isAS $isMnt $isSales $isWork}}
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">{{if $isAS}}AS 접수번호{{else if $isMnt}}정기점검번호{{else}}영업 활동{{end}}</label>
-        {{if .SourceHref}}
+        <label class="block text-xs text-gray-500 mb-1">{{if $isAS}}AS 접수번호{{else if $isMnt}}정기점검번호{{else if $isWork}}작업 구분{{else}}영업 활동{{end}}</label>
+        {{if $isWork}}
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex items-center gap-1 border rounded-lg px-2 py-1.5 text-xs"><input type="radio" name="work_subtype" value="build" {{if eq $t.WorkSubtype "build"}}checked{{end}}> 구축</label>
+          <label class="flex items-center gap-1 border rounded-lg px-2 py-1.5 text-xs"><input type="radio" name="work_subtype" value="construction" {{if eq $t.WorkSubtype "construction"}}checked{{end}}> 공사</label>
+          <label class="flex items-center gap-1 border rounded-lg px-2 py-1.5 text-xs"><input type="radio" name="work_subtype" value="other" {{if eq $t.WorkSubtype "other"}}checked{{end}}> 기타</label>
+        </div>
+        {{else if .SourceHref}}
         <a href="{{.SourceHref}}" class="font-mono text-blue-600 hover:underline">{{.SourceLabel}}</a>
         {{else}}<p class="font-mono">{{$t.SourceID}}</p>{{end}}
       </div>
@@ -328,7 +335,7 @@
     </div>
     {{end}}
 
-    {{if not (or $isAS $isMnt)}}
+    {{if not (or $isAS $isMnt $isWork)}}
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">거래처</label>
       <select name="customer_id" class="w-full border rounded-lg px-3 py-2">
@@ -375,7 +382,53 @@
     </div>
     {{end}}
 
-    {{if not (or $isAS $isMnt)}}
+    {{if $isWork}}
+    <div x-data="{
+      projectId: '{{$t.ProjectID}}',
+      sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{printf "%q" $s.SiteName}},region:{{printf "%q" $s.Region}}}{{end}}],
+      q: '', cands: [], hint: '두 글자 이상 입력하세요',
+      removeSite(id) { this.sites = this.sites.filter(s => s.site_id !== id); },
+      pick(s) { if (this.sites.find(x => x.site_id === s.site_id)) return; this.sites.push(s); this.q=''; this.cands=[]; },
+      async search() {
+        if (!this.projectId) { this.cands = []; this.hint = '사업을 선택하면 대상 사이트를 고를 수 있습니다'; return; }
+        if ((this.q||'').trim().length < 2) { this.cands = []; this.hint = '두 글자 이상 입력하세요'; return; }
+        try {
+          const r = await fetch('/workboard/project-sites?project_id=' + encodeURIComponent(this.projectId) + '&q=' + encodeURIComponent(this.q));
+          const j = await r.json();
+          const taken = this.sites.map(s => s.site_id);
+          this.cands = (j || []).filter(s => taken.indexOf(s.site_id) < 0);
+          this.hint = this.cands.length ? '' : '해당하는 사이트가 없습니다';
+        } catch (e) { this.cands = []; }
+      }
+    }">
+      <label class="block text-sm font-medium text-gray-700 mb-1">사업</label>
+      <select name="project_id" x-model="projectId" @change="sites=[]; cands=[]; search()"
+              class="w-full border rounded-lg px-3 py-2">
+        <option value="">— 선택 (해당 시) —</option>
+        {{range .WorkProjects}}
+        <option value="{{.ProjectID}}" {{if eq $.Task.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+      <label class="block text-sm font-medium text-gray-700 mb-1 mt-3">대상 사이트</label>
+      <template x-for="s in sites" :key="s.site_id">
+        <span class="inline-flex items-center gap-1 mr-1 mb-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-900 text-xs border border-emerald-200">
+          <input type="hidden" name="site_id" :value="s.site_id">
+          <span x-text="s.site_name"></span>
+          <button type="button" class="text-emerald-700" @click="removeSite(s.site_id)">×</button>
+        </span>
+      </template>
+      <input type="search" x-model="q" @input="search()" :disabled="!projectId" autocomplete="off"
+             placeholder="학교·기관명 검색" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
+      <p class="text-xs text-gray-500 mt-1" x-text="projectId ? hint : '사업을 선택하면 대상 사이트를 고를 수 있습니다'"></p>
+      <ul class="mt-1 border rounded-lg overflow-hidden" x-show="cands.length" x-cloak>
+        <template x-for="s in cands" :key="s.site_id">
+          <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" @click="pick(s)">
+            <span x-text="s.site_name"></span>
+          </button></li>
+        </template>
+      </ul>
+    </div>
+    {{else if not (or $isAS $isMnt)}}
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
       <select name="project_id" :required="workType === 'support'"
@@ -516,6 +569,12 @@
       <label class="block text-sm font-medium text-gray-700 mb-1">태그</label>
       <input name="tags" value="{{$t.Tags}}" placeholder="쉼표로 구분" class="w-full border rounded-lg px-3 py-2">
     </div>
+    {{if $isWork}}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">결과 메모</label>
+      <textarea name="complete_note" rows="2" class="w-full border rounded-lg px-3 py-2">{{$t.CompleteNote}}</textarea>
+    </div>
+    {{end}}
 
     {{if $.IsAdminGTD}}
     <div x-show="status === 'waiting_for'" x-cloak class="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
