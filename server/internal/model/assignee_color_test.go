@@ -43,6 +43,10 @@ func TestWorkCardColorStylePrefersAssignee(t *testing.T) {
 	if !containsAll(st, ColorKLAS.Border, ColorKLAS.Soft) {
 		t.Fatalf("최혜영→KLAS: %s", st)
 	}
+	st = WorkCardColorStyle("양기헌", "", WBWorkProjectWork)
+	if !containsAll(st, ColorProjectWork.Border, ColorProjectWork.Soft) {
+		t.Fatalf("작업은 담당자 색보다 구분 색: %s", st)
+	}
 }
 
 func containsAll(s string, parts ...string) bool {

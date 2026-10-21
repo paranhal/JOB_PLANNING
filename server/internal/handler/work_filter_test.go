@@ -21,6 +21,7 @@ func TestFilterWorkItemsAssigneeOrAndKind(t *testing.T) {
 		{Prefix: model.WorkPrefixAS, Assignee: "양기헌", Title: "AS양", Status: "in_progress", ScheduledDate: "2026-09-01"},
 		{Prefix: model.WorkPrefixAS, Assignee: "태자운", Title: "AS태", Status: "received", ScheduledDate: "2026-09-01"},
 		{Prefix: model.WorkPrefixGeneral, Assignee: "양기헌", Title: "행정양", Status: model.WBTaskWaiting, ScheduledDate: "2026-09-01"},
+		{Prefix: model.WorkPrefixProjectWork, Assignee: "양기헌", Title: "작업양", Status: model.WBTaskWaiting, ScheduledDate: "2026-09-01"},
 		{Prefix: model.WorkPrefixAS, Assignee: "최혜영", Title: "AS최", Status: "in_progress", ScheduledDate: "2026-09-01"},
 	}
 	mapped := mapWorkListItems(items)
@@ -36,8 +37,12 @@ func TestFilterWorkItemsAssigneeOrAndKind(t *testing.T) {
 			t.Fatalf("행정가 남았다: %s", it.Title)
 		}
 	}
-	if !seen["AS양"] || !seen["AS태"] || seen["AS최"] || seen["행정양"] {
+	if !seen["AS양"] || !seen["AS태"] || seen["AS최"] || seen["행정양"] || seen["작업양"] {
 		t.Fatalf("OR+AND 결과가 틀리다: %+v", seen)
+	}
+	pw := filterWorkItemsKinds(mapped, []string{workKindProjectWork})
+	if len(pw) != 1 || pw[0].Title != "작업양" {
+		t.Fatalf("작업 필터 %+v", pw)
 	}
 }
 

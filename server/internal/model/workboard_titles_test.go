@@ -44,6 +44,24 @@ func TestWBCategorySalesNotAdmin(t *testing.T) {
 	}
 }
 
+func TestWBWorkTypeProjectWorkBucketAndLabel(t *testing.T) {
+	if got := WBWorkTypeBucket(WBWorkProjectWork); got != WBWorkProjectWork {
+		t.Fatalf("bucket %q", got)
+	}
+	if WBWorkTypeLabel(WBWorkProjectWork) != "작업" {
+		t.Fatal(WBWorkTypeLabel(WBWorkProjectWork))
+	}
+	if FormatProjectWorkTitle("배선") != "[작업]배선" {
+		t.Fatal(FormatProjectWorkTitle("배선"))
+	}
+	if SuggestWorkSubtype(ProjectKindConstruction) != WBWorkSubtypeConstruction {
+		t.Fatal(SuggestWorkSubtype(ProjectKindConstruction))
+	}
+	if FormatTaskSiteLine([]string{"계룡고", "계룡중"}) != "계룡고 외 1곳" {
+		t.Fatal(FormatTaskSiteLine([]string{"계룡고", "계룡중"}))
+	}
+}
+
 func TestWBWorkTypeSalesBucketAndLabel(t *testing.T) {
 	if got := WBWorkTypeBucket(WBWorkSales); got != WBWorkSales {
 		t.Fatalf("bucket sales → %q", got)
