@@ -11,6 +11,9 @@ func applyWorkTaskProjectWork(db *sql.DB) {
 	if db == nil {
 		return
 	}
+	if pragmaHasColumn(db, "work_task_sites", "customer_id") && !pragmaHasColumn(db, "work_task_sites", "site_id") {
+		return
+	}
 	up, err := workTaskProjectWorkMigrationSQL()
 	if err != nil {
 		log.Printf("076 work_task_project_work: %v", err)
