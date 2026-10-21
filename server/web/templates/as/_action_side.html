@@ -1,0 +1,46 @@
+{{define "as_action_side"}}
+<div class="space-y-4 text-ui">
+  <section class="card">
+    <div class="card-header">접수 및 고객 정보</div>
+    <dl class="card-body space-y-2">
+      {{if .AS.OrgName}}<div><dt class="text-ui-sm text-ink-muted">기관</dt><dd>{{.AS.OrgName}}</dd></div>{{end}}
+      {{if .AS.Requester}}<div><dt class="text-ui-sm text-ink-muted">요청자</dt><dd>{{.AS.Requester}}</dd></div>{{end}}
+      {{if .Customer}}{{if .Customer.MainPhone}}<div><dt class="text-ui-sm text-ink-muted">연락처</dt><dd>{{.Customer.MainPhone}}</dd></div>{{end}}{{end}}
+      {{if .Customer}}{{if or .Customer.Address .Customer.AddressDetail}}<div><dt class="text-ui-sm text-ink-muted">주소</dt><dd>{{.Customer.Address}} {{.Customer.AddressDetail}}</dd></div>{{end}}{{end}}
+      {{if .AS.ProductName}}<div><dt class="text-ui-sm text-ink-muted">제품</dt><dd>{{.AS.ProductName}}</dd></div>{{end}}
+      {{if .AS.InstallLocation}}<div><dt class="text-ui-sm text-ink-muted">설치위치</dt><dd>{{.AS.InstallLocation}}</dd></div>{{end}}
+    </dl>
+  </section>
+  {{if .AS.Symptom}}
+  <section class="card">
+    <div class="card-header">고객 접수 내용</div>
+    <div class="card-body whitespace-pre-line">{{.AS.Symptom}}</div>
+  </section>
+  {{end}}
+  {{if .Processes}}
+  <section class="card">
+    <div class="card-header">이전 작업 내역</div>
+    <div class="card-body space-y-1">
+      {{$p := index .Processes (sub (len .Processes) 1)}}
+      {{if $.AS.IsReopen}}<p class="text-ui-sm font-medium text-warning">재방문 · {{if $.AS.RevisitReason}}{{$.AS.RevisitReason}}{{end}}</p>{{end}}
+      <p>{{if $p.WorkContent}}{{$p.WorkContent}}{{else}}—{{end}}</p>
+      {{if $p.CauseType}}<p class="text-ui-sm text-ink-muted">원인 {{$p.CauseType}}</p>{{end}}
+    </div>
+  </section>
+  {{end}}
+  {{if .PastHistory}}
+  <section class="card">
+    <div class="card-header">과거 AS 이력</div>
+    <ul class="card-body space-y-2">
+      {{range .PastHistory}}
+      <li class="text-ui-sm">
+        <a href="/as/{{.ASID}}/action" class="text-primary hover:underline font-mono">{{.ASNumber}}</a>
+        <span class="text-ink-muted">{{.ReceiptDate}}</span>
+        {{if .Symptom}}<p>{{.Symptom}}</p>{{end}}
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</div>
+{{end}}

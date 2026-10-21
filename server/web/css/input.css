@@ -124,12 +124,33 @@
   .sidebar-item { @apply flex items-center gap-2 rounded-control px-3 py-1.5 text-ui text-sidebar-text hover:bg-hover hover:text-ink; }
   .sidebar-item-active { @apply sidebar-item bg-hover text-ink; }
   .sidebar-count { @apply ml-auto text-ui-xs text-ink-muted; }
+
+  .as-action-shell {
+    @apply flex h-full min-h-0 flex-1 flex-col;
+  }
+  .as-action-header { @apply shrink-0 border-b border-line bg-surface px-4 py-3; }
+  .as-action-split { @apply flex min-h-0 flex-1 flex-col lg:flex-row; }
+  .as-action-left { @apply min-h-0 overflow-y-auto border-b border-line p-4 lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r; }
+  .as-action-right { @apply min-h-0 flex-1 overflow-y-auto p-4 pb-24; }
+  .as-action-bar {
+    @apply shrink-0 border-t border-line bg-surface px-4 py-3;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
 }
 
 @layer utilities {
   [x-cloak] {
     display: none !important;
   }
+}
+
+#main-content:has(#as-action-shell) {
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 /* htmx 인디케이터 · 목록 제목행 */

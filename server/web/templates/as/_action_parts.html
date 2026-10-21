@@ -1,0 +1,71 @@
+{{define "as_action_parts_check"}}
+<input type="hidden" name="parts_form" value="1">
+<label class="mt-3 inline-flex items-start gap-2 text-ui text-ink">
+  <input type="checkbox" name="parts_enabled" id="as-parts-enabled" value="1"
+         class="mt-0.5 rounded border-line"
+         {{if .PartsEnabled}}checked{{end}}>
+  자재 사용
+</label>
+{{end}}
+
+{{define "as_action_parts_box"}}
+<section id="as-parts-box" class="card space-y-3 p-4" {{if not .PartsEnabled}}hidden{{end}}>
+  <div class="flex items-center justify-between gap-2">
+    <h4 class="text-ui font-medium text-ink">자재 및 부품</h4>
+    <button type="button" id="as-parts-add" class="btn-secondary btn-sm">＋ 부품 추가</button>
+  </div>
+  {{if .PartsLegacy}}
+  <p class="text-ui-sm text-ink-muted">이전 기록: {{.PartsLegacy}}</p>
+  {{end}}
+  {{if .PartsFormErr}}
+  <p class="field-error">{{.PartsFormErr}}</p>
+  {{end}}
+  <div id="as-parts-rows" class="space-y-2">
+    {{range .PartRows}}
+    <div class="as-part-row grid grid-cols-1 sm:grid-cols-8 gap-2 items-end">
+      <div class="sm:col-span-4 combobox">
+        <label class="label">품명</label>
+        <input type="text" name="part_name" value="{{.PartName}}" autocomplete="off"
+               class="input as-part-name{{if .RowError}} is-invalid{{end}}" placeholder="품명">
+        <input type="hidden" name="part_item_id" value="{{.ItemID}}" class="as-part-item">
+        <ul class="combobox-list as-part-list" hidden></ul>
+        {{if .RowError}}<p class="field-error">{{.RowError}}</p>{{end}}
+      </div>
+      <div class="sm:col-span-2">
+        <label class="label">코드</label>
+        <input type="text" name="part_code" value="{{.PartCode}}" class="input as-part-code" placeholder="선택">
+      </div>
+      <div>
+        <label class="label">수량</label>
+        <input type="number" name="part_qty" min="1" step="1" value="{{if .Qty}}{{.Qty}}{{else}}1{{end}}" class="input as-part-qty">
+      </div>
+      <div>
+        <button type="button" class="btn-ghost btn-sm as-part-del" title="삭제">삭제</button>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  <p id="as-parts-empty" class="text-ui-sm text-ink-muted{{if .PartRows}} hidden{{end}}">사용한 자재를 추가해 주세요</p>
+  <template id="as-part-row-tpl">
+    <div class="as-part-row grid grid-cols-1 sm:grid-cols-8 gap-2 items-end">
+      <div class="sm:col-span-4 combobox">
+        <label class="label">품명</label>
+        <input type="text" name="part_name" autocomplete="off" class="input as-part-name" placeholder="품명">
+        <input type="hidden" name="part_item_id" class="as-part-item">
+        <ul class="combobox-list as-part-list" hidden></ul>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="label">코드</label>
+        <input type="text" name="part_code" class="input as-part-code" placeholder="선택">
+      </div>
+      <div>
+        <label class="label">수량</label>
+        <input type="number" name="part_qty" min="1" step="1" value="1" class="input as-part-qty">
+      </div>
+      <div>
+        <button type="button" class="btn-ghost btn-sm as-part-del" title="삭제">삭제</button>
+      </div>
+    </div>
+  </template>
+</section>
+{{end}}
