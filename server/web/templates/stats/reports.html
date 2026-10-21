@@ -22,6 +22,9 @@
       <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">회사 공통 파일</p>
       <h3 class="text-base font-bold text-gray-800 mt-1">전사 주간업무보고 시트 생성</h3>
       <p class="text-sm text-gray-500 mt-1">회사 xlsx 사본에 (업무) 시트 한 장을 추가합니다. 자동 문장은 초안이며 미리보기에서 고칠 수 있습니다.</p>
+      <p class="text-xs text-ink-muted mt-1">팀별로 따로 작성합니다. {{if .OrgName}}현재 {{.OrgName}}.{{end}}
+        {{if .CompanyReportStatus}}상태 {{if eq .CompanyReportStatus "confirmed"}}확정본{{else}}작성 중{{end}}.{{end}}</p>
+      <a href="/stats/company-weekly/rows" class="inline-block mt-2 text-sm text-ink underline">행 관리</a>
     </div>
     <div x-data="{ show: localStorage.getItem('jp_company_weekly_notice') !== '1' }" x-show="show" x-cloak
          class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-start justify-between gap-2">
@@ -90,8 +93,27 @@
       </details>
       {{end}}
       {{end}}
+      {{if not .CompanyOrgSelected}}
+      <p class="text-sm text-ink-muted">조직을 선택하세요. 전체 보기에서는 작성·확인할 수 없습니다.</p>
+      {{end}}
+      {{if .CanWriteCompanyWeekly}}
       <button type="submit" class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">시트 생성</button>
+      {{else}}
+      <p class="text-sm text-ink-muted">작성은 팀장·비전관리자만 할 수 있습니다.</p>
+      {{end}}
     </form>
+    {{if .CanWriteCompanyWeekly}}
+    <form method="POST" action="/stats/company-weekly/confirm" class="flex flex-wrap gap-2">
+      <input type="hidden" name="company_date" value="{{.CompanyDate}}">
+      <input type="hidden" name="sheet_name" value="{{.CompanySheetName}}">
+      {{if eq .CompanyReportStatus "confirmed"}}
+      <input type="hidden" name="unconfirm" value="1">
+      <button class="btn">작성 중으로</button>
+      {{else}}
+      <button class="btn btn-primary">확인 완료</button>
+      {{end}}
+    </form>
+    {{end}}
   </div>
 
   <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">

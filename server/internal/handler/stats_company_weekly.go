@@ -16,6 +16,8 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/auditlog"
+	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 type companyWeeklyDownload struct {
@@ -58,31 +60,54 @@ func takeCompanyWeeklyDownload(token string) (companyWeeklyDownload, bool) {
 
 // CreateCompanyWeekly 전사 주간업무보고 시트 생성. §16.6.2 · §16.6.11 · §16.6.12
 func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
+	if !canWriteCompanyWeekly(c) {
+		return echo.ErrForbidden
+	}
+	orgID, err := resolveInsertOrg(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, "조직을 선택하세요")
+	}
 	now := time.Now()
 	anchor := reportMeetingMonday(now)
 	if t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(c.FormValue("company_date")), now.Location()); err == nil {
 		anchor = t
 	}
-	draft, err := h.repo.BuildCompanyWeeklyDraftOrg(anchor, currentOrg(c))
+	draft, err := h.repo.BuildCompanyWeeklyDraftOrg(anchor, orgID)
 	if err != nil {
 		return err
+	}
+	if saved, _ := h.repo.GetCompanyWeeklyReport(orgID, draft.Period.Anchor); saved.ReportID != "" {
+		draft.Rows = repository.ApplyCompanyWeeklySaved(draft.Rows, repository.ParseCompanyWeeklyContent(saved.ContentJSON))
 	}
 	sheetName := strings.TrimSpace(c.FormValue("sheet_name"))
 	if sheetName == "" {
 		sheetName = draft.Period.SheetNameDefault
 	}
 	draft.Rows = applyCompanyWeeklyFormEdits(draft.Rows, c.FormValue)
+	_ = h.repo.UpsertCompanyWeeklyReport(orgID, draft.Period.Anchor, sheetName, repository.CompanyWeeklyStatusDraft,
+		repository.EncodeCompanyWeeklyContent(draft.Rows), ctxString(c, "user_name"), false)
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionUpdate,
+		TargetTable: "company_weekly_report",
+		TargetID:    orgID + ":" + draft.Period.Anchor,
+		SubjectType: "report",
+		SubjectID:   draft.Period.Anchor,
+		Reason:      "전사 주간업무보고 편집 저장",
+		Result:      auditlog.ResultOK,
+	})
 
 	src, uploadName, err := readCompanyWeeklyUpload(c)
 	if err != nil {
-		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", companyWeeklyResultData(draft, sheetName, "", nil, err.Error()))
+		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", companyWeeklyResultData(c, draft, sheetName, "", nil, err.Error()))
 	}
 
+	orgShort, _ := h.repo.OrgShortAndName(orgID)
 	result, err := buildCompanyWeeklyWorkbook(companyWeeklyBuildInput{
 		Source:    src,
 		SheetName: sheetName,
 		Period:    draft.Period,
 		Rows:      draft.Rows,
+		OrgShort:  orgShort,
 	})
 	src = nil
 	if err != nil {
@@ -97,7 +122,7 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 			Reason:      "전사 주간업무보고 시트 생성",
 			Result:      auditlog.ResultDeny,
 		})
-		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", companyWeeklyResultData(draft, sheetName, "", nil, err.Error()))
+		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", companyWeeklyResultData(c, draft, sheetName, "", nil, err.Error()))
 	}
 
 	token := putCompanyWeeklyDownload(companyWeeklyDownload{
@@ -119,11 +144,55 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 		Reason:      "전사 주간업무보고 시트 생성",
 		Result:      auditlog.ResultOK,
 	})
-	return c.Render(http.StatusOK, "stats/company_weekly_result.html", companyWeeklyResultData(draft, sheetName, token, &result, ""))
+	return c.Render(http.StatusOK, "stats/company_weekly_result.html", companyWeeklyResultData(c, draft, sheetName, token, &result, ""))
+}
+
+func (h *StatsHandler) ConfirmCompanyWeekly(c echo.Context) error {
+	if !canWriteCompanyWeekly(c) {
+		return echo.ErrForbidden
+	}
+	orgID, err := resolveInsertOrg(c)
+	if err != nil {
+		return echo.ErrForbidden
+	}
+	unconfirm := c.FormValue("unconfirm") == "1"
+	now := time.Now()
+	anchor := reportMeetingMonday(now)
+	if t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(c.FormValue("company_date")), now.Location()); err == nil {
+		anchor = t
+	}
+	p := repository.CompanyWeeklyPeriod(anchor)
+	saved, _ := h.repo.GetCompanyWeeklyReport(orgID, p.Anchor)
+	status := repository.CompanyWeeklyStatusConfirmed
+	reason := "전사 주간업무보고 확인 완료"
+	if unconfirm {
+		status = repository.CompanyWeeklyStatusDraft
+		reason = "전사 주간업무보고 확인 취소"
+	}
+	sheet := strings.TrimSpace(c.FormValue("sheet_name"))
+	if sheet == "" {
+		sheet = saved.SheetName
+	}
+	if err := h.repo.UpsertCompanyWeeklyReport(orgID, p.Anchor, sheet, status, saved.ContentJSON, ctxString(c, "user_name"), !unconfirm); err != nil {
+		return err
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionUpdate,
+		TargetTable: "company_weekly_report",
+		TargetID:    orgID + ":" + p.Anchor,
+		SubjectType: "report",
+		SubjectID:   p.Anchor,
+		Reason:      reason,
+		Result:      auditlog.ResultOK,
+	})
+	return c.Redirect(http.StatusSeeOther, "/stats/reports?company_date="+p.Anchor)
 }
 
 // DownloadCompanyWeekly 생성 결과 한 번만 내려받는다. 업로드 원본은 보관하지 않는다. §16.6.2
 func (h *StatsHandler) DownloadCompanyWeekly(c echo.Context) error {
+	if !canWriteCompanyWeekly(c) {
+		return echo.ErrForbidden
+	}
 	token := strings.TrimSpace(c.QueryParam("token"))
 	item, ok := takeCompanyWeeklyDownload(token)
 	if !ok {
@@ -136,6 +205,14 @@ func (h *StatsHandler) DownloadCompanyWeekly(c echo.Context) error {
 			"Error":  "내려받기 기한이 지났습니다. 확인 > 보고서에서 다시 생성하세요.",
 		})
 	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionDownload,
+		TargetTable: "company_weekly_report",
+		TargetID:    item.UTF8Name,
+		SubjectType: "report",
+		Reason:      "전사 주간업무보고 내려받기",
+		Result:      auditlog.ResultOK,
+	})
 	return writeExcelFile(c, item.Data, item.ASCIIName, item.UTF8Name)
 }
 
@@ -177,7 +254,12 @@ func companyWeeklyAuditDetail(r companyWeeklyBuildResult, uploadName string) str
 	return fmt.Sprintf("mode=%s sheets=%d formulas=%d upload=%s", mode, r.KeptSheets, r.KeptFormulas, name)
 }
 
-func companyWeeklyResultData(draft interface{}, sheetName, token string, result *companyWeeklyBuildResult, errMsg string) map[string]interface{} {
+func companyWeeklyResultData(c echo.Context, draft model.CompanyWeeklyDraft, sheetName, token string, result *companyWeeklyBuildResult, errMsg string) map[string]interface{} {
+	orgName := currentOrgName(c)
+	from, to := companyWeeklyFirstRow, companyWeeklyFirstRow
+	if n := len(draft.Rows); n > 0 {
+		to = companyWeeklyFirstRow + n - 1
+	}
 	data := map[string]interface{}{
 		"Title":            "보고서",
 		"Active":           NavStatsReports,
@@ -185,6 +267,9 @@ func companyWeeklyResultData(draft interface{}, sheetName, token string, result 
 		"CompanySheetName": sheetName,
 		"DownloadToken":    token,
 		"Error":            errMsg,
+		"OrgName":          orgName,
+		"RowFrom":          from,
+		"RowTo":            to,
 	}
 	if result != nil {
 		data["BuildMode"] = result.Mode

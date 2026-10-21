@@ -56,7 +56,7 @@ func TestIncompleteMntVisitsListed(t *testing.T) {
 		VALUES ('V1','mp1','2026-08-12','C1','KLAS',0,'','WPSEED03')`); err != nil {
 		t.Fatal(err)
 	}
-	got, err := NewStatsRepo(db).listIncompleteMntVisits("2026-08-10", "2026-08-17")
+	got, err := NewStatsRepo(db).listIncompleteMntVisits("2026-08-10", "2026-08-17", OrgAll)
 	if err != nil || len(got) != 1 || got[0].OrgName != "유구도서관" {
 		t.Fatalf("incomplete=%v err=%v", got, err)
 	}

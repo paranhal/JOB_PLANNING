@@ -68,7 +68,7 @@ func (r *StatsRepo) BuildCompanyWeeklyDraft(anchor time.Time) (model.CompanyWeek
 
 func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (model.CompanyWeeklyDraft, error) {
 	p := CompanyWeeklyPeriod(anchor)
-	mapRows, err := r.listWeeklyReportRows()
+	mapRows, err := r.ListWeeklyReportRowsOrg(orgIDOrAll(orgID), true)
 	if err != nil {
 		return model.CompanyWeeklyDraft{}, err
 	}
@@ -80,24 +80,25 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 	}
 
 	out := model.CompanyWeeklyDraft{Period: p}
-	for _, row := range mapRows {
+	for i, row := range mapRows {
 		item := model.CompanyWeeklyRow{
-			RowKey:      row.Key,
-			SheetRow:    row.SheetRow,
-			Division:    row.Division,
-			Team:        row.Team,
-			NoLabel:     row.NoLabel,
-			DisplayName: row.DisplayName,
-			ProjectID:   row.ProjectID,
-			RowKind:     row.Kind,
-			Highlight:   row.Highlight,
-			IsActive:    row.Active,
+			RowKey:       row.Key,
+			SheetRow:     20 + i,
+			Division:     row.Division,
+			Team:         row.Team,
+			NoLabel:      row.NoLabel,
+			DisplayName:  row.DisplayName,
+			ProjectID:    row.ProjectID,
+			RowKind:      row.Kind,
+			ActivityKind: row.ActivityKind,
+			Highlight:    row.Highlight,
+			IsActive:     row.Active,
 		}
 		if row.Kind == "project" && strings.TrimSpace(row.ProjectID) == "" {
 			item.MissingProject = true
 		}
 		if row.Kind == "activity" {
-			item.PrevText, item.PlanText, err = r.composeActivityTexts(row, p, mapped)
+			item.PrevText, item.PlanText, err = r.composeActivityTexts(row, p, mapped, orgID)
 			if err != nil {
 				return out, err
 			}
@@ -141,17 +142,44 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		out.Rows = append(out.Rows, item)
 	}
 
-	unassigned, err := r.listCompanyUnassigned(p, mapped)
+	unassigned, err := r.listCompanyUnassigned(p, mapped, orgID)
 	if err != nil {
 		return out, err
 	}
+	if hasMntAsActivity(mapRows) {
+		unassigned = dropUnassignedKinds(unassigned, model.ScopeWorkMaintenance, model.ScopeWorkAS)
+	}
 	out.Unassigned = unassigned
-	incomplete, err := r.listIncompleteMntVisits(p.PrevFrom, p.PrevToEx)
+	incomplete, err := r.listIncompleteMntVisits(p.PrevFrom, p.PrevToEx, orgID)
 	if err != nil {
 		return out, err
 	}
 	out.IncompleteMnt = incomplete
 	return out, nil
+}
+
+func hasMntAsActivity(rows []weeklyReportRow) bool {
+	for _, row := range rows {
+		if row.Kind == "activity" && row.ActivityKind == "mnt_as" {
+			return true
+		}
+	}
+	return false
+}
+
+func dropUnassignedKinds(in []model.CompanyWeeklyUnassigned, kinds ...string) []model.CompanyWeeklyUnassigned {
+	skip := map[string]bool{}
+	for _, k := range kinds {
+		skip[k] = true
+	}
+	var out []model.CompanyWeeklyUnassigned
+	for _, row := range in {
+		if skip[row.Kind] {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
 }
 
 func composePrevText(mntSites int, names []string, asCount int, admin []adminLine) string {
@@ -264,7 +292,7 @@ func slashMD(iso string) string {
 }
 
 type adminLine struct {
-	ID, Title, Date, ProjectID, ParentID, Role, CustomerID string
+	ID, Title, Date, ProjectID, ParentID, Role, CustomerID, WorkType string
 }
 
 func collapseCompanyAdminLines(lines []adminLine) []adminLine {
@@ -370,7 +398,9 @@ func (r *StatsRepo) listCompanyMntSiteNames(projectID, from, toEx, orgID string,
 	return names, cust, rows.Err()
 }
 
-func (r *StatsRepo) listIncompleteMntVisits(from, toEx string) ([]model.IncompleteMntVisit, error) {
+func (r *StatsRepo) listIncompleteMntVisits(from, toEx, orgID string) ([]model.IncompleteMntVisit, error) {
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+	args := append([]interface{}{from, toEx}, mntArgs...)
 	rows, err := r.db.Query(`
 		SELECT v.visit_id, COALESCE(c.org_name,''), v.visit_date,
 		       COALESCE(v.plan_id,''), COALESCE(v.project_id,'')
@@ -378,8 +408,8 @@ func (r *StatsRepo) listIncompleteMntVisits(from, toEx string) ([]model.Incomple
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		WHERE COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
 		  AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?
-		  AND COALESCE(v.completed,0)=0` + statsProjectKindSQL("v.project_id") + `
-		ORDER BY v.visit_date, c.org_name`, from, toEx)
+		  AND COALESCE(v.completed,0)=0`+statsProjectKindSQL("v.project_id")+mntSQL+`
+		ORDER BY v.visit_date, c.org_name`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -416,9 +446,10 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([
 	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
-		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,'')
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
+		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE t.work_type IN ('admin','support')
+		WHERE t.work_type IN ('admin','support','project_work')
 		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)
@@ -441,9 +472,10 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
-		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,'')
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
+		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE t.work_type IN ('admin','support')
+		WHERE t.work_type IN ('admin','support','project_work')
 		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+d+`,'')) != ''
@@ -469,15 +501,18 @@ func (r *StatsRepo) queryAdminLines(q string, args ...interface{}) ([]adminLine,
 	var out []adminLine
 	for rows.Next() {
 		var a adminLine
-		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role, &a.CustomerID); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role, &a.CustomerID, &a.WorkType); err != nil {
 			return nil, err
+		}
+		if a.WorkType == model.WBWorkProjectWork {
+			a.Title = formatProjectWorkLine(a.Title, r.taskSiteNames(a.ID), a.Date)
 		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
 }
 
-func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped map[string]bool) ([]model.CompanyWeeklyUnassigned, error) {
+func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped map[string]bool, orgID string) ([]model.CompanyWeeklyUnassigned, error) {
 	var out []model.CompanyWeeklyUnassigned
 	addIf := func(row model.CompanyWeeklyUnassigned) {
 		pid := strings.TrimSpace(row.ProjectID)
@@ -487,13 +522,20 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		out = append(out, row)
 	}
 
+	mntDoneSQL, mntDoneArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	asDoneSQL, asDoneArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	adminDoneSQL, adminDoneArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	mntPlanSQL, mntPlanArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+	adminPlanSQL, adminPlanArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+
 	vrows, err := r.db.Query(`
 		SELECT v.visit_id, COALESCE(c.org_name,''), `+mntDoneDateSQL+`, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,'')
 		FROM maintenance_visits v
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id
 		WHERE COALESCE(v.completed,0)=1
-		  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?` + statsProjectKindSQL("v.project_id"), p.PrevFrom, p.PrevToEx)
+		  AND `+mntDoneDateSQL+` >= ? AND `+mntDoneDateSQL+` < ?`+statsProjectKindSQL("v.project_id")+mntDoneSQL,
+		append([]interface{}{p.PrevFrom, p.PrevToEx}, mntDoneArgs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +564,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		LEFT JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN work_projects p ON p.project_id = ar.project_id
 		WHERE TRIM(COALESCE(ar.complete_datetime,'')) != ''
-		  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?` + statsProjectKindSQL("ar.project_id"), p.PrevFrom, p.PrevToEx)
+		  AND ar.complete_datetime >= ? AND ar.complete_datetime < ?`+statsProjectKindSQL("ar.project_id")+asDoneSQL,
+		append([]interface{}{p.PrevFrom, p.PrevToEx}, asDoneArgs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -541,24 +584,30 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	arows.Close()
 
 	trows, err := r.db.Query(`
-		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''), COALESCE(p.name,'')
+		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''), COALESCE(p.name,''), COALESCE(t.work_type,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+`
+		WHERE t.work_type IN ('admin','support','project_work')
+		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminDoneSQL+`
 		  AND t.status = 'complete'
-		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)` + statsProjectKindSQL("t.project_id"), p.PrevFrom, p.PrevToEx)
+		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)`+statsProjectKindSQL("t.project_id"),
+		append(append([]interface{}{}, adminDoneArgs...), p.PrevFrom, p.PrevToEx)...)
 	if err != nil {
 		return nil, err
 	}
 	for trows.Next() {
-		var id, title, date, pid, pname string
-		if err := trows.Scan(&id, &title, &date, &pid, &pname); err != nil {
+		var id, title, date, pid, pname, wtype string
+		if err := trows.Scan(&id, &title, &date, &pid, &pname, &wtype); err != nil {
 			trows.Close()
 			return nil, err
 		}
+		label := "행정/지원"
+		if wtype == model.WBWorkProjectWork {
+			label = "작업"
+			title = formatProjectWorkLine(title, r.taskSiteNames(id), date)
+		}
 		addIf(model.CompanyWeeklyUnassigned{
-			Kind: model.ScopeWorkAdmin, KindLabel: "행정/지원",
+			Kind: model.ScopeWorkAdmin, KindLabel: label,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
 			Href: "/workboard/tasks/" + id, Bucket: "prev", BucketLabel: "전주 완료",
 		})
@@ -570,7 +619,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		FROM maintenance_visits v
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id
-		WHERE v.visit_date >= ? AND v.visit_date < ?` + statsProjectKindSQL("v.project_id"), p.ThisFrom, p.ThisToEx)
+		WHERE v.visit_date >= ? AND v.visit_date < ?`+statsProjectKindSQL("v.project_id")+mntPlanSQL,
+		append([]interface{}{p.ThisFrom, p.ThisToEx}, mntPlanArgs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -594,23 +644,25 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 
 	crows, err := r.db.Query(`
 		SELECT t.task_id, t.title, COALESCE(`+companyAdminPlanDateSQL()+`,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
-		       CASE WHEN date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END
+		       CASE WHEN date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END,
+		       COALESCE(t.work_type,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE t.work_type IN ('admin','support')
-		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+`
+		WHERE t.work_type IN ('admin','support','project_work')
+		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminPlanSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != ''
 		  AND (
 		        (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
 		     OR (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
-		  )` + statsProjectKindSQL("t.project_id"), p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisToEx, p.PrevFrom, p.PrevToEx)
+		  )`+statsProjectKindSQL("t.project_id"),
+		append(append([]interface{}{}, adminPlanArgs...), p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisToEx, p.PrevFrom, p.PrevToEx)...)
 	if err != nil {
 		return nil, err
 	}
 	for crows.Next() {
-		var id, title, date, pid, pname, bucket string
-		if err := crows.Scan(&id, &title, &date, &pid, &pname, &bucket); err != nil {
+		var id, title, date, pid, pname, bucket, wtype string
+		if err := crows.Scan(&id, &title, &date, &pid, &pname, &bucket, &wtype); err != nil {
 			crows.Close()
 			return nil, err
 		}
@@ -618,12 +670,58 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		if bucket == "carry" {
 			label = "이월"
 		}
+		kindLabel := "행정/지원"
+		if wtype == model.WBWorkProjectWork {
+			kindLabel = "작업"
+			title = formatProjectWorkLine(title, r.taskSiteNames(id), date)
+		}
 		addIf(model.CompanyWeeklyUnassigned{
-			Kind: model.ScopeWorkAdmin, KindLabel: "행정/지원",
+			Kind: model.ScopeWorkAdmin, KindLabel: kindLabel,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
 			Href: "/workboard/tasks/" + id, Bucket: bucket, BucketLabel: label,
 		})
 	}
 	crows.Close()
 	return out, nil
+}
+
+func (r *StatsRepo) taskSiteNames(taskID string) []string {
+	rows, err := r.db.Query(`
+		SELECT COALESCE(NULLIF(TRIM(c.org_name),''), wts.customer_id)
+		FROM work_task_sites wts
+		LEFT JOIN customers c ON c.customer_id = wts.customer_id
+		WHERE wts.task_id=?
+		ORDER BY 1`, taskID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return names
+		}
+		names = append(names, n)
+	}
+	return names
+}
+
+func formatProjectWorkLine(title string, names []string, _ string) string {
+	title = strings.TrimSpace(title)
+	names = uniqSortedNames(names)
+	if len(names) == 0 {
+		return title
+	}
+	shown := names
+	extra := 0
+	if len(shown) > 2 {
+		extra = len(shown) - 2
+		shown = shown[:2]
+	}
+	core := title + "(" + strings.Join(shown, "·")
+	if extra > 0 {
+		core += fmt.Sprintf(" 외 %d곳", extra)
+	}
+	return core + ")"
 }

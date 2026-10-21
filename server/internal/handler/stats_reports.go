@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 // Reports 확인 > 보고서. 기존 엑셀 엔드포인트를 카드로 모은다. §16 · §16.5
@@ -70,8 +71,15 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		companyAnchor = t
 	}
 	var companyDraft model.CompanyWeeklyDraft
+	org := currentOrg(c)
 	if h.repo != nil {
-		companyDraft, _ = h.repo.BuildCompanyWeeklyDraftOrg(companyAnchor, currentOrg(c))
+		companyDraft, _ = h.repo.BuildCompanyWeeklyDraftOrg(companyAnchor, org)
+		if org != repository.OrgAll {
+			if saved, err := h.repo.GetCompanyWeeklyReport(org, companyDraft.Period.Anchor); err == nil && saved.ReportID != "" {
+				companyDraft.Rows = repository.ApplyCompanyWeeklySaved(companyDraft.Rows, repository.ParseCompanyWeeklyContent(saved.ContentJSON))
+				companyDraft.ReportStatus = saved.Status
+			}
+		}
 	}
 	sheetName := strings.TrimSpace(c.QueryParam("sheet_name"))
 	if sheetName == "" {
@@ -81,29 +89,33 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 	lb := parseLookback(c, metricsBase, now)
 
 	return c.Render(http.StatusOK, "stats/reports.html", map[string]interface{}{
-		"Title":            "보고서",
-		"Active":           NavStatsReports,
-		"Lookback":         lb,
-		"LookbackQS":       template.URL(lb.QueryValues()),
-		"LookbackViewID":   "reportLookbackView",
-		"WeekOptions":      weeks,
-		"DefaultWeek":      defaultWeek,
-		"MonthOptions":     monthOptions(now),
-		"DefaultMonth":     now.Format("2006-01"),
-		"Plans":            plans,
-		"DefaultPlanID":    defaultPlanID,
-		"MetricOptions":    reportsMetricOptions(),
-		"ScopeOptions":     reportsScopeOptions(),
-		"PeriodOptions":    reportsPeriodOptions(),
-		"DefaultMetric":    model.StatsMetricProgress,
-		"DefaultScope":     model.StatsScopeTeam,
-		"DefaultPeriod":    model.StatsPeriodWeek,
-		"DefaultMonthDate": now.Format("2006-01-02"),
-		"HolidayBanners":   holidayBanners,
-		"CompanyWeekly":    companyDraft,
-		"CompanyDate":      companyDraft.Period.Anchor,
-		"CompanySheetName": sheetName,
-		"MetricsBaseDate":  metricsBase,
+		"Title":                 "보고서",
+		"Active":                NavStatsReports,
+		"Lookback":              lb,
+		"LookbackQS":            template.URL(lb.QueryValues()),
+		"LookbackViewID":        "reportLookbackView",
+		"WeekOptions":           weeks,
+		"DefaultWeek":           defaultWeek,
+		"MonthOptions":          monthOptions(now),
+		"DefaultMonth":          now.Format("2006-01"),
+		"Plans":                 plans,
+		"DefaultPlanID":         defaultPlanID,
+		"MetricOptions":         reportsMetricOptions(),
+		"ScopeOptions":          reportsScopeOptionsOrg(currentOrgName(c)),
+		"PeriodOptions":         reportsPeriodOptions(),
+		"DefaultMetric":         model.StatsMetricProgress,
+		"DefaultScope":          model.StatsScopeTeam,
+		"DefaultPeriod":         model.StatsPeriodWeek,
+		"DefaultMonthDate":      now.Format("2006-01-02"),
+		"HolidayBanners":        holidayBanners,
+		"CompanyWeekly":         companyDraft,
+		"CompanyDate":           companyDraft.Period.Anchor,
+		"CompanySheetName":      sheetName,
+		"MetricsBaseDate":       metricsBase,
+		"CanWriteCompanyWeekly": canWriteCompanyWeekly(c),
+		"CompanyOrgSelected":    companyWeeklyOrgSelected(c),
+		"CompanyReportStatus":   companyDraft.ReportStatus,
+		"OrgName":               currentOrgName(c),
 	})
 }
 
@@ -149,8 +161,12 @@ func reportsMetricOptions() []struct{ Value, Label string } {
 }
 
 func reportsScopeOptions() []struct{ Value, Label string } {
+	return reportsScopeOptionsOrg("전체 조직")
+}
+
+func reportsScopeOptionsOrg(orgName string) []struct{ Value, Label string } {
 	return []struct{ Value, Label string }{
-		{model.StatsScopeTeam, "도서관사업팀 전체"},
+		{model.StatsScopeTeam, statsScopeLabelOrg(orgName, model.StatsScopeTeam)},
 		{model.StatsScopeAssignee, "담당자별"},
 	}
 }

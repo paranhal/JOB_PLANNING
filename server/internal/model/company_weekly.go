@@ -27,7 +27,8 @@ type CompanyWeeklyRow struct {
 	NoLabel        string
 	DisplayName    string
 	ProjectID      string
-	RowKind        string // project | manual
+	RowKind        string // project | activity | manual
+	ActivityKind   string // asset | tech | mnt_as | ''
 	Highlight      bool
 	IsActive       bool
 	MissingProject bool   // 404행처럼 대응 사업이 없음
@@ -66,8 +67,9 @@ type CompanyWeeklyUnassigned struct {
 
 // CompanyWeeklyDraft 전사 주간업무보고 초안 (시트 쓰기 전). §16.6.5~7
 type CompanyWeeklyDraft struct {
-	Period           CompanyWeeklyPeriod
-	Rows             []CompanyWeeklyRow
-	Unassigned       []CompanyWeeklyUnassigned
-	IncompleteMnt    []IncompleteMntVisit
+	Period        CompanyWeeklyPeriod
+	Rows          []CompanyWeeklyRow
+	Unassigned    []CompanyWeeklyUnassigned
+	IncompleteMnt []IncompleteMntVisit
+	ReportStatus  string
 }
