@@ -1,0 +1,102 @@
+{{define "title"}}주간보고 행 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-5">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <a href="/stats/reports" class="text-ui-sm text-ink-muted">← 보고서</a>
+      <h2 class="text-ui-xl font-extrabold text-ink mt-1">전사 주간업무보고 행</h2>
+      <p class="text-ui text-ink-muted mt-1">{{if .OrgName}}{{.OrgName}}{{end}} 엑셀 시트에 넣을 행입니다. 시트 행 번호는 20번부터 순서대로 붙습니다.</p>
+      {{if .Hint}}<p class="text-ui-sm text-ink-muted mt-1">{{.Hint}}</p>{{end}}
+    </div>
+  </div>
+
+  {{if .OrgAll}}
+  <div class="rounded-xl border border-line bg-surface px-4 py-3 text-ui text-ink">전체 보기에서는 행을 고칠 수 없습니다. 조직을 선택하세요.</div>
+  {{end}}
+
+  {{if .CanWrite}}
+  <form method="POST" action="/stats/company-weekly/rows" class="rounded-xl border border-line bg-surface p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div><label class="block text-ui-sm text-ink-muted mb-1">부문/실</label><input name="division" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
+    <div><label class="block text-ui-sm text-ink-muted mb-1">팀</label><input name="team" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
+    <div><label class="block text-ui-sm text-ink-muted mb-1">No</label><input name="no_label" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
+    <div><label class="block text-ui-sm text-ink-muted mb-1">순서</label><input name="sort_order" type="number" value="0" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
+    <div class="md:col-span-2"><label class="block text-ui-sm text-ink-muted mb-1">표시명</label><input name="display_name" required class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
+    <div>
+      <label class="block text-ui-sm text-ink-muted mb-1">구분</label>
+      <select name="row_kind" class="w-full border border-line rounded-lg px-3 py-2 text-ui bg-surface">
+        <option value="project">사업</option>
+        <option value="activity">활동</option>
+        <option value="manual">수동</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-ui-sm text-ink-muted mb-1">활동 종류</label>
+      <select name="activity_kind" class="w-full border border-line rounded-lg px-3 py-2 text-ui bg-surface">
+        <option value="">일반(수동)</option>
+        <option value="asset">자산관리</option>
+        <option value="tech">기술영업</option>
+        <option value="mnt_as">정기점검·AS</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-ui-sm text-ink-muted mb-1">사업 연결</label>
+      <select name="project_id" class="w-full border border-line rounded-lg px-3 py-2 text-ui bg-surface">
+        <option value="">없음</option>
+        {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    <label class="inline-flex items-center gap-2 text-ui text-ink mt-6"><input type="checkbox" name="highlight" value="1" class="rounded"> 강조</label>
+    <div class="flex items-end"><button class="btn btn-primary">행 추가</button></div>
+  </form>
+  {{end}}
+
+  <div class="rounded-xl border border-line bg-surface overflow-x-auto">
+    <table class="min-w-full text-ui">
+      <thead class="text-ui-sm text-ink-muted">
+        <tr>
+          <th class="px-3 py-2 text-left">순서</th>
+          <th class="px-3 py-2 text-left">No</th>
+          <th class="px-3 py-2 text-left">표시명</th>
+          <th class="px-3 py-2 text-left">구분</th>
+          <th class="px-3 py-2 text-left">활동</th>
+          <th class="px-3 py-2 text-left">상태</th>
+          {{if $.CanWrite}}<th class="px-3 py-2"></th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr class="border-t border-line">
+          <td class="px-3 py-2">{{.SortOrder}}</td>
+          <td class="px-3 py-2">{{.NoLabel}}</td>
+          <td class="px-3 py-2">{{.DisplayName}}</td>
+          <td class="px-3 py-2">{{.Kind}}</td>
+          <td class="px-3 py-2">{{.ActivityKind}}</td>
+          <td class="px-3 py-2">{{if .Active}}활성{{else}}숨김{{end}}</td>
+          {{if $.CanWrite}}
+          <td class="px-3 py-2">
+            <form method="POST" action="/stats/company-weekly/rows/{{.Key}}/update" class="flex flex-wrap gap-2 items-center">
+              <input type="hidden" name="display_name" value="{{.DisplayName}}">
+              <input type="hidden" name="division" value="{{.Division}}">
+              <input type="hidden" name="team" value="{{.Team}}">
+              <input type="hidden" name="no_label" value="{{.NoLabel}}">
+              <input type="hidden" name="row_kind" value="{{.Kind}}">
+              <input type="hidden" name="activity_kind" value="{{.ActivityKind}}">
+              <input type="hidden" name="project_id" value="{{.ProjectID}}">
+              <input type="hidden" name="is_active" value="{{if .Active}}1{{else}}0{{end}}">
+              <input type="number" name="sort_order" value="{{.SortOrder}}" class="w-16 border border-line rounded px-2 py-1 text-ui-sm">
+              <label class="text-ui-sm"><input type="checkbox" name="highlight" value="1" {{if .Highlight}}checked{{end}}> 강조</label>
+              <button class="btn btn-primary btn-sm">저장</button>
+            </form>
+            <form method="POST" action="/stats/company-weekly/rows/{{.Key}}/toggle" class="inline">
+              {{if .Active}}<input type="hidden" name="off" value="1"><button class="btn btn-sm">숨김</button>
+              {{else}}<button class="btn btn-sm">활성</button>{{end}}
+            </form>
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

@@ -51,10 +51,17 @@ func applyWeeklyReportActivityV59(db *sql.DB) {
 		log.Printf("weekly_report_rows v59 X02: %v", err)
 		return
 	}
-	if _, err := db.Exec(`
+	x03SQL := `
 		INSERT OR IGNORE INTO weekly_report_rows
 		(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active)
-		VALUES ('X03', 26, '', '도서관사업부', '', '##기술영업활동', NULL, 'activity', 1, 1)`); err != nil {
+		VALUES ('X03', 26, '', '도서관사업부', '', '##기술영업활동', NULL, 'activity', 1, 1)`
+	if pragmaHasColumn(db, "weekly_report_rows", "org_id") {
+		x03SQL = `
+		INSERT OR IGNORE INTO weekly_report_rows
+		(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active, org_id)
+		VALUES ('X03', 26, '', '도서관사업부', '', '##기술영업활동', NULL, 'activity', 1, 1, 'O01')`
+	}
+	if _, err := db.Exec(x03SQL); err != nil {
 		log.Printf("weekly_report_rows v59 X03: %v", err)
 		return
 	}
@@ -84,12 +91,34 @@ func seedWeeklyReportRows(db *sql.DB) {
 		{"X02", "", "도서관사업부", "",
 			"##자산관리활동", "", "manual", 25, 1},
 	}
+	hasOrg := pragmaHasColumn(db, "weekly_report_rows", "org_id")
+	hasKind := pragmaHasColumn(db, "weekly_report_rows", "activity_kind")
 	for _, s := range rows {
-		if _, err := db.Exec(`
+		kind := ""
+		if s.key == "X02" {
+			kind = "asset"
+		}
+		var err error
+		if hasOrg && hasKind {
+			_, err = db.Exec(`
+			INSERT OR IGNORE INTO weekly_report_rows
+			(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active, org_id, activity_kind, sort_order)
+			VALUES (?,?,?,?,?,?,?,?,?,1,'O01',?,?)`,
+				s.key, s.sheet, s.division, s.team, s.no, s.name, nullStr(s.project), s.kind, s.highlight, kind, s.sheet-20)
+		} else if hasOrg {
+			_, err = db.Exec(`
+			INSERT OR IGNORE INTO weekly_report_rows
+			(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active, org_id)
+			VALUES (?,?,?,?,?,?,?,?,?,1,'O01')`,
+				s.key, s.sheet, s.division, s.team, s.no, s.name, nullStr(s.project), s.kind, s.highlight)
+		} else {
+			_, err = db.Exec(`
 			INSERT OR IGNORE INTO weekly_report_rows
 			(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active)
 			VALUES (?,?,?,?,?,?,?,?,?,1)`,
-			s.key, s.sheet, s.division, s.team, s.no, s.name, nullStr(s.project), s.kind, s.highlight); err != nil {
+				s.key, s.sheet, s.division, s.team, s.no, s.name, nullStr(s.project), s.kind, s.highlight)
+		}
+		if err != nil {
 			log.Printf("006 weekly_report_rows seed %s: %v", s.key, err)
 			return
 		}
@@ -98,13 +127,30 @@ func seedWeeklyReportRows(db *sql.DB) {
 }
 
 func (r *StatsRepo) listWeeklyReportRows() ([]weeklyReportRow, error) {
-	rows, err := r.db.Query(`
+	return r.ListWeeklyReportRowsOrg(OrgAll, true)
+}
+
+func (r *StatsRepo) ListWeeklyReportRowsOrg(orgID string, activeOnly bool) ([]weeklyReportRow, error) {
+	if err := RequireOrgID(orgID); err != nil {
+		return nil, err
+	}
+	q := `
 		SELECT row_key, sheet_row, COALESCE(division,''), COALESCE(team,''), COALESCE(no_label,''),
 		       COALESCE(display_name,''), COALESCE(project_id,''), COALESCE(row_kind,'project'),
-		       COALESCE(highlight,0), COALESCE(is_active,1)
+		       COALESCE(highlight,0), COALESCE(is_active,1), COALESCE(org_id,''),
+		       COALESCE(activity_kind,''), COALESCE(sort_order,0)
 		FROM weekly_report_rows
-		WHERE COALESCE(is_active,1)=1
-		ORDER BY sheet_row, row_key`)
+		WHERE 1=1`
+	var args []interface{}
+	if activeOnly {
+		q += ` AND COALESCE(is_active,1)=1`
+	}
+	if orgID != OrgAll {
+		q += ` AND org_id=?`
+		args = append(args, orgID)
+	}
+	q += ` ORDER BY sort_order, sheet_row, row_key`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
@@ -117,7 +163,7 @@ func (r *StatsRepo) listWeeklyReportRows() ([]weeklyReportRow, error) {
 		var row weeklyReportRow
 		var hi, active int
 		if err := rows.Scan(&row.Key, &row.SheetRow, &row.Division, &row.Team, &row.NoLabel,
-			&row.DisplayName, &row.ProjectID, &row.Kind, &hi, &active); err != nil {
+			&row.DisplayName, &row.ProjectID, &row.Kind, &hi, &active, &row.OrgID, &row.ActivityKind, &row.SortOrder); err != nil {
 			return nil, err
 		}
 		row.Highlight = hi != 0
@@ -129,6 +175,7 @@ func (r *StatsRepo) listWeeklyReportRows() ([]weeklyReportRow, error) {
 
 type weeklyReportRow struct {
 	Key, Division, Team, NoLabel, DisplayName, ProjectID, Kind string
-	SheetRow                                                   int
+	OrgID, ActivityKind                                        string
+	SheetRow, SortOrder                                        int
 	Highlight, Active                                          bool
 }
