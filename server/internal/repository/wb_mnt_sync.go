@@ -368,6 +368,7 @@ func (r *WBRepo) DeleteTask(id string) error {
 	}
 	_, _ = r.db.Exec(`DELETE FROM work_task_tags WHERE task_id=?`, id)
 	_, _ = r.db.Exec(`DELETE FROM work_task_members WHERE task_id=?`, id)
+	_, _ = r.db.Exec(`DELETE FROM work_task_sites WHERE task_id=?`, id)
 	_, err := r.db.Exec(`DELETE FROM work_tasks WHERE task_id=?`, id)
 	if err != nil && strings.Contains(err.Error(), "no such table") {
 		return nil

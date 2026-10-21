@@ -36,6 +36,13 @@ const (
 	WBWorkAS          = "as"
 	WBWorkMaintenance = "maintenance"
 	WBWorkSales       = "sales" // 영업활동
+	WBWorkProjectWork = "project_work" // 구축·공사 작업
+)
+
+const (
+	WBWorkSubtypeBuild         = "build"
+	WBWorkSubtypeConstruction  = "construction"
+	WBWorkSubtypeOther         = "other"
 )
 
 // work_tasks.source_role. 같은 활동이 「한 일」과 「다음 할 일」 두 업무를 만들 때 가른다. §45
@@ -74,6 +81,8 @@ func WBCategory(sourceType string) string {
 		return WBSourceMaintenance
 	case WBSourceSalesActivity, WBSourceSales:
 		return WBSourceSalesActivity
+	case WBWorkProjectWork:
+		return WBWorkProjectWork
 	default:
 		return WBWorkAdmin
 	}
@@ -87,6 +96,8 @@ func WBCategoryLabel(cat string) string {
 		return "점검"
 	case WBSourceSalesActivity, WBSourceSales:
 		return "영업"
+	case WBWorkProjectWork:
+		return "작업"
 	default:
 		return "행정"
 	}
@@ -100,6 +111,8 @@ func WBCategoryClass(cat string) string {
 		return "bg-sky-100 text-sky-800 border border-sky-300 border-l-[3px] border-l-sky-500 shadow-sm"
 	case WBSourceSalesActivity, WorkPrefixSales:
 		return "bg-orange-100 text-orange-800 border border-orange-300 border-l-[3px] border-l-orange-500 shadow-sm"
+	case WBWorkProjectWork:
+		return "bg-emerald-100 text-emerald-800 border border-emerald-300 border-l-[3px] border-l-emerald-600 shadow-sm"
 	default:
 		return "bg-violet-100 text-violet-800 border border-violet-300 border-l-[3px] border-l-violet-500 shadow-sm"
 	}
@@ -192,6 +205,8 @@ func WBWorkTypeLabel(s string) string {
 		return "정기점검"
 	case WBWorkSales:
 		return "영업활동"
+	case WBWorkProjectWork:
+		return "작업"
 	default:
 		return s
 	}
@@ -209,6 +224,8 @@ func WBWorkTypeClass(s string) string {
 		return "bg-sky-100 text-sky-700"
 	case WBWorkSales:
 		return "bg-orange-100 text-orange-700"
+	case WBWorkProjectWork:
+		return "bg-emerald-100 text-emerald-800"
 	default:
 		return "bg-gray-100 text-gray-600"
 	}
@@ -691,7 +708,8 @@ func ContractKPI(items []WorkProject, today string) (totalN, validN, soonN int, 
 
 type WorkTask struct {
 	TaskID           string    `json:"task_id"`
-	WorkType         string    `json:"work_type"` // admin / support / as / maintenance / sales
+	WorkType         string    `json:"work_type"` // admin / support / as / maintenance / sales / project_work
+	WorkSubtype      string    `json:"work_subtype,omitempty"` // build|construction|other
 	ProjectID        string    `json:"project_id"`
 	Title            string    `json:"title"`
 	Description      string    `json:"description"`
@@ -737,6 +755,7 @@ type WorkTask struct {
 	ProjectName        string  `json:"project_name,omitempty"`
 	ProjectColor       string  `json:"project_color,omitempty"`
 	OrgName            string  `json:"org_name,omitempty"` // 거래처 표시명(기관명 또는 직접입력)
+	SiteLine           string  `json:"site_line,omitempty"`
 	DaysLeft           int     `json:"days_left"`
 	ChildCount         int     `json:"child_count,omitempty"`
 	Depth              int     `json:"depth,omitempty"`                // 목록 들여쓰기(1=상위)
@@ -806,6 +825,8 @@ func WBCardAsWaitingTask(c WBCard) WorkTask {
 	case WBSourceSalesActivity:
 		workType = WBWorkSales
 		sourceType = WBSourceSalesActivity
+	case WBWorkProjectWork:
+		workType = WBWorkProjectWork
 	}
 	taskID := strings.TrimSpace(c.TaskID)
 	if taskID == "" {
@@ -838,6 +859,7 @@ type WBSummary struct {
 	Maintenance  int // 오늘 예정 정기점검
 	Admin        int // 오늘 예정 행정·사업지원
 	Sales        int // 오늘 예정 영업활동
+	ProjectWork  int // 오늘 예정 작업(구축·공사)
 	Waiting      int // 상태별(하위호환)
 	InProgress   int
 	Review       int
@@ -855,6 +877,8 @@ func WBWorkTypeBucket(workType string) string {
 		return WBWorkMaintenance
 	case WBWorkSales:
 		return WBWorkSales
+	case WBWorkProjectWork:
+		return WBWorkProjectWork
 	default:
 		return WBWorkAdmin // admin + support
 	}
@@ -867,6 +891,8 @@ func NormalizeDirectWorkType(s string) string {
 		return WBWorkSupport
 	case WBWorkSales:
 		return WBWorkSales
+	case WBWorkProjectWork:
+		return WBWorkProjectWork
 	default:
 		return WBWorkAdmin
 	}

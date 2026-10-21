@@ -14,7 +14,7 @@ type WBRepo struct{ db *sql.DB }
 func NewWBRepo(db *sql.DB) *WBRepo { return &WBRepo{db: db} }
 
 const workTaskSelect = `
-		SELECT t.task_id, COALESCE(t.work_type,'admin'), COALESCE(t.project_id,''), t.title, COALESCE(t.description,''),
+		SELECT t.task_id, COALESCE(t.work_type,'admin'), COALESCE(t.work_subtype,''), COALESCE(t.project_id,''), t.title, COALESCE(t.description,''),
 		       COALESCE(t.due_date,''), COALESCE(t.work_date,''), COALESCE(t.start_time,''), COALESCE(t.end_time,''),
 		       COALESCE(t.duration_min,30),
 		       COALESCE(t.status,'waiting'), COALESCE(t.priority,'normal'),
@@ -785,14 +785,14 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	stampNewWorkTaskDates(t)
 	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
-		INSERT INTO work_tasks (task_id, work_type, project_id, title, description, due_date,
+		INSERT INTO work_tasks (task_id, work_type, work_subtype, project_id, title, description, due_date,
 			work_date, start_time, end_time, duration_min, status, priority, assignee, assignee_user_id, assignee_source, tags, progress,
 			source_type, source_id, source_role, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
 			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, created_by_user_id, created_by_name, is_test)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.TaskID, t.WorkType, t.WorkSubtype, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
@@ -830,7 +830,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 	normalizeWorkTask(t)
 	t.Assignee, t.AssigneeUserID = bindStaff(r.db, t.Assignee, t.AssigneeUserID)
 	_, err := r.db.Exec(`
-		UPDATE work_tasks SET work_type=?, project_id=?, title=?, description=?, due_date=?,
+		UPDATE work_tasks SET work_type=?, work_subtype=?, project_id=?, title=?, description=?, due_date=?,
 			work_date=?, start_time=?, end_time=?, duration_min=?, status=?, priority=?,
 			assignee=?, assignee_user_id=?, assignee_source=?, tags=?, progress=?, customer_id=?, customer_name=?,
 			hold_reason=?, review_date=?, cancel_reason=?, wait_party_kind=?, wait_party=?, wait_request=?,
@@ -848,7 +848,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 			END,
 			updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=?`,
-		t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
+		t.WorkType, t.WorkSubtype, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority,
 		t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress, nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
@@ -939,8 +939,8 @@ func normalizeWorkTask(t *model.WorkTask) {
 	}
 	t.DurationMin = model.NormalizeDurationMin(t.DurationMin)
 	switch t.WorkType {
-	case model.WBWorkSupport, model.WBWorkAdmin, model.WBWorkSales:
-		// 행정·지원·영업은 사업명 연결 가능(지원은 화면에서 필수)
+	case model.WBWorkSupport, model.WBWorkAdmin, model.WBWorkSales, model.WBWorkProjectWork:
+		// 행정·지원·영업·작업은 사업명 연결 가능(지원은 화면에서 필수)
 	case model.WBWorkAS, model.WBWorkMaintenance:
 		t.ProjectID = ""
 	default:
@@ -1049,7 +1049,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 		var t model.WorkTask
 		var created, updated string
 		if err := rows.Scan(
-			&t.TaskID, &t.WorkType, &t.ProjectID, &t.Title, &t.Description,
+			&t.TaskID, &t.WorkType, &t.WorkSubtype, &t.ProjectID, &t.Title, &t.Description,
 			&t.DueDate, &t.WorkDate, &t.StartTime, &t.EndTime, &t.DurationMin,
 			&t.Status, &t.Priority, &t.Assignee, &t.AssigneeUserID, &t.AssigneeSource, &t.Tags, &t.Progress,
 			&t.SourceType, &t.SourceID, &t.SourceRole, &t.ParentTaskID,

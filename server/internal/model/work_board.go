@@ -16,6 +16,7 @@ const (
 	WorkPrefixSupport     = "support"     // [지원]
 	WorkPrefixGeneral     = "general"     // [일반업무]
 	WorkPrefixSales       = "sales"       // [영업]
+	WorkPrefixProjectWork = "project_work" // [작업]
 )
 
 func WorkPrefixLabel(p string) string {
@@ -32,6 +33,8 @@ func WorkPrefixLabel(p string) string {
 		return "일반업무"
 	case WorkPrefixSales:
 		return "영업"
+	case WorkPrefixProjectWork:
+		return "작업"
 	default:
 		return p
 	}
@@ -45,6 +48,7 @@ type WorkPrefixCounts struct {
 	Support     int `json:"support"`
 	General     int `json:"general"`
 	Sales       int `json:"sales"`
+	ProjectWork int `json:"project_work"`
 	Total       int `json:"total"`
 }
 
@@ -62,6 +66,8 @@ func (c *WorkPrefixCounts) Add(prefix string, n int) {
 		c.General += n
 	case WorkPrefixSales:
 		c.Sales += n
+	case WorkPrefixProjectWork:
+		c.ProjectWork += n
 	}
 	c.Total += n
 }

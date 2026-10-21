@@ -686,6 +686,7 @@ func main() {
 	wb.POST("/register/kanban-move", h.Workboard.RegisterKanbanMove)
 	wb.POST("/register/unlock-past", h.Workboard.UnlockPastRegister, adminOnly)
 	wb.GET("/mnt-month-hint", h.Workboard.MntMonthHint)
+	wb.GET("/project-sites", h.Workboard.SearchProjectWorkSites)
 	wb.POST("/projects", h.Workboard.CreateProject)
 	wb.POST("/tasks", h.Workboard.CreateTask)
 	wb.GET("/tasks/:id/edit", h.Workboard.EditTask)

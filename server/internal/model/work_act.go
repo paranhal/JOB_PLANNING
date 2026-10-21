@@ -7,6 +7,7 @@ const (
 	ActFilterAS   = "as"
 	ActFilterMnt  = "mnt"
 	ActFilterTask = "task"
+	ActFilterWork = "work"
 )
 
 // WorkTaskActClass work_tasks.work_type 분류. 83-D. 매핑 안 되면 기타 업무.
@@ -16,6 +17,8 @@ func WorkTaskActClass(workType string) string {
 		return ActFilterAS
 	case WBWorkMaintenance, "visit":
 		return ActFilterMnt
+	case WBWorkProjectWork:
+		return ActFilterWork
 	default:
 		return ActFilterTask
 	}
@@ -27,6 +30,8 @@ func WorkTaskActLabel(workType string) string {
 		return "AS"
 	case ActFilterMnt:
 		return "정기점검"
+	case ActFilterWork:
+		return "작업"
 	default:
 		return "기타 업무"
 	}

@@ -30,6 +30,36 @@ func FormatSalesWorkTitle(title string) string {
 	return "[영업]" + title
 }
 
+// FormatProjectWorkTitle 일정표 표시용. 저장값은 원문.
+func FormatProjectWorkTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "[작업]"
+	}
+	if strings.HasPrefix(title, "[작업]") {
+		return title
+	}
+	return "[작업]" + title
+}
+
+func FormatTaskSiteLine(names []string) string {
+	var clean []string
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			clean = append(clean, n)
+		}
+	}
+	switch len(clean) {
+	case 0:
+		return ""
+	case 1:
+		return clean[0]
+	default:
+		return fmt.Sprintf("%s 외 %d곳", clean[0], len(clean)-1)
+	}
+}
+
 // FormatMaintenanceWorkTitle 정기점검 업무명 — "[점검]고객명_정기점검번호".
 func FormatMaintenanceWorkTitle(orgName, visitNumber string) string {
 	name := strings.TrimSpace(orgName)

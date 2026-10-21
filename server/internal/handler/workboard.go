@@ -161,6 +161,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	}
 	// 시각 미기재 확정 건도 일정표에 보이도록 표시용 시각만 채운다.
 	placed = ensureTimelineDisplayTimes(placed)
+	h.attachProjectWorkSites(placed)
 
 	role := currentRole(c)
 	roleUnresolved := !model.IsKnownRole(role)
@@ -201,14 +202,20 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	workCards, err := h.paletteWorkCards(org)
+	if err != nil {
+		return err
+	}
 	asCards = filterCardsByAssignee(asCards, assigneeFilter)
 	mntCards = filterCardsByAssignee(mntCards, assigneeFilter)
 	adminCards = filterCardsByAssignee(adminCards, assigneeFilter)
 	salesCards = filterCardsByAssignee(salesCards, assigneeFilter)
+	workCards = filterCardsByAssignee(workCards, assigneeFilter)
 	asCards = filterCardsByProject(asCards, projectFilter)
 	mntCards = filterCardsByProject(mntCards, projectFilter)
 	adminCards = filterCardsByProject(adminCards, projectFilter)
 	salesCards = filterCardsByProject(salesCards, projectFilter)
+	workCards = filterCardsByProject(workCards, projectFilter)
 	unassignedCards = filterCardsByProject(unassignedCards, projectFilter)
 
 	undatedTasks, err := h.repo.ListUndatedASTasksForOrg(org)
@@ -219,6 +226,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	undatedCards := undatedASCards(undatedTasks)
 
 	projects, _ := h.repo.ListProjects(true)
+	workProjects, _ := h.repo.ListWorkPickProjects(org)
 	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListAllInOrg(org)
 	var colorNames []string
@@ -356,7 +364,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"KanbanTotal":     kanbanTotal,
 		"KanbanDrag":      canWrite,
 		"KanbanDrop":      "el",
-		"KanbanHint":      "다섯 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
+		"KanbanHint":      "유형 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
 		"Date":            dateStr,
 		"PeriodLabel":     period.Label,
 		"PrevDate":        period.Prev,
@@ -375,11 +383,13 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"MntCards":        mntCards,
 		"AdminCards":      adminCards,
 		"SalesCards":      salesCards,
+		"WorkCards":       workCards,
 		"UnassignedCards": unassignedCards,
 		"PaletteAll":      strings.TrimSpace(c.QueryParam("palette")) == "all",
 		"UndatedCards":    undatedCards,
 		"PlacedCount":     len(placed),
 		"Projects":        projects,
+		"WorkProjects":    workProjects,
 		"Assignees":       assignees,
 		"Customers":       customers,
 		"AssigneeFilter":  assigneeFilter,
@@ -1047,13 +1057,21 @@ func paletteTaskCard(t model.WorkTask, dimmed bool) model.WBCard {
 	if t.WorkType == model.WBWorkSales || t.SourceType == model.WBSourceSalesActivity {
 		cat = model.WBSourceSalesActivity
 	}
+	if t.WorkType == model.WBWorkProjectWork {
+		cat = model.WBWorkProjectWork
+		title = model.FormatProjectWorkTitle(t.Title)
+	}
+	sub := t.Description
+	if t.WorkType == model.WBWorkProjectWork {
+		sub = projectWorkSub(t)
+	}
 	return model.WBCard{
 		Kind:         "task",
 		RefID:        t.TaskID,
 		TaskID:       t.TaskID,
 		Category:     cat,
 		Title:        title,
-		SubTitle:     t.Description,
+		SubTitle:     sub,
 		SourceNumber: t.TaskID,
 		SourceHref:   "/workboard/tasks/" + t.TaskID,
 		Assignee:     t.Assignee,
@@ -1520,13 +1538,16 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	if err != nil {
 		return nil, err
 	}
-	board = append(board, todayWaitingFromPalette(today, asCards, mntCards, adminCards, seenSource, seenTask, salesCards)...)
+	workCards, _ := h.paletteWorkCards(currentOrg(c))
+	board = append(board, todayWaitingFromPalette(today, asCards, mntCards, adminCards, seenSource, seenTask, salesCards, workCards)...)
 	board = append(board, waitingActionChecks(today, h.repo, seenTask)...)
 
+	h.attachProjectWorkSites(board)
 	projects, err := h.repo.ListProjects(false)
 	if err != nil {
 		return nil, err
 	}
+	workProjects, _ := h.repo.ListWorkPickProjects(currentOrg(c))
 
 	summary := model.WBSummary{}
 	byWorkType := map[string][]model.WorkTask{
@@ -1534,6 +1555,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		model.WBWorkAS:          {},
 		model.WBWorkAdmin:       {},
 		model.WBWorkSales:       {},
+		model.WBWorkProjectWork: {},
 	}
 	byStatus := map[string][]model.WorkTask{
 		model.WBTaskWaiting:    {},
@@ -1566,6 +1588,8 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 				summary.Maintenance++
 			case model.WBWorkSales:
 				summary.Sales++
+			case model.WBWorkProjectWork:
+				summary.ProjectWork++
 			default:
 				summary.Admin++
 			}
@@ -1597,6 +1621,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		"ByWorkType":    byWorkType,
 		"ByStatus":      byStatus,
 		"Projects":      projects,
+		"WorkProjects":  workProjects,
 		"Assignees":     assignees,
 		"Customers":     customers,
 		"ContractTypes": contractTypes,
@@ -1632,6 +1657,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	}
 	workType := strings.TrimSpace(c.FormValue("work_type"))
 	sourceID := strings.TrimSpace(c.FormValue("source_id"))
+	if workType == model.WBWorkProjectWork {
+		return h.createProjectWork(c)
+	}
 
 	workDate, dueDate, start, end, dur, schedOK := parseRequiredSchedule(c)
 	if !schedOK {
@@ -1882,11 +1910,16 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		if existing.SourceType == model.WBSourceMaintenance {
 			projectID = strings.TrimSpace(c.FormValue("project_id"))
 		} else if existing.SourceType == "" {
-			workType = model.NormalizeDirectWorkType(c.FormValue("work_type"))
-			projectID = strings.TrimSpace(c.FormValue("project_id"))
-			if workType == model.WBWorkSupport && projectID == "" {
-				return c.Redirect(http.StatusSeeOther,
-					"/workboard/tasks/"+id+"/edit?err=project_required&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+			if existing.WorkType == model.WBWorkProjectWork {
+				workType = model.WBWorkProjectWork
+				projectID = strings.TrimSpace(c.FormValue("project_id"))
+			} else {
+				workType = model.NormalizeDirectWorkType(c.FormValue("work_type"))
+				projectID = strings.TrimSpace(c.FormValue("project_id"))
+				if workType == model.WBWorkSupport && projectID == "" {
+					return c.Redirect(http.StatusSeeOther,
+						"/workboard/tasks/"+id+"/edit?err=project_required&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+				}
 			}
 		}
 	}
@@ -1909,9 +1942,11 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	t := &model.WorkTask{
 		TaskID:         existing.TaskID,
 		WorkType:       workType,
+		WorkSubtype:    existing.WorkSubtype,
 		ProjectID:      projectID,
 		Title:          title,
 		Description:    desc,
+		CompleteNote:   existing.CompleteNote,
 		DueDate:        dueDate,
 		WorkDate:       workDate,
 		StartTime:      start,
@@ -1997,8 +2032,27 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 				taskPagePath(id, registerScope)+"?err="+url.QueryEscape(msg)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 		}
 	}
+	if existing.WorkType == model.WBWorkProjectWork {
+		if s := model.NormalizeWorkSubtype(c.FormValue("work_subtype")); s != "" {
+			t.WorkSubtype = s
+		}
+		if note := strings.TrimSpace(c.FormValue("complete_note")); note != "" || registerScope {
+			t.CompleteNote = note
+		}
+	}
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
+	}
+	if existing.WorkType == model.WBWorkProjectWork {
+		_ = c.Request().ParseForm()
+		siteIDs := c.Request().Form["site_id"]
+		if t.ProjectID == "" {
+			_ = h.repo.ReplaceTaskSites(t.TaskID, nil)
+		} else if err := h.repo.AssertSitesForProject(org, t.ProjectID, siteIDs); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		} else if err := h.repo.ReplaceTaskSites(t.TaskID, siteIDs); err != nil {
+			return err
+		}
 	}
 	if existing.SourceType == "" && registerScope {
 		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
@@ -2135,6 +2189,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	assignees := listAssignableForPicker(h.userRepo, c)
 	projects, _ := h.repo.ListProjects(false)
+	workProjects, _ := h.repo.ListWorkPickProjects(taskOrgID(c, t))
+	workSites, _ := h.repo.ListTaskSites(t.TaskID)
 	customers, _ := h.customerRepo.ListAll()
 	supportMembers, _ := h.repo.ListMembers(t.TaskID)
 	var supportOnly []model.WorkTaskMember
@@ -2189,6 +2245,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"SupportMembers": supportOnly,
 		"DayLeaveNames":  taskLeaveNames,
 		"Projects":       projects,
+		"WorkProjects":   workProjects,
+		"WorkSites":      workSites,
 		"Customers":      customers,
 		"CanWrite":       canWrite,
 		"FlashOK":        c.QueryParam("ok"),

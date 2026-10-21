@@ -83,11 +83,16 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 			cat = model.WBSourceAS
 		} else if t.WorkType == model.WBWorkMaintenance {
 			cat = model.WBSourceMaintenance
+		} else if t.WorkType == model.WBWorkProjectWork {
+			cat = model.WBWorkProjectWork
 		}
 	}
 	title := t.Title
 	if cat == model.WBSourceSalesActivity {
 		title = model.FormatSalesWorkTitle(t.Title)
+	}
+	if cat == model.WBWorkProjectWork {
+		title = model.FormatProjectWorkTitle(t.Title)
 	}
 	card := model.WBCard{
 		Kind:         "task",
@@ -95,7 +100,7 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 		TaskID:       t.TaskID,
 		Category:     cat,
 		Title:        title,
-		SubTitle:     t.Description,
+		SubTitle:     projectWorkSub(t),
 		Assignee:     t.Assignee,
 		WorkDate:     t.WorkDate,
 		StartTime:    t.StartTime,
@@ -125,6 +130,23 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 		card.SourceHref = "/workboard/tasks/" + t.TaskID
 	}
 	return card
+}
+
+func projectWorkSub(t model.WorkTask) string {
+	if t.WorkType != model.WBWorkProjectWork {
+		return t.Description
+	}
+	var parts []string
+	if s := strings.TrimSpace(t.ProjectName); s != "" {
+		parts = append(parts, s)
+	}
+	if s := strings.TrimSpace(t.SiteLine); s != "" {
+		parts = append(parts, s)
+	}
+	if len(parts) > 0 {
+		return strings.Join(parts, " · ")
+	}
+	return t.Description
 }
 
 // productFromMaintDesc "[제품]고객 정기점검" / 구형 "{제품} 정기 점검" 에서 점검 대상을 뽑는다.
