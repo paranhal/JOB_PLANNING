@@ -22,6 +22,7 @@ type dashRow struct {
 	ASCount   int
 	MntCount  int
 	WaitCount int
+	WorkCount int
 	Href      string
 	Link      bool
 	CanLink   bool
@@ -98,6 +99,7 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 			dr.ASCount = acts.AS[u.ProjectID]
 			dr.MntCount = acts.Mnt[u.ProjectID]
 			dr.WaitCount = acts.Wait[u.ProjectID]
+			dr.WorkCount = acts.Work[u.ProjectID]
 			dr.ASHref = "/projects/" + u.ProjectID
 			dr.MntHref = "/projects/" + u.ProjectID
 			dr.WaitHref = "/workboard/tasks?project=" + url.QueryEscape(u.ProjectID)
@@ -134,7 +136,7 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		}
 		if r.Run == model.RunProgress {
 			showProg++
-			showAct += r.ASCount + r.MntCount + r.WaitCount
+			showAct += r.ASCount + r.MntCount + r.WaitCount + r.WorkCount
 		}
 		if r.Run == model.RunWait {
 			showWait++
@@ -192,6 +194,7 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		"ActAS":         dashQuery(kind, model.ActFilterAS),
 		"ActMnt":        dashQuery(kind, model.ActFilterMnt),
 		"ActTask":       dashQuery(kind, model.ActFilterTask),
+		"ActWork":       dashQuery(kind, model.ActFilterWork),
 		"ReportURL":     "/projects/diary",
 		"FilterURL":     "/projects/registry",
 	})
@@ -218,6 +221,8 @@ func actMatch(act string, r dashRow) bool {
 		return r.MntCount > 0
 	case model.ActFilterTask:
 		return r.WaitCount > 0
+	case model.ActFilterWork:
+		return r.WorkCount > 0
 	default:
 		return true
 	}

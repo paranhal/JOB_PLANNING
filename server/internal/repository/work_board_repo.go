@@ -436,7 +436,7 @@ func (r *WorkBoardRepo) collectWorkTodayOpen(mineUserID string, mineKeys []strin
 	out = append(out, gItems...)
 
 	tItems, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support','sales')
+		`t.work_type IN ('admin','support','sales','project_work')
 		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
 		 AND TRIM(COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')) != ''
 		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') <= ?`,
@@ -586,7 +586,7 @@ func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date
 		tStatus = ``
 	}
 	tItems, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support','sales')
+		`t.work_type IN ('admin','support','sales','project_work')
 			 `+tStatus+`
 			 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=?`,
 		mineUserID, mineKeys, []interface{}{date})
@@ -752,7 +752,7 @@ func (r *WorkBoardRepo) collectCompletedRange(mineUserID string, mineKeys []stri
 		tArgs = []interface{}{from, to}
 	}
 	tItems, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support','sales')
+		`t.work_type IN ('admin','support','sales','project_work')
 		 AND t.status='complete'
 		 AND `+tPred,
 		mineUserID, mineKeys, tArgs)
@@ -815,7 +815,7 @@ func (r *WorkBoardRepo) CollectUnassigned(orgID string) ([]model.WorkListItem, e
 	out = append(out, mItems...)
 
 	tWhere, tArgs := applyOrgWhere(
-		`t.work_type IN ('admin','support','sales')
+		`t.work_type IN ('admin','support','sales','project_work')
 		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled','hold')
 		 AND TRIM(COALESCE(t.assignee,''))=''`,
 		"t", orgID, nil)
@@ -859,7 +859,7 @@ func (r *WorkBoardRepo) CollectTodayAssigned(orgID, mineUserID string, mineKeys 
 	out = append(out, mItems...)
 
 	tWhere, tArgs := applyOrgWhere(
-		`t.work_type IN ('admin','support','sales')
+		`t.work_type IN ('admin','support','sales','project_work')
 		 AND TRIM(COALESCE(t.assignee,'')) != ''
 		 AND date(COALESCE(t.assigned_at,'')) = ?`,
 		"t", orgID, []interface{}{today})
@@ -1167,6 +1167,9 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		if workType == model.WBWorkSales || sourceType == model.WBSourceSalesActivity {
 			it.Prefix = model.WorkPrefixSales
 		}
+		if workType == model.WBWorkProjectWork {
+			it.Prefix = model.WorkPrefixProjectWork
+		}
 		it.RefNumber = it.RefID
 		if workType == model.WBWorkSupport {
 			it.SubLabel = "지원"
@@ -1175,6 +1178,8 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 			if it.SubLabel == "" {
 				it.SubLabel = "영업"
 			}
+		} else if it.Prefix == model.WorkPrefixProjectWork {
+			it.SubLabel = "작업"
 		} else {
 			it.SubLabel = "행정"
 		}

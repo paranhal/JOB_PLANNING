@@ -46,6 +46,7 @@
         <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="maintenance" {{if index .SelKind "maintenance"}}checked{{end}} onchange="this.form.submit()"> 정기점검</label>
         <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="admin" {{if index .SelKind "admin"}}checked{{end}} onchange="this.form.submit()"> 행정·지원</label>
         <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="sales" {{if index .SelKind "sales"}}checked{{end}} onchange="this.form.submit()"> 영업 활동</label>
+        <label class="flex items-center gap-2 px-1 py-0.5 text-xs"><input type="checkbox" name="kind" value="project_work" {{if index .SelKind "project_work"}}checked{{end}} onchange="this.form.submit()"> 작업</label>
       </div>
     </details>
 

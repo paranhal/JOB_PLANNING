@@ -563,6 +563,45 @@ func (r *ProjectRepo) MatchAdminTasks(projectID string, limit int) ([]model.Proj
 	return out, total, rows.Err()
 }
 
+// MatchProjectWork 이 사업에 연결된 구축·공사 작업.
+func (r *ProjectRepo) MatchProjectWork(projectID string, limit int) ([]model.ProjectMatchRow, int, error) {
+	var total int
+	if err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks
+		WHERE project_id=? AND work_type=?`, projectID, model.WBWorkProjectWork).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	q := `
+		SELECT task_id, '', COALESCE(work_date, due_date,''), '',
+			COALESCE(title,''), COALESCE(status,''), ''
+		FROM work_tasks
+		WHERE project_id=? AND work_type=?
+		ORDER BY COALESCE(work_date, due_date) DESC, title`
+	args := []interface{}{projectID, model.WBWorkProjectWork}
+	if limit > 0 {
+		q += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []model.ProjectMatchRow
+	for rows.Next() {
+		var m model.ProjectMatchRow
+		var dummy string
+		if err := rows.Scan(&m.ID, &m.Number, &m.Date, &m.OrgName, &m.Title, &m.Status, &dummy); err != nil {
+			return nil, 0, err
+		}
+		m.Number = m.ID
+		m.Href = "/workboard/tasks/" + m.ID
+		m.StatusLabel = model.WBTaskStatusLabel(m.Status)
+		out = append(out, m)
+	}
+	return out, total, rows.Err()
+}
+
 func buildScopeORConds(rules []model.ProjectScopeRule, custAlias, prodAlias, textCol string, asMode bool) (string, []interface{}) {
 	var parts []string
 	var args []interface{}

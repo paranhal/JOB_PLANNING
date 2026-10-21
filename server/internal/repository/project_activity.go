@@ -10,11 +10,12 @@ type ProjectActivityCounts struct {
 	AS     map[string]int
 	Mnt    map[string]int
 	Wait   map[string]int
+	Work   map[string]int
 	Unspec int
 }
 
 func (r *ProjectRepo) CountProjectActivities() (ProjectActivityCounts, error) {
-	out := ProjectActivityCounts{AS: map[string]int{}, Mnt: map[string]int{}, Wait: map[string]int{}}
+	out := ProjectActivityCounts{AS: map[string]int{}, Mnt: map[string]int{}, Wait: map[string]int{}, Work: map[string]int{}}
 	asN, err := r.countByProjectCol(`SELECT COALESCE(project_id,''), COUNT(*) FROM as_receipts GROUP BY COALESCE(project_id,'')`)
 	if err != nil {
 		return out, err
@@ -61,6 +62,8 @@ func (r *ProjectRepo) CountProjectActivities() (ProjectActivityCounts, error) {
 			out.AS[id] += n
 		case model.ActFilterMnt:
 			out.Mnt[id] += n
+		case model.ActFilterWork:
+			out.Work[id] += n
 		default:
 			out.Wait[id] += n
 		}

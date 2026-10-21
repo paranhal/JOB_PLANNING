@@ -120,7 +120,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 
 	scopeNote := kindNote + " · " + registerScopeNote(role, scopeAll, assigneeFilter, roleUnresolved)
 
-	var asCards, mntCards, adminCards, salesCards []model.WBCard
+	var asCards, mntCards, adminCards, salesCards, workCards []model.WBCard
 	for _, t := range tasks {
 		card := cardFn(t)
 		switch {
@@ -130,6 +130,8 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 			mntCards = append(mntCards, card)
 		case t.SourceType == model.WBSourceSalesActivity || t.WorkType == model.WBWorkSales:
 			salesCards = append(salesCards, card)
+		case t.WorkType == model.WBWorkProjectWork:
+			workCards = append(workCards, card)
 		default:
 			adminCards = append(adminCards, card)
 		}
@@ -153,6 +155,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 	mntStats := buildCardStats(mntCards, today)
 	adminStats := buildCardStats(adminCards, today)
 	salesStats := buildCardStats(salesCards, today)
+	workStats := buildCardStats(workCards, today)
 
 	var monthBanners []model.SalesMonthBanner
 	if view == regViewMonth && h.sales != nil {
@@ -219,11 +222,13 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"MntCards":        mntCards,
 		"AdminCards":      adminCards,
 		"SalesCards":      salesCards,
+		"WorkCards":       workCards,
 		"ASStats":         asStats,
 		"MntStats":        mntStats,
 		"AdminStats":      adminStats,
 		"SalesStats":      salesStats,
-		"TotalStats":      asStats.add(mntStats).add(adminStats).add(salesStats),
+		"WorkStats":       workStats,
+		"TotalStats":      asStats.add(mntStats).add(adminStats).add(salesStats).add(workStats),
 		"Embed":           embed,
 		"HideNav":         embed,
 		"PlacedCount":     len(tasks),

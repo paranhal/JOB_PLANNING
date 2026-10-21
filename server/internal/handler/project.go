@@ -254,6 +254,7 @@ func (h *ProjectHandler) ContractShow(c echo.Context) error {
 		"ASCount":    acts.AS[p.ProjectID],
 		"MntCount":   acts.Mnt[p.ProjectID],
 		"WaitCount":  acts.Wait[p.ProjectID],
+		"WorkCount":  acts.Work[p.ProjectID],
 		"ASHref":     "/projects/" + p.ProjectID,
 		"MntHref":    "/projects/" + p.ProjectID,
 		"WaitHref":   "/workboard/tasks?project=" + url.QueryEscape(p.ProjectID),
@@ -310,6 +311,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	asRows, asTotal, _ := h.repo.MatchAS(id, 20)
 	mntRows, mntTotal, _ := h.repo.MatchMaintenance(id, 20)
 	taskRows, taskTotal, _ := h.repo.MatchAdminTasks(id, 20)
+	workRows, workTotal, _ := h.repo.MatchProjectWork(id, 20)
 	assetTotal, _ := h.assetRepo.CountByProject(id)
 	p.ASCount, p.MntCount, p.TaskCount, p.AssetCount = asTotal, mntTotal, taskTotal, assetTotal
 	assigns, _ := h.repo.ListAssignments(id)
@@ -328,6 +330,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
+		"WorkRows": workRows, "WorkTotal": workTotal,
 		"CanWrite":     canWriteProjects(c),
 		"CanDelete":    canDeleteProjects(c),
 		"CanMerge":     currentRole(c) == model.RoleVisionAdmin,

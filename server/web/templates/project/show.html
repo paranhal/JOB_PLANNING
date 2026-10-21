@@ -120,6 +120,9 @@
         <li class="flex justify-between"><span class="text-gray-600">행정/지원 업무</span>
           <a href="/workboard/tasks" class="font-semibold text-blue-700 hover:underline">{{.Project.TaskCount}}건</a>
         </li>
+        <li class="flex justify-between"><span class="text-gray-600">작업</span>
+          <span class="font-semibold">{{.WorkTotal}}건</span>
+        </li>
         {{if .Progress}}
         <li class="flex justify-between"><span class="text-gray-600">설치</span><span class="font-semibold">{{.Progress.Installed}}/{{.Progress.Denom}}</span></li>
         <li class="flex justify-between"><span class="text-gray-600">검수</span><span class="font-semibold">{{.Progress.Inspected}}/{{.Progress.Denom}}</span></li>
@@ -165,6 +168,7 @@
   {{template "project_match_table" dict "Title" "매칭 AS (최근)" "Rows" .ASRows "Total" .Project.ASCount "Empty" "규칙에 맞는 AS가 없습니다."}}
   {{template "project_match_table" dict "Title" "매칭 정기점검 (최근)" "Rows" .MntRows "Total" .Project.MntCount "Empty" "규칙에 맞는 정기점검이 없습니다."}}
   {{template "project_match_table" dict "Title" "행정/지원 업무 (최근)" "Rows" .TaskRows "Total" .Project.TaskCount "Empty" "연결된 행정/지원 업무가 없습니다."}}
+  {{template "project_match_table" dict "Title" "작업 (최근)" "Rows" .WorkRows "Total" .WorkTotal "Empty" "연결된 작업이 없습니다."}}
 </div>
 {{end}}
 

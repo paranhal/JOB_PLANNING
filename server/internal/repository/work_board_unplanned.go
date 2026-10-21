@@ -123,7 +123,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	}
 
 	tasks, err := r.queryWorkTasks(
-		`t.work_type IN ('admin','support','sales') AND t.status != 'complete'
+		`t.work_type IN ('admin','support','sales','project_work') AND t.status != 'complete'
 		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=''`,
 		mineUserID, mineKeys, nil)
 	if err != nil {

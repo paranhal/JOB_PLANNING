@@ -18,6 +18,7 @@ const (
 	workKindMaintenance = "maintenance"
 	workKindAdmin       = "admin"
 	workKindSales       = "sales"
+	workKindProjectWork = "project_work"
 	workPeriodDefault   = "3m"
 	workStatusWaiting   = "waiting"
 	workStatusProgress  = "in_progress"
@@ -154,6 +155,8 @@ func workItemKind(it model.WorkListItem) string {
 		return workKindMaintenance
 	case model.WorkPrefixSales:
 		return workKindSales
+	case model.WorkPrefixProjectWork:
+		return workKindProjectWork
 	default:
 		return workKindAdmin
 	}
@@ -341,6 +344,8 @@ func workKindLabel(code string) string {
 		return "행정·지원"
 	case workKindSales:
 		return "영업 활동"
+	case workKindProjectWork:
+		return "작업"
 	default:
 		return code
 	}

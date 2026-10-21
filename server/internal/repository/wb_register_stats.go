@@ -56,6 +56,8 @@ func workTypeLabel(key string) string {
 		return "영업"
 	case model.WBWorkSupport:
 		return "지원"
+	case model.WBWorkProjectWork:
+		return "작업"
 	default:
 		return "행정·지원"
 	}
