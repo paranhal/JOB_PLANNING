@@ -293,7 +293,7 @@ func (h *WorkboardHandler) applyRegisterKanbanMove(c echo.Context, key, from, to
 		if note == "" {
 			return errKanban("complete_note")
 		}
-		return h.kanbanComplete(key, date, note)
+		return h.kanbanComplete(c, key, date, note)
 	case from == model.WorkBucketCompletedToday:
 		if err := h.kanbanReopen(key, to, date, assignee); err != nil {
 			return err
@@ -471,7 +471,7 @@ func (h *WorkboardHandler) kanbanSetProgress(key string, start bool) error {
 	}
 }
 
-func (h *WorkboardHandler) kanbanComplete(key, date, note string) error {
+func (h *WorkboardHandler) kanbanComplete(c echo.Context, key, date, note string) error {
 	kind, id := splitKanbanKey(key)
 	switch kind {
 	case "as":
@@ -519,7 +519,11 @@ func (h *WorkboardHandler) kanbanComplete(key, date, note string) error {
 				return errKanban("complete_note")
 			}
 		}
-		return h.updateTaskLogged(t)
+		if err := h.updateTaskLogged(t); err != nil {
+			return err
+		}
+		_ = h.repo.SyncSitesOnProjectWorkComplete(t, currentUserID(c))
+		return nil
 	default:
 		return errKanban("place")
 	}

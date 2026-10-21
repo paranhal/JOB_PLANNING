@@ -51,11 +51,9 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 		if err != nil || pOrg != org {
 			return echo.NewHTTPError(http.StatusBadRequest, "다른 조직 사업입니다")
 		}
-		if err := h.repo.AssertSitesForProject(org, projectID, siteIDs); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-	} else if len(nonEmpty(siteIDs)) > 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "사업을 선택하면 대상 사이트를 고를 수 있습니다")
+	}
+	if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	start := strings.TrimSpace(c.FormValue("start_time"))
@@ -105,41 +103,39 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
 	}
-	if projectID != "" {
-		if err := h.repo.ReplaceTaskSites(t.TaskID, siteIDs); err != nil {
-			return err
-		}
+	if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
+		return err
 	}
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 }
 
-func nonEmpty(ids []string) []string {
-	var out []string
-	for _, id := range ids {
-		if strings.TrimSpace(id) != "" {
-			out = append(out, strings.TrimSpace(id))
-		}
-	}
-	return out
+func (h *WorkboardHandler) SearchProjectWorkSites(c echo.Context) error {
+	return h.SearchWorkTaskSites(c)
 }
 
-func (h *WorkboardHandler) SearchProjectWorkSites(c echo.Context) error {
+func (h *WorkboardHandler) SearchWorkTaskSites(c echo.Context) error {
 	if !hasPerm(c, model.PermWorkboard) {
 		return echo.ErrForbidden
 	}
-	org := currentOrg(c)
-	if org == "" || org == repository.OrgAll {
-		return c.JSON(http.StatusOK, []repository.WorkTaskSite{})
+	if currentRole(c) == model.RoleCLevel || isReadOnly(c) {
+		return echo.ErrForbidden
 	}
 	pid := strings.TrimSpace(c.QueryParam("project_id"))
-	if pid == "" {
-		return c.JSON(http.StatusOK, []repository.WorkTaskSite{})
+	org := currentOrg(c)
+	if pid != "" {
+		pOrg, err := h.repo.ProjectOrgID(pid)
+		if err != nil || pOrg != org {
+			pid = ""
+		}
 	}
-	pOrg, err := h.repo.ProjectOrgID(pid)
-	if err != nil || pOrg != org {
-		return echo.NewHTTPError(http.StatusBadRequest, "다른 조직 사업입니다")
+	var selected []string
+	for _, id := range strings.Split(c.QueryParam("selected"), ",") {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			selected = append(selected, id)
+		}
 	}
-	list, err := h.repo.SearchProjectSites(org, pid, c.QueryParam("q"), 20)
+	list, err := h.repo.SearchWorkTaskCustomers(c.QueryParam("q"), pid, selected, 20)
 	if err != nil {
 		return err
 	}

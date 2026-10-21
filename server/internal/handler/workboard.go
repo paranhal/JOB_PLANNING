@@ -2046,12 +2046,14 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if existing.WorkType == model.WBWorkProjectWork {
 		_ = c.Request().ParseForm()
 		siteIDs := c.Request().Form["site_id"]
-		if t.ProjectID == "" {
-			_ = h.repo.ReplaceTaskSites(t.TaskID, nil)
-		} else if err := h.repo.AssertSitesForProject(org, t.ProjectID, siteIDs); err != nil {
+		if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		} else if err := h.repo.ReplaceTaskSites(t.TaskID, siteIDs); err != nil {
+		}
+		if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
 			return err
+		}
+		if t.Status == model.WBTaskComplete {
+			_ = h.repo.SyncSitesOnProjectWorkComplete(t, currentUserID(c))
 		}
 	}
 	if existing.SourceType == "" && registerScope {
