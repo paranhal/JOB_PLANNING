@@ -42,6 +42,14 @@ func TestSplitContractYearsOracles(t *testing.T) {
 	if hotel[0].Amount != hotel[1].Amount || hotel[1].Amount != hotel[2].Amount {
 		t.Fatalf("같은 일수 연차 금액 %d %d %d", hotel[0].Amount, hotel[1].Amount, hotel[2].Amount)
 	}
+	if hotel[0].Amount != 3348536 || hotel[4].Amount != 3632932 {
+		t.Fatalf("hotel 1·5차 %d %d", hotel[0].Amount, hotel[4].Amount)
+	}
+
+	giga := SplitContractYears(time.Date(2025, 3, 18, 0, 0, 0, 0, time.UTC), time.Date(2031, 10, 31, 0, 0, 0, 0, time.UTC), 249678000, today)
+	if len(giga) != 7 || giga[6].StartDate != "2031-03-18" || giga[6].EndDate != "2031-10-31" || giga[6].Amount != 23533107 {
+		t.Fatalf("giga %+v", giga)
+	}
 
 	one := SplitContractYears(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC), 100, today)
 	if one != nil {
@@ -73,5 +81,16 @@ func TestMapContractKindLabel(t *testing.T) {
 	k, err = InferContractKind("", "운영 사업")
 	if err != nil || k != ProjectKindOther {
 		t.Fatalf("빈 유형 기타 %s %v", k, err)
+	}
+	m, err := NormalizeContractMethod("수의계약")
+	if err != nil || m != "수의" {
+		t.Fatalf("수의계약 %s %v", m, err)
+	}
+	m, err = NormalizeContractMethod("입찰")
+	if err != nil || m != "입찰" {
+		t.Fatalf("입찰 %s %v", m, err)
+	}
+	if _, err := NormalizeContractMethod("모름"); err == nil {
+		t.Fatal("모르는 계약방식")
 	}
 }

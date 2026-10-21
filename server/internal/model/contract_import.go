@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 )
@@ -66,6 +67,21 @@ type ContractImportBatch struct {
 	RowsError int
 	Status    string
 	CreatedBy string
+}
+
+func NormalizeContractMethod(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	key := strings.TrimSuffix(s, "계약")
+	allowed := []string{"수의", "입찰", "제안입찰", "농공단지수의", "민간계약", "기타"}
+	for _, a := range allowed {
+		if s == a || key == a || key == strings.TrimSuffix(a, "계약") {
+			return a, nil
+		}
+	}
+	return "", fmt.Errorf("계약방식을 확인하세요")
 }
 
 func NormalizeContractDirection(s string) string {
@@ -223,7 +239,7 @@ func SplitContractYears(start, end time.Time, amount int, today time.Time) []Yea
 		if i == len(bounds)-1 {
 			amt = amount - used
 		} else {
-			amt = int(int64(amount) * int64(daysInclusive(b.s, b.e)) / int64(total))
+			amt = int(math.Round(float64(amount) * float64(daysInclusive(b.s, b.e)) / float64(total)))
 			used += amt
 		}
 		out = append(out, YearSlice{

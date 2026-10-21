@@ -58,7 +58,7 @@ func TestContractImportHTTPRoutesOnProjectServer(t *testing.T) {
 }
 
 func TestContractImportSamplePathExists(t *testing.T) {
-	p := filepath.Join("..", "..", "..", "docs", "양식", "사업등록_업로드_작성본.xlsx")
+	p := filepath.Join("..", "..", "..", "docs", "양식", "사업등록_업로드_최종_47건.xlsx")
 	if _, err := os.Stat(p); err != nil {
 		t.Skip(err)
 	}

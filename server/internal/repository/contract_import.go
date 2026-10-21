@@ -40,6 +40,7 @@ func ParseContractWorkbook(raw []byte) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	overlayContractDates(f, rows)
 	if err := matchContractHeaders(rows); err != nil {
 		return nil, err
 	}
@@ -69,6 +70,35 @@ func matchContractHeaders(rows [][]string) error {
 	return nil
 }
 
+func overlayContractDates(f *excelize.File, rows [][]string) {
+	if f == nil {
+		return
+	}
+	for i := 1; i < len(rows); i++ {
+		for _, col := range []int{7, 8} {
+			axis, err := excelize.CoordinatesToCellName(col+1, i+1)
+			if err != nil {
+				continue
+			}
+			disp := cell(rows[i], col)
+			raw, _ := f.GetCellValue(contractSheetData, axis, excelize.Options{RawCellValue: true})
+			iso := ""
+			if v, e := parseContractDate(disp); e == nil {
+				iso = v
+			} else if v, e := parseContractDate(raw); e == nil {
+				iso = v
+			}
+			if iso == "" {
+				continue
+			}
+			for len(rows[i]) <= col {
+				rows[i] = append(rows[i], "")
+			}
+			rows[i][col] = iso
+		}
+	}
+}
+
 func parseContractDate(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -77,12 +107,22 @@ func parseContractDate(s string) (string, error) {
 	if i := strings.IndexAny(s, "T "); i > 0 {
 		s = s[:i]
 	}
-	s = strings.ReplaceAll(s, ".", "-")
-	s = strings.ReplaceAll(s, "/", "-")
-	if t, err := time.Parse("2006-01-02", s); err == nil {
+	layouts := []string{"2006-01-02", "2006.01.02", "2006/01/02", "2006-1-2", "2006.1.2", "01-02-06", "1-2-06", "01/02/06"}
+	for _, layout := range layouts {
+		t, err := time.Parse(layout, s)
+		if err != nil {
+			continue
+		}
+		if layout == "2006-01-02" && t.Format(layout) != s {
+			return "", fmt.Errorf("날짜가 없습니다")
+		}
 		return t.Format("2006-01-02"), nil
 	}
-	if t, err := time.Parse("2006-1-2", s); err == nil {
+	norm := strings.ReplaceAll(strings.ReplaceAll(s, ".", "-"), "/", "-")
+	if t, err := time.Parse("2006-01-02", norm); err == nil && t.Format("2006-01-02") == norm {
+		return t.Format("2006-01-02"), nil
+	}
+	if t, err := time.Parse("2006-1-2", norm); err == nil {
 		return t.Format("2006-01-02"), nil
 	}
 	f, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", ""), 64)
@@ -222,7 +262,12 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 		return ir
 	}
 	ir.Kind, ir.KindLabel = kind, model.ProjectKindLabel(kind)
-	ir.ContractType = vals[5]
+	method, err := model.NormalizeContractMethod(vals[5])
+	if err != nil {
+		ir.Action, ir.Msg = "err", err.Error()
+		return ir
+	}
+	ir.ContractType = method
 	dir := model.NormalizeContractDirection(vals[6])
 	if dir == "" {
 		ir.Action, ir.Msg = "err", "거래구분을 확인하세요"
@@ -253,14 +298,14 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 	}
 	ir.Amount = amt
 	ir.ContractNo, ir.SalesUser, ir.ExecUser, ir.Notes = vals[10], vals[11], vals[12], vals[13]
-	partyID, err := r.lookupCustomerName(ir.PartyName)
+	partyID, err := r.lookupCustomerName(ir.PartyName, ir.OrgID)
 	if err != nil {
 		ir.Action, ir.Msg = "err", err.Error()
 		return ir
 	}
 	ir.PartyID = partyID
 	for _, name := range model.SplitEndCustomers(vals[3]) {
-		id, err := r.lookupCustomerName(name)
+		id, err := r.lookupCustomerName(name, ir.OrgID)
 		if err != nil {
 			ir.Action, ir.Msg = "err", "최종수요처 "+err.Error()
 			return ir
@@ -269,20 +314,22 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 		ir.EndIDs = append(ir.EndIDs, id)
 	}
 	if ir.SalesUser != "" {
-		u, err := r.lookupUserName(ir.SalesUser)
+		u, err := r.lookupUserName(ir.SalesUser, ir.OrgID)
 		if err != nil {
-			ir.Action, ir.Msg = "err", "계약담당 "+err.Error()
-			return ir
+			ir.Msg = strings.TrimSpace(ir.Msg + " 계약담당은 비우고 등록합니다")
+			ir.SalesUser = ""
+		} else {
+			ir.SalesID = u
 		}
-		ir.SalesID = u
 	}
 	if ir.ExecUser != "" {
-		u, err := r.lookupUserName(ir.ExecUser)
+		u, err := r.lookupUserName(ir.ExecUser, ir.OrgID)
 		if err != nil {
-			ir.Action, ir.Msg = "err", "업무담당 "+err.Error()
-			return ir
+			ir.Msg = strings.TrimSpace(ir.Msg + " 업무담당은 비우고 등록합니다")
+			ir.ExecUser = ""
+		} else {
+			ir.ExecID = u
 		}
-		ir.ExecID = u
 	}
 	ir.Years = model.SplitContractYears(stT, enT, ir.Amount, today)
 	return ir
@@ -348,13 +395,13 @@ func (r *ProjectRepo) lookupOrgLabel(s string) (string, error) {
 	return "", fmt.Errorf("부서가 없습니다")
 }
 
-func (r *ProjectRepo) lookupCustomerName(name string) (string, error) {
+func (r *ProjectRepo) lookupCustomerName(name, orgID string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", fmt.Errorf("이름이 없습니다")
 	}
 	rows, err := r.db.Query(`SELECT customer_id FROM customers
-		WHERE TRIM(COALESCE(org_name,''))=? OR TRIM(COALESCE(official_name,''))=?`, name, name)
+		WHERE org_id=? AND (TRIM(COALESCE(org_name,''))=? OR TRIM(COALESCE(official_name,''))=?)`, orgID, name, name)
 	if err != nil {
 		return "", err
 	}
@@ -376,10 +423,10 @@ func (r *ProjectRepo) lookupCustomerName(name string) (string, error) {
 	return ids[0], nil
 }
 
-func (r *ProjectRepo) lookupUserName(name string) (string, error) {
+func (r *ProjectRepo) lookupUserName(name, orgID string) (string, error) {
 	name = strings.TrimSpace(name)
 	rows, err := r.db.Query(`SELECT user_id FROM users
-		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND TRIM(full_name)=?`, name)
+		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND org_id=? AND TRIM(full_name)=?`, orgID, name)
 	if err != nil {
 		return "", err
 	}
