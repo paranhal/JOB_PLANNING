@@ -190,6 +190,7 @@ const (
 	RefTypeSalesOrder    = AttachRefSalesOrder
 	RefTypeSalesDelivery = AttachRefSalesDelivery
 	RefTypeASKB          = AttachRefASKB
+	RefTypeWorkTask      = "work_task"
 )
 
 // CanonicalAttachRef 옛 as_receipt 를 as 로 본다. 40-F

@@ -231,6 +231,36 @@ func WBWorkTypeClass(s string) string {
 	}
 }
 
+const (
+	WorkResultDone     = "done"
+	WorkResultPartial  = "partial"
+	WorkResultHold     = "hold"
+	WorkResultTransfer = "transfer"
+	WorkResultCancel   = "cancel"
+	WorkSourcePartial  = "partial"
+)
+
+func WorkTaskActionStatusLabel(status, resultCode string) string {
+	switch strings.TrimSpace(resultCode) {
+	case WorkResultDone:
+		return "완료"
+	case WorkResultPartial:
+		return "일부완료"
+	case WorkResultHold:
+		return "보류"
+	case WorkResultTransfer:
+		return "이관"
+	case WorkResultCancel:
+		return "취소"
+	case "resume":
+		return "재개"
+	}
+	if strings.TrimSpace(status) == StatusPartialComplete {
+		return "일부완료"
+	}
+	return WBTaskStatusLabel(status)
+}
+
 func WBTaskStatusLabel(s string) string {
 	switch s {
 	case WBTaskWaiting:
@@ -740,6 +770,13 @@ type WorkTask struct {
 	ReplyDueDate     string    `json:"reply_due_date"`
 	NextCheckDate    string    `json:"next_check_date"`
 	CompleteNote     string    `json:"complete_note"`
+	WorkPlace        string    `json:"work_place,omitempty"`         // office|field
+	ActionTaken      string    `json:"action_taken,omitempty"`
+	ResultCode       string    `json:"result_code,omitempty"` // done|partial|hold|transfer|cancel
+	CompleteDatetime string    `json:"complete_datetime,omitempty"`
+	CustomerConfirmer string   `json:"customer_confirmer,omitempty"`
+	HoldNextAction   string    `json:"hold_next_action,omitempty"`
+	TransferTo       string    `json:"transfer_to,omitempty"`
 	ReceiptDate      string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
 	CompleteDate     string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
 	RecurrenceRole   string    `json:"recurrence_role,omitempty"`
@@ -780,6 +817,26 @@ func (m WorkTaskMember) IsOwner() bool   { return m.Role == WBMemberOwner }
 func (m WorkTaskMember) IsSupport() bool { return m.Role == WBMemberSupport }
 
 // AssigneeIsManual 일일 업무에서 사람이 직접 바꾼 담당자. AS 동기화가 덮어쓰지 않는다. §42.3
+// WorkTaskProcess 작업 조치 이력 1행 (95-11).
+type WorkTaskProcess struct {
+	ProcessID    string `json:"process_id"`
+	TaskID       string `json:"task_id"`
+	OrgID        string `json:"org_id"`
+	ProcessAt    string `json:"process_at"`
+	Worker       string `json:"worker"`
+	WorkerUserID string `json:"worker_user_id"`
+	WorkPlace    string `json:"work_place"`
+	ResultCode   string `json:"result_code"`
+	WorkContent  string `json:"work_content"`
+	Note         string `json:"note"`
+	NextDate     string `json:"next_date"`
+	CreatedAt    string `json:"created_at"`
+}
+
+func (p WorkTaskProcess) ResultLabel() string {
+	return WorkTaskActionStatusLabel("", p.ResultCode)
+}
+
 func (t WorkTask) AssigneeIsManual() bool {
 	return strings.TrimSpace(t.AssigneeSource) == WBAssigneeSourceManual
 }
