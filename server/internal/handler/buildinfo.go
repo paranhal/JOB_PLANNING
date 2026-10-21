@@ -116,11 +116,11 @@ func VersionLabel(version string) string {
 	return "v" + v
 }
 
-// VersionNumberLabel 사이드바 상단 표기. 숫자만, 앞에 v 없음. D-103
-func VersionNumberLabel(version string) string {
+// versionNumberForHeader 앞에 v가 있으면 떼고, 빈 값·unknown은 dev.
+func versionNumberForHeader(version string) string {
 	v := strings.TrimSpace(version)
 	if v == "" || strings.EqualFold(v, "unknown") {
-		return "version : dev"
+		return "dev"
 	}
 	if len(v) > 1 && (v[0] == 'v' || v[0] == 'V') {
 		rest := v[1:]
@@ -128,7 +128,24 @@ func VersionNumberLabel(version string) string {
 			v = rest
 		}
 	}
-	return "version : " + v
+	return v
+}
+
+func headerBuiltClock(built string) string {
+	t, ok := parseBuilt(built)
+	if !ok {
+		s := strings.TrimSpace(built)
+		if s == "" || strings.EqualFold(s, "unknown") {
+			return "—"
+		}
+		return s
+	}
+	return t.Format("15:04")
+}
+
+// VersionHeaderLabel 사이드바 상단. 예: version 95-8 · built 20:48
+func VersionHeaderLabel(version, built string) string {
+	return "version " + versionNumberForHeader(version) + " · built " + headerBuiltClock(built)
 }
 
 func injectBuildInfo(data map[string]interface{}) {
@@ -139,7 +156,7 @@ func injectBuildInfo(data map[string]interface{}) {
 	data["BuildCommit"] = commit
 	data["BuildTime"] = built
 	data["VersionLabel"] = VersionLabel(version)
-	data["VersionHeader"] = VersionNumberLabel(version)
+	data["VersionHeader"] = VersionHeaderLabel(version, built)
 	data["AssetQuery"] = AssetQuery()
 	data["BuildBadgeShort"] = badgeShort(version, built)
 	data["BuildBadgeFull"] = badgeFull(version, commit, built)

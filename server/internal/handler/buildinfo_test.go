@@ -92,19 +92,20 @@ func TestBuildBadgeCopyAndCacheBust(t *testing.T) {
 	}
 }
 
-func TestVersionNumberLabel(t *testing.T) {
-	cases := []struct{ in, want string }{
-		{"75", "version : 75"},
-		{"v75", "version : 75"},
-		{"V75", "version : 75"},
-		{" 75 ", "version : 75"},
-		{"", "version : dev"},
-		{"unknown", "version : dev"},
-		{"dev", "version : dev"},
+func TestVersionHeaderLabel(t *testing.T) {
+	cases := []struct{ ver, built, want string }{
+		{"75", "2026-10-19 20:48", "version 75 · built 20:48"},
+		{"v75", "2026-10-19 20:48", "version 75 · built 20:48"},
+		{"V75", "2026-10-19 20:48", "version 75 · built 20:48"},
+		{" 75 ", "2026-10-19 20:48", "version 75 · built 20:48"},
+		{"95-8", "2026-10-20 22:18", "version 95-8 · built 22:18"},
+		{"", "2026-10-19 20:48", "version dev · built 20:48"},
+		{"unknown", "unknown", "version dev · built —"},
+		{"dev", "2026-10-19 20:48", "version dev · built 20:48"},
 	}
 	for _, tc := range cases {
-		if got := VersionNumberLabel(tc.in); got != tc.want {
-			t.Errorf("VersionNumberLabel(%q)=%q want %q", tc.in, got, tc.want)
+		if got := VersionHeaderLabel(tc.ver, tc.built); got != tc.want {
+			t.Errorf("VersionHeaderLabel(%q,%q)=%q want %q", tc.ver, tc.built, got, tc.want)
 		}
 	}
 }
@@ -124,8 +125,8 @@ func TestBaseHTMLUsesInjectedVersion(t *testing.T) {
 	if !strings.Contains(s, `id="app-version"`) || !strings.Contains(s, "font-bold") {
 		t.Fatal("버전 줄이 굵은 글씨가 아니다")
 	}
-	if strings.Contains(s, "version : 75") {
-		t.Fatal("템플릿에 version : 75 가 직접 적혀 있다")
+	if strings.Contains(s, "version : 75") || strings.Contains(s, "version 75 · built") {
+		t.Fatal("템플릿에 버전 문자열이 직접 적혀 있다")
 	}
 	if !strings.Contains(s, "{{.VersionLabel}}") {
 		t.Fatal("사이드바가 VersionLabel 을 쓰지 않는다")
@@ -173,7 +174,7 @@ func TestVersionHeaderBetweenBrandAndNav(t *testing.T) {
 
 	assertOrder := func(t *testing.T, body, ver string) {
 		t.Helper()
-		want := "version : " + ver
+		want := "version " + ver + " · built 20:00"
 		iBrand := strings.Index(body, "Work Management")
 		iVer := strings.Index(body, want)
 		iNav := strings.Index(body, `<nav `)
@@ -185,6 +186,9 @@ func TestVersionHeaderBetweenBrandAndNav(t *testing.T) {
 		}
 		if strings.Count(body, `id="app-version"`) < 1 {
 			t.Fatal("app-version 없음")
+		}
+		if strings.Contains(body, "version : ") {
+			t.Fatal("콜론 형식 version : 이 남아 있다")
 		}
 	}
 
@@ -214,7 +218,7 @@ func TestVersionHeaderBetweenBrandAndNav(t *testing.T) {
 		t.Fatalf("76 status=%d", rec.Code)
 	}
 	assertOrder(t, rec.Body.String(), "76")
-	if strings.Contains(rec.Body.String(), "version : 75") {
+	if strings.Contains(rec.Body.String(), "version 75 ·") {
 		t.Fatal("76인데 75가 남았다")
 	}
 }
