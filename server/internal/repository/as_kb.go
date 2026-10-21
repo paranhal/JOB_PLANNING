@@ -204,10 +204,6 @@ func (r *ASRepo) KBHistory(kbID string) []model.ASKBEntry {
 	return out
 }
 
-func kbOrgSQL() string {
-	return `COALESCE(NULLIF(TRIM(as_kb_entries.org_id),''),(SELECT NULLIF(TRIM(u.org_id),'') FROM users u WHERE u.user_id=as_kb_entries.author_id))`
-}
-
 func (r *ASRepo) resolveKBOrg(in KBWrite, asID string) string {
 	if o := strings.TrimSpace(in.OrgID); o != "" && o != OrgAll {
 		return o
@@ -366,7 +362,7 @@ func (r *ASRepo) listCurrentKB(q, orgID string) ([]model.ASKBEntry, error) {
 		where += ` AND (
 			(TRIM(COALESCE(as_id,''))!='' AND EXISTS (SELECT 1 FROM as_receipts ar WHERE ar.as_id=as_kb_entries.as_id AND ar.org_id=?))
 			OR
-			(TRIM(COALESCE(as_id,''))='' AND ` + kbOrgSQL() + `=?)
+			(TRIM(COALESCE(as_id,''))='' AND TRIM(COALESCE(as_kb_entries.org_id,''))=?)
 		)`
 		args = append(args, orgID, orgID)
 	}

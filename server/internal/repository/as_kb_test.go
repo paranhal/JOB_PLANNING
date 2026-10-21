@@ -200,6 +200,16 @@ func TestSearchKnowledgeIndependentKBO01HiddenFromO03(t *testing.T) {
 	if !findKBHit(own, pub.KBID) {
 		t.Fatal("O01 검색에는 보여야 한다")
 	}
+	if _, err := repo.db.Exec(`UPDATE as_kb_entries SET org_id='' WHERE kb_id=?`, pub.KBID); err != nil {
+		t.Fatal(err)
+	}
+	empty, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: model.OrgIDLibrary, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findKBHit(empty, pub.KBID) {
+		t.Fatal("지식 org_id 가 비면 작성자 소속으로 검색되면 안 된다")
+	}
 }
 
 func TestKBSchemaMigrationFile(t *testing.T) {
