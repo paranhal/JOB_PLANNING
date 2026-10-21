@@ -86,6 +86,7 @@
   .combobox { @apply relative; }
   .combobox-list { @apply menu absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-auto; }
   .combobox-option-on { @apply bg-hover; }
+  .lookup-status { @apply mt-2 rounded-control border border-line bg-surface p-3 text-ui text-ink space-y-2; }
 
   .modal-backdrop { @apply fixed inset-0 z-50 bg-ink/40; }
   .modal-panel { @apply rounded-card border border-line bg-surface p-4; }
