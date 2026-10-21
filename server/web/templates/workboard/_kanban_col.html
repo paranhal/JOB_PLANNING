@@ -17,6 +17,7 @@
       </div>
       <a href="{{.DetailHref}}" class="text-sm font-medium text-gray-800 leading-snug hover:text-blue-700">{{.Title}}</a>
       {{if .ProjectName}}<p class="text-[11px] text-gray-500 mt-1">{{.ProjectName}}</p>{{end}}
+      {{if .SiteLine}}<p class="text-[11px] text-gray-500 mt-1">{{.SiteLine}}</p>{{end}}
       {{if gt .Progress 0}}
       <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div class="h-full bg-blue-500 rounded-full" style="width: {{.Progress}}%"></div>

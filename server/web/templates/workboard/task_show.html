@@ -277,6 +277,12 @@
       <div class="sm:col-span-2"><dt class="text-xs text-gray-500">{{if $isAS}}접수 내용{{else if $isMnt}}점검 내용{{else}}업무 내용{{end}}</dt><dd class="whitespace-pre-wrap">{{$t.Description}}</dd></div>
       {{end}}
       <div><dt class="text-xs text-gray-500">사업명</dt><dd>{{if $t.ProjectName}}{{$t.ProjectName}}{{else}}—{{end}}</dd></div>
+      {{if $isWork}}
+      <div><dt class="text-xs text-gray-500">작업 구분</dt><dd>{{if eq $t.WorkSubtype "build"}}구축{{else if eq $t.WorkSubtype "construction"}}공사{{else if eq $t.WorkSubtype "other"}}기타{{else}}—{{end}}</dd></div>
+      <div class="sm:col-span-2"><dt class="text-xs text-gray-500">대상 사이트</dt>
+        <dd>{{if .WorkSites}}{{range $i, $s := .WorkSites}}{{if $i}}, {{end}}{{$s.SiteName}}{{if $s.ParentName}}({{$s.ParentName}}){{end}}{{if $s.OnProject}} · 사업 대상{{end}}{{end}}{{else}}—{{end}}</dd>
+      </div>
+      {{end}}
       <div><dt class="text-xs text-gray-500">업무 등록일</dt><dd>{{if $t.CreatedAt.IsZero}}—{{else}}{{$t.CreatedAt.Format "2006-01-02"}}{{end}}</dd></div>
       <div><dt class="text-xs text-gray-500">업무 시작일</dt><dd>{{if $t.WorkDate}}{{$t.WorkDate}}{{else}}—{{end}}</dd></div>
       <div><dt class="text-xs text-gray-500">업무 종료일</dt><dd>{{if $t.DueDate}}{{$t.DueDate}}{{else}}—{{end}}</dd></div>
@@ -385,15 +391,25 @@
     {{if $isWork}}
     <div x-data="{
       projectId: '{{$t.ProjectID}}',
-      sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{printf "%q" $s.SiteName}},region:{{printf "%q" $s.Region}}}{{end}}],
-      q: '', cands: [], hint: '두 글자 이상 입력하세요',
+      sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{printf "%q" $s.SiteName}},parent_name:{{printf "%q" $s.ParentName}},region:{{printf "%q" $s.Region}},on_project:{{if $s.OnProject}}true{{else}}false{{end}}}{{end}}],
+      q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
       removeSite(id) { this.sites = this.sites.filter(s => s.site_id !== id); },
-      pick(s) { if (this.sites.find(x => x.site_id === s.site_id)) return; this.sites.push(s); this.q=''; this.cands=[]; },
-      async search() {
-        if (!this.projectId) { this.cands = []; this.hint = '사업을 선택하면 대상 사이트를 고를 수 있습니다'; return; }
-        if ((this.q||'').trim().length < 2) { this.cands = []; this.hint = '두 글자 이상 입력하세요'; return; }
+      pick(s) { if (this.sites.find(x => x.site_id === s.site_id) || this.sites.length >= 20) return; this.sites.push(s); this.q=''; this.cands=[]; },
+      async refreshBadges() {
+        const ids = (this.sites || []).map(s => s.site_id).filter(Boolean);
+        if (!ids.length) return;
         try {
-          const r = await fetch('/workboard/project-sites?project_id=' + encodeURIComponent(this.projectId) + '&q=' + encodeURIComponent(this.q));
+          const r = await fetch('/workboard/work-sites/search?project_id=' + encodeURIComponent(this.projectId || '') + '&selected=' + encodeURIComponent(ids.join(',')));
+          const j = await r.json();
+          const hit = {};
+          (j || []).forEach(h => { hit[h.site_id] = !!h.on_project; });
+          this.sites = this.sites.map(s => Object.assign({}, s, { on_project: !!hit[s.site_id] }));
+        } catch (e) {}
+      },
+      async search() {
+        if ((this.q||'').trim().length < 2) { this.cands = []; this.hint = '학교·기관명을 2글자 이상 입력'; return; }
+        try {
+          const r = await fetch('/workboard/work-sites/search?q=' + encodeURIComponent(this.q) + '&project_id=' + encodeURIComponent(this.projectId || ''));
           const j = await r.json();
           const taken = this.sites.map(s => s.site_id);
           this.cands = (j || []).filter(s => taken.indexOf(s.site_id) < 0);
@@ -402,9 +418,9 @@
       }
     }">
       <label class="block text-sm font-medium text-gray-700 mb-1">사업</label>
-      <select name="project_id" x-model="projectId" @change="sites=[]; cands=[]; search()"
+      <select name="project_id" x-model="projectId" @change="refreshBadges(); search()"
               class="w-full border rounded-lg px-3 py-2">
-        <option value="">— 선택 (해당 시) —</option>
+        {{if not .WorkProjects}}<option value="">— 등록된 사업이 없습니다 —</option>{{else}}<option value="">— 선택 (해당 시) —</option>{{end}}
         {{range .WorkProjects}}
         <option value="{{.ProjectID}}" {{if eq $.Task.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
         {{end}}
@@ -413,17 +429,18 @@
       <template x-for="s in sites" :key="s.site_id">
         <span class="inline-flex items-center gap-1 mr-1 mb-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-900 text-xs border border-emerald-200">
           <input type="hidden" name="site_id" :value="s.site_id">
-          <span x-text="s.site_name"></span>
+          <span x-text="s.site_name + (s.on_project ? ' · 사업 대상' : '')"></span>
           <button type="button" class="text-emerald-700" @click="removeSite(s.site_id)">×</button>
         </span>
       </template>
-      <input type="search" x-model="q" @input="search()" :disabled="!projectId" autocomplete="off"
-             placeholder="학교·기관명 검색" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
-      <p class="text-xs text-gray-500 mt-1" x-text="projectId ? hint : '사업을 선택하면 대상 사이트를 고를 수 있습니다'"></p>
+      <input type="search" x-model="q" @input="search()" autocomplete="off"
+             placeholder="학교·기관명을 2글자 이상 입력" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
+      <p class="text-xs text-gray-500 mt-1" x-text="hint"></p>
       <ul class="mt-1 border rounded-lg overflow-hidden" x-show="cands.length" x-cloak>
         <template x-for="s in cands" :key="s.site_id">
           <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" @click="pick(s)">
             <span x-text="s.site_name"></span>
+            <span class="text-xs text-gray-400" x-text="(s.parent_name ? ' · ' + s.parent_name : '') + (s.region ? ' · ' + s.region : '') + (s.on_project ? ' · 사업 대상' : '')"></span>
           </button></li>
         </template>
       </ul>

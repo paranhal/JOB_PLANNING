@@ -318,7 +318,7 @@
     </form>
 
     <form method="post" action="/workboard/tasks" class="p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
-          x-data="{ memberRows: [], subtype: '', projectId: '', sites: [], q: '', cands: [], hint: '두 글자 이상 입력하세요',
+          x-data="{ memberRows: [], subtype: '', projectId: '', sites: [], q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
             suggestKind() {
               const sel = this.$refs.pwProj;
               const k = sel && sel.selectedOptions[0] ? (sel.selectedOptions[0].dataset.kind || '') : '';
@@ -327,15 +327,25 @@
             },
             removeSite(id) { this.sites = this.sites.filter(s => s.site_id !== id); },
             pick(s) {
-              if (this.sites.find(x => x.site_id === s.site_id)) return;
+              if (this.sites.find(x => x.site_id === s.site_id) || this.sites.length >= 20) return;
               this.sites.push(s); this.q = ''; this.cands = [];
             },
-            async search() {
-              this.projectId = this.$refs.pwProj ? this.$refs.pwProj.value : '';
-              if (!this.projectId) { this.cands = []; this.hint = '사업을 선택하면 대상 사이트를 고를 수 있습니다'; return; }
-              if ((this.q || '').trim().length < 2) { this.cands = []; this.hint = '두 글자 이상 입력하세요'; return; }
+            async refreshBadges() {
+              const ids = (this.sites || []).map(s => s.site_id).filter(Boolean);
+              if (!ids.length) return;
               try {
-                const r = await fetch('/workboard/project-sites?project_id=' + encodeURIComponent(this.projectId) + '&q=' + encodeURIComponent(this.q));
+                const r = await fetch('/workboard/work-sites/search?project_id=' + encodeURIComponent(this.projectId || '') + '&selected=' + encodeURIComponent(ids.join(',')));
+                const j = await r.json();
+                const hit = {};
+                (j || []).forEach(h => { hit[h.site_id] = !!h.on_project; });
+                this.sites = this.sites.map(s => Object.assign({}, s, { on_project: !!hit[s.site_id] }));
+              } catch (e) {}
+            },
+            async search() {
+              this.projectId = this.$refs.pwProj ? this.$refs.pwProj.value : this.projectId;
+              if ((this.q || '').trim().length < 2) { this.cands = []; this.hint = '학교·기관명을 2글자 이상 입력'; return; }
+              try {
+                const r = await fetch('/workboard/work-sites/search?q=' + encodeURIComponent(this.q) + '&project_id=' + encodeURIComponent(this.projectId || ''));
                 const j = await r.json();
                 const taken = this.sites.map(s => s.site_id);
                 this.cands = (j || []).filter(s => taken.indexOf(s.site_id) < 0);
@@ -372,9 +382,9 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">사업</label>
-        <select name="project_id" x-ref="pwProj" x-model="projectId" @change="suggestKind(); sites=[]; cands=[]; search()"
+        <select name="project_id" x-ref="pwProj" x-model="projectId" @change="suggestKind(); refreshBadges(); search()"
                 class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="" data-kind="">— 선택 (해당 시) —</option>
+          {{if not .WorkProjects}}<option value="" data-kind="">— 등록된 사업이 없습니다 —</option>{{else}}<option value="" data-kind="">— 선택 (해당 시) —</option>{{end}}
           {{range .WorkProjects}}<option value="{{.ProjectID}}" data-kind="{{.ProjectKind}}">{{.Name}}</option>{{end}}
         </select>
       </div>
@@ -383,18 +393,18 @@
         <template x-for="s in sites" :key="s.site_id">
           <span class="inline-flex items-center gap-1 mr-1 mb-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-900 text-xs border border-emerald-200">
             <input type="hidden" name="site_id" :value="s.site_id">
-            <span x-text="s.site_name"></span>
+            <span x-text="s.site_name + (s.on_project ? ' · 사업 대상' : '')"></span>
             <button type="button" class="text-emerald-700" @click="removeSite(s.site_id)">×</button>
           </span>
         </template>
-        <input type="search" x-model="q" @input="search()" :disabled="!projectId" autocomplete="off"
-               placeholder="학교·기관명 검색" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
-        <p class="text-xs text-gray-500 mt-1" x-text="projectId ? hint : '사업을 선택하면 대상 사이트를 고를 수 있습니다'"></p>
+        <input type="search" x-model="q" @input="search()" autocomplete="off"
+               placeholder="학교·기관명을 2글자 이상 입력" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
+        <p class="text-xs text-gray-500 mt-1" x-text="hint"></p>
         <ul class="mt-1 border rounded-lg overflow-hidden" x-show="cands.length" x-cloak>
           <template x-for="s in cands" :key="s.site_id">
             <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" @click="pick(s)">
               <span x-text="s.site_name"></span>
-              <span class="text-xs text-gray-400" x-text="s.region ? ' · ' + s.region : ''"></span>
+              <span class="text-xs text-gray-400" x-text="(s.parent_name ? ' · ' + s.parent_name : '') + (s.region ? ' · ' + s.region : '') + (s.on_project ? ' · 사업 대상' : '')"></span>
             </button></li>
           </template>
         </ul>
