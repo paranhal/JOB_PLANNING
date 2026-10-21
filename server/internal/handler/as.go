@@ -39,6 +39,8 @@ type ASHandler struct {
 	kwRepo       *repository.ASKeywordRepo
 	notices      *assignNoticeHook
 	maintRepo    *repository.MaintenanceRepo
+	partsRepo    *repository.ASPartsUsedRepo
+	itemRepo     *repository.SalesItemRepo
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
@@ -986,9 +988,15 @@ func (h *ASHandler) mergeReceiptPhotoData(c echo.Context, as *model.ASReceipt, d
 // Action 조치 전용 화면 — 쓰기 권한 없으면 조회 전용(버튼·저장 숨김)
 func (h *ASHandler) Action(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	var as *model.ASReceipt
+	var err error
+	if draft, ok := c.Get("as_receipt_draft").(*model.ASReceipt); ok && draft != nil {
+		as = draft
+	} else {
+		as, err = h.repo.GetByID(currentOrg(c), id)
+		if err != nil || as == nil {
+			return echo.ErrNotFound
+		}
 	}
 
 	processes, _ := h.processRepo.ListByAS(id)
@@ -1107,6 +1115,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
 		"KeywordField":         model.KWFieldAction,
 	}
+	h.mergeActionPartsData(c, as, data)
 	h.mergeReceiptPhotoData(c, as, data)
 	data["CanEditPhotos"] = false
 	data["CanPromote"] = false
@@ -1119,7 +1128,11 @@ func (h *ASHandler) Action(c echo.Context) error {
 	h.mergeASReportData(c, as, data)
 	h.mergeSupportPageData(c, as, data)
 	data["OfferReport"] = c.QueryParam("report") == "1" && canIssueASReportStatus(as.Status)
-	return c.Render(http.StatusOK, "as/action.html", data)
+	status := http.StatusOK
+	if n, ok := c.Get("as_parts_http").(int); ok && n > 0 {
+		status = n
+	}
+	return c.Render(status, "as/action.html", data)
 }
 
 func (h *ASHandler) mergeActionPhotoData(as *model.ASReceipt, data map[string]interface{}, canEdit bool) {
@@ -1282,6 +1295,24 @@ func (h *ASHandler) Update(c echo.Context) error {
 		if code := actionCauseCatMissingErr(as, causeCats); code != "" {
 			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
 		}
+		partsOn, partRows, partsErr := h.collectASPartsForm(c)
+		if partsErr != nil {
+			c.Set("as_receipt_draft", as)
+			c.Set("as_parts_http", http.StatusBadRequest)
+			c.Set("as_parts_rows", partRows)
+			c.Set("as_parts_enabled", true)
+			c.Set("as_parts_msg", partsErr.Error())
+			return h.Action(c)
+		}
+		if c.FormValue("parts_form") == "1" {
+			if !partsOn {
+				as.PartsUsed = ""
+			} else if len(partRows) > 0 {
+				as.PartsUsed = model.FormatPartsUsedSummary(partRows)
+			}
+			c.Set("as_parts_apply", partsOn)
+			c.Set("as_parts_rows", partRows)
+		}
 
 		if formResult != "" {
 			if formResult == model.ResultTransfer {
@@ -1377,10 +1408,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 		h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)
 	}
 	h.saveKeywordChecks(c, as.ASID, model.KWFieldAction)
+	var procID string
 	if canProcessAS(c) {
-		_ = h.appendActionProcess(c, as, formResult, prepNotes, timeSpent)
+		procID, _ = h.appendActionProcess(c, as, formResult, prepNotes, timeSpent)
+		h.applyASPartsSave(c, as.ASID, procID)
 		if applyOut != nil {
-			// 하부업무 담당자(폼) — 미입력 시 Create가 원 접수 담당자를 초기값으로만 복사
 			workTo, workUID := resolveAssigneeFormFields(c, h.userRepo,
 				"work_assigned_to_code", "work_assigned_to_custom", "work_assigned_to")
 			for _, d := range applyOut.WorkItems {
@@ -1663,11 +1695,11 @@ func actionResultLabel(code string) string {
 }
 
 // appendActionProcess 조치 폼 저장 내용을 처리 이력으로 남긴다. 회차별 결과·사유는 컬럼에 보존한다.
-func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, result, prepNotes string, timeSpent int) error {
+func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, result, prepNotes string, timeSpent int) (string, error) {
 	action := strings.TrimSpace(as.ActionTaken)
 	result = strings.TrimSpace(result)
 	if action == "" && result == "" {
-		return nil
+		return "", nil
 	}
 	content := action
 	if content == "" {
@@ -1727,7 +1759,10 @@ func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, res
 		ProcessDatetime: time.Now(),
 	}
 	h.stampActedBy(c, p, as)
-	return h.processRepo.Create(p)
+	if err := h.processRepo.Create(p); err != nil {
+		return "", err
+	}
+	return p.ProcessID, nil
 }
 
 func (h *ASHandler) stampActedBy(c echo.Context, p *model.ASProcess, as *model.ASReceipt) {
@@ -1785,7 +1820,7 @@ func (h *ASHandler) Hold(c echo.Context) error {
 	as.Status = "hold"
 	as.HoldReason = reason
 	as.HoldNextAction = next
-	_ = h.appendActionProcess(c, as, model.ResultHold, "", h.actionDurationMin(id))
+	_, _ = h.appendActionProcess(c, as, model.ResultHold, "", h.actionDurationMin(id))
 	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
 }
 

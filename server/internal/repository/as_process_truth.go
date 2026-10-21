@@ -65,7 +65,13 @@ func asCauseTypeSQL(alias string) string {
 }
 
 func asPartsUsedSQL(alias string) string {
-	return asLatestProcessColSQL(alias, "parts_used", "parts_used")
+	// 최신 이력 행의 parts_used를 그대로 쓴다(빈 칸 포함). 비어 있지 않은 옛 이력을
+	// 끌어오면 자재 사용 해제 저장이 화면·목록에 다시 나타난다.
+	return `COALESCE((
+		SELECT p.parts_used FROM as_processes p
+		 WHERE p.as_id = ` + alias + `.as_id
+		 ORDER BY p.process_datetime DESC, p.process_id DESC LIMIT 1
+	), ` + alias + `.parts_used)`
 }
 
 func asResultCodeSQL(alias string) string {
@@ -148,9 +154,7 @@ func overlayProcessActionFields(as *model.ASReceipt, procs []model.ASProcess) {
 	if s := pick(func(p model.ASProcess) string { return p.CauseType }); s != "" {
 		as.CauseType = s
 	}
-	if s := pick(func(p model.ASProcess) string { return p.PartsUsed }); s != "" {
-		as.PartsUsed = s
-	}
+	as.PartsUsed = procs[len(procs)-1].PartsUsed
 	if s := pick(func(p model.ASProcess) string { return p.ResultCode }); s != "" {
 		as.ResultCode = s
 	}

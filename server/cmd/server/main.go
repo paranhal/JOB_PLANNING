@@ -382,6 +382,7 @@ func main() {
 	as.POST("/kb/:kb_id/archive", h.AS.ArchiveKnowledge, processAS)
 	as.GET("/similar", h.AS.Similar)
 	as.GET("/keywords/suggest", h.AS.KeywordSuggest)
+	as.GET("/parts-suggest", h.AS.SuggestParts)
 	as.GET("/keywords", h.AS.KeywordList)
 	as.POST("/keywords", h.AS.KeywordCreate)
 	as.POST("/keywords/rebuild", h.AS.KeywordRebuild)

@@ -156,6 +156,8 @@ func New(db *sql.DB) *Handler {
 			kwRepo:     repository.NewASKeywordRepo(db),
 			notices:    noticeHook,
 			maintRepo:  maintRepo,
+			partsRepo:  repository.NewASPartsUsedRepo(db),
+			itemRepo:   repository.NewSalesItemRepo(db),
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,
