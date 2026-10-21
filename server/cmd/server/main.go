@@ -671,6 +671,7 @@ func main() {
 	wb.GET("/kanban", h.Workboard.Kanban)
 	wb.GET("/tasks", h.Workboard.List)
 	wb.GET("/register", h.Workboard.Register)
+	wb.GET("/as-lookup", h.Workboard.LookupRegisterAS)
 	wb.POST("/register/kanban-move", h.Workboard.RegisterKanbanMove)
 	wb.POST("/register/unlock-past", h.Workboard.UnlockPastRegister, adminOnly)
 	wb.GET("/mnt-month-hint", h.Workboard.MntMonthHint)

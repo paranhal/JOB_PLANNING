@@ -410,6 +410,142 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	})
 }
 
+const (
+	hintASLookupMinQ = "두 글자 이상 입력하세요"
+	msgASLookupNone  = "AS가 존재하지 않습니다."
+	msgASLookupPlace = "이미 일일업무로 등록된 AS입니다"
+)
+
+type asRegisterLookupItem struct {
+	ASID     string `json:"as_id"`
+	Number   string `json:"as_number"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Kind     string `json:"kind"`
+	Placed   bool   `json:"placed"`
+	TaskID   string `json:"task_id,omitempty"`
+	TaskHref string `json:"task_href,omitempty"`
+	Assignee string `json:"assignee,omitempty"`
+	When     string `json:"when,omitempty"`
+	ASHref   string `json:"as_href"`
+}
+
+func asRegisterClosed(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "completed", "closed", "cancelled", "admin_work":
+		return true
+	default:
+		return false
+	}
+}
+
+func formatASLookupWhen(t model.WorkTask) string {
+	d := strings.TrimSpace(t.WorkDate)
+	st, en := strings.TrimSpace(t.StartTime), strings.TrimSpace(t.EndTime)
+	if st != "" && en != "" {
+		return d + " " + st + "–" + en
+	}
+	if st != "" {
+		return d + " " + st
+	}
+	return d
+}
+
+// LookupRegisterAS 일일업무 등록 AS 검색의 이유 안내. 95-7
+func (h *WorkboardHandler) LookupRegisterAS(c echo.Context) error {
+	q := strings.TrimSpace(c.QueryParam("q"))
+	org := currentOrg(c)
+	canCreate := canReceiveAS(c)
+	resp := map[string]any{
+		"kind":       "missing",
+		"hint":       "",
+		"can_create": canCreate,
+		"new_href":   "/as/new",
+		"items":      []asRegisterLookupItem{},
+	}
+	if len([]rune(q)) < 2 {
+		resp["kind"] = "short"
+		resp["hint"] = hintASLookupMinQ
+		return c.JSON(http.StatusOK, resp)
+	}
+	if org == "" {
+		resp["kind"] = "missing"
+		resp["hint"] = msgASLookupNone
+		return c.JSON(http.StatusOK, resp)
+	}
+	hits, err := h.asRepo.LookupForRegister(org, q, 20)
+	if err != nil {
+		return err
+	}
+	ids := make([]string, 0, len(hits))
+	for _, h0 := range hits {
+		ids = append(ids, h0.ASID)
+	}
+	placed, err := h.repo.LatestPlacedASTasks(ids)
+	if err != nil {
+		return err
+	}
+	var items []asRegisterLookupItem
+	openN, placedN, closedN := 0, 0, 0
+	for _, hit := range hits {
+		it := asRegisterLookupItem{
+			ASID:   hit.ASID,
+			Number: hit.ASNumber,
+			Name:   hit.OrgName,
+			Status: hit.Status,
+			ASHref: "/as/" + hit.ASID,
+		}
+		if t, ok := placed[hit.ASID]; ok {
+			it.Placed = true
+			it.Kind = "placed"
+			it.TaskID = t.TaskID
+			it.TaskHref = "/workboard/tasks/" + t.TaskID
+			it.Assignee = t.Assignee
+			if it.Assignee == "" {
+				it.Assignee = hit.AssignedTo
+			}
+			it.When = formatASLookupWhen(t)
+			placedN++
+		} else if asRegisterClosed(hit.Status) {
+			it.Kind = "closed"
+			closedN++
+		} else {
+			it.Kind = "open"
+			openN++
+		}
+		items = append(items, it)
+	}
+	if openN > 0 {
+		resp["kind"] = "ok"
+		resp["items"] = items
+		return c.JSON(http.StatusOK, resp)
+	}
+	if placedN > 0 {
+		resp["kind"] = "placed"
+		resp["hint"] = msgASLookupPlace
+		resp["items"] = items
+		return c.JSON(http.StatusOK, resp)
+	}
+	if closedN > 0 {
+		resp["kind"] = "closed"
+		resp["hint"] = "완료된 AS입니다"
+		resp["items"] = items
+		return c.JSON(http.StatusOK, resp)
+	}
+	resp["kind"] = "missing"
+	resp["hint"] = msgASLookupNone
+	if h.customerRepo != nil {
+		ids, err := h.customerRepo.ExactCustomerIDsByOrgName(org, q)
+		if err != nil {
+			return err
+		}
+		if len(ids) == 1 {
+			resp["new_href"] = "/as/new?customer_id=" + url.QueryEscape(ids[0])
+		}
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
 // normalizeAssigneeFilter 빈 값·all·팀전체 → 팀전체(필터 없음).
 func normalizeAssigneeFilter(raw string) string {
 	s := strings.TrimSpace(raw)
