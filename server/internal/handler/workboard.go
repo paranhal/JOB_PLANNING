@@ -2185,6 +2185,24 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 			canAction = canViewSales(c)
 		}
 	}
+	pwPartsN, pwAttN := 0, 0
+	if t.WorkType == model.WBWorkProjectWork {
+		_ = h.repo.LoadTaskActionFields(t)
+		actionHref = projectWorkActionPath(t.TaskID)
+		actionLabel = "조치 화면 열기"
+		canAction = true
+		if parts, err := h.repo.ListWorkTaskParts(t.OrgID, t.TaskID); err == nil {
+			pwPartsN = len(parts)
+		}
+		if h.attach != nil && h.attach.repo != nil {
+			if atts, err := h.attach.repo.ListByRef(model.RefTypeWorkTask, t.TaskID); err == nil {
+				pwAttN = len(atts)
+			}
+		}
+		if strings.TrimSpace(t.CompleteDatetime) != "" {
+			completeLocal = t.CompleteDatetime
+		}
+	}
 	var parent *model.WorkTask
 	if t.ParentTaskID != "" {
 		parent, _ = h.repo.GetTask(t.ParentTaskID)
@@ -2258,6 +2276,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"BackURL":        back,
 		"Subtasks":       subtasks,
 		"CanAddSubtask":  canWrite && t.SourceType == "" && t.RecurrenceRole != model.RecurrenceRoleOccurrence && h.repo.CanAttachSubtask(t.TaskID) == nil,
+		"PWPartsCount":   pwPartsN,
+		"PWAttachCount":  pwAttN,
+		"PWStatusLabel":  model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
 	}
 	sel := map[string]bool{}
 	for _, a := range t.LinkedAssets {

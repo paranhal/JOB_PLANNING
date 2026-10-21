@@ -42,6 +42,9 @@
       {{if and $isMnt .CanAction .ActionHref}}
       <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-700 text-white rounded-lg">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치{{end}}</a>
       {{end}}
+      {{if and $isWork (not .EditMode) .ActionHref}}
+      <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="btn btn-primary">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치 화면 열기{{end}}</a>
+      {{end}}
       {{if and $isMnt .SourceHref}}
       <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-sky-300 text-sky-800 rounded-lg hover:bg-sky-50">연간 일정</a>
       {{end}}
@@ -55,7 +58,7 @@
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">수정</a>
       {{end}}
       {{if .EditMode}}
-      <a href="/workboard/tasks/{{$t.TaskID}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}"
+      <a href="{{if $isWork}}/workboard/tasks/{{$t.TaskID}}/action{{else}}/workboard/tasks/{{$t.TaskID}}{{end}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}"
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">조치</a>
       {{end}}
       {{if and (not .EditMode) .CanConvertSales .ConvertSalesHref}}
@@ -129,7 +132,7 @@
       {{end}}
     </ul>
     {{end}}
-    {{if and $.CanWrite (eq $.OpenSubtasks 0)}}
+    {{if and $.CanWrite (eq $.OpenSubtasks 0) (not $isWork)}}
     <form method="post" action="/workboard/tasks/{{$t.TaskID}}/complete-remaining" class="space-y-2 pt-1">
       <input type="hidden" name="complete_parent" value="1">
       <input type="hidden" name="back" value="{{if $.BackURL}}{{$.BackURL}}{{else}}/workboard/tasks/{{$t.TaskID}}{{end}}">
@@ -219,6 +222,26 @@
       <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
         <div class="h-full bg-violet-500 rounded-full" style="width: {{if $t.Progress}}{{$t.Progress}}{{else}}0{{end}}%"></div>
       </div>
+    </div>
+  </div>
+  {{end}}
+
+  {{if and $isWork (not .EditMode)}}
+  <div class="card overflow-hidden">
+    <div class="border-b border-line px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <h3 class="text-ui font-semibold text-ink">작업 조치 요약</h3>
+        {{if .PWStatusLabel}}<span class="badge">{{.PWStatusLabel}}</span>{{end}}
+      </div>
+      {{if .ActionHref}}
+      <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="text-ui text-brand hover:underline">조치 화면 열기 →</a>
+      {{end}}
+    </div>
+    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-ui">
+      <div class="sm:col-span-2"><p class="text-ui-sm text-ink-muted mb-1">조치 내용</p><p class="whitespace-pre-line">{{if $t.ActionTaken}}{{$t.ActionTaken}}{{else}}—{{end}}</p></div>
+      <div><p class="text-ui-sm text-ink-muted">완료 일시</p><p>{{if $t.CompleteDatetime}}{{$t.CompleteDatetime}}{{else}}—{{end}}</p></div>
+      <div><p class="text-ui-sm text-ink-muted">자재</p><p>{{.PWPartsCount}}건</p></div>
+      <div><p class="text-ui-sm text-ink-muted">첨부</p><p>{{.PWAttachCount}}건</p></div>
     </div>
   </div>
   {{end}}

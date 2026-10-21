@@ -573,7 +573,7 @@ func (r *ProjectRepo) MatchProjectWork(projectID string, limit int) ([]model.Pro
 	}
 	q := `
 		SELECT task_id, '', COALESCE(work_date, due_date,''), '',
-			COALESCE(title,''), COALESCE(status,''), ''
+			COALESCE(title,''), COALESCE(status,''), COALESCE(result_code,'')
 		FROM work_tasks
 		WHERE project_id=? AND work_type=?
 		ORDER BY COALESCE(work_date, due_date) DESC, title`
@@ -590,13 +590,13 @@ func (r *ProjectRepo) MatchProjectWork(projectID string, limit int) ([]model.Pro
 	var out []model.ProjectMatchRow
 	for rows.Next() {
 		var m model.ProjectMatchRow
-		var dummy string
-		if err := rows.Scan(&m.ID, &m.Number, &m.Date, &m.OrgName, &m.Title, &m.Status, &dummy); err != nil {
+		var resultCode string
+		if err := rows.Scan(&m.ID, &m.Number, &m.Date, &m.OrgName, &m.Title, &m.Status, &resultCode); err != nil {
 			return nil, 0, err
 		}
 		m.Number = m.ID
-		m.Href = "/workboard/tasks/" + m.ID
-		m.StatusLabel = model.WBTaskStatusLabel(m.Status)
+		m.Href = "/workboard/tasks/" + m.ID + "/action"
+		m.StatusLabel = model.WorkTaskActionStatusLabel(m.Status, resultCode)
 		out = append(out, m)
 	}
 	return out, total, rows.Err()

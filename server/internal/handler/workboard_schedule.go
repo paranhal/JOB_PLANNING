@@ -129,6 +129,10 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 	if card.SourceHref == "" {
 		card.SourceHref = "/workboard/tasks/" + t.TaskID
 	}
+	if t.WorkType == model.WBWorkProjectWork && t.TaskID != "" {
+		card.ActionHref = projectWorkActionPath(t.TaskID)
+		card.StatusLabel = model.WorkTaskActionStatusLabel(t.Status, t.ResultCode)
+	}
 	return card
 }
 
