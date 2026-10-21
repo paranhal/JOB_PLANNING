@@ -22,6 +22,20 @@ func applyWorkTaskActionV79(db *sql.DB) {
 	}
 }
 
+func applyWorkTaskActionExtraV80(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	up, err := workTaskActionExtraMigrationSQL()
+	if err != nil {
+		log.Printf("080 work_task_action_extra: %v", err)
+		return
+	}
+	if err := execSQLIgnoreDupCol(db, up); err != nil {
+		log.Printf("080 work_task_action_extra apply: %v", err)
+	}
+}
+
 func workTaskActionMigrationSQL() (string, error) {
 	for _, p := range workGroupSQLPaths("079_work_task_action.sql") {
 		b, err := os.ReadFile(p)
@@ -40,6 +54,16 @@ func workTaskActionDownSQL() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("079_work_task_action.down.sql 없음")
+}
+
+func workTaskActionExtraMigrationSQL() (string, error) {
+	for _, p := range workGroupSQLPaths("080_work_task_action_extra.sql") {
+		b, err := os.ReadFile(p)
+		if err == nil && len(b) > 0 {
+			return string(b), nil
+		}
+	}
+	return "", fmt.Errorf("080_work_task_action_extra.sql 없음")
 }
 
 func workTaskActionSQLHasSeedInsert(sqlText string) bool {

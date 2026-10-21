@@ -15,6 +15,7 @@ type WorkTaskSite struct {
 	SiteName      string `json:"site_name"`
 	ParentName    string `json:"parent_name,omitempty"`
 	Region        string `json:"region,omitempty"`
+	Phone         string `json:"phone,omitempty"`
 	OnProject     bool   `json:"on_project"`
 	ProjectSiteID string `json:"-"`
 }
@@ -92,6 +93,7 @@ func (r *WBRepo) ListTaskSites(taskID string) ([]WorkTaskSite, error) {
 	rows, err := r.db.Query(`
 		SELECT w.customer_id, c.org_name, COALESCE(p.org_name,''),
 		       COALESCE(NULLIF(TRIM(c.addr_sigungu),''), COALESCE(c.addr_sido,'')),
+		       COALESCE(c.main_phone,''),
 		       COALESCE(w.project_site_id,''),
 		       CASE WHEN TRIM(COALESCE(t.project_id,'')) != '' AND EXISTS (
 		         SELECT 1 FROM project_sites ps
@@ -112,7 +114,7 @@ func (r *WBRepo) ListTaskSites(taskID string) ([]WorkTaskSite, error) {
 	for rows.Next() {
 		var it WorkTaskSite
 		var on int
-		if err := rows.Scan(&it.CustomerID, &it.SiteName, &it.ParentName, &it.Region, &it.ProjectSiteID, &on); err != nil {
+		if err := rows.Scan(&it.CustomerID, &it.SiteName, &it.ParentName, &it.Region, &it.Phone, &it.ProjectSiteID, &on); err != nil {
 			return nil, err
 		}
 		it.SiteID = it.CustomerID
@@ -343,18 +345,15 @@ func (r *WBRepo) SyncSitesOnProjectWorkComplete(t *model.WorkTask, userID string
 	return pe.applyBulkSiteStatus(t.ProjectID, userID, model.WorkCompleteSiteStatus(), eventDate, note, "ui", ids)
 }
 
+// ListWorkPickProjects 작업 폼 사업 후보. 95-9A Q3: 조직과 무관하게 취소·종료가 아닌 계약 사업, 구축·공사 우선.
 func (r *WBRepo) ListWorkPickProjects(orgID string) ([]model.WorkProject, error) {
-	orgID = strings.TrimSpace(orgID)
-	if orgID == "" || orgID == OrgAll {
-		return nil, nil
-	}
+	_ = orgID
 	rows, err := r.db.Query(`
 		SELECT p.project_id, p.name, COALESCE(p.project_kind,''), COALESCE(p.status,'active')
 		FROM work_projects p
-		WHERE TRIM(COALESCE(p.org_id,''))=?
-		  AND COALESCE(p.status,'') NOT IN ('archived','complete')
+		WHERE COALESCE(p.status,'') NOT IN ('archived','complete','cancelled')
 		ORDER BY CASE COALESCE(p.project_kind,'')
-			WHEN 'build' THEN 0 WHEN 'construction' THEN 1 ELSE 2 END, p.name`, orgID)
+			WHEN 'build' THEN 0 WHEN 'construction' THEN 1 ELSE 2 END, p.name`)
 	if err != nil {
 		return nil, err
 	}

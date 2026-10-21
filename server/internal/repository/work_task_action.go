@@ -19,10 +19,12 @@ func (r *WBRepo) LoadTaskActionFields(t *model.WorkTask) error {
 	err := r.db.QueryRow(`
 		SELECT COALESCE(work_place,''), COALESCE(action_taken,''), COALESCE(result_code,''),
 		       COALESCE(complete_datetime,''), COALESCE(customer_confirmer,''),
-		       COALESCE(hold_next_action,''), COALESCE(transfer_to,'')
+		       COALESCE(hold_next_action,''), COALESCE(transfer_to,''),
+		       COALESCE(target_category_id,''), COALESCE(work_reason,'')
 		FROM work_tasks WHERE task_id=? AND org_id=?`, t.TaskID, t.OrgID).
 		Scan(&t.WorkPlace, &t.ActionTaken, &t.ResultCode, &t.CompleteDatetime,
-			&t.CustomerConfirmer, &t.HoldNextAction, &t.TransferTo)
+			&t.CustomerConfirmer, &t.HoldNextAction, &t.TransferTo,
+			&t.TargetCategoryID, &t.WorkReason)
 	if err == sql.ErrNoRows {
 		return nil
 	}
@@ -45,13 +47,15 @@ func (r *WBRepo) SaveTaskActionFields(t *model.WorkTask) error {
 			work_place=?, action_taken=?, result_code=?, complete_datetime=?,
 			customer_confirmer=?, hold_reason=?, hold_next_action=?, transfer_to=?,
 			cancel_reason=?, status=?, complete_date=?, complete_note=?,
-			work_date=?, progress=?,
+			work_date=?, progress=?, work_subtype=?,
+			target_category_id=?, work_reason=?,
 			assignee=?, assignee_user_id=?, updated_at=datetime('now','localtime')
 		WHERE task_id=? AND org_id=?`,
 		t.WorkPlace, t.ActionTaken, t.ResultCode, t.CompleteDatetime,
 		t.CustomerConfirmer, t.HoldReason, t.HoldNextAction, t.TransferTo,
 		t.CancelReason, t.Status, t.CompleteDate, t.CompleteNote,
-		t.WorkDate, t.Progress,
+		t.WorkDate, t.Progress, t.WorkSubtype,
+		t.TargetCategoryID, t.WorkReason,
 		t.Assignee, t.AssigneeUserID, t.TaskID, orgID)
 	return err
 }
