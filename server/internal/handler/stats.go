@@ -30,6 +30,22 @@ func NewStatsHandler(repo *repository.StatsRepo, userRepo *repository.UserRepo, 
 	return &StatsHandler{repo: repo, userRepo: userRepo, wbRepo: wbRepo, workBoard: workBoard, mntRepo: mntRepo}
 }
 
+func canWriteCompanyWeekly(c echo.Context) bool {
+	if isReadOnly(c) || viewAsActive(c) || currentRole(c) == model.RoleCLevel {
+		return false
+	}
+	if !model.IsAdminGrade(currentRole(c)) {
+		return false
+	}
+	org, err := resolveInsertOrg(c)
+	return err == nil && org != "" && org != repository.OrgAll
+}
+
+func companyWeeklyOrgSelected(c echo.Context) bool {
+	org := currentOrg(c)
+	return org != "" && org != repository.OrgAll
+}
+
 func metricsViewData(repo *repository.StatsRepo) (base string) {
 	if repo == nil {
 		return ""
@@ -99,10 +115,29 @@ func statsMetricLabel(m string) string {
 }
 
 func statsScopeLabel(s string) string {
+	return statsScopeLabelOrg("", s)
+}
+
+func statsScopeLabelOrg(orgName, s string) string {
 	if s == model.StatsScopeAssignee {
 		return "담당자별"
 	}
-	return "도서관사업팀 전체"
+	orgName = strings.TrimSpace(orgName)
+	if orgName == "" || orgName == "전체 조직" {
+		return "전체 조직"
+	}
+	return orgName + " 전체"
+}
+
+func currentOrgName(c echo.Context) string {
+	id := currentOrg(c)
+	if id == "" || id == repository.OrgAll {
+		return "전체 조직"
+	}
+	if n := strings.TrimSpace(ctxString(c, "org_name")); n != "" && strings.TrimSpace(ctxString(c, "org_id")) == id {
+		return n
+	}
+	return orgViewLabel(c, nil)
 }
 
 func statsPeriodLabel(p string) string {
@@ -478,7 +513,7 @@ func (h *StatsHandler) List(c echo.Context) error {
 		{model.StatsMetricOverdue, "지연"},
 	}
 	scopeOptions := []struct{ Value, Label string }{
-		{model.StatsScopeTeam, "도서관사업팀 전체"},
+		{model.StatsScopeTeam, statsScopeLabelOrg(currentOrgName(c), model.StatsScopeTeam)},
 		{model.StatsScopeAssignee, "담당자별"},
 	}
 
@@ -491,7 +526,7 @@ func (h *StatsHandler) List(c echo.Context) error {
 		"MetricLabel":     statsMetricLabel(q.Metric),
 		"MetricOptions":   metricOptions,
 		"Scope":           q.Scope,
-		"ScopeLabel":      statsScopeLabel(q.Scope),
+		"ScopeLabel":      statsScopeLabelOrg(currentOrgName(c), q.Scope),
 		"ScopeOptions":    scopeOptions,
 		"Period":          q.Period,
 		"PeriodLabel":     statsPeriodLabel(q.Period),

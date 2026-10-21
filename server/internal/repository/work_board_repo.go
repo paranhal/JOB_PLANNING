@@ -907,7 +907,8 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		       COALESCE(ar.urgency,''), COALESCE(ar.receipt_group_id,''),
 		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,''),
 		       COALESCE(ar.schedule_confirmed,0),
-		       COALESCE(ar.assigned_at,''), COALESCE(ar.assigned_by,'')
+		       COALESCE(ar.assigned_at,''), COALESCE(ar.assigned_by,''),
+		       COALESCE(NULLIF(TRIM(ar.org_id),''), COALESCE(c.org_id,''))
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		WHERE ` + extraWhere
@@ -927,7 +928,7 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		var it model.WorkListItem
 		var status string
 		var confirmed int
-		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID, &it.CustomerID, &it.ProjectID, &confirmed, &it.AssignedAt, &it.AssignedBy); err != nil {
+		if err := rows.Scan(&it.RefID, &it.RefNumber, &it.OrgName, &it.Title, &it.Assignee, &it.ScheduledDate, &status, &it.Urgency, &it.ReceiptGroupID, &it.CustomerID, &it.ProjectID, &confirmed, &it.AssignedAt, &it.AssignedBy, &it.OrgID); err != nil {
 			return nil, err
 		}
 		it.Content = it.Title
@@ -950,7 +951,8 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 		       COALESCE(w.scheduled_date,''), w.status,
 		       COALESCE(w.confirm_target,''), COALESCE(w.notes,''), ar.as_number,
 		       COALESCE(ar.customer_id,''), COALESCE(ar.project_id,''),
-		       COALESCE(w.schedule_confirmed,0), COALESCE(d.support_type,'')
+		       COALESCE(w.schedule_confirmed,0), COALESCE(d.support_type,''),
+		       COALESCE(NULLIF(TRIM(ar.org_id),''), COALESCE(c.org_id,''))
 		FROM as_work_items w
 		JOIN as_receipts ar ON ar.as_id = w.as_id
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -974,7 +976,7 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 		var kind, asID, target, notes, asNum, supportType string
 		var confirmed int
 		if err := rows.Scan(&it.RefID, &it.RefNumber, &kind, &asID, &it.OrgName,
-			&it.Assignee, &it.ScheduledDate, &it.Status, &target, &notes, &asNum, &it.CustomerID, &it.ProjectID, &confirmed, &supportType); err != nil {
+			&it.Assignee, &it.ScheduledDate, &it.Status, &target, &notes, &asNum, &it.CustomerID, &it.ProjectID, &confirmed, &supportType, &it.OrgID); err != nil {
 			return nil, err
 		}
 		it.Tentative = confirmed == 0
@@ -1039,7 +1041,8 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		       COALESCE(mv.entry_category,''), mv.plan_id,
 		       COALESCE(mv.completed,0), COALESCE(mv.assignee,''), COALESCE(mv.product_type,''),
 		       mv.customer_id, COALESCE(mv.project_id,''),
-		       COALESCE(mv.assigned_at,''), COALESCE(mv.assigned_by,'')
+		       COALESCE(mv.assigned_at,''), COALESCE(mv.assigned_by,''),
+		       COALESCE(c.org_id,'')
 		FROM maintenance_visits mv
 		JOIN customers c ON c.customer_id = mv.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = mv.customer_id
@@ -1060,7 +1063,7 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		var planID, cat, product string
 		var completed int
 		if err := rows.Scan(&it.RefID, &it.ScheduledDate, &it.Title, &it.OrgName, &cat, &planID,
-			&completed, &it.Assignee, &product, &it.CustomerID, &it.ProjectID, &it.AssignedAt, &it.AssignedBy); err != nil {
+			&completed, &it.Assignee, &product, &it.CustomerID, &it.ProjectID, &it.AssignedAt, &it.AssignedBy, &it.OrgID); err != nil {
 			return nil, err
 		}
 		it.Prefix = model.WorkPrefixMaintenance
@@ -1132,7 +1135,8 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), COALESCE(p.short_name, p.name, '')),
 		       COALESCE(t.source_type,''), COALESCE(t.customer_id,''), COALESCE(t.project_id,''), COALESCE(t.description,''),
 		       COALESCE(t.assigned_at,''), COALESCE(t.assigned_by,''),
-		       COALESCE(t.source_id,''), COALESCE(sa.sales_id,''), COALESCE(sa.activity_type,'')
+		       COALESCE(t.source_id,''), COALESCE(sa.sales_id,''), COALESCE(sa.activity_type,''),
+		       COALESCE(t.org_id,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
@@ -1156,7 +1160,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 	for rows.Next() {
 		var it model.WorkListItem
 		var workType, sourceType, sourceID, salesID, actType string
-		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType, &it.CustomerID, &it.ProjectID, &it.Content, &it.AssignedAt, &it.AssignedBy, &sourceID, &salesID, &actType); err != nil {
+		if err := rows.Scan(&it.RefID, &it.WorkDate, &it.DueDate, &it.Title, &it.Assignee, &it.Status, &workType, &it.OrgName, &sourceType, &it.CustomerID, &it.ProjectID, &it.Content, &it.AssignedAt, &it.AssignedBy, &sourceID, &salesID, &actType, &it.OrgID); err != nil {
 			return nil, err
 		}
 		it.ScheduledDate = it.WorkDate

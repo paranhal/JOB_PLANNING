@@ -294,6 +294,12 @@ func (h *MeetingHandler) filterMeetingOrg(c echo.Context, items []model.WorkList
 	}
 	var out []model.WorkListItem
 	for _, it := range items {
+		if oid := strings.TrimSpace(it.OrgID); oid != "" {
+			if oid == org {
+				out = append(out, it)
+			}
+			continue
+		}
 		a := strings.TrimSpace(it.Assignee)
 		if foreign[a] {
 			continue

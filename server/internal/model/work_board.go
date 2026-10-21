@@ -104,6 +104,7 @@ type WorkListItem struct {
 	RefID          string `json:"ref_id"`
 	RefNumber      string `json:"ref_number"`
 	Title          string `json:"title"`
+	OrgID          string `json:"org_id,omitempty"`
 	OrgName        string `json:"org_name"`
 	Assignee       string `json:"assignee"`
 	ScheduledDate  string `json:"scheduled_date"`
