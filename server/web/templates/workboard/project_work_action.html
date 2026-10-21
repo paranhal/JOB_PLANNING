@@ -1,332 +1,486 @@
 {{define "title"}}{{.Title}} · {{appName}}{{end}}
 {{define "content"}}
-<div id="as-action-shell" class="as-action-shell" x-data="{ holdOpen: false, transferOpen: false, cancelOpen: false }">
+<div id="as-action-shell" class="as-action-shell">
   <header id="as-action-header" class="as-action-header">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <p class="text-ui-sm font-medium text-brand">[작업] 조치</p>
-        <div class="flex items-center gap-2 flex-wrap mt-1">
-          <h2 class="text-xl font-bold text-ink">{{.Task.Title}}</h2>
-          <span class="badge">{{.SubtypeLabel}}</span>
-          <span class="badge">{{.StatusLabel}}</span>
+      <div class="flex items-center gap-3">
+        <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="btn" title="뒤로">←</a>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-bold text-ink font-mono">{{.Task.TaskID}}</h2>
+            <span class="badge">조치</span>
+            <span class="badge">{{.StatusLabel}}</span>
+          </div>
+          <p class="text-ui-sm text-ink-muted mt-1">{{.ProjectName}} · 일일업무 <span class="font-mono">{{.Task.TaskID}}</span></p>
+          {{if .CanProcess}}
+          <details class="mt-2 text-ui-sm" {{if eq .ActionErr "project"}}open{{end}}>
+            <summary class="cursor-pointer text-brand">▸ 사업 연결·변경</summary>
+            <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/project" class="mt-2 flex flex-wrap gap-2 items-end">
+              <input type="hidden" name="back" value="{{.BackURL}}">
+              <div class="min-w-[12rem] flex-1">
+                <label class="label">사업</label>
+                <input type="search" id="pw-project-filter" class="input mb-1" placeholder="사업명으로 걸러 보기" autocomplete="off">
+                <select name="project_id" id="pw-project-select" class="input">
+                  <option value="">연결 해제</option>
+                  {{range .Projects}}
+                  <option value="{{.ProjectID}}" {{if eq $.Task.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <button class="btn btn-primary" {{if .ReadOnly}}disabled{{end}}>연결</button>
+              <button class="btn" name="project_id" value="" {{if .ReadOnly}}disabled{{end}}>연결 해제</button>
+            </form>
+          </details>
+          {{end}}
         </div>
-        <p class="text-ui-sm text-ink-muted mt-1 font-mono">{{.Task.TaskID}} · {{.ProjectName}}</p>
       </div>
-      <div class="flex flex-wrap gap-2">
-        {{if .BackURL}}
-        <a href="{{.BackURL}}" class="btn">일일업무</a>
-        {{else}}
-        <a href="/workboard/register" class="btn">일일업무</a>
+      <div class="flex flex-wrap items-center gap-2 justify-end">
+        <a href="/workboard/tasks/{{.Task.TaskID}}" class="btn">작업 보기</a>
+        {{if .ShowWorkflow}}
+        <select id="as-workflow-action" class="input min-w-[8rem]">
+          <option value="">다음 처리…</option>
+          <option value="action">조치</option>
+          {{if eq .Task.Status "hold"}}
+          <option value="release">대기 해제</option>
+          {{else}}
+          <option value="hold">대기</option>
+          {{end}}
+          <option value="transfer">이관</option>
+          <option value="cancel">취소</option>
+          {{if .CanUnlockEdit}}<option value="unlock">완료 건 수정 잠금 해제</option>{{end}}
+        </select>
         {{end}}
-        <a href="/workboard/tasks/{{.Task.TaskID}}" class="btn">상세</a>
-        {{if .CanUnlockEdit}}
-        <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/unlock-edit" class="flex items-center gap-2">
-          <input type="password" name="unlock_password" required autocomplete="off" class="input" placeholder="수정 비밀번호">
-          <button class="btn">잠금 해제</button>
-        </form>
-        {{end}}
-        {{if .EditUnlocked}}<p class="text-ui-sm text-ink-muted">잠금 해제 {{.UnlockExpires}}까지</p>{{end}}
       </div>
     </div>
   </header>
 
   <div class="as-action-split">
-    <aside class="as-action-left space-y-3">
-      <h3 class="text-ui font-medium text-ink">작업 보기</h3>
-      <dl class="space-y-2 text-ui text-ink">
-        <div><dt class="text-ink-muted">작업명</dt><dd>{{.Task.Title}}</dd></div>
-        <div><dt class="text-ink-muted">구분</dt><dd>{{.SubtypeLabel}}</dd></div>
-        <div><dt class="text-ink-muted">사업</dt><dd>{{.ProjectName}}</dd></div>
-        <div>
-          <dt class="text-ink-muted">대상 사이트</dt>
-          <dd class="flex flex-wrap gap-1 mt-1">
-            {{range .Sites}}<span class="badge">{{.SiteName}}</span>{{else}}<span class="text-ink-muted">없음</span>{{end}}
-          </dd>
-        </div>
-        <div><dt class="text-ink-muted">작업일</dt><dd>{{.Task.WorkDate}} {{.Task.StartTime}}–{{.Task.EndTime}}</dd></div>
-        <div><dt class="text-ink-muted">담당</dt><dd>{{.Task.Assignee}}</dd></div>
-        <div>
-          <dt class="text-ink-muted">참여자</dt>
-          <dd>{{range $i, $m := .Members}}{{if $i}}, {{end}}{{$m.Assignee}}{{else}}—{{end}}</dd>
-        </div>
-        <div><dt class="text-ink-muted">작업 내용</dt><dd class="whitespace-pre-wrap">{{.Task.Description}}</dd></div>
-      </dl>
-    </aside>
+    <details class="lg:hidden as-action-left">
+      <summary class="cursor-pointer text-ui font-medium text-ink">작업 및 사이트 정보</summary>
+      <div class="mt-3">{{template "pw_action_side" .}}</div>
+    </details>
+    <aside class="hidden lg:block as-action-left">{{template "pw_action_side" .}}</aside>
 
-    <div class="as-action-right space-y-4">
+    <div class="as-action-right space-y-4" id="as-action-main">
       {{if .ActionOK}}<p class="card p-3 text-ui text-ink">저장했습니다.</p>{{end}}
       {{if .ActionErrMsg}}<p class="card p-3 text-ui text-danger">{{.ActionErrMsg}}</p>{{end}}
+      {{if .IsClosed}}
+      <p class="card p-3 text-ui text-ink-muted">완료·취소 건은 읽기 전용입니다.{{if .EditUnlocked}} 잠금 해제 {{.UnlockExpires}}까지.{{end}}</p>
+      {{end}}
+      {{if eq .Task.Status "hold"}}
+      <p class="card p-3 text-ui">대기{{if .Task.HoldNextAction}} · 후속 {{.Task.HoldNextAction}}{{end}}{{if .Task.HoldReason}} — {{.Task.HoldReason}}{{end}}</p>
+      {{end}}
 
-      <form id="as-action-form" method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action" class="space-y-4">
-        <input type="hidden" name="back" value="{{.BackURL}}">
-        <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="0">
-
-        <section class="card p-4 space-y-3">
+      {{if .ReadOnly}}
+      <section class="card overflow-hidden">
+        <div class="border-b border-line px-5 py-4 flex items-center justify-between">
           <h3 class="text-ui font-medium text-ink">조치 사항</h3>
-          <div>
-            <label class="label">담당자</label>
-            <select name="assignee" class="input" {{if .ReadOnly}}disabled{{end}} required>
-              {{range .Assignees}}
-              <option value="{{.FullName}}" {{if eq $.Task.Assignee .FullName}}selected{{end}}>{{.FullName}}</option>
-              {{end}}
-            </select>
-          </div>
-          <div>
-            <label class="label">근무 구분</label>
-            <label class="inline-flex items-center gap-2 mr-3"><input type="radio" name="work_place" value="office" {{if eq .Task.WorkPlace "office"}}checked{{end}} {{if .ReadOnly}}disabled{{end}}> 내근</label>
-            <label class="inline-flex items-center gap-2"><input type="radio" name="work_place" value="field" {{if or (eq .Task.WorkPlace "field") (eq .Task.WorkPlace "")}}checked{{end}} {{if .ReadOnly}}disabled{{end}}> 외근</label>
-          </div>
-          <div>
-            <label class="label">작업일</label>
-            <input type="date" name="work_date" value="{{.Task.WorkDate}}" class="input" {{if .ReadOnly}}disabled{{end}} required>
-          </div>
-          <div>
-            <label class="label">조치 내용</label>
-            <textarea name="action_taken" id="as-action-taken" rows="5" class="input" {{if .ReadOnly}}disabled{{end}}>{{.Task.ActionTaken}}</textarea>
-            <label class="inline-flex items-center gap-2 mt-2 text-ui">
-              <input type="checkbox" name="action_na" id="as-action-na" value="1" {{if .ReadOnly}}disabled{{end}}> 해당 없음
-            </label>
-            <input type="text" name="action_na_reason" id="as-action-na-reason" class="input mt-2 hidden" placeholder="해당 없음 사유">
-          </div>
-          <div>
-            <label class="label">완료 일시</label>
-            <input type="datetime-local" name="complete_datetime" value="{{.CompleteLocal}}" class="input" {{if .ReadOnly}}disabled{{end}}>
-          </div>
-          {{template "as_action_parts_check" .}}
-          <div>
-            <label class="label">고객(현장) 확인자</label>
-            <input type="text" name="customer_confirmer_custom" value="{{.Task.CustomerConfirmer}}" class="input" {{if .ReadOnly}}disabled{{end}} placeholder="이름 직접 입력">
-          </div>
-          <div>
-            <label class="label">처리 결과</label>
-            <label class="inline-flex items-center gap-2 mr-3"><input type="radio" name="result_code" value="{{.ResultDone}}" {{if or (eq .Task.ResultCode "done") (eq .Task.ResultCode "")}}checked{{end}} {{if .ReadOnly}}disabled{{end}}> 완료</label>
-            <label class="inline-flex items-center gap-2"><input type="radio" name="result_code" value="{{.ResultPartial}}" {{if eq .Task.ResultCode "partial"}}checked{{end}} {{if .ReadOnly}}disabled{{end}}> 일부완료</label>
-          </div>
-          <div id="pw-partial-box" class="{{if ne .Task.ResultCode "partial"}}hidden{{end}} space-y-2">
-            <label class="label">일부완료 사유</label>
-            <textarea name="followup_note" rows="2" class="input" {{if .ReadOnly}}disabled{{end}}></textarea>
-            <label class="label">후속 작업일</label>
-            <input type="date" name="next_date" class="input" {{if .ReadOnly}}disabled{{end}}>
-            <label class="inline-flex items-center gap-2 text-ui">
-              <input type="checkbox" name="create_followup" value="1" {{if .ReadOnly}}disabled{{end}}> 일정확정 → 후속 작업 등록
-            </label>
-          </div>
-        </section>
-        {{template "as_action_parts_box" .}}
-      </form>
-
-      <section class="card p-4 space-y-3">
-        <h3 class="text-ui font-medium text-ink">첨부·사진</h3>
-        {{if .Attachments}}
-        <ul class="space-y-1">
-          {{range .Attachments}}
-          <li class="flex items-center justify-between gap-2 text-ui">
-            <a href="/attachments/{{.AttachmentID}}" class="text-brand hover:underline truncate">{{attDisplayName .}}</a>
-            {{if and $.CanProcess (not $.ReadOnly)}}
-            <form method="POST" action="/attachments/{{.AttachmentID}}/delete">
-              <input type="hidden" name="redirect" value="/workboard/tasks/{{$.Task.TaskID}}/action">
-              <button class="btn-ghost btn-sm" onclick="return confirm('삭제할까요?');">삭제</button>
-            </form>
-            {{end}}
-          </li>
-          {{end}}
-        </ul>
-        {{else}}
-        <p class="text-ui-sm text-ink-muted">첨부 없음</p>
-        {{end}}
-        {{if and .CanProcess (not .ReadOnly)}}
-        <form method="POST" action="/attachments" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-end">
-          <input type="hidden" name="ref_type" value="work_task">
-          <input type="hidden" name="ref_id" value="{{.Task.TaskID}}">
-          <input type="hidden" name="redirect" value="/workboard/tasks/{{.Task.TaskID}}/action">
-          <input type="file" name="file" class="input" required>
-          <button class="btn btn-primary">올리기</button>
-        </form>
-        {{end}}
+          <span class="badge">읽기 전용</span>
+        </div>
+        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-ui">
+          <div><p class="text-ui-sm text-ink-muted">처리담당자</p><p>{{if .Task.Assignee}}{{.Task.Assignee}}{{else}}—{{end}}</p></div>
+          <div><p class="text-ui-sm text-ink-muted">근무구분</p><p>{{if eq .Task.WorkPlace "office"}}내근{{else if eq .Task.WorkPlace "field"}}외근{{else}}—{{end}}</p></div>
+          <div><p class="text-ui-sm text-ink-muted">결과</p><p>{{.StatusLabel}}</p></div>
+          <div class="sm:col-span-2"><p class="text-ui-sm text-ink-muted">조치내용</p><p class="whitespace-pre-line">{{if .Task.ActionTaken}}{{.Task.ActionTaken}}{{else}}—{{end}}</p></div>
+        </div>
       </section>
+      {{else if .CanProcess}}
+      <div id="panel-action" class="card overflow-hidden">
+        <div class="border-b border-line px-5 py-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-ui font-medium text-ink">조치 사항</h3>
+            <p class="text-ui-sm text-ink-muted mt-0.5">처리담당자·조치내용·결과를 입력하고 저장합니다.</p>
+          </div>
+          <span class="badge">조치</span>
+        </div>
+        <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action" id="as-action-form" class="p-4 sm:p-5 space-y-4">
+          <input type="hidden" name="back" value="{{.BackURL}}">
+          <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="0">
 
-      <section class="card p-4 space-y-2">
-        <h3 class="text-ui font-medium text-ink">조치 이력</h3>
-        {{if .Processes}}
-        <ul class="space-y-2 text-ui">
-          {{range .Processes}}
-          <li class="border-b border-line pb-2">
-            <p class="text-ink-muted text-ui-sm">{{.ProcessAt}} · {{.Worker}} · {{.ResultLabel}}</p>
-            <p class="whitespace-pre-wrap">{{.WorkContent}}</p>
-            {{if .Note}}<p class="text-ink-muted">{{.Note}}</p>{{end}}
-          </li>
+          <section class="card p-4 sm:p-5 space-y-4">
+            <h4 class="text-ui font-medium text-ink">조치 내역</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="label">처리담당자</label>
+                <select name="assigned_to_code" id="pw-assignee-code" class="input">
+                  {{range .Assignees}}
+                  <option value="{{.UserID}}" {{if or (eq $.Task.AssigneeUserID .UserID) (eq $.Task.Assignee .FullName)}}selected{{end}}>{{.FullName}}</option>
+                  {{end}}
+                  <option value="custom" {{if and .Task.Assignee (not .Task.AssigneeUserID)}}selected{{end}}>직접입력</option>
+                </select>
+                <input type="text" name="assigned_to_custom" id="pw-assignee-custom" class="input mt-2" placeholder="직접입력 시 이름" value="{{if and .Task.Assignee (not .Task.AssigneeUserID)}}{{.Task.Assignee}}{{end}}">
+              </div>
+              <div>
+                <label class="label">근무구분 <span class="text-danger">*</span></label>
+                <div class="flex items-center gap-5 h-[42px]">
+                  <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="work_place" value="office" {{if eq .Task.WorkPlace "office"}}checked{{end}} required> 내근</label>
+                  <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="work_place" value="field" {{if eq .Task.WorkPlace "field"}}checked{{end}} required> 외근</label>
+                </div>
+              </div>
+              <div>
+                <label class="label">작업 구분 <span class="text-danger">*</span></label>
+                <select name="work_subtype" class="input" required>
+                  <option value="">선택</option>
+                  <option value="build" {{if eq .Task.WorkSubtype "build"}}selected{{end}}>구축</option>
+                  <option value="construction" {{if eq .Task.WorkSubtype "construction"}}selected{{end}}>공사</option>
+                  <option value="other" {{if eq .Task.WorkSubtype "other"}}selected{{end}}>기타</option>
+                </select>
+              </div>
+              {{if .ShowTargetCat}}
+              <div>
+                <label class="label">작업 대상 분류</label>
+                <select name="target_category_id" class="input">
+                  <option value="">선택</option>
+                  {{range .TargetCats}}
+                  <option value="{{.ID}}" {{if eq $.Task.TargetCategoryID .ID}}selected{{end}}>{{.Name}}</option>
+                  {{end}}
+                </select>
+              </div>
+              {{end}}
+              <div class="sm:col-span-2">
+                <label class="label">작업 사유·특이사항</label>
+                <textarea name="work_reason" rows="2" class="input" placeholder="예: 현장 사정으로 일정 변경">{{.Task.WorkReason}}</textarea>
+              </div>
+              <div>
+                <label class="label">완료일시</label>
+                <input type="datetime-local" name="complete_datetime" value="{{.CompleteLocal}}" class="input">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="label">조치내용 <span class="text-danger">*</span></label>
+                <p class="text-ui-sm text-ink-muted mb-1">이 내용이 다음 작업자에게 참고가 됩니다</p>
+                <textarea name="action_taken" id="as-action-taken" rows="5" class="input">{{.Task.ActionTaken}}</textarea>
+                <label class="inline-flex items-center gap-2 mt-2 text-ui">
+                  <input type="checkbox" name="action_na" id="as-action-na" value="1"> 해당 없음
+                </label>
+                <input type="text" name="action_na_reason" id="as-action-na-reason" class="input mt-2 hidden" placeholder="해당 없음 사유">
+                {{template "as_action_parts_check" .}}
+              </div>
+            </div>
+          </section>
+          {{template "as_action_parts_box" .}}
+
+          <section class="card p-4 sm:p-5 space-y-3">
+            {{template "as_action_attach" .}}
+          </section>
+
+          <section class="card p-4 sm:p-5 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h4 class="text-ui font-medium text-ink">조치 결과</h4>
+              <p class="text-ui-sm text-ink-muted">선택한 결과에 따라 추가 입력이 열립니다</p>
+            </div>
+            <div class="flex flex-wrap gap-4">
+              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultDone}}" {{if or (eq .Task.ResultCode "done") (eq .Task.ResultCode "")}}checked{{end}}> 완료</label>
+              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultPartial}}" {{if eq .Task.ResultCode "partial"}}checked{{end}}> 추가조치 필요</label>
+              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultTransfer}}" {{if eq .Task.ResultCode "transfer"}}checked{{end}}> 이관</label>
+            </div>
+            <div id="pw-partial-box" class="{{if ne .Task.ResultCode "partial"}}hidden{{end}} space-y-2">
+              <label class="label">추가조치 사유</label>
+              <textarea name="followup_note" rows="2" class="input"></textarea>
+              <label class="label">다음 작업일</label>
+              <input type="date" name="next_date" class="input">
+              <label class="inline-flex items-center gap-2 text-ui"><input type="checkbox" name="create_followup" value="1"> 일정확정 → 후속 작업 등록</label>
+            </div>
+            <div id="pw-transfer-box" class="{{if ne .Task.ResultCode "transfer"}}hidden{{end}} space-y-2">
+              <label class="label">이관처</label>
+              <input type="text" name="transfer_to" class="input" value="{{.Task.TransferTo}}" placeholder="협력사·타 팀">
+              <label class="label">이관 사유</label>
+              <textarea name="transfer_reason" rows="2" class="input"></textarea>
+            </div>
+          </section>
+
+          <section class="card p-4 sm:p-5 space-y-3">
+            <h4 class="text-ui font-medium text-ink">확인</h4>
+            <label class="label">고객확인자</label>
+            <select name="customer_confirmer" id="pw-confirmer" class="input">
+              <option value="">선택</option>
+              {{range .Sites}}
+              <option value="{{.SiteName}}" {{if eq $.Task.CustomerConfirmer .SiteName}}selected{{end}}>{{.SiteName}}</option>
+              {{end}}
+              <option value="custom">직접입력</option>
+            </select>
+            <input type="text" name="customer_confirmer_custom" class="input" placeholder="직접입력 시 이름" value="{{.Task.CustomerConfirmer}}">
+          </section>
+        </form>
+        {{if and .CanProcess (not .ReadOnly)}}
+        <form id="as-action-attach-form" method="POST" action="/attachments" enctype="multipart/form-data"></form>
+        {{template "as_action_attach_dels" .}}
+        {{end}}
+      </div>
+      {{end}}
+
+      {{if .ShowImportSites}}
+      <section class="card p-4 space-y-3">
+        <h4 class="text-ui font-medium text-ink">사업 대상 사이트 불러오기</h4>
+        <p class="text-ui-sm text-ink-muted">이 사업의 사이트 후보입니다. 체크한 곳만 추가합니다.</p>
+        <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/sites" class="space-y-2">
+          <input type="hidden" name="back" value="{{.BackURL}}">
+          {{range .ProjectSites}}
+          <label class="flex items-center gap-2 text-ui"><input type="checkbox" name="site_id" value="{{.SiteID}}"> {{.SiteName}}{{if .ParentName}} · {{.ParentName}}{{end}}{{if .Region}} · {{.Region}}{{end}}</label>
           {{end}}
-        </ul>
+          <button class="btn btn-primary">선택한 사이트 추가</button>
+        </form>
+      </section>
+      {{end}}
+
+      <section class="card p-4 sm:p-5 space-y-3">
+        <div>
+          <h3 class="text-ui font-medium text-ink">조치 이력</h3>
+          <p class="text-ui-sm text-ink-muted mt-1">이 작업({{.Task.TaskID}})의 조치 기록입니다. 회차마다 결과·다음 일정이 남습니다.</p>
+        </div>
+        {{if .Processes}}
+        <div class="overflow-x-auto">
+          <table class="w-full text-ui">
+            <thead class="text-ink-muted text-left"><tr><th class="p-2">일시</th><th class="p-2">처리자</th><th class="p-2">결과</th><th class="p-2">조치 요약</th><th class="p-2">다음 일정</th></tr></thead>
+            <tbody>
+              {{range .Processes}}
+              <tr class="border-t border-line">
+                <td class="p-2 whitespace-nowrap">{{.ProcessAt}}</td>
+                <td class="p-2">{{.Worker}}</td>
+                <td class="p-2">{{.ResultLabel}}</td>
+                <td class="p-2 whitespace-pre-wrap">{{.WorkContent}}</td>
+                <td class="p-2">{{if .NextDate}}{{.NextDate}}{{else}}—{{end}}</td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
         {{else}}
-        <p class="text-ui-sm text-ink-muted">이력 없음</p>
+        <p class="text-ui-sm text-ink-muted text-center py-6">이 작업에 등록된 조치 기록이 없습니다. 조치 저장 시 자동으로 남습니다.</p>
         {{end}}
       </section>
     </div>
   </div>
 
-  <footer class="as-action-bar flex flex-wrap gap-2">
+  <footer id="as-action-bar" class="as-action-bar flex justify-end items-center gap-3">
     {{if and .CanProcess (not .ReadOnly)}}
-    <button type="submit" form="as-action-form" class="btn btn-primary">저장</button>
-    <button type="button" class="btn" @click="holdOpen=true">보류</button>
-    <button type="button" class="btn" @click="transferOpen=true">이관</button>
-    <button type="button" class="btn" @click="cancelOpen=true">취소</button>
-    {{if eq .Task.Status "hold"}}
-    <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/hold/release">
-      <input type="hidden" name="back" value="{{.BackURL}}">
-      <button class="btn">대기 해제</button>
-    </form>
+    <button type="submit" form="as-action-form" class="btn-primary">저장</button>
     {{end}}
-    {{end}}
-    <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="btn">목록으로</a>
+    <span class="text-ui-sm text-ink-muted">{{.AppVer}}</span>
   </footer>
-
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50" x-show="holdOpen" x-cloak @keydown.escape.window="holdOpen=false">
-    <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/hold" class="card p-4 space-y-3 w-full max-w-md">
-      <input type="hidden" name="back" value="{{.BackURL}}">
-      <input type="hidden" name="work_place" value="{{.Task.WorkPlace}}">
-      <input type="hidden" name="action_taken" value="{{.Task.ActionTaken}}">
-      <h3 class="font-medium text-ink">대기(보류)</h3>
-      <select name="hold_next_action" class="input" required>
-        <option value="action">후속: 조치</option>
-        <option value="transfer">후속: 이관</option>
-        <option value="cancel">후속: 취소</option>
-      </select>
-      <textarea name="hold_reason" rows="3" class="input" required placeholder="사유"></textarea>
-      <div class="flex gap-2">
-        <button class="btn btn-primary">저장</button>
-        <button type="button" class="btn" @click="holdOpen=false">닫기</button>
-      </div>
-    </form>
-  </div>
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50" x-show="transferOpen" x-cloak @keydown.escape.window="transferOpen=false">
-    <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/transfer" class="card p-4 space-y-3 w-full max-w-md">
-      <input type="hidden" name="back" value="{{.BackURL}}">
-      <input type="hidden" name="work_place" value="{{.Task.WorkPlace}}">
-      <input type="hidden" name="action_taken" value="{{.Task.ActionTaken}}">
-      <h3 class="font-medium text-ink">이관</h3>
-      <input type="text" name="transfer_to" class="input" required placeholder="이관처(협력사·타 팀)">
-      <textarea name="transfer_reason" rows="3" class="input" required placeholder="사유"></textarea>
-      <div class="flex gap-2">
-        <button class="btn btn-primary">저장</button>
-        <button type="button" class="btn" @click="transferOpen=false">닫기</button>
-      </div>
-    </form>
-  </div>
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50" x-show="cancelOpen" x-cloak @keydown.escape.window="cancelOpen=false">
-    <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/cancel" class="card p-4 space-y-3 w-full max-w-md">
-      <input type="hidden" name="back" value="{{.BackURL}}">
-      <input type="hidden" name="work_place" value="{{.Task.WorkPlace}}">
-      <input type="hidden" name="action_taken" value="{{.Task.ActionTaken}}">
-      <h3 class="font-medium text-ink">취소</h3>
-      <input type="date" name="cancel_date" value="{{.CancelLocal}}" class="input" required>
-      <textarea name="cancel_reason" rows="3" class="input" required placeholder="사유"></textarea>
-      <div class="flex gap-2">
-        <button class="btn btn-primary">저장</button>
-        <button type="button" class="btn" @click="cancelOpen=false">닫기</button>
-      </div>
-    </form>
-  </div>
 </div>
+
+<div id="modal-hold" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-overlay/50">
+  <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/hold" class="card p-4 space-y-3 w-full max-w-md">
+    <input type="hidden" name="back" value="{{.BackURL}}">
+    <h3 class="font-medium text-ink">대기</h3>
+    <select name="hold_next_action" id="hold-next-action" class="input" required>
+      <option value="">선택…</option>
+      <option value="action">후속: 조치</option>
+      <option value="transfer">후속: 이관</option>
+      <option value="cancel">후속: 취소</option>
+    </select>
+    <div id="hold-reason-wrap" class="hidden">
+      <textarea name="hold_reason" id="hold-reason" rows="3" class="input" placeholder="사유"></textarea>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button type="button" data-close-modal="modal-hold" class="btn">닫기</button>
+      <button class="btn btn-primary" id="hold-submit" disabled>저장</button>
+    </div>
+  </form>
+</div>
+<div id="modal-transfer" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-overlay/50">
+  <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/transfer" class="card p-4 space-y-3 w-full max-w-md">
+    <input type="hidden" name="back" value="{{.BackURL}}">
+    <h3 class="font-medium text-ink">이관</h3>
+    <input type="text" name="transfer_to" class="input" required placeholder="이관처">
+    <textarea name="transfer_reason" rows="3" class="input" required placeholder="사유"></textarea>
+    <div class="flex gap-2 justify-end">
+      <button type="button" data-close-modal="modal-transfer" class="btn">닫기</button>
+      <button class="btn btn-primary">저장</button>
+    </div>
+  </form>
+</div>
+<div id="modal-cancel" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-overlay/50">
+  <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/cancel" class="card p-4 space-y-3 w-full max-w-md">
+    <input type="hidden" name="back" value="{{.BackURL}}">
+    <input type="date" name="cancel_date" value="{{.CancelLocal}}" class="input" required>
+    <textarea name="cancel_reason" rows="3" class="input" required placeholder="사유"></textarea>
+    <div class="flex gap-2 justify-end">
+      <button type="button" data-close-modal="modal-cancel" class="btn">닫기</button>
+      <button class="btn btn-primary">저장</button>
+    </div>
+  </form>
+</div>
+<div id="modal-unlock-edit" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-overlay/50">
+  <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/unlock-edit" class="card p-4 space-y-3 w-full max-w-md">
+    <h3 class="font-medium text-ink">수정 잠금 해제</h3>
+    <input type="password" name="unlock_password" required autocomplete="off" class="input" placeholder="수정 비밀번호">
+    <div class="flex gap-2 justify-end">
+      <button type="button" data-close-modal="modal-unlock-edit" class="btn">닫기</button>
+      <button class="btn btn-primary">해제</button>
+    </div>
+  </form>
+</div>
+<form id="pw-hold-release" method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/hold/release" class="hidden">
+  <input type="hidden" name="back" value="{{.BackURL}}">
+</form>
+
 <script>
 (function(){
-  var form = document.getElementById('as-action-form');
-  var ta = document.getElementById('as-action-taken');
-  var na = document.getElementById('as-action-na');
-  var reason = document.getElementById('as-action-na-reason');
-  var shortOk = document.getElementById('as-action-short-ok');
-  var partial = document.getElementById('pw-partial-box');
-  if (form) {
-    form.querySelectorAll('input[name="result_code"]').forEach(function(r){
-      r.addEventListener('change', function(){
-        if (partial) partial.classList.toggle('hidden', r.value !== 'partial' || !r.checked);
-      });
+  function openModal(id){ var el=document.getElementById(id); if(!el) return; el.classList.remove('hidden'); el.classList.add('flex'); }
+  function closeModal(id){ var el=document.getElementById(id); if(!el) return; el.classList.add('hidden'); el.classList.remove('flex'); }
+  document.querySelectorAll('[data-close-modal]').forEach(function(btn){
+    btn.addEventListener('click', function(){ closeModal(btn.getAttribute('data-close-modal')); });
+  });
+  ['modal-hold','modal-transfer','modal-cancel','modal-unlock-edit'].forEach(function(id){
+    var el=document.getElementById(id); if(!el) return;
+    el.addEventListener('click', function(e){ if(e.target===el) closeModal(id); });
+  });
+  var holdNext=document.getElementById('hold-next-action');
+  var holdReasonWrap=document.getElementById('hold-reason-wrap');
+  var holdReason=document.getElementById('hold-reason');
+  var holdSubmit=document.getElementById('hold-submit');
+  function resetHold(){ if(holdNext) holdNext.value=''; if(holdReason){ holdReason.value=''; holdReason.removeAttribute('required'); } if(holdReasonWrap) holdReasonWrap.classList.add('hidden'); if(holdSubmit) holdSubmit.disabled=true; }
+  function syncHold(){ var has=holdNext && holdNext.value; if(holdReasonWrap) holdReasonWrap.classList.toggle('hidden', !has); if(holdReason){ if(has) holdReason.setAttribute('required','required'); else holdReason.removeAttribute('required'); } if(holdSubmit) holdSubmit.disabled=!has; }
+  if(holdNext) holdNext.addEventListener('change', syncHold);
+  function goActionPanel(){ var p=document.getElementById('panel-action'); if(!p) return; p.scrollIntoView({behavior:'smooth', block:'start'}); }
+  var wf=document.getElementById('as-workflow-action');
+  if(wf){
+    wf.addEventListener('change', function(){
+      var v=wf.value; wf.value='';
+      if(v==='action') goActionPanel();
+      else if(v==='hold'){ resetHold(); openModal('modal-hold'); }
+      else if(v==='transfer') openModal('modal-transfer');
+      else if(v==='cancel') openModal('modal-cancel');
+      else if(v==='unlock') openModal('modal-unlock-edit');
+      else if(v==='release'){ var f=document.getElementById('pw-hold-release'); if(f) f.submit(); }
     });
   }
-  function runeLen(s){ return Array.from(String(s || '').trim()).length; }
-  function syncNA(){
-    if (!na) return;
-    var on = na.checked;
-    if (reason) reason.classList.toggle('hidden', !on);
-    if (ta) ta.required = !on;
+  var form=document.getElementById('as-action-form');
+  var ta=document.getElementById('as-action-taken');
+  var na=document.getElementById('as-action-na');
+  var reason=document.getElementById('as-action-na-reason');
+  var shortOk=document.getElementById('as-action-short-ok');
+  var partial=document.getElementById('pw-partial-box');
+  var transfer=document.getElementById('pw-transfer-box');
+  function syncResult(){
+    var el=document.querySelector('input.as-result-radio:checked');
+    var v=el?el.value:'';
+    if(partial) partial.classList.toggle('hidden', v!=='partial');
+    if(transfer) transfer.classList.toggle('hidden', v!=='transfer');
   }
-  if (na) { na.addEventListener('change', syncNA); syncNA(); }
-  if (form && ta) {
+  if(form){ form.querySelectorAll('input[name="result_code"]').forEach(function(r){ r.addEventListener('change', syncResult); }); }
+  function runeLen(s){ return Array.from(String(s||'').trim()).length; }
+  function syncNA(){ if(!na) return; var on=na.checked; if(reason) reason.classList.toggle('hidden', !on); if(ta) ta.required=!on; }
+  if(na){ na.addEventListener('change', syncNA); syncNA(); }
+  if(form && ta){
     form.addEventListener('submit', function(e){
-      if (na && na.checked) return;
-      if (shortOk && shortOk.value === '1') return;
-      if (runeLen(ta.value) >= 10) return;
+      if(na && na.checked) return;
+      if(shortOk && shortOk.value==='1') return;
+      if(runeLen(ta.value)>=10) return;
       e.preventDefault();
-      if (confirm('조금 더 적어 주시겠습니까?')) return;
-      if (shortOk) shortOk.value = '1';
+      if(confirm('조금 더 적어 주시겠습니까?')) return;
+      if(shortOk) shortOk.value='1';
       form.submit();
     });
   }
-  var box = document.getElementById('as-parts-box');
-  var rows = document.getElementById('as-parts-rows');
-  var tpl = document.getElementById('as-part-row-tpl');
-  var add = document.getElementById('as-parts-add');
-  var empty = document.getElementById('as-parts-empty');
-  var enabled = document.getElementById('as-parts-enabled');
-  if (!box || !rows || !tpl) return;
-  if (enabled) {
-    enabled.addEventListener('change', function(){
-      if (!enabled.checked) {
-        var n = rows.querySelectorAll('.as-part-row').length;
-        if (n > 0 && !confirm('입력한 자재 ' + n + '건이 삭제됩니다')) {
-          enabled.checked = true; return;
-        }
-        box.hidden = true;
-      } else { box.hidden = false; }
+  var filt=document.getElementById('pw-project-filter');
+  var sel=document.getElementById('pw-project-select');
+  if(filt && sel){
+    filt.addEventListener('input', function(){
+      var q=String(filt.value||'').toLowerCase();
+      Array.prototype.forEach.call(sel.options, function(opt, i){
+        if(i===0){ opt.hidden=false; return; }
+        opt.hidden = q!=='' && String(opt.textContent||'').toLowerCase().indexOf(q)<0;
+      });
     });
   }
-  function syncEmpty(){
-    var n = rows.querySelectorAll('.as-part-row').length;
-    if (empty) empty.classList.toggle('hidden', n > 0);
-  }
-  function bindRow(row){
-    var del = row.querySelector('.as-part-del');
-    if (del) del.addEventListener('click', function(){ row.remove(); syncEmpty(); });
-    var name = row.querySelector('.as-part-name');
-    var list = row.querySelector('.as-part-list');
-    var item = row.querySelector('.as-part-item');
-    var code = row.querySelector('.as-part-code');
-    if (!name || !list) return;
-    var t = null, idx = -1, hits = [];
-    function close(){ list.hidden = true; idx = -1; }
-    function paint(){
-      list.innerHTML = '';
-      hits.forEach(function(h, i){
-        var li = document.createElement('li');
-        li.className = 'menu-item' + (i === idx ? ' combobox-option-on' : '');
-        li.textContent = h.name + (h.code ? ' · ' + h.code : '');
-        li.addEventListener('mousedown', function(ev){ ev.preventDefault(); pick(h); });
-        list.appendChild(li);
+  var box=document.getElementById('as-parts-box');
+  var rows=document.getElementById('as-parts-rows');
+  var tpl=document.getElementById('as-part-row-tpl');
+  var add=document.getElementById('as-parts-add');
+  var empty=document.getElementById('as-parts-empty');
+  var enabled=document.getElementById('as-parts-enabled');
+  if(box && rows && tpl){
+    if(enabled){
+      enabled.addEventListener('change', function(){
+        if(!enabled.checked){
+          var n=rows.querySelectorAll('.as-part-row').length;
+          if(n>0 && !confirm('입력한 자재 '+n+'건이 삭제됩니다')){ enabled.checked=true; return; }
+          box.hidden=true;
+        } else { box.hidden=false; }
       });
-      list.hidden = hits.length === 0;
     }
-    function pick(h){
-      name.value = h.name || '';
-      if (code) code.value = h.code || '';
-      if (item) item.value = h.item_id || '';
-      close();
+    function syncEmpty(){ var n=rows.querySelectorAll('.as-part-row').length; if(empty) empty.classList.toggle('hidden', n>0); }
+    function bindRow(row){
+      var del=row.querySelector('.as-part-del');
+      if(del) del.addEventListener('click', function(){ row.remove(); syncEmpty(); });
+      var name=row.querySelector('.as-part-name');
+      var list=row.querySelector('.as-part-list');
+      var item=row.querySelector('.as-part-item');
+      var code=row.querySelector('.as-part-code');
+      if(!name || !list) return;
+      var t=null, idx=-1, hits=[];
+      function close(){ list.hidden=true; idx=-1; }
+      function paint(){
+        list.innerHTML='';
+        hits.forEach(function(h,i){
+          var li=document.createElement('li');
+          li.className='menu-item'+(i===idx?' combobox-option-on':'');
+          li.textContent=h.name+(h.code?' · '+h.code:'');
+          li.addEventListener('mousedown', function(ev){ ev.preventDefault(); pick(h); });
+          list.appendChild(li);
+        });
+        list.hidden=hits.length===0;
+      }
+      function pick(h){ name.value=h.name||''; if(code) code.value=h.code||''; if(item) item.value=h.item_id||''; close(); }
+      function run(){
+        var q=String(name.value||'').trim();
+        if(Array.from(q).length<2){ hits=[]; paint(); return; }
+        fetch('/as/parts-suggest?q='+encodeURIComponent(q), {headers:{'Accept':'application/json'}})
+          .then(function(r){ return r.json(); })
+          .then(function(d){ hits=Array.isArray(d)?d:[]; idx=hits.length?0:-1; paint(); })
+          .catch(function(){ hits=[]; paint(); });
+      }
+      name.addEventListener('input', function(){ if(item) item.value=''; clearTimeout(t); t=setTimeout(run,250); });
     }
-    function run(){
-      var q = String(name.value || '').trim();
-      if (Array.from(q).length < 2) { hits = []; paint(); return; }
-      fetch('/as/parts-suggest?q=' + encodeURIComponent(q), {headers:{'Accept':'application/json'}})
-        .then(function(r){ return r.json(); })
-        .then(function(d){ hits = Array.isArray(d) ? d : []; idx = hits.length ? 0 : -1; paint(); })
-        .catch(function(){ hits = []; paint(); });
-    }
-    name.addEventListener('input', function(){ if (item) item.value = ''; clearTimeout(t); t = setTimeout(run, 250); });
+    rows.querySelectorAll('.as-part-row').forEach(bindRow);
+    if(add) add.addEventListener('click', function(){ var node=tpl.content.firstElementChild.cloneNode(true); rows.appendChild(node); bindRow(node); syncEmpty(); });
   }
-  rows.querySelectorAll('.as-part-row').forEach(bindRow);
-  if (add) add.addEventListener('click', function(){
-    var node = tpl.content.firstElementChild.cloneNode(true);
-    rows.appendChild(node);
-    bindRow(node);
-    syncEmpty();
-  });
 })();
 </script>
+{{template "photo_zoom_script"}}
+{{end}}
+
+{{define "pw_action_side"}}
+<div class="space-y-4 text-ui">
+  <section class="card">
+    <div class="card-header">작업 및 사이트 정보</div>
+    <dl class="card-body space-y-2">
+      <div><dt class="text-ui-sm text-ink-muted">사업</dt><dd>{{.ProjectName}}</dd></div>
+      <div><dt class="text-ui-sm text-ink-muted">작업 구분</dt><dd>{{.SubtypeLabel}}</dd></div>
+      <div>
+        <dt class="text-ui-sm text-ink-muted">대상 사이트</dt>
+        <dd class="space-y-1 mt-1">
+          {{range .Sites}}
+          <p>{{.SiteName}}{{if .ParentName}} · {{.ParentName}}{{end}}{{if .Region}} · {{.Region}}{{end}}{{if .Phone}} · {{.Phone}}{{end}}</p>
+          {{else}}<span class="text-ink-muted">없음</span>{{end}}
+        </dd>
+      </div>
+      <div><dt class="text-ui-sm text-ink-muted">작업일</dt><dd>{{.Task.WorkDate}} {{.Task.StartTime}}–{{.Task.EndTime}}</dd></div>
+      <div><dt class="text-ui-sm text-ink-muted">담당자</dt><dd>{{.Task.Assignee}}</dd></div>
+      <div><dt class="text-ui-sm text-ink-muted">참여자</dt><dd>{{range $i, $m := .Members}}{{if $i}}, {{end}}{{$m.Assignee}}{{else}}—{{end}}</dd></div>
+    </dl>
+  </section>
+  <section class="card">
+    <div class="card-header">작업 내용</div>
+    <div class="card-body whitespace-pre-wrap">{{if .Task.Description}}{{.Task.Description}}{{else}}—{{end}}</div>
+  </section>
+  <section class="card">
+    <div class="card-header">과거 작업 이력</div>
+    {{if .PastHistory}}
+    <ul class="card-body space-y-2">
+      {{range .PastHistory}}
+      <li class="text-ui-sm">
+        <a href="/workboard/tasks/{{.TaskID}}/action" class="text-primary hover:underline font-mono">{{.TaskID}}</a>
+        <span class="text-ink-muted">{{.WorkDate}}</span>
+        <p>{{.Title}}</p>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="card-body text-ui-sm text-ink-muted">이력 없음</p>
+    {{end}}
+  </section>
+</div>
 {{end}}

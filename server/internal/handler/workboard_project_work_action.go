@@ -111,15 +111,45 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	if back == "" {
 		back = strings.TrimSpace(c.FormValue("back"))
 	}
+	pick, _ := h.repo.ListWorkPickProjects(t.OrgID)
+	cats, _ := h.repo.ListWorkTargetCategories(t.OrgID)
+	var siteIDs []string
+	for _, s := range sites {
+		if id := strings.TrimSpace(s.SiteID); id != "" {
+			siteIDs = append(siteIDs, id)
+		}
+	}
+	hist, _ := h.repo.ListPastWorkHistory(t.OrgID, t.TaskID, t.ProjectID, siteIDs, 5)
+	var projectSites []repository.WorkTaskSite
+	if strings.TrimSpace(t.ProjectID) != "" && len(sites) == 0 {
+		projectSites, _ = h.repo.ListProjectSitesForPick(t.ProjectID)
+	}
+	var photos, docs []model.Attachment
+	for _, a := range atts {
+		if a.IsImage() {
+			photos = append(photos, a)
+		} else {
+			docs = append(docs, a)
+		}
+	}
+	ver, _, _, _ := currentBuild()
 	data := map[string]interface{}{
 		"Title": "작업 조치 · " + t.Title, "Active": NavWorkRegister,
 		"Task": t, "Sites": sites, "Members": members, "Processes": procs,
-		"PartRows": parts, "PartsEnabled": enabled, "Attachments": atts,
+		"PartRows": parts, "PartsEnabled": enabled, "Attachments": docs,
+		"ActionPhotos":    photos,
 		"Assignees":       listAssignableForPicker(h.userRepo, c),
 		"CanProcess":      canMod, "ReadOnly": readOnly, "CanWrite": canWrite,
 		"IsClosed":        closed, "EditUnlocked": unlocked, "UnlockExpires": unlockExpLocal,
 		"CanUnlockEdit":   closed && isVisionRole(c) && !unlocked,
+		"ShowWorkflow":    canWrite,
 		"ProjectName":     projectName,
+		"Projects":        pick,
+		"TargetCats":      cats,
+		"ShowTargetCat":   len(cats) > 0,
+		"PastHistory":     hist,
+		"ProjectSites":    projectSites,
+		"ShowImportSites": len(projectSites) > 0,
 		"CompleteLocal":   completeLocal,
 		"TodayLocal":      now.Format("2006-01-02"),
 		"CancelLocal":     now.Format("2006-01-02"),
@@ -132,6 +162,12 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		"StatusLabel":     model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
 		"ResultDone":      model.WorkResultDone,
 		"ResultPartial":   model.WorkResultPartial,
+		"ResultTransfer":  model.WorkResultTransfer,
+		"AttachRefID":     t.TaskID,
+		"AttachRedirect":  projectWorkActionPath(t.TaskID),
+		"AttachPhotoType": model.RefTypeWorkTask,
+		"AttachDocType":   model.RefTypeWorkTask,
+		"AppVer":          ver,
 	}
 	if msg, ok := c.Get("pw_parts_msg").(string); ok && msg != "" {
 		data["PartsFormErr"] = msg
@@ -148,6 +184,12 @@ func projectWorkActionErr(code string) string {
 		return "해당 없음 사유를 입력하세요"
 	case "work_place":
 		return "근무 구분을 선택하세요"
+	case "work_subtype":
+		return "작업 구분을 선택하세요"
+	case "result":
+		return "조치 결과를 선택하세요"
+	case "project":
+		return "사업을 찾을 수 없습니다"
 	case "assignee":
 		return "담당자를 선택하세요"
 	case "work_date":
@@ -155,7 +197,7 @@ func projectWorkActionErr(code string) string {
 	case "complete_dt":
 		return "완료 일시를 입력하세요"
 	case "partial_note":
-		return "일부완료 사유를 입력하세요"
+		return "추가조치 사유를 입력하세요"
 	case "hold_reason":
 		return "대기 사유를 입력하세요"
 	case "hold_next":
@@ -209,7 +251,7 @@ func (h *WorkboardHandler) SaveProjectWorkAction(c echo.Context) error {
 	if closed && !unlocked {
 		return h.redirectPWAction(c, t.TaskID, "locked")
 	}
-	if err := h.applyProjectWorkActionForm(c, t, model.WorkResultDone); err != nil {
+	if err := h.applyProjectWorkActionForm(c, t, ""); err != nil {
 		if _, ok := err.(pwRendered); ok {
 			return nil
 		}
@@ -254,16 +296,23 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 	if result == "" {
 		result = defaultResult
 	}
+	if result == "" {
+		return &pwActionErr{"result"}
+	}
 	place := strings.TrimSpace(c.FormValue("work_place"))
 	if place != "office" && place != "field" {
 		return &pwActionErr{"work_place"}
 	}
-	assignee := strings.TrimSpace(c.FormValue("assignee"))
-	if assignee == "" {
-		return &pwActionErr{"assignee"}
+	sub := model.NormalizeWorkSubtype(c.FormValue("work_subtype"))
+	if sub == "" {
+		sub = model.NormalizeWorkSubtype(t.WorkSubtype)
 	}
-	if err := checkAssigneeInOrg(h.userRepo, t.OrgID, assignee, c.FormValue("assignee_user_id"), t.Assignee); err != nil {
-		return &pwActionErr{"assignee"}
+	if sub == "" {
+		return &pwActionErr{"work_subtype"}
+	}
+	assignee, assigneeUID, aerr := h.resolveProjectWorkAssignee(c, t)
+	if aerr != nil {
+		return aerr
 	}
 	workDay := strings.TrimSpace(c.FormValue("work_date"))
 	if workDay == "" {
@@ -299,21 +348,22 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 		confirmer = custom
 	}
 
+	if completeDT == "" && (result == model.WorkResultDone || result == model.WorkResultPartial) {
+		completeDT = time.Now().Format("2006-01-02T15:04")
+	}
 	t.WorkPlace = place
 	t.Assignee = assignee
-	if uid := strings.TrimSpace(c.FormValue("assignee_user_id")); uid != "" {
-		t.AssigneeUserID = uid
-	}
+	t.AssigneeUserID = assigneeUID
 	t.WorkDate = workDay
+	t.WorkSubtype = sub
 	t.ActionTaken = content
 	t.CustomerConfirmer = confirmer
 	t.ResultCode = result
+	t.TargetCategoryID = strings.TrimSpace(c.FormValue("target_category_id"))
+	t.WorkReason = strings.TrimSpace(c.FormValue("work_reason"))
 
 	switch result {
 	case model.WorkResultDone:
-		if completeDT == "" {
-			return &pwActionErr{"complete_dt"}
-		}
 		t.CompleteDatetime = completeDT
 		t.CompleteDate = completeDT[:min(10, len(completeDT))]
 		t.Status = model.WBTaskComplete
@@ -327,8 +377,20 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 		if t.CompleteDate == "" && len(completeDT) >= 10 {
 			t.CompleteDate = completeDT[:10]
 		}
+	case model.WorkResultTransfer:
+		to := strings.TrimSpace(c.FormValue("transfer_to"))
+		reason := strings.TrimSpace(c.FormValue("transfer_reason"))
+		if to == "" {
+			return &pwActionErr{"transfer_to"}
+		}
+		if reason == "" {
+			return &pwActionErr{"transfer_reason"}
+		}
+		t.TransferTo = to
+		t.Status = model.WBTaskTransfer
+		note = reason
 	default:
-		return &pwActionErr{"content"}
+		return &pwActionErr{"result"}
 	}
 	if line := repository.FirstLine(content, 200); line != "" {
 		t.CompleteNote = line
@@ -573,4 +635,109 @@ func (h *WorkboardHandler) UnlockProjectWorkAction(c echo.Context) error {
 		return err
 	}
 	return c.Redirect(http.StatusSeeOther, projectWorkActionPath(t.TaskID)+"?ok="+url.QueryEscape("수정 잠금이 해제되었습니다(30분)"))
+}
+
+func (h *WorkboardHandler) resolveProjectWorkAssignee(c echo.Context, t *model.WorkTask) (string, string, error) {
+	code := strings.TrimSpace(c.FormValue("assigned_to_code"))
+	custom := strings.TrimSpace(c.FormValue("assigned_to_custom"))
+	if code == "custom" {
+		if custom == "" {
+			return "", "", &pwActionErr{"assignee"}
+		}
+		return custom, "", nil
+	}
+	if code != "" {
+		for _, u := range listAssignableForPicker(h.userRepo, c) {
+			if u.UserID == code {
+				if err := checkAssigneeInOrg(h.userRepo, t.OrgID, u.FullName, u.UserID, t.Assignee); err != nil {
+					return "", "", &pwActionErr{"assignee"}
+				}
+				return u.FullName, u.UserID, nil
+			}
+		}
+	}
+	assignee := strings.TrimSpace(c.FormValue("assignee"))
+	if assignee == "" {
+		assignee = strings.TrimSpace(t.Assignee)
+	}
+	if assignee == "" {
+		return "", "", &pwActionErr{"assignee"}
+	}
+	uid := strings.TrimSpace(c.FormValue("assignee_user_id"))
+	if err := checkAssigneeInOrg(h.userRepo, t.OrgID, assignee, uid, t.Assignee); err != nil {
+		return "", "", &pwActionErr{"assignee"}
+	}
+	return assignee, uid, nil
+}
+
+func (h *WorkboardHandler) canMutateProjectWorkAction(c echo.Context, t *model.WorkTask) error {
+	members, _ := h.repo.ListMembers(t.TaskID)
+	if !canWriteProjectWorkAction(c, t, members) {
+		return echo.ErrForbidden
+	}
+	closed := isProjectWorkClosed(t)
+	unlocked := false
+	if h.unlockRepo != nil {
+		unlocked, _, _ = h.unlockRepo.HasActive(t.TaskID, currentUserID(c))
+	}
+	if closed && !unlocked {
+		return &pwActionErr{"locked"}
+	}
+	return nil
+}
+
+func (h *WorkboardHandler) LinkProjectWorkAction(c echo.Context) error {
+	t, err := h.loadProjectWorkForAction(c)
+	if err != nil {
+		return err
+	}
+	if err := h.canMutateProjectWorkAction(c, t); err != nil {
+		if code, ok := err.(*pwActionErr); ok {
+			return h.redirectPWAction(c, t.TaskID, code.code)
+		}
+		return err
+	}
+	pid := strings.TrimSpace(c.FormValue("project_id"))
+	before, after, err := h.repo.SetTaskProject(t.OrgID, t.TaskID, pid)
+	if err != nil {
+		return h.redirectPWAction(c, t.TaskID, "project")
+	}
+	line := "사업 연결: "
+	if before == "" {
+		line += "없음"
+	} else {
+		line += before
+	}
+	line += " → "
+	if after == "" {
+		line += "없음"
+	} else {
+		line += after
+	}
+	_, _ = h.repo.InsertWorkTaskProcess(model.WorkTaskProcess{
+		TaskID: t.TaskID, OrgID: t.OrgID, Worker: ctxString(c, "user_name"),
+		WorkerUserID: currentUserID(c), WorkContent: line,
+	})
+	return c.Redirect(http.StatusSeeOther, projectWorkActionPath(t.TaskID)+queryBack(c, "ok=saved"))
+}
+
+func (h *WorkboardHandler) ImportProjectWorkSites(c echo.Context) error {
+	t, err := h.loadProjectWorkForAction(c)
+	if err != nil {
+		return err
+	}
+	if err := h.canMutateProjectWorkAction(c, t); err != nil {
+		if code, ok := err.(*pwActionErr); ok {
+			return h.redirectPWAction(c, t.TaskID, code.code)
+		}
+		return err
+	}
+	if strings.TrimSpace(t.ProjectID) == "" {
+		return h.redirectPWAction(c, t.TaskID, "project")
+	}
+	_ = c.Request().ParseForm()
+	if err := h.repo.AddTaskCustomers(t.TaskID, t.ProjectID, c.Request().Form["site_id"]); err != nil {
+		return err
+	}
+	return c.Redirect(http.StatusSeeOther, projectWorkActionPath(t.TaskID)+queryBack(c, "ok=saved"))
 }

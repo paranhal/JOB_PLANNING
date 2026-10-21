@@ -97,6 +97,11 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 			return err
 		}
 	} else {
+		if refType == model.RefTypeWorkTask {
+			if err := h.guardWorkTaskPhotoMax(refID, headers); err != nil {
+				return redirectAttachFailure(c, redirect, err)
+			}
+		}
 		for i, fh := range headers {
 			if err := h.saveGenericFile(refType, refID, keywords, fh, i); err != nil {
 				return redirectAttachFailure(c, redirect, err)
@@ -700,6 +705,42 @@ func (h *AttachmentHandler) ListJSON(c echo.Context) error {
 	}
 	items, _ := h.repo.ListByRef(refType, refID)
 	return c.JSON(http.StatusOK, items)
+}
+
+func (h *AttachmentHandler) guardWorkTaskPhotoMax(taskID string, headers []*multipart.FileHeader) error {
+	add := 0
+	for _, fh := range headers {
+		if fh != nil && uploadHeaderIsImage(fh) {
+			add++
+		}
+	}
+	if add == 0 {
+		return nil
+	}
+	existing, _ := h.repo.ListByRef(model.RefTypeWorkTask, taskID)
+	n := 0
+	for _, a := range existing {
+		if a.IsImage() {
+			n++
+		}
+	}
+	if n+add > 3 {
+		return echo.NewHTTPError(http.StatusBadRequest, "attach_photo_max")
+	}
+	return nil
+}
+
+func uploadHeaderIsImage(fh *multipart.FileHeader) bool {
+	if fh == nil {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(fh.Filename))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif", ".bmp":
+		return true
+	}
+	ct := strings.ToLower(fh.Header.Get("Content-Type"))
+	return strings.HasPrefix(ct, "image/")
 }
 
 func (h *AttachmentHandler) guardWorkTaskAttach(c echo.Context, taskID string, write bool) error {

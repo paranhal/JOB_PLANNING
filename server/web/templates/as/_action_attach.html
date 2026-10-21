@@ -67,12 +67,12 @@
         <label class="block text-xs font-medium text-slate-600 mb-1">종류</label>
         <select name="ref_type" data-attach-kind form="as-action-attach-form"
                 class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-          <option value="as_action_photo">사진</option>
-          <option value="as">문서</option>
+          <option value="{{if .AttachPhotoType}}{{.AttachPhotoType}}{{else}}as_action_photo{{end}}">사진</option>
+          <option value="{{if .AttachDocType}}{{.AttachDocType}}{{else}}as{{end}}">문서</option>
         </select>
       </div>
-      <input type="hidden" name="ref_id" form="as-action-attach-form" value="{{.AS.ASID}}">
-      <input type="hidden" name="redirect" form="as-action-attach-form" value="/as/{{.AS.ASID}}/action">
+      <input type="hidden" name="ref_id" form="as-action-attach-form" value="{{if .AttachRefID}}{{.AttachRefID}}{{else}}{{.AS.ASID}}{{end}}">
+      <input type="hidden" name="redirect" form="as-action-attach-form" value="{{if .AttachRedirect}}{{.AttachRedirect}}{{else}}/as/{{.AS.ASID}}/action{{end}}">
       <div class="flex-1 min-w-[12rem]">
         <label class="block text-xs font-medium text-slate-600 mb-1">파일</label>
         <input type="file" name="file" data-attach-file form="as-action-attach-form" multiple required
@@ -92,12 +92,12 @@
 {{if and .CanProcess (not .ReadOnly)}}
 {{range .ActionPhotos}}
 <form id="as-attach-del-{{.AttachmentID}}" method="POST" action="/attachments/{{.AttachmentID}}/delete">
-  <input type="hidden" name="redirect" value="/as/{{$.AS.ASID}}/action">
+  <input type="hidden" name="redirect" value="{{if $.AttachRedirect}}{{$.AttachRedirect}}{{else}}/as/{{$.AS.ASID}}/action{{end}}">
 </form>
 {{end}}
 {{range .Attachments}}
 <form id="as-attach-del-{{.AttachmentID}}" method="POST" action="/attachments/{{.AttachmentID}}/delete">
-  <input type="hidden" name="redirect" value="/as/{{$.AS.ASID}}/action">
+  <input type="hidden" name="redirect" value="{{if $.AttachRedirect}}{{$.AttachRedirect}}{{else}}/as/{{$.AS.ASID}}/action{{end}}">
 </form>
 {{end}}
 {{end}}

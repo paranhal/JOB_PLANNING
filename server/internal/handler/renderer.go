@@ -86,7 +86,12 @@ func templateFiles(name string) []string {
 			files = append(files, partials...)
 		}
 		if name == "workboard/project_work_action.html" {
-			files = appendExisting(files, "web/templates/as/_action_parts.html")
+			files = appendExisting(files,
+				"web/templates/as/_action_parts.html",
+				"web/templates/as/_action_attach.html",
+				"web/templates/as/_photo_gallery.html",
+				"web/templates/as/_photo_zoom.html",
+			)
 		}
 	}
 	if strings.HasPrefix(name, "sales/") {
