@@ -207,8 +207,63 @@ func TestSearchKnowledgeIndependentKBO01HiddenFromO03(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if findKBHit(empty, pub.KBID) {
-		t.Fatal("지식 org_id 가 비면 작성자 소속으로 검색되면 안 된다")
+	if !findKBHit(empty, pub.KBID) {
+		t.Fatal("지식 org_id 가 비면 작성자 소속으로 검색돼야 한다")
+	}
+	emptyOther, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: "O03", Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findKBHit(emptyOther, pub.KBID) {
+		t.Fatal("작성자 소속이 O01인데 O03 검색에 나왔다")
+	}
+}
+
+func TestSearchKnowledgeIndependentKBO03HiddenFromO01(t *testing.T) {
+	repo, _ := setupASSearch(t)
+	if _, err := repo.db.Exec(`INSERT OR IGNORE INTO orgs(org_id,org_no,org_name,kind,is_active,sort_order) VALUES
+		('O03','O03','SI사업팀','business',1,30)`); err != nil {
+		t.Fatal(err)
+	}
+	author := seedKBAuthor(t, repo, "kb-o03", "O03", "SI담당")
+	pub, err := repo.PublishKB(KBWrite{
+		ActionText: "방화벽 예외를 등록해야 근본 해결", AuthorName: "SI담당",
+		AuthorID:   author.UserID, OrgID: "O03",
+		Symptom: "예약대출기 투입 목록",
+	})
+	if err != nil || pub == nil {
+		t.Fatalf("publish: %v", err)
+	}
+	hits, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: model.OrgIDLibrary, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findKBHit(hits, pub.KBID) {
+		t.Fatalf("O03 독립 지식이 O01 검색에 나왔다: %+v", hits)
+	}
+	own, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: "O03", Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !findKBHit(own, pub.KBID) {
+		t.Fatal("O03 검색에는 보여야 한다")
+	}
+	if _, err := repo.db.Exec(`UPDATE as_kb_entries SET org_id='' WHERE kb_id=?`, pub.KBID); err != nil {
+		t.Fatal(err)
+	}
+	emptyOwn, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: "O03", Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !findKBHit(emptyOwn, pub.KBID) {
+		t.Fatal("O03 작성자인데 org_id 가 비면 O03 검색에 보여야 한다")
+	}
+	emptyLib, _, err := repo.SearchKnowledge(model.ASSearchFilter{Query: "예약대출기", OrgID: model.OrgIDLibrary, Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findKBHit(emptyLib, pub.KBID) {
+		t.Fatal("O03 작성자 빈 org_id 가 O01 검색에 나왔다")
 	}
 }
 

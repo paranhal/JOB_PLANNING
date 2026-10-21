@@ -362,7 +362,10 @@ func (r *ASRepo) listCurrentKB(q, orgID string) ([]model.ASKBEntry, error) {
 		where += ` AND (
 			(TRIM(COALESCE(as_id,''))!='' AND EXISTS (SELECT 1 FROM as_receipts ar WHERE ar.as_id=as_kb_entries.as_id AND ar.org_id=?))
 			OR
-			(TRIM(COALESCE(as_id,''))='' AND TRIM(COALESCE(as_kb_entries.org_id,''))=?)
+			(TRIM(COALESCE(as_id,''))='' AND TRIM(COALESCE(
+				NULLIF(TRIM(COALESCE(as_kb_entries.org_id,'')),''),
+				(SELECT TRIM(COALESCE(u.org_id,'')) FROM users u WHERE u.user_id=as_kb_entries.author_id LIMIT 1)
+			)) = ?)
 		)`
 		args = append(args, orgID, orgID)
 	}
