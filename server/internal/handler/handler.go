@@ -95,6 +95,7 @@ func New(db *sql.DB) *Handler {
 	unlockRepo := repository.NewASUnlockRepo(db)
 	attachH := &AttachmentHandler{
 		repo: attachRepo, asRepo: asRepo, unlockRepo: unlockRepo, uploadDir: "data/uploads",
+		wbRepo: repository.NewWBRepo(db),
 	}
 
 	wbH := NewWorkboardHandler(

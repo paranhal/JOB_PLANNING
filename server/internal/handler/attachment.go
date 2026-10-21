@@ -23,6 +23,7 @@ type AttachmentHandler struct {
 	repo       *repository.AttachmentRepo
 	asRepo     *repository.ASRepo
 	unlockRepo *repository.ASUnlockRepo
+	wbRepo     *repository.WBRepo
 	uploadDir  string
 }
 
@@ -34,6 +35,11 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 
 	if !canUploadAttachment(c, refType) {
 		return redirectAttachFailure(c, redirect, echo.ErrForbidden)
+	}
+	if refType == model.RefTypeWorkTask {
+		if err := h.guardWorkTaskAttach(c, refID, true); err != nil {
+			return redirectAttachFailure(c, redirect, err)
+		}
 	}
 	refType, ok := safePathToken(refType)
 	if !ok {
@@ -488,6 +494,8 @@ func canUploadAttachment(c echo.Context, refType string) bool {
 		return canProcessAS(c) || canWriteMaster(c)
 	case model.RefTypeWorkActivity:
 		return canWriteWorkboard(c)
+	case model.RefTypeWorkTask:
+		return canWriteWorkboard(c)
 	default:
 		return canWriteMaster(c)
 	}
@@ -619,6 +627,10 @@ func (h *AttachmentHandler) UpdateKeywords(c echo.Context) error {
 		if err := h.guardActionPhotoWrite(c, att.RefID); err != nil {
 			return err
 		}
+	} else if att.RefType == model.RefTypeWorkTask {
+		if err := h.guardWorkTaskAttach(c, att.RefID, true); err != nil {
+			return err
+		}
 	} else if !canUploadAttachment(c, att.RefType) {
 		return echo.ErrForbidden
 	}
@@ -633,6 +645,11 @@ func (h *AttachmentHandler) Download(c echo.Context) error {
 	att, err := h.repo.GetByID(c.Param("id"))
 	if err != nil || att == nil {
 		return echo.ErrNotFound
+	}
+	if att.RefType == model.RefTypeWorkTask {
+		if err := h.guardWorkTaskAttach(c, att.RefID, false); err != nil {
+			return err
+		}
 	}
 	if att.IsVideo() {
 		return c.Inline(att.FilePath, att.DisplayName())
@@ -651,6 +668,10 @@ func (h *AttachmentHandler) Delete(c echo.Context) error {
 		}
 	} else if att.RefType == model.RefTypeASActionPhoto {
 		if err := h.guardActionPhotoWrite(c, att.RefID); err != nil {
+			return err
+		}
+	} else if att.RefType == model.RefTypeWorkTask {
+		if err := h.guardWorkTaskAttach(c, att.RefID, true); err != nil {
 			return err
 		}
 	} else if !canUploadAttachment(c, att.RefType) {
@@ -672,8 +693,47 @@ func removeAttachmentFiles(att *model.Attachment) {
 func (h *AttachmentHandler) ListJSON(c echo.Context) error {
 	refType := c.QueryParam("ref_type")
 	refID := c.QueryParam("ref_id")
+	if refType == model.RefTypeWorkTask {
+		if err := h.guardWorkTaskAttach(c, refID, false); err != nil {
+			return err
+		}
+	}
 	items, _ := h.repo.ListByRef(refType, refID)
 	return c.JSON(http.StatusOK, items)
+}
+
+func (h *AttachmentHandler) guardWorkTaskAttach(c echo.Context, taskID string, write bool) error {
+	if h.wbRepo == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "업무를 확인할 수 없습니다")
+	}
+	t, err := h.wbRepo.GetTask(strings.TrimSpace(taskID))
+	if err != nil || t == nil {
+		return echo.ErrNotFound
+	}
+	if err := denyOtherOrgTask(c, t); err != nil {
+		return err
+	}
+	if t.WorkType != model.WBWorkProjectWork {
+		return echo.ErrNotFound
+	}
+	_ = h.wbRepo.LoadTaskActionFields(t)
+	if !write {
+		return nil
+	}
+	members, _ := h.wbRepo.ListMembers(t.TaskID)
+	if !canWriteProjectWorkAction(c, t, members) {
+		return echo.ErrForbidden
+	}
+	if isProjectWorkClosed(t) {
+		unlocked := false
+		if h.unlockRepo != nil {
+			unlocked, _, _ = h.unlockRepo.HasActive(t.TaskID, currentUserID(c))
+		}
+		if !unlocked {
+			return echo.NewHTTPError(http.StatusForbidden, "완료·취소 건은 읽기 전용입니다. 관리자는 수정 잠금 해제 후 이용하세요")
+		}
+	}
+	return nil
 }
 
 // PromoteToAsset 접수 사진을 설치자산 슬롯으로 복사한다 (§12.9.6).
