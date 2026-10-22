@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -29,18 +32,20 @@ func (h *ProjectHandler) ContractImport(c echo.Context) error {
 	if !canDownloadContractImport(c) {
 		return echo.ErrForbidden
 	}
-	return h.renderContractImport(c, nil, false)
+	return h.renderContractImport(c, nil, "", false, false)
 }
 
-func (h *ProjectHandler) renderContractImport(c echo.Context, prev *model.ContractImportPreview, applied bool) error {
+func (h *ProjectHandler) renderContractImport(c echo.Context, prev *model.ContractImportPreview, token string, applied, needPipe bool) error {
 	return c.Render(http.StatusOK, "project/import.html", map[string]interface{}{
-		"Title":       "사업 엑셀 등록",
-		"Active":      NavProjectsImport,
-		"CanWrite":    canWriteContractImport(c),
-		"CanDownload": canDownloadContractImport(c),
-		"Preview":     prev,
-		"Apply":       applied,
-		"FlashErr":    c.QueryParam("err"),
+		"Title":               "사업 엑셀 등록",
+		"Active":              NavProjectsImport,
+		"CanWrite":            canWriteContractImport(c),
+		"CanDownload":         canDownloadContractImport(c),
+		"Preview":             prev,
+		"PreviewToken":        token,
+		"Apply":               applied,
+		"NeedPipelineConfirm": needPipe,
+		"FlashErr":            c.QueryParam("err"),
 	})
 }
 
@@ -75,6 +80,32 @@ func (h *ProjectHandler) readContractUpload(c echo.Context) ([]byte, string, err
 	return raw, fh.Filename, nil
 }
 
+func (h *ProjectHandler) contractUpload(c echo.Context, consumeApply bool) ([]byte, string, error) {
+	tok := strings.TrimSpace(c.FormValue("preview_token"))
+	if tok != "" {
+		raw, name, err := h.importHold.Get(currentUserID(c), currentOrg(c), tok, consumeApply)
+		if err != nil {
+			return nil, "", err
+		}
+		return raw, name, nil
+	}
+	return h.readContractUpload(c)
+}
+
+func (h *ProjectHandler) rememberContractUpload(c echo.Context, raw []byte, name string) string {
+	if h.importHold == nil {
+		h.importHold = newContractImportHold()
+	}
+	return h.importHold.Put(currentUserID(c), currentOrg(c), name, raw)
+}
+
+func (h *ProjectHandler) holdErrStatus(err error) error {
+	if errors.Is(err, errImportHoldForbidden) || errors.Is(err, errImportHoldUsed) {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+	return nil
+}
+
 func (h *ProjectHandler) contractImportScope(c echo.Context) (repository.CatImportScope, error) {
 	return h.catImportScope(c)
 }
@@ -83,8 +114,11 @@ func (h *ProjectHandler) ContractImportPreview(c echo.Context) error {
 	if !canWriteContractImport(c) {
 		return echo.ErrForbidden
 	}
-	raw, name, err := h.readContractUpload(c)
+	raw, name, err := h.contractUpload(c, false)
 	if err != nil {
+		if he := h.holdErrStatus(err); he != nil {
+			return he
+		}
 		return c.Redirect(http.StatusSeeOther, "/projects/import?err="+url.QueryEscape(err.Error()))
 	}
 	scope, err := h.contractImportScope(c)
@@ -95,34 +129,68 @@ func (h *ProjectHandler) ContractImportPreview(c echo.Context) error {
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/projects/import?err="+url.QueryEscape(err.Error()))
 	}
-	return h.renderContractImport(c, prev, false)
+	tok := h.rememberContractUpload(c, raw, name)
+	return h.renderContractImport(c, prev, tok, false, false)
+}
+
+func parseContractImportApplyOpt(c echo.Context) model.ContractImportApplyOpt {
+	opt := model.ContractImportApplyOpt{
+		Pipeline: strings.TrimSpace(c.FormValue("pipeline")),
+		Stage:    strings.TrimSpace(c.FormValue("pipeline_stage")),
+	}
+	if strings.TrimSpace(c.FormValue("pipeline_lines_present")) == "1" {
+		opt.Lines = map[int]bool{}
+		_ = c.Request().ParseForm()
+		for _, v := range c.Request().Form["pipeline_line"] {
+			n, err := strconv.Atoi(strings.TrimSpace(v))
+			if err == nil && n > 0 {
+				opt.Lines[n] = true
+			}
+		}
+	}
+	return opt
 }
 
 func (h *ProjectHandler) ContractImportApply(c echo.Context) error {
 	if !canWriteContractImport(c) {
 		return echo.ErrForbidden
 	}
-	raw, name, err := h.readContractUpload(c)
+	opt := parseContractImportApplyOpt(c)
+	consume := opt.Pipeline == "yes" || opt.Pipeline == "no"
+	raw, name, err := h.contractUpload(c, consume)
 	if err != nil {
+		if he := h.holdErrStatus(err); he != nil {
+			return he
+		}
 		return c.Redirect(http.StatusSeeOther, "/projects/import?err="+url.QueryEscape(err.Error()))
 	}
 	scope, err := h.contractImportScope(c)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/projects/import?err="+url.QueryEscape(err.Error()))
 	}
-	prev, err := h.repo.ApplyContractImport(currentUserID(c), name, raw, scope, time.Now())
+	tok := strings.TrimSpace(c.FormValue("preview_token"))
+	if tok == "" {
+		tok = h.rememberContractUpload(c, raw, name)
+	}
+	prev, err := h.repo.ApplyContractImport(currentUserID(c), name, raw, scope, time.Now(), opt)
+	if errors.Is(err, repository.ErrPipelineNeedsConfirm) {
+		return h.renderContractImport(c, prev, tok, false, true)
+	}
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/projects/import?err="+url.QueryEscape(err.Error()))
 	}
-	return h.renderContractImport(c, prev, true)
+	return h.renderContractImport(c, prev, tok, true, false)
 }
 
 func (h *ProjectHandler) ContractImportErrors(c echo.Context) error {
 	if !canWriteContractImport(c) {
 		return echo.ErrForbidden
 	}
-	raw, name, err := h.readContractUpload(c)
+	raw, name, err := h.contractUpload(c, false)
 	if err != nil {
+		if he := h.holdErrStatus(err); he != nil {
+			return he
+		}
 		return err
 	}
 	scope, err := h.contractImportScope(c)

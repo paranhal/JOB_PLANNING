@@ -28,6 +28,7 @@ type ProjectHandler struct {
 	userRepo     *repository.UserRepo
 	pe           *repository.ProjectEquipRepo
 	backup       backup.Config
+	importHold   *contractImportHold
 }
 
 func NewProjectHandler(
@@ -43,6 +44,7 @@ func NewProjectHandler(
 		repo: repo, wbRepo: wbRepo,
 		customerRepo: customerRepo, contactRepo: contactRepo, codeRepo: codeRepo,
 		assetRepo: assetRepo, userRepo: userRepo,
+		importHold: newContractImportHold(),
 	}
 }
 
