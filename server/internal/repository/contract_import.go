@@ -184,6 +184,16 @@ func (r *ProjectRepo) PreviewContractImport(raw []byte, fileName string, scope C
 		}
 		out.Rows = append(out.Rows, ir)
 	}
+	tallyContractPreview(out)
+	return out, nil
+}
+
+func tallyContractPreview(out *model.ContractImportPreview) {
+	if out == nil {
+		return
+	}
+	out.NewN, out.SkipN, out.ErrN = 0, 0, 0
+	out.ErrMissingN, out.ErrDeniedN, out.ErrOtherN = 0, 0, 0
 	for _, ir := range out.Rows {
 		switch ir.Action {
 		case "new":
@@ -192,9 +202,16 @@ func (r *ProjectRepo) PreviewContractImport(raw []byte, fileName string, scope C
 			out.SkipN++
 		default:
 			out.ErrN++
+			switch ir.ErrKind {
+			case "missing_customer":
+				out.ErrMissingN++
+			case "org_denied":
+				out.ErrDeniedN++
+			default:
+				out.ErrOtherN++
+			}
 		}
 	}
-	return out, nil
 }
 
 func contractDupKey(ir model.ContractImportRow) string {
@@ -253,7 +270,12 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 	}
 	ir.OrgID = org
 	if scope.Allowed != nil && !scope.Allowed[org] {
-		ir.Action, ir.Msg = "err", "쓸 수 없는 조직입니다"
+		label := strings.TrimSpace(ir.OrgLabel)
+		if label == "" {
+			label = org
+		}
+		ir.Action, ir.ErrKind, ir.Msg = "err", "org_denied",
+			fmt.Sprintf("이 계정으로는 %s 사업을 등록할 수 없습니다 — 해당 팀 관리자 또는 시스템 관리자가 올려 주세요", label)
 		return ir
 	}
 	kind, err := model.InferContractKind(vals[4], ir.Name)
@@ -300,14 +322,18 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 	ir.ContractNo, ir.SalesUser, ir.ExecUser, ir.Notes = vals[10], vals[11], vals[12], vals[13]
 	partyID, err := r.lookupCustomerName(ir.PartyName, ir.OrgID)
 	if err != nil {
-		ir.Action, ir.Msg = "err", err.Error()
+		ir.Action = "err"
+		ir.MissingName, ir.MissingRole = ir.PartyName, "발주처"
+		ir.ErrKind, ir.Msg = customerLookupErr(err, "발주처", ir.PartyName)
 		return ir
 	}
 	ir.PartyID = partyID
 	for _, name := range model.SplitEndCustomers(vals[3]) {
 		id, err := r.lookupCustomerName(name, ir.OrgID)
 		if err != nil {
-			ir.Action, ir.Msg = "err", "최종수요처 "+err.Error()
+			ir.Action = "err"
+			ir.MissingName, ir.MissingRole = name, "최종수요처"
+			ir.ErrKind, ir.Msg = customerLookupErr(err, "최종수요처", name)
 			return ir
 		}
 		ir.EndNames = append(ir.EndNames, name)
@@ -395,32 +421,110 @@ func (r *ProjectRepo) lookupOrgLabel(s string) (string, error) {
 	return "", fmt.Errorf("부서가 없습니다")
 }
 
-func (r *ProjectRepo) lookupCustomerName(name, orgID string) (string, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", fmt.Errorf("이름이 없습니다")
+type customerLookupFail struct {
+	kind string // none | many
+	name string
+}
+
+func (e customerLookupFail) Error() string {
+	if e.kind == "many" {
+		return fmt.Sprintf("같은 이름의 고객이 여러 개입니다: %s (상위기관명으로 구분해 주세요)", e.name)
 	}
-	rows, err := r.db.Query(`SELECT customer_id FROM customers
-		WHERE org_id=? AND (TRIM(COALESCE(org_name,''))=? OR TRIM(COALESCE(official_name,''))=?)`, orgID, name, name)
+	if strings.TrimSpace(e.name) == "" {
+		return "이름이 없습니다"
+	}
+	return fmt.Sprintf("고객 마스터에 없습니다: %s", e.name)
+}
+
+func customerLookupErr(err error, role, name string) (kind, msg string) {
+	if e, ok := err.(customerLookupFail); ok {
+		if e.kind == "many" {
+			return "ambiguous", e.Error()
+		}
+		if strings.TrimSpace(name) == "" {
+			return "missing_customer", e.Error()
+		}
+		return "missing_customer", fmt.Sprintf("%s 고객 마스터에 없습니다: %s", role, name)
+	}
+	if err != nil {
+		return "missing_customer", err.Error()
+	}
+	return "", ""
+}
+
+func normCustomerName(s string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
+}
+
+func compactCustomerName(s string) string {
+	return strings.ReplaceAll(normCustomerName(s), " ", "")
+}
+
+func customerNameMatch(got, want string) bool {
+	w := compactCustomerName(want)
+	if w == "" {
+		return false
+	}
+	return compactCustomerName(got) == w
+}
+
+// lookupCustomerName 활성 고객 전체에서 이름 일치. 95-2B: 조직 무관, 사업 부서 소속이 1건이면 우선.
+func (r *ProjectRepo) lookupCustomerName(name, orgID string) (string, error) {
+	want := normCustomerName(name)
+	if want == "" {
+		return "", customerLookupFail{kind: "none", name: ""}
+	}
+	compact := compactCustomerName(want)
+	rows, err := r.db.Query(`SELECT customer_id, TRIM(COALESCE(org_id,'')), TRIM(COALESCE(org_name,'')), TRIM(COALESCE(official_name,''))
+		FROM customers
+		WHERE COALESCE(is_active,1)=1
+		  AND (
+			TRIM(COALESCE(org_name,''))=? OR TRIM(COALESCE(official_name,''))=?
+			OR REPLACE(TRIM(COALESCE(org_name,'')),' ','')=? OR REPLACE(TRIM(COALESCE(official_name,'')),' ','')=?
+		  )`, want, want, compact, compact)
 	if err != nil {
 		return "", err
 	}
 	defer rows.Close()
-	var ids []string
+	type hit struct{ id, org string }
+	var hits []hit
+	seen := map[string]bool{}
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var id, org, oname, official string
+		if err := rows.Scan(&id, &org, &oname, &official); err != nil {
 			return "", err
 		}
-		ids = append(ids, id)
+		if !customerNameMatch(oname, want) && !customerNameMatch(official, want) {
+			continue
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		hits = append(hits, hit{id, org})
 	}
-	if len(ids) == 0 {
-		return "", fmt.Errorf("고객 마스터에 없습니다")
+	if err := rows.Err(); err != nil {
+		return "", err
 	}
-	if len(ids) > 1 {
-		return "", fmt.Errorf("이름이 같은 고객이 여러 명입니다")
+	if len(hits) == 0 {
+		return "", customerLookupFail{kind: "none", name: want}
 	}
-	return ids[0], nil
+	var sameOrg []hit
+	for _, h := range hits {
+		if orgID != "" && h.org == orgID {
+			sameOrg = append(sameOrg, h)
+		}
+	}
+	if len(sameOrg) == 1 {
+		return sameOrg[0].id, nil
+	}
+	if len(sameOrg) > 1 {
+		return "", customerLookupFail{kind: "many", name: want}
+	}
+	if len(hits) == 1 {
+		return hits[0].id, nil
+	}
+	return "", customerLookupFail{kind: "many", name: want}
 }
 
 func (r *ProjectRepo) lookupUserName(name, orgID string) (string, error) {
@@ -476,17 +580,7 @@ func (r *ProjectRepo) ApplyContractImport(userID, fileName string, raw []byte, s
 		}
 		ok++
 	}
-	prev.ErrN, prev.NewN, prev.SkipN = 0, 0, 0
-	for _, ir := range prev.Rows {
-		switch ir.Action {
-		case "new":
-			prev.NewN++
-		case "skip":
-			prev.SkipN++
-		default:
-			prev.ErrN++
-		}
-	}
+	tallyContractPreview(prev)
 	n, err := nextSeqTx(tx, "contract_import")
 	if err != nil {
 		return nil, err
@@ -629,5 +723,76 @@ func BuildContractErrorWorkbook(prev *model.ContractImportPreview) ([]byte, erro
 			rows = append(rows, []string{strconv.Itoa(r.Line), r.Action, r.Name, r.Msg})
 		}
 	}
-	return BuildContractWorkbook([]string{"오류 목록"}, rows)
+	raw, err := BuildContractWorkbook([]string{"오류 목록"}, rows)
+	if err != nil {
+		return nil, err
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	const missSheet = "누락 고객"
+	if idx, _ := f.GetSheetIndex(missSheet); idx < 0 {
+		_, _ = f.NewSheet(missSheet)
+	}
+	miss := collectMissingCustomers(prev)
+	hdrFill, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Bold: true, Size: 11, Family: "맑은 고딕", Color: "FFFFFF"},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"1E3A5F"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center", WrapText: true},
+	})
+	_ = f.SetSheetRow(missSheet, "A1", &[]interface{}{"고객명", "구분", "사업명"})
+	_ = f.SetCellStyle(missSheet, "A1", "C1", hdrFill)
+	for i, row := range miss {
+		_ = f.SetCellValue(missSheet, fmt.Sprintf("A%d", i+2), ExcelSafeText(row[0]))
+		_ = f.SetCellValue(missSheet, fmt.Sprintf("B%d", i+2), ExcelSafeText(row[1]))
+		_ = f.SetCellValue(missSheet, fmt.Sprintf("C%d", i+2), ExcelSafeText(row[2]))
+	}
+	_ = f.SetRowHeight(missSheet, 1, 22)
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func collectMissingCustomers(prev *model.ContractImportPreview) [][]string {
+	type key struct{ name, role string }
+	seen := map[key][]string{}
+	var order []key
+	if prev == nil {
+		return nil
+	}
+	for _, r := range prev.Rows {
+		if r.Action != "err" || r.ErrKind != "missing_customer" || strings.TrimSpace(r.MissingName) == "" {
+			continue
+		}
+		k := key{normCustomerName(r.MissingName), r.MissingRole}
+		if k.role == "" {
+			k.role = "발주처"
+		}
+		if _, ok := seen[k]; !ok {
+			order = append(order, k)
+		}
+		seen[k] = appendUnique(seen[k], r.Name)
+	}
+	var out [][]string
+	for _, k := range order {
+		out = append(out, []string{k.name, k.role, strings.Join(seen[k], "; ")})
+	}
+	return out
+}
+
+func appendUnique(list []string, s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return list
+	}
+	for _, x := range list {
+		if x == s {
+			return list
+		}
+	}
+	return append(list, s)
 }
