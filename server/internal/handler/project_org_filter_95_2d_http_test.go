@@ -136,17 +136,20 @@ func TestRegistryOrgFilterAdminsAndCLevel(t *testing.T) {
 	if !strings.Contains(b, "O03고유A-95-2D") || !strings.Contains(b, "O03고유B-95-2D") {
 		t.Fatal("SI 자기 팀 사업 없음")
 	}
-	if strings.Contains(b, "O01고유A-95-2D") || strings.Contains(b, "O02고유A-95-2D") {
-		t.Fatal("SI 목록에 타 조직 사업")
+	if !strings.Contains(b, "O01고유A-95-2D") || !strings.Contains(b, "O02고유A-95-2D") {
+		t.Fatal("95-2E SI 목록에 타 조직 사업 없음")
+	}
+	if !strings.Contains(b, "소속 조직") {
+		t.Fatal("사업 목록 소속 조직 컬럼 없음")
 	}
 
 	oa01 := getHTMLWith(t, e, "/projects/registry", ck.oa01)
-	if strings.Contains(oa01.Body.String(), "O03고유A-95-2D") {
-		t.Fatal("도서관 목록에 SI 사업")
+	if !strings.Contains(oa01.Body.String(), "O03고유A-95-2D") {
+		t.Fatal("95-2E 도서관 목록에 SI 사업 없음")
 	}
 	oa02 := getHTMLWith(t, e, "/projects/registry", ck.oa02)
-	if strings.Contains(oa02.Body.String(), "O01고유A-95-2D") {
-		t.Fatal("미디어 목록에 도서관 사업")
+	if !strings.Contains(oa02.Body.String(), "O01고유A-95-2D") {
+		t.Fatal("95-2E 미디어 목록에 도서관 사업 없음")
 	}
 
 	vs := getHTMLWith(t, e, "/projects/registry", ck.vs)
@@ -173,8 +176,8 @@ func TestSharedProjectViewOnlyNotOtherTeam(t *testing.T) {
 	if !strings.Contains(oa02.Body.String(), "O01공개-95-2D") {
 		t.Fatal("공개 대상 팀에 안 보임")
 	}
-	if strings.Contains(oa02.Body.String(), "O01비공개-95-2D") {
-		t.Fatal("비공개가 대상 팀에 보임")
+	if !strings.Contains(oa02.Body.String(), "O01비공개-95-2D") {
+		t.Fatal("95-2E 전 직원 조회 — 비공개도 대상 팀에 보여야 한다")
 	}
 	show := getHTMLWith(t, e, "/projects/"+sharedID, ck.oa02)
 	if show.Code != http.StatusOK {
@@ -194,12 +197,15 @@ func TestSharedProjectViewOnlyNotOtherTeam(t *testing.T) {
 	}
 
 	oa03 := getHTMLWith(t, e, "/projects/registry", ck.oa03)
-	if strings.Contains(oa03.Body.String(), "O01공개-95-2D") {
-		t.Fatal("비대상 팀에 공개 사업")
+	if !strings.Contains(oa03.Body.String(), "O01공개-95-2D") {
+		t.Fatal("95-2E 비대상 팀도 조회")
 	}
 	miss := getHTMLWith(t, e, "/projects/"+sharedID, ck.oa03)
-	if miss.Code != http.StatusNotFound {
-		t.Fatalf("비대상 상세 %d", miss.Code)
+	if miss.Code != http.StatusOK {
+		t.Fatalf("95-2E 타 조직 상세 %d", miss.Code)
+	}
+	if strings.Contains(miss.Body.String(), `href="/projects/`+sharedID+`/edit"`) {
+		t.Fatal("타 조직 상세에 수정 버튼")
 	}
 }
 
@@ -208,15 +214,15 @@ func TestOtherOrgProjectURLDenied95_12(t *testing.T) {
 	id := seedOrgContractProject(t, db, repo, "O01직접URL-95-2D", "O01")
 
 	show := getHTMLWith(t, e, "/projects/"+id, ck.oa03)
-	if show.Code != http.StatusNotFound {
-		t.Fatalf("상세 %d", show.Code)
+	if show.Code != http.StatusOK {
+		t.Fatalf("95-2E 상세 조회 %d", show.Code)
 	}
-	if !strings.Contains(show.Body.String(), "페이지를 찾을 수 없습니다") {
-		t.Fatal("95-12 404 화면 아님")
+	if strings.Contains(show.Body.String(), `href="/projects/`+id+`/edit"`) {
+		t.Fatal("타 조직 수정 버튼")
 	}
 	years := getHTMLWith(t, e, "/projects/"+id+"/years", ck.oa03)
-	if years.Code != http.StatusNotFound {
-		t.Fatalf("연차 %d", years.Code)
+	if years.Code != http.StatusOK {
+		t.Fatalf("연차 조회 %d", years.Code)
 	}
 
 	htmlPost := postFormWith(t, e, "/projects/"+id+"/archive", url.Values{}, ck.oa03, "text/html", "/projects/registry")
@@ -250,8 +256,8 @@ func TestWorkPickProjectsStaysOrgIndependent(t *testing.T) {
 	e, db, repo, ck := newProjectOrgFilterHTTP(t)
 	seedOrgContractProject(t, db, repo, "O01픽목록-95-2D", "O01")
 	reg := getHTMLWith(t, e, "/projects/registry", ck.oa03)
-	if strings.Contains(reg.Body.String(), "O01픽목록-95-2D") {
-		t.Fatal("등록 관리에 타 조직이 보인다")
+	if !strings.Contains(reg.Body.String(), "O01픽목록-95-2D") {
+		t.Fatal("95-2E 등록 관리에 타 조직이 안 보인다")
 	}
 	pick := getHTMLWith(t, e, "/workboard/register?view=day", ck.oa03)
 	if pick.Code != http.StatusOK {

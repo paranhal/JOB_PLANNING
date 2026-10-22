@@ -55,8 +55,17 @@ func TestOrgCrossNoLeak(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cn != 1 || len(custs) != 1 || custs[0].CustomerID != "C-O1" {
-		t.Fatalf("customer O01 n=%d", cn)
+	foundO1, foundO2 := false, false
+	for _, it := range custs {
+		if it.CustomerID == "C-O1" {
+			foundO1 = true
+		}
+		if it.CustomerID == "C-O2" {
+			foundO2 = true
+		}
+	}
+	if cn < 2 || !foundO1 || !foundO2 {
+		t.Fatalf("95-2E 고객 전사 공용 n=%d o1=%v o2=%v", cn, foundO1, foundO2)
 	}
 
 	sales := NewSalesRepo(db)

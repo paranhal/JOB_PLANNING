@@ -21,14 +21,17 @@ func TestOrgScopeStaticAudit(t *testing.T) {
 	if !strings.Contains(orgScopeAllowlist["SearchCustomersWithoutConfig"], "Q1") {
 		t.Fatal("SearchCustomersWithoutConfig 를 orgScopeAllowlist 에 95-9A Q1 사유와 함께 등록해야 한다")
 	}
-	if !strings.Contains(orgScopeAllowlist["lookupCustomerName"], "95-2B") {
-		t.Fatal("lookupCustomerName 를 orgScopeAllowlist 에 95-2B 사유와 함께 등록해야 한다")
+	if !strings.Contains(orgScopeAllowlist["lookupCustomerName"], "95-2E") {
+		t.Fatal("lookupCustomerName 를 orgScopeAllowlist 에 전사 공용 마스터 — 95-2E 사유와 함께 등록해야 한다")
+	}
+	if !strings.Contains(orgScopeAllowlist["List"], "95-2E") {
+		t.Fatal("CustomerRepo.List 를 orgScopeAllowlist 에 전사 공용 마스터 — 95-2E 사유와 함께 등록해야 한다")
 	}
 	if !strings.Contains(orgScopeAllowlist["ListWorkPickProjects"], "95-9A") {
 		t.Fatal("ListWorkPickProjects 를 orgScopeAllowlist 에 95-9A 사유와 함께 등록해야 한다")
 	}
-	if _, ok := orgScopeAllowlist["listProjects"]; ok {
-		t.Fatal("listProjects 는 사업 등록 관리 조회 — allowlist 예외가 아니라 org 필터를 넣는다")
+	if !strings.Contains(orgScopeAllowlist["listProjects"], "95-2E") {
+		t.Fatal("listProjects 전 직원 조회는 allowlist 에 95-2E 사유를 적는다. 쓰기는 GetVisible(write)")
 	}
 
 	root := "."

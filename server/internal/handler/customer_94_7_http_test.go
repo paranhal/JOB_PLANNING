@@ -78,13 +78,17 @@ func TestCustomer947VisionAllOrgRequiresPick(t *testing.T) {
 		t.Fatal("전체 보기 조직 드롭다운 없음")
 	}
 	miss := postForm947(t, e, "/customers", url.Values{
-		"org_name": {"전체보기기관"}, "official_name": {"전체보기기관"},
+		"org_name": {"전체보기기본기관"}, "official_name": {"전체보기기본기관"},
 	}, ck)
 	if miss.Code == http.StatusInternalServerError {
 		t.Fatal("미선택 500")
 	}
-	if miss.Code != http.StatusOK || !strings.Contains(miss.Body.String(), errNeedInsertOrg) {
-		t.Fatalf("미선택 status=%d body=%s", miss.Code, miss.Body.String()[:minInt(400, miss.Body.Len())])
+	if miss.Code != http.StatusSeeOther {
+		t.Fatalf("95-2E 전체보기 미선택도 기본 조직으로 저장 status=%d", miss.Code)
+	}
+	var defOrg string
+	if err := db.QueryRow(`SELECT org_id FROM customers WHERE org_name='전체보기기본기관'`).Scan(&defOrg); err != nil || defOrg != model.OrgIDLibrary {
+		t.Fatalf("기본 org=%q err=%v", defOrg, err)
 	}
 	ok := postForm947(t, e, "/customers", url.Values{
 		"org_name": {"전체보기기관"}, "official_name": {"전체보기기관"}, "org_id": {"O02"},

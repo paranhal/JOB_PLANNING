@@ -133,8 +133,8 @@ func TestObserverDefaultSeesHomeOrgLikeOrgAdmin(t *testing.T) {
 	oreq := httptest.NewRequest(http.MethodGet, "/customers?search="+url.QueryEscape("이팀고객"), nil)
 	oreq.AddCookie(ck)
 	e.ServeHTTP(other, oreq)
-	if other.Code != http.StatusOK || strings.Contains(other.Body.String(), "전체 1개 기관") {
-		t.Fatal("타 조직 고객이 보인다")
+	if other.Code != http.StatusOK || !strings.Contains(other.Body.String(), "이팀고객") {
+		t.Fatal("95-2E 타 조직 고객이 안 보인다")
 	}
 	body := home.Body.String()
 	if strings.Contains(body, "시점으로 보고 있습니다") {
@@ -189,8 +189,8 @@ func TestObserverViewAsInheritsRoleOrgAndBlocksWrite(t *testing.T) {
 	hreq.AddCookie(ck)
 	hreq.AddCookie(vas)
 	e.ServeHTTP(home, hreq)
-	if home.Code != http.StatusOK || strings.Contains(home.Body.String(), "전체 1개 기관") {
-		t.Fatal("읽기전용 홈 조직이 섞였다")
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "일팀고객") {
+		t.Fatal("95-2E view-as 에서도 고객은 전사 공용")
 	}
 	if !strings.Contains(body, "지금") || !strings.Contains(body, "이해진") || !strings.Contains(body, "시점으로 보고 있습니다") {
 		t.Fatal("시점 띠가 없다")
