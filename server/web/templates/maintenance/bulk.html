@@ -50,6 +50,11 @@
           <label class="label" for="bulk-rounds">주기당 회차 수</label>
           <input id="bulk-rounds" type="number" min="1" name="rounds_per_period" value="1" class="input w-24" x-model="rounds">
         </div>
+        <div>
+          <label class="label" for="bulk-fallback">지역을 지정하는 값(선택)</label>
+          <input id="bulk-fallback" type="text" name="fallback_region" value="{{.FallbackRegion}}" class="input" placeholder="주소에서 모를 때만">
+          <p class="text-ui-sm text-ink-muted mt-1">비우면 주소 기준. 값을 넣으면 지역이 비어 있는 행에만 채웁니다.</p>
+        </div>
         {{if and (not .Legacy) .Products}}
         <div class="flex flex-wrap gap-3">
           {{range .Products}}
@@ -68,6 +73,9 @@
         <span class="text-ui-sm text-ink-muted">선택 <span x-text="sel"></span> / 전체 {{.Selectable}}</span>
         <button type="submit" class="btn btn-primary btn-sm" x-ref="go" :disabled="busy">등록 (<span x-text="sel"></span>곳)</button>
       </div>
+      {{if gt .WarnNoRegion 0}}
+      <p class="flash-warning rounded-control">지역을 알 수 없는 학교 {{.WarnNoRegion}}곳 — 등록 후 지역을 지정하세요</p>
+      {{end}}
     </div>
     <div class="card overflow-x-auto max-h-96 overflow-y-auto">
       <table class="w-full text-ui">
@@ -132,15 +140,26 @@
   <div x-data="{open:true}" x-show="open" x-cloak class="modal-backdrop z-50 flex items-center justify-center p-4" role="dialog">
     <div class="modal-panel w-full max-w-md shadow-pop">
       <h2 class="text-ui font-bold text-ink">등록 결과</h2>
-      <p class="mt-2 text-ui text-ink">등록 {{.Result.Registered}}곳 / 건너뜀 {{len .Result.Skipped}}곳. 점검 일정은 자동 생성되지 않습니다.</p>
+      <p class="mt-2 text-ui text-ink">등록 {{.Result.Registered}}곳 / 건너뜀 {{len .Result.Skipped}}곳. 지역 없음 {{.Result.NoRegion}}곳.</p>
+      <p class="mt-2 text-ui-sm text-ink-muted">점검 일정은 자동으로 만들어지지 않습니다. 반기 사이트는 해당 반기에 점검 계획 화면의 미배정 목록에서 확인하세요.</p>
+      {{if gt .Result.NoRegion 0}}
+      <p class="flash-warning rounded-control mt-2">지역 없는 사이트가 {{.Result.NoRegion}}곳 있습니다. 지역을 지정하세요.</p>
+      {{end}}
       {{if .Result.Skipped}}
       <ul class="mt-2 text-ui-sm text-ink-muted space-y-1">
         {{range .Result.Skipped}}<li>{{.Name}} — {{.Reason}}</li>{{end}}
       </ul>
       <a href="/maintenance/sites/bulk/skips.xlsx" class="btn btn-secondary btn-sm mt-3">건너뜀 목록 엑셀</a>
       {{end}}
-      <div class="mt-4 flex justify-end gap-2">
-        <a href="/maintenance/sites" class="btn btn-primary">점검 사이트 목록으로</a>
+      <div class="mt-4 flex flex-wrap justify-end gap-2">
+        {{if .Result.BatchID}}
+        <a href="/maintenance/sites?batch={{.Result.BatchID}}" class="btn btn-primary">방금 등록한 사이트 보기</a>
+        {{if gt .Result.NoRegion 0}}
+        <a href="/maintenance/sites?batch={{.Result.BatchID}}&region=none" class="btn btn-secondary">지역 없는 사이트 지정하기</a>
+        {{end}}
+        {{end}}
+        <a href="{{.PlanHref}}" class="btn btn-secondary">점검 계획</a>
+        <a href="/maintenance/sites" class="btn btn-secondary">점검 사이트 목록으로</a>
         <button type="button" class="btn btn-secondary" @click="open=false">닫기</button>
       </div>
     </div>

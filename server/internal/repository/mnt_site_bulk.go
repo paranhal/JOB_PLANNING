@@ -210,10 +210,12 @@ func (r *MaintenanceRepo) BulkRegisterSites(in model.SiteBulkRegisterInput) (*mo
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	batchID := randomID("b15")
+	fallback := strings.TrimSpace(in.FallbackRegion)
 	ins, err := tx.Prepare(`
 		INSERT INTO maintenance_site_config
-		(customer_id, short_name, region, has_klas, has_rfid, inspection_cycle, entry_category, fixed_rule, rounds_per_period, org_id, updated_at)
-		VALUES (?,?,?,0,0,?,?,?,?,?, CURRENT_TIMESTAMP)`)
+		(customer_id, short_name, region, has_klas, has_rfid, inspection_cycle, entry_category, fixed_rule, rounds_per_period, org_id, bulk_batch_id, updated_at)
+		VALUES (?,?,?,0,0,?,?,?,?,?,?, CURRENT_TIMESTAMP)`)
 	if err != nil {
 		return nil, err
 	}
@@ -245,8 +247,14 @@ func (r *MaintenanceRepo) BulkRegisterSites(in model.SiteBulkRegisterInput) (*mo
 			short = id
 		}
 		region := r.customerRegionPreview(tx, id)
-		if _, err := ins.Exec(id, short, region, in.Cycle, "normal", nil, rounds, org); err != nil {
+		if region == "" && fallback != "" {
+			region = fallback
+		}
+		if _, err := ins.Exec(id, short, region, in.Cycle, "normal", nil, rounds, org, batchID); err != nil {
 			return nil, err
+		}
+		if strings.TrimSpace(region) == "" {
+			res.NoRegion++
 		}
 		if _, err := tx.Exec(`DELETE FROM site_inspection_products WHERE customer_id=?`, id); err != nil {
 			return nil, err
@@ -260,6 +268,9 @@ func (r *MaintenanceRepo) BulkRegisterSites(in model.SiteBulkRegisterInput) (*mo
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
+	}
+	if res.Registered > 0 {
+		res.BatchID = batchID
 	}
 	label := in.ActorLabel
 	if label == "" {

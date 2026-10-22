@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -55,25 +56,43 @@ func (h *MaintenanceHandler) renderSiteBulk(c echo.Context, errMsg string, resul
 		status = http.StatusBadRequest
 	}
 	selectable := 0
+	warnNoRegion := 0
 	for _, row := range cands {
 		if row.Selectable {
 			selectable++
+			if row.WarnNoRegion {
+				warnNoRegion++
+			}
+		}
+	}
+	planHref := "/maintenance"
+	if !needOrg {
+		plans, _ := h.repo.ListPlansInOrg(org)
+		y := time.Now().Year()
+		for _, p := range plans {
+			if p.PlanYear == y {
+				planHref = "/maintenance/" + p.PlanID
+				break
+			}
 		}
 	}
 	return c.Render(status, "maintenance/bulk.html", map[string]interface{}{
-		"Title":      "업종별 일괄 등록",
-		"Active":     NavMaintenanceSites,
-		"NeedOrg":    needOrg,
-		"Err":        errMsg,
-		"Buckets":    buckets,
-		"Industry":   industry,
-		"Candidates": cands,
-		"Selectable": selectable,
-		"Products":   products,
-		"Legacy":     legacy,
-		"Result":     result,
-		"Cycle":      strings.TrimSpace(c.FormValue("inspection_cycle")),
-		"Rounds":     parseVisitRound(c.FormValue("rounds_per_period")),
+		"Title":          "업종별 일괄 등록",
+		"Active":         NavMaintenanceSites,
+		"NeedOrg":        needOrg,
+		"Err":            errMsg,
+		"Buckets":        buckets,
+		"Industry":       industry,
+		"Candidates":     cands,
+		"Selectable":     selectable,
+		"WarnNoRegion":   warnNoRegion,
+		"Products":       products,
+		"Legacy":         legacy,
+		"Result":         result,
+		"PlanHref":       planHref,
+		"Cycle":          strings.TrimSpace(c.FormValue("inspection_cycle")),
+		"Rounds":         parseVisitRound(c.FormValue("rounds_per_period")),
+		"FallbackRegion": strings.TrimSpace(c.FormValue("fallback_region")),
 	})
 }
 
@@ -109,14 +128,15 @@ func (h *MaintenanceHandler) SiteBulkRegister(c echo.Context) error {
 		shorts[id] = strings.TrimSpace(c.FormValue("short_" + id))
 	}
 	res, err := h.repo.BulkRegisterSites(model.SiteBulkRegisterInput{
-		OrgID:       org,
-		IndustryKey: c.FormValue("industry"),
-		Cycle:       cycle,
-		Rounds:      parseVisitRound(c.FormValue("rounds_per_period")),
-		CustomerIDs: ids,
-		ShortNames:  shorts,
-		ProductIDs:  c.Request().PostForm["product_id"],
-		ActorLabel:  ctxString(c, "user_name"),
+		OrgID:          org,
+		IndustryKey:    c.FormValue("industry"),
+		Cycle:          cycle,
+		Rounds:         parseVisitRound(c.FormValue("rounds_per_period")),
+		CustomerIDs:    ids,
+		ShortNames:     shorts,
+		ProductIDs:     c.Request().PostForm["product_id"],
+		ActorLabel:     ctxString(c, "user_name"),
+		FallbackRegion: strings.TrimSpace(c.FormValue("fallback_region")),
 	})
 	if err != nil {
 		return h.renderSiteBulk(c, err.Error(), nil)
