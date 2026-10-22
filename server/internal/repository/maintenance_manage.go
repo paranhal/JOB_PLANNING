@@ -222,12 +222,12 @@ func (r *MaintenanceRepo) AssignSlot(v model.MaintenanceVisit) error {
 	if tpl := r.findUndatedVisit(v.PlanID, v.CustomerID, v.ProductType); tpl != nil {
 		exceptID = tpl.VisitID
 	}
-	if v.DupReason == "" {
-		if dup, err := r.MonthDuplicate(v.PlanID, v.CustomerID, v.ProductType, v.VisitDate, exceptID); err != nil {
-			return err
-		} else if dup != nil {
-			return ErrMonthDuplicate(dup)
-		}
+	autoRound := v.RoundNo <= 0
+	if autoRound {
+		v.RoundNo = r.nextRoundNo(v.PlanID, v.CustomerID, v.ProductType, v.VisitDate, exceptID)
+	}
+	if err := r.guardVisitRound(v, exceptID, autoRound, false); err != nil {
+		return err
 	}
 	if tpl := r.findUndatedVisit(v.PlanID, v.CustomerID, v.ProductType); tpl != nil {
 		tpl.VisitDate = v.VisitDate

@@ -20,6 +20,7 @@ type MaintenanceSiteConfig struct {
 	AddrSido        string // customers.addr_sido
 	AddrSigungu     string // customers.addr_sigungu
 	OrgID           string // customers.org_id
+	RoundsPerPeriod int    // 주기당 회차 수. 0·미기재는 1.
 	// Products nil 이면 레거시(has_klas/has_rfid). 빈 슬라이스면 신 모드(제품 없음=generic).
 	Products []InspectionProduct
 }
@@ -54,6 +55,54 @@ type MaintenanceVisit struct {
 	Completed     bool   // 방문 완료 여부
 	CompletedDate string // 실제 방문일 (미입력 시 예정일)
 	DupReason     string
+	RoundNo       int    // 주기 안 회차. 0 은 조회 시 1.
+	WorkGroupID   string
+	WorkGroupName string
+}
+
+// MaintenanceVisitAssignee 방문 주담당·참여자
+type MaintenanceVisitAssignee struct {
+	VisitID      string
+	UserID       string
+	AssigneeName string
+	Role         string
+	WorkGroupID  string
+	SortOrder    int
+}
+
+// MaintenanceRegionAssignee 지역 기본 담당
+type MaintenanceRegionAssignee struct {
+	OrgID       string
+	Region      string
+	UserID      string
+	WorkGroupID string
+	Role        string
+	SortOrder   int
+	Name        string
+}
+
+// MaintenanceSiteAssignee 사이트 예외 담당
+type MaintenanceSiteAssignee struct {
+	CustomerID  string
+	UserID      string
+	WorkGroupID string
+	Role        string
+	SortOrder   int
+	Name        string
+}
+
+func (c MaintenanceSiteConfig) SiteRounds() int {
+	if c.RoundsPerPeriod < 1 {
+		return 1
+	}
+	return c.RoundsPerPeriod
+}
+
+func (v MaintenanceVisit) VisitRound() int {
+	if v.RoundNo < 1 {
+		return 1
+	}
+	return v.RoundNo
 }
 
 // DoneOn 완료 표시에 쓸 날짜 — 실제 방문일이 없으면 예정일을 쓴다.
@@ -75,6 +124,8 @@ type UnassignedMonthSlot struct {
 	LastAssignee       string
 	UnconfirmedQuarter bool // 분기 마지막 달에 미확인으로 올린 건
 	OrgID              string
+	RegionPending      bool   // 지역 기본 담당이 있어 배정 예정
+	RegionAssigneeName string
 }
 
 // VisitProductSlotKey 방문의 점검대상을 슬롯 키로 정규화한다(klas/rfid/generic).

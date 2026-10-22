@@ -516,7 +516,7 @@ func skipQuarterAutoDraft(repo *repository.MaintenanceRepo, planID, date string,
 	if !ok {
 		return false
 	}
-	if repo.HasVisitInCyclePeriod(planID, it.cfg.CustomerID, it.slot.ProductType, t.Year(), p) {
+	if repo.CountPeriodRounds(planID, it.cfg.CustomerID, it.slot.ProductType, date) >= it.cfg.SiteRounds() {
 		return true
 	}
 	slotKey := strings.TrimSpace(it.slot.SlotKey)
@@ -538,9 +538,7 @@ func insertGeneratedVisit(repo *repository.MaintenanceRepo, planID, date string,
 	if skipQuarterAutoDraft(repo, planID, date, it) {
 		return errMonthSkip
 	}
-	if dup, err := repo.MonthDuplicate(planID, it.cfg.CustomerID, it.slot.ProductType, date, ""); err != nil {
-		return err
-	} else if dup != nil {
+	if repo.CountPeriodRounds(planID, it.cfg.CustomerID, it.slot.ProductType, date) >= it.cfg.SiteRounds() {
 		return errMonthSkip
 	}
 	cat := it.cfg.EntryCategory

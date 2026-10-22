@@ -35,30 +35,42 @@ func (r *MaintenanceRepo) periodObligations(planID string, year int, period mode
 	for _, cfg := range configs {
 		cfgBy[cfg.CustomerID] = cfg
 	}
-	covered := map[string]map[string]bool{}
+	covered := map[string]map[string]map[int]bool{}
 	for _, v := range visits {
 		if !model.VisitInCyclePeriod(v.VisitDate, year, period) {
 			continue
 		}
 		if covered[v.CustomerID] == nil {
-			covered[v.CustomerID] = map[string]bool{}
+			covered[v.CustomerID] = map[string]map[int]bool{}
 		}
-		covered[v.CustomerID][model.VisitProductSlotKeyFor(v.ProductType, cfgBy[v.CustomerID].Products)] = true
+		key := model.VisitProductSlotKeyFor(v.ProductType, cfgBy[v.CustomerID].Products)
+		if covered[v.CustomerID][key] == nil {
+			covered[v.CustomerID][key] = map[int]bool{}
+		}
+		covered[v.CustomerID][key][v.VisitRound()] = true
 	}
 	var out []model.UnassignedMonthSlot
 	for _, cfg := range configs {
 		if strings.TrimSpace(cfg.InspectionCycle) != period.Cycle {
 			continue
 		}
+		need := cfg.SiteRounds()
 		slots := model.SiteDueProductSlots(cfg, period.StartMonth)
 		have := covered[cfg.CustomerID]
-		genericUsed := have["generic"]
+		genericN := 0
+		if have != nil {
+			genericN = len(have["generic"])
+		}
 		for _, s := range slots {
-			if have[s.SlotKey] {
+			n := 0
+			if have != nil {
+				n = len(have[s.SlotKey])
+			}
+			if n >= need {
 				continue
 			}
-			if genericUsed && s.SlotKey != "generic" {
-				genericUsed = false
+			if genericN >= need && s.SlotKey != "generic" {
+				genericN = 0
 				continue
 			}
 			out = append(out, s)
@@ -93,6 +105,7 @@ func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int
 		s.UnconfirmedQuarter = true
 		out = append(out, s)
 	}
+	r.annotateUnassignedRegion("", out)
 	return out, nil
 }
 
