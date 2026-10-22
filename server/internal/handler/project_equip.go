@@ -80,12 +80,6 @@ func (h *ProjectHandler) loadEquipProject(c echo.Context) (*model.WorkProject, s
 	if org == "" || org == repository.OrgAll {
 		org = model.OrgIDLibrary
 	}
-	view := currentOrg(c)
-	if view != "" && view != repository.OrgAll && org != "" && org != view {
-		if currentRole(c) != model.RoleVisionAdmin && currentRole(c) != model.RoleCLevel {
-			return nil, "", echo.ErrNotFound
-		}
-	}
 	return p, org, nil
 }
 

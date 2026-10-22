@@ -461,6 +461,7 @@ type WorkProject struct {
 	SalesBizType      string    `json:"sales_biz_type,omitempty"`
 	Direction         string    `json:"direction,omitempty"`
 	OrgID             string    `json:"org_id,omitempty"`
+	OrgLabel          string    `json:"org_label,omitempty"`
 	IsShared          bool      `json:"is_shared,omitempty"`
 	ShareFrom         string    `json:"share_from,omitempty"`
 	ShareTo           string    `json:"share_to,omitempty"`

@@ -12,6 +12,7 @@
       <h2 class="text-xl font-bold text-gray-800 mt-1">{{.Project.Name}}</h2>
       <p class="text-xs font-mono text-gray-400 mt-0.5">{{.Project.ProjectID}}</p>
       <p class="text-sm text-gray-500 mt-0.5 flex flex-wrap gap-2 items-center">
+        {{if .Project.OrgLabel}}<span>소속 조직 {{.Project.OrgLabel}}</span>{{else if .Project.OrgID}}<span>소속 조직 {{.Project.OrgID}}</span>{{end}}
         <span>{{projectKindLabel .Project.ProjectKind}}</span>
         {{if .Project.PlanYear}}<span>{{.Project.PlanYear}}년</span>{{end}}
         {{if .Project.IsPaid}}

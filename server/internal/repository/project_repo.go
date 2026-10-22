@@ -48,6 +48,12 @@ func (r *ProjectRepo) ListFiltered(orgID, search string, year int, status string
 
 // ListContracts 계약 정보가 있는 사업만. includeAll 이면 수행 사업까지. §49.6
 func (r *ProjectRepo) ListContracts(orgID, search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
+	_ = orgID
+	return r.listProjects(OrgAll, search, year, status, includeAll)
+}
+
+// ListContractsInOrg 대시보드·집계용. 소속(또는 86 공개)만. 95-2E 전 직원 조회와 분리.
+func (r *ProjectRepo) ListContractsInOrg(orgID, search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
 	return r.listProjects(orgID, search, year, status, includeAll)
 }
 
@@ -90,7 +96,34 @@ func (r *ProjectRepo) listProjects(orgID, search string, year int, status string
 		return nil, err
 	}
 	r.attachOrderAmounts(items)
+	r.attachOrgLabels(items)
 	return items, nil
+}
+
+func (r *ProjectRepo) attachOrgLabels(items []model.WorkProject) {
+	if r == nil || r.db == nil || len(items) == 0 {
+		return
+	}
+	rows, err := r.db.Query(`SELECT org_id, COALESCE(NULLIF(TRIM(org_name),''), org_id) FROM orgs`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	names := map[string]string{}
+	for rows.Next() {
+		var id, name string
+		if rows.Scan(&id, &name) == nil {
+			names[id] = name
+		}
+	}
+	for i := range items {
+		home := projectHomeOrg(items[i].OrgID)
+		lab := names[home]
+		if lab == "" {
+			lab = home
+		}
+		items[i].OrgLabel = lab
+	}
 }
 
 func (r *ProjectRepo) attachOrderAmounts(items []model.WorkProject) {
@@ -191,14 +224,7 @@ func projectRowVisible(p *model.WorkProject, orgID string) bool {
 	if err := RequireOrgID(orgID); err != nil {
 		return false
 	}
-	if orgID == OrgAll || VisibleInOrg(projectHomeOrg(p.OrgID), orgID) {
-		return true
-	}
-	if !p.IsShared {
-		return false
-	}
-	to := strings.TrimSpace(p.ShareTo)
-	return to == "" || to == orgID
+	return true
 }
 
 func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
@@ -211,7 +237,9 @@ func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
 	p.ScopeRules = rules
 	tmp := []model.WorkProject{*p}
 	r.attachOrderAmounts(tmp)
+	r.attachOrgLabels(tmp)
 	p.OrderAmount = tmp[0].OrderAmount
+	p.OrgLabel = tmp[0].OrgLabel
 	return p, nil
 }
 

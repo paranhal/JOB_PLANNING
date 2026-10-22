@@ -40,6 +40,15 @@
       </select>
     </div>
     <div>
+      <label class="block text-xs mb-1">소속 조직</label>
+      <select name="org_id" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[10rem]">
+        <option value="">전체</option>
+        {{range .OrgOptions}}
+        <option value="{{.OrgID}}" {{if eq $.OrgFilter .OrgID}}selected{{end}}>{{if .OrgLabel}}{{.OrgLabel}}{{else}}{{.OrgID}}{{end}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
       <label class="block text-xs text-gray-500 mb-1">상태</label>
       <select name="status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
         <option value="" {{if eq .Status ""}}selected{{end}}>전체</option>
@@ -72,6 +81,7 @@
         <tr>
           <th class="px-4 py-3 font-medium text-left">번호</th>
           <th class="px-4 py-3 font-medium">연도</th>
+          <th class="px-4 py-3 font-medium">소속 조직</th>
           <th class="px-4 py-3 font-medium">사업명</th>
           <th class="px-4 py-3 font-medium">발주처</th>
           <th class="px-4 py-3 font-medium">고객</th>
@@ -87,6 +97,7 @@
         <tr class="hover:bg-gray-50">
           <td class="px-4 py-3 font-mono whitespace-nowrap text-gray-700">{{.ProjectID}}</td>
           <td class="px-4 py-3 text-gray-600">{{if .PlanYear}}{{.PlanYear}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 whitespace-nowrap">{{if .OrgLabel}}{{.OrgLabel}}{{else}}{{.OrgID}}{{end}}</td>
           <td class="px-4 py-3">
             <a href="/projects/{{.ProjectID}}" class="font-medium text-blue-700 hover:underline">
               {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}
@@ -105,7 +116,7 @@
           </td>
           <td class="px-4 py-3 whitespace-nowrap">
             {{$ek := .EffectiveKind}}
-            {{if $.CanWrite}}
+            {{if and $.CanWrite (projectWritable .OrgID $.ViewOrg)}}
             <form method="post" action="/projects/{{.ProjectID}}/kind" class="flex items-center gap-1">
               <input type="hidden" name="back" value="/projects/registry">
               <select name="project_kind" class="border rounded px-1 py-0.5 text-xs" onchange="this.form.submit()">
@@ -126,7 +137,7 @@
         </tr>
         {{else}}
         <tr>
-          <td colspan="9" class="px-4 py-10 text-center text-gray-400">등록된 사업이 없습니다.</td>
+          <td colspan="11" class="px-4 py-10 text-center text-gray-400">등록된 사업이 없습니다.</td>
         </tr>
         {{end}}
       </tbody>

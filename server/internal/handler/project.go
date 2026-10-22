@@ -50,6 +50,9 @@ func NewProjectHandler(
 }
 
 func canViewProjects(c echo.Context) bool {
+	if !model.IsInternalStaffRole(currentRole(c)) {
+		return false
+	}
 	r := currentRole(c)
 	return model.IsAdminGrade(r) || r == model.RoleSupport || r == model.RoleTech ||
 		r == model.RoleSales || r == model.RoleOffice ||
@@ -106,21 +109,56 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	org := currentOrg(c)
-	items, err := h.repo.ListContracts(org, search, year, status, false)
+	orgFilter := strings.TrimSpace(c.QueryParam("org_id"))
+	items, err := h.repo.ListContracts(repository.OrgAll, search, year, status, false)
 	if err != nil {
 		return err
 	}
-	years, _ := h.repo.ListYears(org)
+	orgOpts := orgOptionsFromProjects(items)
+	if orgFilter != "" && orgFilter != repository.OrgAll {
+		var filtered []model.WorkProject
+		for _, p := range items {
+			home := strings.TrimSpace(p.OrgID)
+			if home == "" {
+				home = model.OrgIDLibrary
+			}
+			if home == orgFilter {
+				filtered = append(filtered, p)
+			}
+		}
+		items = filtered
+	}
+	years, _ := h.repo.ListYears(repository.OrgAll)
+	view := currentOrg(c)
 	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
 		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
+		"OrgFilter":   orgFilter,
+		"OrgOptions":  orgOpts,
+		"ViewOrg":     view,
 		"CanWrite":    canWriteProjects(c),
 		"CanMerge":    currentRole(c) == model.RoleVisionAdmin,
 		"DupNames":    model.DuplicateProjectNameGroups(items),
 		"KindOptions": model.ProjectKindOptions(),
 		"FlashOK":     c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
+}
+
+func orgOptionsFromProjects(items []model.WorkProject) []model.WorkProject {
+	seen := map[string]bool{}
+	var out []model.WorkProject
+	for _, p := range items {
+		home := strings.TrimSpace(p.OrgID)
+		if home == "" {
+			home = model.OrgIDLibrary
+		}
+		if seen[home] {
+			continue
+		}
+		seen[home] = true
+		out = append(out, model.WorkProject{OrgID: home, OrgLabel: p.OrgLabel})
+	}
+	return out
 }
 
 func (h *ProjectHandler) SetKind(c echo.Context) error {
@@ -146,7 +184,7 @@ func (h *ProjectHandler) KindReview(c echo.Context) error {
 	if !canViewProjects(c) {
 		return echo.ErrForbidden
 	}
-	items, err := h.repo.ListContracts(currentOrg(c), "", 0, "", false)
+	items, err := h.repo.ListContracts(repository.OrgAll, "", 0, "", false)
 	if err != nil {
 		return err
 	}
@@ -159,7 +197,7 @@ func (h *ProjectHandler) KindReview(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/kind_review.html", map[string]interface{}{
 		"Title": "미분류·추정 유형 정리", "Active": NavProjectsRegistry,
 		"Projects": rows, "KindOptions": model.ProjectKindOptions(),
-		"CanWrite": canWriteProjects(c),
+		"CanWrite": canWriteProjects(c), "ViewOrg": currentOrg(c),
 	})
 }
 

@@ -19,7 +19,7 @@
           {{$ek := .EffectiveKind}}
           {{$sug := .SuggestedKindForReview}}
           <tr class="border-t border-line">
-            <td class="px-3 py-2"><input type="checkbox" name="pick" value="{{.ProjectID}}"></td>
+            <td class="px-3 py-2">{{if and $.CanWrite (projectWritable .OrgID $.ViewOrg)}}<input type="checkbox" name="pick" value="{{.ProjectID}}">{{else}}—{{end}}</td>
             <td class="px-3 py-2 text-ink">{{.Name}}{{if .KindHintConflicts}} <span class="badge-warning">충돌</span>{{end}}</td>
             <td class="px-3 py-2 text-ink-muted">{{$ek.Label}} · {{$ek.SourceLabel}}</td>
             <td class="px-3 py-2">

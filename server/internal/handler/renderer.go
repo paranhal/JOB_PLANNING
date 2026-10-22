@@ -280,6 +280,7 @@ func funcMap() template.FuncMap {
 		"dateLabelMDW":       model.DateLabelMDW,
 		"leaveKindLabel":     model.LeaveKindLabel,
 		"projectKindLabel":   model.ProjectKindLabel,
+		"projectWritable":    repository.ProjectWritableInOrg,
 		"yearStatusLabel":    model.YearStatusLabel,
 		"siteStatusLabel":    model.SiteStatusLabel,
 		"equipStatusLabel":   model.EquipStatusLabel,
