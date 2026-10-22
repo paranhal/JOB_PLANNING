@@ -3,6 +3,7 @@ package repository
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -13,6 +14,8 @@ import (
 
 	"customer-support/internal/model"
 )
+
+var ErrPipelineNeedsConfirm = errors.New("pipeline_confirm")
 
 const (
 	contractSheetGuide = "안내"
@@ -182,6 +185,9 @@ func (r *ProjectRepo) PreviewContractImport(raw []byte, fileName string, scope C
 		if ir.Action != "err" {
 			r.classifyContractDup(&ir)
 		}
+		if ir.Action == model.ContractActionPipeline {
+			r.classifyPipelineDup(&ir)
+		}
 		out.Rows = append(out.Rows, ir)
 	}
 	tallyContractPreview(out)
@@ -192,26 +198,100 @@ func tallyContractPreview(out *model.ContractImportPreview) {
 	if out == nil {
 		return
 	}
-	out.NewN, out.SkipN, out.ErrN = 0, 0, 0
+	out.NewN, out.PipeN, out.SkipN, out.ErrN = 0, 0, 0, 0
 	out.ErrMissingN, out.ErrDeniedN, out.ErrOtherN = 0, 0, 0
 	for _, ir := range out.Rows {
 		switch ir.Action {
-		case "new":
+		case model.ContractActionNew:
 			out.NewN++
-		case "skip":
+		case model.ContractActionPipeline:
+			out.PipeN++
+		case model.ContractActionSkip:
 			out.SkipN++
 		default:
 			out.ErrN++
 			switch ir.ErrKind {
-			case "missing_customer":
+			case model.ContractErrCustomerMiss, "missing_customer":
 				out.ErrMissingN++
-			case "org_denied":
+			case model.ContractErrOrgForbidden, "org_denied":
 				out.ErrDeniedN++
 			default:
 				out.ErrOtherN++
 			}
 		}
 	}
+	out.Summary = buildContractImportSummary(out)
+}
+
+func buildContractImportSummary(out *model.ContractImportPreview) model.ContractImportSummary {
+	s := model.ContractImportSummary{}
+	if out == nil {
+		return s
+	}
+	s.NewN, s.PipeN, s.SkipN, s.ErrN = out.NewN, out.PipeN, out.SkipN, out.ErrN
+	s.Total = s.NewN + s.PipeN + s.SkipN + s.ErrN
+	s.RegisteredZero = s.NewN+s.PipeN == 0
+	type acc struct {
+		label string
+		n     int
+		ex    []string
+	}
+	order := []string{}
+	byKind := map[string]*acc{}
+	orgN := map[string]int{}
+	var orgOrder []string
+	for _, ir := range out.Rows {
+		if ir.Action == model.ContractActionErr {
+			k := ir.ErrKind
+			if k == "" {
+				k = "other"
+			}
+			if k == "org_denied" {
+				k = model.ContractErrOrgForbidden
+			}
+			if k == "missing_customer" {
+				k = model.ContractErrCustomerMiss
+			}
+			if k == "ambiguous" {
+				k = model.ContractErrCustomerAmb
+			}
+			a := byKind[k]
+			if a == nil {
+				a = &acc{label: ir.Msg}
+				byKind[k] = a
+				order = append(order, k)
+			}
+			a.n++
+			if len(a.ex) < 3 && strings.TrimSpace(ir.Name) != "" {
+				a.ex = append(a.ex, ir.Name)
+			}
+			if k == model.ContractErrOrgForbidden {
+				lab := strings.TrimSpace(ir.OrgLabel)
+				if lab == "" {
+					lab = ir.OrgID
+				}
+				if _, ok := orgN[lab]; !ok {
+					orgOrder = append(orgOrder, lab)
+				}
+				orgN[lab]++
+				s.DeniedN++
+			}
+		}
+	}
+	for _, k := range order {
+		a := byKind[k]
+		extra := a.n - len(a.ex)
+		if extra < 0 {
+			extra = 0
+		}
+		s.Reasons = append(s.Reasons, model.ContractImportReasonN{
+			Kind: k, Label: a.label, N: a.n, Examples: a.ex, Extra: extra,
+		})
+	}
+	for _, lab := range orgOrder {
+		s.DeniedOrgs = append(s.DeniedOrgs, model.ContractImportOrgN{Label: lab, N: orgN[lab]})
+	}
+	return s
 }
 
 func contractDupKey(ir model.ContractImportRow) string {
@@ -238,7 +318,35 @@ func (r *ProjectRepo) classifyContractDup(ir *model.ContractImportRow) {
 		ir.Name, ir.PartyName, ir.StartDate, ir.Amount).Scan(&n)
 	if n > 0 {
 		ir.Action, ir.Msg = "skip", "이미 같은 계약이 있습니다"
+		return
 	}
+	if ir.Action != model.ContractActionPipeline {
+		return
+	}
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_projects
+		WHERE org_id=? AND REPLACE(TRIM(name),' ','')=?`, ir.OrgID, compactCustomerName(ir.Name)).Scan(&n)
+	if n > 0 {
+		ir.Action, ir.Msg = "skip", "이미 같은 계약이 있습니다"
+	}
+}
+
+func (r *ProjectRepo) classifyPipelineDup(ir *model.ContractImportRow) {
+	if r == nil || r.db == nil || ir == nil {
+		return
+	}
+	var no, sid string
+	err := r.db.QueryRow(`SELECT sales_id, TRIM(COALESCE(sales_no,'')) FROM sales_projects
+		WHERE org_id=? AND REPLACE(TRIM(name),' ','')=? AND COALESCE(status,'') NOT IN ('dropped')
+		ORDER BY sales_id LIMIT 1`, ir.OrgID, compactCustomerName(ir.Name)).Scan(&sid, &no)
+	if err != nil {
+		return
+	}
+	label := no
+	if label == "" {
+		label = sid
+	}
+	ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrDupPipeline,
+		fmt.Sprintf("이미 영업 파이프라인에 있습니다(번호 %s)", label)
 }
 
 func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportScope, today time.Time) model.ContractImportRow {
@@ -250,22 +358,22 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 			continue
 		}
 		if ExcelFormulaInjected(vals[i]) {
-			ir.Action, ir.Msg = "err", "수식은 넣을 수 없습니다"
+			ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, "other", "수식은 넣을 수 없습니다"
 			return ir
 		}
 	}
 	if ExcelFormulaInjected(vals[9]) {
-		ir.Action, ir.Msg = "err", "수식은 넣을 수 없습니다"
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, "other", "수식은 넣을 수 없습니다"
 		return ir
 	}
 	ir.Name, ir.OrgLabel, ir.PartyName = vals[0], vals[1], vals[2]
 	if ir.Name == "" {
-		ir.Action, ir.Msg = "err", "사업명이 없습니다"
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrNameMissing, "사업명이 없습니다"
 		return ir
 	}
 	org, err := r.resolveContractOrg(ir.OrgLabel)
 	if err != nil {
-		ir.Action, ir.Msg = "err", err.Error()
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, "other", err.Error()
 		return ir
 	}
 	ir.OrgID = org
@@ -274,48 +382,48 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 		if label == "" {
 			label = org
 		}
-		ir.Action, ir.ErrKind, ir.Msg = "err", "org_denied",
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrOrgForbidden,
 			fmt.Sprintf("이 계정으로는 %s 사업을 등록할 수 없습니다 — 해당 팀 관리자 또는 시스템 관리자가 올려 주세요", label)
 		return ir
 	}
 	kind, err := model.InferContractKind(vals[4], ir.Name)
 	if err != nil {
-		ir.Action, ir.Msg = "err", err.Error()
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrKindInvalid, err.Error()
 		return ir
 	}
 	ir.Kind, ir.KindLabel = kind, model.ProjectKindLabel(kind)
 	method, err := model.NormalizeContractMethod(vals[5])
 	if err != nil {
-		ir.Action, ir.Msg = "err", err.Error()
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrMethodInvalid, err.Error()
 		return ir
 	}
 	ir.ContractType = method
 	dir := model.NormalizeContractDirection(vals[6])
 	if dir == "" {
-		ir.Action, ir.Msg = "err", "거래구분을 확인하세요"
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, "other", "거래구분을 확인하세요"
 		return ir
 	}
 	ir.Direction = dir
 	st, err := parseContractDate(vals[7])
 	if err != nil {
-		ir.Action, ir.Msg = "err", "계약시작일 "+err.Error()
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrDateInvalid, "계약시작일 "+err.Error()
 		return ir
 	}
 	en, err := parseContractDate(vals[8])
 	if err != nil {
-		ir.Action, ir.Msg = "err", "계약종료일 "+err.Error()
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrDateInvalid, "계약종료일 "+err.Error()
 		return ir
 	}
 	stT, _ := time.Parse("2006-01-02", st)
 	enT, _ := time.Parse("2006-01-02", en)
 	if enT.Before(stT) {
-		ir.Action, ir.Msg = "err", "종료일이 시작일보다 앞입니다"
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrDateInvalid, "종료일이 시작일보다 앞입니다"
 		return ir
 	}
 	ir.StartDate, ir.EndDate = st, en
 	amt, err := parseContractAmount(vals[9])
 	if err != nil {
-		ir.Action, ir.Msg = "err", err.Error()
+		ir.Action, ir.ErrKind, ir.Msg = model.ContractActionErr, model.ContractErrAmountInvalid, err.Error()
 		return ir
 	}
 	ir.Amount = amt
@@ -356,6 +464,11 @@ func (r *ProjectRepo) parseContractRow(line int, row []string, scope CatImportSc
 		} else {
 			ir.ExecID = u
 		}
+	}
+	if ir.Amount == 0 {
+		ir.Action = model.ContractActionPipeline
+		ir.Years = nil
+		return ir
 	}
 	ir.Years = model.SplitContractYears(stT, enT, ir.Amount, today)
 	return ir
@@ -439,15 +552,15 @@ func (e customerLookupFail) Error() string {
 func customerLookupErr(err error, role, name string) (kind, msg string) {
 	if e, ok := err.(customerLookupFail); ok {
 		if e.kind == "many" {
-			return "ambiguous", e.Error()
+			return model.ContractErrCustomerAmb, e.Error()
 		}
 		if strings.TrimSpace(name) == "" {
-			return "missing_customer", e.Error()
+			return model.ContractErrCustomerMiss, e.Error()
 		}
-		return "missing_customer", fmt.Sprintf("%s 고객 마스터에 없습니다: %s", role, name)
+		return model.ContractErrCustomerMiss, fmt.Sprintf("%s 고객 마스터에 없습니다: %s", role, name)
 	}
 	if err != nil {
-		return "missing_customer", err.Error()
+		return model.ContractErrCustomerMiss, err.Error()
 	}
 	return "", ""
 }
@@ -552,33 +665,53 @@ func (r *ProjectRepo) lookupUserName(name, orgID string) (string, error) {
 	return ids[0], nil
 }
 
-func (r *ProjectRepo) ApplyContractImport(userID, fileName string, raw []byte, scope CatImportScope, today time.Time) (*model.ContractImportPreview, error) {
+func (r *ProjectRepo) ApplyContractImport(userID, fileName string, raw []byte, scope CatImportScope, today time.Time, opt model.ContractImportApplyOpt) (*model.ContractImportPreview, error) {
 	prev, err := r.PreviewContractImport(raw, fileName, scope, today)
 	if err != nil {
 		return nil, err
 	}
+	if prev.PipeN > 0 && opt.Pipeline != "yes" && opt.Pipeline != "no" {
+		return prev, ErrPipelineNeedsConfirm
+	}
+	stage := model.NormalizePipelineStage(opt.Stage)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	ok, skip := 0, 0
+	var createdSales []string
 	for i := range prev.Rows {
 		row := &prev.Rows[i]
-		if row.Action != "new" {
-			if row.Action == "err" {
+		switch row.Action {
+		case model.ContractActionNew:
+			if err := r.insertImportedContractTx(tx, userID, row); err != nil {
+				row.Action, row.ErrKind, row.Msg = model.ContractActionErr, "other", err.Error()
 				skip++
-			} else {
-				ok++
+				continue
 			}
-			continue
-		}
-		if err := r.insertImportedContractTx(tx, userID, row); err != nil {
-			row.Action, row.Msg = "err", err.Error()
+			ok++
+		case model.ContractActionPipeline:
+			want := opt.Pipeline == "yes" && (opt.Lines == nil || opt.Lines[row.Line])
+			if !want {
+				row.Action, row.ErrKind, row.Msg = model.ContractActionErr, model.ContractErrPipelineSkip, "영업 파이프라인 등록 안 함"
+				skip++
+				continue
+			}
+			if err := r.insertImportedPipelineTx(tx, today, stage, row); err != nil {
+				row.Action, row.ErrKind, row.Msg = model.ContractActionErr, "other", err.Error()
+				skip++
+				continue
+			}
+			ok++
+			if row.SalesNo != "" {
+				createdSales = append(createdSales, row.SalesNo)
+			}
+		case model.ContractActionErr:
 			skip++
-			continue
+		default:
+			ok++
 		}
-		ok++
 	}
 	tallyContractPreview(prev)
 	n, err := nextSeqTx(tx, "contract_import")
@@ -593,7 +726,105 @@ func (r *ProjectRepo) ApplyContractImport(userID, fileName string, raw []byte, s
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	for _, no := range createdSales {
+		logCreate(r.db, "sales_projects", "sales_no", no, no)
+	}
 	return prev, nil
+}
+
+func (r *ProjectRepo) insertImportedPipelineTx(tx *sql.Tx, today time.Time, stage string, row *model.ContractImportRow) error {
+	if scopeDeny := row.OrgID; scopeDeny == "" {
+		return fmt.Errorf("부서가 없습니다")
+	}
+	cust := row.PartyID
+	if len(row.EndIDs) > 0 {
+		cust = row.EndIDs[0]
+	}
+	ym := ""
+	if len(row.StartDate) >= 7 {
+		ym = row.StartDate[:7]
+	}
+	notes := strings.TrimSpace(strings.Join([]string{
+		"엑셀 업로드(금액 0)",
+		"사업유형 " + strings.TrimSpace(row.KindLabel),
+		"계약방식 " + strings.TrimSpace(row.ContractType),
+		"계약기간 " + row.StartDate + " ~ " + row.EndDate,
+		"계약번호 " + strings.TrimSpace(row.ContractNo),
+		strings.TrimSpace(row.Notes),
+	}, " · "))
+	p := &model.SalesProject{
+		Name:                    row.Name,
+		OrgID:                   row.OrgID,
+		Stage:                   stage,
+		DealType:                model.SalesDealBuild,
+		CustomerID:              cust,
+		CustomerConfirmed:       strings.TrimSpace(cust) != "",
+		ExpectedAmount:          0,
+		ExpectedAmountConfirmed: false,
+		ExpectedYM:              ym,
+		ExpectedYMConfirmed:     false,
+		ExpectedPrecision:       model.SalesPrecisionMonth,
+		SalesOwner:              row.SalesUser,
+		SalesOwnerID:            row.SalesID,
+		Status:                  model.SalesStatusActive,
+		Notes:                   notes,
+	}
+	p.SalesOwner, p.SalesOwnerID = bindStaff(r.db, p.SalesOwner, p.SalesOwnerID)
+	p.DealType = model.NormalizeSalesDealType(p.DealType)
+	p.ExpectedYM = model.NormalizeSalesYM(p.ExpectedYM)
+	p.Probability = model.SalesProbability(p)
+	idN, err := nextSeqTx(tx, "sales_project")
+	if err != nil {
+		return err
+	}
+	p.SalesID = fmt.Sprintf("SP-%03d", idN)
+	no, err := nextSalesNoTx(tx, today)
+	if err != nil {
+		return err
+	}
+	p.SalesNo = no
+	histN, err := nextSeqTx(tx, "sales_stage_history")
+	if err != nil {
+		return err
+	}
+	byID, byName := stampCreatedBy()
+	_, err = tx.Exec(`
+		INSERT INTO sales_projects (
+			sales_id, sales_no, name, is_tentative_name, stage, probability, probability_override,
+			customer_id, prospect_name, prospect_region, customer_confirmed,
+			expected_ym, expected_precision, expected_ym_confirmed,
+			expected_amount, expected_amount_confirmed,
+			sales_owner, sales_owner_id, competitor, lead_source, lost_reason,
+			status, notes, legacy_stage, won_at, contracted_at,
+			deal_type, po_no, delivered_at,
+			bid_status, close_reason, rfp_received_at, win_prob, probability_final,
+			awarded_amount, contract_amount, contract_target, procurement_route, contract_method,
+			bid_eval_method, mall_contract_type, prev_sales_id,
+			biz_type, budget_year, budget_status,
+			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included, org_id,
+			created_by_user_id, created_by_name
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.SalesID, p.SalesNo, p.Name, 0, p.Stage, p.Probability, nil,
+		nullStr(p.CustomerID), "", "", boolToInt(p.CustomerConfirmed),
+		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
+		p.ExpectedAmount, boolToInt(p.ExpectedAmountConfirmed),
+		p.SalesOwner, nullStr(p.SalesOwnerID), "", "엑셀 업로드", "",
+		p.Status, p.Notes, "", "", "",
+		p.DealType, "", "",
+		"", "", "", nil, nil,
+		0, 0, "", "", row.ContractType,
+		"", "", "",
+		"", 0, "",
+		"", "", "", "", "", 0, p.OrgID, byID, byName)
+	if err != nil {
+		return err
+	}
+	if err := insertSalesHistory(tx, fmt.Sprintf("SH-%03d", histN), p.SalesID, "", p.Stage, "엑셀 업로드", "", byID, byName); err != nil {
+		return err
+	}
+	row.Msg = p.SalesID
+	row.SalesNo = p.SalesNo
+	return nil
 }
 
 func (r *ProjectRepo) insertImportedContractTx(tx *sql.Tx, userID string, row *model.ContractImportRow) error {
@@ -765,7 +996,7 @@ func collectMissingCustomers(prev *model.ContractImportPreview) [][]string {
 		return nil
 	}
 	for _, r := range prev.Rows {
-		if r.Action != "err" || r.ErrKind != "missing_customer" || strings.TrimSpace(r.MissingName) == "" {
+		if r.Action != "err" || (r.ErrKind != model.ContractErrCustomerMiss && r.ErrKind != "missing_customer") || strings.TrimSpace(r.MissingName) == "" {
 			continue
 		}
 		k := key{normCustomerName(r.MissingName), r.MissingRole}

@@ -197,6 +197,18 @@ func NextSalesNo(db *sql.DB, t time.Time) (string, error) {
 	return fmt.Sprintf("S%s-%s", ym, fmtSeq3(n)), nil
 }
 
+func nextSalesNoTx(tx *sql.Tx, t time.Time) (string, error) {
+	if t.IsZero() {
+		t = time.Now()
+	}
+	ym := t.Format("0601")
+	n, err := nextSeqTx(tx, salesNoSeqKey(ym))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("S%s-%s", ym, fmtSeq3(n)), nil
+}
+
 func salesNoSeqKey(ym string) string {
 	return "sales_no:" + ym
 }
