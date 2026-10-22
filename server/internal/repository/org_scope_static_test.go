@@ -18,6 +18,12 @@ func TestOrgScopeStaticAudit(t *testing.T) {
 	if !strings.Contains(reason, "95-9A") {
 		t.Fatal("SearchWorkTaskCustomers 를 orgScopeAllowlist 에 95-9A 사유와 함께 등록해야 한다")
 	}
+	if !strings.Contains(orgScopeAllowlist["SearchCustomersWithoutConfig"], "Q1") {
+		t.Fatal("SearchCustomersWithoutConfig 를 orgScopeAllowlist 에 95-9A Q1 사유와 함께 등록해야 한다")
+	}
+	if !strings.Contains(orgScopeAllowlist["lookupCustomerName"], "95-2B") {
+		t.Fatal("lookupCustomerName 를 orgScopeAllowlist 에 95-2B 사유와 함께 등록해야 한다")
+	}
 
 	root := "."
 	if _, err := os.Stat("work_task_sites.go"); err != nil {
