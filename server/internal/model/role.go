@@ -15,6 +15,7 @@ const (
 	RoleSales       = "sales"
 	RoleObserver    = "observer"
 	RoleTester      = "tester"
+	RolePartner     = "partner" // 96단계. 지금은 역할이 없어도 조회에서 제외한다.
 
 	// 옛 코드 이름. NormalizeRole 이 org_admin·support 로 옮긴다.
 	RoleAdmin  = "admin"
@@ -158,6 +159,8 @@ func NormalizeRole(role string) string {
 		return RoleObserver
 	case RoleTester, "테스터":
 		return RoleTester
+	case RolePartner, "협력사":
+		return RolePartner
 	default:
 		if trimmed := strings.TrimSpace(role); trimmed != "" {
 			log.Printf("[auth] 알 수 없는 역할 %q", role)
@@ -168,7 +171,7 @@ func NormalizeRole(role string) string {
 
 func IsKnownRole(role string) bool {
 	switch NormalizeRole(role) {
-	case RoleVisionAdmin, RoleOrgAdmin, RoleCLevel, RoleSupport, RoleTech, RoleSales:
+	case RoleVisionAdmin, RoleOrgAdmin, RoleCLevel, RoleSupport, RoleTech, RoleSales, RolePartner:
 		return true
 	default:
 		return false
@@ -481,6 +484,16 @@ func PermAccess(role, key string) Access {
 		return AccessFull
 	}
 	return defaultAccess(role, key)
+}
+
+// IsInternalStaffRole 전 직원 조회 허용. 협력사(partner)는 제외. 95-2E
+func IsInternalStaffRole(role string) bool {
+	switch NormalizeRole(role) {
+	case RoleVisionAdmin, RoleOrgAdmin, RoleCLevel, RoleSupport, RoleTech, RoleSales, RoleObserver, RoleTester:
+		return true
+	default:
+		return false
+	}
 }
 
 func DefaultPermissions(role string) []string {
