@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,35 +34,7 @@ func TestContractImportPreviewApplySample(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := sampleContractXLSX(t)
-	rows, err := ParseContractWorkbook(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	seen := map[string]bool{}
-	n := 1
-	for i, row := range rows {
-		if i == 0 {
-			continue
-		}
-		org, err := NewProjectRepo(db).resolveContractOrg(cell(row, 1))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, col := range []int{2, 3} {
-			for _, name := range model.SplitEndCustomers(cell(row, col)) {
-				key := org + "|" + name
-				if name == "" || seen[key] {
-					continue
-				}
-				seen[key] = true
-				cid := fmt.Sprintf("CIMP-%03d", n)
-				n++
-				if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id) VALUES (?,?,?,1,?)`, cid, name, name, org); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
-	}
+	seedUniqueContractCustomers(t, db, raw, model.OrgIDLibrary)
 	repo := NewProjectRepo(db)
 	scope := CatImportScope{Allowed: map[string]bool{"O01": true, "O02": true, "O03": true}}
 	today := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
@@ -169,6 +142,11 @@ func TestContractImportPreviewApplySample(t *testing.T) {
 	if years != wantYears {
 		t.Fatalf("years %d want %d", years, wantYears)
 	}
+	var yearProjects int
+	_ = db.QueryRow(`SELECT COUNT(DISTINCT project_id) FROM contract_years`).Scan(&yearProjects)
+	if yearProjects != 6 {
+		t.Fatalf("year projects %d", yearProjects)
+	}
 	_ = db.QueryRow(`SELECT COUNT(*) FROM contract_import_batches`).Scan(&batch)
 	if batch != 1 {
 		t.Fatalf("batch %d", batch)
@@ -243,6 +221,18 @@ func TestContractImportValidation(t *testing.T) {
 	if prev.ErrN != 4 || prev.NewN != 2 {
 		t.Fatalf("new=%d err=%d %+v", prev.NewN, prev.ErrN, prev.Rows)
 	}
+	foundMissing := false
+	for _, r := range prev.Rows {
+		if r.Name == "없는발주" {
+			foundMissing = true
+			if r.ErrKind != "missing_customer" || !strings.Contains(r.Msg, "발주처 고객 마스터에 없습니다") || !strings.Contains(r.Msg, "없는곳") {
+				t.Fatalf("없는발주 %+v", r)
+			}
+		}
+	}
+	if !foundMissing {
+		t.Fatal("없는발주")
+	}
 	foundDev, foundOther := false, false
 	for _, r := range prev.Rows {
 		if r.Name == "정상" && r.Kind == model.ProjectKindDev && r.ContractType == "수의" && r.SalesID != "" && r.ExecID != "" && len(r.Years) >= 1 {
@@ -262,5 +252,45 @@ func TestContractImportValidation(t *testing.T) {
 	}
 	if oa.ErrN < 2 {
 		t.Fatalf("권한 오류 %d", oa.ErrN)
+	}
+	if oa.ErrDeniedN < 2 {
+		t.Fatalf("권한 유형 %d", oa.ErrDeniedN)
+	}
+	for _, r := range oa.Rows {
+		if r.ErrKind != "org_denied" {
+			continue
+		}
+		if !strings.Contains(r.Msg, "이 계정으로는") || !strings.Contains(r.Msg, "시스템 관리자") {
+			t.Fatalf("권한 문구 %+v", r)
+		}
+	}
+}
+
+func seedUniqueContractCustomers(t *testing.T, db *sql.DB, raw []byte, orgID string) {
+	t.Helper()
+	rows, err := ParseContractWorkbook(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	n := 1
+	for i, row := range rows {
+		if i == 0 {
+			continue
+		}
+		for _, col := range []int{2, 3} {
+			for _, name := range model.SplitEndCustomers(cell(row, col)) {
+				key := strings.TrimSpace(name)
+				if key == "" || seen[key] {
+					continue
+				}
+				seen[key] = true
+				cid := fmt.Sprintf("CIMP-%03d", n)
+				n++
+				if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id) VALUES (?,?,?,1,?)`, cid, name, name, orgID); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
 	}
 }

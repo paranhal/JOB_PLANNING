@@ -55,6 +55,53 @@ func TestContractImportHTTPRoutesOnProjectServer(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "엑셀 일괄 등록") {
 		t.Fatal("form")
 	}
+	if !strings.Contains(rec.Body.String(), `formaction="/projects/import-apply"`) {
+		t.Fatal("apply formaction")
+	}
+	if !strings.Contains(rec.Body.String(), `formaction="/projects/import-errors.xlsx"`) {
+		t.Fatal("errors formaction")
+	}
+}
+
+func TestContractImportHTTPBanner95_2B(t *testing.T) {
+	e, _, vs, oa, _ := newEquipCatHTTP(t)
+	page := doGetWith(t, e, "/projects/import", vs)
+	if page.Code != http.StatusOK {
+		t.Fatalf("page %d", page.Code)
+	}
+	lint := scanTemplateUILint(t)["project/import.html"]
+	if !lint.zero() {
+		t.Fatalf("import.html ui_lint %+v", lint)
+	}
+	raw, err := repository.BuildContractWorkbook(repository.ContractGuideLines(), [][]string{
+		{"사업명 *", "부서 *", "발주처 *", "최종수요처", "사업유형 *", "계약방식", "거래구분", "계약시작일 *", "계약종료일 *", "계약금액(VAT포함) *", "계약번호(선택)", "계약담당", "업무담당", "비고"},
+		{"테스트", "SI사업팀", "발주X", "", "공사", "", "매출", "2026-01-01", "2026-12-31", "1", "", "", "", ""},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := postEquipFile(t, e, "/projects/import-preview", "file", "t.xlsx", raw, oa)
+	if prev.Code != http.StatusOK {
+		t.Fatalf("oa preview %d", prev.Code)
+	}
+	body := prev.Body.String()
+	if !strings.Contains(body, "권한 없는 부서") || !strings.Contains(body, "이 계정으로는") {
+		t.Fatalf("banner %s", body)
+	}
+	apply := postEquipFile(t, e, "/projects/import-apply", "file", "t.xlsx", raw, oa)
+	if apply.Code != http.StatusOK {
+		t.Fatalf("oa apply %d", apply.Code)
+	}
+	if !strings.Contains(apply.Body.String(), "아무것도 등록되지 않았습니다") {
+		t.Fatal("empty apply")
+	}
+	vsPrev := postEquipFile(t, e, "/projects/import-preview", "file", "t.xlsx", raw, vs)
+	if vsPrev.Code != http.StatusOK {
+		t.Fatalf("vs %d", vsPrev.Code)
+	}
+	if !strings.Contains(vsPrev.Body.String(), "고객 없음") || !strings.Contains(vsPrev.Body.String(), "발주처 고객 마스터에 없습니다") {
+		t.Fatalf("missing banner %s", vsPrev.Body.String())
+	}
 }
 
 func TestContractImportSamplePathExists(t *testing.T) {

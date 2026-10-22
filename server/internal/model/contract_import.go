@@ -16,17 +16,23 @@ const (
 )
 
 type ContractImportPreview struct {
-	FileName string
-	NewN     int
-	SkipN    int
-	ErrN     int
-	Rows     []ContractImportRow
+	FileName     string
+	NewN         int
+	SkipN        int
+	ErrN         int
+	ErrMissingN  int
+	ErrDeniedN   int
+	ErrOtherN    int
+	Rows         []ContractImportRow
 }
 
 type ContractImportRow struct {
 	Line         int
 	Action       string // new|skip|err
 	Msg          string
+	ErrKind      string // missing_customer | org_denied | ambiguous | ""
+	MissingName  string
+	MissingRole  string // 발주처 | 최종수요처
 	Name         string
 	OrgID        string
 	OrgLabel     string
