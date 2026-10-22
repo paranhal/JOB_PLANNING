@@ -42,7 +42,7 @@
     </div>
 
     <!-- 행정/지원 · 영업 활동 -->
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
+    <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
           x-data="{ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
             async checkMnt() {
               const title = this.$refs.adminTitle ? this.$refs.adminTitle.value : '';
@@ -179,7 +179,7 @@
     </form>
 
     <!-- AS 일일업무 -->
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='as'" x-cloak
+    <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='as'" x-cloak
           x-data="{ memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="as">
@@ -249,7 +249,7 @@
     </form>
 
     <!-- 정기점검 일일업무 -->
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4" x-show="dailyKind==='maintenance'" x-cloak
+    <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='maintenance'" x-cloak
           x-data="{ memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="maintenance">
@@ -317,11 +317,10 @@
       </div>
     </form>
 
-    <form method="post" action="/workboard/tasks" class="p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
-          x-data="{ memberRows: [], subtype: '', projectId: '', sites: [], q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
+    <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
+          x-data="{ memberRows: [], subtype: '', projectId: '', pickedKind: '', sites: [], q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
             suggestKind() {
-              const sel = this.$refs.pwProj;
-              const k = sel && sel.selectedOptions[0] ? (sel.selectedOptions[0].dataset.kind || '') : '';
+              const k = this.pickedKind || '';
               if (k === 'build') this.subtype = 'build';
               else if (k === 'construction') this.subtype = 'construction';
             },
@@ -342,7 +341,6 @@
               } catch (e) {}
             },
             async search() {
-              this.projectId = this.$refs.pwProj ? this.$refs.pwProj.value : this.projectId;
               if ((this.q || '').trim().length < 2) { this.cands = []; this.hint = '학교·기관명을 2글자 이상 입력'; return; }
               try {
                 const r = await fetch('/workboard/work-sites/search?q=' + encodeURIComponent(this.q) + '&project_id=' + encodeURIComponent(this.projectId || ''));
@@ -382,11 +380,9 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">사업</label>
-        <select name="project_id" x-ref="pwProj" x-model="projectId" @change="suggestKind(); refreshBadges(); search()"
-                class="w-full border rounded-lg px-3 py-2 text-sm">
-          {{if not .WorkProjects}}<option value="" data-kind="">— 등록된 사업이 없습니다 —</option>{{else}}<option value="" data-kind="">— 선택 (해당 시) —</option>{{end}}
-          {{range .WorkProjects}}<option value="{{.ProjectID}}" data-kind="{{.ProjectKind}}">{{.Name}}</option>{{end}}
-        </select>
+        <div @project-picked="projectId=$event.detail.id; pickedKind=$event.detail.kind; suggestKind(); refreshBadges(); search()">
+          {{template "project_combo" dict "Items" .WorkProjects "Selected" "" "Empty" "— 선택 (해당 시) —" "Name" "project_id"}}
+        </div>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">대상 사이트</label>
@@ -585,6 +581,41 @@
   </div>
 </div>
 <script>
+(function () {
+  document.querySelectorAll('form.js-keep-modal').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (form.dataset.keepSkip === '1') return;
+      e.preventDefault();
+      var btns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+      btns.forEach(function (b) { b.disabled = true; });
+      var fd = new FormData(form);
+      fetch(form.action, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
+      }).then(function (r) {
+        if (r.redirected && r.url) { window.location.assign(r.url); return; }
+        if (r.ok) {
+          var dest = fd.get('redirect') || fd.get('back') || window.location.href;
+          window.location.assign(dest);
+          return;
+        }
+        return r.json().then(function (j) {
+          var msg = (j && j.message) ? j.message : '저장하지 못했습니다';
+          if (window.showFlashError) window.showFlashError(msg);
+        }).catch(function () {
+          if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
+        });
+      }).catch(function () {
+        form.dataset.keepSkip = '1';
+        form.submit();
+      }).finally(function () {
+        btns.forEach(function (b) { b.disabled = false; });
+      });
+    });
+  });
+})();
 (function () {
   var q = document.getElementById('as-register-q');
   var box = document.getElementById('as-lookup-status');

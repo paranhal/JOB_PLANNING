@@ -19,13 +19,7 @@
               <input type="hidden" name="back" value="{{.BackURL}}">
               <div class="min-w-[12rem] flex-1">
                 <label class="label">사업</label>
-                <input type="search" id="pw-project-filter" class="input mb-1" placeholder="사업명으로 걸러 보기" autocomplete="off">
-                <select name="project_id" id="pw-project-select" class="input">
-                  <option value="">연결 해제</option>
-                  {{range .Projects}}
-                  <option value="{{.ProjectID}}" {{if eq $.Task.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
-                  {{end}}
-                </select>
+                {{template "project_combo" dict "Items" .Projects "Selected" .Task.ProjectID "Empty" "연결 해제" "Name" "project_id"}}
               </div>
               <button class="btn btn-primary" {{if .ReadOnly}}disabled{{end}}>연결</button>
               <button class="btn" name="project_id" value="" {{if .ReadOnly}}disabled{{end}}>연결 해제</button>
@@ -372,17 +366,6 @@
       if(confirm('조금 더 적어 주시겠습니까?')) return;
       if(shortOk) shortOk.value='1';
       form.submit();
-    });
-  }
-  var filt=document.getElementById('pw-project-filter');
-  var sel=document.getElementById('pw-project-select');
-  if(filt && sel){
-    filt.addEventListener('input', function(){
-      var q=String(filt.value||'').toLowerCase();
-      Array.prototype.forEach.call(sel.options, function(opt, i){
-        if(i===0){ opt.hidden=false; return; }
-        opt.hidden = q!=='' && String(opt.textContent||'').toLowerCase().indexOf(q)<0;
-      });
     });
   }
   var box=document.getElementById('as-parts-box');

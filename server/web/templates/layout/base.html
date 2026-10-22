@@ -10,12 +10,29 @@
   <script src="/static/vendor/htmx.min.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/vendor/alpine.min.js?v={{.AssetQuery}}"></script>
   <style>
+    [x-cloak] { display: none !important; }
     @media print {
       #build-badge { display: none !important; }
     }
   </style>
 </head>
 <body class="h-full" x-data="{ sidebarOpen: false, moreOpen: false }">
+
+<div x-data='flashDialog({{toJSON .FlashPopup}})' x-cloak
+     @app-flash-error.window="show($event.detail)"
+     @keydown.escape.window="if(open) close()"
+     x-show="open" x-cloak
+     class="modal-backdrop z-50 flex items-center justify-center p-4"
+     role="alertdialog" aria-modal="true" aria-labelledby="flash-err-title"
+     @click.self="close()">
+  <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+    <h2 id="flash-err-title" class="text-ui font-bold text-ink">확인해 주세요</h2>
+    <p class="mt-2 text-ui text-ink whitespace-pre-wrap" x-text="msg"></p>
+    <div class="mt-4 flex justify-end">
+      <button type="button" class="btn btn-primary" x-ref="ok" @click="close()">확인</button>
+    </div>
+  </div>
+</div>
 
 {{if .ViewAsActive}}
 <div class="bg-violet-800 text-white text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-3 z-50">
@@ -429,6 +446,62 @@
       toggleG(id) { this.g[id] = !this.openG(id); this.save('nav-g', this.g); },
       toggleM(id) { this.m[id] = !this.openM(id); this.save('nav-m', this.m); },
       toggleP(id) { this.p[id] = !this.openP(id); this.save('nav-p', this.p); }
+    };
+  };
+  window.flashDialog = function (msg) {
+    return {
+      open: !!(msg && String(msg).length),
+      msg: msg ? String(msg) : '',
+      show(m) {
+        this.msg = String(m || '');
+        this.open = this.msg.length > 0;
+        var self = this;
+        this.$nextTick(function () { if (self.$refs.ok) self.$refs.ok.focus(); });
+      },
+      close() { this.open = false; }
+    };
+  };
+  window.showFlashError = function (m) {
+    window.dispatchEvent(new CustomEvent('app-flash-error', { detail: m }));
+  };
+  window.projectCombo = function (items, selected, emptyLabel) {
+    items = items || [];
+    return {
+      items: items,
+      q: '',
+      open: false,
+      hi: 0,
+      selectedId: selected || '',
+      emptyLabel: emptyLabel || '— 선택 (해당 시) —',
+      get selectedName() {
+        var id = this.selectedId;
+        if (!id) return '';
+        var hit = this.items.find(function (p) { return p.project_id === id; });
+        return hit ? hit.name : '';
+      },
+      get filtered() {
+        var q = String(this.q || '').trim().toLowerCase();
+        if (!q) return this.items;
+        return this.items.filter(function (p) {
+          return String(p.name || '').toLowerCase().indexOf(q) >= 0;
+        });
+      },
+      move(d) {
+        var n = this.filtered.length;
+        if (!n) { this.hi = 0; return; }
+        this.hi = (this.hi + d + n) % n;
+      },
+      pickHighlight() {
+        var p = this.filtered[this.hi];
+        if (p) this.pick(p.project_id, p.name, p.project_kind);
+        else this.pick('', '');
+      },
+      pick(id, name, kind) {
+        this.selectedId = id || '';
+        this.q = name || '';
+        this.open = false;
+        this.$dispatch('project-picked', { id: this.selectedId, name: name || '', kind: kind || '' });
+      }
     };
   };
   var badge = document.getElementById('build-badge');

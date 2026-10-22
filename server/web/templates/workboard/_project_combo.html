@@ -1,0 +1,21 @@
+{{define "project_combo"}}
+<div class="combobox" x-data='projectCombo({{toJSON .Items}}, {{toJSON .Selected}}, {{toJSON .Empty}})' @keydown.escape.window="open=false">
+  <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}project_id{{end}}" :value="selectedId">
+  <input type="search" class="input" autocomplete="off" placeholder="사업명으로 찾기"
+         x-model="q" @focus="open=true" @input="open=true"
+         @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+  <p class="field-hint" x-show="selectedName" x-cloak x-text="'선택: ' + selectedName"></p>
+  <ul class="combobox-list" x-show="open" x-cloak>
+    <li>
+      <button type="button" class="menu-item w-full" @click="pick('', '')" x-text="emptyLabel"></button>
+    </li>
+    <template x-for="(p, i) in filtered" :key="p.project_id">
+      <li>
+        <button type="button" class="menu-item w-full" :class="i===hi ? 'combobox-option-on' : ''"
+                @click="pick(p.project_id, p.name, p.project_kind)" x-text="p.name"></button>
+      </li>
+    </template>
+    <li x-show="filtered.length===0" class="menu-item text-ink-muted">해당하는 사업이 없습니다</li>
+  </ul>
+</div>
+{{end}}
