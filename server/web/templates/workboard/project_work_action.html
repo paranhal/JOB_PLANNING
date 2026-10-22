@@ -10,6 +10,7 @@
             <h2 class="text-xl font-bold text-ink font-mono">{{.Task.TaskID}}</h2>
             <span class="badge">조치</span>
             <span class="badge">{{.StatusLabel}}</span>
+            {{if .Task.WorkGroupName}}<span class="badge-neutral">그룹: {{.Task.WorkGroupName}}</span>{{end}}
           </div>
           <p class="text-ui-sm text-ink-muted mt-1">{{.ProjectName}} · 일일업무 <span class="font-mono">{{.Task.TaskID}}</span></p>
           {{if .CanProcess}}
@@ -443,6 +444,7 @@
       <div><dt class="text-ui-sm text-ink-muted">작업일</dt><dd>{{.Task.WorkDate}} {{.Task.StartTime}}–{{.Task.EndTime}}</dd></div>
       <div><dt class="text-ui-sm text-ink-muted">담당자</dt><dd>{{.Task.Assignee}}</dd></div>
       <div><dt class="text-ui-sm text-ink-muted">참여자</dt><dd>{{range $i, $m := .Members}}{{if $i}}, {{end}}{{$m.Assignee}}{{else}}—{{end}}</dd></div>
+      {{if .Task.WorkGroupName}}<div><dt class="text-ui-sm text-ink-muted">업무 그룹</dt><dd>그룹: {{.Task.WorkGroupName}}</dd></div>{{end}}
     </dl>
   </section>
   <section class="card">

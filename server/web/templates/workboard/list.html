@@ -38,7 +38,7 @@
           <tr class="hover:bg-gray-50/80">
             <td class="px-4 py-3 text-xs text-gray-400 font-mono whitespace-nowrap">{{printf "%02d" (add $i 1)}}</td>
             <td class="px-4 py-3 text-center whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-xs {{wbWorkTypeClass $t.WorkType}}">{{wbWorkTypeLabel $t.WorkType}}</span></td>
-            <td class="px-4 py-3 font-medium text-gray-800 whitespace-nowrap"><a href="{{$t.DetailHref}}" class="hover:text-blue-700">{{$t.Title}}</a></td>
+            <td class="px-4 py-3 font-medium text-gray-800 whitespace-nowrap"><a href="{{$t.DetailHref}}" class="hover:text-blue-700">{{$t.Title}}</a>{{if $t.WorkGroupName}} <span class="badge-neutral text-[10px]">그룹: {{$t.WorkGroupName}}</span>{{end}}</td>
             <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{if $t.ProjectName}}{{$t.ProjectName}}{{else}}—{{end}}</td>
             <td class="px-4 py-3 text-center whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">{{wbBoardStatusLabel $t}}</span></td>
             <td class="px-4 py-3 text-center whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-xs {{wbPriorityClass $t.Priority}}">{{wbPriorityLabel $t.Priority}}</span></td>

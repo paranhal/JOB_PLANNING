@@ -16,6 +16,7 @@
         <span class="text-[10px] font-medium {{if lt .DaysLeft 0}}text-red-500{{else}}text-gray-400{{end}}">{{wbDdayLabel .DaysLeft .Status}}</span>
       </div>
       <a href="{{.DetailHref}}" class="text-sm font-medium text-gray-800 leading-snug hover:text-blue-700">{{.Title}}</a>
+      {{if .WorkGroupName}}<p class="text-[11px] mt-1"><span class="badge-neutral">그룹: {{.WorkGroupName}}</span></p>{{end}}
       {{if .ProjectName}}<p class="text-[11px] text-gray-500 mt-1">{{.ProjectName}}</p>{{end}}
       {{if .SiteLine}}<p class="text-[11px] text-gray-500 mt-1">{{.SiteLine}}</p>{{end}}
       {{if gt .Progress 0}}
