@@ -15,22 +15,74 @@ const (
 	ContractImportMaxRows  = 500
 )
 
+const (
+	ContractActionNew      = "new"
+	ContractActionSkip     = "skip"
+	ContractActionPipeline = "pipeline"
+	ContractActionErr      = "err"
+
+	ContractErrOrgForbidden   = "org_forbidden"
+	ContractErrCustomerMiss   = "customer_missing"
+	ContractErrCustomerAmb    = "customer_ambiguous"
+	ContractErrDateInvalid    = "date_invalid"
+	ContractErrKindInvalid    = "kind_invalid"
+	ContractErrMethodInvalid  = "method_invalid"
+	ContractErrAmountInvalid  = "amount_invalid"
+	ContractErrNameMissing    = "name_missing"
+	ContractErrDupPipeline    = "duplicate_in_pipeline"
+	ContractErrPipelineSkip   = "pipeline_skipped"
+)
+
 type ContractImportPreview struct {
-	FileName     string
-	NewN         int
-	SkipN        int
-	ErrN         int
-	ErrMissingN  int
-	ErrDeniedN   int
-	ErrOtherN    int
-	Rows         []ContractImportRow
+	FileName    string
+	NewN        int
+	PipeN       int
+	SkipN       int
+	ErrN        int
+	ErrMissingN int
+	ErrDeniedN  int
+	ErrOtherN   int
+	Rows        []ContractImportRow
+	Summary     ContractImportSummary
+}
+
+type ContractImportSummary struct {
+	NewN           int                      `json:"new_n"`
+	PipeN          int                      `json:"pipe_n"`
+	SkipN          int                      `json:"skip_n"`
+	ErrN           int                      `json:"err_n"`
+	Total          int                      `json:"total"`
+	RegisteredZero bool                     `json:"registered_zero"`
+	Reasons        []ContractImportReasonN  `json:"reasons"`
+	DeniedOrgs     []ContractImportOrgN     `json:"denied_orgs"`
+	DeniedN        int                      `json:"denied_n"`
+}
+
+type ContractImportReasonN struct {
+	Kind     string   `json:"kind"`
+	Label    string   `json:"label"`
+	N        int      `json:"n"`
+	Examples []string `json:"examples"`
+	Extra    int      `json:"extra"`
+}
+
+type ContractImportOrgN struct {
+	Label string `json:"label"`
+	N     int    `json:"n"`
+}
+
+type ContractImportApplyOpt struct {
+	Pipeline string // yes|no|""
+	Stage    string
+	Lines    map[int]bool
 }
 
 type ContractImportRow struct {
 	Line         int
-	Action       string // new|skip|err
+	Action       string // new|skip|pipeline|err
 	Msg          string
-	ErrKind      string // missing_customer | org_denied | ambiguous | ""
+	ErrKind      string
+	SalesNo      string
 	MissingName  string
 	MissingRole  string // 발주처 | 최종수요처
 	Name         string
@@ -73,6 +125,26 @@ type ContractImportBatch struct {
 	RowsError int
 	Status    string
 	CreatedBy string
+}
+
+func NormalizePipelineStage(s string) string {
+	switch strings.TrimSpace(s) {
+	case SalesStage4Propose, SalesStage4Bid:
+		return strings.TrimSpace(s)
+	default:
+		return SalesStage4Discover
+	}
+}
+
+func PipelineStageLabel(s string) string {
+	switch NormalizePipelineStage(s) {
+	case SalesStage4Propose:
+		return "제안"
+	case SalesStage4Bid:
+		return "입찰"
+	default:
+		return "발굴"
+	}
 }
 
 func NormalizeContractMethod(s string) (string, error) {
