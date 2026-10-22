@@ -273,7 +273,7 @@ func (r *ProjectRepo) UndoMerge(mergeID string) error {
 }
 
 func (r *ProjectRepo) ListOthers(exceptID string) ([]model.WorkProject, error) {
-	items, err := r.ListFiltered("", 0, "")
+	items, err := r.ListFiltered(OrgAll, "", 0, "")
 	if err != nil {
 		return nil, err
 	}

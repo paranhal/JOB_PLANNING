@@ -18,7 +18,7 @@ type ContractUnionFilter struct {
 
 // ListContractUnion 사업관리 계약 ∪ 미연결 영업 계약 완료. 80-A. 73-E와 공유.
 func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.ContractRow, error) {
-	works, err := r.ListContracts(f.Search, f.Year, f.Status, f.IncludeAll)
+	works, err := r.ListContracts(orgIDOrAll(f.OrgID), f.Search, f.Year, f.Status, f.IncludeAll)
 	if err != nil {
 		return nil, err
 	}

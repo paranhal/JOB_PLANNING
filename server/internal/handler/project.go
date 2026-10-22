@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -70,6 +71,17 @@ func canDeleteProjects(c echo.Context) bool {
 	return isAdminRole(c)
 }
 
+func (h *ProjectHandler) loadVisibleProject(c echo.Context, write bool) (*model.WorkProject, error) {
+	p, err := h.repo.GetVisible(c.Param("id"), currentOrg(c), write)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectForbidden) {
+			return nil, echo.NewHTTPError(http.StatusForbidden, err.Error())
+		}
+		return nil, echo.ErrNotFound
+	}
+	return p, nil
+}
+
 func (h *ProjectHandler) List(c echo.Context) error {
 	if !canViewProjects(c) {
 		return echo.ErrForbidden
@@ -94,11 +106,12 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
-	items, err := h.repo.ListContracts(search, year, status, false)
+	org := currentOrg(c)
+	items, err := h.repo.ListContracts(org, search, year, status, false)
 	if err != nil {
 		return err
 	}
-	years, _ := h.repo.ListYears()
+	years, _ := h.repo.ListYears(org)
 	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
 		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
@@ -113,6 +126,9 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 func (h *ProjectHandler) SetKind(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
+	}
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
 	}
 	id := strings.TrimSpace(c.Param("id"))
 	kind := strings.TrimSpace(c.FormValue("project_kind"))
@@ -130,7 +146,7 @@ func (h *ProjectHandler) KindReview(c echo.Context) error {
 	if !canViewProjects(c) {
 		return echo.ErrForbidden
 	}
-	items, err := h.repo.ListContracts("", 0, "", false)
+	items, err := h.repo.ListContracts(currentOrg(c), "", 0, "", false)
 	if err != nil {
 		return err
 	}
@@ -159,6 +175,9 @@ func (h *ProjectHandler) KindReviewSave(c echo.Context) error {
 		if !model.ValidProjectKind(kind) {
 			continue
 		}
+		if _, err := h.repo.GetVisible(id, currentOrg(c), true); err != nil {
+			continue
+		}
 		_ = h.repo.SetProjectKind(id, kind, ctxString(c, "user_name"))
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/registry?ok=kind")
@@ -180,7 +199,7 @@ func (h *ProjectHandler) Contracts(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	years, _ := h.repo.ListYears()
+	years, _ := h.repo.ListYears(f.OrgID)
 	today := time.Now().Format("2006-01-02")
 	kpi := model.BuildContractUnionKPI(rows, today)
 	return c.Render(http.StatusOK, "contracts/list.html", map[string]interface{}{
@@ -201,9 +220,9 @@ func (h *ProjectHandler) ContractLinkForm(c echo.Context) error {
 	if !canWriteSales(c) || !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	p, err := h.repo.Get(c.Param("id"))
+	p, err := h.loadVisibleProject(c, true)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/contracts?err=notfound")
+		return err
 	}
 	sid := strings.TrimSpace(c.QueryParam("sales_id"))
 	if sid == "" {
@@ -225,6 +244,9 @@ func (h *ProjectHandler) ContractLinkSave(c echo.Context) error {
 	if strings.TrimSpace(c.FormValue("confirm")) != "1" {
 		return c.Redirect(http.StatusSeeOther, "/contracts?err=confirm")
 	}
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
+	}
 	id := strings.TrimSpace(c.Param("id"))
 	sid := strings.TrimSpace(c.FormValue("sales_id"))
 	if err := h.repo.LinkSalesProject(id, sid, ctxString(c, "user_name")); err != nil {
@@ -237,9 +259,9 @@ func (h *ProjectHandler) ContractShow(c echo.Context) error {
 	if !canViewSales(c) {
 		return echo.ErrForbidden
 	}
-	p, err := h.repo.Get(c.Param("id"))
+	p, err := h.loadVisibleProject(c, false)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/contracts?err=notfound")
+		return err
 	}
 	rules, _ := h.repo.ListRules(p.ProjectID)
 	var assets []model.Asset
@@ -289,6 +311,13 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 		return h.renderForm(c, p, rules, false, "사업 유형을 선택하세요.")
 	}
 	p.ProjectKindSet = 1
+	if org, err := resolveInsertOrg(c); err == nil {
+		p.OrgID = org
+	} else if view := currentOrg(c); view != "" && view != repository.OrgAll {
+		p.OrgID = view
+	} else {
+		p.OrgID = model.OrgIDLibrary
+	}
 	if err := h.repo.Create(p); err != nil {
 		return err
 	}
@@ -306,9 +335,9 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	p, err := h.repo.Get(id)
+	p, err := h.loadVisibleProject(c, false)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+		return err
 	}
 	asRows, asTotal, _ := h.repo.MatchAS(id, 20)
 	mntRows, mntTotal, _ := h.repo.MatchMaintenance(id, 20)
@@ -333,8 +362,8 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
 		"WorkRows": workRows, "WorkTotal": workTotal,
-		"CanWrite":     canWriteProjects(c),
-		"CanDelete":    canDeleteProjects(c),
+		"CanWrite":     canWriteProjects(c) && repository.ProjectWritableInOrg(p.OrgID, currentOrg(c)),
+		"CanDelete":    canDeleteProjects(c) && repository.ProjectWritableInOrg(p.OrgID, currentOrg(c)),
 		"CanMerge":     currentRole(c) == model.RoleVisionAdmin,
 		"SalesMissing": salesMissing,
 		"RunLabel":     model.ContractRunLabel(p.ContractRunStatus(today)),
@@ -347,9 +376,9 @@ func (h *ProjectHandler) Edit(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	p, err := h.repo.Get(c.Param("id"))
+	p, err := h.loadVisibleProject(c, true)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+		return err
 	}
 	return h.renderForm(c, p, p.ScopeRules, true)
 }
@@ -358,10 +387,9 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	id := c.Param("id")
-	existing, err := h.repo.Get(id)
+	existing, err := h.loadVisibleProject(c, true)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+		return err
 	}
 	p, rules := h.parseForm(c)
 	p.ProjectID = existing.ProjectID
@@ -392,8 +420,8 @@ func (h *ProjectHandler) Archive(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	if _, err := h.repo.Get(id); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
 	}
 	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectArchived); err != nil {
 		return err
@@ -406,8 +434,8 @@ func (h *ProjectHandler) Complete(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	if _, err := h.repo.Get(id); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
 	}
 	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectComplete); err != nil {
 		return err
@@ -424,8 +452,8 @@ func (h *ProjectHandler) CompleteCancel(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	if _, err := h.repo.Get(id); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
 	}
 	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectActive); err != nil {
 		return err
@@ -442,8 +470,8 @@ func (h *ProjectHandler) Activate(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	if _, err := h.repo.Get(id); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/registry?err=notfound")
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
 	}
 	if err := h.wbRepo.SetProjectStatus(id, model.WBProjectActive); err != nil {
 		return err
@@ -453,6 +481,9 @@ func (h *ProjectHandler) Activate(c echo.Context) error {
 
 func (h *ProjectHandler) Delete(c echo.Context) error {
 	id := c.Param("id")
+	if _, err := h.loadVisibleProject(c, true); err != nil {
+		return err
+	}
 	if !canDeleteProjects(c) {
 		accessLog(c, auditlog.Record{
 			Action:      auditlog.ActionDelete,

@@ -98,7 +98,7 @@ func (h *CoopHandler) New(c echo.Context) error {
 			targets = append(targets, o)
 		}
 	}
-	projs, _ := h.proj.List(0, "")
+	projs, _ := h.proj.List(currentOrg(c), 0, "")
 	return RenderPartial(c, "coop/_form.html", map[string]interface{}{
 		"Title": "새 협조 요청", "Targets": targets, "Projects": projs, "Err": c.QueryParam("err"),
 	})

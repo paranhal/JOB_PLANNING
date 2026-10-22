@@ -757,7 +757,7 @@ func (r *WBRepo) CountTasksByProject(id string) (int, error) {
 
 // ListProjectsFiltered 검색·상태 필터 목록
 func (r *WBRepo) ListProjectsFiltered(search, status string) ([]model.WorkProject, error) {
-	return NewProjectRepo(r.db).ListFiltered(search, 0, status)
+	return NewProjectRepo(r.db).ListFiltered(OrgAll, search, 0, status)
 }
 
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {

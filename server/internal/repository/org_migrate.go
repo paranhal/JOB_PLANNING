@@ -65,6 +65,12 @@ func applyOrgs(db *sql.DB) {
 	}
 	addNamedColumn(db, "users", "org_id",
 		`ALTER TABLE users ADD COLUMN org_id TEXT DEFAULT ''`)
+	addNamedColumn(db, "work_projects", "is_shared",
+		`ALTER TABLE work_projects ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0`)
+	addNamedColumn(db, "work_projects", "share_from",
+		`ALTER TABLE work_projects ADD COLUMN share_from TEXT NOT NULL DEFAULT ''`)
+	addNamedColumn(db, "work_projects", "share_to",
+		`ALTER TABLE work_projects ADD COLUMN share_to TEXT NOT NULL DEFAULT ''`)
 	applyOrgSplitV266(db)
 }
 

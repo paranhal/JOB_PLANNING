@@ -28,7 +28,7 @@ func TestProjectSeedAndMatch(t *testing.T) {
 	seedDefaultProjects(db)
 
 	repo := NewProjectRepo(db)
-	list, err := repo.List(2026, "")
+	list, err := repo.List(OrgAll, 2026, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestListContractsHidesNonContractUnlessAll(t *testing.T) {
 	if err := repo.Create(withAmt); err != nil {
 		t.Fatal(err)
 	}
-	def, err := repo.ListContracts("", 0, "", false)
+	def, err := repo.ListContracts(OrgAll, "", 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestListContractsHidesNonContractUnlessAll(t *testing.T) {
 	if !names["금액있는계약"] {
 		t.Fatal("계약 금액 있는 사업이 없다")
 	}
-	all, err := repo.ListContracts("", 0, "", true)
+	all, err := repo.ListContracts(OrgAll, "", 0, "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

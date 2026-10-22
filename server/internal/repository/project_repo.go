@@ -28,6 +28,7 @@ const projectSelect = `
 		COALESCE(p.project_kind,'maintenance'), COALESCE(p.project_kind_set,0), COALESCE(sp.biz_type,''),
 		COALESCE(p.contract_date,''), COALESCE(p.contract_category,''), p.amount_vat_included,
 		COALESCE(p.direction,'revenue'),
+		COALESCE(p.org_id,''), COALESCE(p.is_shared,0), COALESCE(p.share_from,''), COALESCE(p.share_to,''),
 		p.created_at, p.updated_at,
 		COALESCE(cu.org_name,''), COALESCE(ct.full_name,''), COALESCE(op.org_name,''),
 		COALESCE(sp.sales_no,''), COALESCE(sp.stage,''), COALESCE(sp.close_reason,'')
@@ -37,22 +38,23 @@ const projectSelect = `
 	LEFT JOIN customers op ON op.customer_id = p.ordering_party_id
 	LEFT JOIN sales_projects sp ON sp.sales_id = p.sales_project_id`
 
-func (r *ProjectRepo) List(year int, status string) ([]model.WorkProject, error) {
-	return r.ListFiltered("", year, status)
+func (r *ProjectRepo) List(orgID string, year int, status string) ([]model.WorkProject, error) {
+	return r.ListFiltered(orgID, "", year, status)
 }
 
-func (r *ProjectRepo) ListFiltered(search string, year int, status string) ([]model.WorkProject, error) {
-	return r.listProjects(search, year, status, true)
+func (r *ProjectRepo) ListFiltered(orgID, search string, year int, status string) ([]model.WorkProject, error) {
+	return r.listProjects(orgID, search, year, status, true)
 }
 
 // ListContracts 계약 정보가 있는 사업만. includeAll 이면 수행 사업까지. §49.6
-func (r *ProjectRepo) ListContracts(search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
-	return r.listProjects(search, year, status, includeAll)
+func (r *ProjectRepo) ListContracts(orgID, search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
+	return r.listProjects(orgID, search, year, status, includeAll)
 }
 
-func (r *ProjectRepo) listProjects(search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
+func (r *ProjectRepo) listProjects(orgID, search string, year int, status string, includeAll bool) ([]model.WorkProject, error) {
 	q := projectSelect + ` WHERE 1=1`
 	var args []interface{}
+	q, args = appendProjectVisible(q, args, "p", orgID)
 	if year > 0 {
 		q += ` AND COALESCE(p.plan_year,0)=?`
 		args = append(args, year)
@@ -147,11 +149,12 @@ func (r *ProjectRepo) SetStatus(id, status string) error {
 	})
 }
 
-func (r *ProjectRepo) ListYears() ([]int, error) {
-	rows, err := r.db.Query(`
-		SELECT DISTINCT plan_year FROM work_projects
-		WHERE COALESCE(plan_year,0) > 0
-		ORDER BY plan_year DESC`)
+func (r *ProjectRepo) ListYears(orgID string) ([]int, error) {
+	q := `SELECT DISTINCT p.plan_year FROM work_projects p WHERE COALESCE(p.plan_year,0) > 0`
+	var args []interface{}
+	q, args = appendProjectVisible(q, args, "p", orgID)
+	q += ` ORDER BY p.plan_year DESC`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +168,37 @@ func (r *ProjectRepo) ListYears() ([]int, error) {
 		years = append(years, y)
 	}
 	return years, rows.Err()
+}
+
+func (r *ProjectRepo) GetVisible(id, orgID string, write bool) (*model.WorkProject, error) {
+	p, err := r.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	if !projectRowVisible(p, orgID) {
+		return nil, sql.ErrNoRows
+	}
+	if write && !VisibleInOrg(projectHomeOrg(p.OrgID), orgID) {
+		return nil, ErrProjectForbidden
+	}
+	return p, nil
+}
+
+func projectRowVisible(p *model.WorkProject, orgID string) bool {
+	if p == nil {
+		return false
+	}
+	if err := RequireOrgID(orgID); err != nil {
+		return false
+	}
+	if orgID == OrgAll || VisibleInOrg(projectHomeOrg(p.OrgID), orgID) {
+		return true
+	}
+	if !p.IsShared {
+		return false
+	}
+	to := strings.TrimSpace(p.ShareTo)
+	return to == "" || to == orgID
 }
 
 func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
@@ -240,17 +274,20 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 	}
 	p.ProjectID = fmt.Sprintf("WP-%03d", id)
 	normalizeProject(p)
+	if strings.TrimSpace(p.OrgID) == "" {
+		p.OrgID = model.OrgIDLibrary
+	}
 	_, err = r.db.Exec(`
 		INSERT INTO work_projects (
 			project_id, name, short_name, plan_year, is_paid, sort_order,
 			ordering_party_id, ordering_party, customer_id,
 			contract_type, billing_type, start_date, end_date, notes, contact_id,
-			color, status, sales_project_id, contract_amount, contract_no, project_kind, project_kind_set
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			color, status, sales_project_id, contract_amount, contract_no, project_kind, project_kind_set, org_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ProjectID, p.Name, p.ShortName, p.PlanYear, boolToInt(p.IsPaid), p.SortOrder,
 		nullStr(p.OrderingPartyID), p.OrderingParty, nullStr(p.CustomerID),
 		p.ContractType, p.BillingType, p.StartDate, p.EndDate, p.Notes, nullStr(p.ContactID),
-		p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind, p.ProjectKindSet)
+		p.Color, p.Status, nullStr(p.SalesProjectID), p.ContractAmount, p.ContractNo, p.ProjectKind, p.ProjectKindSet, strings.TrimSpace(p.OrgID))
 	if err != nil {
 		return err
 	}
@@ -779,7 +816,7 @@ type projectScanner interface {
 func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 	var p model.WorkProject
 	var created, updated string
-	var paid int
+	var paid, shared int
 	var vat sql.NullInt64
 	err := row.Scan(
 		&p.ProjectID, &p.Name, &p.ShortName, &p.PlanYear, &paid, &p.SortOrder,
@@ -789,6 +826,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		&p.Notes, &p.ContactID,
 		&p.Color, &p.Status, &p.SalesProjectID, &p.ContractAmount, &p.ContractNo, &p.ProjectKind, &p.ProjectKindSet, &p.SalesBizType,
 		&p.ContractDate, &p.ContractCategory, &vat, &p.Direction,
+		&p.OrgID, &shared, &p.ShareFrom, &p.ShareTo,
 		&created, &updated,
 		&p.CustomerName, &p.ContactName, &p.OrderingPartyName, &p.SalesNo, &p.SalesStage, &p.SalesCloseReason,
 	)
@@ -796,6 +834,7 @@ func scanProjectRow(row projectScanner) (*model.WorkProject, error) {
 		return nil, err
 	}
 	p.IsPaid = paid != 0
+	p.IsShared = shared != 0
 	if vat.Valid {
 		p.AmountVATKnown = true
 		p.AmountVATIncluded = vat.Int64 != 0

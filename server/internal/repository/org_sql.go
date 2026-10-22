@@ -4,12 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"customer-support/internal/model"
 )
 
 // OrgAll 비젼관리자만 넘긴다. 빈 문자열은 전 조직이 아니라 오류다 (§52.4).
 const OrgAll = "*"
 
-var ErrEmptyOrgID = errors.New("org_id 가 비었습니다")
+var (
+	ErrEmptyOrgID       = errors.New("org_id 가 비었습니다")
+	ErrProjectForbidden = errors.New("이 사업을 변경할 수 없습니다")
+)
 
 func RequireOrgID(orgID string) error {
 	if strings.TrimSpace(orgID) == "" {
@@ -62,6 +67,43 @@ func mustOrgSQL(alias, orgID string) (string, []interface{}) {
 
 func appendOrg(q string, args []interface{}, alias, orgID string) (string, []interface{}) {
 	frag, a := mustOrgSQL(alias, orgID)
+	return q + frag, append(args, a...)
+}
+
+// projectVisibleSQL 사업 등록 관리 조회. 소속 조직이거나 86 공개(is_shared, share_to 빈 값=전 팀·아니면 대상 팀).
+func projectVisibleSQL(alias, orgID string) (string, []interface{}, error) {
+	if err := RequireOrgID(orgID); err != nil {
+		return "", nil, err
+	}
+	if orgID == OrgAll {
+		return "", nil, nil
+	}
+	p := strings.TrimSpace(alias)
+	if p == "" {
+		p = "work_projects"
+	}
+	frag := fmt.Sprintf(` AND (COALESCE(NULLIF(TRIM(%s.org_id),''), ?) = ? OR (COALESCE(%s.is_shared,0)=1 AND (TRIM(COALESCE(%s.share_to,''))='' OR %s.share_to=?)))`,
+		p, p, p, p)
+	return frag, []interface{}{model.OrgIDLibrary, orgID, orgID}, nil
+}
+
+func projectHomeOrg(orgID string) string {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return model.OrgIDLibrary
+	}
+	return orgID
+}
+
+func ProjectWritableInOrg(rowOrg, orgID string) bool {
+	return VisibleInOrg(projectHomeOrg(rowOrg), orgID)
+}
+
+func appendProjectVisible(q string, args []interface{}, alias, orgID string) (string, []interface{}) {
+	frag, a, err := projectVisibleSQL(alias, orgID)
+	if err != nil {
+		return q + ` AND 1=0`, args
+	}
 	return q + frag, append(args, a...)
 }
 

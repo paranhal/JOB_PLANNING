@@ -69,7 +69,7 @@ func (h *ProjectHandler) loadEquipProject(c echo.Context) (*model.WorkProject, s
 	if !canViewProjectEquip(c) {
 		return nil, "", echo.ErrForbidden
 	}
-	p, err := h.repo.Get(c.Param("id"))
+	p, err := h.repo.GetVisible(c.Param("id"), currentOrg(c), false)
 	if err != nil || p == nil {
 		return nil, "", echo.ErrNotFound
 	}
@@ -146,11 +146,12 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 	cats, _ := h.pe.ListCategories(org, false)
 	smap, emap, pending := h.pe.Summary(p.ProjectID)
 	prog, _ := h.pe.SiteProgress(p.ProjectID)
+	works, _ := h.wbRepo.ListSiteWorksByProject(p.ProjectID)
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 사이트·장비", "Active": NavProjects, "Project": p,
 		"Sites": sites, "SiteTotal": total, "Equips": equips, "EquipTotal": etotal,
 		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
-		"Progress": prog,
+		"Progress": prog, "SiteWorks": works,
 		"Q": q, "Region": region, "Status": st, "CanWrite": canWriteProjectEquip(c, h, p, org),
 		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": nil, "Apply": false,
@@ -643,11 +644,12 @@ func (h *ProjectHandler) renderSitesPreview(c echo.Context, p *model.WorkProject
 	cats, _ := h.pe.ListCategories(org, false)
 	smap, emap, pending := h.pe.Summary(p.ProjectID)
 	prog, _ := h.pe.SiteProgress(p.ProjectID)
+	works, _ := h.wbRepo.ListSiteWorksByProject(p.ProjectID)
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 사이트·장비", "Active": NavProjects, "Project": p,
 		"Sites": sites, "SiteTotal": total, "Equips": equips, "EquipTotal": etotal,
 		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
-		"Progress": prog,
+		"Progress": prog, "SiteWorks": works,
 		"CanWrite": canWriteProjectEquip(c, h, p, org),
 		"Preview":  prev, "Apply": applied,
 	})
