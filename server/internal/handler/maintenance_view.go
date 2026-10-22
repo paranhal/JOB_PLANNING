@@ -39,8 +39,13 @@ func mntViewLabel(v string) string {
 type MntCalDay struct {
 	Date        string // YYYY-MM-DD (빈 칸이면 "")
 	Day         int
+	Month       int
+	Year        int
+	OtherMonth  bool
+	OtherYear   bool
 	Weekend     bool
 	Today       bool
+	Selected    bool
 	IsSunday    bool
 	IsSaturday  bool
 	HolidayName string
@@ -52,6 +57,8 @@ type MntCalDay struct {
 	CellStyle   string
 	Leaves      LeaveBadgeGroup
 	Visits      []model.MaintenanceVisit
+	Chips       []MntCalChip
+	More        int
 }
 
 // MntVisitBoard 칸반 열 묶음
@@ -120,30 +127,30 @@ func buildVisitCalendar(year, month int, visits []model.MaintenanceVisit, today 
 
 	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	offset := int(first.Weekday())
-	lastDay := first.AddDate(0, 1, -1).Day()
+	cursor := first.AddDate(0, 0, -offset)
 
-	weeks := make([][]MntCalDay, 0, 6)
+	weeks := make([][]MntCalDay, 6)
 	for w := 0; w < 6; w++ {
 		week := make([]MntCalDay, 7)
-		filled := false
 		for col := 0; col < 7; col++ {
-			day := w*7 + col - offset + 1
-			cell := MntCalDay{Weekend: col == 0 || col == 6}
-			if day >= 1 && day <= lastDay {
-				cell.Day = day
-				cell.Date = fmt.Sprintf("%04d-%02d-%02d", year, month, day)
-				cell.Today = cell.Date == today
-				cell.Visits = byDate[cell.Date]
-				cell.IsSunday = col == 0
-				cell.IsSaturday = col == 6
-				filled = true
+			d := cursor
+			cell := MntCalDay{
+				Weekend:    col == 0 || col == 6,
+				Day:        d.Day(),
+				Month:      int(d.Month()),
+				Year:       d.Year(),
+				Date:       d.Format("2006-01-02"),
+				Today:      d.Format("2006-01-02") == today,
+				OtherMonth: d.Month() != time.Month(month) || d.Year() != year,
+				OtherYear:  d.Year() != year,
+				Visits:     byDate[d.Format("2006-01-02")],
+				IsSunday:   col == 0,
+				IsSaturday: col == 6,
 			}
 			week[col] = cell
+			cursor = cursor.AddDate(0, 0, 1)
 		}
-		if !filled {
-			break // 6주째가 통째로 비면 줄을 만들지 않는다
-		}
-		weeks = append(weeks, week)
+		weeks[w] = week
 	}
 	return weeks
 }

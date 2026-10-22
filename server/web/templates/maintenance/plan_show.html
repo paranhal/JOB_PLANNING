@@ -3,7 +3,38 @@
 {{define "content"}}
 <div class="space-y-5" x-data="{
   addOpen: false, doneOpen: false, editOpen: false,
+  selectedDay: '{{.SelectedDay}}',
+  panelTab: 'all',
+  assigneeOpen: false,
+  viewOpen: false,
+  dayVisits: {},
   edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'', project:'' },
+  init() {
+    const el = document.getElementById('mnt-day-visits');
+    if (!el) return;
+    try { this.dayVisits = JSON.parse(el.textContent || '{}'); } catch (e) { this.dayVisits = {}; }
+  },
+  selectDay(d) {
+    if (!d) return;
+    this.selectedDay = d;
+    const u = new URL(location.href);
+    u.searchParams.set('day', d);
+    history.replaceState({}, '', u);
+  },
+  filteredCards() {
+    const all = this.dayVisits[this.selectedDay] || [];
+    if (this.panelTab === 'done') return all.filter(c => c.state === 'done');
+    if (this.panelTab === 'open') return all.filter(c => c.state !== 'done');
+    return all;
+  },
+  weekdayLabel(d) {
+    const t = Date.parse(d + 'T00:00:00');
+    if (!t) return '';
+    return ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'][new Date(t).getDay()];
+  },
+  openAdd() {
+    this.addOpen = true;
+  },
   openEdit(el) {
     const d = el.dataset;
     this.edit = {
@@ -39,18 +70,22 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
+      {{if ne .View "calendar"}}
       {{if .ShowScopeToggle}}
       {{if .ScopeAll}}
-      <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}"
+      <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}{{.QAssignee}}"
          class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">내 일정만 보기</a>
       {{else}}
-      <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}&all=1"
+      <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}&all=1{{.QAssignee}}"
          class="px-4 py-2 border border-indigo-300 text-indigo-800 rounded-lg text-sm font-medium hover:bg-indigo-50">전체 일정 보기</a>
       {{end}}
       {{end}}
       {{if .CanEdit}}
-      <button type="button" @click="addOpen = true"
+      <button type="button" @click="openAdd()"
               class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">+ 방문 추가</button>
+      {{end}}
+      {{else}}
+      {{template "mnt_cal_toolbar" .}}
       {{end}}
       {{if .IsAdmin}}
       <form method="GET" action="/maintenance/{{.Plan.PlanID}}/generate" class="inline-flex items-center gap-1">
@@ -106,6 +141,13 @@
       </li>
       {{end}}
     </ul>
+  </div>
+  {{end}}
+
+  {{if and .AssigneeKey (ne .AssigneeKey "all")}}
+  <div class="rounded-xl border border-line bg-hover px-4 py-2 text-sm text-ink flex flex-wrap items-center gap-2">
+    <span>필터: {{.AssigneeLabel}}</span>
+    <a href="/maintenance/{{.Plan.PlanID}}?view={{.View}}{{if ne .Month 0}}&month={{.Month}}{{end}}{{.QScope}}" class="text-primary hover:underline text-xs">해제</a>
   </div>
   {{end}}
 
@@ -265,6 +307,7 @@
                 <input type="hidden" name="month" value="{{$.Month}}">
                 <input type="hidden" name="view" value="{{$.View}}">
                 {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+                {{if and $.AssigneeKey (ne $.AssigneeKey "all")}}<input type="hidden" name="assignee" value="{{$.AssigneeKey}}">{{end}}
                 <input type="date" name="visit_date" required class="border border-amber-300 rounded-lg px-2 py-1 text-xs bg-white">
                 <select name="project_id" class="border border-amber-300 rounded-lg px-2 py-1 text-xs bg-white max-w-[10rem]">
                   <option value="">사업명</option>
@@ -283,16 +326,19 @@
   {{end}}
 
   <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+    {{$view := .View}}{{$month := .Month}}{{$pid := .Plan.PlanID}}{{$all := .ScopeAll}}{{$tog := .ShowScopeToggle}}{{$aq := .QAssignee}}{{$sq := .QScope}}
+    {{if ne .View "calendar"}}
     <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
-      {{$view := .View}}{{$month := .Month}}{{$pid := .Plan.PlanID}}{{$all := .ScopeAll}}{{$tog := .ShowScopeToggle}}
       {{range $v := list "calendar" "kanban" "list"}}
-      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{if and $tog $all}}&all=1{{end}}"
+      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$aq}}"
          class="px-4 py-2 {{if eq $view $v}}bg-gray-900 text-white{{else}}bg-white text-gray-700 hover:bg-gray-50{{end}}">{{mntViewLabel $v}}</a>
       {{end}}
       <a href="/maintenance/{{$pid}}/manage"
          class="px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300">관리</a>
     </div>
+    {{end}}
 
+    {{if ne .View "calendar"}}
     <div class="flex flex-wrap items-center gap-3 text-xs text-gray-700">
       {{if .UseOrgProductLegend}}
       {{range .OrgProducts}}<span class="inline-flex items-center gap-1.5">{{.Name}}</span>{{end}}
@@ -302,14 +348,15 @@
       <span class="inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded" style="background-color:#e9d5ff;border:2px solid #9333ea"></span>보라 · 세종 K-LAS</span>
       {{end}}
     </div>
+    {{end}}
 
-    <div class="flex flex-wrap gap-1.5 text-sm">
+    <div class="flex flex-wrap gap-1.5 text-sm {{if eq .View "calendar"}}hidden lg:flex{{end}}">
       {{if eq .View "list"}}
-      <a href="/maintenance/{{$pid}}?view=list{{if and $tog $all}}&all=1{{end}}"
+      <a href="/maintenance/{{$pid}}?view=list{{$sq}}{{$aq}}"
          class="px-3 py-1 rounded-lg {{if eq .Month 0}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">전체</a>
       {{end}}
       {{range $m := seq 12}}
-      <a href="/maintenance/{{$pid}}?view={{$view}}&month={{$m}}{{if and $tog $all}}&all=1{{end}}"
+      <a href="/maintenance/{{$pid}}?view={{$view}}&month={{$m}}{{$sq}}{{$aq}}"
          class="px-3 py-1 rounded-lg {{if eq $month $m}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">{{$m}}월</a>
       {{end}}
     </div>
@@ -334,7 +381,8 @@
       <form method="POST" action="/maintenance/{{.Plan.PlanID}}/visits" class="space-y-3 text-sm">
         <div>
           <label class="block text-gray-600 mb-1">날짜</label>
-          <input type="date" name="visit_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+          <input type="date" name="visit_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2"
+                 :value="selectedDay">
         </div>
         <div>
           <label class="block text-gray-600 mb-1">고객</label>
@@ -405,6 +453,8 @@
         <input type="hidden" name="month" value="{{.Month}}">
         <input type="hidden" name="view" value="{{.View}}">
         {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+        {{if and .AssigneeKey (ne .AssigneeKey "all")}}<input type="hidden" name="assignee" value="{{.AssigneeKey}}">{{end}}
+        <input type="hidden" name="day" :value="selectedDay">
         <div class="flex gap-2 pt-1">
           <button type="button" @click="addOpen = false" class="flex-1 py-2 border border-gray-300 rounded-lg">취소</button>
           <button type="submit" class="flex-1 py-2 bg-gray-900 text-white rounded-lg font-medium">추가</button>
@@ -426,6 +476,8 @@
         <input type="hidden" name="month" value="{{.Month}}">
         <input type="hidden" name="view" value="{{.View}}">
         {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
+        {{if and .AssigneeKey (ne .AssigneeKey "all")}}<input type="hidden" name="assignee" value="{{.AssigneeKey}}">{{end}}
+        <input type="hidden" name="day" :value="selectedDay">
         <input type="hidden" name="completed_present" value="1">
         <div>
           <label class="block text-gray-600 mb-1">날짜</label>
@@ -500,7 +552,7 @@
       </form>
       {{if .CanEdit}}
       <form method="POST" x-show="!edit.completed && edit.date >= '{{.DeleteAfter}}'"
-            :action="'/maintenance/visits/' + edit.id + '/delete?plan_id={{.Plan.PlanID}}&month={{.Month}}&view={{.View}}{{if and .ShowScopeToggle .ScopeAll}}&all=1{{end}}'"
+            :action="'/maintenance/visits/' + edit.id + '/delete?plan_id={{.Plan.PlanID}}&month={{.Month}}&view={{.View}}{{.QScope}}{{.QAssignee}}&day=' + selectedDay"
             class="pt-1 border-t border-gray-100"
             onsubmit="return confirm('이 방문 일정을 삭제할까요? 중복 건을 정리할 때 사용하세요.');">
         <button type="submit" class="w-full py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">이 일정 삭제</button>
@@ -513,107 +565,288 @@
 </div>
 {{end}}
 
-{{define "mnt_calendar"}}
-{{$today := .Today}}
-<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-  <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-    <h3 class="font-semibold text-gray-800">{{.Month}}월 점검 캘린더</h3>
-    <p class="text-xs text-gray-500">{{len .MonthVisits}}건 · 사이트명 옆은 점검 대상</p>
-  </div>
-  <div class="grid grid-cols-7 text-xs font-medium bg-gray-50 border-b border-gray-100">
-    {{range $i, $d := list "일" "월" "화" "수" "목" "금" "토"}}
-    <div class="px-2 py-2 text-center" style="{{if eq $i 0}}color:#DC2626{{else if eq $i 6}}color:#2563EB{{else}}color:#4B5563{{end}}">{{$d}}</div>
-    {{end}}
-  </div>
-  <div class="divide-y divide-gray-100">
-    {{range .Weeks}}
-    <div class="grid grid-cols-7 divide-x divide-gray-100">
-      {{range .}}
-      <div class="min-h-[120px] p-1.5 align-top {{if not .Date}}bg-gray-50{{end}}"
-           style="{{if .Date}}{{.CellStyle}}{{end}}" title="{{.DateTitle}}">
-        {{if .Date}}
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold {{if .Today}}bg-gray-900 text-white rounded-full px-1.5{{end}}"
-                style="{{if not .Today}}{{.DayStyle}}{{end}}">{{.Day}}</span>
-          {{if .Visits}}<span class="text-[10px] text-gray-400">{{len .Visits}}</span>{{end}}
-        </div>
-        {{if .HolidayName}}
-        <p class="text-[9px] leading-tight truncate mb-1" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
-        {{end}}
-        {{if .Leaves.Shown}}
-        <div class="mb-1 space-y-0.5" x-data="{open:false}">
-          {{range .Leaves.Shown}}
-          <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
-                style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
-          {{end}}
-          {{if gt .Leaves.More 0}}
-          <button type="button" class="block text-[9px] text-orange-700 hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
-          <div x-show="open" x-cloak class="space-y-0.5">
-            {{range .Leaves.Hidden}}
-            <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
-                  style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
-            {{end}}
-          </div>
-          {{end}}
-        </div>
-        {{end}}
-        <div class="space-y-1">
-          {{$pid := $.Plan.PlanID}}{{$month := $.Month}}
-          {{range .Visits}}
-          {{$b := mntVisitBadge . $today}}
-          <div class="px-1.5 py-1 rounded text-[11px] leading-tight {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
-               style="{{mntProductStyle .ProductType}}">
-            <div class="font-medium truncate" title="{{visitLabel .}}{{if .Assignee}} · {{.Assignee}}{{end}}">{{visitLabel .}}{{if .RoundNo}} <span class="badge-neutral text-[10px]">{{.RoundNo}}회차</span>{{end}}{{if .DupReason}} <span class="text-[10px] px-1 rounded bg-amber-100 text-amber-800">월 2회차</span>{{end}}</div>
-            {{if $b.Label}}
-            <div class="mt-0.5 flex items-center gap-1 flex-wrap">
-              <span class="{{$b.Class}}">{{$b.Label}}</span>
-              {{if $b.Extra}}<span class="text-[10px] text-gray-500">{{$b.Extra}}</span>{{end}}
-            </div>
-            {{end}}
-            <div class="flex items-center justify-between mt-0.5 text-[10px] opacity-90 gap-1">
-              <span class="truncate">{{.Assignee}}</span>
-              {{if $.CanEdit}}
-              <span class="shrink-0 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
-                <button type="button" class="text-blue-600 hover:underline"
-                        data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
-                        data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
-                        data-project="{{.ProjectID}}"
-                        data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
-                        data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
-                        @click.stop="openEdit($event.currentTarget)">수정</button>
-                <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=calendar{{if and $.ShowScopeToggle $.ScopeAll}}&all=1{{end}}" class="inline">
-                  <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
-                  <button type="submit" class="{{if .Completed}}text-green-700{{else}}text-gray-500 hover:text-green-700{{end}} hover:underline">
-                    {{if .Completed}}완료{{else}}완료{{end}}</button>
-                </form>
-                {{if and (not .Completed) (ge .VisitDate $.DeleteAfter)}}
-                <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=calendar{{if and $.ShowScopeToggle $.ScopeAll}}&all=1{{end}}" class="inline"
-                      onsubmit="return confirm('이 방문 일정을 삭제할까요?');">
-                  <button type="submit" class="text-red-600 hover:underline">삭제</button>
-                </form>
-                {{end}}
-              </span>
-              {{end}}
-            </div>
-          </div>
+{{define "mnt_cal_toolbar"}}
+{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$view := .View}}{{$sq := .QScope}}{{$aq := .QAssignee}}
+<div class="flex flex-wrap items-center gap-2">
+  <div class="relative" @keydown.escape.window="assigneeOpen=false">
+    <button type="button" class="btn-secondary btn-sm" @click="assigneeOpen=!assigneeOpen; viewOpen=false">
+      {{if .AssigneeLabel}}{{.AssigneeLabel}}{{else}}전체 담당자{{end}}
+      <span class="text-ink-subtle">▾</span>
+    </button>
+    <div x-show="assigneeOpen" x-cloak @click.outside="assigneeOpen=false"
+         class="absolute right-0 z-30 mt-1 w-80 max-h-[28rem] overflow-y-auto rounded-card border border-line bg-surface p-2 shadow-pop text-left">
+      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}"
+         class="flex items-center justify-between rounded-control px-2 py-1.5 text-ui hover:bg-hover {{if or (eq .AssigneeKey "all") (eq .AssigneeKey "")}}bg-selected{{end}}">
+        <span>전체 담당자</span>
+        {{if or (eq .AssigneeKey "all") (eq .AssigneeKey "")}}<span class="text-ink-muted">✓</span>{{end}}
+      </a>
+      {{if .CalGroups}}
+      <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">업무 그룹</p>
+      {{range .CalGroups}}
+      <div class="rounded-control border border-line p-2 mb-1.5">
+        <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=group:{{.GroupID}}"
+           class="flex items-start justify-between gap-2">
+          <span>
+            <span class="block text-ui font-medium text-ink">{{.Name}}</span>
+            {{if .OrgLabel}}<span class="block text-ui-xs text-ink-subtle">{{.OrgLabel}}</span>{{end}}
+            {{if .MemberSummary}}<span class="block text-ui-xs text-ink-muted">{{.MemberSummary}}</span>{{end}}
+          </span>
+          <span class="badge-neutral">{{.MemberN}}</span>
+        </a>
+        {{if .Members}}
+        <div class="mt-1.5 flex flex-wrap gap-1">
+          {{range .Members}}
+          <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=user:{{.UserID}}"
+             class="badge-neutral hover:bg-selected">{{.FullName}}</a>
           {{end}}
         </div>
         {{end}}
       </div>
       {{end}}
+      {{end}}
+      {{if .CalPeople}}
+      <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">담당자</p>
+      {{range .CalPeople}}
+      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=user:{{.UserID}}"
+         class="block rounded-control px-2 py-1 text-ui hover:bg-hover">{{.FullName}}</a>
+      {{end}}
+      {{end}}
+      <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">기타</p>
+      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=none"
+         class="block rounded-control px-2 py-1.5 text-ui hover:bg-hover {{if eq .AssigneeKey "none"}}bg-selected{{end}}">미배정</a>
     </div>
-    {{end}}
   </div>
+  <div class="relative" @keydown.escape.window="viewOpen=false">
+    <button type="button" class="btn-secondary btn-sm" @click="viewOpen=!viewOpen; assigneeOpen=false">보기 설정</button>
+    <div x-show="viewOpen" x-cloak @click.outside="viewOpen=false"
+         class="absolute right-0 z-30 mt-1 w-56 rounded-card border border-line bg-surface p-2 shadow-pop">
+      <p class="px-2 pb-1 text-ui-xs font-semibold text-ink-muted">보기</p>
+      {{range $v := list "calendar" "kanban" "list"}}
+      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$aq}}"
+         class="block rounded-control px-2 py-1.5 text-ui hover:bg-hover {{if eq $view $v}}bg-selected{{end}}">{{mntViewLabel $v}}</a>
+      {{end}}
+      {{if .ShowScopeToggle}}
+      <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">범위</p>
+      {{if .ScopeAll}}
+      <a href="/maintenance/{{$pid}}?view={{$view}}{{if ne $month 0}}&month={{$month}}{{end}}{{$aq}}" class="block rounded-control px-2 py-1.5 text-ui hover:bg-hover">내 일정만 보기</a>
+      {{else}}
+      <a href="/maintenance/{{$pid}}?view={{$view}}{{if ne $month 0}}&month={{$month}}{{end}}&all=1{{$aq}}" class="block rounded-control px-2 py-1.5 text-ui hover:bg-hover">전체 일정 보기</a>
+      {{end}}
+      {{end}}
+    </div>
+  </div>
+  {{if .CanEdit}}
+  <a href="/maintenance/{{$pid}}/manage" class="btn-secondary btn-sm">배정 관리</a>
+  {{end}}
+  {{if .HasExcel}}
+  <a href="{{.ExportHref}}" class="btn-secondary btn-sm" title="엑셀 다운로드" aria-label="엑셀 다운로드">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+      <path d="M3 3.5A1.5 1.5 0 0 1 4.5 2h7.379a1.5 1.5 0 0 1 1.06.44l3.622 3.621A1.5 1.5 0 0 1 17 7.122V16.5A1.5 1.5 0 0 1 15.5 18h-11A1.5 1.5 0 0 1 3 16.5v-13Z"/>
+    </svg>
+  </a>
+  {{end}}
+  {{if .CanEdit}}
+  <button type="button" @click="openAdd()" class="btn-primary btn-sm">＋ 방문 추가</button>
+  {{end}}
+</div>
+{{end}}
+
+{{define "mnt_calendar"}}
+{{$today := .Today}}{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}
+<script type="application/json" id="mnt-day-visits">{{toJSON .DayVisits}}</script>
+<div class="flex flex-col lg:flex-row gap-3 items-stretch">
+  <div class="card min-w-0 flex-1 overflow-hidden">
+    <div class="card-header flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        {{if gt $month 1}}
+        <a href="/maintenance/{{$pid}}?view=calendar&month={{subtract $month 1}}{{$sq}}{{$aq}}" class="btn-ghost btn-sm" aria-label="이전 달">‹</a>
+        {{else}}
+        <span class="btn-ghost btn-sm text-ink-subtle">‹</span>
+        {{end}}
+        <h3 class="font-semibold text-ink">{{.Plan.PlanYear}}년 {{.Month}}월</h3>
+        {{if lt $month 12}}
+        <a href="/maintenance/{{$pid}}?view=calendar&month={{add $month 1}}{{$sq}}{{$aq}}" class="btn-ghost btn-sm" aria-label="다음 달">›</a>
+        {{else}}
+        <span class="btn-ghost btn-sm text-ink-subtle">›</span>
+        {{end}}
+        <a href="{{.TodayHref}}" class="btn-secondary btn-sm">오늘</a>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 text-ui-xs text-ink-muted">
+        <span class="inline-flex items-center gap-1"><span class="mnt-cal-dot-done"></span>완료</span>
+        <span class="inline-flex items-center gap-1"><span class="mnt-cal-dot-planned"></span>예정</span>
+        <span class="inline-flex items-center gap-1"><span class="mnt-cal-dot-check"></span>확인 필요</span>
+      </div>
+    </div>
+    <div id="mnt-cal-grid">
+      <div class="grid grid-cols-7 text-xs font-medium bg-hover border-b border-line">
+        {{range $i, $d := list "일" "월" "화" "수" "목" "금" "토"}}
+        <div class="px-2 py-2 text-center {{if eq $i 0}}text-danger{{else if eq $i 6}}text-info{{else}}text-ink-muted{{end}}">{{$d}}</div>
+        {{end}}
+      </div>
+      <div class="divide-y divide-line">
+        {{range .Weeks}}
+        <div class="grid grid-cols-7 divide-x divide-line">
+          {{range .}}
+          <div class="min-h-[104px] p-1.5 align-top {{if .OtherMonth}}mnt-cal-other{{end}} {{if .Today}}mnt-cal-today{{end}} {{if .Selected}}mnt-cal-selected{{end}}"
+               title="{{.DateTitle}}"
+               {{if and .Date (not .OtherMonth)}}@click="selectDay('{{.Date}}')"{{end}}>
+            {{if .Date}}
+            <div class="flex items-center justify-between mb-1">
+              {{if and .OtherMonth (not .OtherYear)}}
+              <a href="/maintenance/{{$pid}}?view=calendar&month={{.Month}}&day={{.Date}}{{$sq}}{{$aq}}"
+                 class="text-xs font-semibold {{.DayClass}}" style="{{.DayStyle}}">{{.Day}}</a>
+              {{else if .Today}}
+              <span class="mnt-cal-num-today">{{.Day}}</span>
+              {{else}}
+              <span class="text-xs font-semibold {{.DayClass}}" style="{{.DayStyle}}">{{.Day}}</span>
+              {{end}}
+            </div>
+            {{if .HolidayName}}
+            <p class="text-[9px] leading-tight truncate mb-1" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
+            {{end}}
+            {{if .Leaves.Shown}}
+            <div class="mb-1 space-y-0.5" x-data="{open:false}">
+              {{range .Leaves.Shown}}
+              <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
+                    style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
+              {{end}}
+              {{if gt .Leaves.More 0}}
+              <button type="button" class="block text-[9px] text-warning hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
+              <div x-show="open" x-cloak class="space-y-0.5">
+                {{range .Leaves.Hidden}}
+                <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
+                      style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
+                {{end}}
+              </div>
+              {{end}}
+            </div>
+            {{end}}
+            <div class="space-y-0.5">
+              {{$day := .Date}}
+              {{range .Chips}}
+              <button type="button" class="mnt-cal-chip-{{.State}} w-full text-left"
+                      title="{{.Title}}" @click.stop="selectDay('{{$day}}')">
+                <span class="mnt-cal-dot-{{.State}}"></span>
+                <span class="truncate">{{.Label}}</span>
+              </button>
+              {{end}}
+              {{if gt .More 0}}
+              <button type="button" class="block w-full text-left text-[10px] text-ink-muted hover:underline"
+                      @click.stop="selectDay('{{$day}}')">외 {{.More}}건</button>
+              {{end}}
+            </div>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  <aside id="mnt-day-panel" class="card w-full lg:w-[285px] lg:shrink-0 flex flex-col">
+    <div class="card-header">
+      <p class="text-ui-xs text-ink-muted">{{.Month}}월</p>
+      <p class="text-2xl font-bold text-ink leading-tight" x-text="selectedDay ? selectedDay.slice(-2).replace(/^0/,'') : ''">{{if .SelectedDay}}{{slice .SelectedDay 8}}{{end}}</p>
+      <p class="text-ui-sm text-ink-muted" x-text="weekdayLabel(selectedDay)">{{.SelectedWeekday}}</p>
+    </div>
+    <div class="px-3 pt-2 flex gap-1 text-ui-sm">
+      <button type="button" class="tab" :class="panelTab==='all' && 'tab-active'" @click="panelTab='all'">전체</button>
+      <button type="button" class="tab" :class="panelTab==='done' && 'tab-active'" @click="panelTab='done'">완료</button>
+      <button type="button" class="tab" :class="panelTab==='open' && 'tab-active'" @click="panelTab='open'">예정</button>
+    </div>
+    <div class="card-body flex-1 min-h-[12rem]">
+      <p class="text-ui-sm font-medium text-ink mb-2">방문 일정 <span class="text-ink-muted" x-text="filteredCards().length"></span></p>
+      <div class="space-y-2">
+        <template x-for="card in filteredCards()" :key="card.visit_id">
+          <div class="flex gap-2 rounded-control border border-line p-2">
+            <span class="mnt-panel-bar" :class="{
+              'mnt-panel-bar-done': card.state==='done',
+              'mnt-panel-bar-planned': card.state==='planned',
+              'mnt-panel-bar-check': card.state==='check'
+            }"></span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-1">
+                <p class="text-ui font-medium text-ink truncate">
+                  <span x-text="card.site"></span>
+                  <span class="badge-neutral" x-show="card.round_no>0" x-text="card.round_no + '회차'"></span>
+                  <span class="badge-warning" x-show="card.dup">월 2회차</span>
+                </p>
+                {{if $.CanEdit}}
+                <button type="button" class="text-ink-subtle"
+                        :data-id="card.visit_id" :data-date="card.date" :data-customer="card.customer_id"
+                        :data-product="card.product_type" :data-assignee="card.assignee"
+                        :data-project="card.project_id" :data-category="card.entry_category"
+                        :data-notes="card.notes"
+                        :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
+                        @click="openEdit($event.currentTarget)" aria-label="수정">›</button>
+                {{end}}
+              </div>
+              <p class="text-ui-xs text-ink-muted truncate" x-text="[card.region, card.product].filter(Boolean).join(' · ')"></p>
+              <p class="text-ui-xs text-ink-muted truncate" :title="card.assignee_title">
+                <span x-text="card.assignee_label || '미배정'"></span>
+                <span x-show="card.group_name" x-text="' · ' + card.group_name"></span>
+              </p>
+              <p class="text-ui-xs">
+                <span x-text="card.state_label"></span>
+                <span class="text-ink-muted" x-text="card.badge_label ? ' · ' + card.badge_label : ''"></span>
+                <span class="text-ink-muted" x-text="card.badge_extra ? ' ' + card.badge_extra : ''"></span>
+              </p>
+              {{if $.CanEdit}}
+              <div class="mt-1.5 flex flex-wrap gap-2 text-ui-xs">
+                <button type="button" class="text-info hover:underline"
+                        :data-id="card.visit_id" :data-date="card.date" :data-customer="card.customer_id"
+                        :data-product="card.product_type" :data-assignee="card.assignee"
+                        :data-project="card.project_id" :data-category="card.entry_category"
+                        :data-notes="card.notes"
+                        :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
+                        @click="openEdit($event.currentTarget)">수정</button>
+                <form method="POST" :action="card.complete_href" class="inline">
+                  <input type="hidden" name="done" :value="card.completed ? '0' : '1'">
+                  <button type="submit" class="text-success hover:underline">완료</button>
+                </form>
+                <form method="POST" x-show="card.can_delete" :action="card.delete_href" class="inline"
+                      onsubmit="return confirm('이 방문 일정을 삭제할까요?');">
+                  <button type="submit" class="text-danger hover:underline">삭제</button>
+                </form>
+              </div>
+              {{end}}
+            </div>
+          </div>
+        </template>
+      </div>
+      <div x-show="filteredCards().length===0" class="text-ui-sm text-ink-muted py-6">
+        <p>이 날짜에 예정된 방문이 없습니다</p>
+        {{if .CanEdit}}
+        <button type="button" class="mt-2 text-primary hover:underline" @click="openAdd()">이 날짜로 방문 추가</button>
+        {{end}}
+      </div>
+    </div>
+    <div class="border-t border-line grid grid-cols-3 text-center px-2 py-3">
+      <div>
+        <p class="text-ui-xs text-ink-muted">이번 달 방문</p>
+        <p class="text-ui-lg font-semibold text-ink">{{.MonthStats.Total}}</p>
+      </div>
+      <div>
+        <p class="text-ui-xs text-ink-muted">완료</p>
+        <p class="text-ui-lg font-semibold text-ink">{{.MonthStats.Done}}</p>
+      </div>
+      <div>
+        <p class="text-ui-xs text-ink-muted">예정·확인</p>
+        <p class="text-ui-lg font-semibold text-ink">{{.MonthStats.Open}}</p>
+      </div>
+    </div>
+  </aside>
 </div>
 {{end}}
 
 {{define "mnt_kanban"}}
 {{$today := .Today}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
-  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
-  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
-  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today}}
+  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
+  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
+  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
+  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
 </div>
 {{end}}
 
@@ -625,7 +858,7 @@
     <span class="text-xs text-gray-500">{{len .Visits}}</span>
   </div>
   <div class="p-2 space-y-2 max-h-[560px] overflow-y-auto">
-    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$all := and .ShowScopeToggle .ScopeAll}}{{$del := .DeleteAfter}}{{$today := .Today}}
+    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$del := .DeleteAfter}}{{$today := .Today}}{{$sq := .QScope}}{{$aq := .QAssignee}}
     {{range .Visits}}
     {{$b := mntVisitBadge . $today}}
     <div class="rounded-lg p-2.5 text-sm {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
@@ -654,13 +887,13 @@
                   data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                   data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                   @click="openEdit($event.currentTarget)">수정</button>
-          <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{if $all}}&all=1{{end}}" class="inline">
+          <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{$sq}}{{$aq}}" class="inline">
             <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
             <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
               {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
           </form>
           {{if and (not .Completed) (ge .VisitDate $del)}}
-          <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{if $all}}&all=1{{end}}" class="inline"
+          <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{$sq}}{{$aq}}" class="inline"
                 onsubmit="return confirm('이 방문을 삭제할까요?');">
             <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
           </form>
@@ -696,7 +929,7 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
-        {{$pid := .Plan.PlanID}}{{$month := .Month}}{{$all := and .ShowScopeToggle .ScopeAll}}
+        {{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}
         {{range .MonthVisits}}
         <tr class="{{if .Completed}}bg-gray-50/80{{end}}">
           <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}{{if .DupReason}} <span class="text-[10px] px-1 rounded bg-amber-100 text-amber-800">월 2회차</span>{{end}}</td>
@@ -725,13 +958,13 @@
                     data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                     data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                     @click="openEdit($event.currentTarget)">수정</button>
-            <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=list{{if $all}}&all=1{{end}}" class="inline ml-2">
+            <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=list{{$sq}}{{$aq}}" class="inline ml-2">
               <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
               <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
                 {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
             </form>
             {{if and (not .Completed) (ge .VisitDate $.DeleteAfter)}}
-            <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{if $all}}&all=1{{end}}" class="inline ml-2"
+            <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{$sq}}{{$aq}}" class="inline ml-2"
                   onsubmit="return confirm('이 방문을 삭제할까요?');">
               <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
             </form>

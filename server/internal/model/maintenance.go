@@ -61,6 +61,7 @@ type MaintenanceVisit struct {
 	RoundNo       int // 주기 안 회차. 0 은 조회 시 1.
 	WorkGroupID   string
 	WorkGroupName string
+	People        []MaintenanceVisitAssignee // 조회 시 채움. 저장 컬럼 아님.
 }
 
 // MaintenanceVisitAssignee 방문 주담당·참여자

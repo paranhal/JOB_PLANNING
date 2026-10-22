@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"net/url"
@@ -23,6 +24,8 @@ type MaintenanceHandler struct {
 	wbRepo       *repository.WBRepo
 	settingsRepo *repository.SettingsRepo
 	holidayRepo  *repository.HolidayRepo
+	groups       *repository.WorkGroupRepo
+	orgs         *repository.OrgRepo
 	notices      *assignNoticeHook
 	dataDir      string
 }
@@ -152,6 +155,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		return err
 	}
 	visits = model.DatedVisits(visits)
+	h.hydrateVisitPeople(visits)
 	// 기술담당: 기본은 본인 배정만. all=1 이면 전체(타 담당자 포함).
 	scopeAll := mntScopeAll(c)
 	showScopeToggle := isTechRole(c)
@@ -189,6 +193,16 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if month != 0 {
 		shown = filterVisitsByMonth(visits, plan.PlanYear, month)
 	}
+	assigneeKey := strings.TrimSpace(c.QueryParam("assignee"))
+	if assigneeKey == "" {
+		assigneeKey = "all"
+	}
+	calGroups, calPeople, groupMembers := h.calFilterOptions(c, shown)
+	userName := ""
+	if kind, uid := parseAssigneeFilter(assigneeKey); kind == "user" && uid != "" {
+		userName = h.userDisplayName(uid)
+	}
+	shown = filterVisitsByAssigneeKey(shown, assigneeKey, groupMembers, userName)
 
 	doneCount := 0
 	var incomplete []model.MaintenanceVisit
@@ -222,6 +236,9 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if scopeAll {
 		yearQ.Set("all", "1")
 	}
+	if a := strings.TrimSpace(assigneeKey); a != "" && a != "all" {
+		yearQ.Set("assignee", a)
+	}
 	yearQuery := ""
 	if enc := yearQ.Encode(); enc != "" {
 		yearQuery = "?" + enc
@@ -242,6 +259,29 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, dupMonth)
 	qNum := model.CalendarQuarter(quotaMonth)
 	qFrom, qTo := model.QuarterDateBounds(plan.PlanYear, qNum)
+	weeks := decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c))
+	selDay := strings.TrimSpace(c.QueryParam("day"))
+	if !dayInWeeks(weeks, selDay) {
+		selDay = defaultSelectedDay(plan.PlanYear, month, today, shown)
+	}
+	attachCalendarChips(weeks, today, selDay)
+	scopeAllFlag := ""
+	if scopeAll && showScopeToggle {
+		scopeAllFlag = "1"
+	}
+	cfgs, _ := h.repo.ListSiteConfigs()
+	regions := visitRegionMap(customers, cfgs)
+	dayCards := buildVisitCards(shown, today, model.NextMonthStart(time.Now()).Format("2006-01-02"), regions)
+	attachCardHrefs(dayCards, plan.PlanID, view, month, assigneeKey, scopeAllFlag, selDay)
+	stats := mntMonthStats(shown, today)
+	qScope := ""
+	if scopeAll && showScopeToggle {
+		qScope = "&all=1"
+	}
+	qAssignee := ""
+	if a := strings.TrimSpace(assigneeKey); a != "" && a != "all" {
+		qAssignee = "&assignee=" + a
+	}
 	periodGroups := buildPeriodGroups(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c))
 	var quarterPending []model.UnassignedMonthSlot
 	quarterLast := model.IsLastMonthOfQuarter(quotaMonth)
@@ -274,8 +314,21 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"View":                view,
 		"Month":               month,
 		"MonthVisits":         shown,
-		"Weeks":               decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c)),
+		"Weeks":               weeks,
 		"Board":               board,
+		"AssigneeKey":         assigneeKey,
+		"AssigneeLabel":       calAssigneeLabel(assigneeKey, calGroups, calPeople),
+		"CalGroups":           calGroups,
+		"CalPeople":           calPeople,
+		"SelectedDay":         selDay,
+		"SelectedWeekday":     weekdayKo(selDay),
+		"DayVisits":           cardsByDay(dayCards),
+		"MonthStats":          stats,
+		"HasExcel":            true,
+		"ExportHref":          template.URL("/maintenance/" + plan.PlanID + "/export.xlsx"),
+		"QScope":              template.URL(qScope),
+		"QAssignee":           template.URL(qAssignee),
+		"TodayHref":           template.URL(calTodayHref(plan.PlanID, plan.PlanYear, today, assigneeKey, scopeAllFlag)),
 		"DoneCount":           doneCount,
 		"OpenCount":           len(visits) - doneCount,
 		"IncompleteVisits":    incomplete,
@@ -296,6 +349,113 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
 		"WorkGroups":          []model.WorkGroup{},
 	})
+}
+
+func (h *MaintenanceHandler) hydrateVisitPeople(visits []model.MaintenanceVisit) {
+	if h == nil || h.repo == nil || len(visits) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(visits))
+	for _, v := range visits {
+		ids = append(ids, v.VisitID)
+	}
+	by, _ := h.repo.ListVisitAssigneesForVisits(ids)
+	repository.AttachVisitPeople(visits, by)
+}
+
+func (h *MaintenanceHandler) userDisplayName(uid string) string {
+	if h == nil || h.userRepo == nil || strings.TrimSpace(uid) == "" {
+		return ""
+	}
+	u, err := h.userRepo.GetByID(uid)
+	if err != nil || u == nil {
+		return ""
+	}
+	return strings.TrimSpace(u.FullName)
+}
+
+func (h *MaintenanceHandler) calFilterOptions(c echo.Context, visits []model.MaintenanceVisit) ([]MntCalGroup, []MntCalPerson, map[string]map[string]bool) {
+	var groups []model.WorkGroup
+	if h != nil && h.groups != nil {
+		org := currentOrg(c)
+		role := model.NormalizeRole(currentRole(c))
+		admin := role == model.RoleOrgAdmin || role == model.RoleAdmin || role == model.RoleVisionAdmin || role == model.RoleCLevel
+		if org == repository.OrgAll && (role == model.RoleVisionAdmin || role == model.RoleCLevel) {
+			groups, _ = h.groups.ListGroups("", model.WorkGroupActive)
+		} else {
+			if org == "" || org == repository.OrgAll {
+				org = workGroupActor(c).HomeOrg()
+			}
+			groups, _ = h.groups.ListVisibleActiveForWork(org, currentUserID(c), admin)
+		}
+	}
+	orgNames := map[string]string{}
+	if h != nil && h.orgs != nil {
+		if rows, err := h.orgs.ListActive(); err == nil {
+			for _, o := range rows {
+				orgNames[o.OrgID] = o.OrgName
+			}
+		}
+	}
+	showOrg := currentOrg(c) == repository.OrgAll
+	outG := make([]MntCalGroup, 0, len(groups))
+	members := map[string]map[string]bool{}
+	inGroup := map[string]bool{}
+	for _, g := range groups {
+		cg := MntCalGroup{GroupID: g.GroupID, Name: g.Name, MemberN: g.MemberN}
+		if showOrg {
+			cg.OrgLabel = orgNames[g.OrgID]
+			if cg.OrgLabel == "" {
+				cg.OrgLabel = g.OrgID
+			}
+		}
+		var names []string
+		if h != nil && h.groups != nil {
+			ms, _ := h.groups.MembersOn(g.GroupID, "")
+			mem := map[string]bool{}
+			for _, m := range ms {
+				mem[m.UserID] = true
+				inGroup[m.UserID] = true
+				names = append(names, m.FullName)
+				cg.Members = append(cg.Members, MntCalPerson{UserID: m.UserID, FullName: m.FullName})
+			}
+			members[g.GroupID] = mem
+			cg.MemberN = len(ms)
+		}
+		cg.MemberSummary = memberSummary(names)
+		outG = append(outG, cg)
+	}
+	seen := map[string]bool{}
+	var people []MntCalPerson
+	addP := func(uid, name string) {
+		uid = strings.TrimSpace(uid)
+		name = strings.TrimSpace(name)
+		if uid == "" || inGroup[uid] || seen[uid] {
+			return
+		}
+		seen[uid] = true
+		if name == "" {
+			name = h.userDisplayName(uid)
+		}
+		people = append(people, MntCalPerson{UserID: uid, FullName: name})
+	}
+	for _, v := range visits {
+		for _, p := range v.People {
+			addP(p.UserID, p.AssigneeName)
+		}
+	}
+	return outG, people, members
+}
+
+func calTodayHref(planID string, planYear int, today, assignee, all string) string {
+	t, err := time.ParseInLocation("2006-01-02", today, time.Local)
+	if err != nil {
+		return calQuery(planID, mntViewCalendar, 0, assignee, all, "")
+	}
+	if t.Year() != planYear {
+		return calQuery(planID, mntViewCalendar, 1, assignee, all, fmt.Sprintf("%d-01-01", planYear))
+	}
+	return calQuery(planID, mntViewCalendar, int(t.Month()), assignee, all, today)
 }
 
 func holidayOffSet(repo *repository.HolidayRepo, year int) map[string]bool {
@@ -584,11 +744,17 @@ func planURLFrom(c echo.Context, planID, done string) string {
 	view := firstNonEmpty(c.FormValue("view"), c.QueryParam("view"))
 	month := firstNonEmpty(c.FormValue("month"), c.QueryParam("month"))
 	all := mntScopeAll(c) && isTechRole(c)
-	return planURL(planID, view, month, done, all)
+	assignee := firstNonEmpty(c.FormValue("assignee"), c.QueryParam("assignee"))
+	day := firstNonEmpty(c.FormValue("day"), c.QueryParam("day"))
+	return planURLExtra(planID, view, month, done, all, assignee, day)
 }
 
 // planURL 계획 화면으로 돌아가는 주소 — 보던 보기 방식·달·담당자 범위를 유지한다.
 func planURL(planID, view, month, done string, all bool) string {
+	return planURLExtra(planID, view, month, done, all, "", "")
+}
+
+func planURLExtra(planID, view, month, done string, all bool, assignee, day string) string {
 	q := url.Values{}
 	if v := mntView(view); v != mntViewCalendar || view != "" {
 		q.Set("view", v)
@@ -598,6 +764,12 @@ func planURL(planID, view, month, done string, all bool) string {
 	}
 	if all {
 		q.Set("all", "1")
+	}
+	if a := strings.TrimSpace(assignee); a != "" && a != "all" {
+		q.Set("assignee", a)
+	}
+	if d := strings.TrimSpace(day); d != "" {
+		q.Set("day", d)
 	}
 	if done != "" {
 		q.Set("done", done)

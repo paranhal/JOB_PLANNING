@@ -9,6 +9,16 @@ module.exports = {
   safelist: [
     "lg:grid-cols-[1fr_16rem]",
     "lg:grid-cols-[1fr_18rem]",
+    "lg:w-[285px]",
+    "mnt-cal-chip-done",
+    "mnt-cal-chip-planned",
+    "mnt-cal-chip-check",
+    "mnt-cal-dot-done",
+    "mnt-cal-dot-planned",
+    "mnt-cal-dot-check",
+    "mnt-panel-bar-done",
+    "mnt-panel-bar-planned",
+    "mnt-panel-bar-check",
   ],
   theme: {
     extend: {

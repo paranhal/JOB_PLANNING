@@ -136,6 +136,21 @@
     @apply shrink-0 border-t border-line bg-surface px-4 py-3;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
   }
+
+  .mnt-cal-chip-done { @apply flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-[10px] leading-tight text-ink bg-hover; }
+  .mnt-cal-chip-planned { @apply flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-[10px] leading-tight text-ink bg-info-soft; }
+  .mnt-cal-chip-check { @apply flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-[10px] leading-tight text-ink bg-warning-soft; }
+  .mnt-cal-dot-done { @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-ink-muted; }
+  .mnt-cal-dot-planned { @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-line-strong; }
+  .mnt-cal-dot-check { @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-ink; }
+  .mnt-cal-today { @apply bg-selected; }
+  .mnt-cal-selected { @apply bg-selected ring-1 ring-inset ring-line-strong; }
+  .mnt-cal-other { @apply opacity-50; }
+  .mnt-cal-num-today { @apply inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-ink px-1 text-[11px] font-semibold text-primary-fg; }
+  .mnt-panel-bar { @apply w-1 shrink-0 self-stretch rounded-full; }
+  .mnt-panel-bar-done { @apply mnt-panel-bar bg-ink-muted; }
+  .mnt-panel-bar-planned { @apply mnt-panel-bar bg-line-strong; }
+  .mnt-panel-bar-check { @apply mnt-panel-bar bg-ink; }
 }
 
 @layer utilities {

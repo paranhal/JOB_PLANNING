@@ -13,6 +13,11 @@ import (
 
 func planViewData(view string, month int, visits []model.MaintenanceVisit) map[string]interface{} {
 	const today = "2026-08-05"
+	weeks := buildVisitCalendar(2026, month, visits, today)
+	sel := defaultSelectedDay(2026, month, today, visits)
+	attachCalendarChips(weeks, today, sel)
+	cards := buildVisitCards(visits, today, "2026-01-01", nil)
+	attachCardHrefs(cards, "mpl_1", view, month, "all", "", sel)
 	return map[string]interface{}{
 		"Title": "정기점검 2026년", "Active": NavMaintenance, "UserRole": "admin",
 		"Plan":        &model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Status: "draft"},
@@ -24,7 +29,7 @@ func planViewData(view string, month int, visits []model.MaintenanceVisit) map[s
 		"View":        view,
 		"Month":       month,
 		"MonthVisits": visits,
-		"Weeks":       buildVisitCalendar(2026, month, visits, today),
+		"Weeks":       weeks,
 		"Board":       buildVisitBoard(visits, today),
 		"DoneCount":   1, "OpenCount": 1,
 		"FlashDone": "", "FlashOK": "", "Today": today,
@@ -32,6 +37,13 @@ func planViewData(view string, month int, visits []model.MaintenanceVisit) map[s
 		"ScopeAll": true, "ShowScopeToggle": false, "ScopeNote": "전체 일정",
 		"Projects": nil, "Unassigned": nil, "QuotaMonth": month,
 		"DupCount": 0, "DeleteAfter": "2026-01-01", "FlashErr": "",
+		"AssigneeKey": "all", "AssigneeLabel": "전체 담당자",
+		"CalGroups": []MntCalGroup{}, "CalPeople": []MntCalPerson{},
+		"SelectedDay": sel, "SelectedWeekday": weekdayKo(sel),
+		"DayVisits": cardsByDay(cards), "MonthStats": mntMonthStats(visits, today),
+		"HasExcel": true, "ExportHref": template.URL("/maintenance/mpl_1/export.xlsx"),
+		"QScope": template.URL(""), "QAssignee": template.URL(""),
+		"TodayHref": template.URL(calTodayHref("mpl_1", 2026, today, "all", "")),
 	}
 }
 
@@ -74,8 +86,13 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 			t.Fatalf("%s 렌더링 실패: %v", view, err)
 		}
 		out := buf.String()
-		for _, want := range []string{"KLAS", "앤로보틱스", "새롬동도서관", "방문 추가", "전월", "방문 일정 수정",
-			"관리", "bbf7d0", "bfdbfe", "세종 K-LAS", "mntProductStyle"} {
+		base := []string{"KLAS", "앤로보틱스", "새롬동도서관", "방문 추가", "전월", "방문 일정 수정", "관리"}
+		if view != mntViewCalendar {
+			base = append(base, "bbf7d0", "bfdbfe", "세종 K-LAS", "mntProductStyle")
+		} else {
+			base = append(base, "확인 필요", "전체 담당자", "배정 관리", "엑셀 다운로드", "mnt-day-panel")
+		}
+		for _, want := range base {
 			if want == "mntProductStyle" {
 				if !strings.Contains(out, "background-color:#bbf7d0") && !strings.Contains(out, "background-color:#bfdbfe") {
 					t.Errorf("%s 화면에 점검 대상 색 style 이 없다", view)
@@ -91,6 +108,18 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 		}
 		if !strings.Contains(out, "/maintenance/visits/mvs_2/delete") {
 			t.Errorf("%s 화면에 삭제 버튼이 없다", view)
+		}
+		if view == mntViewCalendar {
+			grid := out
+			if i := strings.Index(out, `id="mnt-day-panel"`); i >= 0 {
+				grid = out[:i]
+			}
+			if strings.Contains(grid, ">수정<") {
+				t.Errorf("캘린더 칸에 수정 버튼이 있다")
+			}
+			if !strings.Contains(out, ">수정<") {
+				t.Errorf("패널에 수정이 없다")
+			}
 		}
 		if !strings.Contains(out, "방문완료") || !strings.Contains(out, "2026-08-03") {
 			t.Errorf("%s 화면에 방문완료 뱃지·완료일이 없다", view)
@@ -149,8 +178,8 @@ func TestMaintenancePlanScopeToggleRender(t *testing.T) {
 // 캘린더 격자 — 방문이 해당 날짜 칸에 들어가야 한다.
 func TestBuildVisitCalendar(t *testing.T) {
 	weeks := buildVisitCalendar(2026, 8, sampleVisits(), "2026-08-05")
-	if len(weeks) == 0 {
-		t.Fatal("주가 만들어지지 않았다")
+	if len(weeks) != 6 {
+		t.Fatalf("6주여야 한다: %d", len(weeks))
 	}
 	for _, w := range weeks {
 		if len(w) != 7 {
@@ -332,5 +361,55 @@ func TestVisitLabelAndDefaultMonth(t *testing.T) {
 	// 다른 해의 계획이면 방문이 있는 첫 달
 	if m := defaultPlanMonth(2026, visits, time.Date(2027, 3, 1, 0, 0, 0, 0, time.Local)); m != 8 {
 		t.Fatalf("방문이 있는 첫 달: %d", m)
+	}
+}
+
+func TestMaintenanceCalendarReadOnlyAndMoreChips(t *testing.T) {
+	root := findTemplateRoot(t)
+	files := []string{
+		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
+		filepath.Join(root, "maintenance", "plan_show.html"),
+	}
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var many []model.MaintenanceVisit
+	for i := 0; i < 4; i++ {
+		many = append(many, model.MaintenanceVisit{
+			VisitID: "m" + string(rune('a'+i)), PlanID: "mpl_1", VisitDate: "2026-08-10",
+			ShortName: "중복사이트", Assignee: "김", EntryCategory: "normal",
+		})
+	}
+	data := planViewData(mntViewCalendar, 8, many)
+	data["QAssignee"] = template.URL("&assignee=group:g1")
+	data["AssigneeKey"] = "group:g1"
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "외 1건") {
+		t.Fatal("외 N건")
+	}
+	if !strings.Contains(out, "assignee=group") {
+		t.Fatal("담당자 필터 쿼리 없음")
+	}
+	if !strings.Contains(out, "month=7") && !strings.Contains(out, "month=9") {
+		t.Fatal("이전/다음 달 칸 링크 없음")
+	}
+
+	ro := planViewData(mntViewCalendar, 8, sampleVisits())
+	ro["CanEdit"] = false
+	ro["IsAdmin"] = false
+	ro["UserRole"] = model.RoleCLevel
+	buf.Reset()
+	if err := tmpl.ExecuteTemplate(&buf, "content", ro); err != nil {
+		t.Fatal(err)
+	}
+	out = buf.String()
+	if strings.Contains(out, "배정 관리") || strings.Contains(out, "＋ 방문 추가") || strings.Contains(out, ">수정<") {
+		t.Fatal("읽기전용에 조작 버튼")
 	}
 }

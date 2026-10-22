@@ -288,6 +288,7 @@ func funcMap() template.FuncMap {
 		"assignmentSelected": model.AssignmentSelected,
 		"hasSuffix":          strings.HasSuffix,
 		"urlquery":           url.QueryEscape,
+		"weekdayKo":          weekdayKo,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {

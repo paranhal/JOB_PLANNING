@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"strings"
 
 	"customer-support/internal/model"
@@ -31,6 +32,71 @@ func (r *MaintenanceRepo) ListVisitAssignees(visitID string) ([]model.Maintenanc
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+func (r *MaintenanceRepo) ListVisitAssigneesForVisits(visitIDs []string) (map[string][]model.MaintenanceVisitAssignee, error) {
+	out := map[string][]model.MaintenanceVisitAssignee{}
+	if r == nil || r.db == nil || len(visitIDs) == 0 {
+		return out, nil
+	}
+	seen := map[string]bool{}
+	ids := make([]string, 0, len(visitIDs))
+	for _, id := range visitIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	for i := 0; i < len(ids); i += 200 {
+		end := i + 200
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[i:end]
+		ph := strings.Repeat("?,", len(chunk))
+		ph = strings.TrimSuffix(ph, ",")
+		q := fmt.Sprintf(`
+			SELECT visit_id, COALESCE(user_id,''), COALESCE(assignee_name,''), role,
+			       COALESCE(work_group_id,''), COALESCE(sort_order,0)
+			FROM maintenance_visit_assignees WHERE visit_id IN (%s)
+			ORDER BY visit_id, sort_order, role`, ph)
+		args := make([]any, len(chunk))
+		for j, id := range chunk {
+			args[j] = id
+		}
+		rows, err := r.db.Query(q, args...)
+		if err != nil {
+			if strings.Contains(err.Error(), "no such table") {
+				return out, nil
+			}
+			return out, err
+		}
+		for rows.Next() {
+			var a model.MaintenanceVisitAssignee
+			if err := rows.Scan(&a.VisitID, &a.UserID, &a.AssigneeName, &a.Role, &a.WorkGroupID, &a.SortOrder); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out[a.VisitID] = append(out[a.VisitID], a)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
+
+func AttachVisitPeople(visits []model.MaintenanceVisit, byVisit map[string][]model.MaintenanceVisitAssignee) {
+	if len(visits) == 0 {
+		return
+	}
+	for i := range visits {
+		visits[i].People = byVisit[visits[i].VisitID]
+	}
 }
 
 func (r *MaintenanceRepo) ReplaceVisitAssignees(visitID string, items []model.MaintenanceVisitAssignee, groupID string) error {
