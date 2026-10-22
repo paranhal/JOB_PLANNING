@@ -325,6 +325,20 @@ func canWriteMaster(c echo.Context) bool {
 	return hasPerm(c, model.PermMasterWrite) || hasPerm(c, model.PermMasterEdit)
 }
 
+func canDeactivateCustomer(c echo.Context) bool {
+	if isReadOnly(c) || !model.IsInternalStaffRole(currentRole(c)) {
+		return false
+	}
+	return isAdminRole(c)
+}
+
+func requireInternalStaff(c echo.Context) error {
+	if !model.IsInternalStaffRole(currentRole(c)) {
+		return echo.ErrForbidden
+	}
+	return nil
+}
+
 func canManageCodes(c echo.Context) bool {
 	return hasPerm(c, model.PermCodesUsers)
 }

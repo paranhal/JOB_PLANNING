@@ -304,7 +304,7 @@
                     <button type="submit" class="text-xs text-amber-700 hover:underline">확인 완료</button>
                   </form>
                   {{end}}
-                  {{if .IsActive}}
+                  {{if and $.CanDeactivate .IsActive}}
                   <form method="POST" action="/customers/{{.CustomerID}}/delete" class="inline"
                         onsubmit="return confirm('이 기관을 삭제(비활성)할까요?');">
                     <input type="hidden" name="search" value="{{$.Search}}">

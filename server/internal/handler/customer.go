@@ -68,6 +68,9 @@ func (h *CustomerHandler) TabAS(c echo.Context) error {
 
 // List 고객 목록
 func (h *CustomerHandler) List(c echo.Context) error {
+	if err := requireInternalStaff(c); err != nil {
+		return err
+	}
 	search := c.QueryParam("search")
 	category := c.QueryParam("category")
 	industry := c.QueryParam("industry")
@@ -154,6 +157,7 @@ func (h *CustomerHandler) List(c echo.Context) error {
 		"SortDirAS":     nextDir("as"),
 		"SortDirStatus": nextDir("status"),
 		"CanWrite":      canWriteMaster(c),
+		"CanDeactivate": canDeactivateCustomer(c),
 		"ExportRegions": exportRegions,
 		"ExportSites":   exportSites,
 		"ExportRegion":  "",
@@ -168,6 +172,9 @@ func (h *CustomerHandler) List(c echo.Context) error {
 
 // ExportExcel 고객현황 엑셀 (지역·사이트명 콤보 + 목록 필터 반영)
 func (h *CustomerHandler) ExportExcel(c echo.Context) error {
+	if err := requireInternalStaff(c); err != nil {
+		return err
+	}
 	search := c.QueryParam("search")
 	category := c.QueryParam("category")
 	industry := c.QueryParam("industry")
@@ -460,7 +467,7 @@ func (h *CustomerHandler) CreateNameJSON(c echo.Context) error {
 	})
 }
 
-func (h *CustomerHandler) renderCustomerForm(c echo.Context, isNew bool, cust *model.Customer, errMsg string) error {
+func (h *CustomerHandler) renderCustomerForm(c echo.Context, isNew bool, cust *model.Customer, errMsg string, dups []model.Customer) error {
 	if cust == nil {
 		cust = &model.Customer{IsActive: true}
 	}
@@ -480,12 +487,16 @@ func (h *CustomerHandler) renderCustomerForm(c echo.Context, isNew bool, cust *m
 		"InsertOrgs":   insertOrgChoices(c),
 		"FormOrgID":    strings.TrimSpace(cust.OrgID),
 		"Err":          errMsg,
+		"DupCustomers": dups,
 	})
 }
 
 // New 고객 등록 폼
 func (h *CustomerHandler) New(c echo.Context) error {
-	return h.renderCustomerForm(c, true, &model.Customer{IsActive: true}, "")
+	if err := requireInternalStaff(c); err != nil {
+		return err
+	}
+	return h.renderCustomerForm(c, true, &model.Customer{IsActive: true}, "", nil)
 }
 
 // Create 고객 등록 처리
@@ -493,12 +504,21 @@ func (h *CustomerHandler) Create(c echo.Context) error {
 	cust, err := bindCustomer(c)
 	if err != nil {
 		log.Printf("customer create org: %v", err)
-		return h.renderCustomerForm(c, true, cust, err.Error())
+		return h.renderCustomerForm(c, true, cust, err.Error(), nil)
+	}
+	if c.FormValue("confirm_dup") != "1" {
+		dups, derr := h.repo.ListActiveNameMatches(cust.OrgName, "")
+		if derr != nil {
+			return derr
+		}
+		if len(dups) > 0 {
+			return h.renderCustomerForm(c, true, cust, "같은 이름의 고객이 있습니다. 링크를 확인한 뒤 「그래도 등록」을 눌러 주세요.", dups)
+		}
 	}
 	if err := h.repo.Create(cust); err != nil {
 		if errors.Is(err, repository.ErrEmptyOrgID) {
 			log.Printf("customer create org empty: %v", err)
-			return h.renderCustomerForm(c, true, cust, errNeedInsertOrg)
+			return h.renderCustomerForm(c, true, cust, errNeedInsertOrg, nil)
 		}
 		return err
 	}
@@ -507,6 +527,9 @@ func (h *CustomerHandler) Create(c echo.Context) error {
 
 // Show 고객 상세
 func (h *CustomerHandler) Show(c echo.Context) error {
+	if err := requireInternalStaff(c); err != nil {
+		return err
+	}
 	id := c.Param("id")
 	cust, err := h.repo.GetByID(id)
 	if err != nil {
@@ -529,7 +552,8 @@ func (h *CustomerHandler) Show(c echo.Context) error {
 		"Title":        cust.OrgName,
 		"Active":       NavCustomers,
 		"Customer":     cust,
-		"CanWrite":     canWriteMaster(c),
+		"CanWrite":      canWriteMaster(c),
+		"CanDeactivate": canDeactivateCustomer(c),
 		"CanReceive":   canReceiveAS(c),
 		"MergeTargets": mergeTargets,
 	})
@@ -596,13 +620,26 @@ func (h *CustomerHandler) Edit(c echo.Context) error {
 	if cust == nil {
 		return echo.ErrNotFound
 	}
-	return h.renderCustomerForm(c, false, cust, "")
+	return h.renderCustomerForm(c, false, cust, "", nil)
 }
 
 // Update 고객 수정 처리
 func (h *CustomerHandler) Update(c echo.Context) error {
 	cust := bindCustomerFields(c)
 	cust.CustomerID = c.Param("id")
+	if c.FormValue("confirm_dup") != "1" {
+		dups, derr := h.repo.ListActiveNameMatches(cust.OrgName, cust.CustomerID)
+		if derr != nil {
+			return derr
+		}
+		if len(dups) > 0 {
+			existing, _ := h.repo.GetByID(cust.CustomerID)
+			if existing != nil {
+				cust.OrgID = existing.OrgID
+			}
+			return h.renderCustomerForm(c, false, cust, "같은 이름의 고객이 있습니다. 링크를 확인한 뒤 「그래도 등록」을 눌러 주세요.", dups)
+		}
+	}
 	if err := h.repo.Update(cust); err != nil {
 		return err
 	}
@@ -611,7 +648,14 @@ func (h *CustomerHandler) Update(c echo.Context) error {
 
 // Delete 고객 비활성화
 func (h *CustomerHandler) Delete(c echo.Context) error {
+	if !canDeactivateCustomer(c) {
+		return echo.ErrForbidden
+	}
 	id := c.Param("id")
+	asN, siteN, projectN := h.repo.CountCustomerRefs(id)
+	if asN+siteN+projectN > 0 {
+		log.Printf("customer deactivate refs as=%d sites=%d projects=%d id=%s", asN, siteN, projectN, id)
+	}
 	if err := h.repo.Delete(id); err != nil {
 		return err
 	}
@@ -655,6 +699,10 @@ func bindCustomer(c echo.Context) (*model.Customer, error) {
 	cust := bindCustomerFields(c)
 	org, err := resolveInsertOrg(c)
 	if err != nil {
+		if err.Error() == errNeedInsertOrg {
+			cust.OrgID = model.OrgIDLibrary
+			return cust, nil
+		}
 		cust.OrgID = strings.TrimSpace(c.FormValue("org_id"))
 		return cust, err
 	}
