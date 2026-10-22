@@ -13,7 +13,7 @@ import (
 	"customer-support/internal/repository"
 )
 
-func newWGServer(t *testing.T) (*echo.Echo, *repository.WorkGroupRepo, *model.User, *model.User, *model.User) {
+func newWGServer(t *testing.T) (*echo.Echo, *repository.WorkGroupRepo, *model.User, *model.User, *model.User, *model.User) {
 	t.Helper()
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "wghttp.db"))
 	if err != nil {
@@ -23,14 +23,16 @@ func newWGServer(t *testing.T) (*echo.Echo, *repository.WorkGroupRepo, *model.Us
 	users := repository.NewUserRepo(db)
 	oa := &model.User{Username: "oa", PasswordHash: "x", FullName: "조직장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
 	tech := &model.User{Username: "t1", PasswordHash: "x", FullName: "기술원", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
+	off := &model.User{Username: "off13", PasswordHash: "x", FullName: "사무원", Role: model.RoleOffice, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
 	cl := &model.User{Username: "cl", PasswordHash: "x", FullName: "씨레벨", Role: model.RoleCLevel, IsActive: true, IsReadOnly: true, ProfileDone: true}
-	for _, u := range []*model.User{oa, tech, cl} {
+	for _, u := range []*model.User{oa, tech, off, cl} {
 		if err := users.Create(u); err != nil {
 			t.Fatal(err)
 		}
 	}
 	e := echo.New()
 	e.Renderer = NewRenderer()
+	AttachHTTPErrorHandler(e)
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
@@ -39,15 +41,18 @@ func newWGServer(t *testing.T) (*echo.Echo, *repository.WorkGroupRepo, *model.Us
 	g.GET("/work-groups/new", h.WorkGroup.Form)
 	g.POST("/work-groups", h.WorkGroup.Create)
 	g.GET("/work-groups/:id", h.WorkGroup.Form)
+	g.POST("/work-groups/:id/update", h.WorkGroup.Update)
 	g.POST("/work-groups/:id/close", h.WorkGroup.Close)
+	g.POST("/work-groups/:id/reopen", h.WorkGroup.Reopen)
 	g.POST("/work-groups/:id/members", h.WorkGroup.AddMember)
+	g.POST("/work-groups/:id/members/:user_id/remove", h.WorkGroup.RemoveMember)
 	g.POST("/work-groups/:id/leader", h.WorkGroup.SetLeader)
 	g.POST("/admin/users", func(c echo.Context) error { return c.NoContent(http.StatusOK) })
-	return e, repository.NewWorkGroupRepo(db), oa, tech, cl
+	return e, repository.NewWorkGroupRepo(db), oa, tech, cl, off
 }
 
 func TestWorkGroupHTTPPermissions(t *testing.T) {
-	e, repo, oa, tech, cl := newWGServer(t)
+	e, repo, oa, tech, cl, _ := newWGServer(t)
 	oaCK := jwtCookieUserClaims(t, oa)
 	techCK := jwtCookieUserClaims(t, tech)
 	clCK := jwtCookieUserClaims(t, cl)

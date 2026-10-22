@@ -98,6 +98,7 @@ func newProjectWorkHarness(t *testing.T) (*echo.Echo, *repository.WBRepo, *repos
 	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
 	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)
 	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
+	g.POST("/workboard/tasks/:id/refill-group", h.Workboard.RefillTaskGroup)
 	g.GET("/workboard/tasks/:id/action", h.Workboard.ShowProjectWorkAction)
 	g.POST("/workboard/tasks/:id/action", h.Workboard.SaveProjectWorkAction)
 	g.POST("/workboard/tasks/:id/action/hold", h.Workboard.HoldProjectWorkAction)
