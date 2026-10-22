@@ -13,7 +13,7 @@ const mntTaskLinkSelect = `
 	SELECT t.task_id, COALESCE(t.work_date,''), COALESCE(t.due_date,''),
 	       COALESCE(t.start_time,''), COALESCE(t.end_time,''), COALESCE(t.duration_min,30),
 	       COALESCE(t.assignee,''), COALESCE(t.title,''), COALESCE(t.description,''),
-	       COALESCE(t.status,'waiting'), COALESCE(t.project_id,''),
+	       COALESCE(t.status,'waiting'), COALESCE(t.project_id,''), COALESCE(t.assignee_source,''),
 	       v.visit_date, COALESCE(v.assignee,''), COALESCE(v.product_type,''),
 	       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
 	       COALESCE(v.project_id,''),
@@ -27,8 +27,8 @@ const mntTaskLinkSelect = `
 type mntTaskLink struct {
 	taskID, workDate, dueDate, startTime, endTime string
 	durationMin                                   int
-	assignee, title, desc, status, taskProject    string
-	visitDate, visitAssignee, productType         string
+	assignee, title, desc, status, taskProject, assigneeSource string
+	visitDate, visitAssignee, productType                      string
 	completed                                     bool
 	completedDate, visitProject, siteName         string
 }
@@ -47,7 +47,7 @@ func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTask
 		var l mntTaskLink
 		var done int
 		if err := rows.Scan(&l.taskID, &l.workDate, &l.dueDate, &l.startTime, &l.endTime,
-			&l.durationMin, &l.assignee, &l.title, &l.desc, &l.status, &l.taskProject,
+			&l.durationMin, &l.assignee, &l.title, &l.desc, &l.status, &l.taskProject, &l.assigneeSource,
 			&l.visitDate, &l.visitAssignee, &l.productType, &done, &l.completedDate,
 			&l.visitProject, &l.siteName); err != nil {
 			return nil, err
@@ -124,7 +124,8 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 		       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
 		       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
 		       COALESCE(v.project_id,''),
-		       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), '')
+		       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), ''),
+		       COALESCE(v.work_group_id,'')
 		FROM maintenance_visits v
 		JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
@@ -153,9 +154,9 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 
 	n := 0
 	for rows.Next() {
-		var id, date, assignee, product, site, doneDate, projectID, visitOrg string
+		var id, date, assignee, product, site, doneDate, projectID, visitOrg, groupID string
 		var completed int
-		if err := rows.Scan(&id, &date, &assignee, &product, &site, &completed, &doneDate, &projectID, &visitOrg); err != nil {
+		if err := rows.Scan(&id, &date, &assignee, &product, &site, &completed, &doneDate, &projectID, &visitOrg, &groupID); err != nil {
 			return n, err
 		}
 		workDate := date
@@ -182,12 +183,22 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 			SourceID:    id,
 			ReceiptDate: date,
 			OrgID:       strings.TrimSpace(visitOrg),
+			WorkGroupID: strings.TrimSpace(groupID),
 		}
 		if completed == 1 {
 			t.CompleteDate = workDate
 		}
 		if err := r.CreateTask(t); err != nil {
 			return n, err
+		}
+		if ms, err := NewMaintenanceRepo(r.db).ListVisitAssignees(id); err == nil && len(ms) > 0 {
+			var supports []model.WorkTaskMember
+			for _, m := range ms {
+				if m.Role == model.WBMemberSupport {
+					supports = append(supports, model.WorkTaskMember{Assignee: m.AssigneeName, Role: model.WBMemberSupport})
+				}
+			}
+			_ = r.ReplaceSupportMembers(t.TaskID, supports)
 		}
 		n++
 	}
@@ -264,8 +275,10 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 	}
 
 	assignee := strings.TrimSpace(l.assignee)
-	if v := strings.TrimSpace(l.visitAssignee); v != "" {
-		assignee = v
+	if strings.TrimSpace(l.assigneeSource) != model.WBAssigneeSourceManual {
+		if v := strings.TrimSpace(l.visitAssignee); v != "" {
+			assignee = v
+		}
 	}
 	projectID := strings.TrimSpace(l.taskProject)
 	if p := strings.TrimSpace(l.visitProject); p != "" {
