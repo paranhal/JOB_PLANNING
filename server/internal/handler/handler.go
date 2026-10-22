@@ -106,6 +106,7 @@ func New(db *sql.DB) *Handler {
 	wbH.attach = attachH
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
+	wbH.groups = repository.NewWorkGroupRepo(db)
 	if m, err := repository.NewRolePermRepo(db).Load(); err == nil {
 		model.SetAccessOverrides(m)
 	}

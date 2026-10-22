@@ -31,10 +31,12 @@ const workTaskSelect = `
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
 		       t.created_at, t.updated_at,
 		       COALESCE(p.name,''), COALESCE(p.color,''),
-		       COALESCE(t.org_id,'')
+		       COALESCE(t.org_id,''),
+		       COALESCE(t.work_group_id,''), COALESCE(wg.name,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		LEFT JOIN customers c ON c.customer_id = t.customer_id`
+		LEFT JOIN customers c ON c.customer_id = t.customer_id
+		LEFT JOIN work_groups wg ON wg.group_id = t.work_group_id`
 
 func (r *WBRepo) Summary() (model.WBSummary, error) {
 	return r.SummaryOnDate("")
@@ -790,8 +792,8 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 			source_type, source_id, source_role, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
-			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, created_by_user_id, created_by_name, is_test)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, work_group_id, created_by_user_id, created_by_name, is_test)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, t.WorkSubtype, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
@@ -799,7 +801,7 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
 		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate),
-		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), t.OrgID, byID, byName, stampIsTest())
+		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), t.OrgID, nullIfEmpty(t.WorkGroupID), byID, byName, stampIsTest())
 	if err != nil {
 		return err
 	}
@@ -834,7 +836,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 			work_date=?, start_time=?, end_time=?, duration_min=?, status=?, priority=?,
 			assignee=?, assignee_user_id=?, assignee_source=?, tags=?, progress=?, customer_id=?, customer_name=?,
 			hold_reason=?, review_date=?, cancel_reason=?, wait_party_kind=?, wait_party=?, wait_request=?,
-			reply_due_date=?, next_check_date=?, complete_note=?,
+			reply_due_date=?, next_check_date=?, complete_note=?, work_group_id=?,
 			receipt_date=CASE
 				WHEN TRIM(COALESCE(?,'')) != '' THEN ?
 				WHEN TRIM(COALESCE(receipt_date,'')) != '' THEN receipt_date
@@ -854,6 +856,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.HoldReason), nullIfEmpty(t.ReviewDate), nullIfEmpty(t.CancelReason),
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
+		nullIfEmpty(t.WorkGroupID),
 		t.ReceiptDate, t.ReceiptDate,
 		t.Status, t.CompleteDate, t.CompleteDate, t.TaskID)
 	if err != nil {
@@ -1063,7 +1066,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&t.OrgName,
 			&created, &updated,
 			&t.ProjectName, &t.ProjectColor,
-			&t.OrgID,
+			&t.OrgID, &t.WorkGroupID, &t.WorkGroupName,
 		); err != nil {
 			return nil, err
 		}

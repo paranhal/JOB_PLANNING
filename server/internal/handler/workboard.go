@@ -28,6 +28,7 @@ type WorkboardHandler struct {
 	salesRepo    *repository.SalesRepo
 	workBoard    *repository.WorkBoardRepo
 	notices      *assignNoticeHook
+	groups       *repository.WorkGroupRepo
 }
 
 func NewWorkboardHandler(
@@ -198,6 +199,8 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		placed = filterTasksByAssignee(placed, assigneeFilter)
 	}
 	placed = filterTasksByProject(placed, projectFilter)
+	groupFilter := strings.TrimSpace(c.QueryParam("work_group_id"))
+	placed = filterTasksByWorkGroup(placed, groupFilter)
 	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(org, strings.TrimSpace(c.QueryParam("palette")) == "all")
 	if err != nil {
 		return err
@@ -352,6 +355,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	if !unlockExp.IsZero() {
 		unlockExpLabel = unlockExp.Format("15:04")
 	}
+	wgItems, wgJSON := h.workGroupPicks(c)
 
 	return c.Render(http.StatusOK, "workboard/register.html", map[string]interface{}{
 		"Title":           "일일 업무 등록",
@@ -417,6 +421,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"FlashOK":               c.QueryParam("ok"),
 		"FlashErr":              c.QueryParam("err"),
 		"AssigneePickDisabled":  assigneePickDisabled(c),
+		"WorkGroups":           wgItems,
+		"WorkGroupsJSON":       wgJSON,
+		"WorkGroupFilter":      groupFilter,
 	})
 }
 
@@ -1616,6 +1623,10 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	if view == "list" {
 		modalRedirect = "/workboard/tasks"
 	}
+	if gid := strings.TrimSpace(c.QueryParam("work_group_id")); gid != "" {
+		board = filterTasksByWorkGroup(board, gid)
+	}
+	wgItems, wgJSON := h.workGroupPicks(c)
 	return map[string]interface{}{
 		"Title":         "일일 업무 현황",
 		"Active":        NavWorkPlan,
@@ -1634,10 +1645,13 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		"MntCards":      mntCards,
 		"Date":          today,
 		"TodayLabel":    today,
-		"ModalRedirect": modalRedirect,
-		"CanWrite":      canWriteWorkboard(c),
-		"FlashOK":       c.QueryParam("ok"),
-		"FlashErr":      c.QueryParam("err"),
+		"ModalRedirect":   modalRedirect,
+		"CanWrite":        canWriteWorkboard(c),
+		"FlashOK":         c.QueryParam("ok"),
+		"FlashErr":        c.QueryParam("err"),
+		"WorkGroups":      wgItems,
+		"WorkGroupsJSON":  wgJSON,
+		"WorkGroupFilter": strings.TrimSpace(c.QueryParam("work_group_id")),
 	}, nil
 }
 
@@ -1705,6 +1719,15 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 				existing.Assignee = owner
 				recordTaskNotice(h.notices, c, existing, "")
 			}
+			if got, _ := h.repo.GetTask(existing.TaskID); got != nil {
+				got.Assignee = owner
+				if err := h.applyWorkGroupForm(c, got); err != nil {
+					return err
+				}
+				if err := h.repo.UpdateTask(got); err != nil {
+					return err
+				}
+			}
 			_ = h.saveSupportMembers(c, existing.TaskID, owner)
 			h.syncVisitDateFromTask(kind, sourceID, workDate)
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=place"))
@@ -1728,6 +1751,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		}
 		t.OrgID = currentOrg(c)
 		if err := checkAssigneeInOrg(h.userRepo, t.OrgID, t.Assignee, "", ""); err != nil {
+			return err
+		}
+		if err := h.applyWorkGroupForm(c, t); err != nil {
 			return err
 		}
 		if err := h.repo.CreateTask(t); err != nil {
@@ -1797,6 +1823,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return err
 	}
 	if err := checkAssigneeNamesInOrg(h.userRepo, t.OrgID, occupancyNames("", supports), nil); err != nil {
+		return err
+	}
+	if err := h.applyWorkGroupForm(c, t); err != nil {
 		return err
 	}
 	if err := h.repo.CreateTask(t); err != nil {
@@ -1963,6 +1992,7 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		Priority:       priority,
 		Assignee:       assignee,
 		AssigneeSource: existing.AssigneeSource,
+		WorkGroupID:    existing.WorkGroupID,
 		Tags:           strings.TrimSpace(c.FormValue("tags")),
 		Progress:       progress,
 		SourceType:     existing.SourceType,
@@ -2041,6 +2071,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther,
 				taskPagePath(id, registerScope)+"?err="+url.QueryEscape(msg)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 		}
+	}
+	if err := h.applyWorkGroupForm(c, t); err != nil {
+		return err
 	}
 	if existing.WorkType == model.WBWorkProjectWork {
 		if s := model.NormalizeWorkSubtype(c.FormValue("work_subtype")); s != "" {
@@ -2256,6 +2289,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 			active = NavAdminWork
 		}
 	}
+	wgShow, wgShowJSON := h.workGroupPicks(c)
 	data := map[string]interface{}{
 		"Title":          t.Title,
 		"Active":         active,
@@ -2273,6 +2307,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"CompleteLocal":  completeLocal,
 		"Assignees":      assignees,
 		"SupportMembers": supportOnly,
+		"WorkGroups":     wgShow,
+		"WorkGroupsJSON": wgShowJSON,
 		"DayLeaveNames":  taskLeaveNames,
 		"Projects":       projects,
 		"WorkProjects":   workProjects,

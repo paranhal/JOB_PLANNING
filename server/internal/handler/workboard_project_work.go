@@ -93,6 +93,9 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 		Assignee:    assignee,
 		OrgID:       org,
 	}
+	if err := h.applyWorkGroupForm(c, t); err != nil {
+		return err
+	}
 	if err := h.repo.CreateTask(t); err != nil {
 		return err
 	}

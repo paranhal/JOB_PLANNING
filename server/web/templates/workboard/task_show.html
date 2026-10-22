@@ -26,6 +26,7 @@
         </h2>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbWorkTypeClass $t.WorkType}}">{{wbWorkTypeLabel $t.WorkType}}</span>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbPriorityClass $t.Priority}}">{{wbPriorityLabel $t.Priority}}</span>
+        {{if $t.WorkGroupName}}<span class="badge-neutral text-xs">그룹: {{$t.WorkGroupName}}</span>{{end}}
       </div>
       <p class="text-sm text-gray-500 mt-1">업무 고유번호 <span class="font-mono text-gray-800">{{$t.TaskID}}</span>
         {{if .Parent}} · 상위 <a href="/workboard/tasks/{{.Parent.TaskID}}" class="text-blue-600 hover:underline">{{.Parent.Title}}</a>{{end}}
@@ -53,6 +54,12 @@
       {{end}}
       <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register?view=day&date={{if $t.WorkDate}}{{$t.WorkDate}}{{else}}{{.Today}}{{end}}{{end}}"
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">일정표</a>
+      {{if and .CanWrite (not .EditMode) $t.WorkGroupID}}
+      <form method="post" action="/workboard/tasks/{{$t.TaskID}}/refill-group">
+        <input type="hidden" name="redirect" value="/workboard/tasks/{{$t.TaskID}}">
+        <button class="btn btn-secondary btn-sm">그룹 구성원으로 다시 채우기</button>
+      </form>
+      {{end}}
       {{if and .CanWrite (not .EditMode)}}
       <a href="/workboard/tasks/{{$t.TaskID}}/edit{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}"
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">수정</a>
@@ -586,6 +593,15 @@
       </div>
       {{end}}
       <div>
+        <label class="label">업무 그룹</label>
+        <select name="work_group_id" class="js-work-group select w-full">
+          <option value="">없음</option>
+          {{range .WorkGroups}}
+          <option value="{{.GroupID}}" {{if eq $t.WorkGroupID .GroupID}}selected{{end}}>{{.Name}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{if eq $t.RecurrenceRole "occurrence"}}처리 담당자{{else}}주담당{{end}}</label>
         <select name="assignee" required class="w-full border rounded-lg px-3 py-2">
           <option value="">— 선택 —</option>
@@ -904,5 +920,7 @@
   </div>
   {{end}}
   {{if .CanWrite}}{{template "wb_subtask_modal" .}}{{end}}
+  <script type="application/json" id="wb-work-groups">{{.WorkGroupsJSON}}</script>
+  <script src="/static/js/work-group-task.js"></script>
 </div>
 {{end}}

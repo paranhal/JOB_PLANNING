@@ -139,8 +139,9 @@ type WBCard struct {
 	ParentTaskID string `json:"parent_task_id,omitempty"`
 	Status       string `json:"status,omitempty"`       // 업무처리현황 등 표시용
 	StatusLabel  string `json:"status_label,omitempty"` // 완료·부분완료 등
-	ProjectID    string `json:"project_id,omitempty"`
-	Unassigned   bool   `json:"unassigned,omitempty"`
+	ProjectID      string `json:"project_id,omitempty"`
+	WorkGroupName  string `json:"work_group_name,omitempty"`
+	Unassigned     bool   `json:"unassigned,omitempty"`
 	Dimmed       bool   `json:"dimmed,omitempty"`
 }
 
@@ -798,6 +799,8 @@ type WorkTask struct {
 	BlockedReason     string    `json:"blocked_reason,omitempty"` // §42.7
 	BlockedAt         string    `json:"blocked_at,omitempty"`
 	OrgID             string    `json:"org_id,omitempty"`
+	WorkGroupID       string    `json:"work_group_id,omitempty"`
+	WorkGroupName     string    `json:"work_group_name,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 
