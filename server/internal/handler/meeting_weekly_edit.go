@@ -175,6 +175,8 @@ func weeklyItemHref(prefix, ref string) string {
 		return "/as/" + ref
 	case model.WorkPrefixMaintenance:
 		return "/maintenance/visits/" + ref
+	case model.WorkPrefixProjectWork:
+		return model.WorkTaskOpenHref(ref, model.WBWorkProjectWork)
 	default:
 		if ref == "" {
 			return ""

@@ -609,7 +609,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkAdmin, KindLabel: label,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
-			Href: "/workboard/tasks/" + id, Bucket: "prev", BucketLabel: "전주 완료",
+			Href: model.WorkTaskOpenHref(id, wtype), Bucket: "prev", BucketLabel: "전주 완료",
 		})
 	}
 	trows.Close()
@@ -678,7 +678,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkAdmin, KindLabel: kindLabel,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
-			Href: "/workboard/tasks/" + id, Bucket: bucket, BucketLabel: label,
+			Href: model.WorkTaskOpenHref(id, wtype), Bucket: bucket, BucketLabel: label,
 		})
 	}
 	crows.Close()

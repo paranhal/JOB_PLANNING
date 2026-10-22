@@ -856,6 +856,18 @@ func (t WorkTask) CustomerLabel() string {
 	return strings.TrimSpace(t.CustomerName)
 }
 
+// WorkTaskOpenHref 작업은 조치 화면, 그 외는 업무 상세.
+func WorkTaskOpenHref(taskID, workType string) string {
+	id := strings.TrimSpace(taskID)
+	if id == "" {
+		return ""
+	}
+	if workType == WBWorkProjectWork {
+		return "/workboard/tasks/" + id + "/action"
+	}
+	return "/workboard/tasks/" + id
+}
+
 // DetailHref 일일 업무 현황 카드/목록 링크
 func (t WorkTask) DetailHref() string {
 	if t.WorkType == WBWorkProjectWork && t.TaskID != "" && !strings.HasPrefix(t.TaskID, "ext:") {

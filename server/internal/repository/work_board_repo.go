@@ -1188,7 +1188,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 			it.SubLabel = "행정"
 		}
 		it.StatusLabel = workTaskStatusLabel(it.Status)
-		it.Href = "/workboard/tasks/" + it.RefID
+		it.Href = model.WorkTaskOpenHref(it.RefID, workType)
 		if it.Prefix == model.WorkPrefixSales {
 			if strings.TrimSpace(salesID) != "" {
 				it.Href = "/sales/" + strings.TrimSpace(salesID)
