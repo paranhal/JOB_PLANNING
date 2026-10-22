@@ -1,0 +1,191 @@
+{{define "title"}}업종별 일괄 등록 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4" x-data="siteBulkPage({{.Selectable}})">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-ink">업종별 일괄 등록</h2>
+      <p class="text-ui-sm text-ink-muted mt-1">업종을 고르면 후보가 모두 선택됩니다. 해당 없는 곳만 체크를 해제한 뒤 등록하세요. 등록 후 점검 일정은 자동으로 만들어지지 않습니다.</p>
+    </div>
+    <a href="/maintenance/sites" class="btn btn-secondary btn-sm">점검 사이트 목록</a>
+  </div>
+
+  {{if .NeedOrg}}
+  <p class="flash-warning rounded-control">소속 조직을 선택하세요. 위 조직 전환에서 작업 조직을 고른 뒤 진행합니다.</p>
+  {{end}}
+  {{if .Err}}<p class="flash-danger rounded-control">{{.Err}}</p>{{end}}
+
+  {{if not .NeedOrg}}
+  <form method="get" action="/maintenance/sites/bulk" class="card p-4 flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="label" for="bulk-industry">업종</label>
+      <select id="bulk-industry" name="industry" class="select" onchange="this.form.submit()">
+        <option value="">선택</option>
+        {{range .Buckets}}
+        <option value="{{.Key}}" {{if eq $.Industry .Key}}selected{{end}}>{{.Label}} ({{.Count}})</option>
+        {{end}}
+      </select>
+    </div>
+  </form>
+  {{end}}
+
+  {{if and (not .NeedOrg) .Industry .Candidates}}
+  <form method="post" action="/maintenance/sites/bulk" id="bulk-form"
+        @submit.prevent="askConfirm($event)">
+    <input type="hidden" name="industry" value="{{.Industry}}">
+    <div class="card p-4 space-y-3">
+      <div class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="label" for="bulk-cycle">점검주기 <span class="text-danger">*</span></label>
+          <select id="bulk-cycle" name="inspection_cycle" required class="select" x-model="cycle">
+            <option value="">선택</option>
+            <option value="monthly">월</option>
+            <option value="odd_bimonthly">홀수격월</option>
+            <option value="even_bimonthly">짝수격월</option>
+            <option value="quarterly">분기</option>
+            <option value="semi">반기</option>
+            <option value="yearly">년1회</option>
+          </select>
+        </div>
+        <div>
+          <label class="label" for="bulk-rounds">주기당 회차 수</label>
+          <input id="bulk-rounds" type="number" min="1" name="rounds_per_period" value="1" class="input w-24" x-model="rounds">
+        </div>
+        {{if and (not .Legacy) .Products}}
+        <div class="flex flex-wrap gap-3">
+          {{range .Products}}
+          <label class="flex items-center gap-2 text-ui">
+            <input type="checkbox" name="product_id" value="{{.ProductID}}">
+            <span>{{.Name}}</span>
+          </label>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <button type="button" class="btn btn-secondary btn-sm" @click="all(true)">전체 선택</button>
+        <button type="button" class="btn btn-secondary btn-sm" @click="all(false)">전체 해제</button>
+        <input type="search" class="input" placeholder="이름·상위기관·지역" x-model="q" @input="filter()">
+        <span class="text-ui-sm text-ink-muted">선택 <span x-text="sel"></span> / 전체 {{.Selectable}}</span>
+        <button type="submit" class="btn btn-primary btn-sm" x-ref="go" :disabled="busy">등록 (<span x-text="sel"></span>곳)</button>
+      </div>
+    </div>
+    <div class="card overflow-x-auto max-h-96 overflow-y-auto">
+      <table class="w-full text-ui">
+        <thead class="bg-hover sticky top-0">
+          <tr>
+            <th class="text-left p-2">선택</th>
+            <th class="text-left p-2">고객명</th>
+            <th class="text-left p-2">상위기관</th>
+            <th class="text-left p-2">지역</th>
+            <th class="text-left p-2">표시명</th>
+            <th class="text-left p-2">비고</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Candidates}}
+          <tr class="border-t border-line {{if not .Selectable}}opacity-50{{end}}" data-filter="{{.OrgName}} {{.ParentName}} {{.RegionPreview}}">
+            <td class="p-2">
+              {{if .Selectable}}
+              <input type="checkbox" name="customer_id" value="{{.CustomerID}}" checked
+                     @change="count()">
+              {{else}}
+              <input type="checkbox" disabled>
+              {{end}}
+            </td>
+            <td class="p-2">{{.OrgName}}{{if and .ParentName (eq .OrgName .ParentName)}}{{else}}{{end}}</td>
+            <td class="p-2 text-ink-muted">{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
+            <td class="p-2">{{if .RegionPreview}}{{.RegionPreview}}{{else}}—{{end}}</td>
+            <td class="p-2">
+              {{if .Selectable}}
+              <input type="text" name="short_{{.CustomerID}}" value="{{.ShortName}}" class="input">
+              {{else}}—
+              {{end}}
+            </td>
+            <td class="p-2 text-ui-sm">
+              {{if not .Selectable}}<span class="badge-neutral">{{.OtherOrgName}} 점검 사이트로 등록됨</span>{{end}}
+              {{if .WarnSimilar}}<span class="flash-warning rounded-control">비슷한 이름</span>{{end}}
+              {{if .WarnEmpty}}<span class="text-ink-muted">연락처·주소 없음</span>{{end}}
+              {{if .WarnNoRegion}}<span class="text-ink-muted">지역 없음</span>{{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  {{else if and (not .NeedOrg) .Industry}}
+  <p class="text-ui text-ink-muted">해당 업종의 등록 후보가 없습니다.</p>
+  {{end}}
+
+  <div x-show="confirmOpen" x-cloak class="modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" @click.self="confirmOpen=false">
+    <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+      <h2 class="text-ui font-bold text-ink">등록 확인</h2>
+      <p class="mt-2 text-ui text-ink" x-text="confirmMsg"></p>
+      <div class="mt-4 flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" @click="confirmOpen=false">취소</button>
+        <button type="button" class="btn btn-primary" @click="doSubmit()">등록</button>
+      </div>
+    </div>
+  </div>
+
+  {{if .Result}}
+  <div x-data="{open:true}" x-show="open" x-cloak class="modal-backdrop z-50 flex items-center justify-center p-4" role="dialog">
+    <div class="modal-panel w-full max-w-md shadow-pop">
+      <h2 class="text-ui font-bold text-ink">등록 결과</h2>
+      <p class="mt-2 text-ui text-ink">등록 {{.Result.Registered}}곳 / 건너뜀 {{len .Result.Skipped}}곳. 점검 일정은 자동 생성되지 않습니다.</p>
+      {{if .Result.Skipped}}
+      <ul class="mt-2 text-ui-sm text-ink-muted space-y-1">
+        {{range .Result.Skipped}}<li>{{.Name}} — {{.Reason}}</li>{{end}}
+      </ul>
+      <a href="/maintenance/sites/bulk/skips.xlsx" class="btn btn-secondary btn-sm mt-3">건너뜀 목록 엑셀</a>
+      {{end}}
+      <div class="mt-4 flex justify-end gap-2">
+        <a href="/maintenance/sites" class="btn btn-primary">점검 사이트 목록으로</a>
+        <button type="button" class="btn btn-secondary" @click="open=false">닫기</button>
+      </div>
+    </div>
+  </div>
+  {{end}}
+</div>
+<script>
+window.siteBulkPage = function (total) {
+  return {
+    q: '', sel: total, cycle: '', rounds: 1, confirmOpen: false, confirmMsg: '', busy: false,
+    count() {
+      var n = 0;
+      document.querySelectorAll('#bulk-form input[name="customer_id"]').forEach(function (el) {
+        if (el.checked) n++;
+      });
+      this.sel = n;
+    },
+    all(on) {
+      document.querySelectorAll('#bulk-form input[name="customer_id"]').forEach(function (el) { el.checked = on; });
+      this.count();
+    },
+    filter() {
+      var q = String(this.q || '').trim().toLowerCase();
+      document.querySelectorAll('#bulk-form tbody tr').forEach(function (tr) {
+        var hay = (tr.getAttribute('data-filter') || '').toLowerCase();
+        tr.hidden = q !== '' && hay.indexOf(q) < 0;
+      });
+    },
+    askConfirm(ev) {
+      this.count();
+      if (!this.cycle) { window.showFlashError('점검주기를 선택하세요'); return; }
+      if (this.sel < 1) { window.showFlashError('등록할 사이트를 선택하세요'); return; }
+      var lab = {monthly:'월',odd_bimonthly:'홀수격월',even_bimonthly:'짝수격월',quarterly:'분기',semi:'반기',yearly:'년1회'}[this.cycle] || this.cycle;
+      this.confirmMsg = this.sel + '곳을 점검 사이트로 등록합니다. 점검주기: ' + lab + ', 회차 ' + (this.rounds || 1);
+      this.confirmOpen = true;
+      this._form = ev.target;
+    },
+    doSubmit() {
+      if (this.busy) return;
+      this.busy = true;
+      this.confirmOpen = false;
+      if (this.$refs.go) this.$refs.go.disabled = true;
+      if (this._form) this._form.submit();
+    }
+  };
+};
+</script>
+{{end}}
