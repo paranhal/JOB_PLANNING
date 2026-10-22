@@ -40,18 +40,13 @@ func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string,
 		LEFT JOIN assets a ON a.customer_id = c.customer_id
 		LEFT JOIN as_receipts ar ON ar.customer_id = c.customer_id
 		WHERE 1=1`
-	orgFrag, orgArgs, err := AppendOrgSQL("c", orgID)
-	if err != nil {
+	if err := RequireOrgID(orgID); err != nil {
 		return nil, 0, err
 	}
 
 	countQuery := `SELECT COUNT(*) FROM customers c WHERE 1=1`
-	baseQuery += orgFrag
-	countQuery += orgFrag
 	args := []interface{}{}
 	countArgs := []interface{}{}
-	args = append(args, orgArgs...)
-	countArgs = append(countArgs, orgArgs...)
 
 	switch category {
 	case "":
@@ -602,6 +597,50 @@ func (r *CustomerRepo) FindByExactOrgName(name string) (*model.Customer, error) 
 		return nil, err
 	}
 	return c, nil
+}
+
+func NormalizeCustomerName(name string) string {
+	name = strings.ReplaceAll(name, "\n", " ")
+	name = strings.ReplaceAll(name, "\r", " ")
+	return strings.Join(strings.Fields(strings.TrimSpace(name)), " ")
+}
+
+func (r *CustomerRepo) ListActiveNameMatches(name, excludeID string) ([]model.Customer, error) {
+	key := strings.ToLower(NormalizeCustomerName(name))
+	if key == "" {
+		return nil, nil
+	}
+	rows, err := r.db.Query(customerAPISelect+`
+		WHERE is_active=1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.Customer
+	for rows.Next() {
+		c, err := scanCustomerAPI(rows)
+		if err != nil || c == nil {
+			continue
+		}
+		if excludeID != "" && c.CustomerID == excludeID {
+			continue
+		}
+		if strings.ToLower(NormalizeCustomerName(c.OrgName)) == key || strings.ToLower(NormalizeCustomerName(c.OfficialName)) == key {
+			out = append(out, *c)
+		}
+	}
+	return out, rows.Err()
+}
+
+func (r *CustomerRepo) CountCustomerRefs(id string) (asN, siteN, projectN int) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE customer_id=?`, id).Scan(&asN)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM project_sites WHERE customer_id=?`, id).Scan(&siteN)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM work_projects WHERE customer_id=? OR ordering_party_id=?`, id, id).Scan(&projectN)
+	return
 }
 
 // CreatePartnerNameOnly 품목 제조사·공급사용. 이름만 받고 파트너로 만든다. §47.20.4
