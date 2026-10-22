@@ -1341,6 +1341,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWorkTaskActionV79(db)
 	applyWorkTaskActionExtraV80(db)
 	applyWorkTaskGroupV81(db)
+	applyMnt9514(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 
