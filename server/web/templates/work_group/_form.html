@@ -5,8 +5,9 @@
       <button type="button" class="btn btn-ghost btn-sm" data-close-work-group>닫기</button>
     </div>
     {{if .Err}}<p class="text-ui text-danger">{{.Err}}</p>{{end}}
+    {{if .Notice}}<p class="text-ui text-ink" role="status" tabindex="-1" data-wg-status>{{.Notice}}</p>{{end}}
     {{if .Group}}
-    <form method="post" action="/work-groups/{{.Group.GroupID}}/update" class="space-y-3">
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/update" class="space-y-3" data-wg-form>
       <div>
         <label class="text-ui-sm text-ink-muted" for="wg-name">이름</label>
         <input id="wg-name" name="name" required class="input w-full" value="{{.Group.Name}}" {{if not .CanManage}}readonly{{end}}>
@@ -30,20 +31,10 @@
     </form>
     {{if .CanManage}}
     {{if eq .Group.Status "active"}}
-    <form method="post" action="/work-groups/{{.Group.GroupID}}/close"><button class="btn btn-secondary btn-sm" type="submit">그룹 종료</button></form>
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/close" data-wg-form><button class="btn btn-secondary btn-sm" type="submit">그룹 종료</button></form>
     {{else}}
-    <form method="post" action="/work-groups/{{.Group.GroupID}}/reopen"><button class="btn btn-secondary btn-sm" type="submit">다시 열기</button></form>
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/reopen" data-wg-form><button class="btn btn-secondary btn-sm" type="submit">다시 열기</button></form>
     {{end}}
-    <form method="post" action="/work-groups/{{.Group.GroupID}}/leader" class="space-y-1">
-      <label class="text-ui-sm text-ink-muted" for="wg-leader">그룹장</label>
-      <select id="wg-leader" name="user_id" class="select w-full">
-        <option value="">없음</option>
-        {{range .Members}}
-        <option value="{{.UserID}}" {{if eq .Role "leader"}}selected{{end}}>{{.FullName}}</option>
-        {{end}}
-      </select>
-      <button type="submit" class="btn btn-secondary btn-sm">그룹장 지정</button>
-    </form>
     {{end}}
     <table class="w-full text-ui">
       <thead class="text-ink-muted text-left"><tr><th class="p-2">구성원</th><th class="p-2">역할</th><th class="p-2"></th></tr></thead>
@@ -53,28 +44,43 @@
           <td class="p-2">{{.FullName}}</td>
           <td class="p-2"><span class="badge badge-neutral">{{if eq .Role "leader"}}그룹장{{else}}구성원{{end}}</span></td>
           <td class="p-2">
-            {{if and $.CanMembers (ne .UserID $.ActorID)}}
-            <form method="post" action="/work-groups/{{$.Group.GroupID}}/members/{{.UserID}}/remove">
-              <button type="submit" class="btn btn-ghost btn-sm">제거</button>
-            </form>
-            {{end}}
+            <div class="flex flex-wrap gap-1">
+              {{if and $.CanManage (ne .Role "leader")}}
+              <form method="post" action="/work-groups/{{$.Group.GroupID}}/leader" data-wg-form>
+                <input type="hidden" name="user_id" value="{{.UserID}}">
+                <button type="submit" class="btn btn-ghost btn-sm">그룹장으로 지정</button>
+              </form>
+              {{end}}
+              {{if and $.CanMembers (ne .UserID $.ActorID)}}
+              <form method="post" action="/work-groups/{{$.Group.GroupID}}/members/{{.UserID}}/remove" data-wg-form>
+                <button type="submit" class="btn btn-ghost btn-sm">제거</button>
+              </form>
+              {{end}}
+            </div>
           </td>
         </tr>
         {{end}}
       </tbody>
     </table>
     {{if .CanMembers}}
-    <form method="post" action="/work-groups/{{.Group.GroupID}}/members" class="space-y-1">
-      <label class="text-ui-sm text-ink-muted" for="wg-add">구성원 추가</label>
-      <select id="wg-add" name="user_id" class="select w-full" required>
-        <option value="">선택</option>
-        {{range .Candidates}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
-      </select>
-      <button type="submit" class="btn btn-primary btn-sm">추가</button>
+    <form method="post" action="/work-groups/{{.Group.GroupID}}/members" class="space-y-2" data-wg-form>
+      <label class="text-ui-sm text-ink-muted" for="wg-cand-q">구성원 추가</label>
+      <input id="wg-cand-q" type="search" class="input w-full" placeholder="이름 검색" data-wg-filter>
+      <div class="max-h-40 overflow-y-auto border border-line rounded-control p-2 space-y-1" data-wg-cands>
+        {{range .Candidates}}
+        <label class="flex items-center gap-2 text-ui" data-wg-cand data-name="{{.FullName}}">
+          <input type="checkbox" name="member_ids[]" value="{{.UserID}}">
+          <span>{{.FullName}}</span>
+        </label>
+        {{else}}
+        <p class="text-ui-sm text-ink-muted">추가할 사람이 없습니다.</p>
+        {{end}}
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">선택한 구성원 추가</button>
     </form>
     {{end}}
     {{else}}
-    <form method="post" action="/work-groups" class="space-y-3">
+    <form method="post" action="/work-groups" class="space-y-3" data-wg-form data-wg-create>
       {{if .ShowOrgPick}}
       <div>
         <label class="text-ui-sm text-ink-muted" for="wg-org">소속 조직</label>
@@ -91,6 +97,34 @@
       <div>
         <label class="text-ui-sm text-ink-muted" for="wg-purpose-new">목적</label>
         <textarea id="wg-purpose-new" name="purpose" rows="2" class="input w-full"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-ui-sm text-ink-muted" for="wg-start-new">시작</label>
+          <input id="wg-start-new" type="date" name="start_date" class="input w-full">
+        </div>
+        <div>
+          <label class="text-ui-sm text-ink-muted" for="wg-end-new">종료</label>
+          <input id="wg-end-new" type="date" name="end_date" class="input w-full">
+        </div>
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-new-q">구성원</label>
+        <input id="wg-new-q" type="search" class="input w-full" placeholder="이름 검색" data-wg-filter>
+        <div class="max-h-40 overflow-y-auto border border-line rounded-control p-2 space-y-1 mt-1" data-wg-cands>
+          {{range .Candidates}}
+          <label class="flex items-center gap-2 text-ui" data-wg-cand data-name="{{.FullName}}">
+            <input type="checkbox" name="member_ids[]" value="{{.UserID}}" data-wg-member data-label="{{.FullName}}">
+            <span>{{.FullName}}</span>
+          </label>
+          {{end}}
+        </div>
+      </div>
+      <div>
+        <label class="text-ui-sm text-ink-muted" for="wg-leader-new">그룹장</label>
+        <select id="wg-leader-new" name="leader_id" class="select w-full" data-wg-leader>
+          <option value="">없음</option>
+        </select>
       </div>
       <button type="submit" class="btn btn-primary">만들기</button>
     </form>

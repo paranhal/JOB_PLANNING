@@ -210,6 +210,132 @@ func (r *WorkGroupRepo) Create(a model.WorkGroupActor, g *model.WorkGroup) error
 	return nil
 }
 
+func IsWorkGroupAlreadyMember(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(err.Error(), "이미 이 그룹에") || strings.Contains(s, "unique")
+}
+
+func (r *WorkGroupRepo) ListVisibleActiveForWork(orgID, userID string, admin bool) ([]model.WorkGroup, error) {
+	orgID = strings.TrimSpace(orgID)
+	userID = strings.TrimSpace(userID)
+	day := todayYMD()
+	q := `SELECT g.group_id FROM work_groups g
+		WHERE g.org_id=? AND g.status=?
+		  AND (g.end_date IS NULL OR TRIM(g.end_date)='' OR g.end_date>=?)`
+	args := []any{orgID, model.WorkGroupActive, day}
+	if !admin {
+		q += ` AND EXISTS (
+			SELECT 1 FROM work_group_members m
+			 WHERE m.group_id=g.group_id AND m.user_id=?
+			   AND m.joined_on<=? AND (m.left_on IS NULL OR m.left_on>=?))`
+		args = append(args, userID, day, day)
+	}
+	q += ` ORDER BY g.name`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.WorkGroup
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		g, err := r.Get(id)
+		if err != nil || g == nil {
+			continue
+		}
+		out = append(out, *g)
+	}
+	return out, rows.Err()
+}
+
+func (r *WorkGroupRepo) CreateWithMembers(a model.WorkGroupActor, g *model.WorkGroup, memberIDs []string, leaderID string) error {
+	if g == nil {
+		return fmt.Errorf("그룹")
+	}
+	leaderID = strings.TrimSpace(leaderID)
+	seen := map[string]bool{}
+	var ids []string
+	for _, id := range memberIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	if leaderID != "" && !seen[leaderID] {
+		return fmt.Errorf("그룹장은 구성원 안에서 고르세요")
+	}
+	g.OrgID = strings.TrimSpace(g.OrgID)
+	if !a.CanManageOrg(g.OrgID) {
+		return errWGForbidden
+	}
+	g.Name = strings.TrimSpace(g.Name)
+	if g.Name == "" {
+		return fmt.Errorf("이름을 입력하세요")
+	}
+	if g.Status == "" {
+		g.Status = model.WorkGroupActive
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	n, err := nextSeqTx(tx, "work_group")
+	if err != nil {
+		return err
+	}
+	g.GroupID = fmt.Sprintf("WG-%04d", n)
+	g.CreatedBy = a.UserID
+	_, err = tx.Exec(`INSERT INTO work_groups(group_id,org_id,name,purpose,project_id,status,start_date,end_date,created_by)
+		VALUES(?,?,?,?,?,?,?,?,?)`,
+		g.GroupID, g.OrgID, g.Name, g.Purpose, nullIfEmpty(g.ProjectID), g.Status, nullIfEmpty(g.StartDate), nullIfEmpty(g.EndDate), a.UserID)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return fmt.Errorf("같은 이름의 활성 그룹이 있습니다")
+		}
+		return err
+	}
+	joined := todayYMD()
+	for _, uid := range ids {
+		u, err := r.users.GetByID(uid)
+		if err != nil || u == nil || !u.IsActive || u.IsDeleted() {
+			return fmt.Errorf("사용자를 찾을 수 없습니다")
+		}
+		if !workGroupMemberRoleOK(u) {
+			return fmt.Errorf("구성원이 될 수 없습니다")
+		}
+		if !r.sameOrg(u, g.OrgID) {
+			return fmt.Errorf("같은 조직의 구성원만 넣을 수 있습니다")
+		}
+		role := model.WorkGroupMember
+		if uid == leaderID {
+			role = model.WorkGroupLeader
+		}
+		if _, err := tx.Exec(`INSERT INTO work_group_members(group_id,user_id,role,joined_on,added_by) VALUES(?,?,?,?,?)`,
+			g.GroupID, uid, role, joined, a.UserID); err != nil {
+			if IsWorkGroupAlreadyMember(err) {
+				continue
+			}
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	g.LeaderID = leaderID
+	r.event(g.GroupID, a.UserID, "create", map[string]string{"name": g.Name, "leader": leaderID})
+	audit.Log(audit.ActionCreate, "work_groups", "group_id", g.GroupID, g.Name, "", g.Name)
+	return nil
+}
+
 func (r *WorkGroupRepo) Update(a model.WorkGroupActor, g *model.WorkGroup) error {
 	cur, err := r.Get(g.GroupID)
 	if err != nil || cur == nil {
@@ -301,6 +427,9 @@ func (r *WorkGroupRepo) AddMember(a model.WorkGroupActor, groupID, userID, role,
 	_, err = r.db.Exec(`INSERT INTO work_group_members(group_id,user_id,role,joined_on,added_by) VALUES(?,?,?,?,?)`,
 		groupID, userID, role, joinedOn, a.UserID)
 	if err != nil {
+		if IsWorkGroupAlreadyMember(err) {
+			return fmt.Errorf("이미 이 그룹에 있습니다")
+		}
 		return err
 	}
 	r.event(groupID, a.UserID, "add_member", map[string]string{"user_id": userID, "role": role})
