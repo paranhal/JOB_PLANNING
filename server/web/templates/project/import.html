@@ -1,9 +1,9 @@
 {{define "title"}}사업 엑셀 등록 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-4">
+<div class="space-y-4" x-data="importApplyGuard({{if .NeedPipelineConfirm}}true{{else}}false{{end}}, {{if .Preview}}{{.Preview.PipeN}}{{else}}0{{end}})">
   <div>
     <h2 class="text-ui-xl font-extrabold text-ink">사업 엑셀 등록</h2>
-    <p class="text-ui-sm text-ink-muted">계약 시트를 미리보기한 뒤 적용합니다. 오류 행은 건너뜁니다. 영업 연결은 비워 둡니다.</p>
+    <p class="text-ui-sm text-ink-muted">계약 시트를 미리보기한 뒤 적용합니다. 금액 0은 영업 파이프라인 후보입니다. 타 부서 행은 등록되지 않습니다.</p>
   </div>
   {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
 
@@ -17,23 +17,70 @@
   {{if .CanWrite}}
   <div class="card p-4 space-y-3">
     <h3 class="font-semibold text-ink">엑셀 일괄 등록</h3>
-    <p class="text-ui-sm text-ink-muted">미리보기는 DB를 바꾸지 않습니다. 적용 시 오류 행은 건너뛰고, 이미 있는 계약은 건너뜁니다. 한 파일을 고른 뒤 미리보기·적용·오류 엑셀을 고릅니다.</p>
+    <p class="text-ui-sm text-ink-muted">파일은 한 번만 고릅니다. 미리보기는 DB를 바꾸지 않습니다.</p>
     <form method="post" action="/projects/import-preview" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
       <input type="file" name="file" accept=".xlsx" required class="input">
       <button type="submit" class="btn btn-secondary">미리보기</button>
       <button type="submit" formaction="/projects/import-apply" class="btn btn-primary">적용</button>
-      <button type="submit" formaction="/projects/import-errors.xlsx" class="btn btn-secondary btn-sm">오류 목록 엑셀</button>
     </form>
   </div>
   {{end}}
 
   {{if .Preview}}
-  <div class="card p-4 space-y-2">
+  <div class="card p-4 space-y-3">
     <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
-    <p class="text-ui-sm">신규 {{.Preview.NewN}} · 건너뜀 {{.Preview.SkipN}} · 오류 {{.Preview.ErrN}}{{if or .Preview.ErrMissingN .Preview.ErrDeniedN .Preview.ErrOtherN}} · 고객 없음 {{.Preview.ErrMissingN}} · 권한 없는 부서 {{.Preview.ErrDeniedN}}{{if gt .Preview.ErrOtherN 0}} · 기타 {{.Preview.ErrOtherN}}{{end}}{{end}}</p>
-    {{if and .Apply (eq .Preview.NewN 0)}}
-    <div class="flash-danger rounded-control">아무것도 등록되지 않았습니다. 오류를 해결한 뒤 다시 적용하세요</div>
+    <p class="text-ui-sm">사업 관리 {{.Preview.Summary.NewN}} · 영업 파이프라인 {{.Preview.Summary.PipeN}} · 건너뜀 {{.Preview.Summary.SkipN}} · 미등록 {{.Preview.Summary.ErrN}}</p>
+    {{if or .Preview.ErrMissingN .Preview.ErrDeniedN .Preview.ErrOtherN}}
+    <p class="text-ui-sm">고객 없음 {{.Preview.ErrMissingN}} · 권한 없는 부서 {{.Preview.ErrDeniedN}}{{if .Preview.ErrOtherN}} · 기타 {{.Preview.ErrOtherN}}{{end}}</p>
     {{end}}
+    {{if .Preview.Summary.DeniedN}}
+    <p class="text-ui-sm">타 사업팀 사업 {{.Preview.Summary.DeniedN}}건은 해당 팀 관리자 또는 시스템 관리자가 올려야 합니다.{{range .Preview.Summary.DeniedOrgs}} {{.Label}} {{.N}}건{{end}}</p>
+    {{end}}
+    {{if .Preview.Summary.Reasons}}
+    <ul class="text-ui-sm space-y-1">
+      {{range .Preview.Summary.Reasons}}
+      <li>{{.Label}} — {{.N}}건{{if .Examples}} ({{range $i, $e := .Examples}}{{if $i}}, {{end}}{{$e}}{{end}}{{if gt .Extra 0}} 외 {{.Extra}}건{{end}}){{end}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+    {{if and .Apply .Preview.Summary.RegisteredZero}}
+    <div class="flash-danger rounded-control">등록된 사업이 없습니다</div>
+    {{end}}
+    {{if gt .Preview.PipeN 0}}
+    <p class="text-ui-sm font-semibold">금액 0 · 영업 파이프라인 후보 {{.Preview.PipeN}}건</p>
+    {{end}}
+
+    {{if and .CanWrite .PreviewToken (not .Apply)}}
+    <form x-ref="applyForm" method="post" action="/projects/import-apply" class="space-y-2" @submit="intercept($event)">
+      <input type="hidden" name="preview_token" value="{{.PreviewToken}}">
+      <input type="hidden" name="pipeline" value="">
+      <input type="hidden" name="pipeline_stage" value="discover">
+      <input type="hidden" name="pipeline_lines_present" value="1">
+      <div class="overflow-x-auto">
+        <table class="w-full text-ui">
+          <thead class="text-ink-muted text-left"><tr>
+            <th class="p-2">선택</th><th class="p-2">행</th><th class="p-2">처리</th><th class="p-2">사업명</th><th class="p-2">부서</th><th class="p-2">유형</th><th class="p-2">거래</th><th class="p-2">연차</th><th class="p-2">사유</th>
+          </tr></thead>
+          <tbody>
+            {{range .Preview.Rows}}
+            <tr class="border-t border-line">
+              <td class="p-2">{{if eq .Action "pipeline"}}<input type="checkbox" name="pipeline_line" value="{{.Line}}" checked>{{end}}</td>
+              <td class="p-2">{{.Line}}</td>
+              <td class="p-2">{{.Action}}</td>
+              <td class="p-2">{{.Name}}</td>
+              <td class="p-2">{{.OrgLabel}}</td>
+              <td class="p-2">{{.KindLabel}}</td>
+              <td class="p-2">{{if eq .Direction "cost"}}매입{{else}}매출{{end}}</td>
+              <td class="p-2">{{len .Years}}</td>
+              <td class="p-2">{{.Msg}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      <button type="submit" class="btn btn-primary">적용</button>
+    </form>
+    {{else}}
     <div class="overflow-x-auto">
       <table class="w-full text-ui">
         <thead class="text-ink-muted text-left"><tr>
@@ -55,7 +102,115 @@
         </tbody>
       </table>
     </div>
+    {{end}}
+    {{if and .CanWrite .PreviewToken}}
+    <form method="post" action="/projects/import-errors.xlsx" class="inline">
+      <input type="hidden" name="preview_token" value="{{.PreviewToken}}">
+      <button type="submit" class="btn btn-secondary btn-sm">오류 목록 엑셀</button>
+    </form>
+    {{end}}
+    {{if gt .Preview.PipeN 0}}
+    <p class="text-ui-sm"><a href="/sales" class="underline">영업 파이프라인 {{.Preview.PipeN}}건 → 영업관리에서 확인</a></p>
+    {{end}}
   </div>
   {{end}}
+
+  <div x-show="confirmOpen" x-cloak class="modal-backdrop z-50 flex items-center justify-center p-4"
+       role="dialog" aria-modal="true" aria-labelledby="pipe-confirm-title"
+       @keydown.escape.window="if(confirmOpen) cancel()" @click.self="cancel()">
+    <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+      <h2 id="pipe-confirm-title" class="text-ui font-bold text-ink">영업 파이프라인 등록</h2>
+      <p class="mt-2 text-ui text-ink">계약금액이 0인 사업 <span x-text="n"></span>건은 사업 관리에 등록되지 않습니다. 영업 파이프라인 사업으로 등록할까요?</p>
+      <label class="mt-3 block text-ui-sm text-ink-muted">초기 단계
+        <select class="input mt-1" x-model="stage">
+          <option value="discover">발굴</option>
+          <option value="propose">제안</option>
+          <option value="bid">입찰</option>
+        </select>
+      </label>
+      <div class="mt-4 flex flex-wrap justify-end gap-2">
+        <button type="button" class="btn btn-primary" @click="yes()">영업 파이프라인에 등록</button>
+        <button type="button" class="btn btn-secondary" @click="no()">등록하지 않음</button>
+        <button type="button" class="btn btn-secondary" @click="cancel()">취소</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+{{if and .Apply .Preview}}
+<div x-data="importResultDialog({{toJSON .Preview.Summary}})" x-show="open" x-cloak
+     class="modal-backdrop z-50 flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="import-result-title"
+     @keydown.escape.window="if(open) close()" @click.self="close()">
+  <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+    <h2 id="import-result-title" class="text-ui font-bold text-ink">사업 업로드 결과</h2>
+    <p class="mt-2 text-ui font-semibold text-ink" x-show="sum.registered_zero">등록된 사업이 없습니다</p>
+    <p class="mt-2 text-ui text-ink">사업 관리 등록 <span x-text="sum.new_n"></span>건 · 영업 파이프라인 등록 <span x-text="sum.pipe_n"></span>건 · 건너뜀 <span x-text="sum.skip_n"></span>건 · 미등록 <span x-text="sum.err_n"></span>건</p>
+    <p class="mt-2 text-ui-sm text-ink" x-show="sum.denied_n">타 사업팀 사업 <span x-text="sum.denied_n"></span>건은 해당 팀 관리자 또는 시스템 관리자가 올려야 합니다.</p>
+    <ul class="mt-2 text-ui-sm space-y-1">
+      <template x-for="r in (sum.reasons || [])" :key="r.kind">
+        <li>
+          <span x-text="r.label"></span> — <span x-text="r.n"></span>건
+          <span x-show="r.examples && r.examples.length"> (<span x-text="(r.examples||[]).join(', ')"></span><span x-show="r.extra"> 외 <span x-text="r.extra"></span>건</span>)</span>
+        </li>
+      </template>
+    </ul>
+    <p class="mt-2 text-ui-sm" x-show="sum.pipe_n"><a href="/sales" class="underline">영업관리에서 확인</a></p>
+    <div class="mt-4 flex flex-wrap justify-end gap-2">
+      <button type="button" class="btn btn-primary" @click="close()">확인</button>
+      {{if .PreviewToken}}
+      <form method="post" action="/projects/import-errors.xlsx">
+        <input type="hidden" name="preview_token" value="{{.PreviewToken}}">
+        <button type="submit" class="btn btn-secondary btn-sm">오류 목록 엑셀 받기</button>
+      </form>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+<script>
+window.importApplyGuard = function (need, n) {
+  return {
+    confirmOpen: !!need,
+    n: n || 0,
+    stage: 'discover',
+    intercept: function (e) {
+      var form = e.target;
+      var boxes = form.querySelectorAll('input[name="pipeline_line"]');
+      var checked = form.querySelectorAll('input[name="pipeline_line"]:checked');
+      var pipeN = boxes.length ? checked.length : 0;
+      if (!pipeN) return;
+      e.preventDefault();
+      this.n = pipeN;
+      this._form = form;
+      this.confirmOpen = true;
+    },
+    yes: function () {
+      var form = this._form || this.$refs.applyForm;
+      if (!form) return;
+      form.pipeline.value = 'yes';
+      form.pipeline_stage.value = this.stage;
+      this.confirmOpen = false;
+      form.submit();
+    },
+    no: function () {
+      var form = this._form || this.$refs.applyForm;
+      if (!form) return;
+      form.pipeline.value = 'no';
+      this.confirmOpen = false;
+      form.submit();
+    },
+    cancel: function () { this.confirmOpen = false; }
+  };
+};
+window.importResultDialog = function (sum) {
+  sum = sum || {};
+  return {
+    open: true,
+    sum: sum,
+    close: function () { this.open = false; }
+  };
+};
+</script>
 {{end}}

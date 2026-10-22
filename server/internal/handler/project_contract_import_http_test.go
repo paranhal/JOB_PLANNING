@@ -58,8 +58,8 @@ func TestContractImportHTTPRoutesOnProjectServer(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `formaction="/projects/import-apply"`) {
 		t.Fatal("apply formaction")
 	}
-	if !strings.Contains(rec.Body.String(), `formaction="/projects/import-errors.xlsx"`) {
-		t.Fatal("errors formaction")
+	if strings.Contains(rec.Body.String(), `formaction="/projects/import-errors.xlsx"`) {
+		t.Fatal("errors on empty page")
 	}
 }
 
@@ -92,7 +92,7 @@ func TestContractImportHTTPBanner95_2B(t *testing.T) {
 	if apply.Code != http.StatusOK {
 		t.Fatalf("oa apply %d", apply.Code)
 	}
-	if !strings.Contains(apply.Body.String(), "아무것도 등록되지 않았습니다") {
+	if !strings.Contains(apply.Body.String(), "등록된 사업이 없습니다") {
 		t.Fatal("empty apply")
 	}
 	vsPrev := postEquipFile(t, e, "/projects/import-preview", "file", "t.xlsx", raw, vs)
