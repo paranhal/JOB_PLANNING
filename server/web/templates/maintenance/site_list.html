@@ -54,14 +54,76 @@
   </div>
   {{end}}
 
+  {{if .Flash}}
+  <p class="flash-warning rounded-control">{{.Flash}}</p>
+  {{end}}
+
+  <form method="get" action="/maintenance/sites" class="card p-4 flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="label" for="site-region">지역</label>
+      <select id="site-region" name="region" class="select">
+        <option value="">전체</option>
+        <option value="none" {{if eq .FilterRegion "none"}}selected{{end}}>지역 없음</option>
+        {{range .Regions}}
+        <option value="{{.}}" {{if eq $.FilterRegion .}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label class="label" for="site-cycle">점검주기</label>
+      <select id="site-cycle" name="cycle" class="select">
+        <option value="">전체</option>
+        <option value="monthly" {{if eq .FilterCycle "monthly"}}selected{{end}}>월</option>
+        <option value="odd_bimonthly" {{if eq .FilterCycle "odd_bimonthly"}}selected{{end}}>홀수격월</option>
+        <option value="even_bimonthly" {{if eq .FilterCycle "even_bimonthly"}}selected{{end}}>짝수격월</option>
+        <option value="quarterly" {{if eq .FilterCycle "quarterly"}}selected{{end}}>분기</option>
+        <option value="semi" {{if eq .FilterCycle "semi"}}selected{{end}}>반기</option>
+        <option value="yearly" {{if eq .FilterCycle "yearly"}}selected{{end}}>년1회</option>
+      </select>
+    </div>
+    <div>
+      <label class="label" for="site-q">이름</label>
+      <input id="site-q" type="search" name="q" value="{{.FilterQ}}" class="input" placeholder="표시명·기관명">
+    </div>
+    {{if .FilterBatch}}<input type="hidden" name="batch" value="{{.FilterBatch}}">{{end}}
+    <label class="flex items-center gap-2 text-ui">
+      <input type="checkbox" name="sort" value="recent" {{if .SortRecent}}checked{{end}}>
+      <span>최근 등록순</span>
+    </label>
+    <button type="submit" class="btn btn-secondary btn-sm">찾기</button>
+  </form>
+
+  {{if .CanWrite}}
+  <form method="post" action="/maintenance/sites/set-region" id="site-region-form" class="card p-4 flex flex-wrap gap-3 items-end">
+    <input type="hidden" name="filter_region" value="{{.FilterRegion}}">
+    <input type="hidden" name="filter_cycle" value="{{.FilterCycle}}">
+    <input type="hidden" name="filter_q" value="{{.FilterQ}}">
+    <input type="hidden" name="filter_batch" value="{{.FilterBatch}}">
+    <div>
+      <label class="label" for="bulk-region">지역 일괄 지정</label>
+      <input id="bulk-region" name="region" class="input" list="site-region-list" placeholder="충남 또는 직접 입력">
+      <datalist id="site-region-list">
+        {{range .Regions}}<option value="{{.}}">{{end}}
+      </datalist>
+      <p class="text-ui-sm text-ink-muted mt-1">값은 공백만 정리합니다. 충청남도→충남은 안내일 뿐 강제 변환하지 않습니다. 이미 만들어진 방문에는 소급하지 않습니다.</p>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">선택한 사이트에 지정</button>
+    <button type="submit" class="btn btn-secondary btn-sm" formaction="/maintenance/sites/fill-region"
+            onclick="return confirm('지역이 비어 있고 주소에서 알 수 있는 곳만 채웁니다. 고객 주소는 바꾸지 않습니다.');">주소로 지역 채우기</button>
+  </form>
+  {{end}}
+
   <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <table class="min-w-full text-sm">
       <thead class="bg-gray-50 text-gray-600">
         <tr>
+          {{if $.CanWrite}}<th class="text-left px-4 py-3"></th>{{end}}
           <th class="text-left px-4 py-3">기관명</th>
           <th class="text-left px-4 py-3">표시명</th>
           <th class="text-left px-4 py-3">지역</th>
           <th class="text-left px-4 py-3">점검주기</th>
+          <th class="text-left px-4 py-3">회차</th>
+          <th class="text-left px-4 py-3">기본 담당</th>
           <th class="text-left px-4 py-3">점검제품</th>
           <th class="text-left px-4 py-3">유형</th>
           <th class="text-left px-4 py-3">고정 규칙</th>
@@ -71,10 +133,15 @@
       <tbody class="divide-y divide-gray-100">
         {{range .Items}}
         <tr class="hover:bg-gray-50">
+          {{if $.CanWrite}}
+          <td class="px-4 py-3"><input type="checkbox" form="site-region-form" name="customer_id" value="{{.CustomerID}}"></td>
+          {{end}}
           <td class="px-4 py-3 text-gray-700">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</td>
           <td class="px-4 py-3 font-medium">{{.ShortName}}</td>
-          <td class="px-4 py-3">{{if .Region}}{{.Region}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3">{{if .Region}}{{.Region}}{{else}}<span class="text-ink-muted">—</span> <span class="text-warning" title="지역 없음">·</span>{{end}}</td>
           <td class="px-4 py-3">{{maintCycleLabel .InspectionCycle}}</td>
+          <td class="px-4 py-3">{{.SiteRounds}}</td>
+          <td class="px-4 py-3">{{if .DefaultAssignee}}{{.DefaultAssignee}}{{else}}—{{end}}</td>
           <td class="px-4 py-3">
             {{$labs := .ProductLabels}}
             {{if $labs}}{{range $labs}}<span class="inline-block mr-1">{{.}}</span>{{end}}{{else}}—{{end}}
@@ -90,7 +157,7 @@
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">등록된 사이트가 없습니다.</td></tr>
+        <tr><td colspan="11" class="px-4 py-8 text-center text-gray-500">등록된 사이트가 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>

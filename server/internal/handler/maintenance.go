@@ -253,48 +253,48 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		}
 	}
 	return c.Render(200, "maintenance/plan_show.html", map[string]interface{}{
-		"Title":            fmt.Sprintf("정기점검 %d년", plan.PlanYear),
-		"Active":           NavMaintenance,
-		"Plan":             plan,
-		"Plans":            plans,
-		"YearQuery":        yearQuery,
-		"Visits":           visits,
-		"Customers":        customers,
-		"Assignees":        assignees,
-		"Projects":         projects,
-		"Unassigned":       unassigned,
-		"PeriodGroups":     periodGroups,
-		"QuarterPending":   quarterPending,
-		"QuarterLastMonth": quarterLast,
-		"QuarterAlert":     quarterLast && len(quarterPending) > 0,
-		"QuarterNum":       qNum,
-		"QuarterFrom":      qFrom,
-		"QuarterTo":        qTo,
-		"QuotaMonth":       quotaMonth,
-		"View":             view,
-		"Month":            month,
-		"MonthVisits":      shown,
-		"Weeks":            decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c)),
-		"Board":            board,
-		"DoneCount":        doneCount,
-		"OpenCount":        len(visits) - doneCount,
-		"IncompleteVisits": incomplete,
-		"FlashDone":        c.QueryParam("done"),
-		"FlashOK":          c.QueryParam("ok"),
-		"FlashErr":         c.QueryParam("err"),
-		"DupCount":         dupCount,
-		"DeleteAfter":      model.NextMonthStart(time.Now()).Format("2006-01-02"),
-		"Today":            today,
-		"CanEdit":          canEditMaintenanceSchedule(c),
-		"CanManageRegion":  canManageMntRegion(c),
-		"IsAdmin":          isAdminRole(c),
-		"ScopeAll":         scopeAll,
-		"ShowScopeToggle":  showScopeToggle,
-		"ScopeNote":        mntScopeNote(showScopeToggle, scopeAll),
-		"HolidayMissing":   holidayMissingBanner(h.holidayRepo, plan.PlanYear),
-		"OrgProducts":          h.orgProductList(plan.OrgID),
-		"UseOrgProductLegend":  h.useOrgProductLegend(plan.OrgID),
-		"WorkGroups":           []model.WorkGroup{},
+		"Title":               fmt.Sprintf("정기점검 %d년", plan.PlanYear),
+		"Active":              NavMaintenance,
+		"Plan":                plan,
+		"Plans":               plans,
+		"YearQuery":           yearQuery,
+		"Visits":              visits,
+		"Customers":           customers,
+		"Assignees":           assignees,
+		"Projects":            projects,
+		"Unassigned":          unassigned,
+		"PeriodGroups":        periodGroups,
+		"QuarterPending":      quarterPending,
+		"QuarterLastMonth":    quarterLast,
+		"QuarterAlert":        quarterLast && len(quarterPending) > 0,
+		"QuarterNum":          qNum,
+		"QuarterFrom":         qFrom,
+		"QuarterTo":           qTo,
+		"QuotaMonth":          quotaMonth,
+		"View":                view,
+		"Month":               month,
+		"MonthVisits":         shown,
+		"Weeks":               decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c)),
+		"Board":               board,
+		"DoneCount":           doneCount,
+		"OpenCount":           len(visits) - doneCount,
+		"IncompleteVisits":    incomplete,
+		"FlashDone":           c.QueryParam("done"),
+		"FlashOK":             c.QueryParam("ok"),
+		"FlashErr":            c.QueryParam("err"),
+		"DupCount":            dupCount,
+		"DeleteAfter":         model.NextMonthStart(time.Now()).Format("2006-01-02"),
+		"Today":               today,
+		"CanEdit":             canEditMaintenanceSchedule(c),
+		"CanManageRegion":     canManageMntRegion(c),
+		"IsAdmin":             isAdminRole(c),
+		"ScopeAll":            scopeAll,
+		"ShowScopeToggle":     showScopeToggle,
+		"ScopeNote":           mntScopeNote(showScopeToggle, scopeAll),
+		"HolidayMissing":      holidayMissingBanner(h.holidayRepo, plan.PlanYear),
+		"OrgProducts":         h.orgProductList(plan.OrgID),
+		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
+		"WorkGroups":          []model.WorkGroup{},
 	})
 }
 
@@ -668,24 +668,7 @@ func (h *MaintenanceHandler) DeleteVisit(c echo.Context) error {
 // --- 사이트 설정 ---
 
 func (h *MaintenanceHandler) ListSiteConfigs(c echo.Context) error {
-	items, err := h.repo.ListSiteConfigs()
-	if err != nil {
-		return err
-	}
-	org := currentOrg(c)
-	items = repository.FilterSiteConfigsByOrg(items, org)
-	now := time.Now()
-	quota := model.SummarizeMonthVisitQuota(items, now.Year(), int(now.Month()))
-	legacy := org == model.OrgIDLibrary && h.repo.CountInspectionProducts(org) == 0
-	return c.Render(200, "maintenance/site_list.html", map[string]interface{}{
-		"Title":   "정기점검 사이트 설정",
-		"Active":  NavMaintenanceSites,
-		"Items":   items,
-		"Quota":   quota,
-		"Legacy":  legacy,
-		"Synced":  c.QueryParam("synced"),
-		"Skipped": c.QueryParam("skipped"),
-	})
+	return h.renderSiteList(c, "", 0, 0, 0)
 }
 
 // SyncSiteConfigsFromAssets 유상 계약 + 점검주기가 있는 자산의 기관을 사이트 설정에 일괄 등록

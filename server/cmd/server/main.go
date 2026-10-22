@@ -435,6 +435,8 @@ func main() {
 	ms.GET("/bulk", h.Maintenance.SiteBulkPage)
 	ms.POST("/bulk", h.Maintenance.SiteBulkRegister)
 	ms.GET("/bulk/skips.xlsx", h.Maintenance.SiteBulkSkipExcel)
+	ms.POST("/set-region", h.Maintenance.BulkSetSiteRegions)
+	ms.POST("/fill-region", h.Maintenance.FillSiteRegionsFromAddress)
 	ms.POST("/sync", h.Maintenance.SyncSiteConfigsFromAssets)
 	ms.GET("/distance", h.Maintenance.ListRegionOrder)
 	ms.POST("/distance", h.Maintenance.SaveRegionOrder)

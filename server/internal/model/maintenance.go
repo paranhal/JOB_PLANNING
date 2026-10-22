@@ -19,8 +19,11 @@ type MaintenanceSiteConfig struct {
 	OrgName         string // JOIN customers (목록·엑셀용)
 	AddrSido        string // customers.addr_sido
 	AddrSigungu     string // customers.addr_sigungu
-	OrgID           string // customers.org_id
+	OrgID           string // 사이트 org_id, 없으면 고객 org_id
 	RoundsPerPeriod int    // 주기당 회차 수. 0·미기재는 1.
+	BulkBatchID     string
+	UpdatedAt       string
+	DefaultAssignee string
 	// Products nil 이면 레거시(has_klas/has_rfid). 빈 슬라이스면 신 모드(제품 없음=generic).
 	Products []InspectionProduct
 }
@@ -55,7 +58,7 @@ type MaintenanceVisit struct {
 	Completed     bool   // 방문 완료 여부
 	CompletedDate string // 실제 방문일 (미입력 시 예정일)
 	DupReason     string
-	RoundNo       int    // 주기 안 회차. 0 은 조회 시 1.
+	RoundNo       int // 주기 안 회차. 0 은 조회 시 1.
 	WorkGroupID   string
 	WorkGroupName string
 }
@@ -124,7 +127,7 @@ type UnassignedMonthSlot struct {
 	LastAssignee       string
 	UnconfirmedQuarter bool // 분기 마지막 달에 미확인으로 올린 건
 	OrgID              string
-	RegionPending      bool   // 지역 기본 담당이 있어 배정 예정
+	RegionPending      bool // 지역 기본 담당이 있어 배정 예정
 	RegionAssigneeName string
 }
 
@@ -543,15 +546,15 @@ type CycleQuotaRow struct {
 
 // MonthVisitQuota 점검 사이트 설정으로 산출한 그 달 방문 목표
 type MonthVisitQuota struct {
-	Year       int
-	Month      int
-	MonthLabel string
-	DueSites   int
-	Slots      int
-	KlasSlots    int
-	RfidSlots    int
-	ProductRows  []CycleQuotaRow
-	CycleRows    []CycleQuotaRow
+	Year        int
+	Month       int
+	MonthLabel  string
+	DueSites    int
+	Slots       int
+	KlasSlots   int
+	RfidSlots   int
+	ProductRows []CycleQuotaRow
+	CycleRows   []CycleQuotaRow
 }
 
 var inspectionCycleOrder = []struct{ Key, Label string }{

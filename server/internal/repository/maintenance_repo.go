@@ -881,7 +881,8 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 		       s.entry_category, COALESCE(s.fixed_rule,''),
 		       COALESCE(c.org_name,''),
 		       COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,''),
-		       COALESCE(c.org_id,''), COALESCE(s.rounds_per_period,1)
+		       COALESCE(NULLIF(TRIM(s.org_id),''), c.org_id, ''), COALESCE(s.rounds_per_period,1),
+		       COALESCE(s.bulk_batch_id,''), COALESCE(s.updated_at,'')
 		FROM maintenance_site_config s
 		LEFT JOIN customers c ON c.customer_id = s.customer_id
 		ORDER BY s.region, s.short_name`)
@@ -893,7 +894,7 @@ func (r *MaintenanceRepo) ListSiteConfigs() ([]model.MaintenanceSiteConfig, erro
 	for rows.Next() {
 		var cfg model.MaintenanceSiteConfig
 		var klas, rfid int
-		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName, &cfg.AddrSido, &cfg.AddrSigungu, &cfg.OrgID, &cfg.RoundsPerPeriod); err != nil {
+		if err := rows.Scan(&cfg.CustomerID, &cfg.ShortName, &cfg.Region, &klas, &rfid, &cfg.InspectionCycle, &cfg.EntryCategory, &cfg.FixedRule, &cfg.OrgName, &cfg.AddrSido, &cfg.AddrSigungu, &cfg.OrgID, &cfg.RoundsPerPeriod, &cfg.BulkBatchID, &cfg.UpdatedAt); err != nil {
 			return nil, err
 		}
 		cfg.HasKlas = klas == 1
@@ -915,12 +916,13 @@ func (r *MaintenanceRepo) GetSiteConfig(customerID string) (*model.MaintenanceSi
 	err := r.db.QueryRow(`
 		SELECT s.customer_id, s.short_name, COALESCE(s.region,''),
 		       s.has_klas, s.has_rfid, COALESCE(s.inspection_cycle,'monthly'),
-		       s.entry_category, COALESCE(s.fixed_rule,''), COALESCE(c.org_id,''),
-		       COALESCE(s.rounds_per_period,1)
+		       s.entry_category, COALESCE(s.fixed_rule,''),
+		       COALESCE(NULLIF(TRIM(s.org_id),''), c.org_id, ''),
+		       COALESCE(s.rounds_per_period,1), COALESCE(s.bulk_batch_id,''), COALESCE(s.updated_at,'')
 		FROM maintenance_site_config s
 		LEFT JOIN customers c ON c.customer_id = s.customer_id
 		WHERE s.customer_id = ?`, customerID).
-		Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.InspectionCycle, &c.EntryCategory, &c.FixedRule, &c.OrgID, &c.RoundsPerPeriod)
+		Scan(&c.CustomerID, &c.ShortName, &c.Region, &klas, &rfid, &c.InspectionCycle, &c.EntryCategory, &c.FixedRule, &c.OrgID, &c.RoundsPerPeriod, &c.BulkBatchID, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
