@@ -286,6 +286,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"DeleteAfter":      model.NextMonthStart(time.Now()).Format("2006-01-02"),
 		"Today":            today,
 		"CanEdit":          canEditMaintenanceSchedule(c),
+		"CanManageRegion":  canManageMntRegion(c),
 		"IsAdmin":          isAdminRole(c),
 		"ScopeAll":         scopeAll,
 		"ShowScopeToggle":  showScopeToggle,
@@ -293,6 +294,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"HolidayMissing":   holidayMissingBanner(h.holidayRepo, plan.PlanYear),
 		"OrgProducts":          h.orgProductList(plan.OrgID),
 		"UseOrgProductLegend":  h.useOrgProductLegend(plan.OrgID),
+		"WorkGroups":           []model.WorkGroup{},
 	})
 }
 
@@ -379,15 +381,9 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if strings.TrimSpace(v.DupReason) == "" {
-		if dup, err := h.repo.MonthDuplicate(v.PlanID, v.CustomerID, v.ProductType, v.VisitDate, v.VisitID); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		} else if dup != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, repository.ErrMonthDuplicate(dup).Error())
-		}
-	}
 	if err := h.repo.InsertVisitFull(v); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, planURLFrom(c, planID, ""))
 	}
 	if h.wbRepo != nil {
 		_, _ = h.wbRepo.EnsureMaintenanceTasks()
@@ -506,6 +502,8 @@ func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVi
 		ProductType: strings.TrimSpace(c.FormValue("product_type")),
 		ProjectID:   strings.TrimSpace(c.FormValue("project_id")),
 		Completed:   c.FormValue("completed") != "",
+		RoundNo:     parseVisitRound(c.FormValue("round_no")),
+		WorkGroupID: strings.TrimSpace(c.FormValue("work_group_id")),
 	}
 	if v.Completed {
 		v.CompletedDate = strings.TrimSpace(c.FormValue("completed_date"))
@@ -514,6 +512,18 @@ func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVi
 		return v, err
 	}
 	return v, nil
+}
+
+func parseVisitRound(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 func applyVisitDupForm(c echo.Context, v *model.MaintenanceVisit) error {
@@ -707,20 +717,13 @@ func (h *MaintenanceHandler) NewSiteConfigPage(c echo.Context) error {
 
 func (h *MaintenanceHandler) SearchSiteCustomers(c echo.Context) error {
 	q := strings.TrimSpace(c.QueryParam("q"))
-	org := currentOrg(c)
-	if org == "" || org == repository.OrgAll {
-		return c.JSON(http.StatusOK, map[string]any{
-			"items": []repository.SiteCustomerHit{},
-			"hint":  errNeedInsertOrg,
-		})
-	}
 	if len([]rune(q)) < 2 {
 		return c.JSON(http.StatusOK, map[string]any{
 			"items": []repository.SiteCustomerHit{},
 			"hint":  hintSiteCustomerMinQ,
 		})
 	}
-	items, err := h.repo.SearchCustomersWithoutConfig(org, q, 20)
+	items, err := h.repo.SearchCustomersWithoutConfig(currentOrg(c), q, 20)
 	if err != nil {
 		return err
 	}
@@ -753,6 +756,10 @@ func (h *MaintenanceHandler) renderSiteForm(c echo.Context, cfg *model.Maintenan
 			draft.CustomerName = cu.OrgName
 		}
 	}
+	var users []model.User
+	if h.userRepo != nil {
+		users = listAssignableForPicker(h.userRepo, c)
+	}
 	return c.Render(status, "maintenance/site_form.html", map[string]interface{}{
 		"Title":           title,
 		"Active":          NavMaintenanceSites,
@@ -764,6 +771,7 @@ func (h *MaintenanceHandler) renderSiteForm(c echo.Context, cfg *model.Maintenan
 		"FixedDaySet":     days,
 		"FixedLastMonday": lastMon,
 		"Err":             errMsg,
+		"Users":           users,
 	})
 }
 
@@ -804,6 +812,7 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 		InspectionCycle: c.FormValue("inspection_cycle"),
 		EntryCategory:   c.FormValue("entry_category"),
 		FixedRule:       model.FormatFixedRule(days, lastMon),
+		RoundsPerPeriod: parseVisitRound(c.FormValue("rounds_per_period")),
 	}
 	draft := siteFormDraft{
 		CustomerID:   cfg.CustomerID,
@@ -834,10 +843,11 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 		if view == "" || view == repository.OrgAll {
 			return h.renderSiteForm(c, nil, model.FixedDaySet(cfg.FixedRule), lastMon, errNeedInsertOrg, http.StatusBadRequest, draft)
 		}
-		custOrg := h.repo.CustomerOrgID(cfg.CustomerID)
-		sameOrg := custOrg == view || (custOrg == "" && view == model.OrgIDLibrary)
-		if !sameOrg {
-			return h.renderSiteForm(c, nil, model.FixedDaySet(cfg.FixedRule), lastMon, errSiteCustomerWrongOrg, http.StatusBadRequest, draft)
+		if h.customerRepo != nil {
+			cu, _ := h.customerRepo.GetByID(cfg.CustomerID)
+			if cu == nil || !cu.IsActive {
+				return h.renderSiteForm(c, nil, model.FixedDaySet(cfg.FixedRule), lastMon, errNeedSiteCustomer, http.StatusBadRequest, draft)
+			}
 		}
 	}
 	switch cfg.InspectionCycle {
@@ -874,7 +884,25 @@ func (h *MaintenanceHandler) SaveSiteConfig(c echo.Context) error {
 			return h.renderSiteForm(c, show, model.FixedDaySet(cfg.FixedRule), lastMon, err.Error(), http.StatusOK, draft)
 		}
 	}
+	_ = h.repo.ReplaceSiteAssignees(cfg.CustomerID, parseSiteAssigneeForm(c))
 	return c.Redirect(http.StatusSeeOther, "/maintenance/sites")
+}
+
+func parseSiteAssigneeForm(c echo.Context) []model.MaintenanceSiteAssignee {
+	owner := strings.TrimSpace(c.FormValue("site_owner_id"))
+	gid := strings.TrimSpace(c.FormValue("site_work_group_id"))
+	var out []model.MaintenanceSiteAssignee
+	if owner != "" || gid != "" {
+		out = append(out, model.MaintenanceSiteAssignee{UserID: owner, WorkGroupID: gid, Role: model.WBMemberOwner})
+	}
+	for _, id := range c.Request().PostForm["site_support_id"] {
+		id = strings.TrimSpace(id)
+		if id == "" || id == owner {
+			continue
+		}
+		out = append(out, model.MaintenanceSiteAssignee{UserID: id, Role: model.WBMemberSupport})
+	}
+	return out
 }
 
 func (h *MaintenanceHandler) DeleteSiteConfig(c echo.Context) error {

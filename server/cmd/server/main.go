@@ -448,6 +448,9 @@ func main() {
 
 	maint := g.Group("/maintenance")
 	mntEdit := h.Auth.RequireMaintenanceEdit
+	maint.GET("/regions", h.Maintenance.RegionAssignees)
+	maint.POST("/regions", h.Maintenance.SaveRegionAssignees)
+	maint.POST("/regions/reapply", h.Maintenance.ReapplyRegionAssignees)
 	maint.GET("", h.Maintenance.ListPlans)
 	maint.GET("/new", h.Maintenance.NewPlanPage, adminOnly)
 	maint.POST("", h.Maintenance.CreatePlan, adminOnly)

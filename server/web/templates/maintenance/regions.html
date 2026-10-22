@@ -1,0 +1,53 @@
+{{define "title"}}지역별 담당 · {{appName}}{{end}}
+{{define "content"}}
+<div class="max-w-3xl space-y-4">
+  <div class="flex items-start justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-ink">지역별 담당</h2>
+      <p class="text-ui-sm text-ink-muted mt-1">점검 사이트 지역의 기본 주담당·참여자입니다. 사이트 예외가 있으면 지역 기본을 대체합니다.</p>
+    </div>
+    <a href="/maintenance/sites" class="btn btn-secondary btn-sm">점검 사이트</a>
+  </div>
+  {{range .Rows}}
+  <form method="post" action="/maintenance/regions" class="card p-4 space-y-3">
+    <input type="hidden" name="region" value="{{.Region}}">
+    <div class="flex items-center justify-between gap-2">
+      <h3 class="font-semibold text-ink">{{.Region}} <span class="text-ui-sm text-ink-muted">사이트 {{.Sites}}곳</span></h3>
+    </div>
+    <div>
+      <label class="label" for="owner-{{.Region}}">주담당</label>
+      <select id="owner-{{.Region}}" name="owner_id" class="select w-full" {{if not $.CanManage}}disabled{{end}}>
+        <option value="">없음</option>
+        {{range $.Users}}
+        <option value="{{.UserID}}">{{.FullName}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label class="label">참여자</label>
+      <div class="space-y-1">
+        {{range $.Users}}
+        <label class="flex items-center gap-2 text-ui">
+          <input type="checkbox" name="support_id" value="{{.UserID}}" {{if not $.CanManage}}disabled{{end}}>
+          <span>{{.FullName}}</span>
+        </label>
+        {{end}}
+      </div>
+    </div>
+    {{if $.CanManage}}
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="btn btn-primary btn-sm">저장</button>
+    </div>
+    {{end}}
+  </form>
+  {{if $.CanManage}}
+  <form method="post" action="/maintenance/regions/reapply" class="px-1" onsubmit="return confirm('미완료 방문에 현재 지역 담당을 다시 적용할까요?');">
+    <input type="hidden" name="region" value="{{.Region}}">
+    <button type="submit" class="btn btn-secondary btn-sm">미완료 방문에 다시 적용</button>
+  </form>
+  {{end}}
+  {{else}}
+  <p class="text-ui text-ink-muted">지역이 있는 점검 사이트가 없습니다.</p>
+  {{end}}
+</div>
+{{end}}

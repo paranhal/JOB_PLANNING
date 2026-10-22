@@ -13,15 +13,15 @@
       <p class="font-medium text-gray-900">{{.Config.CustomerID}}</p>
     </div>
     {{else}}
-    <div id="site-customer-combobox" class="combobox" {{if .NeedOrg}}data-need-org="1"{{end}}>
+    <div id="site-customer-combobox" class="combobox">
       <label for="site-customer-q" class="block text-gray-600 mb-1">고객 <span class="text-red-500">*</span></label>
       <input type="hidden" name="customer_id" id="site-customer-id" value="{{.Draft.CustomerID}}">
       <input type="text" name="customer_q" id="site-customer-q" value="{{.Draft.CustomerName}}"
              autocomplete="off" role="combobox" aria-expanded="false" aria-controls="site-customer-list"
-             aria-autocomplete="list" {{if .NeedOrg}}disabled{{end}}
+             aria-autocomplete="list"
              class="w-full border border-gray-300 rounded-lg px-3 py-2">
       <ul id="site-customer-list" role="listbox" hidden class="combobox-list"></ul>
-      <p id="site-customer-search-hint" class="text-xs text-gray-500 mt-1">{{if .NeedOrg}}소속 조직을 선택하세요{{else}}이미 설정된 고객은 목록에 나오지 않습니다.{{end}}</p>
+      <p id="site-customer-search-hint" class="text-xs text-gray-500 mt-1">이미 설정된 고객은 목록에 나오지 않습니다.{{if .NeedOrg}} 저장하려면 소속 조직을 선택하세요.{{end}}</p>
     </div>
     {{end}}
 
@@ -36,6 +36,11 @@
       <label class="block text-gray-600 mb-1">지역 (자동 배정 묶음용)</label>
       <input type="text" name="region" value="{{if .Config}}{{.Config.Region}}{{else}}{{.Draft.Region}}{{end}}" placeholder="예: 세종, 대전"
              class="w-full border border-gray-300 rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="label">주기당 회차 수</label>
+      <input type="number" name="rounds_per_period" min="1" class="input w-full"
+             value="{{if .Config}}{{if .Config.RoundsPerPeriod}}{{.Config.RoundsPerPeriod}}{{else}}1{{end}}{{else}}1{{end}}">
     </div>
     <div>
       <label class="block text-gray-600 mb-1">점검주기 <span class="text-red-500">*</span></label>
@@ -107,6 +112,24 @@
       </label>
     </div>
 
+    <div>
+      <label class="label">사이트 예외 주담당</label>
+      <select name="site_owner_id" class="select w-full">
+        <option value="">지역 기본 사용</option>
+        {{range .Users}}<option value="{{.UserID}}">{{.FullName}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label class="label">사이트 예외 참여자</label>
+      <div class="space-y-1">
+        {{range .Users}}
+        <label class="flex items-center gap-2 text-ui">
+          <input type="checkbox" name="site_support_id" value="{{.UserID}}">
+          <span>{{.FullName}}</span>
+        </label>
+        {{end}}
+      </div>
+    </div>
     <div class="flex gap-2 pt-2">
       <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">저장</button>
       <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg">취소</a>

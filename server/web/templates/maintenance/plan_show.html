@@ -256,7 +256,7 @@
           <tr>
             <td class="py-1.5 pr-3 font-medium text-amber-950">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
             <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
-            <td class="py-1.5 pr-3 text-xs">{{if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}</td>
+            <td class="py-1.5 pr-3 text-xs">{{if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}{{if .RegionPending}} <span class="badge-neutral text-[10px]">지역 담당 예정{{if .RegionAssigneeName}} · {{.RegionAssigneeName}}{{end}}</span>{{end}}</td>
             {{if $.CanEdit}}
             <td class="py-1.5">
               <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/assign-slot" class="flex flex-wrap items-center gap-1.5">
@@ -367,6 +367,17 @@
             <select name="assignee" class="w-full border border-gray-300 rounded-lg px-3 py-2">
               <option value="">— 선택 —</option>
               {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
+            </select>
+          </div>
+          <div>
+            <label class="label">회차</label>
+            <input type="number" name="round_no" min="1" class="input w-full" placeholder="자동">
+          </div>
+          <div>
+            <label class="label">업무 그룹</label>
+            <select name="work_group_id" class="select w-full">
+              <option value="">없음</option>
+              {{range .WorkGroups}}<option value="{{.GroupID}}">{{.Name}}</option>{{end}}
             </select>
           </div>
         </div>
@@ -552,7 +563,7 @@
           {{$b := mntVisitBadge . $today}}
           <div class="px-1.5 py-1 rounded text-[11px] leading-tight {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
                style="{{mntProductStyle .ProductType}}">
-            <div class="font-medium truncate" title="{{visitLabel .}}{{if .Assignee}} · {{.Assignee}}{{end}}">{{visitLabel .}}{{if .DupReason}} <span class="text-[10px] px-1 rounded bg-amber-100 text-amber-800">월 2회차</span>{{end}}</div>
+            <div class="font-medium truncate" title="{{visitLabel .}}{{if .Assignee}} · {{.Assignee}}{{end}}">{{visitLabel .}}{{if .RoundNo}} <span class="badge-neutral text-[10px]">{{.RoundNo}}회차</span>{{end}}{{if .DupReason}} <span class="text-[10px] px-1 rounded bg-amber-100 text-amber-800">월 2회차</span>{{end}}</div>
             {{if $b.Label}}
             <div class="mt-0.5 flex items-center gap-1 flex-wrap">
               <span class="{{$b.Class}}">{{$b.Label}}</span>
@@ -697,7 +708,7 @@
             {{end}}
           </td>
           <td class="px-4 py-2 text-gray-600">{{if .ProjectName}}{{.ProjectName}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-gray-600">{{.Assignee}}</td>
+          <td class="px-4 py-2 text-gray-600">{{.Assignee}}{{if .RoundNo}} <span class="badge-neutral text-[10px]">{{.RoundNo}}회차</span>{{end}}</td>
           <td class="px-4 py-2">
             {{$b := mntVisitBadge . $today}}
             {{if $b.Label}}
