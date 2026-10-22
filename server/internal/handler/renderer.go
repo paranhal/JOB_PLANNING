@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -174,6 +175,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	// 로그인 상태·빌드 값 주입. 사이드바와 배지가 같은 값을 쓴다. §40.4
 	if dataMap, ok := data.(map[string]interface{}); ok {
 		injectBuildInfo(dataMap)
+		injectFlash(c, dataMap)
 		cfg := config.Load()
 		dataMap["NavMail"] = cfg.MailEnabled
 		dataMap["NavSMS"] = cfg.SMSEnabled
@@ -285,6 +287,13 @@ func funcMap() template.FuncMap {
 		"assignmentSelected": model.AssignmentSelected,
 		"hasSuffix":          strings.HasSuffix,
 		"urlquery":           url.QueryEscape,
+		"toJSON": func(v interface{}) template.JS {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return template.JS("null")
+			}
+			return template.JS(b)
+		},
 		"hasString": func(list interface{}, s string) bool {
 			switch v := list.(type) {
 			case []string:
