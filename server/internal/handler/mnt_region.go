@@ -44,9 +44,11 @@ func (h *MaintenanceHandler) RegionAssignees(c echo.Context) error {
 	}
 	idx := map[string]int{}
 	var rows []regionRow
+	unspecified := 0
 	for _, cfg := range cfgs {
 		reg := strings.TrimSpace(cfg.Region)
 		if reg == "" {
+			unspecified++
 			continue
 		}
 		i, ok := idx[reg]
@@ -62,13 +64,17 @@ func (h *MaintenanceHandler) RegionAssignees(c echo.Context) error {
 		}
 		rows[i].Sites++
 	}
+	total := len(cfgs)
 	users := listAssignableForPicker(h.userRepo, c)
 	return c.Render(http.StatusOK, "maintenance/regions.html", map[string]interface{}{
-		"Title":     "지역별 담당",
-		"Active":    NavMaintenance,
-		"Rows":      rows,
-		"Users":     users,
-		"CanManage": canManageMntRegion(c),
+		"Title":       "지역별 담당",
+		"Active":      NavMaintenance,
+		"Rows":        rows,
+		"Users":       users,
+		"CanManage":   canManageMntRegion(c),
+		"Total":       total,
+		"WithRegion":  total - unspecified,
+		"Unspecified": unspecified,
 	})
 }
 
