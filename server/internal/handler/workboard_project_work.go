@@ -46,11 +46,8 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	projectID := strings.TrimSpace(c.FormValue("project_id"))
 	_ = c.Request().ParseForm()
 	siteIDs := c.Request().Form["site_id"]
-	if projectID != "" {
-		pOrg, err := h.repo.ProjectOrgID(projectID)
-		if err != nil || pOrg != org {
-			return echo.NewHTTPError(http.StatusBadRequest, "다른 조직 사업입니다")
-		}
+	if err := h.assertProjectExists(projectID); err != nil {
+		return err
 	}
 	if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -121,10 +118,8 @@ func (h *WorkboardHandler) SearchWorkTaskSites(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	pid := strings.TrimSpace(c.QueryParam("project_id"))
-	org := currentOrg(c)
 	if pid != "" {
-		pOrg, err := h.repo.ProjectOrgID(pid)
-		if err != nil || pOrg != org {
+		if _, err := h.repo.ProjectOrgID(pid); err != nil {
 			pid = ""
 		}
 	}
@@ -167,4 +162,15 @@ func (h *WorkboardHandler) paletteWorkCards(orgID string) ([]model.WBCard, error
 		out = append(out, paletteTaskCard(t, false))
 	}
 	return out, nil
+}
+
+func (h *WorkboardHandler) assertProjectExists(projectID string) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil
+	}
+	if _, err := h.repo.ProjectOrgID(projectID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
+	}
+	return nil
 }

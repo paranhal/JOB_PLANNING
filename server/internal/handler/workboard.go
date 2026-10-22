@@ -1782,6 +1782,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if t.WorkType == model.WBWorkSupport && t.ProjectID == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=project_required"))
 	}
+	if err := h.assertProjectExists(t.ProjectID); err != nil {
+		return err
+	}
 	supports := parseSupportMembers(c, t.Assignee)
 	if len(supports) > 0 && t.Assignee == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=owner"))
@@ -2015,6 +2018,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			taskPagePath(id, registerScope)+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	org := taskOrgID(c, existing)
+	if err := h.assertProjectExists(t.ProjectID); err != nil {
+		return err
+	}
 	if err := checkAssigneeInOrg(h.userRepo, org, t.Assignee, "", existing.Assignee); err != nil {
 		return err
 	}

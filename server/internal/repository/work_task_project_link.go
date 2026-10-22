@@ -43,17 +43,13 @@ func (r *WBRepo) SetTaskProject(orgID, taskID, projectID string) (beforeName, af
 	beforeName = r.WorkProjectName(beforeID)
 	projectID = strings.TrimSpace(projectID)
 	if projectID != "" {
-		var st, name string
-		err := r.db.QueryRow(`SELECT COALESCE(status,'active'), COALESCE(name,'') FROM work_projects WHERE project_id=?`, projectID).Scan(&st, &name)
+		var name string
+		err := r.db.QueryRow(`SELECT COALESCE(name,'') FROM work_projects WHERE project_id=?`, projectID).Scan(&name)
 		if err == sql.ErrNoRows {
 			return "", "", fmt.Errorf("사업을 찾을 수 없습니다")
 		}
 		if err != nil {
 			return "", "", err
-		}
-		switch strings.TrimSpace(st) {
-		case "archived", "complete", "cancelled":
-			return "", "", fmt.Errorf("종료·보관 사업은 연결할 수 없습니다")
 		}
 		afterName = strings.TrimSpace(name)
 	}
