@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,12 @@ import (
 )
 
 func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *repository.UserRepo) {
+	t.Helper()
+	e, repo, users, _ := newProjectWorkHarness(t)
+	return e, repo, users
+}
+
+func newProjectWorkHarness(t *testing.T) (*echo.Echo, *repository.WBRepo, *repository.UserRepo, *sql.DB) {
 	t.Helper()
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "pw.db"))
 	if err != nil {
@@ -78,6 +85,7 @@ func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *reposi
 	}
 	e := echo.New()
 	e.Renderer = NewRenderer()
+	AttachHTTPErrorHandler(e)
 	h := New(db)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
@@ -104,7 +112,7 @@ func newProjectWorkServer(t *testing.T) (*echo.Echo, *repository.WBRepo, *reposi
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 	g.GET("/projects/:id/sites", h.Project.Sites)
 	h.Attachment.uploadDir = filepath.Join(t.TempDir(), "uploads")
-	return e, repository.NewWBRepo(db), users
+	return e, repository.NewWBRepo(db), users, db
 }
 
 func doFormUser(t *testing.T, e *echo.Echo, path string, form url.Values, ck *http.Cookie) *httptest.ResponseRecorder {
