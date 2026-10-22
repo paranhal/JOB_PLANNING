@@ -41,14 +41,14 @@ func TestContractImportSIAdmin47Oracle(t *testing.T) {
 		t.Fatalf("si preview new=%d err=%d denied=%d missing=%d %+v", prev.NewN, prev.ErrN, prev.ErrDeniedN, prev.ErrMissingN, errRows(prev))
 	}
 	for _, r := range prev.Rows {
-		if r.ErrKind != "org_denied" {
+		if r.ErrKind != model.ContractErrOrgForbidden {
 			continue
 		}
 		if !strings.Contains(r.Msg, "미디어") || !strings.Contains(r.Msg, "이 계정으로는") {
 			t.Fatalf("denied msg %+v", r)
 		}
 	}
-	app, err := repo.ApplyContractImport("U-SI", "최종47.xlsx", raw, scope, today)
+	app, err := repo.ApplyContractImport("U-SI", "최종47.xlsx", raw, scope, today, model.ContractImportApplyOpt{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,11 +155,11 @@ func TestContractImportCustomerLookup95_2B(t *testing.T) {
 				t.Fatalf("담당 %+v", r)
 			}
 		case "모호행":
-			if r.ErrKind != "ambiguous" || !strings.Contains(r.Msg, "모호고객") {
+			if r.ErrKind != model.ContractErrCustomerAmb || !strings.Contains(r.Msg, "모호고객") {
 				t.Fatalf("모호행 %+v", r)
 			}
 		case "비활행":
-			if r.ErrKind != "missing_customer" || !strings.Contains(r.Msg, "비활성") {
+			if r.ErrKind != model.ContractErrCustomerMiss || !strings.Contains(r.Msg, "비활성") {
 				t.Fatalf("비활행 %+v", r)
 			}
 		}
@@ -169,10 +169,10 @@ func TestContractImportCustomerLookup95_2B(t *testing.T) {
 func TestContractImportErrorWorkbookMissingSheet(t *testing.T) {
 	prev := &model.ContractImportPreview{
 		Rows: []model.ContractImportRow{
-			{Line: 2, Action: "err", Name: "사업1", ErrKind: "missing_customer", MissingName: "학교A", MissingRole: "발주처", Msg: "발주처 고객 마스터에 없습니다: 학교A"},
-			{Line: 3, Action: "err", Name: "사업2", ErrKind: "missing_customer", MissingName: "학교A", MissingRole: "발주처", Msg: "발주처 고객 마스터에 없습니다: 학교A"},
-			{Line: 4, Action: "err", Name: "사업3", ErrKind: "missing_customer", MissingName: "학교B", MissingRole: "최종수요처", Msg: "최종수요처 고객 마스터에 없습니다: 학교B"},
-			{Line: 5, Action: "err", Name: "사업4", ErrKind: "org_denied", Msg: "이 계정으로는 미디어사업팀 사업을 등록할 수 없습니다"},
+			{Line: 2, Action: "err", Name: "사업1", ErrKind: model.ContractErrCustomerMiss, MissingName: "학교A", MissingRole: "발주처", Msg: "발주처 고객 마스터에 없습니다: 학교A"},
+			{Line: 3, Action: "err", Name: "사업2", ErrKind: model.ContractErrCustomerMiss, MissingName: "학교A", MissingRole: "발주처", Msg: "발주처 고객 마스터에 없습니다: 학교A"},
+			{Line: 4, Action: "err", Name: "사업3", ErrKind: model.ContractErrCustomerMiss, MissingName: "학교B", MissingRole: "최종수요처", Msg: "최종수요처 고객 마스터에 없습니다: 학교B"},
+			{Line: 5, Action: "err", Name: "사업4", ErrKind: model.ContractErrOrgForbidden, OrgLabel: "미디어사업팀", Msg: "이 계정으로는 미디어사업팀 사업을 등록할 수 없습니다"},
 			{Line: 6, Action: "new", Name: "사업5"},
 		},
 	}

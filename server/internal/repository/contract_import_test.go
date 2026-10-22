@@ -114,7 +114,7 @@ func TestContractImportPreviewApplySample(t *testing.T) {
 	}
 	nBefore := 0
 	_ = db.QueryRow(`SELECT COUNT(*) FROM work_projects`).Scan(&nBefore)
-	app, err := repo.ApplyContractImport("U1", "최종47.xlsx", raw, scope, today)
+	app, err := repo.ApplyContractImport("U1", "최종47.xlsx", raw, scope, today, model.ContractImportApplyOpt{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +225,7 @@ func TestContractImportValidation(t *testing.T) {
 	for _, r := range prev.Rows {
 		if r.Name == "없는발주" {
 			foundMissing = true
-			if r.ErrKind != "missing_customer" || !strings.Contains(r.Msg, "발주처 고객 마스터에 없습니다") || !strings.Contains(r.Msg, "없는곳") {
+			if r.ErrKind != model.ContractErrCustomerMiss || !strings.Contains(r.Msg, "발주처 고객 마스터에 없습니다") || !strings.Contains(r.Msg, "없는곳") {
 				t.Fatalf("없는발주 %+v", r)
 			}
 		}
@@ -257,7 +257,7 @@ func TestContractImportValidation(t *testing.T) {
 		t.Fatalf("권한 유형 %d", oa.ErrDeniedN)
 	}
 	for _, r := range oa.Rows {
-		if r.ErrKind != "org_denied" {
+		if r.ErrKind != model.ContractErrOrgForbidden {
 			continue
 		}
 		if !strings.Contains(r.Msg, "이 계정으로는") || !strings.Contains(r.Msg, "시스템 관리자") {
