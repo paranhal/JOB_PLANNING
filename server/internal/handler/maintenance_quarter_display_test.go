@@ -106,11 +106,13 @@ func TestQuarterConfirmReadonlyAndViewAsAndOtherOrg(t *testing.T) {
 	req.AddCookie(homeCookie)
 	e.ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if !strings.Contains(body, "우리관") {
+	// 95-2E 고객은 전사 공용 마스터 → 방문 추가 콤보에 「다른관」이 나올 수 있다.
+	// 95-16A는 대기 목록을 접어도 슬롯 행 HTML은 남긴다. 조직 격리는 대기 슬롯 data-name과 skip API로 본다.
+	if !strings.Contains(body, `data-name="우리관"`) {
 		t.Fatal("자기 조직 분기 사이트가 안 보임")
 	}
-	if strings.Contains(body, "다른관") {
-		t.Fatal("다른 조직 사이트가 노출됨")
+	if strings.Contains(body, `data-name="다른관"`) {
+		t.Fatal("다른 조직 사이트가 대기 목록에 노출됨")
 	}
 
 	awaySkip := mntPostWithCookie(t, e, "/maintenance/"+p.PlanID+"/quarter-confirm", url.Values{

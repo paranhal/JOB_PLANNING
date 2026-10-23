@@ -1,0 +1,218 @@
+=== RUN   TestUnplannedKanbanCountsMatchList
+2026/10/24 02:33:15 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:15 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:15 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:15 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:15 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:15 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:15 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:15 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:15 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:15 sales_item_specs 이관: 0건
+2026/10/24 02:33:15 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:15 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:15 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:15 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:15 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:15 052 scope junction: 규칙 6건
+2026/10/24 02:33:15 052 work_task_tags: 업무 0건
+2026/10/24 02:33:15 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:15 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:15 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:15 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:15 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:15 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:15 foreign_key_check: 0건
+--- PASS: TestUnplannedKanbanCountsMatchList (0.35s)
+=== RUN   TestQuarterConfirmReadonlyAndViewAsAndOtherOrg
+2026/10/24 02:33:15 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:15 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:15 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:15 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:15 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:15 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:15 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:15 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:15 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:15 sales_item_specs 이관: 0건
+2026/10/24 02:33:15 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:15 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:15 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:15 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:15 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:15 052 scope junction: 규칙 6건
+2026/10/24 02:33:15 052 work_task_tags: 업무 0건
+2026/10/24 02:33:15 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:15 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:15 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:15 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:15 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:15 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:15 foreign_key_check: 0건
+--- PASS: TestQuarterConfirmReadonlyAndViewAsAndOtherOrg (0.38s)
+=== RUN   TestVisitDateChangeMovesDailyTask
+2026/10/24 02:33:15 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:15 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:15 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:15 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:15 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:15 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:15 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:15 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:15 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:15 sales_item_specs 이관: 0건
+2026/10/24 02:33:15 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:15 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:15 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:15 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:15 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:15 052 scope junction: 규칙 6건
+2026/10/24 02:33:15 052 work_task_tags: 업무 0건
+2026/10/24 02:33:15 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:15 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:15 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:15 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:15 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:16 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:16 foreign_key_check: 0건
+--- PASS: TestVisitDateChangeMovesDailyTask (0.34s)
+=== RUN   TestVisitMoveClearsOverlappingTime
+2026/10/24 02:33:16 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:16 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:16 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:16 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:16 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:16 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:16 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:16 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:16 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:16 sales_item_specs 이관: 0건
+2026/10/24 02:33:16 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:16 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:16 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:16 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:16 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:16 052 scope junction: 규칙 6건
+2026/10/24 02:33:16 052 work_task_tags: 업무 0건
+2026/10/24 02:33:16 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:16 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:16 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:16 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:16 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:16 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:16 foreign_key_check: 0건
+--- PASS: TestVisitMoveClearsOverlappingTime (0.35s)
+=== RUN   TestRegisterRepairsMismatchedVisitDates
+2026/10/24 02:33:16 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:16 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:16 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:16 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:16 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:16 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:16 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:16 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:16 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:16 sales_item_specs 이관: 0건
+2026/10/24 02:33:16 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:16 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:16 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:16 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:16 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:16 052 scope junction: 규칙 6건
+2026/10/24 02:33:16 052 work_task_tags: 업무 0건
+2026/10/24 02:33:16 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:16 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:16 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:16 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:16 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:16 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:16 foreign_key_check: 0건
+--- PASS: TestRegisterRepairsMismatchedVisitDates (0.35s)
+=== RUN   TestRegisterShowsAllKLASVisitsForDay
+2026/10/24 02:33:16 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:16 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:16 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:16 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:16 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:16 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:16 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:16 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:16 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:16 sales_item_specs 이관: 0건
+2026/10/24 02:33:16 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:17 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:17 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:17 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:17 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:17 052 scope junction: 규칙 6건
+2026/10/24 02:33:17 052 work_task_tags: 업무 0건
+2026/10/24 02:33:17 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:17 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:17 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:17 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:17 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:17 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:17 foreign_key_check: 0건
+--- PASS: TestRegisterShowsAllKLASVisitsForDay (0.34s)
+=== RUN   TestUnplaceMaintenanceStaysOffGrid
+2026/10/24 02:33:17 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:17 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:17 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:17 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:17 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:17 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:17 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:17 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:17 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:17 sales_item_specs 이관: 0건
+2026/10/24 02:33:17 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:17 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:17 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:17 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:17 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:17 052 scope junction: 규칙 6건
+2026/10/24 02:33:17 052 work_task_tags: 업무 0건
+2026/10/24 02:33:17 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:17 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:17 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:17 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:17 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:17 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:17 foreign_key_check: 0건
+--- PASS: TestUnplaceMaintenanceStaysOffGrid (0.33s)
+=== RUN   TestUnplannedSortIconsKeepDefaultOrder
+2026/10/24 02:33:17 appendix B-3 data_origin=import: expected=1124 actual=0 match=false
+2026/10/24 02:33:17 appendix B-2 start_datetime backfill: expected=1128 actual=0 match=false
+2026/10/24 02:33:17 appendix B-1 unconfirm without date: expected=1124 actual=0 match=false
+2026/10/24 02:33:17 project_id backfill visits: filled=0 unresolved=0
+2026/10/24 02:33:17 project_id backfill as_receipts: filled=0 unresolved=0
+2026/10/24 02:33:17 SELECT COUNT(*) FROM maintenance_visits WHERE project_id IS NULL → 0
+2026/10/24 02:33:17 SELECT COUNT(*) FROM as_receipts WHERE project_id IS NULL → 0
+2026/10/24 02:33:17 008 holidays 시드: 51건 (2025~2027, 이후 API로 갱신)
+2026/10/24 02:33:17 business_days: 2024년 공휴일 미등록 — 주말만 반영
+2026/10/24 02:33:17 sales_item_specs 이관: 0건
+2026/10/24 02:33:17 as_keyword_links 시드 건너뜀: 접수 0건 · 활성 키워드 36개
+2026/10/24 02:33:17 050 assignee user_id: 매칭 실패 없음
+2026/10/24 02:33:17 051 process truth: 조치 어긋남 없음
+2026/10/24 02:33:17 052 loc copy: ID 없이 이름만 있는 행 0건
+2026/10/24 02:33:17 052 loc copy: 이름 복사본 열 삭제
+2026/10/24 02:33:17 052 scope junction: 규칙 6건
+2026/10/24 02:33:17 052 work_task_tags: 업무 0건
+2026/10/24 02:33:17 052 sales_activity_members: 활동 0건
+2026/10/24 02:33:17 052 attach ref_type: as_receipt → as 0건
+2026/10/24 02:33:17 영업활동 업무 이관: 구분 0건 · 완료 0건
+2026/10/24 02:33:17 44 이관: 총 0건 | discover 0 · propose 0 · bid(pending 0 · won 0) · closed(contracted 0 · lost 0 · dropped 0)
+         | 가중 파이프라인 전 0원 → 후 0원 | negotiation→pending 확인 필요 0건
+2026/10/24 02:33:17 id migrate v2: customers=0 assets=0 as=0 processes=0
+2026/10/24 02:33:17 [v57] 옵저버 0줄 · 테스터 0줄 을 깃발로 옮겼다
+2026/10/24 02:33:17 foreign_key_check: 0건
+--- PASS: TestUnplannedSortIconsKeepDefaultOrder (0.33s)
+PASS
+ok  	customer-support/internal/handler	3.132s

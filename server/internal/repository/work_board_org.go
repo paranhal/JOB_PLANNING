@@ -34,7 +34,12 @@ func (r *WorkBoardRepo) filterWorkListForOrg(items []model.WorkListItem, orgID s
 			taskIDs = append(taskIDs, id)
 		}
 	}
-	asOK := r.orgIDSet(`SELECT as_id FROM as_receipts WHERE as_id IN (`+placeholders(len(asIDs))+`) AND org_id=?`, append(iface(asIDs), orgID)...)
+	// 접수 org_id가 비면 고객 소속(레거시 INSERT)으로 본다. 방문 슬롯과 같은 COALESCE.
+	asOK := r.orgIDSet(`SELECT ar.as_id FROM as_receipts ar
+		LEFT JOIN customers c ON c.customer_id=ar.customer_id
+		WHERE ar.as_id IN (`+placeholders(len(asIDs))+`)
+		  AND COALESCE(NULLIF(TRIM(ar.org_id),''), NULLIF(TRIM(c.org_id),''))=?`,
+		append(iface(asIDs), orgID)...)
 	visitOK := r.orgIDSet(`SELECT mv.visit_id FROM maintenance_visits mv
 		JOIN customers c ON c.customer_id=mv.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id=mv.customer_id

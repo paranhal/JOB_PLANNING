@@ -44,8 +44,9 @@ func newMntSyncServer(t *testing.T, name string) (*echo.Echo, *sql.DB) {
 func seedVisit(t *testing.T, db *sql.DB, visitID, date, assignee, product, org string) {
 	t.Helper()
 	cust := "C_" + visitID
-	if _, err := db.Exec(`INSERT OR IGNORE INTO customers (customer_id, org_name, official_name, is_active)
-		VALUES (?,?,?,1)`, cust, org, org); err != nil {
+	// jwtCookie(admin) → currentOrg=O01. 빈 org_id 고객·업무는 ListTasksBetweenForOrg·denyOtherOrgTask에서 빠진다.
+	if _, err := db.Exec(`INSERT OR IGNORE INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES (?,?,?,1,?)`, cust, org, org, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT OR IGNORE INTO maintenance_plans (plan_id, plan_year, title, status)
@@ -63,9 +64,9 @@ func seedVisitTask(t *testing.T, db *sql.DB, taskID, visitID, workDate, start, e
 	t.Helper()
 	if _, err := db.Exec(`INSERT INTO work_tasks
 		(task_id, work_type, title, description, due_date, work_date, start_time, end_time,
-		 duration_min, status, priority, assignee, source_type, source_id)
-		VALUES (?,'maintenance',?,'[KLAS]점검 정기점검',?,?,?,?,30,'waiting','normal',?,'maintenance',?)`,
-		taskID, title, workDate, workDate, start, end, assignee, visitID); err != nil {
+		 duration_min, status, priority, assignee, source_type, source_id, org_id)
+		VALUES (?,'maintenance',?,'[KLAS]점검 정기점검',?,?,?,?,30,'waiting','normal',?,'maintenance',?,?)`,
+		taskID, title, workDate, workDate, start, end, assignee, visitID, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -151,8 +152,8 @@ func TestVisitMoveClearsOverlappingTime(t *testing.T) {
 	seedVisitTask(t, db, "WT-3", "mvs_3", "2026-08-12", "10:00", "10:30", "최혜영",
 		"[점검]고운동도서관_2026-08-12 · KLAS")
 	if _, err := db.Exec(`INSERT INTO work_tasks
-		(task_id, work_type, title, due_date, work_date, start_time, end_time, duration_min, status, priority, assignee)
-		VALUES ('WT-BLK','admin','선점 업무','2026-08-14','2026-08-14','10:00','10:30',30,'waiting','normal','최혜영')`); err != nil {
+		(task_id, work_type, title, due_date, work_date, start_time, end_time, duration_min, status, priority, assignee, org_id)
+		VALUES ('WT-BLK','admin','선점 업무','2026-08-14','2026-08-14','10:00','10:30',30,'waiting','normal','최혜영',?)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 

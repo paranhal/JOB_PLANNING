@@ -199,17 +199,17 @@ func TestUnplannedSortIconsKeepDefaultOrder(t *testing.T) {
 	today := now.Format("2006-01-02")
 	past := now.AddDate(0, 0, -5).Format("2006-01-02")
 	ts := now.Format("2006-01-02 15:04:05")
-	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
-		VALUES ('C1','기관A','기관A',1)`); err != nil {
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES ('C1','기관A','기관A',1,?)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	insert := func(id, num, visit, confirmed, assigned, status string) {
 		t.Helper()
 		_, err := db.Exec(`INSERT INTO as_receipts (
 			as_id, as_number, receipt_datetime, customer_id, symptom, urgency, status,
-			visit_scheduled_date, schedule_confirmed, assigned_to, created_at, updated_at
-		) VALUES (?,?,?,'C1','증상','중',?,?,?,?,?,?)`,
-			id, num, ts, status, visit, confirmed, assigned, ts, ts)
+			visit_scheduled_date, schedule_confirmed, assigned_to, created_at, updated_at, org_id
+		) VALUES (?,?,?,'C1','증상','중',?,?,?,?,?,?,?)`,
+			id, num, ts, status, visit, confirmed, assigned, ts, ts, model.OrgIDLibrary)
 		if err != nil {
 			t.Fatal(err)
 		}

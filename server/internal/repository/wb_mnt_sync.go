@@ -17,7 +17,8 @@ const mntTaskLinkSelect = `
 	       v.visit_date, COALESCE(v.assignee,''), COALESCE(v.product_type,''),
 	       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
 	       COALESCE(v.project_id,''),
-	       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name)
+	       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
+	       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), '')
 	FROM work_tasks t
 	JOIN maintenance_visits v ON v.visit_id = t.source_id
 	JOIN customers c ON c.customer_id = v.customer_id
@@ -30,7 +31,7 @@ type mntTaskLink struct {
 	assignee, title, desc, status, taskProject, assigneeSource string
 	visitDate, visitAssignee, productType                      string
 	completed                                     bool
-	completedDate, visitProject, siteName         string
+	completedDate, visitProject, siteName, orgID  string
 }
 
 func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTaskLink, error) {
@@ -49,7 +50,7 @@ func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTask
 		if err := rows.Scan(&l.taskID, &l.workDate, &l.dueDate, &l.startTime, &l.endTime,
 			&l.durationMin, &l.assignee, &l.title, &l.desc, &l.status, &l.taskProject, &l.assigneeSource,
 			&l.visitDate, &l.visitAssignee, &l.productType, &done, &l.completedDate,
-			&l.visitProject, &l.siteName); err != nil {
+			&l.visitProject, &l.siteName, &l.orgID); err != nil {
 			return nil, err
 		}
 		l.completed = done != 0
@@ -308,10 +309,19 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 		}
 	}
 
+	orgID := strings.TrimSpace(l.orgID)
 	if workDate == strings.TrimSpace(l.workDate) && dueDate == strings.TrimSpace(l.dueDate) &&
 		assignee == strings.TrimSpace(l.assignee) && title == l.title && desc == strings.TrimSpace(l.desc) &&
 		start == l.startTime && end == l.endTime && projectID == strings.TrimSpace(l.taskProject) {
-		return false, nil
+		if orgID == "" {
+			return false, nil
+		}
+		res, err := r.db.Exec(`UPDATE work_tasks SET org_id=? WHERE task_id=? AND TRIM(COALESCE(org_id,''))=''`, orgID, l.taskID)
+		if err != nil {
+			return false, err
+		}
+		n, _ := res.RowsAffected()
+		return n > 0, nil
 	}
 
 	dur := l.durationMin
@@ -321,10 +331,11 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 	_, err := r.db.Exec(`
 		UPDATE work_tasks
 		SET work_date=?, due_date=?, start_time=?, end_time=?, duration_min=?,
-		    assignee=?, title=?, description=?, project_id=?, updated_at=CURRENT_TIMESTAMP
+		    assignee=?, title=?, description=?, project_id=?, org_id=COALESCE(NULLIF(?,''), org_id),
+		    updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=?`,
 		workDate, dueDate, start, end, model.NormalizeDurationMin(dur),
-		assignee, title, desc, nullStr(projectID), l.taskID)
+		assignee, title, desc, nullStr(projectID), orgID, l.taskID)
 	if err != nil {
 		return false, err
 	}
