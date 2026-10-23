@@ -57,6 +57,36 @@ func TestFilterVisitsByAssigneeKey(t *testing.T) {
 	}
 }
 
+func TestFilterSlotsByAssigneeKey(t *testing.T) {
+	slots := []model.UnassignedMonthSlot{
+		{CustomerID: "a", ShortName: "A학교", LastAssignee: "김서준"},
+		{CustomerID: "b", ShortName: "B학교", LastAssignee: "최유진"},
+		{CustomerID: "c", ShortName: "C학교"},
+	}
+	groups := []MntCalGroup{{GroupID: "g1", Members: []MntCalPerson{{UserID: "u3", FullName: "최유진"}}}}
+	if n := filterSlotsByAssigneeKey(slots, "all", groups, ""); len(n) != 3 {
+		t.Fatalf("all %d", len(n))
+	}
+	none := filterSlotsByAssigneeKey(slots, "none", groups, "")
+	if len(none) != 1 || none[0].CustomerID != "c" {
+		t.Fatalf("none %+v", none)
+	}
+	user := filterSlotsByAssigneeKey(slots, "user:u1", groups, "김서준")
+	if len(user) != 1 || user[0].CustomerID != "a" {
+		t.Fatalf("user %+v", user)
+	}
+	g := filterSlotsByAssigneeKey(slots, "group:g1", groups, "")
+	if len(g) != 1 || g[0].CustomerID != "b" {
+		t.Fatalf("group %+v", g)
+	}
+	gs := filterPeriodGroupsByAssignee([]model.MaintenancePeriodGroup{
+		{Cycle: "semi", LabelShort: "하반기", Slots: slots},
+	}, "none", groups, "")
+	if len(gs) != 1 || len(gs[0].Slots) != 1 {
+		t.Fatalf("group N %+v", gs)
+	}
+}
+
 func TestMntMonthStatsIdentity(t *testing.T) {
 	today := "2026-10-22"
 	visits := []model.MaintenanceVisit{

@@ -177,7 +177,11 @@ func (r *MaintenanceRepo) userDisplay(userID string) string {
 func (r *MaintenanceRepo) annotateUnassignedRegion(orgID string, slots []model.UnassignedMonthSlot) {
 	for i := range slots {
 		cfg, _ := r.GetSiteConfig(slots[i].CustomerID)
-		if cfg == nil || strings.TrimSpace(cfg.Region) == "" {
+		if cfg == nil {
+			continue
+		}
+		slots[i].Region = strings.TrimSpace(cfg.Region)
+		if slots[i].Region == "" {
 			continue
 		}
 		org := strings.TrimSpace(cfg.OrgID)

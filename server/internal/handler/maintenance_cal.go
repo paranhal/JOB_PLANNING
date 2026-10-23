@@ -222,6 +222,59 @@ func filterVisitsByAssigneeKey(visits []model.MaintenanceVisit, key string, grou
 	return out
 }
 
+func slotAssigneeName(s model.UnassignedMonthSlot) string {
+	n := strings.TrimSpace(s.LastAssignee)
+	if n != "" {
+		return n
+	}
+	return strings.TrimSpace(s.RegionAssigneeName)
+}
+
+func filterSlotsByAssigneeKey(slots []model.UnassignedMonthSlot, key string, groups []MntCalGroup, userName string) []model.UnassignedMonthSlot {
+	kind, id := parseAssigneeFilter(key)
+	if kind == "all" {
+		return slots
+	}
+	groupNames := map[string]bool{}
+	if kind == "group" && id != "" {
+		for _, g := range groups {
+			if g.GroupID != id {
+				continue
+			}
+			for _, m := range g.Members {
+				if n := strings.TrimSpace(m.FullName); n != "" {
+					groupNames[strings.ToLower(n)] = true
+				}
+			}
+		}
+	}
+	out := make([]model.UnassignedMonthSlot, 0, len(slots))
+	for _, s := range slots {
+		name := slotAssigneeName(s)
+		switch kind {
+		case "none":
+			if name == "" {
+				out = append(out, s)
+			}
+		case "user":
+			if id == "" {
+				continue
+			}
+			if userName != "" && strings.EqualFold(name, userName) {
+				out = append(out, s)
+			}
+		case "group":
+			if id == "" || len(groupNames) == 0 {
+				continue
+			}
+			if groupNames[strings.ToLower(name)] {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
 func mntMonthStats(visits []model.MaintenanceVisit, today string) MntMonthStats {
 	var s MntMonthStats
 	s.Total = len(visits)

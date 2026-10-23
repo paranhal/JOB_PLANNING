@@ -128,6 +128,7 @@ type UnassignedMonthSlot struct {
 	LastAssignee       string
 	UnconfirmedQuarter bool // 분기 마지막 달에 미확인으로 올린 건
 	OrgID              string
+	Region             string // 표시용. 사이트 지역
 	RegionPending      bool // 지역 기본 담당이 있어 배정 예정
 	RegionAssigneeName string
 }

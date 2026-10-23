@@ -283,6 +283,9 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		qAssignee = "&assignee=" + a
 	}
 	periodGroups := buildPeriodGroups(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c))
+	attachPeriodGroupRegions(h.repo, periodGroups)
+	periodGroups = filterPeriodGroupsByAssignee(periodGroups, assigneeKey, calGroups, userName)
+	unassigned = filterSlotsByAssigneeKey(unassigned, assigneeKey, calGroups, userName)
 	var quarterPending []model.UnassignedMonthSlot
 	quarterLast := model.IsLastMonthOfQuarter(quotaMonth)
 	for _, g := range periodGroups {
@@ -1112,6 +1115,46 @@ func buildPeriodGroups(repo *repository.MaintenanceRepo, planID string, year, mo
 			Cycle: cycle, Index: p.Index, EndMonth: p.EndMonth, LastMonth: p.EndMonth == month,
 			LabelShort: p.LabelShort(), ConfirmTitle: p.ConfirmTitle(), From: from, To: to, Slots: list,
 		})
+	}
+	return out
+}
+
+func attachPeriodGroupRegions(repo *repository.MaintenanceRepo, groups []model.MaintenancePeriodGroup) {
+	if repo == nil || len(groups) == 0 {
+		return
+	}
+	cfgs, err := repo.ListSiteConfigs()
+	if err != nil {
+		return
+	}
+	by := map[string]string{}
+	for _, c := range cfgs {
+		by[c.CustomerID] = strings.TrimSpace(c.Region)
+	}
+	for gi := range groups {
+		for si := range groups[gi].Slots {
+			if groups[gi].Slots[si].Region == "" {
+				groups[gi].Slots[si].Region = by[groups[gi].Slots[si].CustomerID]
+			}
+		}
+	}
+}
+
+func filterPeriodGroupsByAssignee(groups []model.MaintenancePeriodGroup, key string, calGroups []MntCalGroup, userName string) []model.MaintenancePeriodGroup {
+	if len(groups) == 0 {
+		return groups
+	}
+	kind, _ := parseAssigneeFilter(key)
+	if kind == "all" {
+		return groups
+	}
+	var out []model.MaintenancePeriodGroup
+	for _, g := range groups {
+		g.Slots = filterSlotsByAssigneeKey(g.Slots, key, calGroups, userName)
+		if len(g.Slots) == 0 {
+			continue
+		}
+		out = append(out, g)
 	}
 	return out
 }
