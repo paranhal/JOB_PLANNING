@@ -97,8 +97,15 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 	if err := json.Unmarshal(ok.Body.Bytes(), &okJ); err != nil {
 		t.Fatal(err)
 	}
-	if len(okJ.Items) != 1 || okJ.Items[0].ID != "c-gy" {
+	if len(okJ.Items) != 2 {
 		t.Fatalf("검색 %+v", okJ.Items)
+	}
+	ids := map[string]bool{}
+	for _, it := range okJ.Items {
+		ids[it.ID] = true
+	}
+	if !ids["c-gy"] || !ids["c-lib"] || ids["c-done"] {
+		t.Fatalf("전 기관 미설정만 %+v", okJ.Items)
 	}
 
 	all := doGetWith(t, e, "/maintenance/sites/customer-search?q="+url.QueryEscape("계룡"), jwtCookieViewOrg(t, vs, repository.OrgAll))
@@ -109,7 +116,7 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 	if err := json.Unmarshal(all.Body.Bytes(), &allJ); err != nil {
 		t.Fatal(err)
 	}
-	if len(allJ.Items) != 0 || allJ.Hint != errNeedInsertOrg {
+	if len(allJ.Items) != 2 || allJ.Hint != "" {
 		t.Fatalf("전체보기 %+v", allJ)
 	}
 	picked := doGetWith(t, e, "/maintenance/sites/customer-search?q="+url.QueryEscape("계룡"), jwtCookieViewOrg(t, vs, "O03"))
@@ -117,7 +124,7 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 		Items []repository.SiteCustomerHit `json:"items"`
 	}
 	_ = json.Unmarshal(picked.Body.Bytes(), &pickedJ)
-	if len(pickedJ.Items) != 1 || pickedJ.Items[0].ID != "c-gy" {
+	if len(pickedJ.Items) != 2 {
 		t.Fatalf("조직 선택 후 %+v", pickedJ.Items)
 	}
 
@@ -139,8 +146,8 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 	foreign := postForm947(t, e, "/maintenance/sites", url.Values{
 		"customer_id": {"c-lib"}, "short_name": {"도서관"}, "inspection_cycle": {"monthly"},
 	}, o3)
-	if foreign.Code != http.StatusBadRequest || !strings.Contains(foreign.Body.String(), errSiteCustomerWrongOrg) {
-		t.Fatalf("타조직 %d %s", foreign.Code, foreign.Body.String()[:minInt(240, foreign.Body.Len())])
+	if foreign.Code != http.StatusSeeOther {
+		t.Fatalf("타조직 저장 %d %s", foreign.Code, foreign.Body.String()[:minInt(240, foreign.Body.Len())])
 	}
 
 	save := postForm947(t, e, "/maintenance/sites", url.Values{

@@ -80,12 +80,19 @@ func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string
 }
 
 func (r *ProjectEquipRepo) BulkSiteStatus(projectID, userID, to, eventDate, reason string, ids []string) error {
+	return r.applyBulkSiteStatus(projectID, userID, to, eventDate, reason, "ui", ids)
+}
+
+func (r *ProjectEquipRepo) applyBulkSiteStatus(projectID, userID, to, eventDate, reason, source string, ids []string) error {
 	to = model.NormalizeSiteStatus(to)
 	if to == "" {
 		return fmt.Errorf("상태를 확인하세요")
 	}
 	if eventDate == "" {
 		eventDate = time.Now().Format("2006-01-02")
+	}
+	if strings.TrimSpace(source) == "" {
+		source = "ui"
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	for _, id := range ids {
@@ -119,7 +126,7 @@ func (r *ProjectEquipRepo) BulkSiteStatus(projectID, userID, to, eventDate, reas
 			return err
 		}
 		_, _ = r.db.Exec(`INSERT INTO project_site_events(site_id,project_id,from_status,to_status,event_date,note,created_by,source)
-			VALUES(?,?,?,?,?,?,?,?)`, id, projectID, from, to, eventDate, reason, userID, "ui")
+			VALUES(?,?,?,?,?,?,?,?)`, id, projectID, from, to, eventDate, reason, userID, source)
 	}
 	return nil
 }

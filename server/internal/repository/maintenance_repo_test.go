@@ -134,7 +134,7 @@ func TestSearchCustomersWithoutConfig_OrgLimitAndPending(t *testing.T) {
 		t.Fatalf("1글자 %d", len(empty))
 	}
 	allOrg, err := repo.SearchCustomersWithoutConfig(OrgAll, "계룡", 20)
-	if err != nil || len(allOrg) != 0 {
+	if err != nil || len(allOrg) != 20 {
 		t.Fatalf("OrgAll %d %v", len(allOrg), err)
 	}
 	hits, err := repo.SearchCustomersWithoutConfig("O03", "계룡", 20)
@@ -145,7 +145,7 @@ func TestSearchCustomersWithoutConfig_OrgLimitAndPending(t *testing.T) {
 		t.Fatalf("limit %d", len(hits))
 	}
 	for _, h := range hits {
-		if h.ID == "gy-done" || h.ID == "gy-o01" || h.ID == "gy-off" || h.ID == "gy-pt" {
+		if h.ID == "gy-done" || h.ID == "gy-off" || h.ID == "gy-pt" {
 			t.Fatalf("제외되어야 함 %s", h.ID)
 		}
 	}
@@ -157,11 +157,11 @@ func TestSearchCustomersWithoutConfig_OrgLimitAndPending(t *testing.T) {
 	if err != nil || len(idHit) == 0 || idHit[0].ID != "gy1" {
 		t.Fatalf("id %+v %v", idHit, err)
 	}
-	o01, err := repo.SearchCustomersWithoutConfig("O01", "계룡", 20)
+	o01, err := repo.SearchCustomersWithoutConfig("O01", "계룡도서관", 20)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(o01) != 1 || o01[0].ID != "gy-o01" {
-		t.Fatalf("O01 %+v", o01)
+		t.Fatalf("도서관 %+v", o01)
 	}
 }

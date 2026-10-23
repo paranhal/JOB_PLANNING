@@ -15,6 +15,10 @@ import (
 const (
 	CompanyWeeklyStatusDraft     = "draft"
 	CompanyWeeklyStatusConfirmed = "confirmed"
+
+	CompanyWeeklyUpsertSave      = "save"
+	CompanyWeeklyUpsertConfirm   = "confirm"
+	CompanyWeeklyUpsertUnconfirm = "unconfirm"
 )
 
 type CompanyWeeklyReport struct {
@@ -100,7 +104,7 @@ func (r *StatsRepo) GetCompanyWeeklyReport(orgID, weekAnchor string) (CompanyWee
 	return row, err
 }
 
-func (r *StatsRepo) UpsertCompanyWeeklyReport(orgID, weekAnchor, sheetName, status, content, by string, confirm bool) error {
+func (r *StatsRepo) UpsertCompanyWeeklyReport(orgID, weekAnchor, sheetName, content, by, mode string) error {
 	orgID, err := RequireInsertOrg(orgID)
 	if err != nil {
 		return err
@@ -114,19 +118,20 @@ func (r *StatsRepo) UpsertCompanyWeeklyReport(orgID, weekAnchor, sheetName, stat
 	if err != nil {
 		return err
 	}
-	if status == "" {
-		status = CompanyWeeklyStatusDraft
-	}
+	status := CompanyWeeklyStatusDraft
 	confBy, confAt := "", ""
-	if confirm {
+	switch mode {
+	case CompanyWeeklyUpsertConfirm:
 		status = CompanyWeeklyStatusConfirmed
 		confBy, confAt = by, now
-	} else if existing.Status == CompanyWeeklyStatusConfirmed && content != existing.ContentJSON {
+	case CompanyWeeklyUpsertUnconfirm:
 		status = CompanyWeeklyStatusDraft
-	} else if !confirm {
-		confBy, confAt = existing.ConfirmedBy, existing.ConfirmedAt
-		if status == CompanyWeeklyStatusDraft {
-			confBy, confAt = "", ""
+	default:
+		if existing.Status == CompanyWeeklyStatusConfirmed && content != existing.ContentJSON {
+			status = CompanyWeeklyStatusDraft
+		} else if existing.ReportID != "" {
+			status = existing.Status
+			confBy, confAt = existing.ConfirmedBy, existing.ConfirmedAt
 		}
 	}
 	if existing.ReportID == "" {

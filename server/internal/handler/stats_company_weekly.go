@@ -24,6 +24,7 @@ type companyWeeklyDownload struct {
 	Data      []byte
 	ASCIIName string
 	UTF8Name  string
+	OrgID     string
 	Expires   time.Time
 }
 
@@ -47,6 +48,19 @@ func putCompanyWeeklyDownload(item companyWeeklyDownload) string {
 	return token
 }
 
+func peekCompanyWeeklyDownload(token string) (companyWeeklyDownload, bool) {
+	companyWeeklyOut.Lock()
+	defer companyWeeklyOut.Unlock()
+	item, ok := companyWeeklyOut.items[token]
+	if !ok || time.Now().After(item.Expires) {
+		if ok {
+			delete(companyWeeklyOut.items, token)
+		}
+		return companyWeeklyDownload{}, false
+	}
+	return item, true
+}
+
 func takeCompanyWeeklyDownload(token string) (companyWeeklyDownload, bool) {
 	companyWeeklyOut.Lock()
 	defer companyWeeklyOut.Unlock()
@@ -55,6 +69,7 @@ func takeCompanyWeeklyDownload(token string) (companyWeeklyDownload, bool) {
 		delete(companyWeeklyOut.items, token)
 		return companyWeeklyDownload{}, false
 	}
+	delete(companyWeeklyOut.items, token)
 	return item, true
 }
 
@@ -84,8 +99,13 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 		sheetName = draft.Period.SheetNameDefault
 	}
 	draft.Rows = applyCompanyWeeklyFormEdits(draft.Rows, c.FormValue)
-	_ = h.repo.UpsertCompanyWeeklyReport(orgID, draft.Period.Anchor, sheetName, repository.CompanyWeeklyStatusDraft,
-		repository.EncodeCompanyWeeklyContent(draft.Rows), ctxString(c, "user_name"), false)
+	if err := h.repo.UpsertCompanyWeeklyReport(orgID, draft.Period.Anchor, sheetName,
+		repository.EncodeCompanyWeeklyContent(draft.Rows), ctxString(c, "user_name"), repository.CompanyWeeklyUpsertSave); err != nil {
+		return err
+	}
+	if saved, err := h.repo.GetCompanyWeeklyReport(orgID, draft.Period.Anchor); err == nil {
+		draft.ReportStatus = saved.Status
+	}
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionUpdate,
 		TargetTable: "company_weekly_report",
@@ -129,9 +149,10 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 		Data:      result.Data,
 		ASCIIName: result.ASCIIName,
 		UTF8Name:  result.UTF8Name,
+		OrgID:     orgID,
 	})
 	persistCompanyWeeklyFile(h.dataDir, token, companyWeeklyDownload{
-		Data: result.Data, ASCIIName: result.ASCIIName, UTF8Name: result.UTF8Name,
+		Data: result.Data, ASCIIName: result.ASCIIName, UTF8Name: result.UTF8Name, OrgID: orgID,
 	})
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionDownload,
@@ -163,17 +184,17 @@ func (h *StatsHandler) ConfirmCompanyWeekly(c echo.Context) error {
 	}
 	p := repository.CompanyWeeklyPeriod(anchor)
 	saved, _ := h.repo.GetCompanyWeeklyReport(orgID, p.Anchor)
-	status := repository.CompanyWeeklyStatusConfirmed
+	mode := repository.CompanyWeeklyUpsertConfirm
 	reason := "전사 주간업무보고 확인 완료"
 	if unconfirm {
-		status = repository.CompanyWeeklyStatusDraft
+		mode = repository.CompanyWeeklyUpsertUnconfirm
 		reason = "전사 주간업무보고 확인 취소"
 	}
 	sheet := strings.TrimSpace(c.FormValue("sheet_name"))
 	if sheet == "" {
 		sheet = saved.SheetName
 	}
-	if err := h.repo.UpsertCompanyWeeklyReport(orgID, p.Anchor, sheet, status, saved.ContentJSON, ctxString(c, "user_name"), !unconfirm); err != nil {
+	if err := h.repo.UpsertCompanyWeeklyReport(orgID, p.Anchor, sheet, saved.ContentJSON, ctxString(c, "user_name"), mode); err != nil {
 		return err
 	}
 	accessLog(c, auditlog.Record{
@@ -193,8 +214,13 @@ func (h *StatsHandler) DownloadCompanyWeekly(c echo.Context) error {
 	if !canWriteCompanyWeekly(c) {
 		return echo.ErrForbidden
 	}
+	orgID, err := resolveInsertOrg(c)
+	if err != nil {
+		return echo.ErrForbidden
+	}
 	token := strings.TrimSpace(c.QueryParam("token"))
-	item, ok := takeCompanyWeeklyDownload(token)
+	item, fromMem := peekCompanyWeeklyDownload(token)
+	ok := fromMem
 	if !ok {
 		item, ok = loadCompanyWeeklyFile(h.dataDir, token)
 	}
@@ -204,6 +230,12 @@ func (h *StatsHandler) DownloadCompanyWeekly(c echo.Context) error {
 			"Active": NavStatsReports,
 			"Error":  "내려받기 기한이 지났습니다. 확인 > 보고서에서 다시 생성하세요.",
 		})
+	}
+	if item.OrgID != "" && item.OrgID != orgID {
+		return echo.ErrForbidden
+	}
+	if fromMem {
+		takeCompanyWeeklyDownload(token)
 	}
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionDownload,
@@ -304,7 +336,7 @@ func persistCompanyWeeklyFile(dataDir, token string, item companyWeeklyDownload)
 		log.Printf("company weekly persist xlsx: %v", err)
 		return
 	}
-	meta, _ := json.Marshal(map[string]string{"ascii": item.ASCIIName, "utf8": item.UTF8Name})
+	meta, _ := json.Marshal(map[string]string{"ascii": item.ASCIIName, "utf8": item.UTF8Name, "org": item.OrgID})
 	_ = os.WriteFile(filepath.Join(dir, token+".json"), meta, 0644)
 }
 
@@ -328,6 +360,7 @@ func loadCompanyWeeklyFile(dataDir, token string) (companyWeeklyDownload, bool) 
 			if meta["utf8"] != "" {
 				item.UTF8Name = meta["utf8"]
 			}
+			item.OrgID = meta["org"]
 		}
 	}
 	return item, true

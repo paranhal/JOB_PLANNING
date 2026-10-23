@@ -243,6 +243,21 @@ func SiteStatusCountsAsInstalled(s string) bool {
 	return n == SiteInstalled || n == SiteInspected
 }
 
+// WorkCompleteSiteStatus 일일 업무 「작업」 완료 시 연동하는 사이트 상태.
+// 구축·공사·기타 모두 설치완료. 검수완료는 95-3에서 사람이 기록한다.
+func WorkCompleteSiteStatus() string {
+	return SiteInstalled
+}
+
+func SiteAcceptsWorkCompleteStatus(current string) bool {
+	switch NormalizeSiteStatus(current) {
+	case SitePlanned, SiteInProgress:
+		return true
+	default:
+		return false
+	}
+}
+
 func EquipStatusLabel(s string) string {
 	switch strings.TrimSpace(s) {
 	case EquipPlanned:

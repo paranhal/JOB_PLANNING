@@ -45,11 +45,13 @@
         <button type="submit" formmethod="get" formaction="/stats/reports"
                 class="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50">미리보기</button>
       </div>
+      {{if .CanWriteCompanyWeekly}}
       <div>
         <label class="block text-xs text-gray-500 mb-1">회사 파일</label>
         <input type="file" name="file" accept=".xlsx"
                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
       </div>
+      {{end}}
       {{if .CompanyWeekly}}
       <p class="text-xs text-gray-500">전주 {{.CompanyWeekly.Period.PrevRangeLabel}} · 금주 {{.CompanyWeekly.Period.ThisRangeLabel}}</p>
       <div class="space-y-3">
@@ -61,19 +63,35 @@
           {{end}}
           <div>
             <label class="block text-xs text-gray-500 mb-1">전주 추진내역</label>
+            {{if $.CanWriteCompanyWeekly}}
             <textarea name="prev_{{.RowKey}}" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.PrevText}}</textarea>
+            {{else}}
+            <div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-sans whitespace-pre-wrap bg-gray-50">{{.PrevText}}</div>
+            {{end}}
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">금주 추진계획</label>
+            {{if $.CanWriteCompanyWeekly}}
             <textarea name="plan_{{.RowKey}}" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.PlanText}}</textarea>
+            {{else}}
+            <div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-sans whitespace-pre-wrap bg-gray-50">{{.PlanText}}</div>
+            {{end}}
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">지원 필요사항</label>
+            {{if $.CanWriteCompanyWeekly}}
             <textarea name="help_{{.RowKey}}" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.HelpText}}</textarea>
+            {{else}}
+            <div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-sans whitespace-pre-wrap bg-gray-50">{{.HelpText}}</div>
+            {{end}}
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">주요 의사결정</label>
+            {{if $.CanWriteCompanyWeekly}}
             <textarea name="decision_{{.RowKey}}" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-sans">{{.DecisionText}}</textarea>
+            {{else}}
+            <div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-sans whitespace-pre-wrap bg-gray-50">{{.DecisionText}}</div>
+            {{end}}
           </div>
         </div>
         {{end}}
