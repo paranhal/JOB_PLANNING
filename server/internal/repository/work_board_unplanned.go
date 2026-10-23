@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -20,7 +21,23 @@ func (r *WorkBoardRepo) ListUnplannedForOrg(mineUserID string, mineKeys []string
 
 func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind string, reuse *unplannedBase, orgID string) ([]model.UnplannedItem, model.UnplannedKindCounts, error) {
 	start := time.Now()
-	defer logSlowSQL("work.ListUnplanned", start)
+	var tDelayed, tPending, tOpen, tUnassigned, tSlots, tSales, tAsset, tFilter time.Duration
+	step := time.Now()
+	mark := func(d *time.Duration) {
+		*d = time.Since(step)
+		step = time.Now()
+	}
+	defer func() {
+		total := time.Since(start)
+		if total >= 300*time.Millisecond {
+			log.Printf("slow sql path=work.ListUnplanned dur=%s delayed=%s pending=%s open=%s unassigned=%s slots=%s sales=%s asset=%s filter=%s",
+				total.Round(time.Millisecond), tDelayed.Round(time.Millisecond), tPending.Round(time.Millisecond),
+				tOpen.Round(time.Millisecond), tUnassigned.Round(time.Millisecond), tSlots.Round(time.Millisecond),
+				tSales.Round(time.Millisecond), tAsset.Round(time.Millisecond), tFilter.Round(time.Millisecond))
+			return
+		}
+		logSlowSQL("work.ListUnplanned", start)
+	}()
 	today := time.Now().Format("2006-01-02")
 	bag := map[string]*model.UnplannedItem{}
 
@@ -65,23 +82,31 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	var err error
 	if reuse != nil {
 		delayed, pending, open, unassigned = reuse.Delayed, reuse.Pending, reuse.Open, reuse.Unassigned
+		mark(&tDelayed)
+		mark(&tPending)
+		mark(&tOpen)
+		mark(&tUnassigned)
 	} else {
 		delayed, err = r.collectDelayed(mineUserID, mineKeys, today)
 		if err != nil {
 			return nil, model.UnplannedKindCounts{}, err
 		}
+		mark(&tDelayed)
 		pending, err = r.collectSchedulePending(mineUserID, mineKeys)
 		if err != nil {
 			return nil, model.UnplannedKindCounts{}, err
 		}
+		mark(&tPending)
 		open, err = r.collectOpen(mineUserID, mineKeys)
 		if err != nil {
 			return nil, model.UnplannedKindCounts{}, err
 		}
+		mark(&tOpen)
 		unassigned, err = r.CollectUnassigned(OrgAll)
 		if err != nil {
 			return nil, model.UnplannedKindCounts{}, err
 		}
+		mark(&tUnassigned)
 	}
 	started := r.asStartedSet(delayedIDs(delayed))
 	for _, it := range delayed {
@@ -160,6 +185,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	for _, it := range slots {
 		add(it, model.UnplannedNoDate)
 	}
+	mark(&tSlots)
 
 	if err := r.addSalesUnplanned(add, mineUserID, mineKeys); err != nil {
 		return nil, model.UnplannedKindCounts{}, err
@@ -167,9 +193,11 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 	if err := r.addSalesNextYMUnplanned(add, mineUserID, mineKeys); err != nil {
 		return nil, model.UnplannedKindCounts{}, err
 	}
+	mark(&tSales)
 	if err := r.addAssetSerialUnplanned(add); err != nil {
 		return nil, model.UnplannedKindCounts{}, err
 	}
+	mark(&tAsset)
 
 	var counts model.UnplannedKindCounts
 	all := make([]model.UnplannedItem, 0, len(bag))
@@ -197,6 +225,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 		}
 		all = filt
 	}
+	mark(&tFilter)
 	for _, it := range all {
 		counts.AddItem(it)
 	}

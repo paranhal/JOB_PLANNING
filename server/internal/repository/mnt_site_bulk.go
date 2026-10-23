@@ -279,6 +279,9 @@ func (r *MaintenanceRepo) BulkRegisterSites(in model.SiteBulkRegisterInput) (*mo
 	logCreateWithReason(r.db, "maintenance_site_config", "customer_id", "bulk:"+org,
 		label, fmt.Sprintf("업종별 일괄등록 업종=%s 주기=%s 회차=%d 등록=%d 건너뜀=%d",
 			industry, in.Cycle, rounds, res.Registered, len(res.Skipped)))
+	if res.Registered > 0 {
+		invalidateOpenUnassignedSlotsCache()
+	}
 	return res, nil
 }
 

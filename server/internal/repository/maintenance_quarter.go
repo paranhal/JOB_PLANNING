@@ -31,6 +31,13 @@ func (r *MaintenanceRepo) periodObligations(planID string, year int, period mode
 	if err != nil {
 		return nil, err
 	}
+	return r.periodObligationsFrom(configs, visits, year, period), nil
+}
+
+func (r *MaintenanceRepo) periodObligationsFrom(configs []model.MaintenanceSiteConfig, visits []model.MaintenanceVisit, year int, period model.CyclePeriod) []model.UnassignedMonthSlot {
+	if year < 1 || period.Index < 1 {
+		return nil
+	}
 	cfgBy := map[string]model.MaintenanceSiteConfig{}
 	for _, cfg := range configs {
 		cfgBy[cfg.CustomerID] = cfg
@@ -76,16 +83,40 @@ func (r *MaintenanceRepo) periodObligations(planID string, year int, period mode
 			out = append(out, s)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // ListOpenUnassignedSlots 미배정·미계획함·배지가 공유하는 목록(D-71·D-76).
 // 기간 주기(분기·반기·년1회)는 기간 마지막 달에만 미확정으로 넣는다.
 func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
-	slots, err := r.ListUnassignedMonthSlots(planID, year, month)
+	if cached, ok := getCachedOpenUnassignedSlots(planID, year, month); ok {
+		return cached, nil
+	}
+	out, err := r.computeOpenUnassignedSlots(planID, year, month, false)
 	if err != nil {
 		return nil, err
 	}
+	putCachedOpenUnassignedSlots(planID, year, month, out)
+	return cloneUnassignedSlots(out), nil
+}
+
+func (r *MaintenanceRepo) ListOpenUnassignedSlotsSlow(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
+	return r.computeOpenUnassignedSlots(planID, year, month, true)
+}
+
+func (r *MaintenanceRepo) computeOpenUnassignedSlots(planID string, year, month int, slow bool) ([]model.UnassignedMonthSlot, error) {
+	if slow {
+		return r.computeOpenUnassignedSlotsSlow(planID, year, month)
+	}
+	configs, err := r.ListSiteConfigs()
+	if err != nil {
+		return nil, err
+	}
+	visits, err := r.ListVisits(planID)
+	if err != nil {
+		return nil, err
+	}
+	slots := listUnassignedMonthSlotsFrom(configs, visits, year, month)
 	var out []model.UnassignedMonthSlot
 	for _, s := range slots {
 		if model.IsPeriodCycle(s.Cycle) {
@@ -93,7 +124,11 @@ func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int
 		}
 		out = append(out, s)
 	}
-	pending, err := r.PendingPeriodSlots(planID, year, month)
+	lookup, err := r.assigneeIndexFromVisits(planID, visits)
+	if err != nil {
+		return nil, err
+	}
+	pending, err := r.pendingPeriodSlotsFrom(planID, year, month, configs, visits, lookup)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +140,35 @@ func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int
 		s.UnconfirmedQuarter = true
 		out = append(out, s)
 	}
-	r.annotateUnassignedRegion("", out)
+	r.annotateUnassignedRegionFrom("", out, configs)
+	return out, nil
+}
+
+func (r *MaintenanceRepo) computeOpenUnassignedSlotsSlow(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
+	slots, err := r.ListUnassignedMonthSlots(planID, year, month)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.UnassignedMonthSlot
+	for _, s := range slots {
+		if model.IsPeriodCycle(s.Cycle) {
+			continue
+		}
+		out = append(out, s)
+	}
+	pending, err := r.pendingPeriodSlotsSlow(planID, year, month)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range pending {
+		p, ok := model.CyclePeriodOf(s.Cycle, month)
+		if !ok || p.EndMonth != month {
+			continue
+		}
+		s.UnconfirmedQuarter = true
+		out = append(out, s)
+	}
+	r.annotateUnassignedRegionSlow("", out)
 	return out, nil
 }
 
@@ -119,12 +182,16 @@ func (r *MaintenanceRepo) PendingQuarterSlots(planID string, year, quarter int) 
 	if err != nil {
 		return nil, err
 	}
+	lookup, err := r.assigneeIndex(planID)
+	if err != nil {
+		return nil, err
+	}
 	var out []model.UnassignedMonthSlot
 	for _, s := range slots {
 		if skip[s.CustomerID+"|"+s.SlotKey] {
 			continue
 		}
-		s.LastAssignee = r.lookupAssignee(planID, s.CustomerID, s.ProductType)
+		s.LastAssignee = lookup(s.CustomerID, s.ProductType)
 		out = append(out, s)
 	}
 	return out, nil
@@ -132,13 +199,45 @@ func (r *MaintenanceRepo) PendingQuarterSlots(planID string, year, quarter int) 
 
 // PendingPeriodSlots 보는 달이 속한 기간(분기·반기·연)에서 아직 방문·건너뜀이 없는 슬롯.
 func (r *MaintenanceRepo) PendingPeriodSlots(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
+	configs, err := r.ListSiteConfigs()
+	if err != nil {
+		return nil, err
+	}
+	visits, err := r.ListVisits(planID)
+	if err != nil {
+		return nil, err
+	}
+	lookup, err := r.assigneeIndex(planID)
+	if err != nil {
+		return nil, err
+	}
+	return r.pendingPeriodSlotsFrom(planID, year, month, configs, visits, lookup)
+}
+
+func (r *MaintenanceRepo) pendingPeriodSlotsSlow(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
 	var out []model.UnassignedMonthSlot
 	for _, cycle := range []string{"quarterly", "semi", "yearly"} {
 		p, ok := model.CyclePeriodOf(cycle, month)
 		if !ok {
 			continue
 		}
-		slots, err := r.pendingForPeriod(planID, year, p)
+		slots, err := r.pendingForPeriodSlow(planID, year, p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, slots...)
+	}
+	return out, nil
+}
+
+func (r *MaintenanceRepo) pendingPeriodSlotsFrom(planID string, year, month int, configs []model.MaintenanceSiteConfig, visits []model.MaintenanceVisit, lookup func(customerID, product string) string) ([]model.UnassignedMonthSlot, error) {
+	var out []model.UnassignedMonthSlot
+	for _, cycle := range []string{"quarterly", "semi", "yearly"} {
+		p, ok := model.CyclePeriodOf(cycle, month)
+		if !ok {
+			continue
+		}
+		slots, err := r.pendingForPeriodFrom(planID, year, p, configs, visits, lookup)
 		if err != nil {
 			return nil, err
 		}
@@ -148,6 +247,43 @@ func (r *MaintenanceRepo) PendingPeriodSlots(planID string, year, month int) ([]
 }
 
 func (r *MaintenanceRepo) pendingForPeriod(planID string, year int, p model.CyclePeriod) ([]model.UnassignedMonthSlot, error) {
+	lookup, err := r.assigneeIndex(planID)
+	if err != nil {
+		return nil, err
+	}
+	return r.pendingForPeriodFrom(planID, year, p, nil, nil, lookup)
+}
+
+func (r *MaintenanceRepo) pendingForPeriodFrom(planID string, year int, p model.CyclePeriod, configs []model.MaintenanceSiteConfig, visits []model.MaintenanceVisit, lookup func(customerID, product string) string) ([]model.UnassignedMonthSlot, error) {
+	var slots []model.UnassignedMonthSlot
+	if configs != nil {
+		slots = r.periodObligationsFrom(configs, visits, year, p)
+	} else {
+		var err error
+		slots, err = r.periodObligations(planID, year, p)
+		if err != nil {
+			return nil, err
+		}
+	}
+	skip, err := r.quarterSkipSet(planID, year, p.Index)
+	if err != nil {
+		return nil, err
+	}
+	if lookup == nil {
+		lookup = func(string, string) string { return "" }
+	}
+	var out []model.UnassignedMonthSlot
+	for _, s := range slots {
+		if skip[s.CustomerID+"|"+s.SlotKey] {
+			continue
+		}
+		s.LastAssignee = lookup(s.CustomerID, s.ProductType)
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+func (r *MaintenanceRepo) pendingForPeriodSlow(planID string, year int, p model.CyclePeriod) ([]model.UnassignedMonthSlot, error) {
 	slots, err := r.periodObligations(planID, year, p)
 	if err != nil {
 		return nil, err
@@ -161,7 +297,7 @@ func (r *MaintenanceRepo) pendingForPeriod(planID string, year int, p model.Cycl
 		if skip[s.CustomerID+"|"+s.SlotKey] {
 			continue
 		}
-		s.LastAssignee = r.lookupAssignee(planID, s.CustomerID, s.ProductType)
+		s.LastAssignee = r.lookupAssigneeSlow(planID, s.CustomerID, s.ProductType)
 		out = append(out, s)
 	}
 	return out, nil
@@ -215,6 +351,9 @@ func (r *MaintenanceRepo) SkipQuarterSlot(planID, customerID, slotKey, reason, c
 		ON CONFLICT(plan_id, customer_id, slot_key, year, quarter) DO UPDATE SET
 			action='skip', reason=excluded.reason, created_by=excluded.created_by, created_at=excluded.created_at`,
 		id, planID, customerID, slotKey, year, quarter, reason, strings.TrimSpace(createdBy), now)
+	if err == nil {
+		invalidateOpenUnassignedSlotsCache()
+	}
 	return err
 }
 

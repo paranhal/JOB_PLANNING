@@ -61,6 +61,7 @@ func (r *MaintenanceRepo) ReplaceRegionAssignees(orgID, region string, items []m
 			return err
 		}
 	}
+	invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 
@@ -118,6 +119,7 @@ func (r *MaintenanceRepo) ReplaceSiteAssignees(customerID string, items []model.
 			return err
 		}
 	}
+	invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 
@@ -174,7 +176,131 @@ func (r *MaintenanceRepo) userDisplay(userID string) string {
 	return u.FullName
 }
 
-func (r *MaintenanceRepo) annotateUnassignedRegion(orgID string, slots []model.UnassignedMonthSlot) {
+func (r *MaintenanceRepo) userDisplayMap(ids []string) map[string]string {
+	out := map[string]string{}
+	seen := map[string]bool{}
+	var uniq []string
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		uniq = append(uniq, id)
+	}
+	if len(uniq) == 0 {
+		return out
+	}
+	args := make([]any, len(uniq))
+	ph := make([]string, len(uniq))
+	for i, id := range uniq {
+		args[i] = id
+		ph[i] = "?"
+	}
+	q := `SELECT user_id, COALESCE(full_name,'') FROM users WHERE user_id IN (` + strings.Join(ph, ",") + `)`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		for _, id := range uniq {
+			out[id] = r.userDisplay(id)
+		}
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			continue
+		}
+		out[id] = name
+	}
+	return out
+}
+
+func (r *MaintenanceRepo) loadSiteAssigneesByCustomer() (map[string][]model.MaintenanceSiteAssignee, error) {
+	out := map[string][]model.MaintenanceSiteAssignee{}
+	rows, err := r.db.Query(`
+		SELECT customer_id, COALESCE(user_id,''), COALESCE(work_group_id,''), role, COALESCE(sort_order,0)
+		FROM maintenance_site_assignees ORDER BY customer_id, sort_order, role`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return out, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var raw []model.MaintenanceSiteAssignee
+	for rows.Next() {
+		var a model.MaintenanceSiteAssignee
+		if err := rows.Scan(&a.CustomerID, &a.UserID, &a.WorkGroupID, &a.Role, &a.SortOrder); err != nil {
+			return nil, err
+		}
+		raw = append(raw, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(raw))
+	for _, a := range raw {
+		ids = append(ids, a.UserID)
+	}
+	names := r.userDisplayMap(ids)
+	for _, a := range raw {
+		a.Name = names[a.UserID]
+		out[a.CustomerID] = append(out[a.CustomerID], a)
+	}
+	return out, nil
+}
+
+func (r *MaintenanceRepo) loadRegionAssigneesByKey() (map[string][]model.MaintenanceRegionAssignee, error) {
+	out := map[string][]model.MaintenanceRegionAssignee{}
+	rows, err := r.db.Query(`
+		SELECT org_id, region, COALESCE(user_id,''), COALESCE(work_group_id,''), role, COALESCE(sort_order,0)
+		FROM maintenance_region_assignees ORDER BY org_id, region, sort_order, role`)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return out, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var raw []model.MaintenanceRegionAssignee
+	for rows.Next() {
+		var a model.MaintenanceRegionAssignee
+		if err := rows.Scan(&a.OrgID, &a.Region, &a.UserID, &a.WorkGroupID, &a.Role, &a.SortOrder); err != nil {
+			return nil, err
+		}
+		raw = append(raw, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(raw))
+	for _, a := range raw {
+		ids = append(ids, a.UserID)
+	}
+	names := r.userDisplayMap(ids)
+	for _, a := range raw {
+		a.Name = names[a.UserID]
+		key := strings.TrimSpace(a.OrgID) + "|" + strings.TrimSpace(a.Region)
+		out[key] = append(out[key], a)
+	}
+	return out, nil
+}
+
+func defaultOwnerFromMaps(customerID string, cfg *model.MaintenanceSiteConfig, siteBy map[string][]model.MaintenanceSiteAssignee, regionBy map[string][]model.MaintenanceRegionAssignee) string {
+	if items := siteBy[customerID]; len(items) > 0 {
+		n, _ := firstOwner(items)
+		return n
+	}
+	if cfg == nil || strings.TrimSpace(cfg.Region) == "" {
+		return ""
+	}
+	org := strings.TrimSpace(cfg.OrgID)
+	n, _ := firstRegionOwner(regionBy[org+"|"+strings.TrimSpace(cfg.Region)])
+	return n
+}
+
+func (r *MaintenanceRepo) annotateUnassignedRegionSlow(orgID string, slots []model.UnassignedMonthSlot) {
 	for i := range slots {
 		cfg, _ := r.GetSiteConfig(slots[i].CustomerID)
 		if cfg == nil {
@@ -188,7 +314,54 @@ func (r *MaintenanceRepo) annotateUnassignedRegion(orgID string, slots []model.U
 		if org == "" {
 			org = orgID
 		}
+		_ = org
 		name, _ := r.defaultOwnerForSite(slots[i].CustomerID)
+		if name != "" && strings.TrimSpace(slots[i].LastAssignee) == "" {
+			slots[i].RegionPending = true
+			slots[i].RegionAssigneeName = name
+			slots[i].LastAssignee = name
+		}
+	}
+}
+
+func (r *MaintenanceRepo) annotateUnassignedRegion(orgID string, slots []model.UnassignedMonthSlot) {
+	configs, err := r.ListSiteConfigs()
+	if err != nil {
+		r.annotateUnassignedRegionSlow(orgID, slots)
+		return
+	}
+	r.annotateUnassignedRegionFrom(orgID, slots, configs)
+}
+
+func (r *MaintenanceRepo) annotateUnassignedRegionFrom(orgID string, slots []model.UnassignedMonthSlot, configs []model.MaintenanceSiteConfig) {
+	_ = orgID
+	if len(slots) == 0 {
+		return
+	}
+	cfgBy := map[string]model.MaintenanceSiteConfig{}
+	for _, c := range configs {
+		cfgBy[c.CustomerID] = c
+	}
+	siteBy, err := r.loadSiteAssigneesByCustomer()
+	if err != nil {
+		r.annotateUnassignedRegionSlow(orgID, slots)
+		return
+	}
+	regionBy, err := r.loadRegionAssigneesByKey()
+	if err != nil {
+		r.annotateUnassignedRegionSlow(orgID, slots)
+		return
+	}
+	for i := range slots {
+		cfg, ok := cfgBy[slots[i].CustomerID]
+		if !ok {
+			continue
+		}
+		slots[i].Region = strings.TrimSpace(cfg.Region)
+		if slots[i].Region == "" {
+			continue
+		}
+		name := defaultOwnerFromMaps(slots[i].CustomerID, &cfg, siteBy, regionBy)
 		if name != "" && strings.TrimSpace(slots[i].LastAssignee) == "" {
 			slots[i].RegionPending = true
 			slots[i].RegionAssigneeName = name

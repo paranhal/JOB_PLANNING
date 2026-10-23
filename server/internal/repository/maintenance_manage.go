@@ -268,34 +268,130 @@ func (r *MaintenanceRepo) findUndatedVisit(planID, customerID, product string) *
 	return nil
 }
 
-func (r *MaintenanceRepo) lookupAssignee(planID, customerID, product string) string {
+type visitAssigneeRow struct {
+	CustomerID  string
+	ProductType string
+	VisitDate   string
+	Assignee    string
+}
+
+func assigneeIndexKey(customerID, product string) string {
+	return strings.TrimSpace(customerID) + "|" + model.VisitProductSlotKey(product)
+}
+
+func fillAssigneePicks(rows []visitAssigneeRow, dst map[string]string) {
+	bestDate := map[string]string{}
+	for _, v := range rows {
+		a := strings.TrimSpace(v.Assignee)
+		if a == "" {
+			continue
+		}
+		k := assigneeIndexKey(v.CustomerID, v.ProductType)
+		d := strings.TrimSpace(v.VisitDate)
+		if d >= bestDate[k] {
+			bestDate[k] = d
+			dst[k] = a
+		}
+	}
+}
+
+func (r *MaintenanceRepo) listVisitAssigneeRows(planID string) ([]visitAssigneeRow, error) {
+	planID = strings.TrimSpace(planID)
+	if planID == "" {
+		return nil, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT v.customer_id, COALESCE(v.product_type,''), COALESCE(v.visit_date,''), COALESCE(v.assignee,'')
+		FROM maintenance_visits v
+		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
+		WHERE v.plan_id = ?
+		ORDER BY v.visit_date, v.sort_order, cfg.short_name`, planID)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []visitAssigneeRow
+	for rows.Next() {
+		var row visitAssigneeRow
+		if err := rows.Scan(&row.CustomerID, &row.ProductType, &row.VisitDate, &row.Assignee); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func visitAssigneeRowsFrom(list []model.MaintenanceVisit) []visitAssigneeRow {
+	out := make([]visitAssigneeRow, len(list))
+	for i, v := range list {
+		out[i] = visitAssigneeRow{CustomerID: v.CustomerID, ProductType: v.ProductType, VisitDate: v.VisitDate, Assignee: v.Assignee}
+	}
+	return out
+}
+
+func (r *MaintenanceRepo) assigneeIndex(planID string) (func(customerID, product string) string, error) {
+	here, err := r.listVisitAssigneeRows(planID)
+	if err != nil {
+		return func(string, string) string { return "" }, err
+	}
+	return r.assigneeIndexFromRows(planID, here)
+}
+
+func (r *MaintenanceRepo) assigneeIndexFromVisits(planID string, here []model.MaintenanceVisit) (func(customerID, product string) string, error) {
+	return r.assigneeIndexFromRows(planID, visitAssigneeRowsFrom(here))
+}
+
+func (r *MaintenanceRepo) assigneeIndexFromRows(planID string, here []visitAssigneeRow) (func(customerID, product string) string, error) {
+	idx := map[string]string{}
+	empty := func(string, string) string { return "" }
+	plan, err := r.GetPlan(planID)
+	if err != nil || plan == nil {
+		return empty, err
+	}
+	if prev, err := r.GetPlanByYear(plan.PlanYear - 1); err == nil && prev != nil {
+		if rows, err := r.listVisitAssigneeRows(prev.PlanID); err == nil {
+			fillAssigneePicks(rows, idx)
+		}
+	}
+	fillAssigneePicks(here, idx)
+	return func(customerID, product string) string {
+		return idx[assigneeIndexKey(customerID, product)]
+	}, nil
+}
+
+func pickAssigneeFromVisits(list []model.MaintenanceVisit, customerID, product string) string {
+	want := model.VisitProductSlotKey(product)
+	bestDate, best := "", ""
+	for _, v := range list {
+		if v.CustomerID != customerID {
+			continue
+		}
+		if model.VisitProductSlotKey(v.ProductType) != want {
+			continue
+		}
+		a := strings.TrimSpace(v.Assignee)
+		if a == "" {
+			continue
+		}
+		d := strings.TrimSpace(v.VisitDate)
+		if d >= bestDate {
+			bestDate, best = d, a
+		}
+	}
+	return best
+}
+
+// lookupAssigneeSlow 슬롯마다 올해·전년 방문을 다시 읽는 수정 전 구현. 동등성 테스트용.
+func (r *MaintenanceRepo) lookupAssigneeSlow(planID, customerID, product string) string {
 	plan, err := r.GetPlan(planID)
 	if err != nil || plan == nil {
 		return ""
 	}
-	want := model.VisitProductSlotKey(product)
-	pick := func(list []model.MaintenanceVisit) string {
-		bestDate, best := "", ""
-		for _, v := range list {
-			if v.CustomerID != customerID {
-				continue
-			}
-			if model.VisitProductSlotKey(v.ProductType) != want {
-				continue
-			}
-			a := strings.TrimSpace(v.Assignee)
-			if a == "" {
-				continue
-			}
-			d := strings.TrimSpace(v.VisitDate)
-			if d >= bestDate {
-				bestDate, best = d, a
-			}
-		}
-		return best
-	}
 	if here, err := r.ListVisits(planID); err == nil {
-		if a := pick(here); a != "" {
+		if a := pickAssigneeFromVisits(here, customerID, product); a != "" {
 			return a
 		}
 	}
@@ -307,7 +403,15 @@ func (r *MaintenanceRepo) lookupAssignee(planID, customerID, product string) str
 	if err != nil {
 		return ""
 	}
-	return pick(list)
+	return pickAssigneeFromVisits(list, customerID, product)
+}
+
+func (r *MaintenanceRepo) lookupAssignee(planID, customerID, product string) string {
+	lookup, err := r.assigneeIndex(planID)
+	if err != nil || lookup == nil {
+		return ""
+	}
+	return lookup(customerID, product)
 }
 
 // AssigneeForVisit 이전 담당자를 가져오되, 그날 연차인 사람은 비운다. §23.13.6
