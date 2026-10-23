@@ -33,9 +33,23 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)
+	up := filepath.Join(dir, "uploads")
+	h.Attachment.uploadDir = up
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if strings.HasPrefix(c.Request().URL.Path, "/uploads/sales_project") {
+				return echo.ErrNotFound
+			}
+			return next(c)
+		}
+	})
+	e.Static("/uploads", up)
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.Use(h.Auth.InjectViewAs)
+	g.POST("/attachments", h.Attachment.Upload)
+	g.GET("/attachments/:id", h.Attachment.Download)
+	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 	g.GET("/sales", h.Sales.List)
 	g.GET("/sales/dashboard", h.Sales.Dashboard)
 	g.GET("/sales/new", h.Sales.New)
@@ -1178,8 +1192,8 @@ func TestSalesHTTP_FormBizTypePrecisionQuickQuote(t *testing.T) {
 	iName := strings.Index(body, `name="name"`)
 	iOwner := strings.Index(body, `name="sales_owner_id"`)
 	iBiz := strings.Index(body, `name="biz_type"`)
-	if iName < 0 || iOwner < 0 || iBiz < 0 || !(iName < iOwner && iOwner < iBiz) {
-		t.Fatalf("필드 순서 name=%d owner=%d biz=%d", iName, iOwner, iBiz)
+	if iName < 0 || iOwner < 0 || iBiz < 0 || !(iName < iBiz && iBiz < iOwner) {
+		t.Fatalf("필드 순서 name=%d biz=%d owner=%d (01 사업유형 → 03 담당)", iName, iBiz, iOwner)
 	}
 	if strings.Contains(body, `name="budget_year"`) {
 		t.Fatal("예산 연도 칸이 남아 있다")

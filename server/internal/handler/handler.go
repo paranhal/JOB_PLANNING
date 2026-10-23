@@ -241,6 +241,8 @@ func New(db *sql.DB) *Handler {
 	}
 	h.Work.notices = noticeHook
 	h.AdminWork.notices = noticeHook
+	h.Sales.attach = attachH
+	attachH.salesRepo = repository.NewSalesRepo(db)
 	h.Meeting.asH = h.AS
 	h.Meeting.leave = h.Leave
 	h.Meeting.coop = h.Coop.repo

@@ -73,6 +73,9 @@
   .flash-warning { @apply flash bg-warning-soft text-warning; }
   .flash-danger { @apply flash bg-danger-soft text-danger; }
 
+  .sales-drop { @apply rounded-card border border-dashed border-line bg-canvas; }
+  progress { @apply accent-primary; }
+
   .tab { @apply inline-flex items-center border-b-2 border-transparent px-3 py-2 text-ui text-ink-muted hover:text-ink; }
   .tab-active { @apply tab border-primary text-ink; }
 

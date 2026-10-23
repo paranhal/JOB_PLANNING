@@ -1,278 +1,424 @@
 {{define "title"}}{{.Title}} · {{appName}}{{end}}
 
 {{define "content"}}
-<div class="max-w-3xl mx-auto space-y-4">
+<div class="max-w-6xl mx-auto space-y-4">
   <div class="flex items-center justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">{{if .Project.DisplayNo}}{{.Project.DisplayNo}} · {{end}}{{.Title}}</h2>
-      <p class="text-sm text-gray-500">사업명만 필수입니다. 나머지 칸은 비워도 저장됩니다.</p>
+      <h2 class="text-xl font-bold text-ink">{{if .Project.DisplayNo}}{{.Project.DisplayNo}} · {{end}}{{.Title}}</h2>
+      <p class="text-ui-sm text-ink-muted">사업명만 필수입니다. 나머지 칸은 비워도 저장됩니다.</p>
     </div>
-    <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="text-sm text-gray-500 hover:underline">← 돌아가기</a>
+    <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="text-ui-sm text-ink-muted hover:underline">← 돌아가기</a>
   </div>
 
   {{if .FormError}}
-  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
+  <div class="rounded-card bg-danger-soft text-danger text-ui-sm px-4 py-2 border border-line">{{.FormError}}</div>
   {{end}}
 
-  <form method="post" action="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}/sales{{end}}" class="space-y-4"
+  <form method="post" action="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}/sales{{end}}" enctype="multipart/form-data"
+        class="grid lg:grid-cols-[minmax(0,1fr)_18.75rem] gap-4 items-start"
         x-data="salesProjectForm">
     {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
     {{if .Project.PrevSalesID}}<input type="hidden" name="prev_sales_id" value="{{.Project.PrevSalesID}}">{{end}}
-    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500">*</span></label>
-        <input name="name" required value="{{.Project.Name}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="세종시 도서관 RFID 증설(가칭)">
-        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
-          <input type="checkbox" name="is_tentative_name" value="1" {{if .Project.IsTentativeName}}checked{{end}}>
-          가칭
-        </label>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">영업담당</label>
-        <select name="sales_owner_id" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 —</option>
-          {{range .Users}}
-          <option value="{{.UserID}}" {{if eq $.Project.SalesOwnerID .UserID}}selected{{end}}>{{.FullName}}</option>
-          {{end}}
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">사업 유형</label>
-        <select name="biz_type" x-model="bizType" @change="onBizType()" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 —</option>
-          {{range .BizTypes}}
-          <option value="{{.CodeValue}}" {{if eq $.Project.BizType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
-          {{end}}
-        </select>
-      </div>
-      {{if .Project.PrevSalesID}}
-      <p class="text-sm text-gray-500">이전 사업에서 이어 등록합니다.</p>
-      {{end}}
-    </div>
 
-    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-      <h3 class="font-semibold text-gray-800">아래는 전부 나중에 채워도 됩니다</h3>
-      <p class="text-sm text-gray-500">단계는 등록 때 발굴로 시작합니다. 이후에는 상세 화면에서 바꿉니다.{{if .IsEdit}} 현재 {{.DisplayStage}}{{end}}</p>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="min-w-0 space-y-4 order-2 lg:order-1">
+      <section class="card p-5 space-y-4" id="sales-sec-01">
+        <div class="flex gap-3 items-center pb-3 border-b border-line">
+          <div class="w-8 h-8 rounded-full border border-line text-ui-sm grid place-items-center shrink-0">01</div>
+          <div>
+            <b class="block text-ui font-semibold text-ink">사업 기회 정보</b>
+            <span class="text-ui-xs text-ink-subtle">발굴한 사업 기회를 식별할 수 있는 정보를 입력합니다.</span>
+          </div>
+        </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">고객 (등록)</label>
-          <select name="customer_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <label class="label">사업명 <span class="text-danger">*</span></label>
+          <input name="name" required value="{{.Project.Name}}" class="input" placeholder="세종시 도서관 RFID 증설(가칭)" x-model="name">
+          <label class="mt-2 inline-flex items-center gap-2 text-ui-sm text-ink-muted">
+            <input type="checkbox" name="is_tentative_name" value="1" {{if .Project.IsTentativeName}}checked{{end}}>
+            가칭
+          </label>
+        </div>
+        <div>
+          <label class="label">사업 유형</label>
+          <select name="biz_type" x-model="bizType" @change="onBizType()" class="select">
             <option value="">— 선택 —</option>
-            {{range .Customers}}
-            <option value="{{.CustomerID}}" {{if eq $.Project.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>
+            {{range .BizTypes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.BizType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
             {{end}}
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">기관명 직접입력</label>
-          <input name="prospect_name" value="{{.Project.ProspectName}}" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="미등록 고객">
+          <label class="label">메모</label>
+          <textarea name="notes" rows="3" class="textarea">{{.Project.Notes}}</textarea>
         </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">지역</label>
-          <input name="prospect_region" value="{{.Project.ProspectRegion}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-        <label class="flex items-end gap-2 text-sm text-gray-600 pb-2">
-          <input type="checkbox" name="customer_confirmed" value="1" {{if .Project.CustomerConfirmed}}checked{{end}}>
-          고객 확정
+        {{if not .IsEdit}}
+        <label class="inline-flex items-center gap-2 text-ui-sm text-ink">
+          <input type="checkbox" name="quick_quote" value="1" x-model="quickQuote">
+          즉시 견적
         </label>
-      </div>
+        {{end}}
+        {{if .Project.PrevSalesID}}
+        <p class="text-ui-sm text-ink-muted">이전 사업에서 이어 등록합니다.</p>
+        {{end}}
+      </section>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">정밀도</label>
-          <select name="expected_precision" x-model="precision" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="month">월</option>
-            <option value="quarter">분기</option>
-            <option value="half">반기</option>
-            <option value="year">연</option>
-          </select>
-        </div>
-        <div x-show="precision === 'month'" x-cloak>
-          <label class="block text-sm font-medium text-gray-700 mb-1">사업 시기</label>
-          <input type="month" name="expected_ym" :disabled="precision !== 'month'" value="{{.Project.ExpectedYM}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-        <div x-show="precision !== 'month'" class="contents">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">연도</label>
-            <input name="expected_year" type="number" :disabled="precision === 'month'" x-model="year" class="w-full border rounded-lg px-3 py-2 text-sm">
+      <section class="card p-5" id="sales-sec-02" data-card="02">
+        <div class="flex gap-3 items-center" :class="open02 ? 'pb-3 mb-3 border-b border-line' : ''">
+          <div class="w-8 h-8 rounded-full border border-line text-ui-sm grid place-items-center shrink-0">02</div>
+          <div class="min-w-0">
+            <b class="block text-ui font-semibold text-ink">고객 발굴 정보</b>
+            <span class="text-ui-xs text-ink-subtle">고객 접점과 사업 기회가 유입된 경로를 기록합니다.</span>
           </div>
-          <div x-show="precision === 'quarter'" x-cloak>
-            <label class="block text-sm font-medium text-gray-700 mb-1">분기</label>
-            <select name="expected_quarter" :disabled="precision !== 'quarter'" x-model="quarter" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="1">1분기</option>
-              <option value="2">2분기</option>
-              <option value="3">3분기</option>
-              <option value="4">4분기</option>
-            </select>
-          </div>
-          <div x-show="precision === 'half'" x-cloak>
-            <label class="block text-sm font-medium text-gray-700 mb-1">반기</label>
-            <select name="expected_half" :disabled="precision !== 'half'" x-model="half" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="1">상반기</option>
-              <option value="2">하반기</option>
-            </select>
-          </div>
+          <button type="button" class="btn btn-secondary btn-sm ml-auto shrink-0" :aria-expanded="open02.toString()" aria-controls="sales-sec-02-body" @click="open02=!open02">
+            <span x-text="open02 ? '접기' : '펼치기'"></span>
+            <span aria-hidden="true" x-text="open02 ? '⌃' : '⌄'"></span>
+          </button>
         </div>
-        <label class="flex items-end gap-2 text-sm text-gray-600 pb-2">
-          <input type="checkbox" name="expected_ym_confirmed" value="1" {{if .Project.ExpectedYMConfirmed}}checked{{end}}>
-          시기 확정
-        </label>
-      </div>
-      {{if not .IsEdit}}
-      <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" name="quick_quote" value="1" x-model="quickQuote">
-        즉시 견적
-      </label>
-      {{end}}
+        <p class="text-ui-xs text-ink-muted mt-2 ml-11" x-show="!open02" x-cloak>{{.Sum02}}</p>
+        <div id="sales-sec-02-body" x-show="open02" x-cloak class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label">고객 (등록)</label>
+              <select name="customer_id" class="select" x-ref="customerSel" x-model="customerId">
+                <option value="">— 선택 —</option>
+                {{range .Customers}}
+                <option value="{{.CustomerID}}" {{if eq $.Project.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div>
+              <label class="label">기관명 직접입력</label>
+              <input name="prospect_name" value="{{.Project.ProspectName}}" class="input" placeholder="미등록 고객" x-model="prospectName">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label">지역</label>
+              <input name="prospect_region" value="{{.Project.ProspectRegion}}" class="input">
+            </div>
+            <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+              <input type="checkbox" name="customer_confirmed" value="1" {{if .Project.CustomerConfirmed}}checked{{end}}>
+              고객 확정
+            </label>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="!quickQuote" x-cloak>
+            <div>
+              <label class="label">{{if .Project.IsSupply}}견적 금액 (원){{else}}예상 금액 (원){{end}}</label>
+              <input name="expected_amount" :disabled="quickQuote" value="{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}{{end}}" class="input" inputmode="numeric" x-model="expectedAmount">
+            </div>
+            <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+              <input type="checkbox" name="expected_amount_confirmed" value="1" :disabled="quickQuote" {{if .Project.ExpectedAmountConfirmed}}checked{{end}}>
+              금액 확정
+            </label>
+            <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+              <input type="checkbox" name="amount_vat_included" value="1" :disabled="quickQuote" {{if .Project.AmountVATIncluded}}checked{{end}}>
+              VAT 포함
+            </label>
+          </div>
+          <details class="rounded-card border border-line p-3" x-show="!quickQuote" x-cloak>
+            <summary class="text-ui-sm font-medium text-ink cursor-pointer">계약 분류</summary>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">정보 입수 경로</label>
+                <select name="lead_source" :disabled="quickQuote" class="select" x-ref="leadSel" x-model="leadSource">
+                  <option value="">— 선택 —</option>
+                  {{range .LeadSources}}
+                  {{if or .IsActive (eq $.Project.LeadSource .CodeValue)}}
+                  <option value="{{.CodeValue}}" {{if eq $.Project.LeadSource .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                  {{end}}
+                </select>
+              </div>
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">계약 대상</label>
+                <select name="contract_target" :disabled="quickQuote" class="select">
+                  <option value="">— 선택 —</option>
+                  {{range .ContractTargets}}
+                  <option value="{{.CodeValue}}" {{if eq $.Project.ContractTarget .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">조달 경로</label>
+                <select name="procurement_route" id="proc_route" :disabled="quickQuote" class="select">
+                  <option value="">— 선택 —</option>
+                  {{range .ProcurementRoutes}}
+                  <option value="{{.CodeValue}}" {{if eq $.Project.ProcurementRoute .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">계약 방법</label>
+                <select name="contract_method" :disabled="quickQuote" class="select">
+                  <option value="">— 선택 —</option>
+                  {{range .ContractMethods}}
+                  <option value="{{.CodeValue}}" {{if eq $.Project.ContractMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">입찰 평가방법</label>
+                <select name="bid_eval_method" :disabled="quickQuote" class="select">
+                  <option value="">— 선택 —</option>
+                  {{range .BidEvalMethods}}
+                  <option value="{{.CodeValue}}" {{if eq $.Project.BidEvalMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">쇼핑몰 계약 형태</label>
+                <select name="mall_contract_type" :disabled="quickQuote" class="select">
+                  <option value="">— 선택 —</option>
+                  {{range .MallContractTypes}}
+                  <option value="{{.CodeValue}}" {{if eq $.Project.MallContractType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div>
+                <label class="text-ui-xs text-ink-muted mb-1 block">예산 상태</label>
+                <select name="budget_status" :disabled="quickQuote" class="select">
+                  {{range .BudgetStatuses}}
+                  <option value="{{.CodeValue}}" {{if or (eq $.Project.BudgetStatus .CodeValue) (and (eq $.Project.BudgetStatus "") (eq .CodeValue "unknown"))}}selected{{end}}>{{.CodeName}}</option>
+                  {{end}}
+                </select>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" x-show="hasBilling() && !quickQuote" x-cloak>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">대금 주기</label>
-          <select name="billing_cycle" x-model="billingCycle" @change="onCycle()" :disabled="!hasBilling() || quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <option value="">—</option>
-            <option value="once">일시</option>
-            <option value="month">월</option>
-            <option value="quarter">분기</option>
-            <option value="half">반기</option>
-            <option value="year">연</option>
-          </select>
+      <section class="card p-5" id="sales-sec-03" data-card="03">
+        <div class="flex gap-3 items-center" :class="open03 ? 'pb-3 mb-3 border-b border-line' : ''">
+          <div class="w-8 h-8 rounded-full border border-line text-ui-sm grid place-items-center shrink-0">03</div>
+          <div class="min-w-0">
+            <b class="block text-ui font-semibold text-ink">영업 계획 및 담당자</b>
+            <span class="text-ui-xs text-ink-subtle">수주 활동의 담당자와 다음 영업 액션을 지정합니다.</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm ml-auto shrink-0" :aria-expanded="open03.toString()" aria-controls="sales-sec-03-body" @click="open03=!open03">
+            <span x-text="open03 ? '접기' : '펼치기'"></span>
+            <span aria-hidden="true" x-text="open03 ? '⌃' : '⌄'"></span>
+          </button>
         </div>
-        <div x-show="showRange()" x-cloak>
-          <label class="block text-sm font-medium text-gray-700 mb-1">대금 시작</label>
-          <input type="month" name="revenue_from" x-model="revenueFrom" :disabled="!showRange()" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-        <div x-show="showTo()" x-cloak>
-          <label class="block text-sm font-medium text-gray-700 mb-1">대금 종료</label>
-          <input type="month" name="revenue_to" x-model="revenueTo" :disabled="!showTo()" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">입찰 시기</label>
-          <input type="month" name="bid_ym" value="{{.Project.BidYM}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">매출 시기</label>
-          <input type="month" name="revenue_ym" value="{{.Project.RevenueYM}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="!quickQuote" x-cloak>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{if .Project.IsSupply}}견적 금액 (원){{else}}예상 금액 (원){{end}}</label>
-          <input name="expected_amount" :disabled="quickQuote" value="{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm" inputmode="numeric">
-        </div>
-        <label class="flex items-end gap-2 text-sm text-gray-600 pb-2">
-          <input type="checkbox" name="expected_amount_confirmed" value="1" :disabled="quickQuote" {{if .Project.ExpectedAmountConfirmed}}checked{{end}}>
-          금액 확정
-        </label>
-        <label class="flex items-end gap-2 text-sm text-gray-600 pb-2">
-          <input type="checkbox" name="amount_vat_included" value="1" :disabled="quickQuote" {{if .Project.AmountVATIncluded}}checked{{end}}>
-          VAT 포함
-        </label>
-      </div>
-
-      <details class="rounded-lg border border-gray-200 p-3" x-show="!quickQuote" x-cloak>
-        <summary class="text-sm font-medium text-gray-800 cursor-pointer">계약 분류</summary>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <p class="text-ui-xs text-ink-muted mt-2 ml-11" x-show="!open03" x-cloak>{{.Sum03}}</p>
+        <div id="sales-sec-03-body" x-show="open03" x-cloak class="space-y-4">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">정보 입수 경로</label>
-            <select name="lead_source" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <label class="label">영업담당</label>
+            <select name="sales_owner_id" class="select" x-ref="ownerSel" x-model="ownerId">
               <option value="">— 선택 —</option>
-              {{range .LeadSources}}
-              {{if or .IsActive (eq $.Project.LeadSource .CodeValue)}}
-              <option value="{{.CodeValue}}" {{if eq $.Project.LeadSource .CodeValue}}selected{{end}}>{{.CodeName}}</option>
-              {{end}}
+              {{range .Users}}
+              <option value="{{.UserID}}" {{if eq $.Project.SalesOwnerID .UserID}}selected{{end}}>{{.FullName}}</option>
               {{end}}
             </select>
           </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">계약 대상</label>
-            <select name="contract_target" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">— 선택 —</option>
-              {{range .ContractTargets}}
-              <option value="{{.CodeValue}}" {{if eq $.Project.ContractTarget .CodeValue}}selected{{end}}>{{.CodeName}}</option>
-              {{end}}
-            </select>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="label">정밀도</label>
+              <select name="expected_precision" x-model="precision" class="select">
+                <option value="month">월</option>
+                <option value="quarter">분기</option>
+                <option value="half">반기</option>
+                <option value="year">연</option>
+              </select>
+            </div>
+            <div x-show="precision === 'month'" x-cloak>
+              <label class="label">사업 시기</label>
+              <input type="month" name="expected_ym" :disabled="precision !== 'month'" value="{{.Project.ExpectedYM}}" class="input">
+            </div>
+            <div x-show="precision !== 'month'" class="contents">
+              <div>
+                <label class="label">연도</label>
+                <input name="expected_year" type="number" :disabled="precision === 'month'" x-model="year" class="input">
+              </div>
+              <div x-show="precision === 'quarter'" x-cloak>
+                <label class="label">분기</label>
+                <select name="expected_quarter" :disabled="precision !== 'quarter'" x-model="quarter" class="select">
+                  <option value="1">1분기</option>
+                  <option value="2">2분기</option>
+                  <option value="3">3분기</option>
+                  <option value="4">4분기</option>
+                </select>
+              </div>
+              <div x-show="precision === 'half'" x-cloak>
+                <label class="label">반기</label>
+                <select name="expected_half" :disabled="precision !== 'half'" x-model="half" class="select">
+                  <option value="1">상반기</option>
+                  <option value="2">하반기</option>
+                </select>
+              </div>
+            </div>
+            <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+              <input type="checkbox" name="expected_ym_confirmed" value="1" {{if .Project.ExpectedYMConfirmed}}checked{{end}}>
+              시기 확정
+            </label>
           </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">조달 경로</label>
-            <select name="procurement_route" id="proc_route" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">— 선택 —</option>
-              {{range .ProcurementRoutes}}
-              <option value="{{.CodeValue}}" {{if eq $.Project.ProcurementRoute .CodeValue}}selected{{end}}>{{.CodeName}}</option>
-              {{end}}
-            </select>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" x-show="hasBilling() && !quickQuote" x-cloak>
+            <div>
+              <label class="label">대금 주기</label>
+              <select name="billing_cycle" x-model="billingCycle" @change="onCycle()" :disabled="!hasBilling() || quickQuote" class="select">
+                <option value="">—</option>
+                <option value="once">일시</option>
+                <option value="month">월</option>
+                <option value="quarter">분기</option>
+                <option value="half">반기</option>
+                <option value="year">연</option>
+              </select>
+            </div>
+            <div x-show="showRange()" x-cloak>
+              <label class="label">대금 시작</label>
+              <input type="month" name="revenue_from" x-model="revenueFrom" :disabled="!showRange()" class="input">
+            </div>
+            <div x-show="showTo()" x-cloak>
+              <label class="label">대금 종료</label>
+              <input type="month" name="revenue_to" x-model="revenueTo" :disabled="!showTo()" class="input">
+            </div>
           </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">계약 방법</label>
-            <select name="contract_method" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">— 선택 —</option>
-              {{range .ContractMethods}}
-              <option value="{{.CodeValue}}" {{if eq $.Project.ContractMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
-              {{end}}
-            </select>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="label">입찰 시기</label>
+              <input type="month" name="bid_ym" value="{{.Project.BidYM}}" class="input">
+            </div>
+            <div>
+              <label class="label">매출 시기</label>
+              <input type="month" name="revenue_ym" value="{{.Project.RevenueYM}}" class="input">
+            </div>
           </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">입찰 평가방법</label>
-            <select name="bid_eval_method" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">— 선택 —</option>
-              {{range .BidEvalMethods}}
-              <option value="{{.CodeValue}}" {{if eq $.Project.BidEvalMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+          {{if gt (len .Groups) 0}}
+          <div x-show="!quickQuote" x-cloak>
+            <label class="label">사업 대분류</label>
+            <p class="text-ui-xs text-ink-muted mb-2">저장해도 사업 칸은 바뀌지 않고 잇는 표만 바뀝니다.</p>
+            <div class="flex flex-wrap gap-2 text-ui-sm">
+              {{range .Groups}}
+              <label class="inline-flex items-center gap-1 border border-line rounded-control px-2 py-1">
+                <input type="checkbox" name="group_id" value="{{.GroupID}}" :disabled="quickQuote" {{if index $.SelectedGroups .GroupID}}checked{{end}}>
+                {{.GroupNo}} {{.Name}}
+              </label>
               {{end}}
-            </select>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">쇼핑몰 계약 형태</label>
-            <select name="mall_contract_type" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="">— 선택 —</option>
-              {{range .MallContractTypes}}
-              <option value="{{.CodeValue}}" {{if eq $.Project.MallContractType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
-              {{end}}
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1">예산 상태</label>
-            <select name="budget_status" :disabled="quickQuote" class="w-full border rounded-lg px-3 py-2 text-sm">
-              {{range .BudgetStatuses}}
-              <option value="{{.CodeValue}}" {{if or (eq $.Project.BudgetStatus .CodeValue) (and (eq $.Project.BudgetStatus "") (eq .CodeValue "unknown"))}}selected{{end}}>{{.CodeName}}</option>
-              {{end}}
-            </select>
-          </div>
-        </div>
-      </details>
-      {{if .Groups}}
-      <div x-show="!quickQuote" x-cloak>
-        <label class="block text-sm font-medium text-gray-700 mb-1">사업 대분류</label>
-        <p class="text-xs text-gray-500 mb-2">저장해도 사업 칸은 바뀌지 않고 잇는 표만 바뀝니다.</p>
-        <div class="flex flex-wrap gap-2 text-sm">
-          {{range .Groups}}
-          <label class="inline-flex items-center gap-1 border rounded-lg px-2 py-1">
-            <input type="checkbox" name="group_id" value="{{.GroupID}}" :disabled="quickQuote" {{if index $.SelectedGroups .GroupID}}checked{{end}}>
-            {{.GroupNo}} {{.Name}}
-          </label>
           {{end}}
+          <div x-show="!quickQuote" x-cloak>
+            <label class="label">경쟁사</label>
+            <input name="competitor" :disabled="quickQuote" value="{{.Project.Competitor}}" class="input">
+          </div>
         </div>
-      </div>
-      {{end}}
-      <div x-show="!quickQuote" x-cloak>
-        <label class="block text-sm font-medium text-gray-700 mb-1">경쟁사</label>
-        <input name="competitor" :disabled="quickQuote" value="{{.Project.Competitor}}" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">메모</label>
-        <textarea name="notes" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm">{{.Project.Notes}}</textarea>
+      </section>
+
+      <section class="card p-5" id="sales-sec-04" data-card="04">
+        <div class="flex gap-3 items-center" :class="open04 ? 'pb-3 mb-3 border-b border-line' : ''">
+          <div class="w-8 h-8 rounded-full border border-line text-ui-sm grid place-items-center shrink-0">04</div>
+          <div class="min-w-0">
+            <b class="block text-ui font-semibold text-ink">초기 영업 자료<span class="text-ui-xs text-ink-muted font-normal" x-text="fileCountLabel()"></span></b>
+            <span class="text-ui-xs text-ink-subtle">RFP, 문의메일, 미팅 메모 등 발굴 근거를 첨부합니다.</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm ml-auto shrink-0" :aria-expanded="open04.toString()" aria-controls="sales-sec-04-body" @click="open04=!open04">
+            <span x-text="open04 ? '접기' : '펼치기'"></span>
+            <span aria-hidden="true" x-text="open04 ? '⌃' : '⌄'"></span>
+          </button>
+        </div>
+        <p class="text-ui-xs text-ink-muted mt-2 ml-11" x-show="!open04" x-cloak x-text="fileSumLabel()"></p>
+        <div id="sales-sec-04-body" x-show="open04" x-cloak class="space-y-3">
+          <div class="sales-drop rounded-card border border-dashed border-line p-6 text-center bg-canvas"
+               :class="fileOver ? 'bg-primary-soft border-ink' : ''"
+               @dragenter.prevent="fileOver=true" @dragover.prevent="fileOver=true"
+               @dragleave.prevent="fileOver=false" @drop.prevent="fileOver=false; addFiles($event.dataTransfer.files)">
+            <p class="font-medium text-ui text-ink">RFP 또는 관련 자료를 첨부해 주세요</p>
+            <p class="text-ui-xs text-ink-subtle mt-1 mb-3">PDF, DOC, XLS, PPT, HWP · 파일당 최대 20MB</p>
+            <button type="button" class="btn btn-secondary btn-sm" @click="$refs.fileIn.click()">파일 선택</button>
+            <input type="file" name="initial_files" x-ref="fileIn" multiple
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp,.hwpx,.ppt,.pptx" class="hidden"
+                   @change="addFiles($event.target.files); $event.target.value=''; syncInput()">
+          </div>
+          <div class="rounded-control bg-danger-soft text-danger text-ui-xs px-3 py-2 border border-line" x-show="fileErr" x-cloak x-html="fileErr"></div>
+          {{if .Attachments}}
+          <div class="space-y-2">
+            {{range .Attachments}}
+            <div class="flex items-center gap-3 border border-line rounded-card px-3 py-2 bg-surface">
+              <span class="w-9 h-9 grid place-items-center border border-line rounded-control text-ui-xs font-bold text-ink-muted">파일</span>
+              <div class="min-w-0 flex-1">
+                <b class="block text-ui-sm truncate" title="{{.FileName}}">{{.FileName}}</b>
+                <span class="text-ui-xs text-ink-subtle">저장됨</span>
+              </div>
+              {{if $.CanManage}}
+              <form method="post" action="/attachments/{{.AttachmentID}}/delete">
+                <input type="hidden" name="redirect" value="/sales/{{$.Project.SalesID}}/edit">
+                <button type="submit" class="btn-ghost px-2" aria-label="{{.FileName}} 삭제">×</button>
+              </form>
+              {{end}}
+              <a href="/attachments/{{.AttachmentID}}" class="text-ui-xs text-info hover:underline">받기</a>
+            </div>
+            {{end}}
+          </div>
+          {{end}}
+          <div class="space-y-2">
+            <template x-for="(f,i) in pending" :key="f.name+f.size+i">
+              <div class="flex items-center gap-3 border border-line rounded-card px-3 py-2 bg-surface">
+                <span class="w-9 h-9 grid place-items-center border border-line rounded-control text-ui-xs font-bold text-ink-muted" x-text="badgeOf(f.name)"></span>
+                <div class="min-w-0 flex-1">
+                  <b class="block text-ui-sm truncate" x-text="f.name" :title="f.name"></b>
+                  <span class="text-ui-xs text-ink-subtle" x-text="fmtSize(f.size)+' · 저장 대기'"></span>
+                </div>
+                <button type="button" class="btn-ghost px-2" :aria-label="f.name+' 삭제'" @click="removeFile(i)">×</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <div class="flex justify-end gap-2 card p-4">
+        <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="btn btn-secondary">취소</a>
+        <button type="submit" class="btn btn-primary" x-text="quickQuote ? '저장하고 견적 작성' : '저장'">저장</button>
       </div>
     </div>
 
-    <div class="flex justify-end gap-2">
-      <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">취소</a>
-      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
-              x-text="quickQuote ? '저장하고 견적 작성' : '저장'">저장</button>
-    </div>
+    <aside class="space-y-3 order-1 lg:order-2 lg:sticky lg:top-4">
+      <div class="card p-4" x-data="{stageOpen:false}">
+        <h4 class="text-ui-sm font-semibold text-ink mb-3 flex justify-between items-center">영업 단계</h4>
+        <div class="flex items-baseline justify-between mb-1">
+          <strong class="text-2xl font-bold text-ink">{{.StageProb}}%</strong>
+          <span class="text-ui-xs text-ink-muted">수주 가능성</span>
+        </div>
+        <progress class="w-full h-1.5 mb-3" max="100" value="{{.StageProb}}"></progress>
+        <button type="button" class="lg:hidden btn btn-secondary btn-sm w-full mb-2" @click="stageOpen=!stageOpen" :aria-expanded="stageOpen.toString()">
+          <span x-text="stageOpen ? '단계 접기' : '단계 펼치기'"></span>
+          · {{.DisplayStage}}{{if .StageSub}} · {{.StageSub}}{{end}}
+        </button>
+        <ul class="space-y-3" :class="stageOpen ? '' : 'hidden lg:block'">
+          {{$cur := .Project.Stage}}
+          {{$hit := false}}
+          {{range $i, $st := .Stages}}
+          {{$done := and (not $hit) (ne $st.Code $cur)}}
+          {{$isCur := eq $st.Code $cur}}
+          {{if $isCur}}{{$hit = true}}{{end}}
+          <li class="flex gap-3 {{if not $isCur}}{{if not $done}}opacity-50{{end}}{{end}}">
+            <div class="w-6 h-6 rounded-full border-2 border-line grid place-items-center text-ui-xs font-bold shrink-0 {{if $done}}bg-ink text-primary-fg border-ink{{end}} {{if $isCur}}border-ink{{end}}">{{if $done}}✓{{else}}{{$st.SortOrder}}{{end}}</div>
+            <div class="min-w-0 flex-1">
+              <b class="flex justify-between gap-2 text-ui-sm {{if $isCur}}text-ink{{else}}text-ink-muted{{end}}">
+                {{$st.Label}}{{if and $isCur $.StageSub}} · {{$.StageSub}}{{end}}
+              </b>
+              {{if $isCur}}
+              {{if $.StageHint.Desc}}<p class="text-ui-xs text-ink-muted mt-1">{{$.StageHint.Desc}}</p>{{end}}
+              {{if $.StageHint.Need}}<p class="mt-2 text-ui-xs bg-hover border border-line rounded-control px-2 py-1">{{$.StageHint.Need}}</p>{{end}}
+              {{end}}
+            </div>
+          </li>
+          {{end}}
+        </ul>
+        {{if .IsEdit}}
+        <p class="mt-3 pt-3 border-t border-dashed border-line text-ui-xs text-ink-muted">단계 변경은 사업 상세/파이프라인에서 합니다</p>
+        {{end}}
+      </div>
+      <div class="card p-4 bg-hover">
+        <b class="block text-ui-sm text-ink mb-1">등록 전 확인해 주세요</b>
+        <span class="text-ui-xs text-ink-muted">{{.StageHint.Warn}}</span>
+      </div>
+      <div class="card p-4">
+        <h4 class="text-ui-sm font-semibold text-ink mb-2">등록 요약</h4>
+        <div class="flex justify-between py-1.5 border-b border-line text-ui-xs text-ink-muted">영업 단계<b class="text-ink">{{.DisplayStage}}{{if .StageSub}} · {{.StageSub}}{{end}}</b></div>
+        <div class="flex justify-between py-1.5 border-b border-line text-ui-xs text-ink-muted">수주 가능성<b class="text-ink">{{.StageProb}}%</b></div>
+        <div class="flex justify-between py-1.5 border-b border-line text-ui-xs text-ink-muted">고객사<b class="text-ink" x-text="sumCustomer() || '—'"></b></div>
+        <div class="flex justify-between py-1.5 border-b border-line text-ui-xs text-ink-muted">예산/예상 금액<b class="text-ink" x-text="sumAmount() || '—'"></b></div>
+        <div class="flex justify-between py-1.5 text-ui-xs text-ink-muted">영업 담당<b class="text-ink" x-text="sumOwner() || '—'"></b></div>
+      </div>
+    </aside>
   </form>
 </div>
 <script>
@@ -287,6 +433,20 @@ document.addEventListener('alpine:init', () => {
     revenueFrom: {{printf "%q" .Project.RevenueFrom}},
     revenueTo: {{printf "%q" .Project.RevenueTo}},
     quickQuote: false,
+    name: {{printf "%q" .Project.Name}},
+    customerId: {{printf "%q" .Project.CustomerID}},
+    prospectName: {{printf "%q" .Project.ProspectName}},
+    expectedAmount: '{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}{{end}}',
+    leadSource: {{printf "%q" .Project.LeadSource}},
+    ownerId: {{printf "%q" .Project.SalesOwnerID}},
+    open02: {{if .Open02}}true{{else}}false{{end}},
+    open03: {{if .Open03}}true{{else}}false{{end}},
+    open04: true,
+    pending: [],
+    fileErr: '',
+    fileOver: false,
+    savedCount: {{len .Attachments}},
+    okExt: ['pdf','doc','docx','xls','xlsx','hwp','hwpx','ppt','pptx'],
     hasBilling(){ return ['maintenance','develop','construction'].includes(this.bizType); },
     showRange(){ return this.hasBilling() && !this.quickQuote && !!this.billingCycle; },
     showTo(){ return this.showRange() && this.billingCycle !== 'once'; },
@@ -299,7 +459,53 @@ document.addEventListener('alpine:init', () => {
     },
     onCycle(){
       if(this.billingCycle === 'once'){ this.revenueTo = ''; }
-    }
+    },
+    optLabel(sel){
+      if(!sel) return '';
+      const o = sel.options[sel.selectedIndex];
+      if(!o || !o.value) return '';
+      return (o.textContent || '').trim();
+    },
+    sumCustomer(){
+      const c = this.optLabel(this.$refs.customerSel);
+      const p = (this.prospectName || '').trim();
+      return c || p;
+    },
+    sumOwner(){ return this.optLabel(this.$refs.ownerSel); },
+    sumAmount(){
+      const n = parseInt(String(this.expectedAmount||'').replace(/[^0-9]/g,''), 10);
+      if(!n) return '';
+      return n.toLocaleString('ko-KR') + ' 원';
+    },
+    extOf(n){ const m = String(n||'').toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; },
+    badgeOf(n){ const e = this.extOf(n); return e==='docx'?'DOC':e==='xlsx'?'XLS':e==='pptx'?'PPT':e==='hwpx'?'HWP':(e||'').toUpperCase(); },
+    fmtSize(n){ return n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; },
+    fileCountLabel(){ const n = this.savedCount + this.pending.length; return n ? ' · '+n+'건' : ''; },
+    fileSumLabel(){
+      const names = this.pending.map(f => f.name);
+      const n = this.savedCount + names.length;
+      if(!n) return '첨부된 파일이 없습니다.';
+      const extra = n > 2 ? ' 외 '+(n-2)+'건' : '';
+      return '첨부 '+n+'건 · '+names.slice(0,2).join(', ')+extra;
+    },
+    syncInput(){
+      const dt = new DataTransfer();
+      this.pending.forEach(f => dt.items.add(f));
+      if(this.$refs.fileIn) this.$refs.fileIn.files = dt.files;
+    },
+    addFiles(list){
+      const errs = [];
+      Array.from(list||[]).forEach(f => {
+        if(this.okExt.indexOf(this.extOf(f.name)) < 0){ errs.push(f.name+' — PDF, DOC, XLS, PPT, HWP 파일만 올릴 수 있습니다.'); return; }
+        if(f.size > 20*1024*1024){ errs.push(f.name+' — 20MB를 넘습니다 ('+this.fmtSize(f.size)+').'); return; }
+        if(this.pending.some(x => x.name===f.name && x.size===f.size)){ errs.push(f.name+' — 이미 첨부된 파일입니다.'); return; }
+        if(this.pending.length + this.savedCount >= 10){ errs.push('한 번에 10개까지 올릴 수 있습니다.'); return; }
+        this.pending.push(f);
+      });
+      this.fileErr = errs.map(t => t.replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]))).join('<br>');
+      this.syncInput();
+    },
+    removeFile(i){ this.pending.splice(i,1); this.fileErr=''; this.syncInput(); }
   }));
 });
 </script>

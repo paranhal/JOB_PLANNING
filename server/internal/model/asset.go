@@ -177,6 +177,7 @@ const (
 	AttachRefSalesOrder    = "sales_order"
 	AttachRefSalesDelivery = "sales_delivery"
 	AttachRefASKB          = "as_kb"
+	AttachRefSalesProject  = "sales_project"
 	AttachFormReceipt      = "as_receipt" // 폼 분기용. DB 값은 AttachRefAS
 )
 
@@ -191,6 +192,7 @@ const (
 	RefTypeSalesDelivery = AttachRefSalesDelivery
 	RefTypeASKB          = AttachRefASKB
 	RefTypeWorkTask      = "work_task"
+	RefTypeSalesProject  = AttachRefSalesProject
 )
 
 // CanonicalAttachRef 옛 as_receipt 를 as 로 본다. 40-F

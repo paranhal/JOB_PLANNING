@@ -9,6 +9,7 @@ module.exports = {
   safelist: [
     "lg:grid-cols-[1fr_16rem]",
     "lg:grid-cols-[1fr_18rem]",
+    "lg:grid-cols-[minmax(0,1fr)_18.75rem]",
     "lg:w-[285px]",
     "mnt-cal-chip-done",
     "mnt-cal-chip-planned",

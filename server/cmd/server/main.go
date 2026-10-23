@@ -174,6 +174,14 @@ func main() {
 
 	e.Renderer = handler.NewRenderer()
 	e.Static("/static", "web/static")
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if strings.HasPrefix(c.Request().URL.Path, "/uploads/sales_project") {
+				return echo.ErrNotFound
+			}
+			return next(c)
+		}
+	})
 	e.Static("/uploads", "data/uploads")
 
 	h := handler.New(db)

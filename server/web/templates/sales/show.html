@@ -98,6 +98,25 @@
   {{if .FormError}}
   <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">{{.FormError}}</div>
   {{end}}
+  {{if .AttachWarn}}
+  <div class="rounded-lg bg-warning-soft text-warning text-sm px-4 py-2 border border-line">일부 파일을 올리지 못했습니다. {{.AttachWarn}}</div>
+  {{end}}
+  {{if .SalesFiles}}
+  <div class="card p-4 space-y-2">
+    <h3 class="font-semibold text-ink text-sm">초기 영업 자료 · {{len .SalesFiles}}건</h3>
+    {{range .SalesFiles}}
+    <div class="flex items-center justify-between gap-2 text-sm">
+      <a href="/attachments/{{.AttachmentID}}" class="text-info hover:underline truncate">{{.FileName}}</a>
+      {{if $.CanManage}}
+      <form method="post" action="/attachments/{{.AttachmentID}}/delete" class="shrink-0">
+        <input type="hidden" name="redirect" value="/sales/{{$.Project.SalesID}}">
+        <button type="submit" class="text-ink-muted" aria-label="{{.FileName}} 삭제">삭제</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
 
   {{$fromSort := 0}}
   {{range .Stages}}{{if eq .Code $.Project.Stage}}{{$fromSort = .SortOrder}}{{end}}{{end}}

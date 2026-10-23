@@ -25,6 +25,7 @@ type SalesHandler struct {
 	contactRepo  *repository.ContactRepo
 	userRepo     *repository.UserRepo
 	codeRepo     *repository.CodeRepo
+	attach       *AttachmentHandler
 }
 
 func NewSalesHandler(
@@ -280,6 +281,7 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
+	limitSalesUploadBody(c)
 	p := h.parseForm(c)
 	if err := h.repo.Create(p); err != nil {
 		if wantsJSON(c) {
@@ -291,9 +293,11 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	if !quick {
 		_ = h.repo.ReplaceSalesGroups(p.SalesID, c.Request().Form["group_id"], ctxString(c, "user_name"))
 	}
+	fails := h.saveInitialSalesFiles(c, p.SalesID)
 	if wantsJSON(c) {
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"ok": true, "sales_id": p.SalesID, "sales_no": p.DisplayNo(), "name": p.Name,
+			"attach_fails": fails,
 		})
 	}
 	if quick {
@@ -302,6 +306,9 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	loc := "/sales/" + p.SalesID + "?ok=created"
 	if from := strings.TrimSpace(c.FormValue("from_task")); from != "" {
 		loc = "/sales/" + p.SalesID + "?tab=timeline&from_task=" + url.QueryEscape(from) + "&ok=created"
+	}
+	if len(fails) > 0 {
+		loc += "&attach_warn=" + url.QueryEscape(strings.Join(fails, " "))
 	}
 	return c.Redirect(http.StatusSeeOther, loc)
 }
@@ -366,6 +373,10 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		fromTask, _ = h.wbRepo.GetTask(fromTaskID)
 	}
 	quotes, _ := h.repo.QuotesBySalesIDs([]string{p.SalesID})
+	var salesFiles []model.Attachment
+	if h.attach != nil && h.attach.repo != nil {
+		salesFiles, _ = h.attach.repo.ListByRef(model.RefTypeSalesProject, p.SalesID)
+	}
 	model.ApplySalesPipelineAmount(p, quotes)
 	allGroups, _ := h.repo.ListGroups(false)
 	selGroups, _ := h.repo.GroupsContaining(p)
@@ -427,7 +438,9 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"FlashOK":             c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Warn":           c.QueryParam("warn"),
 		"FormError":      querySalesErr(c.QueryParam("err")),
+		"AttachWarn":     strings.TrimSpace(c.QueryParam("attach_warn")),
 		"FromTask":       fromTask,
+		"SalesFiles":     salesFiles,
 		"Memos":          memos,
 		"NextTask":       nextTask,
 		"NextActions":    nextActions,
@@ -453,6 +466,7 @@ func (h *SalesHandler) Update(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	limitSalesUploadBody(c)
 	p := h.parseForm(c)
 	p.SalesID = cur.SalesID
 	p.Stage = cur.Stage
@@ -473,7 +487,12 @@ func (h *SalesHandler) Update(c echo.Context) error {
 		return h.renderForm(c, p, true, err.Error())
 	}
 	_ = h.repo.ReplaceSalesGroups(p.SalesID, c.Request().Form["group_id"], ctxString(c, "user_name"))
-	return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?ok=updated")
+	fails := h.saveInitialSalesFiles(c, p.SalesID)
+	loc := "/sales/" + p.SalesID + "?ok=updated"
+	if len(fails) > 0 {
+		loc += "&attach_warn=" + url.QueryEscape(strings.Join(fails, " "))
+	}
+	return c.Redirect(http.StatusSeeOther, loc)
 }
 
 func (h *SalesHandler) Delete(c echo.Context) error {
@@ -736,6 +755,48 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 	}
 	listBack := "/sales"
 	parts := model.SalesPeriodInputParts(p.ExpectedYM, p.ExpectedPrecision)
+	if strings.TrimSpace(p.Stage) == "" {
+		p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
+	}
+	prob := model.SalesProbability(p)
+	hint := model.SalesFormStageHintOf(p.Stage)
+	sub := ""
+	if p.Stage == model.SalesStage4Bid {
+		sub = model.SalesBidStatusLabel(p.BidStatus)
+	}
+	if p.Stage == model.SalesStage4Closed {
+		sub = model.SalesCloseReasonLabel(p.CloseReason)
+	}
+	custLabel := p.CustomerValue()
+	if custLabel == "" {
+		for _, cu := range customers {
+			if cu.CustomerID == p.CustomerID {
+				custLabel = cu.OrgName
+				break
+			}
+		}
+	}
+	ownerLabel := p.SalesOwner
+	if ownerLabel == "" {
+		for _, u := range users {
+			if u.UserID == p.SalesOwnerID {
+				ownerLabel = u.FullName
+				break
+			}
+		}
+	}
+	leadLabel := ""
+	for _, s := range sources {
+		if s.CodeValue == p.LeadSource {
+			leadLabel = s.CodeName
+			break
+		}
+	}
+	amtLabel := p.AmountLabel()
+	var atts []model.Attachment
+	if isEdit && h.attach != nil && h.attach.repo != nil && p.SalesID != "" {
+		atts, _ = h.attach.repo.ListByRef(model.RefTypeSalesProject, p.SalesID)
+	}
 	return c.Render(http.StatusOK, "sales/form.html", map[string]interface{}{
 		"Title": title, "Active": NavSales,
 		"Project": p, "IsEdit": isEdit, "FormError": formErr,
@@ -749,10 +810,20 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		"PeriodYear":    parts.Year,
 		"PeriodQuarter": parts.Quarter,
 		"PeriodHalf":    parts.Half,
+		"StageProb":     prob,
+		"StageHint":     hint,
+		"StageSub":      sub,
+		"Open02":        model.SalesFormOpen02(formErr),
+		"Open03":        model.SalesFormOpen03(formErr),
+		"Sum02":         model.SalesFormCollapsedSum(custLabel, amtLabel, leadLabel),
+		"Sum03":         model.SalesFormCollapsedSum(ownerLabel, p.PeriodLabel()),
+		"Attachments":   atts,
+		"CanManage":     !isEdit || canManageSalesProject(c, p),
 	})
 }
 
 func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
+	_ = c.Request().ParseMultipartForm(model.SalesInitialAttachMaxRequest)
 	_ = c.Request().ParseForm()
 	p := &model.SalesProject{
 		Name:                    strings.TrimSpace(c.FormValue("name")),

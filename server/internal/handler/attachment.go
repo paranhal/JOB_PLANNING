@@ -24,6 +24,7 @@ type AttachmentHandler struct {
 	asRepo     *repository.ASRepo
 	unlockRepo *repository.ASUnlockRepo
 	wbRepo     *repository.WBRepo
+	salesRepo  *repository.SalesRepo
 	uploadDir  string
 }
 
@@ -38,6 +39,11 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 	}
 	if refType == model.RefTypeWorkTask {
 		if err := h.guardWorkTaskAttach(c, refID, true); err != nil {
+			return redirectAttachFailure(c, redirect, err)
+		}
+	}
+	if refType == model.RefTypeSalesProject {
+		if err := h.guardSalesProjectAttach(c, refID, true); err != nil {
 			return redirectAttachFailure(c, redirect, err)
 		}
 	}
@@ -103,6 +109,12 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 			}
 		}
 		for i, fh := range headers {
+			if refType == model.RefTypeSalesProject {
+				if err := h.saveSalesProjectFile(refID, keywords, fh, i); err != nil {
+					return redirectAttachFailure(c, redirect, err)
+				}
+				continue
+			}
 			if err := h.saveGenericFile(refType, refID, keywords, fh, i); err != nil {
 				return redirectAttachFailure(c, redirect, err)
 			}
@@ -501,6 +513,8 @@ func canUploadAttachment(c echo.Context, refType string) bool {
 		return canWriteWorkboard(c)
 	case model.RefTypeWorkTask:
 		return canWriteWorkboard(c)
+	case model.RefTypeSalesProject:
+		return canWriteSalesDeal(c)
 	default:
 		return canWriteMaster(c)
 	}
@@ -636,6 +650,10 @@ func (h *AttachmentHandler) UpdateKeywords(c echo.Context) error {
 		if err := h.guardWorkTaskAttach(c, att.RefID, true); err != nil {
 			return err
 		}
+	} else if att.RefType == model.RefTypeSalesProject {
+		if err := h.guardSalesProjectAttach(c, att.RefID, true); err != nil {
+			return err
+		}
 	} else if !canUploadAttachment(c, att.RefType) {
 		return echo.ErrForbidden
 	}
@@ -655,6 +673,13 @@ func (h *AttachmentHandler) Download(c echo.Context) error {
 		if err := h.guardWorkTaskAttach(c, att.RefID, false); err != nil {
 			return err
 		}
+	}
+	if att.RefType == model.RefTypeSalesProject {
+		if err := h.guardSalesProjectAttach(c, att.RefID, false); err != nil {
+			return err
+		}
+		c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+		return c.Attachment(att.FilePath, att.DisplayName())
 	}
 	if att.IsVideo() {
 		return c.Inline(att.FilePath, att.DisplayName())
@@ -677,6 +702,10 @@ func (h *AttachmentHandler) Delete(c echo.Context) error {
 		}
 	} else if att.RefType == model.RefTypeWorkTask {
 		if err := h.guardWorkTaskAttach(c, att.RefID, true); err != nil {
+			return err
+		}
+	} else if att.RefType == model.RefTypeSalesProject {
+		if err := h.guardSalesProjectAttach(c, att.RefID, true); err != nil {
 			return err
 		}
 	} else if !canUploadAttachment(c, att.RefType) {
