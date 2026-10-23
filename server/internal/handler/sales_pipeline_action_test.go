@@ -191,7 +191,7 @@ func TestSalesWinConfirmPaths(t *testing.T) {
 	req.Header.Set("Accept", "application/json")
 	req.AddCookie(jwtCookieOrg(t, model.RoleSales, "O01"))
 	e.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
+	if rec.Code != http.StatusForbidden {
 		t.Fatalf("타 조직 %d %s", rec.Code, rec.Body.String())
 	}
 

@@ -278,6 +278,38 @@ func TestListContractUnionLinkSuggest(t *testing.T) {
 	}
 }
 
+func TestListContractUnionEmptyOrgNoAllFallback(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "cu_empty.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	prepo := NewProjectRepo(db)
+	srepo := NewSalesRepo(db)
+	s := &model.SalesProject{Name: "폴백금지", OrgID: model.OrgIDLibrary}
+	if err := srepo.Create(s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, contract_amount=1 WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, s.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	all, err := prepo.ListContractUnion(ContractUnionFilter{OrgID: OrgAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doGetContractHref(all, "폴백금지") == "" {
+		t.Fatal("명시 OrgAll 에 없다")
+	}
+	empty, err := prepo.ListContractUnion(ContractUnionFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doGetContractHref(empty, "폴백금지") != "" {
+		t.Fatal("빈 org_id 가 OrgAll 폴백했다")
+	}
+}
+
 func TestContractUnionIsSharedContractQuery(t *testing.T) {
 	// 73-E 계약 탭은 이 함수를 공유한다. 별도 판정 함수를 두지 않는다.
 	var r *ProjectRepo

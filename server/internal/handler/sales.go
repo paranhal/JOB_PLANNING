@@ -47,7 +47,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	f := salesListFilterFromRequest(c)
-	applySalesVisibilityToList(c, &f)
+	applySalesListReadScope(c, &f)
 	view := salesListView(c.QueryParam("display"), c.QueryParam("view"))
 	items, err := h.repo.ListFilter(f)
 	if err != nil {
@@ -70,7 +70,7 @@ func (h *SalesHandler) List(c echo.Context) error {
 	rows := make([]map[string]interface{}, 0, len(items))
 	for i := range items {
 		def := model.FindSalesStage(stages, items[i].Stage)
-		rows = append(rows, h.viewProject(&items[i], def))
+		rows = append(rows, h.viewProject(c, &items[i], def))
 	}
 	fromTask := strings.TrimSpace(c.QueryParam("from_task"))
 	dealType, buildHref, supplyHref, newHref, resetHref, filterQ := salesDealBoardLinks("/sales", view, f, fromTask)
@@ -146,7 +146,7 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 	today := now.Format("2006-01-02")
 	ym := now.Format("2006-01")
 	listF := repository.SalesListFilter{Status: model.SalesStatusActive}
-	applySalesVisibilityToList(c, &listF)
+	applySalesMyScopeToList(c, &listF)
 	items, err := h.repo.ListFilter(listF)
 	if err != nil {
 		return err
@@ -174,13 +174,13 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 			maxAmt = st.Amount
 		}
 	}
-	migrated, _ := h.repo.ListMigratedUncheckedOrg(listF.OrgID)
+	migrated, _ := h.repo.ListMigratedUncheckedFilter(listF)
 	closedF := repository.SalesListFilter{IncludeClosed: true}
-	applySalesVisibilityToList(c, &closedF)
+	applySalesMyScopeToList(c, &closedF)
 	closed, _ := h.repo.ListFilter(closedF)
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
 	dormantF := repository.SalesListFilter{IncludeDormant: true, Status: model.SalesStatusDormant}
-	applySalesVisibilityToList(c, &dormantF)
+	applySalesMyScopeToList(c, &dormantF)
 	dormant, _ := h.repo.ListFilter(dormantF)
 	dQuotes, _ := h.repo.QuotesBySalesIDs(func() []string {
 		ids := make([]string, 0, len(dormant))
@@ -214,7 +214,9 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 	}
 	var unpromoted []model.ContractRow
 	if h.projectRepo != nil {
-		if urows, err := h.projectRepo.ListContractUnion(repository.ContractUnionFilter{OrgID: listF.OrgID}); err == nil {
+		uf := salesContractUnionFilter(c)
+		if urows, err := h.projectRepo.ListContractUnion(uf); err == nil {
+			annotateSalesContractManage(c, urows)
 			for _, r := range urows {
 				if r.Source == model.ContractSourceSales {
 					unpromoted = append(unpromoted, r)
@@ -371,11 +373,11 @@ func (h *SalesHandler) Show(c echo.Context) error {
 	showStageProg := !p.IsSupply() && (p.Stage == model.SalesStage4Discover || p.Stage == model.SalesStage4Propose || p.Stage == model.SalesStage4Bid)
 	data := map[string]interface{}{
 		"Title": p.DisplayNo() + " · " + p.Name, "Active": NavSalesPipeline,
-		"Project":             h.viewProject(p, def),
+		"Project":             h.viewProject(c, p, def),
 		"Raw":                 p,
 		"WorkProjectID":       workProjectID,
 		"NeedsWorkProject":    model.NeedsWorkProject(p, workProjectID),
-		"CanPromote":          model.CanPromoteSales(p) && workProjectID == "",
+		"CanPromote":          model.CanPromoteSales(p) && workProjectID == "" && canManageSalesProject(c, p),
 		"ShowProgress":        showStageProg,
 		"Progress":            model.SalesProposalProgressFrom(acts),
 		"StageProgress":       stageProg,
@@ -410,12 +412,13 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"PartyHints":          model.CustomerPartyHintNames(parties),
 		"Today":               time.Now().Format("2006-01-02"),
 		"CanWrite":            canWriteSales(c),
-		"NextAction":          model.SalesNextActionOf(p, workProjectID, salesCanShowNextAction(c)),
+		"CanManage":           canManageSalesProject(c, p),
+		"NextAction":          model.SalesNextActionOf(p, workProjectID, salesNextActionEnabled(c, p)),
 		"CanDrop":             canDropSales(c, p) && p.Status == model.SalesStatusActive && !p.IsDormant(),
 		"CanDeleteSales":      canDeleteThisSales(c, p) && workProjectID == "",
 		"DeleteWarn":          salesDeleteWarn(p.SalesID, h.repo),
-		"CanSleep":            canWriteSales(c) && p.Status == model.SalesStatusActive && p.Stage != model.SalesStage4Closed,
-		"CanWake":             canWriteSales(c) && p.IsDormant(),
+		"CanSleep":            canManageSalesProject(c, p) && p.Status == model.SalesStatusActive && p.Stage != model.SalesStage4Closed,
+		"CanWake":             canManageSalesProject(c, p) && p.IsDormant(),
 		"DormantUntilDefault": model.DefaultDormantUntil(time.Now(), h.repo.DormantDefaultMonth()),
 		"SalesGroups":         selGroups,
 		"AllGroups":           allGroups,
@@ -438,24 +441,17 @@ func (h *SalesHandler) Show(c echo.Context) error {
 }
 
 func (h *SalesHandler) Edit(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
-	}
-	p, err := h.repo.Get(c.Param("id"))
+	p, err := h.loadManagedSales(c)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/sales?err=notfound")
+		return err
 	}
 	return h.renderForm(c, p, true, "")
 }
 
 func (h *SalesHandler) Update(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
-	}
-	id := c.Param("id")
-	cur, err := h.repo.Get(id)
+	cur, err := h.loadManagedSales(c)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/sales?err=notfound")
+		return err
 	}
 	p := h.parseForm(c)
 	p.SalesID = cur.SalesID
@@ -871,7 +867,7 @@ func sortSalesProjects(items []model.SalesProject, sortKey, dir string) {
 	})
 }
 
-func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageDef) map[string]interface{} {
+func (h *SalesHandler) viewProject(c echo.Context, p *model.SalesProject, def *model.SalesStageDef) map[string]interface{} {
 	n, total := p.ConfirmedCount()
 	customer := p.CustomerValue()
 	period := p.PeriodLabel()
@@ -919,6 +915,11 @@ func (h *SalesHandler) viewProject(p *model.SalesProject, def *model.SalesStageD
 		"AmountUnconfirmed":       amountUnc,
 		"VATIncluded":             p.AmountVATIncluded,
 		"Owner":                   p.SalesOwner,
+		"OrgID":                   p.OrgID,
+		"OrgLabel":                p.OrgLabel,
+		"CanManage":               canManageSalesProject(c, p),
+		"ForeignOrg":              strings.TrimSpace(p.OrgID) != "" && currentUserHomeOrg(c) != "" && strings.TrimSpace(p.OrgID) != currentUserHomeOrg(c),
+		"ManageHint":              "타 조직 사업 · Owner만 변경",
 		"Status":                  p.Status,
 		"LostReason":              p.LostReason,
 		"Notes":                   p.Notes,
@@ -1199,10 +1200,11 @@ func (h *SalesHandler) fillPartyFromUser(p *model.SalesParty) {
 }
 
 func (h *SalesHandler) SetContractAmount(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := strings.TrimSpace(c.Param("id"))
+	id := p.SalesID
 	amt := parseSalesAmount(c.FormValue("contract_amount"))
 	at := strings.TrimSpace(c.FormValue("contracted_at"))
 	if err := h.repo.SetContractAmount(id, amt, at, ctxString(c, "user_name")); err != nil {

@@ -11,7 +11,7 @@
       <div class="col-span-2"><dt class="text-ink-muted">고객</dt><dd class="text-ink">{{if .Raw.ProspectName}}{{.Raw.ProspectName}}{{else}}—{{end}}</dd></div>
     </dl>
     <div class="flex flex-wrap gap-2">
-      {{if .CanPromote}}
+      {{if and .CanPromote .CanManage}}
       <a href="/sales/{{.Raw.SalesID}}/promote" class="btn btn-primary btn-sm">계약으로 전환</a>
       {{end}}
       <a href="/sales/{{.Raw.SalesID}}" class="btn btn-secondary btn-sm">전체 화면으로 열기</a>

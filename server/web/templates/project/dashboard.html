@@ -123,9 +123,10 @@
           <td class="px-2 py-2 tabular-nums">{{if .MntCount}}<a href="{{.MntHref}}" class="text-primary hover:underline">{{.MntCount}}</a>{{else}}0{{end}}</td>
           <td class="px-2 py-2 tabular-nums">{{if .WaitCount}}<a href="{{.WaitHref}}" class="text-primary hover:underline">{{.WaitCount}}</a>{{else}}0{{end}}</td>
           <td class="px-2 py-2">
-            {{if and $.CanWriteSales (eq .Row.Source "sales")}}
+            {{if and .Row.CanManage (eq .Row.Source "sales")}}
             <a href="/sales/{{.Row.SalesID}}/promote" class="btn btn-primary btn-sm">계약으로 전환</a>
             {{end}}
+            {{if .Row.ForeignOrg}}<span class="badge badge-neutral" title="타 조직 사업 · Owner만 변경">{{.Row.OrgLabel}}</span>{{end}}
           </td>
         </tr>
         {{else}}

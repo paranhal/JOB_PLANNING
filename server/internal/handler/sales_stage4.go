@@ -14,17 +14,18 @@ import (
 )
 
 func (h *SalesHandler) SetBidResult(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
+	id := p.SalesID
 	result := strings.TrimSpace(c.FormValue("result"))
 	if result == "" {
 		result = strings.TrimSpace(c.FormValue("bid_status"))
 	}
 	reason := strings.TrimSpace(c.FormValue("reason"))
 	amount := strings.TrimSpace(c.FormValue("amount"))
-	err := h.repo.SetBidResult(id, result, reason, amount, currentUserID(c), ctxString(c, "user_name"))
+	err = h.repo.SetBidResult(id, result, reason, amount, currentUserID(c), ctxString(c, "user_name"))
 	if err == nil {
 		_ = h.repo.MarkMigratedChecked(id, currentUserID(c), ctxString(c, "user_name"))
 	}
@@ -32,11 +33,12 @@ func (h *SalesHandler) SetBidResult(c echo.Context) error {
 }
 
 func (h *SalesHandler) StartNegotiation(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
-	err := h.repo.StartNegotiation(id, currentUserID(c), ctxString(c, "user_name"))
+	id := p.SalesID
+	err = h.repo.StartNegotiation(id, currentUserID(c), ctxString(c, "user_name"))
 	if err == nil {
 		_ = h.repo.MarkMigratedChecked(id, currentUserID(c), ctxString(c, "user_name"))
 	}
@@ -44,17 +46,11 @@ func (h *SalesHandler) StartNegotiation(c echo.Context) error {
 }
 
 func (h *SalesHandler) CloseContracted(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
-	p, err := h.repo.Get(id)
-	if err != nil || p == nil {
-		return h.replyWinJSON(c, fmt.Errorf("영업 사업을 찾을 수 없습니다"), id, "id")
-	}
-	if strings.TrimSpace(p.OrgID) != "" && !repository.VisibleInOrg(p.OrgID, currentOrg(c)) {
-		return h.replyWinJSON(c, fmt.Errorf("영업 사업을 찾을 수 없습니다"), id, "id")
-	}
+	id := p.SalesID
 	at := strings.TrimSpace(c.FormValue("contracted_at"))
 	if at == "" {
 		return h.replyWinJSON(c, fmt.Errorf("계약일이 필요합니다"), id, "contracted_at")
@@ -79,40 +75,44 @@ func (h *SalesHandler) CloseContracted(c echo.Context) error {
 }
 
 func (h *SalesHandler) CloseNegotiationFailed(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
+	id := p.SalesID
 	reason := strings.TrimSpace(c.FormValue("reason"))
-	err := h.repo.CloseNegotiationFailed(id, reason, currentUserID(c), ctxString(c, "user_name"))
+	err = h.repo.CloseNegotiationFailed(id, reason, currentUserID(c), ctxString(c, "user_name"))
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 
 func (h *SalesHandler) SetWinProb(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
+	id := p.SalesID
 	n, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("win_prob")))
-	err := h.repo.SetWinProb(id, n, currentUserID(c), ctxString(c, "user_name"))
+	err = h.repo.SetWinProb(id, n, currentUserID(c), ctxString(c, "user_name"))
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 
 func (h *SalesHandler) SetRFPReceived(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
-	err := h.repo.SetRFPReceived(id, strings.TrimSpace(c.FormValue("rfp_received_at")), currentUserID(c), ctxString(c, "user_name"))
+	id := p.SalesID
+	err = h.repo.SetRFPReceived(id, strings.TrimSpace(c.FormValue("rfp_received_at")), currentUserID(c), ctxString(c, "user_name"))
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 
 func (h *SalesHandler) MarkMigratedChecked(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
-	err := h.repo.MarkMigratedChecked(id, currentUserID(c), ctxString(c, "user_name"))
+	id := p.SalesID
+	err = h.repo.MarkMigratedChecked(id, currentUserID(c), ctxString(c, "user_name"))
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 
@@ -162,28 +162,22 @@ func (h *SalesHandler) Drop(c echo.Context) error {
 }
 
 func canDropSales(c echo.Context, p *model.SalesProject) bool {
-	if p == nil {
-		return false
-	}
-	if isAdminRole(c) {
-		return true
-	}
-	uid := strings.TrimSpace(currentUserID(c))
-	return uid != "" && uid == strings.TrimSpace(p.SalesOwnerID)
+	return canManageSalesProject(c, p)
 }
 
 func (h *SalesHandler) ChangeStage(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
+	id := p.SalesID
 	to := strings.TrimSpace(c.FormValue("stage"))
 	reason := strings.TrimSpace(c.FormValue("reason"))
 	if to == model.SalesStage4Closed {
 		return h.replyStage(c, fmt.Errorf("상세에서 종료하세요"), id, "/sales/"+id)
 	}
 	keep := c.FormValue("keep_override") == "1"
-	err := h.repo.ChangeStage(id, to, reason, currentUserID(c), ctxString(c, "user_name"), keep)
+	err = h.repo.ChangeStage(id, to, reason, currentUserID(c), ctxString(c, "user_name"), keep)
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=stage")
 }
 

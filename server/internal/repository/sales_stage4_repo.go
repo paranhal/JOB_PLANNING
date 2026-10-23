@@ -397,6 +397,10 @@ func (r *SalesRepo) ListMigratedUnchecked() ([]model.SalesProject, error) {
 }
 
 func (r *SalesRepo) ListMigratedUncheckedOrg(orgID string) ([]model.SalesProject, error) {
+	return r.ListMigratedUncheckedFilter(SalesListFilter{OrgID: orgID})
+}
+
+func (r *SalesRepo) ListMigratedUncheckedFilter(f SalesListFilter) ([]model.SalesProject, error) {
 	q := salesSelect + `
 		WHERE s.stage=? AND s.bid_status=?
 		  AND EXISTS (
@@ -408,7 +412,11 @@ func (r *SalesRepo) ListMigratedUncheckedOrg(orgID string) ([]model.SalesProject
 			WHERE h2.sales_id=s.sales_id AND h2.detail='migrated_checked'
 		  )`
 	args := []interface{}{model.SalesStage4Bid, model.SalesBidPending, model.SalesStage4Bid}
-	q, args = appendOrg(q, args, "s", orgIDOrAll(orgID))
+	if f.MyScope {
+		q, args = appendSalesOrgOrOwner(q, args, "s", f.OrgID, f.OwnerUserID, true)
+	} else {
+		q, args = appendOrg(q, args, "s", orgIDOrAll(f.OrgID))
+	}
 	q += `
 		ORDER BY s.updated_at DESC`
 	rows, err := r.db.Query(q, args...)

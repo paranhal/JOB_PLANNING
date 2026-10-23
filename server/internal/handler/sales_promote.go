@@ -12,8 +12,8 @@ import (
 )
 
 func (h *SalesHandler) PromoteForm(c echo.Context) error {
-	if !canWriteSalesDeal(c) {
-		return echo.ErrForbidden
+	if _, err := h.loadManagedSales(c); err != nil {
+		return err
 	}
 	p, wp, err := h.promoteState(c)
 	if err != nil {
@@ -35,8 +35,8 @@ func (h *SalesHandler) PromoteForm(c echo.Context) error {
 }
 
 func (h *SalesHandler) PromoteCustomer(c echo.Context) error {
-	if !canWriteSalesDeal(c) {
-		return echo.ErrForbidden
+	if _, err := h.loadManagedSales(c); err != nil {
+		return err
 	}
 	p, wp, err := h.promoteState(c)
 	if err != nil {
@@ -89,8 +89,8 @@ func (h *SalesHandler) PromoteCustomer(c echo.Context) error {
 }
 
 func (h *SalesHandler) PromoteSave(c echo.Context) error {
-	if !canWriteSalesDeal(c) {
-		return echo.ErrForbidden
+	if _, err := h.loadManagedSales(c); err != nil {
+		return err
 	}
 	p, wp, err := h.promoteState(c)
 	if err != nil {

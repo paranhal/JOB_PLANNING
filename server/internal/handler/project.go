@@ -233,10 +233,16 @@ func (h *ProjectHandler) Contracts(c echo.Context) error {
 		Search: search, Year: year, Status: status, IncludeAll: includeAll,
 		OrgID: SalesVisibilityScope(c).OrgID,
 	}
+	if currentRole(c) == model.RoleVisionAdmin || currentRole(c) == model.RoleCLevel {
+		if strings.TrimSpace(f.OrgID) == "" {
+			f.OrgID = repository.OrgAll
+		}
+	}
 	rows, err := h.repo.ListContractUnion(f)
 	if err != nil {
 		return err
 	}
+	annotateSalesContractManage(c, rows)
 	years, _ := h.repo.ListYears(f.OrgID)
 	today := time.Now().Format("2006-01-02")
 	kpi := model.BuildContractUnionKPI(rows, today)

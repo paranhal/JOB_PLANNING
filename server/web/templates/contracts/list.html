@@ -94,7 +94,7 @@
             {{if and $.CanLink .LinkSalesID}}
               <a href="/contracts/{{.ProjectID}}/link-sales?sales_id={{.LinkSalesID}}" class="px-2 py-0.5 border rounded">연결</a>
             {{end}}
-            {{if and $.CanWriteSales (eq .Source "sales")}}
+            {{if and .CanManage (eq .Source "sales")}}
               {{if .AmountMissing}}
               <form method="post" action="/sales/{{.SalesID}}/contract-amount" class="inline-flex gap-1">
                 <input type="number" name="contract_amount" min="0" class="w-24 border rounded px-1 py-0.5" required>

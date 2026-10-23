@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -9,18 +10,28 @@ import (
 )
 
 type ContractUnionFilter struct {
-	Search     string
-	Year       int
-	Status     string
-	IncludeAll bool
-	OrgID      string
+	Search      string
+	Year        int
+	Status      string
+	IncludeAll  bool
+	OrgID       string
+	OwnerUserID string
+	MyScope     bool
 }
 
 // ListContractUnion 사업관리 계약 ∪ 미연결 영업 계약 완료. 80-A. 73-E와 공유.
 func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.ContractRow, error) {
-	works, err := r.ListContractsInOrg(orgIDOrAll(f.OrgID), f.Search, f.Year, f.Status, f.IncludeAll)
-	if err != nil {
-		return nil, err
+	org := strings.TrimSpace(f.OrgID)
+	if org == "" && !f.MyScope {
+		log.Printf("ListContractUnion: empty org_id, skip OrgAll fallback")
+	}
+	var works []model.WorkProject
+	var err error
+	if org != "" {
+		works, err = r.ListContractsInOrg(org, f.Search, f.Year, f.Status, f.IncludeAll)
+		if err != nil {
+			return nil, err
+		}
 	}
 	linked := map[string]int{}
 	var salesIDs []string
@@ -35,7 +46,7 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 		return nil, err
 	}
 
-	candidates, err := r.listUnlinkedContractedSales(ContractUnionFilter{OrgID: f.OrgID})
+	candidates, err := r.listUnlinkedContractedSales(f)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +127,8 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 			AmountMissing:  amt <= 0,
 			ContractedAt:   firstNonEmptyStr(s.ContractedAt, s.CreatedAt),
 			OrgID:          s.OrgID,
+			OrgLabel:       s.OrgLabel,
+			SalesOwnerID:   s.SalesOwnerID,
 			Promoted:       s.Status == model.SalesStatusPromoted,
 			SalesBizType:   s.BizType,
 		}
@@ -150,18 +163,20 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 		SELECT s.sales_id, COALESCE(s.sales_no,''), COALESCE(s.name,''), COALESCE(s.prospect_name,''),
 			COALESCE(s.contract_amount,0), COALESCE(s.expected_amount,0), COALESCE(s.contracted_at,''),
 			COALESCE(s.created_at,''), COALESCE(s.org_id,''), COALESCE(s.status,''), COALESCE(s.biz_type,''),
-			COALESCE(NULLIF(TRIM(cu.org_name),''), '')
+			COALESCE(NULLIF(TRIM(cu.org_name),''), ''), COALESCE(s.sales_owner_id,''),
+			COALESCE(NULLIF(TRIM(og.short_name),''), NULLIF(TRIM(og.org_name),''), '')
 		FROM sales_projects s
 		LEFT JOIN customers cu ON cu.customer_id = s.customer_id
+		LEFT JOIN orgs og ON og.org_id = s.org_id
 		LEFT JOIN work_projects w ON TRIM(COALESCE(w.sales_project_id,'')) = s.sales_id
 		WHERE s.stage='closed' AND s.close_reason='contracted'
 		  AND w.project_id IS NULL`
 	var args []interface{}
 	org := strings.TrimSpace(f.OrgID)
-	if org == "" {
-		org = OrgAll
+	if org == "" && !f.MyScope {
+		log.Printf("listUnlinkedContractedSales: empty org_id, skip OrgAll fallback")
 	}
-	q, args = appendOrg(q, args, "s", org)
+	q, args = appendSalesOrgOrOwner(q, args, "s", org, f.OwnerUserID, f.MyScope)
 	q += ` ORDER BY s.contracted_at DESC, s.sales_id`
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
@@ -175,7 +190,8 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 	for rows.Next() {
 		var p model.SalesProject
 		if err := rows.Scan(&p.SalesID, &p.SalesNo, &p.Name, &p.ProspectName,
-			&p.ContractAmount, &p.ExpectedAmount, &p.ContractedAt, &p.CreatedAt, &p.OrgID, &p.Status, &p.BizType, &p.CustomerName); err != nil {
+			&p.ContractAmount, &p.ExpectedAmount, &p.ContractedAt, &p.CreatedAt, &p.OrgID, &p.Status, &p.BizType, &p.CustomerName,
+			&p.SalesOwnerID, &p.OrgLabel); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

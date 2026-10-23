@@ -11,8 +11,15 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
-	"customer-support/internal/repository"
 )
+
+func echoOrKeepHTTP(err error) error {
+	var he *echo.HTTPError
+	if errors.As(err, &he) {
+		return he
+	}
+	return echo.NewHTTPError(http.StatusNotFound, err.Error())
+}
 
 func salesCanShowNextAction(c echo.Context) bool {
 	return canWriteSales(c) && !viewAsActive(c)
@@ -26,8 +33,8 @@ func (h *SalesHandler) loadSalesForNext(c echo.Context) (*model.SalesProject, st
 		}
 		return nil, "", err
 	}
-	if strings.TrimSpace(p.OrgID) != "" && !repository.VisibleInOrg(p.OrgID, currentOrg(c)) {
-		return nil, "", fmt.Errorf("영업 사업을 찾을 수 없습니다")
+	if err := requireManageSalesProject(c, p); err != nil {
+		return nil, "", err
 	}
 	wp := ""
 	if h.projectRepo != nil {
@@ -39,12 +46,12 @@ func (h *SalesHandler) loadSalesForNext(c echo.Context) (*model.SalesProject, st
 }
 
 func (h *SalesHandler) WinDialog(c echo.Context) error {
-	if !salesCanShowNextAction(c) {
+	if !canWriteSales(c) || viewAsActive(c) {
 		return echo.ErrForbidden
 	}
 	p, wp, err := h.loadSalesForNext(c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		return echoOrKeepHTTP(err)
 	}
 	act := model.SalesNextActionOf(p, wp, true)
 	if act.Kind != model.SalesActionWin {
@@ -67,12 +74,12 @@ func (h *SalesHandler) WinDialog(c echo.Context) error {
 }
 
 func (h *SalesHandler) ContractDialog(c echo.Context) error {
-	if !salesCanShowNextAction(c) {
+	if !canWriteSales(c) || viewAsActive(c) {
 		return echo.ErrForbidden
 	}
 	p, wp, err := h.loadSalesForNext(c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		return echoOrKeepHTTP(err)
 	}
 	act := model.SalesNextActionOf(p, wp, true)
 	if act.Kind != model.SalesActionConvert {
@@ -105,6 +112,9 @@ func (h *SalesHandler) ConfirmWin(c echo.Context) error {
 	id := c.Param("id")
 	p, wp, err := h.loadSalesForNext(c)
 	if err != nil {
+		if he, ok := err.(*echo.HTTPError); ok && he.Code == http.StatusForbidden {
+			return he
+		}
 		return h.replyWinJSON(c, err, id, "id")
 	}
 	act := model.SalesNextActionOf(p, wp, true)

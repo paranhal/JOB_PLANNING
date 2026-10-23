@@ -132,6 +132,7 @@
           <td class="px-4 py-3">
             <a href="/sales/{{.SalesID}}{{if $.FromTask}}?tab=timeline&from_task={{$.FromTask}}{{end}}" class="font-medium text-blue-700 hover:underline">{{.DisplayNo}} {{.Name}}</a>
             {{if .IsTentativeName}}<span class="ml-1 text-xs text-gray-400">미확정</span>{{end}}
+            {{if .ForeignOrg}}<span class="badge badge-neutral ml-1" title="{{.ManageHint}}">{{.OrgLabel}}</span>{{end}}
           </td>
           <td class="px-4 py-3 {{if or (eq .CloseReason "lost") (eq .CloseReason "dropped")}}text-gray-400{{end}}">
             {{.DisplayStage}}

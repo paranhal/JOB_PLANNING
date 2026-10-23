@@ -13,10 +13,11 @@ import (
 )
 
 func (h *SalesHandler) Sleep(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
+	id := p.SalesID
 	until := strings.TrimSpace(c.FormValue("until"))
 	if until == "" {
 		until = model.DefaultDormantUntil(time.Now(), h.repo.DormantDefaultMonth())
@@ -24,7 +25,7 @@ func (h *SalesHandler) Sleep(c echo.Context) error {
 	reason := strings.TrimSpace(c.FormValue("reason"))
 	noPlan := c.FormValue("no_plan") == "1" || c.FormValue("no_plan") == "on"
 	warn := h.repo.NextActionBeforeDormant(id, until)
-	err := h.repo.Sleep(id, until, reason, currentUserID(c), ctxString(c, "user_name"), noPlan)
+	err = h.repo.Sleep(id, until, reason, currentUserID(c), ctxString(c, "user_name"), noPlan)
 	loc := "/sales/" + id + "?ok=dormant"
 	if warn {
 		loc += "&warn=next"
@@ -33,12 +34,9 @@ func (h *SalesHandler) Sleep(c echo.Context) error {
 }
 
 func (h *SalesHandler) WakeForm(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
-	}
-	p, err := h.repo.Get(c.Param("id"))
+	p, err := h.loadManagedSales(c)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/sales?err=notfound")
+		return err
 	}
 	year := p.BudgetYear
 	if year > 0 {
@@ -50,12 +48,13 @@ func (h *SalesHandler) WakeForm(c echo.Context) error {
 }
 
 func (h *SalesHandler) Wake(c echo.Context) error {
-	if !canWriteSales(c) {
-		return echo.ErrForbidden
+	p, err := h.loadManagedSales(c)
+	if err != nil {
+		return err
 	}
-	id := c.Param("id")
+	id := p.SalesID
 	y, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("budget_year")))
-	err := h.repo.Wake(id, currentUserID(c), ctxString(c, "user_name"), y, c.FormValue("budget_status"))
+	err = h.repo.Wake(id, currentUserID(c), ctxString(c, "user_name"), y, c.FormValue("budget_status"))
 	return h.replyStage(c, err, id, "/sales/"+id+"?ok=wake")
 }
 
@@ -63,7 +62,7 @@ func (h *SalesHandler) BulkBizType(c echo.Context) error {
 	if !canWriteSales(c) {
 		return echo.ErrForbidden
 	}
-	_, err := h.repo.BulkSetBizType(formIDs(c, "sales_id"), c.FormValue("biz_type"))
+	_, err := h.repo.BulkSetBizType(h.filterManageableSalesIDs(c, formIDs(c, "sales_id")), c.FormValue("biz_type"))
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/sales?err="+err.Error())
 	}
@@ -74,7 +73,7 @@ func (h *SalesHandler) BulkBudgetStatus(c echo.Context) error {
 	if !canWriteSales(c) {
 		return echo.ErrForbidden
 	}
-	_, err := h.repo.BulkSetBudgetStatus(formIDs(c, "sales_id"), c.FormValue("budget_status"))
+	_, err := h.repo.BulkSetBudgetStatus(h.filterManageableSalesIDs(c, formIDs(c, "sales_id")), c.FormValue("budget_status"))
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/sales?err="+err.Error())
 	}

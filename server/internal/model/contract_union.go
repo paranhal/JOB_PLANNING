@@ -27,6 +27,10 @@ type ContractRow struct {
 	StartDate      string
 	Status         string
 	OrgID          string
+	OrgLabel       string
+	SalesOwnerID   string
+	CanManage      bool
+	ForeignOrg     bool
 	Promoted       bool
 	LinkNeed       string // 제안 영업번호. 80-B
 	LinkSalesID    string

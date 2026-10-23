@@ -12,6 +12,7 @@
         {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">미확정</span>{{end}}
         <span>{{.Project.ConfirmationLabel}}</span>
         {{range .SalesGroups}}<span class="text-xs text-gray-500">{{.GroupNo}} {{.Name}}</span>{{end}}
+        {{if .Project.ForeignOrg}}<span class="badge badge-neutral" title="{{.Project.ManageHint}}">{{.Project.OrgLabel}}</span>{{end}}
       </p>
       {{if .ShowProgress}}
       <p class="text-sm text-gray-600 mt-1">
@@ -28,7 +29,7 @@
       </p>
       {{end}}
     </div>
-    {{if .CanWrite}}
+    {{if or .CanWrite .CanManage}}
     <div class="hidden sm:flex flex-wrap gap-2">
       {{if .CanPromote}}
       <a href="/sales/{{.Raw.SalesID}}/promote" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">계약으로 전환</a>
@@ -36,9 +37,13 @@
       {{if .WorkProjectID}}
       <a href="/projects/{{.WorkProjectID}}" class="px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">사업관리에서 보기</a>
       {{end}}
+      {{if .CanWrite}}
       <button type="button" class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-lg" @click="startCreate()">+ 활동 추가</button>
+      {{end}}
+      {{if .CanManage}}
       <a href="/quotes/new?sales_id={{.Project.SalesID}}" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">견적 작성</a>
       <a href="/sales/{{.Project.SalesID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">수정</a>
+      {{end}}
       {{if .CanSleep}}
       <button type="button" class="px-4 py-2 text-sm border rounded-lg" @click="sleepOpen=true">휴면</button>
       {{end}}
@@ -527,11 +532,15 @@
   </div>
   {{if .CanWrite}}{{template "sales_activity_panel" .}}{{end}}
   {{template "sales_stage_reason" .}}
-  {{if .CanWrite}}
+  {{if or .CanWrite .CanManage}}
   <div class="sm:hidden sticky bottom-0 z-20 -mx-4 px-4 py-3 bg-white/95 border-t border-gray-200 flex flex-col gap-2">
+    {{if .CanWrite}}
     <button type="button" class="w-full px-4 py-2.5 text-sm bg-orange-600 text-white rounded-lg" @click="startCreate()">+ 활동 추가</button>
+    {{end}}
+    {{if .CanManage}}
     <a href="/quotes/new?sales_id={{.Project.SalesID}}" class="w-full text-center px-4 py-2.5 text-sm bg-emerald-600 text-white rounded-lg">견적 작성</a>
     <a href="/sales/{{.Project.SalesID}}/edit" class="w-full text-center px-4 py-2.5 text-sm border rounded-lg">수정</a>
+    {{end}}
     {{if .CanPromote}}
     <a href="/sales/{{.Raw.SalesID}}/promote" class="w-full text-center px-4 py-2.5 text-sm text-white bg-blue-600 rounded-lg">계약으로 전환</a>
     {{end}}

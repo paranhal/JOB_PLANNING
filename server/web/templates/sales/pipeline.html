@@ -73,7 +73,7 @@
         {{range .Rows}}
         <tr>
           <td class="px-3 py-2 font-mono text-xs whitespace-nowrap"><a href="/sales/{{.SalesID}}" class="text-blue-700" data-sales-row-link>{{.DisplayNo}}</a></td>
-          <td class="px-3 py-2 whitespace-nowrap">{{.Name}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.Name}} {{if .ForeignOrg}}<span class="badge badge-neutral" title="{{.ManageHint}}">{{.OrgLabel}}</span>{{end}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.Customer}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.Owner}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.DisplayStage}}</td>

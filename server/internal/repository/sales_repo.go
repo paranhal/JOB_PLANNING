@@ -68,9 +68,12 @@ const salesSelect = `
 		COALESCE(s.billing_cycle,''), COALESCE(s.amount_vat_included,0),
 		COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
 		COALESCE(s.created_by_user_id,''), COALESCE(s.created_by_name,''),
-		COALESCE(cu.org_name,'')
+		COALESCE(cu.org_name,''),
+		COALESCE(s.org_id,''),
+		COALESCE(NULLIF(TRIM(og.short_name),''), NULLIF(TRIM(og.org_name),''), '')
 	FROM sales_projects s
-	LEFT JOIN customers cu ON cu.customer_id = s.customer_id`
+	LEFT JOIN customers cu ON cu.customer_id = s.customer_id
+	LEFT JOIN orgs og ON og.org_id = s.org_id`
 
 func (r *SalesRepo) List(search, status, stage string) ([]model.SalesProject, error) {
 	return r.ListFilter(SalesListFilter{Search: search, Status: status, Stage: stage, DealType: model.SalesDealAll, OrgID: OrgAll})
@@ -102,15 +105,50 @@ type SalesListFilter struct {
 	OrgID            string
 	PersonName       string
 	PersonUserID     string
+	OwnerUserID      string // MyScope 전용. Owner(이름 필터)와 혼동 금지.
+	MyScope          bool
+}
+
+func appendSalesOrgOrOwner(q string, args []interface{}, alias, orgID, ownerUserID string, myScope bool) (string, []interface{}) {
+	orgID = strings.TrimSpace(orgID)
+	uid := strings.TrimSpace(ownerUserID)
+	col := "org_id"
+	own := "sales_owner_id"
+	if a := strings.TrimSpace(alias); a != "" {
+		col = a + ".org_id"
+		own = a + ".sales_owner_id"
+	}
+	if myScope {
+		switch {
+		case uid != "" && orgID != "" && orgID != OrgAll:
+			q += fmt.Sprintf(` AND (%s=? OR %s=?)`, col, own)
+			return q, append(args, orgID, uid)
+		case uid != "":
+			q += fmt.Sprintf(` AND %s=?`, own)
+			return q, append(args, uid)
+		case orgID != "" && orgID != OrgAll:
+			return appendOrg(q, args, alias, orgID)
+		default:
+			return q + ` AND 1=0`, args
+		}
+	}
+	if orgID == "" {
+		return q + ` AND 1=0`, args
+	}
+	return appendOrg(q, args, alias, orgID)
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
-	if strings.TrimSpace(f.OrgID) == "" {
-		f.OrgID = OrgAll
-	}
 	q := salesSelect + ` WHERE 1=1`
 	var args []interface{}
-	q, args = appendOrg(q, args, "s", f.OrgID)
+	if f.MyScope {
+		q, args = appendSalesOrgOrOwner(q, args, "s", f.OrgID, f.OwnerUserID, true)
+	} else {
+		if strings.TrimSpace(f.OrgID) == "" {
+			f.OrgID = OrgAll
+		}
+		q, args = appendOrg(q, args, "s", f.OrgID)
+	}
 	if s := strings.TrimSpace(f.DealType); s != "" && s != model.SalesDealAll {
 		deal := model.NormalizeSalesDealType(s)
 		q += ` AND COALESCE(NULLIF(TRIM(s.deal_type),''),'build')=?`
@@ -687,6 +725,7 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 		&p.BizType, &p.BudgetYear, &p.BudgetStatus, &p.DormantUntil, &p.DormantReason, &p.DormantAt, &p.DormantBy,
 		&p.BidYM, &p.RevenueYM, &p.RevenueFrom, &p.RevenueTo, &p.BillingCycle, &vatInc,
 		&p.CreatedAt, &p.UpdatedAt, &p.CreatedByUserID, &p.CreatedByName, &p.CustomerName,
+		&p.OrgID, &p.OrgLabel,
 	)
 	if err != nil {
 		return nil, err

@@ -48,7 +48,6 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 			wpBy = m
 		}
 	}
-	canAct := salesCanShowNextAction(c)
 	rows := make([]map[string]interface{}, 0, len(fc.Rows))
 	for i := range fc.Rows {
 		r := fc.Rows[i]
@@ -56,8 +55,8 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 			continue
 		}
 		def := model.FindSalesStage(stages, r.Project.Stage)
-		vp := h.viewProject(&r.Project, def)
-		act := model.SalesNextActionOf(&r.Project, wpBy[r.Project.SalesID], canAct)
+		vp := h.viewProject(c, &r.Project, def)
+		act := model.SalesNextActionOf(&r.Project, wpBy[r.Project.SalesID], salesNextActionEnabled(c, &r.Project))
 		vp["NextAction"] = act
 		vp["WorkProjectID"] = wpBy[r.Project.SalesID]
 		ym := r.BasisYM

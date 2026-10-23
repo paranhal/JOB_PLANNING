@@ -112,8 +112,8 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 	if !strings.Contains(body, "A1사업") || !strings.Contains(body, "A2사업") {
 		t.Fatal("조직관리자에게 O01 사업이 없다")
 	}
-	if strings.Contains(body, "B사업") {
-		t.Fatal("조직관리자에게 O02 사업이 보인다")
+	if !strings.Contains(body, "B사업") {
+		t.Fatal("95-2G 목록 전 직원 조회 — 조직관리자에게 O02 사업이 없다")
 	}
 	if !strings.Contains(body, "영업담당") {
 		t.Fatal("담당자 필터가 없다")
@@ -124,8 +124,8 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 	if !strings.Contains(b1, "A1사업") || !strings.Contains(b1, "A2사업") {
 		t.Fatal("영업하나가 같은 조직 동료 사업을 못 본다")
 	}
-	if strings.Contains(b1, "B사업") {
-		t.Fatal("영업하나가 다른 조직 사업을 본다")
+	if !strings.Contains(b1, "B사업") {
+		t.Fatal("95-2G 목록 전 직원 조회 — 영업하나가 다른 조직 사업을 못 본다")
 	}
 	if !strings.Contains(b1, "영업담당") {
 		t.Fatal("영업 담당자에게 담당자 필터가 없다")
@@ -189,8 +189,8 @@ func TestSalesVisibilityOrgAdminSeesOrgSalesOnly(t *testing.T) {
 		t.Fatalf("대시보드 O02 누수 status=%d", dash.Code)
 	}
 	pipe := doGetWith(t, e, "/sales?view=pipeline", jwtCookieUser(t, oa))
-	if pipe.Code != http.StatusOK || strings.Contains(pipe.Body.String(), "B사업") {
-		t.Fatalf("파이프라인 O02 누수 status=%d", pipe.Code)
+	if pipe.Code != http.StatusOK || !strings.Contains(pipe.Body.String(), "B사업") {
+		t.Fatalf("파이프라인 목록 조회 O02 status=%d", pipe.Code)
 	}
 }
 
@@ -295,8 +295,8 @@ func TestSalesRoleSeesOrgPeersNotOtherOrg(t *testing.T) {
 	if !strings.Contains(body, "A1사업") || !strings.Contains(body, "A2사업") {
 		t.Fatal("O01 동료 사업이 목록에 없다")
 	}
-	if strings.Contains(body, "B사업") {
-		t.Fatal("O02 사업이 0건이어야 한다")
+	if !strings.Contains(body, "B사업") {
+		t.Fatal("95-2G 목록에 O02 사업이 없다")
 	}
 }
 

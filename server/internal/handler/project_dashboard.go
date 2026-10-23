@@ -11,7 +11,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
-	"customer-support/internal/repository"
 )
 
 type dashRow struct {
@@ -68,10 +67,11 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 	}
 	act := strings.TrimSpace(c.QueryParam("act"))
 	today := time.Now().Format("2006-01-02")
-	union, err := h.repo.ListContractUnion(repository.ContractUnionFilter{OrgID: SalesVisibilityScope(c).OrgID})
+	union, err := h.repo.ListContractUnion(salesContractUnionFilter(c))
 	if err != nil {
 		return err
 	}
+	annotateSalesContractManage(c, union)
 	acts, err := h.repo.CountProjectActivities()
 	if err != nil {
 		return err
