@@ -85,24 +85,35 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		if date < from || date > to {
 			return redirectErr(fmt.Sprintf("방문일은 %s ~ %s 사이여야 합니다", from, to))
 		}
-		assignee := strings.TrimSpace(c.FormValue("assignee"))
-		if assignee == "" {
-			return redirectErr("담당자를 선택하세요")
-		}
 		v := model.MaintenanceVisit{
 			PlanID: planID, VisitDate: date, CustomerID: cust,
-			ProductType: product, Assignee: assignee, EntryCategory: "normal",
+			ProductType: product, EntryCategory: "normal",
 			ProjectID: strings.TrimSpace(c.FormValue("project_id")),
 		}
 		if err := applyVisitDupForm(c, &v); err != nil {
 			return redirectErr(err.Error())
 		}
+		if err := h.applyVisitAssigneesFromForm(c, &v); err != nil {
+			return redirectErr(err.Error())
+		}
+		if strings.TrimSpace(v.Assignee) == "" && len(v.People) == 0 {
+			name := strings.TrimSpace(c.FormValue("assignee"))
+			kind, _ := parseAssigneeFilter(name)
+			if name != "" && kind == "all" && name != "all" {
+				v.Assignee = name
+			}
+		}
+		if strings.TrimSpace(v.Assignee) == "" && len(v.People) == 0 {
+			return redirectErr("담당자를 선택하세요")
+		}
 		if action == "done" && !lastOfPeriod {
 			return redirectErr("이미 점검함은 기간 마지막 달에만 할 수 있습니다")
 		}
-		if err := h.repo.AssignSlot(v); err != nil {
+		visitID, err := h.repo.AssignSlotID(v)
+		if err != nil {
 			return redirectErr(err.Error())
 		}
+		v.VisitID = visitID
 		if action == "done" {
 			if got := h.repo.FindVisitBySlot(planID, cust, product, date); got != nil {
 				_ = h.repo.SetVisitCompleted(got.VisitID, true, date)
@@ -112,7 +123,7 @@ func (h *MaintenanceHandler) ConfirmQuarterSlot(c echo.Context) error {
 		if h.wbRepo != nil {
 			_, _ = h.wbRepo.EnsureMaintenanceTasks()
 		}
-		h.recordVisitAssign(c, v.VisitID, assignee, planID, cust, product, date)
+		h.recordVisitAssign(c, v.VisitID, v.Assignee, planID, cust, product, date)
 		h.repo.TouchPlanUpdated(planID)
 		if action == "done" {
 			return redirectOK("quarter-done")

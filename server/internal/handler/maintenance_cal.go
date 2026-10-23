@@ -44,29 +44,32 @@ type MntMonthStats struct {
 }
 
 type MntVisitCard struct {
-	VisitID        string `json:"visit_id"`
-	Date           string `json:"date"`
-	Site           string `json:"site"`
-	Product        string `json:"product"`
-	Region         string `json:"region"`
-	AssigneeLabel  string `json:"assignee_label"`
-	AssigneeTitle  string `json:"assignee_title"`
-	GroupName      string `json:"group_name"`
-	State          string `json:"state"`
-	StateLabel     string `json:"state_label"`
-	BadgeLabel     string `json:"badge_label"`
-	BadgeExtra     string `json:"badge_extra"`
-	BadgeClass     string `json:"badge_class"`
-	RoundNo        int    `json:"round_no"`
-	Dup            bool   `json:"dup"`
-	Completed      bool   `json:"completed"`
-	CanDelete      bool   `json:"can_delete"`
-	CustomerID     string `json:"customer_id"`
-	ProductType    string `json:"product_type"`
-	Assignee       string `json:"assignee"`
-	ProjectID      string `json:"project_id"`
-	EntryCategory  string `json:"entry_category"`
-	Notes          string `json:"notes"`
+	VisitID       string `json:"visit_id"`
+	Date          string `json:"date"`
+	Site          string `json:"site"`
+	Product       string `json:"product"`
+	Region        string `json:"region"`
+	AssigneeLabel string `json:"assignee_label"`
+	AssigneeTitle string `json:"assignee_title"`
+	GroupName     string `json:"group_name"`
+	State         string `json:"state"`
+	StateLabel    string `json:"state_label"`
+	BadgeLabel    string `json:"badge_label"`
+	BadgeExtra    string `json:"badge_extra"`
+	BadgeClass    string `json:"badge_class"`
+	RoundNo       int    `json:"round_no"`
+	Dup           bool   `json:"dup"`
+	Completed     bool   `json:"completed"`
+	CanDelete     bool   `json:"can_delete"`
+	CustomerID    string `json:"customer_id"`
+	ProductType   string `json:"product_type"`
+	Assignee      string `json:"assignee"`
+	PeopleIDs     string `json:"people_ids"`
+	OwnerID       string `json:"owner_id"`
+	WorkGroupID   string `json:"work_group_id"`
+	ProjectID     string `json:"project_id"`
+	EntryCategory string `json:"entry_category"`
+	Notes         string `json:"notes"`
 	CompletedDate string `json:"completed_date"`
 	CompleteHref  string `json:"complete_href"`
 	DeleteHref    string `json:"delete_href"`
@@ -386,6 +389,9 @@ func buildVisitCards(visits []model.MaintenanceVisit, today, deleteAfter string,
 			CustomerID:    v.CustomerID,
 			ProductType:   v.ProductType,
 			Assignee:      v.Assignee,
+			PeopleIDs:     visitPeopleIDsCSV(v),
+			OwnerID:       visitOwnerUserID(v),
+			WorkGroupID:   v.WorkGroupID,
 			ProjectID:     v.ProjectID,
 			EntryCategory: v.EntryCategory,
 			Notes:         v.Notes,

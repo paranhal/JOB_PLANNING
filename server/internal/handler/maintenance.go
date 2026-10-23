@@ -197,6 +197,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if assigneeKey == "" {
 		assigneeKey = "all"
 	}
+	workGroups, workGroupMembersJSON := h.workGroupPicksForVisit(c)
 	calGroups, calPeople, groupMembers := h.calFilterOptions(c, shown)
 	userName := ""
 	if kind, uid := parseAssigneeFilter(assigneeKey); kind == "user" && uid != "" {
@@ -350,7 +351,8 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"HolidayMissing":      holidayMissingBanner(h.holidayRepo, plan.PlanYear),
 		"OrgProducts":         h.orgProductList(plan.OrgID),
 		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
-		"WorkGroups":          []model.WorkGroup{},
+		"WorkGroups":          workGroups,
+		"WorkGroupMembers":    workGroupMembersJSON,
 	})
 }
 
@@ -378,20 +380,7 @@ func (h *MaintenanceHandler) userDisplayName(uid string) string {
 }
 
 func (h *MaintenanceHandler) calFilterOptions(c echo.Context, visits []model.MaintenanceVisit) ([]MntCalGroup, []MntCalPerson, map[string]map[string]bool) {
-	var groups []model.WorkGroup
-	if h != nil && h.groups != nil {
-		org := currentOrg(c)
-		role := model.NormalizeRole(currentRole(c))
-		admin := role == model.RoleOrgAdmin || role == model.RoleAdmin || role == model.RoleVisionAdmin || role == model.RoleCLevel
-		if org == repository.OrgAll && (role == model.RoleVisionAdmin || role == model.RoleCLevel) {
-			groups, _ = h.groups.ListGroups("", model.WorkGroupActive)
-		} else {
-			if org == "" || org == repository.OrgAll {
-				org = workGroupActor(c).HomeOrg()
-			}
-			groups, _ = h.groups.ListVisibleActiveForWork(org, currentUserID(c), admin)
-		}
-	}
+	groups := h.listVisibleWorkGroups(c)
 	orgNames := map[string]string{}
 	if h != nil && h.orgs != nil {
 		if rows, err := h.orgs.ListActive(); err == nil {
@@ -540,14 +529,16 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 	if _, err := h.requireVisiblePlan(c, planID); err != nil {
 		return err
 	}
-	v, err := parseVisitForm(c, planID, "")
+	v, err := h.parseVisitForm(c, planID, "")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if err := h.repo.InsertVisitFull(v); err != nil {
+	visitID, err := h.repo.InsertVisitFullID(v)
+	if err != nil {
 		setFlashErrCookie(c, err.Error())
 		return c.Redirect(http.StatusSeeOther, planURLFrom(c, planID, ""))
 	}
+	v.VisitID = visitID
 	if h.wbRepo != nil {
 		_, _ = h.wbRepo.EnsureMaintenanceTasks()
 	}
@@ -577,14 +568,19 @@ func (h *MaintenanceHandler) AssignUnassignedSlot(c echo.Context) error {
 	v := model.MaintenanceVisit{
 		PlanID: planID, VisitDate: date, CustomerID: cust,
 		ProductType: product, ProjectID: strings.TrimSpace(c.FormValue("project_id")),
-		Assignee: strings.TrimSpace(c.FormValue("assignee")), EntryCategory: "normal",
+		EntryCategory: "normal",
 	}
 	if err := applyVisitDupForm(c, &v); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if err := h.repo.AssignSlot(v); err != nil {
+	if err := h.applyVisitAssigneesFromForm(c, &v); err != nil {
+		return err
+	}
+	visitID, err := h.repo.AssignSlotID(v)
+	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	v.VisitID = visitID
 	if h.wbRepo != nil {
 		_, _ = h.wbRepo.EnsureMaintenanceTasks()
 	}
@@ -612,7 +608,7 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	if p := c.FormValue("plan_id"); p != "" {
 		planID = p
 	}
-	v, err := parseVisitForm(c, planID, vid)
+	v, err := h.parseVisitForm(c, planID, vid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -645,7 +641,7 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, back+sep+"ok=edit")
 }
 
-func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVisit, error) {
+func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVisit, error) {
 	date, err := model.ParseAppDate(c.FormValue("visit_date"))
 	if err != nil {
 		return model.MaintenanceVisit{}, err
@@ -661,7 +657,6 @@ func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVi
 	v := model.MaintenanceVisit{
 		VisitID: visitID, PlanID: planID, VisitDate: date, CustomerID: cust,
 		EntryCategory: cat, Notes: strings.TrimSpace(c.FormValue("notes")),
-		Assignee:    strings.TrimSpace(c.FormValue("assignee")),
 		ProductType: strings.TrimSpace(c.FormValue("product_type")),
 		ProjectID:   strings.TrimSpace(c.FormValue("project_id")),
 		Completed:   c.FormValue("completed") != "",
@@ -672,6 +667,9 @@ func parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVi
 		v.CompletedDate = strings.TrimSpace(c.FormValue("completed_date"))
 	}
 	if err := applyVisitDupForm(c, &v); err != nil {
+		return v, err
+	}
+	if err := h.applyVisitAssigneesFromForm(c, &v); err != nil {
 		return v, err
 	}
 	return v, nil
@@ -747,7 +745,13 @@ func planURLFrom(c echo.Context, planID, done string) string {
 	view := firstNonEmpty(c.FormValue("view"), c.QueryParam("view"))
 	month := firstNonEmpty(c.FormValue("month"), c.QueryParam("month"))
 	all := mntScopeAll(c) && isTechRole(c)
-	assignee := firstNonEmpty(c.FormValue("assignee"), c.QueryParam("assignee"))
+	assignee := firstNonEmpty(c.FormValue("cal_assignee"), c.QueryParam("assignee"))
+	if raw := strings.TrimSpace(c.FormValue("assignee")); raw != "" {
+		kind, _ := parseAssigneeFilter(raw)
+		if kind != "all" || raw == "all" {
+			assignee = raw
+		}
+	}
 	day := firstNonEmpty(c.FormValue("day"), c.QueryParam("day"))
 	return planURLExtra(planID, view, month, done, all, assignee, day)
 }

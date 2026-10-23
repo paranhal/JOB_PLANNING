@@ -206,15 +206,21 @@ func (r *MaintenanceRepo) FindVisitBySlot(planID, customerID, product, date stri
 
 // AssignSlot 미배정 슬롯에 날짜를 넣는다. 계획 복사로 날짜만 비운 행이 있으면 그 행을 쓴다.
 func (r *MaintenanceRepo) AssignSlot(v model.MaintenanceVisit) error {
+	_, err := r.AssignSlotID(v)
+	return err
+}
+
+// AssignSlotID AssignSlot 과 같고 방문 ID를 돌려준다.
+func (r *MaintenanceRepo) AssignSlotID(v model.MaintenanceVisit) (string, error) {
 	v.VisitDate = strings.TrimSpace(v.VisitDate)
 	v.CustomerID = strings.TrimSpace(v.CustomerID)
 	if v.PlanID == "" || v.VisitDate == "" || v.CustomerID == "" {
-		return fmt.Errorf("날짜와 고객을 선택하세요")
+		return "", fmt.Errorf("날짜와 고객을 선택하세요")
 	}
 	if v.EntryCategory == "" {
 		v.EntryCategory = "normal"
 	}
-	if strings.TrimSpace(v.Assignee) == "" {
+	if v.People == nil && strings.TrimSpace(v.Assignee) == "" {
 		v.Assignee = r.AssigneeForVisit(v.PlanID, v.CustomerID, v.ProductType, v.VisitDate)
 	}
 	v.DupReason = strings.TrimSpace(v.DupReason)
@@ -227,7 +233,7 @@ func (r *MaintenanceRepo) AssignSlot(v model.MaintenanceVisit) error {
 		v.RoundNo = r.nextRoundNo(v.PlanID, v.CustomerID, v.ProductType, v.VisitDate, exceptID)
 	}
 	if err := r.guardVisitRound(v, exceptID, autoRound, false); err != nil {
-		return err
+		return "", err
 	}
 	if tpl := r.findUndatedVisit(v.PlanID, v.CustomerID, v.ProductType); tpl != nil {
 		tpl.VisitDate = v.VisitDate
@@ -237,13 +243,22 @@ func (r *MaintenanceRepo) AssignSlot(v model.MaintenanceVisit) error {
 		if strings.TrimSpace(v.ProjectID) != "" {
 			tpl.ProjectID = v.ProjectID
 		}
+		if strings.TrimSpace(v.WorkGroupID) != "" {
+			tpl.WorkGroupID = v.WorkGroupID
+		}
+		if v.People != nil {
+			tpl.People = v.People
+		}
 		if strings.TrimSpace(tpl.Notes) == "복사(날짜 미정)" {
 			tpl.Notes = ""
 		}
 		tpl.DupReason = v.DupReason
-		return r.UpdateVisit(*tpl)
+		if err := r.UpdateVisit(*tpl); err != nil {
+			return "", err
+		}
+		return tpl.VisitID, nil
 	}
-	return r.InsertVisitFull(v)
+	return r.InsertVisitFullID(v)
 }
 
 func (r *MaintenanceRepo) findUndatedVisit(planID, customerID, product string) *model.MaintenanceVisit {

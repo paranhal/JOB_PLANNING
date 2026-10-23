@@ -1,6 +1,90 @@
 {{define "title"}}정기점검 {{.Plan.PlanYear}}년 · {{appName}}{{end}}
 
 {{define "content"}}
+<script type="application/json" id="mnt-work-group-members">{{if .WorkGroupMembers}}{{.WorkGroupMembers}}{{else}}[]{{end}}</script>
+<script>
+window.mntWorkGroups = (function () {
+  try {
+    return JSON.parse(document.getElementById('mnt-work-group-members').textContent || '[]');
+  } catch (e) { return []; }
+})();
+window.mntAssigneeMulti = function (cfg) {
+  cfg = cfg || {};
+  return {
+    open: false, q: '', selected: {}, autoIds: {}, ownerId: '', groupId: '',
+    target: cfg.target || 'add',
+    init() {
+      const form = this.$el.closest('form');
+      if (!form) return;
+      const sel = form.querySelector('[name="work_group_id"]');
+      if (!sel) return;
+      this.groupId = sel.value || '';
+      sel.addEventListener('change', () => this.onGroup(sel.value || ''));
+    },
+    match(name) {
+      const s = (this.q || '').trim().toLowerCase();
+      if (!s) return true;
+      return String(name || '').toLowerCase().indexOf(s) >= 0;
+    },
+    selectedIds() { return Object.keys(this.selected).filter((id) => this.selected[id]); },
+    excludeIds() {
+      const g = (window.mntWorkGroups || []).find((x) => x.id === this.groupId);
+      if (!g || !g.members) return [];
+      return g.members.map((m) => m.user_id).filter((id) => id && !this.selected[id]);
+    },
+    nameOf(id) {
+      const el = this.$el.querySelector('input[type=checkbox][value="' + id + '"]');
+      if (!el) return id;
+      const lab = el.closest('label');
+      return lab ? String(lab.textContent || '').trim() : id;
+    },
+    summaryLabel() {
+      const ids = this.selectedIds();
+      if (!ids.length) return '— 선택 —';
+      const name = this.nameOf(ids[0]);
+      if (ids.length === 1) return name;
+      return name + ' 외 ' + (ids.length - 1) + '명';
+    },
+    toggle(id, on) {
+      if (on) this.selected[id] = true;
+      else delete this.selected[id];
+      this.syncOwner();
+    },
+    clear() { this.selected = {}; this.autoIds = {}; this.ownerId = ''; },
+    firstSelected() { const ids = this.selectedIds(); return ids[0] || ''; },
+    syncOwner() {
+      const g = (window.mntWorkGroups || []).find((x) => x.id === this.groupId);
+      if (g && g.leader_id && this.selected[g.leader_id]) this.ownerId = g.leader_id;
+      else if (this.selected[this.ownerId]) return;
+      else this.ownerId = this.firstSelected();
+    },
+    onGroup(id) {
+      Object.keys(this.autoIds).forEach((uid) => { if (this.autoIds[uid]) delete this.selected[uid]; });
+      this.autoIds = {};
+      this.groupId = id || '';
+      const g = (window.mntWorkGroups || []).find((x) => x.id === id);
+      if (g && g.members) {
+        g.members.forEach((m) => {
+          if (!m.user_id) return;
+          this.selected[m.user_id] = true;
+          this.autoIds[m.user_id] = true;
+        });
+        this.ownerId = g.leader_id || this.firstSelected();
+      } else {
+        this.syncOwner();
+      }
+    },
+    hydrateFrom(d) {
+      if (!d || d.target !== this.target) return;
+      this.selected = {};
+      this.autoIds = {};
+      this.groupId = d.group || '';
+      (d.ids || []).forEach((id) => { if (id) this.selected[id] = true; });
+      this.ownerId = d.owner || this.firstSelected();
+    }
+  };
+};
+</script>
 <div class="space-y-5" x-data="{
   addOpen: false, doneOpen: false, editOpen: false,
   selectedDay: '{{.SelectedDay}}',
@@ -8,7 +92,7 @@
   assigneeOpen: false,
   viewOpen: false,
   dayVisits: {},
-  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'', project:'' },
+  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'', project:'', group:'', people:'', owner:'' },
   init() {
     const el = document.getElementById('mnt-day-visits');
     if (!el) return;
@@ -42,9 +126,15 @@
       product: d.product || '', assignee: d.assignee || '',
       category: d.category || 'normal', notes: d.notes || '',
       completed: d.completed === '1', completedDate: d.completedDate || d.date || '',
-      project: d.project || ''
+      project: d.project || '', group: d.group || '', people: d.people || '', owner: d.owner || ''
     };
     this.editOpen = true;
+    this.$nextTick(() => this.$dispatch('mnt-picker-hydrate', {
+      target: 'edit',
+      ids: String(d.people || '').split(',').map((s) => s.trim()).filter(Boolean),
+      owner: d.owner || '',
+      group: d.group || ''
+    }));
   }
 }">
   <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">
@@ -267,10 +357,7 @@
           </div>
           <div>
             <label class="block text-gray-600 mb-1">담당자</label>
-            <select name="assignee" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-              <option value="">— 선택 —</option>
-              {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
-            </select>
+            {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "add"}}
           </div>
           <div>
             <label class="label">회차</label>
@@ -280,7 +367,7 @@
             <label class="label">업무 그룹</label>
             <select name="work_group_id" class="select w-full">
               <option value="">없음</option>
-              {{range .WorkGroups}}<option value="{{.GroupID}}">{{.Name}}</option>{{end}}
+              {{range .WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
             </select>
           </div>
         </div>
@@ -308,7 +395,7 @@
         <input type="hidden" name="month" value="{{.Month}}">
         <input type="hidden" name="view" value="{{.View}}">
         {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
-        {{if and .AssigneeKey (ne .AssigneeKey "all")}}<input type="hidden" name="assignee" value="{{.AssigneeKey}}">{{end}}
+        {{if and .AssigneeKey (ne .AssigneeKey "all")}}<input type="hidden" name="cal_assignee" value="{{.AssigneeKey}}">{{end}}
         <input type="hidden" name="day" :value="selectedDay">
         <div class="flex gap-2 pt-1">
           <button type="button" @click="addOpen = false" class="flex-1 py-2 border border-gray-300 rounded-lg">취소</button>
@@ -331,7 +418,7 @@
         <input type="hidden" name="month" value="{{.Month}}">
         <input type="hidden" name="view" value="{{.View}}">
         {{if and .ShowScopeToggle .ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
-        {{if and .AssigneeKey (ne .AssigneeKey "all")}}<input type="hidden" name="assignee" value="{{.AssigneeKey}}">{{end}}
+        {{if and .AssigneeKey (ne .AssigneeKey "all")}}<input type="hidden" name="cal_assignee" value="{{.AssigneeKey}}">{{end}}
         <input type="hidden" name="day" :value="selectedDay">
         <input type="hidden" name="completed_present" value="1">
         <div>
@@ -361,11 +448,15 @@
           </div>
           <div>
             <label class="block text-gray-600 mb-1">담당자</label>
-            <select name="assignee" x-model="edit.assignee" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-              <option value="">— 선택 —</option>
-              {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
-            </select>
+            {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "edit"}}
           </div>
+        </div>
+        <div>
+          <label class="label">업무 그룹</label>
+          <select name="work_group_id" class="select w-full" x-model="edit.group">
+            <option value="">없음</option>
+            {{range .WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
+          </select>
         </div>
         <div>
           <label class="block text-gray-600 mb-1">사업명</label>
@@ -496,10 +587,11 @@
           <input type="hidden" name="view" value="{{$.View}}">
           {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
           <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="input w-full text-xs">
-          <select name="assignee" required class="select w-full text-xs">
-            <option value="">담당자</option>
-            {{range $.Assignees}}<option value="{{.FullName}}" :selected="last==='{{.FullName}}'">{{.FullName}}</option>{{end}}
+          <select name="work_group_id" class="select w-full text-xs">
+            <option value="">업무 그룹 없음</option>
+            {{range $.WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
           </select>
+          {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "period"}}
           <button type="submit" class="btn-primary btn-sm">일정 저장</button>
         </form>
         {{if $g.LastMonth}}
@@ -514,10 +606,11 @@
           {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
           <p class="text-ui-xs font-semibold text-ink">이미 점검함</p>
           <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="input w-full text-xs">
-          <select name="assignee" required class="select w-full text-xs">
-            <option value="">담당자</option>
-            {{range $.Assignees}}<option value="{{.FullName}}" :selected="last==='{{.FullName}}'">{{.FullName}}</option>{{end}}
+          <select name="work_group_id" class="select w-full text-xs">
+            <option value="">업무 그룹 없음</option>
+            {{range $.WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
           </select>
+          {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "period-done"}}
           <button type="submit" class="btn-primary btn-sm">완료 기록</button>
         </form>
         <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/quarter-confirm" class="space-y-1.5">
@@ -586,18 +679,25 @@
     </div>
     <button type="button" class="text-primary text-xs hover:underline" @click="shown+=50">50건 더 보기</button>
     {{if $.CanEdit}}
-    <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/assign-slot" class="flex flex-wrap items-center gap-1.5" x-show="pick" x-cloak>
+    <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/assign-slot" class="flex flex-wrap items-end gap-1.5" x-show="pick" x-cloak>
       <input type="hidden" name="customer_id" :value="pick.split('|')[0]">
       <input type="hidden" name="product_type" :value="pick.split('|').slice(1).join('|')">
       <input type="hidden" name="month" value="{{$.Month}}">
       <input type="hidden" name="view" value="{{$.View}}">
       {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
-      {{if and $.AssigneeKey (ne $.AssigneeKey "all")}}<input type="hidden" name="assignee" value="{{$.AssigneeKey}}">{{end}}
+      {{if and $.AssigneeKey (ne $.AssigneeKey "all")}}<input type="hidden" name="cal_assignee" value="{{$.AssigneeKey}}">{{end}}
       <input type="date" name="visit_date" required class="input text-xs">
       <select name="project_id" class="select text-xs max-w-[10rem]">
         <option value="">사업명</option>
         {{range $.Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
       </select>
+      <select name="work_group_id" class="select text-xs max-w-[12rem]">
+        <option value="">업무 그룹 없음</option>
+        {{range $.WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
+      </select>
+      <div class="min-w-[12rem] max-w-xs">
+        {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "slot"}}
+      </div>
       <button type="submit" class="btn-primary btn-sm">배정</button>
     </form>
     {{end}}
@@ -824,6 +924,7 @@
                 <button type="button" class="text-ink-subtle"
                         :data-id="card.visit_id" :data-date="card.date" :data-customer="card.customer_id"
                         :data-product="card.product_type" :data-assignee="card.assignee"
+                        :data-people="card.people_ids" :data-owner="card.owner_id" :data-group="card.work_group_id"
                         :data-project="card.project_id" :data-category="card.entry_category"
                         :data-notes="card.notes"
                         :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
@@ -845,6 +946,7 @@
                 <button type="button" class="text-info hover:underline"
                         :data-id="card.visit_id" :data-date="card.date" :data-customer="card.customer_id"
                         :data-product="card.product_type" :data-assignee="card.assignee"
+                        :data-people="card.people_ids" :data-owner="card.owner_id" :data-group="card.work_group_id"
                         :data-project="card.project_id" :data-category="card.entry_category"
                         :data-notes="card.notes"
                         :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
@@ -931,6 +1033,7 @@
           <button type="button" class="text-xs text-blue-600 hover:underline"
                   data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                   data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                  data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"
                   data-project="{{.ProjectID}}"
                   data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                   data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
@@ -1002,6 +1105,7 @@
             <button type="button" class="text-xs text-blue-600 hover:underline"
                     data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                     data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
+                    data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"
                   data-project="{{.ProjectID}}"
                     data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                     data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"

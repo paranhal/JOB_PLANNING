@@ -159,6 +159,25 @@ func (r *MaintenanceRepo) applyVisitGroupAndDefaults(v *model.MaintenanceVisit) 
 	if v == nil {
 		return
 	}
+	if v.People != nil {
+		if strings.TrimSpace(v.WorkGroupID) != "" {
+			wg := NewWorkGroupRepo(r.db)
+			if g, err := wg.Get(v.WorkGroupID); err == nil && g != nil {
+				v.WorkGroupName = g.Name
+			}
+		}
+		if strings.TrimSpace(v.Assignee) == "" {
+			for _, p := range v.People {
+				if n := strings.TrimSpace(p.AssigneeName); n != "" {
+					v.Assignee = n
+					if p.Role == model.WBMemberOwner {
+						break
+					}
+				}
+			}
+		}
+		return
+	}
 	if strings.TrimSpace(v.WorkGroupID) != "" {
 		r.applyWorkGroupToVisit(v)
 		return
@@ -205,6 +224,9 @@ func (r *MaintenanceRepo) applyWorkGroupToVisit(v *model.MaintenanceVisit) {
 func (r *MaintenanceRepo) syncVisitAssigneeRows(v model.MaintenanceVisit) error {
 	if strings.TrimSpace(v.VisitID) == "" {
 		return nil
+	}
+	if v.People != nil {
+		return r.ReplaceVisitAssignees(v.VisitID, v.People, v.WorkGroupID)
 	}
 	existing, _ := r.ListVisitAssignees(v.VisitID)
 	var items []model.MaintenanceVisitAssignee

@@ -70,6 +70,7 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
+		filepath.Join(root, "maintenance", "_assignee_multi.html"),
 	}
 	visits := append(sampleVisits(), model.MaintenanceVisit{
 		VisitID: "mvs_3", PlanID: "mpl_1", VisitDate: "2026-08-01",
@@ -152,6 +153,7 @@ func TestMaintenancePlanScopeToggleRender(t *testing.T) {
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
+		filepath.Join(root, "maintenance", "_assignee_multi.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
@@ -283,6 +285,7 @@ func TestMaintenanceDupBannerRender(t *testing.T) {
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
+		filepath.Join(root, "maintenance", "_assignee_multi.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
@@ -370,6 +373,7 @@ func TestMaintenanceCalendarReadOnlyAndMoreChips(t *testing.T) {
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
+		filepath.Join(root, "maintenance", "_assignee_multi.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {

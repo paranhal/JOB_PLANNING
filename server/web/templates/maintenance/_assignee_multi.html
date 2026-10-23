@@ -1,0 +1,44 @@
+{{define "mnt_assignee_multi"}}
+<div class="relative w-full min-w-0" data-mnt-assignee-multi="1"
+     x-data="mntAssigneeMulti({target:'{{if .Target}}{{.Target}}{{else}}add{{end}}'})"
+     @mnt-picker-hydrate.window="hydrateFrom($event.detail)"
+     @keydown.escape.window="if(open){ open=false }">
+  <input type="hidden" name="assignee_multi" value="1">
+  <input type="hidden" name="owner_user_id" :value="ownerId">
+  <template x-for="id in selectedIds()" :key="'a-'+id">
+    <input type="hidden" name="assignee_user_id" :value="id">
+  </template>
+  <template x-for="id in excludeIds()" :key="'x-'+id">
+    <input type="hidden" name="assignee_exclude_id" :value="id">
+  </template>
+  <button type="button" class="btn-secondary w-full text-left text-xs justify-between"
+          @click="open=!open">
+    <span class="truncate" x-text="summaryLabel()"></span>
+    <span class="text-ink-subtle shrink-0">▾</span>
+  </button>
+  <p class="text-[11px] text-ink-subtle mt-1">체크 순서 첫 번째가 주담당입니다. 그룹장이 있으면 그룹장.</p>
+  <div x-show="open" x-cloak @click.outside="open=false"
+       class="absolute z-40 mt-1 w-full min-w-[14rem] max-h-64 overflow-y-auto rounded-card border border-line bg-surface p-2 shadow-pop">
+    <input type="search" class="input w-full text-xs mb-2" placeholder="이름 검색" x-model="q" autocomplete="off">
+    <ul class="space-y-0.5">
+      {{range $.Assignees}}
+      <li x-show="match('{{.FullName}}')" class="flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-hover">
+        <label class="flex items-center gap-2 min-w-0 flex-1 text-ui-sm text-ink">
+          <input type="checkbox" class="rounded border-line" value="{{.UserID}}"
+                 :checked="!!selected['{{.UserID}}']"
+                 @change="toggle('{{.UserID}}', $event.target.checked)">
+          <span class="truncate">{{.FullName}}</span>
+        </label>
+        <span class="text-ui-xs text-ink-subtle shrink-0">{{roleLabel .Role}}</span>
+      </li>
+      {{else}}
+      <li class="text-ui-xs text-ink-muted px-1 py-2">선택할 담당자가 없습니다</li>
+      {{end}}
+    </ul>
+    <div class="flex gap-2 mt-2 pt-2 border-t border-line">
+      <button type="button" class="btn-secondary btn-sm flex-1" @click="clear()">선택 해제</button>
+      <button type="button" class="btn-secondary btn-sm flex-1" @click="open=false">닫기</button>
+    </div>
+  </div>
+</div>
+{{end}}

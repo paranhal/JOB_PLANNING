@@ -18,6 +18,7 @@ func TestMnt95_16AWaitingCollapsedCalendarFirst(t *testing.T) {
 		filepath.Join(root, "layout", "base.html"),
 		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_show.html"),
+		filepath.Join(root, "maintenance", "_assignee_multi.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {

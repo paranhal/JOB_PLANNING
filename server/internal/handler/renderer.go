@@ -114,6 +114,11 @@ func templateFiles(name string) []string {
 		}
 		files = appendExisting(files, "web/templates/workboard/_recurrence_fields.html")
 	}
+	if strings.HasPrefix(name, "maintenance/") {
+		if partials, err := filepath.Glob("web/templates/maintenance/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "stats/") {
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
 			files = append(files, partials...)
@@ -289,6 +294,8 @@ func funcMap() template.FuncMap {
 		"hasSuffix":          strings.HasSuffix,
 		"urlquery":           url.QueryEscape,
 		"weekdayKo":          weekdayKo,
+		"visitPeopleIDs":     visitPeopleIDsCSV,
+		"visitOwnerID":       visitOwnerUserID,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {
