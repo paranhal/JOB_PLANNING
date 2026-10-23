@@ -130,9 +130,6 @@ func (r *MaintenanceRepo) ReplaceVisitAssignees(visitID string, items []model.Ma
 			ownerName, ownerUID = name, uid
 		}
 		gid := strings.TrimSpace(it.WorkGroupID)
-		if gid == "" {
-			gid = strings.TrimSpace(groupID)
-		}
 		if _, err := r.db.Exec(`
 			INSERT INTO maintenance_visit_assignees(visit_id, user_id, assignee_name, role, work_group_id, sort_order)
 			VALUES (?,?,?,?,?,?)`, visitID, uid, name, role, nullIfEmpty(gid), i); err != nil {

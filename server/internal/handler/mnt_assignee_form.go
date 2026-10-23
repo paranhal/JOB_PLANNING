@@ -13,10 +13,13 @@ import (
 )
 
 type mntWorkGroupPickJSON struct {
-	GroupID  string                `json:"id"`
-	Name     string                `json:"name"`
-	LeaderID string                `json:"leader_id"`
-	Members  []mntWorkGroupMemJSON `json:"members"`
+	GroupID       string                `json:"id"`
+	Name          string                `json:"name"`
+	LeaderID      string                `json:"leader_id"`
+	OrgLabel      string                `json:"org_label,omitempty"`
+	MemberN       int                   `json:"member_n"`
+	MemberSummary string                `json:"member_summary,omitempty"`
+	Members       []mntWorkGroupMemJSON `json:"members"`
 }
 
 type mntWorkGroupMemJSON struct {
@@ -45,18 +48,40 @@ func (h *MaintenanceHandler) listVisibleWorkGroups(c echo.Context) []model.WorkG
 
 func (h *MaintenanceHandler) workGroupPicksForVisit(c echo.Context) ([]model.WorkGroup, template.JS) {
 	groups := h.listVisibleWorkGroups(c)
+	orgNames := map[string]string{}
+	if h != nil && h.orgs != nil {
+		if rows, err := h.orgs.ListActive(); err == nil {
+			for _, o := range rows {
+				orgNames[o.OrgID] = o.OrgName
+			}
+		}
+	}
+	showOrg := currentOrg(c) == repository.OrgAll
 	out := make([]mntWorkGroupPickJSON, 0, len(groups))
 	for _, g := range groups {
 		p := mntWorkGroupPickJSON{GroupID: g.GroupID, Name: g.Name, LeaderID: g.LeaderID}
+		if showOrg {
+			p.OrgLabel = orgNames[g.OrgID]
+			if p.OrgLabel == "" {
+				p.OrgLabel = g.OrgID
+			}
+		}
+		var names []string
 		if h.groups != nil {
 			ms, _ := h.groups.MembersOn(g.GroupID, "")
 			for _, m := range ms {
 				p.Members = append(p.Members, mntWorkGroupMemJSON{UserID: m.UserID, Name: m.FullName, Role: m.Role})
+				names = append(names, m.FullName)
 				if m.Role == model.WorkGroupLeader && p.LeaderID == "" {
 					p.LeaderID = m.UserID
 				}
 			}
 		}
+		p.MemberN = len(p.Members)
+		if p.MemberN == 0 {
+			p.MemberN = g.MemberN
+		}
+		p.MemberSummary = memberSummary(names)
 		out = append(out, p)
 	}
 	b, err := json.Marshal(out)
@@ -64,6 +89,20 @@ func (h *MaintenanceHandler) workGroupPicksForVisit(c echo.Context) ([]model.Wor
 		b = []byte("[]")
 	}
 	return groups, template.JS(b)
+}
+
+func uniqueTrimmed(vals []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range vals {
+		id := strings.TrimSpace(raw)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 func mergeVisitAssigneeIDs(groupIDs, checked, exclude []string) []string {
@@ -104,6 +143,20 @@ func formStringSlice(c echo.Context, key string) []string {
 	return vals[key]
 }
 
+func formVisitGroupIDs(c echo.Context) []string {
+	ids := uniqueTrimmed(formStringSlice(c, "assignee_group_id"))
+	if wg := strings.TrimSpace(c.FormValue("work_group_id")); wg != "" && !containsUserID(ids, wg) {
+		ids = append(ids, wg)
+	}
+	return ids
+}
+
+func formVisitExcludeIDs(c echo.Context) []string {
+	raw := append([]string{}, formStringSlice(c, "assignee_exclude_user_id")...)
+	raw = append(raw, formStringSlice(c, "assignee_exclude_id")...)
+	return uniqueTrimmed(raw)
+}
+
 func (h *MaintenanceHandler) visibleGroupByID(c echo.Context, groupID string) *model.WorkGroup {
 	groupID = strings.TrimSpace(groupID)
 	if groupID == "" {
@@ -122,13 +175,12 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 	if v == nil {
 		return nil
 	}
-	gid := strings.TrimSpace(c.FormValue("work_group_id"))
-	v.WorkGroupID = gid
-	checked := formStringSlice(c, "assignee_user_id")
-	exclude := formStringSlice(c, "assignee_exclude_id")
+	groupIDs := formVisitGroupIDs(c)
+	checked := uniqueTrimmed(formStringSlice(c, "assignee_user_id"))
+	exclude := formVisitExcludeIDs(c)
 	ownerID := strings.TrimSpace(c.FormValue("owner_user_id"))
 	multi := strings.TrimSpace(c.FormValue("assignee_multi")) == "1"
-	if !multi && gid == "" && len(checked) == 0 && len(exclude) == 0 && ownerID == "" {
+	if !multi && len(groupIDs) == 0 && len(checked) == 0 && len(exclude) == 0 && ownerID == "" {
 		name := strings.TrimSpace(c.FormValue("assignee"))
 		kind, _ := parseAssigneeFilter(name)
 		if name != "" && kind == "all" && name != "all" {
@@ -137,39 +189,59 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 		return nil
 	}
 
-	var groupIDs []string
+	ex := map[string]bool{}
+	for _, id := range exclude {
+		ex[id] = true
+	}
 	groupMember := map[string]bool{}
-	leaderID := ""
-	if gid != "" {
+	personGroup := map[string]string{}
+	var ids []string
+	seen := map[string]bool{}
+	firstLeader := ""
+	for i, gid := range groupIDs {
 		g := h.visibleGroupByID(c, gid)
 		if g == nil {
 			return fmt.Errorf("업무 그룹을 확인할 수 없습니다")
 		}
-		if h.groups != nil {
-			ms, _ := h.groups.MembersOn(gid, v.VisitDate)
-			for _, m := range ms {
-				groupIDs = append(groupIDs, m.UserID)
-				groupMember[m.UserID] = true
-				if m.Role == model.WorkGroupLeader {
-					leaderID = m.UserID
-				}
+		if h.groups == nil {
+			continue
+		}
+		ms, _ := h.groups.MembersOn(gid, v.VisitDate)
+		for _, m := range ms {
+			uid := strings.TrimSpace(m.UserID)
+			if uid == "" {
+				continue
 			}
+			groupMember[uid] = true
+			if i == 0 && m.Role == model.WorkGroupLeader && firstLeader == "" {
+				firstLeader = uid
+			}
+			if ex[uid] || seen[uid] {
+				continue
+			}
+			seen[uid] = true
+			ids = append(ids, uid)
+			personGroup[uid] = gid
 		}
 	}
-	ids := mergeVisitAssigneeIDs(groupIDs, checked, exclude)
+	for _, uid := range checked {
+		if seen[uid] {
+			continue
+		}
+		seen[uid] = true
+		ids = append(ids, uid)
+	}
 	for _, id := range ids {
 		if !h.assigneeIDAllowed(c, id, groupMember) {
 			return fmt.Errorf("%s", errAssigneeSameOrg)
 		}
 	}
 	if ownerID != "" && !containsUserID(ids, ownerID) {
-		if !h.assigneeIDAllowed(c, ownerID, groupMember) {
-			return fmt.Errorf("%s", errAssigneeSameOrg)
-		}
+		ownerID = ""
 	}
 	if ownerID == "" {
-		if leaderID != "" && containsUserID(ids, leaderID) {
-			ownerID = leaderID
+		if firstLeader != "" && containsUserID(ids, firstLeader) {
+			ownerID = firstLeader
 		} else if len(ids) > 0 {
 			ownerID = ids[0]
 		}
@@ -196,11 +268,16 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 			ownerName = name
 		}
 		people = append(people, model.MaintenanceVisitAssignee{
-			UserID: id, AssigneeName: name, Role: role, WorkGroupID: gid,
+			UserID: id, AssigneeName: name, Role: role, WorkGroupID: personGroup[id],
 		})
 	}
 	v.People = people
 	v.Assignee = ownerName
+	if len(groupIDs) > 0 {
+		v.WorkGroupID = groupIDs[0]
+	} else {
+		v.WorkGroupID = ""
+	}
 	return nil
 }
 
@@ -251,4 +328,22 @@ func visitOwnerUserID(v model.MaintenanceVisit) string {
 		return strings.TrimSpace(v.People[0].UserID)
 	}
 	return ""
+}
+
+func visitGroupIDsCSV(v model.MaintenanceVisit) string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	add(v.WorkGroupID)
+	for _, p := range v.People {
+		add(p.WorkGroupID)
+	}
+	return strings.Join(out, ",")
 }

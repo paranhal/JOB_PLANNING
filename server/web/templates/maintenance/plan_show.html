@@ -11,76 +11,147 @@ window.mntWorkGroups = (function () {
 window.mntAssigneeMulti = function (cfg) {
   cfg = cfg || {};
   return {
-    open: false, q: '', selected: {}, autoIds: {}, ownerId: '', groupId: '',
+    open: false, q: '', groups: {}, extra: {}, exclude: {}, expanded: {}, ownerId: '',
     target: cfg.target || 'add',
-    init() {
-      const form = this.$el.closest('form');
-      if (!form) return;
-      const sel = form.querySelector('[name="work_group_id"]');
-      if (!sel) return;
-      this.groupId = sel.value || '';
-      sel.addEventListener('change', () => this.onGroup(sel.value || ''));
-    },
+    allGroups() { return window.mntWorkGroups || []; },
+    groupOf(id) { return this.allGroups().find((x) => x.id === id) || { members: [] }; },
     match(name) {
       const s = (this.q || '').trim().toLowerCase();
       if (!s) return true;
       return String(name || '').toLowerCase().indexOf(s) >= 0;
     },
-    selectedIds() { return Object.keys(this.selected).filter((id) => this.selected[id]); },
-    excludeIds() {
-      const g = (window.mntWorkGroups || []).find((x) => x.id === this.groupId);
-      if (!g || !g.members) return [];
-      return g.members.map((m) => m.user_id).filter((id) => id && !this.selected[id]);
+    orgLabelOf(id) { return this.groupOf(id).org_label || ''; },
+    memberSummaryOf(id) { return this.groupOf(id).member_summary || ''; },
+    membersOf(id) { return this.groupOf(id).members || []; },
+    groupVisible(id) {
+      const g = this.groupOf(id);
+      if (this.match(g.name)) return true;
+      if (this.match(g.member_summary)) return true;
+      return (g.members || []).some((m) => this.match(m.name));
     },
+    selectedGroupIds() { return Object.keys(this.groups).filter((id) => this.groups[id]); },
+    extraIds() { return Object.keys(this.extra).filter((id) => this.extra[id]); },
+    excludeIds() { return Object.keys(this.exclude).filter((id) => this.exclude[id]); },
+    inSelectedGroups(uid) {
+      return this.selectedGroupIds().some((gid) => (this.membersOf(gid) || []).some((m) => m.user_id === uid));
+    },
+    selectedIds() {
+      const seen = {};
+      const ids = [];
+      this.selectedGroupIds().forEach((gid) => {
+        (this.membersOf(gid) || []).forEach((m) => {
+          const id = m.user_id;
+          if (!id || seen[id] || this.exclude[id]) return;
+          seen[id] = true;
+          ids.push(id);
+        });
+      });
+      this.extraIds().forEach((id) => {
+        if (!id || seen[id]) return;
+        seen[id] = true;
+        ids.push(id);
+      });
+      return ids;
+    },
+    personOn(id) { return this.selectedIds().indexOf(id) >= 0; },
+    memberOn(gid, uid) { return !!this.groups[gid] && !this.exclude[uid]; },
     nameOf(id) {
+      const gmem = this.allGroups().flatMap((g) => g.members || []);
+      const hit = gmem.find((m) => m.user_id === id);
+      if (hit && hit.name) return hit.name;
       const el = this.$el.querySelector('input[type=checkbox][value="' + id + '"]');
       if (!el) return id;
       const lab = el.closest('label');
       return lab ? String(lab.textContent || '').trim() : id;
     },
     summaryLabel() {
+      const gids = this.selectedGroupIds();
       const ids = this.selectedIds();
-      if (!ids.length) return '— 선택 —';
-      const name = this.nameOf(ids[0]);
-      if (ids.length === 1) return name;
-      return name + ' 외 ' + (ids.length - 1) + '명';
+      if (!ids.length && !gids.length) return '— 선택 —';
+      const extras = this.extraIds().filter((id) => !this.inSelectedGroups(id));
+      if (gids.length === 1 && extras.length === 0 && this.excludeIds().length === 0) {
+        return this.groupOf(gids[0]).name || '그룹';
+      }
+      if (!gids.length && ids.length === 1) return this.nameOf(ids[0]);
+      const head = gids.length ? (this.groupOf(gids[0]).name || this.nameOf(ids[0])) : this.nameOf(ids[0]);
+      if (extras.length) {
+        return head + ' 외 ' + this.nameOf(extras[0]) + ' 등 ' + ids.length + '명';
+      }
+      if (ids.length <= 1) return head;
+      return head + ' 외 ' + (ids.length - 1) + '명';
     },
-    toggle(id, on) {
-      if (on) this.selected[id] = true;
-      else delete this.selected[id];
+    toggleGroup(gid, on) {
+      if (on) {
+        this.groups[gid] = true;
+        (this.membersOf(gid) || []).forEach((m) => { delete this.exclude[m.user_id]; delete this.extra[m.user_id]; });
+      } else {
+        delete this.groups[gid];
+        (this.membersOf(gid) || []).forEach((m) => { delete this.exclude[m.user_id]; });
+      }
       this.syncOwner();
     },
-    clear() { this.selected = {}; this.autoIds = {}; this.ownerId = ''; },
-    firstSelected() { const ids = this.selectedIds(); return ids[0] || ''; },
-    syncOwner() {
-      const g = (window.mntWorkGroups || []).find((x) => x.id === this.groupId);
-      if (g && g.leader_id && this.selected[g.leader_id]) this.ownerId = g.leader_id;
-      else if (this.selected[this.ownerId]) return;
-      else this.ownerId = this.firstSelected();
-    },
-    onGroup(id) {
-      Object.keys(this.autoIds).forEach((uid) => { if (this.autoIds[uid]) delete this.selected[uid]; });
-      this.autoIds = {};
-      this.groupId = id || '';
-      const g = (window.mntWorkGroups || []).find((x) => x.id === id);
-      if (g && g.members) {
-        g.members.forEach((m) => {
-          if (!m.user_id) return;
-          this.selected[m.user_id] = true;
-          this.autoIds[m.user_id] = true;
+    toggleGroupMember(gid, uid, on) {
+      if (!this.groups[gid]) {
+        if (!on) return;
+        this.groups[gid] = true;
+        (this.membersOf(gid) || []).forEach((m) => {
+          if (m.user_id !== uid) this.exclude[m.user_id] = true;
+          else delete this.exclude[uid];
         });
-        this.ownerId = g.leader_id || this.firstSelected();
+      } else if (on) {
+        delete this.exclude[uid];
       } else {
-        this.syncOwner();
+        this.exclude[uid] = true;
+        const mems = this.membersOf(gid) || [];
+        if (mems.length && mems.every((m) => this.exclude[m.user_id])) {
+          delete this.groups[gid];
+          mems.forEach((m) => delete this.exclude[m.user_id]);
+        }
       }
+      this.syncOwner();
+    },
+    togglePerson(id, on) {
+      if (this.inSelectedGroups(id)) {
+        if (on) delete this.exclude[id];
+        else this.exclude[id] = true;
+      } else if (on) {
+        this.extra[id] = true;
+      } else {
+        delete this.extra[id];
+      }
+      this.syncOwner();
+    },
+    clear() { this.groups = {}; this.extra = {}; this.exclude = {}; this.ownerId = ''; },
+    syncOwner() {
+      const ids = this.selectedIds();
+      const gids = this.selectedGroupIds();
+      if (gids.length) {
+        const g = this.groupOf(gids[0]);
+        if (g.leader_id && ids.indexOf(g.leader_id) >= 0) {
+          this.ownerId = g.leader_id;
+          return;
+        }
+      }
+      if (this.ownerId && ids.indexOf(this.ownerId) >= 0) return;
+      this.ownerId = ids[0] || '';
     },
     hydrateFrom(d) {
       if (!d || d.target !== this.target) return;
-      this.selected = {};
-      this.autoIds = {};
-      this.groupId = d.group || '';
-      (d.ids || []).forEach((id) => { if (id) this.selected[id] = true; });
-      this.ownerId = d.owner || this.firstSelected();
+      this.groups = {};
+      this.extra = {};
+      this.exclude = {};
+      const saved = {};
+      (d.ids || []).forEach((id) => { if (id) saved[id] = true; });
+      String(d.groups || d.group || '').split(',').map((s) => s.trim()).filter(Boolean).forEach((gid) => {
+        this.groups[gid] = true;
+        (this.membersOf(gid) || []).forEach((m) => {
+          if (m.user_id && !saved[m.user_id]) this.exclude[m.user_id] = true;
+        });
+      });
+      (d.ids || []).forEach((id) => {
+        if (id && !this.inSelectedGroups(id)) this.extra[id] = true;
+      });
+      this.ownerId = d.owner || this.selectedIds()[0] || '';
     }
   };
 };
@@ -92,7 +163,7 @@ window.mntAssigneeMulti = function (cfg) {
   assigneeOpen: false,
   viewOpen: false,
   dayVisits: {},
-  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'', project:'', group:'', people:'', owner:'' },
+  edit: { id:'', date:'', customer:'', product:'', assignee:'', category:'normal', notes:'', completed:false, completedDate:'', project:'', group:'', groups:'', people:'', owner:'' },
   init() {
     const el = document.getElementById('mnt-day-visits');
     if (!el) return;
@@ -126,13 +197,14 @@ window.mntAssigneeMulti = function (cfg) {
       product: d.product || '', assignee: d.assignee || '',
       category: d.category || 'normal', notes: d.notes || '',
       completed: d.completed === '1', completedDate: d.completedDate || d.date || '',
-      project: d.project || '', group: d.group || '', people: d.people || '', owner: d.owner || ''
+      project: d.project || '', group: d.group || '', groups: d.groups || d.group || '', people: d.people || '', owner: d.owner || ''
     };
     this.editOpen = true;
     this.$nextTick(() => this.$dispatch('mnt-picker-hydrate', {
       target: 'edit',
       ids: String(d.people || '').split(',').map((s) => s.trim()).filter(Boolean),
       owner: d.owner || '',
+      groups: d.groups || d.group || '',
       group: d.group || ''
     }));
   }
@@ -357,18 +429,11 @@ window.mntAssigneeMulti = function (cfg) {
           </div>
           <div>
             <label class="block text-gray-600 mb-1">담당자</label>
-            {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "add"}}
+            {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Target" "add"}}
           </div>
           <div>
             <label class="label">회차</label>
             <input type="number" name="round_no" min="1" class="input w-full" placeholder="자동">
-          </div>
-          <div>
-            <label class="label">업무 그룹</label>
-            <select name="work_group_id" class="select w-full">
-              <option value="">없음</option>
-              {{range .WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
-            </select>
           </div>
         </div>
         <div>
@@ -448,15 +513,8 @@ window.mntAssigneeMulti = function (cfg) {
           </div>
           <div>
             <label class="block text-gray-600 mb-1">담당자</label>
-            {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "edit"}}
+            {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Target" "edit"}}
           </div>
-        </div>
-        <div>
-          <label class="label">업무 그룹</label>
-          <select name="work_group_id" class="select w-full" x-model="edit.group">
-            <option value="">없음</option>
-            {{range .WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
-          </select>
         </div>
         <div>
           <label class="block text-gray-600 mb-1">사업명</label>
@@ -587,11 +645,7 @@ window.mntAssigneeMulti = function (cfg) {
           <input type="hidden" name="view" value="{{$.View}}">
           {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
           <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="input w-full text-xs">
-          <select name="work_group_id" class="select w-full text-xs">
-            <option value="">업무 그룹 없음</option>
-            {{range $.WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
-          </select>
-          {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "period"}}
+          {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Target" "period"}}
           <button type="submit" class="btn-primary btn-sm">일정 저장</button>
         </form>
         {{if $g.LastMonth}}
@@ -606,11 +660,7 @@ window.mntAssigneeMulti = function (cfg) {
           {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
           <p class="text-ui-xs font-semibold text-ink">이미 점검함</p>
           <input type="date" name="visit_date" required min="{{$g.From}}" max="{{$g.To}}" class="input w-full text-xs">
-          <select name="work_group_id" class="select w-full text-xs">
-            <option value="">업무 그룹 없음</option>
-            {{range $.WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
-          </select>
-          {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "period-done"}}
+          {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Target" "period-done"}}
           <button type="submit" class="btn-primary btn-sm">완료 기록</button>
         </form>
         <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/quarter-confirm" class="space-y-1.5">
@@ -691,12 +741,8 @@ window.mntAssigneeMulti = function (cfg) {
         <option value="">사업명</option>
         {{range $.Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
       </select>
-      <select name="work_group_id" class="select text-xs max-w-[12rem]">
-        <option value="">업무 그룹 없음</option>
-        {{range $.WorkGroups}}<option value="{{.GroupID}}">{{.Name}} ({{.MemberN}}명)</option>{{end}}
-      </select>
       <div class="min-w-[12rem] max-w-xs">
-        {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "Target" "slot"}}
+        {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Target" "slot"}}
       </div>
       <button type="submit" class="btn-primary btn-sm">배정</button>
     </form>
@@ -925,6 +971,7 @@ window.mntAssigneeMulti = function (cfg) {
                         :data-id="card.visit_id" :data-date="card.date" :data-customer="card.customer_id"
                         :data-product="card.product_type" :data-assignee="card.assignee"
                         :data-people="card.people_ids" :data-owner="card.owner_id" :data-group="card.work_group_id"
+                        :data-groups="card.group_ids"
                         :data-project="card.project_id" :data-category="card.entry_category"
                         :data-notes="card.notes"
                         :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
@@ -947,6 +994,7 @@ window.mntAssigneeMulti = function (cfg) {
                         :data-id="card.visit_id" :data-date="card.date" :data-customer="card.customer_id"
                         :data-product="card.product_type" :data-assignee="card.assignee"
                         :data-people="card.people_ids" :data-owner="card.owner_id" :data-group="card.work_group_id"
+                        :data-groups="card.group_ids"
                         :data-project="card.project_id" :data-category="card.entry_category"
                         :data-notes="card.notes"
                         :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
@@ -1034,6 +1082,7 @@ window.mntAssigneeMulti = function (cfg) {
                   data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                   data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
                   data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"
+                  data-groups="{{visitGroupIDs .}}"
                   data-project="{{.ProjectID}}"
                   data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                   data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
@@ -1106,7 +1155,8 @@ window.mntAssigneeMulti = function (cfg) {
                     data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                     data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
                     data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"
-                  data-project="{{.ProjectID}}"
+                    data-groups="{{visitGroupIDs .}}"
+                    data-project="{{.ProjectID}}"
                     data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                     data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                     @click="openEdit($event.currentTarget)">수정</button>

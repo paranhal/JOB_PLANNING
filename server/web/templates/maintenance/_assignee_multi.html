@@ -5,28 +5,68 @@
      @keydown.escape.window="if(open){ open=false }">
   <input type="hidden" name="assignee_multi" value="1">
   <input type="hidden" name="owner_user_id" :value="ownerId">
+  <template x-for="id in selectedGroupIds()" :key="'g-'+id">
+    <input type="hidden" name="assignee_group_id" :value="id">
+  </template>
   <template x-for="id in selectedIds()" :key="'a-'+id">
     <input type="hidden" name="assignee_user_id" :value="id">
   </template>
   <template x-for="id in excludeIds()" :key="'x-'+id">
-    <input type="hidden" name="assignee_exclude_id" :value="id">
+    <input type="hidden" name="assignee_exclude_user_id" :value="id">
   </template>
   <button type="button" class="btn-secondary w-full text-left text-xs justify-between"
           @click="open=!open">
     <span class="truncate" x-text="summaryLabel()"></span>
     <span class="text-ink-subtle shrink-0">▾</span>
   </button>
-  <p class="text-[11px] text-ink-subtle mt-1">체크 순서 첫 번째가 주담당입니다. 그룹장이 있으면 그룹장.</p>
+  <p class="text-[11px] text-ink-subtle mt-1">그룹장이 있으면 그룹장이 주담당입니다. 저장된 담당자는 방문 당시 구성원입니다.</p>
   <div x-show="open" x-cloak @click.outside="open=false"
-       class="absolute z-40 mt-1 w-full min-w-[14rem] max-h-64 overflow-y-auto rounded-card border border-line bg-surface p-2 shadow-pop">
+       class="absolute z-40 mt-1 w-full min-w-[14rem] max-h-72 overflow-y-auto rounded-card border border-line bg-surface p-2 shadow-pop">
     <input type="search" class="input w-full text-xs mb-2" placeholder="이름 검색" x-model="q" autocomplete="off">
+    <p class="px-1 pt-1 pb-1 text-ui-xs font-semibold text-ink-muted">업무 그룹</p>
+    <div class="space-y-1.5 mb-2">
+      {{range .WorkGroups}}
+      <div class="rounded-control border border-line p-2" x-show="groupVisible('{{.GroupID}}')" data-group-id="{{.GroupID}}">
+        <div class="flex items-start justify-between gap-2">
+          <label class="flex items-start gap-2 min-w-0 flex-1 text-ui-sm text-ink">
+            <input type="checkbox" class="rounded border-line mt-0.5" value="{{.GroupID}}"
+                   :checked="!!groups['{{.GroupID}}']"
+                   @change="toggleGroup('{{.GroupID}}', $event.target.checked)">
+            <span class="min-w-0">
+              <span class="block font-medium truncate">{{.Name}} ({{.MemberN}}명)</span>
+              <span class="block text-ui-xs text-ink-subtle" x-show="orgLabelOf('{{.GroupID}}')" x-text="orgLabelOf('{{.GroupID}}')"></span>
+              <span class="block text-ui-xs text-ink-muted" x-text="memberSummaryOf('{{.GroupID}}')"></span>
+            </span>
+          </label>
+          <button type="button" class="text-ui-xs text-primary shrink-0"
+                  @click="expanded['{{.GroupID}}']=!expanded['{{.GroupID}}']"
+                  x-text="expanded['{{.GroupID}}'] ? '접기' : '구성원'">구성원</button>
+        </div>
+        <div class="mt-1.5 space-y-0.5" x-show="expanded['{{.GroupID}}']" x-cloak>
+          <template x-for="m in membersOf('{{.GroupID}}')" :key="'m-{{.GroupID}}-'+(m.user_id||'')">
+            <label class="flex items-center gap-2 rounded-control px-1 py-0.5 hover:bg-hover">
+              <input type="checkbox" class="rounded border-line"
+                     :value="m.user_id"
+                     :checked="memberOn('{{.GroupID}}', m.user_id)"
+                     @change="toggleGroupMember('{{.GroupID}}', m.user_id, $event.target.checked)">
+              <span class="truncate text-ui-sm" x-text="m.name"></span>
+              <span class="badge-neutral shrink-0" x-show="m.role==='leader'">그룹장</span>
+            </label>
+          </template>
+        </div>
+      </div>
+      {{else}}
+      <p class="text-ui-xs text-ink-muted px-1 py-1">선택할 업무 그룹이 없습니다</p>
+      {{end}}
+    </div>
+    <p class="px-1 pt-1 pb-1 text-ui-xs font-semibold text-ink-muted">담당자</p>
     <ul class="space-y-0.5">
       {{range $.Assignees}}
       <li x-show="match('{{.FullName}}')" class="flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-hover">
         <label class="flex items-center gap-2 min-w-0 flex-1 text-ui-sm text-ink">
           <input type="checkbox" class="rounded border-line" value="{{.UserID}}"
-                 :checked="!!selected['{{.UserID}}']"
-                 @change="toggle('{{.UserID}}', $event.target.checked)">
+                 :checked="personOn('{{.UserID}}')"
+                 @change="togglePerson('{{.UserID}}', $event.target.checked)">
           <span class="truncate">{{.FullName}}</span>
         </label>
         <span class="text-ui-xs text-ink-subtle shrink-0">{{roleLabel .Role}}</span>

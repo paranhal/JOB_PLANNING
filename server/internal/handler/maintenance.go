@@ -660,8 +660,7 @@ func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID stri
 		ProductType: strings.TrimSpace(c.FormValue("product_type")),
 		ProjectID:   strings.TrimSpace(c.FormValue("project_id")),
 		Completed:   c.FormValue("completed") != "",
-		RoundNo:     parseVisitRound(c.FormValue("round_no")),
-		WorkGroupID: strings.TrimSpace(c.FormValue("work_group_id")),
+		RoundNo: parseVisitRound(c.FormValue("round_no")),
 	}
 	if v.Completed {
 		v.CompletedDate = strings.TrimSpace(c.FormValue("completed_date"))

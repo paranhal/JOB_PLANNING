@@ -296,6 +296,7 @@ func funcMap() template.FuncMap {
 		"weekdayKo":          weekdayKo,
 		"visitPeopleIDs":     visitPeopleIDsCSV,
 		"visitOwnerID":       visitOwnerUserID,
+		"visitGroupIDs":      visitGroupIDsCSV,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {

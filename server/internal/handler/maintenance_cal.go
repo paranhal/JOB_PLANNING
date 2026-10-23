@@ -67,6 +67,7 @@ type MntVisitCard struct {
 	PeopleIDs     string `json:"people_ids"`
 	OwnerID       string `json:"owner_id"`
 	WorkGroupID   string `json:"work_group_id"`
+	GroupIDs      string `json:"group_ids"`
 	ProjectID     string `json:"project_id"`
 	EntryCategory string `json:"entry_category"`
 	Notes         string `json:"notes"`
@@ -392,6 +393,7 @@ func buildVisitCards(visits []model.MaintenanceVisit, today, deleteAfter string,
 			PeopleIDs:     visitPeopleIDsCSV(v),
 			OwnerID:       visitOwnerUserID(v),
 			WorkGroupID:   v.WorkGroupID,
+			GroupIDs:      visitGroupIDsCSV(v),
 			ProjectID:     v.ProjectID,
 			EntryCategory: v.EntryCategory,
 			Notes:         v.Notes,
