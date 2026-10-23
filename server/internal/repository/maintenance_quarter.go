@@ -89,14 +89,14 @@ func (r *MaintenanceRepo) periodObligationsFrom(configs []model.MaintenanceSiteC
 // ListOpenUnassignedSlots 미배정·미계획함·배지가 공유하는 목록(D-71·D-76).
 // 기간 주기(분기·반기·년1회)는 기간 마지막 달에만 미확정으로 넣는다.
 func (r *MaintenanceRepo) ListOpenUnassignedSlots(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
-	if cached, ok := getCachedOpenUnassignedSlots(planID, year, month); ok {
+	if cached, ok := getCachedOpenUnassignedSlots(r.db, planID, year, month); ok {
 		return cached, nil
 	}
 	out, err := r.computeOpenUnassignedSlots(planID, year, month, false)
 	if err != nil {
 		return nil, err
 	}
-	putCachedOpenUnassignedSlots(planID, year, month, out)
+	putCachedOpenUnassignedSlots(r.db, planID, year, month, out)
 	return cloneUnassignedSlots(out), nil
 }
 
@@ -352,7 +352,7 @@ func (r *MaintenanceRepo) SkipQuarterSlot(planID, customerID, slotKey, reason, c
 			action='skip', reason=excluded.reason, created_by=excluded.created_by, created_at=excluded.created_at`,
 		id, planID, customerID, slotKey, year, quarter, reason, strings.TrimSpace(createdBy), now)
 	if err == nil {
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return err
 }

@@ -160,6 +160,9 @@ func (r *MaintenanceRepo) SetInspectionProductActive(id string, active bool) err
 	}
 	_, err := r.db.Exec(`UPDATE inspection_products SET is_active=?, updated_at=? WHERE product_id=?`,
 		v, time.Now().Format(time.RFC3339), id)
+	if err == nil {
+		r.invalidateOpenUnassignedSlotsCache()
+	}
 	return err
 }
 
@@ -202,7 +205,11 @@ func (r *MaintenanceRepo) ReplaceSiteProducts(customerID, orgID string, productI
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	r.invalidateOpenUnassignedSlotsCache()
+	return nil
 }
 
 var errOtherOrgInspectionProduct = fmt.Errorf("다른 조직의 점검 제품입니다")

@@ -475,3 +475,126 @@ func TestMnt95_18FixturePerfAndQueryCap(t *testing.T) {
 		slow12Dur.Milliseconds(), fast12Dur.Milliseconds(), len(fast12),
 		unpDur.Milliseconds(), dashDur.Milliseconds(), queries)
 }
+
+func seedOpenSlotsRepo(t *testing.T, name, planID string) *MaintenanceRepo {
+	t.Helper()
+	db, err := InitDB(filepath.Join(t.TempDir(), name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES ('c-slot','슬롯사이트','슬롯사이트',1,?)`, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewMaintenanceRepo(db)
+	if err := repo.UpsertSiteConfig(&model.MaintenanceSiteConfig{
+		CustomerID: "c-slot", ShortName: "슬롯", HasKlas: true, InspectionCycle: "monthly", OrgID: model.OrgIDLibrary,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO maintenance_plans (plan_id, plan_year, title, status, org_id)
+		VALUES (?, 2026, 't', 'draft', ?)`, planID, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	return repo
+}
+
+func TestMnt95_18CacheIsolatesDatabases(t *testing.T) {
+	const planID = "MP-CACHE"
+	r1 := seedOpenSlotsRepo(t, "iso1.db", planID)
+	r2 := seedOpenSlotsRepo(t, "iso2.db", planID)
+	s1, err := r1.ListOpenUnassignedSlots(planID, 2026, 10)
+	if err != nil || len(s1) == 0 {
+		t.Fatalf("db1 슬롯 %d %v", len(s1), err)
+	}
+	if err := r2.InsertVisitFull(model.MaintenanceVisit{
+		PlanID: planID, VisitDate: "2026-10-15", CustomerID: "c-slot", ProductType: "KLAS", Assignee: "배정",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	again, err := r1.ListOpenUnassignedSlots(planID, 2026, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again) == 0 {
+		t.Fatal("다른 DB 배정이 이 DB 캐시를 지웠다")
+	}
+	s2, err := r2.ListOpenUnassignedSlots(planID, 2026, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range s2 {
+		if s.CustomerID == "c-slot" {
+			t.Fatalf("자기 DB 배정 후 캐시가 남음: %+v", s)
+		}
+	}
+}
+
+func TestMnt95_18CacheInvalidateOnVisitMutations(t *testing.T) {
+	repo := seedOpenSlotsRepo(t, "mut.db", "MP-MUT")
+	before, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 10)
+	if err != nil || len(before) == 0 {
+		t.Fatalf("초기 슬롯 %d %v", len(before), err)
+	}
+	if err := repo.InsertVisitFull(model.MaintenanceVisit{
+		PlanID: "MP-MUT", VisitDate: "2026-10-16", CustomerID: "c-slot", ProductType: "KLAS", Assignee: "배정",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterAdd, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range afterAdd {
+		if s.CustomerID == "c-slot" {
+			t.Fatal("추가 후 슬롯 캐시")
+		}
+	}
+	visits, err := repo.ListVisits("MP-MUT")
+	if err != nil || len(visits) != 1 {
+		t.Fatalf("방문 %d %v", len(visits), err)
+	}
+	vid := visits[0].VisitID
+	if err := repo.SetVisitDate(vid, "2026-11-02"); err != nil {
+		t.Fatal(err)
+	}
+	oct, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range oct {
+		if s.CustomerID == "c-slot" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("날짜 이동 후 10월 슬롯이 안 돌아옴")
+	}
+	nov, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range nov {
+		if s.CustomerID == "c-slot" {
+			t.Fatal("11월 배정인데 슬롯 캐시")
+		}
+	}
+	if err := repo.DeleteVisit(vid); err != nil {
+		t.Fatal(err)
+	}
+	afterDel, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, s := range afterDel {
+		if s.CustomerID == "c-slot" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("삭제 후 슬롯이 안 돌아옴")
+	}
+}

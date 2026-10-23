@@ -61,7 +61,7 @@ func (r *MaintenanceRepo) ReplaceRegionAssignees(orgID, region string, items []m
 			return err
 		}
 	}
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 
@@ -119,7 +119,7 @@ func (r *MaintenanceRepo) ReplaceSiteAssignees(customerID string, items []model.
 			return err
 		}
 	}
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 

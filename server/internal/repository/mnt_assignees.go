@@ -144,11 +144,11 @@ func (r *MaintenanceRepo) ReplaceVisitAssignees(visitID string, items []model.Ma
 		_, err := r.db.Exec(`UPDATE maintenance_visits SET assignee=?, assignee_user_id=?, work_group_id=COALESCE(NULLIF(?,''), work_group_id) WHERE visit_id=?`,
 			ownerName, nullIfEmpty(ownerUID), strings.TrimSpace(groupID), visitID)
 		if err == nil {
-			invalidateOpenUnassignedSlotsCache()
+			r.invalidateOpenUnassignedSlotsCache()
 		}
 		return err
 	}
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 

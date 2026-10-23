@@ -153,5 +153,8 @@ func (r *MaintenanceRepo) applySiteRegions(orgID string, ids []string, next func
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	if res.Changed > 0 {
+		r.invalidateOpenUnassignedSlotsCache()
+	}
 	return res, nil
 }

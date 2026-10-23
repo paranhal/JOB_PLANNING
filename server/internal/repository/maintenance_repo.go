@@ -200,7 +200,7 @@ func (r *MaintenanceRepo) AssignOpenVisit(visitID, date, assignee string) error 
 		return err
 	}
 	stampAssignedIfChanged(r.db, "maintenance_visits", "visit_id", visitID, oldName, oldUID, name, uid)
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 
@@ -422,7 +422,7 @@ func (r *MaintenanceRepo) InsertVisitFullID(v model.MaintenanceVisit) (string, e
 	if err == nil {
 		v.VisitID = id
 		_ = r.syncVisitAssigneeRows(v)
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return id, err
 }
@@ -482,7 +482,7 @@ func (r *MaintenanceRepo) UpdateVisit(v model.MaintenanceVisit) error {
 	logUpdate(r.db, "maintenance_visits", "visit_id", v.VisitID, v.VisitDate, before)
 	stampAssignedIfChanged(r.db, "maintenance_visits", "visit_id", v.VisitID, oldName, oldUID, v.Assignee, uid)
 	_ = r.syncVisitAssigneeRows(v)
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 
@@ -777,7 +777,7 @@ func (r *MaintenanceRepo) SetVisitDate(visitID, visitDate string) error {
 		return nil
 	}
 	if err == nil {
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return err
 }
@@ -805,7 +805,7 @@ func (r *MaintenanceRepo) SetVisitCompleted(visitID string, done bool, doneDate 
 		return err
 	})
 	if err == nil {
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return err
 }
@@ -859,7 +859,7 @@ func (r *MaintenanceRepo) CompleteVisitsUntil(planID, until string, onlyAssignee
 		logUpdate(r.db, "maintenance_visits", "visit_id", h.id, h.date, h.before)
 	}
 	n, _ := res.RowsAffected()
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return int(n), nil
 }
 
@@ -897,7 +897,7 @@ func (r *MaintenanceRepo) removeVisitRow(visitID string) error {
 		return err
 	}
 	_, _ = r.db.Exec(`DELETE FROM work_tasks WHERE source_type='maintenance' AND source_id=?`, visitID)
-	invalidateOpenUnassignedSlotsCache()
+	r.invalidateOpenUnassignedSlotsCache()
 	return nil
 }
 
@@ -988,7 +988,7 @@ func (r *MaintenanceRepo) UpsertSiteConfig(c *model.MaintenanceSiteConfig) error
 	}
 	n, _ := res.RowsAffected()
 	if n > 0 {
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 		return nil
 	}
 	_, err = r.db.Exec(`
@@ -997,7 +997,7 @@ func (r *MaintenanceRepo) UpsertSiteConfig(c *model.MaintenanceSiteConfig) error
 		VALUES (?,?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)`,
 		c.CustomerID, c.ShortName, c.Region, klas, rfid, c.InspectionCycle, c.EntryCategory, nullString(c.FixedRule), c.SiteRounds())
 	if err == nil {
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return err
 }
@@ -1013,7 +1013,7 @@ func (r *MaintenanceRepo) DeleteSiteConfig(customerID string) error {
 	_, _ = r.db.Exec(`DELETE FROM site_inspection_products WHERE customer_id = ?`, customerID)
 	_, err := r.db.Exec(`DELETE FROM maintenance_site_config WHERE customer_id = ?`, customerID)
 	if err == nil {
-		invalidateOpenUnassignedSlotsCache()
+		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return err
 }
