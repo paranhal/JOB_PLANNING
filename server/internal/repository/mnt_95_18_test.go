@@ -581,10 +581,68 @@ func TestMnt95_18CacheInvalidateOnVisitMutations(t *testing.T) {
 			t.Fatal("11월 배정인데 슬롯 캐시")
 		}
 	}
+	if err := repo.SetVisitCompleted(vid, true, "2026-11-02"); err != nil {
+		t.Fatal(err)
+	}
+	novDone, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	novDoneSlow, err := repo.ListOpenUnassignedSlotsSlow("MP-MUT", 2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSlotsEqual(t, novDone, novDoneSlow)
+	for _, s := range novDone {
+		if s.CustomerID == "c-slot" {
+			t.Fatal("완료해도 방문일이 있으면 슬롯이 비면 안 된다")
+		}
+	}
+	if err := repo.SetVisitCompleted(vid, false, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.AssignOpenVisit(vid, "2026-10-20", "재배정"); err != nil {
+		t.Fatal(err)
+	}
+	octRe, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	octReSlow, err := repo.ListOpenUnassignedSlotsSlow("MP-MUT", 2026, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSlotsEqual(t, octRe, octReSlow)
+	for _, s := range octRe {
+		if s.CustomerID == "c-slot" {
+			t.Fatal("재배정 후 10월 슬롯 캐시")
+		}
+	}
+	novAfterMove, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	novAfterMoveSlow, err := repo.ListOpenUnassignedSlotsSlow("MP-MUT", 2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSlotsEqual(t, novAfterMove, novAfterMoveSlow)
+	found = false
+	for _, s := range novAfterMove {
+		if s.CustomerID == "c-slot" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("10월로 옮긴 뒤 11월 슬롯이 안 돌아옴")
+	}
+	if err := repo.SetVisitDate(vid, "2026-12-15"); err != nil {
+		t.Fatal(err)
+	}
 	if err := repo.DeleteVisit(vid); err != nil {
 		t.Fatal(err)
 	}
-	afterDel, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 11)
+	afterDel, err := repo.ListOpenUnassignedSlots("MP-MUT", 2026, 12)
 	if err != nil {
 		t.Fatal(err)
 	}
