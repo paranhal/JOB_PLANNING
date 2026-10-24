@@ -58,7 +58,7 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 		selected = resolveMeetingAssignee(c, users)
 		mineUID, mineKeys = meetingAssigneeKeys(selected, users)
 		navQ = template.URL(meetingNavQuery(selected, "", orgScope, showOrgPick))
-		reports = "/stats/reports"
+		reports = "/stats/company-weekly"
 	} else {
 		mineUID, mineKeys = meetingSelfKeys(c, users)
 		reports = "/meeting/weekly/me.xlsx?date=" + mon.Format("2006-01-02")
