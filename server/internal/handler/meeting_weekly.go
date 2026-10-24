@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 // Weekly GET /meeting/weekly 팀 자료. canTeam만. D-108(94-3)
@@ -35,6 +36,10 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 	prevMon := mon.AddDate(0, 0, -7)
 	nextMon := mon.AddDate(0, 0, 7)
 	lastFrom, lastTo := model.LastISOWeekRange(mon)
+	win := repository.WeeklyPlanWindow(mon)
+	if t, err := time.ParseInLocation("2006-01-02", win.WeekFrom, mon.Location()); err == nil {
+		mon = t
+	}
 
 	opts, users, canTeam, orgScope, showOrgPick, orgs := h.meetingPicker(c)
 

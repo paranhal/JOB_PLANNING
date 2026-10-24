@@ -50,6 +50,43 @@ func companyWeekRangeLabel(mon, sun time.Time) string {
 	return fmt.Sprintf("%d.%d(월)~%d.%d(일)", int(mon.Month()), mon.Day(), int(sun.Month()), sun.Day())
 }
 
+// WeekInfoOf 그 주 월요일 기준 목요일 달·주차. 화면·새 엑셀이 이 함수만 쓴다.
+func WeekInfoOf(monday time.Time) model.WeekInfo {
+	loc := monday.Location()
+	y, m, d := monday.Date()
+	mon := time.Date(y, m, d, 0, 0, 0, 0, loc)
+	wd := int(mon.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	mon = mon.AddDate(0, 0, -(wd - 1))
+	thu := mon.AddDate(0, 0, 3)
+	n := (thu.Day() + 6) / 7
+	return model.WeekInfo{
+		Monday: mon,
+		Sunday: mon.AddDate(0, 0, 6),
+		Year:   thu.Year(),
+		Month:  int(thu.Month()),
+		WeekN:  n,
+	}
+}
+
+// WeeklyPlanBounds 보고 주 W(월요일) 기준 이월·차주 계획 구간.
+type WeeklyPlanBounds struct {
+	WeekFrom string // W 월요일
+	WeekToEx string // W+7
+	PlanFrom string // W+7 (차주)
+	PlanToEx string // W+14
+}
+
+func WeeklyPlanWindow(contentMonday time.Time) WeeklyPlanBounds {
+	p := CompanyWeeklyPeriod(contentMonday.AddDate(0, 0, 7))
+	return WeeklyPlanBounds{
+		WeekFrom: p.PrevFrom, WeekToEx: p.PrevToEx,
+		PlanFrom: p.ThisFrom, PlanToEx: p.ThisToEx,
+	}
+}
+
 func nthMondayOfMonth(mon time.Time) int {
 	n := 0
 	for d := 1; d <= mon.Day(); d++ {
@@ -83,7 +120,13 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		}
 	}
 
-	out := model.CompanyWeeklyDraft{Period: p}
+	win := WeeklyPlanWindow(mustParseDay(p.PrevFrom, anchor.Location()))
+	incomplete, err := r.listIncompleteMntVisits(win.WeekFrom, win.WeekToEx, orgID)
+	if err != nil {
+		return model.CompanyWeeklyDraft{}, err
+	}
+
+	out := model.CompanyWeeklyDraft{Period: p, IncompleteMnt: incomplete}
 	for i, row := range mapRows {
 		item := model.CompanyWeeklyRow{
 			RowKey:       row.Key,
@@ -102,46 +145,56 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 			item.MissingProject = true
 		}
 		if row.Kind == "activity" {
-			item.PrevText, item.PlanText, err = r.composeActivityTexts(row, p, mapped, orgID)
+			item.PrevText, item.PlanText, item.AutoDone, item.AutoPlan, err = r.composeActivityTexts(row, p, mapped, orgID)
 			if err != nil {
 				return out, err
 			}
 		} else if pid := strings.TrimSpace(row.ProjectID); pid != "" {
-			item.MntDoneSites, err = r.countCompanyMntSitesDone(pid, p.PrevFrom, p.PrevToEx, orgID)
+			item.MntDoneSites, err = r.countCompanyMntSitesDone(pid, win.WeekFrom, win.WeekToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			item.ASDoneCount, err = r.countCompanyASDone(pid, p.PrevFrom, p.PrevToEx, orgID)
+			item.ASDoneCount, err = r.countCompanyASDone(pid, win.WeekFrom, win.WeekToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			item.MntPlanSites, err = r.countCompanyMntSitesPlanned(pid, p.ThisFrom, p.ThisToEx, orgID)
+			item.MntPlanSites, err = r.countCompanyMntSitesPlanned(pid, win.PlanFrom, win.PlanToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			doneNames, doneCust, err := r.listCompanyMntSiteNames(pid, p.PrevFrom, p.PrevToEx, orgID, false)
+			doneNames, doneCust, err := r.listCompanyMntSiteNames(pid, win.WeekFrom, win.WeekToEx, orgID, false)
 			if err != nil {
 				return out, err
 			}
-			planNames, planCust, err := r.listCompanyMntSiteNames(pid, p.ThisFrom, p.ThisToEx, orgID, true)
+			planNames, planCust, err := r.listCompanyMntSiteNames(pid, win.PlanFrom, win.PlanToEx, orgID, true)
 			if err != nil {
 				return out, err
 			}
-			adminDone, err := r.listCompanyAdminDone(pid, p.PrevFrom, p.PrevToEx, orgID)
+			adminDone, err := r.listCompanyAdminDone(pid, win.WeekFrom, win.WeekToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			adminPlan, err := r.listCompanyAdminPlan(pid, p.ThisFrom, p.ThisToEx, orgID)
+			adminPlan, err := r.listCompanyAdminPlan(pid, win.PlanFrom, win.PlanToEx, orgID)
 			if err != nil {
 				return out, err
 			}
-			carry, err := r.listCompanyAdminCarry(pid, p.PrevFrom, p.PrevToEx, orgID)
+			asFollow, err := r.listCompanyASNextActionPlan(pid, win.PlanFrom, win.PlanToEx, orgID)
 			if err != nil {
 				return out, err
 			}
+			adminPlan = append(adminPlan, asFollow...)
+			carry, err := r.listCompanyAdminCarry(pid, win.WeekFrom, win.PlanFrom, orgID)
+			if err != nil {
+				return out, err
+			}
+			openAS, err := r.listCompanyASOpen(pid, orgID)
+			if err != nil {
+				return out, err
+			}
+			mntCarry := incompleteMntCarry(incomplete, pid)
 			mntCust := mergeCustSet(doneCust, planCust)
-			item.PrevText = composePrevText(item.MntDoneSites, doneNames, item.ASDoneCount, dropDupMntAdmin(adminDone, doneCust))
-			item.PlanText = composePlanText(item.MntPlanSites, planNames, dropDupMntAdmin(adminPlan, mntCust), dropDupMntAdmin(carry, mntCust))
+			item.PrevText, item.AutoDone = composePrevBundle(item.MntDoneSites, doneNames, item.ASDoneCount, openAS, dropDupMntAdmin(adminDone, doneCust), pid)
+			item.PlanText, item.AutoPlan = composePlanBundle(item.MntPlanSites, planNames, dropDupMntAdmin(adminPlan, mntCust), dropDupMntAdmin(carry, mntCust), mntCarry, pid)
 		}
 		out.Rows = append(out.Rows, item)
 	}
@@ -154,12 +207,30 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		unassigned = dropUnassignedKinds(unassigned, model.ScopeWorkMaintenance, model.ScopeWorkAS)
 	}
 	out.Unassigned = unassigned
-	incomplete, err := r.listIncompleteMntVisits(p.PrevFrom, p.PrevToEx, orgID)
-	if err != nil {
-		return out, err
-	}
-	out.IncompleteMnt = incomplete
 	return out, nil
+}
+
+func mustParseDay(iso string, loc *time.Location) time.Time {
+	t, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(iso), loc)
+	if err != nil {
+		return time.Now().In(loc)
+	}
+	return t
+}
+
+func incompleteMntCarry(visits []model.IncompleteMntVisit, projectID string) []adminLine {
+	var out []adminLine
+	for _, v := range visits {
+		if strings.TrimSpace(v.ProjectID) != projectID {
+			continue
+		}
+		title := strings.TrimSpace(v.OrgName)
+		if title == "" {
+			title = v.VisitID
+		}
+		out = append(out, adminLine{ID: v.VisitID, Title: "정기점검 " + title, Date: v.VisitDate, ProjectID: projectID, CustomerID: "", WorkType: "mnt"})
+	}
+	return out
 }
 
 func hasMntAsActivity(rows []weeklyReportRow) bool {
@@ -187,37 +258,96 @@ func dropUnassignedKinds(in []model.CompanyWeeklyUnassigned, kinds ...string) []
 }
 
 func composePrevText(mntSites int, names []string, asCount int, admin []adminLine) string {
-	var lines []string
+	text, _ := composePrevBundle(mntSites, names, asCount, asOpenSummary{}, admin, "")
+	return text
+}
+
+func composePlanText(mntSites int, names []string, plan, carry []adminLine) string {
+	text, _ := composePlanBundle(mntSites, names, plan, carry, nil, "")
+	return text
+}
+
+func composePrevBundle(mntSites int, names []string, asCount int, open asOpenSummary, admin []adminLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
+	var auto []model.CompanyWeeklyAutoLine
 	core := formatMntSitesCore(mntSites, names)
 	if core != "" && asCount > 0 {
-		lines = append(lines, "·"+core+fmt.Sprintf(", AS %d건 처리완료", asCount))
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "agg:done:" + projectID, Text: core + fmt.Sprintf(", AS %d건 처리완료", asCount)})
 	} else if core != "" {
-		lines = append(lines, "·"+core)
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "agg:done:" + projectID, Text: core})
 	} else if asCount > 0 {
-		lines = append(lines, fmt.Sprintf("·AS %d건 처리완료", asCount))
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "agg:done:" + projectID, Text: fmt.Sprintf("AS %d건 처리완료", asCount)})
+	}
+	if open.N > 0 {
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "as:open:" + projectID, Text: formatASOpenLine(open)})
 	}
 	for _, a := range admin {
-		if strings.TrimSpace(a.Date) == "" {
-			lines = append(lines, "·"+a.Title)
+		text := a.Title
+		if strings.TrimSpace(a.Date) != "" {
+			text = a.Title + "(" + slashMD(a.Date) + ")"
+		}
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("task", a.ID), Text: text})
+	}
+	return joinAutoLines(auto), auto
+}
+
+func composePlanBundle(mntSites int, names []string, plan, carry, mntCarry []adminLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
+	var auto []model.CompanyWeeklyAutoLine
+	if core := formatMntSitesCore(mntSites, names); core != "" {
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "agg:plan:" + projectID, Text: core})
+	}
+	for _, a := range plan {
+		kind := "task"
+		if a.WorkType == "as" {
+			kind = "as"
+		}
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey(kind, a.ID), Text: a.Title})
+	}
+	for _, a := range carry {
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("task", a.ID), Text: carryTitle(a.Title)})
+	}
+	for _, a := range mntCarry {
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("mnt", a.ID), Text: carryTitle(a.Title)})
+	}
+	return joinAutoLines(auto), auto
+}
+
+func joinAutoLines(auto []model.CompanyWeeklyAutoLine) string {
+	var lines []string
+	for _, a := range auto {
+		t := strings.TrimSpace(a.Text)
+		if t == "" {
 			continue
 		}
-		lines = append(lines, "·"+a.Title+"("+slashMD(a.Date)+")")
+		if !strings.HasPrefix(t, "·") {
+			t = "·" + t
+		}
+		lines = append(lines, t)
 	}
 	return strings.Join(lines, "\n")
 }
 
-func composePlanText(mntSites int, names []string, plan, carry []adminLine) string {
-	var lines []string
-	if core := formatMntSitesCore(mntSites, names); core != "" {
-		lines = append(lines, "·"+core)
+func carryTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if strings.Contains(title, "이월") || strings.Contains(title, "지연") {
+		return title
 	}
-	for _, a := range plan {
-		lines = append(lines, "·"+a.Title)
+	return title + "(이월)"
+}
+
+func lineKey(kind, id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = "_"
 	}
-	for _, a := range carry {
-		lines = append(lines, "·"+a.Title+"(이월)")
+	return kind + ":" + id
+}
+
+func formatASOpenLine(open asOpenSummary) string {
+	core := fmt.Sprintf("AS 진행 %d건", open.N)
+	if strings.TrimSpace(open.Detail) == "" {
+		return core
 	}
-	return strings.Join(lines, "\n")
+	return core + "(" + open.Detail + ")"
 }
 
 func formatMntSitesCore(n int, names []string) string {
@@ -298,6 +428,13 @@ func slashMD(iso string) string {
 type adminLine struct {
 	ID, Title, Date, ProjectID, ParentID, Role, CustomerID, WorkType string
 }
+
+type asOpenSummary struct {
+	N      int
+	Detail string
+}
+
+const companyWeeklyAdminTypesSQL = `t.work_type IN ('admin','support','project_work','work')`
 
 func collapseCompanyAdminLines(lines []adminLine) []adminLine {
 	type grp struct {
@@ -447,14 +584,13 @@ func (r *StatsRepo) countCompanyASDone(projectID, from, toEx, orgID string) (int
 }
 
 func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([]adminLine, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete, ExcludeSalesActivity: true})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
 		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE t.work_type IN ('admin','support','project_work')
-		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
+		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
@@ -468,19 +604,18 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([
 func companyAdminPlanDateSQL() string {
 	return `CASE WHEN COALESCE(t.recurrence_role,'')='occurrence'
 		THEN NULLIF(TRIM(t.work_date),'')
-		ELSE NULLIF(TRIM(t.due_date),'') END`
+		ELSE COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),'')) END`
 }
 
 func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([]adminLine, error) {
 	d := companyAdminPlanDateSQL()
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit, ExcludeSalesActivity: true})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
 		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE t.work_type IN ('admin','support','project_work')
-		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminSQL+`
+		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+d+`,'')) != ''
 		  AND `+d+` >= ? AND `+d+` < ?
@@ -492,8 +627,120 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 	return collapseCompanyAdminLines(lines), nil
 }
 
-func (r *StatsRepo) listCompanyAdminCarry(projectID, from, toEx, orgID string) ([]adminLine, error) {
-	return r.listCompanyAdminPlan(projectID, from, toEx, orgID)
+func (r *StatsRepo) listCompanyAdminCarry(projectID, weekFrom, planFrom, orgID string) ([]adminLine, error) {
+	d := companyAdminPlanDateSQL()
+	f := r.attachMetrics(model.StatsMeetingFilter{OrgID: orgID, ExcludeSalesActivity: true})
+	orgSQL, orgArgs := mustOrgSQL("t", f.OrgID)
+	adminSQL := ` AND TRIM(COALESCE(t.source_type,'')) NOT IN ('as','maintenance','sales_activity')` +
+		statsProjectKindSQL("t.project_id") + orgSQL + statsTestSQL("t", f)
+	lines, err := r.queryAdminLines(`
+		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
+		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
+		       COALESCE(t.work_type,'')
+		FROM work_tasks t
+		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
+		  AND t.status NOT IN ('complete','cancelled')
+		  AND TRIM(COALESCE(t.project_id,'')) = ?
+		  AND (
+		        TRIM(COALESCE(`+d+`,'')) = ''
+		     OR date(`+d+`) < date(?)
+		  )
+		ORDER BY `+d+`, t.title`, append(append([]interface{}{}, orgArgs...), projectID, planFrom)...)
+	if err != nil {
+		return nil, err
+	}
+	for i := range lines {
+		if n := delayWeeks(lines[i].Date, weekFrom); n >= 1 {
+			lines[i].Title = strings.TrimSpace(lines[i].Title) + fmt.Sprintf("(%d주 지연)", n)
+		}
+	}
+	return collapseCompanyAdminLines(lines), nil
+}
+
+func delayWeeks(date, weekFrom string) int {
+	d, err1 := time.ParseInLocation("2006-01-02", firstISODay(date), time.Local)
+	w, err2 := time.ParseInLocation("2006-01-02", firstISODay(weekFrom), time.Local)
+	if err1 != nil || err2 != nil || !d.Before(w) {
+		return 0
+	}
+	return int(w.Sub(d).Hours()/24) / 7
+}
+
+func firstISODay(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 10 {
+		return s[:10]
+	}
+	return s
+}
+
+func (r *StatsRepo) listCompanyASOpen(projectID, orgID string) (asOpenSummary, error) {
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisReceipt})
+	rows, err := r.db.Query(`
+		SELECT COALESCE(NULLIF(TRIM(c.org_name),''), COALESCE(ar.as_number,''), ar.as_id),
+		       COALESCE(ar.symptom,'')
+		FROM as_receipts ar
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		LEFT JOIN customers c ON c.customer_id = ar.customer_id
+		WHERE TRIM(COALESCE(ar.complete_datetime,'')) = ''
+		  AND LOWER(TRIM(COALESCE(ar.status,''))) NOT IN ('completed','complete','cancelled','canceled','cancel')
+		  AND TRIM(COALESCE(ar.project_id,'')) = ?`+asSQL+`
+		ORDER BY ar.receipt_datetime DESC`, append([]interface{}{projectID}, asArgs...)...)
+	if err != nil {
+		return asOpenSummary{}, err
+	}
+	defer rows.Close()
+	var parts []string
+	n := 0
+	for rows.Next() {
+		var cust, symptom string
+		if err := rows.Scan(&cust, &symptom); err != nil {
+			return asOpenSummary{}, err
+		}
+		n++
+		if len(parts) >= 6 {
+			continue
+		}
+		cust = strings.TrimSpace(cust)
+		symptom = truncateRunes(strings.TrimSpace(strings.ReplaceAll(symptom, "\n", " ")), 20)
+		if cust != "" {
+			parts = append(parts, cust)
+		}
+		if symptom != "" {
+			parts = append(parts, symptom)
+		}
+	}
+	return asOpenSummary{N: n, Detail: strings.Join(parts, " · ")}, rows.Err()
+}
+
+func (r *StatsRepo) listCompanyASNextActionPlan(projectID, from, toEx, orgID string) ([]adminLine, error) {
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisReceipt})
+	rows, err := r.db.Query(`
+		SELECT ar.as_id, COALESCE(NULLIF(TRIM(c.org_name),''), COALESCE(ar.as_number,''), ar.as_id),
+		       MAX(ap.next_action_date)
+		FROM as_receipts ar
+		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		LEFT JOIN customers c ON c.customer_id = ar.customer_id
+		INNER JOIN as_processes ap ON ap.as_id = ar.as_id
+		WHERE TRIM(COALESCE(ar.complete_datetime,'')) = ''
+		  AND TRIM(COALESCE(ap.next_action_date,'')) != ''
+		  AND ap.next_action_date >= ? AND ap.next_action_date < ?
+		  AND TRIM(COALESCE(ar.project_id,'')) = ?`+asSQL+`
+		GROUP BY ar.as_id
+		ORDER BY 3`, append([]interface{}{from, toEx, projectID}, asArgs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []adminLine
+	for rows.Next() {
+		var id, name, date string
+		if err := rows.Scan(&id, &name, &date); err != nil {
+			return nil, err
+		}
+		out = append(out, adminLine{ID: id, Title: "AS 후속 " + name, Date: date, ProjectID: projectID, WorkType: "as"})
+	}
+	return out, rows.Err()
 }
 
 func (r *StatsRepo) queryAdminLines(q string, args ...interface{}) ([]adminLine, error) {
@@ -528,9 +775,9 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 
 	mntDoneSQL, mntDoneArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 	asDoneSQL, asDoneArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
-	adminDoneSQL, adminDoneArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	adminDoneSQL, adminDoneArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete, ExcludeSalesActivity: true})
 	mntPlanSQL, mntPlanArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
-	adminPlanSQL, adminPlanArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
+	adminPlanSQL, adminPlanArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit, ExcludeSalesActivity: true})
 
 	vrows, err := r.db.Query(`
 		SELECT v.visit_id, COALESCE(c.org_name,''), `+mntDoneDateSQL+`, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,'')
@@ -591,8 +838,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''), COALESCE(p.name,''), COALESCE(t.work_type,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE t.work_type IN ('admin','support','project_work')
-		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminDoneSQL+`
+		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminDoneSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)`+statsProjectKindSQL("t.project_id"),
 		append(append([]interface{}{}, adminDoneArgs...), p.PrevFrom, p.PrevToEx)...)
@@ -648,19 +894,18 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 
 	crows, err := r.db.Query(`
 		SELECT t.task_id, t.title, COALESCE(`+companyAdminPlanDateSQL()+`,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
-		       CASE WHEN date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END,
+		       CASE WHEN TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != '' AND date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END,
 		       COALESCE(t.work_type,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE t.work_type IN ('admin','support','project_work')
-		  AND COALESCE(t.source_type,'') IN ('', 'sales_activity')`+SQLRecurrenceWorkUnit+adminPlanSQL+`
+		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminPlanSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
-		  AND TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != ''
 		  AND (
-		        (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
+		        TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) = ''
+		     OR date(`+companyAdminPlanDateSQL()+`) < date(?)
 		     OR (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
 		  )`+statsProjectKindSQL("t.project_id"),
-		append(append([]interface{}{}, adminPlanArgs...), p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisToEx, p.PrevFrom, p.PrevToEx)...)
+		append(append([]interface{}{}, adminPlanArgs...), p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisFrom, p.ThisToEx)...)
 	if err != nil {
 		return nil, err
 	}

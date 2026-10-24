@@ -72,6 +72,7 @@ func applyOrgs(db *sql.DB) {
 	addNamedColumn(db, "work_projects", "share_to",
 		`ALTER TABLE work_projects ADD COLUMN share_to TEXT NOT NULL DEFAULT ''`)
 	applyOrgSplitV266(db)
+	seedWeeklyProgressSettings(db)
 }
 
 func applyOrgSplitV266(db *sql.DB) {
@@ -100,4 +101,16 @@ func applyOrgSplitV266(db *sql.DB) {
 		return
 	}
 	markMetaDone(db, orgSplitMetaKey)
+}
+
+func seedWeeklyProgressSettings(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO app_settings(setting_key, setting_value, updated_at)
+		VALUES ('weekly_progress_mode.O01','auto', datetime('now','localtime')),
+		       ('weekly_progress_cycle.O01','월', datetime('now','localtime'))`); err != nil {
+		log.Printf("weekly_progress seed: %v", err)
+	}
 }

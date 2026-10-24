@@ -35,20 +35,23 @@ type CompanyWeeklyReport struct {
 }
 
 type CompanyWeeklySavedRow struct {
-	Prev     string `json:"prev"`
-	Plan     string `json:"plan"`
-	Help     string `json:"help"`
-	Decision string `json:"decision"`
+	Prev         string              `json:"prev"`
+	Plan         string              `json:"plan"`
+	Help         string              `json:"help"`
+	Decision     string              `json:"decision"`
+	Customer     string              `json:"customer,omitempty"`
+	Assignee     string              `json:"assignee,omitempty"`
+	DoneLines    []CompanyWeeklyLine `json:"done_lines,omitempty"`
+	PlanLines    []CompanyWeeklyLine `json:"plan_lines,omitempty"`
+	SupportNeeds string              `json:"support_needs,omitempty"`
+	DecisionLog  []CompanyWeeklyLog  `json:"decision_log,omitempty"`
+	HiddenDone   []string            `json:"hidden_done,omitempty"`
+	HiddenPlan   []string            `json:"hidden_plan,omitempty"`
+	LineLog      []CompanyWeeklyLog  `json:"line_log,omitempty"`
 }
 
 func ParseCompanyWeeklyContent(raw string) map[string]CompanyWeeklySavedRow {
-	out := map[string]CompanyWeeklySavedRow{}
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return out
-	}
-	_ = json.Unmarshal([]byte(raw), &out)
-	return out
+	return ParseCompanyWeeklyDoc(raw).Rows
 }
 
 func EncodeCompanyWeeklyContent(rows []model.CompanyWeeklyRow) string {
@@ -77,9 +80,21 @@ func ApplyCompanyWeeklySaved(rows []model.CompanyWeeklyRow, saved map[string]Com
 		if !ok {
 			continue
 		}
-		out[i].PrevText = s.Prev
-		out[i].PlanText = s.Plan
-		out[i].HelpText = s.Help
+		if len(s.DoneLines) > 0 {
+			out[i].PrevText = JoinWeeklyLines(s.DoneLines)
+		} else {
+			out[i].PrevText = s.Prev
+		}
+		if len(s.PlanLines) > 0 {
+			out[i].PlanText = JoinWeeklyLines(s.PlanLines)
+		} else {
+			out[i].PlanText = s.Plan
+		}
+		if h := strings.TrimSpace(s.SupportNeeds); h != "" {
+			out[i].HelpText = h
+		} else {
+			out[i].HelpText = s.Help
+		}
 		out[i].DecisionText = s.Decision
 	}
 	return out

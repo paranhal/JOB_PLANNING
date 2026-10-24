@@ -1,38 +1,67 @@
 package repository
 
 import (
+	"strconv"
 	"strings"
 
 	"customer-support/internal/model"
 )
 
-func (r *StatsRepo) composeActivityTexts(row weeklyReportRow, p model.CompanyWeeklyPeriod, mapped map[string]bool, orgID string) (prev, plan string, err error) {
+func (r *StatsRepo) composeActivityTexts(row weeklyReportRow, p model.CompanyWeeklyPeriod, mapped map[string]bool, orgID string) (prev, plan string, autoDone, autoPlan []model.CompanyWeeklyAutoLine, err error) {
 	kind := activityKindOf(row)
-	exclProjects, exclSales := mappedExcludeSQL(mapped)
-	var prevLines, planLines []string
+	exclProjects, _ := mappedExcludeSQL(mapped)
+	var prevLines, planLines []keyedLine
 	switch kind {
 	case "asset":
 		prevLines, err = r.listAssetActivityLines(p.PrevFrom, p.PrevToEx, true, exclProjects, orgID)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, nil, err
 		}
 		planLines, err = r.listAssetActivityLines(p.ThisFrom, p.ThisToEx, false, exclProjects, orgID)
 	case "tech":
-		prevLines, err = r.listTechSalesActivityLines(p.PrevFrom, p.PrevToEx, exclSales, orgID)
+		prevLines, err = r.listTechSalesActivityLines(p.PrevFrom, p.PrevToEx, orgID, false)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, nil, err
 		}
-		planLines, err = r.listTechSalesActivityLines(p.ThisFrom, p.ThisToEx, exclSales, orgID)
+		planLines, err = r.listTechSalesActivityLines(p.ThisFrom, p.ThisToEx, orgID, true)
 	case "mnt_as":
 		prev, plan, err = r.composeUnmappedMntASTexts(p, mapped, orgID)
-		return prev, plan, err
+		return prev, plan, splitAuto(prev, "agg:mntas:done"), splitAuto(plan, "agg:mntas:plan"), err
 	default:
-		return "", "", nil
+		return "", "", nil, nil, nil
 	}
 	if err != nil {
-		return "", "", err
+		return "", "", nil, nil, err
 	}
-	return strings.Join(bulletLines(prevLines), "\n"), strings.Join(bulletLines(planLines), "\n"), nil
+	autoDone = keyedToAuto(prevLines)
+	autoPlan = keyedToAuto(planLines)
+	return joinAutoLines(autoDone), joinAutoLines(autoPlan), autoDone, autoPlan, nil
+}
+
+type keyedLine struct {
+	Key, Text string
+}
+
+func keyedToAuto(in []keyedLine) []model.CompanyWeeklyAutoLine {
+	var out []model.CompanyWeeklyAutoLine
+	seen := map[string]bool{}
+	for _, s := range in {
+		t := strings.TrimSpace(s.Text)
+		if t == "" || seen[s.Key+t] {
+			continue
+		}
+		seen[s.Key+t] = true
+		out = append(out, model.CompanyWeeklyAutoLine{Key: s.Key, Text: t})
+	}
+	return out
+}
+
+func splitAuto(text, prefix string) []model.CompanyWeeklyAutoLine {
+	var out []model.CompanyWeeklyAutoLine
+	for i, l := range SplitWeeklyLines(text) {
+		out = append(out, model.CompanyWeeklyAutoLine{Key: prefix + ":" + strconv.Itoa(i), Text: l.Text})
+	}
+	return out
 }
 
 func activityKindOf(row weeklyReportRow) string {
@@ -79,7 +108,7 @@ func bulletLines(in []string) []string {
 	return out
 }
 
-func (r *StatsRepo) listAssetActivityLines(from, toEx string, done bool, exclProjects, orgID string) ([]string, error) {
+func (r *StatsRepo) listAssetActivityLines(from, toEx string, done bool, exclProjects, orgID string) ([]keyedLine, error) {
 	dateSQL := `COALESCE(NULLIF(TRIM(t.complete_date),''), NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''))`
 	statusSQL := `t.status='complete'`
 	if !done {
@@ -108,18 +137,18 @@ func (r *StatsRepo) listAssetActivityLines(from, toEx string, done bool, exclPro
 		return nil, err
 	}
 	defer rows.Close()
-	var out []string
+	var out []keyedLine
 	for rows.Next() {
 		var id, title string
 		if err := rows.Scan(&id, &title); err != nil {
 			return nil, err
 		}
-		out = append(out, title)
+		out = append(out, keyedLine{Key: lineKey("task", id), Text: title})
 	}
 	return out, rows.Err()
 }
 
-func (r *StatsRepo) listTechSalesActivityLines(from, toEx, exclProjects, orgID string) ([]string, error) {
+func (r *StatsRepo) listTechSalesActivityLines(from, toEx, orgID string, plan bool) ([]keyedLine, error) {
 	orgSQL, orgArgs, err := AppendOrgSQL("sp", orgID)
 	if err != nil {
 		return nil, err
@@ -128,48 +157,110 @@ func (r *StatsRepo) listTechSalesActivityLines(from, toEx, exclProjects, orgID s
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	datePred := `a.activity_date >= ? AND a.activity_date < ?`
+	args := []interface{}{from, toEx}
+	if plan {
+		datePred = `((a.activity_date >= ? AND a.activity_date < ?) OR (TRIM(COALESCE(a.next_action_date,'')) != '' AND a.next_action_date >= ? AND a.next_action_date < ?))`
+		args = []interface{}{from, toEx, from, toEx}
+	}
+	var out []keyedLine
 	arows, err := r.db.Query(`
-		SELECT a.activity_id, COALESCE(NULLIF(TRIM(a.title),''), a.activity_type)
+		SELECT a.activity_id,
+		       COALESCE(NULLIF(TRIM(wp.name),''), NULLIF(TRIM(sp.name),''), ''),
+		       COALESCE(NULLIF(TRIM(a.title),''), a.activity_type)
 		FROM sales_activities a
 		LEFT JOIN work_projects wp ON wp.sales_project_id = a.sales_id
 		LEFT JOIN sales_projects sp ON sp.sales_id = a.sales_id
-		WHERE a.activity_date >= ? AND a.activity_date < ?
-		  AND a.activity_type IN ('research','proposal','quote','rfp','bid','requirement','material','rfp_received')
-		  AND TRIM(COALESCE(wp.project_id,'')) NOT IN (`+exclProjects+`)`+orgSQL+`
-		ORDER BY a.activity_date, a.title`, append([]interface{}{from, toEx}, orgArgs...)...)
+		WHERE `+datePred+`
+		  AND a.activity_type IN ('research','proposal','quote','rfp','bid','requirement','material','rfp_received')`+orgSQL+`
+		ORDER BY a.activity_date, a.title`, append(args, orgArgs...)...)
 	if err != nil {
 		return nil, err
 	}
+	seen := map[string]bool{}
 	for arows.Next() {
-		var id, title string
-		if err := arows.Scan(&id, &title); err != nil {
+		var id, pname, title string
+		if err := arows.Scan(&id, &pname, &title); err != nil {
 			arows.Close()
 			return nil, err
 		}
-		out = append(out, title)
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, keyedLine{Key: lineKey("sales", id), Text: prefixBiz(pname, title)})
 	}
 	arows.Close()
 
 	qrows, err := r.db.Query(`
-		SELECT q.quote_id, COALESCE(NULLIF(TRIM(q.title),''), q.quote_no)
+		SELECT q.quote_id,
+		       COALESCE(NULLIF(TRIM(wp.name),''), ''),
+		       COALESCE(NULLIF(TRIM(q.title),''), q.quote_no)
 		FROM sales_quotes q
 		LEFT JOIN work_projects wp ON wp.sales_project_id = q.sales_id
-		WHERE q.quote_date >= ? AND q.quote_date < ?
-		  AND TRIM(COALESCE(wp.project_id,'')) NOT IN (`+exclProjects+`)`+qorgSQL+`
+		WHERE q.quote_date >= ? AND q.quote_date < ?`+qorgSQL+`
 		ORDER BY q.quote_date, q.quote_no`, append([]interface{}{from, toEx}, qorgArgs...)...)
 	if err != nil {
 		return nil, err
 	}
 	defer qrows.Close()
 	for qrows.Next() {
-		var id, title string
-		if err := qrows.Scan(&id, &title); err != nil {
+		var id, pname, title string
+		if err := qrows.Scan(&id, &pname, &title); err != nil {
 			return nil, err
 		}
-		out = append(out, "견적 "+title)
+		out = append(out, keyedLine{Key: lineKey("quote", id), Text: prefixBiz(pname, "견적 "+title)})
 	}
+	tasks, err := r.listTechWorkTaskLines(from, toEx, orgID, !plan)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tasks...)
 	return out, qrows.Err()
+}
+
+func prefixBiz(pname, title string) string {
+	pname = strings.TrimSpace(pname)
+	title = strings.TrimSpace(title)
+	if pname == "" {
+		return title
+	}
+	return "[" + pname + "] " + title
+}
+
+func (r *StatsRepo) listTechWorkTaskLines(from, toEx, orgID string, done bool) ([]keyedLine, error) {
+	dateSQL := `COALESCE(NULLIF(TRIM(t.complete_date),''), NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''))`
+	statusSQL := `t.status='complete'`
+	if !done {
+		statusSQL = `t.status NOT IN ('complete','cancelled')`
+		dateSQL = `COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''))`
+	}
+	orgSQL, orgArgs, err := AppendOrgSQL("t", orgID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.db.Query(`
+		SELECT t.task_id, COALESCE(NULLIF(TRIM(p.name),''), ''), t.title
+		FROM work_tasks t
+		LEFT JOIN work_projects p ON p.project_id = t.project_id
+		WHERE `+statusSQL+`
+		  AND (t.work_type='sales' OR COALESCE(t.source_type,'')='sales_activity')
+		  AND TRIM(COALESCE(`+dateSQL+`,'')) != ''
+		  AND `+dateSQL+` >= ? AND `+dateSQL+` < ?`+orgSQL+`
+		ORDER BY `+dateSQL+`, t.title`, append([]interface{}{from, toEx}, orgArgs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []keyedLine
+	for rows.Next() {
+		var id, pname, title string
+		if err := rows.Scan(&id, &pname, &title); err != nil {
+			return nil, err
+		}
+		out = append(out, keyedLine{Key: lineKey("task", id), Text: prefixBiz(pname, title)})
+	}
+	return out, rows.Err()
 }
 
 func (r *StatsRepo) composeUnmappedMntASTexts(p model.CompanyWeeklyPeriod, mapped map[string]bool, orgID string) (prev, plan string, err error) {

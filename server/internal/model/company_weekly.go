@@ -39,6 +39,14 @@ type CompanyWeeklyRow struct {
 	MntDoneSites   int
 	ASDoneCount    int
 	MntPlanSites   int
+	AutoDone       []CompanyWeeklyAutoLine // 자동 줄(키 포함). 화면 숨김·수정용
+	AutoPlan       []CompanyWeeklyAutoLine
+}
+
+// CompanyWeeklyAutoLine 집계 줄 식별. 키=(종류, 대상 ID)
+type CompanyWeeklyAutoLine struct {
+	Key  string
+	Text string
 }
 
 // IncompleteMntVisit 완료 표시가 없는 정기점검 방문. §68.6
