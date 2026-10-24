@@ -382,73 +382,24 @@ func (r *CustomerRepo) Delete(id string) error {
 	})
 }
 
-// ListAll 전체 고객 목록 (드롭다운용)
+// ListAll 거래처 전체(ScopeParty). 백업·내보내기 허용. 선택 목록은 Lookup.
 func (r *CustomerRepo) ListAll() ([]model.Customer, error) {
-	return r.ListAllInOrg(OrgAll)
+	return r.listFromLookup(ScopeParty, "")
 }
 
+// ListAllInOrg deprecated: 고객은 전사 공용. orgID 는 무시하고 Lookup(ScopeParty).
 func (r *CustomerRepo) ListAllInOrg(orgID string) ([]model.Customer, error) {
-	q := `SELECT customer_id, org_name FROM customers WHERE is_active=1`
-	q, args := appendOrg(q, nil, "", orgIDForFilter(orgID))
-	q += ` ORDER BY org_name`
-	rows, err := r.db.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var customers []model.Customer
-	for rows.Next() {
-		var c model.Customer
-		if err := rows.Scan(&c.CustomerID, &c.OrgName); err != nil {
-			return nil, err
-		}
-		customers = append(customers, c)
-	}
-	return customers, rows.Err()
+	_ = orgID
+	return r.ListAll()
 }
 
-// ListForReceipt AS 접수·정기점검용. party_kind=customer 만. §34.2.5
+// ListForReceipt AS 접수용. Lookup(ScopeSite) 과 동일 집합.
 func (r *CustomerRepo) ListForReceipt() ([]model.Customer, error) {
-	return r.listForReceipt("")
+	return r.ListSelectable()
 }
 
 func (r *CustomerRepo) ListForReceiptIncluding(id string) ([]model.Customer, error) {
-	return r.listForReceipt(id)
-}
-
-func (r *CustomerRepo) listForReceipt(includeID string) ([]model.Customer, error) {
-	q := `
-		SELECT c.customer_id, c.org_name,
-		       COALESCE(cfg.short_name,''), COALESCE(cfg.region,''),
-		       COALESCE(NULLIF(TRIM(c.party_kind),''),'customer'),
-		       COALESCE(c.is_provisional,0)
-		FROM customers c
-		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = c.customer_id
-		WHERE c.is_active=1
-		  AND (COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'`
-	args := []interface{}{}
-	if includeID = strings.TrimSpace(includeID); includeID != "" {
-		q += ` OR c.customer_id=?`
-		args = append(args, includeID)
-	}
-	q += `) ORDER BY c.org_name`
-	rows, err := r.db.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []model.Customer
-	for rows.Next() {
-		var c model.Customer
-		var prov int
-		if err := rows.Scan(&c.CustomerID, &c.OrgName, &c.ShortName, &c.Region, &c.PartyKind, &prov); err != nil {
-			return nil, err
-		}
-		c.IsProvisional = prov == 1
-		out = append(out, c)
-	}
-	return out, rows.Err()
+	return r.listFromLookup(ScopeSite, id)
 }
 
 const customerAPISelect = `
