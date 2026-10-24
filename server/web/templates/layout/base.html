@@ -464,6 +464,86 @@
   window.showFlashError = function (m) {
     window.dispatchEvent(new CustomEvent('app-flash-error', { detail: m }));
   };
+  window.customerCombo = function (scope, value, required, placeholder, parent, syncKey) {
+    scope = scope || 'site';
+    return {
+      scope: scope,
+      q: '',
+      open: false,
+      hi: 0,
+      selectedId: value || '',
+      selectedLabel: '',
+      items: [],
+      total: 0,
+      placeholder: placeholder || '고객명으로 찾기',
+      parentId: parent || '',
+      required: !!required,
+      timer: null,
+      syncKey: syncKey || '',
+      init() {
+        if (this.syncKey && this.$data && this.$data[this.syncKey]) {
+          this.selectedId = this.$data[this.syncKey];
+        }
+        if (this.selectedId) this.restore();
+      },
+      restore() {
+        var self = this;
+        fetch('/lookup/customers?scope=' + encodeURIComponent(this.scope) + '&include=' + encodeURIComponent(this.selectedId) + '&limit=8', { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            var items = d.items || [];
+            var it = items.find(function (x) { return x.id === self.selectedId; }) || items[0];
+            if (it) {
+              self.selectedLabel = it.label || it.name;
+              self.q = self.selectedLabel;
+            }
+          });
+      },
+      onInput() {
+        var self = this;
+        this.selectedId = '';
+        this.selectedLabel = '';
+        clearTimeout(this.timer);
+        this.timer = setTimeout(function () { self.search(false); }, 250);
+      },
+      search(more) {
+        var q = String(this.q || '').trim();
+        var n = Array.from(q).length;
+        if (n === 1) { this.items = []; this.total = 0; this.open = true; return; }
+        var limit = more ? 100 : 20;
+        var url = '/lookup/customers?scope=' + encodeURIComponent(this.scope) + '&limit=' + limit + '&q=' + encodeURIComponent(q);
+        if (this.parentId) url += '&parent=' + encodeURIComponent(this.parentId);
+        var self = this;
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            self.items = d.items || [];
+            self.total = d.total || 0;
+            self.open = true;
+            self.hi = 0;
+          });
+      },
+      move(d) {
+        var n = this.items.length;
+        if (!n) { this.hi = 0; return; }
+        this.hi = (this.hi + d + n) % n;
+      },
+      pickHighlight() {
+        var it = this.items[this.hi];
+        if (it) this.pick(it);
+      },
+      pick(it) {
+        if (!it || it.registered) return;
+        this.selectedId = it.id;
+        this.selectedLabel = it.label || it.name;
+        this.q = this.selectedLabel;
+        this.open = false;
+        if (this.syncKey) this[this.syncKey] = it.id;
+        var el = this.$refs.hid;
+        if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+  };
   window.projectCombo = function (items, selected, emptyLabel) {
     items = items || [];
     return {

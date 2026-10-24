@@ -114,13 +114,16 @@ func TestNewWorkFormOrgIsolation(t *testing.T) {
 		       ('as-o02','R-O02',?,'c-o02','O02증상','in_progress','이다른','O02',?,?)`, ts, ts, ts, ts, ts, ts); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT OR IGNORE INTO maintenance_plans (plan_id, plan_year, title, status) VALUES ('MP-nw',2026,'정기','approved')`); err != nil {
+	if _, err := db.Exec(`INSERT OR IGNORE INTO maintenance_plans (plan_id, plan_year, title, status, org_id) VALUES
+		('MP-nw',2026,'정기','approved','O01'),
+		('MP-o02',2026,'미디어','approved','O02')`); err != nil {
 		t.Fatal(err)
 	}
 	today := time.Now().Format(dateLayout)
 	if _, err := db.Exec(`INSERT INTO maintenance_visits (visit_id, plan_id, visit_date, customer_id, sort_order, entry_category, assignee, product_type, completed)
 		VALUES ('v-o01','MP-nw',?,'c-o01',0,'normal','김현우','KLAS',0),
-		       ('v-o02','MP-nw',?,'c-o02',0,'normal','이다른','KLAS',0)`, today, today); err != nil {
+		       ('v-o02','MP-nw',?,'c-o02',0,'normal','이다른','KLAS',0),
+		       ('v-x02','MP-o02',?,'c-o02',0,'normal','이다른','KLAS',0)`, today, today, today); err != nil {
 		t.Fatal(err)
 	}
 	ck := jwtCookieUser(t, me)
@@ -129,8 +132,11 @@ func TestNewWorkFormOrgIsolation(t *testing.T) {
 		t.Fatal("AS 조각 조직 격리 실패")
 	}
 	mntBody := doGetWith(t, e, "/workboard/new-work/form?kind=maintenance", ck).Body.String()
-	if !strings.Contains(mntBody, "v-o01") || strings.Contains(mntBody, "v-o02") {
-		t.Fatal("점검 조각 조직 격리 실패")
+	if !strings.Contains(mntBody, "v-o01") || !strings.Contains(mntBody, "v-o02") {
+		t.Fatal("같은 계획 조직 방문이 없다")
+	}
+	if strings.Contains(mntBody, "v-x02") {
+		t.Fatal("다른 계획 조직 방문이 있다")
 	}
 }
 

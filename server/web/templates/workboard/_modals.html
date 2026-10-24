@@ -12,7 +12,9 @@
           x-data="{ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
             async checkMnt() {
               const title = this.$refs.adminTitle ? this.$refs.adminTitle.value : '';
-              const cid = this.$refs.adminCust ? this.$refs.adminCust.value : '';
+              const form = this.$el;
+              const hid = form ? form.querySelector('[name=customer_id]') : null;
+              const cid = hid ? hid.value : '';
               const due = this.preDue || '';
               if (!title.includes('정기점검') || !cid) { this.mntHint = ''; return; }
               const m = (due || '').slice(0, 7);
@@ -48,10 +50,9 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">거래처</label>
-        <select name="customer_id" x-ref="adminCust" @change="checkMnt()" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 기관 선택 —</option>
-          {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
-        </select>
+        <div @change="checkMnt()">
+          {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Placeholder" "고객명으로 찾기"}}
+        </div>
         <input name="customer_name" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="목록에 없으면 직접입력 (예: 충남교육청)">
       </div>
       <div>

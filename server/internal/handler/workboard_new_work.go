@@ -65,7 +65,7 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		data["WorkProjects"] = workProjects
 	case model.WBWorkAdmin, model.WBWorkSales:
 		projects, _ := h.repo.ListProjects(true)
-		customers, _ := h.customerRepo.ListAllInOrg(org)
+		customers, _ := h.customerRepo.ListSelectable()
 		data["Projects"] = projects
 		data["Customers"] = customers
 	}
@@ -118,7 +118,7 @@ func (h *WorkboardHandler) newWorkASCards(orgID string) ([]model.WBCard, error) 
 	return as, nil
 }
 
-func (h *WorkboardHandler) newWorkMntCards(orgID string) ([]model.WBCard, error) {
+func (h *WorkboardHandler) mntVisitsForPalette(orgID string) ([]model.MaintenanceVisit, error) {
 	if h.mntRepo == nil {
 		return nil, nil
 	}
@@ -128,27 +128,41 @@ func (h *WorkboardHandler) newWorkMntCards(orgID string) ([]model.WBCard, error)
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(orgID) == "" || orgID == repository.OrgAll {
+		return visits, nil
+	}
+	plans, err := h.mntRepo.ListPlansInOrg(orgID)
+	if err != nil {
+		return nil, err
+	}
+	ok := map[string]bool{}
+	for _, p := range plans {
+		ok[p.PlanID] = true
+	}
+	var out []model.MaintenanceVisit
+	for _, v := range visits {
+		if ok[v.PlanID] {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
+func (h *WorkboardHandler) newWorkMntCards(orgID string) ([]model.WBCard, error) {
+	if h.mntRepo == nil {
+		return nil, nil
+	}
+	visits, err := h.mntVisitsForPalette(orgID)
+	if err != nil {
+		return nil, err
+	}
 	usedSource, err := h.repo.PlacedSourceKeys()
 	if err != nil {
 		return nil, err
 	}
-	allowed := map[string]bool{}
-	filterOrg := orgID != "" && orgID != repository.OrgAll
-	if filterOrg && h.customerRepo != nil {
-		custs, err := h.customerRepo.ListAllInOrg(orgID)
-		if err != nil {
-			return nil, err
-		}
-		for _, cu := range custs {
-			allowed[cu.CustomerID] = true
-		}
-	}
 	var mnt []model.WBCard
 	for _, v := range visits {
 		if usedSource[model.WBSourceMaintenance+":"+v.VisitID] || v.Completed {
-			continue
-		}
-		if filterOrg && !allowed[v.CustomerID] {
 			continue
 		}
 		name := v.ShortName

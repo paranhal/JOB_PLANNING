@@ -24,7 +24,7 @@
              aria-autocomplete="list"
              class="w-full border border-gray-300 rounded-lg px-3 py-2">
       <ul id="site-customer-list" role="listbox" hidden class="combobox-list"></ul>
-      <p id="site-customer-search-hint" class="text-xs text-gray-500 mt-1">이미 설정된 고객은 목록에 나오지 않습니다.{{if .NeedOrg}} 저장하려면 소속 조직을 선택하세요.{{end}}</p>
+      <p id="site-customer-search-hint" class="text-xs text-gray-500 mt-1">이미 등록된 고객은 배지와 수정 링크로 보입니다.{{if .NeedOrg}} 저장하려면 소속 조직을 선택하세요.{{end}}</p>
     </div>
     {{end}}
 
@@ -162,8 +162,27 @@
       li.id = 'site-cust-opt-' + i;
       li.className = 'menu-item' + (i === idx ? ' combobox-option-on' : '');
       li.setAttribute('aria-selected', i === idx ? 'true' : 'false');
-      li.textContent = it.name + (it.region ? ' · ' + it.region : '');
-      li.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it); });
+      if (it.registered) {
+        li.setAttribute('aria-disabled', 'true');
+        var lab = document.createElement('span');
+        lab.textContent = it.name + (it.region ? ' · ' + it.region : '');
+        li.appendChild(lab);
+        var badge = document.createElement('span');
+        badge.className = 'ml-2 text-ui-sm text-ink-muted';
+        badge.textContent = '이미 점검 사이트로 등록됨';
+        li.appendChild(badge);
+        if (it.edit_href) {
+          var a = document.createElement('a');
+          a.href = it.edit_href;
+          a.className = 'ml-2 text-primary underline';
+          a.textContent = '수정';
+          a.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+          li.appendChild(a);
+        }
+      } else {
+        li.textContent = it.name + (it.region ? ' · ' + it.region : '');
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it); });
+      }
       list.appendChild(li);
     });
     if (idx >= 0 && items[idx]) q.setAttribute('aria-activedescendant', 'site-cust-opt-' + idx);
@@ -181,7 +200,7 @@
     var n = Array.from(v).length;
     if (n < 2) {
       items = [];
-      if (hint) hint.textContent = n === 0 ? '이미 설정된 고객은 목록에 나오지 않습니다.' : '두 글자 이상 입력하세요';
+      if (hint) hint.textContent = n === 0 ? '이미 등록된 고객은 배지와 수정 링크로 보입니다.' : '두 글자 이상 입력하세요';
       setOpen(false);
       return;
     }
@@ -189,7 +208,7 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         items = data.items || [];
-        if (hint) hint.textContent = data.hint || (items.length ? '이미 설정된 고객은 목록에 나오지 않습니다.' : '해당하는 고객이 없습니다');
+        if (hint) hint.textContent = data.hint || (items.length ? '이미 등록된 고객은 배지와 수정 링크로 보입니다.' : '해당하는 고객이 없습니다');
         idx = items.length ? 0 : -1;
         render();
         setOpen(true);
@@ -204,7 +223,7 @@
     if (!open) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(items.length - 1, idx + 1); render(); }
     if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(0, idx - 1); render(); }
-    if (e.key === 'Enter' && idx >= 0 && items[idx]) { e.preventDefault(); pick(items[idx]); }
+    if (e.key === 'Enter' && idx >= 0 && items[idx] && !items[idx].registered) { e.preventDefault(); pick(items[idx]); }
   });
   document.addEventListener('click', function (e) {
     if (!wrap.contains(e.target)) setOpen(false);

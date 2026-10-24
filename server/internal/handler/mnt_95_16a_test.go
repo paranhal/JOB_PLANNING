@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,13 +12,7 @@ import (
 )
 
 func TestMnt95_16AWaitingCollapsedCalendarFirst(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "layout", "_nav_tree.html"),
-		filepath.Join(root, "maintenance", "plan_show.html"),
-		filepath.Join(root, "maintenance", "_assignee_multi.html"),
-	}
+	files := planShowParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)

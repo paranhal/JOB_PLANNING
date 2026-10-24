@@ -231,7 +231,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	projects, _ := h.repo.ListProjects(true)
 	workProjects, _ := h.repo.ListWorkPickProjects(org)
 	assignees := listAssignableForPicker(h.userRepo, c)
-	customers, _ := h.customerRepo.ListAllInOrg(org)
+	customers, _ := h.customerRepo.ListSelectable()
 	var colorNames []string
 	for _, u := range assignees {
 		colorNames = append(colorNames, u.FullName)
@@ -973,9 +973,7 @@ func (h *WorkboardHandler) registerPalette(orgID string, showAll bool) (as, mnt,
 	}
 
 	if h.mntRepo != nil {
-		now := time.Now()
-		visits, e := h.mntRepo.ListVisitsBetween(
-			now.AddDate(0, 0, -7).Format(dateLayout), now.AddDate(0, 0, 45).Format(dateLayout))
+		visits, e := h.mntVisitsForPalette(orgID)
 		if e != nil {
 			return nil, nil, nil, nil, nil, e
 		}
@@ -1624,7 +1622,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		}
 	}
 	assignees := listAssignableForPicker(h.userRepo, c)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListParties()
 	contractTypes, _ := h.codeRepo.ActiveByGroup("project_contract_type")
 	billingTypes, _ := h.codeRepo.ActiveByGroup("project_billing_type")
 
@@ -2263,7 +2261,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	projects, _ := h.repo.ListProjects(false)
 	workProjects, _ := h.repo.ListWorkPickProjects(taskOrgID(c, t))
 	workSites, _ := h.repo.ListTaskSites(t.TaskID)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	supportMembers, _ := h.repo.ListMembers(t.TaskID)
 	var supportOnly []model.WorkTaskMember
 	for _, m := range supportMembers {

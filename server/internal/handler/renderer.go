@@ -140,7 +140,7 @@ func templateFiles(name string) []string {
 	if spartials, err := filepath.Glob("web/templates/sort/_*.html"); err == nil {
 		files = append(files, spartials...)
 	}
-	files = appendExisting(files, "web/templates/_classify_hint.html")
+	files = appendExisting(files, "web/templates/_classify_hint.html", "web/templates/_customer_combo.html")
 	return files
 }
 

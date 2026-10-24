@@ -162,7 +162,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if showScopeToggle && !scopeAll {
 		visits = filterVisitsByAssignee(visits, assigneeKeys(c))
 	}
-	customers, _, err := h.customerRepo.List(currentOrg(c), "", "", "", "", "", 1, 2000, false, model.PartyKindCustomer, false)
+	customers, err := h.customerRepo.ListSelectable()
 	if err != nil {
 		return err
 	}
@@ -271,7 +271,11 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		scopeAllFlag = "1"
 	}
 	cfgs, _ := h.repo.ListSiteConfigs()
-	regions := visitRegionMap(customers, cfgs)
+	custItems := make([]model.CustomerListItem, 0, len(customers))
+	for _, cu := range customers {
+		custItems = append(custItems, model.CustomerListItem{CustomerID: cu.CustomerID, SiteRegion: cu.Region, AddrSido: cu.AddrSido})
+	}
+	regions := visitRegionMap(custItems, cfgs)
 	dayCards := buildVisitCards(shown, today, model.NextMonthStart(time.Now()).Format("2006-01-02"), regions)
 	attachCardHrefs(dayCards, plan.PlanID, view, month, assigneeKey, scopeAllFlag, selDay)
 	stats := mntMonthStats(shown, today)

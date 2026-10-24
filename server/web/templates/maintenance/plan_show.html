@@ -200,7 +200,11 @@ window.mntAssigneeMulti = function (cfg) {
       project: d.project || '', group: d.group || '', groups: d.groups || d.group || '', people: d.people || '', owner: d.owner || ''
     };
     this.editOpen = true;
-    this.$nextTick(() => this.$dispatch('mnt-picker-hydrate', {
+    this.$nextTick(() => {
+      const wrap = document.getElementById('mnt-edit-customer-combo');
+      const st = wrap && wrap._x_dataStack && wrap._x_dataStack[0];
+      if (st) { st.selectedId = d.customer || ''; st.restore(); }
+      this.$dispatch('mnt-picker-hydrate', {
       target: 'edit',
       ids: String(d.people || '').split(',').map((s) => s.trim()).filter(Boolean),
       owner: d.owner || '',
@@ -403,10 +407,7 @@ window.mntAssigneeMulti = function (cfg) {
         </div>
         <div>
           <label class="block text-gray-600 mb-1">고객</label>
-          <select name="customer_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
-            <option value="">선택</option>
-            {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
-          </select>
+          {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Required" true "Placeholder" "고객명으로 찾기"}}
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
@@ -493,11 +494,7 @@ window.mntAssigneeMulti = function (cfg) {
         </div>
         <div>
           <label class="block text-gray-600 mb-1">고객</label>
-          <select name="customer_id" x-model="edit.customer" required
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2">
-            <option value="">선택</option>
-            {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
-          </select>
+          {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Required" true "Placeholder" "고객명으로 찾기" "ID" "mnt-edit-customer-combo"}}
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>

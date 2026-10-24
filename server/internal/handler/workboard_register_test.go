@@ -143,6 +143,7 @@ func registerParseFiles(t *testing.T) []string {
 		}
 		files = append(files, partials...)
 	}
+	files = append(files, filepath.Join(root, "_customer_combo.html"))
 	return files
 }
 

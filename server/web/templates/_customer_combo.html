@@ -1,0 +1,26 @@
+{{define "customer_combo"}}
+<div class="combobox" {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}})' @keydown.escape.window="open=false">
+  <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}customer_id{{end}}" x-ref="hid" :value="selectedId" {{if .Required}}required{{end}}>
+  <input type="search" class="input" autocomplete="off" role="combobox" :placeholder="placeholder"
+         aria-autocomplete="list" :aria-expanded="open ? 'true' : 'false'" aria-controls="customer-combo-list"
+         x-model="q" @focus="open=true; if(!items.length) search(false)"
+         @input="onInput()"
+         @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+  <p class="field-hint" x-show="selectedLabel && selectedId" x-cloak x-text="'선택: ' + selectedLabel"></p>
+  <ul id="customer-combo-list" class="combobox-list" role="listbox" x-show="open" x-cloak>
+    <template x-for="(it, i) in items" :key="it.id">
+      <li role="option" :aria-selected="i===hi" :aria-disabled="!!it.registered">
+        <button type="button" class="menu-item w-full text-left" :class="i===hi ? 'combobox-option-on' : ''"
+                :disabled="!!it.registered" @click="pick(it)">
+          <span x-text="it.label || it.name"></span>
+          <span class="text-ink-muted" x-show="it.region && !(it.label||'').includes(it.region)" x-text="' · ' + it.region"></span>
+        </button>
+      </li>
+    </template>
+    <li x-show="items.length===0" class="menu-item text-ink-muted">해당하는 고객이 없습니다</li>
+    <li x-show="total > items.length" class="menu-item">
+      <button type="button" class="text-primary underline" @click="search(true)">더 보기</button>
+    </li>
+  </ul>
+</div>
+{{end}}

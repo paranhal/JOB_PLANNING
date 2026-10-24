@@ -11,6 +11,18 @@ import (
 	"customer-support/internal/model"
 )
 
+func planShowParseFiles(t *testing.T) []string {
+	t.Helper()
+	root := findTemplateRoot(t)
+	return []string{
+		filepath.Join(root, "layout", "base.html"),
+		filepath.Join(root, "layout", "_nav_tree.html"),
+		filepath.Join(root, "maintenance", "plan_show.html"),
+		filepath.Join(root, "maintenance", "_assignee_multi.html"),
+		filepath.Join(root, "_customer_combo.html"),
+	}
+}
+
 func planViewData(view string, month int, visits []model.MaintenanceVisit) map[string]interface{} {
 	const today = "2026-08-05"
 	weeks := buildVisitCalendar(2026, month, visits, today)
@@ -65,13 +77,7 @@ func sampleVisits() []model.MaintenanceVisit {
 
 // 계획 화면의 세 가지 보기가 모두 렌더링되고, 점검 대상이 함께 보여야 한다.
 func TestMaintenancePlanViewsRender(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "layout", "_nav_tree.html"),
-		filepath.Join(root, "maintenance", "plan_show.html"),
-		filepath.Join(root, "maintenance", "_assignee_multi.html"),
-	}
+	files := planShowParseFiles(t)
 	visits := append(sampleVisits(), model.MaintenanceVisit{
 		VisitID: "mvs_3", PlanID: "mpl_1", VisitDate: "2026-08-01",
 		ShortName: "지난도서관", ProductType: "KLAS", EntryCategory: "normal",
@@ -148,13 +154,7 @@ func TestMaintenancePlanViewsRender(t *testing.T) {
 
 // 기술담당 화면에는 전체 일정 보기 토글이 있어야 한다.
 func TestMaintenancePlanScopeToggleRender(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "layout", "_nav_tree.html"),
-		filepath.Join(root, "maintenance", "plan_show.html"),
-		filepath.Join(root, "maintenance", "_assignee_multi.html"),
-	}
+	files := planShowParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)
@@ -280,13 +280,7 @@ func TestFilterVisitsByAssignee(t *testing.T) {
 }
 
 func TestMaintenanceDupBannerRender(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "layout", "_nav_tree.html"),
-		filepath.Join(root, "maintenance", "plan_show.html"),
-		filepath.Join(root, "maintenance", "_assignee_multi.html"),
-	}
+	files := planShowParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)
@@ -368,13 +362,7 @@ func TestVisitLabelAndDefaultMonth(t *testing.T) {
 }
 
 func TestMaintenanceCalendarReadOnlyAndMoreChips(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "layout", "_nav_tree.html"),
-		filepath.Join(root, "maintenance", "plan_show.html"),
-		filepath.Join(root, "maintenance", "_assignee_multi.html"),
-	}
+	files := planShowParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)

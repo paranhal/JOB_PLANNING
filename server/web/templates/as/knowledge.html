@@ -46,10 +46,7 @@
       </label>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-      <select name="customer_id" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-        <option value="">사이트</option>
-        {{range .Customers}}<option value="{{.CustomerID}}" {{if eq $.Filter.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
-      </select>
+      {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" .Filter.CustomerID "Placeholder" "사이트 검색"}}
       <select name="product" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
         <option value="">제품</option>
         {{range .Products}}<option value="{{.}}" {{if eq $.Filter.Product .}}selected{{end}}>{{.}}</option>{{end}}

@@ -374,12 +374,7 @@
     {{if not (or $isAS $isMnt $isWork)}}
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">거래처</label>
-      <select name="customer_id" class="w-full border rounded-lg px-3 py-2">
-        <option value="">— 기관 선택 —</option>
-        {{range .Customers}}
-        <option value="{{.CustomerID}}" {{if eq $t.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>
-        {{end}}
-      </select>
+      {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" $t.CustomerID "Placeholder" "고객명으로 찾기"}}
       <input name="customer_name" value="{{if not $t.CustomerID}}{{$t.CustomerName}}{{end}}"
              class="mt-2 w-full border rounded-lg px-3 py-2" placeholder="목록에 없으면 직접입력 (예: 충남교육청)">
     </div>

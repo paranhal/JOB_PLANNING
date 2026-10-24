@@ -397,13 +397,7 @@ func TestMnt95_14AAssignSlotMultiAssignees(t *testing.T) {
 }
 
 func TestMnt95_14APlanShowAssigneeComponentRender(t *testing.T) {
-	root := findTemplateRoot(t)
-	files := []string{
-		filepath.Join(root, "layout", "base.html"),
-		filepath.Join(root, "layout", "_nav_tree.html"),
-		filepath.Join(root, "maintenance", "plan_show.html"),
-		filepath.Join(root, "maintenance", "_assignee_multi.html"),
-	}
+	files := planShowParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {
 		t.Fatal(err)
