@@ -99,14 +99,16 @@
             <div class="mt-3 space-y-2" data-project-box>
               <p class="text-ui-sm font-extrabold text-ink">사업</p>
               <input type="search" class="input w-full" placeholder="사업 검색" data-project-filter autocomplete="off">
-              <ul class="max-h-48 overflow-y-auto rounded-card border border-line divide-y divide-line">
+              <ul class="max-h-48 overflow-y-auto rounded-card border border-line divide-y divide-line" data-project-list>
                 {{range $.Projects}}
                 {{$foreign := and $.OrgID .OrgID (ne .OrgID $.OrgID)}}
-                <li class="px-2 py-1.5 {{if $foreign}}bg-canvas text-ink-muted{{end}}" data-project-row data-name="{{.Name}}" {{if $foreign}}data-foreign="1"{{end}}>
+                <li class="px-2 py-1.5 {{if $foreign}}bg-canvas text-ink-muted{{end}}" data-project-row data-name="{{.Name}}" data-start="{{.StartDate}}" data-end="{{.EndDate}}" {{if $foreign}}data-foreign="1"{{end}}>
                   <label class="inline-flex items-center gap-2 text-ui-sm w-full">
                     <input type="radio" name="project_id" value="{{.ProjectID}}" {{if $foreign}}data-foreign="1"{{end}}>
-                    {{if $foreign}}<span class="text-ui-xs">타 조직 사업</span>{{end}}
+                    {{if $foreign}}<span class="text-ui-xs badge-neutral">타 조직 사업</span>{{end}}
                     {{.Name}}
+                    <span class="text-ui-xs badge-neutral" data-period-match hidden>기간 일치</span>
+                    <span class="text-ui-xs badge-neutral" data-period-ended hidden>기간 종료</span>
                   </label>
                 </li>
                 {{end}}

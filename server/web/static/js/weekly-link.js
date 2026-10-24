@@ -69,6 +69,56 @@
     if (btn) btn.disabled = !ok;
   }
 
+  function ymd(s) {
+    return String(s || "").replace(/[./]/g, "-").slice(0, 10);
+  }
+
+  function todayYMD() {
+    var d = new Date();
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+  }
+
+  function inPeriod(day, start, end) {
+    day = ymd(day);
+    start = ymd(start);
+    end = ymd(end);
+    if (!day || (!start && !end)) return false;
+    if (start && day < start) return false;
+    if (end && day > end) return false;
+    return true;
+  }
+
+  function applyPeriod(itemDate) {
+    var m = modal();
+    var list = m && m.querySelector("[data-project-list]");
+    if (!list) return;
+    var today = todayYMD();
+    var rows = Array.prototype.slice.call(list.querySelectorAll("[data-project-row]"));
+    rows.forEach(function (row) {
+      var start = row.getAttribute("data-start") || "";
+      var end = row.getAttribute("data-end") || "";
+      var match = inPeriod(itemDate, start, end);
+      var ended = !!ymd(end) && ymd(end) < today;
+      var mb = row.querySelector("[data-period-match]");
+      var eb = row.querySelector("[data-period-ended]");
+      if (mb) mb.hidden = !match;
+      if (eb) eb.hidden = !ended;
+      row.setAttribute("data-match", match ? "1" : "0");
+    });
+    rows.sort(function (a, b) {
+      var af = a.getAttribute("data-foreign") === "1" ? 1 : 0;
+      var bf = b.getAttribute("data-foreign") === "1" ? 1 : 0;
+      if (af !== bf) return af - bf;
+      var am = a.getAttribute("data-match") === "1" ? 0 : 1;
+      var bm = b.getAttribute("data-match") === "1" ? 0 : 1;
+      if (am !== bm) return am - bm;
+      return 0;
+    });
+    rows.forEach(function (row) { list.appendChild(row); });
+  }
+
   function fillItems(items) {
     var host = modal().querySelector("[data-weekly-link-items]");
     host.innerHTML = "";
@@ -136,9 +186,13 @@
         if (r.value === curUID) r.checked = true;
       });
     }
-    var first = selectedProject();
-    if (first) first.checked = false;
     m.querySelectorAll('input[name="project_id"]').forEach(function (r) { r.checked = false; });
+    var filt = m.querySelector("[data-project-filter]");
+    if (filt) {
+      filt.value = "";
+      m.querySelectorAll("[data-project-row]").forEach(function (row) { row.hidden = false; });
+    }
+    applyPeriod(items[0] && items[0].date);
     m.hidden = false;
     document.body.classList.add("overflow-hidden");
     var closeBtn = m.querySelector("[data-weekly-link-close]");

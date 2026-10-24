@@ -208,7 +208,8 @@ func (r *StatsRepo) ListWeeklyRowProjects(orgID string) ([]model.WorkProject, er
 		return nil, err
 	}
 	rows, err := r.store().Query(`
-		SELECT project_id, name, COALESCE(org_id,'') FROM work_projects
+		SELECT project_id, name, COALESCE(org_id,''), COALESCE(start_date,''), COALESCE(end_date,'')
+		  FROM work_projects
 		 WHERE COALESCE(status,'') NOT IN ('cancelled','archived')
 		   AND COALESCE(is_test,0)=0
 		 ORDER BY CASE WHEN org_id=? THEN 0 ELSE 1 END, name`, orgID)
@@ -219,7 +220,7 @@ func (r *StatsRepo) ListWeeklyRowProjects(orgID string) ([]model.WorkProject, er
 	var out []model.WorkProject
 	for rows.Next() {
 		var p model.WorkProject
-		if err := rows.Scan(&p.ProjectID, &p.Name, &p.OrgID); err != nil {
+		if err := rows.Scan(&p.ProjectID, &p.Name, &p.OrgID, &p.StartDate, &p.EndDate); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
