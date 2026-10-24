@@ -210,6 +210,7 @@ func (r *StatsRepo) ListWeeklyRowProjects(orgID string) ([]model.WorkProject, er
 	rows, err := r.store().Query(`
 		SELECT project_id, name, COALESCE(org_id,'') FROM work_projects
 		 WHERE COALESCE(status,'') NOT IN ('cancelled','archived')
+		   AND COALESCE(is_test,0)=0
 		 ORDER BY CASE WHEN org_id=? THEN 0 ELSE 1 END, name`, orgID)
 	if err != nil {
 		return nil, err
