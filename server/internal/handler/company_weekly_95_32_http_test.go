@@ -23,11 +23,11 @@ func seedWeekly32(t *testing.T, db *sql.DB) {
 		('O03','O03','SI사업팀','SI',1,3)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO work_projects(project_id,name,status,org_id,is_test) VALUES
-		('WP-P1','미행사업','active','O03',0),
-		('WP-P2','행있음사업','active','O03',0),
-		('WP-O01','도서관사업','active',?,0),
-		('WP-TEST','테스트사업','active','O03',1)`, model.OrgIDLibrary); err != nil {
+	if _, err := db.Exec(`INSERT INTO work_projects(project_id,name,status,org_id,is_test,start_date,end_date) VALUES
+		('WP-P1','미행사업','active','O03',0,'2026-08-01','2026-08-31'),
+		('WP-P2','행있음사업','active','O03',0,'2026-01-01','2026-12-31'),
+		('WP-O01','도서관사업','active',?,0,'2025-01-01','2025-12-31'),
+		('WP-TEST','테스트사업','active','O03',1,'2026-01-01','2026-12-31')`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
@@ -198,6 +198,12 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 	if !strings.Contains(body, "타 조직 사업에 연결합니다") {
 		t.Fatal("타 조직 확인 없음")
 	}
+	if !strings.Contains(body, `data-start="2026-08-01"`) || !strings.Contains(body, `data-end="2026-12-31"`) {
+		t.Fatal("사업 기간 속성 없음")
+	}
+	if !strings.Contains(body, "기간 일치") || !strings.Contains(body, "기간 종료") {
+		t.Fatal("기간 배지 없음")
+	}
 	if strings.Contains(body, "테스트사업") || strings.Contains(body, "WP-TEST") {
 		t.Fatal("테스트 사업이 목록에 있다")
 	}
@@ -214,6 +220,9 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 	jsb := string(js)
 	if !strings.Contains(jsb, "Escape") || !strings.Contains(jsb, "Tab") {
 		t.Fatal("Esc·포커스 트랩 없음")
+	}
+	if !strings.Contains(jsb, "applyPeriod") || !strings.Contains(jsb, "inPeriod") {
+		t.Fatal("기간 일치 정렬 없음")
 	}
 
 	locked := postWeeklyLink(t, e, url.Values{
@@ -385,6 +394,9 @@ func TestWeeklyUnassignedInlineSelectRemoved(t *testing.T) {
 	}
 	if !strings.Contains(b, `{{template "weekly_assignee_field"`) {
 		t.Fatal("담당자 부분 템플릿 없음")
+	}
+	if !strings.Contains(b, "data-start") || !strings.Contains(b, "data-period-match") {
+		t.Fatal("기간 표시 속성 없음")
 	}
 	got := countUILint(b)
 	if !got.zero() {
