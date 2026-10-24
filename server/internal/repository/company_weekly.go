@@ -836,7 +836,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	adminPlanSQL, adminPlanArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit, ExcludeSalesActivity: true})
 
 	vrows, err := r.db.Query(`
-		SELECT v.visit_id, COALESCE(c.org_name,''), `+mntDoneDateSQL+`, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,'')
+		SELECT v.visit_id, COALESCE(c.org_name,''), `+mntDoneDateSQL+`, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,''), COALESCE(v.assignee,'')
 		FROM maintenance_visits v
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id
@@ -847,8 +847,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		return nil, err
 	}
 	for vrows.Next() {
-		var id, org, date, pid, pname, planID string
-		if err := vrows.Scan(&id, &org, &date, &pid, &pname, &planID); err != nil {
+		var id, org, date, pid, pname, planID, asg string
+		if err := vrows.Scan(&id, &org, &date, &pid, &pname, &planID, &asg); err != nil {
 			vrows.Close()
 			return nil, err
 		}
@@ -859,14 +859,14 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkMaintenance, KindLabel: "정기점검",
 			ID: id, Title: firstNonEmpty(org, id), Date: date, ProjectID: pid, ProjectName: pname,
-			Href: href, Bucket: "prev", BucketLabel: "전주 완료",
+			Href: href, Bucket: "prev", BucketLabel: "전주 완료", Assignee: asg,
 		})
 	}
 	vrows.Close()
 
 	arows, err := r.db.Query(`
 		SELECT ar.as_id, COALESCE(ar.as_number,''), COALESCE(c.org_name,''), date(ar.complete_datetime),
-		       COALESCE(ar.project_id,''), COALESCE(p.name,'')
+		       COALESCE(ar.project_id,''), COALESCE(p.name,''), COALESCE(ar.assigned_to,''), COALESCE(ar.assigned_user_id,'')
 		FROM as_receipts ar
 		LEFT JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN work_projects p ON p.project_id = ar.project_id
@@ -877,8 +877,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		return nil, err
 	}
 	for arows.Next() {
-		var id, num, org, date, pid, pname string
-		if err := arows.Scan(&id, &num, &org, &date, &pid, &pname); err != nil {
+		var id, num, org, date, pid, pname, asg, auid string
+		if err := arows.Scan(&id, &num, &org, &date, &pid, &pname, &asg, &auid); err != nil {
 			arows.Close()
 			return nil, err
 		}
@@ -886,12 +886,14 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 			Kind: model.ScopeWorkAS, KindLabel: "AS",
 			ID: id, Title: firstNonEmpty(org, num), Date: date, ProjectID: pid, ProjectName: pname,
 			Href: "/as/" + id, Bucket: "prev", BucketLabel: "전주 완료",
+			Assignee: asg, AssigneeUserID: auid,
 		})
 	}
 	arows.Close()
 
 	trows, err := r.db.Query(`
-		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''), COALESCE(p.name,''), COALESCE(t.work_type,'')
+		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''), COALESCE(p.name,''), COALESCE(t.work_type,''),
+		       COALESCE(t.assignee,''), COALESCE(t.assignee_user_id,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminDoneSQL+`
@@ -902,8 +904,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		return nil, err
 	}
 	for trows.Next() {
-		var id, title, date, pid, pname, wtype string
-		if err := trows.Scan(&id, &title, &date, &pid, &pname, &wtype); err != nil {
+		var id, title, date, pid, pname, wtype, asg, auid string
+		if err := trows.Scan(&id, &title, &date, &pid, &pname, &wtype, &asg, &auid); err != nil {
 			trows.Close()
 			return nil, err
 		}
@@ -916,12 +918,13 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 			Kind: model.ScopeWorkAdmin, KindLabel: label,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
 			Href: model.WorkTaskOpenHref(id, wtype), Bucket: "prev", BucketLabel: "전주 완료",
+			Assignee: asg, AssigneeUserID: auid,
 		})
 	}
 	trows.Close()
 
 	prows, err := r.db.Query(`
-		SELECT v.visit_id, COALESCE(c.org_name,''), v.visit_date, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,'')
+		SELECT v.visit_id, COALESCE(c.org_name,''), v.visit_date, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,''), COALESCE(v.assignee,'')
 		FROM maintenance_visits v
 		LEFT JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN work_projects p ON p.project_id = v.project_id
@@ -931,8 +934,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		return nil, err
 	}
 	for prows.Next() {
-		var id, org, date, pid, pname, planID string
-		if err := prows.Scan(&id, &org, &date, &pid, &pname, &planID); err != nil {
+		var id, org, date, pid, pname, planID, asg string
+		if err := prows.Scan(&id, &org, &date, &pid, &pname, &planID, &asg); err != nil {
 			prows.Close()
 			return nil, err
 		}
@@ -943,7 +946,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkMaintenance, KindLabel: "정기점검",
 			ID: id, Title: firstNonEmpty(org, id), Date: date, ProjectID: pid, ProjectName: pname,
-			Href: href, Bucket: "plan", BucketLabel: "금주 계획",
+			Href: href, Bucket: "plan", BucketLabel: "금주 계획", Assignee: asg,
 		})
 	}
 	prows.Close()
@@ -951,7 +954,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	crows, err := r.db.Query(`
 		SELECT t.task_id, t.title, COALESCE(`+companyAdminPlanDateSQL()+`,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
 		       CASE WHEN TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != '' AND date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END,
-		       COALESCE(t.work_type,'')
+		       COALESCE(t.work_type,''), COALESCE(t.assignee,''), COALESCE(t.assignee_user_id,'')
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminPlanSQL+`
@@ -966,8 +969,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		return nil, err
 	}
 	for crows.Next() {
-		var id, title, date, pid, pname, bucket, wtype string
-		if err := crows.Scan(&id, &title, &date, &pid, &pname, &bucket, &wtype); err != nil {
+		var id, title, date, pid, pname, bucket, wtype, asg, auid string
+		if err := crows.Scan(&id, &title, &date, &pid, &pname, &bucket, &wtype, &asg, &auid); err != nil {
 			crows.Close()
 			return nil, err
 		}
@@ -984,6 +987,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 			Kind: model.ScopeWorkAdmin, KindLabel: kindLabel,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
 			Href: model.WorkTaskOpenHref(id, wtype), Bucket: bucket, BucketLabel: label,
+			Assignee: asg, AssigneeUserID: auid,
 		})
 	}
 	crows.Close()

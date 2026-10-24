@@ -43,8 +43,10 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		markCardsEditable(&v, c.QueryParam("edit") == "1" && v.CanEdit)
 	}
 	var projects []model.WorkProject
+	var assignees []model.User
 	if !needOrg && h.repo != nil {
 		projects, _ = h.repo.ListWeeklyRowProjects(orgID)
+		assignees = listAssignableForPicker(h.userRepo, c)
 	}
 	return c.Render(http.StatusOK, "stats/company_weekly.html", map[string]interface{}{
 		"Title": "주간 업무 보고서", "Active": NavStatsWeekly, "View": v,
@@ -53,11 +55,12 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		"ThisWeek": parseWeekMonday("", now).Format("2006-01-02"),
 		"CanExportAll": weeklyCanExportAll(c),
 		"Edit":         c.QueryParam("edit") == "1" && v.CanEdit,
-		"WeeklyProjects": projects,
-		"FlashOK":        c.QueryParam("ok"),
-		"FlashErr":       c.QueryParam("err"),
-		"NeedRow":        c.QueryParam("need_row"),
-		"NeedReagg":      c.QueryParam("reagg") == "1",
+		"WeeklyProjects":  projects,
+		"WeeklyAssignees": assignees,
+		"FlashOK":         c.QueryParam("ok"),
+		"FlashErr":        c.QueryParam("err"),
+		"NeedRow":         c.QueryParam("need_row"),
+		"NeedReagg":       c.QueryParam("reagg") == "1",
 	})
 }
 

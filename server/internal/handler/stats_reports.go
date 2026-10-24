@@ -122,6 +122,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		"OrgName":               currentOrgName(c),
 		"ViewOrgID":             org,
 		"WeeklyProjects":        weeklyProjects,
+		"WeeklyAssignees":       listAssignableForPicker(h.userRepo, c),
 		"FlashOK":               c.QueryParam("ok"),
 		"FlashErr":              c.QueryParam("err"),
 		"NeedRow":               c.QueryParam("need_row"),

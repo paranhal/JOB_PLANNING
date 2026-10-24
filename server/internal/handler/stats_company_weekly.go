@@ -123,7 +123,7 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 
 	src, uploadName, err := readCompanyWeeklyUpload(c)
 	if err != nil {
-		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", companyWeeklyResultData(c, draft, sheetName, "", nil, err.Error()))
+		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", h.withWeeklyPickers(c, companyWeeklyResultData(c, draft, sheetName, "", nil, err.Error())))
 	}
 
 	orgShort, _ := h.repo.OrgShortAndName(orgID)
@@ -147,7 +147,7 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 			Reason:      "전사 주간업무보고 시트 생성",
 			Result:      auditlog.ResultDeny,
 		})
-		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", companyWeeklyResultData(c, draft, sheetName, "", nil, err.Error()))
+		return c.Render(http.StatusBadRequest, "stats/company_weekly_result.html", h.withWeeklyPickers(c, companyWeeklyResultData(c, draft, sheetName, "", nil, err.Error())))
 	}
 
 	token := putCompanyWeeklyDownload(companyWeeklyDownload{
@@ -170,7 +170,7 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 		Reason:      "전사 주간업무보고 시트 생성",
 		Result:      auditlog.ResultOK,
 	})
-	return c.Render(http.StatusOK, "stats/company_weekly_result.html", companyWeeklyResultData(c, draft, sheetName, token, &result, ""))
+	return c.Render(http.StatusOK, "stats/company_weekly_result.html", h.withWeeklyPickers(c, companyWeeklyResultData(c, draft, sheetName, token, &result, "")))
 }
 
 func (h *StatsHandler) ConfirmCompanyWeekly(c echo.Context) error {
@@ -289,6 +289,19 @@ func companyWeeklyAuditDetail(r companyWeeklyBuildResult, uploadName string) str
 		name = "-"
 	}
 	return fmt.Sprintf("mode=%s sheets=%d formulas=%d upload=%s", mode, r.KeptSheets, r.KeptFormulas, name)
+}
+
+func (h *StatsHandler) withWeeklyPickers(c echo.Context, data map[string]interface{}) map[string]interface{} {
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+	org := currentOrg(c)
+	if org != "" && org != repository.OrgAll && h != nil && h.repo != nil {
+		ps, _ := h.repo.ListWeeklyRowProjects(org)
+		data["WeeklyProjects"] = ps
+		data["WeeklyAssignees"] = listAssignableForPicker(h.userRepo, c)
+	}
+	return data
 }
 
 func companyWeeklyResultData(c echo.Context, draft model.CompanyWeeklyDraft, sheetName, token string, result *companyWeeklyBuildResult, errMsg string) map[string]interface{} {

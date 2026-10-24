@@ -59,37 +59,73 @@
     </div>
     {{end}}
     {{if .Draft.UnassignedNoProject}}
-    <div class="mt-4">
+    <div class="mt-4" data-weekly-task-link>
       <h4 class="text-ui-sm font-extrabold text-ink mb-2">사업이 연결되지 않은 업무 {{len .Draft.UnassignedNoProject}}건</h4>
       {{if .CanWrite}}
-      <form method="post" action="/stats/company-weekly/tasks/project" class="space-y-2" data-weekly-task-link>
+      <form method="post" action="/stats/company-weekly/tasks/project" class="space-y-2">
         <input type="hidden" name="week" value="{{.Week}}">
         <input type="hidden" name="org" value="{{.OrgID}}">
         {{if .Next}}<input type="hidden" name="next" value="{{.Next}}">{{end}}
+        <p class="flex flex-wrap gap-2">
+          <button class="btn-secondary btn-sm" type="button" data-weekly-link-bulk>선택한 건 사업 연결</button>
+        </p>
         <ul class="text-ui-sm text-ink space-y-1">
           {{range .Draft.UnassignedNoProject}}
-          <li class="flex flex-wrap items-center gap-2">
+          {{$lk := "work_task"}}{{if eq .Kind "as"}}{{$lk = "as_receipt"}}{{else if eq .Kind "maintenance"}}{{$lk = "maintenance_visit"}}{{end}}
+          <li class="flex flex-wrap items-center gap-2" data-weekly-row
+              data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
+              data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
+              data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
+              data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">
             <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="task_id" value="{{.ID}}" class="rounded">
+              <input type="checkbox" class="rounded" data-weekly-item value="{{$lk}}:{{.ID}}">
               <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
               {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
             </label>
-            <button class="btn-secondary btn-sm" type="submit" name="task_id" value="{{.ID}}">사업 연결</button>
+            <button class="btn-secondary btn-sm" type="button" data-weekly-link
+                    data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
+                    data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
+                    data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
+                    data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">사업 연결</button>
           </li>
           {{end}}
         </ul>
-        <div class="flex flex-wrap gap-2 items-end">
-          <div>
-            <label class="block text-ui-xs text-ink-muted mb-1">사업 연결</label>
-            <input type="search" class="input mb-1" placeholder="사업 검색" data-project-filter>
-            <select name="project_id" class="select min-w-[16rem]" size="6">
-              {{range $.Projects}}<option value="{{.ProjectID}}" {{if and $.OrgID .OrgID}}{{if ne .OrgID $.OrgID}}data-foreign="1"{{end}}{{end}}>{{if and $.OrgID .OrgID}}{{if ne .OrgID $.OrgID}}타 조직 사업 · {{end}}{{end}}{{.Name}}</option>{{end}}
-            </select>
+        <div id="weekly-link-modal" hidden class="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center p-0 md:p-4" data-weekly-link-backdrop>
+          <div role="dialog" aria-modal="true" aria-labelledby="weekly-link-title"
+               class="w-full md:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl md:rounded-card bg-canvas p-4 shadow-pop">
+            <h2 id="weekly-link-title" class="text-ui font-bold text-ink" data-weekly-link-title>사업 연결</h2>
+            <ul class="mt-2 text-ui-sm text-ink space-y-1" data-weekly-link-summary></ul>
+            <p class="mt-2 text-ui-sm text-ink-muted" data-mnt-hint hidden>점검 방문은 이 화면에서 사업을 바꾸지 않습니다. 점검 일정에서 확인하세요.</p>
+            <div class="mt-3 space-y-2" data-project-box>
+              <p class="text-ui-sm font-extrabold text-ink">사업</p>
+              <input type="search" class="input w-full" placeholder="사업 검색" data-project-filter autocomplete="off">
+              <ul class="max-h-48 overflow-y-auto rounded-card border border-line divide-y divide-line">
+                {{range $.Projects}}
+                {{$foreign := and $.OrgID .OrgID (ne .OrgID $.OrgID)}}
+                <li class="px-2 py-1.5 {{if $foreign}}bg-canvas text-ink-muted{{end}}" data-project-row data-name="{{.Name}}" {{if $foreign}}data-foreign="1"{{end}}>
+                  <label class="inline-flex items-center gap-2 text-ui-sm w-full">
+                    <input type="radio" name="project_id" value="{{.ProjectID}}" {{if $foreign}}data-foreign="1"{{end}}>
+                    {{if $foreign}}<span class="text-ui-xs">타 조직 사업</span>{{end}}
+                    {{.Name}}
+                  </label>
+                </li>
+                {{end}}
+              </ul>
+              <label class="inline-flex items-center gap-2 text-ui-sm text-ink">
+                <input type="checkbox" name="confirm_foreign" value="1" class="rounded" data-confirm-foreign>
+                타 조직 사업에 연결합니다
+              </label>
+            </div>
+            {{template "weekly_assignee_field" $}}
+            <div data-weekly-link-items></div>
+            <div class="mt-4 flex justify-end gap-2">
+              <button type="button" class="btn-secondary btn-sm" data-weekly-link-close>취소</button>
+              <button type="submit" class="btn-primary btn-sm" data-weekly-link-submit disabled>연결</button>
+            </div>
           </div>
-          <label class="inline-flex items-center gap-2 text-ui-sm text-ink"><input type="checkbox" name="confirm_foreign" value="1" class="rounded"> 타 조직 사업 확인</label>
-          <button class="btn-primary btn-sm" type="submit">선택한 건을 사업에 연결</button>
         </div>
       </form>
+      <script src="/static/js/weekly-link.js"></script>
       {{else}}
       <ul class="mt-2 text-ui-sm text-ink space-y-1">
         {{range .Draft.UnassignedNoProject}}
@@ -104,21 +140,5 @@
   </details>
   {{end}}
 </section>
-<script>
-(function(){
-  var root=document.querySelector('[data-weekly-unassigned]');
-  if(!root)return;
-  root.querySelectorAll('[data-project-filter]').forEach(function(inp){
-    inp.addEventListener('input',function(){
-      var q=(inp.value||'').toLowerCase();
-      var sel=inp.parentElement && inp.parentElement.querySelector('select[name="project_id"]');
-      if(!sel)return;
-      Array.prototype.forEach.call(sel.options,function(opt){
-        opt.hidden = q && opt.text.toLowerCase().indexOf(q) < 0;
-      });
-    });
-  });
-})();
-</script>
 {{end}}
 {{end}}

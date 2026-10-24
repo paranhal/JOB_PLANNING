@@ -21,12 +21,15 @@
     <div>
       <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">회사 공통 파일</p>
       <h3 class="text-base font-bold text-gray-800 mt-1">전사 주간업무보고 시트 생성</h3>
-      <p class="text-sm text-gray-500 mt-1">회사 xlsx 사본에 (업무) 시트 한 장을 추가합니다. 자동 문장은 초안이며 미리보기에서 고칠 수 있습니다.</p>
+      <p class="text-sm text-gray-500 mt-1">팀별 주간 업무는 새 화면에서 작성합니다. 예전 양식 파일 업로드는 아래에 있습니다.</p>
       <p class="text-xs text-ink-muted mt-1">팀별로 따로 작성합니다. {{if .OrgName}}현재 {{.OrgName}}.{{end}}
         {{if .CompanyReportStatus}}상태 {{if eq .CompanyReportStatus "confirmed"}}확정본{{else}}작성 중{{end}}.{{end}}</p>
-      <a href="/stats/company-weekly/rows" class="inline-block mt-2 text-sm text-ink underline">행 관리</a>
-      <a href="/stats/company-weekly" class="inline-block mt-2 ml-3 text-sm text-ink underline">주간 업무 보고서 화면</a>
     </div>
+    <a href="/stats/company-weekly" class="btn-primary inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold">새 주간 업무 보고서 화면으로 이동</a>
+    <p><a href="/stats/company-weekly/rows" class="text-sm text-ink underline">행 관리</a></p>
+    <details class="rounded-lg border border-line" {{if or .FlashOK .FlashErr .CompanyWeekly.Rows}}open{{end}}>
+      <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-ink">예전 방식으로 만들기</summary>
+      <div class="px-4 pb-4 space-y-4">
     <div x-data="{ show: localStorage.getItem('jp_company_weekly_notice') !== '1' }" x-show="show" x-cloak
          class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-start justify-between gap-2">
       <p>회사 공통 파일입니다. 생성 전 원본을 따로 보관하세요.</p>
@@ -97,7 +100,7 @@
         </div>
         {{end}}
       </div>
-      {{template "weekly_unassigned" dict "Draft" .CompanyWeekly "CanWrite" .CanWriteCompanyWeekly "Week" .CompanyDate "OrgID" .ViewOrgID "Projects" .WeeklyProjects "NeedReagg" false "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" ""}}
+      {{template "weekly_unassigned" dict "Draft" .CompanyWeekly "CanWrite" .CanWriteCompanyWeekly "Week" .CompanyDate "OrgID" .ViewOrgID "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "NeedReagg" false "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" ""}}
       {{end}}
       {{if not .CompanyOrgSelected}}
       <p class="text-sm text-ink-muted">조직을 선택하세요. 전체 보기에서는 작성·확인할 수 없습니다.</p>
@@ -120,6 +123,8 @@
       {{end}}
     </form>
     {{end}}
+      </div>
+    </details>
   </div>
 
   <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">

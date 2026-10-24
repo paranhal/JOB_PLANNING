@@ -42,7 +42,7 @@
       </ul>
     </details>
     {{end}}
-    {{template "weekly_unassigned" dict "Draft" .CompanyWeekly "CanWrite" .CanWriteCompanyWeekly "Week" .CompanyDate "OrgID" .ViewOrgID "Projects" .WeeklyProjects "NeedReagg" false "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" ""}}
+    {{template "weekly_unassigned" dict "Draft" .CompanyWeekly "CanWrite" .CanWriteCompanyWeekly "Week" .CompanyDate "OrgID" .ViewOrgID "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "NeedReagg" false "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" ""}}
     {{range .CompanyWeekly.Rows}}
       {{if .MissingProject}}
       <p class="text-sm text-amber-800">⚠ {{.NoLabel}}행은 대응 사업이 없어 비어 있습니다</p>

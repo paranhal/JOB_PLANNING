@@ -1,0 +1,21 @@
+{{define "weekly_assignee_field"}}
+<div class="space-y-2" data-weekly-assignee>
+  <p class="text-ui-sm font-extrabold text-ink">담당자</p>
+  <label class="inline-flex items-center gap-2 text-ui-sm text-ink">
+    <input type="checkbox" name="assignee_keep" value="1" checked class="rounded" data-assignee-keep>
+    변경 안 함
+  </label>
+  <input type="search" class="input w-full" placeholder="담당자 검색" data-assignee-filter autocomplete="off">
+  <ul class="max-h-40 overflow-y-auto rounded-card border border-line divide-y divide-line" data-assignee-list>
+    {{range .Assignees}}
+    <li class="px-2 py-1.5" data-assignee-row data-name="{{.FullName}}" data-uid="{{.UserID}}">
+      <label class="inline-flex items-center gap-2 text-ui-sm text-ink w-full">
+        <input type="radio" name="primary_user_id" value="{{.UserID}}" class="rounded" data-assignee-radio disabled>
+        <span>{{.FullName}} <span class="text-ui-xs text-ink-muted">{{roleLabel .Role}}</span></span>
+      </label>
+    </li>
+    {{end}}
+  </ul>
+  <p class="text-ui-xs text-ink-muted">주 담당 1명만 반영합니다. 보조 담당·그룹 선택은 공용 담당자 선택기 이후에 연결합니다.</p>
+</div>
+{{end}}

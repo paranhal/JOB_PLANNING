@@ -73,10 +73,12 @@ type CompanyWeeklyUnassigned struct {
 	Date        string
 	ProjectID   string
 	ProjectName string
-	Href        string
-	Bucket      string // prev | plan | carry
-	BucketLabel string
-	Reason      string // no_row | no_project
+	Href           string
+	Bucket         string // prev | plan | carry
+	BucketLabel    string
+	Reason         string // no_row | no_project
+	Assignee       string
+	AssigneeUserID string
 }
 
 // CompanyWeeklyUnassignedProject 보고서 행이 없는 사업 묶음.
