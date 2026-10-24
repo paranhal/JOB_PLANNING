@@ -53,7 +53,7 @@ window.bindASRegisterLookup = function (opts) {
     var btns = el('div', 'mt-4 flex justify-end gap-2', []);
     var addBtn = null;
     if (data.can_create) {
-      addBtn = el('a', 'btn btn-primary', [txt('접수 추가')]);
+      addBtn = el('a', 'inline-flex h-10 items-center rounded-[10px] bg-success px-4 font-semibold text-primary-fg', [txt('접수 추가')]);
       addBtn.href = data.new_href || '/as/new';
       addBtn.target = '_blank';
       addBtn.rel = 'noopener';
