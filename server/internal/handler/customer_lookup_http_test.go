@@ -97,6 +97,44 @@ func TestLookupCustomersHTTP(t *testing.T) {
 	}
 }
 
+func jsonItemIDs(t *testing.T, raw []byte) map[string]bool {
+	t.Helper()
+	var body struct {
+		Items []struct{ ID string `json:"id"` } `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		var alt []struct {
+			ID     string `json:"id"`
+			CID    string `json:"customer_id"`
+			SiteID string `json:"site_id"`
+		}
+		if err2 := json.Unmarshal(raw, &alt); err2 != nil {
+			t.Fatalf("json %v %s", err, raw)
+		}
+		m := map[string]bool{}
+		for _, it := range alt {
+			id := it.ID
+			if id == "" {
+				id = it.CID
+			}
+			if id == "" {
+				id = it.SiteID
+			}
+			if id != "" {
+				m[id] = true
+			}
+		}
+		return m
+	}
+	m := map[string]bool{}
+	for _, it := range body.Items {
+		if it.ID != "" {
+			m[it.ID] = true
+		}
+	}
+	return m
+}
+
 func TestLookupAdaptersSameIDs(t *testing.T) {
 	e, ck, _ := seedLookupHTTP(t)
 	q := url.QueryEscape("공주생명")
@@ -105,12 +143,28 @@ func TestLookupAdaptersSameIDs(t *testing.T) {
 	form := doGetWith(t, e, "/workboard/new-work/form?kind=admin&date=2026-10-24", ck)
 	site := doGetWith(t, e, "/maintenance/sites/customer-search?q="+q, ck)
 	work := doGetWith(t, e, "/workboard/work-sites/search?q="+q, ck)
+	edu := url.QueryEscape("충남교육")
+	lkAll := doGetWith(t, e, "/lookup/customers?scope=site&limit=50", ck)
 	if lk.Code != http.StatusOK {
 		t.Fatalf("lookup %d", lk.Code)
 	}
-	if !strings.Contains(lk.Body.String(), "C-GONG") {
+	want := jsonItemIDs(t, lk.Body.Bytes())
+	if !want["C-GONG"] {
 		t.Fatal("lookup 에 공주 없음")
 	}
+	siteIDs := jsonItemIDs(t, site.Body.Bytes())
+	workIDs := jsonItemIDs(t, work.Body.Bytes())
+	if !siteIDs["C-GONG"] {
+		t.Fatalf("사이트 검색 %+v", siteIDs)
+	}
+	if !workIDs["C-GONG"] {
+		t.Fatalf("작업 검색 %+v", workIDs)
+	}
+	all := jsonItemIDs(t, lkAll.Body.Bytes())
+	if !all["C-EDU"] || !all["C-GONG"] || !all["C-O02"] {
+		t.Fatalf("3종 누락 %+v", all)
+	}
+	_ = edu
 	if as.Code == http.StatusOK && !strings.Contains(as.Body.String(), "C-GONG") && !strings.Contains(as.Body.String(), "공주생명") {
 		t.Fatalf("AS 접수 목록에 공주 없음 %d", as.Code)
 	}
@@ -122,11 +176,5 @@ func TestLookupAdaptersSameIDs(t *testing.T) {
 	}
 	if strings.Contains(form.Body.String(), `<option value="C-GONG">`) {
 		t.Fatal("새 모달이 고객 option 을 내려보낸다")
-	}
-	if site.Code != http.StatusOK || !strings.Contains(site.Body.String(), "C-GONG") {
-		t.Fatalf("사이트 검색 %d %s", site.Code, site.Body.String())
-	}
-	if work.Code != http.StatusOK || !strings.Contains(work.Body.String(), "C-GONG") {
-		t.Fatalf("작업 검색 %d %s", work.Code, work.Body.String())
 	}
 }

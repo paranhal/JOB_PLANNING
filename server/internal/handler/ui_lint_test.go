@@ -146,3 +146,8 @@ func TestUILintRatchet(t *testing.T) {
 	}
 	t.Logf("UI lint: 위반 파일 %d, 합계 %d (전체 템플릿 %d)", files, total, len(actual))
 }
+
+// 95-22: 고객 선택 필드를 <select> 로 직접 두면 실패. 허용 목록은 TestCustomerComboSelectLint.
+func TestUILintCustomerSelect(t *testing.T) {
+	TestCustomerComboSelectLint(t)
+}
