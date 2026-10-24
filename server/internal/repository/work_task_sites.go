@@ -225,7 +225,7 @@ func (r *WBRepo) AssertCustomersActive(ids []string) error {
 	return nil
 }
 
-// org-scope: SearchWorkTaskCustomers — 95-9A 작업 대상 사이트는 조직별 관리가 아니다. 활성 고객 전체 검색, 응답은 기관명·상위기관·지역만.
+// SearchWorkTaskCustomers Lookup 어댑터. 사업 소속 여부는 project_sites 만 본다.
 func (r *WBRepo) SearchWorkTaskCustomers(q, projectID string, selected []string, limit int) ([]WorkTaskSite, error) {
 	q = strings.TrimSpace(q)
 	projectID = strings.TrimSpace(projectID)
@@ -236,58 +236,66 @@ func (r *WBRepo) SearchWorkTaskCustomers(q, projectID string, selected []string,
 	if len(sel) == 0 && utf8.RuneCountInString(q) < 2 {
 		return nil, nil
 	}
-	onProj := `CASE WHEN ? != '' AND EXISTS (
-		SELECT 1 FROM project_sites ps
-		WHERE ps.project_id=? AND ps.customer_id=c.customer_id AND ps.is_active=1 AND ps.status != 'excluded'
-	) THEN 1 ELSE 0 END`
-	base := `
-		SELECT c.customer_id, c.org_name, COALESCE(p.org_name,''),
-		       COALESCE(NULLIF(TRIM(c.addr_sigungu),''), COALESCE(c.addr_sido,'')),
-		       ` + onProj + `
-		FROM customers c
-		LEFT JOIN customers p ON p.customer_id=c.parent_customer_id
-		WHERE c.is_active=1
-		  AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'`
-	var rows *sql.Rows
-	var err error
+	lq := CustomerQuery{Scope: ScopeSite, Limit: limit}
 	if len(sel) > 0 {
-		ph := strings.Repeat("?,", len(sel))
-		ph = strings.TrimSuffix(ph, ",")
-		args := []any{projectID, projectID}
-		for _, id := range sel {
-			args = append(args, id)
-		}
-		rows, err = r.db.Query(base+` AND c.customer_id IN (`+ph+`) ORDER BY c.org_name LIMIT ?`, append(args, limit)...)
+		lq.IncludeIDs = sel
+		lq.Q = ""
+		lq.Limit = len(sel)
 	} else {
-		pat := likeContains(q)
-		rows, err = r.db.Query(base+`
-		  AND (
-			c.org_name LIKE ? ESCAPE '\'
-			OR c.official_name LIKE ? ESCAPE '\'
-			OR COALESCE(c.org_code,'') LIKE ? ESCAPE '\'
-			OR COALESCE(c.addr_sido,'') LIKE ? ESCAPE '\'
-			OR COALESCE(c.addr_sigungu,'') LIKE ? ESCAPE '\'
-			OR COALESCE(p.org_name,'') LIKE ? ESCAPE '\'
-		  )
-		ORDER BY c.org_name
-		LIMIT ?`, projectID, projectID, pat, pat, pat, pat, pat, pat, limit)
+		lq.Q = q
 	}
+	opts, _, err := NewCustomerRepo(r.db).Lookup(lq)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []WorkTaskSite
-	for rows.Next() {
-		var it WorkTaskSite
-		var on int
-		if err := rows.Scan(&it.CustomerID, &it.SiteName, &it.ParentName, &it.Region, &on); err != nil {
+	if len(sel) > 0 {
+		want := map[string]bool{}
+		for _, id := range sel {
+			want[id] = true
+		}
+		var keep []CustomerOption
+		for _, o := range opts {
+			if want[o.ID] {
+				keep = append(keep, o)
+			}
+		}
+		opts = keep
+	}
+	onProj := map[string]bool{}
+	if projectID != "" && len(opts) > 0 {
+		ids := make([]string, 0, len(opts))
+		for _, o := range opts {
+			ids = append(ids, o.ID)
+		}
+		ph := lookupPlaceholders(len(ids))
+		args := []any{projectID}
+		for _, id := range ids {
+			args = append(args, id)
+		}
+		rows, err := r.db.Query(`SELECT customer_id FROM project_sites
+			WHERE project_id=? AND is_active=1 AND status != 'excluded' AND customer_id IN (`+ph+`)`, args...)
+		if err != nil {
 			return nil, err
 		}
-		it.SiteID = it.CustomerID
-		it.OnProject = on == 1
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			onProj[id] = true
+		}
+		rows.Close()
+	}
+	var out []WorkTaskSite
+	for _, o := range opts {
+		it := WorkTaskSite{
+			SiteID: o.ID, CustomerID: o.ID, SiteName: o.Name,
+			ParentName: o.ParentName, Region: o.Region, OnProject: onProj[o.ID],
+		}
 		out = append(out, it)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 type SiteWorkItem struct {

@@ -145,9 +145,25 @@ func TestSearchCustomersWithoutConfig_OrgLimitAndPending(t *testing.T) {
 		t.Fatalf("limit %d", len(hits))
 	}
 	for _, h := range hits {
-		if h.ID == "gy-done" || h.ID == "gy-off" || h.ID == "gy-pt" {
+		if h.ID == "gy-off" || h.ID == "gy-pt" {
 			t.Fatalf("제외되어야 함 %s", h.ID)
 		}
+	}
+	doneHits, err := repo.SearchCustomersWithoutConfig("O03", "계룡고등학교", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundDone := false
+	for _, h := range doneHits {
+		if h.ID == "gy-done" {
+			foundDone = true
+			if !h.Registered || h.EditHref == "" {
+				t.Fatalf("등록 배지 %+v", h)
+			}
+		}
+	}
+	if !foundDone {
+		t.Fatal("이미 등록된 고객이 검색에 없다")
 	}
 	reg, err := repo.SearchCustomersWithoutConfig("O03", "충남", 20)
 	if err != nil || len(reg) == 0 {

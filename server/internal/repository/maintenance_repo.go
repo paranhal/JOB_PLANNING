@@ -1018,47 +1018,51 @@ func (r *MaintenanceRepo) DeleteSiteConfig(customerID string) error {
 	return err
 }
 
-// ListCustomersWithoutConfig 점검 설정이 없는 활성 고객 (선택용)
-func (r *MaintenanceRepo) ListCustomersWithoutConfig() ([]struct{ ID, OrgName string }, error) {
-	return r.ListCustomersWithoutConfigOrg("")
+// SiteCustomerHit 점검 사이트 고객 검색 한 건. 95-6·95-22
+type SiteCustomerHit struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Region     string `json:"region"`
+	Registered bool   `json:"registered,omitempty"`
+	EditHref   string `json:"edit_href,omitempty"`
 }
 
-func (r *MaintenanceRepo) ListCustomersWithoutConfigOrg(orgID string) ([]struct{ ID, OrgName string }, error) {
-	q := `
-		SELECT c.customer_id, c.org_name FROM customers c
-		WHERE c.is_active = 1
-		  AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'
-		  AND NOT EXISTS (
-			SELECT 1 FROM maintenance_site_config s WHERE s.customer_id = c.customer_id
-		)`
-	var args []any
-	orgID = strings.TrimSpace(orgID)
-	if orgID != "" && orgID != OrgAll {
-		q += ` AND COALESCE(c.org_id,'') = ?`
-		args = append(args, orgID)
-	}
-	q += ` ORDER BY c.org_name LIMIT 500`
-	rows, err := r.db.Query(q, args...)
+func (r *MaintenanceRepo) siteConfigIDSet() (map[string]bool, error) {
+	rows, err := r.db.Query(`SELECT customer_id FROM maintenance_site_config`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []struct{ ID, OrgName string }
+	out := map[string]bool{}
 	for rows.Next() {
-		var id, name string
-		if err := rows.Scan(&id, &name); err != nil {
+		var id string
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		out = append(out, struct{ ID, OrgName string }{id, name})
+		out[id] = true
 	}
 	return out, rows.Err()
 }
 
-// SiteCustomerHit 점검 사이트 미등록 고객 검색 한 건. 95-6
-type SiteCustomerHit struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Region string `json:"region"`
+func (r *MaintenanceRepo) annotateSiteHits(opts []CustomerOption) []SiteCustomerHit {
+	ids, err := r.siteConfigIDSet()
+	if err != nil {
+		ids = map[string]bool{}
+	}
+	out := make([]SiteCustomerHit, 0, len(opts))
+	for _, o := range opts {
+		hit := SiteCustomerHit{ID: o.ID, Name: o.Name, Region: o.Region}
+		if ids[o.ID] {
+			hit.Registered = true
+			hit.EditHref = "/maintenance/sites/" + urlPathEscape(o.ID) + "/edit"
+		}
+		out = append(out, hit)
+	}
+	return out
+}
+
+func urlPathEscape(s string) string {
+	return strings.ReplaceAll(s, " ", "%20")
 }
 
 func likeContains(q string) string {
@@ -1066,7 +1070,7 @@ func likeContains(q string) string {
 	return "%" + r.Replace(q) + "%"
 }
 
-// org-scope: SearchCustomersWithoutConfig — 95-9A Q1. 점검 사이트 고객 검색도 조직별 관리가 아니다. 미설정·활성 고객 전체.
+// SearchCustomersWithoutConfig Lookup 후 등록 여부를 붙인다. 이미 등록된 고객도 반환한다(95-22).
 func (r *MaintenanceRepo) SearchCustomersWithoutConfig(orgID, q string, limit int) ([]SiteCustomerHit, error) {
 	if r == nil || r.db == nil {
 		return nil, nil
@@ -1079,42 +1083,15 @@ func (r *MaintenanceRepo) SearchCustomersWithoutConfig(orgID, q string, limit in
 	if limit <= 0 || limit > 20 {
 		limit = 20
 	}
-	pat := likeContains(q)
-	sqlq := `
-		SELECT c.customer_id, c.org_name, COALESCE(NULLIF(TRIM(c.addr_sido),''), COALESCE(c.addr_sigungu,''))
-		FROM customers c
-		WHERE c.is_active = 1
-		  AND COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer'
-		  AND NOT EXISTS (
-			SELECT 1 FROM maintenance_site_config s WHERE s.customer_id = c.customer_id
-		  )
-		  AND (
-			c.org_name LIKE ? ESCAPE '\'
-			OR c.official_name LIKE ? ESCAPE '\'
-			OR c.customer_id LIKE ? ESCAPE '\'
-			OR COALESCE(c.addr_sido,'') LIKE ? ESCAPE '\'
-			OR COALESCE(c.addr_sigungu,'') LIKE ? ESCAPE '\'
-			OR COALESCE(c.address,'') LIKE ? ESCAPE '\'
-		  )
-		ORDER BY c.org_name
-		LIMIT ?`
-	rows, err := r.db.Query(sqlq, pat, pat, pat, pat, pat, pat, limit)
+	opts, _, err := NewCustomerRepo(r.db).Lookup(CustomerQuery{Scope: ScopeSite, Q: q, Limit: limit})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []SiteCustomerHit
-	for rows.Next() {
-		var hit SiteCustomerHit
-		if err := rows.Scan(&hit.ID, &hit.Name, &hit.Region); err != nil {
-			return nil, err
-		}
-		out = append(out, hit)
-	}
+	out := r.annotateSiteHits(opts)
 	if out == nil {
 		out = []SiteCustomerHit{}
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // periodicCycleRank 점검 간격이 짧은 순. 한 기관에 주기가 섞여 있으면 가장 짧은 주기를 따른다.

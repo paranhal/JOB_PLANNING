@@ -407,21 +407,24 @@ func excelMaintBillingCycleLabel(s string) string {
 	}
 }
 
-// SearchJSON 품목 제조사·공급사 고르기용. GET /customers/search?q=
+// SearchJSON 품목 제조사·공급사 고르기용. GET /customers/search?q= — Lookup 어댑터.
 func (h *CustomerHandler) SearchJSON(c echo.Context) error {
 	if !canViewSales(c) && !canWriteMaster(c) {
 		return echo.ErrForbidden
 	}
-	q := strings.TrimSpace(c.QueryParam("q"))
-	items, _, err := h.repo.List(currentOrg(c), q, "", "", "org_name", "asc", 1, 20, false, "", false)
+	opts, _, err := h.repo.Lookup(repository.CustomerQuery{
+		Scope: repository.ScopeParty,
+		Q:     strings.TrimSpace(c.QueryParam("q")),
+		Limit: 20,
+	})
 	if err != nil {
 		return err
 	}
-	out := make([]map[string]interface{}, 0, len(items))
-	for _, it := range items {
+	out := make([]map[string]interface{}, 0, len(opts))
+	for _, it := range opts {
 		out = append(out, map[string]interface{}{
-			"customer_id": it.CustomerID,
-			"org_name":    it.OrgName,
+			"customer_id": it.ID,
+			"org_name":    it.Name,
 			"party_kind":  it.PartyKind,
 		})
 	}

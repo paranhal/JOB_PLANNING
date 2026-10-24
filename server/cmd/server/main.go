@@ -299,6 +299,7 @@ func main() {
 	cust := g.Group("/customers")
 	cust.GET("", h.Customer.List)
 	cust.GET("/search", h.Customer.SearchJSON)
+	g.GET("/lookup/customers", h.Customer.LookupJSON)
 	cust.POST("/quick", h.Customer.CreateNameJSON)
 	cust.GET("/export.xlsx", h.Customer.ExportExcel)
 	cust.GET("/orgs-import", h.Customer.OrgImport)

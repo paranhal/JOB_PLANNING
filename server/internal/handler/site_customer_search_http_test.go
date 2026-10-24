@@ -97,15 +97,22 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 	if err := json.Unmarshal(ok.Body.Bytes(), &okJ); err != nil {
 		t.Fatal(err)
 	}
-	if len(okJ.Items) != 2 {
+	if len(okJ.Items) != 3 {
 		t.Fatalf("검색 %+v", okJ.Items)
 	}
 	ids := map[string]bool{}
+	var done repository.SiteCustomerHit
 	for _, it := range okJ.Items {
 		ids[it.ID] = true
+		if it.ID == "c-done" {
+			done = it
+		}
 	}
-	if !ids["c-gy"] || !ids["c-lib"] || ids["c-done"] {
-		t.Fatalf("전 기관 미설정만 %+v", okJ.Items)
+	if !ids["c-gy"] || !ids["c-lib"] || !ids["c-done"] {
+		t.Fatalf("전 기관 %+v", okJ.Items)
+	}
+	if !done.Registered || done.EditHref == "" {
+		t.Fatalf("등록 배지 %+v", done)
 	}
 
 	all := doGetWith(t, e, "/maintenance/sites/customer-search?q="+url.QueryEscape("계룡"), jwtCookieViewOrg(t, vs, repository.OrgAll))
@@ -116,7 +123,7 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 	if err := json.Unmarshal(all.Body.Bytes(), &allJ); err != nil {
 		t.Fatal(err)
 	}
-	if len(allJ.Items) != 2 || allJ.Hint != "" {
+	if len(allJ.Items) != 3 || allJ.Hint != "" {
 		t.Fatalf("전체보기 %+v", allJ)
 	}
 	picked := doGetWith(t, e, "/maintenance/sites/customer-search?q="+url.QueryEscape("계룡"), jwtCookieViewOrg(t, vs, "O03"))
@@ -124,7 +131,7 @@ func TestSiteCustomerSearchHTTP(t *testing.T) {
 		Items []repository.SiteCustomerHit `json:"items"`
 	}
 	_ = json.Unmarshal(picked.Body.Bytes(), &pickedJ)
-	if len(pickedJ.Items) != 2 {
+	if len(pickedJ.Items) != 3 {
 		t.Fatalf("조직 선택 후 %+v", pickedJ.Items)
 	}
 
