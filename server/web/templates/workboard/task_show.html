@@ -15,7 +15,7 @@
        subRedirect: '/workboard/tasks/{{$t.TaskID}}?ok=sub' }">
   <div class="flex items-start justify-between gap-3">
     <div>
-      <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="text-sm text-gray-500 hover:text-gray-700">← 일일 업무 등록</a>
+      <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="text-sm text-gray-500 hover:text-gray-700">{{if .BackLabel}}{{.BackLabel}}{{else}}← 업무 관리{{end}}</a>
       <div class="flex items-center gap-2 mt-1 flex-wrap">
         <h2 class="text-xl font-bold text-gray-800">
           {{if .EditMode}}
@@ -52,7 +52,7 @@
       {{if and (eq $t.SourceType "sales_activity") .SourceHref}}
       <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-orange-300 text-orange-800 rounded-lg hover:bg-orange-50">영업 사업</a>
       {{end}}
-      <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register?view=day&date={{if $t.WorkDate}}{{$t.WorkDate}}{{else}}{{.Today}}{{end}}{{end}}"
+      <a href="{{.CalendarURL}}"
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">일정표</a>
       {{if and .CanWrite (not .EditMode) $t.WorkGroupID}}
       <form method="post" action="/workboard/tasks/{{$t.TaskID}}/refill-group">
@@ -680,7 +680,7 @@
     {{end}}
 
     <div class="flex justify-end gap-2 pt-2">
-      <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}"
+      <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}"
          class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">취소</a>
       <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">저장</button>
     </div>

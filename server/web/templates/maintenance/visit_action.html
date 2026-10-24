@@ -4,7 +4,7 @@
   <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 shadow-sm">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <a href="{{if .BackURL}}{{.BackURL}}{{else}}/workboard/register{{end}}" class="text-sm text-gray-500 hover:text-gray-700">← 돌아가기</a>
+        <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="text-sm text-gray-500 hover:text-gray-700">{{if .BackLabel}}{{.BackLabel}}{{else}}← 업무 관리{{end}}</a>
         <div class="flex items-center gap-2 mt-1 flex-wrap">
           <h2 class="text-xl font-bold text-gray-800">{{.SiteName}}</h2>
           <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">정기점검</span>

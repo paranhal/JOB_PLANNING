@@ -40,7 +40,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <a href="/admin-work?display=list{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
       <a href="/admin-work?display=kanban{{.QuerySuffix}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .View "kanban"}}bg-violet-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
-      <a href="/workboard/register" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">일일 업무 등록에서 추가</a>
+      <a href="{{workboardHomeURL ""}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">업무 관리에서 추가</a>
     </div>
   </div>
 
