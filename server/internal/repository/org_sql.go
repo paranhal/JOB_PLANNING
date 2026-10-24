@@ -124,19 +124,16 @@ func reportOrgID(orgID string) (string, error) {
 	return orgID, nil
 }
 
-// mntVisitOrgSQL 점검 방문의 수행 조직. 방문 org_id 가 비면 계획 org_id.
+// mntVisitOrgSQL 점검 방문의 수행 조직 = 점검계획 org_id (방문 표에는 org_id 가 없다).
 func mntVisitOrgSQL(orgID string) (string, []interface{}) {
-	orgID = strings.TrimSpace(orgID)
-	if orgID == "" {
-		return ` AND 1=0`, nil
-	}
-	if orgID == OrgAll {
+	frag, args := mustOrgSQL("mp", orgID)
+	if strings.TrimSpace(frag) == "" {
 		return "", nil
 	}
-	return ` AND COALESCE(
-		NULLIF(TRIM(v.org_id),''),
-		(SELECT NULLIF(TRIM(mp.org_id),'') FROM maintenance_plans mp WHERE mp.plan_id=v.plan_id LIMIT 1)
-	)=?`, []interface{}{orgID}
+	if frag == ` AND 1=0` {
+		return frag, args
+	}
+	return ` AND EXISTS (SELECT 1 FROM maintenance_plans mp WHERE mp.plan_id=v.plan_id` + frag + `)`, args
 }
 
 // workTaskVisibleOrgSQL 일일업무 조직 판정: 행 org_id → 담당자 소속 → 작성자 소속.

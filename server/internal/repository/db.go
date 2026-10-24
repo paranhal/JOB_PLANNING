@@ -744,7 +744,6 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE maintenance_visits ADD COLUMN completed INTEGER DEFAULT 0`,
 		`ALTER TABLE maintenance_visits ADD COLUMN completed_date TEXT`,
 		`ALTER TABLE maintenance_visits ADD COLUMN project_id TEXT`,
-		`ALTER TABLE maintenance_visits ADD COLUMN org_id TEXT DEFAULT ''`,
 		`ALTER TABLE maintenance_visits ADD COLUMN dup_reason TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS idx_maintenance_visits_project ON maintenance_visits(project_id)`,
 		// 같은 날 같은 기관이라도 KLAS·앤로보틱스처럼 점검 대상이 다르면 별도 방문으로 둔다.

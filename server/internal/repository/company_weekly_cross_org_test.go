@@ -42,26 +42,12 @@ func seedWeeklyCrossOrg(t *testing.T) (*sql.DB, *StatsRepo) {
 		model.OrgIDLibrary, model.OrgIDLibrary)
 	mustExec(t, db, `INSERT INTO maintenance_plans(plan_id,plan_year,org_id,status) VALUES
 		('MP-LIB',2026,?,'approved'),('MP-SI',2026,'O03','approved')`, model.OrgIDLibrary)
-	// 수행 조직 O01 인데 계획이 O03 — 계획 org 필터면 SI 보고서에 도서관 점검이 섞인다.
-	insVisit := `INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,completed_date,project_id,org_id,assignee)
-		VALUES(?,?,?,?,1,?,?,?,?,?)`
-	if _, err := db.Exec(insVisit, "V-LIB-DONE", "MP-SI", "2026-08-12", "C-LIB", 1, "2026-08-12", "LIB-P1", model.OrgIDLibrary, "도서관담당"); err != nil {
-		mustExec(t, db, `INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,completed_date,project_id,assignee)
-			VALUES('V-LIB-DONE','MP-SI','2026-08-12','C-LIB',1,1,'2026-08-12','LIB-P1','도서관담당')`)
-	}
-	if _, err := db.Exec(insVisit, "V-SI-DONE", "MP-SI", "2026-08-12", "C-SI", 1, "2026-08-12", "SI-P1", "O03", "SI담당"); err != nil {
-		mustExec(t, db, `INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,completed_date,project_id,assignee)
-			VALUES('V-SI-DONE','MP-SI','2026-08-12','C-SI',1,1,'2026-08-12','SI-P1','SI담당')`)
-	}
-	if _, err := db.Exec(insVisit, "V-SI-ON-LIB", "MP-SI", "2026-08-13", "C-SI", 1, "2026-08-13", "LIB-P1", "O03", "SI담당"); err != nil {
-		mustExec(t, db, `INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,completed_date,project_id,assignee)
-			VALUES('V-SI-ON-LIB','MP-SI','2026-08-13','C-SI',1,1,'2026-08-13','LIB-P1','SI담당')`)
-	}
-	if _, err := db.Exec(`INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,project_id,org_id)
-		VALUES('V-LIB-OPEN','MP-LIB','2026-08-12','C-LIB',2,0,'LIB-P2',?)`, model.OrgIDLibrary); err != nil {
-		mustExec(t, db, `INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,project_id)
-			VALUES('V-LIB-OPEN','MP-LIB','2026-08-12','C-LIB',2,0,'LIB-P2')`)
-	}
+	mustExec(t, db, `INSERT INTO maintenance_visits(visit_id,plan_id,visit_date,customer_id,sort_order,completed,completed_date,project_id,assignee)
+		VALUES
+		('V-LIB-DONE','MP-LIB','2026-08-12','C-LIB',1,1,'2026-08-12','LIB-P1','도서관담당'),
+		('V-SI-DONE','MP-SI','2026-08-12','C-SI',1,1,'2026-08-12','SI-P1','SI담당'),
+		('V-SI-ON-LIB','MP-SI','2026-08-13','C-SI',1,1,'2026-08-13','LIB-P1','SI담당'),
+		('V-LIB-OPEN','MP-LIB','2026-08-11','C-LIB',2,0,'','LIB-P2','')`)
 	mustExec(t, db, `INSERT INTO as_receipts(as_id,as_number,receipt_datetime,customer_id,symptom,status,assigned_to,org_id,complete_datetime,project_id,created_at,updated_at)
 		VALUES
 		('AS-LIB','R-LIB','2026-08-12 09:00:00','C-LIB',?,'complete','도서관담당',?,'2026-08-12 15:00:00','LIB-P1','2026-08-12 09:00:00','2026-08-12 15:00:00'),
