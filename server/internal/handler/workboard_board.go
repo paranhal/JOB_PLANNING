@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -59,6 +60,18 @@ type boardItem struct {
 	DayPosHeight    int
 	DayCol          int
 	DayCols         int
+	Unplaced        bool
+	Overdue         bool
+	OverdueDays     int
+	DedupKey        string
+	PlaceKind       string
+	PlaceRef        string
+	PlaceAssignee   string
+	PlaceDur        int
+	PlaceDue        string
+	CanPlace        bool
+	DueTag          string
+	DueLate         bool
 }
 
 type boardMonthCell struct {
@@ -398,78 +411,77 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	q := strings.TrimSpace(c.QueryParam("q"))
 	fromT, toT := boardRange(view, base)
 	from, to := fromT.Format(dateLayout), toT.Format(dateLayout)
-	org := currentOrg(c)
+	scope := resolveBoardScope(c)
+	keep := boardKeepQuery(c)
 
-	syncFrom, syncTo := registerSyncWindow(from, to)
-	h.syncMaintenanceTasks(syncFrom, syncTo, org)
-
-	tasks, err := h.repo.ListTasksBetweenForOrg(from, to, org)
+	entries, err := h.collectBoardEntries(c, from, to, scope)
 	if err != nil {
 		return nil, err
 	}
-	asIDs, mntIDs := collectASMntIDs(tasks)
-	asStatus, _ := h.repo.ASStatusesByIDs(asIDs)
-	mntDone, _ := h.repo.MaintenanceCompletedByIDs(mntIDs)
-	var visible []model.WorkTask
-	for _, t := range tasks {
-		ok := false
-		t, ok = applyWorkboardSourceStatus(t, asStatus, mntDone)
-		if !ok {
-			continue
-		}
-		if t.Status == model.WBTaskCancelled {
-			continue
-		}
-		visible = append(visible, t)
-	}
 
-	ids := taskIDsOf(visible)
-	memberMap := map[string][]model.WorkTaskMember{}
-	if len(ids) > 0 {
-		if m, err := h.repo.ListMembersByTaskIDs(ids); err == nil {
-			memberMap = m
+	filterHit := func(it boardItem) bool {
+		if !boardSearchHit(it, q) {
+			return false
+		}
+		return true
+	}
+	var placed, overdue, unplaced []boardItem
+	for _, it := range entries.Placed {
+		if filterHit(it) {
+			placed = append(placed, it)
 		}
 	}
-	visible = filterTasksForPersonalAssignee(visible, memberMap, currentUserID(c), currentUserDisplayName(c))
-	ids = taskIDsOf(visible)
-
-	siteLines := map[string]string{}
-	if len(ids) > 0 {
-		if m, err := h.repo.TaskSiteLinesByTaskIDs(ids); err == nil {
-			siteLines = m
+	for _, it := range entries.Overdue {
+		if filterHit(it) {
+			overdue = append(overdue, it)
 		}
 	}
-	var custIDs []string
-	for i := range visible {
-		if line := siteLines[visible[i].TaskID]; line != "" {
-			visible[i].SiteLine = line
-		}
-		if cid := strings.TrimSpace(visible[i].CustomerID); cid != "" {
-			custIDs = append(custIDs, cid)
-		}
-	}
-	addrMap := map[string]string{}
-	if h.customerRepo != nil && len(custIDs) > 0 {
-		if m, err := h.customerRepo.AddressesByIDs(custIDs); err == nil {
-			addrMap = m
+	for _, it := range entries.Unplaced {
+		if filterHit(it) {
+			unplaced = append(unplaced, it)
 		}
 	}
 
-	items := make([]boardItem, 0, len(visible))
-	for _, t := range visible {
-		it := buildBoardItem(t, memberMap[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
-		if view == boardViewList && !boardSearchHit(it, q) {
-			continue
+	var items []boardItem
+	if view == boardViewList {
+		day := base.Format(dateLayout)
+		for _, it := range overdue {
+			items = append(items, it)
 		}
-		items = append(items, it)
+		for _, it := range placed {
+			d := strings.TrimSpace(it.Task.WorkDate)
+			if d == "" {
+				d = strings.TrimSpace(it.Task.DueDate)
+			}
+			if d == day {
+				items = append(items, it)
+			}
+		}
+		sortListBoardItems(items)
+	} else {
+		items = append(items, placed...)
+		items = append(items, overdue...)
+		sortBoardItems(items)
 	}
-	sortBoardItems(items)
 
 	byDate := map[string][]boardItem{}
-	for _, it := range items {
+	for _, it := range placed {
 		d := strings.TrimSpace(it.Task.WorkDate)
 		if d == "" {
 			d = strings.TrimSpace(it.Task.DueDate)
+		}
+		if d == "" {
+			continue
+		}
+		byDate[d] = append(byDate[d], it)
+	}
+	for _, it := range overdue {
+		d := strings.TrimSpace(it.Task.WorkDate)
+		if d == "" {
+			d = strings.TrimSpace(it.Task.DueDate)
+		}
+		if d == "" {
+			continue
 		}
 		byDate[d] = append(byDate[d], it)
 	}
@@ -496,7 +508,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 					IsToday:  ds == today,
 					Items:    shown,
 					MoreN:    more,
-					MoreHref: "/workboard/board?view=day&date=" + ds,
+					MoreHref: boardURL(boardViewDay, ds, keep),
 				}
 			}
 			monthWeeks = append(monthWeeks, row)
@@ -571,42 +583,84 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 
 	prev := boardPeriodShift(view, base, -1).Format(dateLayout)
 	next := boardPeriodShift(view, base, 1).Format(dateLayout)
-	calHref := "/workboard/board?view=month&date=" + base.Format(dateLayout)
-	listHref := "/workboard/board?view=list&date=" + base.Format(dateLayout)
-	if q != "" && view == boardViewList {
-		listHref += "&q=" + q
-	}
-
+	calHref := boardURL(boardViewMonth, base.Format(dateLayout), keep)
+	listHref := boardURL(boardViewList, base.Format(dateLayout), keep)
+	ds := base.Format(dateLayout)
 	title := "일일 업무"
 	if view != boardViewList {
 		title = "일정 캘린더"
 	}
+	write := boardCanWrite(c)
+	me := currentUserDisplayName(c)
+	mineKeep := cloneBoardQuery(keep)
+	allKeep := cloneBoardQuery(keep)
+	if scope.ShowToggle {
+		mineKeep.Del("mine")
+		mineKeep.Del("assignee")
+		allKeep.Set("mine", "0")
+		allKeep.Del("assignee")
+	} else {
+		mineKeep.Del("mine")
+		mineKeep.Set("assignee", me)
+		allKeep.Del("mine")
+		allKeep.Del("assignee")
+	}
+	mineEmptyN := 0
+	if !scope.ScopeAll && len(items)+len(unplaced) == 0 {
+		mineEmptyN = boardMineEmptyAllCount(h, c, from, to)
+	}
+	unplacedN := len(unplaced)
 	return map[string]interface{}{
-		"Title":           title,
-		"Active":          NavWorkBoard,
-		"View":            view,
-		"Date":            base.Format(dateLayout),
-		"Today":           today,
-		"DateLabel":       formatDotDate(base.Format(dateLayout)),
-		"PeriodLabel":     boardPeriodLabel(view, base, fromT, toT),
-		"PrevDate":        prev,
-		"NextDate":        next,
-		"Q":               q,
-		"Items":           items,
-		"Count":           len(items),
-		"MonthWeeks":      monthWeeks,
-		"WeekCols":        weekCols,
-		"DayTimed":        dayTimed,
-		"DayUntimed":      dayUntimed,
-		"DayHours":        dayHours,
-		"DayNowTop":       nowTop,
-		"ShowNowLine":     nowTop >= 0,
-		"DayBodyHeight":   (boardDayEndHour - boardDayStartHour + 1) * boardDayPxPerHour,
-		"CalHref":         calHref,
-		"ListHref":        listHref,
-		"Weekdays":        weekdayKR,
-		"CanWrite":        canWriteWorkboard(c),
-		"CurrentUserName": currentUserDisplayName(c),
-		"BoardHref":       "/workboard/board?view=" + view + "&date=" + base.Format(dateLayout),
+		"Title":            title,
+		"Active":           NavWorkBoard,
+		"View":             view,
+		"Date":             ds,
+		"Today":            today,
+		"DateLabel":        formatDotDate(ds),
+		"PeriodLabel":      boardPeriodLabel(view, base, fromT, toT),
+		"PrevDate":         prev,
+		"NextDate":         next,
+		"Q":                q,
+		"Items":            items,
+		"Count":            len(items),
+		"Unplaced":         unplaced,
+		"UnplacedN":        unplacedN,
+		"OtherUnplacedN":   entries.OtherUnplacedN,
+		"MineEmptyAllN":    mineEmptyN,
+		"ScopeAll":         scope.ScopeAll,
+		"ShowScopeToggle":  true,
+		"MineHref":         boardURL(view, ds, mineKeep),
+		"AllHref":          boardURL(view, ds, allKeep),
+		"MonthWeeks":       monthWeeks,
+		"WeekCols":         weekCols,
+		"DayTimed":         dayTimed,
+		"DayUntimed":       dayUntimed,
+		"DayHours":         dayHours,
+		"DayNowTop":        nowTop,
+		"ShowNowLine":      nowTop >= 0,
+		"DayBodyHeight":    (boardDayEndHour - boardDayStartHour + 1) * boardDayPxPerHour,
+		"CalHref":          calHref,
+		"ListHref":         listHref,
+		"PrevHref":         boardURL(view, prev, keep),
+		"NextHref":         boardURL(view, next, keep),
+		"TodayHref":        boardURL(view, today, keep),
+		"MonthViewHref":    boardURL(boardViewMonth, ds, keep),
+		"WeekViewHref":     boardURL(boardViewWeek, ds, keep),
+		"DayViewHref":      boardURL(boardViewDay, ds, keep),
+		"MineParam":        scope.MineParam,
+		"AssigneeFilter":   scope.AssigneeFilter,
+		"Weekdays":         weekdayKR,
+		"CanWrite":         write,
+		"CurrentUserName":  me,
+		"BoardHref":        boardURL(view, ds, keep),
+		"ScheduleRedirect": boardURL(view, ds, keep),
 	}, nil
+}
+
+func cloneBoardQuery(v url.Values) url.Values {
+	out := url.Values{}
+	for k, vs := range v {
+		out[k] = append([]string{}, vs...)
+	}
+	return out
 }

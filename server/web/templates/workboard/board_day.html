@@ -1,6 +1,6 @@
 {{define "title"}}업무 관리 · 일정 캘린더{{end}}
 {{define "content"}}
-<div {{if .CanWrite}}x-data="boardNewWork()"{{end}}>
+{{template "board_shell_open" .}}
   {{template "board_cal_head" .}}
   {{if .DayUntimed}}
   <div class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 py-2.5 text-ui-sm text-ink-muted">
@@ -17,7 +17,7 @@
         <div class="board-day-hour px-3 pt-0.5 text-[11px] font-semibold text-ink-subtle">{{.}}</div>
         {{end}}
       </div>
-      <div class="relative" data-day-body>
+      <div class="relative" data-day-body data-drop="{{.Date}}" data-dayzone="1">
         {{range .DayHours}}
         <div class="board-day-hour border-t border-line"></div>
         {{end}}
@@ -35,8 +35,7 @@
     </div>
   </div>
   </div>
-  {{template "wb_new_work_modal" .}}
-</div>
+{{template "board_shell_close" .}}
 <script>
 (function(){
   var body=document.querySelector('[data-day-body]');

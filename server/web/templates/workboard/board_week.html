@@ -1,11 +1,11 @@
 {{define "title"}}업무 관리 · 일정 캘린더{{end}}
 {{define "content"}}
-<div {{if .CanWrite}}x-data="boardNewWork()"{{end}}>
+{{template "board_shell_open" .}}
   {{template "board_cal_head" .}}
   <div class="border-t border-line">
     <div class="flex flex-col lg:grid lg:min-w-[910px] lg:grid-cols-7">
       {{range .WeekCols}}
-      <div class="min-h-[35rem] border-b border-line px-2.5 pb-3 lg:border-b-0 lg:border-r lg:last:border-r-0">
+      <div class="min-h-[35rem] border-b border-line px-2.5 pb-3 lg:border-b-0 lg:border-r lg:last:border-r-0" data-drop="{{.Date}}">
         <div class="mb-2.5 flex items-start justify-between px-1 py-3 text-ui-sm text-ink-muted {{if .IsToday}}rounded-t-lg bg-success-soft text-success{{end}}">
           <span>{{.Dow}}</span>
           <span class="inline-grid h-9 min-w-[2.25rem] place-items-center rounded-full text-xl font-bold {{if .IsToday}}bg-success text-primary-fg{{else}}text-ink{{end}}">{{.Day}}</span>
@@ -22,6 +22,5 @@
     </div>
   </div>
   </div>
-  {{template "wb_new_work_modal" .}}
-</div>
+{{template "board_shell_close" .}}
 {{end}}

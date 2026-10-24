@@ -1,0 +1,36 @@
+{{define "board_scope_toggle"}}
+<span class="board-sc" role="group" aria-label="범위">
+  <a href="{{.MineHref}}" class="{{if not .ScopeAll}}on{{end}}">내 업무</a>
+  <a href="{{.AllHref}}" class="{{if .ScopeAll}}on{{end}}">전체</a>
+</span>
+{{end}}
+
+{{define "board_scope_hints"}}
+{{if and (not .ScopeAll) (gt .MineEmptyAllN 0)}}
+<p class="board-hint2">내 업무는 없습니다. <a href="{{.AllHref}}">전체 {{.MineEmptyAllN}}건 보기</a></p>
+{{end}}
+{{if and (not .ScopeAll) (gt .OtherUnplacedN 0)}}
+<p class="board-hint2">다른 담당자 미배치 {{.OtherUnplacedN}}건이 있습니다. <a href="{{.AllHref}}">전체 보기</a></p>
+{{end}}
+{{end}}
+
+{{define "board_shell_open"}}
+<div id="board-root" class="board-page" {{if .CanWrite}}x-data="boardNewWork()"{{end}}
+     data-can-write="{{if .CanWrite}}1{{else}}0{{end}}"
+     data-view="{{.View}}"
+     data-date="{{.Date}}"
+     data-redirect="{{.ScheduleRedirect}}"
+     data-scope-all="{{if .ScopeAll}}1{{else}}0{{end}}">
+{{template "board_scope_hints" .}}
+<div class="board-layout" id="board-layout">
+<div class="board-main">
+{{end}}
+
+{{define "board_shell_close"}}
+</div>
+{{template "board_unplaced" .}}
+</div>
+{{template "wb_new_work_modal" .}}
+{{template "board_place_modal" .}}
+</div>
+{{end}}

@@ -1,0 +1,172 @@
+{{define "board_unplaced"}}
+<aside class="card board-pbox" id="board-pbox" aria-label="미배치 업무">
+  <div class="board-ph">
+    <h2><span class="board-pt">미배치 업무</span><span class="board-cnt">{{.UnplacedN}}</span></h2>
+    <span class="board-vt">미배치 업무</span>
+    <button type="button" class="board-tg" data-ptoggle aria-label="접기">›</button>
+  </div>
+  <div class="board-pdesc">날짜·시간이 아직 정해지지 않은 업무입니다. 칸으로 끌어놓거나 「일정 배치」를 누르세요.</div>
+  <div class="board-pf" role="group" aria-label="유형 필터">
+    <button type="button" data-pf="all" class="on">전체 {{.UnplacedN}}</button>
+    <button type="button" data-pf="as">AS <span data-pfc="as">0</span></button>
+    <button type="button" data-pf="mnt">점검 <span data-pfc="mnt">0</span></button>
+    <button type="button" data-pf="work">작업 <span data-pfc="work">0</span></button>
+    <button type="button" data-pf="adm">행정 <span data-pfc="adm">0</span></button>
+    <button type="button" data-pf="sales">영업 <span data-pfc="sales">0</span></button>
+  </div>
+  <div class="board-plist">
+    {{range .Unplaced}}
+    <div class="board-pc {{.Type.Text}}" {{if and $.CanWrite .CanPlace}}draggable="true"{{end}}
+         data-type="{{.Type.Key}}" data-pid="{{.PlaceKind}}:{{.PlaceRef}}"
+         data-kind="{{.PlaceKind}}" data-ref="{{.PlaceRef}}" data-title="{{.Task.Title}}"
+         data-assignee="{{.PlaceAssignee}}" data-dur="{{.PlaceDur}}" data-due="{{.PlaceDue}}"
+         data-can-place="{{if .CanPlace}}1{{else}}0{{end}}">
+      <div class="board-pc-h">
+        <span>{{.Type.Label}}</span>
+        {{if $.ScopeAll}}{{if .AssigneeName}}<span class="board-tag">{{.AssigneeName}}</span>{{end}}{{end}}
+      </div>
+      <div class="board-pc-n">{{.Task.Title}}</div>
+      <div class="board-pc-c">{{.CustomerLine}}</div>
+      <div class="board-pc-m">
+        <span class="board-tag {{if .DueLate}}late{{else if eq .DueTag `날짜 미정`}}none{{end}}">{{.DueTag}}</span>
+        {{if and $.CanWrite .CanPlace}}
+        <button type="button" class="board-go" data-place="{{.PlaceKind}}:{{.PlaceRef}}">일정 배치</button>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    <div class="board-pempty">미배치 업무가 없습니다.</div>
+    {{end}}
+  </div>
+</aside>
+{{end}}
+
+{{define "board_place_modal"}}
+<div class="board-pmask" id="board-pmask" hidden>
+  <div class="board-pdlg" role="dialog" aria-modal="true" aria-labelledby="board-p-title">
+    <h3 id="board-p-title">일정 배치</h3>
+    <div id="board-pinfo" class="board-pmeta"></div>
+    <form method="post" action="/workboard/schedule" id="board-place-form" class="board-pform">
+      <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
+      <input type="hidden" name="kind" id="board-p-kind">
+      <input type="hidden" name="ref_id" id="board-p-ref">
+      <input type="hidden" name="assignee" id="board-p-assignee">
+      <input type="hidden" name="duration_min" id="board-p-dur" value="30">
+      <div class="board-pg2">
+        <div><label for="board-pD">날짜</label><input id="board-pD" name="work_date" type="date" required></div>
+        <div><label for="board-pS">시작</label><input id="board-pS" name="start_time" type="time"></div>
+        <div><label for="board-pE">종료</label><input id="board-pE" name="end_time" type="time"></div>
+      </div>
+      <div><label for="board-pW">담당자</label><input id="board-pW" disabled></div>
+      <div class="board-pft">
+        <button type="button" class="btn" id="board-pc">취소</button>
+        <button type="submit" class="btn btn-primary" id="board-pok">일정에 올리기</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var root=document.getElementById('board-root');
+  if(!root)return;
+  var box=document.getElementById('board-pbox');
+  var layout=document.getElementById('board-layout');
+  var KEY='jp-board-unplaced-min';
+  function applyMin(on){
+    if(!box||!layout)return;
+    box.classList.toggle('min',on);
+    layout.classList.toggle('col',on);
+    var b=box.querySelector('[data-ptoggle]');
+    if(b){b.setAttribute('aria-label',on?'펼치기':'접기');b.textContent=on?'‹':'›';}
+  }
+  try{applyMin(localStorage.getItem(KEY)==='1');}catch(e){}
+  function countTypes(){
+    var n={as:0,mnt:0,work:0,adm:0,sales:0};
+    box.querySelectorAll('.board-pc').forEach(function(el){
+      var k=el.getAttribute('data-type'); if(n[k]!=null)n[k]++;
+    });
+    Object.keys(n).forEach(function(k){
+      var s=box.querySelector('[data-pfc="'+k+'"]'); if(s)s.textContent=n[k];
+    });
+  }
+  countTypes();
+  var pf='all';
+  function applyPf(){
+    box.querySelectorAll('.board-pc').forEach(function(el){
+      el.hidden=!(pf==='all'||el.getAttribute('data-type')===pf);
+    });
+    box.querySelectorAll('[data-pf]').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-pf')===pf);});
+  }
+  root.addEventListener('click',function(e){
+    var t=e.target.closest('[data-ptoggle],[data-pf],[data-place]');
+    if(!t)return;
+    if(t.hasAttribute('data-ptoggle')){
+      var on=!box.classList.contains('min'); applyMin(on);
+      try{localStorage.setItem(KEY,on?'1':'0');}catch(x){}
+      return;
+    }
+    if(t.getAttribute('data-pf')){pf=t.getAttribute('data-pf');applyPf();return;}
+    if(t.getAttribute('data-place')){
+      var card=t.closest('.board-pc'); if(card) openPlace(card, root.getAttribute('data-date')||'', '09:00');
+    }
+  });
+  var mask=document.getElementById('board-pmask');
+  function addMin(t,m){
+    if(!t)t='09:00';
+    var p=t.split(':'); var x=(+p[0])*60+(+p[1]||0)+m;
+    return String(Math.floor(x/60)%24).padStart(2,'0')+':'+String(x%60).padStart(2,'0');
+  }
+  function openPlace(card,date,st){
+    if(!card||card.getAttribute('data-can-place')!=='1')return;
+    var due=card.getAttribute('data-due')||'';
+    var view=root.getAttribute('data-view')||'list';
+    var d=date;
+    if(due && view==='list' && date===(root.getAttribute('data-date')||'')) d=due;
+    if(!d) d=root.getAttribute('data-date')||'';
+    document.getElementById('board-pinfo').textContent=(card.querySelector('.board-pc-h span')||{}).textContent+' · '+(card.getAttribute('data-title')||'');
+    document.getElementById('board-p-kind').value=card.getAttribute('data-kind')||'';
+    document.getElementById('board-p-ref').value=card.getAttribute('data-ref')||'';
+    document.getElementById('board-p-assignee').value=card.getAttribute('data-assignee')||'';
+    document.getElementById('board-p-dur').value=card.getAttribute('data-dur')||'30';
+    document.getElementById('board-pD').value=d;
+    document.getElementById('board-pS').value=st||'09:00';
+    document.getElementById('board-pE').value=addMin(st||'09:00',60);
+    document.getElementById('board-pW').value=card.getAttribute('data-assignee')||'';
+    mask.hidden=false; mask.classList.add('on');
+  }
+  document.getElementById('board-pc').addEventListener('click',function(){mask.hidden=true;mask.classList.remove('on');});
+  mask.addEventListener('click',function(e){if(e.target===mask){mask.hidden=true;mask.classList.remove('on');}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){mask.hidden=true;mask.classList.remove('on');}});
+  var dragEl=null;
+  root.addEventListener('dragstart',function(e){
+    var c=e.target.closest('.board-pc'); if(!c||c.getAttribute('data-can-place')!=='1')return;
+    dragEl=c; c.classList.add('drag');
+    e.dataTransfer.setData('text/plain',c.getAttribute('data-pid')||'');
+    e.dataTransfer.effectAllowed='move';
+  });
+  root.addEventListener('dragend',function(){
+    dragEl=null;
+    root.querySelectorAll('.drag,.drop').forEach(function(x){x.classList.remove('drag','drop');});
+  });
+  root.addEventListener('dragover',function(e){
+    var z=e.target.closest('[data-drop]'); if(!z||!dragEl)return;
+    e.preventDefault();
+    root.querySelectorAll('.drop').forEach(function(x){if(x!==z)x.classList.remove('drop');});
+    z.classList.add('drop');
+  });
+  root.addEventListener('drop',function(e){
+    var z=e.target.closest('[data-drop]'); if(!z||!dragEl)return;
+    e.preventDefault();
+    var date=z.getAttribute('data-drop'), st='09:00';
+    if(z.getAttribute('data-dayzone')){
+      var r=z.getBoundingClientRect();
+      var m=Math.round(((e.clientY-r.top)/64*60+7*60)/30)*30;
+      m=Math.max(7*60,Math.min(20*60,m));
+      st=String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+    }
+    openPlace(dragEl,date,st);
+    dragEl=null;
+  });
+})();
+</script>
+{{end}}
