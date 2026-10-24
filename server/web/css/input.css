@@ -257,3 +257,9 @@ table thead th .inline-flex.flex-col {
   font-size: 1rem !important;
   line-height: 1 !important;
 }
+
+@media (max-width: 900px) {
+  .weekly-card-cols {
+    grid-template-columns: 1fr;
+  }
+}
