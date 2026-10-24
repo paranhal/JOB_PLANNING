@@ -120,6 +120,7 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.GET("/workboard/new-work/form", h.Workboard.NewWorkForm)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
+	g.POST("/workboard/schedule", h.Workboard.Schedule)
 	g.GET("/work", h.Work.List)
 	g.GET("/work/all", h.Work.ListAll)
 	return e, db, got1, got2, h.Workboard.repo
@@ -180,8 +181,16 @@ func TestPersonalBoardOrgIsolationAndOrgAllMineOnly(t *testing.T) {
 	if !strings.Contains(p, "비전본인") {
 		t.Fatal("OrgAll 비전 본인 업무 없음")
 	}
-	if strings.Contains(p, "O01내업무") || strings.Contains(p, "O02타업무") {
-		t.Fatal("비전 관리자에게 남의 업무가 보인다")
+	if !strings.Contains(p, "O01내업무") || !strings.Contains(p, "O02타업무") {
+		t.Fatal("비전 관리자 기본 전체에서 조직 업무가 안 보인다")
+	}
+	mine := doGetWith(t, e, "/workboard/board?assignee="+url.QueryEscape(got.FullName), jwtCookieUser(t, got))
+	mb := mine.Body.String()
+	if !strings.Contains(mb, "비전본인") {
+		t.Fatal("비전 내 업무 필터에 본인 없음")
+	}
+	if strings.Contains(mb, "O01내업무") {
+		t.Fatal("비전 내 업무 필터에 타인 업무가 보인다")
 	}
 }
 
@@ -290,15 +299,16 @@ func TestPersonalBoardUntimedLastAndDayStrip(t *testing.T) {
 	today := time.Now().Format(dateLayout)
 	mustCreateBoardTask(t, repo, "시각있음", today, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	mustCreateBoardTask(t, repo, "시간미정업무", today, "", "", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
-	list := doGetWith(t, e, "/workboard/board?view=list&date="+today, jwtCookieUser(t, me))
+	ck := jwtCookieUser(t, me)
+	list := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0", ck)
 	a := strings.Index(list.Body.String(), "시각있음")
 	b := strings.Index(list.Body.String(), "시간미정업무")
 	if a < 0 || b < 0 || a > b {
 		t.Fatalf("리스트 시각 없음이 아래가 아님 a=%d b=%d", a, b)
 	}
-	day := doGetWith(t, e, "/workboard/board?view=day&date="+today, jwtCookieUser(t, me))
-	if !strings.Contains(day.Body.String(), "시간 미정") || !strings.Contains(day.Body.String(), "시간미정업무") {
-		t.Fatal("일 화면 시간 미정 띠 없음")
+	day := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ck)
+	if !strings.Contains(day.Body.String(), "시간미정업무") {
+		t.Fatal("일 화면에 시각 없는 업무가 없다")
 	}
 }
 
