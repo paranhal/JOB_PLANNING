@@ -254,6 +254,48 @@ func (r *CustomerRepo) GetByID(id string) (*model.Customer, error) {
 	return c, nil
 }
 
+// AddressesByIDs 고객 ID → 표시 주소. 한 번에 조회한다.
+func (r *CustomerRepo) AddressesByIDs(ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	var clean []string
+	seen := map[string]bool{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		clean = append(clean, id)
+	}
+	if r == nil || r.db == nil || len(clean) == 0 {
+		return out, nil
+	}
+	ph := make([]string, len(clean))
+	args := make([]interface{}, len(clean))
+	for i, id := range clean {
+		ph[i] = "?"
+		args[i] = id
+	}
+	rows, err := r.db.Query(`
+		SELECT customer_id,
+		       TRIM(COALESCE(NULLIF(TRIM(address),''),
+		            TRIM(COALESCE(addr_sido,'') || ' ' || COALESCE(addr_sigungu,'') || ' ' || COALESCE(addr_dong,''))))
+		  FROM customers
+		 WHERE customer_id IN (`+strings.Join(ph, ",")+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, addr string
+		if err := rows.Scan(&id, &addr); err != nil {
+			return nil, err
+		}
+		out[id] = strings.TrimSpace(addr)
+	}
+	return out, rows.Err()
+}
+
 // Create 고객 등록
 func (r *CustomerRepo) Create(c *model.Customer) error {
 	orgID, err := RequireInsertOrg(c.OrgID)
@@ -610,7 +652,7 @@ func (r *CustomerRepo) ListActiveNameMatches(name, excludeID string) ([]model.Cu
 	if key == "" {
 		return nil, nil
 	}
-	rows, err := r.db.Query(customerAPISelect+`
+	rows, err := r.db.Query(customerAPISelect + `
 		WHERE is_active=1`)
 	if err != nil {
 		return nil, err

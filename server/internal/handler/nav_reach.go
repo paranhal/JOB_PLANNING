@@ -13,6 +13,7 @@ type oldNavLink struct {
 func oldSidebarCatalog() []oldNavLink {
 	return []oldNavLink{
 		{Href: "/", Channel: "sidebar"},
+		{Href: "/workboard/board", Channel: "sidebar"},
 		{Href: "/work", Channel: "sidebar"},
 		{Href: "/work/all", Channel: "sidebar"},
 		{Href: "/workboard/register", Channel: "sidebar"},

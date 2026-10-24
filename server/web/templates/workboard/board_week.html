@@ -1,0 +1,26 @@
+{{define "title"}}업무 관리 · 일정 캘린더{{end}}
+{{define "content"}}
+<div>
+  {{template "board_cal_head" .}}
+  <div class="border-t border-line">
+    <div class="flex flex-col lg:grid lg:min-w-[910px] lg:grid-cols-7">
+      {{range .WeekCols}}
+      <div class="min-h-[35rem] border-b border-line px-2.5 pb-3 lg:border-b-0 lg:border-r lg:last:border-r-0">
+        <div class="mb-2.5 flex items-start justify-between px-1 py-3 text-ui-sm text-ink-muted {{if .IsToday}}rounded-t-lg bg-success-soft text-success{{end}}">
+          <span>{{.Dow}}</span>
+          <span class="inline-grid h-9 min-w-[2.25rem] place-items-center rounded-full text-xl font-bold {{if .IsToday}}bg-success text-primary-fg{{else}}text-ink{{end}}">{{.Day}}</span>
+        </div>
+        {{range .Items}}
+        <a href="{{.Href}}" class="{{.Type.Text}} mb-2.5 block rounded-[10px] border border-line border-t-[3px] border-t-current bg-surface px-3 py-2.5">
+          <div class="text-ui-sm font-extrabold">{{if .ChipTime}}{{.ChipTime}}{{else}}시간 미정{{end}}</div>
+          <div class="my-0.5 text-ui font-bold text-ink">{{.Task.Title}}</div>
+          <div class="text-[11px] text-ink-muted">{{.CustomerLine}}</div>
+        </a>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+  </div>
+</div>
+{{end}}

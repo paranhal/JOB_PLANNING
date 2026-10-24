@@ -1,0 +1,28 @@
+{{define "board_cal_head"}}
+<section class="card">
+  <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <p class="text-ui-sm font-extrabold tracking-wide text-success">SCHEDULE</p>
+        <h1 class="mt-0.5 text-2xl font-bold text-ink">일정 캘린더</h1>
+      </div>
+      <p class="mb-1 text-ui text-ink-muted">내 일정과 업무를 한눈에 확인하세요.</p>
+    </div>
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <a href="{{.ListHref}}" class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 text-ui font-semibold text-ink hover:bg-hover">일정 리스트 보기</a>
+      <div class="inline-flex rounded-xl border border-line bg-surface p-0.5">
+        <a href="/workboard/board?view=month&amp;date={{.Date}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `month`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">월</a>
+        <a href="/workboard/board?view=week&amp;date={{.Date}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `week`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">주</a>
+        <a href="/workboard/board?view=day&amp;date={{.Date}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `day`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">일</a>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="card mt-4 overflow-hidden">
+  <div class="flex items-center gap-2 px-5 py-3.5">
+    <a href="/workboard/board?view={{.View}}&amp;date={{.PrevDate}}" class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="이전">‹</a>
+    <p class="min-w-0 text-lg font-extrabold text-ink">{{.PeriodLabel}}</p>
+    <a href="/workboard/board?view={{.View}}&amp;date={{.NextDate}}" class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="다음">›</a>
+    <a href="/workboard/board?view={{.View}}&amp;date={{.Today}}" class="ml-1 inline-flex h-8 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm font-semibold text-ink">오늘</a>
+  </div>
+{{end}}

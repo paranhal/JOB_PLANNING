@@ -1,0 +1,30 @@
+{{define "title"}}업무 관리 · 일정 캘린더{{end}}
+{{define "content"}}
+<div>
+  {{template "board_cal_head" .}}
+  <div class="overflow-x-auto border-t border-line">
+    <div class="grid min-w-[770px] grid-cols-7">
+      {{range .Weekdays}}
+      <div class="border-b border-line px-3 py-3 text-center text-ui-sm text-ink-muted">{{.}}</div>
+      {{end}}
+      {{range .MonthWeeks}}
+      {{range .}}
+      <div class="min-h-[8rem] border-b border-r border-line p-2 last:border-r-0">
+        <a href="{{.MoreHref}}" class="inline-grid h-6 min-w-[1.5rem] place-items-center rounded-full text-ui-sm font-bold {{if .IsToday}}bg-success text-primary-fg{{else if .InMonth}}text-ink{{else}}text-ink-subtle{{end}}">{{.Day}}</a>
+        <div class="mt-1 hidden lg:block">
+          {{range .Items}}
+          <a href="{{.Href}}" class="{{.Type.Text}} mt-1 block truncate rounded border-l-[3px] border-current {{.Type.Bg}} px-1.5 py-0.5 text-[11px] font-semibold">{{if .ChipTime}}{{.ChipTime}} {{end}}<span class="text-ink">{{.Task.Title}}</span></a>
+          {{end}}
+          {{if gt .MoreN 0}}<a href="{{.MoreHref}}" class="mt-1 block px-1 text-[11px] font-bold text-success">+{{.MoreN}}건 더보기</a>{{end}}
+        </div>
+        <div class="mt-1 flex items-center gap-1 lg:hidden">
+          {{if .Items}}<span class="inline-block h-1.5 w-1.5 rounded-full bg-success"></span><span class="text-[11px] text-ink-muted">{{add (len .Items) .MoreN}}건</span>{{end}}
+        </div>
+      </div>
+      {{end}}
+      {{end}}
+    </div>
+  </div>
+  </div>
+</div>
+{{end}}

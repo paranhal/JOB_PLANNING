@@ -45,10 +45,13 @@ func (r *WBRepo) ListMembersByTaskIDs(ids []string) (map[string][]model.WorkTask
 		args[i] = id
 	}
 	rows, err := r.db.Query(`
-		SELECT task_id, COALESCE(assignee,''), COALESCE(user_id,''), COALESCE(member_role,''), duration_min, COALESCE(sort_order,0)
-		  FROM work_task_members
-		 WHERE task_id IN (`+strings.Join(ph, ",")+`)
-		 ORDER BY CASE member_role WHEN 'owner' THEN 0 ELSE 1 END, sort_order, assignee`, args...)
+		SELECT m.task_id,
+		       COALESCE(NULLIF(TRIM(u.full_name),''), COALESCE(m.assignee,'')),
+		       COALESCE(m.user_id,''), COALESCE(m.member_role,''), m.duration_min, COALESCE(m.sort_order,0)
+		  FROM work_task_members m
+		  LEFT JOIN users u ON u.user_id = m.user_id
+		 WHERE m.task_id IN (`+strings.Join(ph, ",")+`)
+		 ORDER BY CASE m.member_role WHEN 'owner' THEN 0 ELSE 1 END, m.sort_order, m.assignee`, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return out, nil
@@ -61,11 +64,6 @@ func (r *WBRepo) ListMembersByTaskIDs(ids []string) (map[string][]model.WorkTask
 		var dur sql.NullInt64
 		if err := rows.Scan(&m.TaskID, &m.Assignee, &m.UserID, &m.Role, &dur, &m.SortOrder); err != nil {
 			return nil, err
-		}
-		if m.UserID != "" {
-			if n := UserName(r.db, m.UserID); n != "" {
-				m.Assignee = n
-			}
 		}
 		if dur.Valid {
 			m.DurationMin = int(dur.Int64)

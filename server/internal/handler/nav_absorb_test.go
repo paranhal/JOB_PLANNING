@@ -18,6 +18,7 @@ func TestAbsorbTabsPresentInTemplates(t *testing.T) {
 		file string
 		need []string
 	}{
+		// 95-20: 상단 흡수 탭의 일일 업무 등록 링크는 메뉴와 별개로 유지한다.
 		{"web/templates/workboard/register.html", []string{`id="absorb-tabs"`, `/plan/unplanned`}},
 		{"web/templates/plan/unplanned.html", []string{`id="absorb-tabs"`, `/workboard/register`}},
 		{"web/templates/stats/overview.html", []string{`id="absorb-tabs"`, `/work-status`, `/as/stats`}},

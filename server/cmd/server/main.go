@@ -700,6 +700,7 @@ func main() {
 
 	wb := g.Group("/workboard")
 	wb.GET("", h.Workboard.Index)
+	wb.GET("/board", h.Workboard.Board)
 	wb.GET("/kanban", h.Workboard.Kanban)
 	wb.GET("/tasks", h.Workboard.List)
 	wb.GET("/register", h.Workboard.Register)

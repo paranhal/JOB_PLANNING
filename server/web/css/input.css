@@ -154,6 +154,23 @@
   .mnt-panel-bar-done { @apply mnt-panel-bar bg-ink-muted; }
   .mnt-panel-bar-planned { @apply mnt-panel-bar bg-line-strong; }
   .mnt-panel-bar-check { @apply mnt-panel-bar bg-ink; }
+
+  .board-t-as { color: rgb(217 83 43); }
+  .board-b-as { background-color: rgb(253 238 232); color: rgb(217 83 43); }
+  .board-t-mnt { color: rgb(43 111 209); }
+  .board-b-mnt { background-color: rgb(232 241 252); color: rgb(43 111 209); }
+  .board-t-work { color: rgb(132 86 200); }
+  .board-b-work { background-color: rgb(240 234 250); color: rgb(132 86 200); }
+  .board-t-adm { color: rgb(91 107 115); }
+  .board-b-adm { background-color: rgb(237 241 242); color: rgb(91 107 115); }
+  .board-t-sales { color: rgb(19 128 95); }
+  .board-b-sales { background-color: rgb(229 245 239); color: rgb(19 128 95); }
+  .board-st-prog { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-success-soft text-success; }
+  .board-st-plan { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-info-soft text-info; }
+  .board-st-done { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-hover text-ink-muted; }
+  .board-st-late { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-danger-soft text-danger; }
+  .board-day-hour { height: 64px; }
+  .board-day-ev { position: absolute; overflow: hidden; }
 }
 
 @layer utilities {

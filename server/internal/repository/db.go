@@ -14,6 +14,11 @@ import (
 
 // InitDB SQLite DB를 열고 스키마를 초기화한다
 func InitDB(dbPath string) (*sql.DB, error) {
+	return InitDBDriver("sqlite", dbPath)
+}
+
+// InitDBDriver 지정 드라이버로 SQLite를 연다. 쿼리 수 측정 테스트에서 쓴다.
+func InitDBDriver(driver, dbPath string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		return nil, err
 	}
@@ -31,7 +36,7 @@ func InitDB(dbPath string) (*sql.DB, error) {
 		"&_pragma=cache_size(-32000)" + // 32MB. 운영 DB 17MB 를 통째로 메모리에
 		"&_pragma=wal_autocheckpoint(512)"
 
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
 	}

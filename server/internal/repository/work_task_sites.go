@@ -124,6 +124,58 @@ func (r *WBRepo) ListTaskSites(taskID string) ([]WorkTaskSite, error) {
 	return out, rows.Err()
 }
 
+func (r *WBRepo) TaskSiteLinesByTaskIDs(ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	var clean []string
+	seen := map[string]bool{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		clean = append(clean, id)
+	}
+	if r == nil || r.db == nil || len(clean) == 0 {
+		return out, nil
+	}
+	ph := make([]string, len(clean))
+	args := make([]interface{}, len(clean))
+	for i, id := range clean {
+		ph[i] = "?"
+		args[i] = id
+	}
+	rows, err := r.db.Query(`
+		SELECT w.task_id, c.org_name, COALESCE(p.org_name,'')
+		FROM work_task_sites w
+		JOIN customers c ON c.customer_id=w.customer_id
+		LEFT JOIN customers p ON p.customer_id=c.parent_customer_id
+		WHERE w.task_id IN (`+strings.Join(ph, ",")+`)
+		ORDER BY w.task_id, c.org_name`, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return out, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	names := map[string][]string{}
+	for rows.Next() {
+		var taskID, name, parent string
+		if err := rows.Scan(&taskID, &name, &parent); err != nil {
+			return nil, err
+		}
+		names[taskID] = append(names[taskID], customerDisplayName(name, parent))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for id, list := range names {
+		out[id] = model.FormatTaskSiteLine(list)
+	}
+	return out, nil
+}
+
 func (r *WBRepo) TaskSiteLine(taskID string) (string, error) {
 	sites, err := r.ListTaskSites(taskID)
 	if err != nil {

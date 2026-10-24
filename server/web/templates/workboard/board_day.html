@@ -1,0 +1,56 @@
+{{define "title"}}업무 관리 · 일정 캘린더{{end}}
+{{define "content"}}
+<div>
+  {{template "board_cal_head" .}}
+  {{if .DayUntimed}}
+  <div class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 py-2.5 text-ui-sm text-ink-muted">
+    <b class="text-ink">시간 미정</b>
+    {{range .DayUntimed}}
+    <a href="{{.Href}}" class="{{.Type.Text}} rounded border-l-[3px] border-current {{.Type.Bg}} px-2 py-0.5 text-[11px] font-semibold"><span class="text-ink">{{.Task.Title}}</span></a>
+    {{end}}
+  </div>
+  {{end}}
+  <div class="overflow-x-auto border-t border-line">
+    <div class="grid min-w-[620px] grid-cols-[64px_1fr]">
+      <div class="border-r border-line bg-canvas">
+        {{range .DayHours}}
+        <div class="board-day-hour px-3 pt-0.5 text-[11px] font-semibold text-ink-subtle">{{.}}</div>
+        {{end}}
+      </div>
+      <div class="relative" data-day-body>
+        {{range .DayHours}}
+        <div class="board-day-hour border-t border-line"></div>
+        {{end}}
+        {{range .DayTimed}}
+        <a href="{{.Href}}" class="board-day-ev {{.Type.Text}} rounded-[10px] border-l-4 border-current {{.Type.Bg}} px-2.5 py-1.5" data-top="{{.DayPosTop}}" data-h="{{.DayPosHeight}}" data-col="{{.DayCol}}" data-cols="{{.DayCols}}">
+          <div class="text-[11px] font-extrabold">{{.ChipTime}} · {{.Type.Label}}</div>
+          <div class="text-ui font-bold leading-snug text-ink">{{.Task.Title}}</div>
+          <div class="text-[11px] text-ink-muted">{{.CustomerLine}}</div>
+        </a>
+        {{end}}
+        {{if .ShowNowLine}}
+        <div class="absolute left-0 right-0 z-[2] border-t-2 border-danger" data-now="{{.DayNowTop}}"></div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+<script>
+(function(){
+  var body=document.querySelector('[data-day-body]');
+  if(!body)return;
+  body.querySelectorAll('.board-day-ev').forEach(function(el){
+    var cols=Math.max(parseInt(el.getAttribute('data-cols'),10)||1,1);
+    var col=parseInt(el.getAttribute('data-col'),10)||0;
+    var w=100/cols;
+    el.style.top=(parseInt(el.getAttribute('data-top'),10)||0)+'px';
+    el.style.height=(parseInt(el.getAttribute('data-h'),10)||40)+'px';
+    el.style.left='calc('+(col*w)+'% + 6px)';
+    el.style.width='calc('+w+'% - 12px)';
+  });
+  var now=body.querySelector('[data-now]');
+  if(now) now.style.top=(parseInt(now.getAttribute('data-now'),10)||0)+'px';
+})();
+</script>
+{{end}}

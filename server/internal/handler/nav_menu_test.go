@@ -148,8 +148,9 @@ func TestNavAutoExpandCurrentMoreAndParent(t *testing.T) {
 		t.Fatal("수행관계는 더 보기 자동 펼침이어야 한다")
 	}
 	work := FilterNav(ctx, NavWorkAll, NavBadges{})
-	if !containsHref(work.CurParents, "work_review") {
-		t.Fatal("전체 업무는 업무 확인 자동 펼침")
+	// 95-20: 오늘/전체 업무는 '예전 화면 보기' 하위로 옮겼다. 활성 시 그 그룹이 펼쳐져야 한다.
+	if !containsHref(work.CurParents, "legacy_views") {
+		t.Fatal("전체 업무는 예전 화면 보기 자동 펼침")
 	}
 	if work.CurGroup != "work" {
 		t.Fatalf("전체 업무 그룹=%s", work.CurGroup)
@@ -208,7 +209,7 @@ func TestNavAssignBadgeOnWorkReview(t *testing.T) {
 			continue
 		}
 		for _, it := range g.Items {
-			if it.ID == "work_review" {
+			if it.ID == "legacy_views" {
 				review = it
 				for _, ch := range it.Children {
 					if ch.ID == "work_today" {
@@ -222,7 +223,7 @@ func TestNavAssignBadgeOnWorkReview(t *testing.T) {
 		}
 	}
 	if review.Badge != 3 || today.Badge != 3 {
-		t.Fatalf("미배정 배지 review=%d today=%d", review.Badge, today.Badge)
+		t.Fatalf("미배정 배지 legacy=%d today=%d", review.Badge, today.Badge)
 	}
 	if appr.Badge != 3 {
 		t.Fatalf("결재 합산 배지=%d", appr.Badge)

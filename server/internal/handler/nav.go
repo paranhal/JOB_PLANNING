@@ -4,6 +4,7 @@ package handler
 const (
 	NavDashboard           = "dashboard"
 	NavWorkRegister        = "work_register"
+	NavWorkBoard           = "work_board"
 	NavPlanUnplanned       = "plan_unplanned"
 	NavMaintenance         = "maintenance"
 	NavMeeting             = "meeting"

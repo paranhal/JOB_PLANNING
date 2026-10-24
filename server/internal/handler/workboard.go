@@ -51,7 +51,7 @@ func NewWorkboardHandler(
 }
 
 func (h *WorkboardHandler) Index(c echo.Context) error {
-	return c.Redirect(http.StatusSeeOther, "/workboard/kanban")
+	return c.Redirect(http.StatusSeeOther, "/workboard/board")
 }
 
 func (h *WorkboardHandler) Kanban(c echo.Context) error {
@@ -1495,6 +1495,22 @@ func waitingActionChecks(today string, repo *repository.WBRepo, seenTask map[str
 	return out
 }
 
+func applyWorkboardSourceStatus(t model.WorkTask, asStatus map[string]string, mntDone map[string]bool) (model.WorkTask, bool) {
+	if t.SourceType == model.WBSourceAS {
+		mapped := model.MapASStatusToWB(asStatus[t.SourceID])
+		if mapped == "" {
+			return t, false
+		}
+		t.Status = mapped
+	} else if t.SourceType == model.WBSourceMaintenance && mntDone[t.SourceID] {
+		t.Status = model.WBTaskComplete
+	}
+	if model.IsAdminGTDTask(t) && t.Status == model.WBTaskCancelled {
+		return t, false
+	}
+	return t, true
+}
+
 func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]interface{}, error) {
 	today := time.Now().Format(dateLayout)
 	tasks, err := h.repo.ListTasksOnDate(today)
@@ -1525,16 +1541,9 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	seenSource := map[string]bool{}
 	seenTask := map[string]bool{}
 	for _, t := range tasks {
-		if t.SourceType == model.WBSourceAS {
-			mapped := model.MapASStatusToWB(asStatus[t.SourceID])
-			if mapped == "" {
-				continue // 취소 등 제외
-			}
-			t.Status = mapped
-		} else if t.SourceType == model.WBSourceMaintenance && mntDone[t.SourceID] {
-			t.Status = model.WBTaskComplete
-		}
-		if model.IsAdminGTDTask(t) && t.Status == model.WBTaskCancelled {
+		ok := false
+		t, ok = applyWorkboardSourceStatus(t, asStatus, mntDone)
+		if !ok {
 			continue
 		}
 		board = append(board, t)

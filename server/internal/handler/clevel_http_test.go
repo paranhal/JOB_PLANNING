@@ -53,6 +53,7 @@ func newCLevelServer(t *testing.T) (*echo.Echo, *model.User, *model.User) {
 	g.GET("/exec/org/:id", h.Exec.OrgSoon, h.Auth.RequireExecView)
 	g.GET("/admin/users", h.Auth.UserList, h.Auth.RequireAdminMW)
 	g.GET("/workboard/register", h.Workboard.Register)
+	g.GET("/workboard/board", h.Workboard.Board)
 	g.GET("/work", h.Work.List)
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
@@ -62,7 +63,7 @@ func newCLevelServer(t *testing.T) (*echo.Echo, *model.User, *model.User) {
 func TestCLevelHiddenGET403(t *testing.T) {
 	e, ceo, _ := newCLevelServer(t)
 	ck := jwtCookieUser(t, ceo)
-	for _, path := range []string{"/admin/users", "/workboard/register", "/work"} {
+	for _, path := range []string{"/admin/users", "/workboard/register", "/workboard/board", "/work"} {
 		rec := doGetWith(t, e, path, ck)
 		if rec.Code != http.StatusForbidden {
 			t.Errorf("%s → %d want 403", path, rec.Code)

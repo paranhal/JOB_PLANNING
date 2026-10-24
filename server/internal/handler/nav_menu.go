@@ -175,11 +175,7 @@ func navDefinition() []navDefGroup {
 			ID: "work", Label: "업무관리", Show: role, Default: true,
 			Items: []navDefItem{
 				{ID: "dashboard", Label: "대시보드", Href: "/", Active: []string{NavDashboard}, Show: role},
-				{ID: "register", Label: "일일 업무 등록", Href: "/workboard/register", Active: []string{NavWorkRegister}, Show: role},
-				{ID: "work_review", Label: "업무 확인", Show: role, Badge: "assign", Children: []navDefItem{
-					{ID: "work_today", Label: "오늘 업무", Href: "/work", Active: []string{NavWork, NavWorkPlan}, Show: role, Badge: "assign"},
-					{ID: "work_all", Label: "전체 업무", Href: "/work/all", Active: []string{NavWorkAll}, Show: role},
-				}},
+				{ID: "work_board", Label: "업무 관리", Href: "/workboard/board", Active: []string{NavWorkBoard}, Show: role},
 				{ID: "work_groups", Label: "업무 그룹", Href: "/work-groups", Active: []string{NavWorkGroups}, Show: role},
 				{ID: "work_meeting", Label: "업무 회의", Show: role, Children: []navDefItem{
 					{ID: "meeting", Label: "일일 업무 회의", Href: "/meeting", Active: []string{NavMeeting}, Show: role},
@@ -189,6 +185,11 @@ func navDefinition() []navDefGroup {
 				{ID: "approval", Label: "결재", Show: role, Badge: "approvals_sum", Children: []navDefItem{
 					{ID: "approvals_inbox", Label: "결재할 문서", Href: "/approvals/inbox", Active: []string{NavApprovalsInbox, NavApprovalsHub}, Show: role, Badge: "approvals"},
 					{ID: "leaves", Label: "휴가 신청", Href: "/leaves", Active: []string{NavLeaves}, Show: role, Badge: "leaves"},
+				}},
+				{ID: "legacy_views", Label: "예전 화면 보기", Show: role, Badge: "assign", Children: []navDefItem{
+					{ID: "register", Label: "일일 업무 등록 (예전)", Href: "/workboard/register", Active: []string{NavWorkRegister}, Show: role},
+					{ID: "work_today", Label: "오늘 업무 (예전)", Href: "/work", Active: []string{NavWork, NavWorkPlan}, Show: role, Badge: "assign"},
+					{ID: "work_all", Label: "전체 업무 (예전)", Href: "/work/all", Active: []string{NavWorkAll}, Show: role},
 				}},
 			},
 		},

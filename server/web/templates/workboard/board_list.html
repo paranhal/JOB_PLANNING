@@ -1,0 +1,64 @@
+{{define "title"}}업무 관리 · 일일 업무{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <section class="card">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <p class="text-ui-sm font-extrabold tracking-wide text-success">업무 관리</p>
+          <h1 class="mt-0.5 text-2xl font-bold text-ink">일일 업무</h1>
+        </div>
+        <p class="mb-1 text-ui text-ink-muted">내게 배정된 업무를 한곳에서 확인하세요.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <form method="get" action="/workboard/board" class="contents">
+          <input type="hidden" name="view" value="list">
+          <input type="hidden" name="date" value="{{.Date}}">
+          <input name="q" value="{{.Q}}" placeholder="업무 검색" class="h-9 w-full rounded-[10px] border border-line bg-hover px-3 text-ui text-ink md:w-56" aria-label="업무 검색">
+        </form>
+        <a href="{{.CalHref}}" class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 text-ui font-semibold text-ink hover:bg-hover">일정 캘린더 보기</a>
+        <span class="rounded-full bg-success-soft px-4 py-2 text-ui font-bold text-success">전체 {{.Count}}건</span>
+        <div class="flex items-center gap-1 text-ui font-semibold text-ink-muted">
+          <a href="/workboard/board?view=list&amp;date={{.PrevDate}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="이전 날">‹</a>
+          <a href="/workboard/board?view=list&amp;date={{.Today}}" class="inline-flex h-6 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm">오늘</a>
+          <a href="/workboard/board?view=list&amp;date={{.NextDate}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="다음 날">›</a>
+          <span class="ml-1">{{.DateLabel}}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card overflow-hidden">
+    <div class="hidden border-b border-line bg-canvas px-6 py-3 text-ui-sm text-ink-muted md:grid md:grid-cols-[2.4fr_1.8fr_1.3fr_1.1fr_.9fr] md:gap-3">
+      <div>업무 정보</div><div>거래처 / 위치</div><div>일정</div><div>담당자</div><div>상태</div>
+    </div>
+    {{range .Items}}
+    <a href="{{.Href}}" class="grid grid-cols-1 gap-1.5 border-t border-line px-4 py-3.5 text-ink hover:bg-hover md:grid-cols-[2.4fr_1.8fr_1.3fr_1.1fr_.9fr] md:items-center md:gap-3 md:px-6">
+      <div class="flex min-w-0 items-center gap-3">
+        <span class="{{.Type.Bg}} grid h-11 w-11 shrink-0 place-items-center rounded-xl text-ui font-extrabold">{{.Type.Letter}}</span>
+        <span class="min-w-0">
+          <span class="{{.Type.Text}} block text-ui-sm font-bold">{{.Type.Label}}</span>
+          <span class="block truncate text-ui-lg font-bold">{{.Task.Title}}</span>
+        </span>
+      </div>
+      <div class="min-w-0">
+        <div class="font-bold">{{.CustomerLine}}</div>
+        {{if .PlaceLine}}<div class="text-ui-sm text-ink-muted">{{.PlaceLine}}</div>{{end}}
+      </div>
+      <div>
+        <div class="font-bold">{{.DateLabel}}</div>
+        {{if .TimeLabel}}<div class="text-ui-sm text-ink-muted">{{.TimeLabel}}</div>{{end}}
+      </div>
+      <div class="flex items-center" title="{{.AssigneeTitle}}">
+        <span class="mr-2 inline-grid h-7 w-7 place-items-center rounded-full bg-success-soft text-ui-sm font-bold text-success">{{.AssigneeInitial}}</span>
+        <span>{{.AssigneeName}}{{.AssigneeExtra}}</span>
+      </div>
+      <div><span class="{{.Status.Class}}">{{.Status.Label}}</span></div>
+    </a>
+    {{else}}
+    <p class="px-6 py-12 text-center text-ink-subtle">선택한 날짜에 배정된 업무가 없습니다.</p>
+    {{end}}
+    <p class="border-t border-line px-6 py-3.5 text-ui-sm text-ink-muted">총 {{.Count}}개의 업무</p>
+  </section>
+</div>
+{{end}}
