@@ -47,7 +47,7 @@ func (h *ContactHandler) List(c echo.Context) error {
 
 // New 담당자 등록 폼
 func (h *ContactHandler) New(c echo.Context) error {
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	jobGrades, _ := h.codeRepo.ActiveByGroup("job_grade")
 	ct := &model.Contact{Status: "active", ContactRole: "primary", IsPrimary: true, Affiliation: "institution"}
 	if cid := c.QueryParam("customer_id"); cid != "" {
@@ -99,7 +99,7 @@ func (h *ContactHandler) Edit(c echo.Context) error {
 	if ct == nil {
 		return echo.ErrNotFound
 	}
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	jobGrades, _ := h.codeRepo.ActiveByGroup("job_grade")
 	return c.Render(http.StatusOK, "contact/form.html", map[string]interface{}{
 		"Title":     "담당자 수정",

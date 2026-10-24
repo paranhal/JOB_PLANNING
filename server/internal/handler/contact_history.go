@@ -74,7 +74,7 @@ func (h *ContactHistoryHandler) List(c echo.Context) error {
 	contactID := c.QueryParam("contact_id")
 	customerID := c.QueryParam("customer_id")
 
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 
 	var contacts []model.Contact
 	var items []model.ContactHistoryListItem

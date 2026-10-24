@@ -79,7 +79,7 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	customers, _ := h.customerRepo.ListAllInOrg(org)
+	customers, _ := h.customerRepo.ListSelectable()
 	products, _ := h.repo.SearchProductNamesInOrg(org)
 	cats, _ := h.repo.ListCauseCategories()
 	var catL1 []model.CauseCategory

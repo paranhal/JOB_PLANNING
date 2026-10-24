@@ -726,7 +726,7 @@ func (h *SalesHandler) Pipeline(c echo.Context) error {
 
 func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit bool, formErr string) error {
 	stages, _ := h.repo.StagesFor(p.DealType)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListParties()
 	users := listAssignableForPicker(h.userRepo, c)
 	sources, _ := h.codeRepo.ListByGroup(model.SalesCodeGroupLeadSource)
 	targets, _ := h.codeRepo.ActiveByGroup("sales_contract_target")

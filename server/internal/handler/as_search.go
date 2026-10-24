@@ -43,7 +43,7 @@ func (h *ASHandler) Search(c echo.Context) error {
 		return err
 	}
 
-	customers, _ := h.customerRepo.ListAllInOrg(currentOrg(c))
+	customers, _ := h.customerRepo.ListSelectable()
 	products, _ := h.repo.SearchProductNamesInOrg(currentOrg(c))
 	causeTypes, _ := h.codeRepo.ActiveByGroup("cause_type")
 	procTypes, _ := h.codeRepo.ActiveByGroup("process_type")

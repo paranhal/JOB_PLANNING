@@ -28,7 +28,7 @@ func (h *RelationHandler) List(c echo.Context) error {
 		return err
 	}
 	totalPages := (total + 19) / 20
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	relTypes, _ := h.codeRepo.ActiveByGroup("relation_type")
 	compTypes, _ := h.codeRepo.ActiveByGroup("company_type")
 
@@ -41,7 +41,7 @@ func (h *RelationHandler) List(c echo.Context) error {
 }
 
 func (h *RelationHandler) New(c echo.Context) error {
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	relTypes, _ := h.codeRepo.ActiveByGroup("relation_type")
 	compTypes, _ := h.codeRepo.ActiveByGroup("company_type")
 	rel := &model.PerformanceRelation{IsActive: true}
@@ -68,7 +68,7 @@ func (h *RelationHandler) Edit(c echo.Context) error {
 	if err != nil || p == nil {
 		return echo.ErrNotFound
 	}
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	relTypes, _ := h.codeRepo.ActiveByGroup("relation_type")
 	compTypes, _ := h.codeRepo.ActiveByGroup("company_type")
 	return c.Render(http.StatusOK, "relation/form.html", map[string]interface{}{

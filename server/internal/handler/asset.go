@@ -49,7 +49,7 @@ func (h *AssetHandler) List(c echo.Context) error {
 	if pageSize > 0 {
 		totalPages = (total + pageSize - 1) / pageSize
 	}
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	projects, _ := h.wbRepo.ListProjects(false)
 	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
 
@@ -105,7 +105,7 @@ func (h *AssetHandler) List(c echo.Context) error {
 }
 
 func (h *AssetHandler) New(c echo.Context) error {
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	productTypes, _ := h.codeRepo.ActiveByGroup("product_type")
 	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
 	installerTypes, _ := h.codeRepo.ActiveByGroup("installer_type")
@@ -226,7 +226,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	if err != nil || a == nil {
 		return echo.ErrNotFound
 	}
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	productTypes, _ := h.codeRepo.ActiveByGroup("product_type")
 	productCategories, _ := h.codeRepo.ActiveByGroup("stats_product_category")
 	installerTypes, _ := h.codeRepo.ActiveByGroup("installer_type")

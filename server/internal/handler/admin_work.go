@@ -42,7 +42,7 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 	h.repo.FillTaskDepth(items)
 	projects, _ := h.repo.ListProjects(true)
 	assignees := listAssignableForPicker(h.userRepo, c)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	flashErr := c.QueryParam("err")
 	kanban := model.FillAdminKanban(model.AdminKanbanColumnDefs(), items)
 	return c.Render(http.StatusOK, "admin_work/list.html", map[string]interface{}{
@@ -92,7 +92,7 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 	h.repo.FillTaskDepth(items)
 	projects, _ := h.repo.ListProjects(true)
 	assignees := listAssignableForPicker(h.userRepo, c)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	return c.Render(http.StatusOK, "admin_work/stats.html", map[string]interface{}{
 		"Title":       "행정관련업무현황",
 		"Active":      NavAdminWorkStats,
@@ -120,7 +120,7 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 	}
 	projects, _ := h.repo.ListProjects(true)
 	assignees := listAssignableForPicker(h.userRepo, c)
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListSelectable()
 	data := map[string]interface{}{
 		"Title":            "행정관련업무 등록",
 		"Active":           NavAdminWork,

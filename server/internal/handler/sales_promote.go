@@ -196,7 +196,7 @@ func (h *SalesHandler) renderPromoteCustomer(c echo.Context, p *model.SalesProje
 }
 
 func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesProject, p *model.WorkProject, rules []model.ProjectScopeRule, errMsg string) error {
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListParties()
 	parents, _, _ := h.customerRepo.ListCategories()
 	contractTypes, _ := h.codeRepo.ActiveByGroup("project_contract_type")
 	billingTypes, _ := h.codeRepo.ActiveByGroup("project_billing_type")

@@ -82,7 +82,7 @@ func (h *SpaceHandler) List(c echo.Context) error {
 			totalPages = 1
 		}
 	}
-	customers, _, _ := h.customerRepo.List(orgID, "", "", "", "", "", 1, 2000, false, model.PartyKindCustomer, false)
+	customers, _ := h.customerRepo.ListSelectable()
 
 	nextDir := func(col string) string {
 		if sort == col && dir == "asc" {
@@ -157,7 +157,7 @@ func (h *SpaceHandler) Edit(c echo.Context) error {
 	customerID := c.QueryParam("customer_id")
 	buildingID := c.QueryParam("building_id")
 	floorID := c.QueryParam("floor_id")
-	customers, _, _ := h.customerRepo.List(orgID, "", "", "", "", "", 1, 2000, false, model.PartyKindCustomer, false)
+	customers, _ := h.customerRepo.ListSelectable()
 
 	var buildings []model.CustomerBuilding
 	var floors []model.CustomerFloor

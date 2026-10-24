@@ -585,7 +585,7 @@ func (h *ProjectHandler) Delete(c echo.Context) error {
 }
 
 func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules []model.ProjectScopeRule, isEdit bool, errs ...string) error {
-	customers, _ := h.customerRepo.ListAll()
+	customers, _ := h.customerRepo.ListParties()
 	parents, _, _ := h.customerRepo.ListCategories()
 	contractTypes, _ := h.codeRepo.ActiveByGroup("project_contract_type")
 	billingTypes, _ := h.codeRepo.ActiveByGroup("project_billing_type")
