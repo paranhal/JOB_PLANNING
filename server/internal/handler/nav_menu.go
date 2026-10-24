@@ -98,6 +98,9 @@ func (c MenuCtx) visStatsGroup() bool {
 func (c MenuCtx) visStatsCore() bool {
 	return c.roleKnown() || c.isObserver() || c.has(model.PermStatsView, model.PermStats)
 }
+func (c MenuCtx) visCompanyWeekly() bool {
+	return c.visStatsCore()
+}
 func (c MenuCtx) visMasterView() bool {
 	return c.isAdmin() || c.isObserver() || c.isOffice() || c.isTech() || c.isSales() || c.isTester() ||
 		c.has(model.PermMasterView, model.PermMasterEdit, model.PermMasterWrite)
@@ -190,6 +193,7 @@ func navDefinition() []navDefGroup {
 					{ID: "register", Label: "일일 업무 등록 (예전)", Href: "/workboard/register", Active: []string{NavWorkRegister}, Show: role},
 					{ID: "work_today", Label: "오늘 업무 (예전)", Href: "/work", Active: []string{NavWork, NavWorkPlan}, Show: role, Badge: "assign"},
 					{ID: "work_all", Label: "전체 업무 (예전)", Href: "/work/all", Active: []string{NavWorkAll}, Show: role},
+					{ID: "reports_legacy", Label: "보고서 (예전)", Href: "/stats/reports", Active: []string{NavStatsReports, NavStatsDetail}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
 				}},
 			},
 		},
@@ -241,8 +245,7 @@ func navDefinition() []navDefGroup {
 			Items: []navDefItem{
 				{ID: "stats", Label: "통계", Href: "/stats", Active: []string{NavStats}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
 				{ID: "milestones", Label: "마일스톤", Href: "/stats/milestones", Active: []string{NavStatsMilestones}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
-				{ID: "reports", Label: "보고서", Href: "/stats/reports", Active: []string{NavStatsReports, NavStatsDetail}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
-				{ID: "weekly", Label: "주간업무보고", Href: "/stats/company-weekly", Active: []string{NavStatsWeekly}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
+				{ID: "reports", Label: "보고서", Href: "/stats/company-weekly", Active: []string{NavStatsWeekly}, Show: func(c MenuCtx) bool { return c.visCompanyWeekly() }},
 			},
 		},
 		{
@@ -316,6 +319,8 @@ func viewItem(it navDefItem, active string, b NavBadges) NavItemView {
 }
 
 func FilterNav(ctx MenuCtx, active string, badges NavBadges) NavFilterResult {
+	ctx.Role = model.NormalizeRole(ctx.Role)
+	ctx.LoginRole = model.NormalizeRole(ctx.LoginRole)
 	var out NavFilterResult
 	for _, g := range navDefsFor(ctx) {
 		if g.Show != nil && !g.Show(ctx) {

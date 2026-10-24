@@ -46,7 +46,7 @@ func oldSidebarCatalog() []oldNavLink {
 		{Href: "/as/stats", Channel: "tab", Via: "/stats"},
 		{Href: "/stats", Channel: "sidebar"},
 		{Href: "/stats/milestones", Channel: "sidebar"},
-		{Href: "/stats/reports", Channel: "sidebar"},
+		{Href: "/stats/reports", Channel: "sidebar", Via: "legacy_views"},
 		{Href: "/customers", Channel: "sidebar"},
 		{Href: "/spaces", Channel: "sidebar"},
 		{Href: "/contacts", Channel: "sidebar"},

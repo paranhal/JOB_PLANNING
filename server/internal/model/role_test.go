@@ -12,6 +12,7 @@ func TestNormalizeRoleKnownAliases(t *testing.T) {
 		{RoleAdmin, RoleOrgAdmin},
 		{"관리자", RoleOrgAdmin},
 		{RoleOrgAdmin, RoleOrgAdmin},
+		{"조직관리자", RoleOrgAdmin},
 		{RoleVisionAdmin, RoleVisionAdmin},
 		{"비젼관리자", RoleVisionAdmin},
 		{RoleTech, RoleTech},
@@ -43,7 +44,7 @@ func TestNormalizeRoleKnownAliases(t *testing.T) {
 		{" admin ", RoleOrgAdmin},
 	}
 	known := map[string]bool{
-		RoleAdmin: true, "관리자": true, RoleOrgAdmin: true, RoleVisionAdmin: true, "비젼관리자": true,
+		RoleAdmin: true, "관리자": true, "조직관리자": true, RoleOrgAdmin: true, RoleVisionAdmin: true, "비젼관리자": true,
 		RoleCLevel: true, "C-Level": true, "c-level": true, "경영진": true, "대표": true, "임원": true,
 		RoleTech: true, "기술": true, "기술담당": true, RoleSales: true, "영업": true, "영업담당": true,
 		RoleOffice: true, "행정": true, "receipt": true, "접수": true, "접수담당": true, "user": true,

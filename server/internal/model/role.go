@@ -145,7 +145,7 @@ func NormalizeRole(role string) string {
 	switch strings.TrimSpace(role) {
 	case RoleVisionAdmin, "비젼관리자", "비전관리자":
 		return RoleVisionAdmin
-	case RoleOrgAdmin, RoleAdmin, "관리자":
+	case RoleOrgAdmin, RoleAdmin, "관리자", "조직관리자":
 		return RoleOrgAdmin
 	case RoleCLevel, "C-Level", "c-level", "경영진", "대표", "임원":
 		return RoleCLevel

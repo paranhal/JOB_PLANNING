@@ -19,7 +19,7 @@ func (h *StatsHandler) ListCompanyWeeklyRows(c echo.Context) error {
 	if org == repository.OrgAll {
 		rows, _ := h.repo.ListWeeklyReportRowsOrg(repository.OrgAll, false)
 		return c.Render(http.StatusOK, "stats/company_weekly_rows.html", map[string]interface{}{
-			"Title": "주간보고 행", "Active": NavStatsReports,
+			"Title": "주간보고 행", "Active": NavStatsWeekly,
 			"Rows": rows, "CanWrite": false, "OrgAll": true,
 			"Hint": "조직을 선택해야 행을 등록·수정할 수 있습니다. 95-2 사업 업로드 전에는 활동 일반 행만 등록하세요.",
 		})
@@ -35,7 +35,7 @@ func (h *StatsHandler) ListCompanyWeeklyRows(c echo.Context) error {
 	projects, _ := h.repo.ListWeeklyRowProjects(orgID)
 	missing, _ := h.repo.ListUnmappedWeeklyProjects(orgID, 8, time.Now())
 	return c.Render(http.StatusOK, "stats/company_weekly_rows.html", map[string]interface{}{
-		"Title": "주간보고 행", "Active": NavStatsReports,
+		"Title": "주간보고 행", "Active": NavStatsWeekly,
 		"Rows": rows, "Projects": projects, "CanWrite": canWriteCompanyWeekly(c),
 		"OrgName": currentOrgName(c), "ViewOrgID": orgID,
 		"MissingProjects": missing, "FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),

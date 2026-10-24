@@ -47,14 +47,14 @@ func TestNavRoleVisibilityTable(t *testing.T) {
 		{
 			name: "비전",
 			ctx:  visionMenuCtx(),
-			want: []string{"/exec", "/", "/work", "/work-groups", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/admin/users", "/admin/system", "/admin/test-stats"},
+			want: []string{"/exec", "/", "/work", "/work-groups", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/stats/company-weekly", "/admin/users", "/admin/system", "/admin/test-stats"},
 			hide: []string{"/account", "/admin-work", "/plan/unplanned", "/work-status"},
 		},
 		{
 			name: "조직관리자",
 			ctx: MenuCtx{Role: model.RoleOrgAdmin, LoginRole: model.RoleOrgAdmin, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleOrgAdmin)},
-			want: []string{"/", "/work", "/work-groups", "/as", "/meeting/weekly", "/meeting/weekly/me", "/admin/users", "/admin/holidays"},
+			want: []string{"/", "/work", "/work-groups", "/as", "/meeting/weekly", "/meeting/weekly/me", "/admin/users", "/admin/holidays", "/stats", "/stats/company-weekly", "/stats/reports"},
 			hide: []string{"/admin/system", "/admin/data", "/admin/permissions"},
 		},
 		{
@@ -101,9 +101,96 @@ func TestNavRoleVisibilityTable(t *testing.T) {
 	}
 }
 
+func TestNavCompanyWeeklyVisibleByRole(t *testing.T) {
+	weekly := "/stats/company-weekly"
+	type row struct {
+		name string
+		ctx  MenuCtx
+		want bool
+	}
+	rows := []row{
+		{
+			name: "SI조직관리자",
+			ctx: MenuCtx{Role: model.RoleOrgAdmin, LoginRole: model.RoleOrgAdmin,
+				Perms: model.DefaultPermissions(model.RoleOrgAdmin)},
+			want: true,
+		},
+		{
+			name: "SI조직관리자 권한목록없음",
+			ctx:  MenuCtx{Role: model.RoleOrgAdmin, LoginRole: model.RoleOrgAdmin},
+			want: true,
+		},
+		{
+			name: "한글 조직관리자",
+			ctx:  MenuCtx{Role: "조직관리자", LoginRole: "조직관리자"},
+			want: true,
+		},
+		{name: "비전", ctx: visionMenuCtx(), want: true},
+		{name: "C-Level", ctx: cLevelMenuCtx(sampleExecOrgs()), want: true},
+		{
+			name: "기술",
+			ctx: MenuCtx{Role: model.RoleTech, LoginRole: model.RoleTech,
+				Perms: model.DefaultPermissions(model.RoleTech)},
+			want: true,
+		},
+		{
+			name: "영업",
+			ctx: MenuCtx{Role: model.RoleSales, LoginRole: model.RoleSales,
+				Perms: model.DefaultPermissions(model.RoleSales)},
+			want: true,
+		},
+	}
+	for _, r := range rows {
+		got := collectNavHrefs(FilterNav(r.ctx, NavDashboard, NavBadges{}).Groups)
+		has := containsHref(got, weekly)
+		if has != r.want {
+			t.Errorf("%s: /stats/company-weekly 표시=%v want %v hrefs=%v", r.name, has, r.want, got)
+		}
+		if r.want && !containsHref(got, "/stats/reports") {
+			t.Errorf("%s: 보고서 (예전) 메뉴가 없다", r.name)
+		}
+		res := FilterNav(r.ctx, NavDashboard, NavBadges{})
+		if r.want && !navHasLabel(res.Groups, "보고서") {
+			t.Errorf("%s: 라벨 보고서 없음", r.name)
+		}
+		if r.want && !navHasLabel(res.Groups, "보고서 (예전)") {
+			t.Errorf("%s: 라벨 보고서 (예전) 없음", r.name)
+		}
+		if navHasLabel(res.Groups, "주간업무보고") {
+			t.Errorf("%s: 별도 주간업무보고 항목이 남아 있다", r.name)
+		}
+	}
+	partner := FilterNav(MenuCtx{Role: model.RolePartner, LoginRole: model.RolePartner}, NavDashboard, NavBadges{})
+	ph := collectNavHrefs(partner.Groups)
+	if containsHref(ph, "/stats/company-weekly") || containsHref(ph, "/stats/reports") {
+		t.Fatalf("협력사에 보고서 메뉴가 있다 %v", ph)
+	}
+}
+
 func containsHref(list []string, h string) bool {
 	for _, x := range list {
 		if x == h {
+			return true
+		}
+	}
+	return false
+}
+
+func navHasLabel(groups []NavGroupView, label string) bool {
+	var walk func([]NavItemView) bool
+	walk = func(items []NavItemView) bool {
+		for _, it := range items {
+			if it.Label == label {
+				return true
+			}
+			if walk(it.Children) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, g := range groups {
+		if walk(g.Items) || walk(g.More) {
 			return true
 		}
 	}
@@ -151,6 +238,10 @@ func TestNavAutoExpandCurrentMoreAndParent(t *testing.T) {
 	// 95-20: 오늘/전체 업무는 '예전 화면 보기' 하위로 옮겼다. 활성 시 그 그룹이 펼쳐져야 한다.
 	if !containsHref(work.CurParents, "legacy_views") {
 		t.Fatal("전체 업무는 예전 화면 보기 자동 펼침")
+	}
+	rep := FilterNav(ctx, NavStatsReports, NavBadges{})
+	if !containsHref(rep.CurParents, "legacy_views") {
+		t.Fatal("보고서 (예전) 은 예전 화면 보기 자동 펼침")
 	}
 	if work.CurGroup != "work" {
 		t.Fatalf("전체 업무 그룹=%s", work.CurGroup)
