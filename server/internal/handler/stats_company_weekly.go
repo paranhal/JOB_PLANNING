@@ -99,8 +99,13 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 		sheetName = draft.Period.SheetNameDefault
 	}
 	draft.Rows = applyCompanyWeeklyFormEdits(draft.Rows, c.FormValue)
+	savedDoc := repository.ParseCompanyWeeklyDoc("")
+	if saved, err := h.repo.GetCompanyWeeklyReport(orgID, draft.Period.Anchor); err == nil {
+		savedDoc = repository.ParseCompanyWeeklyDoc(saved.ContentJSON)
+	}
+	savedDoc.Rows = repository.ParseCompanyWeeklyContent(repository.EncodeCompanyWeeklyContent(draft.Rows))
 	if err := h.repo.UpsertCompanyWeeklyReport(orgID, draft.Period.Anchor, sheetName,
-		repository.EncodeCompanyWeeklyContent(draft.Rows), ctxString(c, "user_name"), repository.CompanyWeeklyUpsertSave); err != nil {
+		repository.EncodeCompanyWeeklyDoc(savedDoc), ctxString(c, "user_name"), repository.CompanyWeeklyUpsertSave); err != nil {
 		return err
 	}
 	if saved, err := h.repo.GetCompanyWeeklyReport(orgID, draft.Period.Anchor); err == nil {
