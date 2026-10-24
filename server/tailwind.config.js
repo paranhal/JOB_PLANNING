@@ -4,6 +4,7 @@ const c = (n) => `rgb(var(--c-${n}) / <alpha-value>)`;
 module.exports = {
   content: [
     "./web/templates/**/*.html",
+    "./web/static/js/**/*.js",
     "./internal/**/*.go",
   ],
   safelist: [

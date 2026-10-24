@@ -113,6 +113,7 @@ function boardNewWork() {
       this.$nextTick(() => this.focusKind());
     },
     closeNewWork() {
+      if (window.__asLookupMissingOpen) return;
       this.newWorkOpen = false;
       this.newWorkStep = 1;
       this.dailyKind = '';
@@ -162,7 +163,7 @@ function boardNewWork() {
           if (!slot) return;
           slot.innerHTML = html;
           if (window.Alpine && Alpine.initTree) Alpine.initTree(slot);
-          if (window.bindASRegisterLookup) bindASRegisterLookup();
+          if (window.bindASRegisterLookup) bindASRegisterLookup({ missingDialog: true });
           slot.querySelectorAll('button').forEach(function (b) {
             var t = (b.textContent || '');
             if (t.indexOf('유형 선택') >= 0 || t.indexOf('종류 선택') >= 0) {
