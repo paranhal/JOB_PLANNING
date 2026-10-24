@@ -2,8 +2,12 @@
 {{define "content"}}
 <div class="space-y-5">
   <div>
-    <h2 class="text-xl font-bold text-gray-800">보고서</h2>
+    <h2 class="text-xl font-bold text-gray-800">보고서 (예전)</h2>
     <p class="text-sm text-gray-500 mt-1">정기 산출물을 한곳에서 내려받습니다. 과거 이관 데이터는 제외합니다.</p>
+    <div class="flash-warning rounded-card mt-3 p-3 flex flex-wrap items-center justify-between gap-2">
+      <p class="text-ui-sm text-ink">예전 보고서 화면입니다. 새 주간 업무 보고서는 「통계·보고서 › 보고서」에 있습니다.</p>
+      <a href="/stats/company-weekly" class="btn-primary btn-sm">새 주간 업무 보고서</a>
+    </div>
     {{if .MetricsBaseDate}}
     <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
     {{end}}
@@ -25,7 +29,6 @@
       <p class="text-xs text-ink-muted mt-1">팀별로 따로 작성합니다. {{if .OrgName}}현재 {{.OrgName}}.{{end}}
         {{if .CompanyReportStatus}}상태 {{if eq .CompanyReportStatus "confirmed"}}확정본{{else}}작성 중{{end}}.{{end}}</p>
     </div>
-    <a href="/stats/company-weekly" class="btn-primary inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold">새 주간 업무 보고서 화면으로 이동</a>
     <p><a href="/stats/company-weekly/rows" class="text-sm text-ink underline">행 관리</a></p>
     <details class="rounded-lg border border-line" {{if or .FlashOK .FlashErr .CompanyWeekly.Rows}}open{{end}}>
       <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-ink">예전 방식으로 만들기</summary>
@@ -127,7 +130,7 @@
     </details>
   </div>
 
-  <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+  <div id="outputs" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
     <div>
       <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">팀 내부 산출물</p>
       <h3 class="text-base font-bold text-gray-800 mt-1">기본 출력물</h3>

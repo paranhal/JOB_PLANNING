@@ -1,6 +1,12 @@
 {{define "title"}}주간 업무 보고서 · {{appName}}{{end}}
 {{define "content"}}
 <div class="max-w-6xl mx-auto">
+  <div x-data="{ show: localStorage.getItem('jp_weekly_nav_notice') !== '1' }" x-show="show" x-cloak
+       class="flash-warning rounded-card mb-3 p-3 flex flex-wrap items-start justify-between gap-2">
+    <p class="text-ui-sm text-ink">보고서가 새 주간 업무 보고서 화면으로 바뀌었습니다. 예전 화면은 「예전 화면 보기 › 보고서 (예전)」에 있습니다.</p>
+    <button type="button" class="btn-secondary btn-sm"
+            @click="localStorage.setItem('jp_weekly_nav_notice','1'); show=false">확인</button>
+  </div>
   <div class="text-ui-sm font-extrabold text-success">{{.View.WeekInfo.Year}}년 {{.View.WeekInfo.Month}}월 {{.View.WeekInfo.WeekN}}주차</div>
   <div class="flex flex-wrap justify-between items-end gap-4">
     <div>
@@ -8,6 +14,10 @@
       <div class="text-ui text-ink-muted">사업팀별 추진 실적과 차주 계획을 보고합니다.</div>
     </div>
     <div class="flex flex-wrap gap-2 items-center">
+      <a class="text-ui-xs text-ink-muted underline" href="/stats/reports#outputs">다른 출력물</a>
+      <a class="text-ui-xs text-ink-muted underline" href="/stats/reports">예전 화면으로</a>
+      {{$un := 0}}{{if .View.Draft}}{{$un = len .View.Draft.Unassigned}}{{end}}
+      {{if gt $un 0}}<a class="text-ui-xs rounded-full px-2 py-1 bg-hover text-ink" href="#weekly-unassigned">보고서에 포함되지 않은 활동 {{$un}}건</a>{{end}}
       <span class="h-11 px-4 inline-flex items-center gap-2 rounded-card border border-line bg-surface text-ui-sm text-ink-muted"><b class="text-ink">{{.View.VisibleTeams}}개 사업팀</b> · {{.View.VisibleCards}}개 업무</span>
       {{if not .View.NeedOrg}}
       <details class="relative">
@@ -127,6 +137,6 @@
   {{if not .View.NeedOrg}}
   {{template "weekly_unassigned" dict "Draft" .View.Draft "CanWrite" .View.CanEdit "Week" .Week "OrgID" .View.OrgID "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "NeedReagg" .NeedReagg "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" (printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID)}}
   {{end}}
-  <p class="text-ui-xs text-ink-muted mt-8"><a class="underline" href="/stats/reports">예전 방식으로 만들기</a> · <a class="underline" href="/stats/company-weekly/rows">행 관리</a></p>
+  <p class="text-ui-xs text-ink-muted mt-8"><a class="underline" href="/stats/company-weekly/rows">행 관리</a></p>
 </div>
 {{end}}

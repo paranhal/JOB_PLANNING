@@ -1,7 +1,7 @@
 {{define "weekly_unassigned"}}
 {{$n := 0}}{{if .Draft}}{{$n = len .Draft.Unassigned}}{{end}}
 {{if or $n .FlashOK .FlashErr .NeedRow}}
-<section class="card p-4 mt-4 border-line" data-weekly-unassigned>
+<section id="weekly-unassigned" class="card p-4 mt-4 border-line" data-weekly-unassigned>
   {{if .FlashOK}}<p class="flash-success rounded-card mb-3">{{.FlashOK}}</p>{{end}}
   {{if .FlashErr}}<p class="flash-warning rounded-card mb-3">{{.FlashErr}}</p>{{end}}
   {{if .NeedReagg}}<p class="flash-warning rounded-card mb-3">확정된 주차입니다. 행은 추가됐으니 「다시 집계」가 필요합니다. 확정 상태는 바꾸지 않았습니다.</p>{{end}}
