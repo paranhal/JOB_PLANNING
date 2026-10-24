@@ -42,18 +42,7 @@
       </ul>
     </details>
     {{end}}
-    {{if .CompanyWeekly.Unassigned}}
-    <details class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-      <summary class="text-sm text-amber-900 cursor-pointer font-medium">미배정 활동 {{len .CompanyWeekly.Unassigned}}건 (사업 연결 안 됨)</summary>
-      <ul class="mt-2 text-sm text-amber-950 space-y-1">
-        {{range .CompanyWeekly.Unassigned}}
-        <li><span class="text-xs text-amber-700">{{.KindLabel}} · {{.BucketLabel}}</span>
-          {{if .Href}}<a href="{{.Href}}" class="text-blue-700 hover:underline">{{.Title}}</a>{{else}}{{.Title}}{{end}}
-        </li>
-        {{end}}
-      </ul>
-    </details>
-    {{end}}
+    {{template "weekly_unassigned" dict "Draft" .CompanyWeekly "CanWrite" .CanWriteCompanyWeekly "Week" .CompanyDate "OrgID" .ViewOrgID "Projects" .WeeklyProjects "NeedReagg" false "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" ""}}
     {{range .CompanyWeekly.Rows}}
       {{if .MissingProject}}
       <p class="text-sm text-amber-800">⚠ {{.NoLabel}}행은 대응 사업이 없어 비어 있습니다</p>

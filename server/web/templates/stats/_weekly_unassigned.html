@@ -1,0 +1,124 @@
+{{define "weekly_unassigned"}}
+{{$n := 0}}{{if .Draft}}{{$n = len .Draft.Unassigned}}{{end}}
+{{if or $n .FlashOK .FlashErr .NeedRow}}
+<section class="card p-4 mt-4 border-line" data-weekly-unassigned>
+  {{if .FlashOK}}<p class="flash-success rounded-card mb-3">{{.FlashOK}}</p>{{end}}
+  {{if .FlashErr}}<p class="flash-warning rounded-card mb-3">{{.FlashErr}}</p>{{end}}
+  {{if .NeedReagg}}<p class="flash-warning rounded-card mb-3">확정된 주차입니다. 행은 추가됐으니 「다시 집계」가 필요합니다. 확정 상태는 바꾸지 않았습니다.</p>{{end}}
+  {{if and .NeedRow .CanWrite}}
+  <form method="post" action="/stats/company-weekly/rows/from-projects" class="flash-warning rounded-card mb-3 p-3">
+    <input type="hidden" name="project_id" value="{{.NeedRow}}">
+    <input type="hidden" name="week" value="{{.Week}}">
+    <input type="hidden" name="org" value="{{.OrgID}}">
+    {{if .Next}}<input type="hidden" name="next" value="{{.Next}}">{{end}}
+    <p class="text-ui-sm text-ink mb-2">연결한 사업이 보고서 행에 없습니다.</p>
+    <button class="btn-primary btn-sm" type="submit">보고서 행으로 추가</button>
+  </form>
+  {{end}}
+  {{if gt $n 0}}
+  <details class="rounded-card border border-line bg-canvas px-4 py-3" open>
+    <summary class="text-ui font-semibold text-ink cursor-pointer">보고서에 포함되지 않은 활동 {{$n}}건</summary>
+    {{if .Draft.UnassignedNoRow}}
+    <div class="mt-3">
+      <h4 class="text-ui-sm font-extrabold text-ink mb-2">보고서 행이 없는 사업 {{len .Draft.UnassignedNoRow}}개 · 업무 {{.Draft.UnassignedNoRowTaskN}}건</h4>
+      {{if .CanWrite}}
+      <form method="post" action="/stats/company-weekly/rows/from-projects" class="space-y-2">
+        <input type="hidden" name="week" value="{{.Week}}">
+        <input type="hidden" name="org" value="{{.OrgID}}">
+        {{if .Next}}<input type="hidden" name="next" value="{{.Next}}">{{end}}
+        {{range .Draft.UnassignedNoRow}}
+        <div class="rounded-card border border-line p-3">
+          <label class="inline-flex items-center gap-2 text-ui text-ink font-semibold">
+            <input type="checkbox" name="project_id" value="{{.ProjectID}}" checked class="rounded">
+            {{.ProjectName}} <span class="text-ui-xs text-ink-muted font-normal">{{.Count}}건 · {{.KindSummary}}</span>
+          </label>
+          <button class="btn-primary btn-sm mt-2" type="submit" name="project_id" value="{{.ProjectID}}">보고서 행으로 추가</button>
+          <details class="mt-2">
+            <summary class="text-ui-xs text-ink-muted cursor-pointer">업무 목록</summary>
+            <ul class="mt-1 text-ui-sm text-ink space-y-1">
+              {{range .Items}}
+              <li><span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+                {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+                {{if .Date}}<span class="text-ui-xs text-ink-subtle">{{.Date}}</span>{{end}}
+              </li>
+              {{end}}
+            </ul>
+          </details>
+        </div>
+        {{end}}
+        <label class="inline-flex items-center gap-2 text-ui-sm text-ink"><input type="checkbox" name="confirm_foreign" value="1" class="rounded"> 타 조직 사업을 이 조직 행으로 추가합니다</label>
+        <button class="btn-primary btn-sm" type="submit">선택한 사업을 보고서 행으로 추가</button>
+      </form>
+      {{else}}
+      <ul class="mt-2 text-ui-sm text-ink space-y-1">
+        {{range .Draft.UnassignedNoRow}}
+        <li>{{.ProjectName}} · {{.Count}}건 · {{.KindSummary}}</li>
+        {{end}}
+      </ul>
+      {{end}}
+    </div>
+    {{end}}
+    {{if .Draft.UnassignedNoProject}}
+    <div class="mt-4">
+      <h4 class="text-ui-sm font-extrabold text-ink mb-2">사업이 연결되지 않은 업무 {{len .Draft.UnassignedNoProject}}건</h4>
+      {{if .CanWrite}}
+      <form method="post" action="/stats/company-weekly/tasks/project" class="space-y-2" data-weekly-task-link>
+        <input type="hidden" name="week" value="{{.Week}}">
+        <input type="hidden" name="org" value="{{.OrgID}}">
+        {{if .Next}}<input type="hidden" name="next" value="{{.Next}}">{{end}}
+        <ul class="text-ui-sm text-ink space-y-1">
+          {{range .Draft.UnassignedNoProject}}
+          <li class="flex flex-wrap items-center gap-2">
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="task_id" value="{{.ID}}" class="rounded">
+              <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+              {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+            </label>
+            <button class="btn-secondary btn-sm" type="submit" name="task_id" value="{{.ID}}">사업 연결</button>
+          </li>
+          {{end}}
+        </ul>
+        <div class="flex flex-wrap gap-2 items-end">
+          <div>
+            <label class="block text-ui-xs text-ink-muted mb-1">사업 연결</label>
+            <input type="search" class="input mb-1" placeholder="사업 검색" data-project-filter>
+            <select name="project_id" class="select min-w-[16rem]" size="6">
+              {{range $.Projects}}<option value="{{.ProjectID}}" {{if and $.OrgID .OrgID}}{{if ne .OrgID $.OrgID}}data-foreign="1"{{end}}{{end}}>{{if and $.OrgID .OrgID}}{{if ne .OrgID $.OrgID}}타 조직 사업 · {{end}}{{end}}{{.Name}}</option>{{end}}
+            </select>
+          </div>
+          <label class="inline-flex items-center gap-2 text-ui-sm text-ink"><input type="checkbox" name="confirm_foreign" value="1" class="rounded"> 타 조직 사업 확인</label>
+          <button class="btn-primary btn-sm" type="submit">선택한 건을 사업에 연결</button>
+        </div>
+      </form>
+      {{else}}
+      <ul class="mt-2 text-ui-sm text-ink space-y-1">
+        {{range .Draft.UnassignedNoProject}}
+        <li><span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+          {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+        </li>
+        {{end}}
+      </ul>
+      {{end}}
+    </div>
+    {{end}}
+  </details>
+  {{end}}
+</section>
+<script>
+(function(){
+  var root=document.querySelector('[data-weekly-unassigned]');
+  if(!root)return;
+  root.querySelectorAll('[data-project-filter]').forEach(function(inp){
+    inp.addEventListener('input',function(){
+      var q=(inp.value||'').toLowerCase();
+      var sel=inp.parentElement && inp.parentElement.querySelector('select[name="project_id"]');
+      if(!sel)return;
+      Array.prototype.forEach.call(sel.options,function(opt){
+        opt.hidden = q && opt.text.toLowerCase().indexOf(q) < 0;
+      });
+    });
+  });
+})();
+</script>
+{{end}}
+{{end}}

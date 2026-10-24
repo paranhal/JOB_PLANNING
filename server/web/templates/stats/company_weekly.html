@@ -124,6 +124,9 @@
   {{end}}
   {{end}}
   {{end}}
+  {{if not .View.NeedOrg}}
+  {{template "weekly_unassigned" dict "Draft" .View.Draft "CanWrite" .View.CanEdit "Week" .Week "OrgID" .View.OrgID "Projects" .WeeklyProjects "NeedReagg" .NeedReagg "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "Next" (printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID)}}
+  {{end}}
   <p class="text-ui-xs text-ink-muted mt-8"><a class="underline" href="/stats/reports">예전 방식으로 만들기</a> · <a class="underline" href="/stats/company-weekly/rows">행 관리</a></p>
 </div>
 {{end}}
