@@ -1114,6 +1114,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CanReceive":           canReceiveAS(c),
 		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
 		"KeywordField":         model.KWFieldAction,
+		"BackURL":              requestBackOrHome(c),
 	}
 	h.mergeActionPartsData(c, as, data)
 	h.mergeReceiptPhotoData(c, as, data)

@@ -355,7 +355,7 @@ func (h *WorkboardHandler) DeleteRecurrenceParent(c echo.Context) error {
 	}
 	back := strings.TrimSpace(c.FormValue("back"))
 	if back == "" {
-		back = "/workboard/register"
+		back = workboardHomeURL("")
 	}
 	return c.Redirect(http.StatusSeeOther, back+"?ok=rec_deleted")
 }

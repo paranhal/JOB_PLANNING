@@ -29,11 +29,11 @@ func (h *MaintenanceHandler) VisitAction(c echo.Context) error {
 	}
 	back := strings.TrimSpace(c.QueryParam("back"))
 	if back == "" {
-		back = "/workboard/register"
+		back = workboardHomeURL("")
 	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", map[string]interface{}{
 		"Title":            "정기점검 조치 · " + name,
-		"Active":           NavWorkRegister,
+		"Active":           workboardNavActive(back),
 		"Visit":            v,
 		"SiteName":         name,
 		"Assignees":        assignees,
@@ -43,6 +43,7 @@ func (h *MaintenanceHandler) VisitAction(c echo.Context) error {
 		"FlashErr":         c.QueryParam("err"),
 		"Today":            time.Now().Format("2006-01-02"),
 		"BackURL":          back,
+		"BackLabel":        workboardBackLabel(back),
 		"PlanHref":         mntVisitHref(*v),
 		"SignatureDataURL": signatureDataURL(signaturePNGForName(h.userRepo, v.Assignee)),
 		"Embed":            c.QueryParam("embed") == "1",

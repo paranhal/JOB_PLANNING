@@ -293,6 +293,7 @@ func funcMap() template.FuncMap {
 		"assignmentSelected": model.AssignmentSelected,
 		"hasSuffix":          strings.HasSuffix,
 		"urlquery":           url.QueryEscape,
+		"workboardHomeURL":   workboardHomeURL,
 		"weekdayKo":          weekdayKo,
 		"visitPeopleIDs":     visitPeopleIDsCSV,
 		"visitOwnerID":       visitOwnerUserID,

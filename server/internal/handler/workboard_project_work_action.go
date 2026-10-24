@@ -111,6 +111,9 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	if back == "" {
 		back = strings.TrimSpace(c.FormValue("back"))
 	}
+	if back == "" {
+		back = workboardHomeURL("")
+	}
 	pick, _ := h.repo.ListWorkPickProjects(t.OrgID)
 	cats, _ := h.repo.ListWorkTargetCategories(t.OrgID)
 	var siteIDs []string
@@ -134,7 +137,7 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	}
 	ver, _, _, _ := currentBuild()
 	data := map[string]interface{}{
-		"Title": "작업 조치 · " + t.Title, "Active": NavWorkRegister,
+		"Title": "작업 조치 · " + t.Title, "Active": workboardNavActive(back),
 		"Task": t, "Sites": sites, "Members": members, "Processes": procs,
 		"PartRows": parts, "PartsEnabled": enabled, "Attachments": docs,
 		"ActionPhotos":    photos,

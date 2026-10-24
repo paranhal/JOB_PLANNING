@@ -29,7 +29,7 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		dateStr = time.Now().Format(dateLayout)
 	}
 	today := time.Now().Format(dateLayout)
-	redirect := safeWorkboardRedirect(c.QueryParam("redirect"), "/workboard/board")
+	redirect := safeWorkboardRedirect(c.QueryParam("redirect"), workboardHomeURL(""))
 	org := currentOrg(c)
 	wgItems, _ := h.workGroupPicks(c)
 	data := map[string]interface{}{

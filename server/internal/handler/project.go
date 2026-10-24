@@ -95,7 +95,7 @@ func (h *ProjectHandler) List(c echo.Context) error {
 		"WorkSeed":    workMgmtSeed{},
 		"Example":     false,
 		"ReportURL":   "/projects/diary",
-		"RegisterURL": "/workboard/register",
+		"RegisterURL": workboardHomeURL(""),
 		"DocsURL":     "/projects/docs",
 		"RegistryURL": "/projects/registry",
 		"CanWrite":    canWriteProjects(c),

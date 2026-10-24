@@ -2272,15 +2272,11 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	back := strings.TrimSpace(c.QueryParam("back"))
 	if back == "" {
-		back = "/workboard/register"
+		back = workboardHomeURL("")
 	}
 	active := NavWorkRegister
 	if !editMode {
-		if strings.Contains(back, "/admin-work/stats") {
-			active = NavAdminWorkStats
-		} else if strings.Contains(back, "/admin-work") {
-			active = NavAdminWork
-		}
+		active = workboardNavActive(back)
 	}
 	wgShow, wgShowJSON := h.workGroupPicks(c)
 	data := map[string]interface{}{
@@ -2313,6 +2309,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"FlashErrMsg":    gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n")),
 		"Today":          time.Now().Format(dateLayout),
 		"BackURL":        back,
+		"BackLabel":      workboardBackLabel(back),
+		"CalendarURL":    workboardCalendarURL(t.WorkDate, t.DueDate),
 		"Subtasks":       subtasks,
 		"CanAddSubtask":  canWrite && t.SourceType == "" && t.RecurrenceRole != model.RecurrenceRoleOccurrence && h.repo.CanAttachSubtask(t.TaskID) == nil,
 		"PWPartsCount":   pwPartsN,

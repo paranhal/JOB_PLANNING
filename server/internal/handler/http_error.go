@@ -244,8 +244,10 @@ func moduleFallback(c echo.Context) string {
 		path = c.Request().URL.Path
 	}
 	switch {
-	case strings.HasPrefix(path, "/workboard"):
+	case strings.HasPrefix(path, "/workboard/register"):
 		return "/workboard/register"
+	case strings.HasPrefix(path, "/workboard"):
+		return workboardHomeURL("")
 	case strings.HasPrefix(path, "/as"):
 		return "/as"
 	case strings.HasPrefix(path, "/maintenance"):
