@@ -25,6 +25,7 @@
       <p class="text-xs text-ink-muted mt-1">팀별로 따로 작성합니다. {{if .OrgName}}현재 {{.OrgName}}.{{end}}
         {{if .CompanyReportStatus}}상태 {{if eq .CompanyReportStatus "confirmed"}}확정본{{else}}작성 중{{end}}.{{end}}</p>
       <a href="/stats/company-weekly/rows" class="inline-block mt-2 text-sm text-ink underline">행 관리</a>
+      <a href="/stats/company-weekly" class="inline-block mt-2 ml-3 text-sm text-ink underline">주간 업무 보고서 화면</a>
     </div>
     <div x-data="{ show: localStorage.getItem('jp_company_weekly_notice') !== '1' }" x-show="show" x-cloak
          class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex flex-wrap items-start justify-between gap-2">

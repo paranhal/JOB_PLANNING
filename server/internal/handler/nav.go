@@ -29,6 +29,7 @@ const (
 	NavWorkStatus          = "work_status"
 	NavStats               = "stats"
 	NavStatsReports        = "stats_reports"
+	NavStatsWeekly         = "stats_weekly"
 	NavStatsDetail         = "stats_detail"
 	NavStatsMilestones     = "stats_milestones"
 	NavAnalysis            = "analysis"

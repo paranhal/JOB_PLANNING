@@ -1,0 +1,32 @@
+{{define "weekly_card"}}
+<article class="card mb-3 overflow-hidden weekly-card">
+  <div class="flex items-center gap-3 px-5 py-4 border-b border-line">
+    <span class="w-8 h-8 rounded-control bg-hover grid place-items-center text-ui-xs font-extrabold text-ink-muted">{{printf "%02d" .No}}</span>
+    <div class="flex-1 min-w-0"><b class="block text-ink">{{.Title}}</b><small class="text-ink-muted">{{if .Customer}}고객 · {{.Customer}}{{else}}&nbsp;{{end}}</small></div>
+    {{if .KindLabel}}<span class="badge {{if eq .KindLabel "타팀 지원"}}badge-info{{else}}badge-success{{end}}">{{.KindLabel}}</span>{{end}}
+  </div>
+  {{if .Edit}}
+  <input type="hidden" name="touch_{{.RowKey}}" value="1">
+  <div class="grid md:grid-cols-2 weekly-card-cols">
+    <div class="p-5"><h4 class="text-ui-xs text-success font-extrabold mb-2">금주 추진내역</h4><textarea name="done_{{.RowKey}}" rows="4" class="textarea">{{range $i, $l := .Done}}{{if $i}}{{printf "\n"}}{{end}}{{$l.Text}}{{end}}</textarea></div>
+    <div class="p-5 md:border-l border-line"><h4 class="text-ui-xs text-ink-muted font-extrabold mb-2">차주 추진계획</h4><textarea name="plan_{{.RowKey}}" rows="4" class="textarea">{{range $i, $l := .Plan}}{{if $i}}{{printf "\n"}}{{end}}{{$l.Text}}{{end}}</textarea></div>
+  </div>
+  <div class="grid md:grid-cols-2 border-t border-line weekly-card-cols">
+    <div class="p-4 bg-danger-soft"><h4 class="text-ui-xs font-extrabold text-danger mb-1">지원 필요사항</h4><textarea name="need_{{.RowKey}}" rows="2" class="textarea min-h-[4rem]">{{.Need}}</textarea></div>
+    <div class="p-4 bg-info-soft md:border-l border-line"><h4 class="text-ui-xs font-extrabold text-info mb-1">주요 의사결정</h4><textarea name="dec_{{.RowKey}}" rows="2" class="textarea min-h-[4rem]">{{.Decision}}</textarea></div>
+  </div>
+  {{if .HiddenN}}<p class="text-ui-xs text-ink-muted px-5 py-2">숨긴 줄 {{.HiddenN}}개 · {{range .HiddenKeys}}<label class="mr-2"><input type="checkbox" name="restore_{{$.RowKey}}" value="{{.}}"> 복원 {{.}}</label>{{end}}</p>{{end}}
+  {{else}}
+  <div class="grid md:grid-cols-2 weekly-card-cols">
+    <div class="p-5"><h4 class="text-ui-xs text-success font-extrabold mb-2">금주 추진내역</h4>{{if .Done}}<ul class="m-0 p-0 list-none grid gap-1.5 text-ui">{{range .Done}}<li class="flex gap-2"><span class="text-success font-extrabold">✓</span><span>{{.Text}}</span></li>{{end}}</ul>{{else}}<div class="text-ink-subtle text-ui-sm">내용 없음</div>{{end}}</div>
+    <div class="p-5 md:border-l border-line"><h4 class="text-ui-xs text-ink-muted font-extrabold mb-2">차주 추진계획</h4>{{if .Plan}}<ul class="m-0 p-0 list-none grid gap-1.5 text-ui">{{range .Plan}}<li class="flex gap-2"><span class="text-ink-muted font-extrabold">→</span><span>{{.Text}}</span></li>{{end}}</ul>{{else}}<div class="text-ink-subtle text-ui-sm">내용 없음</div>{{end}}</div>
+  </div>
+  {{if or .Need .Decision}}
+  <div class="grid md:grid-cols-2 border-t border-line weekly-card-cols">
+    <div class="p-4 bg-danger-soft"><h4 class="text-ui-xs font-extrabold text-danger mb-1">지원 필요사항</h4>{{if .Need}}<p class="whitespace-pre-wrap text-ui">{{.Need}}</p>{{else}}<div class="text-ink-subtle">—</div>{{end}}</div>
+    <div class="p-4 bg-info-soft md:border-l border-line"><h4 class="text-ui-xs font-extrabold text-info mb-1">주요 의사결정</h4>{{if .Decision}}<p class="whitespace-pre-wrap text-ui">{{.Decision}}</p>{{else}}<div class="text-ink-subtle">—</div>{{end}}</div>
+  </div>
+  {{end}}
+  {{end}}
+</article>
+{{end}}

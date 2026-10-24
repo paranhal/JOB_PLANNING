@@ -64,6 +64,7 @@ func execNavDefinition(orgs []model.Org) []navDefGroup {
 					{ID: "exec_stats", Label: "통계", Href: "/stats", Active: []string{NavStats}, Show: show},
 					{ID: "exec_ms", Label: "마일스톤", Href: "/stats/milestones", Active: []string{NavStatsMilestones}, Show: show},
 					{ID: "exec_reports", Label: "보고서", Href: "/stats/reports", Active: []string{NavStatsReports, NavStatsDetail}, Show: show},
+					{ID: "exec_weekly", Label: "주간업무보고", Href: "/stats/company-weekly", Active: []string{NavStatsWeekly}, Show: show},
 				}},
 			},
 		},

@@ -242,6 +242,7 @@ func navDefinition() []navDefGroup {
 				{ID: "stats", Label: "통계", Href: "/stats", Active: []string{NavStats}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
 				{ID: "milestones", Label: "마일스톤", Href: "/stats/milestones", Active: []string{NavStatsMilestones}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
 				{ID: "reports", Label: "보고서", Href: "/stats/reports", Active: []string{NavStatsReports, NavStatsDetail}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
+				{ID: "weekly", Label: "주간업무보고", Href: "/stats/company-weekly", Active: []string{NavStatsWeekly}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
 			},
 		},
 		{
