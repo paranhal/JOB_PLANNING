@@ -164,28 +164,14 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	placed = ensureTimelineDisplayTimes(placed)
 	h.attachProjectWorkSites(placed)
 
-	role := currentRole(c)
-	roleUnresolved := !model.IsKnownRole(role)
-	mineParam := c.QueryParam("mine")
-	assigneeFilter := normalizeAssigneeFilter(c.QueryParam("assignee"))
+	scope := resolveBoardScope(c)
+	role := scope.Role
+	roleUnresolved := scope.RoleUnresolved
+	mineParam := scope.MineParam
+	assigneeFilter := scope.AssigneeFilter
+	scopeAll := scope.ScopeAll
+	showScopeToggle := scope.ShowToggle
 	projectFilter := strings.TrimSpace(c.QueryParam("project"))
-	scopeAll := true
-	showScopeToggle := false
-	if roleUnresolved {
-		scopeAll = true
-	} else if model.IsAdminGrade(role) || role == model.RoleSupport {
-		scopeAll = assigneeFilter == ""
-	} else if role == model.RoleTech || role == model.RoleSales {
-		showScopeToggle = true
-		if mineParam == "0" {
-			scopeAll = true
-		} else {
-			scopeAll = false
-			if assigneeFilter == "" {
-				assigneeFilter = currentUserDisplayName(c)
-			}
-		}
-	}
 
 	memberMap := map[string][]model.WorkTaskMember{}
 	if ids := taskIDsOf(placed); len(ids) > 0 {
