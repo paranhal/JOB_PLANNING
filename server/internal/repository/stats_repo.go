@@ -9,9 +9,25 @@ import (
 	"customer-support/internal/model"
 )
 
-type StatsRepo struct{ db *sql.DB }
+type statsStore interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+type StatsRepo struct {
+	db *sql.DB
+	st statsStore
+}
 
 func NewStatsRepo(db *sql.DB) *StatsRepo { return &StatsRepo{db: db} }
+
+func (r *StatsRepo) store() statsStore {
+	if r != nil && r.st != nil {
+		return r.st
+	}
+	return r.db
+}
 
 func (r *StatsRepo) DB() *sql.DB {
 	if r == nil {

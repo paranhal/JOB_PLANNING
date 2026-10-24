@@ -150,7 +150,7 @@ func (r *StatsRepo) ListWeeklyReportRowsOrg(orgID string, activeOnly bool) ([]we
 		args = append(args, orgID)
 	}
 	q += ` ORDER BY sort_order, sheet_row, row_key`
-	rows, err := r.db.Query(q, args...)
+	rows, err := r.store().Query(q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil

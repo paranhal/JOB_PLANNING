@@ -207,7 +207,58 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		unassigned = dropUnassignedKinds(unassigned, model.ScopeWorkMaintenance, model.ScopeWorkAS)
 	}
 	out.Unassigned = unassigned
+	out.UnassignedNoRow, out.UnassignedNoProject = SplitCompanyUnassigned(unassigned)
+	for _, g := range out.UnassignedNoRow {
+		out.UnassignedNoRowTaskN += g.Count
+	}
 	return out, nil
+}
+
+func SplitCompanyUnassigned(in []model.CompanyWeeklyUnassigned) (groups []model.CompanyWeeklyUnassignedProject, noProject []model.CompanyWeeklyUnassigned) {
+	order := make([]string, 0)
+	by := map[string]*model.CompanyWeeklyUnassignedProject{}
+	for _, u := range in {
+		if strings.TrimSpace(u.ProjectID) == "" {
+			noProject = append(noProject, u)
+			continue
+		}
+		g, ok := by[u.ProjectID]
+		if !ok {
+			g = &model.CompanyWeeklyUnassignedProject{ProjectID: u.ProjectID, ProjectName: u.ProjectName}
+			by[u.ProjectID] = g
+			order = append(order, u.ProjectID)
+		}
+		g.Items = append(g.Items, u)
+		g.Count++
+	}
+	for _, id := range order {
+		g := by[id]
+		g.KindSummary = unassignedKindSummary(g.Items)
+		groups = append(groups, *g)
+	}
+	return groups, noProject
+}
+
+func unassignedKindSummary(items []model.CompanyWeeklyUnassigned) string {
+	counts := map[string]int{}
+	var labels []string
+	seen := map[string]bool{}
+	for _, it := range items {
+		lab := strings.TrimSpace(it.KindLabel)
+		if lab == "" {
+			lab = it.Kind
+		}
+		counts[lab]++
+		if !seen[lab] {
+			seen[lab] = true
+			labels = append(labels, lab)
+		}
+	}
+	var parts []string
+	for _, lab := range labels {
+		parts = append(parts, fmt.Sprintf("%s %d", lab, counts[lab]))
+	}
+	return strings.Join(parts, " · ")
 }
 
 func mustParseDay(iso string, loc *time.Location) time.Time {
@@ -769,6 +820,11 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		pid := strings.TrimSpace(row.ProjectID)
 		if pid != "" && mapped[pid] {
 			return
+		}
+		if pid == "" {
+			row.Reason = model.UnassignedReasonNoProject
+		} else {
+			row.Reason = model.UnassignedReasonNoRow
 		}
 		out = append(out, row)
 	}

@@ -59,6 +59,11 @@ type IncompleteMntVisit struct {
 	Href      string
 }
 
+const (
+	UnassignedReasonNoRow     = "no_row"
+	UnassignedReasonNoProject = "no_project"
+)
+
 // CompanyWeeklyUnassigned 어느 행에도 안 붙은 활동. §16.6.5 · §16.6.9
 type CompanyWeeklyUnassigned struct {
 	Kind        string // maintenance | as | admin
@@ -71,13 +76,26 @@ type CompanyWeeklyUnassigned struct {
 	Href        string
 	Bucket      string // prev | plan | carry
 	BucketLabel string
+	Reason      string // no_row | no_project
+}
+
+// CompanyWeeklyUnassignedProject 보고서 행이 없는 사업 묶음.
+type CompanyWeeklyUnassignedProject struct {
+	ProjectID   string
+	ProjectName string
+	Count       int
+	KindSummary string
+	Items       []CompanyWeeklyUnassigned
 }
 
 // CompanyWeeklyDraft 전사 주간업무보고 초안 (시트 쓰기 전). §16.6.5~7
 type CompanyWeeklyDraft struct {
-	Period        CompanyWeeklyPeriod
-	Rows          []CompanyWeeklyRow
-	Unassigned    []CompanyWeeklyUnassigned
-	IncompleteMnt []IncompleteMntVisit
-	ReportStatus  string
+	Period              CompanyWeeklyPeriod
+	Rows                []CompanyWeeklyRow
+	Unassigned          []CompanyWeeklyUnassigned
+	UnassignedNoRow        []CompanyWeeklyUnassignedProject
+	UnassignedNoRowTaskN   int
+	UnassignedNoProject    []CompanyWeeklyUnassigned
+	IncompleteMnt          []IncompleteMntVisit
+	ReportStatus        string
 }
