@@ -131,7 +131,7 @@ func (r *StatsRepo) ComputeMilestones(monday time.Time, orgID string) error {
 		}
 	}
 
-	names, err := r.weeklyActiveAssignees(from, toEx)
+	names, err := r.weeklyActiveAssignees(from, toEx, orgID)
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func (r *StatsRepo) ListMilestoneEvidence(week, orgID, domain, metric string) ([
 		return nil, err
 	}
 	from, toEx := WeekRange(mon)
-	events, err := r.ListWeeklyEventRows(from, toEx)
+	events, err := r.ListWeeklyEventRows(from, toEx, orgID)
 	if err != nil {
 		return nil, err
 	}

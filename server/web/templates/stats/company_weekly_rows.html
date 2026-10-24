@@ -15,7 +15,7 @@
   {{end}}
 
   {{if .CanWrite}}
-  <form method="POST" action="/stats/company-weekly/rows" class="rounded-xl border border-line bg-surface p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+  <form method="POST" action="/stats/company-weekly/rows" class="rounded-xl border border-line bg-surface p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" data-weekly-row-form>
     <div><label class="block text-ui-sm text-ink-muted mb-1">부문/실</label><input name="division" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
     <div><label class="block text-ui-sm text-ink-muted mb-1">팀</label><input name="team" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
     <div><label class="block text-ui-sm text-ink-muted mb-1">No</label><input name="no_label" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
@@ -42,7 +42,7 @@
       <label class="block text-ui-sm text-ink-muted mb-1">사업 연결</label>
       <select name="project_id" class="w-full border border-line rounded-lg px-3 py-2 text-ui bg-surface">
         <option value="">없음</option>
-        {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
+        {{range .Projects}}<option value="{{.ProjectID}}" {{if and $.ViewOrgID .OrgID}}{{if ne .OrgID $.ViewOrgID}}data-foreign="1"{{end}}{{end}}>{{if and $.ViewOrgID .OrgID}}{{if ne .OrgID $.ViewOrgID}}타 조직 사업 · {{end}}{{end}}{{.Name}}</option>{{end}}
       </select>
     </div>
     <label class="inline-flex items-center gap-2 text-ui text-ink mt-6"><input type="checkbox" name="highlight" value="1" class="rounded"> 강조</label>
@@ -99,4 +99,20 @@
     </table>
   </div>
 </div>
+<script>
+(function(){
+  var f=document.querySelector('[data-weekly-row-form]');
+  if(!f)return;
+  f.addEventListener('submit',function(ev){
+    var sel=f.querySelector('[name="project_id"]');
+    if(!sel)return;
+    var opt=sel.options[sel.selectedIndex];
+    if(opt && opt.getAttribute('data-foreign')==='1'){
+      if(!confirm('타 조직 사업입니다. 이 조직 보고서에 연결할까요? 집계는 이 조직이 수행한 업무만 들어갑니다.')){
+        ev.preventDefault();
+      }
+    }
+  });
+})();
+</script>
 {{end}}

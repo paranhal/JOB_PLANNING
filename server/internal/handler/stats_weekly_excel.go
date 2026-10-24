@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,14 +25,17 @@ func (h *StatsHandler) ExportWeeklyReport(c echo.Context) error {
 	}
 	now := time.Now()
 	p := parseReportPeriod(c, now)
+	orgID, err := resolveInsertOrg(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, errNeedInsertOrg)
+	}
 	var (
 		rep model.WeeklyReport
-		err error
 	)
 	if p.Period == model.StatsPeriodWeek {
-		rep, err = h.repo.BuildWeeklyReportOrg(p.From, currentOrg(c))
+		rep, err = h.repo.BuildWeeklyReportOrg(p.From, orgID)
 	} else {
-		rep, err = h.repo.BuildWeeklyReportRangeOrg(p.FromStr, p.ToExStr, currentOrg(c))
+		rep, err = h.repo.BuildWeeklyReportRangeOrg(p.FromStr, p.ToExStr, orgID)
 	}
 	if err != nil {
 		return err

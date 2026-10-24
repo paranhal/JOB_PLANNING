@@ -230,7 +230,7 @@ func TestTesterRowsZeroInAllAggregations(t *testing.T) {
 			t.Fatal("테스터 AS가 주간 목록에 있다")
 		}
 	}
-	names, err := repo.weeklyActiveAssignees("2026-08-03", "2026-08-10")
+	names, err := repo.weeklyActiveAssignees("2026-08-03", "2026-08-10", OrgAll)
 	if err != nil {
 		t.Fatal(err)
 	}

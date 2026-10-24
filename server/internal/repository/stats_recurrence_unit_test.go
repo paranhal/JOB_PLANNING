@@ -85,7 +85,7 @@ func TestRecurrenceAggregationUnits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rawEvents, err := stats.ListWeeklyEventRows(week.WeekFrom, week.WeekToEx)
+	rawEvents, err := stats.ListWeeklyEventRows(week.WeekFrom, week.WeekToEx, OrgAll)
 	if err != nil {
 		t.Fatal(err)
 	}

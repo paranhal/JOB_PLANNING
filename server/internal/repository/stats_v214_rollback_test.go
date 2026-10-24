@@ -43,7 +43,7 @@ func TestV214RollbackStatsBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, err := repo.listWeeklyASEvents("2026-08-01", "2026-09-01")
+	events, err := repo.listWeeklyASEvents("2026-08-01", "2026-09-01", OrgAll)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestStatsBuildKindDoesNotChangeMaintenanceKPI(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		events, err := repo.listWeeklyASEvents("2026-08-01", "2026-09-01")
+		events, err := repo.listWeeklyASEvents("2026-08-01", "2026-09-01", OrgAll)
 		if err != nil {
 			t.Fatal(err)
 		}

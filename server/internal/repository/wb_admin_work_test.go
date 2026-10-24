@@ -101,7 +101,7 @@ func TestAdminWorkCustomerOnWeeklyAndList(t *testing.T) {
 		t.Fatalf("현황 %+v", st)
 	}
 
-	weekly, err := NewStatsRepo(db).ListWeeklyEventRows("2026-08-10", "2026-08-17")
+	weekly, err := NewStatsRepo(db).ListWeeklyEventRows("2026-08-10", "2026-08-17", OrgAll)
 	if err != nil {
 		t.Fatal(err)
 	}

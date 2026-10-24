@@ -67,8 +67,12 @@ func (r *StatsRepo) BuildCompanyWeeklyDraft(anchor time.Time) (model.CompanyWeek
 }
 
 func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (model.CompanyWeeklyDraft, error) {
+	orgID, err := reportOrgID(orgID)
+	if err != nil {
+		return model.CompanyWeeklyDraft{}, err
+	}
 	p := CompanyWeeklyPeriod(anchor)
-	mapRows, err := r.ListWeeklyReportRowsOrg(orgIDOrAll(orgID), true)
+	mapRows, err := r.ListWeeklyReportRowsOrg(orgID, true)
 	if err != nil {
 		return model.CompanyWeeklyDraft{}, err
 	}
@@ -330,7 +334,7 @@ func collapseCompanyAdminLines(lines []adminLine) []adminLine {
 }
 
 func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx, orgID string) (int, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
@@ -342,7 +346,7 @@ func (r *StatsRepo) countCompanyMntSitesDone(projectID, from, toEx, orgID string
 }
 
 func (r *StatsRepo) countCompanyMntSitesPlanned(projectID, from, toEx, orgID string) (int, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 	err := r.db.QueryRow(`
@@ -358,7 +362,7 @@ func (r *StatsRepo) listCompanyMntSiteNames(projectID, from, toEx, orgID string,
 	var rows *sql.Rows
 	var err error
 	if planned {
-		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
 		args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 		rows, err = r.db.Query(`
 			SELECT DISTINCT v.customer_id, COALESCE(NULLIF(TRIM(c.org_name),''), v.customer_id)
@@ -368,7 +372,7 @@ func (r *StatsRepo) listCompanyMntSiteNames(projectID, from, toEx, orgID string,
 			  AND TRIM(COALESCE(v.project_id,'')) = ?`+mntSQL+`
 			ORDER BY 2`, args...)
 	} else {
-		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 		args := append([]interface{}{from, toEx, projectID}, mntArgs...)
 		rows, err = r.db.Query(`
 			SELECT DISTINCT v.customer_id, COALESCE(NULLIF(TRIM(c.org_name),''), v.customer_id)
@@ -399,7 +403,7 @@ func (r *StatsRepo) listCompanyMntSiteNames(projectID, from, toEx, orgID string,
 }
 
 func (r *StatsRepo) listIncompleteMntVisits(from, toEx, orgID string) ([]model.IncompleteMntVisit, error) {
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
 	args := append([]interface{}{from, toEx}, mntArgs...)
 	rows, err := r.db.Query(`
 		SELECT v.visit_id, COALESCE(c.org_name,''), v.visit_date,
@@ -430,7 +434,7 @@ func (r *StatsRepo) listIncompleteMntVisits(from, toEx, orgID string) ([]model.I
 }
 
 func (r *StatsRepo) countCompanyASDone(projectID, from, toEx, orgID string) (int, error) {
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 	var n int
 	args := append([]interface{}{from, toEx, projectID}, asArgs...)
 	err := r.db.QueryRow(`
@@ -443,7 +447,7 @@ func (r *StatsRepo) countCompanyASDone(projectID, from, toEx, orgID string) (int
 }
 
 func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([]adminLine, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
@@ -469,7 +473,7 @@ func companyAdminPlanDateSQL() string {
 
 func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([]adminLine, error) {
 	d := companyAdminPlanDateSQL()
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
@@ -522,11 +526,11 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		out = append(out, row)
 	}
 
-	mntDoneSQL, mntDoneArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
-	asDoneSQL, asDoneArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
-	adminDoneSQL, adminDoneArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
-	mntPlanSQL, mntPlanArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
-	adminPlanSQL, adminPlanArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+	mntDoneSQL, mntDoneArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	asDoneSQL, asDoneArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	adminDoneSQL, adminDoneArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	mntPlanSQL, mntPlanArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
+	adminPlanSQL, adminPlanArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
 
 	vrows, err := r.db.Query(`
 		SELECT v.visit_id, COALESCE(c.org_name,''), `+mntDoneDateSQL+`, COALESCE(v.project_id,''), COALESCE(p.name,''), COALESCE(v.plan_id,'')

@@ -115,6 +115,30 @@ func orgIDOrAll(orgID string) string {
 	return orgID
 }
 
+// reportOrgID 주간 보고서 경로. 빈 값은 전체로 바꾸지 않는다(95-24). OrgAll 은 호출 측에서 막는다.
+func reportOrgID(orgID string) (string, error) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return "", ErrEmptyOrgID
+	}
+	return orgID, nil
+}
+
+// mntVisitOrgSQL 점검 방문의 수행 조직. 방문 org_id 가 비면 계획 org_id.
+func mntVisitOrgSQL(orgID string) (string, []interface{}) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return ` AND 1=0`, nil
+	}
+	if orgID == OrgAll {
+		return "", nil
+	}
+	return ` AND COALESCE(
+		NULLIF(TRIM(v.org_id),''),
+		(SELECT NULLIF(TRIM(mp.org_id),'') FROM maintenance_plans mp WHERE mp.plan_id=v.plan_id LIMIT 1)
+	)=?`, []interface{}{orgID}
+}
+
 // workTaskVisibleOrgSQL 일일업무 조직 판정: 행 org_id → 담당자 소속 → 작성자 소속.
 // 셋 다 비면 조직 지정 조회에서 제외한다. OrgAll이면 조건 없음.
 func workTaskVisibleOrgSQL(alias, orgID string) (string, []interface{}) {

@@ -33,7 +33,7 @@ func (h *StatsHandler) ListCompanyWeeklyRows(c echo.Context) error {
 	return c.Render(http.StatusOK, "stats/company_weekly_rows.html", map[string]interface{}{
 		"Title": "주간보고 행", "Active": NavStatsReports,
 		"Rows": rows, "Projects": projects, "CanWrite": canWriteCompanyWeekly(c),
-		"OrgName": currentOrgName(c),
+		"OrgName": currentOrgName(c), "ViewOrgID": orgID,
 		"Hint":    "사업 매핑 행은 95-2 사업 업로드 후에 등록할 수 있습니다. 그 전에는 활동 일반 행만 등록하세요.",
 	})
 }
@@ -69,8 +69,8 @@ func (h *StatsHandler) UpdateCompanyWeeklyRow(c echo.Context) error {
 	in := parseWeeklyRowForm(c, orgID)
 	in.Key = strings.TrimSpace(c.Param("key"))
 	if err := h.repo.UpdateWeeklyReportRow(in); err != nil {
-		if strings.Contains(err.Error(), "다른 조직") {
-			return echo.ErrForbidden
+		if strings.Contains(err.Error(), "다른 조직") || strings.Contains(err.Error(), "행이 없습니다") {
+			return echo.NewHTTPError(http.StatusNotFound, "행이 없습니다")
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -91,8 +91,8 @@ func (h *StatsHandler) ToggleCompanyWeeklyRow(c echo.Context) error {
 	}
 	off := c.FormValue("off") == "1"
 	if err := h.repo.SetWeeklyReportRowActive(orgID, c.Param("key"), !off); err != nil {
-		if strings.Contains(err.Error(), "다른 조직") {
-			return echo.ErrForbidden
+		if strings.Contains(err.Error(), "다른 조직") || strings.Contains(err.Error(), "행이 없습니다") {
+			return echo.NewHTTPError(http.StatusNotFound, "행이 없습니다")
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

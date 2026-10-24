@@ -80,7 +80,7 @@ func (h *StatsHandler) CreateCompanyWeekly(c echo.Context) error {
 	}
 	orgID, err := resolveInsertOrg(c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "조직을 선택하세요")
+		return echo.NewHTTPError(http.StatusForbidden, errNeedInsertOrg)
 	}
 	now := time.Now()
 	anchor := reportMeetingMonday(now)

@@ -932,10 +932,8 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	fragB, argsB := mntMetricsBaseSQL(f)
 	b.WriteString(fragB)
 	args = append(args, argsB...)
-	frag, a := mustOrgSQL("mp", f.OrgID)
-	b.WriteString(` AND EXISTS (SELECT 1 FROM maintenance_plans mp WHERE mp.plan_id=v.plan_id`)
+	frag, a := mntVisitOrgSQL(f.OrgID)
 	b.WriteString(frag)
-	b.WriteString(`)`)
 	args = append(args, a...)
 	return b.String(), args
 }

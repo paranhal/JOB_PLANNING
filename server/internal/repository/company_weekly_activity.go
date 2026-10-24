@@ -86,7 +86,7 @@ func (r *StatsRepo) listAssetActivityLines(from, toEx string, done bool, exclPro
 		statusSQL = `t.status NOT IN ('complete','cancelled')`
 		dateSQL = `COALESCE(NULLIF(TRIM(t.due_date),''), NULLIF(TRIM(t.work_date),''))`
 	}
-	orgSQL, orgArgs, err := AppendOrgSQL("t", orgIDOrAll(orgID))
+	orgSQL, orgArgs, err := AppendOrgSQL("t", orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,11 +120,11 @@ func (r *StatsRepo) listAssetActivityLines(from, toEx string, done bool, exclPro
 }
 
 func (r *StatsRepo) listTechSalesActivityLines(from, toEx, exclProjects, orgID string) ([]string, error) {
-	orgSQL, orgArgs, err := AppendOrgSQL("sp", orgIDOrAll(orgID))
+	orgSQL, orgArgs, err := AppendOrgSQL("sp", orgID)
 	if err != nil {
 		return nil, err
 	}
-	qorgSQL, qorgArgs, err := AppendOrgSQL("q", orgIDOrAll(orgID))
+	qorgSQL, qorgArgs, err := AppendOrgSQL("q", orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (r *StatsRepo) countUnmappedMnt(from, toEx, orgID, excl string, planned boo
 	var n int
 	var names []string
 	if planned {
-		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisVisit})
+		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
 		args := append([]interface{}{from, toEx}, mntArgs...)
 		err := r.db.QueryRow(`
 			SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
@@ -222,7 +222,7 @@ func (r *StatsRepo) countUnmappedMnt(from, toEx, orgID, excl string, planned boo
 		}
 		return n, names, rows.Err()
 	}
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 	args := append([]interface{}{from, toEx}, mntArgs...)
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
@@ -255,7 +255,7 @@ func (r *StatsRepo) countUnmappedMnt(from, toEx, orgID, excl string, planned boo
 }
 
 func (r *StatsRepo) countUnmappedAS(from, toEx, orgID, excl string) (int, error) {
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgIDOrAll(orgID), DateBasis: model.BasisComplete})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
 	var n int
 	err := r.db.QueryRow(`
 		SELECT COUNT(*) FROM as_receipts ar

@@ -87,7 +87,7 @@ func (r *StatsRepo) InsertWeeklyReportRow(in WeeklyReportRowInput) (string, erro
 	act := normalizeActivityKind(in.ActivityKind, kind)
 	pid := strings.TrimSpace(in.ProjectID)
 	if pid != "" {
-		if err := r.assertProjectInOrg(pid, orgID); err != nil {
+		if err := r.assertProjectExists(pid); err != nil {
 			return "", err
 		}
 	} else {
@@ -138,7 +138,7 @@ func (r *StatsRepo) UpdateWeeklyReportRow(in WeeklyReportRowInput) error {
 	act := normalizeActivityKind(in.ActivityKind, kind)
 	pid := strings.TrimSpace(in.ProjectID)
 	if pid != "" {
-		if err := r.assertProjectInOrg(pid, orgID); err != nil {
+		if err := r.assertProjectExists(pid); err != nil {
 			return err
 		}
 	}
@@ -191,14 +191,11 @@ func (r *StatsRepo) SetWeeklyReportRowActive(orgID, key string, active bool) err
 	return nil
 }
 
-func (r *StatsRepo) assertProjectInOrg(projectID, orgID string) error {
-	var got string
-	err := r.db.QueryRow(`SELECT COALESCE(org_id,'') FROM work_projects WHERE project_id=?`, projectID).Scan(&got)
-	if err != nil {
+func (r *StatsRepo) assertProjectExists(projectID string) error {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM work_projects WHERE project_id=?`, projectID).Scan(&n)
+	if err != nil || n == 0 {
 		return fmt.Errorf("사업을 찾을 수 없습니다")
-	}
-	if !VisibleInOrg(got, orgID) {
-		return fmt.Errorf("다른 조직의 사업은 연결할 수 없습니다")
 	}
 	return nil
 }
@@ -209,9 +206,9 @@ func (r *StatsRepo) ListWeeklyRowProjects(orgID string) ([]model.WorkProject, er
 		return nil, err
 	}
 	rows, err := r.db.Query(`
-		SELECT project_id, name FROM work_projects
-		 WHERE org_id=? AND COALESCE(status,'') NOT IN ('cancelled','archived')
-		 ORDER BY name`, orgID)
+		SELECT project_id, name, COALESCE(org_id,'') FROM work_projects
+		 WHERE COALESCE(status,'') NOT IN ('cancelled','archived')
+		 ORDER BY CASE WHEN org_id=? THEN 0 ELSE 1 END, name`, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +216,7 @@ func (r *StatsRepo) ListWeeklyRowProjects(orgID string) ([]model.WorkProject, er
 	var out []model.WorkProject
 	for rows.Next() {
 		var p model.WorkProject
-		if err := rows.Scan(&p.ProjectID, &p.Name); err != nil {
+		if err := rows.Scan(&p.ProjectID, &p.Name, &p.OrgID); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

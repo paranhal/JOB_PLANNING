@@ -44,8 +44,8 @@ func TestWeeklyReportRowsOrgIsolation(t *testing.T) {
 	}
 	if _, err := repo.InsertWeeklyReportRow(WeeklyReportRowInput{
 		OrgID: "O02", DisplayName: "타팀사업", Kind: "project", ProjectID: "WPSEED01", Active: true,
-	}); err == nil {
-		t.Fatal("타 조직 사업 연결을 막아야 함")
+	}); err != nil {
+		t.Fatalf("타 조직 사업 연결을 허용해야 함: %v", err)
 	}
 }
 

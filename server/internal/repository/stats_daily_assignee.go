@@ -169,7 +169,7 @@ func (r *StatsRepo) BuildDailyAssigneeReportOrg(from, toEx, fileDay, orgID strin
 		out.TeamMinuteAvg = mathRound1(avg)
 	}
 
-	events, err := r.ListWeeklyEventRows(from, toEx)
+	events, err := r.ListWeeklyEventRows(from, toEx, orgID)
 	if err != nil {
 		return out, err
 	}

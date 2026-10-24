@@ -15,6 +15,9 @@ func (r *StatsRepo) BuildWeeklyReport(anchor time.Time) (model.WeeklyReport, err
 }
 
 func (r *StatsRepo) BuildWeeklyReportOrg(anchor time.Time, orgID string) (model.WeeklyReport, error) {
+	if _, err := reportOrgID(orgID); err != nil {
+		return model.WeeklyReport{}, err
+	}
 	cols := BuildStatsPeriodColumns(model.StatsViewWeek, anchor)
 	if len(cols) < 2 {
 		return model.WeeklyReport{}, fmt.Errorf("주간 기간 열 없음")
@@ -31,6 +34,9 @@ func (r *StatsRepo) BuildWeeklyReportRange(from, toEx string) (model.WeeklyRepor
 }
 
 func (r *StatsRepo) BuildWeeklyReportRangeOrg(from, toEx, orgID string) (model.WeeklyReport, error) {
+	if _, err := reportOrgID(orgID); err != nil {
+		return model.WeeklyReport{}, err
+	}
 	weekTo := exclusiveToInclusive(toEx)
 	friday := weekTo
 	if t, err := time.ParseInLocation("2006-01-02", from, time.Local); err == nil {
@@ -70,7 +76,7 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday, orgID stri
 		HolidayYearMissing: yearMissing,
 	}
 
-	unplanned, err := r.unplannedCountsByAssignee()
+	unplanned, err := r.unplannedCountsByAssignee(orgID)
 	if err != nil {
 		return out, err
 	}
@@ -81,7 +87,7 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday, orgID stri
 	}
 	out.PersonRows = append(out.PersonRows, team)
 
-	names, err := r.weeklyActiveAssignees(from, toEx)
+	names, err := r.weeklyActiveAssignees(from, toEx, orgID)
 	if err != nil {
 		return out, err
 	}
@@ -136,7 +142,7 @@ func (r *StatsRepo) buildWeeklyReportCore(from, weekTo, toEx, friday, orgID stri
 	}
 	out.AdminLead = lead
 
-	out.Events, err = r.ListWeeklyEventRows(from, toEx)
+	out.Events, err = r.ListWeeklyEventRows(from, toEx, orgID)
 	if err != nil {
 		return out, err
 	}
@@ -290,9 +296,9 @@ func (r *StatsRepo) countWeeklyInProgress(toEx string, f model.StatsMeetingFilte
 	return n + a, nil
 }
 
-func (r *StatsRepo) unplannedCountsByAssignee() (map[string]int, error) {
+func (r *StatsRepo) unplannedCountsByAssignee(orgID string) (map[string]int, error) {
 	out := map[string]int{}
-	items, _, err := NewWorkBoardRepo(r.db).ListUnplanned("", nil, "")
+	items, _, err := NewWorkBoardRepo(r.db).ListUnplannedForOrg("", nil, "", orgID)
 	if err != nil {
 		return out, err
 	}
@@ -316,7 +322,7 @@ func (r *StatsRepo) unplannedCountsByAssignee() (map[string]int, error) {
 	return out, nil
 }
 
-func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
+func (r *StatsRepo) weeklyActiveAssignees(from, toEx, orgID string) ([]string, error) {
 	base := r.MetricsPolicy().BaseDate
 	asBase, mntBase, adminBase := "", "", ""
 	var asB, mntB, adminB []interface{}
@@ -326,6 +332,9 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 		adminBase = ` AND date(` + adminTaskReceiptDateSQL + `) >= date(?)`
 		asB, mntB, adminB = []interface{}{dayTimeStart(base)}, []interface{}{base}, []interface{}{base}
 	}
+	asOrg, asOrgArgs := mustOrgSQL("ar", orgID)
+	mntOrg, mntOrgArgs := mntVisitOrgSQL(orgID)
+	adminOrg, adminOrgArgs := mustOrgSQL("t", orgID)
 	q := `
 		SELECT name FROM (
 			SELECT TRIM(COALESCE(ar.assigned_to,'')) AS name
@@ -341,7 +350,7 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			        AND ar.receipt_datetime < ?
 			        AND (TRIM(COALESCE(ar.complete_datetime,'')) = ''
 			             OR ar.complete_datetime >= ?))
-			  )
+			  )` + asOrg + `
 			UNION
 			SELECT TRIM(COALESCE(v.assignee,''))
 			FROM maintenance_visits v
@@ -353,7 +362,7 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			        AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) >= ?
 			        AND COALESCE(NULLIF(TRIM(v.completed_date),''), v.visit_date) < ?)
 			    OR (COALESCE(v.completed,0)=0 AND v.visit_date < ?)
-			  )
+			  )` + mntOrg + `
 			UNION
 			SELECT TRIM(COALESCE(t.assignee,''))
 			FROM work_tasks t
@@ -365,15 +374,18 @@ func (r *StatsRepo) weeklyActiveAssignees(from, toEx string) ([]string, error) {
 			    OR (t.status='complete' AND ` + adminTaskCompleteDateSQL + ` >= ? AND ` + adminTaskCompleteDateSQL + ` < ?)
 			    OR (COALESCE(t.status,'') != 'complete'
 			        AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), date(t.created_at)) < ?)
-			  )
+			  )` + adminOrg + `
 		) WHERE 1=1`
 	args := []interface{}{}
 	args = append(args, asB...)
 	args = append(args, from, toEx, from, toEx, toEx, toEx)
+	args = append(args, asOrgArgs...)
 	args = append(args, mntB...)
 	args = append(args, from, toEx, from, toEx, toEx)
+	args = append(args, mntOrgArgs...)
 	args = append(args, adminB...)
 	args = append(args, from, toEx, from, toEx, toEx)
+	args = append(args, adminOrgArgs...)
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -589,29 +601,29 @@ func weeklyProduct(category, name, modelName string) string {
 }
 
 // ListWeeklyEventRows 그 주에 접수·조치·완료·방문이 있는 건. 이관 제외. 발생일·업무번호 순.
-func (r *StatsRepo) ListWeeklyEventRows(from, toEx string) ([]model.WeeklyEventRow, error) {
+func (r *StatsRepo) ListWeeklyEventRows(from, toEx, orgID string) ([]model.WeeklyEventRow, error) {
 	var out []model.WeeklyEventRow
-	as, err := r.listWeeklyASEvents(from, toEx)
+	as, err := r.listWeeklyASEvents(from, toEx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, as...)
-	mnt, err := r.listWeeklyMntEvents(from, toEx)
+	mnt, err := r.listWeeklyMntEvents(from, toEx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, mnt...)
-	admin, err := r.listWeeklyAdminEvents(from, toEx)
+	admin, err := r.listWeeklyAdminEvents(from, toEx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, admin...)
-	sales, err := r.listWeeklySalesEvents(from, toEx)
+	sales, err := r.listWeeklySalesEvents(from, toEx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, sales...)
-	waiting, err := r.listWeeklyWaitingForEvents(from, toEx)
+	waiting, err := r.listWeeklyWaitingForEvents(from, toEx, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -658,9 +670,9 @@ func weeklyEventKindOrder(kind string) int {
 	}
 }
 
-func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
+func (r *StatsRepo) listWeeklyASEvents(from, toEx, orgID string) ([]model.WeeklyEventRow, error) {
 	var out []model.WeeklyEventRow
-	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: OrgAll})
+	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID})
 	base := `
 		SELECT COALESCE(ar.as_number,''), COALESCE(c.org_name,''),
 		       COALESCE(a.product_category,''), COALESCE(a.product_name,''), COALESCE(a.model_name,''),
@@ -747,9 +759,9 @@ func (r *StatsRepo) listWeeklyASEvents(from, toEx string) ([]model.WeeklyEventRo
 	return out, prows.Err()
 }
 
-func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
+func (r *StatsRepo) listWeeklyMntEvents(from, toEx, orgID string) ([]model.WeeklyEventRow, error) {
 	doneDate := `COALESCE(NULLIF(TRIM(v.completed_date),''), CASE WHEN COALESCE(v.completed,0)=1 THEN v.visit_date ELSE '' END)`
-	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: OrgAll})
+	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID})
 	q := `
 		SELECT COALESCE(v.visit_id,''), COALESCE(c.org_name,''), COALESCE(v.product_type,''),
 		       COALESCE(NULLIF(TRIM(v.assignee),''), ''),
@@ -792,8 +804,8 @@ func (r *StatsRepo) listWeeklyMntEvents(from, toEx string) ([]model.WeeklyEventR
 	return items, rows.Err()
 }
 
-func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: OrgAll})
+func (r *StatsRepo) listWeeklyAdminEvents(from, toEx, orgID string) ([]model.WeeklyEventRow, error) {
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID})
 	q := `
 		SELECT COALESCE(t.task_id,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
@@ -854,8 +866,8 @@ func (r *StatsRepo) listWeeklyAdminEvents(from, toEx string) ([]model.WeeklyEven
 	return items, rows.Err()
 }
 
-func (r *StatsRepo) listWeeklySalesEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
-	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: OrgAll})
+func (r *StatsRepo) listWeeklySalesEvents(from, toEx, orgID string) ([]model.WeeklyEventRow, error) {
+	adminSQL, adminArgs := r.filterAdmin(model.StatsMeetingFilter{OrgID: orgID})
 	q := `
 		SELECT COALESCE(t.task_id,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
@@ -909,7 +921,8 @@ func (r *StatsRepo) listWeeklySalesEvents(from, toEx string) ([]model.WeeklyEven
 }
 
 // listWeeklyWaitingForEvents 「회신 대기」 건. v2.4는 미계획건 시트가 없으므로 전체 리스트에 대기 대상·회신 예정일을 싣는다(§13.10).
-func (r *StatsRepo) listWeeklyWaitingForEvents(from, toEx string) ([]model.WeeklyEventRow, error) {
+func (r *StatsRepo) listWeeklyWaitingForEvents(from, toEx, orgID string) ([]model.WeeklyEventRow, error) {
+	orgSQL, orgArgs := mustOrgSQL("t", orgID)
 	q := `
 		SELECT COALESCE(t.task_id,''),
 		       COALESCE(NULLIF(TRIM(c.org_name),''), NULLIF(TRIM(t.customer_name),''), ''),
@@ -925,8 +938,9 @@ func (r *StatsRepo) listWeeklyWaitingForEvents(from, toEx string) ([]model.Weekl
 		  AND (
 		    (TRIM(COALESCE(t.reply_due_date,'')) != '' AND t.reply_due_date >= ? AND t.reply_due_date < ?)
 		    OR (TRIM(COALESCE(t.next_check_date,'')) != '' AND t.next_check_date >= ? AND t.next_check_date < ?)
-		  )` + statsProjectKindSQL("t.project_id")
-	rows, err := r.db.Query(q, model.WBTaskWaitingFor, from, toEx, from, toEx)
+		  )` + statsProjectKindSQL("t.project_id") + orgSQL
+	args := append([]interface{}{model.WBTaskWaitingFor, from, toEx, from, toEx}, orgArgs...)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
 			return nil, nil

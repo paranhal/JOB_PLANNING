@@ -67,15 +67,15 @@ func TestDumpProdStatsSnapshot(t *testing.T) {
 		if err != nil {
 			t.Fatal(tag, err)
 		}
-		asE, err := repo.listWeeklyASEvents(from, toEx)
+		asE, err := repo.listWeeklyASEvents(from, toEx, OrgAll)
 		if err != nil {
 			t.Fatal(tag, err)
 		}
-		mntE, err := repo.listWeeklyMntEvents(from, toEx)
+		mntE, err := repo.listWeeklyMntEvents(from, toEx, OrgAll)
 		if err != nil {
 			t.Fatal(tag, err)
 		}
-		adE, err := repo.listWeeklyAdminEvents(from, toEx)
+		adE, err := repo.listWeeklyAdminEvents(from, toEx, OrgAll)
 		if err != nil {
 			t.Fatal(tag, err)
 		}
