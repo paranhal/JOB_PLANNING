@@ -1,0 +1,8 @@
+{{define "title"}}{{end}}
+{{define "content"}}
+{{if eq .DailyKind "as"}}{{template "wb_form_as" .}}
+{{else if eq .DailyKind "maintenance"}}{{template "wb_form_maintenance" .}}
+{{else if eq .DailyKind "project_work"}}{{template "wb_form_project_work" .}}
+{{else}}{{template "wb_form_admin_sales" .}}
+{{end}}
+{{end}}

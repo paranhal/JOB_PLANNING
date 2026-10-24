@@ -117,7 +117,9 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.Use(h.Auth.GuardCLevelHidden)
 	g.GET("/workboard", h.Workboard.Index)
 	g.GET("/workboard/board", h.Workboard.Board)
+	g.GET("/workboard/new-work/form", h.Workboard.NewWorkForm)
 	g.GET("/workboard/register", h.Workboard.Register)
+	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.GET("/work", h.Work.List)
 	g.GET("/work/all", h.Work.ListAll)
 	return e, db, got1, got2, h.Workboard.repo

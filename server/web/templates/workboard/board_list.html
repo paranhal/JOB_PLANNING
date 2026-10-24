@@ -1,6 +1,6 @@
 {{define "title"}}업무 관리 · 일일 업무{{end}}
 {{define "content"}}
-<div class="space-y-4">
+<div class="space-y-4" {{if .CanWrite}}x-data="boardNewWork()"{{end}}>
   <section class="card">
     <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
       <div class="flex flex-wrap items-end gap-3">
@@ -17,6 +17,7 @@
           <input name="q" value="{{.Q}}" placeholder="업무 검색" class="h-9 w-full rounded-[10px] border border-line bg-hover px-3 text-ui text-ink md:w-56" aria-label="업무 검색">
         </form>
         <a href="{{.CalHref}}" class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 text-ui font-semibold text-ink hover:bg-hover">일정 캘린더 보기</a>
+        {{template "board_new_work_btn" .}}
         <span class="rounded-full bg-success-soft px-4 py-2 text-ui font-bold text-success">전체 {{.Count}}건</span>
         <div class="flex items-center gap-1 text-ui font-semibold text-ink-muted">
           <a href="/workboard/board?view=list&amp;date={{.PrevDate}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="이전 날">‹</a>
@@ -60,5 +61,6 @@
     {{end}}
     <p class="border-t border-line px-6 py-3.5 text-ui-sm text-ink-muted">총 {{.Count}}개의 업무</p>
   </section>
+  {{template "wb_new_work_modal" .}}
 </div>
 {{end}}

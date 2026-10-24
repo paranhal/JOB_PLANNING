@@ -1,6 +1,6 @@
 {{define "title"}}업무 관리 · 일정 캘린더{{end}}
 {{define "content"}}
-<div>
+<div {{if .CanWrite}}x-data="boardNewWork()"{{end}}>
   {{template "board_cal_head" .}}
   <div class="border-t border-line">
     <div class="flex flex-col lg:grid lg:min-w-[910px] lg:grid-cols-7">
@@ -22,5 +22,6 @@
     </div>
   </div>
   </div>
+  {{template "wb_new_work_modal" .}}
 </div>
 {{end}}

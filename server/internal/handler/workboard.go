@@ -358,69 +358,69 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	wgItems, wgJSON := h.workGroupPicks(c)
 
 	return c.Render(http.StatusOK, "workboard/register.html", map[string]interface{}{
-		"Title":           "일일 업무 등록",
-		"Active":          NavWorkRegister,
-		"View":            view,
-		"ViewLabel":       registerViewLabel(view),
-		"Display":         display,
-		"DisplayQ":        displayQ,
-		"KanbanColumns":   kanbanCols,
-		"KanbanTotal":     kanbanTotal,
-		"KanbanDrag":      canWrite,
-		"KanbanDrop":      "el",
-		"KanbanHint":      "유형 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
-		"Date":            dateStr,
-		"PeriodLabel":     period.Label,
-		"PrevDate":        period.Prev,
-		"NextDate":        period.Next,
-		"Today":           today,
-		"Columns":         period.Columns,
-		"DayColumns":      dayCols,
-		"MonthWeeks":      monthWeeks,
-		"SlotTimes":       slotTimes,
-		"SlotRem":         registerSlotRem,
-		"GridHeightStyle": gridHeightStyle,
-		"SlotTopStyles":   slotTopStyles,
-		"Rows":            rows,
-		"AssigneeLegend":  assigneeLegend,
-		"ASCards":         asCards,
-		"MntCards":        mntCards,
-		"AdminCards":      adminCards,
-		"SalesCards":      salesCards,
-		"WorkCards":       workCards,
-		"UnassignedCards": unassignedCards,
-		"PaletteAll":      strings.TrimSpace(c.QueryParam("palette")) == "all",
-		"UndatedCards":    undatedCards,
-		"PlacedCount":     len(placed),
-		"Projects":        projects,
-		"WorkProjects":    workProjects,
-		"Assignees":       assignees,
-		"Customers":       customers,
-		"AssigneeFilter":  assigneeFilter,
-		"ProjectFilter":   projectFilter,
-		"AssigneeQ":       filterQ, // 하위호환: 템플릿 링크용 (&assignee=&project=)
-		"FilterQ":         filterQ,
-		"Role":            role,
-		"RoleUnresolved":  roleUnresolved,
-		"ShowScopeToggle": showScopeToggle,
-		"ScopeAll":        scopeAll,
-		"MineParam":       mineParam,
-		"TeamHref":        registerURLDisplay(view, dateStr, "", projectFilter, "0", display),
-		"MineHref":        registerURLDisplay(view, dateStr, "", projectFilter, "", display),
-		"ScopeNote":       registerScopeNote(role, scopeAll, assigneeFilter, roleUnresolved),
-		"ExtraAssignees":  extraAssigneesForDay(view, assigneeFilter, assignees, dayCols),
-		"DayLeaveNames":   dayLeaveNames,
-		"AssigneeColMin":  registerAssigneeColMinPx,
-		"ModalRedirect":   regBase,
-		"CanWrite":        canWrite,
-		"PastDayLocked":   dayPast && !unlocked,
-		"CanUnlockPast":   canUnlock,
-		"EditUnlocked":    unlocked && dayPast,
-		"UnlockExpires":   unlockExpLabel,
-		"UnlockRedirect":  regBase,
-		"FlashOK":               c.QueryParam("ok"),
-		"FlashErr":              c.QueryParam("err"),
-		"AssigneePickDisabled":  assigneePickDisabled(c),
+		"Title":                "일일 업무 등록",
+		"Active":               NavWorkRegister,
+		"View":                 view,
+		"ViewLabel":            registerViewLabel(view),
+		"Display":              display,
+		"DisplayQ":             displayQ,
+		"KanbanColumns":        kanbanCols,
+		"KanbanTotal":          kanbanTotal,
+		"KanbanDrag":           canWrite,
+		"KanbanDrop":           "el",
+		"KanbanHint":           "유형 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
+		"Date":                 dateStr,
+		"PeriodLabel":          period.Label,
+		"PrevDate":             period.Prev,
+		"NextDate":             period.Next,
+		"Today":                today,
+		"Columns":              period.Columns,
+		"DayColumns":           dayCols,
+		"MonthWeeks":           monthWeeks,
+		"SlotTimes":            slotTimes,
+		"SlotRem":              registerSlotRem,
+		"GridHeightStyle":      gridHeightStyle,
+		"SlotTopStyles":        slotTopStyles,
+		"Rows":                 rows,
+		"AssigneeLegend":       assigneeLegend,
+		"ASCards":              asCards,
+		"MntCards":             mntCards,
+		"AdminCards":           adminCards,
+		"SalesCards":           salesCards,
+		"WorkCards":            workCards,
+		"UnassignedCards":      unassignedCards,
+		"PaletteAll":           strings.TrimSpace(c.QueryParam("palette")) == "all",
+		"UndatedCards":         undatedCards,
+		"PlacedCount":          len(placed),
+		"Projects":             projects,
+		"WorkProjects":         workProjects,
+		"Assignees":            assignees,
+		"Customers":            customers,
+		"AssigneeFilter":       assigneeFilter,
+		"ProjectFilter":        projectFilter,
+		"AssigneeQ":            filterQ, // 하위호환: 템플릿 링크용 (&assignee=&project=)
+		"FilterQ":              filterQ,
+		"Role":                 role,
+		"RoleUnresolved":       roleUnresolved,
+		"ShowScopeToggle":      showScopeToggle,
+		"ScopeAll":             scopeAll,
+		"MineParam":            mineParam,
+		"TeamHref":             registerURLDisplay(view, dateStr, "", projectFilter, "0", display),
+		"MineHref":             registerURLDisplay(view, dateStr, "", projectFilter, "", display),
+		"ScopeNote":            registerScopeNote(role, scopeAll, assigneeFilter, roleUnresolved),
+		"ExtraAssignees":       extraAssigneesForDay(view, assigneeFilter, assignees, dayCols),
+		"DayLeaveNames":        dayLeaveNames,
+		"AssigneeColMin":       registerAssigneeColMinPx,
+		"ModalRedirect":        regBase,
+		"CanWrite":             canWrite,
+		"PastDayLocked":        dayPast && !unlocked,
+		"CanUnlockPast":        canUnlock,
+		"EditUnlocked":         unlocked && dayPast,
+		"UnlockExpires":        unlockExpLabel,
+		"UnlockRedirect":       regBase,
+		"FlashOK":              c.QueryParam("ok"),
+		"FlashErr":             c.QueryParam("err"),
+		"AssigneePickDisabled": assigneePickDisabled(c),
 		"WorkGroups":           wgItems,
 		"WorkGroupsJSON":       wgJSON,
 		"WorkGroupFilter":      groupFilter,
@@ -1637,23 +1637,23 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 	}
 	wgItems, wgJSON := h.workGroupPicks(c)
 	return map[string]interface{}{
-		"Title":         "일일 업무 현황",
-		"Active":        NavWorkPlan,
-		"View":          view,
-		"Summary":       summary,
-		"Tasks":         board,
-		"ByWorkType":    byWorkType,
-		"ByStatus":      byStatus,
-		"Projects":      projects,
-		"WorkProjects":  workProjects,
-		"Assignees":     assignees,
-		"Customers":     customers,
-		"ContractTypes": contractTypes,
-		"BillingTypes":  billingTypes,
-		"ASCards":       asCards,
-		"MntCards":      mntCards,
-		"Date":          today,
-		"TodayLabel":    today,
+		"Title":           "일일 업무 현황",
+		"Active":          NavWorkPlan,
+		"View":            view,
+		"Summary":         summary,
+		"Tasks":           board,
+		"ByWorkType":      byWorkType,
+		"ByStatus":        byStatus,
+		"Projects":        projects,
+		"WorkProjects":    workProjects,
+		"Assignees":       assignees,
+		"Customers":       customers,
+		"ContractTypes":   contractTypes,
+		"BillingTypes":    billingTypes,
+		"ASCards":         asCards,
+		"MntCards":        mntCards,
+		"Date":            today,
+		"TodayLabel":      today,
 		"ModalRedirect":   modalRedirect,
 		"CanWrite":        canWriteWorkboard(c),
 		"FlashOK":         c.QueryParam("ok"),
@@ -2510,11 +2510,43 @@ func convertSalesHref(taskID string, projects []model.SalesProject) string {
 	return "/sales?" + q
 }
 
-func redirectBack(c echo.Context, q string) string {
-	back := strings.TrimSpace(c.FormValue("redirect"))
-	if back == "" {
-		back = "/workboard/kanban"
+func workboardRedirectPathOK(path string) bool {
+	switch path {
+	case "/workboard/register", "/workboard/kanban", "/workboard/tasks", "/workboard/board":
+		return true
 	}
+	return strings.HasPrefix(path, "/workboard/tasks/")
+}
+
+func safeWorkboardRedirect(raw, fallback string) string {
+	if fallback == "" {
+		fallback = "/workboard/kanban"
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+	if strings.ContainsAny(raw, "\r\n\t") || strings.Contains(raw, "://") || strings.HasPrefix(raw, "//") {
+		return fallback
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" || !strings.HasPrefix(u.Path, "/") {
+		return fallback
+	}
+	if strings.Contains(u.Path, "..") {
+		return fallback
+	}
+	if !workboardRedirectPathOK(u.Path) {
+		return fallback
+	}
+	if u.RawQuery != "" {
+		return u.Path + "?" + u.RawQuery
+	}
+	return u.Path
+}
+
+func redirectBack(c echo.Context, q string) string {
+	back := safeWorkboardRedirect(c.FormValue("redirect"), "/workboard/kanban")
 	if q != "" {
 		if strings.Contains(back, "?") {
 			return back + "&" + q

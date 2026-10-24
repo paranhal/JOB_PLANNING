@@ -2,22 +2,12 @@
 {{define "content"}}
 <div class="-mx-1 sm:-mx-2 space-y-3"
      x-data="{
-       taskOpen: false,
+       {{template "wb_register_state" .}}
        projectOpen: false,
-       dailyKind: '',
-       workType: 'admin',
-       preselect: '',
-       preDue: '{{.Date}}',
-       preWork: '{{.Date}}',
-       preStart: '09:00',
-       preEnd: '09:30',
-       preAssignee: '',
        extraCols: [],
        addOpen: false,
        leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{printf "%q" $n}}{{end}}],
        onLeave(name) { return !!name && this.leaveNames.indexOf(name) >= 0; },
-       asQ: '',
-       mntQ: '',
        sel: null,
        unlockOpen: false,
        kanbanAskAssignee: false,

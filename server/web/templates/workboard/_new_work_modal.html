@@ -1,0 +1,221 @@
+{{define "board_new_work_btn"}}
+{{if .CanWrite}}
+<button type="button" class="inline-flex h-9 items-center rounded-[10px] bg-success px-3.5 text-ui font-semibold text-primary-fg hover:opacity-90" @click="openNewWork()" data-new-work>+ 업무 등록</button>
+{{end}}
+{{end}}
+
+{{define "wb_new_work_modal"}}
+{{if .CanWrite}}
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/55" x-show="newWorkOpen" x-cloak
+     @keydown.escape.window="if (newWorkOpen) closeNewWork()" role="dialog" aria-modal="true" aria-labelledby="nw-title">
+  <div class="flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[22px] bg-surface shadow-pop"
+       :class="newWorkStep === 1 ? 'max-w-[760px]' : 'max-w-lg'">
+    <div class="flex items-start justify-between px-7 pb-4 pt-5">
+      <div>
+        <p class="text-[11px] font-extrabold tracking-[0.12em] text-success">NEW WORK</p>
+        <h2 id="nw-title" class="mt-0.5 text-[22px] font-bold text-ink">새 업무 등록</h2>
+      </div>
+      <button type="button" class="text-[26px] leading-none text-ink-muted" @click="closeNewWork()" aria-label="닫기">×</button>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-3 border-y border-line bg-canvas px-4 py-4">
+      <div class="flex items-center gap-2 text-[12.5px] font-bold" :class="newWorkStep===1 ? 'text-success' : 'text-ink-subtle'">
+        <span class="grid h-[26px] w-[26px] place-items-center rounded-full border text-xs" :class="newWorkStep===1 ? 'border-success bg-success text-primary-fg' : 'border-line bg-surface'">1</span>업무 유형
+      </div>
+      <span class="h-px w-14 bg-line"></span>
+      <div class="flex items-center gap-2 text-[12.5px] font-bold" :class="newWorkStep===2 ? 'text-success' : 'text-ink-subtle'">
+        <span class="grid h-[26px] w-[26px] place-items-center rounded-full border text-xs" :class="newWorkStep===2 ? 'border-success bg-success text-primary-fg' : 'border-line bg-surface'">2</span>상세 정보
+      </div>
+      <span class="h-px w-14 bg-line"></span>
+      <div class="flex items-center gap-2 text-[12.5px] font-bold" :class="newWorkStep===2 ? 'text-success' : 'text-ink-subtle'">
+        <span class="grid h-[26px] w-[26px] place-items-center rounded-full border text-xs" :class="newWorkStep===2 ? 'border-success bg-success text-primary-fg' : 'border-line bg-surface'">3</span>일정 · 담당
+      </div>
+    </div>
+    <div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div class="px-7 py-6" x-show="newWorkStep===1" x-cloak>
+        <h3 class="text-[19px] font-bold text-ink">어떤 업무를 등록할까요?</h3>
+        <p class="mb-[18px] mt-1 text-[12.5px] text-ink-muted">업무 유형에 따라 필요한 입력 항목이 달라집니다.</p>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="업무 유형" @keydown="onKindKey($event)">
+          <template x-for="(k, i) in nwKinds" :key="k.id">
+            <button type="button" role="radio" :aria-checked="newWorkKind===k.id"
+                    class="relative flex w-full items-center gap-3.5 rounded-2xl border bg-surface px-[18px] py-[18px] text-left last:sm:col-span-2"
+                    :class="newWorkKind===k.id ? 'border-2 border-success bg-success-soft py-[17px] px-[17px]' : 'border-line'"
+                    :data-kind="k.id" @click="newWorkKind=k.id; $nextTick(() => $el.focus())">
+              <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-ui font-extrabold" :class="k.bg" x-text="k.ch"></span>
+              <span class="min-w-0">
+                <b class="block text-[14.5px] text-ink" x-text="k.label"></b>
+                <small class="text-xs text-ink-muted" x-text="k.desc"></small>
+              </span>
+              <span class="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-success text-[13px] text-primary-fg" x-show="newWorkKind===k.id" x-cloak>✓</span>
+            </button>
+          </template>
+        </div>
+      </div>
+      <div x-show="newWorkStep===2" x-cloak>
+        <div class="px-5 pt-4" x-show="newWorkLoading">불러오는 중…</div>
+        <div class="px-5 pt-4" x-show="newWorkError">
+          <p>폼을 불러오지 못했습니다. 다시 시도</p>
+          <button type="button" class="mt-2 rounded-lg border border-line px-3 py-1.5 text-ui" @click="goNext()">다시 시도</button>
+        </div>
+        <div id="new-work-form-slot" class="mx-auto w-full max-w-lg"></div>
+      </div>
+    </div>
+    <div class="flex items-center justify-between border-t border-line px-7 py-4" x-show="newWorkStep===1">
+      <button type="button" class="font-semibold text-ink-muted" @click="closeNewWork()">취소</button>
+      <button type="button" class="inline-flex h-11 items-center rounded-[10px] bg-success px-[22px] font-semibold text-primary-fg" @click="goNext()">다음 단계 ›</button>
+    </div>
+  </div>
+</div>
+<script>
+function boardNewWork() {
+  var kinds = [
+    {id:'as', label:'AS 조치', ch:'W', bg:'board-b-as', desc:'고장 접수 및 현장 조치'},
+    {id:'maintenance', label:'정기점검 방문', ch:'C', bg:'board-b-mnt', desc:'설비 정기 점검과 기록'},
+    {id:'project_work', label:'작업 수행', ch:'H', bg:'board-b-work', desc:'설치·교체·보수 작업'},
+    {id:'admin', label:'행정/지원 업무', ch:'D', bg:'board-b-adm', desc:'문서·교육·내부 지원'},
+    {id:'sales', label:'영업 활동', ch:'T', bg:'board-b-sales', desc:'고객 상담 및 계약 활동'}
+  ];
+  return {
+    {{template "wb_register_state" .}}
+    nwKinds: kinds,
+    newWorkOpen: false,
+    newWorkStep: 1,
+    newWorkKind: 'as',
+    newWorkLoading: false,
+    newWorkError: false,
+    lastFocus: null,
+    bindKindWatch() {
+      if (this._nwWatchBound || !this.$watch) return;
+      this._nwWatchBound = true;
+      this.$watch('dailyKind', (v) => {
+        if (!v && this.newWorkOpen && this.newWorkStep === 2) {
+          this.newWorkStep = 1;
+        }
+      });
+    },
+    init() {
+      this.bindKindWatch();
+    },
+    openNewWork() {
+      this.bindKindWatch();
+      this.lastFocus = document.activeElement;
+      this.newWorkOpen = true;
+      this.newWorkStep = 1;
+      this.newWorkKind = 'as';
+      this.dailyKind = '';
+      this.workType = 'admin';
+      this.preselect = '';
+      this.preDue = '{{.Date}}';
+      this.preWork = '{{.Date}}';
+      this.preStart = '09:00';
+      this.preEnd = '09:30';
+      this.preAssignee = {{toJSON .CurrentUserName}};
+      this.newWorkError = false;
+      this.$nextTick(() => this.focusKind());
+    },
+    closeNewWork() {
+      this.newWorkOpen = false;
+      this.newWorkStep = 1;
+      this.dailyKind = '';
+      var btn = this.lastFocus;
+      this.$nextTick(() => { if (btn && btn.focus) btn.focus(); });
+    },
+    focusKind() {
+      var el = this.$root.querySelector('[role="radio"][aria-checked="true"]');
+      if (el) el.focus();
+    },
+    onKindKey(e) {
+      var ids = kinds.map(k => k.id);
+      var i = ids.indexOf(this.newWorkKind);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.newWorkKind = ids[(i+1+ids.length)%ids.length];
+        this.$nextTick(() => this.focusKind());
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.newWorkKind = ids[(i-1+ids.length)%ids.length];
+        this.$nextTick(() => this.focusKind());
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        this.goNext();
+      }
+    },
+    goNext() {
+      var k = this.newWorkKind;
+      this.dailyKind = k;
+      this.workType = (k === 'admin') ? 'admin' : (k === 'sales' ? 'sales' : k);
+      this.newWorkStep = 2;
+      this.newWorkLoading = true;
+      this.newWorkError = false;
+      var slot = document.getElementById('new-work-form-slot');
+      if (slot) slot.replaceChildren();
+      var url = '/workboard/new-work/form?kind=' + encodeURIComponent(k)
+        + '&date=' + encodeURIComponent('{{.Date}}')
+        + '&redirect=' + encodeURIComponent({{toJSON .BoardHref}});
+      var self = this;
+      fetch(url, { credentials: 'same-origin', headers: { 'HX-Request': 'true', 'Accept': 'text/html' } })
+        .then(function (r) {
+          if (!r.ok) throw new Error('load');
+          return r.text();
+        })
+        .then(function (html) {
+          self.newWorkLoading = false;
+          if (!slot) return;
+          slot.innerHTML = html;
+          if (window.Alpine && Alpine.initTree) Alpine.initTree(slot);
+          if (window.bindASRegisterLookup) bindASRegisterLookup();
+          slot.querySelectorAll('button').forEach(function (b) {
+            var t = (b.textContent || '');
+            if (t.indexOf('유형 선택') >= 0 || t.indexOf('종류 선택') >= 0) {
+              b.addEventListener('click', function () { self.newWorkStep = 1; });
+            }
+          });
+        })
+        .catch(function () {
+          self.newWorkLoading = false;
+          self.newWorkError = true;
+        });
+    }
+  };
+}
+</script>
+<script>
+(function () {
+  if (window.__wbKeepModalBound) return;
+  window.__wbKeepModalBound = true;
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || !form.classList || !form.classList.contains('js-keep-modal')) return;
+    if (form.dataset.keepSkip === '1') return;
+    e.preventDefault();
+    var btns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+    btns.forEach(function (b) { b.disabled = true; });
+    var fd = new FormData(form);
+    fetch(form.action, {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
+    }).then(function (r) {
+      if (r.redirected && r.url) { window.location.assign(r.url); return; }
+      if (r.ok) {
+        var dest = fd.get('redirect') || fd.get('back') || window.location.href;
+        window.location.assign(dest);
+        return;
+      }
+      return r.json().then(function (j) {
+        var msg = (j && j.message) ? j.message : '저장하지 못했습니다';
+        if (window.showFlashError) window.showFlashError(msg);
+      }).catch(function () {
+        if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
+      });
+    }).catch(function () {
+      form.dataset.keepSkip = '1';
+      form.submit();
+    }).finally(function () {
+      btns.forEach(function (b) { b.disabled = false; });
+    });
+  });
+})();
+</script>
+{{end}}
+{{end}}

@@ -1,6 +1,6 @@
 {{define "title"}}업무 관리 · 일정 캘린더{{end}}
 {{define "content"}}
-<div>
+<div {{if .CanWrite}}x-data="boardNewWork()"{{end}}>
   {{template "board_cal_head" .}}
   {{if .DayUntimed}}
   <div class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 py-2.5 text-ui-sm text-ink-muted">
@@ -35,6 +35,7 @@
     </div>
   </div>
   </div>
+  {{template "wb_new_work_modal" .}}
 </div>
 <script>
 (function(){

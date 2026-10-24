@@ -7,50 +7,7 @@
   </select>
 </div>
 {{end}}
-{{define "wb_modals"}}
-{{if .CanWrite}}
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="typeof taskOpen !== 'undefined' && taskOpen" x-cloak
-     @keydown.escape.window="taskOpen=false">
-  <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] min-w-0 overflow-x-hidden overflow-y-auto" @click.outside="taskOpen=false">
-    <div class="flex items-center justify-between px-5 py-4 border-b">
-      <h3 class="font-semibold text-gray-800">일일 업무 등록</h3>
-      <button type="button" @click="taskOpen=false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-    </div>
-
-    <!-- 1단계: 업무 종류 선택 -->
-    <div class="p-5 space-y-3" x-show="!dailyKind" x-cloak>
-      <p class="text-sm text-gray-600">등록할 일일 업무 종류를 선택하세요.</p>
-      <button type="button" @click="dailyKind='admin'; workType='admin'"
-              class="w-full text-left border border-violet-200 rounded-xl px-4 py-3 hover:bg-violet-50">
-        <p class="font-medium text-gray-800">행정 / 지원업무</p>
-        <p class="text-xs text-gray-500 mt-0.5">사업·행정 관련 일일 업무를 직접 입력합니다.</p>
-      </button>
-      <button type="button" @click="dailyKind='as'"
-              class="w-full text-left border border-rose-200 rounded-xl px-4 py-3 hover:bg-rose-50">
-        <p class="font-medium text-gray-800">AS 일일업무</p>
-        <p class="text-xs text-gray-500 mt-0.5">AS 접수번호를 골라 업무 고유번호를 부여합니다.</p>
-      </button>
-      <button type="button" @click="dailyKind='maintenance'"
-              class="w-full text-left border border-sky-200 rounded-xl px-4 py-3 hover:bg-sky-50">
-        <p class="font-medium text-gray-800">정기점검 일일업무</p>
-        <p class="text-xs text-gray-500 mt-0.5">정기점검 번호를 골라 업무 고유번호를 부여합니다.</p>
-      </button>
-      <button type="button" @click="dailyKind='sales'; workType='sales'"
-              class="w-full text-left border border-orange-200 rounded-xl px-4 py-3 hover:bg-orange-50">
-        <p class="font-medium text-gray-800">영업 활동</p>
-        <p class="text-xs text-gray-500 mt-0.5">영업 사업·활동 관련 일일 업무를 등록합니다.</p>
-      </button>
-      <button type="button" @click="dailyKind='project_work'; workType='project_work'"
-              class="w-full text-left border border-emerald-200 rounded-xl px-4 py-3 hover:bg-emerald-50">
-        <p class="font-medium text-gray-800">작업</p>
-        <p class="text-xs text-gray-500 mt-0.5">구축·공사 작업을 일일 업무로 등록합니다.</p>
-      </button>
-      <div class="flex justify-end pt-1">
-        <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
-      </div>
-    </div>
-
-    <!-- 행정/지원 · 영업 활동 -->
+{{define "wb_form_admin_sales"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
           x-data="{ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
             async checkMnt() {
@@ -68,7 +25,7 @@
             }
           }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; workType='admin'">← 종류 선택</button>
+      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; workType='admin'; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">업무 구분 <span class="text-red-500">*</span></label>
         <div class="grid grid-cols-3 gap-2">
@@ -187,13 +144,14 @@
         </div>
       </div>
     </form>
+{{end}}
 
-    <!-- AS 일일업무 -->
+{{define "wb_form_as"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='as'" x-cloak
           x-data="{ memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="as">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''">← 종류 선택</button>
+      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">AS 접수번호 <span class="text-red-500">*</span></label>
         <input type="search" id="as-register-q" x-model="asQ" placeholder="고객명·접수번호 검색"
@@ -258,13 +216,14 @@
         <button type="submit" class="px-4 py-2 text-sm text-white bg-rose-600 rounded-lg">AS 업무 등록</button>
       </div>
     </form>
+{{end}}
 
-    <!-- 정기점검 일일업무 -->
+{{define "wb_form_maintenance"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='maintenance'" x-cloak
           x-data="{ memberRows: [] }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="maintenance">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''">← 종류 선택</button>
+      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">정기점검번호 <span class="text-red-500">*</span></label>
         <input type="search" x-model="mntQ" placeholder="고객명·점검대상 검색"
@@ -328,7 +287,9 @@
         <button type="submit" class="px-4 py-2 text-sm text-white bg-sky-600 rounded-lg">정기점검 업무 등록</button>
       </div>
     </form>
+{{end}}
 
+{{define "wb_form_project_work"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
           x-data="{ memberRows: [], subtype: '', projectId: '', pickedKind: '', sites: [], q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
             suggestKind() {
@@ -365,7 +326,7 @@
           }">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}/workboard/register{{end}}">
       <input type="hidden" name="work_type" value="project_work">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''">← 종류 선택</button>
+      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">작업명 <span class="text-red-500">*</span></label>
         <input name="title" required maxlength="100" class="w-full border rounded-lg px-3 py-2 text-sm">
@@ -455,6 +416,61 @@
         <button type="submit" class="px-4 py-2 text-sm text-white bg-emerald-700 rounded-lg">저장</button>
       </div>
     </form>
+{{end}}
+
+{{define "wb_modals"}}
+{{if .CanWrite}}
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="typeof taskOpen !== 'undefined' && taskOpen" x-cloak
+     @keydown.escape.window="taskOpen=false">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] min-w-0 overflow-x-hidden overflow-y-auto" @click.outside="taskOpen=false">
+    <div class="flex items-center justify-between px-5 py-4 border-b">
+      <h3 class="font-semibold text-gray-800">일일 업무 등록</h3>
+      <button type="button" @click="taskOpen=false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+
+    <!-- 1단계: 업무 종류 선택 -->
+    <div class="p-5 space-y-3" x-show="!dailyKind" x-cloak>
+      <p class="text-sm text-gray-600">등록할 일일 업무 종류를 선택하세요.</p>
+      <button type="button" @click="dailyKind='admin'; workType='admin'"
+              class="w-full text-left border border-violet-200 rounded-xl px-4 py-3 hover:bg-violet-50">
+        <p class="font-medium text-gray-800">행정 / 지원업무</p>
+        <p class="text-xs text-gray-500 mt-0.5">사업·행정 관련 일일 업무를 직접 입력합니다.</p>
+      </button>
+      <button type="button" @click="dailyKind='as'"
+              class="w-full text-left border border-rose-200 rounded-xl px-4 py-3 hover:bg-rose-50">
+        <p class="font-medium text-gray-800">AS 일일업무</p>
+        <p class="text-xs text-gray-500 mt-0.5">AS 접수번호를 골라 업무 고유번호를 부여합니다.</p>
+      </button>
+      <button type="button" @click="dailyKind='maintenance'"
+              class="w-full text-left border border-sky-200 rounded-xl px-4 py-3 hover:bg-sky-50">
+        <p class="font-medium text-gray-800">정기점검 일일업무</p>
+        <p class="text-xs text-gray-500 mt-0.5">정기점검 번호를 골라 업무 고유번호를 부여합니다.</p>
+      </button>
+      <button type="button" @click="dailyKind='sales'; workType='sales'"
+              class="w-full text-left border border-orange-200 rounded-xl px-4 py-3 hover:bg-orange-50">
+        <p class="font-medium text-gray-800">영업 활동</p>
+        <p class="text-xs text-gray-500 mt-0.5">영업 사업·활동 관련 일일 업무를 등록합니다.</p>
+      </button>
+      <button type="button" @click="dailyKind='project_work'; workType='project_work'"
+              class="w-full text-left border border-emerald-200 rounded-xl px-4 py-3 hover:bg-emerald-50">
+        <p class="font-medium text-gray-800">작업</p>
+        <p class="text-xs text-gray-500 mt-0.5">구축·공사 작업을 일일 업무로 등록합니다.</p>
+      </button>
+      <div class="flex justify-end pt-1">
+        <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
+      </div>
+    </div>
+
+    <!-- 행정/지원 · 영업 활동 -->
+    {{template "wb_form_admin_sales" .}}
+
+    <!-- AS 일일업무 -->
+    {{template "wb_form_as" .}}
+
+    <!-- 정기점검 일일업무 -->
+    {{template "wb_form_maintenance" .}}
+
+    {{template "wb_form_project_work" .}}
   </div>
 </div>
 
@@ -598,43 +614,47 @@
 </div>
 <script>
 (function () {
-  document.querySelectorAll('form.js-keep-modal').forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      if (form.dataset.keepSkip === '1') return;
-      e.preventDefault();
-      var btns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
-      btns.forEach(function (b) { b.disabled = true; });
-      var fd = new FormData(form);
-      fetch(form.action, {
-        method: 'POST',
-        body: fd,
-        credentials: 'same-origin',
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
-      }).then(function (r) {
-        if (r.redirected && r.url) { window.location.assign(r.url); return; }
-        if (r.ok) {
-          var dest = fd.get('redirect') || fd.get('back') || window.location.href;
-          window.location.assign(dest);
-          return;
-        }
-        return r.json().then(function (j) {
-          var msg = (j && j.message) ? j.message : '저장하지 못했습니다';
-          if (window.showFlashError) window.showFlashError(msg);
-        }).catch(function () {
-          if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
-        });
+  if (window.__wbKeepModalBound) return;
+  window.__wbKeepModalBound = true;
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || !form.classList || !form.classList.contains('js-keep-modal')) return;
+    if (form.dataset.keepSkip === '1') return;
+    e.preventDefault();
+    var btns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+    btns.forEach(function (b) { b.disabled = true; });
+    var fd = new FormData(form);
+    fetch(form.action, {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
+    }).then(function (r) {
+      if (r.redirected && r.url) { window.location.assign(r.url); return; }
+      if (r.ok) {
+        var dest = fd.get('redirect') || fd.get('back') || window.location.href;
+        window.location.assign(dest);
+        return;
+      }
+      return r.json().then(function (j) {
+        var msg = (j && j.message) ? j.message : '저장하지 못했습니다';
+        if (window.showFlashError) window.showFlashError(msg);
       }).catch(function () {
-        form.dataset.keepSkip = '1';
-        form.submit();
-      }).finally(function () {
-        btns.forEach(function (b) { b.disabled = false; });
+        if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
       });
+    }).catch(function () {
+      form.dataset.keepSkip = '1';
+      form.submit();
+    }).finally(function () {
+      btns.forEach(function (b) { b.disabled = false; });
     });
   });
 })();
-(function () {
+window.bindASRegisterLookup = function () {
   var q = document.getElementById('as-register-q');
   var box = document.getElementById('as-lookup-status');
+  if (!q || !box || q.dataset.lookupBound === '1') return;
+  q.dataset.lookupBound = '1';
   if (!q || !box) return;
   var timer = null, last = null;
   function txt(s) { return document.createTextNode(s || ''); }
@@ -723,7 +743,8 @@
     clearTimeout(timer);
     timer = setTimeout(lookup, 250);
   });
-})();
+};
+window.bindASRegisterLookup();
 </script>
 {{end}}
 {{end}}
