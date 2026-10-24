@@ -87,6 +87,10 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 	}
 	metricsBase := metricsViewData(h.repo)
 	lb := parseLookback(c, metricsBase, now)
+	var weeklyProjects []model.WorkProject
+	if org != repository.OrgAll && h.repo != nil {
+		weeklyProjects, _ = h.repo.ListWeeklyRowProjects(org)
+	}
 
 	return c.Render(http.StatusOK, "stats/reports.html", map[string]interface{}{
 		"Title":                 "보고서",
@@ -116,6 +120,11 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		"CompanyOrgSelected":    companyWeeklyOrgSelected(c),
 		"CompanyReportStatus":   companyDraft.ReportStatus,
 		"OrgName":               currentOrgName(c),
+		"ViewOrgID":             org,
+		"WeeklyProjects":        weeklyProjects,
+		"FlashOK":               c.QueryParam("ok"),
+		"FlashErr":              c.QueryParam("err"),
+		"NeedRow":               c.QueryParam("need_row"),
 	})
 }
 

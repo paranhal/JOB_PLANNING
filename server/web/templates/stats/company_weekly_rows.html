@@ -14,6 +14,24 @@
   <div class="rounded-xl border border-line bg-surface px-4 py-3 text-ui text-ink">전체 보기에서는 행을 고칠 수 없습니다. 조직을 선택하세요.</div>
   {{end}}
 
+  {{if .FlashOK}}<p class="flash-success rounded-card">{{.FlashOK}}</p>{{end}}
+  {{if .FlashErr}}<p class="flash-warning rounded-card">{{.FlashErr}}</p>{{end}}
+
+  {{if and .CanWrite .MissingProjects}}
+  <form method="POST" action="/stats/company-weekly/rows/from-projects" class="rounded-xl border border-line bg-surface p-4 space-y-2">
+    <h3 class="text-ui font-extrabold text-ink">미연결 사업에서 추가</h3>
+    <p class="text-ui-sm text-ink-muted">최근 8주 이내 이 조직 업무가 있는데 행이 없는 사업입니다.</p>
+    {{range .MissingProjects}}
+    <label class="flex items-center gap-2 text-ui text-ink">
+      <input type="checkbox" name="project_id" value="{{.ProjectID}}" checked class="rounded">
+      {{.ProjectName}} <span class="text-ui-xs text-ink-muted">{{.Count}}건 · {{.KindSummary}}</span>
+    </label>
+    {{end}}
+    <label class="inline-flex items-center gap-2 text-ui-sm text-ink"><input type="checkbox" name="confirm_foreign" value="1" class="rounded"> 타 조직 사업 확인</label>
+    <button class="btn btn-primary">선택한 사업을 보고서 행으로 추가</button>
+  </form>
+  {{end}}
+
   {{if .CanWrite}}
   <form method="POST" action="/stats/company-weekly/rows" class="rounded-xl border border-line bg-surface p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" data-weekly-row-form>
     <div><label class="block text-ui-sm text-ink-muted mb-1">부문/실</label><input name="division" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>

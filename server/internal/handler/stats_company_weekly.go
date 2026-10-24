@@ -297,16 +297,23 @@ func companyWeeklyResultData(c echo.Context, draft model.CompanyWeeklyDraft, she
 	if n := len(draft.Rows); n > 0 {
 		to = companyWeeklyFirstRow + n - 1
 	}
+	org := currentOrg(c)
 	data := map[string]interface{}{
-		"Title":            "보고서",
-		"Active":           NavStatsReports,
-		"CompanyWeekly":    draft,
-		"CompanySheetName": sheetName,
-		"DownloadToken":    token,
-		"Error":            errMsg,
-		"OrgName":          orgName,
-		"RowFrom":          from,
-		"RowTo":            to,
+		"Title":                 "보고서",
+		"Active":                NavStatsReports,
+		"CompanyWeekly":         draft,
+		"CompanySheetName":      sheetName,
+		"DownloadToken":         token,
+		"Error":                 errMsg,
+		"OrgName":               orgName,
+		"RowFrom":               from,
+		"RowTo":                 to,
+		"CanWriteCompanyWeekly": canWriteCompanyWeekly(c),
+		"ViewOrgID":             org,
+		"CompanyDate":           draft.Period.Anchor,
+		"FlashOK":               c.QueryParam("ok"),
+		"FlashErr":              c.QueryParam("err"),
+		"NeedRow":               c.QueryParam("need_row"),
 	}
 	if result != nil {
 		data["BuildMode"] = result.Mode

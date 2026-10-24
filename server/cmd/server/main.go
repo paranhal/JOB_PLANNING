@@ -512,6 +512,8 @@ func main() {
 	stats.POST("/company-weekly/confirm", h.Stats.ConfirmCompanyWeekly)
 	stats.GET("/company-weekly/rows", h.Stats.ListCompanyWeeklyRows)
 	stats.POST("/company-weekly/rows", h.Stats.CreateCompanyWeeklyRow)
+	stats.POST("/company-weekly/rows/from-projects", h.Stats.CreateCompanyWeeklyRowsFromProjects)
+	stats.POST("/company-weekly/tasks/project", h.Stats.LinkWeeklyTasksProject)
 	stats.POST("/company-weekly/rows/:key/update", h.Stats.UpdateCompanyWeeklyRow)
 	stats.POST("/company-weekly/rows/:key/toggle", h.Stats.ToggleCompanyWeeklyRow)
 	stats.GET("/detail", h.Stats.List)

@@ -42,6 +42,10 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		v = built
 		markCardsEditable(&v, c.QueryParam("edit") == "1" && v.CanEdit)
 	}
+	var projects []model.WorkProject
+	if !needOrg && h.repo != nil {
+		projects, _ = h.repo.ListWeeklyRowProjects(orgID)
+	}
 	return c.Render(http.StatusOK, "stats/company_weekly.html", map[string]interface{}{
 		"Title": "주간 업무 보고서", "Active": NavStatsWeekly, "View": v,
 		"Week": week.Format("2006-01-02"), "PrevWeek": week.AddDate(0, 0, -7).Format("2006-01-02"),
@@ -49,6 +53,11 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		"ThisWeek": parseWeekMonday("", now).Format("2006-01-02"),
 		"CanExportAll": weeklyCanExportAll(c),
 		"Edit":         c.QueryParam("edit") == "1" && v.CanEdit,
+		"WeeklyProjects": projects,
+		"FlashOK":        c.QueryParam("ok"),
+		"FlashErr":       c.QueryParam("err"),
+		"NeedRow":        c.QueryParam("need_row"),
+		"NeedReagg":      c.QueryParam("reagg") == "1",
 	})
 }
 
