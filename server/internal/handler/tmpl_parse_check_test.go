@@ -46,6 +46,7 @@ func TestAllTemplatesParse(t *testing.T) {
 		if spartials, err := filepath.Glob(filepath.Join(root, "sort", "_*.html")); err == nil {
 			files = append(files, spartials...)
 		}
+		files = append(files, filepath.Join(root, "_customer_combo.html"), filepath.Join(root, "_classify_hint.html"))
 		if strings.Contains(filepath.ToSlash(page), "/admin_work/") {
 			files = append(files, filepath.Join(root, "workboard", "_recurrence_fields.html"))
 		}
