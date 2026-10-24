@@ -46,7 +46,7 @@ func TestCreateSupportHTTPAndCompleteWarnAllow(t *testing.T) {
 	}
 
 	show := httptest.NewRecorder()
-	sreq := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	sreq := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
 	sreq.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, sreq)
 	body := show.Body.String()

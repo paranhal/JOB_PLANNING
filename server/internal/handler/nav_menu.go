@@ -194,6 +194,7 @@ func navDefinition() []navDefGroup {
 					{ID: "work_today", Label: "오늘 업무 (예전)", Href: "/work", Active: []string{NavWork, NavWorkPlan}, Show: role, Badge: "assign"},
 					{ID: "work_all", Label: "전체 업무 (예전)", Href: "/work/all", Active: []string{NavWorkAll}, Show: role},
 					{ID: "reports_legacy", Label: "보고서 (예전)", Href: "/stats/reports", Active: []string{NavStatsReports, NavStatsDetail}, Show: func(c MenuCtx) bool { return c.visStatsCore() }},
+					{ID: "as_show_legacy", Label: "AS 접수 상세 (예전)", Href: "/as?legacy=1", Active: []string{NavASShowLegacy}, Show: role},
 				}},
 			},
 		},

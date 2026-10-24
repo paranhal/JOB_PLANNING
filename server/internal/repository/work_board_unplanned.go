@@ -600,7 +600,7 @@ func toUnplannedItem(it model.WorkListItem) model.UnplannedItem {
 	key := unplannedItemKey(it)
 	if strings.HasPrefix(key, "as:") {
 		u.CanNoDate = true
-		u.Href = "/as/" + it.RefID + "/action"
+		u.Href = model.ASOpenHref(it.RefID)
 	}
 	if it.Prefix == model.WorkPrefixMaintenance && !strings.HasPrefix(key, "slot:") {
 		u.Href = "/maintenance/visits/" + it.RefID + "/action"

@@ -339,7 +339,7 @@ func scanStatsCaseRows(rows *sql.Rows) ([]model.StatsRow, error) {
 			it.WorkForm = "AS"
 		}
 		if it.Href == "" && it.ASID != "" {
-			it.Href = "/as/" + it.ASID + "/action"
+			it.Href = model.ASOpenHref(it.ASID)
 		}
 		items = append(items, it)
 	}

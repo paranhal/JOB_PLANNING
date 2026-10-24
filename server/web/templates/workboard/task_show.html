@@ -30,14 +30,16 @@
       </div>
       <p class="text-sm text-gray-500 mt-1">업무 고유번호 <span class="font-mono text-gray-800">{{$t.TaskID}}</span>
         {{if .Parent}} · 상위 <a href="/workboard/tasks/{{.Parent.TaskID}}" class="text-blue-600 hover:underline">{{.Parent.Title}}</a>{{end}}
-        {{if .MovedFromAS}} · <a href="/as/{{.MovedFromAS.ASID}}" class="text-violet-700 hover:underline">{{.MovedFromAS.ASNumber}} 에서 옮겨옴</a>{{end}}
+        {{if .MovedFromAS}} · <a href="{{asHref .MovedFromAS.ASID}}" class="text-violet-700 hover:underline">{{.MovedFromAS.ASNumber}} 에서 옮겨옴</a>{{end}}
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
       {{if and $isAS .SourceHref}}
+      {{if and .CanAction .ActionHref (ne .ActionHref .SourceHref)}}
       <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-rose-300 text-rose-800 rounded-lg hover:bg-rose-50">AS접수이동</a>
-      {{if and .CanAction .ActionHref}}
       <a href="{{.ActionHref}}" class="px-3 py-1.5 text-sm {{if .ASClosed}}bg-slate-700 hover:bg-slate-800{{else}}bg-blue-600 hover:bg-blue-700{{end}} text-white rounded-lg">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치{{end}}</a>
+      {{else}}
+      <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-rose-300 text-rose-800 rounded-lg hover:bg-rose-50">AS 열기</a>
       {{end}}
       {{end}}
       {{if and $isMnt .CanAction .ActionHref}}

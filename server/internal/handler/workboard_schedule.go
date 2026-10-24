@@ -115,7 +115,7 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 	switch t.SourceType {
 	case model.WBSourceAS:
 		card.SourceNumber = t.SourceID
-		card.SourceHref = "/as/" + t.SourceID
+		card.SourceHref = asOpenHref(t.SourceID)
 	case model.WBSourceMaintenance:
 		card.SourceNumber = t.SourceID
 		// 상세는 Show에서 plan 링크로 보강. 기본은 업무 상세.

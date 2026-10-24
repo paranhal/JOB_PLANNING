@@ -294,6 +294,8 @@ func funcMap() template.FuncMap {
 		"hasSuffix":          strings.HasSuffix,
 		"urlquery":           url.QueryEscape,
 		"workboardHomeURL":   workboardHomeURL,
+		"asHref":             model.ASOpenHref,
+		"asLegacyHref":       model.ASLegacyHref,
 		"weekdayKo":          weekdayKo,
 		"visitPeopleIDs":     visitPeopleIDsCSV,
 		"visitOwnerID":       visitOwnerUserID,
@@ -455,7 +457,7 @@ func funcMap() template.FuncMap {
 			id := strings.TrimSpace(n.SourceID)
 			switch n.SourceType {
 			case model.AssignNoticeSourceAS:
-				return "/as/" + id + "?embed=1"
+				return asEmbedHref(id)
 			case model.AssignNoticeSourceMaintenance:
 				return "/maintenance/visits/" + id + "?embed=1"
 			default:

@@ -123,7 +123,7 @@ func (r *WBRepo) ListAssetSupportHistory(assetID string, limit int) ([]model.Ass
 			return nil, err
 		}
 		ev.Kind = "as"
-		ev.Href = "/as/" + ev.ID
+		ev.Href = model.ASOpenHref(ev.ID)
 		ev.SortAt = at
 		if t := parseTime(at); !t.IsZero() {
 			ev.Date = t.Format("2006-01-02")

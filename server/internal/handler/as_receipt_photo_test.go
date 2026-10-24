@@ -121,7 +121,7 @@ func TestASReceiptPhotoStoredSeparatelyAndResized(t *testing.T) {
 	}
 
 	show := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"?legacy=1", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, req)
 	if show.Code != http.StatusOK {
@@ -176,7 +176,7 @@ func TestASReceiptPhotoPDFKeepsName(t *testing.T) {
 		t.Fatal("pdf에 썸네일이 생기면 안 된다")
 	}
 	show := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"?legacy=1", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, req)
 	if !strings.Contains(show.Body.String(), "접수서_스캔.pdf") {
@@ -359,10 +359,7 @@ func TestASCreateUploadsReceiptPhoto(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	loc := rec.Header().Get("Location")
-	asID := strings.TrimPrefix(loc, "/as/")
-	if i := strings.Index(asID, "?"); i >= 0 {
-		asID = asID[:i]
-	}
+	asID := asIDFromHref(loc)
 	if asID == "" || strings.Contains(asID, "/") {
 		t.Fatalf("redirect: %s", loc)
 	}

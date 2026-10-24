@@ -101,7 +101,7 @@ func postASReport(t *testing.T, e *echo.Echo, asID string, d model.ASReportDraft
 func TestASShowReportButtonDisabledWhenNotComplete(t *testing.T) {
 	e, _, _, _, asID := newASReportFixture(t)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -309,7 +309,7 @@ func TestASShowListsReportHistory(t *testing.T) {
 		t.Fatalf("발급 실패 %d", rec.Code)
 	}
 	page := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(page, req)
 	body := page.Body.String()

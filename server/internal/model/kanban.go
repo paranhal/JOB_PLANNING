@@ -513,7 +513,7 @@ func KanbanCardFromAS(it ASListItem) KanbanCard {
 		RefID:       it.ASID,
 		RefNumber:   it.ASNumber,
 		Title:       it.OrgName,
-		Href:        "/as/" + it.ASID,
+		Href:        ASOpenHref(it.ASID),
 		OrgName:     it.OrgName,
 		Assignee:    it.AssignedTo,
 		Prefix:      WorkPrefixAS,

@@ -35,9 +35,9 @@ func (h *ASHandler) CreateSupport(c echo.Context) error {
 	w.AssignedTo, w.AssignedUserID = resolveAssigneeFormFields(c, h.userRepo,
 		"assigned_to_code", "assigned_to_custom", "assigned_to")
 	if err := h.workRepo.CreateSupport(w, d); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+url.QueryEscape(err.Error()))
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+url.QueryEscape(err.Error())))
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"?ok="+url.QueryEscape("지원업무를 등록했습니다"))
+	return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "ok="+url.QueryEscape("지원업무를 등록했습니다")))
 }
 
 func supportDetailFromForm(c echo.Context) model.ASSupportDetail {

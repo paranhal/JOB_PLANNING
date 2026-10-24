@@ -71,7 +71,7 @@
   {{if .Items}}
   <div class="space-y-3">
     {{range .Items}}
-    <a href="/as/{{.ASID}}" class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm">
+    <a href="{{asHref .ASID}}" class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm">
       <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-2">
         <span class="font-mono text-sm font-semibold text-blue-700">{{.ASNumber}}</span>
         <span>{{.OrgName}}</span>

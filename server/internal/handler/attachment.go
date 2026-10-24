@@ -831,7 +831,7 @@ func (h *AttachmentHandler) PromoteToAsset(c echo.Context) error {
 	if !att.IsImage() {
 		return echo.NewHTTPError(http.StatusBadRequest, "이미지만 자산 사진으로 옮길 수 있습니다")
 	}
-	redirect := attachmentRedirect(c, "/as/"+as.ASID)
+	redirect := attachmentRedirect(c, asOpenHref(as.ASID))
 
 	slotOverride := 0
 	if v := strings.TrimSpace(c.FormValue("slot_no")); v != "" {

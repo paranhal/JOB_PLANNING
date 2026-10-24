@@ -108,7 +108,7 @@ func (r *WorkStatusRepo) listAS(start, endEx, phase string) ([]model.WorkCalItem
 		}
 		it.Category = "as"
 		it.Date = trimDate(d)
-		it.Link = "/as/" + it.ID
+		it.Link = model.ASOpenHref(it.ID)
 		items = append(items, it)
 	}
 	return items, rows.Err()

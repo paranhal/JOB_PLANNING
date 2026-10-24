@@ -480,7 +480,7 @@ func (r *StatsRepo) ListCompletedDetail(from, toEx string, f model.StatsMeetingF
 			it.ProductModel = strings.TrimSpace(productName)
 		}
 		it.WorkForm = "AS"
-		it.Href = "/as/" + it.ASID + "/action"
+		it.Href = model.ASOpenHref(it.ASID)
 		it.ReceiptForm = mapReceiptForm(channel, reqType)
 		it.StatusLabel = statsStatusLabel(it.Status)
 		if it.Assignee == "" {
@@ -681,7 +681,7 @@ func (r *StatsRepo) ListNegativeLeadSpans(from, toEx string, f model.StatsMeetin
 			it.CompleteDate = it.CompleteDate[:10]
 		}
 		it.WorkForm = "AS"
-		it.Href = "/as/" + it.ASID + "/action"
+		it.Href = model.ASOpenHref(it.ASID)
 		it.Status = status
 		it.StatusLabel = statsStatusLabel(status)
 		items = append(items, it)

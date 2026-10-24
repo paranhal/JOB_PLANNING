@@ -34,7 +34,7 @@ func TestASCreateThenShow(t *testing.T) {
 	if !strings.HasPrefix(loc, "/as/R") {
 		t.Fatalf("redirect: %s", loc)
 	}
-	got, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(loc, "/as/"))
+	got, err := asRepo.GetByID(repository.OrgAll, asIDFromHref(loc))
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestASCreateStampsIsTestFromTesterFlag(t *testing.T) {
 		if !strings.HasPrefix(loc, "/as/R") {
 			t.Fatalf("%s redirect: %s", u.Username, loc)
 		}
-		return strings.TrimPrefix(loc, "/as/")
+		return asIDFromHref(loc)
 	}
 
 	var testerFlag, normalFlag int
@@ -214,7 +214,7 @@ func TestASCreateMultiEquipmentGroup(t *testing.T) {
 	if !strings.HasPrefix(loc, "/as/R") {
 		t.Fatalf("redirect: %s", loc)
 	}
-	first, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(loc, "/as/"))
+	first, err := asRepo.GetByID(repository.OrgAll, asIDFromHref(loc))
 	if err != nil || first == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestASCreateUrgencyReasonSetsHighAndConfirmsDate(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	got, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(rec.Header().Get("Location"), "/as/"))
+	got, err := asRepo.GetByID(repository.OrgAll, asIDFromHref(rec.Header().Get("Location")))
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -340,7 +340,7 @@ func TestASCreateNoneReasonLeavesNormalUnconfirmed(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status=%d", rec.Code)
 	}
-	got, err := asRepo.GetByID(repository.OrgAll, strings.TrimPrefix(rec.Header().Get("Location"), "/as/"))
+	got, err := asRepo.GetByID(repository.OrgAll, asIDFromHref(rec.Header().Get("Location")))
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)
 	}

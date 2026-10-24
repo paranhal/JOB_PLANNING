@@ -164,9 +164,13 @@ func (c WBCard) DetailHref() string {
 		}
 	}
 	if c.Category == WBSourceAS {
-		asID := strings.TrimPrefix(c.SourceHref, "/as/")
+		src := strings.TrimSpace(c.SourceHref)
+		if strings.HasSuffix(src, "/action") {
+			return src
+		}
+		asID := strings.TrimPrefix(src, "/as/")
 		if asID != "" && !strings.Contains(asID, "/") {
-			return "/as/" + asID + "/action"
+			return ASOpenHref(asID)
 		}
 	}
 	if c.Category == WBSourceMaintenance {
@@ -888,7 +892,7 @@ func (t WorkTask) DetailHref() string {
 		return "/workboard/tasks/" + t.TaskID
 	}
 	if t.SourceType == WBSourceAS && t.SourceID != "" {
-		return "/as/" + t.SourceID
+		return ASOpenHref(t.SourceID)
 	}
 	if t.SourceType == WBSourceMaintenance && t.SourceID != "" {
 		return "/maintenance/visits/" + t.SourceID

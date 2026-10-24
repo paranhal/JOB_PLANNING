@@ -127,7 +127,7 @@
         <li class="px-4 py-3 hover:bg-gray-50">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <a href="/as/{{.ASID}}" class="font-medium text-blue-600 hover:underline shrink-0">{{.ASNumber}}</a>
+              <a href="{{asHref .ASID}}" class="font-medium text-blue-600 hover:underline shrink-0">{{.ASNumber}}</a>
               <span class="font-medium text-gray-800">{{.CustomerName}}</span>
               {{if .ProductModel}}<span class="text-gray-500">· {{.ProductModel}}</span>{{end}}
               <span class="text-gray-500">· {{.ReceiptForm}}</span>
@@ -226,7 +226,7 @@
             <td class="px-3 py-2 text-gray-700 max-w-[14rem]"><div class="whitespace-pre-line line-clamp-3" title="{{.Symptom}}">{{if .Symptom}}{{.Symptom}}{{else}}—{{end}}</div></td>
             <td class="px-3 py-2 text-gray-800 max-w-[18rem]"><div class="whitespace-pre-line {{if eq $.Metric "completed"}}line-clamp-6{{else}}line-clamp-3{{end}}" title="{{.ActionTaken}}">{{if .ActionTaken}}{{.ActionTaken}}{{else}}—{{end}}</div></td>
             <td class="px-3 py-2 whitespace-nowrap">
-              <a href="/as/{{.ASID}}/action" class="inline-flex items-center gap-1 text-blue-600 hover:underline">{{statusBadge .Status}}</a>
+              <a href="{{asHref .ASID}}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">{{statusBadge .Status}}</a>
             </td>
           </tr>
           {{end}}

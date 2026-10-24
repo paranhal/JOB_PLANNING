@@ -122,7 +122,7 @@ func TestASAssignedWithoutDateAppearsUndatedOnRegister(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/as/") {
 		t.Fatalf("접수 loc=%s status=%d", rec.Header().Get("Location"), rec.Code)
 	}
-	asID := strings.TrimPrefix(rec.Header().Get("Location"), "/as/")
+	asID := asIDFromHref(rec.Header().Get("Location"))
 	task, err := wb.GetTaskBySource(model.WBSourceAS, asID)
 	if err != nil || task == nil {
 		t.Fatalf("예정일 없이 일일업무가 없다: %+v err=%v", task, err)
@@ -149,7 +149,7 @@ func TestASAssignedWithoutDateAppearsUndatedOnRegister(t *testing.T) {
 	var asCount int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM work_tasks WHERE source_type='as'`).Scan(&asCount)
 	show := doGet(t, e, "/as/"+asID)
-	if show.Code != http.StatusOK {
+	if show.Code != http.StatusFound && show.Code != http.StatusOK {
 		t.Fatalf("show status=%d", show.Code)
 	}
 	list := doGet(t, e, "/as")
@@ -178,7 +178,7 @@ func TestASUnassignedStaysInUnplannedNotDaily(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create status=%d", rec.Code)
 	}
-	asID := strings.TrimPrefix(rec.Header().Get("Location"), "/as/")
+	asID := asIDFromHref(rec.Header().Get("Location"))
 	task, err := wb.GetTaskBySource(model.WBSourceAS, asID)
 	if err != nil || task != nil {
 		t.Fatalf("미배정은 일일업무에 있으면 안 된다: %+v", task)
@@ -219,7 +219,7 @@ func TestASAssigneeChangeFollowsUntilManual(t *testing.T) {
 		"assigned_to":      {"양기헌"},
 		"receipt_datetime": {"2026-08-10T10:00"},
 	})
-	asID := strings.TrimPrefix(rec.Header().Get("Location"), "/as/")
+	asID := asIDFromHref(rec.Header().Get("Location"))
 	as, err := h.AS.repo.GetByID(repository.OrgAll, asID)
 	if err != nil || as == nil {
 		t.Fatal(err)

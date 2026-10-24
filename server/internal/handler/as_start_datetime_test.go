@@ -137,7 +137,7 @@ func TestASShowDisplaysStartDatetimeReadOnly(t *testing.T) {
 	want := "착수 " + got.StartDatetime.Format("2006-01-02 15:04")
 
 	page := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"?legacy=1", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(page, req)
 	if page.Code != http.StatusOK {

@@ -221,7 +221,7 @@ func (h *ASHandler) ReportIssue(c echo.Context) error {
 	if strings.TrimSpace(c.FormValue("return_file")) == "1" {
 		return writeDownloadBytes(c, data, mime, asciiName, utf8Name)
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?ok=report_saved")
+	return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(as.ASID, "ok=report_saved"))
 }
 
 func reportStampName(u *model.User, draftName string) string {

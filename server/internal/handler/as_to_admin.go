@@ -66,7 +66,7 @@ func (h *ASHandler) ToAdminWork(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if !canMoveASToAdminWork(c, as) {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=move_admin")
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=move_admin"))
 	}
 	reason := strings.TrimSpace(c.FormValue("reason"))
 	_, err = h.repo.MoveToAdminWork(id, reason)
@@ -77,8 +77,8 @@ func (h *ASHandler) ToAdminWork(c echo.Context) error {
 		} else if errors.Is(err, repository.ErrASAlreadyMoved) {
 			code = "move_done"
 		}
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+code)
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
 	}
 	h.syncASPlannedDailyTask(id)
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"?ok=moved")
+	return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "ok=moved"))
 }

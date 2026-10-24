@@ -24,6 +24,7 @@ func oldSidebarCatalog() []oldNavLink {
 		{Href: "/leaves", Channel: "sidebar"},
 		{Href: "/approvals/inbox", Channel: "sidebar"},
 		{Href: "/as", Channel: "sidebar"},
+		{Href: "/as?legacy=1", Channel: "sidebar", Via: "legacy_views"},
 		{Href: "/as/knowledge", Channel: "sidebar"},
 		{Href: "/maintenance", Channel: "sidebar"},
 		{Href: "/maintenance/sites", Channel: "sidebar"},

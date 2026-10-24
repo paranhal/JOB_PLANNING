@@ -48,7 +48,7 @@ func TestASCreateDirectCustomer(t *testing.T) {
 		t.Fatalf("create status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	loc := rec.Header().Get("Location")
-	id := strings.TrimPrefix(loc, "/as/")
+	id := asIDFromHref(loc)
 	got, err := asRepo.GetByID(repository.OrgAll, id)
 	if err != nil || got == nil {
 		t.Fatalf("get: %v", err)

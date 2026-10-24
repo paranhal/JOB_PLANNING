@@ -110,7 +110,7 @@ func (r *WBRepo) plannedASSources(from, to string) ([]model.WorkTask, error) {
 			Tags:        num,
 			SourceType:  model.WBSourceAS,
 			SourceID:    id,
-			BoardHref:   "/as/" + id,
+			BoardHref:   model.ASOpenHref(id),
 		})
 	}
 	return out, rows.Err()

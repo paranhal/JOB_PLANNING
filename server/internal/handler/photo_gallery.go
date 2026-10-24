@@ -56,7 +56,7 @@ func receiptGalleryFromPage(as *model.ASReceipt, data map[string]interface{}) Ph
 		title = "증상 사진"
 	}
 	if redirect == "" && as != nil {
-		redirect = "/as/" + as.ASID
+		redirect = asOpenHref(as.ASID)
 	}
 	return PhotoGalleryVM{
 		AS:                as,

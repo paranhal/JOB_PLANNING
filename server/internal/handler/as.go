@@ -165,9 +165,14 @@ func (h *ASHandler) List(c echo.Context) error {
 
 	kanbanLink := cloneURLValues(listBase)
 	kanbanLink.Set("display", "kanban")
+	legacyLinks := applyASListLegacy(c, listBase, kanbanLink)
+	active := NavAS
+	if legacyLinks {
+		active = NavASShowLegacy
+	}
 
 	return c.Render(http.StatusOK, "as/list.html", map[string]interface{}{
-		"Title": "AS 관리", "Active": NavAS,
+		"Title": "AS 관리", "Active": active,
 		"Items": items, "Total": total,
 		"Page": page, "TotalPages": totalPages,
 		"Status": status, "Search": search,
@@ -183,8 +188,9 @@ func (h *ASHandler) List(c echo.Context) error {
 		"AssigneeID":  assigneeID, "AssigneeName": assigneeName,
 		"IsHoldList": status == "hold",
 		"Display":    "list",
-		"KanbanHref": "/as?" + kanbanLink.Encode(),
-		"ListHref":   "/as?" + listBase.Encode(),
+		"KanbanHref":  "/as?" + kanbanLink.Encode(),
+		"ListHref":    "/as?" + listBase.Encode(),
+		"LegacyLinks": legacyLinks,
 	})
 }
 
@@ -208,8 +214,13 @@ func (h *ASHandler) renderASKanban(c echo.Context, status, search, mineUserID st
 	listQ := cloneURLValues(listBase)
 	listQ.Del("display")
 	listQ.Del("view")
+	legacyLinks := applyASListLegacy(c, listBase, kanbanQ, listQ)
+	active := NavAS
+	if legacyLinks {
+		active = NavASShowLegacy
+	}
 	return c.Render(http.StatusOK, "as/kanban.html", map[string]interface{}{
-		"Title": "AS 관리", "Active": NavAS,
+		"Title": "AS 관리", "Active": active,
 		"KanbanColumns": board.Columns,
 		"KanbanTotal":   board.Total,
 		"KanbanDrag":    false,
@@ -219,10 +230,23 @@ func (h *ASHandler) renderASKanban(c echo.Context, status, search, mineUserID st
 		"Search":        search, "Mine": mine, "Role": role,
 		"Status":     status,
 		"CanReceive": canReceiveAS(c), "CanProcess": canProcessAS(c),
-		"ListHref":   "/as?" + listQ.Encode(),
-		"KanbanHref": "/as?" + kanbanQ.Encode(),
-		"Display":    "kanban",
+		"ListHref":    "/as?" + listQ.Encode(),
+		"KanbanHref":  "/as?" + kanbanQ.Encode(),
+		"Display":     "kanban",
+		"LegacyLinks": legacyLinks,
 	})
+}
+
+func applyASListLegacy(c echo.Context, sets ...url.Values) bool {
+	if c.QueryParam("legacy") != "1" {
+		return false
+	}
+	for _, v := range sets {
+		if v != nil {
+			v.Set("legacy", "1")
+		}
+	}
+	return true
 }
 
 // Kanban /as/kanban — /as?display=kanban 과 같다.
@@ -675,12 +699,12 @@ func (h *ASHandler) UpdateCustomerDirect(c echo.Context) error {
 		return h.redirectLocked(c, id, "action")
 	}
 	if _, err := h.applyDirectCustomer(c, as); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+url.QueryEscape(err.Error()))
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+url.QueryEscape(err.Error())))
 	}
 	if err := h.repo.UpdateReceipt(as); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 func (h *ASHandler) Create(c echo.Context) error {
@@ -730,7 +754,7 @@ func (h *ASHandler) Create(c echo.Context) error {
 								msg = s
 							}
 						}
-						return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID+"?err="+url.QueryEscape(msg))
+						return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(as.ASID, "err="+url.QueryEscape(msg)))
 					}
 				}
 			}
@@ -740,7 +764,7 @@ func (h *ASHandler) Create(c echo.Context) error {
 	if first == nil {
 		return c.Redirect(http.StatusSeeOther, "/as/new?err="+url.QueryEscape("증상을 입력하세요"))
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+first.ASID)
+	return c.Redirect(http.StatusSeeOther, asOpenHref(first.ASID))
 }
 
 func (h *ASHandler) Edit(c echo.Context) error {
@@ -831,7 +855,7 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	}
 	h.saveKeywordChecks(c, id, model.KWFieldSymptom)
 	h.rebuildDictKeywordLinks(id)
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 // UpdateVisitDate 상세에서 방문 예정일만 수정 (관리자·배정담당자)
@@ -846,14 +870,14 @@ func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	}
 	date, err := model.ParseAppDate(c.FormValue("visit_scheduled_date"))
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err=date_year")
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=date_year"))
 	}
 	confirmed := model.SyncScheduleConfirmed(date)
 	if err := h.repo.UpdateVisitScheduledDate(id, date, confirmed); err != nil {
 		return err
 	}
 	h.syncASPlannedDailyTask(id)
-	return c.Redirect(http.StatusSeeOther, "/as/"+id)
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 // syncASPlannedDailyTask 담당자가 있으면 일일업무(work_tasks)를 만들고/맞춘다. §42.2
@@ -876,6 +900,16 @@ func (h *ASHandler) Show(c echo.Context) error {
 	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
+	}
+
+	embed := c.QueryParam("embed") == "1"
+	legacy := c.QueryParam("legacy") == "1"
+	if !embed && !legacy {
+		loc := asOpenHref(id)
+		if qs := strings.TrimSpace(c.QueryString()); qs != "" {
+			loc += "?" + qs
+		}
+		return c.Redirect(http.StatusFound, loc)
 	}
 
 	var customer *model.Customer
@@ -907,9 +941,12 @@ func (h *ASHandler) Show(c echo.Context) error {
 	if unlocked && !unlockExp.IsZero() {
 		unlockExpLocal = unlockExp.Format("15:04")
 	}
-	embed := c.QueryParam("embed") == "1"
+	active := NavAS
+	if legacy {
+		active = NavASShowLegacy
+	}
 	data := map[string]interface{}{
-		"Title": as.ASNumber, "Active": NavAS, "AS": as,
+		"Title": as.ASNumber, "Active": active, "AS": as,
 		"Customer": customer, "Asset": asset,
 		"ParentAS":          parent,
 		"Reopens":           reopens,
@@ -933,6 +970,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"ActionOK":          asShowOK(c.QueryParam("ok")),
 		"OpenDaily":         !embed && c.QueryParam("daily") == "1",
 		"Embed":             embed,
+		"LegacyBanner":      legacy && !embed,
 	}
 	if as.ReceiptGroupID != "" {
 		mates, _ := h.repo.ListByReceiptGroup(as.ReceiptGroupID)
@@ -949,6 +987,9 @@ func (h *ASHandler) Show(c echo.Context) error {
 		data["UserRole"] = ctxString(c, "role")
 		data["Username"] = ctxString(c, "username")
 		data["UserID"] = ctxString(c, "user_id")
+		data["PhotoRedirect"] = "/as/" + as.ASID + "?embed=1"
+	} else {
+		data["PhotoRedirect"] = asLegacyHref(as.ASID)
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	h.mergeASReportData(c, as, data)
@@ -979,7 +1020,9 @@ func (h *ASHandler) mergeReceiptPhotoData(c echo.Context, as *model.ASReceipt, d
 	data["CanEditPhotos"] = canEdit
 	data["CanPromote"] = (canWriteMaster(c) || canReceiveAS(c)) && as.AssetID != ""
 	data["AssetImageCount"] = assetCount
-	data["PhotoRedirect"] = "/as/" + as.ASID
+	if _, ok := data["PhotoRedirect"].(string); !ok {
+		data["PhotoRedirect"] = asOpenHref(as.ASID)
+	}
 	data["PhotoSectionTitle"] = "증상 사진"
 	data["HideIfEmpty"] = false
 	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
@@ -1109,18 +1152,36 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"AttachErrMsg":         attachErrMessage(c.QueryParam("err")),
 		"ActionWarn":           c.QueryParam("warn"),
 		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
-		"ActionOK":             c.QueryParam("ok"),
+		"ActionOK":             asShowOK(c.QueryParam("ok")),
 		"ConclusionDraft":      asConclusionDraft(as, processes),
 		"CanReceive":           canReceiveAS(c),
 		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
 		"KeywordField":         model.KWFieldAction,
 		"BackURL":              requestBackOrHome(c),
+		"CanMoveAdminWork":     canMoveASToAdminWork(c, as),
+		"CanReopen":            closed && canReceiveAS(c),
+		"CanEditReceipt":       canSaveASReceipt(c, as, canMod),
+		"CanDelete":            isAdminRole(c) && (!closed || canMod),
+	}
+	if as.ReceiptGroupID != "" {
+		mates, _ := h.repo.ListByReceiptGroup(as.ReceiptGroupID)
+		data["GroupMates"] = mates
+	}
+	if as.CustomerID != "" && h.customerRepo != nil {
+		if customer, _ := h.customerRepo.GetByID(as.CustomerID); customer != nil {
+			data["Customer"] = customer
+		}
+	}
+	if as.AssetID != "" && h.assetRepo != nil {
+		if asset, _ := h.assetRepo.GetByID(as.AssetID); asset != nil {
+			data["Asset"] = asset
+		}
 	}
 	h.mergeActionPartsData(c, as, data)
 	h.mergeReceiptPhotoData(c, as, data)
 	data["CanEditPhotos"] = false
 	data["CanPromote"] = false
-	data["PhotoRedirect"] = "/as/" + as.ASID + "/action"
+	data["PhotoRedirect"] = asOpenHref(as.ASID)
 	data["PhotoSectionTitle"] = "접수 시 증상 사진"
 	data["PhotoPanelClass"] = "bg-sky-50 border-2 border-sky-200"
 	data["HideIfEmpty"] = true
@@ -1150,7 +1211,7 @@ func (h *ASHandler) mergeActionPhotoData(as *model.ASReceipt, data map[string]in
 		Photos:            photos,
 		CanEditPhotos:     canEdit,
 		CanPromote:        false,
-		PhotoRedirect:     "/as/" + as.ASID + "/action",
+		PhotoRedirect:     asOpenHref(as.ASID),
 		PhotoSectionTitle: "조치 사진",
 		PhotoPanelClass:   "bg-white border border-slate-200",
 		HideIfEmpty:       false,
@@ -1224,11 +1285,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 		if savingAction {
 			resolved, code := model.ResolveActionContent(as.ActionTaken, na, naReason)
 			if code != "" {
-				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
+				return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
 			}
 			as.ActionTaken = resolved
 			if model.ActionContentTooShort(as.ActionTaken) && c.FormValue("action_short_ok") != "1" {
-				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+model.ActionErrShort)
+				return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+model.ActionErrShort))
 			}
 		}
 		as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
@@ -1273,28 +1334,28 @@ func (h *ASHandler) Update(c echo.Context) error {
 		followupNote := strings.TrimSpace(c.FormValue("followup_note"))
 
 		if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && nextVisit == "" {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=date_year"))
 		}
 		if raw := strings.TrimSpace(c.FormValue("complete_datetime")); raw != "" && as.CompleteDatetime == nil {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=date_year"))
 		}
 		if raw := strings.TrimSpace(c.FormValue("visit_date")); as.ProcessType == model.ProcessTypeVisit && raw != "" && as.VisitDate == "" {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=date_year")
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=date_year"))
 		}
 
 		if formResult != "" && !model.IsSelectableActionResult(formResult) {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=result_not_allowed")
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=result_not_allowed"))
 		}
 		if formResult == model.ResultDone && h.workRepo != nil {
 			if n, _ := h.workRepo.CountOpenSupport(id); n > 0 && c.FormValue("confirm_open_support") != "1" {
-				return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=open_support&n="+strconv.Itoa(n))
+				return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=open_support&n="+strconv.Itoa(n)))
 			}
 		}
 		if code := actionSaveMissingErr(as, formResult); code != "" {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
 		}
 		if code := actionCauseCatMissingErr(as, causeCats); code != "" {
-			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+code)
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
 		}
 		partsOn, partRows, partsErr := h.collectASPartsForm(c)
 		if partsErr != nil {
@@ -1319,7 +1380,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 			if formResult == model.ResultTransfer {
 				if transferNeedFollowup {
 					if followupNote == "" {
-						return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=followup_note")
+						return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=followup_note"))
 					}
 					transferDetail = model.TransferDetailFollowup
 				} else {
@@ -1350,21 +1411,21 @@ func (h *ASHandler) Update(c echo.Context) error {
 			if err != nil {
 				switch err {
 				case model.ErrRevisitReasonRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=revisit_reason")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=revisit_reason"))
 				case model.ErrRevisitDateRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=revisit_date")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=revisit_date"))
 				case model.ErrTemporaryDateRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=temporary_date")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=temporary_date"))
 				case model.ErrTransferDetailRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=transfer_detail")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=transfer_detail"))
 				case model.ErrConfirmDateRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=confirm_date")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=confirm_date"))
 				case model.ErrConfirmTargetRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=confirm_target")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=confirm_target"))
 				case model.ErrConfirmContactRequired:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=confirm_contact")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=confirm_contact"))
 				default:
-					return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=action")
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=action"))
 				}
 			}
 			applyOut = out
@@ -1440,10 +1501,10 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if followupChild != nil {
 		h.rebuildDictKeywordLinks(followupChild.ASID)
 	}
-	loc := "/as/" + id + "/action"
+	loc := asOpenHref(id)
 	q := url.Values{}
 	if followupChild != nil {
-		loc = "/as/" + followupChild.ASID
+		loc = asOpenHref(followupChild.ASID)
 		q.Set("ok", "이관 후속 접수를 만들었습니다")
 	} else {
 		if canIssueASReportStatus(as.Status) {
@@ -1809,11 +1870,11 @@ func (h *ASHandler) Hold(c echo.Context) error {
 	switch next {
 	case "action", "transfer", "cancel":
 	default:
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_next")
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=hold_next"))
 	}
 	reason := strings.TrimSpace(c.FormValue("hold_reason"))
 	if reason == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=hold_reason")
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=hold_reason"))
 	}
 	if err := h.repo.SetHold(id, reason, next); err != nil {
 		return err
@@ -1822,7 +1883,7 @@ func (h *ASHandler) Hold(c echo.Context) error {
 	as.HoldReason = reason
 	as.HoldNextAction = next
 	_, _ = h.appendActionProcess(c, as, model.ResultHold, "", h.actionDurationMin(id))
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 // ReleaseHold 보류 삭제(해제) → 필드 기준 워크플로 상태 복귀
@@ -1836,7 +1897,7 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if as.Status != "hold" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+		return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 	}
 	if err := h.repo.ReleaseHold(id); err != nil {
 		return err
@@ -1848,7 +1909,7 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 	if redir == "list" {
 		return c.Redirect(http.StatusSeeOther, "/as?status=hold")
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 // Transfer 이관 처리
@@ -1867,7 +1928,7 @@ func (h *ASHandler) Transfer(c echo.Context) error {
 	if err := h.repo.SetTransfer(id); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 // CompleteTransfer 이관 건 완료 (결과코드 + 완료일)
@@ -1886,12 +1947,12 @@ func (h *ASHandler) CompleteTransfer(c echo.Context) error {
 	resultCode := strings.TrimSpace(c.FormValue("result_code"))
 	completeDate := strings.TrimSpace(c.FormValue("complete_date"))
 	if resultCode == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err=result_code")
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=result_code"))
 	}
 	if err := h.repo.CompleteTransfer(id, resultCode, completeDate); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 // Cancel 접수취소
@@ -1911,7 +1972,7 @@ func (h *ASHandler) Cancel(c echo.Context) error {
 	if err := h.repo.SetCancelled(id, cancelDate); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 }
 
 func receiptCreateErrQuery(err error) string {
@@ -1965,10 +2026,10 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 	na := c.FormValue("action_na") == "1"
 	resolved, code := model.ResolveActionContent(p.WorkContent, na, strings.TrimSpace(c.FormValue("action_na_reason")))
 	if code != "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+asID+"?err="+code)
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(asID, "err="+code))
 	}
 	if model.ActionContentTooShort(resolved) && c.FormValue("action_short_ok") != "1" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+asID+"?err="+model.ActionErrShort)
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(asID, "err="+model.ActionErrShort))
 	}
 	p.WorkContent = resolved
 	if t, ok := parseFormDatetime(c.FormValue("process_datetime")); ok {
@@ -1992,7 +2053,7 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 		return err
 	}
 	h.rebuildDictKeywordLinks(asID)
-	return c.Redirect(http.StatusSeeOther, "/as/"+asID)
+	return c.Redirect(http.StatusSeeOther, asOpenHref(asID))
 }
 
 // Reopen 완료된 접수를 같은 증상으로 다시 접수한다.
@@ -2007,11 +2068,11 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if !model.CanReopenAS(src.Status) {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+url.QueryEscape("완료·종료된 건만 재접수할 수 있습니다"))
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+url.QueryEscape("완료·종료된 건만 재접수할 수 있습니다")))
 	}
 	reason := strings.TrimSpace(c.FormValue("reopen_reason"))
 	if reason == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+url.QueryEscape("재접수 사유를 입력하세요"))
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+url.QueryEscape("재접수 사유를 입력하세요")))
 	}
 
 	as := model.NewReopenReceipt(src, reason, time.Now())
@@ -2040,7 +2101,7 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 	h.rebuildDictKeywordLinks(as.ASID)
 	// 원 접수에도 재접수 사실을 이력으로 남긴다.
 	h.appendReopenProcess(src, as, reason, c)
-	return c.Redirect(http.StatusSeeOther, "/as/"+as.ASID)
+	return c.Redirect(http.StatusSeeOther, asOpenHref(as.ASID))
 }
 
 func (h *ASHandler) appendReopenProcess(src, as *model.ASReceipt, reason string, c echo.Context) {
@@ -2136,7 +2197,7 @@ func (h *ASHandler) DeleteProcess(c echo.Context) error {
 		}
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+asID+"/action")
+	return c.Redirect(http.StatusSeeOther, asOpenHref(asID))
 }
 
 // APIHistory 기관별 과거(완료) AS 이력 JSON

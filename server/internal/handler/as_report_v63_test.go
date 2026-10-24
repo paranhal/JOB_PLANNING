@@ -19,7 +19,7 @@ func TestASShowReportButtonByHistory(t *testing.T) {
 	e, h, asRepo, _, asID := newASReportFixture(t)
 	completeASForReport(t, asRepo, asID, "증상", "원인", "결론")
 	page := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(page, req)
 	if page.Code != http.StatusOK {
@@ -39,7 +39,7 @@ func TestASShowReportButtonByHistory(t *testing.T) {
 		t.Fatalf("발급 %d", rec.Code)
 	}
 	page = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(page, req)
 	body = page.Body.String()

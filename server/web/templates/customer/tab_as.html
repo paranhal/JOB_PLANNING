@@ -30,7 +30,7 @@
         {{range .Items}}
         <tr class="hover:bg-gray-50 transition-colors">
           <td class="py-2.5 pr-4 whitespace-nowrap">
-            <a href="/as/{{.ASID}}" class="font-mono text-xs text-blue-600 hover:underline">{{.ASNumber}}</a>
+            <a href="{{asHref .ASID}}" class="font-mono text-xs text-blue-600 hover:underline">{{.ASNumber}}</a>
           </td>
           <td class="py-2.5 pr-4 text-gray-600 text-xs whitespace-nowrap">
             {{.ReceiptDatetime.Format "2006-01-02 15:04"}}

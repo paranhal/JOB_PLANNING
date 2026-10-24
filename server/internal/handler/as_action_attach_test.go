@@ -472,7 +472,7 @@ func TestASActionTransferFollowupCreatesChild(t *testing.T) {
 	}
 
 	showChild := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+child.ASID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+child.ASID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(showChild, req)
 	body := showChild.Body.String()
@@ -484,7 +484,7 @@ func TestASActionTransferFollowupCreatesChild(t *testing.T) {
 	}
 
 	showSrc := httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID, nil)
+	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+asID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(showSrc, req)
 	srcBody := showSrc.Body.String()

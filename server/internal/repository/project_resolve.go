@@ -311,7 +311,7 @@ func (r *ProjectRepo) ListUnresolvedProjectRows() ([]model.UnresolvedProjectRow,
 		row.KindLabel = "AS"
 		row.ProductType = firstNonEmpty(prodType, prodName)
 		row.Reason = r.unresolvedReason(row.CustomerID, strings.Join([]string{prodType, prodName, symptom}, " "), model.ScopeWorkAS)
-		row.Href = "/as/" + row.ID
+		row.Href = model.ASOpenHref(row.ID)
 		out = append(out, row)
 	}
 	return out, arows.Err()

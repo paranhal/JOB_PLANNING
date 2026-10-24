@@ -18,7 +18,7 @@
       {{range .History}}
       <tr class="hover:bg-gray-50 align-top">
         <td class="py-2 pr-3 whitespace-nowrap">
-          <a href="/as/{{.ASID}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>
+          <a href="{{asHref .ASID}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>
         </td>
         <td class="py-2 pr-3 whitespace-nowrap text-gray-700">{{if .ReceiptDate}}{{.ReceiptDate}}{{else}}—{{end}}</td>
         <td class="py-2 pr-3 whitespace-nowrap text-gray-700">{{if .VisitDate}}{{.VisitDate}}{{else}}—{{end}}</td>

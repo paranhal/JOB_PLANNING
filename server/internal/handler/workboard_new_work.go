@@ -108,7 +108,7 @@ func (h *WorkboardHandler) newWorkASCards(orgID string) ([]model.WBCard, error) 
 			Title:        titles[it.ASID],
 			SubTitle:     it.Symptom,
 			SourceNumber: it.ASNumber,
-			SourceHref:   "/as/" + it.ASID,
+			SourceHref:   asOpenHref(it.ASID),
 			Assignee:     it.AssignedTo,
 			PlannedDay:   it.VisitScheduledDate,
 			DurationMin:  30,

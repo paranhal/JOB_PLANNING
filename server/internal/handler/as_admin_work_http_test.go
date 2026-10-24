@@ -38,6 +38,7 @@ func new45DServer(t *testing.T) (*echo.Echo, *sql.DB, *repository.WBRepo, *repos
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/as/new", h.AS.New)
 	g.GET("/as/:id", h.AS.Show)
+	g.GET("/as/:id/action", h.AS.Action)
 	g.POST("/as/:id/to-admin-work", h.AS.ToAdminWork)
 	g.GET("/admin-work/new", h.AdminWork.New)
 	g.POST("/admin-work", h.AdminWork.Create)
@@ -101,13 +102,13 @@ func TestAdminWorkAssetLinkAndASMoveHTTP(t *testing.T) {
 	}
 
 	if _, err := db.Exec(`
-		INSERT INTO as_receipts (as_id, as_number, customer_id, asset_id, receipt_datetime, symptom, status, assigned_to, data_origin)
-		VALUES ('R9','R2609-012','C1','A1','2026-09-15 10:00:00','웹 접근성 오류','received','관리자','app')`); err != nil {
+		INSERT INTO as_receipts (as_id, as_number, customer_id, asset_id, receipt_datetime, symptom, status, assigned_to, data_origin, org_id)
+		VALUES ('R9','R2609-012','C1','A1','2026-09-15 10:00:00','웹 접근성 오류','received','관리자','app',?)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	bad := doForm(t, e, "/as/R9/to-admin-work", url.Values{})
 	if bad.Code != http.StatusSeeOther || !strings.Contains(bad.Header().Get("Location"), "err=move_reason") {
-		t.Fatalf("no reason loc=%s", bad.Header().Get("Location"))
+		t.Fatalf("no reason status=%d loc=%s body=%s", bad.Code, bad.Header().Get("Location"), truncate(bad.Body.String(), 300))
 	}
 	ok := doForm(t, e, "/as/R9/to-admin-work", url.Values{"reason": {"AS가 아니라 지원 요청"}})
 	if ok.Code != http.StatusSeeOther || !strings.Contains(ok.Header().Get("Location"), "ok=moved") {
@@ -117,7 +118,7 @@ func TestAdminWorkAssetLinkAndASMoveHTTP(t *testing.T) {
 	if as == nil || as.Status != model.StatusAdminWork || as.MovedTaskID == "" {
 		t.Fatalf("as %+v", as)
 	}
-	asShow := doGet(t, e, "/as/R9")
+	asShow := doGet(t, e, "/as/R9/action")
 	if !strings.Contains(asShow.Body.String(), as.MovedTaskID+" 로 옮김") {
 		t.Fatal("AS 상세 링크 없음")
 	}

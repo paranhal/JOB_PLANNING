@@ -55,6 +55,13 @@ func (r *ASRepo) MoveToAdminWork(asID, reason string) (*model.WorkTask, error) {
 	if !as.ReceiptDatetime.IsZero() {
 		receiptDate = as.ReceiptDatetime.Format("2006-01-02")
 	}
+	orgID := strings.TrimSpace(as.OrgID)
+	if orgID == "" {
+		_ = r.db.QueryRow(`SELECT TRIM(COALESCE(org_id,'')) FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&orgID)
+	}
+	if orgID == "" {
+		orgID = model.OrgIDLibrary
+	}
 	t := &model.WorkTask{
 		WorkType:       model.WBWorkAdmin,
 		Title:          title,
@@ -68,6 +75,7 @@ func (r *ASRepo) MoveToAdminWork(asID, reason string) (*model.WorkTask, error) {
 		AssigneeUserID: as.AssignedUserID,
 		CustomerID:     as.CustomerID,
 		ReceiptDate:    receiptDate,
+		OrgID:          orgID,
 	}
 
 	before := rowJSON(r.db, "as_receipts", "as_id", as.ASID)
@@ -90,8 +98,8 @@ func (r *ASRepo) MoveToAdminWork(asID, reason string) (*model.WorkTask, error) {
 			source_type, source_id, source_role, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
-			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, is_test)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, is_test)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
@@ -99,7 +107,7 @@ func (r *ASRepo) MoveToAdminWork(asID, reason string) (*model.WorkTask, error) {
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
 		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate),
-		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), stampIsTest())
+		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), t.OrgID, stampIsTest())
 	if err != nil {
 		return nil, err
 	}

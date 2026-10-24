@@ -102,7 +102,7 @@
                    class="rounded border-gray-300"
                    @change="onCheck($event, $el.value, $el.dataset.symptom)">
           </td>
-          <td class="px-2 py-2 font-mono text-xs whitespace-nowrap"><a href="/as/{{.ASID}}" class="text-blue-700 hover:underline" hx-boost="false">{{.ASNumber}}</a></td>
+          <td class="px-2 py-2 font-mono text-xs whitespace-nowrap"><a href="{{asHref .ASID}}" class="text-blue-700 hover:underline" hx-boost="false">{{.ASNumber}}</a></td>
           <td class="px-2 py-2 text-xs text-slate-600 whitespace-nowrap">{{.ReceiptDate}}</td>
           <td class="px-2 py-2 text-xs whitespace-nowrap">{{.CustomerName}}</td>
           <td class="px-2 py-2 whitespace-nowrap">

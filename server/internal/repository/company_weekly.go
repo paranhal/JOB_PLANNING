@@ -885,7 +885,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkAS, KindLabel: "AS",
 			ID: id, Title: firstNonEmpty(org, num), Date: date, ProjectID: pid, ProjectName: pname,
-			Href: "/as/" + id, Bucket: "prev", BucketLabel: "전주 완료",
+			Href: model.ASOpenHref(id), Bucket: "prev", BucketLabel: "전주 완료",
 			Assignee: asg, AssigneeUserID: auid,
 		})
 	}

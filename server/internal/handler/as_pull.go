@@ -41,7 +41,7 @@ func (h *ASHandler) APIOpenByCustomer(c echo.Context) error {
 		items = append(items, model.CustomerOpenItem{
 			Kind: "as", ItemKey: "as:" + it.ASID, ID: it.ASID, Number: it.ASNumber,
 			Title: title, Assignee: assignee, VisitDate: it.VisitScheduledDate,
-			Status: model.ASStatusDisplayLabel(it.Status), Href: "/as/" + it.ASID + "?embed=1",
+			Status: model.ASStatusDisplayLabel(it.Status), Href: asEmbedHref(it.ASID),
 		})
 	}
 	if h.maintRepo != nil {

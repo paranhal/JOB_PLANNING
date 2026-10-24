@@ -58,7 +58,7 @@ func (r *WBRepo) ListASReceivedBetween(from, to string) ([]model.WorkTask, error
 			Tags:        asNum,
 			SourceType:  model.WBSourceAS,
 			SourceID:    asID,
-			BoardHref:   "/as/" + asID,
+			BoardHref:   model.ASOpenHref(asID),
 		})
 	}
 	return out, rows.Err()

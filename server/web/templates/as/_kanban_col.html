@@ -7,7 +7,7 @@
   </div>
   <div class="p-3 space-y-2">
     {{range $col.Items}}
-    <a href="/as/{{.ASID}}"
+    <a href="{{if $.LegacyLinks}}{{asLegacyHref .ASID}}{{else}}{{asHref .ASID}}{{end}}"
        class="block bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow
               {{if and (gt .VisitDaysOverdue 0) (not .VisitDone)}}border-red-200{{else if gt .DaysElapsed 3}}border-amber-200{{else}}border-gray-100{{end}}">
       <div class="flex items-start justify-between gap-2 mb-1.5">

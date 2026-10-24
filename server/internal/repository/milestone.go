@@ -398,7 +398,7 @@ func (r *StatsRepo) ListMilestoneEvidence(week, orgID, domain, metric string) ([
 		href := "/workboard/tasks/?embed=1"
 		switch ev.WorkType {
 		case "AS":
-			href = "/as/" + ev.WorkNo + "?embed=1"
+			href = model.ASEmbedHref(ev.WorkNo)
 		case "정기점검":
 			href = "/maintenance/visits/" + ev.WorkNo + "?embed=1"
 		}

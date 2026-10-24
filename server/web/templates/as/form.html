@@ -522,7 +522,7 @@
           var id = it.as_id || it.ASID || '';
           var num = it.as_number || it.ASNumber || '';
           return '<tr class="hover:bg-gray-50 align-top">' +
-            '<td class="py-2 pr-3 whitespace-nowrap"><a href="/as/' + esc(id) + '" class="font-mono text-blue-600 hover:underline">' + esc(num) + '</a></td>' +
+            '<td class="py-2 pr-3 whitespace-nowrap"><a href="/as/' + esc(id) + '/action" class="font-mono text-blue-600 hover:underline">' + esc(num) + '</a></td>' +
             '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.receipt_date || it.ReceiptDate) + '</td>' +
             '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.visit_date || it.VisitDate) + '</td>' +
             '<td class="py-2 pr-3 whitespace-nowrap text-gray-700">' + cell(it.complete_date || it.CompleteDate) + '</td>' +

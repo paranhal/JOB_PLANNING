@@ -511,7 +511,7 @@ func (r *ProjectRepo) MatchAS(projectID string, limit int) ([]model.ProjectMatch
 		if err := rows.Scan(&m.ID, &m.Number, &m.Date, &m.OrgName, &m.Title, &m.Status, &prodType, &prodName); err != nil {
 			return nil, 0, err
 		}
-		m.Href = "/as/" + m.ID
+		m.Href = model.ASOpenHref(m.ID)
 		m.StatusLabel = asMatchStatusLabel(m.Status)
 		m.ProductHint = firstNonEmpty(prodType, prodName)
 		out = append(out, m)

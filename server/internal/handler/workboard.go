@@ -496,7 +496,7 @@ func (h *WorkboardHandler) LookupRegisterAS(c echo.Context) error {
 			Number: hit.ASNumber,
 			Name:   hit.OrgName,
 			Status: hit.Status,
-			ASHref: "/as/" + hit.ASID,
+			ASHref: asOpenHref(hit.ASID),
 		}
 		if t, ok := placed[hit.ASID]; ok {
 			it.Placed = true
@@ -652,7 +652,7 @@ func undatedASCards(tasks []model.WorkTask) []model.WBCard {
 			Title:        t.Title,
 			SubTitle:     t.Description,
 			SourceNumber: t.SourceID,
-			SourceHref:   "/as/" + t.SourceID,
+			SourceHref:   asOpenHref(t.SourceID),
 			Assignee:     t.Assignee,
 			DurationMin:  dur,
 			TaskID:       t.TaskID,
@@ -847,7 +847,7 @@ func (h *WorkboardHandler) taskCard(t model.WorkTask) model.WBCard {
 	switch t.SourceType {
 	case model.WBSourceAS:
 		card.SourceNumber = t.SourceID
-		card.SourceHref = "/as/" + t.SourceID
+		card.SourceHref = asOpenHref(t.SourceID)
 	case model.WBSourceMaintenance:
 		if h.mntRepo != nil {
 			if v, _ := h.mntRepo.GetVisit(t.SourceID); v != nil {
@@ -942,7 +942,7 @@ func (h *WorkboardHandler) registerPalette(orgID string, showAll bool) (as, mnt,
 				Title:        titles[it.ASID],
 				SubTitle:     it.Symptom,
 				SourceNumber: it.ASNumber,
-				SourceHref:   "/as/" + it.ASID,
+				SourceHref:   asOpenHref(it.ASID),
 				Assignee:     it.AssignedTo,
 				PlannedDay:   it.VisitScheduledDate,
 				DurationMin:  30,
@@ -2174,9 +2174,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	var completeLocal string
 	switch t.SourceType {
 	case model.WBSourceAS:
-		sourceHref = "/as/" + t.SourceID
+		sourceHref = asOpenHref(t.SourceID)
 		sourceLabel = t.SourceID
-		actionHref = "/as/" + t.SourceID + "/action"
+		actionHref = asOpenHref(t.SourceID)
 		actionLabel = "조치"
 		// 쓰기 가능한 경우만 「조치/조치 완료」버튼 (옵저버는 can* 가 false)
 		canAction = canWrite && (canProcessAS(c) || canReceiveAS(c) || canWriteWorkboard(c))

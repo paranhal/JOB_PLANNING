@@ -115,7 +115,7 @@ func TestASClosedOwnerEditHTTPAndPeers(t *testing.T) {
 	peerCK := jwtCookieUser(t, t2)
 	oaCK := jwtCookieUser(t, oa)
 
-	show := doGetWith(t, e, "/as/"+recpt.ASID, ownerCK)
+	show := doGetWith(t, e, "/as/"+recpt.ASID+"/action", ownerCK)
 	if show.Code != http.StatusOK {
 		t.Fatalf("본인 상세 %d", show.Code)
 	}
@@ -129,7 +129,7 @@ func TestASClosedOwnerEditHTTPAndPeers(t *testing.T) {
 		t.Fatal("본인에게 접수 수정 버튼이 없다")
 	}
 
-	peerShow := doGetWith(t, e, "/as/"+recpt.ASID, peerCK)
+	peerShow := doGetWith(t, e, "/as/"+recpt.ASID+"/action", peerCK)
 	if !strings.Contains(peerShow.Body.String(), "읽기 전용") {
 		t.Fatal("타인에게 읽기 전용 안내가 없다")
 	}
@@ -188,7 +188,7 @@ func TestASClosedOwnerEditHTTPAndPeers(t *testing.T) {
 		}
 	}
 
-	oaShow := doGetWith(t, e, "/as/"+recpt.ASID, oaCK)
+	oaShow := doGetWith(t, e, "/as/"+recpt.ASID+"/action", oaCK)
 	if !strings.Contains(oaShow.Body.String(), "접수 정보 수정") {
 		t.Fatal("조직관리자에게 완료 건 접수 수정 링크가 없다")
 	}

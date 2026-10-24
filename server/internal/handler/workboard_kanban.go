@@ -188,7 +188,7 @@ func planKanbanItemKey(it model.WorkListItem) string {
 func planKanbanHrefs(it model.WorkListItem) (action, edit string) {
 	switch {
 	case strings.HasPrefix(it.Href, "/as/") && !strings.Contains(it.Href, "/work/"):
-		return "/as/" + it.RefID + "/action", ""
+		return asOpenHref(it.RefID), ""
 	case it.Prefix == model.WorkPrefixMaintenance:
 		return "/maintenance/visits/" + it.RefID + "/action", ""
 	case strings.HasPrefix(it.Href, "/workboard/tasks/"):

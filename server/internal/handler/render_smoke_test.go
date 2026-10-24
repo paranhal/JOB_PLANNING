@@ -82,6 +82,7 @@ func newUISmokeApp(t *testing.T) (*echo.Echo, *uiSmokeActors) {
 	g.GET("/work", h.Work.List)
 	g.GET("/as", h.AS.List)
 	g.GET("/as/:id", h.AS.Show)
+	g.GET("/as/:id/action", h.AS.Action)
 	g.GET("/quotes", h.Quotes.List)
 	return e, &uiSmokeActors{admin: admin, tech: tech, obs: obs, asID: as.ASID}
 }
@@ -156,7 +157,7 @@ func TestRenderSmokeRolesAndHX(t *testing.T) {
 		t.Fatal("로그인 응답에 color-scheme 메타 없음")
 	}
 
-	pages := []string{"/", "/customers", "/work", "/as", "/quotes", "/as/" + ids.asID}
+	pages := []string{"/", "/customers", "/work", "/as", "/quotes", "/as/" + ids.asID + "/action"}
 	type actor struct {
 		name    string
 		cookies []*http.Cookie
@@ -208,14 +209,14 @@ func TestRenderSmokeRolesAndHX(t *testing.T) {
 		t.Fatalf("HX content 가 비어 보임: %s", truncate(hxBody, 200))
 	}
 
-	peekDirect := uiGET(t, e, "/as/"+ids.asID, []*http.Cookie{adminCK}, false)
+	peekDirect := uiGET(t, e, "/as/"+ids.asID+"/action", []*http.Cookie{adminCK}, false)
 	if peekDirect.Code != http.StatusOK || !strings.Contains(peekDirect.Body.String(), "<html") {
 		t.Fatalf("피크 직접 접근(상세 URL)이 풀페이지가 아님 status=%d", peekDirect.Code)
 	}
 	if !strings.Contains(peekDirect.Body.String(), `name="color-scheme"`) {
 		t.Fatal("상세 직접 접근에 color-scheme 없음")
 	}
-	peekHX := uiGET(t, e, "/as/"+ids.asID, []*http.Cookie{adminCK}, true)
+	peekHX := uiGET(t, e, "/as/"+ids.asID+"/action", []*http.Cookie{adminCK}, true)
 	if peekHX.Code != http.StatusOK {
 		t.Fatalf("HX 상세 %d", peekHX.Code)
 	}

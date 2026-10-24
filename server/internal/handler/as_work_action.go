@@ -32,8 +32,8 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 		"CanWrite":     canProcessAS(c) || canReceiveAS(c) || canWriteWorkboard(c),
 		"FlashOK":      c.QueryParam("ok"),
 		"FlashErr":     c.QueryParam("err"),
-		"ParentHref":   "/as/" + as.ASID,
-		"ParentAction": "/as/" + as.ASID + "/action",
+		"ParentHref":   asOpenHref(as.ASID),
+		"ParentAction": asOpenHref(as.ASID),
 		"SupportTypes": model.SupportTypeOptions(),
 	}
 	if w.WorkKind == model.WorkKindSupport && h.workRepo != nil {

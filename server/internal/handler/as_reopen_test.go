@@ -55,6 +55,7 @@ func newReopenFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo, s
 	g.Use(h.Auth.AuthMiddleware)
 	g.POST("/as/:id/reopen", h.AS.Reopen)
 	g.GET("/as/:id", h.AS.Show)
+	g.GET("/as/:id/action", h.AS.Action)
 	return e, h, asRepo, src.ASID
 }
 
@@ -82,7 +83,10 @@ func TestASReopenCreatesLinkedReceipt(t *testing.T) {
 		t.Fatalf("재접수 실패: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	loc := rec.Header().Get("Location")
-	newID := strings.TrimPrefix(loc, "/as/")
+	newID := strings.TrimSuffix(strings.TrimPrefix(loc, "/as/"), "/action")
+	if i := strings.Index(newID, "?"); i >= 0 {
+		newID = newID[:i]
+	}
 	if newID == "" || newID == srcID {
 		t.Fatalf("새 접수번호가 발급되지 않았다: %q", loc)
 	}
@@ -125,7 +129,7 @@ func TestASReopenCreatesLinkedReceipt(t *testing.T) {
 
 	// 상세 화면에 연결이 보여야 한다.
 	show := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+newID, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/as/"+newID+"/action", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, req)
 	if show.Code != http.StatusOK {

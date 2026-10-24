@@ -33,17 +33,17 @@ const asReceiptEditDeniedMsg = "접수한 사람, 배정 담당자, 조직관리
 func redirectASReceiptEditDenied(c echo.Context, id, page string) error {
 	msg := url.QueryEscape(asReceiptEditDeniedMsg)
 	if page == "action" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+msg)
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+msg))
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+msg)
+	return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+msg))
 }
 
 func (h *ASHandler) redirectLocked(c echo.Context, id, page string) error {
 	msg := url.QueryEscape("완료·종료 건은 읽기 전용입니다. 관리자는 수정 잠금 해제 후 이용하세요")
 	if page == "action" {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/action?err="+msg)
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+msg))
 	}
-	return c.Redirect(http.StatusSeeOther, "/as/"+id+"?err="+msg)
+	return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+msg))
 }
 
 // UnlockEdit 관리자: 완료 건 수정 비밀번호 확인 후 잠금 해제(30분)
@@ -57,12 +57,12 @@ func (h *ASHandler) UnlockEdit(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	if !isASClosedStatus(as.Status) {
-		return c.Redirect(http.StatusSeeOther, "/as/"+id)
+		return c.Redirect(http.StatusSeeOther, asOpenHref(id))
 	}
 	pw := strings.TrimSpace(c.FormValue("unlock_password"))
 	redirect := strings.TrimSpace(c.FormValue("redirect"))
 	if redirect == "" {
-		redirect = "/as/" + id
+		redirect = asOpenHref(id)
 	}
 	ok := verifyAndUpgradeSetting(h.settingsRepo, repository.SettingASCompletedEditPassword, pw)
 	_ = h.unlockRepo.LogAttempt(id, currentUserID(c), ctxString(c, "username"), c.RealIP(), ok)

@@ -166,6 +166,7 @@ func TestASEditPermissionHTTP(t *testing.T) {
 	g.Use(h.Auth.InjectViewAs)
 	g.Use(h.Auth.GuardViewAsWrite)
 	g.GET("/as/:id", h.AS.Show)
+	g.GET("/as/:id/action", h.AS.Action)
 	g.GET("/as/:id/edit", h.AS.Edit)
 	g.POST("/as/:id/edit", h.AS.UpdateReceipt)
 	g.POST("/as/:id/customer-direct", h.AS.UpdateCustomerDirect)
@@ -180,7 +181,7 @@ func TestASEditPermissionHTTP(t *testing.T) {
 
 	assertEditOK := func(name, id string, ck *http.Cookie) {
 		t.Helper()
-		show := doGetWith(t, e, "/as/"+id, ck)
+		show := doGetWith(t, e, "/as/"+id+"/action", ck)
 		if show.Code != http.StatusOK {
 			t.Fatalf("%s 상세 %d", name, show.Code)
 		}
@@ -197,7 +198,7 @@ func TestASEditPermissionHTTP(t *testing.T) {
 	}
 	assertEditDenied := func(name, id string, ck *http.Cookie) {
 		t.Helper()
-		show := doGetWith(t, e, "/as/"+id, ck)
+		show := doGetWith(t, e, "/as/"+id+"/action", ck)
 		if show.Code == http.StatusOK && strings.Contains(show.Body.String(), "접수 정보 수정") {
 			t.Fatalf("%s 상세에 수정 링크가 있으면 안 된다", name)
 		}

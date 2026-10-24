@@ -16,6 +16,9 @@
           <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">조치</span>
           {{end}}
           {{statusBadge .AS.Status}}
+          {{if eq .AS.Urgency "high"}}
+          <span class="text-sm font-bold text-red-600">🔴 {{urgencyReasonText .AS.UrgencyReason .AS.UrgencyReasonNote}}</span>
+          {{end}}
         </div>
         <p class="text-sm text-gray-500">{{.AS.OrgName}}{{if .DailyTask}} · 일일업무 <span class="font-mono">{{.DailyTask.TaskID}}</span>{{end}}</p>
         {{if .CanProcess}}
@@ -33,6 +36,10 @@
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 justify-end">
+      <a href="{{asLegacyHref .AS.ASID}}" class="text-xs text-slate-500 hover:underline">예전 화면으로</a>
+      {{if .CanEditReceipt}}
+      <a href="/as/{{.AS.ASID}}/edit" class="px-3 py-1.5 border border-amber-400 rounded-lg text-sm font-medium text-amber-800 hover:bg-amber-50">접수 정보 수정</a>
+      {{end}}
       {{if .CanUnlockEdit}}
       <button type="button" id="btn-unlock-edit"
               class="px-3 py-1.5 border border-amber-500 bg-amber-50 rounded-lg text-sm font-medium text-amber-900 hover:bg-amber-100">수정</button>
@@ -42,10 +49,10 @@
       {{if .CanIssueReport}}
         {{if .ReportReady}}
         <a href="/as/{{.AS.ASID}}/report" id="btn-as-report"
-           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">조치완료보고서</a>
+           class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}}</a>
         {{else}}
         <span id="btn-as-report-disabled" title="{{.ReportBlockReason}}"
-              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">조치완료보고서</span>
+              class="px-3 py-1.5 bg-slate-200 text-slate-500 rounded-lg text-sm font-medium cursor-not-allowed">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}}</span>
         {{end}}
       {{end}}
       {{if .ShowWorkflow}}
@@ -61,6 +68,31 @@
         <option value="transfer">이관</option>
         {{end}}
       </select>
+      {{end}}
+      {{if .AS.MovedTaskID}}
+      <a href="/workboard/tasks/{{.AS.MovedTaskID}}" class="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700">{{.AS.MovedTaskID}} 로 옮김</a>
+      {{end}}
+      {{if .CanReopen}}
+      <button type="button" id="btn-reopen" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">재접수</button>
+      {{end}}
+      {{if or .CanMoveAdminWork .CanDelete}}
+      <details class="relative" id="as-action-more">
+        <summary class="list-none cursor-pointer px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">⋯</summary>
+        <div class="absolute right-0 mt-1 z-20 w-64 rounded-lg border border-slate-200 bg-white shadow-lg p-3 space-y-3">
+          {{if .CanMoveAdminWork}}
+          <form method="POST" action="/as/{{.AS.ASID}}/to-admin-work" class="space-y-2"
+                onsubmit="var r=this.reason.value.trim(); if(!r){alert('사유를 입력하세요.'); return false;} return confirm('이 접수를 행정/지원 업무로 옮길까요? AS 번호는 남고 상태는 행정/지원 이관으로 닫힙니다.');">
+            <input name="reason" required placeholder="이관 사유" class="w-full px-2 py-1.5 border rounded-lg text-sm">
+            <button type="submit" class="w-full px-3 py-1.5 border border-violet-300 rounded-lg text-sm font-medium text-violet-800 hover:bg-violet-50">행정/지원으로 옮기기</button>
+          </form>
+          {{end}}
+          {{if .CanDelete}}
+          <form method="POST" action="/as/{{.AS.ASID}}/delete" onsubmit="return confirm('이 AS 접수를 삭제할까요?\n관련 처리 기록도 함께 삭제됩니다.');">
+            <button type="submit" class="w-full px-3 py-1.5 border border-red-300 rounded-lg text-sm font-medium text-red-700 hover:bg-red-50">접수 삭제</button>
+          </form>
+          {{end}}
+        </div>
+      </details>
       {{end}}
     </div>
   </div>
@@ -119,6 +151,25 @@
     <a href="/as/{{.AS.ASID}}/report" id="btn-as-report-make"
        class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">조치완료보고서 만들기</a>
   </div>
+  {{end}}
+  {{with .GroupMates}}
+  {{if gt (len .) 1}}
+  <div class="rounded-lg border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-sm">
+    <p class="font-medium text-indigo-950 mb-1">함께 접수된 건 {{len .}}건</p>
+    <ul class="space-y-1">
+      {{range .}}
+      {{if ne .ASID $.AS.ASID}}
+      <li class="flex flex-wrap items-center gap-2 text-slate-700">
+        <a href="{{asHref .ASID}}" class="font-mono font-medium text-blue-700 hover:underline">{{.ASNumber}}</a>
+        {{if .ProductName}}<span>{{.ProductName}}</span>{{end}}
+        {{statusBadge .Status}}
+        <span class="text-xs text-slate-500 max-w-xs truncate">{{.Symptom}}</span>
+      </li>
+      {{end}}
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
   {{end}}
   {{if .AS.IsReopen}}
   {{template "as_parent_complete" .}}
@@ -475,6 +526,7 @@
     <p class="text-sm text-gray-400 text-center py-6">이 접수에 등록된 조치 기록이 없습니다. 조치 저장 시 자동으로 남습니다.</p>
     {{end}}
   </div>
+  {{template "as_action_moved" .}}
     </div>
   </div>
   {{if and .CanProcess (not .ReadOnly)}}
@@ -485,6 +537,43 @@
 </div>
 
 
+
+{{if .AS.AssetID}}
+<div id="modal-asset-as-history" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+    <div class="px-5 py-3 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-800 text-sm">장비 AS 내역</h3>
+      <button type="button" data-close-modal="modal-asset-as-history" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+    </div>
+    <div class="p-4 overflow-y-auto text-sm" id="asset-as-history-body"
+         data-asset-id="{{.AS.AssetID}}" data-exclude="{{.AS.ASID}}">
+      <p class="text-gray-400 text-center py-8">버튼을 누르면 이력을 불러옵니다.</p>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{if .CanReopen}}
+<div id="modal-reopen" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div class="px-5 py-3 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-800">동일 증상 재접수</h3>
+      <button type="button" data-close-modal="modal-reopen" class="text-gray-400 hover:text-gray-700 text-xl">&times;</button>
+    </div>
+    <form method="POST" action="/as/{{.AS.ASID}}/reopen" class="p-5 space-y-4">
+      <p class="text-sm text-gray-600">완료된 건을 바탕으로 새 접수를 만듭니다. 원 건은 그대로 둡니다.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">재접수 사유 <span class="text-red-500">*</span></label>
+        <textarea name="reopen_reason" required rows="3" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="동일 증상이 다시 발생한 사유"></textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close-modal="modal-reopen" class="px-4 py-2 text-sm border rounded-lg">취소</button>
+        <button type="submit" class="px-4 py-2 text-sm text-white bg-emerald-600 rounded-lg">재접수</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
 
 {{if .CanUnlockEdit}}
 <div id="modal-unlock-edit" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40">
@@ -596,7 +685,7 @@
   document.querySelectorAll('[data-close-modal]').forEach(function (btn) {
     btn.addEventListener('click', function () { closeModal(btn.getAttribute('data-close-modal')); });
   });
-  ['modal-hold','modal-transfer','modal-cancel','modal-unlock-edit'].forEach(function (id) {
+  ['modal-hold','modal-transfer','modal-cancel','modal-unlock-edit','modal-reopen','modal-asset-as-history'].forEach(function (id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('click', function (e) { if (e.target === el) closeModal(id); });
@@ -608,9 +697,43 @@
   }
 
   var assetHistBtn = document.getElementById('btn-asset-as-history');
+  var histLoaded = false;
   if (assetHistBtn) {
-    assetHistBtn.addEventListener('click', function () { openModal('modal-asset-as-history'); });
+    assetHistBtn.addEventListener('click', function () {
+      openModal('modal-asset-as-history');
+      if (histLoaded) return;
+      var body = document.getElementById('asset-as-history-body');
+      if (!body) return;
+      histLoaded = true;
+      var asset = body.getAttribute('data-asset-id') || '';
+      var exclude = body.getAttribute('data-exclude') || '';
+      fetch('/api/as/asset-history/' + encodeURIComponent(asset) + '?exclude=' + encodeURIComponent(exclude), {credentials:'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (items) {
+          if (!items || !items.length) {
+            body.innerHTML = '<p class="text-gray-400 text-center py-8">동일 장비의 다른 AS 이력이 없습니다.</p>';
+            return;
+          }
+          var html = '<table class="min-w-full text-sm"><thead><tr class="border-b text-left text-xs text-gray-500">'
+            + '<th class="py-2 pr-3">접수번호</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">완료일</th><th class="py-2">증상</th>'
+            + '</tr></thead><tbody class="divide-y">';
+          items.forEach(function (it) {
+            var extra = it.kind === 'factory_repair' ? ' <span class="text-teal-700 text-xs">제조사 수리 중' + (it.duration_text ? (' ' + it.duration_text) : '') + '</span>' : '';
+            html += '<tr><td class="py-2 pr-3"><a href="/as/' + it.as_id + '/action" class="font-mono text-blue-600 hover:underline">'
+              + (it.as_number || '') + '</a></td><td class="py-2 pr-3">' + (it.receipt_date || '') + '</td><td class="py-2 pr-3">'
+              + (it.complete_date || '—') + '</td><td class="py-2 truncate max-w-xs">' + (it.symptom || '—') + extra + '</td></tr>';
+          });
+          html += '</tbody></table>';
+          body.innerHTML = html;
+        })
+        .catch(function () {
+          histLoaded = false;
+          body.innerHTML = '<p class="text-gray-400 text-center py-8">이력을 불러오지 못했습니다.</p>';
+        });
+    });
   }
+  var btnReopen = document.getElementById('btn-reopen');
+  if (btnReopen) btnReopen.addEventListener('click', function () { openModal('modal-reopen'); });
 
   var holdNext = document.getElementById('hold-next-action');
   var holdReasonWrap = document.getElementById('hold-reason-wrap');

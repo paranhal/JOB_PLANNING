@@ -34,7 +34,7 @@
     <ul class="card-body space-y-2">
       {{range .PastHistory}}
       <li class="text-ui-sm">
-        <a href="/as/{{.ASID}}/action" class="text-primary hover:underline font-mono">{{.ASNumber}}</a>
+        <a href="{{asHref .ASID}}" class="text-primary hover:underline font-mono">{{.ASNumber}}</a>
         <span class="text-ink-muted">{{.ReceiptDate}}</span>
         {{if .Symptom}}<p>{{.Symptom}}</p>{{end}}
       </li>

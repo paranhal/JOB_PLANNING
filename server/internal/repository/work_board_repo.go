@@ -937,7 +937,7 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		it.StatusLabel = asStatusLabel(status)
 		it.WorkDate = it.ScheduledDate
 		it.DueDate = it.ScheduledDate
-		it.Href = "/as/" + it.RefID
+		it.Href = model.ASOpenHref(it.RefID)
 		it.Tentative = confirmed == 0
 		items = append(items, it)
 	}

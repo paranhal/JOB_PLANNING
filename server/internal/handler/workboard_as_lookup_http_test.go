@@ -136,7 +136,7 @@ func TestWorkboardASLookupHTTP(t *testing.T) {
 	}
 
 	done := getASLookup(t, e, "R2610-099", oa)
-	if done.Kind != "closed" || len(done.Items) != 1 || done.Items[0].ASHref != "/as/as-done" {
+	if done.Kind != "closed" || len(done.Items) != 1 || done.Items[0].ASHref != "/as/as-done/action" {
 		t.Fatalf("완료 %+v", done)
 	}
 

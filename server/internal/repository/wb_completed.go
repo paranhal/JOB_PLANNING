@@ -110,7 +110,7 @@ func (r *WBRepo) completedASBetween(from, toEx string) ([]model.WorkTask, error)
 			Tags:        asNum,
 			SourceType:  model.WBSourceAS,
 			SourceID:    asID,
-			BoardHref:   "/as/" + asID + "/action",
+			BoardHref:   model.ASOpenHref(asID),
 		})
 	}
 	return out, rows.Err()
@@ -183,7 +183,7 @@ func (r *WBRepo) ListOnBehalfASBetween(from, toEx, userID, userName, username st
 			Tags:        asNum,
 			SourceType:  model.WBSourceAS,
 			SourceID:    asID,
-			BoardHref:   "/as/" + asID + "/action",
+			BoardHref:   model.ASOpenHref(asID),
 		})
 	}
 	return out, rows.Err()
@@ -379,7 +379,7 @@ func (r *WBRepo) missingAS() ([]model.WorkTask, error) {
 			Tags:        asNum,
 			SourceType:  model.WBSourceAS,
 			SourceID:    asID,
-			BoardHref:   "/as/" + asID + "/action",
+			BoardHref:   model.ASOpenHref(asID),
 		})
 	}
 	return out, rows.Err()
@@ -512,7 +512,7 @@ func (r *WBRepo) missingAssigneeAS() ([]model.WorkTask, error) {
 			Tags:        asNum,
 			SourceType:  model.WBSourceAS,
 			SourceID:    asID,
-			BoardHref:   "/as/" + asID + "/action",
+			BoardHref:   model.ASOpenHref(asID),
 		})
 	}
 	return out, rows.Err()

@@ -43,7 +43,7 @@ func kbBack(c echo.Context, asID string) string {
 		return "/as/knowledge?q=" + url.QueryEscape(q)
 	}
 	if asID != "" {
-		return "/as/" + asID + "/action"
+		return asOpenHref(asID)
 	}
 	return "/as/knowledge"
 }

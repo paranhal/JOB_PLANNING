@@ -33,7 +33,7 @@
               {{end}}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
+              <a href="{{if $.LegacyLinks}}{{asLegacyHref .ASID}}{{else}}{{asHref .ASID}}{{end}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
               {{if gt .GroupSize 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 text-[10px] align-middle" title="함께 접수된 건 {{.GroupSize}}건">🔗</span>{{end}}
               {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
               {{if .IsTransferFollowup}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[10px] align-middle" title="이관하면서 우리 몫이 남은 후속 접수">이관후속</span>{{end}}

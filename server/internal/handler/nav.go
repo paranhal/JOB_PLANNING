@@ -15,6 +15,7 @@ const (
 	NavAS                  = "as"
 	NavASStats             = "as_stats"
 	NavASKnowledge         = "as_knowledge"
+	NavASShowLegacy        = "as_show_legacy"
 	NavAdminWork           = "admin_work"
 	NavAdminWorkStats      = "admin_work_stats"
 	NavSales               = "sales"

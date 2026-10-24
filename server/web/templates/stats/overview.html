@@ -455,7 +455,7 @@
             <td class="px-3 py-2 whitespace-nowrap text-gray-500">{{if .WorkForm}}{{.WorkForm}}{{else}}AS{{end}}</td>
             <td class="px-3 py-2 whitespace-nowrap">
               <span class="inline-flex items-center gap-1.5">
-                {{if .Href}}<a href="{{.Href}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{else}}<a href="/as/{{.ASID}}/action" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{end}}
+                {{if .Href}}<a href="{{.Href}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{else}}<a href="{{asHref .ASID}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{end}}
                 {{statusBadge .Status}}
               </span>
             </td>

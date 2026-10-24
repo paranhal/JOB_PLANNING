@@ -453,7 +453,7 @@ func workListToBoardItem(it model.WorkListItem, today string) boardItem {
 		bi.Href = "/as/work/" + it.RefID + "/action"
 	}
 	if it.Prefix == model.WorkPrefixAS && (bi.Href == "" || bi.Href == "#") {
-		bi.Href = "/as/" + it.RefID
+		bi.Href = asOpenHref(it.RefID)
 	}
 	return bi
 }

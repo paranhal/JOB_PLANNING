@@ -189,7 +189,7 @@ func (h *ASHandler) VoteCase(c echo.Context) error {
 	}
 	back := c.Request().Header.Get("Referer")
 	if back == "" {
-		back = "/as/" + id + "/action"
+		back = asOpenHref(id)
 	}
 	return c.Redirect(http.StatusSeeOther, back)
 }

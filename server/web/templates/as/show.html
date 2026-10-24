@@ -2,6 +2,11 @@
 {{define "content"}}
 <div class="max-w-5xl mx-auto space-y-6" id="as-show-root"
      x-data="{ dailyOpen: {{if .OpenDaily}}true{{else}}false{{end}} }">
+  {{if .LegacyBanner}}
+  <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+    예전 화면입니다. <a href="{{asHref .AS.ASID}}" class="font-medium underline">새 조치 화면으로</a>
+  </div>
+  {{end}}
   <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 shadow-sm">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="flex items-center gap-3">
@@ -28,7 +33,7 @@
       <a href="/as/{{.AS.ASID}}/edit" class="px-3 py-1.5 border border-amber-400 rounded-lg text-sm font-medium text-amber-800 hover:bg-amber-50">접수 정보 수정</a>
       {{end}}
       {{if .CanProcess}}
-      <a href="/as/{{.AS.ASID}}/action"
+      <a href="{{asHref .AS.ASID}}"
          class="px-3 py-1.5 {{if .IsClosed}}bg-slate-700 hover:bg-slate-800{{else}}bg-blue-600 hover:bg-blue-700{{end}} text-white rounded-lg text-sm font-medium">{{if .IsClosed}}조치 완료{{else}}조치{{end}}</a>
       {{end}}
       {{if .CanIssueReport}}
@@ -94,7 +99,7 @@
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-sm font-semibold text-emerald-800">조치 완료 요약</h3>
       {{if .CanProcess}}
-      <a href="/as/{{.AS.ASID}}/action" class="text-xs font-medium text-blue-700 hover:underline">조치 화면 →</a>
+      <a href="{{asHref .AS.ASID}}" class="text-xs font-medium text-blue-700 hover:underline">조치 화면 →</a>
       {{end}}
     </div>
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -169,7 +174,7 @@
       {{range .}}
       {{if ne .ASID $.AS.ASID}}
       <li class="flex flex-wrap items-center gap-2 text-slate-700">
-        <a href="/as/{{.ASID}}" class="font-mono font-medium text-blue-700 hover:underline">{{.ASNumber}}</a>
+        <a href="{{asHref .ASID}}" class="font-mono font-medium text-blue-700 hover:underline">{{.ASNumber}}</a>
         {{if .ProductName}}<span>{{.ProductName}}</span>{{end}}
         {{statusBadge .Status}}
         <span class="text-xs text-slate-500 max-w-xs truncate">{{.Symptom}}</span>
@@ -192,7 +197,7 @@
     <ul class="space-y-1">
       {{range .Reopens}}
       <li class="flex items-center gap-2 text-gray-600">
-        <a href="/as/{{.ASID}}" class="font-medium text-blue-700 hover:underline">{{.ASNumber}}</a>
+        <a href="{{asHref .ASID}}" class="font-medium text-blue-700 hover:underline">{{.ASNumber}}</a>
         <span class="text-xs">{{.ReceiptDate}} 접수</span>
         {{statusBadge .Status}}
       </li>
@@ -209,7 +214,7 @@
     </div>
     <div class="flex flex-wrap gap-2">
       {{if .CanProcess}}
-      <a href="/as/{{.AS.ASID}}/action"
+      <a href="{{asHref .AS.ASID}}"
          class="px-3 py-1.5 {{if .IsClosed}}bg-slate-700 hover:bg-slate-800{{else}}bg-blue-600 hover:bg-blue-700{{end}} text-white rounded-lg text-xs font-medium">{{if .IsClosed}}조치 완료{{else}}조치{{end}}</a>
       {{end}}
       <a href="/workboard/tasks/{{.DailyTask.TaskID}}?back={{urlquery (printf "/as/%s" .AS.ASID)}}"
@@ -409,7 +414,7 @@
     <form method="post" action="/workboard/tasks" class="p-5 space-y-4">
       <input type="hidden" name="work_type" value="as">
       <input type="hidden" name="source_id" value="{{.AS.ASID}}">
-      <input type="hidden" name="redirect" value="/as/{{.AS.ASID}}">
+      <input type="hidden" name="redirect" value="{{asLegacyHref .AS.ASID}}">
       <div class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm">
         <p class="text-xs text-rose-700">AS 접수번호</p>
         <p class="font-mono font-semibold text-rose-900">{{.AS.ASNumber}}</p>
@@ -487,7 +492,7 @@
       <button type="button" data-close-modal="modal-unlock-edit" class="text-gray-400 hover:text-gray-700 text-xl">&times;</button>
     </div>
     <form method="POST" action="/as/{{.AS.ASID}}/unlock-edit" class="p-5 space-y-4">
-      <input type="hidden" name="redirect" value="/as/{{.AS.ASID}}">
+      <input type="hidden" name="redirect" value="{{asLegacyHref .AS.ASID}}">
       <p class="text-sm text-gray-600">관리자 로그인 비밀번호와 <strong>다른</strong> 수정 전용 비밀번호를 입력하세요. 해제 후 30분간 수정할 수 있습니다.</p>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">수정 비밀번호 <span class="text-red-500">*</span></label>
@@ -554,7 +559,7 @@
           +'</tr></thead><tbody class="divide-y">';
         items.forEach(function(it){
           var extra = it.kind==='factory_repair' ? ' <span class="text-teal-700 text-xs">제조사 수리 중'+(it.duration_text?(' '+it.duration_text):'')+'</span>' : '';
-          html+='<tr><td class="py-2 pr-3"><a href="/as/'+it.as_id+'" class="font-mono text-blue-600 hover:underline">'
+          html+='<tr><td class="py-2 pr-3"><a href="/as/'+it.as_id+'/action" class="font-mono text-blue-600 hover:underline">'
             +(it.as_number||'')+'</a></td><td class="py-2 pr-3">'+(it.receipt_date||'')+'</td><td class="py-2 pr-3">'
             +(it.complete_date||'—')+'</td><td class="py-2 truncate max-w-xs">'+(it.symptom||'—')+extra+'</td></tr>';
         });

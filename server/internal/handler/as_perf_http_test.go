@@ -93,7 +93,7 @@ func TestASShowDefersAssetHistoryAndActionDefersSimilar(t *testing.T) {
 	}
 
 	show := httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+open.ASID, nil)
+	req = httptest.NewRequest(http.MethodGet, "http://localhost/as/"+open.ASID+"?legacy=1", nil)
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, req)
 	if show.Code != http.StatusOK {

@@ -161,12 +161,12 @@ func TestSalesReceiveOnlyCanReceiveButNotProcess(t *testing.T) {
 		t.Fatalf("접수 POST: status=%d body=%s", created.Code, created.Body.String())
 	}
 
-	show := salesASGet(t, e, "/as/"+asID, ck)
+	show := salesASGet(t, e, "/as/"+asID+"/action", ck)
 	if show.Code != http.StatusOK {
 		t.Fatalf("상세: status=%d", show.Code)
 	}
-	if strings.Contains(show.Body.String(), "/as/"+asID+"/action") {
-		t.Fatal("접수만 받은 사람에게 조치 버튼이 있다")
+	if strings.Contains(show.Body.String(), `id="as-action-form"`) {
+		t.Fatal("접수만 받은 사람에게 조치 저장 폼이 있다")
 	}
 
 	if rec := salesASPost(t, e, "/as/"+asID+"/process", url.Values{"work_content": {"조치"}}, ck); rec.Code != http.StatusForbidden {
@@ -195,12 +195,12 @@ func TestSalesWithReceiveAndProcessCanUseAS(t *testing.T) {
 		t.Fatalf("접수 화면: status=%d", rec.Code)
 	}
 
-	show := salesASGet(t, e, "/as/"+asID, ck)
+	show := salesASGet(t, e, "/as/"+asID+"/action", ck)
 	if show.Code != http.StatusOK {
 		t.Fatalf("상세: status=%d", show.Code)
 	}
-	if !strings.Contains(show.Body.String(), "/as/"+asID+"/action") {
-		t.Fatal("조치 권한이 있는데 조치 버튼이 없다")
+	if !strings.Contains(show.Body.String(), `id="as-action-form"`) {
+		t.Fatal("조치 권한이 있는데 조치 저장 폼이 없다")
 	}
 
 	proc := salesASPost(t, e, "/as/"+asID+"/process", url.Values{

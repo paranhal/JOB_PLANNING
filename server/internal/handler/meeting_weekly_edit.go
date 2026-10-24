@@ -160,7 +160,7 @@ func (h *MeetingHandler) loadWeeklyEditTarget(c echo.Context) (model.WorkListIte
 		it.Assignee = as.AssignedTo
 		it.Status = as.Status
 		it.ScheduledDate = as.VisitScheduledDate
-		it.Href = "/as/" + as.ASID
+		it.Href = asOpenHref(as.ASID)
 		return it, as, 0
 	}
 	if prefix == "" || ref == "" {
@@ -172,7 +172,7 @@ func (h *MeetingHandler) loadWeeklyEditTarget(c echo.Context) (model.WorkListIte
 func weeklyItemHref(prefix, ref string) string {
 	switch prefix {
 	case model.WorkPrefixAS:
-		return "/as/" + ref
+		return asOpenHref(ref)
 	case model.WorkPrefixMaintenance:
 		return "/maintenance/visits/" + ref
 	case model.WorkPrefixProjectWork:
