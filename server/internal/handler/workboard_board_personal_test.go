@@ -432,6 +432,7 @@ func TestPersonalBoardMenuAndLegacyURLs(t *testing.T) {
 		"/workboard/register": "일일 업무 등록 (예전)",
 		"/work":               "오늘 업무 (예전)",
 		"/work/all":           "전체 업무 (예전)",
+		"/stats/reports":      "보고서 (예전)",
 	}
 	found := map[string]bool{}
 	for _, ch := range legacy.Children {
