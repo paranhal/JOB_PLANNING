@@ -75,7 +75,7 @@ func TestCollapseDuplicateMonthVisitsKeepsOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := repo.InsertVisitFull(model.MaintenanceVisit{
-		PlanID: p.PlanID, VisitDate: "2026-08-14", CustomerID: "c1", ProductType: "KLAS",
+		PlanID: p.PlanID, VisitDate: "2026-08-14", CustomerID: "c1",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -90,8 +90,8 @@ func TestCollapseDuplicateMonthVisitsKeepsOne(t *testing.T) {
 	if err != nil || len(list) != 1 {
 		t.Fatalf("남은 건=%d err=%v", len(list), err)
 	}
-	if list[0].VisitDate != "2026-08-14" {
-		t.Fatalf("남은 날짜=%s want 2026-08-14", list[0].VisitDate)
+	if list[0].VisitDate != "2026-08-10" {
+		t.Fatalf("남은 날짜=%s want 2026-08-10 (미완료는 빠른 날)", list[0].VisitDate)
 	}
 }
 

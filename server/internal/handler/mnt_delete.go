@@ -19,6 +19,19 @@ import (
 	"customer-support/internal/service"
 )
 
+const flashMntDupCookie = "jp_flash_mnt_dup"
+
+type mntDupSkipItem struct {
+	Date   string `json:"date"`
+	Site   string `json:"site"`
+	Reason string `json:"reason"`
+}
+
+type mntDupFlash struct {
+	Deleted int              `json:"deleted"`
+	Skipped []mntDupSkipItem `json:"skipped"`
+}
+
 func planConfirmTitle(p *model.MaintenancePlan) string {
 	if p == nil {
 		return ""
@@ -231,19 +244,40 @@ func (h *MaintenanceHandler) DuplicatesPreview(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	deletable := 0
+	skipBy := map[string]int{}
+	for _, d := range drops {
+		if d.Deletable() {
+			deletable++
+			continue
+		}
+		skipBy[d.StatusLabel()]++
+	}
 	return c.Render(http.StatusOK, "maintenance/plan_duplicates.html", map[string]interface{}{
 		"Title": "중복 정리", "Active": NavMaintenance, "Plan": plan,
 		"Drops": drops, "Month": month, "View": c.QueryParam("view"),
+		"DeletableCount": deletable, "SkipBy": skipBy, "SkipTotal": len(drops) - deletable,
+		"CanEdit": canEditMaintenanceSchedule(c),
 	})
 }
 
 func (h *MaintenanceHandler) CollapseDuplicates(c echo.Context) error {
 	id := c.Param("id")
+	q := url.Values{}
+	q.Set("month", c.FormValue("month"))
+	q.Set("view", c.FormValue("view"))
+	dupURL := "/maintenance/" + id + "/duplicates?" + q.Encode()
 	if c.FormValue("confirm") != "1" {
-		q := url.Values{}
-		q.Set("month", c.FormValue("month"))
-		q.Set("view", c.FormValue("view"))
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+id+"/duplicates?"+q.Encode())
+		return c.Redirect(http.StatusSeeOther, dupURL)
+	}
+	if !canEditMaintenanceSchedule(c) {
+		return c.Render(http.StatusForbidden, "auth/forbidden.html", map[string]interface{}{
+			"Title": "접근 권한 없음", "Active": NavNone,
+		})
+	}
+	if !requireCSRF(c) {
+		setFlashErrCookie(c, msgBulkCSRF)
+		return c.Redirect(http.StatusSeeOther, dupURL)
 	}
 	plan, err := h.requireVisiblePlan(c, id)
 	if err != nil {
@@ -257,33 +291,86 @@ func (h *MaintenanceHandler) CollapseDuplicates(c echo.Context) error {
 		for m := 1; m <= 12; m++ {
 			d, s, e := h.repo.CollapseDuplicateMonthVisits(id, plan.PlanYear, m)
 			if e != nil {
-				return h.planErrRedirect(c, id, e.Error())
+				setFlashErrCookie(c, e.Error())
+				return c.Redirect(http.StatusSeeOther, planURLFrom(c, id, ""))
 			}
 			deleted += d
 			skipped += s
 		}
 	}
 	if err != nil {
-		return h.planErrRedirect(c, id, err.Error())
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, planURLFrom(c, id, ""))
 	}
+	var remain []repository.DuplicateDrop
+	if month >= 1 && month <= 12 {
+		remain, _ = h.repo.ListDuplicateDrops(id, plan.PlanYear, month)
+	} else {
+		for m := 1; m <= 12; m++ {
+			d, e := h.repo.ListDuplicateDrops(id, plan.PlanYear, m)
+			if e != nil {
+				break
+			}
+			remain = append(remain, d...)
+		}
+	}
+	_ = skipped
+	detail := fmt.Sprintf("중복 방문 %d건 정리 (제외 %d건)", deleted, len(remain))
 	if deleted > 0 {
-		accessLog(c, auditlog.Record{
-			Action:      auditlog.ActionBulkDelete,
-			TargetTable: "maintenance_visits",
-			TargetID:    id,
-			SubjectType: "maintenance_plan",
-			SubjectID:   id,
-			SubjectName: planConfirmTitle(plan),
-			Detail:      fmt.Sprintf("중복 방문 %d건 정리 (제외 %d건)", deleted, skipped),
-			Reason:      "중복정리",
-			Result:      auditlog.ResultOK,
+		detail += ", 당월보호예외"
+	}
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionBulkDelete,
+		TargetTable: "maintenance_visits",
+		TargetID:    id,
+		SubjectType: "maintenance_plan",
+		SubjectID:   id,
+		SubjectName: planConfirmTitle(plan),
+		Detail:      detail,
+		Reason:      "중복정리",
+		Result:      auditlog.ResultOK,
+	})
+	setMntDupFlash(c, deleted, remain)
+	return c.Redirect(http.StatusSeeOther, planURLFrom(c, id, ""))
+}
+
+func setMntDupFlash(c echo.Context, deleted int, skipped []repository.DuplicateDrop) {
+	pop := mntDupFlash{Deleted: deleted}
+	for _, d := range skipped {
+		if d.Deletable() {
+			continue
+		}
+		pop.Skipped = append(pop.Skipped, mntDupSkipItem{
+			Date: d.Drop.VisitDate, Site: d.SiteName(), Reason: d.SkipReason,
 		})
 	}
-	msg := fmt.Sprintf("중복 %d건을 정리했습니다", deleted)
-	if skipped > 0 {
-		msg += fmt.Sprintf(" (당월·이전 %d건은 제외)", skipped)
+	payload, err := json.Marshal(pop)
+	if err != nil {
+		return
 	}
-	return h.planOKRedirect(c, id, msg)
+	c.SetCookie(sessionCookie(flashMntDupCookie, url.QueryEscape(string(payload)), 120))
+}
+
+func injectMntDupFlash(c echo.Context, data map[string]interface{}) {
+	if c == nil || data == nil || c.Request() == nil {
+		return
+	}
+	ck, err := c.Cookie(flashMntDupCookie)
+	if err != nil || ck == nil || strings.TrimSpace(ck.Value) == "" {
+		return
+	}
+	raw, uerr := url.QueryUnescape(ck.Value)
+	if uerr != nil {
+		raw = ck.Value
+	}
+	var pop mntDupFlash
+	if json.Unmarshal([]byte(raw), &pop) != nil {
+		return
+	}
+	data["MntDupPopup"] = pop
+	if !c.Response().Committed {
+		c.SetCookie(sessionCookie(flashMntDupCookie, "", -1))
+	}
 }
 
 func backupPlanDeleteJSON(dataDir string, plan *model.MaintenancePlan, visits []model.MaintenanceVisit) (string, error) {

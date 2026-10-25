@@ -61,9 +61,13 @@ func seedProtectPlan(t *testing.T, db *sql.DB, repo *repository.MaintenanceRepo,
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, d := range dates {
+	for i, d := range dates {
+		pt := "KLAS"
+		if i > 0 {
+			pt = ""
+		}
 		if err := repo.InsertVisitFull(model.MaintenanceVisit{
-			PlanID: p.PlanID, VisitDate: d, CustomerID: "c1", ProductType: "KLAS",
+			PlanID: p.PlanID, VisitDate: d, CustomerID: "c1", ProductType: pt,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -82,12 +86,44 @@ func mntGet(t *testing.T, e *echo.Echo, path string) *httptest.ResponseRecorder 
 
 func mntPost(t *testing.T, e *echo.Echo, path string, form url.Values) *httptest.ResponseRecorder {
 	t.Helper()
+	return mntPostCookie(t, e, path, form, jwtCookie(t))
+}
+
+func mntPostCookie(t *testing.T, e *echo.Echo, path string, form url.Values, ck *http.Cookie, extra ...*http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://localhost"+path, strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
+	if ck != nil {
+		req.AddCookie(ck)
+	}
+	for _, c := range extra {
+		if c != nil {
+			req.AddCookie(c)
+		}
+	}
 	e.ServeHTTP(rec, req)
 	return rec
+}
+
+func csrfFromRec(t *testing.T, rec *httptest.ResponseRecorder) (ck *http.Cookie, token string) {
+	t.Helper()
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == csrfCookieName {
+			ck = c
+			token = c.Value
+		}
+	}
+	if i := strings.Index(rec.Body.String(), `name="csrf" value="`); i >= 0 {
+		rest := rec.Body.String()[i+len(`name="csrf" value="`):]
+		if j := strings.Index(rest, `"`); j >= 0 {
+			token = rest[:j]
+		}
+	}
+	if ck == nil || token == "" {
+		t.Fatalf("csrf 없음 cookie=%v token=%q", ck, token)
+	}
+	return ck, token
 }
 
 func locText(rec *httptest.ResponseRecorder) string {
@@ -139,9 +175,15 @@ func TestCollapseDuplicatesRequiresConfirm(t *testing.T) {
 		t.Fatalf("확인 전에 삭제됨: %d", len(n))
 	}
 
-	ok := mntPost(t, e, "/maintenance/"+p.PlanID+"/duplicates", url.Values{"confirm": {"1"}, "month": {"11"}})
+	csrfCk, token := csrfFromRec(t, preview)
+	ok := mntPostCookie(t, e, "/maintenance/"+p.PlanID+"/duplicates", url.Values{
+		"confirm": {"1"}, "month": {"11"}, "csrf": {token},
+	}, jwtCookie(t), csrfCk)
 	if ok.Code != http.StatusSeeOther {
 		t.Fatalf("정리 status=%d", ok.Code)
+	}
+	if !strings.Contains(locText(ok), "month=11") && !strings.Contains(ok.Header().Get("Location"), "month=11") {
+		t.Fatalf("월 필터 없음: %s", ok.Header().Get("Location"))
 	}
 	left, _ := h.Maintenance.repo.ListVisits(p.PlanID)
 	if len(left) != 1 {

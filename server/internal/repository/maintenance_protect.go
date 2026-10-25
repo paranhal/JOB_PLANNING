@@ -11,11 +11,46 @@ import (
 // ErrVisitDeleteProtected 당월·이전 달 방문 삭제 거부 (§23.11).
 var ErrVisitDeleteProtected = fmt.Errorf("당월·이전 달 방문은 삭제할 수 없습니다")
 
+const (
+	// DupSkipCompleted Drop 만 완료된 경우(선정 오류 방어).
+	DupSkipCompleted = "완료된 방문"
+	// DupSkipBothDone 같은 슬롯의 방문이 둘 다 완료.
+	DupSkipBothDone = "둘 다 완료됨"
+	// DupSkipRecord 비고·시간·장비·사인·결과서가 있어 자동 삭제 불가.
+	DupSkipRecord = "조치 기록이 있어 직접 확인이 필요합니다"
+)
+
 // DuplicateDrop 중복 정리 시 지워질 방문과 남을 방문.
 type DuplicateDrop struct {
-	Drop      model.MaintenanceVisit
-	Keep      model.MaintenanceVisit
-	Protected bool
+	Drop       model.MaintenanceVisit
+	Keep       model.MaintenanceVisit
+	SkipReason string
+}
+
+func (d DuplicateDrop) Deletable() bool {
+	return strings.TrimSpace(d.SkipReason) == ""
+}
+
+func (d DuplicateDrop) StatusLabel() string {
+	switch strings.TrimSpace(d.SkipReason) {
+	case "":
+		return "삭제 예정"
+	case DupSkipCompleted:
+		return "제외 — 완료된 방문"
+	case DupSkipRecord:
+		return "제외 — 조치 기록 있음"
+	case DupSkipBothDone:
+		return "제외 — 둘 다 완료"
+	default:
+		return "제외 — " + d.SkipReason
+	}
+}
+
+func (d DuplicateDrop) SiteName() string {
+	if s := strings.TrimSpace(d.Drop.ShortName); s != "" {
+		return s
+	}
+	return strings.TrimSpace(d.Drop.OrgName)
 }
 
 // GuardPlanDelete 계획 삭제 가능 여부를 검사한다. 핸들러가 백업 전에 호출한다.
@@ -140,11 +175,15 @@ func (r *MaintenanceRepo) ListDuplicateDrops(planID string, year, month int) ([]
 	if err != nil {
 		return nil, err
 	}
-	type key struct{ cust, slot string }
+	type key struct {
+		cust  string
+		slot  string
+		round int
+	}
 	best := map[key]model.MaintenanceVisit{}
 	var drops []DuplicateDrop
 	for _, v := range visits {
-		k := key{v.CustomerID, model.VisitProductSlotKey(v.ProductType)}
+		k := key{v.CustomerID, model.VisitProductSlotKey(v.ProductType), v.VisitRound()}
 		cur, ok := best[k]
 		if !ok {
 			best[k] = v
@@ -158,18 +197,25 @@ func (r *MaintenanceRepo) ListDuplicateDrops(planID string, year, month int) ([]
 		if model.VisitProductSlotKey(v.ProductType) != "generic" {
 			continue
 		}
-		_, hasKlas := best[key{v.CustomerID, "klas"}]
-		_, hasRfid := best[key{v.CustomerID, "rfid"}]
-		if hasKlas || hasRfid {
-			keep := best[key{v.CustomerID, "klas"}]
-			if keep.VisitID == "" {
-				keep = best[key{v.CustomerID, "rfid"}]
+		var prod model.MaintenanceVisit
+		for _, slot := range []string{"klas", "rfid"} {
+			if p, ok := best[key{v.CustomerID, slot, v.VisitRound()}]; ok {
+				prod = p
+				break
 			}
-			drops = append(drops, DuplicateDrop{Drop: v, Keep: keep})
-			delete(best, key{v.CustomerID, "generic"})
+		}
+		if prod.VisitID == "" {
+			continue
+		}
+		keep, lose := pickBetterMonthVisit(v, prod)
+		drops = append(drops, DuplicateDrop{Drop: lose, Keep: keep})
+		if keep.VisitID == v.VisitID {
+			delete(best, key{prod.CustomerID, model.VisitProductSlotKey(prod.ProductType), prod.VisitRound()})
+			best[key{v.CustomerID, "generic", v.VisitRound()}] = v
+		} else {
+			delete(best, key{v.CustomerID, "generic", v.VisitRound()})
 		}
 	}
-	now := r.nowTime()
 	seen := map[string]struct{}{}
 	kept := map[string]struct{}{}
 	for _, v := range best {
@@ -187,10 +233,80 @@ func (r *MaintenanceRepo) ListDuplicateDrops(planID string, year, month int) ([]
 			continue
 		}
 		seen[d.Drop.VisitID] = struct{}{}
-		d.Protected = model.VisitDeleteProtected(d.Drop.VisitDate, now)
+		r.classifyDuplicateDrop(&d)
 		out = append(out, d)
 	}
 	return out, nil
+}
+
+func (r *MaintenanceRepo) classifyDuplicateDrop(d *DuplicateDrop) {
+	if d == nil {
+		return
+	}
+	if d.Drop.Completed && d.Keep.Completed {
+		d.SkipReason = DupSkipBothDone
+		return
+	}
+	if d.Drop.Completed {
+		d.SkipReason = DupSkipCompleted
+		return
+	}
+	if d.Keep.VisitID == "" || d.Keep.PlanID != d.Drop.PlanID || d.Keep.CustomerID != d.Drop.CustomerID {
+		d.SkipReason = "남을 방문이 같은 슬롯에 없습니다"
+		return
+	}
+	if visitYearMonth(d.Drop.VisitDate) != visitYearMonth(d.Keep.VisitDate) {
+		d.SkipReason = "남을 방문이 같은 슬롯에 없습니다"
+		return
+	}
+	if r.visitHasActionRecord(d.Drop) {
+		d.SkipReason = DupSkipRecord
+	}
+}
+
+func visitYearMonth(date string) string {
+	date = strings.TrimSpace(date)
+	if len(date) >= 7 {
+		return date[:7]
+	}
+	return date
+}
+
+func (r *MaintenanceRepo) visitHasActionRecord(v model.MaintenanceVisit) bool {
+	if strings.TrimSpace(v.Notes) != "" {
+		return true
+	}
+	if strings.TrimSpace(v.StartTime) != "" || strings.TrimSpace(v.EndTime) != "" {
+		return true
+	}
+	targets, err := r.ListVisitTargets(v.VisitID)
+	if err == nil && len(targets) > 0 {
+		return true
+	}
+	return r.visitHasSignatureOrReport(v.VisitID)
+}
+
+func (r *MaintenanceRepo) visitHasSignatureOrReport(visitID string) bool {
+	visitID = strings.TrimSpace(visitID)
+	if visitID == "" || r == nil || r.db == nil {
+		return false
+	}
+	tables := []string{
+		"maintenance_visit_signatures",
+		"maintenance_visit_reports",
+		"maintenance_reports",
+	}
+	for _, tbl := range tables {
+		var n int
+		q := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE visit_id=?`, tbl)
+		if err := r.db.QueryRow(q, visitID).Scan(&n); err != nil {
+			continue
+		}
+		if n > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *MaintenanceRepo) CountDuplicateDrops(planID string, year int, month int) (int, error) {
@@ -207,6 +323,28 @@ func (r *MaintenanceRepo) CountDuplicateDrops(planID string, year int, month int
 		n += len(d)
 	}
 	return n, nil
+}
+
+// deleteVisitAllowProtectedDuplicate 중복 정리 전용. allowProtectedDuplicate=true 일 때만
+// §23.11 당월 보호를 건너뛰고 removeVisitRow 한다. 일반 DeleteVisit 는 이 인자를 받지 않는다.
+func (r *MaintenanceRepo) deleteVisitAllowProtectedDuplicate(visitID string, allowProtectedDuplicate bool) error {
+	if !allowProtectedDuplicate {
+		return r.DeleteVisit(visitID)
+	}
+	v, err := r.GetVisit(visitID)
+	if err != nil {
+		return err
+	}
+	if v == nil {
+		return fmt.Errorf("방문을 찾을 수 없습니다")
+	}
+	if v.Completed {
+		return fmt.Errorf("완료된 방문은 삭제할 수 없습니다")
+	}
+	if r.visitHasActionRecord(*v) {
+		return fmt.Errorf("%s", DupSkipRecord)
+	}
+	return r.removeVisitRow(visitID)
 }
 
 // DeleteVisitIDs 기간 보호 대상은 건너뛰고 나머지만 지운다. skipped 는 제외 건수.

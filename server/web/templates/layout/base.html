@@ -108,6 +108,34 @@
 </div>
 {{end}}
 
+{{if .MntDupPopup}}
+<div x-data="asSaveDialog()" x-cloak x-show="open"
+     @keydown.escape.window="if(open) close()"
+     class="modal-backdrop z-[60] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="mnt-dup-title"
+     @click.self="close()">
+  <div class="modal-panel w-full max-w-lg shadow-pop" @click.stop>
+    <h2 id="mnt-dup-title" class="text-ui font-bold text-ink">중복 정리</h2>
+    {{if eq .MntDupPopup.Deleted 0}}
+    <p class="mt-2 text-ui text-ink">정리할 수 있는 중복이 없습니다</p>
+    {{else}}
+    <p class="mt-2 text-ui text-ink">중복 {{.MntDupPopup.Deleted}}건을 정리했습니다.{{if .MntDupPopup.Skipped}} (제외 {{len .MntDupPopup.Skipped}}건){{end}}</p>
+    {{end}}
+    {{if .MntDupPopup.Skipped}}
+    <p class="mt-3 text-ui-sm font-semibold text-ink">제외된 건</p>
+    <ul class="mt-1 max-h-48 overflow-y-auto space-y-1 text-sm text-ink">
+      {{range .MntDupPopup.Skipped}}
+      <li>{{.Date}} · {{.Site}} · {{.Reason}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+    <div class="mt-4 flex justify-end">
+      <button type="button" class="btn btn-primary" x-ref="ok" @click="close()">확인</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
 <div x-data="asDeleteDialog()" x-cloak x-show="open"
      @as-delete-open.window="openWith($event.detail)"
      @keydown.escape.window="if(open) close()"

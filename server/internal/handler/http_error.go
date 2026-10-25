@@ -179,6 +179,7 @@ func injectFlash(c echo.Context, data map[string]interface{}) {
 	}
 	injectASSaveFlash(c, data)
 	injectBulkDeleteFlash(c, data)
+	injectMntDupFlash(c, data)
 }
 
 func formReturnURL(c echo.Context) string {
