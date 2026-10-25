@@ -253,11 +253,11 @@ func Test95_38_DeleteCSRFAndModalMarkup(t *testing.T) {
 	breq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	breq.AddCookie(jwtCookie(t))
 	e.ServeHTTP(bad, breq)
+	if still, _ := asRepo.GetByID(repository.OrgAll, as.ASID); still == nil {
+		t.Fatal("CSRF 없이 삭제되면 안 된다")
+	}
 	if bad.Code != http.StatusForbidden && bad.Code != http.StatusSeeOther {
 		t.Fatalf("csrf 없는 POST %d", bad.Code)
-	}
-	if bad.Code == http.StatusSeeOther {
-		t.Fatal("CSRF 없이 삭제되면 안 된다")
 	}
 	list := doGetWith(t, e, "/as", jwtCookie(t))
 	if !strings.Contains(list.Body.String(), "js-as-delete") || !strings.Contains(list.Body.String(), "as-delete-title") {
@@ -341,11 +341,18 @@ func Test95_38_DeletePermissionMatrix(t *testing.T) {
 	if c := try(oa, open2); c != http.StatusSeeOther {
 		t.Fatalf("자기 조직장 미처리 %d", c)
 	}
-	if c := try(oa2, open); c != http.StatusNotFound && c != http.StatusForbidden {
+	libLive := newAS("received", recv.UserID, recv.FullName, model.OrgIDLibrary)
+	if c := try(oa2, libLive); c != http.StatusNotFound && c != http.StatusForbidden && c != http.StatusSeeOther {
 		t.Fatalf("타 조직장 %d", c)
 	}
-	if c := try(oa, otherOrg); c != http.StatusNotFound && c != http.StatusForbidden {
+	if still, _ := asRepo.GetByID(repository.OrgAll, libLive.ASID); still == nil {
+		t.Fatal("타 조직장이 도서관 접수를 지움")
+	}
+	if c := try(oa, otherOrg); c != http.StatusNotFound && c != http.StatusForbidden && c != http.StatusSeeOther {
 		t.Fatalf("타조직 건 %d", c)
+	}
+	if still, _ := asRepo.GetByID(repository.OrgAll, otherOrg.ASID); still == nil {
+		t.Fatal("타조직 건이 삭제됨")
 	}
 	open3 := newAS("received", recv.UserID, recv.FullName, model.OrgIDLibrary)
 	if c := try(recv, open3); c != http.StatusSeeOther {
@@ -358,12 +365,18 @@ func Test95_38_DeletePermissionMatrix(t *testing.T) {
 	if still == nil {
 		t.Fatal("다른 접수자가 조치건을 지움")
 	}
-	if c := try(recv, withProc); c != http.StatusForbidden {
+	if c := try(recv, withProc); c != http.StatusForbidden && c != http.StatusSeeOther {
 		t.Fatalf("접수자 조치건 %d", c)
 	}
+	if still, _ := asRepo.GetByID(repository.OrgAll, withProc.ASID); still == nil {
+		t.Fatal("접수자가 조치건을 지움")
+	}
 	openTech := newAS("received", recv.UserID, recv.FullName, model.OrgIDLibrary)
-	if c := try(tech, openTech); c != http.StatusForbidden {
+	if c := try(tech, openTech); c != http.StatusForbidden && c != http.StatusSeeOther {
 		t.Fatalf("담당 tech %d", c)
+	}
+	if still, _ := asRepo.GetByID(repository.OrgAll, openTech.ASID); still == nil {
+		t.Fatal("담당 tech가 접수를 지움")
 	}
 	openCL := newAS("received", recv.UserID, recv.FullName, model.OrgIDLibrary)
 	if c := try(cl, openCL); c != http.StatusForbidden && c != http.StatusSeeOther {
@@ -466,4 +479,3 @@ func Test95_38_DeleteCascadeAndLinkedRefuse(t *testing.T) {
 		t.Fatal("삭제 팝업 없음")
 	}
 }
-

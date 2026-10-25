@@ -15,7 +15,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"customer-support/internal/auditlog"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -2358,93 +2357,6 @@ func (h *ASHandler) appendReopenProcess(src, as *model.ASReceipt, reason string,
 		Worker:          worker,
 		Notes:           fmt.Sprintf("동일 증상 재접수 — %s (사유: %s)", as.ASNumber, reason),
 	})
-}
-
-// Delete AS 접수 삭제 (처리 이력 포함) — 비전·조직관리자·접수자(미처리)
-func (h *ASHandler) Delete(c echo.Context) error {
-	id := c.Param("id")
-	deny := func(reason, detail string, as *model.ASReceipt, code error) error {
-		rec := auditlog.Record{
-			Action:      auditlog.ActionDelete,
-			TargetTable: "as_receipts",
-			TargetID:    id,
-			Detail:      detail,
-			Reason:      reason,
-			Result:      auditlog.ResultDeny,
-		}
-		if as != nil {
-			rec.TargetID = as.ASID
-			rec.SubjectType = "customer"
-			rec.SubjectID = as.CustomerID
-			rec.SubjectName = as.OrgName
-			rec.BeforeJSON = toJSON(as)
-		}
-		accessLog(c, rec)
-		return code
-	}
-	if !requireCSRF(c) {
-		return deny("CSRF", "CSRF 없음", nil, echo.ErrForbidden)
-	}
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
-	}
-	if !h.canDeleteThis(c, as) {
-		if isASClosedStatus(as.Status) && isAdminRole(c) && !h.canModifyAS(c, as) {
-			_ = deny("잠금", "완료·종료 건 삭제 거부", as, echo.ErrForbidden)
-			return h.redirectLocked(c, id, "show")
-		}
-		return deny("권한없음", "권한없음", as, echo.ErrForbidden)
-	}
-	if linked, _ := h.repo.HasLinkedAS(as.ASID); linked {
-		setFlashErrCookie(c, "이관/재접수로 연결된 접수는 삭제할 수 없습니다")
-		accessLog(c, auditlog.Record{
-			Action:      auditlog.ActionDelete,
-			TargetTable: "as_receipts",
-			TargetID:    as.ASID,
-			SubjectType: "customer",
-			SubjectID:   as.CustomerID,
-			SubjectName: as.OrgName,
-			Detail:      "연결 건 삭제 거부",
-			Reason:      "연결",
-			Result:      auditlog.ResultDeny,
-			BeforeJSON:  toJSON(as),
-		})
-		return c.Redirect(http.StatusSeeOther, "/as")
-	}
-	if err := h.repo.Delete(id); err != nil {
-		accessLog(c, auditlog.Record{
-			Action:      auditlog.ActionDelete,
-			TargetTable: "as_receipts",
-			TargetID:    as.ASID,
-			SubjectType: "customer",
-			SubjectID:   as.CustomerID,
-			SubjectName: as.OrgName,
-			Detail:      err.Error(),
-			Reason:      accessReason(c, "AS 접수 삭제"),
-			Result:      auditlog.ResultDeny,
-			BeforeJSON:  toJSON(as),
-		})
-		return err
-	}
-	reason := accessReason(c, "AS 접수 삭제")
-	if asReceiverIsSelf(c, as) && !(isVisionRole(c) || (model.NormalizeRole(currentRole(c)) == model.RoleOrgAdmin && orgAdminInHome(c))) {
-		reason = "접수자 본인 삭제"
-	}
-	accessLog(c, auditlog.Record{
-		Action:      auditlog.ActionDelete,
-		TargetTable: "as_receipts",
-		TargetID:    as.ASID,
-		SubjectType: "customer",
-		SubjectID:   as.CustomerID,
-		SubjectName: as.OrgName,
-		Detail:      "AS 접수 삭제 " + as.ASNumber,
-		Reason:      reason,
-		Result:      auditlog.ResultOK,
-		BeforeJSON:  toJSON(as),
-	})
-	setFlashOKCookie(c, flashOKDeleted, []string{as.ASNumber})
-	return c.Redirect(http.StatusSeeOther, "/as")
 }
 
 // DeleteProcess 처리(조치) 이력 삭제 — 관리자만 (완료·종료는 잠금 해제 필요)

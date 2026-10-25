@@ -29,6 +29,7 @@ type WorkboardHandler struct {
 	workBoard    *repository.WorkBoardRepo
 	notices      *assignNoticeHook
 	groups       *repository.WorkGroupRepo
+	asH          *ASHandler
 }
 
 func NewWorkboardHandler(

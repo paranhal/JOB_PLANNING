@@ -40,38 +40,42 @@ type boardStatusView struct {
 }
 
 type boardItem struct {
-	Task            model.WorkTask
-	Href            string
-	Type            boardTypeStyle
-	Status          boardStatusView
-	CustomerLine    string
-	PlaceLine       string
-	DateLabel       string
-	TimeLabel       string
-	HasTime         bool
-	StartMin        int
-	EndMin          int
-	AssigneeName    string
-	AssigneeExtra   string
-	AssigneeTitle   string
-	AssigneeInitial string
-	ChipTime        string
-	DayPosTop       int
-	DayPosHeight    int
-	DayCol          int
-	DayCols         int
-	Unplaced        bool
-	Overdue         bool
-	OverdueDays     int
-	DedupKey        string
-	PlaceKind       string
-	PlaceRef        string
-	PlaceAssignee   string
-	PlaceDur        int
-	PlaceDue        string
-	CanPlace        bool
-	DueTag          string
-	DueLate         bool
+	Task                 model.WorkTask
+	Href                 string
+	Type                 boardTypeStyle
+	Status               boardStatusView
+	CustomerLine         string
+	PlaceLine            string
+	DateLabel            string
+	TimeLabel            string
+	HasTime              bool
+	StartMin             int
+	EndMin               int
+	AssigneeName         string
+	AssigneeExtra        string
+	AssigneeTitle        string
+	AssigneeInitial      string
+	ChipTime             string
+	DayPosTop            int
+	DayPosHeight         int
+	DayCol               int
+	DayCols              int
+	Unplaced             bool
+	Overdue              bool
+	OverdueDays          int
+	DedupKey             string
+	PlaceKind            string
+	PlaceRef             string
+	PlaceAssignee        string
+	PlaceDur             int
+	PlaceDue             string
+	CanPlace             bool
+	DueTag               string
+	DueLate              bool
+	CanDelete            bool
+	DeleteDisabledReason string
+	CustomerPlace        string
+	ScheduleLine         string
 }
 
 type boardMonthCell struct {
@@ -371,8 +375,47 @@ func buildBoardItem(t model.WorkTask, mems []model.WorkTaskMember, addr string, 
 		AssigneeTitle:   strings.Join(names, ", "),
 		AssigneeInitial: firstRune(primary),
 		ChipTime:        chipTime,
+		CustomerPlace:   customerPlaceLine(cust, place),
+		ScheduleLine:    boardOneLineSchedule(day, timeLabel),
 	}
 	return it
+}
+
+func customerPlaceLine(cust, place string) string {
+	cust, place = strings.TrimSpace(cust), strings.TrimSpace(place)
+	if cust != "" && place != "" {
+		return cust + " · " + place
+	}
+	if cust != "" {
+		return cust
+	}
+	return place
+}
+
+func boardOneLineSchedule(day, timeLabel string) string {
+	day = strings.TrimSpace(day)
+	if day == "" {
+		return "날짜 미정"
+	}
+	t, err := time.ParseInLocation(dateLayout, day, time.Local)
+	if err != nil {
+		if strings.TrimSpace(timeLabel) != "" {
+			return strings.TrimSpace(timeLabel)
+		}
+		return day
+	}
+	wd := []string{"일", "월", "화", "수", "목", "금", "토"}
+	s := fmt.Sprintf("%d/%02d (%s)", int(t.Month()), t.Day(), wd[int(t.Weekday())])
+	clock := strings.TrimSpace(timeLabel)
+	if clock == "" {
+		return s
+	}
+	clock = strings.ReplaceAll(clock, "–", " ")
+	clock = strings.ReplaceAll(clock, "-", " ")
+	if f := strings.Fields(clock); len(f) > 0 {
+		s += " " + f[0]
+	}
+	return s
 }
 
 func sortBoardItems(items []boardItem) {
@@ -458,6 +501,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 			}
 		}
 		sortListBoardItems(items)
+		h.annotateListDelete(c, items)
 	} else {
 		items = append(items, placed...)
 		items = append(items, overdue...)

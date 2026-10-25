@@ -42,6 +42,9 @@ func requireCSRF(c echo.Context) bool {
 	}
 	ck, err := c.Cookie(csrfCookieName)
 	got := strings.TrimSpace(c.FormValue("csrf"))
+	if got == "" && c.Request() != nil {
+		got = strings.TrimSpace(c.Request().Header.Get("X-CSRF-Token"))
+	}
 	if err != nil || ck == nil || strings.TrimSpace(ck.Value) == "" || got == "" {
 		return false
 	}

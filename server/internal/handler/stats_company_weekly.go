@@ -33,6 +33,12 @@ var companyWeeklyOut = struct {
 	items map[string]companyWeeklyDownload
 }{items: map[string]companyWeeklyDownload{}}
 
+func invalidateCompanyWeeklyDownloads() {
+	companyWeeklyOut.Lock()
+	defer companyWeeklyOut.Unlock()
+	companyWeeklyOut.items = map[string]companyWeeklyDownload{}
+}
+
 func putCompanyWeeklyDownload(item companyWeeklyDownload) string {
 	companyWeeklyOut.Lock()
 	defer companyWeeklyOut.Unlock()

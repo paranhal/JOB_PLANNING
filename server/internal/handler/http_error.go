@@ -178,6 +178,7 @@ func injectFlash(c echo.Context, data map[string]interface{}) {
 		clearFlashErrCookie(c)
 	}
 	injectASSaveFlash(c, data)
+	injectBulkDeleteFlash(c, data)
 }
 
 func formReturnURL(c echo.Context) string {

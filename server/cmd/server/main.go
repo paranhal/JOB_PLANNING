@@ -722,6 +722,8 @@ func main() {
 	wb.GET("/work-sites/search", h.Workboard.SearchWorkTaskSites)
 	wb.POST("/projects", h.Workboard.CreateProject)
 	wb.POST("/tasks", h.Workboard.CreateTask)
+	wb.POST("/tasks/bulk-delete/preview", h.Workboard.BulkDeletePreview)
+	wb.POST("/tasks/bulk-delete", h.Workboard.BulkDelete)
 	wb.GET("/tasks/:id/edit", h.Workboard.EditTask)
 	wb.GET("/tasks/:id/action", h.Workboard.ShowProjectWorkAction)
 	wb.POST("/tasks/:id/action", h.Workboard.SaveProjectWorkAction)

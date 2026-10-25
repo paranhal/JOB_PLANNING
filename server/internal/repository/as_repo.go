@@ -1299,6 +1299,7 @@ func (r *ASRepo) FindRecentDuplicate(orgID, customerID, symptom string, within t
 	return nil, nil
 }
 
+// HasLinkedAS 이관·재접수의 parent_as_id 만 본다. 같은 receipt_group_id 번들은 연결 건이 아니다.
 func (r *ASRepo) HasLinkedAS(asID string) (bool, error) {
 	if r == nil || r.db == nil {
 		return false, nil

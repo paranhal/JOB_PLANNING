@@ -289,6 +289,7 @@ func New(db *sql.DB) *Handler {
 		}
 	}
 	bindASFlashHandler(h.AS)
+	h.Workboard.asH = h.AS
 	return h
 }
 

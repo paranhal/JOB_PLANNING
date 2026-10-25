@@ -390,12 +390,56 @@ func (r *WBRepo) DeleteTask(id string) error {
 	if id == "" {
 		return nil
 	}
-	_, _ = r.db.Exec(`DELETE FROM work_task_tags WHERE task_id=?`, id)
-	_, _ = r.db.Exec(`DELETE FROM work_task_members WHERE task_id=?`, id)
-	_, _ = r.db.Exec(`DELETE FROM work_task_sites WHERE task_id=?`, id)
+	for _, q := range []string{
+		`DELETE FROM work_task_tags WHERE task_id=?`,
+		`DELETE FROM work_task_sites WHERE task_id=?`,
+		`DELETE FROM work_task_assets WHERE task_id=?`,
+		`DELETE FROM work_task_parts_used WHERE task_id=?`,
+		`DELETE FROM work_activities WHERE task_id=?`,
+		`DELETE FROM work_actions WHERE task_id=?`,
+		`DELETE FROM attachments WHERE ref_id=? AND ref_type IN ('work_task','work_activity')`,
+	} {
+		_, _ = r.db.Exec(q, id)
+	}
 	_, err := r.db.Exec(`DELETE FROM work_tasks WHERE task_id=?`, id)
 	if err != nil && strings.Contains(err.Error(), "no such table") {
 		return nil
 	}
 	return err
+}
+
+func (r *WBRepo) TaskIDsBySource(sourceType, sourceID string) []string {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	sourceType = strings.TrimSpace(sourceType)
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceType == "" || sourceID == "" {
+		return nil
+	}
+	rows, err := r.db.Query(`SELECT task_id FROM work_tasks WHERE source_type=? AND source_id=?`, sourceType, sourceID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && strings.TrimSpace(id) != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (r *WBRepo) TaskCooperationID(taskID string) string {
+	if r == nil || r.db == nil {
+		return ""
+	}
+	var s string
+	err := r.db.QueryRow(`SELECT COALESCE(cooperation_id,'') FROM work_tasks WHERE task_id=?`, strings.TrimSpace(taskID)).Scan(&s)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(s)
 }
