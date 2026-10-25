@@ -188,6 +188,7 @@ func main() {
 
 	// /version 은 로그인 없이. 배포 직후 curl 한 줄로 확인한다. §40.4 ③
 	e.GET("/version", handler.VersionJSON)
+	e.GET("/csrf", handler.CSRFJSON)
 
 	// 인증
 	e.GET("/login", h.Auth.LoginPage)

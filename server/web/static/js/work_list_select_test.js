@@ -69,4 +69,138 @@ if (ctx.n !== 2) {
   process.exit(1);
 }
 
-console.log('ok');
+const five = [box('a'), box('b'), box('c'), box('d'), box('e')];
+five.forEach(function (x) { x.checked = true; });
+const fiveRoot = {
+  querySelectorAll(sel) {
+    if (sel === '.js-wl-check') return five;
+    return [];
+  },
+  querySelector() { return null; }
+};
+
+function jsonRes(status, body) {
+  return Promise.resolve({
+    ok: status >= 200 && status < 300,
+    status: status,
+    json: function () { return Promise.resolve(body); }
+  });
+}
+
+global.document = {
+  cookie: 'jp_csrf=livecookie01234567',
+  querySelector: function (sel) {
+    if (sel === 'meta[name="csrf-token"]') {
+      return { getAttribute: function () { return 'metatoken012345678'; }, setAttribute: function () {} };
+    }
+    return null;
+  },
+  getElementById: function () { return fiveRoot; }
+};
+
+const flashes = [];
+global.window = {
+  showFlashError: function (m, reload) {
+    flashes.push({ m: m, reload: reload });
+  }
+};
+
+const p = workListSelect('stale');
+p.$root = fiveRoot;
+p.sync();
+if (p.n !== 5) {
+  console.error('5건 n=', p.n);
+  process.exit(1);
+}
+
+let fetches = [];
+global.fetch = function (url, opts) {
+  fetches.push({ url: url, opts: opts });
+  if (String(url).indexOf('/csrf') >= 0) {
+    return jsonRes(200, { csrf: 'livecookie01234567' });
+  }
+  return jsonRes(403, { error: '보안 확인에 실패했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.' });
+};
+
+p.preview();
+function wait(ms) {
+  return new Promise(function (r) { setTimeout(r, ms); });
+}
+
+wait(40).then(function () {
+  if (p.modal) {
+    console.error('403 인데 모달이 열림 delN=', p.delN);
+    process.exit(1);
+  }
+  if (!p.lastError || p.lastError.indexOf('보안 확인') < 0) {
+    console.error('오류 문구 없음', p.lastError, flashes);
+    process.exit(1);
+  }
+  if (!fetches.length || fetches[0].opts.credentials !== 'same-origin') {
+    console.error('credentials 없음', fetches[0]);
+    process.exit(1);
+  }
+
+  flashes.length = 0;
+  p.lastError = '';
+  p.modal = false;
+  fetches = [];
+  global.fetch = function (url, opts) {
+    fetches.push({ url: url, opts: opts });
+    return jsonRes(200, {
+      deletable: five.map(function (x) { return { id: x.value, title: x.value }; }),
+      skipped: []
+    });
+  };
+  p.preview();
+  return wait(40);
+}).then(function () {
+  if (!p.modal || p.delN !== 5) {
+    console.error('정상 미리보기 실패', p.modal, p.delN);
+    process.exit(1);
+  }
+  var title = '선택 ' + p.n + '건 중 삭제 ' + p.delN + '건';
+  if (title !== '선택 5건 중 삭제 5건') {
+    console.error('제목', title);
+    process.exit(1);
+  }
+
+  p.modal = false;
+  p.deletable = [];
+  p.skipped = [];
+  p.delN = 0;
+  p.lastError = '';
+  flashes.length = 0;
+  global.fetch = function () { return jsonRes(200, {}); };
+  p.preview();
+  return wait(40);
+}).then(function () {
+  if (p.modal || p.delN !== 0) {
+    console.error('빈 객체인데 0건 모달', p.modal, p.delN);
+    process.exit(1);
+  }
+  if (!p.lastError || p.lastError.indexOf('확인 결과') < 0) {
+    console.error('빈 객체 오류 없음', p.lastError);
+    process.exit(1);
+  }
+
+  p.modal = false;
+  p.lastError = '';
+  flashes.length = 0;
+  global.fetch = function () { return Promise.reject(new Error('network')); };
+  p.preview();
+  return wait(40);
+}).then(function () {
+  if (p.modal) {
+    console.error('네트워크 실패인데 모달');
+    process.exit(1);
+  }
+  if (!p.lastError) {
+    console.error('네트워크 오류 없음');
+    process.exit(1);
+  }
+  console.log('ok');
+}).catch(function (e) {
+  console.error(e);
+  process.exit(1);
+});

@@ -30,7 +30,8 @@
   <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
     <h2 id="flash-err-title" class="text-ui font-bold text-ink">확인해 주세요</h2>
     <p class="mt-2 text-ui text-ink whitespace-pre-wrap" x-text="msg"></p>
-    <div class="mt-4 flex justify-end">
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="button" class="btn btn-secondary" x-show="reload" x-cloak @click="location.reload()">화면 새로고침</button>
       <button type="button" class="btn btn-primary" x-ref="ok" @click="close()">확인</button>
     </div>
   </div>
@@ -543,13 +544,21 @@
     return {
       open: !!(msg && String(msg).length),
       msg: msg ? String(msg) : '',
+      reload: !!(msg && String(msg).indexOf('새로고침') >= 0),
       show(m) {
-        this.msg = String(m || '');
+        this.reload = false;
+        if (m && typeof m === 'object') {
+          this.msg = String(m.msg || m.detail || '');
+          this.reload = !!m.reload;
+        } else {
+          this.msg = String(m || '');
+        }
+        if (/새로고침/.test(this.msg)) this.reload = true;
         this.open = this.msg.length > 0;
         var self = this;
         this.$nextTick(function () { if (self.$refs.ok) self.$refs.ok.focus(); });
       },
-      close() { this.open = false; }
+      close() { this.open = false; this.reload = false; }
     };
   };
   window.asSaveDialog = function () {
@@ -594,8 +603,12 @@
       }
     }));
   });
-  window.showFlashError = function (m) {
-    window.dispatchEvent(new CustomEvent('app-flash-error', { detail: m }));
+  window.showFlashError = function (m, reload) {
+    var detail = m;
+    if (reload === true && typeof m === 'string') {
+      detail = { msg: m, reload: true };
+    }
+    window.dispatchEvent(new CustomEvent('app-flash-error', { detail: detail }));
   };
   window.customerCombo = function (scope, value, required, placeholder, parent, syncKey) {
     scope = scope || 'site';

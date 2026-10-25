@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -112,15 +113,23 @@ func injectBulkDeleteFlash(c echo.Context, data map[string]interface{}) {
 	}
 }
 
+func logBulkDeleteDeny(c echo.Context, stage, reason string, n int) {
+	log.Printf("bulk-delete %s deny reason=%s user=%s org=%s n=%d",
+		stage, reason, ctxString(c, "username"), currentOrg(c), n)
+}
+
 func (h *WorkboardHandler) BulkDeletePreview(c echo.Context) error {
+	ids := formIDList(c)
 	if !requireCSRF(c) {
+		logBulkDeleteDeny(c, "preview", "csrf", len(ids))
 		return c.JSON(http.StatusForbidden, map[string]string{"error": msgBulkCSRF})
 	}
 	if isReadOnly(c) || viewAsActive(c) {
+		logBulkDeleteDeny(c, "preview", "readonly", len(ids))
 		return c.JSON(http.StatusForbidden, map[string]string{"error": msgBulkReadOnly})
 	}
-	ids := formIDList(c)
 	if len(ids) > bulkDeleteMax {
+		logBulkDeleteDeny(c, "preview", "too_many", len(ids))
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": msgBulkTooMany})
 	}
 	var del []bulkPreviewRow
@@ -159,14 +168,17 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 		setFlashErrCookie(c, msg)
 		return c.Redirect(http.StatusSeeOther, ret)
 	}
+	ids := formIDList(c)
 	if !requireCSRF(c) {
+		logBulkDeleteDeny(c, "delete", "csrf", len(ids))
 		return fail(http.StatusForbidden, msgBulkCSRF)
 	}
 	if isReadOnly(c) || viewAsActive(c) {
+		logBulkDeleteDeny(c, "delete", "readonly", len(ids))
 		return fail(http.StatusForbidden, msgBulkReadOnly)
 	}
-	ids := formIDList(c)
 	if len(ids) > bulkDeleteMax {
+		logBulkDeleteDeny(c, "delete", "too_many", len(ids))
 		return fail(http.StatusBadRequest, msgBulkTooMany)
 	}
 	var deleted []string
