@@ -93,6 +93,22 @@
 
   .modal-backdrop { @apply fixed inset-0 z-50 bg-ink/40; }
   .modal-panel { @apply rounded-card border border-line bg-surface p-4; }
+  .brief-panel { @apply modal-panel w-full max-w-lg overflow-hidden p-0 shadow-pop; }
+  .brief-head { @apply bg-primary px-5 py-5 text-primary-fg; }
+  .brief-kicker { @apply text-ui-sm font-semibold opacity-90; }
+  .brief-hello { @apply mt-1 text-lg font-bold; }
+  .brief-sub { @apply mt-1 text-ui-sm opacity-90; }
+  .brief-x { @apply btn btn-ghost min-h-[44px] min-w-[44px] px-3 text-primary-fg hover:bg-primary-hover; }
+  .brief-body { @apply space-y-4 px-5 py-5; }
+  .brief-grid { @apply grid grid-cols-2 gap-3; }
+  .brief-card-daily { @apply block rounded-card bg-primary-soft p-4 text-ink no-underline hover:opacity-90; }
+  .brief-card-warn { @apply block rounded-card bg-warning-soft p-4 text-ink no-underline hover:opacity-90; }
+  .brief-card-label { @apply text-ui-sm font-medium text-ink-muted; }
+  .brief-card-num { @apply mt-1 text-2xl font-bold text-ink; }
+  .brief-badge { @apply badge bg-surface text-ink-muted; }
+  .brief-hint { @apply text-ui-sm text-ink-muted; }
+  .brief-start { @apply btn w-full bg-ink text-primary-fg hover:opacity-90 min-h-[44px]; }
+  .brief-off { @apply btn btn-ghost w-full text-ink-muted min-h-[44px]; }
   .peek-panel { @apply fixed inset-y-0 right-0 z-40 w-full max-w-md border-l border-line bg-surface shadow-pop; }
 
   .stepper { @apply flex items-center gap-2; }

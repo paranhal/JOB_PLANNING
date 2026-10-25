@@ -52,7 +52,11 @@ func NewWorkboardHandler(
 }
 
 func (h *WorkboardHandler) Index(c echo.Context) error {
-	return c.Redirect(http.StatusSeeOther, "/workboard/board")
+	u := "/workboard/board"
+	if q := strings.TrimSpace(c.QueryString()); q != "" {
+		u += "?" + q
+	}
+	return c.Redirect(http.StatusSeeOther, u)
 }
 
 func (h *WorkboardHandler) Kanban(c echo.Context) error {

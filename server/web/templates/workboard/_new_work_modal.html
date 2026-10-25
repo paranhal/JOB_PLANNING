@@ -94,6 +94,15 @@ function boardNewWork() {
     },
     init() {
       this.bindKindWatch();
+      {{if .CanWrite}}this.maybeOpenNewFromQuery();{{end}}
+    },
+    maybeOpenNewFromQuery() {
+      var q = new URLSearchParams(location.search);
+      if (q.get('new') !== '1') return;
+      this.openNewWork();
+      q.delete('new');
+      var qs = q.toString();
+      history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
     },
     openNewWork() {
       this.bindKindWatch();

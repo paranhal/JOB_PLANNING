@@ -1,0 +1,65 @@
+{{define "login_briefing"}}
+{{if .LoginBriefing}}
+<div id="login-briefing-modal" class="modal-backdrop flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="login-briefing-title"
+     x-data="{
+       open: true,
+       csrf: {{printf "%q" .CSRFToken}},
+       close() { this.open = false; },
+       async hideToday() {
+         try {
+           await fetch('/login-briefing/off', {
+             method: 'POST',
+             credentials: 'same-origin',
+             headers: { 'X-CSRF-Token': this.csrf }
+           });
+         } catch (e) {}
+         this.close();
+       }
+     }"
+     x-show="open"
+     x-cloak
+     x-init="$nextTick(() => { const b = $refs.startBtn; if (b && b.focus) b.focus(); })"
+     @keydown.escape.window="close()"
+     @click.self="close()">
+  <div class="brief-panel" @click.stop>
+    <div class="brief-head">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="brief-kicker">오늘의 업무 브리핑</p>
+          <h2 id="login-briefing-title" class="brief-hello">{{.LoginBriefing.Greeting}}</h2>
+          {{if eq .LoginBriefing.Scope "org"}}
+          <p class="brief-sub">{{.LoginBriefing.OrgName}} 전체 업무입니다.</p>
+          {{else}}
+          <p class="brief-sub">로그인이 완료되었습니다. 오늘 처리할 업무를 확인해 주세요.</p>
+          {{end}}
+        </div>
+        <button type="button" class="brief-x" @click="close()" aria-label="닫기">&times;</button>
+      </div>
+    </div>
+    <div class="brief-body">
+      <div class="brief-grid">
+        <a href="{{.LoginBriefing.DailyHref}}" class="brief-card-daily">
+          <p class="brief-card-label">일일 업무{{if eq .LoginBriefing.Scope "org"}} <span class="brief-badge">조직 전체</span>{{end}}</p>
+          <p class="brief-card-num">{{.LoginBriefing.DailyCount}}건</p>
+        </a>
+        <a href="{{.LoginBriefing.UnassignedHref}}" class="brief-card-warn">
+          <p class="brief-card-label">미배정 업무{{if eq .LoginBriefing.Scope "org"}} <span class="brief-badge">조직 전체</span>{{end}}</p>
+          <p class="brief-card-num">{{.LoginBriefing.UnassignedCount}}건</p>
+        </a>
+      </div>
+      <p class="brief-hint">
+        {{if eq .LoginBriefing.HintKind "before10"}}<span class="font-semibold">오전 10시까지</span> 우선순위가 높은 미배정 업무를 확인해 주세요.
+        {{else if eq .LoginBriefing.HintKind "after10"}}<span class="font-semibold">오늘 안에</span> 미배정 업무의 날짜·시간을 정해 주세요.
+        {{else}}{{.LoginBriefing.Hint}}{{end}}
+        {{if and (eq .LoginBriefing.Scope "org") (gt .LoginBriefing.UnplannedCount 0)}}
+        <span class="block mt-1">날짜 미정 업무 {{.LoginBriefing.UnplannedCount}}건</span>
+        {{end}}
+      </p>
+      <a href="{{.LoginBriefing.StartHref}}" class="brief-start" x-ref="startBtn">{{.LoginBriefing.StartLabel}}</a>
+      <button type="button" class="brief-off" @click="hideToday()">오늘은 다시 보지 않기</button>
+    </div>
+  </div>
+</div>
+{{end}}
+{{end}}

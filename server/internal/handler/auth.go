@@ -88,6 +88,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 
 	tokenStr := h.writeSessionCookie(c, sessionClaims(user, false))
 	h.clearViewAsCookie(c)
+	issueLoginBriefingCookie(c)
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionLogin,
 		Result:      auditlog.ResultOK,
@@ -125,6 +126,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	accessLog(c, rec)
 	h.clearTokenCookie(c)
 	h.clearViewAsCookie(c)
+	clearLoginBriefingCookie(c)
 	return c.Redirect(http.StatusSeeOther, "/login")
 }
 

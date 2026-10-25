@@ -212,6 +212,7 @@ func main() {
 	g.Use(h.Auth.RequireActiveRole)
 	g.Use(h.Auth.GuardViewAsWrite)
 	g.Use(h.InjectAssignNotices)
+	g.Use(h.InjectLoginBriefing)
 
 	g.GET("/", h.Dashboard)
 	g.GET("/exec", h.Exec.Dashboard, h.Auth.RequireExecView)
@@ -260,6 +261,7 @@ func main() {
 	g.POST("/work/assign-notices/later", h.Work.AssignNoticeLater)
 	g.POST("/work/assign-notices/add", h.Work.AssignNoticeAdd)
 	g.POST("/work/assign-notices/transfer", h.Work.AssignNoticeTransfer)
+	g.POST("/login-briefing/off", h.LoginBriefingOff)
 	g.POST("/work/assign/one", h.Work.AssignOne)
 	g.POST("/work/transfer/one", h.Work.TransferOne)
 	g.POST("/work/hold/one", h.Work.HoldOne)

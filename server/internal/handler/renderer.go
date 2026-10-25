@@ -142,7 +142,8 @@ func templateFiles(name string) []string {
 	}
 	files = appendExisting(files, "web/templates/_classify_hint.html", "web/templates/_customer_combo.html",
 		"web/templates/_site_multi_picker.html",
-		"web/templates/_partials/view_group_toggle.html")
+		"web/templates/_partials/view_group_toggle.html",
+		"web/templates/_partials/login_briefing.html")
 	return files
 }
 
@@ -222,6 +223,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 			}
 		}
 		injectAssignNoticeView(c, dataMap)
+		injectLoginBriefingView(c, dataMap)
 		injectOrgView(c, dataMap)
 		injectNavMenu(c, dataMap)
 		if v := c.Get("auth_unconfirmed"); v != nil {

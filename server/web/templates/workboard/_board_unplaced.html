@@ -1,5 +1,5 @@
 {{define "board_unplaced"}}
-<aside class="card board-pbox" id="board-pbox" aria-label="미배치 업무">
+<aside class="card board-pbox" id="unplanned" aria-label="미배치 업무">
   <div class="board-ph">
     <h2><span class="board-pt">미배치 업무</span><span class="board-cnt">{{.UnplacedN}}</span></h2>
     <span class="board-vt">미배치 업무</span>
@@ -69,7 +69,7 @@
 (function(){
   var root=document.getElementById('board-root');
   if(!root)return;
-  var box=document.getElementById('board-pbox');
+  var box=document.getElementById('unplanned')||document.getElementById('board-pbox');
   var layout=document.getElementById('board-layout');
   var KEY='jp-board-unplaced-min';
   function applyMin(on){
