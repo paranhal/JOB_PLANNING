@@ -15,6 +15,7 @@ func slotSig(s model.UnassignedMonthSlot) string {
 	return strings.Join([]string{
 		s.CustomerID, s.SlotKey, s.ProductType, s.Cycle, s.LastAssignee, s.Region,
 		s.RegionAssigneeName, fmt.Sprintf("%v", s.RegionPending), fmt.Sprintf("%v", s.UnconfirmedQuarter), s.OrgID,
+		fmt.Sprintf("%d", s.TargetMonth), fmt.Sprintf("%v", s.TargetCarry),
 	}, "|")
 }
 

@@ -714,7 +714,7 @@ window.mntAssigneeMulti = function (cfg) {
               x-show="visible($el)">
             <td class="py-1.5 pr-3 font-medium text-ink">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
             <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
-            <td class="py-1.5 pr-3 text-xs">{{if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}{{if .RegionPending}} <span class="badge-neutral text-[10px]">지역 담당 예정{{if .RegionAssigneeName}} · {{.RegionAssigneeName}}{{end}}</span>{{end}}</td>
+            <td class="py-1.5 pr-3 text-xs">{{if .TargetCarry}}<span class="text-ink-muted">{{.TargetMonth}}월 등록 · 미배정</span>{{else if .TargetMonth}}{{.TargetMonth}}월 등록{{else if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}{{if .RegionPending}} <span class="badge-neutral text-[10px]">지역 담당 예정{{if .RegionAssigneeName}} · {{.RegionAssigneeName}}{{end}}</span>{{end}}</td>
             {{if $.CanEdit}}
             <td class="py-1.5">
               <button type="button" class="btn-secondary btn-sm"

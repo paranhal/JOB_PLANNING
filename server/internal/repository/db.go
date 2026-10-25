@@ -1353,6 +1353,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASWorkGroupV86(db)
 	applyWorkTaskOrgFromSourceV87(db)
 	applyASCauseCat1CustomV88(db)
+	applyMaintenanceMonthTargetsV89(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 

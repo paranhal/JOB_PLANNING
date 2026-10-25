@@ -129,8 +129,10 @@ type UnassignedMonthSlot struct {
 	UnconfirmedQuarter bool // 분기 마지막 달에 미확인으로 올린 건
 	OrgID              string
 	Region             string // 표시용. 사이트 지역
-	RegionPending      bool // 지역 기본 담당이 있어 배정 예정
+	RegionPending      bool   // 지역 기본 담당이 있어 배정 예정
 	RegionAssigneeName string
+	TargetMonth        int  // month target 등록 달. 0 이면 미확정 등
+	TargetCarry        bool // 등록 달이 지나 이월
 }
 
 // VisitProductSlotKey 방문의 점검대상을 슬롯 키로 정규화한다(klas/rfid/generic).
@@ -152,17 +154,14 @@ func VisitProductSlotKey(product string) string {
 	return "generic"
 }
 
-// SiteDueProductSlots 그 달 주기가 도래한 사이트의 점검대상 슬롯(표시명 포함).
-func SiteDueProductSlots(cfg MaintenanceSiteConfig, month int) []UnassignedMonthSlot {
-	if !InspectionCycleDue(cfg.InspectionCycle, month) {
-		return nil
-	}
+// SiteProductSlots 주기와 무관한 사이트 제품 슬롯.
+func SiteProductSlots(cfg MaintenanceSiteConfig) []UnassignedMonthSlot {
 	name := cfg.ShortName
 	if name == "" {
 		name = cfg.OrgName
 	}
 	base := UnassignedMonthSlot{
-		CustomerID: cfg.CustomerID, OrgName: cfg.OrgName, ShortName: name, Cycle: cfg.InspectionCycle, OrgID: cfg.OrgID,
+		CustomerID: cfg.CustomerID, OrgName: cfg.OrgName, ShortName: name, Cycle: cfg.InspectionCycle, OrgID: cfg.OrgID, Region: strings.TrimSpace(cfg.Region),
 	}
 	var out []UnassignedMonthSlot
 	if cfg.Products != nil {
@@ -202,6 +201,14 @@ func SiteDueProductSlots(cfg MaintenanceSiteConfig, month int) []UnassignedMonth
 		out = append(out, s)
 	}
 	return out
+}
+
+// SiteDueProductSlots 그 달 주기가 도래한 사이트의 점검대상 슬롯(표시명 포함).
+func SiteDueProductSlots(cfg MaintenanceSiteConfig, month int) []UnassignedMonthSlot {
+	if !InspectionCycleDue(cfg.InspectionCycle, month) {
+		return nil
+	}
+	return SiteProductSlots(cfg)
 }
 
 // MonthPrefix YYYY-MM-
@@ -275,6 +282,23 @@ func CyclePeriodOf(cycle string, month int) (CyclePeriod, bool) {
 	default:
 		return CyclePeriod{}, false
 	}
+}
+
+const RegionUnspecified = "지역 미지정"
+
+func RegionLabel(region string) string {
+	if strings.TrimSpace(region) == "" {
+		return RegionUnspecified
+	}
+	return strings.TrimSpace(region)
+}
+
+func MonthInCyclePeriod(cycle string, month int) bool {
+	p, ok := CyclePeriodOf(cycle, month)
+	if !ok {
+		return false
+	}
+	return month >= p.StartMonth && month <= p.EndMonth
 }
 
 // PeriodDateBounds 기간의 첫째 날과 마지막 날.

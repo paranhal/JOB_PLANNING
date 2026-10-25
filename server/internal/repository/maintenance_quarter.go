@@ -128,18 +128,15 @@ func (r *MaintenanceRepo) computeOpenUnassignedSlots(planID string, year, month 
 	if err != nil {
 		return nil, err
 	}
-	pending, err := r.pendingPeriodSlotsFrom(planID, year, month, configs, visits, lookup)
+	targets, err := r.ListActiveMonthTargets(planID, year)
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range pending {
-		p, ok := model.CyclePeriodOf(s.Cycle, month)
-		if !ok || p.EndMonth != month {
-			continue
-		}
-		s.UnconfirmedQuarter = true
-		out = append(out, s)
+	period, err := r.openPeriodSlotsFrom(planID, year, month, configs, visits, targets, lookup)
+	if err != nil {
+		return nil, err
 	}
+	out = append(out, period...)
 	r.annotateUnassignedRegionFrom("", out, configs)
 	return out, nil
 }
@@ -156,18 +153,27 @@ func (r *MaintenanceRepo) computeOpenUnassignedSlotsSlow(planID string, year, mo
 		}
 		out = append(out, s)
 	}
-	pending, err := r.pendingPeriodSlotsSlow(planID, year, month)
+	lookup, err := r.assigneeIndex(planID)
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range pending {
-		p, ok := model.CyclePeriodOf(s.Cycle, month)
-		if !ok || p.EndMonth != month {
-			continue
-		}
-		s.UnconfirmedQuarter = true
-		out = append(out, s)
+	configs, err := r.ListSiteConfigs()
+	if err != nil {
+		return nil, err
 	}
+	visits, err := r.ListVisits(planID)
+	if err != nil {
+		return nil, err
+	}
+	targets, err := r.ListActiveMonthTargets(planID, year)
+	if err != nil {
+		return nil, err
+	}
+	period, err := r.openPeriodSlotsFrom(planID, year, month, configs, visits, targets, lookup)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, period...)
 	r.annotateUnassignedRegionSlow("", out)
 	return out, nil
 }

@@ -119,6 +119,7 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.GET("/workboard/board", h.Workboard.Board)
 	g.GET("/workboard/new-work/form", h.Workboard.NewWorkForm)
 	g.GET("/workboard/register", h.Workboard.Register)
+	g.POST("/workboard/mnt-quick-register", h.Workboard.QuickRegisterMaintenance)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.POST("/workboard/schedule", h.Workboard.Schedule)
 	g.GET("/work", h.Work.List)

@@ -55,6 +55,7 @@
         <option value="semi" {{if .Config}}{{if eq .Config.InspectionCycle "semi"}}selected{{end}}{{end}}>반기</option>
         <option value="yearly" {{if .Config}}{{if eq .Config.InspectionCycle "yearly"}}selected{{end}}{{end}}>년1회</option>
       </select>
+      <p class="text-[11px] text-gray-500 mt-1">분기·반기·년1회는 계획 관리에서 점검할 달(지역/사이트 단위)을 정해 올립니다.</p>
     </div>
     {{if .Legacy}}
     <div class="flex gap-6">

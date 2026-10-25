@@ -89,6 +89,52 @@
     </div>
   </section>
 
+  {{if .CanEdit}}
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3" data-month-target-panel
+           data-plan-id="{{.Plan.PlanID}}" data-year="{{.Plan.PlanYear}}">
+    <h3 class="font-semibold text-gray-800">월 점검 대상 등록</h3>
+    <p class="text-xs text-gray-500">분기·반기·년1회 사이트를 기간 안의 달에 지역 또는 사이트 단위로 올립니다. 방문일은 대기목록에서 정합니다.</p>
+    <div class="flex flex-wrap items-end gap-2">
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1" for="mt-month">월 선택</label>
+        <select id="mt-month" class="border rounded-lg px-2 py-1.5 text-sm">
+          {{range seq 12}}<option value="{{.}}" {{if eq . $.UnassignedMonth}}selected{{end}}>{{.}}월</option>{{end}}
+        </select>
+      </div>
+      <div class="flex-1 min-w-[12rem]">
+        <label class="block text-[11px] text-gray-500 mb-1" for="mt-q">사이트 검색</label>
+        <input id="mt-q" type="search" placeholder="학교명·사이트" class="w-full border rounded-lg px-3 py-1.5 text-sm" autocomplete="off">
+      </div>
+      <button type="button" id="mt-reload" class="px-3 py-1.5 border rounded-lg text-sm">조회</button>
+    </div>
+    <div>
+      <p class="text-xs font-medium text-gray-700 mb-1">지역 단위</p>
+      <div id="mt-regions" class="flex flex-wrap gap-2 text-sm"></div>
+      <button type="button" id="mt-reg-region" class="mt-2 px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">이 달로 등록</button>
+    </div>
+    <div>
+      <p class="text-xs font-medium text-gray-700 mb-1">개별 사이트 단위</p>
+      <p class="text-[11px] text-gray-400 mb-1">선택 <span id="mt-sel-n">0</span>건</p>
+      <div class="overflow-x-auto max-h-64 border rounded-lg">
+        <table class="min-w-full text-xs">
+          <thead class="bg-gray-50 text-left text-gray-500">
+            <tr>
+              <th class="px-2 py-1"><input type="checkbox" id="mt-all"></th>
+              <th class="px-2 py-1">사이트</th>
+              <th class="px-2 py-1">지역</th>
+              <th class="px-2 py-1">주기</th>
+              <th class="px-2 py-1">상태</th>
+            </tr>
+          </thead>
+          <tbody id="mt-sites" class="divide-y"></tbody>
+        </table>
+      </div>
+      <button type="button" id="mt-reg-sites" class="mt-2 px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">선택한 사이트 등록</button>
+    </div>
+    <div id="mt-result" class="hidden rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950" role="status"></div>
+  </section>
+  {{end}}
+
   {{if .IsAdmin}}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
@@ -304,7 +350,7 @@
                 <input type="hidden" name="product_type" value="{{.ProductType}}">
               </td>
               <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
-              <td class="py-1.5 pr-3 text-xs">{{if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}</td>
+              <td class="py-1.5 pr-3 text-xs">{{if .TargetCarry}}<span class="text-gray-500">{{.TargetMonth}}월 등록 · 미배정</span>{{else if .TargetMonth}}{{.TargetMonth}}월 등록{{else if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}</td>
               <td class="py-1.5"><input type="date" name="visit_date" class="border rounded-lg px-2 py-1 text-xs"></td>
             </tr>
             {{end}}
@@ -321,13 +367,109 @@
 <script>
 (function () {
   var sel = document.getElementById('mnt-year-select');
-  if (!sel) return;
-  sel.addEventListener('change', function () {
-    var v = sel.value;
-    if (v === '__new__') { location.href = '/maintenance/new'; return; }
-    if (!v) return;
-    location.href = '/maintenance/' + v + (sel.getAttribute('data-query') || '');
+  if (sel) {
+    sel.addEventListener('change', function () {
+      var v = sel.value;
+      if (v === '__new__') { location.href = '/maintenance/new'; return; }
+      if (!v) return;
+      location.href = '/maintenance/' + v + (sel.getAttribute('data-query') || '');
+    });
+  }
+  var panel = document.querySelector('[data-month-target-panel]');
+  if (!panel) return;
+  var planId = panel.getAttribute('data-plan-id');
+  var monthEl = document.getElementById('mt-month');
+  var qEl = document.getElementById('mt-q');
+  var regionBox = document.getElementById('mt-regions');
+  var siteBody = document.getElementById('mt-sites');
+  var result = document.getElementById('mt-result');
+  var selN = document.getElementById('mt-sel-n');
+  function csrf() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+  }
+  function showResult(msg) {
+    result.classList.remove('hidden');
+    result.textContent = msg;
+  }
+  function cycleLabel(c) {
+    return {quarterly:'분기', semi:'반기', yearly:'년1회'}[c] || c;
+  }
+  function selectedSites() {
+    return Array.prototype.map.call(siteBody.querySelectorAll('input[name="customer_id"]:checked'), function (el) { return el.value; });
+  }
+  function countSel() { selN.textContent = String(selectedSites().length); }
+  function load() {
+    var url = '/maintenance/' + planId + '/month-targets?month=' + encodeURIComponent(monthEl.value) + '&q=' + encodeURIComponent(qEl.value || '');
+    fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (data) {
+      regionBox.replaceChildren();
+      (data.regions || []).forEach(function (rg) {
+        var lab = document.createElement('label');
+        lab.className = 'inline-flex items-center gap-1 border rounded-lg px-2 py-1';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.name = 'region';
+        cb.value = rg.Region;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(rg.Region + ' ' + rg.Total + '곳 / 등록 ' + rg.Registered + ' / 미등록 ' + rg.Open));
+        regionBox.appendChild(lab);
+      });
+      siteBody.replaceChildren();
+      (data.sites || []).forEach(function (s) {
+        var tr = document.createElement('tr');
+        var td0 = document.createElement('td');
+        td0.className = 'px-2 py-1';
+        if (!s.Registered) {
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.name = 'customer_id';
+          cb.value = s.CustomerID;
+          cb.addEventListener('change', countSel);
+          td0.appendChild(cb);
+        }
+        var td1 = document.createElement('td'); td1.className = 'px-2 py-1'; td1.textContent = s.Name;
+        var td2 = document.createElement('td'); td2.className = 'px-2 py-1'; td2.textContent = s.Region;
+        var td3 = document.createElement('td'); td3.className = 'px-2 py-1'; td3.textContent = cycleLabel(s.Cycle);
+        var td4 = document.createElement('td'); td4.className = 'px-2 py-1';
+        td4.textContent = s.Registered ? (s.SkipReason || '등록됨') : (s.SkipReason || '미등록');
+        tr.appendChild(td0); tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+        siteBody.appendChild(tr);
+      });
+      countSel();
+    });
+  }
+  function post(extra) {
+    var fd = extra;
+    fd.append('month', monthEl.value);
+    fetch('/maintenance/' + planId + '/month-targets', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
+      body: fd
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      showResult(data.message || data.error || '');
+      load();
+    });
+  }
+  document.getElementById('mt-reload').addEventListener('click', load);
+  monthEl.addEventListener('change', load);
+  qEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
+  document.getElementById('mt-all').addEventListener('change', function () {
+    siteBody.querySelectorAll('input[name="customer_id"]').forEach(function (el) { el.checked = document.getElementById('mt-all').checked; });
+    countSel();
   });
+  document.getElementById('mt-reg-region').addEventListener('click', function () {
+    var fd = new FormData();
+    fd.append('source', 'region');
+    regionBox.querySelectorAll('input[name="region"]:checked').forEach(function (el) { fd.append('region', el.value); });
+    post(fd);
+  });
+  document.getElementById('mt-reg-sites').addEventListener('click', function () {
+    var fd = new FormData();
+    fd.append('source', 'site');
+    selectedSites().forEach(function (id) { fd.append('customer_id', id); });
+    post(fd);
+  });
+  load();
 })();
 </script>
 {{end}}
