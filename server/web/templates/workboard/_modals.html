@@ -9,6 +9,7 @@
 {{end}}
 {{define "wb_form_admin_sales"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
+          {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           x-data="{ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
             async checkMnt() {
               const title = this.$refs.adminTitle ? this.$refs.adminTitle.value : '';
@@ -118,8 +119,8 @@
       {{template "wb_work_group_field" $}}
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
-          <select name="assignee" x-model="preAssignee" required class="w-full border rounded-lg px-3 py-2 text-sm">
+          <label class="block text-sm font-medium text-gray-700 mb-1">주담당{{if .AssigneeRequired}} <span class="text-red-500">*</span>{{end}}</label>
+          <select name="assignee" x-model="preAssignee" data-focus-target="assignee" {{if not .AssigneeRequired}}required{{end}} class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
           </select>
@@ -204,7 +205,7 @@
       {{template "wb_work_group_field" $}}
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
-        <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
+        <select name="assignee" x-model="preAssignee" data-focus-target="assignee" class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 원본 담당자 —</option>
           {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
         </select>
@@ -275,7 +276,7 @@
       {{template "wb_work_group_field" $}}
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">주담당</label>
-        <select name="assignee" x-model="preAssignee" class="w-full border rounded-lg px-3 py-2 text-sm">
+        <select name="assignee" x-model="preAssignee" data-focus-target="assignee" class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 원본 담당자 —</option>
           {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
         </select>
@@ -292,6 +293,7 @@
 
 {{define "wb_form_project_work"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
+          {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           x-data="{ memberRows: [], subtype: '', projectId: '', pickedKind: '', sites: [], q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
             suggestKind() {
               const k = this.pickedKind || '';
@@ -402,7 +404,7 @@
       {{template "wb_work_group_field" $}}
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">담당자 <span class="text-red-500">*</span></label>
-        <select name="assignee" x-model="preAssignee" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        <select name="assignee" x-model="preAssignee" data-focus-target="assignee" {{if not .AssigneeRequired}}required{{end}} class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 선택 —</option>
           {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
         </select>

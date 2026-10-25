@@ -598,61 +598,90 @@
     if (!el.getAttribute('min')) el.setAttribute('min', '2000-01-01T00:00');
     if (!el.getAttribute('max')) el.setAttribute('max', '2100-12-31T23:59');
   });
-  function assigneeControlValue(form) {
-    var sel = form.querySelector('[data-focus-target="assignee"]');
-    if (!sel) return '';
-    var v = (sel.value || '').trim();
-    if (v === 'custom') {
-      var custom = form.querySelector('[name="assigned_to_custom"], [name="assignee_external"]');
-      return custom ? (custom.value || '').trim() : '';
+  function assigneeValueIn(root) {
+    if (!root) return '';
+    var sel = root.querySelector('select[data-focus-target="assignee"], select.eq-assigned-code, select[name="assigned_to_code"], select[name="assignee"]');
+    if (sel) {
+      var v = (sel.value || '').trim();
+      if (v === 'custom') {
+        var custom = root.querySelector('[name="eq_assigned_custom"], [name="assigned_to_custom"], [name="assignee_external"]');
+        return custom ? (custom.value || '').trim() : '';
+      }
+      if (v) return v;
     }
-    if (v) return v;
-    var checks = form.querySelectorAll('input[name="assignee_user_id"]:checked, input[name="assignee_group_id"]:checked');
-    if (checks.length) return '1';
-    var group = form.querySelector('[name="work_group_id"]');
+    var group = root.querySelector('[name="eq_work_group_id"], [name="work_group_id"]');
     if (group && (group.value || '').trim()) return group.value;
-    var assignee = form.querySelector('[name="assignee"]');
-    if (assignee && (assignee.value || '').trim()) return assignee.value;
+    var checks = root.querySelectorAll('input[name="assignee_user_id"]:checked, input[name="assignee_group_id"]:checked');
+    if (checks.length) return '1';
+    var hids = root.querySelectorAll('input[name="assignee_user_id"], input[name="assignee_group_id"]');
+    for (var i = 0; i < hids.length; i++) {
+      if ((hids[i].value || '').trim()) return '1';
+    }
     return '';
   }
-  function focusAssigneeControl(form) {
-    var el = form.querySelector('[data-focus-target="assignee"]');
-    if (!el) el = document.querySelector('[data-focus-target="assignee"]');
-    if (!el) return;
-    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
-    if (typeof el.focus === 'function') el.focus();
+  function assigneeControlValue(form) {
+    return assigneeValueIn(form);
+  }
+  function showAssigneeErrorNear(form, el, boxRoot) {
+    var root = boxRoot || (el && el.parentNode) || form;
+    var box = root.querySelector('[data-assignee-error]');
+    if (!box) {
+      box = document.createElement('p');
+      box.className = 'mt-1 text-xs text-red-600';
+      box.setAttribute('data-assignee-error', '1');
+      if (el && el.parentNode) el.parentNode.appendChild(box);
+      else form.appendChild(box);
+    }
+    box.textContent = '담당자를 선택하세요';
+    var top = form.querySelector('[data-assignee-banner]');
+    if (!top) {
+      top = document.createElement('div');
+      top.setAttribute('data-assignee-banner', '1');
+      top.className = 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-3';
+      form.insertBefore(top, form.firstChild);
+    }
+    top.textContent = '담당자를 선택하세요';
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (el && typeof el.focus === 'function') el.focus();
   }
   document.querySelectorAll('form[data-require-assignee]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
+      var rows = form.querySelectorAll('#eq-rows .eq-row');
+      if (rows.length) {
+        for (var r = 0; r < rows.length; r++) {
+          var row = rows[r];
+          var a = row.querySelector('.eq-asset');
+          var s = row.querySelector('textarea[name="eq_symptom"]');
+          var filled = (a && a.value) || (s && (s.value || '').trim());
+          if (!filled) continue;
+          if (assigneeValueIn(row)) continue;
+          e.preventDefault();
+          var sel = row.querySelector('[data-focus-target="assignee"]');
+          showAssigneeErrorNear(form, sel, row);
+          return;
+        }
+        return;
+      }
       if (assigneeControlValue(form)) return;
       e.preventDefault();
-      var box = form.querySelector('[data-assignee-error]');
-      if (!box) {
-        box = document.createElement('p');
-        box.className = 'mt-1 text-xs text-red-600';
-        box.setAttribute('data-assignee-error', '1');
-        var sel = form.querySelector('[data-focus-target="assignee"]');
-        if (sel && sel.parentNode) sel.parentNode.appendChild(box);
-      }
-      box.textContent = '담당자를 선택하세요';
-      var top = form.querySelector('[data-assignee-banner]');
-      if (!top) {
-        top = document.createElement('div');
-        top.setAttribute('data-assignee-banner', '1');
-        top.className = 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-3';
-        form.insertBefore(top, form.firstChild);
-      }
-      top.textContent = '담당자를 선택하세요';
-      focusAssigneeControl(form);
+      var sel = form.querySelector('[data-focus-target="assignee"]');
+      showAssigneeErrorNear(form, sel, form);
     });
   });
-  if (/[?&]focus=assignee/.test(location.search)) {
-    var t = document.querySelector('[data-focus-target="assignee"]');
-    if (t) {
-      if (typeof t.scrollIntoView === 'function') t.scrollIntoView({ block: 'center' });
-      if (typeof t.focus === 'function') t.focus();
+  (function focusAssigneeOnLoad() {
+    var miss = document.querySelector('#eq-rows [data-assignee-miss], #eq-rows [data-assignee-error]');
+    var el = null;
+    if (miss) {
+      var row = miss.closest('.eq-row') || miss;
+      el = row.querySelector('[data-focus-target="assignee"]');
     }
-  }
+    if (!el && /[?&]focus=assignee/.test(location.search)) {
+      el = document.querySelector('[data-focus-target="assignee"]');
+    }
+    if (!el) return;
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (typeof el.focus === 'function') el.focus();
+  })();
 })();
 </script>
 </body>

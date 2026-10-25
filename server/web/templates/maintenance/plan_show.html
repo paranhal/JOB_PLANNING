@@ -400,7 +400,8 @@ window.mntAssigneeMulti = function (cfg) {
         <h3 class="font-semibold text-gray-800">방문 추가</h3>
         <button type="button" @click="addOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
       </div>
-      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/visits" class="space-y-3 text-sm">
+      <form method="POST" action="/maintenance/{{.Plan.PlanID}}/visits" class="space-y-3 text-sm"
+            {{if .AssigneeRequired}}data-require-assignee="1"{{end}}>
         <div>
           <label class="block text-gray-600 mb-1">날짜</label>
           <input type="date" name="visit_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2"
@@ -480,7 +481,8 @@ window.mntAssigneeMulti = function (cfg) {
         <h3 class="font-semibold text-gray-800">방문 일정 수정</h3>
         <button type="button" @click="editOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
       </div>
-      <form method="POST" :action="'/maintenance/visits/' + edit.id + '/update'" class="space-y-3 text-sm">
+      <form method="POST" :action="'/maintenance/visits/' + edit.id + '/update'" class="space-y-3 text-sm"
+            {{if .AssigneeRequired}}data-require-assignee="1"{{end}}>
         <input type="hidden" name="plan_id" value="{{.Plan.PlanID}}">
         <input type="hidden" name="month" value="{{.Month}}">
         <input type="hidden" name="view" value="{{.View}}">

@@ -119,6 +119,7 @@ func TestASCreateInvalidCustomerRedirectsNot500(t *testing.T) {
 		"customer_id":      {"NO_SUCH"},
 		"symptom":          {"게이트 오류"},
 		"received_by":      {"테스터"},
+		"assigned_to":      {"최혜영"},
 		"receipt_datetime": {time.Now().Format("2006-01-02T15:04")},
 	}
 	rec := httptest.NewRecorder()

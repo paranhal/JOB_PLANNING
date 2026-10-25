@@ -315,6 +315,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"Visits":              visits,
 		"Customers":           customers,
 		"Assignees":           assignees,
+		"AssigneeRequired":    requiresAssigneeChoice(c),
 		"Projects":            projects,
 		"Unassigned":          unassigned,
 		"PeriodGroups":        periodGroups,

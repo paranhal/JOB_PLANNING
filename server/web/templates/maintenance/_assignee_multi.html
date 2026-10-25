@@ -1,5 +1,5 @@
 {{define "mnt_assignee_multi"}}
-<div class="relative w-full min-w-0" data-mnt-assignee-multi="1"
+<div class="relative w-full min-w-0" data-mnt-assignee-multi="1" data-focus-target="assignee" tabindex="0"
      x-data="mntAssigneeMulti({target:'{{if .Target}}{{.Target}}{{else}}add{{end}}'})"
      @mnt-picker-hydrate.window="hydrateFrom($event.detail)"
      @keydown.escape.window="if(open){ open=false }">

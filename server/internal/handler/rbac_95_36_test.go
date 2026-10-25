@@ -173,16 +173,22 @@ func Test95_36AssigneeRequiredAndBehalfAndViewAsOff(t *testing.T) {
 		"receipt_datetime": {time.Now().Format("2006-01-02T15:04")},
 	}
 	miss := postForm(t, e, "/as", form, oaCK)
-	if miss.Code != http.StatusSeeOther || !strings.Contains(miss.Header().Get("Location"), "assignee_required") {
-		t.Fatalf("담당 없이 저장 loc=%s code=%d", miss.Header().Get("Location"), miss.Code)
+	if miss.Code == http.StatusSeeOther {
+		t.Fatalf("담당 없이 저장이 리다이렉트 loc=%s", miss.Header().Get("Location"))
 	}
-	newPage := doGetWith(t, e, "/as/new?err=assignee_required&focus=assignee", oaCK)
-	if newPage.Code != http.StatusOK {
-		t.Fatalf("접수 폼 %d", newPage.Code)
+	if miss.Code != http.StatusUnprocessableEntity && miss.Code != http.StatusOK {
+		t.Fatalf("담당 없이 저장 code=%d", miss.Code)
 	}
-	body := newPage.Body.String()
+	body := miss.Body.String()
 	if !strings.Contains(body, "담당자를 선택하세요") || !strings.Contains(body, `data-focus-target="assignee"`) || !strings.Contains(body, `data-require-assignee`) {
 		t.Fatal("담당자 필수 마크업 없음")
+	}
+	if !strings.Contains(body, "접수36") {
+		t.Fatal("거부 시 증상이 지워졌다")
+	}
+	newPage := doGetWith(t, e, "/as/new", oaCK)
+	if newPage.Code != http.StatusOK {
+		t.Fatalf("접수 폼 %d", newPage.Code)
 	}
 	form.Set("assigned_to_code", tech.UserID)
 	ok := postForm(t, e, "/as", form, oaCK)

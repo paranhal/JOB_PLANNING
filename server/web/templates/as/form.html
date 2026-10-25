@@ -28,7 +28,9 @@
   {{else if eq .Err "date_year"}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">날짜 연도는 2000~2100 사이여야 합니다.</div>
   {{else if eq .Err "assignee_required"}}
+  {{if not .IsNew}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">담당자를 선택하세요</div>
+  {{end}}
   {{else if .Err}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Err}}</div>
   {{end}}
@@ -228,7 +230,54 @@
         <button type="button" id="eq-add" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100">＋장비 추가</button>
       </div>
       <p class="text-xs text-slate-400">장비마다 접수번호가 따로 부여됩니다. 기관·요청자·연락처는 공통입니다.</p>
+      {{if eq .Err "assignee_required"}}
+      <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" data-assignee-banner>담당자를 선택하세요</div>
+      {{end}}
       <div id="eq-rows" class="space-y-3">
+        {{range $i, $row := .EqRows}}
+        <div class="eq-row rounded-lg border border-slate-200 p-4 space-y-3" {{if $row.AssigneeErr}}data-assignee-miss="1"{{end}}>
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-slate-700">장비 <span class="eq-row-num">{{add $i 1}}</span></p>
+            <button type="button" class="eq-remove text-xs text-slate-400 hover:text-red-600 {{if lt (len $.EqRows) 2}}hidden{{end}}">삭제</button>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">설치자산</label>
+            <select name="eq_asset_id" class="eq-asset w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">자산 미연결 (나중에 매핑)</option>
+              {{range $.Assets}}
+              <option value="{{.AssetID}}" data-family="{{assetUrgencyFamily .}}" {{if eq $row.AssetID .AssetID}}selected{{end}}>
+                {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
+              </option>
+              {{end}}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">증상 내용 <span class="text-red-500">*</span></label>
+            <textarea name="eq_symptom" {{if eq $i 0}}id="as-symptom"{{end}} rows="3" required placeholder="이 장비의 장애·지원 요청 내용"
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{$row.Symptom}}</textarea>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">긴급 사유</label>
+              <select name="eq_urgency_reason" class="eq-urgency-reason w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                {{range $.UrgencyReasons}}
+                <option value="{{.CodeValue}}" data-family="{{urgencyReasonFamily .CodeGroup}}" {{if or (eq .CodeValue $row.UrgencyReason) (and (not $row.UrgencyReason) (eq .CodeValue "none"))}}selected{{end}}>{{.CodeName}}</option>
+                {{end}}
+              </select>
+              <div class="eq-urgency-note-wrap mt-2 {{if eq $row.UrgencyReason "other"}}{{else}}hidden{{end}}">
+                <input type="text" name="eq_urgency_note" value="{{$row.UrgencyNote}}" placeholder="기타 사유 직접 입력"
+                       class="eq-urgency-note w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
+            {{template "as_eq_assignee_fields" dict "Row" $row "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Required" $.AssigneeRequired}}
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-slate-700 mb-1">예정업무일</label>
+              <input type="date" name="eq_visit_date" value="{{$row.VisitDate}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <p class="mt-1 text-xs text-slate-400">날짜가 있으면 일정이 확정됩니다.</p>
+            </div>
+          </div>
+        </div>
+        {{else}}
         <div class="eq-row rounded-lg border border-slate-200 p-4 space-y-3">
           <div class="flex items-center justify-between">
             <p class="text-sm font-semibold text-slate-700">장비 <span class="eq-row-num">1</span></p>
@@ -238,52 +287,26 @@
             <label class="block text-sm font-medium text-slate-700 mb-1">설치자산</label>
             <select name="eq_asset_id" class="eq-asset w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
               <option value="">자산 미연결 (나중에 매핑)</option>
-              {{range .Assets}}
-              <option value="{{.AssetID}}" data-family="{{assetUrgencyFamily .}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
-                {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
-              </option>
-              {{end}}
             </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">증상 내용 <span class="text-red-500">*</span></label>
             <textarea name="eq_symptom" id="as-symptom" rows="3" required placeholder="이 장비의 장애·지원 요청 내용"
-                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.Symptom}}</textarea>
+                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">긴급 사유</label>
-              <select name="eq_urgency_reason" class="eq-urgency-reason w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                {{range $.UrgencyReasons}}
-                <option value="{{.CodeValue}}" data-family="{{urgencyReasonFamily .CodeGroup}}" {{if eq .CodeValue "none"}}selected{{end}}>{{.CodeName}}</option>
-                {{end}}
-              </select>
-              <div class="eq-urgency-note-wrap mt-2 hidden">
-                <input type="text" name="eq_urgency_note" placeholder="기타 사유 직접 입력"
-                       class="eq-urgency-note w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-              </div>
+              <select name="eq_urgency_reason" class="eq-urgency-reason w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자</label>
-              <select name="eq_assigned_code" class="eq-assigned-code w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">미배정</option>
-                {{range .Assignees}}
-                <option value="{{.UserID}}">{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
-                {{end}}
-                <option value="custom">직접입력</option>
-              </select>
-              <div class="eq-assigned-custom-wrap mt-2 hidden">
-                <input type="text" name="eq_assigned_custom" placeholder="배정 담당자 이름 직접 입력"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-              </div>
-            </div>
+            {{template "as_eq_assignee_fields" dict "Row" .EmptyEq "Assignees" .Assignees "WorkGroups" .WorkGroups "Required" .AssigneeRequired}}
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">예정업무일</label>
               <input type="date" name="eq_visit_date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-              <p class="mt-1 text-xs text-slate-400">날짜가 있으면 일정이 확정됩니다.</p>
             </div>
           </div>
         </div>
+        {{end}}
       </div>
       {{template "as_keyword_checks" .}}
     </section>
@@ -317,20 +340,7 @@
                      class="eq-urgency-note w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
             </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자</label>
-            <select name="eq_assigned_code" class="eq-assigned-code w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-              <option value="">미배정</option>
-              {{range .Assignees}}
-              <option value="{{.UserID}}">{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
-              {{end}}
-              <option value="custom">직접입력</option>
-            </select>
-            <div class="eq-assigned-custom-wrap mt-2 hidden">
-              <input type="text" name="eq_assigned_custom" placeholder="배정 담당자 이름 직접 입력"
-                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            </div>
-          </div>
+          {{template "as_eq_assignee_fields" dict "Row" $.EmptyEq "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Required" $.AssigneeRequired}}
           <div class="sm:col-span-2">
             <label class="block text-sm font-medium text-slate-700 mb-1">예정업무일</label>
             <input type="date" name="eq_visit_date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
@@ -375,7 +385,10 @@
       </div>
       <input type="file" name="receipt_photo" multiple accept="image/*,.heic,.heif,.pdf,.webp"
              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-      <input type="text" name="photo_memo" placeholder="사진 메모 (선택, 예: 오류 화면)"
+      {{if .PhotoReselect}}
+      <p class="text-xs text-amber-800">첨부 파일은 브라우저 제약으로 다시 선택하세요.</p>
+      {{end}}
+      <input type="text" name="photo_memo" value="{{.PhotoMemo}}" placeholder="사진 메모 (선택, 예: 오류 화면)"
              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
     </section>
     {{end}}
@@ -1140,4 +1153,29 @@
   </div>
 {{template "photo_zoom_script"}}
 </div>
+{{end}}
+
+{{define "as_eq_assignee_fields"}}
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자{{if .Required}} <span class="text-red-500">*</span>{{end}}</label>
+              <select name="eq_assigned_code" class="eq-assigned-code w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" data-focus-target="assignee">
+                <option value="">미배정</option>
+                {{range .Assignees}}
+                <option value="{{.UserID}}" {{if eq $.Row.AssignedCode .UserID}}selected{{end}}>{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
+                {{end}}
+                <option value="custom" {{if eq .Row.AssignedCode "custom"}}selected{{end}}>직접입력</option>
+              </select>
+              {{if .Row.AssigneeErr}}<p class="mt-1 text-xs text-red-600" data-assignee-error>담당자를 선택하세요</p>{{end}}
+              <label class="block text-xs text-slate-500 mt-2 mb-1">또는 업무 그룹</label>
+              <select name="eq_work_group_id" class="eq-work-group w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">그룹 없음</option>
+                {{range .WorkGroups}}
+                <option value="{{.GroupID}}" {{if eq $.Row.WorkGroupID .GroupID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+              <div class="eq-assigned-custom-wrap mt-2 {{if eq .Row.AssignedCode "custom"}}{{else}}hidden{{end}}">
+                <input type="text" name="eq_assigned_custom" value="{{.Row.AssignedCustom}}" placeholder="배정 담당자 이름 직접 입력"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
 {{end}}

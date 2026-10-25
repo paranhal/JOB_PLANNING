@@ -1,0 +1,6 @@
+---
+description: 서버가 폼을 거부하면 사용자가 보는 위치에 오류를 보여 준다
+alwaysApply: true
+---
+
+서버가 폼 제출을 거부하면 사용자가 보는 위치에 오류가 보여야 한다(배너가 뷰포트 밖이면 scrollIntoView).

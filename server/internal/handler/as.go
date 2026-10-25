@@ -392,15 +392,63 @@ func asStatsListBaseQuery(status, sort, dir string) url.Values {
 	return v
 }
 
+type asEqRowVM struct {
+	AssetID, Symptom, UrgencyReason, UrgencyNote, VisitDate string
+	AssignedCode, AssignedCustom, WorkGroupID               string
+	AssigneeErr                                             bool
+}
+
+func eqVMFromReceipt(as *model.ASReceipt) asEqRowVM {
+	if as == nil {
+		return asEqRowVM{}
+	}
+	vm := asEqRowVM{
+		AssetID: as.AssetID, Symptom: as.Symptom,
+		UrgencyReason: as.UrgencyReason, UrgencyNote: as.UrgencyReasonNote,
+		VisitDate: as.VisitScheduledDate, WorkGroupID: strings.TrimSpace(as.WorkGroupID),
+	}
+	if uid := strings.TrimSpace(as.AssignedUserID); uid != "" {
+		vm.AssignedCode = uid
+	} else if n := strings.TrimSpace(as.AssignedTo); n != "" {
+		if vm.WorkGroupID == "" || n != strings.TrimSpace(as.WorkGroupName) {
+			vm.AssignedCode = "custom"
+			vm.AssignedCustom = n
+		}
+	}
+	return vm
+}
+
+func defaultEqRows(as *model.ASReceipt) []asEqRowVM {
+	return []asEqRowVM{eqVMFromReceipt(as)}
+}
+
+func eqRowsFromReceipts(rows []*model.ASReceipt, miss int) []asEqRowVM {
+	out := make([]asEqRowVM, 0, len(rows))
+	for i, as := range rows {
+		vm := eqVMFromReceipt(as)
+		if miss >= 0 && i == miss {
+			vm.AssigneeErr = true
+		}
+		out = append(out, vm)
+	}
+	if len(out) == 0 {
+		out = []asEqRowVM{{}}
+	}
+	return out
+}
+
+func postedReceiptPhotos(c echo.Context) bool {
+	_ = c.Request().ParseMultipartForm(32 << 20)
+	if mf := c.Request().MultipartForm; mf != nil && len(mf.File["receipt_photo"]) > 0 {
+		return true
+	}
+	return false
+}
+
 func (h *ASHandler) New(c echo.Context) error {
 	if !canReceiveAS(c) {
 		return echo.ErrForbidden
 	}
-	customers, _ := h.customerRepo.ListForReceipt()
-	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
-	urgReasons := h.urgencyReasonCodes()
-	assignees := listAssignableForPicker(h.userRepo, c)
-
 	now := time.Now()
 	as := &model.ASReceipt{
 		Urgency: "normal", Priority: "normal", Status: "received",
@@ -416,7 +464,31 @@ func (h *ASHandler) New(c echo.Context) error {
 	if aid := c.QueryParam("asset_id"); aid != "" {
 		as.AssetID = aid
 	}
+	return h.renderASNew(c, as, defaultEqRows(as), c.QueryParam("err"), http.StatusOK, false)
+}
 
+func (h *ASHandler) renderNewValidation(c echo.Context, base *model.ASReceipt, rows []*model.ASReceipt, errKey string, miss int) error {
+	if c.Request().Header.Get("HX-Request") == "true" && errKey == errAssigneeRequired {
+		return rejectAssigneeRequired(c, "/as/new")
+	}
+	return h.renderASNew(c, base, eqRowsFromReceipts(rows, miss), errKey, http.StatusUnprocessableEntity, postedReceiptPhotos(c))
+}
+
+func (h *ASHandler) renderASNew(c echo.Context, as *model.ASReceipt, eqRows []asEqRowVM, errKey string, status int, photoReselect bool) error {
+	if as == nil {
+		as = &model.ASReceipt{Urgency: "normal", Priority: "normal", Status: "received"}
+	}
+	if len(eqRows) == 0 {
+		eqRows = defaultEqRows(as)
+	}
+	customers, _ := h.customerRepo.ListForReceipt()
+	channels, _ := h.codeRepo.ActiveByGroup("receipt_channel")
+	urgReasons := h.urgencyReasonCodes()
+	assignees := listAssignableForPicker(h.userRepo, c)
+	now := time.Now()
+	if as.ReceiptDatetime.IsZero() {
+		as.ReceiptDatetime = now
+	}
 	var assets []model.Asset
 	var contacts []model.Contact
 	var history []model.ASHistoryItem
@@ -425,27 +497,41 @@ func (h *ASHandler) New(c echo.Context) error {
 		contacts, _ = h.contactRepo.ListByCustomer(as.CustomerID)
 		history, _ = h.repo.ListPastHistory(as.CustomerID, "", 50)
 	}
-
-	return c.Render(http.StatusOK, "as/form.html", map[string]interface{}{
+	sym := as.Symptom
+	if strings.TrimSpace(sym) == "" && len(eqRows) > 0 {
+		sym = eqRows[0].Symptom
+	}
+	focus := errKey == errAssigneeRequired || c.QueryParam("focus") == "assignee"
+	for _, r := range eqRows {
+		if r.AssigneeErr {
+			focus = true
+			break
+		}
+	}
+	return c.Render(status, "as/form.html", map[string]interface{}{
 		"Title": "AS 접수", "Active": NavAS, "IsNew": true,
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
 		"Channels": channels, "UrgencyReasons": urgReasons,
 		"Assignees":        assignees,
 		"WorkGroups":       h.visibleWorkGroups(c),
+		"EqRows":           eqRows,
+		"EmptyEq":          asEqRowVM{},
 		"CustomersJSON":    receiptCustomersJSON(customers),
-		"ReceiptLocal":     now.Format("2006-01-02T15:04"),
-		"CanEditVisitDate": true, // 신규 접수 시 접수 권한자가 설정 가능
+		"ReceiptLocal":     as.ReceiptDatetime.Format("2006-01-02T15:04"),
+		"CanEditVisitDate": true,
 		"History":          history,
 		"CanReceive":       canReceiveAS(c),
 		"CanSave":          canReceiveAS(c),
-		"KeywordChecks":    h.keywordChecks("", model.KWFieldSymptom, as.Symptom),
+		"KeywordChecks":    h.keywordChecks("", model.KWFieldSymptom, sym),
 		"KeywordField":     model.KWFieldSymptom,
 		"ClassifyHint":     classifyHint(h.codeRepo),
-		"Err":              c.QueryParam("err"),
+		"Err":              errKey,
 		"TodayLocal":       now.Format("2006-01-02"),
 		"WorkerDefault":    asWorkerDefault(c, as),
 		"AssigneeRequired": requiresAssigneeChoice(c),
-		"FocusAssignee":    c.QueryParam("focus") == "assignee",
+		"FocusAssignee":    focus,
+		"PhotoMemo":        c.FormValue("photo_memo"),
+		"PhotoReselect":    photoReselect,
 	})
 }
 
@@ -648,6 +734,7 @@ func (h *ASHandler) parseEquipmentRows(c echo.Context, base *model.ASReceipt) []
 	visits := formVals(c, "eq_visit_date")
 	codes := formVals(c, "eq_assigned_code")
 	customs := formVals(c, "eq_assigned_custom")
+	groups := formVals(c, "eq_work_group_id")
 	n := len(assets)
 	if len(symptoms) > n {
 		n = len(symptoms)
@@ -679,8 +766,21 @@ func (h *ASHandler) parseEquipmentRows(c echo.Context, base *model.ASReceipt) []
 		rawVisit := formAt(visits, i)
 		row.VisitScheduledDate = normalizeVisitDate(rawVisit)
 		applyReceiptDerivedFields(&row)
-		if name, uid := h.resolveAssigneeCode(formAt(codes, i), formAt(customs, i)); name != "" || uid != "" {
-			row.AssignedTo, row.AssignedUserID = name, uid
+		code := formAt(codes, i)
+		custom := formAt(customs, i)
+		gid := formAt(groups, i)
+		if code != "" || custom != "" || gid != "" {
+			row.AssignedTo, row.AssignedUserID = h.resolveAssigneeCode(code, custom)
+			row.WorkGroupID = gid
+			row.WorkGroupName = ""
+			if gid != "" && h.groups != nil {
+				if g, _ := h.groups.Get(gid); g != nil {
+					row.WorkGroupName = g.Name
+					if strings.TrimSpace(row.AssignedTo) == "" {
+						row.AssignedTo = g.Name
+					}
+				}
+			}
 		}
 		out = append(out, &row)
 	}
@@ -765,23 +865,31 @@ func (h *ASHandler) Create(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	base := h.parseReceiptForm(c)
-	if _, err := h.applyDirectCustomer(c, base); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/as/new?err="+url.QueryEscape(err.Error()))
-	}
 	rows := h.parseEquipmentRows(c, base)
 	if len(rows) == 0 {
 		rows = []*model.ASReceipt{base}
 	}
+	if _, err := h.applyDirectCustomer(c, base); err != nil {
+		if len(rows) > 0 {
+			rows[0].CustomerID = base.CustomerID
+		}
+		return h.renderNewValidation(c, base, rows, err.Error(), -1)
+	}
+	for _, r := range rows {
+		if r != nil {
+			r.CustomerID = base.CustomerID
+		}
+	}
 	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && base.VisitScheduledDate == "" {
-		return c.Redirect(http.StatusSeeOther, "/as/new?err=date_year")
+		return h.renderNewValidation(c, base, rows, "date_year", -1)
 	}
 	if equipmentVisitDateYearErr(c) {
-		return c.Redirect(http.StatusSeeOther, "/as/new?err=date_year")
+		return h.renderNewValidation(c, base, rows, "date_year", -1)
 	}
 	if requiresAssigneeChoice(c) {
-		for _, as := range rows {
+		for i, as := range rows {
 			if as != nil && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
-				return rejectAssigneeRequired(c, "/as/new")
+				return h.renderNewValidation(c, base, rows, errAssigneeRequired, i)
 			}
 		}
 	}
@@ -863,6 +971,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
 		"Channels": channels, "UrgencyReasons": urgReasons,
 		"Assignees":        assignees,
+		"WorkGroups":       h.visibleWorkGroups(c),
 		"CustomersJSON":    receiptCustomersJSON(customers),
 		"ReceiptLocal":     as.ReceiptDatetime.Format("2006-01-02T15:04"),
 		"CanEditVisitDate": canEditVisitDate(c, as),
