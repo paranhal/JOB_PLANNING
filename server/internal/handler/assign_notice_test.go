@@ -19,6 +19,7 @@ import (
 
 func newAssignNoticeServer(t *testing.T) (*echo.Echo, *sql.DB, *model.User) {
 	t.Helper()
+	enableViewAsForTest(t)
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "assign-notice.db"))
 	if err != nil {
 		t.Fatal(err)

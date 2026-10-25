@@ -27,6 +27,8 @@
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">일정 확정 시 예정업무일을 먼저 입력하세요.</div>
   {{else if eq .Err "date_year"}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">날짜 연도는 2000~2100 사이여야 합니다.</div>
+  {{else if eq .Err "assignee_required"}}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">담당자를 선택하세요</div>
   {{else if .Err}}
   <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Err}}</div>
   {{end}}
@@ -39,6 +41,7 @@
 
   <form id="as-form" method="POST" action="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}/edit{{end}}" class="space-y-4"
         {{if .IsNew}}enctype="multipart/form-data" data-multi="1"{{end}}
+        {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
         data-init-asset="{{.AS.AssetID}}"
         data-init-requester="{{.AS.Requester}}"
         data-exclude-as="{{if not .IsNew}}{{.AS.ASID}}{{end}}">
@@ -177,14 +180,15 @@
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자</label>
-          <select name="assigned_to_code" id="as-assigned-code" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <label class="block text-sm font-medium text-slate-700 mb-1">배정 담당자{{if .AssigneeRequired}} <span class="text-red-500">*</span>{{end}}</label>
+          <select name="assigned_to_code" id="as-assigned-code" data-focus-target="assignee" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
             <option value="">미배정</option>
             {{range .Assignees}}
             <option value="{{.UserID}}" {{if or (eq $.AS.AssignedUserID .UserID) (eq $.AS.AssignedTo .FullName)}}selected{{end}}>{{.FullName}} ({{.Username}} · {{roleLabel .Role}})</option>
             {{end}}
             <option value="custom" {{if and .AS.AssignedTo (not .AS.AssignedUserID)}}selected{{end}}>직접입력</option>
           </select>
+          {{if eq .Err "assignee_required"}}<p class="mt-1 text-xs text-red-600" data-assignee-error>담당자를 선택하세요</p>{{end}}
           <div id="as-assigned-custom-wrap" class="mt-2 {{if and .AS.AssignedTo (not .AS.AssignedUserID)}}{{else}}hidden{{end}}">
             <input type="text" name="assigned_to_custom" value="{{if and .AS.AssignedTo (not .AS.AssignedUserID)}}{{.AS.AssignedTo}}{{end}}" placeholder="배정 담당자 이름 직접 입력"
                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">

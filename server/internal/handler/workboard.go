@@ -1749,6 +1749,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		if err := h.applyWorkGroupForm(c, t); err != nil {
 			return err
 		}
+		if requiresAssigneeChoice(c) && !assigneeFilled(t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
+			return rejectAssigneeRequired(c, redirectBack(c, ""))
+		}
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
@@ -1821,12 +1824,17 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if err := h.applyWorkGroupForm(c, t); err != nil {
 		return err
 	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
+		return rejectAssigneeRequired(c, redirectBack(c, ""))
+	}
 	if err := h.repo.CreateTask(t); err != nil {
 		if q := subtaskErrQuery(err); q != "" {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+q))
 		}
 		return err
 	}
+	uid, name, on := stampOnBehalf(c, t.AssigneeUserID, t.Assignee)
+	_ = h.repo.StampActedBy(t.TaskID, uid, name, on)
 	recordTaskNotice(h.notices, c, t, "")
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
@@ -2068,6 +2076,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := h.applyWorkGroupForm(c, t); err != nil {
 		return err
 	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
+		return rejectAssigneeRequired(c, taskPagePath(id, registerScope)+"?back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+	}
 	if existing.WorkType == model.WBWorkProjectWork {
 		if s := model.NormalizeWorkSubtype(c.FormValue("work_subtype")); s != "" {
 			t.WorkSubtype = s
@@ -2079,6 +2090,8 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
 	}
+	uid, name, on := stampOnBehalf(c, t.AssigneeUserID, t.Assignee)
+	_ = h.repo.StampActedBy(t.TaskID, uid, name, on)
 	if existing.WorkType == model.WBWorkProjectWork {
 		_ = c.Request().ParseForm()
 		siteIDs := c.Request().Form["site_id"]

@@ -169,12 +169,12 @@ func TestASAssignedWithoutDateAppearsUndatedOnRegister(t *testing.T) {
 
 func TestASUnassignedStaysInUnplannedNotDaily(t *testing.T) {
 	e, _, _, wb := newASDailyHTTP(t)
-	rec := doForm(t, e, "/as", url.Values{
+	rec := doFormWith(t, e, "/as", url.Values{
 		"customer_id":      {"C1"},
 		"symptom":          {"미배정 증상"},
 		"received_by":      {"테스터"},
 		"receipt_datetime": {"2026-08-10T10:00"},
-	})
+	}, jwtCookieRole(t, model.RoleTech))
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create status=%d", rec.Code)
 	}

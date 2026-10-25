@@ -22,6 +22,7 @@ func newSalesServer(t *testing.T) *echo.Echo {
 
 func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	t.Helper()
+	enableViewAsForTest(t)
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "sales_http.db"))
 	if err != nil {

@@ -128,15 +128,20 @@ type ASProcess struct {
 	OnBehalf        bool      `json:"on_behalf,omitempty"`
 }
 
-// ActorLabel 조치 이력 표시. 대신 처리면 「주인 (대신: 실제)」. §65.4
+// ActorLabel 조치 이력 표시. 대체 입력이면 「담당자 (대체 입력: 입력자)」.
 func (p ASProcess) ActorLabel() string {
-	w := strings.TrimSpace(p.Worker)
-	if p.OnBehalf {
-		if a := strings.TrimSpace(p.ActedByName); a != "" {
+	return OnBehalfLabel(p.Worker, p.ActedByName, p.OnBehalf)
+}
+
+// OnBehalfLabel 담당자 표시. 본인 입력이면 담당자만, 대리면 「홍길동 (대체 입력: 김팀장)」.
+func OnBehalfLabel(owner, actor string, onBehalf bool) string {
+	w := strings.TrimSpace(owner)
+	if onBehalf {
+		if a := strings.TrimSpace(actor); a != "" {
 			if w == "" {
-				return "(대신: " + a + ")"
+				return "(대체 입력: " + a + ")"
 			}
-			return w + " (대신: " + a + ")"
+			return w + " (대체 입력: " + a + ")"
 		}
 	}
 	return w

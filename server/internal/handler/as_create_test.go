@@ -20,6 +20,7 @@ func TestASCreateThenShow(t *testing.T) {
 		"customer_id":      {"cust_a"},
 		"symptom":          {"게이트 오류"},
 		"received_by":      {"테스터"},
+		"assigned_to":      {"최혜영"},
 		"receipt_datetime": {time.Now().Format("2006-01-02T15:04")},
 	}
 	rec := httptest.NewRecorder()
@@ -192,6 +193,7 @@ func TestASCreateMultiEquipmentGroup(t *testing.T) {
 	form := url.Values{
 		"customer_id":        {"cust_a"},
 		"received_by":        {"테스터"},
+		"assigned_to":        {"최혜영"},
 		"receipt_datetime":   {time.Now().Format("2006-01-02T15:04")},
 		"confirm_contact":    {"010-1111-2222"},
 		"eq_asset_id":        {a1.AssetID, a2.AssetID},
@@ -278,6 +280,7 @@ func TestASCreateUrgencyReasonSetsHighAndConfirmsDate(t *testing.T) {
 	form := url.Values{
 		"customer_id":        {"cust_a"},
 		"received_by":        {"테스터"},
+		"assigned_to":        {"최혜영"},
 		"receipt_datetime":   {time.Now().Format("2006-01-02T15:04")},
 		"eq_asset_id":        {""},
 		"eq_symptom":         {"게이트 정지"},
@@ -326,6 +329,7 @@ func TestASCreateNoneReasonLeavesNormalUnconfirmed(t *testing.T) {
 	form := url.Values{
 		"customer_id":       {"cust_a"},
 		"received_by":       {"테스터"},
+		"assigned_to":       {"최혜영"},
 		"receipt_datetime":  {time.Now().Format("2006-01-02T15:04")},
 		"eq_asset_id":       {""},
 		"eq_symptom":        {"문의"},

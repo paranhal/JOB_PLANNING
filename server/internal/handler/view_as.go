@@ -7,12 +7,20 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/audit"
+	"customer-support/internal/config"
 	"customer-support/internal/model"
 )
 
 const viewAsCookie = "view_as_user_id"
 
+func viewAsFeatureEnabled() bool {
+	return config.Load().ViewAsEnabled
+}
+
 func canUseViewAs(c echo.Context) bool {
+	if !viewAsFeatureEnabled() {
+		return false
+	}
 	return model.IsAdminGrade(loginRole(c))
 }
 
@@ -69,6 +77,12 @@ func viewAsCandidates(users []model.User, selfID string) []model.User {
 
 func (h *AuthHandler) InjectViewAs(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		if !viewAsFeatureEnabled() {
+			if ck, err := c.Cookie(viewAsCookie); err == nil && ck != nil && strings.TrimSpace(ck.Value) != "" {
+				c.SetCookie(sessionCookie(viewAsCookie, "", -1))
+			}
+			return next(c)
+		}
 		if !canUseViewAs(c) {
 			return next(c)
 		}
@@ -115,6 +129,9 @@ func (h *AuthHandler) GuardViewAsWrite(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (h *AuthHandler) SetViewAs(c echo.Context) error {
+	if !viewAsFeatureEnabled() {
+		return echo.ErrNotFound
+	}
 	if !canUseViewAs(c) {
 		return echo.ErrForbidden
 	}
@@ -136,6 +153,9 @@ func (h *AuthHandler) SetViewAs(c echo.Context) error {
 }
 
 func (h *AuthHandler) ClearViewAs(c echo.Context) error {
+	if !viewAsFeatureEnabled() {
+		return echo.ErrNotFound
+	}
 	if !canUseViewAs(c) {
 		return echo.ErrForbidden
 	}

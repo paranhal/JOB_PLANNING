@@ -13,6 +13,7 @@ type Config struct {
 	JWTSecret         string
 	AppEnv            string
 	CookieSecure      bool
+	ViewAsEnabled     bool
 	IntegrationAPIKey string
 	MailEnabled       bool
 	MailHost          string
@@ -39,6 +40,7 @@ func Load() *Config {
 		JWTSecret:         getEnv("JWT_SECRET", "dev-secret-change-in-production"),
 		AppEnv:            getEnv("APP_ENV", "development"),
 		CookieSecure:      envBool("COOKIE_SECURE"),
+		ViewAsEnabled:     envBool("VIEW_AS_ENABLED"),
 		IntegrationAPIKey: getEnv("INTEGRATION_API_KEY", ""),
 		MailEnabled:       envBool("MAIL_ENABLED"),
 		MailHost:          getEnv("MAIL_HOST", "smtp.gmail.com"),

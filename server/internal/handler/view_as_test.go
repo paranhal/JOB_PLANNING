@@ -16,6 +16,11 @@ import (
 	"customer-support/internal/repository"
 )
 
+func enableViewAsForTest(t *testing.T) {
+	t.Helper()
+	t.Setenv("VIEW_AS_ENABLED", "1")
+}
+
 func jwtCookieLegacyObserver(t *testing.T) *http.Cookie {
 	t.Helper()
 	secret := []byte("cs-system-jwt-secret-2026")
@@ -56,6 +61,7 @@ func jwtCookieUserClaims(t *testing.T, u *model.User) *http.Cookie {
 
 func newObserverSimApp(t *testing.T) (*echo.Echo, *observerSimUsers) {
 	t.Helper()
+	enableViewAsForTest(t)
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "view-as-sim.db"))
 	if err != nil {
 		t.Fatal(err)

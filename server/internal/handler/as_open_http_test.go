@@ -149,7 +149,7 @@ func TestASBehalfProcessKeepsOwner(t *testing.T) {
 	if !p.OnBehalf || p.ActedByName != "관리자" {
 		t.Fatalf("on_behalf=%v acted=%s", p.OnBehalf, p.ActedByName)
 	}
-	if p.ActorLabel() != "양기헌 (대신: 관리자)" {
+	if p.ActorLabel() != "양기헌 (대체 입력: 관리자)" {
 		t.Fatalf("표시=%s", p.ActorLabel())
 	}
 	got, _ := asRepo.GetByID(repository.OrgAll, asID)
@@ -157,7 +157,7 @@ func TestASBehalfProcessKeepsOwner(t *testing.T) {
 		t.Fatalf("완료 상태=%v", got)
 	}
 	page := getASActionPage(t, e, asID)
-	if !strings.Contains(page, "대신: 관리자") && !strings.Contains(page, "대신 처리합니다") {
-		t.Fatal("대신 표시가 없다")
+	if !strings.Contains(page, "대체 입력: 관리자") && !strings.Contains(page, "대체 입력합니다") {
+		t.Fatal("대체 입력 표시가 없다")
 	}
 }

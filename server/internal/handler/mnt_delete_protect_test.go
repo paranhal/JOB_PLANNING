@@ -19,6 +19,7 @@ import (
 
 func newMntProtectApp(t *testing.T) (*echo.Echo, *sql.DB, *Handler, string) {
 	t.Helper()
+	enableViewAsForTest(t)
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "protect.db"))
 	if err != nil {

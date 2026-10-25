@@ -396,6 +396,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		ReceiptDatetime: now,
 		OrgID:           currentOrg(c),
 	}
+	applySupportAssigneeDefault(c, as)
 	if cid := c.QueryParam("customer_id"); cid != "" {
 		as.CustomerID = cid
 	}
@@ -428,7 +429,9 @@ func (h *ASHandler) New(c echo.Context) error {
 		"ClassifyHint":     classifyHint(h.codeRepo),
 		"Err":              c.QueryParam("err"),
 		"TodayLocal":       now.Format("2006-01-02"),
-		"WorkerDefault":    ctxString(c, "user_name"),
+		"WorkerDefault":    asWorkerDefault(c, as),
+		"AssigneeRequired": requiresAssigneeChoice(c),
+		"FocusAssignee":    c.QueryParam("focus") == "assignee",
 	})
 }
 
@@ -725,6 +728,13 @@ func (h *ASHandler) Create(c echo.Context) error {
 	if equipmentVisitDateYearErr(c) {
 		return c.Redirect(http.StatusSeeOther, "/as/new?err=date_year")
 	}
+	if requiresAssigneeChoice(c) {
+		for _, as := range rows {
+			if as != nil && !assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+				return rejectAssigneeRequired(c, "/as/new")
+			}
+		}
+	}
 	if len(rows) >= 2 {
 		gid := repository.NewReceiptGroupID()
 		for _, r := range rows {
@@ -808,6 +818,8 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		"KeywordField":     model.KWFieldSymptom,
 		"CanReceive":       canReceiveAS(c),
 		"CanSave":          canSaveASReceipt(c, as, h.canModifyAS(c, as)),
+		"AssigneeRequired": requiresAssigneeChoice(c),
+		"FocusAssignee":    c.QueryParam("focus") == "assignee",
 	}
 	h.mergeReceiptPhotoData(c, as, data)
 	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"
@@ -839,6 +851,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	}
 	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && as.VisitScheduledDate == "" {
 		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err=date_year")
+	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+		return rejectAssigneeRequired(c, "/as/"+id+"/edit")
 	}
 	// 방문 예정일: 관리자·배정담당자만 변경. 그 외는 기존 값 유지. 확정은 서버가 날짜로 채운다. §34.2.3
 	if !canEditVisitDate(c, existing) {
@@ -1060,6 +1075,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		}
 	}
 	assignees := listAssignableForPicker(h.userRepo, c)
+	applySupportAssigneeDefault(c, as)
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
 
 	var dailyTask *model.WorkTask
@@ -1145,7 +1161,9 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CompleteLocal":        completeLocal,
 		"CancelLocal":          cancelLocal,
 		"TodayLocal":           now.Format("2006-01-02"),
-		"WorkerDefault":        ctxString(c, "user_name"),
+		"WorkerDefault":        asWorkerDefault(c, as),
+		"AssigneeRequired":     requiresAssigneeChoice(c),
+		"FocusAssignee":        c.QueryParam("focus") == "assignee",
 		"OnBehalf":             !sessionOwnsAS(c, as),
 		"ActionErr":            c.QueryParam("err"),
 		"ActionErrMsg":         actionErrMessageWithSupport(c.QueryParam("err"), parseOpenSupportN(c)),
@@ -1264,6 +1282,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 				}
 			}
 		}
+	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+		return rejectAssigneeRequired(c, asOpenHrefQuery(id, ""))
 	}
 	if err := checkAssigneeInOrg(h.userRepo, as.OrgID, as.AssignedTo, as.AssignedUserID, prevTo); err != nil {
 		return err
@@ -1694,6 +1715,8 @@ func actionErrMessage(code string) string {
 		return "날짜 연도는 2000~2100 사이여야 합니다."
 	case "schedule_date":
 		return "일정 확정 시 예정업무일을 먼저 입력하세요."
+	case errAssigneeRequired:
+		return msgAssigneeRequired
 	default:
 		return code
 	}
@@ -1801,9 +1824,6 @@ func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, res
 		notesParts = append(notesParts, "준비:"+prepNotes)
 	}
 	worker := strings.TrimSpace(as.AssignedTo)
-	if worker == "" {
-		worker = ctxString(c, "user_name")
-	}
 	p := &model.ASProcess{
 		ASID:            as.ASID,
 		Worker:          worker,
@@ -1848,7 +1868,7 @@ func sessionOwnsAS(c echo.Context, as *model.ASReceipt) bool {
 		return true
 	}
 	if strings.TrimSpace(as.AssignedTo) == "" && strings.TrimSpace(as.AssignedUserID) == "" {
-		return true
+		return currentRole(c) == model.RoleSupport
 	}
 	return isSelfAssign(ctxString(c, "user_id"), ctxString(c, "user_name"), ctxString(c, "username"), as.AssignedUserID, as.AssignedTo, "")
 }
@@ -2040,8 +2060,6 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 	if strings.TrimSpace(p.Worker) == "" {
 		if as, err := h.repo.GetByID(currentOrg(c), asID); err == nil && as != nil && strings.TrimSpace(as.AssignedTo) != "" {
 			p.Worker = as.AssignedTo
-		} else {
-			p.Worker = ctxString(c, "user_name")
 		}
 	}
 	if as, err := h.repo.GetByID(currentOrg(c), asID); err == nil {

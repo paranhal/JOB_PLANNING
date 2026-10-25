@@ -23,6 +23,7 @@ type uiSmokeActors struct {
 
 func newUISmokeApp(t *testing.T) (*echo.Echo, *uiSmokeActors) {
 	t.Helper()
+	enableViewAsForTest(t)
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "ui-smoke.db"))
 	if err != nil {
 		t.Fatal(err)

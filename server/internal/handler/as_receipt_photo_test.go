@@ -341,6 +341,7 @@ func TestASCreateUploadsReceiptPhoto(t *testing.T) {
 	_ = w.WriteField("customer_id", "cust_a")
 	_ = w.WriteField("symptom", "게이트 오류")
 	_ = w.WriteField("received_by", "테스터")
+	_ = w.WriteField("assigned_to", "최혜영")
 	_ = w.WriteField("receipt_datetime", time.Now().Format("2006-01-02T15:04"))
 	_ = w.WriteField("photo_memo", "오류 화면")
 	fw, err := w.CreateFormFile("receipt_photo", "증상.png")

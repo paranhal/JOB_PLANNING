@@ -598,6 +598,61 @@
     if (!el.getAttribute('min')) el.setAttribute('min', '2000-01-01T00:00');
     if (!el.getAttribute('max')) el.setAttribute('max', '2100-12-31T23:59');
   });
+  function assigneeControlValue(form) {
+    var sel = form.querySelector('[data-focus-target="assignee"]');
+    if (!sel) return '';
+    var v = (sel.value || '').trim();
+    if (v === 'custom') {
+      var custom = form.querySelector('[name="assigned_to_custom"], [name="assignee_external"]');
+      return custom ? (custom.value || '').trim() : '';
+    }
+    if (v) return v;
+    var checks = form.querySelectorAll('input[name="assignee_user_id"]:checked, input[name="assignee_group_id"]:checked');
+    if (checks.length) return '1';
+    var group = form.querySelector('[name="work_group_id"]');
+    if (group && (group.value || '').trim()) return group.value;
+    var assignee = form.querySelector('[name="assignee"]');
+    if (assignee && (assignee.value || '').trim()) return assignee.value;
+    return '';
+  }
+  function focusAssigneeControl(form) {
+    var el = form.querySelector('[data-focus-target="assignee"]');
+    if (!el) el = document.querySelector('[data-focus-target="assignee"]');
+    if (!el) return;
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (typeof el.focus === 'function') el.focus();
+  }
+  document.querySelectorAll('form[data-require-assignee]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (assigneeControlValue(form)) return;
+      e.preventDefault();
+      var box = form.querySelector('[data-assignee-error]');
+      if (!box) {
+        box = document.createElement('p');
+        box.className = 'mt-1 text-xs text-red-600';
+        box.setAttribute('data-assignee-error', '1');
+        var sel = form.querySelector('[data-focus-target="assignee"]');
+        if (sel && sel.parentNode) sel.parentNode.appendChild(box);
+      }
+      box.textContent = '담당자를 선택하세요';
+      var top = form.querySelector('[data-assignee-banner]');
+      if (!top) {
+        top = document.createElement('div');
+        top.setAttribute('data-assignee-banner', '1');
+        top.className = 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-3';
+        form.insertBefore(top, form.firstChild);
+      }
+      top.textContent = '담당자를 선택하세요';
+      focusAssigneeControl(form);
+    });
+  });
+  if (/[?&]focus=assignee/.test(location.search)) {
+    var t = document.querySelector('[data-focus-target="assignee"]');
+    if (t) {
+      if (typeof t.scrollIntoView === 'function') t.scrollIntoView({ block: 'center' });
+      if (typeof t.focus === 'function') t.focus();
+    }
+  }
 })();
 </script>
 </body>

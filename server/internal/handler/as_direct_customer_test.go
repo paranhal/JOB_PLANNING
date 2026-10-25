@@ -37,6 +37,7 @@ func TestASCreateDirectCustomer(t *testing.T) {
 		"phone_direct":     {"010-1111-2222"},
 		"symptom":          {"직접입력 접수 증상"},
 		"received_by":      {"테스터"},
+		"assigned_to":      {"최혜영"},
 		"receipt_datetime": {time.Now().Format("2006-01-02T15:04")},
 	}
 	rec := httptest.NewRecorder()

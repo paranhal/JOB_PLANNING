@@ -1050,9 +1050,12 @@ func (h *SalesHandler) CreateActivity(c echo.Context) error {
 			link = t
 		}
 	}
-	if err := h.repo.CreateActivity(a, ctxString(c, "user_name"), link); err != nil {
+	createdBy := ctxString(c, "user_name")
+	if err := h.repo.CreateActivity(a, createdBy, link); err != nil {
 		return replyErr(err, link)
 	}
+	uid, name, on := stampOnBehalf(c, "", createdBy)
+	_ = h.repo.StampActivityActedBy(a.ActivityID, uid, name, on)
 	if wantsJSON(c) {
 		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "activity_id": a.ActivityID})
 	}
@@ -1109,6 +1112,8 @@ func (h *SalesHandler) UpdateActivity(c echo.Context) error {
 	if err := h.repo.UpdateActivity(a); err != nil {
 		return replyErr(err)
 	}
+	uid, name, on := stampOnBehalf(c, "", cur.CreatedBy)
+	_ = h.repo.StampActivityActedBy(a.ActivityID, uid, name, on)
 	if wantsJSON(c) {
 		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "activity_id": a.ActivityID})
 	}

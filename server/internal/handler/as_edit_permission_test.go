@@ -45,8 +45,8 @@ func TestCanEditASReceiptMatrix(t *testing.T) {
 
 	peer := echoCtxRole(model.RoleSupport, "다른지원")
 	peer.Set("user_id", "u-peer")
-	if canEditASReceipt(peer, as) {
-		t.Fatal("같은 조직 다른 지원은 불가")
+	if !canEditASReceipt(peer, as) {
+		t.Fatal("같은 조직 다른 지원은 대리 입력 가능")
 	}
 	peerTech := echoCtxRole(model.RoleTech, "다른기술")
 	peerTech.Set("user_id", "u-peer2")
@@ -95,12 +95,13 @@ func TestCanEditASReceiptMatrix(t *testing.T) {
 	if h.canModifyAS(vis, &closed) {
 		t.Fatal("비전 관리자 완료 건은 잠금 필요")
 	}
-	if h.canModifyAS(peer, &closed) {
-		t.Fatal("타인 완료 건은 불가")
+	if !h.canModifyAS(peer, &closed) {
+		t.Fatal("지원은 타인 완료 건도 수정 가능")
 	}
 }
 
 func TestASEditPermissionHTTP(t *testing.T) {
+	enableViewAsForTest(t)
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "as-edit-perm.db"))
 	if err != nil {
@@ -250,8 +251,8 @@ func TestASEditPermissionHTTP(t *testing.T) {
 	assertEditOK("조직관리자 자기 조직", openSup.ASID, oaCK)
 	assertEditOK("비전", openSup.ASID, vsCK)
 
-	assertEditDenied("다른 지원", openSup.ASID, sup2CK)
-	assertEditDenied("다른 지원-영업건", openSales.ASID, sup2CK)
+	assertEditOK("다른 지원", openSup.ASID, sup2CK)
+	assertEditOK("다른 지원-영업건", openSales.ASID, sup2CK)
 	assertEditDenied("읽기 전용", openSup.ASID, roCK)
 
 	otherShow := doGetWith(t, e, "/as/"+otherOrg.ASID, oaCK)
@@ -274,7 +275,7 @@ func TestASEditPermissionHTTP(t *testing.T) {
 	if vsClosed.Code == http.StatusOK {
 		t.Fatal("비전 관리자가 잠금 없이 완료 건 수정 화면을 열었다")
 	}
-	assertEditDenied("타인 완료", closedSup.ASID, sup2CK)
+	assertEditOK("지원 타인 완료", closedSup.ASID, sup2CK)
 
 	oaForm := url.Values{
 		"customer_id": {"c1"}, "symptom": {"조직장수정"}, "received_by": {"조직장"},

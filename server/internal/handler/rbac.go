@@ -111,6 +111,35 @@ func isReadOnly(c echo.Context) bool {
 	return v
 }
 
+// canActForOthers 자기 조직 건을 대신 입력할 수 있는가. vision_admin · 홈조직 org_admin · 자기 조직 support.
+func canActForOthers(c echo.Context) bool {
+	if isReadOnly(c) || viewAsActive(c) {
+		return false
+	}
+	switch currentRole(c) {
+	case model.RoleVisionAdmin:
+		return true
+	case model.RoleOrgAdmin:
+		return orgAdminInHome(c)
+	case model.RoleSupport:
+		return orgAdminInHome(c)
+	default:
+		return false
+	}
+}
+
+func requiresAssigneeChoice(c echo.Context) bool {
+	if isReadOnly(c) {
+		return false
+	}
+	switch currentRole(c) {
+	case model.RoleOrgAdmin, model.RoleSupport:
+		return true
+	default:
+		return false
+	}
+}
+
 func isSalesRole(c echo.Context) bool {
 	return currentRole(c) == model.RoleSales
 }
@@ -188,7 +217,7 @@ func isSuspendedRole(c echo.Context) bool {
 }
 
 func canEditVisitDate(c echo.Context, as *model.ASReceipt) bool {
-	if isAdminRole(c) {
+	if canActForOthers(c) {
 		return true
 	}
 	if as == nil {
@@ -271,10 +300,7 @@ func canEditASReceipt(c echo.Context, as *model.ASReceipt) bool {
 	if isASOwner(c, as) {
 		return true
 	}
-	if currentRole(c) == model.RoleVisionAdmin {
-		return true
-	}
-	return currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c)
+	return canActForOthers(c)
 }
 
 func canSaveASReceipt(c echo.Context, as *model.ASReceipt, canMod bool) bool {
@@ -300,7 +326,10 @@ func asUnlockAllowsClosed(c echo.Context, as *model.ASReceipt, unlockOK bool) bo
 	if isASOwner(c, as) {
 		return true
 	}
-	if currentRole(c) == model.RoleOrgAdmin && orgAdminInHome(c) {
+	if canActForOthers(c) {
+		if currentRole(c) == model.RoleVisionAdmin {
+			return unlockOK
+		}
 		return true
 	}
 	if isAdminRole(c) {

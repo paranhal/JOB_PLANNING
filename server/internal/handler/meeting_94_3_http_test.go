@@ -23,6 +23,7 @@ type meeting943Users struct {
 
 func newMeeting943Server(t *testing.T) (*echo.Echo, *sql.DB, meeting943Users) {
 	t.Helper()
+	enableViewAsForTest(t)
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "meeting94_3.db"))
 	if err != nil {
 		t.Fatal(err)

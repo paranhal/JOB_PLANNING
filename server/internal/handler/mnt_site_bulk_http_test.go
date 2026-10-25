@@ -17,6 +17,7 @@ import (
 
 func newSiteBulkHTTP(t *testing.T) (*echo.Echo, *repository.MaintenanceRepo, *http.Cookie, *http.Cookie, *http.Cookie, *model.User) {
 	t.Helper()
+	enableViewAsForTest(t)
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "h15.db"))
 	if err != nil {
 		t.Fatal(err)

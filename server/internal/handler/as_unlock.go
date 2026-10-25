@@ -28,7 +28,7 @@ func (h *ASHandler) unlockActive(c echo.Context, asID string) (bool, time.Time, 
 	return h.unlockRepo.HasActive(asID, currentUserID(c))
 }
 
-const asReceiptEditDeniedMsg = "접수한 사람, 배정 담당자, 조직관리자만 수정할 수 있습니다"
+const asReceiptEditDeniedMsg = "접수한 사람, 배정 담당자, 조직관리자, 지원만 수정할 수 있습니다"
 
 func redirectASReceiptEditDenied(c echo.Context, id, page string) error {
 	msg := url.QueryEscape(asReceiptEditDeniedMsg)

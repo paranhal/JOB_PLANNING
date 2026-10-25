@@ -537,12 +537,17 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(v.Assignee, "", v.WorkGroupID) && len(v.People) == 0 {
+		return rejectAssigneeRequired(c, planURLFrom(c, planID, ""))
+	}
 	visitID, err := h.repo.InsertVisitFullID(v)
 	if err != nil {
 		setFlashErrCookie(c, err.Error())
 		return c.Redirect(http.StatusSeeOther, planURLFrom(c, planID, ""))
 	}
 	v.VisitID = visitID
+	uid, name, on := stampOnBehalf(c, "", v.Assignee)
+	_ = h.repo.StampVisitActedBy(visitID, uid, name, on)
 	if h.wbRepo != nil {
 		_, _ = h.wbRepo.EnsureMaintenanceTasks()
 	}
@@ -616,6 +621,9 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(v.Assignee, "", v.WorkGroupID) && len(v.People) == 0 {
+		return rejectAssigneeRequired(c, planURLFrom(c, planID, ""))
+	}
 	// 완료 체크박스가 폼에 없으면 기존 완료 상태를 유지한다(수정 모달에서 끈 경우만 해제).
 	if c.FormValue("completed_present") == "1" {
 		v.Completed = c.FormValue("completed") != ""
@@ -634,6 +642,8 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	if err := h.repo.UpdateVisit(v); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	uid, name, on := stampOnBehalf(c, "", v.Assignee)
+	_ = h.repo.StampVisitActedBy(vid, uid, name, on)
 	h.syncVisitTask(vid, v.Completed)
 	h.recordVisitAssign(c, vid, v.Assignee, "", "", "", "")
 	h.repo.TouchPlanUpdated(planID)

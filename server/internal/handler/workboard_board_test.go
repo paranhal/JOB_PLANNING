@@ -184,6 +184,7 @@ func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 		"work_date":  {"2026-08-31"},
 		"start_time": {"09:00"},
 		"end_time":   {"09:30"},
+		"assignee":   {"최혜영"},
 	})
 	if !strings.Contains(rec.Header().Get("Location"), "err=project_required") {
 		t.Fatalf("지원업무 사업명 검증 실패: loc=%q", rec.Header().Get("Location"))
@@ -196,6 +197,7 @@ func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 		"work_date":  {"2026-08-31"},
 		"start_time": {"09:00"},
 		"end_time":   {"09:30"},
+		"assignee":   {"최혜영"},
 	})
 	if !strings.Contains(rec.Header().Get("Location"), "ok=task") {
 		t.Fatalf("행정업무 등록 실패: loc=%q", rec.Header().Get("Location"))
@@ -209,7 +211,7 @@ func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 	}
 
 	rec = doForm(t, e, "/workboard/tasks", url.Values{
-		"work_type": {"admin"}, "title": {"시간 없음"}, "due_date": {"2026-08-31"},
+		"work_type": {"admin"}, "title": {"시간 없음"}, "due_date": {"2026-08-31"}, "assignee": {"최혜영"},
 	})
 	if !strings.Contains(rec.Header().Get("Location"), "err=time") {
 		t.Fatalf("시간 필수 검증 실패: loc=%q", rec.Header().Get("Location"))
@@ -241,6 +243,7 @@ func TestWorkboardCompleteTaskProgress(t *testing.T) {
 		"start_time": {"09:00"},
 		"end_time":   {"09:30"},
 		"status":     {"complete"},
+		"assignee":   {"최혜영"},
 	})
 	doForm(t, e, "/workboard/tasks", url.Values{
 		"work_type":  {"admin"},
@@ -250,6 +253,7 @@ func TestWorkboardCompleteTaskProgress(t *testing.T) {
 		"start_time": {"10:00"},
 		"end_time":   {"10:30"},
 		"progress":   {"250"},
+		"assignee":   {"최혜영"},
 	})
 
 	tasks, _ := repo.ListTasks()
