@@ -18,7 +18,8 @@ const mntTaskLinkSelect = `
 	       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
 	       COALESCE(v.project_id,''),
 	       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
-	       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), '')
+	       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), ''),
+	       COALESCE(v.start_time,''), COALESCE(v.end_time,''), COALESCE(v.duration_min,0)
 	FROM work_tasks t
 	JOIN maintenance_visits v ON v.visit_id = t.source_id
 	JOIN customers c ON c.customer_id = v.customer_id
@@ -26,12 +27,14 @@ const mntTaskLinkSelect = `
 	WHERE t.source_type = 'maintenance'`
 
 type mntTaskLink struct {
-	taskID, workDate, dueDate, startTime, endTime string
-	durationMin                                   int
+	taskID, workDate, dueDate, startTime, endTime              string
+	durationMin                                                int
 	assignee, title, desc, status, taskProject, assigneeSource string
 	visitDate, visitAssignee, productType                      string
-	completed                                     bool
-	completedDate, visitProject, siteName, orgID  string
+	completed                                                  bool
+	completedDate, visitProject, siteName, orgID               string
+	visitStart, visitEnd                                       string
+	visitDuration                                              int
 }
 
 func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTaskLink, error) {
@@ -50,7 +53,8 @@ func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTask
 		if err := rows.Scan(&l.taskID, &l.workDate, &l.dueDate, &l.startTime, &l.endTime,
 			&l.durationMin, &l.assignee, &l.title, &l.desc, &l.status, &l.taskProject, &l.assigneeSource,
 			&l.visitDate, &l.visitAssignee, &l.productType, &done, &l.completedDate,
-			&l.visitProject, &l.siteName, &l.orgID); err != nil {
+			&l.visitProject, &l.siteName, &l.orgID,
+			&l.visitStart, &l.visitEnd, &l.visitDuration); err != nil {
 			return nil, err
 		}
 		l.completed = done != 0
@@ -126,7 +130,8 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 		       COALESCE(v.completed,0), COALESCE(NULLIF(TRIM(v.completed_date),''), ''),
 		       COALESCE(v.project_id,''),
 		       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), ''),
-		       COALESCE(v.work_group_id,'')
+		       COALESCE(v.work_group_id,''),
+		       COALESCE(v.start_time,''), COALESCE(v.end_time,''), COALESCE(v.duration_min,0)
 		FROM maintenance_visits v
 		JOIN customers c ON c.customer_id = v.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
@@ -155,9 +160,9 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 
 	n := 0
 	for rows.Next() {
-		var id, date, assignee, product, site, doneDate, projectID, visitOrg, groupID string
-		var completed int
-		if err := rows.Scan(&id, &date, &assignee, &product, &site, &completed, &doneDate, &projectID, &visitOrg, &groupID); err != nil {
+		var id, date, assignee, product, site, doneDate, projectID, visitOrg, groupID, startT, endT string
+		var completed, visitDur int
+		if err := rows.Scan(&id, &date, &assignee, &product, &site, &completed, &doneDate, &projectID, &visitOrg, &groupID, &startT, &endT, &visitDur); err != nil {
 			return n, err
 		}
 		workDate := date
@@ -176,6 +181,8 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 			Description: model.FormatMaintenanceDescription(product, site),
 			DueDate:     date,
 			WorkDate:    workDate,
+			StartTime:   strings.TrimSpace(startT),
+			EndTime:     strings.TrimSpace(endT),
 			DurationMin: 30,
 			Status:      status,
 			Priority:    model.WBPriorityNormal,
@@ -185,6 +192,13 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 			ReceiptDate: date,
 			OrgID:       strings.TrimSpace(visitOrg),
 			WorkGroupID: strings.TrimSpace(groupID),
+		}
+		if visitDur > 0 {
+			t.DurationMin = visitDur
+		} else if t.StartTime != "" && t.EndTime != "" {
+			if got, ok := model.VisitSiteDurationMin(t.StartTime, t.EndTime); ok && got > 0 {
+				t.DurationMin = got
+			}
 		}
 		if completed == 1 {
 			t.CompleteDate = workDate
@@ -298,8 +312,16 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 	}
 
 	start, end := l.startTime, l.endTime
+	dur := l.durationMin
+	if strings.TrimSpace(l.visitStart) != "" || strings.TrimSpace(l.visitEnd) != "" {
+		start, end = strings.TrimSpace(l.visitStart), strings.TrimSpace(l.visitEnd)
+	}
+	if l.visitDuration > 0 {
+		dur = l.visitDuration
+	}
 	// 미완료 건을 옮긴 날짜에서 같은 담당자 일정과 겹치면 시각을 비워 자동 배치에 맡긴다.
-	if moved && !done && start != "" {
+	// 방문 조치에서 넣은 시각은 그대로 두고 겹침은 경고만 한다.
+	if moved && !done && start != "" && strings.TrimSpace(l.visitStart) == "" && strings.TrimSpace(l.visitEnd) == "" {
 		overlap, err := r.AssigneeTimeOverlaps(workDate, assignee, start, end, l.taskID)
 		if err != nil {
 			return false, err
@@ -312,7 +334,7 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 	orgID := strings.TrimSpace(l.orgID)
 	if workDate == strings.TrimSpace(l.workDate) && dueDate == strings.TrimSpace(l.dueDate) &&
 		assignee == strings.TrimSpace(l.assignee) && title == l.title && desc == strings.TrimSpace(l.desc) &&
-		start == l.startTime && end == l.endTime && projectID == strings.TrimSpace(l.taskProject) {
+		start == l.startTime && end == l.endTime && dur == l.durationMin && projectID == strings.TrimSpace(l.taskProject) {
 		if orgID == "" {
 			return false, nil
 		}
@@ -324,9 +346,12 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 		return n > 0, nil
 	}
 
-	dur := l.durationMin
 	if start != "" && end != "" {
-		dur = model.DurationFromTimes(start, end)
+		if got, ok := model.VisitSiteDurationMin(start, end); ok && got > 0 {
+			dur = got
+		} else {
+			dur = model.DurationFromTimes(start, end)
+		}
 	}
 	_, err := r.db.Exec(`
 		UPDATE work_tasks

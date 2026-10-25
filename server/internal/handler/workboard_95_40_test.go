@@ -150,7 +150,7 @@ func Test95_40_WorkListSelectNIncrements(t *testing.T) {
 
 func Test95_40_BoardOneLineSchedule(t *testing.T) {
 	got := boardOneLineSchedule("2026-10-19", "09:00 – 10:00")
-	if got != "10/19 (월) 09:00" {
+	if got != "10/19 (월) 09:00~10:00" {
 		t.Fatalf("%q", got)
 	}
 	if boardOneLineSchedule("", "") != "날짜 미정" {

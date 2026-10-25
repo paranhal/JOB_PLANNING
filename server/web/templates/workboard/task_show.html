@@ -308,6 +308,9 @@
       {{if $t.Description}}
       <div class="sm:col-span-2"><dt class="text-xs text-gray-500">{{if $isAS}}접수 내용{{else if $isMnt}}점검 내용{{else}}업무 내용{{end}}</dt><dd class="whitespace-pre-wrap">{{$t.Description}}</dd></div>
       {{end}}
+      {{if and $isMnt .MntEquipmentLine}}
+      <div class="sm:col-span-2"><dt class="text-xs text-gray-500">점검 장비</dt><dd>{{.MntEquipmentLine}}</dd></div>
+      {{end}}
       <div><dt class="text-xs text-gray-500">사업명</dt><dd>{{if $t.ProjectName}}{{$t.ProjectName}}{{else}}—{{end}}</dd></div>
       {{if $isWork}}
       <div><dt class="text-xs text-gray-500">작업 구분</dt><dd>{{if eq $t.WorkSubtype "build"}}구축{{else if eq $t.WorkSubtype "construction"}}공사{{else if eq $t.WorkSubtype "other"}}기타{{else}}—{{end}}</dd></div>

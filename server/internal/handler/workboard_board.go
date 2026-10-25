@@ -411,11 +411,10 @@ func boardOneLineSchedule(day, timeLabel string) string {
 	if clock == "" {
 		return s
 	}
-	clock = strings.ReplaceAll(clock, "–", " ")
-	clock = strings.ReplaceAll(clock, "-", " ")
-	if f := strings.Fields(clock); len(f) > 0 {
-		s += " " + f[0]
-	}
+	clock = strings.ReplaceAll(clock, "–", "~")
+	clock = strings.ReplaceAll(clock, " - ", "~")
+	clock = strings.Join(strings.Fields(clock), "")
+	s += " " + clock
 	return s
 }
 

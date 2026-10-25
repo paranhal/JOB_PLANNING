@@ -61,7 +61,23 @@ type MaintenanceVisit struct {
 	RoundNo       int // 주기 안 회차. 0 은 조회 시 1.
 	WorkGroupID   string
 	WorkGroupName string
+	StartTime     string                     // HH:MM 방문(도착)
+	EndTime       string                     // HH:MM 작업 종료
+	TravelMin     int                        // 편도 분
+	DurationMin   int                        // 현장 소요(분)
 	People        []MaintenanceVisitAssignee // 조회 시 채움. 저장 컬럼 아님.
+	Targets       []MaintenanceVisitTarget   // 조회 시 채움. 저장 컬럼 아님.
+}
+
+// MaintenanceVisitTarget 방문에서 점검한 장비(설치자산 또는 직접 입력).
+type MaintenanceVisitTarget struct {
+	TargetID  string
+	VisitID   string
+	AssetID   string
+	Name      string
+	Memo      string
+	SortOrder int
+	OrgID     string
 }
 
 // MaintenanceVisitAssignee 방문 주담당·참여자

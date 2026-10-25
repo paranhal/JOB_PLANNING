@@ -192,9 +192,10 @@ func New(db *sql.DB) *Handler {
 			repo: maintRepo, customerRepo: customerRepo, userRepo: userRepo,
 			wbRepo: repository.NewWBRepo(db), settingsRepo: settingsRepo,
 			holidayRepo: holidayRepo, notices: noticeHook,
-			groups:  repository.NewWorkGroupRepo(db),
-			orgs:    repository.NewOrgRepo(db),
-			dataDir: dataDirFromEnv(),
+			groups:    repository.NewWorkGroupRepo(db),
+			orgs:      repository.NewOrgRepo(db),
+			assetRepo: assetRepo,
+			dataDir:   dataDirFromEnv(),
 		},
 		Project: func() *ProjectHandler {
 			ph := NewProjectHandler(

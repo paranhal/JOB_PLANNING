@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	flashOKCookie = "jp_flash_ok"
-	flashOKSaved  = "saved"
+	flashOKCookie  = "jp_flash_ok"
+	flashOKSaved   = "saved"
 	flashOKDeleted = "deleted"
 )
 
@@ -118,6 +118,9 @@ func bindASFlashHandler(h *ASHandler) {
 func injectASSaveFlash(c echo.Context, data map[string]interface{}) {
 	kind, values := readFlashOKCookie(c)
 	if kind == "" || len(values) == 0 {
+		return
+	}
+	if kind != flashOKSaved && kind != flashOKDeleted {
 		return
 	}
 	clearFlashOKCookie(c)
