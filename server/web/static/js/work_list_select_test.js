@@ -179,7 +179,7 @@ wait(40).then(function () {
     console.error('빈 객체인데 0건 모달', p.modal, p.delN);
     process.exit(1);
   }
-  if (!p.lastError || p.lastError.indexOf('확인 결과') < 0) {
+  if (!p.lastError || p.lastError.indexOf('삭제 대상 ID') < 0) {
     console.error('빈 객체 오류 없음', p.lastError);
     process.exit(1);
   }
@@ -197,6 +197,51 @@ wait(40).then(function () {
   }
   if (!p.lastError) {
     console.error('네트워크 오류 없음');
+    process.exit(1);
+  }
+
+  p.modal = false;
+  p.lastError = '';
+  flashes.length = 0;
+  fetches = [];
+  global.fetch = function (url, opts) {
+    fetches.push({ url: url, opts: opts });
+    return jsonRes(400, { error: '삭제 대상 ID 가 비어 있습니다' });
+  };
+  p.preview();
+  return wait(40);
+}).then(function () {
+  if (p.modal) {
+    console.error('400 인데 모달');
+    process.exit(1);
+  }
+  if (!p.lastError || p.lastError.indexOf('삭제 대상 ID') < 0) {
+    console.error('400 메시지 없음', p.lastError);
+    process.exit(1);
+  }
+
+  const blank = box('');
+  blank.checked = true;
+  const blankRoot = {
+    querySelectorAll(sel) {
+      if (sel === '.js-wl-check') return [blank];
+      return [];
+    },
+    querySelector() { return null; }
+  };
+  p.$root = blankRoot;
+  p.sync();
+  p.modal = false;
+  p.lastError = '';
+  flashes.length = 0;
+  fetches = [];
+  p.preview();
+  if (p.modal || fetches.length) {
+    console.error('빈 value 가 전송됨', fetches.length, p.modal);
+    process.exit(1);
+  }
+  if (!p.lastError || p.lastError.indexOf('삭제 대상') < 0) {
+    console.error('빈 value 오류 없음', p.lastError);
     process.exit(1);
   }
   console.log('ok');

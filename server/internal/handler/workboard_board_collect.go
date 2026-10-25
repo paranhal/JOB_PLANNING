@@ -402,15 +402,17 @@ func (h *WorkboardHandler) boardOverdueItems(c echo.Context, from, org string, s
 func workListToBoardItem(it model.WorkListItem, today string) boardItem {
 	day := model.WorkItemScheduledDate(it)
 	t := model.WorkTask{
-		Title:      it.Title,
-		Assignee:   it.Assignee,
-		Status:     it.MappedStatus,
-		WorkDate:   day,
-		DueDate:    it.DueDate,
-		OrgName:    it.OrgName,
-		CustomerID: it.CustomerID,
-		ProjectID:  it.ProjectID,
-		SourceID:   it.RefID,
+		Title:       it.Title,
+		Assignee:    it.Assignee,
+		Status:      it.MappedStatus,
+		WorkDate:    day,
+		DueDate:     it.DueDate,
+		OrgID:       it.OrgID,
+		OrgName:     it.OrgName,
+		CustomerID:  it.CustomerID,
+		ProjectID:   it.ProjectID,
+		SourceID:    it.RefID,
+		WorkGroupID: it.WorkGroupID,
 	}
 	if t.Status == "" {
 		t.Status = it.Status
@@ -457,6 +459,7 @@ func workListToBoardItem(it model.WorkListItem, today string) boardItem {
 	if it.Prefix == model.WorkPrefixAS && (bi.Href == "" || bi.Href == "#") {
 		bi.Href = asOpenHref(it.RefID)
 	}
+	bi.DeleteKey, bi.DeleteDisabledReason = deleteKeyForWorkList(it, t)
 	return bi
 }
 

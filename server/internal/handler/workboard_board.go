@@ -73,6 +73,7 @@ type boardItem struct {
 	DueTag               string
 	DueLate              bool
 	CanDelete            bool
+	DeleteKey            string
 	DeleteDisabledReason string
 	CustomerPlace        string
 	ScheduleLine         string

@@ -55,8 +55,8 @@
     {{range .Items}}
     <div class="wl-row border-t border-line px-4 py-2 text-ink hover:bg-hover md:px-6">
       <div class="wl-check flex items-center" @click.stop>
-        {{if .CanDelete}}
-        <input type="checkbox" class="js-wl-check" name="ids" value="{{.Task.TaskID}}" title="선택"
+        {{if and .CanDelete .DeleteKey}}
+        <input type="checkbox" class="js-wl-check" name="ids" value="{{.DeleteKey}}" title="선택"
                data-title="{{.Task.Title}}" @change="sync()">
         {{else}}
         <input type="checkbox" class="js-wl-check-off" disabled title="{{.DeleteDisabledReason}}">

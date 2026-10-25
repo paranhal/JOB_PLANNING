@@ -27,7 +27,13 @@ const (
 	msgBulkComplete       = "완료 업무는 조직관리자·지원만 삭제할 수 있습니다"
 	msgBulkOtherOrg       = "타 조직 업무"
 	msgBulkGone           = "이미 삭제됨"
+	msgBulkEmptyID        = "삭제 대상 ID 가 비어 있습니다"
+	msgBulkNoKey          = "삭제 대상 ID 를 확인할 수 없습니다"
+	msgBulkSales          = "영업 활동은 영업 화면에서 관리합니다"
+	msgBulkConfirmWork    = "확인·지원 업무는 여기서 삭제할 수 없습니다"
 	flashBulkCookie       = "jp_flash_bulk"
+	bulkKeyAS             = "as:"
+	bulkKeyTask           = "task:"
 )
 
 type bulkSkipItem struct {
@@ -52,23 +58,162 @@ type bulkDeleteFlash struct {
 }
 
 func formIDList(c echo.Context) []string {
+	valid, _ := formPostedIDs(c)
+	return valid
+}
+
+func formPostedIDs(c echo.Context) (valid []string, posted int) {
 	if c == nil || c.Request() == nil {
-		return nil
+		return nil, 0
 	}
 	_ = c.Request().ParseForm()
 	raw := append([]string{}, c.Request().PostForm["ids"]...)
 	raw = append(raw, c.Request().PostForm["ids[]"]...)
+	posted = len(raw)
 	seen := map[string]bool{}
-	var out []string
 	for _, id := range raw {
 		id = strings.TrimSpace(id)
 		if id == "" || seen[id] {
 			continue
 		}
 		seen[id] = true
-		out = append(out, id)
+		valid = append(valid, id)
 	}
-	return out
+	return valid, posted
+}
+
+func parseBulkDeleteKey(raw string) (kind, id string) {
+	raw = strings.TrimSpace(raw)
+	switch {
+	case strings.HasPrefix(raw, bulkKeyAS):
+		return "as", strings.TrimSpace(strings.TrimPrefix(raw, bulkKeyAS))
+	case strings.HasPrefix(raw, bulkKeyTask):
+		return "task", strings.TrimSpace(strings.TrimPrefix(raw, bulkKeyTask))
+	default:
+		return "task", raw
+	}
+}
+
+func deleteKeyForTask(t model.WorkTask) (key, reason string) {
+	src := strings.TrimSpace(t.SourceType)
+	sid := strings.TrimSpace(t.SourceID)
+	switch src {
+	case model.WBSourceAS:
+		if sid == "" {
+			return "", msgBulkNoKey
+		}
+		return bulkKeyAS + sid, ""
+	case model.WBSourceMaintenance:
+		return "", msgBulkMnt
+	case model.WBSourceSalesActivity:
+		return "", msgBulkSales
+	}
+	tid := strings.TrimSpace(t.TaskID)
+	if tid != "" {
+		return bulkKeyTask + tid, ""
+	}
+	return "", msgBulkNoKey
+}
+
+func deleteKeyForWorkList(it model.WorkListItem, t model.WorkTask) (key, reason string) {
+	switch it.Prefix {
+	case model.WorkPrefixAS:
+		sid := strings.TrimSpace(it.RefID)
+		if sid == "" {
+			sid = strings.TrimSpace(t.SourceID)
+		}
+		if sid == "" {
+			return "", msgBulkNoKey
+		}
+		return bulkKeyAS + sid, ""
+	case model.WorkPrefixMaintenance:
+		return "", msgBulkMnt
+	case model.WorkPrefixSales:
+		return "", msgBulkSales
+	case model.WorkPrefixConfirm, model.WorkPrefixSupport:
+		return "", msgBulkConfirmWork
+	}
+	return deleteKeyForTask(t)
+}
+
+func syntheticASTask(as *model.ASReceipt) *model.WorkTask {
+	if as == nil {
+		return nil
+	}
+	st := model.MapASStatusToWB(as.Status)
+	if st == "" {
+		st = model.WBTaskWaiting
+	}
+	day := strings.TrimSpace(as.VisitScheduledDate)
+	return &model.WorkTask{
+		Title:          model.FormatASWorkTitle(as.OrgName, as.ASNumber),
+		WorkType:       model.WBWorkAS,
+		SourceType:     model.WBSourceAS,
+		SourceID:       as.ASID,
+		OrgID:          as.OrgID,
+		OrgName:        as.OrgName,
+		Assignee:       as.AssignedTo,
+		AssigneeUserID: as.AssignedUserID,
+		CustomerID:     as.CustomerID,
+		Status:         st,
+		WorkDate:       day,
+		DueDate:        day,
+		WorkGroupID:    as.WorkGroupID,
+	}
+}
+
+func (h *WorkboardHandler) resolveBulkTask(kind, id string) (*model.WorkTask, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, nil
+	}
+	if kind == "as" {
+		if h.repo != nil {
+			if t, err := h.repo.GetTaskBySource(model.WBSourceAS, id); err != nil {
+				return nil, err
+			} else if t != nil {
+				return t, nil
+			}
+		}
+		if h.asH == nil || h.asH.repo == nil {
+			return nil, nil
+		}
+		as, err := h.asH.repo.GetByID(repository.OrgAll, id)
+		if err != nil {
+			return nil, err
+		}
+		return syntheticASTask(as), nil
+	}
+	if h.repo == nil {
+		return nil, nil
+	}
+	return h.repo.GetTask(id)
+}
+
+func markBulkCascade(gone map[string]bool, t *model.WorkTask, extra []string) {
+	if gone == nil {
+		return
+	}
+	for _, id := range extra {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		gone[id] = true
+		gone[bulkKeyTask+id] = true
+	}
+	if t == nil {
+		return
+	}
+	if tid := strings.TrimSpace(t.TaskID); tid != "" {
+		gone[tid] = true
+		gone[bulkKeyTask+tid] = true
+	}
+	if strings.TrimSpace(t.SourceType) == model.WBSourceAS {
+		if sid := strings.TrimSpace(t.SourceID); sid != "" {
+			gone[bulkKeyAS+sid] = true
+		}
+	}
 }
 
 func bulkReturnURL(c echo.Context) string {
@@ -119,7 +264,7 @@ func logBulkDeleteDeny(c echo.Context, stage, reason string, n int) {
 }
 
 func (h *WorkboardHandler) BulkDeletePreview(c echo.Context) error {
-	ids := formIDList(c)
+	ids, posted := formPostedIDs(c)
 	if !requireCSRF(c) {
 		logBulkDeleteDeny(c, "preview", "csrf", len(ids))
 		return c.JSON(http.StatusForbidden, map[string]string{"error": msgBulkCSRF})
@@ -128,21 +273,49 @@ func (h *WorkboardHandler) BulkDeletePreview(c echo.Context) error {
 		logBulkDeleteDeny(c, "preview", "readonly", len(ids))
 		return c.JSON(http.StatusForbidden, map[string]string{"error": msgBulkReadOnly})
 	}
+	if posted > 0 && len(ids) == 0 {
+		logBulkDeleteDeny(c, "preview", "empty_id", posted)
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": msgBulkEmptyID})
+	}
+	if len(ids) == 0 {
+		logBulkDeleteDeny(c, "preview", "empty_id", 0)
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": msgBulkEmptyID})
+	}
 	if len(ids) > bulkDeleteMax {
 		logBulkDeleteDeny(c, "preview", "too_many", len(ids))
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": msgBulkTooMany})
 	}
 	var del []bulkPreviewRow
 	var skip []bulkSkipItem
-	for _, id := range ids {
-		t, err := h.repo.GetTask(id)
-		if err != nil || t == nil {
-			skip = append(skip, bulkSkipItem{ID: id, Reason: msgBulkGone})
+	seenAS := map[string]bool{}
+	for _, raw := range ids {
+		kind, id := parseBulkDeleteKey(raw)
+		if id == "" {
+			skip = append(skip, bulkSkipItem{ID: raw, Reason: msgBulkEmptyID})
 			continue
+		}
+		t, err := h.resolveBulkTask(kind, id)
+		if err != nil {
+			skip = append(skip, bulkSkipItem{ID: raw, Reason: "삭제 대상을 확인하지 못했습니다"})
+			continue
+		}
+		if t == nil {
+			skip = append(skip, bulkSkipItem{ID: raw, Reason: msgBulkGone})
+			continue
+		}
+		if strings.TrimSpace(t.SourceType) == model.WBSourceAS {
+			sid := strings.TrimSpace(t.SourceID)
+			if sid != "" && seenAS[sid] {
+				skip = append(skip, bulkSkipItem{ID: raw, Title: t.Title, Reason: "같은 접수(이미 선택됨)"})
+				continue
+			}
+			if sid != "" {
+				seenAS[sid] = true
+			}
 		}
 		reason := h.listDeleteBlockReason(c, t)
 		row := bulkPreviewRow{
-			ID: t.TaskID, Kind: boardTypeStyleOf(*t).Label, Title: t.Title,
+			ID: raw, Kind: boardTypeStyleOf(*t).Label, Title: t.Title,
 			Org: strings.TrimSpace(t.OrgName), Schedule: strings.TrimSpace(t.WorkDate),
 			Assignee: t.Assignee, Complete: t.Status == model.WBTaskComplete,
 		}
@@ -150,7 +323,7 @@ func (h *WorkboardHandler) BulkDeletePreview(c echo.Context) error {
 			row.Schedule = t.DueDate
 		}
 		if reason != "" {
-			skip = append(skip, bulkSkipItem{ID: id, Title: t.Title, Reason: reason})
+			skip = append(skip, bulkSkipItem{ID: raw, Title: t.Title, Reason: reason})
 			continue
 		}
 		del = append(del, row)
@@ -168,7 +341,7 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 		setFlashErrCookie(c, msg)
 		return c.Redirect(http.StatusSeeOther, ret)
 	}
-	ids := formIDList(c)
+	ids, posted := formPostedIDs(c)
 	if !requireCSRF(c) {
 		logBulkDeleteDeny(c, "delete", "csrf", len(ids))
 		return fail(http.StatusForbidden, msgBulkCSRF)
@@ -177,6 +350,14 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 		logBulkDeleteDeny(c, "delete", "readonly", len(ids))
 		return fail(http.StatusForbidden, msgBulkReadOnly)
 	}
+	if posted > 0 && len(ids) == 0 {
+		logBulkDeleteDeny(c, "delete", "empty_id", posted)
+		return fail(http.StatusBadRequest, msgBulkEmptyID)
+	}
+	if len(ids) == 0 {
+		logBulkDeleteDeny(c, "delete", "empty_id", 0)
+		return fail(http.StatusBadRequest, msgBulkEmptyID)
+	}
 	if len(ids) > bulkDeleteMax {
 		logBulkDeleteDeny(c, "delete", "too_many", len(ids))
 		return fail(http.StatusBadRequest, msgBulkTooMany)
@@ -184,33 +365,42 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 	var deleted []string
 	var skipped []bulkSkipItem
 	cascadeGone := map[string]bool{}
-	for _, id := range ids {
-		if cascadeGone[id] {
-			deleted = append(deleted, id)
+	for _, raw := range ids {
+		if cascadeGone[raw] {
+			deleted = append(deleted, raw)
 			continue
 		}
-		t, err := h.repo.GetTask(id)
+		kind, id := parseBulkDeleteKey(raw)
+		if id == "" {
+			skipped = append(skipped, bulkSkipItem{ID: raw, Reason: msgBulkEmptyID})
+			continue
+		}
+		t, err := h.resolveBulkTask(kind, id)
 		if err != nil {
-			skipped = append(skipped, bulkSkipItem{ID: id, Reason: "삭제 중 오류가 발생했습니다"})
+			skipped = append(skipped, bulkSkipItem{ID: raw, Reason: "삭제 중 오류가 발생했습니다"})
 			continue
 		}
 		if t == nil {
-			skipped = append(skipped, bulkSkipItem{ID: id, Reason: msgBulkGone})
+			skipped = append(skipped, bulkSkipItem{ID: raw, Reason: msgBulkGone})
 			continue
 		}
+		if strings.TrimSpace(t.SourceType) == model.WBSourceAS {
+			if sid := strings.TrimSpace(t.SourceID); sid != "" && cascadeGone[bulkKeyAS+sid] {
+				deleted = append(deleted, raw)
+				continue
+			}
+		}
 		if reason := h.listDeleteBlockReason(c, t); reason != "" {
-			skipped = append(skipped, bulkSkipItem{ID: id, Title: t.Title, Reason: reason})
+			skipped = append(skipped, bulkSkipItem{ID: raw, Title: t.Title, Reason: reason})
 			continue
 		}
 		ok, skipReason, cascade := h.deleteTaskForList(c, t)
-		for _, cid := range cascade {
-			cascadeGone[cid] = true
-		}
+		markBulkCascade(cascadeGone, t, cascade)
 		if ok {
-			deleted = append(deleted, id)
+			deleted = append(deleted, raw)
 			continue
 		}
-		skipped = append(skipped, bulkSkipItem{ID: id, Title: t.Title, Reason: skipReason})
+		skipped = append(skipped, bulkSkipItem{ID: raw, Title: t.Title, Reason: skipReason})
 	}
 	if len(deleted) > 0 {
 		invalidateCompanyWeeklyDownloads()
@@ -233,7 +423,7 @@ func (h *WorkboardHandler) listDeleteBlockReason(c echo.Context, t *model.WorkTa
 	if org != repository.OrgAll && strings.TrimSpace(t.OrgID) != "" && t.OrgID != org {
 		return msgBulkOtherOrg
 	}
-	if h.repo != nil && h.repo.TaskCooperationID(t.TaskID) != "" {
+	if h.repo != nil && strings.TrimSpace(t.TaskID) != "" && h.repo.TaskCooperationID(t.TaskID) != "" {
 		return msgBulkCoop
 	}
 	switch strings.TrimSpace(t.SourceType) {
@@ -299,14 +489,17 @@ func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) 
 		}
 		if deny != "" {
 			if deny == msgASDeleteGone {
-				if err := h.repo.DeleteTask(t.TaskID); err != nil {
-					return false, "삭제 중 오류가 발생했습니다", nil
+				if strings.TrimSpace(t.TaskID) != "" {
+					if err := h.repo.DeleteTask(t.TaskID); err != nil {
+						return false, "삭제 중 오류가 발생했습니다", nil
+					}
+					accessLog(c, auditlog.Record{
+						Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
+						Detail: t.Title, Reason: bulkDeleteAuditReason, Result: auditlog.ResultOK,
+					})
+					return true, "", []string{t.TaskID}
 				}
-				accessLog(c, auditlog.Record{
-					Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
-					Detail: t.Title, Reason: bulkDeleteAuditReason, Result: auditlog.ResultOK,
-				})
-				return true, "", []string{t.TaskID}
+				return true, "", nil
 			}
 			return false, deny, nil
 		}
@@ -337,8 +530,26 @@ func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) 
 
 func (h *WorkboardHandler) annotateListDelete(c echo.Context, items []boardItem) {
 	for i := range items {
+		if strings.TrimSpace(items[i].DeleteKey) == "" {
+			key, why := deleteKeyForTask(items[i].Task)
+			items[i].DeleteKey = key
+			if why != "" && items[i].DeleteDisabledReason == "" {
+				items[i].DeleteDisabledReason = why
+			}
+		}
+		if strings.TrimSpace(items[i].DeleteKey) == "" {
+			items[i].CanDelete = false
+			if items[i].DeleteDisabledReason == "" {
+				items[i].DeleteDisabledReason = msgBulkNoKey
+			}
+			continue
+		}
 		reason := h.listDeleteBlockReason(c, &items[i].Task)
-		items[i].DeleteDisabledReason = reason
-		items[i].CanDelete = reason == ""
+		if reason != "" {
+			items[i].DeleteDisabledReason = reason
+			items[i].CanDelete = false
+			continue
+		}
+		items[i].CanDelete = true
 	}
 }

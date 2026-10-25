@@ -49,6 +49,9 @@
       selectedIds() {
         return this.boxes().filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
       },
+      selectedBoxes() {
+        return this.boxes().filter(function (b) { return b.checked; });
+      },
       readCsrf() {
         return cookieValue('jp_csrf') || metaCsrf() || this.csrf || '';
       },
@@ -91,8 +94,14 @@
         this.showErr(msg, true);
       },
       preview() {
-        var ids = this.selectedIds();
-        if (!ids.length) return;
+        var boxes = this.selectedBoxes();
+        if (!boxes.length) return;
+        var empty = boxes.some(function (b) { return !String(b.value || '').trim(); });
+        if (empty) {
+          this.showErr('선택한 항목의 삭제 대상을 확인할 수 없습니다', true);
+          return;
+        }
+        var ids = boxes.map(function (b) { return b.value; });
         this.ids = ids;
         this.applyCsrf(this.readCsrf());
         this.fetchPreview(ids, false);
@@ -135,7 +144,7 @@
           var del = d.deletable || [];
           var skip = d.skipped || [];
           if (ids.length > 0 && del.length + skip.length === 0) {
-            self.showErr('확인 결과를 받지 못했습니다', true);
+            self.showErr('서버가 선택한 업무를 확인하지 못했습니다. 삭제 대상 ID가 비어 있거나 목록을 새로고침해야 합니다', true);
             return;
           }
           self.deletable = del;
