@@ -23,6 +23,13 @@ func NewMaintenanceRepo(db *sql.DB) *MaintenanceRepo {
 	return &MaintenanceRepo{db: db}
 }
 
+func (r *MaintenanceRepo) DB() *sql.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 func randomID(prefix string) string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)

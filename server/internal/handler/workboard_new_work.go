@@ -31,7 +31,7 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 	today := time.Now().Format(dateLayout)
 	redirect := safeWorkboardRedirect(c.QueryParam("redirect"), workboardHomeURL(""))
 	org := currentOrg(c)
-	wgItems, _ := h.workGroupPicks(c)
+	wgItems, wgJSON := h.workGroupPicks(c)
 	data := map[string]interface{}{
 		"Date":          dateStr,
 		"Today":         today,
@@ -42,6 +42,7 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		"Assignees":        listAssignableForPicker(h.userRepo, c),
 		"AssigneeRequired":  requiresAssigneeChoice(c),
 		"WorkGroups":    wgItems,
+		"WorkGroupsJSON": wgJSON,
 		"ASCards":       []model.WBCard{},
 		"MntCards":      []model.WBCard{},
 		"Customers":     []model.Customer{},

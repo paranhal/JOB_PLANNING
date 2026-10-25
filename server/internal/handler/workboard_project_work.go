@@ -39,7 +39,14 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	} else {
 		workDay = d
 	}
-	assignee := strings.TrimSpace(c.FormValue("assignee"))
+	sel, selErr := h.taskSelectionFromForm(c, true)
+	if selErr != nil {
+		return rejectPickerErr(c, selErr, redirectBack(c, ""))
+	}
+	assignee := strings.TrimSpace(sel.PrimaryName)
+	if assignee == "" {
+		assignee = strings.TrimSpace(c.FormValue("assignee"))
+	}
 	if assignee == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "담당자를 선택하세요")
 	}
@@ -102,6 +109,11 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	recordTaskNotice(h.notices, c, t, "")
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
+	}
+	if !sel.Empty() {
+		applySelectionToTask(t, sel)
+		_ = h.repo.UpdateTask(t)
+		_ = h.saveSelectionOnTask(t.TaskID, sel)
 	}
 	if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
 		return err

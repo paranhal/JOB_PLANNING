@@ -15,6 +15,7 @@ import (
 type workGroupPickJSON struct {
 	GroupID    string             `json:"id"`
 	Name       string             `json:"name"`
+	LeaderID   string             `json:"leader_id"`
 	LeaderName string             `json:"leader_name"`
 	Members    []workGroupPickMem `json:"members"`
 }
@@ -46,7 +47,7 @@ func (h *WorkboardHandler) workGroupPicks(c echo.Context) ([]model.WorkGroup, st
 	items := h.visibleWorkGroups(c)
 	out := make([]workGroupPickJSON, 0, len(items))
 	for _, g := range items {
-		p := workGroupPickJSON{GroupID: g.GroupID, Name: g.Name, LeaderName: g.LeaderName}
+		p := workGroupPickJSON{GroupID: g.GroupID, Name: g.Name, LeaderID: g.LeaderID, LeaderName: g.LeaderName}
 		ms, _ := h.groups.MembersOn(g.GroupID, "")
 		for _, m := range ms {
 			p.Members = append(p.Members, workGroupPickMem{UserID: m.UserID, FullName: m.FullName, Role: m.Role})

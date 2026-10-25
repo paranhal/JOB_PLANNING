@@ -13,6 +13,13 @@ import (
 
 type WBRepo struct{ db *sql.DB }
 
+func (r *WBRepo) DB() *sql.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 func NewWBRepo(db *sql.DB) *WBRepo { return &WBRepo{db: db} }
 
 const workTaskSelect = `

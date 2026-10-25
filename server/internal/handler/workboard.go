@@ -1687,18 +1687,50 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=past"))
 	}
 
+	sel, selErr := h.taskSelectionFromForm(c, false)
+	if selErr != nil {
+		return rejectPickerErr(c, selErr, redirectBack(c, ""))
+	}
+
 	// AS·정기점검 일일업무 — 원본을 골라 업무 고유번호를 부여하고 업무 화면으로 이동
 	if workType == model.WBWorkAS || workType == model.WBWorkMaintenance {
 		kind := workType
-		if sourceID == "" {
+		batchIDs := []string{}
+		if sourceID != "" {
+			batchIDs = append(batchIDs, sourceID)
+		}
+		extraSites := formNamedIDList(c, "site_id")
+		if kind == model.WBWorkAS {
+			batchIDs = uniqueNonEmptyIDs(append(batchIDs, formNamedIDList(c, "extra_as_id", "source_id")...))
+		}
+		if len(batchIDs) == 0 {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=task"))
 		}
+		mode := parseMultiSiteMode(c, len(batchIDs)+len(extraSites))
+		if kind == model.WBWorkAS && len(batchIDs) > 1 {
+			res, err := h.RegisterWorkBatch(c, kind, batchIDs, mode, sel, workDate, dueDate, start, end, dur)
+			if err != nil {
+				return err
+			}
+			return h.respondWorkBatch(c, res)
+		}
+		sourceID = batchIDs[0]
 		if existing, _ := h.repo.GetTaskBySource(kind, sourceID); existing != nil {
-			owner := strings.TrimSpace(c.FormValue("assignee"))
+			owner := strings.TrimSpace(sel.PrimaryName)
+			if owner == "" {
+				owner = strings.TrimSpace(c.FormValue("assignee"))
+			}
 			if owner == "" {
 				owner = strings.TrimSpace(existing.Assignee)
 			}
 			supports := parseSupportMembers(c, owner)
+			if len(sel.People) > 1 {
+				for _, p := range sel.People {
+					if p.Role == model.WBMemberSupport {
+						supports = append(supports, model.WorkTaskMember{Assignee: p.Name, UserID: p.UserID, Role: p.Role, DurationMin: p.DurationMin})
+					}
+				}
+			}
 			if err := denyOtherOrgTask(c, existing); err != nil {
 				return err
 			}
@@ -1729,11 +1761,17 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 				}
 			}
 			_ = h.saveSupportMembers(c, existing.TaskID, owner)
+			if !sel.Empty() {
+				_ = h.saveSelectionOnTask(existing.TaskID, sel)
+			}
 			h.syncVisitDateFromTask(kind, sourceID, workDate)
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=place"))
 		}
-		t, err := h.buildSourceTask(kind, sourceID, workDate, start, end, dur,
-			strings.TrimSpace(c.FormValue("assignee")), "")
+		ownerName := strings.TrimSpace(sel.PrimaryName)
+		if ownerName == "" {
+			ownerName = strings.TrimSpace(c.FormValue("assignee"))
+		}
+		t, err := h.buildSourceTask(kind, sourceID, workDate, start, end, dur, ownerName, "")
 		if err != nil {
 			return err
 		}
@@ -1746,6 +1784,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		st, pr := createTaskStatusPriority(c)
 		t.Status = st
 		t.Priority = pr
+		applySelectionToTask(t, sel)
 		if msg := h.firstParticipantOverlap(workDate, start, end, "", occupancyNames(t.Assignee, parseSupportMembers(c, t.Assignee))); msg != "" {
 			return overlapRedirect(c, msg)
 		}
@@ -1764,6 +1803,16 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		}
 		if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 			return err
+		}
+		if !sel.Empty() {
+			_ = h.saveSelectionOnTask(t.TaskID, sel)
+		}
+		if kind == model.WBWorkMaintenance && len(extraSites) > 0 {
+			sites := extraSites
+			if strings.TrimSpace(t.CustomerID) != "" {
+				sites = uniqueNonEmptyIDs(append([]string{t.CustomerID}, extraSites...))
+			}
+			_ = h.repo.ReplaceTaskSites(t.TaskID, sites)
 		}
 		h.syncVisitDateFromTask(kind, sourceID, workDate)
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
@@ -1799,12 +1848,13 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		DurationMin:  dur,
 		Status:       st,
 		Priority:     pr,
-		Assignee:     strings.TrimSpace(c.FormValue("assignee")),
+		Assignee:     strings.TrimSpace(firstNonEmpty(sel.PrimaryName, c.FormValue("assignee"))),
 		Tags:         strings.TrimSpace(c.FormValue("tags")),
 		Progress:     progress,
 		ParentTaskID: strings.TrimSpace(c.FormValue("parent_task_id")),
 	}
 	applyCustomerForm(t, c)
+	applySelectionToTask(t, sel)
 	if t.Title == "" || (t.DueDate == "" && !dueUndeterminedFromForm(c)) {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=task"))
 	}
@@ -1845,6 +1895,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	recordTaskNotice(h.notices, c, t, "")
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
+	}
+	if !sel.Empty() {
+		_ = h.saveSelectionOnTask(t.TaskID, sel)
 	}
 	if t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport {
 		_ = c.Request().ParseForm()

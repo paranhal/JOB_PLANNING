@@ -598,17 +598,24 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 	assignedCode := c.FormValue("assigned_to_code")
 	assignedName := ""
 	assignedUID := ""
-	if assignedCode == "custom" {
-		assignedName = strings.TrimSpace(c.FormValue("assigned_to_custom"))
-	} else if assignedCode != "" {
-		if u, _ := h.userRepo.GetByID(assignedCode); u != nil {
-			assignedUID = u.UserID
-			assignedName = u.FullName
-		} else {
-			assignedName = assignedCode
+	if strings.TrimSpace(c.FormValue("assignee_multi")) == "1" {
+		if sel, err := ParseSelection(c, h.pickerDeps(), PickerSpec{AllowGroups: true, AllowExternal: true}); err == nil && !sel.Empty() {
+			assignedName, assignedUID = sel.PrimaryName, sel.PrimaryUserID
 		}
-	} else if v := c.FormValue("assigned_to"); v != "" {
-		assignedName = v
+	}
+	if assignedName == "" {
+		if assignedCode == "custom" {
+			assignedName = strings.TrimSpace(c.FormValue("assigned_to_custom"))
+		} else if assignedCode != "" {
+			if u, _ := h.userRepo.GetByID(assignedCode); u != nil {
+				assignedUID = u.UserID
+				assignedName = u.FullName
+			} else {
+				assignedName = assignedCode
+			}
+		} else if v := c.FormValue("assigned_to"); v != "" {
+			assignedName = v
+		}
 	}
 
 	as := &model.ASReceipt{
@@ -943,6 +950,11 @@ func (h *ASHandler) Create(c echo.Context) error {
 		if err := h.repo.Create(as); err != nil {
 			log.Printf("AS 접수 등록 실패: %v", err)
 			return c.Redirect(http.StatusSeeOther, "/as/new?err="+receiptCreateErrQuery(err))
+		}
+		if strings.TrimSpace(c.FormValue("assignee_multi")) == "1" {
+			if sel, err := ParseSelection(c, h.pickerDeps(), PickerSpec{AllowGroups: true, AllowExternal: true}); err == nil && !sel.Empty() {
+				_ = repository.SaveAssignees(h.db, repository.AssigneeTargetASReceipt, as.ASID, sel.People, sel.GroupID())
+			}
 		}
 		h.syncASPlannedDailyTask(as.ASID)
 		if h.notices != nil {
@@ -1491,38 +1503,56 @@ func (h *ASHandler) Update(c echo.Context) error {
 	}
 
 	// 접수담당은 배정만, 기술/관리자는 처리 필드 포함
-	assignedCode := c.FormValue("assigned_to_code")
-	if assignedCode == "custom" {
-		as.AssignedTo = strings.TrimSpace(c.FormValue("assigned_to_custom"))
-		as.AssignedUserID = ""
-	} else if assignedCode != "" {
-		if u, _ := h.userRepo.GetByID(assignedCode); u != nil {
-			as.AssignedUserID = u.UserID
-			as.AssignedTo = u.FullName
-		} else {
-			as.AssignedTo = assignedCode
+	if strings.TrimSpace(c.FormValue("assignee_multi")) == "1" {
+		sel, err := ParseSelection(c, h.pickerDeps(), PickerSpec{
+			AllowGroups: true, AllowExternal: true, Required: requiresAssigneeChoice(c),
+		})
+		if err != nil {
+			return rejectPickerErr(c, err, asOpenHrefQuery(id, ""))
 		}
-	} else if v := c.FormValue("assigned_to"); v != "" {
-		as.AssignedTo = v
-		if as.AssignedUserID == "" {
-			if users := listAssignableForPicker(h.userRepo, c); users != nil {
-				for _, u := range users {
-					if strings.TrimSpace(u.FullName) == strings.TrimSpace(v) || u.Username == v {
-						as.AssignedUserID = u.UserID
-						as.AssignedTo = u.FullName
-						break
+		if !sel.Empty() {
+			as.AssignedTo = sel.PrimaryName
+			as.AssignedUserID = sel.PrimaryUserID
+			if gid := sel.GroupID(); gid != "" || c.FormValue("work_group_present") == "1" {
+				as.WorkGroupID = gid
+			}
+			_ = repository.SaveAssignees(h.db, repository.AssigneeTargetASReceipt, as.ASID, sel.People, sel.GroupID())
+		}
+	}
+	if strings.TrimSpace(c.FormValue("assignee_multi")) != "1" {
+		assignedCode := c.FormValue("assigned_to_code")
+		if assignedCode == "custom" {
+			as.AssignedTo = strings.TrimSpace(c.FormValue("assigned_to_custom"))
+			as.AssignedUserID = ""
+		} else if assignedCode != "" {
+			if u, _ := h.userRepo.GetByID(assignedCode); u != nil {
+				as.AssignedUserID = u.UserID
+				as.AssignedTo = u.FullName
+			} else {
+				as.AssignedTo = assignedCode
+			}
+		} else if v := c.FormValue("assigned_to"); v != "" {
+			as.AssignedTo = v
+			if as.AssignedUserID == "" {
+				if users := listAssignableForPicker(h.userRepo, c); users != nil {
+					for _, u := range users {
+						if strings.TrimSpace(u.FullName) == strings.TrimSpace(v) || u.Username == v {
+							as.AssignedUserID = u.UserID
+							as.AssignedTo = u.FullName
+							break
+						}
 					}
 				}
 			}
 		}
-	}
-	if gid := strings.TrimSpace(c.FormValue("work_group_id")); gid != "" || c.FormValue("work_group_present") == "1" {
-		as.WorkGroupID = gid
+		if gid := strings.TrimSpace(c.FormValue("work_group_id")); gid != "" || c.FormValue("work_group_present") == "1" {
+			as.WorkGroupID = gid
+		}
 	}
 	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
 		return rejectAssigneeRequired(c, asOpenHrefQuery(id, ""))
 	}
-	if strings.TrimSpace(as.WorkGroupID) != "" {
+	if strings.TrimSpace(as.WorkGroupID) != "" && strings.TrimSpace(c.FormValue("assignee_multi")) != "1" {
 		worker := strings.TrimSpace(c.FormValue("worker"))
 		if worker == "" {
 			return rejectAssigneeRequired(c, asOpenHrefQuery(id, "err=assignee_required"))

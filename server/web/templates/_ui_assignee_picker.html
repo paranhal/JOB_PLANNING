@@ -1,0 +1,117 @@
+{{define "assignee_picker"}}
+<div class="relative w-full min-w-0" data-assignee-picker="1" data-mnt-assignee-multi="1" data-focus-target="assignee" tabindex="0"
+     x-data="assigneePicker({target:'{{if .Target}}{{.Target}}{{else}}add{{end}}', mode:'{{if .Mode}}{{.Mode}}{{else}}multi{{end}}', allowExternal: {{if .AllowExternal}}true{{else}}false{{end}}, allowGroups: {{if eq .AllowGroups false}}false{{else}}true{{end}}})"
+     x-init="seedFromParent()"
+     @mnt-picker-hydrate.window="hydrateFrom($event.detail)"
+     @assignee-picker-hydrate.window="hydrateFrom($event.detail)"
+     @keydown.escape.window="if(open){ open=false }">
+  <input type="hidden" name="assignee_multi" value="1">
+  <input type="hidden" name="owner_user_id" :value="ownerId">
+  <template x-for="id in selectedGroupIds()" :key="'g-'+id">
+    <input type="hidden" name="assignee_group_id" :value="id">
+  </template>
+  <template x-for="id in selectedIds()" :key="'a-'+id">
+    <span>
+      <input type="hidden" name="assignee_user_id" :value="id">
+      <input type="hidden" name="assignee_support_min" :value="id===ownerId ? '' : (supportMin[id]||'')">
+    </span>
+  </template>
+  <template x-for="id in excludeIds()" :key="'x-'+id">
+    <input type="hidden" name="assignee_exclude_user_id" :value="id">
+  </template>
+  <label class="block text-sm font-medium text-gray-700 mb-1">{{if .Label}}{{.Label}}{{else}}담당자{{end}}{{if .Required}} <span class="text-red-500">*</span>{{end}}</label>
+  <button type="button" class="btn-secondary w-full text-left text-xs justify-between"
+          @click="open=!open">
+    <span class="truncate" x-text="summaryLabel()"></span>
+    <span class="text-ink-subtle shrink-0">▾</span>
+  </button>
+  <p class="text-[11px] text-ink-subtle mt-1">그룹장이 있으면 그룹장이 주담당입니다. 보조 담당은 지원 분을 적을 수 있습니다.</p>
+  <div x-show="open" x-cloak @click.outside="open=false"
+       class="absolute z-50 mt-1 w-full min-w-[14rem] max-h-80 overflow-y-auto rounded-card border border-line bg-surface p-2 shadow-pop">
+    <input type="search" class="input w-full text-xs mb-2" placeholder="이름 검색" x-model="q" autocomplete="off">
+    <div x-show="allowGroups">
+    <p class="px-1 pt-1 pb-1 text-ui-xs font-semibold text-ink-muted">업무 그룹</p>
+    <div class="space-y-1.5 mb-2">
+      {{range .WorkGroups}}
+      <div class="rounded-control border border-line p-2" x-show="groupVisible('{{.GroupID}}')" data-group-id="{{.GroupID}}">
+        <div class="flex items-start justify-between gap-2">
+          <label class="flex items-start gap-2 min-w-0 flex-1 text-ui-sm text-ink">
+            <input type="checkbox" class="rounded border-line mt-0.5" value="{{.GroupID}}"
+                   :checked="!!groups['{{.GroupID}}']"
+                   @change="toggleGroup('{{.GroupID}}', $event.target.checked)">
+            <span class="min-w-0">
+              <span class="block font-medium truncate">{{.Name}} ({{.MemberN}}명)</span>
+              <span class="block text-ui-xs text-ink-subtle" x-show="orgLabelOf('{{.GroupID}}')" x-text="orgLabelOf('{{.GroupID}}')"></span>
+              <span class="block text-ui-xs text-ink-muted" x-text="memberSummaryOf('{{.GroupID}}')"></span>
+            </span>
+          </label>
+          <button type="button" class="text-ui-xs text-primary shrink-0"
+                  @click="expanded['{{.GroupID}}']=!expanded['{{.GroupID}}']"
+                  x-text="expanded['{{.GroupID}}'] ? '접기' : '구성원'">구성원</button>
+        </div>
+        <div class="mt-1.5 space-y-0.5" x-show="expanded['{{.GroupID}}']" x-cloak>
+          <template x-for="m in membersOf('{{.GroupID}}')" :key="'m-{{.GroupID}}-'+(m.user_id||'')">
+            <label class="flex items-center gap-2 rounded-control px-1 py-0.5 hover:bg-hover">
+              <input type="checkbox" class="rounded border-line"
+                     :value="m.user_id"
+                     :checked="memberOn('{{.GroupID}}', m.user_id)"
+                     @change="toggleGroupMember('{{.GroupID}}', m.user_id, $event.target.checked)">
+              <span class="truncate text-ui-sm" x-text="m.name"></span>
+              <span class="badge-neutral shrink-0" x-show="m.role==='leader'">그룹장</span>
+            </label>
+          </template>
+        </div>
+      </div>
+      {{else}}
+      <p class="text-ui-xs text-ink-muted px-1 py-1">선택할 업무 그룹이 없습니다</p>
+      {{end}}
+    </div>
+    </div>
+    <p class="px-1 pt-1 pb-1 text-ui-xs font-semibold text-ink-muted">담당자</p>
+    <ul class="space-y-0.5">
+      {{range $.Assignees}}
+      <li x-show="match('{{.FullName}}')" class="flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-hover">
+        <label class="flex items-center gap-2 min-w-0 flex-1 text-ui-sm text-ink">
+          <input type="checkbox" class="rounded border-line" value="{{.UserID}}" data-name="{{.FullName}}"
+                 :checked="personOn('{{.UserID}}')"
+                 @change="togglePerson('{{.UserID}}', $event.target.checked)">
+          <span class="truncate">{{.FullName}}</span>
+        </label>
+        <span class="text-ui-xs text-ink-subtle shrink-0">{{roleLabel .Role}}</span>
+        <input x-show="personOn('{{.UserID}}') && ownerId !== '{{.UserID}}'" x-cloak
+               type="number" min="1" class="w-14 input text-ui-xs py-0.5" placeholder="분"
+               x-model="supportMin['{{.UserID}}']" title="지원 분">
+      </li>
+      {{else}}
+      <li class="text-ui-xs text-ink-muted px-1 py-2">선택할 담당자가 없습니다</li>
+      {{end}}
+    </ul>
+    <div x-show="allowExternal" x-cloak class="mt-2 pt-2 border-t border-line">
+      <label class="block text-ui-xs text-ink-muted mb-1">직접입력(협력사·외부)</label>
+      <input name="assignee_external" class="input w-full text-xs" placeholder="이름만 저장" x-model="external">
+    </div>
+    <div class="flex gap-2 mt-2 pt-2 border-t border-line">
+      <button type="button" class="btn-secondary btn-sm flex-1" @click="clear()">선택 해제</button>
+      <button type="button" class="btn-secondary btn-sm flex-1" @click="open=false">닫기</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "wb_assignee_picker"}}
+{{template "assignee_picker" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "wb" "Required" .AssigneeRequired "Label" "담당자"}}
+{{end}}
+
+{{define "wb_multi_site_mode"}}
+<div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-1" x-show="(sites||[]).length >= 2 || (extraCount||0) >= 2" x-cloak>
+  <p class="text-xs font-medium text-slate-800">처리 방식</p>
+  <label class="flex items-start gap-2 text-sm text-slate-800">
+    <input type="radio" name="multi_site_mode" value="separate" checked class="mt-0.5">
+    <span>사이트마다 업무를 따로 만들기<br><span class="text-[11px] text-slate-500">각 사이트의 업무·접수·방문이 별도로 만들어져 개별 완료 처리됩니다.</span></span>
+  </label>
+  <label class="flex items-start gap-2 text-sm text-slate-800">
+    <input type="radio" name="multi_site_mode" value="joint" class="mt-0.5">
+    <span>업무 1건에 사이트를 함께 연결하기<br><span class="text-[11px] text-slate-500">한 업무로 묶여 한 번에 처리하며, 사이트별 개별 완료는 업무 상세에서 합니다.</span></span>
+  </label>
+</div>
+{{end}}

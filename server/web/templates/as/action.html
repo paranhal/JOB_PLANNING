@@ -299,23 +299,9 @@
           <h4 class="text-sm font-semibold text-slate-800">조치 내역</h4>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">처리담당자{{if .AssigneeRequired}} <span class="text-red-500">*</span>{{end}}</label>
-              <select name="assigned_to_code" data-focus-target="assignee" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">미배정</option>
-                {{range .Assignees}}
-                <option value="{{.UserID}}" {{if or (eq $.AS.AssignedUserID .UserID) (eq $.AS.AssignedTo .FullName)}}selected{{end}}>{{.FullName}} ({{.Username}})</option>
-                {{end}}
-                <option value="custom" {{if and .AS.AssignedTo (not .AS.AssignedUserID)}}selected{{end}}>직접입력</option>
-              </select>
+              {{template "assignee_picker" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "as-action" "Required" .AssigneeRequired "Label" "처리담당자" "AllowExternal" true}}
               {{if eq .ActionErr "assignee_required"}}<p class="mt-1 text-xs text-red-600" data-assignee-error>담당자를 선택하세요</p>{{end}}
               <input type="hidden" name="work_group_present" value="1">
-              <label class="block text-xs text-slate-500 mt-2 mb-1">또는 업무 그룹</label>
-              <select name="work_group_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">그룹 없음</option>
-                {{range .WorkGroups}}
-                <option value="{{.GroupID}}" {{if eq $.AS.WorkGroupID .GroupID}}selected{{end}}>{{.Name}}</option>
-                {{end}}
-              </select>
               {{if .AS.WorkGroupID}}
               <label class="block text-xs text-slate-500 mt-2 mb-1">수행자 <span class="text-red-500">*</span></label>
               <select name="worker" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
