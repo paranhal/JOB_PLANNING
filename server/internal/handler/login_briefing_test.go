@@ -49,6 +49,7 @@ func newLoginBriefingServer(t *testing.T) (*echo.Echo, *sql.DB, *Handler) {
 	g.Use(h.Auth.GuardViewAsWrite)
 	g.Use(h.InjectAssignNotices)
 	g.Use(h.InjectLoginBriefing)
+	e.GET("/login", h.Auth.LoginPage)
 	e.POST("/login", h.Auth.Login)
 	e.GET("/logout", h.Auth.Logout)
 	g.POST("/login-briefing/off", h.LoginBriefingOff)
@@ -131,6 +132,11 @@ func TestLoginIssuesBriefingCookieAndLogoutClears(t *testing.T) {
 	cleared := cookieNamed(out, loginBriefingCookie)
 	if cleared == nil || (cleared.MaxAge >= 0 && cleared.Value != "") {
 		t.Fatalf("logout 이 브리핑 쿠키를 안 지움 %v", out.Result().Header.Values("Set-Cookie"))
+	}
+	page := httptest.NewRecorder()
+	e.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "http://localhost/login", nil))
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `name="username"`) {
+		t.Fatalf("로그아웃 후 /login status=%d", page.Code)
 	}
 }
 

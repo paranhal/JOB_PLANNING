@@ -152,7 +152,13 @@ func TestRenderSmokeRolesAndHX(t *testing.T) {
 
 	login := uiGET(t, e, "/login", nil, false)
 	if login.Code != http.StatusOK {
-		t.Fatalf("login %d", login.Code)
+		t.Fatalf("login %d body=%s", login.Code, truncate(login.Body.String(), 400))
+	}
+	if strings.Contains(login.Body.String(), `"message":"Internal Server Error"`) {
+		t.Fatal("로그인 500 JSON")
+	}
+	if !strings.Contains(login.Body.String(), `name="username"`) {
+		t.Fatal("로그인 폼 username 없음")
 	}
 	if !strings.Contains(login.Body.String(), `name="color-scheme"`) || !strings.Contains(login.Body.String(), `content="light"`) {
 		t.Fatal("로그인 응답에 color-scheme 메타 없음")

@@ -208,6 +208,7 @@ func TestManagePlanRender(t *testing.T) {
 		filepath.Join(root, "layout", "_nav_tree.html"),
 		filepath.Join(root, "maintenance", "plan_manage.html"),
 		filepath.Join(root, "_partials", "view_group_toggle.html"),
+		filepath.Join(root, "_partials", "login_briefing.html"),
 	}
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
 	if err != nil {

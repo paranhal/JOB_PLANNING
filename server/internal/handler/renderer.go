@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -38,12 +39,18 @@ func appendExisting(files []string, paths ...string) []string {
 	return files
 }
 
-func templateFiles(name string) []string {
-	files := []string{
+// baseTemplateFiles 는 layout/base.html 이 호출하는 공통 조각이다.
+// auth/login.html 조기 반환을 포함해 모든 화면이 같은 목록을 쓴다.
+func baseTemplateFiles() []string {
+	return appendExisting(nil,
 		"web/templates/layout/base.html",
 		"web/templates/layout/_nav_tree.html",
-		filepath.Join("web/templates", name),
-	}
+		"web/templates/_partials/login_briefing.html",
+	)
+}
+
+func templateFiles(name string) []string {
+	files := appendExisting(baseTemplateFiles(), filepath.Join("web/templates", name))
 	if name == "auth/login.html" {
 		return files
 	}
@@ -143,8 +150,7 @@ func templateFiles(name string) []string {
 	files = appendExisting(files, "web/templates/_classify_hint.html", "web/templates/_customer_combo.html",
 		"web/templates/_site_multi_picker.html",
 		"web/templates/_ui_assignee_picker.html",
-		"web/templates/_partials/view_group_toggle.html",
-		"web/templates/_partials/login_briefing.html")
+		"web/templates/_partials/view_group_toggle.html")
 	return files
 }
 
@@ -234,7 +240,11 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		}
 	}
 
-	return tmpl.ExecuteTemplate(w, blockName, data)
+	err = tmpl.ExecuteTemplate(w, blockName, data)
+	if err != nil {
+		log.Printf("템플릿 실행 실패 name=%s block=%s: %v", name, blockName, err)
+	}
+	return err
 }
 
 func injectOrgView(c echo.Context, dataMap map[string]interface{}) {

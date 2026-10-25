@@ -143,7 +143,12 @@ func registerParseFiles(t *testing.T) []string {
 		}
 		files = append(files, partials...)
 	}
-	files = append(files, filepath.Join(root, "_customer_combo.html"))
+	files = append(files,
+		filepath.Join(root, "_customer_combo.html"),
+		filepath.Join(root, "_site_multi_picker.html"),
+		filepath.Join(root, "_ui_assignee_picker.html"),
+		filepath.Join(root, "_partials", "login_briefing.html"),
+	)
 	return files
 }
 
@@ -255,8 +260,8 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 	if strings.Contains(out, "날짜 미정") {
 		t.Fatal("UndatedCards 없이 날짜 미정 줄이 렌더되면 안 된다")
 	}
-	if !strings.Contains(out, "주담당") || !strings.Contains(out, "참여자") {
-		t.Fatal("등록 모달에 주담당·참여자 칸이 없다")
+	if !strings.Contains(out, "주담당") || !strings.Contains(out, "data-assignee-picker") {
+		t.Fatal("등록 모달에 담당자 선택기가 없다")
 	}
 	for _, want := range []string{"업무 내용", "업무 등록일", "업무 시작일", "업무 종료일", "＋하위 업무 등록", "기간 내 반복 실행"} {
 		if !strings.Contains(out, want) {
