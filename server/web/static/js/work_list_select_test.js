@@ -244,6 +244,26 @@ wait(40).then(function () {
     console.error('빈 value 오류 없음', p.lastError);
     process.exit(1);
   }
+  const asRoot = {
+    id: 'as-list-select',
+    querySelectorAll(sel) {
+      if (sel === '.js-wl-check') return [a, b];
+      return [];
+    },
+    querySelector(sel) {
+      if (sel === '.js-wl-all') return all;
+      return null;
+    }
+  };
+  const asSel = workListSelect('as-tok');
+  asSel.$root = asRoot;
+  a.checked = true;
+  b.checked = false;
+  asSel.sync();
+  if (asSel.n !== 1) {
+    console.error('AS 목록 공용 JS n=', asSel.n);
+    process.exit(1);
+  }
   console.log('ok');
 }).catch(function (e) {
   console.error(e);

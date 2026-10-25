@@ -49,7 +49,7 @@ func (h *ASHandler) deleteASReceipt(c echo.Context, id, auditReason string) (num
 				Action: auditlog.ActionDelete, TargetTable: "as_receipts", TargetID: id,
 				Detail: "타 조직 삭제 거부", Reason: "타조직", Result: auditlog.ResultDeny, BeforeJSON: toJSON(other),
 			})
-			return "", msgASDeleteOtherOrg, nil
+			return "", otherOrgReason("", other.OrgID), nil
 		}
 		return "", msgASDeleteGone, nil
 	}

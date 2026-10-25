@@ -33,7 +33,7 @@
     </div>
   </section>
 
-  <section class="card mt-4 overflow-hidden" x-data="workListSelect({{printf "%q" .CSRFToken}})" x-init="sync()" id="work-list-select">
+  <section class="card mt-4 overflow-hidden js-bulk-select" x-data="workListSelect({{printf "%q" .CSRFToken}})" x-init="sync()" id="work-list-select">
     <div class="js-wl-bar sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-line bg-canvas px-4 py-2 md:px-6">
       <span class="text-ui font-semibold text-ink">총 {{.Count}}개의 업무</span>
       <div class="flex flex-wrap items-center gap-2">

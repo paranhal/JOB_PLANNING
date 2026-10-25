@@ -24,7 +24,11 @@
       delN: 0,
       lastError: '',
       rootEl() {
-        return this.$root || (typeof document !== 'undefined' ? document.getElementById('work-list-select') : null);
+        if (this.$root) return this.$root;
+        if (typeof document === 'undefined') return null;
+        return document.querySelector('.js-bulk-select') ||
+          document.getElementById('work-list-select') ||
+          document.getElementById('as-list-select');
       },
       boxes() {
         var el = this.rootEl();

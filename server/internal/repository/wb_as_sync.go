@@ -57,6 +57,7 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 		visit = ""
 	}
 	title := model.FormatASWorkTitle(as.OrgName, as.ASNumber)
+	wantOrg := strings.TrimSpace(as.OrgID)
 	if existing == nil {
 		t := &model.WorkTask{
 			WorkType:       model.WBWorkAS,
@@ -73,6 +74,8 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 			SourceType:     model.WBSourceAS,
 			SourceID:       as.ASID,
 			CustomerID:     as.CustomerID,
+			OrgID:          wantOrg,
+			WorkGroupID:    as.WorkGroupID,
 		}
 		if model.CanReopenAS(as.Status) {
 			t.Status = model.WBTaskComplete
@@ -107,6 +110,12 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 			existing.Progress = 100
 		}
 	}
+	if wantOrg != "" {
+		existing.OrgID = wantOrg
+	}
+	if gid := strings.TrimSpace(as.WorkGroupID); gid != "" || strings.TrimSpace(existing.WorkGroupID) == "" {
+		existing.WorkGroupID = as.WorkGroupID
+	}
 	if asDailyTaskUnchanged(&before, existing) {
 		return nil
 	}
@@ -126,7 +135,9 @@ func asDailyTaskUnchanged(a, b *model.WorkTask) bool {
 		a.AssigneeUserID == b.AssigneeUserID &&
 		a.AssigneeSource == b.AssigneeSource &&
 		a.Status == b.Status &&
-		a.Progress == b.Progress
+		a.Progress == b.Progress &&
+		a.OrgID == b.OrgID &&
+		a.WorkGroupID == b.WorkGroupID
 }
 
 // ListUndatedASTasks 예정일·배정일이 비어 있는 AS 일일업무. 일정표 위 「날짜 미정」 줄. §42.2
@@ -184,8 +195,8 @@ func ReconcileASDailyTasks(db *sql.DB) (int, error) {
 	wb := NewWBRepo(db)
 	rows, err := db.Query(`
 		SELECT ar.as_id, ar.as_number, COALESCE(ar.status,''), COALESCE(ar.assigned_to,''),
-		       COALESCE(ar.visit_scheduled_date,''), COALESCE(ar.symptom,''), ar.customer_id,
-		       COALESCE(c.org_name,'')
+		       COALESCE(ar.assigned_user_id,''), COALESCE(ar.visit_scheduled_date,''), COALESCE(ar.symptom,''), ar.customer_id,
+		       COALESCE(c.org_name,''), COALESCE(ar.org_id,''), COALESCE(ar.work_group_id,'')
 		  FROM as_receipts ar
 		  JOIN customers c ON c.customer_id = ar.customer_id`)
 	if err != nil {
@@ -198,8 +209,8 @@ func ReconcileASDailyTasks(db *sql.DB) (int, error) {
 	n := 0
 	for rows.Next() {
 		var as model.ASReceipt
-		if err := rows.Scan(&as.ASID, &as.ASNumber, &as.Status, &as.AssignedTo,
-			&as.VisitScheduledDate, &as.Symptom, &as.CustomerID, &as.OrgName); err != nil {
+		if err := rows.Scan(&as.ASID, &as.ASNumber, &as.Status, &as.AssignedTo, &as.AssignedUserID,
+			&as.VisitScheduledDate, &as.Symptom, &as.CustomerID, &as.OrgName, &as.OrgID, &as.WorkGroupID); err != nil {
 			log.Printf("AS 일일업무 정리 행 읽기 실패: %v", err)
 			continue
 		}

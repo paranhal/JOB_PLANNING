@@ -420,8 +420,14 @@ func (h *WorkboardHandler) listDeleteBlockReason(c echo.Context, t *model.WorkTa
 		return msgBulkReadOnly
 	}
 	org := currentOrg(c)
-	if org != repository.OrgAll && strings.TrimSpace(t.OrgID) != "" && t.OrgID != org {
-		return msgBulkOtherOrg
+	if strings.TrimSpace(t.SourceType) != model.WBSourceAS {
+		if org != repository.OrgAll && strings.TrimSpace(t.OrgID) != "" && t.OrgID != org {
+			name := ""
+			if h.repo != nil {
+				name = h.repo.OrgName(t.OrgID)
+			}
+			return otherOrgReason(name, t.OrgID)
+		}
 	}
 	if h.repo != nil && strings.TrimSpace(t.TaskID) != "" && h.repo.TaskCooperationID(t.TaskID) != "" {
 		return msgBulkCoop
@@ -433,18 +439,15 @@ func (h *WorkboardHandler) listDeleteBlockReason(c echo.Context, t *model.WorkTa
 		if h.asH == nil {
 			return msgBulkNoPerm
 		}
-		as, _ := h.asH.repo.GetByID(currentOrg(c), t.SourceID)
+		as, _ := h.asH.repo.GetByID(repository.OrgAll, t.SourceID)
 		if as == nil {
-			if other, _ := h.asH.repo.GetByID(repository.OrgAll, t.SourceID); other != nil {
-				return msgBulkOtherOrg
-			}
 			return msgBulkGone
 		}
-		if !h.asH.canDeleteThis(c, as) {
-			return msgBulkNoPerm
+		if org != repository.OrgAll && strings.TrimSpace(as.OrgID) != "" && as.OrgID != org {
+			return otherOrgReason(h.asH.orgName(as.OrgID), as.OrgID)
 		}
-		if linked, _ := h.asH.repo.HasLinkedAS(as.ASID); linked {
-			return msgASDeleteLinked
+		if reason := h.asH.asListDeleteReason(c, as); reason != "" {
+			return reason
 		}
 		return ""
 	}

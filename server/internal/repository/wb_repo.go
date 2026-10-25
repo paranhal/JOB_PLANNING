@@ -3,6 +3,8 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -764,10 +766,87 @@ func (r *WBRepo) ListProjectsFiltered(search, status string) ([]model.WorkProjec
 	return NewProjectRepo(r.db).ListFiltered(OrgAll, search, 0, status)
 }
 
+func lookupOrgID(db *sql.DB, q string, arg string) string {
+	if db == nil {
+		return ""
+	}
+	arg = strings.TrimSpace(arg)
+	if arg == "" {
+		return ""
+	}
+	var org string
+	if err := db.QueryRow(q, arg).Scan(&org); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(org)
+}
+
+func (r *WBRepo) OrgName(orgID string) string {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" || r == nil || r.db == nil {
+		return ""
+	}
+	var name string
+	_ = r.db.QueryRow(`SELECT COALESCE(NULLIF(TRIM(org_name),''), org_id) FROM orgs WHERE org_id=?`, orgID).Scan(&name)
+	return strings.TrimSpace(name)
+}
+
+func (r *WBRepo) orgIDFromSource(t *model.WorkTask) string {
+	if r == nil || r.db == nil || t == nil {
+		return ""
+	}
+	switch strings.TrimSpace(t.SourceType) {
+	case model.WBSourceAS:
+		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM as_receipts WHERE as_id=?`, t.SourceID); o != "" {
+			return o
+		}
+	case model.WBSourceMaintenance:
+		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), ''))
+			FROM maintenance_visits v
+			JOIN customers c ON c.customer_id = v.customer_id
+			LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = v.customer_id
+			WHERE v.visit_id=?`, t.SourceID); o != "" {
+			return o
+		}
+	case model.WBSourceSalesActivity:
+		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(p.org_id,'')) FROM sales_activities a
+			JOIN work_projects p ON p.project_id = a.sales_id WHERE a.activity_id=?`, t.SourceID); o != "" {
+			return o
+		}
+	case model.WBSourceSales:
+		sid := strings.TrimSpace(t.SourceID)
+		if i := strings.Index(sid, ":"); i > 0 {
+			sid = sid[:i]
+		}
+		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM work_projects WHERE project_id=?`, sid); o != "" {
+			return o
+		}
+	}
+	if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM work_tasks WHERE task_id=?`, t.ParentTaskID); o != "" {
+		return o
+	}
+	if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM work_projects WHERE project_id=?`, t.ProjectID); o != "" {
+		return o
+	}
+	return ""
+}
+
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {
+	if t != nil && strings.TrimSpace(t.OrgID) == "" {
+		if filled := r.orgIDFromSource(t); filled != "" {
+			log.Printf("CreateTask org_id 보정 %s source=%s/%s title=%s", filled, t.SourceType, t.SourceID, t.Title)
+			t.OrgID = filled
+		} else if src := strings.TrimSpace(t.SourceType); src == model.WBSourceAS || src == model.WBSourceMaintenance || src == model.WBSourceSalesActivity || src == model.WBSourceSales {
+			return fmt.Errorf("work_tasks.org_id 필요 (source=%s/%s)", src, strings.TrimSpace(t.SourceID))
+		}
+	}
 	orgID, err := RequireInsertOrg(t.OrgID)
 	if err != nil {
 		if t.OrgID == "" {
+			if strings.TrimSpace(os.Getenv("APP_ENV")) == "production" {
+				log.Printf("CreateTask org_id 없음 title=%s source=%s/%s — 기본값 O01 금지", t.Title, t.SourceType, t.SourceID)
+				return fmt.Errorf("업무 조직이 없습니다")
+			}
 			t.OrgID = model.OrgIDLibrary
 		} else {
 			return err
@@ -839,6 +918,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 			assignee=?, assignee_user_id=?, assignee_source=?, tags=?, progress=?, customer_id=?, customer_name=?,
 			hold_reason=?, review_date=?, cancel_reason=?, wait_party_kind=?, wait_party=?, wait_request=?,
 			reply_due_date=?, next_check_date=?, complete_note=?, work_group_id=?,
+			org_id=CASE WHEN TRIM(COALESCE(?,'')) != '' THEN ? ELSE org_id END,
 			receipt_date=CASE
 				WHEN TRIM(COALESCE(?,'')) != '' THEN ?
 				WHEN TRIM(COALESCE(receipt_date,'')) != '' THEN receipt_date
@@ -859,6 +939,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
 		nullIfEmpty(t.WorkGroupID),
+		t.OrgID, t.OrgID,
 		t.ReceiptDate, t.ReceiptDate,
 		t.Status, t.CompleteDate, t.CompleteDate, t.TaskID)
 	if err != nil {
@@ -1007,6 +1088,8 @@ func (r *WBRepo) CreateSubtasks(parent *model.WorkTask, dates []string) (int, er
 			CustomerID:   parent.CustomerID,
 			CustomerName: parent.CustomerName,
 			ParentTaskID: parent.TaskID,
+			OrgID:        parent.OrgID,
+			WorkGroupID:  parent.WorkGroupID,
 		}
 		if err := r.CreateTask(child); err != nil {
 			return n, err

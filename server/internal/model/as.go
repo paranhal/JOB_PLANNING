@@ -171,9 +171,11 @@ type ASListItem struct {
 	GroupSize          int          `json:"group_size,omitempty"`    // 함께 접수한 건 수. 2 이상이면 🔗. §34.2.1
 	UrgencyReason      string       `json:"urgency_reason,omitempty"`
 	UrgencyReasonNote  string       `json:"urgency_reason_note,omitempty"`
-	WorkGroupID        string       `json:"work_group_id,omitempty"`
-	WorkGroupName      string       `json:"work_group_name,omitempty"`
-	CanDelete          bool         `json:"can_delete,omitempty"`
+	WorkGroupID          string       `json:"work_group_id,omitempty"`
+	WorkGroupName        string       `json:"work_group_name,omitempty"`
+	CanDelete            bool         `json:"can_delete,omitempty"`
+	DeleteKey            string       `json:"delete_key,omitempty"`
+	DeleteDisabledReason string       `json:"delete_disabled_reason,omitempty"`
 }
 
 // ASWorkItem 접수 하부 확인·재방문 업무 ({접수번호}-Wnn).

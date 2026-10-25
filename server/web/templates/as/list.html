@@ -84,6 +84,57 @@
     </form>
   </div>
 
-  {{template "as_list_table" .}}
+  <div class="js-bulk-select" id="as-list-select" x-data="workListSelect({{printf "%q" .CSRFToken}})" x-init="sync()">
+    <div class="js-wl-bar mb-2 flex flex-wrap items-center justify-between gap-2">
+      <span class="text-sm font-semibold text-gray-700">총 {{.Total}}건</span>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" class="btn btn-sm"
+                :class="n>0 ? 'btn-danger' : 'btn-secondary'"
+                :disabled="n===0"
+                :title="n===0 ? '삭제할 접수를 왼쪽 체크박스로 선택하세요' : ''"
+                @click="preview()"
+                x-text="n>0 ? ('선택 삭제 (' + n + ')') : '선택 삭제'">선택 삭제</button>
+        <button type="button" class="btn btn-secondary btn-sm" x-show="n>0" x-cloak @click="clear()">선택 해제</button>
+      </div>
+    </div>
+    {{template "as_list_table" .}}
+    <div x-show="modal" x-cloak class="modal-backdrop z-50 flex items-center justify-center p-4"
+         role="dialog" aria-modal="true" aria-labelledby="as-wl-del-title" @click.self="modal=false">
+      <div class="modal-panel w-full max-w-lg shadow-pop" @click.stop>
+        <h2 id="as-wl-del-title" class="text-ui font-bold text-ink" x-text="'선택 ' + n + '건 중 삭제 ' + delN + '건'"></h2>
+        <div class="mt-3 max-h-48 overflow-y-auto space-y-1 text-sm text-ink">
+          <template x-for="row in deletable" :key="row.id">
+            <p>
+              <span x-text="row.kind"></span> · <span x-text="row.title"></span> ·
+              <span x-text="row.org"></span> · <span x-text="row.schedule"></span> ·
+              <span x-text="row.assignee"></span>
+              <span class="text-warning" x-show="row.complete"> · 완료 업무</span>
+            </p>
+          </template>
+        </div>
+        <template x-if="skipped.length">
+          <div class="mt-3">
+            <p class="text-ui-sm font-semibold text-ink">삭제할 수 없는 건</p>
+            <ul class="mt-1 max-h-32 overflow-y-auto text-sm text-ink-muted">
+              <template x-for="row in skipped" :key="row.id">
+                <li><span x-text="row.title || row.id"></span> — <span x-text="row.reason"></span></li>
+              </template>
+            </ul>
+          </div>
+        </template>
+        <p class="mt-3 text-xs text-ink-muted">삭제하면 복구할 수 없습니다. AS 접수는 처리 이력·사진·자재 사용 기록이 함께 삭제됩니다.</p>
+        <form method="POST" action="/workboard/tasks/bulk-delete" class="mt-4 flex justify-end gap-2" @submit="busy=true">
+          <input type="hidden" name="csrf" :value="csrf">
+          <input type="hidden" name="back" value="{{.ListHref}}">
+          <template x-for="id in ids" :key="'f-'+id">
+            <input type="hidden" name="ids" :value="id">
+          </template>
+          <button type="button" class="btn btn-secondary btn-sm" @click="modal=false" :disabled="busy">취소</button>
+          <button type="submit" class="btn btn-danger btn-sm"
+                  :disabled="busy || ids.length===0" x-text="busy ? '삭제 중…' : '삭제'">삭제</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 {{end}}

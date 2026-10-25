@@ -442,6 +442,7 @@ func (r *SalesRepo) syncWorkTask(a *model.SalesActivity, p *model.SalesProject, 
 		SourceID:     a.ActivityID,
 		SourceRole:   model.WBSourceRoleDone,
 		CustomerName: customerName,
+		OrgID:        lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM work_projects WHERE project_id=?`, a.SalesID),
 	}
 	if err := wb.CreateTask(t); err != nil {
 		return err
@@ -532,6 +533,7 @@ func (r *SalesRepo) CreateNextActionTask(activityID, date, assignee, assigneeUID
 		SourceID:       a.ActivityID,
 		SourceRole:     model.WBSourceRoleNext,
 		CustomerName:   a.CustomerName,
+		OrgID:          lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM work_projects WHERE project_id=?`, a.SalesID),
 	}
 	return wb.CreateTask(t)
 }

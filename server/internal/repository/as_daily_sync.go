@@ -16,7 +16,7 @@ func backfillASPlannedDailyTasks(db *sql.DB) {
 	wb := NewWBRepo(db)
 	rows, err := db.Query(`
 		SELECT ar.as_id, ar.as_number, COALESCE(c.org_name,''), COALESCE(ar.symptom,''),
-		       COALESCE(ar.assigned_to,''), ar.visit_scheduled_date
+		       COALESCE(ar.assigned_to,''), ar.visit_scheduled_date, COALESCE(ar.org_id,''), COALESCE(ar.work_group_id,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		WHERE ar.status IN `+model.SQLStatusOpenIncomplete+`
@@ -30,8 +30,8 @@ func backfillASPlannedDailyTasks(db *sql.DB) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var asID, asNumber, orgName, symptom, assignee, visit string
-		if rows.Scan(&asID, &asNumber, &orgName, &symptom, &assignee, &visit) != nil {
+		var asID, asNumber, orgName, symptom, assignee, visit, orgID, groupID string
+		if rows.Scan(&asID, &asNumber, &orgName, &symptom, &assignee, &visit, &orgID, &groupID) != nil {
 			continue
 		}
 		visit = strings.TrimSpace(visit)
@@ -50,6 +50,8 @@ func backfillASPlannedDailyTasks(db *sql.DB) {
 			Assignee:    strings.TrimSpace(assignee),
 			SourceType:  model.WBSourceAS,
 			SourceID:    asID,
+			OrgID:       strings.TrimSpace(orgID),
+			WorkGroupID: strings.TrimSpace(groupID),
 		}
 		_ = wb.CreateTask(t)
 	}

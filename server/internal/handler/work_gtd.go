@@ -144,6 +144,7 @@ func (h *AdminWorkHandler) CreateInbox(c echo.Context) error {
 		Status:      model.WBTaskWaiting,
 		Priority:    model.WBPriorityNormal,
 		DurationMin: 30,
+		OrgID:       assignableOrgID(c),
 	}
 	applyCustomerForm(t, c)
 	if err := h.repo.CreateTask(t); err != nil {

@@ -470,6 +470,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.moved_task_id,''),
 		       COALESCE(ar.created_by_user_id,''), COALESCE(ar.created_by_name,''),
 		       COALESCE(ar.work_group_id,''), COALESCE(wg.name,''),
+		       COALESCE(ar.org_id,''),
 		       c.org_name, COALESCE(a.product_name,''), COALESCE(a.install_location,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -514,6 +515,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		&as.MovedTaskID,
 		&as.CreatedByUserID, &as.CreatedByName,
 		&as.WorkGroupID, &as.WorkGroupName,
+		&as.OrgID,
 		&as.OrgName, &as.ProductName, &as.InstallLocation,
 	)
 	if err == sql.ErrNoRows {
@@ -1318,6 +1320,50 @@ func (r *ASRepo) HasLinkedAS(asID string) (bool, error) {
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// LinkedASNumbers 이 접수와 parent_as_id 로 연결된 접수번호.
+func (r *ASRepo) LinkedASNumbers(asID string) []string {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	asID = strings.TrimSpace(asID)
+	if asID == "" {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	add := func(num string) {
+		num = strings.TrimSpace(num)
+		if num == "" || seen[num] {
+			return
+		}
+		seen[num] = true
+		out = append(out, num)
+	}
+	var parent string
+	_ = r.db.QueryRow(`SELECT COALESCE(parent_as_id,'') FROM as_receipts WHERE as_id=?`, asID).Scan(&parent)
+	parent = strings.TrimSpace(parent)
+	if parent != "" {
+		var num string
+		_ = r.db.QueryRow(`SELECT COALESCE(as_number, as_id) FROM as_receipts WHERE as_id=?`, parent).Scan(&num)
+		if strings.TrimSpace(num) == "" {
+			num = parent
+		}
+		add(num)
+	}
+	rows, err := r.db.Query(`SELECT COALESCE(as_number, as_id) FROM as_receipts WHERE parent_as_id=? ORDER BY as_number`, asID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var num string
+		if rows.Scan(&num) == nil {
+			add(num)
+		}
+	}
+	return out
 }
 
 func execIgnoreMissingTx(tx *sql.Tx, q string, args ...any) error {

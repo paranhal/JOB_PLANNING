@@ -10,6 +10,9 @@
     <table class="w-full min-w-[1200px] text-sm break-keep">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
+          <th class="text-center px-3 py-3 w-10 whitespace-nowrap">
+            <input type="checkbox" class="js-wl-all" title="전체 선택" @click.stop="toggleAll($event.target.checked)">
+          </th>
           <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8 whitespace-nowrap">!</th>
           {{template "sort_th" (dict "Label" "접수번호" "Key" "as_number" "Cur" $sort "Dir" $dir "Href" (index $href "as_number"))}}
           {{template "sort_th" (dict "Label" "기관(고객명)" "Key" "org_name" "Cur" $sort "Dir" $dir "Href" (index $href "org_name"))}}
@@ -28,6 +31,14 @@
         {{if .Items}}
           {{range .Items}}
           <tr class="hover:bg-gray-50 transition-colors {{if and (gt .VisitDaysOverdue 0) (not .VisitDone)}}bg-red-50/40{{else if gt .DaysElapsed 3}}bg-red-50/20{{end}}">
+            <td class="px-3 py-3 text-center whitespace-nowrap" @click.stop>
+              {{if and .CanDelete .DeleteKey}}
+              <input type="checkbox" class="js-wl-check" name="ids" value="{{.DeleteKey}}" title="선택"
+                     data-title="{{.ASNumber}}" @change="sync()">
+              {{else}}
+              <input type="checkbox" class="js-wl-check-off" disabled title="{{.DeleteDisabledReason}}">
+              {{end}}
+            </td>
             <td class="px-4 py-3 whitespace-nowrap">
               {{if eq .Urgency "high"}}
               <span class="text-xs font-bold text-red-600" title="{{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
@@ -93,6 +104,7 @@
           </tr>
           {{range .WorkChildren}}
           <tr class="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
+            <td class="px-3 py-2 whitespace-nowrap"></td>
             <td class="px-4 py-2 whitespace-nowrap"></td>
             <td class="px-4 py-2 pl-8 whitespace-nowrap">
               <a href="/as/work/{{.WorkID}}/action" class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-700 hover:underline">
@@ -123,7 +135,7 @@
           {{end}}
           {{end}}
         {{else}}
-          <tr><td colspan="{{if $isHold}}10{{else}}9{{end}}" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">표시할 AS가 없습니다.</td></tr>
+          <tr><td colspan="{{if $isHold}}11{{else}}10{{end}}" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">표시할 AS가 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>

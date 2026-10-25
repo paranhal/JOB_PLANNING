@@ -222,6 +222,7 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		AssigneeSource: model.WBAssigneeSourceManual,
 		Progress:       progress,
 		ParentTaskID:   parentID,
+		OrgID:          assignableOrgID(c),
 	}
 	if d := strings.TrimSpace(c.FormValue("duration_min")); d != "" {
 		fmtScanInt(d, &t.DurationMin)

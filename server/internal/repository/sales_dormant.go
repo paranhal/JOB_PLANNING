@@ -224,6 +224,7 @@ func (r *SalesRepo) EnsureDormantReviewTasks(now time.Time) (int, error) {
 			SourceType:     model.WBSourceSales,
 			SourceID:       src,
 			CustomerName:   p.CustomerValue(),
+			OrgID:          strings.TrimSpace(p.OrgID),
 		}
 		if err := wb.CreateTask(t); err != nil {
 			return n, err

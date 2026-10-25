@@ -416,6 +416,8 @@ func occurrenceFromParent(parent *model.WorkTask, finalDue, workDate string, seq
 		CustomerID:       parent.CustomerID,
 		CustomerName:     parent.CustomerName,
 		ParentTaskID:     parent.TaskID,
+		OrgID:            parent.OrgID,
+		WorkGroupID:      parent.WorkGroupID,
 		RecurrenceRole:   model.RecurrenceRoleOccurrence,
 		OccurrenceSeq:    seq,
 		OccurrenceStatus: model.OccurrenceScheduled,
