@@ -99,6 +99,9 @@ func (h *WorkHandler) List(c echo.Context) error {
 	if viewingOther {
 		lockWorkTodayOtherView(items)
 	}
+	if !viewGroupInclude(c) {
+		items = filterPersonalOnlyWork(items, uid, keys)
+	}
 	model.SortWorkListItems(items, sortKey, dir)
 	kanban := model.FillWorkKanban(model.ExecKanbanColumnDefs(), items)
 	nSched, nProg, nDelay, nDone := countWorkTodayBuckets(items, today)
@@ -118,7 +121,7 @@ func (h *WorkHandler) List(c echo.Context) error {
 	if assigneeQ != "" {
 		reviewHref += "&assignee=" + url.QueryEscape(assigneeQ)
 	}
-	return c.Render(http.StatusOK, "work/list.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "work/list.html", attachViewGroup(c, map[string]interface{}{
 		"Title":              title,
 		"Active":             NavWork,
 		"View":               view,
@@ -150,7 +153,7 @@ func (h *WorkHandler) List(c echo.Context) error {
 		"AssigneeFilter":     assigneeFilter,
 		"CanWrite":           canWriteWorkboard(c) && !viewingOther,
 		"SortSelect":         sortSelectOptions(workListSortCols(viewingOther), sortHrefs, sortKey, dir),
-	})
+	}))
 }
 
 func (h *WorkHandler) ListAll(c echo.Context) error {
@@ -205,6 +208,9 @@ func (h *WorkHandler) ListAll(c echo.Context) error {
 		asIDs = h.asRepo.MatchIDs(qtext)
 	}
 	items = filterWorkItemsKeyword(items, qtext, asIDs)
+	if !viewGroupInclude(c) {
+		items = filterPersonalOnlyWork(items, currentUserID(c), assigneeKeys(c))
+	}
 	annotateWorkEdit(c, items)
 	model.SortWorkListItems(items, sortKey, dir)
 
@@ -242,7 +248,7 @@ func (h *WorkHandler) ListAll(c echo.Context) error {
 	if len(statuses) == 1 {
 		statusFilter = statuses[0]
 	}
-	return c.Render(http.StatusOK, "work/list.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "work/list.html", attachViewGroup(c, map[string]interface{}{
 		"Title":           "전체 업무",
 		"Active":          NavWorkAll,
 		"AllWork":         true,
@@ -290,7 +296,7 @@ func (h *WorkHandler) ListAll(c echo.Context) error {
 		"ShowAssignee":    true,
 		"CanWrite":        canWriteWorkboard(c),
 		"SortSelect":      sortSelectOptions(workListSortCols(true), workAllSortHrefs(q), sortKey, dir),
-	})
+	}))
 }
 
 func mapWorkListItems(raw []model.WorkListItem) []model.WorkListItem {
@@ -307,7 +313,7 @@ func mapWorkListItems(raw []model.WorkListItem) []model.WorkListItem {
 // annotateWorkEdit §37.3 남의 담당자는 굵게, 읽기 전용은 자물쇠.
 func annotateWorkEdit(c echo.Context, items []model.WorkListItem) {
 	for i := range items {
-		items[i].EditLocked = !canEditTask(c, items[i].Assignee, "")
+		items[i].EditLocked = !canEditTask(c, items[i].Assignee, "", items[i].WorkGroupID)
 		items[i].AssigneeOther = strings.TrimSpace(items[i].Assignee) != "" && !assigneeIsMine(c, items[i].Assignee, "")
 	}
 }

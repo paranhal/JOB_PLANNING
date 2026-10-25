@@ -136,6 +136,7 @@ type WorkListItem struct {
 	CoopID         string `json:"coop_id,omitempty"`
 	CoopFromOrg    string `json:"coop_from_org,omitempty"`
 	WorkGroupName  string `json:"work_group_name,omitempty"`
+	WorkGroupID    string `json:"work_group_id,omitempty"`
 }
 
 // IsWaiting 막힌 이유가 있으면 지연이 아니라 기다리는 것. §42.7

@@ -64,7 +64,7 @@
               <span class="text-gray-300">—</span>
               {{end}}
             </td>
-            <td class="px-4 py-3 hidden md:table-cell text-gray-600 whitespace-nowrap">{{.AssignedTo}}</td>
+            <td class="px-4 py-3 hidden md:table-cell text-gray-600 whitespace-nowrap">{{.AssignedTo}}{{if .WorkGroupName}} <span class="badge-neutral text-[10px]">그룹: {{.WorkGroupName}}</span>{{end}}</td>
             <td class="px-4 py-3 text-right text-gray-500 whitespace-nowrap">{{.DaysElapsed}}일</td>
             {{if $isHold}}
             <td class="px-4 py-3 text-center whitespace-nowrap">

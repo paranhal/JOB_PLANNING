@@ -61,6 +61,12 @@ func (h *MaintenanceHandler) recordVisitAssign(c echo.Context, visitID, assignee
 	if visitID == "" {
 		return
 	}
+	if h.repo != nil {
+		if v, err := h.repo.GetVisit(visitID); err == nil && v != nil && strings.TrimSpace(v.WorkGroupID) != "" {
+			h.notices.RecordGroup(c, model.AssignNoticeSourceMaintenance, visitID, v.WorkGroupID)
+			return
+		}
+	}
 	h.notices.Record(c, model.AssignNoticeSourceMaintenance, visitID, assignee, "", "", "")
 }
 
@@ -300,7 +306,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 			break
 		}
 	}
-	return c.Render(200, "maintenance/plan_show.html", map[string]interface{}{
+	return c.Render(200, "maintenance/plan_show.html", attachViewGroup(c, map[string]interface{}{
 		"Title":               fmt.Sprintf("정기점검 %d년", plan.PlanYear),
 		"Active":              NavMaintenance,
 		"Plan":                plan,
@@ -357,7 +363,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
 		"WorkGroups":          workGroups,
 		"WorkGroupMembers":    workGroupMembersJSON,
-	})
+	}))
 }
 
 func (h *MaintenanceHandler) hydrateVisitPeople(visits []model.MaintenanceVisit) {

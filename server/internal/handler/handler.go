@@ -117,6 +117,7 @@ func New(db *sql.DB) *Handler {
 		wbRepo:   repository.NewWBRepo(db), db: db, cfg: config.Load(), jwtSecret: jwtSecret, uploadDir: attachH.uploadDir,
 	}
 	noticeHook := newAssignNoticeHook(repository.NewAssignNoticeRepo(db), userRepo)
+	noticeHook.groups = repository.NewWorkGroupRepo(db)
 	wbH.notices = noticeHook
 	aprEng := &approval.Engine{DB: db}
 	leaveSvc := leaveapp.New(db, aprEng)
@@ -160,6 +161,7 @@ func New(db *sql.DB) *Handler {
 			maintRepo:  maintRepo,
 			partsRepo:  repository.NewASPartsUsedRepo(db),
 			itemRepo:   repository.NewSalesItemRepo(db),
+			groups:     repository.NewWorkGroupRepo(db),
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,
@@ -489,7 +491,17 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		data["QuickLinks"] = filtered
 	}
 
-	return c.Render(200, "dashboard.html", data)
+	if mine && !viewGroupInclude(c) {
+		todayList = filterPersonalOnlyWork(todayList, userID, mineKeys)
+		delayedList = filterPersonalOnlyWork(delayedList, userID, mineKeys)
+		pendingList = filterPersonalOnlyWork(pendingList, userID, mineKeys)
+		todayAssigned = filterPersonalOnlyWork(todayAssigned, userID, mineKeys)
+		data["TodayList"] = todayList
+		data["DelayedList"] = delayedList
+		data["PendingList"] = pendingList
+		data["TodayAssigned"] = todayAssigned
+	}
+	return c.Render(200, "dashboard.html", attachViewGroup(c, data))
 }
 
 type dashLink struct {

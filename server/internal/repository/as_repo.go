@@ -72,17 +72,19 @@ func (r *ASRepo) ListFiltered(orgID, status, search, mineUserID string, mineKeys
 		       CASE WHEN TRIM(COALESCE(ar.receipt_group_id,'')) = '' THEN 0
 		            ELSE (SELECT COUNT(*) FROM as_receipts g WHERE g.receipt_group_id = ar.receipt_group_id)
 		       END AS group_size,
-		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,'')
+		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,''),
+		       COALESCE(ar.work_group_id,''), COALESCE(wg.name,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		LEFT JOIN work_groups wg ON wg.group_id = ar.work_group_id
 		WHERE 1=1`
 	orgFrag, orgArgs, err := AppendOrgSQL("ar", orgID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	countQuery := `SELECT COUNT(*) FROM as_receipts ar JOIN customers c ON c.customer_id=ar.customer_id WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM as_receipts ar JOIN customers c ON c.customer_id=ar.customer_id LEFT JOIN work_groups wg ON wg.group_id=ar.work_group_id WHERE 1=1`
 	baseQuery += orgFrag
 	countQuery += orgFrag
 	args := []interface{}{}
@@ -241,6 +243,7 @@ func (r *ASRepo) ListFiltered(orgID, status, search, mineUserID string, mineKeys
 			&item.Symptom, &item.Urgency, &item.Status, &item.AssignedTo,
 			&item.DaysElapsed, &item.VisitScheduledDate, &item.VisitDaysOverdue, &visitDone, &isReopen,
 			&item.ParentASID, &groupSize, &item.UrgencyReason, &item.UrgencyReasonNote,
+			&item.WorkGroupID, &item.WorkGroupName,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -294,7 +297,7 @@ func cleanAssignees(assignees []string) []string {
 
 // mineAssigneeCond 본인 배정. §38.4 assigneeMatchSQL.
 func mineAssigneeCond(alias, userID string, keys []string) (string, []interface{}) {
-	return assigneeMatchKeys(AssigneeKindAS, alias, mergeAssigneeKeys(userID, "", keys...))
+	return mineOrGroupCond(AssigneeKindAS, alias, userID, keys)
 }
 
 // Stats AS 현황 통계 (완료=전체 완료+종료) — 목록/현황 화면용
@@ -463,10 +466,12 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.visit_date,''), COALESCE(ar.process_type_reason,''),
 		       COALESCE(ar.moved_task_id,''),
 		       COALESCE(ar.created_by_user_id,''), COALESCE(ar.created_by_name,''),
+		       COALESCE(ar.work_group_id,''), COALESCE(wg.name,''),
 		       c.org_name, COALESCE(a.product_name,''), COALESCE(a.install_location,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		LEFT JOIN work_groups wg ON wg.group_id = ar.work_group_id
 		WHERE ar.as_id = ?`
 
 	orgFrag, orgArgs, err := AppendOrgSQL("ar", orgID)
@@ -505,6 +510,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		&as.VisitDate, &as.ProcessTypeReason,
 		&as.MovedTaskID,
 		&as.CreatedByUserID, &as.CreatedByName,
+		&as.WorkGroupID, &as.WorkGroupName,
 		&as.OrgName, &as.ProductName, &as.InstallLocation,
 	)
 	if err == sql.ErrNoRows {
@@ -585,8 +591,8 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			visit_scheduled_date, schedule_confirmed, status,
 			is_recurrence, is_reopen, parent_as_id, reopen_reason, followup_note,
 			project_id, receipt_group_id, confirm_contact,
-			urgency_reason, urgency_reason_note, external_assignee, org_id, created_by_user_id, created_by_name, created_at, updated_at, is_test
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			urgency_reason, urgency_reason_note, external_assignee, org_id, created_by_user_id, created_by_name, created_at, updated_at, is_test, work_group_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			as.ASID, as.ASNumber, receiptStr, as.CustomerID, nullStr(as.AssetID),
 			as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 			as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ReceivedBy,
@@ -596,7 +602,7 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 			nullStr(as.ParentASID), nullStr(as.ReopenReason), nullStr(as.FollowupNote),
 			nullStr(as.ProjectID), nullStr(as.ReceiptGroupID), nullStr(as.ConfirmContact),
 			nullStr(as.UrgencyReason), nullStr(as.UrgencyReasonNote), nullIfEmpty(as.ExternalAssignee), as.OrgID,
-			as.CreatedByUserID, as.CreatedByName, now, now, stampIsTest(),
+			as.CreatedByUserID, as.CreatedByName, now, now, stampIsTest(), nullIfEmpty(as.WorkGroupID),
 		)
 		if err == nil {
 			// §25.2 AS 접수 등록은 이력 미기록(○)
@@ -794,14 +800,14 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 			requester_type=?, requester_name=?, assigned_to=?, assigned_user_id=?, external_assignee=?,
 			received_by=?, visit_scheduled_date=?, schedule_confirmed=?,
 			confirm_contact=?, urgency_reason=?, urgency_reason_note=?,
-			project_id=?, updated_at=?`
+			project_id=?, work_group_id=?, updated_at=?`
 	args := []interface{}{
 		receiptStr, as.CustomerID, nullStr(as.AssetID),
 		as.ReceiptChannel, as.Requester, as.Symptom, as.Urgency, as.Priority,
 		as.RequesterType, as.RequesterName, as.AssignedTo, as.AssignedUserID, as.ExternalAssignee,
 		as.ReceivedBy, nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
 		as.ConfirmContact, as.UrgencyReason, as.UrgencyReasonNote,
-		nullStr(as.ProjectID), now,
+		nullStr(as.ProjectID), nullIfEmpty(as.WorkGroupID), now,
 	}
 	if model.IsASWorkflowStatus(curStatus) {
 		q += `, status=?`

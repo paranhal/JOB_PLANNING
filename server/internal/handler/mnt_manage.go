@@ -79,7 +79,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		}
 	}
 
-	return c.Render(http.StatusOK, "maintenance/plan_manage.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "maintenance/plan_manage.html", attachViewGroup(c, map[string]interface{}{
 		"Title": fmt.Sprintf("정기점검 관리 %d년", plan.PlanYear), "Active": NavMaintenance,
 		"Plan": plan, "Plans": plans, "IsAdmin": isAdminRole(c),
 		"Regions": regions, "Assignees": assignees,
@@ -93,7 +93,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		"HolidayMissing": holidayMissingBanner(h.holidayRepo, plan.PlanYear),
 		"OrgProducts":         h.orgProductList(plan.OrgID),
 		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
-	})
+	}))
 }
 
 func distinctRegions(cfgs []model.MaintenanceSiteConfig) []string {

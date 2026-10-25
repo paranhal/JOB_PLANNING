@@ -37,6 +37,15 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if !viewGroupInclude(c) {
+		var mine []model.UnplannedItem
+		for _, it := range items {
+			if strings.TrimSpace(it.WorkGroupID) == "" {
+				mine = append(mine, it)
+			}
+		}
+		items = mine
+	}
 	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "assignee,prefix,task_id,customer,due_date")
 	if sortKey != "" {
 		sortUnplannedByColumn(items, sortKey, dir)
@@ -57,7 +66,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 	}
 	filter := unplannedFilterQuery(mineOn, role, kind, display)
 	hrefs := sortLinkHrefs("/plan/unplanned", filter, []string{"assignee", "prefix", "task_id", "customer", "due_date"}, sortKey, dir)
-	return c.Render(http.StatusOK, "plan/unplanned.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "plan/unplanned.html", attachViewGroup(c, map[string]interface{}{
 		"Title":          "미계획 업무함",
 		"Active":         NavPlanUnplanned,
 		"Items":          items,
@@ -96,7 +105,7 @@ func (h *WorkHandler) UnplannedList(c echo.Context) error {
 		"Dir":            dir,
 		"SortHref":       hrefs,
 		"SortSelect":     sortSelectOptions(unplannedSortCols(showAssignee), hrefs, sortKey, dir),
-	})
+	}))
 }
 
 func sortUnplannedByColumn(items []model.UnplannedItem, sortKey, dir string) {

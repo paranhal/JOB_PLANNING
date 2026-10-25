@@ -128,6 +128,43 @@ func canActForOthers(c echo.Context) bool {
 	}
 }
 
+func groupIDMap(c echo.Context, key string) map[string]bool {
+	v := c.Get(key)
+	if m, ok := v.(map[string]bool); ok {
+		return m
+	}
+	return nil
+}
+
+func leaderOfGroup(c echo.Context, groupID string) bool {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return false
+	}
+	return groupIDMap(c, "leader_group_ids")[groupID]
+}
+
+func memberOfGroup(c echo.Context, groupID string) bool {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return false
+	}
+	if groupIDMap(c, "member_group_ids")[groupID] {
+		return true
+	}
+	return leaderOfGroup(c, groupID)
+}
+
+func canActForGroupWork(c echo.Context, groupID string) bool {
+	if canActForOthers(c) {
+		return true
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return false
+	}
+	return leaderOfGroup(c, groupID)
+}
+
 func requiresAssigneeChoice(c echo.Context) bool {
 	if isReadOnly(c) {
 		return false
@@ -217,6 +254,9 @@ func isSuspendedRole(c echo.Context) bool {
 }
 
 func canEditVisitDate(c echo.Context, as *model.ASReceipt) bool {
+	if as != nil && canActForGroupWork(c, as.WorkGroupID) {
+		return true
+	}
 	if canActForOthers(c) {
 		return true
 	}
@@ -300,7 +340,7 @@ func canEditASReceipt(c echo.Context, as *model.ASReceipt) bool {
 	if isASOwner(c, as) {
 		return true
 	}
-	return canActForOthers(c)
+	return canActForGroupWork(c, as.WorkGroupID)
 }
 
 func canSaveASReceipt(c echo.Context, as *model.ASReceipt, canMod bool) bool {
@@ -326,7 +366,7 @@ func asUnlockAllowsClosed(c echo.Context, as *model.ASReceipt, unlockOK bool) bo
 	if isASOwner(c, as) {
 		return true
 	}
-	if canActForOthers(c) {
+	if canActForGroupWork(c, as.WorkGroupID) {
 		if currentRole(c) == model.RoleVisionAdmin {
 			return unlockOK
 		}
@@ -436,9 +476,16 @@ func assigneeIsMine(c echo.Context, assignee, assignedUserID string) bool {
 
 // canEditTask §37.3 — 보는 것과 고치는 것을 나눈다.
 // canWriteWorkboard 로 쓰기 권한을 열고, 기술·영업은 assigneeKeys 로 내 배정만 허용한다.
-func canEditTask(c echo.Context, assignee, assignedUserID string) bool {
+func canEditTask(c echo.Context, assignee, assignedUserID string, groupID ...string) bool {
 	if isReadOnly(c) {
 		return false
+	}
+	gid := ""
+	if len(groupID) > 0 {
+		gid = groupID[0]
+	}
+	if canActForGroupWork(c, gid) {
+		return true
 	}
 	if isAdminRole(c) || isOfficeRole(c) {
 		return true
@@ -459,7 +506,7 @@ func denyUnlessCanEditTask(c echo.Context, t *model.WorkTask) error {
 	if t == nil {
 		return echo.ErrNotFound
 	}
-	if !canEditTask(c, t.Assignee, t.AssigneeUserID) {
+	if !canEditTask(c, t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
 		return echo.ErrForbidden
 	}
 	return nil

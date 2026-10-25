@@ -1,0 +1,8 @@
+{{define "view_group_toggle"}}
+{{if .ViewGroupToggle}}
+<div class="inline-flex rounded-control border border-line text-ui-sm overflow-hidden" role="group" aria-label="그룹 포함 보기">
+  <a class="px-3 py-1.5 {{if .ViewGroupWith}}bg-primary text-white{{else}}text-ink hover:bg-hover{{end}}" href="?scope=with">그룹 포함</a>
+  <a class="px-3 py-1.5 {{if not .ViewGroupWith}}bg-primary text-white{{else}}text-ink hover:bg-hover{{end}}" href="?scope=personal">개인만</a>
+</div>
+{{end}}
+{{end}}

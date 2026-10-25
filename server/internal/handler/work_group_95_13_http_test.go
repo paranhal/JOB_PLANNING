@@ -79,8 +79,8 @@ func TestWorkGroupPopupStayOpenFetchAndBulkMembers(t *testing.T) {
 	if rm.Code != http.StatusOK {
 		t.Fatalf("fetch remove %d", rm.Code)
 	}
-	if strings.Contains(rm.Body.String(), `>사무원</td>`) || strings.Contains(rm.Body.String(), `<td class="p-2">사무원</td>`) {
-		t.Fatal("제거 후에도 구성원 표시")
+	if !strings.Contains(rm.Body.String(), "탈퇴") {
+		t.Fatal("소프트 제거 후 탈퇴 상태 없음")
 	}
 
 	fb := postForm947(t, e, "/work-groups/"+id+"/members", url.Values{"user_id": {off.UserID}, "member_ids[]": {off.UserID}}, oaCK)

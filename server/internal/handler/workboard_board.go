@@ -610,7 +610,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		mineEmptyN = boardMineEmptyAllCount(h, c, from, to)
 	}
 	unplacedN := len(unplaced)
-	return map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":            title,
 		"Active":           NavWorkBoard,
 		"View":             view,
@@ -654,7 +654,8 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"CurrentUserName":  me,
 		"BoardHref":        boardURL(view, ds, keep),
 		"ScheduleRedirect": boardURL(view, ds, keep),
-	}, nil
+	}
+	return attachViewGroup(c, data), nil
 }
 
 func cloneBoardQuery(v url.Values) url.Values {

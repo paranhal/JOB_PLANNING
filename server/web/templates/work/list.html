@@ -11,6 +11,7 @@
     <div>
       <div class="flex flex-wrap items-center gap-3">
         <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
+        {{template "view_group_toggle" .}}
         {{if .ShowAssigneePicker}}
         <form method="GET" action="/work" class="inline-flex items-center gap-2">
           {{if .View}}<input type="hidden" name="display" value="{{.View}}">{{end}}

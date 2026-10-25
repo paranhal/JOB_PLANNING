@@ -17,8 +17,9 @@ import (
 const assignNoticeShownCookie = "assign_notice_shown"
 
 type assignNoticeHook struct {
-	repo  *repository.AssignNoticeRepo
-	users *repository.UserRepo
+	repo   *repository.AssignNoticeRepo
+	users  *repository.UserRepo
+	groups *repository.WorkGroupRepo
 }
 
 func newAssignNoticeHook(dbRepo *repository.AssignNoticeRepo, users *repository.UserRepo) *assignNoticeHook {
@@ -26,6 +27,23 @@ func newAssignNoticeHook(dbRepo *repository.AssignNoticeRepo, users *repository.
 		return nil
 	}
 	return &assignNoticeHook{repo: dbRepo, users: users}
+}
+
+func (h *assignNoticeHook) RecordGroup(c echo.Context, sourceType, sourceID, groupID string) {
+	if h == nil || h.groups == nil {
+		return
+	}
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return
+	}
+	ms, err := h.groups.MembersOn(groupID, "")
+	if err != nil {
+		return
+	}
+	for _, m := range ms {
+		h.Record(c, sourceType, sourceID, m.FullName, m.UserID, "", "")
+	}
 }
 
 func (h *assignNoticeHook) Record(c echo.Context, sourceType, sourceID, newName, newUID, oldName, oldUID string) {
@@ -85,6 +103,10 @@ func recordTaskNotice(h *assignNoticeHook, c echo.Context, t *model.WorkTask, ol
 	}
 	st := strings.TrimSpace(t.SourceType)
 	if st == model.WBSourceAS || st == model.WBSourceMaintenance {
+		return
+	}
+	if strings.TrimSpace(t.WorkGroupID) != "" {
+		h.RecordGroup(c, model.AssignNoticeSourceTask, t.TaskID, t.WorkGroupID)
 		return
 	}
 	if strings.TrimSpace(t.Assignee) == "" && strings.TrimSpace(oldAssignee) == "" {

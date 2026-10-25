@@ -217,6 +217,7 @@ window.mntAssigneeMulti = function (cfg) {
     <div>
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-xl font-bold text-gray-800">정기점검</h2>
+        {{template "view_group_toggle" .}}
         <label class="sr-only" for="mnt-year-select">연도 선택</label>
         <select id="mnt-year-select"
                 class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"

@@ -92,7 +92,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		weeklyProjects, _ = h.repo.ListWeeklyRowProjects(org)
 	}
 
-	return c.Render(http.StatusOK, "stats/reports.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "stats/reports.html", attachViewGroup(c, map[string]interface{}{
 		"Title":                 "보고서",
 		"Active":                NavStatsReports,
 		"Lookback":              lb,
@@ -126,7 +126,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 		"FlashOK":               c.QueryParam("ok"),
 		"FlashErr":              c.QueryParam("err"),
 		"NeedRow":               c.QueryParam("need_row"),
-	})
+	}))
 }
 
 func reportMeetingMonday(now time.Time) time.Time {

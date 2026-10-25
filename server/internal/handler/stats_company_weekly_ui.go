@@ -53,7 +53,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		projects, _ = h.repo.ListWeeklyRowProjects(orgID)
 		assignees = listAssignableForPicker(h.userRepo, c)
 	}
-	return c.Render(http.StatusOK, "stats/company_weekly.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "stats/company_weekly.html", attachViewGroup(c, map[string]interface{}{
 		"Title": "주간 업무 보고서", "Active": NavStatsWeekly, "View": v,
 		"Week": week.Format("2006-01-02"), "PrevWeek": week.AddDate(0, 0, -7).Format("2006-01-02"),
 		"NextWeek": week.AddDate(0, 0, 7).Format("2006-01-02"),
@@ -66,7 +66,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		"FlashErr":        c.QueryParam("err"),
 		"NeedRow":         c.QueryParam("need_row"),
 		"NeedReagg":       c.QueryParam("reagg") == "1",
-	})
+	}))
 }
 
 func markCardsEditable(v *weeklyReportView, edit bool) {

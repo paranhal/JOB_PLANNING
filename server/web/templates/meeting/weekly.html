@@ -12,6 +12,7 @@
     <div>
       <div class="flex flex-wrap items-center gap-3">
         <h2 class="text-xl font-bold text-ink">{{.Title}}</h2>
+        {{template "view_group_toggle" .}}
         {{if .Team}}
         <form method="GET" action="{{.PagePath}}" class="inline-flex items-center gap-2 flex-wrap">
           <input type="hidden" name="date" value="{{.WeekStart}}">

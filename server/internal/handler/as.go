@@ -41,6 +41,7 @@ type ASHandler struct {
 	maintRepo    *repository.MaintenanceRepo
 	partsRepo    *repository.ASPartsUsedRepo
 	itemRepo     *repository.SalesItemRepo
+	groups       *repository.WorkGroupRepo
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
@@ -100,6 +101,18 @@ func (h *ASHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if mine && !viewGroupInclude(c) {
+		var mineOnly []model.ASListItem
+		for _, it := range items {
+			if strings.TrimSpace(it.WorkGroupID) != "" {
+				continue
+			}
+			mineOnly = append(mineOnly, it)
+		}
+		items = mineOnly
+		total = len(items)
+	}
+
 	if len(items) > 0 {
 		ids := make([]string, len(items))
 		for i := range items {
@@ -171,7 +184,7 @@ func (h *ASHandler) List(c echo.Context) error {
 		active = NavASShowLegacy
 	}
 
-	return c.Render(http.StatusOK, "as/list.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "as/list.html", attachViewGroup(c, map[string]interface{}{
 		"Title": "AS 관리", "Active": active,
 		"Items": items, "Total": total,
 		"Page": page, "TotalPages": totalPages,
@@ -191,7 +204,7 @@ func (h *ASHandler) List(c echo.Context) error {
 		"KanbanHref":  "/as?" + kanbanLink.Encode(),
 		"ListHref":    "/as?" + listBase.Encode(),
 		"LegacyLinks": legacyLinks,
-	})
+	}))
 }
 
 func (h *ASHandler) renderASKanban(c echo.Context, status, search, mineUserID string, mineKeys []string, mine bool, role, sort, dir, assigneeID, assigneeName string) error {
@@ -418,6 +431,7 @@ func (h *ASHandler) New(c echo.Context) error {
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
 		"Channels": channels, "UrgencyReasons": urgReasons,
 		"Assignees":        assignees,
+		"WorkGroups":       h.visibleWorkGroups(c),
 		"CustomersJSON":    receiptCustomersJSON(customers),
 		"ReceiptLocal":     now.Format("2006-01-02T15:04"),
 		"CanEditVisitDate": true, // 신규 접수 시 접수 권한자가 설정 가능
@@ -433,6 +447,31 @@ func (h *ASHandler) New(c echo.Context) error {
 		"AssigneeRequired": requiresAssigneeChoice(c),
 		"FocusAssignee":    c.QueryParam("focus") == "assignee",
 	})
+}
+
+func (h *ASHandler) visibleWorkGroups(c echo.Context) []model.WorkGroup {
+	if h == nil || h.groups == nil {
+		return nil
+	}
+	org := currentOrg(c)
+	if org == "" || org == repository.OrgAll {
+		org = workGroupActor(c).HomeOrg()
+	}
+	role := model.NormalizeRole(currentRole(c))
+	admin := role == model.RoleOrgAdmin || role == model.RoleAdmin || role == model.RoleVisionAdmin
+	items, err := h.groups.ListVisibleActiveForWork(org, currentUserID(c), admin)
+	if err != nil {
+		return nil
+	}
+	return items
+}
+
+func (h *ASHandler) groupMembersForAS(c echo.Context, as *model.ASReceipt) []model.WorkGroupPerson {
+	if h == nil || h.groups == nil || as == nil || strings.TrimSpace(as.WorkGroupID) == "" {
+		return nil
+	}
+	ms, _ := h.groups.MembersOn(as.WorkGroupID, "")
+	return ms
 }
 
 func (h *ASHandler) distinctRequesterNames() ([]string, error) {
@@ -498,6 +537,17 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 	if dt := c.FormValue("receipt_datetime"); dt != "" {
 		if t, ok := parseFormDatetime(dt); ok {
 			as.ReceiptDatetime = t
+		}
+	}
+	if gid := strings.TrimSpace(c.FormValue("work_group_id")); gid != "" {
+		as.WorkGroupID = gid
+		if h.groups != nil {
+			if g, _ := h.groups.Get(gid); g != nil {
+				as.WorkGroupName = g.Name
+				if strings.TrimSpace(as.AssignedTo) == "" {
+					as.AssignedTo = g.Name
+				}
+			}
 		}
 	}
 	applyReceiptDerivedFields(as)
@@ -730,7 +780,7 @@ func (h *ASHandler) Create(c echo.Context) error {
 	}
 	if requiresAssigneeChoice(c) {
 		for _, as := range rows {
-			if as != nil && !assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+			if as != nil && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
 				return rejectAssigneeRequired(c, "/as/new")
 			}
 		}
@@ -750,7 +800,11 @@ func (h *ASHandler) Create(c echo.Context) error {
 		}
 		h.syncASPlannedDailyTask(as.ASID)
 		if h.notices != nil {
-			h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, "", "")
+			if strings.TrimSpace(as.WorkGroupID) != "" {
+				h.notices.RecordGroup(c, model.AssignNoticeSourceAS, as.ASID, as.WorkGroupID)
+			} else {
+				h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, "", "")
+			}
 		}
 		if i == 0 {
 			h.saveKeywordChecks(c, as.ASID, model.KWFieldSymptom)
@@ -852,7 +906,8 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && as.VisitScheduledDate == "" {
 		return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err=date_year")
 	}
-	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+	as.WorkGroupID = strings.TrimSpace(c.FormValue("work_group_id"))
+	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
 		return rejectAssigneeRequired(c, "/as/"+id+"/edit")
 	}
 	// 방문 예정일: 관리자·배정담당자만 변경. 그 외는 기존 값 유지. 확정은 서버가 날짜로 채운다. §34.2.3
@@ -1143,6 +1198,8 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CauseCategoriesJSON":  causeCategoriesJSON(causeCats),
 		"ActionResults":        model.ActionResultOptions(),
 		"Assignees":            assignees,
+		"WorkGroups":           h.visibleWorkGroups(c),
+		"GroupMembers":         h.groupMembersForAS(c, as),
 		"Contacts":             contacts,
 		"DailyTask":            dailyTask,
 		"IsClosed":             closed,
@@ -1283,8 +1340,17 @@ func (h *ASHandler) Update(c echo.Context) error {
 			}
 		}
 	}
-	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+	if gid := strings.TrimSpace(c.FormValue("work_group_id")); gid != "" || c.FormValue("work_group_present") == "1" {
+		as.WorkGroupID = gid
+	}
+	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
 		return rejectAssigneeRequired(c, asOpenHrefQuery(id, ""))
+	}
+	if strings.TrimSpace(as.WorkGroupID) != "" {
+		worker := strings.TrimSpace(c.FormValue("worker"))
+		if worker == "" {
+			return rejectAssigneeRequired(c, asOpenHrefQuery(id, "err=assignee_required"))
+		}
 	}
 	if err := checkAssigneeInOrg(h.userRepo, as.OrgID, as.AssignedTo, as.AssignedUserID, prevTo); err != nil {
 		return err
@@ -1865,6 +1931,9 @@ func (h *ASHandler) stampActedBy(c echo.Context, p *model.ASProcess, as *model.A
 
 func sessionOwnsAS(c echo.Context, as *model.ASReceipt) bool {
 	if as == nil {
+		return true
+	}
+	if strings.TrimSpace(as.WorkGroupID) != "" && memberOfGroup(c, as.WorkGroupID) {
 		return true
 	}
 	if strings.TrimSpace(as.AssignedTo) == "" && strings.TrimSpace(as.AssignedUserID) == "" {

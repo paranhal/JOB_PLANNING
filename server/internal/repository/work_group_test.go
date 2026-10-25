@@ -103,11 +103,18 @@ func TestWorkGroupSchemaAndACL(t *testing.T) {
 	if err := repo.Create(lead, &model.WorkGroup{OrgID: model.OrgIDLibrary, Name: "불가"}); err == nil {
 		t.Fatal("그룹장 생성")
 	}
-	if err := repo.Close(lead, g1.GroupID); err == nil {
-		t.Fatal("그룹장 종료")
+	g1.Name = "그룹1"
+	if err := repo.Update(lead, g1); err != nil {
+		t.Fatal("그룹장 수정", err)
 	}
-	if err := repo.SetLeader(lead, g1.GroupID, u2.UserID); err == nil {
-		t.Fatal("그룹장 변경")
+	if err := repo.SetLeader(lead, g1.GroupID, u2.UserID); err != nil {
+		t.Fatal("그룹장 위임", err)
+	}
+	if err := repo.SetLeader(lead, g1.GroupID, u1.UserID); err == nil {
+		t.Fatal("위임 후 옛 그룹장")
+	}
+	if err := repo.SetLeader(a, g1.GroupID, u1.UserID); err != nil {
+		t.Fatal("관리자 그룹장 복구", err)
 	}
 	if err := repo.RemoveMember(lead, g1.GroupID, u1.UserID); err == nil {
 		t.Fatal("본인 제거")

@@ -302,6 +302,23 @@
                 <option value="custom" {{if and .AS.AssignedTo (not .AS.AssignedUserID)}}selected{{end}}>직접입력</option>
               </select>
               {{if eq .ActionErr "assignee_required"}}<p class="mt-1 text-xs text-red-600" data-assignee-error>담당자를 선택하세요</p>{{end}}
+              <input type="hidden" name="work_group_present" value="1">
+              <label class="block text-xs text-slate-500 mt-2 mb-1">또는 업무 그룹</label>
+              <select name="work_group_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">그룹 없음</option>
+                {{range .WorkGroups}}
+                <option value="{{.GroupID}}" {{if eq $.AS.WorkGroupID .GroupID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+              {{if .AS.WorkGroupID}}
+              <label class="block text-xs text-slate-500 mt-2 mb-1">수행자 <span class="text-red-500">*</span></label>
+              <select name="worker" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">수행자 선택</option>
+                {{range .GroupMembers}}
+                <option value="{{.FullName}}" {{if eq $.WorkerDefault .FullName}}selected{{end}}>{{.FullName}}{{if eq .Role "leader"}} (그룹장){{end}}</option>
+                {{end}}
+              </select>
+              {{end}}
               <input type="text" name="assigned_to_custom" value="{{if and .AS.AssignedTo (not .AS.AssignedUserID)}}{{.AS.AssignedTo}}{{end}}" placeholder="직접입력 시 이름" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2">
             </div>
             <div>

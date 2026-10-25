@@ -28,6 +28,8 @@ func workGroupActor(c echo.Context) model.WorkGroupActor {
 	return model.WorkGroupActor{
 		UserID: currentUserID(c), OrgID: org, Role: currentRole(c),
 		ReadOnly: isReadOnly(c), ViewAs: viewAsActive(c),
+		MemberGroups: groupIDMap(c, "member_group_ids"),
+		LeaderGroups: groupIDMap(c, "leader_group_ids"),
 	}
 }
 
@@ -95,12 +97,7 @@ func (h *WorkGroupHandler) renderForm(c echo.Context, id, notice, errMsg string,
 			return echo.ErrNotFound
 		}
 		g = got
-		raw, _ := h.repo.MembersOn(id, "")
-		for _, m := range raw {
-			if strings.TrimSpace(m.LeftOn) == "" {
-				members = append(members, m)
-			}
-		}
+		members, _ = h.repo.MembersAll(id)
 	} else if !a.CanManageOrg(a.HomeOrg()) && currentRole(c) != model.RoleVisionAdmin {
 		return echo.ErrForbidden
 	}
@@ -113,7 +110,9 @@ func (h *WorkGroupHandler) renderForm(c echo.Context, id, notice, errMsg string,
 	cands, _ := h.users.ListAssignable(org)
 	in := map[string]bool{}
 	for _, m := range members {
-		in[m.UserID] = true
+		if strings.TrimSpace(m.LeftOn) == "" {
+			in[m.UserID] = true
+		}
 	}
 	var open []model.User
 	for _, u := range cands {
@@ -123,9 +122,13 @@ func (h *WorkGroupHandler) renderForm(c echo.Context, id, notice, errMsg string,
 	}
 	canManage := g == nil && (a.CanManageOrg(org) || (currentRole(c) == model.RoleVisionAdmin && a.CanWrite()))
 	if g != nil {
-		canManage = a.CanManageOrg(g.OrgID)
+		canManage = h.repo.CanManageGroup(a, g)
 	}
 	canMembers := g != nil && h.repo.CanEditMembers(a, g)
+	var events []repository.WorkGroupEventRow
+	if g != nil {
+		events, _ = h.repo.ListEvents(g.GroupID, 30)
+	}
 	title := "업무 그룹"
 	if g != nil {
 		title = g.Name
@@ -141,7 +144,8 @@ func (h *WorkGroupHandler) renderForm(c echo.Context, id, notice, errMsg string,
 		"Title": title, "Group": g, "Members": members, "Candidates": open,
 		"CanManage": canManage, "CanMembers": canMembers, "ActorID": a.UserID,
 		"ShowOrgPick": showInsertOrgPick(c) && g == nil, "InsertOrgs": insertOrgChoices(c),
-		"FormOrgID": org, "Err": errMsg, "Notice": notice,
+		"FormOrgID": org, "Err": errMsg, "Notice": notice, "Events": events,
+		"CanCreate": a.CanManageOrg(org) || (currentRole(c) == model.RoleVisionAdmin && a.CanWrite()),
 	})
 }
 

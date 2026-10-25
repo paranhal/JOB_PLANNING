@@ -106,8 +106,8 @@ func TestWorkGroupHTTPPermissions(t *testing.T) {
 	if !strings.Contains(body, "구성원 추가") {
 		t.Fatal("그룹장 추가 단추")
 	}
-	if strings.Contains(body, "그룹 종료") || strings.Contains(body, "그룹장 지정") {
-		t.Fatal("그룹장에게 관리 단추")
+	if !strings.Contains(body, "그룹 종료") {
+		t.Fatal("그룹장 종료 단추")
 	}
 	foreign := doGetWith(t, e, "/work-groups/WG-9999", techCK)
 	if foreign.Code != http.StatusNotFound {

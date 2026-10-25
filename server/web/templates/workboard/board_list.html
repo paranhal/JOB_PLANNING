@@ -12,6 +12,7 @@
       </div>
       <div class="flex flex-wrap items-center gap-2">
         {{template "board_scope_toggle" .}}
+        {{template "view_group_toggle" .}}
         <form method="get" action="/workboard/board" class="contents">
           <input type="hidden" name="view" value="list">
           <input type="hidden" name="date" value="{{.Date}}">

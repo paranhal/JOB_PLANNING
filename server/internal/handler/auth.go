@@ -947,6 +947,9 @@ func (h *AuthHandler) AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				return c.Redirect(http.StatusSeeOther, "/account/vision-password")
 			}
 		}
+		if uid != "" && h.db != nil {
+			injectGroupMaps(c, repository.NewWorkGroupRepo(h.db))
+		}
 		if uid != "" && h.userRepo != nil {
 			if u, _ := h.userRepo.GetByID(uid); u != nil && u.MustChangePassword {
 				if !mustChangePasswordExempt(path) {

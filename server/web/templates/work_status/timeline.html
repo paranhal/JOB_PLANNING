@@ -1,6 +1,7 @@
 {{define "title"}}업무처리현황{{end}}
 {{define "content"}}
 <div class="-mx-1 sm:-mx-2 space-y-3">
+  {{template "view_group_toggle" .}}
 
   {{if .RoleUnresolved}}
   <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">

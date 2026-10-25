@@ -361,7 +361,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 	if len(cols) >= 2 {
 		factoryWait = h.repo.LoadFactoryWaitCard(cols[1].From, cols[1].ToExclusive)
 	}
-	return c.Render(http.StatusOK, "stats/overview.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "stats/overview.html", attachViewGroup(c, map[string]interface{}{
 		"Title":             title,
 		"Active":            NavStats,
 		"View":              lb.View,
@@ -403,7 +403,7 @@ func (h *StatsHandler) Overview(c echo.Context) error {
 		"CanTestStats":      canSeeTestStats(c),
 		"NegativeRows":      negativeRows,
 		"FactoryWait":       factoryWait,
-	})
+	}))
 }
 
 func statsMeetingFilterQuery(f model.StatsMeetingFilter) string {

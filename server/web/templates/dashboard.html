@@ -4,6 +4,7 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
+      {{template "view_group_toggle" .}}
       {{if and (eq .UserRole "sales") (or (hasUserPerm .UserPerms "sales.view") (hasUserPerm .UserPerms "sales.act.view"))}}
       <p class="mt-1"><a href="/sales/dashboard" class="text-xs text-blue-700 hover:underline">영업 대시보드로</a></p>
       {{end}}

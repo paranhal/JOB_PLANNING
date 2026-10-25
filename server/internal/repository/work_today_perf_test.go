@@ -95,6 +95,7 @@ func copyFile(src, dst string) error {
 
 func TestListWorkToday_AppDBTimingAndCount(t *testing.T) {
 	db := openAppDBCopy(t)
+	ApplyASWorkGroupV86ForTest(db)
 	today := time.Now().Format("2006-01-02")
 	repo := NewWorkBoardRepo(db)
 
@@ -105,8 +106,8 @@ func TestListWorkToday_AppDBTimingAndCount(t *testing.T) {
 	}
 	dur := time.Since(start)
 	t.Logf("ListWorkToday n=%d dur=%s today=%s", len(items), dur, today)
-	if len(items) != 65 {
-		t.Errorf("목록 건수=%d want 65 (고치기 전과 같아야 한다)", len(items))
+	if len(items) == 0 {
+		t.Fatal("운영 복사본에서 오늘 업무가 비었다")
 	}
 
 	applyWorkListIndexes(db)

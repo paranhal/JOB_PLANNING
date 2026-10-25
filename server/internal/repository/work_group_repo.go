@@ -341,7 +341,7 @@ func (r *WorkGroupRepo) Update(a model.WorkGroupActor, g *model.WorkGroup) error
 	if err != nil || cur == nil {
 		return errWGNotFound
 	}
-	if !a.CanManageOrg(cur.OrgID) {
+	if !r.CanManageGroup(a, cur) {
 		return errWGForbidden
 	}
 	before := cur.Name
@@ -360,7 +360,7 @@ func (r *WorkGroupRepo) Close(a model.WorkGroupActor, id string) error {
 	if err != nil || g == nil {
 		return errWGNotFound
 	}
-	if !a.CanManageOrg(g.OrgID) {
+	if !r.CanManageGroup(a, g) {
 		return errWGForbidden
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -379,7 +379,7 @@ func (r *WorkGroupRepo) Reopen(a model.WorkGroupActor, id string) error {
 	if err != nil || g == nil {
 		return errWGNotFound
 	}
-	if !a.CanManageOrg(g.OrgID) {
+	if !r.CanManageGroup(a, g) {
 		return errWGForbidden
 	}
 	_, err = r.db.Exec(`UPDATE work_groups SET status=?, closed_by=NULL, closed_at=NULL WHERE group_id=?`,
@@ -405,7 +405,7 @@ func (r *WorkGroupRepo) AddMember(a model.WorkGroupActor, groupID, userID, role,
 	if role == "" {
 		role = model.WorkGroupMember
 	}
-	if role == model.WorkGroupLeader && !a.CanManageOrg(g.OrgID) {
+	if role == model.WorkGroupLeader && !r.CanManageGroup(a, g) {
 		return errWGForbidden
 	}
 	u, err := r.users.GetByID(userID)
@@ -418,7 +418,15 @@ func (r *WorkGroupRepo) AddMember(a model.WorkGroupActor, groupID, userID, role,
 	if !r.sameOrg(u, g.OrgID) {
 		return fmt.Errorf("같은 조직의 구성원만 넣을 수 있습니다")
 	}
-	if r.memberOn(groupID, userID, todayYMD()) != nil {
+	if m := r.memberOn(groupID, userID, todayYMD()); m != nil {
+		if strings.TrimSpace(m.LeftOn) != "" {
+			_, err = r.db.Exec(`UPDATE work_group_members SET left_on=NULL, removed_by='' WHERE id=?`, m.ID)
+			if err != nil {
+				return err
+			}
+			r.event(groupID, a.UserID, "rejoin", map[string]string{"user_id": userID})
+			return nil
+		}
 		return fmt.Errorf("이미 이 그룹에 있습니다")
 	}
 	if joinedOn == "" {
@@ -478,8 +486,8 @@ func (r *WorkGroupRepo) RemoveMember(a model.WorkGroupActor, groupID, userID str
 	if m == nil {
 		return fmt.Errorf("구성원이 아닙니다")
 	}
-	if m.Role == model.WorkGroupLeader && !a.CanManageOrg(g.OrgID) {
-		return fmt.Errorf("그룹장은 조직관리자가 바꿉니다")
+	if m.Role == model.WorkGroupLeader && !r.CanManageGroup(a, g) {
+		return fmt.Errorf("그룹장은 조직관리자 또는 그룹장이 바꿉니다")
 	}
 	_, err = r.db.Exec(`UPDATE work_group_members SET left_on=?, removed_by=? WHERE id=?`, todayYMD(), a.UserID, m.ID)
 	if err != nil {
@@ -494,7 +502,7 @@ func (r *WorkGroupRepo) SetLeader(a model.WorkGroupActor, groupID, userID string
 	if err != nil || g == nil {
 		return errWGNotFound
 	}
-	if !a.CanManageOrg(g.OrgID) {
+	if !r.CanManageGroup(a, g) {
 		return errWGForbidden
 	}
 	if userID == "" {

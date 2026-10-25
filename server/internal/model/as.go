@@ -65,6 +65,8 @@ type ASReceipt struct {
 	OrgID              string     `json:"org_id,omitempty"`
 	CreatedByUserID    string     `json:"created_by_user_id,omitempty"`
 	CreatedByName      string     `json:"created_by_name,omitempty"`
+	WorkGroupID        string     `json:"work_group_id,omitempty"`
+	WorkGroupName      string     `json:"work_group_name,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 
@@ -169,6 +171,8 @@ type ASListItem struct {
 	GroupSize          int          `json:"group_size,omitempty"`    // 함께 접수한 건 수. 2 이상이면 🔗. §34.2.1
 	UrgencyReason      string       `json:"urgency_reason,omitempty"`
 	UrgencyReasonNote  string       `json:"urgency_reason_note,omitempty"`
+	WorkGroupID        string       `json:"work_group_id,omitempty"`
+	WorkGroupName      string       `json:"work_group_name,omitempty"`
 }
 
 // ASWorkItem 접수 하부 확인·재방문 업무 ({접수번호}-Wnn).

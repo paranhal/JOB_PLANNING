@@ -204,7 +204,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		}
 	}
 
-	return c.Render(http.StatusOK, "work_status/timeline.html", map[string]interface{}{
+	return c.Render(http.StatusOK, "work_status/timeline.html", attachViewGroup(c, map[string]interface{}{
 		"Title":           "업무처리현황",
 		"Active":          NavWorkStatus,
 		"View":            view,
@@ -256,7 +256,7 @@ func (h *WorkStatusHandler) Calendar(c echo.Context) error {
 		"ShowMissing":     showMissing,
 		"MissingTitle":    missingTitle,
 		"MissingItems":    missingItems,
-	})
+	}))
 }
 
 func workStatusViewLabel(view string) string {

@@ -93,11 +93,29 @@ type WorkEffortSum struct {
 }
 
 type WorkGroupActor struct {
-	UserID   string
-	OrgID    string
-	Role     string
-	ReadOnly bool
-	ViewAs   bool
+	UserID       string
+	OrgID        string
+	Role         string
+	ReadOnly     bool
+	ViewAs       bool
+	LeaderGroups map[string]bool
+	MemberGroups map[string]bool
+}
+
+func (a WorkGroupActor) LeaderOf(groupID string) bool {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" || a.LeaderGroups == nil {
+		return false
+	}
+	return a.LeaderGroups[groupID]
+}
+
+func (a WorkGroupActor) MemberOf(groupID string) bool {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" || a.MemberGroups == nil {
+		return false
+	}
+	return a.MemberGroups[groupID]
 }
 
 func (a WorkGroupActor) HomeOrg() string {

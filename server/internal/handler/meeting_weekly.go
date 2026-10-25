@@ -156,7 +156,7 @@ func (h *MeetingHandler) renderWeekly(c echo.Context, team bool) error {
 	if !team {
 		h.fillWeeklyPersonalCards(c, mon, fri, data)
 	}
-	return c.Render(http.StatusOK, "meeting/weekly.html", data)
+	return c.Render(http.StatusOK, "meeting/weekly.html", attachViewGroup(c, data))
 }
 
 func weeklyCoopTitle(team bool) string {

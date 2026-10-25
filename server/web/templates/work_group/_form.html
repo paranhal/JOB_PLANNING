@@ -11,7 +11,7 @@
       <div>
         <label class="text-ui-sm text-ink-muted" for="wg-name">이름</label>
         <input id="wg-name" name="name" required class="input w-full" value="{{.Group.Name}}" {{if not .CanManage}}readonly{{end}}>
-        {{if not .CanManage}}<p class="text-ui-sm text-ink-muted">이름은 조직관리자·비젼관리자만 바꿉니다.</p>{{end}}
+        {{if not .CanManage}}<p class="text-ui-sm text-ink-muted">이름·기간은 조직관리자 또는 이 그룹 그룹장이 바꿉니다.</p>{{end}}
       </div>
       <div>
         <label class="text-ui-sm text-ink-muted" for="wg-purpose">목적</label>
@@ -37,23 +37,32 @@
     {{end}}
     {{end}}
     <table class="w-full text-ui">
-      <thead class="text-ink-muted text-left"><tr><th class="p-2">구성원</th><th class="p-2">역할</th><th class="p-2"></th></tr></thead>
+      <thead class="text-ink-muted text-left"><tr><th class="p-2">구성원</th><th class="p-2">역할</th><th class="p-2">가입일</th><th class="p-2">탈퇴일</th><th class="p-2">상태</th><th class="p-2"></th></tr></thead>
       <tbody>
         {{range .Members}}
         <tr class="border-t border-line">
           <td class="p-2">{{.FullName}}</td>
           <td class="p-2"><span class="badge badge-neutral">{{if eq .Role "leader"}}그룹장{{else}}구성원{{end}}</span></td>
+          <td class="p-2 whitespace-nowrap">{{.JoinedOn}}</td>
+          <td class="p-2 whitespace-nowrap">{{.LeftOn}}</td>
+          <td class="p-2">{{if .LeftOn}}탈퇴{{else}}활성{{end}}</td>
           <td class="p-2">
             <div class="flex flex-wrap gap-1">
-              {{if and $.CanManage (ne .Role "leader")}}
+              {{if and $.CanManage (not .LeftOn) (ne .Role "leader")}}
               <form method="post" action="/work-groups/{{$.Group.GroupID}}/leader" data-wg-form>
                 <input type="hidden" name="user_id" value="{{.UserID}}">
                 <button type="submit" class="btn btn-ghost btn-sm">그룹장으로 지정</button>
               </form>
               {{end}}
-              {{if and $.CanMembers (ne .UserID $.ActorID)}}
+              {{if and $.CanMembers (not .LeftOn) (ne .UserID $.ActorID)}}
               <form method="post" action="/work-groups/{{$.Group.GroupID}}/members/{{.UserID}}/remove" data-wg-form>
                 <button type="submit" class="btn btn-ghost btn-sm">제거</button>
+              </form>
+              {{end}}
+              {{if and $.CanMembers .LeftOn}}
+              <form method="post" action="/work-groups/{{$.Group.GroupID}}/members" data-wg-form>
+                <input type="hidden" name="user_id" value="{{.UserID}}">
+                <button type="submit" class="btn btn-ghost btn-sm">재가입</button>
               </form>
               {{end}}
             </div>
@@ -62,6 +71,14 @@
         {{end}}
       </tbody>
     </table>
+    {{if .Events}}
+    <h3 class="text-ui font-semibold mt-4">변경 이력</h3>
+    <ul class="text-ui-sm text-ink-muted space-y-1 max-h-40 overflow-y-auto">
+      {{range .Events}}
+      <li>{{.At}} · {{.ActorName}} · {{.Action}} {{.Detail}}</li>
+      {{end}}
+    </ul>
+    {{end}}
     {{if .CanMembers}}
     <form method="post" action="/work-groups/{{.Group.GroupID}}/members" class="space-y-2" data-wg-form>
       <label class="text-ui-sm text-ink-muted" for="wg-cand-q">구성원 추가</label>

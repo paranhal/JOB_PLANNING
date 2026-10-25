@@ -41,7 +41,7 @@ func applySupportAssigneeDefault(c echo.Context, as *model.ASReceipt) {
 	if as == nil || currentRole(c) != model.RoleSupport {
 		return
 	}
-	if assigneeFilled(as.AssignedTo, as.AssignedUserID, "") {
+	if assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
 		return
 	}
 	as.AssignedUserID = strings.TrimSpace(currentUserID(c))
@@ -49,6 +49,12 @@ func applySupportAssigneeDefault(c echo.Context, as *model.ASReceipt) {
 }
 
 func asWorkerDefault(c echo.Context, as *model.ASReceipt) string {
+	if as != nil && strings.TrimSpace(as.WorkGroupID) != "" {
+		self := strings.TrimSpace(ctxString(c, "user_name"))
+		if memberOfGroup(c, as.WorkGroupID) && self != "" {
+			return self
+		}
+	}
 	if as != nil {
 		if n := strings.TrimSpace(as.AssignedTo); n != "" {
 			return n

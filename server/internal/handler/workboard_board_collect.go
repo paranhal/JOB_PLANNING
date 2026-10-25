@@ -169,7 +169,9 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 			memberMap = m
 		}
 	}
+	allVisible := visible
 	visible = filterTasksByParticipants(visible, memberMap, scope.AssigneeFilter)
+	visible = applyViewGroupToTasks(c, allVisible, visible, scope)
 
 	siteLines := map[string]string{}
 	ids = taskIDsOf(visible)
