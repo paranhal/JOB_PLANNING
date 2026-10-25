@@ -230,6 +230,19 @@ func wantsJSON(c echo.Context) bool {
 }
 
 func (h *SalesHandler) replyStage(c echo.Context, err error, id, okPath string) error {
+	if err == nil {
+		if msg := h.afterSalesChildChanged(id); msg != "" {
+			if wantsJSON(c) {
+				return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "group_closed": msg})
+			}
+			back := salesReturnPath(c, okPath)
+			sep := "?"
+			if strings.Contains(back, "?") {
+				sep = "&"
+			}
+			return c.Redirect(http.StatusSeeOther, back+sep+"ok="+url.QueryEscape(msg))
+		}
+	}
 	if err != nil {
 		code := salesErrCode(err)
 		msg := querySalesErr(code)

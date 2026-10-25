@@ -30,7 +30,10 @@ type SalesGroup struct {
 	Notes      string
 	CreatedAt  string
 	UpdatedAt  string
-	ClosedAt   string
+	ClosedAt           string
+	ChildNameTemplate  string
+	ChildDefaultsJSON  string
+	AutoClose          bool
 }
 
 type SalesGroupMember struct {
@@ -112,6 +115,107 @@ func SalesGroupTotalsAllowDup(items []SalesProject, quotes map[string][]SalesQuo
 		weighted += p.PipeAmount * SalesProbability(&p) / 100
 	}
 	return
+}
+
+const (
+	SalesChildProgress  = "progress"
+	SalesChildWon       = "won"
+	SalesChildContract  = "contract"
+	SalesChildLost      = "lost"
+	SalesChildDropped   = "dropped"
+)
+
+func SalesChildBucket(p SalesProject) string {
+	if p.Stage == SalesStage4Closed {
+		switch strings.TrimSpace(p.CloseReason) {
+		case SalesCloseContracted:
+			return SalesChildContract
+		case SalesCloseLost:
+			return SalesChildLost
+		case SalesCloseDropped:
+			return SalesChildDropped
+		}
+		if p.Status == SalesStatusContracted {
+			return SalesChildContract
+		}
+		if p.Status == SalesStatusDropped {
+			return SalesChildDropped
+		}
+		return SalesChildLost
+	}
+	if p.Stage == SalesStage4Bid {
+		switch strings.TrimSpace(p.BidStatus) {
+		case SalesBidWon, SalesBidNegotiating:
+			return SalesChildWon
+		}
+	}
+	return SalesChildProgress
+}
+
+func SalesChildDecided(p SalesProject) bool {
+	if strings.TrimSpace(p.Status) == SalesStatusDormant {
+		return false
+	}
+	b := SalesChildBucket(p)
+	return b == SalesChildWon || b == SalesChildContract || b == SalesChildLost || b == SalesChildDropped
+}
+
+func SalesChildAmount(p SalesProject) int {
+	switch SalesChildBucket(p) {
+	case SalesChildContract:
+		if p.ContractAmount > 0 {
+			return p.ContractAmount
+		}
+		if p.AwardedAmount > 0 {
+			return p.AwardedAmount
+		}
+	case SalesChildWon:
+		if p.AwardedAmount > 0 {
+			return p.AwardedAmount
+		}
+	}
+	return p.ExpectedAmount
+}
+
+type SalesChildSummary struct {
+	ProgressN, ProgressAmt int
+	WonN, WonAmt           int
+	ContractN, ContractAmt int
+	LostN, LostAmt         int
+	DroppedN, DroppedAmt   int
+}
+
+func (s SalesChildSummary) Add(p SalesProject) SalesChildSummary {
+	if strings.TrimSpace(p.Status) == SalesStatusDormant {
+		return s
+	}
+	n, amt := 1, SalesChildAmount(p)
+	switch SalesChildBucket(p) {
+	case SalesChildWon:
+		s.WonN += n
+		s.WonAmt += amt
+	case SalesChildContract:
+		s.ContractN += n
+		s.ContractAmt += amt
+	case SalesChildLost:
+		s.LostN += n
+		s.LostAmt += amt
+	case SalesChildDropped:
+		s.DroppedN += n
+		s.DroppedAmt += amt
+	default:
+		s.ProgressN += n
+		s.ProgressAmt += amt
+	}
+	return s
+}
+
+func SalesChildSummaryOf(items []SalesProject) SalesChildSummary {
+	var s SalesChildSummary
+	for _, p := range items {
+		s = s.Add(p)
+	}
+	return s
 }
 
 func SalesAvgProbLabel(amount, weighted int) string {

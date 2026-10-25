@@ -91,6 +91,7 @@ func (h *SalesHandler) GroupShow(c echo.Context) error {
 	qm := model.GroupQuotesBySales(quotes)
 	model.ApplySalesPipelineAmounts(ps, quotes)
 	cnt, amt, w := model.SalesGroupTotalsAllowDup(ps, qm)
+	childSum := model.SalesChildSummaryOf(ps)
 	members, _ := h.repo.ListGroupMemberRows(g.GroupID)
 	ex, inc := 0, 0
 	for _, m := range members {
@@ -126,6 +127,7 @@ func (h *SalesHandler) GroupShow(c echo.Context) error {
 		"Count": cnt, "Amount": model.FormatSalesMoney(int64(amt)), "Weighted": model.FormatSalesMoney(int64(w)),
 		"Avg": model.SalesAvgProbLabel(amt, w), "FilterN": filterN, "ExcludeN": ex, "IncludeN": inc,
 		"Others": others, "CanWrite": canWriteSales(c),
+		"ChildSummary": childSum, "Bucket": strings.TrimSpace(c.QueryParam("bucket")),
 	})
 }
 

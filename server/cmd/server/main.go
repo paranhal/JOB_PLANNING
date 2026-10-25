@@ -621,6 +621,8 @@ func main() {
 	sales.POST("/groups/:id/members/:sid/remove", h.Sales.GroupRemoveMember)
 	sales.POST("/groups/:id/close", h.Sales.GroupClose)
 	sales.GET("/groups/:id/search-projects", h.Sales.GroupSearchProjects)
+	sales.POST("/groups/:id/children/preview", h.Sales.GroupChildrenPreview)
+	sales.POST("/groups/:id/children", h.Sales.GroupChildrenCreate)
 	sales.POST("/bulk-biz", h.Sales.BulkBizType)
 	sales.POST("/bulk-budget", h.Sales.BulkBudgetStatus)
 	sales.GET("/:id/promote", h.Sales.PromoteForm)

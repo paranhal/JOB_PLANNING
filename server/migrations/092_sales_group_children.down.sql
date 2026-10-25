@@ -1,0 +1,1 @@
+-- SQLite DROP COLUMN 미지원. 잔존 허용.

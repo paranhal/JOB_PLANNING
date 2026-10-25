@@ -141,11 +141,44 @@ func (r *SalesRepo) CloseGroup(id string) error {
 	return nil
 }
 
+func (r *SalesRepo) ReopenGroup(id string) error {
+	g, err := r.GetGroup(id)
+	if err != nil {
+		return err
+	}
+	before := rowJSON(r.db, "sales_groups", "group_id", id)
+	_, err = r.db.Exec(`UPDATE sales_groups SET status=?, closed_at='', updated_at=CURRENT_TIMESTAMP WHERE group_id=?`,
+		model.SalesGroupActive, id)
+	if err != nil {
+		return err
+	}
+	logUpdate(r.db, "sales_groups", "group_id", id, g.Name, before)
+	return nil
+}
+
+func (r *SalesRepo) SaveGroupChildDefaults(id, tmpl, defaultsJSON string, autoClose bool) error {
+	if !tableHasColumn(r.db, "sales_groups", "child_name_template") {
+		return nil
+	}
+	ac := 0
+	if autoClose {
+		ac = 1
+	}
+	_, err := r.db.Exec(`UPDATE sales_groups SET child_name_template=?, child_defaults_json=?, auto_close=?, updated_at=CURRENT_TIMESTAMP WHERE group_id=?`,
+		tmpl, defaultsJSON, ac, id)
+	return err
+}
+
 func (r *SalesRepo) GetGroup(id string) (*model.SalesGroup, error) {
 	row := r.db.QueryRow(`
 		SELECT group_id, group_no, name, year, owner_id, owner_name, group_kind, filter_json, pinned, status, notes,
 			created_at, updated_at, closed_at FROM sales_groups WHERE group_id=?`, id)
-	return scanSalesGroup(row)
+	g, err := scanSalesGroup(row)
+	if err != nil {
+		return nil, err
+	}
+	r.loadGroupChildSettings(g)
+	return g, nil
 }
 
 func (r *SalesRepo) ListGroups(includeClosed bool) ([]model.SalesGroup, error) {
@@ -202,7 +235,18 @@ func scanSalesGroup(row salesScanner) (*model.SalesGroup, error) {
 		return nil, err
 	}
 	g.Pinned = pinned != 0
+	g.AutoClose = true
 	return &g, nil
+}
+
+func (r *SalesRepo) loadGroupChildSettings(g *model.SalesGroup) {
+	if r == nil || r.db == nil || g == nil || !tableHasColumn(r.db, "sales_groups", "child_name_template") {
+		return
+	}
+	var ac int
+	_ = r.db.QueryRow(`SELECT COALESCE(child_name_template,''), COALESCE(child_defaults_json,''), COALESCE(auto_close,1) FROM sales_groups WHERE group_id=?`,
+		g.GroupID).Scan(&g.ChildNameTemplate, &g.ChildDefaultsJSON, &ac)
+	g.AutoClose = ac != 0
 }
 
 func (r *SalesRepo) AddGroupMembers(groupID string, salesIDs []string, kind, by string) error {
@@ -338,6 +382,7 @@ func (r *SalesRepo) GroupsForSales(salesID string) ([]model.SalesGroup, error) {
 		if err != nil {
 			return nil, err
 		}
+		r.loadGroupChildSettings(g)
 		out = append(out, *g)
 	}
 	return out, rows.Err()

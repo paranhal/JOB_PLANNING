@@ -67,6 +67,7 @@ func (h *SalesHandler) CloseContracted(c echo.Context) error {
 	if err != nil {
 		return h.replyWinJSON(c, err, id, "")
 	}
+	_ = h.afterSalesChildChanged(id)
 	next := "/sales/" + id + "/promote"
 	if wantsJSON(c) {
 		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "next": next})

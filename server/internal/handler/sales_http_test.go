@@ -73,6 +73,8 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.POST("/sales/groups/:id/members/:sid/remove", h.Sales.GroupRemoveMember)
 	g.POST("/sales/groups/:id/close", h.Sales.GroupClose)
 	g.GET("/sales/groups/:id/search-projects", h.Sales.GroupSearchProjects)
+	g.POST("/sales/groups/:id/children/preview", h.Sales.GroupChildrenPreview)
+	g.POST("/sales/groups/:id/children", h.Sales.GroupChildrenCreate)
 	g.POST("/sales/bulk-biz", h.Sales.BulkBizType)
 	g.POST("/sales/bulk-budget", h.Sales.BulkBudgetStatus)
 	g.GET("/sales/:id/promote", h.Sales.PromoteForm)
