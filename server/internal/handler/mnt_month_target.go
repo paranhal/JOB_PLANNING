@@ -25,7 +25,8 @@ func (h *MaintenanceHandler) MonthTargetPanelJSON(c echo.Context) error {
 	if month < 1 || month > 12 {
 		month = 1
 	}
-	stats, sites, err := h.repo.MonthTargetPanel(plan, month, c.QueryParam("q"), c.QueryParam("industry"))
+	stats, sites, err := h.repo.MonthTargetPanelFilter(plan, month, c.QueryParam("q"), c.QueryParam("industry"),
+		c.QueryParam("sido"), c.QueryParam("sigungu"))
 	if err != nil {
 		return err
 	}
@@ -54,6 +55,17 @@ func (h *MaintenanceHandler) RegisterMonthTargets(c echo.Context) error {
 	}
 	actorID := strings.TrimSpace(currentUserID(c))
 	actorName := strings.TrimSpace(ctxString(c, "user_name"))
+	regions = model.CollapseMonthTargetRegionKeys(regions)
+	if len(regions) == 0 && len(custs) == 0 {
+		msg := "등록할 지역을 선택하세요"
+		if source == model.MonthTargetSourceSite {
+			msg = "등록할 사이트를 선택하세요"
+		}
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": msg, "message": msg})
+		}
+		return h.manageErrRedirect(c, plan.PlanID, msg)
+	}
 	var res model.MonthTargetRegisterResult
 	if len(regions) > 0 && (source == model.MonthTargetSourceRegion || source == "") {
 		for _, reg := range regions {
@@ -76,6 +88,9 @@ func (h *MaintenanceHandler) RegisterMonthTargets(c echo.Context) error {
 	msg := fmt.Sprintf("%d곳 등록", res.Added)
 	if n := len(res.Skipped); n > 0 {
 		msg += fmt.Sprintf(" / %d곳 건너뜀", n)
+	}
+	if len(regions) > 0 {
+		msg = model.RegionRegisterSummary(regions, res.Added, len(res.Skipped))
 	}
 	if wantsJSON(c) {
 		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "added": res.Added, "skipped": res.Skipped, "message": msg})
@@ -120,7 +135,7 @@ func (h *MaintenanceHandler) MoveMonthTarget(c echo.Context) error {
 
 func (h *MaintenanceHandler) monthTargetErr(c echo.Context, planID string, err error) error {
 	if wantsJSON(c) {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error(), "message": err.Error()})
 	}
 	return h.manageErrRedirect(c, planID, err.Error())
 }

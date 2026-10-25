@@ -191,21 +191,50 @@ func periodMonthOpenSlots(configs []model.MaintenanceSiteConfig, visits []model.
 
 type MonthTargetRegionStat struct {
 	Region     string
+	Key        string
+	Label      string
 	Total      int
 	Registered int
 	Open       int
+	Children   []MonthTargetRegionStat `json:",omitempty"`
 }
 
 type MonthTargetSiteRow struct {
-	CustomerID string
-	Name       string
-	Region     string
-	Cycle      string
-	Registered bool
-	SkipReason string
+	CustomerID  string
+	Name        string
+	Region      string
+	Sigungu     string
+	RegionLabel string
+	Cycle       string
+	Registered  bool
+	SkipReason  string
+}
+
+type monthTargetParentAcc struct {
+	st      MonthTargetRegionStat
+	kids    map[string]*MonthTargetRegionStat
+	emptyGu int
+	namedGu int
+}
+
+func bumpMonthTargetStat(st *MonthTargetRegionStat, registered bool, reason string) {
+	st.Total++
+	if registered {
+		st.Registered++
+	} else if reason == "" {
+		st.Open++
+	} else if strings.Contains(reason, "이미") {
+		st.Registered++
+	} else {
+		st.Open++
+	}
 }
 
 func (r *MaintenanceRepo) MonthTargetPanel(plan *model.MaintenancePlan, month int, q, industry string) ([]MonthTargetRegionStat, []MonthTargetSiteRow, error) {
+	return r.MonthTargetPanelFilter(plan, month, q, industry, "", "")
+}
+
+func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, month int, q, industry, sidoFilter, sigunguFilter string) ([]MonthTargetRegionStat, []MonthTargetSiteRow, error) {
 	if plan == nil {
 		return nil, nil, fmt.Errorf("계획이 없습니다")
 	}
@@ -221,8 +250,13 @@ func (r *MaintenanceRepo) MonthTargetPanel(plan *model.MaintenancePlan, month in
 	if err != nil {
 		return nil, nil, err
 	}
+	dist, _ := r.ListRegionDistanceOrder()
+	rank := regionDistanceRank(dist)
 	q = strings.ToLower(strings.TrimSpace(q))
 	industry = strings.TrimSpace(industry)
+	sidoFilter = strings.TrimSpace(sidoFilter)
+	sigunguFilter = strings.TrimSpace(sigunguFilter)
+	unsetGu := sigunguFilter == model.RegionSigunguUnsetQuery
 	indBy := map[string]string{}
 	if industry != "" {
 		rows, err := r.db.Query(`SELECT customer_id, COALESCE(industry,'') FROM customers`)
@@ -236,7 +270,7 @@ func (r *MaintenanceRepo) MonthTargetPanel(plan *model.MaintenancePlan, month in
 			}
 		}
 	}
-	statsMap := map[string]*MonthTargetRegionStat{}
+	parents := map[string]*monthTargetParentAcc{}
 	var sites []MonthTargetSiteRow
 	for _, cfg := range configs {
 		if strings.TrimSpace(plan.OrgID) != "" && strings.TrimSpace(plan.OrgID) != OrgAll &&
@@ -249,49 +283,122 @@ func (r *MaintenanceRepo) MonthTargetPanel(plan *model.MaintenancePlan, month in
 		if err := model.PeriodMonthTargetAllowed(cfg.InspectionCycle, month); err != nil {
 			continue
 		}
-		reg := model.RegionLabel(cfg.Region)
-		st := statsMap[reg]
-		if st == nil {
-			st = &MonthTargetRegionStat{Region: reg}
-			statsMap[reg] = st
+		sido, gu := model.SiteRegion(cfg)
+		parentKey := model.SidoRegionKey(sido)
+		parentLab := model.RegionLabel(sido)
+		acc := parents[parentKey]
+		if acc == nil {
+			acc = &monthTargetParentAcc{
+				st:   MonthTargetRegionStat{Region: parentLab, Key: parentKey, Label: parentLab},
+				kids: map[string]*MonthTargetRegionStat{},
+			}
+			parents[parentKey] = acc
 		}
-		st.Total++
 		name := cfg.ShortName
 		if name == "" {
 			name = cfg.OrgName
 		}
 		reason := r.monthTargetSkipReason(cfg, visits, targets, plan.PlanYear, month)
 		registered := reason == "" && r.hasMonthTarget(cfg, targets, plan.PlanYear, month)
-		if registered {
-			st.Registered++
-		} else if reason == "" {
-			st.Open++
-		} else if strings.Contains(reason, "이미") {
-			st.Registered++
-		} else {
-			st.Open++
+		bumpMonthTargetStat(&acc.st, registered, reason)
+		if parentKey != model.RegionUnspecified {
+			ck := model.FormatRegionKey(sido, gu)
+			ch := acc.kids[ck]
+			if ch == nil {
+				lab := gu
+				if lab == "" {
+					lab = model.RegionSigunguUnsetLabel
+				}
+				ch = &MonthTargetRegionStat{Region: lab, Key: ck, Label: lab}
+				acc.kids[ck] = ch
+			}
+			bumpMonthTargetStat(ch, registered, reason)
+			if gu == "" {
+				acc.emptyGu++
+			} else {
+				acc.namedGu++
+			}
 		}
 		if industry != "" && !strings.EqualFold(indBy[cfg.CustomerID], industry) {
 			continue
 		}
 		if q != "" {
-			blob := strings.ToLower(name + " " + cfg.OrgName + " " + cfg.CustomerID + " " + cfg.Region)
+			blob := strings.ToLower(name + " " + cfg.OrgName + " " + cfg.CustomerID + " " + cfg.Region + " " + cfg.AddrSigungu + " " + gu)
 			if !strings.Contains(blob, q) {
 				continue
 			}
 		}
+		if sidoFilter != "" {
+			want := sidoFilter
+			if want == model.RegionUnspecified {
+				if sido != "" {
+					continue
+				}
+			} else if sido != want {
+				continue
+			}
+		}
+		if unsetGu {
+			if gu != "" {
+				continue
+			}
+		} else if sigunguFilter != "" && gu != sigunguFilter {
+			continue
+		}
 		sites = append(sites, MonthTargetSiteRow{
-			CustomerID: cfg.CustomerID, Name: name, Region: reg, Cycle: cfg.InspectionCycle,
+			CustomerID: cfg.CustomerID, Name: name, Region: parentLab, Sigungu: gu,
+			RegionLabel: model.SiteRegionLabel(cfg), Cycle: cfg.InspectionCycle,
 			Registered: registered || strings.Contains(reason, "이미"), SkipReason: reason,
 		})
 	}
 	var stats []MonthTargetRegionStat
-	for _, st := range statsMap {
-		stats = append(stats, *st)
+	for _, acc := range parents {
+		st := acc.st
+		if acc.namedGu > 0 {
+			var kids []MonthTargetRegionStat
+			for _, ch := range acc.kids {
+				kids = append(kids, *ch)
+			}
+			sort.Slice(kids, func(i, j int) bool {
+				ri, rj := rank[kids[i].Key], rank[kids[j].Key]
+				if ri == 0 {
+					ri = 1 << 30
+				}
+				if rj == 0 {
+					rj = 1 << 30
+				}
+				if ri != rj {
+					return ri < rj
+				}
+				return kids[i].Label < kids[j].Label
+			})
+			st.Children = kids
+		}
+		stats = append(stats, st)
 	}
 	sort.Slice(stats, func(i, j int) bool { return stats[i].Region < stats[j].Region })
 	sort.Slice(sites, func(i, j int) bool { return sites[i].Name < sites[j].Name })
 	return stats, sites, nil
+}
+
+func regionDistanceRank(items []model.RegionDistanceOrder) map[string]int {
+	out := map[string]int{}
+	for _, it := range items {
+		ord := it.SortOrder + 1
+		sido := model.ShortRegionName(it.Sido)
+		if sido == "" {
+			sido = strings.TrimSpace(it.Sido)
+		}
+		key := model.FormatRegionKey(sido, it.Sigungu)
+		if _, ok := out[key]; !ok {
+			out[key] = ord
+		}
+		raw := model.FormatRegionKey(strings.TrimSpace(it.Sido), it.Sigungu)
+		if _, ok := out[raw]; !ok {
+			out[raw] = ord
+		}
+	}
+	return out
 }
 
 func (r *MaintenanceRepo) hasMonthTarget(cfg model.MaintenanceSiteConfig, targets []model.MaintenanceMonthTarget, year, month int) bool {
@@ -393,7 +500,6 @@ func (r *MaintenanceRepo) RegisterMonthTargets(plan *model.MaintenancePlan, mont
 	}
 	if source == model.MonthTargetSourceRegion {
 		regionKey := strings.TrimSpace(region)
-		unspec := regionKey == "" || regionKey == model.RegionUnspecified
 		for _, c := range configs {
 			if strings.TrimSpace(c.OrgID) != "" && c.OrgID != orgID {
 				continue
@@ -401,11 +507,7 @@ func (r *MaintenanceRepo) RegisterMonthTargets(plan *model.MaintenancePlan, mont
 			if !model.IsPeriodCycle(c.InspectionCycle) {
 				continue
 			}
-			if unspec {
-				if strings.TrimSpace(c.Region) != "" {
-					continue
-				}
-			} else if strings.TrimSpace(c.Region) != regionKey {
+			if !model.MatchRegionKey(c, regionKey) {
 				continue
 			}
 			customerIDs = append(customerIDs, c.CustomerID)

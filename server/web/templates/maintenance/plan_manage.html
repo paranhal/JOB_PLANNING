@@ -101,16 +101,31 @@
           {{range seq 12}}<option value="{{.}}" {{if eq . $.UnassignedMonth}}selected{{end}}>{{.}}월</option>{{end}}
         </select>
       </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1" for="mt-sido">시·도</label>
+        <select id="mt-sido" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-1" for="mt-sigungu">시·군·구</label>
+        <select id="mt-sigungu" class="border rounded-lg px-2 py-1.5 text-sm">
+          <option value="">전체</option>
+        </select>
+      </div>
       <div class="flex-1 min-w-[12rem]">
         <label class="block text-[11px] text-gray-500 mb-1" for="mt-q">사이트 검색</label>
-        <input id="mt-q" type="search" placeholder="학교명·사이트" class="w-full border rounded-lg px-3 py-1.5 text-sm" autocomplete="off">
+        <input id="mt-q" type="search" placeholder="학교명·사이트·시군구" class="w-full border rounded-lg px-3 py-1.5 text-sm" autocomplete="off">
       </div>
       <button type="button" id="mt-reload" class="px-3 py-1.5 border rounded-lg text-sm">조회</button>
     </div>
     <div>
       <p class="text-xs font-medium text-gray-700 mb-1">지역 단위</p>
-      <div id="mt-regions" class="flex flex-wrap gap-2 text-sm"></div>
-      <button type="button" id="mt-reg-region" class="mt-2 px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">이 달로 등록</button>
+      <div id="mt-regions" class="space-y-1 text-sm"></div>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" id="mt-reg-region" class="px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">이 달로 등록</button>
+        <span id="mt-region-summary" class="text-xs text-gray-500"></span>
+      </div>
     </div>
     <div>
       <p class="text-xs font-medium text-gray-700 mb-1">개별 사이트 단위</p>
@@ -132,6 +147,15 @@
       <button type="button" id="mt-reg-sites" class="mt-2 px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">선택한 사이트 등록</button>
     </div>
     <div id="mt-result" class="hidden rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950" role="status"></div>
+    <div id="mt-popup" class="hidden modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="modal-panel w-full max-w-md shadow-pop">
+        <h2 class="text-sm font-bold text-gray-800">월 점검 대상</h2>
+        <p id="mt-popup-msg" class="mt-2 text-sm text-gray-800"></p>
+        <div class="mt-4 flex justify-end">
+          <button type="button" id="mt-popup-ok" class="btn btn-primary">확인</button>
+        </div>
+      </div>
+    </div>
   </section>
   {{end}}
 
@@ -380,10 +404,18 @@
   var planId = panel.getAttribute('data-plan-id');
   var monthEl = document.getElementById('mt-month');
   var qEl = document.getElementById('mt-q');
+  var sidoEl = document.getElementById('mt-sido');
+  var sigunguEl = document.getElementById('mt-sigungu');
   var regionBox = document.getElementById('mt-regions');
   var siteBody = document.getElementById('mt-sites');
   var result = document.getElementById('mt-result');
   var selN = document.getElementById('mt-sel-n');
+  var regionSummary = document.getElementById('mt-region-summary');
+  var popup = document.getElementById('mt-popup');
+  var popupMsg = document.getElementById('mt-popup-msg');
+  var checkedKeys = {};
+  var expandedKeys = {};
+  var lastRegions = [];
   function csrf() {
     var m = document.querySelector('meta[name="csrf-token"]');
     return m ? m.getAttribute('content') : '';
@@ -392,6 +424,13 @@
     result.classList.remove('hidden');
     result.textContent = msg;
   }
+  function showPopup(msg) {
+    popupMsg.textContent = msg || '';
+    popup.classList.remove('hidden');
+  }
+  function hidePopup() { popup.classList.add('hidden'); }
+  document.getElementById('mt-popup-ok').addEventListener('click', hidePopup);
+  popup.addEventListener('click', function (e) { if (e.target === popup) hidePopup(); });
   function cycleLabel(c) {
     return {quarterly:'분기', semi:'반기', yearly:'년1회'}[c] || c;
   }
@@ -399,21 +438,165 @@
     return Array.prototype.map.call(siteBody.querySelectorAll('input[name="customer_id"]:checked'), function (el) { return el.value; });
   }
   function countSel() { selN.textContent = String(selectedSites().length); }
-  function load() {
-    var url = '/maintenance/' + planId + '/month-targets?month=' + encodeURIComponent(monthEl.value) + '&q=' + encodeURIComponent(qEl.value || '');
-    fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (data) {
-      regionBox.replaceChildren();
-      (data.regions || []).forEach(function (rg) {
-        var lab = document.createElement('label');
-        lab.className = 'inline-flex items-center gap-1 border rounded-lg px-2 py-1';
-        var cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.name = 'region';
-        cb.value = rg.Region;
-        lab.appendChild(cb);
-        lab.appendChild(document.createTextNode(rg.Region + ' ' + rg.Total + '곳 / 등록 ' + rg.Registered + ' / 미등록 ' + rg.Open));
-        regionBox.appendChild(lab);
+  function selectedRegionKeys() {
+    var keys = [];
+    regionBox.querySelectorAll('input[name="region"]').forEach(function (el) {
+      if (el.dataset.role === 'sido') {
+        if (el.checked && !el.indeterminate) keys.push(el.value);
+        return;
+      }
+      if (el.checked) {
+        var parent = el.getAttribute('data-parent');
+        var p = regionBox.querySelector('input[name="region"][data-role="sido"][value="' + parent + '"]');
+        if (p && p.checked && !p.indeterminate) return;
+        keys.push(el.value);
+      }
+    });
+    return keys;
+  }
+  function updateRegionSummary() {
+    var keys = selectedRegionKeys();
+    if (!keys.length) { regionSummary.textContent = ''; return; }
+    var labels = keys.map(function (k) {
+      var el = regionBox.querySelector('input[name="region"][value="' + k + '"]');
+      return el ? (el.getAttribute('data-label') || k) : k;
+    });
+    if (labels.length === 1) regionSummary.textContent = labels[0] + ' 선택';
+    else regionSummary.textContent = labels[0] + ' 외 ' + (labels.length - 1) + '곳 선택';
+  }
+  function fillSelect(sel, items, keep) {
+    var cur = keep || sel.value;
+    sel.replaceChildren();
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '전체';
+    sel.appendChild(opt0);
+    (items || []).forEach(function (it) {
+      var o = document.createElement('option');
+      o.value = it.value;
+      o.textContent = it.label;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+  function syncParent(parentCb, childBox) {
+    var kids = childBox.querySelectorAll('input[name="region"]');
+    var n = 0, on = 0;
+    kids.forEach(function (el) { n++; if (el.checked) on++; });
+    parentCb.checked = n > 0 && on === n;
+    parentCb.indeterminate = on > 0 && on < n;
+    var nSel = parentCb.checked ? n : on;
+    var badge = parentCb.parentNode.querySelector('[data-sel-count]');
+    if (badge) badge.textContent = nSel ? ('선택 ' + nSel + '곳') : '';
+  }
+  function renderRegions(regions) {
+    lastRegions = regions || [];
+    regionBox.replaceChildren();
+    lastRegions.forEach(function (rg) {
+      var key = rg.Key || rg.Region;
+      var kids = rg.Children || [];
+      var wrap = document.createElement('div');
+      wrap.className = 'border rounded-lg px-2 py-1';
+      var row = document.createElement('div');
+      row.className = 'flex flex-wrap items-center gap-1';
+      if (kids.length) {
+        var tog = document.createElement('button');
+        tog.type = 'button';
+        tog.setAttribute('aria-expanded', expandedKeys[key] ? 'true' : 'false');
+        tog.className = 'px-1 text-gray-500';
+        tog.textContent = expandedKeys[key] ? '▼' : '▶';
+        row.appendChild(tog);
+      }
+      var lab = document.createElement('label');
+      lab.className = 'inline-flex items-center gap-1';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.name = 'region';
+      cb.value = key;
+      cb.dataset.role = 'sido';
+      cb.setAttribute('data-label', rg.Label || rg.Region);
+      if (checkedKeys[key]) cb.checked = true;
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode((rg.Region || '') + ' ' + rg.Total + '곳 (등록 ' + rg.Registered + ' / 미등록 ' + rg.Open + ')'));
+      row.appendChild(lab);
+      var badge = document.createElement('span');
+      badge.setAttribute('data-sel-count', '1');
+      badge.className = 'text-xs text-gray-500';
+      row.appendChild(badge);
+      wrap.appendChild(row);
+      var childBox = document.createElement('div');
+      childBox.className = 'mt-1 flex flex-wrap gap-1' + (kids.length && expandedKeys[key] ? '' : (kids.length ? ' hidden' : ''));
+      kids.forEach(function (ch) {
+        var cl = document.createElement('label');
+        cl.className = 'inline-flex items-center gap-1 border rounded-lg px-2 py-0.5';
+        var cc = document.createElement('input');
+        cc.type = 'checkbox';
+        cc.name = 'region';
+        cc.value = ch.Key;
+        cc.setAttribute('data-parent', key);
+        cc.setAttribute('data-label', ch.Label || ch.Region);
+        if (checkedKeys[ch.Key] || (cb.checked && !cb.indeterminate)) cc.checked = true;
+        cl.appendChild(cc);
+        cl.appendChild(document.createTextNode((ch.Label || ch.Region) + ' ' + ch.Total + '곳 · 등록 ' + ch.Registered + ' / 미등록 ' + ch.Open));
+        childBox.appendChild(cl);
+        cc.addEventListener('change', function () {
+          checkedKeys[ch.Key] = cc.checked;
+          if (!cc.checked) checkedKeys[key] = false;
+          syncParent(cb, childBox);
+          updateRegionSummary();
+        });
       });
+      if (kids.length) {
+        wrap.appendChild(childBox);
+        row.querySelector('button').addEventListener('click', function () {
+          expandedKeys[key] = !expandedKeys[key];
+          childBox.classList.toggle('hidden', !expandedKeys[key]);
+          this.textContent = expandedKeys[key] ? '▼' : '▶';
+          this.setAttribute('aria-expanded', expandedKeys[key] ? 'true' : 'false');
+        });
+        cb.addEventListener('change', function () {
+          checkedKeys[key] = cb.checked;
+          childBox.querySelectorAll('input[name="region"]').forEach(function (el) {
+            el.checked = cb.checked;
+            checkedKeys[el.value] = cb.checked;
+          });
+          cb.indeterminate = false;
+          syncParent(cb, childBox);
+          updateRegionSummary();
+        });
+        syncParent(cb, childBox);
+      } else {
+        cb.addEventListener('change', function () {
+          checkedKeys[key] = cb.checked;
+          updateRegionSummary();
+        });
+      }
+      regionBox.appendChild(wrap);
+    });
+    updateRegionSummary();
+  }
+  function load() {
+    var url = '/maintenance/' + planId + '/month-targets?month=' + encodeURIComponent(monthEl.value) +
+      '&q=' + encodeURIComponent(qEl.value || '') +
+      '&sido=' + encodeURIComponent(sidoEl.value || '') +
+      '&sigungu=' + encodeURIComponent(sigunguEl.value || '');
+    fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (data) {
+      var regions = data.regions || [];
+      fillSelect(sidoEl, regions.map(function (rg) {
+        return { value: rg.Key || rg.Region, label: rg.Region };
+      }), sidoEl.value);
+      var sidoNow = sidoEl.value;
+      var guItems = [];
+      regions.forEach(function (rg) {
+        var match = !sidoNow || rg.Region === sidoNow || rg.Key === sidoNow;
+        if (!match) return;
+        (rg.Children || []).forEach(function (ch) {
+          var v = ch.Key && ch.Key.indexOf('|') >= 0 && ch.Key.slice(-1) === '|' ? '__unset__' : (ch.Label || ch.Region);
+          guItems.push({ value: v, label: ch.Label || ch.Region });
+        });
+      });
+      fillSelect(sigunguEl, guItems, sigunguEl.value);
+      renderRegions(regions);
       siteBody.replaceChildren();
       (data.sites || []).forEach(function (s) {
         var tr = document.createElement('tr');
@@ -428,7 +611,7 @@
           td0.appendChild(cb);
         }
         var td1 = document.createElement('td'); td1.className = 'px-2 py-1'; td1.textContent = s.Name;
-        var td2 = document.createElement('td'); td2.className = 'px-2 py-1'; td2.textContent = s.Region;
+        var td2 = document.createElement('td'); td2.className = 'px-2 py-1'; td2.textContent = s.RegionLabel || s.Region;
         var td3 = document.createElement('td'); td3.className = 'px-2 py-1'; td3.textContent = cycleLabel(s.Cycle);
         var td4 = document.createElement('td'); td4.className = 'px-2 py-1';
         td4.textContent = s.Registered ? (s.SkipReason || '등록됨') : (s.SkipReason || '미등록');
@@ -445,28 +628,45 @@
       method: 'POST',
       headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
       body: fd
-    }).then(function (r) { return r.json(); }).then(function (data) {
-      showResult(data.message || data.error || '');
+    }).then(function (r) { return r.json().then(function (data) { return { okHttp: r.ok, data: data }; }); }).then(function (pack) {
+      var data = pack.data || {};
+      var msg = data.message || data.error || '';
+      showResult(msg);
+      if (data.ok === false || !pack.okHttp) showPopup(msg);
       load();
     });
   }
   document.getElementById('mt-reload').addEventListener('click', load);
   monthEl.addEventListener('change', load);
+  sidoEl.addEventListener('change', function () { sigunguEl.value = ''; load(); });
+  sigunguEl.addEventListener('change', load);
   qEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
   document.getElementById('mt-all').addEventListener('change', function () {
     siteBody.querySelectorAll('input[name="customer_id"]').forEach(function (el) { el.checked = document.getElementById('mt-all').checked; });
     countSel();
   });
   document.getElementById('mt-reg-region').addEventListener('click', function () {
+    var keys = selectedRegionKeys();
+    if (!keys.length) {
+      showPopup('등록할 지역을 선택하세요');
+      showResult('등록할 지역을 선택하세요');
+      return;
+    }
     var fd = new FormData();
     fd.append('source', 'region');
-    regionBox.querySelectorAll('input[name="region"]:checked').forEach(function (el) { fd.append('region', el.value); });
+    keys.forEach(function (k) { fd.append('region', k); });
     post(fd);
   });
   document.getElementById('mt-reg-sites').addEventListener('click', function () {
+    var ids = selectedSites();
+    if (!ids.length) {
+      showPopup('등록할 사이트를 선택하세요');
+      showResult('등록할 사이트를 선택하세요');
+      return;
+    }
     var fd = new FormData();
     fd.append('source', 'site');
-    selectedSites().forEach(function (id) { fd.append('customer_id', id); });
+    ids.forEach(function (id) { fd.append('customer_id', id); });
     post(fd);
   });
   load();
