@@ -104,7 +104,9 @@ func (r *WBRepo) ListProjects(activeOnly bool) ([]model.WorkProject, error) {
 		LEFT JOIN contacts ct ON ct.contact_id = p.contact_id
 		LEFT JOIN customers op ON op.customer_id = p.ordering_party_id`
 	if activeOnly {
-		q += ` WHERE p.status = 'active'`
+		q += ` WHERE p.status = 'active' AND COALESCE(p.is_test,0)=0`
+	} else {
+		q += ` WHERE COALESCE(p.is_test,0)=0`
 	}
 	q += ` ORDER BY COALESCE(p.sort_order,0), p.name`
 	rows, err := r.db.Query(q)

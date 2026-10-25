@@ -346,6 +346,8 @@ type StatsMeetingFilter struct {
 	AlsoBases            []DateBasis // 리드타임: 기준일 두 개(또는 셋)를 모두 넘긴 건만 (§4.15 · §68.3.3)
 	OrgID                string      // 세션 조직. 빈 값은 전 조직이 아니다 (§52.4)
 	TestDataOnly         bool        // true면 is_test=1 만. 기본은 테스터 행 제외 (§53.8.2)
+	SkipProjectKind      bool        // true면 유지보수 종류 필터를 넣지 않는다(95-34 주간 행·미포함)
+	SkipOrg              bool        // true면 조직 조건은 호출 측에서 붙인다
 }
 
 // StatsKPICard 상단 중요 통계 카드

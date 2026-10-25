@@ -285,6 +285,7 @@ func (r *StatsRepo) countUnmappedMnt(from, toEx, orgID, excl string, planned boo
 	var names []string
 	if planned {
 		mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisVisit})
+		mntSQL += companyWeeklyProjectTestSQL("v.project_id")
 		args := append([]interface{}{from, toEx}, mntArgs...)
 		err := r.db.QueryRow(`
 			SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
@@ -314,6 +315,7 @@ func (r *StatsRepo) countUnmappedMnt(from, toEx, orgID, excl string, planned boo
 		return n, names, rows.Err()
 	}
 	mntSQL, mntArgs := r.filterMnt(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	mntSQL += companyWeeklyProjectTestSQL("v.project_id")
 	args := append([]interface{}{from, toEx}, mntArgs...)
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT v.customer_id) FROM maintenance_visits v
@@ -347,6 +349,7 @@ func (r *StatsRepo) countUnmappedMnt(from, toEx, orgID, excl string, planned boo
 
 func (r *StatsRepo) countUnmappedAS(from, toEx, orgID, excl string) (int, error) {
 	asSQL, asArgs := r.filterAS(model.StatsMeetingFilter{OrgID: orgID, DateBasis: model.BasisComplete})
+	asSQL += companyWeeklyProjectTestSQL("ar.project_id")
 	var n int
 	err := r.db.QueryRow(`
 		SELECT COUNT(*) FROM as_receipts ar

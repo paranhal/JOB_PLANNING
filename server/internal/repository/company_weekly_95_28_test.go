@@ -80,9 +80,8 @@ func TestCompanyWeeklyUnassignedNoRowVsNoProject(t *testing.T) {
 	if len(draft.UnassignedNoProject) != 1 || draft.UnassignedNoProject[0].ID != "T-NP" {
 		t.Fatalf("no_project %+v", draft.UnassignedNoProject)
 	}
-	if len(draft.UnassignedNoRow)+len(draft.UnassignedNoProject) != len(draft.Unassigned) &&
-		draft.UnassignedNoRowTaskN+len(draft.UnassignedNoProject) != len(draft.Unassigned) {
-		t.Fatalf("구역 합 %d+%d != %d", draft.UnassignedNoRowTaskN, len(draft.UnassignedNoProject), len(draft.Unassigned))
+	if draft.UnassignedNoRowTaskN+len(draft.UnassignedNoProject)+draft.UnassignedForeignTaskN != len(draft.Unassigned) {
+		t.Fatalf("구역 합 %d+%d+%d != %d", draft.UnassignedNoRowTaskN, len(draft.UnassignedNoProject), draft.UnassignedForeignTaskN, len(draft.Unassigned))
 	}
 }
 

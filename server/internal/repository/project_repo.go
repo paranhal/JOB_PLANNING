@@ -82,6 +82,7 @@ func (r *ProjectRepo) listProjects(orgID, search string, year int, status string
 	if !includeAll {
 		q += ` AND` + model.ContractedSQL("p", "sp")
 	}
+	q += ` AND COALESCE(p.is_test,0)=0`
 	q += ` ORDER BY COALESCE(p.sort_order,0), COALESCE(p.plan_year,0) DESC, p.name`
 	rows, err := r.db.Query(q, args...)
 	if err != nil {

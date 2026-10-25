@@ -62,42 +62,60 @@ type IncompleteMntVisit struct {
 const (
 	UnassignedReasonNoRow     = "no_row"
 	UnassignedReasonNoProject = "no_project"
+	UnassignedReasonForeign   = "foreign_org"
 )
 
 // CompanyWeeklyUnassigned 어느 행에도 안 붙은 활동. §16.6.5 · §16.6.9
 type CompanyWeeklyUnassigned struct {
-	Kind        string // maintenance | as | admin
-	KindLabel   string
-	ID          string
-	Title       string
-	Date        string
-	ProjectID   string
-	ProjectName string
+	Kind           string // maintenance | as | admin
+	KindLabel      string
+	ID             string
+	Title          string
+	Date           string
+	ProjectID      string
+	ProjectName    string
+	ProjectOrgID   string
+	ProjectKind    string
 	Href           string
 	Bucket         string // prev | plan | carry
 	BucketLabel    string
-	Reason         string // no_row | no_project
+	Reason         string // no_row | no_project | foreign_org
 	Assignee       string
 	AssigneeUserID string
 }
 
 // CompanyWeeklyUnassignedProject 보고서 행이 없는 사업 묶음.
 type CompanyWeeklyUnassignedProject struct {
-	ProjectID   string
-	ProjectName string
-	Count       int
-	KindSummary string
-	Items       []CompanyWeeklyUnassigned
+	ProjectID     string
+	ProjectName   string
+	ProjectOrgID  string
+	ProjectKind   string
+	Count         int
+	KindSummary   string
+	Items         []CompanyWeeklyUnassigned
+}
+
+// CompanyWeeklyExclusion 미포함 후보가 빠진 이유(?debug=1). 95-34
+type CompanyWeeklyExclusion struct {
+	ID      string
+	Kind    string
+	Title   string
+	Date    string
+	Reasons string
 }
 
 // CompanyWeeklyDraft 전사 주간업무보고 초안 (시트 쓰기 전). §16.6.5~7
 type CompanyWeeklyDraft struct {
-	Period              CompanyWeeklyPeriod
-	Rows                []CompanyWeeklyRow
-	Unassigned          []CompanyWeeklyUnassigned
+	Period                 CompanyWeeklyPeriod
+	Rows                   []CompanyWeeklyRow
+	Unassigned             []CompanyWeeklyUnassigned
 	UnassignedNoRow        []CompanyWeeklyUnassignedProject
 	UnassignedNoRowTaskN   int
 	UnassignedNoProject    []CompanyWeeklyUnassigned
+	UnassignedForeign      []CompanyWeeklyUnassignedProject
+	UnassignedForeignTaskN int
+	UnassignedMainN        int
 	IncompleteMnt          []IncompleteMntVisit
-	ReportStatus        string
+	DebugExclusions        []CompanyWeeklyExclusion
+	ReportStatus           string
 }

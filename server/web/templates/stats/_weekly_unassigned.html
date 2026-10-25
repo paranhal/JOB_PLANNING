@@ -1,6 +1,6 @@
 {{define "weekly_unassigned"}}
-{{$n := 0}}{{if .Draft}}{{$n = len .Draft.Unassigned}}{{end}}
-{{if or $n .FlashOK .FlashErr .NeedRow}}
+{{$n := 0}}{{$fn := 0}}{{if .Draft}}{{$n = .Draft.UnassignedMainN}}{{$fn = .Draft.UnassignedForeignTaskN}}{{end}}
+{{if or $n $fn .FlashOK .FlashErr .NeedRow .WeeklyDebug}}
 <section id="weekly-unassigned" class="card p-4 mt-4 border-line" data-weekly-unassigned>
   {{if .FlashOK}}<p class="flash-success rounded-card mb-3">{{.FlashOK}}</p>{{end}}
   {{if .FlashErr}}<p class="flash-warning rounded-card mb-3">{{.FlashErr}}</p>{{end}}
@@ -15,9 +15,22 @@
     <button class="btn-primary btn-sm" type="submit">보고서 행으로 추가</button>
   </form>
   {{end}}
-  {{if gt $n 0}}
+  {{if or (gt $n 0) (gt $fn 0) .WeeklyDebug}}
   <details class="rounded-card border border-line bg-canvas px-4 py-3" open>
     <summary class="text-ui font-semibold text-ink cursor-pointer">보고서에 포함되지 않은 활동 {{$n}}건</summary>
+    {{if .WeeklyDebug}}
+    <div class="mt-3 overflow-x-auto" data-weekly-debug>
+      <h4 class="text-ui-sm font-extrabold text-ink mb-2">제외 사유(debug)</h4>
+      <table class="text-ui-xs w-full">
+        <thead><tr><th class="text-left">종류</th><th class="text-left">ID</th><th class="text-left">제목</th><th class="text-left">날짜</th><th class="text-left">사유</th></tr></thead>
+        <tbody>
+        {{range .Draft.DebugExclusions}}
+        <tr><td>{{.Kind}}</td><td>{{.ID}}</td><td>{{.Title}}</td><td>{{.Date}}</td><td>{{.Reasons}}</td></tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
     {{if .Draft.UnassignedNoRow}}
     <div class="mt-3">
       <h4 class="text-ui-sm font-extrabold text-ink mb-2">보고서 행이 없는 사업 {{len .Draft.UnassignedNoRow}}개 · 업무 {{.Draft.UnassignedNoRowTaskN}}건</h4>
@@ -30,7 +43,8 @@
         <div class="rounded-card border border-line p-3">
           <label class="inline-flex items-center gap-2 text-ui text-ink font-semibold">
             <input type="checkbox" name="project_id" value="{{.ProjectID}}" checked class="rounded">
-            {{.ProjectName}} <span class="text-ui-xs text-ink-muted font-normal">{{.Count}}건 · {{.KindSummary}}</span>
+            {{.ProjectName}}{{if .ProjectKind}} <span class="text-ui-xs badge-neutral">{{projectKindLabel .ProjectKind}}</span>{{end}}
+            <span class="text-ui-xs text-ink-muted font-normal">{{.Count}}건 · {{.KindSummary}}</span>
           </label>
           <button class="btn-primary btn-sm mt-2" type="submit" name="project_id" value="{{.ProjectID}}">보고서 행으로 추가</button>
           <details class="mt-2">
@@ -137,6 +151,38 @@
         {{end}}
       </ul>
       {{end}}
+    </div>
+    {{end}}
+    {{if .Draft.UnassignedForeign}}
+    <div class="mt-4" data-weekly-task-link>
+      <details class="rounded-card border border-line p-3" {{if eq $n 0}}open{{end}}>
+        <summary class="text-ui-sm font-extrabold text-ink cursor-pointer">다른 조직 사업에 연결된 업무 {{.Draft.UnassignedForeignTaskN}}건</summary>
+        <p class="mt-2 text-ui-xs text-ink-muted">다른 조직 사업입니다. 이 조직 보고서 행으로는 추가하지 않습니다. 연결 변경만 할 수 있습니다.</p>
+        {{range .Draft.UnassignedForeign}}
+        <div class="mt-2">
+          <p class="text-ui-sm font-semibold text-ink">{{.ProjectName}}{{if .ProjectKind}} <span class="text-ui-xs badge-neutral">{{projectKindLabel .ProjectKind}}</span>{{end}}
+            <span class="text-ui-xs text-ink-muted font-normal">{{.Count}}건 · {{.KindSummary}}</span></p>
+          <ul class="mt-1 text-ui-sm text-ink space-y-1">
+            {{range .Items}}
+            {{$lk := "work_task"}}{{if eq .Kind "as"}}{{$lk = "as_receipt"}}{{else if eq .Kind "maintenance"}}{{$lk = "maintenance_visit"}}{{end}}
+            <li class="flex flex-wrap items-center gap-2" data-weekly-row
+                data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
+                data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
+                data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
+                data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">
+              <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+              {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+              {{if $.CanWrite}}<button class="btn-secondary btn-sm" type="button" data-weekly-link
+                      data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
+                      data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
+                      data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
+                      data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">연결 변경</button>{{end}}
+            </li>
+            {{end}}
+          </ul>
+        </div>
+        {{end}}
+      </details>
     </div>
     {{end}}
   </details>

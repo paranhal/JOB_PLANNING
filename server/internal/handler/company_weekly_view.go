@@ -76,6 +76,7 @@ type weeklyReportView struct {
 	ProgressCycleSel string
 	NeedSalesRow     bool
 	Draft            model.CompanyWeeklyDraft
+	WeeklyDebug      bool
 }
 
 func companyWeeklyAnchor(weekMon time.Time) time.Time {

@@ -41,6 +41,11 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		built.CanEdit, built.CanConfirm = canEdit, canEdit
 		v = built
 		markCardsEditable(&v, c.QueryParam("edit") == "1" && v.CanEdit)
+		if c.QueryParam("debug") == "1" && currentRole(c) == model.RoleVisionAdmin && h.repo != nil {
+			v.WeeklyDebug = true
+			ex, _ := h.repo.DiagnoseCompanyWeeklyUnassigned(v.Anchor, orgID)
+			v.Draft.DebugExclusions = ex
+		}
 	}
 	var projects []model.WorkProject
 	var assignees []model.User

@@ -885,7 +885,9 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		)`)
 		args = append(args, f.ProjectID, f.ProjectID)
 	}
-	b.WriteString(statsASProjectKindSQL())
+	if !f.SkipProjectKind {
+		b.WriteString(statsASProjectKindSQL())
+	}
 	if !f.IncludeImport {
 		b.WriteString(` AND COALESCE(ar.data_origin,'app') != 'import'`)
 	}
@@ -893,9 +895,11 @@ func asFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	fragB, argsB := asMetricsBaseSQL(f)
 	b.WriteString(fragB)
 	args = append(args, argsB...)
-	frag, a := mustOrgSQL("ar", f.OrgID)
-	b.WriteString(frag)
-	args = append(args, a...)
+	if !f.SkipOrg {
+		frag, a := mustOrgSQL("ar", f.OrgID)
+		b.WriteString(frag)
+		args = append(args, a...)
+	}
 	return b.String(), args
 }
 
@@ -924,7 +928,9 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND TRIM(COALESCE(v.project_id,'')) = ?`)
 		args = append(args, f.ProjectID)
 	}
-	b.WriteString(statsProjectKindSQL("v.project_id"))
+	if !f.SkipProjectKind {
+		b.WriteString(statsProjectKindSQL("v.project_id"))
+	}
 	if !f.IncludeImport {
 		b.WriteString(` AND COALESCE(v.data_origin,'app') != 'import'`)
 	}
@@ -932,9 +938,11 @@ func mntFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 	fragB, argsB := mntMetricsBaseSQL(f)
 	b.WriteString(fragB)
 	args = append(args, argsB...)
-	frag, a := mntVisitOrgSQL(f.OrgID)
-	b.WriteString(frag)
-	args = append(args, a...)
+	if !f.SkipOrg {
+		frag, a := mntVisitOrgSQL(f.OrgID)
+		b.WriteString(frag)
+		args = append(args, a...)
+	}
 	return b.String(), args
 }
 
@@ -968,14 +976,18 @@ func adminFilterSQL(f model.StatsMeetingFilter) (string, []interface{}) {
 		b.WriteString(` AND t.project_id = ?`)
 		args = append(args, f.ProjectID)
 	}
-	b.WriteString(statsProjectKindSQL("t.project_id"))
+	if !f.SkipProjectKind {
+		b.WriteString(statsProjectKindSQL("t.project_id"))
+	}
 	b.WriteString(SQLRecurrenceWorkUnit)
 	fragB, argsB := adminMetricsBaseSQL(f)
 	b.WriteString(fragB)
 	args = append(args, argsB...)
-	frag, a := mustOrgSQL("t", f.OrgID)
-	b.WriteString(frag)
-	args = append(args, a...)
+	if !f.SkipOrg {
+		frag, a := mustOrgSQL("t", f.OrgID)
+		b.WriteString(frag)
+		args = append(args, a...)
+	}
 	b.WriteString(statsTestSQL("t", f))
 	return b.String(), args
 }
