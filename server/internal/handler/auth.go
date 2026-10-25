@@ -1031,7 +1031,7 @@ func (h *AuthHandler) writeSessionCookie(c echo.Context, claims jwt.MapClaims) s
 	if err != nil {
 		return ""
 	}
-	c.SetCookie(tokenCookie(tokenStr, 86400))
+	c.SetCookie(tokenCookie(tokenStr, 0))
 	return tokenStr
 }
 
