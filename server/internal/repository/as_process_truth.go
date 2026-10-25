@@ -151,9 +151,7 @@ func overlayProcessActionFields(as *model.ASReceipt, procs []model.ASProcess) {
 	if s := pick(func(p model.ASProcess) string { return p.WorkContent }); s != "" {
 		as.ActionTaken = s
 	}
-	if s := pick(func(p model.ASProcess) string { return p.CauseType }); s != "" {
-		as.CauseType = s
-	}
+	as.CauseType = strings.TrimSpace(procs[len(procs)-1].CauseType)
 	as.PartsUsed = procs[len(procs)-1].PartsUsed
 	if s := pick(func(p model.ASProcess) string { return p.ResultCode }); s != "" {
 		as.ResultCode = s

@@ -899,6 +899,13 @@ func (h *ASHandler) Create(c echo.Context) error {
 	if equipmentVisitDateYearErr(c) {
 		return h.renderNewValidation(c, base, rows, "date_year", -1)
 	}
+	extras, extraErr := parseExtraSiteReceipts(c, base)
+	if extraErr != "" {
+		return h.renderNewValidation(c, base, rows, extraErr, -1)
+	}
+	if 1+len(extras) > 20 {
+		return h.renderNewValidation(c, base, rows, "extra_sites_max", -1)
+	}
 	if requiresAssigneeChoice(c) {
 		for i, as := range rows {
 			if as != nil && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
@@ -919,6 +926,9 @@ func (h *ASHandler) Create(c echo.Context) error {
 		if dup != nil {
 			return h.renderASNewDup(c, base, rows, dup)
 		}
+	}
+	if len(extras) > 0 {
+		rows = append(rows, extras...)
 	}
 	if len(rows) >= 2 {
 		gid := repository.NewReceiptGroupID()
@@ -1161,6 +1171,9 @@ func (h *ASHandler) Show(c echo.Context) error {
 		dailyTask, _ = h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
 	}
 
+	if cats, err := h.repo.ListCauseCategories(); err == nil {
+		as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(cats))
+	}
 	closed := isASClosedStatus(as.Status)
 	unlocked, unlockExp, _ := h.unlockActive(c, as.ASID)
 	canMod := h.canModifyAS(c, as)
@@ -1283,10 +1296,12 @@ func (h *ASHandler) Action(c echo.Context) error {
 	causeCats, _ := h.repo.ListCauseCategories()
 	var causeCatL1 []model.CauseCategory
 	for _, cat := range causeCats {
-		if cat.Level == 1 {
+		if cat.Level == 1 && cat.Code != model.CauseCatCustom {
 			causeCatL1 = append(causeCatL1, cat)
 		}
 	}
+	as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(causeCats))
+	customRecent, _ := h.repo.ListCauseCat1CustomRecent(currentOrg(c), 20)
 	assignees := listAssignableForPicker(h.userRepo, c)
 	applySupportAssigneeDefault(c, as)
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
@@ -1353,6 +1368,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"Processes":         processes, "WorkItems": workItems, "Attachments": attachments,
 		"ProcTypes": procTypes, "CauseTypes": causeTypes, "ResultCodes": resultCodes,
 		"CauseCatL1":           causeCatL1,
+		"CauseCatCustomRecent": customRecent,
 		"CauseCategoriesJSON":  causeCategoriesJSON(causeCats),
 		"ActionResults":        model.ActionResultOptions(),
 		"Assignees":            assignees,
@@ -1386,6 +1402,8 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"ActionWarn":           c.QueryParam("warn"),
 		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
 		"ActionOK":             asShowOK(c.QueryParam("ok")),
+		"ApplyN":               c.QueryParam("apply_n"),
+		"ApplySkip":            c.QueryParam("apply_skip"),
 		"ConclusionDraft":      asConclusionDraft(as, processes),
 		"CanReceive":           canReceiveAS(c),
 		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
@@ -1514,6 +1532,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		return err
 	}
 	var applyOut *model.ActionApplyResult
+	var applyIn *model.ActionApplyInput
 	formResult := ""
 	prepNotes := ""
 	var followupChild *model.ASReceipt
@@ -1538,11 +1557,17 @@ func (h *ASHandler) Update(c echo.Context) error {
 			}
 		}
 		as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
-		as.CauseCat1 = strings.TrimSpace(c.FormValue("cause_cat1"))
-		as.CauseCat2 = strings.TrimSpace(c.FormValue("cause_cat2"))
-		as.CauseCat3 = strings.TrimSpace(c.FormValue("cause_cat3"))
 		causeCats, _ := h.repo.ListCauseCategories()
-		as.CauseType = model.CauseTypeFromCat2(causeCats, as.CauseCat2)
+		if code := model.ApplyCauseCat1(as, c.FormValue("cause_cat1"), c.FormValue("cause_cat1_custom")); code != "" && (na || as.ActionTaken != "" || formResult != "") {
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
+		}
+		if as.CauseCat1 != model.CauseCatCustom {
+			as.CauseCat2 = strings.TrimSpace(c.FormValue("cause_cat2"))
+			as.CauseCat3 = strings.TrimSpace(c.FormValue("cause_cat3"))
+			as.CauseType = model.CauseTypeFromCat2(causeCats, as.CauseCat2)
+		} else {
+			as.CauseType = ""
+		}
 		as.RevisitReason = strings.TrimSpace(c.FormValue("revisit_reason"))
 		prepNotes = strings.TrimSpace(c.FormValue("revisit_prep"))
 		confCode := c.FormValue("customer_confirmer_code")
@@ -1641,6 +1666,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 				RevisitDate:               revisitDate,
 				RevisitScheduleConfirmed:  revisitConfirmed,
 			}
+			applyIn = &in
 			switch formResult {
 			case model.ResultRevisit, model.ResultTemporary, model.ResultPartial:
 				in.NextDate = firstNonEmpty(revisitDate, nextVisit)
@@ -1716,9 +1742,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 	}
 	h.saveKeywordChecks(c, as.ASID, model.KWFieldAction)
 	var procID string
+	applyN, applySkips := 0, []string(nil)
 	if canProcessAS(c) {
 		procID, _ = h.appendActionProcess(c, as, formResult, prepNotes, timeSpent)
 		h.applyASPartsSave(c, as.ASID, procID)
+		applyN, applySkips = h.applyActionCopies(c, as, formResult, prepNotes, timeSpent, applyIn)
 		if applyOut != nil {
 			workTo, workUID := resolveAssigneeFormFields(c, h.userRepo,
 				"work_assigned_to_code", "work_assigned_to_custom", "work_assigned_to")
@@ -1758,6 +1786,12 @@ func (h *ASHandler) Update(c echo.Context) error {
 		if model.ShowsASCauseReport(formResult) && strings.TrimSpace(as.CauseDetail) == "" {
 			q.Set("warn", "cause_report")
 		}
+	}
+	if applyN > 0 {
+		q.Set("apply_n", strconv.Itoa(applyN))
+	}
+	if len(applySkips) > 0 {
+		q.Set("apply_skip", strings.Join(applySkips, " | "))
 	}
 	if len(q) > 0 {
 		loc += "?" + q.Encode()
@@ -1811,6 +1845,12 @@ func actionCauseCatMissingErr(as *model.ASReceipt, cats []model.CauseCategory) s
 	}
 	if strings.TrimSpace(as.CauseCat1) == "" {
 		return "cause_cat1"
+	}
+	if as.CauseCat1 == model.CauseCatCustom {
+		if !model.CauseCatCustomOK(as.CauseCat1Custom) {
+			return "cause_cat1_custom"
+		}
+		return ""
 	}
 	if strings.TrimSpace(as.CauseCat2) == "" {
 		return "cause_cat2"
@@ -1899,6 +1939,12 @@ func actionErrMessage(code string) string {
 		return "2차 분류를 선택하세요."
 	case "cause_cat3":
 		return "3차 분류를 선택하세요."
+	case "cause_cat1_custom":
+		return "대상 장비 구분을 직접 입력하세요."
+	case "cause_cat1_custom_len":
+		return "대상 장비 구분은 40자까지입니다."
+	case "extra_sites_max":
+		return "사이트는 최대 20곳입니다."
 	case "process_type":
 		return "처리유형을 선택하세요."
 	case "process_type_reason":
@@ -2475,9 +2521,11 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 		title = "내 AS 현황"
 	}
 
+	causeCounts, _ := h.repo.CountCauseCat1(currentOrg(c))
 	return c.Render(http.StatusOK, "as/stats.html", map[string]interface{}{
 		"Title": title, "Active": NavASStats,
 		"Stats":       stats,
+		"CauseCat1":   causeCounts,
 		"Personal":    personal,
 		"DisplayName": ctxString(c, "user_name"),
 		"Role":        role,

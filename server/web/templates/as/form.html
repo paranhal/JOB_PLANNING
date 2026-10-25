@@ -108,6 +108,14 @@
         </div>
       </div>
     </section>
+    {{if .IsNew}}
+    <section class="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 space-y-3 shadow-sm"
+             x-data="siteMultiPicker({ idName: 'extra_site_id', extraKey: 'symptom', extraName: 'extra_site_symptom', excludeId: '{{.AS.CustomerID}}', max: 19 })">
+      <h3 class="text-sm font-semibold text-slate-800">다른 사이트도 함께 접수</h3>
+      <p class="text-[11px] text-slate-500">증상·긴급도·담당자·방문 예정일을 공통으로 쓰고, 사이트마다 접수 1건을 만듭니다. 추가 사이트는 장비 없이 접수됩니다. 최대 20곳.</p>
+      {{template "site_multi_picker" dict "Label" "추가 사이트"}}
+    </section>
+    {{end}}
 
     <section id="as-open-banner" class="hidden rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-2">

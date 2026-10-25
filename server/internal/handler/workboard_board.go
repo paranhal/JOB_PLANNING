@@ -319,12 +319,12 @@ func buildBoardItem(t model.WorkTask, mems []model.WorkTaskMember, addr string, 
 	if len(names) > 1 {
 		extra = fmt.Sprintf(" 외 %d명", len(names)-1)
 	}
-	cust := strings.TrimSpace(t.OrgName)
+	cust := strings.TrimSpace(t.SiteLine)
 	if cust == "" {
-		cust = strings.TrimSpace(t.CustomerName)
+		cust = strings.TrimSpace(t.OrgName)
 	}
 	if cust == "" {
-		cust = strings.TrimSpace(t.SiteLine)
+		cust = strings.TrimSpace(t.CustomerName)
 	}
 	place := strings.TrimSpace(addr)
 	if place == "" {

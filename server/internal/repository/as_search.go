@@ -148,8 +148,17 @@ func appendASSearchFilters(where string, args []interface{}, f model.ASSearchFil
 		args = append(args, s)
 	}
 	if s := strings.TrimSpace(f.CauseCat); s != "" {
-		where += ` AND (ar.cause_cat1 = ? OR ar.cause_cat2 = ? OR ar.cause_cat3 = ?)`
-		args = append(args, s, s, s)
+		if s == model.CauseCatCustom {
+			where += ` AND ar.cause_cat1 = ?`
+			args = append(args, model.CauseCatCustom)
+		} else if strings.HasPrefix(s, model.CauseCatCustom+":") {
+			want := model.NormalizeCauseCatCustom(strings.TrimPrefix(s, model.CauseCatCustom+":"))
+			where += ` AND ar.cause_cat1 = ? AND lower(TRIM(COALESCE(ar.cause_cat1_custom,''))) = lower(?)`
+			args = append(args, model.CauseCatCustom, want)
+		} else {
+			where += ` AND (ar.cause_cat1 = ? OR ar.cause_cat2 = ? OR ar.cause_cat3 = ?)`
+			args = append(args, s, s, s)
+		}
 	}
 	if f.RequireAction {
 		where += ` AND` + similarHasWorkSQL()
@@ -169,7 +178,10 @@ var asSearchHitSQL = `
 		          WHERE p.as_id = ar.as_id AND TRIM(COALESCE(p.work_content,'')) != ''
 		          ORDER BY p.process_datetime DESC LIMIT 1
 		       ), ''),
-		       COALESCE(ct.code_name, ` + asCauseTypeSQL("ar") + `, ''),
+		       CASE WHEN TRIM(COALESCE(ar.cause_cat1,'')) = '` + model.CauseCatCustom + `'
+		            THEN TRIM(COALESCE(ar.cause_cat1_custom,''))
+		            ELSE COALESCE(cat1.label, ct.code_name, ` + asCauseTypeSQL("ar") + `, '')
+		       END,
 		       COALESCE(ar.assigned_to,''),
 		       COALESCE(date(ar.complete_datetime), ''),
 		       COALESCE(ar.customer_id,''),
@@ -177,6 +189,7 @@ var asSearchHitSQL = `
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
+		LEFT JOIN as_cause_categories cat1 ON cat1.code = ar.cause_cat1
 		LEFT JOIN codes ct ON ct.code_group='cause_type' AND ct.code_value = ` + asCauseTypeSQL("ar") + `
 		LEFT JOIN (SELECT as_id, COUNT(*) AS n FROM as_case_votes GROUP BY as_id) kv ON kv.as_id = ar.as_id`
 

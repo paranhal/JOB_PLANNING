@@ -269,6 +269,7 @@
       <div><p class="text-xs text-slate-500">처리담당자</p><p>{{if .AS.AssignedTo}}{{.AS.AssignedTo}}{{else}}—{{end}}</p></div>
       <div><p class="text-xs text-slate-500">근무구분</p><p>{{if workPlaceLabel .AS.WorkPlace}}{{workPlaceLabel .AS.WorkPlace}}{{else}}—{{end}}</p></div>
       <div><p class="text-xs text-slate-500">결과</p><p>{{if .AS.ResultCode}}{{actionResultLabel .AS.ResultCode}}{{else}}—{{end}}</p></div>
+      <div><p class="text-xs text-slate-500">1차 분류</p><p>{{if .AS.CauseCatLabel}}{{.AS.CauseCatLabel}}{{else}}{{causeCat1Label .AS.CauseCat1 .AS.CauseCat1Custom}}{{end}}</p></div>
       <div class="sm:col-span-2"><p class="text-xs text-slate-500 mb-1">조치내용</p><p class="whitespace-pre-line">{{if .AS.ActionTaken}}{{.AS.ActionTaken}}{{else}}—{{end}}</p></div>
   {{else if .CanProcess}}
   <div id="panel-action" class="scroll-mt-4 rounded-2xl border border-blue-200 bg-slate-50 overflow-hidden shadow-sm">
@@ -285,6 +286,12 @@
 <div class="p-4 sm:p-5 space-y-4">
         {{if and .ActionErr (not .AttachErrMsg)}}
         <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErrMsg}}</div>
+        {{end}}
+        {{if or .ApplyN .ApplySkip}}
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {{if .ApplyN}}<p>같은 조치를 {{.ApplyN}}건에 적용했습니다.</p>{{end}}
+          {{if .ApplySkip}}<p class="mt-1 text-amber-900">제외: {{.ApplySkip}}</p>{{end}}
+        </div>
         {{end}}
 
         <!-- 조치 내역 -->
@@ -354,16 +361,7 @@
                      placeholder="왜 처리유형을 지금 정하지 못하는지"
                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
             </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">1차 분류 <span class="text-red-500">*</span></label>
-              <select name="cause_cat1" id="as-cause-cat1" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">선택</option>
-                {{range .CauseCatL1}}
-                <option value="{{.Code}}" {{if eq .Code $.AS.CauseCat1}}selected{{end}}>{{.Label}}</option>
-                {{end}}
-              </select>
-              <p class="text-[11px] text-slate-400 mt-1">RFID · KLAS · 홈페이지 · 서버</p>
-            </div>
+            {{template "as_cause_cat1_fields" .}}
             <div id="as-cause-cat2-wrap" class="hidden">
               <label class="block text-sm font-medium text-slate-700 mb-1">2차 분류 <span class="text-red-500">*</span></label>
               <select name="cause_cat2" id="as-cause-cat2" data-current="{{.AS.CauseCat2}}"
@@ -497,6 +495,23 @@
             </div>
           </div>
         </section>
+        {{if and .CanProcess (not .ReadOnly)}}
+        <section class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-3"
+                 x-data="Object.assign({ applyOpen: false }, siteMultiPicker({ searchUrl: '/as/open-for-apply', idName: 'extra_as_id', extraKey: 'action', extraName: 'extra_action_taken', excludeId: '{{.AS.ASID}}', hint: '사이트·접수번호 2글자 이상' }))">
+          <h4 class="text-sm font-semibold text-slate-800">같은 조치를 다른 AS 접수에도 적용</h4>
+          <p class="text-[11px] text-slate-500">자재 사용·사진 첨부는 이 접수에만 남습니다. 완료·종료 건과 타 조직 건은 고를 수 없습니다.</p>
+          {{template "site_multi_picker" dict "Label" "적용할 접수(사이트 검색)"}}
+          <input type="hidden" name="apply_as_confirm" id="as-apply-confirm" value="">
+          <div x-show="applyOpen" x-cloak class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <p class="font-medium">다음 접수에 같은 조치를 남깁니다.</p>
+            <ul class="mt-1 list-disc pl-5">
+              <template x-for="s in sites" :key="'m-'+s.site_id">
+                <li x-text="s.site_name"></li>
+              </template>
+            </ul>
+          </div>
+        </section>
+        {{end}}
       </div>
 
     </form>
@@ -909,7 +924,22 @@
         sel.appendChild(opt);
       });
     }
+    var customWrap = document.getElementById('as-cause-cat1-custom-wrap');
+    var customInp = document.getElementById('as-cause-cat1-custom');
     function sync(resetLower) {
+      var isCustom = cat1.value === 'custom';
+      if (customWrap) customWrap.classList.toggle('hidden', !isCustom);
+      if (customInp) {
+        customInp.required = isCustom;
+        if (!isCustom) { customInp.value = ''; customInp.removeAttribute('required'); }
+      }
+      if (isCustom) {
+        if (wrap2) wrap2.classList.add('hidden');
+        if (wrap3) wrap3.classList.add('hidden');
+        if (cat2) { cat2.value = ''; cat2.required = false; }
+        if (cat3) { cat3.value = ''; cat3.required = false; }
+        return;
+      }
       var l2 = childrenOf(cat1.value, 2);
       if (wrap2) wrap2.classList.toggle('hidden', l2.length === 0);
       if (l2.length === 0) {
@@ -934,6 +964,24 @@
     cat1.addEventListener('change', function () { sync(true); });
     if (cat2) cat2.addEventListener('change', function () { sync(false); });
     sync(false);
+  })();
+  (function applyOthersConfirm() {
+    var form = document.getElementById('as-action-form');
+    if (!form) return;
+    form.addEventListener('submit', function (ev) {
+      var ids = form.querySelectorAll('input[name="extra_as_id"]');
+      var conf = document.getElementById('as-apply-confirm');
+      if (!ids.length || !conf || conf.value === '1') return;
+      ev.preventDefault();
+      var names = [];
+      ids.forEach(function (el) {
+        var wrap = el.closest('span');
+        names.push(wrap ? wrap.innerText.replace('×', '').trim() : el.value);
+      });
+      if (!window.confirm('선택한 접수에도 같은 조치를 남깁니다.\n' + names.join('\n') + '\n계속할까요?')) return;
+      conf.value = '1';
+      form.submit();
+    });
   })();
   var confSel = document.getElementById('as-confirmer-code');
   var confWrap = document.getElementById('as-confirmer-custom-wrap');

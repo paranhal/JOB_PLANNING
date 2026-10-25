@@ -37,6 +37,8 @@ type ASReceipt struct {
 	CauseCat1          string     `json:"cause_cat1"`          // 원인분류 1차. §34.3.3
 	CauseCat2          string     `json:"cause_cat2"`
 	CauseCat3          string     `json:"cause_cat3"`
+	CauseCat1Custom    string     `json:"cause_cat1_custom,omitempty"` // 1차=custom 일 때 직접 입력. 95-44
+	CauseCatLabel      string     `json:"cause_cat_label,omitempty"`   // 표시용. DB 아님.
 	Conclusion         string     `json:"conclusion"`   // 결론 서술. 보고서용 초안·수정 (§12.10.4)
 	ActionTaken        string     `json:"action_taken"` // 조치내용
 	PartsUsed          string     `json:"parts_used"`

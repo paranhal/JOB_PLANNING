@@ -1,0 +1,22 @@
+{{define "as_cause_cat1_fields"}}
+<div>
+  <label class="block text-sm font-medium text-slate-700 mb-1">1차 분류 <span class="text-red-500">*</span></label>
+  <select name="cause_cat1" id="as-cause-cat1" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">선택</option>
+    {{range .CauseCatL1}}
+    <option value="{{.Code}}" {{if eq .Code $.AS.CauseCat1}}selected{{end}}>{{.Label}}</option>
+    {{end}}
+    <option value="custom" {{if eq $.AS.CauseCat1 "custom"}}selected{{end}}>직접 입력</option>
+  </select>
+  <p class="text-[11px] text-slate-400 mt-1">목록에 없으면 직접 입력</p>
+</div>
+<div id="as-cause-cat1-custom-wrap" class="{{if ne .AS.CauseCat1 "custom"}}hidden{{end}}">
+  <label class="block text-sm font-medium text-slate-700 mb-1">대상 장비 구분(직접 입력) <span class="text-red-500">*</span></label>
+  <input type="text" name="cause_cat1_custom" id="as-cause-cat1-custom" maxlength="40"
+         value="{{.AS.CauseCat1Custom}}" list="as-cause-cat1-custom-list"
+         placeholder="예: CCTV" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  <datalist id="as-cause-cat1-custom-list">
+    {{range .CauseCatCustomRecent}}<option value="{{.}}">{{end}}
+  </datalist>
+</div>
+{{end}}

@@ -380,6 +380,10 @@
       {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" $t.CustomerID "Placeholder" "고객명으로 찾기"}}
       <input name="customer_name" value="{{if not $t.CustomerID}}{{$t.CustomerName}}{{end}}"
              class="mt-2 w-full border rounded-lg px-3 py-2" placeholder="목록에 없으면 직접입력 (예: 충남교육청)">
+      <div class="mt-3" x-show="workType !== 'sales'" x-cloak
+           x-data="siteMultiPicker({ sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{printf "%q" $s.SiteName}},parent_name:{{printf "%q" $s.ParentName}},region:{{printf "%q" $s.Region}},on_project:{{if $s.OnProject}}true{{else}}false{{end}}}{{end}}] })">
+        {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "여러 사이트를 고르면 이 업무에 함께 연결됩니다."}}
+      </div>
     </div>
     {{if $.EditMode}}{{template "task_asset_picker" .}}{{end}}
     {{end}}
@@ -417,57 +421,12 @@
     {{end}}
 
     {{if $isWork}}
-    <div x-data="{
-      projectId: '{{$t.ProjectID}}',
-      sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{printf "%q" $s.SiteName}},parent_name:{{printf "%q" $s.ParentName}},region:{{printf "%q" $s.Region}},on_project:{{if $s.OnProject}}true{{else}}false{{end}}}{{end}}],
-      q: '', cands: [], hint: '학교·기관명을 2글자 이상 입력',
-      removeSite(id) { this.sites = this.sites.filter(s => s.site_id !== id); },
-      pick(s) { if (this.sites.find(x => x.site_id === s.site_id) || this.sites.length >= 20) return; this.sites.push(s); this.q=''; this.cands=[]; },
-      async refreshBadges() {
-        const ids = (this.sites || []).map(s => s.site_id).filter(Boolean);
-        if (!ids.length) return;
-        try {
-          const r = await fetch('/workboard/work-sites/search?project_id=' + encodeURIComponent(this.projectId || '') + '&selected=' + encodeURIComponent(ids.join(',')));
-          const j = await r.json();
-          const hit = {};
-          (j || []).forEach(h => { hit[h.site_id] = !!h.on_project; });
-          this.sites = this.sites.map(s => Object.assign({}, s, { on_project: !!hit[s.site_id] }));
-        } catch (e) {}
-      },
-      async search() {
-        if ((this.q||'').trim().length < 2) { this.cands = []; this.hint = '학교·기관명을 2글자 이상 입력'; return; }
-        try {
-          const r = await fetch('/workboard/work-sites/search?q=' + encodeURIComponent(this.q) + '&project_id=' + encodeURIComponent(this.projectId || ''));
-          const j = await r.json();
-          const taken = this.sites.map(s => s.site_id);
-          this.cands = (j || []).filter(s => taken.indexOf(s.site_id) < 0);
-          this.hint = this.cands.length ? '' : '해당하는 사이트가 없습니다';
-        } catch (e) { this.cands = []; }
-      }
-    }">
+    <div x-data="siteMultiPicker({ projectId: '{{$t.ProjectID}}', sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{printf "%q" $s.SiteName}},parent_name:{{printf "%q" $s.ParentName}},region:{{printf "%q" $s.Region}},on_project:{{if $s.OnProject}}true{{else}}false{{end}}}{{end}}] })">
       <label class="block text-sm font-medium text-gray-700 mb-1">사업</label>
       <div @project-picked="projectId=$event.detail.id; refreshBadges(); search()">
         {{template "project_combo" dict "Items" .WorkProjects "Selected" $t.ProjectID "Empty" "— 선택 (해당 시) —" "Name" "project_id"}}
       </div>
-      <label class="block text-sm font-medium text-gray-700 mb-1 mt-3">대상 사이트</label>
-      <template x-for="s in sites" :key="s.site_id">
-        <span class="inline-flex items-center gap-1 mr-1 mb-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-900 text-xs border border-emerald-200">
-          <input type="hidden" name="site_id" :value="s.site_id">
-          <span x-text="s.site_name + (s.on_project ? ' · 사업 대상' : '')"></span>
-          <button type="button" class="text-emerald-700" @click="removeSite(s.site_id)">×</button>
-        </span>
-      </template>
-      <input type="search" x-model="q" @input="search()" autocomplete="off"
-             placeholder="학교·기관명을 2글자 이상 입력" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
-      <p class="text-xs text-gray-500 mt-1" x-text="hint"></p>
-      <ul class="mt-1 border rounded-lg overflow-hidden" x-show="cands.length" x-cloak>
-        <template x-for="s in cands" :key="s.site_id">
-          <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" @click="pick(s)">
-            <span x-text="s.site_name"></span>
-            <span class="text-xs text-gray-400" x-text="(s.parent_name ? ' · ' + s.parent_name : '') + (s.region ? ' · ' + s.region : '') + (s.on_project ? ' · 사업 대상' : '')"></span>
-          </button></li>
-        </template>
-      </ul>
+      <div class="mt-3">{{template "site_multi_picker" dict "Label" "대상 사이트"}}</div>
     </div>
     {{else if not (or $isAS $isMnt)}}
     <div>

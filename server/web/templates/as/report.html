@@ -69,6 +69,10 @@
         <span class="text-xs text-slate-500">장애원인</span>
         <textarea name="cause_detail" rows="3" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.Draft.CauseDetail}}</textarea>
       </label>
+      {{if or .AS.CauseCatLabel .AS.CauseCat1}}
+      <p class="text-sm"><span class="text-xs text-slate-500">1차 분류</span>
+        <span class="ml-2">{{if .AS.CauseCatLabel}}{{.AS.CauseCatLabel}}{{else}}{{causeCat1Label .AS.CauseCat1 .AS.CauseCat1Custom}}{{end}}</span></p>
+      {{end}}
       <label class="block text-sm">
         <span class="text-xs text-slate-500">결론</span>
         <textarea name="conclusion" rows="3" placeholder="초안을 확인한 뒤 고치세요"

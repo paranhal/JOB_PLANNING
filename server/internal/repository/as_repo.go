@@ -466,6 +466,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.receipt_group_id,''),
 		       COALESCE(ar.urgency_reason,''), COALESCE(ar.urgency_reason_note,''),
 		       COALESCE(ar.cause_cat1,''), COALESCE(ar.cause_cat2,''), COALESCE(ar.cause_cat3,''),
+		       COALESCE(ar.cause_cat1_custom,''),
 		       COALESCE(ar.visit_date,''), COALESCE(ar.process_type_reason,''),
 		       COALESCE(ar.moved_task_id,''),
 		       COALESCE(ar.created_by_user_id,''), COALESCE(ar.created_by_name,''),
@@ -510,7 +511,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		&startStr, &completeStr, &confirmStr, &cancelStr,
 		&as.ParentASID, &as.ReopenReason, &as.FollowupNote, &as.ReceiptGroupID,
 		&as.UrgencyReason, &as.UrgencyReasonNote,
-		&as.CauseCat1, &as.CauseCat2, &as.CauseCat3,
+		&as.CauseCat1, &as.CauseCat2, &as.CauseCat3, &as.CauseCat1Custom,
 		&as.VisitDate, &as.ProcessTypeReason,
 		&as.MovedTaskID,
 		&as.CreatedByUserID, &as.CreatedByName,
@@ -727,7 +728,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 			customer_confirmer=?, is_recurrence=?, is_reopen=?, replace_review=?,
 			visit_scheduled_date=?, schedule_confirmed=?,
 			transfer_detail=?, confirm_target=?, confirm_contact=?,
-			cause_cat1=?, cause_cat2=?, cause_cat3=?,
+			cause_cat1=?, cause_cat2=?, cause_cat3=?, cause_cat1_custom=?,
 			visit_date=?, process_type_reason=?,
 			updated_at=?`
 	args := []interface{}{
@@ -737,7 +738,7 @@ func (r *ASRepo) Update(as *model.ASReceipt) error {
 		as.CustomerConfirmer, boolToInt(as.IsRecurrence), boolToInt(as.IsReopen), boolToInt(as.ReplaceReview),
 		nullStr(as.VisitScheduledDate), boolToInt(as.ScheduleConfirmed),
 		as.TransferDetail, as.ConfirmTarget, as.ConfirmContact,
-		nullStr(as.CauseCat1), nullStr(as.CauseCat2), nullStr(as.CauseCat3),
+		nullStr(as.CauseCat1), nullStr(as.CauseCat2), nullStr(as.CauseCat3), nullStr(as.CauseCat1Custom),
 		nullStr(as.VisitDate), nullStr(as.ProcessTypeReason),
 		nowStr,
 	}

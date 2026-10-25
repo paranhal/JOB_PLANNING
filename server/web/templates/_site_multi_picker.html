@@ -1,0 +1,30 @@
+{{define "site_multi_picker"}}
+<div class="js-site-multi-picker">
+  <label class="block text-sm font-medium text-gray-700 mb-1">{{if .Label}}{{.Label}}{{else}}대상 사이트{{end}}</label>
+  <template x-for="s in sites" :key="s.site_id">
+    <span class="inline-flex flex-col mr-1 mb-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-900 text-xs border border-emerald-200">
+      <span class="inline-flex items-center gap-1">
+        <input type="hidden" :name="idName" :value="s.site_id">
+        <span x-text="s.site_name + (s.on_project ? ' · 사업 대상' : '')"></span>
+        <button type="button" class="text-emerald-700" @click="removeSite(s.site_id)">×</button>
+      </span>
+      <template x-if="extraKey">
+        <input type="text" :name="extraName" x-model="s[extraKey]" :placeholder="extraKey === 'action' ? '조치 내용(비우면 공통)' : '증상(비우면 공통)'"
+               class="mt-1 w-40 border rounded px-1 py-0.5 text-xs text-slate-700 bg-white">
+      </template>
+    </span>
+  </template>
+  <input type="search" x-model="q" @input="search()" autocomplete="off"
+         placeholder="학교·기관명을 2글자 이상 입력" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
+  <p class="text-xs text-gray-500 mt-1" x-text="hint"></p>
+  <ul class="mt-1 border rounded-lg overflow-hidden" x-show="cands.length" x-cloak>
+    <template x-for="s in cands" :key="s.site_id">
+      <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" @click="pick(s)">
+        <span x-text="s.site_name"></span>
+        <span class="text-xs text-gray-400" x-text="(s.parent_name ? ' · ' + s.parent_name : '') + (s.region ? ' · ' + s.region : '') + (s.on_project ? ' · 사업 대상' : '')"></span>
+      </button></li>
+    </template>
+  </ul>
+  {{if .Hint}}<p class="text-[11px] text-slate-400 mt-1">{{.Hint}}</p>{{end}}
+</div>
+{{end}}

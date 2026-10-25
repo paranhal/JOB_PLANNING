@@ -20,8 +20,11 @@ func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
 		t.Fatal("원인분류 5종 select 가 남아 있다")
 	}
 	n := strings.Count(form, `name="cause_cat`)
-	if n != 3 {
-		t.Fatalf("원인분류 드롭다운 %d개", n)
+	if n != 4 {
+		t.Fatalf("원인분류 필드 %d개 (1·2·3차+직접입력)", n)
+	}
+	if !strings.Contains(form, `name="cause_cat1_custom"`) || !strings.Contains(form, "직접 입력") {
+		t.Fatal("직접 입력 칸이 없다")
 	}
 	if !strings.Contains(body, `"code":"server.patch"`) || !strings.Contains(body, `"label":"패치"`) {
 		t.Fatal("시드에 패치가 없다")

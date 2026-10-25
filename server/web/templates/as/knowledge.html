@@ -111,6 +111,7 @@
         {{if .MatchAction}}<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[11px]">조치</span>{{end}}
       </div>
       <p class="text-sm {{if .HasAction}}text-slate-800{{else}}text-slate-400{{end}}"><span class="text-[11px] text-slate-400">조치</span> {{.ActionHTML}}</p>
+      {{if .CauseName}}<p class="text-xs text-slate-600">분류 {{.CauseName}}</p>{{end}}
       <p class="text-xs text-slate-600">
         {{.AuthorName}}
         <span title="{{.AuthorFull}}">{{.AuthorDate}}</span>

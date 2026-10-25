@@ -1842,6 +1842,13 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
 	}
+	if t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport {
+		_ = c.Request().ParseForm()
+		siteIDs := c.Request().Form["site_id"]
+		if err := h.saveAdminTaskSites(c, t, siteIDs); err != nil {
+			return err
+		}
+	}
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
 		dates, err := collectDatesFromForm(mode, c.FormValue("daily_from"), c.FormValue("daily_to"), c.FormValue("sub_dates"))
 		if err == nil && len(dates) > 0 {
@@ -2106,6 +2113,12 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		}
 		if t.Status == model.WBTaskComplete {
 			_ = h.repo.SyncSitesOnProjectWorkComplete(t, currentUserID(c))
+		}
+	}
+	if t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport {
+		_ = c.Request().ParseForm()
+		if err := h.saveAdminTaskSites(c, t, c.Request().Form["site_id"]); err != nil {
+			return err
 		}
 	}
 	if existing.SourceType == "" && registerScope {
@@ -2473,6 +2486,34 @@ func (h *WorkboardHandler) CreateSubtasks(c echo.Context) error {
 	}
 	return c.Redirect(http.StatusSeeOther,
 		fmt.Sprintf("/workboard/tasks/%s?ok=sub&n=%d", parent.TaskID, n))
+}
+
+func (h *WorkboardHandler) saveAdminTaskSites(c echo.Context, t *model.WorkTask, siteIDs []string) error {
+	if h == nil || h.repo == nil || t == nil {
+		return nil
+	}
+	if t.WorkType == model.WBWorkSales {
+		return nil
+	}
+	if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if len(siteIDs) > 20 {
+		return echo.NewHTTPError(http.StatusBadRequest, "사이트는 최대 20곳입니다")
+	}
+	if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
+		return err
+	}
+	if t.CustomerID == "" {
+		for _, id := range siteIDs {
+			if s := strings.TrimSpace(id); s != "" {
+				t.CustomerID = s
+				_ = h.repo.UpdateTask(t)
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func applyCustomerForm(t *model.WorkTask, c echo.Context) {

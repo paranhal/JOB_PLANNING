@@ -238,6 +238,9 @@ func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
 	if err != nil || as == nil {
 		return nil, echo.ErrNotFound
 	}
+	if cats, e := h.repo.ListCauseCategories(); e == nil {
+		as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(cats))
+	}
 	return as, nil
 }
 

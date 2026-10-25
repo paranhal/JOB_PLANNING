@@ -24,7 +24,7 @@
       {{$p := index .Processes (sub (len .Processes) 1)}}
       {{if $.AS.IsReopen}}<p class="text-ui-sm font-medium text-warning">재방문 · {{if $.AS.RevisitReason}}{{$.AS.RevisitReason}}{{end}}</p>{{end}}
       <p>{{if $p.WorkContent}}{{$p.WorkContent}}{{else}}—{{end}}</p>
-      {{if $p.CauseType}}<p class="text-ui-sm text-ink-muted">원인 {{$p.CauseType}}</p>{{end}}
+      {{if $.AS.CauseCatLabel}}<p class="text-ui-sm text-ink-muted">분류 {{$.AS.CauseCatLabel}}</p>{{else if $p.CauseType}}<p class="text-ui-sm text-ink-muted">원인 {{$p.CauseType}}</p>{{end}}
     </div>
   </section>
   {{end}}

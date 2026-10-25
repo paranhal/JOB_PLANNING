@@ -84,10 +84,11 @@ func (h *ASHandler) Knowledge(c echo.Context) error {
 	cats, _ := h.repo.ListCauseCategories()
 	var catL1 []model.CauseCategory
 	for _, cat := range cats {
-		if cat.Level == 1 {
+		if cat.Level == 1 && cat.Code != model.CauseCatCustom {
 			catL1 = append(catL1, cat)
 		}
 	}
+	catL1 = append(catL1, model.CauseCategory{Code: model.CauseCatCustom, Label: "직접 입력", Level: 1})
 	sites, _ := h.repo.KnowledgeSitesInOrg(org)
 
 	data := map[string]interface{}{

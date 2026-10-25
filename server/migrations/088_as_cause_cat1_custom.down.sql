@@ -1,0 +1,1 @@
+-- SQLite 는 DROP COLUMN 이 제한적이라 코드 쪽 멱등 ADD 만 사용한다.

@@ -141,6 +141,7 @@ func templateFiles(name string) []string {
 		files = append(files, spartials...)
 	}
 	files = appendExisting(files, "web/templates/_classify_hint.html", "web/templates/_customer_combo.html",
+		"web/templates/_site_multi_picker.html",
 		"web/templates/_partials/view_group_toggle.html")
 	return files
 }
@@ -546,6 +547,9 @@ func funcMap() template.FuncMap {
 		},
 		"partyKindLabel":      model.PartyKindLabel,
 		"processTypePlaces":   model.ProcessTypePlaces,
+		"causeCat1Label": func(cat1, custom string) string {
+			return model.CauseCat1Label(cat1, custom, nil)
+		},
 		"urgencyReasonFamily": model.UrgencyReasonFamilyFromGroup,
 		"assetUrgencyFamily": func(a model.Asset) string {
 			return model.AssetUrgencyFamily(a.ProductCategory, a.ProductName, a.ProductType)

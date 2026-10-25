@@ -405,6 +405,7 @@ func main() {
 	as.GET("/customer-match", h.AS.CustomerMatch)
 	as.GET("/new", h.AS.New, receiveAS)
 	as.POST("", h.AS.Create, receiveAS)
+	as.GET("/open-for-apply", h.AS.SearchOpenForApply, processAS)
 	as.POST("/open/pull", h.AS.PullOpen, processAS)
 	as.POST("/open/assign", h.AS.AssignOpenDates, processAS)
 	as.GET("/stats", h.AS.StatsDashboard)

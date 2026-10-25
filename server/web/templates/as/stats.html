@@ -67,6 +67,17 @@
     </a>
   </div>
 
+  {{if .CauseCat1}}
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <h3 class="font-semibold text-gray-700 text-sm mb-2">1차 분류</h3>
+    <ul class="flex flex-wrap gap-2 text-sm">
+      {{range .CauseCat1}}
+      <li class="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200">{{.Label}} <span class="tabular-nums text-slate-500">{{.N}}</span></li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+
   <div class="space-y-3">
     <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">
