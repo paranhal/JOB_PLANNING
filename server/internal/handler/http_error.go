@@ -177,6 +177,7 @@ func injectFlash(c echo.Context, data map[string]interface{}) {
 		data["FlashPopup"] = msg
 		clearFlashErrCookie(c)
 	}
+	injectASSaveFlash(c, data)
 }
 
 func formReturnURL(c echo.Context) string {

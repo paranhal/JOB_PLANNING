@@ -300,8 +300,11 @@ func TestAS95_33PostRedirectsToAction(t *testing.T) {
 		t.Fatal(err)
 	}
 	del := httptest.NewRecorder()
-	dreq := httptest.NewRequest(http.MethodPost, "/as/"+victim.ASID+"/delete", nil)
+	dform := url.Values{"csrf": {"testcsrf0123456789ab"}}
+	dreq := httptest.NewRequest(http.MethodPost, "/as/"+victim.ASID+"/delete", strings.NewReader(dform.Encode()))
+	dreq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	dreq.AddCookie(ck)
+	dreq.AddCookie(&http.Cookie{Name: "jp_csrf", Value: "testcsrf0123456789ab", Path: "/"})
 	e.ServeHTTP(del, dreq)
 	if del.Code != http.StatusSeeOther {
 		t.Fatalf("delete %d loc=%s body=%s", del.Code, del.Header().Get("Location"), truncate(del.Body.String(), 300))

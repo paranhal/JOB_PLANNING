@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"customer-support/internal/model"
@@ -39,6 +40,21 @@ func scanASProcesses(rows *sql.Rows) ([]model.ASProcess, error) {
 		items = append(items, p)
 	}
 	return items, rows.Err()
+}
+
+func (r *ASProcessRepo) CountByAS(asID string) (int, error) {
+	if r == nil || r.db == nil {
+		return 0, nil
+	}
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM as_processes WHERE as_id=?`, asID).Scan(&n)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
 }
 
 func (r *ASProcessRepo) ListByAS(asID string) ([]model.ASProcess, error) {

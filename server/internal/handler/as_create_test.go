@@ -214,10 +214,14 @@ func TestASCreateMultiEquipmentGroup(t *testing.T) {
 		t.Fatalf("create status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	loc := rec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/as/R") {
-		t.Fatalf("redirect: %s", loc)
+	if loc != "/as" {
+		t.Fatalf("2건은 목록으로: %s", loc)
 	}
-	first, err := asRepo.GetByID(repository.OrgAll, asIDFromHref(loc))
+	listed, _, err := asRepo.ListFiltered(repository.OrgAll, "", "카드 인식", "", nil, "", "", 1, 20)
+	if err != nil || len(listed) < 1 {
+		t.Fatalf("list: %v n=%d", err, len(listed))
+	}
+	first, err := asRepo.GetByID(repository.OrgAll, listed[0].ASID)
 	if err != nil || first == nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -254,7 +258,7 @@ func TestASCreateMultiEquipmentGroup(t *testing.T) {
 	}
 
 	show := httptest.NewRecorder()
-	reqShow := httptest.NewRequest(http.MethodGet, "http://localhost"+loc, nil)
+	reqShow := httptest.NewRequest(http.MethodGet, "http://localhost"+asOpenHref(first.ASID), nil)
 	reqShow.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, reqShow)
 	if show.Code != http.StatusOK {

@@ -87,9 +87,8 @@
           </form>
           {{end}}
           {{if .CanDelete}}
-          <form method="POST" action="/as/{{.AS.ASID}}/delete" onsubmit="return confirm('이 AS 접수를 삭제할까요?\n관련 처리 기록도 함께 삭제됩니다.');">
-            <button type="submit" class="w-full px-3 py-1.5 border border-red-300 rounded-lg text-sm font-medium text-red-700 hover:bg-red-50">접수 삭제</button>
-          </form>
+          <button type="button" class="js-as-delete w-full px-3 py-1.5 border border-red-300 rounded-lg text-sm font-medium text-red-700 hover:bg-red-50"
+                  data-as-id="{{.AS.ASID}}" data-as-number="{{.AS.ASNumber}}" data-as-org="{{.AS.OrgName}}" data-as-snippet="{{asSymptomSnippet .AS.Symptom}}">접수 삭제</button>
           {{end}}
         </div>
       </details>

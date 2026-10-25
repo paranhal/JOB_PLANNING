@@ -184,6 +184,7 @@ func (h *ASHandler) List(c echo.Context) error {
 		active = NavASShowLegacy
 	}
 
+	h.markListCanDelete(c, items)
 	return c.Render(http.StatusOK, "as/list.html", attachViewGroup(c, map[string]interface{}{
 		"Title": "AS 관리", "Active": active,
 		"Items": items, "Total": total,
@@ -508,7 +509,7 @@ func (h *ASHandler) renderASNew(c echo.Context, as *model.ASReceipt, eqRows []as
 			break
 		}
 	}
-	return c.Render(status, "as/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "AS 접수", "Active": NavAS, "IsNew": true,
 		"AS": as, "Customers": customers, "Assets": assets, "Contacts": contacts,
 		"Channels": channels, "UrgencyReasons": urgReasons,
@@ -532,7 +533,20 @@ func (h *ASHandler) renderASNew(c echo.Context, as *model.ASReceipt, eqRows []as
 		"FocusAssignee":    focus,
 		"PhotoMemo":        c.FormValue("photo_memo"),
 		"PhotoReselect":    photoReselect,
-	})
+		"SubmitToken":      asFormSubmitToken(c),
+	}
+	if dup, ok := c.Get("as_dup").(*model.ASReceipt); ok && dup != nil {
+		data["DupAS"] = dup
+		data["DupSnippet"] = asSymptomSnippet(dup.Symptom)
+	}
+	return c.Render(status, "as/form.html", data)
+}
+
+func asFormSubmitToken(c echo.Context) string {
+	if tok := strings.TrimSpace(c.FormValue("submit_token")); tok != "" {
+		return tok
+	}
+	return newASSubmitToken()
 }
 
 func (h *ASHandler) visibleWorkGroups(c echo.Context) []model.WorkGroup {
@@ -893,6 +907,20 @@ func (h *ASHandler) Create(c echo.Context) error {
 			}
 		}
 	}
+	submitTok := strings.TrimSpace(c.FormValue("submit_token"))
+	if ids, ok := lookupASSubmitToken(submitTok); ok {
+		setFlashOKCookie(c, flashOKSaved, ids)
+		if len(ids) >= 2 {
+			return c.Redirect(http.StatusSeeOther, "/as")
+		}
+		return c.Redirect(http.StatusSeeOther, asOpenHref(ids[0]))
+	}
+	if submitTok != "" && strings.TrimSpace(c.FormValue("confirm_dup")) != "1" && base != nil && h.repo != nil {
+		dup, _ := h.repo.FindRecentDuplicate(currentOrg(c), base.CustomerID, firstCreateSymptom(base, rows), time.Minute)
+		if dup != nil {
+			return h.renderASNewDup(c, base, rows, dup)
+		}
+	}
 	if len(rows) >= 2 {
 		gid := repository.NewReceiptGroupID()
 		for _, r := range rows {
@@ -900,6 +928,7 @@ func (h *ASHandler) Create(c echo.Context) error {
 		}
 	}
 	var first *model.ASReceipt
+	var createdIDs []string
 	for i, as := range rows {
 		applyReceiptDerivedFields(as)
 		if err := h.repo.Create(as); err != nil {
@@ -914,6 +943,7 @@ func (h *ASHandler) Create(c echo.Context) error {
 				h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, "", "")
 			}
 		}
+		createdIDs = append(createdIDs, as.ASID)
 		if i == 0 {
 			h.saveKeywordChecks(c, as.ASID, model.KWFieldSymptom)
 			first = as
@@ -936,7 +966,27 @@ func (h *ASHandler) Create(c echo.Context) error {
 	if first == nil {
 		return c.Redirect(http.StatusSeeOther, "/as/new?err="+url.QueryEscape("증상을 입력하세요"))
 	}
+	rememberASSubmitToken(submitTok, createdIDs)
+	setFlashOKCookie(c, flashOKSaved, createdIDs)
+	if len(createdIDs) >= 2 {
+		return c.Redirect(http.StatusSeeOther, "/as")
+	}
 	return c.Redirect(http.StatusSeeOther, asOpenHref(first.ASID))
+}
+
+func firstCreateSymptom(base *model.ASReceipt, rows []*model.ASReceipt) string {
+	if len(rows) > 0 && rows[0] != nil && strings.TrimSpace(rows[0].Symptom) != "" {
+		return rows[0].Symptom
+	}
+	if base != nil {
+		return base.Symptom
+	}
+	return ""
+}
+
+func (h *ASHandler) renderASNewDup(c echo.Context, base *model.ASReceipt, rows []*model.ASReceipt, dup *model.ASReceipt) error {
+	c.Set("as_dup", dup)
+	return h.renderASNew(c, base, eqRowsFromReceipts(rows, -1), "", http.StatusUnprocessableEntity, postedReceiptPhotos(c))
 }
 
 func (h *ASHandler) Edit(c echo.Context) error {
@@ -1142,7 +1192,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"CanUnlockEdit":     closed && isVisionRole(c) && !unlocked && !embed && !isASOwner(c, as),
 		"CanEditReceipt":    !embed && canSaveASReceipt(c, as, canMod),
 		"CanOwnerEdit":      closed && canMod,
-		"CanDelete":         !embed && isAdminRole(c) && (!closed || canMod),
+		"CanDelete":         !embed && h.canDeleteThis(c, as),
 		"CanWriteDaily":     !embed && canWriteWorkboard(c) && !closed,
 		"TodayLocal":        now.Format("2006-01-02"),
 		"ActionErr":         actionErrMessage(c.QueryParam("err")),
@@ -1345,7 +1395,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CanMoveAdminWork":     canMoveASToAdminWork(c, as),
 		"CanReopen":            closed && canReceiveAS(c),
 		"CanEditReceipt":       canSaveASReceipt(c, as, canMod),
-		"CanDelete":            isAdminRole(c) && (!closed || canMod),
+		"CanDelete":            h.canDeleteThis(c, as),
 	}
 	if as.ReceiptGroupID != "" {
 		mates, _ := h.repo.ListByReceiptGroup(as.ReceiptGroupID)
@@ -2310,25 +2360,44 @@ func (h *ASHandler) appendReopenProcess(src, as *model.ASReceipt, reason string,
 	})
 }
 
-// Delete AS 접수 삭제 (처리 이력 포함) — 관리자만 (완료·종료는 잠금 해제 필요)
+// Delete AS 접수 삭제 (처리 이력 포함) — 비전·조직관리자·접수자(미처리)
 func (h *ASHandler) Delete(c echo.Context) error {
 	id := c.Param("id")
-	if !isAdminRole(c) {
-		accessLog(c, auditlog.Record{
+	deny := func(reason, detail string, as *model.ASReceipt, code error) error {
+		rec := auditlog.Record{
 			Action:      auditlog.ActionDelete,
 			TargetTable: "as_receipts",
 			TargetID:    id,
-			Detail:      "권한없음",
-			Reason:      "권한없음",
+			Detail:      detail,
+			Reason:      reason,
 			Result:      auditlog.ResultDeny,
-		})
-		return echo.ErrForbidden
+		}
+		if as != nil {
+			rec.TargetID = as.ASID
+			rec.SubjectType = "customer"
+			rec.SubjectID = as.CustomerID
+			rec.SubjectName = as.OrgName
+			rec.BeforeJSON = toJSON(as)
+		}
+		accessLog(c, rec)
+		return code
+	}
+	if !requireCSRF(c) {
+		return deny("CSRF", "CSRF 없음", nil, echo.ErrForbidden)
 	}
 	as, err := h.repo.GetByID(currentOrg(c), id)
 	if err != nil || as == nil {
 		return echo.ErrNotFound
 	}
-	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
+	if !h.canDeleteThis(c, as) {
+		if isASClosedStatus(as.Status) && isAdminRole(c) && !h.canModifyAS(c, as) {
+			_ = deny("잠금", "완료·종료 건 삭제 거부", as, echo.ErrForbidden)
+			return h.redirectLocked(c, id, "show")
+		}
+		return deny("권한없음", "권한없음", as, echo.ErrForbidden)
+	}
+	if linked, _ := h.repo.HasLinkedAS(as.ASID); linked {
+		setFlashErrCookie(c, "이관/재접수로 연결된 접수는 삭제할 수 없습니다")
 		accessLog(c, auditlog.Record{
 			Action:      auditlog.ActionDelete,
 			TargetTable: "as_receipts",
@@ -2336,12 +2405,12 @@ func (h *ASHandler) Delete(c echo.Context) error {
 			SubjectType: "customer",
 			SubjectID:   as.CustomerID,
 			SubjectName: as.OrgName,
-			Detail:      "완료·종료 건 삭제 거부",
-			Reason:      "잠금",
+			Detail:      "연결 건 삭제 거부",
+			Reason:      "연결",
 			Result:      auditlog.ResultDeny,
 			BeforeJSON:  toJSON(as),
 		})
-		return h.redirectLocked(c, id, "show")
+		return c.Redirect(http.StatusSeeOther, "/as")
 	}
 	if err := h.repo.Delete(id); err != nil {
 		accessLog(c, auditlog.Record{
@@ -2358,6 +2427,10 @@ func (h *ASHandler) Delete(c echo.Context) error {
 		})
 		return err
 	}
+	reason := accessReason(c, "AS 접수 삭제")
+	if asReceiverIsSelf(c, as) && !(isVisionRole(c) || (model.NormalizeRole(currentRole(c)) == model.RoleOrgAdmin && orgAdminInHome(c))) {
+		reason = "접수자 본인 삭제"
+	}
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionDelete,
 		TargetTable: "as_receipts",
@@ -2366,10 +2439,11 @@ func (h *ASHandler) Delete(c echo.Context) error {
 		SubjectID:   as.CustomerID,
 		SubjectName: as.OrgName,
 		Detail:      "AS 접수 삭제 " + as.ASNumber,
-		Reason:      accessReason(c, "AS 접수 삭제"),
+		Reason:      reason,
 		Result:      auditlog.ResultOK,
 		BeforeJSON:  toJSON(as),
 	})
+	setFlashOKCookie(c, flashOKDeleted, []string{as.ASNumber})
 	return c.Redirect(http.StatusSeeOther, "/as")
 }
 

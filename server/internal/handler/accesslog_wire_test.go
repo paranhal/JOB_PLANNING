@@ -249,8 +249,11 @@ func TestAccessLogASDelete(t *testing.T) {
 	g.POST("/as/:id/delete", h.AS.Delete)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+src.ASID+"/delete", nil)
+	dform := url.Values{"csrf": {"testcsrf0123456789ab"}}
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+src.ASID+"/delete", strings.NewReader(dform.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	req.AddCookie(jwtCookie(t))
+	req.AddCookie(&http.Cookie{Name: "jp_csrf", Value: "testcsrf0123456789ab", Path: "/"})
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("AS 삭제 status=%d", rec.Code)

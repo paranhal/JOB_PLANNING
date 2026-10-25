@@ -173,6 +173,7 @@ type ASListItem struct {
 	UrgencyReasonNote  string       `json:"urgency_reason_note,omitempty"`
 	WorkGroupID        string       `json:"work_group_id,omitempty"`
 	WorkGroupName      string       `json:"work_group_name,omitempty"`
+	CanDelete          bool         `json:"can_delete,omitempty"`
 }
 
 // ASWorkItem 접수 하부 확인·재방문 업무 ({접수번호}-Wnn).

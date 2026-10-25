@@ -182,6 +182,7 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 	if dataMap, ok := data.(map[string]interface{}); ok {
 		injectBuildInfo(dataMap)
 		injectFlash(c, dataMap)
+		dataMap["CSRFToken"] = ensureCSRFToken(c)
 		cfg := config.Load()
 		dataMap["NavMail"] = cfg.MailEnabled
 		dataMap["NavSMS"] = cfg.SMSEnabled
@@ -297,6 +298,7 @@ func funcMap() template.FuncMap {
 		"workboardHomeURL":   workboardHomeURL,
 		"asHref":             model.ASOpenHref,
 		"asLegacyHref":       model.ASLegacyHref,
+		"asSymptomSnippet":   asSymptomSnippet,
 		"weekdayKo":          weekdayKo,
 		"visitPeopleIDs":     visitPeopleIDsCSV,
 		"visitOwnerID":       visitOwnerUserID,

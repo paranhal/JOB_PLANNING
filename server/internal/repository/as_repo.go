@@ -2,12 +2,15 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"customer-support/internal/model"
 )
+
+var ErrASLinked = errors.New("이관/재접수로 연결된 접수는 삭제할 수 없습니다")
 
 type ASRepo struct {
 	db *sql.DB
@@ -1245,6 +1248,85 @@ func formatElapsed(from, to time.Time) string {
 	return fmt.Sprintf("%d분", int(d.Minutes()))
 }
 
+func NormalizeASSymptom(s string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
+}
+
+func (r *ASRepo) FindRecentDuplicate(orgID, customerID, symptom string, within time.Duration) (*model.ASReceipt, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
+	orgID = strings.TrimSpace(orgID)
+	customerID = strings.TrimSpace(customerID)
+	want := NormalizeASSymptom(symptom)
+	if customerID == "" || want == "" {
+		return nil, nil
+	}
+	if within <= 0 {
+		within = time.Minute
+	}
+	since := time.Now().Add(-within).Format("2006-01-02 15:04:05")
+	q := `
+		SELECT as_id FROM as_receipts
+		 WHERE customer_id=? AND created_at>=?
+		   AND (?='' OR org_id=?)
+		 ORDER BY created_at DESC LIMIT 20`
+	rows, err := r.db.Query(q, customerID, since, orgID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		as, err := r.GetByID(OrgAll, id)
+		if err != nil || as == nil {
+			continue
+		}
+		if NormalizeASSymptom(as.Symptom) == want {
+			return as, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *ASRepo) HasLinkedAS(asID string) (bool, error) {
+	if r == nil || r.db == nil {
+		return false, nil
+	}
+	asID = strings.TrimSpace(asID)
+	if asID == "" {
+		return false, nil
+	}
+	var parent string
+	_ = r.db.QueryRow(`SELECT COALESCE(parent_as_id,'') FROM as_receipts WHERE as_id=?`, asID).Scan(&parent)
+	if strings.TrimSpace(parent) != "" {
+		return true, nil
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM as_receipts WHERE parent_as_id=?`, asID).Scan(&n); err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func execIgnoreMissingTx(tx *sql.Tx, q string, args ...any) error {
+	_, err := tx.Exec(q, args...)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return nil
+	}
+	return err
+}
+
 // Delete 접수 및 처리 이력 삭제
 func (r *ASRepo) Delete(asID string) error {
 	var num string
@@ -1255,13 +1337,38 @@ func (r *ASRepo) Delete(asID string) error {
 			return err
 		}
 		defer tx.Rollback()
-		if _, err := tx.Exec(`DELETE FROM as_processes WHERE as_id=?`, asID); err != nil {
+		if err := execIgnoreMissingTx(tx, `DELETE FROM as_processes WHERE as_id=?`, asID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`DELETE FROM as_work_items WHERE as_id=?`, asID); err != nil {
+		if err := execIgnoreMissingTx(tx, `DELETE FROM as_work_items WHERE as_id=?`, asID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`DELETE FROM as_keyword_links WHERE as_id=?`, asID); err != nil {
+		if err := execIgnoreMissingTx(tx, `DELETE FROM as_keyword_links WHERE as_id=?`, asID); err != nil {
+			return err
+		}
+		if err := execIgnoreMissingTx(tx, `DELETE FROM as_parts_used WHERE as_id=?`, asID); err != nil {
+			return err
+		}
+		if err := execIgnoreMissingTx(tx, `DELETE FROM work_assign_notices WHERE source_type='as' AND source_id=?`, asID); err != nil {
+			return err
+		}
+		if err := execIgnoreMissingTx(tx, `DELETE FROM attachments WHERE ref_id=? AND ref_type IN ('as','as_receipt','as_action_photo','as_report')`, asID); err != nil {
+			return err
+		}
+		taskSub := `SELECT task_id FROM work_tasks WHERE source_type='as' AND source_id=?`
+		for _, q := range []string{
+			`DELETE FROM work_task_tags WHERE task_id IN (` + taskSub + `)`,
+			`DELETE FROM work_task_sites WHERE task_id IN (` + taskSub + `)`,
+			`DELETE FROM work_task_assets WHERE task_id IN (` + taskSub + `)`,
+			`DELETE FROM work_task_parts_used WHERE task_id IN (` + taskSub + `)`,
+			`DELETE FROM work_activities WHERE task_id IN (` + taskSub + `)`,
+			`DELETE FROM work_actions WHERE task_id IN (` + taskSub + `)`,
+		} {
+			if err := execIgnoreMissingTx(tx, q, asID); err != nil {
+				return err
+			}
+		}
+		if err := execIgnoreMissingTx(tx, `DELETE FROM work_tasks WHERE source_type='as' AND source_id=?`, asID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`DELETE FROM as_receipts WHERE as_id=?`, asID); err != nil {

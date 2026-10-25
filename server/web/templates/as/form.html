@@ -42,11 +42,13 @@
   {{end}}
 
   <form id="as-form" method="POST" action="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}/edit{{end}}" class="space-y-4"
-        {{if .IsNew}}enctype="multipart/form-data" data-multi="1"{{end}}
+        {{if .IsNew}}enctype="multipart/form-data" data-multi="1" data-submit-guard="1"{{end}}
         {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
         data-init-asset="{{.AS.AssetID}}"
         data-init-requester="{{.AS.Requester}}"
         data-exclude-as="{{if not .IsNew}}{{.AS.ASID}}{{end}}">
+    {{if .IsNew}}<input type="hidden" name="submit_token" value="{{.SubmitToken}}">{{end}}
+    {{if .DupAS}}<input type="hidden" name="confirm_dup" id="as-confirm-dup" value="">{{end}}
 
     <!-- 기본 정보 -->
     <section class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-blue-500 p-5 sm:p-6 space-y-4 shadow-sm">
@@ -427,10 +429,39 @@
     </div>
   </div>
 
+  {{if .DupAS}}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" id="as-dup-modal" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+      <h2 class="font-bold text-slate-800">방금 같은 내용이 접수되었습니다</h2>
+      <p class="mt-2 text-sm text-slate-700 font-mono">{{.DupAS.ASNumber}} · {{.DupAS.OrgName}} · "{{.DupSnippet}}"</p>
+      <div class="mt-4 flex justify-end gap-2">
+        <a href="/as" class="px-3 py-1.5 border rounded-lg text-sm">닫기</a>
+        <button type="button" id="as-dup-force" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">그래도 새로 접수</button>
+      </div>
+    </div>
+  </div>
+  {{end}}
+
   <script>
   (function () {
     var form = document.getElementById('as-form');
     if (!form) return;
+    var dupForce = document.getElementById('as-dup-force');
+    if (dupForce) {
+      dupForce.addEventListener('click', function(){
+        var hid = document.getElementById('as-confirm-dup');
+        if (hid) hid.value = '1';
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      });
+    }
+    if (form.getAttribute('data-submit-guard') === '1') {
+      form.addEventListener('submit', function () {
+        var btn = document.getElementById('as-submit-btn');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = '저장 중…';
+      });
+    }
     var custSel = document.getElementById('as-customer_id');
     var assetSel = document.getElementById('as-asset_id');
     var reqSel = document.getElementById('as-requester_code');
