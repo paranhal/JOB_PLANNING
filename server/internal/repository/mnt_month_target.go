@@ -235,7 +235,7 @@ func (r *MaintenanceRepo) MonthTargetPanel(plan *model.MaintenancePlan, month in
 	return r.MonthTargetPanelFilter(plan, month, q, industry, "", "")
 }
 
-func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, month int, q, industry, sidoFilter, sigunguFilter string) ([]MonthTargetRegionStat, []MonthTargetSiteRow, error) {
+func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, month int, q, industry, sidoFilter, sigunguFilter string, regionKeys ...string) ([]MonthTargetRegionStat, []MonthTargetSiteRow, error) {
 	if plan == nil {
 		return nil, nil, fmt.Errorf("계획이 없습니다")
 	}
@@ -329,6 +329,9 @@ func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, mo
 			if !strings.Contains(blob, q) {
 				continue
 			}
+		}
+		if !model.MatchAnyRegionKey(cfg, regionKeys) {
+			continue
 		}
 		if sidoFilter != "" {
 			want := sidoFilter

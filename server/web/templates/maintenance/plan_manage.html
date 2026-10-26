@@ -181,11 +181,11 @@
   <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3" data-month-target-panel
            data-plan-id="{{.Plan.PlanID}}" data-year="{{.Plan.PlanYear}}">
     <h3 class="font-semibold text-gray-800 flex flex-wrap items-baseline gap-2">
-      <span class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-sky-800 text-[11px] font-bold text-white">①</span>
+      <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-800 text-xs font-bold text-white">①</span>
       월 점검 대상 등록
       <span class="text-xs font-normal text-gray-500">분기·반기·연1회 사이트를 이번 달 점검 대상으로 올립니다 (월 단위 사이트는 자동)</span>
     </h3>
-    <p class="text-xs text-gray-500">분기·반기·년1회 사이트를 기간 안의 달에 지역 또는 사이트 단위로 올립니다. 방문일은 대기목록에서 정합니다.</p>
+    <p class="text-xs text-gray-500">분기·반기·년1회 사이트를 기간 안의 달에 올립니다. 지역을 체크하면 아래 목록이 바로 그 지역만 보입니다. 방문일은 일정 화면 미배정 블록 또는 업무 등록 모달에서 정합니다.</p>
     <div class="flex flex-wrap items-end gap-2">
       <div>
         <label class="block text-[11px] text-gray-500 mb-1" for="mt-month">월 선택</label>
@@ -215,7 +215,6 @@
       <p class="text-xs font-medium text-gray-700 mb-1">지역 단위</p>
       <div id="mt-regions" class="space-y-1 text-sm"></div>
       <div class="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" id="mt-reg-region" class="px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">이 달로 등록</button>
         <span id="mt-region-summary" class="text-xs text-gray-500"></span>
       </div>
     </div>
@@ -225,7 +224,7 @@
       <div id="mt-sticky" class="sticky top-0 z-10 mb-1 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs">
         <label class="inline-flex items-center gap-1"><input type="checkbox" id="mt-all"> 전체 선택</label>
         <span>선택 <span id="mt-sel-n">0</span>건</span>
-        <button type="button" id="mt-reg-sites" class="px-2 py-1 bg-sky-700 text-white rounded-lg">선택한 사이트 등록</button>
+        <button type="button" id="mt-reg-sites" class="px-2 py-1 bg-sky-700 text-white rounded-lg">확인</button>
         <button type="button" id="mt-cancel-sites" class="px-2 py-1 border rounded-lg">등록 해제</button>
         <label class="inline-flex items-center gap-1">다른 달
           <select id="mt-move-month" class="border rounded px-1 py-0.5">
@@ -255,20 +254,29 @@
         <h2 class="text-sm font-bold text-gray-800">월 점검 대상</h2>
         <p id="mt-popup-msg" class="mt-2 text-sm text-gray-800"></p>
         <div class="mt-4 flex justify-end">
-          <button type="button" id="mt-popup-ok" class="btn btn-primary">확인</button>
+          <button type="button" id="mt-popup-ok" class="btn btn-primary">닫기</button>
+        </div>
+      </div>
+    </div>
+    <div id="mt-confirm" class="hidden modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="modal-panel w-full max-w-md shadow-pop">
+        <h2 class="text-sm font-bold text-gray-800">월 점검 대상 등록</h2>
+        <p id="mt-confirm-msg" class="mt-2 text-sm text-gray-800"></p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" id="mt-confirm-no" class="btn">취소</button>
+          <button type="button" id="mt-confirm-yes" class="btn btn-primary">확인</button>
         </div>
       </div>
     </div>
   </section>
   {{end}}
 
-  {{if .CanEdit}}
-  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3" data-unassigned-bulk data-plan-id="{{.Plan.PlanID}}" data-month="{{.UnassignedMonth}}">
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3" data-unassigned-list data-plan-id="{{.Plan.PlanID}}" data-month="{{.UnassignedMonth}}">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h3 class="font-semibold text-gray-800 flex flex-wrap items-baseline gap-2">
-        <span class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-sky-800 text-[11px] font-bold text-white">②</span>
+        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-800 text-xs font-bold text-white">②</span>
         대기 목록 (미배정)
-        <span class="text-xs font-normal text-gray-500">우리 조직 사이트만 표시 · 날짜와 담당자를 정하면 캘린더로 올라갑니다</span>
+        <span class="text-xs font-normal text-gray-500">조회 전용 · 우리 조직 사이트만 표시</span>
       </h3>
       <form method="GET" action="/maintenance/{{.Plan.PlanID}}/manage" class="flex items-center gap-2 text-sm">
         <label class="text-xs text-gray-500">월</label>
@@ -277,71 +285,30 @@
         </select>
       </form>
     </div>
-    <p class="text-xs text-gray-500">{{.UnassignedMonth}}월 대상인데 방문일이 없는 건입니다. 지역으로 묶어 선택 후 같은 날짜 또는 기간 배분으로 넣습니다. 담당을 비우면 지역 기본 → 지난해 값을 씁니다.</p>
-    <div class="flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs">
-      <label class="inline-flex items-center gap-1"><input type="checkbox" id="ua-all"> 목록 전체</label>
-      <span>선택 <span id="ua-sel-n">0</span>곳</span>
-      <div>
-        <label class="block text-[11px] text-gray-500">같은 방문일</label>
-        <input type="date" id="ua-same-date" class="border rounded-lg px-2 py-1">
-      </div>
-      <div>
-        <label class="block text-[11px] text-gray-500">기간 시작</label>
-        <input type="date" id="ua-from" class="border rounded-lg px-2 py-1">
-      </div>
-      <div>
-        <label class="block text-[11px] text-gray-500">기간 끝</label>
-        <input type="date" id="ua-to" class="border rounded-lg px-2 py-1">
-      </div>
-      <div>
-        <label class="block text-[11px] text-gray-500">하루 N곳</label>
-        <input type="number" id="ua-per-day" min="1" value="8" class="border rounded-lg px-2 py-1 w-16">
-      </div>
-      <label class="inline-flex items-center gap-1"><input type="checkbox" id="ua-skip-we" checked> 주말·공휴일 제외</label>
-      <div class="min-w-[12rem]">
-        <label class="block text-[11px] text-gray-500 mb-1">담당 (선택)</label>
-        {{template "assignee_picker" dict "Target" "unassigned" "Mode" "multi"}}
-      </div>
-      <button type="button" id="ua-preview" class="px-3 py-1.5 border rounded-lg">미리보기</button>
-      <button type="button" id="ua-apply" class="px-3 py-1.5 bg-amber-800 text-white rounded-lg">③ 날짜·담당자 일괄 배정</button>
-    </div>
-    <p id="ua-err" class="hidden text-sm text-red-700"></p>
+    <p class="text-xs text-gray-500">{{.UnassignedMonth}}월 대상인데 방문일이 없는 건입니다. 날짜·담당자 배정은 일정 화면 미배정 블록 또는 업무 등록 모달에서 합니다.</p>
     {{if not .Unassigned}}
     <p class="text-sm text-gray-500">이 달 미배정 건이 없습니다.</p>
     {{else}}
     {{range .UnassignedGroups}}
-    {{$rk := .Key}}
     <details class="border rounded-lg" open>
       <summary class="px-3 py-2 text-sm font-medium cursor-pointer flex items-center gap-2">
-        <input type="checkbox" class="ua-region" data-region="{{$rk}}" onclick="event.stopPropagation()">
         {{.Label}} <span class="text-xs text-gray-500">{{len .Slots}}곳</span>
       </summary>
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead class="text-left text-xs text-gray-500">
             <tr>
-              <th class="py-1 px-2"></th>
               <th class="py-1 pr-3">사이트</th>
               <th class="py-1 pr-3">점검 대상</th>
               <th class="py-1 pr-3">주기</th>
-              <th class="py-1">방문일(개별)</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             {{range .Slots}}
             <tr>
-              <td class="py-1 px-2"><input type="checkbox" class="ua-slot" name="slot_key" value="{{.CustomerID}}|{{.ProductType}}" data-region="{{$rk}}"></td>
               <td class="py-1.5 pr-3">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
               <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
               <td class="py-1.5 pr-3 text-xs">{{if .TargetCarry}}<span class="text-gray-500">{{.TargetMonth}}월 등록 · 미배정</span>{{else if .TargetMonth}}{{.TargetMonth}}월 등록{{else if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}</td>
-              <td class="py-1.5">
-                <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/assign-slots" class="flex items-center gap-1">
-                  <input type="hidden" name="customer_id" value="{{.CustomerID}}">
-                  <input type="hidden" name="product_type" value="{{.ProductType}}">
-                  <input type="date" name="visit_date" class="border rounded-lg px-2 py-1 text-xs">
-                  <button type="submit" class="text-xs text-sky-700">넣기</button>
-                </form>
-              </td>
             </tr>
             {{end}}
           </tbody>
@@ -350,22 +317,11 @@
     </details>
     {{end}}
     {{end}}
-    <div id="ua-popup" class="hidden modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div class="modal-panel w-full max-w-lg shadow-pop">
-        <h2 class="text-sm font-bold text-gray-800">일괄 배정 결과</h2>
-        <p id="ua-popup-msg" class="mt-2 text-sm text-gray-800 whitespace-pre-wrap"></p>
-        <div id="ua-popup-days" class="mt-2 text-xs text-gray-600 space-y-1"></div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button type="button" id="ua-popup-close" class="btn btn-ghost">닫기</button>
-        </div>
-      </div>
-    </div>
   </section>
-  {{end}}
 
   <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-2" id="mnt-calendar-link">
     <h3 class="font-semibold text-gray-800 flex flex-wrap items-baseline gap-2">
-      <span class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-sky-800 text-[11px] font-bold text-white">④</span>
+      <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-800 text-xs font-bold text-white">④</span>
       정기점검 캘린더
       <span class="text-xs font-normal text-gray-500">배정된 방문이 날짜별로 표시됩니다</span>
     </h3>
@@ -679,6 +635,7 @@
           if (!cc.checked) checkedKeys[key] = false;
           syncParent(cb, childBox);
           updateRegionSummary();
+          load();
         });
       });
       if (kids.length) {
@@ -698,12 +655,14 @@
           cb.indeterminate = false;
           syncParent(cb, childBox);
           updateRegionSummary();
+          load();
         });
         syncParent(cb, childBox);
       } else {
         cb.addEventListener('change', function () {
           checkedKeys[key] = cb.checked;
           updateRegionSummary();
+          load();
         });
       }
       regionBox.appendChild(wrap);
@@ -715,6 +674,9 @@
       '&q=' + encodeURIComponent(qEl.value || '') +
       '&sido=' + encodeURIComponent(sidoEl.value || '') +
       '&sigungu=' + encodeURIComponent(sigunguEl.value || '');
+    selectedRegionKeys().forEach(function (k) {
+      url += '&region=' + encodeURIComponent(k);
+    });
     fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (data) {
       var regions = data.regions || [];
       fillSelect(sidoEl, regions.map(function (rg) {
@@ -750,6 +712,7 @@
           emptyEl.textContent = '';
         }
       }
+      var regionOn = selectedRegionKeys().length > 0;
       (data.sites || []).forEach(function (s) {
         var tr = document.createElement('tr');
         var td0 = document.createElement('td');
@@ -759,6 +722,7 @@
         cb.name = s.Registered ? 'target_id' : 'customer_id';
         cb.value = s.Registered ? (s.TargetID || '') : s.CustomerID;
         if (s.Registered && !s.TargetID) cb.disabled = true;
+        if (regionOn && !cb.disabled) cb.checked = true;
         cb.addEventListener('change', countSel);
         td0.appendChild(cb);
         var td1 = document.createElement('td'); td1.className = 'px-2 py-1'; td1.textContent = s.Name;
@@ -798,18 +762,26 @@
     });
     countSel();
   });
-  document.getElementById('mt-reg-region').addEventListener('click', function () {
-    var keys = selectedRegionKeys();
-    if (!keys.length) {
-      showPopup('등록할 지역을 선택하세요');
-      showResult('등록할 지역을 선택하세요');
-      return;
-    }
-    var fd = new FormData();
-    fd.append('source', 'region');
-    keys.forEach(function (k) { fd.append('region', k); });
-    post(fd);
-  });
+  var confirmBox = document.getElementById('mt-confirm');
+  var confirmMsg = document.getElementById('mt-confirm-msg');
+  var pendingFd = null;
+  function hideConfirm() {
+    pendingFd = null;
+    if (confirmBox) confirmBox.classList.add('hidden');
+  }
+  if (document.getElementById('mt-confirm-no')) {
+    document.getElementById('mt-confirm-no').addEventListener('click', hideConfirm);
+  }
+  if (confirmBox) {
+    confirmBox.addEventListener('click', function (e) { if (e.target === confirmBox) hideConfirm(); });
+  }
+  if (document.getElementById('mt-confirm-yes')) {
+    document.getElementById('mt-confirm-yes').addEventListener('click', function () {
+      var fd = pendingFd;
+      hideConfirm();
+      if (fd) post(fd);
+    });
+  }
   document.getElementById('mt-reg-sites').addEventListener('click', function () {
     var ids = selectedSites();
     if (!ids.length) {
@@ -820,7 +792,9 @@
     var fd = new FormData();
     fd.append('source', 'site');
     ids.forEach(function (id) { fd.append('customer_id', id); });
-    post(fd);
+    pendingFd = fd;
+    if (confirmMsg) confirmMsg.textContent = ids.length + '곳을 이 달 점검 대상으로 등록할까요?';
+    if (confirmBox) confirmBox.classList.remove('hidden');
   });
   function postBulkTargets(action) {
     var ids = selectedTargets();
@@ -849,130 +823,6 @@
   var moveBtn = document.getElementById('mt-move-sites');
   if (moveBtn) moveBtn.addEventListener('click', function () { postBulkTargets('move'); });
   load();
-})();
-(function () {
-  var box = document.querySelector('[data-unassigned-bulk]');
-  if (!box) return;
-  var planId = box.getAttribute('data-plan-id');
-  var month = box.getAttribute('data-month');
-  function csrf() {
-    var m = document.querySelector('meta[name="csrf-token"]');
-    return m ? m.getAttribute('content') : '';
-  }
-  function slots() { return Array.prototype.slice.call(box.querySelectorAll('.ua-slot')); }
-  function selectedKeys() {
-    return slots().filter(function (el) { return el.checked; }).map(function (el) { return el.value; });
-  }
-  function recount() {
-    var n = document.getElementById('ua-sel-n');
-    if (n) n.textContent = String(selectedKeys().length);
-  }
-  var all = document.getElementById('ua-all');
-  if (all) all.addEventListener('change', function () {
-    slots().forEach(function (el) { el.checked = all.checked; });
-    box.querySelectorAll('.ua-region').forEach(function (el) { el.checked = all.checked; });
-    recount();
-  });
-  box.querySelectorAll('.ua-region').forEach(function (rg) {
-    rg.addEventListener('change', function () {
-      var key = rg.getAttribute('data-region');
-      slots().forEach(function (el) {
-        if (el.getAttribute('data-region') === key) el.checked = rg.checked;
-      });
-      recount();
-    });
-  });
-  box.addEventListener('change', function (e) {
-    if (e.target && e.target.classList.contains('ua-slot')) recount();
-  });
-  function showUa(msg, days) {
-    var pop = document.getElementById('ua-popup');
-    var pmsg = document.getElementById('ua-popup-msg');
-    var pdays = document.getElementById('ua-popup-days');
-    if (pmsg) pmsg.textContent = msg || '';
-    if (pdays) {
-      pdays.replaceChildren();
-      (days || []).forEach(function (d) {
-        var row = document.createElement('p');
-        row.textContent = d.date + ' · ' + d.n + '곳';
-        pdays.appendChild(row);
-      });
-    }
-    if (pop) pop.classList.remove('hidden');
-  }
-  var close = document.getElementById('ua-popup-close');
-  if (close) close.addEventListener('click', function () { document.getElementById('ua-popup').classList.add('hidden'); });
-  function fdBase(mode) {
-    var fd = new FormData();
-    fd.append('month', month || '');
-    fd.append('mode', mode);
-    selectedKeys().forEach(function (k) { fd.append('slot_key', k); });
-    var same = document.getElementById('ua-same-date');
-    if (same && same.value) fd.append('visit_date', same.value);
-    var fr = document.getElementById('ua-from');
-    var to = document.getElementById('ua-to');
-    var pd = document.getElementById('ua-per-day');
-    if (fr) fd.append('date_from', fr.value || '');
-    if (to) fd.append('date_to', to.value || '');
-    if (pd) fd.append('per_day', pd.value || '8');
-    var we = document.getElementById('ua-skip-we');
-    fd.append('skip_weekend', we && we.checked ? '1' : '0');
-    var asg = box.querySelector('[data-assignee-picker] input[name="assignee"]');
-    if (asg && asg.value) fd.append('assignee', asg.value);
-    box.querySelectorAll('[data-assignee-picker] input[name="assignee_user_id"]').forEach(function (el) {
-      fd.append('assignee_user_id', el.value);
-    });
-    box.querySelectorAll('[data-assignee-picker] input[name="assignee_group_id"]').forEach(function (el) {
-      fd.append('assignee_group_id', el.value);
-    });
-    var own = box.querySelector('[data-assignee-picker] input[name="owner_user_id"]');
-    if (own && own.value) fd.append('owner_user_id', own.value);
-    fd.append('assignee_multi', '1');
-    return fd;
-  }
-  function modeOf() {
-    var fr = document.getElementById('ua-from');
-    var to = document.getElementById('ua-to');
-    if (fr && to && fr.value && to.value) return 'spread';
-    return 'same_date';
-  }
-  function postUa(path, after) {
-    var err = document.getElementById('ua-err');
-    if (err) { err.classList.add('hidden'); err.textContent = ''; }
-    if (!selectedKeys().length) {
-      if (err) { err.classList.remove('hidden'); err.textContent = '사이트를 선택하세요'; err.scrollIntoView({ block: 'nearest' }); }
-      return;
-    }
-    fetch(path, {
-      method: 'POST',
-      headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
-      body: fdBase(modeOf())
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (res) {
-      if (!res.ok || (res.j && res.j.error && !res.j.ok && !res.j.applied)) {
-        var msg = (res.j && (res.j.error || res.j.message)) || '처리에 실패했습니다';
-        if (err) { err.classList.remove('hidden'); err.textContent = msg; err.scrollIntoView({ block: 'nearest' }); }
-        showUa(msg, res.j && res.j.days);
-        return;
-      }
-      after(res.j || {});
-    }).catch(function () {
-      if (err) { err.classList.remove('hidden'); err.textContent = '처리에 실패했습니다'; }
-    });
-  }
-  var prev = document.getElementById('ua-preview');
-  if (prev) prev.addEventListener('click', function () {
-    postUa('/maintenance/' + planId + '/assign-slots/preview', function (j) {
-      showUa('미리보기 ' + (j.count || 0) + '건', j.days);
-    });
-  });
-  var apply = document.getElementById('ua-apply');
-  if (apply) apply.addEventListener('click', function () {
-    postUa('/maintenance/' + planId + '/assign-slots/bulk', function (j) {
-      showUa(j.message || ('배정 ' + (j.applied || 0) + '건'), j.days);
-      setTimeout(function () { location.reload(); }, 800);
-    });
-  });
-  recount();
 })();
 </script>
 {{end}}

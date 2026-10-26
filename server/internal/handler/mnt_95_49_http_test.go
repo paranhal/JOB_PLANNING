@@ -121,7 +121,7 @@ func Test95_49_PlanManageMarkupAndCSS(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(tpl)
-	for _, w := range []string{"mt-sido", "mt-sigungu", "aria-expanded", "RegionLabel", "Children", "등록할 지역을 선택하세요"} {
+	for _, w := range []string{"mt-sido", "mt-sigungu", "aria-expanded", "RegionLabel", "Children", "등록할 사이트를 선택하세요"} {
 		if !strings.Contains(s, w) {
 			t.Fatalf("%q 없음", w)
 		}

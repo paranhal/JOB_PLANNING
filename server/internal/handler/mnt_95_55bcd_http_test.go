@@ -51,8 +51,11 @@ func Test95_55BBulkAssignSameDateAndSpread(t *testing.T) {
 		t.Fatalf("manage=%d %s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "assign-slots/bulk") || !strings.Contains(body, "차년도 계획 수립") {
-		t.Fatal("일괄 배정·차년도 계획 수립 없음")
+	if !strings.Contains(body, "차년도 계획 수립") {
+		t.Fatal("차년도 계획 수립 없음")
+	}
+	if strings.Contains(body, "id=\"ua-apply\"") || strings.Contains(body, "assign-slots/bulk") {
+		t.Fatal("대기 목록에 일괄 배정 UI가 남아 있음")
 	}
 
 	slots, err := repo.ListOpenUnassignedSlotsForOrg(p.PlanID, 2026, 10, model.OrgIDLibrary)
@@ -151,9 +154,9 @@ func Test95_55JSShowsBulkError(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(b)
-	for _, w := range []string{"ua-err", "scrollIntoView", "res.j.error", "assign-slots/bulk"} {
-		if !strings.Contains(s, w) {
-			t.Fatalf("JS %q 없음", w)
+	for _, w := range []string{"ua-apply", "ua-preview", "assign-slots/bulk", "data-unassigned-bulk"} {
+		if strings.Contains(s, w) {
+			t.Fatalf("대기 목록 일괄 배정 UI %q 가 남아 있음", w)
 		}
 	}
 	js, err := os.ReadFile(filepath.Join(findStaticRoot(t), "js", "mnt-quick-register.js"))

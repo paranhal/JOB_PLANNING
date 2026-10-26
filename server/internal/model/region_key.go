@@ -134,6 +134,27 @@ func MatchRegionKey(cfg MaintenanceSiteConfig, key string) bool {
 	return sido == wantSido && sigungu == wantGu
 }
 
+// MatchAnyRegionKey 선택된 지역 키 중 하나라도 맞으면 true. 키가 없으면 필터 없음.
+func MatchAnyRegionKey(cfg MaintenanceSiteConfig, keys []string) bool {
+	var nonempty []string
+	for _, k := range keys {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		nonempty = append(nonempty, k)
+	}
+	if len(nonempty) == 0 {
+		return true
+	}
+	for _, k := range nonempty {
+		if MatchRegionKey(cfg, k) {
+			return true
+		}
+	}
+	return false
+}
+
 // CollapseMonthTargetRegionKeys 시·도 전체가 있으면 그 하위 시·군·구 키를 뺀다.
 func CollapseMonthTargetRegionKeys(keys []string) []string {
 	parents := map[string]bool{}

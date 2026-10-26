@@ -28,7 +28,7 @@ func TestMnt95_45ManagePanelMarkupAndAuth(t *testing.T) {
 		t.Fatalf("status=%d", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, w := range []string{"월 점검 대상 등록", "월 선택", "지역 단위", "사이트 검색", "이 달로 등록", "mt-result"} {
+	for _, w := range []string{"월 점검 대상 등록", "월 선택", "지역 단위", "사이트 검색", "확인", "mt-result"} {
 		if !strings.Contains(body, w) {
 			t.Fatalf("%q 없음", w)
 		}
@@ -36,6 +36,9 @@ func TestMnt95_45ManagePanelMarkupAndAuth(t *testing.T) {
 	tech := manageGet(t, e, "/maintenance/"+p.PlanID+"/manage", jwtCookieRole(t, "tech"))
 	if tech.Code != http.StatusOK {
 		t.Fatalf("tech status=%d", tech.Code)
+	}
+	if strings.Contains(body, "이 달로 등록") {
+		t.Fatal("이 달로 등록 버튼이 남아 있음")
 	}
 	if !strings.Contains(tech.Body.String(), "월 점검 대상 등록") {
 		t.Fatal("기술담당 패널 없음")

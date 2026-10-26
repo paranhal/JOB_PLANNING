@@ -81,7 +81,9 @@ func newMntManageApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRepo, *mo
 	adminOnly := h.Auth.RequireAdminMW
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/maintenance/:id", h.Maintenance.ShowPlan)
 	g.GET("/maintenance/:id/manage", h.Maintenance.ManagePlan)
+	g.POST("/maintenance/:id/assign-slot", h.Maintenance.AssignUnassignedSlot, h.Auth.RequireMaintenanceEdit)
 	g.GET("/maintenance/:id/month-targets", h.Maintenance.MonthTargetPanelJSON)
 	g.POST("/maintenance/:id/month-targets", h.Maintenance.RegisterMonthTargets, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance/:id/month-targets/bulk", h.Maintenance.BulkMonthTargets, h.Auth.RequireMaintenanceEdit)
@@ -235,7 +237,7 @@ func TestManagePlanRender(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(buf.String(), "미배정 일괄 배정") {
+	if !strings.Contains(buf.String(), "대기 목록 (미배정)") {
 		t.Fatal("미배정 구역 없음")
 	}
 }

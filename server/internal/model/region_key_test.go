@@ -58,6 +58,16 @@ func TestSiteRegionAndMatchRegionKey(t *testing.T) {
 	if SiteRegionLabel(hong) != "충남 홍성군" {
 		t.Fatalf("사이트 라벨 %q", SiteRegionLabel(hong))
 	}
+
+	if !MatchAnyRegionKey(hong, nil) || !MatchAnyRegionKey(hong, []string{"", "  "}) {
+		t.Fatal("키 없음은 통과")
+	}
+	if !MatchAnyRegionKey(hong, []string{"충남|예산군", "충남|홍성군"}) {
+		t.Fatal("여러 키 중 하나 매칭")
+	}
+	if MatchAnyRegionKey(hong, []string{"충남|천안시 동남구"}) {
+		t.Fatal("천안시 키에 홍성군이 매칭됨")
+	}
 }
 
 func TestCollapseMonthTargetRegionKeys(t *testing.T) {

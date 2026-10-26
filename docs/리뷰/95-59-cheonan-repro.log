@@ -1,0 +1,25 @@
+95-59 천안시 체크해도 목록이 안 바뀌는 원인 재현
+실행일: 2026-10-26
+대상: GET /maintenance/:id/month-targets , plan_manage.html 지역 칩
+
+[수정 전 코드]
+1) 화면(plan_manage.html)
+   - #mt-regions 시·군·구 칩 change → checkedKeys 갱신 + updateRegionSummary() 만 수행
+   - load() 를 부르지 않음
+   - load() URL: month, q, sido, sigungu 만. region 없음
+   → 천안시 동남구/서북구 칩을 켜도 #mt-sites 는 이전 전체 목록 그대로
+
+2) 서버(MonthTargetPanelJSON)
+   - QueryParam("sido"), QueryParam("sigungu") 만 MonthTargetPanelFilter 에 전달
+   - region 쿼리를 읽지 않음
+   → 설령 화면이 region=충남|천안시 동남구 를 붙여도 목록이 안 줄어듦
+
+[재현 데이터]
+성환(충남|천안시 동남구), 쌍용(충남|천안시 서북구), 홍성(충남|홍성군), 주기 semi, 2월
+GET ?month=2 → sites 3건
+GET ?month=2&region=충남|천안시 동남구  (수정 전) → sites 3건 (필터 무시)
+
+[수정 후]
+GET ?month=2&region=충남|천안시 동남구 → sites 1건(성환)
+지역 칩 change → load() + URL 에 &region= 키 반복
+테스트: Test95_59_CheonanRegionCheckCauseAndFilter, Test95_59_MonthTargetPanelRegionQueryCheonan

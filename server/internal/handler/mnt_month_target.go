@@ -25,8 +25,9 @@ func (h *MaintenanceHandler) MonthTargetPanelJSON(c echo.Context) error {
 	if month < 1 || month > 12 {
 		month = 1
 	}
+	regionKeys := append([]string{}, c.QueryParams()["region"]...)
 	stats, sites, err := h.repo.MonthTargetPanelFilter(plan, month, c.QueryParam("q"), c.QueryParam("industry"),
-		c.QueryParam("sido"), c.QueryParam("sigungu"))
+		c.QueryParam("sido"), c.QueryParam("sigungu"), regionKeys...)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ func Test95_57ManageLayoutOrderAndCollapse(t *testing.T) {
 		`id="next-plan-box"`,
 		"연도 계획 현황",
 		`data-month-target-panel`,
-		`data-unassigned-bulk`,
+		`data-unassigned-list`,
 		`id="mnt-calendar-link"`,
 	}
 	var prev int
@@ -65,8 +65,11 @@ func Test95_57ManageLayoutOrderAndCollapse(t *testing.T) {
 	if !strings.Contains(body, "/maintenance/"+p.PlanID+"/status") {
 		t.Fatal("연도 계획 현황에 상태 변경이 없습니다")
 	}
-	if !strings.Contains(body, "③ 날짜·담당자 일괄 배정") {
-		t.Fatal("③ 버튼 없음")
+	if !strings.Contains(body, "③</span> 방문 날짜·담당자 배정") {
+		t.Fatal("③ 흐름 안내 없음")
+	}
+	if strings.Contains(body, "날짜·담당자 일괄 배정") {
+		t.Fatal("대기 목록 일괄 배정 UI가 남아 있음")
 	}
 	html, err := os.ReadFile(filepath.Join(findTemplateRoot(t), "maintenance", "plan_manage.html"))
 	if err != nil {
