@@ -8,6 +8,41 @@
 
   <form id="asset-form" method="POST" action="{{if .IsNew}}/assets{{else}}/assets/{{.Asset.AssetID}}/update{{end}}" class="space-y-6"
         x-data="{
+          pgGroups: {{toJSON .ProductGroups}},
+          pgClass: '',
+          pgType: '',
+          pgGroup: '{{.Asset.ProductGroupID}}',
+          pgTypes() {
+            const id = this.pgClass;
+            const seen = {};
+            const out = [];
+            (this.pgGroups||[]).forEach(g => {
+              if (g.class_id !== id) return;
+              if (seen[g.type_name]) return;
+              seen[g.type_name] = true;
+              out.push(g.type_name);
+            });
+            return out;
+          },
+          pgDetails() {
+            return (this.pgGroups||[]).filter(g => g.class_id===this.pgClass && g.type_name===this.pgType);
+          },
+          pgInit() {
+            const id = this.pgGroup;
+            const g = (this.pgGroups||[]).find(x => x.group_id===id);
+            if (g) { this.pgClass = g.class_id; this.pgType = g.type_name; }
+          },
+          pgPick() {
+            const d = this.pgDetails();
+            if (d.length===1) this.pgGroup = d[0].group_id;
+            const g = (this.pgGroups||[]).find(x => x.group_id===this.pgGroup);
+            if (g) {
+              const t = document.querySelector('[name=product_type]');
+              const c = document.querySelector('[name=product_category]');
+              if (t) t.value = g.sync_type||'';
+              if (c) c.value = g.sync_category||'';
+            }
+          },
           installer: '{{.Asset.InstallerType}}',
           management: '{{.Asset.ManagementType}}',
           managed: {{if .Asset.IsManaged}}true{{else}}false{{end}},
@@ -52,7 +87,7 @@
             return this.management && this.selectableMgmt.indexOf(this.management) < 0;
           }
         }"
-        x-init="initCycle(); syncFromManagement()">
+        x-init="initCycle(); syncFromManagement(); pgInit(); pgPick()">
 
     <!-- 기관/제품 기본 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
@@ -79,17 +114,28 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">제품분류</label>
-          <select name="product_category" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <select class="w-full border rounded-lg px-3 py-2 text-sm" x-model="pgClass" @change="pgType=''; pgGroup=''; pgPick()">
             <option value="">선택</option>
-            {{range .ProductCategories}}<option value="{{.CodeValue}}" {{if eq .CodeValue $.Asset.ProductCategory}}selected{{end}}>{{.CodeName}}</option>{{end}}
+            {{range .ProductClasses}}<option value="{{.ClassID}}">{{.ClassName}}</option>{{end}}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">제품구분</label>
-          <select name="product_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+          <select class="w-full border rounded-lg px-3 py-2 text-sm" x-model="pgType" @change="pgGroup=''; pgPick()">
             <option value="">선택</option>
-            {{range .ProductTypes}}<option value="{{upper .CodeValue}}" {{if eq (upper .CodeValue) (upper $.Asset.ProductType)}}selected{{end}}>{{.CodeName}}</option>{{end}}
+            <template x-for="t in pgTypes()" :key="t"><option :value="t" x-text="t"></option></template>
           </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">세부제품군</label>
+          <select name="product_group_id" class="w-full border rounded-lg px-3 py-2 text-sm" x-model="pgGroup" @change="pgPick()">
+            <option value="">선택</option>
+            <template x-for="g in pgDetails()" :key="g.group_id">
+              <option :value="g.group_id" x-text="g.detail_name ? g.detail_name : '미등록'"></option>
+            </template>
+          </select>
+          <input type="hidden" name="product_category" value="{{.Asset.ProductCategory}}">
+          <input type="hidden" name="product_type" value="{{.Asset.ProductType}}">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">모델명

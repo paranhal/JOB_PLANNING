@@ -1,0 +1,51 @@
+{{define "title"}}제품군 엑셀 업로드 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h2 class="text-ui-xl font-extrabold text-ink">제품군 엑셀 업로드</h2>
+      <p class="text-ui-sm text-ink-muted">양식을 받아 작성한 뒤 미리보고, 확인 후 등록합니다. 미리보기는 저장하지 않습니다.</p>
+    </div>
+    <a href="/product-groups" class="btn btn-secondary btn-sm">목록으로</a>
+  </div>
+  {{if .FlashErr}}<div class="flash-danger rounded-control" role="alert">{{.FlashErr}}</div>{{end}}
+  <div class="flex flex-wrap gap-2">
+    <a href="/product-groups/template.xlsx" class="btn btn-secondary btn-sm">양식 내려받기</a>
+  </div>
+  {{if .CanWrite}}
+  <form method="post" action="/product-groups/import-preview" enctype="multipart/form-data" class="card p-4 space-y-3">
+    <input type="file" name="file" accept=".xlsx" required class="input">
+    <button type="submit" class="btn btn-secondary">검증 미리보기</button>
+  </form>
+  {{end}}
+  {{if .Preview}}
+  <div class="card p-4 space-y-3">
+    <h3 class="font-semibold text-ink">{{if .Apply}}등록 결과{{else}}검증 미리보기{{end}}</h3>
+    <p class="text-ui-sm">반영 {{.OKN}} · 오류 {{.ErrN}}</p>
+    {{if and .CanWrite .PreviewToken (not .Apply)}}
+    <form method="post" action="/product-groups/import-apply" class="flex gap-2">
+      <input type="hidden" name="preview_token" value="{{.PreviewToken}}">
+      <button type="submit" class="btn btn-primary">확인하고 등록</button>
+    </form>
+    {{end}}
+    <div class="overflow-x-auto">
+      <table class="table-base text-ui">
+        <thead><tr class="text-ink-muted"><th class="p-2">행</th><th class="p-2">고유번호</th><th class="p-2">제품분류</th><th class="p-2">제품구분</th><th class="p-2">세부제품군</th><th class="p-2">메시지</th></tr></thead>
+        <tbody>
+          {{range .Rows}}
+          <tr class="border-t border-line">
+            <td class="p-2">{{.Line}}</td>
+            <td class="p-2">{{.GroupID}}</td>
+            <td class="p-2">{{.ClassName}}</td>
+            <td class="p-2">{{.TypeName}}</td>
+            <td class="p-2">{{.DetailName}}</td>
+            <td class="p-2">{{.Msg}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

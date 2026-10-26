@@ -26,6 +26,7 @@ type Handler struct {
 	Contact        *ContactHandler
 	ContactHistory *ContactHistoryHandler
 	Asset          *AssetHandler
+	ProductGroup   *ProductGroupHandler
 	SWDetail       *SWDetailHandler
 	Relation       *RelationHandler
 	AS             *ASHandler
@@ -141,8 +142,10 @@ func New(db *sql.DB) *Handler {
 		},
 		Asset: &AssetHandler{
 			repo: assetRepo, customerRepo: customerRepo, codeRepo: codeRepo, attachRepo: attachRepo,
-			wbRepo: repository.NewWBRepo(db),
+			wbRepo: repository.NewWBRepo(db), spaceRepo: spaceRepo,
+			groups: repository.NewProductGroupRepo(db),
 		},
+		ProductGroup: &ProductGroupHandler{repo: repository.NewProductGroupRepo(db)},
 		SWDetail: &SWDetailHandler{repo: swDetailRepo},
 		Relation: &RelationHandler{repo: relationRepo, customerRepo: customerRepo, codeRepo: codeRepo},
 		AS: &ASHandler{
@@ -177,6 +180,7 @@ func New(db *sql.DB) *Handler {
 			settings:   settingsRepo,
 			importRepo: repository.NewASImportRepo(db),
 			customers:  customerRepo,
+			codes:      codeRepo,
 		},
 		DataReset: &DataResetHandler{
 			cfg:  backup.Config{DataDir: dataDirFromEnv(), DB: db},

@@ -18,6 +18,10 @@ type AssetHandler struct {
 	codeRepo     *repository.CodeRepo
 	attachRepo   *repository.AttachmentRepo
 	wbRepo       *repository.WBRepo
+	spaceRepo    *repository.SpaceRepo
+	groups       *repository.ProductGroupRepo
+	importHold   *contractImportHold
+	resultCSV    map[string][]byte
 }
 
 func (h *AssetHandler) List(c echo.Context) error {
@@ -129,6 +133,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 		"Title": "자산 등록", "Active": NavAssets, "IsNew": true,
 		"Asset": asset, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
+		"ProductGroups": h.formGroups(), "ProductClasses": h.formClasses(),
 		"InstallerTypes":  installerTypes,
 		"ManagementTypes": withLegacyManagementOption(managementTypes, ""), "RequesterTypes": requesterTypes,
 		"OpStatuses":         opStatuses,
@@ -139,8 +144,8 @@ func (h *AssetHandler) New(c echo.Context) error {
 
 func (h *AssetHandler) Create(c echo.Context) error {
 	a := bindAsset(c)
-	// 타사 장비는 RFID자동화가 아닌 경우가 많아, 미선택 시 기타로 둔다.
-	if a.ProductCategory == "" {
+	h.applyGroup(a)
+	if a.ProductCategory == "" && a.ProductGroupID == "" {
 		a.ProductCategory = "other"
 	}
 	notice := ""
@@ -251,6 +256,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 		"Title": "자산 수정", "Active": NavAssets, "IsNew": false,
 		"Asset": a, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
+		"ProductGroups": h.formGroups(), "ProductClasses": h.formClasses(),
 		"InstallerTypes":  installerTypes,
 		"ManagementTypes": withLegacyManagementOption(managementTypes, a.ManagementType), "RequesterTypes": requesterTypes,
 		"OpStatuses":         opStatuses,
@@ -269,6 +275,7 @@ func (h *AssetHandler) Update(c echo.Context) error {
 	}
 	a := bindAsset(c)
 	a.AssetID = id
+	h.applyGroup(a)
 	notice := ""
 	if !managementTypeOK(a.ManagementType) {
 		a.ManagementType = prev.ManagementType
@@ -389,6 +396,34 @@ func (h *AssetHandler) APIAssetsByCustomer(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+func (h *AssetHandler) applyGroup(a *model.Asset) {
+	if h != nil && h.groups != nil {
+		h.groups.ApplyToAsset(a)
+	}
+}
+
+func (h *AssetHandler) formGroups() []model.ProductGroup {
+	if h == nil || h.groups == nil {
+		return nil
+	}
+	items, _ := h.groups.List("", "")
+	var out []model.ProductGroup
+	for _, g := range items {
+		if g.IsActive {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+func (h *AssetHandler) formClasses() []model.ProductClass {
+	if h == nil || h.groups == nil {
+		return nil
+	}
+	cs, _ := h.groups.Classes()
+	return cs
+}
+
 func bindAsset(c echo.Context) *model.Asset {
 	billingCycle := c.FormValue("maint_billing_cycle_code")
 	if billingCycle == "custom" {
@@ -409,6 +444,7 @@ func bindAsset(c echo.Context) *model.Asset {
 		ProductName:       c.FormValue("product_name"),
 		ProductType:       productType,
 		ProductCategory:   c.FormValue("product_category"),
+		ProductGroupID:    strings.TrimSpace(c.FormValue("product_group_id")),
 		ModelName:         c.FormValue("model_name"),
 		Manufacturer:      c.FormValue("manufacturer"),
 		SerialNumber:      c.FormValue("serial_number"),

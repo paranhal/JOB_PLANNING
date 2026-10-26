@@ -53,6 +53,7 @@ const (
 	NavMaintenanceProducts = "maintenance_products"
 	NavRegionOrder         = "region_order"
 	NavCodes               = "codes"
+	NavProductGroups       = "product_groups"
 	NavUsers               = "users"
 	NavHolidays            = "holidays"
 	NavOrgs                = "orgs"

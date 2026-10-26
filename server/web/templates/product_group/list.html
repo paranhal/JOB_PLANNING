@@ -1,0 +1,139 @@
+{{define "title"}}제품군 관리 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4" x-data="{ showAdd: false, editId: '', q: '{{.Q}}' }">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <p class="text-ui-sm text-ink-muted">제품 관리 / 제품군 관리</p>
+      <h2 class="text-xl font-semibold text-ink">제품군 관리</h2>
+      <p class="text-ui-sm text-ink-muted">제품분류와 제품구분을 매칭하고 세부 제품군을 관리합니다.</p>
+    </div>
+    {{if .CanWrite}}
+    <div class="flex flex-wrap gap-2">
+      <a href="/product-groups/import" class="btn-secondary btn-sm">엑셀 업로드</a>
+      <button type="button" class="btn-primary btn-sm" @click="showAdd=true">+ 제품군 추가</button>
+    </div>
+    {{end}}
+  </div>
+
+  {{if .FlashErr}}<div class="flash-danger rounded-control" role="alert" id="pg-flash-err">{{.FlashErr}}</div>{{end}}
+  {{if .FlashOK}}<div class="flash-success rounded-control" role="status">{{.FlashOK}}</div>{{end}}
+  {{if gt .Unmapped 0}}
+  <div class="flash-warning rounded-control" role="status">제품군이 붙지 않은 자산 {{.Unmapped}}건이 있습니다. 이름은 쓰지 않고 제품분류·제품구분 값으로만 맞춥니다.</div>
+  {{end}}
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">전체 제품군</p><p class="text-2xl font-semibold text-ink">{{.KPI.Total}} <span class="text-ui-sm font-normal text-ink-muted">개</span></p></div>
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">제품분류</p><p class="text-2xl font-semibold text-ink">{{.KPI.Classes}} <span class="text-ui-sm font-normal text-ink-muted">개</span></p></div>
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">제품구분</p><p class="text-2xl font-semibold text-ink">{{.KPI.Types}} <span class="text-ui-sm font-normal text-ink-muted">개</span></p></div>
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">세부제품군 미등록</p><p class="text-2xl font-semibold text-ink">{{.KPI.NoDetail}} <span class="text-ui-sm font-normal text-ink-muted">개</span></p></div>
+  </div>
+
+  <div class="card">
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-line">
+      <input type="search" x-model="q" placeholder="검색" class="input max-w-xs">
+      <div class="flex flex-wrap gap-1">
+        <a href="/product-groups" class="badge {{if not .ClassID}}badge-info{{else}}badge-neutral{{end}}">전체</a>
+        {{range .Classes}}
+        <a href="/product-groups?class={{.ClassID}}" class="badge {{if eq $.ClassID .ClassID}}badge-info{{else}}badge-neutral{{end}}">{{.ClassName}}</a>
+        {{end}}
+      </div>
+      <button type="button" class="btn-ghost btn-sm ml-auto" data-table-cols-reset="product_groups">열 너비 초기화</button>
+    </div>
+    {{if .CanWrite}}
+    <form method="POST" action="/product-groups/bulk-delete" id="pg-bulk">
+    {{end}}
+    <div class="table-scroll">
+      <table class="table-base table-cols" data-table-cols="product_groups">
+        <colgroup>
+          <col data-col="0"><col data-col="1"><col data-col="2"><col data-col="3"><col data-col="4"><col data-col="5"><col data-col="6">
+        </colgroup>
+        <thead>
+          <tr class="text-ui-sm text-ink-muted">
+            <th class="relative px-2 py-3 font-medium">{{if $.CanWrite}}<input type="checkbox" onclick="document.querySelectorAll('.pg-id').forEach(function(c){c.checked=this.checked}.bind(this))">{{end}}<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="0"></span></th>
+            <th class="relative px-2 py-3 font-medium">고유번호<span class="col-resize-handle col-resize-handle-wide" role="separator" aria-label="고유번호 열 너비 조절" tabindex="0" data-col="1"></span></th>
+            <th class="relative px-2 py-3 font-medium">제품분류<span class="col-resize-handle col-resize-handle-wide" role="separator" aria-label="제품분류 열 너비 조절" tabindex="0" data-col="2"></span></th>
+            <th class="relative px-2 py-3 font-medium">제품구분<span class="col-resize-handle col-resize-handle-wide" role="separator" aria-label="제품구분 열 너비 조절" tabindex="0" data-col="3"></span></th>
+            <th class="relative px-2 py-3 font-medium">세부제품군<span class="col-resize-handle col-resize-handle-wide" role="separator" aria-label="세부제품군 열 너비 조절" tabindex="0" data-col="4"></span></th>
+            <th class="relative px-2 py-3 font-medium">최종 수정일<span class="col-resize-handle col-resize-handle-wide" role="separator" aria-label="최종 수정일 열 너비 조절" tabindex="0" data-col="5"></span></th>
+            <th class="relative px-2 py-3 font-medium">관리<span class="col-resize-handle col-resize-handle-wide" role="separator" aria-label="관리 열 너비 조절" tabindex="0" data-col="6"></span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Items}}
+          <tr class="h-9 border-b border-line text-ui" x-show="!q || ('{{.GroupID}} {{.ClassName}} {{.TypeName}} {{.DetailLabel}}').toLowerCase().indexOf(q.toLowerCase())>=0">
+            <td class="px-2">{{if $.CanWrite}}<input class="pg-id" type="checkbox" name="ids" value="{{.GroupID}}">{{end}}</td>
+            <td class="px-2 whitespace-nowrap text-primary">{{.GroupID}}</td>
+            <td class="px-2">
+              {{if eq .ClassID "hw"}}<span class="badge badge-info">{{.ClassName}}</span>
+              {{else if eq .ClassID "sw"}}<span class="badge badge-success">{{.ClassName}}</span>
+              {{else}}<span class="badge badge-warning">{{.ClassName}}</span>{{end}}
+            </td>
+            <td class="px-2">{{.TypeName}}</td>
+            <td class="px-2">{{if .DetailName}}{{.DetailName}}{{else}}<span class="badge badge-warning">미등록</span>{{end}}</td>
+            <td class="px-2 text-ink-muted whitespace-nowrap">{{.DateDot}}</td>
+            <td class="px-2">
+              {{if $.CanWrite}}
+              <div class="flex gap-1">
+                <button type="button" class="btn-ghost btn-sm" @click="editId='{{.GroupID}}'">수정</button>
+                {{if gt .AssetCount 0}}
+                <button type="submit" form="pg-off-{{.GroupID}}" class="btn-ghost btn-sm" onclick="return confirm('사용 중이라 삭제할 수 없습니다. 사용중지할까요?')">사용중지</button>
+                {{else}}
+                <button type="submit" form="pg-del-{{.GroupID}}" class="btn-ghost btn-sm" onclick="return confirm('삭제할까요? 번호는 재사용하지 않습니다.')">삭제</button>
+                {{end}}
+              </div>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if .CanWrite}}
+    <div class="px-4 py-3 flex items-center gap-3">
+      <p class="text-ui-sm text-ink-muted">총 {{.KPI.Total}}개 제품군</p>
+      <button class="btn-secondary btn-sm" onclick="return confirm('선택한 미사용 제품군을 삭제할까요? 사용 중은 건너뜁니다.')">선택 삭제</button>
+    </div>
+    </form>
+    {{else}}
+    <p class="px-4 py-3 text-ui-sm text-ink-muted">총 {{.KPI.Total}}개 제품군</p>
+    {{end}}
+  </div>
+
+  {{if .CanWrite}}
+  {{range .Items}}
+  {{if gt .AssetCount 0}}
+  <form id="pg-off-{{.GroupID}}" method="POST" action="/product-groups/{{.GroupID}}/deactivate"></form>
+  {{else}}
+  <form id="pg-del-{{.GroupID}}" method="POST" action="/product-groups/{{.GroupID}}/delete"></form>
+  {{end}}
+  {{end}}
+
+  <div x-show="showAdd" x-cloak class="card p-4 space-y-3">
+    <h3 class="font-medium text-ink">제품군 추가</h3>
+    <form method="POST" action="/product-groups" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+      <div><label class="label">제품분류</label>
+        <select name="class_id" required class="select">{{range .Classes}}<option value="{{.ClassID}}">{{.ClassName}}</option>{{end}}</select></div>
+      <div><label class="label">제품구분</label><input name="type_name" required class="input"></div>
+      <div><label class="label">세부제품군</label><input name="detail_name" class="input" placeholder="비우면 미등록"></div>
+      <div class="flex gap-2"><button class="btn-primary">저장</button><button type="button" class="btn-secondary" @click="showAdd=false">닫기</button></div>
+    </form>
+  </div>
+
+  {{range .Items}}
+  {{$g := .}}
+  <div x-show="editId==='{{$g.GroupID}}'" x-cloak class="card p-4 space-y-3">
+    <h3 class="font-medium text-ink">{{$g.GroupID}} 수정</h3>
+    <form method="POST" action="/product-groups/{{$g.GroupID}}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+      <div><label class="label">제품분류</label>
+        <select name="class_id" class="select">{{range $.Classes}}<option value="{{.ClassID}}" {{if eq .ClassID $g.ClassID}}selected{{end}}>{{.ClassName}}</option>{{end}}</select></div>
+      <div><label class="label">제품구분</label><input name="type_name" value="{{$g.TypeName}}" class="input"></div>
+      <div><label class="label">세부제품군</label><input name="detail_name" value="{{$g.DetailName}}" class="input"></div>
+      <div class="flex gap-2"><button class="btn-primary">저장</button><button type="button" class="btn-secondary" @click="editId=''">닫기</button></div>
+    </form>
+  </div>
+  {{end}}
+  {{end}}
+</div>
+<script src="/static/js/table-cols.js?v={{.AssetQuery}}"></script>
+<script>(function(){ var el=document.getElementById('pg-flash-err'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'nearest'}); })();</script>
+{{end}}

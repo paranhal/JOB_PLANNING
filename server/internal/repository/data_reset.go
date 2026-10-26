@@ -36,7 +36,7 @@ func skipResetTable(name string) bool {
 	switch name {
 	case "data_change_logs", "data_backups", "data_log_archives",
 		"admin_unlocks", "admin_unlock_log", "as_edit_unlocks", "as_edit_unlock_log",
-		"users", "orgs", "codes", "as_cause_categories", "as_keywords",
+		"users", "orgs", "codes", "product_classes", "product_groups", "as_cause_categories", "as_keywords",
 		"app_settings", "app_versions", "schema_migrations", "id_sequences",
 		"sqlite_sequence":
 		return true

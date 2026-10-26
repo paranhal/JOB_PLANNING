@@ -37,7 +37,7 @@ func TestCLevelMenuHrefsOrder(t *testing.T) {
 	hide := []string{
 		"/admin/users", "/workboard/register", "/work", "/meeting",
 		"/meeting/weekly/me", "/as/knowledge", "/items", "/contacts",
-		"/maintenance/sites", "/codes",
+		"/maintenance/sites", "/codes", "/product-groups",
 	}
 	for _, h := range hide {
 		if containsHref(got, h) {

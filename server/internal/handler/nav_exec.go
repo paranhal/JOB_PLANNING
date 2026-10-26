@@ -144,6 +144,7 @@ func cLevelHiddenPath(path string) bool {
 		strings.HasPrefix(p, "/items"),
 		strings.HasPrefix(p, "/maintenance/sites"),
 		strings.HasPrefix(p, "/codes"),
+		strings.HasPrefix(p, "/product-groups"),
 		strings.HasPrefix(p, "/sales/new"),
 		strings.HasPrefix(p, "/sales/groups"),
 		strings.HasPrefix(p, "/projects/new"),

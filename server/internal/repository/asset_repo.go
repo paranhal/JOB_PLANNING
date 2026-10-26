@@ -11,14 +11,26 @@ import (
 type AssetRepo struct {
 	db      *sql.DB
 	locCopy bool
+	hasPG   bool
 }
 
 func NewAssetRepo(db *sql.DB) *AssetRepo {
-	return &AssetRepo{db: db, locCopy: tableHasColumn(db, "assets", "loc_building_name")}
+	return &AssetRepo{
+		db: db,
+		locCopy: tableHasColumn(db, "assets", "loc_building_name"),
+		hasPG:   tableHasColumn(db, "assets", "product_group_id"),
+	}
 }
 
 func (r *AssetRepo) locNameSQL(alias, locCol, joinExpr string) string {
 	return assetLocNameSQL(alias, locCol, joinExpr, r.locCopy)
+}
+
+func (r *AssetRepo) pgSQL() string {
+	if r != nil && r.hasPG {
+		return `COALESCE(a.product_group_id,'')`
+	}
+	return `''`
 }
 
 func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir string, page, pageSize int) ([]model.Asset, int, error) {
@@ -32,7 +44,7 @@ func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir stri
 
 	base := `
 		SELECT a.asset_id, a.customer_id, a.product_name, COALESCE(a.product_type,''),
-		       COALESCE(a.product_category,''),
+		       COALESCE(a.product_category,''), ` + r.pgSQL() + `,
 		       COALESCE(a.model_name,''), COALESCE(a.manufacturer,''), COALESCE(a.serial_number,''),
 		       COALESCE(a.install_date,''), COALESCE(a.operation_status,'operating'),
 		       COALESCE(a.management_type,''), a.is_managed,
@@ -111,7 +123,7 @@ func (r *AssetRepo) List(customerID, search, projectID, category, sort, dir stri
 		var managed int
 		if err := rows.Scan(
 			&a.AssetID, &a.CustomerID, &a.ProductName, &a.ProductType,
-			&a.ProductCategory,
+			&a.ProductCategory, &a.ProductGroupID,
 			&a.ModelName, &a.Manufacturer, &a.SerialNumber,
 			&a.InstallDate, &a.OperationStatus, &a.ManagementType, &managed,
 			&a.MaintContractType, &a.MaintCycle,
@@ -179,7 +191,7 @@ func assetListOrderBy(sort, orderDir string) string {
 func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 	q := `
 		SELECT a.asset_id, a.customer_id, a.product_name, COALESCE(a.product_type,''),
-		       COALESCE(a.product_category,''),
+		       COALESCE(a.product_category,''), ` + r.pgSQL() + `,
 		       COALESCE(a.model_name,''), COALESCE(a.manufacturer,''), COALESCE(a.serial_number,''),
 		       COALESCE(a.install_date,''), COALESCE(a.retire_date,''),
 		       COALESCE(a.installer_type,''), COALESCE(a.original_installer,''),
@@ -213,7 +225,7 @@ func (r *AssetRepo) GetByID(id string) (*model.Asset, error) {
 	var createdAt, updatedAt string
 	err := r.db.QueryRow(q, id).Scan(
 		&a.AssetID, &a.CustomerID, &a.ProductName, &a.ProductType,
-		&a.ProductCategory,
+		&a.ProductCategory, &a.ProductGroupID,
 		&a.ModelName, &a.Manufacturer, &a.SerialNumber,
 		&a.InstallDate, &a.RetireDate,
 		&a.InstallerType, &a.OriginalInstaller,
@@ -258,7 +270,7 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 	byID, byName := stampCreatedBy()
 	_, err = r.db.Exec(`
 		INSERT INTO assets (
-			asset_id, customer_id, product_name, product_type, product_category, model_name,
+			asset_id, customer_id, product_name, product_type, product_category, product_group_id, model_name,
 			manufacturer, serial_number, install_date, retire_date,
 			installer_type, original_installer, operation_status, management_type,
 			is_managed,
@@ -269,8 +281,8 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 			building_id, floor_id, room_id,
 			install_location, location_detail, notes, project_id, sales_order_id,
 			created_by_user_id, created_by_name, created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		a.AssetID, a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ProductGroupID, a.ModelName,
 		a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 		a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
 		boolToInt(a.IsManaged),
@@ -285,7 +297,16 @@ func (r *AssetRepo) Create(a *model.Asset) error {
 		return err
 	}
 	logCreate(r.db, "assets", "asset_id", a.AssetID, a.ProductName+" "+a.ModelName)
+	r.persistLocNames(a)
 	return nil
+}
+
+func (r *AssetRepo) persistLocNames(a *model.Asset) {
+	if r == nil || !r.locCopy || a == nil || strings.TrimSpace(a.AssetID) == "" {
+		return
+	}
+	_, _ = r.db.Exec(`UPDATE assets SET loc_building_name=?, loc_floor_name=?, loc_room_name=? WHERE asset_id=?`,
+		a.LocBuildingName, a.LocFloorName, a.LocRoomName, a.AssetID)
 }
 
 func (r *AssetRepo) Update(a *model.Asset) error {
@@ -294,7 +315,7 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 		now := time.Now().Format("2006-01-02 15:04:05")
 		_, err := r.db.Exec(`
 		UPDATE assets SET
-			customer_id=?, product_name=?, product_type=?, product_category=?, model_name=?,
+			customer_id=?, product_name=?, product_type=?, product_category=?, product_group_id=?, model_name=?,
 			manufacturer=?, serial_number=?, install_date=?, retire_date=?,
 			installer_type=?, original_installer=?, operation_status=?, management_type=?,
 			is_managed=?,
@@ -306,7 +327,7 @@ func (r *AssetRepo) Update(a *model.Asset) error {
 			install_location=?, location_detail=?, notes=?, project_id=?,
 			updated_at=?
 		WHERE asset_id=?`,
-			a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ModelName,
+			a.CustomerID, a.ProductName, a.ProductType, a.ProductCategory, a.ProductGroupID, a.ModelName,
 			a.Manufacturer, a.SerialNumber, a.InstallDate, a.RetireDate,
 			a.InstallerType, a.OriginalInstaller, a.OperationStatus, a.ManagementType,
 			boolToInt(a.IsManaged),

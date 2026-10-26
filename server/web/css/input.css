@@ -10,6 +10,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 95-61: HTML hidden 이 Tailwind display 유틸(.flex 등)보다 항상 이긴다. 레이어 밖에 둔다. */
+[hidden] {
+  display: none !important;
+}
+
 @layer base {
   :root {
     color-scheme: light;            /* 기기 다크 설정이 있어도 라이트 고정 (§2.3) */
@@ -134,6 +139,10 @@
   .table-cols { table-layout: fixed; width: max-content; }
   .col-resize-handle {
     @apply absolute top-0 right-0 h-full w-2 cursor-col-resize;
+    touch-action: none;
+  }
+  .col-resize-handle-wide {
+    @apply absolute top-0 right-0 z-10 h-full w-4 cursor-col-resize border-r border-line;
     touch-action: none;
   }
   .cell-ellipsis { @apply overflow-hidden text-ellipsis whitespace-nowrap; }

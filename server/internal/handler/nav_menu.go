@@ -258,6 +258,7 @@ func navDefinition() []navDefGroup {
 				{ID: "approval_settings", Label: "결재 설정", Href: "/admin/approval-settings", Active: []string{NavApproval}, Show: func(c MenuCtx) bool { return c.visAdmin() }},
 				{ID: "items", Label: "품목 마스터", Href: "/items", Active: []string{NavSalesItems}, Show: role},
 				{ID: "codes", Label: "코드관리", Href: "/codes", Active: []string{NavCodes}, Show: func(c MenuCtx) bool { return c.visCodes() }},
+				{ID: "product_groups", Label: "제품군 관리", Href: "/product-groups", Active: []string{NavProductGroups}, Show: func(c MenuCtx) bool { return c.visVision() }},
 				{ID: "equip_cats", Label: "장비 분류", Href: "/projects/equipment-categories", Active: []string{NavEquipCategories}, Show: func(c MenuCtx) bool { return c.visAdmin() }, More: true},
 				{ID: "mail", Label: "메일 보낸 함", Href: "/admin/mail", Active: []string{NavMail}, Show: func(c MenuCtx) bool { return c.visAdmin() && c.visMail() }, More: true},
 				{ID: "notify", Label: "알림 설정", Href: "/admin/notify", Active: []string{NavNotify}, Show: func(c MenuCtx) bool { return c.visAdmin() }, More: true},

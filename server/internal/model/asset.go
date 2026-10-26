@@ -12,8 +12,9 @@ type Asset struct {
 	AssetID           string `json:"asset_id"`
 	CustomerID        string `json:"customer_id"`
 	ProductName       string `json:"product_name"`
-	ProductType       string `json:"product_type"`     // 제품구분 코드: SW, HW, 서버 등
-	ProductCategory   string `json:"product_category"` // 제품분류: 홈페이지, 전자도서관, 모바일, RFID자동화, 자료관리, 기타
+	ProductType       string `json:"product_type"`      // 제품구분 코드: SW, HW, 서버 등
+	ProductCategory   string `json:"product_category"`  // 제품분류: 홈페이지, 전자도서관, 모바일, RFID자동화, 자료관리, 기타
+	ProductGroupID    string `json:"product_group_id"` // 95-64 제품군 PG-####
 	ModelName         string `json:"model_name"`
 	Manufacturer      string `json:"manufacturer"`
 	SerialNumber      string `json:"serial_number"`
