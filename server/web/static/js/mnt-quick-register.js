@@ -29,10 +29,15 @@ window.bindMntQuickRegister = function () {
       showErr('사이트를 선택하세요');
       return;
     }
+    var visitDate = (document.getElementById('mnt-quick-date') || {}).value || '';
+    if (!visitDate) {
+      showErr('방문일을 입력하세요');
+      return;
+    }
     var body = {
       customer_id: cid,
       month: parseInt(monthEl && monthEl.value, 10) || 0,
-      visit_date: (document.getElementById('mnt-quick-date') || {}).value || '',
+      visit_date: visitDate,
       assignee: (document.getElementById('mnt-quick-assignee') || {}).value || ''
     };
     fetch('/workboard/mnt-quick-register', {
@@ -66,5 +71,46 @@ window.bindMntQuickRegister = function () {
   });
 };
 
-document.addEventListener('DOMContentLoaded', function () { window.bindMntQuickRegister(); });
-document.addEventListener('htmx:afterSwap', function () { window.bindMntQuickRegister(); });
+window.bindMntCandidateSearch = function () {
+  var inp = document.querySelector('#mnt-register-source') ? document.querySelector('input[x-model="mntQ"], input[placeholder="고객명·점검대상 검색"]') : null;
+  var sel = document.getElementById('mnt-register-source');
+  if (!inp || !sel || inp.dataset.candBound === '1') return;
+  inp.dataset.candBound = '1';
+  var t = null;
+  function load() {
+    var q = inp.value || '';
+    fetch('/workboard/mnt-candidates?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var cur = sel.value;
+        sel.replaceChildren();
+        (data.items || []).forEach(function (it) {
+          var opt = document.createElement('option');
+          opt.value = it.id;
+          opt.textContent = it.label;
+          sel.appendChild(opt);
+        });
+        if (!sel.options.length) {
+          var empty = document.createElement('option');
+          empty.value = '';
+          empty.disabled = true;
+          empty.textContent = q ? '검색 결과가 없습니다' : '대기 중인 정기점검이 없습니다';
+          sel.appendChild(empty);
+        }
+        if (cur) sel.value = cur;
+      });
+  }
+  inp.addEventListener('input', function () {
+    clearTimeout(t);
+    t = setTimeout(load, 200);
+  });
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+  window.bindMntQuickRegister();
+  window.bindMntCandidateSearch();
+});
+document.addEventListener('htmx:afterSwap', function () {
+  window.bindMntQuickRegister();
+  window.bindMntCandidateSearch();
+});

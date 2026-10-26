@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -187,5 +188,118 @@ func (h *WorkboardHandler) newWorkMntCards(orgID string) ([]model.WBCard, error)
 			Unassigned:   strings.TrimSpace(v.Assignee) == "",
 		})
 	}
+	if yearPlans, err := h.mntRepo.ListPlansWithCountsInOrg(orgID); err == nil {
+		year := time.Now().Year()
+		var planID string
+		for _, p := range yearPlans {
+			if p.PlanYear == year {
+				planID = p.PlanID
+				break
+			}
+		}
+		if planID != "" {
+			targets, _ := h.mntRepo.ListActiveMonthTargets(planID, year)
+			haveVisit := map[string]bool{}
+			for _, v := range visits {
+				if v.Completed {
+					continue
+				}
+				haveVisit[v.CustomerID] = true
+			}
+			for _, tg := range targets {
+				if haveVisit[tg.CustomerID] {
+					continue
+				}
+				cfg, _ := h.mntRepo.GetSiteConfig(tg.CustomerID)
+				name := tg.CustomerID
+				if cfg != nil {
+					name = cfg.ShortName
+					if name == "" {
+						name = cfg.OrgName
+					}
+				}
+				num := fmt.Sprintf("%d월대상", tg.Month)
+				mnt = append(mnt, model.WBCard{
+					Kind:         model.WBSourceMaintenance,
+					RefID:        "mt:" + tg.TargetID,
+					Category:     model.WBSourceMaintenance,
+					Title:        model.FormatMaintenanceWorkTitle(name, num),
+					SubTitle:     "월 점검 대상",
+					SourceNumber: num,
+					SourceHref:   "/maintenance/" + planID + "/manage",
+					PlannedDay:   "",
+					DurationMin:  30,
+					Unassigned:   true,
+				})
+			}
+		}
+	}
 	return mnt, nil
+}
+
+func (h *WorkboardHandler) MntCandidates(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	q := strings.ToLower(strings.TrimSpace(c.QueryParam("q")))
+	cards, err := h.newWorkMntCards(currentOrg(c))
+	if err != nil {
+		return err
+	}
+	type item struct {
+		ID    string `json:"id"`
+		Label string `json:"label"`
+	}
+	var out []item
+	for _, c0 := range cards {
+		blob := strings.ToLower(c0.Title + " " + c0.SourceNumber + " " + c0.ProductType + " " + c0.SubTitle)
+		if q != "" && !strings.Contains(blob, q) {
+			continue
+		}
+		out = append(out, item{ID: c0.RefID, Label: c0.Title + " · " + c0.SourceNumber})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"items": out})
+}
+
+func (h *WorkboardHandler) resolveMntSourceID(c echo.Context, sourceID, workDate string, sel Selection) (string, error) {
+	sourceID = strings.TrimSpace(sourceID)
+	if !strings.HasPrefix(sourceID, "mt:") {
+		return sourceID, nil
+	}
+	if h.mntRepo == nil {
+		return "", fmt.Errorf("정기점검 저장소를 쓸 수 없습니다")
+	}
+	tid := strings.TrimPrefix(sourceID, "mt:")
+	tg, err := h.mntRepo.GetMonthTarget(tid)
+	if err != nil || tg == nil {
+		return "", fmt.Errorf("월 대상을 찾을 수 없습니다")
+	}
+	v := model.MaintenanceVisit{
+		PlanID: tg.PlanID, VisitDate: workDate, CustomerID: tg.CustomerID,
+		ProductType: "", EntryCategory: "normal", Assignee: sel.PrimaryName,
+	}
+	return h.mntRepo.AssignSlotID(v)
+}
+
+func (h *WorkboardHandler) ensureMntVisitForCustomer(c echo.Context, customerID, workDate string, sel Selection) (string, error) {
+	if h.mntRepo == nil {
+		return "", fmt.Errorf("정기점검 저장소를 쓸 수 없습니다")
+	}
+	cfg, err := h.mntRepo.GetSiteConfig(customerID)
+	if err != nil || cfg == nil {
+		return "", fmt.Errorf("점검 사이트가 아닙니다")
+	}
+	org := strings.TrimSpace(cfg.OrgID)
+	if org == "" {
+		org = currentOrg(c)
+	}
+	plan, err := h.mntRepo.EnsureYearPlan(org, time.Now().Year())
+	if err != nil {
+		return "", err
+	}
+	v := model.MaintenanceVisit{
+		PlanID: plan.PlanID, VisitDate: workDate, CustomerID: customerID,
+		EntryCategory: "normal", Assignee: sel.PrimaryName,
+	}
+	return h.mntRepo.AssignSlotID(v)
 }

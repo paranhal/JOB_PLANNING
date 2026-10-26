@@ -30,9 +30,73 @@ func (h *MaintenanceHandler) MonthTargetPanelJSON(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	cfgs, _ := h.repo.ListSiteConfigs()
+	cfgs = repository.FilterSiteConfigsByOrg(cfgs, plan.OrgID)
+	orgPeriod := 0
+	orgSites := 0
+	for _, cfg := range cfgs {
+		orgSites++
+		if model.IsPeriodCycle(cfg.InspectionCycle) {
+			orgPeriod++
+		}
+	}
+	empty := ""
+	if orgSites == 0 {
+		empty = "no_sites"
+	} else if orgPeriod == 0 {
+		empty = "no_period"
+	} else if len(sites) == 0 {
+		empty = "no_match"
+	}
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"month": month, "regions": stats, "sites": sites,
+		"empty": empty, "org_site_count": orgSites, "org_period_count": orgPeriod,
 	})
+}
+
+func (h *MaintenanceHandler) BulkMonthTargets(c echo.Context) error {
+	if !canEditMaintenanceSchedule(c) {
+		return echo.ErrForbidden
+	}
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
+	}
+	action := strings.TrimSpace(c.FormValue("action"))
+	month, _ := strconv.Atoi(c.FormValue("month"))
+	_ = c.Request().ParseForm()
+	ids := uniqueNonEmptyIDs(c.Request().PostForm["target_id"])
+	okN, skipN := 0, 0
+	var reasons []string
+	for _, id := range ids {
+		var e error
+		if action == "move" {
+			e = h.repo.MoveMonthTarget(id, month)
+		} else {
+			e = h.repo.CancelMonthTarget(id)
+		}
+		if e != nil {
+			skipN++
+			reasons = append(reasons, e.Error())
+			continue
+		}
+		okN++
+	}
+	verb := "등록 해제"
+	if action == "move" {
+		verb = "월 이동"
+	}
+	msg := fmt.Sprintf("%s %d건", verb, okN)
+	if skipN > 0 {
+		msg += fmt.Sprintf(" / 건너뜀 %d건", skipN)
+		if len(reasons) > 0 {
+			msg += " (" + reasons[0] + ")"
+		}
+	}
+	if wantsJSON(c) {
+		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "applied": okN, "skipped": skipN, "message": msg})
+	}
+	return h.manageOKRedirect(c, plan.PlanID, msg)
 }
 
 func (h *MaintenanceHandler) RegisterMonthTargets(c echo.Context) error {
@@ -171,6 +235,9 @@ func (h *WorkboardHandler) QuickRegisterMaintenance(c echo.Context) error {
 	if req.CustomerID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "사이트를 선택하세요"})
 	}
+	if req.VisitDate == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "방문일을 입력하세요"})
+	}
 	if requiresAssigneeChoice(c) && !assigneeFilled(req.Assignee, "", "") {
 		return c.JSON(http.StatusUnprocessableEntity, map[string]string{"error": msgAssigneeRequired})
 	}
@@ -212,7 +279,23 @@ func (h *WorkboardHandler) QuickRegisterMaintenance(c echo.Context) error {
 					"ok": true, "visit_id": existing.VisitID, "title": existing.ShortName, "hint": res.Skipped[0].Reason, "existing": true,
 				})
 			}
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": res.Skipped[0].Reason})
+			v := model.MaintenanceVisit{
+				PlanID: plan.PlanID, VisitDate: req.VisitDate, CustomerID: req.CustomerID,
+				ProductType: req.ProductType, Assignee: req.Assignee, EntryCategory: "normal",
+			}
+			visitID, err := h.mntRepo.AssignSlotID(v)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			}
+			name := cfg.ShortName
+			if name == "" {
+				name = cfg.OrgName
+			}
+			num := model.FormatMaintenanceVisitNumber(req.VisitDate, req.ProductType)
+			return c.JSON(http.StatusOK, map[string]interface{}{
+				"ok": true, "visit_id": visitID, "title": model.FormatMaintenanceWorkTitle(name, num),
+				"source_number": num, "hint": res.Skipped[0].Reason, "from_month_target": true,
+			})
 		}
 	}
 	v := model.MaintenanceVisit{

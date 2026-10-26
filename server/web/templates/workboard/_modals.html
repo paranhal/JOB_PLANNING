@@ -223,10 +223,7 @@
         <select id="mnt-register-source" name="source_id" x-model="preselect" required size="5"
                 class="w-full border rounded-lg px-2 py-1 text-sm">
           {{range .MntCards}}
-          <option value="{{.RefID}}"
-                  :hidden="mntQ && !('{{.Title}} {{.SourceNumber}} {{.ProductType}}'.toLowerCase().includes(mntQ.toLowerCase()))">
-            {{.Title}} · {{.SourceNumber}}
-          </option>
+          <option value="{{.RefID}}">{{.Title}} · {{.SourceNumber}}</option>
           {{else}}
           <option value="" disabled>대기 중인 정기점검이 없습니다</option>
           {{end}}
@@ -244,7 +241,7 @@
               <input type="number" id="mnt-quick-month" name="mnt_month" min="1" max="12" class="w-full border rounded-lg px-2 py-1.5 text-sm">
             </div>
             <div>
-              <label class="block text-[11px] text-gray-500 mb-1">방문 예정일 (선택)</label>
+              <label class="block text-[11px] text-gray-500 mb-1">방문 예정일 <span class="text-red-500">*</span></label>
               <input type="date" id="mnt-quick-date" class="w-full border rounded-lg px-2 py-1.5 text-sm">
             </div>
           </div>

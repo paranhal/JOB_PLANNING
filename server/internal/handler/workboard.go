@@ -1715,6 +1715,14 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			return h.respondWorkBatch(c, res)
 		}
 		sourceID = batchIDs[0]
+		if kind == model.WBWorkMaintenance {
+			resolved, rerr := h.resolveMntSourceID(c, sourceID, workDate, sel)
+			if rerr != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, rerr.Error())
+			}
+			sourceID = resolved
+			batchIDs[0] = resolved
+		}
 		if existing, _ := h.repo.GetTaskBySource(kind, sourceID); existing != nil {
 			owner := strings.TrimSpace(sel.PrimaryName)
 			if owner == "" {
@@ -1808,11 +1816,24 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			_ = h.saveSelectionOnTask(t.TaskID, sel)
 		}
 		if kind == model.WBWorkMaintenance && len(extraSites) > 0 {
-			sites := extraSites
-			if strings.TrimSpace(t.CustomerID) != "" {
-				sites = uniqueNonEmptyIDs(append([]string{t.CustomerID}, extraSites...))
+			if mode == "joint" {
+				sites := extraSites
+				if strings.TrimSpace(t.CustomerID) != "" {
+					sites = uniqueNonEmptyIDs(append([]string{t.CustomerID}, extraSites...))
+				}
+				_ = h.repo.ReplaceTaskSites(t.TaskID, sites)
+			} else {
+				for _, cid := range extraSites {
+					if strings.TrimSpace(cid) == "" || cid == t.CustomerID {
+						continue
+					}
+					vid, err := h.ensureMntVisitForCustomer(c, cid, workDate, sel)
+					if err != nil || vid == "" {
+						continue
+					}
+					_, _ = h.RegisterWorkBatch(c, kind, []string{vid}, "separate", sel, workDate, dueDate, start, end, dur)
+				}
 			}
-			_ = h.repo.ReplaceTaskSites(t.TaskID, sites)
 		}
 		h.syncVisitDateFromTask(kind, sourceID, workDate)
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))

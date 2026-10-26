@@ -118,7 +118,7 @@ func TestMnt95_45QuickRegisterFlow(t *testing.T) {
 	}
 	ck := jwtCookieUser(t, me)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "http://localhost/workboard/mnt-quick-register", strings.NewReader(`{"customer_id":"sch1","month":2,"assignee":"김현우"}`))
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/workboard/mnt-quick-register", strings.NewReader(`{"customer_id":"sch1","month":2,"visit_date":"2026-02-10","assignee":"김현우"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	req.AddCookie(ck)
 	e.ServeHTTP(rec, req)
