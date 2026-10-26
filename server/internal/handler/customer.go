@@ -364,28 +364,7 @@ func excelMaintContractLabel(s string) string {
 }
 
 func excelMaintCycleLabel(s string) string {
-	switch s {
-	case "monthly":
-		return "월"
-	case "quarterly":
-		return "분기"
-	case "semi":
-		return "반기"
-	case "odd_bimonthly":
-		return "홀수격월"
-	case "even_bimonthly":
-		return "짝수격월"
-	case "yearly":
-		return "년1회"
-	case "custom":
-		return "직접입력"
-	case "call":
-		return "Call"
-	case "none":
-		return "없음"
-	default:
-		return strings.TrimSpace(s)
-	}
+	return model.MaintCycleDisplayLabel(s)
 }
 
 func excelMaintBillingCycleLabel(s string) string {

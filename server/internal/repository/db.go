@@ -1144,7 +1144,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		('MCY003','maint_cycle','semi','반기',3),
 		('MCY004','maint_cycle','odd_bimonthly','홀수격월',4),
 		('MCY005','maint_cycle','even_bimonthly','짝수격월',5),
-		('MCY006','maint_cycle','custom','직접입력',6)`)
+		('MCY007','maint_cycle','call','CALL',6),
+		('MCY006','maint_cycle','custom','직접입력',7)`)
 
 	// 관리유형: 타사장비 (당사 비관리 · 연동 참고)
 	db.Exec(`INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_order) VALUES
@@ -1357,6 +1358,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyMaintenanceVisitActionV90(db)
 	applyAssigneePickerV91(db)
 	applySalesGroupChildrenV92(db)
+	applyAssetMgmtTypesV93(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 

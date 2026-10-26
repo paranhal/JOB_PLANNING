@@ -130,7 +130,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 		"Asset": asset, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
 		"InstallerTypes":  installerTypes,
-		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
+		"ManagementTypes": withLegacyManagementOption(managementTypes, ""), "RequesterTypes": requesterTypes,
 		"OpStatuses":         opStatuses,
 		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
 		"MaintBillingCycles": maintBillingCycles,
@@ -143,9 +143,17 @@ func (h *AssetHandler) Create(c echo.Context) error {
 	if a.ProductCategory == "" {
 		a.ProductCategory = "other"
 	}
+	notice := ""
+	if !managementTypeOK(a.ManagementType) {
+		a.ManagementType = ""
+		notice = msgManagementTypeOnly3
+	}
 	applyAssetBusinessRules(a)
 	if err := h.repo.Create(a); err != nil {
 		return err
+	}
+	if notice != "" {
+		setFlashErrCookie(c, notice)
 	}
 	return c.Redirect(http.StatusSeeOther, "/assets/"+a.AssetID)
 }
@@ -244,7 +252,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 		"Asset": a, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
 		"InstallerTypes":  installerTypes,
-		"ManagementTypes": managementTypes, "RequesterTypes": requesterTypes,
+		"ManagementTypes": withLegacyManagementOption(managementTypes, a.ManagementType), "RequesterTypes": requesterTypes,
 		"OpStatuses":         opStatuses,
 		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
 		"MaintBillingCycles": maintBillingCycles,
@@ -254,11 +262,24 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 }
 
 func (h *AssetHandler) Update(c echo.Context) error {
+	id := c.Param("id")
+	prev, err := h.repo.GetByID(id)
+	if err != nil || prev == nil {
+		return echo.ErrNotFound
+	}
 	a := bindAsset(c)
-	a.AssetID = c.Param("id")
+	a.AssetID = id
+	notice := ""
+	if !managementTypeOK(a.ManagementType) {
+		a.ManagementType = prev.ManagementType
+		notice = msgManagementTypeOnly3
+	}
 	applyAssetBusinessRules(a)
 	if err := h.repo.Update(a); err != nil {
 		return err
+	}
+	if notice != "" {
+		setFlashErrCookie(c, notice)
 	}
 	return c.Redirect(http.StatusSeeOther, "/assets/"+a.AssetID)
 }
@@ -317,9 +338,31 @@ func assetListQuery(search, customerID, projectID, category, sort, dir, display 
 	return v
 }
 
-// applyAssetBusinessRules 타사장비 규칙을 적용한다.
+const msgManagementTypeOnly3 = "관리유형은 장애대응·정기점검·타사장비만 선택할 수 있습니다. 이전 값을 유지했습니다."
+
+func managementTypeOK(s string) bool {
+	s = strings.TrimSpace(s)
+	return s == "" || model.IsSelectableManagementType(s)
+}
+
+func withLegacyManagementOption(active []model.Code, current string) []model.Code {
+	cur := strings.TrimSpace(current)
+	if cur == "" || model.IsSelectableManagementType(cur) {
+		return active
+	}
+	for _, c := range active {
+		if c.CodeValue == cur {
+			return active
+		}
+	}
+	legacy := model.Code{CodeValue: cur, CodeName: model.ManagementTypeLabel(cur) + " (구)", IsActive: false}
+	return append([]model.Code{legacy}, active...)
+}
+
+// applyAssetBusinessRules 타사장비 규칙과 미계약 점검주기 초기값을 적용한다.
 func applyAssetBusinessRules(a *model.Asset) {
 	applyThirdPartyRules(a)
+	model.ApplyNoneContractCycleDefault(a)
 }
 
 // applyThirdPartyRules 관리유형 타사장비는 당사 비관리. 설치주체만 타사이고 유형이 비면 타사장비로 둔다.
@@ -355,6 +398,7 @@ func bindAsset(c echo.Context) *model.Asset {
 	if maintCycle == "custom" {
 		maintCycle = c.FormValue("maint_cycle_custom")
 	}
+	maintCycle = model.CanonicalMaintCycleCode(maintCycle)
 
 	productType := strings.TrimSpace(c.FormValue("product_type"))
 	if productType != "" {

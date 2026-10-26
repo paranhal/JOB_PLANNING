@@ -124,6 +124,25 @@ func TestSyncSiteConfigsFromAssets(t *testing.T) {
 	}
 }
 
+func TestSyncSiteConfigsSkipsNoneAndCall(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "callsync.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	insertSyncCustomer(t, db, "c_none", "미계약도서관", "충청남도")
+	insertSyncCustomer(t, db, "c_pcall", "유상CALL도서관", "충청남도")
+	insertSyncAsset(t, db, "AC-001", "c_none", "RFID", "rfid", "none", "call")
+	insertSyncAsset(t, db, "AC-002", "c_pcall", "RFID", "rfid", "paid", "call")
+	res, err := NewMaintenanceRepo(db).SyncSiteConfigsFromAssets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Added != 0 {
+		t.Fatalf("CALL·미계약이 사이트 동기화되면 안 됨 added=%d %v", res.Added, res.Names)
+	}
+}
+
 func TestSyncSiteConfigsSkipsThirdPartyEquipment(t *testing.T) {
 	db, err := InitDB(filepath.Join(t.TempDir(), "tp.db"))
 	if err != nil {

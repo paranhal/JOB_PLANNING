@@ -610,17 +610,7 @@ func funcMap() template.FuncMap {
 			return s
 		},
 		"managementTypeLabel": func(s string) string {
-			m := map[string]string{
-				"direct": "직접유지보수", "fault": "장애대응", "periodic": "정기점검",
-				"on_demand": "요청시지원", "reference": "참고관리", "third_party": "타사장비",
-			}
-			if l, ok := m[s]; ok {
-				return l
-			}
-			if s == "" {
-				return "—"
-			}
-			return s
+			return model.ManagementTypeLabel(s)
 		},
 		"maintContractLabel": func(s string) string {
 			m := map[string]string{
@@ -635,17 +625,7 @@ func funcMap() template.FuncMap {
 			return model.VisitDeleteProtected(date, time.Now())
 		},
 		"maintCycleLabel": func(s string) string {
-			m := map[string]string{
-				"monthly": "월", "quarterly": "분기", "semi": "반기",
-				"odd_bimonthly": "홀수격월", "even_bimonthly": "짝수격월",
-				"yearly": "년1회", "custom": "직접입력",
-				// 이전 시드 호환
-				"call": "Call", "none": "없음",
-			}
-			if l, ok := m[s]; ok {
-				return l
-			}
-			return s
+			return model.MaintCycleDisplayLabel(s)
 		},
 		"maintBillingCycleLabel": func(s string) string {
 			m := map[string]string{
