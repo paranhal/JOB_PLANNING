@@ -51,8 +51,8 @@ func Test95_55BBulkAssignSameDateAndSpread(t *testing.T) {
 		t.Fatalf("manage=%d %s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "assign-slots/bulk") || !strings.Contains(body, "연도 계획 관리") {
-		t.Fatal("일괄 배정·연도 계획 관리 없음")
+	if !strings.Contains(body, "assign-slots/bulk") || !strings.Contains(body, "차년도 계획 수립") {
+		t.Fatal("일괄 배정·차년도 계획 수립 없음")
 	}
 
 	slots, err := repo.ListOpenUnassignedSlotsForOrg(p.PlanID, 2026, 10, model.OrgIDLibrary)
@@ -130,7 +130,7 @@ func Test95_55DManageEmptyAndStickyAndYearPlan(t *testing.T) {
 	e, _, p := newMntManageApp(t)
 	rec := manageGet(t, e, "/maintenance/"+p.PlanID+"/manage", jwtCookie(t))
 	body := rec.Body.String()
-	for _, w := range []string{"mt-sticky", "mt-cancel-sites", "mt-move-sites", "연도 계획 관리", "새 연도 계획 만들기"} {
+	for _, w := range []string{"mt-sticky", "mt-cancel-sites", "mt-move-sites", "차년도 계획 수립", "새 연도 빈 계획 만들기"} {
 		if !strings.Contains(body, w) {
 			t.Fatalf("%q 없음", w)
 		}

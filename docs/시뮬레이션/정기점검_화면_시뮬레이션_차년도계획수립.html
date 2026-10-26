@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>정기점검 화면 시뮬레이션</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:13px/1.5 -apple-system,"Malgun Gothic",sans-serif;background:#f3f5f8;color:#1f2937}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.note{background:#fffbe6;border:1px solid #f3e08a;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px}
+.box{background:#fff;border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
+.hd{display:flex;align-items:center;gap:8px;padding:10px 14px;font-weight:600}
+.hd .step{background:#0e6a9b;color:#fff;border-radius:10px;font-size:11px;padding:1px 8px}
+.hd .sub{font-weight:400;color:#6b7280;font-size:12px}
+.bd{padding:0 14px 14px}
+.next{border:1px dashed #9db4c8;background:#f7fafc}
+.next .hd{cursor:pointer;user-select:none}
+.next .arrow{display:inline-block;transition:.15s}
+.next.open .arrow{transform:rotate(90deg)}
+.next .bd{display:none}.next.open .bd{display:block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.card{border:1px solid #dfe3ea;border-radius:6px;padding:12px}
+.card h4{margin:0 0 4px;font-size:13px}.card p{margin:0 0 8px;color:#6b7280;font-size:12px}
+label{font-size:11px;color:#6b7280;display:block}
+input,select{border:1px solid #cfd5de;border-radius:4px;padding:4px 6px;font-size:12px}
+.btn{background:#0e6a9b;color:#fff;border:0;border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer}
+.btn.gray{background:#fff;color:#374151;border:1px solid #cfd5de}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:6px 8px;border-bottom:1px solid #eef0f4;text-align:left}th{background:#f7f8fa;color:#6b7280;font-weight:500}
+.tag{color:#c2410c}.ok{color:#15803d}.muted{color:#6b7280}
+.row{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.flow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;font-size:12px}
+.flow span{background:#fff;border:1px solid #dfe3ea;border-radius:14px;padding:3px 10px}
+.flow b{color:#0e6a9b}
+.msg{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;display:none}
+.msg.show{display:block}.msg.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}.msg.good{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+</style></head><body><div class="wrap">
+
+<div class="note">시뮬레이션 화면입니다(저장되지 않음). 위쪽 「차년도 계획 수립」을 눌러 접기/펼치기를 확인하세요. 실제 화면은 Cursor 구현 후 확인합니다.</div>
+
+<div class="flow"><span>정기점검 화면 흐름</span><span><b>①</b> 월 점검 대상 등록</span>→<span><b>②</b> 대기 목록(미배정)</span>→<span><b>③</b> 방문 날짜·담당자 배정</span>→<span><b>④</b> 캘린더 확인</span></div>
+
+<!-- 최상단: 차년도 계획 수립 (기본 접힘) -->
+<section class="box next" id="nextbox">
+  <div class="hd" id="nexthd" role="button" tabindex="0" aria-expanded="false" aria-controls="nextbd">
+    <span class="arrow">▶</span> 차년도 계획 수립
+    <span class="sub">내년 틀을 미리 만들 때만 사용 · 올해 계획은 자동으로 만들어집니다</span>
+  </div>
+  <div class="bd" id="nextbd">
+    <div class="grid2">
+      <div class="card">
+        <h4>새 연도 빈 계획 만들기</h4>
+        <p>점검 설정 없이 비어 있는 계획을 만듭니다.</p>
+        <div class="row">
+          <div><label>연도</label><input id="y1" type="number" value="2027" style="width:90px"></div>
+          <div><label>제목</label><input id="t1" value="2027년 정기점검" style="width:180px"></div>
+          <button class="btn" onclick="act('create')">계획 생성</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>올해 계획 복사해서 새 연도 만들기</h4>
+        <p>사이트·주기·담당자 설정을 가져오고 방문일은 비웁니다.</p>
+        <div class="row">
+          <div><label>원본 연도</label><select><option>2026년</option></select></div>
+          <div><label>새 연도</label><input id="y2" type="number" value="2027" style="width:90px"></div>
+          <button class="btn" onclick="act('copy')">계획 복사</button>
+        </div>
+      </div>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+</section>
+
+<!-- 연도 계획 현황 -->
+<section class="box">
+  <div class="hd">연도 계획 현황</div>
+  <div class="bd"><table><tr><th>연도</th><th>제목</th><th>상태</th><th>방문</th><th>완료</th><th>최종 수정</th><th></th></tr>
+  <tr><td>2026</td><td>2026년</td><td class="tag">초안</td><td>841</td><td>689</td><td class="muted">2026-10-23 08:27</td><td><a href="#">일정</a> · <a href="#">관리</a></td></tr></table></div>
+</section>
+
+<!-- ① 월 점검 대상 등록 -->
+<section class="box">
+  <div class="hd"><span class="step">①</span> 월 점검 대상 등록 <span class="sub">분기·반기·연1회 사이트를 이번 달 점검 대상으로 올립니다 (월 단위 사이트는 자동)</span></div>
+  <div class="bd">
+    <div class="row" style="margin-bottom:8px">
+      <div><label>월 선택</label><select><option>10월</option></select></div>
+      <div><label>시도</label><select><option>전체</option></select></div>
+      <div><label>시군구</label><select><option>전체</option></select></div>
+      <div style="flex:1"><label>사이트 검색</label><input style="width:100%" placeholder="학교명·사이트·시군구"></div>
+      <button class="btn gray">조회</button>
+    </div>
+    <div class="muted" style="margin:4px 0">개별 사이트 단위 · 선택 0건 &nbsp; <a href="#">전체 선택</a> · <a href="#">미등록만</a> · <a href="#">해제</a></div>
+    <table><tr><th style="width:28px"><input type="checkbox"></th><th>사이트</th><th>지역</th><th>주기</th><th>상태</th></tr>
+    <tr><td><input type="checkbox"></td><td>법제처</td><td>세종</td><td>분기</td><td class="ok">이번 달 등록됨</td></tr>
+    <tr><td><input type="checkbox"></td><td>신성대학교</td><td>충남 당진시</td><td>분기</td><td class="ok">이번 달 등록됨</td></tr></table>
+    <div style="margin-top:8px"><button class="btn">선택한 사이트 등록</button> <button class="btn gray">선택 해제(대상에서 빼기)</button></div>
+  </div>
+</section>
+
+<!-- ② 대기 목록 -->
+<section class="box">
+  <div class="hd"><span class="step">②</span> 대기 목록 (미배정) <span class="sub">우리 조직 사이트만 표시 · 날짜와 담당자를 정하면 캘린더로 올라갑니다</span></div>
+  <div class="bd"><table><tr><th style="width:28px"><input type="checkbox"></th><th>사이트</th><th>지역</th><th>주기</th></tr>
+  <tr><td><input type="checkbox"></td><td>법제처</td><td>세종</td><td>분기</td></tr>
+  <tr><td><input type="checkbox"></td><td>신성대학교</td><td>충남 당진시</td><td>분기</td></tr></table>
+  <div style="margin-top:8px"><button class="btn">③ 날짜·담당자 일괄 배정</button></div></div>
+</section>
+
+<!-- ④ 캘린더 -->
+<section class="box">
+  <div class="hd"><span class="step">④</span> 정기점검 캘린더 <span class="sub">배정된 방문이 날짜별로 표시됩니다</span></div>
+  <div class="bd muted">(기존 캘린더 영역 — 변경 없음)</div>
+</section>
+
+</div>
+<script>
+var box=document.getElementById('nextbox'),hd=document.getElementById('nexthd');
+function toggle(open){var o=(open===undefined)?!box.classList.contains('open'):open;box.classList.toggle('open',o);hd.setAttribute('aria-expanded',o);try{localStorage.setItem('nextPlanOpen',o?'1':'0')}catch(e){}}
+hd.onclick=function(){toggle()};hd.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}};
+function act(k){var m=document.getElementById('msg');var y=k==='create'?document.getElementById('y1').value:document.getElementById('y2').value;
+m.className='msg show '+(y==2026?'err':'good');
+m.textContent=y==2026?'2026년 계획이 이미 있습니다. 새 연도를 입력하세요.':(k==='create'?y+'년 빈 계획을 만들었습니다.':'2026년 설정을 복사해 '+y+'년 계획을 만들었습니다. 방문일은 비어 있습니다.')}
+</script></body></html>

@@ -125,7 +125,7 @@ func TestManagePlanPageAndCopy(t *testing.T) {
 		t.Fatalf("관리 화면 status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"연도 계획", "계획 복사", "방문 일괄 담당자", "방문 일괄 삭제", "미배정 일괄 배정", "2026"} {
+	for _, want := range []string{"연도 계획", "계획 복사", "방문 일괄 담당자", "방문 일괄 삭제", "대기 목록 (미배정)", "2026"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("%q 없음", want)
 		}

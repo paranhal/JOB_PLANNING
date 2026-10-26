@@ -75,7 +75,8 @@ func newMnt955ACrossOrgApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRep
 	lib := &model.User{Username: "lib55", PasswordHash: HashPassword("x"), FullName: "도서관장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
 	med := &model.User{Username: "med55", PasswordHash: HashPassword("x"), FullName: "미디어장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O02", ProfileDone: true}
 	si := &model.User{Username: "si55", PasswordHash: HashPassword("x"), FullName: "에스아이장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O03", ProfileDone: true}
-	for _, u := range []*model.User{lib, med, si} {
+	tech := &model.User{Username: "tech55", PasswordHash: HashPassword("x"), FullName: "미디어기술", Role: model.RoleTech, IsActive: true, OrgID: "O02", ProfileDone: true}
+	for _, u := range []*model.User{lib, med, si, tech} {
 		if err := users.Create(u); err != nil {
 			t.Fatal(err)
 		}
@@ -108,10 +109,14 @@ func newMnt955ACrossOrgApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRep
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)
+	adminOnly := h.Auth.RequireAdminMW
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/maintenance/:id", h.Maintenance.ShowPlan)
 	g.GET("/maintenance/:id/manage", h.Maintenance.ManagePlan)
+	g.POST("/maintenance", h.Maintenance.CreatePlan, adminOnly)
+	g.POST("/maintenance/:id/copy", h.Maintenance.CopyPlan, adminOnly)
+	g.POST("/maintenance/:id/status", h.Maintenance.SetPlanStatus, adminOnly)
 	g.POST("/maintenance/:id/assign-slots", h.Maintenance.AssignUnassignedSlots, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance/:id/assign-slots/bulk", h.Maintenance.AssignUnassignedSlotsBulk, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance/:id/assign-slots/preview", h.Maintenance.PreviewAssignUnassignedSlotsBulk, h.Auth.RequireMaintenanceEdit)
@@ -121,7 +126,7 @@ func newMnt955ACrossOrgApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRep
 	g.GET("/workboard/mnt-candidates", h.Workboard.MntCandidates)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.GET("/workboard/new-work/form", h.Workboard.NewWorkForm)
-	return e, repo, plans, map[string]*model.User{"O01": lib, "O02": med, "O03": si}
+	return e, repo, plans, map[string]*model.User{"O01": lib, "O02": med, "O03": si, "techO02": tech}
 }
 
 func Test95_55CrossOrgUnassignedAndAssignSlots(t *testing.T) {
@@ -252,8 +257,8 @@ func Test95_55IntegrationSIThenOtherOrgs(t *testing.T) {
 			t.Fatalf("%s manage=%d", org, mg.Code)
 		}
 		foreign := map[string][]string{
-			"O03": {"해미도서관", "미디어센터"},
-			"O02": {"해미도서관", "SI학교"},
+			"O03":              {"해미도서관", "미디어센터"},
+			"O02":              {"해미도서관", "SI학교"},
 			model.OrgIDLibrary: {"SI학교", "미디어센터"},
 		}[org]
 		for _, name := range foreign {

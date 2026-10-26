@@ -125,29 +125,34 @@ func (h *MaintenanceHandler) CreatePlan(c echo.Context) error {
 	year, _ := strconv.Atoi(c.FormValue("plan_year"))
 	next := strings.TrimSpace(c.FormValue("next"))
 	fromID := strings.TrimSpace(c.FormValue("from_plan_id"))
-	if year < 2000 || year > 2100 {
-		if next == "manage" && fromID != "" {
-			return h.manageErrRedirect(c, fromID, "연도를 입력하세요")
-		}
-		return echo.NewHTTPError(http.StatusBadRequest, "연도를 입력하세요")
-	}
 	title := c.FormValue("title")
+	if msg := planYearOutOfRange(year); msg != "" {
+		if next == "manage" && fromID != "" {
+			return h.manageYearPlanErr(c, fromID, msg, year, title)
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
+	}
 	org, orgErr := resolveInsertOrg(c)
 	if orgErr != nil {
 		if next == "manage" && fromID != "" {
-			return h.manageErrRedirect(c, fromID, orgErr.Error())
+			return h.manageYearPlanErr(c, fromID, orgErr.Error(), year, title)
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, orgErr.Error())
 	}
 	p, err := h.repo.CreatePlanForOrg(org, year, title)
 	if err != nil {
-		if next == "manage" && fromID != "" {
-			return h.manageErrRedirect(c, fromID, err.Error())
+		msg := err.Error()
+		if strings.Contains(msg, "이미") {
+			msg = fmt.Sprintf("%d년 계획이 이미 있습니다. 새 연도를 입력하세요", year)
 		}
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		if next == "manage" && fromID != "" {
+			return h.manageYearPlanErr(c, fromID, msg, year, title)
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 	if next == "manage" {
-		return c.Redirect(http.StatusSeeOther, "/maintenance/"+p.PlanID+"/manage")
+		return c.Redirect(http.StatusSeeOther, "/maintenance/"+p.PlanID+"/manage?ok="+url.QueryEscape(
+			fmt.Sprintf("%d년 계획을 만들었습니다", p.PlanYear)))
 	}
 	return c.Redirect(http.StatusSeeOther, "/maintenance/"+p.PlanID)
 }

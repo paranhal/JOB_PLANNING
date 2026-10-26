@@ -19,6 +19,27 @@ func (h *MaintenanceHandler) manageErrRedirect(c echo.Context, planID, msg strin
 	return c.Redirect(http.StatusSeeOther, "/maintenance/"+planID+"/manage?err="+url.QueryEscape(msg))
 }
 
+func (h *MaintenanceHandler) manageYearPlanErr(c echo.Context, planID, msg string, year int, title string) error {
+	q := url.Values{}
+	q.Set("err", msg)
+	q.Set("open_next", "1")
+	if year > 0 {
+		q.Set("np_year", strconv.Itoa(year))
+	}
+	if strings.TrimSpace(title) != "" {
+		q.Set("np_title", title)
+	}
+	return c.Redirect(http.StatusSeeOther, "/maintenance/"+planID+"/manage?"+q.Encode())
+}
+
+func planYearOutOfRange(year int) string {
+	now := time.Now().Year()
+	if year < 2000 || year > now+5 {
+		return "연도 범위를 확인하세요"
+	}
+	return ""
+}
+
 func (h *MaintenanceHandler) manageOKRedirect(c echo.Context, planID, msg string) error {
 	return c.Redirect(http.StatusSeeOther, "/maintenance/"+planID+"/manage?ok="+url.QueryEscape(msg))
 }
@@ -88,10 +109,14 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		"Unassigned": unassigned, "UnassignedGroups": unassignedGroups, "UnassignedMonth": um,
 		"DupCount": dupCount,
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"Preview": preview, "PreviewN": previewN, "PreviewSkip": previewSkip,
+		"OpenNext":       c.QueryParam("open_next") == "1",
+		"NextYearInput":  firstNonEmpty(c.QueryParam("np_year"), strconv.Itoa(time.Now().Year()+1)),
+		"NextTitleInput": firstNonEmpty(c.QueryParam("np_title"), strconv.Itoa(time.Now().Year()+1)+"년 정기점검"),
+		"Preview":        preview, "PreviewN": previewN, "PreviewSkip": previewSkip,
 		"FilterMonth": c.QueryParam("month"), "FilterRegion": c.QueryParam("region"),
 		"FilterProduct": c.QueryParam("product_type"),
-		"NewYear":       time.Now().Year() + 1, "CopyYear": plan.PlanYear + 1,
+		"NewYear":       time.Now().Year() + 1, "CopyYear": time.Now().Year() + 1,
+		"MaxPlanYear":         time.Now().Year() + 5,
 		"HolidayMissing":      holidayMissingBanner(h.holidayRepo, plan.PlanYear),
 		"OrgProducts":         h.orgProductList(plan.OrgID),
 		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
@@ -120,9 +145,16 @@ func (h *MaintenanceHandler) CopyPlan(c echo.Context) error {
 	}
 	year, _ := strconv.Atoi(c.FormValue("plan_year"))
 	title := strings.TrimSpace(c.FormValue("title"))
+	if msg := planYearOutOfRange(year); msg != "" {
+		return h.manageYearPlanErr(c, srcID, msg, year, title)
+	}
 	dest, err := h.repo.CopyPlan(srcID, year, title)
 	if err != nil {
-		return h.manageErrRedirect(c, srcID, err.Error())
+		msg := err.Error()
+		if strings.Contains(msg, "이미") {
+			msg = fmt.Sprintf("%d년 계획이 이미 있습니다. 새 연도를 입력하세요", year)
+		}
+		return h.manageYearPlanErr(c, srcID, msg, year, title)
 	}
 	return c.Redirect(http.StatusSeeOther, "/maintenance/"+dest.PlanID+"/manage?ok="+url.QueryEscape(
 		fmt.Sprintf("%d년 계획을 복사했습니다. 방문일은 비어 있고 담당자만 넘겼습니다.", dest.PlanYear)))
