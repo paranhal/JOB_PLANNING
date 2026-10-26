@@ -46,6 +46,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		return err
 	}
 	cfgs, _ := h.repo.ListSiteConfigs()
+	cfgs = repository.FilterSiteConfigsByOrg(cfgs, plan.OrgID)
 	regions := distinctRegions(cfgs)
 
 	um, _ := strconv.Atoi(c.QueryParam("um"))
@@ -56,7 +57,8 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 			um = 1
 		}
 	}
-	unassigned, _ := h.repo.ListOpenUnassignedSlots(plan.PlanID, plan.PlanYear, um)
+	unassigned, _ := h.repo.ListOpenUnassignedSlotsForOrg(plan.PlanID, plan.PlanYear, um, plan.OrgID)
+	unassignedGroups := groupUnassignedByRegion(unassigned, cfgs)
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, 0)
 
 	var assignees []model.User
@@ -83,7 +85,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		"Title": fmt.Sprintf("정기점검 관리 %d년", plan.PlanYear), "Active": NavMaintenance,
 		"Plan": plan, "Plans": plans, "IsAdmin": isAdminRole(c),
 		"Regions": regions, "Assignees": assignees,
-		"Unassigned": unassigned, "UnassignedMonth": um,
+		"Unassigned": unassigned, "UnassignedGroups": unassignedGroups, "UnassignedMonth": um,
 		"DupCount": dupCount,
 		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": preview, "PreviewN": previewN, "PreviewSkip": previewSkip,
@@ -220,20 +222,37 @@ func (h *MaintenanceHandler) BulkDeleteVisits(c echo.Context) error {
 }
 
 func (h *MaintenanceHandler) AssignUnassignedSlots(c echo.Context) error {
-	id := c.Param("id")
+	if !canEditMaintenanceSchedule(c) {
+		return echo.ErrForbidden
+	}
+	plan, err := h.requireVisiblePlan(c, c.Param("id"))
+	if err != nil {
+		return err
+	}
+	id := plan.PlanID
 	_ = c.Request().ParseForm()
 	custs := c.Request().PostForm["customer_id"]
 	products := c.Request().PostForm["product_type"]
 	dates := c.Request().PostForm["visit_date"]
 	assignee := strings.TrimSpace(c.FormValue("assignee"))
 	project := strings.TrimSpace(c.FormValue("project_id"))
-	n := 0
+	cfgs, _ := h.repo.ListSiteConfigs()
+	allow := map[string]bool{}
+	for _, cfg := range repository.FilterSiteConfigsByOrg(cfgs, plan.OrgID) {
+		allow[cfg.CustomerID] = true
+	}
+	n, skipped := 0, 0
 	for i := range custs {
 		date := ""
 		if i < len(dates) {
 			date = strings.TrimSpace(dates[i])
 		}
-		if date == "" || strings.TrimSpace(custs[i]) == "" {
+		cid := strings.TrimSpace(custs[i])
+		if date == "" || cid == "" {
+			continue
+		}
+		if !allow[cid] {
+			skipped++
 			continue
 		}
 		product := ""
@@ -241,7 +260,7 @@ func (h *MaintenanceHandler) AssignUnassignedSlots(c echo.Context) error {
 			product = products[i]
 		}
 		v := model.MaintenanceVisit{
-			PlanID: id, VisitDate: date, CustomerID: strings.TrimSpace(custs[i]),
+			PlanID: id, VisitDate: date, CustomerID: cid,
 			ProductType: product, Assignee: assignee, ProjectID: project, EntryCategory: "normal",
 		}
 		if err := applyVisitDupForm(c, &v); err != nil {
@@ -258,5 +277,9 @@ func (h *MaintenanceHandler) AssignUnassignedSlots(c echo.Context) error {
 	if n > 0 {
 		h.repo.TouchPlanUpdated(id)
 	}
-	return h.manageOKRedirect(c, id, fmt.Sprintf("미배정 %d건에 방문일을 넣었습니다", n))
+	msg := fmt.Sprintf("미배정 %d건에 방문일을 넣었습니다", n)
+	if skipped > 0 {
+		msg += fmt.Sprintf(" · 다른 조직 %d건 건너뜀", skipped)
+	}
+	return h.manageOKRedirect(c, id, msg)
 }

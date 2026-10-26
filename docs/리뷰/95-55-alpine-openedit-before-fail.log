@@ -1,0 +1,12 @@
+node --check openedit-before.js
+/private/var/folders/pd/3n_lw76n14ldjtn627_9qgq00000gn/T/Test95_55AlpineOpenEditBeforeFixFails3812049489/001/openedit-before.js:11
+    }));
+      ^
+
+SyntaxError: Unexpected token ')'
+    at wrapSafe (node:internal/modules/cjs/loader:1900:18)
+    at checkSyntax (node:internal/main/check_syntax:88:3)
+
+Node.js v26.11.1
+
+err=exit status 1

@@ -363,6 +363,29 @@ func (r *MaintenanceRepo) SkipQuarterSlot(planID, customerID, slotKey, reason, c
 	return err
 }
 
+// ListOpenUnassignedSlotsForOrg 해당 조직 점검 사이트만 남긴다(빈 org_id 는 도서관만).
+func (r *MaintenanceRepo) ListOpenUnassignedSlotsForOrg(planID string, year, month int, orgID string) ([]model.UnassignedMonthSlot, error) {
+	slots, err := r.ListOpenUnassignedSlots(planID, year, month)
+	if err != nil {
+		return nil, err
+	}
+	cfgs, err := r.ListSiteConfigs()
+	if err != nil {
+		return nil, err
+	}
+	allow := map[string]bool{}
+	for _, cfg := range FilterSiteConfigsByOrg(cfgs, orgID) {
+		allow[cfg.CustomerID] = true
+	}
+	var out []model.UnassignedMonthSlot
+	for _, s := range slots {
+		if allow[s.CustomerID] {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
 // FilterUnassignedSlotsByOrg 빈 org_id 행은 레거시로 두고, 값이 있으면 조직만 남긴다.
 func FilterUnassignedSlotsByOrg(slots []model.UnassignedMonthSlot, orgID string) []model.UnassignedMonthSlot {
 	orgID = strings.TrimSpace(orgID)

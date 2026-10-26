@@ -205,12 +205,13 @@ window.mntAssigneeMulti = function (cfg) {
       const st = wrap && wrap._x_dataStack && wrap._x_dataStack[0];
       if (st) { st.selectedId = d.customer || ''; st.restore(); }
       this.$dispatch('mnt-picker-hydrate', {
-      target: 'edit',
-      ids: String(d.people || '').split(',').map((s) => s.trim()).filter(Boolean),
-      owner: d.owner || '',
-      groups: d.groups || d.group || '',
-      group: d.group || ''
-    }));
+        target: 'edit',
+        ids: String(d.people || '').split(',').map((s) => s.trim()).filter(Boolean),
+        owner: d.owner || '',
+        groups: d.groups || d.group || '',
+        group: d.group || ''
+      });
+    });
   }
 }">
   <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">

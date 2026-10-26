@@ -257,8 +257,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 	var unassigned []model.UnassignedMonthSlot
 	if quotaMonth >= 1 && quotaMonth <= 12 {
-		unassigned, _ = h.repo.ListOpenUnassignedSlots(plan.PlanID, plan.PlanYear, quotaMonth)
-		unassigned = repository.FilterUnassignedSlotsByOrg(unassigned, currentOrg(c))
+		unassigned, _ = h.repo.ListOpenUnassignedSlotsForOrg(plan.PlanID, plan.PlanYear, quotaMonth, plan.OrgID)
 	}
 	dupMonth := month
 	if view != mntViewList {
@@ -278,6 +277,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		scopeAllFlag = "1"
 	}
 	cfgs, _ := h.repo.ListSiteConfigs()
+	cfgs = repository.FilterSiteConfigsByOrg(cfgs, plan.OrgID)
 	custItems := make([]model.CustomerListItem, 0, len(customers))
 	for _, cu := range customers {
 		custItems = append(custItems, model.CustomerListItem{CustomerID: cu.CustomerID, SiteRegion: cu.Region, AddrSido: cu.AddrSido})

@@ -101,6 +101,7 @@ func (h *MaintenanceHandler) GenerateConfirm(c echo.Context) error {
 	}
 	order := service.NormalizeGenerateOrder(c.QueryParam("assign_order"))
 	configs, _ := h.repo.ListSiteConfigs()
+	configs = repository.FilterSiteConfigsByOrg(configs, plan.OrgID)
 	dist, _ := h.repo.ListRegionDistanceOrder()
 	unreg := service.UnregisteredRegionCount(configs, dist)
 	return c.Render(http.StatusOK, "maintenance/plan_generate.html", map[string]interface{}{

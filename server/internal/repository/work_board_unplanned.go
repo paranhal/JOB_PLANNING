@@ -287,11 +287,10 @@ func (r *WorkBoardRepo) listUnassignedSlotsAsItems(orgID string) ([]model.Unplan
 	if err != nil || planID == "" {
 		return nil, nil
 	}
-	slots, err := mnt.ListOpenUnassignedSlots(planID, year, month)
+	slots, err := mnt.ListOpenUnassignedSlotsForOrg(planID, year, month, orgID)
 	if err != nil {
 		return nil, err
 	}
-	slots = FilterUnassignedSlotsByOrg(slots, orgID)
 	out := make([]model.UnplannedItem, 0, len(slots))
 	for _, s := range slots {
 		out = append(out, unplannedFromMonthSlot(planID, s))
@@ -342,11 +341,10 @@ func (r *WorkBoardRepo) CollectQuarterUnassignedAlerts(orgID string, year, month
 	if err != nil || p == nil {
 		return nil, err
 	}
-	slots, err := mnt.ListOpenUnassignedSlots(p.PlanID, year, month)
+	slots, err := mnt.ListOpenUnassignedSlotsForOrg(p.PlanID, year, month, orgID)
 	if err != nil {
 		return nil, err
 	}
-	slots = FilterUnassignedSlotsByOrg(slots, orgID)
 	var out []model.WorkListItem
 	for _, s := range slots {
 		if !s.UnconfirmedQuarter {

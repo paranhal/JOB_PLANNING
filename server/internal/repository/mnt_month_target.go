@@ -208,6 +208,7 @@ type MonthTargetSiteRow struct {
 	Cycle       string
 	Registered  bool
 	SkipReason  string
+	TargetID    string
 }
 
 type monthTargetParentAcc struct {
@@ -242,6 +243,7 @@ func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, mo
 	if err != nil {
 		return nil, nil, err
 	}
+	configs = FilterSiteConfigsByOrg(configs, plan.OrgID)
 	visits, err := r.ListVisits(plan.PlanID)
 	if err != nil {
 		return nil, nil, err
@@ -345,10 +347,18 @@ func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, mo
 		} else if sigunguFilter != "" && gu != sigunguFilter {
 			continue
 		}
+		tid := ""
+		for _, t := range targets {
+			if t.CustomerID == cfg.CustomerID && t.Year == plan.PlanYear && t.Month == month && t.Active() {
+				tid = t.TargetID
+				break
+			}
+		}
 		sites = append(sites, MonthTargetSiteRow{
 			CustomerID: cfg.CustomerID, Name: name, Region: parentLab, Sigungu: gu,
 			RegionLabel: model.SiteRegionLabel(cfg), Cycle: cfg.InspectionCycle,
 			Registered: registered || strings.Contains(reason, "이미"), SkipReason: reason,
+			TargetID: tid,
 		})
 	}
 	var stats []MonthTargetRegionStat
