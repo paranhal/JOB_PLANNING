@@ -794,6 +794,11 @@ type WorkTask struct {
 	TransferTo        string    `json:"transfer_to,omitempty"`
 	TargetCategoryID  string    `json:"target_category_id,omitempty"`
 	WorkReason        string    `json:"work_reason,omitempty"`
+	ActionStartAt        string `json:"action_start_at,omitempty"`
+	ActionDurationMin    int    `json:"action_duration_min,omitempty"`
+	ActionRemark         string `json:"action_remark,omitempty"`
+	RecurrencePossible   bool   `json:"recurrence_possible,omitempty"`
+	CustomerConfirmedAt  string `json:"customer_confirmed_at,omitempty"`
 	ReceiptDate       string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
 	CompleteDate      string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
 	RecurrenceRole    string    `json:"recurrence_role,omitempty"`

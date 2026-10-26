@@ -16,15 +16,23 @@ func (r *WBRepo) LoadTaskActionFields(t *model.WorkTask) error {
 	if r == nil || r.db == nil || t == nil || strings.TrimSpace(t.TaskID) == "" {
 		return nil
 	}
+	var recurrence int
 	err := r.db.QueryRow(`
 		SELECT COALESCE(work_place,''), COALESCE(action_taken,''), COALESCE(result_code,''),
 		       COALESCE(complete_datetime,''), COALESCE(customer_confirmer,''),
 		       COALESCE(hold_next_action,''), COALESCE(transfer_to,''),
-		       COALESCE(target_category_id,''), COALESCE(work_reason,'')
+		       COALESCE(target_category_id,''), COALESCE(work_reason,''),
+		       COALESCE(action_start_at,''), COALESCE(action_duration_min,0),
+		       COALESCE(action_remark,''), COALESCE(recurrence_possible,0),
+		       COALESCE(customer_confirmed_at,'')
 		FROM work_tasks WHERE task_id=? AND org_id=?`, t.TaskID, t.OrgID).
 		Scan(&t.WorkPlace, &t.ActionTaken, &t.ResultCode, &t.CompleteDatetime,
 			&t.CustomerConfirmer, &t.HoldNextAction, &t.TransferTo,
-			&t.TargetCategoryID, &t.WorkReason)
+			&t.TargetCategoryID, &t.WorkReason,
+			&t.ActionStartAt, &t.ActionDurationMin, &t.ActionRemark, &recurrence, &t.CustomerConfirmedAt)
+	if err == nil {
+		t.RecurrencePossible = recurrence != 0
+	}
 	if err == sql.ErrNoRows {
 		return nil
 	}
@@ -42,21 +50,30 @@ func (r *WBRepo) SaveTaskActionFields(t *model.WorkTask) error {
 	if err != nil {
 		return err
 	}
+	recurrence := 0
+	if t.RecurrencePossible {
+		recurrence = 1
+	}
 	_, err = r.db.Exec(`
 		UPDATE work_tasks SET
 			work_place=?, action_taken=?, result_code=?, complete_datetime=?,
 			customer_confirmer=?, hold_reason=?, hold_next_action=?, transfer_to=?,
 			cancel_reason=?, status=?, complete_date=?, complete_note=?,
-			work_date=?, progress=?, work_subtype=?,
+			progress=?, work_subtype=?,
 			target_category_id=?, work_reason=?,
-			assignee=?, assignee_user_id=?, updated_at=datetime('now','localtime')
+			assignee=?, assignee_user_id=?, title=?, description=?,
+			action_start_at=?, action_duration_min=?, action_remark=?,
+			recurrence_possible=?, customer_confirmed_at=?,
+			updated_at=datetime('now','localtime')
 		WHERE task_id=? AND org_id=?`,
 		t.WorkPlace, t.ActionTaken, t.ResultCode, t.CompleteDatetime,
 		t.CustomerConfirmer, t.HoldReason, t.HoldNextAction, t.TransferTo,
 		t.CancelReason, t.Status, t.CompleteDate, t.CompleteNote,
-		t.WorkDate, t.Progress, t.WorkSubtype,
+		t.Progress, t.WorkSubtype,
 		t.TargetCategoryID, t.WorkReason,
-		t.Assignee, t.AssigneeUserID, t.TaskID, orgID)
+		t.Assignee, t.AssigneeUserID, t.Title, t.Description,
+		t.ActionStartAt, t.ActionDurationMin, t.ActionRemark,
+		recurrence, t.CustomerConfirmedAt, t.TaskID, orgID)
 	return err
 }
 

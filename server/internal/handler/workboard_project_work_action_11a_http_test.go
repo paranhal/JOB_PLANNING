@@ -26,7 +26,7 @@ func TestProjectWorkActionASLayoutHTML(t *testing.T) {
 		"조치 내역", "처리담당자", "근무구분", "작업 구분",
 		"이 내용이 다음 작업자에게 참고가 됩니다",
 		"추가조치 필요", "확인", "고객확인자", "조치 이력",
-		`id="as-action-bar"`, "저장",
+		`id="as-action-bar"`, "조치 완료",
 	} {
 		if !strings.Contains(body, need) {
 			t.Fatalf("레이아웃에 %q 없음", need)
@@ -94,6 +94,9 @@ func TestProjectWorkActionLinkProjectAndHistory(t *testing.T) {
 
 	idA := pwCreateTask(t, e, repo, "이력원본")
 	_ = repo.ReplaceTaskCustomers(idA, "WP-O01", []string{"C-high"})
+	if rec := doForm(t, e, "/workboard/tasks/"+idA+"/action", pwActionForm()); rec.Code != http.StatusSeeOther {
+		t.Fatalf("이력원본 완료 %d", rec.Code)
+	}
 	idB := pwCreateTask(t, e, repo, "이력대상")
 	_ = repo.ReplaceTaskCustomers(idB, "WP-O01", []string{"C-high"})
 	page := doGet(t, e, "/workboard/tasks/"+idB+"/action")

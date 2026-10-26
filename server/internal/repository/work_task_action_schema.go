@@ -22,6 +22,22 @@ func applyWorkTaskActionV79(db *sql.DB) {
 	}
 }
 
+func applyWorkTaskActionV94(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	addNamedColumn(db, "work_tasks", "action_start_at",
+		`ALTER TABLE work_tasks ADD COLUMN action_start_at TEXT NOT NULL DEFAULT ''`)
+	addNamedColumn(db, "work_tasks", "action_duration_min",
+		`ALTER TABLE work_tasks ADD COLUMN action_duration_min INTEGER NOT NULL DEFAULT 0`)
+	addNamedColumn(db, "work_tasks", "action_remark",
+		`ALTER TABLE work_tasks ADD COLUMN action_remark TEXT NOT NULL DEFAULT ''`)
+	addNamedColumn(db, "work_tasks", "recurrence_possible",
+		`ALTER TABLE work_tasks ADD COLUMN recurrence_possible INTEGER NOT NULL DEFAULT 0`)
+	addNamedColumn(db, "work_tasks", "customer_confirmed_at",
+		`ALTER TABLE work_tasks ADD COLUMN customer_confirmed_at TEXT NOT NULL DEFAULT ''`)
+}
+
 func applyWorkTaskActionExtraV80(db *sql.DB) {
 	if db == nil {
 		return

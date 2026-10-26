@@ -1359,6 +1359,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyAssigneePickerV91(db)
 	applySalesGroupChildrenV92(db)
 	applyAssetMgmtTypesV93(db)
+	applyWorkTaskActionV94(db)
 	applyCustomerProvisionalV74(db)
 	applyMaintenanceQuarterDecisionsV76(db)
 

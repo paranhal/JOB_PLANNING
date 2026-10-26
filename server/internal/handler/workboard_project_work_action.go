@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -124,7 +125,7 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 			siteIDs = append(siteIDs, id)
 		}
 	}
-	hist, _ := h.repo.ListPastWorkHistory(t.OrgID, t.TaskID, t.ProjectID, siteIDs, 5)
+	hist, _ := h.repo.ListPastWorkHistory(t.OrgID, t.TaskID, t.ProjectID, siteIDs, 3)
 	var projectSites []repository.WorkTaskSite
 	if strings.TrimSpace(t.ProjectID) != "" && len(sites) == 0 {
 		projectSites, _ = h.repo.ListProjectSitesForPick(t.ProjectID)
@@ -176,6 +177,8 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		"ActionErrField":  projectWorkActionErrField(errCode),
 		"ActionOK":        c.QueryParam("ok"),
 		"BackURL":         back,
+		"ListURL":         workboardHomeURL(""),
+		"CancelURL":       projectWorkCancelURL(c, t.TaskID, back),
 		"SubtypeLabel":    model.WorkSubtypeLabel(t.WorkSubtype),
 		"StatusLabel":     model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
 		"ResultDone":      model.WorkResultDone,
@@ -218,7 +221,41 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	if v, ok := c.Get("pw_cancel_reason").(string); ok {
 		data["CancelReason"] = v
 	}
-	data["ConfirmCompleteBeforeWork"] = errCode == "complete_before_work"
+	data["ConfirmStartDiffersPlan"] = errCode == "start_differs_plan"
+	startLocal := defaultActionStartLocal(t, now)
+	if v, ok := c.Get("pw_start_local").(string); ok && v != "" {
+		startLocal = v
+	}
+	data["StartLocal"] = startLocal
+	dur := defaultActionDuration(t)
+	if v, ok := c.Get("pw_duration_min").(int); ok && v > 0 {
+		dur = v
+	}
+	data["ActionDurationMin"] = dur
+	data["DurationOptions"] = model.ActionDurationMins
+	data["DurationCustom"] = !model.IsActionDurationOption(dur)
+	if model.IsActionDurationOption(dur) {
+		data["ActionDurationSel"] = strconv.Itoa(dur)
+	} else {
+		data["ActionDurationSel"] = "custom"
+	}
+	supports := supportMembersOnly(members)
+	if v, ok := c.Get("pw_supports").([]model.WorkTaskMember); ok {
+		supports = v
+	}
+	data["SupportMembers"] = supports
+	if v, ok := c.Get("pw_action_remark").(string); ok {
+		t.ActionRemark = v
+	}
+	if v, ok := c.Get("pw_confirmed_at").(string); ok {
+		t.CustomerConfirmedAt = v
+	}
+	if v, ok := c.Get("pw_recurrence").(bool); ok {
+		t.RecurrencePossible = v
+	}
+	if v, ok := c.Get("pw_title").(string); ok && v != "" {
+		t.Title = v
+	}
 	formResult := t.ResultCode
 	if v, ok := c.Get("pw_form_result").(string); ok && v != "" {
 		formResult = v
@@ -245,10 +282,22 @@ func projectWorkActionErr(code string) string {
 		return "담당자를 선택하세요"
 	case "work_date":
 		return "작업일을 입력하세요"
+	case "action_start":
+		return "시작 일시를 입력하세요"
+	case "action_duration":
+		return "작업 시간을 입력하세요"
+	case "title":
+		return "작업명을 입력하세요"
 	case "complete_dt":
 		return "완료 일시를 입력하세요"
-	case "complete_before_work":
-		return "완료일시가 작업일보다 이전입니다. 그대로 저장할까요?"
+	case "complete_before_start":
+		return "완료 일시가 시작 일시보다 이전입니다"
+	case "start_differs_plan":
+		return "작업 일정과 다른 날짜입니다. 그대로 저장할까요?"
+	case "supporter_owner":
+		return "처리 담당자는 지원 인력에 넣을 수 없습니다"
+	case "supporters_max":
+		return "지원 인력은 최대 20명입니다"
 	case "partial_note":
 		return "추가조치 사유를 입력하세요"
 	case "hold_reason":
@@ -286,7 +335,13 @@ func projectWorkActionErrField(code string) string {
 		return "result_code"
 	case "assignee":
 		return "assigned_to_code"
-	case "complete_dt", "complete_before_work":
+	case "action_start", "start_differs_plan":
+		return "action_start_at"
+	case "action_duration":
+		return "action_duration_min"
+	case "title":
+		return "title"
+	case "complete_dt", "complete_before_start":
 		return "complete_datetime"
 	case "partial_note":
 		return "followup_note"
@@ -359,6 +414,31 @@ func overlayProjectWorkActionDraft(c echo.Context, t *model.WorkTask) {
 	} else if _, ok := c.Request().PostForm["complete_datetime"]; ok {
 		c.Set("pw_complete_local", "")
 	}
+	if v := strings.TrimSpace(c.FormValue("action_start_at")); v != "" {
+		c.Set("pw_start_local", v)
+		t.ActionStartAt = v
+	}
+	if n, code := parseActionDurationMin(c); code == "" {
+		c.Set("pw_duration_min", n)
+		t.ActionDurationMin = n
+	}
+	if v := strings.TrimSpace(c.FormValue("title")); v != "" {
+		c.Set("pw_title", v)
+		t.Title = v
+	}
+	if _, ok := c.Request().PostForm["description"]; ok {
+		t.Description = strings.TrimSpace(c.FormValue("description"))
+	}
+	if _, ok := c.Request().PostForm["action_remark"]; ok {
+		c.Set("pw_action_remark", strings.TrimSpace(c.FormValue("action_remark")))
+		t.ActionRemark = strings.TrimSpace(c.FormValue("action_remark"))
+	}
+	if _, ok := c.Request().PostForm["customer_confirmed_at"]; ok {
+		c.Set("pw_confirmed_at", strings.TrimSpace(c.FormValue("customer_confirmed_at")))
+		t.CustomerConfirmedAt = strings.TrimSpace(c.FormValue("customer_confirmed_at"))
+	}
+	c.Set("pw_recurrence", c.FormValue("recurrence_possible") == "1")
+	t.RecurrencePossible = c.FormValue("recurrence_possible") == "1"
 	confirmer := strings.TrimSpace(c.FormValue("customer_confirmer"))
 	if custom := strings.TrimSpace(c.FormValue("customer_confirmer_custom")); custom != "" {
 		confirmer = custom
@@ -389,9 +469,10 @@ func overlayProjectWorkActionDraft(c echo.Context, t *model.WorkTask) {
 
 func (h *WorkboardHandler) failPWAction(c echo.Context, t *model.WorkTask, code string) error {
 	overlayProjectWorkActionDraft(c, t)
+	overlaySupportDraft(c, listAssignableForPicker(h.userRepo, c))
 	c.Set("pw_action_err", code)
-	if code == "complete_before_work" {
-		c.Set("pw_action_err_msg", "완료일시가 작업일("+strings.TrimSpace(t.WorkDate)+")보다 이전입니다. 그대로 저장할까요?")
+	if code == "start_differs_plan" {
+		c.Set("pw_action_err_msg", "작업 일정("+strings.TrimSpace(t.WorkDate)+")과 다른 날짜입니다. 그대로 저장할까요?")
 	}
 	return h.renderProjectWorkAction(c, t)
 }
@@ -492,9 +573,22 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 		return aerr
 	}
 	completeDT := strings.TrimSpace(c.FormValue("complete_datetime"))
-	workDay := resolveProjectWorkDate(c.FormValue("work_date"), t.WorkDate, completeDT)
-	if workDay == "" {
-		return &pwActionErr{"work_date"}
+	startLocal, startDay, startErr := parseActionStartAt(c.FormValue("action_start_at"))
+	if startErr != "" {
+		return &pwActionErr{startErr}
+	}
+	durMin, durErr := parseActionDurationMin(c)
+	if durErr != "" {
+		return &pwActionErr{durErr}
+	}
+	if title := strings.TrimSpace(c.FormValue("title")); title != "" {
+		t.Title = title
+	}
+	if strings.TrimSpace(t.Title) == "" {
+		return &pwActionErr{"title"}
+	}
+	if resolveProcessWorkDate(startDay, c.FormValue("work_date"), t.WorkDate, completeDT) == "" {
+		return &pwActionErr{"action_start"}
 	}
 	na := c.FormValue("action_na") == "1"
 	content := strings.TrimSpace(c.FormValue("action_taken"))
@@ -529,20 +623,34 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 		completeDT = time.Now().Format("2006-01-02T15:04")
 	}
 	if (result == model.WorkResultDone || result == model.WorkResultPartial) &&
-		completeDatetimeBeforeWorkDate(completeDT, workDay) &&
-		c.FormValue("confirm_complete_before_work") != "1" {
-		return &pwActionErr{"complete_before_work"}
+		completeDatetimeBeforeStart(completeDT, startLocal) {
+		return &pwActionErr{"complete_before_start"}
+	}
+	if startDayDiffersPlan(startDay, t.WorkDate) &&
+		c.FormValue("confirm_start_differs_plan") != "1" {
+		return &pwActionErr{"start_differs_plan"}
+	}
+	supports, suppErr := collectProjectWorkSupports(c, assigneeUID, assignee, listAssignableForPicker(h.userRepo, c))
+	if suppErr != "" {
+		return &pwActionErr{suppErr}
 	}
 	t.WorkPlace = place
 	t.Assignee = assignee
 	t.AssigneeUserID = assigneeUID
-	t.WorkDate = workDay
 	t.WorkSubtype = sub
 	t.ActionTaken = content
 	t.CustomerConfirmer = confirmer
 	t.ResultCode = result
 	t.TargetCategoryID = strings.TrimSpace(c.FormValue("target_category_id"))
 	t.WorkReason = strings.TrimSpace(c.FormValue("work_reason"))
+	t.ActionStartAt = startLocal
+	t.ActionDurationMin = durMin
+	t.ActionRemark = strings.TrimSpace(c.FormValue("action_remark"))
+	t.RecurrencePossible = c.FormValue("recurrence_possible") == "1"
+	t.CustomerConfirmedAt = strings.TrimSpace(c.FormValue("customer_confirmed_at"))
+	if _, ok := c.Request().PostForm["description"]; ok {
+		t.Description = strings.TrimSpace(c.FormValue("description"))
+	}
 
 	switch result {
 	case model.WorkResultDone:
@@ -580,10 +688,17 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 	if err := h.repo.SaveTaskActionFields(t); err != nil {
 		return err
 	}
+	if err := h.repo.ReplaceSupportMembers(t.TaskID, supports); err != nil {
+		return err
+	}
+	processAt := startLocal
+	if len(processAt) == 16 {
+		processAt = processAt[:10] + " " + processAt[11:] + ":00"
+	}
 	pid, err := h.repo.InsertWorkTaskProcess(model.WorkTaskProcess{
 		TaskID: t.TaskID, OrgID: t.OrgID, Worker: ctxString(c, "user_name"),
 		WorkerUserID: currentUserID(c), WorkPlace: place, ResultCode: result,
-		WorkContent: content, Note: note, NextDate: nextDate,
+		WorkContent: content, Note: note, NextDate: nextDate, ProcessAt: processAt,
 	})
 	if err != nil {
 		return err

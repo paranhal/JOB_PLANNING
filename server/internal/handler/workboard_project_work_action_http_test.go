@@ -23,7 +23,7 @@ var pwSlot int
 func pwCreateTask(t *testing.T, e *echo.Echo, repo *repository.WBRepo, title string) string {
 	t.Helper()
 	pwSlot++
-	startMin := 8*60 + pwSlot*30
+	startMin := 8*60 + (pwSlot%16)*30
 	start := fmt.Sprintf("%02d:%02d", startMin/60, startMin%60)
 	endMin := startMin + 30
 	end := fmt.Sprintf("%02d:%02d", endMin/60, endMin%60)
@@ -53,6 +53,8 @@ func pwActionForm() url.Values {
 		"work_place":                {"field"},
 		"work_subtype":              {"other"},
 		"action_taken":              {"현장 배선 정리 및 점검 완료함"},
+		"action_start_at":           {"2026-10-21T08:00"},
+		"action_duration_min":       {"30"},
 		"complete_datetime":         {"2026-10-21T15:00"},
 		"result_code":               {model.WorkResultDone},
 		"customer_confirmer_custom": {"김선생"},
@@ -145,6 +147,7 @@ func TestProjectWorkActionCompletePartialHoldTransferCancel(t *testing.T) {
 
 	miss := doForm(t, e, "/workboard/tasks/"+id+"/action", url.Values{
 		"work_place": {"field"}, "work_subtype": {"other"},
+		"action_start_at": {"2026-10-21T08:00"}, "action_duration_min": {"30"},
 		"result_code": {model.WorkResultDone}, "complete_datetime": {"2026-10-21T15:00"},
 	})
 	if miss.Code != http.StatusOK || !strings.Contains(miss.Body.String(), "조치 내용을 입력하세요") {

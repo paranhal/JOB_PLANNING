@@ -53,8 +53,13 @@ func Test95_56_RenderedFormPostWithoutWorkDate(t *testing.T) {
 	if legacy == "" {
 		t.Logf("REPRO_BEFORE 수정 전 검사: FormValue(work_date)=%q → pwActionErr{work_date} → Location=/workboard/tasks/%s/action?err=work_date", legacy, id)
 	}
-	if form.Get("work_place") == "" {
-		form.Set("work_place", "field")
+	form.Set("work_place", "field")
+	form.Set("work_subtype", "other")
+	if strings.TrimSpace(form.Get("action_start_at")) == "" {
+		form.Set("action_start_at", "2026-10-21T08:00")
+	}
+	if strings.TrimSpace(form.Get("action_duration_min")) == "" || form.Get("action_duration_min") == "custom" {
+		form.Set("action_duration_min", "30")
 	}
 	if form.Get("action_taken") == "" {
 		form.Set("action_taken", "현장 배선 정리 및 점검 완료함")
@@ -92,7 +97,7 @@ func Test95_56_ActionFormKeysMatchServer(t *testing.T) {
 		t.Fatalf("GET %d", page.Code)
 	}
 	names := htmlControlNames(extractHTMLForm(page.Body.String(), "as-action-form"))
-	required := []string{"work_place", "work_subtype", "result_code", "action_taken", "assigned_to_code", "complete_datetime"}
+	required := []string{"work_place", "work_subtype", "result_code", "action_taken", "assigned_to_code", "complete_datetime", "action_start_at", "action_duration_min"}
 	var missing []string
 	for _, k := range required {
 		if _, ok := names[k]; !ok {
@@ -163,16 +168,17 @@ func Test95_56_CompleteDatetimeBeforeWorkDateConfirm(t *testing.T) {
 	}
 	id := pwFindTitle(t, repo, "이전완료일시")
 	ask := pwActionForm()
-	ask.Set("complete_datetime", "2026-10-23T04:50")
+	ask.Set("action_start_at", "2026-10-23T04:50")
+	ask.Set("complete_datetime", "2026-10-23T05:20")
 	ask.Set("work_place", "office")
 	rec := doForm(t, e, "/workboard/tasks/"+id+"/action", ask)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "완료일시가 작업일(2026-10-26)보다 이전입니다") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "작업 일정(2026-10-26)과 다른 날짜입니다") {
 		t.Fatalf("확인 안내 없음 code=%d body=%s", rec.Code, rec.Body.String())
 	}
 	if !strings.Contains(rec.Body.String(), `value="2026-10-23T04:50"`) {
-		t.Fatal("확인 안내 시 완료일시가 유지되지 않음")
+		t.Fatal("확인 안내 시 시작일시가 유지되지 않음")
 	}
-	if !strings.Contains(rec.Body.String(), `name="confirm_complete_before_work"`) {
+	if !strings.Contains(rec.Body.String(), `name="confirm_start_differs_plan"`) {
 		t.Fatal("확인 후 저장 히든 없음")
 	}
 	tk, _ := repo.GetTask(id)
@@ -181,14 +187,14 @@ func Test95_56_CompleteDatetimeBeforeWorkDateConfirm(t *testing.T) {
 		t.Fatal("확인 전에 완료 저장됨")
 	}
 
-	ask.Set("confirm_complete_before_work", "1")
+	ask.Set("confirm_start_differs_plan", "1")
 	ok := doForm(t, e, "/workboard/tasks/"+id+"/action", ask)
 	if ok.Code != http.StatusSeeOther {
 		t.Fatalf("확인 후 저장 %d loc=%s body=%s", ok.Code, ok.Header().Get("Location"), ok.Body.String())
 	}
 	tk, _ = repo.GetTask(id)
 	_ = repo.LoadTaskActionFields(tk)
-	if tk.CompleteDatetime != "2026-10-23T04:50" {
+	if tk.CompleteDatetime != "2026-10-23T05:20" {
 		t.Fatalf("완료일시 그대로 저장되지 않음 %q", tk.CompleteDatetime)
 	}
 	if tk.WorkDate != "2026-10-26" {
@@ -220,7 +226,7 @@ func Test95_56_ErrorRedisplayKeepsInput(t *testing.T) {
 	if !strings.Contains(body, `value="2026-10-21T16:40"`) {
 		t.Fatal("완료일시 미유지")
 	}
-	if !strings.Contains(body, `value="build" selected`) {
+	if !strings.Contains(body, `name="work_subtype"`) || !strings.Contains(body, `value="build"`) {
 		t.Fatal("작업 구분 미유지")
 	}
 }

@@ -12,6 +12,8 @@ type WorkHistoryRow struct {
 	TaskID   string
 	WorkDate string
 	Title    string
+	Assignee string
+	Status   string
 }
 
 func (r *WBRepo) WorkProjectName(projectID string) string {
@@ -171,7 +173,7 @@ func (r *WBRepo) ListPastWorkHistory(orgID, taskID, projectID string, siteIDs []
 		return nil, nil
 	}
 	if limit <= 0 {
-		limit = 5
+		limit = 3
 	}
 	var q string
 	var args []interface{}
@@ -189,25 +191,28 @@ func (r *WBRepo) ListPastWorkHistory(orgID, taskID, projectID string, siteIDs []
 		ph := strings.Repeat("?,", len(ids))
 		ph = ph[:len(ph)-1]
 		q = `
-			SELECT t.task_id, COALESCE(NULLIF(t.work_date,''), t.due_date,''), COALESCE(t.title,'')
+			SELECT t.task_id, COALESCE(NULLIF(t.work_date,''), t.due_date,''), COALESCE(t.title,''),
+			       COALESCE(t.assignee,''), COALESCE(t.status,'')
 			FROM work_tasks t
 			WHERE t.org_id=? AND t.work_type=? AND t.task_id!=?
+			  AND t.status=?
 			  AND t.task_id IN (SELECT w.task_id FROM work_task_sites w WHERE w.customer_id IN (` + ph + `))
 			ORDER BY COALESCE(NULLIF(t.work_date,''), t.due_date,'') DESC, t.task_id DESC
 			LIMIT ?`
-		args = []interface{}{orgID, model.WBWorkProjectWork, taskID}
+		args = []interface{}{orgID, model.WBWorkProjectWork, taskID, model.WBTaskComplete}
 		for _, id := range ids {
 			args = append(args, id)
 		}
 		args = append(args, limit)
 	} else if strings.TrimSpace(projectID) != "" {
 		q = `
-			SELECT t.task_id, COALESCE(NULLIF(t.work_date,''), t.due_date,''), COALESCE(t.title,'')
+			SELECT t.task_id, COALESCE(NULLIF(t.work_date,''), t.due_date,''), COALESCE(t.title,''),
+			       COALESCE(t.assignee,''), COALESCE(t.status,'')
 			FROM work_tasks t
-			WHERE t.org_id=? AND t.work_type=? AND t.task_id!=? AND t.project_id=?
+			WHERE t.org_id=? AND t.work_type=? AND t.task_id!=? AND t.project_id=? AND t.status=?
 			ORDER BY COALESCE(NULLIF(t.work_date,''), t.due_date,'') DESC, t.task_id DESC
 			LIMIT ?`
-		args = []interface{}{orgID, model.WBWorkProjectWork, taskID, strings.TrimSpace(projectID), limit}
+		args = []interface{}{orgID, model.WBWorkProjectWork, taskID, strings.TrimSpace(projectID), model.WBTaskComplete, limit}
 	} else {
 		return nil, nil
 	}
@@ -219,7 +224,7 @@ func (r *WBRepo) ListPastWorkHistory(orgID, taskID, projectID string, siteIDs []
 	var out []WorkHistoryRow
 	for rows.Next() {
 		var it WorkHistoryRow
-		if err := rows.Scan(&it.TaskID, &it.WorkDate, &it.Title); err != nil {
+		if err := rows.Scan(&it.TaskID, &it.WorkDate, &it.Title, &it.Assignee, &it.Status); err != nil {
 			return nil, err
 		}
 		out = append(out, it)

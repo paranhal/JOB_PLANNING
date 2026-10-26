@@ -1,35 +1,33 @@
 {{define "title"}}{{.Title}} · {{appName}}{{end}}
 {{define "content"}}
-<div id="as-action-shell" class="as-action-shell">
-  <header id="as-action-header" class="as-action-header">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex items-center gap-3">
-        <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="btn" title="뒤로">←</a>
-        <div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <h2 class="text-xl font-bold text-ink font-mono">{{.Task.TaskID}}</h2>
-            <span class="badge">조치</span>
-            <span class="badge">{{.StatusLabel}}</span>
-            {{if .Task.WorkGroupName}}<span class="badge-neutral">그룹: {{.Task.WorkGroupName}}</span>{{end}}
-          </div>
-          <p class="text-ui-sm text-ink-muted mt-1">{{.ProjectName}} · 일일업무 <span class="font-mono">{{.Task.TaskID}}</span></p>
-          {{if .CanProcess}}
-          <details class="mt-2 text-ui-sm" {{if eq .ActionErr "project"}}open{{end}}>
-            <summary class="cursor-pointer text-brand">▸ 사업 연결·변경</summary>
-            <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/project" class="mt-2 flex flex-wrap gap-2 items-end">
-              <input type="hidden" name="back" value="{{.BackURL}}">
-              <div class="min-w-[12rem] flex-1">
-                <label class="label">사업</label>
-                {{template "project_combo" dict "Items" .Projects "Selected" .Task.ProjectID "Empty" "연결 해제" "Name" "project_id"}}
-              </div>
-              <button class="btn btn-primary" {{if .ReadOnly}}disabled{{end}}>연결</button>
-              <button class="btn" name="project_id" value="" {{if .ReadOnly}}disabled{{end}}>연결 해제</button>
-            </form>
-          </details>
-          {{end}}
-        </div>
+<script src="/static/js/pw-action.js?v={{.AssetQuery}}"></script>
+<div id="as-action-shell" class="as-action-shell" data-pw-action-layout="1"
+     x-data='pwActionScreen({subtype:{{toJSON .Task.WorkSubtype}}, place:{{toJSON .Task.WorkPlace}}, start:{{toJSON .StartLocal}}, duration:{{toJSON .ActionDurationSel}}, durationCustom:{{toJSON .ActionDurationMin}}, complete:{{toJSON .CompleteLocal}}, result:{{toJSON .FormResult}}, supports:[{{range $i, $m := .SupportMembers}}{{if $i}},{{end}}{id:{{toJSON $m.UserID}},name:{{toJSON $m.Assignee}}}{{end}}]})'>
+  <header id="as-action-header" class="as-action-header" data-pw-fixed="top">
+    <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="text-ui-sm text-ink-muted hover:text-ink">‹ 작업 목록</a>
+    <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p class="font-mono text-ui-sm text-ink-muted">{{.Task.TaskID}} · WORK ACTION</p>
+        <h2 class="text-xl font-bold text-ink mt-0.5">{{.Task.Title}}</h2>
+        <p class="text-ui-sm text-ink-muted mt-1">조치 내용을 입력하고 저장하면 이 작업의 이력이 남습니다. 계획된 작업일은 바꾸지 않습니다.</p>
+        {{if .CanProcess}}
+        <details class="mt-2 text-ui-sm" {{if eq .ActionErr "project"}}open{{end}}>
+          <summary class="cursor-pointer text-brand">▸ 사업 연결·변경</summary>
+          <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/project" class="mt-2 flex flex-wrap gap-2 items-end">
+            <input type="hidden" name="back" value="{{.BackURL}}">
+            <div class="min-w-[12rem] flex-1">
+              <label class="label">사업</label>
+              {{template "project_combo" dict "Items" .Projects "Selected" .Task.ProjectID "Empty" "연결 해제" "Name" "project_id"}}
+            </div>
+            <button class="btn btn-primary" {{if .ReadOnly}}disabled{{end}}>연결</button>
+            <button class="btn" name="project_id" value="" {{if .ReadOnly}}disabled{{end}}>연결 해제</button>
+          </form>
+        </details>
+        {{end}}
       </div>
       <div class="flex flex-wrap items-center gap-2 justify-end">
+        <span class="badge">조치 입력</span>
+        <span class="badge">{{.StatusLabel}}</span>
         <a href="/workboard/tasks/{{.Task.TaskID}}" class="btn">작업 보기</a>
         {{if .ShowWorkflow}}
         <select id="as-workflow-action" class="input min-w-[8rem]">
@@ -41,7 +39,7 @@
           <option value="hold">대기</option>
           {{end}}
           <option value="transfer">이관</option>
-          <option value="cancel">취소</option>
+          <option value="cancel">업무 취소</option>
           {{if .CanUnlockEdit}}<option value="unlock">완료 건 수정 잠금 해제</option>{{end}}
         </select>
         {{end}}
@@ -49,16 +47,17 @@
     </div>
   </header>
 
-  <div class="as-action-split">
-    <details class="lg:hidden as-action-left">
-      <summary class="cursor-pointer text-ui font-medium text-ink">작업 및 사이트 정보</summary>
-      <div class="mt-3">{{template "pw_action_side" .}}</div>
-    </details>
-    <aside class="hidden lg:block as-action-left">{{template "pw_action_side" .}}</aside>
+  <div id="pw-action-mid" class="pw-action-mid" data-pw-scroll="mid">
+    <aside class="pw-action-left" data-pw-left="1">
+      <button type="button" class="pw-action-sum btn w-full text-left mb-3" @click="infoOpen=!infoOpen">
+        01 작업 및 사이트 정보 · {{.ProjectName}}
+        <span class="text-ink-muted">{{if .Sites}}{{(index .Sites 0).SiteName}}{{else}}사이트 없음{{end}}</span>
+      </button>
+      <div class="pw-action-full" :class="infoOpen ? '!block' : ''">{{template "pw_action_side" .}}</div>
+    </aside>
 
-    <div class="as-action-right space-y-4" id="as-action-main">
+    <div class="pw-action-right space-y-4" id="as-action-main">
       {{if .ActionOK}}<p class="card p-3 text-ui text-ink">저장했습니다.</p>{{end}}
-      {{if .ActionErrMsg}}<p id="pw-action-err-top" class="card p-3 text-ui text-danger border border-line">{{.ActionErrMsg}}</p>{{end}}
       {{if .IsClosed}}
       <p class="card p-3 text-ui text-ink-muted">완료·취소 건은 읽기 전용입니다.{{if .EditUnlocked}} 잠금 해제 {{.UnlockExpires}}까지.{{end}}</p>
       {{end}}
@@ -80,136 +79,200 @@
         </div>
       </section>
       {{else if .CanProcess}}
-      <div id="panel-action" class="card overflow-hidden">
-        <div class="border-b border-line px-5 py-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 class="text-ui font-medium text-ink">조치 사항</h3>
-            <p class="text-ui-sm text-ink-muted mt-0.5">처리담당자·조치내용·결과를 입력하고 저장합니다.</p>
-          </div>
-          <span class="badge">조치</span>
-        </div>
-        <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action" id="as-action-form" class="p-4 sm:p-5 space-y-4">
+      <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action" id="as-action-form" class="space-y-4"
+            @input="dirty=true" @submit="onSubmit()">
           <input type="hidden" name="back" value="{{.BackURL}}">
           <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="0">
-          {{if .ConfirmCompleteBeforeWork}}<input type="hidden" name="confirm_complete_before_work" value="1">{{end}}
+          {{if .ConfirmStartDiffersPlan}}<input type="hidden" name="confirm_start_differs_plan" value="1">{{end}}
+          {{/* work_subtype·work_place·result_code 는 아래 라디오 name 으로 보낸다 */}}
+          <template x-for="(s, i) in supports" :key="'sup-'+i">
+            <span>
+              <input type="hidden" name="supporter_user_id" :value="s.id">
+              <input type="hidden" name="supporter_name" :value="s.name">
+            </span>
+          </template>
 
-          <section class="card p-4 sm:p-5 space-y-4">
-            <h4 class="text-ui font-medium text-ink">조치 내역</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="label">처리담당자</label>
-                <select name="assigned_to_code" id="pw-assignee-code" class="input" data-focus-target="assigned_to_code">
-                  {{range .Assignees}}
-                  <option value="{{.UserID}}" {{if or (eq $.Task.AssigneeUserID .UserID) (eq $.Task.Assignee .FullName)}}selected{{end}}>{{.FullName}}</option>
-                  {{end}}
-                  <option value="custom" {{if and .Task.Assignee (not .Task.AssigneeUserID)}}selected{{end}}>직접입력</option>
-                </select>
-                <input type="text" name="assigned_to_custom" id="pw-assignee-custom" class="input mt-2" placeholder="직접입력 시 이름" value="{{if and .Task.Assignee (not .Task.AssigneeUserID)}}{{.Task.Assignee}}{{end}}">
-              </div>
-              <div>
-                <label class="label">근무구분 <span class="text-danger">*</span></label>
-                <div class="flex items-center gap-5 h-[42px]">
-                  <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="work_place" value="office" {{if eq .Task.WorkPlace "office"}}checked{{end}} required> 내근</label>
-                  <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="work_place" value="field" {{if eq .Task.WorkPlace "field"}}checked{{end}} required> 외근</label>
-                </div>
-                {{if eq .ActionErr "work_place"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>근무 구분을 선택하세요</p>{{end}}
-              </div>
-              <div>
-                <label class="label">작업 구분 <span class="text-danger">*</span></label>
-                <select name="work_subtype" class="input" required data-focus-target="work_subtype">
-                  <option value="">선택</option>
-                  <option value="build" {{if eq .Task.WorkSubtype "build"}}selected{{end}}>구축</option>
-                  <option value="construction" {{if eq .Task.WorkSubtype "construction"}}selected{{end}}>공사</option>
-                  <option value="other" {{if eq .Task.WorkSubtype "other"}}selected{{end}}>기타</option>
-                </select>
-              </div>
-              {{if .ShowTargetCat}}
-              <div>
-                <label class="label">작업 대상 분류</label>
-                <select name="target_category_id" class="input">
-                  <option value="">선택</option>
-                  {{range .TargetCats}}
-                  <option value="{{.ID}}" {{if eq $.Task.TargetCategoryID .ID}}selected{{end}}>{{.Name}}</option>
-                  {{end}}
-                </select>
-              </div>
-              {{end}}
-              <div class="sm:col-span-2">
-                <label class="label">작업 사유·특이사항</label>
-                <textarea name="work_reason" rows="2" class="input" placeholder="예: 현장 사정으로 일정 변경">{{.Task.WorkReason}}</textarea>
-              </div>
-              <div>
-                <label class="label">완료일시</label>
-                <input type="datetime-local" name="complete_datetime" value="{{.CompleteLocal}}" class="input" data-focus-target="complete_datetime">
-                {{if or (eq .ActionErr "complete_dt") (eq .ActionErr "complete_before_work")}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>{{.ActionErrMsg}}</p>{{end}}
-              </div>
-              <div class="sm:col-span-2">
-                <label class="label">조치내용 <span class="text-danger">*</span></label>
-                <p class="text-ui-sm text-ink-muted mb-1">이 내용이 다음 작업자에게 참고가 됩니다</p>
-                <textarea name="action_taken" id="as-action-taken" rows="5" class="input" data-focus-target="action_taken">{{.Task.ActionTaken}}</textarea>
-                {{if eq .ActionErr "content"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>조치 내용을 입력하세요</p>{{end}}
-                <label class="inline-flex items-center gap-2 mt-2 text-ui">
-                  <input type="checkbox" name="action_na" id="as-action-na" value="1" {{if .ActionNA}}checked{{end}}> 해당 없음
+          <section class="card p-4 sm:p-5 space-y-4" data-pw-card="info">
+            <h4 class="text-ui font-medium text-ink">01 작업 정보 · 조치 내역</h4>
+            <div>
+              <label class="label">작업 구분 <span class="text-danger">*</span></label>
+              <div class="flex gap-2">
+                <label class="pw-type-card" :class="subtype==='construction' && 'pw-type-card-on'">
+                  <input type="radio" class="sr-only" name="work_subtype" value="construction" {{if eq .Task.WorkSubtype "construction"}}checked{{end}} x-model="subtype">공사
                 </label>
-                <input type="text" name="action_na_reason" id="as-action-na-reason" class="input mt-2 {{if not .ActionNA}}hidden{{end}}" placeholder="해당 없음 사유" value="{{.ActionNAReason}}">
-                {{if eq .ActionErr "na_reason"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>해당 없음 사유를 입력하세요</p>{{end}}
-                {{template "as_action_parts_check" .}}
+                <label class="pw-type-card" :class="subtype==='build' && 'pw-type-card-on'">
+                  <input type="radio" class="sr-only" name="work_subtype" value="build" {{if eq .Task.WorkSubtype "build"}}checked{{end}} x-model="subtype">구축
+                </label>
+                <label class="pw-type-card" :class="subtype==='other' && 'pw-type-card-on'">
+                  <input type="radio" class="sr-only" name="work_subtype" value="other" {{if eq .Task.WorkSubtype "other"}}checked{{end}} x-model="subtype">기타
+                </label>
+              </div>
+              {{if eq .ActionErr "work_subtype"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>작업 구분을 선택하세요</p>{{end}}
+            </div>
+            {{if .ShowTargetCat}}
+            <div>
+              <label class="label">세부 유형</label>
+              <select name="target_category_id" class="input" data-focus-target="target_category_id">
+                <option value="">선택</option>
+                {{range .TargetCats}}
+                <option value="{{.ID}}" {{if eq $.Task.TargetCategoryID .ID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+            </div>
+            {{end}}
+            <div>
+              <label class="label">근무구분 <span class="text-danger">*</span></label>
+              <div class="flex gap-2">
+                <label class="pw-type-card" :class="place==='field' && 'pw-type-card-on'">
+                  <input type="radio" class="sr-only" name="work_place" value="field" {{if eq .Task.WorkPlace "field"}}checked{{end}} x-model="place">외근
+                </label>
+                <label class="pw-type-card" :class="place==='office' && 'pw-type-card-on'">
+                  <input type="radio" class="sr-only" name="work_place" value="office" {{if eq .Task.WorkPlace "office"}}checked{{end}} x-model="place">내근
+                </label>
+              </div>
+              {{if eq .ActionErr "work_place"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>근무 구분을 선택하세요</p>{{end}}
+            </div>
+            <div>
+              <label class="label">작업명 <span class="text-danger">*</span></label>
+              <input type="text" name="title" class="input" value="{{.Task.Title}}" data-focus-target="title" required>
+              {{if eq .ActionErr "title"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>작업명을 입력하세요</p>{{end}}
+            </div>
+            <div>
+              <label class="label">처리담당자 <span class="text-danger">*</span></label>
+              <select name="assigned_to_code" id="pw-assignee-code" class="input" data-focus-target="assigned_to_code">
+                {{range .Assignees}}
+                <option value="{{.UserID}}" {{if or (eq $.Task.AssigneeUserID .UserID) (eq $.Task.Assignee .FullName)}}selected{{end}}>{{.FullName}}</option>
+                {{end}}
+                <option value="custom" {{if and .Task.Assignee (not .Task.AssigneeUserID)}}selected{{end}}>직접입력</option>
+              </select>
+              <input type="text" name="assigned_to_custom" id="pw-assignee-custom" class="input mt-2" placeholder="직접입력 시 이름" value="{{if and .Task.Assignee (not .Task.AssigneeUserID)}}{{.Task.Assignee}}{{end}}">
+            </div>
+            <div data-pw-supporters="1">
+              <label class="label">지원 인력</label>
+              <div class="flex flex-wrap gap-1 mb-2">
+                <template x-for="(s, i) in supports" :key="'chip-'+i">
+                  <span class="pw-chip"><span x-text="s.name"></span>
+                    <button type="button" class="text-ink-muted" @click="removeSupport(i)" aria-label="삭제">✕</button>
+                  </span>
+                </template>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <select id="pw-support-pick" class="input" x-model="pickId" @change="addPicked()">
+                  <option value="">구성원 선택</option>
+                  {{range .Assignees}}
+                  <option value="{{.UserID}}" data-name="{{.FullName}}">{{.FullName}}</option>
+                  {{end}}
+                </select>
+                <input type="text" class="input" placeholder="직책 없이 이름만 입력" x-model="customName"
+                       @keydown.enter.prevent="addCustom()">
+                <button type="button" class="btn" @click="addCustom()">추가</button>
+              </div>
+              {{if or (eq .ActionErr "supporter_owner") (eq .ActionErr "supporters_max")}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>{{.ActionErrMsg}}</p>{{end}}
+            </div>
+            <div>
+              <label class="label">작업 세부사항</label>
+              <textarea name="work_reason" rows="2" class="input" placeholder="작업 세부사항">{{.Task.WorkReason}}</textarea>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="label">시작 일시 <span class="text-danger">*</span></label>
+                <input type="datetime-local" name="action_start_at" class="input" value="{{.StartLocal}}" x-model="start" @change="onStartChange()" data-focus-target="action_start_at" required>
+                {{if eq .ActionErr "action_start"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>시작 일시를 입력하세요</p>{{end}}
+                {{if eq .ActionErr "start_differs_plan"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>{{.ActionErrMsg}}</p>{{end}}
+              </div>
+              <div>
+                <label class="label">작업 시간 <span class="text-danger">*</span></label>
+                <select name="action_duration_min" class="input" x-model="duration" @change="onDurationChange()" data-focus-target="action_duration_min">
+                  {{range .DurationOptions}}
+                  <option value="{{.}}" {{if eq (printf "%d" .) $.ActionDurationSel}}selected{{end}}>{{.}}분</option>
+                  {{end}}
+                  <option value="custom" {{if eq $.ActionDurationSel "custom"}}selected{{end}}>직접 입력</option>
+                </select>
+                <input type="number" min="1" name="action_duration_custom" class="input mt-2" x-show="duration==='custom'" x-cloak x-model="durationCustom" @change="onDurationChange()" placeholder="분">
+                {{if eq .ActionErr "action_duration"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>작업 시간을 입력하세요</p>{{end}}
+              </div>
+              <div>
+                <label class="label">완료 일시 <span class="text-danger">*</span></label>
+                <input type="datetime-local" name="complete_datetime" class="input" value="{{.CompleteLocal}}" x-model="complete" @change="onCompleteChange()" data-focus-target="complete_datetime">
+                {{if or (eq .ActionErr "complete_dt") (eq .ActionErr "complete_before_start")}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>{{.ActionErrMsg}}</p>{{end}}
               </div>
             </div>
+          </section>
+
+          <section class="card p-4 sm:p-5 space-y-3" data-pw-card="action">
+            <h4 class="text-ui font-medium text-ink">02 조치 내용</h4>
+            <p class="text-ui-sm text-ink-muted">이 내용이 다음 작업자에게 참고가 됩니다</p>
+            <textarea name="action_taken" id="as-action-taken" rows="5" class="input" data-focus-target="action_taken">{{.Task.ActionTaken}}</textarea>
+            {{if eq .ActionErr "content"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>조치 내용을 입력하세요</p>{{end}}
+            <label class="inline-flex items-center gap-2 mt-2 text-ui">
+              <input type="checkbox" name="action_na" id="as-action-na" value="1" {{if .ActionNA}}checked{{end}}> 해당 없음
+            </label>
+            <input type="text" name="action_na_reason" id="as-action-na-reason" class="input mt-2 {{if not .ActionNA}}hidden{{end}}" placeholder="해당 없음 사유" value="{{.ActionNAReason}}">
+            {{if eq .ActionErr "na_reason"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>해당 없음 사유를 입력하세요</p>{{end}}
+            <div>
+              <label class="label">특이사항 / 후속 조치</label>
+              <textarea name="action_remark" rows="2" class="input" placeholder="특이사항·후속 메모">{{.Task.ActionRemark}}</textarea>
+            </div>
+            {{template "as_action_parts_check" .}}
+            <label class="inline-flex items-center gap-2 text-ui">
+              <input type="checkbox" name="recurrence_possible" value="1" {{if .Task.RecurrencePossible}}checked{{end}}> 재발 가능성 있음
+            </label>
           </section>
           {{template "as_action_parts_box" .}}
 
-          <section class="card p-4 sm:p-5 space-y-3">
+          <section class="card p-4 sm:p-5 space-y-3" data-pw-card="confirm">
+            <h4 class="text-ui font-medium text-ink">03 확인 및 첨부</h4>
+            <p class="text-ui-sm text-ink-muted">사진 최대 3장, 총 4장까지, 파일당 20MB</p>
             {{template "as_action_attach" .}}
-          </section>
-
-          <section class="card p-4 sm:p-5 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h4 class="text-ui font-medium text-ink">조치 결과</h4>
-              <p class="text-ui-sm text-ink-muted">선택한 결과에 따라 추가 입력이 열립니다</p>
+            <div>
+              <h5 class="text-ui font-medium text-ink">조치 결과 <span class="text-danger">*</span></h5>
+              <p class="text-ui-sm text-ink-muted mb-2">선택한 결과에 따라 추가 입력이 열립니다</p>
+              <div class="flex flex-wrap gap-4">
+                <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultDone}}" {{if or (eq .FormResult "done") (eq .FormResult "")}}checked{{end}} @change="result='{{.ResultDone}}'"> 완료</label>
+                <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultPartial}}" {{if eq .FormResult "partial"}}checked{{end}} @change="result='{{.ResultPartial}}'"> 추가조치 필요</label>
+                <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultTransfer}}" {{if eq .FormResult "transfer"}}checked{{end}} @change="result='{{.ResultTransfer}}'"> 이관</label>
+              </div>
+              {{if eq .ActionErr "result"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>조치 결과를 선택하세요</p>{{end}}
+              <div id="pw-partial-box" class="space-y-2 mt-3" x-show="result==='partial'" x-cloak>
+                <label class="label">추가조치 사유</label>
+                <textarea name="followup_note" rows="2" class="input" data-focus-target="followup_note">{{.FollowupNote}}</textarea>
+                {{if eq .ActionErr "partial_note"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>추가조치 사유를 입력하세요</p>{{end}}
+                <label class="label">다음 작업일</label>
+                <input type="date" name="next_date" class="input" value="{{.NextDate}}">
+                <label class="inline-flex items-center gap-2 text-ui"><input type="checkbox" name="create_followup" value="1" {{if .CreateFollowup}}checked{{end}}> 일정확정 → 후속 작업 등록</label>
+              </div>
+              <div id="pw-transfer-box" class="space-y-2 mt-3" x-show="result==='transfer'" x-cloak>
+                <label class="label">이관처</label>
+                <input type="text" name="transfer_to" class="input" value="{{.Task.TransferTo}}" placeholder="협력사·타 팀" data-focus-target="transfer_to">
+                {{if eq .ActionErr "transfer_to"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관처를 입력하세요</p>{{end}}
+                <label class="label">이관 사유</label>
+                <textarea name="transfer_reason" rows="2" class="input" data-focus-target="transfer_reason">{{.TransferReason}}</textarea>
+                {{if eq .ActionErr "transfer_reason"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관 사유를 입력하세요</p>{{end}}
+              </div>
             </div>
-            <div class="flex flex-wrap gap-4">
-              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultDone}}" {{if or (eq .FormResult "done") (eq .FormResult "")}}checked{{end}}> 완료</label>
-              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultPartial}}" {{if eq .FormResult "partial"}}checked{{end}}> 추가조치 필요</label>
-              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultTransfer}}" {{if eq .FormResult "transfer"}}checked{{end}}> 이관</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="label">고객확인자</label>
+                <select name="customer_confirmer" id="pw-confirmer" class="input">
+                  <option value="">선택</option>
+                  {{range .Sites}}
+                  <option value="{{.SiteName}}" {{if eq $.Task.CustomerConfirmer .SiteName}}selected{{end}}>{{.SiteName}}</option>
+                  {{end}}
+                  <option value="custom">직접입력</option>
+                </select>
+                <input type="text" name="customer_confirmer_custom" class="input mt-2" placeholder="직접입력 시 이름" value="{{.Task.CustomerConfirmer}}">
+              </div>
+              <div>
+                <label class="label">확인 일시</label>
+                <input type="datetime-local" name="customer_confirmed_at" class="input" value="{{.Task.CustomerConfirmedAt}}">
+              </div>
             </div>
-            {{if eq .ActionErr "result"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>조치 결과를 선택하세요</p>{{end}}
-            <div id="pw-partial-box" class="{{if ne .FormResult "partial"}}hidden{{end}} space-y-2">
-              <label class="label">추가조치 사유</label>
-              <textarea name="followup_note" rows="2" class="input" data-focus-target="followup_note">{{.FollowupNote}}</textarea>
-              {{if eq .ActionErr "partial_note"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>추가조치 사유를 입력하세요</p>{{end}}
-              <label class="label">다음 작업일</label>
-              <input type="date" name="next_date" class="input" value="{{.NextDate}}">
-              <label class="inline-flex items-center gap-2 text-ui"><input type="checkbox" name="create_followup" value="1" {{if .CreateFollowup}}checked{{end}}> 일정확정 → 후속 작업 등록</label>
-            </div>
-            <div id="pw-transfer-box" class="{{if ne .FormResult "transfer"}}hidden{{end}} space-y-2">
-              <label class="label">이관처</label>
-              <input type="text" name="transfer_to" class="input" value="{{.Task.TransferTo}}" placeholder="협력사·타 팀" data-focus-target="transfer_to">
-              {{if eq .ActionErr "transfer_to"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관처를 입력하세요</p>{{end}}
-              <label class="label">이관 사유</label>
-              <textarea name="transfer_reason" rows="2" class="input" data-focus-target="transfer_reason">{{.TransferReason}}</textarea>
-              {{if eq .ActionErr "transfer_reason"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관 사유를 입력하세요</p>{{end}}
-            </div>
-          </section>
-
-          <section class="card p-4 sm:p-5 space-y-3">
-            <h4 class="text-ui font-medium text-ink">확인</h4>
-            <label class="label">고객확인자</label>
-            <select name="customer_confirmer" id="pw-confirmer" class="input">
-              <option value="">선택</option>
-              {{range .Sites}}
-              <option value="{{.SiteName}}" {{if eq $.Task.CustomerConfirmer .SiteName}}selected{{end}}>{{.SiteName}}</option>
-              {{end}}
-              <option value="custom">직접입력</option>
-            </select>
-            <input type="text" name="customer_confirmer_custom" class="input" placeholder="직접입력 시 이름" value="{{.Task.CustomerConfirmer}}">
           </section>
         </form>
         {{if and .CanProcess (not .ReadOnly)}}
         <form id="as-action-attach-form" method="POST" action="/attachments" enctype="multipart/form-data"></form>
         {{template "as_action_attach_dels" .}}
         {{end}}
-      </div>
       {{end}}
 
       {{if .ShowImportSites}}
@@ -255,13 +318,28 @@
     </div>
   </div>
 
-  <footer id="as-action-bar" class="as-action-bar flex justify-end items-center gap-3">
-    {{if .ActionErrMsg}}<div id="pw-action-err-bar" class="flex-1 text-ui text-danger rounded border border-line px-3 py-2">{{.ActionErrMsg}}</div>{{end}}
-    {{if and .CanProcess (not .ReadOnly)}}
-    <button type="submit" form="as-action-form" class="btn-primary">저장</button>
-    {{end}}
-    <span class="text-ui-sm text-ink-muted">{{.AppVer}}</span>
-  </footer>
+  <div class="shrink-0">
+    {{if .ActionErrMsg}}<div id="pw-action-err-bar" class="border-t border-line bg-danger-soft px-4 py-2 text-ui text-danger">{{.ActionErrMsg}}</div>{{end}}
+    <footer id="as-action-bar" class="as-action-bar flex justify-between items-center gap-3" data-pw-fixed="bar">
+      {{if and .CanProcess (not .ReadOnly)}}
+      <button type="button" id="pw-action-cancel" class="btn" data-cancel-url="{{if .CancelURL}}{{.CancelURL}}{{else}}/workboard/tasks/{{.Task.TaskID}}{{end}}" @click="onCancel($el.getAttribute('data-cancel-url'))">취소</button>
+      <button type="submit" form="as-action-form" class="btn-primary" id="pw-action-submit" :disabled="saving" x-text="saving ? '저장 중…' : submitLabel()">조치 완료</button>
+      {{else}}
+      <span></span>
+      {{end}}
+      <span class="text-ui-sm text-ink-muted">{{.AppVer}}</span>
+    </footer>
+  </div>
+
+  <div id="pw-leave-modal" class="fixed inset-0 z-50 items-center justify-center p-4 bg-overlay/50" x-show="leaveOpen" x-cloak role="dialog">
+    <div class="card p-4 space-y-3 w-full max-w-md">
+      <h3 class="font-medium text-ink">작성 중인 내용이 사라집니다. 나갈까요?</h3>
+      <div class="flex gap-2 justify-end">
+        <button type="button" class="btn" @click="leaveOpen=false">계속 작성</button>
+        <button type="button" class="btn-primary" id="pw-leave-go" @click="leave()">나가기</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="modal-hold" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-overlay/50">
@@ -330,11 +408,12 @@
 (function(){
   var errField={{toJSON .ActionErrField}};
   if(errField){
+    var mid=document.getElementById('pw-action-mid');
     var fel=document.querySelector('[data-focus-target="'+errField+'"]')||document.querySelector('[name="'+errField+'"]');
-    if(fel){ try{ fel.scrollIntoView({block:'center'}); fel.focus(); }catch(e){} }
+    if(fel){ try{ if(mid){ fel.scrollIntoView({block:'center'}); } fel.focus(); }catch(e){} }
   }
-  var errBar=document.getElementById('pw-action-err-bar')||document.getElementById('pw-action-err-top');
-  if(errBar && !errField){ try{ errBar.scrollIntoView({block:'center'}); }catch(e){} }
+  var errBar=document.getElementById('pw-action-err-bar');
+  if(errBar && !errField){ try{ errBar.scrollIntoView({block:'nearest'}); }catch(e){} }
   if({{if or (eq .ActionErr "hold_reason") (eq .ActionErr "hold_next")}}true{{else}}false{{end}}){ var hm=document.getElementById('modal-hold'); if(hm){ hm.classList.remove('hidden'); hm.classList.add('flex'); } }
   if({{if or (eq .ActionErr "transfer_to") (eq .ActionErr "transfer_reason")}}true{{else}}false{{end}}){ var tm=document.getElementById('modal-transfer'); if(tm){ tm.classList.remove('hidden'); tm.classList.add('flex'); } }
   if({{if or (eq .ActionErr "cancel_reason") (eq .ActionErr "cancel_date")}}true{{else}}false{{end}}){ var cm=document.getElementById('modal-cancel'); if(cm){ cm.classList.remove('hidden'); cm.classList.add('flex'); } }
@@ -372,15 +451,6 @@
   var na=document.getElementById('as-action-na');
   var reason=document.getElementById('as-action-na-reason');
   var shortOk=document.getElementById('as-action-short-ok');
-  var partial=document.getElementById('pw-partial-box');
-  var transfer=document.getElementById('pw-transfer-box');
-  function syncResult(){
-    var el=document.querySelector('input.as-result-radio:checked');
-    var v=el?el.value:'';
-    if(partial) partial.classList.toggle('hidden', v!=='partial');
-    if(transfer) transfer.classList.toggle('hidden', v!=='transfer');
-  }
-  if(form){ form.querySelectorAll('input[name="result_code"]').forEach(function(r){ r.addEventListener('change', syncResult); }); }
   function runeLen(s){ return Array.from(String(s||'').trim()).length; }
   function syncNA(){ if(!na) return; var on=na.checked; if(reason) reason.classList.toggle('hidden', !on); if(ta) ta.required=!on; }
   if(na){ na.addEventListener('change', syncNA); syncNA(); }
@@ -455,7 +525,7 @@
 {{define "pw_action_side"}}
 <div class="space-y-4 text-ui">
   <section class="card">
-    <div class="card-header">작업 및 사이트 정보</div>
+    <div class="card-header">01 작업 및 사이트 정보</div>
     <dl class="card-body space-y-2">
       <div><dt class="text-ui-sm text-ink-muted">사업</dt><dd>{{.ProjectName}}</dd></div>
       <div><dt class="text-ui-sm text-ink-muted">작업 구분</dt><dd>{{.SubtypeLabel}}</dd></div>
@@ -467,7 +537,7 @@
           {{else}}<span class="text-ink-muted">없음</span>{{end}}
         </dd>
       </div>
-      <div><dt class="text-ui-sm text-ink-muted">작업일</dt><dd>{{.Task.WorkDate}} {{.Task.StartTime}}–{{.Task.EndTime}}</dd></div>
+      <div><dt class="text-ui-sm text-ink-muted">작업 일정</dt><dd>{{.Task.WorkDate}} {{.Task.StartTime}}–{{.Task.EndTime}}</dd></div>
       <div><dt class="text-ui-sm text-ink-muted">담당자</dt><dd>{{.Task.Assignee}}</dd></div>
       <div><dt class="text-ui-sm text-ink-muted">참여자</dt><dd>{{range $i, $m := .Members}}{{if $i}}, {{end}}{{$m.Assignee}}{{else}}—{{end}}</dd></div>
       {{if .Task.WorkGroupName}}<div><dt class="text-ui-sm text-ink-muted">업무 그룹</dt><dd>그룹: {{.Task.WorkGroupName}}</dd></div>{{end}}
@@ -478,7 +548,7 @@
     <div class="card-body whitespace-pre-wrap">{{if .Task.Description}}{{.Task.Description}}{{else}}—{{end}}</div>
   </section>
   <section class="card">
-    <div class="card-header">과거 작업 이력</div>
+    <div class="card-header">02 과거 작업 이력</div>
     {{if .PastHistory}}
     <ul class="card-body space-y-2">
       {{range .PastHistory}}
@@ -486,11 +556,12 @@
         <a href="/workboard/tasks/{{.TaskID}}/action" class="text-primary hover:underline font-mono">{{.TaskID}}</a>
         <span class="text-ink-muted">{{.WorkDate}}</span>
         <p>{{.Title}}</p>
+        <p class="text-ink-muted">{{if eq .Status "complete"}}완료{{else}}{{.Status}}{{end}}{{if .Assignee}} · {{.Assignee}}{{end}}</p>
       </li>
       {{end}}
     </ul>
     {{else}}
-    <p class="card-body text-ui-sm text-ink-muted">이력 없음</p>
+    <p class="card-body text-ui-sm text-ink-muted">이전 작업이 없습니다</p>
     {{end}}
   </section>
 </div>
