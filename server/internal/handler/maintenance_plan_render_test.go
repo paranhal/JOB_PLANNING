@@ -22,6 +22,7 @@ func planShowParseFiles(t *testing.T) []string {
 		filepath.Join(root, "_customer_combo.html"),
 		filepath.Join(root, "_ui_assignee_picker.html"),
 		filepath.Join(root, "_partials", "view_group_toggle.html"),
+		filepath.Join(root, "_partials", "schedule_show_toggle.html"),
 		filepath.Join(root, "_partials", "login_briefing.html"),
 	}
 }
@@ -32,7 +33,7 @@ func planViewData(view string, month int, visits []model.MaintenanceVisit) map[s
 	sel := defaultSelectedDay(2026, month, today, visits)
 	attachCalendarChips(weeks, today, sel)
 	cards := buildVisitCards(visits, today, "2026-01-01", nil)
-	attachCardHrefs(cards, "mpl_1", view, month, "all", "", sel)
+	attachCardHrefs(cards, "mpl_1", view, month, "all", "", sel, "plan")
 	return map[string]interface{}{
 		"Title": "정기점검 2026년", "Active": NavMaintenance, "UserRole": "admin",
 		"Plan":        &model.MaintenancePlan{PlanID: "mpl_1", PlanYear: 2026, Status: "draft"},
@@ -57,8 +58,11 @@ func planViewData(view string, month int, visits []model.MaintenanceVisit) map[s
 		"SelectedDay": sel, "SelectedWeekday": weekdayKo(sel),
 		"DayVisits": cardsByDay(cards), "MonthStats": mntMonthStats(visits, today),
 		"HasExcel": true, "ExportHref": template.URL("/maintenance/mpl_1/export.xlsx"),
-		"QScope": template.URL(""), "QAssignee": template.URL(""),
-		"TodayHref": template.URL(calTodayHref("mpl_1", 2026, today, "all", "")),
+		"QScope": template.URL(""), "QAssignee": template.URL(""), "QShow": template.URL("&show=plan"),
+		"ShowPlan": true, "ShowAct": false, "ShowParam": "plan", "PlanCount": len(visits), "ActCount": 0,
+		"ShowPlanHref": "/maintenance/mpl_1?view=" + view + "&show=plan",
+		"ShowActHref":  "/maintenance/mpl_1?view=" + view + "&show=plan%2Cact",
+		"TodayHref":    template.URL(calTodayHref("mpl_1", 2026, today, "all", "", "plan")),
 	}
 }
 

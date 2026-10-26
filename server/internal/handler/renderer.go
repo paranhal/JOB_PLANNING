@@ -46,6 +46,7 @@ func baseTemplateFiles() []string {
 		"web/templates/layout/base.html",
 		"web/templates/layout/_nav_tree.html",
 		"web/templates/_partials/login_briefing.html",
+		"web/templates/_partials/schedule_show_toggle.html",
 	)
 }
 

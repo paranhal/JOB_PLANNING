@@ -450,7 +450,7 @@ func weekdayKo(date string) string {
 	}
 }
 
-func calQuery(planID string, view string, month int, assignee, all, day string) string {
+func calQuery(planID string, view string, month int, assignee, all, day, show string) string {
 	q := url.Values{}
 	if view != "" {
 		q.Set("view", view)
@@ -466,6 +466,9 @@ func calQuery(planID string, view string, month int, assignee, all, day string) 
 	}
 	if strings.TrimSpace(day) != "" {
 		q.Set("day", day)
+	}
+	if s := strings.TrimSpace(show); s != "" {
+		q.Set("show", s)
 	}
 	enc := q.Encode()
 	if enc == "" {
@@ -549,13 +552,13 @@ func visitRegionMap(customers []model.CustomerListItem, cfgs []model.Maintenance
 	return out
 }
 
-func attachCardHrefs(cards []MntVisitCard, planID, view string, month int, assignee, all, day string) {
+func attachCardHrefs(cards []MntVisitCard, planID, view string, month int, assignee, all, day, show string) {
 	for i := range cards {
 		d := cards[i].Date
 		if len(d) >= 10 {
 			d = d[:10]
 		}
-		q := strings.TrimPrefix(calQuery(planID, view, month, assignee, all, d), "/maintenance/"+planID)
+		q := strings.TrimPrefix(calQuery(planID, view, month, assignee, all, d, show), "/maintenance/"+planID)
 		q = strings.TrimPrefix(q, "?")
 		if q != "" {
 			q = "&" + q

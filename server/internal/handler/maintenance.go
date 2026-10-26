@@ -201,9 +201,11 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		}
 	}
 
+	showPlan, showAct := model.ParseScheduleShow(c.QueryParam("show"))
+	showEnc := model.EncodeScheduleShow(showPlan, showAct)
 	shown := visits
 	if month != 0 {
-		shown = filterVisitsByMonth(visits, plan.PlanYear, month)
+		shown = filterVisitsByMonthShow(visits, plan.PlanYear, month, showPlan, showAct)
 	}
 	assigneeKey := strings.TrimSpace(c.QueryParam("assignee"))
 	if assigneeKey == "" {
@@ -216,6 +218,16 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		userName = h.userDisplayName(uid)
 	}
 	shown = filterVisitsByAssigneeKey(shown, assigneeKey, groupMembers, userName)
+	planN, actN := 0, 0
+	for _, v := range shown {
+		if mntVisitPlanDate(v) != "" {
+			planN++
+		}
+		if mntVisitActDate(v) != "" {
+			actN++
+		}
+	}
+	shown = filterVisitsByScheduleShow(shown, showPlan, showAct)
 
 	doneCount := 0
 	var incomplete []model.MaintenanceVisit
@@ -252,6 +264,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if a := strings.TrimSpace(assigneeKey); a != "" && a != "all" {
 		yearQ.Set("assignee", a)
 	}
+	yearQ.Set("show", showEnc)
 	yearQuery := ""
 	if enc := yearQ.Encode(); enc != "" {
 		yearQuery = "?" + enc
@@ -271,7 +284,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, dupMonth)
 	qNum := model.CalendarQuarter(quotaMonth)
 	qFrom, qTo := model.QuarterDateBounds(plan.PlanYear, qNum)
-	weeks := decorateMntWeeks(buildVisitCalendar(plan.PlanYear, month, shown, today), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c))
+	weeks := decorateMntWeeks(buildVisitCalendarShow(plan.PlanYear, month, shown, today, showPlan, showAct), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c))
 	selDay := strings.TrimSpace(c.QueryParam("day"))
 	if !dayInWeeks(weeks, selDay) {
 		selDay = defaultSelectedDay(plan.PlanYear, month, today, shown)
@@ -289,7 +302,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 	regions := visitRegionMap(custItems, cfgs)
 	dayCards := buildVisitCards(shown, today, model.NextMonthStart(time.Now()).Format("2006-01-02"), regions)
-	attachCardHrefs(dayCards, plan.PlanID, view, month, assigneeKey, scopeAllFlag, selDay)
+	attachCardHrefs(dayCards, plan.PlanID, view, month, assigneeKey, scopeAllFlag, selDay, showEnc)
 	stats := mntMonthStats(shown, today)
 	qScope := ""
 	if scopeAll && showScopeToggle {
@@ -298,6 +311,11 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	qAssignee := ""
 	if a := strings.TrimSpace(assigneeKey); a != "" && a != "all" {
 		qAssignee = "&assignee=" + a
+	}
+	qShow := "&show=" + url.QueryEscape(showEnc)
+	monthQ := ""
+	if month != 0 {
+		monthQ = "&month=" + strconv.Itoa(month)
 	}
 	periodGroups := buildPeriodGroups(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c))
 	attachPeriodGroupRegions(h.repo, periodGroups)
@@ -349,7 +367,15 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"ExportHref":          template.URL("/maintenance/" + plan.PlanID + "/export.xlsx"),
 		"QScope":              template.URL(qScope),
 		"QAssignee":           template.URL(qAssignee),
-		"TodayHref":           template.URL(calTodayHref(plan.PlanID, plan.PlanYear, today, assigneeKey, scopeAllFlag)),
+		"QShow":               template.URL(qShow),
+		"ShowPlan":            showPlan,
+		"ShowAct":             showAct,
+		"ShowParam":           showEnc,
+		"PlanCount":           planN,
+		"ActCount":            actN,
+		"ShowPlanHref":        "/maintenance/" + plan.PlanID + "?view=" + view + monthQ + qScope + qAssignee + "&show=" + url.QueryEscape(model.ToggleScheduleShow(showEnc, model.ScheduleShowPlan)),
+		"ShowActHref":         "/maintenance/" + plan.PlanID + "?view=" + view + monthQ + qScope + qAssignee + "&show=" + url.QueryEscape(model.ToggleScheduleShow(showEnc, model.ScheduleShowAct)),
+		"TodayHref":           template.URL(calTodayHref(plan.PlanID, plan.PlanYear, today, assigneeKey, scopeAllFlag, showEnc)),
 		"DoneCount":           doneCount,
 		"OpenCount":           len(visits) - doneCount,
 		"IncompleteVisits":    incomplete,
@@ -456,15 +482,15 @@ func (h *MaintenanceHandler) calFilterOptions(c echo.Context, visits []model.Mai
 	return outG, people, members
 }
 
-func calTodayHref(planID string, planYear int, today, assignee, all string) string {
+func calTodayHref(planID string, planYear int, today, assignee, all, show string) string {
 	t, err := time.ParseInLocation("2006-01-02", today, time.Local)
 	if err != nil {
-		return calQuery(planID, mntViewCalendar, 0, assignee, all, "")
+		return calQuery(planID, mntViewCalendar, 0, assignee, all, "", show)
 	}
 	if t.Year() != planYear {
-		return calQuery(planID, mntViewCalendar, 1, assignee, all, fmt.Sprintf("%d-01-01", planYear))
+		return calQuery(planID, mntViewCalendar, 1, assignee, all, fmt.Sprintf("%d-01-01", planYear), show)
 	}
-	return calQuery(planID, mntViewCalendar, int(t.Month()), assignee, all, today)
+	return calQuery(planID, mntViewCalendar, int(t.Month()), assignee, all, today, show)
 }
 
 func holidayOffSet(repo *repository.HolidayRepo, year int) map[string]bool {

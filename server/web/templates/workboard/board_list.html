@@ -13,9 +13,11 @@
       <div class="flex flex-wrap items-center gap-2">
         {{template "board_scope_toggle" .}}
         {{template "view_group_toggle" .}}
+        {{template "schedule_show_toggle" .}}
         <form method="get" action="/workboard/board" class="contents">
           <input type="hidden" name="view" value="list">
           <input type="hidden" name="date" value="{{.Date}}">
+          {{if .ShowParam}}<input type="hidden" name="show" value="{{.ShowParam}}">{{end}}
           {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
           {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
           <input name="q" value="{{.Q}}" placeholder="업무 검색" class="h-9 w-full rounded-[10px] border border-line bg-hover px-3 text-ui text-ink md:w-56" aria-label="업무 검색">

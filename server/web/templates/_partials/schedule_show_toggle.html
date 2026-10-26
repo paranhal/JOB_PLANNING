@@ -1,0 +1,6 @@
+{{define "schedule_show_toggle"}}
+<span class="sched-show" id="schedule-show" role="group" aria-label="접수·조치 표시" data-show="{{.ShowParam}}" data-storage-key="jp.schedule.show">
+  <a href="{{.ShowPlanHref}}" class="{{if .ShowPlan}}on{{end}}" data-show-bit="plan">접수(계획) {{.PlanCount}}건</a>
+  <a href="{{.ShowActHref}}" class="{{if .ShowAct}}on{{end}}" data-show-bit="act">조치(실행) {{.ActCount}}건</a>
+</span>
+{{end}}

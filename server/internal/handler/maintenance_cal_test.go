@@ -147,7 +147,7 @@ func TestBuildVisitCalendarOtherMonthLinks(t *testing.T) {
 }
 
 func TestCalQueryPreservesAssigneeAll(t *testing.T) {
-	got := calQuery("mpl_1", "calendar", 9, "user:u1", "1", "2026-09-30")
+	got := calQuery("mpl_1", "calendar", 9, "user:u1", "1", "2026-09-30", "")
 	for _, w := range []string{"view=calendar", "month=9", "assignee=user", "all=1", "day=2026-09-30"} {
 		if !strings.Contains(got, w) {
 			t.Fatalf("%s 없음 %s", w, got)

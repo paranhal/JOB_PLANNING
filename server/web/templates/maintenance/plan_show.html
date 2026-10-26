@@ -346,16 +346,17 @@ window.mntAssigneeMulti = function (cfg) {
   {{end}}
 
   <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
-    {{$view := .View}}{{$month := .Month}}{{$pid := .Plan.PlanID}}{{$all := .ScopeAll}}{{$tog := .ShowScopeToggle}}{{$aq := .QAssignee}}{{$sq := .QScope}}
+    {{$view := .View}}{{$month := .Month}}{{$pid := .Plan.PlanID}}{{$all := .ScopeAll}}{{$tog := .ShowScopeToggle}}{{$aq := .QAssignee}}{{$sq := .QScope}}{{$sh := .QShow}}
     {{if ne .View "calendar"}}
     <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
       {{range $v := list "calendar" "kanban" "list"}}
-      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$aq}}"
+      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$aq}}{{$sh}}"
          class="px-4 py-2 {{if eq $view $v}}bg-gray-900 text-white{{else}}bg-white text-gray-700 hover:bg-gray-50{{end}}">{{mntViewLabel $v}}</a>
       {{end}}
       <a href="/maintenance/{{$pid}}/manage"
          class="px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300">관리</a>
     </div>
+    {{template "schedule_show_toggle" .}}
     {{end}}
 
     {{if ne .View "calendar"}}
@@ -372,11 +373,11 @@ window.mntAssigneeMulti = function (cfg) {
 
     <div class="flex flex-wrap gap-1.5 text-sm {{if eq .View "calendar"}}hidden lg:flex{{end}}">
       {{if eq .View "list"}}
-      <a href="/maintenance/{{$pid}}?view=list{{$sq}}{{$aq}}"
+      <a href="/maintenance/{{$pid}}?view=list{{$sq}}{{$aq}}{{$sh}}"
          class="px-3 py-1 rounded-lg {{if eq .Month 0}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">전체</a>
       {{end}}
       {{range $m := seq 12}}
-      <a href="/maintenance/{{$pid}}?view={{$view}}&month={{$m}}{{$sq}}{{$aq}}"
+      <a href="/maintenance/{{$pid}}?view={{$view}}&month={{$m}}{{$sq}}{{$aq}}{{$sh}}"
          class="px-3 py-1 rounded-lg {{if eq $month $m}}bg-gray-900 text-white{{else}}bg-gray-100 hover:bg-gray-200{{end}}">{{$m}}월</a>
       {{end}}
     </div>
@@ -754,8 +755,9 @@ window.mntAssigneeMulti = function (cfg) {
 {{end}}
 
 {{define "mnt_cal_toolbar"}}
-{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$view := .View}}{{$sq := .QScope}}{{$aq := .QAssignee}}
+{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$view := .View}}{{$sq := .QScope}}{{$aq := .QAssignee}}{{$sh := .QShow}}
 <div class="flex flex-wrap items-center gap-2">
+  {{template "schedule_show_toggle" .}}
   <div class="relative" @keydown.escape.window="assigneeOpen=false">
     <button type="button" class="btn-secondary btn-sm" @click="assigneeOpen=!assigneeOpen; viewOpen=false">
       {{if .AssigneeLabel}}{{.AssigneeLabel}}{{else}}전체 담당자{{end}}
@@ -763,7 +765,7 @@ window.mntAssigneeMulti = function (cfg) {
     </button>
     <div x-show="assigneeOpen" x-cloak @click.outside="assigneeOpen=false"
          class="absolute right-0 z-30 mt-1 w-80 max-h-[28rem] overflow-y-auto rounded-card border border-line bg-surface p-2 shadow-pop text-left">
-      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}"
+      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$sh}}"
          class="flex items-center justify-between rounded-control px-2 py-1.5 text-ui hover:bg-hover {{if or (eq .AssigneeKey "all") (eq .AssigneeKey "")}}bg-selected{{end}}">
         <span>전체 담당자</span>
         {{if or (eq .AssigneeKey "all") (eq .AssigneeKey "")}}<span class="text-ink-muted">✓</span>{{end}}
@@ -772,7 +774,7 @@ window.mntAssigneeMulti = function (cfg) {
       <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">업무 그룹</p>
       {{range .CalGroups}}
       <div class="rounded-control border border-line p-2 mb-1.5">
-        <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=group:{{.GroupID}}"
+        <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$sh}}&assignee=group:{{.GroupID}}"
            class="flex items-start justify-between gap-2">
           <span>
             <span class="block text-ui font-medium text-ink">{{.Name}}</span>
@@ -784,7 +786,7 @@ window.mntAssigneeMulti = function (cfg) {
         {{if .Members}}
         <div class="mt-1.5 flex flex-wrap gap-1">
           {{range .Members}}
-          <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=user:{{.UserID}}"
+          <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$sh}}&assignee=user:{{.UserID}}"
              class="badge-neutral hover:bg-selected">{{.FullName}}</a>
           {{end}}
         </div>
@@ -795,12 +797,12 @@ window.mntAssigneeMulti = function (cfg) {
       {{if .CalPeople}}
       <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">담당자</p>
       {{range .CalPeople}}
-      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=user:{{.UserID}}"
+      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$sh}}&assignee=user:{{.UserID}}"
          class="block rounded-control px-2 py-1 text-ui hover:bg-hover">{{.FullName}}</a>
       {{end}}
       {{end}}
       <p class="px-2 pt-2 pb-1 text-ui-xs font-semibold text-ink-muted">기타</p>
-      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}&assignee=none"
+      <a href="/maintenance/{{$pid}}?view=calendar{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$sh}}&assignee=none"
          class="block rounded-control px-2 py-1.5 text-ui hover:bg-hover {{if eq .AssigneeKey "none"}}bg-selected{{end}}">미배정</a>
     </div>
   </div>
@@ -810,7 +812,7 @@ window.mntAssigneeMulti = function (cfg) {
          class="absolute right-0 z-30 mt-1 w-56 rounded-card border border-line bg-surface p-2 shadow-pop">
       <p class="px-2 pb-1 text-ui-xs font-semibold text-ink-muted">보기</p>
       {{range $v := list "calendar" "kanban" "list"}}
-      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$aq}}"
+      <a href="/maintenance/{{$pid}}?view={{$v}}{{if ne $month 0}}&month={{$month}}{{end}}{{$sq}}{{$aq}}{{$sh}}"
          class="block rounded-control px-2 py-1.5 text-ui hover:bg-hover {{if eq $view $v}}bg-selected{{end}}">{{mntViewLabel $v}}</a>
       {{end}}
       {{if .ShowScopeToggle}}
@@ -840,27 +842,27 @@ window.mntAssigneeMulti = function (cfg) {
 {{end}}
 
 {{define "mnt_calendar"}}
-{{$today := .Today}}{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}
+{{$today := .Today}}{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}{{$sh := .QShow}}
 <script type="application/json" id="mnt-day-visits">{{toJSON .DayVisits}}</script>
 <div id="mnt_calendar" class="flex flex-col lg:flex-row gap-3 items-stretch">
   <div class="card min-w-0 flex-1 overflow-hidden">
     <div class="card-header flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         {{if gt $month 1}}
-        <a href="/maintenance/{{$pid}}?view=calendar&month={{subtract $month 1}}{{$sq}}{{$aq}}" class="btn-ghost btn-sm" aria-label="이전 달">‹</a>
+        <a href="/maintenance/{{$pid}}?view=calendar&month={{subtract $month 1}}{{$sq}}{{$aq}}{{$sh}}" class="btn-ghost btn-sm" aria-label="이전 달">‹</a>
         {{else}}
         <span class="btn-ghost btn-sm text-ink-subtle">‹</span>
         {{end}}
         <h3 class="font-semibold text-ink whitespace-nowrap">{{.Plan.PlanYear}}년</h3>
         <label class="sr-only" for="mnt-month-select">월 선택</label>
         <select id="mnt-month-select" class="select text-ui py-1"
-                onchange="location.href='/maintenance/{{$pid}}?view=calendar&month='+this.value+'{{$sq}}{{$aq}}'">
+                onchange="location.href='/maintenance/{{$pid}}?view=calendar&month='+this.value+'{{$sq}}{{$aq}}{{$sh}}'">
           {{range $m := seq 12}}
           <option value="{{$m}}" {{if eq $month $m}}selected{{end}}>{{$m}}월</option>
           {{end}}
         </select>
         {{if lt $month 12}}
-        <a href="/maintenance/{{$pid}}?view=calendar&month={{add $month 1}}{{$sq}}{{$aq}}" class="btn-ghost btn-sm" aria-label="다음 달">›</a>
+        <a href="/maintenance/{{$pid}}?view=calendar&month={{add $month 1}}{{$sq}}{{$aq}}{{$sh}}" class="btn-ghost btn-sm" aria-label="다음 달">›</a>
         {{else}}
         <span class="btn-ghost btn-sm text-ink-subtle">›</span>
         {{end}}
@@ -888,7 +890,7 @@ window.mntAssigneeMulti = function (cfg) {
             {{if .Date}}
             <div class="flex items-center justify-between mb-1">
               {{if and .OtherMonth (not .OtherYear)}}
-              <a href="/maintenance/{{$pid}}?view=calendar&month={{.Month}}&day={{.Date}}{{$sq}}{{$aq}}"
+              <a href="/maintenance/{{$pid}}?view=calendar&month={{.Month}}&day={{.Date}}{{$sq}}{{$aq}}{{$sh}}"
                  class="text-xs font-semibold {{.DayClass}}" style="{{.DayStyle}}">{{.Day}}</a>
               {{else if .Today}}
               <span class="mnt-cal-num-today">{{.Day}}</span>
@@ -1042,10 +1044,10 @@ window.mntAssigneeMulti = function (cfg) {
 {{define "mnt_kanban"}}
 {{$today := .Today}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
-  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
-  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
-  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee}}
+  {{template "mnt_kanban_col" dict "Title" "예정일 경과" "Tone" "red" "Visits" .Board.Overdue "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee "QShow" .QShow}}
+  {{template "mnt_kanban_col" dict "Title" "오늘" "Tone" "sky" "Visits" .Board.Today "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee "QShow" .QShow}}
+  {{template "mnt_kanban_col" dict "Title" "예정" "Tone" "gray" "Visits" .Board.Upcoming "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee "QShow" .QShow}}
+  {{template "mnt_kanban_col" dict "Title" "방문 완료" "Tone" "green" "Visits" .Board.Done "Plan" .Plan "Month" .Month "CanEdit" .CanEdit "ScopeAll" .ScopeAll "ShowScopeToggle" .ShowScopeToggle "DeleteAfter" .DeleteAfter "Today" $today "QScope" .QScope "QAssignee" .QAssignee "QShow" .QShow}}
 </div>
 {{end}}
 
@@ -1057,7 +1059,7 @@ window.mntAssigneeMulti = function (cfg) {
     <span class="text-xs text-gray-500">{{len .Visits}}</span>
   </div>
   <div class="p-2 space-y-2 max-h-[560px] overflow-y-auto">
-    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$del := .DeleteAfter}}{{$today := .Today}}{{$sq := .QScope}}{{$aq := .QAssignee}}
+    {{$plan := .Plan}}{{$month := .Month}}{{$can := .CanEdit}}{{$del := .DeleteAfter}}{{$today := .Today}}{{$sq := .QScope}}{{$aq := .QAssignee}}{{$sh := .QShow}}
     {{range .Visits}}
     {{$b := mntVisitBadge . $today}}
     <div class="rounded-lg p-2.5 text-sm {{mntProductClass .ProductType}} {{if .Completed}}opacity-80{{end}}"
@@ -1088,13 +1090,13 @@ window.mntAssigneeMulti = function (cfg) {
                   data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                   data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                   @click="openEdit($event.currentTarget)">수정</button>
-          <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{$sq}}{{$aq}}" class="inline">
+          <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{$sq}}{{$aq}}{{$sh}}" class="inline">
             <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
             <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
               {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
           </form>
           {{if and (not .Completed) (ge .VisitDate $del)}}
-          <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{$sq}}{{$aq}}" class="inline"
+          <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$plan.PlanID}}&month={{$month}}&view=kanban{{$sq}}{{$aq}}{{$sh}}" class="inline"
                 onsubmit="return confirm('이 방문을 삭제할까요?');">
             <button type="submit" class="text-xs text-red-600 hover:underline">삭제</button>
           </form>
@@ -1130,7 +1132,7 @@ window.mntAssigneeMulti = function (cfg) {
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
-        {{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}
+        {{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}{{$sh := .QShow}}
         {{range .MonthVisits}}
         <tr class="{{if .Completed}}bg-gray-50/80{{end}}">
           <td class="px-4 py-2 whitespace-nowrap">{{.VisitDate}}{{if .DupReason}} <span class="text-[10px] px-1 rounded bg-amber-100 text-amber-800">월 2회차</span>{{end}}</td>
@@ -1161,13 +1163,13 @@ window.mntAssigneeMulti = function (cfg) {
                     data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                     data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                     @click="openEdit($event.currentTarget)">수정</button>
-            <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=list{{$sq}}{{$aq}}" class="inline ml-2">
+            <form method="POST" action="/maintenance/visits/{{.VisitID}}/complete?plan_id={{$pid}}&month={{$month}}&view=list{{$sq}}{{$aq}}{{$sh}}" class="inline ml-2">
               <input type="hidden" name="done" value="{{if .Completed}}0{{else}}1{{end}}">
               <button type="submit" class="text-xs {{if .Completed}}text-gray-500{{else}}text-green-700{{end}} hover:underline">
                 {{if .Completed}}완료 취소{{else}}완료{{end}}</button>
             </form>
             {{if and (not .Completed) (ge .VisitDate $.DeleteAfter)}}
-            <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{$sq}}{{$aq}}" class="inline ml-2"
+            <form method="POST" action="/maintenance/visits/{{.VisitID}}/delete?plan_id={{$pid}}&month={{$month}}&view=list{{$sq}}{{$aq}}{{$sh}}" class="inline ml-2"
                   onsubmit="return confirm('이 방문을 삭제할까요?');">
               <button type="submit" class="text-red-600 hover:underline text-xs">삭제</button>
             </form>

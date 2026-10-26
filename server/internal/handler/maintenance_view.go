@@ -83,10 +83,64 @@ func defaultPlanMonth(year int, visits []model.MaintenanceVisit, now time.Time) 
 }
 
 func filterVisitsByMonth(visits []model.MaintenanceVisit, year, month int) []model.MaintenanceVisit {
+	return filterVisitsByMonthShow(visits, year, month, true, false)
+}
+
+func filterVisitsByMonthShow(visits []model.MaintenanceVisit, year, month int, plan, act bool) []model.MaintenanceVisit {
 	prefix := fmt.Sprintf("%04d-%02d-", year, month)
 	out := make([]model.MaintenanceVisit, 0, len(visits))
 	for _, v := range visits {
-		if len(v.VisitDate) >= len(prefix) && v.VisitDate[:len(prefix)] == prefix {
+		ok := false
+		if plan && visitInMonth(mntVisitPlanDate(v), prefix) {
+			ok = true
+		}
+		if act && visitInMonth(mntVisitActDate(v), prefix) {
+			ok = true
+		}
+		if ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func visitInMonth(d, prefix string) bool {
+	return len(d) >= len(prefix) && d[:len(prefix)] == prefix
+}
+
+func mntVisitPlanDate(v model.MaintenanceVisit) string {
+	d := strings.TrimSpace(v.VisitDate)
+	if len(d) >= 10 {
+		return d[:10]
+	}
+	return d
+}
+
+func mntVisitActDate(v model.MaintenanceVisit) string {
+	if !v.Completed {
+		return ""
+	}
+	d := strings.TrimSpace(v.CompletedDate)
+	if d == "" {
+		d = v.VisitDate
+	}
+	if len(d) >= 10 {
+		return d[:10]
+	}
+	return d
+}
+
+func filterVisitsByScheduleShow(visits []model.MaintenanceVisit, plan, act bool) []model.MaintenanceVisit {
+	if plan && act {
+		return visits
+	}
+	out := make([]model.MaintenanceVisit, 0, len(visits))
+	for _, v := range visits {
+		if plan && mntVisitPlanDate(v) != "" {
+			out = append(out, v)
+			continue
+		}
+		if act && mntVisitActDate(v) != "" {
 			out = append(out, v)
 		}
 	}
@@ -117,12 +171,25 @@ func filterVisitsByAssignee(visits []model.MaintenanceVisit, keys []string) []mo
 
 // buildVisitCalendar 월간 달력(일~토 6주) 격자. month가 0이면 만들지 않는다.
 func buildVisitCalendar(year, month int, visits []model.MaintenanceVisit, today string, offDates ...map[string]bool) [][]MntCalDay {
+	return buildVisitCalendarShow(year, month, visits, today, true, false)
+}
+
+func buildVisitCalendarShow(year, month int, visits []model.MaintenanceVisit, today string, showPlan, showAct bool) [][]MntCalDay {
 	if month < 1 || month > 12 {
 		return nil
 	}
 	byDate := map[string][]model.MaintenanceVisit{}
 	for _, v := range visits {
-		byDate[v.VisitDate] = append(byDate[v.VisitDate], v)
+		if showPlan {
+			if d := mntVisitPlanDate(v); d != "" {
+				byDate[d] = append(byDate[d], v)
+			}
+		}
+		if showAct {
+			if d := mntVisitActDate(v); d != "" && (!showPlan || d != mntVisitPlanDate(v)) {
+				byDate[d] = append(byDate[d], v)
+			}
+		}
 	}
 
 	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)

@@ -77,6 +77,7 @@ type boardItem struct {
 	DeleteDisabledReason string
 	CustomerPlace        string
 	ScheduleLine         string
+	PlaceDate            string
 }
 
 type boardMonthCell struct {
@@ -456,6 +457,8 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	from, to := fromT.Format(dateLayout), toT.Format(dateLayout)
 	scope := resolveBoardScope(c)
 	keep := boardKeepQuery(c)
+	showPlan, showAct := model.ParseScheduleShow(c.QueryParam("show"))
+	keep.Set("show", model.EncodeScheduleShow(showPlan, showAct))
 
 	entries, err := h.collectBoardEntries(c, from, to, scope)
 	if err != nil {
@@ -485,45 +488,68 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		}
 	}
 
+	var calItems []boardItem
+	if showPlan {
+		for _, it := range placed {
+			it.PlaceDate = model.TaskPlanDate(it.Task)
+			calItems = append(calItems, it)
+		}
+		for _, it := range overdue {
+			it.PlaceDate = model.TaskPlanDate(it.Task)
+			calItems = append(calItems, it)
+		}
+	}
+	if showAct {
+		same := map[string]bool{}
+		if showPlan {
+			for _, it := range calItems {
+				d := it.PlaceDate
+				if d == "" {
+					d = model.TaskPlanDate(it.Task)
+				}
+				if d != "" && d == model.TaskExecDate(it.Task) {
+					same[taskDedupKey(it.Task)] = true
+				}
+			}
+		}
+		for _, it := range entries.Exec {
+			if !filterHit(it) {
+				continue
+			}
+			ed := strings.TrimSpace(it.PlaceDate)
+			if ed == "" {
+				ed = model.TaskExecDate(it.Task)
+			}
+			if showPlan && same[taskDedupKey(it.Task)] {
+				continue
+			}
+			it.PlaceDate = ed
+			calItems = append(calItems, it)
+		}
+	}
+
 	var items []boardItem
 	if view == boardViewList {
 		day := base.Format(dateLayout)
-		for _, it := range overdue {
-			items = append(items, it)
-		}
-		for _, it := range placed {
-			d := strings.TrimSpace(it.Task.WorkDate)
-			if d == "" {
-				d = strings.TrimSpace(it.Task.DueDate)
+		for _, it := range calItems {
+			if it.Overdue && showPlan {
+				items = append(items, it)
+				continue
 			}
-			if d == day {
+			if it.PlaceDate == day {
 				items = append(items, it)
 			}
 		}
 		sortListBoardItems(items)
 		h.annotateListDelete(c, items)
 	} else {
-		items = append(items, placed...)
-		items = append(items, overdue...)
+		items = append(items, calItems...)
 		sortBoardItems(items)
 	}
 
 	byDate := map[string][]boardItem{}
-	for _, it := range placed {
-		d := strings.TrimSpace(it.Task.WorkDate)
-		if d == "" {
-			d = strings.TrimSpace(it.Task.DueDate)
-		}
-		if d == "" {
-			continue
-		}
-		byDate[d] = append(byDate[d], it)
-	}
-	for _, it := range overdue {
-		d := strings.TrimSpace(it.Task.WorkDate)
-		if d == "" {
-			d = strings.TrimSpace(it.Task.DueDate)
-		}
+	for _, it := range calItems {
+		d := strings.TrimSpace(it.PlaceDate)
 		if d == "" {
 			continue
 		}
@@ -654,6 +680,22 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		mineEmptyN = boardMineEmptyAllCount(h, c, from, to)
 	}
 	unplacedN := len(unplaced)
+	planN, actN := 0, 0
+	for _, it := range placed {
+		if filterHit(it) {
+			planN++
+		}
+	}
+	for _, it := range entries.Exec {
+		if filterHit(it) {
+			actN++
+		}
+	}
+	curShow := model.EncodeScheduleShow(showPlan, showAct)
+	planKeep := cloneBoardQuery(keep)
+	planKeep.Set("show", model.ToggleScheduleShow(curShow, model.ScheduleShowPlan))
+	actKeep := cloneBoardQuery(keep)
+	actKeep.Set("show", model.ToggleScheduleShow(curShow, model.ScheduleShowAct))
 	data := map[string]interface{}{
 		"Title":            title,
 		"Active":           NavWorkBoard,
@@ -698,6 +740,13 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"CurrentUserName":  me,
 		"BoardHref":        boardURL(view, ds, keep),
 		"ScheduleRedirect": boardURL(view, ds, keep),
+		"ShowPlan":         showPlan,
+		"ShowAct":          showAct,
+		"ShowParam":        curShow,
+		"PlanCount":        planN,
+		"ActCount":         actN,
+		"ShowPlanHref":     boardURL(view, ds, planKeep),
+		"ShowActHref":      boardURL(view, ds, actKeep),
 	}
 	return attachViewGroup(c, data), nil
 }

@@ -202,6 +202,20 @@ func (r *WBRepo) ListTasksBetweenForOrg(from, to, orgID string) ([]model.WorkTas
 	return r.listStoredTasks(where+frag+workTaskOrder, append(args, extra...)...)
 }
 
+func (r *WBRepo) ListTasksCompleteBetweenForOrg(from, to, orgID string) ([]model.WorkTask, error) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return nil, nil
+	}
+	where := `
+		WHERE TRIM(COALESCE(t.complete_date,'')) != ''
+		  AND t.complete_date >= ? AND t.complete_date <= ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`
+	args := []interface{}{from, to}
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	return r.listStoredTasks(where+frag+workTaskOrder, append(args, extra...)...)
+}
+
 // ListTasksDatedBetween 배정일(없으면 예정일)이 기간 안인 업무 — 시간 유무 무관(업무처리현황용)
 func (r *WBRepo) ListTasksDatedBetween(from, to string) ([]model.WorkTask, error) {
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)

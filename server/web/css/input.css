@@ -256,6 +256,9 @@
   .board-sc { @apply inline-flex rounded-[10px] border border-line bg-surface p-0.5; }
   .board-sc a { @apply rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-ink-muted no-underline; }
   .board-sc a.on { @apply bg-success-soft text-success; }
+  .sched-show { @apply inline-flex flex-wrap rounded-[10px] border border-line bg-surface p-0.5; }
+  .sched-show a { @apply rounded-lg px-3 py-1.5 text-ui-sm font-bold text-ink-muted no-underline; }
+  .sched-show a.on { @apply bg-success text-primary-fg; }
   .board-hint2 { @apply mb-3 rounded-[10px] border border-warning px-3.5 py-2 text-[12.5px] text-warning bg-warning-soft; }
   .board-pmask { position: fixed; inset: 0; background: rgba(20,32,28,.5); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 30; }
   .board-pmask.on { display: flex; }

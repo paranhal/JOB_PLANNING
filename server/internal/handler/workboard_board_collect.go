@@ -16,6 +16,9 @@ type boardEntries struct {
 	Placed         []boardItem
 	Unplaced       []boardItem
 	Overdue        []boardItem
+	Exec           []boardItem
+	PlanN          int
+	ActN           int
 	OtherUnplacedN int
 }
 
@@ -37,6 +40,10 @@ func boardKeepQuery(c echo.Context) url.Values {
 	v := url.Values{}
 	if m := strings.TrimSpace(c.QueryParam("mine")); m != "" {
 		v.Set("mine", m)
+	}
+	if s := strings.TrimSpace(c.QueryParam("show")); s != "" {
+		plan, act := model.ParseScheduleShow(s)
+		v.Set("show", model.EncodeScheduleShow(plan, act))
 	}
 	if a := normalizeAssigneeFilter(c.QueryParam("assignee")); a != "" {
 		v.Set("assignee", a)
@@ -222,6 +229,51 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 		seen[it.DedupKey] = true
 		out.Placed = append(out.Placed, it)
 	}
+	out.PlanN = len(out.Placed)
+
+	execRaw, err := h.repo.ListTasksCompleteBetweenForOrg(from, to, org)
+	if err != nil {
+		return out, err
+	}
+	execRaw = ensureTimelineDisplayTimes(execRaw)
+	asIDs2, mntIDs2 := collectASMntIDs(execRaw)
+	asStatus2, _ := h.repo.ASStatusesByIDs(asIDs2)
+	mntDone2, _ := h.repo.MaintenanceCompletedByIDs(mntIDs2)
+	var execVis []model.WorkTask
+	for _, t := range execRaw {
+		ok := false
+		t, ok = applyWorkboardSourceStatus(t, asStatus2, mntDone2)
+		if !ok || t.Status == model.WBTaskCancelled {
+			continue
+		}
+		execVis = append(execVis, t)
+	}
+	execVis = filterTasksByProject(execVis, projectFilter)
+	execVis = filterTasksByWorkGroup(execVis, groupFilter)
+	execIDs := taskIDsOf(execVis)
+	execMem := map[string][]model.WorkTaskMember{}
+	if len(execIDs) > 0 {
+		if m, err := h.repo.ListMembersByTaskIDs(execIDs); err == nil {
+			execMem = m
+		}
+	}
+	allExec := execVis
+	execVis = filterTasksByParticipants(execVis, execMem, scope.AssigneeFilter)
+	execVis = applyViewGroupToTasks(c, allExec, execVis, scope)
+	execSeen := map[string]bool{}
+	for _, t := range execVis {
+		it := buildBoardItem(t, execMem[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
+		it.DedupKey = taskDedupKey(t) + "|act"
+		it.Href = t.DetailHref()
+		it.PlaceDate = model.TaskExecDate(t)
+		k := it.DedupKey
+		if execSeen[k] {
+			continue
+		}
+		execSeen[k] = true
+		out.Exec = append(out.Exec, it)
+	}
+	out.ActN = len(out.Exec)
 
 	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(org, strings.TrimSpace(c.QueryParam("palette")) == "all")
 	if err != nil {
