@@ -49,8 +49,11 @@ func TestProjectWorkActionWorkPlaceRequired(t *testing.T) {
 	form := pwActionForm()
 	form.Del("work_place")
 	rec := doForm(t, e, "/workboard/tasks/"+id+"/action", form)
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=work_place") {
-		t.Fatalf("근무구분 누락 loc=%s code=%d", rec.Header().Get("Location"), rec.Code)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "근무 구분을 선택하세요") {
+		t.Fatalf("근무구분 누락 code=%d loc=%s", rec.Code, rec.Header().Get("Location"))
+	}
+	if !strings.Contains(rec.Body.String(), "현장 배선 정리 및 점검 완료함") {
+		t.Fatal("근무구분 오류 시 조치내용이 유지되지 않음")
 	}
 }
 

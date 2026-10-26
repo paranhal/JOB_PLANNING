@@ -58,7 +58,7 @@
 
     <div class="as-action-right space-y-4" id="as-action-main">
       {{if .ActionOK}}<p class="card p-3 text-ui text-ink">저장했습니다.</p>{{end}}
-      {{if .ActionErrMsg}}<p class="card p-3 text-ui text-danger">{{.ActionErrMsg}}</p>{{end}}
+      {{if .ActionErrMsg}}<p id="pw-action-err-top" class="card p-3 text-ui text-danger border border-line">{{.ActionErrMsg}}</p>{{end}}
       {{if .IsClosed}}
       <p class="card p-3 text-ui text-ink-muted">완료·취소 건은 읽기 전용입니다.{{if .EditUnlocked}} 잠금 해제 {{.UnlockExpires}}까지.{{end}}</p>
       {{end}}
@@ -91,13 +91,14 @@
         <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action" id="as-action-form" class="p-4 sm:p-5 space-y-4">
           <input type="hidden" name="back" value="{{.BackURL}}">
           <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="0">
+          {{if .ConfirmCompleteBeforeWork}}<input type="hidden" name="confirm_complete_before_work" value="1">{{end}}
 
           <section class="card p-4 sm:p-5 space-y-4">
             <h4 class="text-ui font-medium text-ink">조치 내역</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="label">처리담당자</label>
-                <select name="assigned_to_code" id="pw-assignee-code" class="input">
+                <select name="assigned_to_code" id="pw-assignee-code" class="input" data-focus-target="assigned_to_code">
                   {{range .Assignees}}
                   <option value="{{.UserID}}" {{if or (eq $.Task.AssigneeUserID .UserID) (eq $.Task.Assignee .FullName)}}selected{{end}}>{{.FullName}}</option>
                   {{end}}
@@ -111,10 +112,11 @@
                   <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="work_place" value="office" {{if eq .Task.WorkPlace "office"}}checked{{end}} required> 내근</label>
                   <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="work_place" value="field" {{if eq .Task.WorkPlace "field"}}checked{{end}} required> 외근</label>
                 </div>
+                {{if eq .ActionErr "work_place"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>근무 구분을 선택하세요</p>{{end}}
               </div>
               <div>
                 <label class="label">작업 구분 <span class="text-danger">*</span></label>
-                <select name="work_subtype" class="input" required>
+                <select name="work_subtype" class="input" required data-focus-target="work_subtype">
                   <option value="">선택</option>
                   <option value="build" {{if eq .Task.WorkSubtype "build"}}selected{{end}}>구축</option>
                   <option value="construction" {{if eq .Task.WorkSubtype "construction"}}selected{{end}}>공사</option>
@@ -138,16 +140,19 @@
               </div>
               <div>
                 <label class="label">완료일시</label>
-                <input type="datetime-local" name="complete_datetime" value="{{.CompleteLocal}}" class="input">
+                <input type="datetime-local" name="complete_datetime" value="{{.CompleteLocal}}" class="input" data-focus-target="complete_datetime">
+                {{if or (eq .ActionErr "complete_dt") (eq .ActionErr "complete_before_work")}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>{{.ActionErrMsg}}</p>{{end}}
               </div>
               <div class="sm:col-span-2">
                 <label class="label">조치내용 <span class="text-danger">*</span></label>
                 <p class="text-ui-sm text-ink-muted mb-1">이 내용이 다음 작업자에게 참고가 됩니다</p>
-                <textarea name="action_taken" id="as-action-taken" rows="5" class="input">{{.Task.ActionTaken}}</textarea>
+                <textarea name="action_taken" id="as-action-taken" rows="5" class="input" data-focus-target="action_taken">{{.Task.ActionTaken}}</textarea>
+                {{if eq .ActionErr "content"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>조치 내용을 입력하세요</p>{{end}}
                 <label class="inline-flex items-center gap-2 mt-2 text-ui">
-                  <input type="checkbox" name="action_na" id="as-action-na" value="1"> 해당 없음
+                  <input type="checkbox" name="action_na" id="as-action-na" value="1" {{if .ActionNA}}checked{{end}}> 해당 없음
                 </label>
-                <input type="text" name="action_na_reason" id="as-action-na-reason" class="input mt-2 hidden" placeholder="해당 없음 사유">
+                <input type="text" name="action_na_reason" id="as-action-na-reason" class="input mt-2 {{if not .ActionNA}}hidden{{end}}" placeholder="해당 없음 사유" value="{{.ActionNAReason}}">
+                {{if eq .ActionErr "na_reason"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>해당 없음 사유를 입력하세요</p>{{end}}
                 {{template "as_action_parts_check" .}}
               </div>
             </div>
@@ -164,22 +169,26 @@
               <p class="text-ui-sm text-ink-muted">선택한 결과에 따라 추가 입력이 열립니다</p>
             </div>
             <div class="flex flex-wrap gap-4">
-              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultDone}}" {{if or (eq .Task.ResultCode "done") (eq .Task.ResultCode "")}}checked{{end}}> 완료</label>
-              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultPartial}}" {{if eq .Task.ResultCode "partial"}}checked{{end}}> 추가조치 필요</label>
-              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultTransfer}}" {{if eq .Task.ResultCode "transfer"}}checked{{end}}> 이관</label>
+              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultDone}}" {{if or (eq .FormResult "done") (eq .FormResult "")}}checked{{end}}> 완료</label>
+              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultPartial}}" {{if eq .FormResult "partial"}}checked{{end}}> 추가조치 필요</label>
+              <label class="inline-flex items-center gap-2 text-ui"><input type="radio" name="result_code" class="as-result-radio" value="{{.ResultTransfer}}" {{if eq .FormResult "transfer"}}checked{{end}}> 이관</label>
             </div>
-            <div id="pw-partial-box" class="{{if ne .Task.ResultCode "partial"}}hidden{{end}} space-y-2">
+            {{if eq .ActionErr "result"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>조치 결과를 선택하세요</p>{{end}}
+            <div id="pw-partial-box" class="{{if ne .FormResult "partial"}}hidden{{end}} space-y-2">
               <label class="label">추가조치 사유</label>
-              <textarea name="followup_note" rows="2" class="input"></textarea>
+              <textarea name="followup_note" rows="2" class="input" data-focus-target="followup_note">{{.FollowupNote}}</textarea>
+              {{if eq .ActionErr "partial_note"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>추가조치 사유를 입력하세요</p>{{end}}
               <label class="label">다음 작업일</label>
-              <input type="date" name="next_date" class="input">
-              <label class="inline-flex items-center gap-2 text-ui"><input type="checkbox" name="create_followup" value="1"> 일정확정 → 후속 작업 등록</label>
+              <input type="date" name="next_date" class="input" value="{{.NextDate}}">
+              <label class="inline-flex items-center gap-2 text-ui"><input type="checkbox" name="create_followup" value="1" {{if .CreateFollowup}}checked{{end}}> 일정확정 → 후속 작업 등록</label>
             </div>
-            <div id="pw-transfer-box" class="{{if ne .Task.ResultCode "transfer"}}hidden{{end}} space-y-2">
+            <div id="pw-transfer-box" class="{{if ne .FormResult "transfer"}}hidden{{end}} space-y-2">
               <label class="label">이관처</label>
-              <input type="text" name="transfer_to" class="input" value="{{.Task.TransferTo}}" placeholder="협력사·타 팀">
+              <input type="text" name="transfer_to" class="input" value="{{.Task.TransferTo}}" placeholder="협력사·타 팀" data-focus-target="transfer_to">
+              {{if eq .ActionErr "transfer_to"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관처를 입력하세요</p>{{end}}
               <label class="label">이관 사유</label>
-              <textarea name="transfer_reason" rows="2" class="input"></textarea>
+              <textarea name="transfer_reason" rows="2" class="input" data-focus-target="transfer_reason">{{.TransferReason}}</textarea>
+              {{if eq .ActionErr "transfer_reason"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관 사유를 입력하세요</p>{{end}}
             </div>
           </section>
 
@@ -247,6 +256,7 @@
   </div>
 
   <footer id="as-action-bar" class="as-action-bar flex justify-end items-center gap-3">
+    {{if .ActionErrMsg}}<div id="pw-action-err-bar" class="flex-1 text-ui text-danger rounded border border-line px-3 py-2">{{.ActionErrMsg}}</div>{{end}}
     {{if and .CanProcess (not .ReadOnly)}}
     <button type="submit" form="as-action-form" class="btn-primary">저장</button>
     {{end}}
@@ -260,13 +270,15 @@
     <h3 class="font-medium text-ink">대기</h3>
     <select name="hold_next_action" id="hold-next-action" class="input" required>
       <option value="">선택…</option>
-      <option value="action">후속: 조치</option>
-      <option value="transfer">후속: 이관</option>
-      <option value="cancel">후속: 취소</option>
+      <option value="action" {{if eq .HoldNextAction "action"}}selected{{end}}>후속: 조치</option>
+      <option value="transfer" {{if eq .HoldNextAction "transfer"}}selected{{end}}>후속: 이관</option>
+      <option value="cancel" {{if eq .HoldNextAction "cancel"}}selected{{end}}>후속: 취소</option>
     </select>
-    <div id="hold-reason-wrap" class="hidden">
-      <textarea name="hold_reason" id="hold-reason" rows="3" class="input" placeholder="사유"></textarea>
+    {{if eq .ActionErr "hold_next"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>대기 후속을 선택하세요</p>{{end}}
+    <div id="hold-reason-wrap" class="{{if not .HoldReason}}hidden{{end}}">
+      <textarea name="hold_reason" id="hold-reason" rows="3" class="input" placeholder="사유">{{.HoldReason}}</textarea>
     </div>
+    {{if eq .ActionErr "hold_reason"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>대기 사유를 입력하세요</p>{{end}}
     <div class="flex gap-2 justify-end">
       <button type="button" data-close-modal="modal-hold" class="btn">닫기</button>
       <button class="btn btn-primary" id="hold-submit" disabled>저장</button>
@@ -277,8 +289,10 @@
   <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/transfer" class="card p-4 space-y-3 w-full max-w-md">
     <input type="hidden" name="back" value="{{.BackURL}}">
     <h3 class="font-medium text-ink">이관</h3>
-    <input type="text" name="transfer_to" class="input" required placeholder="이관처">
-    <textarea name="transfer_reason" rows="3" class="input" required placeholder="사유"></textarea>
+    <input type="text" name="transfer_to" class="input" required placeholder="이관처" value="{{.Task.TransferTo}}">
+    {{if eq .ActionErr "transfer_to"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관처를 입력하세요</p>{{end}}
+    <textarea name="transfer_reason" rows="3" class="input" required placeholder="사유">{{.TransferReason}}</textarea>
+    {{if eq .ActionErr "transfer_reason"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>이관 사유를 입력하세요</p>{{end}}
     <div class="flex gap-2 justify-end">
       <button type="button" data-close-modal="modal-transfer" class="btn">닫기</button>
       <button class="btn btn-primary">저장</button>
@@ -289,7 +303,9 @@
   <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/cancel" class="card p-4 space-y-3 w-full max-w-md">
     <input type="hidden" name="back" value="{{.BackURL}}">
     <input type="date" name="cancel_date" value="{{.CancelLocal}}" class="input" required>
-    <textarea name="cancel_reason" rows="3" class="input" required placeholder="사유"></textarea>
+    {{if eq .ActionErr "cancel_date"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>취소일을 입력하세요</p>{{end}}
+    <textarea name="cancel_reason" rows="3" class="input" required placeholder="사유">{{.CancelReason}}</textarea>
+    {{if eq .ActionErr "cancel_reason"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>취소 사유를 입력하세요</p>{{end}}
     <div class="flex gap-2 justify-end">
       <button type="button" data-close-modal="modal-cancel" class="btn">닫기</button>
       <button class="btn btn-primary">저장</button>
@@ -312,6 +328,16 @@
 
 <script>
 (function(){
+  var errField={{toJSON .ActionErrField}};
+  if(errField){
+    var fel=document.querySelector('[data-focus-target="'+errField+'"]')||document.querySelector('[name="'+errField+'"]');
+    if(fel){ try{ fel.scrollIntoView({block:'center'}); fel.focus(); }catch(e){} }
+  }
+  var errBar=document.getElementById('pw-action-err-bar')||document.getElementById('pw-action-err-top');
+  if(errBar && !errField){ try{ errBar.scrollIntoView({block:'center'}); }catch(e){} }
+  if({{if or (eq .ActionErr "hold_reason") (eq .ActionErr "hold_next")}}true{{else}}false{{end}}){ var hm=document.getElementById('modal-hold'); if(hm){ hm.classList.remove('hidden'); hm.classList.add('flex'); } }
+  if({{if or (eq .ActionErr "transfer_to") (eq .ActionErr "transfer_reason")}}true{{else}}false{{end}}){ var tm=document.getElementById('modal-transfer'); if(tm){ tm.classList.remove('hidden'); tm.classList.add('flex'); } }
+  if({{if or (eq .ActionErr "cancel_reason") (eq .ActionErr "cancel_date")}}true{{else}}false{{end}}){ var cm=document.getElementById('modal-cancel'); if(cm){ cm.classList.remove('hidden'); cm.classList.add('flex'); } }
   function openModal(id){ var el=document.getElementById(id); if(!el) return; el.classList.remove('hidden'); el.classList.add('flex'); }
   function closeModal(id){ var el=document.getElementById(id); if(!el) return; el.classList.add('hidden'); el.classList.remove('flex'); }
   document.querySelectorAll('[data-close-modal]').forEach(function(btn){

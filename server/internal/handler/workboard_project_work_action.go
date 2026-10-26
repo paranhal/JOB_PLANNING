@@ -89,7 +89,9 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	readOnly := !canMod
 	now := time.Now()
 	completeLocal := strings.TrimSpace(t.CompleteDatetime)
-	if completeLocal == "" {
+	if v, ok := c.Get("pw_complete_local").(string); ok {
+		completeLocal = v
+	} else if completeLocal == "" {
 		completeLocal = now.Format("2006-01-02T15:04")
 	}
 	unlockExpLocal := ""
@@ -135,6 +137,18 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 			docs = append(docs, a)
 		}
 	}
+	errCode := strings.TrimSpace(c.QueryParam("err"))
+	if v, ok := c.Get("pw_action_err").(string); ok && v != "" {
+		errCode = v
+	}
+	errMsg := projectWorkActionErr(errCode)
+	if v, ok := c.Get("pw_action_err_msg").(string); ok && v != "" {
+		errMsg = v
+	}
+	cancelLocal := now.Format("2006-01-02")
+	if v := strings.TrimSpace(c.FormValue("cancel_date")); v != "" {
+		cancelLocal = v
+	}
 	ver, _, _, _ := currentBuild()
 	data := map[string]interface{}{
 		"Title": "작업 조치 · " + t.Title, "Active": workboardNavActive(back),
@@ -155,10 +169,11 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		"ShowImportSites": len(projectSites) > 0,
 		"CompleteLocal":   completeLocal,
 		"TodayLocal":      now.Format("2006-01-02"),
-		"CancelLocal":     now.Format("2006-01-02"),
+		"CancelLocal":     cancelLocal,
 		"WorkerDefault":   ctxString(c, "user_name"),
-		"ActionErr":       c.QueryParam("err"),
-		"ActionErrMsg":    projectWorkActionErr(c.QueryParam("err")),
+		"ActionErr":       errCode,
+		"ActionErrMsg":    errMsg,
+		"ActionErrField":  projectWorkActionErrField(errCode),
 		"ActionOK":        c.QueryParam("ok"),
 		"BackURL":         back,
 		"SubtypeLabel":    model.WorkSubtypeLabel(t.WorkSubtype),
@@ -176,6 +191,39 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		data["PartsFormErr"] = msg
 		data["ActionErrMsg"] = msg
 	}
+	if v, ok := c.Get("pw_action_na").(bool); ok {
+		data["ActionNA"] = v
+	}
+	if v, ok := c.Get("pw_na_reason").(string); ok {
+		data["ActionNAReason"] = v
+	}
+	if v, ok := c.Get("pw_followup_note").(string); ok {
+		data["FollowupNote"] = v
+	}
+	if v, ok := c.Get("pw_next_date").(string); ok {
+		data["NextDate"] = v
+	}
+	if v, ok := c.Get("pw_create_followup").(bool); ok {
+		data["CreateFollowup"] = v
+	}
+	if v, ok := c.Get("pw_transfer_reason").(string); ok {
+		data["TransferReason"] = v
+	}
+	if v, ok := c.Get("pw_hold_reason").(string); ok {
+		data["HoldReason"] = v
+	}
+	if v, ok := c.Get("pw_hold_next").(string); ok {
+		data["HoldNextAction"] = v
+	}
+	if v, ok := c.Get("pw_cancel_reason").(string); ok {
+		data["CancelReason"] = v
+	}
+	data["ConfirmCompleteBeforeWork"] = errCode == "complete_before_work"
+	formResult := t.ResultCode
+	if v, ok := c.Get("pw_form_result").(string); ok && v != "" {
+		formResult = v
+	}
+	data["FormResult"] = formResult
 	return c.Render(http.StatusOK, "workboard/project_work_action.html", data)
 }
 
@@ -199,6 +247,8 @@ func projectWorkActionErr(code string) string {
 		return "작업일을 입력하세요"
 	case "complete_dt":
 		return "완료 일시를 입력하세요"
+	case "complete_before_work":
+		return "완료일시가 작업일보다 이전입니다. 그대로 저장할까요?"
 	case "partial_note":
 		return "추가조치 사유를 입력하세요"
 	case "hold_reason":
@@ -220,6 +270,130 @@ func projectWorkActionErr(code string) string {
 	default:
 		return ""
 	}
+}
+
+func projectWorkActionErrField(code string) string {
+	switch code {
+	case "content":
+		return "action_taken"
+	case "na_reason":
+		return "action_na_reason"
+	case "work_place":
+		return "work_place"
+	case "work_subtype":
+		return "work_subtype"
+	case "result":
+		return "result_code"
+	case "assignee":
+		return "assigned_to_code"
+	case "complete_dt", "complete_before_work":
+		return "complete_datetime"
+	case "partial_note":
+		return "followup_note"
+	case "transfer_to":
+		return "transfer_to"
+	case "transfer_reason":
+		return "transfer_reason"
+	case "hold_reason":
+		return "hold_reason"
+	case "hold_next":
+		return "hold_next_action"
+	case "cancel_reason":
+		return "cancel_reason"
+	case "cancel_date":
+		return "cancel_date"
+	default:
+		return ""
+	}
+}
+
+func resolveProjectWorkDate(formDay, taskDay, completeDT string) string {
+	if d := strings.TrimSpace(formDay); d != "" {
+		return d
+	}
+	if d := strings.TrimSpace(taskDay); d != "" {
+		return d
+	}
+	c := strings.TrimSpace(completeDT)
+	if len(c) >= 10 {
+		return c[:10]
+	}
+	return ""
+}
+
+func completeDatetimeBeforeWorkDate(completeDT, workDay string) bool {
+	c := strings.TrimSpace(completeDT)
+	w := strings.TrimSpace(workDay)
+	if len(c) < 10 || w == "" {
+		return false
+	}
+	return c[:10] < w
+}
+
+func overlayProjectWorkActionDraft(c echo.Context, t *model.WorkTask) {
+	if t == nil {
+		return
+	}
+	_ = c.Request().ParseForm()
+	if v := strings.TrimSpace(c.FormValue("work_place")); v != "" {
+		t.WorkPlace = v
+	}
+	if v := model.NormalizeWorkSubtype(c.FormValue("work_subtype")); v != "" {
+		t.WorkSubtype = v
+	}
+	if _, ok := c.Request().PostForm["action_taken"]; ok {
+		t.ActionTaken = strings.TrimSpace(c.FormValue("action_taken"))
+	}
+	if v := strings.TrimSpace(c.FormValue("result_code")); v != "" {
+		c.Set("pw_form_result", v)
+	}
+	if v := strings.TrimSpace(c.FormValue("work_reason")); v != "" || c.Request().PostForm.Has("work_reason") {
+		t.WorkReason = strings.TrimSpace(c.FormValue("work_reason"))
+	}
+	if v := strings.TrimSpace(c.FormValue("target_category_id")); v != "" || c.Request().PostForm.Has("target_category_id") {
+		t.TargetCategoryID = strings.TrimSpace(c.FormValue("target_category_id"))
+	}
+	if v := strings.TrimSpace(c.FormValue("complete_datetime")); v != "" {
+		c.Set("pw_complete_local", v)
+		t.CompleteDatetime = v
+	} else if _, ok := c.Request().PostForm["complete_datetime"]; ok {
+		c.Set("pw_complete_local", "")
+	}
+	confirmer := strings.TrimSpace(c.FormValue("customer_confirmer"))
+	if custom := strings.TrimSpace(c.FormValue("customer_confirmer_custom")); custom != "" {
+		confirmer = custom
+	}
+	if confirmer != "" {
+		t.CustomerConfirmer = confirmer
+	}
+	code := strings.TrimSpace(c.FormValue("assigned_to_code"))
+	if code == "custom" {
+		t.Assignee = strings.TrimSpace(c.FormValue("assigned_to_custom"))
+		t.AssigneeUserID = ""
+	} else if code != "" {
+		t.AssigneeUserID = code
+	}
+	if v := strings.TrimSpace(c.FormValue("transfer_to")); v != "" {
+		t.TransferTo = v
+	}
+	c.Set("pw_action_na", c.FormValue("action_na") == "1")
+	c.Set("pw_na_reason", strings.TrimSpace(c.FormValue("action_na_reason")))
+	c.Set("pw_followup_note", strings.TrimSpace(c.FormValue("followup_note")))
+	c.Set("pw_next_date", strings.TrimSpace(c.FormValue("next_date")))
+	c.Set("pw_create_followup", c.FormValue("create_followup") == "1")
+	c.Set("pw_transfer_reason", strings.TrimSpace(c.FormValue("transfer_reason")))
+	c.Set("pw_hold_reason", strings.TrimSpace(c.FormValue("hold_reason")))
+	c.Set("pw_hold_next", strings.TrimSpace(c.FormValue("hold_next_action")))
+	c.Set("pw_cancel_reason", strings.TrimSpace(c.FormValue("cancel_reason")))
+}
+
+func (h *WorkboardHandler) failPWAction(c echo.Context, t *model.WorkTask, code string) error {
+	overlayProjectWorkActionDraft(c, t)
+	c.Set("pw_action_err", code)
+	if code == "complete_before_work" {
+		c.Set("pw_action_err_msg", "완료일시가 작업일("+strings.TrimSpace(t.WorkDate)+")보다 이전입니다. 그대로 저장할까요?")
+	}
+	return h.renderProjectWorkAction(c, t)
 }
 
 func (h *WorkboardHandler) redirectPWAction(c echo.Context, id, errCode string) error {
@@ -252,14 +426,14 @@ func (h *WorkboardHandler) SaveProjectWorkAction(c echo.Context) error {
 		unlocked, _, _ = h.unlockRepo.HasActive(t.TaskID, currentUserID(c))
 	}
 	if closed && !unlocked {
-		return h.redirectPWAction(c, t.TaskID, "locked")
+		return h.failPWAction(c, t, "locked")
 	}
 	if err := h.applyProjectWorkActionForm(c, t, ""); err != nil {
 		if _, ok := err.(pwRendered); ok {
 			return nil
 		}
 		if code, ok := err.(*pwActionErr); ok {
-			return h.redirectPWAction(c, t.TaskID, code.code)
+			return h.failPWAction(c, t, code.code)
 		}
 		return err
 	}
@@ -317,7 +491,8 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 	if aerr != nil {
 		return aerr
 	}
-	workDay := strings.TrimSpace(c.FormValue("work_date"))
+	completeDT := strings.TrimSpace(c.FormValue("complete_datetime"))
+	workDay := resolveProjectWorkDate(c.FormValue("work_date"), t.WorkDate, completeDT)
 	if workDay == "" {
 		return &pwActionErr{"work_date"}
 	}
@@ -345,7 +520,6 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 
 	note := strings.TrimSpace(c.FormValue("followup_note"))
 	nextDate := strings.TrimSpace(c.FormValue("next_date"))
-	completeDT := strings.TrimSpace(c.FormValue("complete_datetime"))
 	confirmer := strings.TrimSpace(c.FormValue("customer_confirmer"))
 	if custom := strings.TrimSpace(c.FormValue("customer_confirmer_custom")); custom != "" {
 		confirmer = custom
@@ -353,6 +527,11 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 
 	if completeDT == "" && (result == model.WorkResultDone || result == model.WorkResultPartial) {
 		completeDT = time.Now().Format("2006-01-02T15:04")
+	}
+	if (result == model.WorkResultDone || result == model.WorkResultPartial) &&
+		completeDatetimeBeforeWorkDate(completeDT, workDay) &&
+		c.FormValue("confirm_complete_before_work") != "1" {
+		return &pwActionErr{"complete_before_work"}
 	}
 	t.WorkPlace = place
 	t.Assignee = assignee
@@ -518,7 +697,7 @@ func (h *WorkboardHandler) saveProjectWorkSideResult(c echo.Context, result stri
 		unlocked, _, _ = h.unlockRepo.HasActive(t.TaskID, currentUserID(c))
 	}
 	if closed && !unlocked {
-		return h.redirectPWAction(c, t.TaskID, "locked")
+		return h.failPWAction(c, t, "locked")
 	}
 	place := strings.TrimSpace(c.FormValue("work_place"))
 	if place == "" {
@@ -533,10 +712,10 @@ func (h *WorkboardHandler) saveProjectWorkSideResult(c echo.Context, result stri
 		note = strings.TrimSpace(c.FormValue("transfer_reason"))
 		to := strings.TrimSpace(c.FormValue("transfer_to"))
 		if to == "" {
-			return h.redirectPWAction(c, t.TaskID, "transfer_to")
+			return h.failPWAction(c, t, "transfer_to")
 		}
 		if note == "" {
-			return h.redirectPWAction(c, t.TaskID, "transfer_reason")
+			return h.failPWAction(c, t, "transfer_reason")
 		}
 		t.TransferTo = to
 		t.Status = model.WBTaskTransfer
@@ -544,10 +723,10 @@ func (h *WorkboardHandler) saveProjectWorkSideResult(c echo.Context, result stri
 	if result == model.WorkResultHold {
 		next := strings.TrimSpace(c.FormValue("hold_next_action"))
 		if next != "action" && next != "transfer" && next != "cancel" {
-			return h.redirectPWAction(c, t.TaskID, "hold_next")
+			return h.failPWAction(c, t, "hold_next")
 		}
 		if note == "" {
-			return h.redirectPWAction(c, t.TaskID, "hold_reason")
+			return h.failPWAction(c, t, "hold_reason")
 		}
 		t.HoldReason = note
 		t.HoldNextAction = next
@@ -557,10 +736,10 @@ func (h *WorkboardHandler) saveProjectWorkSideResult(c echo.Context, result stri
 		note = strings.TrimSpace(c.FormValue("cancel_reason"))
 		day := strings.TrimSpace(c.FormValue("cancel_date"))
 		if day == "" {
-			return h.redirectPWAction(c, t.TaskID, "cancel_date")
+			return h.failPWAction(c, t, "cancel_date")
 		}
 		if note == "" {
-			return h.redirectPWAction(c, t.TaskID, "cancel_reason")
+			return h.failPWAction(c, t, "cancel_reason")
 		}
 		t.CancelReason = note
 		t.CompleteDate = day

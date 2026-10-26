@@ -50,14 +50,13 @@ func pwCreateTask(t *testing.T, e *echo.Echo, repo *repository.WBRepo, title str
 
 func pwActionForm() url.Values {
 	return url.Values{
-		"assignee":           {"관리자"},
-		"work_place":         {"field"},
-		"work_date":          {"2026-10-21"},
-		"action_taken":       {"현장 배선 정리 및 점검 완료함"},
-		"complete_datetime":  {"2026-10-21T15:00"},
-		"result_code":        {model.WorkResultDone},
+		"work_place":                {"field"},
+		"work_subtype":              {"other"},
+		"action_taken":              {"현장 배선 정리 및 점검 완료함"},
+		"complete_datetime":         {"2026-10-21T15:00"},
+		"result_code":               {model.WorkResultDone},
 		"customer_confirmer_custom": {"김선생"},
-		"action_short_ok":    {"1"},
+		"action_short_ok":           {"1"},
 	}
 }
 
@@ -145,11 +144,14 @@ func TestProjectWorkActionCompletePartialHoldTransferCancel(t *testing.T) {
 	id := pwCreateTask(t, e, repo, "완료작업")
 
 	miss := doForm(t, e, "/workboard/tasks/"+id+"/action", url.Values{
-		"assignee": {"관리자"}, "work_place": {"field"}, "work_date": {"2026-10-21"},
+		"work_place": {"field"}, "work_subtype": {"other"},
 		"result_code": {model.WorkResultDone}, "complete_datetime": {"2026-10-21T15:00"},
 	})
-	if miss.Code != http.StatusSeeOther || !strings.Contains(miss.Header().Get("Location"), "err=content") {
-		t.Fatalf("빈 조치 loc=%s code=%d", miss.Header().Get("Location"), miss.Code)
+	if miss.Code != http.StatusOK || !strings.Contains(miss.Body.String(), "조치 내용을 입력하세요") {
+		t.Fatalf("빈 조치 code=%d loc=%s body=%s", miss.Code, miss.Header().Get("Location"), miss.Body.String())
+	}
+	if !strings.Contains(miss.Body.String(), `value="2026-10-21T15:00"`) {
+		t.Fatal("오류 시 완료일시가 유지되지 않음")
 	}
 
 	ok := doForm(t, e, "/workboard/tasks/"+id+"/action", pwActionForm())
@@ -236,8 +238,8 @@ func TestProjectWorkActionCompletePartialHoldTransferCancel(t *testing.T) {
 	bad := doForm(t, e, "/workboard/tasks/"+id5+"/action/cancel", url.Values{
 		"cancel_date": {"2026-10-21"},
 	})
-	if bad.Code != http.StatusSeeOther || !strings.Contains(bad.Header().Get("Location"), "err=cancel_reason") {
-		t.Fatalf("cancel 사유 loc=%s", bad.Header().Get("Location"))
+	if bad.Code != http.StatusOK || !strings.Contains(bad.Body.String(), "취소 사유를 입력하세요") {
+		t.Fatalf("cancel 사유 code=%d loc=%s", bad.Code, bad.Header().Get("Location"))
 	}
 	cn := doForm(t, e, "/workboard/tasks/"+id5+"/action/cancel", url.Values{
 		"cancel_date": {"2026-10-21"}, "cancel_reason": {"발주 취소"},
