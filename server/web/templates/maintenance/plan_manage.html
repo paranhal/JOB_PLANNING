@@ -28,10 +28,19 @@
   </div>
 
   {{if .FlashErr}}
-  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{.FlashErr}}</div>
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" id="mnt-flash-err">{{.FlashErr}}</div>
   {{end}}
   {{if .FlashOK}}
-  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.FlashOK}}</div>
+  <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 sticky top-0 z-20" id="mnt-flash-ok">{{.FlashOK}}</div>
+  <div id="mnt-flash-ok-popup" class="modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="modal-panel w-full max-w-md shadow-pop">
+      <h2 class="text-sm font-bold text-gray-800">처리 결과</h2>
+      <p class="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{{.FlashOK}}</p>
+      <div class="mt-4 flex justify-end">
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('mnt-flash-ok-popup').classList.add('hidden')">확인</button>
+      </div>
+    </div>
+  </div>
   {{end}}
 
   {{if .HolidayMissing}}
@@ -129,12 +138,24 @@
     </div>
     <div>
       <p class="text-xs font-medium text-gray-700 mb-1">개별 사이트 단위</p>
-      <p class="text-[11px] text-gray-400 mb-1">선택 <span id="mt-sel-n">0</span>건</p>
+      <div id="mt-empty" class="hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"></div>
+      <div id="mt-sticky" class="sticky top-0 z-10 mb-1 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs">
+        <label class="inline-flex items-center gap-1"><input type="checkbox" id="mt-all"> 전체 선택</label>
+        <span>선택 <span id="mt-sel-n">0</span>건</span>
+        <button type="button" id="mt-reg-sites" class="px-2 py-1 bg-sky-700 text-white rounded-lg">선택한 사이트 등록</button>
+        <button type="button" id="mt-cancel-sites" class="px-2 py-1 border rounded-lg">등록 해제</button>
+        <label class="inline-flex items-center gap-1">다른 달
+          <select id="mt-move-month" class="border rounded px-1 py-0.5">
+            {{range seq 12}}<option value="{{.}}">{{.}}월</option>{{end}}
+          </select>
+        </label>
+        <button type="button" id="mt-move-sites" class="px-2 py-1 border rounded-lg">이동</button>
+      </div>
       <div class="overflow-x-auto max-h-64 border rounded-lg">
         <table class="min-w-full text-xs">
           <thead class="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th class="px-2 py-1"><input type="checkbox" id="mt-all"></th>
+              <th class="px-2 py-1"></th>
               <th class="px-2 py-1">사이트</th>
               <th class="px-2 py-1">지역</th>
               <th class="px-2 py-1">주기</th>
@@ -144,7 +165,6 @@
           <tbody id="mt-sites" class="divide-y"></tbody>
         </table>
       </div>
-      <button type="button" id="mt-reg-sites" class="mt-2 px-3 py-1.5 bg-sky-700 text-white rounded-lg text-sm">선택한 사이트 등록</button>
     </div>
     <div id="mt-result" class="hidden rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950" role="status"></div>
     <div id="mt-popup" class="hidden modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -159,7 +179,7 @@
   </section>
   {{end}}
 
-  {{if .IsAdmin}}
+  {{if false}}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
       <h3 class="font-semibold text-gray-800">계획 생성</h3>
@@ -227,7 +247,9 @@
       {{end}}
     </div>
   </section>
+  {{end}}
 
+  {{if .IsAdmin}}
   <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
     <h3 class="font-semibold text-gray-800">방문 일괄 담당자 변경</h3>
     <p class="text-xs text-gray-500">월·지역·점검대상으로 골라 담당자를 한 번에 넣습니다.</p>
@@ -331,7 +353,12 @@
     {{end}}
   </section>
 
-  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+  {{else}}
+  <p class="text-sm text-gray-500">생성·복사·상태 변경·일괄 변경은 관리자만 할 수 있습니다. 조회만 가능합니다.</p>
+  {{end}}
+
+  {{if .CanEdit}}
+  <section class="bg-white rounded-xl border border-gray-200 p-4 space-y-3" data-unassigned-bulk data-plan-id="{{.Plan.PlanID}}" data-month="{{.UnassignedMonth}}">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h3 class="font-semibold text-gray-800">미배정 일괄 배정</h3>
       <form method="GET" action="/maintenance/{{.Plan.PlanID}}/manage" class="flex items-center gap-2 text-sm">
@@ -341,51 +368,134 @@
         </select>
       </form>
     </div>
-    <p class="text-xs text-gray-500">{{.UnassignedMonth}}월 주기에 해당하는데 방문일이 없는 건입니다. 날짜를 넣고 배정하면 캘린더에 올라갑니다. 담당자를 비우면 지난해(또는 복사본) 값을 씁니다.</p>
+    <p class="text-xs text-gray-500">{{.UnassignedMonth}}월 대상인데 방문일이 없는 건입니다. 지역으로 묶어 선택 후 같은 날짜 또는 기간 배분으로 넣습니다. 담당을 비우면 지역 기본 → 지난해 값을 씁니다.</p>
+    <div class="flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs">
+      <label class="inline-flex items-center gap-1"><input type="checkbox" id="ua-all"> 목록 전체</label>
+      <span>선택 <span id="ua-sel-n">0</span>곳</span>
+      <div>
+        <label class="block text-[11px] text-gray-500">같은 방문일</label>
+        <input type="date" id="ua-same-date" class="border rounded-lg px-2 py-1">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500">기간 시작</label>
+        <input type="date" id="ua-from" class="border rounded-lg px-2 py-1">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500">기간 끝</label>
+        <input type="date" id="ua-to" class="border rounded-lg px-2 py-1">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500">하루 N곳</label>
+        <input type="number" id="ua-per-day" min="1" value="8" class="border rounded-lg px-2 py-1 w-16">
+      </div>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" id="ua-skip-we" checked> 주말·공휴일 제외</label>
+      <div class="min-w-[12rem]">
+        <label class="block text-[11px] text-gray-500 mb-1">담당 (선택)</label>
+        {{template "assignee_picker" dict "Target" "unassigned" "Mode" "multi"}}
+      </div>
+      <button type="button" id="ua-preview" class="px-3 py-1.5 border rounded-lg">미리보기</button>
+      <button type="button" id="ua-apply" class="px-3 py-1.5 bg-amber-800 text-white rounded-lg">배정</button>
+    </div>
+    <p id="ua-err" class="hidden text-sm text-red-700"></p>
     {{if not .Unassigned}}
     <p class="text-sm text-gray-500">이 달 미배정 건이 없습니다.</p>
     {{else}}
-    <form method="POST" action="/maintenance/{{.Plan.PlanID}}/assign-slots" class="space-y-2">
-      <div class="flex flex-wrap items-end gap-2">
-        <div>
-          <label class="block text-[11px] text-gray-500 mb-1">일괄 담당자 (선택)</label>
-          <select name="assignee" class="border rounded-lg px-2 py-1.5 text-sm">
-            <option value="">지난해·복사본 담당자</option>
-            {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
-          </select>
-        </div>
-        <button type="submit" class="px-3 py-1.5 bg-amber-800 text-white rounded-lg text-sm">날짜 넣은 건 배정</button>
-      </div>
+    {{range .UnassignedGroups}}
+    {{$rk := .Key}}
+    <details class="border rounded-lg" open>
+      <summary class="px-3 py-2 text-sm font-medium cursor-pointer flex items-center gap-2">
+        <input type="checkbox" class="ua-region" data-region="{{$rk}}" onclick="event.stopPropagation()">
+        {{.Label}} <span class="text-xs text-gray-500">{{len .Slots}}곳</span>
+      </summary>
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead class="text-left text-xs text-gray-500">
             <tr>
+              <th class="py-1 px-2"></th>
               <th class="py-1 pr-3">사이트</th>
               <th class="py-1 pr-3">점검 대상</th>
               <th class="py-1 pr-3">주기</th>
-              <th class="py-1">방문일</th>
+              <th class="py-1">방문일(개별)</th>
             </tr>
           </thead>
           <tbody class="divide-y">
-            {{range .Unassigned}}
+            {{range .Slots}}
             <tr>
-              <td class="py-1.5 pr-3">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}
-                <input type="hidden" name="customer_id" value="{{.CustomerID}}">
-                <input type="hidden" name="product_type" value="{{.ProductType}}">
-              </td>
+              <td class="py-1 px-2"><input type="checkbox" class="ua-slot" name="slot_key" value="{{.CustomerID}}|{{.ProductType}}" data-region="{{$rk}}"></td>
+              <td class="py-1.5 pr-3">{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</td>
               <td class="py-1.5 pr-3">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
               <td class="py-1.5 pr-3 text-xs">{{if .TargetCarry}}<span class="text-gray-500">{{.TargetMonth}}월 등록 · 미배정</span>{{else if .TargetMonth}}{{.TargetMonth}}월 등록{{else if .UnconfirmedQuarter}}분기 점검 미확정{{else}}{{maintCycleLabel .Cycle}}{{end}}</td>
-              <td class="py-1.5"><input type="date" name="visit_date" class="border rounded-lg px-2 py-1 text-xs"></td>
+              <td class="py-1.5">
+                <form method="POST" action="/maintenance/{{$.Plan.PlanID}}/assign-slots" class="flex items-center gap-1">
+                  <input type="hidden" name="customer_id" value="{{.CustomerID}}">
+                  <input type="hidden" name="product_type" value="{{.ProductType}}">
+                  <input type="date" name="visit_date" class="border rounded-lg px-2 py-1 text-xs">
+                  <button type="submit" class="text-xs text-sky-700">넣기</button>
+                </form>
+              </td>
             </tr>
             {{end}}
           </tbody>
         </table>
       </div>
-    </form>
+    </details>
     {{end}}
+    {{end}}
+    <div id="ua-popup" class="hidden modal-backdrop z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="modal-panel w-full max-w-lg shadow-pop">
+        <h2 class="text-sm font-bold text-gray-800">일괄 배정 결과</h2>
+        <p id="ua-popup-msg" class="mt-2 text-sm text-gray-800 whitespace-pre-wrap"></p>
+        <div id="ua-popup-days" class="mt-2 text-xs text-gray-600 space-y-1"></div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" id="ua-popup-close" class="btn btn-ghost">닫기</button>
+        </div>
+      </div>
+    </div>
   </section>
-  {{else}}
-  <p class="text-sm text-gray-500">생성·복사·상태 변경·일괄 변경은 관리자만 할 수 있습니다. 조회만 가능합니다.</p>
+  {{end}}
+
+  {{if .IsAdmin}}
+  <details class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <summary class="font-semibold text-gray-800 cursor-pointer">연도 계획 관리</summary>
+    <p class="text-xs text-gray-500">연도 계획을 만들거나 복사하고 상태를 바꿉니다. 일상 배정 작업과 별도입니다.</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
+      <section class="border rounded-lg p-3 space-y-2">
+        <h4 class="text-sm font-semibold">새 연도 계획 만들기</h4>
+        <p class="text-[11px] text-gray-500">빈 연도 계획을 추가합니다. 연도당 1개입니다.</p>
+        <form method="POST" action="/maintenance" class="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="next" value="manage">
+          <input type="hidden" name="from_plan_id" value="{{.Plan.PlanID}}">
+          <input type="number" name="plan_year" value="{{.NewYear}}" required min="2000" max="2100" class="border rounded-lg px-3 py-1.5 text-sm w-28">
+          <input type="text" name="title" placeholder="예: 2027년 정기점검" class="flex-1 min-w-[10rem] border rounded-lg px-3 py-1.5 text-sm">
+          <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">만들기</button>
+        </form>
+      </section>
+      <section class="border rounded-lg p-3 space-y-2">
+        <h4 class="text-sm font-semibold">계획 복사</h4>
+        <p class="text-[11px] text-gray-500">사이트·주기·담당자를 넘기고 방문일은 비웁니다.</p>
+        <form method="POST" action="/maintenance/{{.Plan.PlanID}}/copy" class="flex flex-wrap items-end gap-2">
+          <input type="number" name="plan_year" value="{{.CopyYear}}" required min="2000" max="2100" class="border rounded-lg px-3 py-1.5 text-sm w-28">
+          <input type="text" name="title" placeholder="{{.CopyYear}}년 정기점검" class="flex-1 min-w-[10rem] border rounded-lg px-3 py-1.5 text-sm">
+          <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">복사</button>
+        </form>
+      </section>
+    </div>
+    <section class="border rounded-lg p-3 space-y-2 mt-3">
+      <h4 class="text-sm font-semibold">이 계획 상태</h4>
+      <p class="text-[11px] text-gray-500">현재: {{if eq .Plan.Status "approved"}}승인{{else if eq .Plan.Status "archived"}}보관{{else}}초안{{end}}</p>
+      <div class="flex flex-wrap gap-2">
+        {{if ne .Plan.Status "draft"}}
+        <form method="POST" action="/maintenance/{{.Plan.PlanID}}/status"><input type="hidden" name="status" value="draft"><button type="submit" class="px-3 py-1.5 border rounded-lg text-sm">초안으로</button></form>
+        {{end}}
+        {{if ne .Plan.Status "approved"}}
+        <form method="POST" action="/maintenance/{{.Plan.PlanID}}/status"><input type="hidden" name="status" value="approved"><button type="submit" class="px-3 py-1.5 border rounded-lg text-sm">승인</button></form>
+        {{end}}
+        {{if ne .Plan.Status "archived"}}
+        <form method="POST" action="/maintenance/{{.Plan.PlanID}}/status"><input type="hidden" name="status" value="archived"><button type="submit" class="px-3 py-1.5 border rounded-lg text-sm">보관</button></form>
+        {{end}}
+      </div>
+    </section>
+  </details>
   {{end}}
 </div>
 <script>
@@ -437,7 +547,13 @@
   function selectedSites() {
     return Array.prototype.map.call(siteBody.querySelectorAll('input[name="customer_id"]:checked'), function (el) { return el.value; });
   }
-  function countSel() { selN.textContent = String(selectedSites().length); }
+  function selectedTargets() {
+    return Array.prototype.map.call(siteBody.querySelectorAll('input[name="target_id"]:checked'), function (el) { return el.value; }).filter(Boolean);
+  }
+  function countSel() {
+    var n = siteBody.querySelectorAll('input[type="checkbox"]:checked').length;
+    selN.textContent = String(n);
+  }
   function selectedRegionKeys() {
     var keys = [];
     regionBox.querySelectorAll('input[name="region"]').forEach(function (el) {
@@ -598,18 +714,34 @@
       fillSelect(sigunguEl, guItems, sigunguEl.value);
       renderRegions(regions);
       siteBody.replaceChildren();
+      var emptyEl = document.getElementById('mt-empty');
+      if (emptyEl) {
+        var empty = data.empty || '';
+        if (empty === 'no_sites') {
+          emptyEl.classList.remove('hidden');
+          emptyEl.innerHTML = '이 조직에 등록된 점검 사이트가 없습니다. <a class="underline text-sky-800" href="/maintenance/sites">점검 사이트 등록</a>';
+        } else if (empty === 'no_period') {
+          emptyEl.classList.remove('hidden');
+          emptyEl.innerHTML = '분기·반기·년1회 사이트가 없습니다. 월 대상은 해당 주기만 올립니다. <a class="underline text-sky-800" href="/maintenance/sites">점검 사이트</a>';
+        } else if (empty === 'no_match') {
+          emptyEl.classList.remove('hidden');
+          emptyEl.textContent = '검색·필터에 해당하는 사이트가 없습니다. 시·도·검색어를 바꿔 보세요.';
+        } else {
+          emptyEl.classList.add('hidden');
+          emptyEl.textContent = '';
+        }
+      }
       (data.sites || []).forEach(function (s) {
         var tr = document.createElement('tr');
         var td0 = document.createElement('td');
         td0.className = 'px-2 py-1';
-        if (!s.Registered) {
-          var cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.name = 'customer_id';
-          cb.value = s.CustomerID;
-          cb.addEventListener('change', countSel);
-          td0.appendChild(cb);
-        }
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.name = s.Registered ? 'target_id' : 'customer_id';
+        cb.value = s.Registered ? (s.TargetID || '') : s.CustomerID;
+        if (s.Registered && !s.TargetID) cb.disabled = true;
+        cb.addEventListener('change', countSel);
+        td0.appendChild(cb);
         var td1 = document.createElement('td'); td1.className = 'px-2 py-1'; td1.textContent = s.Name;
         var td2 = document.createElement('td'); td2.className = 'px-2 py-1'; td2.textContent = s.RegionLabel || s.Region;
         var td3 = document.createElement('td'); td3.className = 'px-2 py-1'; td3.textContent = cycleLabel(s.Cycle);
@@ -642,7 +774,9 @@
   sigunguEl.addEventListener('change', load);
   qEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
   document.getElementById('mt-all').addEventListener('change', function () {
-    siteBody.querySelectorAll('input[name="customer_id"]').forEach(function (el) { el.checked = document.getElementById('mt-all').checked; });
+    siteBody.querySelectorAll('input[type="checkbox"]').forEach(function (el) {
+      if (!el.disabled) el.checked = document.getElementById('mt-all').checked;
+    });
     countSel();
   });
   document.getElementById('mt-reg-region').addEventListener('click', function () {
@@ -669,7 +803,157 @@
     ids.forEach(function (id) { fd.append('customer_id', id); });
     post(fd);
   });
+  function postBulkTargets(action) {
+    var ids = selectedTargets();
+    if (!ids.length) {
+      showPopup('등록된 사이트를 선택하세요');
+      return;
+    }
+    var fd = new FormData();
+    fd.append('action', action);
+    fd.append('month', (document.getElementById('mt-move-month') || {}).value || monthEl.value);
+    ids.forEach(function (id) { fd.append('target_id', id); });
+    fetch('/maintenance/' + planId + '/month-targets/bulk', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
+      body: fd
+    }).then(function (r) { return r.json().then(function (data) { return { okHttp: r.ok, data: data }; }); }).then(function (pack) {
+      var data = pack.data || {};
+      var msg = data.message || data.error || '';
+      showResult(msg);
+      showPopup(msg);
+      load();
+    });
+  }
+  var cancelBtn = document.getElementById('mt-cancel-sites');
+  if (cancelBtn) cancelBtn.addEventListener('click', function () { postBulkTargets('cancel'); });
+  var moveBtn = document.getElementById('mt-move-sites');
+  if (moveBtn) moveBtn.addEventListener('click', function () { postBulkTargets('move'); });
   load();
+})();
+(function () {
+  var box = document.querySelector('[data-unassigned-bulk]');
+  if (!box) return;
+  var planId = box.getAttribute('data-plan-id');
+  var month = box.getAttribute('data-month');
+  function csrf() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+  }
+  function slots() { return Array.prototype.slice.call(box.querySelectorAll('.ua-slot')); }
+  function selectedKeys() {
+    return slots().filter(function (el) { return el.checked; }).map(function (el) { return el.value; });
+  }
+  function recount() {
+    var n = document.getElementById('ua-sel-n');
+    if (n) n.textContent = String(selectedKeys().length);
+  }
+  var all = document.getElementById('ua-all');
+  if (all) all.addEventListener('change', function () {
+    slots().forEach(function (el) { el.checked = all.checked; });
+    box.querySelectorAll('.ua-region').forEach(function (el) { el.checked = all.checked; });
+    recount();
+  });
+  box.querySelectorAll('.ua-region').forEach(function (rg) {
+    rg.addEventListener('change', function () {
+      var key = rg.getAttribute('data-region');
+      slots().forEach(function (el) {
+        if (el.getAttribute('data-region') === key) el.checked = rg.checked;
+      });
+      recount();
+    });
+  });
+  box.addEventListener('change', function (e) {
+    if (e.target && e.target.classList.contains('ua-slot')) recount();
+  });
+  function showUa(msg, days) {
+    var pop = document.getElementById('ua-popup');
+    var pmsg = document.getElementById('ua-popup-msg');
+    var pdays = document.getElementById('ua-popup-days');
+    if (pmsg) pmsg.textContent = msg || '';
+    if (pdays) {
+      pdays.replaceChildren();
+      (days || []).forEach(function (d) {
+        var row = document.createElement('p');
+        row.textContent = d.date + ' · ' + d.n + '곳';
+        pdays.appendChild(row);
+      });
+    }
+    if (pop) pop.classList.remove('hidden');
+  }
+  var close = document.getElementById('ua-popup-close');
+  if (close) close.addEventListener('click', function () { document.getElementById('ua-popup').classList.add('hidden'); });
+  function fdBase(mode) {
+    var fd = new FormData();
+    fd.append('month', month || '');
+    fd.append('mode', mode);
+    selectedKeys().forEach(function (k) { fd.append('slot_key', k); });
+    var same = document.getElementById('ua-same-date');
+    if (same && same.value) fd.append('visit_date', same.value);
+    var fr = document.getElementById('ua-from');
+    var to = document.getElementById('ua-to');
+    var pd = document.getElementById('ua-per-day');
+    if (fr) fd.append('date_from', fr.value || '');
+    if (to) fd.append('date_to', to.value || '');
+    if (pd) fd.append('per_day', pd.value || '8');
+    var we = document.getElementById('ua-skip-we');
+    fd.append('skip_weekend', we && we.checked ? '1' : '0');
+    var asg = box.querySelector('[data-assignee-picker] input[name="assignee"]');
+    if (asg && asg.value) fd.append('assignee', asg.value);
+    box.querySelectorAll('[data-assignee-picker] input[name="assignee_user_id"]').forEach(function (el) {
+      fd.append('assignee_user_id', el.value);
+    });
+    box.querySelectorAll('[data-assignee-picker] input[name="assignee_group_id"]').forEach(function (el) {
+      fd.append('assignee_group_id', el.value);
+    });
+    var own = box.querySelector('[data-assignee-picker] input[name="owner_user_id"]');
+    if (own && own.value) fd.append('owner_user_id', own.value);
+    fd.append('assignee_multi', '1');
+    return fd;
+  }
+  function modeOf() {
+    var fr = document.getElementById('ua-from');
+    var to = document.getElementById('ua-to');
+    if (fr && to && fr.value && to.value) return 'spread';
+    return 'same_date';
+  }
+  function postUa(path, after) {
+    var err = document.getElementById('ua-err');
+    if (err) { err.classList.add('hidden'); err.textContent = ''; }
+    if (!selectedKeys().length) {
+      if (err) { err.classList.remove('hidden'); err.textContent = '사이트를 선택하세요'; err.scrollIntoView({ block: 'nearest' }); }
+      return;
+    }
+    fetch(path, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
+      body: fdBase(modeOf())
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (res) {
+      if (!res.ok || (res.j && res.j.error && !res.j.ok && !res.j.applied)) {
+        var msg = (res.j && (res.j.error || res.j.message)) || '처리에 실패했습니다';
+        if (err) { err.classList.remove('hidden'); err.textContent = msg; err.scrollIntoView({ block: 'nearest' }); }
+        showUa(msg, res.j && res.j.days);
+        return;
+      }
+      after(res.j || {});
+    }).catch(function () {
+      if (err) { err.classList.remove('hidden'); err.textContent = '처리에 실패했습니다'; }
+    });
+  }
+  var prev = document.getElementById('ua-preview');
+  if (prev) prev.addEventListener('click', function () {
+    postUa('/maintenance/' + planId + '/assign-slots/preview', function (j) {
+      showUa('미리보기 ' + (j.count || 0) + '건', j.days);
+    });
+  });
+  var apply = document.getElementById('ua-apply');
+  if (apply) apply.addEventListener('click', function () {
+    postUa('/maintenance/' + planId + '/assign-slots/bulk', function (j) {
+      showUa(j.message || ('배정 ' + (j.applied || 0) + '건'), j.days);
+      setTimeout(function () { location.reload(); }, 800);
+    });
+  });
+  recount();
 })();
 </script>
 {{end}}

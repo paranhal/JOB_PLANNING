@@ -440,3 +440,18 @@ func (r *MaintenanceRepo) AssigneeForVisit(planID, customerID, product, date str
 	}
 	return a
 }
+
+func (r *MaintenanceRepo) CountVisitsByAssigneeOn(planID, assignee, date string) (int, error) {
+	if r == nil || r.db == nil {
+		return 0, nil
+	}
+	assignee = strings.TrimSpace(assignee)
+	date = strings.TrimSpace(date)
+	if assignee == "" || len(date) < 10 {
+		return 0, nil
+	}
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM maintenance_visits WHERE plan_id=? AND substr(visit_date,1,10)=? AND assignee=?`,
+		planID, date[:10], assignee).Scan(&n)
+	return n, err
+}

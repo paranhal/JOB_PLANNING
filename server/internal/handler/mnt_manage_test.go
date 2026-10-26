@@ -84,6 +84,7 @@ func newMntManageApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRepo, *mo
 	g.GET("/maintenance/:id/manage", h.Maintenance.ManagePlan)
 	g.GET("/maintenance/:id/month-targets", h.Maintenance.MonthTargetPanelJSON)
 	g.POST("/maintenance/:id/month-targets", h.Maintenance.RegisterMonthTargets, h.Auth.RequireMaintenanceEdit)
+	g.POST("/maintenance/:id/month-targets/bulk", h.Maintenance.BulkMonthTargets, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance/:id/month-targets/:tid/cancel", h.Maintenance.CancelMonthTarget, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance/:id/month-targets/:tid/move", h.Maintenance.MoveMonthTarget, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance/:id/copy", h.Maintenance.CopyPlan, adminOnly)
@@ -91,6 +92,9 @@ func newMntManageApp(t *testing.T) (*echo.Echo, *repository.MaintenanceRepo, *mo
 	g.POST("/maintenance/:id/bulk-assignee", h.Maintenance.BulkUpdateAssignees, adminOnly)
 	g.POST("/maintenance/:id/bulk-delete", h.Maintenance.BulkDeleteVisits, adminOnly)
 	g.POST("/maintenance/:id/assign-slots", h.Maintenance.AssignUnassignedSlots, adminOnly)
+	g.POST("/maintenance/:id/assign-slots/bulk", h.Maintenance.AssignUnassignedSlotsBulk, h.Auth.RequireMaintenanceEdit)
+	g.POST("/maintenance/:id/assign-slots/preview", h.Maintenance.PreviewAssignUnassignedSlotsBulk, h.Auth.RequireMaintenanceEdit)
+	g.POST("/maintenance/:id/month-targets/bulk", h.Maintenance.BulkMonthTargets, h.Auth.RequireMaintenanceEdit)
 	g.POST("/maintenance", h.Maintenance.CreatePlan, adminOnly)
 	return e, repo, p
 }
