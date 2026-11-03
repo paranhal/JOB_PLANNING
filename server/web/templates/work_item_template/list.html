@@ -1,0 +1,117 @@
+{{define "title"}}작업 항목 관리 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4" x-data="{ showAdd: false, editId: '', q: '{{.Q}}' }">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <p class="text-ui-sm text-ink-muted">설정·관리 / 작업 항목 관리</p>
+      <h2 class="text-xl font-semibold text-ink">작업 항목 관리</h2>
+      <p class="text-ui-sm text-ink-muted">업무에서 고를 항목과 함께 하는 세트 구성을 등록합니다. 전사 공통은 관리자만 수정합니다.</p>
+    </div>
+    {{if .CanWrite}}
+    <button type="button" class="btn-primary btn-sm" @click="showAdd=true" data-wit-add>+ 항목 추가</button>
+    {{end}}
+  </div>
+
+  {{if .FlashErr}}<div class="flash-danger rounded-control" role="alert" id="wit-flash-err">{{.FlashErr}}</div>{{end}}
+  {{if .FlashOK}}<div class="flash-success rounded-control" role="status">{{.FlashOK}}</div>{{end}}
+
+  <form method="get" action="/work-item-templates" class="card p-3 flex flex-wrap items-end gap-2">
+    <div>
+      <label class="label">구분</label>
+      <select name="kind" class="input">
+        <option value="">전체</option>
+        {{range .ItemKinds}}<option value="{{.CodeValue}}" {{if eq $.Kind .CodeValue}}selected{{end}}>{{.CodeName}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label class="label">이름</label>
+      <input type="search" name="q" value="{{.Q}}" class="input" placeholder="검색">
+    </div>
+    <label class="inline-flex items-center gap-2 text-ui-sm pb-2">
+      <input type="checkbox" name="inactive" value="1" {{if .Inactive}}checked{{end}}> 비활성 포함
+    </label>
+    <button type="submit" class="btn btn-secondary btn-sm">조회</button>
+  </form>
+
+  <div class="card">
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-line">
+      <button type="button" class="btn-ghost btn-sm ml-auto" data-table-cols-reset="work_item_templates">열 너비 초기화</button>
+    </div>
+    <div class="table-scroll">
+      <table class="table-base table-cols" data-table-cols="work_item_templates">
+        <colgroup>
+          <col data-col="0"><col data-col="1"><col data-col="2"><col data-col="3"><col data-col="4"><col data-col="5"><col data-col="6"><col data-col="7">
+        </colgroup>
+        <thead>
+          <tr class="text-ui-sm text-ink-muted">
+            <th class="relative px-2 py-3 font-medium">이름<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="0"></span></th>
+            <th class="relative px-2 py-3 font-medium">구분<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="1"></span></th>
+            <th class="relative px-2 py-3 font-medium">수량<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="2"></span></th>
+            <th class="relative px-2 py-3 font-medium">세트<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="3"></span></th>
+            <th class="relative px-2 py-3 font-medium">범위<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="4"></span></th>
+            <th class="relative px-2 py-3 font-medium">상태<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="5"></span></th>
+            <th class="relative px-2 py-3 font-medium">순서<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="6"></span></th>
+            <th class="relative px-2 py-3 font-medium">관리<span class="col-resize-handle col-resize-handle-wide" role="separator" tabindex="0" data-col="7"></span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Items}}
+          <tr class="h-9 border-b border-line text-ui" data-wit-row="{{.TemplateID}}">
+            <td class="px-2 font-medium">{{.Name}}</td>
+            <td class="px-2">{{.KindLabel}}</td>
+            <td class="px-2 whitespace-nowrap">{{.DefaultQty}} {{.Unit}}</td>
+            <td class="px-2">
+              {{range .Links}}
+              <span class="badge {{if .DefaultChecked}}badge-info{{else}}badge-neutral{{end}}">{{.ChildName}} · {{if .DefaultChecked}}기본 포함{{else}}기본 제외{{end}}</span>
+              {{end}}
+            </td>
+            <td class="px-2 text-ink-muted">{{.OrgLabel}}</td>
+            <td class="px-2">{{if .IsActive}}사용{{else}}비활성{{end}}</td>
+            <td class="px-2 text-ink-muted">{{.SortOrder}}</td>
+            <td class="px-2">
+              {{if .CanEdit}}
+              <div class="flex flex-wrap gap-1">
+                <button type="button" class="btn-ghost btn-sm" @click="editId='{{.TemplateID}}'">수정</button>
+                {{if .InUse}}
+                <button type="submit" form="wit-off-{{.TemplateID}}" class="btn-ghost btn-sm" onclick="return confirm('사용 중이라 삭제할 수 없습니다. 비활성할까요?')">비활성</button>
+                {{else}}
+                <button type="submit" form="wit-del-{{.TemplateID}}" class="btn-ghost btn-sm" onclick="return confirm('삭제할까요?')">삭제</button>
+                {{end}}
+              </div>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if not .Items}}<p class="px-4 py-3 text-ui-sm text-ink-muted">등록된 항목이 없습니다.</p>{{end}}
+  </div>
+
+  {{range .Items}}
+  {{if .CanEdit}}
+  {{if .InUse}}
+  <form id="wit-off-{{.TemplateID}}" method="POST" action="/work-item-templates/{{.TemplateID}}/deactivate"></form>
+  {{else}}
+  <form id="wit-del-{{.TemplateID}}" method="POST" action="/work-item-templates/{{.TemplateID}}/delete"></form>
+  {{end}}
+  {{end}}
+  {{end}}
+
+  {{if .CanWrite}}
+  <div x-show="showAdd" x-cloak class="card p-4 space-y-3" data-wit-form="add">
+    <h3 class="font-medium text-ink">항목 추가</h3>
+    {{template "wit_form" dict "Action" "/work-item-templates" "Item" nil "Root" .}}
+  </div>
+  {{range .Items}}
+  {{if .CanEdit}}
+  <div x-show="editId==='{{.TemplateID}}'" x-cloak class="card p-4 space-y-3" data-wit-form="{{.TemplateID}}">
+    <h3 class="font-medium text-ink">항목 수정</h3>
+    {{template "wit_form" dict "Action" (printf "/work-item-templates/%s" .TemplateID) "Item" . "Root" $}}
+  </div>
+  {{end}}
+  {{end}}
+  {{end}}
+</div>
+<script>(function(){ var el=document.getElementById('wit-flash-err'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'nearest'}); })();</script>
+{{end}}

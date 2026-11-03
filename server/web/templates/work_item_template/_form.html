@@ -1,0 +1,82 @@
+{{define "wit_form"}}
+{{$root := .Root}}
+{{$item := .Item}}
+<form method="POST" action="{{.Action}}" class="space-y-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div>
+      <label class="label">이름</label>
+      <input class="input" name="name" required value="{{if $item}}{{$item.Name}}{{end}}">
+    </div>
+    <div>
+      <label class="label">구분</label>
+      <select class="input" name="kind" required>
+        {{range $root.ItemKinds}}
+        <option value="{{.CodeValue}}" {{if $item}}{{if eq $item.Kind .CodeValue}}selected{{end}}{{end}}>{{.CodeName}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label class="label">기본 수량</label>
+      <input class="input" type="number" name="default_qty" min="1" value="{{if $item}}{{$item.DefaultQty}}{{else}}1{{end}}">
+    </div>
+    <div>
+      <label class="label">단위</label>
+      <select class="input" name="unit">
+        {{range $root.ItemUnits}}
+        <option value="{{.CodeValue}}" {{if $item}}{{if eq $item.Unit .CodeValue}}selected{{end}}{{else}}{{if eq .CodeValue "건"}}selected{{end}}{{end}}>{{.CodeName}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label class="label">순서</label>
+      <input class="input" type="number" name="sort_order" value="{{if $item}}{{$item.SortOrder}}{{else}}0{{end}}">
+    </div>
+    {{if $root.IsVision}}
+    <div>
+      <label class="label">범위</label>
+      <select class="input" name="org_id">
+        <option value="">전사 공통</option>
+        {{range $root.Orgs}}
+        <option value="{{.OrgID}}" {{if $item}}{{if eq $item.OrgID .OrgID}}selected{{end}}{{end}}>{{if .ShortName}}{{.ShortName}}{{else}}{{.OrgName}}{{end}}</option>
+        {{end}}
+      </select>
+    </div>
+    {{end}}
+    <div class="sm:col-span-2">
+      <label class="label">메모</label>
+      <input class="input" name="note" value="{{if $item}}{{$item.Note}}{{end}}">
+    </div>
+  </div>
+  <div>
+    <p class="label">함께 하는 항목(세트)</p>
+    <div class="space-y-1 max-h-64 overflow-y-auto border border-line rounded-lg p-2">
+      {{range $root.Items}}
+      {{if $item}}{{if eq .TemplateID $item.TemplateID}}{{else}}
+      {{template "wit_link_row" dict "Cand" . "Item" $item}}
+      {{end}}{{else}}
+      {{template "wit_link_row" dict "Cand" . "Item" $item}}
+      {{end}}
+      {{end}}
+      {{if not $root.Items}}<p class="text-ui-sm text-ink-muted">다른 항목을 먼저 등록하면 세트로 고를 수 있습니다.</p>{{end}}
+    </div>
+  </div>
+  <div class="flex justify-end gap-2">
+    <button type="submit" class="btn btn-primary">저장</button>
+  </div>
+</form>
+{{end}}
+
+{{define "wit_link_row"}}
+{{$cand := .Cand}}
+{{$item := .Item}}
+{{$on := false}}
+{{$chk := true}}
+{{if $item}}{{range $item.Links}}{{if eq .ChildTemplateID $cand.TemplateID}}{{$on = true}}{{$chk = .DefaultChecked}}{{end}}{{end}}{{end}}
+<label class="flex flex-wrap items-center gap-2 text-ui-sm py-1">
+  <input type="checkbox" name="link_child" value="{{$cand.TemplateID}}" {{if $on}}checked{{end}}>
+  <span>{{$cand.KindLabel}} · {{$cand.Name}}</span>
+  <label class="inline-flex items-center gap-1 text-ink-muted">
+    <input type="checkbox" name="link_checked" value="{{$cand.TemplateID}}" {{if $chk}}checked{{end}}> 기본 체크
+  </label>
+</label>
+{{end}}
