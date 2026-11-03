@@ -2,7 +2,6 @@
 {{define "content"}}
 <div class="max-w-3xl mx-auto space-y-6">
   <div class="flex items-center gap-3">
-    <a href="/assets" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
     <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}자산 등록{{else}}자산 수정{{end}}</h2>
   </div>
 
@@ -64,7 +63,7 @@
             if (this.management === 'third_party') { this.managed = false; }
           },
           initCycle() {
-            const s = {{printf "%q" .Asset.MaintCycle}};
+            const s = {{toJSON .Asset.MaintCycle}};
             if (this.cyclePresets.indexOf(s) >= 0) { this.cycleMode = s; }
             else if (s) { this.cycleMode = 'custom'; this.cycleCustom = s; }
           },
@@ -280,13 +279,13 @@
     <!-- 위치/담당: 공간정보 표시(읽기전용) + 공간관리 추가/연동 -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4"
          x-data='assetSpaceLink({
-           building: {{printf "%q" (or .Asset.LocBuildingName .Asset.BuildingName)}},
-           floor: {{printf "%q" (or .Asset.LocFloorName .Asset.FloorName)}},
-           room: {{printf "%q" (or .Asset.LocRoomName .Asset.RoomName)}},
-           install: {{printf "%q" .Asset.InstallLocation}},
-           initBuilding: {{printf "%q" .Asset.BuildingID}},
-           initFloor: {{printf "%q" .Asset.FloorID}},
-           initRoom: {{printf "%q" .Asset.RoomID}}
+           building: {{toJSON (or .Asset.LocBuildingName .Asset.BuildingName)}},
+           floor: {{toJSON (or .Asset.LocFloorName .Asset.FloorName)}},
+           room: {{toJSON (or .Asset.LocRoomName .Asset.RoomName)}},
+           install: {{toJSON .Asset.InstallLocation}},
+           initBuilding: {{toJSON .Asset.BuildingID}},
+           initFloor: {{toJSON .Asset.FloorID}},
+           initRoom: {{toJSON .Asset.RoomID}}
          })'>
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">위치 · 담당</h3>
       <p class="text-xs text-gray-500">공간정보는 조회만 가능합니다. 변경은 오른쪽에서 <span class="font-medium">공간관리 추가</span> 또는 <span class="font-medium">공간관리 연동</span>을 선택하세요.</p>

@@ -1,0 +1,90 @@
+{{define "title"}}설치자산 엑셀 업로드 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4" id="asset-import">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h2 class="text-ui-xl font-extrabold text-ink">설치자산 엑셀 업로드</h2>
+      <p class="text-ui-sm text-ink-muted">미리보기는 저장하지 않습니다. 확인하고 등록한 뒤에 결과 CSV를 받을 수 있습니다. 「자산입력」시트 2행부터 한 줄에 장비 1대입니다. 기관은 전사 고객과 이름으로 맞춥니다.</p>
+    </div>
+    <a href="/assets" class="btn btn-secondary btn-sm">목록으로</a>
+  </div>
+  {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
+
+  <div class="flex flex-wrap gap-2">
+    <a href="/assets/import/template.xlsx" class="btn btn-secondary btn-sm">양식 내려받기</a>
+  </div>
+
+  {{if .CanWrite}}
+  <form method="post" action="/assets/import-preview" enctype="multipart/form-data" class="card p-4 space-y-3">
+    <input type="file" name="file" accept=".xlsx" required class="input">
+    <label class="flex items-center gap-2 text-ui-sm text-ink">
+      <input type="checkbox" name="create_spaces" value="1">
+      공간관리에 같은 이름이 없으면 건물·층·호실을 새로 만듭니다
+    </label>
+    <button type="submit" class="btn btn-secondary">검증 미리보기</button>
+  </form>
+  {{end}}
+
+  {{if .Preview}}
+  <div class="card p-4 space-y-3" data-asset-import-result>
+    <h3 class="font-semibold text-ink">{{if .Apply}}등록 결과{{else}}검증 미리보기{{end}}</h3>
+    <p class="text-ui-sm">등록 {{.Preview.OKN}} · 건너뜀 {{.Preview.SkipN}} · 오류 {{.Preview.ErrN}} · 경고 {{.Preview.WarnN}}</p>
+    {{if gt .Preview.ErrN 0}}
+    <p class="text-ui-sm" data-asset-import-reasons>다른 조직 소속 {{.Preview.ErrOtherOrgN}} · 등록된 기관 없음 {{.Preview.ErrMissingN}} · 조직 미지정 {{.Preview.ErrNoOrgN}} · 동명 여러 개 {{.Preview.ErrDupN}}</p>
+    {{end}}
+    {{if and .CanWrite .PreviewToken (not .Apply)}}
+    <form method="post" action="/assets/import-apply" class="flex flex-wrap gap-2">
+      <input type="hidden" name="preview_token" value="{{.PreviewToken}}">
+      {{if .Preview.CreateSpaces}}<input type="hidden" name="create_spaces" value="1">{{end}}
+      <button type="submit" class="btn btn-primary" data-asset-import-confirm>확인하고 등록</button>
+    </form>
+    {{end}}
+    {{if and .Apply .PreviewToken}}
+    <a class="btn btn-secondary btn-sm" href="/assets/import/result.csv?token={{urlquery .PreviewToken}}{{if .Preview.CreateSpaces}}&create_spaces=1{{end}}">결과 CSV</a>
+    {{end}}
+    <div class="overflow-x-auto">
+      <table data-table-cols-skip class="w-full text-ui">
+        <thead class="text-ink-muted text-left"><tr>
+          <th class="p-2">행</th><th class="p-2">처리</th><th class="p-2">기관</th><th class="p-2">제품</th><th class="p-2">시리얼</th><th class="p-2">설치위치</th><th class="p-2">메시지</th>
+        </tr></thead>
+        <tbody>
+          {{range .Preview.Rows}}
+          <tr class="border-t border-line">
+            <td class="p-2">{{.Line}}</td>
+            <td class="p-2">{{.Action}}</td>
+            <td class="p-2">{{.SiteName}}</td>
+            <td class="p-2">{{.Asset.ProductName}}</td>
+            <td class="p-2">{{.Asset.SerialNumber}}</td>
+            <td class="p-2">{{.Asset.InstallLocation}}</td>
+            <td class="p-2">{{range $i, $m := .Msgs}}{{if $i}}; {{end}}{{$m}}{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+
+  {{if and .Apply .Preview}}
+  <div x-data="{open:true}" x-show="open" x-cloak
+       class="modal-backdrop z-50 flex items-center justify-center p-4"
+       role="dialog" aria-modal="true" aria-labelledby="asset-import-result-title"
+       data-asset-import-popup
+       @keydown.escape.window="if(open) open=false" @click.self="open=false">
+    <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+      <h2 id="asset-import-result-title" class="text-ui font-bold text-ink">설치자산 업로드 결과</h2>
+      <p class="mt-2 text-ui text-ink">등록 {{.Preview.OKN}}건 · 건너뜀 {{.Preview.SkipN}}건 · 오류 {{.Preview.ErrN}}건 · 경고 {{.Preview.WarnN}}건</p>
+      {{if gt .Preview.ErrN 0}}
+      <p class="mt-2 text-ui-sm">다른 조직 소속 {{.Preview.ErrOtherOrgN}} · 등록된 기관 없음 {{.Preview.ErrMissingN}} · 조직 미지정 {{.Preview.ErrNoOrgN}} · 동명 여러 개 {{.Preview.ErrDupN}}</p>
+      {{end}}
+      {{if .PreviewToken}}
+      <p class="mt-2 text-ui-sm"><a class="underline" href="/assets/import/result.csv?token={{urlquery .PreviewToken}}{{if .Preview.CreateSpaces}}&create_spaces=1{{end}}">결과 CSV 내려받기</a></p>
+      {{end}}
+      <div class="mt-4 flex justify-end">
+        <button type="button" class="btn btn-primary" @click="open=false">닫기</button>
+      </div>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

@@ -3,89 +3,118 @@
 <div class="max-w-4xl mx-auto space-y-6">
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <a href="/assets" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
       <div>
-        <h2 class="text-xl font-bold text-gray-800">{{.Asset.ProductName}}</h2>
-        <p class="text-sm text-gray-500">자산번호 <span class="font-mono text-gray-700">{{.Asset.AssetID}}</span> · {{.Asset.OrgName}} · {{productCategoryLabel .Asset.ProductCategory}}</p>
+        <h2 class="text-xl font-bold text-ink">{{.Asset.ProductName}}</h2>
+        <p class="text-sm text-ink-muted">자산번호 <span class="font-mono text-ink">{{.Asset.AssetID}}</span> · {{.Asset.OrgName}} · {{productCategoryLabel .Asset.ProductCategory}}</p>
       </div>
-      <span class="px-2 py-0.5 rounded-full text-xs font-medium {{if eq .Asset.OperationStatus "operating"}}bg-green-100 text-green-700{{else if eq .Asset.OperationStatus "fault"}}bg-red-100 text-red-700{{else}}bg-gray-100 text-gray-600{{end}}">{{opStatusLabel .Asset.OperationStatus}}</span>
+      <span class="px-2 py-0.5 rounded-full text-xs font-medium {{if eq .Asset.OperationStatus "operating"}}bg-green-100 text-success{{else if eq .Asset.OperationStatus "fault"}}bg-red-100 text-danger{{else}}bg-hover text-ink-muted{{end}}">{{opStatusLabel .Asset.OperationStatus}}</span>
     </div>
     <div class="flex gap-2">
       {{if .CanWrite}}
-      <a href="/assets/{{.Asset.AssetID}}/edit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">수정</a>
+      <a href="/assets/{{.Asset.AssetID}}/edit" class="px-4 py-2 border border-line rounded-lg text-sm font-medium hover:bg-hover">수정</a>
       {{end}}
-      <a href="/assets/{{.Asset.AssetID}}/sw" class="px-4 py-2 border border-blue-300 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50">SW상세</a>
+      <a href="/assets/{{.Asset.AssetID}}/sw" class="px-4 py-2 border border-blue-300 text-primary rounded-lg text-sm font-medium hover:bg-primary-soft">SW상세</a>
       {{if .CanReceive}}
-      <a href="/as/new?customer_id={{.Asset.CustomerID}}&asset_id={{.Asset.AssetID}}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">AS접수</a>
+      <a href="/as/new?customer_id={{.Asset.CustomerID}}&asset_id={{.Asset.AssetID}}" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium">AS접수</a>
       {{end}}
     </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">제품 정보</h3>
+    <div class="bg-white rounded-xl border border-line p-6">
+      <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">제품 정보</h3>
       <dl class="space-y-2 text-sm">
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">자산번호</dt><dd class="text-gray-800 font-mono">{{.Asset.AssetID}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">제품분류</dt><dd class="text-gray-800">{{productCategoryLabel .Asset.ProductCategory}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">제품구분</dt><dd class="text-gray-800">{{if .Asset.ProductType}}{{upper .Asset.ProductType}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">모델명</dt><dd class="text-gray-800">{{.Asset.ModelName}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">제조사</dt><dd class="text-gray-800">{{.Asset.Manufacturer}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">S/N</dt><dd class="text-gray-800 font-mono">{{.Asset.SerialNumber}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치일</dt><dd class="text-gray-800">{{.Asset.InstallDate}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치주체</dt><dd class="text-gray-800">{{installerTypeLabel .Asset.InstallerType}} {{if .Asset.OriginalInstaller}}({{.Asset.OriginalInstaller}}){{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">관리유형</dt>
-          <dd class="text-gray-800">
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">자산번호</dt><dd class="text-ink font-mono">{{.Asset.AssetID}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">제품분류</dt><dd class="text-ink">{{productCategoryLabel .Asset.ProductCategory}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">제품구분</dt><dd class="text-ink">{{if .Asset.ProductType}}{{upper .Asset.ProductType}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">모델명</dt><dd class="text-ink">{{.Asset.ModelName}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">제조사</dt><dd class="text-ink">{{.Asset.Manufacturer}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">S/N</dt><dd class="text-ink font-mono">{{.Asset.SerialNumber}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">설치일</dt><dd class="text-ink">{{.Asset.InstallDate}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">설치주체</dt><dd class="text-ink">{{installerTypeLabel .Asset.InstallerType}} {{if .Asset.OriginalInstaller}}({{.Asset.OriginalInstaller}}){{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">관리유형</dt>
+          <dd class="text-ink">
             {{if eq .Asset.ManagementType "third_party"}}
-            <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">타사장비</span>
-            <span class="text-xs text-gray-500 ml-1">당사 비관리 · 연동 참고</span>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-warning-soft text-warning">타사장비</span>
+            <span class="text-xs text-ink-muted ml-1">당사 비관리 · 연동 참고</span>
             {{else}}{{managementTypeLabel .Asset.ManagementType}}{{end}}
           </dd>
         </div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">관리대상</dt><dd class="text-gray-800">{{if .Asset.IsManaged}}예{{else}}아니오{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">관리대상</dt><dd class="text-ink">{{if .Asset.IsManaged}}예{{else}}아니오{{end}}</dd></div>
       </dl>
     </div>
 
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">유지보수 계약</h3>
+    <div class="bg-white rounded-xl border border-line p-6">
+      <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">유지보수 계약</h3>
       <dl class="space-y-2 text-sm">
-        <div class="flex gap-4"><dt class="text-gray-500 w-24 shrink-0">사업명</dt>
-          <dd class="text-gray-800">
+        <div class="flex gap-4"><dt class="text-ink-muted w-24 shrink-0">사업명</dt>
+          <dd class="text-ink">
             {{if .Asset.ProjectID}}
-            <a href="/projects/{{.Asset.ProjectID}}" class="text-blue-700 hover:underline">{{if .Asset.ProjectName}}{{.Asset.ProjectName}}{{else}}{{.Asset.ProjectID}}{{end}}</a>
+            <a href="/projects/{{.Asset.ProjectID}}" class="text-primary hover:underline">{{if .Asset.ProjectName}}{{.Asset.ProjectName}}{{else}}{{.Asset.ProjectID}}{{end}}</a>
             {{else}}—{{end}}
           </dd>
         </div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">계약구분</dt><dd class="text-gray-800">{{if .Asset.MaintContractType}}{{maintContractLabel .Asset.MaintContractType}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">점검주기</dt><dd class="text-gray-800">{{if .Asset.MaintCycle}}{{maintCycleLabel .Asset.MaintCycle}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">계약기간</dt><dd class="text-gray-800">{{if or .Asset.MaintStartDate .Asset.MaintEndDate}}{{.Asset.MaintStartDate}} ~ {{.Asset.MaintEndDate}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">청구처</dt><dd class="text-gray-800">{{if .Asset.MaintBillingParty}}{{.Asset.MaintBillingParty}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">청구주기</dt><dd class="text-gray-800">{{if .Asset.MaintBillingCycle}}{{maintBillingCycleLabel .Asset.MaintBillingCycle}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">계약구분</dt><dd class="text-ink">{{if .Asset.MaintContractType}}{{maintContractLabel .Asset.MaintContractType}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">점검주기</dt><dd class="text-ink">{{if .Asset.MaintCycle}}{{maintCycleLabel .Asset.MaintCycle}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">계약기간</dt><dd class="text-ink">{{if or .Asset.MaintStartDate .Asset.MaintEndDate}}{{.Asset.MaintStartDate}} ~ {{.Asset.MaintEndDate}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">청구처</dt><dd class="text-ink">{{if .Asset.MaintBillingParty}}{{.Asset.MaintBillingParty}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">청구주기</dt><dd class="text-ink">{{if .Asset.MaintBillingCycle}}{{maintBillingCycleLabel .Asset.MaintBillingCycle}}{{else}}—{{end}}</dd></div>
       </dl>
     </div>
 
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">위치 · 담당</h3>
+    <div class="bg-white rounded-xl border border-line p-6">
+      <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">위치 · 담당</h3>
       <dl class="space-y-2 text-sm">
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">공간정보</dt>
-          <dd class="text-gray-800">{{if or .Asset.LocBuildingName .Asset.LocFloorName .Asset.LocRoomName .Asset.BuildingName .Asset.FloorName .Asset.RoomName}}{{or .Asset.LocBuildingName .Asset.BuildingName}}{{if or .Asset.LocFloorName .Asset.FloorName}} {{or .Asset.LocFloorName .Asset.FloorName}}{{end}}{{if or .Asset.LocRoomName .Asset.RoomName}} {{or .Asset.LocRoomName .Asset.RoomName}}{{end}}{{else}}-{{end}}</dd>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">공간정보</dt>
+          <dd class="text-ink">{{if or .Asset.LocBuildingName .Asset.LocFloorName .Asset.LocRoomName .Asset.BuildingName .Asset.FloorName .Asset.RoomName}}{{or .Asset.LocBuildingName .Asset.BuildingName}}{{if or .Asset.LocFloorName .Asset.FloorName}} {{or .Asset.LocFloorName .Asset.FloorName}}{{end}}{{if or .Asset.LocRoomName .Asset.RoomName}} {{or .Asset.LocRoomName .Asset.RoomName}}{{end}}{{else}}-{{end}}</dd>
         </div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">설치위치</dt><dd class="text-gray-800 font-medium">{{if .Asset.InstallLocation}}{{.Asset.InstallLocation}}{{else}}—{{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">상세위치</dt><dd class="text-gray-800">{{.Asset.LocationDetail}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">요청주체</dt><dd class="text-gray-800">{{.Asset.RequesterType}} {{if .Asset.RequesterName}}({{.Asset.RequesterName}}){{end}}</dd></div>
-        <div class="flex gap-4"><dt class="text-gray-500 w-24">당사담당</dt><dd class="text-gray-800">{{.Asset.OurContact}}</dd></div>
-        {{if .Asset.Notes}}<div class="flex gap-4"><dt class="text-gray-500 w-24">비고</dt><dd class="text-gray-800">{{.Asset.Notes}}</dd></div>{{end}}
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">설치위치</dt><dd class="text-ink font-medium">{{if .Asset.InstallLocation}}{{.Asset.InstallLocation}}{{else}}—{{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">상세위치</dt><dd class="text-ink">{{.Asset.LocationDetail}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">요청주체</dt><dd class="text-ink">{{.Asset.RequesterType}} {{if .Asset.RequesterName}}({{.Asset.RequesterName}}){{end}}</dd></div>
+        <div class="flex gap-4"><dt class="text-ink-muted w-24">당사담당</dt><dd class="text-ink">{{.Asset.OurContact}}</dd></div>
+        {{if .Asset.Notes}}<div class="flex gap-4"><dt class="text-ink-muted w-24">비고</dt><dd class="text-ink">{{.Asset.Notes}}</dd></div>{{end}}
       </dl>
     </div>
   </div>
 
   {{template "asset_image_slots" dict "Asset" .Asset "Images" .Images "ImageCount" .ImageCount "CanWrite" .CanWrite "CanUpload" .CanUpload "Editable" false "Redirect" (printf "/assets/%s" .Asset.AssetID)}}
 
-  <div class="bg-white rounded-xl border border-gray-200 p-6">
-    <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">지원 이력</h3>
-    {{if .SupportHistory}}
-    <table class="min-w-full text-sm">
+  <div class="bg-white rounded-xl border border-line p-6">
+    <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">작업 이력</h3>
+    {{if .WorkHistory}}
+    <table data-table-cols-skip class="min-w-full text-sm">
       <thead>
-        <tr class="border-b text-left text-xs text-gray-500">
+        <tr class="border-b text-left text-xs text-ink-muted">
+          <th class="py-2 pr-3 font-medium">일자</th>
+          <th class="py-2 pr-3 font-medium">구분</th>
+          <th class="py-2 pr-3 font-medium">사업·작업</th>
+          <th class="py-2 pr-3 font-medium">항목</th>
+          <th class="py-2 font-medium">상태</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .WorkHistory}}
+        <tr data-work-history="1">
+          <td class="py-2 pr-3 whitespace-nowrap">{{if .WorkDate}}{{.WorkDate}}{{else}}{{.DueDate}}{{end}}</td>
+          <td class="py-2 pr-3 whitespace-nowrap">{{.KindLabel}}</td>
+          <td class="py-2 pr-3"><a href="{{.Href}}" class="text-primary hover:underline">{{if .ProjectName}}{{.ProjectName}} · {{end}}{{.TaskTitle}}</a></td>
+          <td class="py-2 pr-3">{{.ItemTitle}}{{if .ASNumber}} · <a href="{{.ASHref}}">{{.ASNumber}}</a>{{end}}</td>
+          <td class="py-2">{{.StatusLabel}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="text-sm text-ink-subtle">연결된 작업 이력이 없습니다.</p>
+    {{end}}
+  </div>
+
+  <div class="bg-white rounded-xl border border-line p-6">
+    <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">지원 이력</h3>
+    {{if .SupportHistory}}
+    <table data-table-cols-skip class="min-w-full text-sm">
+      <thead>
+        <tr class="border-b text-left text-xs text-ink-muted">
           <th class="py-2 pr-3 font-medium">일자</th>
           <th class="py-2 pr-3 font-medium">구분</th>
           <th class="py-2 pr-3 font-medium">번호</th>
@@ -98,7 +127,7 @@
         <tr>
           <td class="py-2 pr-3 whitespace-nowrap">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
           <td class="py-2 pr-3 whitespace-nowrap">{{if eq .Kind "as"}}AS{{else}}행정/지원{{end}}</td>
-          <td class="py-2 pr-3 whitespace-nowrap font-mono"><a href="{{.Href}}" class="text-blue-600 hover:underline">{{.Number}}</a></td>
+          <td class="py-2 pr-3 whitespace-nowrap font-mono"><a href="{{.Href}}" class="text-primary hover:underline">{{.Number}}</a></td>
           <td class="py-2 pr-3">{{.Title}}</td>
           <td class="py-2">{{if .StatusLabel}}{{.StatusLabel}}{{else}}{{.Status}}{{end}}</td>
         </tr>
@@ -106,7 +135,7 @@
       </tbody>
     </table>
     {{else}}
-    <p class="text-sm text-gray-400">AS·행정/지원 이력이 없습니다.</p>
+    <p class="text-sm text-ink-subtle">AS·행정/지원 이력이 없습니다.</p>
     {{end}}
   </div>
 </div>

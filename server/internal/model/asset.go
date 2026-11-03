@@ -142,6 +142,7 @@ type Attachment struct {
 	MIMEType     string    `json:"mime_type"`
 	Keywords     string    `json:"keywords"` // 설치사진 등 검색·매뉴얼용 키워드
 	SlotNo       int       `json:"slot_no"`  // 자산 이미지 슬롯 1~3
+	ActionSetID  string    `json:"action_set_id,omitempty"`
 	UploadedAt   time.Time `json:"uploaded_at"`
 }
 
