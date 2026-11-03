@@ -294,6 +294,63 @@ func applySelectionToTask(t *model.WorkTask, sel Selection) {
 	}
 }
 
+func pickerSeedFromTask(t *model.WorkTask, members []model.WorkTaskMember, users []model.User) (ownerID string, ids []string) {
+	byName := map[string]string{}
+	for _, u := range users {
+		n := strings.TrimSpace(u.FullName)
+		if n != "" && strings.TrimSpace(u.UserID) != "" {
+			byName[n] = u.UserID
+		}
+	}
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		for _, x := range ids {
+			if x == id {
+				return
+			}
+		}
+		ids = append(ids, id)
+	}
+	if t != nil {
+		ownerID = strings.TrimSpace(t.AssigneeUserID)
+		if ownerID == "" {
+			ownerID = byName[strings.TrimSpace(t.Assignee)]
+		}
+		add(ownerID)
+	}
+	for _, m := range members {
+		uid := strings.TrimSpace(m.UserID)
+		if uid == "" {
+			uid = byName[strings.TrimSpace(m.Assignee)]
+		}
+		add(uid)
+	}
+	return ownerID, ids
+}
+
+func ensureTaskProjectListed(t *model.WorkTask, list []model.WorkProject) []model.WorkProject {
+	if t == nil {
+		return list
+	}
+	pid := strings.TrimSpace(t.ProjectID)
+	if pid == "" {
+		return list
+	}
+	for _, p := range list {
+		if p.ProjectID == pid {
+			return list
+		}
+	}
+	name := strings.TrimSpace(t.ProjectName)
+	if name == "" {
+		return list
+	}
+	return append([]model.WorkProject{{ProjectID: pid, Name: name}}, list...)
+}
+
 func (h *WorkboardHandler) saveSelectionOnTask(taskID string, sel Selection) error {
 	if h == nil || h.repo == nil || strings.TrimSpace(taskID) == "" {
 		return nil
@@ -308,25 +365,40 @@ func (h *WorkboardHandler) taskSelectionFromForm(c echo.Context, required bool) 
 	if err != nil {
 		return sel, err
 	}
-	if !sel.Empty() {
-		return sel, nil
-	}
 	owner := strings.TrimSpace(c.FormValue("assignee"))
-	supports := parseSupportMembers(c, owner)
-	if owner == "" && len(supports) == 0 {
-		if required {
-			return sel, errPicker(msgAssigneeRequired)
+	supports := parseSupportMembers(c, firstNonEmpty(sel.PrimaryName, owner))
+	if sel.Empty() {
+		if owner == "" && len(supports) == 0 {
+			if required {
+				return sel, errPicker(msgAssigneeRequired)
+			}
+			return sel, nil
 		}
-		return sel, nil
+		sel.PrimaryName = owner
+		sel.People = []repository.AssigneePerson{{Name: owner, Role: model.WBMemberOwner}}
 	}
-	sel.PrimaryName = owner
-	sel.People = []repository.AssigneePerson{{Name: owner, Role: model.WBMemberOwner}}
+	seen := map[string]bool{}
+	for _, p := range sel.People {
+		if n := strings.TrimSpace(p.Name); n != "" {
+			seen[n] = true
+		}
+		if id := strings.TrimSpace(p.UserID); id != "" {
+			seen[id] = true
+		}
+	}
 	for i, m := range supports {
+		if seen[strings.TrimSpace(m.Assignee)] {
+			continue
+		}
 		sel.People = append(sel.People, repository.AssigneePerson{
 			Name: m.Assignee, UserID: m.UserID, Role: model.WBMemberSupport,
 			DurationMin: m.DurationMin, SortOrder: i + 1,
 		})
 		sel.Names = append(sel.Names, m.Assignee)
+		seen[strings.TrimSpace(m.Assignee)] = true
+	}
+	if sel.PrimaryName == "" {
+		sel.PrimaryName = owner
 	}
 	return sel, nil
 }

@@ -38,9 +38,80 @@ func listAssignableForPicker(users *repository.UserRepo, c echo.Context) []model
 	}
 	list, err := users.ListAssignable(assignableOrgID(c))
 	if err != nil {
-		return nil
+		list = nil
+	}
+	return ensurePickerUsers(users, list, currentUserID(c))
+}
+
+func pickerDisplayName(u model.User) string {
+	n := strings.TrimSpace(u.FullName)
+	if n != "" && !strings.HasPrefix(n, "USR-") {
+		return n
+	}
+	n = strings.TrimSpace(u.Username)
+	if n != "" && !strings.HasPrefix(n, "USR-") {
+		return n
+	}
+	return "담당자"
+}
+
+func pickerNamesMap(users []model.User) map[string]string {
+	out := map[string]string{}
+	for _, u := range users {
+		id := strings.TrimSpace(u.UserID)
+		if id == "" {
+			continue
+		}
+		out[id] = pickerDisplayName(u)
+	}
+	return out
+}
+
+func ensurePickerUsers(users *repository.UserRepo, list []model.User, extraIDs ...string) []model.User {
+	seen := map[string]bool{}
+	for _, u := range list {
+		if id := strings.TrimSpace(u.UserID); id != "" {
+			seen[id] = true
+		}
+	}
+	if users == nil {
+		return list
+	}
+	for _, raw := range extraIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" || seen[id] {
+			continue
+		}
+		u, err := users.GetByID(id)
+		if err != nil || u == nil {
+			continue
+		}
+		list = append(list, *u)
+		seen[id] = true
 	}
 	return list
+}
+
+func pickerNamesFor(users *repository.UserRepo, list []model.User, extraIDs ...string) map[string]string {
+	names := pickerNamesMap(list)
+	if users == nil {
+		return names
+	}
+	for _, raw := range extraIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if n := strings.TrimSpace(names[id]); n != "" && !strings.HasPrefix(n, "USR-") {
+			continue
+		}
+		u, err := users.GetByID(id)
+		if err != nil || u == nil {
+			continue
+		}
+		names[id] = pickerDisplayName(*u)
+	}
+	return names
 }
 
 func taskOrgID(c echo.Context, t *model.WorkTask) string {
@@ -61,7 +132,10 @@ func denyOtherOrgTask(c echo.Context, t *model.WorkTask) error {
 		return nil
 	}
 	to := strings.TrimSpace(t.OrgID)
-	if to == "" || to != org {
+	if to == "" {
+		return nil
+	}
+	if to != org {
 		return echo.ErrNotFound
 	}
 	return nil

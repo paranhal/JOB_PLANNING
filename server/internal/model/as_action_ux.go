@@ -91,10 +91,11 @@ func ProcessTypePlaces(code string) string {
 
 // IsSelectableActionResult 조치 화면에서 고를 수 있는 결과. §34.3.4
 func IsSelectableActionResult(code string) bool {
-	switch strings.TrimSpace(code) {
-	case ResultDone, ResultPartial, ResultTransfer:
-		return true
-	default:
-		return false
+	code = strings.TrimSpace(code)
+	for _, o := range ActionResultsForAS() {
+		if o.Value == code {
+			return true
+		}
 	}
+	return false
 }

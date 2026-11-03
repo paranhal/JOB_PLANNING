@@ -5,32 +5,32 @@
 {{if .SortSelect}}
 <div class="md:hidden mb-2">{{template "sort_select" (dict "Options" .SortSelect "ID" "as-sort")}}</div>
 {{end}}
-<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+<div class="bg-white rounded-xl border border-line overflow-hidden">
   <div class="overflow-x-auto">
     <table class="w-full min-w-[1200px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
           <th class="text-center px-3 py-3 w-10 whitespace-nowrap">
             <input type="checkbox" class="js-wl-all" title="전체 선택" @click.stop="toggleAll($event.target.checked)">
           </th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8 whitespace-nowrap">!</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider w-8 whitespace-nowrap">!</th>
           {{template "sort_th" (dict "Label" "접수번호" "Key" "as_number" "Cur" $sort "Dir" $dir "Href" (index $href "as_number"))}}
           {{template "sort_th" (dict "Label" "기관(고객명)" "Key" "org_name" "Cur" $sort "Dir" $dir "Href" (index $href "org_name"))}}
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">증상</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">증상</th>
           {{template "sort_th" (dict "Label" "상태" "Key" "status" "Cur" $sort "Dir" $dir "Href" (index $href "status") "Align" "center")}}
           {{template "sort_th" (dict "Label" "예정일" "Key" "visit" "Cur" $sort "Dir" $dir "Href" (index $href "visit"))}}
           {{template "sort_th" (dict "Label" "담당" "Key" "assigned" "Cur" $sort "Dir" $dir "Href" (index $href "assigned") "ThClass" "hidden md:table-cell")}}
           {{template "sort_th" (dict "Label" "경과" "Key" "days" "Cur" $sort "Dir" $dir "Href" (index $href "days") "Align" "right")}}
-          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16 whitespace-nowrap">삭제</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider w-16 whitespace-nowrap">삭제</th>
           {{if $isHold}}
-          <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 whitespace-nowrap">보류</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider w-24 whitespace-nowrap">보류</th>
           {{end}}
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{if .Items}}
           {{range .Items}}
-          <tr class="hover:bg-gray-50 transition-colors {{if and (gt .VisitDaysOverdue 0) (not .VisitDone)}}bg-red-50/40{{else if gt .DaysElapsed 3}}bg-red-50/20{{end}}">
+          <tr class="hover:bg-hover transition-colors {{if and (gt .VisitDaysOverdue 0) (not .VisitDone)}}bg-danger-soft/40{{else if gt .DaysElapsed 3}}bg-danger-soft/20{{end}}">
             <td class="px-3 py-3 text-center whitespace-nowrap" @click.stop>
               {{if and .CanDelete .DeleteKey}}
               <input type="checkbox" class="js-wl-check" name="ids" value="{{.DeleteKey}}" title="선택"
@@ -41,46 +41,46 @@
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               {{if eq .Urgency "high"}}
-              <span class="text-xs font-bold text-red-600" title="{{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
+              <span class="text-xs font-bold text-danger" title="{{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}">🔴 {{urgencyReasonText .UrgencyReason .UrgencyReasonNote}}</span>
               {{end}}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <a href="{{if $.LegacyLinks}}{{asLegacyHref .ASID}}{{else}}{{asHref .ASID}}{{end}}" class="font-mono font-medium text-blue-600 hover:underline">{{.ASNumber}}</a>
-              {{if gt .GroupSize 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 text-[10px] align-middle" title="함께 접수된 건 {{.GroupSize}}건">🔗</span>{{end}}
-              {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
+              <a href="{{if $.LegacyLinks}}{{asLegacyHref .ASID}}{{else}}{{asHref .ASID}}{{end}}" class="font-mono font-medium text-primary hover:underline">{{.ASNumber}}</a>
+              {{if gt .GroupSize 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-primary-soft text-indigo-800 text-[10px] align-middle" title="함께 접수된 건 {{.GroupSize}}건">🔗</span>{{end}}
+              {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-warning-soft text-warning text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
               {{if .IsTransferFollowup}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[10px] align-middle" title="이관하면서 우리 몫이 남은 후속 접수">이관후속</span>{{end}}
-              {{if gt .PhotoCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 text-[10px] align-middle" title="증상 사진">📷 {{.PhotoCount}}</span>{{end}}
-              <p class="text-xs text-gray-400 mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
+              {{if gt .PhotoCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-info-soft text-info text-[10px] align-middle" title="증상 사진">📷 {{.PhotoCount}}</span>{{end}}
+              <p class="text-xs text-ink-subtle mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <span class="font-medium text-gray-800">{{.OrgName}}</span>
+              <span class="font-medium text-ink">{{.OrgName}}</span>
               {{if .ProductName}}
-              <p class="text-xs text-gray-400 mt-0.5">{{.ProductName}}</p>
+              <p class="text-xs text-ink-subtle mt-0.5">{{.ProductName}}</p>
               {{end}}
             </td>
-            <td class="px-4 py-3 hidden lg:table-cell text-gray-600 max-w-[18rem]">{{.Symptom}}</td>
+            <td class="px-4 py-3 hidden lg:table-cell text-ink-muted max-w-[18rem]">{{.Symptom}}</td>
             <td class="px-4 py-3 text-center whitespace-nowrap">
               {{statusBadge .Status}}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               {{if .VisitScheduledDate}}
-              <span class="text-gray-800">{{.VisitScheduledDate}}</span>
+              <span class="text-ink">{{.VisitScheduledDate}}</span>
               {{if and (gt .VisitDaysOverdue 0) .VisitDone}}
-              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700" title="예정일 이후 방문 기록이 있습니다. 다음 일정을 잡거나 완료 처리해 주세요.">방문함</span>
+              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-warning-soft text-warning" title="예정일 이후 방문 기록이 있습니다. 다음 일정을 잡거나 완료 처리해 주세요.">방문함</span>
               {{else if gt .VisitDaysOverdue 0}}
-              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">D+{{.VisitDaysOverdue}}</span>
+              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-danger">D+{{.VisitDaysOverdue}}</span>
               {{else if eq .VisitDaysOverdue 0}}
-              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-100 text-sky-700">오늘</span>
+              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-info-soft text-info">오늘</span>
               {{end}}
               {{else}}
-              <span class="text-gray-300">—</span>
+              <span class="text-ink-subtle">—</span>
               {{end}}
             </td>
-            <td class="px-4 py-3 hidden md:table-cell text-gray-600 whitespace-nowrap">{{.AssignedTo}}{{if .WorkGroupName}} <span class="badge-neutral text-[10px]">그룹: {{.WorkGroupName}}</span>{{end}}</td>
-            <td class="px-4 py-3 text-right text-gray-500 whitespace-nowrap">{{.DaysElapsed}}일</td>
+            <td class="px-4 py-3 hidden md:table-cell text-ink-muted whitespace-nowrap">{{.AssignedTo}}{{if .WorkGroupName}} <span class="badge-neutral text-[10px]">그룹: {{.WorkGroupName}}</span>{{end}}</td>
+            <td class="px-4 py-3 text-right text-ink-muted whitespace-nowrap">{{.DaysElapsed}}일</td>
             <td class="px-4 py-3 text-center whitespace-nowrap">
               {{if .CanDelete}}
-              <button type="button" class="js-as-delete text-slate-400 hover:text-red-600" title="삭제"
+              <button type="button" class="js-as-delete text-ink-subtle hover:text-danger" title="삭제"
                       data-as-id="{{.ASID}}" data-as-number="{{.ASNumber}}" data-as-org="{{.OrgName}}" data-as-snippet="{{asSymptomSnippet .Symptom}}">
                 <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0h8"/></svg>
               </button>
@@ -94,48 +94,48 @@
               <form method="POST" action="/as/{{.ASID}}/hold-release"
                     onsubmit="return confirm('보류를 삭제하고 접수 상태로 되돌릴까요?');">
                 <input type="hidden" name="redirect" value="list">
-                <button type="submit" class="text-red-600 hover:underline text-xs font-medium">삭제</button>
+                <button type="submit" class="text-danger hover:underline text-xs font-medium">삭제</button>
               </form>
               {{else}}
-              <span class="text-gray-300 text-xs">—</span>
+              <span class="text-ink-subtle text-xs">—</span>
               {{end}}
             </td>
             {{end}}
           </tr>
           {{range .WorkChildren}}
-          <tr class="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
+          <tr class="bg-hover/80 hover:bg-hover/80 transition-colors">
             <td class="px-3 py-2 whitespace-nowrap"></td>
             <td class="px-4 py-2 whitespace-nowrap"></td>
             <td class="px-4 py-2 pl-8 whitespace-nowrap">
-              <a href="/as/work/{{.WorkID}}/action" class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-700 hover:underline">
-                <span class="text-gray-300">└</span>
+              <a href="/as/work/{{.WorkID}}/action" class="inline-flex items-center gap-1.5 font-mono text-sm text-ink hover:underline">
+                <span class="text-ink-subtle">└</span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workKindBadgeClass .WorkKind}}">[{{workKindLabel .WorkKind}}]</span>
                 <span>{{.WorkNumber}}</span>
               </a>
             </td>
-            <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap" colspan="1">
+            <td class="px-4 py-2 text-xs text-ink-muted whitespace-nowrap" colspan="1">
               {{if .ConfirmTarget}}{{.ConfirmTarget}}{{if .ConfirmContact}} · {{.ConfirmContact}}{{end}}{{else}}—{{end}}
             </td>
-            <td class="px-4 py-2 hidden lg:table-cell text-xs text-gray-400 whitespace-nowrap">{{if .Notes}}{{.Notes}}{{else}}—{{end}}</td>
+            <td class="px-4 py-2 hidden lg:table-cell text-xs text-ink-subtle whitespace-nowrap">{{if .Notes}}{{.Notes}}{{else}}—{{end}}</td>
             <td class="px-4 py-2 text-center whitespace-nowrap">
               {{if eq .Status "done"}}
-              <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-700">완료</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-ink">완료</span>
               {{else if .ScheduleConfirmed}}
-              <span class="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-800">일정 확정</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-success">일정 확정</span>
               {{else}}
-              <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800">미확정</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-warning-soft text-warning">미확정</span>
               {{end}}
             </td>
-            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{{if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
-            <td class="px-4 py-2 hidden md:table-cell text-gray-600 text-xs whitespace-nowrap">{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td>
-            <td class="px-4 py-2 text-right text-gray-300 text-xs whitespace-nowrap">—</td>
+            <td class="px-4 py-2 whitespace-nowrap text-sm text-ink">{{if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
+            <td class="px-4 py-2 hidden md:table-cell text-ink-muted text-xs whitespace-nowrap">{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td>
+            <td class="px-4 py-2 text-right text-ink-subtle text-xs whitespace-nowrap">—</td>
             <td class="px-4 py-2 whitespace-nowrap"></td>
             {{if $isHold}}<td class="px-4 py-2 whitespace-nowrap"></td>{{end}}
           </tr>
           {{end}}
           {{end}}
         {{else}}
-          <tr><td colspan="{{if $isHold}}11{{else}}10{{end}}" class="px-4 py-10 text-center text-gray-400 whitespace-nowrap">표시할 AS가 없습니다.</td></tr>
+          <tr><td colspan="{{if $isHold}}11{{else}}10{{end}}" class="px-4 py-10 text-center text-ink-subtle whitespace-nowrap">표시할 AS가 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -145,7 +145,7 @@
 {{if gt .TotalPages 1}}
 <div class="flex justify-center gap-2 mt-4">
   {{if gt .Page 1}}<a href="{{.PrevURL}}" class="px-3 py-1 border rounded text-sm">이전</a>{{end}}
-  <span class="px-3 py-1 text-sm text-gray-600">{{.Page}} / {{.TotalPages}}</span>
+  <span class="px-3 py-1 text-sm text-ink-muted">{{.Page}} / {{.TotalPages}}</span>
   {{if lt .Page .TotalPages}}<a href="{{.NextURL}}" class="px-3 py-1 border rounded text-sm">다음</a>{{end}}
 </div>
 {{end}}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -43,7 +44,21 @@ func (h *ASHandler) WorkAction(c echo.Context) error {
 		}
 		data["Support"] = d
 	}
+	if daily := h.workTaskForASWork(w); daily != nil {
+		items, _ := h.wbRepo.ListItems(daily.TaskID)
+		data["WorkItems"] = items
+		ro := !canProcessAS(c) && !canReceiveAS(c) && !canWriteWorkboard(c)
+		attachWorkSegData(data, h.wbRepo, daily, c.QueryParam("err"), "/as/work/"+w.WorkID+"/action", ro || w.Status == "done")
+	}
 	return c.Render(http.StatusOK, "as/work_action.html", data)
+}
+
+func (h *ASHandler) workTaskForASWork(w *model.ASWorkItem) *model.WorkTask {
+	if h.wbRepo == nil || w == nil {
+		return nil
+	}
+	t, _ := h.wbRepo.GetTaskBySource(model.WBSourceASWork, w.WorkID)
+	return t
 }
 
 // UpdateWorkAction 하부업무만 저장·완료. 원 접수 담당자·상태는 건드리지 않는다.
@@ -85,6 +100,14 @@ func (h *ASHandler) UpdateWorkAction(c echo.Context) error {
 
 	if err := h.workRepo.Update(w); err != nil {
 		return err
+	}
+	if daily := h.workTaskForASWork(w); daily != nil {
+		if err := savePostedActionSegments(c, h.wbRepo, daily); err != nil {
+			if errors.Is(err, errSegShift) {
+				return c.Redirect(http.StatusSeeOther, "/as/work/"+workID+"/action?err=seg_shift")
+			}
+			return err
+		}
 	}
 	msg := "하부업무를 저장했습니다"
 	if w.Status == "done" {

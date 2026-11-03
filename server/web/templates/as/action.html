@@ -5,7 +5,6 @@
   <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 shadow-sm">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="flex items-center gap-3">
-      <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500" title="업무 관리로"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
       <div>
         <p class="text-xs font-semibold tracking-wide text-blue-600 mb-1">{{if .IsClosed}}AS 조치 완료{{else}}AS 조치{{end}}</p>
         <div class="flex items-center gap-2 flex-wrap">
@@ -36,6 +35,7 @@
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 justify-end">
+      {{if .CanPlanEdit}}<a href="{{.PlanEditHref}}" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-800 hover:bg-slate-50">계획 수정</a>{{end}}
       <a href="{{asLegacyHref .AS.ASID}}" class="text-xs text-slate-500 hover:underline">예전 화면으로</a>
       {{if .CanEditReceipt}}
       <a href="/as/{{.AS.ASID}}/edit" class="px-3 py-1.5 border border-amber-400 rounded-lg text-sm font-medium text-amber-800 hover:bg-amber-50">접수 정보 수정</a>
@@ -259,13 +259,20 @@
 
   {{template "as_receipt_photos" .}}
 
+  {{if and .DraftSetN (not .IsClosed)}}
+  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">임시 저장된 조치 {{.DraftSetN}}건이 있습니다. 저장을 눌러 마무리하세요</div>
+  {{end}}
   {{if .ReadOnly}}
   <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
     <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
       <h3 class="text-sm font-semibold text-slate-800">{{if .IsClosed}}조치 완료 (조회){{else}}조치 사항 (조회){{end}}</h3>
       <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">읽기 전용</span>
     </div>
-    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+    <div class="p-5 space-y-3">
+      {{range .ActionSets}}
+      {{template "as_action_set" dict "Set" . "Root" $}}
+      {{end}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
       <div><p class="text-xs text-slate-500">처리담당자</p><p>{{if .AS.AssignedTo}}{{.AS.AssignedTo}}{{else}}—{{end}}</p></div>
       <div><p class="text-xs text-slate-500">근무구분</p><p>{{if workPlaceLabel .AS.WorkPlace}}{{workPlaceLabel .AS.WorkPlace}}{{else}}—{{end}}</p></div>
       <div><p class="text-xs text-slate-500">결과</p><p>{{if .AS.ResultCode}}{{actionResultLabel .AS.ResultCode}}{{else}}—{{end}}</p></div>
@@ -276,9 +283,9 @@
     <div class="bg-white border-b border-slate-200 px-5 py-4 flex flex-wrap items-center justify-between gap-2">
       <div>
         <h3 class="text-sm font-semibold text-slate-800">조치 사항</h3>
-        <p class="text-xs text-slate-500 mt-0.5">처리담당자·조치내용·결과코드를 입력하고 저장합니다.</p>
+        <p class="text-xs text-slate-500 mt-0.5">조치 내역·사진·결과를 세트로 입력합니다. 마지막 조치의 결과만 접수 상태에 반영됩니다.</p>
       </div>
-      <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">조치</span>
+      <button type="button" id="as-add-set" class="px-3 py-1.5 rounded-lg text-sm font-bold border border-teal-700 bg-teal-50 text-teal-800">＋ 조치 추가</button>
     </div>
     <form method="POST" action="/as/{{.AS.ASID}}/update" id="as-action-form"
           {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
@@ -293,100 +300,38 @@
           {{if .ApplySkip}}<p class="mt-1 text-amber-900">제외: {{.ApplySkip}}</p>{{end}}
         </div>
         {{end}}
+        <input type="hidden" name="cause_cat1" id="as-cause-cat1" value="{{.AS.CauseCat1}}">
+        <input type="hidden" name="cause_cat1_custom" id="as-cause-cat1-custom" value="{{.AS.CauseCat1Custom}}">
+        <input type="hidden" name="cause_cat2" id="as-cause-cat2" value="{{.AS.CauseCat2}}">
+        <input type="hidden" name="cause_cat3" id="as-cause-cat3" value="{{.AS.CauseCat3}}">
+        <input type="hidden" name="cause_detail" id="as-cause-detail" value="{{.AS.CauseDetail}}">
 
-        <!-- 조치 내역 -->
-        <section class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
-          <h4 class="text-sm font-semibold text-slate-800">조치 내역</h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              {{template "assignee_picker" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "as-action" "Required" .AssigneeRequired "Label" "처리담당자" "AllowExternal" true}}
-              {{if eq .ActionErr "assignee_required"}}<p class="mt-1 text-xs text-red-600" data-assignee-error>담당자를 선택하세요</p>{{end}}
-              <input type="hidden" name="work_group_present" value="1">
-              {{if .AS.WorkGroupID}}
-              <label class="block text-xs text-slate-500 mt-2 mb-1">수행자 <span class="text-red-500">*</span></label>
-              <select name="worker" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">수행자 선택</option>
-                {{range .GroupMembers}}
-                <option value="{{.FullName}}" {{if eq $.WorkerDefault .FullName}}selected{{end}}>{{.FullName}}{{if eq .Role "leader"}} (그룹장){{end}}</option>
-                {{end}}
-              </select>
-              {{end}}
-              <input type="text" name="assigned_to_custom" value="{{if and .AS.AssignedTo (not .AS.AssignedUserID)}}{{.AS.AssignedTo}}{{end}}" placeholder="직접입력 시 이름" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">근무구분 <span class="text-red-500">*</span></label>
-              <div class="flex items-center gap-5 h-[42px]">
-                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                  <input type="radio" name="work_place" value="office" {{if eq .AS.WorkPlace "office"}}checked{{end}} required class="text-blue-600"> 내근
-                </label>
-                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                  <input type="radio" name="work_place" value="field" {{if eq .AS.WorkPlace "field"}}checked{{end}} required class="text-blue-600"> 외근
-                </label>
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">처리유형 <span class="text-red-500">*</span></label>
-              <select name="process_type" id="as-process-type" required {{if not .AS.WorkPlace}}disabled{{end}}
-                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">선택</option>
-                {{range .ProcTypes}}
-                <option value="{{.CodeValue}}" data-places="{{processTypePlaces .CodeValue}}"
-                        {{if eq .CodeValue $.AS.ProcessType}}selected{{end}}>{{.CodeName}}</option>
-                {{end}}
-              </select>
-            </div>
-            <div id="as-visit-date-wrap" class="{{if ne .AS.ProcessType "visit"}}hidden{{end}}">
-              <label class="block text-sm font-medium text-slate-700 mb-1">방문일 <span class="text-red-500">*</span></label>
-              <input type="date" name="visit_date" id="as-visit-date" value="{{.AS.VisitDate}}"
-                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-              <p class="text-[11px] text-slate-400 mt-1">현장에 간 날입니다. 저장 시각·착수일시와 별개입니다.</p>
-            </div>
-            <div id="as-process-type-reason-wrap" class="{{if ne .AS.ProcessType "undetermined"}}hidden{{end}}">
-              <label class="block text-sm font-medium text-slate-700 mb-1">미정 사유 <span class="text-red-500">*</span></label>
-              <input type="text" name="process_type_reason" id="as-process-type-reason" value="{{.AS.ProcessTypeReason}}"
-                     placeholder="왜 처리유형을 지금 정하지 못하는지"
-                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            </div>
-            {{template "as_cause_cat1_fields" .}}
-            <div id="as-cause-cat2-wrap" class="hidden">
-              <label class="block text-sm font-medium text-slate-700 mb-1">2차 분류 <span class="text-red-500">*</span></label>
-              <select name="cause_cat2" id="as-cause-cat2" data-current="{{.AS.CauseCat2}}"
-                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">선택</option>
-              </select>
-            </div>
-            <div id="as-cause-cat3-wrap" class="hidden">
-              <label class="block text-sm font-medium text-slate-700 mb-1">3차 분류 <span class="text-red-500">*</span></label>
-              <select name="cause_cat3" id="as-cause-cat3" data-current="{{.AS.CauseCat3}}"
-                      class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">선택</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">장애원인</label>
-              <textarea name="cause_detail" id="as-cause-detail" rows="2" placeholder="예: 전원 불량"
-                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.CauseDetail}}</textarea>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">완료일시</label>
-              <input type="datetime-local" name="complete_datetime" id="as-complete-datetime" value="{{.CompleteLocal}}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">조치내용 <span class="text-red-500">*</span></label>
-              <p class="text-xs text-emerald-800 mb-1.5">이 내용이 다음 사람에게 답이 됩니다</p>
-              <textarea name="action_taken" id="as-action-taken" rows="4" required placeholder="수행한 조치 내용을 입력하세요"
-                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{.AS.ActionTaken}}</textarea>
-              <label class="mt-2 inline-flex items-start gap-2 text-sm text-slate-700">
-                <input type="checkbox" name="action_na" id="as-action-na" value="1" class="mt-0.5 rounded border-gray-300">
-                해당 없음
-              </label>
-              <input type="text" name="action_na_reason" id="as-action-na-reason" placeholder="해당 없음 사유"
-                     class="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm hidden">
-              <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="{{if eq .ActionErr "action_short"}}1{{end}}">
-              {{if not .ReadOnly}}{{template "as_action_parts_check" .}}{{end}}
-            </div>
-            {{if not .ReadOnly}}{{template "as_keyword_checks" .}}{{end}}
-          </div>
+        <script type="application/json" id="as-cause-categories-json">{{.CauseCategoriesJSON}}</script>
+        <div id="as-action-sets" class="space-y-3">
+          {{range .ActionSets}}
+          {{template "as_action_set" dict "Set" . "Root" $}}
+          {{end}}
+        </div>
+        <p id="as-add-set-err" class="text-sm text-red-700 hidden">조치 결과를 먼저 선택해 주세요. 결과를 고르면 이 조치가 저장되고 다음 조치를 추가할 수 있습니다.</p>
+        <input type="hidden" name="work_group_present" value="1">
+        <input type="hidden" id="as-work-place-mirror" value="{{.AS.WorkPlace}}">
+        <div class="hidden" aria-hidden="true">
+          <label><input type="radio" name="work_place" value="office" {{if eq .AS.WorkPlace "office"}}checked{{end}}></label>
+          <label><input type="radio" name="work_place" value="field" {{if or (eq .AS.WorkPlace "field") (eq .AS.WorkPlace "")}}checked{{end}}></label>
+        </div>
+        <input type="hidden" name="process_type" id="as-process-type" value="{{.AS.ProcessType}}">
+        <div id="as-visit-date-wrap" class="hidden" aria-hidden="true">
+          <input type="hidden" name="visit_date" id="as-visit-date" value="{{.AS.VisitDate}}">
+        </div>
+        <div id="as-process-type-reason-wrap" class="{{if ne .AS.ProcessType "undetermined"}}hidden{{end}}">
+          <input type="text" name="process_type_reason" id="as-process-type-reason" value="{{.AS.ProcessTypeReason}}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div id="as-cause-cat2-wrap" class="hidden"></div>
+        <div id="as-cause-cat3-wrap" class="hidden"></div>
+        <textarea name="action_taken" id="as-action-taken" class="hidden">{{.AS.ActionTaken}}</textarea>
+        <input type="checkbox" name="action_na" value="1" class="hidden" id="as-action-na">
+        <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="{{if eq .ActionErr "action_short"}}1{{end}}">
+        {{if not .ReadOnly}}{{template "as_action_parts_check" .}}{{end}}
   {{end}}
   {{if or .ReadOnly .CanProcess}}
           {{if .ReadOnly}}<div class="sm:col-span-2">{{end}}
@@ -397,25 +342,36 @@
   </div>
   {{else if .CanProcess}}
         </section>
+        {{if not .ReadOnly}}{{template "as_keyword_checks" .}}{{end}}
         {{template "as_action_parts_box" .}}
 
-        <!-- 처리 결과 -->
-        <section class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+        <!-- 최종 저장 -->
+        <section class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4" id="as-final-save">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <h4 class="text-sm font-semibold text-slate-800">조치 결과</h4>
-            <p class="text-[11px] text-slate-500">선택한 결과에 따라 추가 입력이 열립니다. 저장 코드·통계 규칙은 그대로입니다.</p>
+            <h4 class="text-sm font-semibold text-slate-800">최종 저장</h4>
+            <p class="text-[11px] text-slate-500">마지막 조치의 결과에 따라 추가 입력이 열립니다.</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm" id="as-set-sum">
+              <thead><tr class="text-xs text-slate-500"><th class="text-left py-1 pr-3">조치</th><th class="text-left py-1 pr-3">담당자</th><th class="text-left py-1 pr-3">조치내용</th><th class="text-left py-1 pr-3">사진</th><th class="text-left py-1 pr-3">결과</th><th class="text-left py-1">상태</th></tr></thead>
+              <tbody>
+              {{range .ActionSets}}
+              <tr class="border-t border-slate-100"><td>조치 {{.Seq}}</td><td>{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td><td>{{if .ActionTaken}}{{.ActionTaken}}{{else}}—{{end}}</td><td>{{.PhotoN}}장</td><td>{{if .ResultCode}}{{actionResultLabel .ResultCode}}{{else}}—{{end}}</td><td>{{.SavedTag}}</td></tr>
+              {{end}}
+              </tbody>
+            </table>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-2">결과 <span class="text-red-500">*</span></label>
-            <div id="as-result-code-group" class="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <select name="result_code" id="as-result-code" class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">선택하세요</option>
               {{range .ActionResults}}
-              <label class="inline-flex items-center gap-2">
-                <input type="radio" name="result_code" value="{{.Value}}" class="as-result-radio text-blue-600"
-                       {{if eq .Value $.AS.ResultCode}}checked{{end}}>
-                {{.Label}}
-              </label>
+              <option value="{{.Value}}" {{if eq .Value $.AS.ResultCode}}selected{{end}}>{{.Label}}</option>
               {{end}}
-            </div>
+              {{if and .AS.ResultCode (not (eq .AS.ResultCode "done")) (not (eq .AS.ResultCode "partial")) (not (eq .AS.ResultCode "transfer"))}}
+              <option value="{{.AS.ResultCode}}" selected disabled>{{actionResultLabel .AS.ResultCode}} (기존 · 3종 중 하나로 바꾸세요)</option>
+              {{end}}
+            </select>
           </div>
 
           <div id="as-transfer-detail-wrap" class="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-3 {{if ne .AS.ResultCode "transfer"}}hidden{{end}}">
@@ -437,7 +393,7 @@
           </div>
 
           <div id="as-revisit-fields" class="rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-3 {{if ne .AS.ResultCode "partial"}}hidden{{end}}">
-            <p class="text-sm font-semibold text-sky-900" id="as-revisit-title">추가조치 필요</p>
+            <p class="text-sm font-semibold text-sky-900" id="as-revisit-title">추가 조치 필요</p>
             <p class="text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2" id="as-partial-hint">통계에는 완료(부분완료)로 집계되고, 목록·일일업무에서는 진행중으로 관리됩니다.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -485,7 +441,7 @@
         <section class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-3"
                  x-data="Object.assign({ applyOpen: false }, siteMultiPicker({ searchUrl: '/as/open-for-apply', idName: 'extra_as_id', extraKey: 'action', extraName: 'extra_action_taken', excludeId: '{{.AS.ASID}}', hint: '사이트·접수번호 2글자 이상' }))">
           <h4 class="text-sm font-semibold text-slate-800">같은 조치를 다른 AS 접수에도 적용</h4>
-          <p class="text-[11px] text-slate-500">자재 사용·사진 첨부는 이 접수에만 남습니다. 완료·종료 건과 타 조직 건은 고를 수 없습니다.</p>
+          <p class="text-[11px] text-slate-500">마지막 조치 내용 기준입니다. 자재 사용·사진 첨부는 이 접수에만 남습니다. 완료·종료 건과 타 조직 건은 고를 수 없습니다.</p>
           {{template "site_multi_picker" dict "Label" "적용할 접수(사이트 검색)"}}
           <input type="hidden" name="apply_as_confirm" id="as-apply-confirm" value="">
           <div x-show="applyOpen" x-cloak class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
@@ -517,7 +473,24 @@
       <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider">조치 이력</h3>
       <p class="text-xs text-gray-400 mt-1">이 접수({{.AS.ASNumber}})의 조치 기록입니다. 회차마다 결과·다음 일정이 남습니다.</p>
     </div>
-    {{if .Processes}}
+    {{if .HasStoredSets}}
+    <div class="space-y-4">
+      {{range .ActionSets}}
+      {{if not .Virtual}}
+      <div class="border-l-2 border-blue-200 pl-4 py-1">
+        <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <span class="font-medium text-slate-700">조치 {{.Seq}}</span>
+          {{if .ResultCode}}<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">{{actionResultLabel .ResultCode}}</span>{{end}}
+          {{if .AssignedTo}}<span>{{.AssignedTo}}</span>{{end}}
+          {{if .TimeSummary}}<span>{{.TimeSummary}}</span>{{end}}
+          {{if .LeaveDisplay}}<span>{{.LeaveDisplay}}</span>{{end}}
+        </div>
+        <p class="text-sm text-gray-800 mt-1 whitespace-pre-line">{{if .ActionTaken}}{{.ActionTaken}}{{else}}—{{end}}</p>
+      </div>
+      {{end}}
+      {{end}}
+    </div>
+    {{else if .Processes}}
     <div class="space-y-4">
       {{range .Processes}}
       <div class="border-l-2 {{if eq .ResultCode "done"}}border-green-400{{else if eq .ResultCode "hold"}}border-orange-400{{else if eq .ResultCode "transfer"}}border-purple-400{{else}}border-blue-200{{end}} pl-4 py-1">
@@ -733,7 +706,7 @@
             body.innerHTML = '<p class="text-gray-400 text-center py-8">동일 장비의 다른 AS 이력이 없습니다.</p>';
             return;
           }
-          var html = '<table class="min-w-full text-sm"><thead><tr class="border-b text-left text-xs text-gray-500">'
+          var html = '<table data-table-cols-skip class="min-w-full text-sm"><thead><tr class="border-b text-left text-xs text-gray-500">'
             + '<th class="py-2 pr-3">접수번호</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">완료일</th><th class="py-2">증상</th>'
             + '</tr></thead><tbody class="divide-y">';
           items.forEach(function (it) {
@@ -797,8 +770,10 @@
   {{if .OpenAction}}(function(){ var p=document.getElementById('panel-action'); if(p){ p.scrollIntoView({behavior:'smooth',block:'start'}); } })();{{end}}
 
   function selectedResult() {
-    var el = document.querySelector('input.as-result-radio:checked');
-    return el ? el.value : '';
+    var el = document.getElementById('as-result-code');
+    if (el && el.value) return el.value;
+    var last = document.querySelector('.as-action-set:last-child .as-set-result');
+    return last ? last.value : '';
   }
   var transferWrap = document.getElementById('as-transfer-detail-wrap');
   var revisitFields = document.getElementById('as-revisit-fields');
@@ -830,11 +805,14 @@
     if (isTransfer) syncTransferFollowup();
     else if (followupNote) followupNote.removeAttribute('required');
   }
-  document.querySelectorAll('input.as-result-radio').forEach(function (el) {
+  var resultSel = document.getElementById('as-result-code');
+  if (resultSel) resultSel.addEventListener('change', syncResultUI);
+  document.querySelectorAll('.as-set-result').forEach(function (el) {
     el.addEventListener('change', syncResultUI);
   });
   if (followupChk) followupChk.addEventListener('change', syncTransferFollowup);
-  if (document.querySelector('input.as-result-radio')) syncResultUI();
+  window.syncResultUI = syncResultUI;
+  syncResultUI();
 
   (function syncProcessTypeByPlace() {
     var procSel = document.getElementById('as-process-type');
@@ -868,10 +846,10 @@
       var reasonInp = document.getElementById('as-process-type-reason');
       var isVisit = procSel.value === 'visit';
       var isUndet = procSel.value === 'undetermined';
-      if (visitWrap) visitWrap.classList.toggle('hidden', !isVisit);
+      if (visitWrap) visitWrap.classList.add('hidden');
       if (visitInp) {
-        visitInp.required = isVisit;
-        if (!isVisit) visitInp.removeAttribute('required');
+        visitInp.required = false;
+        visitInp.removeAttribute('required');
       }
       if (reasonWrap) reasonWrap.classList.toggle('hidden', !isUndet);
       if (reasonInp) {
@@ -893,7 +871,7 @@
     var cat3 = document.getElementById('as-cause-cat3');
     var wrap2 = document.getElementById('as-cause-cat2-wrap');
     var wrap3 = document.getElementById('as-cause-cat3-wrap');
-    if (!cat1) return;
+    if (!cat1 || cat1.tagName !== 'SELECT') return;
     function childrenOf(parent, level) {
       return (cats || []).filter(function (c) {
         return c.level === level && c.parent_code === parent && c.is_active !== false;
@@ -1146,6 +1124,115 @@
     });
     syncEmpty();
   })();
+})();
+</script>
+<script src="/static/js/as_action_sets.js"></script>
+<script src="/static/js/as_action_set_cause.js"></script>
+<script>
+(function focusActionErr(){
+  var params = new URLSearchParams(location.search);
+  var err = params.get('err') || '';
+  var seq = params.get('focus_set') || '';
+  if (err.indexOf('set_draft_') === 0 && !seq) seq = err.replace('set_draft_', '');
+  if (seq) {
+    var root = document.querySelector('.as-action-set[data-action-set="'+seq+'"]');
+    if (root && window.ASActionSets && window.ASActionSets.toggleOpen) {
+      window.ASActionSets.toggleOpen(root, true);
+      root.scrollIntoView({block:'center'});
+    }
+    if (err.indexOf('set_draft_') === 0 || err === 'set_draft') {
+      var rs = root && root.querySelector('.as-set-result');
+      if (rs) { rs.classList.add('border-danger'); rs.focus(); }
+    }
+    if (err.indexOf('cause_cat') === 0 && root) {
+      var cat = root.querySelector('select[name$="'+err+'"]') || root.querySelector('[name$="'+err+'"]');
+      if (cat) { cat.classList.add('border-danger'); cat.focus(); }
+    }
+  }
+  if (err === 'work_date_required' || err === 'visit_date') {
+    var el = document.querySelector('.as-set-work-date');
+    if (el) {
+      el.classList.add('border-red-500');
+      el.focus();
+      if (el.scrollIntoView) el.scrollIntoView({block:'center'});
+    }
+  }
+})();
+</script>
+<script>
+(function bindKw95_85(){
+  var box = document.getElementById('as-kw-box');
+  var list = document.getElementById('as-kw-list');
+  var empty = document.getElementById('as-kw-empty');
+  var sug = document.getElementById('as-kw-suggested');
+  var neu = document.getElementById('as-kw-new');
+  var neuEmpty = document.getElementById('as-kw-new-empty');
+  var manual = document.getElementById('as-kw-manual');
+  var chosen = document.getElementById('as-kw-chosen');
+  if (!box || !list) return;
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  var field = box.getAttribute('data-field') || 'action';
+  function texts(){
+    var t = box.getAttribute('data-extra') || '';
+    document.querySelectorAll('.as-set-text, .as-set-cause').forEach(function(el){ t += ' ' + (el.value||''); });
+    var hid = document.getElementById('as-action-taken');
+    if (hid) t += ' ' + hid.value;
+    return t;
+  }
+  function renderChosen(){
+    var bits = [];
+    list.querySelectorAll('input:checked').forEach(function(el){
+      var lab = el.closest('label');
+      bits.push((lab && lab.getAttribute('data-label') || el.value) + '(' + (lab && lab.getAttribute('data-group') || '') + ')');
+    });
+    if (neu) neu.querySelectorAll('input:checked').forEach(function(el){
+      var lab = el.closest('label');
+      bits.push((lab && lab.getAttribute('data-label') || '') + '(' + (lab && lab.getAttribute('data-group') || '') + ')');
+    });
+    if (manual && manual.value.trim()) bits.push(manual.value.trim());
+    if (chosen) chosen.textContent = bits.length ? bits.join(', ') : '없음';
+  }
+  function render(d){
+    var items = (d && d.items) || [];
+    var html = '';
+    var ids = [];
+    items.forEach(function(it){
+      ids.push(it.keyword_id);
+      html += '<label data-label="'+esc(it.keyword)+'" data-group="'+esc(it.kw_group)+'" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs border-slate-200 bg-white">' +
+        '<input type="checkbox" name="kw_'+field+'" value="'+esc(it.keyword_id)+'" class="rounded border-slate-300 text-blue-600">' +
+        '<span>'+esc(it.keyword)+'</span><span class="text-slate-400">'+esc(it.kw_group)+'</span></label>';
+    });
+    list.innerHTML = html;
+    if (sug) sug.value = ids.join(',');
+    if (empty) empty.classList.toggle('hidden', items.length > 0);
+    var news = (d && d.new) || [];
+    var nh = '';
+    news.forEach(function(it){
+      var key = 'new:'+it.keyword+'|'+(it.kw_group||'조치');
+      nh += '<label data-label="'+esc(it.keyword)+'" data-group="'+esc(it.kw_group)+'" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-dashed text-xs">' +
+        '<input type="checkbox" name="kw_'+field+'" value="'+esc(key)+'" class="rounded">' +
+        '<span>'+esc(it.keyword)+'</span><span class="text-slate-400">'+esc(it.kw_group)+'</span></label>';
+    });
+    if (neu) neu.innerHTML = nh;
+    if (neuEmpty) neuEmpty.classList.toggle('hidden', news.length > 0);
+    renderChosen();
+  }
+  var t=null;
+  function run(){
+    var q = texts().trim();
+    var body = new URLSearchParams(); body.set('text', q); body.set('q', q);
+    fetch('/as/keywords/suggest', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString()})
+      .then(function(r){ return r.json(); }).then(render).catch(function(){});
+  }
+  document.addEventListener('input', function(e){
+    if (!e.target) return;
+    if (e.target.classList && (e.target.classList.contains('as-set-text') || e.target.classList.contains('as-set-cause') || e.target.id==='as-kw-manual')) {
+      clearTimeout(t); t=setTimeout(run, 400); renderChosen();
+    }
+  });
+  if (list) list.addEventListener('change', renderChosen);
+  if (neu) neu.addEventListener('change', renderChosen);
+  run();
 })();
 </script>
 {{template "photo_zoom_script"}}

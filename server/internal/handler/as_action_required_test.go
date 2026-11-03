@@ -66,7 +66,7 @@ func TestASActionDoneRequiresWorkPlaceCauseProcessType(t *testing.T) {
 		{"work_place", "work_place"},
 		{"process_type", "process_type"},
 		{"cause_cat2", "cause_cat2"},
-		{"visit_date", "visit_date"},
+		{"visit_date", "work_date_required"},
 	}
 	for _, tc := range cases {
 		e, h, asRepo, _, asID := newASActionFixture(t)
@@ -105,6 +105,7 @@ func TestASActionDoneWithRequiredFieldsCompletes(t *testing.T) {
 		"cause_type":   {"hw"},
 		"action_taken": {"프로그램 재시작 후 정상"},
 		"time_spent":   {"30"},
+		"work_date":    {"2026-08-10"},
 		"result_code":  {model.ResultDone},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -137,7 +138,8 @@ func TestASActionPageMapsActionRequiredBanner(t *testing.T) {
 		{"work_place", "근무구분(내근/외근)을 선택하세요"},
 		{"cause_cat2", "2차 분류를 선택하세요"},
 		{"process_type", "처리유형을 선택하세요"},
-		{"visit_date", "현장방문이면 방문일을 입력하세요"},
+		{"visit_date", "작업일을 입력하세요"},
+		{"work_date_required", "작업일을 입력하세요"},
 		{"process_type_reason", "처리유형이 미정이면 사유를 입력하세요"},
 	}
 	for _, tc := range cases {

@@ -212,7 +212,6 @@ func TestWorkCompletedAssigneeCanEdit(t *testing.T) {
 	e, repo := newWorkTodayServer(t)
 	id := findWorkTaskIDByTitle(t, repo, "관리자완료")
 	form := url.Values{
-		"scope":    {"register"},
 		"title":    {"관리자완료-수정"},
 		"status":   {model.WBTaskComplete},
 		"due_date": {time.Now().Format("2006-01-02")},

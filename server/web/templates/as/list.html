@@ -3,28 +3,28 @@
 {{define "content"}}
 <div class="space-y-4">
   {{if .LegacyLinks}}
-  <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+  <div class="rounded-lg border border-amber-200 bg-warning-soft px-4 py-3 text-sm text-amber-950">
     예전 링크 방식입니다. 번호를 누르면 예전 접수 상세가 열립니다.
     <a href="/as" class="font-medium underline">새 조치 화면 목록으로</a>
   </div>
   {{end}}
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-    <p class="text-sm text-gray-500">
-      {{if .Mine}}<span class="text-blue-600 font-medium">내 배정 · </span>{{end}}
+    <p class="text-sm text-ink-muted">
+      {{if .Mine}}<span class="text-primary font-medium">내 배정 · </span>{{end}}
       {{if eq .Status "in_progress"}}진행중·부분완료{{else if eq .Status "assigned"}}담당자 배정{{else if eq .Status "partial_complete"}}부분완료{{else if eq .Status "completed_today"}}오늘 완료{{else if eq .Status "completed"}}완료{{else if eq .Status "overdue"}}접수 지연{{else if eq .Status "today"}}오늘 접수{{else if eq .Status "visit_past"}}예정일 경과{{else if eq .Status "visit_done_open"}}다음 일정 미정{{else if eq .Status "visit_today"}}오늘 방문{{else if eq .Status "visit_upcoming"}}예정(미도래){{else if eq .Status "transfer_overdue"}}이관 지연{{else if eq .Status "week_received"}}주간접수{{else if eq .Status "week_completed"}}주간완료{{else if eq .Status "week_in_progress"}}주간진행중{{else if eq .Status "received"}}접수{{else if eq .Status "hold"}}보류{{else if eq .Status "transfer"}}이관(회신 대기){{else if eq .Status "cancelled"}}접수취소{{else if eq .Status "closed"}}종료{{else if eq .Status "open"}}미완료{{else}}전체{{end}}
-      {{if or .AssigneeID .AssigneeName}}<span class="text-blue-600 font-medium"> · 담당자 필터</span>{{end}}
+      {{if or .AssigneeID .AssigneeName}}<span class="text-primary font-medium"> · 담당자 필터</span>{{end}}
       {{.Total}}건
     </p>
     <div class="flex flex-wrap items-center gap-2">
       {{template "view_group_toggle" .}}
-      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">칸반</a>
-      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white">리스트</a>
-      <a href="/as/knowledge" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">사례 검색</a>
-      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">본문 검색</a>
-      <a href="/as/keywords" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">키워드</a>
+      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-line text-ink-muted hover:bg-hover">칸반</a>
+      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-white">리스트</a>
+      <a href="/as/knowledge" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-line text-ink-muted hover:bg-hover">사례 검색</a>
+      <a href="/as/search" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-line text-ink-muted hover:bg-hover">본문 검색</a>
+      <a href="/as/keywords" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-line text-ink-muted hover:bg-hover">키워드</a>
       {{if .CanReceive}}
       <a href="/as/new"
-         class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+         class="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
@@ -34,12 +34,12 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+  <div class="bg-white rounded-xl border border-line p-4 space-y-3">
     <form method="GET" action="/as/search" class="flex flex-col sm:flex-row gap-3">
       <input type="search" name="q"
              placeholder="증상·조치·원인 본문 검색 (과거 사례 포함)"
-             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">본문 검색</button>
+             class="flex-1 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-hover">본문 검색</button>
     </form>
     <form method="GET" action="/as" class="flex flex-col sm:flex-row gap-3">
       {{if .LegacyLinks}}<input type="hidden" name="legacy" value="1">{{end}}
@@ -47,7 +47,7 @@
       <input type="hidden" name="mine" value="{{if .Mine}}1{{else}}0{{end}}">
       {{end}}
       <select name="status"
-              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              class="border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="" {{if eq .Status ""}}selected{{end}}>전체 상태</option>
         <option value="open" {{if eq .Status "open"}}selected{{end}}>미완료(접수+배정+진행+부분완료+보류+이관)</option>
         <option value="received" {{if eq .Status "received"}}selected{{end}}>접수만</option>
@@ -73,7 +73,7 @@
       </select>
       <input type="text" name="search" value="{{.Search}}"
              placeholder="AS번호, 기관명 빠른 찾기"
-             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+             class="flex-1 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
       {{if or (ne .Sort "receipt") (ne .Dir "desc")}}
       <input type="hidden" name="sort" value="{{.Sort}}">
       <input type="hidden" name="dir" value="{{.Dir}}">
@@ -84,9 +84,9 @@
     </form>
   </div>
 
-  <div class="js-bulk-select" id="as-list-select" x-data="workListSelect({{printf "%q" .CSRFToken}})" x-init="sync()">
+  <div class="js-bulk-select" id="as-list-select" x-data="workListSelect({{toJSON .CSRFToken}})" x-init="sync()">
     <div class="js-wl-bar mb-2 flex flex-wrap items-center justify-between gap-2">
-      <span class="text-sm font-semibold text-gray-700">총 {{.Total}}건</span>
+      <span class="text-sm font-semibold text-ink">총 {{.Total}}건</span>
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" class="btn btn-sm"
                 :class="n>0 ? 'btn-danger' : 'btn-secondary'"

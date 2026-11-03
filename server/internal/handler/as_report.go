@@ -238,7 +238,7 @@ func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
 	if err != nil || as == nil {
 		return nil, echo.ErrNotFound
 	}
-	if cats, e := h.repo.ListCauseCategories(); e == nil {
+	if cats, e := h.repo.ListCauseCategoriesForOrgAll(as.OrgID); e == nil {
 		as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(cats))
 	}
 	return as, nil
@@ -316,7 +316,17 @@ func (h *ASHandler) buildASReportDraft(as *model.ASReceipt, now time.Time) model
 	if as != nil && h.processRepo != nil {
 		processes, _ = h.processRepo.ListByAS(as.ASID)
 	}
-	return model.BuildASReportDraft(as, processes, customer, asset, contacts, now)
+	d := model.BuildASReportDraft(as, processes, customer, asset, contacts, now)
+	if as != nil && h.setRepo != nil {
+		if sets, err := h.setRepo.ListByAS(as.ASID); err == nil && len(sets) >= 2 {
+			d.Actions = model.JoinActionSetsForReport(sets)
+		} else if err == nil && len(sets) == 1 {
+			if lv := sets[0].LeaveDisplay(); lv != "" && strings.TrimSpace(d.Actions) != "" {
+				d.Actions = strings.TrimSpace(d.Actions) + " (" + lv + ")"
+			}
+		}
+	}
+	return d
 }
 
 func (h *ASHandler) listActionPhotos(asID string) []model.Attachment {

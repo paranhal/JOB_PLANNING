@@ -69,8 +69,8 @@ func TestASActionVisitRequiresVisitDate(t *testing.T) {
 		"result_code":  {model.ResultDone},
 	})
 	loc := rec.Header().Get("Location")
-	if rec.Code != http.StatusSeeOther || !strings.Contains(loc, "err=visit_date") {
-		t.Fatalf("방문일 누락이 거절되지 않았다: loc=%s", loc)
+	if rec.Code != http.StatusSeeOther || !strings.Contains(loc, "work_date_required") {
+		t.Fatalf("작업일 누락이 거절되지 않았다: loc=%s", loc)
 	}
 	got, _ := asRepo.GetByID(repository.OrgAll, asID)
 	if got != nil && got.Status == "completed" {
@@ -147,8 +147,10 @@ func TestASActionKeepsStartDatetimeWhenVisitDateSaved(t *testing.T) {
 		t.Fatal("start_datetime 이 비었다")
 	}
 	page := getASActionPage(t, e, asID)
-	idx := strings.Index(page, `id="as-visit-date-wrap"`)
-	if idx < 0 || strings.Contains(page[idx:idx+90], "hidden") {
-		t.Fatal("현장방문인데 방문일 칸이 숨겨져 있다")
+	if !strings.Contains(page, `id="as-visit-date"`) {
+		t.Fatal("접수 본문 방문일 미러 필드가 없다")
+	}
+	if !strings.Contains(page, "작업일이 방문일로") && !strings.Contains(page, `class="as-set-work-date"`) {
+		t.Fatal("작업일 통합 안내가 없다")
 	}
 }

@@ -24,6 +24,7 @@ func jwtCookiePerms(t *testing.T, role string, perms ...string) *http.Cookie {
 		"username":    role,
 		"role":        role,
 		"name":        role,
+		"org_id":      "O01",
 		"permissions": model.FormatPermissions(perms),
 		"verified_at": time.Now().Unix(),
 		"exp":         time.Now().Add(time.Hour).Unix(),

@@ -52,19 +52,35 @@ func TestASActionCauseCatsReplaceCauseTypeSelect(t *testing.T) {
 		t.Fatalf("패치 매핑 cause_type=%q want sw", got.CauseType)
 	}
 
+	emptyCode := ""
+	cats, _ := asRepo.ListCauseCategories()
+	for _, c := range cats {
+		if c.Level == 2 && strings.TrimSpace(c.CauseTypeMap) == "" && c.IsActive {
+			emptyCode = c.Code
+			break
+		}
+	}
+	if emptyCode == "" {
+		t.Fatal("cause_type_map 빈 2차가 시드에 없다")
+	}
+	parent := emptyCode
+	if i := strings.Index(emptyCode, "."); i > 0 {
+		parent = emptyCode[:i]
+	}
 	empty := postASAction(t, e, asID, url.Values{
 		"work_place":   {"office"},
 		"process_type": {"remote"},
-		"cause_cat1":   {"web"},
-		"cause_cat2":   {"web.post_edit"},
-		"action_taken": {"게시물 수정"},
+		"cause_cat1":   {parent},
+		"cause_cat2":   {emptyCode},
+		"action_taken": {"매핑없는분류"},
 	})
 	if empty.Code != http.StatusSeeOther || strings.Contains(empty.Header().Get("Location"), "err=") {
 		t.Fatalf("매핑 없는 2차 저장 실패: %s", empty.Header().Get("Location"))
 	}
 	got, _ = asRepo.GetByID(repository.OrgAll, asID)
-	if got.CauseType != "" {
-		t.Fatalf("매핑 없으면 cause_type 빈값이어야 한다: %q", got.CauseType)
+	wantType := model.CauseTypeFromCat2(cats, emptyCode)
+	if got.CauseType != wantType {
+		t.Fatalf("cause_type=%q want %q (cat2=%s)", got.CauseType, wantType, emptyCode)
 	}
 }
 

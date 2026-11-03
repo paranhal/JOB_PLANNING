@@ -79,7 +79,7 @@
   <div class="md:hidden">{{template "sort_select" (dict "Options" .SortSelect "ID" (printf "gap-sort-%s" $key))}}</div>
   {{end}}
   <div class="overflow-x-auto border border-gray-100 rounded-lg">
-    <table class="w-full min-w-[900px] text-sm break-keep">
+    <table data-table-cols-skip class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b border-gray-100">
         <tr>
           <th class="w-8 px-2 py-2 whitespace-nowrap"></th>

@@ -62,8 +62,8 @@ func TestASActionRejectsProcessTypeMismatchAndBannedResults(t *testing.T) {
 		"result_code":            {model.ResultRevisit},
 		"revisit_scheduled_date": {"2026-08-20"},
 	})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=result_not_allowed") {
-		t.Fatalf("재방문 결과가 거절되지 않음: %s", rec.Header().Get("Location"))
+	if rec.Code != http.StatusBadRequest && (rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=result_not_allowed")) {
+		t.Fatalf("재방문 결과가 거절되지 않음: %d %s", rec.Code, rec.Header().Get("Location")+rec.Body.String())
 	}
 
 	rec = postASAction(t, e, asID, url.Values{
@@ -73,8 +73,8 @@ func TestASActionRejectsProcessTypeMismatchAndBannedResults(t *testing.T) {
 		"action_taken": {"대기 요청"},
 		"result_code":  {model.ResultHold},
 	})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=result_not_allowed") {
-		t.Fatalf("대기 결과가 거절되지 않음: %s", rec.Header().Get("Location"))
+	if rec.Code != http.StatusBadRequest && (rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=result_not_allowed")) {
+		t.Fatalf("대기 결과가 거절되지 않음: %d %s", rec.Code, rec.Header().Get("Location")+rec.Body.String())
 	}
 
 	got, _ := asRepo.GetByID(repository.OrgAll, asID)

@@ -31,7 +31,7 @@ func newAssignNoticeServer(t *testing.T) (*echo.Echo, *sql.DB, *model.User) {
 	}
 	if err := users.Create(&model.User{
 		Username: "choi", PasswordHash: HashPassword("pw"), FullName: "최혜영",
-		Role: model.RoleTech, IsActive: true,
+		Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestAssignNoticeModalAndBadge(t *testing.T) {
 	if !strings.Contains(body, "R2609-012") || !strings.Contains(body, "부여군립도서관") {
 		t.Fatal("3일 전 배정이 모달에 없다")
 	}
-	if !strings.Contains(body, "bg-red-500") || !strings.Contains(body, ">2</span>") {
+	if !strings.Contains(body, "bg-danger") || !strings.Contains(body, ">2</span>") {
 		t.Fatal("사이드바 안 본 건수 뱃지가 없다")
 	}
 	if !strings.Contains(body, `aria-label="닫기"`) || !strings.Contains(body, ">닫기</button>") {
@@ -186,7 +186,7 @@ func TestAssignNoticeModalAndBadge(t *testing.T) {
 	if strings.Contains(third.Body.String(), "새로 배정된 업무") {
 		t.Fatal("나중에 이후에도 모달이 떴다")
 	}
-	if !strings.Contains(third.Body.String(), "bg-red-500") {
+	if !strings.Contains(third.Body.String(), "bg-danger") {
 		t.Fatal("나중에 눌러도 뱃지가 사라졌다")
 	}
 }
@@ -360,17 +360,17 @@ func TestSidebarBadgeCountsOnlyOwnUnseenNotices(t *testing.T) {
 	if page.Code != http.StatusOK {
 		t.Fatalf("status=%d", page.Code)
 	}
-	if strings.Contains(page.Body.String(), `bg-red-500`) {
+	if strings.Contains(page.Body.String(), `bg-danger`) {
 		t.Fatal("미배정 조직 건이 오늘 내 업무 뱃지에 올라갔다")
 	}
 
 	insertUnseenNotice(t, db, choi.UserID, "R2610-own", "본인 AS", time.Now())
 	mine := doGetWith(t, e, "/work", jwtCookieUser(t, choi))
-	if !strings.Contains(mine.Body.String(), "bg-red-500") || !strings.Contains(mine.Body.String(), ">1</span>") {
+	if !strings.Contains(mine.Body.String(), "bg-danger") || !strings.Contains(mine.Body.String(), ">1</span>") {
 		t.Fatal("본인 안 본 배정 뱃지가 없다")
 	}
 	admin2 := doGetWith(t, e, "/work", jwtCookieUser(t, admin))
-	if strings.Contains(admin2.Body.String(), `bg-red-500`) {
+	if strings.Contains(admin2.Body.String(), `bg-danger`) {
 		t.Fatal("다른 사람 배정이 관리자 뱃지에 있다")
 	}
 }

@@ -163,14 +163,7 @@ func (h *ASHandler) KeywordRebuild(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/as/keywords?ok=relink")
 }
 
-// KeywordSuggest 본문 대조 후보 JSON. 쓰지 않으면 붙지 않는다.
+// KeywordSuggest 본문 대조 후보 JSON. POST 는 신규 후보도 함께. 95-85 §3.
 func (h *ASHandler) KeywordSuggest(c echo.Context) error {
-	items, err := h.kwRepo.Suggest(c.QueryParam("q"))
-	if err != nil {
-		return err
-	}
-	if items == nil {
-		items = []model.ASKeyword{}
-	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
+	return h.KeywordSuggestPost(c)
 }

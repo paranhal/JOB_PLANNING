@@ -1,22 +1,22 @@
 {{define "as_action_moved"}}
 {{if .CanIssueReport}}
-<details class="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm" id="as-report-history" open>
-  <summary class="cursor-pointer text-sm font-semibold text-emerald-800">조치완료보고서 발급 이력</summary>
+<details class="rounded-xl border border-success bg-white p-4 shadow-sm" id="as-report-history" open>
+  <summary class="cursor-pointer text-sm font-semibold text-success">조치완료보고서 발급 이력</summary>
   <div class="mt-3 space-y-3">
     {{if not .ReportReady}}
-    <p class="text-sm text-slate-600">{{.ReportBlockReason}}</p>
+    <p class="text-sm text-ink-muted">{{.ReportBlockReason}}</p>
     {{else if .ReportMissing}}
-    <p class="text-sm text-amber-800">보고서 발급에
+    <p class="text-sm text-warning">보고서 발급에
       {{range $i, $f := .ReportMissing}}{{if $i}}·{{end}}<strong>{{$f}}</strong>{{end}}
       이(가) 없습니다.
-      <a href="/as/{{.AS.ASID}}/report" class="font-medium text-blue-700 hover:underline">보고서 미리보기에서 입력</a>
+      <a href="/as/{{.AS.ASID}}/report" class="font-medium text-primary hover:underline">보고서 미리보기에서 입력</a>
       할 수 있습니다.
     </p>
     {{end}}
     {{if .ASReports}}
-    <table class="w-full text-sm break-keep">
+    <table data-table-cols-skip class="w-full text-sm break-keep">
       <thead>
-        <tr class="text-left text-xs text-slate-500">
+        <tr class="text-left text-xs text-ink-muted">
           <th class="py-1 font-medium whitespace-nowrap">발급일시</th>
           <th class="py-1 font-medium whitespace-nowrap">발급자</th>
           <th class="py-1 font-medium whitespace-nowrap">파일</th>
@@ -24,90 +24,90 @@
       </thead>
       <tbody>
         {{range .ASReports}}
-        <tr class="border-t border-slate-100">
+        <tr class="border-t border-line">
           <td class="py-1.5 whitespace-nowrap">{{.UploadedAt.Format "2006-01-02 15:04"}}</td>
           <td class="py-1.5 whitespace-nowrap">{{if .ReportIssuer}}{{.ReportIssuer}}{{else}}—{{end}}</td>
-          <td class="py-1.5 whitespace-nowrap"><a href="/attachments/{{.AttachmentID}}" class="text-blue-700 hover:underline">내려받기</a></td>
+          <td class="py-1.5 whitespace-nowrap"><a href="/attachments/{{.AttachmentID}}" class="text-primary hover:underline">내려받기</a></td>
         </tr>
         {{end}}
       </tbody>
     </table>
     {{else}}
-    <p class="text-sm text-slate-500">아직 발급 이력이 없습니다.</p>
+    <p class="text-sm text-ink-muted">아직 발급 이력이 없습니다.</p>
     {{end}}
   </div>
 </details>
 {{end}}
 
-<details class="rounded-xl border border-teal-200 bg-white p-4 space-y-3" id="as-support-card">
-  <summary class="cursor-pointer text-sm font-semibold text-slate-800">지원 업무</summary>
+<details class="rounded-xl border border-info bg-white p-4 space-y-3" id="as-support-card">
+  <summary class="cursor-pointer text-sm font-semibold text-ink">지원 업무</summary>
   <div class="mt-3 space-y-3">
     {{if and .SupportStepper .SupportStepper.Show}}
     <ol class="flex flex-wrap gap-2 text-xs">
       {{$st := .SupportStepper.Stage}}
-      <li class="px-2 py-1 rounded-full {{if ge $st 0}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">입고 예정</li>
-      <li class="px-2 py-1 rounded-full {{if ge $st 1}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">입고 완료 · 수리 중</li>
-      <li class="px-2 py-1 rounded-full {{if ge $st 2}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">회수 예정</li>
-      <li class="px-2 py-1 rounded-full {{if ge $st 3}}bg-teal-600 text-white{{else}}bg-slate-100 text-slate-500{{end}}">회수 완료</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 0}}bg-info text-white{{else}}bg-hover text-ink-muted{{end}}">입고 예정</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 1}}bg-info text-white{{else}}bg-hover text-ink-muted{{end}}">입고 완료 · 수리 중</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 2}}bg-info text-white{{else}}bg-hover text-ink-muted{{end}}">회수 예정</li>
+      <li class="px-2 py-1 rounded-full {{if ge $st 3}}bg-info text-white{{else}}bg-hover text-ink-muted{{end}}">회수 완료</li>
     </ol>
     {{end}}
     {{if .SupportItems}}
     <ul class="divide-y text-sm">
       {{range .SupportItems}}
       <li class="py-2 flex flex-wrap items-center justify-between gap-2">
-        <a href="/as/work/{{.Work.WorkID}}/action" class="font-mono text-teal-800 hover:underline">
+        <a href="/as/work/{{.Work.WorkID}}/action" class="font-mono text-info hover:underline">
           <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{workKindBadgeClass .Work.WorkKind}}">[{{workKindLabel .Work.WorkKind}}]</span>
           {{.Work.WorkNumber}} · {{supportTypeLabel .Detail.SupportType}}
         </a>
-        <span class="text-xs text-slate-500">{{if eq .Work.Status "done"}}완료{{else}}진행 중{{end}}{{if .Detail.DueDate}} · 예정 {{.Detail.DueDate}}{{end}}</span>
+        <span class="text-xs text-ink-muted">{{if eq .Work.Status "done"}}완료{{else}}진행 중{{end}}{{if .Detail.DueDate}} · 예정 {{.Detail.DueDate}}{{end}}</span>
       </li>
       {{end}}
     </ul>
     {{else}}
-    <p class="text-sm text-slate-400">등록된 지원업무가 없습니다.</p>
+    <p class="text-sm text-ink-subtle">등록된 지원업무가 없습니다.</p>
     {{end}}
     {{if .CanProcess}}
     <form method="POST" action="/as/{{.AS.ASID}}/support" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t" id="as-support-form">
       <input type="hidden" name="asset_id" value="{{.SupportDefaultAsset}}">
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">유형</label>
-        <select name="support_type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-xs font-medium text-ink-muted mb-1">유형</label>
+        <select name="support_type" required class="w-full border border-line rounded-lg px-3 py-2 text-sm">
           {{range .SupportTypes}}
           <option value="{{.Value}}">{{.Label}}</option>
           {{end}}
         </select>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">제조사</label>
-        <input type="text" name="vendor_name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-xs font-medium text-ink-muted mb-1">제조사</label>
+        <input type="text" name="vendor_name" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">예정일</label>
-        <input type="date" name="due_date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-xs font-medium text-ink-muted mb-1">예정일</label>
+        <input type="date" name="due_date" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">송장번호</label>
-        <input type="text" name="tracking_no" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-xs font-medium text-ink-muted mb-1">송장번호</label>
+        <input type="text" name="tracking_no" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
       </div>
       <div class="sm:col-span-2">
-        <label class="block text-xs font-medium text-slate-600 mb-1">메모</label>
-        <input type="text" name="memo" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-xs font-medium text-ink-muted mb-1">메모</label>
+        <input type="text" name="memo" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
       </div>
       <div class="sm:col-span-2 flex justify-end">
-        <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium">+ 지원업무 추가</button>
+        <button type="submit" class="px-4 py-2 bg-info hover:bg-info text-white rounded-lg text-sm font-medium">+ 지원업무 추가</button>
       </div>
     </form>
     {{end}}
   </div>
 </details>
 
-<details class="rounded-xl border border-slate-200 bg-white p-4" id="as-history-card">
-  <summary class="cursor-pointer text-sm font-semibold text-slate-800">이력</summary>
+<details class="rounded-xl border border-line bg-white p-4" id="as-history-card">
+  <summary class="cursor-pointer text-sm font-semibold text-ink">이력</summary>
   <div class="mt-3 space-y-2">
     {{if .AS.AssetID}}
-    <button type="button" id="btn-asset-as-history" class="px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 text-xs">기기별 AS이력</button>
+    <button type="button" id="btn-asset-as-history" class="px-2 py-0.5 rounded border border-primary bg-primary-soft text-primary text-xs">기기별 AS이력</button>
     {{end}}
-    <p class="text-xs text-slate-500">고객·기기 과거 접수는 아래에서 불러옵니다.</p>
+    <p class="text-xs text-ink-muted">고객·기기 과거 접수는 아래에서 불러옵니다.</p>
   </div>
 </details>
 {{end}}

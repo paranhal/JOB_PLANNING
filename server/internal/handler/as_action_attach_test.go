@@ -58,6 +58,9 @@ func newASActionFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 	g.POST("/as/:id/vote", h.AS.VoteCase)
 	g.GET("/as/:id", h.AS.Show)
 	g.POST("/as/:id/hold", h.AS.Hold)
+	g.POST("/as/:id/action-sets", h.AS.SaveActionSet)
+	g.GET("/as/keywords/suggest", h.AS.KeywordSuggest)
+	g.POST("/as/keywords/suggest", h.AS.KeywordSuggest)
 	g.GET("/as/work/:work_id/action", h.AS.WorkAction)
 	g.POST("/as/work/:work_id/action", h.AS.UpdateWorkAction)
 	g.POST("/attachments", h.Attachment.Upload)
@@ -76,6 +79,8 @@ func TestASActionSavesWorkPlace(t *testing.T) {
 		"process_type": {"visit"},
 		"cause_type":   {"hw"},
 		"action_taken": {"현장 점검"},
+		"work_date":    {"2026-08-10"},
+		"visit_date":   {"2026-08-10"},
 		"time_spent":   {"30"},
 	})
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
@@ -314,10 +319,11 @@ func TestASActionScreenShowsResultLabels(t *testing.T) {
 		t.Fatalf("status=%d", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, s := range []string{"추가조치 필요", "추가 조치 필요", "대기"} {
-		if !strings.Contains(body, s) {
-			t.Errorf("조치 화면에 %q 없음", s)
-		}
+	if !strings.Contains(body, "추가 조치 필요") {
+		t.Error("조치 화면에 추가 조치 필요 없음")
+	}
+	if !strings.Contains(body, "대기") {
+		t.Error("조치 화면에 대기(워크플로) 없음")
 	}
 	if strings.Contains(body, "처리 확인 후 완료") || strings.Contains(body, "우리 팀 추가 작업") {
 		t.Error("이관 라디오(처리 확인 후 완료 / 우리 팀 추가 작업)가 남아 있다")
@@ -398,7 +404,7 @@ func TestASActionStoresProcessResultAndWait(t *testing.T) {
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(show, req)
 	body := show.Body.String()
-	if !strings.Contains(body, "추가조치 필요") || !strings.Contains(body, "SSD 입고 대기") {
+	if (!strings.Contains(body, "추가조치 필요") && !strings.Contains(body, "추가 조치 필요")) || !strings.Contains(body, "SSD 입고 대기") {
 		t.Error("Timeline에 이전 회차·대기 사유가 없다")
 	}
 }

@@ -29,8 +29,8 @@ func TestASVisitDateCreatesDailyTaskAndRegisterPalette(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = db.Exec(`
-		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, symptom, status, assigned_to, visit_scheduled_date, schedule_confirmed)
-		VALUES ('R2608-036','R2608-036','C1','2026-08-10 10:00:00','장서점검 자료요청','in_progress','최혜영','',0)`)
+		INSERT INTO as_receipts (as_id, as_number, customer_id, receipt_datetime, symptom, status, assigned_to, visit_scheduled_date, schedule_confirmed, org_id)
+		VALUES ('R2608-036','R2608-036','C1','2026-08-10 10:00:00','장서점검 자료요청','in_progress','최혜영','',0,'O01')`)
 	if err != nil {
 		t.Fatal(err)
 	}

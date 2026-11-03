@@ -1,0 +1,100 @@
+{{define "as_action_set"}}
+{{$s := .Set}}{{$root := .Root}}{{$p := $s.Prefix}}{{$ro := $root.ReadOnly}}
+<div class="as-action-set rounded-xl border {{if $s.Open}}border-blue-300{{else}}border-slate-200{{end}} overflow-hidden bg-white" data-action-set="{{$s.Seq}}" data-set-id="{{$s.SetID}}" data-open="{{if $s.Open}}1{{else}}0{{end}}">
+  <div class="as-set-head flex flex-wrap gap-2 items-center justify-between px-4 py-3 bg-slate-50 cursor-pointer" data-set-toggle="{{$s.Seq}}">
+    <div class="min-w-0 flex flex-wrap items-center gap-2">
+      <b class="text-sm">조치 {{$s.Seq}}</b>
+      <span class="px-2 py-0.5 rounded text-[11px] font-bold {{if or (eq $s.State "saved") (eq $s.State "final")}}bg-emerald-50 text-emerald-800{{else}}bg-amber-50 text-amber-800{{end}}">{{$s.SavedTag}}</span>
+      <span class="text-xs text-slate-500 truncate">{{$s.SummaryLine}}</span>
+    </div>
+    <button type="button" class="btn-secondary text-xs shrink-0" data-set-toggle="{{$s.Seq}}">{{if $s.Open}}접기 ▲{{else}}펼치기 ▼{{end}}</button>
+  </div>
+  <div class="as-set-body p-4 space-y-4 {{if not $s.Open}}hidden{{end}}">
+    <section class="rounded-xl border border-slate-200 p-4 space-y-4">
+      <div class="flex items-center justify-between gap-2">
+        <h4 class="text-sm font-semibold text-slate-800">조치 내역</h4>
+        <button type="button" class="btn-secondary text-xs" data-set-toggle="{{$s.Seq}}">{{if $s.Open}}접기 ▲{{else}}펼치기 ▼{{end}}</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+        <div class="min-w-0">
+          {{if not $ro}}
+          {{template "assignee_picker" dict "Assignees" $root.Assignees "WorkGroups" $root.WorkGroups "Target" (printf "as-set-%d" $s.Seq) "Required" $root.AssigneeRequired "Label" "처리담당자" "AllowExternal" true "PickerNames" $root.PickerNames "OwnerID" $s.AssignedUserID}}
+          {{else}}
+          <p class="text-xs text-slate-500">처리담당자</p><p>{{if $s.AssignedTo}}{{$s.AssignedTo}}{{else}}—{{end}}</p>
+          {{end}}
+          <input type="hidden" name="{{$p}}assigned_to" value="{{$s.AssignedTo}}">
+          <input type="hidden" name="{{$p}}assigned_user_id" value="{{$s.AssignedUserID}}">
+          <input type="hidden" name="{{$p}}set_id" value="{{$s.SetID}}">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">근무구분 <span class="text-red-500">*</span></label>
+          <div class="flex items-center gap-5 min-h-[42px]">
+            <label class="inline-flex items-center gap-2 text-sm"><input type="radio" name="{{$p}}work_place" value="office" {{if eq $s.WorkPlace "office"}}checked{{end}} {{if $ro}}disabled{{end}} class="text-blue-600 as-set-place"> 내근</label>
+            <label class="inline-flex items-center gap-2 text-sm"><input type="radio" name="{{$p}}work_place" value="field" {{if or (eq $s.WorkPlace "field") (eq $s.WorkPlace "")}}checked{{end}} {{if $ro}}disabled{{end}} class="text-blue-600 as-set-place"> 외근</label>
+          </div>
+        </div>
+        <div class="min-w-0">
+          <label class="block text-sm font-medium text-slate-700 mb-1">처리유형 <span class="text-red-500">*</span></label>
+          <select name="{{$p}}process_type" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-ptype">
+            <option value="">선택</option>
+            {{range $root.ProcTypes}}
+            <option value="{{.CodeValue}}" data-places="{{processTypePlaces .CodeValue}}" {{if eq .CodeValue $s.ProcessType}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="as-set-visit min-w-0 {{if ne $s.ProcessType "visit"}}hidden{{end}}">
+          <p class="text-[11px] text-slate-500 pt-7">현장방문 — 작업일이 방문일로 기록됩니다</p>
+        </div>
+        <div class="as-set-undetermined min-w-0 {{if ne $s.ProcessType "undetermined"}}hidden{{end}}">
+          <label class="block text-sm font-medium text-slate-700 mb-1">미정 사유</label>
+          <input type="text" name="{{$p}}process_type_reason" value="{{$s.ProcessTypeReason}}" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        {{template "as_cause_cat1_fields" dict "Prefix" $p "FieldID" (printf "as-set-%d-cause-cat1" $s.Seq) "AS" $s "CauseCatL1" $root.CauseCatL1 "CauseCatCustomRecent" $root.CauseCatCustomRecent "ReadOnly" $ro "CauseFreeInput" $root.CauseFreeInput}}
+        <div class="min-w-0 sm:col-span-2">
+          <label class="block text-sm font-medium text-slate-700 mb-1">장애원인</label>
+          <textarea name="{{$p}}cause_detail" rows="2" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-cause">{{$s.CauseDetail}}</textarea>
+        </div>
+      </div>
+      {{template "as_action_work_time" dict "Set" $s "Root" $root}}
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">조치내용 <span class="text-red-500">*</span></label>
+        <p class="text-[11px] text-slate-500 mb-1">이 내용이 다음 사람에게 답이 됩니다. 조금 더 적어 주시겠습니까?</p>
+        <textarea name="{{$p}}action_taken" rows="4" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-text" placeholder="수행한 조치 내용을 입력하세요">{{$s.ActionTaken}}</textarea>
+        {{if not $ro}}
+        <label class="mt-2 inline-flex items-start gap-2 text-sm"><input type="checkbox" name="{{$p}}action_na" value="1" {{if $s.ActionNA}}checked{{end}} class="mt-0.5 rounded"> 해당 없음</label>
+        <input type="text" name="{{$p}}action_na_reason" value="{{$s.ActionNAReason}}" placeholder="해당 없음 사유" class="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        {{end}}
+      </div>
+      {{if $s.OverlapWarn}}<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{{$s.OverlapWarn}}</p>{{end}}
+    </section>
+    <section class="rounded-xl border border-slate-200 p-4 space-y-2">
+      <div class="flex justify-between items-center"><h4 class="text-sm font-semibold">조치 사진 입력</h4><span class="text-xs text-slate-500">사진 {{$s.PhotoN}}장</span></div>
+      {{if not $ro}}
+      <input type="hidden" name="action_set_id" form="as-action-attach-form" value="{{$s.SetID}}" class="as-set-photo-id">
+      <p class="text-xs text-slate-500">이 조치에 붙는 사진입니다. 아래 첨부 영역에서 올립니다.</p>
+      {{end}}
+    </section>
+    <section class="rounded-xl border border-slate-200 p-4 space-y-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h4 class="text-sm font-semibold">조치 결과</h4>
+        <p class="text-[11px] text-slate-500">결과를 선택하면 이 조치가 저장되고 접힙니다. 결과를 정하지 못했으면 「임시 저장」을 누르세요. 마지막 조치의 결과만 접수 상태에 반영됩니다.</p>
+      </div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">결과 <span class="text-red-500">*</span></label>
+      <select name="{{$p}}result_code" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-result">
+        <option value="">선택하세요</option>
+        {{range $root.ActionResults}}
+        <option value="{{.Value}}" {{if eq .Value $s.ResultCode}}selected{{end}}>{{.Label}}</option>
+        {{end}}
+        {{if and $s.ResultCode (not (eq $s.ResultCode "done")) (not (eq $s.ResultCode "partial")) (not (eq $s.ResultCode "transfer"))}}
+        <option value="{{$s.ResultCode}}" selected disabled>{{actionResultLabel $s.ResultCode}} (기존 · 3종 중 하나로 바꾸세요)</option>
+        {{end}}
+      </select>
+      <p class="as-set-err text-sm text-red-700 hidden"></p>
+      <p class="as-set-missing text-sm text-slate-500 hidden"></p>
+      {{if not $ro}}
+      <button type="button" class="btn-secondary text-xs as-set-save">임시 저장</button>
+      {{end}}
+    </section>
+  </div>
+</div>
+{{end}}

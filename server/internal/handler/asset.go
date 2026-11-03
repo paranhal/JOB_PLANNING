@@ -154,6 +154,11 @@ func (h *AssetHandler) Create(c echo.Context) error {
 		notice = msgManagementTypeOnly3
 	}
 	applyAssetBusinessRules(a)
+	if h.wbRepo != nil {
+		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, a.ProjectID); err != nil {
+			return err
+		}
+	}
 	if err := h.repo.Create(a); err != nil {
 		return err
 	}
@@ -174,11 +179,12 @@ func (h *AssetHandler) Show(c echo.Context) error {
 	}
 	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 	history, _ := h.wbRepo.ListAssetSupportHistory(id, 80)
+	workHist, _ := h.wbRepo.ListWorkHistoryForAsset(id)
 	return c.Render(http.StatusOK, "asset/show.html", map[string]interface{}{
 		"Title": a.ProductName, "Active": NavAssets, "Asset": a,
 		"Images": slots, "ImageCount": filled, "CanUpload": filled < 3,
 		"CanWrite": canWriteMaster(c), "CanReceive": canReceiveAS(c),
-		"SupportHistory": history,
+		"SupportHistory": history, "WorkHistory": workHist,
 	})
 }
 
@@ -282,6 +288,11 @@ func (h *AssetHandler) Update(c echo.Context) error {
 		notice = msgManagementTypeOnly3
 	}
 	applyAssetBusinessRules(a)
+	if h.wbRepo != nil {
+		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, a.ProjectID); err != nil {
+			return err
+		}
+	}
 	if err := h.repo.Update(a); err != nil {
 		return err
 	}

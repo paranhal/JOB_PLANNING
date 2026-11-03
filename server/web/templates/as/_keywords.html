@@ -1,11 +1,12 @@
 {{define "as_keyword_checks"}}
 {{$field := .KeywordField}}
-<div id="as-kw-box" class="sm:col-span-2" data-field="{{$field}}" data-extra="{{if .AS}}{{.AS.Symptom}}{{end}}">
-  <p class="text-xs font-medium text-slate-600 mb-1">키워드 후보
-    <span class="font-normal text-slate-400">· 해당하면 체크하세요. 자동으로 붙이지 않습니다</span>
+<div id="as-kw-box" class="w-full block" data-field="{{$field}}" data-extra="{{if .AS}}{{.AS.Symptom}}{{end}}">
+  <h2 class="text-sm font-semibold text-slate-800 mb-1">키워드</h2>
+  <p class="text-xs text-slate-500 mb-3">조치내용을 바탕으로 후보를 찾고, 해당하면 체크하세요. 자동으로 붙이지 않습니다.
     <a href="/as/keywords" class="ml-1 text-blue-600 hover:underline">사전</a>
   </p>
   <input type="hidden" name="kw_suggested_{{$field}}" id="as-kw-suggested" value="{{range .KeywordChecks}}{{if .Suggested}}{{.KeywordID}},{{end}}{{end}}">
+  <p class="text-[11px] text-slate-500 mb-1">자동 키워드 후보 (사전)</p>
   <div id="as-kw-list" class="flex flex-wrap gap-2">
     {{range .KeywordChecks}}
     <label data-label="{{.Keyword}}" data-group="{{.Group}}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs {{if .Linked}}border-blue-300 bg-blue-50{{else}}border-slate-200 bg-white{{end}}">
@@ -15,6 +16,15 @@
     </label>
     {{end}}
   </div>
-  <p id="as-kw-empty" class="text-[11px] text-slate-400 {{if .KeywordChecks}}hidden{{end}}">본문에 맞는 사전 키워드가 있으면 여기 뜹니다.</p>
+  <p id="as-kw-empty" class="text-[11px] text-teal-800 bg-teal-50 rounded-lg px-3 py-2 {{if .KeywordChecks}}hidden{{end}}">자동 키워드 후보가 없습니다.</p>
+  <p class="text-[11px] text-slate-500 mt-3 mb-1">새 키워드 후보 (사전에 없는 말 · 선택하면 저장 때 사전에 함께 등록)</p>
+  <div id="as-kw-new" class="flex flex-wrap gap-2"></div>
+  <p id="as-kw-new-empty" class="text-[11px] text-teal-800 bg-teal-50 rounded-lg px-3 py-2">새로 만들 후보가 없습니다.</p>
+  <label class="flex flex-col gap-1 text-xs text-slate-500 mt-3 w-full">직접 입력 (쉼표(,)로 구분하고 이름(그룹) 형식으로 쓰세요. 그룹은 대상·증상·원인·조치)
+    <input id="as-kw-manual" name="kw_manual" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="예: DB(대상), 오류(증상), 재기동(조치)" value="">
+  </label>
+  <p id="as-kw-manual-err" class="text-xs text-red-700 mt-1 hidden"></p>
+  <p class="text-[11px] text-slate-500 mt-3">선택된 키워드</p>
+  <p id="as-kw-chosen" class="text-sm text-slate-700">없음</p>
 </div>
 {{end}}

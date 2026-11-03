@@ -29,8 +29,8 @@ func TestProcessConflictsExcelAndAdminTab(t *testing.T) {
 	) VALUES ('as-xlsx','R2609-XL','c-xlsx','2026-09-01','completed','증상','app','접수본문XYZ')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO as_processes (process_id, as_id, process_datetime, work_content)
-		VALUES ('p-xlsx','as-xlsx','2026-09-02','이력본문ABC')`); err != nil {
+	if _, err := db.Exec(`INSERT INTO as_processes (process_id, as_id, process_datetime, work_content, time_spent)
+		VALUES ('p-xlsx','as-xlsx','2026-09-02','이력본문ABC',30)`); err != nil {
 		t.Fatal(err)
 	}
 

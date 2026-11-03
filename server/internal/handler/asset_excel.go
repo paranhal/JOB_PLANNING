@@ -8,6 +8,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 // ExportExcel 설치자산 목록 엑셀 (현재 검색·기관·정렬 반영)
@@ -100,14 +101,10 @@ func buildAssetExcelWorkbook(items []model.Asset) (*excelize.File, error) {
 }
 
 func excelProductCategoryLabel(s string) string {
-	m := map[string]string{
-		"homepage": "홈페이지", "elibrary": "전자도서관", "mobile": "모바일",
-		"rfid": "RFID자동화", "materials": "자료관리", "other": "기타",
+	if strings.TrimSpace(s) == "" {
+		return s
 	}
-	if l, ok := m[s]; ok {
-		return l
-	}
-	return s
+	return repository.ProductCategoryLabel(s)
 }
 
 func excelOpStatusLabel(s string) string {
