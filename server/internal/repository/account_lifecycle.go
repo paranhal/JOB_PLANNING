@@ -123,6 +123,13 @@ func (r *AccountRepo) Reserve(username, userID, reason string) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("db")
 	}
+	return reserveOn(r.db, username, userID, reason, time.Now().Format("2006-01-02 15:04:05"))
+}
+
+func reserveOn(q rowDB, username, userID, reason, now string) error {
+	if q == nil {
+		return fmt.Errorf("db")
+	}
 	norm := model.NormalizeUsername(username)
 	if norm == "" || strings.TrimSpace(userID) == "" {
 		return fmt.Errorf("아이디가 비었습니다")
@@ -130,10 +137,13 @@ func (r *AccountRepo) Reserve(username, userID, reason string) error {
 	if reason == "" {
 		reason = model.ReserveCurrent
 	}
-	_, err := r.db.Exec(`INSERT INTO username_reservations(username_norm,user_id,reason,created_at)
+	if strings.TrimSpace(now) == "" {
+		now = time.Now().Format("2006-01-02 15:04:05")
+	}
+	_, err := q.Exec(`INSERT INTO username_reservations(username_norm,user_id,reason,created_at)
 		VALUES(?,?,?,?)
 		ON CONFLICT(username_norm) DO UPDATE SET user_id=excluded.user_id, reason=excluded.reason`,
-		norm, strings.TrimSpace(userID), reason, time.Now().Format("2006-01-02 15:04:05"))
+		norm, strings.TrimSpace(userID), reason, now)
 	return err
 }
 
@@ -153,22 +163,277 @@ func (r *AccountRepo) UsernameReserved(username, exceptUserID string) (bool, err
 	return n > 0, err
 }
 
-func (r *UserRepo) UsernameTaken(username, exceptUserID string) (bool, error) {
-	username = strings.TrimSpace(username)
-	if r == nil || r.db == nil || username == "" {
-		return false, fmt.Errorf("아이디가 비었습니다")
+type rowDB interface {
+	QueryRow(query string, args ...any) *sql.Row
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func (r *AccountRepo) GetReservation(username string) (*model.UsernameReservation, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("db")
 	}
-	acc := NewAccountRepo(r.db)
-	res, err := acc.UsernameReserved(username, exceptUserID)
+	return getReservationOn(r.db, username)
+}
+
+func getReservationOn(q rowDB, username string) (*model.UsernameReservation, error) {
+	if q == nil {
+		return nil, fmt.Errorf("db")
+	}
+	norm := model.NormalizeUsername(username)
+	if norm == "" {
+		return nil, nil
+	}
+	var it model.UsernameReservation
+	err := q.QueryRow(`SELECT username_norm,user_id,reason,created_at FROM username_reservations WHERE username_norm=?`, norm).
+		Scan(&it.UsernameNorm, &it.UserID, &it.Reason, &it.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &it, nil
+}
+
+func (r *AccountRepo) ListHeldReservations() ([]model.UsernameReservation, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("db")
+	}
+	rows, err := r.db.Query(`SELECT r.username_norm, r.user_id, r.reason, r.created_at,
+		COALESCE(u.full_name,''), COALESCE(u.username,''), COALESCE(u.deleted_at,'')
+		FROM username_reservations r
+		LEFT JOIN users u ON u.user_id=r.user_id
+		WHERE r.reason!=?
+		ORDER BY r.created_at DESC, r.username_norm`, model.ReserveCurrent)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.UsernameReservation
+	for rows.Next() {
+		var it model.UsernameReservation
+		var del string
+		if err := rows.Scan(&it.UsernameNorm, &it.UserID, &it.Reason, &it.CreatedAt, &it.OwnerName, &it.OwnerUsername, &del); err != nil {
+			return nil, err
+		}
+		it.OwnerDeleted = strings.TrimSpace(del) != ""
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (r *UserRepo) findByUsernameAny(username string) (*model.User, error) {
+	return findByUsernameAnyOn(r.db, username)
+}
+
+func findByUsernameAnyOn(q rowDB, username string) (*model.User, error) {
+	if q == nil {
+		return nil, fmt.Errorf("db")
+	}
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, nil
+	}
+	row := q.QueryRow(userSelect+` WHERE username=? COLLATE NOCASE`, username)
+	u, err := scanUser(row, false)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func getByIDOn(q rowDB, id string) (*model.User, error) {
+	if q == nil {
+		return nil, fmt.Errorf("db")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, nil
+	}
+	row := q.QueryRow(userSelectAuth+` WHERE user_id=?`, id)
+	u, err := scanUser(row, true)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) LookupUsernameConflict(username, exceptUserID string) (model.UsernameConflict, error) {
+	if r == nil || r.db == nil {
+		return model.UsernameConflict{}, fmt.Errorf("아이디가 비었습니다")
+	}
+	return lookupUsernameConflictOn(r.db, username, exceptUserID)
+}
+
+func lookupUsernameConflictOn(q rowDB, username, exceptUserID string) (model.UsernameConflict, error) {
+	username = strings.TrimSpace(username)
+	exceptUserID = strings.TrimSpace(exceptUserID)
+	if q == nil || username == "" {
+		return model.UsernameConflict{}, fmt.Errorf("아이디가 비었습니다")
+	}
+	hit, err := findByUsernameAnyOn(q, username)
+	if err != nil {
+		return model.UsernameConflict{}, err
+	}
+	if hit != nil && hit.UserID != exceptUserID {
+		cf := conflictFromUser(username, hit)
+		return cf, nil
+	}
+	res, err := getReservationOn(q, username)
+	if err != nil {
+		return model.UsernameConflict{}, err
+	}
+	if res == nil {
+		return model.UsernameConflict{}, nil
+	}
+	if res.UserID == exceptUserID && (res.Reason == model.ReserveCurrent || res.Reason == model.ReserveRenamedFrom) {
+		return model.UsernameConflict{}, nil
+	}
+	return conflictFromReservation(q, username, res), nil
+}
+
+func conflictFromUser(username string, hit *model.User) model.UsernameConflict {
+	cf := model.UsernameConflict{
+		UserID: hit.UserID, User: hit, Username: username,
+		OwnerName: hit.FullName, OwnerUsername: hit.Username, OwnerDeleted: hit.IsDeleted(),
+	}
+	if hit.IsDeleted() {
+		cf.Kind = model.UsernameConflictDeleted
+		cf.Reason = model.ReserveDeleted
+		cf.ReservedAt = hit.DeletedAt
+		return cf
+	}
+	cf.Kind = model.UsernameConflictLive
+	cf.Reason = model.ReserveCurrent
+	return cf
+}
+
+func conflictFromReservation(q rowDB, username string, res *model.UsernameReservation) model.UsernameConflict {
+	cf := model.UsernameConflict{
+		UserID: res.UserID, Username: username, ReservedAt: res.CreatedAt, Reason: res.Reason,
+	}
+	owner, _ := getByIDOn(q, res.UserID)
+	if owner != nil {
+		cf.User = owner
+		cf.OwnerName = owner.FullName
+		cf.OwnerUsername = owner.Username
+		cf.OwnerDeleted = owner.IsDeleted()
+	}
+	switch res.Reason {
+	case model.ReserveDeleted:
+		if owner != nil && owner.IsDeleted() {
+			cf.Kind = model.UsernameConflictDeleted
+		} else if owner == nil {
+			cf.Kind = model.UsernameConflictReservedOrphan
+		} else {
+			cf.Kind = model.UsernameConflictDeleted
+		}
+	case model.ReserveRenamedFrom:
+		if owner == nil {
+			cf.Kind = model.UsernameConflictReservedOrphan
+		} else {
+			cf.Kind = model.UsernameConflictRenamed
+		}
+	case model.ReserveCurrent:
+		cf.Kind = model.UsernameConflictLive
+	default:
+		if owner == nil {
+			cf.Kind = model.UsernameConflictReservedOrphan
+		} else {
+			cf.Kind = model.UsernameConflictReserved
+		}
+	}
+	return cf
+}
+
+func (r *UserRepo) UsernameTaken(username, exceptUserID string) (bool, error) {
+	cf, err := r.LookupUsernameConflict(username, exceptUserID)
 	if err != nil {
 		return false, err
 	}
-	if res {
-		return true, nil
+	return !cf.Empty(), nil
+}
+
+func (r *UserRepo) ReleaseUsernameReservation(username, actorID, note, applyUserID string) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("db")
 	}
-	var n int
-	err = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username=? COLLATE NOCASE AND user_id!=?`, username, strings.TrimSpace(exceptUserID)).Scan(&n)
-	return n > 0, err
+	username = strings.TrimSpace(username)
+	note = strings.TrimSpace(note)
+	actorID = strings.TrimSpace(actorID)
+	applyUserID = strings.TrimSpace(applyUserID)
+	if username == "" {
+		return fmt.Errorf("아이디가 비었습니다")
+	}
+	if note == "" {
+		return fmt.Errorf("해제 사유가 필요합니다")
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	if err := r.releaseUsernameReservationTx(tx, username, actorID, note, applyUserID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *UserRepo) releaseUsernameReservationTx(tx *sql.Tx, username, actorID, note, applyUserID string) error {
+	res, err := getReservationOn(tx, username)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return fmt.Errorf("예약이 없습니다")
+	}
+	if res.Reason == model.ReserveCurrent {
+		return fmt.Errorf("지금 쓰는 아이디의 예약은 해제할 수 없습니다")
+	}
+	hit, err := findByUsernameAnyOn(tx, username)
+	if err != nil {
+		return err
+	}
+	if hit != nil {
+		if hit.IsDeleted() {
+			return fmt.Errorf("삭제된 계정이 이 아이디를 가지고 있습니다. 복구 기능을 쓰세요")
+		}
+		return fmt.Errorf("이미 사용 중인 아이디입니다")
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if _, err := tx.Exec(`DELETE FROM username_reservations WHERE username_norm=?`, res.UsernameNorm); err != nil {
+		return err
+	}
+	lifeUser := strings.TrimSpace(res.UserID)
+	if lifeUser == "" {
+		lifeUser = applyUserID
+	}
+	if lifeUser == "" {
+		lifeUser = actorID
+	}
+	if lifeUser == "" {
+		lifeUser = "system"
+	}
+	detail := res.UsernameNorm + " " + res.Reason
+	if _, err := tx.Exec(`INSERT INTO user_lifecycle_events(event_id,user_id,kind,actor_id,note,detail,created_at) VALUES(?,?,?,?,?,?,?)`,
+		newID("ULE"), lifeUser, model.LifeReservationReleased, actorID, note, detail, now); err != nil {
+		return err
+	}
+	if err := audit.InsertTx(tx, audit.ActionDelete, "username_reservations", "username_norm", res.UsernameNorm, res.UsernameNorm, res.Reason, "", note, "아이디 예약 해제"); err != nil {
+		return err
+	}
+	if applyUserID != "" {
+		if err := r.renameUsernameTx(tx, applyUserID, username); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *AccountRepo) AddLifecycle(userID, kind, actorID, note, detail string) error {
@@ -362,7 +627,9 @@ const accReqSelect = `SELECT request_id, org_id, requested_by, full_name, userna
 	status, COALESCE(restore_user_id,''), COALESCE(decided_by,''), COALESCE(decided_at,''), COALESCE(decision_note,''),
 	COALESCE(created_user_id,''), COALESCE(created_at,'') FROM account_requests`
 
-func scanAccountRequest(row interface{ Scan(dest ...interface{}) error }) (model.AccountRequest, error) {
+func scanAccountRequest(row interface {
+	Scan(dest ...interface{}) error
+}) (model.AccountRequest, error) {
 	var a model.AccountRequest
 	err := row.Scan(&a.RequestID, &a.OrgID, &a.RequestedBy, &a.FullName, &a.Username, &a.Role, &a.Mobile, &a.Reason,
 		&a.Status, &a.RestoreUserID, &a.DecidedBy, &a.DecidedAt, &a.DecisionNote, &a.CreatedUserID, &a.CreatedAt)

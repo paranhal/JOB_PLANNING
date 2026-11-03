@@ -62,9 +62,8 @@ func (h *AuthHandler) MembersRequestCreate(c echo.Context) error {
 	if name == "" || user == "" {
 		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape("이름과 아이디를 입력하세요."))
 	}
-	taken, err := h.userRepo.UsernameTaken(user, "")
-	if err != nil || taken {
-		return c.Redirect(http.StatusSeeOther, "/admin/my-org/members?err="+url.QueryEscape(model.UsernameReservedMsg))
+	if blocked, err := h.redirectIfUsernameConflict(c, "/admin/my-org/members", user, ""); blocked {
+		return err
 	}
 	req := &model.AccountRequest{
 		OrgID: home, RequestedBy: ctxString(c, "user_id"), FullName: name, Username: user,
@@ -114,11 +113,13 @@ func (h *AuthHandler) AccountRequestList(c echo.Context) error {
 			items[i].RestoreUserID = d.UserID
 		}
 	}
-	return c.Render(http.StatusOK, "admin/account_requests.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "등록 요청", "Active": NavUsers, "Items": items,
 		"OK": c.QueryParam("ok"), "Error": c.QueryParam("err"),
 		"TempPW": takeOncePassword(c.QueryParam("once")),
-	})
+	}
+	h.attachDupUsername(c, data)
+	return c.Render(http.StatusOK, "admin/account_requests.html", data)
 }
 
 func (h *AuthHandler) AccountRequestDecide(c echo.Context) error {
@@ -142,9 +143,8 @@ func (h *AuthHandler) AccountRequestDecide(c echo.Context) error {
 		})
 		return c.Redirect(http.StatusSeeOther, "/admin/users/requests?ok="+url.QueryEscape("반려했습니다."))
 	}
-	taken, err := h.userRepo.UsernameTaken(a.Username, strings.TrimSpace(c.FormValue("restore_user_id")))
-	if err != nil || taken {
-		return c.Redirect(http.StatusSeeOther, "/admin/users/requests?err="+url.QueryEscape(model.UsernameReservedMsg))
+	if blocked, err := h.redirectIfUsernameConflict(c, "/admin/users/requests", a.Username, strings.TrimSpace(c.FormValue("restore_user_id"))); blocked {
+		return err
 	}
 	pw, err := randomTempPassword()
 	if err != nil {
@@ -187,9 +187,18 @@ func (h *AuthHandler) DeletedUsers(c echo.Context) error {
 	if !h.requireVision(c) {
 		return h.forbidden(c)
 	}
+	tab := strings.TrimSpace(c.QueryParam("tab"))
+	if tab == "" {
+		tab = "deleted"
+	}
 	items, _ := h.userRepo.ListDeleted()
-	return c.Render(http.StatusOK, "admin/users_deleted.html", map[string]interface{}{
+	var held []model.UsernameReservation
+	if h.accounts != nil {
+		held, _ = h.accounts.ListHeldReservations()
+	}
+	data := map[string]interface{}{
 		"Title": "삭제 내역", "Active": NavUsers, "Items": items,
+		"Reservations": held, "Tab": tab,
 		"OK": c.QueryParam("ok"), "Error": c.QueryParam("err"),
 		"TempPW": takeOncePassword(c.QueryParam("once")),
 		"Orgs": func() []model.Org {
@@ -199,7 +208,9 @@ func (h *AuthHandler) DeletedUsers(c echo.Context) error {
 			o, _ := h.orgRepo.ListActive()
 			return o
 		}(),
-	})
+	}
+	h.attachDupUsername(c, data)
+	return c.Render(http.StatusOK, "admin/users_deleted.html", data)
 }
 
 func (h *AuthHandler) RestoreUser(c echo.Context) error {
@@ -207,21 +218,41 @@ func (h *AuthHandler) RestoreUser(c echo.Context) error {
 		return h.forbidden(c)
 	}
 	if !h.verifyVisionAdminPassword(c, c.FormValue("vision_password")) {
-		return c.Redirect(http.StatusSeeOther, "/admin/users/deleted?err="+url.QueryEscape("비젼관리자 비밀번호가 올바르지 않습니다."))
+		ret := safeUsernameDupReturn(c.FormValue("return"))
+		q := url.Values{}
+		q.Set("err", "비젼관리자 비밀번호가 올바르지 않습니다.")
+		id := strings.TrimSpace(c.Param("id"))
+		if id != "" {
+			q.Set("dup", "deleted")
+			q.Set("id", id)
+			q.Set("return", ret)
+		}
+		return c.Redirect(http.StatusSeeOther, ret+"?"+q.Encode())
 	}
 	id := strings.TrimSpace(c.Param("id"))
 	role := model.NormalizeRole(c.FormValue("job"))
 	orgID := strings.TrimSpace(c.FormValue("org_id"))
 	note := strings.TrimSpace(c.FormValue("reason"))
+	ret := safeUsernameDupReturn(c.FormValue("return"))
+	fail := func(msg string) error {
+		q := url.Values{}
+		q.Set("err", msg)
+		if strings.TrimSpace(id) != "" {
+			q.Set("dup", "deleted")
+			q.Set("id", id)
+			q.Set("return", ret)
+		}
+		return c.Redirect(http.StatusSeeOther, ret+"?"+q.Encode())
+	}
 	if note == "" {
-		return c.Redirect(http.StatusSeeOther, "/admin/users/deleted?err="+url.QueryEscape("복구 사유가 필요합니다."))
+		return fail("복구 사유가 필요합니다.")
 	}
 	if err := h.userRepo.Restore(id, ctxString(c, "user_id"), role, orgID, note); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/admin/users/deleted?err="+url.QueryEscape(err.Error()))
+		return fail(err.Error())
 	}
 	pw, err := randomTempPassword()
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/admin/users/deleted?err="+url.QueryEscape("임시 비밀번호를 만들지 못했습니다."))
+		return fail("임시 비밀번호를 만들지 못했습니다.")
 	}
 	_ = h.userRepo.UpdatePassword(id, HashPassword(pw))
 	_ = h.userRepo.SetMustChangePassword(id, true)
@@ -230,6 +261,60 @@ func (h *AuthHandler) RestoreUser(c echo.Context) error {
 		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
 		TargetTable: "users", TargetID: id, Detail: "계정 복구", Reason: note,
 	})
-	return c.Redirect(http.StatusSeeOther, "/admin/users/deleted?ok="+url.QueryEscape("복구했습니다. 임시 비밀번호는 한 번만 보입니다.")+"&once="+url.QueryEscape(tok))
+	okQ := url.Values{}
+	okQ.Set("ok", "복구했습니다. 임시 비밀번호는 한 번만 보입니다.")
+	okQ.Set("once", tok)
+	return c.Redirect(http.StatusSeeOther, ret+"?"+okQ.Encode())
 }
 
+func (h *AuthHandler) ReleaseUsernameReservation(c echo.Context) error {
+	if !h.requireVision(c) || isReadOnly(c) {
+		return h.forbidden(c)
+	}
+	uname := strings.TrimSpace(c.FormValue("username"))
+	applyID := strings.TrimSpace(c.FormValue("apply_user_id"))
+	note := strings.TrimSpace(c.FormValue("reason"))
+	dup := strings.TrimSpace(c.FormValue("dup"))
+	if dup == "" {
+		dup = model.UsernameConflictRenamed
+	}
+	ret := safeUsernameDupReturn(c.FormValue("return"))
+	fail := func(msg string) error {
+		q := url.Values{}
+		q.Set("err", msg)
+		q.Set("dup", dup)
+		q.Set("username", uname)
+		q.Set("return", ret)
+		if applyID != "" {
+			q.Set("apply_user_id", applyID)
+		}
+		return c.Redirect(http.StatusSeeOther, ret+"?"+q.Encode())
+	}
+	if !h.verifyVisionAdminPassword(c, c.FormValue("vision_password")) {
+		return fail("비젼관리자 비밀번호가 올바르지 않습니다.")
+	}
+	if uname == "" {
+		return fail("아이디가 비었습니다")
+	}
+	if note == "" {
+		return fail("해제 사유가 필요합니다.")
+	}
+	if err := h.userRepo.ReleaseUsernameReservation(uname, ctxString(c, "user_id"), note, applyID); err != nil {
+		return fail(err.Error())
+	}
+	accessLog(c, auditlog.Record{
+		Action: auditlog.ActionUpdate, Result: auditlog.ResultOK,
+		TargetTable: "username_reservations", TargetID: uname, Detail: "아이디 예약 해제", Reason: note,
+	})
+	okQ := url.Values{}
+	if applyID != "" {
+		okQ.Set("ok", "예약을 해제하고 아이디를 바꿨습니다.")
+		if ctxString(c, "user_id") == applyID {
+			h.clearTokenCookie(c)
+			return c.Redirect(http.StatusSeeOther, "/login")
+		}
+	} else {
+		okQ.Set("ok", "예약을 해제했습니다. 다시 등록하거나 변경하세요.")
+	}
+	return c.Redirect(http.StatusSeeOther, ret+"?"+okQ.Encode())
+}

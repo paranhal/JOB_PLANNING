@@ -47,6 +47,8 @@ func v68App(t *testing.T) (*echo.Echo, *repository.UserRepo, *repository.Account
 	g.POST("/admin/users/requests/:id/decide", h.Auth.AccountRequestDecide, sec, adminOnly)
 	g.GET("/admin/users/deleted", h.Auth.DeletedUsers, sec, adminOnly)
 	g.POST("/admin/users/deleted/:id/restore", h.Auth.RestoreUser, sec, adminOnly)
+	g.POST("/admin/users/reservations/release", h.Auth.ReleaseUsernameReservation, sec, adminOnly)
+	g.POST("/users/:id/username", h.Auth.UserRenameUsername, sec, adminOnly)
 	g.POST("/login", h.Auth.Login)
 	g.GET("/account", h.Auth.AccountPage)
 	g.POST("/account/password", h.Auth.AccountChangePassword)
@@ -230,8 +232,8 @@ func TestV68SoftDeleteRestoreAndReservedUsername(t *testing.T) {
 	dreq.AddCookie(jwtOrgCookie(t, oa))
 	e.ServeHTTP(deny, dreq)
 	loc := deny.Header().Get("Location")
-	if !strings.Contains(loc, url.QueryEscape(model.UsernameReservedMsg)) && !strings.Contains(loc, "%EC%9D%B4%EB%AF%B8") {
-		t.Fatalf("예약 거부 loc=%s", loc)
+	if !strings.Contains(loc, "dup=deleted") || !strings.Contains(loc, "id="+u.UserID) {
+		t.Fatalf("삭제 아이디 팝업 거절 loc=%s", loc)
 	}
 
 	rst := httptest.NewRecorder()
