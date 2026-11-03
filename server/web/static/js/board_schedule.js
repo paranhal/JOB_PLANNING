@@ -1,8 +1,13 @@
 (function () {
+  function boot() {
   var root = document.getElementById('board-root');
   if (!root) return;
+  if (root.getAttribute('data-board-sched-bound') === '1') return;
   var form = document.getElementById('board-move-form');
-  if (!form) return;
+  if (!form) {
+    root.setAttribute('data-board-sched-bound', '0');
+    return;
+  }
   var leaveNames = [];
   try {
     var raw = root.getAttribute('data-leave-names') || '[]';
@@ -103,6 +108,16 @@
   function zoneFrom(el) {
     return el && el.closest ? el.closest('[data-drop]') : null;
   }
+  function dayzoneAt(x, y, ignore) {
+    var prev = '';
+    if (ignore) {
+      prev = ignore.style.pointerEvents;
+      ignore.style.pointerEvents = 'none';
+    }
+    var hit = document.elementFromPoint(x, y);
+    if (ignore) ignore.style.pointerEvents = prev;
+    return hit && hit.closest ? hit.closest('[data-dayzone]') : null;
+  }
 
   root.addEventListener('click', function (e) {
     if (Date.now() < ignoreClickUntil) {
@@ -149,25 +164,12 @@
     }
   });
 
-  root.addEventListener('click', function (e) {
-    var n = e.target.closest('[data-nudge]');
-    if (!n) return;
-    e.preventDefault();
-    e.stopPropagation();
-    var bar = barFrom(n);
-    if (!bar || bar.getAttribute('data-can-resize') !== '1') return;
-    var add = parseInt(n.getAttribute('data-nudge'), 10) || 0;
-    var start = bar.getAttribute('data-start') || '09:00';
-    var end = addMin(bar.getAttribute('data-end') || addMin(start, parseInt(bar.getAttribute('data-duration'), 10) || 30), add);
-    submitResize(bar, start, end);
-  });
-
   root.addEventListener('dragstart', function (e) {
     if (resizing || moving || pendingMove || Date.now() < ignoreClickUntil) {
       e.preventDefault();
       return;
     }
-    if (e.target.closest('[data-resize],[data-nudge],[data-bar-act]')) {
+    if (e.target.closest('[data-resize],[data-bar-act]')) {
       e.preventDefault();
       return;
     }
@@ -257,6 +259,8 @@
     }
     if (moving) {
       e.preventDefault();
+      var over = dayzoneAt(e.clientX, e.clientY, moving.bar);
+      if (over) moving.zone = over;
       var startMin = snapY(moving.zone, e.clientY);
       moving.bar.style.top = ((startMin - DAY_START) * PX_HOUR / 60 + 2) + 'px';
       moving.start = hhmm(startMin);
@@ -285,7 +289,9 @@
       ignoreClickUntil = Date.now() + 400;
       m.bar.classList.remove('board-bar-picked', 'drag');
       if (m.start) {
-        submitMove(m.bar, m.bar.getAttribute('data-date'), m.start, '', m.bar.getAttribute('data-assignee'), false);
+        var colAs = m.zone ? m.zone.getAttribute('data-assignee') : null;
+        submitMove(m.bar, m.bar.getAttribute('data-date'), m.start, '',
+          colAs !== null ? colAs : m.bar.getAttribute('data-assignee'), colAs !== null);
       } else if (m.origTop != null) {
         m.bar.style.top = m.origTop + 'px';
       }
@@ -313,4 +319,8 @@
     resizing = null;
     ignoreClickUntil = Date.now() + 400;
   });
+  root.setAttribute('data-board-sched-bound', '1');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();

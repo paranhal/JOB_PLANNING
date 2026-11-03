@@ -1,4 +1,5 @@
 (function () {
+  function boot() {
   function el(id) { return document.getElementById(id); }
   var board = document.querySelector('[data-kanban-board]');
   if (!board) return;
@@ -96,4 +97,8 @@
     if (!to) return;
     post({ item_key: card.getAttribute('data-item-key'), from: from, to: to });
   });
+  board.setAttribute('data-kanban-bound', '1');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();

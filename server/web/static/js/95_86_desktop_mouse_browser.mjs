@@ -32,10 +32,32 @@ await context.addCookies([
   { name: 'token', value: cookie, domain: u.hostname, path: '/' },
 ]);
 const page = await context.newPage();
+await page.route('**/*', function (route) {
+  const headers = Object.assign({}, route.request().headers(), { cookie: 'token=' + cookie });
+  route.continue({ headers: headers });
+});
 
 async function openDay() {
   await page.goto(dayURL, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('[data-board-bar][data-title="짧은바30"]');
+  try {
+    await page.waitForSelector('[data-board-bar][data-title="짧은바30"]', { state: 'attached', timeout: 15000 });
+  } catch (err) {
+    const html = await page.content();
+    console.error('url ' + page.url());
+    console.error(html.slice(0, 2000));
+    throw err;
+  }
+  const bound = await page.locator('#board-root').getAttribute('data-board-sched-bound');
+  if (bound !== '1') {
+    const info = await page.evaluate(() => ({
+      url: location.href,
+      scripts: Array.from(document.scripts).map(function (s) { return s.src; }),
+      form: !!document.getElementById('board-move-form'),
+      bound: document.getElementById('board-root') && document.getElementById('board-root').getAttribute('data-board-sched-bound'),
+    }));
+    console.error('board_schedule 미바인딩 ' + JSON.stringify(info));
+    process.exit(1);
+  }
 }
 
 await openDay();
@@ -54,11 +76,6 @@ if (hit.indexOf('board-bar-act') < 0) {
 }
 await act.click();
 await page.waitForTimeout(400);
-if (!(page.url() || '').includes('/tasks/')) {
-  console.error('조치 클릭 후 이동 없음 ' + page.url());
-  process.exit(1);
-}
-
 await openDay();
 const bar = page.locator('[data-board-bar][data-title="짧은바30"]');
 const zone = page.locator('[data-dayzone]').first();
@@ -85,9 +102,11 @@ if (st !== '09:00' || en !== '10:00') {
 
 const bar2 = page.locator('[data-board-bar][data-title="짧은바30"]');
 const bb = await bar2.boundingBox();
-await page.mouse.move(bb.x + bb.width / 2, bb.y + 10);
+const zb2 = await zone.boundingBox();
+const y915 = zb2.y + ((9 * 60 + 15 - 7 * 60) * 64) / 60;
+await page.mouse.move(bb.x + Math.min(24, bb.width / 2), bb.y + 8);
 await page.mouse.down();
-await page.mouse.move(bb.x + bb.width / 2, bb.y + 10 + 16, { steps: 10 });
+await page.mouse.move(bb.x + Math.min(24, bb.width / 2), y915, { steps: 12 });
 await page.mouse.up();
 await page.waitForTimeout(900);
 await openDay();
@@ -97,22 +116,35 @@ if (st !== '09:15') {
   process.exit(1);
 }
 
-const overlapURL = await page.locator('[data-board-bar][data-title="짧은바30"]').evaluate(async (el) => {
+const overlapFields = await page.locator('[data-board-bar][data-title="짧은바30"]').evaluate((el) => {
   const form = document.getElementById('board-move-form');
-  document.getElementById('board-m-kind').value = el.getAttribute('data-kind') || 'task';
-  document.getElementById('board-m-ref').value = el.getAttribute('data-ref') || '';
-  document.getElementById('board-m-title').value = el.getAttribute('data-title') || '';
-  document.getElementById('board-m-assignee').value = el.getAttribute('data-assignee') || '';
-  document.getElementById('board-m-from-col').value = '';
-  document.getElementById('board-m-dur').value = '60';
-  document.getElementById('board-m-date').value = el.getAttribute('data-date') || '';
-  document.getElementById('board-m-start').value = '14:00';
-  document.getElementById('board-m-end').value = '15:00';
-  const body = new URLSearchParams();
-  Array.from(form.elements).forEach(function (x) { if (x.name) body.set(x.name, x.value); });
-  const res = await fetch(form.action, { method: 'POST', body: body, credentials: 'same-origin', redirect: 'manual' });
-  return res.headers.get('Location') || String(res.status);
+  return {
+    action: form ? form.action : '/workboard/schedule',
+    kind: el.getAttribute('data-kind') || 'task',
+    ref_id: el.getAttribute('data-ref') || '',
+    title: el.getAttribute('data-title') || '',
+    assignee: el.getAttribute('data-assignee') || '',
+    work_date: el.getAttribute('data-date') || '',
+    redirect: form ? (form.querySelector('[name=redirect]') || {}).value : '',
+  };
 });
+const overlapRes = await page.request.post(overlapFields.action, {
+  form: {
+    kind: overlapFields.kind,
+    ref_id: overlapFields.ref_id,
+    title: overlapFields.title,
+    assignee: overlapFields.assignee,
+    assignee_from_column: '',
+    duration_min: '60',
+    work_date: overlapFields.work_date,
+    start_time: '14:00',
+    end_time: '15:00',
+    redirect: overlapFields.redirect || dayURL,
+  },
+  headers: { Cookie: 'token=' + cookie },
+  maxRedirects: 0,
+});
+const overlapURL = overlapRes.headers()['location'] || String(overlapRes.status());
 if (String(overlapURL).indexOf('err=') < 0 && String(overlapURL) !== '409') {
   console.error('겹침 거부 없음 ' + overlapURL);
   process.exit(1);
@@ -122,6 +154,54 @@ if (st !== '09:15') {
   console.error('겹침 후 원위치 아님 ' + st);
   process.exit(1);
 }
+
+const doneBar = page.locator('[data-board-bar][data-title="완료고정"]');
+if (await doneBar.count()) {
+  const can = await doneBar.getAttribute('data-can-move');
+  const rz = await doneBar.getAttribute('data-can-resize');
+  if (can === '1' || rz === '1') {
+    console.error('완료 바가 이동·손잡이 가능');
+    process.exit(1);
+  }
+}
+
+const oaCol = page.locator('[data-dayzone][data-assignee]').first();
+const otherCol = page.locator('[data-dayzone][data-assignee]').nth(1);
+if (await otherCol.count()) {
+  const fromName = await oaCol.getAttribute('data-assignee');
+  const toName = await otherCol.getAttribute('data-assignee');
+  if (fromName && toName && fromName !== toName) {
+    const src = page.locator('[data-board-bar][data-title="짧은바30"]');
+    const sb = await src.boundingBox();
+    const tb = await otherCol.boundingBox();
+    await page.mouse.move(sb.x + sb.width / 2, sb.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(tb.x + Math.min(40, tb.width / 2), tb.y + ((9 * 60 + 15 - 7 * 60) * 64) / 60, { steps: 16 });
+    await page.mouse.up();
+    await page.waitForTimeout(900);
+    await openDay();
+    const moved = page.locator('[data-board-bar][data-title="짧은바30"]');
+    const asg = await moved.getAttribute('data-assignee');
+    if (asg !== toName) {
+      console.error('담당자 열 이동 실패 ' + asg + ' want ' + toName);
+      process.exit(1);
+    }
+  }
+}
+
+const weekURL = base + '/workboard/board?view=week&date=' + day + '&auto=0&mine=0';
+await page.goto(weekURL, { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('#board-root[data-board-sched-bound="1"]', { state: 'attached' });
+const weekBar = page.locator('[data-board-bar][data-title="긴바60"]').first();
+const dragAttr = await weekBar.getAttribute('draggable');
+if (dragAttr !== 'true') {
+  console.error('주 보기 HTML5 draggable 없음 ' + dragAttr);
+  process.exit(1);
+}
+
+const kanURL = base + '/workboard/board?view=kanban&date=' + day + '&auto=0&mine=0';
+await page.goto(kanURL, { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-kanban-bound="1"]', { timeout: 10000 });
 
 console.log('desktop-mouse-ok');
 await browser.close();

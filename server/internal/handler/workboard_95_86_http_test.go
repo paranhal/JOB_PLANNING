@@ -350,8 +350,11 @@ func Test95_86_ResizeDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0&mine=0", ck).Body.String()
-	if !strings.Contains(body, `data-nudge="-15"`) || !strings.Contains(body, `data-resize="1"`) {
-		t.Fatal("일 보기 손잡이·±15 없음")
+	if strings.Contains(body, `data-nudge`) {
+		t.Fatal("±15 버튼이 남아 있음")
+	}
+	if !strings.Contains(body, `data-resize="1"`) {
+		t.Fatal("일 보기 손잡이 없음")
 	}
 	if !strings.Contains(body, `data-can-resize="1"`) {
 		t.Fatal("조절 가능 바 없음")

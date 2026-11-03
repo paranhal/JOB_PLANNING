@@ -62,12 +62,7 @@ for (const width of widths) {
       await fetch(form.action, { method: 'POST', body: body, credentials: 'same-origin', redirect: 'manual' });
     }
     var bar = document.querySelector('[data-board-bar]');
-    var zone = document.querySelector('[data-dayzone]');
-    if (bar && zone) {
-      bar.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      var r = zone.getBoundingClientRect();
-      zone.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: r.left + 24, clientY: r.top + 200, view: window }));
-    }
+    if (!bar) throw new Error('바 없음');
     fill(bar, '14:00', '15:00', bar.getAttribute('data-duration') || '60', true);
     await postForm();
     var start = bar.getAttribute('data-start') || '09:00';

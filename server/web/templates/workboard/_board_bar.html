@@ -59,10 +59,6 @@
       <button type="submit" class="board-bar-act-aux board-bar-x" title="대기 목록으로 내리기">&times;</button>
     </form>
     {{end}}
-    {{if and (eq $page.View `day`) $page.CanWrite $item.CanResize}}
-    <button type="button" class="board-bar-act-aux" data-bar-act="1" data-nudge="-15" title="15분 짧게">−15</button>
-    <button type="button" class="board-bar-act-aux" data-bar-act="1" data-nudge="15" title="15분 늘리기">+15</button>
-    {{end}}
   </div>
   {{end}}
   {{end}}
