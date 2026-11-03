@@ -202,8 +202,9 @@ func (r *StatsRepo) CountASAdminMoved(from, toEx string, f model.StatsMeetingFil
 		LEFT JOIN assets a ON a.asset_id = ar.asset_id
 		WHERE ar.status = '` + model.StatusAdminWork + `'
 		  AND TRIM(COALESCE(ar.moved_task_id,'')) != ''
-		  AND COALESCE(ar.complete_datetime, ar.updated_at, ar.receipt_datetime) >= ?
-		  AND COALESCE(ar.complete_datetime, ar.updated_at, ar.receipt_datetime) < ?` + asSQL
+		  AND TRIM(COALESCE(ar.complete_datetime,'')) != ''
+		  AND ar.complete_datetime >= ?
+		  AND ar.complete_datetime < ?` + asSQL
 	args := append([]interface{}{from, toEx}, extra...)
 	var n int
 	err := r.db.QueryRow(q, args...).Scan(&n)
