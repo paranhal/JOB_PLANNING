@@ -130,18 +130,18 @@ func TestTemplatesHaveNoUnconfirmedContractArea(t *testing.T) {
 
 func TestProjectDashboardContractedKindAndAct(t *testing.T) {
 	e, repo, wb := newProjectServer(t)
-	hidden := &model.WorkProject{Name: "계약전숨김", PlanYear: 2026, Status: model.WBProjectActive}
+	hidden := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "계약전숨김", PlanYear: 2026, Status: model.WBProjectActive}
 	if err := repo.Create(hidden); err != nil {
 		t.Fatal(err)
 	}
-	build := &model.WorkProject{
+	build := &model.WorkProject{OrgID: model.OrgIDLibrary, 
 		Name: "구축계약", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1000,
 		ProjectKind: model.ProjectKindBuild, ProjectKindSet: 1, StartDate: "2020-01-01", EndDate: "2099-01-01",
 	}
 	if err := repo.Create(build); err != nil {
 		t.Fatal(err)
 	}
-	need := &model.WorkProject{
+	need := &model.WorkProject{OrgID: model.OrgIDLibrary, 
 		Name: "종료확인", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 500,
 		ProjectKind: model.ProjectKindConstruction, ProjectKindSet: 1, StartDate: "2020-01-01", EndDate: "2020-02-01",
 	}
@@ -184,7 +184,7 @@ func TestProjectDashboardContractedKindAndAct(t *testing.T) {
 
 func TestProjectDashboardHidesUnclassifiedTabWhenEmpty(t *testing.T) {
 	e, repo, _ := newProjectServer(t)
-	p := &model.WorkProject{
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, 
 		Name: "확정만", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 10,
 		ProjectKind: model.ProjectKindDev, ProjectKindSet: 1,
 	}
@@ -214,7 +214,7 @@ func TestProjectDashboardHidesUnclassifiedTabWhenEmpty(t *testing.T) {
 func TestProjectDashboardActFilterAndConvertCopy(t *testing.T) {
 	e, db := newSalesServerDB(t)
 	prepo := repository.NewProjectRepo(db)
-	p := &model.WorkProject{
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, 
 		Name: "필터대상", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 10,
 		ProjectKind: model.ProjectKindOther, ProjectKindSet: 1,
 	}
@@ -222,7 +222,7 @@ func TestProjectDashboardActFilterAndConvertCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	srepo := repository.NewSalesRepo(db)
-	s := &model.SalesProject{Name: "전환대기"}
+	s := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "전환대기"}
 	if err := srepo.Create(s); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestProjectDashboardActFilterAndConvertCopy(t *testing.T) {
 
 func TestProjectDashboardNamePlainWithoutSalesView(t *testing.T) {
 	e, repo, _ := newProjectServer(t)
-	p := &model.WorkProject{
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, 
 		Name: "링크숨김사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1,
 		ProjectKind: model.ProjectKindOther, ProjectKindSet: 1,
 	}

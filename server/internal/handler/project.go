@@ -27,6 +27,7 @@ type ProjectHandler struct {
 	assetRepo    *repository.AssetRepo
 	salesRepo    *repository.SalesRepo
 	userRepo     *repository.UserRepo
+	orgs         *repository.OrgRepo
 	pe           *repository.ProjectEquipRepo
 	backup       backup.Config
 	importHold   *contractImportHold
@@ -110,30 +111,50 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	status := strings.TrimSpace(c.QueryParam("status"))
 	search := strings.TrimSpace(c.QueryParam("search"))
 	orgFilter := strings.TrimSpace(c.QueryParam("org_id"))
+	relFilter := strings.TrimSpace(c.QueryParam("related"))
 	items, err := h.repo.ListContracts(repository.OrgAll, search, year, status, false)
 	if err != nil {
 		return err
 	}
 	orgOpts := orgOptionsFromProjects(items)
+	view := currentOrg(c)
 	if orgFilter != "" && orgFilter != repository.OrgAll {
 		var filtered []model.WorkProject
 		for _, p := range items {
 			home := strings.TrimSpace(p.OrgID)
-			if home == "" {
-				home = model.OrgIDLibrary
-			}
 			if home == orgFilter {
 				filtered = append(filtered, p)
 			}
 		}
 		items = filtered
 	}
+	if relFilter == "1" || relFilter == "owner" {
+		home := view
+		if home == "" || home == repository.OrgAll {
+			home = loginHomeOrg(c)
+		}
+		want := model.ProjectAccessRelated
+		if relFilter == "owner" {
+			want = model.ProjectAccessOwner
+		}
+		var filtered []model.WorkProject
+		for _, p := range items {
+			if model.ProjectAccess(p, home) == want {
+				filtered = append(filtered, p)
+			}
+		}
+		items = filtered
+	}
+	for i := range items {
+		items[i].Related = model.ProjectAccess(items[i], view) == model.ProjectAccessRelated ||
+			(view != repository.OrgAll && loginHomeOrg(c) != "" && model.ProjectAccess(items[i], loginHomeOrg(c)) == model.ProjectAccessRelated)
+	}
 	years, _ := h.repo.ListYears(repository.OrgAll)
-	view := currentOrg(c)
 	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
 		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
 		"OrgFilter":   orgFilter,
+		"RelatedFilter": relFilter,
 		"OrgOptions":  orgOpts,
 		"ViewOrg":     view,
 		"CanWrite":    canWriteProjects(c),
@@ -351,19 +372,26 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, false, "사업명을 입력하세요.")
 	}
+	if err := model.ValidatePlanYearDates(p); err != nil {
+		return h.renderForm(c, p, rules, false, err.Error())
+	}
 	if !model.ValidProjectKind(p.ProjectKind) {
 		return h.renderForm(c, p, rules, false, "사업 유형을 선택하세요.")
 	}
 	p.ProjectKindSet = 1
-	if org, err := resolveInsertOrg(c); err == nil {
-		p.OrgID = org
-	} else if view := currentOrg(c); view != "" && view != repository.OrgAll {
-		p.OrgID = view
-	} else {
-		p.OrgID = model.OrgIDLibrary
+	org, err := resolveInsertOrg(c)
+	if err != nil {
+		return h.renderForm(c, p, rules, false, err.Error())
+	}
+	p.OrgID = org
+	if strings.TrimSpace(p.OrgID) == "" || p.OrgID == repository.OrgAll {
+		return h.renderForm(c, p, rules, false, errNeedInsertOrg)
 	}
 	if err := h.repo.Create(p); err != nil {
-		return err
+		return h.renderForm(c, p, rules, false, err.Error())
+	}
+	if err := h.saveRelatedOrgs(c, p); err != nil {
+		return h.renderForm(c, p, rules, false, err.Error())
 	}
 	if err := h.repo.ReplaceRules(p.ProjectID, rules); err != nil {
 		return err
@@ -413,6 +441,12 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"RunLabel":     model.ContractRunLabel(p.ContractRunStatus(today)),
 		"Progress":     prog,
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Access":       model.ProjectAccess(*p, currentOrg(c)),
+		"CanRegisterWork": model.CanRegisterWorkOnProject(*p, currentOrg(c)),
+		"RelatedLine":  p.RelatedLine,
+		"RelatedOrgs":  p.RelatedOrgs,
+		"CanEditOrgs":  canEditProjectOrgs(c, p),
+		"OrgHomeName":  p.OrgLabel,
 	})
 }
 
@@ -441,6 +475,9 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
 	}
+	if err := model.ValidatePlanYearDates(p); err != nil {
+		return h.renderForm(c, p, rules, true, err.Error())
+	}
 	if model.ValidProjectKind(p.ProjectKind) {
 		p.ProjectKindSet = 1
 	} else {
@@ -453,10 +490,23 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	if err := h.repo.ReplaceRules(p.ProjectID, rules); err != nil {
 		return err
 	}
+	ok := "updated"
+	if err := h.saveRelatedOrgs(c, existing); err != nil {
+		return h.renderForm(c, p, rules, true, err.Error())
+	}
+	wantOrg := strings.TrimSpace(c.FormValue("org_id"))
+	if wantOrg != "" && wantOrg != strings.TrimSpace(existing.OrgID) {
+		if err := h.moveProjectOrg(c, existing, wantOrg); err != nil {
+			p.OrgID = existing.OrgID
+			p.RelatedOrgs = existing.RelatedOrgs
+			return h.renderForm(c, p, rules, true, err.Error())
+		}
+		ok = "moved"
+	}
 	if err := h.saveAssignments(c, p.ProjectID); err != nil {
 		return h.renderForm(c, p, rules, true, err.Error())
 	}
-	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=updated")
+	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok="+ok)
 }
 
 func (h *ProjectHandler) Archive(c echo.Context) error {
@@ -618,7 +668,7 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	if len(assigns) == 0 && isEdit && p != nil && p.ProjectID != "" {
 		assigns, _ = h.repo.ListAssignments(p.ProjectID)
 	}
-	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": title, "Active": NavProjects,
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": isEdit,
 		"Customers": customers, "Parents": parents,
@@ -635,7 +685,33 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 		},
 		"FormError": errMsg,
 		"CanWrite":  true,
-	})
+	}
+	for k, v := range h.orgFormData(c, p, isEdit) {
+		data[k] = v
+	}
+	if p != nil {
+		if strings.TrimSpace(p.OrgID) == "" {
+			if s, ok := data["OrgSelected"].(string); ok {
+				p.OrgID = s
+			}
+		}
+		if len(p.RelatedOrgIDs) == 0 {
+			if rel, ok := data["RelatedOrgIDs"].([]string); ok {
+				p.RelatedOrgIDs = rel
+			}
+		}
+	}
+	dutyUsers := dutyAssigneeUsers(h.userRepo, p)
+	accUsers := accountingAssigneeUsers(h.userRepo)
+	names := orgNameMap(h.orgs)
+	data["DutyOrgGroups"] = pickerOrgGroups(dutyUsers, names)
+	data["AccountingOrgGroups"] = pickerOrgGroups(accUsers, names)
+	data["DutyPickerNames"] = pickerNamesMap(dutyUsers)
+	data["AccountingPickerNames"] = pickerNamesMap(accUsers)
+	data["AssignSelected"] = assignSelectedMap(assigns)
+	data["DutyUsers"] = dutyUsers
+	data["AccountingUsers"] = accUsers
+	return c.Render(http.StatusOK, "project/form.html", data)
 }
 
 func splitCSVLocal(s string) []string {
@@ -744,6 +820,17 @@ func (h *ProjectHandler) assignableUsers(c echo.Context) []model.User {
 		return nil
 	}
 	list := listAssignableForPicker(h.userRepo, c)
+	role := currentRole(c)
+	if role == model.RoleVisionAdmin || role == model.RoleOrgAdmin {
+		var out []model.User
+		for _, u := range list {
+			if u.IsDeleted() || !u.IsActive {
+				continue
+			}
+			out = append(out, u)
+		}
+		return out
+	}
 	org := currentOrg(c)
 	var out []model.User
 	for _, u := range list {

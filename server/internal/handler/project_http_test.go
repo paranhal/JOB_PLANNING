@@ -218,7 +218,7 @@ func TestWBRepoProjectHelpers(t *testing.T) {
 	}
 	defer db.Close()
 	wb := repository.NewWBRepo(db)
-	p := &model.WorkProject{Name: "헬퍼사업", Status: model.WBProjectActive, Color: "#3B82F6", IsPaid: true}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "헬퍼사업", Status: model.WBProjectActive, Color: "#3B82F6", IsPaid: true}
 	if err := wb.CreateProject(p); err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestProjectCreateKindRequired(t *testing.T) {
 
 func TestProjectKindInlineAndBulk(t *testing.T) {
 	e, repo, _ := newProjectServer(t)
-	p := &model.WorkProject{Name: "도서관 구축", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "도서관 구축", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestProjectKindInlineAndBulk(t *testing.T) {
 		t.Fatalf("읽기전용 %d", ro.Code)
 	}
 
-	p2 := &model.WorkProject{Name: "유지보수 힌트", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
+	p2 := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "유지보수 힌트", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
 	if err := repo.Create(p2); err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +387,7 @@ func TestProjectKindInlineAndBulk(t *testing.T) {
 
 func TestProjectCompleteDoesNotAutoOnEndDate(t *testing.T) {
 	e, repo, _ := newProjectServer(t)
-	p := &model.WorkProject{Name: "종료경과", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1, EndDate: "2020-01-01"}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "종료경과", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1, EndDate: "2020-01-01"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

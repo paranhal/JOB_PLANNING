@@ -55,6 +55,7 @@ func ParseWorkProjectForm(c echo.Context) *model.WorkProject {
 		Status:          strings.TrimSpace(c.FormValue("status")),
 		ContractNo:      strings.TrimSpace(c.FormValue("contract_no")),
 		ProjectKind:     strings.TrimSpace(c.FormValue("project_kind")),
+		OrgID:           strings.TrimSpace(c.FormValue("org_id")),
 	}
 	if n, err := strconv.Atoi(strings.TrimSpace(strings.ReplaceAll(c.FormValue("contract_amount"), ",", ""))); err == nil {
 		p.ContractAmount = n
@@ -64,6 +65,9 @@ func ParseWorkProjectForm(c echo.Context) *model.WorkProject {
 	}
 	if p.Status == "" {
 		p.Status = model.WBProjectActive
+	}
+	if p.PlanYear == 0 {
+		model.ApplyPlanYearDefault(p, nil)
 	}
 	return p
 }
