@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"html/template"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,5 +15,6 @@ func TestMain(m *testing.M) {
 	if err := os.Chdir(root); err != nil {
 		panic(err)
 	}
+	testSharedRenderer = &TemplateRenderer{cache: map[string]*template.Template{}}
 	os.Exit(m.Run())
 }

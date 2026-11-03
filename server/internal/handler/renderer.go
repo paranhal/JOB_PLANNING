@@ -28,7 +28,13 @@ type TemplateRenderer struct {
 	cache map[string]*template.Template
 }
 
+// testSharedRenderer TestMain 이 채우면 NewRenderer 가 인스턴스를 재사용한다(95-98).
+var testSharedRenderer *TemplateRenderer
+
 func NewRenderer() *TemplateRenderer {
+	if testSharedRenderer != nil {
+		return testSharedRenderer
+	}
 	return &TemplateRenderer{cache: map[string]*template.Template{}}
 }
 

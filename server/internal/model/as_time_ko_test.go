@@ -6,6 +6,7 @@ import (
 )
 
 func TestFormatKoreanTimeTable(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ in, want string }{
 		{"00:00", "오전 12:00"},
 		{"09:00", "오전 09:00"},
@@ -21,6 +22,7 @@ func TestFormatKoreanTimeTable(t *testing.T) {
 }
 
 func TestAddMinutesClockBounds(t *testing.T) {
+	t.Parallel()
 	end, ok := AddMinutesClock("09:00", 90)
 	if !ok || end != "10:30" {
 		t.Fatalf("09:00+90 → %s ok=%v", end, ok)
@@ -31,6 +33,7 @@ func TestAddMinutesClockBounds(t *testing.T) {
 }
 
 func TestTimeSlotAndDurationCounts(t *testing.T) {
+	t.Parallel()
 	if n := len(TimeSlotOptions()); n != 144 {
 		t.Fatalf("시작 슬롯 %d", n)
 	}

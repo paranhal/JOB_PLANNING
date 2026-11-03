@@ -1,0 +1,3 @@
+<nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1 text-sm">
+     x-data="navMenu('admin', [], [])"
+     @click="if ($event.target.closest('a') && window.innerWidth < 1024) sidebarOpen=false">
