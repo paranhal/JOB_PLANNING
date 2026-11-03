@@ -1,0 +1,81 @@
+{
+  "viewports": [
+    {"name": "390", "width": 390, "height": 844},
+    {"name": "360", "width": 360, "height": 800}
+  ],
+  "min_touch": 44,
+  "grades": {
+    "A": {
+      "label": "현장·매일",
+      "note": "① 단계에서 390·360 캡처·실측. 기술·지원이 매일 쓰는 화면.",
+      "screens": [
+        {"id": "login", "path": "/login", "title": "로그인", "auth": false},
+        {"id": "dashboard", "path": "/", "title": "대시보드"},
+        {"id": "workboard_list", "path": "/workboard/board?view=list", "title": "일일 업무 리스트"},
+        {"id": "workboard_day", "path": "/workboard/board?view=day", "title": "일일 업무 일"},
+        {"id": "as_list", "path": "/as", "title": "AS 접수·조치 목록"},
+        {"id": "as_action", "path": "/as", "title": "AS 조치", "resolve": "as_action"},
+        {"id": "mnt_list", "path": "/maintenance", "title": "정기점검 목록"},
+        {"id": "mnt_action", "path": "/maintenance", "title": "정기점검 조치", "resolve": "mnt_action"},
+        {"id": "customers", "path": "/customers", "title": "고객현황"},
+        {"id": "assets", "path": "/assets", "title": "설치자산"},
+        {"id": "quotes", "path": "/quotes", "title": "견적·수주·계약"},
+        {"id": "meeting", "path": "/meeting", "title": "일일 업무 회의"},
+        {"id": "approvals", "path": "/approvals/inbox", "title": "결재할 문서"},
+        {"id": "leaves", "path": "/leaves", "title": "휴가 신청"}
+      ]
+    },
+    "B": {
+      "label": "주간·조회",
+      "note": "자주 보지만 현장 응급은 아님. ② 단계에서 필요 시 캡처.",
+      "screens": [
+        {"id": "workboard_week", "path": "/workboard/board?view=week", "title": "일일 업무 주"},
+        {"id": "workboard_month", "path": "/workboard/board?view=month", "title": "일일 업무 월"},
+        {"id": "work_groups", "path": "/work-groups", "title": "업무 그룹"},
+        {"id": "as_kb", "path": "/as/knowledge", "title": "AS 사례 검색"},
+        {"id": "sales_dash", "path": "/sales/dashboard", "title": "영업 대시보드"},
+        {"id": "sales_pipe", "path": "/sales?view=pipeline", "title": "파이프라인"},
+        {"id": "sales_act", "path": "/sales/activities", "title": "영업 활동"},
+        {"id": "projects_dash", "path": "/projects/dashboard", "title": "사업 대시보드"},
+        {"id": "projects", "path": "/projects", "title": "사업 목록"},
+        {"id": "stats", "path": "/stats", "title": "통계"},
+        {"id": "weekly", "path": "/stats/company-weekly", "title": "주간 업무 보고서"},
+        {"id": "contacts", "path": "/contacts", "title": "담당자관리"},
+        {"id": "codes", "path": "/codes", "title": "코드관리"},
+        {"id": "items", "path": "/items", "title": "품목 마스터"},
+        {"id": "product_groups", "path": "/product-groups", "title": "제품군 관리"},
+        {"id": "spaces", "path": "/spaces", "title": "공간관리"},
+        {"id": "meeting_weekly", "path": "/meeting/weekly", "title": "주간 회의 (팀)"},
+        {"id": "meeting_me", "path": "/meeting/weekly/me", "title": "주간 회의 (내 자료)"}
+      ]
+    },
+    "C": {
+      "label": "데스크톱·설정",
+      "note": "표가 넓거나 관리 전용. 가로 스크롤을 표 영역에서 허용해도 되는 후보.",
+      "screens": [
+        {"id": "work_legacy", "path": "/work", "title": "오늘 업무 (예전)"},
+        {"id": "work_all", "path": "/work/all", "title": "전체 업무 (예전)"},
+        {"id": "register_legacy", "path": "/workboard/register", "title": "일일 업무 등록 (예전)"},
+        {"id": "reports_legacy", "path": "/stats/reports", "title": "보고서 (예전)"},
+        {"id": "as_legacy", "path": "/as?legacy=1", "title": "AS 접수 상세 (예전)"},
+        {"id": "mnt_sites", "path": "/maintenance/sites", "title": "점검 사이트 설정"},
+        {"id": "mnt_products", "path": "/maintenance/products", "title": "점검 제품"},
+        {"id": "region_order", "path": "/maintenance/sites/distance", "title": "지역 거리 순서"},
+        {"id": "contact_history", "path": "/contact-history", "title": "담당자이력"},
+        {"id": "relations", "path": "/relations", "title": "수행관계"},
+        {"id": "sales_groups", "path": "/sales/groups", "title": "사업 대분류"},
+        {"id": "analysis", "path": "/analysis", "title": "교체대상현황"},
+        {"id": "proj_import", "path": "/projects/import", "title": "사업 엑셀 등록"},
+        {"id": "proj_docs", "path": "/projects/docs", "title": "서류 작성·관리"},
+        {"id": "proj_diary", "path": "/projects/diary", "title": "업무일지·투입관리"},
+        {"id": "proj_reg", "path": "/projects/registry", "title": "사업 등록 관리"},
+        {"id": "milestones", "path": "/stats/milestones", "title": "마일스톤"},
+        {"id": "admin_users", "path": "/admin/users", "title": "사용자/권한"},
+        {"id": "admin_orgs", "path": "/admin/orgs", "title": "전체 조직 관리"},
+        {"id": "admin_data", "path": "/admin/data", "title": "데이터 관리"},
+        {"id": "admin_system", "path": "/admin/system", "title": "시스템 정보"},
+        {"id": "labor_rates", "path": "/labor-rates", "title": "노임 단가"}
+      ]
+    }
+  }
+}
