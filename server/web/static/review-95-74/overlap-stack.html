@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-width=360, initial-scale=1">
+  <title>95-74 overlap stack</title>
+  <style>
+    .modal-backdrop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .hidden { display: none !important; }
+    .z-50 { z-index: 50; }
+    .z-80 { z-index: 80; }
+    .bg { background: rgba(0,0,0,.55); }
+    .panel { background: #fff; padding: 1.5rem; width: min(32rem, 100%); }
+    .grid { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+    @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+<div id="new-work" class="modal-backdrop z-50 bg">
+  <div class="panel"><h1>새 업무 등록</h1><p>3단계</p>
+    <button id="nw-save">저장</button>
+    <div data-assignee-picker="1"><button type="button"><span class="truncate" id="assignee-summary">양현모</span></button></div>
+  </div>
+</div>
+<div id="overlap-resolve" class="modal-backdrop z-80 bg">
+  <div class="panel">
+    <h2>시간이 겹칩니다</h2>
+    <div class="grid">
+      <button type="button" data-overlap-action="edit">기존 계획 수정</button>
+      <button type="button" data-overlap-action="delete">기존 계획 삭제</button>
+      <button type="button" data-overlap-action="leave">담당자만 빼고 새 계획 등록</button>
+      <button type="button" data-overlap-action="cancel">취소</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>95-74 edit form behavior</title>
+  <script defer src="../vendor/alpine.min.js"></script>
+  <script src="../js/overlap_resolve.js"></script>
+</head>
+<body>
+<div x-data="{ status: 'complete', openOcc: 2 }">
+  <form id="edit-form" method="post" action="/workboard/tasks/T1/update" class="js-keep-modal"
+        data-require-assignee="1"
+        @submit="if (status === 'complete' && openOcc > 0) { var box = $refs.confirmOcc; if (box && !box.checked) { if (!confirm('완료되지 않은 실행 작업이 ' + openOcc + '건 있습니다. 전체 업무를 완료 처리하시겠습니까?')) { $event.preventDefault(); return } box.checked = true } }">
+    <input type="hidden" x-ref="confirmOcc" name="confirm_open_occ" value="">
+    <p id="assignee-label">담당자</p>
+    <div data-focus-target="assignee"></div>
+    <button type="submit" id="save">저장</button>
+  </form>
+</div>
+<div id="flash" hidden></div>
+<script>
+window.showFlashError = function (m) {
+  var el = document.getElementById('flash');
+  el.hidden = false;
+  el.textContent = m || '';
+};
+function assigneeControlValue(form) {
+  var hids = form.querySelectorAll('input[name="assignee_user_id"], input[name="assignee_group_id"]');
+  for (var i = 0; i < hids.length; i++) {
+    if ((hids[i].value || '').trim()) return '1';
+  }
+  return '';
+}
+document.querySelectorAll('form[data-require-assignee]').forEach(function (form) {
+  form.addEventListener('submit', function (e) {
+    if (assigneeControlValue(form)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    var top = form.querySelector('[data-assignee-banner]');
+    if (!top) {
+      top = document.createElement('div');
+      top.setAttribute('data-assignee-banner', '1');
+      form.insertBefore(top, form.firstChild);
+    }
+    top.textContent = '담당자를 선택하세요';
+    if (window.showFlashError) window.showFlashError('담당자를 선택하세요');
+  });
+});
+</script>
+</body>
+</html>
