@@ -109,7 +109,7 @@ func TestSales95_2GCurrentOrgAndEmptyUnionFallback(t *testing.T) {
 
 	e, db, repo, _ := seed95_2G(t)
 	_ = e
-	mustSales95(t, repo, db, "빈조직미전환", "", "누구", "", true)
+	mustSales95(t, repo, db, "빈조직미전환", model.OrgIDLibrary, "누구", "", true)
 	if _, err := db.Exec(`UPDATE sales_projects SET org_id='' WHERE name='빈조직미전환'`); err != nil {
 		t.Fatal(err)
 	}

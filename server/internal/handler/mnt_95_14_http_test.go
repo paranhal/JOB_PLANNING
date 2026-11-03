@@ -80,9 +80,11 @@ func TestMnt95_14HTTPSameRoundFlash(t *testing.T) {
 	p, _ := repo.CreatePlan(2026, "t")
 	_ = doForm(t, e, "/maintenance/"+p.PlanID+"/visits", url.Values{
 		"visit_date": {"2026-08-13"}, "customer_id": {"c14h"}, "product_type": {"KLAS"}, "round_no": {"1"},
+		"assignee":   {"관리자"},
 	})
 	rec := doForm(t, e, "/maintenance/"+p.PlanID+"/visits", url.Values{
 		"visit_date": {"2026-08-20"}, "customer_id": {"c14h"}, "product_type": {"KLAS"}, "round_no": {"1"},
+		"assignee":   {"관리자"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("flash 303 got %d", rec.Code)

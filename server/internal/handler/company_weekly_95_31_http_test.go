@@ -74,11 +74,11 @@ func TestReportsPageStaysLegacyNoRedirect(t *testing.T) {
 		t.Fatal("최초 안내 없음")
 	}
 
+	if ParentPage("/stats/company-weekly/rows") != "/stats/company-weekly" {
+		t.Fatal("행 관리 이전이 새 주소가 아니다")
+	}
 	root := findTemplateRoot(t)
 	rows := string(mustRead(t, filepath.Join(root, "stats/company_weekly_rows.html")))
-	if !strings.Contains(rows, `href="/stats/company-weekly"`) {
-		t.Fatal("행 관리 돌아가기가 새 주소가 아니다")
-	}
 	if strings.Contains(rows, `href="/stats/reports"`) {
 		t.Fatal("행 관리가 예전 보고서를 가리킨다")
 	}

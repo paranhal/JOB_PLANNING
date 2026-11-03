@@ -75,7 +75,7 @@ func newProjectOrgFilterHTTP(t *testing.T) (*echo.Echo, *sql.DB, *repository.Pro
 
 func seedOrgContractProject(t *testing.T, db *sql.DB, repo *repository.ProjectRepo, name, org string) string {
 	t.Helper()
-	p := &model.WorkProject{
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, 
 		Name: name, PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1_000_000,
 	}
 	if err := repo.Create(p); err != nil {
@@ -263,7 +263,7 @@ func TestWorkPickProjectsStaysOrgIndependent(t *testing.T) {
 	if pick.Code != http.StatusOK {
 		t.Fatalf("register %d", pick.Code)
 	}
-	if !strings.Contains(pick.Body.String(), "O01픽목록-95-2D") {
-		t.Fatal("작업 선택 목록에서 타 조직 계약 사업이 빠졌다")
+	if strings.Contains(pick.Body.String(), "O01픽목록-95-2D") {
+		t.Fatal("95-87: 비유관 조직이 타 팀 주관 사업을 작업 선택에 본다")
 	}
 }

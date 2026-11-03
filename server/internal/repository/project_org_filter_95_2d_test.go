@@ -119,16 +119,33 @@ func TestListWorkPickProjectsIgnoresOrg(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	if _, err := db.Exec(`INSERT OR IGNORE INTO orgs(org_id,org_no,org_name,kind,is_active,sort_order) VALUES
+		('O02','O02','미디어사업팀','business',1,20),('O03','O03','SI사업팀','business',1,30)`); err != nil {
+		t.Fatal(err)
+	}
 	repo := NewProjectRepo(db)
-	seedOrgAmtProject(t, repo, db, "픽O01", "O01")
+	id01 := seedOrgAmtProject(t, repo, db, "픽O01", "O01")
 	seedOrgAmtProject(t, repo, db, "픽O03", "O03")
 	pick, err := NewWBRepo(db).ListWorkPickProjects("O03")
 	if err != nil {
 		t.Fatal(err)
 	}
 	n := namesOf(pick)
-	if !n["픽O01"] || !n["픽O03"] {
-		t.Fatal("선택 목록 조직 무관이 깨짐")
+	if n["픽O01"] {
+		t.Fatal("95-87 유관이 아닌 O01 사업이 O03 선택 목록에 있다")
+	}
+	if !n["픽O03"] {
+		t.Fatal("자기 팀 사업이 선택 목록에 없다")
+	}
+	if err := repo.ReplaceRelatedOrgs(id01, "U1", []string{"O03"}, "O01"); err != nil {
+		t.Fatal(err)
+	}
+	pickRel, err := NewWBRepo(db).ListWorkPickProjects("O03")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !namesOf(pickRel)["픽O01"] {
+		t.Fatal("유관 사업이 선택 목록에 없다")
 	}
 	listed, err := repo.ListContracts("O03", "", 0, "", false)
 	if err != nil {
@@ -136,13 +153,6 @@ func TestListWorkPickProjectsIgnoresOrg(t *testing.T) {
 	}
 	if !namesOf(listed)["픽O01"] {
 		t.Fatal("95-2E 등록 관리 전 직원 조회")
-	}
-	pickOnly, err := NewWBRepo(db).ListWorkPickProjects("O01")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !namesOf(pickOnly)["픽O03"] {
-		t.Fatal("선택 목록 조직 무관 회귀")
 	}
 }
 
@@ -201,11 +211,11 @@ func TestListContracts47OrgOracle(t *testing.T) {
 	if len(staff) < 47 {
 		t.Fatalf("전 직원 조회 %d", len(staff))
 	}
-	pick, err := NewWBRepo(db).ListWorkPickProjects("O01")
+	pick, err := NewWBRepo(db).ListWorkPickProjects("O03")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(pick) < 47 {
-		t.Fatalf("pick %d", len(pick))
+	if len(pick) < 14 {
+		t.Fatalf("SI pick %d", len(pick))
 	}
 }

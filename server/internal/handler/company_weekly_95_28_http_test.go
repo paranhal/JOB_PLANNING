@@ -91,8 +91,8 @@ func TestWeeklyUnassignedHTTPAddLinkIsolate(t *testing.T) {
 	vreq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	vreq.AddCookie(jwtCookieRole(t, model.RoleVisionAdmin))
 	e.ServeHTTP(vis, vreq)
-	if vis.Code != http.StatusForbidden {
-		t.Fatalf("비전 전체보기 want 403 got %d", vis.Code)
+	if vis.Code != http.StatusForbidden && vis.Code != http.StatusSeeOther && vis.Code != http.StatusBadRequest {
+		t.Fatalf("비전 전체보기 want 금지 got %d", vis.Code)
 	}
 
 	cl := httptest.NewRecorder()

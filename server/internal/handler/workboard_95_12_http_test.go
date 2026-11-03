@@ -80,11 +80,11 @@ func TestWorkPickProjects47ContractLikeAndCombo(t *testing.T) {
 	if !strings.Contains(body, "projectCombo") {
 		t.Fatal("등록 콤보 없음")
 	}
-	for i := 1; i <= 47; i++ {
-		name := fmt.Sprintf("계약사업%02d 긴이름점검", i)
-		if !strings.Contains(body, name) {
-			t.Fatalf("등록에 %q 없음", name)
-		}
+	if !strings.Contains(body, "계약사업01 긴이름점검") {
+		t.Fatal("주관 사업이 등록 콤보에 없다")
+	}
+	if strings.Contains(body, "계약사업02 긴이름점검") {
+		t.Fatal("타 조직 사업이 등록 콤보에 있다")
 	}
 	if strings.Contains(body, "숨김완료") {
 		t.Fatal("완료 사업이 목록에 있다")
@@ -98,31 +98,31 @@ func TestWorkPickProjects47ContractLikeAndCombo(t *testing.T) {
 	empty.AddCookie(jwtCookieUser(t, oa04))
 	emptyRec := httptest.NewRecorder()
 	e.ServeHTTP(emptyRec, empty)
-	if !strings.Contains(emptyRec.Body.String(), "계약사업01 긴이름점검") {
-		t.Fatal("O04에서도 47건 목록이 안 보인다")
+	if strings.Contains(emptyRec.Body.String(), "계약사업01 긴이름점검") {
+		t.Fatal("비유관 O04가 타 팀 사업을 본다")
 	}
 
 	ok := doForm(t, e, "/workboard/tasks", url.Values{
 		"work_type": {"project_work"}, "title": {"47사업연결"}, "work_subtype": {"build"},
-		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-c03"},
+		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-c01"},
 		"start_time": {"09:00"}, "end_time": {"09:30"},
 	})
 	if ok.Code != http.StatusSeeOther {
-		t.Fatalf("타 조직 계약사업 저장 %d %s", ok.Code, ok.Body.String())
+		t.Fatalf("주관 계약사업 저장 %d %s", ok.Code, ok.Body.String())
 	}
 	id := pwFindTitle(t, repo, "47사업연결")
 	got, _ := repo.GetTask(id)
-	if got == nil || got.ProjectID != "WP-c03" {
+	if got == nil || got.ProjectID != "WP-c01" {
 		t.Fatalf("project_id=%v", got)
 	}
 
 	edit := doGet(t, e, "/workboard/tasks/"+id+"/edit")
-	if !strings.Contains(edit.Body.String(), "계약사업47 긴이름점검") || !strings.Contains(edit.Body.String(), "projectCombo") {
-		t.Fatal("수정 화면 콤보/47건 없음")
+	if !strings.Contains(edit.Body.String(), "계약사업01 긴이름점검") || !strings.Contains(edit.Body.String(), "projectCombo") {
+		t.Fatal("수정 화면 콤보/주관 사업 없음")
 	}
 	act := doGet(t, e, "/workboard/tasks/"+id+"/action")
-	if !strings.Contains(act.Body.String(), "계약사업10 긴이름점검") || !strings.Contains(act.Body.String(), "projectCombo") {
-		t.Fatal("조치 화면 콤보/47건 없음")
+	if !strings.Contains(act.Body.String(), "계약사업01 긴이름점검") || !strings.Contains(act.Body.String(), "projectCombo") {
+		t.Fatal("조치 화면 콤보/주관 사업 없음")
 	}
 
 	mf := url.Values{

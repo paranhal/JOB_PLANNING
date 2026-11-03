@@ -139,10 +139,13 @@ func TestTaskShowCalendarAndBackLinks(t *testing.T) {
 		if href != want {
 			t.Fatalf("%s 일정표=%q want %s", tc.id, href, want)
 		}
-		if strings.Contains(body, "← 일일 업무 등록") {
+		if strings.Contains(body, "← 일일 업무 등록") || strings.Contains(body, "← 업무 관리") {
 			t.Fatalf("%s 예전 돌아가기 문구", tc.id)
 		}
-		if !strings.Contains(body, `href="/workboard/board"`) || !strings.Contains(body, "← 업무 관리") {
+		if strings.Count(body, `id="page-back"`) != 1 || !strings.Contains(body, "‹ 이전") {
+			t.Fatalf("%s 공통 이전 버튼 없음", tc.id)
+		}
+		if !strings.Contains(body, `href="/workboard/board"`) {
 			t.Fatalf("%s 기본 돌아가기 없음", tc.id)
 		}
 	}
@@ -156,8 +159,11 @@ func TestTaskShowCalendarAndBackLinks(t *testing.T) {
 	}
 
 	regBack := doGet(t, e, "/workboard/tasks/"+admin.TaskID+"?back="+url.QueryEscape("/workboard/register"))
-	if !strings.Contains(regBack.Body.String(), "← 일일 업무 등록") {
-		t.Fatal("예전 화면에서 들어온 돌아가기 문구")
+	if !strings.Contains(regBack.Body.String(), `href="/workboard/register"`) {
+		t.Fatal("예전 화면에서 들어온 back 유지")
+	}
+	if strings.Contains(regBack.Body.String(), "← 일일 업무 등록") {
+		t.Fatal("예전 돌아가기 문구가 남았다")
 	}
 }
 
@@ -217,7 +223,8 @@ func TestVisitAndASActionBackDefault(t *testing.T) {
 	if asPage.Code != http.StatusOK {
 		t.Fatalf("as action %d", asPage.Code)
 	}
-	if !strings.Contains(asPage.Body.String(), `href="/workboard/board"`) || !strings.Contains(asPage.Body.String(), "업무 관리로") {
+	asBody := asPage.Body.String()
+	if !strings.Contains(asBody, `href="/workboard/board"`) || !strings.Contains(asBody, "‹ 이전") {
 		t.Fatal("AS 조치 기본 돌아가기")
 	}
 	if strings.Contains(asPage.Body.String(), "일일 업무 등록으로") {

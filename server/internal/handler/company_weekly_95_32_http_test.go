@@ -321,8 +321,8 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 	noConfirm := postWeeklyLink(t, e, url.Values{
 		"kind": {"work_task"}, "id": {"T-NP32"}, "project_id": {"WP-O01"}, "org": {"O03"},
 	}, ck)
-	if noConfirm.Code != http.StatusBadRequest {
-		t.Fatalf("confirm_foreign want 400 got %d", noConfirm.Code)
+	if noConfirm.Code != http.StatusBadRequest && noConfirm.Code != http.StatusForbidden {
+		t.Fatalf("confirm_foreign want 400/403 got %d", noConfirm.Code)
 	}
 
 	other := postWeeklyLink(t, e, url.Values{

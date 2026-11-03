@@ -103,7 +103,7 @@ func TestSales95_19NewFormStageBoxAndFields(t *testing.T) {
 			t.Fatalf("필드 없음 %s", n)
 		}
 	}
-	p := &model.SalesProject{Stage: model.SalesStage4Discover}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Stage: model.SalesStage4Discover}
 	if model.SalesProbability(p) != 10 {
 		t.Fatal("SalesProbability")
 	}
@@ -128,7 +128,7 @@ func TestSales95_19EditProbabilityByStage(t *testing.T) {
 
 	check := func(stage, extra string, want int, needles ...string) {
 		t.Helper()
-		p := &model.SalesProject{Stage: stage}
+		p := &model.SalesProject{OrgID: model.OrgIDLibrary, Stage: stage}
 		switch stage {
 		case model.SalesStage4Propose:
 			p.RFPReceivedAt = extra
@@ -221,7 +221,7 @@ func TestSales95_19FormErrorOpensCards(t *testing.T) {
 	c.Set("role", model.RoleAdmin)
 	c.Set("user_name", "관리자")
 	c.Set("permissions", model.DefaultPermissions(model.RoleAdmin))
-	p := &model.SalesProject{Stage: model.SalesStage4Discover, DealType: model.SalesDealBuild}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Stage: model.SalesStage4Discover, DealType: model.SalesDealBuild}
 	if err := h.Sales.renderForm(c, p, false, "유입 경로를 확인하세요"); err != nil {
 		t.Fatal(err)
 	}

@@ -261,7 +261,7 @@ func Test95_36A_ScreenAssigneeFocusConsistency(t *testing.T) {
 	if !strings.Contains(task, `data-focus-target="assignee"`) {
 		t.Fatal("업무 상세 담당자에 포커스 대상이 없다")
 	}
-	mnt := read("maintenance/_assignee_multi.html")
+	mnt := read("_ui_assignee_picker.html")
 	if !strings.Contains(mnt, `data-focus-target="assignee"`) {
 		t.Fatal("방문 추가 복수담당에 포커스 대상이 없다")
 	}
