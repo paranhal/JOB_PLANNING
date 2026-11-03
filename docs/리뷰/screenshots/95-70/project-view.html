@@ -1,0 +1,1962 @@
+
+<!DOCTYPE html>
+<html lang="ko" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="csrf-token" content="1cfadf15cfd42f9849eaeee3e82db065">
+  <title>업무 회의 · 업무관리시스템</title>
+  <link rel="stylesheet" href="/static/vendor/tailwind.css?v=v2.37-2026-09-13-1422">
+  <script src="/static/vendor/htmx.min.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/work_list_select.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/table-cols.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/site_multi_picker.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/assignee_picker.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/overlap_resolve.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/carryover.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/board_kanban.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/board_schedule.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/work_items.js?v=v2.37-2026-09-13-1422"></script>
+  <script src="/static/js/schedule-show.js?v=v2.37-2026-09-13-1422"></script>
+  <script defer src="/static/vendor/alpine.min.js?v=v2.37-2026-09-13-1422"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    @media print {
+      #build-badge { display: none !important; }
+    }
+  </style>
+</head>
+<body class="h-full" x-data="{ sidebarOpen: false, moreOpen: false }">
+
+<div x-data='flashDialog(null)' x-cloak
+     @app-flash-error.window="show($event.detail)"
+     @keydown.escape.window="if(open) close()"
+     x-show="open" x-cloak
+     class="modal-backdrop z-50 flex items-center justify-center p-4"
+     role="alertdialog" aria-modal="true" aria-labelledby="flash-err-title"
+     @click.self="close()">
+  <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+    <h2 id="flash-err-title" class="text-ui font-bold text-ink">확인해 주세요</h2>
+    <p class="mt-2 text-ui text-ink whitespace-pre-wrap" x-text="msg"></p>
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="button" class="btn btn-secondary" x-show="reload" x-cloak @click="location.reload()">화면 새로고침</button>
+      <button type="button" class="btn btn-primary" x-ref="ok" @click="close()">확인</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+<div x-data="asDeleteDialog()" x-cloak x-show="open"
+     @as-delete-open.window="openWith($event.detail)"
+     @keydown.escape.window="if(open) close()"
+     class="modal-backdrop z-[70] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="as-delete-title"
+     @click.self="close()">
+  <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+    <h2 id="as-delete-title" class="text-ui font-bold text-ink">접수를 삭제할까요?</h2>
+    <p class="mt-2 text-sm text-ink"><span class="font-mono" x-text="number"></span> · <span x-text="org"></span> · "<span x-text="snippet"></span>"</p>
+    <p class="mt-2 text-xs text-slate-600">삭제하면 연결된 일일 업무도 정리됩니다</p>
+    <form method="POST" class="mt-4 flex justify-end gap-2" :action="'/as/' + id + '/delete'">
+      <input type="hidden" name="csrf" id="as-delete-csrf" value="1cfadf15cfd42f9849eaeee3e82db065">
+      <input type="hidden" name="back" :value="back">
+      <button type="button" class="px-3 py-1.5 border rounded-lg text-sm" @click="close()">취소</button>
+      <button type="submit" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm" x-ref="ok">삭제</button>
+    </form>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+<div class="flex h-full">
+  <div x-show="sidebarOpen" x-cloak @click="sidebarOpen=false" class="fixed inset-0 z-30 bg-gray-900/50 lg:hidden"></div>
+
+  <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+         class="fixed inset-y-0 left-0 z-40 flex h-full max-h-[100dvh] w-60 flex-col overflow-hidden bg-gray-900 text-white transition-transform duration-300 lg:relative lg:translate-x-0">
+    <div class="shrink-0 px-5 py-4 border-b border-gray-700">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </div>
+        <div><p class="text-sm font-bold">업무관리시스템</p><p class="text-xs text-gray-400">Work Management</p></div>
+        <button type="button" @click="sidebarOpen=false" class="ml-auto p-1.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white lg:hidden" aria-label="메뉴 닫기">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p id="app-version" class="mt-2 truncate text-xs font-bold text-gray-100">version 2.37 · built 14:22</p>
+    </div>
+
+    
+    
+    
+    
+    
+    
+    
+<nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1 text-sm" style="-webkit-overflow-scrolling:touch"
+     x-data="navMenu('work', [], [])"
+     @click="if ($event.target.closest('a') && window.innerWidth < 1024) sidebarOpen=false">
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('work')"
+            :aria-expanded="openG('work') ? 'true' : 'false'">
+      <span>업무관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('work')" x-cloak>6</span>
+    </button>
+    <div x-show="openG('work')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>대시보드</span>
+        
+      </a>
+      
+      
+      
+      <a href="/workboard/board" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무 관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/work-groups" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무 그룹</span>
+        
+      </a>
+      
+      
+      
+      <a href="/meeting/board" class="bg-primary text-white nav-active flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무 회의</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleP('approval')"
+                :aria-expanded="openP('approval') ? 'true' : 'false'">
+          <span>결재</span>
+          <span class="text-ink-muted" x-text="openP('approval') ? '▾' : '▸'"></span>
+          
+        </button>
+        <div x-show="openP('approval')" x-cloak class="space-y-0.5">
+          
+          <a href="/approvals/inbox" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>결재할 문서</span>
+            
+          </a>
+          
+          <a href="/leaves" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>휴가 신청</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleP('legacy_views')"
+                :aria-expanded="openP('legacy_views') ? 'true' : 'false'">
+          <span>예전 화면 보기</span>
+          <span class="text-ink-muted" x-text="openP('legacy_views') ? '▾' : '▸'"></span>
+          
+        </button>
+        <div x-show="openP('legacy_views')" x-cloak class="space-y-0.5">
+          
+          <a href="/workboard/register" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>일일 업무 등록 (예전)</span>
+            
+          </a>
+          
+          <a href="/work" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>오늘 업무 (예전)</span>
+            
+          </a>
+          
+          <a href="/work/all" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>전체 업무 (예전)</span>
+            
+          </a>
+          
+          <a href="/stats/reports" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>보고서 (예전)</span>
+            
+          </a>
+          
+          <a href="/as?legacy=1" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>AS 접수 상세 (예전)</span>
+            
+          </a>
+          
+          <a href="/meeting" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>일일 업무 회의 (예전)</span>
+            
+          </a>
+          
+          <a href="/meeting/weekly" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>주간 회의 (팀) (예전)</span>
+            
+          </a>
+          
+          <a href="/meeting/weekly/me" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>주간 회의 (내 자료) (예전)</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+      
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('customer')"
+            :aria-expanded="openG('customer') ? 'true' : 'false'">
+      <span>고객관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('customer')" x-cloak>12</span>
+    </button>
+    <div x-show="openG('customer')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/as" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>AS 접수·조치</span>
+        
+      </a>
+      
+      
+      
+      <a href="/as/knowledge" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>AS 사례 검색</span>
+        
+      </a>
+      
+      
+      
+      <a href="/maintenance" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>정기점검</span>
+        
+      </a>
+      
+      
+      
+      <a href="/customers" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>고객현황</span>
+        
+      </a>
+      
+      
+      
+      <a href="/assets" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>설치자산</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleM('customer')"
+                :aria-expanded="openM('customer') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('customer') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('customer')" x-cloak class="space-y-0.5">
+          
+          <a href="/contacts" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>담당자관리</span>
+            
+          </a>
+          
+          <a href="/contact-history" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>담당자이력</span>
+            
+          </a>
+          
+          <a href="/spaces" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>공간관리</span>
+            
+          </a>
+          
+          <a href="/relations" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>수행관계</span>
+            
+          </a>
+          
+          <a href="/maintenance/sites" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>점검 사이트 설정</span>
+            
+          </a>
+          
+          <a href="/maintenance/products" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>점검 제품</span>
+            
+          </a>
+          
+          <a href="/maintenance/sites/distance" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>지역 거리 순서</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('sales')"
+            :aria-expanded="openG('sales') ? 'true' : 'false'">
+      <span>영업관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('sales')" x-cloak>6</span>
+    </button>
+    <div x-show="openG('sales')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/sales/dashboard" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>영업 대시보드</span>
+        
+      </a>
+      
+      
+      
+      <a href="/sales?view=pipeline" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>파이프라인</span>
+        
+      </a>
+      
+      
+      
+      <a href="/sales/activities" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>영업 활동</span>
+        
+      </a>
+      
+      
+      
+      <a href="/quotes" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>견적·수주·계약</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleM('sales')"
+                :aria-expanded="openM('sales') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('sales') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('sales')" x-cloak class="space-y-0.5">
+          
+          <a href="/sales/groups" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>사업 대분류</span>
+            
+          </a>
+          
+          <a href="/analysis" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>교체대상현황</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('project')"
+            :aria-expanded="openG('project') ? 'true' : 'false'">
+      <span>사업관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('project')" x-cloak>5</span>
+    </button>
+    <div x-show="openG('project')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/projects/dashboard" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>사업 대시보드</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleP('projects')"
+                :aria-expanded="openP('projects') ? 'true' : 'false'">
+          <span>사업·업무관리</span>
+          <span class="text-ink-muted" x-text="openP('projects') ? '▾' : '▸'"></span>
+          
+        </button>
+        <div x-show="openP('projects')" x-cloak class="space-y-0.5">
+          
+          <a href="/projects" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>사업 목록</span>
+            
+          </a>
+          
+          <a href="/projects/import" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>엑셀 등록</span>
+            
+          </a>
+          
+          <a href="/cooperations/inbox" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>받은 협조</span>
+            
+          </a>
+          
+          <a href="/cooperations/sent" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>보낸 협조</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+      
+      
+      <a href="/projects/docs" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>서류 작성·관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/projects/diary" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무일지·투입관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/projects/registry" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>사업 등록 관리</span>
+        
+      </a>
+      
+      
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('stats')"
+            :aria-expanded="openG('stats') ? 'true' : 'false'">
+      <span>통계·보고서</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('stats')" x-cloak>3</span>
+    </button>
+    <div x-show="openG('stats')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/stats" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>통계</span>
+        
+      </a>
+      
+      
+      
+      <a href="/stats/milestones" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>마일스톤</span>
+        
+      </a>
+      
+      
+      
+      <a href="/stats/company-weekly" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>보고서</span>
+        
+      </a>
+      
+      
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('admin')"
+            :aria-expanded="openG('admin') ? 'true' : 'false'">
+      <span>설정·관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('admin')" x-cloak>12</span>
+    </button>
+    <div x-show="openG('admin')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/admin/users" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>사용자/권한</span>
+        
+      </a>
+      
+      
+      
+      <a href="/admin/my-org/members" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>소속 인원 관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/admin/holidays" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>휴무일 관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/admin/approval-settings" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>결재 설정</span>
+        
+      </a>
+      
+      
+      
+      <a href="/items" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>품목 마스터</span>
+        
+      </a>
+      
+      
+      
+      <a href="/codes" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>코드관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/work-item-templates" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>작업 항목 관리</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleM('admin')"
+                :aria-expanded="openM('admin') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('admin') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('admin')" x-cloak class="space-y-0.5">
+          
+          <a href="/projects/equipment-categories" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>장비 분류</span>
+            
+          </a>
+          
+          <a href="/as/cause-categories" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>원인 분류표</span>
+            
+          </a>
+          
+          <a href="/admin/notify" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>알림 설정</span>
+            
+          </a>
+          
+          <a href="/admin/sales-logs" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>영업 로그 관리</span>
+            
+          </a>
+          
+          <a href="/admin/orgs" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>전체 조직 관리</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+</nav>
+
+
+    
+
+    <div class="shrink-0 px-4 py-3 border-t border-gray-700 space-y-2">
+      <div class="flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <p class="text-sm text-white truncate">도서관관리자</p>
+          <p class="text-xs text-gray-500 truncate">@oa01 · 조직관리자</p>
+        </div>
+        <p class="text-sm text-white shrink-0" title="v2.37 · 커밋 deadbee · 빌드 2026-09-13 14:22 KST">v2.37</p>
+      </div>
+      <a href="/logout" class="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-gray-800 hover:bg-red-600 text-gray-200 hover:text-white text-sm font-medium transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        로그아웃
+      </a>
+    </div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4">
+      <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden p-2 rounded-lg hover:bg-gray-100">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="flex min-w-0 items-center gap-1">
+        
+
+<a id="page-back" href="/"
+   class="inline-flex h-8 shrink-0 items-center rounded-lg px-2 text-ui font-semibold text-ink-muted hover:bg-hover hover:text-ink"
+   >‹ 이전</a>
+
+
+        <h1 class="text-lg font-semibold text-gray-800 truncate">업무 회의</h1>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <div class="htmx-indicator">
+          <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div class="relative" x-data="{ open: false }" @click.outside="open=false">
+          <button type="button" @click="open=!open"
+                  class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 text-sm text-gray-700">
+            <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">
+              도
+            </span>
+            <span class="hidden sm:inline font-medium">도서관관리자</span>
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div x-show="open" x-cloak
+               class="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+            <div class="px-3 py-2 border-b border-gray-100">
+              <p class="text-sm font-medium text-gray-800 truncate">도서관관리자</p>
+              <p class="text-xs text-gray-500">조직관리자</p>
+            </div>
+            <a href="/account" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">내 계정</a>
+            
+            <a href="/admin/users" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">사용자/권한</a>
+            
+            <a href="/logout" class="block px-3 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">로그아웃</a>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="flex-1 overflow-y-auto p-6 pb-24 lg:pb-6" id="main-content">
+      
+      
+<div class="max-w-6xl mx-auto space-y-4"
+     data-meeting-board
+     data-view="project"
+     data-people-total="5"
+     data-project-total="5"
+     data-item-total="5"
+     data-sched-total="5"
+     data-mnt-target="2"
+     data-mnt-done="0"
+     data-mnt-incomplete="2"
+     data-mnt-overdue="1"
+     data-mnt-unassigned="1"
+     data-mnt-rate="0.0%"
+     x-data="{
+       showLeave: true,
+       showMnt: true,
+       showWork: true,
+       openLeave: true,
+       openMnt: true,
+       openWork: true,
+       expandAll() { this.openLeave = true; this.openMnt = true; this.openWork = true },
+       collapseAll() { this.openLeave = false; this.openMnt = false; this.openWork = false }
+     }">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-bold text-ink">업무 회의</h1>
+      <p class="text-ui-sm text-ink-muted mt-1">도서관사업팀 · 2026-10-21 ~ 2026-10-21</p>
+      
+    </div>
+    <div class="flex flex-wrap gap-2 items-center no-print">
+      <a class="text-ui-xs text-ink-muted underline" href="/meeting">일일 (예전)</a>
+      <a class="text-ui-xs text-ink-muted underline" href="/meeting/weekly">주간 팀 (예전)</a>
+      <a class="text-ui-xs text-ink-muted underline" href="/meeting/weekly/me">주간 내 자료 (예전)</a>
+    </div>
+  </div>
+
+  
+
+  
+  <p id="meeting-board-org-locked" class="text-ui-sm text-ink" data-org-locked="1">도서관사업팀</p>
+  
+
+  <form method="GET" action="/meeting/board" class="card p-4 space-y-3 no-print" data-board-filter>
+    
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="label" for="board-from">시작</label>
+        <input id="board-from" type="date" name="from" value="2026-10-21" class="input w-auto">
+      </div>
+      <div>
+        <label class="label" for="board-to">끝</label>
+        <input id="board-to" type="date" name="to" value="2026-10-21" class="input w-auto">
+      </div>
+      <input type="hidden" name="view" value="project">
+      
+
+<div class="inline-flex rounded-control border border-line text-ui-sm overflow-hidden" role="group" aria-label="그룹 포함 보기">
+  <a class="px-3 py-1.5 bg-primary text-white" href="?scope=with">그룹 포함</a>
+  <a class="px-3 py-1.5 text-ink hover:bg-hover" href="?scope=personal">개인만</a>
+</div>
+
+
+      <button type="submit" class="btn-primary btn-sm">조회</button>
+    </div>
+    <div class="flex flex-wrap gap-3 text-ui-sm">
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="as" checked> AS</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="maintenance" checked> 정기점검</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="project_work" checked> 작업</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="sales" checked> 영업</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="general" checked> 일반업무</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="support" checked> 지원</label>
+    </div>
+    <label class="inline-flex items-center gap-2 text-ui-sm">
+      <input type="checkbox" name="with_weekly" value="1" > 주간 자료 함께 보기
+    </label>
+  </form>
+
+  <div class="flex flex-wrap gap-2 no-print" data-view-tabs>
+    <a href="/meeting/board?from=2026-10-21&amp;to=2026-10-21&amp;view=people" data-view-tab="people" class="btn-secondary btn-sm" >담당자별 보기</a>
+    <a href="/meeting/board?from=2026-10-21&amp;to=2026-10-21&amp;view=project" data-view-tab="project" class="btn-primary btn-sm" aria-current="page">사업별 보기</a>
+    <a href="/meeting/board?from=2026-10-21&amp;to=2026-10-21&amp;view=weekly" data-view-tab="weekly" class="btn-secondary btn-sm" >주간 회의 자료표</a>
+    <a href="/meeting/board.xlsx?from=2026-10-21&amp;to=2026-10-21&amp;view=project" class="btn-secondary btn-sm" id="board-excel">엑셀</a>
+    <a href="/meeting/board?from=2026-10-21&amp;print=1&amp;to=2026-10-21&amp;view=project" class="btn-secondary btn-sm" id="board-print">회의용 인쇄</a>
+  </div>
+
+  <div class="flex flex-wrap gap-3 text-ui-sm no-print" data-panel-toggles>
+    <label class="inline-flex items-center gap-1"><input type="checkbox" x-model="showLeave"> 휴가자</label>
+    <label class="inline-flex items-center gap-1"><input type="checkbox" x-model="showMnt"> 정기점검 집행</label>
+    <label class="inline-flex items-center gap-1"><input type="checkbox" x-model="showWork"> 업무 목록</label>
+    <button type="button" class="btn-ghost btn-sm" @click="expandAll()">모두 펼치기</button>
+    <button type="button" class="btn-ghost btn-sm" @click="collapseAll()">모두 접기</button>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="showLeave" x-cloak data-leave-panel>
+    <div class="card p-4 space-y-2">
+      <button type="button" class="flex w-full items-center justify-between text-left" @click="openLeave=!openLeave">
+        <h2 class="text-ui font-medium text-ink">휴가자</h2>
+        <span class="text-ui-sm text-ink-muted">1명</span>
+      </button>
+      <div x-show="openLeave" x-cloak>
+        
+        <ul class="text-ui-sm space-y-1" data-leave-list>
+          
+          <li data-leave-name="도서관기술">도서관기술 연차 · 2026-10-21</li>
+          
+        </ul>
+        
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 space-y-2" x-show="showMnt" x-cloak data-mnt-panel>
+    <button type="button" class="flex w-full items-center justify-between text-left" @click="openMnt=!openMnt">
+      <h2 class="text-ui font-medium text-ink">정기점검 집행 현황</h2>
+      <span class="text-ui-sm text-ink-muted">10월 · 0.0%</span>
+    </button>
+    <div x-show="openMnt" x-cloak class="overflow-x-auto">
+      <table data-table-cols="meeting_board_mnt" class="table-base min-w-[320px] break-keep">
+        <thead>
+          <tr>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">대상</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">완료</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">미완료</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">지연</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">미배정</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">집행률</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="px-3 py-2" data-mnt-col="target">2</td>
+            <td class="px-3 py-2" data-mnt-col="done">0</td>
+            <td class="px-3 py-2" data-mnt-col="incomplete">2</td>
+            <td class="px-3 py-2" data-mnt-col="overdue">1</td>
+            <td class="px-3 py-2" data-mnt-col="unassigned">1</td>
+            <td class="px-3 py-2" data-mnt-col="rate">0.0%</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="text-ui-sm text-ink-muted mt-2">집행률 = 당월 완료 ÷ 월 방문 목표(CountMonthMntQuota). 분모 0이면 —.</p>
+    </div>
+  </div>
+
+  <div x-show="showWork" x-cloak data-work-panel>
+    <div class="flex items-center justify-between mb-2">
+      <button type="button" class="text-ui font-medium text-ink" @click="openWork=!openWork">업무 목록</button>
+      <button type="button" class="btn btn-ghost btn-sm no-print" data-table-cols-reset="meeting_board">열 너비 초기화</button>
+    </div>
+    <div x-show="openWork" x-cloak>
+      
+      
+      
+<div class="card overflow-hidden" data-board-table="project">
+  <div class="card-header">사업별 보기</div>
+  <div class="overflow-x-auto">
+    <table data-table-cols="meeting_board" class="table-base min-w-[320px] break-keep">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">사업</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">담당자</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">접수</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">조치</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        
+        <tr class="bg-hover" data-project-id="">
+          <td colspan="5" class="px-3 py-1.5 text-ui-sm font-medium text-ink">사업 미연결 · 4건
+            <span class="text-ink-muted font-normal">담당 도서관기술, 도서관영업</span>
+          </td>
+        </tr>
+        
+        <tr class="hover:bg-hover" data-item-key="maintenance:v2">
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">—</td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">미배정
+            
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[정기점검]</span></td>
+          <td class="px-3 py-2 text-ui-sm"><a href="/maintenance/visits/v2" class="hover:underline">2026-10-21 2026-10-21 점검2</a></td>
+          <td class="px-3 py-2 text-ui-sm">예정</td>
+        </tr>
+        
+        <tr class="hover:bg-hover" data-item-key="maintenance:v1">
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">—</td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">도서관기술
+            <span class="badge-warning" data-leave-badge="도서관기술">휴가</span>
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[정기점검]</span></td>
+          <td class="px-3 py-2 text-ui-sm"><a href="/maintenance/visits/v1" class="hover:underline">2026-10-21 2026-10-21 회의도서관</a></td>
+          <td class="px-3 py-2 text-ui-sm">방문 완료</td>
+        </tr>
+        
+        <tr class="hover:bg-hover" data-item-key="as:as-s">
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">—</td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">도서관영업
+            
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[AS]</span></td>
+          <td class="px-3 py-2 text-ui-sm"><a href="/as/as-s/action" class="hover:underline">R2610-S01 2026-10-21 영업건</a></td>
+          <td class="px-3 py-2 text-ui-sm">진행중</td>
+        </tr>
+        
+        <tr class="hover:bg-hover" data-item-key="as:as-t">
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">—</td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">도서관기술
+            <span class="badge-warning" data-leave-badge="도서관기술">휴가</span>
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[AS]</span></td>
+          <td class="px-3 py-2 text-ui-sm"><a href="/as/as-t/action" class="hover:underline">R2610-T01 2026-10-21 기술건</a></td>
+          <td class="px-3 py-2 text-ui-sm">진행중</td>
+        </tr>
+        
+        
+        <tr class="bg-hover" data-project-id="WP-A">
+          <td colspan="5" class="px-3 py-1.5 text-ui-sm font-medium text-ink">도서관공사 · 1건
+            <span class="text-ink-muted font-normal">담당 도서관기술</span>
+          </td>
+        </tr>
+        
+        <tr class="hover:bg-hover" data-item-key="project_work:wt-p">
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">WP-A</td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">도서관기술
+            <span class="badge-warning" data-leave-badge="도서관기술">휴가</span>
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[작업]</span></td>
+          <td class="px-3 py-2 text-ui-sm"><a href="/workboard/tasks/wt-p/action" class="hover:underline">wt-p 2026-10-21 공사현장</a></td>
+          <td class="px-3 py-2 text-ui-sm">할 일</td>
+        </tr>
+        
+        
+        
+      </tbody>
+    </table>
+  </div>
+</div>
+
+      
+      
+    </div>
+  </div>
+</div>
+
+    </main>
+  </div>
+</div>
+
+<nav id="mobile-tab-bar" class="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface" aria-label="모바일 바로가기">
+  <ul class="grid grid-cols-5">
+    <li>
+      <a href="/" class="flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs text-ink-muted">대시보드</a>
+    </li>
+    <li>
+      <a href="/work" class="flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs text-ink-muted">내 업무</a>
+    </li>
+    <li>
+      <a href="/approvals/inbox" class="relative flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs text-ink-muted">
+        결재
+        
+      </a>
+    </li>
+    <li>
+      <a href="/leaves" class="relative flex min-h-[44px] flex-col items-center justify-center px-1 text-ui-xs text-ink-muted">
+        휴가 신청
+        
+      </a>
+    </li>
+    <li>
+      <button type="button" class="flex min-h-[44px] w-full flex-col items-center justify-center px-1 text-ui-xs text-ink-muted" @click="moreOpen=true" :aria-expanded="moreOpen ? 'true' : 'false'">더보기</button>
+    </li>
+  </ul>
+</nav>
+<div id="mobile-more-sheet" class="lg:hidden" x-show="moreOpen" x-cloak>
+  <div class="fixed inset-0 z-40 bg-gray-900/50" @click="moreOpen=false"></div>
+  <div class="fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-xl bg-gray-900 pb-safe" role="dialog" aria-label="전체 메뉴">
+    <div class="flex min-h-[44px] items-center justify-between border-b border-gray-700 px-4 py-2">
+      <p class="text-sm font-semibold text-white">메뉴</p>
+      <button type="button" class="min-h-[44px] min-w-[44px] text-gray-300" @click="moreOpen=false" aria-label="닫기">닫기</button>
+    </div>
+    
+<nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1 text-sm" style="-webkit-overflow-scrolling:touch"
+     x-data="navMenu('work', [], [])"
+     @click="if ($event.target.closest('a') && window.innerWidth < 1024) sidebarOpen=false">
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('work')"
+            :aria-expanded="openG('work') ? 'true' : 'false'">
+      <span>업무관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('work')" x-cloak>6</span>
+    </button>
+    <div x-show="openG('work')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>대시보드</span>
+        
+      </a>
+      
+      
+      
+      <a href="/workboard/board" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무 관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/work-groups" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무 그룹</span>
+        
+      </a>
+      
+      
+      
+      <a href="/meeting/board" class="bg-primary text-white nav-active flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무 회의</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleP('approval')"
+                :aria-expanded="openP('approval') ? 'true' : 'false'">
+          <span>결재</span>
+          <span class="text-ink-muted" x-text="openP('approval') ? '▾' : '▸'"></span>
+          
+        </button>
+        <div x-show="openP('approval')" x-cloak class="space-y-0.5">
+          
+          <a href="/approvals/inbox" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>결재할 문서</span>
+            
+          </a>
+          
+          <a href="/leaves" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>휴가 신청</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleP('legacy_views')"
+                :aria-expanded="openP('legacy_views') ? 'true' : 'false'">
+          <span>예전 화면 보기</span>
+          <span class="text-ink-muted" x-text="openP('legacy_views') ? '▾' : '▸'"></span>
+          
+        </button>
+        <div x-show="openP('legacy_views')" x-cloak class="space-y-0.5">
+          
+          <a href="/workboard/register" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>일일 업무 등록 (예전)</span>
+            
+          </a>
+          
+          <a href="/work" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>오늘 업무 (예전)</span>
+            
+          </a>
+          
+          <a href="/work/all" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>전체 업무 (예전)</span>
+            
+          </a>
+          
+          <a href="/stats/reports" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>보고서 (예전)</span>
+            
+          </a>
+          
+          <a href="/as?legacy=1" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>AS 접수 상세 (예전)</span>
+            
+          </a>
+          
+          <a href="/meeting" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>일일 업무 회의 (예전)</span>
+            
+          </a>
+          
+          <a href="/meeting/weekly" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>주간 회의 (팀) (예전)</span>
+            
+          </a>
+          
+          <a href="/meeting/weekly/me" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>주간 회의 (내 자료) (예전)</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+      
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('customer')"
+            :aria-expanded="openG('customer') ? 'true' : 'false'">
+      <span>고객관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('customer')" x-cloak>12</span>
+    </button>
+    <div x-show="openG('customer')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/as" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>AS 접수·조치</span>
+        
+      </a>
+      
+      
+      
+      <a href="/as/knowledge" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>AS 사례 검색</span>
+        
+      </a>
+      
+      
+      
+      <a href="/maintenance" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>정기점검</span>
+        
+      </a>
+      
+      
+      
+      <a href="/customers" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>고객현황</span>
+        
+      </a>
+      
+      
+      
+      <a href="/assets" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>설치자산</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleM('customer')"
+                :aria-expanded="openM('customer') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('customer') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('customer')" x-cloak class="space-y-0.5">
+          
+          <a href="/contacts" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>담당자관리</span>
+            
+          </a>
+          
+          <a href="/contact-history" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>담당자이력</span>
+            
+          </a>
+          
+          <a href="/spaces" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>공간관리</span>
+            
+          </a>
+          
+          <a href="/relations" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>수행관계</span>
+            
+          </a>
+          
+          <a href="/maintenance/sites" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>점검 사이트 설정</span>
+            
+          </a>
+          
+          <a href="/maintenance/products" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>점검 제품</span>
+            
+          </a>
+          
+          <a href="/maintenance/sites/distance" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>지역 거리 순서</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('sales')"
+            :aria-expanded="openG('sales') ? 'true' : 'false'">
+      <span>영업관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('sales')" x-cloak>6</span>
+    </button>
+    <div x-show="openG('sales')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/sales/dashboard" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>영업 대시보드</span>
+        
+      </a>
+      
+      
+      
+      <a href="/sales?view=pipeline" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>파이프라인</span>
+        
+      </a>
+      
+      
+      
+      <a href="/sales/activities" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>영업 활동</span>
+        
+      </a>
+      
+      
+      
+      <a href="/quotes" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>견적·수주·계약</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleM('sales')"
+                :aria-expanded="openM('sales') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('sales') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('sales')" x-cloak class="space-y-0.5">
+          
+          <a href="/sales/groups" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>사업 대분류</span>
+            
+          </a>
+          
+          <a href="/analysis" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>교체대상현황</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('project')"
+            :aria-expanded="openG('project') ? 'true' : 'false'">
+      <span>사업관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('project')" x-cloak>5</span>
+    </button>
+    <div x-show="openG('project')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/projects/dashboard" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>사업 대시보드</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleP('projects')"
+                :aria-expanded="openP('projects') ? 'true' : 'false'">
+          <span>사업·업무관리</span>
+          <span class="text-ink-muted" x-text="openP('projects') ? '▾' : '▸'"></span>
+          
+        </button>
+        <div x-show="openP('projects')" x-cloak class="space-y-0.5">
+          
+          <a href="/projects" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>사업 목록</span>
+            
+          </a>
+          
+          <a href="/projects/import" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>엑셀 등록</span>
+            
+          </a>
+          
+          <a href="/cooperations/inbox" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>받은 협조</span>
+            
+          </a>
+          
+          <a href="/cooperations/sent" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>보낸 협조</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+      
+      
+      <a href="/projects/docs" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>서류 작성·관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/projects/diary" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>업무일지·투입관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/projects/registry" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>사업 등록 관리</span>
+        
+      </a>
+      
+      
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('stats')"
+            :aria-expanded="openG('stats') ? 'true' : 'false'">
+      <span>통계·보고서</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('stats')" x-cloak>3</span>
+    </button>
+    <div x-show="openG('stats')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/stats" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>통계</span>
+        
+      </a>
+      
+      
+      
+      <a href="/stats/milestones" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>마일스톤</span>
+        
+      </a>
+      
+      
+      
+      <a href="/stats/company-weekly" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>보고서</span>
+        
+      </a>
+      
+      
+      
+    </div>
+  </div>
+  
+  <div class="pt-2 first:pt-0">
+    <button type="button"
+            class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+            @click.stop="toggleG('admin')"
+            :aria-expanded="openG('admin') ? 'true' : 'false'">
+      <span>설정·관리</span>
+      <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('admin')" x-cloak>12</span>
+    </button>
+    <div x-show="openG('admin')" x-cloak class="space-y-0.5">
+      
+      
+      <a href="/admin/users" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>사용자/권한</span>
+        
+      </a>
+      
+      
+      
+      <a href="/admin/my-org/members" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>소속 인원 관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/admin/holidays" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>휴무일 관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/admin/approval-settings" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>결재 설정</span>
+        
+      </a>
+      
+      
+      
+      <a href="/items" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>품목 마스터</span>
+        
+      </a>
+      
+      
+      
+      <a href="/codes" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>코드관리</span>
+        
+      </a>
+      
+      
+      
+      <a href="/work-item-templates" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-6 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+        <span>작업 항목 관리</span>
+        
+      </a>
+      
+      
+      
+      <div>
+        <button type="button"
+                class="flex w-full min-h-[44px] items-center gap-2 rounded-lg pl-6 pr-3 py-2 text-[13px] text-ink-subtle hover:bg-hover hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                @click.stop="toggleM('admin')"
+                :aria-expanded="openM('admin') ? 'true' : 'false'">
+          더 보기
+          <span x-text="openM('admin') ? '▾' : '▸'"></span>
+        </button>
+        <div x-show="openM('admin')" x-cloak class="space-y-0.5">
+          
+          <a href="/projects/equipment-categories" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>장비 분류</span>
+            
+          </a>
+          
+          <a href="/as/cause-categories" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>원인 분류표</span>
+            
+          </a>
+          
+          <a href="/admin/notify" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>알림 설정</span>
+            
+          </a>
+          
+          <a href="/admin/sales-logs" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>영업 로그 관리</span>
+            
+          </a>
+          
+          <a href="/admin/orgs" class="text-ink-subtle hover:bg-hover flex min-h-[44px] items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary">
+            <span>전체 조직 관리</span>
+            
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+</nav>
+
+  </div>
+</div>
+
+
+
+
+
+<button type="button" id="build-badge"
+        class="fixed bottom-2 right-2 z-20 rounded px-1.5 py-0.5 text-[10px] leading-none text-gray-400/80 hover:text-gray-600 hover:bg-white/80 cursor-pointer select-none"
+        style="opacity:.7"
+        title="v2.37 · 커밋 deadbee · 빌드 2026-09-13 14:22 KST"
+        data-copy="v2.37 · 커밋 deadbee · 빌드 2026-09-13 14:22 KST">v2.37 · 09-13 14:22</button>
+
+<script>
+(function () {
+  function copyText(t) {
+    if (!t) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).catch(function () { fallbackCopy(t); });
+      return;
+    }
+    fallbackCopy(t);
+  }
+  function fallbackCopy(t) {
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  window.navMenu = function (curGroup, curMore, curParents) {
+    return {
+      g: {},
+      m: {},
+      p: {},
+      init() {
+        var load = function (key, into) {
+          try {
+            var s = sessionStorage.getItem(key);
+            if (s) Object.assign(into, JSON.parse(s));
+          } catch (e) {}
+        };
+        load('nav-g', this.g);
+        load('nav-m', this.m);
+        load('nav-p', this.p);
+        if (this.g.work === undefined) this.g.work = true;
+        if (curGroup) this.g[curGroup] = true;
+        (curMore || []).forEach(function (id) { this.m[id] = true; }.bind(this));
+        (curParents || []).forEach(function (id) { this.p[id] = true; }.bind(this));
+      },
+      save(key, obj) {
+        try { sessionStorage.setItem(key, JSON.stringify(obj)); } catch (e) {}
+      },
+      openG(id) { return !!this.g[id]; },
+      openM(id) { return !!this.m[id]; },
+      openP(id) { return !!this.p[id]; },
+      toggleG(id) { this.g[id] = !this.openG(id); this.save('nav-g', this.g); },
+      toggleM(id) { this.m[id] = !this.openM(id); this.save('nav-m', this.m); },
+      toggleP(id) { this.p[id] = !this.openP(id); this.save('nav-p', this.p); }
+    };
+  };
+  window.flashDialog = function (msg) {
+    return {
+      open: !!(msg && String(msg).length),
+      msg: msg ? String(msg) : '',
+      reload: !!(msg && String(msg).indexOf('새로고침') >= 0),
+      show(m) {
+        this.reload = false;
+        if (m && typeof m === 'object') {
+          this.msg = String(m.msg || m.detail || '');
+          this.reload = !!m.reload;
+        } else {
+          this.msg = String(m || '');
+        }
+        if (/새로고침/.test(this.msg)) this.reload = true;
+        this.open = this.msg.length > 0;
+        var self = this;
+        this.$nextTick(function () { if (self.$refs.ok) self.$refs.ok.focus(); });
+      },
+      close() { this.open = false; this.reload = false; }
+    };
+  };
+  window.asSaveDialog = function () {
+    return {
+      open: true,
+      close() { this.open = false; },
+      init() {
+        var self = this;
+        this.$nextTick(function () { if (self.$refs.ok) self.$refs.ok.focus(); });
+      }
+    };
+  };
+  window.asDeleteDialog = function () {
+    return {
+      open: false, id: '', number: '', org: '', snippet: '', back: '',
+      openWith(d) {
+        d = d || {};
+        this.id = d.id || '';
+        this.number = d.number || '';
+        this.org = d.org || '';
+        this.snippet = d.snippet || '';
+        this.back = (window.location && (window.location.pathname + window.location.search)) || '';
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        var inp = document.getElementById('as-delete-csrf');
+        if (meta && inp && meta.getAttribute('content')) inp.value = meta.getAttribute('content');
+        this.open = !!this.id;
+        var self = this;
+        this.$nextTick(function () { if (self.$refs.ok) self.$refs.ok.focus(); });
+      },
+      close() { this.open = false; }
+    };
+  };
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('.js-as-delete') : null;
+    if (!b) return;
+    window.dispatchEvent(new CustomEvent('as-delete-open', {
+      detail: {
+        id: b.getAttribute('data-as-id') || '',
+        number: b.getAttribute('data-as-number') || '',
+        org: b.getAttribute('data-as-org') || '',
+        snippet: b.getAttribute('data-as-snippet') || ''
+      }
+    }));
+  });
+  window.showFlashError = function (m, reload) {
+    var detail = m;
+    if (reload === true && typeof m === 'string') {
+      detail = { msg: m, reload: true };
+    }
+    window.dispatchEvent(new CustomEvent('app-flash-error', { detail: detail }));
+  };
+  window.customerCombo = function (scope, value, required, placeholder, parent, syncKey) {
+    scope = scope || 'site';
+    return {
+      scope: scope,
+      q: '',
+      open: false,
+      hi: 0,
+      selectedId: value || '',
+      selectedLabel: '',
+      items: [],
+      total: 0,
+      placeholder: placeholder || '고객명으로 찾기',
+      parentId: parent || '',
+      required: !!required,
+      timer: null,
+      syncKey: syncKey || '',
+      init() {
+        if (this.syncKey && this.$data && this.$data[this.syncKey]) {
+          this.selectedId = this.$data[this.syncKey];
+        }
+        if (this.selectedId) this.restore();
+      },
+      restore() {
+        var self = this;
+        fetch('/lookup/customers?scope=' + encodeURIComponent(this.scope) + '&include=' + encodeURIComponent(this.selectedId) + '&limit=8', { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            var items = d.items || [];
+            var it = items.find(function (x) { return x.id === self.selectedId; }) || items[0];
+            if (it) {
+              self.selectedLabel = it.label || it.name;
+              self.q = self.selectedLabel;
+            }
+          });
+      },
+      onInput() {
+        var self = this;
+        this.selectedId = '';
+        this.selectedLabel = '';
+        clearTimeout(this.timer);
+        this.timer = setTimeout(function () { self.search(false); }, 250);
+      },
+      search(more) {
+        var q = String(this.q || '').trim();
+        var n = Array.from(q).length;
+        if (n === 1) { this.items = []; this.total = 0; this.open = true; return; }
+        var limit = more ? 100 : 20;
+        var url = '/lookup/customers?scope=' + encodeURIComponent(this.scope) + '&limit=' + limit + '&q=' + encodeURIComponent(q);
+        if (this.parentId) url += '&parent=' + encodeURIComponent(this.parentId);
+        var self = this;
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            self.items = d.items || [];
+            self.total = d.total || 0;
+            self.open = true;
+            self.hi = 0;
+          });
+      },
+      move(d) {
+        var n = this.items.length;
+        if (!n) { this.hi = 0; return; }
+        this.hi = (this.hi + d + n) % n;
+      },
+      pickHighlight() {
+        var it = this.items[this.hi];
+        if (it) this.pick(it);
+      },
+      pick(it) {
+        if (!it || it.registered) return;
+        this.selectedId = it.id;
+        this.selectedLabel = it.label || it.name;
+        this.q = this.selectedLabel;
+        this.open = false;
+        if (this.syncKey) this[this.syncKey] = it.id;
+        var el = this.$refs.hid;
+        if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+  };
+  window.projectCombo = function (items, selected, emptyLabel) {
+    items = items || [];
+    var startName = '';
+    if (selected) {
+      var hit = items.find(function (p) { return p.project_id === selected; });
+      startName = hit ? (hit.name || '') : '';
+    }
+    return {
+      items: items,
+      q: startName,
+      open: false,
+      hi: 0,
+      selectedId: selected || '',
+      emptyLabel: emptyLabel || '— 선택 (해당 시) —',
+      get selectedName() {
+        var id = this.selectedId;
+        if (!id) return '';
+        var hit = this.items.find(function (p) { return p.project_id === id; });
+        return hit ? hit.name : '';
+      },
+      get filtered() {
+        var q = String(this.q || '').trim().toLowerCase();
+        if (!q) return this.items;
+        return this.items.filter(function (p) {
+          return String(p.name || '').toLowerCase().indexOf(q) >= 0;
+        });
+      },
+      move(d) {
+        var n = this.filtered.length;
+        if (!n) { this.hi = 0; return; }
+        this.hi = (this.hi + d + n) % n;
+      },
+      pickHighlight() {
+        var p = this.filtered[this.hi];
+        if (p) this.pick(p.project_id, p.name, p.project_kind);
+        else this.pick('', '');
+      },
+      pick(id, name, kind) {
+        this.selectedId = id || '';
+        this.q = name || '';
+        this.open = false;
+        this.$dispatch('project-picked', { id: this.selectedId, name: name || '', kind: kind || '' });
+      }
+    };
+  };
+  window.orgPicker = function (mode, orgs, selected, related, ownerId) {
+    orgs = orgs || [];
+    related = related || [];
+    function keyOf(o) { return (o && (o.org_id || o.OrgID)) || ''; }
+    function labelOf(o) { return (o && (o.org_name || o.OrgName || o.org_id || o.OrgID)) || ''; }
+    return {
+      mode: mode || 'single',
+      orgs: orgs,
+      open: false,
+      ownerId: selected || ownerId || '',
+      selected: related.slice(),
+      orgKey: keyOf,
+      orgLabel: labelOf,
+      isOwner: function (id) { return !!id && id === this.ownerId; },
+      labelOf: function (id) {
+        var hit = this.orgs.find(function (o) { return keyOf(o) === id; });
+        return hit ? labelOf(hit) : id;
+      },
+      onOwner: function () {
+        var self = this;
+        this.selected = this.selected.filter(function (id) { return id !== self.ownerId; });
+      },
+      toggle: function (id) {
+        if (!id || this.isOwner(id)) return;
+        var i = this.selected.indexOf(id);
+        if (i >= 0) this.selected.splice(i, 1);
+        else this.selected.push(id);
+      }
+    };
+  };
+  var badge = document.getElementById('build-badge');
+  if (badge) {
+    badge.addEventListener('click', function () {
+      copyText(badge.getAttribute('data-copy') || '');
+    });
+  }
+  document.querySelectorAll('input[type="date"]').forEach(function (el) {
+    if (!el.getAttribute('min')) el.setAttribute('min', '2000-01-01');
+    if (!el.getAttribute('max')) el.setAttribute('max', '2100-12-31');
+  });
+  document.querySelectorAll('input[type="datetime-local"]').forEach(function (el) {
+    if (!el.getAttribute('min')) el.setAttribute('min', '2000-01-01T00:00');
+    if (!el.getAttribute('max')) el.setAttribute('max', '2100-12-31T23:59');
+  });
+  function assigneeValueIn(root) {
+    if (!root) return '';
+    var sel = root.querySelector('select[data-focus-target="assignee"], select.eq-assigned-code, select[name="assigned_to_code"], select[name="assignee"]');
+    if (sel) {
+      var v = (sel.value || '').trim();
+      if (v === 'custom') {
+        var custom = root.querySelector('[name="eq_assigned_custom"], [name="assigned_to_custom"], [name="assignee_external"]');
+        return custom ? (custom.value || '').trim() : '';
+      }
+      if (v) return v;
+    }
+    var group = root.querySelector('[name="eq_work_group_id"], [name="work_group_id"]');
+    if (group && (group.value || '').trim()) return group.value;
+    var checks = root.querySelectorAll('input[name="assignee_user_id"]:checked, input[name="assignee_group_id"]:checked');
+    if (checks.length) return '1';
+    var hids = root.querySelectorAll('input[name="assignee_user_id"], input[name="assignee_group_id"]');
+    for (var i = 0; i < hids.length; i++) {
+      if ((hids[i].value || '').trim()) return '1';
+    }
+    return '';
+  }
+  function assigneeControlValue(form) {
+    return assigneeValueIn(form);
+  }
+  function showAssigneeErrorNear(form, el, boxRoot) {
+    var root = boxRoot || (el && el.parentNode) || form;
+    var box = root.querySelector('[data-assignee-error]');
+    if (!box) {
+      box = document.createElement('p');
+      box.className = 'mt-1 text-xs text-red-600';
+      box.setAttribute('data-assignee-error', '1');
+      if (el && el.parentNode) el.parentNode.appendChild(box);
+      else form.appendChild(box);
+    }
+    box.textContent = '담당자를 선택하세요';
+    var top = form.querySelector('[data-assignee-banner]');
+    if (!top) {
+      top = document.createElement('div');
+      top.setAttribute('data-assignee-banner', '1');
+      top.className = 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-3';
+      form.insertBefore(top, form.firstChild);
+    }
+    top.textContent = '담당자를 선택하세요';
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (el && typeof el.focus === 'function') el.focus();
+  }
+  document.querySelectorAll('form[data-require-assignee]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      var rows = form.querySelectorAll('#eq-rows .eq-row');
+      if (rows.length) {
+        for (var r = 0; r < rows.length; r++) {
+          var row = rows[r];
+          var a = row.querySelector('.eq-asset');
+          var s = row.querySelector('textarea[name="eq_symptom"]');
+          var filled = (a && a.value) || (s && (s.value || '').trim());
+          if (!filled) continue;
+          if (assigneeValueIn(row)) continue;
+          e.preventDefault();
+          var sel = row.querySelector('[data-focus-target="assignee"]');
+          showAssigneeErrorNear(form, sel, row);
+          return;
+        }
+        return;
+      }
+      if (assigneeControlValue(form)) return;
+      e.preventDefault();
+      var sel = form.querySelector('[data-focus-target="assignee"]');
+      showAssigneeErrorNear(form, sel, form);
+    });
+  });
+  (function focusAssigneeOnLoad() {
+    var miss = document.querySelector('#eq-rows [data-assignee-miss], #eq-rows [data-assignee-error]');
+    var el = null;
+    if (miss) {
+      var row = miss.closest('.eq-row') || miss;
+      el = row.querySelector('[data-focus-target="assignee"]');
+    }
+    if (!el && /[?&]focus=assignee/.test(location.search)) {
+      el = document.querySelector('[data-focus-target="assignee"]');
+    }
+    if (!el) return;
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (typeof el.focus === 'function') el.focus();
+  })();
+})();
+</script>
+<script>
+(function(){
+  var el = document.getElementById('page-back');
+  if (!el || el.getAttribute('data-page-back') !== 'history') return;
+  el.addEventListener('click', function(e){
+    if (history.length > 1) { e.preventDefault(); history.back(); }
+  });
+})();
+</script>
+<script type="application/json" id="assignee-picker-names">{}</script>
+<div id="overlap-resolve" hidden class="hidden modal-backdrop z-[80] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="overlap-resolve-title">
+  <div class="modal-panel w-full max-w-lg shadow-pop max-h-[90vh] overflow-y-auto" tabindex="-1">
+    <h2 id="overlap-resolve-title" class="text-ui font-bold text-ink">시간이 겹칩니다</h2>
+    <p id="overlap-resolve-msg" class="mt-2 text-ui text-ink"></p>
+    <p class="mt-1 text-xs text-ink-muted">담당자만 빼기·삭제는 아래 겹친 업무 모두에 적용됩니다. 끼워 넣기는 같은 작업자의 계획을 나눕니다.</p>
+    <p id="overlap-resolve-err" hidden class="mt-2 text-ui text-red-700" role="alert"></p>
+    <p id="overlap-resolve-busy" hidden class="mt-2 text-ui text-ink-muted">처리 중…</p>
+    <ul id="overlap-conflict-list" class="mt-3 space-y-2"></ul>
+    <div id="overlap-split-box" class="mt-3 space-y-2">
+      <p class="text-ui-sm font-semibold text-ink">이동 시간</p>
+      <div class="flex flex-wrap gap-2" id="overlap-travel-chips">
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="0">0분</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="15">15분</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="30">30분</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="60">60분</button>
+      </div>
+      <label class="text-ui-sm text-ink-muted">직접 입력(0~180)
+        <input type="number" id="overlap-travel-min" min="0" max="180" value="0" class="input mt-1 w-24">
+      </label>
+      <div id="overlap-split-preview" class="text-ui-sm text-ink space-y-1"></div>
+    </div>
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <button type="button" class="btn btn-primary" data-overlap-action="split">끼워 넣기</button>
+      <button type="button" class="btn btn-secondary" data-overlap-action="edit">기존 계획 수정</button>
+      <button type="button" class="btn btn-danger" data-overlap-action="delete">기존 계획 삭제</button>
+      <button type="button" class="btn btn-secondary" data-overlap-action="leave">담당자만 빼고 새 계획 등록</button>
+      <button type="button" class="btn btn-ghost" data-overlap-action="cancel">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="carry-modal" hidden class="hidden modal-backdrop z-[90] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="carry-title">
+  <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+    <h2 id="carry-title" class="text-ui font-bold text-ink">업무 이월</h2>
+    <p id="carry-task-title" class="mt-2 text-ui font-semibold text-ink"></p>
+    <p id="carry-task-sched" class="mt-1 text-ui-sm text-ink-muted"></p>
+    <p id="carry-task-delay" class="mt-1 text-ui-sm text-danger hidden"></p>
+    <form id="carry-form" method="post" action="" class="mt-4 space-y-3">
+      <input type="hidden" name="redirect" id="carry-redirect" value="">
+      <input type="hidden" name="back" id="carry-back" value="">
+      <div id="carry-single-wrap">
+        <label class="label" for="carry-new-date">새 날짜</label>
+        <input type="date" class="input" name="new_date" id="carry-new-date"
+               min=""
+               value="">
+      </div>
+      <div id="carry-span-wrap" class="hidden space-y-3">
+        <div>
+          <label class="label" for="carry-new-due">새 종료일</label>
+          <input type="date" class="input" name="new_due_date" id="carry-new-due"
+                 min=""
+                 value="">
+        </div>
+      </div>
+      <p id="carry-skip" class="text-ui-sm text-ink-muted hidden"></p>
+      <p id="carry-partial-leave" class="text-ui-sm text-warning hidden"></p>
+      <p id="carry-holiday" class="text-ui-sm text-warning hidden"
+         data-next="" data-holiday="0">
+        선택한 날은 휴무일입니다. 다음 영업일 로 바꾸기
+        <button type="button" class="btn btn-secondary btn-sm" id="carry-hol-change">바꾸기</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="carry-hol-keep">그대로</button>
+      </p>
+      <div>
+        <label class="label" for="carry-reason">지연 사유</label>
+        <textarea class="input min-h-[5rem]" name="delay_reason" id="carry-reason" rows="3"></textarea>
+        <p id="carry-reason-err" class="mt-1 text-ui-sm text-danger hidden">지연 사유를 입력하세요</p>
+      </div>
+      <p id="carry-form-err" class="text-ui-sm text-danger hidden"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-ghost" id="carry-cancel">취소</button>
+        <button type="submit" class="btn btn-primary" id="carry-submit">확인</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="delay-reason-modal" hidden class="hidden modal-backdrop z-[90] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="delay-reason-title">
+  <div class="modal-panel w-full max-w-md shadow-pop">
+    <h2 id="delay-reason-title" class="text-ui font-bold text-ink">지연 사유</h2>
+    <form id="delay-reason-form" method="post" action="" class="mt-4 space-y-3">
+      <input type="hidden" name="redirect" id="delay-reason-redirect" value="">
+      <textarea class="input min-h-[5rem]" name="delay_reason" id="delay-reason-text" rows="3"></textarea>
+      <p id="delay-reason-err" class="text-ui-sm text-danger hidden">지연 사유를 입력하세요</p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-ghost" id="delay-reason-cancel">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</body>
+</html>

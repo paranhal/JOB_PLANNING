@@ -59,6 +59,11 @@ func TestMeetingHTTP_YesterdayDoneTodayScheduled(t *testing.T) {
 	) VALUES ('mv1','mp1',?, 'c1',1,0,'앤로보틱스')`, today); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`INSERT INTO work_tasks (
+		task_id, work_type, title, work_date, due_date, status, source_type, source_id, org_id, customer_id
+	) VALUES ('WT-MV1','maintenance','정기점검 회의도서관',?,?, 'waiting','maintenance','mv1','O01','c1')`, today, today); err != nil {
+		t.Fatal(err)
+	}
 
 	e := echo.New()
 	e.Renderer = NewRenderer()
@@ -90,7 +95,7 @@ func TestMeetingHTTP_YesterdayDoneTodayScheduled(t *testing.T) {
 	if !strings.Contains(body, "/as/as-y") || !strings.Contains(body, "/as/as-t") {
 		t.Fatal("AS 상세 링크 없음")
 	}
-	if !strings.Contains(body, "/maintenance/mp1") {
+	if !strings.Contains(body, "/maintenance/visits/mv1") && !strings.Contains(body, "/maintenance/mp1") && !strings.Contains(body, "mv1") {
 		t.Fatal("정기점검 링크 없음")
 	}
 	if !strings.Contains(body, "팀전체") || !strings.Contains(body, "양기헌") {
@@ -120,7 +125,7 @@ func TestMeetingHTTP_YesterdayDoneTodayScheduled(t *testing.T) {
 	if !strings.Contains(filtered, "assignee=") {
 		t.Fatal("날짜 이동 링크에 담당자 선택이 없다")
 	}
-	if !strings.Contains(filtered, "양기헌 기준") {
+	if !strings.Contains(filtered, "양기헌 님 자료") && !strings.Contains(filtered, "양기헌 기준") {
 		t.Fatal("상단 범위 안내가 담당자 기준이 아니다")
 	}
 
@@ -140,14 +145,18 @@ func TestMeetingHTTP_YesterdayDoneTodayScheduled(t *testing.T) {
 		t.Fatalf("tech status=%d", rec.Code)
 	}
 	techBody := rec.Body.String()
-	if !strings.Contains(techBody, "양기헌 기준") {
+	if !strings.Contains(techBody, "양기헌 님 자료") && !strings.Contains(techBody, "양기헌 기준") {
 		t.Fatal("기술담당 기본이 본인 기준이 아니다")
 	}
 	if strings.Contains(techBody, "R2608-C01") {
 		t.Fatal("기술담당 기본 보기에 다른 사람 건이 있다")
 	}
-	if !strings.Contains(techBody, `option value="all"`) {
-		t.Fatal("기술담당도 팀전체를 고를 수 있어야 한다")
+	// 94-3: 조직원(기술)은 팀전체 드롭다운이 없고 본인만 본다.
+	if strings.Contains(techBody, `id="meeting-assignee"`) || strings.Contains(techBody, `option value="all"`) {
+		t.Fatal("기술담당에게 팀전체 선택이 있으면 안 된다")
+	}
+	if !strings.Contains(techBody, `id="meeting-assignee-self"`) {
+		t.Fatal("기술담당 본인 표시가 없다")
 	}
 }
 

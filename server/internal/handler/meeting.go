@@ -24,6 +24,9 @@ type MeetingHandler struct {
 	asH      *ASHandler
 	leave    *LeaveHandler
 	coop     *repository.CoopRepo
+	leaves   *repository.StaffLeaveRepo
+	wb       *repository.WBRepo
+	groups   *repository.WorkGroupRepo
 }
 
 func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo, asRepo *repository.ASRepo, orgRepo *repository.OrgRepo) *MeetingHandler {

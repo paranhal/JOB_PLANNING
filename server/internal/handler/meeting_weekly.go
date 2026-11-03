@@ -258,8 +258,8 @@ func (h *MeetingHandler) collectWeekOverdue(weekMon time.Time, uid string, keys 
 		if meetingItemComplete(it) {
 			continue
 		}
-		sched := model.WorkItemScheduledDate(it)
-		if it.DaysOverdue < 1 && (sched == "" || sched >= mon) {
+		today := time.Now().Format("2006-01-02")
+		if !model.WorkListTaskDelayState(it, today).Delayed {
 			continue
 		}
 		k := model.WorkListItemKey(it)

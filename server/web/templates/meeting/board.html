@@ -1,0 +1,271 @@
+{{define "title"}}업무 회의 · {{appName}}{{end}}
+{{define "content"}}
+<div class="max-w-6xl mx-auto space-y-4"
+     data-meeting-board
+     data-view="{{.View}}"
+     data-people-total="{{.PeopleN}}"
+     data-project-total="{{.ProjectN}}"
+     data-item-total="{{.ItemN}}"
+     data-sched-total="{{.SchedN}}"
+     data-mnt-target="{{.Mnt.Target}}"
+     data-mnt-done="{{.Mnt.Done}}"
+     data-mnt-incomplete="{{.Mnt.Incomplete}}"
+     data-mnt-overdue="{{.Mnt.Overdue}}"
+     data-mnt-unassigned="{{.Mnt.Unassigned}}"
+     data-mnt-rate="{{.Mnt.RateLabel}}"
+     x-data="{
+       showLeave: {{if .ShowLeave}}true{{else}}false{{end}},
+       showMnt: {{if .ShowMnt}}true{{else}}false{{end}},
+       showWork: {{if .ShowWork}}true{{else}}false{{end}},
+       openLeave: true,
+       openMnt: true,
+       openWork: true,
+       expandAll() { this.openLeave = true; this.openMnt = true; this.openWork = true },
+       collapseAll() { this.openLeave = false; this.openMnt = false; this.openWork = false }
+     }">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-bold text-ink">업무 회의</h1>
+      <p class="text-ui-sm text-ink-muted mt-1">{{.ScopeNote}} · {{.From}} ~ {{.To}}</p>
+      {{if .ReadOnly}}<p class="text-ui-sm text-ink-muted mt-1">조회 전용입니다. 이 화면에서 수정할 수 없습니다.</p>{{end}}
+    </div>
+    <div class="flex flex-wrap gap-2 items-center no-print">
+      <a class="text-ui-xs text-ink-muted underline" href="/meeting">일일 (예전)</a>
+      {{if .CanTeam}}<a class="text-ui-xs text-ink-muted underline" href="/meeting/weekly">주간 팀 (예전)</a>{{end}}
+      <a class="text-ui-xs text-ink-muted underline" href="/meeting/weekly/me">주간 내 자료 (예전)</a>
+    </div>
+  </div>
+
+  {{if .ShowOrgTabs}}
+  <nav class="flex flex-wrap gap-2 no-print" aria-label="조직" data-org-tabs>
+    <a class="{{if or (eq .ViewOrgID `*`) (eq .ViewOrgID ``)}}btn-primary{{else}}btn-secondary{{end}} btn-sm"
+       data-org-tab="*" href="/meeting/board?from={{.From}}&to={{.To}}&view={{.View}}&view_org_id=*"
+       {{if or (eq .ViewOrgID `*`) (eq .ViewOrgID ``)}}aria-current="page"{{end}}>전체 조직</a>
+    {{range .Orgs}}
+    <a class="{{if eq $.ViewOrgID .OrgID}}btn-primary{{else}}btn-secondary{{end}} btn-sm"
+       data-org-tab="{{.OrgID}}" href="/meeting/board?from={{$.From}}&to={{$.To}}&view={{$.View}}&view_org_id={{.OrgID}}"
+       {{if eq $.ViewOrgID .OrgID}}aria-current="page"{{end}}>{{.OrgName}}</a>
+    {{end}}
+  </nav>
+  {{end}}
+
+  {{if .OrgLocked}}
+  <p id="meeting-board-org-locked" class="text-ui-sm text-ink" data-org-locked="1">{{.OrgLabel}}</p>
+  {{end}}
+
+  <form method="GET" action="/meeting/board" class="card p-4 space-y-3 no-print" data-board-filter>
+    {{if .ShowOrgSelect}}
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="text-ui-sm text-ink-muted" for="meeting-board-view-org">조직</label>
+      <select id="meeting-board-view-org" name="view_org_id" class="select w-auto" onchange="this.form.submit()">
+        <option value="*" {{if eq .ViewOrgID "*"}}selected{{end}}>전체 조직</option>
+        {{range .Orgs}}
+        <option value="{{.OrgID}}" {{if eq $.ViewOrgID .OrgID}}selected{{end}}>{{.OrgName}}</option>
+        {{end}}
+      </select>
+    </div>
+    {{end}}
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="label" for="board-from">시작</label>
+        <input id="board-from" type="date" name="from" value="{{.From}}" class="input w-auto">
+      </div>
+      <div>
+        <label class="label" for="board-to">끝</label>
+        <input id="board-to" type="date" name="to" value="{{.To}}" class="input w-auto">
+      </div>
+      <input type="hidden" name="view" value="{{.View}}">
+      {{if .ViewGroupToggle}}{{template "view_group_toggle" .}}{{end}}
+      <button type="submit" class="btn-primary btn-sm">조회</button>
+    </div>
+    <div class="flex flex-wrap gap-3 text-ui-sm">
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="as" {{if .KindAS}}checked{{end}}> AS</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="maintenance" {{if .KindMnt}}checked{{end}}> 정기점검</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="project_work" {{if .KindWork}}checked{{end}}> 작업</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="sales" {{if .KindSales}}checked{{end}}> 영업</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="general" {{if .KindGeneral}}checked{{end}}> 일반업무</label>
+      <label class="inline-flex items-center gap-1"><input type="checkbox" name="kind" value="support" {{if .KindSupport}}checked{{end}}> 지원</label>
+    </div>
+    <label class="inline-flex items-center gap-2 text-ui-sm">
+      <input type="checkbox" name="with_weekly" value="1" {{if .WithWeekly}}checked{{end}}> 주간 자료 함께 보기
+    </label>
+  </form>
+
+  <div class="flex flex-wrap gap-2 no-print" data-view-tabs>
+    <a href="{{.PeopleHref}}" data-view-tab="people" class="{{if eq .View `people`}}btn-primary{{else}}btn-secondary{{end}} btn-sm" {{if eq .View "people"}}aria-current="page"{{end}}>담당자별 보기</a>
+    <a href="{{.ProjectHref}}" data-view-tab="project" class="{{if eq .View `project`}}btn-primary{{else}}btn-secondary{{end}} btn-sm" {{if eq .View "project"}}aria-current="page"{{end}}>사업별 보기</a>
+    <a href="{{.WeeklyHref}}" data-view-tab="weekly" class="{{if eq .View `weekly`}}btn-primary{{else}}btn-secondary{{end}} btn-sm" {{if eq .View "weekly"}}aria-current="page"{{end}}>주간 회의 자료표</a>
+    <a href="{{.ExcelHref}}" class="btn-secondary btn-sm" id="board-excel">엑셀</a>
+    <a href="{{.PrintHref}}" class="btn-secondary btn-sm" id="board-print">회의용 인쇄</a>
+  </div>
+
+  <div class="flex flex-wrap gap-3 text-ui-sm no-print" data-panel-toggles>
+    <label class="inline-flex items-center gap-1"><input type="checkbox" x-model="showLeave"> 휴가자</label>
+    <label class="inline-flex items-center gap-1"><input type="checkbox" x-model="showMnt"> 정기점검 집행</label>
+    <label class="inline-flex items-center gap-1"><input type="checkbox" x-model="showWork"> 업무 목록</label>
+    <button type="button" class="btn-ghost btn-sm" @click="expandAll()">모두 펼치기</button>
+    <button type="button" class="btn-ghost btn-sm" @click="collapseAll()">모두 접기</button>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="showLeave" x-cloak data-leave-panel>
+    <div class="card p-4 space-y-2">
+      <button type="button" class="flex w-full items-center justify-between text-left" @click="openLeave=!openLeave">
+        <h2 class="text-ui font-medium text-ink">휴가자</h2>
+        <span class="text-ui-sm text-ink-muted">{{if .Leaves}}{{len .Leaves}}명{{else}}없음{{end}}</span>
+      </button>
+      <div x-show="openLeave" x-cloak>
+        {{if .Leaves}}
+        <ul class="text-ui-sm space-y-1" data-leave-list>
+          {{range .Leaves}}
+          <li data-leave-name="{{.Name}}">{{.Kind}} · {{.Date}}</li>
+          {{end}}
+        </ul>
+        {{else}}
+        <p class="text-ui-sm text-ink-subtle">이 기간 휴가가 없습니다.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 space-y-2" x-show="showMnt" x-cloak data-mnt-panel>
+    <button type="button" class="flex w-full items-center justify-between text-left" @click="openMnt=!openMnt">
+      <h2 class="text-ui font-medium text-ink">정기점검 집행 현황</h2>
+      <span class="text-ui-sm text-ink-muted">{{.Mnt.Month}}월 · {{.Mnt.RateLabel}}</span>
+    </button>
+    <div x-show="openMnt" x-cloak class="overflow-x-auto">
+      <table data-table-cols="meeting_board_mnt" class="table-base min-w-[320px] break-keep">
+        <thead>
+          <tr>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">대상</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">완료</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">미완료</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">지연</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">미배정</th>
+            <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted">집행률</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="px-3 py-2" data-mnt-col="target">{{.Mnt.Target}}</td>
+            <td class="px-3 py-2" data-mnt-col="done">{{.Mnt.Done}}</td>
+            <td class="px-3 py-2" data-mnt-col="incomplete">{{.Mnt.Incomplete}}</td>
+            <td class="px-3 py-2" data-mnt-col="overdue">{{.Mnt.Overdue}}</td>
+            <td class="px-3 py-2" data-mnt-col="unassigned">{{.Mnt.Unassigned}}</td>
+            <td class="px-3 py-2" data-mnt-col="rate">{{.Mnt.RateLabel}}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="text-ui-sm text-ink-muted mt-2">집행률 = 당월 완료 ÷ 월 방문 목표(CountMonthMntQuota). 분모 0이면 —.</p>
+    </div>
+  </div>
+
+  <div x-show="showWork" x-cloak data-work-panel>
+    <div class="flex items-center justify-between mb-2">
+      <button type="button" class="text-ui font-medium text-ink" @click="openWork=!openWork">업무 목록</button>
+      <button type="button" class="btn btn-ghost btn-sm no-print" data-table-cols-reset="meeting_board">열 너비 초기화</button>
+    </div>
+    <div x-show="openWork" x-cloak>
+      {{if eq .View "people"}}
+      {{template "meeting_board_table" dict "ID" "people" "Title" "담당자별 보기" "Groups" .PeopleGroups "Empty" "이 기간 업무가 없습니다." "LeaveNames" .LeaveNames "Mode" "people"}}
+      {{end}}
+      {{if eq .View "project"}}
+      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames}}
+      {{end}}
+      {{if or (eq .View "weekly") .WithWeekly}}
+      <p class="text-ui-sm text-ink-muted mb-2">주간 회의 자료표 (읽기 전용)</p>
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {{template "meeting_board_table" dict "ID" "done" "Title" "지난주 완료" "Groups" .DoneGroups "Empty" "지난주 완료가 없습니다." "LeaveNames" .LeaveNames "Mode" "weekly"}}
+        {{template "meeting_board_table" dict "ID" "plan" "Title" "이번 주 예정" "Groups" .PlanGroups "Empty" "이번 주 예정이 없습니다." "LeaveNames" .LeaveNames "Mode" "weekly"}}
+        {{template "meeting_board_table" dict "ID" "overdue" "Title" "미완료·기한 경과" "Groups" .OverdueGroups "Empty" "기한 경과 업무가 없습니다." "LeaveNames" .LeaveNames "Mode" "weekly"}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "meeting_board_table"}}
+<div class="card overflow-hidden" data-board-table="{{.ID}}">
+  <div class="card-header">{{.Title}}</div>
+  <div class="overflow-x-auto">
+    <table data-table-cols="meeting_board" class="table-base min-w-[320px] break-keep">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">담당자</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">접수</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">조치</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{if .Groups}}
+        {{range .Groups}}
+        <tr class="bg-hover">
+          <td colspan="5" class="px-3 py-1.5 text-ui-sm font-medium text-ink">{{.Label}} · {{.Count}}건
+            {{if index $.LeaveNames .Label}}<span class="badge-warning" data-leave-badge="{{.Label}}">휴가</span>{{end}}
+          </td>
+        </tr>
+        {{range .Items}}
+        <tr class="hover:bg-hover" data-item-key="{{.Prefix}}:{{.RefID}}">
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span></td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}<span class="badge-neutral">미배정</span>{{end}}
+            {{if and .Assignee (index $.LeaveNames .Assignee)}}<span class="badge-warning" data-leave-badge="{{.Assignee}}">휴가</span>{{end}}
+          </td>
+          <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .}}" class="hover:underline font-medium text-ink">{{if .RefNumber}}{{.RefNumber}} {{end}}{{boardReceipt .}}</a>{{if .ItemKindLine}}<span class="block text-ui-xs text-ink-muted" data-item-kind-line="1">{{.ItemKindLine}}</span>{{end}}</td>
+          <td class="px-3 py-2 text-ui-sm">{{boardAction .}}</td>
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{.StatusLabel}}{{if .DelayReason}}<span class="block text-ui-xs" title="{{.DelayReasonFull}}">{{.DelayReason}}</span>{{end}}</td>
+        </tr>
+        {{end}}
+        {{end}}
+        {{else}}
+        <tr><td colspan="5" class="px-4 py-10 text-center text-ink-subtle">{{.Empty}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{define "meeting_board_project"}}
+<div class="card overflow-hidden" data-board-table="project">
+  <div class="card-header">사업별 보기</div>
+  <div class="overflow-x-auto">
+    <table data-table-cols="meeting_board" class="table-base min-w-[320px] break-keep">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">사업</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">담당자</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">접수</th>
+          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">조치</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{if .Groups}}
+        {{range .Groups}}
+        <tr class="bg-hover" data-project-id="{{.ProjectID}}">
+          <td colspan="5" class="px-3 py-1.5 text-ui-sm font-medium text-ink">{{.Label}} · {{.Count}}건
+            <span class="text-ink-muted font-normal">담당 {{if .AssigneeLine}}{{.AssigneeLine}}{{else}}미배정{{end}}</span>
+          </td>
+        </tr>
+        {{range .Items}}
+        <tr class="hover:bg-hover" data-item-key="{{.Prefix}}:{{.RefID}}">
+          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .ProjectID}}{{.ProjectID}}{{else}}—{{end}}</td>
+          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}미배정{{end}}
+            {{if and .Assignee (index $.LeaveNames .Assignee)}}<span class="badge-warning" data-leave-badge="{{.Assignee}}">휴가</span>{{end}}
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span></td>
+          <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{boardReceipt .}}</a>{{if .ItemKindLine}}<span class="block text-ui-xs text-ink-muted" data-item-kind-line="1">{{.ItemKindLine}}</span>{{end}}</td>
+          <td class="px-3 py-2 text-ui-sm">{{boardAction .}}</td>
+        </tr>
+        {{end}}
+        {{end}}
+        {{else}}
+        <tr><td colspan="5" class="px-4 py-10 text-center text-ink-subtle">이 기간 업무가 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
