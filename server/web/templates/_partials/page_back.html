@@ -1,0 +1,7 @@
+{{define "page_back"}}
+{{if not .HidePageBack}}
+<a id="page-back" href="{{if .PageBackHref}}{{.PageBackHref}}{{else}}/{{end}}"
+   class="inline-flex h-8 shrink-0 items-center rounded-lg px-2 text-ui font-semibold text-ink-muted hover:bg-hover hover:text-ink"
+   {{if eq .PageBackKind "history"}}data-page-back="history"{{end}}>‹ 이전</a>
+{{end}}
+{{end}}
