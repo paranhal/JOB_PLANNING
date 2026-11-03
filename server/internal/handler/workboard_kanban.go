@@ -9,6 +9,7 @@ import (
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
+	"customer-support/internal/service"
 )
 
 type RegisterKanbanColumn = model.KanbanColumn
@@ -276,41 +277,43 @@ func (h *WorkboardHandler) RegisterKanbanMove(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) applyRegisterKanbanMove(c echo.Context, key, from, to, date, assignee, note string) error {
-	needAssignee := (to == model.WorkBucketToday || to == model.WorkBucketInProgress) &&
-		(from == model.WorkBucketUnplanned)
-	cur := h.kanbanCurrentAssignee(key)
-	if needAssignee {
-		if strings.TrimSpace(cur) == "" && assignee == "" {
-			return errKanban("assignee")
-		}
-		if assignee == "" {
-			assignee = cur
-		}
+	err := service.ApplyKanbanMove(handlerKanbanOps{h: h, c: c}, service.KanbanMove{
+		Key: key, From: from, To: to, Date: date, Assignee: assignee, Note: note,
+		Org: assignableOrgID(c), ConfirmReopen: strings.TrimSpace(c.FormValue("confirm_reopen")) == "1",
+	})
+	if km, ok := err.(*service.KanbanMoveError); ok {
+		return errKanban(km.Code)
 	}
-	org := assignableOrgID(c)
-	if strings.TrimSpace(assignee) != "" {
-		if err := checkAssigneeInOrg(h.userRepo, org, assignee, "", cur); err != nil {
-			return err
-		}
-	}
+	return err
+}
 
-	switch {
-	case to == model.WorkBucketCompletedToday:
-		if note == "" {
-			return errKanban("complete_note")
-		}
-		return h.kanbanComplete(c, key, date, note)
-	case from == model.WorkBucketCompletedToday:
-		if err := h.kanbanReopen(key, to, date, assignee); err != nil {
-			return err
-		}
-		if to == model.WorkBucketToday || to == model.WorkBucketInProgress {
-			return h.kanbanApplyOpenMove(org, key, model.WorkBucketToday, to, date, assignee)
-		}
-		return nil
-	default:
-		return h.kanbanApplyOpenMove(org, key, from, to, date, assignee)
-	}
+type handlerKanbanOps struct {
+	h *WorkboardHandler
+	c echo.Context
+}
+
+func (o handlerKanbanOps) CurrentAssignee(key string) string {
+	return o.h.kanbanCurrentAssignee(key)
+}
+
+func (o handlerKanbanOps) CheckAssignee(org, assignee, current string) error {
+	return checkAssigneeInOrg(o.h.userRepo, org, assignee, "", current)
+}
+
+func (o handlerKanbanOps) AssignDate(org, key, date, assignee string, start bool) error {
+	return o.h.kanbanAssignDate(org, key, date, assignee, start)
+}
+
+func (o handlerKanbanOps) SetProgress(key string, start bool) error {
+	return o.h.kanbanSetProgress(key, start)
+}
+
+func (o handlerKanbanOps) Complete(key, date, note string) error {
+	return o.h.kanbanComplete(o.c, key, date, note)
+}
+
+func (o handlerKanbanOps) Reopen(key, to, date, assignee string) error {
+	return o.h.kanbanReopen(key, to, date, assignee)
 }
 
 func errKanban(code string) error {

@@ -1,0 +1,39 @@
+{{define "board_kanban_card"}}
+<article class="rounded-[10px] border border-line bg-surface p-3" draggable="{{if .CanCarry}}true{{end}}"
+         data-kanban-card="1" data-carry-default="today"
+         data-item-key="{{.KanbanKey}}" data-task-id="{{.Task.TaskID}}"
+         data-as="{{if eq .Task.SourceType `as`}}1{{end}}" data-mnt="{{if eq .Task.SourceType `maintenance`}}1{{end}}"
+         data-remain="{{.RemainItemN}}" data-follow-n="{{if .FollowHref}}1{{else}}0{{end}}"
+         data-delayed="{{if .Overdue}}true{{else}}false{{end}}" data-carry-id="{{.Task.TaskID}}"
+         data-carry-title="{{.Task.Title}}" data-carry-work="{{.Task.WorkDate}}" data-carry-due="{{.Task.DueDate}}"
+         data-carry-start="{{.Task.StartTime}}" data-carry-end="{{.Task.EndTime}}" data-carry-days="{{.OverdueDays}}"
+         data-carry-delayed="{{if .Overdue}}true{{else}}false{{end}}" data-carry-span="{{if .ChipUntil}}true{{else}}false{{end}}">
+  <div class="flex items-start justify-between gap-2">
+    <span class="{{.Type.Bg}} {{.Type.Text}} rounded px-1.5 py-0.5 text-[11px] font-bold">{{.Type.Label}}</span>
+    {{if .KanbanBadgeToday}}<span class="rounded bg-success-soft px-1.5 py-0.5 text-[11px] font-semibold text-success">오늘 일정</span>{{end}}
+  </div>
+  <a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="mt-1 block text-ui font-bold text-ink hover:underline">{{.Task.Title}}</a>
+  {{if .CustomerPlace}}<p class="mt-0.5 truncate text-ui-sm text-ink-muted">{{.CustomerPlace}}</p>{{end}}
+  {{if .HasTime}}<p class="text-ui-sm text-ink-muted">{{.TimeLabel}}</p>{{end}}
+  <p class="mt-1 truncate text-ui-sm text-ink" data-assignee-line title="{{.AssigneeTitle}}">{{.AssigneeLine}}</p>
+  {{if .ItemKindLine}}<p class="truncate text-[11px] text-ink-muted" data-item-kind-line="1" title="{{.ItemKindLine}}">{{.ItemKindLine}}</p>{{end}}
+  {{if .Overdue}}<p class="mt-1 text-ui-sm font-semibold text-danger">지연 {{.OverdueDays}}일</p>
+    {{if .DelayReason}}<p class="text-ui-sm text-ink-muted" title="{{.DelayReasonFull}}">{{.DelayReason}}</p>
+    {{else}}<button type="button" class="text-ui-sm font-semibold text-danger" data-delay-reason-open="1" data-carry-id="{{.Task.TaskID}}">사유 입력</button>{{end}}
+  {{end}}
+  {{if gt .RemainItemN 0}}<p class="text-ui-sm text-ink">남은 항목 {{.RemainItemN}}건</p>{{end}}
+  {{if .FollowHref}}<a href="{{.FollowHref}}" class="text-ui-sm font-semibold text-brand">{{.FollowLabel}}</a>{{end}}
+  {{if .FollowMissing}}<span class="text-ui-sm font-semibold text-warning">후속 미생성</span>
+    <a href="/workboard/tasks/{{.Task.TaskID}}/action" class="text-ui-sm font-semibold text-brand">후속 만들기</a>{{end}}
+  <div class="mt-2 flex flex-wrap gap-1">
+    {{if .Href}}<a href="{{.Href}}" class="btn btn-secondary btn-sm">조치</a>{{end}}
+    {{if .PlanEditHref}}<a href="{{.PlanEditHref}}" class="btn btn-ghost btn-sm">수정</a>{{end}}
+    {{if .CanCarry}}<button type="button" class="btn btn-secondary btn-sm" data-carry-open="1" data-carry-default="today"
+      data-carry-id="{{.Task.TaskID}}" data-carry-title="{{.Task.Title}}" data-carry-work="{{.Task.WorkDate}}"
+      data-carry-due="{{.Task.DueDate}}" data-carry-start="{{.Task.StartTime}}" data-carry-end="{{.Task.EndTime}}"
+      data-carry-days="{{.OverdueDays}}" data-carry-delayed="{{if .Overdue}}true{{else}}false{{end}}"
+      data-carry-span="{{if .ChipUntil}}true{{else}}false{{end}}">이월</button>{{end}}
+    <button type="button" class="btn btn-ghost btn-sm md:hidden" data-kanban-menu="1">이동…</button>
+  </div>
+</article>
+{{end}}
