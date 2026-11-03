@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+  <title>시간이 겹칩니다</title>
+</head>
+<body class="h-full bg-gray-50">
+  <div class="modal-backdrop z-50 flex items-center justify-center p-4" style="position:fixed;inset:0;background:rgba(15,23,42,.45)">
+    <div class="modal-panel w-full max-w-lg shadow-pop max-h-[90vh] overflow-y-auto bg-white rounded-xl p-4">
+      <h2 class="text-ui font-bold text-ink">시간이 겹칩니다</h2>
+      <p class="mt-2 text-ui text-ink">최혜영의 09:00~10:00에 다른 업무가 있습니다 (외근이 겹칩니다)</p>
+      <ul class="mt-3 space-y-2">
+        <li class="rounded-control border px-3 py-2">기존외근 · 최혜영 · 09:00~10:00 · 외근</li>
+      </ul>
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button type="button" class="btn btn-primary">기존 계획 수정</button>
+        <button type="button" class="btn btn-danger">기존 계획 삭제</button>
+        <button type="button" class="btn btn-secondary">담당자만 빼고 새 계획 등록</button>
+        <button type="button" class="btn btn-ghost">취소</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

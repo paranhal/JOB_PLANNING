@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+  <title>계획 수정 — 기존값</title>
+</head>
+<body class="bg-gray-50 p-4">
+  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3 max-w-lg mx-auto text-sm">
+    <h1 class="text-base font-bold">행정/지원업무 수정</h1>
+    <label class="block">업무명
+      <input class="input w-full" value="수정대상">
+    </label>
+    <label class="block">사업
+      <input type="hidden" name="project_id" value="PJ-1">
+      <input type="search" class="input w-full" value="수정화면사업">
+    </label>
+    <div>
+      <p class="mb-1 font-medium">담당자</p>
+      <input type="hidden" name="owner_user_id" value="USR-choi">
+      <input type="hidden" name="assignee_user_id" value="USR-choi">
+      <label class="inline-flex items-center gap-1"><input type="checkbox" checked> 최혜영</label>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <label>시작일 <input type="date" class="input w-full" value="2026-11-04"></label>
+      <label>종료일 <input type="date" class="input w-full" value="2026-11-04"></label>
+      <label>시작 <input type="time" class="input w-full" value="09:00"></label>
+      <label>종료 <input type="time" class="input w-full" value="09:30"></label>
+    </div>
+    <div>
+      <p class="mb-1 font-medium">근무 구분</p>
+      <label class="mr-3"><input type="radio" name="work_place" value="office" checked>내근</label>
+      <label><input type="radio" name="work_place" value="field">외근</label>
+    </div>
+  </div>
+</body>
+</html>
