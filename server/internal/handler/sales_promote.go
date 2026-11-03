@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 func (h *SalesHandler) PromoteForm(c echo.Context) error {
@@ -110,6 +111,15 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 	}
 	proj := ParseWorkProjectForm(c)
 	rules := parseScopeRules(c)
+	if err := model.ValidatePlanYearDates(proj); err != nil {
+		draft := model.WorkProjectFromSales(p)
+		draft.ContractType, draft.BillingType = proj.ContractType, proj.BillingType
+		draft.StartDate, draft.EndDate = proj.StartDate, proj.EndDate
+		draft.PlanYear = proj.PlanYear
+		draft.IsPaid, draft.Notes = proj.IsPaid, proj.Notes
+		draft.ProjectKind = proj.ProjectKind
+		return h.renderPromoteProjectForm(c, p, draft, rules, err.Error())
+	}
 	if strings.TrimSpace(proj.Name) == "" {
 		draft := model.WorkProjectFromSales(p)
 		draft.ContractType, draft.BillingType = proj.ContractType, proj.BillingType
@@ -135,6 +145,18 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 		proj.OrderingPartyID = p.CustomerID
 	}
 	proj.SalesProjectID = p.SalesID
+	proj.OrgID = strings.TrimSpace(p.OrgID)
+	if proj.OrgID == "" {
+		proj.OrgID = currentUserHomeOrg(c)
+	}
+	if formOrg := strings.TrimSpace(c.FormValue("org_id")); formOrg != "" && canSwitchOrg(c) {
+		if org, err := resolveInsertOrg(c); err == nil {
+			proj.OrgID = org
+		}
+	}
+	if strings.TrimSpace(proj.OrgID) == "" || proj.OrgID == repository.OrgAll {
+		return h.renderPromoteProjectForm(c, p, proj, rules, errNeedInsertOrg)
+	}
 	if err := h.projectRepo.Create(proj); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			if existing, e2 := h.projectRepo.GetBySalesID(p.SalesID); e2 == nil && existing != nil {
@@ -148,6 +170,9 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 		return err
 	}
 	if err := h.projectRepo.ReplaceAssignments(proj.ProjectID, ctxString(c, "user_id"), parseAssignmentForm(c)); err != nil {
+		return h.renderPromoteProjectForm(c, p, proj, rules, err.Error())
+	}
+	if err := h.projectRepo.ReplaceRelatedOrgs(proj.ProjectID, currentUserID(c), parseRelatedOrgIDs(c), proj.OrgID); err != nil {
 		return h.renderPromoteProjectForm(c, p, proj, rules, err.Error())
 	}
 	if err := h.repo.MarkPromoted(p.SalesID); err != nil {
@@ -217,7 +242,7 @@ func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesPr
 		})
 	}
 	rulesJSON, _ := json.Marshal(jsRules)
-	return c.Render(http.StatusOK, "project/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "계약으로 전환", "Active": NavSales,
 		"Project": p, "Rules": rules, "RulesJSON": string(rulesJSON), "IsEdit": false,
 		"FromSales": true, "SalesID": s.SalesID, "SalesAmount": s.AmountLabel(),
@@ -235,7 +260,37 @@ func (h *SalesHandler) renderPromoteProjectForm(c echo.Context, s *model.SalesPr
 		},
 		"FormError": errMsg,
 		"CanWrite":  true,
-	})
+	}
+	ph := &ProjectHandler{orgs: h.orgs, repo: h.projectRepo, userRepo: h.userRepo}
+	if p != nil && strings.TrimSpace(p.OrgID) == "" && s != nil {
+		p.OrgID = s.OrgID
+	}
+	for k, v := range ph.orgFormData(c, p, false) {
+		data[k] = v
+	}
+	if p != nil {
+		if strings.TrimSpace(p.OrgID) == "" {
+			if s, ok := data["OrgSelected"].(string); ok {
+				p.OrgID = s
+			}
+		}
+		if len(p.RelatedOrgIDs) == 0 {
+			if rel, ok := data["RelatedOrgIDs"].([]string); ok {
+				p.RelatedOrgIDs = rel
+			}
+		}
+	}
+	dutyUsers := dutyAssigneeUsers(h.userRepo, p)
+	accUsers := accountingAssigneeUsers(h.userRepo)
+	names := orgNameMap(h.orgs)
+	data["DutyOrgGroups"] = pickerOrgGroups(dutyUsers, names)
+	data["AccountingOrgGroups"] = pickerOrgGroups(accUsers, names)
+	data["DutyPickerNames"] = pickerNamesMap(dutyUsers)
+	data["AccountingPickerNames"] = pickerNamesMap(accUsers)
+	data["AssignSelected"] = assignSelectedMap(parseAssignmentForm(c))
+	data["DutyUsers"] = dutyUsers
+	data["AccountingUsers"] = accUsers
+	return c.Render(http.StatusOK, "project/form.html", data)
 }
 
 func (h *SalesHandler) promoteAssignableUsers(c echo.Context) []model.User {

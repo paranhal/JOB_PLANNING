@@ -7,16 +7,16 @@
       <h2 class="text-xl font-bold text-ink">{{if .Project.DisplayNo}}{{.Project.DisplayNo}} · {{end}}{{.Title}}</h2>
       <p class="text-ui-sm text-ink-muted">사업명만 필수입니다. 나머지 칸은 비워도 저장됩니다.</p>
     </div>
-    <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="text-ui-sm text-ink-muted hover:underline">← 돌아가기</a>
   </div>
 
   {{if .FormError}}
-  <div class="rounded-card bg-danger-soft text-danger text-ui-sm px-4 py-2 border border-line">{{.FormError}}</div>
+  <div id="form-error" class="rounded-card bg-danger-soft text-danger text-ui-sm px-4 py-2 border border-line">{{.FormError}}</div>
   {{end}}
 
   <form method="post" action="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}/sales{{end}}" enctype="multipart/form-data"
         class="grid lg:grid-cols-[minmax(0,1fr)_18.75rem] gap-4 items-start"
-        x-data="salesProjectForm">
+        x-data="salesProjectForm"
+        @change="onCustomerChange($event)">
     {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
     {{if .Project.PrevSalesID}}<input type="hidden" name="prev_sales_id" value="{{.Project.PrevSalesID}}">{{end}}
 
@@ -29,13 +29,23 @@
             <span class="text-ui-xs text-ink-subtle">발굴한 사업 기회를 식별할 수 있는 정보를 입력합니다.</span>
           </div>
         </div>
+        {{if .CanManage}}
+        {{template "org_picker" dict "Mode" "single" "Orgs" .OrgChoices "Selected" .OrgSelected "Required" .OrgRequired "Locked" .OrgLocked "LockedName" .OrgHomeName}}
+        {{end}}
         <div>
-          <label class="label">사업명 <span class="text-danger">*</span></label>
-          <input name="name" required value="{{.Project.Name}}" class="input" placeholder="세종시 도서관 RFID 증설(가칭)" x-model="name">
-          <label class="mt-2 inline-flex items-center gap-2 text-ui-sm text-ink-muted">
-            <input type="checkbox" name="is_tentative_name" value="1" {{if .Project.IsTentativeName}}checked{{end}}>
+          <label class="mt-0 inline-flex items-center gap-2 text-ui-sm text-ink-muted">
+            <input type="checkbox" name="is_tentative_name" value="1" x-model="isTentative" {{if .Project.IsTentativeName}}checked{{end}}>
             가칭
           </label>
+          <div class="mt-2" x-show="isTentative" x-cloak>
+            <label class="label">가칭 <span class="text-danger">*</span></label>
+            <input name="tentative_name" value="{{.Project.TentativeName}}" class="input" placeholder="세종시 도서관 RFID 증설" x-model="tentativeName" :required="isTentative">
+          </div>
+          <div class="mt-2">
+            <label class="label">정식 사업명 <span class="text-danger" x-show="!isTentative" x-cloak>*</span></label>
+            <input name="name" value="{{.Project.Name}}" class="input" placeholder="세종시 도서관 RFID 증설" x-model="name" :required="!isTentative">
+            <p class="text-ui-xs text-danger mt-1" x-show="isTentative && (name||'').trim()" x-cloak>정식 사업명을 쓰면 가칭 체크를 해제하세요. 자동으로 풀리지 않습니다.</p>
+          </div>
         </div>
         <div>
           <label class="label">사업 유형</label>
@@ -78,16 +88,11 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="label">고객 (등록)</label>
-              <select name="customer_id" class="select" x-ref="customerSel" x-model="customerId">
-                <option value="">— 선택 —</option>
-                {{range .Customers}}
-                <option value="{{.CustomerID}}" {{if eq $.Project.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>
-                {{end}}
-              </select>
+              {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" .Project.CustomerID "Placeholder" "고객명으로 찾기"}}
             </div>
             <div>
               <label class="label">기관명 직접입력</label>
-              <input name="prospect_name" value="{{.Project.ProspectName}}" class="input" placeholder="미등록 고객" x-model="prospectName">
+              <input name="prospect_name" value="{{.Project.ProspectName}}" class="input" placeholder="미등록 고객" x-model="prospectName" @input="clearCustomerIfProspect()">
             </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -201,13 +206,7 @@
         <p class="text-ui-xs text-ink-muted mt-2 ml-11" x-show="!open03" x-cloak>{{.Sum03}}</p>
         <div id="sales-sec-03-body" x-show="open03" x-cloak class="space-y-4">
           <div>
-            <label class="label">영업담당</label>
-            <select name="sales_owner_id" class="select" x-ref="ownerSel" x-model="ownerId">
-              <option value="">— 선택 —</option>
-              {{range .Users}}
-              <option value="{{.UserID}}" {{if eq $.Project.SalesOwnerID .UserID}}selected{{end}}>{{.FullName}}</option>
-              {{end}}
-            </select>
+            {{template "assignee_picker" dict "Layout" "org" "FieldName" "sales_owner_id" "Label" "영업담당" "OrgGroups" .SalesOwnerOrgGroups "SelectedIDs" .SalesOwnerIDs "AllowGroups" false "Assignees" .SalesOwnerGroups "PickerNames" .SalesOwnerNames "Target" "sales-owner"}}
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -424,21 +423,23 @@
 <script>
 document.addEventListener('alpine:init', () => {
   Alpine.data('salesProjectForm', () => ({
-    bizType: {{printf "%q" .Project.BizType}},
-    precision: {{printf "%q" (or .Project.ExpectedPrecision "month")}},
-    billingCycle: {{printf "%q" .Project.BillingCycle}},
+    bizType: {{toJSON .Project.BizType}},
+    precision: {{toJSON (or .Project.ExpectedPrecision "month")}},
+    billingCycle: {{toJSON .Project.BillingCycle}},
     year: {{if .PeriodYear}}'{{.PeriodYear}}'{{else}}''{{end}},
     quarter: {{if .PeriodQuarter}}'{{.PeriodQuarter}}'{{else}}'1'{{end}},
     half: {{if .PeriodHalf}}'{{.PeriodHalf}}'{{else}}'1'{{end}},
-    revenueFrom: {{printf "%q" .Project.RevenueFrom}},
-    revenueTo: {{printf "%q" .Project.RevenueTo}},
+    revenueFrom: {{toJSON .Project.RevenueFrom}},
+    revenueTo: {{toJSON .Project.RevenueTo}},
     quickQuote: false,
-    name: {{printf "%q" .Project.Name}},
-    customerId: {{printf "%q" .Project.CustomerID}},
-    prospectName: {{printf "%q" .Project.ProspectName}},
+    isTentative: {{if .Project.IsTentativeName}}true{{else}}false{{end}},
+    tentativeName: {{toJSON .Project.TentativeName}},
+    name: {{toJSON .Project.Name}},
+    customerId: {{toJSON .Project.CustomerID}},
+    prospectName: {{toJSON .Project.ProspectName}},
     expectedAmount: '{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}{{end}}',
-    leadSource: {{printf "%q" .Project.LeadSource}},
-    ownerId: {{printf "%q" .Project.SalesOwnerID}},
+    leadSource: {{toJSON .Project.LeadSource}},
+    ownerId: {{toJSON .Project.SalesOwnerID}},
     open02: {{if .Open02}}true{{else}}false{{end}},
     open03: {{if .Open03}}true{{else}}false{{end}},
     open04: true,
@@ -466,12 +467,42 @@ document.addEventListener('alpine:init', () => {
       if(!o || !o.value) return '';
       return (o.textContent || '').trim();
     },
+    comboLabel(){
+      const hint = this.$el && this.$el.querySelector('.combobox .field-hint');
+      const t = hint ? String(hint.textContent||'').replace(/^선택:\s*/,'').trim() : '';
+      const hid = this.$el && this.$el.querySelector('input[name=customer_id]');
+      if (hid && hid.value && t) return t;
+      return '';
+    },
+    comboRoot(){ return this.$el && this.$el.querySelector('.combobox'); },
+    clearCustomerIfProspect(){
+      if (!(this.prospectName||'').trim()) return;
+      const box = this.comboRoot();
+      if (box && box._x_dataStack && box._x_dataStack[0]) {
+        box._x_dataStack[0].selectedId = '';
+        box._x_dataStack[0].selectedLabel = '';
+        box._x_dataStack[0].q = '';
+      }
+      this.customerId = '';
+    },
+    onCustomerChange(e){
+      if (!e || !e.target || e.target.name !== 'customer_id') return;
+      if (e.target.value) this.prospectName = '';
+      this.customerId = e.target.value || '';
+    },
     sumCustomer(){
-      const c = this.optLabel(this.$refs.customerSel);
+      const c = this.comboLabel();
       const p = (this.prospectName || '').trim();
       return c || p;
     },
-    sumOwner(){ return this.optLabel(this.$refs.ownerSel); },
+    sumOwner(){
+      const box = this.$el && this.$el.querySelector('[data-assignee-picker]');
+      if (box && box._x_dataStack && box._x_dataStack[0] && box._x_dataStack[0].summaryLabel) {
+        const s = box._x_dataStack[0].summaryLabel();
+        return s && s !== '— 선택 —' ? s : '';
+      }
+      return '';
+    },
     sumAmount(){
       const n = parseInt(String(this.expectedAmount||'').replace(/[^0-9]/g,''), 10);
       if(!n) return '';
@@ -508,5 +539,9 @@ document.addEventListener('alpine:init', () => {
     removeFile(i){ this.pending.splice(i,1); this.fileErr=''; this.syncInput(); }
   }));
 });
+(function(){
+  var el = document.getElementById('form-error');
+  if (el && el.scrollIntoView) el.scrollIntoView({block:'center'});
+})();
 </script>
 {{end}}

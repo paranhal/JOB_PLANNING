@@ -2,18 +2,18 @@
 {{define "content"}}
 <div class="space-y-4">
   <div class="flex flex-wrap items-end justify-between gap-3">
-    <h2 class="text-xl font-bold text-gray-800">영업 대시보드</h2>
+    <h2 class="text-xl font-bold text-ink">영업 대시보드</h2>
     {{if eq .UserRole "sales"}}
-    <a href="/?home=tech" class="text-xs text-blue-700 hover:underline">기술 대시보드 보기</a>
+    <a href="/?home=tech" class="text-xs text-primary hover:underline">기술 대시보드 보기</a>
     {{end}}
   </div>
   {{if gt .UnpromotedN 0}}
-  <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
-    <p class="font-semibold text-amber-900">사업관리 미전환 {{.UnpromotedN}}건 · 영업 계약 완료 · 계약 전환 필요</p>
+  <div class="rounded-xl border border-warning bg-warning-soft p-4 space-y-2">
+    <p class="font-semibold text-warning">사업관리 미전환 {{.UnpromotedN}}건 · 영업 계약 완료 · 계약 전환 필요</p>
     <ul class="text-sm space-y-1">
       {{range .Unpromoted}}
       <li class="flex flex-wrap items-center gap-2">
-        <a class="text-amber-900 underline" href="{{.Href}}" data-contract-modal data-id="{{.SalesID}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a>
+        <a class="text-warning underline" href="{{.Href}}" data-contract-modal data-id="{{.SalesID}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a>
         {{if .CanManage}}<a href="/sales/{{.SalesID}}/promote" class="underline">계약으로 전환</a>{{end}}
         {{if .ForeignOrg}}<span class="badge badge-neutral" title="타 조직 사업 · Owner만 변경">{{.OrgLabel}}</span>{{end}}
       </li>
@@ -22,101 +22,101 @@
   </div>
   {{end}}
   {{if gt .MigratedN 0}}
-  <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
-    <p class="font-semibold text-amber-900">이관 확인 필요 {{.MigratedN}}건</p>
+  <div class="rounded-xl border border-warning bg-warning-soft p-4 space-y-2">
+    <p class="font-semibold text-warning">이관 확인 필요 {{.MigratedN}}건</p>
     <ul class="text-sm space-y-1">
       {{range .Migrated}}
-      <li><a class="text-amber-900 underline" href="/sales/{{.SalesID}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a></li>
+      <li><a class="text-warning underline" href="/sales/{{.SalesID}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a></li>
       {{end}}
     </ul>
   </div>
   {{end}}
-  <p class="text-sm text-gray-500">숫자는 파이프라인과 같습니다. 오늘 활동은 영업 활동 로그입니다.</p>
+  <p class="text-sm text-ink-muted">숫자는 파이프라인과 같습니다. 오늘 활동은 영업 활동 로그입니다.</p>
 
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-    <div class="col-span-2 lg:col-span-1 order-first bg-white rounded-xl border border-orange-200 p-4">
-      <p class="text-xs text-gray-500">가중 파이프라인</p>
-      <p class="text-2xl font-bold text-orange-800">{{.Pipe.WeightedLabel}}</p>
-      <p class="text-[11px] text-gray-400 mt-1">금액 × 확도</p>
+    <div class="col-span-2 lg:col-span-1 order-first bg-white rounded-xl border border-warning p-4">
+      <p class="text-xs text-ink-muted">가중 파이프라인</p>
+      <p class="text-2xl font-bold text-warning">{{.Pipe.WeightedLabel}}</p>
+      <p class="text-[11px] text-ink-subtle mt-1">금액 × 확도</p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs text-gray-500">예상 매출</p>
-      <p class="text-2xl font-bold text-gray-800">{{.Pipe.TotalAmountLabel}}</p>
-      <p class="text-[11px] text-gray-400 mt-1">수주 전 합</p>
+    <div class="bg-white rounded-xl border border-line p-4">
+      <p class="text-xs text-ink-muted">예상 매출</p>
+      <p class="text-2xl font-bold text-ink">{{.Pipe.TotalAmountLabel}}</p>
+      <p class="text-[11px] text-ink-subtle mt-1">수주 전 합</p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs text-gray-500">진행 사업</p>
-      <p class="text-2xl font-bold text-gray-800">{{.OpenCount}}건</p>
+    <div class="bg-white rounded-xl border border-line p-4">
+      <p class="text-xs text-ink-muted">진행 사업</p>
+      <p class="text-2xl font-bold text-ink">{{.OpenCount}}건</p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs text-gray-500">이번 달 수주</p>
-      <p class="text-2xl font-bold text-gray-800">{{.MonthWon}}</p>
+    <div class="bg-white rounded-xl border border-line p-4">
+      <p class="text-xs text-ink-muted">이번 달 수주</p>
+      <p class="text-2xl font-bold text-ink">{{.MonthWon}}</p>
     </div>
-    <a href="/sales?dormant=1" class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs text-gray-500">휴면</p>
-      <p class="text-2xl font-bold text-gray-800">{{.DormantN}}건</p>
-      <p class="text-[11px] text-gray-400 mt-1">{{.DormantAmount}}</p>
+    <a href="/sales?dormant=1" class="bg-white rounded-xl border border-line p-4">
+      <p class="text-xs text-ink-muted">휴면</p>
+      <p class="text-2xl font-bold text-ink">{{.DormantN}}건</p>
+      <p class="text-[11px] text-ink-subtle mt-1">{{.DormantAmount}}</p>
     </a>
     <a href="/sales?dormant=1" class="bg-white rounded-xl border border-amber-200 p-4">
-      <p class="text-xs text-gray-500">예산 편성기 도래</p>
-      <p class="text-2xl font-bold text-gray-800">{{.DormantDueN}}건</p>
+      <p class="text-xs text-ink-muted">예산 편성기 도래</p>
+      <p class="text-2xl font-bold text-ink">{{.DormantDueN}}건</p>
     </a>
   </div>
   {{if .PinnedGroups}}
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
     {{range .PinnedGroups}}
-    <a href="{{.Href}}" class="bg-white rounded-xl border border-blue-200 p-4">
-      <p class="text-xs text-gray-500">{{.Group.GroupNo}} {{.Group.Name}}</p>
+    <a href="{{.Href}}" class="bg-white rounded-xl border border-primary p-4">
+      <p class="text-xs text-ink-muted">{{.Group.GroupNo}} {{.Group.Name}}</p>
       <p class="text-lg font-bold">{{.Count}}건 · {{.Amount}}</p>
-      <p class="text-[11px] text-gray-400">가중 {{.Weighted}}</p>
+      <p class="text-[11px] text-ink-subtle">가중 {{.Weighted}}</p>
     </a>
     {{end}}
   </div>
   {{end}}
 
-  <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-    <h3 class="font-semibold text-gray-800">파이프라인</h3>
+  <div class="bg-white rounded-xl border border-line p-4 space-y-3">
+    <h3 class="font-semibold text-ink">파이프라인</h3>
     {{$max := .StageMax}}
     {{range .Pipe.Stages}}
     <div class="space-y-1">
-      <div class="flex justify-between text-xs text-gray-600">
+      <div class="flex justify-between text-xs text-ink-muted">
         <span>{{.Label}} · {{.Count}}건</span>
         <span class="tabular-nums">{{.AmountLabel}}</span>
       </div>
-      <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div class="h-2 rounded-full bg-hover overflow-hidden">
         <div class="h-2 {{salesStageStripe .Code}} rounded-full" style="width: {{if gt $max 0}}{{printf "%.0f" (percent .Amount $max)}}%{{else}}0%{{end}}"></div>
       </div>
     </div>
     {{else}}
-    <p class="text-sm text-gray-400">진행 중인 사업이 없습니다.</p>
+    <p class="text-sm text-ink-subtle">진행 중인 사업이 없습니다.</p>
     {{end}}
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 class="font-semibold text-gray-800 mb-3">오늘의 영업 활동</h3>
+    <div class="bg-white rounded-xl border border-line p-4">
+      <h3 class="font-semibold text-ink mb-3">오늘의 영업 활동</h3>
       <ul class="divide-y divide-gray-100 text-sm">
         {{range .TodayActs}}
         <li class="py-2 flex items-start gap-2">
-          <span class="text-xs text-gray-500 tabular-nums w-12 shrink-0">{{if .StartTime}}{{.StartTime}}{{else}}—{{end}}</span>
+          <span class="text-xs text-ink-muted tabular-nums w-12 shrink-0">{{if .StartTime}}{{.StartTime}}{{else}}—{{end}}</span>
           <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{salesActBadgeClass .ActivityType}}">{{salesActBadgeLabel .ActivityType $.ActivityTypes}}</span>
           <div class="min-w-0">
-            <a href="/sales/{{.SalesID}}" class="font-medium text-gray-800 hover:text-blue-700">{{.Title}}</a>
-            {{if .SalesName}}<p class="text-xs text-gray-400 truncate">{{if .SalesNo}}{{.SalesNo}} · {{end}}{{.SalesName}}</p>{{end}}
+            <a href="/sales/{{.SalesID}}" class="font-medium text-ink hover:text-primary">{{.Title}}</a>
+            {{if .SalesName}}<p class="text-xs text-ink-subtle truncate">{{if .SalesNo}}{{.SalesNo}} · {{end}}{{.SalesName}}</p>{{end}}
           </div>
         </li>
         {{else}}
-        <li class="py-6 text-center text-gray-400">오늘 등록된 활동이 없습니다.</li>
+        <li class="py-6 text-center text-ink-subtle">오늘 등록된 활동이 없습니다.</li>
         {{end}}
       </ul>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
+    <div class="bg-white rounded-xl border border-line p-4 overflow-x-auto">
       <div class="flex justify-between items-center mb-3">
-        <h3 class="font-semibold text-gray-800">주요 사업기회</h3>
-        <a href="/sales" class="text-xs text-blue-700 hover:underline">전체 보기 →</a>
+        <h3 class="font-semibold text-ink">주요 사업기회</h3>
+        <a href="/sales" class="text-xs text-primary hover:underline">전체 보기 →</a>
       </div>
       <table class="w-full min-w-[900px] text-sm break-keep">
-        <thead class="text-xs text-gray-500"><tr>
+        <thead class="text-xs text-ink-muted"><tr>
           <th class="text-left py-1 whitespace-nowrap">사업명</th>
           <th class="text-left py-1 whitespace-nowrap">고객</th>
           <th class="text-left py-1 whitespace-nowrap">단계</th>
@@ -127,15 +127,15 @@
         <tbody class="divide-y divide-gray-100">
           {{range .Opps}}
           <tr>
-            <td class="py-1.5 whitespace-nowrap"><a href="{{.Href}}" class="text-blue-700 hover:underline">{{if .DisplayNo}}{{.DisplayNo}} {{end}}{{.Name}}</a></td>
-            <td class="py-1.5 text-gray-600 whitespace-nowrap">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+            <td class="py-1.5 whitespace-nowrap"><a href="{{.Href}}" class="text-primary hover:underline">{{if .DisplayNo}}{{.DisplayNo}} {{end}}{{.Name}}</a></td>
+            <td class="py-1.5 text-ink-muted whitespace-nowrap">{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
             <td class="py-1.5 whitespace-nowrap">{{.StageLabel}}</td>
             <td class="py-1.5 text-right tabular-nums whitespace-nowrap">{{.Amount}}</td>
             <td class="py-1.5 text-right whitespace-nowrap">{{if .Prob}}{{.Prob}}{{else}}—{{end}}</td>
-            <td class="py-1.5 text-gray-600 whitespace-nowrap">{{.Next}}</td>
+            <td class="py-1.5 text-ink-muted whitespace-nowrap">{{.Next}}</td>
           </tr>
           {{else}}
-          <tr><td colspan="6" class="py-6 text-center text-gray-400 whitespace-nowrap">진행 사업이 없습니다.</td></tr>
+          <tr><td colspan="6" class="py-6 text-center text-ink-subtle whitespace-nowrap">진행 사업이 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>
@@ -143,25 +143,25 @@
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 class="font-semibold text-gray-800 mb-1">포기</h3>
-      <p class="text-2xl font-bold text-gray-800">{{.Drop.Count}}건</p>
-      <p class="text-[11px] text-gray-400 mb-3">올해 · 사유별</p>
+    <div class="bg-white rounded-xl border border-line p-4">
+      <h3 class="font-semibold text-ink mb-1">포기</h3>
+      <p class="text-2xl font-bold text-ink">{{.Drop.Count}}건</p>
+      <p class="text-[11px] text-ink-subtle mb-3">올해 · 사유별</p>
       {{range .Drop.ByCode}}
       <div class="flex justify-between text-sm py-0.5"><span>{{.Label}}</span><span class="tabular-nums">{{.Count}}</span></div>
       {{else}}
-      <p class="text-sm text-gray-400">올해 포기 건이 없습니다.</p>
+      <p class="text-sm text-ink-subtle">올해 포기 건이 없습니다.</p>
       {{end}}
-      <p class="text-[11px] text-gray-400 mt-3 mb-1">어느 단계에서 그만뒀나</p>
+      <p class="text-[11px] text-ink-subtle mt-3 mb-1">어느 단계에서 그만뒀나</p>
       {{range .Drop.ByStage}}
       <div class="flex justify-between text-sm py-0.5"><span>{{.Label}}</span><span class="tabular-nums">{{.Count}}</span></div>
       {{end}}
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
-      <h3 class="font-semibold text-gray-800 mb-1">판단 정확도</h3>
-      <p class="text-[11px] text-gray-400 mb-3">동결 확도 구간별 실제 수주 비율 · 5건 미만은 —</p>
+    <div class="bg-white rounded-xl border border-line p-4 overflow-x-auto">
+      <h3 class="font-semibold text-ink mb-1">판단 정확도</h3>
+      <p class="text-[11px] text-ink-subtle mb-3">동결 확도 구간별 실제 수주 비율 · 5건 미만은 —</p>
       <table class="w-full min-w-[900px] text-sm break-keep">
-        <thead class="text-xs text-gray-500"><tr>
+        <thead class="text-xs text-ink-muted"><tr>
           <th class="text-left py-1 whitespace-nowrap">영업대표</th>
           <th class="text-right py-1 whitespace-nowrap">10~30</th>
           <th class="text-right py-1 whitespace-nowrap">40~60</th>
@@ -176,7 +176,7 @@
             <td class="py-1.5 text-right tabular-nums whitespace-nowrap">{{.High}}</td>
           </tr>
           {{else}}
-          <tr><td colspan="4" class="py-6 text-center text-gray-400 whitespace-nowrap">집계할 종료 건이 없습니다.</td></tr>
+          <tr><td colspan="4" class="py-6 text-center text-ink-subtle whitespace-nowrap">집계할 종료 건이 없습니다.</td></tr>
           {{end}}
         </tbody>
       </table>

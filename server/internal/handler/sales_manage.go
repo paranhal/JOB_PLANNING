@@ -19,7 +19,7 @@ func currentUserHomeOrg(c echo.Context) string {
 	if canSwitchOrg(c) {
 		return ""
 	}
-	return model.OrgIDLibrary
+	return ""
 }
 
 // canManageSalesProject 수정·단계·수주·계약 전환. 활동 로그는 쓰지 않는다. 95-2G.
@@ -38,7 +38,7 @@ func canManageSalesProject(c echo.Context, p *model.SalesProject) bool {
 		return true
 	}
 	uid := strings.TrimSpace(currentUserID(c))
-	if uid != "" && uid == strings.TrimSpace(p.SalesOwnerID) {
+	if uid != "" && p.HasSalesPerson(uid, "") {
 		return true
 	}
 	return false

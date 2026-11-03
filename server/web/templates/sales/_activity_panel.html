@@ -1,19 +1,19 @@
 {{define "sales_activity_panel"}}
 <div x-show="typeof open !== 'undefined' && typeof open === 'boolean' && open" x-cloak class="fixed inset-0 z-40"
      @keydown.escape.window="if (typeof open === 'boolean') open=false">
-  <div class="absolute inset-0 bg-slate-900/20" @click="open=false"></div>
-  <aside class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-xl border-l border-slate-200 overflow-y-auto"
+  <div class="absolute inset-0 bg-ink/20" @click="open=false"></div>
+  <aside class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-xl border-l border-line overflow-y-auto"
          @click.stop>
     <form method="post" action="{{.FormAction}}" class="p-5 space-y-5" x-ref="actForm" @submit.prevent="submit($event)">
       {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask.TaskID}}">{{end}}
       {{if .FixedSalesID}}<input type="hidden" name="sales_id" value="{{.FixedSalesID}}">{{end}}
       <div class="flex items-center justify-between">
-        <h3 class="font-semibold text-gray-800" x-text="editingId ? '활동 수정' : '활동 등록'">활동 등록</h3>
-        <button type="button" class="text-sm text-gray-500" @click="open=false">닫기</button>
+        <h3 class="font-semibold text-ink" x-text="editingId ? '활동 수정' : '활동 등록'">활동 등록</h3>
+        <button type="button" class="text-sm text-ink-muted" @click="open=false">닫기</button>
       </div>
       {{if not .FixedSalesID}}
       <div>
-        <label class="block text-xs text-gray-500 mb-1">사업 *</label>
+        <label class="block text-xs text-ink-muted mb-1">사업 *</label>
         <select name="sales_id" required class="w-full border rounded-lg px-3 py-2 text-sm" :disabled="!!editingId" @change="loadPartyHints($event.target.value)">
           <option value="">사업을 선택하세요</option>
           {{range .SalesOptions}}
@@ -23,14 +23,14 @@
       </div>
       {{end}}
       <div>
-        <p class="text-xs font-semibold text-gray-600 mb-2">기본 정보</p>
+        <p class="text-xs font-semibold text-ink-muted mb-2">기본 정보</p>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">활동일 *</label>
+            <label class="block text-xs text-ink-muted mb-1">활동일 *</label>
             <input type="date" name="activity_date" required value="{{if and .FromTask .FromTask.WorkDate}}{{.FromTask.WorkDate}}{{else}}{{.Today}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">활동 유형 *</label>
+            <label class="block text-xs text-ink-muted mb-1">활동 유형 *</label>
             <select name="activity_type" required class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="활동 유형"
                     data-project-stage="{{.ProjectStage}}" data-project-stage-label="{{.ProjectStageLabel}}"
                     @change="onActTypeChange($event)">
@@ -43,11 +43,11 @@
               </optgroup>
               {{end}}
             </select>
-            <p class="text-[11px] text-gray-500 mt-1" x-show="typeHint" x-text="typeHint"></p>
-            <p class="text-[11px] text-amber-800 mt-1" role="status" x-show="typeWarn" x-text="typeWarn"></p>
+            <p class="text-[11px] text-ink-muted mt-1" x-show="typeHint" x-text="typeHint"></p>
+            <p class="text-[11px] text-warning mt-1" role="status" x-show="typeWarn" x-text="typeWarn"></p>
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">방법 *</label>
+            <label class="block text-xs text-ink-muted mb-1">방법 *</label>
             <select name="activity_method" required class="w-full border rounded-lg px-3 py-2 text-sm" aria-label="방법">
               <option value="">선택</option>
               {{range .ActivityMethods}}
@@ -56,11 +56,11 @@
             </select>
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">시작 시간</label>
+            <label class="block text-xs text-ink-muted mb-1">시작 시간</label>
             <input type="time" name="start_time" step="900" value="{{if .FromTask}}{{.FromTask.StartTime}}{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">소요 시간(분)</label>
+            <label class="block text-xs text-ink-muted mb-1">소요 시간(분)</label>
             <input type="number" name="duration_min" x-model="dur" min="1" value="{{if .FromTask}}{{if gt .FromTask.DurationMin 0}}{{.FromTask.DurationMin}}{{else}}30{{end}}{{else}}30{{end}}" class="w-full border rounded-lg px-3 py-2 text-sm">
             <div class="flex flex-wrap gap-1 mt-1">
               <button type="button" class="px-2 py-0.5 text-[11px] border rounded" @click="dur=30">30</button>
@@ -72,24 +72,24 @@
         </div>
       </div>
       <div>
-        <p class="text-xs font-semibold text-gray-600 mb-2">활동 내용</p>
+        <p class="text-xs font-semibold text-ink-muted mb-2">활동 내용</p>
         <div class="space-y-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">제목 *</label>
+            <label class="block text-xs text-ink-muted mb-1">제목 *</label>
             <input name="title" required class="w-full border rounded-lg px-3 py-2 text-sm" value="{{if .FromTask}}{{.FromTask.Title}}{{end}}">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">장소</label>
+            <label class="block text-xs text-ink-muted mb-1">장소</label>
             <input name="place" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">상대(실명)</label>
+            <label class="block text-xs text-ink-muted mb-1">상대(실명)</label>
             <input type="hidden" id="sales-default-members" value="{{if .FromTask}}{{.FromTask.Assignee}}{{else}}{{.DefaultOwner}}{{end}}">
             <div class="flex flex-wrap gap-1 border rounded-lg px-2 py-1.5 min-h-[42px]">
               <template x-for="(n, i) in counterChips" :key="i">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-xs text-slate-700">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-hover text-xs text-ink">
                   <span x-text="n"></span>
-                  <button type="button" class="text-slate-400 hover:text-slate-700" @click="counterChips.splice(i,1)">×</button>
+                  <button type="button" class="text-ink-subtle hover:text-ink" @click="counterChips.splice(i,1)">×</button>
                 </span>
               </template>
               <input list="party-hints" x-model="counterDraft"
@@ -103,15 +103,15 @@
               {{range .PartyHints}}<option value="{{.}}">{{end}}
             </datalist>
             <input type="hidden" name="counterparts">
-            <p class="text-[11px] text-gray-400 mt-1">관계자를 미리 등록하지 않아도 됩니다. 저장하면 관계자 탭에 쌓입니다.</p>
+            <p class="text-[11px] text-ink-subtle mt-1">관계자를 미리 등록하지 않아도 됩니다. 저장하면 관계자 탭에 쌓입니다.</p>
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">당사 참석자</label>
+            <label class="block text-xs text-ink-muted mb-1">당사 참석자</label>
             <div class="flex flex-wrap gap-1 mb-1 min-h-[24px]">
               <template x-for="(n, i) in memberChips" :key="'m'+i">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 text-xs text-orange-800">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning-soft text-xs text-warning">
                   <span x-text="n"></span>
-                  <button type="button" class="text-orange-400 hover:text-orange-800" @click="memberChips.splice(i,1)">×</button>
+                  <button type="button" class="text-warning hover:text-warning" @click="memberChips.splice(i,1)">×</button>
                 </span>
               </template>
             </div>
@@ -122,27 +122,27 @@
             <input type="hidden" name="our_members" value="{{if .FromTask}}{{.FromTask.Assignee}}{{else}}{{.DefaultOwner}}{{end}}">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">내용</label>
+            <label class="block text-xs text-ink-muted mb-1">내용</label>
             <textarea name="content" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm">{{if .FromTask}}{{.FromTask.Description}}{{end}}</textarea>
           </div>
         </div>
       </div>
       <div>
-        <p class="text-xs font-semibold text-gray-600 mb-2">다음 행동</p>
+        <p class="text-xs font-semibold text-ink-muted mb-2">다음 행동</p>
         <div class="space-y-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">다음에 할 일</label>
+            <label class="block text-xs text-ink-muted mb-1">다음에 할 일</label>
             <input name="next_action" x-model="nextAction" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">다음 행동일</label>
+            <label class="block text-xs text-ink-muted mb-1">다음 행동일</label>
             <input type="date" name="next_action_date" x-model="nextDate" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
       </div>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" class="px-3 py-2 border rounded-lg text-sm" @click="open=false">취소</button>
-        <button type="submit" class="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm" x-text="editingId ? '수정 저장' : '활동 저장'">활동 저장</button>
+        <button type="submit" class="px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm" x-text="editingId ? '수정 저장' : '활동 저장'">활동 저장</button>
       </div>
     </form>
   </aside>

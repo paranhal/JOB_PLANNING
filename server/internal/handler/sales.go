@@ -25,6 +25,7 @@ type SalesHandler struct {
 	contactRepo  *repository.ContactRepo
 	userRepo     *repository.UserRepo
 	codeRepo     *repository.CodeRepo
+	orgs         *repository.OrgRepo
 	attach       *AttachmentHandler
 }
 
@@ -283,6 +284,26 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	}
 	limitSalesUploadBody(c)
 	p := h.parseForm(c)
+	if err := model.ApplySalesTentative(p); err != nil {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+		}
+		return h.renderForm(c, p, false, err.Error())
+	}
+	org, err := resolveInsertOrg(c)
+	if err != nil {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+		}
+		return h.renderForm(c, p, false, err.Error())
+	}
+	p.OrgID = org
+	if msg := h.salesOwnerOrgErr(p); msg != "" {
+		if wantsJSON(c) {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": msg})
+		}
+		return h.renderForm(c, p, false, msg)
+	}
 	if err := h.repo.Create(p); err != nil {
 		if wantsJSON(c) {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
@@ -481,6 +502,15 @@ func (h *SalesHandler) Update(c echo.Context) error {
 	}
 	if p.LostReason == "" {
 		p.LostReason = cur.LostReason
+	}
+	p.OrgID = cur.OrgID
+	if err := model.ApplySalesTentative(p); err != nil {
+		p.SalesID = cur.SalesID
+		return h.renderForm(c, p, true, err.Error())
+	}
+	if msg := h.salesOwnerOrgErr(p); msg != "" {
+		p.SalesID = cur.SalesID
+		return h.renderForm(c, p, true, msg)
 	}
 	if err := h.repo.Update(p, ctxString(c, "user_name")); err != nil {
 		p.SalesID = cur.SalesID
@@ -793,6 +823,11 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		}
 	}
 	amtLabel := p.AmountLabel()
+	orgHome := loginHomeOrg(c)
+	orgSelected := strings.TrimSpace(p.OrgID)
+	if orgSelected == "" {
+		orgSelected = orgHome
+	}
 	var atts []model.Attachment
 	if isEdit && h.attach != nil && h.attach.repo != nil && p.SalesID != "" {
 		atts, _ = h.attach.repo.ListByRef(model.RefTypeSalesProject, p.SalesID)
@@ -819,6 +854,15 @@ func (h *SalesHandler) renderForm(c echo.Context, p *model.SalesProject, isEdit 
 		"Sum03":         model.SalesFormCollapsedSum(ownerLabel, p.PeriodLabel()),
 		"Attachments":   atts,
 		"CanManage":     !isEdit || canManageSalesProject(c, p),
+		"OrgChoices":    insertOrgChoices(c),
+		"OrgSelected":   orgSelected,
+		"OrgRequired":   canSwitchOrg(c),
+		"OrgLocked":     !canSwitchOrg(c),
+		"OrgHomeName":   orgHome,
+		"SalesOwnerOrgGroups": pickerOrgGroups(users, orgNameMap(h.orgs)),
+		"SalesOwnerIDs":       p.SalesOwnerIDs,
+		"SalesOwnerNames":     pickerNamesMap(users),
+		"SalesOwnerGroups":    users,
 	})
 }
 
@@ -829,6 +873,7 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		Name:                    strings.TrimSpace(c.FormValue("name")),
 		OrgID:                   currentOrg(c),
 		IsTentativeName:         c.FormValue("is_tentative_name") == "1",
+		TentativeName:           strings.TrimSpace(c.FormValue("tentative_name")),
 		DealType:                "",
 		Stage:                   strings.TrimSpace(c.FormValue("stage")),
 		CustomerID:              strings.TrimSpace(c.FormValue("customer_id")),
@@ -846,6 +891,7 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		RevenueTo:               strings.TrimSpace(c.FormValue("revenue_to")),
 		BillingCycle:            strings.TrimSpace(c.FormValue("billing_cycle")),
 		SalesOwnerID:            strings.TrimSpace(c.FormValue("sales_owner_id")),
+		SalesOwnerIDs:           formStringList(c, "sales_owner_id"),
 		SalesOwner:              strings.TrimSpace(c.FormValue("sales_owner")),
 		Competitor:              strings.TrimSpace(c.FormValue("competitor")),
 		LeadSource:              strings.TrimSpace(c.FormValue("lead_source")),
@@ -873,6 +919,11 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 	}
 	if strings.TrimSpace(c.FormValue("quick_quote")) == "1" {
 		model.ApplyQuickQuoteClear(p)
+	}
+	model.ApplySalesCustomerExclusive(p)
+	_ = model.ApplySalesTentative(p)
+	if p.SalesOwnerID == "" && len(p.SalesOwnerIDs) > 0 {
+		p.SalesOwnerID = p.SalesOwnerIDs[0]
 	}
 	if p.SalesOwnerID != "" && p.SalesOwner == "" && h.userRepo != nil {
 		if u, err := h.userRepo.GetByID(p.SalesOwnerID); err == nil && u != nil {
@@ -905,6 +956,52 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 	}
 	p.Probability = stageProb
 	return p
+}
+
+func formStringList(c echo.Context, name string) []string {
+	raw := c.Request().Form[name]
+	if len(raw) == 0 {
+		raw = c.Request().PostForm[name]
+	}
+	seen := map[string]struct{}{}
+	var out []string
+	for _, v := range raw {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func (h *SalesHandler) salesOwnerOrgErr(p *model.SalesProject) string {
+	if h == nil || h.userRepo == nil || p == nil {
+		return ""
+	}
+	org := strings.TrimSpace(p.OrgID)
+	if org == "" {
+		return ""
+	}
+	ids := p.SalesOwnerIDs
+	if len(ids) == 0 && strings.TrimSpace(p.SalesOwnerID) != "" {
+		ids = []string{p.SalesOwnerID}
+	}
+	for _, id := range ids {
+		u, err := h.userRepo.GetByID(id)
+		if err != nil || u == nil {
+			continue
+		}
+		uo := strings.TrimSpace(u.OrgID)
+		if uo != "" && uo != org {
+			return "소속 부서가 다른 담당자는 넣을 수 없습니다"
+		}
+	}
+	return ""
 }
 
 func sortSalesProjects(items []model.SalesProject, sortKey, dir string) {

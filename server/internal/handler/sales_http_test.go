@@ -316,7 +316,7 @@ func TestSalesHTTP_AdminDeleteReasonLogAndPromotedBlock(t *testing.T) {
 	rec = doForm(t, e, "/sales", url.Values{"name": {"승격사업"}})
 	pid := salesIDFromRedirect(t, rec.Header().Get("Location"))
 	pr := repository.NewProjectRepo(db)
-	if err := pr.Create(&model.WorkProject{Name: "계약사업", SalesProjectID: pid}); err != nil {
+	if err := pr.Create(&model.WorkProject{Name: "계약사업", SalesProjectID: pid, OrgID: model.OrgIDLibrary}); err != nil {
 		t.Fatal(err)
 	}
 	blocked := doForm(t, e, "/sales/"+pid+"/delete", url.Values{"reason": {"지우려다"}})

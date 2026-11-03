@@ -120,10 +120,10 @@ func TestSalesHTTP_ActivityLogTimelineAndPanel(t *testing.T) {
 	if !strings.Contains(sepBody, "+ 활동 추가") || strings.Count(sepBody, `@click="startCreate()"`) != 1 {
 		t.Fatal("이 달 빈 화면의 등록 버튼이 하나가 아니다")
 	}
-	if !strings.Contains(body, "text-orange-800") || !strings.Contains(body, "다음: 제안서 작성 및 제출 · 2026-09-15") {
+	if !strings.Contains(body, "text-warning") || !strings.Contains(body, "다음: 제안서 작성 및 제출 · 2026-09-15") {
 		t.Fatalf("다음 행동 주황 칩 없음: %s", clipBody(body))
 	}
-	if !strings.Contains(body, "다음 행동 없음") || !strings.Contains(body, "text-gray-500") {
+	if !strings.Contains(body, "다음 행동 없음") || !strings.Contains(body, "text-ink-muted") {
 		t.Fatalf("다음 행동 없음이 숨겨졌다: %s", clipBody(body))
 	}
 
