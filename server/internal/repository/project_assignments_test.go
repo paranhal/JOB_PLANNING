@@ -30,7 +30,7 @@ func TestProjectAssignmentsMultiDutyUniqueAndDeletedReject(t *testing.T) {
 	}
 
 	repo := NewProjectRepo(db)
-	p := &model.WorkProject{Name: "배정사업", Status: model.WBProjectActive, ProjectKind: model.ProjectKindConstruction}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "배정사업", Status: model.WBProjectActive, ProjectKind: model.ProjectKindConstruction}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -74,8 +74,8 @@ func TestProjectAssignmentsMultiDutyUniqueAndDeletedReject(t *testing.T) {
 		t.Fatal("삭제된 사용자 배정이 통과했다")
 	}
 
-	keep := &model.WorkProject{Name: "남김", Status: model.WBProjectActive, ProjectKind: model.ProjectKindMaintenance}
-	drop := &model.WorkProject{Name: "없앰", Status: model.WBProjectActive, ProjectKind: model.ProjectKindMaintenance}
+	keep := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "남김", Status: model.WBProjectActive, ProjectKind: model.ProjectKindMaintenance}
+	drop := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "없앰", Status: model.WBProjectActive, ProjectKind: model.ProjectKindMaintenance}
 	if err := repo.Create(keep); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestProjectKindRequiredAtHandlerLayerDocumentedByEmptyCreateDefault(t *test
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewProjectRepo(db)
-	p := &model.WorkProject{Name: "기본유형", Status: model.WBProjectActive}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "기본유형", Status: model.WBProjectActive}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

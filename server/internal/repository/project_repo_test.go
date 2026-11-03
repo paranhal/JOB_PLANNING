@@ -71,7 +71,7 @@ func TestProjectSeedAndMatch(t *testing.T) {
 		t.Fatalf("AS 매칭 실패 total=%d rows=%d", total, len(rows))
 	}
 
-	np := &model.WorkProject{Name: "테스트사업", PlanYear: 2026, IsPaid: true, Status: model.WBProjectActive}
+	np := &model.WorkProject{Name: "테스트사업", PlanYear: 2026, IsPaid: true, Status: model.WBProjectActive, OrgID: model.OrgIDLibrary}
 	if err := repo.Create(np); err != nil {
 		t.Fatal(err)
 	}
@@ -160,11 +160,11 @@ func TestListContractsHidesNonContractUnlessAll(t *testing.T) {
 	}
 	defer db.Close()
 	repo := NewProjectRepo(db)
-	plain := &model.WorkProject{Name: "수행만사업", PlanYear: 2026, Status: model.WBProjectActive}
+	plain := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "수행만사업", PlanYear: 2026, Status: model.WBProjectActive}
 	if err := repo.Create(plain); err != nil {
 		t.Fatal(err)
 	}
-	withAmt := &model.WorkProject{Name: "금액있는계약", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1_000_000}
+	withAmt := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "금액있는계약", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1_000_000}
 	if err := repo.Create(withAmt); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestListContractsHidesNonContractUnlessAll(t *testing.T) {
 		t.Fatalf("KPI n=%d amt=%d", kpiN, kpiAmt)
 	}
 
-	withNo := &model.WorkProject{Name: "번호만계약", PlanYear: 2026, Status: model.WBProjectActive, ContractNo: "CN-1"}
+	withNo := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "번호만계약", PlanYear: 2026, Status: model.WBProjectActive, ContractNo: "CN-1"}
 	if err := repo.Create(withNo); err != nil {
 		t.Fatal(err)
 	}

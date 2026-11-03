@@ -33,22 +33,36 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 	redirect := safeWorkboardRedirect(c.QueryParam("redirect"), workboardHomeURL(""))
 	org := currentOrg(c)
 	wgItems, wgJSON := h.workGroupPicks(c)
+	var extraIDs []string
+	extraIDs = append(extraIDs, currentUserID(c))
+	if h.groups != nil {
+		for _, g := range wgItems {
+			ms, _ := h.groups.MembersOn(g.GroupID, "")
+			for _, m := range ms {
+				extraIDs = append(extraIDs, m.UserID)
+			}
+		}
+	}
+	assignees := ensurePickerUsers(h.userRepo, listAssignableForPicker(h.userRepo, c), extraIDs...)
 	data := map[string]interface{}{
-		"Date":          dateStr,
-		"Today":         today,
-		"ModalRedirect": redirect,
-		"KindBackLabel": "← 업무 유형 선택",
-		"DailyKind":     kind,
-		"CanWrite":      true,
-		"Assignees":        listAssignableForPicker(h.userRepo, c),
-		"AssigneeRequired":  requiresAssigneeChoice(c),
-		"WorkGroups":    wgItems,
-		"WorkGroupsJSON": wgJSON,
-		"ASCards":       []model.WBCard{},
-		"MntCards":      []model.WBCard{},
-		"Customers":     []model.Customer{},
-		"Projects":      []model.WorkProject{},
-		"WorkProjects":  []model.WorkProject{},
+		"Date":             dateStr,
+		"Today":            today,
+		"ModalRedirect":    redirect,
+		"KindBackLabel":    "← 업무 유형 선택",
+		"DailyKind":        kind,
+		"CanWrite":         true,
+		"Assignees":        assignees,
+		"PickerNames":      pickerNamesFor(h.userRepo, assignees, extraIDs...),
+		"PickerOwnerID":    currentUserID(c),
+		"PickerUserIDs":    []string{currentUserID(c)},
+		"AssigneeRequired": requiresAssigneeChoice(c),
+		"WorkGroups":       wgItems,
+		"WorkGroupsJSON":   wgJSON,
+		"ASCards":          []model.WBCard{},
+		"MntCards":         []model.WBCard{},
+		"Customers":        []model.Customer{},
+		"Projects":         []model.WorkProject{},
+		"WorkProjects":     []model.WorkProject{},
 	}
 	switch kind {
 	case model.WBWorkAS:
@@ -73,6 +87,8 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		data["Customers"] = customers
 	}
 	c.Request().Header.Set("HX-Request", "true")
+	data["ItemOrgID"] = currentOrg(c)
+	attachWorkItemView(data, h, nil, false)
 	return c.Render(http.StatusOK, "workboard/new_work_form.html", data)
 }
 

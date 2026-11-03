@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -70,8 +71,19 @@ func (h *MaintenanceHandler) workGroupPicksForVisit(c echo.Context) ([]model.Wor
 		if h.groups != nil {
 			ms, _ := h.groups.MembersOn(g.GroupID, "")
 			for _, m := range ms {
-				p.Members = append(p.Members, mntWorkGroupMemJSON{UserID: m.UserID, Name: m.FullName, Role: m.Role})
-				names = append(names, m.FullName)
+				name := strings.TrimSpace(m.FullName)
+				if name == "" || strings.HasPrefix(name, "USR-") {
+					if h.userRepo != nil {
+						if u, err := h.userRepo.GetByID(m.UserID); err == nil && u != nil {
+							name = pickerDisplayName(*u)
+						}
+					}
+				}
+				if name == "" || strings.HasPrefix(name, "USR-") {
+					name = "담당자"
+				}
+				p.Members = append(p.Members, mntWorkGroupMemJSON{UserID: m.UserID, Name: name, Role: m.Role})
+				names = append(names, name)
 				if m.Role == model.WorkGroupLeader && p.LeaderID == "" {
 					p.LeaderID = m.UserID
 				}
@@ -175,6 +187,9 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 	if v == nil {
 		return nil
 	}
+	if c != nil && c.Request() != nil {
+		_ = c.Request().ParseForm()
+	}
 	groupIDs := formVisitGroupIDs(c)
 	checked := uniqueTrimmed(formStringSlice(c, "assignee_user_id"))
 	exclude := formVisitExcludeIDs(c)
@@ -206,7 +221,12 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 		if h.groups == nil {
 			continue
 		}
-		ms, _ := h.groups.MembersOn(gid, v.VisitDate)
+		// 과거 방문에 그룹을 넣을 때도 지금 구성원을 쓴다. joined_on 이 방문일 뒤면 MembersOn(visitDate) 가 비다.
+		on := strings.TrimSpace(v.VisitDate)
+		if today := time.Now().Format("2006-01-02"); on == "" || on < today {
+			on = today
+		}
+		ms, _ := h.groups.MembersOn(gid, on)
 		for _, m := range ms {
 			uid := strings.TrimSpace(m.UserID)
 			if uid == "" {

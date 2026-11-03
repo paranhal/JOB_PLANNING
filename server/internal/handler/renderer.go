@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/appclock"
 	"customer-support/internal/config"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -47,6 +49,9 @@ func baseTemplateFiles() []string {
 		"web/templates/layout/_nav_tree.html",
 		"web/templates/_partials/login_briefing.html",
 		"web/templates/_partials/schedule_show_toggle.html",
+		"web/templates/_partials/page_back.html",
+		"web/templates/_partials/dup_username_dialog.html",
+		"web/templates/workboard/_carry_modal.html",
 	)
 }
 
@@ -79,6 +84,10 @@ func templateFiles(name string) []string {
 		if partials, err := filepath.Glob("web/templates/as/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
+		files = appendExisting(files,
+			"web/templates/workboard/_segments_form.html",
+			"web/templates/workboard/_work_items.html",
+		)
 	}
 	if strings.HasPrefix(name, "asset/") {
 		if partials, err := filepath.Glob("web/templates/asset/_*.html"); err == nil {
@@ -87,6 +96,11 @@ func templateFiles(name string) []string {
 	}
 	if strings.HasPrefix(name, "work/") {
 		if partials, err := filepath.Glob("web/templates/work/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
+	if strings.HasPrefix(name, "work_item_template/") {
+		if partials, err := filepath.Glob("web/templates/work_item_template/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
 	}
@@ -126,6 +140,10 @@ func templateFiles(name string) []string {
 		if partials, err := filepath.Glob("web/templates/maintenance/_*.html"); err == nil {
 			files = append(files, partials...)
 		}
+		files = appendExisting(files,
+			"web/templates/workboard/_segments_form.html",
+			"web/templates/workboard/_work_items.html",
+		)
 	}
 	if strings.HasPrefix(name, "stats/") {
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
@@ -150,8 +168,11 @@ func templateFiles(name string) []string {
 	}
 	files = appendExisting(files, "web/templates/_classify_hint.html", "web/templates/_customer_combo.html",
 		"web/templates/_site_multi_picker.html",
+		"web/templates/_org_picker.html",
 		"web/templates/_ui_assignee_picker.html",
-		"web/templates/_partials/view_group_toggle.html")
+		"web/templates/_project_year_dates.html",
+		"web/templates/_partials/view_group_toggle.html",
+		"web/templates/_partials/page_back.html")
 	return files
 }
 
@@ -234,6 +255,8 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		injectLoginBriefingView(c, dataMap)
 		injectOrgView(c, dataMap)
 		injectNavMenu(c, dataMap)
+		injectPageBack(c, dataMap)
+		injectPickerNames(dataMap)
 		if v := c.Get("auth_unconfirmed"); v != nil {
 			if b, ok := v.(bool); ok && b {
 				dataMap["AuthUnconfirmed"] = true
@@ -265,6 +288,24 @@ func injectOrgView(c echo.Context, dataMap map[string]interface{}) {
 	if c.Request() != nil && c.Request().URL != nil {
 		dataMap["ReturnPath"] = c.Request().URL.RequestURI()
 	}
+}
+
+func injectPickerNames(dataMap map[string]interface{}) {
+	if dataMap == nil {
+		return
+	}
+	names, _ := dataMap["PickerNames"].(map[string]string)
+	if names == nil {
+		names = map[string]string{}
+	}
+	if list, ok := dataMap["Assignees"].([]model.User); ok {
+		for id, n := range pickerNamesMap(list) {
+			if strings.TrimSpace(names[id]) == "" || strings.HasPrefix(names[id], "USR-") {
+				names[id] = n
+			}
+		}
+	}
+	dataMap["PickerNames"] = names
 }
 
 func ctxString(c echo.Context, key string) string {
@@ -312,12 +353,16 @@ func funcMap() template.FuncMap {
 		"urlquery":           url.QueryEscape,
 		"workboardHomeURL":   workboardHomeURL,
 		"asHref":             model.ASOpenHref,
+		"boardReceipt":       boardReceiptText,
+		"boardAction":        boardActionText,
+		"boardItemHref":      boardItemHref,
 		"asLegacyHref":       model.ASLegacyHref,
 		"asSymptomSnippet":   asSymptomSnippet,
 		"weekdayKo":          weekdayKo,
 		"visitPeopleIDs":     visitPeopleIDsCSV,
 		"visitOwnerID":       visitOwnerUserID,
 		"visitGroupIDs":      visitGroupIDsCSV,
+		"pickerName":         pickerDisplayName,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {
@@ -335,6 +380,18 @@ func funcMap() template.FuncMap {
 				}
 			}
 			return false
+		},
+		"safeLen": func(v interface{}) int {
+			if v == nil {
+				return 0
+			}
+			rv := reflect.ValueOf(v)
+			switch rv.Kind() {
+			case reflect.Slice, reflect.Array, reflect.Map, reflect.String:
+				return rv.Len()
+			default:
+				return 0
+			}
 		},
 		"dict": func(pairs ...interface{}) map[string]interface{} {
 			m := make(map[string]interface{}, len(pairs)/2)
@@ -463,6 +520,7 @@ func funcMap() template.FuncMap {
 			}
 		},
 		"actionResultLabel":   model.ActionResultLabel,
+		"formatKoreanTime":    model.FormatKoreanTime,
 		"transferDetailLabel": model.TransferDetailLabel,
 		"workPrefixLabel": func(s string) string {
 			return model.WorkPrefixLabel(s)
@@ -559,8 +617,8 @@ func funcMap() template.FuncMap {
 		"urgencyReasonText": func(code, note string) string {
 			return model.UrgencyReasonLabel(code, note, nil)
 		},
-		"partyKindLabel":      model.PartyKindLabel,
-		"processTypePlaces":   model.ProcessTypePlaces,
+		"partyKindLabel":    model.PartyKindLabel,
+		"processTypePlaces": model.ProcessTypePlaces,
 		"causeCat1Label": func(cat1, custom string) string {
 			return model.CauseCat1Label(cat1, custom, nil)
 		},
@@ -588,17 +646,7 @@ func funcMap() template.FuncMap {
 			return s
 		},
 		"productCategoryLabel": func(s string) string {
-			m := map[string]string{
-				"homepage": "홈페이지", "elibrary": "전자도서관", "mobile": "모바일",
-				"rfid": "RFID자동화", "materials": "자료관리", "other": "기타",
-			}
-			if l, ok := m[s]; ok {
-				return l
-			}
-			if s == "" {
-				return "—"
-			}
-			return s
+			return repository.ProductCategoryLabel(s)
 		},
 		"installerTypeLabel": func(s string) string {
 			m := map[string]string{
@@ -623,7 +671,7 @@ func funcMap() template.FuncMap {
 			return s
 		},
 		"visitProtected": func(date string) bool {
-			return model.VisitDeleteProtected(date, time.Now())
+			return model.VisitDeleteProtected(date, appclock.Now())
 		},
 		"maintCycleLabel": func(s string) string {
 			return model.MaintCycleDisplayLabel(s)

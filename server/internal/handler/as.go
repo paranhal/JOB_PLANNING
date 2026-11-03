@@ -41,6 +41,7 @@ type ASHandler struct {
 	partsRepo    *repository.ASPartsUsedRepo
 	itemRepo     *repository.SalesItemRepo
 	groups       *repository.WorkGroupRepo
+	setRepo      *repository.ASActionSetRepo
 
 	reportTemplateBytes []byte
 	reportTemplatePath  string
@@ -199,8 +200,8 @@ func (h *ASHandler) List(c echo.Context) error {
 		"CanReceive":  canReceiveAS(c), "CanProcess": canProcessAS(c),
 		"StatusLabel": statusLabel,
 		"AssigneeID":  assigneeID, "AssigneeName": assigneeName,
-		"IsHoldList": status == "hold",
-		"Display":    "list",
+		"IsHoldList":  status == "hold",
+		"Display":     "list",
 		"KanbanHref":  "/as?" + kanbanLink.Encode(),
 		"ListHref":    "/as?" + listBase.Encode(),
 		"LegacyLinks": legacyLinks,
@@ -1183,7 +1184,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		dailyTask, _ = h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID)
 	}
 
-	if cats, err := h.repo.ListCauseCategories(); err == nil {
+	if cats, err := h.repo.ListCauseCategoriesForOrgAll(as.OrgID); err == nil {
 		as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(cats))
 	}
 	closed := isASClosedStatus(as.Status)
@@ -1206,6 +1207,8 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"TransferFollowups": followups,
 		"Assignees":         assignees,
 		"DailyTask":         dailyTask,
+		"CanPlanEdit":       dailyTask != nil && canPlanEditTask(c, dailyTask),
+		"PlanEditHref":      planEditHrefFromTask(dailyTask),
 		"CanMoveAdminWork":  !embed && canMoveASToAdminWork(c, as),
 		"CanReopen":         closed && canReceiveAS(c) && !embed,
 		"CanReceive":        canReceiveAS(c),
@@ -1217,6 +1220,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 		"CanEditReceipt":    !embed && canSaveASReceipt(c, as, canMod),
 		"CanOwnerEdit":      closed && canMod,
 		"CanDelete":         !embed && h.canDeleteThis(c, as),
+		"ActionSets":        h.actionSetsOrVirtual(as),
 		"CanWriteDaily":     !embed && canWriteWorkboard(c) && !closed,
 		"TodayLocal":        now.Format("2006-01-02"),
 		"ActionErr":         actionErrMessage(c.QueryParam("err")),
@@ -1305,16 +1309,17 @@ func (h *ASHandler) Action(c echo.Context) error {
 	procTypes = filterSelectableProcessTypes(procTypes)
 	causeTypes, _ := h.codeRepo.ActiveByGroup("cause_type")
 	resultCodes, _ := h.codeRepo.ActiveByGroup("result_code")
-	causeCats, _ := h.repo.ListCauseCategories()
+	causeCats, _ := h.listCauseCategoriesForAS(as)
+	labelCats, _ := h.repo.ListCauseCategoriesForOrgAll(as.OrgID)
 	var causeCatL1 []model.CauseCategory
 	for _, cat := range causeCats {
 		if cat.Level == 1 && cat.Code != model.CauseCatCustom {
 			causeCatL1 = append(causeCatL1, cat)
 		}
 	}
-	as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(causeCats))
+	as.CauseCatLabel = model.CauseCat1Label(as.CauseCat1, as.CauseCat1Custom, model.CauseCategoryLabels(labelCats))
 	customRecent, _ := h.repo.ListCauseCat1CustomRecent(currentOrg(c), 20)
-	assignees := listAssignableForPicker(h.userRepo, c)
+	assignees := ensurePickerUsers(h.userRepo, listAssignableForPicker(h.userRepo, c), as.AssignedUserID, currentUserID(c))
 	applySupportAssigneeDefault(c, as)
 	contacts, _ := h.contactRepo.ListByCustomer(as.CustomerID)
 
@@ -1382,12 +1387,18 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CauseCatL1":           causeCatL1,
 		"CauseCatCustomRecent": customRecent,
 		"CauseCategoriesJSON":  causeCategoriesJSON(causeCats),
+		"CauseFreeInput":       model.CauseCatalogEmpty(causeCats),
 		"ActionResults":        model.ActionResultOptions(),
 		"Assignees":            assignees,
+		"PickerNames":          pickerNamesFor(h.userRepo, assignees, as.AssignedUserID, currentUserID(c)),
+		"PickerOwnerID":        as.AssignedUserID,
+		"PickerUserIDs":        []string{as.AssignedUserID},
 		"WorkGroups":           h.visibleWorkGroups(c),
 		"GroupMembers":         h.groupMembersForAS(c, as),
 		"Contacts":             contacts,
 		"DailyTask":            dailyTask,
+		"CanPlanEdit":          dailyTask != nil && canPlanEditTask(c, dailyTask),
+		"PlanEditHref":         planEditHrefFromTask(dailyTask),
 		"IsClosed":             closed,
 		"EditUnlocked":         unlocked,
 		"UnlockExpires":        unlockExpLocal,
@@ -1409,7 +1420,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"FocusAssignee":        c.QueryParam("focus") == "assignee",
 		"OnBehalf":             !sessionOwnsAS(c, as),
 		"ActionErr":            c.QueryParam("err"),
-		"ActionErrMsg":         actionErrMessageWithSupport(c.QueryParam("err"), parseOpenSupportN(c)),
+		"ActionErrMsg":         actionErrMessagePrefixed(c),
 		"AttachErrMsg":         attachErrMessage(c.QueryParam("err")),
 		"ActionWarn":           c.QueryParam("warn"),
 		"ActionWarnMsg":        actionWarnMessage(c.QueryParam("warn")),
@@ -1420,11 +1431,26 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CanReceive":           canReceiveAS(c),
 		"KeywordChecks":        h.keywordChecks(as.ASID, model.KWFieldAction, as.ActionTaken+" "+as.Symptom),
 		"KeywordField":         model.KWFieldAction,
+		"ActionSets":           h.actionSetsOrVirtual(as),
+		"TimeSlots":            model.TimeSlotOptions(),
+		"DurationOpts":         model.DurationMinOptions(),
+		"TodayDate":            now.Format("2006-01-02"),
 		"BackURL":              requestBackOrHome(c),
 		"CanMoveAdminWork":     canMoveASToAdminWork(c, as),
 		"CanReopen":            closed && canReceiveAS(c),
 		"CanEditReceipt":       canSaveASReceipt(c, as, canMod),
 		"CanDelete":            h.canDeleteThis(c, as),
+	}
+	if sets, ok := data["ActionSets"].([]model.ASActionSet); ok && len(sets) > 0 {
+		data["DraftSetN"] = countSavedActionSets(sets)
+		data["LastActionSet"] = sets[len(sets)-1]
+		stored := 0
+		for _, s := range sets {
+			if !s.Virtual {
+				stored++
+			}
+		}
+		data["HasStoredSets"] = stored > 1
 	}
 	if as.ReceiptGroupID != "" {
 		mates, _ := h.repo.ListByReceiptGroup(as.ReceiptGroupID)
@@ -1568,13 +1594,26 @@ func (h *ASHandler) Update(c echo.Context) error {
 	var followupChild *model.ASReceipt
 	if canProcessAS(c) {
 		as.ProcessType = strings.TrimSpace(c.FormValue("process_type"))
-		as.ProcessTypeReason = strings.TrimSpace(c.FormValue("process_type_reason"))
 		as.WorkPlace = model.NormalizeWorkPlace(c.FormValue("work_place"))
 		as.ActionTaken = strings.TrimSpace(c.FormValue("action_taken"))
-		na := c.FormValue("action_na") == "1"
-		naReason := strings.TrimSpace(c.FormValue("action_na_reason"))
 		formResult = strings.TrimSpace(c.FormValue("result_code"))
 		as.ResultCode = formResult
+		posted := h.collectPostedActionSets(c, as)
+		fv := newActionFormView(c, posted)
+		as.ProcessTypeReason = strings.TrimSpace(fv.Get("process_type_reason"))
+		na := fv.Get("action_na") == "1"
+		naReason := strings.TrimSpace(fv.Get("action_na_reason"))
+		if len(posted) > 0 {
+			c.Set("as_posted_sets", posted)
+			if last := model.LastCommittedActionSet(posted); last != nil {
+				model.CopyActionSetOntoReceipt(as, *last)
+				formResult = strings.TrimSpace(last.ResultCode)
+				as.ResultCode = formResult
+			} else {
+				formResult = ""
+				as.ResultCode = ""
+			}
+		}
 		savingAction := na || as.ActionTaken != "" || formResult != ""
 		if savingAction {
 			resolved, code := model.ResolveActionContent(as.ActionTaken, na, naReason)
@@ -1586,14 +1625,24 @@ func (h *ASHandler) Update(c echo.Context) error {
 				return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+model.ActionErrShort))
 			}
 		}
-		as.CauseDetail = strings.TrimSpace(c.FormValue("cause_detail"))
-		causeCats, _ := h.repo.ListCauseCategories()
-		if code := model.ApplyCauseCat1(as, c.FormValue("cause_cat1"), c.FormValue("cause_cat1_custom")); code != "" && (na || as.ActionTaken != "" || formResult != "") {
-			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
-		}
-		if as.CauseCat1 != model.CauseCatCustom {
-			as.CauseCat2 = strings.TrimSpace(c.FormValue("cause_cat2"))
-			as.CauseCat3 = strings.TrimSpace(c.FormValue("cause_cat3"))
+		as.CauseDetail = strings.TrimSpace(fv.Get("cause_detail"))
+		causeCats, _ := h.listCauseCategoriesForAS(as)
+		cat1In, customIn := fv.Get("cause_cat1"), fv.Get("cause_cat1_custom")
+		if model.CauseCatalogEmpty(causeCats) {
+			if strings.TrimSpace(cat1In) == "" && strings.TrimSpace(customIn) != "" {
+				cat1In = model.CauseCatCustom
+			}
+			as.CauseCat1 = model.CauseCatCustom
+			as.CauseCat1Custom = model.NormalizeCauseCatCustom(customIn)
+			as.CauseCat2 = strings.TrimSpace(fv.Get("cause_cat2"))
+			as.CauseCat3 = strings.TrimSpace(fv.Get("cause_cat3"))
+			as.CauseType = ""
+		} else if code := model.ApplyCauseCat1(as, cat1In, customIn); code != "" && (na || as.ActionTaken != "" || formResult != "") {
+			h.keepPostedAsDraft(c, as, posted)
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code+focusSetQuery(fv)))
+		} else if as.CauseCat1 != model.CauseCatCustom {
+			as.CauseCat2 = strings.TrimSpace(fv.Get("cause_cat2"))
+			as.CauseCat3 = strings.TrimSpace(fv.Get("cause_cat3"))
 			as.CauseType = model.CauseTypeFromCat2(causeCats, as.CauseCat2)
 		} else {
 			as.CauseType = ""
@@ -1616,7 +1665,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 			as.ProcessTypeReason = ""
 		}
 		if as.ProcessType == model.ProcessTypeVisit {
-			as.VisitDate = normalizeVisitDate(c.FormValue("visit_date"))
+			if w := normalizeVisitDate(c.FormValue("work_date")); w != "" {
+				as.VisitDate = w
+			} else if v := normalizeVisitDate(c.FormValue("visit_date")); v != "" {
+				as.VisitDate = v
+			}
 		} else {
 			as.VisitDate = ""
 		}
@@ -1644,7 +1697,30 @@ func (h *ASHandler) Update(c echo.Context) error {
 		}
 
 		if formResult != "" && !model.IsSelectableActionResult(formResult) {
-			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=result_not_allowed"))
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": actionErrMessage("result_not_allowed"), "code": "result_not_allowed"})
+		}
+		if posted, _ := c.Get("as_posted_sets").([]model.ASActionSet); len(posted) > 0 {
+			for _, s := range posted {
+				if strings.TrimSpace(s.ResultCode) == "" {
+					h.keepPostedAsDraft(c, as, posted)
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=set_draft_"+strconv.Itoa(s.Seq)+"&focus_set="+strconv.Itoa(s.Seq)))
+				}
+				if code := model.ValidateActionSetWorkTime(s); code != "" {
+					h.keepPostedAsDraft(c, as, posted)
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code+"&focus_set="+strconv.Itoa(s.Seq)))
+				}
+			}
+		}
+		if kwErr := func() string {
+			if strings.TrimSpace(c.FormValue("kw_manual")) == "" {
+				return ""
+			}
+			if len(model.ParseKeywordTokens(c.FormValue("kw_manual")).Err) > 0 {
+				return "keyword_manual"
+			}
+			return ""
+		}(); kwErr != "" {
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+kwErr))
 		}
 		if formResult == model.ResultDone && h.workRepo != nil {
 			if n, _ := h.workRepo.CountOpenSupport(id); n > 0 && c.FormValue("confirm_open_support") != "1" {
@@ -1652,10 +1728,12 @@ func (h *ASHandler) Update(c echo.Context) error {
 			}
 		}
 		if code := actionSaveMissingErr(as, formResult); code != "" {
-			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
+			h.keepPostedAsDraft(c, as, posted)
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code+focusSetQuery(fv)))
 		}
-		if code := actionCauseCatMissingErr(as, causeCats); code != "" {
-			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code))
+		if code := causeRuleFor(causeCats)(as, causeCats); code != "" {
+			h.keepPostedAsDraft(c, as, posted)
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+code+focusSetQuery(fv)))
 		}
 		partsOn, partRows, partsErr := h.collectASPartsForm(c)
 		if partsErr != nil {
@@ -1709,6 +1787,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 				in.NextDate = nextVisit
 			}
 			out, err := model.ApplyActionResult(as, in, time.Now())
+			if err == nil {
+				asActionSideEffectRuns++
+			}
 			if err != nil {
 				switch err {
 				case model.ErrRevisitReasonRequired:
@@ -1761,16 +1842,55 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if err := h.repo.Update(as); err != nil {
 		return err
 	}
+	if canProcessAS(c) && strings.TrimSpace(formResult) != "" {
+		if _, code := h.persistPostedSets(c, as, true); code != "" {
+			if code == "result_not_allowed" {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": actionErrMessage(code), "code": code})
+			}
+			q := "err=" + code
+			if strings.HasPrefix(code, "set_draft_") {
+				q += "&focus_set=" + strings.TrimPrefix(code, "set_draft_")
+			}
+			return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, q))
+		}
+	}
 	if formResult == model.ResultDone && c.FormValue("confirm_open_support") == "1" && h.workRepo != nil {
 		if n, _ := h.workRepo.CountOpenSupport(id); n > 0 {
 			h.workRepo.LogOpenSupportCompleteAllow(as.ASID, as.ASNumber, n)
 		}
 	}
 	h.syncASPlannedDailyTask(as.ASID)
+	if h.wbRepo != nil {
+		if daily, _ := h.wbRepo.GetTaskBySource(model.WBSourceAS, as.ASID); daily != nil {
+			if err := savePostedActionSegments(c, h.wbRepo, daily); err != nil {
+				if errors.Is(err, errSegShift) {
+					return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=seg_shift"))
+				}
+				return err
+			}
+			if actual, _ := h.wbRepo.ListActualSegments(daily.TaskID); len(actual) > 0 {
+				st, en, _ := model.EnvelopeFromPlanSegments(actual)
+				st, en = model.ClockHHMM(st), model.ClockHHMM(en)
+				day0 := firstNonEmpty(actual[0].WorkDate, daily.WorkDate)
+				day1 := firstNonEmpty(actual[len(actual)-1].WorkDate, daily.WorkDate)
+				if t, ok := parseFormDatetime(day0 + "T" + st); ok {
+					if as.StartDatetime == nil || as.StartDatetime.IsZero() {
+						as.StartDatetime = &t
+					}
+				}
+				if t, ok := parseFormDatetime(day1 + "T" + en); ok {
+					as.CompleteDatetime = &t
+				}
+				_ = h.repo.Update(as)
+			}
+		}
+	}
 	if h.notices != nil {
 		h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)
 	}
 	h.saveKeywordChecks(c, as.ASID, model.KWFieldAction)
+	h.applyNewKeywordChips(c, as.ASID)
+	_ = h.applyManualKeywords(c, as.ASID)
 	var procID string
 	applyN, applySkips := 0, []string(nil)
 	if canProcessAS(c) {
@@ -1859,7 +1979,29 @@ func actionSaveMissingErr(as *model.ASReceipt, formResult string) string {
 		return "process_type_mismatch"
 	}
 	if as.ProcessType == model.ProcessTypeVisit && strings.TrimSpace(as.VisitDate) == "" {
-		return "visit_date"
+		return "work_date_required"
+	}
+	return ""
+}
+
+func causeRuleFor(cats []model.CauseCategory) func(*model.ASReceipt, []model.CauseCategory) string {
+	if model.CauseCatalogEmpty(cats) {
+		return causeCatFreeInputErr
+	}
+	return actionCauseCatMissingErr
+}
+
+func causeCatFreeInputErr(as *model.ASReceipt, _ []model.CauseCategory) string {
+	if as == nil {
+		return ""
+	}
+	action := strings.TrimSpace(as.ActionTaken)
+	saving := action != "" || strings.TrimSpace(as.ResultCode) != ""
+	if !saving {
+		return ""
+	}
+	if !model.CauseCatCustomOK(as.CauseCat1Custom) {
+		return "cause_cat1_input"
 	}
 	return ""
 }
@@ -1948,7 +2090,15 @@ func actionErrMessageWithSupport(code string, n int) string {
 }
 
 func actionErrMessage(code string) string {
-	switch strings.TrimSpace(code) {
+	code = strings.TrimSpace(code)
+	if strings.HasPrefix(code, "set_draft_") {
+		n := strings.TrimPrefix(code, "set_draft_")
+		return "조치 " + n + "이(가) 임시 저장 상태입니다. 결과를 선택해 주세요"
+	}
+	if code == "set_draft" {
+		return "임시 저장 상태인 조치가 있습니다. 결과를 선택해 주세요"
+	}
+	switch code {
 	case "move_reason":
 		return "행정/지원으로 옮기려면 사유를 입력하세요."
 	case "move_done":
@@ -1965,6 +2115,8 @@ func actionErrMessage(code string) string {
 		return "원인분류를 선택하세요."
 	case "cause_cat1":
 		return "1차 분류를 선택하세요."
+	case "cause_cat1_input":
+		return "1차 분류를 입력하세요."
 	case "cause_cat2":
 		return "2차 분류를 선택하세요."
 	case "cause_cat3":
@@ -1981,10 +2133,28 @@ func actionErrMessage(code string) string {
 		return "처리유형이 미정이면 사유를 입력하세요."
 	case "process_type_mismatch":
 		return "근무구분에 맞는 처리유형을 선택하세요."
-	case "visit_date":
-		return "현장방문이면 방문일을 입력하세요."
+	case "visit_date", "work_date_required":
+		return "작업일을 입력하세요."
 	case "result_not_allowed":
-		return "완료 · 추가조치 필요 · 이관만 선택할 수 있습니다."
+		return "완료 · 추가 조치 필요 · 이관만 선택할 수 있습니다."
+	case "work_time_pair":
+		return "업무 시작 시간과 작업 시간을 함께 입력하세요"
+	case "work_time_midnight":
+		return "작업이 자정을 넘을 수 없습니다"
+	case "leave_before_end":
+		return "철수 시간은 완료 시간 이후여야 합니다"
+	case "leave_time_step", "start_time_step", "duration_step":
+		return "시간은 10분 단위로 입력하세요"
+	case "leave_time_required":
+		return "외근에서 철수 시간을 직접 입력하세요"
+	case "keyword_manual":
+		return "키워드 직접 입력을 확인하세요"
+	case "seg_shift":
+		return "끼워 넣은 업무의 실제 시간이 다음 구간과 겹칩니다. 후속 구간을 조정할까요?"
+	case "seg_merge":
+		return "이 업무는 여러 구간으로 나뉘어 있습니다. 방문 시간을 바꾸면 구간이 하나로 합쳐집니다"
+	case "seg_date":
+		return "사람별 구간이 있는 업무의 날짜를 옮기면 공통 구간 1개로 합칩니다"
 	case "time_spent":
 		return "소요시간은 일일 업무 등록에서 입력합니다."
 	case "revisit_date":
@@ -2122,6 +2292,12 @@ func (h *ASHandler) appendActionProcess(c echo.Context, as *model.ASReceipt, res
 	}
 	if prepNotes != "" {
 		notesParts = append(notesParts, "준비:"+prepNotes)
+	}
+	if posted, _ := c.Get("as_posted_sets").([]model.ASActionSet); len(posted) > 0 {
+		last := posted[len(posted)-1]
+		if lv := last.LeaveDisplay(); lv != "" {
+			notesParts = append(notesParts, lv)
+		}
 	}
 	worker := strings.TrimSpace(as.AssignedTo)
 	p := &model.ASProcess{

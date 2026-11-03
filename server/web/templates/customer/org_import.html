@@ -30,9 +30,9 @@
   <div class="card p-4 space-y-2">
     <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
     <p class="text-ui-sm">신규 {{.Preview.NewN}} · 건너뜀 {{.Preview.SkipN}} · 오류 {{.Preview.ErrN}}</p>
-    {{if .Preview.NeedParent}}<p class="text-ui-sm text-amber-800">상위 기관이 없는 행이 있습니다. 체크 후 다시 올리세요.</p>{{end}}
+    {{if .Preview.NeedParent}}<p class="text-ui-sm text-warning">상위 기관이 없는 행이 있습니다. 체크 후 다시 올리세요.</p>{{end}}
     <div class="overflow-x-auto">
-      <table class="min-w-full text-ui-sm">
+      <table data-table-cols-skip class="min-w-full text-ui-sm">
         <thead><tr><th class="text-left p-2">행</th><th class="text-left p-2">결과</th><th class="text-left p-2">상위</th><th class="text-left p-2">기관</th><th class="text-left p-2">안내</th></tr></thead>
         <tbody>
         {{range .Preview.Rows}}

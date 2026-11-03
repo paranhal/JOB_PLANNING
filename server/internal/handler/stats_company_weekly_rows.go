@@ -52,6 +52,9 @@ func (h *StatsHandler) CreateCompanyWeeklyRow(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	in := parseWeeklyRowForm(c, orgID)
+	if err := repository.AssertProjectRegisterAccess(h.repo.DB(), in.ProjectID, orgID); err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
 	key, err := h.repo.InsertWeeklyReportRow(in)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())

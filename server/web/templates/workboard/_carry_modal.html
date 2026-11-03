@@ -1,0 +1,62 @@
+{{define "carry_modal"}}
+<div id="carry-modal" hidden class="hidden modal-backdrop z-[90] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="carry-title">
+  <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+    <h2 id="carry-title" class="text-ui font-bold text-ink">업무 이월</h2>
+    <p id="carry-task-title" class="mt-2 text-ui font-semibold text-ink"></p>
+    <p id="carry-task-sched" class="mt-1 text-ui-sm text-ink-muted"></p>
+    <p id="carry-task-delay" class="mt-1 text-ui-sm text-danger hidden"></p>
+    <form id="carry-form" method="post" action="" class="mt-4 space-y-3">
+      <input type="hidden" name="redirect" id="carry-redirect" value="">
+      <input type="hidden" name="back" id="carry-back" value="">
+      <div id="carry-single-wrap">
+        <label class="label" for="carry-new-date">새 날짜</label>
+        <input type="date" class="input" name="new_date" id="carry-new-date"
+               min="{{if .CarryMinDate}}{{.CarryMinDate}}{{end}}"
+               value="{{if .CarryDefaultDate}}{{.CarryDefaultDate}}{{end}}">
+      </div>
+      <div id="carry-span-wrap" class="hidden space-y-3">
+        <div>
+          <label class="label" for="carry-new-due">새 종료일</label>
+          <input type="date" class="input" name="new_due_date" id="carry-new-due"
+                 min="{{if .CarryMinDate}}{{.CarryMinDate}}{{end}}"
+                 value="{{if .CarryDefaultDate}}{{.CarryDefaultDate}}{{end}}">
+        </div>
+      </div>
+      <p id="carry-skip" class="text-ui-sm text-ink-muted {{if not .CarrySkipNotice}}hidden{{end}}">{{.CarrySkipNotice}}</p>
+      <p id="carry-partial-leave" class="text-ui-sm text-warning {{if not .CarryPartialLeave}}hidden{{end}}">{{.CarryPartialLeave}}</p>
+      <p id="carry-holiday" class="text-ui-sm text-warning {{if not .CarryHoliday}}hidden{{end}}"
+         data-next="{{.CarryNextWorkday}}" data-holiday="{{if .CarryHoliday}}1{{else}}0{{end}}">
+        선택한 날은 휴무일입니다. 다음 영업일 {{.CarryNextWorkday}}로 바꾸기
+        <button type="button" class="btn btn-secondary btn-sm" id="carry-hol-change">바꾸기</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="carry-hol-keep">그대로</button>
+      </p>
+      <div>
+        <label class="label" for="carry-reason">지연 사유</label>
+        <textarea class="input min-h-[5rem]" name="delay_reason" id="carry-reason" rows="3"></textarea>
+        <p id="carry-reason-err" class="mt-1 text-ui-sm text-danger hidden">지연 사유를 입력하세요</p>
+      </div>
+      <p id="carry-form-err" class="text-ui-sm text-danger hidden"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-ghost" id="carry-cancel">취소</button>
+        <button type="submit" class="btn btn-primary" id="carry-submit">확인</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="delay-reason-modal" hidden class="hidden modal-backdrop z-[90] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="delay-reason-title">
+  <div class="modal-panel w-full max-w-md shadow-pop">
+    <h2 id="delay-reason-title" class="text-ui font-bold text-ink">지연 사유</h2>
+    <form id="delay-reason-form" method="post" action="" class="mt-4 space-y-3">
+      <input type="hidden" name="redirect" id="delay-reason-redirect" value="">
+      <textarea class="input min-h-[5rem]" name="delay_reason" id="delay-reason-text" rows="3"></textarea>
+      <p id="delay-reason-err" class="text-ui-sm text-danger hidden">지연 사유를 입력하세요</p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-ghost" id="delay-reason-cancel">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}

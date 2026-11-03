@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시뮬레이션 · 정기점검 조치 (방문 시간·소요 시간·저장 팝업)</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--line:#e2e8f0;--ink:#1e293b;--mute:#64748b;--sky:#0284c7;--sky-d:#0369a1;--green:#15803d;--green-bg:#dcfce7;--amber-bg:#fef3c7;--amber:#92400e;--red:#b91c1c;--red-bg:#fee2e2;--ind:#4f46e5;--side:#141b2d}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+.note{background:#fffbeb;border-bottom:1px solid #fde68a;color:#78350f;padding:10px 20px;font-size:13px;line-height:1.5}
+.note b{color:#451a03}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 60px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.head{padding:16px 20px}
+.head a{color:var(--mute);font-size:13px;text-decoration:none}
+.head h2{margin:4px 8px 0 0;font-size:20px;display:inline-block}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;margin-right:4px}
+.b-sky{background:#e0f2fe;color:#075985}.b-amber{background:var(--amber-bg);color:var(--amber)}.b-green{background:var(--green-bg);color:#166534}
+.head p{margin:6px 0 0;color:var(--mute)}
+.head .mono{font-family:ui-monospace,Menlo,monospace;color:var(--ink)}
+.form{padding:18px 20px}
+.form h3{margin:0 0 4px;font-size:14px}
+.hint{font-size:12px;color:var(--mute);margin:0 0 14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.full{grid-column:1/-1}
+label.l{display:block;font-weight:600;font-size:13px;margin-bottom:5px;color:#334155}
+input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font:inherit;background:#fff;color:var(--ink)}
+textarea{resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid #7dd3fc;outline-offset:0}
+.timebox{border:1px solid var(--line);background:#f8fafc;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.timebox .t{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.timebox .t b{font-size:13px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:560px){.row3{grid-template-columns:1fr}}
+.sub{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.chip{border:1px solid #cbd5e1;background:#fff;border-radius:99px;padding:3px 10px;font-size:12px;cursor:pointer;color:#334155}
+.chip:hover{background:#f1f5f9}.chip.on{background:#e0f2fe;border-color:#7dd3fc;color:#075985;font-weight:600}
+.now{border:1px solid var(--sky);color:var(--sky-d);background:#fff;border-radius:9px;padding:0 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+.inl{display:flex;gap:6px}
+.dur{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #bae6fd;border-radius:10px;padding:10px 12px}
+.dur .big{font-size:18px;font-weight:700;color:var(--sky-d);font-variant-numeric:tabular-nums}
+.dur small{color:var(--mute)}
+.warn{font-size:12px;color:var(--red);margin-top:4px;min-height:16px}
+.foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.btn{border-radius:9px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer;border:1px solid transparent}
+.btn.done{border-color:#16a34a;color:#166534;background:#fff}.btn.done:hover{background:#f0fdf4}
+.btn.save{background:var(--sky);color:#fff}.btn.save:hover{background:var(--sky-d)}
+.btn.ghost{background:#fff;border-color:#cbd5e1;color:#334155}
+.btn.ind{background:var(--ind);color:#fff}
+.bk{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.bk.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:440px;padding:22px 22px 18px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal h4{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:8px}
+.ico{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;font-size:15px}
+.ico.ok{background:var(--green-bg);color:var(--green)}.ico.err{background:var(--red-bg);color:var(--red)}
+.sum{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0 14px;font-size:13px}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+.sum span:first-child{color:var(--mute)}
+.sum b{font-variant-numeric:tabular-nums}
+.macts{display:flex;justify-content:flex-end;gap:8px}
+.legend{font-size:12px;color:var(--mute);padding:0 4px;line-height:1.6}
+.legend b{color:#334155}
+.tag{display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:6px;font-size:11px;padding:1px 6px;margin-left:6px;font-weight:700;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="note"><b>시뮬레이션 화면입니다.</b> 실제 저장은 되지 않습니다. 시간을 바꿔 보고 「저장」·「방문 완료 처리」를 눌러 팝업을 확인하세요. 새로 생기는 부분에 <span class="tag">NEW</span> 표시를 했습니다.</div>
+
+<div class="wrap">
+  <div class="card head">
+    <a href="#" onclick="return false">← 업무 관리</a><br>
+    <h2>서산고등학교</h2><span class="badge b-sky">정기점검</span><span class="badge b-amber" id="stBadge">예정</span>
+    <p>예정일 <span class="mono">2026-10-12</span> · K-LAS</p>
+  </div>
+
+  <form class="card" id="f" onsubmit="return false">
+    <div class="form">
+      <h3>방문 조치</h3>
+      <p class="hint">이 방문 건만 처리합니다. 연간 목록이 아니라 조치 화면입니다.</p>
+      <div class="grid">
+        <div><label class="l">예정일</label><input type="date" id="vdate" value="2026-10-12"></div>
+        <div><label class="l">담당자</label>
+          <select id="asg"><option>— 선택 —</option><option selected>유대성</option><option>박창훈</option><option>김상현</option></select></div>
+        <div><label class="l">사업명</label>
+          <select><option>2026년 충청남도교육청 테크센터 운영 사업</option></select></div>
+        <div><label class="l">점검 대상</label><input type="text" value="K-LAS" placeholder="점검 제품"></div>
+
+        <div class="full">
+          <div class="timebox">
+            <div class="t"><b>방문 시간 · 소요 시간 <span class="tag">NEW</span></b>
+              <span class="hint" style="margin:0">시작·종료를 넣으면 소요 시간이 자동 계산됩니다</span></div>
+            <div class="row3">
+              <div>
+                <label class="l">방문(도착) 시각</label>
+                <div class="inl"><input type="time" id="st" value="10:00"><button type="button" class="now" onclick="nowTo('st')">지금</button></div>
+              </div>
+              <div>
+                <label class="l">작업 종료 시각</label>
+                <div class="inl"><input type="time" id="et" value="11:30"><button type="button" class="now" onclick="nowTo('et')">지금</button></div>
+              </div>
+              <div>
+                <label class="l">이동 시간 <small style="font-weight:400;color:var(--mute)">(편도·선택)</small></label>
+                <div class="inl"><input type="number" id="mv" min="0" step="5" value="40" style="text-align:right"><span style="align-self:center;color:var(--mute)">분</span></div>
+              </div>
+            </div>
+            <div class="dur">
+              <div><small>현장 소요 시간</small><div class="big" id="durTxt">1시간 30분</div></div>
+              <div style="margin-left:auto;text-align:right"><small>이동 포함 총 시간</small><div class="big" id="totTxt" style="color:#334155">2시간 50분</div></div>
+            </div>
+            <div class="sub" id="chips">
+              <span style="font-size:12px;color:var(--mute);align-self:center">소요 시간 빠른 입력</span>
+              <button type="button" class="chip" data-m="30">30분</button>
+              <button type="button" class="chip" data-m="60">1시간</button>
+              <button type="button" class="chip" data-m="90">1시간 30분</button>
+              <button type="button" class="chip" data-m="120">2시간</button>
+              <button type="button" class="chip" data-m="180">3시간</button>
+              <button type="button" class="chip" data-m="240">4시간</button>
+            </div>
+            <div class="warn" id="warn"></div>
+            <div style="font-size:12px;color:var(--mute)">시작 시각을 넣고 소요 시간 칩을 누르면 종료 시각이 자동으로 채워집니다. 시간을 모르면 비워 둘 수 있습니다(선택).</div>
+          </div>
+        </div>
+
+        <div><label class="l">상태</label>
+          <select id="status"><option value="open">예정</option><option value="done">방문 완료</option></select></div>
+        <div class="full" id="doneWrap" style="display:none"><label class="l">실제 방문일</label><input type="date" id="cdate" value="2026-10-12" style="max-width:220px"></div>
+        <div class="full"><label class="l">조치·비고</label><textarea id="note" rows="4" placeholder="점검 결과·특이사항">점검 결과 이상 없음</textarea></div>
+      </div>
+    </div>
+    <div class="foot">
+      <button type="button" class="btn done" id="btnDone">방문 완료 처리</button>
+      <button type="button" class="btn save" id="btnSave">저장</button>
+    </div>
+  </form>
+
+  <div class="legend">
+    <b>추가·변경 요약</b><br>
+    ① <b>방문(도착) 시각 · 작업 종료 시각 · 이동 시간</b> 입력 칸, <b>현장 소요 시간 자동 계산</b>(이동 포함 총 시간도 표시), 소요 시간 빠른 입력 칩, 「지금」 버튼.<br>
+    ② 「저장」·「방문 완료 처리」를 누르면 <b>화면 가운데 팝업</b>으로 결과를 알려 줍니다(접수번호·사이트·시간 요약). 저장 실패·시간 오류도 팝업으로 이유를 보여 줍니다.<br>
+    ③ 업무 관리의 정기점검 일일 업무에도 같은 시간·소요 시간이 표시됩니다(일정 칸 「10/12 (월) 10:00~11:30」).
+  </div>
+</div>
+
+<!-- 성공 팝업 -->
+<div class="bk" id="okBk" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h4><span class="ico ok">✓</span><span id="okTitle">저장되었습니다.</span></h4>
+    <div class="sum" id="okSum"></div>
+    <div class="macts">
+      <button class="btn ghost" onclick="closeAll()">계속 수정</button>
+      <button class="btn ind" onclick="closeAll()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 오류 팝업 (예: 사진의 「확인해 주세요」 스타일) -->
+<div class="bk" id="errBk" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h4><span class="ico err">!</span>확인해 주세요</h4>
+    <p id="errMsg" style="margin:0 0 16px;line-height:1.55"></p>
+    <div class="macts"><button class="btn ind" onclick="closeAll()">확인</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  function toMin(v){if(!v)return null;var p=v.split(':');return +p[0]*60+ +p[1]}
+  function fmtMin(m){if(m==null||isNaN(m))return '—';var h=Math.floor(m/60),r=m%60;return (h?h+'시간 ':'')+(r||!h?r+'분':'')}
+  function fmtT(m){var h=Math.floor(m/60)%24,r=m%60;return (h<10?'0':'')+h+':'+(r<10?'0':'')+r}
+  function calc(){
+    var s=toMin($('st').value),e=toMin($('et').value),mv=parseInt($('mv').value||'0',10)||0,w='';
+    var d=null;
+    if(s!=null&&e!=null){ if(e<=s){w='종료 시각이 방문 시각보다 빠르거나 같습니다.'} else d=e-s }
+    $('durTxt').textContent=d==null?'—':fmtMin(d);
+    $('totTxt').textContent=d==null?'—':fmtMin(d+mv*2);
+    $('warn').textContent=w;
+    var chips=document.querySelectorAll('.chip');
+    for(var i=0;i<chips.length;i++){chips[i].classList.toggle('on',d!=null&&+chips[i].dataset.m===d)}
+    return {d:d,w:w,s:s,e:e,mv:mv};
+  }
+  window.nowTo=function(id){var n=new Date();var v=(n.getHours()<10?'0':'')+n.getHours()+':'+(n.getMinutes()<10?'0':'')+n.getMinutes();$(id).value=v;calc()};
+  ['st','et','mv'].forEach(function(i){$(i).addEventListener('input',calc)});
+  document.getElementById('chips').addEventListener('click',function(ev){
+    var b=ev.target.closest('.chip');if(!b)return;
+    var s=toMin($('st').value);if(s==null){showErr('먼저 방문(도착) 시각을 입력하세요.');return}
+    $('et').value=fmtT(s+ +b.dataset.m);calc();
+  });
+  $('status').addEventListener('change',function(){$('doneWrap').style.display=this.value==='done'?'block':'none'});
+  function closeAll(){$('okBk').classList.remove('show');$('errBk').classList.remove('show')}
+  window.closeAll=closeAll;
+  function showErr(m){$('errMsg').textContent=m;$('errBk').classList.add('show')}
+  function validate(){
+    if($('asg').value.indexOf('선택')>=0){showErr('담당자를 선택하세요.');return null}
+    var r=calc();
+    if(r.w){showErr(r.w+' 시간을 확인해 주세요.');return null}
+    return r;
+  }
+  function summary(r,done){
+    var rows=[['사이트','서산고등학교'],['점검 대상','K-LAS'],['담당자',$('asg').value],
+      ['방문일',(done?$('cdate').value:$('vdate').value)],
+      ['방문 시간',(r.s!=null?fmtT(r.s):'—')+' ~ '+(r.e!=null?fmtT(r.e):'—')],
+      ['현장 소요 시간',r.d!=null?fmtMin(r.d):'—'],
+      ['상태',done?'방문 완료':'예정']];
+    $('okSum').innerHTML=rows.map(function(x){return '<div><span>'+x[0]+'</span><b>'+x[1]+'</b></div>'}).join('');
+  }
+  $('btnSave').addEventListener('click',function(){
+    var r=validate();if(!r)return;
+    var done=$('status').value==='done';
+    $('okTitle').textContent='저장되었습니다.';summary(r,done);$('okBk').classList.add('show');
+  });
+  $('btnDone').addEventListener('click',function(){
+    var r=validate();if(!r)return;
+    $('status').value='done';$('doneWrap').style.display='block';
+    $('stBadge').textContent='방문 완료';$('stBadge').className='badge b-green';
+    $('okTitle').textContent='방문 완료 처리되었습니다.';summary(r,true);$('okBk').classList.add('show');
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll()});
+  calc();
+})();
+</script>
+</body>
+</html>

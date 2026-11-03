@@ -47,34 +47,34 @@ func TestNavRoleVisibilityTable(t *testing.T) {
 		{
 			name: "비전",
 			ctx:  visionMenuCtx(),
-			want: []string{"/exec", "/", "/work", "/work-groups", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/stats/company-weekly", "/admin/users", "/admin/system", "/admin/test-stats"},
+			want: []string{"/exec", "/", "/work", "/work-groups", "/meeting/board", "/meeting/weekly", "/meeting/weekly/me", "/approvals/inbox", "/leaves", "/as", "/sales/dashboard", "/quotes", "/projects", "/stats", "/stats/company-weekly", "/admin/users", "/admin/system", "/admin/test-stats"},
 			hide: []string{"/account", "/admin-work", "/plan/unplanned", "/work-status"},
 		},
 		{
 			name: "조직관리자",
 			ctx: MenuCtx{Role: model.RoleOrgAdmin, LoginRole: model.RoleOrgAdmin, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleOrgAdmin)},
-			want: []string{"/", "/work", "/work-groups", "/as", "/meeting/weekly", "/meeting/weekly/me", "/admin/users", "/admin/holidays", "/stats", "/stats/company-weekly", "/stats/reports"},
+			want: []string{"/", "/work", "/work-groups", "/as", "/meeting/board", "/meeting/weekly", "/meeting/weekly/me", "/admin/users", "/admin/holidays", "/stats", "/stats/company-weekly", "/stats/reports"},
 			hide: []string{"/admin/system", "/admin/data", "/admin/permissions"},
 		},
 		{
 			name: "영업",
 			ctx: MenuCtx{Role: model.RoleSales, LoginRole: model.RoleSales, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleSales)},
-			want: []string{"/", "/work", "/work-groups", "/as", "/sales?view=pipeline", "/items", "/meeting/weekly/me"},
+			want: []string{"/", "/work", "/work-groups", "/as", "/sales?view=pipeline", "/items", "/meeting/board", "/meeting/weekly/me"},
 			hide: []string{"/admin/users", "/admin/system", "/meeting/weekly"},
 		},
 		{
 			name: "기술",
 			ctx: MenuCtx{Role: model.RoleTech, LoginRole: model.RoleTech, ShowProjects: true,
 				Perms: model.DefaultPermissions(model.RoleTech)},
-			want: []string{"/", "/work", "/work-groups", "/as", "/maintenance", "/meeting/weekly/me"},
+			want: []string{"/", "/work", "/work-groups", "/as", "/maintenance", "/meeting/board", "/meeting/weekly/me"},
 			hide: []string{"/admin/users", "/maintenance/sites", "/meeting/weekly"},
 		},
 		{
 			name: "읽기전용",
 			ctx:  MenuCtx{Role: model.RoleTech, LoginRole: model.RoleTech, IsReadOnly: true, ShowProjects: true},
-			want: []string{"/", "/work", "/work-groups", "/as", "/meeting/weekly/me"},
+			want: []string{"/", "/work", "/work-groups", "/as", "/meeting/board", "/meeting/weekly/me"},
 			hide: []string{"/admin/users", "/meeting/weekly"},
 		},
 		{
@@ -203,6 +203,9 @@ func TestNavActiveExactlyOnePerMenuKey(t *testing.T) {
 	var walk func([]navDefItem)
 	walk = func(items []navDefItem) {
 		for _, it := range items {
+			if it.Show != nil && !it.Show(ctx) {
+				continue
+			}
 			if len(it.Active) > 0 && it.Href != "" {
 				keys = append(keys, it.Active[0])
 			}
@@ -247,12 +250,12 @@ func TestNavAutoExpandCurrentMoreAndParent(t *testing.T) {
 		t.Fatalf("전체 업무 그룹=%s", work.CurGroup)
 	}
 	meet := FilterNav(ctx, NavMeetingWeekly, NavBadges{})
-	if !containsHref(meet.CurParents, "work_meeting") {
-		t.Fatal("주간 회의는 업무 회의 자동 펼침")
+	if !containsHref(meet.CurParents, "legacy_views") {
+		t.Fatal("주간 회의 (예전) 은 예전 화면 보기 자동 펼침")
 	}
 	me := FilterNav(ctx, NavMeetingWeeklyMe, NavBadges{})
-	if !containsHref(me.CurParents, "work_meeting") {
-		t.Fatal("내 자료는 업무 회의 자동 펼침")
+	if !containsHref(me.CurParents, "legacy_views") {
+		t.Fatal("내 자료 (예전) 은 예전 화면 보기 자동 펼침")
 	}
 }
 

@@ -103,10 +103,14 @@ func TestUnplannedKanbanCountsMatchList(t *testing.T) {
 			t.Errorf("열 %s 없음", col)
 		}
 	}
-	listN := strings.Count(lb, `class="hover:bg-gray-50`)
 	kanbanN := strings.Count(kb, `data-item-key="`)
-	if listN == 0 || listN != kanbanN {
-		t.Fatalf("리스트 %d 칸반 %d", listN, kanbanN)
+	if kanbanN != 5 {
+		t.Fatalf("칸반 카드 %d", kanbanN)
+	}
+	for _, id := range []string{"AS-NODATE", "AS-DELAY", "AS-NEXT", "AS-UNAS", "AS-REV"} {
+		if !strings.Contains(lb, id) || !strings.Contains(kb, id) {
+			t.Fatalf("리스트·칸반에 %s 없음", id)
+		}
 	}
 }
 

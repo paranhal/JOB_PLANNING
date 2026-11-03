@@ -16,7 +16,7 @@ func TestSalesChangeStageAllowDenyAndFreeze(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{Name: "규칙 사업", BidEvalMethod: "lowest"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "규칙 사업", BidEvalMethod: "lowest"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestSalesChangeStageAllowDenyAndFreeze(t *testing.T) {
 		t.Fatal("되돌린 뒤 동결이 남았다")
 	}
 
-	noEval := &model.SalesProject{Name: "평가 없음"}
+	noEval := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "평가 없음"}
 	if err := repo.Create(noEval); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestSalesChangeStageAllowDenyAndFreeze(t *testing.T) {
 	if err := repo.ChangeStage(noEval.SalesID, model.SalesStage4Bid, "", "u1", "테스터", false); err == nil {
 		t.Fatal("평가방법 없이 입찰로 갔다")
 	}
-	priv := &model.SalesProject{Name: "민간", ProcurementRoute: "private"}
+	priv := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "민간", ProcurementRoute: "private"}
 	if err := repo.Create(priv); err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestSalesChangeStageAllowDenyAndFreeze(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	direct := &model.SalesProject{Name: "바로 수주"}
+	direct := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "바로 수주"}
 	if err := repo.Create(direct); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestSalesChangeStageAllowDenyAndFreeze(t *testing.T) {
 		t.Fatalf("바로 수주 %+v %s", dw.Stage, dw.BidStatus)
 	}
 
-	closed := &model.SalesProject{Name: "종료 거부"}
+	closed := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "종료 거부"}
 	if err := repo.Create(closed); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestCloseContractedAllowsZeroAmount(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "무상계약"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "무상계약"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{Name: "입찰 결과", BidEvalMethod: "lowest"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "입찰 결과", BidEvalMethod: "lowest"}
 	_ = repo.Create(p)
 	_ = repo.ChangeStage(p.SalesID, model.SalesStage4Propose, "", "u1", "t", false)
 	_ = repo.ChangeStage(p.SalesID, model.SalesStage4Bid, "", "u1", "t", false)
@@ -163,7 +163,7 @@ func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 	if !model.CanPromoteSales(done) || done.DealType == model.SalesDealSupply && !model.CanPromoteSales(done) {
 		t.Fatal("계약 종료 후 승격 불가")
 	}
-	supply := &model.SalesProject{Name: "단품 계약", DealType: model.SalesDealSupply}
+	supply := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "단품 계약", DealType: model.SalesDealSupply}
 	_ = repo.Create(supply)
 	_ = repo.ChangeStage(supply.SalesID, model.SalesDirectWin, "", "u1", "t", false)
 	_ = repo.CloseContracted(supply.SalesID, "2026-09-02", 100, "u1", "t")
@@ -172,7 +172,7 @@ func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 		t.Fatal("단품 납품은 사업관리로 넘기지 않는다")
 	}
 
-	fail := &model.SalesProject{Name: "결렬", BidEvalMethod: "lowest"}
+	fail := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "결렬", BidEvalMethod: "lowest"}
 	_ = repo.Create(fail)
 	_ = repo.ChangeStage(fail.SalesID, model.SalesDirectWin, "", "u1", "t", false)
 	if err := repo.CloseNegotiationFailed(fail.SalesID, "단가", "u1", "t"); err != nil {
@@ -194,7 +194,7 @@ func TestSalesBidResultClosePromoteAndWinRate(t *testing.T) {
 	}
 
 	old := time.Now().AddDate(0, 0, -40).Format("2006-01-02")
-	unsigned := &model.SalesProject{Name: "미계약"}
+	unsigned := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "미계약"}
 	_ = repo.Create(unsigned)
 	_ = repo.ChangeStage(unsigned.SalesID, model.SalesDirectWin, "", "u1", "t", false)
 	_, _ = db.Exec(`UPDATE sales_projects SET won_at=? WHERE sales_id=?`, old, unsigned.SalesID)
@@ -211,7 +211,7 @@ func TestSalesOrderWonDeliveryDoesNotClose(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "발주연동", BidEvalMethod: "lowest"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "발주연동", BidEvalMethod: "lowest"}
 	_ = repo.Create(p)
 	_ = repo.ChangeStage(p.SalesID, model.SalesStage4Propose, "", "u1", "t", false)
 	_ = repo.ChangeStage(p.SalesID, model.SalesStage4Bid, "", "u1", "t", false)

@@ -2,6 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -293,29 +296,104 @@ func TestLoginTemplateDoesNotPullKanbanPartials(t *testing.T) {
 }
 
 func TestMainListensBeforeHousekeeping(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join("cmd", "server", "main.go"))
+	src, err := os.ReadFile(filepath.Join("cmd", "server", "main.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(b)
-	if !strings.Contains(s, "go repository.RunWorkListHousekeeping(db)") {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "cmd/server/main.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fn *ast.FuncDecl
+	for _, d := range f.Decls {
+		fd, ok := d.(*ast.FuncDecl)
+		if ok && fd.Name.Name == "main" {
+			fn = fd
+			break
+		}
+	}
+	if fn == nil || fn.Body == nil {
+		t.Fatal("main 함수가 없다")
+	}
+	hkGo, startGo := false, false
+	syncHK := false
+	hasSIGTERM, hasWAL, deferClose := false, false, false
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.GoStmt:
+			if callHasSel(x.Call, "repository", "RunWorkListHousekeeping") {
+				hkGo = true
+			}
+			if callHasSel(x.Call, "e", "Start") {
+				startGo = true
+			}
+			if cl, ok := x.Call.Fun.(*ast.FuncLit); ok && cl.Body != nil {
+				ast.Inspect(cl.Body, func(inner ast.Node) bool {
+					if c, ok := inner.(*ast.CallExpr); ok && callHasSel(c, "e", "Start") {
+						startGo = true
+					}
+					return true
+				})
+			}
+		case *ast.CallExpr:
+			if callHasSel(x, "repository", "RunWorkListHousekeeping") {
+				syncHK = true
+			}
+			if callHasSel(x, "signal", "Notify") {
+				for _, a := range x.Args {
+					if sel, ok := a.(*ast.SelectorExpr); ok && sel.Sel.Name == "SIGTERM" {
+						hasSIGTERM = true
+					}
+				}
+			}
+			if bl, ok := firstArgBasic(x); ok && strings.Contains(bl, "wal_checkpoint(TRUNCATE)") {
+				hasWAL = true
+			}
+		case *ast.DeferStmt:
+			if callHasSel(x.Call, "db", "Close") {
+				deferClose = true
+			}
+		}
+		return true
+	})
+	if !hkGo {
 		t.Fatal("기동 정리가 리슨을 막으면 로그인부터 느려진다")
 	}
-	idxHK := strings.Index(s, "go repository.RunWorkListHousekeeping(db)")
-	idxStart := strings.Index(s, "e.Start")
-	if idxHK < 0 || idxStart < 0 || idxHK > idxStart {
-		t.Fatal("일일업무 정리는 e.Start 앞에서 백그라운드로 돌려야 한다")
+	if !startGo {
+		t.Fatal("e.Start 는 고루틴으로 리슨해야 한다")
 	}
-	if strings.Contains(s, "repository.RunWorkListHousekeeping(db)\n") &&
-		!strings.Contains(s, "go repository.RunWorkListHousekeeping(db)") {
+	if syncHK && !hkGo {
 		t.Fatal("정리가 동기 호출로 남아 있다")
 	}
-	if !strings.Contains(s, "syscall.SIGTERM") || !strings.Contains(s, "wal_checkpoint(TRUNCATE)") {
+	if !hasSIGTERM || !hasWAL {
 		t.Fatal("SIGTERM 종료 시 WAL TRUNCATE 가 있어야 한다")
 	}
-	if strings.Contains(s, "defer db.Close()") {
+	if deferClose {
 		t.Fatal("db.Close 는 종료 경로에서 한 번만 호출한다")
 	}
+}
+
+func callHasSel(c *ast.CallExpr, pkg, name string) bool {
+	if c == nil {
+		return false
+	}
+	sel, ok := c.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel == nil || sel.Sel.Name != name {
+		return false
+	}
+	id, ok := sel.X.(*ast.Ident)
+	return ok && id.Name == pkg
+}
+
+func firstArgBasic(c *ast.CallExpr) (string, bool) {
+	if c == nil || len(c.Args) == 0 {
+		return "", false
+	}
+	if lit, ok := c.Args[0].(*ast.BasicLit); ok {
+		return lit.Value, true
+	}
+	return "", false
 }
 
 func TestDockerfileInjectsLdflags(t *testing.T) {

@@ -18,7 +18,7 @@ func TestFillCustomerSalesView(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := NewSalesRepo(db)
-	open := &model.SalesProject{
+	open := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "진행", CustomerID: "C1", Stage: model.SalesStageLead, Status: model.SalesStatusActive,
 	}
 	if err := repo.Create(open); err != nil {

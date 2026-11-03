@@ -35,6 +35,11 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 	if strings.TrimSpace(as.Status) == "cancelled" {
 		return r.DeleteTasksBySource(model.WBSourceAS, as.ASID)
 	}
+	// 95-82: 작업 항목에 연결된 AS 는 상위 작업 일정 안에서만 수행한다.
+	// ReconcileASDailyTasks / SyncASDailyTask 가 별도 work_tasks 막대를 만들지 않게 기존 일일업무도 지운다.
+	if r.ASLinkedToWorkItem(as.ASID) {
+		return r.DeleteTasksBySource(model.WBSourceAS, as.ASID)
+	}
 	assignee := strings.TrimSpace(as.AssignedTo)
 	assigneeUID := strings.TrimSpace(as.AssignedUserID)
 	existing, err := r.GetTaskBySource(model.WBSourceAS, as.ASID)
@@ -93,7 +98,8 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 		existing.CustomerID = as.CustomerID
 	}
 	existing.DueDate = visit
-	if strings.TrimSpace(existing.StartTime) == "" {
+	nSeg, _ := r.CountStoredPlanSegments(existing.TaskID)
+	if nSeg == 0 && strings.TrimSpace(existing.StartTime) == "" {
 		existing.WorkDate = visit
 	}
 	if model.RequireAppDateYear(existing.WorkDate) != nil {

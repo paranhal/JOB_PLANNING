@@ -28,7 +28,11 @@ func TestListTasksBetweenUsesWorkDateOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Title != "오늘" {
+	titles := map[string]bool{}
+	for _, tsk := range got {
+		titles[tsk.Title] = true
+	}
+	if !titles["오늘"] || !titles["미배정"] || titles["어제"] || titles["상위"] {
 		t.Fatalf("got=%+v", got)
 	}
 }
@@ -43,19 +47,23 @@ func TestListTasksNeedingAutoPlaceAndPlacedKeys(t *testing.T) {
 	need := &model.WorkTask{
 		WorkType: model.WBWorkAS, Title: "올릴것", WorkDate: "2026-10-19",
 		Status: model.WBTaskWaiting, SourceType: model.WBSourceAS, SourceID: "A1",
+		OrgID: model.OrgIDLibrary,
 	}
 	placed := &model.WorkTask{
 		WorkType: model.WBWorkAS, Title: "이미", WorkDate: "2026-10-19",
 		StartTime: "09:00", EndTime: "09:30", Status: model.WBTaskWaiting,
 		SourceType: model.WBSourceAS, SourceID: "A2",
+		OrgID: model.OrgIDLibrary,
 	}
 	done := &model.WorkTask{
 		WorkType: model.WBWorkAS, Title: "완료", WorkDate: "2026-10-19",
 		Status: model.WBTaskComplete, SourceType: model.WBSourceAS, SourceID: "A3",
+		OrgID: model.OrgIDLibrary,
 	}
 	otherDay := &model.WorkTask{
 		WorkType: model.WBWorkAS, Title: "다른날", WorkDate: "2026-10-20",
 		Status: model.WBTaskWaiting, SourceType: model.WBSourceAS, SourceID: "A4",
+		OrgID: model.OrgIDLibrary,
 	}
 	for _, tsk := range []*model.WorkTask{need, placed, done, otherDay} {
 		if err := wb.CreateTask(tsk); err != nil {

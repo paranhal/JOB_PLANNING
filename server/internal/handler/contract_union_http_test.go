@@ -16,7 +16,7 @@ import (
 func TestContractsHTTP_UnionAndAmountInput(t *testing.T) {
 	e, db := newSalesServerDB(t)
 	srepo := repository.NewSalesRepo(db)
-	p := &model.SalesProject{Name: "미전환계약", ProspectName: "세종", ExpectedAmount: 220000}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "미전환계약", ProspectName: "세종", ExpectedAmount: 220000}
 	if err := srepo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestContractsHTTP_UnionAndAmountInput(t *testing.T) {
 		t.Fatalf("읽기 전용 POST status=%d", roRec.Code)
 	}
 
-	wp := &model.WorkProject{Name: "상세회귀", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 100}
+	wp := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "상세회귀", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 100}
 	if err := repository.NewProjectRepo(db).Create(wp); err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestContractsHTTP_UnionAndAmountInput(t *testing.T) {
 func TestSalesHTTP_UnpromotedBadge(t *testing.T) {
 	e, db := newSalesServerDB(t)
 	srepo := repository.NewSalesRepo(db)
-	p := &model.SalesProject{Name: "배지계약"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "배지계약"}
 	if err := srepo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestContractsHTTP_LinkSuggest(t *testing.T) {
 	e, db := newSalesServerDB(t)
 	srepo := repository.NewSalesRepo(db)
 	prepo := repository.NewProjectRepo(db)
-	s := &model.SalesProject{Name: "연결확인사업"}
+	s := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "연결확인사업"}
 	if err := srepo.Create(s); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestContractsHTTP_LinkSuggest(t *testing.T) {
 		model.SalesStage4Closed, model.SalesCloseContracted, 1000, "S2609-099", s.SalesID); err != nil {
 		t.Fatal(err)
 	}
-	w := &model.WorkProject{Name: "연결확인사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 2000}
+	w := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "연결확인사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 2000}
 	if err := prepo.Create(w); err != nil {
 		t.Fatal(err)
 	}

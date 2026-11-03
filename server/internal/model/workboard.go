@@ -54,6 +54,7 @@ const (
 // 업무 등록 일정표에 올리는 카드의 출처. 빈 값은 행정관련 업무(직접 등록).
 const (
 	WBSourceAS            = "as"
+	WBSourceASWork        = "as_work"
 	WBSourceMaintenance   = "maintenance"
 	WBSourceSalesActivity = "sales_activity"
 	WBSourceSales         = "sales"
@@ -120,29 +121,29 @@ func WBCategoryClass(cat string) string {
 
 // WBCard 업무 등록 화면의 카드 (일정표에 배치할 대상 · 배치된 업무 공통)
 type WBCard struct {
-	Kind         string `json:"kind"`          // as | maintenance | task
-	RefID        string `json:"ref_id"`        // as_id / visit_id / task_id
-	Category     string `json:"category"`      // as | maintenance | sales_activity | admin
-	Title        string `json:"title"`         // 카드 본문 ([AS]고객명 · [영업]제목 등)
-	SubTitle     string `json:"sub_title"`     // 증상·설명
-	ProductType  string `json:"product_type"`  // 정기점검 점검 대상(색 구분용)
-	SourceNumber string `json:"source_number"` // AS 접수번호 / 정기점검 방문번호
-	SourceHref   string `json:"source_href"`   // 원본 화면 링크(연간 일정 등)
-	ActionHref   string `json:"action_href"`   // 조치 화면(있으면 DetailHref 우선)
-	Assignee     string `json:"assignee"`
-	WorkDate     string `json:"work_date"`
-	StartTime    string `json:"start_time"`
-	EndTime      string `json:"end_time"`
-	DurationMin  int    `json:"duration_min"`
-	PlannedDay   string `json:"planned_day"`
-	TaskID       string `json:"task_id"`
-	ParentTaskID string `json:"parent_task_id,omitempty"`
-	Status       string `json:"status,omitempty"`       // 업무처리현황 등 표시용
-	StatusLabel  string `json:"status_label,omitempty"` // 완료·부분완료 등
-	ProjectID      string `json:"project_id,omitempty"`
-	WorkGroupName  string `json:"work_group_name,omitempty"`
-	Unassigned     bool   `json:"unassigned,omitempty"`
-	Dimmed       bool   `json:"dimmed,omitempty"`
+	Kind          string `json:"kind"`          // as | maintenance | task
+	RefID         string `json:"ref_id"`        // as_id / visit_id / task_id
+	Category      string `json:"category"`      // as | maintenance | sales_activity | admin
+	Title         string `json:"title"`         // 카드 본문 ([AS]고객명 · [영업]제목 등)
+	SubTitle      string `json:"sub_title"`     // 증상·설명
+	ProductType   string `json:"product_type"`  // 정기점검 점검 대상(색 구분용)
+	SourceNumber  string `json:"source_number"` // AS 접수번호 / 정기점검 방문번호
+	SourceHref    string `json:"source_href"`   // 원본 화면 링크(연간 일정 등)
+	ActionHref    string `json:"action_href"`   // 조치 화면(있으면 DetailHref 우선)
+	Assignee      string `json:"assignee"`
+	WorkDate      string `json:"work_date"`
+	StartTime     string `json:"start_time"`
+	EndTime       string `json:"end_time"`
+	DurationMin   int    `json:"duration_min"`
+	PlannedDay    string `json:"planned_day"`
+	TaskID        string `json:"task_id"`
+	ParentTaskID  string `json:"parent_task_id,omitempty"`
+	Status        string `json:"status,omitempty"`       // 업무처리현황 등 표시용
+	StatusLabel   string `json:"status_label,omitempty"` // 완료·부분완료 등
+	ProjectID     string `json:"project_id,omitempty"`
+	WorkGroupName string `json:"work_group_name,omitempty"`
+	Unassigned    bool   `json:"unassigned,omitempty"`
+	Dimmed        bool   `json:"dimmed,omitempty"`
 }
 
 // Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [영업] / [행정]
@@ -470,6 +471,10 @@ type WorkProject struct {
 	IsShared          bool      `json:"is_shared,omitempty"`
 	ShareFrom         string    `json:"share_from,omitempty"`
 	ShareTo           string    `json:"share_to,omitempty"`
+	RelatedOrgIDs     []string  `json:"related_org_ids,omitempty"`
+	RelatedOrgs       []Org     `json:"related_orgs,omitempty"`
+	RelatedLine       string    `json:"related_line,omitempty"`
+	Related           bool      `json:"related,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 
@@ -752,66 +757,69 @@ func ContractKPI(items []WorkProject, today string) (totalN, validN, soonN int, 
 }
 
 type WorkTask struct {
-	TaskID            string    `json:"task_id"`
-	WorkType          string    `json:"work_type"`              // admin / support / as / maintenance / sales / project_work
-	WorkSubtype       string    `json:"work_subtype,omitempty"` // build|construction|other
-	ProjectID         string    `json:"project_id"`
-	Title             string    `json:"title"`
-	Description       string    `json:"description"`
-	DueDate           string    `json:"due_date"`
-	WorkDate          string    `json:"work_date"`  // 수행일 YYYY-MM-DD
-	StartTime         string    `json:"start_time"` // HH:MM (15분 단위)
-	EndTime           string    `json:"end_time"`   // HH:MM
-	DurationMin       int       `json:"duration_min"`
-	Status            string    `json:"status"`
-	Priority          string    `json:"priority"`
-	Assignee          string    `json:"assignee"`
-	AssigneeUserID    string    `json:"assignee_user_id,omitempty"`
-	AssigneeSource    string    `json:"assignee_source,omitempty"` // as | manual. §42.3
-	Tags              string    `json:"tags"`
-	Progress          int       `json:"progress"`
-	SourceType        string    `json:"source_type"`           // as / maintenance / sales_activity / 빈 값
-	SourceID          string    `json:"source_id"`             // as_id / visit_id / activity_id
-	SourceRole        string    `json:"source_role,omitempty"` // done | next
-	ParentTaskID      string    `json:"parent_task_id"`
-	CustomerID        string    `json:"customer_id"`   // 거래처(고객마스터)
-	CustomerName      string    `json:"customer_name"` // 거래처 직접입력
-	HoldReason        string    `json:"hold_reason"`
-	ReviewDate        string    `json:"review_date"`
-	CancelReason      string    `json:"cancel_reason"`
-	WaitPartyKind     string    `json:"wait_party_kind"`
-	WaitParty         string    `json:"wait_party"`
-	WaitRequest       string    `json:"wait_request"`
-	ReplyDueDate      string    `json:"reply_due_date"`
-	NextCheckDate     string    `json:"next_check_date"`
-	CompleteNote      string    `json:"complete_note"`
-	WorkPlace         string    `json:"work_place,omitempty"` // office|field
-	ActionTaken       string    `json:"action_taken,omitempty"`
-	ResultCode        string    `json:"result_code,omitempty"` // done|partial|hold|transfer|cancel
-	CompleteDatetime  string    `json:"complete_datetime,omitempty"`
-	CustomerConfirmer string    `json:"customer_confirmer,omitempty"`
-	HoldNextAction    string    `json:"hold_next_action,omitempty"`
-	TransferTo        string    `json:"transfer_to,omitempty"`
-	TargetCategoryID  string    `json:"target_category_id,omitempty"`
-	WorkReason        string    `json:"work_reason,omitempty"`
-	ActionStartAt        string `json:"action_start_at,omitempty"`
-	ActionDurationMin    int    `json:"action_duration_min,omitempty"`
-	ActionRemark         string `json:"action_remark,omitempty"`
-	RecurrencePossible   bool   `json:"recurrence_possible,omitempty"`
-	CustomerConfirmedAt  string `json:"customer_confirmed_at,omitempty"`
-	ReceiptDate       string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
-	CompleteDate      string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
-	RecurrenceRole    string    `json:"recurrence_role,omitempty"`
-	OccurrenceSeq     int       `json:"occurrence_seq,omitempty"`
-	OccurrenceStatus  string    `json:"occurrence_status,omitempty"`
-	NotDoneReason     string    `json:"not_done_reason,omitempty"`
-	BlockedReason     string    `json:"blocked_reason,omitempty"` // §42.7
-	BlockedAt         string    `json:"blocked_at,omitempty"`
-	OrgID             string    `json:"org_id,omitempty"`
-	WorkGroupID       string    `json:"work_group_id,omitempty"`
-	WorkGroupName     string    `json:"work_group_name,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	TaskID              string    `json:"task_id"`
+	WorkType            string    `json:"work_type"`              // admin / support / as / maintenance / sales / project_work
+	WorkSubtype         string    `json:"work_subtype,omitempty"` // build|construction|other
+	ProjectID           string    `json:"project_id"`
+	Title               string    `json:"title"`
+	Description         string    `json:"description"`
+	DueDate             string    `json:"due_date"`
+	WorkDate            string    `json:"work_date"`  // 수행일 YYYY-MM-DD
+	StartTime           string    `json:"start_time"` // HH:MM (15분 단위)
+	EndTime             string    `json:"end_time"`   // HH:MM
+	DurationMin         int       `json:"duration_min"`
+	Status              string    `json:"status"`
+	Priority            string    `json:"priority"`
+	Assignee            string    `json:"assignee"`
+	AssigneeUserID      string    `json:"assignee_user_id,omitempty"`
+	AssigneeSource      string    `json:"assignee_source,omitempty"` // as | manual. §42.3
+	Tags                string    `json:"tags"`
+	Progress            int       `json:"progress"`
+	SourceType          string    `json:"source_type"`           // as / maintenance / sales_activity / 빈 값
+	SourceID            string    `json:"source_id"`             // as_id / visit_id / activity_id
+	SourceRole          string    `json:"source_role,omitempty"` // done | next
+	ParentTaskID        string    `json:"parent_task_id"`
+	CustomerID          string    `json:"customer_id"`   // 거래처(고객마스터)
+	CustomerName        string    `json:"customer_name"` // 거래처 직접입력
+	HoldReason          string    `json:"hold_reason"`
+	ReviewDate          string    `json:"review_date"`
+	CancelReason        string    `json:"cancel_reason"`
+	WaitPartyKind       string    `json:"wait_party_kind"`
+	WaitParty           string    `json:"wait_party"`
+	WaitRequest         string    `json:"wait_request"`
+	ReplyDueDate        string    `json:"reply_due_date"`
+	NextCheckDate       string    `json:"next_check_date"`
+	CompleteNote        string    `json:"complete_note"`
+	WorkPlace           string    `json:"work_place,omitempty"` // office|field
+	ActionTaken         string    `json:"action_taken,omitempty"`
+	ResultCode          string    `json:"result_code,omitempty"` // done|partial|hold|transfer|cancel
+	CompleteDatetime    string    `json:"complete_datetime,omitempty"`
+	CustomerConfirmer   string    `json:"customer_confirmer,omitempty"`
+	HoldNextAction      string    `json:"hold_next_action,omitempty"`
+	TransferTo          string    `json:"transfer_to,omitempty"`
+	TargetCategoryID    string    `json:"target_category_id,omitempty"`
+	WorkReason          string    `json:"work_reason,omitempty"`
+	ActionStartAt       string    `json:"action_start_at,omitempty"`
+	ActionDurationMin   int       `json:"action_duration_min,omitempty"`
+	ActionRemark        string    `json:"action_remark,omitempty"`
+	RecurrencePossible  bool      `json:"recurrence_possible,omitempty"`
+	CustomerConfirmedAt string    `json:"customer_confirmed_at,omitempty"`
+	ReceiptDate         string    `json:"receipt_date"`  // 접수일 YYYY-MM-DD (§13.4)
+	CompleteDate        string    `json:"complete_date"` // 완료일 YYYY-MM-DD. 완료 시 서버 기록
+	RecurrenceRole      string    `json:"recurrence_role,omitempty"`
+	OccurrenceSeq       int       `json:"occurrence_seq,omitempty"`
+	OccurrenceStatus    string    `json:"occurrence_status,omitempty"`
+	NotDoneReason       string    `json:"not_done_reason,omitempty"`
+	BlockedReason       string    `json:"blocked_reason,omitempty"` // §42.7
+	BlockedAt           string    `json:"blocked_at,omitempty"`
+	OrgID               string    `json:"org_id,omitempty"`
+	WorkGroupID         string    `json:"work_group_id,omitempty"`
+	WorkGroupName       string    `json:"work_group_name,omitempty"`
+	OrigWorkDate        string    `json:"orig_work_date,omitempty"`
+	OrigDueDate         string    `json:"orig_due_date,omitempty"`
+	CarryCount          int       `json:"carry_count,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 
 	ProjectName        string  `json:"project_name,omitempty"`
 	ProjectColor       string  `json:"project_color,omitempty"`

@@ -89,8 +89,8 @@ func TestSpaceEditScreenHasBackLink(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "← 공간 목록") {
-		t.Fatal("← 공간 목록 없음")
+	if !strings.Contains(body, "‹ 이전") {
+		t.Fatal("공통 이전 버튼 없음")
 	}
 	if !strings.Contains(body, `href="/spaces"`) {
 		t.Fatal("목록 링크가 /spaces 가 아니다")

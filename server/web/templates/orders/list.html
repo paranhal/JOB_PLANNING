@@ -3,44 +3,44 @@
 <div class="space-y-4"{{if and (eq .Display "kanban") .CanWrite}} x-data="{ dragging:null, start(id,bucket){this.dragging={id:id,bucket:bucket}}, drop(col){ if(!this.dragging||this.dragging.bucket===col){this.dragging=null;return;} const id=this.dragging.id; this.dragging=null; fetch('/orders/'+encodeURIComponent(id)+'/status',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({status:col,return:location.pathname+location.search})}).then(function(r){return r.json()}).then(function(d){ if(!d||!d.ok){alert((d&&d.error)||'저장에 실패했습니다');return;} location.reload(); }).catch(function(){alert('저장에 실패했습니다');}); } }"{{end}}>
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">수주 <span class="text-sm font-normal text-gray-400">({{.Total}}건)</span></h2>
-      <p class="text-sm text-gray-500">견적 라인을 복사해 넘깁니다. 합계는 <span class="font-medium">확정 금액 기준</span>입니다.</p>
+      <h2 class="text-xl font-bold text-ink">수주 <span class="text-sm font-normal text-ink-subtle">({{.Total}}건)</span></h2>
+      <p class="text-sm text-ink-muted">견적 라인을 복사해 넘깁니다. 합계는 <span class="font-medium">확정 금액 기준</span>입니다.</p>
       <div id="absorb-tabs" class="mt-2 flex flex-wrap gap-2 text-xs">
-        <a href="/quotes" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">견적</a>
-        <a href="/orders" class="px-2 py-1 rounded-full bg-blue-50 text-blue-800">수주</a>
-        <a href="/contracts" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">계약</a>
+        <a href="/quotes" class="px-2 py-1 rounded-full bg-hover text-ink">견적</a>
+        <a href="/orders" class="px-2 py-1 rounded-full bg-primary-soft text-primary">수주</a>
+        <a href="/contracts" class="px-2 py-1 rounded-full bg-hover text-ink">계약</a>
       </div>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">리스트</a>
-      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .Display "kanban"}}bg-blue-600 text-white{{else}}border border-gray-200 text-gray-600 hover:bg-gray-50{{end}}">칸반</a>
+      <a href="{{.ListHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if ne .Display "kanban"}}bg-primary text-white{{else}}border border-line text-ink-muted hover:bg-hover{{end}}">리스트</a>
+      <a href="{{.KanbanHref}}" class="px-3 py-1.5 text-xs font-medium rounded-lg {{if eq .Display "kanban"}}bg-primary text-white{{else}}border border-line text-ink-muted hover:bg-hover{{end}}">칸반</a>
     </div>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     <div class="bg-white rounded-xl border p-4">
-      <p class="text-xs text-gray-500">총 수주금액</p>
+      <p class="text-xs text-ink-muted">총 수주금액</p>
       <p class="text-2xl font-bold">{{.ConfirmedAmt}}</p>
-      <p class="text-[11px] text-gray-400">확정 금액 기준</p>
+      <p class="text-[11px] text-ink-subtle">확정 금액 기준</p>
     </div>
   </div>
 
   {{if eq .FlashOK "created"}}
-  <div class="rounded-lg bg-green-50 text-green-800 text-sm px-4 py-2 border border-green-200">수주로 넘겼습니다.</div>
+  <div class="rounded-lg bg-success-soft text-success text-sm px-4 py-2 border border-success">수주로 넘겼습니다.</div>
   {{end}}
   {{if eq .FlashErr "notfound"}}
-  <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-2 border border-red-200">수주를 찾을 수 없습니다.</div>
+  <div class="rounded-lg bg-danger-soft text-red-800 text-sm px-4 py-2 border border-danger">수주를 찾을 수 없습니다.</div>
   {{end}}
 
-  <form method="GET" action="/orders" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
+  <form method="GET" action="/orders" class="bg-white rounded-xl border border-line p-4 flex flex-wrap gap-3 items-end">
     {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
     <div class="flex-1 min-w-[12rem]">
-      <label class="block text-xs text-gray-500 mb-1">검색</label>
+      <label class="block text-xs text-ink-muted mb-1">검색</label>
       <input type="text" name="search" value="{{.Search}}" placeholder="번호, 건명, 수신, 발주서"
-             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+             class="w-full border border-line rounded-lg px-3 py-2 text-sm">
     </div>
     <div>
-      <label class="block text-xs text-gray-500 mb-1">상태</label>
+      <label class="block text-xs text-ink-muted mb-1">상태</label>
       <select name="status" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]">
         <option value="">전체</option>
         {{range .Statuses}}<option value="{{.Key}}" {{if eq .Key $.Status}}selected{{end}}>{{.Title}}</option>{{end}}
@@ -48,7 +48,7 @@
     </div>
     <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
     {{if or .Search .Status}}
-    <a href="/orders{{if eq .Display "kanban"}}?display=kanban{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
+    <a href="/orders{{if eq .Display "kanban"}}?display=kanban{{end}}" class="px-4 py-2 border rounded-lg text-sm text-ink-muted hover:bg-hover">초기화</a>
     {{end}}
   </form>
 
@@ -58,51 +58,51 @@
   <div class="md:hidden space-y-2">
     {{range .Items}}
     <a href="/orders/{{.OrderID}}" class="block bg-white rounded-xl border p-3">
-      <p class="text-xs font-mono text-gray-400">{{if .SalesDisplayNo}}{{.SalesDisplayNo}} / {{end}}{{.DisplayNo}}</p>
-      <p class="font-medium text-gray-800">{{if .Title}}{{.Title}}{{else}}—{{end}}</p>
-      <p class="text-xs text-gray-500 mt-1">납기 {{if .DueDate}}{{.DueDate}}{{else}}—{{end}} · {{orderScheduleLabel . $.Today}} · {{orderStatusLabel .Status}}</p>
+      <p class="text-xs font-mono text-ink-subtle">{{if .SalesDisplayNo}}{{.SalesDisplayNo}} / {{end}}{{.DisplayNo}}</p>
+      <p class="font-medium text-ink">{{if .Title}}{{.Title}}{{else}}—{{end}}</p>
+      <p class="text-xs text-ink-muted mt-1">납기 {{if .DueDate}}{{.DueDate}}{{else}}—{{end}} · {{orderScheduleLabel . $.Today}} · {{orderStatusLabel .Status}}</p>
     </a>
     {{else}}
-    <p class="text-center text-gray-400 py-8">수주가 없습니다.</p>
+    <p class="text-center text-ink-subtle py-8">수주가 없습니다.</p>
     {{end}}
   </div>
-  <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
+  <div class="hidden md:block bg-white rounded-xl border border-line overflow-x-auto">
     <table class="w-full min-w-[1200px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b"><tr>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">번호</th>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">수주일</th>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">수신</th>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">건명</th>
-        <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">합계</th>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">수주·계약</th>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">납기일</th>
+      <thead class="bg-hover border-b"><tr>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">번호</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">수주일</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">수신</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">건명</th>
+        <th class="text-right px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">합계</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">수주·계약</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">납기일</th>
         {{if .CanSeeMargin}}
-        <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">마진</th>
+        <th class="text-right px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">마진</th>
         {{end}}
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">진행</th>
-        <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">상태</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">진행</th>
+        <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">상태</th>
       </tr></thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Items}}
-        <tr class="hover:bg-slate-50">
+        <tr class="hover:bg-hover">
           <td class="px-4 py-2 font-mono text-xs whitespace-nowrap">
-            <a href="/orders/{{.OrderID}}" class="font-medium text-blue-700 hover:underline">{{if .SalesDisplayNo}}{{.SalesDisplayNo}} / {{end}}{{.DisplayNo}}</a>
-            {{if .DiffersFromQuote}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800">견적과 다름</span>{{end}}
+            <a href="/orders/{{.OrderID}}" class="font-medium text-primary hover:underline">{{if .SalesDisplayNo}}{{.SalesDisplayNo}} / {{end}}{{.DisplayNo}}</a>
+            {{if .DiffersFromQuote}}<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-warning-soft text-warning">견적과 다름</span>{{end}}
           </td>
-          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{.OrderDate}}</td>
-          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .RecipientName}}{{.RecipientName}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-ink-muted whitespace-nowrap">{{.OrderDate}}</td>
+          <td class="px-4 py-2 text-ink-muted whitespace-nowrap">{{if .RecipientName}}{{.RecipientName}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 whitespace-nowrap">{{if .Title}}{{.Title}}{{else}}—{{end}}</td>
           <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Total}}원</td>
-          <td class="px-4 py-2 text-xs text-gray-600 whitespace-nowrap">{{if .OrderContractLabel}}{{.OrderContractLabel}}{{else}}—{{end}}</td>
-          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-xs text-ink-muted whitespace-nowrap">{{if .OrderContractLabel}}{{.OrderContractLabel}}{{else}}—{{end}}</td>
+          <td class="px-4 py-2 text-ink-muted whitespace-nowrap">{{if .DueDate}}{{.DueDate}}{{else}}—{{end}}</td>
           {{if $.CanSeeMargin}}
           <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{{won .Margin}}원</td>
           {{end}}
           <td class="px-4 py-2 whitespace-nowrap">{{orderScheduleLabel . $.Today}}</td>
-          <td class="px-4 py-2 text-gray-600 whitespace-nowrap">{{orderStatusLabel .Status}}</td>
+          <td class="px-4 py-2 text-ink-muted whitespace-nowrap">{{orderStatusLabel .Status}}</td>
         </tr>
         {{else}}
-        <tr><td colspan="{{if .CanSeeMargin}}9{{else}}8{{end}}" class="px-4 py-8 text-center text-gray-400 whitespace-nowrap">수주가 없습니다. 견적 상세에서 넘기면 여기 나타납니다.</td></tr>
+        <tr><td colspan="{{if .CanSeeMargin}}9{{else}}8{{end}}" class="px-4 py-8 text-center text-ink-subtle whitespace-nowrap">수주가 없습니다. 견적 상세에서 넘기면 여기 나타납니다.</td></tr>
         {{end}}
       </tbody>
     </table>

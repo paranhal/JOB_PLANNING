@@ -23,28 +23,42 @@ func TestAppendixCUsesSQLStatusStatsCompleted(t *testing.T) {
 }
 
 func TestNoCompleteDatetimeUpdatedAtFallback(t *testing.T) {
-	entries, err := os.ReadDir(".")
+	db, err := InitDB(filepath.Join(t.TempDir(), "no_updated_at_fallback.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
-			continue
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
+		VALUES ('C-FB','폴백도서관','폴백도서관',1,'O01')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO as_receipts (
+		as_id, as_number, receipt_datetime, customer_id, symptom, urgency, status,
+		assigned_to, complete_datetime, updated_at, org_id, data_origin
+	) VALUES
+		('AS-FB-empty','R-FB-E','2026-10-01 09:00:00','C-FB','증상','중','completed','테크',NULL,'2026-11-03 18:00:00','O01','app'),
+		('AS-FB-done','R-FB-D','2026-10-01 09:00:00','C-FB','증상','중','completed','테크','2026-11-03 16:00:00','2026-11-03 18:00:00','O01','app')`); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := NewWorkBoardRepo(db).ListCompletedOn("2026-11-03", "", nil, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawEmpty, sawDone bool
+	for _, it := range items {
+		if it.RefID == "AS-FB-empty" || it.RefNumber == "R-FB-E" {
+			sawEmpty = true
 		}
-		b, err := os.ReadFile(e.Name())
-		if err != nil {
-			t.Fatal(err)
+		if it.RefID == "AS-FB-done" || it.RefNumber == "R-FB-D" {
+			sawDone = true
 		}
-		src := string(b)
-		for _, needle := range []string{
-			"complete_datetime, ar.updated_at",
-			"complete_datetime, updated_at",
-			"complete_datetime,ar.updated_at",
-		} {
-			if strings.Contains(src, needle) {
-				t.Errorf("%s: COALESCE(complete_datetime, updated_at) 폴백이 남아 있다", e.Name())
-			}
-		}
+	}
+	if sawEmpty {
+		t.Fatal("complete_datetime 없는 완료 건이 updated_at 날짜로 집계됐다")
+	}
+	if !sawDone {
+		t.Fatal("complete_datetime 있는 완료 건이 집계되지 않았다")
 	}
 }
 

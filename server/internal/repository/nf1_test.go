@@ -235,7 +235,7 @@ func TestNF1_SalesMembersFindMine(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "멤버시험"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "멤버시험"}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/appclock"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -114,7 +114,7 @@ func (h *QuotesHandler) List(c echo.Context) error {
 	}
 	kq := cloneURLValues(qv)
 	kq.Set("display", "kanban")
-	today := time.Now().Format("2006-01-02")
+	today := appclock.Now().Format("2006-01-02")
 	expiredN := 0
 	for i := range items {
 		if items[i].IsExpiredSent(today) {
@@ -146,7 +146,7 @@ func (h *QuotesHandler) List(c echo.Context) error {
 		"Dir":          dir,
 		"SortHref":     hrefs,
 		"SortSelect":   sortSelectOptions(quoteListSortCols(), hrefs, sortKey, dir),
-		"KPI":          model.BuildQuoteListKPI(items, time.Now().Format("2006-01")),
+		"KPI":          model.BuildQuoteListKPI(items, appclock.Now().Format("2006-01")),
 		"DocQuotes":    nQ, "DocOrders": nO, "DocContracts": nC, "DocAll": nQ + nO + nC,
 	})
 }
@@ -160,7 +160,7 @@ func (h *QuotesHandler) New(c echo.Context) error {
 		FormType:       form,
 		VATMode:        model.DefaultVATMode(form),
 		RoundRule:      h.repo.LastRoundRule(),
-		QuoteDate:      time.Now().Format("2006-01-02"),
+		QuoteDate:      appclock.Now().Format("2006-01-02"),
 		RecipientKind:  model.QuoteRecipientCustomer,
 		Purpose:        model.QuotePurposeDeal,
 		Status:         model.QuoteStatusDraft,
@@ -215,7 +215,7 @@ func (h *QuotesHandler) Create(c echo.Context) error {
 	q.QuoteNo = ""
 	q.IsLegacy = false
 	if strings.TrimSpace(q.QuoteDate) == "" {
-		q.QuoteDate = time.Now().Format("2006-01-02")
+		q.QuoteDate = appclock.Now().Format("2006-01-02")
 	}
 	if err := h.repo.Create(q); err != nil {
 		return h.renderForm(c, q, true, err.Error())
@@ -311,7 +311,7 @@ func (h *QuotesHandler) Copy(c echo.Context) error {
 	if !canWriteSales(c) {
 		return echo.ErrForbidden
 	}
-	today := time.Now().Format("2006-01-02")
+	today := appclock.Now().Format("2006-01-02")
 	dst, err := h.repo.CopyAsNew(c.Param("id"), today)
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/quotes?err=notfound")
@@ -446,7 +446,7 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 	oh, tech := h.repo.StandardRates()
 	year := q.QuoteYear()
 	if year <= 0 {
-		year = time.Now().Year()
+		year = appclock.Now().Year()
 	}
 	use, missing, note := h.repo.ResolveLaborYear(year)
 	rates, _ := h.repo.ListLaborRates(use)
@@ -767,7 +767,7 @@ func (h *QuotesHandler) LaborRates(c echo.Context) error {
 	}
 	year := atoiQuiet(c.QueryParam("year"))
 	if year <= 0 {
-		year = time.Now().Year()
+		year = appclock.Now().Year()
 	}
 	use, missing, note := h.repo.ResolveLaborYear(year)
 	items, err := h.repo.ListLaborRates(use)
@@ -775,7 +775,7 @@ func (h *QuotesHandler) LaborRates(c echo.Context) error {
 		return err
 	}
 	years, _ := h.repo.ListLaborYears()
-	nowY := time.Now().Year()
+	nowY := appclock.Now().Year()
 	seen := map[int]bool{}
 	var yearOpts []int
 	for _, y := range years {

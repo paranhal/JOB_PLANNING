@@ -3,7 +3,6 @@
 <div class="max-w-6xl mx-auto space-y-4" x-data="quoteForm">
   <div class="flex items-center justify-between gap-3">
     <div>
-      <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 목록</a>
       <h2 class="text-xl font-bold text-gray-800 mt-1">{{if .IsNew}}견적 작성{{else}}견적 수정{{end}}</h2>
       <p class="text-sm text-gray-500">라인 금액·소계·부가세·합계는 계산값입니다. 손으로 고칠 칸이 없습니다.</p>
     </div>
@@ -98,8 +97,8 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="relative" x-data="{
-          q: {{printf "%q" .Quote.RecipientName}},
-          id: {{printf "%q" .Quote.CustomerID}},
+          q: {{toJSON .Quote.RecipientName}},
+          id: {{toJSON .Quote.CustomerID}},
           hits: [], open: false, making: false, newName: '',
           async search(){
             const q=this.q.trim();
@@ -248,7 +247,7 @@
         <button type="button" class="text-sm text-blue-700 hover:underline" @click="addLine()">+ 줄 추가</button>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[1200px] text-sm break-keep">
+        <table data-table-cols-skip class="w-full min-w-[1200px] text-sm break-keep">
           <thead class="bg-gray-50 border-b"><tr>
             <th class="text-left px-2 py-2 text-xs text-gray-500 w-24 whitespace-nowrap">구분</th>
             <th class="text-left px-2 py-2 text-xs text-gray-500 whitespace-nowrap" :class="isLabor() ? 'w-[28%]' : 'w-[46%]'" x-text="isLabor() ? '품명' : '품명 · 내용'">품명 · 내용</th>

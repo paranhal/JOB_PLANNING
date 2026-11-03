@@ -15,7 +15,7 @@ func TestSalesDropAndClosedFilter(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{Name: "드롭 발굴"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "드롭 발굴"}
 	_ = repo.Create(p)
 	if err := repo.Drop(p.SalesID, "budget", "", "u1", "테스터"); err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestSalesDropAndClosedFilter(t *testing.T) {
 		t.Fatalf("드롭 %+v from=%s", got.CloseReason, got.DroppedFromStage)
 	}
 
-	pr := &model.SalesProject{Name: "드롭 제안"}
+	pr := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "드롭 제안"}
 	_ = repo.Create(pr)
 	_ = repo.ChangeStage(pr.SalesID, model.SalesStage4Propose, "", "u1", "t", false)
 	_ = repo.Drop(pr.SalesID, "postponed", "", "u1", "t")
@@ -34,7 +34,7 @@ func TestSalesDropAndClosedFilter(t *testing.T) {
 		t.Fatalf("제안 드롭 from=%s", pg.DroppedFromStage)
 	}
 
-	bid := &model.SalesProject{Name: "드롭 입찰", BidEvalMethod: "lowest"}
+	bid := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "드롭 입찰", BidEvalMethod: "lowest"}
 	_ = repo.Create(bid)
 	_ = repo.ChangeStage(bid.SalesID, model.SalesStage4Propose, "", "u1", "t", false)
 	_ = repo.ChangeStage(bid.SalesID, model.SalesStage4Bid, "", "u1", "t", false)
@@ -42,7 +42,7 @@ func TestSalesDropAndClosedFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	won := &model.SalesProject{Name: "수주 후 드롭"}
+	won := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "수주 후 드롭"}
 	_ = repo.Create(won)
 	_ = repo.ChangeStage(won.SalesID, model.SalesDirectWin, "", "u1", "t", false)
 	if err := repo.Drop(won.SalesID, "budget", "", "u1", "t"); err == nil {
@@ -71,7 +71,7 @@ func TestSalesDropCancelsOpenTasks(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "업무 취소"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "업무 취소"}
 	_ = repo.Create(p)
 	a1 := &model.SalesActivity{SalesID: p.SalesID, ActivityDate: "2026-09-01", ActivityType: "other", ActivityMethod: "call", Title: "콜"}
 	_ = repo.CreateActivity(a1, "t", nil)

@@ -21,6 +21,11 @@ module.exports = {
     "mnt-panel-bar-done",
     "mnt-panel-bar-planned",
     "mnt-panel-bar-check",
+    "border-info",
+    "bg-info",
+    "bg-info-soft",
+    "text-info",
+    "focus:ring-primary",
   ],
   theme: {
     extend: {

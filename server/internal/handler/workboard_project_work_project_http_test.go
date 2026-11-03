@@ -15,10 +15,11 @@ func TestProjectWorkProjectIDPersistsAndShows(t *testing.T) {
 
 	reg := doGet(t, e, "/workboard/register?view=day")
 	body := reg.Body.String()
-	for _, name := range []string{"도서관공사", "SI구축", "보류사업"} {
-		if !strings.Contains(body, name) {
-			t.Fatalf("등록 팝업 사업 목록에 %q 없음", name)
-		}
+	if !strings.Contains(body, "도서관공사") {
+		t.Fatal("등록 팝업 사업 목록에 주관 사업이 없다")
+	}
+	if strings.Contains(body, "SI구축") || strings.Contains(body, "보류사업") {
+		t.Fatal("타 조직 사업이 등록 팝업에 있다")
 	}
 	if strings.Contains(body, "종료사업") || strings.Contains(body, "보관사업") {
 		t.Fatal("완료·보관 사업이 선택 목록에 있다")
@@ -89,13 +90,8 @@ func TestProjectWorkProjectIDPersistsAndShows(t *testing.T) {
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-O03"},
 		"start_time": {"16:00"}, "end_time": {"16:30"},
 	})
-	if cross.Code != http.StatusSeeOther {
-		t.Fatalf("타 조직 사업 저장 status=%d (95-9A Q3 허용)", cross.Code)
-	}
-	idX := pwFindTitle(t, repo, "타조직사업")
-	tx, _ := repo.GetTask(idX)
-	if tx.ProjectID != "WP-O03" || tx.ProjectName != "SI구축" {
-		t.Fatalf("타 조직 사업 project=%s name=%s", tx.ProjectID, tx.ProjectName)
+	if cross.Code != http.StatusForbidden && cross.Code != http.StatusBadRequest {
+		t.Fatalf("타 조직 사업 저장 status=%d", cross.Code)
 	}
 
 	hold := doForm(t, e, "/workboard/tasks", url.Values{
@@ -103,11 +99,8 @@ func TestProjectWorkProjectIDPersistsAndShows(t *testing.T) {
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-hold"},
 		"start_time": {"17:00"}, "end_time": {"17:30"},
 	})
-	if hold.Code != http.StatusSeeOther {
-		t.Fatalf("hold 사업 %d", hold.Code)
-	}
-	if g, _ := repo.GetTask(pwFindTitle(t, repo, "보류사업작업")); g.ProjectID != "WP-hold" {
-		t.Fatalf("hold project=%s", g.ProjectID)
+	if hold.Code != http.StatusForbidden && hold.Code != http.StatusBadRequest {
+		t.Fatalf("타 조직 hold 사업 %d", hold.Code)
 	}
 
 	oa04, err := users.GetByUsername("oa04")
@@ -121,11 +114,8 @@ func TestProjectWorkProjectIDPersistsAndShows(t *testing.T) {
 	if emptyRec.Code != http.StatusOK {
 		t.Fatalf("O04 register %d", emptyRec.Code)
 	}
-	if strings.Contains(emptyRec.Body.String(), "등록된 사업이 없습니다") {
-		t.Fatal("조직 무관 목록인데 빈 안내가 나옴")
-	}
-	if !strings.Contains(emptyRec.Body.String(), "도서관공사") {
-		t.Fatal("O04도 도서관공사 후보를 봐야 한다")
+	if strings.Contains(emptyRec.Body.String(), "도서관공사") {
+		t.Fatal("비유관 O04가 타 팀 주관 사업을 본다")
 	}
 }
 

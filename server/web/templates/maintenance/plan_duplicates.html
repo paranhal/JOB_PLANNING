@@ -1,16 +1,16 @@
 {{define "title"}}중복 정리 · {{appName}}{{end}}
 {{define "content"}}
 <div class="max-w-3xl mx-auto space-y-4">
-  <h2 class="text-xl font-bold text-gray-800">중복 정리</h2>
-  <p class="text-sm text-gray-600">{{.Plan.PlanYear}}년 · 같은 달·같은 기관·같은 점검대상에서 남을 건과 지워질 건입니다.</p>
+  <h2 class="text-xl font-bold text-ink">중복 정리</h2>
+  <p class="text-sm text-ink-muted">{{.Plan.PlanYear}}년 · 같은 달·같은 기관·같은 점검대상에서 남을 건과 지워질 건입니다.</p>
   {{if not .Drops}}
-  <p class="text-sm text-gray-500">정리할 중복이 없습니다.</p>
-  <a href="/maintenance/{{.Plan.PlanID}}{{if .Month}}?month={{.Month}}{{end}}" class="inline-block px-4 py-2 border border-gray-300 rounded-lg text-sm">돌아가기</a>
+  <p class="text-sm text-ink-muted">정리할 중복이 없습니다.</p>
+  <a href="/maintenance/{{.Plan.PlanID}}{{if .Month}}?month={{.Month}}{{end}}" class="inline-block px-4 py-2 border border-line rounded-lg text-sm">돌아가기</a>
   {{else}}
-  <p class="text-sm text-gray-700">삭제 예정 {{.DeletableCount}}건 · 제외 {{.SkipTotal}}건{{if .SkipBy}}{{range $k, $n := .SkipBy}} ({{$k}} {{$n}}){{end}}{{end}}</p>
-  <div class="overflow-x-auto bg-white rounded-xl border border-gray-200">
+  <p class="text-sm text-ink">삭제 예정 {{.DeletableCount}}건 · 제외 {{.SkipTotal}}건{{if .SkipBy}}{{range $k, $n := .SkipBy}} ({{$k}} {{$n}}){{end}}{{end}}</p>
+  <div class="overflow-x-auto bg-white rounded-xl border border-line">
     <table class="min-w-full text-sm">
-      <thead class="bg-gray-50 text-left text-xs text-gray-500">
+      <thead class="bg-hover text-left text-xs text-ink-muted">
         <tr>
           <th class="px-3 py-2">지워질 방문</th>
           <th class="px-3 py-2">남을 방문</th>
@@ -22,7 +22,7 @@
         <tr>
           <td class="px-3 py-2">{{.Drop.VisitDate}} · {{if .Drop.ShortName}}{{.Drop.ShortName}}{{else}}{{.Drop.OrgName}}{{end}} · {{if .Drop.ProductType}}{{.Drop.ProductType}}{{else}}(대상 없음){{end}}</td>
           <td class="px-3 py-2">{{.Keep.VisitDate}} · {{if .Keep.ShortName}}{{.Keep.ShortName}}{{else}}{{.Keep.OrgName}}{{end}} · {{if .Keep.ProductType}}{{.Keep.ProductType}}{{else}}(대상 없음){{end}}</td>
-          <td class="px-3 py-2">{{if .Deletable}}<span class="text-red-700">{{.StatusLabel}}</span>{{else}}<span class="text-amber-800">{{.StatusLabel}}</span>{{end}}</td>
+          <td class="px-3 py-2">{{if .Deletable}}<span class="text-danger">{{.StatusLabel}}</span>{{else}}<span class="text-warning">{{.StatusLabel}}</span>{{end}}</td>
         </tr>
         {{end}}
       </tbody>
@@ -34,10 +34,10 @@
     <input type="hidden" name="view" value="{{.View}}">
     <input type="hidden" name="csrf" value="{{.CSRFToken}}">
     <button type="submit" class="px-4 py-2 bg-amber-800 text-white rounded-lg text-sm font-medium hover:bg-amber-900 disabled:opacity-50 disabled:cursor-not-allowed" {{if or (not .CanEdit) (eq .DeletableCount 0)}}disabled{{end}}>확인하고 정리</button>
-    <a href="/maintenance/{{.Plan.PlanID}}{{if .Month}}?month={{.Month}}{{end}}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">취소</a>
+    <a href="/maintenance/{{.Plan.PlanID}}{{if .Month}}?month={{.Month}}{{end}}" class="px-4 py-2 border border-line rounded-lg text-sm">취소</a>
   </form>
   {{if eq .DeletableCount 0}}
-  <p class="text-sm text-amber-800">정리할 수 있는 중복이 없습니다. 완료된 방문이나 조치 기록이 있는 건은 직접 확인하세요.</p>
+  <p class="text-sm text-warning">정리할 수 있는 중복이 없습니다. 완료된 방문이나 조치 기록이 있는 건은 직접 확인하세요.</p>
   {{end}}
   {{end}}
 </div>

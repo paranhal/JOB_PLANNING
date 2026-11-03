@@ -104,6 +104,7 @@ func TestUnplaceKeepsSourceRow(t *testing.T) {
 		DueDate: "2026-08-14", WorkDate: "2026-08-14", StartTime: "09:00", EndTime: "09:30",
 		DurationMin: 30, Status: model.WBTaskWaiting, Priority: model.WBPriorityNormal,
 		SourceType: model.WBSourceMaintenance, SourceID: "v-keep",
+		OrgID: model.OrgIDLibrary,
 	}
 	if err := repo.CreateTask(t0); err != nil {
 		t.Fatal(err)

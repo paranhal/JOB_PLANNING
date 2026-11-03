@@ -52,24 +52,36 @@ func (r *StaffLeaveRepo) ListByYear(year int) ([]model.StaffLeave, error) {
 }
 
 func (r *StaffLeaveRepo) ListInRange(from, toInclusive string) ([]model.StaffLeave, error) {
+	return r.ListInRangeForOrg(from, toInclusive, "")
+}
+
+// ListInRangeForOrg 연차 목록. orgID 가 있으면 그 조직 사용자만(95-84).
+func (r *StaffLeaveRepo) ListInRangeForOrg(from, toInclusive, orgID string) ([]model.StaffLeave, error) {
 	if r == nil || r.db == nil {
 		return nil, nil
 	}
 	from = strings.TrimSpace(from)
 	toInclusive = strings.TrimSpace(toInclusive)
+	orgID = strings.TrimSpace(orgID)
 	if len(from) >= 10 {
 		from = from[:10]
 	}
 	if len(toInclusive) >= 10 {
 		toInclusive = toInclusive[:10]
 	}
-	rows, err := r.db.Query(`
+	q := `
 		SELECT l.leave_id, l.user_id, COALESCE(NULLIF(TRIM(u.full_name),''), COALESCE(u.username,''), ''),
 		       l.leave_date, l.leave_kind, COALESCE(l.note,''), COALESCE(l.created_by,''), IFNULL(l.created_at,'')
 		FROM staff_leaves l
 		LEFT JOIN users u ON u.user_id = l.user_id
-		WHERE l.leave_date >= ? AND l.leave_date <= ?
-		ORDER BY l.leave_date, u.full_name`, from, toInclusive)
+		WHERE l.leave_date >= ? AND l.leave_date <= ?`
+	args := []interface{}{from, toInclusive}
+	if orgID != "" && orgID != OrgAll {
+		q += ` AND TRIM(COALESCE(u.org_id,'')) = ?`
+		args = append(args, orgID)
+	}
+	q += ` ORDER BY l.leave_date, u.full_name`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ func TestSalesStageLabelsRenameKeepsCodesAndProbability(t *testing.T) {
 	LoadLookupCache(db)
 
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "이름만 바뀌는 건", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "이름만 바뀌는 건", IsTentativeName: true}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

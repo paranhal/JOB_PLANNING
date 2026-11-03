@@ -6,8 +6,8 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"time"
 
+	"customer-support/internal/appclock"
 	"customer-support/internal/model"
 )
 
@@ -190,7 +190,7 @@ func (r *QuoteRepo) ListLaborYears() ([]int, error) {
 
 func (r *QuoteRepo) ResolveLaborYear(want int) (use int, missing bool, note string) {
 	if want <= 0 {
-		want = time.Now().Year()
+		want = appclock.Now().Year()
 	}
 	items, _ := r.ListLaborRates(want)
 	if len(items) > 0 {

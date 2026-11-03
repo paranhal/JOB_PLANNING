@@ -1,6 +1,6 @@
 {{define "sort_th"}}
 {{$align := or .Align ""}}{{$dir := or .Dir ""}}{{$cur := or .Cur ""}}{{$key := or .Key ""}}
-<th class="{{if .ThClass}}{{.ThClass}} {{end}}{{if .PadClass}}{{.PadClass}}{{else}}px-4 py-3 {{end}}text-xs font-semibold whitespace-nowrap {{if eq $align "right"}}text-right{{else if eq $align "center"}}text-center{{else}}text-left{{end}} {{if eq $cur $key}}text-gray-800{{else}}text-gray-500{{end}}">
+<th class="relative {{if .ThClass}}{{.ThClass}} {{end}}{{if .PadClass}}{{.PadClass}}{{else}}px-4 py-3 {{end}}text-xs font-semibold whitespace-nowrap {{if eq $align "right"}}text-right{{else if eq $align "center"}}text-center{{else}}text-left{{end}} {{if eq $cur $key}}text-gray-800{{else}}text-gray-500{{end}}">
   <a href="{{.Href}}" class="inline-flex items-center gap-0.5 hover:text-blue-700 {{if eq $align "right"}}justify-end w-full{{else if eq $align "center"}}justify-center w-full{{end}}">
     <span>{{.Label}}</span>
     {{if eq $cur $key}}

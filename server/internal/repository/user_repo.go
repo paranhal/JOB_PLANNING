@@ -120,6 +120,66 @@ func (r *UserRepo) ListTechActive() ([]model.User, error) {
 	return items, rows.Err()
 }
 
+// LookupAccountingAssignees 전 조직 활성 내부 직원. 95-88 회계 담당 후보. org_id 무필터(허용 목록).
+func (r *UserRepo) LookupAccountingAssignees() ([]model.User, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
+	q := userSelect + `
+		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))=''
+		  AND LOWER(TRIM(COALESCE(username,''))) NOT IN ('vsadmin')
+		  AND LOWER(TRIM(COALESCE(role,''))) NOT IN ('partner')
+		  AND TRIM(COALESCE(full_name,''))<>''
+		  AND full_name NOT LIKE 'USR-%'
+		ORDER BY COALESCE(org_id,''), full_name`
+	rows, err := r.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.User
+	for rows.Next() {
+		u, err := scanUser(rows, false)
+		if err != nil {
+			return nil, err
+		}
+		if !model.IsInternalStaffRole(u.Role) {
+			continue
+		}
+		items = append(items, u)
+	}
+	return items, rows.Err()
+}
+
+func (r *UserRepo) ListAssignableInOrgs(orgIDs []string) ([]model.User, error) {
+	seen := map[string]struct{}{}
+	var out []model.User
+	for _, raw := range orgIDs {
+		org := strings.TrimSpace(raw)
+		if org == "" || org == OrgAll {
+			continue
+		}
+		list, err := r.ListAssignable(org)
+		if err != nil {
+			return nil, err
+		}
+		for _, u := range list {
+			if _, ok := seen[u.UserID]; ok {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(u.Username), "vsadmin") {
+				continue
+			}
+			if model.NormalizeRole(u.Role) == model.RolePartner {
+				continue
+			}
+			seen[u.UserID] = struct{}{}
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
 func (r *UserRepo) ListAssignable(orgID string) ([]model.User, error) {
 	orgID = strings.TrimSpace(orgID)
 	if orgID == "" {

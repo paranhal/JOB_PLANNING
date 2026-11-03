@@ -48,7 +48,8 @@ func execNavDefinition(orgs []model.Org) []navDefGroup {
 					{ID: "exec_work_org", Label: "조직별 업무", Href: "/exec/work", Active: []string{NavExecWork}, Show: show},
 					{ID: "exec_work_all", Label: "전체 업무", Href: "/work/all", Active: []string{NavWorkAll}, Show: show},
 					{ID: "exec_work_groups", Label: "업무 그룹", Href: "/work-groups", Active: []string{NavWorkGroups}, Show: show},
-					{ID: "exec_weekly", Label: "주간 회의 (팀 자료)", Href: "/meeting/weekly", Active: []string{NavMeetingWeekly}, Show: show},
+					{ID: "exec_weekly", Label: "업무 회의", Href: "/meeting/board", Active: []string{NavMeetingBoard}, Show: show},
+					{ID: "exec_meeting_weekly_legacy", Label: "주간 회의 (팀) (예전)", Href: "/meeting/weekly", Active: []string{NavMeetingWeekly}, Show: show},
 				}},
 				{ID: "exec_as", Label: "AS·점검", Show: show, Children: []navDefItem{
 					{ID: "exec_as_list", Label: "AS 현황", Href: "/as", Active: []string{NavAS}, Show: show},
@@ -145,6 +146,7 @@ func cLevelHiddenPath(path string) bool {
 		strings.HasPrefix(p, "/maintenance/sites"),
 		strings.HasPrefix(p, "/codes"),
 		strings.HasPrefix(p, "/product-groups"),
+		strings.HasPrefix(p, "/work-item-templates"),
 		strings.HasPrefix(p, "/sales/new"),
 		strings.HasPrefix(p, "/sales/groups"),
 		strings.HasPrefix(p, "/projects/new"),

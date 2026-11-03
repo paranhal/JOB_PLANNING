@@ -6,7 +6,7 @@
        projectOpen: false,
        extraCols: [],
        addOpen: false,
-       leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{printf "%q" $n}}{{end}}],
+       leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{toJSON $n}}{{end}}],
        onLeave(name) { return !!name && this.leaveNames.indexOf(name) >= 0; },
        sel: null,
        unlockOpen: false,
@@ -146,48 +146,48 @@
      }">
 
   {{if .RoleUnresolved}}
-  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+  <div class="rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
     권한 정보를 불러오지 못했습니다. 새로고침하거나 다시 로그인해 주세요.
   </div>
   {{end}}
 
   {{if .FlashOK}}
-  <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-sm text-emerald-800 shadow-sm">
+  <div class="rounded-xl bg-success-soft border border-success px-4 py-2.5 text-sm text-success shadow-sm">
     {{if eq .FlashOK "place"}}업무가 일정표에 배치되었습니다.{{else if eq .FlashOK "unplace"}}업무를 일정표에서 내렸습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "kanban"}}칸반에서 업무를 옮겼습니다.{{else}}{{.FlashOK}}{{end}}
   </div>
   {{end}}
   {{if .FlashErr}}
-  <div class="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 shadow-sm">
-    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "kanban_unplanned"}}미계획으로 옮길 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.{{else if eq .FlashErr "kanban_assignee"}}담당자를 지정해야 오늘 예정으로 둘 수 있습니다.{{else if eq .FlashErr "kanban_complete"}}완료 내용을 입력하세요.{{else if eq .FlashErr "kanban_reopen"}}완료를 취소하고 되돌릴까요? 다시 끌어 확인하세요.{{else}}{{.FlashErr}}{{end}}
+  <div class="rounded-xl bg-danger-soft border border-danger px-4 py-2.5 text-sm text-red-800 shadow-sm">
+    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else if eq .FlashErr "kanban_unplanned"}}미계획으로 옮길 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.{{else if eq .FlashErr "kanban_assignee"}}담당자를 지정해야 오늘 예정으로 둘 수 있습니다.{{else if eq .FlashErr "kanban_complete"}}완료 내용을 입력하세요.{{else if eq .FlashErr "kanban_reopen"}}완료를 취소하고 되돌릴까요? 다시 끌어 확인하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
   {{if .PastDayLocked}}
-  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm flex flex-wrap items-center justify-between gap-2">
+  <div class="rounded-xl border border-amber-200 bg-warning-soft px-4 py-3 text-sm text-amber-950 shadow-sm flex flex-wrap items-center justify-between gap-2">
     <p>지난 날짜는 <strong>읽기 전용</strong>입니다.{{if .CanUnlockPast}} 관리자는 수정 전용 비밀번호로 잠금을 해제할 수 있습니다.{{end}}</p>
     {{if .CanUnlockPast}}
     <button type="button" @click="unlockOpen=true"
-            class="px-3 py-1.5 text-xs font-semibold border border-amber-500 bg-white text-amber-900 rounded-lg hover:bg-amber-100">
+            class="px-3 py-1.5 text-xs font-semibold border border-amber-500 bg-white text-warning rounded-lg hover:bg-warning-soft">
       수정 잠금 해제
     </button>
     {{end}}
   </div>
   {{end}}
   {{if .EditUnlocked}}
-  <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900 shadow-sm">
+  <div class="rounded-xl border border-success bg-success-soft px-4 py-2.5 text-sm text-emerald-900 shadow-sm">
     지난 날짜 수정 잠금이 해제되어 있습니다{{if .UnlockExpires}} ({{.UnlockExpires}}까지){{end}}.
   </div>
   {{end}}
 
   {{/* 툴바 — Figma/스크린샷: 제목·범례·뷰·날짜를 한 줄 구성 */}}
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
+  <div class="bg-white rounded-xl border border-line shadow-sm px-4 py-3">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-xl font-bold text-slate-900 tracking-tight">{{.ViewLabel}}</h2>
           <nav id="absorb-tabs" class="flex flex-wrap gap-1 text-xs" aria-label="등록 화면">
-            <a href="/workboard/register" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">일일 업무 등록</a>
-            <a href="/plan/unplanned" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">미계획 업무함</a>
+            <a href="/workboard/register" class="px-3 py-1.5 rounded-lg bg-primary text-white">일일 업무 등록</a>
+            <a href="/plan/unplanned" class="px-3 py-1.5 rounded-lg border border-line text-ink hover:bg-hover">미계획 업무함</a>
           </nav>
           <form method="GET" action="/workboard/register" class="inline-flex flex-wrap gap-1.5">
             <input type="hidden" name="view" value="{{.View}}">
@@ -198,7 +198,7 @@
             {{else if not .AssigneePickDisabled}}
             <label class="sr-only" for="reg-assignee">담당자</label>
             <select id="reg-assignee" name="assignee" onchange="this.form.submit()"
-                    class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[7.5rem]">
+                    class="border border-line rounded-lg px-2.5 py-1 text-xs text-ink bg-hover hover:bg-white min-w-[7.5rem]">
               <option value="" {{if eq .AssigneeFilter ""}}selected{{end}}>팀전체</option>
               {{range .Assignees}}
               <option value="{{.FullName}}" {{if eq $.AssigneeFilter .FullName}}selected{{end}}>{{.FullName}}</option>
@@ -207,7 +207,7 @@
             {{end}}
             <label class="sr-only" for="reg-project">사업</label>
             <select id="reg-project" name="project" onchange="this.form.submit()"
-                    class="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-slate-50 hover:bg-white min-w-[9rem]">
+                    class="border border-line rounded-lg px-2.5 py-1 text-xs text-ink bg-hover hover:bg-white min-w-[9rem]">
               <option value="" {{if eq .ProjectFilter ""}}selected{{end}}>사업 전체</option>
               {{range .Projects}}
               <option value="{{.ProjectID}}" {{if eq $.ProjectFilter .ProjectID}}selected{{end}}>{{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}</option>
@@ -224,55 +224,55 @@
           </form>
           {{if .ShowScopeToggle}}
           {{if .ScopeAll}}
-          <a href="{{.MineHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">내 배정만</a>
+          <a href="{{.MineHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-line text-ink-muted hover:bg-hover">내 배정만</a>
           {{else}}
-          <a href="{{.TeamHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100">팀 전체 보기</a>
+          <a href="{{.TeamHref}}" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-primary text-primary bg-primary-soft hover:bg-blue-100">팀 전체 보기</a>
           {{end}}
           {{end}}
         </div>
-        <p class="text-[12px] text-slate-500 mt-1">
-          {{.PeriodLabel}} · 07:00~20:00 15분 단위 · 확정 배치 <span class="font-semibold text-slate-700">{{.PlacedCount}}</span>건 · 우측은 미확정 대기
-          {{if .ScopeNote}} · {{.ScopeNote}}{{else if .AssigneeFilter}} · <span class="text-blue-700 font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
+        <p class="text-[12px] text-ink-muted mt-1">
+          {{.PeriodLabel}} · 07:00~20:00 15분 단위 · 확정 배치 <span class="font-semibold text-ink">{{.PlacedCount}}</span>건 · 우측은 미확정 대기
+          {{if .ScopeNote}} · {{.ScopeNote}}{{else if .AssigneeFilter}} · <span class="text-primary font-medium">{{.AssigneeFilter}}</span>{{else}} · 팀전체{{end}}
           · 시작일만 있고 시간이 없는 건은 07:00부터 순차 표시
         </p>
-        <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-600">
+        <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-ink-muted">
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#16a34a"></span>양기헌 · 앤로보틱스</span>
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#2563eb"></span>최혜영 · K-LAS</span>
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#9333ea"></span>세종 K-LAS</span>
           <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background-color:#ea580c"></span>행정·기타</span>
         </div>
         {{if .AssigneeLegend}}
-        <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-600">
-          <span class="text-slate-400 shrink-0">담당자</span>
+        <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-ink-muted">
+          <span class="text-ink-subtle shrink-0">담당자</span>
           {{range .AssigneeLegend}}
           <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border" style="background-color:{{.Soft}};border-color:{{.Border}};border-left-width:3px" {{if .Unregistered}}title="사용자 미등록"{{end}}>
             <span class="font-medium" style="color:{{.Border}}">{{.Name}}</span>
-            {{if .Unregistered}}<span class="text-[9px] text-slate-500">미등록</span>{{end}}
+            {{if .Unregistered}}<span class="text-[9px] text-ink-muted">미등록</span>{{end}}
           </span>
           {{end}}
         </div>
         {{end}}
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+        <div class="inline-flex rounded-lg border border-line overflow-hidden shadow-sm">
           <a href="/workboard/register?view=day&date={{.Date}}{{.AssigneeQ}}"
-             class="px-3 py-1.5 text-xs font-semibold {{if eq .View "day"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">일일</a>
+             class="px-3 py-1.5 text-xs font-semibold {{if eq .View "day"}}bg-primary text-white{{else}}text-ink-muted bg-white hover:bg-hover{{end}}">일일</a>
           <a href="/workboard/register?view=week&date={{.Date}}{{.AssigneeQ}}"
-             class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .View "week"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">주간</a>
+             class="px-3 py-1.5 text-xs font-semibold border-l border-line {{if eq .View "week"}}bg-primary text-white{{else}}text-ink-muted bg-white hover:bg-hover{{end}}">주간</a>
           <a href="/workboard/register?view=month&date={{.Date}}{{.AssigneeQ}}"
-             class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .View "month"}}bg-blue-600 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">월간</a>
+             class="px-3 py-1.5 text-xs font-semibold border-l border-line {{if eq .View "month"}}bg-primary text-white{{else}}text-ink-muted bg-white hover:bg-hover{{end}}">월간</a>
         </div>
         {{if eq .View "day"}}
-        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+        <div class="inline-flex rounded-lg border border-line overflow-hidden shadow-sm">
           <a href="/workboard/register?view=day&date={{.Date}}{{.AssigneeQ}}"
-             class="px-3 py-1.5 text-xs font-semibold {{if ne .Display "kanban"}}bg-slate-800 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">일정표</a>
+             class="px-3 py-1.5 text-xs font-semibold {{if ne .Display "kanban"}}bg-slate-800 text-white{{else}}text-ink-muted bg-white hover:bg-hover{{end}}">일정표</a>
           <a href="/workboard/register?view=day&date={{.Date}}{{.AssigneeQ}}&display=kanban"
-             class="px-3 py-1.5 text-xs font-semibold border-l border-slate-200 {{if eq .Display "kanban"}}bg-slate-800 text-white{{else}}text-slate-600 bg-white hover:bg-slate-50{{end}}">칸반</a>
+             class="px-3 py-1.5 text-xs font-semibold border-l border-line {{if eq .Display "kanban"}}bg-slate-800 text-white{{else}}text-ink-muted bg-white hover:bg-hover{{end}}">칸반</a>
         </div>
         {{end}}
-        <div class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-0.5 shadow-sm">
+        <div class="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-1 py-0.5 shadow-sm">
           <a href="/workboard/register?view={{.View}}&date={{.PrevDate}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}"
-             class="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md" title="이전">←</a>
+             class="px-2 py-1 text-xs font-medium text-ink-muted hover:bg-hover rounded-md" title="이전">←</a>
           <form method="GET" action="/workboard/register" class="flex items-center">
             <input type="hidden" name="view" value="{{.View}}">
             {{if eq .Display "kanban"}}<input type="hidden" name="display" value="kanban">{{end}}
@@ -280,21 +280,21 @@
             {{if .ProjectFilter}}<input type="hidden" name="project" value="{{.ProjectFilter}}">{{end}}
             {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
             <input type="date" name="date" value="{{.Date}}" onchange="this.form.submit()"
-                   class="border-0 bg-transparent px-1 py-1 text-xs text-slate-700 focus:ring-0">
+                   class="border-0 bg-transparent px-1 py-1 text-xs text-ink focus:ring-0">
           </form>
           <a href="/workboard/register?view={{.View}}&date={{.NextDate}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}"
-             class="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md" title="다음">→</a>
+             class="px-2 py-1 text-xs font-medium text-ink-muted hover:bg-hover rounded-md" title="다음">→</a>
           <a href="/workboard/register?view={{.View}}&date={{.Today}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}"
-             class="px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-md">오늘</a>
+             class="px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft rounded-md">오늘</a>
         </div>
         {{if .CanWrite}}
         <button type="button" @click="openTaskModal()"
-                class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/20">
+                class="px-3 py-1.5 text-xs font-semibold text-white bg-primary rounded-lg hover:bg-primary-hover shadow-sm shadow-blue-600/20">
           + 일일 업무 등록
         </button>
         {{else if .CanUnlockPast}}
         <button type="button" @click="unlockOpen=true"
-                class="px-3 py-1.5 text-xs font-semibold border border-amber-500 bg-amber-50 text-amber-900 rounded-lg hover:bg-amber-100">
+                class="px-3 py-1.5 text-xs font-semibold border border-amber-500 bg-warning-soft text-warning rounded-lg hover:bg-warning-soft">
           수정 잠금 해제
         </button>
         {{end}}
@@ -313,7 +313,7 @@
     <input type="hidden" name="complete_note">
     <input type="hidden" name="confirm_reopen">
   </form>
-  <form method="post" action="/workboard/schedule" x-ref="placeForm" class="hidden">
+  <form method="post" action="/workboard/schedule" x-ref="placeForm" class="js-keep-modal hidden">
     <input type="hidden" name="redirect" value="/workboard/register?view={{.View}}&date={{.Date}}{{if eq .Display "kanban"}}{{.DisplayQ}}{{else}}{{.AssigneeQ}}{{end}}">
     <input type="hidden" name="kind">
     <input type="hidden" name="ref_id">
@@ -326,23 +326,23 @@
     <input type="hidden" name="end_time">
   </form>
 
-  <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900 shadow-sm"
+  <div class="rounded-xl border border-primary bg-primary-soft px-4 py-2 text-xs text-blue-900 shadow-sm"
        x-show="sel" x-cloak>
     <span class="font-semibold" x-text="sel ? sel.title : ''"></span>
-    <span class="text-blue-700/80"> 선택됨 · 일정표 칸을 클릭하면 그 시각으로 배정됩니다.</span>
+    <span class="text-primary/80"> 선택됨 · 일정표 칸을 클릭하면 그 시각으로 배정됩니다.</span>
     <button type="button" @click="sel=null" class="ml-2 font-medium underline decoration-blue-400 hover:text-blue-950">선택 해제</button>
   </div>
   {{end}}
 
   {{if eq .Display "kanban"}}
   {{template "kanban_board" .}}
-  <p class="text-[11px] text-slate-500">다섯 열 합계 <span class="font-semibold text-slate-700">{{.KanbanTotal}}</span>건 · 한 카드는 한 열에만 있습니다</p>
+  <p class="text-[11px] text-ink-muted">다섯 열 합계 <span class="font-semibold text-ink">{{.KanbanTotal}}</span>건 · 한 카드는 한 열에만 있습니다</p>
 
   <div x-show="kanbanAskAssignee" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" @click.outside="kanbanAskAssignee=false">
-      <h3 class="font-semibold text-slate-800">담당자를 지정하세요</h3>
-      <p class="text-xs text-slate-500">담당자 없이 예정일만 잡으면 미계획으로 돌아갑니다.</p>
-      <select x-model="kanbanAssignee" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+      <h3 class="font-semibold text-ink">담당자를 지정하세요</h3>
+      <p class="text-xs text-ink-muted">담당자 없이 예정일만 잡으면 미계획으로 돌아갑니다.</p>
+      <select x-model="kanbanAssignee" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
         <option value="">선택</option>
         {{range .Assignees}}
         <option value="{{.FullName}}">{{.FullName}}</option>
@@ -350,18 +350,18 @@
       </select>
       <div class="flex justify-end gap-2">
         <button type="button" class="px-3 py-1.5 text-xs rounded-lg border" @click="kanbanAskAssignee=false">취소</button>
-        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white" @click="if(kanbanAssignee) submitKanban()">확인</button>
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-primary text-white" @click="if(kanbanAssignee) submitKanban()">확인</button>
       </div>
     </div>
   </div>
   <div x-show="kanbanAskComplete" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" @click.outside="kanbanAskComplete=false">
-      <h3 class="font-semibold text-slate-800">완료 내용</h3>
-      <p class="text-xs text-slate-500">완료 처리를 위해 조치 내용을 입력하세요.</p>
-      <textarea x-model="kanbanNote" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"></textarea>
+      <h3 class="font-semibold text-ink">완료 내용</h3>
+      <p class="text-xs text-ink-muted">완료 처리를 위해 조치 내용을 입력하세요.</p>
+      <textarea x-model="kanbanNote" rows="3" class="w-full border border-line rounded-lg px-3 py-2 text-sm"></textarea>
       <div class="flex justify-end gap-2">
         <button type="button" class="px-3 py-1.5 text-xs rounded-lg border" @click="kanbanAskComplete=false">취소</button>
-        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white" @click="if(kanbanNote.trim()) submitKanban()">완료</button>
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-primary text-white" @click="if(kanbanNote.trim()) submitKanban()">완료</button>
       </div>
     </div>
   </div>
@@ -371,8 +371,8 @@
 
     {{if eq .View "month"}}
     {{/* 월간 캘린더 (피그마형) */}}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center">
+    <div class="bg-white rounded-xl border border-line shadow-sm overflow-hidden">
+      <div class="grid grid-cols-7 border-b border-line bg-hover text-center">
         {{range $i, $d := list "일" "월" "화" "수" "목" "금" "토"}}
         <div class="px-1 py-2 text-[11px] font-bold border-r border-slate-100 last:border-r-0"
              style="{{if eq $i 0}}color:#DC2626{{else if eq $i 6}}color:#2563EB{{else}}color:#64748B{{end}}">{{$d}}</div>
@@ -382,7 +382,7 @@
         {{range .MonthWeeks}}
         <div class="grid grid-cols-7 min-h-[7.5rem]">
           {{range .}}
-          <div class="relative border-r border-slate-50 last:border-r-0 p-1.5 min-h-[7.5rem] {{if not .InMonth}}bg-slate-50/60{{else}}bg-white{{end}} {{if .InMonth}}hover:bg-blue-50/50 cursor-pointer{{end}} transition-colors"
+          <div class="relative border-r border-slate-50 last:border-r-0 p-1.5 min-h-[7.5rem] {{if not .InMonth}}bg-hover/60{{else}}bg-white{{end}} {{if .InMonth}}hover:bg-primary-soft/50 cursor-pointer{{end}} transition-colors"
                style="{{if .InMonth}}{{.CellStyle}}{{end}}"
                title="{{.DateTitle}}"
                {{if .InMonth}}data-date="{{.Date}}" data-time=""
@@ -393,14 +393,14 @@
               <span class="text-[11px] font-semibold {{if not .InMonth}}text-slate-300{{end}}"
                     style="{{if .InMonth}}{{.DayStyle}}{{end}}">{{.DayNum}}</span>
               {{if and .InMonth (gt .Total 0)}}
-              <span class="text-[9px] text-slate-400 tabular-nums">{{.Total}}건</span>
+              <span class="text-[9px] text-ink-subtle tabular-nums">{{.Total}}건</span>
               {{end}}
             </div>
             {{if and .InMonth .HolidayName}}
             <p class="text-[9px] leading-tight truncate mb-0.5" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
             {{end}}
             {{if and .InMonth (gt .Unassigned 0)}}
-            <span class="inline-flex mb-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-orange-100 text-orange-700">미배정 {{.Unassigned}}</span>
+            <span class="inline-flex mb-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-orange-100 text-warning">미배정 {{.Unassigned}}</span>
             {{end}}
             {{if and .InMonth .Leaves.Shown}}
             <div class="mb-1 space-y-0.5" x-data="{open:false}">
@@ -409,7 +409,7 @@
                     style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
               {{end}}
               {{if gt .Leaves.More 0}}
-              <button type="button" class="block text-[9px] text-orange-700 hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
+              <button type="button" class="block text-[9px] text-warning hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
               <div x-show="open" x-cloak class="space-y-0.5">
                 {{range .Leaves.Hidden}}
                 <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
@@ -433,7 +433,7 @@
               {{end}}
               {{if gt .MoreCount 0}}
               <a href="/workboard/register?view=day&date={{.Date}}{{$.AssigneeQ}}"
-                 class="block text-[9px] text-blue-600 hover:underline px-0.5"
+                 class="block text-[9px] text-primary hover:underline px-0.5"
                  @click.stop>+{{.MoreCount}}건 더보기</a>
               {{end}}
             </div>
@@ -446,10 +446,10 @@
     {{else}}
     <div class="min-w-0 space-y-2">
     {{if .UndatedCards}}
-    <div class="rounded-xl border border-amber-200 bg-amber-50/80 shadow-sm overflow-hidden">
+    <div class="rounded-xl border border-amber-200 bg-warning-soft/80 shadow-sm overflow-hidden">
       <div class="px-3 py-1.5 border-b border-amber-200 flex items-center justify-between">
-        <p class="text-xs font-bold text-amber-900">날짜 미정 <span class="font-semibold opacity-80">({{len .UndatedCards}}건)</span></p>
-        <p class="text-[10px] text-amber-800/80">시간표에 끌어다 날짜를 잡습니다</p>
+        <p class="text-xs font-bold text-warning">날짜 미정 <span class="font-semibold opacity-80">({{len .UndatedCards}}건)</span></p>
+        <p class="text-[10px] text-warning/80">시간표에 끌어다 날짜를 잡습니다</p>
       </div>
       <div class="flex flex-wrap gap-1.5 p-2">
         {{range .UndatedCards}}
@@ -473,22 +473,22 @@
     {{end}}
     {{if eq .View "day"}}
     {{/* 일일 — 담당자 열. 주간은 아래 else (기존 요일 열) */}}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-line shadow-sm overflow-hidden">
       {{if eq (len .DayColumns) 0}}
       <div x-show="extraCols.length===0" class="px-4 py-10 text-center space-y-3">
-        <p class="text-sm text-slate-500">배치된 업무가 없습니다</p>
+        <p class="text-sm text-ink-muted">배치된 업무가 없습니다</p>
         {{if and .CanWrite .ExtraAssignees}}
         <div class="relative inline-block">
           <button type="button" @click="addOpen=!addOpen"
-                  class="px-3 py-1.5 text-xs font-semibold text-blue-700 border border-blue-200 rounded-lg bg-white hover:bg-blue-50">
+                  class="px-3 py-1.5 text-xs font-semibold text-primary border border-primary rounded-lg bg-white hover:bg-primary-soft">
             ＋담당자
           </button>
           <div x-show="addOpen" x-cloak @click.outside="addOpen=false"
-               class="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-40 min-w-[8rem] max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1 text-left">
+               class="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-40 min-w-[8rem] max-h-56 overflow-y-auto rounded-lg border border-line bg-white shadow-lg py-1 text-left">
             {{range .ExtraAssignees}}
-            <button type="button" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-slate-50"
-                    x-show="extraCols.indexOf({{printf "%q" .}}) < 0"
-                    @click="addExtra({{printf "%q" .}})">{{.}}</button>
+            <button type="button" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover"
+                    x-show="extraCols.indexOf({{toJSON .}}) < 0"
+                    @click="addExtra({{toJSON .}})">{{.}}</button>
             {{end}}
           </div>
         </div>
@@ -497,38 +497,38 @@
       {{end}}
       <div class="max-h-[74vh] overflow-auto" x-show="{{len .DayColumns}} > 0 || extraCols.length > 0">
         <div :style="'min-width:calc(3rem + ' + (({{len .DayColumns}} + extraCols.length) * {{.AssigneeColMin}}) + 'px)'">
-          <div class="sticky top-0 z-20 flex border-b border-slate-200 bg-slate-50/95 backdrop-blur">
-            <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-slate-400 border-r border-slate-200 sticky left-0 z-30 bg-slate-50">시간</div>
+          <div class="sticky top-0 z-20 flex border-b border-line bg-hover/95 backdrop-blur">
+            <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-ink-subtle border-r border-line sticky left-0 z-30 bg-hover">시간</div>
             {{range .DayColumns}}
-            <div class="px-1.5 py-2 border-r border-slate-200 text-center {{if .Unassigned}}bg-slate-100{{end}}"
+            <div class="px-1.5 py-2 border-r border-line text-center {{if .Unassigned}}bg-hover{{end}}"
                  style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{if .Unassigned}}background-color:#f1f5f9;{{else}}{{.CellStyle}}{{end}}"
                  title="{{.Label}}{{if .Sub}} · {{.Sub}}{{end}}">
-              <p class="text-[11px] font-bold truncate {{if .Unassigned}}text-slate-500{{end}}">{{.Label}}</p>
-              <p class="text-[9px] truncate {{if .Unassigned}}text-slate-500{{else}}text-slate-400{{end}}">{{.Sub}}</p>
-              {{if .Unregistered}}<p class="text-[9px] text-slate-500" title="사용자 미등록">미등록</p>{{end}}
-              {{if .OnLeave}}<p class="text-[9px] text-orange-700">연차</p>{{end}}
+              <p class="text-[11px] font-bold truncate {{if .Unassigned}}text-ink-muted{{end}}">{{.Label}}</p>
+              <p class="text-[9px] truncate {{if .Unassigned}}text-ink-muted{{else}}text-ink-subtle{{end}}">{{.Sub}}</p>
+              {{if .Unregistered}}<p class="text-[9px] text-ink-muted" title="사용자 미등록">미등록</p>{{end}}
+              {{if .OnLeave}}<p class="text-[9px] text-warning">연차</p>{{end}}
             </div>
             {{end}}
             <template x-for="name in extraCols" :key="'h-'+name">
-              <div class="px-1.5 py-2 border-r border-slate-200 text-center bg-slate-50"
+              <div class="px-1.5 py-2 border-r border-line text-center bg-hover"
                    :style="'min-width:{{.AssigneeColMin}}px;flex:1 1 {{.AssigneeColMin}}px'">
-                <p class="text-[11px] font-bold text-slate-700 truncate" x-text="name"></p>
-                <p class="text-[9px] text-slate-400">0건</p>
-                <p class="text-[9px] text-orange-700" x-show="onLeave(name)" x-cloak>연차</p>
+                <p class="text-[11px] font-bold text-ink truncate" x-text="name"></p>
+                <p class="text-[9px] text-ink-subtle">0건</p>
+                <p class="text-[9px] text-warning" x-show="onLeave(name)" x-cloak>연차</p>
               </div>
             </template>
             {{if and .CanWrite .ExtraAssignees}}
-            <div class="shrink-0 sticky right-0 z-30 bg-slate-50/95 px-1 py-1.5 border-l border-slate-200 relative">
+            <div class="shrink-0 sticky right-0 z-30 bg-hover/95 px-1 py-1.5 border-l border-line relative">
               <button type="button" @click="addOpen=!addOpen"
-                      class="px-2 py-1 text-[10px] font-semibold text-blue-700 border border-blue-200 rounded-md bg-white hover:bg-blue-50 whitespace-nowrap">
+                      class="px-2 py-1 text-[10px] font-semibold text-primary border border-primary rounded-md bg-white hover:bg-primary-soft whitespace-nowrap">
                 ＋담당자
               </button>
               <div x-show="addOpen" x-cloak @click.outside="addOpen=false"
-                   class="absolute right-0 top-full mt-1 z-40 min-w-[8rem] max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+                   class="absolute right-0 top-full mt-1 z-40 min-w-[8rem] max-h-56 overflow-y-auto rounded-lg border border-line bg-white shadow-lg py-1">
                 {{range .ExtraAssignees}}
-                <button type="button" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-slate-50"
-                        x-show="extraCols.indexOf({{printf "%q" .}}) < 0"
-                        @click="addExtra({{printf "%q" .}})">{{.}}</button>
+                <button type="button" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover"
+                        x-show="extraCols.indexOf({{toJSON .}}) < 0"
+                        @click="addExtra({{toJSON .}})">{{.}}</button>
                 {{end}}
               </div>
             </div>
@@ -537,19 +537,19 @@
           <div class="flex relative">
             <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-30 bg-white">
               {{range .SlotTimes}}
-              <div class="box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-slate-50{{end}}"
+              <div class="box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-hover{{end}}"
                    style="height:{{$.SlotRem}}rem">
-                <span class="block text-right text-[9px] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-slate-600{{else}}text-slate-300{{end}}"
+                <span class="block text-right text-[9px] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-ink-muted{{else}}text-slate-300{{end}}"
                       style="line-height:{{$.SlotRem}}rem">{{.}}</span>
               </div>
               {{end}}
             </div>
             {{range .DayColumns}}
             {{$col := .}}
-            <div class="relative border-r border-slate-50 {{if $col.Unassigned}}bg-slate-50/80{{end}}"
+            <div class="relative border-r border-slate-50 {{if $col.Unassigned}}bg-hover/80{{end}}"
                  style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{$.GridHeightStyle}}">
               {{range $i, $t := $.SlotTimes}}
-              <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-blue-50/60 cursor-pointer"
+              <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-primary-soft/60 cursor-pointer"
                    style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"
                    data-date="{{$col.Date}}" data-time="{{$t}}" data-assignee="{{$col.Assignee}}"
                    @click="place($event.currentTarget)"
@@ -575,7 +575,7 @@
                    {{end}}
                    title="{{if .IsSupport}}지원 · {{end}}{{if .OverlapWarn}}같은 담당자 시간 겹침 · {{end}}{{.Card.Title}}{{if .Card.SubTitle}} · {{.Card.SubTitle}}{{end}} · {{.Card.StartTime}}~{{.Card.EndTime}}">
                 {{if .IsSupport}}
-                <span class="absolute left-0 top-0 z-10 text-[8px] leading-none px-0.5 rounded-br bg-white/90 text-slate-600 border-r border-b border-dashed">지원</span>
+                <span class="absolute left-0 top-0 z-10 text-[8px] leading-none px-0.5 rounded-br bg-white/90 text-ink-muted border-r border-b border-dashed">지원</span>
                 {{else if .OverlapWarn}}
                 <span class="absolute left-0 top-0 z-10 text-[9px] leading-none text-amber-600" title="같은 담당자 시간 겹침">⚠</span>
                 {{end}}
@@ -589,12 +589,12 @@
                   <span class="shrink-0 inline-flex items-center gap-0.5">
                     {{if $.CanWrite}}
                     <button type="button"
-                            class="px-1 rounded border border-blue-300/80 bg-white/95 text-[8px] font-semibold text-blue-700 hover:bg-blue-50"
+                            class="px-1 rounded border border-blue-300/80 bg-white/95 text-[8px] font-semibold text-primary hover:bg-primary-soft"
                             @click.stop="openWork($event.currentTarget.closest('[data-kind]'))"
                             title="{{if eq .Card.Category "as"}}AS 조치 화면{{else if eq .Card.Category "maintenance"}}정기점검 방문 조치{{else}}업무 화면{{end}}">조치</button>
                     {{if .Card.EditHref}}
                     <button type="button"
-                            class="px-1 rounded border border-slate-300/80 bg-white/95 text-[8px] font-semibold text-slate-700 hover:bg-slate-50"
+                            class="px-1 rounded border border-line/80 bg-white/95 text-[8px] font-semibold text-ink hover:bg-hover"
                             @click.stop="editWork($event.currentTarget.closest('[data-kind]'))"
                             title="일일 업무 등록">수정</button>
                     {{end}}
@@ -613,7 +613,7 @@
                   <input type="hidden" name="redirect" value="/workboard/register?view={{$.View}}&date={{$.Date}}{{$.AssigneeQ}}">
                   <input type="hidden" name="task_id" value="{{.Card.TaskID}}">
                   <button type="submit"
-                          class="w-4 h-4 flex items-center justify-center rounded text-sm leading-none text-slate-400 hover:text-red-600 hover:bg-white/90"
+                          class="w-4 h-4 flex items-center justify-center rounded text-sm leading-none text-ink-subtle hover:text-danger hover:bg-white/90"
                           title="대기 목록으로 내리기">&times;</button>
                 </form>
                 {{end}}
@@ -625,7 +625,7 @@
               <div class="relative border-r border-slate-50"
                    :style="'min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{$.GridHeightStyle}}'">
                 {{range $i, $t := $.SlotTimes}}
-                <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-blue-50/60 cursor-pointer"
+                <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-primary-soft/60 cursor-pointer"
                      style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"
                      data-date="{{$.Date}}" data-time="{{$t}}"
                      x-bind:data-assignee="name"
@@ -641,19 +641,19 @@
     </div>
     {{else}}
     {{/* 주간 일정표 — 기존 요일 열. 일일 변경이 여기 영향을 주지 않게 둔다 */}}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-line shadow-sm overflow-hidden">
       <div class="max-h-[74vh] overflow-auto">
         <div class="min-w-[36rem]">
-          <div class="sticky top-0 z-20 flex border-b border-slate-200 bg-slate-50/95 backdrop-blur">
-            <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-slate-400 border-r border-slate-200">시간</div>
+          <div class="sticky top-0 z-20 flex border-b border-line bg-hover/95 backdrop-blur">
+            <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-ink-subtle border-r border-line">시간</div>
             {{range .DayColumns}}
-            <div class="flex-1 min-w-0 px-1.5 py-2 border-r border-slate-200 last:border-r-0 text-center"
+            <div class="flex-1 min-w-0 px-1.5 py-2 border-r border-line last:border-r-0 text-center"
                  style="{{.CellStyle}}" title="{{.DateTitle}}">
               <p class="text-[11px] font-bold" style="{{.DayStyle}}">{{.Label}}</p>
               {{if .HolidayName}}
               <p class="text-[9px] truncate" style="{{.DayStyle}}" title="{{.HolidayName}}">{{.HolidayName}}</p>
               {{else}}
-              <p class="text-[9px] text-slate-400">{{.Sub}}</p>
+              <p class="text-[9px] text-ink-subtle">{{.Sub}}</p>
               {{end}}
               {{if .Leaves.Shown}}
               <div class="mt-1 space-y-0.5" x-data="{open:false}">
@@ -662,7 +662,7 @@
                       style="background-color:{{.Color}}" title="{{.Text}}">{{.Text}}</span>
                 {{end}}
                 {{if gt .Leaves.More 0}}
-                <button type="button" class="block w-full text-[9px] text-orange-700 hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
+                <button type="button" class="block w-full text-[9px] text-warning hover:underline" @click.stop="open=!open">외 {{.Leaves.More}}명</button>
                 <div x-show="open" x-cloak class="space-y-0.5">
                   {{range .Leaves.Hidden}}
                   <span class="block truncate rounded px-1 py-px text-[9px] leading-tight text-white {{if .Bold}}font-bold{{end}}"
@@ -678,9 +678,9 @@
           <div class="flex relative">
             <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-10 bg-white">
               {{range .SlotTimes}}
-              <div class="box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-slate-50{{end}}"
+              <div class="box-border border-t border-slate-100 px-1 {{if hasSuffix . ":00"}}bg-hover{{end}}"
                    style="height:{{$.SlotRem}}rem">
-                <span class="block text-right text-[9px] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-slate-600{{else}}text-slate-300{{end}}"
+                <span class="block text-right text-[9px] pr-0.5 {{if hasSuffix . ":00"}}font-bold text-ink-muted{{else}}text-slate-300{{end}}"
                       style="line-height:{{$.SlotRem}}rem">{{.}}</span>
               </div>
               {{end}}
@@ -690,7 +690,7 @@
             <div class="flex-1 min-w-0 relative border-r border-slate-50 last:border-r-0"
                  style="{{$.GridHeightStyle}};{{$col.CellStyle}}">
               {{range $i, $t := $.SlotTimes}}
-              <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-blue-50/60 cursor-pointer"
+              <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-primary-soft/60 cursor-pointer"
                    style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"
                    data-date="{{$col.Date}}" data-time="{{$t}}"
                    @click="place($event.currentTarget)"
@@ -716,12 +716,12 @@
                   <span class="shrink-0 inline-flex items-center gap-0.5">
                     {{if $.CanWrite}}
                     <button type="button"
-                            class="px-1 rounded border border-blue-300/80 bg-white/95 text-[8px] font-semibold text-blue-700 hover:bg-blue-50"
+                            class="px-1 rounded border border-blue-300/80 bg-white/95 text-[8px] font-semibold text-primary hover:bg-primary-soft"
                             @click.stop="openWork($event.currentTarget.closest('[data-kind]'))"
                             title="{{if eq .Card.Category "as"}}AS 조치 화면{{else if eq .Card.Category "maintenance"}}정기점검 방문 조치{{else}}업무 화면{{end}}">조치</button>
                     {{if .Card.EditHref}}
                     <button type="button"
-                            class="px-1 rounded border border-slate-300/80 bg-white/95 text-[8px] font-semibold text-slate-700 hover:bg-slate-50"
+                            class="px-1 rounded border border-line/80 bg-white/95 text-[8px] font-semibold text-ink hover:bg-hover"
                             @click.stop="editWork($event.currentTarget.closest('[data-kind]'))"
                             title="일일 업무 등록">수정</button>
                     {{end}}
@@ -739,7 +739,7 @@
                   <input type="hidden" name="redirect" value="/workboard/register?view={{$.View}}&date={{$.Date}}{{$.AssigneeQ}}">
                   <input type="hidden" name="task_id" value="{{.Card.TaskID}}">
                   <button type="submit"
-                          class="w-4 h-4 flex items-center justify-center rounded text-sm leading-none text-slate-400 hover:text-red-600 hover:bg-white/90"
+                          class="w-4 h-4 flex items-center justify-center rounded text-sm leading-none text-ink-subtle hover:text-danger hover:bg-white/90"
                           title="대기 목록으로 내리기">&times;</button>
                 </form>
                 {{end}}
@@ -758,18 +758,18 @@
     {{/* 우측: 일일 업무 미확정(일자 미배정) 대기 목록 — 왼쪽 확정 건과 겹치지 않음 */}}
     <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-2 min-w-0">
       <div class="sm:col-span-3 xl:col-span-1 flex items-center justify-between gap-2 px-0.5">
-        <p class="text-[11px] text-slate-500">단위 업무별 대기 · {{if .PaletteAll}}전체{{else}}미확정만{{end}}</p>
-        <div class="inline-flex rounded border border-slate-200 text-[10px] overflow-hidden">
-          <a href="/workboard/register?view={{.View}}&date={{.Date}}{{.FilterQ}}" class="px-2 py-0.5 {{if not .PaletteAll}}bg-slate-700 text-white{{else}}bg-white text-slate-600{{end}}">미배치</a>
-          <a href="/workboard/register?view={{.View}}&date={{.Date}}{{.FilterQ}}&palette=all" class="px-2 py-0.5 {{if .PaletteAll}}bg-slate-700 text-white{{else}}bg-white text-slate-600{{end}}">전체</a>
+        <p class="text-[11px] text-ink-muted">단위 업무별 대기 · {{if .PaletteAll}}전체{{else}}미확정만{{end}}</p>
+        <div class="inline-flex rounded border border-line text-[10px] overflow-hidden">
+          <a href="/workboard/register?view={{.View}}&date={{.Date}}{{.FilterQ}}" class="px-2 py-0.5 {{if not .PaletteAll}}bg-slate-700 text-white{{else}}bg-white text-ink-muted{{end}}">미배치</a>
+          <a href="/workboard/register?view={{.View}}&date={{.Date}}{{.FilterQ}}&palette=all" class="px-2 py-0.5 {{if .PaletteAll}}bg-slate-700 text-white{{else}}bg-white text-ink-muted{{end}}">전체</a>
         </div>
       </div>
-      {{template "wb_palette" (wbPalette "AS" "border-rose-200" "text-rose-700" "bg-rose-50" .ASCards .CanWrite)}}
-      {{template "wb_palette" (wbPalette "정기점검" "border-sky-200" "text-sky-700" "bg-sky-50" .MntCards .CanWrite)}}
-      {{template "wb_palette" (wbPalette "행정관련업무" "border-violet-200" "text-violet-700" "bg-violet-50" .AdminCards .CanWrite)}}
-      {{template "wb_palette" (wbPalette "영업" "border-orange-200" "text-orange-700" "bg-orange-50" .SalesCards .CanWrite)}}
-      {{if .WorkCards}}{{template "wb_palette" (wbPalette "작업" "border-emerald-200" "text-emerald-800" "bg-emerald-50" .WorkCards .CanWrite)}}{{end}}
-      {{template "wb_palette" (wbPalette "미계획업무" "border-amber-200" "text-amber-800" "bg-amber-50" .UnassignedCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "AS" "border-danger" "text-danger" "bg-danger-soft" .ASCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "정기점검" "border-info" "text-info" "bg-info-soft" .MntCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "행정관련업무" "border-primary" "text-primary" "bg-primary-soft" .AdminCards .CanWrite)}}
+      {{template "wb_palette" (wbPalette "영업" "border-warning" "text-warning" "bg-warning-soft" .SalesCards .CanWrite)}}
+      {{if .WorkCards}}{{template "wb_palette" (wbPalette "작업" "border-success" "text-success" "bg-success-soft" .WorkCards .CanWrite)}}{{end}}
+      {{template "wb_palette" (wbPalette "미계획업무" "border-amber-200" "text-warning" "bg-warning-soft" .UnassignedCards .CanWrite)}}
     </div>
 
   </div>
@@ -785,15 +785,15 @@
        @keydown.escape.window="unlockOpen=false">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md" @click.outside="unlockOpen=false">
       <div class="px-5 py-3 border-b flex items-center justify-between">
-        <h3 class="font-semibold text-gray-800">지난 날짜 수정 잠금 해제</h3>
-        <button type="button" @click="unlockOpen=false" class="text-gray-400 hover:text-gray-700 text-xl">&times;</button>
+        <h3 class="font-semibold text-ink">지난 날짜 수정 잠금 해제</h3>
+        <button type="button" @click="unlockOpen=false" class="text-ink-subtle hover:text-ink text-xl">&times;</button>
       </div>
       <form method="POST" action="/workboard/register/unlock-past" class="p-5 space-y-4">
         <input type="hidden" name="date" value="{{.Date}}">
         <input type="hidden" name="redirect" value="{{.UnlockRedirect}}">
-        <p class="text-sm text-gray-600">AS 완료 건 수정과 <strong>동일한</strong> 수정 전용 비밀번호를 입력하세요. 해제 후 30분간 이 날짜를 수정할 수 있습니다.</p>
+        <p class="text-sm text-ink-muted">AS 완료 건 수정과 <strong>동일한</strong> 수정 전용 비밀번호를 입력하세요. 해제 후 30분간 이 날짜를 수정할 수 있습니다.</p>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">수정 비밀번호 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-ink mb-1">수정 비밀번호 <span class="text-red-500">*</span></label>
           <input type="password" name="unlock_password" required autocomplete="off"
                  class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="수정 전용 비밀번호">
         </div>

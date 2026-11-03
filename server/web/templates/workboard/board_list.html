@@ -1,6 +1,7 @@
 {{define "title"}}업무 관리 · 일일 업무{{end}}
 {{define "content"}}
 {{template "board_shell_open" .}}
+{{if .ShowMemberFilter}}<div x-data="memberFilterBox()">{{end}}
   <section class="card">
     <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
       <div class="flex flex-wrap items-end gap-3">
@@ -13,29 +14,39 @@
       <div class="flex flex-wrap items-center gap-2">
         {{template "board_scope_toggle" .}}
         {{template "view_group_toggle" .}}
+        {{if .ShowMemberFilter}}
+        <button type="button" class="btn btn-secondary btn-sm" x-show="closed" x-cloak @click="openBox()" aria-label="팀원별 보기 열기">팀원별 보기</button>
+        {{end}}
         {{template "schedule_show_toggle" .}}
+        {{template "board_view_links" .}}
+        {{template "board_period_seg_list" .}}
         <form method="get" action="/workboard/board" class="contents">
           <input type="hidden" name="view" value="list">
           <input type="hidden" name="date" value="{{.Date}}">
+          {{if and .ListRange (ne .ListRange `day`)}}<input type="hidden" name="range" value="{{.ListRange}}">{{end}}
           {{if .ShowParam}}<input type="hidden" name="show" value="{{.ShowParam}}">{{end}}
           {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
           {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
+          {{range .TeamMembers}}{{if .Checked}}<input type="hidden" name="members" value="{{.UserID}}">{{end}}{{end}}
           <input name="q" value="{{.Q}}" placeholder="업무 검색" class="h-9 w-full rounded-[10px] border border-line bg-hover px-3 text-ui text-ink md:w-56" aria-label="업무 검색">
         </form>
         <a href="{{.CalHref}}" class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 text-ui font-semibold text-ink hover:bg-hover">일정 캘린더 보기</a>
         {{template "board_new_work_btn" .}}
         <span class="rounded-full bg-success-soft px-4 py-2 text-ui font-bold text-success">전체 {{.Count}}건</span>
         <div class="flex items-center gap-1 text-ui font-semibold text-ink-muted">
-          <a href="{{.PrevHref}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="이전 날">‹</a>
+          <a href="{{.PrevHref}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="이전">‹</a>
           <a href="{{.TodayHref}}" class="inline-flex h-6 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm">오늘</a>
-          <a href="{{.NextHref}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="다음 날">›</a>
-          <span class="ml-1">{{.DateLabel}}</span>
+          <a href="{{.NextHref}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="다음">›</a>
+          <span class="ml-1">{{.PeriodLabel}}</span>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="card mt-4 overflow-hidden js-bulk-select" x-data="workListSelect({{printf "%q" .CSRFToken}})" x-init="sync()" id="work-list-select">
+  {{template "board_member_filter" .}}
+{{if .ShowMemberFilter}}</div>{{end}}
+
+  <section class="card mt-4 overflow-x-auto js-bulk-select" data-grid-cols="workboard_list" x-data="workListSelect({{toJSON .CSRFToken}})" x-init="sync()" id="work-list-select">
     <div class="js-wl-bar sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-line bg-canvas px-4 py-2 md:px-6">
       <span class="text-ui font-semibold text-ink">총 {{.Count}}개의 업무</span>
       <div class="flex flex-wrap items-center gap-2">
@@ -46,6 +57,7 @@
                 @click="preview()"
                 x-text="n>0 ? ('선택 삭제 (' + n + ')') : '선택 삭제'">선택 삭제</button>
         <button type="button" class="btn btn-secondary btn-sm" x-show="n>0" x-cloak @click="clear()">선택 해제</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-table-cols-reset="workboard_list">열 너비 초기화</button>
       </div>
     </div>
     <div class="wl-head border-b border-line bg-canvas px-6 py-3 text-ui-sm text-ink-muted">
@@ -54,31 +66,50 @@
       </div>
       <div>업무 정보</div><div>거래처 / 위치</div><div>일정</div><div>담당자</div><div>상태</div>
     </div>
+    {{range .ListGroups}}
+    {{if .Label}}<div class="border-t border-line bg-canvas px-6 py-2 text-ui font-bold text-ink" data-list-date="{{.Date}}">{{.Label}}</div>{{end}}
     {{range .Items}}
-    <div class="wl-row border-t border-line px-4 py-2 text-ink hover:bg-hover md:px-6">
+    <div class="wl-row border-t border-line px-4 py-2 text-ink hover:bg-hover md:px-6 {{if .Fragment}}pl-8{{end}}">
       <div class="wl-check flex items-center" @click.stop>
-        {{if and .CanDelete .DeleteKey}}
+        {{if .Fragment}}
+        {{else if and .CanDelete .DeleteKey}}
         <input type="checkbox" class="js-wl-check" name="ids" value="{{.DeleteKey}}" title="선택"
                data-title="{{.Task.Title}}" @change="sync()">
         {{else}}
         <input type="checkbox" class="js-wl-check-off" disabled title="{{.DeleteDisabledReason}}">
         {{end}}
       </div>
+      <div class="flex min-w-0 items-center gap-2">
       <a href="{{.Href}}" class="flex min-w-0 items-center gap-2 text-ink hover:underline" title="{{.Type.Label}} {{.Task.Title}}">
+        {{if .Fragment}}
+        <span class="text-ink-muted text-ui" data-seg-frag="1">┗</span>
+        <span class="truncate"><span class="font-bold">{{.Task.Title}}</span>{{if .SegLabel}} · {{.SegLabel}}{{end}}</span>
+        {{else}}
         <span class="{{.Type.Bg}} grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ui font-extrabold">{{.Type.Letter}}</span>
-        <span class="truncate"><span class="{{.Type.Text}} text-ui-sm font-bold">{{.Type.Label}}</span> · <span class="font-bold">{{.Task.Title}}</span></span>
+        <span class="truncate"><span class="{{.Type.Text}} text-ui-sm font-bold">{{.Type.Label}}</span> · <span class="font-bold">{{.Task.Title}}</span>{{if .SegLabel}} · {{.SegLabel}}{{end}}{{if .ReturnPending}} · <span class="text-warning">복귀 미확인</span>{{end}}{{if .ItemKindLine}} · <span class="text-ink-muted font-medium" data-item-kind-line="1" title="{{.ItemKindLine}}">{{.ItemKindLine}}</span>{{end}}</span>
+        {{end}}
       </a>
+      {{if .PlanEditHref}}<a href="{{.PlanEditHref}}" class="shrink-0 text-ui-sm font-semibold text-brand">계획 수정</a>{{end}}
+      {{if .CanCarry}}<button type="button" class="btn btn-secondary btn-sm shrink-0" data-carry-open="1"
+        data-carry-id="{{.Task.TaskID}}" data-carry-title="{{.Task.Title}}" data-carry-work="{{.Task.WorkDate}}"
+        data-carry-due="{{.Task.DueDate}}" data-carry-start="{{.Task.StartTime}}" data-carry-end="{{.Task.EndTime}}"
+        data-carry-days="{{.OverdueDays}}" data-carry-delayed="{{if .Overdue}}true{{else}}false{{end}}"
+        data-carry-span="{{if .ChipUntil}}true{{else}}false{{end}}">이월</button>{{end}}
+      </div>
       <a href="{{.Href}}" class="truncate text-ink hover:underline" title="{{.CustomerPlace}}">{{.CustomerPlace}}</a>
       <a href="{{.Href}}" class="truncate text-ink hover:underline" title="{{if .Unplaced}}날짜 미정{{else}}{{.ScheduleLine}}{{end}}">{{if .Unplaced}}날짜 미정{{else}}{{.ScheduleLine}}{{end}}</a>
       <a href="{{.Href}}" class="flex min-w-0 items-center text-ink hover:underline" title="{{.AssigneeTitle}}">
         <span class="mr-2 inline-grid h-7 w-7 shrink-0 place-items-center rounded-full bg-success-soft text-ui-sm font-bold text-success">{{.AssigneeInitial}}</span>
-        <span class="truncate">{{.AssigneeName}}{{.AssigneeExtra}}</span>
+        <span class="truncate" data-assignee-line title="{{.AssigneeTitle}}">{{.AssigneeLine}}</span>
       </a>
       <a href="{{.Href}}" class="truncate text-ink hover:underline" title="{{if .Overdue}}지연 {{.OverdueDays}}일{{else}}{{.Status.Label}}{{end}}">
         {{if .Overdue}}<span class="{{.Status.Class}}">지연 {{.OverdueDays}}일</span>
+          {{if .DelayReason}}<span class="block text-ui-sm text-ink-muted" title="{{.DelayReasonFull}}">{{.DelayReason}}</span>
+          {{else}}<button type="button" class="block text-ui-sm font-semibold text-danger" data-delay-reason-open="1" data-carry-id="{{.Task.TaskID}}">사유 입력</button>{{end}}
         {{else}}<span class="{{.Status.Class}}">{{.Status.Label}}</span>{{end}}
       </a>
     </div>
+    {{end}}
     {{else}}
     <p class="px-6 py-12 text-center text-ink-subtle">선택한 날짜에 배정된 업무가 없습니다.</p>
     {{end}}

@@ -272,8 +272,16 @@ func (s *Service) profilePhone(userID string) string {
 	return strings.TrimSpace(p)
 }
 
+type leaveRowQuery interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 func (s *Service) Get(id string) (*Request, error) {
-	row := s.DB.QueryRow(`SELECT r.leave_req_id, r.org_id, r.user_id, r.doc_no, r.type_key, COALESCE(r.type_note,''),
+	return s.getOn(s.DB, id)
+}
+
+func (s *Service) getOn(q leaveRowQuery, id string) (*Request, error) {
+	row := q.QueryRow(`SELECT r.leave_req_id, r.org_id, r.user_id, r.doc_no, r.type_key, COALESCE(r.type_note,''),
 		r.period_mode, r.start_date, r.end_date, COALESCE(r.start_time,''), COALESCE(r.end_time,''), COALESCE(r.half_part,''),
 		r.work_minutes, COALESCE(r.swap_date,''), COALESCE(r.swap_state,''), r.reason, COALESCE(r.destination,''),
 		COALESCE(r.contact_phone,''), COALESCE(r.deputy_user_id,''), COALESCE(du.full_name,''),

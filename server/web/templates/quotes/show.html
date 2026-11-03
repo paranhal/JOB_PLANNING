@@ -3,7 +3,6 @@
 <div class="max-w-4xl mx-auto space-y-4">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
-      <a href="/quotes" class="text-sm text-gray-500 hover:underline">← 목록</a>
       <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{if .Quote.SalesDisplayNo}}{{.Quote.SalesDisplayNo}} / {{end}}{{.Quote.DisplayNo}}</h2>
       <p class="text-sm text-gray-500 mt-1">{{.Quote.QuoteDate}} · {{quoteStatusLabel .Quote.Status}} · {{vatModeLabel .Quote.VATMode}}</p>
       <p class="mt-2 flex flex-wrap gap-1">
@@ -44,7 +43,7 @@
       {{end}}
       {{if .CanDelete}}
       <form method="post" action="/quotes/{{.Quote.QuoteID}}/delete"
-            onsubmit="return confirm({{printf "%q" (print .Quote.DisplayNo " 을 지웁니다. 되돌릴 수 없습니다.")}})">
+            onsubmit="return confirm({{toJSON (print .Quote.DisplayNo " 을 지웁니다. 되돌릴 수 없습니다.")}})">
         <button type="submit" class="px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50">삭제</button>
       </form>
       {{end}}
@@ -81,7 +80,7 @@
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-    <table class="w-full min-w-[900px] text-sm break-keep">
+    <table data-table-cols-skip class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b"><tr>
         <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">구분</th>
         <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">내용</th>

@@ -146,10 +146,14 @@ func touchUpdate(db *sql.DB, table, pk, id, label string, fn func() error) error
 }
 
 func touchDelete(db *sql.DB, table, pk, id, label string, fn func() error) error {
+	return touchDeleteWithReason(db, table, pk, id, label, "", fn)
+}
+
+func touchDeleteWithReason(db *sql.DB, table, pk, id, label, reason string, fn func() error) error {
 	before := rowJSON(db, table, pk, id)
 	if err := fn(); err != nil {
 		return err
 	}
-	logDelete(db, table, pk, id, label, before)
+	logDeleteWithReason(db, table, pk, id, label, before, reason)
 	return nil
 }

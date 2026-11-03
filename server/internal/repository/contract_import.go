@@ -828,6 +828,9 @@ func (r *ProjectRepo) insertImportedPipelineTx(tx *sql.Tx, today time.Time, stag
 }
 
 func (r *ProjectRepo) insertImportedContractTx(tx *sql.Tx, userID string, row *model.ContractImportRow) error {
+	if strings.TrimSpace(row.OrgID) == "" || strings.TrimSpace(row.OrgID) == OrgAll {
+		return fmt.Errorf("부서가 없습니다")
+	}
 	seq, err := nextSeqTx(tx, "work_project")
 	if err != nil {
 		return err

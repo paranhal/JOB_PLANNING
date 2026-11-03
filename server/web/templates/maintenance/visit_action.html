@@ -9,32 +9,37 @@ window.mntWorkGroups = (function () {
 })();
 </script>
 <div class="max-w-2xl mx-auto space-y-5">
-  <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 shadow-sm">
+  <div class="rounded-2xl border border-line bg-white px-4 py-4 sm:px-5 shadow-sm">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="text-sm text-gray-500 hover:text-gray-700">{{if .BackLabel}}{{.BackLabel}}{{else}}← 업무 관리{{end}}</a>
+        {{if .HideNav}}
+        <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="text-sm text-ink-muted hover:text-ink">{{if .BackLabel}}{{.BackLabel}}{{else}}← 업무 관리{{end}}</a>
+        {{end}}
         <div class="flex items-center gap-2 mt-1 flex-wrap">
-          <h2 class="text-xl font-bold text-gray-800">{{.SiteName}}</h2>
-          <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">정기점검</span>
+          <h2 class="text-xl font-bold text-ink">{{.SiteName}}</h2>
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-info-soft text-info">정기점검</span>
           {{if .Visit.Completed}}
-          <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">방문 완료</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-success">방문 완료</span>
           {{else}}
-          <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">예정</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-warning-soft text-warning">예정</span>
           {{end}}
         </div>
-        <p class="text-sm text-gray-500 mt-1">
-          예정일 <span class="font-mono text-gray-800">{{.Visit.VisitDate}}</span>
+        <p class="text-sm text-ink-muted mt-1">
+          예정일 <span class="font-mono text-ink">{{.Visit.VisitDate}}</span>
           {{if .Visit.ProductType}} · {{.Visit.ProductType}}{{end}}
           {{if .EquipmentLine}} · {{.EquipmentLine}}{{end}}
         </p>
       </div>
-      <a href="{{.PlanHref}}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">연간 일정</a>
+      <div class="flex flex-wrap gap-2">
+        {{if .CanPlanEdit}}<a href="{{.PlanEditHref}}" class="px-3 py-1.5 text-sm border border-line rounded-lg text-ink hover:bg-hover">계획 수정</a>{{end}}
+        <a href="{{.PlanHref}}" class="px-3 py-1.5 text-sm border border-line rounded-lg text-ink hover:bg-hover">연간 일정</a>
+      </div>
     </div>
   </div>
 
   {{if .CanEdit}}
   <form method="POST" action="/maintenance/visits/{{.Visit.VisitID}}/action"
-        class="bg-white rounded-xl border border-slate-200 overflow-hidden"
+        class="bg-white rounded-xl border border-line overflow-hidden"
         x-data='mntVisitAction({start:{{toJSON .Visit.StartTime}},end:{{toJSON .Visit.EndTime}},travel:{{.Visit.TravelMin}},duration:{{.Visit.DurationMin}},customs:{{toJSON .CustomTargets}},selected:{{toJSON .TargetSelected}}})'
         x-init="$nextTick(() => $dispatch('mnt-picker-hydrate', {target:'action', ids: ({{toJSON .PeopleIDs}}||'').split(',').filter(Boolean), groups: {{toJSON .GroupIDs}}, owner: {{toJSON .OwnerUserID}}}))"
         @submit="onSubmit($event)">
@@ -42,19 +47,19 @@ window.mntWorkGroups = (function () {
     {{if .Embed}}<input type="hidden" name="embed" value="1">{{end}}
     <input type="hidden" name="duration_min" :value="duration">
     <div class="p-4 sm:p-5 space-y-4">
-      <h3 class="text-sm font-semibold text-slate-800">방문 조치</h3>
-      <p class="text-xs text-slate-500">이 방문 건만 처리합니다. 연간 목록이 아니라 조치 화면입니다.</p>
+      <h3 class="text-sm font-semibold text-ink">방문 조치</h3>
+      <p class="text-xs text-ink-muted">이 방문 건만 처리합니다. 연간 목록이 아니라 조치 화면입니다.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">예정일</label>
+          <label class="block text-sm font-medium text-ink mb-1">예정일</label>
           <input type="date" name="visit_date" value="{{.Visit.VisitDate}}" class="input w-full text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">담당자</label>
-          {{template "mnt_assignee_multi" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "action"}}
+          <label class="block text-sm font-medium text-ink mb-1">담당자</label>
+          {{template "mnt_assignee_multi" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "action" "PickerNames" .PickerNames}}
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">사업명</label>
+          <label class="block text-sm font-medium text-ink mb-1">사업명</label>
           <select name="project_id" class="input w-full text-sm">
             <option value="">— 선택 —</option>
             {{range .Projects}}
@@ -63,9 +68,9 @@ window.mntWorkGroups = (function () {
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">점검 대상(제품)</label>
+          <label class="block text-sm font-medium text-ink mb-1">점검 대상(제품)</label>
           {{if .ProductLocked}}
-          <input type="text" value="{{.Visit.ProductType}}" readonly class="input w-full text-sm bg-slate-50">
+          <input type="text" value="{{.Visit.ProductType}}" readonly class="input w-full text-sm bg-hover">
           <p class="text-[11px] text-ink-subtle mt-1">제품 슬롯은 계획 관리에서 바꿉니다. 아래 장비는 따로 고릅니다.</p>
           {{else}}
           <input type="text" name="product_type" value="{{.Visit.ProductType}}" list="mnt-action-products"
@@ -79,38 +84,38 @@ window.mntWorkGroups = (function () {
         </div>
 
         <div class="sm:col-span-2">
-          <div class="rounded-xl border border-line bg-slate-50 p-4 space-y-3">
+          <div class="rounded-xl border border-line bg-hover p-4 space-y-3">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
               <p class="text-sm font-semibold text-ink">방문 시간 · 소요 시간</p>
               <p class="text-ui-xs text-ink-subtle">시작·종료를 넣으면 소요 시간이 자동 계산됩니다</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">방문(도착) 시각</label>
+                <label class="block text-sm font-medium text-ink mb-1">방문(도착) 시각</label>
                 <div class="flex gap-1.5">
                   <input type="time" name="start_time" class="input w-full text-sm" x-model="start" @input="calc()">
                   <button type="button" class="btn btn-secondary btn-sm shrink-0" @click="nowTo('start')">지금</button>
                 </div>
               </div>
               <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">작업 종료 시각</label>
+                <label class="block text-sm font-medium text-ink mb-1">작업 종료 시각</label>
                 <div class="flex gap-1.5">
                   <input type="time" name="end_time" class="input w-full text-sm" x-model="end" @input="calc()">
                   <button type="button" class="btn btn-secondary btn-sm shrink-0" @click="nowTo('end')">지금</button>
                 </div>
               </div>
               <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">이동 시간 <span class="font-normal text-ink-subtle">(편도·선택)</span></label>
+                <label class="block text-sm font-medium text-ink mb-1">이동 시간 <span class="font-normal text-ink-subtle">(편도·선택)</span></label>
                 <div class="flex gap-1.5 items-center">
                   <input type="number" name="travel_min" min="0" step="5" class="input w-full text-sm text-right" x-model.number="travel" @input="calc()">
                   <span class="text-ui-xs text-ink-subtle shrink-0">분</span>
                 </div>
               </div>
             </div>
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-sky-200 bg-white px-3 py-2">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-info bg-white px-3 py-2">
               <div>
                 <p class="text-ui-xs text-ink-subtle">현장 소요 시간</p>
-                <p class="text-lg font-bold text-sky-800 tabular-nums" x-text="durLabel()">{{if .Visit.DurationMin}}{{.Visit.DurationMin}}분{{else}}—{{end}}</p>
+                <p class="text-lg font-bold text-info tabular-nums" x-text="durLabel()">{{if .Visit.DurationMin}}{{.Visit.DurationMin}}분{{else}}—{{end}}</p>
               </div>
               <div class="sm:ml-auto sm:text-right">
                 <p class="text-ui-xs text-ink-subtle">이동 포함 총 시간</p>
@@ -120,25 +125,27 @@ window.mntWorkGroups = (function () {
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="text-ui-xs text-ink-subtle">소요 시간 빠른 입력</span>
               <button type="button" class="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink hover:bg-hover"
-                      :class="{ 'bg-sky-50 border-sky-300 text-sky-800 font-semibold': chipOn(30) }" @click="applyChip(30)">30분</button>
+                      :class="{ 'bg-info-soft border-sky-300 text-info font-semibold': chipOn(30) }" @click="applyChip(30)">30분</button>
               <button type="button" class="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink hover:bg-hover"
-                      :class="{ 'bg-sky-50 border-sky-300 text-sky-800 font-semibold': chipOn(60) }" @click="applyChip(60)">1시간</button>
+                      :class="{ 'bg-info-soft border-sky-300 text-info font-semibold': chipOn(60) }" @click="applyChip(60)">1시간</button>
               <button type="button" class="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink hover:bg-hover"
-                      :class="{ 'bg-sky-50 border-sky-300 text-sky-800 font-semibold': chipOn(90) }" @click="applyChip(90)">1시간 30분</button>
+                      :class="{ 'bg-info-soft border-sky-300 text-info font-semibold': chipOn(90) }" @click="applyChip(90)">1시간 30분</button>
               <button type="button" class="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink hover:bg-hover"
-                      :class="{ 'bg-sky-50 border-sky-300 text-sky-800 font-semibold': chipOn(120) }" @click="applyChip(120)">2시간</button>
+                      :class="{ 'bg-info-soft border-sky-300 text-info font-semibold': chipOn(120) }" @click="applyChip(120)">2시간</button>
               <button type="button" class="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink hover:bg-hover"
-                      :class="{ 'bg-sky-50 border-sky-300 text-sky-800 font-semibold': chipOn(180) }" @click="applyChip(180)">3시간</button>
+                      :class="{ 'bg-info-soft border-sky-300 text-info font-semibold': chipOn(180) }" @click="applyChip(180)">3시간</button>
               <button type="button" class="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink hover:bg-hover"
-                      :class="{ 'bg-sky-50 border-sky-300 text-sky-800 font-semibold': chipOn(240) }" @click="applyChip(240)">4시간</button>
+                      :class="{ 'bg-info-soft border-sky-300 text-info font-semibold': chipOn(240) }" @click="applyChip(240)">4시간</button>
             </div>
-            <p class="text-xs text-red-600 min-h-[1rem]" x-text="warn"></p>
+            <p class="text-xs text-danger min-h-[1rem]" x-text="warn"></p>
             <p class="text-ui-xs text-ink-subtle">시작 시각을 넣고 소요 시간 칩을 누르면 종료 시각이 자동으로 채워집니다. 시간을 모르면 비워 둘 수 있습니다(선택).</p>
+            {{template "work_task_items" .}}
+            {{template "work_segments_form" .}}
           </div>
         </div>
 
         <div class="sm:col-span-2">
-          <label class="block text-sm font-medium text-slate-700 mb-1">점검 장비</label>
+          <label class="block text-sm font-medium text-ink mb-1">점검 장비</label>
           <p class="text-ui-xs text-ink-subtle mb-2">설치자산이 있으면 체크하고, 없으면 직접 입력 행을 추가합니다. 자산은 만들지 않습니다.</p>
           {{if .Assets}}
           <div class="rounded-lg border border-line p-3 space-y-2">
@@ -178,7 +185,7 @@ window.mntWorkGroups = (function () {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">상태</label>
+          <label class="block text-sm font-medium text-ink mb-1">상태</label>
           <select name="status" class="input w-full text-sm"
                   x-data="{v:'{{if .Visit.Completed}}done{{else}}open{{end}}'}" x-model="v"
                   @change="var w=document.getElementById('mnt-done-date-wrap'); if(w) w.classList.toggle('hidden', v!=='done')">
@@ -187,26 +194,26 @@ window.mntWorkGroups = (function () {
           </select>
         </div>
         <div id="mnt-done-date-wrap" class="{{if not .Visit.Completed}}hidden{{end}}">
-          <label class="block text-sm font-medium text-slate-700 mb-1">실제 방문일</label>
+          <label class="block text-sm font-medium text-ink mb-1">실제 방문일</label>
           <input type="date" name="completed_date" value="{{if .Visit.CompletedDate}}{{.Visit.CompletedDate}}{{else}}{{.Visit.VisitDate}}{{end}}"
                  class="input w-full text-sm max-w-xs">
         </div>
         <div class="sm:col-span-2">
-          <label class="block text-sm font-medium text-slate-700 mb-1">조치·비고</label>
+          <label class="block text-sm font-medium text-ink mb-1">조치·비고</label>
           <textarea name="notes" rows="4" class="input w-full text-sm"
                     placeholder="점검 결과·특이사항">{{.Visit.Notes}}</textarea>
         </div>
       </div>
     </div>
-    <div class="px-5 py-4 border-t border-slate-200 flex flex-wrap justify-end gap-2">
+    <div class="px-5 py-4 border-t border-line flex flex-wrap justify-end gap-2">
       {{if not .Visit.Completed}}
-      <button type="submit" name="mark_done" value="1" class="btn btn-secondary border-green-600 text-green-800">방문 완료 처리</button>
+      <button type="submit" name="mark_done" value="1" class="btn btn-secondary border-green-600 text-success">방문 완료 처리</button>
       {{end}}
       <button type="submit" class="btn btn-primary">저장</button>
     </div>
   </form>
   {{else}}
-  <section class="bg-white rounded-xl border border-slate-200 p-5 text-sm space-y-2">
+  <section class="bg-white rounded-xl border border-line p-5 text-sm space-y-2">
     <p>담당: {{if .Visit.Assignee}}{{.Visit.AssigneeSummary}}{{else}}—{{end}}</p>
     {{if .SignatureDataURL}}
     <img src="{{.SignatureDataURL}}" alt="사인" class="h-16 w-auto">
@@ -214,16 +221,16 @@ window.mntWorkGroups = (function () {
     <p>점검 대상: {{if .Visit.ProductType}}{{.Visit.ProductType}}{{else}}—{{end}}</p>
     {{if .EquipmentLine}}<p>점검 장비: {{.EquipmentLine}}</p>{{end}}
     {{if .Visit.StartTime}}<p>방문 시간: {{.Visit.StartTime}}{{if .Visit.EndTime}}~{{.Visit.EndTime}}{{end}}</p>{{end}}
-    {{if .Visit.Notes}}<p class="whitespace-pre-wrap text-slate-600">{{.Visit.Notes}}</p>{{end}}
+    {{if .Visit.Notes}}<p class="whitespace-pre-wrap text-ink-muted">{{.Visit.Notes}}</p>{{end}}
   </section>
   {{end}}
-  <div class="bg-white rounded-xl border border-slate-200 p-5">
-    <p class="text-xs text-slate-500">담당 · 결과서</p>
-    <p class="text-sm font-medium text-slate-800 mt-1">{{if .Visit.Assignee}}{{.Visit.AssigneeSummary}}{{else}}이름만 적습니다{{end}}</p>
+  <div class="bg-white rounded-xl border border-line p-5">
+    <p class="text-xs text-ink-muted">담당 · 결과서</p>
+    <p class="text-sm font-medium text-ink mt-1">{{if .Visit.Assignee}}{{.Visit.AssigneeSummary}}{{else}}이름만 적습니다{{end}}</p>
     {{if .SignatureDataURL}}
     <img src="{{.SignatureDataURL}}" alt="사인" class="mt-2 h-16 w-auto">
     {{else}}
-    <p class="text-xs text-slate-400 mt-1">사인이 없으면 이름만 적습니다.</p>
+    <p class="text-xs text-ink-subtle mt-1">사인이 없으면 이름만 적습니다.</p>
     {{end}}
   </div>
 </div>
@@ -237,7 +244,7 @@ window.mntWorkGroups = (function () {
      @click.self="close({{if eq .MntSavePopup.Kind "mnt_done"}}true{{else}}false{{end}})">
   <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
     <h2 id="mnt-save-title" class="text-ui font-bold text-ink">{{.MntSavePopup.Title}}</h2>
-    <div class="mt-3 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm space-y-1">
+    <div class="mt-3 rounded-lg border border-line bg-hover px-3 py-2 text-sm space-y-1">
       <div class="flex justify-between gap-3"><span class="text-ink-subtle">사이트</span><b>{{.MntSavePopup.Site}}</b></div>
       <div class="flex justify-between gap-3"><span class="text-ink-subtle">점검 대상</span><b>{{.MntSavePopup.Equipment}}</b></div>
       <div class="flex justify-between gap-3"><span class="text-ink-subtle">담당자</span><b>{{.MntSavePopup.Assignee}}</b></div>
@@ -247,7 +254,7 @@ window.mntWorkGroups = (function () {
       <div class="flex justify-between gap-3"><span class="text-ink-subtle">상태</span><b>{{.MntSavePopup.Status}}</b></div>
     </div>
     {{if .MntSavePopup.Warning}}
-    <p class="mt-2 text-xs text-amber-800">{{.MntSavePopup.Warning}}</p>
+    <p class="mt-2 text-xs text-warning">{{.MntSavePopup.Warning}}</p>
     {{end}}
     <div class="mt-4 flex justify-end gap-2">
       {{if .MntSavePopup.Continue}}

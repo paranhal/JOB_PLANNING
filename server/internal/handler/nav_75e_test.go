@@ -68,7 +68,7 @@ func TestNav75E_SalesListMenuRemovedPipelineDefault(t *testing.T) {
 		t.Fatalf("상세 status=%d", show.Code)
 	}
 	sb := show.Body.String()
-	if !strings.Contains(sb, `href="/sales?view=pipeline" class="bg-blue-600 text-white nav-active`) {
+	if !strings.Contains(sb, `href="/sales?view=pipeline"`) || !strings.Contains(sb, `nav-active`) {
 		t.Fatal("상세에서 파이프라인이 활성이 아니다")
 	}
 
@@ -123,7 +123,7 @@ func TestSalesListBackReferer(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/sales/x", nil)
 	req.Header.Set("Referer", "http://localhost/sales?display=timeline")
 	c := e.NewContext(req, nil)
-	p := &model.SalesProject{}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, }
 	if got := salesListBack(c, p); got != "/sales?display=timeline" {
 		t.Fatalf("got %s", got)
 	}

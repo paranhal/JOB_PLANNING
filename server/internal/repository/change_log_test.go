@@ -137,7 +137,7 @@ func TestChangeLogScopePerSpec252(t *testing.T) {
 	}
 
 	// 당월·완료 방문은 계획 삭제가 거부되므로, 이력 확인 후 미래 미완료로 바꿔 삭제한다.
-	if _, err := db.Exec(`UPDATE maintenance_visits SET completed=0, completed_date='', visit_date='2026-11-14' WHERE visit_id=?`, visitID); err != nil {
+		if _, err := db.Exec(`UPDATE maintenance_visits SET completed=0, completed_date='', visit_date='2026-12-14' WHERE visit_id=?`, visitID); err != nil {
 		t.Fatal(err)
 	}
 

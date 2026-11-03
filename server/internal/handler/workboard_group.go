@@ -50,7 +50,18 @@ func (h *WorkboardHandler) workGroupPicks(c echo.Context) ([]model.WorkGroup, st
 		p := workGroupPickJSON{GroupID: g.GroupID, Name: g.Name, LeaderID: g.LeaderID, LeaderName: g.LeaderName}
 		ms, _ := h.groups.MembersOn(g.GroupID, "")
 		for _, m := range ms {
-			p.Members = append(p.Members, workGroupPickMem{UserID: m.UserID, FullName: m.FullName, Role: m.Role})
+			name := strings.TrimSpace(m.FullName)
+			if name == "" || strings.HasPrefix(name, "USR-") {
+				if h.userRepo != nil {
+					if u, err := h.userRepo.GetByID(m.UserID); err == nil && u != nil {
+						name = pickerDisplayName(*u)
+					}
+				}
+			}
+			if name == "" || strings.HasPrefix(name, "USR-") {
+				name = "담당자"
+			}
+			p.Members = append(p.Members, workGroupPickMem{UserID: m.UserID, FullName: name, Role: m.Role})
 		}
 		out = append(out, p)
 	}

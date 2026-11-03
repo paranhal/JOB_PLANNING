@@ -199,6 +199,9 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 	} else if status != model.WBTaskInbox && dueDate == "" {
 		return fail("task")
 	}
+	if dueBeforeWork(workDate, dueDate) {
+		return fail("date_order")
+	}
 	if workType == model.WBWorkSupport && strings.TrimSpace(c.FormValue("project_id")) == "" {
 		return fail("project_required")
 	}
@@ -223,6 +226,9 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		Progress:       progress,
 		ParentTaskID:   parentID,
 		OrgID:          assignableOrgID(c),
+	}
+	if err := requireProjectRegisterAccess(c, h.repo.GetProject, t.ProjectID); err != nil {
+		return err
 	}
 	if d := strings.TrimSpace(c.FormValue("duration_min")); d != "" {
 		fmtScanInt(d, &t.DurationMin)

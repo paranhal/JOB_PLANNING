@@ -82,9 +82,12 @@ func projectVisibleSQL(alias, orgID string) (string, []interface{}, error) {
 	if p == "" {
 		p = "work_projects"
 	}
-	frag := fmt.Sprintf(` AND (COALESCE(NULLIF(TRIM(%s.org_id),''), ?) = ? OR (COALESCE(%s.is_shared,0)=1 AND (TRIM(COALESCE(%s.share_to,''))='' OR %s.share_to=?)))`,
-		p, p, p, p)
-	return frag, []interface{}{model.OrgIDLibrary, orgID, orgID}, nil
+	frag := fmt.Sprintf(` AND (
+		COALESCE(NULLIF(TRIM(%[1]s.org_id),''), ?) = ?
+		OR EXISTS (SELECT 1 FROM work_project_orgs r WHERE r.project_id=%[1]s.project_id AND r.org_id=?)
+		OR (COALESCE(%[1]s.is_shared,0)=1 AND (TRIM(COALESCE(%[1]s.share_to,''))='' OR %[1]s.share_to=?))
+	)`, p)
+	return frag, []interface{}{model.OrgIDLibrary, orgID, orgID, orgID}, nil
 }
 
 func projectHomeOrg(orgID string) string {
@@ -96,7 +99,7 @@ func projectHomeOrg(orgID string) string {
 }
 
 func ProjectWritableInOrg(rowOrg, orgID string) bool {
-	return VisibleInOrg(projectHomeOrg(rowOrg), orgID)
+	return model.ProjectAccess(model.WorkProject{OrgID: projectHomeOrg(rowOrg)}, orgID) == model.ProjectAccessOwner
 }
 
 func appendProjectVisible(q string, args []interface{}, alias, orgID string) (string, []interface{}) {

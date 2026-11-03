@@ -68,6 +68,9 @@ func (r *ProjectRepo) ReplaceAssignments(projectID, createdBy string, items []mo
 		}
 		clean = append(clean, model.ProjectAssignment{ProjectID: projectID, UserID: uid, Duty: duty})
 	}
+	if err := r.assertDutyAssigneeScope(projectID, clean); err != nil {
+		return err
+	}
 	before := rowJSON(r.db, "work_projects", "project_id", projectID)
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -88,5 +91,45 @@ func (r *ProjectRepo) ReplaceAssignments(projectID, createdBy string, items []mo
 		return err
 	}
 	logUpdate(r.db, "work_projects", "project_id", projectID, "사업 담당자", before)
+	return nil
+}
+
+func (r *ProjectRepo) assertDutyAssigneeScope(projectID string, items []model.ProjectAssignment) error {
+	if r == nil || len(items) == 0 {
+		return nil
+	}
+	p, err := r.Get(projectID)
+	if err != nil || p == nil {
+		return fmt.Errorf("사업을 찾을 수 없습니다")
+	}
+	orgIDs := append([]string{strings.TrimSpace(p.OrgID)}, p.RelatedOrgIDs...)
+	users := NewUserRepo(r.db)
+	duty, err := users.ListAssignableInOrgs(orgIDs)
+	if err != nil {
+		return err
+	}
+	acc, err := users.LookupAccountingAssignees()
+	if err != nil {
+		return err
+	}
+	dutyOK := map[string]struct{}{}
+	for _, u := range duty {
+		dutyOK[u.UserID] = struct{}{}
+	}
+	accOK := map[string]struct{}{}
+	for _, u := range acc {
+		accOK[u.UserID] = struct{}{}
+	}
+	for _, it := range items {
+		if it.Duty == model.ProjectDutyAccounting {
+			if _, ok := accOK[it.UserID]; !ok {
+				return fmt.Errorf("회계 담당은 전 조직 활성 구성원만 지정할 수 있습니다")
+			}
+			continue
+		}
+		if _, ok := dutyOK[it.UserID]; !ok {
+			return fmt.Errorf("주관·유관 부서 구성원만 지정할 수 있습니다")
+		}
+	}
 	return nil
 }

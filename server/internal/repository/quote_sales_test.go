@@ -9,7 +9,7 @@ import (
 
 func mustSalesForQuote(t *testing.T, db *sql.DB) string {
 	t.Helper()
-	p := &model.SalesProject{Name: "견적 연결 사업"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "견적 연결 사업"}
 	if err := NewSalesRepo(db).Create(p); err != nil {
 		t.Fatal(err)
 	}

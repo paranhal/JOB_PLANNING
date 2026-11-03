@@ -18,8 +18,8 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if currentRole(c) == model.RoleCLevel || isReadOnly(c) {
 		return echo.ErrForbidden
 	}
-	org := currentOrg(c)
-	if org == "" || org == repository.OrgAll {
+	org, orgErr := resolveInsertOrg(c)
+	if orgErr != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "조직을 선택하세요")
 	}
 	title := strings.TrimSpace(c.FormValue("title"))
@@ -53,7 +53,7 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	projectID := strings.TrimSpace(c.FormValue("project_id"))
 	_ = c.Request().ParseForm()
 	siteIDs := c.Request().Form["site_id"]
-	if err := h.assertProjectExists(projectID); err != nil {
+	if err := h.assertProjectLinkable(c, projectID); err != nil {
 		return err
 	}
 	if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
@@ -76,8 +76,8 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	}
 	supports := parseSupportMembers(c, assignee)
 	if workDate != "" {
-		if msg := h.firstParticipantOverlap(workDate, start, end, "", occupancyNames(assignee, supports)); msg != "" {
-			return overlapRedirect(c, msg)
+		if err := h.rejectIfOverlap(c, workDate, start, end, "", occupancyNames(assignee, supports)); err != nil {
+			return overlapDone(err)
 		}
 	}
 	if err := checkAssigneeInOrg(h.userRepo, org, assignee, "", ""); err != nil {
@@ -106,9 +106,17 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if err := h.repo.CreateTask(t); err != nil {
 		return err
 	}
+	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
+		return overlapDone(err)
+	}
+	h.applyPlanWorkPlace(c, t.TaskID)
 	recordTaskNotice(h.notices, c, t, "")
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
+	}
+	if err := h.saveWorkItemsFromForm(c, t.TaskID); err != nil {
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, taskPagePath(t.TaskID, false)+"?err=item")
 	}
 	if !sel.Empty() {
 		applySelectionToTask(t, sel)
@@ -180,12 +188,19 @@ func (h *WorkboardHandler) paletteWorkCards(orgID string) ([]model.WBCard, error
 }
 
 func (h *WorkboardHandler) assertProjectExists(projectID string) error {
+	return h.assertProjectLinkable(nil, projectID)
+}
+
+func (h *WorkboardHandler) assertProjectLinkable(c echo.Context, projectID string) error {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return nil
 	}
-	if _, err := h.repo.ProjectOrgID(projectID); err != nil {
+	p, err := h.repo.GetProject(projectID)
+	if err != nil || p == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
 	}
-	return nil
+	return requireProjectRegisterAccess(c, func(id string) (*model.WorkProject, error) {
+		return p, nil
+	}, projectID)
 }

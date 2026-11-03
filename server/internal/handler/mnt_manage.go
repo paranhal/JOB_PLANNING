@@ -10,6 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/appclock"
 	"customer-support/internal/auditlog"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -92,7 +93,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 	if c.QueryParam("preview") == "delete" {
 		f := parseVisitFilter(c)
 		preview, _ = h.repo.ListVisitsFiltered(plan.PlanID, plan.PlanYear, f)
-		now := time.Now()
+		now := appclock.Now()
 		for _, v := range preview {
 			if model.VisitDeleteProtected(v.VisitDate, now) {
 				previewSkip++

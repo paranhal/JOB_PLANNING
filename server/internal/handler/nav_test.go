@@ -57,10 +57,10 @@ func TestWorkListSidebarHighlightsWork(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, `href="/" class="bg-blue-600`) {
+	if strings.Contains(body, `href="/" class="bg-primary`) {
 		t.Fatal("대시보드가 강조되고 있다")
 	}
-	if !strings.Contains(body, `href="/work" class="bg-blue-600`) {
+	if !strings.Contains(body, `href="/work"`) || !strings.Contains(body, `nav-active`) {
 		t.Fatal("오늘 내 업무가 강조되지 않는다")
 	}
 }

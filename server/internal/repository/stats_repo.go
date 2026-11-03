@@ -290,7 +290,7 @@ func (r *StatsRepo) ListDetail(q model.StatsQuery) ([]model.StatsRow, error) {
 		if t := parseTime(receiptStr); !t.IsZero() {
 			it.ReceiptDate = t.Format("2006-01-02")
 		}
-		it.ProductCategory = mapProductCategory(productCategory, productType, productName)
+		it.ProductCategory = MapStatsProductCategory(productCategory, productType, productName)
 		it.ProductModel = strings.TrimSpace(modelName)
 		if it.ProductModel == "" {
 			it.ProductModel = strings.TrimSpace(productName)
@@ -372,7 +372,7 @@ func (r *StatsRepo) listPartialWorkDetail(q model.StatsQuery, now time.Time) ([]
 		if t := parseTime(createdStr); !t.IsZero() {
 			it.ReceiptDate = t.Format("2006-01-02")
 		}
-		it.ProductCategory = mapProductCategory(productCategory, productType, productName)
+		it.ProductCategory = MapStatsProductCategory(productCategory, productType, productName)
 		it.ProductModel = strings.TrimSpace(modelName)
 		if it.ProductModel == "" {
 			it.ProductModel = strings.TrimSpace(productName)
@@ -428,52 +428,7 @@ func (r *StatsRepo) ListDetailPeriod(period string, offset int) ([]model.StatsRo
 }
 
 func mapProductCategory(productCategory, productType, productName string) string {
-	c := strings.ToLower(strings.TrimSpace(productCategory))
-	switch c {
-	case "homepage", "홈페이지":
-		return "홈페이지"
-	case "elibrary", "전자도서관":
-		return "전자도서관"
-	case "mobile", "모바일":
-		return "모바일"
-	case "rfid", "rfid자동화", "rfid_auto":
-		return "RFID자동화"
-	case "materials", "자료관리":
-		return "자료관리"
-	case "other", "기타":
-		return "기타"
-	}
-	t := strings.ToLower(strings.TrimSpace(productType))
-	n := strings.ToLower(strings.TrimSpace(productName))
-	switch t {
-	case "homepage", "home", "홈페이지":
-		return "홈페이지"
-	case "elibrary", "library", "전자도서관":
-		return "전자도서관"
-	case "mobile", "모바일":
-		return "모바일"
-	case "rfid", "rfid자동화", "rfid_auto":
-		return "RFID자동화"
-	case "materials", "자료관리", "data_mgmt":
-		return "자료관리"
-	case "other", "기타":
-		return "기타"
-	}
-	combined := t + " " + n
-	switch {
-	case strings.Contains(combined, "홈페이지") || strings.Contains(combined, "homepage"):
-		return "홈페이지"
-	case strings.Contains(combined, "전자도서") || strings.Contains(combined, "elibrary") || strings.Contains(combined, "도서관시스템"):
-		return "전자도서관"
-	case strings.Contains(combined, "모바일") || strings.Contains(combined, "mobile"):
-		return "모바일"
-	case strings.Contains(combined, "rfid"):
-		return "RFID자동화"
-	case strings.Contains(combined, "자료관리") || strings.Contains(combined, "klas"):
-		return "자료관리"
-	default:
-		return "기타"
-	}
+	return MapStatsProductCategory(productCategory, productType, productName)
 }
 
 func mapReceiptForm(channel, requesterType string) string {

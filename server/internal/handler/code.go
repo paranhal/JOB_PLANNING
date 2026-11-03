@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
@@ -30,7 +31,17 @@ func (h *CodeHandler) List(c echo.Context) error {
 	return c.Render(http.StatusOK, "code/list.html", map[string]interface{}{
 		"Title": "코드 관리", "Active": NavCodes,
 		"Codes": codes, "Groups": groups, "SelectedGroup": group,
+		"ProductCatGroup": repository.ProductCategoryGroup,
+		"FlashErr":        c.QueryParam("err"),
 	})
+}
+
+func codesRedirect(group, errMsg string) string {
+	q := "/codes?group=" + url.QueryEscape(group)
+	if errMsg != "" {
+		q += "&err=" + url.QueryEscape(errMsg)
+	}
+	return q
 }
 
 func (h *CodeHandler) Create(c echo.Context) error {
@@ -43,9 +54,9 @@ func (h *CodeHandler) Create(c echo.Context) error {
 		IsActive:  c.FormValue("is_active") != "0",
 	}
 	if err := h.repo.Create(code); err != nil {
-		return err
+		return c.Redirect(http.StatusSeeOther, codesRedirect(code.CodeGroup, err.Error()))
 	}
-	return c.Redirect(http.StatusSeeOther, "/codes?group="+code.CodeGroup)
+	return c.Redirect(http.StatusSeeOther, codesRedirect(code.CodeGroup, ""))
 }
 
 func (h *CodeHandler) Update(c echo.Context) error {
@@ -59,14 +70,24 @@ func (h *CodeHandler) Update(c echo.Context) error {
 		IsActive:  c.FormValue("is_active") != "0",
 	}
 	if err := h.repo.Update(code); err != nil {
-		return err
+		return c.Redirect(http.StatusSeeOther, codesRedirect(code.CodeGroup, err.Error()))
 	}
-	return c.Redirect(http.StatusSeeOther, "/codes?group="+code.CodeGroup)
+	return c.Redirect(http.StatusSeeOther, codesRedirect(code.CodeGroup, ""))
 }
 
 func (h *CodeHandler) Delete(c echo.Context) error {
-	if err := h.repo.Delete(c.Param("id")); err != nil {
-		return err
+	id := c.Param("id")
+	group := c.QueryParam("group")
+	if err := h.repo.Delete(id); err != nil {
+		if group == "" {
+			if cur, e := h.repo.Get(id); e == nil && cur != nil {
+				group = cur.CodeGroup
+			}
+		}
+		return c.Redirect(http.StatusSeeOther, codesRedirect(group, err.Error()))
 	}
-	return c.Redirect(http.StatusSeeOther, "/codes")
+	if group == "" {
+		group = c.FormValue("code_group")
+	}
+	return c.Redirect(http.StatusSeeOther, codesRedirect(group, ""))
 }

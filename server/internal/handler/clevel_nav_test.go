@@ -23,7 +23,7 @@ func TestCLevelMenuHrefsOrder(t *testing.T) {
 		"/exec",
 		"/projects/dashboard", "/projects", "/cooperations/inbox", "/cooperations/sent", "/quotes", "/projects/registry",
 		"/sales/dashboard", "/sales?view=pipeline", "/sales/activities",
-		"/exec/work", "/work/all", "/work-groups", "/meeting/weekly",
+		"/exec/work", "/work/all", "/work-groups", "/meeting/board", "/meeting/weekly",
 		"/as", "/maintenance", "/customers", "/assets",
 		"/approvals/inbox", "/leaves",
 		"/stats", "/stats/milestones", "/stats/company-weekly", "/stats/reports",
@@ -37,7 +37,7 @@ func TestCLevelMenuHrefsOrder(t *testing.T) {
 	hide := []string{
 		"/admin/users", "/workboard/register", "/work", "/meeting",
 		"/meeting/weekly/me", "/as/knowledge", "/items", "/contacts",
-		"/maintenance/sites", "/codes", "/product-groups",
+		"/maintenance/sites", "/codes", "/product-groups", "/work-item-templates",
 	}
 	for _, h := range hide {
 		if containsHref(got, h) {
@@ -110,7 +110,7 @@ func TestCLevelHiddenPathList(t *testing.T) {
 	if !cLevelHiddenPath("/workboard/new-work/form") {
 		t.Error("/workboard/new-work/form 가 숨김이 아니다")
 	}
-	for _, p := range []string{"/exec", "/exec/work", "/work/all", "/work-groups", "/meeting/weekly", "/as", "/account"} {
+	for _, p := range []string{"/exec", "/exec/work", "/work/all", "/work-groups", "/meeting/board", "/meeting/weekly", "/as", "/account"} {
 		if cLevelHiddenPath(p) {
 			t.Errorf("%s 가 숨김으로 막혔다", p)
 		}

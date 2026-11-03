@@ -1,7 +1,6 @@
 {{define "title"}}{{.Title}} · {{appName}}{{end}}
 {{define "content"}}
 <div class="max-w-4xl mx-auto space-y-4">
-  <a href="/orders/{{.Order.OrderID}}" class="text-sm text-gray-500 hover:underline">← 상세</a>
   <h2 class="text-xl font-bold text-gray-800 font-mono">{{.Order.DisplayNo}} 수정</h2>
   <p class="text-sm text-gray-500">수주번호·일자는 바꿀 수 없습니다. 수량·단가만 조정합니다.</p>
 
@@ -38,7 +37,7 @@
     </div>
 
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-      <table class="w-full min-w-[900px] text-sm break-keep">
+      <table data-table-cols-skip class="w-full min-w-[900px] text-sm break-keep">
         <thead class="bg-gray-50 border-b"><tr>
           <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">내용</th>
           <th class="text-right px-3 py-2 text-xs text-gray-500 whitespace-nowrap">수량</th>

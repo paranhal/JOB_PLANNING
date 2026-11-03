@@ -3,42 +3,42 @@
 {{define "content"}}
 <div class="max-w-xl space-y-4">
   <div class="flex flex-wrap items-start justify-between gap-2">
-    <h2 class="text-xl font-bold text-gray-800">{{if .Config}}점검 사이트 수정{{else}}점검 사이트 등록{{end}}</h2>
+    <h2 class="text-xl font-bold text-ink">{{if .Config}}점검 사이트 수정{{else}}점검 사이트 등록{{end}}</h2>
     <a href="/maintenance/sites/bulk" class="btn btn-secondary btn-sm">업종별 일괄 등록</a>
   </div>
 
   {{if .Err}}<p id="site-form-err" class="text-ui text-danger">{{.Err}}</p>{{end}}
-  <form method="POST" action="/maintenance/sites" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4 text-sm">
+  <form method="POST" action="/maintenance/sites" class="bg-white rounded-xl border border-line p-6 space-y-4 text-sm">
     {{if .Config}}
     <input type="hidden" name="customer_id" value="{{.Config.CustomerID}}">
     <div>
-      <label class="block text-gray-600 mb-1">고객</label>
-      <p class="font-medium text-gray-900">{{.Config.CustomerID}}</p>
+      <label class="block text-ink-muted mb-1">고객</label>
+      <p class="font-medium text-ink">{{.Config.CustomerID}}</p>
     </div>
     {{else}}
     <div id="site-customer-combobox" class="combobox">
-      <label for="site-customer-q" class="block text-gray-600 mb-1">고객 <span class="text-red-500">*</span></label>
+      <label for="site-customer-q" class="block text-ink-muted mb-1">고객 <span class="text-red-500">*</span></label>
       <input type="hidden" name="customer_id" id="site-customer-id" value="{{.Draft.CustomerID}}">
       <input type="text" name="customer_q" id="site-customer-q" value="{{.Draft.CustomerName}}"
              autocomplete="off" role="combobox" aria-expanded="false" aria-controls="site-customer-list"
              aria-autocomplete="list"
-             class="w-full border border-gray-300 rounded-lg px-3 py-2">
+             class="w-full border border-line rounded-lg px-3 py-2">
       <ul id="site-customer-list" role="listbox" hidden class="combobox-list"></ul>
-      <p id="site-customer-search-hint" class="text-xs text-gray-500 mt-1">이미 등록된 고객은 배지와 수정 링크로 보입니다.{{if .NeedOrg}} 저장하려면 소속 조직을 선택하세요.{{end}}</p>
+      <p id="site-customer-search-hint" class="text-xs text-ink-muted mt-1">이미 등록된 고객은 배지와 수정 링크로 보입니다.{{if .NeedOrg}} 저장하려면 소속 조직을 선택하세요.{{end}}</p>
     </div>
     {{end}}
 
     <div>
-      <label class="block text-gray-600 mb-1">달력·엑셀 표시명 <span class="text-red-500">*</span></label>
+      <label class="block text-ink-muted mb-1">달력·엑셀 표시명 <span class="text-red-500">*</span></label>
       <input type="text" name="short_name" required
              value="{{if .Config}}{{.Config.ShortName}}{{else}}{{.Draft.ShortName}}{{end}}"
              placeholder="예: 국립세종"
-             class="w-full border border-gray-300 rounded-lg px-3 py-2">
+             class="w-full border border-line rounded-lg px-3 py-2">
     </div>
     <div>
-      <label class="block text-gray-600 mb-1">지역 (자동 배정 묶음용)</label>
+      <label class="block text-ink-muted mb-1">지역 (자동 배정 묶음용)</label>
       <input type="text" name="region" value="{{if .Config}}{{.Config.Region}}{{else}}{{.Draft.Region}}{{end}}" placeholder="예: 세종, 대전"
-             class="w-full border border-gray-300 rounded-lg px-3 py-2">
+             class="w-full border border-line rounded-lg px-3 py-2">
     </div>
     <div>
       <label class="label">주기당 회차 수</label>
@@ -46,8 +46,8 @@
              value="{{if .Config}}{{if .Config.RoundsPerPeriod}}{{.Config.RoundsPerPeriod}}{{else}}1{{end}}{{else}}1{{end}}">
     </div>
     <div>
-      <label class="block text-gray-600 mb-1">점검주기 <span class="text-red-500">*</span></label>
-      <select name="inspection_cycle" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <label class="block text-ink-muted mb-1">점검주기 <span class="text-red-500">*</span></label>
+      <select name="inspection_cycle" required class="w-full border border-line rounded-lg px-3 py-2">
         <option value="monthly" {{if .Config}}{{if eq .Config.InspectionCycle "monthly"}}selected{{end}}{{else}}selected{{end}}>월</option>
         <option value="odd_bimonthly" {{if .Config}}{{if eq .Config.InspectionCycle "odd_bimonthly"}}selected{{end}}{{end}}>홀수격월</option>
         <option value="even_bimonthly" {{if .Config}}{{if eq .Config.InspectionCycle "even_bimonthly"}}selected{{end}}{{end}}>짝수격월</option>
@@ -55,7 +55,7 @@
         <option value="semi" {{if .Config}}{{if eq .Config.InspectionCycle "semi"}}selected{{end}}{{end}}>반기</option>
         <option value="yearly" {{if .Config}}{{if eq .Config.InspectionCycle "yearly"}}selected{{end}}{{end}}>년1회</option>
       </select>
-      <p class="text-[11px] text-gray-500 mt-1">분기·반기·년1회는 계획 관리에서 점검할 달(지역/사이트 단위)을 정해 올립니다.</p>
+      <p class="text-[11px] text-ink-muted mt-1">분기·반기·년1회는 계획 관리에서 점검할 달(지역/사이트 단위)을 정해 올립니다.</p>
     </div>
     {{if .Legacy}}
     <div class="flex gap-6">
@@ -72,7 +72,7 @@
     </div>
     {{else}}
     <div>
-      <p class="block text-gray-600 mb-1">점검 제품</p>
+      <p class="block text-ink-muted mb-1">점검 제품</p>
       {{if .Products}}
       <div class="flex flex-wrap gap-4">
         {{range .Products}}
@@ -84,25 +84,25 @@
         {{end}}
       </div>
       {{else}}
-      <p class="text-xs text-gray-500">등록된 제품이 없습니다. <a href="/maintenance/products" class="text-blue-600">점검 제품</a>에서 추가하세요. 비어 있으면 제품 구분 없이 1건입니다.</p>
+      <p class="text-xs text-ink-muted">등록된 제품이 없습니다. <a href="/maintenance/products" class="text-primary">점검 제품</a>에서 추가하세요. 비어 있으면 제품 구분 없이 1건입니다.</p>
       <input type="hidden" name="product_id" value="">
       {{end}}
     </div>
     {{end}}
     <div>
-      <label class="block text-gray-600 mb-1">엑셀 글자색 구분</label>
-      <select name="entry_category" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <label class="block text-ink-muted mb-1">엑셀 글자색 구분</label>
+      <select name="entry_category" class="w-full border border-line rounded-lg px-3 py-2">
         <option value="normal" {{if .Config}}{{if eq .Config.EntryCategory "normal"}}selected{{end}}{{end}}>일반 (녹색)</option>
         <option value="fixed" {{if .Config}}{{if eq .Config.EntryCategory "fixed"}}selected{{end}}{{end}}>고정·지정일 (적색)</option>
         <option value="office" {{if .Config}}{{if eq .Config.EntryCategory "office"}}selected{{end}}{{end}}>사무소 등 (청색)</option>
       </select>
     </div>
     <div>
-      <label class="block text-gray-600 mb-1">고정일 (선택)</label>
-      <p class="text-xs text-gray-500 mb-2">월별 방문일. 여러 날을 고르면 가장 빠른 날에 한 번만 잡힙니다. 휴일이면 같은 달 근무일로 옮깁니다.</p>
+      <label class="block text-ink-muted mb-1">고정일 (선택)</label>
+      <p class="text-xs text-ink-muted mb-2">월별 방문일. 여러 날을 고르면 가장 빠른 날에 한 번만 잡힙니다. 휴일이면 같은 달 근무일로 옮깁니다.</p>
       <div class="grid grid-cols-7 gap-1.5">
         {{range seq 31}}
-        <label class="inline-flex items-center justify-center gap-0.5 text-xs border border-gray-200 rounded px-1 py-1 {{if index $.FixedDaySet .}}bg-indigo-50 border-indigo-300{{end}}">
+        <label class="inline-flex items-center justify-center gap-0.5 text-xs border border-line rounded px-1 py-1 {{if index $.FixedDaySet .}}bg-primary-soft border-indigo-300{{end}}">
           <input type="checkbox" name="fixed_day" value="{{.}}" class="rounded"
                  {{if index $.FixedDaySet .}}checked{{end}}>
           {{.}}
@@ -135,8 +135,8 @@
       </div>
     </div>
     <div class="flex gap-2 pt-2">
-      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">저장</button>
-      <a href="/maintenance/sites" class="px-4 py-2 border border-gray-300 rounded-lg">취소</a>
+      <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg font-medium">저장</button>
+      <a href="/maintenance/sites" class="px-4 py-2 border border-line rounded-lg">취소</a>
     </div>
   </form>
 </div>

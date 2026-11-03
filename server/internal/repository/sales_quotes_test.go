@@ -86,7 +86,7 @@ func TestQuoteRepoNumberDateDuplicateAndCopy(t *testing.T) {
 		t.Fatalf("복사 소계=%d", got.Subtotal)
 	}
 
-	p := &model.SalesProject{Name: "기존 구축", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "기존 구축", IsTentativeName: true}
 	if err := NewSalesRepo(db).Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestQuoteRepoReviseLaborSeedRatesFrozenBudgetPipeline(t *testing.T) {
 	}
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "예산건", IsTentativeName: true, ExpectedAmount: 30_000_000, ExpectedYM: "2027-03"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "예산건", IsTentativeName: true, ExpectedAmount: 30_000_000, ExpectedYM: "2027-03"}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

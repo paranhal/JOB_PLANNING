@@ -16,12 +16,12 @@ func TestListContractUnionSources(t *testing.T) {
 	prepo := NewProjectRepo(db)
 	srepo := NewSalesRepo(db)
 
-	onlyWork := &model.WorkProject{Name: "사업관리만", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1000}
+	onlyWork := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "사업관리만", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1000}
 	if err := prepo.Create(onlyWork); err != nil {
 		t.Fatal(err)
 	}
 
-	linkedS := &model.SalesProject{Name: "연결영업", ProspectName: "고객A"}
+	linkedS := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "연결영업", ProspectName: "고객A"}
 	if err := srepo.Create(linkedS); err != nil {
 		t.Fatal(err)
 	}
@@ -29,17 +29,17 @@ func TestListContractUnionSources(t *testing.T) {
 		model.SalesStage4Closed, model.SalesCloseContracted, 5000, "2026-09-01", linkedS.SalesID); err != nil {
 		t.Fatal(err)
 	}
-	linkedW := &model.WorkProject{Name: "연결된사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 5000, SalesProjectID: linkedS.SalesID}
+	linkedW := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "연결된사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 5000, SalesProjectID: linkedS.SalesID}
 	if err := prepo.Create(linkedW); err != nil {
 		t.Fatal(err)
 	}
 
-	openS := &model.SalesProject{Name: "진행중"}
+	openS := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "진행중"}
 	if err := srepo.Create(openS); err != nil {
 		t.Fatal(err)
 	}
 
-	lost := &model.SalesProject{Name: "실주"}
+	lost := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "실주"}
 	if err := srepo.Create(lost); err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestListContractUnionSources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	zero := &model.SalesProject{Name: "금액0계약", ProspectName: "고객B", ExpectedAmount: 165000}
+	zero := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "금액0계약", ProspectName: "고객B", ExpectedAmount: 165000}
 	if err := srepo.Create(zero); err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestListContractUnionLinkSuggest(t *testing.T) {
 	prepo := NewProjectRepo(db)
 	srepo := NewSalesRepo(db)
 
-	s1 := &model.SalesProject{Name: "제천 RFID 구축"}
+	s1 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "제천 RFID 구축"}
 	if err := srepo.Create(s1); err != nil {
 		t.Fatal(err)
 	}
@@ -165,12 +165,12 @@ func TestListContractUnionLinkSuggest(t *testing.T) {
 		model.SalesStage4Closed, model.SalesCloseContracted, 17869000, "S2609-032", s1.SalesID); err != nil {
 		t.Fatal(err)
 	}
-	w1 := &model.WorkProject{Name: "제천RFID구축", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 17689000}
+	w1 := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "제천RFID구축", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 17689000}
 	if err := prepo.Create(w1); err != nil {
 		t.Fatal(err)
 	}
 
-	partial := &model.SalesProject{Name: "제천 RFID"}
+	partial := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "제천 RFID"}
 	if err := srepo.Create(partial); err != nil {
 		t.Fatal(err)
 	}
@@ -179,8 +179,8 @@ func TestListContractUnionLinkSuggest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sDupA := &model.SalesProject{Name: "동명이인"}
-	sDupB := &model.SalesProject{Name: "동명이인"}
+	sDupA := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "동명이인"}
+	sDupB := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "동명이인"}
 	if err := srepo.Create(sDupA); err != nil {
 		t.Fatal(err)
 	}
@@ -191,12 +191,12 @@ func TestListContractUnionLinkSuggest(t *testing.T) {
 		model.SalesStage4Closed, model.SalesCloseContracted, sDupA.SalesID, sDupB.SalesID); err != nil {
 		t.Fatal(err)
 	}
-	wDup := &model.WorkProject{Name: "동명이인", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
+	wDup := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "동명이인", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1}
 	if err := prepo.Create(wDup); err != nil {
 		t.Fatal(err)
 	}
 
-	linkedS := &model.SalesProject{Name: "중복연결영업"}
+	linkedS := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "중복연결영업"}
 	if err := srepo.Create(linkedS); err != nil {
 		t.Fatal(err)
 	}
@@ -204,11 +204,11 @@ func TestListContractUnionLinkSuggest(t *testing.T) {
 		model.SalesStage4Closed, model.SalesCloseContracted, linkedS.SalesID); err != nil {
 		t.Fatal(err)
 	}
-	wA := &model.WorkProject{Name: "중복A", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 9, SalesProjectID: linkedS.SalesID}
+	wA := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "중복A", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 9, SalesProjectID: linkedS.SalesID}
 	if err := prepo.Create(wA); err != nil {
 		t.Fatal(err)
 	}
-	wB := &model.WorkProject{Name: "중복B", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 9, SalesProjectID: linkedS.SalesID}
+	wB := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "중복B", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 9, SalesProjectID: linkedS.SalesID}
 	if err := prepo.Create(wB); err == nil {
 		t.Fatal("같은 영업 사업에 사업관리 두 건 연결이 허용됐다")
 	}

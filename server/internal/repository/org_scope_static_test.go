@@ -27,8 +27,11 @@ func TestOrgScopeStaticAudit(t *testing.T) {
 	if !strings.Contains(orgScopeAllowlist["List"], "95-2E") {
 		t.Fatal("CustomerRepo.List 를 orgScopeAllowlist 에 전사 공용 마스터 — 95-2E 사유와 함께 등록해야 한다")
 	}
-	if !strings.Contains(orgScopeAllowlist["ListWorkPickProjects"], "95-9A") {
-		t.Fatal("ListWorkPickProjects 를 orgScopeAllowlist 에 95-9A 사유와 함께 등록해야 한다")
+	if !strings.Contains(orgScopeAllowlist["ListWorkPickProjects"], "95-87") {
+		t.Fatal("ListWorkPickProjects 를 orgScopeAllowlist 에 95-87 사유와 함께 등록해야 한다")
+	}
+	if !strings.Contains(orgScopeAllowlist["LookupAccountingAssignees"], "95-88") {
+		t.Fatal("LookupAccountingAssignees 를 orgScopeAllowlist 에 95-88 사유와 함께 등록해야 한다")
 	}
 	if !strings.Contains(orgScopeAllowlist["listProjects"], "95-2E") {
 		t.Fatal("listProjects 전 직원 조회는 allowlist 에 95-2E 사유를 적는다. 쓰기는 GetVisible(write)")
@@ -75,7 +78,8 @@ func TestOrgScopeStaticAudit(t *testing.T) {
 				continue
 			}
 			if !strings.Contains(low, "search") && !strings.Contains(low, "lookup") &&
-				name != "SearchWorkTaskCustomers" && name != "ListWorkPickProjects" && name != "listProjects" {
+				name != "SearchWorkTaskCustomers" && name != "ListWorkPickProjects" && name != "listProjects" &&
+				name != "LookupAccountingAssignees" {
 				continue
 			}
 			start := fset.Position(fn.Pos()).Offset

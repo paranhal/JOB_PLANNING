@@ -80,7 +80,7 @@ func TestCompanyWeeklyHTTPOrgIsolationAndNeedOrg(t *testing.T) {
 
 	xlsx := httptest.NewRecorder()
 	xr := httptest.NewRequest(http.MethodGet, "/stats/weekly-report.xlsx?date=2026-08-10", nil)
-	xr.AddCookie(jwtCookieRole(t, model.RoleVisionAdmin))
+	xr.AddCookie(jwtCookieOrg(t, model.RoleVisionAdmin, repository.OrgAll))
 	e.ServeHTTP(xlsx, xr)
 	if xlsx.Code == http.StatusOK {
 		t.Fatal("vision 전체보기로 통계 주간 엑셀이 내려갔다")

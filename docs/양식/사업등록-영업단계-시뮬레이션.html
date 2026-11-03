@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사업 등록 영업 단계 시뮬레이션</title>
+<style>
+  :root{
+    --bg:#ececec; --panel:#f7f7f7; --card:#fff; --line:#cfcfcf; --line2:#e2e2e2;
+    --ink:#2b2b2b; --mute:#7a7a7a; --soft:#a8a8a8; --dark:#4a4a4a; --mid:#8a8a8a;
+    --hl:#e9ecf2; --hl-line:#8f98ab; --ok:#5d6674;
+    --font:"Pretendard","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:13px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 28px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .topbar small{display:block;letter-spacing:.14em;font-size:10px;color:var(--mute);font-weight:700}
+  .topbar b{font-size:18px}
+  .tag{font-size:11px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:#fafafa;color:var(--mute)}
+  .app{display:grid;grid-template-columns:220px minmax(0,1fr);max-width:1400px;margin:24px auto;border:1px solid var(--line);background:var(--panel)}
+  .side{background:#f1f1f1;border-right:1px solid var(--line);padding:22px 12px;min-height:640px}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;margin:0 8px 28px}
+  .logo i{width:22px;height:22px;background:var(--dark);transform:rotate(45deg);border-radius:4px;display:inline-block}
+  .side h6{margin:0 8px 8px;font-size:10px;letter-spacing:.14em;color:var(--mute)}
+  .nav{padding:10px 12px;border-radius:6px;color:#555;margin-bottom:4px}
+  .nav.on{background:var(--dark);color:#fff;font-weight:600}
+  .main{min-width:0}
+  .head{height:56px;border-bottom:1px solid var(--line);background:#f9f9f9;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:5px;padding:7px 12px;font:inherit;font-size:12px;color:var(--ink);cursor:default}
+  .search{border:1px solid var(--line);border-radius:5px;padding:7px 12px;width:240px;color:var(--soft);background:#fff;font-size:12px}
+  .page{padding:20px 28px 40px}
+  .crumb{color:var(--soft);font-size:12px;margin-bottom:10px}
+  h1{font-size:26px;font-weight:500;margin:0 0 4px}
+  .sub{color:var(--mute);font-size:12px;margin-bottom:18px}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:20px;margin-bottom:14px}
+  .sec{display:flex;gap:12px;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line2)}
+  .num{width:32px;height:32px;border:1px solid var(--mid);border-radius:50%;display:grid;place-items:center;font-size:12px;flex:none}
+  .sec b{display:block;font-size:15px;font-weight:600}
+  .sec span{font-size:11px;color:var(--soft)}
+  label.l{display:block;font-size:11px;color:var(--mute);margin:12px 0 5px}
+  .in,.sel{width:100%;border:1px solid var(--line);border-radius:5px;padding:9px 11px;font:inherit;font-size:12px;background:#fff;color:var(--ink)}
+  .in[disabled]{background:#f3f3f3;color:var(--mute)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .types{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .ty{border:1px solid var(--line);border-radius:5px;padding:12px;font-size:12px;color:var(--mute)}
+  .ty b{color:var(--ink);display:block;margin-bottom:2px}
+  .ty.on{background:#ededed;border-color:var(--dark)}
+  /* 오른쪽 */
+  .box{background:#fff;border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:12px}
+  .box h4{margin:0 0 12px;font-size:12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .new{font-size:10px;padding:2px 6px;border-radius:3px;background:var(--dark);color:#fff;letter-spacing:.04em}
+  .prob{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+  .prob strong{font-size:26px;font-weight:700}
+  .prob span{font-size:11px;color:var(--mute)}
+  .bar{height:6px;background:#e4e4e4;border-radius:3px;overflow:hidden;margin-bottom:16px}
+  .bar i{display:block;height:100%;background:var(--dark);transition:width .3s}
+  .steps{list-style:none;margin:0;padding:0;position:relative}
+  .steps li{position:relative;display:flex;gap:11px;padding:0 0 14px 0;cursor:pointer;border-radius:5px}
+  .steps li:last-child{padding-bottom:0}
+  .steps li::before{content:"";position:absolute;left:11px;top:24px;bottom:-2px;width:2px;background:var(--line)}
+  .steps li:last-child::before{display:none}
+  .steps li.done::before{background:var(--ok)}
+  .dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--soft);flex:none;z-index:1}
+  .done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+  .cur .dot{border-color:var(--dark);color:var(--dark);box-shadow:0 0 0 4px #e1e1e1}
+  .st{min-width:0;flex:1}
+  .st b{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:600;color:#9a9a9a}
+  .done .st b{color:#555}
+  .cur .st b{color:var(--ink)}
+  .st em{font-style:normal;font-weight:500;font-size:11px;color:var(--soft)}
+  .cur .st em{color:var(--mute)}
+  .st p{margin:3px 0 0;font-size:11px;color:var(--mute);line-height:1.5;display:none}
+  .cur .st p{display:block}
+  .need{margin-top:6px;display:none;font-size:11px;background:var(--hl);border:1px solid var(--hl-line);border-radius:4px;padding:6px 8px;color:#444}
+  .cur .need{display:block}
+  .sub-opts{display:none;margin-top:8px;gap:6px;flex-wrap:wrap}
+  .cur .sub-opts{display:flex}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 9px;font-size:11px;color:var(--mute);cursor:pointer;font-family:inherit}
+  .chip.on{background:var(--dark);border-color:var(--dark);color:#fff}
+  .ctrl{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:11px;color:var(--mute);display:flex;gap:8px;align-items:center}
+  .mini{height:5px;background:#e4e4e4;border-radius:3px;overflow:hidden;margin:2px 0 12px}
+  .mini i{display:block;height:100%;background:var(--mid)}
+  .warn{background:#efefef;border-radius:5px;padding:12px;font-size:11px;color:var(--mute);line-height:1.55}
+  .warn b{display:block;color:var(--ink);margin-bottom:3px;font-size:12px}
+  .sum{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2);font-size:11px;color:var(--mute)}
+  .sum:last-child{border:0}
+  .sum b{color:var(--ink);font-weight:600}
+  .foot{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;padding:14px 18px;gap:10px;flex-wrap:wrap}
+  .foot .btn.p{background:var(--dark);color:#fff;border-color:var(--dark)}
+  .note{max-width:1400px;margin:0 auto 28px;padding:0 4px;font-size:12px;color:var(--mute);line-height:1.7}
+  .note b{color:var(--ink)}
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr}.side{display:none}.grid{grid-template-columns:1fr}.types{grid-template-columns:1fr 1fr}
+    .page{padding:16px}.row2{grid-template-columns:1fr}
+  }
+  /* 접기/펼치기 + 파일 업로드 */
+  .sec{position:relative}
+  .tg{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:5px;padding:6px 11px;font:inherit;font-size:11px;color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .tg:hover{background:#f4f4f4}
+  .tg svg{width:10px;height:10px;transition:transform .2s}
+  .card.collapsed .tg svg{transform:rotate(180deg)}
+  .card.collapsed .body{display:none}
+  .card.collapsed .sec{margin-bottom:0;padding-bottom:0;border-bottom:0}
+  .collapsed-sum{display:none;margin:10px 0 0 44px;font-size:11px;color:var(--mute)}
+  .card.collapsed .collapsed-sum{display:block}
+  .drop{border:1.5px dashed var(--mid);border-radius:6px;padding:26px 16px;text-align:center;background:#fafafa;transition:background .15s,border-color .15s}
+  .drop.over{background:var(--hl);border-color:var(--dark)}
+  .clip{width:40px;height:40px;border:1px solid var(--mid);border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;background:#fff}
+  .drop b{display:block;font-size:12px;margin-bottom:4px}
+  .drop small{display:block;font-size:11px;color:var(--soft);margin-bottom:12px}
+  .files{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+  .file{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:6px;padding:10px 14px;background:#fff}
+  .ext{width:38px;height:38px;border:1px solid var(--line);border-radius:5px;background:#eee;display:grid;place-items:center;font-size:10px;font-weight:700;color:#555;flex:none}
+  .fi{min-width:0;flex:1}
+  .fi b{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fi span{font-size:11px;color:var(--soft)}
+  .x{border:0;background:none;font-size:18px;line-height:1;color:var(--mute);cursor:pointer;padding:4px 8px;border-radius:4px}
+  .x:hover{background:#eee;color:var(--ink)}
+  .ferr{margin-top:10px;font-size:11px;color:#8a3b2b;background:#f6ebe8;border:1px solid #e3c9c2;border-radius:5px;padding:7px 10px}
+  .cnt{font-size:11px;color:var(--mute);margin-left:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div><small>LOW-FIDELITY SIMULATION</small><b>사업 등록 화면 · 영업 단계 박스</b></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <span class="tag">왼쪽 ‘영업 단계’ 선택 또는 오른쪽 단계를 눌러 보세요</span>
+    <button class="btn" id="reset" type="button">처음 상태</button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="side">
+    <div class="logo"><i></i>업무관리</div>
+    <h6>WORKSPACE</h6>
+    <div class="nav">대시보드</div><div class="nav on">사업 관리</div><div class="nav">영업 관리</div>
+    <div class="nav">고객사</div><div class="nav">구성원</div><div class="nav">리포트</div>
+  </aside>
+  <div class="main">
+    <div class="head"><span class="btn">사업 등록</span><span class="search">검색</span></div>
+    <div class="page">
+      <div class="crumb">사업 관리 › <b style="color:#555">새 사업 등록</b></div>
+      <h1>새 사업 등록</h1>
+      <div class="sub">새롭게 발굴한 영업 기회를 등록하고 수주 활동을 시작합니다.</div>
+
+      <div class="grid">
+        <!-- 왼쪽 폼 -->
+        <div>
+          <section class="card">
+            <div class="sec"><div class="num">01</div><div><b>사업 기회 정보</b><span>발굴한 사업 기회를 식별할 수 있는 정보를 입력합니다.</span></div></div>
+            <label class="l">사업명 *</label>
+            <input class="in" value="AI 기반 고객 상담 시스템 구축">
+            <div class="row2">
+              <div><label class="l">최초 발굴일</label><input class="in" value="2026. 10. 24."></div>
+              <div><label class="l">영업 단계 *</label>
+                <select class="sel" id="stageSel">
+                  <option value="discover">발굴</option>
+                  <option value="propose">제안</option>
+                  <option value="bid">입찰</option>
+                  <option value="closed">사업 종료</option>
+                </select>
+              </div>
+            </div>
+            <label class="l">사업 유형 *</label>
+            <div class="types">
+              <div class="ty on"><b>구축</b>시스템 및 인프라 도입·구축</div>
+              <div class="ty"><b>공사</b>시설 및 설비 시공·공사</div>
+              <div class="ty"><b>개발</b>소프트웨어 및 서비스 개발</div>
+              <div class="ty"><b>유지보수</b>기존 시스템 운영·유지관리</div>
+              <div class="ty"><b>물품구매</b>장비·라이선스·물품 구매</div>
+              <div class="ty"><b>기타</b>분류에 포함되지 않는 사업</div>
+            </div>
+            <label class="l">고객 니즈 및 사업 배경</label>
+            <textarea class="in" rows="3">상담 인력 부족과 응대 품질 편차로 인해 AI 상담 시스템 도입을 검토하고 있습니다.</textarea>
+          </section>
+
+          <section class="card collapsible collapsed" id="sec02">
+            <div class="sec"><div class="num">02</div><div><b>고객 발굴 정보</b><span>고객 접점과 사업 기회가 유입된 경로를 기록합니다.</span></div><button type="button" class="tg" aria-expanded="true"><span class="tgt">접기</span><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 6.5 5 3l3.5 3.5"/></svg></button></div>
+            <div class="collapsed-sum">에이펙스커머스 · 예산 1.8억원 · 기존 고객 추천</div>
+            <div class="row2">
+              <div><label class="l">고객사 *</label><input class="in" value="에이펙스커머스"></div>
+              <div><label class="l">고객 담당자</label><input class="in" value="정재훈 · 디지털혁신팀"></div>
+              <div><label class="l">예산 금액 *</label><input class="in" value="180,000,000 원"></div>
+              <div><label class="l">유입 경로 *</label><input class="in" value="기존 고객 추천"></div>
+            </div>
+          </section>
+
+          <section class="card collapsible collapsed" id="sec03">
+            <div class="sec"><div class="num">03</div><div><b>영업 계획 및 담당자</b><span>수주 활동의 담당자와 다음 영업 액션을 지정합니다.</span></div><button type="button" class="tg" aria-expanded="true"><span class="tgt">접기</span><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 6.5 5 3l3.5 3.5"/></svg></button></div>
+            <div class="collapsed-sum">영업 담당 유다은 · 다음 액션 고객 니즈 확인 미팅 (2026. 10. 30.)</div>
+            <div class="row2">
+              <div><label class="l">영업 담당자 *</label><input class="in" value="유다은"></div>
+              <div><label class="l">수주 가능성 <span style="color:var(--soft)">(단계 기준 자동)</span></label><input class="in" id="probField" disabled></div>
+              <div><label class="l">다음 액션 *</label><input class="in" value="고객 니즈 확인 미팅"></div>
+              <div><label class="l">다음 액션 예정일</label><input class="in" value="2026. 10. 30."></div>
+            </div>
+          </section>
+
+          <section class="card collapsible" id="sec04">
+            <div class="sec"><div class="num">04</div><div><b>초기 영업 자료<span class="cnt" id="fileCnt"></span></b><span>RFP, 문의메일, 미팅 메모 등 발굴 근거를 첨부합니다.</span></div><button type="button" class="tg" aria-expanded="true"><span class="tgt">접기</span><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 6.5 5 3l3.5 3.5"/></svg></button></div>
+            <div class="collapsed-sum" id="fileSum">첨부된 파일이 없습니다.</div>
+            <div class="drop" id="drop">
+              <div class="clip"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.9-8.9a3.4 3.4 0 0 1 4.8 4.8l-8.9 8.9a1.7 1.7 0 0 1-2.4-2.4l8.2-8.2"/></svg></div>
+              <b>RFP 또는 관련 자료를 첨부해 주세요</b>
+              <small>파일을 여기로 끌어다 놓거나 아래 버튼으로 선택 · PDF, DOC, XLS · 파일당 최대 20MB</small>
+              <button type="button" class="btn" id="pick" style="cursor:pointer">파일 선택</button>
+              <input type="file" id="fileIn" multiple accept=".pdf,.doc,.docx,.xls,.xlsx" hidden>
+            </div>
+            <div class="ferr" id="ferr" hidden></div>
+            <div class="files" id="files"></div>
+          </section>
+
+          <div class="foot">
+            <span style="font-size:11px;color:var(--soft)">마지막 저장: 아직 저장되지 않음</span>
+            <span style="display:flex;gap:8px"><span class="btn">취소</span><span class="btn">임시 저장</span><span class="btn p">영업 기회 등록</span></span>
+          </div>
+        </div>
+
+        <!-- 오른쪽: 영업 단계 박스 -->
+        <aside>
+          <div class="box" id="stageBox">
+            <h4>영업 단계 <span class="new">NEW</span></h4>
+            <div class="prob"><strong id="probNum">10%</strong><span>수주 가능성</span></div>
+            <div class="bar"><i id="probBar" style="width:10%"></i></div>
+
+            <ul class="steps" id="steps"></ul>
+
+            <div class="ctrl" id="rfpCtrl" hidden>
+              <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="rfpChk"> RFP(제안요청서) 접수</label>
+            </div>
+          </div>
+
+          <div class="box warn"><b>등록 전 확인해 주세요</b><span id="warnTxt"></span></div>
+
+          <div class="box">
+            <h4>등록 요약</h4>
+            <div class="sum">영업 단계<b id="sumStage">발굴</b></div>
+            <div class="sum">수주 가능성<b id="sumProb">10%</b></div>
+            <div class="sum">고객사<b>에이펙스커머스</b></div>
+            <div class="sum">예산 금액<b>1.8억원</b></div>
+            <div class="sum">영업 담당<b>유다은</b></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>이 시뮬레이션이 보여주는 것</b><br>
+  · 오른쪽 맨 위 박스가 ‘영업 단계’로 바뀌고, 기회 정보 완성도 박스는 삭제했습니다.<br>
+  · 단계는 실제 시스템의 4단계(발굴 → 제안 → 입찰 → 사업 종료)를 쓰고, 수주 가능성은 단계 규칙으로 자동 계산됩니다(발굴 10%, 제안 20% / RFP 접수 후 50%, 입찰 중 별도 확률, 협상·수주 100%).<br>
+  · 02·03 박스는 기본이 접힘이고 오른쪽 위 버튼으로 펼칩니다. 04 초기 영업 자료는 펼친 상태로 시작하며 파일 선택·끌어놓기 업로드(PDF·DOC·XLS, 20MB 이하)와 삭제가 됩니다. 시뮬레이션이라 파일은 서버에 올라가지 않습니다.<br>
+  · 현재 단계에서 채워야 할 항목이 박스 안에 바로 안내됩니다. 왼쪽 ‘수주 가능성’ 입력칸은 단계 기준 자동 표시로 바뀝니다.
+</div>
+
+<script>
+(function(){
+  var STAGES = [
+    {k:'discover', n:'발굴', d:'고객 니즈를 파악하고 사업 기회를 식별하는 단계입니다.', need:'필수: 사업명 · 고객사 · 예산 · 유입 경로'},
+    {k:'propose', n:'제안', d:'제안서를 준비·제출하고 고객 검토를 받는 단계입니다.', need:'필수: RFP 접수일 · 제안 마감일 · 제안 담당'},
+    {k:'bid', n:'입찰', d:'입찰·협상을 진행하며 수주 여부를 확정합니다.', need:'필수: 입찰 상태 · 입찰 마감일 · 최종 수주 확률'},
+    {k:'closed', n:'사업 종료', d:'계약 체결, 실주, 중단 중 하나로 영업을 마칩니다.', need:'필수: 종료 사유 · 종료일'}
+  ];
+  var st = {stage:'discover', rfp:false, bid:'pending', close:'contracted'};
+  var $ = function(id){return document.getElementById(id)};
+  var bidLabel = {pending:'입찰 중', negotiating:'협상 중', won:'수주'};
+  var closeLabel = {contracted:'계약', lost:'실주', dropped:'중단'};
+
+  function prob(){
+    if(st.stage==='discover') return 10;
+    if(st.stage==='propose') return st.rfp ? 50 : 20;
+    if(st.stage==='bid') return st.bid==='pending' ? 30 : 100;
+    return st.close==='contracted' ? 100 : 0;
+  }
+  function idx(){ for(var i=0;i<STAGES.length;i++) if(STAGES[i].k===st.stage) return i; return 0; }
+  function note(s){
+    if(s.k==='propose') return st.rfp ? 'RFP 접수됨 · 50%' : '20% (RFP 접수 시 50%)';
+    if(s.k==='bid') return '입찰 중 30% · 협상·수주 100%';
+    if(s.k==='discover') return '10%';
+    return '계약 100% · 실주/중단 0%';
+  }
+  function render(){
+    var cur = idx(), p = prob();
+    $('stageSel').value = st.stage;
+    $('probNum').textContent = p + '%';
+    $('probBar').style.width = p + '%';
+    $('probField').value = p + '%  (' + STAGES[cur].n + ' 기준)';
+    $('sumProb').textContent = p + '%';
+    $('sumStage').textContent = STAGES[cur].n + (st.stage==='bid' ? ' · ' + bidLabel[st.bid] : st.stage==='closed' ? ' · ' + closeLabel[st.close] : '');
+    $('rfpCtrl').hidden = st.stage!=='propose';
+    $('rfpChk').checked = st.rfp;
+
+    var html = '';
+    STAGES.forEach(function(s,i){
+      var cls = i<cur ? 'done' : i===cur ? 'cur' : '';
+      var sub = '';
+      if(s.k==='bid' && i===cur){
+        sub = '<div class="sub-opts">' + ['pending','negotiating','won'].map(function(b){
+          return '<button type="button" class="chip'+(st.bid===b?' on':'')+'" data-bid="'+b+'">'+bidLabel[b]+'</button>';
+        }).join('') + '</div>';
+      }
+      if(s.k==='closed' && i===cur){
+        sub = '<div class="sub-opts">' + ['contracted','lost','dropped'].map(function(b){
+          return '<button type="button" class="chip'+(st.close===b?' on':'')+'" data-close="'+b+'">'+closeLabel[b]+'</button>';
+        }).join('') + '</div>';
+      }
+      html += '<li class="'+cls+'" data-k="'+s.k+'"><div class="dot">'+(i<cur?'✓':(i+1))+'</div>' +
+        '<div class="st"><b>'+s.n+'<em>'+note(s)+'</em></b><p>'+s.d+'</p>' +
+        '<div class="need">'+s.need+'</div>'+sub+'</div></li>';
+    });
+    $('steps').innerHTML = html;
+
+    var w = {
+      discover:'등록된 사업은 영업 파이프라인의 ‘발굴’ 단계에 추가됩니다. 수주 확정 전까지 수행 프로젝트는 생성되지 않습니다.',
+      propose:'‘제안’ 단계로 바로 등록합니다. RFP 접수일을 넣으면 수주 가능성이 50%로 올라갑니다.',
+      bid:'‘입찰’ 단계로 등록합니다. 입찰 상태와 마감일을 확인하세요.',
+      closed:'이미 종료된 사업을 등록합니다. 계약으로 종료하면 사업관리로 전환할 수 있습니다.'
+    }[st.stage];
+    $('warnTxt').textContent = w;
+  }
+
+  $('steps').addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if(chip){
+      if(chip.dataset.bid) st.bid = chip.dataset.bid;
+      if(chip.dataset.close) st.close = chip.dataset.close;
+      render(); return;
+    }
+    var li = e.target.closest('li');
+    if(li){ st.stage = li.dataset.k; render(); }
+  });
+  $('stageSel').addEventListener('change', function(e){ st.stage = e.target.value; render(); });
+  $('rfpChk').addEventListener('change', function(e){ st.rfp = e.target.checked; render(); });
+  $('reset').addEventListener('click', function(){ st = {stage:'discover', rfp:false, bid:'pending', close:'contracted'}; render();
+    ['sec02','sec03'].forEach(function(id){ var c=$(id); c.classList.add('collapsed'); syncBtn(c); });
+    var c4=$('sec04'); c4.classList.remove('collapsed'); syncBtn(c4);
+    files = [{name:'에이펙스커머스_AI상담_RFP.pdf', size:4.2*1024*1024}]; showErr([]); renderFiles(); });
+  render();
+
+  /* ---- 접기/펼치기 ---- */
+  function wrapBodies(){
+    document.querySelectorAll('.collapsible').forEach(function(card){
+      var sec = card.querySelector('.sec'); if(!sec) return;
+      var body = document.createElement('div'); body.className='body';
+      var sum = card.querySelector('.collapsed-sum');
+      var kids = Array.prototype.slice.call(card.children).filter(function(el){return el!==sec && el!==sum});
+      kids.forEach(function(el){ body.appendChild(el); });
+      card.appendChild(body);
+      syncBtn(card);
+    });
+  }
+  function syncBtn(card){
+    var b = card.querySelector('.tg'), c = card.classList.contains('collapsed');
+    b.setAttribute('aria-expanded', c ? 'false' : 'true');
+    b.querySelector('.tgt').textContent = c ? '펼치기' : '접기';
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('.tg'); if(!b) return;
+    var card = b.closest('.collapsible'); card.classList.toggle('collapsed'); syncBtn(card);
+  });
+  wrapBodies();
+
+  /* ---- 파일 업로드 (시뮬레이션: 브라우저 메모리에만 보관) ---- */
+  var MAX = 20 * 1024 * 1024, OK = ['pdf','doc','docx','xls','xlsx'];
+  var files = [
+    {name:'에이펙스커머스_AI상담_RFP.pdf', size:4.2*1024*1024, sample:true}
+  ];
+  function fmt(n){ return n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+  function extOf(n){ var m = n.toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; }
+  function badge(n){ var e = extOf(n); return e==='docx'?'DOC':e==='xlsx'?'XLS':e.toUpperCase(); }
+  function esc(t){ return t.replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function showErr(msgs){
+    var el = $('ferr');
+    if(!msgs.length){ el.hidden = true; el.textContent=''; return; }
+    el.hidden = false; el.innerHTML = msgs.map(esc).join('<br>');
+  }
+  function renderFiles(){
+    $('files').innerHTML = files.map(function(f,i){
+      return '<div class="file"><div class="ext">'+badge(f.name)+'</div>' +
+        '<div class="fi"><b title="'+esc(f.name)+'">'+esc(f.name)+'</b><span>'+fmt(f.size)+' · 업로드 완료</span></div>' +
+        '<button type="button" class="x" data-i="'+i+'" aria-label="'+esc(f.name)+' 삭제">×</button></div>';
+    }).join('');
+    $('fileCnt').textContent = files.length ? ' · '+files.length+'건' : '';
+    $('fileSum').textContent = files.length ? '첨부 '+files.length+'건 · '+files.map(function(f){return f.name}).slice(0,2).join(', ')+(files.length>2?' 외 '+(files.length-2)+'건':'') : '첨부된 파일이 없습니다.';
+  }
+  function addFiles(list){
+    var errs = [];
+    Array.prototype.forEach.call(list, function(f){
+      if(OK.indexOf(extOf(f.name)) < 0){ errs.push(f.name+' — PDF, DOC, XLS 파일만 올릴 수 있습니다.'); return; }
+      if(f.size > MAX){ errs.push(f.name+' — 20MB를 넘습니다 ('+fmt(f.size)+').'); return; }
+      if(files.some(function(x){return x.name===f.name && x.size===f.size})){ errs.push(f.name+' — 이미 첨부된 파일입니다.'); return; }
+      files.push({name:f.name, size:f.size});
+    });
+    showErr(errs); renderFiles();
+  }
+  $('pick').addEventListener('click', function(){ $('fileIn').click(); });
+  $('fileIn').addEventListener('change', function(e){ addFiles(e.target.files); e.target.value=''; });
+  var drop = $('drop');
+  ['dragenter','dragover'].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave','drop'].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function(e){ if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+  $('files').addEventListener('click', function(e){
+    var x = e.target.closest('.x'); if(!x) return;
+    files.splice(+x.dataset.i, 1); showErr([]); renderFiles();
+  });
+  renderFiles();
+})();
+</script>
+</body>
+</html>

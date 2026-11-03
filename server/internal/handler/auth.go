@@ -189,12 +189,15 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 	if must && msg == "" {
 		msg = "임시 비밀번호입니다. 지금 바꿔 주세요."
 	}
-	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg, "Orgs": orgs,
+		"Error":         c.QueryParam("err"),
 		"MustChange":    must,
 		"HasSignature":  strings.TrimSpace(u.SignaturePath) != "" && signatureFileExists(u.SignaturePath),
 		"HasSignature2": strings.TrimSpace(u.SignaturePath2) != "" && signatureFileExists(u.SignaturePath2),
-	})
+	}
+	h.attachDupUsername(c, data)
+	return c.Render(http.StatusOK, "auth/account.html", data)
 }
 
 func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
@@ -236,6 +239,9 @@ func (h *AuthHandler) AccountRenameUsername(c echo.Context) error {
 		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
 			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": "아이디를 입력하세요.",
 		})
+	}
+	if blocked, err := h.redirectIfUsernameConflict(c, "/account", newUsername, uid); blocked {
+		return err
 	}
 	if err := h.userRepo.RenameUsername(uid, newUsername); err != nil {
 		u, _ := h.userRepo.GetByID(uid)
@@ -422,7 +428,8 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 				if u.Role == model.RoleCLevel {
 					continue
 				}
-				if u.OrgID == home {
+				uo := strings.TrimSpace(u.OrgID)
+				if uo == home || (uo == "" && home == model.OrgIDLibrary) {
 					scoped = append(scoped, u)
 				}
 			}
@@ -485,6 +492,7 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	if old := strings.TrimSpace(c.QueryParam("old")); old != "" && h.userRepo != nil {
 		data["Unmatched"] = h.userRepo.UnmatchedAfterNameChange(old)
 	}
+	h.attachDupUsername(c, data)
 	return c.Render(http.StatusOK, "auth/users.html", data)
 }
 
@@ -546,8 +554,8 @@ func (h *AuthHandler) UserCreate(c echo.Context) error {
 	if strings.TrimSpace(u.Username) == "" || strings.TrimSpace(u.FullName) == "" {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("이름과 아이디를 입력하세요."))
 	}
-	if taken, err := h.userRepo.UsernameTaken(u.Username, ""); err != nil || taken {
-		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(model.UsernameReservedMsg))
+	if blocked, err := h.redirectIfUsernameConflict(c, "/users", u.Username, ""); blocked {
+		return err
 	}
 	if err := h.userRepo.Create(u); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("계정을 만들지 못했습니다."))
@@ -693,6 +701,9 @@ func (h *AuthHandler) UserRenameUsername(c echo.Context) error {
 	newUsername := strings.TrimSpace(c.FormValue("username"))
 	if newUsername == "" {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape("아이디를 입력하세요."))
+	}
+	if blocked, err := h.redirectIfUsernameConflict(c, "/users", newUsername, id); blocked {
+		return err
 	}
 	if err := h.userRepo.RenameUsername(id, newUsername); err != nil {
 		return c.Redirect(http.StatusSeeOther, "/users?err="+url.QueryEscape(err.Error()))

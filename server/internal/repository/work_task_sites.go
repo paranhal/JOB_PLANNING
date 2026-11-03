@@ -405,15 +405,24 @@ func (r *WBRepo) SyncSitesOnProjectWorkComplete(t *model.WorkTask, userID string
 	return pe.applyBulkSiteStatus(t.ProjectID, userID, model.WorkCompleteSiteStatus(), eventDate, note, "ui", ids)
 }
 
-// ListWorkPickProjects 작업 폼 사업 후보. 95-9A Q3: 조직과 무관하게 취소·종료가 아닌 계약 사업, 구축·공사 우선.
+// ListWorkPickProjects 작업 폼 사업 후보. 95-87: 주관 또는 유관 부서만. OrgAll 은 전체.
 func (r *WBRepo) ListWorkPickProjects(orgID string) ([]model.WorkProject, error) {
-	_ = orgID
-	rows, err := r.db.Query(`
-		SELECT p.project_id, p.name, COALESCE(p.project_kind,''), COALESCE(p.status,'active')
+	q := `
+		SELECT p.project_id, p.name, COALESCE(p.project_kind,''), COALESCE(p.status,'active'), COALESCE(p.org_id,'')
 		FROM work_projects p
-		WHERE COALESCE(p.status,'') NOT IN ('archived','complete','cancelled')
-		ORDER BY CASE COALESCE(p.project_kind,'')
-			WHEN 'build' THEN 0 WHEN 'construction' THEN 1 ELSE 2 END, p.name`)
+		WHERE COALESCE(p.status,'') NOT IN ('archived','complete','cancelled')`
+	var args []interface{}
+	orgID = strings.TrimSpace(orgID)
+	if orgID != "" && orgID != OrgAll {
+		q += ` AND (TRIM(COALESCE(p.org_id,''))=? OR EXISTS (
+			SELECT 1 FROM work_project_orgs r WHERE r.project_id=p.project_id AND r.org_id=?))`
+		args = append(args, orgID, orgID)
+	} else if orgID == "" {
+		q += ` AND 1=0`
+	}
+	q += ` ORDER BY CASE COALESCE(p.project_kind,'')
+			WHEN 'build' THEN 0 WHEN 'construction' THEN 1 ELSE 2 END, p.name`
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -421,9 +430,10 @@ func (r *WBRepo) ListWorkPickProjects(orgID string) ([]model.WorkProject, error)
 	var out []model.WorkProject
 	for rows.Next() {
 		var p model.WorkProject
-		if err := rows.Scan(&p.ProjectID, &p.Name, &p.ProjectKind, &p.Status); err != nil {
+		if err := rows.Scan(&p.ProjectID, &p.Name, &p.ProjectKind, &p.Status, &p.OrgID); err != nil {
 			return nil, err
 		}
+		p.Related = orgID != "" && orgID != OrgAll && strings.TrimSpace(p.OrgID) != orgID
 		out = append(out, p)
 	}
 	return out, rows.Err()

@@ -474,7 +474,7 @@ func (r *StatsRepo) ListCompletedDetail(from, toEx string, f model.StatsMeetingF
 			it.ReceiptDate = t.Format("2006-01-02")
 		}
 		it.CompleteDate = strings.TrimSpace(completeStr)
-		it.ProductCategory = mapProductCategory(productCategory, productType, productName)
+		it.ProductCategory = MapStatsProductCategory(productCategory, productType, productName)
 		it.ProductModel = strings.TrimSpace(modelName)
 		if it.ProductModel == "" {
 			it.ProductModel = strings.TrimSpace(productName)

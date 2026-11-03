@@ -36,7 +36,7 @@
     <form method="post" action="/work-groups/{{.Group.GroupID}}/reopen" data-wg-form><button class="btn btn-secondary btn-sm" type="submit">다시 열기</button></form>
     {{end}}
     {{end}}
-    <table class="w-full text-ui">
+    <table data-table-cols-skip class="w-full text-ui">
       <thead class="text-ink-muted text-left"><tr><th class="p-2">구성원</th><th class="p-2">역할</th><th class="p-2">가입일</th><th class="p-2">탈퇴일</th><th class="p-2">상태</th><th class="p-2"></th></tr></thead>
       <tbody>
         {{range .Members}}

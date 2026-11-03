@@ -30,6 +30,9 @@ func loginHelpApp(t *testing.T) (*echo.Echo, *sql.DB, *Handler) {
 	if err := users.EnsureAdmin(HashPassword("adminpass12")); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`UPDATE users SET role=? WHERE username='admin'`, model.RoleVisionAdmin); err != nil {
+		t.Fatal(err)
+	}
 	e := echo.New()
 	e.Renderer = NewRenderer()
 	h := New(db)

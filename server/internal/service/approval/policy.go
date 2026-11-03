@@ -1,6 +1,7 @@
 package approval
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -26,13 +27,10 @@ func (e *Engine) EnsurePolicy(orgID string) error {
 	return e.ensureTemplates(orgID)
 }
 
-func (e *Engine) GetPolicy(orgID string) (Policy, error) {
-	if err := e.EnsurePolicy(orgID); err != nil {
-		return Policy{}, err
-	}
+func loadPolicy(q rowQuery, orgID string) (Policy, error) {
 	var p Policy
 	var a, b, c, d, sl, sq, n int
-	err := e.DB.QueryRow(`SELECT org_id, deleg_by_head, deleg_by_admin, deleg_with_leave, admin_emergency_approve,
+	err := q.QueryRow(`SELECT org_id, deleg_by_head, deleg_by_admin, deleg_with_leave, admin_emergency_approve,
 		self_approve_leave, self_approve_quote, notify_admin_self_approve, COALESCE(updated_by,'')
 		FROM approval_policies WHERE org_id=?`, orgID).Scan(
 		&p.OrgID, &a, &b, &c, &d, &sl, &sq, &n, &p.UpdatedBy)
@@ -43,6 +41,21 @@ func (e *Engine) GetPolicy(orgID string) (Policy, error) {
 	p.AdminEmergencyApprove = d == 1
 	p.SelfApproveLeave, p.SelfApproveQuote, p.NotifyAdminSelfApprove = sl == 1, sq == 1, n == 1
 	return p, nil
+}
+
+func (e *Engine) GetPolicy(orgID string) (Policy, error) {
+	if err := e.EnsurePolicy(orgID); err != nil {
+		return Policy{}, err
+	}
+	return loadPolicy(e.DB, orgID)
+}
+
+// GetPolicyTx 같은 트랜잭션 안에서 정책을 읽는다.
+func (e *Engine) GetPolicyTx(tx *sql.Tx, orgID string) (Policy, error) {
+	if tx == nil {
+		return e.GetPolicy(orgID)
+	}
+	return loadPolicy(tx, orgID)
 }
 
 func (e *Engine) SavePolicy(actor Actor, orgID string, p Policy) error {

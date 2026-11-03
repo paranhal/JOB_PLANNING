@@ -358,7 +358,7 @@ func TestBriefingSuppressesAssignNoticeWithoutConsumingShown(t *testing.T) {
 	if cookieNamed(first, assignNoticeShownCookie) != nil {
 		t.Fatal("assign_notice_shown 이 소비됨")
 	}
-	if !strings.Contains(body, "bg-red-500") {
+	if !strings.Contains(body, "bg-danger") {
 		t.Fatal("사이드바 뱃지가 사라짐")
 	}
 }

@@ -10,8 +10,14 @@
   <link rel="stylesheet" href="/static/vendor/tailwind.css?v={{.AssetQuery}}">
   <script src="/static/vendor/htmx.min.js?v={{.AssetQuery}}"></script>
   <script src="/static/js/work_list_select.js?v={{.AssetQuery}}"></script>
+  <script src="/static/js/table-cols.js?v={{.AssetQuery}}"></script>
   <script src="/static/js/site_multi_picker.js?v={{.AssetQuery}}"></script>
   <script src="/static/js/assignee_picker.js?v={{.AssetQuery}}"></script>
+  <script src="/static/js/overlap_resolve.js?v={{.AssetQuery}}"></script>
+  <script src="/static/js/carryover.js?v={{.AssetQuery}}"></script>
+  <script src="/static/js/board_kanban.js?v={{.AssetQuery}}"></script>
+  <script src="/static/js/board_schedule.js?v={{.AssetQuery}}"></script>
+  <script src="/static/js/work_items.js?v={{.AssetQuery}}"></script>
   <script src="/static/js/schedule-show.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/vendor/alpine.min.js?v={{.AssetQuery}}"></script>
   <style>
@@ -39,6 +45,7 @@
     </div>
   </div>
 </div>
+{{template "dup_username_dialog" .}}
 
 {{if .ASSavePopup}}
 <div x-data="asSaveDialog()" x-cloak x-show="open"
@@ -261,7 +268,10 @@
       <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden p-2 rounded-lg hover:bg-gray-100">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1 class="text-lg font-semibold text-gray-800">{{.Title}}</h1>
+      <div class="flex min-w-0 items-center gap-1">
+        {{template "page_back" .}}
+        <h1 class="text-lg font-semibold text-gray-800 truncate">{{.Title}}</h1>
+      </div>
       <div class="ml-auto flex items-center gap-3">
         <div class="htmx-indicator">
           <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -723,9 +733,14 @@
   };
   window.projectCombo = function (items, selected, emptyLabel) {
     items = items || [];
+    var startName = '';
+    if (selected) {
+      var hit = items.find(function (p) { return p.project_id === selected; });
+      startName = hit ? (hit.name || '') : '';
+    }
     return {
       items: items,
-      q: '',
+      q: startName,
       open: false,
       hi: 0,
       selectedId: selected || '',
@@ -758,6 +773,36 @@
         this.q = name || '';
         this.open = false;
         this.$dispatch('project-picked', { id: this.selectedId, name: name || '', kind: kind || '' });
+      }
+    };
+  };
+  window.orgPicker = function (mode, orgs, selected, related, ownerId) {
+    orgs = orgs || [];
+    related = related || [];
+    function keyOf(o) { return (o && (o.org_id || o.OrgID)) || ''; }
+    function labelOf(o) { return (o && (o.org_name || o.OrgName || o.org_id || o.OrgID)) || ''; }
+    return {
+      mode: mode || 'single',
+      orgs: orgs,
+      open: false,
+      ownerId: selected || ownerId || '',
+      selected: related.slice(),
+      orgKey: keyOf,
+      orgLabel: labelOf,
+      isOwner: function (id) { return !!id && id === this.ownerId; },
+      labelOf: function (id) {
+        var hit = this.orgs.find(function (o) { return keyOf(o) === id; });
+        return hit ? labelOf(hit) : id;
+      },
+      onOwner: function () {
+        var self = this;
+        this.selected = this.selected.filter(function (id) { return id !== self.ownerId; });
+      },
+      toggle: function (id) {
+        if (!id || this.isOwner(id)) return;
+        var i = this.selected.indexOf(id);
+        if (i >= 0) this.selected.splice(i, 1);
+        else this.selected.push(id);
       }
     };
   };
@@ -861,6 +906,48 @@
   })();
 })();
 </script>
+<script>
+(function(){
+  var el = document.getElementById('page-back');
+  if (!el || el.getAttribute('data-page-back') !== 'history') return;
+  el.addEventListener('click', function(e){
+    if (history.length > 1) { e.preventDefault(); history.back(); }
+  });
+})();
+</script>
+<script type="application/json" id="assignee-picker-names">{{toJSON .PickerNames}}</script>
+<div id="overlap-resolve" hidden class="hidden modal-backdrop z-[80] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="overlap-resolve-title">
+  <div class="modal-panel w-full max-w-lg shadow-pop max-h-[90vh] overflow-y-auto" tabindex="-1">
+    <h2 id="overlap-resolve-title" class="text-ui font-bold text-ink">시간이 겹칩니다</h2>
+    <p id="overlap-resolve-msg" class="mt-2 text-ui text-ink"></p>
+    <p class="mt-1 text-xs text-ink-muted">담당자만 빼기·삭제는 아래 겹친 업무 모두에 적용됩니다. 끼워 넣기는 같은 작업자의 계획을 나눕니다.</p>
+    <p id="overlap-resolve-err" hidden class="mt-2 text-ui text-red-700" role="alert"></p>
+    <p id="overlap-resolve-busy" hidden class="mt-2 text-ui text-ink-muted">처리 중…</p>
+    <ul id="overlap-conflict-list" class="mt-3 space-y-2"></ul>
+    <div id="overlap-split-box" class="mt-3 space-y-2">
+      <p class="text-ui-sm font-semibold text-ink">이동 시간</p>
+      <div class="flex flex-wrap gap-2" id="overlap-travel-chips">
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="0">0분</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="15">15분</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="30">30분</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-travel="60">60분</button>
+      </div>
+      <label class="text-ui-sm text-ink-muted">직접 입력(0~180)
+        <input type="number" id="overlap-travel-min" min="0" max="180" value="0" class="input mt-1 w-24">
+      </label>
+      <div id="overlap-split-preview" class="text-ui-sm text-ink space-y-1"></div>
+    </div>
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <button type="button" class="btn btn-primary" data-overlap-action="split">끼워 넣기</button>
+      <button type="button" class="btn btn-secondary" data-overlap-action="edit">기존 계획 수정</button>
+      <button type="button" class="btn btn-danger" data-overlap-action="delete">기존 계획 삭제</button>
+      <button type="button" class="btn btn-secondary" data-overlap-action="leave">담당자만 빼고 새 계획 등록</button>
+      <button type="button" class="btn btn-ghost" data-overlap-action="cancel">취소</button>
+    </div>
+  </div>
+</div>
+{{template "carry_modal" .}}
 </body>
 </html>
 {{end}}

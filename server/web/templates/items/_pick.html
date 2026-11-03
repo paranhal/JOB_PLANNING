@@ -1,7 +1,7 @@
 {{define "items_quote_line"}}
 <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3"
      x-data="{
-       q:'', itemId:'', spec:'', specId:'', specs:[], unit:'EA', price:'', customer: {{printf "%q" .QuoteCustomer}}, quotedAt: {{printf "%q" .Today}},
+       q:'', itemId:'', spec:'', specId:'', specs:[], unit:'EA', price:'', customer: {{toJSON .QuoteCustomer}}, quotedAt: {{toJSON .Today}},
        hits:[], open:false, picked:'', msg:'',
        async search(){
          const q=this.q.trim();

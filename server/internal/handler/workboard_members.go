@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -67,22 +65,6 @@ func occupancyNames(owner string, supports []model.WorkTaskMember) []string {
 	return out
 }
 
-func (h *WorkboardHandler) firstParticipantOverlap(date, start, end, excludeID string, names []string) string {
-	if strings.TrimSpace(date) == "" || strings.TrimSpace(start) == "" {
-		return ""
-	}
-	for _, name := range names {
-		ok, err := h.repo.AssigneeTimeOverlaps(date, name, start, end, excludeID)
-		if err != nil {
-			continue
-		}
-		if ok {
-			return assigneeOverlapMessage(name, start, end)
-		}
-	}
-	return ""
-}
-
 func (h *WorkboardHandler) saveSupportMembers(c echo.Context, taskID, owner string) error {
 	members := parseSupportMembers(c, owner)
 	org := assignableOrgID(c)
@@ -104,8 +86,4 @@ func (h *WorkboardHandler) saveSupportMembers(c echo.Context, taskID, owner stri
 		return err
 	}
 	return h.repo.ReplaceSupportMembers(taskID, members)
-}
-
-func overlapRedirect(c echo.Context, msg string) error {
-	return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+url.QueryEscape(msg)))
 }

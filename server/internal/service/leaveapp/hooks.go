@@ -2,6 +2,7 @@ package leaveapp
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,7 +13,16 @@ func (s *Service) Snapshot(tx *sql.Tx, docType, docID string) (string, string, e
 	if docType != approval.DocLeave {
 		return docType + " " + docID, `{"doc_id":"` + docID + `"}`, nil
 	}
-	return s.SnapshotJSON(docID)
+	req, err := s.getOn(tx, docID)
+	if err != nil || req == nil {
+		return "", "", fmt.Errorf("신청서가 없다")
+	}
+	sn := snapshotFrom(req, s.now())
+	b, err := json.Marshal(sn)
+	if err != nil {
+		return "", "", err
+	}
+	return "근태허가원 " + req.DocNo, string(b), nil
 }
 
 func (s *Service) AfterApproved(tx *sql.Tx, req approval.Request) error {
@@ -22,7 +32,7 @@ func (s *Service) AfterApproved(tx *sql.Tx, req approval.Request) error {
 	if tx == nil {
 		return fmt.Errorf("tx")
 	}
-	leave, err := s.Get(req.DocID)
+	leave, err := s.getOn(tx, req.DocID)
 	if err != nil || leave == nil {
 		return fmt.Errorf("신청서가 없다")
 	}
@@ -62,14 +72,14 @@ func (s *Service) AfterApproved(tx *sql.Tx, req approval.Request) error {
 	if strings.TrimSpace(leave.ApproverDeputyUserID) == "" {
 		return nil
 	}
-	p, err := s.Eng.GetPolicy(leave.OrgID)
+	p, err := s.Eng.GetPolicyTx(tx, leave.OrgID)
 	if err != nil {
 		return err
 	}
 	if !p.DelegWithLeave {
 		return nil
 	}
-	head, err := s.Eng.OrgHead(leave.OrgID)
+	head, err := s.Eng.OrgHeadTx(tx, leave.OrgID)
 	if err != nil || head == "" || head != leave.UserID {
 		return nil
 	}

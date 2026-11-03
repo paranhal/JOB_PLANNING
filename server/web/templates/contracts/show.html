@@ -2,7 +2,6 @@
 {{define "content"}}
 <div class="space-y-4">
   <div>
-    <a href="/contracts" class="text-sm text-gray-500 hover:underline">← 계약 목록</a>
     <h2 class="text-xl font-bold text-gray-800 mt-1">{{.Project.Name}}</h2>
     <p class="text-sm text-gray-500">{{if .Project.SalesNo}}{{.Project.SalesNo}} · {{end}}{{.Project.ContractNoLabel}} · {{.Life}}</p>
   </div>

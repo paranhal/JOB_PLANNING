@@ -6,7 +6,6 @@
   selectedRoom: ''
 }">
   <div>
-    <a href="/spaces" class="inline-block text-sm text-blue-600 hover:underline mb-2">← 공간 목록</a>
     <h2 class="text-xl font-bold text-gray-800">공간 관리</h2>
     <p class="text-sm text-gray-500 mt-1">기관 → 건물 → 층 콤보로 선택하고, 호실은 시트(00호·01호…)로 관리합니다.</p>
   </div>
@@ -200,7 +199,7 @@
 
         {{if .SelectedFloor.Rooms}}
         <div class="overflow-x-auto rounded-lg border border-gray-200">
-          <table class="text-sm border-collapse min-w-full">
+          <table data-table-cols-skip class="text-sm border-collapse min-w-full">
             <thead>
               <tr class="bg-gray-50">
                 {{range $i, $r := .SelectedFloor.Rooms}}

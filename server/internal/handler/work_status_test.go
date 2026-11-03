@@ -341,21 +341,21 @@ func TestWorkStatusHTTP_SalesMonthBanners(t *testing.T) {
 	e, db := newMntSyncServer(t, "ws_sales_banner.db")
 	repo := repository.NewSalesRepo(db)
 
-	monthP := &model.SalesProject{
+	monthP := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "부여군도서관 제안", IsTentativeName: true,
 		ExpectedYM: "2026-09", ExpectedPrecision: model.SalesPrecisionMonth,
 	}
 	if err := repo.Create(monthP); err != nil {
 		t.Fatal(err)
 	}
-	qP := &model.SalesProject{
+	qP := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "분기제안사업", IsTentativeName: true,
 		ExpectedYM: "2026-11", ExpectedPrecision: model.SalesPrecisionQuarter,
 	}
 	if err := repo.Create(qP); err != nil {
 		t.Fatal(err)
 	}
-	confP := &model.SalesProject{
+	confP := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "확정월사업", IsTentativeName: true,
 		ExpectedYM: "2026-09", ExpectedPrecision: model.SalesPrecisionMonth,
 		ExpectedYMConfirmed: true,
@@ -363,7 +363,7 @@ func TestWorkStatusHTTP_SalesMonthBanners(t *testing.T) {
 	if err := repo.Create(confP); err != nil {
 		t.Fatal(err)
 	}
-	actP := &model.SalesProject{Name: "다음활동사업", IsTentativeName: true}
+	actP := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "다음활동사업", IsTentativeName: true}
 	if err := repo.Create(actP); err != nil {
 		t.Fatal(err)
 	}

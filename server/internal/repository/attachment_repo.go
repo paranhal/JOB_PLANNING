@@ -16,7 +16,7 @@ func NewAttachmentRepo(db *sql.DB) *AttachmentRepo { return &AttachmentRepo{db: 
 const attachmentSelect = `
 		SELECT attachment_id, ref_type, ref_id, file_name, file_path,
 		       COALESCE(file_size,0), COALESCE(mime_type,''),
-		       COALESCE(keywords,''), COALESCE(slot_no,0), uploaded_at`
+		       COALESCE(keywords,''), COALESCE(slot_no,0), COALESCE(action_set_id,''), uploaded_at`
 
 func scanAttachment(scanner interface {
 	Scan(dest ...any) error
@@ -25,7 +25,7 @@ func scanAttachment(scanner interface {
 	var uploadedStr string
 	if err := scanner.Scan(&a.AttachmentID, &a.RefType, &a.RefID,
 		&a.FileName, &a.FilePath, &a.FileSize, &a.MIMEType,
-		&a.Keywords, &a.SlotNo, &uploadedStr); err != nil {
+		&a.Keywords, &a.SlotNo, &a.ActionSetID, &uploadedStr); err != nil {
 		return nil, err
 	}
 	a.UploadedAt = parseTime(uploadedStr)
@@ -229,10 +229,10 @@ func (r *AttachmentRepo) Create(a *model.Attachment) error {
 	a.AttachmentID = newID("ATT")
 	_, err := r.db.Exec(`
 		INSERT INTO attachments
-		(attachment_id,ref_type,ref_id,file_name,file_path,file_size,mime_type,keywords,slot_no,uploaded_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		(attachment_id,ref_type,ref_id,file_name,file_path,file_size,mime_type,keywords,slot_no,action_set_id,uploaded_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
 		a.AttachmentID, a.RefType, a.RefID, a.FileName, a.FilePath,
-		a.FileSize, a.MIMEType, a.Keywords, a.SlotNo,
+		a.FileSize, a.MIMEType, a.Keywords, a.SlotNo, a.ActionSetID,
 		time.Now().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return err

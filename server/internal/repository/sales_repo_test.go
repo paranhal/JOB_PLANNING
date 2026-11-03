@@ -27,7 +27,7 @@ func TestSalesProjectNameOnlyAndStageRules(t *testing.T) {
 		t.Fatalf("active sales_stage4=%d err=%v", active, err)
 	}
 
-	p := &model.SalesProject{Name: "세종 RFID 증설(가칭)", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "세종 RFID 증설(가칭)", IsTentativeName: true}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestSalesProjectDoesNotAffectStatsKPI(t *testing.T) {
 		VALUES ('a1','R1','c1','2026-08-03 09:00:00','2026-08-05','2026-08-05','completed','양기헌','2026-08-07','visit','2026-08-05','app')`); err != nil {
 		t.Fatal(err)
 	}
-	if err := NewSalesRepo(db).Create(&model.SalesProject{
+	if err := NewSalesRepo(db).Create(&model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "영업 건은 지표에 안 탄다", IsTentativeName: true, ExpectedAmount: 180000000,
 	}); err != nil {
 		t.Fatal(err)
@@ -134,7 +134,7 @@ func TestSalesProjectDoesNotAffectStatsKPI(t *testing.T) {
 	if got != want {
 		t.Fatalf("영업 건이 통계에 섞였다\n got %s\nwant %s", got, want)
 	}
-	if err := NewSalesRepo(db).Create(&model.SalesProject{
+	if err := NewSalesRepo(db).Create(&model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "단품 토너", DealType: model.SalesDealSupply, ExpectedAmount: 850000, PONo: "PO-1",
 	}); err != nil {
 		t.Fatal(err)
@@ -181,7 +181,7 @@ func TestSalesActivityCreatesWorkTaskAndExecToggle(t *testing.T) {
 	}
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "영업 활동 연동", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "영업 활동 연동", IsTentativeName: true}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestSalesUnplannedNoFollowAndStale(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "후속 없는 건", IsTentativeName: true, ExpectedYM: "2020-01"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "후속 없는 건", IsTentativeName: true, ExpectedYM: "2020-01"}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestSalesAmountChangeAndPartyReplaceKeepOld(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{Name: "세종 RFID", IsTentativeName: true, ExpectedAmount: 30_000_000}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "세종 RFID", IsTentativeName: true, ExpectedAmount: 30_000_000}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -397,11 +397,11 @@ func TestSalesPipelineAndActivityMove(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	lead := &model.SalesProject{Name: "리드", IsTentativeName: true, ExpectedAmount: 30_000_000, ExpectedYM: "2026-09"}
+	lead := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "리드", IsTentativeName: true, ExpectedAmount: 30_000_000, ExpectedYM: "2026-09"}
 	if err := repo.Create(lead); err != nil {
 		t.Fatal(err)
 	}
-	won := &model.SalesProject{
+	won := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "계약", ExpectedAmount: 100_000_000, ExpectedYM: "2026-10",
 		CustomerConfirmed: true, ExpectedYMConfirmed: true, ExpectedAmountConfirmed: true,
 	}
@@ -411,7 +411,7 @@ func TestSalesPipelineAndActivityMove(t *testing.T) {
 	if err := repo.ChangeStage(won.SalesID, model.SalesDirectWin, "", "u1", "t", false); err != nil {
 		t.Fatal(err)
 	}
-	lost := &model.SalesProject{Name: "실패", IsTentativeName: true, LostReason: "예산"}
+	lost := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "실패", IsTentativeName: true, LostReason: "예산"}
 	if err := repo.Create(lost); err != nil {
 		t.Fatal(err)
 	}
@@ -492,11 +492,11 @@ func TestSalesDealTypeSupplyStagesAndAutoAdvance(t *testing.T) {
 		t.Fatalf("단품도 4단계 n=%d err=%v", len(supply), err)
 	}
 
-	buildP := &model.SalesProject{Name: "구축 건", IsTentativeName: true}
+	buildP := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "구축 건", IsTentativeName: true}
 	if err := repo.Create(buildP); err != nil {
 		t.Fatal(err)
 	}
-	p := &model.SalesProject{Name: "토너 납품", DealType: model.SalesDealSupply, ExpectedAmount: 850000}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "토너 납품", DealType: model.SalesDealSupply, ExpectedAmount: 850000}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

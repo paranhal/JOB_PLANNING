@@ -18,6 +18,9 @@ func testSvc(t *testing.T) (*Service, string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`PRAGMA busy_timeout=30000`); err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() { db.Close() })
 	users := repository.NewUserRepo(db)
 	head := &model.User{Username: "head1", PasswordHash: "x", FullName: "팀장", Role: model.RoleOrgAdmin, IsActive: true, OrgID: "O01"}

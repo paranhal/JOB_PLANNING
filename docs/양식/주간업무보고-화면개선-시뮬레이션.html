@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주간 업무 보고 시뮬레이션</title>
+<style>
+:root{
+  --bg:#f4f6f5; --card:#fff; --line:#e3e8e5; --fg:#1f2a26; --mute:#6b7872; --faint:#a3aea8;
+  --brand:#0f6e56; --brand-soft:#e4f3ee; --brand-dk:#0c5c47;
+  --late:#d33a3a; --warn-bg:#fff8e6; --warn-line:#f0dca0; --warn-fg:#7a5a00;
+  --need:#fdeee8; --need-fg:#b24420; --dec:#e8f1fc; --dec-fg:#2b5fb3;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+.sim{margin:0;padding:8px max(16px,3vw);border-bottom:1px dashed var(--line);background:#fff;color:var(--mute);font-size:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.sim select{height:30px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:#fff}
+.top{background:#fff;border-bottom:1px solid var(--line);padding:14px max(16px,3vw);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:12px}
+.logo i{width:38px;height:38px;border-radius:10px;background:var(--brand);color:#fff;display:grid;place-items:center;font-style:normal;font-weight:800}
+.logo b{display:block;font-size:15px}.logo small{color:var(--mute);font-size:12px}
+.pill{border:1px solid var(--line);background:#f7f9f8;border-radius:99px;padding:6px 16px;font-size:12.5px;font-weight:600;color:var(--mute)}
+.wrap{max-width:1180px;margin:0 auto;padding:28px max(16px,3vw) 60px}
+.eyebrow{font-size:13px;font-weight:800;color:var(--brand)}
+h1{margin:6px 0 4px;font-size:36px;letter-spacing:-.02em;text-wrap:balance}
+.desc{color:var(--mute);font-size:14px}
+.hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{height:44px;padding:0 18px;border:1px solid var(--line);background:#fff;border-radius:12px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:#f7f9f8}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:var(--brand-dk)}
+.btn.ghost{border-color:var(--brand);color:var(--brand)}
+.btn.sm{height:34px;padding:0 12px;font-size:12.5px;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.stat{border:1px solid var(--line);background:#fff;border-radius:12px;height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mute)}
+.stat b{color:var(--fg)}
+.weekbar{display:flex;align-items:center;gap:8px;margin:18px 0 6px;flex-wrap:wrap}
+.sq{width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:10px}
+.wk{font-weight:800;font-size:16px;min-width:200px}
+.tabs{display:flex;gap:10px;margin:14px 0 18px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px 26px;font-weight:700;color:var(--mute);display:flex;gap:8px;align-items:center}
+.tab.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.tab .n{font-size:11px;background:rgba(0,0,0,.08);border-radius:99px;padding:0 7px}
+.tab.on .n{background:rgba(255,255,255,.25)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px}
+.team{padding:22px 26px}
+.team h2{margin:0;font-size:20px;border-left:5px solid var(--brand);padding-left:12px;line-height:1.1}
+.team .sub{margin:4px 0 0 17px;color:var(--mute);font-size:12.5px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+.kpi{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#fafbfa}
+.kpi.hl{background:#eaf6f1;border-color:#bfe0d3}
+.kpi small{color:var(--mute);font-size:12px}
+.kpi b{display:block;font-size:30px;line-height:1.2;margin:4px 0}
+.kpi em{font-style:normal;font-size:11.5px;color:var(--faint)}
+.kpi.hl em{color:var(--brand);font-weight:700}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:26px 2px 12px}
+.sec h3{margin:0;font-size:17px}.sec span{color:var(--mute);font-size:12.5px}
+.status{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:3px 12px;font-size:12px;font-weight:800}
+.status.draft{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-line)}
+.status.ok{background:var(--brand-soft);color:var(--brand)}
+.item{margin-bottom:14px;overflow:hidden}
+.ih{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+.no{width:30px;height:30px;border-radius:9px;background:#eef2f0;display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--mute);flex:none}
+.it{min-width:0;flex:1}.it b{display:block;font-size:15.5px}.it small{color:var(--mute);font-size:12.5px}
+.badge{border-radius:99px;padding:3px 12px;font-size:12px;font-weight:800;background:var(--brand-soft);color:var(--brand);flex:none}
+.badge.sup{background:#f0eafa;color:#7447b8}
+.cols{display:grid;grid-template-columns:1fr 1fr}
+.col{padding:16px 22px 18px;min-width:0}
+.col+.col{border-left:1px solid var(--line)}
+.col h4{margin:0 0 8px;font-size:12px;color:var(--brand);font-weight:800}
+.col ul{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.col li{display:flex;gap:9px;font-size:13.5px}
+.col li::before{content:"✓";color:var(--brand);font-weight:800;flex:none}
+.col.plan li::before{content:"→";color:var(--mute)}
+.col .empty{color:var(--faint);font-size:12.5px}
+.extra{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.ex{padding:12px 22px;font-size:13px;min-width:0}
+.ex+.ex{border-left:1px solid var(--line)}
+.ex h4{margin:0 0 4px;font-size:11.5px;font-weight:800}
+.ex.need{background:#fffaf8}.ex.need h4{color:var(--need-fg)}
+.ex.dec{background:#f8fbff}.ex.dec h4{color:var(--dec-fg)}
+.ex .empty{color:var(--faint)}
+.ex p{margin:0;white-space:pre-wrap}
+textarea{width:100%;min-height:92px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;background:#fff}
+textarea:focus{outline:2px solid var(--brand);outline-offset:-1px}
+.hint{font-size:11.5px;color:var(--mute);margin-top:4px}
+.warn{margin:0 0 14px;padding:9px 14px;border-radius:10px;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-fg);font-size:12.5px}
+.empty-state{padding:60px 20px;text-align:center;color:var(--faint)}
+.menu{position:absolute;right:0;top:50px;z-index:20;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.14);min-width:300px;padding:6px}
+.menu button{display:block;width:100%;text-align:left;border:0;background:none;border-radius:10px;padding:10px 12px}
+.menu button:hover:not(:disabled){background:#f3f7f5}
+.menu button:disabled{opacity:.45;cursor:not-allowed}
+.menu b{display:block;font-size:13.5px}.menu small{color:var(--mute);font-size:12px}
+.rel{position:relative}
+.mask{position:fixed;inset:0;background:rgba(20,32,28,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:30}
+.mask.on{display:flex}
+.modal{background:#fff;border-radius:20px;width:100%;max-width:980px;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--line)}
+.mh h2{margin:0;font-size:18px}.x{border:0;background:none;font-size:26px;color:var(--mute);line-height:1}
+.mb{padding:18px 24px}.mf{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid var(--line)}
+.tw{overflow:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;min-width:1100px;width:100%;font-size:12px}
+th{background:#eef5f1;text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top;white-space:pre-wrap;max-width:300px}
+.steps{display:grid;gap:8px;margin-top:12px}
+.step{border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;display:flex;gap:10px}
+.step i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2a26;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}
+.toast.on{opacity:1}
+@media (max-width:900px){
+  .kpis{grid-template-columns:1fr 1fr}.cols,.extra{grid-template-columns:1fr}
+  .col+.col,.ex+.ex{border-left:0;border-top:1px solid var(--line)}
+  h1{font-size:28px}
+}
+</style>
+</head>
+<body>
+<div class="sim"><span>시뮬레이션 · 샘플 문구는 전사 주간업무보고 시트의 형식에 맞춘 예시입니다(이름 등 제거). 엑셀 저장은 실제 .xlsx 가 내려받아집니다.</span>
+  <label>보기 계정 <select id="role"><option value="all">전사 열람 (C-Level·비전관리자)</option><option value="head">SI사업팀 팀장 (작성·확정)</option><option value="mem">SI사업팀 팀원 (읽기)</option></select></label></div>
+<div class="top"><div class="logo"><i>↗</i><div><b>주간 업무 보고</b><small>사업팀 통합 현황</small></div></div><span class="pill" id="range"></span></div>
+<div class="wrap" id="root"></div>
+
+<div class="mask" id="mask"><div class="modal" role="dialog" aria-modal="true"><div class="mh"><h2 id="mt"></h2><button class="x" id="mx" aria-label="닫기">×</button></div><div class="mb" id="mbody"></div><div class="mf" id="mfoot"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  var DOW=['일','월','화','수','목','금','토'];
+  function p2(n){return String(n).padStart(2,'0');}
+  function parse(s){var a=s.split('-');return new Date(+a[0],+a[1]-1,+a[2]);}
+  function iso(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+  function addD(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x;}
+  function yymmdd(d){return p2(d.getFullYear()%100)+'.'+p2(d.getMonth()+1)+'.'+p2(d.getDate())+'('+DOW[d.getDay()]+')';}
+  /* 주차 규칙: 목요일이 속한 달의 N번째 목요일 */
+  function weekInfo(mon){var th=addD(mon,3);return {month:th.getMonth()+1,year:th.getFullYear(),n:Math.ceil(th.getDate()/7)};}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+  var TEAMS=[
+    {id:'lib',name:'도서관사업팀',short:'도서관사업팀',desc:'도서관 통합시스템 및 RFID 유지관리'},
+    {id:'media',name:'미디어사업팀',short:'미디어사업팀',desc:'방송·CCTV·정보통신 공사 및 서비스'},
+    {id:'si',name:'SI사업팀',short:'SI사업팀',desc:'교육청 테크센터·스쿨넷·인프라 운영'}
+  ];
+  var W4='2026-10-19',W3='2026-10-12';
+  var D={};
+  D[W4+'|lib']={status:'draft',kpi:[['정기점검','27건','누적 72/75건 · 달성률 96.0%',1],['A/S 처리','25건','4개 유지관리 사업 합계'],['사업 업무','4건','보안·개인정보·정보개방 대응'],['영업·지원','3건','영업 2건 · 자산관리 1건']],rows:[
+    {t:'2026년 충청남도교육청 도서관 통합정보시스템 SW 유지관리',c:'충남교육청',done:['정기점검 5건 (10월 20/21사이트, 95.2%)','A/S 17건 처리','11월 보안룰셋 변경요청서 송부','개인정보 유출사고 대비 점검자료 및 정보개방 대상 테이블 추출'],plan:['정기점검 1건 (10월 21/21사이트, 100%)','PHP 보안 취약점 점검 및 대응','10월 기성금 청구서류 준비']},
+    {t:'2026년 제천시립도서관 홈페이지 유지보수 용역',c:'제천시립도서관',done:['웹접근성 품질평가 1차 심사 보완 작업 완료','A/S 1건 처리'],plan:['웹접근성 품질평가 2차 심사 요청']},
+    {t:'세종시 도서관 ICT 통합정보시스템 유지관리(2026년)',c:'세종시립도서관',done:['정기점검 13건 (10월 24/25사이트)','A/S 1건 처리'],plan:['정기점검 1건 (10월 25/25사이트, 100%)','평생교육원 안테나 이전 공사 견적 준비']},
+    {t:'충남세종지역 앤로보틱스 RFID자동화 장비 유지보수',c:'충남·세종 지역',done:['정기점검 9건 (10월 28/29사이트, 96.6%)','A/S 6건 처리','KDI 국제정책대학원 자가대출반납기 신규 납품'],plan:['정기점검 2건 (10월 29/29사이트, 100%)']},
+    {t:'기술영업활동',kind:'영업',done:['전세버스공제조합 PG 수정안 송부','윈세프360 영업 브로슈어 제작'],plan:['제63회 전국도서관대회 참석 (10/28~10/30)']},
+    {t:'자산관리활동',kind:'지원',done:['업무관리시스템 개발'],plan:['업무관리시스템 개발 및 보고']}
+  ]};
+  D[W4+'|media']={status:'ok',kpi:[['정기점검','0건','이번 주 대상 없음',1],['고객서비스·A/S','4건','CCTV·방송 장애 처리'],['사업 업무','3건','공사·구축 사업 수행'],['영업·지원','2건','타팀 지원 1건 포함']],rows:[
+    {t:'공주~세종 광역BRT 구축사업 차고지 신축공사(소방)',c:'공주시',done:['실정보고 설계변경 작업'],plan:['실정보고 제출, 옥외 터파기 공사 진행예정']},
+    {t:'제민천 산책로 진출입 차단시설 자동화사업',c:'비엔에스테크',done:['IP충돌 현상에 대한 원인파악과 해결방안 마련(IP리스트 재작성)'],plan:['IP재셋팅(월요일) 및 진출입 차단기 원격구동 안되는 현상 해결위해 협업예정']},
+    {t:'옥룡동행정복지센터 CCTV설치',c:'공주시청',done:['행정복지센터 CCTV 1대 신규설치 완료'],plan:[]},
+    {t:'업무지원활동',kind:'지원',c:'SI사업팀',done:['정안초 함체이전에 따른 광접속 작업(SI사업팀 지원)'],plan:[],support:true},
+    {t:'역량강화활동',kind:'지원',done:['관리감독자 안전관리교육 수료(3명)'],plan:[]},
+    {t:'고객서비스활동',kind:'지원',c:'충남교육청 외 2곳',done:['CCTV카메라 이상(부품 단종으로 회사 카메라로 교체)','천안서여중 수리 의뢰','유구읍사무소 노트북 잡음 혼입(임시조치 후 모니터링)'],plan:['동일 현상 반복 시 전원계통 잡음 해결 조치 예정']}
+  ]};
+  D[W4+'|si']={status:'draft',kpi:[['정기점검','1건','누적 199/199교 · 달성률 100%',1],['장애처리','12건','자체 원격점검 후 현장조치'],['사업 업무','3건','테크센터·호텔·유지보수'],['영업·지원','0건','—']],rows:[
+    {t:'2026년 공주시도서관 전산시스템 통합유지보수 용역',c:'공주시도서관',done:[],plan:['10월 정기점검(월) 예정']},
+    {t:'2025년 충청남도교육청 테크센터 운영 사업',c:'충남교육청 관할 초중고',done:['하반기 현장정기점검 1건 수행 완료(199개교 중 199개교 완료 100%)','하반기 정기점검 산출물작업 수행(199개교 중 164개교 완료 84%) 10/30 완료 예정','정기점검 산출물 55건 보완작업 완료','장애처리 12건 처리(아산 12건, 자체 원격점검 후 현장조치)','정안초등학교 내진공사 완료에 따른 함체 원복작업 완료'],plan:['하반기 정기점검 산출물작업 35건 수행 예정(199개교 중 199개교 완료 예정)','정기점검 산출물 검수 중 미달 산출물 보완작업','충남교육청 학교 무선통신장비 제안서 작업 관련 테스트(월)'],need:'',dec:'하반기 정기점검 최종완료 11월 6일 예정\n(산출물 PM 검토 완료)'},
+    {t:'호텔인터시티 인터넷서비스 재계약 투자 구매[비용]',c:'호텔인터시티',done:['10월 정기점검 완료','별관4층 서버실 스위치 1대(임대) 증설 완료'],plan:[]}
+  ]};
+  D[W3+'|si']={status:'ok',kpi:[['정기점검','23건','누적 198/199교 · 달성률 99%',1],['장애처리','2건','아산 1 · 홍성 1'],['사업 업무','4건','테크센터·스쿨넷·10Giga 등'],['영업·지원','0건','—']],rows:[
+    {t:'2025년 충청남도교육청 테크센터 운영 사업',c:'충남교육청 관할 초중고',done:['하반기 현장정기점검 23건 수행 완료(199개교 중 198개교 완료 99%)','하반기 정기점검 산출물작업 수행(199개교 중 110개교 완료 55%) 10/30 완료 예정','장애처리 2건 처리(아산 1건, 홍성 1건)'],plan:['하반기 정기점검 - 아산고등학교(10/21 수)','정기점검 산출물작업 40건 수행 예정(199개교 중 150개교 완료 예정)','공주 정안초등학교 내진공사 후 함체이전 원복 작업 관련 광케이블 접속작업'],need:'정안초 함체이전 원복 광케이블 접속작업 관련 1명 지원 필요\n(미디어사업팀에 사전협조 요청 완료)',dec:'하반기 정기점검 최종완료 11월 6일 예정'},
+    {t:'학교 10Giga 인터넷 구축 사업 충남교육청 장비 유지보수 구매계약',c:'충남교육청 관할 초중고',done:['방화벽 이중화 오류 원인 파악 완료','DNS 프록시 기능 사용에 의한 출발지 IP 변경으로 스쿨넷 방화벽에서 DNS 차단 확인'],plan:[],dec:'스쿨넷 5차 이용기관 방화벽 정책 작업 시 누락 주의'},
+    {t:'호텔인터시티 인터넷서비스 재계약 투자 구매[비용]',c:'호텔인터시티',done:[],plan:['별관4층 가오스홀 스위치 1대 증설작업(10/20 화)']}
+  ]};
+
+  var S={team:'lib',week:W4,edit:false,role:'all'};
+  var root=document.getElementById('root');
+  function visibleTeams(){return S.role==='all'?TEAMS:TEAMS.filter(function(t){return t.id==='si';});}
+  function canEdit(){return S.role==='head';}
+  function data(){return D[S.week+'|'+S.team];}
+  function weekRows(team,week){var d=D[week+'|'+team];return d?d.rows:[];}
+  function toast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(function(){el.classList.remove('on');},2600);}
+  function ul(a){return a.length?'<ul>'+a.map(function(x){return '<li><span>'+esc(x)+'</span></li>';}).join('')+'</ul>':'<div class="empty">내용 없음</div>';}
+
+  function progBox(d){var p=d.prog||(d.prog={cycle:S.team==='si'?'반기':'월',done:'',total:'',pct:'',memo:''});
+  return '<div class="ex need" style="margin-top:14px"><h4>정기점검 진행율 (작성자 입력 · 주기 '+esc(p.cycle)+')</h4><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select data-p="cycle"><option'+(p.cycle==='월'?' selected':'')+'>월</option><option'+(p.cycle==='분기'?' selected':'')+'>분기</option><option'+(p.cycle==='반기'?' selected':'')+'>반기</option><option'+(p.cycle==='연'?' selected':'')+'>연</option></select>누적 완료 <input data-p="done" type="number" min="0" value="'+esc(p.done)+'" style="width:84px"> / 계획 <input data-p="total" type="number" min="0" value="'+esc(p.total)+'" style="width:84px"> 진행율 <input data-p="pct" type="number" min="0" max="100" value="'+esc(p.pct)+'" style="width:72px">% <input data-p="memo" placeholder="메모(선택)" value="'+esc(p.memo)+'" style="flex:1;min-width:140px"></div><div class="hint">완료·계획을 둘 다 넣으면 진행율은 자동 계산됩니다. 도서관사업팀은 시스템이 자동 집계합니다.</div></div>';}
+function render(){
+    var mon=parse(S.week),sun=addD(mon,6),wi=weekInfo(mon);
+    document.getElementById('range').textContent=mon.getFullYear()+'. '+p2(mon.getMonth()+1)+'. '+p2(mon.getDate())+' — '+p2(sun.getMonth()+1)+'. '+p2(sun.getDate());
+    var vt=visibleTeams();
+    if(!vt.some(function(t){return t.id===S.team;}))S.team=vt[0].id;
+    var d=data(),team=TEAMS.filter(function(t){return t.id===S.team;})[0];
+    var total=0,teamsN=0;vt.forEach(function(t){var r=weekRows(t.id,S.week);if(r.length){teamsN++;total+=r.length;}});
+    var h='<div class="eyebrow">'+wi.year+'년 '+wi.month+'월 '+wi.n+'주차</div><div class="hd"><div><h1>주간 업무 보고서</h1><div class="desc">사업팀별 추진 실적과 차주 계획을 보고합니다.</div></div>'+
+      '<div class="acts"><span class="stat"><b>'+vt.length+'개 사업팀</b> · '+total+'개 업무</span>'+
+      '<div class="rel"><button class="btn pri" id="xbtn">⬇ 엑셀 저장 ▾</button><div class="menu" id="xmenu" hidden>'+
+        '<button data-x="team"><b>이 팀 엑셀 (.xlsx)</b><small>'+esc(team.name)+' · '+wi.n+'주차 · 전사 주간업무보고 시트와 같은 열</small></button>'+
+        '<button data-x="all" '+(S.role==='all'?'':'disabled')+'><b>전사 통합 엑셀</b><small>'+(S.role==='all'?'팀별 시트로 나눈 한 파일':'전사 열람 권한에서만')+'</small></button>'+
+        '<button data-x="append" disabled><b>전사 주간업무보고 파일에 추가…</b><small>후속 단계(95-27B)에서 제공 예정</small></button></div></div>'+
+      '</div></div>'+
+      '<div class="weekbar"><button class="sq" data-w="-1" aria-label="이전 주">‹</button><span class="wk">'+yymmdd(mon)+' ~ '+yymmdd(sun)+'</span><button class="sq" data-w="1" aria-label="다음 주">›</button><button class="btn sm" data-w="0">이번 주</button></div>'+
+      '<div class="tabs" role="tablist">'+vt.map(function(t){var n=weekRows(t.id,S.week).length;return '<button class="tab'+(t.id===S.team?' on':'')+'" role="tab" data-team="'+t.id+'">'+esc(t.name)+'<span class="n">'+n+'</span></button>';}).join('')+'</div><div id="cap">';
+    if(S.role==='mem'&&false){}
+    if(!d){
+      h+='<div class="card empty-state">이 주차에 '+esc(team.name)+' 보고 내용이 없습니다.<br><small>일일 업무·AS·정기점검 기록에서 자동으로 채워지며, 팀장이 직접 입력할 수도 있습니다.</small>'+(canEdit()?'<br><br><button class="btn pri" id="gen">이 주차 보고서 자동 생성</button>':'')+'</div></div>';
+      root.innerHTML=h;return;
+    }
+    h+='<section class="card team"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start"><div><h2>'+esc(team.name)+'</h2><div class="sub">'+esc(team.desc)+'</div></div>'+
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="status '+(d.status==='ok'?'ok':'draft')+'">'+(d.status==='ok'?'확정됨':'작성 중')+'</span>'+
+      (canEdit()?'<button class="btn sm" id="edit">'+(S.edit?'편집 끝내기':'✎ 편집')+'</button>'+(d.status==='draft'?'<button class="btn sm pri" id="confirm">확정</button>':''):'')+'</div></div>'+
+      '<div class="kpis">'+d.kpi.map(function(k){var chip=k[3]?'<span class="badge'+(S.team==='lib'?'':' sup')+'" style="margin-left:6px">'+(S.team==='lib'?'자동 집계':'작성자 입력')+'</span>':'';return '<div class="kpi'+(k[3]?' hl':'')+'"><small>'+esc(k[0])+chip+'</small><b>'+esc(k[1])+'</b><em>'+esc(k[2])+'</em></div>';}).join('')+'</div>'+(S.edit&&S.team!=='lib'?progBox(d):'')+'</section>';
+    h+='<div class="sec"><h3>사업별 업무 현황</h3><span>총 '+d.rows.length+'개 업무</span></div>';
+    if(S.edit)h+='<p class="warn">편집 모드 · 시스템이 집계한 줄은 「다시 집계」 때 최신값으로 바뀌고, 직접 입력한 줄(맨 앞 <b>＋</b>)은 유지됩니다. 확정 후 고치면 「작성 중」으로 돌아갑니다(지원 필요사항·주요 의사결정은 확정 후에도 기록 가능).</p>';
+    d.rows.forEach(function(r,i){
+      h+='<article class="card item"><div class="ih"><span class="no">'+p2(i+1)+'</span><div class="it"><b>'+esc(r.t)+'</b><small>'+(r.c?'고객 · '+esc(r.c):'&nbsp;')+'</small></div>'+(r.kind?'<span class="badge'+(r.support?' sup':'')+'">'+(r.support?'타팀 지원':esc(r.kind))+'</span>':'')+'</div>';
+      if(S.edit){
+        h+='<div class="cols"><div class="col"><h4>금주 추진내역</h4><textarea data-i="'+i+'" data-f="done">'+esc(r.done.join('\n'))+'</textarea><div class="hint">한 줄에 한 항목</div></div><div class="col plan"><h4>차주 추진계획</h4><textarea data-i="'+i+'" data-f="plan">'+esc(r.plan.join('\n'))+'</textarea></div></div>';
+        h+='<div class="extra"><div class="ex need"><h4>지원 필요사항</h4><textarea data-i="'+i+'" data-f="need" style="min-height:60px">'+esc(r.need||'')+'</textarea></div><div class="ex dec"><h4>주요 의사결정 (보고 회의 기록)</h4><textarea data-i="'+i+'" data-f="dec" style="min-height:60px">'+esc(r.dec||'')+'</textarea></div></div>';
+      }else{
+        h+='<div class="cols"><div class="col"><h4>금주 추진내역</h4>'+ul(r.done)+'</div><div class="col plan"><h4>차주 추진계획</h4>'+ul(r.plan)+'</div></div>';
+        if(r.need||r.dec)h+='<div class="extra"><div class="ex need"><h4>지원 필요사항</h4>'+(r.need?'<p>'+esc(r.need)+'</p>':'<div class="empty">—</div>')+'</div><div class="ex dec"><h4>주요 의사결정</h4>'+(r.dec?'<p>'+esc(r.dec)+'</p>':'<div class="empty">—</div>')+'</div></div>';
+      }
+      h+='</article>';
+    });
+    h+='</div>';
+    root.innerHTML=h;
+  }
+
+  /* ---- 엑셀 (전사 주간업무보고 시트와 같은 14열) ---- */
+  var HEAD=['월','주차','시작일','종료일','팀','부문/실','담당자 (필요시)','No','프로젝트 이름 or 업무활동 (선택만 가능)','고객(사용자)','추진내역','추진계획','지원 필요사항','주요 의사결정 (주간업무보고 시간 의사결정 내역 기록)'];
+  function bullets(a){return a.map(function(x){return '* '+x;}).join('\n');}
+  function sheetRows(teamId,week){
+    var team=TEAMS.filter(function(t){return t.id===teamId;})[0],mon=parse(week),sun=addD(mon,6),wi=weekInfo(mon),out=[];
+    weekRows(teamId,week).forEach(function(r){
+      out.push([wi.month,wi.n,yymmdd(mon),yymmdd(sun),team.short,'','','',(r.kind?'## ':'')+r.t,r.c||'',bullets(r.done),bullets(r.plan),r.need||'',r.dec||'']);
+    });
+    return out;
+  }
+  function fname(sfx){var wi=weekInfo(parse(S.week));return '전사주간업무보고_'+sfx+'_'+String(wi.year).slice(2)+p2(wi.month)+'_'+wi.n+'주차.xlsx';}
+  function dl(wb,name){
+    if(!window.XLSX){toast('엑셀 라이브러리를 불러오지 못했습니다(인터넷 연결 필요). 실제 구현은 서버에서 생성합니다.');return;}
+    XLSX.writeFile(wb,name);toast('엑셀을 저장했습니다 · '+name);
+  }
+  function mkSheet(rows){
+    var ws=XLSX.utils.aoa_to_sheet([HEAD].concat(rows));
+    ws['!cols']=[{wch:5},{wch:5},{wch:13},{wch:13},{wch:12},{wch:8},{wch:10},{wch:5},{wch:42},{wch:18},{wch:60},{wch:60},{wch:36},{wch:36}];return ws;
+  }
+  function exportTeam(){
+    if(!window.XLSX){dl();return;}
+    var t=TEAMS.filter(function(x){return x.id===S.team;})[0],wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,mkSheet(sheetRows(S.team,S.week)),t.short);dl(wb,fname(t.short));
+  }
+  function exportAll(){
+    if(!window.XLSX){dl();return;}
+    var wb=XLSX.utils.book_new();visibleTeams().forEach(function(t){XLSX.utils.book_append_sheet(wb,mkSheet(sheetRows(t.id,S.week)),t.short);});dl(wb,fname('전사'));
+  }
+
+  /* ---- 모달: 전사 파일에 추가 ---- */
+  var mask=document.getElementById('mask');
+  function openM(title,body,foot){document.getElementById('mt').textContent=title;document.getElementById('mbody').innerHTML=body;document.getElementById('mfoot').innerHTML=foot;mask.classList.add('on');}
+  function closeM(){mask.classList.remove('on');}
+  function openAppend(){
+    var t=TEAMS.filter(function(x){return x.id===S.team;})[0],rows=sheetRows(S.team,S.week);
+    var prev='<div class="tw"><table><thead><tr>'+HEAD.map(function(h){return '<th>'+esc(h.split(' (')[0])+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
+    openM('전사 주간업무보고 파일에 추가',
+      '<p style="margin:0 0 10px">내려받은 <b>26Q3_주간업무보고_01.xlsx</b> 를 올리면 <b>'+esc(t.short)+'</b> 시트 맨 위(머리 2행 아래)에 이번 주 <b>'+rows.length+'행</b>을 넣어 새 파일로 내려드립니다. 기존 서식·드롭다운·다른 시트·다른 주차는 그대로 둡니다.</p>'+
+      '<input type="file" id="upf" accept=".xlsx"> <span class="hint">구글 시트는 「파일 → 다운로드 → Microsoft Excel」 로 받은 .xlsx 를 올리세요.</span>'+
+      '<div class="steps"><div class="step"><i>1</i><span>시트 확인 — <b>'+esc(t.short)+'</b> 시트와 14개 머리글이 일치하는지 검사 <span class="hint" id="s1">(대기)</span></span></div>'+
+      '<div class="step"><i>2</i><span>같은 주차(<b>'+yymmdd(parse(S.week))+'</b>) 행이 이미 있으면 중단하고 「교체 / 건너뜀」을 묻습니다 <span class="hint" id="s2">(대기)</span></span></div>'+
+      '<div class="step"><i>3</i><span>프로젝트 이름이 계약목록의 드롭다운 값과 같은지 검사(다르면 경고 목록) <span class="hint" id="s3">(대기)</span></span></div></div>'+
+      '<h4 style="margin:16px 0 8px">추가될 행 미리보기</h4>'+prev,
+      '<button class="btn" id="mc">닫기</button><button class="btn pri" id="mgo">파일에 추가하고 내려받기</button>');
+  }
+  document.addEventListener('click',function(e){
+    var xb=e.target.closest('#xbtn');var menu=document.getElementById('xmenu');
+    if(xb){menu.hidden=!menu.hidden;return;}
+    var x=e.target.closest('[data-x]');
+    if(x&&!x.disabled){menu.hidden=true;var k=x.dataset.x;if(k==='team')exportTeam();else if(k==='all')exportAll();else openAppend();return;}
+    if(menu&&!e.target.closest('#xmenu'))menu.hidden=true;
+    if(e.target.id==='mx'||e.target.id==='mc'||e.target===mask){closeM();return;}
+    if(e.target.id==='mgo'){
+      var f=document.getElementById('upf');
+      if(!f||!f.files.length){toast('전사 주간업무보고 .xlsx 파일을 선택하세요');return;}
+      ['s1','s2','s3'].forEach(function(id,i){setTimeout(function(){document.getElementById(id).textContent=['✔ 일치','✔ 같은 주차 행 없음','✔ 경고 0건'][i];},300*(i+1));});
+      setTimeout(function(){closeM();toast('시뮬레이션: 실제 파일은 수정하지 않습니다 · 서버 구현에서 새 파일로 내려받습니다');},1500);return;
+    }
+    var w=e.target.closest('[data-w]');if(w){var v=+w.dataset.w;S.week=v===0?W4:iso(addD(parse(S.week),7*v));S.edit=false;render();return;}
+    var t=e.target.closest('[data-team]');if(t){S.team=t.dataset.team;S.edit=false;render();return;}
+    if(e.target.id==='edit'){S.edit=!S.edit;render();if(!S.edit)toast('저장했습니다 · 작성 중');return;}
+    if(e.target.id==='confirm'){data().status='ok';S.edit=false;render();toast('확정했습니다 · 이후 수정하면 「작성 중」으로 돌아갑니다');return;}
+    if(e.target.id==='gen'){D[S.week+'|'+S.team]={status:'draft',kpi:[['정기점검','0건','—',1],['A/S 처리','0건','—'],['사업 업무','0건','—'],['영업·지원','0건','—']],rows:[{t:'(자동 집계 결과가 여기에 채워집니다)',done:[],plan:[]}]};render();return;}
+  });
+  document.addEventListener('input',function(e){
+    var t=e.target;if(t.tagName!=='TEXTAREA'||!t.dataset.f)return;
+    var r=data().rows[+t.dataset.i],f=t.dataset.f;
+    if(f==='done'||f==='plan')r[f]=t.value.split('\n').filter(function(s){return s.trim();});else r[f]=t.value;
+    if(data().status==='ok'&&(f==='done'||f==='plan'))data().status='draft';
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeM();});
+  document.addEventListener('input',function(e){var f=e.target.dataset&&e.target.dataset.p;if(!f)return;var d=data(),p=d.prog;p[f]=e.target.value;if(f==='done'||f==='total'){if(+p.total>0&&p.done!==''){p.pct=(Math.round(+p.done/+p.total*1000)/10)+'';var q=document.querySelector('[data-p=pct]');if(q)q.value=p.pct;}}
+  var cyc=p.cycle,txt=(p.pct!==''?cyc+' · '+(p.total?'누적 '+p.done+'/'+p.total+' · ':'')+p.pct+'%':'진행율 미입력');d.kpi[0][2]=txt;var em=document.querySelector('.kpi.hl em');if(em)em.textContent=txt;});
+  document.addEventListener('change',function(e){if(e.target.dataset&&e.target.dataset.p==='cycle'){data().prog.cycle=e.target.value;}});
+  document.getElementById('role').addEventListener('change',function(e){S.role=e.target.value;S.edit=false;if(S.role!=='all')S.team='si';render();});
+  render();
+})();
+</script>
+</body>
+</html>

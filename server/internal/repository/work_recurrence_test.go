@@ -21,7 +21,7 @@ func TestGenerateOccurrencesCopiesParentAndDates(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	wb := NewWBRepo(db)
-	proj := &model.WorkProject{Name: "반복실행 사업", ContractType: "private", BillingType: "monthly", StartDate: "2026-01-01", EndDate: "2026-12-31"}
+	proj := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "반복실행 사업", ContractType: "private", BillingType: "monthly", StartDate: "2026-01-01", EndDate: "2026-12-31"}
 	if err := wb.CreateProject(proj); err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestMarkPastOccurrencesOverdueLeavesFuture(t *testing.T) {
 	future := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
 	parent := &model.WorkTask{
 		WorkType: model.WBWorkAdmin, Title: "반복 확인", DueDate: future,
-		Assignee: "양기헌", Status: model.WBTaskWaiting,
+		Assignee: "양기헌", Status: model.WBTaskWaiting, OrgID: model.OrgIDLibrary,
 	}
 	if err := wb.CreateTask(parent); err != nil {
 		t.Fatal(err)

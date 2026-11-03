@@ -123,8 +123,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 
 	today := time.Now().Format("2006-01-02")
 	rec = doForm(t, e, "/workboard/tasks", url.Values{
-		"work_type":  {"support"},
-		"project_id": {p.ProjectID},
+		"work_type":  {"admin"},
 		"title":      {"월 정기점검 보고서 작성"},
 		"due_date":   {today},
 		"work_date":  {today},
@@ -132,13 +131,13 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		"end_time":   {"10:00"},
 		"status":     {"in_progress"},
 		"priority":   {"urgent"},
-		"assignee":   {"관리자"},
+		"assignee":   {"최혜영"},
 		"tags":       {"보고서,점검"},
 		"progress":   {"40"},
 		"redirect":   {"/workboard/tasks"},
 	})
 	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=task") {
-		t.Fatalf("업무 등록: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
+		t.Fatalf("업무 등록: status=%d loc=%q body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
 
 	tasks, err := repo.ListTasks()
@@ -146,7 +145,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("ListTasks: len=%d err=%v", len(tasks), err)
 	}
 	task := tasks[0]
-	if task.WorkType != "support" || task.ProjectID != p.ProjectID || task.Progress != 40 {
+	if task.WorkType != "admin" || task.Progress != 40 {
 		t.Fatalf("업무 저장값: %+v", task)
 	}
 
@@ -155,7 +154,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("칸반: status=%d", kanban.Code)
 	}
 	body := kanban.Body.String()
-	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "영업활동", "완료", "월 정기점검 보고서 작성", "긴급", "지원업무", "40%", "할 일", "진행중"} {
+	for _, want := range []string{"칸반 보드", "정기점검", "AS", "행정/사업지원", "영업활동", "완료", "월 정기점검 보고서 작성", "긴급", "40%", "할 일", "진행중"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("칸반 화면에 %q 없음", want)
 		}
@@ -166,7 +165,7 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		t.Fatalf("목록: status=%d", list.Code)
 	}
 	body = list.Body.String()
-	for _, want := range []string{"업무 목록", "월 정기점검 보고서 작성", "2026 도서관 자동화 유지보수", today, "관리자"} {
+	for _, want := range []string{"업무 목록", "월 정기점검 보고서 작성", today, "최혜영"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("목록 화면에 %q 없음", want)
 		}

@@ -75,13 +75,18 @@ type ActionResultOption struct {
 	Label string
 }
 
-// ActionResultOptions 조치 등록 화면의 결과 세 가지. §34.3.4
-func ActionResultOptions() []ActionResultOption {
+// ActionResultsForAS 조치 화면 결과 3종. 화면·검증·테스트가 이 목록만 쓴다. 95-85 §2-1.
+func ActionResultsForAS() []ActionResultOption {
 	return []ActionResultOption{
 		{ResultDone, "완료"},
-		{ResultPartial, "추가조치 필요"},
+		{ResultPartial, "추가 조치 필요"},
 		{ResultTransfer, "이관"},
 	}
+}
+
+// ActionResultOptions 조치 등록 화면의 결과 세 가지. ActionResultsForAS 와 같다.
+func ActionResultOptions() []ActionResultOption {
+	return ActionResultsForAS()
 }
 
 // ActionResultLabel 조치 결과 화면 문구. 저장 코드는 바꾸지 않는다.
@@ -90,7 +95,7 @@ func ActionResultLabel(code string) string {
 	case ResultDone:
 		return "완료"
 	case ResultPartial:
-		return "추가조치 필요"
+		return "추가 조치 필요"
 	case ResultRevisit:
 		return "재방문 필요"
 	case ResultTransfer:
@@ -98,7 +103,7 @@ func ActionResultLabel(code string) string {
 	case ResultHold:
 		return "대기"
 	case ResultTemporary:
-		return "임시조치"
+		return "임시 조치"
 	case ResultEscalation:
 		return "제조사에스컬레이션"
 	default:

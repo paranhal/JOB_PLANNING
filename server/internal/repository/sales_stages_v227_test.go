@@ -152,7 +152,7 @@ func TestSalesContractUnsignedUnplanned(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "날인 없는 수주", CustomerConfirmed: true,
 		ExpectedYMConfirmed: true, ExpectedAmountConfirmed: true,
 	}

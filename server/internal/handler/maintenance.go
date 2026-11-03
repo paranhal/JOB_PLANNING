@@ -618,6 +618,11 @@ func (h *MaintenanceHandler) AssignUnassignedSlot(c echo.Context) error {
 		ProductType: product, ProjectID: strings.TrimSpace(c.FormValue("project_id")),
 		EntryCategory: "normal",
 	}
+	if h.wbRepo != nil {
+		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, v.ProjectID); err != nil {
+			return err
+		}
+	}
 	if err := applyVisitDupForm(c, &v); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

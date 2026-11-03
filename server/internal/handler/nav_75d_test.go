@@ -102,6 +102,7 @@ func TestAdminWorkCreateFromRegister(t *testing.T) {
 		"end_time":   {"10:00"},
 		"status":     {"waiting"},
 		"priority":   {"normal"},
+		"assignee":   {"관리자"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status=%d loc=%q", rec.Code, rec.Header().Get("Location"))

@@ -273,6 +273,44 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 	}
 }
 
+func Test95_88RegisterLeaveNamesJSON(t *testing.T) {
+	files := registerParseFiles(t)
+	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dateCol := RegisterColumn{Date: "2026-08-18", From: "2026-08-18", To: "2026-08-18"}
+	slotTimes := registerSlotTimes()
+	gridH, slotTops := registerGridStyles(len(slotTimes))
+	data := map[string]interface{}{
+		"Title": "일일 업무 등록", "Active": NavWorkRegister, "UserRole": "admin",
+		"View": regViewDay, "ViewLabel": registerViewLabel(regViewDay),
+		"Date": "2026-08-18", "PeriodLabel": "2026-08-18",
+		"PrevDate": "2026-08-17", "NextDate": "2026-08-19", "Today": "2026-08-18",
+		"Columns": []RegisterColumn{dateCol}, "DayColumns": []RegisterDayColumn{},
+		"SlotTimes": slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
+		"ASCards": []model.WBCard{}, "MntCards": []model.WBCard{},
+		"AdminCards": []model.WBCard(nil), "CanWrite": true,
+		"DayLeaveNames": []string{"홍길동", `김"연차`},
+		"ExtraAssignees": []string{},
+		"AssigneeColMin": registerAssigneeColMinPx,
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "홍길동") || !strings.Contains(out, "leaveNames:") {
+		t.Fatal("연차자 JSON 문자열이 없다")
+	}
+	if strings.Contains(out, `"\"\""`) || strings.Contains(out, `leaveNames: [""]`) && strings.Contains(out, `printf`) {
+		t.Fatal("이중 따옴표 leaveNames")
+	}
+	if !strings.Contains(out, "onLeave(name)") {
+		t.Fatal("onLeave 가 없다")
+	}
+}
+
 func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
 	files := registerParseFiles(t)
 	tmpl, err := template.New("").Funcs(funcMap()).ParseFiles(files...)

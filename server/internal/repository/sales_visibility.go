@@ -24,8 +24,9 @@ func appendSalesPersonSQL(q string, args []interface{}, projectAlias, name, user
 		args = append(args, name, name, name, name)
 	}
 	if userID != "" {
-		parts = append(parts, p+`.sales_owner_id=?`, p+`.created_by_user_id=?`)
-		args = append(args, userID, userID)
+		parts = append(parts, p+`.sales_owner_id=?`, p+`.created_by_user_id=?`,
+			`EXISTS (SELECT 1 FROM sales_project_owners _so WHERE _so.sales_id=`+p+`.sales_id AND _so.user_id=?)`)
+		args = append(args, userID, userID, userID)
 	}
 	q += strings.Join(parts, " OR ") + `)`
 	return q, args
@@ -49,8 +50,9 @@ func appendActivityPersonSQL(q string, args []interface{}, name, userID string) 
 		args = append(args, name, name, name, name)
 	}
 	if userID != "" {
-		parts = append(parts, `COALESCE(a.created_by_user_id,'')=?`, `s.sales_owner_id=?`, `s.created_by_user_id=?`)
-		args = append(args, userID, userID, userID)
+		parts = append(parts, `COALESCE(a.created_by_user_id,'')=?`, `s.sales_owner_id=?`, `s.created_by_user_id=?`,
+			`EXISTS (SELECT 1 FROM sales_project_owners _so WHERE _so.sales_id=s.sales_id AND _so.user_id=?)`)
+		args = append(args, userID, userID, userID, userID)
 	}
 	q += strings.Join(parts, " OR ") + `)`
 	return q, args

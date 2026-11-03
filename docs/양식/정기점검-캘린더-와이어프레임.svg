@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <style>
+      text { font-family: "Pretendard", "Noto Sans KR", Arial, sans-serif; fill: #303744; }
+      .label { font-size: 12px; font-weight: 600; }
+      .small { font-size: 10px; fill: #737b88; }
+      .tiny { font-size: 9px; fill: #818997; }
+      .title { font-size: 22px; font-weight: 700; }
+      .line { stroke: #c8cdd5; stroke-width: 1; }
+      .strong-line { stroke: #9fa7b3; stroke-width: 1.25; }
+      .surface { fill: #fff; stroke: #c8cdd5; }
+      .soft { fill: #f4f5f7; }
+      .accent { fill: #e7edf8; stroke: #8292ad; }
+      .button { fill: #fff; stroke: #aeb5c0; }
+      .primary { fill: #4f607c; stroke: #4f607c; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#eef0f3"/>
+
+  <!-- Sidebar -->
+  <g id="Sidebar">
+    <rect x="0" y="0" width="220" height="1000" fill="#303641"/>
+    <rect x="18" y="18" width="34" height="34" rx="6" fill="#d9dde4"/>
+    <rect x="27" y="26" width="16" height="19" rx="2" fill="none" stroke="#4d5562" stroke-width="2"/>
+    <text x="64" y="31" font-size="13" font-weight="700" fill="#fff">업무관리시스템</text>
+    <text x="64" y="46" class="tiny" fill="#abb1bc">WORK MANAGEMENT</text>
+    <line x1="0" y1="69" x2="220" y2="69" stroke="#4c535f"/>
+    <text x="18" y="92" class="tiny" fill="#9098a5">업무관리</text>
+    <g fill="#c8cdd5" font-size="11">
+      <text x="42" y="124">대시보드</text><circle cx="25" cy="120" r="5" fill="none" stroke="#aeb5bf"/>
+      <text x="42" y="160">일일 업무 등록</text><rect x="20" y="151" width="10" height="12" fill="none" stroke="#aeb5bf"/>
+      <text x="42" y="196">업무 확인</text><path d="M20 192l3 3 7-7" fill="none" stroke="#aeb5bf"/>
+      <text x="42" y="232">업무 그룹</text><circle cx="23" cy="225" r="4" fill="none" stroke="#aeb5bf"/>
+      <text x="42" y="268">업무 회의</text><rect x="19" y="258" width="12" height="11" fill="none" stroke="#aeb5bf"/>
+      <text x="42" y="304">결재</text><rect x="20" y="295" width="10" height="12" fill="none" stroke="#aeb5bf"/>
+    </g>
+    <text x="18" y="352" class="tiny" fill="#9098a5">고객관리</text>
+    <g fill="#c8cdd5" font-size="11">
+      <text x="42" y="386">AS 접수조치</text>
+      <text x="42" y="422">AS 사례 검색</text>
+    </g>
+    <rect x="10" y="444" width="200" height="39" rx="6" fill="#59677d"/>
+    <rect x="20" y="455" width="13" height="13" rx="2" fill="none" stroke="#fff"/>
+    <text x="42" y="469" font-size="11" font-weight="700" fill="#fff">정기점검</text>
+    <g fill="#c8cdd5" font-size="11">
+      <text x="42" y="518">고객현황</text>
+      <text x="42" y="554">설치자산</text>
+      <text x="42" y="590">담당자관리</text>
+      <text x="42" y="626">담당자이력</text>
+      <text x="42" y="662">공간관리</text>
+      <text x="42" y="698">수행관계</text>
+      <text x="42" y="734">점검 사이트 설정</text>
+    </g>
+    <line x1="0" y1="932" x2="220" y2="932" stroke="#4c535f"/>
+    <circle cx="30" cy="964" r="15" fill="#d9dde4"/>
+    <text x="26" y="968" font-size="11" font-weight="700">S</text>
+    <text x="54" y="960" font-size="10" font-weight="700" fill="#fff">SI사업팀관리자</text>
+    <text x="54" y="975" class="tiny" fill="#929aa7">si_admin · 조직관리자</text>
+  </g>
+
+  <!-- Header -->
+  <g id="Header">
+    <rect x="220" y="0" width="1380" height="60" fill="#fff"/>
+    <line x1="220" y1="60" x2="1600" y2="60" class="line"/>
+    <text x="250" y="36" class="small">고객관리  /  <tspan font-weight="700" fill="#303744">정기점검</tspan></text>
+    <circle cx="1490" cy="30" r="15" fill="#e1e5ea"/>
+    <text x="1486" y="34" font-size="10" font-weight="700">S</text>
+    <text x="1515" y="34" class="small">SI사업팀관리자</text>
+  </g>
+
+  <!-- Page heading -->
+  <g id="Page heading">
+    <line x1="250" y1="94" x2="272" y2="94" stroke="#65748c" stroke-width="2"/>
+    <text x="280" y="98" class="tiny">REGULAR INSPECTION</text>
+    <text x="250" y="134" class="title">정기점검</text>
+    <rect x="360" y="109" width="84" height="30" rx="5" class="button"/>
+    <text x="377" y="129" class="label">2026년⌄</text>
+    <text x="250" y="156" class="small">2026년 테크센터 정기점검 현황과 방문 일정을 관리합니다.</text>
+
+    <rect x="866" y="112" width="132" height="38" rx="6" class="accent"/>
+    <circle cx="886" cy="131" r="7" fill="none" stroke="#65748c"/>
+    <circle cx="893" cy="131" r="7" fill="none" stroke="#65748c"/>
+    <text x="908" y="135" class="label">전체 담당자⌄</text>
+    <rect x="1008" y="112" width="103" height="38" rx="6" class="button"/>
+    <text x="1032" y="135" class="label">보기 설정</text>
+    <rect x="1121" y="112" width="103" height="38" rx="6" class="button"/>
+    <text x="1145" y="135" class="label">배정 관리</text>
+    <rect x="1234" y="112" width="42" height="38" rx="6" class="button"/>
+    <path d="M1255 121v16m0 0-6-6m6 6 6-6M1248 142h14" fill="none" stroke="#65748c" stroke-width="1.5"/>
+    <rect x="1286" y="112" width="108" height="38" rx="6" class="primary"/>
+    <text x="1309" y="135" class="label" fill="#fff">＋ 방문 추가</text>
+  </g>
+
+  <!-- Calendar -->
+  <g id="Calendar">
+    <rect x="250" y="184" width="1115" height="770" rx="9" class="surface"/>
+    <line x1="250" y1="245" x2="1365" y2="245" class="line"/>
+    <rect x="270" y="200" width="29" height="29" rx="5" class="button"/>
+    <text x="280" y="220" class="label">‹</text>
+    <text x="320" y="221" font-size="15" font-weight="700">2026년 10월</text>
+    <rect x="430" y="200" width="29" height="29" rx="5" class="button"/>
+    <text x="441" y="220" class="label">›</text>
+    <rect x="470" y="200" width="48" height="29" rx="5" class="button"/>
+    <text x="485" y="219" class="small">오늘</text>
+    <circle cx="1130" cy="214" r="4" fill="#8795a9"/><text x="1140" y="218" class="tiny">완료</text>
+    <circle cx="1190" cy="214" r="4" fill="#bac4d3"/><text x="1200" y="218" class="tiny">예정</text>
+    <circle cx="1250" cy="214" r="4" fill="#5d6674"/><text x="1260" y="218" class="tiny">확인 필요</text>
+
+    <!-- Weekday header -->
+    <rect x="250" y="245" width="830" height="34" class="soft"/>
+    <g class="tiny" text-anchor="middle">
+      <text x="309" y="266">일</text><text x="428" y="266">월</text><text x="546" y="266">화</text>
+      <text x="665" y="266">수</text><text x="783" y="266">목</text><text x="902" y="266">금</text><text x="1021" y="266">토</text>
+    </g>
+
+    <!-- Calendar grid -->
+    <path d="M368.6 245v709M487.1 245v709M605.7 245v709M724.3 245v709M842.9 245v709M961.4 245v709
+             M250 279h830M250 391.5h830M250 504h830M250 616.5h830M250 729h830M250 841.5h830" fill="none" class="line"/>
+    <g class="small">
+      <text x="264" y="299" fill="#aeb4bd">27</text><text x="383" y="299" fill="#aeb4bd">28</text><text x="501" y="299" fill="#aeb4bd">29</text>
+      <text x="620" y="299" fill="#aeb4bd">30</text><text x="739" y="299">1</text><text x="857" y="299">2</text><text x="976" y="299">3</text>
+      <text x="264" y="412">4</text><text x="383" y="412">5</text><text x="501" y="412">6</text><text x="620" y="412">7</text><text x="739" y="412">8</text><text x="857" y="412">9</text><text x="976" y="412">10</text>
+      <text x="264" y="524">11</text><text x="383" y="524">12</text><text x="501" y="524">13</text><text x="620" y="524">14</text><text x="739" y="524">15</text><text x="857" y="524">16</text><text x="976" y="524">17</text>
+      <text x="264" y="637">18</text><text x="383" y="637">19</text><text x="501" y="637">20</text><text x="620" y="637">21</text><text x="739" y="637">22</text>
+    </g>
+    <rect x="724" y="616" width="119" height="113" fill="#edf0f5" stroke="#8292ad"/>
+    <circle cx="748" cy="637" r="12" fill="#59677d"/><text x="741" y="641" font-size="10" font-weight="700" fill="#fff">23</text>
+    <g class="small">
+      <text x="857" y="637">24</text><text x="264" y="750">25</text><text x="383" y="750">26</text><text x="501" y="750">27</text>
+      <text x="620" y="750">28</text><text x="739" y="750">29</text><text x="857" y="750">30</text><text x="976" y="750">31</text>
+      <text x="264" y="862" fill="#aeb4bd">1</text><text x="383" y="862" fill="#aeb4bd">2</text><text x="501" y="862" fill="#aeb4bd">3</text>
+      <text x="620" y="862" fill="#aeb4bd">4</text><text x="739" y="862" fill="#aeb4bd">5</text><text x="857" y="862" fill="#aeb4bd">6</text><text x="976" y="862" fill="#aeb4bd">7</text>
+    </g>
+
+    <!-- Events -->
+    <g>
+      <rect x="378" y="426" width="99" height="23" rx="4" fill="#e9edf1"/><circle cx="388" cy="438" r="3" fill="#8795a9"/><text x="396" y="442" class="tiny">대동초등학교</text>
+      <rect x="734" y="426" width="99" height="23" rx="4" fill="#e9edf1"/><circle cx="744" cy="438" r="3" fill="#8795a9"/><text x="752" y="442" class="tiny">동방초등학교</text>
+      <rect x="378" y="539" width="99" height="23" rx="4" fill="#e9edf1"/><circle cx="388" cy="551" r="3" fill="#8795a9"/><text x="396" y="555" class="tiny">마장초등학교</text>
+      <rect x="852" y="539" width="99" height="23" rx="4" fill="#e9edf1"/><circle cx="862" cy="551" r="3" fill="#8795a9"/><text x="870" y="555" class="tiny">문산초등학교</text>
+      <rect x="615" y="651" width="99" height="23" rx="4" fill="#e9edf1"/><circle cx="625" cy="663" r="3" fill="#8795a9"/><text x="633" y="667" class="tiny">미당초등학교</text>
+      <rect x="734" y="651" width="99" height="23" rx="4" fill="#dfe3e9"/><circle cx="744" cy="663" r="3" fill="#5d6674"/><text x="752" y="667" class="tiny">장곡초등학교</text>
+      <rect x="615" y="764" width="99" height="23" rx="4" fill="#f0f1f3"/><circle cx="625" cy="776" r="3" fill="#bac4d3"/><text x="633" y="780" class="tiny">서남초등학교</text>
+    </g>
+
+    <!-- Day detail -->
+    <g id="Day detail">
+      <rect x="1080" y="245" width="285" height="709" fill="#f7f8fa"/>
+      <line x1="1080" y1="245" x2="1080" y2="954" class="line"/>
+      <text x="1100" y="289" class="label">10월</text>
+      <text x="1138" y="294" font-size="30" font-weight="700">23</text>
+      <text x="1182" y="289" class="small">금요일</text>
+      <rect x="1100" y="313" width="43" height="26" rx="5" class="accent"/><text x="1114" y="330" class="tiny">전체</text>
+      <rect x="1148" y="313" width="43" height="26" rx="5" class="button"/><text x="1162" y="330" class="tiny">완료</text>
+      <rect x="1196" y="313" width="43" height="26" rx="5" class="button"/><text x="1210" y="330" class="tiny">예정</text>
+      <line x1="1080" y1="356" x2="1365" y2="356" class="line"/>
+      <text x="1100" y="383" class="label">방문 일정</text><text x="1328" y="383" class="tiny">1건</text>
+      <rect x="1094" y="397" width="257" height="86" rx="7" class="surface"/>
+      <rect x="1105" y="410" width="4" height="60" rx="2" fill="#5d6674"/>
+      <text x="1121" y="424" class="label">장곡초등학교</text>
+      <text x="1121" y="443" class="tiny">충남 · 냉난방기</text>
+      <text x="1121" y="462" class="tiny">김서준  ·  중부권 점검팀</text>
+      <text x="1330" y="443" class="label">›</text>
+      <line x1="1080" y1="884" x2="1365" y2="884" class="line"/>
+      <g text-anchor="middle">
+        <text x="1128" y="907" class="tiny">이번 달 방문</text><text x="1128" y="931" font-size="16" font-weight="700">7</text>
+        <text x="1223" y="907" class="tiny">완료</text><text x="1223" y="931" font-size="16" font-weight="700">5</text>
+        <text x="1318" y="907" class="tiny">예정·확인</text><text x="1318" y="931" font-size="16" font-weight="700">2</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Assignee dropdown: separate editable overlay -->
+  <g id="Assignee dropdown">
+    <rect x="866" y="156" width="310" height="455" rx="9" fill="#fff" stroke="#aeb5c0"/>
+    <text x="882" y="181" class="label">담당자별 보기</text>
+    <text x="1042" y="181" class="tiny">업무 그룹 또는 담당자 선택</text>
+    <line x1="874" y1="193" x2="1168" y2="193" class="line"/>
+    <rect x="875" y="201" width="292" height="48" rx="6" class="accent"/>
+    <circle cx="897" cy="225" r="12" fill="#d8dee8"/><text x="919" y="222" class="label">전체 담당자</text><text x="919" y="237" class="tiny">모든 점검 일정 표시</text><text x="1144" y="228" class="label">✓</text>
+    <text x="884" y="270" class="tiny">업무 그룹</text>
+    <g>
+      <rect x="875" y="279" width="292" height="74" rx="6" class="soft"/>
+      <rect x="886" y="289" width="28" height="28" rx="6" fill="#dfe3e9"/>
+      <text x="925" y="302" class="label">수도권 점검팀</text><text x="925" y="318" class="tiny">박지훈 · 최유진</text>
+      <circle cx="1128" cy="303" r="10" fill="#dfe3e9"/><text x="1125" y="307" class="tiny">2</text>
+      <text x="925" y="341" class="small">○ 박지훈　　○ 최유진</text>
+      <rect x="875" y="359" width="292" height="74" rx="6" class="soft"/>
+      <rect x="886" y="369" width="28" height="28" rx="6" fill="#dfe3e9"/>
+      <text x="925" y="382" class="label">중부권 점검팀</text><text x="925" y="398" class="tiny">김서준 · 이하은</text>
+      <circle cx="1128" cy="383" r="10" fill="#dfe3e9"/><text x="1125" y="387" class="tiny">3</text>
+      <text x="925" y="421" class="small">○ 김서준　　○ 이하은</text>
+      <rect x="875" y="439" width="292" height="74" rx="6" class="soft"/>
+      <rect x="886" y="449" width="28" height="28" rx="6" fill="#dfe3e9"/>
+      <text x="925" y="462" class="label">영남권 점검팀</text><text x="925" y="478" class="tiny">정민호</text>
+      <circle cx="1128" cy="463" r="10" fill="#dfe3e9"/><text x="1125" y="467" class="tiny">1</text>
+      <text x="925" y="501" class="small">○ 정민호</text>
+    </g>
+    <text x="884" y="535" class="tiny">기타</text>
+    <rect x="875" y="544" width="292" height="50" rx="6" class="soft"/>
+    <circle cx="897" cy="569" r="12" fill="#dfe3e9"/><text x="894" y="573" class="label">?</text>
+    <text x="919" y="566" class="label">미배정</text><text x="919" y="581" class="tiny">담당자가 없는 일정</text>
+  </g>
+
+  <text x="250" y="982" class="tiny">정기점검 캘린더 · Low-fidelity wireframe · 1600 × 1000</text>
+</svg>

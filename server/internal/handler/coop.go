@@ -111,6 +111,11 @@ func (h *CoopHandler) Create(c echo.Context) error {
 		Title: c.FormValue("title"), Body: c.FormValue("body"),
 		ProjectID: c.FormValue("project_id"), WantStart: c.FormValue("want_start"), WantEnd: c.FormValue("want_end"),
 	}
+	if h.proj != nil {
+		if err := requireProjectRegisterAccess(c, h.proj.Get, row.ProjectID); err != nil {
+			return err
+		}
+	}
 	if err := h.repo.Create(a, row); err != nil {
 		if repository.IsCoopForbidden(err) {
 			return echo.ErrForbidden

@@ -13,13 +13,50 @@
       {{template "view_group_toggle" .}}
       {{template "schedule_show_toggle" .}}
       {{template "board_new_work_btn" .}}
-      <a href="{{.ListHref}}" class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3 text-ui font-semibold text-ink hover:bg-hover">일정 리스트 보기</a>
-      <div class="inline-flex rounded-xl border border-line bg-surface p-0.5">
-        <a href="{{.MonthViewHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `month`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">월</a>
-        <a href="{{.WeekViewHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `week`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">주</a>
-        <a href="{{.DayViewHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `day`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">일</a>
-      </div>
+      {{template "board_view_links" .}}
+      {{template "board_period_seg_cal" .}}
     </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 border-t border-line px-6 py-2.5">
+    <form method="GET" action="/workboard/board" class="inline-flex flex-wrap items-center gap-1.5">
+      <input type="hidden" name="view" value="{{.View}}">
+      <input type="hidden" name="date" value="{{.Date}}">
+      {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
+      {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
+      {{if eq .Cols "flat"}}<input type="hidden" name="cols" value="flat">{{end}}
+      {{if .ShowParam}}<input type="hidden" name="show" value="{{.ShowParam}}">{{end}}
+      <label class="sr-only" for="board-project">사업</label>
+      <select id="board-project" name="project" onchange="this.form.submit()" class="h-8 rounded-lg border border-line bg-surface px-2 text-ui-sm text-ink">
+        <option value="" {{if eq .ProjectFilter ""}}selected{{end}}>사업 전체</option>
+        {{range .Projects}}
+        <option value="{{.ProjectID}}" {{if eq $.ProjectFilter .ProjectID}}selected{{end}}>{{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}</option>
+        {{end}}
+      </select>
+      <label class="sr-only" for="board-group">업무 그룹</label>
+      <select id="board-group" name="work_group_id" onchange="this.form.submit()" class="h-8 rounded-lg border border-line bg-surface px-2 text-ui-sm text-ink">
+        <option value="" {{if eq .WorkGroupFilter ""}}selected{{end}}>그룹 전체</option>
+        {{range .WorkGroups}}
+        <option value="{{.GroupID}}" {{if eq $.WorkGroupFilter .GroupID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </form>
+    {{if eq .View "day"}}
+    <div class="inline-flex rounded-lg border border-line overflow-hidden">
+      <a href="{{.PersonHref}}" class="px-2.5 py-1 text-ui-sm font-semibold {{if ne .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">담당자별 열</a>
+      <a href="{{.FlatHref}}" class="border-l border-line px-2.5 py-1 text-ui-sm font-semibold {{if eq .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">한 줄</a>
+    </div>
+    {{end}}
+    {{if .AssigneeLegend}}
+    <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-muted">
+      <span>담당자</span>
+      {{range .AssigneeLegend}}
+      <span class="inline-flex items-center gap-1 rounded border border-line bg-canvas px-1.5 py-0.5">
+        <span class="font-medium text-ink">{{.Name}}</span>
+        {{if .Unregistered}}<span class="text-[9px]">미등록</span>{{end}}
+      </span>
+      {{end}}
+    </div>
+    {{end}}
   </div>
 </section>
 <div class="card mt-4 overflow-hidden">

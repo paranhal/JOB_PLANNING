@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"customer-support/internal/appclock"
 	"customer-support/internal/model"
 )
 
@@ -210,6 +211,8 @@ func (r *WorkBoardRepo) ListBucketOn(bucket, date, mineUserID string, mineKeys [
 		return nil, err
 	}
 	r.fillCoopWorkItems(items)
+	r.stampDelayReasons(items)
+	stampWorkListItemKinds(r, items)
 	return sortLimitWorkItems(items, limit), nil
 }
 
@@ -351,6 +354,8 @@ func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includ
 		out = appendUniqueWorkItems(out, sales, seen)
 	}
 	r.fillCoopWorkItems(out)
+	r.stampDelayReasons(out)
+	stampWorkListItemKinds(r, out)
 	return out, nil
 }
 
@@ -358,7 +363,7 @@ func (r *WorkBoardRepo) ListUnified(mineUserID string, mineKeys []string, includ
 // collectOpen·ListUnified 는 대시보드·미계획·/work/all 이 그대로 쓴다. 여기서 고치지 않는다.
 func (r *WorkBoardRepo) ListWorkToday(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {
 	if today == "" {
-		today = time.Now().Format("2006-01-02")
+		today = appclock.Now().Format("2006-01-02")
 	}
 
 	seen := map[string]bool{}
@@ -386,6 +391,8 @@ func (r *WorkBoardRepo) ListWorkToday(mineUserID string, mineKeys []string, toda
 	stampWorkTodayOverdue(out, today)
 	r.fillBlockedReasons(out)
 	r.fillCoopWorkItems(out)
+	r.stampDelayReasons(out)
+	stampWorkListItemKinds(r, out)
 	return out, nil
 }
 
@@ -466,18 +473,22 @@ func (r *WorkBoardRepo) collectWorkTodayExtras(mineUserID string, mineKeys []str
 }
 
 func stampWorkTodayOverdue(items []model.WorkListItem, today string) {
+	stampWorkListOverdueState(items, today)
+}
+
+func stampWorkListOverdueState(items []model.WorkListItem, today string) {
 	today = strings.TrimSpace(today)
 	for i := range items {
-		if items[i].DaysOverdue > 0 {
+		ds := model.WorkListTaskDelayState(items[i], today)
+		if ds.Delayed {
+			items[i].DaysOverdue = ds.Days
 			continue
 		}
-		sched := model.WorkItemScheduledDate(items[i])
-		if sched != "" && today != "" && sched < today {
-			d := model.DaysBetweenDates(sched, today)
-			if d < 1 {
-				d = 1
-			}
-			items[i].DaysOverdue = d
+		p := strings.TrimSpace(items[i].Prefix)
+		if p == model.WorkPrefixGeneral || p == model.WorkPrefixSales || p == model.WorkPrefixProjectWork {
+			items[i].DaysOverdue = 0
+		} else if items[i].DaysOverdue == 0 && ds.Days > 0 {
+			items[i].DaysOverdue = ds.Days
 		}
 	}
 }
@@ -588,8 +599,11 @@ func (r *WorkBoardRepo) collectByDate(mineUserID string, mineKeys []string, date
 	tItems, err := r.queryWorkTasks(
 		`t.work_type IN ('admin','support','sales','project_work')
 			 `+tStatus+`
-			 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=?`,
-		mineUserID, mineKeys, []interface{}{date})
+			 AND (
+			   (TRIM(COALESCE(t.due_date,'')) = '' AND COALESCE(NULLIF(TRIM(t.work_date),''), '')=?)
+			   OR (TRIM(COALESCE(t.due_date,'')) != '' AND COALESCE(NULLIF(TRIM(t.work_date),''), t.due_date) <= ? AND t.due_date >= ?)
+			 )`,
+		mineUserID, mineKeys, []interface{}{date, date, date})
 	if err != nil {
 		return nil, err
 	}
@@ -655,7 +669,35 @@ func (r *WorkBoardRepo) collectDelayed(mineUserID string, mineKeys []string, tod
 		return nil, err
 	}
 	out = append(out, occItems...)
-	return r.withoutWaiting(out), nil
+
+	tItems, err := r.queryWorkTasks(
+		`t.work_type IN ('admin','support','sales','project_work')
+		 AND COALESCE(t.status,'') NOT IN ('complete','cancelled')
+		 AND TRIM(COALESCE(t.due_date,'')) != ''
+		 AND t.due_date < ?`,
+		mineUserID, mineKeys, []interface{}{today})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tItems...)
+	out = r.withoutWaiting(out)
+	var delayed []model.WorkListItem
+	for i := range out {
+		ds := model.WorkListTaskDelayState(out[i], today)
+		if ds.Delayed {
+			out[i].DaysOverdue = ds.Days
+			delayed = append(delayed, out[i])
+			continue
+		}
+		p := strings.TrimSpace(out[i].Prefix)
+		if p == model.WorkPrefixGeneral || p == model.WorkPrefixSales || p == model.WorkPrefixProjectWork {
+			continue
+		}
+		if out[i].DaysOverdue > 0 {
+			delayed = append(delayed, out[i])
+		}
+	}
+	return delayed, nil
 }
 
 func (r *WorkBoardRepo) collectOverdueOccurrences(mineUserID string, mineKeys []string, today string) ([]model.WorkListItem, error) {

@@ -75,7 +75,7 @@ func (h *AttachmentHandler) Upload(c echo.Context) error {
 		if err := h.guardActionPhotoWrite(c, refID); err != nil {
 			return redirectAttachFailure(c, redirect, err)
 		}
-		if err := h.saveActionPhotos(refID, keywords, headers); err != nil {
+		if err := h.saveActionPhotos(refID, keywords, headers, strings.TrimSpace(c.FormValue("action_set_id"))); err != nil {
 			return redirectAttachFailure(c, redirect, err)
 		}
 		return c.Redirect(http.StatusSeeOther, redirect)
@@ -225,12 +225,13 @@ func (h *AttachmentHandler) saveReceiptPhotos(asID, keywords string, files []*mu
 	}, files)
 }
 
-func (h *AttachmentHandler) saveActionPhotos(asID, keywords string, files []*multipart.FileHeader) error {
+func (h *AttachmentHandler) saveActionPhotos(asID, keywords string, files []*multipart.FileHeader, actionSetID string) error {
 	return h.saveProcessedPhotos(processedPhotoOpts{
 		refType: model.RefTypeASActionPhoto, asID: asID, keywords: keywords,
 		max: model.MaxActionPhotos, dir: repository.ActionPhotoDir(h.uploadDir, asID),
 		imageOnly: true,
-		errMax:    "attach_photo_max",
+		errMax:      "attach_photo_max",
+		actionSetID: actionSetID,
 	}, files)
 }
 
@@ -340,13 +341,14 @@ func (h *AttachmentHandler) saveKBDocument(opt processedPhotoOpts, file *multipa
 }
 
 type processedPhotoOpts struct {
-	refType   string
-	asID      string
-	keywords  string
-	max       int
-	dir       string
-	imageOnly bool
-	errMax    string
+	refType     string
+	asID        string
+	keywords    string
+	max         int
+	dir         string
+	imageOnly   bool
+	errMax      string
+	actionSetID string
 }
 
 func (h *AttachmentHandler) saveProcessedPhotos(opt processedPhotoOpts, files []*multipart.FileHeader) error {
@@ -399,13 +401,14 @@ func (h *AttachmentHandler) saveOneProcessedPhoto(opt processedPhotoOpts, file *
 			return err
 		}
 		return h.repo.Create(&model.Attachment{
-			RefType:  opt.refType,
-			RefID:    opt.asID,
-			FileName: origName,
-			FilePath: filepath.ToSlash(dstPath),
-			FileSize: int64(len(out.Full)),
-			MIMEType: out.MIMEType,
-			Keywords: opt.keywords,
+			RefType:     opt.refType,
+			RefID:       opt.asID,
+			FileName:    origName,
+			FilePath:    filepath.ToSlash(dstPath),
+			FileSize:    int64(len(out.Full)),
+			MIMEType:    out.MIMEType,
+			Keywords:    opt.keywords,
+			ActionSetID: opt.actionSetID,
 		})
 	}
 

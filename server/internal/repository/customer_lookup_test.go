@@ -240,3 +240,35 @@ func TestListForReceiptMatchesLookup(t *testing.T) {
 	}
 	_ = model.PartyKindCustomer
 }
+
+func TestLookupOrgIDFilterAndNormalizedInOrg(t *testing.T) {
+	r := setupLookupDB(t)
+	all, _, err := r.Lookup(CustomerQuery{Scope: ScopeSite, Q: "동일명"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) < 2 {
+		t.Fatalf("전사 동명 %d", len(all))
+	}
+	o01, err := r.LookupNormalizedInOrg("O01", "동일명")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(o01) != 0 {
+		t.Fatalf("동명이면 고르지 않음 %+v", o01)
+	}
+	hit, err := r.LookupNormalizedInOrg("O02", "타 조직 도서관")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hit) != 1 || hit[0].ID != "C-O02" {
+		t.Fatalf("정규화 %+v", hit)
+	}
+	shared, err := r.LookupNormalizedInOrg("O01", "타조직도서관")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(shared) != 1 || shared[0].ID != "C-O02" {
+		t.Fatalf("전사 공용이어야 함 %+v", shared)
+	}
+}

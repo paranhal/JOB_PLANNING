@@ -1,0 +1,42 @@
+{{define "project_year_dates"}}
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3"
+     x-data="projectYearDates({{if .Project.PlanYear}}{{.Project.PlanYear}}{{else}}0{{end}}, {{toJSON .Project.StartDate}}, {{toJSON .Project.EndDate}})">
+  <div>
+    <label class="label">사업 연도</label>
+    <input type="number" name="plan_year" x-model="year" @input="onYear()" min="2000" max="2100" class="input">
+  </div>
+  <div>
+    <label class="label">계약기간 시작</label>
+    <input type="date" name="start_date" x-model="start" @change="onStart()" class="input">
+  </div>
+  <div>
+    <label class="label">계약기간 마감</label>
+    <input type="date" name="end_date" x-model="end" @change="onEnd()" class="input">
+  </div>
+</div>
+<script>
+window.projectYearDates = window.projectYearDates || function (year, start, end) {
+  return {
+    year: year || '',
+    start: start || '',
+    end: end || '',
+    yearTouched: false,
+    onYear() { this.yearTouched = true; },
+    onStart() {
+      if (this.yearTouched) return;
+      const m = String(this.start || '').match(/^(\d{4})-/);
+      if (m) {
+        const y = parseInt(m[1], 10);
+        if (y >= 2000 && y <= 2100) this.year = y;
+      }
+    },
+    onEnd() {
+      if (this.start && this.end && this.end < this.start) {
+        alert('계약기간 마감은 시작일보다 빠를 수 없습니다');
+        this.end = '';
+      }
+    }
+  };
+};
+</script>
+{{end}}

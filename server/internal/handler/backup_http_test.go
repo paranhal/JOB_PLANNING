@@ -70,6 +70,9 @@ func TestBackupPageAndSave(t *testing.T) {
 	if !strings.Contains(body, "AS 반입") {
 		t.Error("AS 반입 탭이 없다")
 	}
+	if !strings.Contains(body, "제품분류") {
+		t.Error("제품분류 탭이 없다")
+	}
 	if !strings.Contains(body, "지표 기준") {
 		t.Error("지표 기준 탭이 없다")
 	}

@@ -55,13 +55,14 @@ type SalesTimelineAxis struct {
 }
 
 type SalesTimelineRow struct {
-	SalesID     string
-	DisplayNo   string
-	Name        string
-	YM          string
-	Period      string
-	StageLabel  string
-	Unscheduled bool
+	SalesID         string
+	DisplayNo       string
+	Name            string
+	YM              string
+	Period          string
+	StageLabel      string
+	Unscheduled     bool
+	IsTentativeName bool
 }
 
 const salesUnscheduledYM = "unscheduled"
@@ -516,12 +517,13 @@ func BuildSalesTimelineAxis(projects []SalesProject, stages []SalesStageDef, now
 		p := projects[i]
 		def := FindSalesStage(stages, p.Stage)
 		row := SalesTimelineRow{
-			SalesID:    p.SalesID,
-			DisplayNo:  p.DisplayNo(),
-			Name:       p.Name,
-			YM:         NormalizeSalesYM(p.ExpectedYM),
-			Period:     p.PeriodLabel(),
-			StageLabel: p.DisplayStage(def),
+			SalesID:         p.SalesID,
+			DisplayNo:       p.DisplayNo(),
+			Name:            p.Name,
+			YM:              NormalizeSalesYM(p.ExpectedYM),
+			Period:          p.PeriodLabel(),
+			StageLabel:      p.DisplayStage(def),
+			IsTentativeName: p.IsTentativeName,
 		}
 		if row.YM == "" {
 			row.Unscheduled = true

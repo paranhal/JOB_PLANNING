@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -112,6 +113,9 @@ func (h *WorkboardHandler) RegisterWorkBatch(c echo.Context, kind string, ids []
 		if skip != nil {
 			out.Skipped = append(out.Skipped, *skip)
 		} else if err != nil {
+			if errors.Is(err, errOverlapResponse) {
+				return out, err
+			}
 			out.Failed = append(out.Failed, WorkBatchItem{ID: first, Reason: err.Error()})
 		} else if task != nil {
 			out.Created = append(out.Created, WorkBatchItem{ID: first, TaskID: task.TaskID, Label: task.Title})
@@ -149,6 +153,9 @@ func (h *WorkboardHandler) RegisterWorkBatch(c echo.Context, kind string, ids []
 			continue
 		}
 		if err != nil {
+			if errors.Is(err, errOverlapResponse) {
+				return out, err
+			}
 			out.Failed = append(out.Failed, WorkBatchItem{ID: id, Reason: err.Error()})
 			continue
 		}
@@ -169,6 +176,11 @@ func (h *WorkboardHandler) batchOneSource(c echo.Context, kind, sourceID string,
 		label := existing.Title
 		return nil, &WorkBatchItem{ID: sourceID, Label: label, Reason: "이미 등록됨", TaskID: existing.TaskID}, nil
 	}
+	if strings.TrimSpace(start) != "" && strings.TrimSpace(workDate) != "" {
+		if err := h.rejectIfOverlap(c, workDate, start, end, "", occupancyNames(sel.PrimaryName, nil)); err != nil {
+			return nil, nil, err
+		}
+	}
 	t, err := h.buildSourceTask(kind, sourceID, workDate, start, end, dur, sel.PrimaryName, "")
 	if err != nil {
 		return nil, nil, err
@@ -178,10 +190,17 @@ func (h *WorkboardHandler) batchOneSource(c echo.Context, kind, sourceID string,
 	}
 	applySelectionToTask(t, sel)
 	t.OrgID = org
-	if t.OrgID == "" {
-		t.OrgID = currentOrg(c)
+	if strings.TrimSpace(t.OrgID) == "" || t.OrgID == repository.OrgAll {
+		ins, ierr := resolveInsertOrg(c)
+		if ierr != nil {
+			return nil, nil, ierr
+		}
+		t.OrgID = ins
 	}
 	if err := h.repo.CreateTask(t); err != nil {
+		return nil, nil, err
+	}
+	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
 		return nil, nil, err
 	}
 	_ = h.saveSelectionOnTask(t.TaskID, sel)

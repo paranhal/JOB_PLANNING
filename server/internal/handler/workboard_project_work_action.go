@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
+	"customer-support/internal/service"
 )
 
 func projectWorkActionPath(id string) string {
@@ -155,14 +157,20 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		"Title": "작업 조치 · " + t.Title, "Active": workboardNavActive(back),
 		"Task": t, "Sites": sites, "Members": members, "Processes": procs,
 		"PartRows": parts, "PartsEnabled": enabled, "Attachments": docs,
-		"ActionPhotos":    photos,
-		"Assignees":       listAssignableForPicker(h.userRepo, c),
-		"CanProcess":      canMod, "ReadOnly": readOnly, "CanWrite": canWrite,
-		"IsClosed":        closed, "EditUnlocked": unlocked, "UnlockExpires": unlockExpLocal,
+		"ActionPhotos": photos,
+		"Assignees":    listAssignableForPicker(h.userRepo, c),
+		"CanProcess":   canMod, "ReadOnly": readOnly, "CanWrite": canWrite,
+		"CanPlanEdit":   canPlanEditTask(c, t),
+		"CanCarry":      canPlanEditTask(c, t),
+		"TaskDelayed":   model.TaskDelayState(*t, now.Format(dateLayout)).Delayed,
+		"TaskDelayDays": model.TaskDelayState(*t, now.Format(dateLayout)).Days,
+		"PlanEditHref":  planEditHref(t.TaskID),
+		"IsClosed":      closed, "EditUnlocked": unlocked, "UnlockExpires": unlockExpLocal,
 		"CanUnlockEdit":   closed && isVisionRole(c) && !unlocked,
 		"ShowWorkflow":    canWrite,
 		"ProjectName":     projectName,
 		"Projects":        pick,
+		"WorkProjects":    pick,
 		"TargetCats":      cats,
 		"ShowTargetCat":   len(cats) > 0,
 		"PastHistory":     hist,
@@ -209,6 +217,22 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	if v, ok := c.Get("pw_create_followup").(bool); ok {
 		data["CreateFollowup"] = v
 	}
+	if nd, _ := data["NextDate"].(string); strings.TrimSpace(nd) == "" {
+		who := []string{t.Assignee, t.AssigneeUserID}
+		if mems, err := h.repo.ListMembers(t.TaskID); err == nil {
+			who = taskWhoNames(t, mems)
+		}
+		next, skipped := nextWorkdayFor(h, now, who, t.OrgID, false)
+		if next == "" {
+			next = now.AddDate(0, 0, 1).Format(dateLayout)
+		}
+		data["NextDate"] = next
+		data["CarrySkipNotice"] = service.FormatSkipNotice(next, skipped)
+	}
+	mergeCarryModal(data)
+	if hist, err := h.repo.ListDelaysByTask(t.TaskID); err == nil {
+		data["DelayHistory"] = hist
+	}
 	if v, ok := c.Get("pw_transfer_reason").(string); ok {
 		data["TransferReason"] = v
 	}
@@ -222,6 +246,16 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		data["CancelReason"] = v
 	}
 	data["ConfirmStartDiffersPlan"] = errCode == "start_differs_plan"
+	data["ConfirmSegShift"] = errCode == "seg_shift"
+	items, _ := h.repo.ListItems(t.TaskID)
+	if items == nil {
+		items = []model.WorkTaskItem{}
+	}
+	data["WorkItems"] = items
+	attachWorkItemView(data, h, t, readOnly)
+	attachWorkSegData(data, h.repo, t, errCode, projectWorkActionPath(t.TaskID), readOnly)
+	deps, _ := h.repo.ListDepartures(t.TaskID)
+	data["Departures"] = deps
 	startLocal := defaultActionStartLocal(t, now)
 	if v, ok := c.Get("pw_start_local").(string); ok && v != "" {
 		startLocal = v
@@ -294,10 +328,14 @@ func projectWorkActionErr(code string) string {
 		return "완료 일시가 시작 일시보다 이전입니다"
 	case "start_differs_plan":
 		return "작업 일정과 다른 날짜입니다. 그대로 저장할까요?"
+	case "seg_shift":
+		return "끼워 넣은 업무의 실제 시간이 다음 구간과 겹칩니다. 후속 구간을 조정할까요?"
 	case "supporter_owner":
 		return "처리 담당자는 지원 인력에 넣을 수 없습니다"
 	case "supporters_max":
 		return "지원 인력은 최대 20명입니다"
+	case "item":
+		return "작업 항목을 확인하세요"
 	case "partial_note":
 		return "추가조치 사유를 입력하세요"
 	case "hold_reason":
@@ -652,6 +690,55 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 		t.Description = strings.TrimSpace(c.FormValue("description"))
 	}
 
+	var items []model.WorkTaskItem
+	if _, postedItems := c.Request().PostForm["item_title"]; postedItems {
+		allowed := itemAssigneeAllowed(c, h, t.TaskID)
+		parsed, excludedIDs, err := parseWorkItemsForm(c, allowed)
+		if err != nil {
+			c.Set("pw_action_err_msg", err.Error())
+			return h.failPWAction(c, t, "item")
+		}
+		old, _ := h.repo.ListItems(t.TaskID)
+		oldByID := map[string]model.WorkTaskItem{}
+		for _, o := range old {
+			oldByID[o.ItemID] = o
+		}
+		for _, id := range excludedIDs {
+			if o, ok := oldByID[id]; ok && itemHistoryLocked(o) {
+				c.Set("pw_action_err_msg", "완료·연결 항목은 제외할 수 없습니다")
+				return h.failPWAction(c, t, "item")
+			}
+		}
+		if err := h.repo.ReplaceItems(t.TaskID, parsed); err != nil {
+			return err
+		}
+		items = parsed
+	} else {
+		items, _ = h.repo.ListItems(t.TaskID)
+	}
+	hasOpen := false
+	for _, it := range items {
+		if model.ItemIncomplete(it.Status) {
+			hasOpen = true
+			break
+		}
+	}
+	if result == model.WorkResultDone && hasOpen {
+		result = model.WorkResultPartial
+		t.ResultCode = result
+		if note == "" {
+			note = "미완료 작업 항목이 있어 부분 완료로 저장했습니다"
+		}
+		c.Set("pw_force_followup_items", true)
+	}
+
+	if err := savePostedActionSegments(c, h.repo, t); err != nil {
+		if errors.Is(err, errSegShift) {
+			return &pwActionErr{"seg_shift"}
+		}
+		return err
+	}
+
 	switch result {
 	case model.WorkResultDone:
 		t.CompleteDatetime = completeDT
@@ -713,7 +800,7 @@ func (h *WorkboardHandler) applyProjectWorkActionForm(c echo.Context, t *model.W
 	if result == model.WorkResultDone {
 		_ = h.repo.SyncSitesOnProjectWorkComplete(t, currentUserID(c))
 	}
-	if result == model.WorkResultPartial && c.FormValue("create_followup") == "1" {
+	if result == model.WorkResultPartial && (c.FormValue("create_followup") == "1" || c.Get("pw_force_followup_items") == true) {
 		if err := h.createPartialFollowup(c, t, nextDate); err != nil {
 			return err
 		}
@@ -737,7 +824,11 @@ func collectWorkTaskPartsForm(c echo.Context) (bool, []model.ASPartUsed, error) 
 
 func (h *WorkboardHandler) createPartialFollowup(c echo.Context, src *model.WorkTask, nextDate string) error {
 	if nextDate == "" {
-		nextDate = time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+		who := taskWhoNames(src, nil)
+		nextDate, _ = nextWorkdayFor(h, time.Now(), who, src.OrgID, false)
+		if nextDate == "" {
+			nextDate = time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+		}
 	}
 	n, err := h.repo.CountPartialFollowups(src.OrgID, src.TaskID, nextDate)
 	if err != nil {
@@ -782,6 +873,7 @@ func (h *WorkboardHandler) createPartialFollowup(c echo.Context, src *model.Work
 	if len(ids) > 0 {
 		_ = h.repo.ReplaceTaskCustomers(child.TaskID, src.ProjectID, ids)
 	}
+	_ = h.repo.CopyIncompleteItems(src.TaskID, child.TaskID)
 	return nil
 }
 
@@ -995,6 +1087,9 @@ func (h *WorkboardHandler) LinkProjectWorkAction(c echo.Context) error {
 		return err
 	}
 	pid := strings.TrimSpace(c.FormValue("project_id"))
+	if err := h.assertProjectLinkable(c, pid); err != nil {
+		return err
+	}
 	before, after, err := h.repo.SetTaskProject(t.OrgID, t.TaskID, pid)
 	if err != nil {
 		return h.redirectPWAction(c, t.TaskID, "project")

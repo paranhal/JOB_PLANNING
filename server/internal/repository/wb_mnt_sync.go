@@ -19,7 +19,8 @@ const mntTaskLinkSelect = `
 	       COALESCE(v.project_id,''),
 	       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
 	       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), ''),
-	       COALESCE(v.start_time,''), COALESCE(v.end_time,''), COALESCE(v.duration_min,0)
+	       COALESCE(v.start_time,''), COALESCE(v.end_time,''), COALESCE(v.duration_min,0),
+	       COALESCE(t.source_id,'')
 	FROM work_tasks t
 	JOIN maintenance_visits v ON v.visit_id = t.source_id
 	JOIN customers c ON c.customer_id = v.customer_id
@@ -35,6 +36,7 @@ type mntTaskLink struct {
 	completedDate, visitProject, siteName, orgID               string
 	visitStart, visitEnd                                       string
 	visitDuration                                              int
+	visitID                                                    string
 }
 
 func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTaskLink, error) {
@@ -54,7 +56,7 @@ func (r *WBRepo) queryMntTaskLinks(where string, args ...interface{}) ([]mntTask
 			&l.durationMin, &l.assignee, &l.title, &l.desc, &l.status, &l.taskProject, &l.assigneeSource,
 			&l.visitDate, &l.visitAssignee, &l.productType, &done, &l.completedDate,
 			&l.visitProject, &l.siteName, &l.orgID,
-			&l.visitStart, &l.visitEnd, &l.visitDuration); err != nil {
+			&l.visitStart, &l.visitEnd, &l.visitDuration, &l.visitID); err != nil {
 			return nil, err
 		}
 		l.completed = done != 0
@@ -313,10 +315,28 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 
 	start, end := l.startTime, l.endTime
 	dur := l.durationMin
-	if strings.TrimSpace(l.visitStart) != "" || strings.TrimSpace(l.visitEnd) != "" {
+	nSeg, _ := r.CountStoredPlanSegments(l.taskID)
+	if nSeg > 0 {
+		plan, _ := r.ListPlanSegmentsOrVirtual(model.WorkTask{TaskID: l.taskID, WorkDate: l.workDate, StartTime: l.startTime, EndTime: l.endTime, DurationMin: l.durationMin})
+		envSt, envEn, envDur := model.EnvelopeFromPlanSegments(plan)
+		envSt, envEn = clockHHMM(envSt), clockHHMM(envEn)
+		vSt, vEn := clockHHMM(l.visitStart), clockHHMM(l.visitEnd)
+		if envSt != "" {
+			start, end = envSt, envEn
+			if envDur > 0 {
+				dur = envDur
+			}
+			if (vSt != envSt || vEn != envEn) && l.visitID != "" {
+				_ = r.PushEnvelopeToVisit(l.visitID, envSt, envEn, dur)
+			}
+		}
+	} else if strings.TrimSpace(l.visitStart) != "" || strings.TrimSpace(l.visitEnd) != "" {
 		start, end = strings.TrimSpace(l.visitStart), strings.TrimSpace(l.visitEnd)
+		if l.visitDuration > 0 {
+			dur = l.visitDuration
+		}
 	}
-	if l.visitDuration > 0 {
+	if nSeg == 0 && l.visitDuration > 0 {
 		dur = l.visitDuration
 	}
 	// 미완료 건을 옮긴 날짜에서 같은 담당자 일정과 겹치면 시각을 비워 자동 배치에 맡긴다.
@@ -410,12 +430,54 @@ func (r *WBRepo) DeleteTasksBySource(sourceType, sourceID string) error {
 	return err
 }
 
+func (r *WBRepo) DeleteTaskLogged(id, reason string) error {
+	id = strings.TrimSpace(id)
+	if r == nil || r.db == nil || id == "" {
+		return nil
+	}
+	label := id
+	if t, _ := r.GetTask(id); t != nil && strings.TrimSpace(t.Title) != "" {
+		label = t.Title
+	}
+	return touchDeleteWithReason(r.db, "work_tasks", "task_id", id, label, reason, func() error {
+		return r.DeleteTask(id)
+	})
+}
+
+func (r *WBRepo) UpdateTaskLogged(id, reason string, fn func() error) error {
+	id = strings.TrimSpace(id)
+	if r == nil || r.db == nil || id == "" {
+		if fn != nil {
+			return fn()
+		}
+		return nil
+	}
+	label := id
+	if t, _ := r.GetTask(id); t != nil && strings.TrimSpace(t.Title) != "" {
+		label = t.Title
+	}
+	before := rowJSON(r.db, "work_tasks", "task_id", id)
+	if fn != nil {
+		if err := fn(); err != nil {
+			return err
+		}
+	}
+	logUpdateWithReason(r.db, "work_tasks", "task_id", id, label, before, reason)
+	return nil
+}
+
 func (r *WBRepo) DeleteTask(id string) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil
 	}
 	for _, q := range []string{
+		`DELETE FROM work_task_item_segments WHERE item_id IN (SELECT item_id FROM work_task_items WHERE task_id=?)`,
+		`DELETE FROM work_task_item_assignees WHERE item_id IN (SELECT item_id FROM work_task_items WHERE task_id=?)`,
+		`DELETE FROM work_task_item_assets WHERE item_id IN (SELECT item_id FROM work_task_items WHERE task_id=?)`,
+		`DELETE FROM work_task_items WHERE task_id=?`,
+		`DELETE FROM work_task_departures WHERE task_id=?`,
+		`DELETE FROM work_task_segments WHERE task_id=?`,
 		`DELETE FROM work_task_tags WHERE task_id=?`,
 		`DELETE FROM work_task_sites WHERE task_id=?`,
 		`DELETE FROM work_task_assets WHERE task_id=?`,

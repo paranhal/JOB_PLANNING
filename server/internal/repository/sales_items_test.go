@@ -66,7 +66,7 @@ func TestSalesItemsSeedFromAssetsDistinctAndReview(t *testing.T) {
 	}
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "기존 구축", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "기존 구축", IsTentativeName: true}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

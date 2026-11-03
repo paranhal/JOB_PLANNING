@@ -45,7 +45,7 @@ func postUsersAudit(t *testing.T, e *echo.Echo, path string, form url.Values) *h
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
+	req.AddCookie(jwtCookieRole(t, model.RoleVisionAdmin))
 	e.ServeHTTP(rec, req)
 	return rec
 }

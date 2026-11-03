@@ -256,6 +256,7 @@ func TestOverdueWaitingActionInUnplannedAndDelayed(t *testing.T) {
 	task := &model.WorkTask{
 		WorkType: model.WBWorkAdmin, Title: "IRM 평가지표", Status: model.WBTaskWaitingFor,
 		DueDate: today, WaitParty: "□□정보 박OO", WaitRequest: "전자도서관 부문",
+		OrgID: model.OrgIDLibrary,
 	}
 	if err := wb.CreateTask(task); err != nil {
 		t.Fatal(err)

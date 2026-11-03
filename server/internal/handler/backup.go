@@ -24,6 +24,12 @@ type BackupHandler struct {
 	settings   *repository.SettingsRepo
 	importRepo *repository.ASImportRepo
 	customers  *repository.CustomerRepo
+	codes      *repository.CodeRepo
+}
+
+type productCatView struct {
+	model.Code
+	UseCount int
 }
 
 func dataDirFromEnv() string {
@@ -108,6 +114,17 @@ func (h *BackupHandler) Page(c echo.Context) error {
 	if tab == "org_empty" && h.cfg.DB != nil {
 		orgEmpty, _ = repository.ListEmptyOrgRows(h.cfg.DB)
 	}
+	var productCats []productCatView
+	if tab == "product_cat" && h.codes != nil {
+		items, uses, _ := h.codes.ListProductCategories()
+		for i, it := range items {
+			n := 0
+			if i < len(uses) {
+				n = uses[i]
+			}
+			productCats = append(productCats, productCatView{Code: it, UseCount: n})
+		}
+	}
 	return c.Render(http.StatusOK, "admin/data.html", map[string]interface{}{
 		"Title":              "데이터 관리",
 		"Active":             NavData,
@@ -136,7 +153,76 @@ func (h *BackupHandler) Page(c echo.Context) error {
 		"ImportErrors":       importIssueRows(importRows, true),
 		"ImportReady":        importIssueRows(importRows, false),
 		"ImportCustomers":    importCustomers,
+		"ProductCats":        productCats,
 	})
+}
+
+func productCatRedirect(ok, errMsg string) string {
+	q := "/admin/data?tab=product_cat"
+	if errMsg != "" {
+		return q + "&err=" + url.QueryEscape(errMsg)
+	}
+	if ok != "" {
+		return q + "&ok=" + url.QueryEscape(ok)
+	}
+	return q
+}
+
+func (h *BackupHandler) ProductCatCreate(c echo.Context) error {
+	if h.codes == nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", "저장할 수 없습니다"))
+	}
+	sortOrder, _ := strconv.Atoi(c.FormValue("sort_order"))
+	code := &model.Code{
+		CodeGroup: repository.ProductCategoryGroup,
+		CodeValue: c.FormValue("code_value"),
+		CodeName:  c.FormValue("code_name"),
+		SortOrder: sortOrder,
+		IsActive:  true,
+	}
+	if err := h.codes.CreateProductCategory(code); err != nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, productCatRedirect("등록했습니다. 고유번호 "+code.CodeID, ""))
+}
+
+func (h *BackupHandler) ProductCatUpdate(c echo.Context) error {
+	if h.codes == nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", "저장할 수 없습니다"))
+	}
+	sortOrder, _ := strconv.Atoi(c.FormValue("sort_order"))
+	code := &model.Code{
+		CodeID:    c.Param("id"),
+		CodeGroup: repository.ProductCategoryGroup,
+		CodeValue: c.FormValue("code_value"),
+		CodeName:  c.FormValue("code_name"),
+		SortOrder: sortOrder,
+		IsActive:  c.FormValue("is_active") != "0",
+	}
+	if err := h.codes.UpdateProductCategory(code); err != nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, productCatRedirect("저장했습니다", ""))
+}
+
+func (h *BackupHandler) ProductCatDeactivate(c echo.Context) error {
+	if h.codes == nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", "저장할 수 없습니다"))
+	}
+	if err := h.codes.DeactivateProductCategory(c.Param("id")); err != nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, productCatRedirect("사용중지했습니다", ""))
+}
+
+func (h *BackupHandler) ProductCatDelete(c echo.Context) error {
+	if h.codes == nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", "저장할 수 없습니다"))
+	}
+	if err := h.codes.DeleteProductCategory(c.Param("id")); err != nil {
+		return c.Redirect(http.StatusSeeOther, productCatRedirect("", err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, productCatRedirect("삭제했습니다. 고유번호는 다시 쓰지 않습니다", ""))
 }
 
 func (h *BackupHandler) Save(c echo.Context) error {

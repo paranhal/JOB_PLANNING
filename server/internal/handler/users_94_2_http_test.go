@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -197,7 +198,7 @@ func TestUsers94PasswordChangeAndReset(t *testing.T) {
 	if len(m) < 2 {
 		t.Fatal("임시 비밀번호 표시 없음")
 	}
-	temp := m[1]
+	temp := html.UnescapeString(strings.TrimSpace(m[1]))
 	if err := assertResetPasswordShape(temp); err != nil {
 		t.Fatal(err)
 	}

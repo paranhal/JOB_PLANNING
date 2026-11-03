@@ -38,6 +38,9 @@ func (r *ASRepo) SetASReceiptProject(orgID, asID, projectID string) (beforeName,
 	beforeName = workProjectName(r.db, beforeID)
 	projectID = strings.TrimSpace(projectID)
 	if projectID != "" {
+		if err := AssertProjectRegisterAccess(r.db, projectID, orgID); err != nil {
+			return "", "", err
+		}
 		afterName = workProjectName(r.db, projectID)
 		if afterName == "" {
 			var n int

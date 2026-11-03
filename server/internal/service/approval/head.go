@@ -6,12 +6,28 @@ import (
 	"strings"
 )
 
-func (e *Engine) OrgHead(orgID string) (userID string, err error) {
-	err = e.DB.QueryRow(`SELECT user_id FROM employee_profiles WHERE org_id=? AND is_org_head=1`, orgID).Scan(&userID)
+type rowQuery interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func scanOrgHead(q rowQuery, orgID string) (userID string, err error) {
+	err = q.QueryRow(`SELECT user_id FROM employee_profiles WHERE org_id=? AND is_org_head=1`, orgID).Scan(&userID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	return userID, err
+}
+
+func (e *Engine) OrgHead(orgID string) (userID string, err error) {
+	return scanOrgHead(e.DB, orgID)
+}
+
+// OrgHeadTx 같은 트랜잭션 안에서 팀장을 읽는다. DB 풀을 또 쓰지 않는다.
+func (e *Engine) OrgHeadTx(tx *sql.Tx, orgID string) (string, error) {
+	if tx == nil {
+		return e.OrgHead(orgID)
+	}
+	return scanOrgHead(tx, orgID)
 }
 
 func (e *Engine) SetOrgHead(actor Actor, userID, orgID string) error {

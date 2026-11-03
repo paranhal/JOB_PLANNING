@@ -121,9 +121,13 @@ func (h *WorkHandler) List(c echo.Context) error {
 	if assigneeQ != "" {
 		reviewHref += "&assignee=" + url.QueryEscape(assigneeQ)
 	}
+	flashRaw := c.QueryParam("err")
+	flashMsg := visibleQueryErr(flashRaw)
 	return c.Render(http.StatusOK, "work/list.html", attachViewGroup(c, map[string]interface{}{
 		"Title":              title,
 		"Active":             NavWork,
+		"FlashErr":           flashRaw,
+		"FlashErrMsg":        flashMsg,
 		"View":               view,
 		"Items":              items,
 		"KanbanColumns":      kanban.Columns,
@@ -315,6 +319,7 @@ func annotateWorkEdit(c echo.Context, items []model.WorkListItem) {
 	for i := range items {
 		items[i].EditLocked = !canEditTask(c, items[i].Assignee, "", items[i].WorkGroupID)
 		items[i].AssigneeOther = strings.TrimSpace(items[i].Assignee) != "" && !assigneeIsMine(c, items[i].Assignee, "")
+		items[i].PlanEditHref = workListPlanEditHref(c, items[i])
 	}
 }
 
@@ -386,16 +391,14 @@ func filterWorkItemsInRange(items []model.WorkListItem, from, to string) []model
 func stampWorkListOverdue(items []model.WorkListItem, today string) {
 	today = strings.TrimSpace(today)
 	for i := range items {
-		if items[i].DaysOverdue > 0 {
+		ds := model.WorkListTaskDelayState(items[i], today)
+		if ds.Delayed {
+			items[i].DaysOverdue = ds.Days
 			continue
 		}
-		sched := model.WorkItemScheduledDate(items[i])
-		if sched != "" && today != "" && sched < today {
-			d := model.DaysBetweenDates(sched, today)
-			if d < 1 {
-				d = 1
-			}
-			items[i].DaysOverdue = d
+		p := strings.TrimSpace(items[i].Prefix)
+		if p == model.WorkPrefixGeneral || p == model.WorkPrefixSales || p == model.WorkPrefixProjectWork {
+			items[i].DaysOverdue = 0
 		}
 	}
 }
@@ -407,8 +410,7 @@ func countWorkTodayBuckets(items []model.WorkListItem, today string) (sched, pro
 			done++
 			continue
 		}
-		d := model.WorkItemScheduledDate(it)
-		overdue := d != "" && today != "" && d < today
+		overdue := model.WorkListTaskDelayState(it, today).Delayed
 		if overdue && !it.IsWaiting() {
 			delayed++
 			continue
@@ -417,7 +419,7 @@ func countWorkTodayBuckets(items []model.WorkListItem, today string) (sched, pro
 			progress++
 			continue
 		}
-		if d == today {
+		if model.WorkItemScheduledDate(it) == today {
 			sched++
 		}
 	}

@@ -238,6 +238,7 @@ func TestScheduleMoveUpdatesVisitDate(t *testing.T) {
 
 // 방문을 지우면 일일업무의 유령 카드도 사라진다.
 func TestDeleteVisitRemovesDailyTask(t *testing.T) {
+	pinClockBeforeNov2026(t)
 	e, db := newMntSyncServer(t, "mnt_delete.db")
 	seedVisit(t, db, "mvs_7", "2026-11-14", "최혜영", "KLAS", "책문화센터")
 	seedVisitTask(t, db, "WT-7", "mvs_7", "2026-11-14", "11:00", "11:30", "최혜영",

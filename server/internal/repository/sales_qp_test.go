@@ -15,7 +15,7 @@ func TestSalesSleepWakeAndReviewTask(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "휴면시험", Stage: model.SalesStage4Propose, Status: model.SalesStatusActive, SalesOwner: "최혜영", BudgetYear: 2026}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "휴면시험", Stage: model.SalesStage4Propose, Status: model.SalesStatusActive, SalesOwner: "최혜영", BudgetYear: 2026}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestSalesSleepWakeAndReviewTask(t *testing.T) {
 		t.Fatalf("파이프라인에 휴면 금액이 들어갔다 %d", pipe.TotalAmount)
 	}
 
-	closed := &model.SalesProject{Name: "종료건"}
+	closed := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "종료건"}
 	if err := repo.Create(closed); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestSalesSleepWakeAndReviewTask(t *testing.T) {
 		t.Fatalf("budget_year 제안 %d", got.BudgetYear)
 	}
 
-	p2 := &model.SalesProject{Name: "검토", Stage: model.SalesStage4Discover, Status: model.SalesStatusActive, SalesOwner: "최혜영", SalesOwnerID: "u1", BudgetYear: 2026}
+	p2 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "검토", Stage: model.SalesStage4Discover, Status: model.SalesStatusActive, SalesOwner: "최혜영", SalesOwnerID: "u1", BudgetYear: 2026}
 	if err := repo.Create(p2); err != nil {
 		t.Fatal(err)
 	}
@@ -95,8 +95,8 @@ func TestSalesBulkBizAndBudget(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	a := &model.SalesProject{Name: "A"}
-	b := &model.SalesProject{Name: "B"}
+	a := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "A"}
+	b := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "B"}
 	_ = repo.Create(a)
 	_ = repo.Create(b)
 	if a.BizType != "" {
@@ -135,9 +135,9 @@ func TestSalesGroupsNoMutateProjectAndDupTotals(t *testing.T) {
 	if g1.GroupNo != "G"+yy+"-001" || g2.GroupNo != "G"+yy+"-002" {
 		t.Fatalf("번호 %s %s", g1.GroupNo, g2.GroupNo)
 	}
-	p1 := &model.SalesProject{Name: "1", ExpectedAmount: 100, Stage: model.SalesStage4Discover}
-	p2 := &model.SalesProject{Name: "2", ExpectedAmount: 200, Stage: model.SalesStage4Discover}
-	p3 := &model.SalesProject{Name: "3", ExpectedAmount: 300, Stage: model.SalesStage4Discover}
+	p1 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "1", ExpectedAmount: 100, Stage: model.SalesStage4Discover}
+	p2 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "2", ExpectedAmount: 200, Stage: model.SalesStage4Discover}
+	p3 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "3", ExpectedAmount: 300, Stage: model.SalesStage4Discover}
 	_ = repo.Create(p1)
 	_ = repo.Create(p2)
 	_ = repo.Create(p3)
@@ -174,7 +174,7 @@ func TestSalesGroupsNoMutateProjectAndDupTotals(t *testing.T) {
 	if grand != a1 {
 		t.Fatalf("전체 합계가 중복을 빼지 않았다 grand=%d g1=%d", grand, a1)
 	}
-	lost := &model.SalesProject{Name: "실주"}
+	lost := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "실주"}
 	_ = repo.Create(lost)
 	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, status=?, expected_amount=? WHERE sales_id=?`,
 		model.SalesStage4Closed, model.SalesCloseLost, model.SalesStatusLost, 999, lost.SalesID); err != nil {

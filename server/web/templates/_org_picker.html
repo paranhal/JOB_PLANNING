@@ -1,0 +1,46 @@
+{{define "org_picker"}}
+{{$mode := .Mode}}{{if not $mode}}{{$mode = "single"}}{{end}}
+<div class="org-picker" x-data='orgPicker({{toJSON $mode}}, {{toJSON .Orgs}}, {{toJSON .Selected}}, {{toJSON .Related}}, {{toJSON .OwnerID}})' data-org-picker="{{$mode}}">
+  {{if eq $mode "single"}}
+  <label class="label" for="org-picker-owner">주관 부서 {{if .Required}}<span class="text-danger">*</span>{{end}}</label>
+  {{if .Locked}}
+  <input type="hidden" name="org_id" value="{{.Selected}}">
+  <p class="input bg-hover text-ink" data-org-locked="1">{{if .LockedName}}{{.LockedName}}{{else}}{{.Selected}}{{end}}</p>
+  {{else}}
+  <select id="org-picker-owner" name="org_id" class="select w-full" {{if .Required}}required{{end}} x-model="ownerId" @change="onOwner()">
+    {{if .Required}}<option value="">— 선택 —</option>{{end}}
+    {{range .Orgs}}
+    <option value="{{.OrgID}}" {{if eq $.Selected .OrgID}}selected{{end}}>{{if .OrgName}}{{.OrgName}}{{else}}{{.OrgID}}{{end}}</option>
+    {{end}}
+  </select>
+  {{end}}
+  {{else}}
+  <label class="label">유관 부서</label>
+  <p class="text-ui-xs text-ink-muted mb-1">유관 부서 조직원도 이 사업으로 업무를 등록할 수 있습니다.</p>
+  <div class="relative">
+    <button type="button" class="input w-full text-left" @click="open=!open" data-org-multi-toggle="1">유관 부서 선택</button>
+    <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-line bg-surface p-2 shadow-pop" x-show="open" x-cloak @click.outside="open=false">
+      <template x-for="o in orgs" :key="orgKey(o)">
+        <label class="flex items-center gap-2 rounded px-1 py-1 text-ui-sm" :class="isOwner(orgKey(o)) ? 'text-ink-subtle' : 'text-ink'">
+          <input type="checkbox" class="checkbox" :value="orgKey(o)" :disabled="isOwner(orgKey(o))" :checked="selected.indexOf(orgKey(o))>=0"
+                 @change="toggle(orgKey(o))">
+          <span x-text="orgLabel(o)"></span>
+          <span class="text-ui-xs text-ink-muted" x-show="isOwner(orgKey(o))">주관 부서</span>
+        </label>
+      </template>
+    </div>
+  </div>
+  <div class="mt-2 flex flex-wrap gap-1" data-org-chips>
+    <template x-for="id in selected" :key="id">
+      <span class="inline-flex items-center gap-1 rounded-full border border-line bg-hover px-2 py-0.5 text-ui-xs text-ink">
+        <span x-text="labelOf(id)"></span>
+        <button type="button" class="text-ink-muted" @click="toggle(id)" aria-label="해제">×</button>
+      </span>
+    </template>
+  </div>
+  <template x-for="id in selected" :key="'h-'+id">
+    <input type="hidden" name="related_org_ids" :value="id">
+  </template>
+  {{end}}
+</div>
+{{end}}

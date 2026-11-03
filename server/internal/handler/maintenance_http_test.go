@@ -19,7 +19,7 @@ func jwtCookie(t *testing.T) *http.Cookie {
 	secret := []byte("cs-system-jwt-secret-2026")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": "admin-id", "username": "admin", "role": "admin",
-		"name": "관리자", "exp": time.Now().Add(time.Hour).Unix(),
+		"name": "관리자", "org_id": "O01", "exp": time.Now().Add(time.Hour).Unix(),
 	})
 	s, err := token.SignedString(secret)
 	if err != nil {
@@ -79,6 +79,7 @@ func min(a, b int) int {
 }
 
 func TestMaintenanceHTTP_DeleteVisit_visitIDRoute(t *testing.T) {
+	pinClockBeforeNov2026(t)
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "del.db"))
 	if err != nil {

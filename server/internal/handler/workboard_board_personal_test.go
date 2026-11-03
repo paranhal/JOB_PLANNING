@@ -123,6 +123,10 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.GET("/workboard/mnt-candidates", h.Workboard.MntCandidates)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.POST("/workboard/schedule", h.Workboard.Schedule)
+	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)
+	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
+	g.POST("/workboard/tasks/:id/merge-interrupt", h.Workboard.MergeInterrupt)
+	g.POST("/workboard/tasks/:id/return-confirm", h.Workboard.ConfirmReturn)
 	g.GET("/work", h.Work.List)
 	g.GET("/work/all", h.Work.ListAll)
 	return e, db, got1, got2, h.Workboard.repo
@@ -261,8 +265,8 @@ func TestPersonalBoardWeekStartsMonday(t *testing.T) {
 	e, _, me, _, _ := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "b6.db"))
 	rec := doGetWith(t, e, "/workboard/board?view=week&date=2026-10-24", jwtCookieUser(t, me))
 	body := rec.Body.String()
-	iMon := strings.Index(body, ">월<")
-	iSun := strings.Index(body, ">일<")
+	iMon := strings.Index(body, `data-dow>월<`)
+	iSun := strings.Index(body, `data-dow>일<`)
 	if iMon < 0 || iSun < 0 || iMon > iSun {
 		t.Fatalf("주 화면 월~일 순서 아님 mon=%d sun=%d", iMon, iSun)
 	}
@@ -278,9 +282,13 @@ func TestBoardStatusAndCancelSkip(t *testing.T) {
 	if prog.Key != "prog" {
 		t.Fatalf("진행중=%s", prog.Key)
 	}
-	late := boardStatus(model.WorkTask{Status: model.WBTaskWaiting, WorkDate: "2026-10-01"}, today)
+	late := boardStatus(model.WorkTask{Status: model.WBTaskWaiting, WorkDate: "2026-10-01", DueDate: "2026-10-01"}, today)
 	if late.Key != "late" {
 		t.Fatalf("지연=%s", late.Key)
+	}
+	noDue := boardStatus(model.WorkTask{Status: model.WBTaskWaiting, WorkDate: "2026-10-01"}, today)
+	if noDue.Key == "late" {
+		t.Fatal("종료일 없음은 지연이 아님")
 	}
 	plan := boardStatus(model.WorkTask{Status: model.WBTaskWaiting, WorkDate: today}, today)
 	if plan.Key != "plan" {
@@ -439,7 +447,7 @@ func TestPersonalBoardMenuAndLegacyURLs(t *testing.T) {
 	found := map[string]bool{}
 	for _, ch := range legacy.Children {
 		found[ch.Href] = true
-		if want[ch.Href] != ch.Label {
+		if w, ok := want[ch.Href]; ok && w != ch.Label {
 			t.Errorf("%s label=%s", ch.Href, ch.Label)
 		}
 	}

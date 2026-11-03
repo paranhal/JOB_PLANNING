@@ -6,23 +6,18 @@
   <!-- 헤더 -->
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <a href="/customers" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-        </svg>
-      </a>
       <div>
-        <h2 class="text-xl font-bold text-gray-800">{{.Customer.OrgName}}</h2>
-        <p class="text-sm text-gray-500">고객번호 <span class="font-mono text-gray-700">{{.Customer.CustomerID}}</span>{{if .Customer.OfficialName}} · {{.Customer.OfficialName}}{{end}}</p>
+        <h2 class="text-xl font-bold text-ink">{{.Customer.OrgName}}</h2>
+        <p class="text-sm text-ink-muted">고객번호 <span class="font-mono text-ink">{{.Customer.CustomerID}}</span>{{if .Customer.OfficialName}} · {{.Customer.OfficialName}}{{end}}</p>
       </div>
       {{if .Customer.IsActive}}
-        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">활성</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-success">활성</span>
       {{else}}
-        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">비활성</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-hover text-ink-muted">비활성</span>
       {{end}}
-      <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">{{partyKindLabel .Customer.PartyKind}}</span>
+      <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-hover text-ink">{{partyKindLabel .Customer.PartyKind}}</span>
       {{if .Customer.NeedsReview}}
-        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">확인 필요</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-warning-soft text-warning">확인 필요</span>
       {{end}}
       {{if .Customer.IsProvisional}}
         <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-800">미확정</span>
@@ -31,17 +26,17 @@
     <div class="flex gap-2">
       {{if .CanWrite}}
       <a href="/customers/{{.Customer.CustomerID}}/edit"
-         class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+         class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-hover transition-colors">
         수정
       </a>
       {{end}}
       <a href="/as/knowledge?tab=site&amp;customer_id={{.Customer.CustomerID}}"
-         class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+         class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-hover transition-colors">
         AS 이력
       </a>
       {{if .CanReceive}}
       <a href="/as/new?customer_id={{.Customer.CustomerID}}"
-         class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+         class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors">
         AS 접수
       </a>
       {{end}}
@@ -49,7 +44,7 @@
   </div>
 
   {{if .Customer.IsProvisional}}
-  <div class="rounded-xl border border-violet-200 bg-violet-50 px-5 py-4 space-y-3">
+  <div class="rounded-xl border border-primary bg-primary-soft px-5 py-4 space-y-3">
     <p class="text-sm font-semibold text-violet-900">AS 접수에서 직접입력한 미확정 기관입니다</p>
     <p class="text-xs text-violet-800">자산·계약·영업은 정식 승격 후 쓰는 것이 안전합니다. 임시 상태로도 등록은 가능합니다.</p>
     {{if .CanWrite}}
@@ -75,12 +70,12 @@
   {{end}}
 
   {{if .Customer.NeedsReview}}
-  <div class="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+  <div class="rounded-xl border border-amber-200 bg-warning-soft px-5 py-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p class="text-sm font-semibold text-amber-900">확인이 필요한 기관입니다</p>
-        <p class="text-sm text-amber-800 mt-1">{{.Customer.ReviewReason}}</p>
-        <p class="text-xs text-amber-700 mt-1">기관명·공식명칭·주소·연락처를 확인해 수정하거나, 기존 기관과 중복이면 통합해 주세요.</p>
+        <p class="text-sm font-semibold text-warning">확인이 필요한 기관입니다</p>
+        <p class="text-sm text-warning mt-1">{{.Customer.ReviewReason}}</p>
+        <p class="text-xs text-warning mt-1">기관명·공식명칭·주소·연락처를 확인해 수정하거나, 기존 기관과 중복이면 통합해 주세요.</p>
       </div>
       {{if .CanWrite}}
       <div class="flex items-center gap-2">
@@ -89,7 +84,7 @@
         <form method="POST" action="/customers/{{.Customer.CustomerID}}/review">
           <input type="hidden" name="on" value="0">
           <input type="hidden" name="redirect" value="/customers/{{.Customer.CustomerID}}">
-          <button type="submit" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-100">
+          <button type="submit" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-warning text-warning hover:bg-warning-soft">
             확인 완료
           </button>
         </form>
@@ -102,7 +97,7 @@
     <form method="POST" action="/customers/{{.Customer.CustomerID}}/review">
       <input type="hidden" name="on" value="1">
       <input type="hidden" name="redirect" value="/customers/{{.Customer.CustomerID}}">
-      <button type="submit" class="text-xs text-gray-400 hover:text-amber-700 hover:underline">확인 필요로 표시</button>
+      <button type="submit" class="text-xs text-ink-subtle hover:text-warning hover:underline">확인 필요로 표시</button>
     </form>
   </div>
   {{end}}
@@ -110,63 +105,63 @@
   <!-- 정보 카드 -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">기본 정보</h3>
+    <div class="bg-white rounded-xl border border-line p-6">
+      <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">기본 정보</h3>
       <dl class="space-y-3">
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">고객번호</dt>
-          <dd class="text-sm text-gray-800 font-mono">{{.Customer.CustomerID}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">고객번호</dt>
+          <dd class="text-sm text-ink font-mono">{{.Customer.CustomerID}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">구분</dt>
-          <dd class="text-sm text-gray-800">{{partyKindLabel .Customer.PartyKind}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">구분</dt>
+          <dd class="text-sm text-ink">{{partyKindLabel .Customer.PartyKind}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">업종</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.Industry}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">업종</dt>
+          <dd class="text-sm text-ink">{{.Customer.Industry}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">대표전화</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.MainPhone}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">대표전화</dt>
+          <dd class="text-sm text-ink">{{.Customer.MainPhone}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">이메일</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.OrgEmail}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">이메일</dt>
+          <dd class="text-sm text-ink">{{.Customer.OrgEmail}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">홈페이지</dt>
-          <dd class="text-sm text-gray-800">
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">홈페이지</dt>
+          <dd class="text-sm text-ink">
             {{if .Customer.Website}}
-            <a href="{{.Customer.Website}}" target="_blank" class="text-blue-600 hover:underline">{{.Customer.Website}}</a>
+            <a href="{{.Customer.Website}}" target="_blank" class="text-primary hover:underline">{{.Customer.Website}}</a>
             {{end}}
           </dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">사업자번호</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.BusinessNumber}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">사업자번호</dt>
+          <dd class="text-sm text-ink">{{.Customer.BusinessNumber}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">대표자</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.Representative}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">대표자</dt>
+          <dd class="text-sm text-ink">{{.Customer.Representative}}</dd>
         </div>
       </dl>
     </div>
 
-    <div class="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 class="font-semibold text-gray-700 text-sm uppercase tracking-wider mb-4">주소 · 비고</h3>
+    <div class="bg-white rounded-xl border border-line p-6">
+      <h3 class="font-semibold text-ink text-sm uppercase tracking-wider mb-4">주소 · 비고</h3>
       <dl class="space-y-3">
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">주소</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.DisplayAddress}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">주소</dt>
+          <dd class="text-sm text-ink">{{.Customer.DisplayAddress}}</dd>
         </div>
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">등록일</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.CreatedAt.Format "2006-01-02"}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">등록일</dt>
+          <dd class="text-sm text-ink">{{.Customer.CreatedAt.Format "2006-01-02"}}</dd>
         </div>
         {{if .Customer.Notes}}
         <div class="flex gap-4">
-          <dt class="text-sm text-gray-500 w-24 flex-shrink-0">비고</dt>
-          <dd class="text-sm text-gray-800">{{.Customer.Notes}}</dd>
+          <dt class="text-sm text-ink-muted w-24 flex-shrink-0">비고</dt>
+          <dd class="text-sm text-ink">{{.Customer.Notes}}</dd>
         </div>
         {{end}}
       </dl>
@@ -175,30 +170,30 @@
   </div>
 
   <!-- 탭: 설치자산 / 담당자 / AS 이력 (HTMX 연동) -->
-  <div class="bg-white rounded-xl border border-gray-200"
+  <div class="bg-white rounded-xl border border-line"
        x-data="{ activeTab: 'assets' }">
-    <div class="border-b border-gray-200 px-6">
+    <div class="border-b border-line px-6">
       <nav class="flex gap-6 -mb-px">
         <button
           @click="activeTab='assets'"
           hx-get="/customers/{{.Customer.CustomerID}}/tab/assets"
           hx-target="#tab-content"
           hx-swap="innerHTML"
-          :class="activeTab==='assets' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+          :class="activeTab==='assets' ? 'border-blue-500 text-primary' : 'border-transparent text-ink-muted hover:text-ink'"
           class="py-4 text-sm font-medium border-b-2 transition-colors">설치자산</button>
         <button
           @click="activeTab='contacts'"
           hx-get="/customers/{{.Customer.CustomerID}}/tab/contacts"
           hx-target="#tab-content"
           hx-swap="innerHTML"
-          :class="activeTab==='contacts' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+          :class="activeTab==='contacts' ? 'border-blue-500 text-primary' : 'border-transparent text-ink-muted hover:text-ink'"
           class="py-4 text-sm font-medium border-b-2 transition-colors">담당자</button>
         <button
           @click="activeTab='as'"
           hx-get="/customers/{{.Customer.CustomerID}}/tab/as"
           hx-target="#tab-content"
           hx-swap="innerHTML"
-          :class="activeTab==='as' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+          :class="activeTab==='as' ? 'border-blue-500 text-primary' : 'border-transparent text-ink-muted hover:text-ink'"
           class="py-4 text-sm font-medium border-b-2 transition-colors">AS 이력</button>
       </nav>
     </div>
@@ -206,7 +201,7 @@
     <div id="tab-content"
          hx-get="/customers/{{.Customer.CustomerID}}/tab/assets"
          hx-trigger="load">
-      <div class="p-10 text-center text-gray-400 text-sm">불러오는 중...</div>
+      <div class="p-10 text-center text-ink-subtle text-sm">불러오는 중...</div>
     </div>
   </div>
 

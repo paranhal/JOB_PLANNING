@@ -137,13 +137,26 @@
 
   .table-scroll { @apply w-full overflow-x-auto; }
   .table-cols { table-layout: fixed; width: max-content; }
-  .col-resize-handle {
-    @apply absolute top-0 right-0 h-full w-2 cursor-col-resize;
+  .col-resize-handle,
+  .col-resize-handle-wide {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 10;
+    height: 100%;
+    width: 1rem;
+    cursor: col-resize;
     touch-action: none;
   }
-  .col-resize-handle-wide {
-    @apply absolute top-0 right-0 z-10 h-full w-4 cursor-col-resize border-r border-line;
-    touch-action: none;
+  .col-resize-handle::after,
+  .col-resize-handle-wide::after {
+    content: "";
+    position: absolute;
+    top: 0.35rem;
+    bottom: 0.35rem;
+    right: 0.35rem;
+    width: 1px;
+    background-color: rgb(var(--c-border));
   }
   .cell-ellipsis { @apply overflow-hidden text-ellipsis whitespace-nowrap; }
   .cell-wrap { overflow-wrap: anywhere; }
@@ -231,7 +244,34 @@
   .board-st-done { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-hover text-ink-muted; }
   .board-st-late { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-danger-soft text-danger; }
   .board-day-hour { height: 64px; }
-  .board-day-ev { position: absolute; overflow: hidden; }
+  .board-person-col { min-width: 160px; }
+  .board-day-stack { height: 960px; }
+  .board-day-ev { position: absolute; overflow: hidden; padding-bottom: 16px; }
+  .board-day-ev:hover, .board-day-ev.board-bar-picked, .board-day-ev:not(.board-bar-short) { overflow: visible; z-index: 20; }
+  .board-week-ev { position: relative; overflow: hidden; }
+  .board-week-ev:hover, .board-week-ev.board-bar-picked, .board-week-ev:not(.board-bar-short) { overflow: visible; z-index: 20; }
+  .board-bar-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; position: relative; z-index: 5; padding-bottom: 4px; }
+  .board-bar-short .board-bar-acts { display: none; }
+  .board-bar-short:hover .board-bar-acts,
+  .board-bar-short.board-bar-picked .board-bar-acts { display: flex; }
+  .board-bar-act {
+    @apply inline-flex items-center justify-center rounded-md border border-line bg-surface px-2 font-semibold text-ink;
+    min-height: 24px;
+    font-size: 16px;
+    line-height: 1.25;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .board-bar-act-aux { @apply inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink; }
+  .board-bar-x { @apply text-danger; }
+  .board-resize { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; height: 12px; cursor: ns-resize; touch-action: none; }
+  .board-month-chip { @apply mt-0.5 flex max-w-full min-w-0 flex-col items-stretch gap-0 truncate rounded px-1 py-0.5 text-[11px] font-semibold; }
+  @media (pointer: coarse) {
+    .board-bar-short.board-bar-picked .board-bar-acts { display: flex; }
+    .board-resize { height: 18px; }
+  }
+  .board-bar-picked { outline: 2px solid rgb(37 99 235); outline-offset: 1px; }
+  [data-drop].drop { background-color: rgb(239 246 255); }
 
   .board-layout { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 16px; align-items: start; }
   .board-layout.col { grid-template-columns: minmax(0,1fr) 56px; }
@@ -340,7 +380,7 @@ table thead th .inline-flex.flex-col {
 @media (min-width: 768px) {
   .wl-row,
   .wl-head {
-    grid-template-columns: 2rem minmax(0, 2.6fr) minmax(0, 1.9fr) minmax(0, 1.3fr) minmax(0, 1.1fr) 5.5rem;
+    grid-template-columns: var(--wl-cols, 2rem minmax(0, 2.6fr) minmax(0, 1.9fr) minmax(0, 1.3fr) minmax(0, 1.1fr) 5.5rem);
     align-items: center;
     column-gap: 0.75rem;
     min-height: 3.5rem;
@@ -351,5 +391,13 @@ table thead th .inline-flex.flex-col {
   }
   .wl-head {
     display: grid;
+  }
+}
+
+@media print {
+  .no-print,
+  #build-badge,
+  #page-back {
+    display: none !important;
   }
 }

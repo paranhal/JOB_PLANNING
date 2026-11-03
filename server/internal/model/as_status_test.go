@@ -123,7 +123,7 @@ func TestIsOpenIncompleteStatus(t *testing.T) {
 }
 
 func TestActionResultLabels(t *testing.T) {
-	if ActionResultLabel(ResultPartial) != "추가조치 필요" {
+	if ActionResultLabel(ResultPartial) != "추가 조치 필요" {
 		t.Fatal(ActionResultLabel(ResultPartial))
 	}
 	if ActionResultLabel(ResultHold) != "대기" {

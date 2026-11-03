@@ -41,7 +41,8 @@ const workTaskSelect = `
 		       t.created_at, t.updated_at,
 		       COALESCE(p.name,''), COALESCE(p.color,''),
 		       COALESCE(t.org_id,''),
-		       COALESCE(t.work_group_id,''), COALESCE(wg.name,'')
+		       COALESCE(t.work_group_id,''), COALESCE(wg.name,''),
+		       COALESCE(t.orig_work_date,''), COALESCE(t.orig_due_date,''), COALESCE(t.carry_count,0)
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
@@ -193,13 +194,74 @@ func (r *WBRepo) ListTasksBetweenForOrg(from, to, orgID string) ([]model.WorkTas
 	if from == "" || to == "" {
 		return nil, nil
 	}
+	// 월·주: 시작일 칸만. 일·리스트(from=to): 시작≤날≤종료 기간 포함(95-80).
 	where := `
-		WHERE TRIM(COALESCE(t.work_date,'')) != ''
-		  AND t.work_date >= ? AND t.work_date <= ?
-		  AND COALESCE(t.recurrence_role,'') != 'parent'`
-	args := []interface{}{from, to}
+		WHERE COALESCE(t.recurrence_role,'') != 'parent'`
+	var args []interface{}
+	if from == to {
+		where += `
+		  AND (
+		    (TRIM(COALESCE(t.due_date,'')) = '' AND TRIM(COALESCE(t.work_date,'')) != '' AND t.work_date = ?)
+		    OR (TRIM(COALESCE(t.due_date,'')) != '' AND COALESCE(NULLIF(TRIM(t.work_date),''), t.due_date) <= ? AND t.due_date >= ?)
+		  )`
+		args = []interface{}{from, from, from}
+	} else {
+		where += `
+		  AND TRIM(COALESCE(t.work_date,'')) != ''
+		  AND t.work_date >= ? AND t.work_date <= ?`
+		args = []interface{}{from, to}
+	}
 	frag, extra := workTaskVisibleOrgSQL("t", orgID)
 	return r.listStoredTasks(where+frag+workTaskOrder, append(args, extra...)...)
+}
+
+func (r *WBRepo) ListOpenInProgressForOrg(orgID string) ([]model.WorkTask, error) {
+	where := `
+		WHERE COALESCE(t.recurrence_role,'') != 'parent'
+		  AND t.status IN ('in_progress','hold','transfer','review','waiting_for')`
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	return r.listStoredTasks(where+frag+workTaskOrder, extra...)
+}
+
+func (r *WBRepo) ListPartialFollowupsByParents(parentIDs []string) (map[string][]model.WorkTask, error) {
+	out := map[string][]model.WorkTask{}
+	if r == nil || r.db == nil || len(parentIDs) == 0 {
+		return out, nil
+	}
+	seen := map[string]bool{}
+	var ids []string
+	for _, id := range parentIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	ph := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
+	args := make([]interface{}, len(ids)+1)
+	for i, id := range ids {
+		args[i] = id
+	}
+	args[len(ids)] = model.WorkSourcePartial
+	rows, err := r.db.Query(workTaskSelect+`
+		WHERE t.parent_task_id IN (`+ph+`) AND COALESCE(t.source_role,'')=?
+		ORDER BY t.work_date, t.title`, args...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	list, err := scanWorkTasks(rows)
+	if err != nil {
+		return out, err
+	}
+	for _, t := range list {
+		out[t.ParentTaskID] = append(out[t.ParentTaskID], t)
+	}
+	return out, nil
 }
 
 func (r *WBRepo) ListTasksCompleteBetweenForOrg(from, to, orgID string) ([]model.WorkTask, error) {
@@ -614,19 +676,47 @@ func (r *WBRepo) AssigneeTimeOverlaps(date, assignee, start, end, excludeTaskID 
 		if strings.TrimSpace(t.StartTime) == "" {
 			continue
 		}
-		ts := model.ParseHHMMMinutes(t.StartTime)
-		te := model.ParseHHMMMinutes(t.EndTime)
-		if te < 0 {
-			te = ts + model.NormalizeDurationMin(t.DurationMin)
-		}
-		if ts < 0 || te <= ts {
-			continue
-		}
-		if sm < te && ts < em {
+		segs, _ := r.ListPlanSegmentsOrVirtual(t)
+		deps, _ := r.ListDepartures(t.TaskID)
+		if personOccupiesAt(t, assignee, members[t.TaskID], segs, deps, start, end) {
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+// ListAssigneeTimeOverlaps 같은 담당자·같은 날 시간이 겹치는 업무.
+func (r *WBRepo) ListAssigneeTimeOverlaps(date, assignee, start, end, excludeTaskID string) ([]model.WorkTask, error) {
+	assignee = strings.TrimSpace(assignee)
+	sm := model.ParseHHMMMinutes(start)
+	em := model.ParseHHMMMinutes(end)
+	if sm < 0 || em <= sm {
+		return nil, nil
+	}
+	placed, err := r.ListTasksByDate(date)
+	if err != nil {
+		return nil, err
+	}
+	members, _ := r.membersForTasks(placed)
+	var out []model.WorkTask
+	for _, t := range placed {
+		if excludeTaskID != "" && t.TaskID == excludeTaskID {
+			continue
+		}
+		if !personOnTask(t, assignee, members) {
+			continue
+		}
+		if strings.TrimSpace(t.StartTime) == "" {
+			continue
+		}
+		segs, _ := r.ListPlanSegmentsOrVirtual(t)
+		deps, _ := r.ListDepartures(t.TaskID)
+		mem := members[t.TaskID]
+		if personOccupiesAt(t, assignee, mem, segs, deps, start, end) {
+			out = append(out, t)
+		}
+	}
+	return out, nil
 }
 
 func (r *WBRepo) membersForTasks(tasks []model.WorkTask) (map[string][]model.WorkTaskMember, error) {
@@ -648,12 +738,17 @@ const (
 // 예정일(due_date)이 비어 있으면 배정일과 같게 채운다.
 func (r *WBRepo) PlaceTask(taskID, workDate, startTime, endTime string) error {
 	dur := model.DurationFromTimes(startTime, endTime)
+	var oldDate string
+	_ = r.db.QueryRow(`SELECT COALESCE(work_date,'') FROM work_tasks WHERE task_id=?`, taskID).Scan(&oldDate)
 	_, err := r.db.Exec(`
 		UPDATE work_tasks SET work_date=?, start_time=?, end_time=?, duration_min=?,
 		due_date=CASE WHEN TRIM(COALESCE(due_date,''))='' THEN ? ELSE due_date END,
 		updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=?`, workDate, startTime, endTime, dur, workDate, taskID)
-	return err
+	if err != nil {
+		return err
+	}
+	return r.ShiftSegmentDates(taskID, oldDate, workDate)
 }
 
 // SetTaskAssignee 배치된 업무의 담당자만 바꾼다. 일일 열 이동. §7.6.6
@@ -727,8 +822,15 @@ func (r *WBRepo) CreateProject(p *model.WorkProject) error {
 	if p.Color == "" {
 		p.Color = "#3B82F6"
 	}
-	if p.PlanYear == 0 && len(p.StartDate) >= 4 {
-		fmt.Sscanf(p.StartDate[:4], "%d", &p.PlanYear)
+	orgID, err := RequireInsertOrg(p.OrgID)
+	if err != nil {
+		return fmt.Errorf("소속 조직을 선택하세요")
+	}
+	p.OrgID = orgID
+	if !model.ValidPlanYear(p.PlanYear) {
+		if y := model.YearFromDatePrefix(p.StartDate); y > 0 {
+			p.PlanYear = y
+		}
 	}
 	paid := 1
 	if !p.IsPaid {
@@ -802,6 +904,37 @@ func lookupOrgID(db *sql.DB, q string, arg string) string {
 	return strings.TrimSpace(org)
 }
 
+func (r *WBRepo) sourceExists(t *model.WorkTask) bool {
+	if r == nil || r.db == nil || t == nil {
+		return false
+	}
+	id := strings.TrimSpace(t.SourceID)
+	if id == "" {
+		return false
+	}
+	q := ""
+	switch strings.TrimSpace(t.SourceType) {
+	case model.WBSourceAS:
+		q = `SELECT 1 FROM as_receipts WHERE as_id=?`
+	case model.WBSourceMaintenance:
+		q = `SELECT 1 FROM maintenance_visits WHERE visit_id=?`
+	case model.WBSourceSalesActivity:
+		q = `SELECT 1 FROM sales_activities WHERE activity_id=?`
+	case model.WBSourceSales:
+		if i := strings.Index(id, ":"); i > 0 {
+			id = id[:i]
+		}
+		q = `SELECT 1 FROM sales_projects WHERE sales_id=?`
+	default:
+		return false
+	}
+	var n int
+	if err := r.db.QueryRow(q, id).Scan(&n); err != nil {
+		return false
+	}
+	return true
+}
+
 func (r *WBRepo) OrgName(orgID string) string {
 	orgID = strings.TrimSpace(orgID)
 	if orgID == "" || r == nil || r.db == nil {
@@ -831,7 +964,7 @@ func (r *WBRepo) orgIDFromSource(t *model.WorkTask) string {
 		}
 	case model.WBSourceSalesActivity:
 		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(p.org_id,'')) FROM sales_activities a
-			JOIN work_projects p ON p.project_id = a.sales_id WHERE a.activity_id=?`, t.SourceID); o != "" {
+			JOIN sales_projects p ON p.sales_id = a.sales_id WHERE a.activity_id=?`, t.SourceID); o != "" {
 			return o
 		}
 	case model.WBSourceSales:
@@ -839,7 +972,7 @@ func (r *WBRepo) orgIDFromSource(t *model.WorkTask) string {
 		if i := strings.Index(sid, ":"); i > 0 {
 			sid = sid[:i]
 		}
-		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM work_projects WHERE project_id=?`, sid); o != "" {
+		if o := lookupOrgID(r.db, `SELECT TRIM(COALESCE(org_id,'')) FROM sales_projects WHERE sales_id=?`, sid); o != "" {
 			return o
 		}
 	}
@@ -853,25 +986,29 @@ func (r *WBRepo) orgIDFromSource(t *model.WorkTask) string {
 }
 
 func (r *WBRepo) CreateTask(t *model.WorkTask) error {
-	if t != nil && strings.TrimSpace(t.OrgID) == "" {
-		if filled := r.orgIDFromSource(t); filled != "" {
-			log.Printf("CreateTask org_id 보정 %s source=%s/%s title=%s", filled, t.SourceType, t.SourceID, t.Title)
-			t.OrgID = filled
-		} else if src := strings.TrimSpace(t.SourceType); src == model.WBSourceAS || src == model.WBSourceMaintenance || src == model.WBSourceSalesActivity || src == model.WBSourceSales {
-			return fmt.Errorf("work_tasks.org_id 필요 (source=%s/%s)", src, strings.TrimSpace(t.SourceID))
+	if t != nil {
+		if strings.TrimSpace(t.OrgID) == "" || t.OrgID == OrgAll {
+			if filled := r.orgIDFromSource(t); filled != "" {
+				log.Printf("CreateTask org_id 보정 %s source=%s/%s title=%s", filled, t.SourceType, t.SourceID, t.Title)
+				t.OrgID = filled
+			} else {
+				t.OrgID = ""
+				src := strings.TrimSpace(t.SourceType)
+				if src == model.WBSourceAS || src == model.WBSourceMaintenance || src == model.WBSourceSalesActivity || src == model.WBSourceSales {
+					if !r.sourceExists(t) {
+						return fmt.Errorf("work_tasks.org_id 필요 (source=%s/%s)", src, strings.TrimSpace(t.SourceID))
+					}
+				}
+			}
 		}
 	}
 	orgID, err := RequireInsertOrg(t.OrgID)
 	if err != nil {
-		if t.OrgID == "" {
-			if strings.TrimSpace(os.Getenv("APP_ENV")) == "production" {
-				log.Printf("CreateTask org_id 없음 title=%s source=%s/%s — 기본값 O01 금지", t.Title, t.SourceType, t.SourceID)
-				return fmt.Errorf("업무 조직이 없습니다")
-			}
-			t.OrgID = model.OrgIDLibrary
-		} else {
-			return err
+		if strings.TrimSpace(os.Getenv("APP_ENV")) == "production" {
+			log.Printf("CreateTask org_id 없음 title=%s source=%s/%s — 기본값 O01 금지", t.Title, t.SourceType, t.SourceID)
+			return fmt.Errorf("업무 조직이 없습니다")
 		}
+		t.OrgID = model.OrgIDLibrary
 	} else {
 		t.OrgID = orgID
 	}
@@ -1173,6 +1310,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&created, &updated,
 			&t.ProjectName, &t.ProjectColor,
 			&t.OrgID, &t.WorkGroupID, &t.WorkGroupName,
+			&t.OrigWorkDate, &t.OrigDueDate, &t.CarryCount,
 		); err != nil {
 			return nil, err
 		}

@@ -24,19 +24,34 @@ var assigneeNameTargets = []struct {
 }
 
 func (r *UserRepo) RenameUsername(userID, newUsername string) error {
-	userID = strings.TrimSpace(userID)
-	newUsername = strings.TrimSpace(newUsername)
-	if r == nil || r.db == nil || userID == "" || newUsername == "" {
+	if r == nil || r.db == nil {
 		return fmt.Errorf("아이디가 비었습니다")
 	}
-	taken, err := r.UsernameTaken(newUsername, userID)
+	tx, err := r.db.Begin()
 	if err != nil {
 		return err
 	}
-	if taken {
-		return fmt.Errorf("이미 쓰는 아이디입니다")
+	if err := r.renameUsernameTx(tx, userID, newUsername); err != nil {
+		_ = tx.Rollback()
+		return err
 	}
-	u, err := r.GetByID(userID)
+	return tx.Commit()
+}
+
+func (r *UserRepo) renameUsernameTx(tx *sql.Tx, userID, newUsername string) error {
+	userID = strings.TrimSpace(userID)
+	newUsername = strings.TrimSpace(newUsername)
+	if tx == nil || userID == "" || newUsername == "" {
+		return fmt.Errorf("아이디가 비었습니다")
+	}
+	cf, err := lookupUsernameConflictOn(tx, newUsername, userID)
+	if err != nil {
+		return err
+	}
+	if !cf.Empty() {
+		return fmt.Errorf("%s", cf.Message())
+	}
+	u, err := getByIDOn(tx, userID)
 	if err != nil {
 		return err
 	}
@@ -48,17 +63,20 @@ func (r *UserRepo) RenameUsername(userID, newUsername string) error {
 	}
 	old := u.Username
 	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err = r.db.Exec(`UPDATE users SET username=?, username_changed_at=? WHERE user_id=?`, newUsername, now, userID)
-	if err != nil {
+	if _, err := tx.Exec(`UPDATE users SET username=?, username_changed_at=? WHERE user_id=?`, newUsername, now, userID); err != nil {
 		return err
 	}
-	acc := NewAccountRepo(r.db)
-	_ = acc.Reserve(old, userID, model.ReserveRenamedFrom)
-	_ = acc.Reserve(newUsername, userID, model.ReserveCurrent)
-	_ = acc.AddLifecycle(userID, model.LifeRenamed, userID, old+" → "+newUsername, "")
-	audit.Use(r.db)
-	audit.LogWithReason("update", "users", "user_id", userID, u.FullName, old, newUsername, "아이디 변경")
-	return nil
+	if err := reserveOn(tx, old, userID, model.ReserveRenamedFrom, now); err != nil {
+		return err
+	}
+	if err := reserveOn(tx, newUsername, userID, model.ReserveCurrent, now); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`INSERT INTO user_lifecycle_events(event_id,user_id,kind,actor_id,note,detail,created_at) VALUES(?,?,?,?,?,?,?)`,
+		newID("ULE"), userID, model.LifeRenamed, userID, old+" → "+newUsername, "", now); err != nil {
+		return err
+	}
+	return audit.InsertTx(tx, audit.ActionUpdate, "users", "user_id", userID, u.FullName, old, newUsername, "", "아이디 변경")
 }
 
 func (r *UserRepo) RewriteAssigneeNames(userID, oldName, newName string) (int, []UnmatchedAssignee, error) {

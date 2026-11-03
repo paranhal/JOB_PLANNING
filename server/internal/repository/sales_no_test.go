@@ -16,7 +16,7 @@ func TestSalesNoCreateAndSearch(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p1 := &model.SalesProject{Name: "9월 1건"}
+	p1 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "9월 1건"}
 	if err := repo.Create(p1); err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +47,8 @@ func TestSalesNoBackfillThenCreateDoesNotCollide(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	a := &model.SalesProject{Name: "기존 A"}
-	b := &model.SalesProject{Name: "기존 B"}
+	a := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "기존 A"}
+	b := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "기존 B"}
 	if err := repo.Create(a); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestSalesNoBackfillThenCreateDoesNotCollide(t *testing.T) {
 	oct := time.Date(2026, 10, 1, 10, 0, 0, 0, time.Local)
 	_, _ = db.Exec(`UPDATE sales_projects SET sales_no='', created_at=? WHERE sales_id=?`, sep.Format("2006-01-02 15:04:05"), a.SalesID)
 	_, _ = db.Exec(`UPDATE sales_projects SET sales_no='', created_at=? WHERE sales_id=?`, sep.Add(time.Hour).Format("2006-01-02 15:04:05"), b.SalesID)
-	c := &model.SalesProject{Name: "10월"}
+	c := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "10월"}
 	if err := repo.Create(c); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestSalesNoBackfillThenCreateDoesNotCollide(t *testing.T) {
 		t.Fatalf("두 번째 실행이 번호를 바꿈: %s %s", ga2.SalesNo, gb2.SalesNo)
 	}
 
-	n := &model.SalesProject{Name: "새 9월"}
+	n := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "새 9월"}
 	n.SalesNo, err = NextSalesNo(db, sep)
 	if err != nil {
 		t.Fatal(err)

@@ -3,6 +3,30 @@
   if (el) {
     try { window.assigneePickerGroups = JSON.parse(el.textContent || "[]"); } catch (e) {}
   }
+  function mergePickerNames(raw) {
+    window.assigneePickerNames = window.assigneePickerNames || {};
+    if (!raw) return;
+    try {
+      var d = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
+      if (!d) return;
+      Object.keys(d).forEach(function (k) {
+        var n = String(d[k] || '').trim();
+        if (!n || n.indexOf('USR-') === 0) return;
+        window.assigneePickerNames[k] = n;
+      });
+    } catch (e) {}
+  }
+  var namesEl = document.getElementById('assignee-picker-names');
+  if (namesEl) mergePickerNames(namesEl.textContent);
+  window.mergeAssigneePickerNames = mergePickerNames;
+  window.safePickerLabel = function (id, fallback) {
+    var names = window.assigneePickerNames || {};
+    var n = names[id];
+    if (n && String(n).indexOf('USR-') !== 0) return n;
+    n = fallback;
+    if (n && String(n).indexOf('USR-') !== 0) return n;
+    return '담당자';
+  };
 })();
 
 window.assigneePicker = window.assigneePicker || function (cfg) {
@@ -12,9 +36,28 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
     supportMin: {}, external: '',
     target: cfg.target || 'add',
     mode: cfg.mode || 'multi',
+    layout: cfg.layout || '',
+    fieldName: cfg.fieldName || 'assignee_user_id',
     allowExternal: !!cfg.allowExternal,
     allowGroups: cfg.allowGroups !== false,
     allGroups() { return cfg.groups || window.mntWorkGroups || window.assigneePickerGroups || []; },
+    isOrgLayout() { return this.layout === 'org'; },
+    orgCount(id) {
+      return (this.membersOf(id) || []).filter((m) => this.personOn(m.user_id)).length;
+    },
+    orgOpen(id) {
+      if (this.expanded[id]) return true;
+      const s = (this.q || '').trim();
+      if (!s) return false;
+      return (this.membersOf(id) || []).some((m) => this.match(m.name));
+    },
+    orgAllOn(id) {
+      const ms = this.membersOf(id) || [];
+      return ms.length > 0 && ms.every((m) => this.personOn(m.user_id));
+    },
+    toggleOrgAll(id, on) {
+      (this.membersOf(id) || []).forEach((m) => this.togglePerson(m.user_id, on));
+    },
     groupOf(id) { return this.allGroups().find((x) => x.id === id) || { members: [] }; },
     match(name) {
       const s = (this.q || '').trim().toLowerCase();
@@ -58,14 +101,27 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
     personOn(id) { return this.selectedIds().indexOf(id) >= 0; },
     memberOn(gid, uid) { return !!this.groups[gid] && !this.exclude[uid]; },
     nameOf(id) {
+      const names = window.assigneePickerNames || {};
+      if (names[id] && String(names[id]).indexOf('USR-') !== 0) return names[id];
+      try {
+        const local = this.$el && this.$el.querySelector('.js-picker-names');
+        if (local) {
+          const d = JSON.parse(local.textContent || '{}') || {};
+          if (d[id] && String(d[id]).indexOf('USR-') !== 0) return d[id];
+        }
+      } catch (e) {}
       const gmem = this.allGroups().flatMap((g) => g.members || []);
       const hit = gmem.find((m) => m.user_id === id);
-      if (hit && hit.name) return hit.name;
-      const el = this.$el.querySelector('input[type=checkbox][value="' + id + '"]');
-      if (!el) return id;
-      const lab = el.closest('label');
-      if (el.getAttribute('data-name')) return el.getAttribute('data-name');
-      return lab ? String(lab.textContent || '').trim() : id;
+      if (hit && hit.name && String(hit.name).indexOf('USR-') !== 0) return hit.name;
+      const el = this.$el ? this.$el.querySelector('input[type=checkbox][value="' + id + '"]') : null;
+      if (el) {
+        const dn = el.getAttribute('data-name');
+        if (dn && String(dn).indexOf('USR-') !== 0) return dn;
+        const lab = el.closest('label');
+        const txt = lab ? String(lab.textContent || '').trim() : '';
+        if (txt && txt.indexOf('USR-') !== 0) return txt;
+      }
+      return '담당자';
     },
     leaveNames() {
       try {
@@ -162,7 +218,16 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
     },
     seedFromParent() {
       try {
+        const local = this.$el && this.$el.querySelector('.js-picker-names');
+        if (local && window.mergeAssigneePickerNames) window.mergeAssigneePickerNames(local.textContent);
         const p = this.$parent || {};
+        const ids = p.preAssigneeIds || [];
+        const owner = (p.preOwnerId || '').trim();
+        const gid = (p.preGroupId || '').trim();
+        if ((ids && ids.length) || owner || gid) {
+          this.hydrateFrom({ ids: ids, owner: owner, groups: gid, target: this.target });
+          return;
+        }
         const name = (p.preAssignee || '').trim();
         if (!name) return;
         const el = this.$el.querySelector('input[type=checkbox][data-name="' + name + '"]');
@@ -175,7 +240,12 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
       this.extra = {};
       this.exclude = {};
       const saved = {};
-      (d.ids || []).forEach((id) => { if (id) saved[id] = true; });
+      (d.ids || []).forEach((id) => {
+        if (id) {
+          saved[id] = true;
+          if (window.mergeAssigneePickerNames && d.names) window.mergeAssigneePickerNames(d.names);
+        }
+      });
       String(d.groups || d.group || '').split(',').map((s) => s.trim()).filter(Boolean).forEach((gid) => {
         this.groups[gid] = true;
         (this.membersOf(gid) || []).forEach((m) => {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -113,6 +114,7 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 		"Visit":               v,
 		"SiteName":            name,
 		"Assignees":           assignees,
+		"PickerNames":         pickerNamesMap(assignees),
 		"WorkGroups":          groups,
 		"WorkGroupMembers":    groupJSON,
 		"Projects":            projects,
@@ -134,10 +136,29 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 		"PeopleIDs":           visitPeopleIDsCSV(*v),
 		"GroupIDs":            visitGroupIDsCSV(*v),
 		"OwnerUserID":         visitOwnerUserID(*v),
+		"CanPlanEdit":         false,
+		"PlanEditHref":        "",
 		"TargetSelected":      visitTargetSelected(v.Targets),
 		"CustomTargets":       visitCustomTargets(v.Targets),
 	}
-	if formErr != "" {
+	errCode := strings.TrimSpace(formErr)
+	if errCode == "" {
+		errCode = strings.TrimSpace(c.QueryParam("err"))
+	}
+	if h.wbRepo != nil {
+		if daily, err := h.wbRepo.GetTaskBySource(model.WBSourceMaintenance, v.VisitID); err == nil && daily != nil {
+			data["CanPlanEdit"] = canPlanEditTask(c, daily)
+			data["PlanEditHref"] = planEditHref(daily.TaskID)
+			items, _ := h.wbRepo.ListItems(daily.TaskID)
+			data["WorkItems"] = items
+			attachWorkSegData(data, h.wbRepo, daily, errCode, mntVisitActionHref(*v), !canEditVisitAction(c, v.Completed))
+		} else {
+			attachWorkSegData(data, h.wbRepo, nil, errCode, mntVisitActionHref(*v), !canEditVisitAction(c, v.Completed))
+		}
+	} else {
+		attachWorkSegData(data, nil, nil, errCode, mntVisitActionHref(*v), !canEditVisitAction(c, v.Completed))
+	}
+	if formErr != "" && formErr != "seg_merge" && formErr != "seg_shift" {
 		data["FlashPopup"] = formErr
 	} else if q := strings.TrimSpace(c.QueryParam("err")); q != "" {
 		if q == errAssigneeRequired {
@@ -208,6 +229,11 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	v := *existing
 	v.Notes = strings.TrimSpace(c.FormValue("notes"))
 	v.ProjectID = strings.TrimSpace(c.FormValue("project_id"))
+	if h.wbRepo != nil {
+		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, v.ProjectID); err != nil {
+			return err
+		}
+	}
 	if d := strings.TrimSpace(c.FormValue("visit_date")); d != "" {
 		parsed, err := model.ParseAppDate(d)
 		if err != nil {
@@ -241,6 +267,34 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 		return h.renderVisitAction(c, &v, err.Error())
 	}
 	v.StartTime, v.EndTime, v.TravelMin, v.DurationMin = start, end, travel, dur
+	if h.wbRepo != nil {
+		if daily, _ := h.wbRepo.GetTaskBySource(model.WBSourceMaintenance, vid); daily != nil {
+			n, _ := h.wbRepo.CountStoredPlanSegments(daily.TaskID)
+			clockChanged := model.ClockHHMM(start) != model.ClockHHMM(existing.StartTime) ||
+				model.ClockHHMM(end) != model.ClockHHMM(existing.EndTime)
+			if n > 1 && clockChanged && strings.TrimSpace(c.FormValue("confirm_merge_segments")) != "1" {
+				return h.renderVisitAction(c, &v, "seg_merge")
+			}
+			if n > 1 && clockChanged {
+				_ = h.wbRepo.CollapsePlanToSingle(daily, v.VisitDate, start, end)
+			}
+			if err := savePostedActionSegments(c, h.wbRepo, daily); err != nil {
+				if errors.Is(err, errSegShift) {
+					return h.renderVisitAction(c, &v, "seg_shift")
+				}
+				return err
+			}
+			if actual, _ := h.wbRepo.ListActualSegments(daily.TaskID); len(actual) > 0 {
+				st, en, d := model.EnvelopeFromPlanSegments(actual)
+				if strings.TrimSpace(st) != "" {
+					v.StartTime, v.EndTime = model.ClockHHMM(st), model.ClockHHMM(en)
+					if d > 0 {
+						v.DurationMin = d
+					}
+				}
+			}
+		}
+	}
 
 	status := strings.TrimSpace(c.FormValue("status"))
 	markDone := c.FormValue("mark_done") == "1"

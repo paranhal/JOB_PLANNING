@@ -3,7 +3,6 @@
 {{$p := .Parent}}
 <div class="max-w-3xl mx-auto space-y-5" x-data="{ workType: '{{if $p}}{{$p.WorkType}}{{else}}admin{{end}}', dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day' }">
   <div>
-    <a href="/admin-work" class="text-sm text-gray-500 hover:text-gray-700">← 행정관련업무등록/처리</a>
     <h2 class="text-xl font-bold text-gray-800 mt-1">행정·지원업무 등록</h2>
     {{if $p}}
     <p class="text-sm text-gray-500 mt-1">상위 <a href="/workboard/tasks/{{$p.TaskID}}" class="font-mono text-blue-600 hover:underline">{{$p.TaskID}}</a> {{$p.Title}} · 담당자·거래처·사업은 기본값이며 고칠 수 있습니다.</p>
@@ -25,6 +24,7 @@
     {{else if eq .FlashErr "sub_cycle"}}자기 자신이나 하위 업무는 상위가 될 수 없습니다.
     {{else if eq .FlashErr "sub_occur"}}실행 작업에는 하위 업무를 달 수 없습니다.
     {{else if eq .FlashErr "sub_parent"}}상위 업무를 확인할 수 없습니다.
+    {{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.
     {{else}}업무명과 업무 종료일을 입력하세요.{{end}}
   </div>
   {{end}}
@@ -132,13 +132,18 @@
       </div>
     </div>
 
-    <label class="flex items-center gap-2 text-sm text-gray-700">
-      <input type="checkbox" name="recurrence_enabled" value="1" x-model="recOn" class="rounded">
-      기간 내 반복 실행
-    </label>
-    <div x-show="recOn" x-cloak class="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm">
-      {{template "wb_recurrence_fields" .}}
-    </div>
+    <details class="rounded-lg border border-gray-200">
+      <summary class="cursor-pointer px-3 py-2 text-sm text-gray-700">기간 내 반복 실행</summary>
+      <div class="px-3 pb-3 space-y-3 text-sm">
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" name="recurrence_enabled" value="1" x-model="recOn" class="rounded">
+          반복 사용
+        </label>
+        <div x-show="recOn" x-cloak class="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm">
+          {{template "wb_recurrence_fields" .}}
+        </div>
+      </div>
+    </details>
 
     {{if not $p}}
     <div class="flex items-center justify-between gap-2 pt-2">

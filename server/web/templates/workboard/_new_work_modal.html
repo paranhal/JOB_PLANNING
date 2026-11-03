@@ -118,11 +118,14 @@ function boardNewWork() {
       this.preStart = '09:00';
       this.preEnd = '09:30';
       this.preAssignee = {{toJSON .CurrentUserName}};
+      this.preOwnerId = {{toJSON .UserID}};
+      this.preAssigneeIds = {{if .UserID}}[{{toJSON .UserID}}]{{else}}[]{{end}};
       this.newWorkError = false;
       this.$nextTick(() => this.focusKind());
     },
     closeNewWork() {
       if (window.__asLookupMissingOpen) return;
+      if (window.closeOverlapResolve) window.closeOverlapResolve(true);
       this.newWorkOpen = false;
       this.newWorkStep = 1;
       this.dailyKind = '';
@@ -206,6 +209,7 @@ function boardNewWork() {
       credentials: 'same-origin',
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
     }).then(function (r) {
+      if (window.handleKeepModalResponse) return window.handleKeepModalResponse(r, form, fd);
       if (r.redirected && r.url) { window.location.assign(r.url); return; }
       if (r.ok) {
         var dest = fd.get('redirect') || fd.get('back') || window.location.href;
@@ -219,8 +223,7 @@ function boardNewWork() {
         if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
       });
     }).catch(function () {
-      form.dataset.keepSkip = '1';
-      form.submit();
+      if (window.showFlashError) window.showFlashError('저장하지 못했습니다. 네트워크를 확인해 주세요');
     }).finally(function () {
       btns.forEach(function (b) { b.disabled = false; });
     });

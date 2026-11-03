@@ -10,12 +10,12 @@ import (
 
 // WorkPrefix 업무 리스트 접두어
 const (
-	WorkPrefixAS          = "as"          // [AS]
-	WorkPrefixMaintenance = "maintenance" // [정기점검]
-	WorkPrefixConfirm     = "confirm"     // [확인]
-	WorkPrefixSupport     = "support"     // [지원]
-	WorkPrefixGeneral     = "general"     // [일반업무]
-	WorkPrefixSales       = "sales"       // [영업]
+	WorkPrefixAS          = "as"           // [AS]
+	WorkPrefixMaintenance = "maintenance"  // [정기점검]
+	WorkPrefixConfirm     = "confirm"      // [확인]
+	WorkPrefixSupport     = "support"      // [지원]
+	WorkPrefixGeneral     = "general"      // [일반업무]
+	WorkPrefixSales       = "sales"        // [영업]
 	WorkPrefixProjectWork = "project_work" // [작업]
 )
 
@@ -100,43 +100,48 @@ type AssigneePrefixStats struct {
 
 // WorkListItem 통합 업무 리스트 1행
 type WorkListItem struct {
-	Prefix         string `json:"prefix"`
-	RefID          string `json:"ref_id"`
-	RefNumber      string `json:"ref_number"`
-	Title          string `json:"title"`
-	OrgID          string `json:"org_id,omitempty"`
-	OrgName        string `json:"org_name"`
-	Assignee       string `json:"assignee"`
-	ScheduledDate  string `json:"scheduled_date"`
-	WorkDate       string `json:"work_date,omitempty"`
-	DueDate        string `json:"due_date,omitempty"`
-	CompleteDate   string `json:"complete_date,omitempty"`
-	Status         string `json:"status"`
-	StatusLabel    string `json:"status_label"`
-	MappedStatus   string `json:"mapped_status,omitempty"` // MapASStatusToWB 결과
-	Bucket         string `json:"bucket,omitempty"`        // 3열 또는 5열 배정 결과
-	Href           string `json:"href"`
-	DaysOverdue    int    `json:"days_overdue"`
-	SubLabel       string `json:"sub_label"` // 재방문 등 보조 라벨
-	NeedPlan       bool   `json:"need_plan,omitempty"`
-	Urgency        string `json:"urgency,omitempty"`
-	ReceiptGroupID string `json:"receipt_group_id,omitempty"`
-	ProductType    string `json:"product_type,omitempty"`
-	EditLocked     bool   `json:"edit_locked,omitempty"`    // §37.3 읽기 전용
-	AssigneeOther  bool   `json:"assignee_other,omitempty"` // 내 배정이 아님
-	AssignedAt     string `json:"assigned_at,omitempty"`
-	AssignedBy     string `json:"assigned_by,omitempty"`
-	CustomerID     string `json:"customer_id,omitempty"`    // §37.4 기관 필터
-	ProjectID      string `json:"project_id,omitempty"`     // §37.4 사업 필터
-	Content        string `json:"content,omitempty"`        // 제목·기관 외 본문(검색)
-	Tentative      bool   `json:"tentative,omitempty"`      // §38.5 미확정 뱃지. 집계에는 안 씀
-	BlockedReason  string `json:"blocked_reason,omitempty"` // §42.7 막힌 이유. 있으면 기다리는 것
-	BlockedAt      string `json:"blocked_at,omitempty"`
-	CanEdit        bool   `json:"can_edit,omitempty"`
-	CoopID         string `json:"coop_id,omitempty"`
-	CoopFromOrg    string `json:"coop_from_org,omitempty"`
-	WorkGroupName  string `json:"work_group_name,omitempty"`
-	WorkGroupID    string `json:"work_group_id,omitempty"`
+	Prefix          string `json:"prefix"`
+	RefID           string `json:"ref_id"`
+	RefNumber       string `json:"ref_number"`
+	Title           string `json:"title"`
+	OrgID           string `json:"org_id,omitempty"`
+	OrgName         string `json:"org_name"`
+	Assignee        string `json:"assignee"`
+	ScheduledDate   string `json:"scheduled_date"`
+	WorkDate        string `json:"work_date,omitempty"`
+	DueDate         string `json:"due_date,omitempty"`
+	CompleteDate    string `json:"complete_date,omitempty"`
+	Status          string `json:"status"`
+	StatusLabel     string `json:"status_label"`
+	MappedStatus    string `json:"mapped_status,omitempty"` // MapASStatusToWB 결과
+	Bucket          string `json:"bucket,omitempty"`        // 3열 또는 5열 배정 결과
+	Href            string `json:"href"`
+	DaysOverdue     int    `json:"days_overdue"`
+	SubLabel        string `json:"sub_label"` // 재방문 등 보조 라벨
+	NeedPlan        bool   `json:"need_plan,omitempty"`
+	Urgency         string `json:"urgency,omitempty"`
+	ReceiptGroupID  string `json:"receipt_group_id,omitempty"`
+	ProductType     string `json:"product_type,omitempty"`
+	EditLocked      bool   `json:"edit_locked,omitempty"`    // §37.3 읽기 전용
+	AssigneeOther   bool   `json:"assignee_other,omitempty"` // 내 배정이 아님
+	AssignedAt      string `json:"assigned_at,omitempty"`
+	AssignedBy      string `json:"assigned_by,omitempty"`
+	CustomerID      string `json:"customer_id,omitempty"`    // §37.4 기관 필터
+	ProjectID       string `json:"project_id,omitempty"`     // §37.4 사업 필터
+	Content         string `json:"content,omitempty"`        // 제목·기관 외 본문(검색)
+	Tentative       bool   `json:"tentative,omitempty"`      // §38.5 미확정 뱃지. 집계에는 안 씀
+	BlockedReason   string `json:"blocked_reason,omitempty"` // §42.7 막힌 이유. 있으면 기다리는 것
+	BlockedAt       string `json:"blocked_at,omitempty"`
+	CanEdit         bool   `json:"can_edit,omitempty"`
+	PlanEditHref    string `json:"plan_edit_href,omitempty"`
+	CoopID          string `json:"coop_id,omitempty"`
+	CoopFromOrg     string `json:"coop_from_org,omitempty"`
+	WorkGroupName   string `json:"work_group_name,omitempty"`
+	WorkGroupID     string `json:"work_group_id,omitempty"`
+	DelayReason     string `json:"delay_reason,omitempty"`
+	DelayReasonFull string `json:"delay_reason_full,omitempty"`
+	ItemKindLine    string `json:"item_kind_line,omitempty"`
+	ItemProgress    string `json:"item_progress,omitempty"`
 }
 
 // IsWaiting 막힌 이유가 있으면 지연이 아니라 기다리는 것. §42.7
@@ -169,10 +174,8 @@ func (it *WorkListItem) applyKanbanMapping(layout, selectedDate string) bool {
 		return false
 	}
 	it.Bucket = AssignKanbanColumn(*it, selectedDate, layout)
-	if layout == KanbanLayoutPlan && it.Bucket == WorkBucketInProgress {
-		if sched := WorkItemScheduledDate(*it); sched != "" && selectedDate != "" && sched < selectedDate {
-			it.DaysOverdue = DaysBetweenDates(sched, selectedDate)
-		}
+	if ds := WorkListTaskDelayState(*it, selectedDate); ds.Delayed {
+		it.DaysOverdue = ds.Days
 	}
 	return it.Bucket != ""
 }
@@ -211,12 +214,21 @@ func assignPlanKanbanColumn(it WorkListItem, mapped, selectedDate string) string
 	if it.NeedPlan || sched == "" || strings.TrimSpace(it.Assignee) == "" {
 		return WorkBucketUnplanned
 	}
-	// 3 진행중 — 3열과 같은 WBKanbanBucket 판정
+	ds := WorkListTaskDelayState(it, selectedDate)
+	// 3 진행중 — 3열과 같은 WBKanbanBucket 판정, 또는 시작~종료 사이
 	if WBKanbanBucket(mapped) == WBTaskInProgress {
 		return WorkBucketInProgress
 	}
-	// 4 지연
-	if sched != "" && selectedDate != "" && sched < selectedDate {
+	w := NormalizeAppDate(it.WorkDate)
+	if w == "" {
+		w = sched
+	}
+	due := NormalizeAppDate(it.DueDate)
+	if w != "" && selectedDate != "" && w < selectedDate && due != "" && due >= selectedDate {
+		return WorkBucketInProgress
+	}
+	// 4 지연 — 종료일 기준(TaskDelayState)
+	if ds.Delayed {
 		return WorkBucketDelayed
 	}
 	// 5 오늘 예정

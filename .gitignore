@@ -32,8 +32,14 @@ server/server
 *접속 정보*.md
 *접속정보*.md
 
-# 배포 산출물 백업·로컬 덤프
+# 배포 산출물 백업·로컬 덤프 (재생성 가능, 95-98)
+deploy/server-app.tar
 deploy/server-app.tar.prev
+deploy/server-app.tar.prev-*
+output/
+.codex-finalizer-brochure/
+docs/리뷰/*.log
+server/gotest*.log
 docs/_schema_dump.txt
 server/docs/figma_register_ref/
 cursor-chat-export.cursor-chat.json

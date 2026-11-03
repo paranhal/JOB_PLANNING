@@ -16,7 +16,7 @@ func TestSalesActivityNextActionCreatesSecondTask(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "다음 할 일", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "다음 할 일", IsTentativeName: true}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

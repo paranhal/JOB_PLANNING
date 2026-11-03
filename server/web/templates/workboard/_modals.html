@@ -1,3 +1,16 @@
+{{define "wb_plan_work_place"}}
+<div>
+  <p class="block text-sm font-medium text-ink mb-1">근무 구분</p>
+  <div class="flex flex-wrap gap-4">
+    <label class="inline-flex items-center gap-1.5 text-sm text-ink">
+      <input type="radio" name="work_place" value="office" {{if eq . "office"}}checked{{end}}>내근
+    </label>
+    <label class="inline-flex items-center gap-1.5 text-sm text-ink">
+      <input type="radio" name="work_place" value="field" {{if eq . "field"}}checked{{end}}>외근
+    </label>
+  </div>
+</div>
+{{end}}
 {{define "wb_work_group_field"}}
 <div>
   <label class="label">업무 그룹</label>
@@ -9,6 +22,7 @@
 {{end}}
 {{define "wb_form_admin_sales"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
+          data-focus-target="assignee"
           {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           x-data="Object.assign({ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
             async checkMnt() {
@@ -28,29 +42,29 @@
             }
           }, siteMultiPicker({}))">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; workType='admin'; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
+      <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; workType='admin'; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">업무 구분 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">업무 구분 <span class="text-red-500">*</span></label>
         <div class="grid grid-cols-3 gap-2">
           <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
-                 :class="workType === 'admin' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
-            <input type="radio" name="work_type" value="admin" x-model="workType" class="text-blue-600">
+                 :class="workType === 'admin' ? 'border-blue-500 bg-primary-soft' : 'border-line'">
+            <input type="radio" name="work_type" value="admin" x-model="workType" class="text-primary">
             <span class="text-sm">행정업무</span>
           </label>
           <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
-                 :class="workType === 'support' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
-            <input type="radio" name="work_type" value="support" x-model="workType" class="text-blue-600">
+                 :class="workType === 'support' ? 'border-blue-500 bg-primary-soft' : 'border-line'">
+            <input type="radio" name="work_type" value="support" x-model="workType" class="text-primary">
             <span class="text-sm">지원업무</span>
           </label>
           <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
-                 :class="workType === 'sales' ? 'border-orange-500 bg-orange-50' : 'border-gray-200'">
-            <input type="radio" name="work_type" value="sales" x-model="workType" class="text-orange-600">
+                 :class="workType === 'sales' ? 'border-orange-500 bg-warning-soft' : 'border-line'">
+            <input type="radio" name="work_type" value="sales" x-model="workType" class="text-warning">
             <span class="text-sm">영업활동</span>
           </label>
         </div>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">거래처</label>
+        <label class="block text-sm font-medium text-ink mb-1">거래처</label>
         <div @change="checkMnt()">
           {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Placeholder" "고객명으로 찾기"}}
         </div>
@@ -60,37 +74,37 @@
         </div>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">업무명 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">업무명 <span class="text-red-500">*</span></label>
         <input name="title" x-ref="adminTitle" @input="checkMnt()" required class="w-full border rounded-lg px-3 py-2 text-sm">
-        <div x-show="mntHint" x-cloak class="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950" x-text="mntHint"></div>
+        <div x-show="mntHint" x-cloak class="mt-2 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-amber-950" x-text="mntHint"></div>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">업무 내용</label>
+        <label class="block text-sm font-medium text-ink mb-1">업무 내용</label>
         <textarea name="description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
         <select name="project_id" :required="workType === 'support'"
                 class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 선택 (해당 시) —</option>
-          {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
+          {{range .WorkProjects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
         </select>
       </div>
       <div>
-        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
-        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+        <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-ink bg-hover border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-ink-subtle">저장 시 자동</span></p>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-red-500">*</span></label>
           <input type="date" name="work_date" x-model="preWork" required
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일 <span class="text-red-500" x-show="!dueUndetermined">*</span></label>
+          <label class="block text-sm font-medium text-ink mb-1">업무 종료일 <span class="text-red-500" x-show="!dueUndetermined">*</span></label>
           <input type="date" name="due_date" x-model="preDue" @change="checkMnt()" :required="!dueUndetermined" :disabled="dueUndetermined"
-                 class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
-          <label class="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
+                 class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-hover">
+          <label class="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
             <input type="checkbox" name="due_undetermined" value="1" x-model="dueUndetermined" class="rounded">
             미정 + 사유
           </label>
@@ -106,36 +120,44 @@
           </div>
         </div>
       </div>
-      <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
-        <p class="text-xs font-medium text-gray-700">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-gray-400 font-normal">(분 단위)</span></p>
+      <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
+        <p class="text-xs font-medium text-ink">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-ink-subtle font-normal">(분 단위)</span></p>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">시작</label>
+            <label class="block text-xs text-ink-muted mb-1">시작</label>
             <input type="time" name="start_time" x-model="preStart" required step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">종료</label>
+            <label class="block text-xs text-ink-muted mb-1">종료</label>
             <input type="time" name="end_time" x-model="preEnd" required step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
       </div>
       {{template "wb_assignee_picker" $}}
+      {{template "wb_work_group_field" .}}
+      {{template "wb_plan_work_place" ""}}
+      {{template "work_task_items" .}}
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">진행률 (%)</label>
+        <label class="block text-sm font-medium text-ink mb-1">진행률 (%)</label>
         <input type="number" name="progress" min="0" max="100" value="0" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
-      <label class="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" name="recurrence_enabled" value="1" x-model="recOn" class="rounded">
-        기간 내 반복 실행
-      </label>
-      <div x-show="recOn" x-cloak class="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
-        {{template "wb_recurrence_fields" .}}
-      </div>
+      <details class="rounded-lg border border-line">
+        <summary class="cursor-pointer px-3 py-2 text-sm text-ink">기간 내 반복 실행</summary>
+        <div class="px-3 pb-3 space-y-3">
+          <label class="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" name="recurrence_enabled" value="1" x-model="recOn" class="rounded">
+            반복 사용
+          </label>
+          <div x-show="recOn" x-cloak class="space-y-3 rounded-lg border border-indigo-100 bg-primary-soft/40 p-3">
+            {{template "wb_recurrence_fields" .}}
+          </div>
+        </div>
+      </details>
       <div class="flex items-center justify-between gap-2 pt-2">
-        <button type="button" class="px-4 py-2 text-sm border rounded-lg text-gray-700" @click="alert('상위 업무를 저장한 뒤 상세에서 하위 업무를 등록하세요.')">＋하위 업무 등록</button>
+        <button type="button" class="px-4 py-2 text-sm border rounded-lg text-ink" @click="alert('상위 업무를 저장한 뒤 상세에서 하위 업무를 등록하세요.')">＋하위 업무 등록</button>
         <div class="flex gap-2">
           <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
-          <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">저장</button>
+          <button type="submit" class="px-4 py-2 text-sm text-white bg-primary rounded-lg">저장</button>
         </div>
       </div>
     </form>
@@ -143,12 +165,13 @@
 
 {{define "wb_form_as"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='as'" x-cloak
+          data-focus-target="assignee"
           x-data="Object.assign({ memberRows: [], extraCount: 0 }, siteMultiPicker({ searchUrl: '/as/open-for-apply', idName: 'extra_as_id', hint: '접수·사이트 2글자 이상' }))">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
       <input type="hidden" name="work_type" value="as">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
+      <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; preselect=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">AS 접수번호 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">AS 접수번호 <span class="text-red-500">*</span></label>
         <input type="search" id="as-register-q" x-model="asQ" placeholder="고객명·접수번호 검색"
                class="w-full border rounded-lg px-3 py-2 text-sm mb-2" autocomplete="off">
         <select name="source_id" x-model="preselect" required size="5"
@@ -164,43 +187,45 @@
         </select>
         <div id="as-lookup-status" class="lookup-status" role="status" aria-live="polite" hidden></div>
         <p class="mt-2">
-          <a href="/as/new" target="_blank" rel="noopener" class="inline-flex h-9 items-center rounded-[10px] border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-800" aria-label="AS 접수 추가">AS 접수 추가</a>
+          <a href="/as/new" target="_blank" rel="noopener" class="inline-flex h-9 items-center rounded-[10px] border border-danger bg-danger-soft px-3 text-xs font-semibold text-rose-800" aria-label="AS 접수 추가">AS 접수 추가</a>
         </p>
-        <p class="text-[11px] text-gray-400 mt-1">업무명: [AS]고객명_접수번호 · 등록 시 업무 고유번호 부여</p>
+        <p class="text-[11px] text-ink-subtle mt-1">업무명: [AS]고객명_접수번호 · 등록 시 업무 고유번호 부여</p>
         {{template "site_multi_picker" dict "Label" "추가 접수(사이트)" "Hint" "여러 접수를 고르면 아래에서 처리 방식을 선택합니다. 최대 20건."}}
         {{template "wb_multi_site_mode"}}
       </div>
       <div>
-        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
-        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+        <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-ink bg-hover border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-ink-subtle">저장 시 자동</span></p>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일</label>
-          <input type="date" name="due_date" x-model="preDue"
-                 class="w-full border rounded-lg px-3 py-2 text-sm">
-          <p class="text-[11px] text-gray-400 mt-1">드롭한 날짜 · 비우면 AS 방문예정일</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-red-500">*</span></label>
           <input type="date" name="work_date" x-model="preWork" required
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
+        <div>
+          <label class="block text-sm font-medium text-ink mb-1">업무 종료일</label>
+          <input type="date" name="due_date" x-model="preDue"
+                 class="w-full border rounded-lg px-3 py-2 text-sm">
+          <p class="text-[11px] text-ink-subtle mt-1">드롭한 날짜 · 비우면 AS 방문예정일</p>
+        </div>
       </div>
-      <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
-        <p class="text-xs font-medium text-gray-700">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-gray-400 font-normal">(분 단위)</span></p>
+      <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
+        <p class="text-xs font-medium text-ink">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-ink-subtle font-normal">(분 단위)</span></p>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">시작</label>
+            <label class="block text-xs text-ink-muted mb-1">시작</label>
             <input type="time" name="start_time" x-model="preStart" required step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">종료</label>
+            <label class="block text-xs text-ink-muted mb-1">종료</label>
             <input type="time" name="end_time" x-model="preEnd" required step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
       </div>
       {{template "wb_assignee_picker" $}}
+      {{template "wb_work_group_field" .}}
+      {{template "wb_plan_work_place" ""}}
       <input type="hidden" name="priority" value="normal">
       <input type="hidden" name="status" value="waiting">
       <div class="flex justify-end gap-2 pt-2">
@@ -212,12 +237,13 @@
 
 {{define "wb_form_maintenance"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='maintenance'" x-cloak
+          data-focus-target="assignee"
           x-data="Object.assign({ memberRows: [], mntAdd: false, extraCount: 0 }, siteMultiPicker({}))" {{if .AssigneeRequired}}data-require-assignee="1"{{end}}>
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
       <input type="hidden" name="work_type" value="maintenance">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; preselect=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
+      <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; preselect=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">정기점검번호 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">정기점검번호 <span class="text-red-500">*</span></label>
         <input type="search" x-model="mntQ" placeholder="고객명·점검대상 검색"
                class="w-full border rounded-lg px-3 py-2 text-sm mb-2">
         <select id="mnt-register-source" name="source_id" x-model="preselect" required size="5"
@@ -229,71 +255,73 @@
           {{end}}
         </select>
         <p class="mt-2 flex flex-wrap items-center gap-2">
-          <button type="button" id="mnt-quick-open" class="inline-flex h-9 items-center rounded-[10px] border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800" @click="mntAdd=true" aria-label="정기점검 등록">정기점검 등록</button>
-          <a href="/maintenance" target="_blank" rel="noopener" class="text-xs text-sky-700 underline">계획 관리에서 등록</a>
+          <button type="button" id="mnt-quick-open" class="inline-flex h-9 items-center rounded-[10px] border border-info bg-info-soft px-3 text-xs font-semibold text-info" @click="mntAdd=true" aria-label="정기점검 등록">정기점검 등록</button>
+          <a href="/maintenance" target="_blank" rel="noopener" class="text-xs text-info underline">계획 관리에서 등록</a>
         </p>
-        <div id="mnt-quick-form" class="mt-2 rounded-lg border border-sky-100 bg-sky-50/60 p-3 space-y-2" x-show="mntAdd" x-cloak>
-          <p class="text-xs font-medium text-gray-700">간이 정기점검 등록</p>
+        <div id="mnt-quick-form" class="mt-2 rounded-lg border border-sky-100 bg-info-soft/60 p-3 space-y-2" x-show="mntAdd" x-cloak>
+          <p class="text-xs font-medium text-ink">간이 정기점검 등록</p>
           {{template "customer_combo" dict "Name" "mnt_customer_id" "Scope" "site" "Required" false "Placeholder" "사이트 검색"}}
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-[11px] text-gray-500 mb-1">점검 월</label>
+              <label class="block text-[11px] text-ink-muted mb-1">점검 월</label>
               <input type="number" id="mnt-quick-month" name="mnt_month" min="1" max="12" class="w-full border rounded-lg px-2 py-1.5 text-sm">
             </div>
             <div>
-              <label class="block text-[11px] text-gray-500 mb-1">방문 예정일 <span class="text-red-500">*</span></label>
+              <label class="block text-[11px] text-ink-muted mb-1">방문 예정일 <span class="text-red-500">*</span></label>
               <input type="date" id="mnt-quick-date" class="w-full border rounded-lg px-2 py-1.5 text-sm">
             </div>
           </div>
           <div>
-            <label class="block text-[11px] text-gray-500 mb-1">담당자{{if .AssigneeRequired}} <span class="text-red-500">*</span>{{end}}</label>
+            <label class="block text-[11px] text-ink-muted mb-1">담당자{{if .AssigneeRequired}} <span class="text-red-500">*</span>{{end}}</label>
             <select id="mnt-quick-assignee" class="w-full border rounded-lg px-2 py-1.5 text-sm">
               <option value="">— 선택 —</option>
               {{range .Assignees}}<option value="{{.FullName}}">{{.FullName}}</option>{{end}}
             </select>
           </div>
-          <p id="mnt-quick-hint" class="text-[11px] text-sky-800" hidden></p>
-          <p id="mnt-quick-err" class="text-[11px] text-red-600" hidden></p>
+          <p id="mnt-quick-hint" class="text-[11px] text-info" hidden></p>
+          <p id="mnt-quick-err" class="text-[11px] text-danger" hidden></p>
           <div class="flex justify-end gap-2">
             <button type="button" class="px-3 py-1.5 text-xs border rounded-lg" @click="mntAdd=false">닫기</button>
             <button type="button" id="mnt-quick-save" class="px-3 py-1.5 text-xs text-white bg-sky-600 rounded-lg">등록</button>
           </div>
         </div>
-        <p class="text-[11px] text-gray-400 mt-1">업무명: [점검]고객_점검번호 · 설명 [제품]고객 정기점검</p>
+        <p class="text-[11px] text-ink-subtle mt-1">업무명: [점검]고객_점검번호 · 설명 [제품]고객 정기점검</p>
         {{template "site_multi_picker" dict "Label" "추가 사이트" "Hint" "여러 사이트를 고르면 아래에서 처리 방식을 선택합니다. 최대 20곳."}}
         {{template "wb_multi_site_mode"}}
       </div>
       <div>
-        <p class="block text-sm font-medium text-gray-700 mb-1">업무 등록일</p>
-        <p class="px-3 py-2 text-sm text-gray-700 bg-gray-50 border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-gray-400">저장 시 자동</span></p>
+        <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
+        <p class="px-3 py-2 text-sm text-ink bg-hover border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-ink-subtle">저장 시 자동</span></p>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 종료일</label>
-          <input type="date" name="due_date" x-model="preDue"
-                 class="w-full border rounded-lg px-3 py-2 text-sm">
-          <p class="text-[11px] text-gray-400 mt-1">드롭한 날짜 · 비우면 방문예정일</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">업무 시작일 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-red-500">*</span></label>
           <input type="date" name="work_date" x-model="preWork" required
                  class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
+        <div>
+          <label class="block text-sm font-medium text-ink mb-1">업무 종료일</label>
+          <input type="date" name="due_date" x-model="preDue"
+                 class="w-full border rounded-lg px-3 py-2 text-sm">
+          <p class="text-[11px] text-ink-subtle mt-1">드롭한 날짜 · 비우면 방문예정일</p>
+        </div>
       </div>
-      <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
-        <p class="text-xs font-medium text-gray-700">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-gray-400 font-normal">(분 단위)</span></p>
+      <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
+        <p class="text-xs font-medium text-ink">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-ink-subtle font-normal">(분 단위)</span></p>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">시작</label>
+            <label class="block text-xs text-ink-muted mb-1">시작</label>
             <input type="time" name="start_time" x-model="preStart" required step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">종료</label>
+            <label class="block text-xs text-ink-muted mb-1">종료</label>
             <input type="time" name="end_time" x-model="preEnd" required step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
       </div>
       {{template "wb_assignee_picker" $}}
+      {{template "wb_work_group_field" .}}
+      {{template "wb_plan_work_place" ""}}
       <input type="hidden" name="priority" value="normal">
       <input type="hidden" name="status" value="waiting">
       <div class="flex justify-end gap-2 pt-2">
@@ -305,6 +333,7 @@
 
 {{define "wb_form_project_work"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
+          data-focus-target="assignee"
           {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           x-data="Object.assign({ memberRows: [], subtype: '', pickedKind: '',
             suggestKind() {
@@ -315,61 +344,64 @@
           }, siteMultiPicker({}))">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
       <input type="hidden" name="work_type" value="project_work">
-      <button type="button" class="text-xs text-gray-500 hover:underline" @click="dailyKind=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
+      <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">작업명 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">작업명 <span class="text-red-500">*</span></label>
         <input name="title" required maxlength="100" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">작업 구분 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">작업 구분 <span class="text-red-500">*</span></label>
         <div class="grid grid-cols-3 gap-2">
           <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
                  data-kind="build"
-                 :class="subtype === 'build' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'">
-            <input type="radio" name="work_subtype" value="build" x-model="subtype" required class="text-emerald-700">
+                 :class="subtype === 'build' ? 'border-emerald-500 bg-success-soft' : 'border-line'">
+            <input type="radio" name="work_subtype" value="build" x-model="subtype" required class="text-success">
             <span class="text-sm">구축</span>
           </label>
           <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
                  data-kind="construction"
-                 :class="subtype === 'construction' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'">
-            <input type="radio" name="work_subtype" value="construction" x-model="subtype" class="text-emerald-700">
+                 :class="subtype === 'construction' ? 'border-emerald-500 bg-success-soft' : 'border-line'">
+            <input type="radio" name="work_subtype" value="construction" x-model="subtype" class="text-success">
             <span class="text-sm">공사</span>
           </label>
           <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer"
                  data-kind="other"
-                 :class="subtype === 'other' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'">
-            <input type="radio" name="work_subtype" value="other" x-model="subtype" class="text-emerald-700">
+                 :class="subtype === 'other' ? 'border-emerald-500 bg-success-soft' : 'border-line'">
+            <input type="radio" name="work_subtype" value="other" x-model="subtype" class="text-success">
             <span class="text-sm">기타</span>
           </label>
         </div>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">사업</label>
+        <label class="block text-sm font-medium text-ink mb-1">사업</label>
         <div @project-picked="projectId=$event.detail.id; pickedKind=$event.detail.kind; suggestKind(); refreshBadges(); search()">
           {{template "project_combo" dict "Items" .WorkProjects "Selected" "" "Empty" "— 선택 (해당 시) —" "Name" "project_id"}}
         </div>
       </div>
       {{template "site_multi_picker" dict "Label" "대상 사이트"}}
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">작업일 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">작업일 <span class="text-red-500">*</span></label>
         <input type="date" name="work_date" x-model="preWork" required class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
-      <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
-        <p class="text-xs font-medium text-gray-700">시작·종료 시간 <span class="text-gray-400 font-normal">(지정할 때만)</span></p>
+      <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
+        <p class="text-xs font-medium text-ink">시작·종료 시간 <span class="text-ink-subtle font-normal">(지정할 때만)</span></p>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">시작</label>
+            <label class="block text-xs text-ink-muted mb-1">시작</label>
             <input type="time" name="start_time" x-model="preStart" step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">종료</label>
+            <label class="block text-xs text-ink-muted mb-1">종료</label>
             <input type="time" name="end_time" x-model="preEnd" step="60" class="w-full border rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
       </div>
       {{template "wb_assignee_picker" $}}
+      {{template "wb_work_group_field" .}}
+      {{template "wb_plan_work_place" ""}}
+      {{template "work_task_items" .}}
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">작업 내용</label>
+        <label class="block text-sm font-medium text-ink mb-1">작업 내용</label>
         <textarea name="description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
       <div class="flex justify-end gap-2 pt-2">
@@ -385,37 +417,37 @@
      @keydown.escape.window="taskOpen=false">
   <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] min-w-0 overflow-x-hidden overflow-y-auto" @click.outside="taskOpen=false">
     <div class="flex items-center justify-between px-5 py-4 border-b">
-      <h3 class="font-semibold text-gray-800">일일 업무 등록</h3>
-      <button type="button" @click="taskOpen=false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      <h3 class="font-semibold text-ink">일일 업무 등록</h3>
+      <button type="button" @click="taskOpen=false" class="text-ink-subtle hover:text-ink-muted text-xl">&times;</button>
     </div>
 
     <!-- 1단계: 업무 종류 선택 -->
     <div class="p-5 space-y-3" x-show="!dailyKind" x-cloak>
-      <p class="text-sm text-gray-600">등록할 일일 업무 종류를 선택하세요.</p>
+      <p class="text-sm text-ink-muted">등록할 일일 업무 종류를 선택하세요.</p>
       <button type="button" @click="dailyKind='admin'; workType='admin'"
-              class="w-full text-left border border-violet-200 rounded-xl px-4 py-3 hover:bg-violet-50">
-        <p class="font-medium text-gray-800">행정 / 지원업무</p>
-        <p class="text-xs text-gray-500 mt-0.5">사업·행정 관련 일일 업무를 직접 입력합니다.</p>
+              class="w-full text-left border border-primary rounded-xl px-4 py-3 hover:bg-primary-soft">
+        <p class="font-medium text-ink">행정 / 지원업무</p>
+        <p class="text-xs text-ink-muted mt-0.5">사업·행정 관련 일일 업무를 직접 입력합니다.</p>
       </button>
       <button type="button" @click="dailyKind='as'"
-              class="w-full text-left border border-rose-200 rounded-xl px-4 py-3 hover:bg-rose-50">
-        <p class="font-medium text-gray-800">AS 일일업무</p>
-        <p class="text-xs text-gray-500 mt-0.5">AS 접수번호를 골라 업무 고유번호를 부여합니다.</p>
+              class="w-full text-left border border-danger rounded-xl px-4 py-3 hover:bg-danger-soft">
+        <p class="font-medium text-ink">AS 일일업무</p>
+        <p class="text-xs text-ink-muted mt-0.5">AS 접수번호를 골라 업무 고유번호를 부여합니다.</p>
       </button>
       <button type="button" @click="dailyKind='maintenance'"
-              class="w-full text-left border border-sky-200 rounded-xl px-4 py-3 hover:bg-sky-50">
-        <p class="font-medium text-gray-800">정기점검 일일업무</p>
-        <p class="text-xs text-gray-500 mt-0.5">정기점검 번호를 골라 업무 고유번호를 부여합니다.</p>
+              class="w-full text-left border border-info rounded-xl px-4 py-3 hover:bg-info-soft">
+        <p class="font-medium text-ink">정기점검 일일업무</p>
+        <p class="text-xs text-ink-muted mt-0.5">정기점검 번호를 골라 업무 고유번호를 부여합니다.</p>
       </button>
       <button type="button" @click="dailyKind='sales'; workType='sales'"
-              class="w-full text-left border border-orange-200 rounded-xl px-4 py-3 hover:bg-orange-50">
-        <p class="font-medium text-gray-800">영업 활동</p>
-        <p class="text-xs text-gray-500 mt-0.5">영업 사업·활동 관련 일일 업무를 등록합니다.</p>
+              class="w-full text-left border border-warning rounded-xl px-4 py-3 hover:bg-warning-soft">
+        <p class="font-medium text-ink">영업 활동</p>
+        <p class="text-xs text-ink-muted mt-0.5">영업 사업·활동 관련 일일 업무를 등록합니다.</p>
       </button>
       <button type="button" @click="dailyKind='project_work'; workType='project_work'"
-              class="w-full text-left border border-emerald-200 rounded-xl px-4 py-3 hover:bg-emerald-50">
-        <p class="font-medium text-gray-800">작업</p>
-        <p class="text-xs text-gray-500 mt-0.5">구축·공사 작업을 일일 업무로 등록합니다.</p>
+              class="w-full text-left border border-success rounded-xl px-4 py-3 hover:bg-success-soft">
+        <p class="font-medium text-ink">작업</p>
+        <p class="text-xs text-ink-muted mt-0.5">구축·공사 작업을 일일 업무로 등록합니다.</p>
       </button>
       <div class="flex justify-end pt-1">
         <button type="button" @click="taskOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
@@ -438,12 +470,12 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50" x-show="typeof projectOpen !== 'undefined' && projectOpen" x-cloak @keydown.escape.window="projectOpen=false">
   <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" @click.outside="projectOpen=false">
     <div class="flex items-center justify-between px-5 py-4 border-b">
-      <h3 class="font-semibold text-gray-800">새 프로젝트 등록</h3>
-      <button type="button" @click="projectOpen=false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      <h3 class="font-semibold text-ink">새 프로젝트 등록</h3>
+      <button type="button" @click="projectOpen=false" class="text-ink-subtle hover:text-ink-muted text-xl">&times;</button>
     </div>
-    <p class="px-5 pt-3 text-xs text-gray-500">
+    <p class="px-5 pt-3 text-xs text-ink-muted">
       새 사업은
-      <a href="/sales/new" class="text-blue-600 hover:underline">영업에서 등록</a>하고, 계약이 끝나면 사업관리로 전환됩니다.
+      <a href="/sales/new" class="text-primary hover:underline">영업에서 등록</a>하고, 계약이 끝나면 사업관리로 전환됩니다.
     </p>
     <form method="post" action="/workboard/projects" class="p-5 space-y-4"
           x-data="{
@@ -489,11 +521,11 @@
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else if eq .View "list"}}/workboard/tasks{{else}}/workboard/kanban{{end}}">
       <input type="hidden" name="color" value="#3B82F6">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500">*</span></label>
         <input name="name" required class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="프로젝트(사업) 명칭">
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">발주처</label>
+        <label class="block text-sm font-medium text-ink mb-1">발주처</label>
         <select name="ordering_party_id" x-model="orderingPartyId" class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 선택 —</option>
           {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
@@ -503,25 +535,25 @@
                class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주 기관·업체 직접입력">
         <a x-show="orderingPartyId && orderingPartyId !== 'custom'" x-cloak
            :href="'/customers/' + orderingPartyId"
-           class="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:underline">
+           class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
           발주처 상세 보기 →
         </a>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">고객명</label>
+        <label class="block text-sm font-medium text-ink mb-1">고객명</label>
         <select name="customer_id" x-model="customerId" @change="loadContacts()" class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 선택 —</option>
           {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
         </select>
         <a x-show="customerId" x-cloak
            :href="'/customers/' + customerId"
-           class="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:underline">
+           class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
           고객 상세 보기 →
         </a>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">계약방식</label>
+          <label class="block text-sm font-medium text-ink mb-1">계약방식</label>
           <select name="contract_type" x-model="contractMode" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .ContractTypes}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
@@ -530,7 +562,7 @@
                  class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="계약방식 직접입력">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">청구방식</label>
+          <label class="block text-sm font-medium text-ink mb-1">청구방식</label>
           <select name="billing_type" x-model="billingMode" class="w-full border rounded-lg px-3 py-2 text-sm">
             <option value="">— 선택 —</option>
             {{range .BillingTypes}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}
@@ -541,34 +573,34 @@
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 시작일</label>
+          <label class="block text-sm font-medium text-ink mb-1">계약기간 시작일</label>
           <input type="date" name="start_date" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">계약기간 마감일</label>
+          <label class="block text-sm font-medium text-ink mb-1">계약기간 마감일</label>
           <input type="date" name="end_date" class="w-full border rounded-lg px-3 py-2 text-sm">
         </div>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
+        <label class="block text-sm font-medium text-ink mb-1">담당자</label>
         <select name="contact_id" x-ref="contactSel" x-model="contactId" @change="onContactChange()"
                 :disabled="!customerId"
-                class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-50">
+                class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-hover">
         </select>
-        <p class="text-xs text-gray-400 mt-1" x-show="!customerId">고객을 먼저 선택하면 해당 사이트 담당자가 표시됩니다.</p>
+        <p class="text-xs text-ink-subtle mt-1" x-show="!customerId">고객을 먼저 선택하면 해당 사이트 담당자가 표시됩니다.</p>
         <a x-show="contactId && contactId !== '__new__'" x-cloak
            :href="'/contacts/' + contactId"
-           class="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:underline">
+           class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
           담당자 상세 보기 →
         </a>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">비고</label>
+        <label class="block text-sm font-medium text-ink mb-1">비고</label>
         <textarea name="notes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" @click="projectOpen=false" class="px-4 py-2 text-sm border rounded-lg">취소</button>
-        <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg">프로젝트 등록</button>
+        <button type="submit" class="px-4 py-2 text-sm text-white bg-primary rounded-lg">프로젝트 등록</button>
       </div>
     </form>
   </div>
@@ -591,6 +623,7 @@
       credentials: 'same-origin',
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
     }).then(function (r) {
+      if (window.handleKeepModalResponse) return window.handleKeepModalResponse(r, form, fd);
       if (r.redirected && r.url) { window.location.assign(r.url); return; }
       if (r.ok) {
         var dest = fd.get('redirect') || fd.get('back') || window.location.href;
@@ -604,8 +637,7 @@
         if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
       });
     }).catch(function () {
-      form.dataset.keepSkip = '1';
-      form.submit();
+      if (window.showFlashError) window.showFlashError('저장하지 못했습니다. 네트워크를 확인해 주세요');
     }).finally(function () {
       btns.forEach(function (b) { b.disabled = false; });
     });

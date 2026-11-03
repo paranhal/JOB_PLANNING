@@ -48,6 +48,9 @@ func boardKeepQuery(c echo.Context) url.Values {
 	if a := normalizeAssigneeFilter(c.QueryParam("assignee")); a != "" {
 		v.Set("assignee", a)
 	}
+	for _, id := range splitMemberIDs(c.QueryParams()["members"]) {
+		v.Add("members", id)
+	}
 	if q := strings.TrimSpace(c.QueryParam("q")); q != "" {
 		v.Set("q", q)
 	}
@@ -59,6 +62,12 @@ func boardKeepQuery(c echo.Context) url.Values {
 	}
 	if g := strings.TrimSpace(c.QueryParam("work_group_id")); g != "" {
 		v.Set("work_group_id", g)
+	}
+	if parseBoardCols(c.QueryParam("cols")) == boardColsFlat {
+		v.Set("cols", boardColsFlat)
+	}
+	if r := parseListRangeParam(c.QueryParam("range")); r != boardRangeDay && parseBoardView(c.QueryParam("view")) == boardViewList {
+		v.Set("range", r)
 	}
 	return v
 }
@@ -128,6 +137,7 @@ func (h *WorkboardHandler) collectBoardEntries(c echo.Context, from, to string, 
 
 func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to string, scope boardScope, doAuto bool) (boardEntries, error) {
 	var out boardEntries
+	scope = h.withBoardMemberFilter(c, scope)
 	org := currentOrg(c)
 	today := time.Now().Format(dateLayout)
 	projectFilter := strings.TrimSpace(c.QueryParam("project"))
@@ -177,7 +187,7 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 		}
 	}
 	allVisible := visible
-	visible = filterTasksByParticipants(visible, memberMap, scope.AssigneeFilter)
+	visible = applyBoardPeopleFilter(visible, memberMap, scope)
 	visible = applyViewGroupToTasks(c, allVisible, visible, scope)
 
 	siteLines := map[string]string{}
@@ -207,21 +217,12 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 	write := boardCanWrite(c)
 	for _, t := range visible {
 		it := buildBoardItem(t, memberMap[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
+		it.Members = memberMap[t.TaskID]
 		it.DedupKey = taskDedupKey(t)
 		it.Href = t.DetailHref()
-		if it.Status.Key == "late" {
-			day := strings.TrimSpace(t.WorkDate)
-			if day == "" {
-				day = strings.TrimSpace(t.DueDate)
-			}
-			if day != "" && day < today {
-				d := model.DaysBetweenDates(day, today)
-				if d < 1 {
-					d = 1
-				}
-				it.Overdue = true
-				it.OverdueDays = d
-			}
+		if ds := model.TaskDelayState(t, today); ds.Delayed {
+			it.Overdue = true
+			it.OverdueDays = ds.Days
 		}
 		if seen[it.DedupKey] {
 			continue
@@ -258,11 +259,12 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 		}
 	}
 	allExec := execVis
-	execVis = filterTasksByParticipants(execVis, execMem, scope.AssigneeFilter)
+	execVis = applyBoardPeopleFilter(execVis, execMem, scope)
 	execVis = applyViewGroupToTasks(c, allExec, execVis, scope)
 	execSeen := map[string]bool{}
 	for _, t := range execVis {
 		it := buildBoardItem(t, execMem[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
+		it.Members = execMem[t.TaskID]
 		it.DedupKey = taskDedupKey(t) + "|act"
 		it.Href = t.DetailHref()
 		it.PlaceDate = model.TaskExecDate(t)
@@ -302,7 +304,12 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 	rawUnplaced = append(rawUnplaced, allCards...)
 	rawUnplaced = append(rawUnplaced, undatedCards...)
 
-	filtered := filterCardsByAssignee(rawUnplaced, scope.AssigneeFilter)
+	var filtered []model.WBCard
+	if scope.MembersRequested {
+		filtered = filterCardsByMemberNames(rawUnplaced, scope.memberNames())
+	} else {
+		filtered = filterCardsByAssignee(rawUnplaced, scope.AssigneeFilter)
+	}
 	out.OtherUnplacedN = unplacedOtherCount(rawUnplaced, filtered)
 
 	for _, card := range filtered {
@@ -395,32 +402,23 @@ func (h *WorkboardHandler) boardOverdueItems(c echo.Context, from, org string, s
 		return nil, nil
 	}
 	var mineKeys []string
-	if strings.TrimSpace(scope.AssigneeFilter) != "" {
+	if scope.MembersRequested {
+		mineKeys = scope.memberNames()
+		if len(mineKeys) == 0 {
+			return nil, nil
+		}
+	} else if strings.TrimSpace(scope.AssigneeFilter) != "" {
 		mineKeys = []string{scope.AssigneeFilter}
 	}
 	delayed, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketDelayed, from, "", mineKeys, 0, org)
 	if err != nil {
 		return nil, err
 	}
-	progress, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketInProgress, from, "", mineKeys, 0, org)
-	if err != nil {
-		return nil, err
-	}
 	stampWorkListOverdue(delayed, today)
-	stampWorkListOverdue(progress, today)
 	var merged []model.WorkListItem
 	uSeen := map[string]bool{}
 	for _, it := range delayed {
-		k := model.WorkListItemKey(it)
-		if uSeen[k] {
-			continue
-		}
-		uSeen[k] = true
-		merged = append(merged, it)
-	}
-	for _, it := range progress {
-		d := model.WorkItemScheduledDate(it)
-		if d == "" || d >= from {
+		if !model.WorkListTaskDelayState(it, today).Delayed {
 			continue
 		}
 		k := model.WorkListItemKey(it)

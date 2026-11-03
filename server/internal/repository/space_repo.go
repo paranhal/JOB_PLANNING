@@ -76,6 +76,51 @@ func (r *SpaceRepo) GetBuilding(orgID, id string) (*model.CustomerBuilding, erro
 	return &b, nil
 }
 
+// EnsureNamedSpace 고객 공간관리에 건물·층·호 이름이 없으면 만든다. 있으면 그대로 둔다.
+func (r *SpaceRepo) EnsureNamedSpace(customerID, building, floor, room string) error {
+	customerID = strings.TrimSpace(customerID)
+	building = strings.TrimSpace(building)
+	floor = strings.TrimSpace(floor)
+	room = strings.TrimSpace(room)
+	if r == nil || r.db == nil || customerID == "" || building == "" {
+		return nil
+	}
+	var bid string
+	_ = r.db.QueryRow(`SELECT building_id FROM customer_buildings WHERE customer_id=? AND TRIM(building_name)=TRIM(?) LIMIT 1`,
+		customerID, building).Scan(&bid)
+	if bid == "" {
+		b := &model.CustomerBuilding{CustomerID: customerID, BuildingName: building, IsActive: true}
+		if err := r.CreateBuilding(b); err != nil {
+			return err
+		}
+		bid = b.BuildingID
+	}
+	if floor == "" {
+		return nil
+	}
+	var fid string
+	_ = r.db.QueryRow(`SELECT floor_id FROM customer_floors WHERE building_id=? AND TRIM(floor_name)=TRIM(?) LIMIT 1`,
+		bid, floor).Scan(&fid)
+	if fid == "" {
+		f := &model.CustomerFloor{BuildingID: bid, FloorName: floor}
+		if err := r.CreateFloor(f); err != nil {
+			return err
+		}
+		fid = f.FloorID
+	}
+	if room == "" {
+		return nil
+	}
+	var rid string
+	_ = r.db.QueryRow(`SELECT room_id FROM customer_rooms WHERE floor_id=? AND TRIM(room_name)=TRIM(?) LIMIT 1`,
+		fid, room).Scan(&rid)
+	if rid == "" {
+		rm := &model.CustomerRoom{FloorID: fid, RoomName: room}
+		return r.CreateRoom(rm)
+	}
+	return nil
+}
+
 func (r *SpaceRepo) CreateBuilding(b *model.CustomerBuilding) error {
 	b.BuildingID = newID("BLD")
 	_, err := r.db.Exec(

@@ -139,7 +139,7 @@
 <div class="card overflow-hidden">
   <div class="card-header">{{.Title}}</div>
   <div class="overflow-x-auto">
-    <table class="table-base min-w-[320px] break-keep">
+    <table data-table-cols-skip class="table-base min-w-[320px] break-keep">
       <thead>
         <tr>
           <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
@@ -166,6 +166,7 @@
           <td class="px-3 py-2">
             <a href="{{.Href}}" class="hover:underline font-medium text-ink">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if .OrgName}}{{.OrgName}}{{else}}{{.Title}}{{end}}</a>
             <p class="text-ui-sm text-ink-muted truncate max-w-xs">{{.Title}}</p>
+            {{if .ItemKindLine}}<p class="text-ui-xs text-ink-muted truncate" data-item-kind-line="1">{{.ItemKindLine}}</p>{{end}}
           </td>
           <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{.StatusLabel}}</td>
           <td class="px-3 py-2 whitespace-nowrap">

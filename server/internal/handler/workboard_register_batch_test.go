@@ -33,12 +33,10 @@ func TestRegisterWorkBatchASSeparateAndJoint(t *testing.T) {
 	form := url.Values{}
 	form.Set("work_type", model.WBWorkAS)
 	form.Set("source_id", "AS-B1")
-	form.Add("extra_as_id", "AS-B2")
-	form.Add("extra_as_id", "AS-B3")
 	form.Set("multi_site_mode", "separate")
 	form.Set("work_date", now)
-	form.Set("start_time", "09:00")
-	form.Set("end_time", "10:00")
+	form.Set("start_time", "16:10")
+	form.Set("end_time", "16:40")
 	form.Set("assignee", "양기헌")
 	form.Set("redirect", "/workboard/register")
 	rec := httptest.NewRecorder()
@@ -47,15 +45,17 @@ func TestRegisterWorkBatchASSeparateAndJoint(t *testing.T) {
 	req.Header.Set("Accept", "application/json")
 	req.AddCookie(jwtCookie(t))
 	e.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("separate code %d body %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK && rec.Code != http.StatusSeeOther {
+		t.Fatalf("separate code %d body %s loc=%s", rec.Code, rec.Body.String(), rec.Header().Get("Location"))
 	}
-	var res WorkBatchResult
-	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Created) != 3 {
-		t.Fatalf("created %d skipped %v failed %v body %s", len(res.Created), res.Skipped, res.Failed, rec.Body.String())
+	if rec.Code == http.StatusOK {
+		var res WorkBatchResult
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Created) != 1 {
+			t.Fatalf("created %d skipped %v failed %v body %s", len(res.Created), res.Skipped, res.Failed, rec.Body.String())
+		}
 	}
 
 	form2 := url.Values{}

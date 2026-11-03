@@ -4,7 +4,6 @@
 <div id="as-action-shell" class="as-action-shell" data-pw-action-layout="1"
      x-data='pwActionScreen({subtype:{{toJSON .Task.WorkSubtype}}, place:{{toJSON .Task.WorkPlace}}, start:{{toJSON .StartLocal}}, duration:{{toJSON .ActionDurationSel}}, durationCustom:{{toJSON .ActionDurationMin}}, complete:{{toJSON .CompleteLocal}}, result:{{toJSON .FormResult}}, supports:[{{range $i, $m := .SupportMembers}}{{if $i}},{{end}}{id:{{toJSON $m.UserID}},name:{{toJSON $m.Assignee}}}{{end}}]})'>
   <header id="as-action-header" class="as-action-header" data-pw-fixed="top">
-    <a href="{{if .BackURL}}{{.BackURL}}{{else}}{{workboardHomeURL ""}}{{end}}" class="text-ui-sm text-ink-muted hover:text-ink">‹ 작업 목록</a>
     <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <p class="font-mono text-ui-sm text-ink-muted">{{.Task.TaskID}} · WORK ACTION</p>
@@ -17,7 +16,7 @@
             <input type="hidden" name="back" value="{{.BackURL}}">
             <div class="min-w-[12rem] flex-1">
               <label class="label">사업</label>
-              {{template "project_combo" dict "Items" .Projects "Selected" .Task.ProjectID "Empty" "연결 해제" "Name" "project_id"}}
+              {{template "project_combo" dict "Items" .WorkProjects "Selected" .Task.ProjectID "Empty" "연결 해제" "Name" "project_id"}}
             </div>
             <button class="btn btn-primary" {{if .ReadOnly}}disabled{{end}}>연결</button>
             <button class="btn" name="project_id" value="" {{if .ReadOnly}}disabled{{end}}>연결 해제</button>
@@ -26,8 +25,16 @@
         {{end}}
       </div>
       <div class="flex flex-wrap items-center gap-2 justify-end">
+        {{if .WorkItemSummary}}{{if .WorkItemSummary.Line}}<span class="badge" data-item-kind-line="1">{{.WorkItemSummary.Line}}</span>{{end}}{{end}}
         <span class="badge">조치 입력</span>
         <span class="badge">{{.StatusLabel}}</span>
+        {{if .CanPlanEdit}}<a href="{{.PlanEditHref}}" class="btn">계획 수정</a>{{end}}
+        {{if .TaskDelayed}}<p class="text-ui-sm text-danger w-full sm:w-auto">지연 {{.TaskDelayDays}}일 — 날짜를 옮기려면 이월하세요.</p>{{end}}
+        {{if .CanCarry}}<button type="button" class="btn" data-carry-open="1"
+          data-carry-id="{{.Task.TaskID}}" data-carry-title="{{.Task.Title}}" data-carry-work="{{.Task.WorkDate}}"
+          data-carry-due="{{.Task.DueDate}}" data-carry-start="{{.Task.StartTime}}" data-carry-end="{{.Task.EndTime}}"
+          data-carry-days="{{.TaskDelayDays}}" data-carry-delayed="{{if .TaskDelayed}}true{{else}}false{{end}}"
+          data-carry-span="{{if and .Task.WorkDate .Task.DueDate (ne .Task.WorkDate .Task.DueDate)}}true{{else}}false{{end}}">이월</button>{{end}}
         <a href="/workboard/tasks/{{.Task.TaskID}}" class="btn">작업 보기</a>
         {{if .ShowWorkflow}}
         <select id="as-workflow-action" class="input min-w-[8rem]">
@@ -173,6 +180,8 @@
               <label class="label">작업 세부사항</label>
               <textarea name="work_reason" rows="2" class="input" placeholder="작업 세부사항">{{.Task.WorkReason}}</textarea>
             </div>
+            {{template "work_task_items" .}}
+            {{template "work_segments_form" .}}
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="label">시작 일시 <span class="text-danger">*</span></label>
@@ -239,6 +248,7 @@
                 {{if eq .ActionErr "partial_note"}}<p class="text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>추가조치 사유를 입력하세요</p>{{end}}
                 <label class="label">다음 작업일</label>
                 <input type="date" name="next_date" class="input" value="{{.NextDate}}">
+                {{if .CarrySkipNotice}}<p class="mt-1 text-ui-sm text-ink-muted">{{.CarrySkipNotice}}</p>{{end}}
                 <label class="inline-flex items-center gap-2 text-ui"><input type="checkbox" name="create_followup" value="1" {{if .CreateFollowup}}checked{{end}}> 일정확정 → 후속 작업 등록</label>
               </div>
               <div id="pw-transfer-box" class="space-y-2 mt-3" x-show="result==='transfer'" x-cloak>
@@ -296,7 +306,7 @@
         </div>
         {{if .Processes}}
         <div class="overflow-x-auto">
-          <table class="w-full text-ui">
+          <table data-table-cols-skip class="w-full text-ui">
             <thead class="text-ink-muted text-left"><tr><th class="p-2">일시</th><th class="p-2">처리자</th><th class="p-2">결과</th><th class="p-2">조치 요약</th><th class="p-2">다음 일정</th></tr></thead>
             <tbody>
               {{range .Processes}}

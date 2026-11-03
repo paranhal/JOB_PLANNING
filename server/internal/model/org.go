@@ -21,6 +21,9 @@ const (
 	OrgNoLibrary   = "O01"
 	OrgNameLibrary = "도서관사업팀"
 
+	// LegacyCauseOrgID 기존 as_cause_categories(도서관사업팀)를 쓰는 조직. 95-97
+	LegacyCauseOrgID = OrgIDLibrary
+
 	OrgKindBusiness = "business"
 	OrgKindSupport  = "support"
 )

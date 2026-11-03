@@ -13,5 +13,8 @@ var orgScopeAllowlist = map[string]string{
 	"searchASFTS":                  "AS 전문검색. 상위 MatchIDs가 조직 범위를 적용한다.",
 	"searchASLike":                 "AS LIKE 검색. 상위 MatchIDs가 조직 범위를 적용한다.",
 	"activitySearchLike":           "영업활동 검색 LIKE. 상위 쿼리가 조직 범위를 적용한다.",
-	"ListWorkPickProjects":         "95-9A/95-12 작업·일일업무·AS 사업 선택 목록. 조직과 무관하게 취소·종료가 아닌 계약 사업.",
+	"ListWorkPickProjects":         "95-87 작업·일일업무 사업 선택. ProjectAccess owner/related. 전 팀 공개(viewer)는 업무 등록 목록에서 제외.",
+	"MatchProjectWork":             "95-87 사업 상세는 주관+유관 부서 업무를 함께 보여 준다. 편집 권한은 업무 조직.",
+	"MatchAdminTasks":              "95-87 사업 상세 행정 업무. 주관+유관 업무를 project_id 로 함께 조회.",
+	"LookupAccountingAssignees":    "95-88 회계 담당은 전 조직 활성 내부 직원(이름·조직명만). 삭제·비활성·협력사·vsadmin 제외. org_id 필터 없음.",
 }

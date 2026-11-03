@@ -11,7 +11,7 @@ import (
 )
 
 func TestDeliveriesHTTP_GoodsSplitSerialConsumableSkippedUnplanned(t *testing.T) {
-	e, db := newSalesServerDB(t)
+	e, _, db := newQuoteServerDB(t)
 	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active)
 		VALUES ('c1','세종시교육청','세종시교육청',1)`); err != nil {
 		t.Fatal(err)

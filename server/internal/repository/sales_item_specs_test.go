@@ -86,7 +86,7 @@ func TestSalesItemSpecsReplaceSearchMigrateDeactivate(t *testing.T) {
 	}
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "견적연결"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "견적연결"}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

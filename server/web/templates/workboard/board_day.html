@@ -1,4 +1,5 @@
 {{define "title"}}업무 관리 · 일정 캘린더{{end}}
+{{/* ItemKindLine · SegLabel 은 board_cal_bar */}}
 {{define "content"}}
 {{template "board_shell_open" .}}
   {{template "board_cal_head" .}}
@@ -6,10 +7,11 @@
   <div class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 py-2.5 text-ui-sm text-ink-muted">
     <b class="text-ink">시간 미정</b>
     {{range .DayUntimed}}
-    <a href="{{.Href}}" class="{{.Type.Text}} rounded border-l-[3px] border-current {{.Type.Bg}} px-2 py-0.5 text-[11px] font-semibold"><span class="text-ink">{{.Task.Title}}</span></a>
+    <a href="{{.Href}}" class="{{.Type.Text}} rounded border-l-[3px] border-current {{.Type.Bg}} px-2 py-0.5 text-[11px] font-semibold"><span class="text-ink">{{.Task.Title}}</span>{{template "board_assignee_line" .}}</a>
     {{end}}
   </div>
   {{end}}
+  {{if eq .Cols "flat"}}
   <div class="overflow-x-auto border-t border-line">
     <div class="grid min-w-[620px] grid-cols-[64px_1fr]">
       <div class="border-r border-line bg-canvas">
@@ -22,11 +24,7 @@
         <div class="board-day-hour border-t border-line"></div>
         {{end}}
         {{range .DayTimed}}
-        <a href="{{.Href}}" class="board-day-ev {{.Type.Text}} rounded-[10px] border-l-4 border-current {{.Type.Bg}} px-2.5 py-1.5" data-top="{{.DayPosTop}}" data-h="{{.DayPosHeight}}" data-col="{{.DayCol}}" data-cols="{{.DayCols}}">
-          <div class="text-[11px] font-extrabold">{{.ChipTime}} · {{.Type.Label}}</div>
-          <div class="text-ui font-bold leading-snug text-ink">{{.Task.Title}}</div>
-          <div class="text-[11px] text-ink-muted">{{.CustomerLine}}</div>
-        </a>
+        {{template "board_cal_bar" dict "Item" . "Page" $}}
         {{end}}
         {{if .ShowNowLine}}
         <div class="absolute left-0 right-0 z-[2] border-t-2 border-danger" data-now="{{.DayNowTop}}"></div>
@@ -34,23 +32,89 @@
       </div>
     </div>
   </div>
+  {{else}}
+  <div class="overflow-x-auto border-t border-line"
+       x-data="{ extraCols: [], addOpen: false, leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{toJSON $n}}{{end}}], onLeave(name){ return !!name && this.leaveNames.indexOf(name)>=0; }, addExtra(name){ if(name && this.extraCols.indexOf(name)<0) this.extraCols.push(name); this.addOpen=false; } }">
+    {{if and (eq (len .DayPersonCols) 0) (eq (len .ExtraAssignees) 0)}}
+    <p class="px-4 py-8 text-center text-ui text-ink-muted">배치된 업무가 없습니다</p>
+    {{end}}
+    <div class="flex min-w-[620px]">
+      <div class="w-16 shrink-0 border-r border-line bg-canvas">
+        <div class="h-14 border-b border-line px-2 py-2 text-[11px] font-bold text-ink-subtle">시간</div>
+        {{range .DayHours}}
+        <div class="board-day-hour px-2 pt-0.5 text-[11px] font-semibold text-ink-subtle">{{.}}</div>
+        {{end}}
+      </div>
+      {{range .DayPersonCols}}
+      <div class="board-person-col relative flex-1 border-r border-line">
+        <div class="h-14 border-b border-line px-1.5 py-1.5 text-center {{if .Unassigned}}bg-canvas{{end}}">
+          <p class="truncate text-[11px] font-bold text-ink">{{.Label}}</p>
+          <p class="truncate text-[10px] text-ink-muted">{{.Sub}}</p>
+          {{if .Unregistered}}<p class="text-[10px] text-ink-muted">미등록</p>{{end}}
+          {{if .OnLeave}}<p class="text-[10px] text-warning">연차</p>{{end}}
+        </div>
+        <div class="board-day-stack relative" data-day-body data-drop="{{$.Date}}" data-dayzone="1" data-assignee="{{.Assignee}}">
+          {{range $.DayHours}}
+          <div class="board-day-hour border-t border-line"></div>
+          {{end}}
+          {{range .Items}}
+          {{template "board_cal_bar" dict "Item" . "Page" $}}
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+      <template x-for="name in extraCols" :key="'c-'+name">
+        <div class="board-person-col relative flex-1 border-r border-line">
+          <div class="h-14 border-b border-line px-1.5 py-1.5 text-center">
+            <p class="truncate text-[11px] font-bold text-ink" x-text="name"></p>
+            <p class="text-[10px] text-ink-muted">0건</p>
+            <p class="text-[10px] text-warning" x-show="onLeave(name)" x-cloak>연차</p>
+          </div>
+          <div class="board-day-stack relative" data-day-body data-drop="{{.Date}}" data-dayzone="1" x-bind:data-assignee="name">
+            {{range .DayHours}}
+            <div class="board-day-hour border-t border-line"></div>
+            {{end}}
+          </div>
+        </div>
+      </template>
+      {{if and .CanWrite .ExtraAssignees}}
+      <div class="sticky right-0 z-10 w-24 shrink-0 border-l border-line bg-canvas px-1 py-1.5">
+        <button type="button" @click="addOpen=!addOpen" class="board-bar-act whitespace-nowrap">＋담당자</button>
+        <div x-show="addOpen" x-cloak @click.outside="addOpen=false" class="absolute z-40 mt-1 max-h-56 min-w-[8rem] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-pop">
+          {{range .ExtraAssignees}}
+          <button type="button" class="block w-full px-3 py-1.5 text-left text-[11px] hover:bg-hover"
+                  x-show="extraCols.indexOf({{toJSON .}}) < 0"
+                  @click="addExtra({{toJSON .}})">{{.}}</button>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
   </div>
 {{template "board_shell_close" .}}
 <script>
 (function(){
-  var body=document.querySelector('[data-day-body]');
-  if(!body)return;
-  body.querySelectorAll('.board-day-ev').forEach(function(el){
-    var cols=Math.max(parseInt(el.getAttribute('data-cols'),10)||1,1);
-    var col=parseInt(el.getAttribute('data-col'),10)||0;
-    var w=100/cols;
-    el.style.top=(parseInt(el.getAttribute('data-top'),10)||0)+'px';
-    el.style.height=(parseInt(el.getAttribute('data-h'),10)||40)+'px';
-    el.style.left='calc('+(col*w)+'% + 6px)';
-    el.style.width='calc('+w+'% - 12px)';
+  document.querySelectorAll('[data-day-body]').forEach(function(body){
+    body.querySelectorAll('.board-day-ev').forEach(function(el){
+      var cols=Math.max(parseInt(el.getAttribute('data-cols'),10)||1,1);
+      var col=parseInt(el.getAttribute('data-col'),10)||0;
+      var w=100/cols;
+      el.style.top=(parseInt(el.getAttribute('data-top'),10)||0)+'px';
+      el.style.height=(parseInt(el.getAttribute('data-h'),10)||40)+'px';
+      if(body.getAttribute('data-assignee')!==null){
+        el.style.left='6px';
+        el.style.right='6px';
+        el.style.width='auto';
+      } else {
+        el.style.left='calc('+(col*w)+'% + 6px)';
+        el.style.width='calc('+w+'% - 12px)';
+      }
+    });
+    var now=body.querySelector('[data-now]');
+    if(now) now.style.top=(parseInt(now.getAttribute('data-now'),10)||0)+'px';
   });
-  var now=body.querySelector('[data-now]');
-  if(now) now.style.top=(parseInt(now.getAttribute('data-now'),10)||0)+'px';
 })();
 </script>
 {{end}}

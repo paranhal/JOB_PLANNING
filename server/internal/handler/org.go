@@ -92,7 +92,7 @@ func resolveInsertOrg(c echo.Context) (string, error) {
 	if !canSwitchOrg(c) {
 		home := loginHomeOrg(c)
 		if home == "" {
-			home = model.OrgIDLibrary
+			return "", fmt.Errorf(errNeedInsertOrg)
 		}
 		if id != home {
 			return "", fmt.Errorf("자기 조직만 등록할 수 있습니다")

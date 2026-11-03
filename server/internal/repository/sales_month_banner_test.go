@@ -16,14 +16,14 @@ func TestListMonthBannersPlacesQuarterOnFirstMonth(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "부여군도서관 제안", IsTentativeName: true,
 		ExpectedYM: "2026-09", ExpectedPrecision: model.SalesPrecisionMonth,
 	}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
-	q := &model.SalesProject{
+	q := &model.SalesProject{OrgID: model.OrgIDLibrary, 
 		Name: "분기사업", IsTentativeName: true,
 		ExpectedYM: "2026-11", ExpectedPrecision: model.SalesPrecisionQuarter,
 	}
@@ -53,7 +53,7 @@ func TestListMonthBannersPlacesQuarterOnFirstMonth(t *testing.T) {
 		t.Fatalf("11월에 띠가 있다: %+v", nov)
 	}
 
-	p2 := &model.SalesProject{Name: "다음활동사업", IsTentativeName: true}
+	p2 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "다음활동사업", IsTentativeName: true}
 	if err := repo.Create(p2); err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 {{define "title"}}등록 요청 · {{appName}}{{end}}
 {{define "content"}}
 <div class="space-y-5">
-  <a href="/admin/users" class="text-ui font-semibold text-ink-muted">‹ 사용자 관리</a>
   <h2 class="text-ui-xl font-extrabold text-ink">등록 요청</h2>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}{{if .TempPW}} <code class="font-mono bg-surface px-2 py-0.5 rounded-control">{{.TempPW}}</code> <span class="text-ui-xs">이 화면을 새로고침하면 다시 보이지 않습니다.</span>{{end}}</div>{{end}}
   {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}

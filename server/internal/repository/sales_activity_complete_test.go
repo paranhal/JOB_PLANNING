@@ -16,7 +16,7 @@ func TestSalesActivityMarksWorkTaskComplete(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "활동 완료 연동", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "활동 완료 연동", IsTentativeName: true}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

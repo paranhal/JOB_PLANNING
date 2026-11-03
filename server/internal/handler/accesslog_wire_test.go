@@ -115,6 +115,7 @@ func TestAccessLogLoginLogoutAndFail(t *testing.T) {
 }
 
 func TestAccessLogPlanAndVisitDelete(t *testing.T) {
+	pinClockBeforeNov2026(t)
 	path := initTestAccessDB(t)
 	e, db, h, _ := newMntProtectApp(t)
 	p := seedProtectPlan(t, db, h.Maintenance.repo, "2026-11-10")
@@ -203,7 +204,7 @@ func TestAccessLogUserDeactivate(t *testing.T) {
 func TestAccessLogProjectDelete(t *testing.T) {
 	path := initTestAccessDB(t)
 	e, repo, _ := newProjectServer(t)
-	p := &model.WorkProject{Name: "접속기록사업", Status: model.WBProjectActive, Color: "#3B82F6"}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "접속기록사업", Status: model.WBProjectActive, Color: "#3B82F6"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

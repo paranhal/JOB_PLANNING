@@ -23,7 +23,7 @@ func jwtCookieRole(t *testing.T, role string) *http.Cookie {
 	secret := []byte("cs-system-jwt-secret-2026")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": role + "-id", "username": role, "role": role,
-		"name": role, "exp": time.Now().Add(time.Hour).Unix(),
+		"name": role, "org_id": "O01", "exp": time.Now().Add(time.Hour).Unix(),
 	})
 	s, err := token.SignedString(secret)
 	if err != nil {
@@ -160,6 +160,7 @@ func TestManagePlanPageAndCopy(t *testing.T) {
 }
 
 func TestManageBulkDeleteRequiresConfirm(t *testing.T) {
+	pinClockBeforeNov2026(t)
 	e, repo, p := newMntManageApp(t)
 	skip := managePost(t, e, "/maintenance/"+p.PlanID+"/bulk-delete", url.Values{"month": {"11"}}, jwtCookie(t))
 	if skip.Code != http.StatusSeeOther || !strings.Contains(skip.Header().Get("Location"), "preview=delete") {

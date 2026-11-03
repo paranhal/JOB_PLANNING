@@ -25,7 +25,7 @@ func TestSalesNextYMUnplannedInbox(t *testing.T) {
 	}
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "월만 다음행동", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "월만 다음행동", IsTentativeName: true}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

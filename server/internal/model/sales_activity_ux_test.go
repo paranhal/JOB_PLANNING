@@ -13,15 +13,15 @@ func TestFormatSalesDurationAndNextChip(t *testing.T) {
 		t.Fatalf("카드=%q", got)
 	}
 	label, class := SalesNextActionChip("", "", "2026-09-04")
-	if label != "다음 행동 없음" || !strings.Contains(class, "text-gray-500") {
+	if label != "다음 행동 없음" || !strings.Contains(class, "text-ink-muted") {
 		t.Fatalf("없음=%s %s", label, class)
 	}
 	label, class = SalesNextActionChip("제안서 작성 및 제출", "2026-09-15", "2026-09-04")
-	if label != "다음: 제안서 작성 및 제출 · 2026-09-15" || !strings.Contains(class, "text-orange-800") {
+	if label != "다음: 제안서 작성 및 제출 · 2026-09-15" || !strings.Contains(class, "text-warning") {
 		t.Fatalf("미래=%s %s", label, class)
 	}
 	_, class = SalesNextActionChip("재통화", "2026-09-01", "2026-09-04")
-	if !strings.Contains(class, "text-red-700") {
+	if !strings.Contains(class, "text-danger") {
 		t.Fatalf("지난 날=%s", class)
 	}
 	_, class = SalesNextActionChip("오늘 할 일", "2026-09-04", "2026-09-04")

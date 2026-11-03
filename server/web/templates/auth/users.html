@@ -5,8 +5,8 @@
 <div class="space-y-5">
   <div class="flex items-start justify-between gap-3 flex-wrap">
     <div>
-      <h2 class="text-2xl font-extrabold text-slate-800">사용자 관리</h2>
-      <p class="text-sm text-slate-500 mt-1">조직별 사용자 아이디와 업무 권한을 관리하세요.</p>
+      <h2 class="text-2xl font-extrabold text-ink">사용자 관리</h2>
+      <p class="text-sm text-ink-muted mt-1">조직별 사용자 아이디와 업무 권한을 관리하세요.</p>
     </div>
     <div class="flex gap-2 flex-wrap">
     {{if .IsVision}}
@@ -14,15 +14,15 @@
     <a href="/admin/users/deleted" class="px-4 py-2 border rounded-lg text-sm">삭제 내역</a>
     {{end}}
     {{if .CanCreateUser}}
-    <button type="button" id="btn-new" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">＋ 아이디 생성</button>
+    <button type="button" id="btn-new" class="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-semibold">＋ 아이디 생성</button>
     {{end}}
     </div>
   </div>
 
-  {{if .OK}}<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>{{end}}
-  {{if .Error}}<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>{{end}}
+  {{if .OK}}<div class="rounded-lg border border-success bg-success-soft px-4 py-3 text-sm text-success">{{.OK}}</div>{{end}}
+  {{if .Error}}<div class="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">{{.Error}}</div>{{end}}
   {{if .TempPW}}
-  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+  <div class="rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-amber-950">
     <p class="font-semibold mb-1">임시 비밀번호를 한 번만 보여 줍니다.{{if .TempPWName}} ({{.TempPWName}}){{end}}</p>
     <p class="flex flex-wrap items-center gap-2"><code id="temp-pw" class="font-mono bg-white px-2 py-1 rounded border">{{.TempPW}}</code>
       <button type="button" id="btn-copy-temp" class="px-2 py-1 border rounded text-xs bg-white">복사</button></p>
@@ -31,7 +31,7 @@
   {{end}}
 
   {{if .Unmatched}}
-  <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+  <div class="rounded-lg border border-amber-200 bg-warning-soft px-4 py-3 text-sm text-warning">
     <p class="font-medium mb-2">user_id 가 없어 이름 글자를 못 고친 행입니다. 사람이 확인하세요.</p>
     <table class="w-full text-xs break-keep"><thead><tr class="text-left"><th class="py-1">표</th><th>칸</th><th>이름</th><th class="text-right">건수</th></tr></thead>
     <tbody>{{range .Unmatched}}<tr><td class="font-mono">{{.Table}}</td><td class="font-mono">{{.Column}}</td><td>{{.Name}}</td><td class="text-right">{{.Count}}</td></tr>{{end}}</tbody></table>
@@ -40,9 +40,9 @@
 
   {{if .HashMig}}
     {{if .HashMig.Complete}}
-    <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">비밀번호 해시가 bcrypt로 전환되었습니다. 사용자 {{.HashMig.UserBcrypt}}명 · AS 수정·정기점검 삭제 비밀번호 포함.</div>
+    <div class="rounded-lg border border-success bg-success-soft px-4 py-3 text-sm text-success">비밀번호 해시가 bcrypt로 전환되었습니다. 사용자 {{.HashMig.UserBcrypt}}명 · AS 수정·정기점검 삭제 비밀번호 포함.</div>
     {{else}}
-    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    <div class="rounded-lg border border-amber-200 bg-warning-soft px-4 py-3 text-sm text-warning">
       비밀번호 해시 전환 진행 중 — 사용자 {{.HashMig.UserBcrypt}}/{{.HashMig.UserTotal}}명이 bcrypt입니다. 나머지 계정은 다음 로그인 시 자동 전환됩니다.
       AS 수정 비밀번호: {{if .HashMig.ASBcrypt}}전환됨{{else if .HashMig.ASSet}}미전환 (다음 잠금 해제 시 자동 전환){{else}}미설정{{end}}
       · 정기점검 삭제 비밀번호: {{if .HashMig.DelBcrypt}}전환됨{{else if .HashMig.DelSet}}미전환{{else}}미설정{{end}}
@@ -51,33 +51,33 @@
   {{end}}
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <a href="/admin/orgs" class="rounded-2xl border border-transparent bg-blue-50 p-5 hover:border-blue-200">
-      <p class="text-sm font-bold text-blue-600 mb-2">비젼관리자</p>
-      <p class="font-bold text-slate-800">전체 조직 관리</p>
-      <p class="text-sm text-slate-500 mt-1">모든 조직과 관리자를 설정할 수 있습니다.</p>
-      <p class="text-xs font-bold text-blue-700 mt-3">전체 조직 관리 →</p>
+    <a href="/admin/orgs" class="rounded-2xl border border-transparent bg-primary-soft p-5 hover:border-primary">
+      <p class="text-sm font-bold text-primary mb-2">비젼관리자</p>
+      <p class="font-bold text-ink">전체 조직 관리</p>
+      <p class="text-sm text-ink-muted mt-1">모든 조직과 관리자를 설정할 수 있습니다.</p>
+      <p class="text-xs font-bold text-primary mt-3">전체 조직 관리 →</p>
     </a>
-    <a href="/admin/my-org/members" class="rounded-2xl border border-gray-200 bg-white p-5 hover:border-green-200">
+    <a href="/admin/my-org/members" class="rounded-2xl border border-line bg-white p-5 hover:border-success">
       <p class="text-sm font-bold text-green-600 mb-2">조직관리자</p>
-      <p class="font-bold text-slate-800">소속 조직 인원 관리</p>
-      <p class="text-sm text-slate-500 mt-1">아이디, 비밀번호, 업무와 인원을 관리합니다.</p>
-      <p class="text-xs font-bold text-green-700 mt-3">소속 인원 관리 →</p>
+      <p class="font-bold text-ink">소속 조직 인원 관리</p>
+      <p class="text-sm text-ink-muted mt-1">아이디, 비밀번호, 업무와 인원을 관리합니다.</p>
+      <p class="text-xs font-bold text-success mt-3">소속 인원 관리 →</p>
     </a>
-    <a href="/admin/permissions?tab=work" class="rounded-2xl border border-gray-200 bg-white p-5 hover:border-slate-300">
-      <p class="text-sm font-bold text-slate-500 mb-2">일반 이용자</p>
-      <p class="font-bold text-slate-800">업무별 서비스 이용</p>
-      <p class="text-sm text-slate-500 mt-1">영업 · 기술 · 지원 중 하나를 가집니다.</p>
-      <p class="text-xs font-bold text-slate-600 mt-3">업무별 권한 확인 →</p>
+    <a href="/admin/permissions?tab=work" class="rounded-2xl border border-line bg-white p-5 hover:border-line">
+      <p class="text-sm font-bold text-ink-muted mb-2">일반 이용자</p>
+      <p class="font-bold text-ink">업무별 서비스 이용</p>
+      <p class="text-sm text-ink-muted mt-1">영업 · 기술 · 지원 중 하나를 가집니다.</p>
+      <p class="text-xs font-bold text-ink-muted mt-3">업무별 권한 확인 →</p>
     </a>
   </div>
 
-  <div class="rounded-2xl border border-gray-200 bg-white px-5 py-3.5 text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-2 items-center">
-    <b class="text-slate-800">깃발</b>
-    <span><span class="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs">읽기전용</span> 등급·업무는 그대로 두고 <b class="text-slate-700">쓰기만</b> 막습니다. 어느 등급에나 붙습니다.</span>
-    <span><span class="inline-block px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-xs">테스터</span> 이 사람이 만든 자료를 <b class="text-slate-700">지표에서 뺍니다.</b> 일반에만 붙습니다.</span>
+  <div class="rounded-2xl border border-line bg-white px-5 py-3.5 text-sm text-ink-muted flex flex-wrap gap-x-4 gap-y-2 items-center">
+    <b class="text-ink">깃발</b>
+    <span><span class="inline-block px-2.5 py-0.5 rounded-md bg-hover text-ink-muted text-xs">읽기전용</span> 등급·업무는 그대로 두고 <b class="text-ink">쓰기만</b> 막습니다. 어느 등급에나 붙습니다.</span>
+    <span><span class="inline-block px-2.5 py-0.5 rounded-md bg-warning-soft text-warning text-xs">테스터</span> 이 사람이 만든 자료를 <b class="text-ink">지표에서 뺍니다.</b> 일반에만 붙습니다.</span>
   </div>
 
-  <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+  <div class="rounded-2xl border border-line bg-white overflow-hidden">
     <div class="p-5 space-y-3">
       <div class="relative">
         <input id="q" type="search" placeholder="이름, 아이디, 조직 검색" class="w-full border rounded-lg pl-10 pr-3 py-2.5 text-sm">
@@ -102,8 +102,8 @@
     </div>
 
     {{if $canEdit}}
-    <form id="bulk" method="POST" class="hidden items-center gap-2 flex-wrap px-5 py-3 bg-blue-50 border-y border-gray-200">
-      <span class="text-sm font-bold text-blue-700" id="bulkN">0명 선택</span>
+    <form id="bulk" method="POST" class="hidden items-center gap-2 flex-wrap px-5 py-3 bg-primary-soft border-y border-line">
+      <span class="text-sm font-bold text-primary" id="bulkN">0명 선택</span>
       <select name="org_id" class="border rounded px-2 py-1 text-xs"><option value="">조직</option>{{range .Orgs}}<option value="{{.OrgID}}">{{.OrgName}}</option>{{end}}</select>
       <button type="submit" formaction="/users/bulk/org" class="px-3 py-1.5 border rounded-lg text-xs bg-white">조직 옮기기</button>
       <select name="job" class="border rounded px-2 py-1 text-xs"><option value="">업무</option><option value="sales">영업</option><option value="tech">기술</option><option value="support">지원</option></select>
@@ -120,7 +120,7 @@
     <div class="overflow-x-auto">
       <table class="w-full min-w-[1240px] text-sm">
         <thead>
-          <tr class="bg-slate-50 text-left text-xs font-bold text-slate-500">
+          <tr class="bg-hover text-left text-xs font-bold text-ink-muted">
             <th class="px-4 py-3 w-11">{{if $canEdit}}<input type="checkbox" id="all">{{end}}</th>
             <th class="px-4 py-3">사용자</th>
             <th class="px-4 py-3 whitespace-nowrap">관리 등급</th>
@@ -138,7 +138,7 @@
         {{$job := ""}}{{if or (eq .Role "sales") (eq .Role "tech") (eq .Role "support")}}{{$job = .Role}}{{end}}
         {{$orgLabel := "전체 조직"}}{{if .OrgID}}{{$orgLabel = .OrgID}}{{end}}
         {{if and .OrgID $orgNames}}{{with index $orgNames .OrgID}}{{$orgLabel = .}}{{end}}{{end}}
-        <tr class="border-t border-gray-100 hover:bg-slate-50{{if .IsReadOnly}} bg-slate-50{{end}}"
+        <tr class="border-t border-line hover:bg-hover{{if .IsReadOnly}} bg-hover{{end}}"
             data-id="{{.UserID}}" data-name="{{.FullName}}" data-user="{{.Username}}" data-email="{{.Email}}"
             data-org="{{.OrgID}}" data-org-name="{{$orgLabel}}" data-grade="{{$grade}}" data-job="{{$job}}"
             data-on="{{if .IsActive}}1{{else}}0{{end}}" data-ro="{{if .IsReadOnly}}1{{else}}0{{end}}" data-test="{{if .IsTest}}1{{else}}0{{end}}"
@@ -149,14 +149,14 @@
           <td class="px-4 py-3">{{if $canEdit}}<input type="checkbox" class="row-ck" data-id="{{.UserID}}">{{end}}</td>
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-800 text-xs font-bold grid place-items-center shrink-0">{{if .Username}}{{slice .Username 0 1}}{{end}}</div>
+              <div class="w-10 h-10 rounded-full bg-blue-100 text-primary text-xs font-bold grid place-items-center shrink-0">{{if .Username}}{{slice .Username 0 1}}{{end}}</div>
               <div>
-                <div class="font-bold text-slate-800">{{.FullName}}</div>
-                <div class="text-xs text-slate-500">{{if .Email}}{{.Email}}{{else}}@{{.Username}}{{end}}{{if .Mobile}} · {{.Mobile}}{{end}} · <span class="perm-src">{{userPermSource .}}</span></div>
+                <div class="font-bold text-ink">{{.FullName}}</div>
+                <div class="text-xs text-ink-muted">{{if .Email}}{{.Email}}{{else}}@{{.Username}}{{end}}{{if .Mobile}} · {{.Mobile}}{{end}} · <span class="perm-src">{{userPermSource .}}</span></div>
               </div>
             </div>
           </td>
-          <td class="px-4 py-3 whitespace-nowrap font-bold {{if eq $grade "vision"}}text-blue-600{{else if eq $grade "exec"}}text-violet-600{{else if eq $grade "org"}}text-green-600{{else}}text-slate-400{{end}}">
+          <td class="px-4 py-3 whitespace-nowrap font-bold {{if eq $grade "vision"}}text-primary{{else if eq $grade "exec"}}text-violet-600{{else if eq $grade "org"}}text-green-600{{else}}text-ink-subtle{{end}}">
             {{if eq $grade "vision"}}비젼관리자{{else if eq $grade "exec"}}C-Level(경영진){{else if eq $grade "org"}}조직관리자{{else}}일반{{end}}
           </td>
           <td class="px-4 py-3 whitespace-nowrap">{{$orgLabel}}</td>
@@ -171,52 +171,52 @@
                 </select>
               </form>
               {{else}}
-                {{if eq $job "sales"}}영업{{else if eq $job "tech"}}기술{{else if eq $job "support"}}지원{{else}}<span class="text-slate-400">미지정</span>{{end}}
+                {{if eq $job "sales"}}영업{{else if eq $job "tech"}}기술{{else if eq $job "support"}}지원{{else}}<span class="text-ink-subtle">미지정</span>{{end}}
               {{end}}
             {{else}}<span class="text-slate-300" title="관리 등급은 업무를 따로 두지 않습니다">전체</span>{{end}}
           </td>
           <td class="px-4 py-3 whitespace-nowrap">
-            {{if .IsReadOnly}}<span class="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs mr-1">읽기전용</span>{{end}}
-            {{if .IsTest}}<span class="inline-block px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-xs">테스터</span>{{end}}
+            {{if .IsReadOnly}}<span class="inline-block px-2.5 py-0.5 rounded-md bg-hover text-ink-muted text-xs mr-1">읽기전용</span>{{end}}
+            {{if .IsTest}}<span class="inline-block px-2.5 py-0.5 rounded-md bg-warning-soft text-warning text-xs">테스터</span>{{end}}
             {{if and (not .IsReadOnly) (not .IsTest)}}<span class="text-slate-300">—</span>{{end}}
           </td>
           <td class="px-4 py-3 whitespace-nowrap">
-            {{if .IsActive}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-green-50 text-green-600 text-xs font-semibold">활성</span>
-            {{else}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 text-xs font-semibold">비활성</span>{{end}}
+            {{if .IsActive}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-success-soft text-green-600 text-xs font-semibold">활성</span>
+            {{else}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-hover text-ink-subtle text-xs font-semibold">비활성</span>{{end}}
           </td>
-          <td class="px-4 py-3 text-slate-500 whitespace-nowrap">{{.CreatedAt.Format "2006-01-02"}}</td>
+          <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{.CreatedAt.Format "2006-01-02"}}</td>
           <td class="px-4 py-3">{{if $canEdit}}<button type="button" class="edit px-3 py-1 border rounded-md text-xs" data-edit="{{.UserID}}">수정</button>{{end}}</td>
         </tr>
         {{end}}
         </tbody>
       </table>
     </div>
-    <div class="px-5 py-3 text-xs text-slate-500 flex justify-between flex-wrap gap-2">
+    <div class="px-5 py-3 text-xs text-ink-muted flex justify-between flex-wrap gap-2">
       <span id="count"></span>
-      <span><b class="text-slate-700">관리 등급과 업무는 함께 가질 수 없습니다.</b> 관리자는 업무 칸이 비고, 일반만 업무를 갖습니다.</span>
+      <span><b class="text-ink">관리 등급과 업무는 함께 가질 수 없습니다.</b> 관리자는 업무 칸이 비고, 일반만 업무를 갖습니다.</span>
     </div>
   </div>
 
   {{if $canEdit}}
   <div class="bg-white rounded-xl border border-amber-200 p-5 space-y-3">
-    <h3 class="font-semibold text-gray-800 text-sm">완료·종료 AS 수정 비밀번호</h3>
-    <p class="text-xs text-gray-500">로그인 비밀번호와 별도입니다. 최초 기본값: <code class="font-mono bg-gray-100 px-1 rounded">as-edit</code></p>
+    <h3 class="font-semibold text-ink text-sm">완료·종료 AS 수정 비밀번호</h3>
+    <p class="text-xs text-ink-muted">로그인 비밀번호와 별도입니다. 최초 기본값: <code class="font-mono bg-hover px-1 rounded">as-edit</code></p>
     <form method="POST" action="/users/as-edit-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
           onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
-      <div><label class="block text-xs text-gray-500 mb-1">현재 수정 비밀번호</label><input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs text-gray-500 mb-1">새 수정 비밀번호</label><input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label><input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-ink-muted mb-1">현재 수정 비밀번호</label><input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-ink-muted mb-1">새 수정 비밀번호</label><input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-ink-muted mb-1">새 비밀번호 확인</label><input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
       <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">변경</button>
     </form>
   </div>
-  <div class="bg-white rounded-xl border border-rose-200 p-5 space-y-3">
-    <h3 class="font-semibold text-gray-800 text-sm">정기점검 계획 삭제 비밀번호</h3>
-    <p class="text-xs text-gray-500">로그인·AS 수정 비밀번호와 별도입니다.</p>
+  <div class="bg-white rounded-xl border border-danger p-5 space-y-3">
+    <h3 class="font-semibold text-ink text-sm">정기점검 계획 삭제 비밀번호</h3>
+    <p class="text-xs text-ink-muted">로그인·AS 수정 비밀번호와 별도입니다.</p>
     <form method="POST" action="/users/mnt-delete-password" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
           onsubmit="if(this.new_password.value!==this.confirm_password.value){alert('새 비밀번호 확인이 일치하지 않습니다.');return false;}">
-      <div><label class="block text-xs text-gray-500 mb-1">현재 삭제 비밀번호</label><input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs text-gray-500 mb-1">새 삭제 비밀번호</label><input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-      <div><label class="block text-xs text-gray-500 mb-1">새 비밀번호 확인</label><input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-ink-muted mb-1">현재 삭제 비밀번호</label><input type="password" name="current_password" required autocomplete="off" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-ink-muted mb-1">새 삭제 비밀번호</label><input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-ink-muted mb-1">새 비밀번호 확인</label><input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
       <button type="submit" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm">변경</button>
     </form>
   </div>
@@ -230,38 +230,38 @@
     <div class="p-5 border-b flex justify-between gap-3 sticky top-0 bg-white">
       <div>
         <div class="text-lg font-extrabold" id="dTitle">아이디 생성</div>
-        <div class="text-xs text-slate-500" id="dSub"></div>
+        <div class="text-xs text-ink-muted" id="dSub"></div>
       </div>
       <button type="button" id="dClose" class="px-3 py-1 border rounded-lg text-sm">닫기</button>
     </div>
     <div class="p-5 space-y-4 flex-1">
       <input type="hidden" name="prev_role" id="dPrev">
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">이름</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">이름</label>
         <input name="full_name" id="dName" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div id="wUser">
-        <label class="block text-xs font-semibold text-slate-500 mb-1">아이디</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">아이디</label>
         <input name="username" id="dUser" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div id="wPass">
-        <label class="block text-xs font-semibold text-slate-500 mb-1">비밀번호</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">비밀번호</label>
         <input type="password" name="password" id="dPass" minlength="10" class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="new-password">
         <input type="password" name="password_confirm" id="dPass2" minlength="10" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="비밀번호 확인" autocomplete="new-password">
         <label id="wMust" class="hidden mt-2 flex gap-2 text-sm"><input type="checkbox" name="must_change_password" value="1" id="dMust"> 다음 로그인 때 변경하게 하기</label>
       </div>
-      <div id="wSig" class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-        <p class="text-xs font-bold text-slate-700">사인</p>
-        <p class="text-[11px] text-slate-500">이미지 파일이거나 아래에 그립니다. 파일은 서버에 두고 DB에는 경로만 저장합니다. 보고서·견적서에 씁니다.</p>
-        <p id="dSigLink" class="hidden font-mono text-[11px] text-blue-700 break-all"></p>
+      <div id="wSig" class="rounded-xl border border-line bg-hover p-3 space-y-2">
+        <p class="text-xs font-bold text-ink">사인</p>
+        <p class="text-[11px] text-ink-muted">이미지 파일이거나 아래에 그립니다. 파일은 서버에 두고 DB에는 경로만 저장합니다. 보고서·견적서에 씁니다.</p>
+        <p id="dSigLink" class="hidden font-mono text-[11px] text-primary break-all"></p>
         <div class="flex flex-wrap gap-4">
           <div>
-            <p class="text-[11px] text-slate-500">1번</p>
-            <img id="dSigImg" alt="1번 사인" class="hidden h-16 w-auto border border-gray-200 rounded bg-white">
+            <p class="text-[11px] text-ink-muted">1번</p>
+            <img id="dSigImg" alt="1번 사인" class="hidden h-16 w-auto border border-line rounded bg-white">
           </div>
           <div>
-            <p class="text-[11px] text-slate-500">2번</p>
-            <img id="dSigImg2" alt="2번 사인" class="hidden h-16 w-auto border border-gray-200 rounded bg-white">
+            <p class="text-[11px] text-ink-muted">2번</p>
+            <img id="dSigImg2" alt="2번 사인" class="hidden h-16 w-auto border border-line rounded bg-white">
           </div>
         </div>
         <div class="flex gap-3 text-xs">
@@ -269,87 +269,87 @@
           <label class="flex items-center gap-1"><input type="radio" name="dSigSlot" value="2"> 2번에 저장</label>
         </div>
         <div>
-          <label class="block text-[11px] font-semibold text-slate-500 mb-1">이미지 올리기 (PNG·JPG)</label>
+          <label class="block text-[11px] font-semibold text-ink-muted mb-1">이미지 올리기 (PNG·JPG)</label>
           <input type="file" id="dSigFile" accept="image/png,image/jpeg" class="w-full text-sm bg-white border rounded-lg px-2 py-1.5">
         </div>
         <div>
-          <label class="block text-[11px] font-semibold text-slate-500 mb-1">직접 그리기</label>
+          <label class="block text-[11px] font-semibold text-ink-muted mb-1">직접 그리기</label>
           <canvas id="dSigPad" width="380" height="140" class="w-full border rounded-lg bg-white cursor-crosshair"></canvas>
-          <button type="button" id="dSigClear" class="mt-1 text-[11px] text-slate-500 hover:underline">그림 지우기</button>
+          <button type="button" id="dSigClear" class="mt-1 text-[11px] text-ink-muted hover:underline">그림 지우기</button>
         </div>
-        <p id="dSigHint" class="hidden text-[11px] text-amber-700">계정을 먼저 저장한 뒤 사인을 올릴 수 있습니다.</p>
+        <p id="dSigHint" class="hidden text-[11px] text-warning">계정을 먼저 저장한 뒤 사인을 올릴 수 있습니다.</p>
         <div class="flex gap-2">
           <button type="button" id="btn-sig" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold">사인 저장</button>
-          <button type="button" id="btn-sig-del" class="hidden px-3 py-1.5 border rounded-lg text-xs text-red-600">1번 지우기</button>
-          <button type="button" id="btn-sig-del2" class="hidden px-3 py-1.5 border rounded-lg text-xs text-red-600">2번 지우기</button>
+          <button type="button" id="btn-sig-del" class="hidden px-3 py-1.5 border rounded-lg text-xs text-danger">1번 지우기</button>
+          <button type="button" id="btn-sig-del2" class="hidden px-3 py-1.5 border rounded-lg text-xs text-danger">2번 지우기</button>
         </div>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-2">관리 등급</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-2">관리 등급</label>
         <div class="space-y-2" id="dGrade">
-          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="vision"> <span>비젼관리자<span class="block text-xs text-slate-500">전 조직. 업무와 조직을 두지 않습니다.</span></span></label>
-          {{if $.IsVision}}<label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="exec"> <span>C-Level(경영진)<span class="block text-xs text-slate-500">전사 조회. 설정·쓰기는 막습니다.</span></span></label>{{end}}
-          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="org"> <span>조직관리자<span class="block text-xs text-slate-500">소속 조직 전부. 업무를 두지 않습니다.</span></span></label>
-          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="none" checked> <span>일반<span class="block text-xs text-slate-500">업무를 하나 고릅니다.</span></span></label>
+          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="vision"> <span>비젼관리자<span class="block text-xs text-ink-muted">전 조직. 업무와 조직을 두지 않습니다.</span></span></label>
+          {{if $.IsVision}}<label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="exec"> <span>C-Level(경영진)<span class="block text-xs text-ink-muted">전사 조회. 설정·쓰기는 막습니다.</span></span></label>{{end}}
+          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="org"> <span>조직관리자<span class="block text-xs text-ink-muted">소속 조직 전부. 업무를 두지 않습니다.</span></span></label>
+          <label class="flex gap-2 border rounded-lg p-3 text-sm"><input type="radio" name="admin_grade" value="none" checked> <span>일반<span class="block text-xs text-ink-muted">업무를 하나 고릅니다.</span></span></label>
         </div>
       </div>
       <div id="wOrg">
-        <label class="block text-xs font-semibold text-slate-500 mb-1">조직</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">조직</label>
         <select name="org_id" id="dOrg" class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">선택</option>
           {{range $.Orgs}}<option value="{{.OrgID}}">{{.OrgName}}</option>{{end}}
         </select>
       </div>
       <div id="wJob">
-        <label class="block text-xs font-semibold text-slate-500 mb-1">업무</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">업무</label>
         <select name="job" id="dJob" class="w-full border rounded-lg px-3 py-2 text-sm">
           <option value="">— 고르세요 —</option>
           <option value="sales">영업</option><option value="tech">기술</option><option value="support">지원</option>
         </select>
       </div>
       <div class="border-t pt-4 space-y-3">
-        <p class="text-xs font-bold text-slate-500">권한 (체크 · 비우면 직급 기본값)</p>
-        <p class="text-[11px] text-slate-400">적용 중: <span id="dPermSrc"></span></p>
+        <p class="text-xs font-bold text-ink-muted">권한 (체크 · 비우면 직급 기본값)</p>
+        <p class="text-[11px] text-ink-subtle">적용 중: <span id="dPermSrc"></span></p>
         <div class="space-y-3" id="dPerms">
           {{range permGroups}}
           <div>
-            <p class="text-[11px] font-semibold text-slate-500 mb-1">{{.Label}}</p>
+            <p class="text-[11px] font-semibold text-ink-muted mb-1">{{.Label}}</p>
             <div class="flex flex-wrap gap-3">
               {{range .Items}}
-              <label class="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                <input type="checkbox" name="perm" value="{{.Key}}" class="d-perm rounded border-gray-300 text-blue-600"> {{.Label}}
+              <label class="inline-flex items-center gap-1.5 text-xs text-ink">
+                <input type="checkbox" name="perm" value="{{.Key}}" class="d-perm rounded border-line text-primary"> {{.Label}}
               </label>
               {{end}}
             </div>
           </div>
           {{end}}
         </div>
-        <p class="text-[11px] text-slate-400">직급 기본값과 같으면 저장하지 않습니다. 직급을 바꾸면 개별 권한을 비울지 묻습니다.</p>
-        <button type="button" id="btn-reset-perms" class="hidden text-xs text-blue-700 hover:underline">직급 기본값으로 되돌리기</button>
+        <p class="text-[11px] text-ink-subtle">직급 기본값과 같으면 저장하지 않습니다. 직급을 바꾸면 개별 권한을 비울지 묻습니다.</p>
+        <button type="button" id="btn-reset-perms" class="hidden text-xs text-primary hover:underline">직급 기본값으로 되돌리기</button>
       </div>
       <div class="border-t pt-4 space-y-3">
-        <p class="text-xs font-bold text-slate-500">깃발</p>
-        <label class="flex gap-2 text-sm"><input type="checkbox" name="is_readonly" value="1" id="dRO"> <span>읽기전용<span class="block text-xs text-slate-500" id="roHint">볼 수는 있고 아무것도 바꿀 수 없습니다.</span></span></label>
-        <label class="flex gap-2 text-sm" id="wTest"><input type="checkbox" name="is_test" value="1" id="dTest"> <span>테스터<span class="block text-xs text-slate-500">이 사람이 만든 자료를 지표에서 뺍니다.</span></span></label>
-        <label class="block text-xs font-semibold text-slate-500">깃발 사유
+        <p class="text-xs font-bold text-ink-muted">깃발</p>
+        <label class="flex gap-2 text-sm"><input type="checkbox" name="is_readonly" value="1" id="dRO"> <span>읽기전용<span class="block text-xs text-ink-muted" id="roHint">볼 수는 있고 아무것도 바꿀 수 없습니다.</span></span></label>
+        <label class="flex gap-2 text-sm" id="wTest"><input type="checkbox" name="is_test" value="1" id="dTest"> <span>테스터<span class="block text-xs text-ink-muted">이 사람이 만든 자료를 지표에서 뺍니다.</span></span></label>
+        <label class="block text-xs font-semibold text-ink-muted">깃발 사유
           <input name="reason" id="dReason" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="읽기전용을 끄면 필수">
         </label>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">핸드폰</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">핸드폰</label>
         <input name="mobile" id="dMobile" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">전화</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">전화</label>
         <input name="tel" id="dTel" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">이메일</label>
+        <label class="block text-xs font-semibold text-ink-muted mb-1">이메일</label>
         <input type="text" name="email" id="dEmail" class="w-full border rounded-lg px-3 py-2 text-sm">
       </div>
       <label class="flex gap-2 text-sm"><input type="checkbox" id="dOn" checked> 활성</label>
       <div id="wRename" class="hidden border-t pt-4">
-        <p class="text-xs font-bold text-slate-500 mb-2">아이디 변경</p>
+        <p class="text-xs font-bold text-ink-muted mb-2">아이디 변경</p>
         <div class="flex gap-2">
           <input id="dRename" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="새 아이디">
           <button type="button" id="btn-rename" class="px-3 py-2 border rounded-lg text-sm">변경</button>
@@ -357,7 +357,7 @@
       </div>
     </div>
     <div class="p-4 border-t flex gap-2 sticky bottom-0 bg-white">
-      <button type="submit" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold">저장</button>
+      <button type="submit" class="flex-1 bg-primary text-white rounded-lg py-2 text-sm font-semibold">저장</button>
       <button type="button" id="dCancel" class="px-4 border rounded-lg text-sm">취소</button>
     </div>
   </form>
@@ -376,7 +376,7 @@
   <form id="rename-form" method="POST" class="hidden"></form>
   <form id="reset-form" method="POST" class="hidden"></form>
   <form id="reset-pw-form" method="POST" class="hidden p-5 border-t shrink-0">
-    <button type="submit" id="btn-reset-pw" class="w-full px-3 py-2 border rounded-lg text-sm text-amber-800">비밀번호 초기화</button>
+    <button type="submit" id="btn-reset-pw" class="w-full px-3 py-2 border rounded-lg text-sm text-warning">비밀번호 초기화</button>
   </form>
 </aside>
 {{end}}
@@ -546,7 +546,7 @@
     var df=document.getElementById('del-form');
     if(df){ df.classList.remove('hidden'); df.action='/users/'+tr.dataset.id+'/delete'; }
     var rpw=document.getElementById('reset-pw-form');
-    var selfId={{printf "%q" .CurrentUserID}};
+    var selfId={{toJSON .CurrentUserID}};
     if(rpw){
       if (tr.dataset.id===selfId){ rpw.classList.add('hidden'); }
       else { rpw.classList.remove('hidden'); rpw.action='/users/'+tr.dataset.id+'/reset-password'; }

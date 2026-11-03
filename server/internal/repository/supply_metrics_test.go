@@ -45,7 +45,7 @@ func TestSupplyDealDoesNotChangeExecVisitCompleteAndBudgetOutOfConversion(t *tes
 	before := snap()
 
 	sales := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "RFID 게이트 단품", DealType: model.SalesDealSupply, ExpectedAmount: 3_000_000}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "RFID 게이트 단품", DealType: model.SalesDealSupply, ExpectedAmount: 3_000_000}
 	if err := sales.Create(p); err != nil {
 		t.Fatal(err)
 	}

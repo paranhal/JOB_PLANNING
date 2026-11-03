@@ -12,31 +12,31 @@
 <div class="space-y-5" x-data="statsDashboard()">
   <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">{{if .Filter.TestDataOnly}}통계 · 테스터만{{else}}통계{{end}}</h2>
+      <h2 class="text-xl font-bold text-ink">{{if .Filter.TestDataOnly}}통계 · 테스터만{{else}}통계{{end}}</h2>
       {{template "view_group_toggle" .}}
-      <p class="text-sm text-gray-500 mt-1">관리 단위(기간·담당·사업) 기준 · 방문 3일 · 완료 7일</p>
+      <p class="text-sm text-ink-muted mt-1">관리 단위(기간·담당·사업) 기준 · 방문 3일 · 완료 7일</p>
       {{if .MetricsBaseDate}}
-      <p class="mt-1 text-xs font-semibold text-slate-700">{{.MetricsBaseDate}} 이후 데이터 기준</p>
+      <p class="mt-1 text-xs font-semibold text-ink">{{.MetricsBaseDate}} 이후 데이터 기준</p>
       {{end}}
-      <p class="mt-1.5 text-xs text-gray-600">
+      <p class="mt-1.5 text-xs text-ink-muted">
         현재 대상:
-        {{if and (eq .Filter.Scope "assignee") .Filter.Key}}<span class="font-semibold text-blue-700">담당자 · {{.Filter.Key}}</span>
-        {{else if and (eq .Filter.Scope "product") .Filter.Key}}<span class="font-semibold text-blue-700">업무별 · {{.Filter.Key}}</span>
-        {{else}}<span class="font-semibold text-gray-800">팀전체</span>{{end}}
+        {{if and (eq .Filter.Scope "assignee") .Filter.Key}}<span class="font-semibold text-primary">담당자 · {{.Filter.Key}}</span>
+        {{else if and (eq .Filter.Scope "product") .Filter.Key}}<span class="font-semibold text-primary">업무별 · {{.Filter.Key}}</span>
+        {{else}}<span class="font-semibold text-ink">팀전체</span>{{end}}
         {{if .Filter.ProjectID}}
           {{range .Projects}}{{if eq .ProjectID $.Filter.ProjectID}} · 사업 {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}{{end}}{{end}}
         {{end}}
-        {{if .Filter.IncludeImport}}<span class="ml-1 text-amber-700">· 이관 데이터 포함</span>{{else}}<span class="ml-1 text-gray-500">· 이관 데이터 제외</span>{{end}}
+        {{if .Filter.IncludeImport}}<span class="ml-1 text-warning">· 이관 데이터 포함</span>{{else}}<span class="ml-1 text-ink-muted">· 이관 데이터 제외</span>{{end}}
         {{if .Filter.TestDataOnly}}<span class="ml-1 text-violet-800">· 테스터만 보기</span>{{end}}
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2 shrink-0">
       <nav id="absorb-tabs" class="flex flex-wrap gap-1 text-xs" aria-label="통계 화면">
-        <a href="/stats" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">통계</a>
-        <a href="/work-status" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">업무처리현황</a>
-        <a href="/as/stats" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">AS 현황</a>
+        <a href="/stats" class="px-3 py-1.5 rounded-lg bg-primary text-white">통계</a>
+        <a href="/work-status" class="px-3 py-1.5 rounded-lg border border-line text-ink hover:bg-hover">업무처리현황</a>
+        <a href="/as/stats" class="px-3 py-1.5 rounded-lg border border-line text-ink hover:bg-hover">AS 현황</a>
       </nav>
-      <a href="/stats/detail" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50">상세 · 엑셀</a>
+      <a href="/stats/detail" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-line rounded-lg text-xs font-medium text-ink hover:bg-hover">상세 · 엑셀</a>
     </div>
   </div>
 
@@ -46,142 +46,142 @@
   </div>
   {{end}}
   {{if and .MissingComplete (gt .MissingComplete.AS 0)}}
-  <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+  <div class="rounded-xl border border-warning bg-warning-soft px-4 py-3 text-sm text-amber-950">
     완료일 미기록 {{.MissingComplete.AS}}건 제외
-    <a href="/work-status?missing=complete" class="ml-2 text-amber-800 underline">목록</a>
+    <a href="/work-status?missing=complete" class="ml-2 text-warning underline">목록</a>
   </div>
   {{end}}
 	{{if $kpi.HolidayMissingLine}}
-	<div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">{{$kpi.HolidayMissingLine}}</div>
+	<div class="rounded-xl border border-warning bg-warning-soft px-4 py-3 text-sm text-amber-950">{{$kpi.HolidayMissingLine}}</div>
 	{{end}}
 	{{/* KPI 카드 */}}
 	{{$vtd := $kpi.VisitToDoneDisplay}}
 	<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-	  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" title="{{$.BusinessDaysHint}}">
+	  <div class="rounded-xl border border-line bg-white p-4 shadow-sm" title="{{$.BusinessDaysHint}}">
 	    <div class="flex items-start justify-between gap-2">
-	      <p class="text-sm font-medium text-gray-600">접수→방문</p>
+	      <p class="text-sm font-medium text-ink-muted">접수→방문</p>
 	      <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800">영업일 기준</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800" title="{{$.VisitLeadHint}}">[참고]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">[현장방문 건만]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$vis.Sample}}건</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$vis.Reason}}">{{$vis.GradeMark}} {{$vis.GradeLabel}}</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink-muted">[{{$.MetricScopeAS}}]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-info-soft text-info">영업일 기준</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-warning-soft text-warning" title="{{$.VisitLeadHint}}">[참고]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-warning-soft text-warning">[현장방문 건만]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink">표본 {{$vis.Sample}}건</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink" title="{{$vis.Reason}}">{{$vis.GradeMark}} {{$vis.GradeLabel}}</span>
 	        {{if $vis.ShowTarget}}
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $visitOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $visitOK}}기준충족{{else}}기준미충족{{end}}</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $visitOK}}bg-success-soft text-success{{else}}bg-danger-soft text-danger{{end}}">{{if $visitOK}}기준충족{{else}}기준미충족{{end}}</span>
 	        {{end}}
 	      </span>
 	    </div>
 	    {{if $vis.ShowValue}}
-	    <p class="mt-2 text-3xl font-bold tabular-nums {{if $vis.ShowTarget}}{{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $vis.Value}}영업일</p>
+	    <p class="mt-2 text-3xl font-bold tabular-nums {{if $vis.ShowTarget}}{{if $visitOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-ink{{end}}">{{printf "%.1f" $vis.Value}}영업일</p>
 	    {{if $vis.ShowDelta}}
 	    <p class="mt-1 text-[11px] {{if le $kpi.VisitDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
 	      {{if gt $kpi.VisitDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.VisitDelta}}일 이전 기간 대비
 	    </p>
 	    {{end}}
 	    {{else}}
-	    <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$vis.Reason}}">—</p>
-	    <p class="mt-1 text-[11px] text-gray-400">{{$vis.Reason}}</p>
+	    <p class="mt-2 text-3xl font-bold text-ink-subtle" title="{{$vis.Reason}}">—</p>
+	    <p class="mt-1 text-[11px] text-ink-subtle">{{$vis.Reason}}</p>
 	    {{end}}
-	    <p class="mt-1 text-[11px] text-gray-500">목표 {{printf "%.0f" .VisitTarget}}영업일</p>
-	    <p class="mt-1 text-[11px] text-amber-800 leading-snug">{{.VisitLeadHint}}</p>
+	    <p class="mt-1 text-[11px] text-ink-muted">목표 {{printf "%.0f" .VisitTarget}}영업일</p>
+	    <p class="mt-1 text-[11px] text-warning leading-snug">{{.VisitLeadHint}}</p>
 	    {{if gt $kpi.AdminMovedN 0}}
 	    <p class="mt-1 text-[11px] text-violet-800">행정/지원 이관 {{$kpi.AdminMovedN}}건 (리드타임에서 제외)</p>
 	    {{end}}
 	  </div>
 
-	  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" title="{{$.BusinessDaysHint}}">
+	  <div class="rounded-xl border border-line bg-white p-4 shadow-sm" title="{{$.BusinessDaysHint}}">
 	    <div class="flex items-start justify-between gap-2">
-	      <p class="text-sm font-medium text-gray-600">방문→조치완료</p>
+	      <p class="text-sm font-medium text-ink-muted">방문→조치완료</p>
 	      <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800">영업일 기준</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">[현장방문 건만]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$vtd.Sample}}건</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink-muted">[{{$.MetricScopeAS}}]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-info-soft text-info">영업일 기준</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-warning-soft text-warning">[현장방문 건만]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink">표본 {{$vtd.Sample}}건</span>
 	      </span>
 	    </div>
 	    {{if $vtd.ShowValue}}
-	    <p class="mt-2 text-3xl font-bold tabular-nums text-gray-800">{{printf "%.1f" $vtd.Value}}영업일</p>
+	    <p class="mt-2 text-3xl font-bold tabular-nums text-ink">{{printf "%.1f" $vtd.Value}}영업일</p>
 	    {{if $vtd.ShowDelta}}
 	    <p class="mt-1 text-[11px] {{if le $kpi.VisitToDoneDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
 	      {{if gt $kpi.VisitToDoneDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.VisitToDoneDelta}}일 이전 기간 대비
 	    </p>
 	    {{end}}
 	    {{else}}
-	    <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$vtd.Reason}}">—</p>
-	    <p class="mt-1 text-[11px] text-gray-400">{{$vtd.Reason}}</p>
+	    <p class="mt-2 text-3xl font-bold text-ink-subtle" title="{{$vtd.Reason}}">—</p>
+	    <p class="mt-1 text-[11px] text-ink-subtle">{{$vtd.Reason}}</p>
 	    {{end}}
-	    <p class="mt-1 text-[11px] text-amber-800 leading-snug">{{.VisitToDoneHint}}</p>
+	    <p class="mt-1 text-[11px] text-warning leading-snug">{{.VisitToDoneHint}}</p>
 	  </div>
 
-	  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" title="{{$.BusinessDaysHint}}">
+	  <div class="rounded-xl border border-line bg-white p-4 shadow-sm" title="{{$.BusinessDaysHint}}">
 	    <div class="flex items-start justify-between gap-2">
-	      <p class="text-sm font-medium text-gray-600">접수→조치완료</p>
+	      <p class="text-sm font-medium text-ink-muted">접수→조치완료</p>
 	      <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">[{{$.MetricScopeAS}}]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800">영업일 기준</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-800">[전화·원격 포함]</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700">표본 {{$cmp.Sample}}건</span>
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$cmp.Reason}}">{{$cmp.GradeMark}} {{$cmp.GradeLabel}}</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink-muted">[{{$.MetricScopeAS}}]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-info-soft text-info">영업일 기준</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary-soft text-violet-800">[전화·원격 포함]</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink">표본 {{$cmp.Sample}}건</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink" title="{{$cmp.Reason}}">{{$cmp.GradeMark}} {{$cmp.GradeLabel}}</span>
 	        {{if $cmp.ShowTarget}}
-	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $completeOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $completeOK}}기준충족{{else}}기준미충족{{end}}</span>
+	        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $completeOK}}bg-success-soft text-success{{else}}bg-danger-soft text-danger{{end}}">{{if $completeOK}}기준충족{{else}}기준미충족{{end}}</span>
 	        {{end}}
 	      </span>
 	    </div>
 	    {{if $cmp.ShowValue}}
-	    <p class="mt-2 text-3xl font-bold tabular-nums {{if $cmp.ShowTarget}}{{if $completeOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-gray-800{{end}}">{{printf "%.1f" $cmp.Value}}영업일</p>
+	    <p class="mt-2 text-3xl font-bold tabular-nums {{if $cmp.ShowTarget}}{{if $completeOK}}text-emerald-600{{else}}text-rose-600{{end}}{{else}}text-ink{{end}}">{{printf "%.1f" $cmp.Value}}영업일</p>
 	    {{if $cmp.ShowDelta}}
 	    <p class="mt-1 text-[11px] {{if le $kpi.CompleteDelta 0.0}}text-emerald-600{{else}}text-rose-600{{end}}">
 	      {{if gt $kpi.CompleteDelta 0.0}}+{{end}}{{printf "%.1f" $kpi.CompleteDelta}}일 이전 기간 대비
 	    </p>
 	    {{end}}
 	    {{else}}
-	    <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$cmp.Reason}}">—</p>
-	    <p class="mt-1 text-[11px] text-gray-400">{{$cmp.Reason}}</p>
+	    <p class="mt-2 text-3xl font-bold text-ink-subtle" title="{{$cmp.Reason}}">—</p>
+	    <p class="mt-1 text-[11px] text-ink-subtle">{{$cmp.Reason}}</p>
 	    {{end}}
-	    <p class="mt-1 text-[11px] text-gray-500">목표 {{printf "%.0f" .CompleteTarget}}영업일 · {{.CompleteLeadHint}}</p>
+	    <p class="mt-1 text-[11px] text-ink-muted">목표 {{printf "%.0f" .CompleteTarget}}영업일 · {{.CompleteLeadHint}}</p>
 	  </div>
 
-	  <a href="/plan/unplanned" class="rounded-xl border border-rose-200 bg-white p-4 shadow-sm hover:border-rose-400 transition-all block">
+	  <a href="/plan/unplanned" class="rounded-xl border border-danger bg-white p-4 shadow-sm hover:border-rose-400 transition-all block">
       <div class="flex items-start justify-between gap-2">
-        <p class="text-sm font-medium text-gray-600">계획 수립률</p>
+        <p class="text-sm font-medium text-ink-muted">계획 수립률</p>
         <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
-          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" title="{{$pl.Reason}}">{{$pl.GradeMark}} {{$pl.GradeLabel}}</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink" title="{{$pl.Reason}}">{{$pl.GradeMark}} {{$pl.GradeLabel}}</span>
           {{if $pl.ShowValue}}
-          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $planOK}}bg-emerald-50 text-emerald-700{{else}}bg-rose-50 text-rose-700{{end}}">{{if $planOK}}기준충족{{else}}기준미충족{{end}}</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {{if $planOK}}bg-success-soft text-success{{else}}bg-danger-soft text-danger{{end}}">{{if $planOK}}기준충족{{else}}기준미충족{{end}}</span>
           {{end}}
         </span>
       </div>
       {{if $pl.ShowValue}}
       <p class="mt-2 text-3xl font-bold tabular-nums {{if $planOK}}text-emerald-600{{else}}text-rose-600{{end}}">{{printf "%.1f" $pl.Value}}%</p>
       {{else}}
-      <p class="mt-2 text-3xl font-bold text-gray-300" title="{{$pl.Reason}}">—</p>
-      <p class="mt-1 text-[11px] text-gray-400">{{$pl.Reason}}</p>
+      <p class="mt-2 text-3xl font-bold text-ink-subtle" title="{{$pl.Reason}}">—</p>
+      <p class="mt-1 text-[11px] text-ink-subtle">{{$pl.Reason}}</p>
       {{end}}
-      <p class="mt-1 text-[11px] text-gray-500">예정+미정 {{$kpi.PlanningPlanned}} / 미완료 {{$kpi.PlanningOpen}} · 목표 {{printf "%.0f" .PlanTarget}}%</p>
+      <p class="mt-1 text-[11px] text-ink-muted">예정+미정 {{$kpi.PlanningPlanned}} / 미완료 {{$kpi.PlanningOpen}} · 목표 {{printf "%.0f" .PlanTarget}}%</p>
     </a>
   </div>
 	{{$fw := .FactoryWait}}
 	<div class="mt-3 rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
 	  <div class="flex items-start justify-between gap-2">
-	    <p class="text-sm font-medium text-gray-600">제조사 대기</p>
+	    <p class="text-sm font-medium text-ink-muted">제조사 대기</p>
 	    <span class="shrink-0 inline-flex items-center gap-1 flex-wrap justify-end">
 	      <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800">KPI와 별도</span>
-	      <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700">{{$fw.Count}}건</span>
+	      <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-hover text-ink">{{$fw.Count}}건</span>
 	    </span>
 	  </div>
-	  <p class="mt-2 text-3xl font-bold tabular-nums {{if eq $fw.DisplayLabel "—"}}text-gray-300{{else}}text-gray-800{{end}}">{{$fw.DisplayLabel}}</p>
+	  <p class="mt-2 text-3xl font-bold tabular-nums {{if eq $fw.DisplayLabel "—"}}text-ink-subtle{{else}}text-ink{{end}}">{{$fw.DisplayLabel}}</p>
 	  {{if $fw.InProgress}}
-	  <p class="mt-1 text-[11px] text-amber-800">진행 중 {{$fw.InProgress}}건 · 접수→조치완료 KPI에는 넣지 않습니다</p>
+	  <p class="mt-1 text-[11px] text-warning">진행 중 {{$fw.InProgress}}건 · 접수→조치완료 KPI에는 넣지 않습니다</p>
 	  {{else}}
-	  <p class="mt-1 text-[11px] text-gray-500">입고일~회수일 영업일. 접수→조치완료 KPI는 그대로입니다</p>
+	  <p class="mt-1 text-[11px] text-ink-muted">입고일~회수일 영업일. 접수→조치완료 KPI는 그대로입니다</p>
 	  {{end}}
 	</div>
   {{if $kpi.HasVisit}}
-  <p class="text-xs text-gray-600">합 {{printf "%.1f" $kpi.VisitPlusDoneAvg}}영업일 (같은 {{$kpi.VisitSample}}건) · ③은 방문하지 않은 건까지 포함하므로 ①+②와 다릅니다</p>
+  <p class="text-xs text-ink-muted">합 {{printf "%.1f" $kpi.VisitPlusDoneAvg}}영업일 (같은 {{$kpi.VisitSample}}건) · ③은 방문하지 않은 건까지 포함하므로 ①+②와 다릅니다</p>
   {{end}}
   {{if gt $kpi.NegativeSpanN 0}}
-  <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950">
+  <div class="rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm text-rose-950">
     입력 확인 필요 {{$kpi.NegativeSpanN}}건
     {{if .NegativeRows}}
     <ul class="mt-2 space-y-1 text-xs">
@@ -195,26 +195,26 @@
 
   {{/* 필터 바 — 드롭다운 즉시 표시, 선택 시 자동 조회 */}}
   <form method="GET" action="/stats" id="statsFilterForm"
-        class="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm"
+        class="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white px-3 py-3 shadow-sm"
         x-data="{ scope: '{{.Filter.Scope}}' }">
     <input type="hidden" name="scope" :value="scope">
 
-    <label class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 cursor-pointer">
-      <input type="checkbox" name="import" value="1" class="rounded border-amber-300 text-amber-700"
+    <label class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-warning-soft px-3 py-1.5 text-xs text-warning cursor-pointer">
+      <input type="checkbox" name="import" value="1" class="rounded border-warning text-warning"
              {{if .Filter.IncludeImport}}checked{{end}}
              onchange="this.form.submit()">
       과거 이관 데이터 포함
     </label>
     <input type="hidden" name="sales" id="statsSalesField" value="{{if .Filter.ExcludeSalesActivity}}0{{end}}">
-    <label class="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs text-orange-900 cursor-pointer">
-      <input type="checkbox" class="rounded border-orange-300 text-orange-700"
+    <label class="inline-flex items-center gap-2 rounded-lg border border-warning bg-warning-soft px-3 py-1.5 text-xs text-orange-900 cursor-pointer">
+      <input type="checkbox" class="rounded border-warning text-warning"
              {{if not .Filter.ExcludeSalesActivity}}checked{{end}}
              onchange="document.getElementById('statsSalesField').value=this.checked?'':'0'; this.form.submit()">
       영업 활동 포함
     </label>
     {{if .CanTestStats}}
-    <label class="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-900 cursor-pointer">
-      <input type="checkbox" name="test" value="1" class="rounded border-violet-300 text-violet-700"
+    <label class="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary-soft px-3 py-1.5 text-xs text-violet-900 cursor-pointer">
+      <input type="checkbox" name="test" value="1" class="rounded border-violet-300 text-primary"
              {{if .Filter.TestDataOnly}}checked{{end}}
              onchange="this.form.submit()">
       테스터만 보기
@@ -226,28 +226,28 @@
     </div>
 
     <div>
-      <p class="text-[11px] text-gray-500 mb-1">통계 대상</p>
-      <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+      <p class="text-[11px] text-ink-muted mb-1">통계 대상</p>
+      <div class="inline-flex rounded-lg border border-line overflow-hidden">
         <button type="button" @click="scope='team'; $nextTick(() => $el.closest('form').submit())"
-                :class="scope==='team' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
+                :class="scope==='team' ? 'bg-primary text-white' : 'text-ink-muted hover:bg-hover'"
                 class="px-3 py-1.5 text-xs font-semibold">팀전체</button>
         <button type="button" @click="scope='assignee'"
-                :class="scope==='assignee' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
-                class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200">담당자별</button>
+                :class="scope==='assignee' ? 'bg-primary text-white' : 'text-ink-muted hover:bg-hover'"
+                class="px-3 py-1.5 text-xs font-semibold border-l border-line">담당자별</button>
         <button type="button" @click="scope='product'"
-                :class="scope==='product' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
-                class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200">업무별</button>
+                :class="scope==='product' ? 'bg-primary text-white' : 'text-ink-muted hover:bg-hover'"
+                class="px-3 py-1.5 text-xs font-semibold border-l border-line">업무별</button>
       </div>
     </div>
 
     <div x-show="scope==='assignee'" x-cloak class="min-w-[8rem]">
-      <label class="block text-[11px] text-gray-500 mb-1">담당자</label>
+      <label class="block text-[11px] text-ink-muted mb-1">담당자</label>
       <select {{if eq .Filter.Scope "assignee"}}name="key"{{end}}
               :name="scope==='assignee' ? 'key' : null"
               {{if ne .Filter.Scope "assignee"}}disabled{{end}}
               :disabled="scope!=='assignee'"
               onchange="if(this.value) this.form.submit()"
-              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full">
+              class="border border-line rounded-lg px-3 py-1.5 text-sm w-full">
         <option value="">담당자 선택</option>
         {{range .Assignees}}
         <option value="{{.FullName}}" {{if and (eq $.Filter.Scope "assignee") (eq $.Filter.Key .FullName)}}selected{{end}}>{{.FullName}}</option>
@@ -255,13 +255,13 @@
       </select>
     </div>
     <div x-show="scope==='product'" x-cloak class="min-w-[8rem]">
-      <label class="block text-[11px] text-gray-500 mb-1">업무(제품)</label>
+      <label class="block text-[11px] text-ink-muted mb-1">업무(제품)</label>
       <select {{if eq .Filter.Scope "product"}}name="key"{{end}}
               :name="scope==='product' ? 'key' : null"
               {{if ne .Filter.Scope "product"}}disabled{{end}}
               :disabled="scope!=='product'"
               onchange="if(this.value) this.form.submit()"
-              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full">
+              class="border border-line rounded-lg px-3 py-1.5 text-sm w-full">
         <option value="">업무 선택</option>
         {{range .ProductOptions}}
         <option value="{{.}}" {{if and (eq $.Filter.Scope "product") (eq $.Filter.Key .)}}selected{{end}}>{{.}}</option>
@@ -270,9 +270,9 @@
     </div>
 
     <div>
-      <label class="block text-[11px] text-gray-500 mb-1">사업별</label>
+      <label class="block text-[11px] text-ink-muted mb-1">사업별</label>
       <select name="project" onchange="this.form.submit()"
-              class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[9rem]">
+              class="border border-line rounded-lg px-3 py-1.5 text-sm min-w-[9rem]">
         <option value="">사업 선택</option>
         {{range .Projects}}
         <option value="{{.ProjectID}}" {{if eq $.Filter.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
@@ -281,42 +281,42 @@
     </div>
 
     <a href="/stats/export.xlsx?metric=progress&period=range&from={{.Lookback.From}}&to={{.Lookback.To}}{{.FilterQ}}"
-       class="px-4 py-2 text-sm font-semibold rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50">Excel</a>
+       class="px-4 py-2 text-sm font-semibold rounded-lg border border-blue-300 text-primary hover:bg-primary-soft">Excel</a>
     <a href="/stats/reports{{if .LookbackQS}}?{{.LookbackQS}}{{end}}"
-       class="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">보고서로 이동</a>
+       class="px-4 py-2 text-sm font-semibold rounded-lg border border-line text-ink hover:bg-hover">보고서로 이동</a>
   </form>
 
   {{/* 업무 분석 */}}
-  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+  <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h3 class="text-sm font-bold text-gray-800">업무 분석 <span class="font-normal text-gray-500">({{.ViewLabel}}{{if .CompletedRange}} · {{.CompletedRange}}{{end}})</span></h3>
-      <p class="text-[11px] text-gray-400">이관 = 이전 기간에서 넘어온 미완료 / 다음 기간으로 넘긴 미완료</p>
+      <h3 class="text-sm font-bold text-ink">업무 분석 <span class="font-normal text-ink-muted">({{.ViewLabel}}{{if .CompletedRange}} · {{.CompletedRange}}{{end}})</span></h3>
+      <p class="text-[11px] text-ink-subtle">이관 = 이전 기간에서 넘어온 미완료 / 다음 기간으로 넘긴 미완료</p>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-      <div class="rounded-lg border border-rose-100 bg-rose-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">접수</p>
-        <p class="text-xl font-bold tabular-nums text-rose-700">{{$an.Receipt}}</p>
+      <div class="rounded-lg border border-rose-100 bg-danger-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">접수</p>
+        <p class="text-xl font-bold tabular-nums text-danger">{{$an.Receipt}}</p>
       </div>
-      <div class="rounded-lg border border-amber-100 bg-amber-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">방문(조치시작)</p>
-        <p class="text-xl font-bold tabular-nums text-amber-700">{{$an.Visit}}</p>
+      <div class="rounded-lg border border-amber-100 bg-warning-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">방문(조치시작)</p>
+        <p class="text-xl font-bold tabular-nums text-warning">{{$an.Visit}}</p>
       </div>
-      <div class="rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">완료</p>
-        <p class="text-xl font-bold tabular-nums text-emerald-700">{{$an.Completed}}</p>
+      <div class="rounded-lg border border-emerald-100 bg-success-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">완료</p>
+        <p class="text-xl font-bold tabular-nums text-success">{{$an.Completed}}</p>
       </div>
-      <div class="rounded-lg border border-sky-100 bg-sky-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">이전에서 이월</p>
-        <p class="text-xl font-bold tabular-nums text-sky-700">{{$an.CarryIn}}</p>
+      <div class="rounded-lg border border-sky-100 bg-info-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">이전에서 이월</p>
+        <p class="text-xl font-bold tabular-nums text-info">{{$an.CarryIn}}</p>
       </div>
-      <div class="rounded-lg border border-violet-100 bg-violet-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">다음으로 이월</p>
-        <p class="text-xl font-bold tabular-nums text-violet-700">{{$an.CarryOut}}</p>
+      <div class="rounded-lg border border-violet-100 bg-primary-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">다음으로 이월</p>
+        <p class="text-xl font-bold tabular-nums text-primary">{{$an.CarryOut}}</p>
       </div>
     </div>
     <div class="mt-3 overflow-x-auto">
       <table class="min-w-full text-xs">
-        <thead class="text-gray-500">
+        <thead class="text-ink-muted">
           <tr>
             <th class="px-2 py-1 text-left font-medium">구분</th>
             <th class="px-2 py-1 text-right font-medium">접수</th>
@@ -336,7 +336,7 @@
             <td class="px-2 py-1 text-right tabular-nums">{{$an.AS.CarryOut}}</td>
           </tr>
           <tr>
-            <td class="px-2 py-1 text-sky-800 font-medium">정기점검</td>
+            <td class="px-2 py-1 text-info font-medium">정기점검</td>
             <td class="px-2 py-1 text-right tabular-nums">{{$an.Mnt.Receipt}}</td>
             <td class="px-2 py-1 text-right tabular-nums">{{$an.Mnt.Visit}}</td>
             <td class="px-2 py-1 text-right tabular-nums">{{$an.Mnt.Completed}}</td>
@@ -355,73 +355,73 @@
       </table>
     </div>
     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="rounded-lg border border-violet-100 bg-violet-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">평균 리드타임 (행정/지원)</p>
+      <div class="rounded-lg border border-violet-100 bg-primary-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">평균 리드타임 (행정/지원)</p>
         {{$ld := $an.AdminLead.LeadDisplay}}
         {{if $ld.ShowValue}}
         <p class="text-xl font-bold tabular-nums text-violet-800">{{printf "%.1f" $ld.Value}}일</p>
         {{else}}
-        <p class="text-xl font-bold text-gray-300" title="{{$ld.Reason}}">—</p>
+        <p class="text-xl font-bold text-ink-subtle" title="{{$ld.Reason}}">—</p>
         {{end}}
-        <p class="text-[11px] text-gray-500 mt-1">complete_date − receipt_date · 표본 {{$ld.Sample}}건 {{if $ld.GradeMark}}{{$ld.GradeMark}}{{end}}</p>
+        <p class="text-[11px] text-ink-muted mt-1">complete_date − receipt_date · 표본 {{$ld.Sample}}건 {{if $ld.GradeMark}}{{$ld.GradeMark}}{{end}}</p>
       </div>
-      <div class="rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2">
-        <p class="text-[11px] text-gray-500">외부 대기 비중</p>
+      <div class="rounded-lg border border-indigo-100 bg-primary-soft/40 px-3 py-2">
+        <p class="text-[11px] text-ink-muted">외부 대기 비중</p>
         {{$ws := $an.AdminLead.WaitShareDisplay}}
         {{if $ws.ShowValue}}
         <p class="text-xl font-bold tabular-nums text-indigo-800">{{printf "%.1f" $ws.Value}}%</p>
         {{else}}
-        <p class="text-xl font-bold text-gray-300" title="{{$ws.Reason}}">—</p>
+        <p class="text-xl font-bold text-ink-subtle" title="{{$ws.Reason}}">—</p>
         {{end}}
-        <p class="text-[11px] text-gray-500 mt-1">요청→회신 구간(겹치면 1회) ÷ 총 리드타임 · 실작업 {{$an.AdminLead.WorkMinutes}}분 · 내부유휴 {{$an.AdminLead.IdleMinutes}}분</p>
+        <p class="text-[11px] text-ink-muted mt-1">요청→회신 구간(겹치면 1회) ÷ 총 리드타임 · 실작업 {{$an.AdminLead.WorkMinutes}}분 · 내부유휴 {{$an.AdminLead.IdleMinutes}}분</p>
       </div>
     </div>
   </div>
 
   {{/* 접수/방문/완료일 */}}
-  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+  <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h3 class="text-sm font-bold text-gray-800">접수 · 방문 · 조치완료일</h3>
-      <span class="text-[11px] text-gray-400">기간에 접수한·방문한·완료한 건 · 최대 100건</span>
+      <h3 class="text-sm font-bold text-ink">접수 · 방문 · 조치완료일</h3>
+      <span class="text-[11px] text-ink-subtle">기간에 접수한·방문한·완료한 건 · 최대 100건</span>
     </div>
     {{template "stats_case_table" dict "Rows" $sp.Timeline "ShowDuration" 0 "ShowRounds" 0 "Empty" "해당 기간 일정이 없습니다."}}
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-bold text-gray-800 mb-1">시간이 제일 오래 걸린 건</h3>
-      <p class="text-[11px] text-gray-400 mb-3">기간 접수 {{$sp.PeriodCount}}건 → 상위 {{$sp.TopN}}건 (10건↑ 2건, 20건↑ 3건)</p>
+    <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-bold text-ink mb-1">시간이 제일 오래 걸린 건</h3>
+      <p class="text-[11px] text-ink-subtle mb-3">기간 접수 {{$sp.PeriodCount}}건 → 상위 {{$sp.TopN}}건 (10건↑ 2건, 20건↑ 3건)</p>
       {{template "stats_case_table" dict "Rows" $sp.Longest "ShowDuration" 1 "ShowRounds" 0 "Empty" "소요시간을 계산할 완료 건이 없습니다."}}
     </div>
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-bold text-gray-800 mb-1">1시간 초과 건</h3>
-      <p class="text-[11px] text-gray-400 mb-3">처리이력 소요 또는 조치시작→완료가 60분 초과</p>
+    <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-bold text-ink mb-1">1시간 초과 건</h3>
+      <p class="text-[11px] text-ink-subtle mb-3">처리이력 소요 또는 조치시작→완료가 60분 초과</p>
       {{template "stats_case_table" dict "Rows" $sp.OverHour "ShowDuration" 1 "ShowRounds" 0 "Empty" "1시간 초과 건이 없습니다."}}
     </div>
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-bold text-gray-800 mb-1">방문 차수가 가장 많은 건</h3>
-      <p class="text-[11px] text-gray-400 mb-3">1차 이상 · 처리이력 건수 많은 순</p>
+    <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-bold text-ink mb-1">방문 차수가 가장 많은 건</h3>
+      <p class="text-[11px] text-ink-subtle mb-3">1차 이상 · 처리이력 건수 많은 순</p>
       {{template "stats_case_table" dict "Rows" $sp.MostVisits "ShowDuration" 0 "ShowRounds" 1 "Empty" "방문(1차 이상) 건이 없습니다."}}
     </div>
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-bold text-gray-800 mb-1">긴급도·중요도 상</h3>
-      <p class="text-[11px] text-gray-400 mb-3">긴급도=상 그리고 중요도=상</p>
+    <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-bold text-ink mb-1">긴급도·중요도 상</h3>
+      <p class="text-[11px] text-ink-subtle mb-3">긴급도=상 그리고 중요도=상</p>
       {{template "stats_case_table" dict "Rows" $sp.HighPriority "ShowDuration" 0 "ShowRounds" 0 "Empty" "긴급·중요 상 건이 없습니다."}}
     </div>
   </div>
 
   {{/* 차트 */}}
-  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+  <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-      <h3 class="text-sm font-bold text-gray-800">{{if eq .View "week"}}주별{{else if eq .View "month"}}월별{{else if eq .View "range"}}기간별{{else}}일자별{{end}} 업무 현황</h3>
-      {{if .ChartBucketNote}}<p class="text-[11px] text-gray-500">{{.ChartBucketNote}}</p>{{end}}
-      <div class="flex flex-wrap items-center gap-3 text-[11px] text-gray-600">
+      <h3 class="text-sm font-bold text-ink">{{if eq .View "week"}}주별{{else if eq .View "month"}}월별{{else if eq .View "range"}}기간별{{else}}일자별{{end}} 업무 현황</h3>
+      {{if .ChartBucketNote}}<p class="text-[11px] text-ink-muted">{{.ChartBucketNote}}</p>{{end}}
+      <div class="flex flex-wrap items-center gap-3 text-[11px] text-ink-muted">
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>접수</span>
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-sky-400"></span>미완료</span>
         <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>완료</span>
       </div>
     </div>
-    <p class="text-[11px] text-gray-400 mb-3">
+    <p class="text-[11px] text-ink-subtle mb-3">
       {{if eq .View "week"}}기준일이 속한 주=이번주 · 전전주/전주/이번주 옆 숫자는 해당 주 월요일{{else if eq .View "month"}}기준일이 속한 달=이번달 · 전전월/전월/이번달{{else if eq .View "range"}}선택한 기간({{.RangeFrom}} ~ {{.RangeTo}}){{else}}기준일 포함 최근 14일{{end}}
       · 미완료=접수·담당자 배정·진행중·보류·이관 등 미종료
       · 부분완료 접수는 완료로 집계하고, 그때 생긴 하위업무(확인·재방문)는 접수·미완료로 별도 집계
@@ -430,14 +430,14 @@
   </div>
 
   {{/* 현재 기간 완료 건 — 조치내용 */}}
-  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+  <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h3 class="text-sm font-bold text-gray-800">완료 건 <span class="font-normal text-gray-500">({{if .CompletedRange}}{{.CompletedRange}}{{else}}현재 기간{{end}} · {{len .CompletedRows}}건)</span></h3>
-      <span class="text-[11px] text-gray-400">조치내용 포함 · 최대 200건</span>
+      <h3 class="text-sm font-bold text-ink">완료 건 <span class="font-normal text-ink-muted">({{if .CompletedRange}}{{.CompletedRange}}{{else}}현재 기간{{end}} · {{len .CompletedRows}}건)</span></h3>
+      <span class="text-[11px] text-ink-subtle">조치내용 포함 · 최대 200건</span>
     </div>
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm">
-        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs text-gray-500">
+        <thead class="bg-hover border-b border-line text-left text-xs text-ink-muted">
           <tr>
             <th class="px-3 py-2 font-medium whitespace-nowrap">완료일</th>
             <th class="px-3 py-2 font-medium whitespace-nowrap">업무</th>
@@ -451,24 +451,24 @@
         <tbody class="divide-y divide-gray-100">
           {{if .CompletedRows}}
           {{range .CompletedRows}}
-          <tr class="hover:bg-gray-50 align-top">
-            <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{if .CompleteDate}}{{.CompleteDate}}{{else}}—{{end}}</td>
-            <td class="px-3 py-2 whitespace-nowrap text-gray-500">{{if .WorkForm}}{{.WorkForm}}{{else}}AS{{end}}</td>
+          <tr class="hover:bg-hover align-top">
+            <td class="px-3 py-2 whitespace-nowrap text-ink-muted">{{if .CompleteDate}}{{.CompleteDate}}{{else}}—{{end}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-ink-muted">{{if .WorkForm}}{{.WorkForm}}{{else}}AS{{end}}</td>
             <td class="px-3 py-2 whitespace-nowrap">
               <span class="inline-flex items-center gap-1.5">
-                {{if .Href}}<a href="{{.Href}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{else}}<a href="{{asHref .ASID}}" class="font-mono text-blue-600 hover:underline">{{.ASNumber}}</a>{{end}}
+                {{if .Href}}<a href="{{.Href}}" class="font-mono text-primary hover:underline">{{.ASNumber}}</a>{{else}}<a href="{{asHref .ASID}}" class="font-mono text-primary hover:underline">{{.ASNumber}}</a>{{end}}
                 {{statusBadge .Status}}
               </span>
             </td>
-            <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{.CustomerName}}</td>
-            <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{.Assignee}}</td>
-            <td class="px-3 py-2 text-gray-700 max-w-[14rem]"><div class="whitespace-pre-line line-clamp-3">{{if .Symptom}}{{.Symptom}}{{else}}—{{end}}</div></td>
-            <td class="px-3 py-2 text-gray-800 max-w-[20rem]"><div class="whitespace-pre-line line-clamp-4">{{if .ActionTaken}}{{.ActionTaken}}{{else}}<span class="text-gray-400">—</span>{{end}}</div></td>
+            <td class="px-3 py-2 whitespace-nowrap text-ink">{{.CustomerName}}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-ink-muted">{{.Assignee}}</td>
+            <td class="px-3 py-2 text-ink max-w-[14rem]"><div class="whitespace-pre-line line-clamp-3">{{if .Symptom}}{{.Symptom}}{{else}}—{{end}}</div></td>
+            <td class="px-3 py-2 text-ink max-w-[20rem]"><div class="whitespace-pre-line line-clamp-4">{{if .ActionTaken}}{{.ActionTaken}}{{else}}<span class="text-ink-subtle">—</span>{{end}}</div></td>
           </tr>
           {{end}}
           {{else}}
           <tr>
-            <td colspan="7" class="px-3 py-8 text-center text-gray-400">해당 기간 완료 건이 없습니다.</td>
+            <td colspan="7" class="px-3 py-8 text-center text-ink-subtle">해당 기간 완료 건이 없습니다.</td>
           </tr>
           {{end}}
         </tbody>
@@ -477,43 +477,43 @@
   </div>
 
   <div>
-    <h3 class="text-sm font-bold text-gray-800 mb-1">예정 · 접수 · 처리 요약</h3>
-    <p class="text-[11px] text-gray-500 mb-2">[{{.MetricScopeCounts}}] · 정기점검은 사이트×점검대상. 접수=그 기간 방문 예약, 처리=조치 완료.</p>
-    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+    <h3 class="text-sm font-bold text-ink mb-1">예정 · 접수 · 처리 요약</h3>
+    <p class="text-[11px] text-ink-muted mb-2">[{{.MetricScopeCounts}}] · 정기점검은 사이트×점검대상. 접수=그 기간 방문 예약, 처리=조치 완료.</p>
+    <div class="bg-white rounded-xl border border-line overflow-x-auto">
       <table class="min-w-full text-sm">
-        <thead><tr class="bg-gray-50 text-gray-600 border-b border-gray-200">
-          <th class="px-3 py-2.5 text-left font-medium sticky left-0 bg-gray-50 z-10">업무</th>
+        <thead><tr class="bg-hover text-ink-muted border-b border-line">
+          <th class="px-3 py-2.5 text-left font-medium sticky left-0 bg-hover z-10">업무</th>
           <th class="px-3 py-2.5 text-left font-medium">구분</th>
-          {{range .Columns}}<th class="px-3 py-2.5 text-center font-medium min-w-[6.5rem]"><div>{{.Label}}</div><div class="text-[11px] font-normal text-gray-400 mt-0.5">{{.RangeLabel}}</div></th>{{end}}
+          {{range .Columns}}<th class="px-3 py-2.5 text-center font-medium min-w-[6.5rem]"><div>{{.Label}}</div><div class="text-[11px] font-normal text-ink-subtle mt-0.5">{{.RangeLabel}}</div></th>{{end}}
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
-          <tr class="hover:bg-rose-50/40"><td class="px-3 py-2 font-medium text-rose-800 sticky left-0 bg-white" rowspan="3">AS</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.AS.Planned}}</td>{{end}}</tr>
-          <tr class="hover:bg-rose-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.AS.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-rose-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.AS.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-sky-50/40"><td class="px-3 py-2 font-medium text-sky-800 sticky left-0 bg-white" rowspan="3">정기점검</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Mnt.Planned}}{{if gt .Counts.Mnt.Quota 0}}<div class="text-[11px] font-normal text-sky-700 mt-0.5">({{.Counts.Mnt.Cumulative}}/{{.Counts.Mnt.Remaining}})</div>{{end}}</td>{{end}}</tr>
-          <tr class="hover:bg-sky-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Mnt.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-sky-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Mnt.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-violet-50/40"><td class="px-3 py-2 font-medium text-violet-800 sticky left-0 bg-white" rowspan="3">행정·지원</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Admin.Planned}}</td>{{end}}</tr>
-          <tr class="hover:bg-violet-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Admin.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-violet-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Admin.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-orange-50/40"><td class="px-3 py-2 font-medium text-orange-800 sticky left-0 bg-white" rowspan="3">영업활동</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Sales.Planned}}</td>{{end}}</tr>
-          <tr class="hover:bg-orange-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Sales.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-orange-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Sales.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-emerald-50/40"><td class="px-3 py-2 font-medium text-emerald-800 sticky left-0 bg-white" rowspan="3">작업</td><td class="px-3 py-2 text-gray-600">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.ProjectWork.Planned}}</td>{{end}}</tr>
-          <tr class="hover:bg-emerald-50/40"><td class="px-3 py-2 text-gray-600">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.ProjectWork.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="hover:bg-emerald-50/40"><td class="px-3 py-2 text-gray-600">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.ProjectWork.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="bg-slate-50 font-semibold border-t-2 border-slate-200"><td class="px-3 py-2.5 sticky left-0 bg-slate-50" rowspan="4">합계</td><td class="px-3 py-2.5">예정업무</td>{{range .Columns}}<td class="px-3 py-2.5 text-center tabular-nums">{{.Counts.PlannedTotal}}</td>{{end}}</tr>
-          <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5">접수 <span class="text-[10px] font-normal text-slate-500">[AS · 정기점검 · 행정지원 · 영업활동 · 작업]</span></td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-blue-800">{{.Counts.ReceiptTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5">처리 <span class="text-[10px] font-normal text-slate-500">[AS · 정기점검 · 행정지원 · 영업활동 · 작업]</span></td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-emerald-800">{{.Counts.ProcessTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
-          <tr class="bg-slate-50 font-semibold"><td class="px-3 py-2.5">계획수정</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-amber-800">{{.Counts.ModifiedTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-gray-300">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-danger-soft/40"><td class="px-3 py-2 font-medium text-rose-800 sticky left-0 bg-white" rowspan="3">AS</td><td class="px-3 py-2 text-ink-muted">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.AS.Planned}}</td>{{end}}</tr>
+          <tr class="hover:bg-danger-soft/40"><td class="px-3 py-2 text-ink-muted">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.AS.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-danger-soft/40"><td class="px-3 py-2 text-ink-muted">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.AS.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-info-soft/40"><td class="px-3 py-2 font-medium text-info sticky left-0 bg-white" rowspan="3">정기점검</td><td class="px-3 py-2 text-ink-muted">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Mnt.Planned}}{{if gt .Counts.Mnt.Quota 0}}<div class="text-[11px] font-normal text-info mt-0.5">({{.Counts.Mnt.Cumulative}}/{{.Counts.Mnt.Remaining}})</div>{{end}}</td>{{end}}</tr>
+          <tr class="hover:bg-info-soft/40"><td class="px-3 py-2 text-ink-muted">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Mnt.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-info-soft/40"><td class="px-3 py-2 text-ink-muted">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Mnt.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-primary-soft/40"><td class="px-3 py-2 font-medium text-violet-800 sticky left-0 bg-white" rowspan="3">행정·지원</td><td class="px-3 py-2 text-ink-muted">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Admin.Planned}}</td>{{end}}</tr>
+          <tr class="hover:bg-primary-soft/40"><td class="px-3 py-2 text-ink-muted">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Admin.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-primary-soft/40"><td class="px-3 py-2 text-ink-muted">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Admin.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-warning-soft/40"><td class="px-3 py-2 font-medium text-warning sticky left-0 bg-white" rowspan="3">영업활동</td><td class="px-3 py-2 text-ink-muted">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.Sales.Planned}}</td>{{end}}</tr>
+          <tr class="hover:bg-warning-soft/40"><td class="px-3 py-2 text-ink-muted">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Sales.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-warning-soft/40"><td class="px-3 py-2 text-ink-muted">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.Sales.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-success-soft/40"><td class="px-3 py-2 font-medium text-success sticky left-0 bg-white" rowspan="3">작업</td><td class="px-3 py-2 text-ink-muted">예정업무</td>{{range .Columns}}<td class="px-3 py-2 text-center tabular-nums font-semibold">{{.Counts.ProjectWork.Planned}}</td>{{end}}</tr>
+          <tr class="hover:bg-success-soft/40"><td class="px-3 py-2 text-ink-muted">접수</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.ProjectWork.Receipt}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="hover:bg-success-soft/40"><td class="px-3 py-2 text-ink-muted">처리</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2 text-center tabular-nums">{{.Counts.ProjectWork.Process}}</td>{{else}}<td class="px-3 py-2 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="bg-hover font-semibold border-t-2 border-line"><td class="px-3 py-2.5 sticky left-0 bg-hover" rowspan="4">합계</td><td class="px-3 py-2.5">예정업무</td>{{range .Columns}}<td class="px-3 py-2.5 text-center tabular-nums">{{.Counts.PlannedTotal}}</td>{{end}}</tr>
+          <tr class="bg-hover font-semibold"><td class="px-3 py-2.5">접수 <span class="text-[10px] font-normal text-ink-muted">[AS · 정기점검 · 행정지원 · 영업활동 · 작업]</span></td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-primary">{{.Counts.ReceiptTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="bg-hover font-semibold"><td class="px-3 py-2.5">처리 <span class="text-[10px] font-normal text-ink-muted">[AS · 정기점검 · 행정지원 · 영업활동 · 작업]</span></td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-success">{{.Counts.ProcessTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
+          <tr class="bg-hover font-semibold"><td class="px-3 py-2.5">계획수정</td>{{range .Columns}}{{if .ShowActual}}<td class="px-3 py-2.5 text-center tabular-nums text-warning">{{.Counts.ModifiedTotal}}</td>{{else}}<td class="px-3 py-2.5 text-center text-ink-subtle">—</td>{{end}}{{end}}</tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-600 space-y-1">
-    <p><span class="font-medium text-gray-800">방문기간</span> = 접수일→방문일 평균(현장방문이고 방문일이 있는 완료 건만. 목표 {{printf "%.0f" .VisitTarget}}일. [{{.MetricScopeAS}}])</p>
-    <p><span class="font-medium text-gray-800">조치완료기간</span> = 접수일→완료일 평균(목표 {{printf "%.0f" .CompleteTarget}}일) · <span class="font-medium text-gray-800">계획 수립률</span> = (예정일 있는 건 + 미정 사유)÷미완료×100 (목표 {{printf "%.0f" .PlanTarget}}%)</p>
+  <div class="rounded-lg border border-line bg-hover px-4 py-3 text-xs text-ink-muted space-y-1">
+    <p><span class="font-medium text-ink">방문기간</span> = 접수일→방문일 평균(현장방문이고 방문일이 있는 완료 건만. 목표 {{printf "%.0f" .VisitTarget}}일. [{{.MetricScopeAS}}])</p>
+    <p><span class="font-medium text-ink">조치완료기간</span> = 접수일→완료일 평균(목표 {{printf "%.0f" .CompleteTarget}}일) · <span class="font-medium text-ink">계획 수립률</span> = (예정일 있는 건 + 미정 사유)÷미완료×100 (목표 {{printf "%.0f" .PlanTarget}}%)</p>
   </div>
 </div>
 

@@ -452,7 +452,7 @@ func ProjectMatchesListFilter(p model.SalesProject, f SalesListFilter) bool {
 	if s := strings.TrimSpace(f.BudgetStatus); s != "" && p.BudgetStatus != s {
 		return false
 	}
-	if s := strings.TrimSpace(f.Owner); s != "" && p.SalesOwner != s && p.SalesOwnerID != s {
+	if s := strings.TrimSpace(f.Owner); s != "" && !p.HasSalesPerson(s, s) {
 		return false
 	}
 	if s := strings.TrimSpace(f.Stage); s != "" && p.Stage != s {

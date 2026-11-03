@@ -46,7 +46,7 @@
   <div class="board-pdlg" role="dialog" aria-modal="true" aria-labelledby="board-p-title">
     <h3 id="board-p-title">일정 배치</h3>
     <div id="board-pinfo" class="board-pmeta"></div>
-    <form method="post" action="/workboard/schedule" id="board-place-form" class="board-pform">
+    <form method="post" action="/workboard/schedule" id="board-place-form" class="js-keep-modal board-pform">
       <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
       <input type="hidden" name="kind" id="board-p-kind">
       <input type="hidden" name="ref_id" id="board-p-ref">

@@ -108,6 +108,8 @@ func newProjectWorkHarness(t *testing.T) (*echo.Echo, *repository.WBRepo, *repos
 	g.POST("/workboard/tasks/:id/action/unlock-edit", h.Workboard.UnlockProjectWorkAction)
 	g.POST("/workboard/tasks/:id/action/project", h.Workboard.LinkProjectWorkAction)
 	g.POST("/workboard/tasks/:id/action/sites", h.Workboard.ImportProjectWorkSites)
+	g.POST("/workboard/tasks/:id/merge-interrupt", h.Workboard.MergeInterrupt)
+	g.POST("/workboard/tasks/:id/return-confirm", h.Workboard.ConfirmReturn)
 	g.POST("/attachments", h.Attachment.Upload)
 	g.GET("/attachments/:id", h.Attachment.Download)
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
@@ -299,7 +301,7 @@ func TestProjectWorkSitesAndSearch(t *testing.T) {
 		"work_type": {"project_work"}, "title": {"타조직"}, "work_subtype": {"other"},
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-O03"},
 	})
-	if cross.Code != http.StatusSeeOther {
+	if cross.Code != http.StatusForbidden && cross.Code != http.StatusBadRequest {
 		t.Fatalf("타 조직 사업 status=%d", cross.Code)
 	}
 

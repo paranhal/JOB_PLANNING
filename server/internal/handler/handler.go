@@ -27,6 +27,7 @@ type Handler struct {
 	ContactHistory *ContactHistoryHandler
 	Asset          *AssetHandler
 	ProductGroup   *ProductGroupHandler
+	ItemTemplate   *WorkItemTemplateHandler
 	SWDetail       *SWDetailHandler
 	Relation       *RelationHandler
 	AS             *ASHandler
@@ -91,6 +92,7 @@ func New(db *sql.DB) *Handler {
 
 	holidayRepo := repository.NewHolidayRepo(db)
 	service.SetHolidayCalendar(service.NewCalendar(holidayRepo))
+	service.SetStaffLeaves(repository.NewStaffLeaveRepo(db))
 	jwtSecret := []byte("cs-system-jwt-secret-2026")
 	settingsRepo := repository.NewSettingsRepo(db)
 	unlockRepo := repository.NewASUnlockRepo(db)
@@ -108,6 +110,7 @@ func New(db *sql.DB) *Handler {
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
 	wbH.groups = repository.NewWorkGroupRepo(db)
+	wbH.itemTpl = repository.NewItemTemplateRepo(db)
 	if m, err := repository.NewRolePermRepo(db).Load(); err == nil {
 		model.SetAccessOverrides(m)
 	}
@@ -146,6 +149,11 @@ func New(db *sql.DB) *Handler {
 			groups: repository.NewProductGroupRepo(db),
 		},
 		ProductGroup: &ProductGroupHandler{repo: repository.NewProductGroupRepo(db)},
+		ItemTemplate: &WorkItemTemplateHandler{
+			repo:     repository.NewItemTemplateRepo(db),
+			codeRepo: codeRepo,
+			orgs:     repository.NewOrgRepo(db),
+		},
 		SWDetail: &SWDetailHandler{repo: swDetailRepo},
 		Relation: &RelationHandler{repo: relationRepo, customerRepo: customerRepo, codeRepo: codeRepo},
 		AS: &ASHandler{
@@ -165,6 +173,7 @@ func New(db *sql.DB) *Handler {
 			partsRepo:  repository.NewASPartsUsedRepo(db),
 			itemRepo:   repository.NewSalesItemRepo(db),
 			groups:     repository.NewWorkGroupRepo(db),
+			setRepo:    repository.NewASActionSetRepo(db),
 		},
 		Work:       NewWorkHandler(workBoardRepo, asRepo, maintRepo, repository.NewWBRepo(db), userRepo, customerRepo),
 		Workboard:  wbH,
@@ -207,12 +216,17 @@ func New(db *sql.DB) *Handler {
 				customerRepo, contactRepo, codeRepo, assetRepo, userRepo,
 			)
 			ph.pe = repository.NewProjectEquipRepo(db)
+			ph.orgs = repository.NewOrgRepo(db)
 			return ph
 		}(),
-		Sales: NewSalesHandler(
-			repository.NewSalesRepo(db), repository.NewProjectRepo(db), repository.NewWBRepo(db),
-			customerRepo, contactRepo, userRepo, codeRepo,
-		),
+		Sales: func() *SalesHandler {
+			sh := NewSalesHandler(
+				repository.NewSalesRepo(db), repository.NewProjectRepo(db), repository.NewWBRepo(db),
+				customerRepo, contactRepo, userRepo, codeRepo,
+			)
+			sh.orgs = repository.NewOrgRepo(db)
+			return sh
+		}(),
 		Quotes: NewQuotesHandler(
 			repository.NewQuoteRepo(db), repository.NewSalesItemRepo(db), repository.NewSalesRepo(db),
 			userRepo, settingsRepo, repository.NewOrderRepo(db),
@@ -253,6 +267,9 @@ func New(db *sql.DB) *Handler {
 	h.Meeting.asH = h.AS
 	h.Meeting.leave = h.Leave
 	h.Meeting.coop = h.Coop.repo
+	h.Meeting.leaves = repository.NewStaffLeaveRepo(db)
+	h.Meeting.wb = repository.NewWBRepo(db)
+	h.Meeting.groups = repository.NewWorkGroupRepo(db)
 	h.Project.salesRepo = repository.NewSalesRepo(db)
 	h.Project.backup = backup.Config{DataDir: dataDirFromEnv(), DB: db}
 	h.Stats.dataDir = dataDirFromEnv()

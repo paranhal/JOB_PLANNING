@@ -54,6 +54,7 @@ func TestAdminWorkCustomerOnWeeklyAndList(t *testing.T) {
 		WorkDate:   "2026-08-14",
 		SourceType: model.WBSourceAS,
 		SourceID:   "as-1",
+		OrgID:      model.OrgIDLibrary,
 	}
 	if err := wb.CreateTask(asTask); err != nil {
 		t.Fatal(err)

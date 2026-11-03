@@ -3,125 +3,126 @@
 <div class="space-y-6">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h2 class="text-xl font-bold text-gray-800">데이터 관리</h2>
-      <p class="text-sm text-gray-500 mt-1">백업 목록, 변경 이력(언제·누가·무엇·어떻게), 롤백, 기존 백업 분석.</p>
-      <p class="text-xs text-gray-400 mt-1 font-mono">{{.DataPath}}</p>
+      <h2 class="text-xl font-bold text-ink">데이터 관리</h2>
+      <p class="text-sm text-ink-muted mt-1">백업 목록, 변경 이력(언제·누가·무엇·어떻게), 롤백, 기존 백업 분석.</p>
+      <p class="text-xs text-ink-subtle mt-1 font-mono">{{.DataPath}}</p>
     </div>
     <div class="flex flex-wrap gap-2">
       <form method="POST" action="/admin/data/save"
             onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='저장 중…';">
-        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">현재 데이터 저장</button>
+        <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium">현재 데이터 저장</button>
       </form>
       <form method="POST" action="/admin/data/archive"
             onsubmit="return confirm('변경 이력을 파일로 백업한 뒤 테이블을 비웁니다. 계속할까요?');">
-        <button type="submit" class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium">관리 로그 백업 후 초기화</button>
+        <button type="submit" class="px-4 py-2 bg-white border border-line hover:bg-hover text-ink rounded-lg text-sm font-medium">관리 로그 백업 후 초기화</button>
       </form>
     </div>
   </div>
 
   {{if .OK}}
-  <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>
+  <div class="rounded-lg border border-success bg-success-soft px-4 py-3 text-sm text-success">{{.OK}}</div>
   {{end}}
   {{if .Error}}
-  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
+  <div class="flash-danger rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">{{.Error}}</div>
   {{end}}
   {{if .Due}}
-  <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">변경 이력이 3개월을 넘었습니다. 관리 로그를 백업한 뒤 테이블을 비우는 것을 권장합니다.</div>
+  <div class="rounded-lg border border-amber-200 bg-warning-soft px-4 py-3 text-sm text-warning">변경 이력이 3개월을 넘었습니다. 관리 로그를 백업한 뒤 테이블을 비우는 것을 권장합니다.</div>
   {{end}}
 
-  <div class="flex gap-1 border-b border-gray-200">
-    <a href="/admin/data?tab=backup" class="px-4 py-2 text-sm {{if eq .Tab "backup"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">백업 목록</a>
-    <a href="/admin/data?tab=logs" class="px-4 py-2 text-sm {{if eq .Tab "logs"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">변경 이력</a>
-    <a href="/admin/data?tab=analyze" class="px-4 py-2 text-sm {{if eq .Tab "analyze"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">백업 분석</a>
-    <a href="/admin/data?tab=unassigned" class="px-4 py-2 text-sm {{if eq .Tab "unassigned"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">사업 미배정</a>
-    <a href="/admin/data?tab=org_empty" class="px-4 py-2 text-sm {{if eq .Tab "org_empty"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">조직 미지정</a>
-    <a href="/admin/data?tab=metrics" class="px-4 py-2 text-sm {{if eq .Tab "metrics"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">지표 기준</a>
-    <a href="/admin/data?tab=checks" class="px-4 py-2 text-sm {{if eq .Tab "checks"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">정합성 점검</a>
-    <a href="/admin/data?tab=assignees" class="px-4 py-2 text-sm {{if eq .Tab "assignees"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">담당자 매칭</a>
-    <a href="/admin/data?tab=processes" class="px-4 py-2 text-sm {{if eq .Tab "processes"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">조치 단일화</a>
-    <a href="/admin/data?tab=import" class="px-4 py-2 text-sm {{if eq .Tab "import"}}border-b-2 border-blue-600 text-blue-700 font-semibold{{else}}text-gray-500 hover:text-gray-800{{end}}">AS 반입</a>
-    <a href="/admin/data/reset" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-800">데이터 초기화</a>
+  <div class="flex gap-1 border-b border-line">
+    <a href="/admin/data?tab=backup" class="px-4 py-2 text-sm {{if eq .Tab "backup"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">백업 목록</a>
+    <a href="/admin/data?tab=logs" class="px-4 py-2 text-sm {{if eq .Tab "logs"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">변경 이력</a>
+    <a href="/admin/data?tab=analyze" class="px-4 py-2 text-sm {{if eq .Tab "analyze"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">백업 분석</a>
+    <a href="/admin/data?tab=unassigned" class="px-4 py-2 text-sm {{if eq .Tab "unassigned"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">사업 미배정</a>
+    <a href="/admin/data?tab=org_empty" class="px-4 py-2 text-sm {{if eq .Tab "org_empty"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">조직 미지정</a>
+    <a href="/admin/data?tab=metrics" class="px-4 py-2 text-sm {{if eq .Tab "metrics"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">지표 기준</a>
+    <a href="/admin/data?tab=checks" class="px-4 py-2 text-sm {{if eq .Tab "checks"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">정합성 점검</a>
+    <a href="/admin/data?tab=assignees" class="px-4 py-2 text-sm {{if eq .Tab "assignees"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">담당자 매칭</a>
+    <a href="/admin/data?tab=processes" class="px-4 py-2 text-sm {{if eq .Tab "processes"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">조치 단일화</a>
+    <a href="/admin/data?tab=import" class="px-4 py-2 text-sm {{if eq .Tab "import"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">AS 반입</a>
+    <a href="/admin/data?tab=product_cat" class="px-4 py-2 text-sm {{if eq .Tab "product_cat"}}border-b-2 border-blue-600 text-primary font-semibold{{else}}text-ink-muted hover:text-ink{{end}}">제품분류</a>
+    <a href="/admin/data/reset" class="px-4 py-2 text-sm text-ink-muted hover:text-ink">데이터 초기화</a>
   </div>
 
   {{if eq .Tab "backup"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-gray-700">저장된 복사본</h3>
-      <span class="text-xs text-gray-400">일 단위 스냅샷은 최근 14일 · 관리 로그는 유지</span>
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-ink">저장된 복사본</h3>
+      <span class="text-xs text-ink-subtle">일 단위 스냅샷은 최근 14일 · 관리 로그는 유지</span>
     </div>
     {{if .Items}}
     <table class="w-full min-w-[900px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">폴더</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">구분</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">저장 시각</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">저장한 사람</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap"></th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">폴더</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">구분</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">저장 시각</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">저장한 사람</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap"></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Items}}
         <tr>
-          <td class="px-4 py-3 font-mono text-xs text-gray-800 whitespace-nowrap">{{.Name}}</td>
+          <td class="px-4 py-3 font-mono text-xs text-ink whitespace-nowrap">{{.Name}}</td>
           <td class="px-4 py-3 whitespace-nowrap">
             {{if eq .Kind "manual"}}
-            <span class="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">{{.KindLabel}}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-primary">{{.KindLabel}}</span>
             {{else if eq .Kind "log_archive"}}
-            <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">{{.KindLabel}}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-warning-soft text-warning">{{.KindLabel}}</span>
             {{else}}
-            <span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{.KindLabel}}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-hover text-ink-muted">{{.KindLabel}}</span>
             {{end}}
           </td>
-          <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{.SavedAt}}</td>
-          <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{if .CreatedByName}}{{.CreatedByName}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{.SavedAt}}</td>
+          <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{if .CreatedByName}}{{.CreatedByName}}{{else}}—{{end}}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
-            <a href="/admin/data?name={{.Name}}" class="text-xs text-blue-600 hover:underline">분석</a>
+            <a href="/admin/data?name={{.Name}}" class="text-xs text-primary hover:underline">분석</a>
           </td>
         </tr>
         {{end}}
       </tbody>
     </table>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-400 text-center">아직 저장된 복사본이 없습니다.</p>
+    <p class="px-4 py-8 text-sm text-ink-subtle text-center">아직 저장된 복사본이 없습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "logs"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-gray-700">변경 이력</h3>
-      <span class="text-xs text-gray-400">현재 {{.LogCount}}건{{if .OldestLog}} · 가장 오래됨 {{.OldestLog}}{{end}}</span>
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-ink">변경 이력</h3>
+      <span class="text-xs text-ink-subtle">현재 {{.LogCount}}건{{if .OldestLog}} · 가장 오래됨 {{.OldestLog}}{{end}}</span>
     </div>
     {{if .Logs}}
     <table class="w-full min-w-[900px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">언제</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">누가</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">어떻게</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">어떤 데이터</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap"></th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">언제</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">누가</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">어떻게</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">어떤 데이터</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap"></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Logs}}
         <tr class="{{if .RolledBack}}opacity-50{{end}} align-top">
-          <td class="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{{.OccurredAt}}</td>
-          <td class="px-4 py-3 text-gray-800 whitespace-nowrap">{{.Who}}</td>
+          <td class="px-4 py-3 text-xs text-ink-muted whitespace-nowrap">{{.OccurredAt}}</td>
+          <td class="px-4 py-3 text-ink whitespace-nowrap">{{.Who}}</td>
           <td class="px-4 py-3 whitespace-nowrap">
-            <span class="px-2 py-0.5 rounded-full text-xs {{if eq .Action "delete"}}bg-red-100 text-red-700{{else if eq .Action "update"}}bg-amber-100 text-amber-800{{else}}bg-green-100 text-green-700{{end}}">{{.ActionLabel}}</span>
-            {{if .RolledBack}}<span class="ml-1 text-xs text-gray-400">롤백됨</span>{{end}}
+            <span class="px-2 py-0.5 rounded-full text-xs {{if eq .Action "delete"}}bg-red-100 text-danger{{else if eq .Action "update"}}bg-warning-soft text-warning{{else}}bg-green-100 text-success{{end}}">{{.ActionLabel}}</span>
+            {{if .RolledBack}}<span class="ml-1 text-xs text-ink-subtle">롤백됨</span>{{end}}
           </td>
           <td class="px-4 py-3 whitespace-nowrap">
-            <div class="text-gray-800">{{.TableLabel}} · {{.EntityLabel}} <span class="font-mono text-xs text-gray-400">{{.EntityID}}</span></div>
+            <div class="text-ink">{{.TableLabel}} · {{.EntityLabel}} <span class="font-mono text-xs text-ink-subtle">{{.EntityID}}</span></div>
             {{if or .BeforePretty .AfterPretty}}
             <details class="mt-1">
-              <summary class="text-xs text-blue-600 cursor-pointer">전·후 값</summary>
+              <summary class="text-xs text-primary cursor-pointer">전·후 값</summary>
               <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                {{if .BeforePretty}}<pre class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48">{{.BeforePretty}}</pre>{{end}}
-                {{if .AfterPretty}}<pre class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48">{{.AfterPretty}}</pre>{{end}}
+                {{if .BeforePretty}}<pre class="text-xs bg-hover p-2 rounded overflow-auto max-h-48">{{.BeforePretty}}</pre>{{end}}
+                {{if .AfterPretty}}<pre class="text-xs bg-hover p-2 rounded overflow-auto max-h-48">{{.AfterPretty}}</pre>{{end}}
               </div>
             </details>
             {{end}}
@@ -131,7 +132,7 @@
             <form method="POST" action="/admin/data/rollback" class="inline"
                   onsubmit="return confirm('이 변경을 되돌릴까요?');">
               <input type="hidden" name="log_id" value="{{.LogID}}">
-              <button type="submit" class="text-xs text-blue-600 hover:underline">롤백</button>
+              <button type="submit" class="text-xs text-primary hover:underline">롤백</button>
             </form>
             {{end}}
           </td>
@@ -140,18 +141,18 @@
       </tbody>
     </table>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-400 text-center">기록된 변경이 없습니다.</p>
+    <p class="px-4 py-8 text-sm text-ink-subtle text-center">기록된 변경이 없습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "analyze"}}
-  <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+  <div class="bg-white rounded-xl border border-line p-4 space-y-4">
     <form method="GET" action="/admin/data" class="flex flex-wrap gap-2 items-end">
       <input type="hidden" name="tab" value="analyze">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">백업 폴더</label>
-        <select name="name" class="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[20rem]">
+        <label class="block text-xs text-ink-muted mb-1">백업 폴더</label>
+        <select name="name" class="border border-line rounded-lg px-3 py-2 text-sm min-w-[20rem]">
           <option value="">선택</option>
           {{range .Items}}
           <option value="{{.Name}}" {{if and $.Stats (eq $.Stats.Name .Name)}}selected{{end}}>{{.KindLabel}} · {{.Name}}</option>
@@ -163,38 +164,38 @@
 
     {{if .Stats}}
       {{if .Stats.Error}}
-      <p class="text-sm text-red-600">{{.Stats.Error}}</p>
+      <p class="text-sm text-danger">{{.Stats.Error}}</p>
       {{else}}
-      <p class="text-sm text-gray-700"><span class="font-semibold">{{.Stats.KindLabel}}</span> · <span class="font-mono text-xs">{{.Stats.Name}}</span></p>
+      <p class="text-sm text-ink"><span class="font-semibold">{{.Stats.KindLabel}}</span> · <span class="font-mono text-xs">{{.Stats.Name}}</span></p>
       {{if .Stats.IsLogArchive}}
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">변경 이력</p><p class="text-lg font-semibold">{{.Stats.ChangeLogs}}</p></div>
+        <div class="rounded-lg bg-hover p-3"><p class="text-xs text-ink-muted">변경 이력</p><p class="text-lg font-semibold">{{.Stats.ChangeLogs}}</p></div>
       </div>
       {{if .Stats.LogByUser}}
       <div>
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">사용자별</h4>
-        <ul class="text-sm text-gray-600 space-y-1">{{range .Stats.LogByUser}}<li>{{index . 0}} · {{index . 1}}건</li>{{end}}</ul>
+        <h4 class="text-sm font-semibold text-ink mb-2">사용자별</h4>
+        <ul class="text-sm text-ink-muted space-y-1">{{range .Stats.LogByUser}}<li>{{index . 0}} · {{index . 1}}건</li>{{end}}</ul>
       </div>
       {{end}}
       {{if .Stats.LogByTable}}
       <div>
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">데이터별</h4>
-        <ul class="text-sm text-gray-600 space-y-1">{{range .Stats.LogByTable}}<li>{{index . 0}} · {{index . 1}}건</li>{{end}}</ul>
+        <h4 class="text-sm font-semibold text-ink mb-2">데이터별</h4>
+        <ul class="text-sm text-ink-muted space-y-1">{{range .Stats.LogByTable}}<li>{{index . 0}} · {{index . 1}}건</li>{{end}}</ul>
       </div>
       {{end}}
       {{else}}
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">고객</p><p class="text-lg font-semibold">{{.Stats.Customers}}</p></div>
-        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">설치자산</p><p class="text-lg font-semibold">{{.Stats.Assets}}</p></div>
-        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">AS 접수</p><p class="text-lg font-semibold">{{.Stats.ASReceipts}}</p></div>
-        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">첨부</p><p class="text-lg font-semibold">{{.Stats.Attachments}}</p></div>
-        <div class="rounded-lg bg-gray-50 p-3"><p class="text-xs text-gray-500">일일업무</p><p class="text-lg font-semibold">{{.Stats.WorkTasks}}</p></div>
+        <div class="rounded-lg bg-hover p-3"><p class="text-xs text-ink-muted">고객</p><p class="text-lg font-semibold">{{.Stats.Customers}}</p></div>
+        <div class="rounded-lg bg-hover p-3"><p class="text-xs text-ink-muted">설치자산</p><p class="text-lg font-semibold">{{.Stats.Assets}}</p></div>
+        <div class="rounded-lg bg-hover p-3"><p class="text-xs text-ink-muted">AS 접수</p><p class="text-lg font-semibold">{{.Stats.ASReceipts}}</p></div>
+        <div class="rounded-lg bg-hover p-3"><p class="text-xs text-ink-muted">첨부</p><p class="text-lg font-semibold">{{.Stats.Attachments}}</p></div>
+        <div class="rounded-lg bg-hover p-3"><p class="text-xs text-ink-muted">일일업무</p><p class="text-lg font-semibold">{{.Stats.WorkTasks}}</p></div>
       </div>
       {{if .Stats.RecentAS}}
       <div>
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">최근 AS</h4>
+        <h4 class="text-sm font-semibold text-ink mb-2">최근 AS</h4>
         <table class="w-full min-w-[900px] text-sm break-keep">
-          <thead><tr class="text-xs text-gray-500"><th class="text-left py-1 whitespace-nowrap">번호</th><th class="text-left py-1 whitespace-nowrap">기관</th><th class="text-left py-1 whitespace-nowrap">상태</th></tr></thead>
+          <thead><tr class="text-xs text-ink-muted"><th class="text-left py-1 whitespace-nowrap">번호</th><th class="text-left py-1 whitespace-nowrap">기관</th><th class="text-left py-1 whitespace-nowrap">상태</th></tr></thead>
           <tbody>
             {{range .Stats.RecentAS}}
             <tr><td class="py-1 font-mono text-xs whitespace-nowrap">{{index . 0}}</td><td>{{index . 1}}</td><td>{{index . 2}}</td></tr>
@@ -206,67 +207,67 @@
       {{end}}
       {{end}}
     {{else}}
-      <p class="text-sm text-gray-400">목록에서 백업을 고르면 건수와 최근 내용을 보여 줍니다. 관리 로그 폴더는 다른 PC로 옮긴 뒤에도 여기서 열 수 있습니다.</p>
+      <p class="text-sm text-ink-subtle">목록에서 백업을 고르면 건수와 최근 내용을 보여 줍니다. 관리 로그 폴더는 다른 PC로 옮긴 뒤에도 여기서 열 수 있습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "unassigned"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100">
-      <h3 class="text-sm font-semibold text-gray-700">사업 미배정</h3>
-      <p class="text-xs text-gray-500 mt-1">정기점검 방문·AS 접수 중 <span class="font-mono">project_id</span>가 비어 있는 건입니다. 상위기관을 연결하거나 범위 규칙을 맞춘 뒤 서버를 다시 시작하면 채워집니다. 해석에 실패한 건은 버리지 않습니다.</p>
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line">
+      <h3 class="text-sm font-semibold text-ink">사업 미배정</h3>
+      <p class="text-xs text-ink-muted mt-1">정기점검 방문·AS 접수 중 <span class="font-mono">project_id</span>가 비어 있는 건입니다. 상위기관을 연결하거나 범위 규칙을 맞춘 뒤 서버를 다시 시작하면 채워집니다. 해석에 실패한 건은 버리지 않습니다.</p>
     </div>
     {{if .Unresolved}}
     <table class="w-full min-w-[900px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">구분</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">번호</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">일자</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">기관</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">제품</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">사유</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">구분</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">번호</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">일자</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">기관</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">제품</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">사유</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Unresolved}}
         <tr>
           <td class="px-4 py-3 whitespace-nowrap">
-            <span class="px-2 py-0.5 rounded-full text-xs {{if eq .Kind "as"}}bg-blue-100 text-blue-700{{else}}bg-emerald-100 text-emerald-800{{end}}">{{.KindLabel}}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs {{if eq .Kind "as"}}bg-blue-100 text-primary{{else}}bg-success-soft text-success{{end}}">{{.KindLabel}}</span>
           </td>
-          <td class="px-4 py-3 font-mono text-xs whitespace-nowrap"><a href="{{.Href}}" class="text-blue-600 hover:underline">{{.Number}}</a></td>
-          <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{.Date}}</td>
-          <td class="px-4 py-3 text-gray-800 whitespace-nowrap">{{if .OrgName}}{{.OrgName}}{{else}}<span class="text-gray-400">{{.CustomerID}}</span>{{end}}</td>
-          <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
-          <td class="px-4 py-3 text-amber-800 whitespace-nowrap">{{.Reason}}</td>
+          <td class="px-4 py-3 font-mono text-xs whitespace-nowrap"><a href="{{.Href}}" class="text-primary hover:underline">{{.Number}}</a></td>
+          <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{.Date}}</td>
+          <td class="px-4 py-3 text-ink whitespace-nowrap">{{if .OrgName}}{{.OrgName}}{{else}}<span class="text-ink-subtle">{{.CustomerID}}</span>{{end}}</td>
+          <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{if .ProductType}}{{.ProductType}}{{else}}—{{end}}</td>
+          <td class="px-4 py-3 text-warning whitespace-nowrap">{{.Reason}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-400 text-center">미배정 건이 없습니다.</p>
+    <p class="px-4 py-8 text-sm text-ink-subtle text-center">미배정 건이 없습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "org_empty"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line flex items-start justify-between gap-3">
       <div>
-        <h3 class="text-sm font-semibold text-gray-700">조직 미지정 행</h3>
-        <p class="text-xs text-gray-500 mt-1">org_id 가 비어 있으면 어느 조직 목록에도 안 보입니다. 비젼관리자를 뺀 계정과 뿌리 17개 표만 셉니다.</p>
+        <h3 class="text-sm font-semibold text-ink">조직 미지정 행</h3>
+        <p class="text-xs text-ink-muted mt-1">org_id 가 비어 있으면 어느 조직 목록에도 안 보입니다. 비젼관리자를 뺀 계정과 뿌리 17개 표만 셉니다.</p>
       </div>
       <form method="POST" action="/admin/data/org-assign" onsubmit="return confirm('비어 있는 행을 도서관사업팀(O01)으로 지정할까요?');">
-        <button type="submit" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">O01로 지정</button>
+        <button type="submit" class="px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm">O01로 지정</button>
       </form>
     </div>
     {{if .OrgEmpty}}
     <table class="w-full min-w-[900px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">표</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">건수</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">표</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted uppercase whitespace-nowrap">건수</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
@@ -279,90 +280,90 @@
       </tbody>
     </table>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-400 text-center">집계할 표가 없습니다.</p>
+    <p class="px-4 py-8 text-sm text-ink-subtle text-center">집계할 표가 없습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "metrics"}}
-  <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4 max-w-xl">
+  <div class="bg-white rounded-xl border border-line p-5 space-y-4 max-w-xl">
     <div>
-      <h3 class="text-sm font-semibold text-gray-700">지표 기준일</h3>
-      <p class="text-xs text-gray-500 mt-1">통계·대시보드 KPI·보고서 집계에만 적용합니다. AS 목록·상세·검색·이력은 바꾸지 않습니다. 세는 사건의 날짜 칸에 맞는 기준일을 씁니다.</p>
+      <h3 class="text-sm font-semibold text-ink">지표 기준일</h3>
+      <p class="text-xs text-ink-muted mt-1">통계·대시보드 KPI·보고서 집계에만 적용합니다. AS 목록·상세·검색·이력은 바꾸지 않습니다. 세는 사건의 날짜 칸에 맞는 기준일을 씁니다.</p>
     </div>
     <form method="POST" action="/admin/data/metrics" class="space-y-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">접수 기준일 (metrics_base_receipt)</label>
+        <label class="block text-xs text-ink-muted mb-1">접수 기준일 (metrics_base_receipt)</label>
         <input type="date" name="metrics_base_receipt" value="{{.MetricsBaseReceipt}}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        <p class="text-[11px] text-gray-400 mt-1">AS 접수 건수·리드타임 접수 쪽. 접수 기록을 믿을 수 있게 된 날.</p>
+               class="w-full border border-line rounded-lg px-3 py-2 text-sm">
+        <p class="text-[11px] text-ink-subtle mt-1">AS 접수 건수·리드타임 접수 쪽. 접수 기록을 믿을 수 있게 된 날.</p>
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">방문 기준일 (metrics_base_visit)</label>
+        <label class="block text-xs text-ink-muted mb-1">방문 기준일 (metrics_base_visit)</label>
         <input type="date" name="metrics_base_visit" value="{{.MetricsBaseVisit}}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        <p class="text-[11px] text-gray-400 mt-1">정기점검 계획 사이트·행정/지원 계획·리드타임 방문 쪽. 방문 기록을 믿을 수 있게 된 날.</p>
+               class="w-full border border-line rounded-lg px-3 py-2 text-sm">
+        <p class="text-[11px] text-ink-subtle mt-1">정기점검 계획 사이트·행정/지원 계획·리드타임 방문 쪽. 방문 기록을 믿을 수 있게 된 날.</p>
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">완료 기준일 (metrics_base_complete)</label>
+        <label class="block text-xs text-ink-muted mb-1">완료 기준일 (metrics_base_complete)</label>
         <input type="date" name="metrics_base_complete" value="{{.MetricsBaseComplete}}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        <p class="text-[11px] text-gray-400 mt-1">AS 완료 건수·정기점검 완료 사이트·행정/지원 완료·리드타임 완료 쪽. 비우면 제한 없음 — 그 주에 끝낸 일은 접수가 언제였든 셉니다.</p>
+               class="w-full border border-line rounded-lg px-3 py-2 text-sm">
+        <p class="text-[11px] text-ink-subtle mt-1">AS 완료 건수·정기점검 완료 사이트·행정/지원 완료·리드타임 완료 쪽. 비우면 제한 없음 — 그 주에 끝낸 일은 접수가 언제였든 셉니다.</p>
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">옛 기준일 (metrics_base_date) — 지우지 않음</label>
+        <label class="block text-xs text-ink-muted mb-1">옛 기준일 (metrics_base_date) — 지우지 않음</label>
         <input type="date" name="metrics_base_date" value="{{.MetricsBaseDate}}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        <p class="text-[11px] text-gray-400 mt-1">셋의 초기값이자 되돌릴 근거. 집계는 위 셋을 씁니다.</p>
+               class="w-full border border-line rounded-lg px-3 py-2 text-sm">
+        <p class="text-[11px] text-ink-subtle mt-1">셋의 초기값이자 되돌릴 근거. 집계는 위 셋을 씁니다.</p>
       </div>
-      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">저장</button>
+      <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium">저장</button>
     </form>
-    <form method="POST" action="/admin/data/business-days" class="pt-2 border-t border-gray-100 space-y-2"
+    <form method="POST" action="/admin/data/business-days" class="pt-2 border-t border-line space-y-2"
           onsubmit="return confirm('선택한 해부터 영업일 표를 다시 만들까요?');">
-      <p class="text-sm font-semibold text-gray-700">영업일 표 다시 만들기</p>
-      <p class="text-xs text-gray-500">공휴일을 넣은 뒤 리드타임이 안 바뀌면 그 해부터 다시 계산합니다.</p>
+      <p class="text-sm font-semibold text-ink">영업일 표 다시 만들기</p>
+      <p class="text-xs text-ink-muted">공휴일을 넣은 뒤 리드타임이 안 바뀌면 그 해부터 다시 계산합니다.</p>
       <div class="flex flex-wrap items-end gap-2">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">연도</label>
+          <label class="block text-xs text-ink-muted mb-1">연도</label>
           <input type="number" name="year" min="2000" max="2100" placeholder="비우면 전체"
-                 class="w-36 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                 class="w-36 border border-line rounded-lg px-3 py-2 text-sm">
         </div>
-        <button type="submit" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-800 rounded-lg text-sm font-medium">다시 만들기</button>
+        <button type="submit" class="px-4 py-2 border border-line hover:bg-hover text-ink rounded-lg text-sm font-medium">다시 만들기</button>
       </div>
     </form>
   </div>
   {{end}}
 
   {{if eq .Tab "checks"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100">
-      <h3 class="text-sm font-semibold text-gray-700">정합성 점검 (부록 C)</h3>
-      <p class="text-xs text-gray-500 mt-1">V-1~V-8은 지표 기준일 이후입니다. 신규 건(<span class="font-mono">data_origin='app'</span>) 기준입니다. 값을 자동으로 고치지는 않습니다.</p>
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line">
+      <h3 class="text-sm font-semibold text-ink">정합성 점검 (부록 C)</h3>
+      <p class="text-xs text-ink-muted mt-1">V-1~V-8은 지표 기준일 이후입니다. 신규 건(<span class="font-mono">data_origin='app'</span>) 기준입니다. 값을 자동으로 고치지는 않습니다.</p>
     </div>
     {{if .Checks}}
     <table class="w-full min-w-[1200px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">항목</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">목적</th>
-          <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">건수</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">기대</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">항목</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">목적</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">건수</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">기대</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Checks}}
-        <tr class="{{if and (eq .Expected "0") (not .OK)}}bg-amber-50{{end}}">
-          <td class="px-4 py-3 font-mono text-xs text-gray-700 whitespace-nowrap">{{.ID}}</td>
-          <td class="px-4 py-3 text-gray-800 max-w-[18rem]">{{.Purpose}}{{if .Detail}}<p class="text-xs text-gray-400 mt-0.5">{{.Detail}}</p>{{end}}</td>
-          <td class="px-4 py-3 text-right font-semibold whitespace-nowrap {{if and (eq .Expected "0") (not .OK)}}text-amber-800{{else}}text-gray-800{{end}}">{{.Count}}</td>
-          <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{.Expected}}</td>
+        <tr class="{{if and (eq .Expected "0") (not .OK)}}bg-warning-soft{{end}}">
+          <td class="px-4 py-3 font-mono text-xs text-ink whitespace-nowrap">{{.ID}}</td>
+          <td class="px-4 py-3 text-ink max-w-[18rem]">{{.Purpose}}{{if .Detail}}<p class="text-xs text-ink-subtle mt-0.5">{{.Detail}}</p>{{end}}</td>
+          <td class="px-4 py-3 text-right font-semibold whitespace-nowrap {{if and (eq .Expected "0") (not .OK)}}text-warning{{else}}text-ink{{end}}">{{.Count}}</td>
+          <td class="px-4 py-3 text-xs text-ink-muted whitespace-nowrap">{{.Expected}}</td>
         </tr>
         {{if and (or (eq .ID "V-11") (eq .ID "V-12")) .Rows}}
         <tr>
-          <td colspan="4" class="px-4 py-3 bg-gray-50">
-            <p class="text-xs font-semibold text-gray-600 mb-2">{{if eq .ID "V-12"}}착수가 완료보다 늦은 건{{else}}연도 범위 밖 날짜 (수정은 원본 화면에서){{end}}</p>
+          <td colspan="4" class="px-4 py-3 bg-hover">
+            <p class="text-xs font-semibold text-ink-muted mb-2">{{if eq .ID "V-12"}}착수가 완료보다 늦은 건{{else}}연도 범위 밖 날짜 (수정은 원본 화면에서){{end}}</p>
             <table class="w-full text-xs break-keep">
-              <thead><tr class="text-gray-500">
+              <thead><tr class="text-ink-muted">
                 <th class="text-left py-1 whitespace-nowrap">테이블</th>
                 <th class="text-left py-1 whitespace-nowrap">컬럼</th>
                 <th class="text-left py-1 whitespace-nowrap">번호</th>
@@ -374,7 +375,7 @@
                   <td class="py-1 font-mono whitespace-nowrap">{{.Table}}</td>
                   <td class="py-1 font-mono whitespace-nowrap">{{.Column}}</td>
                   <td class="py-1 font-mono whitespace-nowrap">{{if .Number}}{{.Number}}{{else}}{{.EntityID}}{{end}}</td>
-                  <td class="py-1 font-mono text-amber-800 whitespace-nowrap">{{.Value}}</td>
+                  <td class="py-1 font-mono text-warning whitespace-nowrap">{{.Value}}</td>
                 </tr>
                 {{end}}
               </tbody>
@@ -386,70 +387,70 @@
       </tbody>
     </table>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-400 text-center">점검 결과를 불러오지 못했습니다.</p>
+    <p class="px-4 py-8 text-sm text-ink-subtle text-center">점검 결과를 불러오지 못했습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "assignees"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100">
-      <h3 class="text-sm font-semibold text-gray-700">담당자 이름 ↔ 직원 ID 매칭 실패</h3>
-      <p class="text-xs text-gray-500 mt-1">이름 열이 <span class="font-mono">users</span> 에 없는 값입니다. 우리 직원이 아니면 사용자로 넣지 말고 외부 협력사 담당자로 다룹니다. <span class="font-mono">assignee</span> 에는 우리 직원만 들어갑니다.</p>
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line">
+      <h3 class="text-sm font-semibold text-ink">담당자 이름 ↔ 직원 ID 매칭 실패</h3>
+      <p class="text-xs text-ink-muted mt-1">이름 열이 <span class="font-mono">users</span> 에 없는 값입니다. 우리 직원이 아니면 사용자로 넣지 말고 외부 협력사 담당자로 다룹니다. <span class="font-mono">assignee</span> 에는 우리 직원만 들어갑니다.</p>
     </div>
     {{if .UnmatchedAssignees}}
     <table class="w-full min-w-[900px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">테이블</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">열</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">이름</th>
-          <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">건수</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">테이블</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">열</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">이름</th>
+          <th class="text-right px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">건수</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .UnmatchedAssignees}}
-        <tr class="bg-amber-50">
-          <td class="px-4 py-3 font-mono text-xs text-gray-700 whitespace-nowrap">{{.Table}}</td>
-          <td class="px-4 py-3 font-mono text-xs text-gray-700 whitespace-nowrap">{{.Column}}</td>
-          <td class="px-4 py-3 text-amber-900 font-medium whitespace-nowrap">{{.Name}}</td>
-          <td class="px-4 py-3 text-right font-semibold text-amber-800 whitespace-nowrap">{{.Count}}</td>
+        <tr class="bg-warning-soft">
+          <td class="px-4 py-3 font-mono text-xs text-ink whitespace-nowrap">{{.Table}}</td>
+          <td class="px-4 py-3 font-mono text-xs text-ink whitespace-nowrap">{{.Column}}</td>
+          <td class="px-4 py-3 text-warning font-medium whitespace-nowrap">{{.Name}}</td>
+          <td class="px-4 py-3 text-right font-semibold text-warning whitespace-nowrap">{{.Count}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-500 text-center">매칭 실패가 없습니다. 이름 열을 지우기 전에 한두 주 더 돌려 보세요.</p>
+    <p class="px-4 py-8 text-sm text-ink-muted text-center">매칭 실패가 없습니다. 이름 열을 지우기 전에 한두 주 더 돌려 보세요.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "processes"}}
-  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+  <div class="bg-white rounded-xl border border-line overflow-hidden">
+    <div class="px-4 py-3 border-b border-line flex items-start justify-between gap-3">
       <div>
-        <h3 class="text-sm font-semibold text-gray-700">접수 조치 ↔ 처리 이력 어긋남</h3>
-        <p class="text-xs text-gray-500 mt-1"><span class="font-mono">as_receipts.action_taken</span> 과 <span class="font-mono">as_processes.work_content</span> 가 둘 다 있는데 내용이 다릅니다. 화면은 이력을 정답으로 보여 줍니다. <strong>사람이 확인하기 전에는 어느 열도 지우지 않습니다.</strong></p>
+        <h3 class="text-sm font-semibold text-ink">접수 조치 ↔ 처리 이력 어긋남</h3>
+        <p class="text-xs text-ink-muted mt-1"><span class="font-mono">as_receipts.action_taken</span> 과 <span class="font-mono">as_processes.work_content</span> 가 둘 다 있는데 내용이 다릅니다. 화면은 이력을 정답으로 보여 줍니다. <strong>사람이 확인하기 전에는 어느 열도 지우지 않습니다.</strong></p>
       </div>
-      <a href="/admin/data/process-conflicts.xlsx" class="shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium">xlsx 받기</a>
+      <a href="/admin/data/process-conflicts.xlsx" class="shrink-0 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-medium">xlsx 받기</a>
     </div>
     {{if .ProcessConflicts}}
     <div class="overflow-x-auto">
     <table class="w-full min-w-[900px] text-sm break-keep">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-hover border-b border-line">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">AS번호</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">사이트</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">접수 조치</th>
-          <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">이력 조치</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">AS번호</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">사이트</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">접수 조치</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted whitespace-nowrap">이력 조치</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .ProcessConflicts}}
-        <tr class="bg-amber-50 align-top">
-          <td class="px-4 py-3 font-mono text-xs text-gray-800 whitespace-nowrap">{{.ASNumber}}</td>
-          <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{.OrgName}}</td>
-          <td class="px-4 py-3 text-amber-900 text-xs whitespace-pre-wrap whitespace-nowrap">{{.ReceiptAction}}</td>
+        <tr class="bg-warning-soft align-top">
+          <td class="px-4 py-3 font-mono text-xs text-ink whitespace-nowrap">{{.ASNumber}}</td>
+          <td class="px-4 py-3 text-ink whitespace-nowrap">{{.OrgName}}</td>
+          <td class="px-4 py-3 text-warning text-xs whitespace-pre-wrap whitespace-nowrap">{{.ReceiptAction}}</td>
           <td class="px-4 py-3 text-blue-900 text-xs whitespace-pre-wrap whitespace-nowrap">{{.ProcessAction}}</td>
         </tr>
         {{end}}
@@ -457,30 +458,30 @@
     </table>
     </div>
     {{else}}
-    <p class="px-4 py-8 text-sm text-gray-500 text-center">어긋난 건이 없습니다. 접수 조치 열은 아직 지우지 않습니다.</p>
+    <p class="px-4 py-8 text-sm text-ink-muted text-center">어긋난 건이 없습니다. 접수 조치 열은 아직 지우지 않습니다.</p>
     {{end}}
   </div>
   {{end}}
 
   {{if eq .Tab "import"}}
   <div class="space-y-4">
-    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-      <h3 class="text-sm font-semibold text-gray-700">과거 AS 정제 반입</h3>
-      <p class="text-xs text-gray-500">엑셀·CSV를 올려도 바로 반영하지 않습니다. 검증 리포트에서 오류를 고치거나 제외한 뒤 반영합니다. 반영 건은 지표에서 기본 제외되며, 배치로 일괄 취소할 수 있습니다. 키워드는 후보만 계산하고 확정하지 않습니다.</p>
+    <div class="bg-white rounded-xl border border-line p-4 space-y-3">
+      <h3 class="text-sm font-semibold text-ink">과거 AS 정제 반입</h3>
+      <p class="text-xs text-ink-muted">엑셀·CSV를 올려도 바로 반영하지 않습니다. 검증 리포트에서 오류를 고치거나 제외한 뒤 반영합니다. 반영 건은 지표에서 기본 제외되며, 배치로 일괄 취소할 수 있습니다. 키워드는 후보만 계산하고 확정하지 않습니다.</p>
       <form method="POST" action="/admin/data/import" enctype="multipart/form-data" class="flex flex-wrap items-end gap-3">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">파일</label>
+          <label class="block text-xs text-ink-muted mb-1">파일</label>
           <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="text-sm">
         </div>
-        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">올려서 검증</button>
+        <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium">올려서 검증</button>
       </form>
     </div>
 
     {{if .ImportBatches}}
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div class="px-4 py-3 border-b border-gray-100"><h3 class="text-sm font-semibold text-gray-700">배치</h3></div>
+    <div class="bg-white rounded-xl border border-line overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h3 class="text-sm font-semibold text-ink">배치</h3></div>
       <table class="w-full min-w-[900px] text-sm break-keep">
-        <thead class="bg-gray-50 border-b text-xs text-gray-500">
+        <thead class="bg-hover border-b text-xs text-ink-muted">
           <tr>
             <th class="text-left px-4 py-2 whitespace-nowrap">배치</th>
             <th class="text-left px-4 py-2 whitespace-nowrap">파일</th>
@@ -498,7 +499,7 @@
             <td class="px-4 py-2 whitespace-nowrap">{{.StatusLabel}}</td>
             <td class="px-4 py-2 text-right whitespace-nowrap">{{.TotalRows}}</td>
             <td class="px-4 py-2 text-right whitespace-nowrap">{{.ErrorRows}}</td>
-            <td class="px-4 py-2 text-right whitespace-nowrap"><a href="/admin/data?tab=import&batch={{.BatchID}}" class="text-xs text-blue-600 hover:underline">리포트</a></td>
+            <td class="px-4 py-2 text-right whitespace-nowrap"><a href="/admin/data?tab=import&batch={{.BatchID}}" class="text-xs text-primary hover:underline">리포트</a></td>
           </tr>
           {{end}}
         </tbody>
@@ -507,23 +508,23 @@
     {{end}}
 
     {{if .ImportBatch}}
-    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+    <div class="bg-white rounded-xl border border-line p-4 space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 class="text-sm font-semibold text-gray-800">검증 리포트 {{.ImportBatch.BatchID}}</h3>
-          <p class="text-xs text-gray-500 mt-0.5">{{.ImportBatch.Filename}} · {{.ImportBatch.StatusLabel}} · 전체 {{.ImportBatch.TotalRows}} · 오류 {{.ImportBatch.ErrorRows}} · 자산미매칭 {{.ImportBatch.WarningRows}} · 제외 {{.ImportBatch.ExcludedRows}} · 반영가능 {{.ImportBatch.ReadyRows}}</p>
+          <h3 class="text-sm font-semibold text-ink">검증 리포트 {{.ImportBatch.BatchID}}</h3>
+          <p class="text-xs text-ink-muted mt-0.5">{{.ImportBatch.Filename}} · {{.ImportBatch.StatusLabel}} · 전체 {{.ImportBatch.TotalRows}} · 오류 {{.ImportBatch.ErrorRows}} · 자산미매칭 {{.ImportBatch.WarningRows}} · 제외 {{.ImportBatch.ExcludedRows}} · 반영가능 {{.ImportBatch.ReadyRows}}</p>
         </div>
         <div class="flex gap-2">
           {{if eq .ImportBatch.Status "reported"}}
           <form method="POST" action="/admin/data/import/{{.ImportBatch.BatchID}}/apply"
                 onsubmit="return confirm('검증을 통과한 행만 반영합니다. 계속할까요?');">
-            <button type="submit" class="px-3 py-1.5 rounded-lg text-sm text-white {{if .ImportBatch.CanApply}}bg-blue-600 hover:bg-blue-700{{else}}bg-gray-300 cursor-not-allowed{{end}}" {{if not .ImportBatch.CanApply}}disabled{{end}}>반영</button>
+            <button type="submit" class="px-3 py-1.5 rounded-lg text-sm text-white {{if .ImportBatch.CanApply}}bg-primary hover:bg-primary-hover{{else}}bg-gray-300 cursor-not-allowed{{end}}" {{if not .ImportBatch.CanApply}}disabled{{end}}>반영</button>
           </form>
           {{end}}
           {{if .ImportBatch.CanCancel}}
           <form method="POST" action="/admin/data/import/{{.ImportBatch.BatchID}}/cancel"
                 onsubmit="return confirm('이 배치로 반영한 접수를 한꺼번에 지웁니다. 계속할까요?');">
-            <button type="submit" class="px-3 py-1.5 rounded-lg text-sm border border-red-200 text-red-700 hover:bg-red-50">일괄 취소</button>
+            <button type="submit" class="px-3 py-1.5 rounded-lg text-sm border border-danger text-danger hover:bg-danger-soft">일괄 취소</button>
           </form>
           {{end}}
         </div>
@@ -534,7 +535,7 @@
         <h4 class="text-xs font-semibold text-red-800 mb-2">오류 · 제외하거나 기관·날짜를 고치세요</h4>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[900px] text-xs break-keep">
-            <thead class="text-gray-500 border-b"><tr>
+            <thead class="text-ink-muted border-b"><tr>
               <th class="text-left py-1 pr-2 whitespace-nowrap">행</th>
               <th class="text-left py-1 pr-2 whitespace-nowrap">기관</th>
               <th class="text-left py-1 pr-2 whitespace-nowrap">접수일</th>
@@ -550,17 +551,17 @@
                 <td class="py-2 pr-2 whitespace-nowrap">{{.CustomerRaw}}</td>
                 <td class="py-2 pr-2 font-mono whitespace-nowrap">{{if .ReceiptDate}}{{.ReceiptDate}}{{else}}{{.ReceiptRaw}}{{end}}</td>
                 <td class="py-2 pr-2 max-w-xs truncate whitespace-nowrap">{{.Symptom}}</td>
-                <td class="py-2 pr-2 text-red-700 whitespace-nowrap">{{.IssueText}}</td>
+                <td class="py-2 pr-2 text-danger whitespace-nowrap">{{.IssueText}}</td>
                 <td class="py-2 whitespace-nowrap">
                   {{if eq $.ImportBatch.Status "reported"}}
                   <form method="POST" action="/admin/data/import/{{$.ImportBatch.BatchID}}/exclude" class="inline">
                     <input type="hidden" name="row_no" value="{{.RowNo}}">
                     {{if .Excluded}}
                     <input type="hidden" name="excluded" value="0">
-                    <button class="text-blue-600 hover:underline">제외 해제</button>
+                    <button class="text-primary hover:underline">제외 해제</button>
                     {{else}}
                     <input type="hidden" name="excluded" value="1">
-                    <button class="text-red-600 hover:underline">제외</button>
+                    <button class="text-danger hover:underline">제외</button>
                     {{end}}
                   </form>
                   {{if not .Excluded}}
@@ -571,7 +572,7 @@
                       {{range $.ImportCustomers}}<option value="{{.CustomerID}}" {{if eq $err.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>{{end}}
                     </select>
                     <input type="date" name="receipt_date" min="2000-01-01" max="2100-12-31" value="{{.ReceiptDate}}" class="border rounded px-1 py-0.5">
-                    <button class="text-blue-600 hover:underline">수정</button>
+                    <button class="text-primary hover:underline">수정</button>
                   </form>
                   {{end}}
                   {{end}}
@@ -586,8 +587,8 @@
 
       {{if .ImportReady}}
       <div>
-        <h4 class="text-xs font-semibold text-green-800 mb-2">반영 가능 ({{len .ImportReady}}건)</h4>
-        <ul class="text-xs text-gray-600 space-y-1 max-h-64 overflow-auto">
+        <h4 class="text-xs font-semibold text-success mb-2">반영 가능 ({{len .ImportReady}}건)</h4>
+        <ul class="text-xs text-ink-muted space-y-1 max-h-64 overflow-auto">
           {{range .ImportReady}}
           <li><span class="font-mono">{{.RowNo}}</span> {{.CustomerRaw}} · {{.ReceiptDate}} · {{.Symptom}}</li>
           {{end}}
@@ -596,6 +597,73 @@
       {{end}}
     </div>
     {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "product_cat"}}
+  <div class="space-y-4" data-product-cat>
+    <p class="text-sm text-ink-muted">고유번호는 SPC### 일련이며 지워도 다시 쓰지 않습니다. 키는 바꿀 수 없고, 분류명은 겹칠 수 없습니다. 자산이 쓰는 분류는 삭제 대신 사용중지합니다.</p>
+    <form method="POST" action="/admin/data/product-categories" class="bg-white rounded-xl border border-line p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+      <div>
+        <label class="block text-xs font-medium text-ink-muted mb-1">키</label>
+        <input name="code_value" required placeholder="firewall" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-ink-muted mb-1">분류명</label>
+        <input name="code_name" required placeholder="방화벽" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-ink-muted mb-1">순서</label>
+        <input type="number" name="sort_order" value="0" class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="bg-primary hover:bg-primary-hover text-white rounded-lg py-2 text-sm font-medium">등록 (고유번호 자동)</button>
+    </form>
+    <div class="bg-white rounded-xl border border-line overflow-x-auto">
+      <table class="w-full min-w-[900px] text-sm break-keep">
+        <thead class="bg-hover border-b border-line"><tr>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted">고유번호</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted">키</th>
+          <th class="text-left px-4 py-3 text-xs font-semibold text-ink-muted">분류명</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-ink-muted">사용</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-ink-muted">활성</th>
+          <th class="text-center px-4 py-3 text-xs font-semibold text-ink-muted">작업</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          {{range .ProductCats}}
+          <tr>
+            <td class="px-4 py-2.5 font-mono text-xs">{{.CodeID}}</td>
+            <td class="px-4 py-2.5 font-mono text-xs">{{.CodeValue}}</td>
+            <td class="px-4 py-2.5">
+              <form method="POST" action="/admin/data/product-categories/{{.CodeID}}" class="flex gap-2 items-center">
+                <input type="hidden" name="code_value" value="{{.CodeValue}}">
+                <input type="hidden" name="sort_order" value="{{.SortOrder}}">
+                <input type="hidden" name="is_active" value="{{if .IsActive}}1{{else}}0{{end}}">
+                <input name="code_name" value="{{.CodeName}}" class="border rounded px-2 py-1 text-sm w-40">
+                <button class="text-primary text-xs">이름저장</button>
+              </form>
+            </td>
+            <td class="px-4 py-2.5 text-center text-xs">{{.UseCount}}</td>
+            <td class="px-4 py-2.5 text-center">{{if .IsActive}}<span class="text-green-600">●</span>{{else}}<span class="text-ink-subtle">●</span>{{end}}</td>
+            <td class="px-4 py-2.5 text-center whitespace-nowrap">
+              {{if .IsActive}}
+              <form method="POST" action="/admin/data/product-categories/{{.CodeID}}/deactivate" class="inline">
+                <button class="text-warning text-xs">사용중지</button>
+              </form>
+              {{end}}
+              {{if eq .UseCount 0}}
+              <form method="POST" action="/admin/data/product-categories/{{.CodeID}}/delete" class="inline"
+                    onsubmit="return confirm('삭제할까요? 고유번호는 다시 쓰지 않습니다.')">
+                <button class="text-red-500 text-xs">삭제</button>
+              </form>
+              {{else}}
+              <span class="text-xs text-ink-subtle">사용 중 삭제 불가</span>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
   </div>
   {{end}}
 </div>

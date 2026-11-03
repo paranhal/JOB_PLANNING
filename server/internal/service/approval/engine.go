@@ -57,14 +57,14 @@ func (e *Engine) submitTx(actor Actor, requestID string, resubmit bool) error {
 	if req.DrafterID != actor.UserID && !isAdminRole(actor.Role) {
 		return fmt.Errorf("기안자만 상신할 수 있다")
 	}
-	head, err := e.OrgHead(req.OrgID)
+	head, err := scanOrgHead(tx, req.OrgID)
 	if err != nil {
 		return err
 	}
 	if head == "" {
 		return fmt.Errorf("팀장이 지정되지 않은 조직은 상신할 수 없다")
 	}
-	p, err := e.GetPolicy(req.OrgID)
+	p, err := loadPolicy(tx, req.OrgID)
 	if err != nil {
 		return err
 	}

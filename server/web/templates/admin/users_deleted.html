@@ -1,10 +1,43 @@
 {{define "title"}}삭제 내역 · {{appName}}{{end}}
 {{define "content"}}
 <div class="space-y-5">
-  <a href="/admin/users" class="text-ui font-semibold text-ink-muted">‹ 사용자 관리</a>
   <h2 class="text-ui-xl font-extrabold text-ink">삭제 내역</h2>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}{{if .TempPW}} <code class="font-mono bg-surface px-2 py-0.5 rounded-control">{{.TempPW}}</code> <span class="text-ui-xs">새로고침하면 다시 안 보입니다.</span>{{end}}</div>{{end}}
   {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <div class="flex gap-4 border-b border-line">
+    <a href="/admin/users/deleted" class="px-3 py-2 text-ui-sm {{if ne .Tab "reservations"}}border-b-2 border-primary text-primary font-semibold{{else}}text-ink-muted{{end}}">삭제 내역</a>
+    <a href="/admin/users/deleted?tab=reservations" class="px-3 py-2 text-ui-sm {{if eq .Tab "reservations"}}border-b-2 border-primary text-primary font-semibold{{else}}text-ink-muted{{end}}">예약된 아이디</a>
+  </div>
+  {{if eq .Tab "reservations"}}
+  <div class="card overflow-hidden">
+    <table class="table-base min-w-[720px]">
+      <thead><tr class="bg-canvas text-ui-xs text-ink-muted text-left">
+        <th class="px-4 py-3">아이디</th><th class="px-4 py-3">사유</th><th class="px-4 py-3">소유자</th><th class="px-4 py-3">예약일</th><th class="px-4 py-3"></th>
+      </tr></thead>
+      <tbody>
+      {{if not .Reservations}}<tr><td colspan="5" class="px-4 py-12 text-center text-ink-subtle">예약된 아이디가 없습니다.</td></tr>{{end}}
+      {{range .Reservations}}
+      <tr class="border-t border-line">
+        <td class="px-4 py-3 font-mono">{{.UsernameNorm}}</td>
+        <td class="px-4 py-3">{{.ReasonLabel}}</td>
+        <td class="px-4 py-3">{{if .OwnerName}}{{.OwnerName}}{{if .OwnerUsername}} ({{.OwnerUsername}}){{end}}{{if .OwnerDeleted}} · 삭제됨{{end}}{{else}}—{{end}}</td>
+        <td class="px-4 py-3 whitespace-nowrap">{{.CreatedAt}}</td>
+        <td class="px-4 py-3">
+          <form method="POST" action="/admin/users/reservations/release" class="space-y-1">
+            <input type="hidden" name="username" value="{{.UsernameNorm}}">
+            <input type="hidden" name="return" value="/admin/users/deleted">
+            <input type="hidden" name="dup" value="{{if eq .Reason "renamed_from"}}renamed{{else if eq .Reason "deleted"}}deleted{{else}}reserved{{end}}">
+            <input type="password" name="vision_password" placeholder="비젼관리자 비밀번호" class="input text-ui-xs" required>
+            <input name="reason" placeholder="해제 사유" class="input text-ui-xs" required>
+            <button class="btn btn-primary btn-sm">해제</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
   <div class="card overflow-hidden">
     <table class="table-base min-w-[960px]">
       <thead><tr class="bg-canvas text-ui-xs text-ink-muted text-left">
@@ -39,5 +72,6 @@
       </tbody>
     </table>
   </div>
+  {{end}}
 </div>
 {{end}}

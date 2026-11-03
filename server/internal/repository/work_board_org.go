@@ -62,7 +62,12 @@ func (r *WorkBoardRepo) filterWorkListForOrg(items []model.WorkListItem, orgID s
 		case model.WorkPrefixMaintenance:
 			keep = visitOK[id]
 		default:
-			keep = taskOK[id]
+			// 납품 시리얼 미입력은 work_tasks 가 아니다. 조직 필터로 지우면 §36.10 미계획함이 비게 된다.
+			if it.Status == "serial" {
+				keep = true
+			} else {
+				keep = taskOK[id]
+			}
 		}
 		if keep {
 			out = append(out, it)

@@ -86,7 +86,7 @@ func TestSalesActivitySplit91CreateRejectsLegacyType(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "검증91"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "검증91"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestSalesActivityFilterTypeAndMethodAND(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "필터91"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "필터91"}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

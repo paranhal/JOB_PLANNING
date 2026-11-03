@@ -4,7 +4,7 @@
      role="dialog" aria-modal="true" aria-labelledby="login-briefing-title"
      x-data="{
        open: true,
-       csrf: {{printf "%q" .CSRFToken}},
+       csrf: {{toJSON .CSRFToken}},
        close() { this.open = false; },
        async hideToday() {
          try {

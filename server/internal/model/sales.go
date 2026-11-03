@@ -144,6 +144,7 @@ func (d SalesStageDef) IsLost() bool {
 type SalesProject struct {
 	SalesID                 string
 	Name                    string
+	TentativeName           string
 	IsTentativeName         bool
 	DealType                string
 	Stage                   string
@@ -163,6 +164,7 @@ type SalesProject struct {
 	ExpectedAmountConfirmed bool
 	SalesOwner              string
 	SalesOwnerID            string
+	SalesOwnerIDs           []string
 	Competitor              string
 	LeadSource              string
 	LostReason              string
@@ -324,6 +326,7 @@ func WorkProjectFromSales(s *SalesProject) *WorkProject {
 	}
 	p := &WorkProject{
 		Name:            strings.TrimSpace(s.Name),
+		OrgID:           strings.TrimSpace(s.OrgID),
 		CustomerID:      cust,
 		OrderingPartyID: cust,
 		IsPaid:          true,
@@ -347,6 +350,9 @@ func WorkProjectFromSales(s *SalesProject) *WorkProject {
 		if y, err := strconv.Atoi(ym[:4]); err == nil {
 			p.PlanYear = y
 		}
+	}
+	if p.PlanYear == 0 {
+		p.PlanYear = time.Now().Year()
 	}
 	notes := strings.TrimSpace(s.Notes)
 	if amt := s.AmountLabel(); amt != "" {

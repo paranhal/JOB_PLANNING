@@ -2,7 +2,6 @@
 {{define "content"}}
 <div class="max-w-4xl mx-auto space-y-4">
   <div>
-    <a href="/labor-rates?year={{.Year}}" class="text-sm text-gray-500 hover:underline">← 노임단가</a>
     <h2 class="text-xl font-bold text-gray-800 mt-1">노임단가 엑셀 올리기</h2>
     <p class="text-sm text-gray-500">파일은 저장하지 않습니다. 값만 미리보기한 뒤 반영합니다. 5MB · xlsx.</p>
   </div>
@@ -50,7 +49,7 @@
   <form method="post" action="/labor-rates/upload/apply" class="bg-white rounded-xl border overflow-x-auto">
     <input type="hidden" name="year" value="{{.Year}}">
     <input type="hidden" name="file_name" value="{{.FileName}}">
-    <table class="w-full min-w-[900px] text-sm break-keep">
+    <table data-table-cols-skip class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b text-xs text-gray-500"><tr>
         <th class="px-3 py-2 text-left whitespace-nowrap">직무</th>
         <th class="px-3 py-2 whitespace-nowrap">월</th>

@@ -16,7 +16,7 @@ func TestCountProjectActivitiesMapsWorkType(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	prepo := NewProjectRepo(db)
 	wb := NewWBRepo(db)
-	p := &model.WorkProject{Name: "활동사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1, ProjectKind: model.ProjectKindBuild, ProjectKindSet: 1}
+	p := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "활동사업", PlanYear: 2026, Status: model.WBProjectActive, ContractAmount: 1, ProjectKind: model.ProjectKindBuild, ProjectKindSet: 1}
 	if err := prepo.Create(p); err != nil {
 		t.Fatal(err)
 	}

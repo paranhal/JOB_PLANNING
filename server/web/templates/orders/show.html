@@ -3,7 +3,6 @@
 <div class="max-w-4xl mx-auto space-y-4">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
-      <a href="/orders" class="text-sm text-gray-500 hover:underline">← 목록</a>
       <h2 class="text-xl font-bold text-gray-800 mt-1 font-mono">{{if .Order.SalesDisplayNo}}{{.Order.SalesDisplayNo}} / {{end}}{{.Order.DisplayNo}}</h2>
       <p class="text-sm text-gray-500 mt-1">{{.Order.OrderDate}} · {{orderStatusLabel .Order.Status}} · {{vatModeLabel .Order.VATMode}}</p>
       {{if .Differs}}
@@ -39,7 +38,7 @@
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-    <table class="w-full min-w-[900px] text-sm break-keep">
+    <table data-table-cols-skip class="w-full min-w-[900px] text-sm break-keep">
       <thead class="bg-gray-50 border-b"><tr>
         <th class="text-left px-4 py-2 text-xs text-gray-500 whitespace-nowrap">내용</th>
         <th class="text-right px-4 py-2 text-xs text-gray-500 whitespace-nowrap">수량</th>
@@ -104,7 +103,7 @@
     <p class="text-xs text-gray-500">재고·수량 잔고는 계산하지 않습니다. 라인별 발주 기록만 남깁니다.</p>
     {{if .Order.Purchases}}
     <div class="overflow-x-auto">
-      <table class="w-full min-w-[900px] text-sm break-keep">
+      <table data-table-cols-skip class="w-full min-w-[900px] text-sm break-keep">
         <thead class="bg-gray-50 border-b"><tr>
           <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">공급사</th>
           <th class="text-left px-3 py-2 text-xs text-gray-500 whitespace-nowrap">발주일</th>

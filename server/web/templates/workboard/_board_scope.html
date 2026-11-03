@@ -20,8 +20,25 @@
      data-view="{{.View}}"
      data-date="{{.Date}}"
      data-redirect="{{.ScheduleRedirect}}"
-     data-scope-all="{{if .ScopeAll}}1{{else}}0{{end}}">
+     data-scope-all="{{if .ScopeAll}}1{{else}}0{{end}}"
+     data-leave-names='{{toJSON .DayLeaveNames}}'>
 {{template "board_scope_hints" .}}
+{{if .PastDayLocked}}
+<div class="mb-3 rounded-control border border-warning bg-warning-soft px-4 py-3 text-ui text-ink" role="status">
+  <p>지난 날짜는 <strong>읽기 전용</strong>입니다.{{if .CanUnlockPast}} 관리자는 수정 전용 비밀번호로 잠금을 해제할 수 있습니다.{{end}}</p>
+  {{if .CanUnlockPast}}
+  <button type="button" class="mt-2 rounded-lg border border-warning bg-surface px-3 py-1.5 text-ui-sm font-semibold" data-unlock-open="1">수정 잠금 해제</button>
+  {{end}}
+</div>
+{{end}}
+{{if .EditUnlocked}}
+<div class="mb-3 rounded-control border border-success bg-success-soft px-4 py-2.5 text-ui text-ink">지난 날짜 수정 잠금이 해제되어 있습니다{{if .UnlockExpires}} ({{.UnlockExpires}}까지){{end}}.</div>
+{{end}}
+{{if .FlashErrMsg}}
+<div class="flash-danger rounded-control mb-3" role="alert">{{.FlashErrMsg}}</div>
+{{else if .FlashErr}}
+<div class="flash-danger rounded-control mb-3" role="alert">{{.FlashErr}}</div>
+{{end}}
 <div class="board-layout" id="board-layout">
 <div class="board-main">
 {{end}}
@@ -32,5 +49,34 @@
 </div>
 {{template "wb_new_work_modal" .}}
 {{template "board_place_modal" .}}
+<form method="post" action="/workboard/schedule" id="board-move-form" class="js-keep-modal hidden">
+  <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
+  <input type="hidden" name="kind" id="board-m-kind">
+  <input type="hidden" name="ref_id" id="board-m-ref">
+  <input type="hidden" name="title" id="board-m-title">
+  <input type="hidden" name="assignee" id="board-m-assignee">
+  <input type="hidden" name="assignee_from_column" id="board-m-from-col" value="">
+  <input type="hidden" name="duration_min" id="board-m-dur" value="30">
+  <input type="hidden" name="work_date" id="board-m-date">
+  <input type="hidden" name="start_time" id="board-m-start">
+  <input type="hidden" name="end_time" id="board-m-end">
+</form>
+{{if .CanUnlockPast}}
+<div id="board-unlock" hidden class="modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="modal-panel w-full max-w-md shadow-pop">
+    <h3 class="text-ui font-bold text-ink">지난 날짜 수정 잠금 해제</h3>
+    <form method="POST" action="/workboard/register/unlock-past" class="mt-3 space-y-3">
+      <input type="hidden" name="date" value="{{.Date}}">
+      <input type="hidden" name="redirect" value="{{.UnlockRedirect}}">
+      <p class="text-ui-sm text-ink-muted">AS 완료 건 수정과 동일한 수정 전용 비밀번호를 입력하세요. 해제 후 30분간 이 날짜를 수정할 수 있습니다.</p>
+      <input type="password" name="unlock_password" required autocomplete="off" class="w-full rounded-lg border border-line px-3 py-2 text-ui" placeholder="수정 전용 비밀번호">
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-unlock-close="1">취소</button>
+        <button type="submit" class="btn btn-primary">잠금 해제</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
 </div>
 {{end}}

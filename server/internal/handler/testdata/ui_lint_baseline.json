@@ -6,6 +6,76 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "_customer_combo.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_org_picker.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_partials/dup_username_dialog.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_partials/login_briefing.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_partials/page_back.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_partials/schedule_show_toggle.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_partials/view_group_toggle.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_project_year_dates.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_site_multi_picker.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "_ui_assignee_picker.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "admin/account_requests.html": {
     "raw_color": 0,
     "hex": 0,
@@ -28,7 +98,7 @@
     "cdn": 0
   },
   "admin/data.html": {
-    "raw_color": 285,
+    "raw_color": 30,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -56,7 +126,7 @@
     "cdn": 0
   },
   "admin/members.html": {
-    "raw_color": 39,
+    "raw_color": 38,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -98,14 +168,14 @@
     "cdn": 0
   },
   "admin/orgs.html": {
-    "raw_color": 60,
+    "raw_color": 59,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "admin/permissions.html": {
-    "raw_color": 29,
+    "raw_color": 3,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -161,7 +231,7 @@
     "cdn": 0
   },
   "admin_work/list.html": {
-    "raw_color": 28,
+    "raw_color": 25,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -183,6 +253,48 @@
   },
   "as/_action_attach.html": {
     "raw_color": 34,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "as/_action_moved.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "as/_action_parts.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "as/_action_set.html": {
+    "raw_color": 41,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "as/_action_side.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "as/_action_work_time.html": {
+    "raw_color": 13,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "as/_cause_cat1.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -217,14 +329,14 @@
     "cdn": 0
   },
   "as/_keywords.html": {
-    "raw_color": 10,
+    "raw_color": 20,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "as/_list_table.html": {
-    "raw_color": 53,
+    "raw_color": 8,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -273,21 +385,21 @@
     "cdn": 0
   },
   "as/action.html": {
-    "raw_color": 232,
+    "raw_color": 269,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "as/form.html": {
-    "raw_color": 198,
+    "raw_color": 26,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "as/kanban.html": {
-    "raw_color": 18,
+    "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -322,28 +434,28 @@
     "cdn": 0
   },
   "as/list.html": {
-    "raw_color": 29,
+    "raw_color": 7,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "as/report.html": {
-    "raw_color": 146,
+    "raw_color": 145,
     "hex": 1,
     "inline_style": 11,
     "style_tag": 0,
     "cdn": 0
   },
   "as/search.html": {
-    "raw_color": 46,
+    "raw_color": 45,
     "hex": 1,
     "inline_style": 0,
     "style_tag": 1,
     "cdn": 0
   },
   "as/show.html": {
-    "raw_color": 210,
+    "raw_color": 216,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -357,14 +469,14 @@
     "cdn": 0
   },
   "as/stats.html": {
-    "raw_color": 67,
+    "raw_color": 36,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "as/work_action.html": {
-    "raw_color": 74,
+    "raw_color": 72,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -384,6 +496,13 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "asset/import.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "asset/list.html": {
     "raw_color": 144,
     "hex": 0,
@@ -392,7 +511,7 @@
     "cdn": 0
   },
   "asset/show.html": {
-    "raw_color": 78,
+    "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -441,7 +560,7 @@
     "cdn": 0
   },
   "auth/users.html": {
-    "raw_color": 135,
+    "raw_color": 15,
     "hex": 3,
     "inline_style": 0,
     "style_tag": 0,
@@ -455,14 +574,14 @@
     "cdn": 0
   },
   "code/list.html": {
-    "raw_color": 36,
+    "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "contact/form.html": {
-    "raw_color": 57,
+    "raw_color": 55,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -476,7 +595,7 @@
     "cdn": 0
   },
   "contact/show.html": {
-    "raw_color": 40,
+    "raw_color": 38,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -489,8 +608,22 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "contracts/link.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "contracts/list.html": {
-    "raw_color": 25,
+    "raw_color": 1,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "contracts/modal.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -503,22 +636,50 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "coop/_detail.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "coop/_form.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "coop/list.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "customer/form.html": {
-    "raw_color": 80,
+    "raw_color": 78,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "customer/list.html": {
-    "raw_color": 131,
+    "raw_color": 16,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "customer/org_import.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "customer/show.html": {
-    "raw_color": 75,
+    "raw_color": 17,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -552,6 +713,34 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "error/not_found.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "exec/dashboard.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "exec/org_soon.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "exec/work.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "items/_pick.html": {
     "raw_color": 23,
     "hex": 0,
@@ -560,7 +749,7 @@
     "cdn": 0
   },
   "items/form.html": {
-    "raw_color": 71,
+    "raw_color": 69,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -580,11 +769,25 @@
     "style_tag": 0,
     "cdn": 0
   },
-  "layout/base.html": {
-    "raw_color": 215,
+  "layout/_nav_tree.html": {
+    "raw_color": 0,
     "hex": 0,
-    "inline_style": 2,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "layout/base.html": {
+    "raw_color": 66,
+    "hex": 0,
+    "inline_style": 1,
     "style_tag": 1,
+    "cdn": 0
+  },
+  "leave/_stamps.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
     "cdn": 0
   },
   "leave/approval_show.html": {
@@ -622,8 +825,22 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "maintenance/_assignee_multi.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "maintenance/bulk.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "maintenance/list.html": {
-    "raw_color": 6,
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -637,7 +854,7 @@
     "cdn": 0
   },
   "maintenance/plan_duplicates.html": {
-    "raw_color": 12,
+    "raw_color": 2,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -651,7 +868,7 @@
     "cdn": 0
   },
   "maintenance/plan_manage.html": {
-    "raw_color": 154,
+    "raw_color": 142,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -665,9 +882,16 @@
     "cdn": 0
   },
   "maintenance/plan_show.html": {
-    "raw_color": 156,
+    "raw_color": 152,
     "hex": 6,
     "inline_style": 10,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "maintenance/products.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
@@ -678,22 +902,29 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "maintenance/regions.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "maintenance/site_form.html": {
-    "raw_color": 25,
+    "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "maintenance/site_list.html": {
-    "raw_color": 32,
+    "raw_color": 6,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "maintenance/visit_action.html": {
-    "raw_color": 53,
+    "raw_color": 8,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -701,6 +932,20 @@
   },
   "meeting/_cards.html": {
     "raw_color": 18,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "meeting/_item_edit.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "meeting/board.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -720,29 +965,50 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "meeting/weekly.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "orders/form.html": {
-    "raw_color": 24,
+    "raw_color": 23,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "orders/list.html": {
-    "raw_color": 54,
+    "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "orders/show.html": {
-    "raw_color": 96,
+    "raw_color": 95,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "plan/unplanned.html": {
-    "raw_color": 105,
+    "raw_color": 12,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "product_group/import.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "product_group/list.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -769,9 +1035,30 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "project/equip_cats.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "project/form.html": {
-    "raw_color": 49,
+    "raw_color": 44,
     "hex": 1,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/import.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/kind_review.html": {
+    "raw_color": 0,
+    "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
@@ -784,42 +1071,63 @@
     "cdn": 0
   },
   "project/merge.html": {
-    "raw_color": 20,
+    "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "project/registry.html": {
-    "raw_color": 45,
+    "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "project/show.html": {
-    "raw_color": 82,
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/sites.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/sites_pick.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "project/years.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "quotes/form.html": {
-    "raw_color": 101,
+    "raw_color": 100,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "quotes/labor_rates.html": {
-    "raw_color": 23,
+    "raw_color": 22,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "quotes/labor_upload.html": {
-    "raw_color": 13,
+    "raw_color": 12,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -833,14 +1141,14 @@
     "cdn": 0
   },
   "quotes/show.html": {
-    "raw_color": 76,
+    "raw_color": 75,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "relation/form.html": {
-    "raw_color": 24,
+    "raw_color": 22,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -853,22 +1161,36 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "sales/_activity_73i.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "sales/_activity_card.html": {
-    "raw_color": 19,
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "sales/_activity_log.html": {
-    "raw_color": 26,
+    "raw_color": 1,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
     "cdn": 0
   },
   "sales/_activity_panel.html": {
-    "raw_color": 30,
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "sales/_contract_dialog.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -883,6 +1205,20 @@
   },
   "sales/_filters.html": {
     "raw_color": 49,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "sales/_view_switch.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "sales/_win_dialog.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -903,7 +1239,7 @@
     "cdn": 0
   },
   "sales/dashboard.html": {
-    "raw_color": 65,
+    "raw_color": 4,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
@@ -924,7 +1260,7 @@
     "cdn": 0
   },
   "sales/group_show.html": {
-    "raw_color": 14,
+    "raw_color": 1,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -938,14 +1274,21 @@
     "cdn": 0
   },
   "sales/list.html": {
-    "raw_color": 71,
+    "raw_color": 60,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "sales/modal.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "sales/pipeline.html": {
-    "raw_color": 14,
+    "raw_color": 3,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -959,14 +1302,14 @@
     "cdn": 0
   },
   "sales/promote_customer.html": {
-    "raw_color": 13,
+    "raw_color": 12,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "sales/show.html": {
-    "raw_color": 208,
+    "raw_color": 27,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -987,7 +1330,7 @@
     "cdn": 0
   },
   "space/edit.html": {
-    "raw_color": 80,
+    "raw_color": 79,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -995,6 +1338,13 @@
   },
   "space/list.html": {
     "raw_color": 67,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "stats/_assignee_field.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -1014,15 +1364,43 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "stats/_weekly_card.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "stats/_weekly_unassigned.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "stats/company_weekly.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "stats/company_weekly_result.html": {
-    "raw_color": 32,
+    "raw_color": 26,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "stats/company_weekly_rows.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "stats/list.html": {
-    "raw_color": 90,
+    "raw_color": 88,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -1043,7 +1421,7 @@
     "cdn": 0
   },
   "stats/overview.html": {
-    "raw_color": 309,
+    "raw_color": 49,
     "hex": 5,
     "inline_style": 0,
     "style_tag": 0,
@@ -1057,14 +1435,14 @@
     "cdn": 0
   },
   "sw_detail/form.html": {
-    "raw_color": 21,
+    "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
   },
   "sw_detail/list.html": {
-    "raw_color": 34,
+    "raw_color": 32,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -1078,7 +1456,35 @@
     "cdn": 0
   },
   "work/list.html": {
-    "raw_color": 76,
+    "raw_color": 11,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "work_group/_form.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "work_group/list.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "work_item_template/_form.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "work_item_template/list.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -1092,29 +1498,99 @@
     "cdn": 0
   },
   "work_status/calendar.html": {
-    "raw_color": 36,
+    "raw_color": 1,
     "hex": 6,
     "inline_style": 5,
     "style_tag": 0,
     "cdn": 0
   },
   "work_status/timeline.html": {
-    "raw_color": 112,
+    "raw_color": 22,
     "hex": 8,
     "inline_style": 10,
     "style_tag": 0,
     "cdn": 0
   },
+  "workboard/_board_assignee.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_bar.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_head.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_kanban_card.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_members.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_scope.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_unplaced.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_board_views.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_carry_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "workboard/_kanban_col.html": {
-    "raw_color": 14,
+    "raw_color": 1,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
     "cdn": 0
   },
   "workboard/_modals.html": {
-    "raw_color": 133,
+    "raw_color": 34,
     "hex": 1,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_new_work_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
     "cdn": 0
@@ -1126,8 +1602,29 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "workboard/_project_combo.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "workboard/_recurrence_fields.html": {
     "raw_color": 22,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_register_state.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/_segments_form.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -1147,8 +1644,50 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "workboard/_work_items.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/board_day.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/board_kanban.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/board_list.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/board_month.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/board_week.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "workboard/kanban.html": {
-    "raw_color": 31,
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
@@ -1161,15 +1700,29 @@
     "style_tag": 0,
     "cdn": 0
   },
+  "workboard/new_work_form.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
+  "workboard/project_work_action.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0
+  },
   "workboard/register.html": {
-    "raw_color": 217,
+    "raw_color": 45,
     "hex": 8,
     "inline_style": 34,
     "style_tag": 0,
     "cdn": 0
   },
   "workboard/task_show.html": {
-    "raw_color": 260,
+    "raw_color": 55,
     "hex": 0,
     "inline_style": 2,
     "style_tag": 0,

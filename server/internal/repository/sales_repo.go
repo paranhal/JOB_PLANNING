@@ -44,7 +44,7 @@ func (r *SalesRepo) allStageDefs() []model.SalesStageDef {
 }
 
 const salesSelect = `
-	SELECT s.sales_id, s.name, COALESCE(s.is_tentative_name,0), COALESCE(s.stage,'lead'),
+	SELECT s.sales_id, s.name, COALESCE(s.is_tentative_name,0), COALESCE(s.tentative_name,''), COALESCE(s.stage,'lead'),
 		COALESCE(s.probability,0), s.probability_override,
 		COALESCE(s.customer_id,''), COALESCE(s.prospect_name,''), COALESCE(s.prospect_region,''),
 		COALESCE(s.customer_confirmed,0),
@@ -112,22 +112,23 @@ type SalesListFilter struct {
 func appendSalesOrgOrOwner(q string, args []interface{}, alias, orgID, ownerUserID string, myScope bool) (string, []interface{}) {
 	orgID = strings.TrimSpace(orgID)
 	uid := strings.TrimSpace(ownerUserID)
-	col := "org_id"
-	own := "sales_owner_id"
-	if a := strings.TrimSpace(alias); a != "" {
-		col = a + ".org_id"
-		own = a + ".sales_owner_id"
+	a := strings.TrimSpace(alias)
+	if a == "" {
+		a = "s"
 	}
+	col := a + ".org_id"
+	own := a + ".sales_owner_id"
+	ownerSQL := fmt.Sprintf(`(%s=? OR EXISTS (SELECT 1 FROM sales_project_owners _so WHERE _so.sales_id=%s.sales_id AND _so.user_id=?))`, own, a)
 	if myScope {
 		switch {
 		case uid != "" && orgID != "" && orgID != OrgAll:
-			q += fmt.Sprintf(` AND (%s=? OR %s=?)`, col, own)
-			return q, append(args, orgID, uid)
+			q += fmt.Sprintf(` AND (%s=? OR %s)`, col, ownerSQL)
+			return q, append(args, orgID, uid, uid)
 		case uid != "":
-			q += fmt.Sprintf(` AND %s=?`, own)
-			return q, append(args, uid)
+			q += ` AND ` + ownerSQL
+			return q, append(args, uid, uid)
 		case orgID != "" && orgID != OrgAll:
-			return appendOrg(q, args, alias, orgID)
+			return appendOrg(q, args, a, orgID)
 		default:
 			return q + ` AND 1=0`, args
 		}
@@ -135,7 +136,7 @@ func appendSalesOrgOrOwner(q string, args []interface{}, alias, orgID, ownerUser
 	if orgID == "" {
 		return q + ` AND 1=0`, args
 	}
-	return appendOrg(q, args, alias, orgID)
+	return appendOrg(q, args, a, orgID)
 }
 
 func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) {
@@ -222,8 +223,10 @@ func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) 
 		args = append(args, like, like, like, like, like)
 	}
 	if s := strings.TrimSpace(f.Owner); s != "" {
-		q += ` AND (s.sales_owner=? OR s.sales_owner_id=?)`
-		args = append(args, s, s)
+		q += ` AND (s.sales_owner=? OR s.sales_owner_id=?
+			OR EXISTS (SELECT 1 FROM sales_project_owners _so WHERE _so.sales_id=s.sales_id AND _so.user_id=?)
+			OR EXISTS (SELECT 1 FROM sales_project_owners _so JOIN users _u ON _u.user_id=_so.user_id WHERE _so.sales_id=s.sales_id AND _u.full_name=?))`
+		args = append(args, s, s, s, s)
 	}
 	q, args = appendSalesPersonSQL(q, args, "s", f.PersonName, f.PersonUserID)
 	if s := strings.TrimSpace(f.Customer); s != "" {
@@ -250,7 +253,12 @@ func (r *SalesRepo) ListFilter(f SalesListFilter) ([]model.SalesProject, error) 
 		return nil, err
 	}
 	defer rows.Close()
-	return scanSalesRows(rows)
+	items, err := scanSalesRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	r.attachOwners(items)
+	return items, nil
 }
 
 func salesPeriodSQL(period string) (string, []interface{}) {
@@ -301,6 +309,10 @@ func (r *SalesRepo) Get(id string) (*model.SalesProject, error) {
 	if p != nil && strings.TrimSpace(p.OrgID) == "" {
 		_ = r.db.QueryRow(`SELECT TRIM(COALESCE(org_id,'')) FROM sales_projects WHERE sales_id=?`, p.SalesID).Scan(&p.OrgID)
 	}
+	if p != nil {
+		ids, _ := r.ListOwnerIDs(p.SalesID)
+		p.SalesOwnerIDs = ids
+	}
 	return p, nil
 }
 
@@ -310,14 +322,9 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 	}
 	orgID, err := RequireInsertOrg(p.OrgID)
 	if err != nil {
-		if p.OrgID == "" {
-			p.OrgID = model.OrgIDLibrary
-		} else {
-			return err
-		}
-	} else {
-		p.OrgID = orgID
+		return fmt.Errorf("소속 조직을 선택하세요")
 	}
+	p.OrgID = orgID
 	if strings.TrimSpace(p.Name) == "" {
 		return fmt.Errorf("사업명을 입력하세요")
 	}
@@ -364,7 +371,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 	byID, byName := stampCreatedBy()
 	_, err = tx.Exec(`
 		INSERT INTO sales_projects (
-			sales_id, sales_no, name, is_tentative_name, stage, probability, probability_override,
+			sales_id, sales_no, name, is_tentative_name, tentative_name, stage, probability, probability_override,
 			customer_id, prospect_name, prospect_region, customer_confirmed,
 			expected_ym, expected_precision, expected_ym_confirmed,
 			expected_amount, expected_amount_confirmed,
@@ -377,8 +384,8 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			biz_type, budget_year, budget_status,
 			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included, org_id,
 			created_by_user_id, created_by_name
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.Stage, p.Probability, overrideArg(p),
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.TentativeName, p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
 		p.ExpectedAmount, boolToInt(p.ExpectedAmountConfirmed),
@@ -400,6 +407,11 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		return err
 	}
 	logCreate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name)
+	ids := p.SalesOwnerIDs
+	if len(ids) == 0 && strings.TrimSpace(p.SalesOwnerID) != "" {
+		ids = []string{p.SalesOwnerID}
+	}
+	_ = r.ReplaceSalesOwners(p.SalesID, p.SalesOwnerID, byID, ids)
 	return nil
 }
 
@@ -435,7 +447,7 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 	err = touchUpdate(r.db, "sales_projects", "sales_id", p.SalesID, p.Name, func() error {
 		_, err := r.db.Exec(`
 			UPDATE sales_projects SET
-				name=?, is_tentative_name=?, probability=?,
+				name=?, is_tentative_name=?, tentative_name=?, probability=?,
 				customer_id=?, prospect_name=?, prospect_region=?, customer_confirmed=?,
 				expected_ym=?, expected_precision=?, expected_ym_confirmed=?,
 				expected_amount=?, expected_amount_confirmed=?,
@@ -446,7 +458,7 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 				bid_ym=?, revenue_ym=?, revenue_from=?, revenue_to=?, billing_cycle=?, amount_vat_included=?,
 				updated_at=CURRENT_TIMESTAMP
 			WHERE sales_id=?`,
-			p.Name, boolToInt(p.IsTentativeName), p.Probability,
+			p.Name, boolToInt(p.IsTentativeName), p.TentativeName, p.Probability,
 			nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 			p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
 			p.ExpectedAmount, boolToInt(p.ExpectedAmountConfirmed),
@@ -463,6 +475,11 @@ func (r *SalesRepo) Update(p *model.SalesProject, byName string) error {
 	if err := r.recordProjectChanges(old, p, byName); err != nil {
 		return err
 	}
+	ids := p.SalesOwnerIDs
+	if len(ids) == 0 && strings.TrimSpace(p.SalesOwnerID) != "" {
+		ids = []string{p.SalesOwnerID}
+	}
+	_ = r.ReplaceSalesOwners(p.SalesID, p.SalesOwnerID, "", ids)
 	return nil
 }
 
@@ -711,7 +728,7 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 	var override, winProb, probFinal sql.NullInt64
 	var tentative, custConf, ymConf, amtConf, vatInc int
 	err := row.Scan(
-		&p.SalesID, &p.Name, &tentative, &p.Stage, &p.Probability, &override,
+		&p.SalesID, &p.Name, &tentative, &p.TentativeName, &p.Stage, &p.Probability, &override,
 		&p.CustomerID, &p.ProspectName, &p.ProspectRegion, &custConf,
 		&p.ExpectedYM, &p.ExpectedPrecision, &ymConf,
 		&p.ExpectedAmount, &amtConf,

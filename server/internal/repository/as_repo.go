@@ -1394,6 +1394,9 @@ func (r *ASRepo) Delete(asID string) error {
 		if err := execIgnoreMissingTx(tx, `DELETE FROM as_keyword_links WHERE as_id=?`, asID); err != nil {
 			return err
 		}
+		if err := execIgnoreMissingTx(tx, `DELETE FROM as_action_sets WHERE as_id=?`, asID); err != nil {
+			return err
+		}
 		if err := execIgnoreMissingTx(tx, `DELETE FROM as_parts_used WHERE as_id=?`, asID); err != nil {
 			return err
 		}

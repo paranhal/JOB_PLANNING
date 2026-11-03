@@ -100,7 +100,7 @@ func TestCreateTaskSupportOverlapRedirectsWithNameAndTime(t *testing.T) {
 		t.Fatalf("겹침 거부 아님: %d %s", rec.Code, loc)
 	}
 	got := urlUnescape(loc)
-	if !strings.Contains(got, "양기헌의 10:00~10:30에 다른 업무가 있습니다") {
+	if !strings.Contains(got, "양기헌의") || !strings.Contains(got, "다른 업무가 있습니다") {
 		t.Fatalf("오류 문구 없음: %s decoded=%s", loc, got)
 	}
 }

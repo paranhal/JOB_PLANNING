@@ -98,6 +98,7 @@ func (r *ProjectRepo) listProjects(orgID, search string, year int, status string
 	}
 	r.attachOrderAmounts(items)
 	r.attachOrgLabels(items)
+	r.attachRelatedOrgs(items)
 	return items, nil
 }
 
@@ -212,7 +213,7 @@ func (r *ProjectRepo) GetVisible(id, orgID string, write bool) (*model.WorkProje
 	if !projectRowVisible(p, orgID) {
 		return nil, sql.ErrNoRows
 	}
-	if write && !VisibleInOrg(projectHomeOrg(p.OrgID), orgID) {
+	if write && model.ProjectAccess(*p, orgID) != model.ProjectAccessOwner {
 		return nil, ErrProjectForbidden
 	}
 	return p, nil
@@ -241,6 +242,8 @@ func (r *ProjectRepo) Get(id string) (*model.WorkProject, error) {
 	r.attachOrgLabels(tmp)
 	p.OrderAmount = tmp[0].OrderAmount
 	p.OrgLabel = tmp[0].OrgLabel
+	rels, _ := r.ListRelatedOrgs(id)
+	stampRelated(p, rels)
 	return p, nil
 }
 
@@ -303,9 +306,11 @@ func (r *ProjectRepo) Create(p *model.WorkProject) error {
 	}
 	p.ProjectID = fmt.Sprintf("WP-%03d", id)
 	normalizeProject(p)
-	if strings.TrimSpace(p.OrgID) == "" {
-		p.OrgID = model.OrgIDLibrary
+	orgID, err := RequireInsertOrg(p.OrgID)
+	if err != nil {
+		return fmt.Errorf("소속 조직을 선택하세요")
 	}
+	p.OrgID = orgID
 	_, err = r.db.Exec(`
 		INSERT INTO work_projects (
 			project_id, name, short_name, plan_year, is_paid, sort_order,
@@ -809,9 +814,8 @@ func normalizeProject(p *model.WorkProject) {
 	if p.ProjectKind != "" && !model.ValidProjectKind(p.ProjectKind) {
 		p.ProjectKind = ""
 	}
-	if p.PlanYear == 0 && len(p.StartDate) >= 4 {
-		var y int
-		if _, err := fmt.Sscanf(p.StartDate[:4], "%d", &y); err == nil {
+	if !model.ValidPlanYear(p.PlanYear) {
+		if y := model.YearFromDatePrefix(p.StartDate); y > 0 {
 			p.PlanYear = y
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"customer-support/internal/appclock"
 	"customer-support/internal/model"
 )
 
@@ -132,7 +133,7 @@ func (r *MaintenanceRepo) nowTime() time.Time {
 	if r != nil && r.Now != nil {
 		return r.Now()
 	}
-	return time.Now()
+	return appclock.Now()
 }
 
 func (r *MaintenanceRepo) DeletePlan(planID string) error {

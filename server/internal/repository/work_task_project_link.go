@@ -45,6 +45,9 @@ func (r *WBRepo) SetTaskProject(orgID, taskID, projectID string) (beforeName, af
 	beforeName = r.WorkProjectName(beforeID)
 	projectID = strings.TrimSpace(projectID)
 	if projectID != "" {
+		if err := AssertProjectRegisterAccess(r.db, projectID, orgID); err != nil {
+			return "", "", err
+		}
 		var name string
 		err := r.db.QueryRow(`SELECT COALESCE(name,'') FROM work_projects WHERE project_id=?`, projectID).Scan(&name)
 		if err == sql.ErrNoRows {

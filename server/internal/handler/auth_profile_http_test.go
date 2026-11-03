@@ -138,7 +138,7 @@ func TestUserUpdateAllowsEmptyContactAndOrg(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/users/"+u.UserID+"/update", strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	req.AddCookie(jwtCookie(t))
+	req.AddCookie(jwtCookieRole(t, model.RoleVisionAdmin))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("빈 연락처 저장 거부 loc=%s", rec.Header().Get("Location"))

@@ -94,6 +94,9 @@ func filterPersonalOnlyWork(items []model.WorkListItem, userID string, keys []st
 }
 
 func applyViewGroupToTasks(c echo.Context, all, filtered []model.WorkTask, scope boardScope) []model.WorkTask {
+	if scope.MembersRequested {
+		return filtered
+	}
 	include := viewGroupInclude(c)
 	if !include {
 		var out []model.WorkTask

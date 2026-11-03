@@ -2,11 +2,6 @@
 {{define "content"}}
 <div class="max-w-2xl mx-auto space-y-6">
   <div class="flex items-center gap-3">
-    <a href="/items" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-      </svg>
-    </a>
     <div>
       <h2 class="text-xl font-bold text-gray-800">{{if .IsNew}}품목 등록{{else}}품목 수정{{end}}</h2>
       <p class="text-sm text-gray-500">견적서의 품명·규격·단위를 여기서 맞춥니다.</p>
@@ -68,9 +63,9 @@
           <input type="text" name="model" value="{{.Item.Model}}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
         </div>
         <div x-data="{
-          q: {{printf "%q" .Item.ManufacturerLabel}},
-          id: {{printf "%q" .Item.ManufacturerID}},
-          text: {{printf "%q" .Item.Manufacturer}},
+          q: {{toJSON .Item.ManufacturerLabel}},
+          id: {{toJSON .Item.ManufacturerID}},
+          text: {{toJSON .Item.Manufacturer}},
           hits: [], open: false, making: false, newName: '',
           async search(){
             const q=this.q.trim();
@@ -251,7 +246,7 @@
   <div class="bg-white rounded-xl border border-gray-200 p-6">
     <h3 class="font-semibold text-gray-800 mb-3">이 품목이 들어간 견적</h3>
     {{if .Quotes}}
-    <table class="w-full text-sm break-keep">
+    <table data-table-cols-skip class="w-full text-sm break-keep">
       <thead class="text-xs text-gray-500 border-b"><tr>
         <th class="text-left py-2 whitespace-nowrap">견적번호</th>
         <th class="text-left py-2 whitespace-nowrap">견적일</th>

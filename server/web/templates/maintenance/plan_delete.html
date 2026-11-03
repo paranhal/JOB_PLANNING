@@ -1,6 +1,6 @@
 {{define "title"}}계획 삭제 · {{appName}}{{end}}
 {{define "content"}}
-<div class="max-w-lg mx-auto space-y-4" x-data="{ title: '', expected: {{printf "%q" .ConfirmTitle}} }">
+<div class="max-w-lg mx-auto space-y-4" x-data="{ title: '', expected: {{toJSON .ConfirmTitle}} }">
   <h2 class="text-xl font-bold text-gray-800">계획 삭제</h2>
   <p class="text-sm text-gray-600">{{.Plan.PlanYear}}년 · {{if .Plan.Title}}{{.Plan.Title}}{{else}}제목 없음{{end}}</p>
 

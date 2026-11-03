@@ -1,0 +1,81 @@
+{{define "board_cal_bar"}}
+{{$item := .Item}}{{$page := .Page}}
+{{$short := and (gt $item.PlaceDur 0) (le $item.PlaceDur 30)}}
+<div class="{{if eq $page.View `day`}}board-day-ev{{else}}board-week-ev mb-2.5{{end}} {{if $short}}board-bar-short{{end}} {{$item.Type.Text}} rounded-[10px] border-l-4 border-current {{$item.Type.Bg}} px-2.5 py-1.5 {{if $item.IsSupport}}border border-dashed border-ink-muted opacity-70{{end}}"
+     data-board-bar="1"
+     data-kind="{{if $item.PlaceKind}}{{$item.PlaceKind}}{{else}}task{{end}}"
+     data-ref="{{if $item.PlaceRef}}{{$item.PlaceRef}}{{else}}{{$item.Task.TaskID}}{{end}}"
+     data-title="{{$item.Task.Title}}"
+     data-assignee="{{$item.PlaceAssignee}}"
+     data-start="{{$item.StartHHMM}}"
+     data-end="{{$item.EndHHMM}}"
+     data-duration="{{$item.PlaceDur}}"
+     data-date="{{if $item.PlaceDate}}{{$item.PlaceDate}}{{else}}{{$item.Task.WorkDate}}{{end}}"
+     data-href="{{if $item.Done}}{{$item.ActionHref}}{{else}}{{$item.Href}}{{end}}"
+     data-can-move="{{if $item.CanMove}}1{{else}}0{{end}}"
+     data-can-resize="{{if and (eq $page.View `day`) $item.CanResize}}1{{else}}0{{end}}"
+     data-seg-count="{{$item.SegCount}}"
+     data-support="{{if $item.IsSupport}}1{{else}}0{{end}}"
+     data-done="{{if $item.Done}}1{{else}}0{{end}}"
+     data-short="{{if $short}}1{{else}}0{{end}}"
+     data-top="{{$item.DayPosTop}}" data-h="{{$item.DayPosHeight}}" data-col="{{$item.DayCol}}" data-cols="{{$item.DayCols}}"
+     {{if and $page.CanWrite $item.CanMove}}draggable="true"{{end}}>
+  {{if $item.IsSupport}}
+  <span class="absolute left-0 top-0 z-10 rounded-br border-b border-r border-dashed bg-surface px-0.5 text-[8px] leading-none text-ink-muted">지원</span>
+  {{else if $item.OverlapWarn}}
+  <span class="absolute left-0 top-0 z-10 text-[11px] leading-none text-warning" title="같은 담당자 시간 겹침">⚠</span>
+  {{end}}
+  {{if $item.Done}}
+  <a href="{{$item.ActionHref}}" class="block text-inherit" data-bar-open="1">
+    <div class="text-[11px] font-extrabold">작업완료{{if $item.ChipTime}} · {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}</div>
+    {{template "board_assignee_line" $item}}
+    <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}</div>
+  </a>
+  {{else}}
+  <div class="text-[11px] font-extrabold {{if or $item.OverlapWarn $item.IsSupport}}pl-2.5{{end}}">{{$item.ChipTime}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}} · {{$item.Type.Label}}</div>
+  {{template "board_assignee_line" $item}}
+  <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}{{if $item.ReturnPending}} <span class="text-warning">복귀 미확인</span>{{end}}</div>
+  {{if $item.ItemKindLine}}<div class="truncate text-[11px] text-ink-muted" data-item-kind-line="1" title="{{$item.ItemKindLine}}">{{$item.ItemKindLine}}</div>{{end}}
+  {{if $item.TravelAfter}}<div class="mt-1 border-t border-dashed border-current opacity-70" title="이동"></div>{{end}}
+  <div class="text-[11px] text-ink-muted">{{$item.CustomerLine}}</div>
+  {{if not $item.IsSupport}}
+  <div class="board-bar-acts mt-1 flex flex-wrap items-center gap-1">
+    {{if $page.CanWrite}}
+    <a href="{{$item.Href}}" class="board-bar-act" data-bar-act="1">조치</a>
+    {{if $item.EditHref}}<a href="{{$item.EditHref}}" class="board-bar-act" data-bar-act="1">수정</a>{{end}}
+    {{end}}
+    {{if $item.PlanEditHref}}<a href="{{$item.PlanEditHref}}" class="board-bar-act-aux" data-bar-act="1">계획 수정</a>{{end}}
+    {{if $item.CanCarry}}<button type="button" class="board-bar-act-aux" data-bar-act="1" data-carry-open="1"
+      data-carry-id="{{$item.Task.TaskID}}" data-carry-title="{{$item.Task.Title}}" data-carry-work="{{$item.Task.WorkDate}}"
+      data-carry-due="{{$item.Task.DueDate}}" data-carry-start="{{$item.Task.StartTime}}" data-carry-end="{{$item.Task.EndTime}}"
+      data-carry-days="{{$item.OverdueDays}}" data-carry-delayed="{{if $item.Overdue}}true{{else}}false{{end}}"
+      data-carry-span="{{if $item.ChipUntil}}true{{else}}false{{end}}">이월</button>{{end}}
+    {{if and $page.CanWrite $item.CanUnschedule}}
+    <form method="post" action="/workboard/unschedule" class="inline" data-bar-act="1">
+      <input type="hidden" name="redirect" value="{{$page.ScheduleRedirect}}">
+      <input type="hidden" name="task_id" value="{{$item.Task.TaskID}}">
+      <button type="submit" class="board-bar-act-aux board-bar-x" title="대기 목록으로 내리기">&times;</button>
+    </form>
+    {{end}}
+    {{if and (eq $page.View `day`) $page.CanWrite $item.CanResize}}
+    <button type="button" class="board-bar-act-aux" data-bar-act="1" data-nudge="-15" title="15분 짧게">−15</button>
+    <button type="button" class="board-bar-act-aux" data-bar-act="1" data-nudge="15" title="15분 늘리기">+15</button>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
+  {{if and (eq $page.View `day`) $page.CanWrite $item.CanResize}}
+  <button type="button" class="board-resize" data-resize="1" draggable="false" aria-label="종료 시각 조절"></button>
+  {{end}}
+</div>
+{{end}}
+
+{{define "board_month_chip"}}
+<a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="board-month-chip {{.Type.Text}} {{.Type.Bg}}" data-month-chip="1" data-done="{{if .Done}}1{{else}}0{{end}}" title="{{.Task.Title}}">
+  <span class="flex min-w-0 items-center gap-0.5">
+    {{if .Done}}<span class="font-extrabold">✓</span>{{end}}
+    <span class="truncate">{{.Task.Title}}</span>
+  </span>
+  {{template "board_assignee_line" .}}
+</a>
+{{end}}

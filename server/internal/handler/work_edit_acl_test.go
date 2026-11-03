@@ -138,10 +138,10 @@ func TestWorkOtherTaskReadOnlyAndForbidden(t *testing.T) {
 	if !strings.Contains(body, "읽기 전용") {
 		t.Fatal("남의 상세에 읽기 전용 안내가 없다")
 	}
-	if strings.Contains(body, ">저장</button>") {
+	if strings.Contains(body, `hover:bg-blue-700">저장</button>`) {
 		t.Fatal("남의 상세에 저장 버튼이 있다")
 	}
-	if strings.Contains(body, ">삭제</button>") {
+	if strings.Contains(body, `hover:bg-red-50">삭제</button>`) {
 		t.Fatal("남의 상세에 삭제 버튼이 있다")
 	}
 

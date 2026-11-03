@@ -15,7 +15,7 @@ func TestEnsureCustomerPartiesFromCounterparts(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{Name: "세종 RFID", ProspectName: "세종시립도서관", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "세종 RFID", ProspectName: "세종시립도서관", IsTentativeName: true}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestBackfillActivityCounterpartsToParties(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
 
-	p := &model.SalesProject{Name: "옛 글자만 상대", ProspectName: "고객사", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "옛 글자만 상대", ProspectName: "고객사", IsTentativeName: true}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestDeleteActivityKeepsAutoPartiesAndDropsWorkTask(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	repo := NewSalesRepo(db)
-	p := &model.SalesProject{Name: "삭제 후 관계자", ProspectName: "고객사", IsTentativeName: true}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "삭제 후 관계자", ProspectName: "고객사", IsTentativeName: true}
 	if err := repo.Create(p); err != nil {
 		t.Fatal(err)
 	}

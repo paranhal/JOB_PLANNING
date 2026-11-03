@@ -413,8 +413,17 @@ func (r *WorkBoardRepo) addSalesUnplanned(add func(model.UnplannedItem, string),
 		}
 	}
 	for _, p := range gaps {
-		if mine && !mineSet[strings.TrimSpace(p.SalesOwner)] && !mineSet[strings.TrimSpace(p.SalesOwnerID)] {
-			continue
+		if mine && !p.HasSalesPerson(mineUserID, p.SalesOwner) && !mineSet[strings.TrimSpace(p.SalesOwner)] && !mineSet[strings.TrimSpace(p.SalesOwnerID)] {
+			hit := false
+			for _, id := range p.SalesOwnerIDs {
+				if mineSet[strings.TrimSpace(id)] {
+					hit = true
+					break
+				}
+			}
+			if !hit {
+				continue
+			}
 		}
 		org := p.CustomerValue()
 		it := model.UnplannedItem{

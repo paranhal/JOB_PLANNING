@@ -42,6 +42,19 @@ func (r *WBRepo) LoadTaskActionFields(t *model.WorkTask) error {
 	return err
 }
 
+func (r *WBRepo) SetTaskWorkPlace(taskID, place string) error {
+	taskID = strings.TrimSpace(taskID)
+	if r == nil || r.db == nil || taskID == "" {
+		return nil
+	}
+	place = model.NormalizeWorkPlace(place)
+	_, err := r.db.Exec(`UPDATE work_tasks SET work_place=?, updated_at=datetime('now','localtime') WHERE task_id=?`, place, taskID)
+	if err != nil && strings.Contains(err.Error(), "no such column") {
+		return nil
+	}
+	return err
+}
+
 func (r *WBRepo) SaveTaskActionFields(t *model.WorkTask) error {
 	if r == nil || t == nil || strings.TrimSpace(t.TaskID) == "" {
 		return fmt.Errorf("업무가 없습니다")

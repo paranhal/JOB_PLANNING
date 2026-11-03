@@ -75,6 +75,9 @@ func (r *CodeRepo) Groups() ([]string, error) {
 }
 
 func (r *CodeRepo) Create(c *model.Code) error {
+	if c != nil && isProductCategoryGroup(c.CodeGroup) {
+		return r.CreateProductCategory(c)
+	}
 	c.CodeID = newID("CD")
 	_, err := r.db.Exec(
 		`INSERT INTO codes (code_id,code_group,code_value,code_name,sort_order,is_active)
@@ -89,6 +92,13 @@ func (r *CodeRepo) Create(c *model.Code) error {
 }
 
 func (r *CodeRepo) Update(c *model.Code) error {
+	if c != nil && isProductCategoryGroup(c.CodeGroup) {
+		return r.UpdateProductCategory(c)
+	}
+	cur, _ := r.Get(c.CodeID)
+	if cur != nil && isProductCategoryGroup(cur.CodeGroup) {
+		return r.UpdateProductCategory(c)
+	}
 	err := touchUpdate(r.db, "codes", "code_id", c.CodeID, c.CodeName, func() error {
 		_, err := r.db.Exec(
 			`UPDATE codes SET code_group=?,code_value=?,code_name=?,sort_order=?,is_active=?
@@ -103,6 +113,13 @@ func (r *CodeRepo) Update(c *model.Code) error {
 }
 
 func (r *CodeRepo) Delete(id string) error {
+	if cur, err := r.Get(id); err == nil && cur != nil && isProductCategoryGroup(cur.CodeGroup) {
+		return r.DeleteProductCategory(id)
+	}
+	return r.deleteCodeRow(id)
+}
+
+func (r *CodeRepo) deleteCodeRow(id string) error {
 	err := touchDelete(r.db, "codes", "code_id", id, "코드", func() error {
 		_, err := r.db.Exec(`DELETE FROM codes WHERE code_id=?`, id)
 		return err

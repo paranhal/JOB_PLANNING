@@ -50,7 +50,13 @@ func (h *StatsHandler) LinkWeeklyTasksProject(c echo.Context) error {
 	if !ok {
 		return echo.NewHTTPError(http.StatusBadRequest, "목록에 없는 사업입니다")
 	}
-	if proj.OrgID != "" && proj.OrgID != orgID && c.FormValue("confirm_foreign") != "1" {
+	if wp, e2 := repository.NewProjectRepo(h.repo.DB()).Get(pid); e2 == nil && wp != nil {
+		if !model.CanRegisterWorkOnProject(*wp, orgID) {
+			return echo.NewHTTPError(http.StatusForbidden, "이 사업에 업무를 등록할 수 없습니다")
+		}
+		proj = *wp
+	}
+	if proj.OrgID != "" && proj.OrgID != orgID && !model.CanRegisterWorkOnProject(proj, orgID) && c.FormValue("confirm_foreign") != "1" {
 		return echo.NewHTTPError(http.StatusBadRequest, "타 조직 사업 확인이 필요합니다")
 	}
 

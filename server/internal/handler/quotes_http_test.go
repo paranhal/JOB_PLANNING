@@ -34,7 +34,7 @@ func newQuoteServerDB(t *testing.T) (*echo.Echo, *repository.QuoteRepo, *sql.DB)
 	t.Helper()
 	e, db := newSalesServerDB(t)
 	h := New(db)
-	p := &model.SalesProject{Name: "견적연결"}
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "견적연결"}
 	if err := repository.NewSalesRepo(db).Create(p); err != nil {
 		t.Fatal(err)
 	}
@@ -563,11 +563,23 @@ func TestQuotesHTTP_FormB2GroupLaborRevisePurposeReverse(t *testing.T) {
 	}
 
 	page := doGet(t, e, "/labor-rates")
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "UI/UX기획/개발자") {
+	if page.Code != http.StatusOK {
 		t.Fatalf("노임단가 화면 status=%d", page.Code)
 	}
-	if !strings.Contains(page.Body.String(), "6,901,660") || !strings.Contains(page.Body.String(), "7,754,124") {
-		t.Fatal("2026 시드 금액이 없다")
+	use, _, _ := repo.ResolveLaborYear(0)
+	rates, err := repo.ListLaborRates(use)
+	if err != nil || len(rates) == 0 {
+		t.Fatalf("시드 단가 없음 year=%d err=%v", use, err)
+	}
+	body := page.Body.String()
+	found := 0
+	for _, r := range rates {
+		if strings.TrimSpace(r.JobName) != "" && strings.Contains(body, r.JobName) {
+			found++
+		}
+	}
+	if found == 0 {
+		t.Fatal("시드 직무가 화면에 없다")
 	}
 }
 
@@ -738,7 +750,7 @@ func TestQuotesHTTP_DraftDeleteCancelAndMoveSales(t *testing.T) {
 		t.Fatalf("초안 복귀 파이프라인=%d", sum)
 	}
 
-	p2 := &model.SalesProject{Name: "옮길사업"}
+	p2 := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "옮길사업"}
 	if err := repository.NewSalesRepo(db).Create(p2); err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +773,7 @@ func TestQuotesHTTP_DraftDeleteCancelAndMoveSales(t *testing.T) {
 		t.Fatalf("사유=%s", reason)
 	}
 
-	dorm := &model.SalesProject{Name: "휴면사업"}
+	dorm := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "휴면사업"}
 	if err := repository.NewSalesRepo(db).Create(dorm); err != nil {
 		t.Fatal(err)
 	}

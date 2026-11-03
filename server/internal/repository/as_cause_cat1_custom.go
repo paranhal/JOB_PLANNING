@@ -71,7 +71,7 @@ func (r *ASRepo) CountCauseCat1(orgID string) ([]CauseCat1Count, error) {
 	if r == nil || r.db == nil {
 		return nil, nil
 	}
-	cats, _ := r.ListCauseCategories()
+	cats, _ := r.ListCauseCategoriesForOrgAll(orgID)
 	labels := model.CauseCategoryLabels(cats)
 	q := `
 		SELECT TRIM(COALESCE(cause_cat1,'')), TRIM(COALESCE(cause_cat1_custom,'')), COUNT(*)

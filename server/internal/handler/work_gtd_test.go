@@ -336,7 +336,7 @@ func TestIRMCaseNextActionsAndTimeline(t *testing.T) {
 func TestForceCompleteRecordsReason(t *testing.T) {
 	e, repo := newGTDServer(t)
 	task := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "강제완료", DueDate: "2026-08-20",
-		WorkDate: "2026-08-20", Status: model.WBTaskInProgress}
+		WorkDate: "2026-08-20", Status: model.WBTaskInProgress, Assignee: "관리자", OrgID: model.OrgIDLibrary}
 	if err := repo.CreateTask(task); err != nil {
 		t.Fatal(err)
 	}
@@ -353,6 +353,7 @@ func TestForceCompleteRecordsReason(t *testing.T) {
 		"force_reason":   {"일정 마감으로 잔여 행동 종결"},
 		"work_type":      {"admin"},
 		"priority":       {"normal"},
+		"assignee":       {"관리자"},
 	})
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("강제 완료 loc=%q", rec.Header().Get("Location"))
@@ -482,7 +483,7 @@ func TestSection336ActionVsEdit(t *testing.T) {
 	e, repo := newGTDServer(t)
 	task := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "구분고정", DueDate: "2026-08-20",
 		WorkDate: "2026-08-20", StartTime: "09:00", EndTime: "09:30", Status: model.WBTaskInProgress,
-		CustomerName: "충남교육청"}
+		CustomerName: "충남교육청", Assignee: "관리자", OrgID: model.OrgIDLibrary}
 	if err := repo.CreateTask(task); err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +530,7 @@ func TestSection336ActionVsEdit(t *testing.T) {
 
 	rec := doForm(t, e, "/workboard/tasks/"+task.TaskID+"/update", url.Values{
 		"scope": {"action"}, "status": {"in_progress"}, "work_type": {"support"},
-		"title": {"바뀌면안됨"}, "priority": {"normal"},
+		"title": {"바뀌면안됨"}, "priority": {"normal"}, "assignee": {"관리자"},
 	})
 	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
 		t.Fatalf("조치 저장 loc=%q", rec.Header().Get("Location"))

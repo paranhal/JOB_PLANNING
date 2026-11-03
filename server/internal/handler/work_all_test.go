@@ -37,7 +37,7 @@ func TestWorkAllShowsLastMonthAndTeam(t *testing.T) {
 	if strings.Contains(tb, "지난달업무") || strings.Contains(tb, "다른담당진행") {
 		t.Fatal("오늘 내 업무에 지난달·남의 건이 보인다")
 	}
-	if strings.Contains(tb, `href="/work/all" class="bg-blue-600`) {
+	if strings.Contains(tb, `href="/work/all" class="bg-primary`) {
 		t.Fatal("오늘 내 업무에서 전체 업무 메뉴가 강조된다")
 	}
 
@@ -52,10 +52,10 @@ func TestWorkAllShowsLastMonthAndTeam(t *testing.T) {
 	if !strings.Contains(body, "지난달업무") || !strings.Contains(body, "다른담당진행") {
 		t.Fatal("전체 업무에 지난달·팀 건이 없다")
 	}
-	if !strings.Contains(body, `href="/work/all" class="bg-blue-600`) {
+	if !strings.Contains(body, `href="/work/all" class="bg-primary`) {
 		t.Fatal("사이드바 전체 업무가 강조되지 않는다")
 	}
-	if strings.Contains(body, `href="/work" class="bg-blue-600`) {
+	if strings.Contains(body, `href="/work" class="bg-primary`) {
 		t.Fatal("전체 업무에서 오늘 내 업무가 강조된다")
 	}
 

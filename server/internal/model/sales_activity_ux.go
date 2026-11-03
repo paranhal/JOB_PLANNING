@@ -39,7 +39,7 @@ func SalesNextActionChip(next, date, today string) (label, class string) {
 		today = time.Now().Format("2006-01-02")
 	}
 	if next == "" && date == "" {
-		return "다음 행동 없음", "text-gray-500 bg-gray-50 border-gray-200"
+		return "다음 행동 없음", "text-ink-muted bg-hover border-line"
 	}
 	label = "다음: " + next
 	if date != "" {
@@ -49,9 +49,9 @@ func SalesNextActionChip(next, date, today string) (label, class string) {
 			label += " · " + date
 		}
 	}
-	class = "text-orange-800 bg-orange-50 border-orange-200"
+	class = "text-warning bg-warning-soft border-warning"
 	if date != "" && date < today {
-		class = "text-red-700 bg-red-50 border-red-200"
+		class = "text-danger bg-danger-soft border-danger"
 	}
 	if date == today {
 		class += " font-semibold"

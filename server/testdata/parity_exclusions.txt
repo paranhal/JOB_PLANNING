@@ -1,0 +1,4 @@
+# 95-86 신화면 기능 이식 — 승인된 제외. 형식: 키 사유 승인일
+/work/review/complete 95-86 단계 B 리스트 검토 처리 이식 예정 2026-11-03
+/work/review/hold 95-86 단계 B 리스트 검토 처리 이식 예정 2026-11-03
+/workboard/register/kanban-move 95-86 단계 C 칸반 담당자 지정 모달은 신화면 전용 이동 API 사용 2026-11-03

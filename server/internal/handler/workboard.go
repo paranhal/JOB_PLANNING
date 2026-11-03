@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -30,6 +31,7 @@ type WorkboardHandler struct {
 	notices      *assignNoticeHook
 	groups       *repository.WorkGroupRepo
 	asH          *ASHandler
+	itemTpl      *repository.ItemTemplateRepo
 }
 
 func NewWorkboardHandler(
@@ -219,8 +221,8 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	undatedTasks = filterTasksByAssignee(undatedTasks, assigneeFilter)
 	undatedCards := undatedASCards(undatedTasks)
 
-	projects, _ := h.repo.ListProjects(true)
 	workProjects, _ := h.repo.ListWorkPickProjects(org)
+	projects := workProjects
 	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListSelectable()
 	var colorNames []string
@@ -663,6 +665,79 @@ func undatedASCards(tasks []model.WorkTask) []model.WBCard {
 			DurationMin:  dur,
 			TaskID:       t.TaskID,
 		})
+	}
+	return out
+}
+
+func applyBoardPeopleFilter(tasks []model.WorkTask, members map[string][]model.WorkTaskMember, scope boardScope) []model.WorkTask {
+	if scope.MembersRequested {
+		return filterTasksByMemberIDs(tasks, members, scope.MemberIDs, scope.memberNames())
+	}
+	return filterTasksByParticipants(tasks, members, scope.AssigneeFilter)
+}
+
+func filterTasksByMemberIDs(tasks []model.WorkTask, members map[string][]model.WorkTaskMember, ids, names []string) []model.WorkTask {
+	idSet := map[string]bool{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			idSet[id] = true
+		}
+	}
+	nameSet := map[string]bool{}
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			nameSet[n] = true
+		}
+	}
+	if len(idSet) == 0 && len(nameSet) == 0 {
+		return nil
+	}
+	var out []model.WorkTask
+	for _, t := range tasks {
+		if idSet[strings.TrimSpace(t.AssigneeUserID)] {
+			out = append(out, t)
+			continue
+		}
+		hit := false
+		for _, m := range members[t.TaskID] {
+			if idSet[strings.TrimSpace(m.UserID)] {
+				hit = true
+				break
+			}
+			if strings.TrimSpace(m.UserID) == "" && nameSet[strings.TrimSpace(m.Assignee)] {
+				hit = true
+				break
+			}
+		}
+		if hit {
+			out = append(out, t)
+			continue
+		}
+		if strings.TrimSpace(t.AssigneeUserID) == "" && nameSet[strings.TrimSpace(t.Assignee)] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func filterCardsByMemberNames(cards []model.WBCard, names []string) []model.WBCard {
+	nameSet := map[string]bool{}
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			nameSet[n] = true
+		}
+	}
+	if len(nameSet) == 0 {
+		return nil
+	}
+	var out []model.WBCard
+	for _, c := range cards {
+		if nameSet[strings.TrimSpace(c.Assignee)] {
+			out = append(out, c)
+		}
 	}
 	return out
 }
@@ -1130,6 +1205,9 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 			if err := denyUnlessCanEditTask(c, existing); err != nil {
 				return err
 			}
+			if err := rejectScheduleIfClosed(c, existing); err != nil {
+				return err
+			}
 			if assignee == "" {
 				assignee = strings.TrimSpace(existing.Assignee)
 			}
@@ -1137,6 +1215,9 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 	} else if kind == model.WBSourceAS || kind == model.WBSourceMaintenance {
 		if existing, _ := h.repo.GetTaskBySource(kind, refID); existing != nil {
 			if err := denyUnlessCanEditTask(c, existing); err != nil {
+				return err
+			}
+			if err := rejectScheduleIfClosed(c, existing); err != nil {
 				return err
 			}
 			excludeID = existing.TaskID
@@ -1169,7 +1250,7 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 			return err
 		}
 		if s == "" {
-			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+url.QueryEscape(assigneeOverlapMessage(assignee, "07:00", "20:00"))))
+			return overlapDone(overlapRedirect(c, assigneeOverlapMessage(assignee, "07:00", "20:00")))
 		}
 		start = s
 		_ = e
@@ -1187,18 +1268,36 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 			occ = occupancyNames(assignee, supports)
 		}
 	}
-	if msg := h.firstParticipantOverlap(date, start, end, excludeID, occ); msg != "" {
-		return overlapRedirect(c, msg)
+	if err := h.rejectIfOverlap(c, date, start, end, excludeID, occ); err != nil {
+		return overlapDone(err)
 	}
 
 	fromColumn := strings.TrimSpace(c.FormValue("assignee_from_column")) == "1"
 
 	var openedTaskID string
+	createdNew := false
 	switch kind {
 	case "task":
-		if err := h.repo.PlaceTask(refID, date, start, end); err != nil {
+		var carryOld *model.WorkTask
+		var carryDue string
+		if existing, _ := h.repo.GetTask(refID); existing != nil {
+			carryOld = existing
+			carryDue = existing.DueDate
+			if strings.TrimSpace(existing.DueDate) == "" || strings.TrimSpace(existing.WorkDate) == strings.TrimSpace(existing.DueDate) {
+				carryDue = date
+			}
+			if err := h.requireDelayReasonOnDateMove(c, existing, date, carryDue); err != nil {
+				return err
+			}
+		}
+		if err := placeTaskMovingSegments(c, h.repo, refID, date, start, end); err != nil {
+			if errors.Is(err, errSegDate) {
+				return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=seg_date"))
+			}
 			return err
 		}
+		h.recordDelayIfDateMoved(c, carryOld, date, carryDue)
+		h.applyPlanWorkPlace(c, refID)
 		if t, _ := h.repo.GetTask(refID); t != nil {
 			h.syncVisitDateFromTask(t.SourceType, t.SourceID, date)
 		}
@@ -1209,7 +1308,10 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 			return err
 		}
 		if existing != nil {
-			if err := h.repo.PlaceTask(existing.TaskID, date, start, end); err != nil {
+			if err := placeTaskMovingSegments(c, h.repo, existing.TaskID, date, start, end); err != nil {
+				if errors.Is(err, errSegDate) {
+					return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=seg_date"))
+				}
 				return err
 			}
 			h.syncVisitDateFromTask(kind, refID, date)
@@ -1221,14 +1323,26 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		t.OrgID = currentOrg(c)
+		if strings.TrimSpace(t.OrgID) == "" || t.OrgID == repository.OrgAll {
+			org, oerr := resolveInsertOrg(c)
+			if oerr != nil {
+				return oerr
+			}
+			t.OrgID = org
+		}
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
 		h.syncVisitDateFromTask(kind, refID, date)
 		openedTaskID = t.TaskID
+		createdNew = true
 	default:
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=place"))
+	}
+	if openedTaskID != "" {
+		if err := h.commitPendingInterrupt(c, openedTaskID, createdNew); err != nil {
+			return overlapDone(err)
+		}
 	}
 	if fromColumn && openedTaskID != "" {
 		if err := h.repo.SetTaskAssignee(openedTaskID, assignee); err != nil {
@@ -1663,6 +1777,11 @@ func (h *WorkboardHandler) CreateProject(c echo.Context) error {
 	if p.Name == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=name"))
 	}
+	org, err := resolveInsertOrg(c)
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=org"))
+	}
+	p.OrgID = org
 	if err := h.repo.CreateProject(p); err != nil {
 		return err
 	}
@@ -1682,6 +1801,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	workDate, dueDate, start, end, dur, schedOK := parseRequiredSchedule(c)
 	if !schedOK {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=time"))
+	}
+	if dueBeforeWork(workDate, dueDate) {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=date_order"))
 	}
 	if !h.canEditRegisterDate(c, workDate) {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=past"))
@@ -1710,7 +1832,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		if kind == model.WBWorkAS && len(batchIDs) > 1 {
 			res, err := h.RegisterWorkBatch(c, kind, batchIDs, mode, sel, workDate, dueDate, start, end, dur)
 			if err != nil {
-				return err
+				return overlapDone(err)
 			}
 			return h.respondWorkBatch(c, res)
 		}
@@ -1745,11 +1867,17 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			if err := checkAssigneeInOrg(h.userRepo, taskOrgID(c, existing), owner, "", existing.Assignee); err != nil {
 				return err
 			}
-			if msg := h.firstParticipantOverlap(workDate, start, end, existing.TaskID, occupancyNames(owner, supports)); msg != "" {
-				return overlapRedirect(c, msg)
+			if err := h.rejectIfOverlap(c, workDate, start, end, existing.TaskID, occupancyNames(owner, supports)); err != nil {
+				return overlapDone(err)
 			}
-			if err := h.repo.PlaceTask(existing.TaskID, workDate, start, end); err != nil {
+			if err := placeTaskMovingSegments(c, h.repo, existing.TaskID, workDate, start, end); err != nil {
+				if errors.Is(err, errSegDate) {
+					return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=seg_date"))
+				}
 				return err
+			}
+			if err := h.commitPendingInterrupt(c, existing.TaskID, false); err != nil {
+				return overlapDone(err)
 			}
 			if dueDate != "" {
 				_ = h.repo.SetTaskDueDate(existing.TaskID, dueDate)
@@ -1793,10 +1921,14 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		t.Status = st
 		t.Priority = pr
 		applySelectionToTask(t, sel)
-		if msg := h.firstParticipantOverlap(workDate, start, end, "", occupancyNames(t.Assignee, parseSupportMembers(c, t.Assignee))); msg != "" {
-			return overlapRedirect(c, msg)
+		if err := h.rejectIfOverlap(c, workDate, start, end, "", occupancyNames(t.Assignee, parseSupportMembers(c, t.Assignee))); err != nil {
+			return overlapDone(err)
 		}
-		t.OrgID = currentOrg(c)
+		org, oerr := resolveInsertOrg(c)
+		if oerr != nil {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=org"))
+		}
+		t.OrgID = org
 		if err := checkAssigneeInOrg(h.userRepo, t.OrgID, t.Assignee, "", ""); err != nil {
 			return err
 		}
@@ -1809,8 +1941,16 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		if err := h.repo.CreateTask(t); err != nil {
 			return err
 		}
+		if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
+			return overlapDone(err)
+		}
+		h.applyPlanWorkPlace(c, t.TaskID)
 		if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 			return err
+		}
+		if err := h.saveWorkItemsFromForm(c, t.TaskID); err != nil {
+			setFlashErrCookie(c, err.Error())
+			return c.Redirect(http.StatusSeeOther, taskPagePath(t.TaskID, false)+"?err=item")
 		}
 		if !sel.Empty() {
 			_ = h.saveSelectionOnTask(t.TaskID, sel)
@@ -1882,17 +2022,21 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if t.WorkType == model.WBWorkSupport && t.ProjectID == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=project_required"))
 	}
-	if err := h.assertProjectExists(t.ProjectID); err != nil {
+	if err := h.assertProjectLinkable(c, t.ProjectID); err != nil {
 		return err
 	}
 	supports := parseSupportMembers(c, t.Assignee)
 	if len(supports) > 0 && t.Assignee == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=owner"))
 	}
-	if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, "", occupancyNames(t.Assignee, supports)); msg != "" {
-		return overlapRedirect(c, msg)
+	if err := h.rejectIfOverlap(c, t.WorkDate, t.StartTime, t.EndTime, "", occupancyNames(t.Assignee, supports)); err != nil {
+		return overlapDone(err)
 	}
-	t.OrgID = currentOrg(c)
+	org, oerr := resolveInsertOrg(c)
+	if oerr != nil {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=org"))
+	}
+	t.OrgID = org
 	if err := checkAssigneeInOrg(h.userRepo, t.OrgID, t.Assignee, "", ""); err != nil {
 		return err
 	}
@@ -1911,11 +2055,19 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		}
 		return err
 	}
+	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
+		return overlapDone(err)
+	}
+	h.applyPlanWorkPlace(c, t.TaskID)
 	uid, name, on := stampOnBehalf(c, t.AssigneeUserID, t.Assignee)
 	_ = h.repo.StampActedBy(t.TaskID, uid, name, on)
 	recordTaskNotice(h.notices, c, t, "")
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
+	}
+	if err := h.saveWorkItemsFromForm(c, t.TaskID); err != nil {
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, taskPagePath(t.TaskID, false)+"?err=item")
 	}
 	if !sel.Empty() {
 		_ = h.saveSelectionOnTask(t.TaskID, sel)
@@ -1939,6 +2091,16 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"?ok=rec_gen")
 	}
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
+}
+
+// dueBeforeWork 종료일(due_date)이 시작일(work_date)보다 앞이면 true. 한쪽이 비면 검사하지 않는다.
+func dueBeforeWork(workDate, dueDate string) bool {
+	w := strings.TrimSpace(workDate)
+	d := strings.TrimSpace(dueDate)
+	if w == "" || d == "" {
+		return false
+	}
+	return d < w
 }
 
 // parseRequiredSchedule 업무 시작일·시작·종료(필수). 업무 종료일(due)은 비어 있을 수 있다(원본 일정·미정).
@@ -1988,10 +2150,14 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := denyOtherOrgTask(c, existing); err != nil {
 		return err
 	}
-	if err := denyUnlessCanEditTask(c, existing); err != nil {
+	registerScope := strings.TrimSpace(c.FormValue("scope")) == "register"
+	if registerScope {
+		if err := denyUnlessCanPlanEdit(c, existing); err != nil {
+			return err
+		}
+	} else if err := denyUnlessCanEditTask(c, existing); err != nil {
 		return err
 	}
-	registerScope := strings.TrimSpace(c.FormValue("scope")) == "register"
 	workDate, dueDate, start, end, dur, schedOK := parseRequiredSchedule(c)
 	adminGTD := model.IsAdminGTDTask(*existing)
 	if !registerScope {
@@ -2080,8 +2246,10 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		Status:         status,
 		Priority:       priority,
 		Assignee:       assignee,
+		AssigneeUserID: existing.AssigneeUserID,
 		AssigneeSource: existing.AssigneeSource,
 		WorkGroupID:    existing.WorkGroupID,
+		OrgID:          existing.OrgID,
 		Tags:           strings.TrimSpace(c.FormValue("tags")),
 		Progress:       progress,
 		SourceType:     existing.SourceType,
@@ -2090,7 +2258,23 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		CustomerID:     existing.CustomerID,
 		CustomerName:   existing.CustomerName,
 	}
-	if strings.TrimSpace(assignee) != strings.TrimSpace(existing.Assignee) {
+	postedPicker := registerScope && strings.TrimSpace(c.FormValue("assignee_multi")) == "1"
+	var sel Selection
+	if registerScope {
+		var selErr error
+		sel, selErr = h.taskSelectionFromForm(c, false)
+		if selErr != nil {
+			return rejectPickerErr(c, selErr, taskPagePath(id, registerScope)+"?back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		}
+		if postedPicker && sel.Empty() {
+			t.Assignee = ""
+			t.AssigneeUserID = ""
+			t.WorkGroupID = ""
+		} else if !sel.Empty() {
+			applySelectionToTask(t, sel)
+		}
+	}
+	if strings.TrimSpace(t.Assignee) != strings.TrimSpace(existing.Assignee) || strings.TrimSpace(t.AssigneeUserID) != strings.TrimSpace(existing.AssigneeUserID) {
 		t.AssigneeSource = model.WBAssigneeSourceManual
 	}
 	if registerScope && existing.SourceType == "" {
@@ -2127,20 +2311,43 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if t.DueDate == "" && !adminGTD {
 		t.DueDate = workDate
 	}
+	if dueBeforeWork(t.WorkDate, t.DueDate) {
+		return c.Redirect(http.StatusSeeOther,
+			taskPagePath(id, registerScope)+"?err=date_order&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+	}
 	if t.DueDate == "" && t.Status != model.WBTaskInbox {
 		return c.Redirect(http.StatusSeeOther,
 			taskPagePath(id, registerScope)+"?err=task&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	supports := parseSupportMembers(c, t.Assignee)
+	if !sel.Empty() {
+		supports = nil
+		for _, p := range sel.People {
+			if p.Role == model.WBMemberSupport {
+				supports = append(supports, model.WorkTaskMember{
+					Assignee: p.Name, UserID: p.UserID, Role: p.Role, DurationMin: p.DurationMin,
+				})
+			}
+		}
+	}
 	if len(supports) > 0 && t.Assignee == "" {
 		return c.Redirect(http.StatusSeeOther,
 			taskPagePath(id, registerScope)+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	org := taskOrgID(c, existing)
-	if err := h.assertProjectExists(t.ProjectID); err != nil {
+	if err := h.assertProjectLinkable(c, t.ProjectID); err != nil {
 		return err
 	}
-	if err := checkAssigneeInOrg(h.userRepo, org, t.Assignee, "", existing.Assignee); err != nil {
+	if err := checkAssigneeInOrg(h.userRepo, org, t.Assignee, t.AssigneeUserID, existing.Assignee); err != nil {
+		return err
+	}
+	prevNames := []string{existing.Assignee}
+	if existingMembers, err := h.repo.ListMembers(existing.TaskID); err == nil {
+		for _, m := range existingMembers {
+			prevNames = append(prevNames, m.Assignee)
+		}
+	}
+	if err := checkAssigneeNamesInOrg(h.userRepo, org, occupancyNames(t.Assignee, supports), prevNames); err != nil {
 		return err
 	}
 	if code := h.recurrenceCompleteErr(existing, t, c); code != "" {
@@ -2156,13 +2363,17 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, loc)
 	}
 	if t.StartTime != "" {
-		if msg := h.firstParticipantOverlap(t.WorkDate, t.StartTime, t.EndTime, t.TaskID, occupancyNames(t.Assignee, supports)); msg != "" {
-			return c.Redirect(http.StatusSeeOther,
-				taskPagePath(id, registerScope)+"?err="+url.QueryEscape(msg)+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		if err := h.rejectIfOverlap(c, t.WorkDate, t.StartTime, t.EndTime, t.TaskID, occupancyNames(t.Assignee, supports)); err != nil {
+			return overlapDone(err)
 		}
 	}
-	if err := h.applyWorkGroupForm(c, t); err != nil {
+	if err := h.requireDelayReasonOnDateMove(c, existing, t.WorkDate, t.DueDate); err != nil {
 		return err
+	}
+	if !registerScope {
+		if err := h.applyWorkGroupForm(c, t); err != nil {
+			return err
+		}
 	}
 	if requiresAssigneeChoice(c) && !assigneeFilled(t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
 		return rejectAssigneeRequired(c, taskPagePath(id, registerScope)+"?back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
@@ -2175,8 +2386,34 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			t.CompleteNote = note
 		}
 	}
+	if err := applyDateMoveToSegments(c, h.repo, existing, existing.WorkDate, t.WorkDate); err != nil {
+		if errors.Is(err, errSegDate) {
+			return c.Redirect(http.StatusSeeOther,
+				taskPagePath(id, registerScope)+"?err=seg_date&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		}
+		return err
+	}
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
+	}
+	h.recordDelayIfDateMoved(c, existing, t.WorkDate, t.DueDate)
+	_ = h.repo.ShiftSegmentDates(t.TaskID, existing.WorkDate, t.WorkDate)
+	if err := savePostedActionSegments(c, h.repo, t); err != nil {
+		if errors.Is(err, errSegShift) {
+			return c.Redirect(http.StatusSeeOther,
+				taskPagePath(id, registerScope)+"?err=seg_shift&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		}
+		return err
+	}
+	if err := h.saveWorkItemsFromForm(c, t.TaskID); err != nil {
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, taskPagePath(id, registerScope)+"?err=item&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+	}
+	if registerScope {
+		h.applyPlanWorkPlace(c, t.TaskID)
+	}
+	if err := h.commitPendingInterrupt(c, t.TaskID, false); err != nil {
+		return overlapDone(err)
 	}
 	uid, name, on := stampOnBehalf(c, t.AssigneeUserID, t.Assignee)
 	_ = h.repo.StampActedBy(t.TaskID, uid, name, on)
@@ -2212,8 +2449,14 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		}
 		return c.Redirect(http.StatusSeeOther, taskPagePath(id, registerScope)+"?err="+code)
 	}
-	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
-		return err
+	if registerScope && !sel.Empty() {
+		if err := h.saveSelectionOnTask(t.TaskID, sel); err != nil {
+			return err
+		}
+	} else if !registerScope {
+		if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
+			return err
+		}
 	}
 	if adminGTD && !registerScope {
 		h.addActionSaveActivity(existing, t, c)
@@ -2249,7 +2492,7 @@ func (h *WorkboardHandler) EditTask(c echo.Context) error {
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	if err := denyUnlessCanEditTask(c, t); err != nil {
+	if err := denyUnlessCanPlanEdit(c, t); err != nil {
 		return err
 	}
 	return h.renderTaskPage(c, true)
@@ -2351,8 +2594,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		parent, _ = h.repo.GetTask(t.ParentTaskID)
 	}
 	assignees := listAssignableForPicker(h.userRepo, c)
-	projects, _ := h.repo.ListProjects(false)
 	workProjects, _ := h.repo.ListWorkPickProjects(taskOrgID(c, t))
+	workProjects = ensureTaskProjectListed(t, workProjects)
+	projects := workProjects
 	workSites, _ := h.repo.ListTaskSites(t.TaskID)
 	customers, _ := h.customerRepo.ListSelectable()
 	supportMembers, _ := h.repo.ListMembers(t.TaskID)
@@ -2362,6 +2606,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 			supportOnly = append(supportOnly, m)
 		}
 	}
+	pickerOwner, pickerIDs := pickerSeedFromTask(t, supportMembers, assignees)
+	assignees = ensurePickerUsers(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...)
 	var taskLeaveNames []string
 	if h.mntRepo != nil {
 		if lr := h.mntRepo.Leaves(); lr != nil && t.WorkDate != "" {
@@ -2403,6 +2649,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"CompleteLocal":    completeLocal,
 		"Assignees":        assignees,
 		"AssigneeRequired": requiresAssigneeChoice(c),
+		"PickerNames":      pickerNamesFor(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...),
+		"PickerOwnerID":    pickerOwner,
+		"PickerUserIDs":    pickerIDs,
 		"SupportMembers":   supportOnly,
 		"WorkGroups":       wgShow,
 		"WorkGroupsJSON":   wgShowJSON,
@@ -2412,9 +2661,14 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"WorkSites":        workSites,
 		"Customers":        customers,
 		"CanWrite":         canWrite,
+		"CanPlanEdit":      canPlanEditTask(c, t),
+		"CanCarry":         canPlanEditTask(c, t),
+		"TaskDelayed":      model.TaskDelayState(*t, today).Delayed,
+		"TaskDelayDays":    model.TaskDelayState(*t, today).Days,
 		"FlashOK":          c.QueryParam("ok"),
 		"FlashErr":         c.QueryParam("err"),
-		"FlashErrMsg":      gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n")),
+		"FlashErrMsg":      firstNonEmpty(visibleQueryErr(c.QueryParam("err")), gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n"))),
+		"Notice":           c.QueryParam("notice"),
 		"Today":            time.Now().Format(dateLayout),
 		"BackURL":          back,
 		"BackLabel":        workboardBackLabel(back),
@@ -2425,6 +2679,19 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"PWAttachCount":    pwAttN,
 		"PWStatusLabel":    model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
 	}
+	mergeCarryModal(data)
+	if hist, err := h.repo.ListDelaysByTask(t.TaskID); err == nil {
+		data["DelayHistory"] = hist
+	}
+	if latest, err := h.repo.LatestDelayReasons([]string{t.TaskID}); err == nil {
+		data["DelayReason"] = latest[t.TaskID]
+		data["DelayReasonShort"] = model.TruncRunes(latest[t.TaskID], 40)
+	}
+	if items, err := h.repo.ListItems(t.TaskID); err == nil {
+		data["WorkItems"] = items
+	}
+	attachWorkItemView(data, h, t, !canWrite)
+	attachWorkSegData(data, h.repo, t, c.QueryParam("err"), "/workboard/tasks/"+t.TaskID, !canWrite)
 	sel := map[string]bool{}
 	for _, a := range t.LinkedAssets {
 		sel[a.AssetID] = true
@@ -2666,6 +2933,20 @@ func safeWorkboardRedirect(raw, fallback string) string {
 		return u.Path + "?" + u.RawQuery
 	}
 	return u.Path
+}
+
+func rejectScheduleIfClosed(c echo.Context, t *model.WorkTask) error {
+	if t == nil {
+		return nil
+	}
+	st := strings.TrimSpace(t.Status)
+	if st == model.WBTaskComplete || st == model.WBTaskCancelled {
+		if err := c.Redirect(http.StatusSeeOther, redirectBack(c, "err=done")); err != nil {
+			return err
+		}
+		return errScheduleClosed
+	}
+	return nil
 }
 
 func redirectBack(c echo.Context, q string) string {

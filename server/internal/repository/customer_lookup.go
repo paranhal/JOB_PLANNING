@@ -21,7 +21,7 @@ type CustomerQuery struct {
 	Q          string
 	IncludeIDs []string
 	ParentID   string
-	Limit      int // 0 = 제한 없음
+	Limit      int    // 0 = 제한 없음
 	Offset     int
 }
 

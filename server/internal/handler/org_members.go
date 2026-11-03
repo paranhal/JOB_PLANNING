@@ -44,7 +44,11 @@ func (h *AuthHandler) adminVisibleUser(c echo.Context, u *model.User) bool {
 	if home == "" {
 		return true
 	}
-	return strings.TrimSpace(u.OrgID) == home
+	userOrg := strings.TrimSpace(u.OrgID)
+	if userOrg == "" {
+		return home == model.OrgIDLibrary
+	}
+	return userOrg == home
 }
 
 func (h *AuthHandler) loadAdminScopedUser(c echo.Context, id string) (*model.User, error) {
@@ -79,7 +83,7 @@ func (h *AuthHandler) MembersList(c echo.Context) error {
 	if h.accounts != nil {
 		reqs, _ = h.accounts.ListRequests("", home, ctxString(c, "user_id"))
 	}
-	return c.Render(http.StatusOK, "admin/members.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":    "소속 인원 관리",
 		"Active":   NavMembers,
 		"OrgID":    home,
@@ -90,7 +94,9 @@ func (h *AuthHandler) MembersList(c echo.Context) error {
 		"FlashOK":  strings.TrimSpace(c.QueryParam("ok")),
 		"FlashErr": strings.TrimSpace(c.QueryParam("err")),
 		"TempPW":   takeOncePassword(c.QueryParam("once")),
-	})
+	}
+	h.attachDupUsername(c, data)
+	return c.Render(http.StatusOK, "admin/members.html", data)
 }
 
 func (h *AuthHandler) MemberCreate(c echo.Context) error {
