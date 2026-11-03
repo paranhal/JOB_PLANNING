@@ -1,0 +1,68 @@
+{{define "title"}}원인 분류표 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <h2 class="text-ui-xl font-extrabold text-ink">원인 분류표</h2>
+    <p class="text-ui-sm text-ink-muted">본인 조직의 1·2·3차 분류입니다. 양식을 내려받아 입력한 뒤 미리보기·적용하세요.</p>
+  </div>
+  {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
+  {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
+
+  <div class="flex flex-wrap gap-2">
+    <a href="/as/cause-categories/template.xlsx" class="btn btn-secondary btn-sm">양식 다운로드</a>
+    <a href="/as/cause-categories/export.xlsx" class="btn btn-secondary btn-sm">현재 분류표 내려받기</a>
+  </div>
+
+  <div class="card p-4 space-y-3">
+    <h3 class="font-semibold text-ink">엑셀 일괄 등록</h3>
+    <p class="text-ui-sm text-ink-muted">미리보기는 DB를 바꾸지 않습니다. 적용 시 오류 행은 건너뛰고, 파일에 없는 분류는 지우지 않습니다.</p>
+    <form method="post" action="/as/cause-categories/import-preview" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <button type="submit" class="btn btn-secondary">미리보기</button>
+    </form>
+    <form method="post" action="/as/cause-categories/import-apply" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <button type="submit" class="btn btn-primary">적용</button>
+    </form>
+    <form method="post" action="/as/cause-categories/import-errors.xlsx" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+      <input type="file" name="file" accept=".xlsx" required class="input">
+      <button type="submit" class="btn btn-secondary btn-sm">오류 목록 엑셀</button>
+    </form>
+  </div>
+
+  {{if .Preview}}
+  <div class="card p-4 space-y-2">
+    <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
+    <p class="text-ui-sm">신규 {{.Preview.NewN}} · 수정 {{.Preview.UpdN}} · 변경 없음 {{.Preview.SameN}} · 오류 {{.Preview.ErrN}}</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-ui">
+        <thead class="text-ink-muted text-left"><tr><th class="p-2">시트</th><th class="p-2">행</th><th class="p-2">처리</th><th class="p-2">키</th><th class="p-2">사유</th></tr></thead>
+        <tbody>
+          {{range .Preview.Rows}}
+          <tr class="border-t border-line"><td class="p-2">{{.Sheet}}</td><td class="p-2">{{.Line}}</td><td class="p-2">{{.Action}}</td><td class="p-2">{{.Key}}</td><td class="p-2">{{.Msg}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+
+  <div class="card overflow-x-auto">
+    <table class="w-full text-ui">
+      <thead class="text-ink-muted text-left"><tr><th class="p-3">단계</th><th class="p-3">이름</th><th class="p-3">상위</th><th class="p-3">사용</th></tr></thead>
+      <tbody>
+        {{range .Cats}}
+        <tr class="border-t border-line">
+          <td class="p-3">{{.Level}}</td>
+          <td class="p-3">{{.Label}}</td>
+          <td class="p-3">{{.ParentCode}}</td>
+          <td class="p-3">{{if .IsActive}}사용{{else}}비활성{{end}}</td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="4">아직 올린 분류가 없습니다. 조치 화면에서는 직접 입력합니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
