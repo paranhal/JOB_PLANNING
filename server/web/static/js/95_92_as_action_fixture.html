@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>95-92 AS action fixture</title>
+<form id="as-action-form" action="/as/AS1/update" method="post">
+  <div id="as-action-sets">
+    <div class="as-action-set" data-action-set="1" data-open="1">
+      <div class="as-set-head"><b>조치 1</b><button type="button" data-set-toggle="1">접기 ▲</button></div>
+      <div class="as-set-body">
+        <select class="as-set-ptype" name="s1_process_type">
+          <option value="">선택</option>
+          <option value="visit" selected>현장방문</option>
+          <option value="remote">원격</option>
+        </select>
+        <div class="as-set-visit"><p>현장방문 — 작업일이 방문일로 기록됩니다</p></div>
+        <input class="as-set-work-date" name="s1_work_date" type="date" value="2026-11-03">
+        <select class="as-set-start" name="s1_start_time"><option value="09:00" selected>오전 09:00</option></select>
+        <select class="as-set-dur" name="s1_duration_min"><option value="30" selected>30분</option></select>
+        <textarea class="as-set-text" name="s1_action_taken">조치내용 임시</textarea>
+        <select class="as-set-result" name="s1_result_code">
+          <option value="">선택하세요</option>
+          <option value="done">완료</option>
+        </select>
+        <p class="as-set-err hidden"></p>
+        <p class="as-set-missing hidden"></p>
+        <button type="button" class="as-set-save">임시 저장</button>
+        <input type="hidden" name="s1_set_id" value="">
+        <label><input type="radio" class="as-set-place" name="s1_work_place" value="field" checked>외근</label>
+      </div>
+    </div>
+  </div>
+  <p id="as-add-set-err" class="hidden">조치 결과를 먼저 선택해 주세요</p>
+  <button type="button" id="as-add-set">＋ 조치 추가</button>
+  <input type="hidden" id="as-visit-date" name="visit_date" value="">
+  <input type="hidden" id="as-process-type" name="process_type" value="visit">
+  <textarea id="as-action-taken" name="action_taken" class="hidden"></textarea>
+  <select id="as-result-code" name="result_code"><option value=""></option><option value="done">완료</option></select>
+</form>
+<script src="./as_action_sets.js"></script>

@@ -1,0 +1,47 @@
+{{define "as_action_work_time"}}
+{{$s := .Set}}{{$root := .Root}}{{$p := $s.Prefix}}{{$ro := $root.ReadOnly}}
+<div class="rounded-xl border border-slate-200 p-3 space-y-3 min-w-0">
+  <p class="text-sm font-semibold text-slate-800">작업 시간</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
+    <label class="flex flex-col gap-1 text-xs text-slate-500 min-w-0">작업일
+      <input type="date" name="{{$p}}work_date" value="{{if $s.WorkDate}}{{$s.WorkDate}}{{else if $s.VisitDate}}{{$s.VisitDate}}{{else}}{{$root.TodayDate}}{{end}}" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-work-date">
+    </label>
+    <label class="flex flex-col gap-1 text-xs text-slate-500 min-w-0">업무 시작 시간
+      <select name="{{$p}}start_time" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-start">
+        <option value="">선택</option>
+        {{range $root.TimeSlots}}
+        <option value="{{.Value}}" {{if eq .Value $s.StartTime}}selected{{end}}>{{.Label}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label class="flex flex-col gap-1 text-xs text-slate-500 min-w-0">작업 시간
+      <select name="{{$p}}duration_min" {{if $ro}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-dur">
+        <option value="">선택</option>
+        {{range $root.DurationOpts}}
+        <option value="{{.Value}}" {{if eq .Value (printf "%d" $s.DurationMin)}}selected{{end}}>{{.Label}}</option>
+        {{end}}
+      </select>
+    </label>
+    <div class="flex flex-col gap-1 text-xs text-slate-500 min-w-0">완료 시간(자동)
+      <p class="as-set-end-label text-sm text-slate-800 py-2">{{if $s.EndTime}}{{formatKoreanTime $s.EndTime}}{{else}}—{{end}}</p>
+      <input type="hidden" name="{{$p}}end_time" value="{{$s.EndTime}}" class="as-set-end">
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-3 min-w-0">
+    <label class="inline-flex items-center gap-2 text-sm shrink-0">
+      <input type="hidden" name="{{$p}}leave_same" value="0">
+      <input type="checkbox" name="{{$p}}leave_same" value="1" class="as-set-leave-same rounded" {{if $s.LeaveSame}}checked{{end}} {{if $ro}}disabled{{end}}>
+      철수 시간 동일
+    </label>
+    <label class="flex flex-col gap-1 text-xs text-slate-500 min-w-0 flex-1">철수 시간
+      <select name="{{$p}}leave_time" {{if or $ro $s.LeaveSame}}disabled{{end}} class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm as-set-leave">
+        <option value="">선택</option>
+        {{range $root.TimeSlots}}
+        <option value="{{.Value}}" {{if eq .Value $s.LeaveTime}}selected{{end}}>{{.Label}}</option>
+        {{end}}
+      </select>
+    </label>
+    <p class="text-[11px] text-slate-500 as-set-leave-hint">{{if $s.LeaveSame}}완료 시간이 철수 시간이 됩니다{{end}}</p>
+  </div>
+</div>
+{{end}}
