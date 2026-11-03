@@ -1,0 +1,178 @@
+{{define "work_task_items"}}
+{{$ro := .WorkItemsReadOnly}}
+{{$members := .ItemMembers}}
+{{$taskID := .ItemTaskID}}
+{{$kinds := .ItemKinds}}
+<div class="rounded-lg border border-line p-3 space-y-2" data-work-items="1"
+     data-task-id="{{$taskID}}" data-customer-id="{{.ItemCustomerID}}" data-work-date="{{.ItemWorkDate}}"
+     x-data="{
+       members: {{if $members}}{{toJSON $members}}{{else}}[]{{end}},
+       rows: {{if .WorkItems}}{{toJSON .WorkItems}}{{else}}[]{{end}},
+       templates: {{if .ItemTemplatesJSON}}{{toJSON .ItemTemplatesJSON}}{{else}}[]{{end}},
+       pickId: '',
+       seq: 0,
+       allNames() { return (this.members||[]).map(m => m.Name || m.name).filter(Boolean); },
+       included(row) { return row && row.SetIncluded !== false; },
+       rowLocked(row) {
+         if (!row) return false;
+         if (row.Status==='done' || row.ASLocked) return true;
+         if (row.ASID) return true;
+         return (row.AssetIDs||[]).length > 0;
+       },
+       nextKey() { this.seq += 1; return 'k'+Date.now()+'-'+this.seq; },
+       blankRow() {
+         const names = this.allNames();
+         return {ItemID:'',Title:'',ProductName:'',ModelName:'',Kind:'etc',Qty:1,Unit:'건',Status:'todo',Note:'',
+           TemplateID:'', SetMainItemID:'', ClientKey:this.nextKey(), SetMainKey:'', IsSetMain:false, SetIncluded:true,
+           Assignees: names.map(n => ({Name:n,UserID:''})), ASID:'', ASNumber:'', ASLocked:false, AssetMissing:false, AssetIDs:[]};
+       },
+       fromTpl(t, key, mainKey, included, isMain) {
+         const names = this.allNames();
+         return {ItemID:'',Title:t.Name||'',ProductName:t.Name||'',ModelName:'',Kind:t.Kind||'etc',Qty:t.DefaultQty||1,
+           Unit:t.Unit||'건',Status:'todo',Note:'', TemplateID:t.TemplateID||'', SetMainItemID:'',
+           ClientKey:key, SetMainKey:mainKey||'', IsSetMain:!!isMain, SetIncluded: included!==false,
+           Assignees: names.map(n => ({Name:n,UserID:''})), ASID:'', ASNumber:'', ASLocked:false, AssetMissing:false, AssetIDs:[]};
+       },
+       addRow() { this.rows.push(this.blankRow()); },
+       addFromSelect() {
+         const id = this.pickId;
+         if (!id) { this.addRow(); return; }
+         const t = (this.templates||[]).find(x => x.TemplateID === id);
+         if (!t) { this.addRow(); return; }
+         const mainKey = this.nextKey();
+         this.rows.push(this.fromTpl(t, mainKey, '', true, true));
+         (t.Links||[]).forEach(ch => {
+           const on = ch.DefaultChecked === true || ch.DefaultChecked === 1 || ch.DefaultChecked === '1';
+           this.rows.push(this.fromTpl(ch, this.nextKey(), mainKey, on, false));
+         });
+       },
+       toggleInclude(row) {
+         if (this.rowLocked(row)) return;
+         row.SetIncluded = this.included(row) ? false : true;
+       },
+       removeRow(i) {
+         const row = this.rows[i];
+         if (!row) return;
+         if (row.IsSetMain || (!row.SetMainKey && row.TemplateID && !(row.SetMainItemID))) {
+           const key = row.ClientKey || row.ItemID;
+           this.rows.forEach(r => {
+             if ((r.SetMainKey && r.SetMainKey===key) || (r.SetMainItemID && r.SetMainItemID===row.ItemID)) {
+               r.SetMainKey=''; r.SetMainItemID=''; r.IsSetMain=false;
+             }
+           });
+           this.rows.splice(i,1);
+           return;
+         }
+         if (row.SetMainKey || row.SetMainItemID) {
+           if (this.rowLocked(row)) { window.alert('완료·연결 항목은 제외할 수 없습니다'); return; }
+           row.SetIncluded = false;
+           return;
+         }
+         if (this.rowLocked(row) && !window.confirm('완료·연결 항목을 삭제할까요?')) return;
+         this.rows.splice(i,1);
+       },
+       assigneeCsv(row) { return (row.Assignees||[]).map(a => a.Name||a.name||a).filter(Boolean).join(','); },
+       hasAssignee(row, name) { return this.assigneeCsv(row).split(',').map(s=>s.trim()).indexOf(name)>=0; },
+       toggleAssignee(row, name) {
+         const cur = this.assigneeCsv(row).split(',').map(s=>s.trim()).filter(Boolean);
+         const i = cur.indexOf(name);
+         if (i>=0) cur.splice(i,1); else cur.push(name);
+         row.Assignees = cur.map(n => ({Name:n,UserID:''}));
+       }
+     }">
+  {{if .WorkItemSummary}}{{if .WorkItemSummary.Line}}
+  <p class="text-ui-sm font-semibold text-ink" data-item-kind-line="1">{{.WorkItemSummary.Line}}{{if .WorkItemSummary.Progress}} · {{.WorkItemSummary.Progress}}{{end}}</p>
+  {{end}}{{end}}
+  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-ui font-medium text-ink">작업 리스트</p>
+    {{if not $ro}}
+    <div class="flex flex-wrap items-center gap-2">
+      <select class="input" x-model="pickId" data-item-template-select>
+        <option value="">직접 입력 항목</option>
+        {{if .ItemTemplates}}{{range .ItemTemplates}}
+        <option value="{{.TemplateID}}">{{.KindLabel}} · {{.Name}}</option>
+        {{end}}{{end}}
+      </select>
+      <button type="button" class="btn btn-secondary btn-sm" @click="addFromSelect()" data-item-add>항목 추가</button>
+    </div>
+    {{end}}
+  </div>
+  <p class="text-ui-sm text-ink-muted">미완료 항목이 있으면 완료로 저장되지 않고 부분 완료·후속으로 넘어갑니다. 항목은 상위 작업 일정 안에서 수행합니다. 세트 체크를 끄면 이번 작업에서 빠집니다.</p>
+  <p id="work-items-err" class="hidden text-ui-sm text-danger rounded border border-line px-2 py-1" data-work-items-err></p>
+  <template x-for="(row, i) in rows" :key="row.ClientKey || row.ItemID || i">
+    <div class="grid grid-cols-1 gap-2 rounded-lg border border-line p-2 sm:grid-cols-[auto_7rem_1fr_4rem_auto_minmax(8rem,1fr)_6rem_auto] sm:items-start"
+         :class="included(row) ? '' : 'opacity-50'"
+         :data-set-included="included(row) ? '1' : '0'"
+         :data-item-name="row.ProductName || row.Title || ''">
+      <input type="hidden" name="item_id" :value="row.ItemID || ''">
+      <input type="hidden" name="item_as_id" :value="row.ASID || ''">
+      <input type="hidden" name="item_assignees" :value="assigneeCsv(row)">
+      <input type="hidden" name="item_note" :value="row.Note || ''">
+      <input type="hidden" name="item_template_id" :value="row.TemplateID || ''">
+      <input type="hidden" name="item_unit" :value="row.Unit || ''">
+      <input type="hidden" name="item_client_key" :value="row.ClientKey || row.ItemID || ''">
+      <input type="hidden" name="item_set_main_key" :value="row.SetMainKey || row.SetMainItemID || ''">
+      <input type="hidden" name="item_included" :value="included(row) ? '1' : '0'">
+      <div class="flex items-center gap-1">
+        <template x-if="row.IsSetMain">
+          <span class="badge badge-info" data-set-main>세트 주항목</span>
+        </template>
+        <template x-if="row.SetMainKey || row.SetMainItemID">
+          <label class="inline-flex items-center gap-1 text-[11px]">
+            <input type="checkbox" class="rounded" :checked="included(row)" :disabled="rowLocked(row)" @change="toggleInclude(row)" data-set-check>
+            <span>세트</span>
+          </label>
+        </template>
+      </div>
+      <select name="item_kind" class="input" x-model="row.Kind" {{if $ro}}disabled{{end}}>
+        {{if $kinds}}{{range $kinds}}<option value="{{.CodeValue}}">{{.CodeName}}</option>{{end}}{{else}}
+        <option value="install">장비 장착</option>
+        <option value="work">공사</option>
+        <option value="as">AS</option>
+        <option value="etc">기타</option>
+        {{end}}
+      </select>
+      <input type="text" name="item_product" class="input" placeholder="장비·품목" x-model="row.ProductName" :value="row.ProductName || row.Title" {{if $ro}}readonly{{end}}>
+      <input type="hidden" name="item_title" :value="row.ProductName || row.Title || ''">
+      <div class="flex items-center gap-1">
+        <input type="number" name="item_qty" class="input" min="1" x-model="row.Qty" {{if $ro}}readonly{{end}} title="수량">
+        <span class="text-[11px] text-ink-muted whitespace-nowrap" x-text="row.Unit || ''" data-item-unit></span>
+      </div>
+      <div class="flex flex-wrap gap-1" data-item-assignees>
+        <template x-for="m in members" :key="m.Name||m.name">
+          <label class="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[11px]">
+            <input type="checkbox" class="rounded" :checked="hasAssignee(row, m.Name||m.name)" @change="toggleAssignee(row, m.Name||m.name)" {{if $ro}}disabled{{end}}>
+            <span x-text="m.Name||m.name"></span>
+          </label>
+        </template>
+      </div>
+      <input type="hidden" name="item_status" :value="row.Status">
+      <select class="input" x-model="row.Status" :disabled="row.ASLocked" {{if $ro}}disabled{{end}}>
+        <option value="todo">할 일</option>
+        <option value="doing">진행</option>
+        <option value="hold">보류</option>
+        <option value="done">완료</option>
+        <option value="na">해당없음</option>
+      </select>
+      <div class="flex flex-wrap items-center gap-1">
+        <template x-if="row.Kind==='install'">
+          <button type="button" class="btn btn-secondary btn-sm" data-item-asset-register @click="window.workItemsOpenAsset && window.workItemsOpenAsset($el, row, i)">자산 등록</button>
+        </template>
+        <template x-if="row.Kind==='as'">
+          <button type="button" class="btn btn-secondary btn-sm" data-item-asset-pick @click="window.workItemsOpenPick && window.workItemsOpenPick($el, row, i)">대상 자산</button>
+        </template>
+        <template x-if="row.Kind==='as'">
+          <button type="button" class="btn btn-secondary btn-sm" data-item-as-link @click="window.workItemsOpenAS && window.workItemsOpenAS($el, row, i)">AS 접수 연결</button>
+        </template>
+        <template x-if="row.Kind==='work' || row.Kind==='etc'">
+          <button type="button" class="btn btn-ghost btn-sm" data-item-asset-pick @click="window.workItemsOpenPick && window.workItemsOpenPick($el, row, i)">자산</button>
+        </template>
+        <span class="text-[11px] font-semibold text-danger" x-show="row.AssetMissing && row.Kind==='install'">자산 미등록</span>
+        <a class="text-[11px] font-semibold text-brand" x-show="row.ASNumber" :href="'/as/'+(row.ASID||'')" x-text="row.ASNumber"></a>
+        {{if not $ro}}<button type="button" class="btn btn-ghost btn-sm" @click="removeRow(i)" aria-label="삭제">✕</button>{{end}}
+      </div>
+    </div>
+  </template>
+  <p class="text-ui-sm text-ink-muted" x-show="rows.length===0">항목이 없습니다. 추가해 주세요.</p>
+</div>
+{{end}}

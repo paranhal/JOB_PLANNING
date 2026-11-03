@@ -1,0 +1,60 @@
+{{define "work_segments_form"}}
+{{$n := safeLen .WorkSegRows}}
+{{$open := or .SegsOpen (gt $n 1)}}
+{{$ro := .SegsReadOnly}}
+<div class="overflow-x-auto" data-work-segments="1" x-data="{open: {{if $open}}true{{else}}false{{end}}}">
+  <button type="button" class="text-ui font-medium text-ink mb-2" @click="open=!open" data-seg-toggle>
+    작업 구간 {{if $n}}{{$n}}{{else}}0{{end}}개
+  </button>
+  {{if eq .ActionErr "seg_shift"}}
+  <div id="seg-shift-confirm" class="mt-1 mb-2 rounded border border-line bg-danger-soft px-3 py-2 text-ui text-danger" role="dialog" aria-modal="true">
+    <p class="mb-2" data-pw-field-err>{{if .ActionErrMsg}}{{.ActionErrMsg}}{{else}}끼워 넣은 업무의 실제 시간이 다음 구간과 겹칩니다. 후속 구간을 조정할까요?{{end}}</p>
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" name="confirm_seg_shift" value="1" class="btn btn-primary btn-sm">조정하고 저장</button>
+      <button type="submit" name="confirm_seg_shift" value="0" class="btn btn-secondary btn-sm">조정 없이 저장</button>
+      <a href="{{if .SegsCancelHref}}{{.SegsCancelHref}}{{else}}?{{end}}" class="btn btn-ghost btn-sm">취소</a>
+    </div>
+  </div>
+  {{end}}
+  {{if eq .ActionErr "seg_merge"}}
+  <div id="seg-merge-confirm" class="mt-1 mb-2 rounded border border-line bg-warning-soft px-3 py-2 text-ui" role="dialog">
+    <p class="mb-2">{{.ActionErrMsg}}</p>
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" name="confirm_merge_segments" value="1" class="btn btn-primary btn-sm">합치고 저장</button>
+      <a href="{{if .SegsCancelHref}}{{.SegsCancelHref}}{{else}}?{{end}}" class="btn btn-ghost btn-sm">취소</a>
+    </div>
+  </div>
+  {{end}}
+  {{if eq .ActionErr "seg_date"}}
+  <div id="seg-date-confirm" class="mt-1 mb-2 rounded border border-line bg-warning-soft px-3 py-2 text-ui" role="dialog">
+    <p class="mb-2">{{.ActionErrMsg}}</p>
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" name="confirm_collapse_segments" value="1" class="btn btn-primary btn-sm">합치고 옮기기</button>
+      <button type="submit" name="confirm_collapse_segments" value="0" class="btn btn-secondary btn-sm">구간 유지하고 옮기기</button>
+      <a href="{{if .SegsCancelHref}}{{.SegsCancelHref}}{{else}}?{{end}}" class="btn btn-ghost btn-sm">취소</a>
+    </div>
+  </div>
+  {{end}}
+  <div x-show="open" {{if not $open}}x-cloak{{end}}>
+    <table class="w-full text-ui min-w-[520px]">
+      <thead class="text-ui-sm text-ink-muted">
+        <tr><th class="text-left py-1">구간</th><th class="text-left py-1">시작</th><th class="text-left py-1">종료</th><th class="text-left py-1">처리 담당자</th></tr>
+      </thead>
+      <tbody>
+        {{range .WorkSegRows}}
+        <tr>
+          <td class="py-1 pr-2">{{.Label}}</td>
+          <td class="py-1 pr-2"><input type="datetime-local" name="seg_start" class="input" value="{{.StartLocal}}" {{if $ro}}disabled{{end}}></td>
+          <td class="py-1 pr-2"><input type="datetime-local" name="seg_end" class="input" value="{{.EndLocal}}" {{if $ro}}disabled{{end}}></td>
+          <td class="py-1"><input type="text" name="seg_worker" class="input" value="{{.Worker}}" {{if $ro}}disabled{{end}}></td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4" class="text-ink-muted py-2">계획 구간이 없습니다</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{if .SegTotalMin}}<p class="mt-1 text-ui-sm text-ink-muted" data-seg-total>합계 {{.SegTotalMin}}분 (이동 제외)</p>{{end}}
+    {{if .SegAddHref}}<p class="mt-1"><a href="{{.SegAddHref}}" class="text-ui-sm font-semibold text-brand">여기에 다른 업무 추가</a></p>{{end}}
+  </div>
+</div>
+{{end}}
