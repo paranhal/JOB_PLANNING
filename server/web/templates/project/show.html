@@ -25,13 +25,10 @@
         {{if .RunLabel}}<span class="px-2 py-0.5 rounded-full text-xs bg-hover text-ink">{{.RunLabel}}</span>{{end}}
       </p>
     </div>
-    {{if .CanWrite}}
     <div class="flex flex-wrap gap-2">
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">일일 업무 현황</a>
       <a href="/workboard/new-work/form?kind=project_work&project_id={{.Project.ProjectID}}" class="btn btn-secondary btn-sm">이 사업으로 업무 등록</a>
-      {{end}}
       {{if .CanWrite}}
-      <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">일일 업무 현황</a>
       <a href="/projects/{{.Project.ProjectID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">수정</a>
       {{if .CanMerge}}
       <a href="/projects/{{.Project.ProjectID}}/merge" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">합치기</a>
@@ -64,7 +61,6 @@
       {{end}}
       {{end}}
     </div>
-    {{end}}
   </div>
 
   {{if eq .FlashOK "created"}}
@@ -83,6 +79,7 @@
   <div class="rounded-lg bg-success-soft text-success text-sm px-4 py-2 border border-success">영업 사업에서 등록했습니다. 활동 로그는 영업 상세에 남아 있습니다.</div>
   {{else if eq .FlashOK "moved"}}
   <div class="flash-success rounded-control">주관 부서를 이관했습니다.</div>
+  {{end}}
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <div class="lg:col-span-2 bg-white rounded-xl border border-line p-5 space-y-3">
@@ -100,18 +97,20 @@
         <div><dt class="text-ink-muted">계약/청구</dt><dd class="text-ink">{{if .Project.ContractType}}{{.Project.ContractType}}{{else}}—{{end}} / {{if .Project.BillingType}}{{.Project.BillingType}}{{else}}—{{end}}</dd></div>
         <div><dt class="text-ink-muted">기간</dt><dd class="text-ink">{{if or .Project.StartDate .Project.EndDate}}{{.Project.StartDate}} ~ {{.Project.EndDate}}{{else}}—{{end}}</dd></div>
         <div class="sm:col-span-2"><dt class="text-ink-muted">비고</dt><dd class="text-ink whitespace-pre-wrap">{{if .Project.Notes}}{{.Project.Notes}}{{else}}—{{end}}</dd></div>
-        {{if .Project.SalesProjectID}}
         <div class="sm:col-span-2">
-          <dt class="text-ink-muted">원본 영업 사업</dt>
+          <dt class="text-ink-muted">영업 파이프라인</dt>
           <dd>
-            {{if .SalesMissing}}
-            <span class="text-ink-muted">(없음)</span>
+            {{if .Project.SalesProjectID}}
+              {{if .SalesMissing}}
+              <span class="text-ink-muted">연결 번호는 있으나 영업 건이 없습니다</span>
+              {{else}}
+              <a href="/sales/{{.Project.SalesProjectID}}" class="text-primary hover:underline">{{.Project.SalesProjectID}}</a>
+              {{end}}
             {{else}}
-            <a href="/sales/{{.Project.SalesProjectID}}" class="text-primary hover:underline">{{.Project.SalesProjectID}}</a>
+            <span>영업 없이 직접 등록 · 파이프라인 미연결</span>
             {{end}}
           </dd>
         </div>
-        {{end}}
       </dl>
     </div>
     <div class="bg-white rounded-xl border border-line p-5">
