@@ -1,22 +1,61 @@
 {{define "as_cause_cat1_fields"}}
+{{$p := .Prefix}}{{$id := "as-cause-cat1"}}{{if .FieldID}}{{$id = .FieldID}}{{end}}
+{{if .CauseFreeInput}}
 <div>
-  <label class="block text-sm font-medium text-slate-700 mb-1">1차 분류 <span class="text-red-500">*</span></label>
-  <select name="cause_cat1" id="as-cause-cat1" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  <input type="hidden" name="{{$p}}cause_cat1" value="custom">
+  <label class="block text-sm font-medium text-ink mb-1">1차 분류(직접 입력) <span class="text-danger">*</span></label>
+  <input type="text" name="{{$p}}cause_cat1_custom" id="{{$id}}-custom" maxlength="40" required
+         value="{{.AS.CauseCat1Custom}}" list="{{$id}}-custom-list"
+         placeholder="예: CCTV" class="w-full border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
+  <datalist id="{{$id}}-custom-list">
+    {{range .CauseCatCustomRecent}}<option value="{{.}}">{{end}}
+  </datalist>
+  <p class="text-[11px] text-ink-subtle mt-1">조직관리자가 원인분류표를 등록하면 목록에서 선택할 수 있습니다</p>
+</div>
+{{if $p}}
+<div class="min-w-0">
+  <label class="block text-sm font-medium text-ink mb-1">2차 분류(선택)</label>
+  <input type="text" name="{{$p}}cause_cat2" id="{{$id}}-cat2" maxlength="40" value="{{.AS.CauseCat2}}" class="w-full min-w-0 border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
+</div>
+<div class="min-w-0">
+  <label class="block text-sm font-medium text-ink mb-1">3차 분류(선택)</label>
+  <input type="text" name="{{$p}}cause_cat3" id="{{$id}}-cat3" maxlength="40" value="{{.AS.CauseCat3}}" class="w-full min-w-0 border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
+</div>
+{{end}}
+{{else}}
+<div>
+  <label class="block text-sm font-medium text-ink mb-1">1차 분류 <span class="text-danger">*</span></label>
+  <select name="{{$p}}cause_cat1" id="{{$id}}" required class="w-full border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
     <option value="">선택</option>
     {{range .CauseCatL1}}
     <option value="{{.Code}}" {{if eq .Code $.AS.CauseCat1}}selected{{end}}>{{.Label}}</option>
     {{end}}
     <option value="custom" {{if eq $.AS.CauseCat1 "custom"}}selected{{end}}>직접 입력</option>
   </select>
-  <p class="text-[11px] text-slate-400 mt-1">목록에 없으면 직접 입력</p>
+  <p class="text-[11px] text-ink-subtle mt-1">목록에 없으면 직접 입력</p>
 </div>
-<div id="as-cause-cat1-custom-wrap" class="{{if ne .AS.CauseCat1 "custom"}}hidden{{end}}">
-  <label class="block text-sm font-medium text-slate-700 mb-1">대상 장비 구분(직접 입력) <span class="text-red-500">*</span></label>
-  <input type="text" name="cause_cat1_custom" id="as-cause-cat1-custom" maxlength="40"
-         value="{{.AS.CauseCat1Custom}}" list="as-cause-cat1-custom-list"
-         placeholder="예: CCTV" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-  <datalist id="as-cause-cat1-custom-list">
+<div id="{{$id}}-custom-wrap" class="{{if ne .AS.CauseCat1 "custom"}}hidden{{end}}" data-cause-custom-wrap>
+  <label class="block text-sm font-medium text-ink mb-1">대상 장비 구분(직접 입력) <span class="text-danger">*</span></label>
+  <input type="text" name="{{$p}}cause_cat1_custom" id="{{$id}}-custom" maxlength="40"
+         value="{{.AS.CauseCat1Custom}}" list="{{$id}}-custom-list"
+         placeholder="예: CCTV" class="w-full border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
+  <datalist id="{{$id}}-custom-list">
     {{range .CauseCatCustomRecent}}<option value="{{.}}">{{end}}
   </datalist>
 </div>
+{{if $p}}
+<div class="min-w-0" data-cause-wrap="2">
+  <label class="block text-sm font-medium text-ink mb-1">2차 분류</label>
+  <select name="{{$p}}cause_cat2" id="{{$id}}-cat2" data-current="{{.AS.CauseCat2}}" class="w-full min-w-0 border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
+    <option value="">선택</option>
+  </select>
+</div>
+<div class="min-w-0" data-cause-wrap="3">
+  <label class="block text-sm font-medium text-ink mb-1">3차 분류</label>
+  <select name="{{$p}}cause_cat3" id="{{$id}}-cat3" data-current="{{.AS.CauseCat3}}" class="w-full min-w-0 border border-line rounded-lg px-3 py-2 text-sm" {{if .ReadOnly}}disabled{{end}}>
+    <option value="">선택</option>
+  </select>
+</div>
+{{end}}
+{{end}}
 {{end}}
