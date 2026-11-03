@@ -40,6 +40,9 @@ output/
 .codex-finalizer-brochure/
 docs/리뷰/*.log
 server/gotest*.log
+package-lock.json
+/testdata/
+docs/**/*.xlsx
 docs/_schema_dump.txt
 server/docs/figma_register_ref/
 cursor-chat-export.cursor-chat.json
