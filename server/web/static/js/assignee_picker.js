@@ -11,7 +11,7 @@
       if (!d) return;
       Object.keys(d).forEach(function (k) {
         var n = String(d[k] || '').trim();
-        if (!n || n.indexOf('USR-') === 0) return;
+        if (!n || n.indexOf('USR-') === 0 || n === '담당자') return;
         window.assigneePickerNames[k] = n;
       });
     } catch (e) {}
@@ -22,10 +22,12 @@
   window.safePickerLabel = function (id, fallback) {
     var names = window.assigneePickerNames || {};
     var n = names[id];
-    if (n && String(n).indexOf('USR-') !== 0) return n;
+    if (n && String(n).indexOf('USR-') !== 0 && n !== '담당자') return n;
     n = fallback;
-    if (n && String(n).indexOf('USR-') !== 0) return n;
-    return '담당자';
+    if (n && String(n).indexOf('USR-') !== 0 && n !== '담당자') return n;
+    id = String(id || '').trim();
+    if (id) return id;
+    return '이름 미등록';
   };
 })();
 
@@ -102,26 +104,28 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
     memberOn(gid, uid) { return !!this.groups[gid] && !this.exclude[uid]; },
     nameOf(id) {
       const names = window.assigneePickerNames || {};
-      if (names[id] && String(names[id]).indexOf('USR-') !== 0) return names[id];
+      if (names[id] && String(names[id]).indexOf('USR-') !== 0 && names[id] !== '담당자') return names[id];
       try {
         const local = this.$el && this.$el.querySelector('.js-picker-names');
         if (local) {
           const d = JSON.parse(local.textContent || '{}') || {};
-          if (d[id] && String(d[id]).indexOf('USR-') !== 0) return d[id];
+          if (d[id] && String(d[id]).indexOf('USR-') !== 0 && d[id] !== '담당자') return d[id];
         }
       } catch (e) {}
       const gmem = this.allGroups().flatMap((g) => g.members || []);
       const hit = gmem.find((m) => m.user_id === id);
-      if (hit && hit.name && String(hit.name).indexOf('USR-') !== 0) return hit.name;
+      if (hit && hit.name && String(hit.name).indexOf('USR-') !== 0 && hit.name !== '담당자') return hit.name;
       const el = this.$el ? this.$el.querySelector('input[type=checkbox][value="' + id + '"]') : null;
       if (el) {
         const dn = el.getAttribute('data-name');
-        if (dn && String(dn).indexOf('USR-') !== 0) return dn;
+        if (dn && String(dn).indexOf('USR-') !== 0 && dn !== '담당자') return dn;
         const lab = el.closest('label');
         const txt = lab ? String(lab.textContent || '').trim() : '';
-        if (txt && txt.indexOf('USR-') !== 0) return txt;
+        if (txt && txt.indexOf('USR-') !== 0 && txt !== '담당자') return txt;
       }
-      return '담당자';
+      id = String(id || '').trim();
+      if (id) return id;
+      return '이름 미등록';
     },
     leaveNames() {
       try {
@@ -213,8 +217,24 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
           return;
         }
       }
-      if (this.ownerId && ids.indexOf(this.ownerId) >= 0) return;
+      if (this.ownerId && ids.indexOf(this.ownerId) >= 0) {
+        this.syncAssignedHidden();
+        return;
+      }
       this.ownerId = ids[0] || '';
+      this.syncAssignedHidden();
+    },
+    syncAssignedHidden() {
+      try {
+        const box = this.$el && this.$el.closest('.as-action-set');
+        if (!box) return;
+        const uid = this.ownerId || (this.selectedIds()[0] || '');
+        const name = uid ? this.nameOf(uid) : (this.external || '');
+        const to = box.querySelector('input[type=hidden][name$="assigned_to"]');
+        const idEl = box.querySelector('input[type=hidden][name$="assigned_user_id"]');
+        if (to) to.value = (name && name !== '이름 미등록') ? name : (this.external || '');
+        if (idEl) idEl.value = uid;
+      } catch (e) {}
     },
     seedFromParent() {
       try {

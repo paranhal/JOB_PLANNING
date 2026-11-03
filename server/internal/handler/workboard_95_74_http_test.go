@@ -61,8 +61,11 @@ func Test95_74_HandleKeepModalAlwaysVisible(t *testing.T) {
 
 func Test95_74_AssigneeNeverShowsUSR(t *testing.T) {
 	js := string(mustRead(t, filepath.Join(findTemplateRoot(t), "..", "static/js/assignee_picker.js")))
-	if !strings.Contains(js, "return '담당자'") {
-		t.Fatal("nameOf 가 USR- 대신 담당자를 반환하지 않는다")
+	if !strings.Contains(js, "이름 미등록") {
+		t.Fatal("nameOf 최종 fallback 이 이름 미등록이 아니다")
+	}
+	if strings.Contains(js, "return '담당자'") {
+		t.Fatal("nameOf 가 이름 대신 담당자를 반환한다")
 	}
 	if strings.Contains(js, "if (!el) return id") {
 		t.Fatal("nameOf 가 id 를 그대로 반환한다")
@@ -95,8 +98,14 @@ func Test95_74_PickerDisplayName(t *testing.T) {
 		t.Fatalf("username fallback %s", pickerDisplayName(u))
 	}
 	u.Username = "USR-x"
-	if pickerDisplayName(u) != "담당자" {
+	if pickerDisplayName(u) != u.UserID {
 		t.Fatalf("both USR %s", pickerDisplayName(u))
+	}
+	if pickerDisplayName(model.User{}) != "이름 미등록" {
+		t.Fatalf("empty %s", pickerDisplayName(model.User{}))
+	}
+	if pickerDisplayName(u) == "담당자" {
+		t.Fatal("담당자 단독 반환")
 	}
 }
 

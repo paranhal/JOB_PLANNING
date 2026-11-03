@@ -79,8 +79,12 @@ func (h *MaintenanceHandler) workGroupPicksForVisit(c echo.Context) ([]model.Wor
 						}
 					}
 				}
-				if name == "" || strings.HasPrefix(name, "USR-") {
-					name = "담당자"
+				if name == "" || strings.HasPrefix(name, "USR-") || name == "담당자" {
+					if id := strings.TrimSpace(m.UserID); id != "" {
+						name = id
+					} else {
+						name = pickerNameUnregistered
+					}
 				}
 				p.Members = append(p.Members, mntWorkGroupMemJSON{UserID: m.UserID, Name: name, Role: m.Role})
 				names = append(names, name)

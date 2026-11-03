@@ -1442,6 +1442,13 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CanDelete":            h.canDeleteThis(c, as),
 	}
 	if sets, ok := data["ActionSets"].([]model.ASActionSet); ok && len(sets) > 0 {
+		extraIDs := []string{as.AssignedUserID, currentUserID(c)}
+		for _, s := range sets {
+			extraIDs = append(extraIDs, s.AssignedUserID)
+		}
+		assignees = ensurePickerUsers(h.userRepo, assignees, extraIDs...)
+		data["Assignees"] = assignees
+		data["PickerNames"] = pickerNamesFor(h.userRepo, assignees, extraIDs...)
 		data["DraftSetN"] = countSavedActionSets(sets)
 		data["LastActionSet"] = sets[len(sets)-1]
 		stored := 0

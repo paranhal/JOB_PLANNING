@@ -43,16 +43,21 @@ func listAssignableForPicker(users *repository.UserRepo, c echo.Context) []model
 	return ensurePickerUsers(users, list, currentUserID(c))
 }
 
+const pickerNameUnregistered = "이름 미등록"
+
 func pickerDisplayName(u model.User) string {
 	n := strings.TrimSpace(u.FullName)
-	if n != "" && !strings.HasPrefix(n, "USR-") {
+	if n != "" && !strings.HasPrefix(n, "USR-") && n != "담당자" {
 		return n
 	}
 	n = strings.TrimSpace(u.Username)
-	if n != "" && !strings.HasPrefix(n, "USR-") {
+	if n != "" && !strings.HasPrefix(n, "USR-") && n != "담당자" {
 		return n
 	}
-	return "담당자"
+	if id := strings.TrimSpace(u.UserID); id != "" {
+		return id
+	}
+	return pickerNameUnregistered
 }
 
 func pickerNamesMap(users []model.User) map[string]string {
