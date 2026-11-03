@@ -2518,27 +2518,21 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	subtasks, _ := h.repo.ListSubtasks(id)
 	var sourceHref, sourceLabel string
-	var actionHref, actionLabel string
-	var canAction, asClosed bool
 	var asSource *model.ASReceipt
+	var asClosed bool
 	var completeLocal string
+	tgt := h.taskActionTarget(c, t)
+	actionHref, actionLabel, canAction := tgt.Href, tgt.Label, tgt.Can
 	switch t.SourceType {
 	case model.WBSourceAS:
 		sourceHref = asOpenHref(t.SourceID)
 		sourceLabel = t.SourceID
-		actionHref = asOpenHref(t.SourceID)
-		actionLabel = "조치"
-		// 쓰기 가능한 경우만 「조치/조치 완료」버튼 (옵저버는 can* 가 false)
-		canAction = canWrite && (canProcessAS(c) || canReceiveAS(c) || canWriteWorkboard(c))
 		if as, _ := h.asRepo.GetByID(repository.OrgAll, t.SourceID); as != nil {
 			asSource = as
 			if as.ASNumber != "" {
 				sourceLabel = as.ASNumber
 			}
 			asClosed = isASClosedStatus(as.Status)
-			if asClosed {
-				actionLabel = "조치 완료"
-			}
 			if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() {
 				completeLocal = as.CompleteDatetime.Format("2006-01-02 15:04")
 			}
@@ -2547,11 +2541,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		if v, _ := h.mntRepo.GetVisit(t.SourceID); v != nil {
 			sourceHref = mntVisitHref(*v)
 			sourceLabel = mntVisitNumber(*v)
-			actionHref = mntVisitActionHref(*v)
-			actionLabel = "조치"
-			canAction = canWrite && (canEditMaintenanceSchedule(c) || canWriteWorkboard(c))
 			if v.Completed {
-				actionLabel = "조치 완료"
 				t.Status = model.WBTaskComplete
 				if t.Progress < 100 {
 					t.Progress = 100
@@ -2566,17 +2556,11 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		if sid := h.repo.SalesIDByActivity(t.SourceID); sid != "" {
 			sourceHref = "/sales/" + sid
 			sourceLabel = sid
-			actionHref = "/sales/" + sid
-			actionLabel = "영업 사업"
-			canAction = canViewSales(c)
 		}
 	}
 	pwPartsN, pwAttN := 0, 0
 	if t.WorkType == model.WBWorkProjectWork {
 		_ = h.repo.LoadTaskActionFields(t)
-		actionHref = projectWorkActionPath(t.TaskID)
-		actionLabel = "조치 화면 열기"
-		canAction = true
 		if parts, err := h.repo.ListWorkTaskParts(t.OrgID, t.TaskID); err == nil {
 			pwPartsN = len(parts)
 		}
@@ -2626,6 +2610,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	back := strings.TrimSpace(c.QueryParam("back"))
 	if back == "" {
 		back = workboardHomeURL("")
+	}
+	if canAction && strings.TrimSpace(actionHref) != "" {
+		actionHref = hrefWithBack(actionHref, back)
 	}
 	active := NavWorkRegister
 	if !editMode {

@@ -40,17 +40,7 @@ func boardItemDone(it boardItem) bool {
 }
 
 func boardActionHref(t model.WorkTask) string {
-	if t.SourceType == model.WBSourceAS && strings.TrimSpace(t.SourceID) != "" {
-		return model.ASOpenHref(t.SourceID)
-	}
-	if t.SourceType == model.WBSourceMaintenance && strings.TrimSpace(t.SourceID) != "" {
-		return "/maintenance/visits/" + strings.TrimSpace(t.SourceID) + "/action"
-	}
-	id := strings.TrimSpace(t.TaskID)
-	if id != "" && !strings.HasPrefix(id, "ext:") {
-		return "/workboard/tasks/" + id + "/action"
-	}
-	return t.DetailHref()
+	return (*WorkboardHandler)(nil).taskActionTarget(nil, &t).Href
 }
 
 func boardBarOpenHref(it boardItem) string {
@@ -129,7 +119,7 @@ func positionBoardBar(it *boardItem) {
 	it.DayPosTop, it.DayPosHeight = boardDayBarHeight(it.StartMin, it.EndMin, boardPlaceDur(*it))
 }
 
-func stampBoardMove(c echo.Context, items []boardItem, write bool) {
+func (h *WorkboardHandler) stampBoardMove(c echo.Context, items []boardItem, write bool, back string) {
 	for i := range items {
 		it := &items[i]
 		if strings.TrimSpace(it.PlaceKind) == "" && strings.TrimSpace(it.Task.TaskID) != "" {
@@ -149,7 +139,14 @@ func stampBoardMove(c echo.Context, items []boardItem, write bool) {
 		if it.Task.TaskID != "" {
 			it.EditHref = "/workboard/tasks/" + it.Task.TaskID + "/edit"
 		}
-		it.ActionHref = boardActionHref(it.Task)
+		tgt := h.taskActionTarget(c, &it.Task)
+		it.ActionLabel = tgt.Label
+		it.CanAction = tgt.Can
+		if tgt.Href != "" {
+			it.ActionHref = hrefWithBack(tgt.Href, back)
+		} else {
+			it.ActionHref = ""
+		}
 		it.Done = boardItemDone(*it)
 		can := write && !it.Done && it.Task.TaskID != "" && canEditTask(c, it.Task.Assignee, it.Task.AssigneeUserID, it.Task.WorkGroupID)
 		it.CanMove = can

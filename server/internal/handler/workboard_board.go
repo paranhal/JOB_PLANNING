@@ -115,6 +115,8 @@ type boardItem struct {
 	ExtraCount           int
 	EditHref             string
 	ActionHref           string
+	ActionLabel          string
+	CanAction            bool
 	Done                 bool
 	CanMove              bool
 	CanResize            bool
@@ -873,15 +875,16 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	for i := range monthWeeks {
 		for j := range monthWeeks[i] {
 			stampBoardPlanEdit(c, monthWeeks[i][j].Items)
-			stampBoardMove(c, monthWeeks[i][j].Items, write)
+			h.stampBoardMove(c, monthWeeks[i][j].Items, write, boardURL(view, ds, keep))
 		}
 	}
-	stampBoardMove(c, items, write)
-	stampBoardMove(c, unplaced, write)
-	stampBoardMove(c, dayTimed, write)
-	stampBoardMove(c, dayUntimed, write)
+	boardBack := boardURL(view, ds, keep)
+	h.stampBoardMove(c, items, write, boardBack)
+	h.stampBoardMove(c, unplaced, write, boardBack)
+	h.stampBoardMove(c, dayTimed, write, boardBack)
+	h.stampBoardMove(c, dayUntimed, write, boardBack)
 	for i := range weekCols {
-		stampBoardMove(c, weekCols[i].Items, write)
+		h.stampBoardMove(c, weekCols[i].Items, write, boardBack)
 	}
 	if view == boardViewDay && colsMode == boardColsPerson {
 		assignees := listAssignableForPicker(h.userRepo, c)
@@ -1004,7 +1007,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		stampBoardPlanEdit(c, kanbanItems)
 		stampBoardDelayReasons(h, kanbanItems)
 		stampBoardItemKinds(h, kanbanItems)
-		stampBoardMove(c, kanbanItems, write)
+		h.stampBoardMove(c, kanbanItems, write, boardURL(view, ds, keep))
 		kcols := classifyKanban(kanbanItems, today)
 		stampKanbanExtras(h, kcols)
 		data["KanbanDelay"] = kcols[kanbanColDelay]

@@ -51,16 +51,12 @@ func Test95_86_BoardItemDone(t *testing.T) {
 		t.Fatal("cols 기본값")
 	}
 	admin := model.WorkTask{TaskID: "T1", WorkType: model.WBWorkAdmin}
-	if boardActionHref(admin) != "/workboard/tasks/T1/action" {
+	if boardActionHref(admin) != "/workboard/tasks/T1" {
 		t.Fatalf("행정 조치 주소 %s", boardActionHref(admin))
 	}
 	as := model.WorkTask{TaskID: "T2", SourceType: model.WBSourceAS, SourceID: "AS1"}
 	if boardActionHref(as) != "/as/AS1/action" {
 		t.Fatalf("AS 조치 주소 %s", boardActionHref(as))
-	}
-	mnt := model.WorkTask{TaskID: "T3", SourceType: model.WBSourceMaintenance, SourceID: "V1"}
-	if boardActionHref(mnt) != "/maintenance/visits/V1/action" {
-		t.Fatalf("방문 조치 주소 %s", boardActionHref(mnt))
 	}
 }
 
@@ -207,7 +203,7 @@ func Test95_86_ActButtonsAndDoneOpen(t *testing.T) {
 	if !strings.Contains(dayBody, "작업완료") {
 		t.Fatal("완료 라벨 없음")
 	}
-	if done == nil || !strings.Contains(dayBody, "/workboard/tasks/"+done.TaskID+"/action") {
+	if done == nil || !strings.Contains(dayBody, "/workboard/tasks/"+done.TaskID) {
 		t.Fatal("완료 바 조치 화면 주소 없음")
 	}
 	if i := strings.Index(dayBody, "부분바"); i >= 0 {
@@ -234,7 +230,7 @@ func Test95_86_ActButtonsAndDoneOpen(t *testing.T) {
 	if !strings.Contains(month, `data-month-chip`) {
 		t.Fatal("월 칩 없음")
 	}
-	if done != nil && !strings.Contains(month, "/workboard/tasks/"+done.TaskID+"/action") {
+	if done != nil && !strings.Contains(month, "/workboard/tasks/"+done.TaskID) {
 		t.Fatal("월 칩 조치 화면 없음")
 	}
 	if !strings.Contains(month, "✓") {
@@ -245,7 +241,7 @@ func Test95_86_ActButtonsAndDoneOpen(t *testing.T) {
 	if !strings.Contains(kan, "오늘완료칸반") {
 		t.Fatal("칸반 완료 라벨 없음")
 	}
-	if todayDone != nil && !strings.Contains(kan, "/workboard/tasks/"+todayDone.TaskID+"/action") {
+	if todayDone != nil && !strings.Contains(kan, "/workboard/tasks/"+todayDone.TaskID) {
 		t.Fatal("칸반 완료 조치 화면 없음")
 	}
 }

@@ -26,7 +26,8 @@
   {{if .FollowMissing}}<span class="text-ui-sm font-semibold text-warning">후속 미생성</span>
     <a href="/workboard/tasks/{{.Task.TaskID}}/action" class="text-ui-sm font-semibold text-brand">후속 만들기</a>{{end}}
   <div class="mt-2 flex flex-wrap gap-1">
-    {{if .Href}}<a href="{{.Href}}" class="btn btn-secondary btn-sm">조치</a>{{end}}
+    {{if and .CanAction .ActionHref}}<a href="{{.ActionHref}}" class="btn btn-secondary btn-sm">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치{{end}}</a>
+    {{else if .Href}}<a href="{{.Href}}" class="btn btn-secondary btn-sm">조치</a>{{end}}
     {{if .PlanEditHref}}<a href="{{.PlanEditHref}}" class="btn btn-ghost btn-sm">수정</a>{{end}}
     {{if .CanCarry}}<button type="button" class="btn btn-secondary btn-sm" data-carry-open="1" data-carry-default="today"
       data-carry-id="{{.Task.TaskID}}" data-carry-title="{{.Task.Title}}" data-carry-work="{{.Task.WorkDate}}"

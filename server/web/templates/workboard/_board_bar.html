@@ -42,7 +42,8 @@
   {{if not $item.IsSupport}}
   <div class="board-bar-acts mt-1 flex flex-wrap items-center gap-1">
     {{if $page.CanWrite}}
-    <a href="{{$item.Href}}" class="board-bar-act" data-bar-act="1">조치</a>
+    {{if and $item.CanAction $item.ActionHref}}<a href="{{$item.ActionHref}}" class="board-bar-act" data-bar-act="1">{{if $item.ActionLabel}}{{$item.ActionLabel}}{{else}}조치{{end}}</a>
+    {{else if $item.Href}}<a href="{{$item.Href}}" class="board-bar-act" data-bar-act="1">조치</a>{{end}}
     {{if $item.EditHref}}<a href="{{$item.EditHref}}" class="board-bar-act" data-bar-act="1">수정</a>{{end}}
     {{end}}
     {{if $item.PlanEditHref}}<a href="{{$item.PlanEditHref}}" class="board-bar-act-aux" data-bar-act="1">계획 수정</a>{{end}}

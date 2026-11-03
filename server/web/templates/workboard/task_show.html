@@ -44,10 +44,10 @@
       {{end}}
       {{end}}
       {{if and $isMnt .CanAction .ActionHref}}
-      <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-700 text-white rounded-lg">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치{{end}}</a>
+      <a href="{{.ActionHref}}" class="px-3 py-1.5 text-sm bg-sky-600 hover:bg-sky-700 text-white rounded-lg">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치{{end}}</a>
       {{end}}
       {{if and $isWork (not .EditMode) .ActionHref}}
-      <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="btn btn-primary">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치 화면 열기{{end}}</a>
+      <a href="{{.ActionHref}}" class="btn btn-primary">{{if .ActionLabel}}{{.ActionLabel}}{{else}}조치 화면 열기{{end}}</a>
       {{end}}
       {{if and $isMnt .SourceHref}}
       <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-sky-300 text-info rounded-lg hover:bg-info-soft">연간 일정</a>
