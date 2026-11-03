@@ -1,0 +1,258 @@
+{
+  "url": "http://127.0.0.1:52602/workboard/board?view=day&date=2026-11-04&auto=0&mine=0",
+  "bars": [
+    {
+      "title": "짧은바30",
+      "dur": "30",
+      "short": "1",
+      "start": "09:00",
+      "end": "09:30",
+      "h": "40",
+      "top": "130",
+      "box": {
+        "x": 335,
+        "y": 560,
+        "w": 631,
+        "h": 40
+      },
+      "overflow": "hidden",
+      "z": "auto",
+      "padB": "6px",
+      "actsOutside": true,
+      "titleOutside": false,
+      "handle": {
+        "w": 627,
+        "h": 12,
+        "vis": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "opacity": "1",
+          "h": "12px"
+        }
+      },
+      "btn": {
+        "x": 0,
+        "y": 0,
+        "label": "조치"
+      }
+    },
+    {
+      "title": "긴바60",
+      "dur": "60",
+      "short": "0",
+      "start": "10:00",
+      "end": "11:00",
+      "h": "60",
+      "top": "194",
+      "box": {
+        "x": 335,
+        "y": 624,
+        "w": 631,
+        "h": 60
+      },
+      "overflow": "visible",
+      "z": "20",
+      "padB": "6px",
+      "actsOutside": true,
+      "titleOutside": false,
+      "handle": {
+        "w": 627,
+        "h": 12,
+        "vis": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "opacity": "1",
+          "h": "12px"
+        }
+      },
+      "btn": {
+        "x": 371.828125,
+        "y": 699.875,
+        "label": "조치"
+      }
+    },
+    {
+      "title": "제로분",
+      "dur": "30",
+      "short": "1",
+      "start": "13:00",
+      "end": "13:30",
+      "h": "40",
+      "top": "386",
+      "box": {
+        "x": 335,
+        "y": 816,
+        "w": 631,
+        "h": 40
+      },
+      "overflow": "hidden",
+      "z": "auto",
+      "padB": "6px",
+      "actsOutside": true,
+      "titleOutside": false,
+      "handle": {
+        "w": 627,
+        "h": 12,
+        "vis": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "opacity": "1",
+          "h": "12px"
+        }
+      },
+      "btn": {
+        "x": 0,
+        "y": 0,
+        "label": "조치"
+      }
+    }
+  ],
+  "probe": [
+    {
+      "title": "짧은바30",
+      "btn": "조치",
+      "hit": {
+        "x": 0,
+        "y": 0,
+        "chain": [
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "shrink-0 px-5 py-4 border-b border-gray-700",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "ASIDE",
+            "id": "",
+            "cls": "fixed inset-y-0 left-0 z-40 flex h-full max-h-[100dvh] w-60 flex-col overflow-hidden bg-gray-900 text-white transition-transform duration-300 lg:relative lg:translate-x-0 -translate-x-full",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex h-full",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "BODY",
+            "id": "",
+            "cls": "h-full",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "HTML",
+            "id": "",
+            "cls": "h-full bg-gray-50",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          }
+        ]
+      }
+    },
+    {
+      "title": "긴바60",
+      "btn": "조치",
+      "hit": {
+        "x": 371.828125,
+        "y": 699.875,
+        "chain": [
+          {
+            "tag": "A",
+            "id": "",
+            "cls": "board-bar-act",
+            "text": "조치"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "board-bar-acts mt-1 flex flex-wrap items-center gap-1",
+            "text": "조치 수정 계획 수정 이월 × −15 +15"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "board-day-ev  board-t-adm rounded-[10px] border-l-4 border-current board-b-adm px-2.5 py-1.5 ",
+            "text": "10:00 · 행정/지원 업무 도서관관리자 긴바60 조치 수정 계획 수정"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "board-day-stack relative",
+            "text": "09:00 · 행정/지원 업무 도서관관리자 짧은바30 10:00 · 행정"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "board-person-col relative flex-1 border-r border-line",
+            "text": "도서관관리자 3건 · 2시간 09:00 · 행정/지원 업무 도서관관리자 "
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex min-w-[620px]",
+            "text": "시간 07:00 08:00 09:00 10:00 11:00 12:00 1"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "overflow-x-auto border-t border-line",
+            "text": "시간 07:00 08:00 09:00 10:00 11:00 12:00 1"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "card mt-4 overflow-hidden",
+            "text": "‹ 2026년 11월 4일 (수) › 오늘 시간 07:00 08:00 0"
+          }
+        ]
+      }
+    },
+    {
+      "title": "제로분",
+      "btn": "조치",
+      "hit": {
+        "x": 0,
+        "y": 0,
+        "chain": [
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "shrink-0 px-5 py-4 border-b border-gray-700",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "ASIDE",
+            "id": "",
+            "cls": "fixed inset-y-0 left-0 z-40 flex h-full max-h-[100dvh] w-60 flex-col overflow-hidden bg-gray-900 text-white transition-transform duration-300 lg:relative lg:translate-x-0 -translate-x-full",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex h-full",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "BODY",
+            "id": "",
+            "cls": "h-full",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          },
+          {
+            "tag": "HTML",
+            "id": "",
+            "cls": "h-full bg-gray-50",
+            "text": "업무관리시스템 Work Management version dev · bu"
+          }
+        ]
+      }
+    },
+    {
+      "handlePoint": {
+        "x": 650.5,
+        "y": 598
+      },
+      "hitH": {
+        "tag": "BUTTON",
+        "cls": "board-resize",
+        "text": ""
+      }
+    }
+  ]
+}

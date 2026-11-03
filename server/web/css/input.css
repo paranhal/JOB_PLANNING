@@ -244,13 +244,13 @@
   .board-st-done { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-hover text-ink-muted; }
   .board-st-late { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-danger-soft text-danger; }
   .board-day-hour { height: 64px; }
-  .board-person-col { min-width: 160px; }
+  .board-person-col { min-width: 160px; isolation: isolate; }
   .board-day-stack { height: 960px; }
-  .board-day-ev { position: absolute; overflow: hidden; padding-bottom: 16px; }
-  .board-day-ev:hover, .board-day-ev.board-bar-picked, .board-day-ev:not(.board-bar-short) { overflow: visible; z-index: 20; }
+  .board-day-ev { position: absolute; overflow: hidden; z-index: 3; padding-bottom: 10px; }
+  .board-day-ev:hover, .board-day-ev.board-bar-picked { overflow: visible; z-index: 40; }
   .board-week-ev { position: relative; overflow: hidden; }
-  .board-week-ev:hover, .board-week-ev.board-bar-picked, .board-week-ev:not(.board-bar-short) { overflow: visible; z-index: 20; }
-  .board-bar-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; position: relative; z-index: 5; padding-bottom: 4px; }
+  .board-week-ev:hover, .board-week-ev.board-bar-picked { overflow: visible; z-index: 20; }
+  .board-bar-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; position: relative; z-index: 8; padding-bottom: 8px; }
   .board-bar-short .board-bar-acts { display: none; }
   .board-bar-short:hover .board-bar-acts,
   .board-bar-short.board-bar-picked .board-bar-acts { display: flex; }
@@ -264,11 +264,28 @@
   }
   .board-bar-act-aux { @apply inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink; }
   .board-bar-x { @apply text-danger; }
-  .board-resize { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; height: 12px; cursor: ns-resize; touch-action: none; }
+  .board-resize {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 12;
+    height: 8px; cursor: ns-resize; touch-action: none; background: transparent;
+  }
+  .board-resize::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    width: 24px;
+    height: 4px;
+    margin-left: -12px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.35;
+  }
+  .board-resize:hover::after,
+  .board-day-ev:hover .board-resize::after { opacity: 0.9; }
   .board-month-chip { @apply mt-0.5 flex max-w-full min-w-0 flex-col items-stretch gap-0 truncate rounded px-1 py-0.5 text-[11px] font-semibold; }
   @media (pointer: coarse) {
     .board-bar-short.board-bar-picked .board-bar-acts { display: flex; }
-    .board-resize { height: 18px; }
+    .board-resize { height: 12px; }
   }
   .board-bar-picked { outline: 2px solid rgb(37 99 235); outline-offset: 1px; }
   [data-drop].drop { background-color: rgb(239 246 255); }

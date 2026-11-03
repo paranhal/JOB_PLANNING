@@ -779,21 +779,8 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		h1 := (boardDayEndHour + 1) * 60
 		for i := range timed {
 			p := placedLay[i]
-			s := p.StartMin
-			e := p.EndMin
-			if s < h0 {
-				s = h0
-			}
-			if e > h1 {
-				e = h1
-			}
-			top := (s-h0)*boardDayPxPerHour/60 + 2
-			hgt := (e-s)*boardDayPxPerHour/60 - 4
-			if hgt < 40 {
-				hgt = 40
-			}
-			timed[i].DayPosTop = top
-			timed[i].DayPosHeight = hgt
+			dur := boardPlaceDur(timed[i])
+			timed[i].DayPosTop, timed[i].DayPosHeight = boardDayBarHeight(p.StartMin, p.EndMin, dur)
 			timed[i].DayCol = p.Col
 			timed[i].DayCols = p.Cols
 			dayTimed = append(dayTimed, timed[i])

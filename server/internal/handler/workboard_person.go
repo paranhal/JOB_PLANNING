@@ -70,10 +70,49 @@ func boardPlaceDur(it boardItem) int {
 	if it.HasTime && it.EndMin > it.StartMin {
 		return it.EndMin - it.StartMin
 	}
+	if sm, okS := parseClockMin(it.StartHHMM); okS {
+		if em, okE := parseClockMin(it.EndHHMM); okE && em > sm {
+			return em - sm
+		}
+	}
 	if it.Task.DurationMin > 0 {
 		return it.Task.DurationMin
 	}
+	if d := model.DurationFromTimes(it.Task.StartTime, it.Task.EndTime); d > 0 {
+		return d
+	}
 	return 30
+}
+
+func boardBarMinutes(it boardItem) int {
+	return boardPlaceDur(it)
+}
+
+const (
+	boardDayBarMinShort = 64
+	boardDayBarMinLong  = 96
+)
+
+func boardDayBarHeight(startMin, endMin, dur int) (top, hgt int) {
+	h0 := boardDayStartHour * 60
+	h1 := (boardDayEndHour + 1) * 60
+	s, e := startMin, endMin
+	if s < h0 {
+		s = h0
+	}
+	if e > h1 {
+		e = h1
+	}
+	top = (s-h0)*boardDayPxPerHour/60 + 2
+	hgt = (e-s)*boardDayPxPerHour/60 - 4
+	minH := boardDayBarMinShort
+	if dur > 30 {
+		minH = boardDayBarMinLong
+	}
+	if hgt < minH {
+		hgt = minH
+	}
+	return top, hgt
 }
 
 func formatHHMM(min int) string {
@@ -87,22 +126,7 @@ func positionBoardBar(it *boardItem) {
 	if it == nil {
 		return
 	}
-	h0 := boardDayStartHour * 60
-	h1 := (boardDayEndHour + 1) * 60
-	s, e := it.StartMin, it.EndMin
-	if s < h0 {
-		s = h0
-	}
-	if e > h1 {
-		e = h1
-	}
-	top := (s-h0)*boardDayPxPerHour/60 + 2
-	hgt := (e-s)*boardDayPxPerHour/60 - 4
-	if hgt < 40 {
-		hgt = 40
-	}
-	it.DayPosTop = top
-	it.DayPosHeight = hgt
+	it.DayPosTop, it.DayPosHeight = boardDayBarHeight(it.StartMin, it.EndMin, boardPlaceDur(*it))
 }
 
 func stampBoardMove(c echo.Context, items []boardItem, write bool) {

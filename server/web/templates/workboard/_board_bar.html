@@ -1,6 +1,7 @@
 {{define "board_cal_bar"}}
 {{$item := .Item}}{{$page := .Page}}
-{{$short := and (gt $item.PlaceDur 0) (le $item.PlaceDur 30)}}
+{{$dur := boardBarMinutes $item}}
+{{$short := le $dur 30}}
 <div class="{{if eq $page.View `day`}}board-day-ev{{else}}board-week-ev mb-2.5{{end}} {{if $short}}board-bar-short{{end}} {{$item.Type.Text}} rounded-[10px] border-l-4 border-current {{$item.Type.Bg}} px-2.5 py-1.5 {{if $item.IsSupport}}border border-dashed border-ink-muted opacity-70{{end}}"
      data-board-bar="1"
      data-kind="{{if $item.PlaceKind}}{{$item.PlaceKind}}{{else}}task{{end}}"
@@ -9,7 +10,7 @@
      data-assignee="{{$item.PlaceAssignee}}"
      data-start="{{$item.StartHHMM}}"
      data-end="{{$item.EndHHMM}}"
-     data-duration="{{$item.PlaceDur}}"
+     data-duration="{{$dur}}"
      data-date="{{if $item.PlaceDate}}{{$item.PlaceDate}}{{else}}{{$item.Task.WorkDate}}{{end}}"
      data-href="{{if $item.Done}}{{$item.ActionHref}}{{else}}{{$item.Href}}{{end}}"
      data-can-move="{{if $item.CanMove}}1{{else}}0{{end}}"
@@ -19,7 +20,7 @@
      data-done="{{if $item.Done}}1{{else}}0{{end}}"
      data-short="{{if $short}}1{{else}}0{{end}}"
      data-top="{{$item.DayPosTop}}" data-h="{{$item.DayPosHeight}}" data-col="{{$item.DayCol}}" data-cols="{{$item.DayCols}}"
-     {{if and $page.CanWrite $item.CanMove}}draggable="true"{{end}}>
+     {{if and $page.CanWrite $item.CanMove (ne $page.View `day`)}}draggable="true"{{end}}>
   {{if $item.IsSupport}}
   <span class="absolute left-0 top-0 z-10 rounded-br border-b border-r border-dashed bg-surface px-0.5 text-[8px] leading-none text-ink-muted">지원</span>
   {{else if $item.OverlapWarn}}

@@ -362,6 +362,7 @@ func funcMap() template.FuncMap {
 		"boardReceipt":       boardReceiptText,
 		"boardAction":        boardActionText,
 		"boardItemHref":      boardItemHref,
+		"boardBarMinutes":    boardBarMinutes,
 		"asLegacyHref":       model.ASLegacyHref,
 		"asSymptomSnippet":   asSymptomSnippet,
 		"weekdayKo":          weekdayKo,

@@ -14,6 +14,8 @@
   var picked = null;
   var dragBar = null;
   var resizing = null;
+  var pendingMove = null;
+  var moving = null;
   var ignoreClickUntil = 0;
   var PX_HOUR = 64;
   var DAY_START = 7 * 60;
@@ -161,11 +163,11 @@
   });
 
   root.addEventListener('dragstart', function (e) {
-    if (resizing || Date.now() < ignoreClickUntil) {
+    if (resizing || moving || pendingMove || Date.now() < ignoreClickUntil) {
       e.preventDefault();
       return;
     }
-    if (e.target.closest('[data-resize],[data-nudge]')) {
+    if (e.target.closest('[data-resize],[data-nudge],[data-bar-act]')) {
       e.preventDefault();
       return;
     }
@@ -208,24 +210,58 @@
 
   root.addEventListener('pointerdown', function (e) {
     var h = e.target.closest('[data-resize]');
-    if (!h) return;
-    var bar = barFrom(h);
-    if (!bar || bar.getAttribute('data-can-resize') !== '1') return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (h.setPointerCapture) {
-      try { h.setPointerCapture(e.pointerId); } catch (err) {}
+    if (h) {
+      var bar = barFrom(h);
+      if (!bar || bar.getAttribute('data-can-resize') !== '1') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (h.setPointerCapture) {
+        try { h.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      resizing = {
+        bar: bar,
+        start: bar.getAttribute('data-start') || '09:00',
+        origH: bar.style.height,
+        pointerId: e.pointerId
+      };
+      bar.classList.add('board-bar-picked');
+      ignoreClickUntil = Date.now() + 800;
+      return;
     }
-    resizing = {
-      bar: bar,
-      start: bar.getAttribute('data-start') || '09:00',
-      origH: bar.style.height,
+    if (e.target.closest('[data-bar-act],[data-bar-open]')) return;
+    var moveBar = barFrom(e.target);
+    if (!moveBar || moveBar.getAttribute('data-can-move') !== '1') return;
+    var zone = moveBar.closest('[data-dayzone]');
+    if (!zone) return;
+    pendingMove = {
+      bar: moveBar,
+      zone: zone,
+      x: e.clientX,
+      y: e.clientY,
+      origTop: parseInt(moveBar.style.top, 10) || 0,
       pointerId: e.pointerId
     };
-    bar.classList.add('board-bar-picked');
-    ignoreClickUntil = Date.now() + 800;
   });
   document.addEventListener('pointermove', function (e) {
+    if (pendingMove && !moving && !resizing) {
+      var dx = e.clientX - pendingMove.x;
+      var dy = e.clientY - pendingMove.y;
+      if (dx * dx + dy * dy < 36) return;
+      moving = pendingMove;
+      pendingMove = null;
+      moving.bar.classList.add('board-bar-picked', 'drag');
+      ignoreClickUntil = Date.now() + 800;
+      if (moving.bar.setPointerCapture) {
+        try { moving.bar.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+    }
+    if (moving) {
+      e.preventDefault();
+      var startMin = snapY(moving.zone, e.clientY);
+      moving.bar.style.top = ((startMin - DAY_START) * PX_HOUR / 60 + 2) + 'px';
+      moving.start = hhmm(startMin);
+      return;
+    }
     if (!resizing) return;
     e.preventDefault();
     var zone = resizing.bar.closest('[data-dayzone]') || resizing.bar.closest('[data-day-body]');
@@ -234,10 +270,27 @@
     var startMin = parseMin(resizing.start);
     if (endMin < startMin + 15) endMin = startMin + 15;
     if (endMin > DAY_END) endMin = DAY_END;
-    resizing.bar.style.height = Math.max(40, (endMin - startMin) * PX_HOUR / 60 - 4) + 'px';
+    var dur = endMin - startMin;
+    var minH = dur > 30 ? 96 : 64;
+    resizing.bar.style.height = Math.max(minH, dur * PX_HOUR / 60 - 4) + 'px';
     resizing.end = hhmm(endMin);
   }, { passive: false });
   document.addEventListener('pointerup', function () {
+    if (pendingMove) {
+      pendingMove = null;
+    }
+    if (moving) {
+      var m = moving;
+      moving = null;
+      ignoreClickUntil = Date.now() + 400;
+      m.bar.classList.remove('board-bar-picked', 'drag');
+      if (m.start) {
+        submitMove(m.bar, m.bar.getAttribute('data-date'), m.start, '', m.bar.getAttribute('data-assignee'), false);
+      } else if (m.origTop != null) {
+        m.bar.style.top = m.origTop + 'px';
+      }
+      return;
+    }
     if (!resizing) return;
     var r = resizing;
     resizing = null;
@@ -247,6 +300,13 @@
     else if (r.origH != null) r.bar.style.height = r.origH;
   });
   document.addEventListener('pointercancel', function () {
+    if (pendingMove) pendingMove = null;
+    if (moving) {
+      if (moving.origTop != null) moving.bar.style.top = moving.origTop + 'px';
+      moving.bar.classList.remove('board-bar-picked', 'drag');
+      moving = null;
+      ignoreClickUntil = Date.now() + 400;
+    }
     if (!resizing) return;
     if (resizing.origH != null) resizing.bar.style.height = resizing.origH;
     resizing.bar.classList.remove('board-bar-picked');
