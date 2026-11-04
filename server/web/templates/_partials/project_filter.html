@@ -1,0 +1,56 @@
+{{define "project_filter"}}
+<div class="pf" data-project-filter
+     data-other-url="{{.OtherURL}}"
+     data-other-count="{{.OtherCount}}"
+     data-all-orgs="{{if .AllOrgs}}1{{else}}0{{end}}"
+     data-my-org="{{.MyOrgName}}">
+  <label class="sr-only" for="{{.ID}}">사업</label>
+  <input type="hidden" id="{{.ID}}" name="{{.Name}}" value="{{.Value}}">
+  <button type="button" class="pf-btn{{if .Value}} is-on{{end}}" data-pf-open
+          aria-haspopup="listbox" aria-expanded="false" aria-label="사업">
+    <span class="pf-kicker">사업</span>
+    <span class="pf-current">
+      {{if .OrgTag}}<span class="pf-org" data-pf-org-tag>{{.OrgTag}}</span>{{end}}
+      <span data-pf-label>{{.Current}}</span>
+    </span>
+    <span class="pf-caret" aria-hidden="true">▾</span>
+  </button>
+  <div class="pf-panel" hidden data-pf-panel>
+    <div class="pf-search">
+      <input type="search" class="input" data-pf-q placeholder="사업명 검색" autocomplete="off">
+    </div>
+    <div data-pf-own>
+      {{if .AllOrgs}}
+      <p class="pf-empty" data-pf-all-placeholder>조직별 목록을 불러옵니다.</p>
+      {{else}}
+      <div class="pf-sech">
+        <span>내 조직 사업{{if .MyOrgName}} · {{.MyOrgName}}{{end}}</span>
+        <small data-pf-own-n>{{len .Own}}건</small>
+      </div>
+      <div class="pf-sec" data-pf-own-list>
+        <button type="button" class="pf-it{{if not .Value}} is-on{{end}}" data-pf-all data-project-id="" role="option">
+          <span class="pf-chk">{{if not .Value}}✓{{end}}</span>
+          <span class="pf-nm">사업 전체 (내 조직)</span>
+        </button>
+        {{range .Own}}
+        <button type="button" class="pf-it{{if eq .ProjectID $.Value}} is-on{{end}}"
+                data-project-id="{{.ProjectID}}" data-pf-name="{{.Name}}"
+                data-related="{{if .Related}}1{{end}}" role="option">
+          <span class="pf-chk">{{if eq .ProjectID $.Value}}✓{{end}}</span>
+          {{if .Related}}<span class="pf-org is-rel">유관</span>{{end}}
+          <span class="pf-nm" title="{{.Name}}">{{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}</span>
+        </button>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{if and (not .AllOrgs) .OtherCount}}
+    <div class="pf-foot" data-pf-foot>
+      <button type="button" class="pf-more" data-pf-more>▼ 타 부서 사업 보기 ({{.OtherCount}}건)</button>
+      <p class="pf-hint" hidden data-pf-hint></p>
+    </div>
+    <div class="pf-other" hidden data-pf-other></div>
+    {{end}}
+  </div>
+</div>
+{{end}}

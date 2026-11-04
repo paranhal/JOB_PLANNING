@@ -99,6 +99,11 @@ func (r *WBRepo) SummaryOnDate(date string) (model.WBSummary, error) {
 	return s, rows.Err()
 }
 
+// ListActiveProjectsLabeled 활성 사업 + 주관 부서(org_id)·유관 부서. 필터 목록용.
+func (r *WBRepo) ListActiveProjectsLabeled() ([]model.WorkProject, error) {
+	return NewProjectRepo(r.db).ListFiltered(OrgAll, "", 0, "active")
+}
+
 func (r *WBRepo) ListProjects(activeOnly bool) ([]model.WorkProject, error) {
 	q := `SELECT p.project_id, p.name, COALESCE(p.short_name,''), COALESCE(p.plan_year,0),
 		COALESCE(p.is_paid,1), COALESCE(p.sort_order,0),
