@@ -86,9 +86,9 @@ func (h *ASHandler) asSavePopupItems(c echo.Context, ids []string) []asSavePopup
 	for _, id := range ids {
 		as, err := h.repo.GetByID(repository.OrgAll, id)
 		if err != nil || as == nil {
-			as, err = h.repo.GetByID(currentOrg(c), id)
+			continue
 		}
-		if err != nil || as == nil {
+		if !CanViewRecord(c, as) {
 			continue
 		}
 		n := 0

@@ -60,6 +60,16 @@ func viewGroupScope(c echo.Context) string {
 	return viewGroupMine
 }
 
+func userHasWorkGroup(c echo.Context) bool {
+	for _, key := range []string{"member_group_ids", "leader_group_ids"} {
+		m, _ := c.Get(key).(map[string]bool)
+		if len(m) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func attachViewGroup(c echo.Context, data map[string]interface{}) map[string]interface{} {
 	if data == nil {
 		data = map[string]interface{}{}

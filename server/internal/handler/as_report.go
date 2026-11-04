@@ -43,7 +43,7 @@ func (h *ASHandler) mergeASReportData(c echo.Context, as *model.ASReceipt, data 
 }
 
 func (h *ASHandler) ReportPreview(c echo.Context) error {
-	as, err := h.loadAS(c.Param("id"))
+	as, err := h.loadASScoped(c, c.Param("id"))
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (h *ASHandler) ReportPreview(c echo.Context) error {
 }
 
 func (h *ASHandler) ReportIssue(c echo.Context) error {
-	as, err := h.loadAS(c.Param("id"))
+	as, err := h.loadASScoped(c, c.Param("id"))
 	if err != nil {
 		return err
 	}
@@ -234,8 +234,24 @@ func reportStampName(u *model.User, draftName string) string {
 }
 
 func (h *ASHandler) loadAS(id string) (*model.ASReceipt, error) {
-	as, err := h.repo.GetByID(repository.OrgAll, id)
-	if err != nil || as == nil {
+	return h.loadASScoped(nil, id)
+}
+
+func (h *ASHandler) loadASScoped(c echo.Context, id string) (*model.ASReceipt, error) {
+	var as *model.ASReceipt
+	var err error
+	if c != nil {
+		as, err = h.asInScope(c, id)
+	} else {
+		as, err = h.repo.GetByID(repository.OrgAll, id)
+		if err != nil || as == nil {
+			return nil, echo.ErrNotFound
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if as == nil {
 		return nil, echo.ErrNotFound
 	}
 	if cats, e := h.repo.ListCauseCategoriesForOrgAll(as.OrgID); e == nil {

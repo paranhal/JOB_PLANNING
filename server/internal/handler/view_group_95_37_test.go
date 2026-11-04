@@ -67,8 +67,6 @@ func Test95_37ToggleOnRequiredScreens(t *testing.T) {
 	need := map[string]string{
 		"as/list.html":                    "AS 목록",
 		"work/list.html":                  "오늘·전체 업무",
-		"workboard/board_list.html":       "업무 관리 리스트",
-		"workboard/_board_head.html":      "업무 관리 캘린더",
 		"plan/unplanned.html":             "미계획 업무함",
 		"dashboard.html":                  "대시보드",
 		"meeting/weekly.html":             "주간 회의",
@@ -86,6 +84,18 @@ func Test95_37ToggleOnRequiredScreens(t *testing.T) {
 		}
 		if !strings.Contains(string(b), `view_group_toggle`) {
 			t.Errorf("%s (%s) 토글 없음", label, rel)
+		}
+	}
+	for _, rel := range []string{"workboard/board_list.html", "workboard/_board_head.html", "workboard/board_kanban.html"} {
+		b, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatalf("%s 읽기 %v", rel, err)
+		}
+		if !strings.Contains(string(b), `board_top_controls`) {
+			t.Errorf("%s 상단 드롭다운 묶음 없음", rel)
+		}
+		if strings.Contains(string(b), `view_group_toggle`) {
+			t.Errorf("%s 가 공용 view_group_toggle 을 쓰면 안 된다", rel)
 		}
 	}
 }

@@ -61,9 +61,9 @@ func (h *ASHandler) ToAdminWork(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if !canMoveASToAdminWork(c, as) {
 		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err=move_admin"))

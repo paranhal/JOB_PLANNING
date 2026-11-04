@@ -229,7 +229,7 @@ func (h *AttachmentHandler) saveActionPhotos(asID, keywords string, files []*mul
 	return h.saveProcessedPhotos(processedPhotoOpts{
 		refType: model.RefTypeASActionPhoto, asID: asID, keywords: keywords,
 		max: model.MaxActionPhotos, dir: repository.ActionPhotoDir(h.uploadDir, asID),
-		imageOnly: true,
+		imageOnly:   true,
 		errMax:      "attach_photo_max",
 		actionSetID: actionSetID,
 	}, files)
@@ -531,9 +531,15 @@ func (h *AttachmentHandler) guardReceiptPhotoWrite(c echo.Context, asID string) 
 	if h.asRepo == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
 	}
-	as, err := h.asRepo.GetByID(currentOrg(c), asID)
+	as, err := h.asRepo.GetByID(scopeOrgForRead(c), asID)
 	if err != nil || as == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수를 찾을 수 없습니다")
+	}
+	if err := denyUnlessCanView(c, as); err != nil {
+		return err
+	}
+	if !CanWriteOrg(c, as.OrgID) {
+		return echo.ErrForbidden
 	}
 	if !canManageReceiptPhoto(c, as) {
 		return echo.ErrForbidden
@@ -548,9 +554,15 @@ func (h *AttachmentHandler) guardActionPhotoWrite(c echo.Context, asID string) e
 	if h.asRepo == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
 	}
-	as, err := h.asRepo.GetByID(currentOrg(c), asID)
+	as, err := h.asRepo.GetByID(scopeOrgForRead(c), asID)
 	if err != nil || as == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수를 찾을 수 없습니다")
+	}
+	if err := denyUnlessCanView(c, as); err != nil {
+		return err
+	}
+	if !CanWriteOrg(c, as.OrgID) {
+		return echo.ErrForbidden
 	}
 	if !canProcessAS(c) && !canWriteMaster(c) {
 		return echo.ErrForbidden
@@ -672,6 +684,9 @@ func (h *AttachmentHandler) Download(c echo.Context) error {
 	if err != nil || att == nil {
 		return echo.ErrNotFound
 	}
+	if err := h.guardAttachmentView(c, att); err != nil {
+		return err
+	}
 	if att.RefType == model.RefTypeWorkTask {
 		if err := h.guardWorkTaskAttach(c, att.RefID, false); err != nil {
 			return err
@@ -725,6 +740,25 @@ func removeAttachmentFiles(att *model.Attachment) {
 	}
 	os.Remove(att.FilePath)
 	os.Remove(imageproc.ThumbPath(att.FilePath))
+}
+
+func (h *AttachmentHandler) guardAttachmentView(c echo.Context, att *model.Attachment) error {
+	if att == nil {
+		return echo.ErrNotFound
+	}
+	switch att.RefType {
+	case model.RefTypeAS, model.RefTypeASReceipt, model.RefTypeASActionPhoto, model.RefTypeASReport:
+		if h.asRepo == nil {
+			return echo.ErrNotFound
+		}
+		as, err := h.asRepo.GetByID(repository.OrgAll, att.RefID)
+		if err != nil || as == nil {
+			return echo.ErrNotFound
+		}
+		return denyUnlessCanView(c, as)
+	default:
+		return nil
+	}
 }
 
 func (h *AttachmentHandler) ListJSON(c echo.Context) error {
@@ -827,9 +861,15 @@ func (h *AttachmentHandler) PromoteToAsset(c echo.Context) error {
 	if h.asRepo == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "접수 정보를 확인할 수 없습니다")
 	}
-	as, err := h.asRepo.GetByID(currentOrg(c), att.RefID)
+	as, err := h.asRepo.GetByID(scopeOrgForRead(c), att.RefID)
 	if err != nil || as == nil || strings.TrimSpace(as.AssetID) == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "연결된 설치자산이 없습니다")
+	}
+	if err := denyUnlessCanView(c, as); err != nil {
+		return err
+	}
+	if !CanWriteOrg(c, as.OrgID) {
+		return echo.ErrForbidden
 	}
 	if !att.IsImage() {
 		return echo.NewHTTPError(http.StatusBadRequest, "이미지만 자산 사진으로 옮길 수 있습니다")

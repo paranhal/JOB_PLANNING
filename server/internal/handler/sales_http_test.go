@@ -235,8 +235,11 @@ func TestSalesHTTP_NameOnlyStageOverrideWon(t *testing.T) {
 func TestSalesHTTP_ProjectFormUnchanged(t *testing.T) {
 	e := newSalesServer(t)
 	rec := doGet(t, e, "/projects/new")
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "/sales/new") {
-		t.Fatalf("사업관리 직접 등록은 영업으로 보내야 한다 status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("영업 없이 직접 등록 폼 status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
+	}
+	if strings.Contains(rec.Body.String(), "임시 사업명") {
+		t.Fatal("일반 사업 등록에 영업 필드가 섞였다")
 	}
 }
 

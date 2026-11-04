@@ -39,19 +39,22 @@ func (h *ASHandler) deleteASReceipt(c echo.Context, id, auditReason string) (num
 	if h == nil || h.repo == nil || id == "" {
 		return "", msgASDeleteGone, nil
 	}
-	as, err := h.repo.GetByID(currentOrg(c), id)
+	as, err := h.repo.GetByID(repository.OrgAll, id)
 	if err != nil {
 		return "", "", err
 	}
 	if as == nil {
-		if other, _ := h.repo.GetByID(repository.OrgAll, id); other != nil {
-			accessLog(c, auditlog.Record{
-				Action: auditlog.ActionDelete, TargetTable: "as_receipts", TargetID: id,
-				Detail: "타 조직 삭제 거부", Reason: "타조직", Result: auditlog.ResultDeny, BeforeJSON: toJSON(other),
-			})
-			return "", otherOrgReason("", other.OrgID), nil
-		}
 		return "", msgASDeleteGone, nil
+	}
+	if !CanViewRecord(c, as) {
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionDelete, TargetTable: "as_receipts", TargetID: id,
+			Detail: "타 조직 삭제 거부", Reason: "타조직", Result: auditlog.ResultDeny, BeforeJSON: toJSON(as),
+		})
+		return "", otherOrgReason("", as.OrgID), nil
+	}
+	if !CanWriteOrg(c, as.OrgID) {
+		return as.ASNumber, msgASDeletePerm, nil
 	}
 	if !h.canDeleteThis(c, as) {
 		reason := "권한없음"

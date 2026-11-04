@@ -478,9 +478,12 @@ func (h *WorkHandler) applyNoticeTransfer(c echo.Context, n *model.AssignNotice,
 		if h.asRepo == nil {
 			return fmt.Errorf("지원하지 않는 유형입니다")
 		}
-		as, err := h.asRepo.GetByID(currentOrg(c), n.SourceID)
+		as, err := h.asRepo.GetByID(scopeOrgForRead(c), n.SourceID)
 		if err != nil || as == nil {
 			return err
+		}
+		if !CanViewRecord(c, as) || !CanWriteOrg(c, as.OrgID) {
+			return echo.ErrNotFound
 		}
 		as.AssignedTo = to.FullName
 		as.AssignedUserID = to.UserID

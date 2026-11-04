@@ -126,7 +126,7 @@ type reportSigJSONSet struct {
 }
 
 func (h *ASHandler) ReportSignatures(c echo.Context) error {
-	as, err := h.loadAS(c.Param("id"))
+	as, err := h.loadASScoped(c, c.Param("id"))
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (h *ASHandler) reportSignatureSet(userID, name string) reportSigJSONSet {
 }
 
 func (h *ASHandler) ReportApplySignature(c echo.Context) error {
-	if _, err := h.loadAS(c.Param("id")); err != nil {
+	if _, err := h.loadASScoped(c, c.Param("id")); err != nil {
 		return err
 	}
 	if !canProcessAS(c) {
