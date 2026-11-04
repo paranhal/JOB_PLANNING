@@ -64,21 +64,74 @@
     if (el) { el.hidden = true; el.textContent = ''; }
   }
 
+  function flattenConflicts(payload) {
+    if (payload && payload.conflicts && payload.conflicts.length) return payload.conflicts;
+    var days = (payload && payload.dates) || [];
+    var out = [];
+    days.forEach(function (d) {
+      (d.conflicts || []).forEach(function (c) {
+        if (d.date && !c.date) c.date = d.date;
+        out.push(c);
+      });
+    });
+    return out;
+  }
+
   function renderConflicts(conflicts) {
     var ul = listEl();
     if (!ul) return;
     ul.innerHTML = '';
+    var groups = {};
+    var order = [];
     (conflicts || []).forEach(function (c) {
-      var li = document.createElement('li');
-      li.className = 'rounded-control border border-line px-3 py-2 text-ui text-ink';
-      var place = placeLabel(c);
-      li.innerHTML =
-        '<span class="font-semibold">' + (c.title || c.task_id) + '</span>' +
-        (c.assignee ? ' · ' + c.assignee : '') +
-        (c.start ? ' · ' + c.start + '~' + (c.end || '') : '') +
-        (place ? ' · ' + place : '');
-      ul.appendChild(li);
+      var d = c.date || '';
+      if (!groups[d]) { groups[d] = []; order.push(d); }
+      groups[d].push(c);
     });
+    var many = (conflicts || []).length > 20;
+    order.forEach(function (d, gi) {
+      var wrap = document.createElement('li');
+      wrap.className = 'rounded-control border border-line px-3 py-2 text-ui text-ink space-y-1';
+      if (many && gi > 2) wrap.hidden = true;
+      var head = document.createElement('p');
+      head.className = 'font-semibold';
+      head.textContent = d || '겹친 일정';
+      wrap.appendChild(head);
+      groups[d].forEach(function (c) {
+        var p = document.createElement('p');
+        var place = placeLabel(c);
+        p.textContent = (c.title || c.task_id) +
+          (c.assignee ? ' · ' + c.assignee : '') +
+          (c.start ? ' · ' + c.start + '~' + (c.end || '') : '') +
+          (place ? ' · ' + place : '');
+        wrap.appendChild(p);
+        if (c.split_block_label || (!c.can_split && c.split_block_reason)) {
+          var why = document.createElement('p');
+          why.className = 'text-ui-sm text-danger';
+          why.textContent = c.split_block_label || '';
+          wrap.appendChild(why);
+        }
+        var lab = document.createElement('label');
+        lab.className = 'text-ui-sm text-ink-muted block';
+        lab.innerHTML = '이 날짜 <select data-day-action="' + (c.date || '') + '">' +
+          '<option value="split">끼워넣기</option>' +
+          '<option value="skip">건너뛰기</option>' +
+          '<option value="edit">기존 계획 수정</option></select>';
+        wrap.appendChild(lab);
+      });
+      ul.appendChild(wrap);
+    });
+    if (many) {
+      var more = document.createElement('li');
+      more.className = 'text-ui-sm text-info';
+      more.textContent = '겹침 ' + conflicts.length + '건 — 더 보기';
+      more.setAttribute('role', 'button');
+      more.addEventListener('click', function () {
+        Array.prototype.forEach.call(ul.querySelectorAll('li[hidden]'), function (el) { el.hidden = false; });
+        more.hidden = true;
+      });
+      ul.appendChild(more);
+    }
   }
 
   function hideOverlay(clearPending) {
@@ -129,13 +182,13 @@
     if (splitBtn) {
       var any = (conflicts || []).some(function (c) { return c.can_split; });
       splitBtn.disabled = !any;
-      splitBtn.title = any ? '' : '이 계획을 나눌 수 없습니다';
+      splitBtn.removeAttribute('title');
     }
   }
 
   window.showOverlapResolve = function (form, payload) {
     pendingForm = form;
-    pendingConflicts = (payload && payload.conflicts) || [];
+    pendingConflicts = flattenConflicts(payload);
     var msg = document.getElementById('overlap-resolve-msg');
     if (msg) msg.textContent = (payload && payload.message) || '같은 담당자의 시간이 겹칩니다';
     clearModalError();
@@ -167,6 +220,17 @@
     pendingConflicts.forEach(function (c) {
       if (c && c.task_id) fd.append('conflict_task_id', c.task_id);
     });
+    var skipSel = document.querySelectorAll('[data-day-action]');
+    skipSel.forEach(function (sel) {
+      if (sel.value === 'skip' && sel.getAttribute('data-day-action')) {
+        fd.append('overlap_skip_date', sel.getAttribute('data-day-action'));
+      }
+    });
+    if (action === 'skip') {
+      pendingConflicts.forEach(function (c) {
+        if (c && c.date) fd.append('overlap_skip_date', c.date);
+      });
+    }
     if (pendingConflicts[0] && pendingConflicts[0].task_id) {
       fd.set('overlap_edit_task_id', pendingConflicts[0].task_id);
     }
@@ -219,6 +283,14 @@
       e.preventDefault();
       var tr = travelInput();
       if (tr) tr.value = chip.getAttribute('data-travel') || '0';
+      return;
+    }
+    var bulk = e.target && e.target.closest ? e.target.closest('[data-overlap-bulk]') : null;
+    if (bulk && isOpen()) {
+      e.preventDefault();
+      var kind = bulk.getAttribute('data-overlap-bulk');
+      document.querySelectorAll('[data-day-action]').forEach(function (sel) { sel.value = kind; });
+      postAction(kind);
       return;
     }
     var b = e.target && e.target.closest ? e.target.closest('[data-overlap-action]') : null;
@@ -300,4 +372,19 @@
       return false;
     });
   };
+
+  function focusDueDateOrder() {
+    try {
+      var q = new URLSearchParams(location.search).get('err');
+      if (q !== 'date_order') return;
+      var el = document.querySelector('[data-wb-period-dates] [name=due_date]') || document.querySelector('[name=due_date]');
+      if (!el) return;
+      var hint = el.parentElement && el.parentElement.querySelector('.due-date-err');
+      if (hint) hint.hidden = false;
+      el.focus();
+      if (el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', focusDueDateOrder);
+  else focusDueDateOrder();
 })();

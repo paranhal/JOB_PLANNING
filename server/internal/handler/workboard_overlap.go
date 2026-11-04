@@ -22,21 +22,30 @@ func overlapDone(err error) error {
 }
 
 type overlapConflictJSON struct {
-	TaskID         string   `json:"task_id"`
-	Title          string   `json:"title"`
-	Assignee       string   `json:"assignee"`
-	Start          string   `json:"start"`
-	End            string   `json:"end"`
-	WorkPlace      string   `json:"work_place"`
-	WorkPlaceLabel string   `json:"work_place_label"`
-	Href           string   `json:"href"`
-	CanSplit       bool     `json:"can_split"`
-	Preview        []string `json:"preview,omitempty"`
+	TaskID           string   `json:"task_id"`
+	Title            string   `json:"title"`
+	Assignee         string   `json:"assignee"`
+	Date             string   `json:"date,omitempty"`
+	Start            string   `json:"start"`
+	End              string   `json:"end"`
+	WorkPlace        string   `json:"work_place"`
+	WorkPlaceLabel   string   `json:"work_place_label"`
+	Href             string   `json:"href"`
+	CanSplit         bool     `json:"can_split"`
+	SplitBlockReason string   `json:"split_block_reason,omitempty"`
+	SplitBlockLabel  string   `json:"split_block_label,omitempty"`
+	Preview          []string `json:"preview,omitempty"`
 }
 
 type overlapHit struct {
 	Task     model.WorkTask
 	Assignee string
+	Date     string
+}
+
+type overlapDayJSON struct {
+	Date      string                `json:"date"`
+	Conflicts []overlapConflictJSON `json:"conflicts"`
 }
 
 func workPlaceLabel(p string) string {
@@ -71,7 +80,7 @@ func (h *WorkboardHandler) listParticipantOverlaps(date, start, end, excludeID s
 			}
 			seen[t.TaskID] = true
 			_ = h.repo.LoadTaskActionFields(&t)
-			hits = append(hits, overlapHit{Task: t, Assignee: name})
+			hits = append(hits, overlapHit{Task: t, Assignee: name, Date: date})
 		}
 	}
 	return hits
@@ -92,36 +101,56 @@ func overlapConflictsJSON(c echo.Context, h *WorkboardHandler, hits []overlapHit
 		t := hit.Task
 		place := model.NormalizeWorkPlace(t.WorkPlace)
 		mems, _ := h.repo.ListMembers(t.TaskID)
-		can := canSplitPlan(c, &t, mems)
+		can, reason, label := canSplitPlanReason(c, &t, mems)
 		var preview []string
 		if can {
 			plan, _ := h.repo.ListPlanSegmentsOrVirtual(t)
+			if len(plan) == 0 {
+				can = false
+				reason, label = "no_segments", splitBlockLabel("no_segments")
+			}
+			splitOK := false
 			for _, seg := range plan {
 				if !model.RangesOverlapHHMM(seg.StartTime, seg.EndTime, newStart, newEnd) {
 					continue
 				}
-				if sp, err := model.SplitPlanAround(seg.StartTime, seg.EndTime, newStart, newEnd, travel); err == nil {
-					if sp.HasFront {
-						preview = append(preview, t.Title+" "+sp.FrontStart+"~"+sp.FrontEnd)
+				sp, err := model.SplitPlanAround(seg.StartTime, seg.EndTime, newStart, newEnd, travel)
+				if err != nil {
+					if reason == "" {
+						reason, label = "too_short", splitBlockLabel("too_short")
 					}
-					preview = append(preview, "끼워넣기 "+newStart+"~"+newEnd)
-					if sp.HasBack {
-						preview = append(preview, t.Title+" "+sp.BackStart+"~"+sp.BackEnd)
-					}
+					continue
+				}
+				splitOK = true
+				if sp.HasFront {
+					preview = append(preview, t.Title+" "+sp.FrontStart+"~"+sp.FrontEnd)
+				}
+				preview = append(preview, "끼워넣기 "+newStart+"~"+newEnd)
+				if sp.HasBack {
+					preview = append(preview, t.Title+" "+sp.BackStart+"~"+sp.BackEnd)
+				}
+			}
+			if can && !splitOK {
+				can = false
+				if reason == "" {
+					reason, label = "too_short", splitBlockLabel("too_short")
 				}
 			}
 		}
 		out = append(out, overlapConflictJSON{
-			TaskID:         t.TaskID,
-			Title:          t.Title,
-			Assignee:       hit.Assignee,
-			Start:          trimHHMM(t.StartTime),
-			End:            trimHHMM(t.EndTime),
-			WorkPlace:      place,
-			WorkPlaceLabel: workPlaceLabel(place),
-			Href:           "/workboard/tasks/" + t.TaskID + "/edit",
-			CanSplit:       can,
-			Preview:        preview,
+			TaskID:           t.TaskID,
+			Title:            t.Title,
+			Assignee:         hit.Assignee,
+			Date:             hit.Date,
+			Start:            trimHHMM(t.StartTime),
+			End:              trimHHMM(t.EndTime),
+			WorkPlace:        place,
+			WorkPlaceLabel:   workPlaceLabel(place),
+			Href:             "/workboard/tasks/" + t.TaskID + "/edit",
+			CanSplit:         can,
+			SplitBlockReason: reason,
+			SplitBlockLabel:  label,
+			Preview:          preview,
 		})
 	}
 	return out
@@ -191,6 +220,19 @@ func idSetEqual(a, b []string) bool {
 			return false
 		}
 		m[x]--
+	}
+	return true
+}
+
+func idSetCovers(posted, current []string) bool {
+	m := map[string]bool{}
+	for _, x := range posted {
+		m[x] = true
+	}
+	for _, x := range current {
+		if !m[x] {
+			return false
+		}
 	}
 	return true
 }
@@ -276,12 +318,35 @@ func (h *WorkboardHandler) applyOverlapResolutionToHits(c echo.Context, action s
 			}
 		}
 		return nil
+	case "skip":
+		var days []string
+		for _, hit := range hits {
+			if d := strings.TrimSpace(hit.Date); d != "" {
+				days = append(days, d)
+			}
+		}
+		if len(days) == 0 {
+			if d := strings.TrimSpace(c.FormValue("work_date")); d != "" {
+				days = append(days, d)
+			}
+		}
+		mergeOverlapSkipDates(c, days)
+		return nil
 	case "split":
 		travel := parseSplitTravel(c)
 		date := strings.TrimSpace(c.FormValue("work_date"))
 		start := strings.TrimSpace(c.FormValue("start_time"))
 		end := strings.TrimSpace(c.FormValue("end_time"))
+		skip := overlapSkipDateSet(c)
+		var keep []overlapHit
 		for _, hit := range hits {
+			day := strings.TrimSpace(hit.Date)
+			if day == "" {
+				day = date
+			}
+			if skip[day] {
+				continue
+			}
 			t, err := h.repo.GetTask(hit.Task.TaskID)
 			if err != nil || t == nil {
 				return overlapActionErr(c, "겹친 업무를 찾을 수 없습니다")
@@ -290,8 +355,12 @@ func (h *WorkboardHandler) applyOverlapResolutionToHits(c echo.Context, action s
 				return overlapActionErr(c, "다른 조직의 업무입니다")
 			}
 			mems, _ := h.repo.ListMembers(t.TaskID)
-			if !canSplitPlan(c, t, mems) {
-				return overlapActionErr(c, "이 계획을 나눌 권한이 없습니다")
+			ok, _, label := canSplitPlanReason(c, t, mems)
+			if !ok {
+				if label == "" {
+					label = "이 계획을 나눌 권한이 없습니다"
+				}
+				return overlapActionErr(c, label)
 			}
 			plan, _ := h.repo.ListPlanSegmentsOrVirtual(*t)
 			okSplit := false
@@ -305,9 +374,14 @@ func (h *WorkboardHandler) applyOverlapResolutionToHits(c echo.Context, action s
 			if !okSplit {
 				return overlapActionErr(c, "남는 구간이 15분 미만이라 끼워 넣을 수 없습니다")
 			}
+			hit.Date = day
+			keep = append(keep, hit)
+		}
+		if len(keep) == 0 {
+			return nil
 		}
 		c.Set("pending_interrupt", &pendingInterrupt{
-			Hits: hits, Travel: travel, Date: date, Start: start, End: end, Names: names,
+			Hits: keep, Travel: travel, Date: date, Start: start, End: end, Names: names,
 		})
 		return nil
 	case "leave":
@@ -409,11 +483,16 @@ func (h *WorkboardHandler) dropNamesFromTask(t *model.WorkTask, names []string) 
 }
 
 func (h *WorkboardHandler) rejectIfOverlap(c echo.Context, date, start, end, excludeID string, names []string) error {
+	return h.rejectIfOverlapDates(c, []string{date}, start, end, excludeID, names)
+}
+
+func (h *WorkboardHandler) rejectIfOverlapDates(c echo.Context, dates []string, start, end, excludeID string, names []string) error {
 	action := strings.TrimSpace(c.FormValue("overlap_action"))
 	if action == "cancel" {
 		return overlapCancelled(c)
 	}
-	hits := h.listParticipantOverlaps(date, start, end, excludeID, names)
+	dates = filterSkippedDates(dates, overlapSkipDateSet(c))
+	hits := h.PlanOverlapsForDates(dates, start, end, excludeID, names)
 	place := model.NormalizeWorkPlace(c.FormValue("work_place"))
 	if action == "" {
 		if len(hits) == 0 {
@@ -422,11 +501,18 @@ func (h *WorkboardHandler) rejectIfOverlap(c echo.Context, date, start, end, exc
 		return respondOverlap(c, hits, place, start, end, parseSplitTravel(c), h)
 	}
 	posted := postedOverlapIDs(c)
-	if len(posted) > 0 && !idSetEqual(posted, overlapHitIDs(hits)) {
-		if len(hits) == 0 {
-			return nil
+	if len(posted) > 0 {
+		curIDs := overlapHitIDs(hits)
+		okIDs := idSetEqual(posted, curIDs)
+		if len(overlapSkipDateSet(c)) > 0 {
+			okIDs = idSetCovers(posted, curIDs)
 		}
-		return respondOverlap(c, hits, place, start, end, parseSplitTravel(c), h)
+		if !okIDs {
+			if len(hits) == 0 {
+				return nil
+			}
+			return respondOverlap(c, hits, place, start, end, parseSplitTravel(c), h)
+		}
 	}
 	if len(hits) == 0 {
 		return nil
@@ -437,10 +523,11 @@ func (h *WorkboardHandler) rejectIfOverlap(c echo.Context, date, start, end, exc
 	if action == "edit" {
 		return errOverlapResponse
 	}
-	if action == "split" {
+	if action == "split" || action == "skip" {
 		return nil
 	}
-	hits = h.listParticipantOverlaps(date, start, end, excludeID, names)
+	remain := filterSkippedDates(dates, overlapSkipDateSet(c))
+	hits = h.PlanOverlapsForDates(remain, start, end, excludeID, names)
 	if len(hits) == 0 {
 		return nil
 	}
@@ -450,11 +537,13 @@ func (h *WorkboardHandler) rejectIfOverlap(c echo.Context, date, start, end, exc
 func respondOverlap(c echo.Context, hits []overlapHit, pendingPlace, newStart, newEnd string, travel int, h *WorkboardHandler) error {
 	msg := overlapMessageFromHits(hits, pendingPlace)
 	conflicts := overlapConflictsJSON(c, h, hits, newStart, newEnd, travel)
+	days := groupOverlapDays(conflicts)
 	if wantsJSONError(c) {
 		if err := c.JSON(http.StatusConflict, map[string]interface{}{
 			"error":      "overlap",
 			"message":    msg,
 			"conflicts":  conflicts,
+			"dates":      days,
 			"travel_min": travel,
 		}); err != nil {
 			return err
