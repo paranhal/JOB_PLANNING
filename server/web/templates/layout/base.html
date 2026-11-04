@@ -19,6 +19,9 @@
   <script defer src="/static/js/board_schedule.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/work_items.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/schedule-show.js?v={{.AssetQuery}}"></script>
+  <script defer src="/static/js/exec_dash_nav.js?v={{.AssetQuery}}"></script>
+  <script defer src="/static/js/ui_dropdown.js?v={{.AssetQuery}}"></script>
+  <script defer src="/static/js/project_filter.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/vendor/alpine.min.js?v={{.AssetQuery}}"></script>
   <style>
     [x-cloak] { display: none !important; }
@@ -189,7 +192,7 @@
 
 {{if .CanSwitchOrg}}
 <div class="{{if .OrgViewAll}}bg-amber-600{{else}}bg-blue-800{{end}} text-white text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-3 z-40">
-  <span>지금 보는 조직: <strong>{{.OrgViewLabel}}</strong>{{if .OrgViewAll}} (전 조직){{end}}</span>
+  <span>지금 보는 조직: <strong>{{.OrgViewLabel}}</strong>{{if .OrgViewAll}} (전 조직){{end}}{{if .ViewOnlyBanner}} · 조회 전용{{end}}</span>
   {{if .OrgSwitchList}}
   <form method="post" action="/admin/orgs/switch" class="flex items-center gap-2">
     <input type="hidden" name="return" value="{{if .ReturnPath}}{{.ReturnPath}}{{else}}/{{end}}">
@@ -204,6 +207,9 @@
   </form>
   {{end}}
 </div>
+{{end}}
+{{if and .ViewOnlyBanner (not .CanSwitchOrg)}}
+<p class="text-center text-xs px-4 py-1.5">조회 전용</p>
 {{end}}
 
 {{if .SchemaNotice}}
@@ -924,6 +930,11 @@
     <p class="mt-1 text-xs text-ink-muted">담당자만 빼기·삭제는 아래 겹친 업무 모두에 적용됩니다. 끼워 넣기는 같은 작업자의 계획을 나눕니다.</p>
     <p id="overlap-resolve-err" hidden class="mt-2 text-ui text-red-700" role="alert"></p>
     <p id="overlap-resolve-busy" hidden class="mt-2 text-ui text-ink-muted">처리 중…</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" data-overlap-bulk="split">모든 날짜에 끼워넣기</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-overlap-bulk="skip">모든 날짜 건너뛰기</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-overlap-action="edit">모든 날짜 기존 계획 수정</button>
+    </div>
     <ul id="overlap-conflict-list" class="mt-3 space-y-2"></ul>
     <div id="overlap-split-box" class="mt-3 space-y-2">
       <p class="text-ui-sm font-semibold text-ink">이동 시간</p>
@@ -940,6 +951,7 @@
     </div>
     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
       <button type="button" class="btn btn-primary" data-overlap-action="split">끼워 넣기</button>
+      <button type="button" class="btn btn-secondary" data-overlap-action="skip">이 날짜 건너뛰기</button>
       <button type="button" class="btn btn-secondary" data-overlap-action="edit">기존 계획 수정</button>
       <button type="button" class="btn btn-danger" data-overlap-action="delete">기존 계획 삭제</button>
       <button type="button" class="btn btn-secondary" data-overlap-action="leave">담당자만 빼고 새 계획 등록</button>

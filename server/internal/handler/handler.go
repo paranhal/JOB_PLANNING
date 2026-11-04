@@ -249,7 +249,9 @@ func New(db *sql.DB) *Handler {
 			repository.NewProjectRepo(db), repository.NewWorkGroupRepo(db), attachH.uploadDir,
 			db, settingsRepo,
 		),
-		Exec: NewExecHandler(repository.NewOrgRepo(db)),
+		Exec: NewExecHandler(repository.NewOrgRepo(db), repository.NewExecDashRepo(
+			repository.NewOrgRepo(db), workBoardRepo, userRepo, repository.NewStaffLeaveRepo(db),
+		)),
 
 		customerRepo: customerRepo,
 		asRepo:       asRepo,

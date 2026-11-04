@@ -24,8 +24,8 @@ func (h *MeetingHandler) weeklyItemCanEdit(c echo.Context, it model.WorkListItem
 		if h.asRepo == nil {
 			return false
 		}
-		as, err := h.asRepo.GetByID(currentOrg(c), it.RefID)
-		if err != nil || as == nil {
+		as, err := h.asRepo.GetByID(scopeOrgForRead(c), it.RefID)
+		if err != nil || as == nil || !CanViewRecord(c, as) {
 			return false
 		}
 		canMod := false
@@ -109,9 +109,12 @@ func (h *MeetingHandler) WeeklyItemSave(c echo.Context) error {
 				}
 			}
 		}
-		as2, err := h.asRepo.GetByID(currentOrg(c), as.ASID)
-		if err != nil || as2 == nil {
+		as2, err := h.asRepo.GetByID(scopeOrgForRead(c), as.ASID)
+		if err != nil || as2 == nil || !CanViewRecord(c, as2) {
 			return echo.ErrNotFound
+		}
+		if !CanWriteOrg(c, as2.OrgID) {
+			return echo.ErrForbidden
 		}
 		if memo := strings.TrimSpace(c.FormValue("memo")); memo != "" {
 			as2.Symptom = memo
@@ -152,8 +155,11 @@ func (h *MeetingHandler) loadWeeklyEditTarget(c echo.Context) (model.WorkListIte
 		if h.asRepo == nil {
 			return it, nil, http.StatusNotFound
 		}
-		as, err := h.asRepo.GetByID(currentOrg(c), ref)
+		as, err := h.asRepo.GetByID(scopeOrgForRead(c), ref)
 		if err != nil || as == nil {
+			return it, nil, http.StatusNotFound
+		}
+		if !CanViewRecord(c, as) {
 			return it, nil, http.StatusNotFound
 		}
 		it.Title = as.Symptom

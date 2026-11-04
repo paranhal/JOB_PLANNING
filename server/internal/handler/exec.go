@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -12,10 +13,11 @@ import (
 
 type ExecHandler struct {
 	orgs *repository.OrgRepo
+	dash *repository.ExecDashRepo
 }
 
-func NewExecHandler(orgs *repository.OrgRepo) *ExecHandler {
-	return &ExecHandler{orgs: orgs}
+func NewExecHandler(orgs *repository.OrgRepo, dash *repository.ExecDashRepo) *ExecHandler {
+	return &ExecHandler{orgs: orgs, dash: dash}
 }
 
 func canViewExec(c echo.Context) bool {
@@ -39,13 +41,7 @@ func (h *AuthHandler) GuardCLevelHidden(next echo.HandlerFunc) echo.HandlerFunc 
 		}
 		path := c.Request().URL.Path
 		method := c.Request().Method
-		if method != http.MethodGet && method != http.MethodHead {
-			if cLevelWriteExempt(path) {
-				return next(c)
-			}
-			return h.forbidden(c)
-		}
-		if cLevelHiddenPath(path) {
+		if cLevelWriteBlocked(method, path) {
 			return h.forbidden(c)
 		}
 		return next(c)
@@ -63,12 +59,66 @@ func (h *ExecHandler) listOrgs() []model.Org {
 	return list
 }
 
+func execDashDate(c echo.Context) string {
+	if d := strings.TrimSpace(c.QueryParam("date")); d != "" {
+		if t, err := time.ParseInLocation("2006-01-02", d, time.Local); err == nil {
+			return t.Format("2006-01-02")
+		}
+	}
+	n := time.Now()
+	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, n.Location()).Format("2006-01-02")
+}
+
+func execScopeOrgIDs(c echo.Context) []string {
+	s := DataScopeFor(c)
+	if s.All {
+		return nil
+	}
+	return s.OrgIDs
+}
+
+func (h *ExecHandler) dashData(c echo.Context) (map[string]interface{}, error) {
+	date := execDashDate(c)
+	var orgs []repository.ExecOrgToday
+	var tot repository.ExecTotals
+	var err error
+	if h != nil && h.dash != nil {
+		orgs, tot, err = h.dash.Today(date, execScopeOrgIDs(c))
+		if err != nil {
+			return nil, err
+		}
+	}
+	wd := []string{"일", "월", "화", "수", "목", "금", "토"}
+	t, _ := time.ParseInLocation("2006-01-02", date, time.Local)
+	dateLabel := date
+	if !t.IsZero() {
+		dateLabel = t.Format("2006.01.02") + " (" + wd[int(t.Weekday())] + ")"
+	}
+	return map[string]interface{}{
+		"Title":      "경영 통합 대시보드",
+		"Active":     NavExec,
+		"Date":       date,
+		"DateLabel":  dateLabel,
+		"RoleLabel":  model.RoleLabel(currentRole(c)),
+		"Orgs":   orgs,
+		"Totals": tot,
+	}, nil
+}
+
 func (h *ExecHandler) Dashboard(c echo.Context) error {
-	return c.Render(http.StatusOK, "exec/dashboard.html", map[string]interface{}{
-		"Title":  "경영 통합 대시보드",
-		"Active": NavExec,
-		"Orgs":   h.listOrgs(),
-	})
+	data, err := h.dashData(c)
+	if err != nil {
+		return err
+	}
+	return c.Render(http.StatusOK, "exec/dashboard.html", data)
+}
+
+func (h *ExecHandler) Cards(c echo.Context) error {
+	data, err := h.dashData(c)
+	if err != nil {
+		return err
+	}
+	return RenderPartial(c, "exec/_org_cards.html", data)
 }
 
 func (h *ExecHandler) Work(c echo.Context) error {

@@ -66,11 +66,7 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	todayDone, err := h.work.ListCompletedOn(dateStr, mineUID, mineKeys, 300)
-	if err != nil {
-		return err
-	}
-	todayItems, err := h.work.ListScheduledOn(dateStr, mineUID, mineKeys, 300)
+	todayDone, todayItems, progress, err := h.work.MeetingTodaySets(dateStr, mineUID, mineKeys, 300)
 	if err != nil {
 		return err
 	}
@@ -91,11 +87,6 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		}
 		unplannedNeed = append(unplannedNeed, it)
 	}
-	progress, err := h.work.ListBucketOn(model.WorkBucketInProgress, dateStr, mineUID, mineKeys, 300)
-	if err != nil {
-		return err
-	}
-	progress = meetingProgressExcludingScheduled(progress, dateStr)
 
 	yesterday = h.filterMeetingOrg(c, yesterday)
 	todayDone = h.filterMeetingOrg(c, todayDone)
@@ -109,6 +100,16 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 	display := model.ParseDisplay(c.QueryParam("display"), c.QueryParam("view"))
 	navQ := meetingNavQuery(selected, display, orgScope, showOrgPick)
 	overviewQ := meetingOverviewQuery(dateStr, selected, len(yesterday), plannedN, len(unplannedRaw))
+	fromExec := strings.TrimSpace(c.QueryParam("from")) == "exec"
+	viewOrgName := ""
+	if showOrgPick && orgScope != "" && orgScope != repository.OrgAll {
+		for _, o := range orgs {
+			if o.OrgID == orgScope {
+				viewOrgName = o.NavLabel()
+				break
+			}
+		}
+	}
 
 	return c.Render(http.StatusOK, "meeting/show.html", map[string]interface{}{
 		"Title":           "일일 업무 회의",
@@ -138,6 +139,8 @@ func (h *MeetingHandler) Show(c echo.Context) error {
 		"CanTeam":         canTeam,
 		"ShowOrgPick":     showOrgPick,
 		"ViewOrgID":       orgScope,
+		"ViewOrgName":     viewOrgName,
+		"FromExec":        fromExec,
 		"Orgs":            orgs,
 		"KanbanColumns":   kanban.Columns,
 		"KanbanTotal":     kanban.Total,
@@ -229,14 +232,7 @@ func atoiDefault(s string, fallback int) int {
 }
 
 func meetingProgressExcludingScheduled(items []model.WorkListItem, date string) []model.WorkListItem {
-	var out []model.WorkListItem
-	for _, it := range items {
-		if model.WorkItemScheduledDate(it) == date {
-			continue
-		}
-		out = append(out, it)
-	}
-	return out
+	return model.MeetingProgressExcludingScheduled(items, date)
 }
 
 func logMeetingPlannedIdentity(date, assignee string, planned int, view model.KanbanView) {

@@ -1,15 +1,54 @@
 {{define "title"}}경영 통합 대시보드 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-6">
+<div class="space-y-6" data-exec-dash>
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
-      <div class="flex items-center gap-2">
+      <p class="text-ui-xs text-ink-muted">업무관리시스템 / 경영 통합 대시보드 · 업무</p>
+      <div class="mt-1 flex items-center gap-2">
         <h2 class="text-xl font-bold text-ink">경영 통합 대시보드</h2>
         <span class="rounded-full bg-hover px-2 py-0.5 text-xs font-medium text-ink-muted">전사 개요</span>
       </div>
-      <p class="mt-1 text-sm text-ink-muted">세 조직의 성과와 운영 리스크를 한눈에 확인하세요.</p>
+    </div>
+    <div class="text-right text-sm text-ink-muted">
+      <p>{{.DateLabel}}</p>
+      <p>{{.RoleLabel}}</p>
     </div>
   </div>
-  <p class="text-sm text-ink-muted">집계 화면은 이어서 채웁니다. 왼쪽 메뉴에서 기존 현황 화면을 읽기 전용으로 열 수 있습니다.</p>
+
+  <div class="grid grid-cols-2 gap-3 md:grid-cols-5" data-exec-totals>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">전사 오늘 업무</p>
+      <p class="mt-1 text-lg font-bold tabular-nums">{{.Totals.Total}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">완료</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-success">{{.Totals.Done}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">진행</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-info">{{.Totals.InProgress}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">지연</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-danger">{{.Totals.Delayed}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">오늘 휴가자</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-warning">{{.Totals.OnLeave}}</p>
+    </div>
+  </div>
+
+  <div>
+    <h3 class="text-ui font-bold text-ink">조직별 오늘 현황</h3>
+    <p class="mt-1 text-sm text-ink-muted">조직 박스를 누르면 업무 회의 화면으로 이동하고, 뒤로 가면 이 위치로 돌아옵니다.</p>
+  </div>
+
+  <div id="exec-org-cards" class="min-h-[80vh] pb-[50vh]"
+       data-exec-date="{{.Date}}"
+       hx-get="/exec/cards{{if .Date}}?date={{.Date}}{{end}}"
+       hx-trigger="every 5m [!document.hidden]"
+       hx-swap="innerHTML">
+    {{template "exec_org_cards" .}}
+  </div>
 </div>
 {{end}}

@@ -1,0 +1,51 @@
+{{define "exec_org_cards"}}
+{{if .Orgs}}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {{range .Orgs}}
+  <a href="{{.Href}}" data-exec-org="{{.Org.OrgID}}" data-exec-card data-exec-total="{{.Total}}">
+     class="card flex min-h-[16rem] flex-col p-4 text-ink no-underline hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-ui font-bold">{{.Org.NavLabel}}</span>
+        <span class="badge-neutral">{{if .Org.OrgNo}}{{.Org.OrgNo}}{{else}}{{.Org.OrgID}}{{end}}</span>
+      </div>
+      <span class="text-ui-sm text-ink-muted">인원 {{.Headcount}}명</span>
+    </div>
+    <div class="mt-3 flex items-baseline justify-between gap-2">
+      <p class="text-ui">오늘 업무 <span class="font-semibold tabular-nums">{{.Total}}</span>건</p>
+      <p class="text-ui-sm text-ink-muted">완료율 {{.DonePct}}%</p>
+    </div>
+    <div class="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-hover" data-exec-bar>
+      {{if gt .Done 0}}<span class="block h-full bg-success" style="flex:{{.Done}} 0 0" data-exec-bar-done></span>{{end}}
+      {{if gt .InProgress 0}}<span class="block h-full bg-info" style="flex:{{.InProgress}} 0 0" data-exec-bar-prog></span>{{end}}
+      {{if gt .NotStarted 0}}<span class="block h-full bg-hover border-l border-line" style="flex:{{.NotStarted}} 0 0" data-exec-bar-wait></span>{{end}}
+      {{if gt .Delayed 0}}<span class="block h-full bg-danger" style="flex:{{.Delayed}} 0 0" data-exec-bar-delay></span>{{end}}
+    </div>
+    <div class="mt-2 grid grid-cols-4 gap-1 text-center text-ui-xs text-ink-muted">
+      <div>완료 <span class="block font-semibold tabular-nums text-success">{{.Done}}</span></div>
+      <div>진행 <span class="block font-semibold tabular-nums text-info">{{.InProgress}}</span></div>
+      <div>미착수 <span class="block font-semibold tabular-nums text-ink">{{.NotStarted}}</span></div>
+      <div>지연 <span class="block font-semibold tabular-nums text-danger">{{.Delayed}}</span></div>
+    </div>
+    <div class="mt-3 min-h-[108px] rounded-lg bg-warning-soft px-3 py-2 text-ui-sm text-warning" data-exec-leave>
+      <p class="font-medium">오늘 휴가자 {{add (len .OnLeave) .LeaveMore}}명</p>
+      {{if .OnLeave}}
+      <ul class="mt-1 space-y-0.5 text-ink">
+        {{range .OnLeave}}
+        <li>{{.Name}} · {{leaveKindLabel .Kind}}</li>
+        {{end}}
+      </ul>
+      {{if gt .LeaveMore 0}}<p class="mt-1 text-ink-muted">외 {{.LeaveMore}}명</p>{{end}}
+      {{else}}
+      <p class="mt-1 text-ink-muted">휴가자 없음</p>
+      {{end}}
+    </div>
+    <p class="mt-auto pt-3 text-ui-sm text-primary">업무 회의 화면 보기 →</p>
+  </a>
+  {{end}}
+</div>
+{{else}}
+<p class="text-sm text-ink-muted">표시할 조직이 없습니다.</p>
+{{end}}
+{{end}}
+{{template "exec_org_cards" .}}
