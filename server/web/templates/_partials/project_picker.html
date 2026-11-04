@@ -11,15 +11,16 @@
   <input type="hidden" name="project_match_pending" value="" :value="pending ? '1' : ''">
   {{end}}
   <div class="space-y-1" x-show="!pending">
-    <p class="text-xs text-ink" x-show="selectedName" x-cloak>
+    <p class="text-xs text-ink" data-picked-name x-show="selectedName" x-cloak>
       선택: <span class="font-medium" x-text="selectedName"></span>
       <button type="button" class="text-ink-muted ml-1" @click="clear()">✕</button>
     </p>
+    <div class="relative">
     <input type="search" class="input w-full" autocomplete="off"
            placeholder="{{if $p.Placeholder}}{{$p.Placeholder}}{{else}}사업명으로 찾기{{end}}"
-           x-model="q" @focus="open=true" @input="open=true"
+           x-model="q" @focus="open=true; revealList()" @input="open=true; revealList()"
            @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
-    <ul class="combobox-list" x-show="open" x-cloak>
+    <ul class="combobox-list" x-ref="list" x-show="open" x-cloak>
       <li>
         <button type="button" class="menu-item w-full" @click="clear()" x-text="emptyLabel"></button>
       </li>
@@ -48,6 +49,7 @@
       </li>
       {{end}}
     </ul>
+    </div>
     <div class="pt-1">
       {{if $p.CanPickOther}}
       <button type="button" class="text-xs text-ink-muted hover:underline" @click="toggleOther()">

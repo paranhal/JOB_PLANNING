@@ -31,6 +31,18 @@ function projectPicker(cfg) {
       if (!n) { this.hi = 0; return; }
       this.hi = (this.hi + d + n) % n;
     },
+    revealList: function () {
+      var self = this;
+      if (this.$nextTick) {
+        this.$nextTick(function () { self._scrollList(); });
+      } else {
+        self._scrollList();
+      }
+    },
+    _scrollList: function () {
+      var el = this.$refs && this.$refs.list;
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    },
     pickHighlight: function () {
       var p = this.filtered[this.hi];
       if (p) this.pick(p.project_id, p.name, p.project_kind);
@@ -42,6 +54,13 @@ function projectPicker(cfg) {
       this.q = '';
       if (typeof this.$dispatch === 'function') {
         this.$dispatch('project-picked', { id: this.selectedId, name: name || '', kind: kind || '' });
+      }
+      var self = this;
+      if (this.$nextTick) {
+        this.$nextTick(function () {
+          var el = self.$el && self.$el.querySelector('[data-picked-name]');
+          if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+        });
       }
     },
     clear: function () {

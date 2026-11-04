@@ -64,7 +64,8 @@ const picked = await page.evaluate(() => {
 });
 if (picked.err) fail('목록에 도서관사업 버튼 없음', JSON.stringify(picked));
 if (picked.id !== 'WP-O01') fail('선택 id', JSON.stringify(picked));
-const selected = await page.locator('[data-project-picker]').first().innerText();
+await page.waitForTimeout(200);
+const selected = await page.locator('#new-work-form-slot [data-project-picker] [data-picked-name]').innerText();
 if (!selected.includes('도서관사업')) fail('선택 표시', selected);
 const q = await search.inputValue();
 if (q !== '') fail('선택명이 검색어가 되면 안 됨', q);
