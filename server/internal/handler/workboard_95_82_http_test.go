@@ -77,13 +77,11 @@ func Test95_82_SharedTemplateAndForm(t *testing.T) {
 		t.Fatal("장비 종류 전체 보기 없음")
 	}
 	for _, f := range []string{
-		"workboard/_modals.html",
 		"workboard/task_show.html",
 		"workboard/project_work_action.html",
-		"workboard/new_work_form.html",
 	} {
 		src := string(mustRead(t, filepath.Join(root, f)))
-		if f != "workboard/new_work_form.html" && !strings.Contains(src, `template "work_task_items"`) {
+		if !strings.Contains(src, `template "work_task_items"`) {
 			t.Fatalf("%s 공용 템플릿 없음", f)
 		}
 	}

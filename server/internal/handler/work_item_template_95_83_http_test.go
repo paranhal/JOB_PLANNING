@@ -449,9 +449,9 @@ func Test95_83_SetExpandSnapshotSummaryCopy(t *testing.T) {
 	if !strings.Contains(src, "직접 입력 항목") || !strings.Contains(src, "addFromSelect") || !strings.Contains(src, "data-set-check") {
 		t.Fatal("공용 템플릿 세트 UI 없음")
 	}
-	for _, f := range []string{"workboard/_modals.html", "workboard/task_show.html", "workboard/project_work_action.html", "workboard/new_work_form.html"} {
+	for _, f := range []string{"workboard/task_show.html", "workboard/project_work_action.html"} {
 		b := string(mustRead(t, filepath.Join(root, f)))
-		if f != "workboard/new_work_form.html" && !strings.Contains(b, `template "work_task_items"`) {
+		if !strings.Contains(b, `template "work_task_items"`) {
 			t.Fatalf("%s 공용 템플릿 없음", f)
 		}
 	}

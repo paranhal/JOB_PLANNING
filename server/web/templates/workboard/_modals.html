@@ -110,11 +110,6 @@
       {{template "wb_assignee_picker" $}}
       {{template "wb_work_group_field" .}}
       {{template "wb_plan_work_place" ""}}
-      {{template "work_task_items" .}}
-      <div>
-        <label class="block text-sm font-medium text-ink mb-1">진행률 (%)</label>
-        <input type="number" name="progress" min="0" max="100" value="0" class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
       <details class="rounded-lg border border-line">
         <summary class="cursor-pointer px-3 py-2 text-sm text-ink">기간 내 반복 실행</summary>
         <div class="px-3 pb-3 space-y-3">
@@ -378,7 +373,6 @@
       {{template "wb_assignee_picker" $}}
       {{template "wb_work_group_field" .}}
       {{template "wb_plan_work_place" ""}}
-      {{template "work_task_items" .}}
       <div>
         <label class="block text-sm font-medium text-ink mb-1">작업 내용</label>
         <textarea name="description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>

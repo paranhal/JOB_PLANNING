@@ -108,3 +108,65 @@ func Test95_123_T2_SaveSelfAndOrgAdminChange(t *testing.T) {
 		t.Fatalf("조직관리자가 다른 사람 지정 실패 %+v", got2)
 	}
 }
+
+func Test95_123_T3_NewWorkHasNoItemsOrProgress(t *testing.T) {
+	e, db, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d123-t3.db"))
+	ck := jwtCookieUser(t, me)
+	form := doGetWith(t, e, "/workboard/new-work/form?kind=admin&date=2026-11-04", ck).Body.String()
+	if strings.Contains(form, `name="progress"`) {
+		t.Fatal("새 업무에 진행률 입력이 남아 있다")
+	}
+	if strings.Contains(form, "작업 리스트") || strings.Contains(form, `data-work-items="1"`) {
+		t.Fatal("새 업무에 작업 리스트가 남아 있다")
+	}
+	reg := doGetWith(t, e, "/workboard/register?view=day", ck).Body.String()
+	if strings.Contains(reg, `name="progress"`) {
+		t.Fatal("일정표 등록 모달에 진행률 입력이 있다")
+	}
+	day := time.Now().AddDate(0, 0, 6).Format(dateLayout)
+	rec := doFormWith(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"admin"}, "title": {"진행률없음"}, "work_date": {day}, "due_date": {day},
+		"start_time": {"09:00"}, "end_time": {"09:30"},
+		"assignee_multi": {"1"}, "owner_user_id": {me.UserID}, "assignee_user_id": {me.UserID},
+	}, ck)
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("저장 loc=%s", rec.Header().Get("Location"))
+	}
+	var id string
+	if err := db.QueryRow(`SELECT task_id FROM work_tasks WHERE title='진행률없음'`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := repo.GetTask(id)
+	if got == nil || got.Progress != 0 {
+		t.Fatalf("progress=%v", got)
+	}
+}
+
+func Test95_123_T4_EditDropsProgressKeepsItems(t *testing.T) {
+	e, db, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d123-t4.db"))
+	day := time.Now().AddDate(0, 0, 7).Format(dateLayout)
+	rec := doFormWith(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"admin"}, "title": {"항목유지"}, "work_date": {day}, "due_date": {day},
+		"start_time": {"09:00"}, "end_time": {"09:30"},
+		"assignee_multi": {"1"}, "owner_user_id": {me.UserID}, "assignee_user_id": {me.UserID},
+	}, jwtCookieUser(t, me))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("저장 %d", rec.Code)
+	}
+	var id string
+	if err := db.QueryRow(`SELECT task_id FROM work_tasks WHERE title='항목유지'`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_task_items(item_id,task_id,seq,title,status,note) VALUES('WI-123',?,1,'기존항목','todo','')`, id); err != nil {
+		t.Fatal(err)
+	}
+	edit := doGetWith(t, e, "/workboard/tasks/"+id+"/edit", jwtCookieUser(t, me)).Body.String()
+	if strings.Contains(edit, `name="progress"`) {
+		t.Fatal("수정 폼에 진행률 입력이 있다")
+	}
+	show := doGetWith(t, e, "/workboard/tasks/"+id, jwtCookieUser(t, me)).Body.String()
+	if !strings.Contains(show, "기존항목") && !strings.Contains(show, "data-work-items") {
+		t.Fatal("상세에 기존 작업 항목이 없다")
+	}
+	_ = repo
+}

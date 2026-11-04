@@ -635,11 +635,6 @@
           {{end}}
         </select>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-ink mb-1">진행률 (%)</label>
-        <input type="number" name="progress" min="0" max="100" value="{{$t.Progress}}"
-               class="w-full border rounded-lg px-3 py-2">
-      </div>
     </div>
     {{template "wb_member_fields" .}}
     {{template "work_segments_form" .}}
