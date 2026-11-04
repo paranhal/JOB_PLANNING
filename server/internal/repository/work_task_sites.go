@@ -233,6 +233,9 @@ func (r *WBRepo) SearchWorkTaskCustomers(q, projectID string, selected []string,
 		limit = 20
 	}
 	sel, _ := uniqueCustomerIDs(selected, false)
+	if len(sel) == 0 && projectID != "" {
+		return r.SearchProjectSitePool(projectID, q, 100)
+	}
 	if len(sel) == 0 && utf8.RuneCountInString(q) < 2 {
 		return nil, nil
 	}

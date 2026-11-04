@@ -19,6 +19,7 @@ const (
 	ProjectDutyExecution  = "execution"
 	ProjectDutyManagement = "management"
 	ProjectDutyAccounting = "accounting"
+	ProjectDutyPM         = "pm"
 )
 
 func ValidProjectKind(v string) bool {
@@ -156,7 +157,7 @@ func ProjectKindOptions() []struct{ Value, Label string } {
 
 func ValidProjectDuty(v string) bool {
 	switch strings.TrimSpace(v) {
-	case ProjectDutySales, ProjectDutyExecution, ProjectDutyManagement, ProjectDutyAccounting:
+	case ProjectDutySales, ProjectDutyExecution, ProjectDutyManagement, ProjectDutyAccounting, ProjectDutyPM:
 		return true
 	default:
 		return false
@@ -173,6 +174,8 @@ func ProjectDutyLabel(v string) string {
 		return "사업관리 담당"
 	case ProjectDutyAccounting:
 		return "회계 담당"
+	case ProjectDutyPM:
+		return "PM"
 	default:
 		return v
 	}
@@ -183,6 +186,7 @@ func ProjectDutyOptions() []struct{ Value, Label string } {
 		{ProjectDutySales, "영업 담당"},
 		{ProjectDutyExecution, "수행 담당"},
 		{ProjectDutyManagement, "사업관리 담당"},
+		{ProjectDutyPM, "PM"},
 		{ProjectDutyAccounting, "회계 담당"},
 	}
 }
