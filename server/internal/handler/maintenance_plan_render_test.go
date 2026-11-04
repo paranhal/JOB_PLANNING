@@ -31,7 +31,7 @@ func planViewData(view string, month int, visits []model.MaintenanceVisit) map[s
 	const today = "2026-08-05"
 	weeks := buildVisitCalendar(2026, month, visits, today)
 	sel := defaultSelectedDay(2026, month, today, visits)
-	attachCalendarChips(weeks, today, sel)
+	attachCalendarChips(weeks, today, sel, nil)
 	cards := buildVisitCards(visits, today, "2026-01-01", nil)
 	attachCardHrefs(cards, "mpl_1", view, month, "all", "", sel, "plan")
 	return map[string]interface{}{

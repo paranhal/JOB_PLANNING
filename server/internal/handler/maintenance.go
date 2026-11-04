@@ -289,7 +289,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if !dayInWeeks(weeks, selDay) {
 		selDay = defaultSelectedDay(plan.PlanYear, month, today, shown)
 	}
-	attachCalendarChips(weeks, today, selDay)
+	attachCalendarChips(weeks, today, selDay, h.openLiveVisitIDs(shown))
 	scopeAllFlag := ""
 	if scopeAll && showScopeToggle {
 		scopeAllFlag = "1"
@@ -412,14 +412,11 @@ func (h *MaintenanceHandler) hydrateVisitPeople(visits []model.MaintenanceVisit)
 }
 
 func (h *MaintenanceHandler) userDisplayName(uid string) string {
-	if h == nil || h.userRepo == nil || strings.TrimSpace(uid) == "" {
-		return ""
+	var repo *repository.UserRepo
+	if h != nil {
+		repo = h.userRepo
 	}
-	u, err := h.userRepo.GetByID(uid)
-	if err != nil || u == nil {
-		return ""
-	}
-	return strings.TrimSpace(u.FullName)
+	return userDisplayName(repo, uid, "")
 }
 
 func (h *MaintenanceHandler) calFilterOptions(c echo.Context, visits []model.MaintenanceVisit) ([]MntCalGroup, []MntCalPerson, map[string]map[string]bool) {
@@ -683,14 +680,9 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 		v.Completed = existing.Completed
 		v.CompletedDate = existing.CompletedDate
 	}
-	if err := h.repo.UpdateVisit(v); err != nil {
+	if err := h.moveVisitDate(c, &v, v.VisitDate); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	uid, name, on := stampOnBehalf(c, "", v.Assignee)
-	_ = h.repo.StampVisitActedBy(vid, uid, name, on)
-	h.syncVisitTask(vid, v.Completed)
-	h.recordVisitAssign(c, vid, v.Assignee, "", "", "", "")
-	h.repo.TouchPlanUpdated(planID)
 	back := planURLFrom(c, planID, "")
 	sep := "?"
 	if strings.Contains(back, "?") {

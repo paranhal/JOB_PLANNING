@@ -17,10 +17,12 @@ const (
 )
 
 type MntCalChip struct {
-	VisitID string
-	Label   string
-	State   string
-	Title   string
+	VisitID  string
+	Label    string
+	State    string
+	Title    string
+	Locked   bool
+	LockHint string
 }
 
 type MntCalGroup struct {
@@ -320,7 +322,7 @@ func siteNameOf(v model.MaintenanceVisit) string {
 	return v.OrgName
 }
 
-func buildDayChips(visits []model.MaintenanceVisit, today string, limit int) (chips []MntCalChip, more int) {
+func buildDayChips(visits []model.MaintenanceVisit, today string, limit int, openLive map[string]bool) (chips []MntCalChip, more int) {
 	if limit < 1 {
 		limit = 3
 	}
@@ -335,17 +337,25 @@ func buildDayChips(visits []model.MaintenanceVisit, today string, limit int) (ch
 		if names != "" {
 			title += " · " + names
 		}
-		chips = append(chips, MntCalChip{
+		ch := MntCalChip{
 			VisitID: v.VisitID,
 			Label:   siteNameOf(v),
 			State:   st,
 			Title:   title,
-		})
+		}
+		if v.Completed {
+			ch.Locked = true
+			ch.LockHint = "완료된 방문은 옮길 수 없습니다"
+		} else if openLive[v.VisitID] {
+			ch.Locked = true
+			ch.LockHint = "작업 중인 방문은 옮길 수 없습니다"
+		}
+		chips = append(chips, ch)
 	}
 	return chips, more
 }
 
-func attachCalendarChips(weeks [][]MntCalDay, today string, selected string) {
+func attachCalendarChips(weeks [][]MntCalDay, today string, selected string, openLive map[string]bool) {
 	for wi := range weeks {
 		for di := range weeks[wi] {
 			d := &weeks[wi][di]
@@ -353,7 +363,7 @@ func attachCalendarChips(weeks [][]MntCalDay, today string, selected string) {
 				continue
 			}
 			d.Selected = d.Date == selected
-			d.Chips, d.More = buildDayChips(d.Visits, today, 3)
+			d.Chips, d.More = buildDayChips(d.Visits, today, 3, openLive)
 		}
 	}
 }

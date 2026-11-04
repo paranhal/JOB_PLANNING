@@ -844,8 +844,8 @@ window.mntAssigneeMulti = function (cfg) {
 {{define "mnt_calendar"}}
 {{$today := .Today}}{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}{{$sh := .QShow}}
 <script type="application/json" id="mnt-day-visits">{{toJSON .DayVisits}}</script>
-<div id="mnt_calendar" class="flex flex-col lg:flex-row gap-3 items-stretch">
-  <div class="card min-w-0 flex-1 overflow-hidden">
+<div id="mnt_calendar" class="flex flex-col lg:flex-row gap-3 lg:gap-0 items-stretch min-w-0 overflow-hidden">
+  <div id="mnt-cal-main" class="card mnt-cal-main">
     <div class="card-header flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         {{if gt $month 1}}
@@ -884,8 +884,9 @@ window.mntAssigneeMulti = function (cfg) {
         {{range .Weeks}}
         <div class="grid grid-cols-7 divide-x divide-line">
           {{range .}}
-          <div class="min-h-[104px] p-1.5 align-top {{if .OtherMonth}}mnt-cal-other{{end}} {{if .Today}}mnt-cal-today{{end}} {{if .Selected}}mnt-cal-selected{{end}}"
+          <div class="mnt-cal-cell min-h-[104px] p-1.5 align-top {{if .OtherMonth}}mnt-cal-other{{end}} {{if .Today}}mnt-cal-today{{end}} {{if .Selected}}mnt-cal-selected{{end}}"
                title="{{.DateTitle}}"
+               {{if .Date}}data-date="{{.Date}}"{{end}}
                {{if and .Date (not .OtherMonth)}}@click="selectDay('{{.Date}}')"{{end}}>
             {{if .Date}}
             <div class="flex items-center justify-between mb-1">
@@ -918,11 +919,15 @@ window.mntAssigneeMulti = function (cfg) {
               {{end}}
             </div>
             {{end}}
-            <div class="space-y-0.5">
+            <div class="mnt-cal-chips space-y-0.5">
               {{$day := .Date}}
               {{range .Chips}}
-              <button type="button" class="mnt-cal-chip-{{.State}} w-full text-left"
-                      title="{{.Title}}" @click.stop="selectDay('{{$day}}')">
+              <button type="button" class="mnt-cal-chip-{{.State}} w-full text-left{{if .Locked}} mnt-cal-chip-locked{{end}}"
+                      data-visit-id="{{.VisitID}}" data-date="{{$day}}"
+                      {{if .Locked}}data-locked="1"{{end}}
+                      {{if and $.CanEdit (not .Locked)}}draggable="true"{{end}}
+                      title="{{if .LockHint}}{{.LockHint}}{{else}}{{.Title}}{{end}}"
+                      @click.stop="selectDay('{{$day}}')">
                 <span class="mnt-cal-dot-{{.State}}"></span>
                 <span class="truncate">{{.Label}}</span>
               </button>
@@ -941,7 +946,9 @@ window.mntAssigneeMulti = function (cfg) {
     </div>
   </div>
 
-  <aside id="mnt-day-panel" class="card w-full lg:w-[285px] lg:shrink-0 flex flex-col">
+  <div id="mnt-cal-splitter" class="mnt-cal-splitter hidden lg:block" role="separator" aria-orientation="vertical" tabindex="0" aria-label="달력과 일자 패널 너비 조절" aria-valuemin="240" aria-valuemax="560" aria-valuenow="285"></div>
+
+  <aside id="mnt-day-panel" class="card w-full lg:w-[285px] lg:shrink-0 flex flex-col min-w-0">
     <div class="card-header">
       <p class="text-ui-xs text-ink-muted">{{.Month}}월</p>
       <p class="text-2xl font-bold text-ink leading-tight" x-text="selectedDay ? selectedDay.slice(-2).replace(/^0/,'') : ''">{{if .SelectedDay}}{{slice .SelectedDay 8}}{{end}}</p>
@@ -1039,6 +1046,8 @@ window.mntAssigneeMulti = function (cfg) {
     </div>
   </aside>
 </div>
+<script src="/static/js/mnt_calendar_resize.js?v={{.AssetQuery}}"></script>
+<script src="/static/js/mnt_calendar_dnd.js?v={{.AssetQuery}}"></script>
 {{end}}
 
 {{define "mnt_kanban"}}

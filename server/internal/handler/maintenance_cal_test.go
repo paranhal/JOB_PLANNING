@@ -113,7 +113,7 @@ func TestBuildDayChipsMore(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		vs = append(vs, model.MaintenanceVisit{VisitID: "v", ShortName: "사이트", VisitDate: "2026-10-10", Assignee: "김"})
 	}
-	chips, more := buildDayChips(vs, "2026-10-01", 3)
+	chips, more := buildDayChips(vs, "2026-10-01", 3, nil)
 	if len(chips) != 3 || more != 2 {
 		t.Fatalf("chips=%d more=%d", len(chips), more)
 	}
