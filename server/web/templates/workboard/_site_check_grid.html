@@ -1,0 +1,42 @@
+{{define "wb_site_check_grid"}}
+{{$t := .Task}}
+<div id="site-check-grid" class="space-y-2">
+  <p class="text-sm mb-2">달성률 <span class="font-medium">{{.SiteCheckRate}}</span></p>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-xs" data-site-check-grid>
+      <thead>
+        <tr>
+          <th class="text-left pr-2 py-1">사이트</th>
+          {{range .SiteCheckDays}}<th class="px-1 py-1 whitespace-nowrap">{{.}}</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range $s := .WorkSites}}
+        <tr>
+          <td class="pr-2 py-1">{{$s.SiteName}}</td>
+          {{range $d := $.SiteCheckDays}}
+          {{$k := printf "%s|%s" $s.SiteID $d}}
+          <td class="px-1 py-1">
+            <form method="post" action="/workboard/tasks/{{$t.TaskID}}/site-check"
+                  hx-post="/workboard/tasks/{{$t.TaskID}}/site-check"
+                  hx-trigger="change"
+                  hx-target="#site-check-grid"
+                  hx-swap="outerHTML">
+              <input type="hidden" name="customer_id" value="{{$s.SiteID}}">
+              <input type="hidden" name="work_date" value="{{$d}}">
+              {{if $.BackURL}}<input type="hidden" name="back" value="{{$.BackURL}}">{{end}}
+              <select name="status" class="border rounded px-1 py-0.5" onchange="if(!window.htmx)this.form.submit()">
+                <option value="pending" {{if or (not (index $.SiteCheckHit $k)) (eq (index $.SiteCheckHit $k) "pending")}}selected{{end}}>미완</option>
+                <option value="done" {{if eq (index $.SiteCheckHit $k) "done"}}selected{{end}}>완료</option>
+                <option value="na" {{if eq (index $.SiteCheckHit $k) "na"}}selected{{end}}>해당없음</option>
+              </select>
+            </form>
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

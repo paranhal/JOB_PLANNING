@@ -40,7 +40,7 @@
                 this.mntHint = j.hint || '';
               } catch (e) { this.mntHint = ''; }
             }
-          }, siteMultiPicker({}))">
+          }, siteMultiPicker({ max: 100 }))">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
       <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; workType='admin'; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>
@@ -70,7 +70,7 @@
         </div>
         <input name="customer_name" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="목록에 없으면 직접입력 (예: 충남교육청)">
         <div class="mt-3" x-show="workType !== 'sales'" x-cloak>
-          {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "여러 사이트를 고르면 이 업무에 함께 연결됩니다. 비우면 위 거래처만 씁니다."}}
+          {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "여러 사이트를 고르면 이 업무에 함께 연결됩니다. 비우면 위 거래처만 씁니다. 최대 100곳."}}
         </div>
       </div>
       <div>
@@ -93,6 +93,7 @@
         <p class="px-3 py-2 text-sm text-ink bg-hover border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-ink-subtle">저장 시 자동</span></p>
       </div>
       {{template "wb_period_dates" dict "ShowUndetermined" true "Hint" "비우면 시작일과 같은 하루. 시작일 시작시간부터 종료일 종료시간까지 이어지는 하나의 업무입니다."}}
+      {{template "wb_track_progress" dict "Checked" true}}
       <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
         <p class="text-xs font-medium text-ink">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-ink-subtle font-normal">(분 단위)</span></p>
         <div class="grid grid-cols-2 gap-3">
@@ -321,7 +322,7 @@
               if (k === 'build') this.subtype = 'build';
               else if (k === 'construction') this.subtype = 'construction';
             }
-          }, siteMultiPicker({}))">
+          }, siteMultiPicker({ max: 100 }))">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
       <input type="hidden" name="work_type" value="project_work">
       <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
@@ -358,8 +359,9 @@
           {{if .ProjectPickerWork}}{{template "project_picker" .ProjectPickerWork}}{{else if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
         </div>
       </div>
-      {{template "site_multi_picker" dict "Label" "대상 사이트"}}
+      {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "사이트는 최대 100곳입니다."}}
       {{template "wb_period_dates" dict "ShowUndetermined" false "Hint" "비우면 시작일과 같은 하루. 시작일 시작시간부터 종료일 종료시간까지 이어지는 하나의 업무입니다. 날마다 같은 시간은 반복 옵션을 쓰세요."}}
+      {{template "wb_track_progress" dict "Checked" true}}
       <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
         <p class="text-xs font-medium text-ink">시작·종료 시간 <span class="text-ink-subtle font-normal">(지정할 때만)</span></p>
         <div class="grid grid-cols-2 gap-3">

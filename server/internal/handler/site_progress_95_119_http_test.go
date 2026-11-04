@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -168,8 +169,8 @@ func Test95_119_PoolSearchAndSiteCheck(t *testing.T) {
 		t.Fatalf("체크 %d", chk.Code)
 	}
 	show2 := doGet(t, e, "/workboard/tasks/"+id)
-	if !strings.Contains(show2.Body.String(), "25%") {
-		t.Fatal("1/4 달성률 아님")
+	if !strings.Contains(show2.Body.String(), "50%") {
+		t.Fatal("사이트당 1회 1/2 달성률 아님")
 	}
 	asID := "WT-AS119"
 	if _, err := db.Exec(`INSERT INTO work_tasks(task_id,work_type,title,status,work_date,due_date,org_id,source_type)
@@ -197,4 +198,254 @@ func Test95_119_SiteNotRequired(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("사이트 없이 저장 %d", rec.Code)
 	}
+}
+
+func Test95_119A_TrackProgressCheckbox(t *testing.T) {
+	e, repo, _, db := newProjectWorkHarness(t)
+	h := New(db)
+	mount119(e, h)
+	page := doGet(t, e, "/workboard/register?view=day")
+	if page.Code != http.StatusOK {
+		t.Fatalf("register %d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, "달성률 계산") || !strings.Contains(body, `name="track_progress"`) || !strings.Contains(body, "checked") {
+		t.Fatal("여러 날 폼에 달성률 계산 기본 체크 없음")
+	}
+	if !strings.Contains(body, "data-track-progress") {
+		t.Fatal("data-track-progress 없음")
+	}
+	off := doForm(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"project_work"}, "title": {"집계제외"}, "work_subtype": {"other"},
+		"work_date": {"2026-11-01"}, "due_date": {"2026-11-02"}, "assignee": {"관리자"},
+		"site_id": {"C-high", "C-mid"}, "project_id": {"WP-O01"}, "track_progress": {"0"},
+	})
+	if off.Code != http.StatusSeeOther {
+		t.Fatalf("해제 저장 %d", off.Code)
+	}
+	id := lastTaskID(t, repo, "집계제외")
+	if repo.TrackProgress(id) {
+		t.Fatal("해제했는데 집계 대상")
+	}
+	show := doGet(t, e, "/workboard/tasks/"+id)
+	if !strings.Contains(show.Body.String(), "—") {
+		t.Fatal("집계 제외 시 달성률이 — 가 아님")
+	}
+	if !strings.Contains(show.Body.String(), "data-site-check-grid") {
+		t.Fatal("체크 그리드가 사라져서는 안 됨")
+	}
+	on := doForm(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"project_work"}, "title": {"집계포함"}, "work_subtype": {"other"},
+		"work_date": {"2026-11-01"}, "due_date": {"2026-11-02"}, "assignee": {"관리자"},
+		"site_id": {"C-high"}, "project_id": {"WP-O01"}, "track_progress": {"1"},
+	})
+	if on.Code != http.StatusSeeOther {
+		t.Fatalf("체크 저장 %d", on.Code)
+	}
+	id2 := lastTaskID(t, repo, "집계포함")
+	if !repo.TrackProgress(id2) {
+		t.Fatal("기본 체크 저장이 집계에서 빠짐")
+	}
+}
+
+func Test95_119A_SiteCap100(t *testing.T) {
+	e, repo, _, db := newProjectWorkHarness(t)
+	okForm := url.Values{
+		"work_type": {"project_work"}, "title": {"100곳"}, "work_subtype": {"other"},
+		"work_date": {"2026-11-04"}, "assignee": {"관리자"}, "project_id": {"WP-O01"},
+	}
+	var ids []string
+	for i := 1; i <= 100; i++ {
+		id := fmt.Sprintf("C-ok%03d", i)
+		name := fmt.Sprintf("허용교%03d", i)
+		if _, err := db.Exec(`INSERT INTO customers(customer_id,org_name,official_name,is_active,org_id,party_kind)
+			VALUES(?,?,?,1,?,'customer')`, id, name, name, model.OrgIDLibrary); err != nil {
+			t.Fatal(err)
+		}
+		okForm.Add("site_id", id)
+		ids = append(ids, id)
+	}
+	ok := doForm(t, e, "/workboard/tasks", okForm)
+	if ok.Code != http.StatusSeeOther {
+		t.Fatalf("100곳 %d %s", ok.Code, ok.Body.String())
+	}
+	tid := lastTaskID(t, repo, "100곳")
+	sites, err := repo.ListTaskSites(tid)
+	if err != nil || len(sites) != 100 {
+		t.Fatalf("저장 사이트 %d err=%v", len(sites), err)
+	}
+	_ = ids
+}
+
+func Test95_119A_RecurrenceOncePerSite(t *testing.T) {
+	e, repo, _, db := newProjectWorkHarness(t)
+	h := New(db)
+	mount119(e, h)
+	save := doForm(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"project_work"}, "title": {"반복상위"}, "work_subtype": {"other"},
+		"work_date": {"2026-11-01"}, "due_date": {"2026-11-10"}, "assignee": {"관리자"},
+		"site_id": {"C-high"}, "project_id": {"WP-O01"}, "track_progress": {"1"},
+	})
+	if save.Code != http.StatusSeeOther {
+		t.Fatalf("저장 %d", save.Code)
+	}
+	parentID := lastTaskID(t, repo, "반복상위")
+	if _, err := db.Exec(`UPDATE work_tasks SET recurrence_role='parent' WHERE task_id=?`, parentID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks(task_id,work_type,title,status,work_date,due_date,org_id,parent_task_id,recurrence_role,project_id)
+		VALUES('WT-occ1','project_work','회차1','waiting','2026-11-03','2026-11-03',?,?,'occurrence','WP-O01'),
+		      ('WT-occ2','project_work','회차2','waiting','2026-11-05','2026-11-05',?,?,'occurrence','WP-O01')`,
+		model.OrgIDLibrary, parentID, model.OrgIDLibrary, parentID); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertSiteCheck("WT-occ1", "C-high", "2026-11-03", model.SiteCheckDone, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpsertSiteCheck("WT-occ2", "C-high", "2026-11-05", model.SiteCheckDone, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	sites, err := repo.ListTaskSites(parentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, total, lab := repo.TaskSiteCheckRate(parentID, "2026-11-01", "2026-11-10", sites)
+	if done != 1 || total != 1 || lab != "100%" {
+		t.Fatalf("이중 집계 done=%d total=%d lab=%s", done, total, lab)
+	}
+	rows, err := repo.ListProjectSiteWorkProgress("WP-O01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.CustomerID == "C-high" && row.Done > 1 {
+			t.Fatalf("사업 탭 사이트 완료가 %d회", row.Done)
+		}
+	}
+}
+
+func Test95_119A_MigrationReapplyEmptyTab(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "reapply.db")
+	db, err := repository.InitDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	db, err = repository.InitDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE name IN ('work_task_site_progress','work_task_progress_flag')`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("105 표 n=%d err=%v", n, err)
+	}
+	users := repository.NewUserRepo(db)
+	users.EnsureAdmin(HashPassword("admin"))
+	if _, err := db.Exec(`INSERT INTO work_projects(project_id,name,status,org_id,project_kind,project_kind_set)
+		VALUES('WP-empty','빈사이트','active',?,'build',1)`, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	AttachHTTPErrorHandler(e)
+	h := New(db)
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/projects/:id", h.Project.Show)
+	page := doGet(t, e, "/projects/WP-empty")
+	if page.Code != http.StatusOK {
+		t.Fatalf("상세 %d %s", page.Code, page.Body.String())
+	}
+	if !strings.Contains(page.Body.String(), "data-site-progress-tab") || !strings.Contains(page.Body.String(), "등록된 사이트가 없습니다") {
+		t.Fatal("사이트 0건 탭 안내 없음")
+	}
+}
+
+func Test95_119A_HTMXAndPermissionMatrix(t *testing.T) {
+	e, repo, users, db := newProjectWorkHarness(t)
+	h := New(db)
+	mount119(e, h)
+	save := doForm(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"project_work"}, "title": {"권한행렬"}, "work_subtype": {"other"},
+		"work_date": {"2026-11-01"}, "due_date": {"2026-11-02"}, "assignee": {"관리자"},
+		"site_id": {"C-high"}, "project_id": {"WP-O01"}, "track_progress": {"1"},
+	})
+	if save.Code != http.StatusSeeOther {
+		t.Fatalf("저장 %d", save.Code)
+	}
+	id := lastTaskID(t, repo, "권한행렬")
+	hx := httptest.NewRequest(http.MethodPost, "/workboard/tasks/"+id+"/site-check", strings.NewReader(url.Values{
+		"customer_id": {"C-high"}, "work_date": {"2026-11-01"}, "status": {"done"},
+	}.Encode()))
+	hx.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	hx.Header.Set("HX-Request", "true")
+	hx.AddCookie(jwtCookie(t))
+	hrec := httptest.NewRecorder()
+	e.ServeHTTP(hrec, hx)
+	if hrec.Code != http.StatusOK {
+		t.Fatalf("HX 체크 %d %s", hrec.Code, hrec.Body.String())
+	}
+	if !strings.Contains(hrec.Body.String(), "id=\"site-check-grid\"") || !strings.Contains(hrec.Body.String(), "100%") {
+		t.Fatalf("HX 조각 아님: %s", hrec.Body.String())
+	}
+
+	clPick := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieRole(t, model.RoleCLevel))
+	if clPick.Code == http.StatusOK && strings.Contains(clPick.Body.String(), "선택한 학교 추가") {
+		t.Fatal("C-Level이 사이트 등록 가능")
+	}
+	clAdd := doFormUser(t, e, "/projects/WP-O01/sites/add-schools", url.Values{"customer_id": {"C-pct"}}, jwtCookieRole(t, model.RoleCLevel))
+	if clAdd.Code != http.StatusForbidden && clAdd.Code != http.StatusSeeOther {
+		t.Fatalf("C-Level 추가 %d", clAdd.Code)
+	}
+	if clAdd.Code == http.StatusSeeOther {
+		t.Fatal("C-Level 사이트 추가가 통과함")
+	}
+	clChk := doFormUser(t, e, "/workboard/tasks/"+id+"/site-check", url.Values{
+		"customer_id": {"C-high"}, "work_date": {"2026-11-02"}, "status": {"done"},
+	}, jwtCookieRole(t, model.RoleCLevel))
+	if clChk.Code != http.StatusForbidden {
+		t.Fatalf("C-Level 체크 %d", clChk.Code)
+	}
+	roChk := doFormUser(t, e, "/workboard/tasks/"+id+"/site-check", url.Values{
+		"customer_id": {"C-high"}, "work_date": {"2026-11-02"}, "status": {"done"},
+	}, jwtCookieReadOnly(t, "tech"))
+	if roChk.Code != http.StatusForbidden {
+		t.Fatalf("읽기전용 체크 %d", roChk.Code)
+	}
+	oa03, err := users.GetByUsername("oa03")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := doFormUser(t, e, "/workboard/tasks/"+id+"/site-check", url.Values{
+		"customer_id": {"C-high"}, "work_date": {"2026-11-02"}, "status": {"done"},
+	}, jwtCookieUser(t, oa03))
+	if other.Code != http.StatusForbidden && other.Code != http.StatusNotFound {
+		t.Fatalf("타 조직 체크 %d", other.Code)
+	}
+	vs := model.User{Username: "vs119a", PasswordHash: HashPassword("password10"), FullName: "비젼119",
+		Role: model.RoleVisionAdmin, IsActive: true, ProfileDone: true}
+	if err := users.Create(&vs); err != nil {
+		t.Fatal(err)
+	}
+	vu, _ := users.GetByUsername("vs119a")
+	vPick := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieUser(t, vu))
+	if vPick.Code != http.StatusOK || !strings.Contains(vPick.Body.String(), "선택한 학교 추가") {
+		t.Fatalf("비젼 pick %d", vPick.Code)
+	}
+}
+
+func lastTaskID(t *testing.T, repo *repository.WBRepo, title string) string {
+	t.Helper()
+	tasks, err := repo.ListTasks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := len(tasks) - 1; i >= 0; i-- {
+		if tasks[i].Title == title {
+			return tasks[i].TaskID
+		}
+	}
+	t.Fatalf("업무 없음: %s", title)
+	return ""
 }

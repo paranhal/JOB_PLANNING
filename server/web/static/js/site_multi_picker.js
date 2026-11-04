@@ -20,7 +20,10 @@
         if (!s || !s.site_id) return;
         if (this.excludeId && s.site_id === this.excludeId) return;
         if ((this.sites || []).find(function (x) { return x.site_id === s.site_id; })) return;
-        if ((this.sites || []).length >= this.maxSites) return;
+        if ((this.sites || []).length >= this.maxSites) {
+          this.hint = '사이트는 최대 ' + this.maxSites + '곳입니다';
+          return;
+        }
         var row = Object.assign({}, s);
         if (this.extraKey && row[this.extraKey] == null) row[this.extraKey] = '';
         this.sites = (this.sites || []).concat([row]);

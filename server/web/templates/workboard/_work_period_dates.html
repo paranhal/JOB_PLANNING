@@ -30,3 +30,15 @@
   </div>
 </div>
 {{end}}
+{{define "wb_track_progress"}}
+<template x-if="preWork && preDue && preWork !== preDue">
+  <div class="mt-2" data-track-progress>
+    <input type="hidden" name="track_progress" value="0">
+    <label class="flex items-center gap-1.5 text-sm text-ink">
+      <input type="checkbox" name="track_progress" value="1" class="rounded" {{if .Checked}}checked{{end}}>
+      달성률 계산
+    </label>
+    <p class="text-[11px] text-ink-subtle mt-0.5">해제하면 사이트 완료 체크는 남고 달성률 집계에서만 빠집니다.</p>
+  </div>
+</template>
+{{end}}

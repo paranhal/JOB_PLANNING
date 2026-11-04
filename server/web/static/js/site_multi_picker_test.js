@@ -19,6 +19,13 @@ for (let i = 0; i < 25; i++) {
   p.pick({ site_id: 'S' + i, site_name: 's' + i });
 }
 assert(p.sites.length === 20, 'max 20 got ' + p.sites.length);
+assert(p.hint.indexOf('최대 20곳') >= 0, 'cap hint');
+const r = siteMultiPicker({ max: 100 });
+for (let i = 0; i < 101; i++) {
+  r.pick({ site_id: 'T' + i, site_name: 't' + i });
+}
+assert(r.sites.length === 100, 'max 100 got ' + r.sites.length);
+assert(r.hint.indexOf('최대 100곳') >= 0, 'cap 100 hint');
 const q = siteMultiPicker({ excludeId: 'X' });
 q.pick({ site_id: 'X', site_name: '제외' });
 assert(q.sites.length === 0, 'exclude');

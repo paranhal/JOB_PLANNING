@@ -9,6 +9,9 @@ import (
 	"customer-support/internal/model"
 )
 
+// MaxWorkTaskSites 한 업무에 연결하는 사이트 상한(95-119A). AS 추가 사이트 20과 별개.
+const MaxWorkTaskSites = 100
+
 type WorkTaskSite struct {
 	SiteID        string `json:"site_id"`
 	CustomerID    string `json:"-"`
@@ -83,8 +86,8 @@ func uniqueCustomerIDs(ids []string, rejectDup bool) ([]string, error) {
 		seen[id] = true
 		out = append(out, id)
 	}
-	if len(out) > 20 {
-		return nil, fmt.Errorf("사이트는 최대 20곳입니다")
+	if len(out) > MaxWorkTaskSites {
+		return nil, fmt.Errorf("사이트는 최대 %d곳입니다", MaxWorkTaskSites)
 	}
 	return out, nil
 }

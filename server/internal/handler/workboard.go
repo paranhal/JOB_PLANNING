@@ -2135,6 +2135,7 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			return err
 		}
 	}
+	h.applyTrackProgressFromForm(c, t)
 	skip := overlapSkipDateSet(c)
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
 		dates, err := collectDatesFromForm(mode, c.FormValue("daily_from"), c.FormValue("daily_to"), c.FormValue("sub_dates"))
@@ -2527,6 +2528,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			return err
 		}
 	}
+	if registerScope {
+		h.applyTrackProgressFromForm(c, t)
+	}
 	if existing.SourceType == "" && registerScope {
 		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
 	}
@@ -2754,7 +2758,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"SiteCheckDays":    model.DatesInclusive(t.WorkDate, t.DueDate),
 		"SiteCheckRate":    siteCheckRateOf(h.repo, t, workSites),
 		"SiteCheckHit":     siteCheckHitOf(h.repo, t.TaskID),
-		"CanCheckSites":    canCheckTaskSiteProgress(c, t) && h.repo.TrackProgress(t.TaskID),
+		"CanCheckSites":    canCheckTaskSiteProgress(c, t),
+		"TrackProgress":    h.repo.TrackProgress(t.TaskID),
 		"Customers":        customers,
 		"CanWrite":         canWrite,
 		"CanPlanEdit":      canPlanEditTask(c, t),
@@ -2957,8 +2962,8 @@ func (h *WorkboardHandler) saveAdminTaskSites(c echo.Context, t *model.WorkTask,
 	if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if len(siteIDs) > 20 {
-		return echo.NewHTTPError(http.StatusBadRequest, "사이트는 최대 20곳입니다")
+	if len(siteIDs) > repository.MaxWorkTaskSites {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("사이트는 최대 %d곳입니다", repository.MaxWorkTaskSites))
 	}
 	if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
 		return err
@@ -2984,6 +2989,25 @@ func applyCustomerForm(t *model.WorkTask, c echo.Context) {
 	if t.CustomerID != "" {
 		t.CustomerName = ""
 	}
+}
+
+func (h *WorkboardHandler) applyTrackProgressFromForm(c echo.Context, t *model.WorkTask) {
+	if h == nil || h.repo == nil || t == nil {
+		return
+	}
+	if !model.TaskTracksSiteProgress(t.WorkType, t.SourceType) {
+		return
+	}
+	days := model.DatesInclusive(t.WorkDate, t.DueDate)
+	if len(days) < 2 {
+		return
+	}
+	_ = c.Request().ParseForm()
+	vals := c.Request().Form["track_progress"]
+	if len(vals) == 0 {
+		return
+	}
+	_ = h.repo.SetTrackProgress(t.TaskID, strings.TrimSpace(vals[len(vals)-1]) == "1")
 }
 
 func siteCheckRateOf(repo *repository.WBRepo, t *model.WorkTask, sites []repository.WorkTaskSite) string {

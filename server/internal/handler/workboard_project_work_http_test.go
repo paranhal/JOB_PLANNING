@@ -226,7 +226,7 @@ func TestProjectWorkModalFiveKindsAndSave(t *testing.T) {
 }
 
 func TestProjectWorkSitesAndSearch(t *testing.T) {
-	e, repo, _ := newProjectWorkServer(t)
+	e, repo, _, db := newProjectWorkHarness(t)
 	rec := doForm(t, e, "/workboard/tasks", url.Values{
 		"work_type":    {"project_work"},
 		"title":        {"설치"},
@@ -288,14 +288,22 @@ func TestProjectWorkSitesAndSearch(t *testing.T) {
 		t.Fatalf("중복 status=%d", dupID.Code)
 	}
 	tooMany := url.Values{
-		"work_type": {"project_work"}, "title": {"21곳"}, "work_subtype": {"other"},
+		"work_type": {"project_work"}, "title": {"101곳"}, "work_subtype": {"other"},
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"},
 	}
-	for i := 1; i <= 21; i++ {
-		tooMany.Add("site_id", fmt.Sprintf("C-sr%02d", i))
+	for i := 1; i <= 101; i++ {
+		id := fmt.Sprintf("C-cap%03d", i)
+		name := fmt.Sprintf("상한교%03d", i)
+		if _, err := db.Exec(`INSERT INTO customers(customer_id,org_name,official_name,is_active,org_id,party_kind)
+			VALUES(?,?,?,1,?,'customer')`, id, name, name, model.OrgIDLibrary); err != nil {
+			t.Fatal(err)
+		}
+		tooMany.Add("site_id", id)
 	}
 	if got := doForm(t, e, "/workboard/tasks", tooMany); got.Code != http.StatusBadRequest {
-		t.Fatalf("21곳 status=%d", got.Code)
+		t.Fatalf("101곳 status=%d body=%s", got.Code, got.Body.String())
+	} else if !strings.Contains(got.Body.String(), "최대 100곳") {
+		t.Fatalf("101곳 안내 없음: %s", got.Body.String())
 	}
 	cross := doForm(t, e, "/workboard/tasks", url.Values{
 		"work_type": {"project_work"}, "title": {"타조직"}, "work_subtype": {"other"},

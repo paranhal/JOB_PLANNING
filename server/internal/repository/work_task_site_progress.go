@@ -186,18 +186,94 @@ func (r *WBRepo) ListSiteChecks(taskID string) ([]SiteProgressCell, error) {
 	return out, rows.Err()
 }
 
+func (r *WBRepo) progressFamilyIDs(taskID string) (root string, ids []string) {
+	taskID = strings.TrimSpace(taskID)
+	root = taskID
+	if taskID == "" || r == nil || r.db == nil {
+		if taskID != "" {
+			ids = []string{taskID}
+		}
+		return root, ids
+	}
+	var role, parent string
+	_ = r.db.QueryRow(`SELECT COALESCE(recurrence_role,''), COALESCE(parent_task_id,'') FROM work_tasks WHERE task_id=?`, taskID).Scan(&role, &parent)
+	if role == model.RecurrenceRoleOccurrence && strings.TrimSpace(parent) != "" {
+		root = strings.TrimSpace(parent)
+	}
+	ids = []string{root}
+	rows, err := r.db.Query(`SELECT task_id FROM work_tasks WHERE parent_task_id=? AND COALESCE(recurrence_role,'')=?`,
+		root, model.RecurrenceRoleOccurrence)
+	if err != nil {
+		return root, ids
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return root, ids
+		}
+		id = strings.TrimSpace(id)
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return root, ids
+}
+
+func (r *WBRepo) ListSiteChecksFamily(taskID string) ([]SiteProgressCell, error) {
+	_, ids := r.progressFamilyIDs(taskID)
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var out []SiteProgressCell
+	seen := map[string]bool{}
+	for _, id := range ids {
+		rows, err := r.ListSiteChecks(id)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			k := row.CustomerID + "|" + row.WorkDate + "|" + row.Status
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}
+
 func (r *WBRepo) TaskSiteCheckRate(taskID, workDate, dueDate string, sites []WorkTaskSite) (done, total int, label string) {
-	if r == nil || !r.TrackProgress(taskID) {
+	root, _ := r.progressFamilyIDs(taskID)
+	if r == nil || !r.TrackProgress(root) {
 		return 0, 0, "—"
 	}
-	days := model.DatesInclusive(workDate, dueDate)
-	if len(days) == 0 || len(sites) == 0 {
+	if len(sites) == 0 {
+		sites, _ = r.ListTaskSites(root)
+	}
+	if len(sites) == 0 {
 		return 0, 0, "—"
 	}
-	checks, _ := r.ListSiteChecks(taskID)
-	hit := map[string]string{}
+	_ = workDate
+	_ = dueDate
+	checks, _ := r.ListSiteChecksFamily(taskID)
+	doneSite := map[string]bool{}
+	naSite := map[string]bool{}
+	otherSite := map[string]bool{}
 	for _, c := range checks {
-		hit[c.CustomerID+"|"+c.WorkDate] = c.Status
+		cid := strings.TrimSpace(c.CustomerID)
+		if cid == "" {
+			continue
+		}
+		switch c.Status {
+		case model.SiteCheckDone:
+			doneSite[cid] = true
+		case model.SiteCheckNA:
+			naSite[cid] = true
+		default:
+			otherSite[cid] = true
+		}
 	}
 	for _, s := range sites {
 		cid := strings.TrimSpace(s.CustomerID)
@@ -207,16 +283,15 @@ func (r *WBRepo) TaskSiteCheckRate(taskID, workDate, dueDate string, sites []Wor
 		if cid == "" {
 			continue
 		}
-		for _, d := range days {
-			st := hit[cid+"|"+d]
-			if st == model.SiteCheckNA {
-				continue
-			}
+		if doneSite[cid] {
 			total++
-			if st == model.SiteCheckDone {
-				done++
-			}
+			done++
+			continue
 		}
+		if naSite[cid] && !otherSite[cid] {
+			continue
+		}
+		total++
 	}
 	return done, total, model.SiteCheckRateLabel(done, total)
 }
@@ -229,15 +304,24 @@ func (r *WBRepo) ListProjectSiteWorkProgress(projectID string) ([]ProjectSiteWor
 	rows, err := r.db.Query(`
 		SELECT ps.customer_id, COALESCE(NULLIF(TRIM(ps.site_name),''), c.org_name),
 		       COALESCE(ps.region,''),
-		       COUNT(w.task_id),
-		       SUM(CASE WHEN p.status='done' THEN 1 ELSE 0 END)
+		       COUNT(DISTINCT t.task_id),
+		       COUNT(DISTINCT CASE WHEN p.task_id IS NOT NULL THEN t.task_id END)
 		FROM project_sites ps
 		JOIN customers c ON c.customer_id=ps.customer_id
 		LEFT JOIN work_task_sites w ON w.customer_id=ps.customer_id
 		LEFT JOIN work_tasks t ON t.task_id=w.task_id AND t.project_id=ps.project_id
 		  AND COALESCE(t.work_type,'') NOT IN ('as','maintenance')
 		  AND COALESCE(t.source_type,'') NOT IN ('as','maintenance')
-		LEFT JOIN work_task_site_progress p ON p.task_id=t.task_id AND p.customer_id=ps.customer_id
+		  AND COALESCE(t.recurrence_role,'') != 'occurrence'
+		  AND NOT EXISTS (SELECT 1 FROM work_task_progress_flag f WHERE f.task_id=t.task_id AND f.track=0)
+		LEFT JOIN work_task_site_progress p ON p.customer_id=ps.customer_id AND p.status='done'
+		  AND (
+		    p.task_id=t.task_id
+		    OR p.task_id IN (
+		      SELECT o.task_id FROM work_tasks o
+		      WHERE o.parent_task_id=t.task_id AND COALESCE(o.recurrence_role,'')='occurrence'
+		    )
+		  )
 		WHERE ps.project_id=? AND ps.is_active=1 AND ps.status != 'excluded'
 		GROUP BY ps.customer_id
 		ORDER BY 2`, projectID)

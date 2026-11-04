@@ -142,6 +142,7 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
 		return err
 	}
+	h.applyTrackProgressFromForm(c, t)
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 }
 
@@ -168,6 +169,20 @@ func (h *WorkboardHandler) SaveSiteCheck(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	back := strings.TrimSpace(c.FormValue("back"))
+	if c.Request().Header.Get("HX-Request") == "true" {
+		workSites, _ := h.repo.ListTaskSites(t.TaskID)
+		return c.Render(http.StatusOK, "workboard/site_check_grid.html", map[string]interface{}{
+			"Title":         "사이트 진행",
+			"HideNav":       true,
+			"Task":          t,
+			"WorkSites":     workSites,
+			"SiteCheckDays": model.DatesInclusive(t.WorkDate, t.DueDate),
+			"SiteCheckRate": siteCheckRateOf(h.repo, t, workSites),
+			"SiteCheckHit":  siteCheckHitOf(h.repo, t.TaskID),
+			"CanCheckSites": true,
+			"BackURL":       back,
+		})
+	}
 	loc := "/workboard/tasks/" + t.TaskID + "?ok=saved"
 	if back != "" {
 		loc += "&back=" + url.QueryEscape(back)
