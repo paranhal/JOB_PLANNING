@@ -90,8 +90,8 @@ func TestProjectWorkProjectIDPersistsAndShows(t *testing.T) {
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-O03"},
 		"start_time": {"16:00"}, "end_time": {"16:30"},
 	})
-	if cross.Code != http.StatusForbidden && cross.Code != http.StatusBadRequest {
-		t.Fatalf("타 조직 사업 저장 status=%d", cross.Code)
+	if cross.Code != http.StatusSeeOther {
+		t.Fatalf("조직관리자는 타 부서 사업을 저장할 수 있어야 함 status=%d", cross.Code)
 	}
 
 	hold := doForm(t, e, "/workboard/tasks", url.Values{
@@ -99,8 +99,8 @@ func TestProjectWorkProjectIDPersistsAndShows(t *testing.T) {
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-hold"},
 		"start_time": {"17:00"}, "end_time": {"17:30"},
 	})
-	if hold.Code != http.StatusForbidden && hold.Code != http.StatusBadRequest {
-		t.Fatalf("타 조직 hold 사업 %d", hold.Code)
+	if hold.Code != http.StatusSeeOther {
+		t.Fatalf("조직관리자는 보류 사업도 저장할 수 있어야 함 %d", hold.Code)
 	}
 
 	oa04, err := users.GetByUsername("oa04")

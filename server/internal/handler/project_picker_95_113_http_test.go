@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -67,7 +66,7 @@ func Test95_113_T1_RenderPickerAndClick(t *testing.T) {
 func Test95_113_T2_PendingAndStartBlocked(t *testing.T) {
 	e, _, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "p113t2.db"))
 	ck := jwtCookieUser(t, me)
-	day := time.Now().AddDate(0, 0, 1).Format(dateLayout)
+	const day = "2026-11-05"
 	rec := doFormWith(t, e, "/workboard/tasks", url.Values{
 		"work_type":             {"support"},
 		"title":                 {"매칭대기"},
@@ -117,7 +116,7 @@ func Test95_113_T3_SaveVisibleOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	ck := jwtCookieUser(t, me)
-	day := time.Now().AddDate(0, 0, 1).Format(dateLayout)
+	const day = "2026-11-05"
 	deny := doFormWith(t, e, "/workboard/tasks", url.Values{
 		"work_type":  {"admin"},
 		"title":      {"타부서거절"},

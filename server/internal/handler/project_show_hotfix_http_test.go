@@ -138,14 +138,15 @@ func TestProjectShowRenderRolesAndListRows(t *testing.T) {
 	}
 
 	workBtns := []string{"일일 업무 현황", "이 사업으로 업무 등록"}
+	noReg := []string{"일일 업무 현황", "이 사업에 업무를 등록할 권한이 없습니다"}
 	assertShow(t, "/projects/"+linked.ProjectID, "영업연결상세", ck.oa01, append(workBtns, "SP-HOTFIX", `href="/sales/SP-HOTFIX"`), nil)
 	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.oa01, append(workBtns, "영업 없이 직접 등록 · 파이프라인 미연결", "수정"), nil)
 	assertShow(t, "/projects/"+missing.ProjectID, "영업결번상세", ck.oa01, []string{"연결 번호는 있으나 영업 건이 없습니다"}, nil)
 
 	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.oa03, append(workBtns, "유관"), []string{`href="/projects/` + direct.ProjectID + `/edit"`})
-	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.cl, workBtns, []string{`href="/projects/` + direct.ProjectID + `/edit"`})
+	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.cl, noReg, []string{`href="/projects/` + direct.ProjectID + `/edit"`, "이 사업으로 업무 등록"})
 	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.vs, append(workBtns, "수정"), nil)
-	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.oa02, workBtns, []string{`href="/projects/` + direct.ProjectID + `/edit"`})
+	assertShow(t, "/projects/"+direct.ProjectID, "직접등록상세", ck.oa02, noReg, []string{`href="/projects/` + direct.ProjectID + `/edit"`, "이 사업으로 업무 등록"})
 
 	list := doGetWith(t, e, "/projects/registry", ck.vs)
 	if list.Code != http.StatusOK {

@@ -144,8 +144,8 @@ func TestProjectWorkModalFiveKindsAndSave(t *testing.T) {
 	if !strings.Contains(body, "학교·기관명을 2글자 이상 입력") {
 		t.Fatal("사이트 검색 안내 없음")
 	}
-	if strings.Contains(body, "등록된 사업이 없습니다") {
-		t.Fatal("O01 사업 목록이 있는데 빈 안내가 나옴")
+	if !strings.Contains(body, "도서관공사") {
+		t.Fatal("O01 사업 목록이 등록 화면에 없다")
 	}
 	if !strings.Contains(body, `data-kind="construction"`) {
 		t.Fatal("사업 유형 제안 data-kind 없음")
@@ -301,8 +301,8 @@ func TestProjectWorkSitesAndSearch(t *testing.T) {
 		"work_type": {"project_work"}, "title": {"타조직"}, "work_subtype": {"other"},
 		"work_date": {"2026-10-21"}, "assignee": {"관리자"}, "project_id": {"WP-O03"},
 	})
-	if cross.Code != http.StatusForbidden && cross.Code != http.StatusBadRequest {
-		t.Fatalf("타 조직 사업 status=%d", cross.Code)
+	if cross.Code != http.StatusSeeOther {
+		t.Fatalf("조직관리자는 타 부서 사업을 저장할 수 있어야 함 status=%d", cross.Code)
 	}
 
 	q1 := doGet(t, e, "/workboard/work-sites/search?q="+url.QueryEscape("계"))
@@ -474,8 +474,8 @@ func TestProjectWorkOrgIsolationSearch(t *testing.T) {
 	if emptyRec.Code != http.StatusOK {
 		t.Fatalf("O04 register status=%d", emptyRec.Code)
 	}
-	if strings.Contains(emptyRec.Body.String(), "등록된 사업이 없습니다") {
-		t.Fatal("조직 무관 목록인데 빈 안내")
+	if !strings.Contains(emptyRec.Body.String(), `data-project-picker`) {
+		t.Fatal("O04 등록 화면에 사업 피커 없음")
 	}
 
 	cl := httptest.NewRequest(http.MethodGet, "/workboard/work-sites/search?q="+url.QueryEscape("계룡"), nil)

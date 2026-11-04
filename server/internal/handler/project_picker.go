@@ -54,6 +54,17 @@ type ProjectPickerView struct {
 	CanCreateProject   bool                `json:"CanCreateProject"`
 }
 
+func pickerAccessOrg(c echo.Context) string {
+	if model.NormalizeRole(currentRole(c)) == model.RoleVisionAdmin {
+		return "*"
+	}
+	org := pickerHomeOrg(c)
+	if org == repository.OrgAll {
+		return "*"
+	}
+	return org
+}
+
 func pickerHomeOrg(c echo.Context) string {
 	org := strings.TrimSpace(currentOrg(c))
 	if org == "" || org == repository.OrgAll {

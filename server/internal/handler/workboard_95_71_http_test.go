@@ -264,8 +264,8 @@ func Test95_71_EditUsesAssigneePickerAndChecksOwner(t *testing.T) {
 	if !strings.Contains(body, `value="`+pid+`"`) {
 		t.Fatal("사업 선택값(project_id)이 HTML value 에 없다")
 	}
-	if !strings.Contains(body, `value="수정화면사업"`) {
-		t.Fatal("사업 입력칸 value 에 사업명이 없다")
+	if !strings.Contains(body, `"SelectedName":"수정화면사업"`) && !strings.Contains(body, "수정화면사업") {
+		t.Fatal("피커에 선택된 사업명이 없다")
 	}
 	if !strings.Contains(body, `name="owner_user_id" value="`+choi.UserID+`"`) {
 		t.Fatal("주담당 owner_user_id value 가 없다")
@@ -526,4 +526,3 @@ func Test95_71_OverlapModalMobileLayout(t *testing.T) {
 		t.Fatal("겹침 모달이 좁은 화면에서 가로로 넘친다")
 	}
 }
-

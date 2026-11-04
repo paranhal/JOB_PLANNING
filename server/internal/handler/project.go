@@ -460,7 +460,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"Progress":     prog,
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Access":          model.ProjectAccess(*p, currentOrg(c)),
-		"CanRegisterWork": canWriteWorkboard(c) && model.CanLinkWorkProject(*p, pickerHomeOrg(c), currentRole(c), pickerExtraOrgIDs(c), false),
+		"CanRegisterWork": !isReadOnly(c) && canWriteProjects(c) && model.CanRegisterWorkOnProject(*p, pickerAccessOrg(c)),
 		"RelatedLine":     p.RelatedLine,
 		"RelatedOrgs":     p.RelatedOrgs,
 		"CanEditOrgs":     canEditProjectOrgs(c, p),
