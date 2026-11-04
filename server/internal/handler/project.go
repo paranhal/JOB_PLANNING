@@ -448,6 +448,10 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	if h.pe != nil {
 		prog, _ = h.pe.SiteProgress(id)
 	}
+	var siteWork []repository.ProjectSiteWorkRow
+	if h.wbRepo != nil {
+		siteWork, _ = h.wbRepo.ListProjectSiteWorkProgress(id)
+	}
 	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
@@ -458,6 +462,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"SalesMissing": salesMissing,
 		"RunLabel":     model.ContractRunLabel(p.ContractRunStatus(today)),
 		"Progress":     prog,
+		"SiteWork":     siteWork,
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Access":          model.ProjectAccess(*p, currentOrg(c)),
 		"CanRegisterWork": !isReadOnly(c) && canWriteProjects(c) && model.CanRegisterWorkOnProject(*p, pickerAccessOrg(c)),

@@ -143,6 +143,38 @@
     </div>
   </div>
 
+  <div class="bg-white rounded-xl border border-line p-5 space-y-3" data-site-progress-tab>
+    <h3 class="font-semibold text-ink">사이트·진행</h3>
+    <p class="text-xs text-ink-muted">업무 사이트 완료 체크입니다. AS·정기점검은 포함하지 않습니다.</p>
+    {{if .SiteWork}}
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-hover text-ink-muted text-left">
+          <tr>
+            <th class="px-3 py-2">사이트</th>
+            <th class="px-3 py-2">지역</th>
+            <th class="px-3 py-2">연결 업무</th>
+            <th class="px-3 py-2">완료 체크</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {{range .SiteWork}}
+          <tr>
+            <td class="px-3 py-2">{{.SiteName}}</td>
+            <td class="px-3 py-2">{{.Region}}</td>
+            <td class="px-3 py-2">{{.Total}}</td>
+            <td class="px-3 py-2">{{.Done}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <p class="text-sm text-ink-muted">등록된 사이트가 없습니다.</p>
+    {{end}}
+    <a href="/projects/{{.Project.ProjectID}}/sites" class="text-xs text-primary hover:underline">사이트·장비 화면</a>
+  </div>
+
   <div class="bg-white rounded-xl border border-line p-5 space-y-3">
     <h3 class="font-semibold text-ink">범위 규칙</h3>
     {{if .Project.ScopeRules}}
