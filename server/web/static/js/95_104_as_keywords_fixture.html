@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<title>95-104 keywords</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  #as-kw-box { width: 100%; padding: 8px; box-sizing: border-box; }
+  .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+</style>
+<body>
+<form id="as-action-form">
+<div id="as-kw-box" data-field="action" data-extra="게이트 오작동">
+  <div id="as-kw-list" class="flex-wrap">
+    <label data-label="A" data-group="대상" class="inline-flex"><input type="checkbox" name="kw_action" value="K1" checked><span>A</span></label>
+    <label data-label="B" data-group="증상" class="inline-flex"><input type="checkbox" name="kw_action" value="K2"><span>B</span></label>
+    <label data-label="C" data-group="조치" class="inline-flex"><input type="checkbox" name="kw_action" value="K3"><span>C</span></label>
+  </div>
+  <p id="as-kw-empty" class="hidden"></p>
+  <input type="hidden" name="kw_suggested_action" id="as-kw-suggested" value="K1,K2,K3">
+  <div id="as-kw-new" class="flex-wrap"></div>
+  <p id="as-kw-new-empty"></p>
+  <input id="as-kw-manual" name="kw_manual" value="">
+  <p id="as-kw-chosen">없음</p>
+  <textarea class="as-set-text" name="s1_action_taken"></textarea>
+</div>
+<button type="submit" id="save">저장</button>
+</form>
+<script>
+window.__suggest = {
+  items: [
+    { keyword_id: 'K1', keyword: 'A', kw_group: '대상' },
+    { keyword_id: 'K2', keyword: 'B', kw_group: '증상' },
+    { keyword_id: 'K3', keyword: 'C', kw_group: '조치' }
+  ],
+  new: [{ keyword: '재기동', kw_group: '조치' }]
+};
+window.__fetchCalls = [];
+window.fetch = function (url, opts) {
+  window.__fetchCalls.push({ url: String(url), body: opts && String(opts.body || ''), method: (opts && opts.method) || 'GET' });
+  var data = window.__suggest;
+  return Promise.resolve({ json: function () { return Promise.resolve(data); } });
+};
+</script>
+<script src="./as_keywords.js"></script>
+</body>
+</html>
