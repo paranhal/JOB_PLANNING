@@ -37,8 +37,8 @@ func TestProjectWorkMenusAndDiaryStats(t *testing.T) {
 	if list.Code != http.StatusOK {
 		t.Fatalf("list status=%d", list.Code)
 	}
-	if !strings.Contains(list.Body.String(), "사업·업무관리") || !strings.Contains(list.Body.String(), "단계별 일정표") {
-		t.Fatal("목록 제목·단계표 없음")
+	if !strings.Contains(list.Body.String(), "사업·업무관리") || !strings.Contains(list.Body.String(), "이 화면은 준비 중입니다") {
+		t.Fatal("목록 제목·준비 중 안내 없음")
 	}
 }
 
@@ -51,13 +51,10 @@ func TestProjectDiaryFigmaLayout(t *testing.T) {
 	body := page.Body.String()
 	for _, want := range []string{
 		"업무일지·투입관리",
-		"임시저장",
-		"검토 요청",
-		"사업 선택",
-		"금일 수행 업무 및 다음 계획",
-		"참여자·투입 시간",
-		"자재·장비 / 시스템 자원",
-		"작업 결과 및 산출물 첨부",
+		"이 화면은 준비 중입니다",
+		"사업 등록 관리",
+		"/projects/registry",
+		"data-project-pending",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("화면에 %q 없음", want)

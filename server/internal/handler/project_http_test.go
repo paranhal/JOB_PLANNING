@@ -152,8 +152,8 @@ func TestProjectCRUDArchiveSmoke(t *testing.T) {
 	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "사업 등록 관리") {
 		t.Fatal("사업·업무관리에 사업 등록 관리 링크가 없다")
 	}
-	if strings.Contains(home.Body.String(), ">사업 등록<") {
-		t.Fatal("사업관리에서 직접 등록 버튼이 남아 있다")
+	if !strings.Contains(home.Body.String(), "사업 등록") {
+		t.Fatal("사업관리에 직접 등록 링크가 없다")
 	}
 
 	// 수정
@@ -272,19 +272,10 @@ func TestProjectWorkMgmtFigmaLayout(t *testing.T) {
 	body := page.Body.String()
 	for _, want := range []string{
 		"사업·업무관리",
-		"업무 리포트",
-		"업무 등록",
 		"사업 등록 관리",
-		"사업 선택",
-		"표시할 사업이 없습니다",
-		"공정→기성→준공",
-		"구축→개통→검수",
-		"접수→조치→완료",
-		`value="other"`,
-		"수행 기간",
-		"단계별 일정표",
-		"계획 시작",
-		"실제 처리",
+		"이 화면은 준비 중입니다",
+		"/projects/registry",
+		"data-project-pending",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("화면에 %q 없음", want)

@@ -1,0 +1,11 @@
+{{define "project_pending"}}
+<div class="rounded-control border border-warning bg-warning-soft px-4 py-3 space-y-2" data-project-pending="1" role="status">
+  <p class="text-ui font-semibold text-ink">이 화면은 준비 중입니다</p>
+  <p class="text-ui-sm text-ink-muted">단계·서류·일지는 아직 실제 데이터와 연결되지 않았습니다. 사업 목록과 등록은 「사업 등록 관리」에서 합니다.</p>
+  <div class="flex flex-wrap gap-2 pt-1">
+    <a href="/projects/registry" class="btn btn-primary btn-sm">사업 등록 관리</a>
+    <a href="/projects/dashboard" class="btn btn-secondary btn-sm">사업 대시보드</a>
+    {{if .CanWrite}}<a href="/projects/new" class="btn btn-secondary btn-sm">직접 등록</a>{{end}}
+  </div>
+</div>
+{{end}}

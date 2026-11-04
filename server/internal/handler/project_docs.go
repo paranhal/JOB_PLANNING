@@ -51,6 +51,6 @@ func (h *ProjectHandler) Docs(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "project/docs.html", map[string]interface{}{
 		"Title": "서류 작성·관리", "Active": NavProjectsDocs,
-		"Seed": docsSeed{}, "Example": false,
+		"Seed": docsSeed{}, "Example": false, "CanWrite": canWriteProjects(c),
 	})
 }

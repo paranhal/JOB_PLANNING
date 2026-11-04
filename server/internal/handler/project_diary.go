@@ -82,6 +82,7 @@ func (h *ProjectHandler) Diary(c echo.Context) error {
 		"Date":    day,
 		"Seed":    diarySeed{},
 		"Example": false,
+		"CanWrite": canWriteProjects(c),
 	})
 }
 

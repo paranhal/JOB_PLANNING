@@ -30,6 +30,7 @@
       {{template "org_picker" dict "Mode" "multi" "Orgs" .OrgChoices "Selected" .OrgSelected "Related" .RelatedOrgIDs "OwnerID" .OrgSelected}}
       {{else}}
       <div>
+        <input type="hidden" name="org_id" value="{{.OrgSelected}}">
         <p class="text-ui-sm text-ink">주관 부서 {{.OrgHomeName}}</p>
         {{if .RelatedLine}}<p class="text-ui-xs text-ink-muted">{{.RelatedLine}}</p>{{end}}
       </div>

@@ -5,13 +5,14 @@
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-ink">{{if .Title}}{{.Title}}{{else}}사업 등록 관리{{end}}</h2>
-      <p class="text-sm text-ink-muted">계약이 끝난 수행 사업입니다. 신규 등록은 영업에서 하고, 계약 완료 후 여기로 전환됩니다.</p>
+      <p class="text-sm text-ink-muted">수행 중인 사업입니다. 영업을 거치지 않고 직접 등록할 수 있고, 영업에서 계약 전환한 건도 여기 모입니다.</p>
     </div>
     <div class="flex flex-wrap gap-2">
       <a href="/projects" class="px-4 py-2 text-sm border rounded-lg text-ink hover:bg-hover">사업·업무관리</a>
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg text-ink hover:bg-hover">일일 업무 현황</a>
       {{if .CanWrite}}
       <a href="/projects/kind-review" class="px-4 py-2 text-sm border rounded-lg text-ink hover:bg-hover">미분류·추정 유형 정리</a>
+      <a href="/projects/new" class="px-4 py-2 text-sm border rounded-lg text-ink hover:bg-hover">직접 등록</a>
       <a href="/sales/new" class="px-4 py-2 text-sm border rounded-lg text-ink hover:bg-hover">영업에서 등록</a>
       {{end}}
     </div>
@@ -114,6 +115,7 @@
               {{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}
             </a>
             {{if .Related}}<span class="badge badge-neutral ml-1">유관</span>{{end}}
+            {{if .SalesProjectID}}<span class="badge badge-neutral ml-1" title="영업 파이프라인">파이프라인</span>{{else}}<span class="badge badge-neutral ml-1">직접 등록</span>{{end}}
             {{if .ShortName}}<p class="text-xs text-ink-subtle mt-0.5 truncate max-w-md">{{.Name}}</p>{{end}}
           </td>
           <td class="px-4 py-3 text-ink">{{.OrderingPartyLabel}}</td>

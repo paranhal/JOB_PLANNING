@@ -26,39 +26,107 @@ func parseSplitTravel(c echo.Context) int {
 	return model.ClampTravelMin(n)
 }
 
+func splitBlockLabel(code string) string {
+	switch code {
+	case "read_only":
+		return "읽기 전용에서는 나눌 수 없습니다"
+	case "other_org":
+		return "다른 조직의 업무는 나눌 수 없습니다"
+	case "completed":
+		return "완료된 업무는 나눌 수 없습니다"
+	case "cancelled":
+		return "취소된 업무는 나눌 수 없습니다"
+	case "not_assignee":
+		return "다른 사람 업무는 조직관리자만 나눌 수 있습니다"
+	case "no_segments":
+		return "나눌 계획 구간이 없습니다"
+	case "too_short":
+		return "남는 구간이 15분 미만입니다"
+	default:
+		return "이 계획을 나눌 수 없습니다"
+	}
+}
+
 // canSplitPlan 완료·취소·타 조직·읽기 전용이 아니면 나눌 수 있다. AS·작업·정기점검·행정/지원 등 유형은 막지 않는다.
 func canSplitPlan(c echo.Context, t *model.WorkTask, members []model.WorkTaskMember) bool {
+	ok, _, _ := canSplitPlanReason(c, t, members)
+	return ok
+}
+
+func canSplitPlanReason(c echo.Context, t *model.WorkTask, members []model.WorkTaskMember) (bool, string, string) {
 	if t == nil {
-		return false
+		return false, "no_segments", splitBlockLabel("no_segments")
 	}
 	if isReadOnly(c) || !canWriteWorkboard(c) {
-		return false
+		return false, "read_only", splitBlockLabel("read_only")
 	}
 	st := strings.TrimSpace(t.Status)
-	if st == model.WBTaskComplete || st == model.WBTaskCancelled {
-		return false
+	if st == model.WBTaskComplete {
+		return false, "completed", splitBlockLabel("completed")
+	}
+	if st == model.WBTaskCancelled {
+		return false, "cancelled", splitBlockLabel("cancelled")
 	}
 	if err := denyOtherOrgTask(c, t); err != nil {
-		return false
+		return false, "other_org", splitBlockLabel("other_org")
 	}
 	uid := currentUserID(c)
 	name := currentUserDisplayName(c)
 	if taskAssignedToUser(*t, members, uid, name) {
-		return true
+		return true, "", ""
+	}
+	if memberOfGroup(c, t.WorkGroupID) {
+		return true, "", ""
 	}
 	role := currentRole(c)
 	if role == model.RoleVisionAdmin {
-		return true
+		return true, "", ""
 	}
 	if role == model.RoleOrgAdmin {
 		org := currentOrg(c)
-		return org != "" && (org == t.OrgID || org == repository.OrgAll)
+		if org != "" && (org == t.OrgID || org == repository.OrgAll) {
+			return true, "", ""
+		}
 	}
-	return false
+	return false, "not_assignee", splitBlockLabel("not_assignee")
 }
 
 func (h *WorkboardHandler) applyPendingInterrupt(c echo.Context, newID string) error {
-	return h.commitPendingInterrupt(c, newID, true)
+	h.seedPendingFromLiveHost(c)
+	return h.applyLiveInterrupt(c, newID)
+}
+
+func (h *WorkboardHandler) seedPendingFromLiveHost(c echo.Context) {
+	if c == nil {
+		return
+	}
+	if v, _ := c.Get("pending_interrupt").(*pendingInterrupt); v != nil && len(v.Hits) > 0 {
+		return
+	}
+	hostID := strings.TrimSpace(firstNonEmpty(c.FormValue("live_host_id"), c.FormValue("interrupt_host_id")))
+	if hostID == "" {
+		return
+	}
+	host, err := h.repo.GetTask(hostID)
+	if err != nil || host == nil {
+		return
+	}
+	day, hhmm, _ := parseLiveClock(c, firstNonEmpty(c.FormValue("work_date"), host.WorkDate))
+	start := firstNonEmpty(c.FormValue("start_time"), hhmm)
+	dur := atoiSafe(c.FormValue("duration_min"))
+	if dur <= 0 {
+		dur = 60
+	}
+	end := firstNonEmpty(c.FormValue("end_time"), model.FormatHHMMMinutes(model.ParseHHMMMinutes(start)+dur))
+	c.Set("pending_interrupt", &pendingInterrupt{
+		Hits:   []overlapHit{{Task: *host, Date: day}},
+		Travel: atoiSafe(c.FormValue("travel_before_min")),
+		Date:   day, Start: start, End: end,
+		Names: occupancyNames(host.Assignee, nil),
+	})
+	if fr := strings.TrimSpace(c.FormValue("force_reason")); fr != "" {
+		c.Set("live_force_reason", fr)
+	}
 }
 
 func (h *WorkboardHandler) commitPendingInterrupt(c echo.Context, newID string, rollbackNew bool) error {
@@ -68,6 +136,7 @@ func (h *WorkboardHandler) commitPendingInterrupt(c echo.Context, newID string, 
 	}
 	var firstErr error
 	applied := []string{}
+	splitOK := map[string]bool{}
 	for _, hit := range v.Hits {
 		t, err := h.repo.GetTask(hit.Task.TaskID)
 		if err != nil || t == nil {
@@ -75,25 +144,37 @@ func (h *WorkboardHandler) commitPendingInterrupt(c echo.Context, newID string, 
 			break
 		}
 		mems, _ := h.repo.ListMembers(t.TaskID)
-		if !canSplitPlan(c, t, mems) {
-			firstErr = overlapActionErr(c, "이 계획을 나눌 권한이 없습니다")
+		ok, _, label := canSplitPlanReason(c, t, mems)
+		if !ok {
+			if label == "" {
+				label = "이 계획을 나눌 권한이 없습니다"
+			}
+			firstErr = overlapActionErr(c, label)
 			break
 		}
 		names := []string{hit.Assignee}
 		if len(v.Names) > 0 {
 			names = v.Names
 		}
+		day := strings.TrimSpace(hit.Date)
+		if day == "" {
+			day = v.Date
+		}
 		var err2 error
 		for i := 0; i < 5; i++ {
-			err2 = h.repo.ApplyInterruptSplit(t, newID, v.Date, v.Start, v.End, v.Travel, names)
+			err2 = h.repo.ApplyInterruptSplit(t, newID, day, v.Start, v.End, v.Travel, names)
 			if err2 == nil || !strings.Contains(err2.Error(), "SQLITE_BUSY") {
 				break
 			}
 		}
 		if err2 != nil {
+			if splitOK[t.TaskID] && strings.Contains(err2.Error(), "끼워 넣을 겹친 구간이 없습니다") {
+				continue
+			}
 			firstErr = overlapActionErr(c, err2.Error())
 			break
 		}
+		splitOK[t.TaskID] = true
 		applied = append(applied, t.TaskID)
 	}
 	if firstErr != nil {
@@ -440,6 +521,10 @@ func (h *WorkboardHandler) offerMergeAfterDelete(c echo.Context, deletedID strin
 		return true
 	}
 	return false
+}
+
+func boardItemIsExec(it boardItem) bool {
+	return strings.Contains(it.DedupKey, "|act")
 }
 
 func uniqueTaskCount(items []boardItem) int {

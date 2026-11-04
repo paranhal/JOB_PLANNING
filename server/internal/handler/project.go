@@ -75,6 +75,22 @@ func canDeleteProjects(c echo.Context) bool {
 	return isAdminRole(c)
 }
 
+func formErrText(err error) string {
+	if err == nil {
+		return ""
+	}
+	var he *echo.HTTPError
+	if errors.As(err, &he) {
+		switch m := he.Message.(type) {
+		case string:
+			return m
+		case error:
+			return m.Error()
+		}
+	}
+	return err.Error()
+}
+
 func (h *ProjectHandler) loadVisibleProject(c echo.Context, write bool) (*model.WorkProject, error) {
 	p, err := h.repo.GetVisible(c.Param("id"), currentOrg(c), write)
 	if err != nil {
@@ -361,7 +377,9 @@ func (h *ProjectHandler) New(c echo.Context) error {
 	if !canWriteProjects(c) {
 		return echo.ErrForbidden
 	}
-	return c.Redirect(http.StatusSeeOther, "/sales/new?from=projects")
+	p := &model.WorkProject{Status: model.WBProjectActive, IsPaid: true, Color: "#3B82F6"}
+	model.ApplyPlanYearDefault(p, nil)
+	return h.renderForm(c, p, nil, false)
 }
 
 func (h *ProjectHandler) Create(c echo.Context) error {
@@ -388,10 +406,10 @@ func (h *ProjectHandler) Create(c echo.Context) error {
 		return h.renderForm(c, p, rules, false, errNeedInsertOrg)
 	}
 	if err := h.repo.Create(p); err != nil {
-		return h.renderForm(c, p, rules, false, err.Error())
+		return h.renderForm(c, p, rules, false, formErrText(err))
 	}
 	if err := h.saveRelatedOrgs(c, p); err != nil {
-		return h.renderForm(c, p, rules, false, err.Error())
+		return h.renderForm(c, p, rules, false, formErrText(err))
 	}
 	if err := h.repo.ReplaceRules(p.ProjectID, rules); err != nil {
 		return err
@@ -472,6 +490,9 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	p, rules := h.parseForm(c)
 	p.ProjectID = existing.ProjectID
 	p.SalesProjectID = existing.SalesProjectID
+	if strings.TrimSpace(p.OrgID) == "" {
+		p.OrgID = existing.OrgID
+	}
 	if p.Name == "" {
 		return h.renderForm(c, p, rules, true, "사업명을 입력하세요.")
 	}
@@ -492,19 +513,19 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	}
 	ok := "updated"
 	if err := h.saveRelatedOrgs(c, existing); err != nil {
-		return h.renderForm(c, p, rules, true, err.Error())
+		return h.renderForm(c, p, rules, true, formErrText(err))
 	}
 	wantOrg := strings.TrimSpace(c.FormValue("org_id"))
 	if wantOrg != "" && wantOrg != strings.TrimSpace(existing.OrgID) {
 		if err := h.moveProjectOrg(c, existing, wantOrg); err != nil {
 			p.OrgID = existing.OrgID
 			p.RelatedOrgs = existing.RelatedOrgs
-			return h.renderForm(c, p, rules, true, err.Error())
+			return h.renderForm(c, p, rules, true, formErrText(err))
 		}
 		ok = "moved"
 	}
 	if err := h.saveAssignments(c, p.ProjectID); err != nil {
-		return h.renderForm(c, p, rules, true, err.Error())
+		return h.renderForm(c, p, rules, true, formErrText(err))
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok="+ok)
 }
