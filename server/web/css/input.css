@@ -134,6 +134,9 @@
   }
   .combobox { @apply relative; }
   .combobox-list { @apply menu absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-auto; }
+  /* 95-117: 피커 루트가 containing block. 목록은 입력칸 아래 흐름 배치(모달 overflow에 안 잘리게). */
+  .pp { @apply relative; }
+  .pp .combobox-list { @apply static left-auto right-auto z-20 mt-1 w-full max-h-60 overflow-auto; }
   .combobox-option-on { @apply bg-hover; }
   .lookup-status { @apply mt-2 rounded-control border border-line bg-surface p-3 text-ui text-ink space-y-2; }
 
