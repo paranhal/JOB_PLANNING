@@ -30,12 +30,12 @@
   <a href="{{$item.ActionHref}}" class="block text-inherit" data-bar-open="1">
     <div class="text-[11px] font-extrabold">작업완료{{if $item.ChipTime}} · {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}</div>
     {{template "board_assignee_line" $item}}
-    <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}</div>
+    <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}} {{projectMatchPendingBadge $item.Task.ProjectMatchPending}}</div>
   </a>
   {{else}}
   <div class="text-[11px] font-extrabold {{if or $item.OverlapWarn $item.IsSupport}}pl-2.5{{end}}">{{$item.ChipTime}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}} · {{$item.Type.Label}}</div>
   {{template "board_assignee_line" $item}}
-  <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}{{if $item.ReturnPending}} <span class="text-warning">복귀 미확인</span>{{end}}</div>
+  <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}{{if $item.ReturnPending}} <span class="text-warning">복귀 미확인</span>{{end}} {{projectMatchPendingBadge $item.Task.ProjectMatchPending}}</div>
   {{if $item.ItemKindLine}}<div class="truncate text-[11px] text-ink-muted" data-item-kind-line="1" title="{{$item.ItemKindLine}}">{{$item.ItemKindLine}}</div>{{end}}
   {{if $item.TravelAfter}}<div class="mt-1 border-t border-dashed border-current opacity-70" title="이동"></div>{{end}}
   <div class="text-[11px] text-ink-muted">{{$item.CustomerLine}}</div>

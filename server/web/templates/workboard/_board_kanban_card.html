@@ -10,6 +10,7 @@
          data-carry-delayed="{{if .Overdue}}true{{else}}false{{end}}" data-carry-span="{{if .ChipUntil}}true{{else}}false{{end}}">
   <div class="flex items-start justify-between gap-2">
     <span class="{{.Type.Bg}} {{.Type.Text}} rounded px-1.5 py-0.5 text-[11px] font-bold">{{.Type.Label}}</span>
+    {{projectMatchPendingBadge .Task.ProjectMatchPending}}
     {{if .KanbanBadgeToday}}<span class="rounded bg-success-soft px-1.5 py-0.5 text-[11px] font-semibold text-success">오늘 일정</span>{{end}}
   </div>
   <a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="mt-1 block text-ui font-bold text-ink hover:underline">{{.Task.Title}}</a>
