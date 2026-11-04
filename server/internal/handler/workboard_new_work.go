@@ -44,26 +44,16 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		}
 	}
 	assignees := ensurePickerUsers(h.userRepo, listAssignableForPicker(h.userRepo, c), extraIDs...)
-	seed := defaultAssigneeSeed(c)
-	pickerIDs := seed.IDs
-	if len(pickerIDs) == 0 {
-		pickerIDs = extraIDs
-	}
 	data := map[string]interface{}{
-		"Date":             dateStr,
-		"Today":            today,
-		"ModalRedirect":    redirect,
-		"KindBackLabel":    "← 업무 유형 선택",
-		"DailyKind":        kind,
-		"CanWrite":         true,
-		"Assignees":        assignees,
-		"PickerNames":      pickerNamesFor(h.userRepo, assignees, extraIDs...),
-		"PickerOwnerID":    seed.OwnerID,
-		"PickerUserIDs":    pickerIDs,
-		"AssigneeRequired": seed.Required,
-		"AssigneeSeed":     seed,
-		"WorkGroups":       wgItems,
-		"WorkGroupsJSON":   wgJSON,
+		"Date":           dateStr,
+		"Today":          today,
+		"ModalRedirect":  redirect,
+		"KindBackLabel":  "← 업무 유형 선택",
+		"DailyKind":      kind,
+		"CanWrite":       true,
+		"Assignees":      assignees,
+		"WorkGroups":     wgItems,
+		"WorkGroupsJSON": wgJSON,
 		"ASCards":          []model.WBCard{},
 		"MntCards":         []model.WBCard{},
 		"Customers":        []model.Customer{},
@@ -92,6 +82,7 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		data["Projects"] = projects
 		data["Customers"] = customers
 	}
+	attachNewWorkAssigneePicker(c, h.userRepo, data)
 	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: kind == model.WBWorkAdmin || kind == model.WBWorkSales})
 	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
 	c.Request().Header.Set("HX-Request", "true")

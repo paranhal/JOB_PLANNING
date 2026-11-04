@@ -7,9 +7,9 @@
        preWork: '{{.Date}}',
        preStart: '09:00',
        preEnd: '09:30',
-       preAssignee: '',
-       preOwnerId: '',
-       preAssigneeIds: [],
+       preAssignee: {{if .DisplayAssignee}}{{toJSON .DisplayAssignee}}{{else}}''{{end}},
+       preOwnerId: {{if .PickerOwnerID}}{{toJSON .PickerOwnerID}}{{else}}''{{end}},
+       preAssigneeIds: {{if .PickerUserIDs}}{{toJSON .PickerUserIDs}}{{else}}[]{{end}},
        asQ: '',
        mntQ: '',
 {{end}}

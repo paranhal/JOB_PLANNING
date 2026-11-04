@@ -466,6 +466,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"WorkGroupsJSON":       wgJSON,
 		"WorkGroupFilter":      groupFilter,
 	}
+	attachNewWorkAssigneePicker(c, h.userRepo, data)
 	attachProjectFilter(c, h, data, "reg-project")
 	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: true})
 	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
@@ -1795,33 +1796,34 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		board = filterTasksByWorkGroup(board, gid)
 	}
 	wgItems, wgJSON := h.workGroupPicks(c)
-	return map[string]interface{}{
-		"Title":            "일일 업무 현황",
-		"Active":           NavWorkPlan,
-		"View":             view,
-		"Summary":          summary,
-		"Tasks":            board,
-		"ByWorkType":       byWorkType,
-		"ByStatus":         byStatus,
-		"Projects":         projects,
-		"WorkProjects":     workProjects,
-		"Assignees":        assignees,
-		"AssigneeRequired": requiresAssigneeChoice(c),
-		"Customers":        customers,
-		"ContractTypes":    contractTypes,
-		"BillingTypes":     billingTypes,
-		"ASCards":          asCards,
-		"MntCards":         mntCards,
-		"Date":             today,
-		"TodayLabel":       today,
-		"ModalRedirect":    modalRedirect,
-		"CanWrite":         canWriteWorkboard(c),
-		"FlashOK":          c.QueryParam("ok"),
-		"FlashErr":         c.QueryParam("err"),
-		"WorkGroups":       wgItems,
-		"WorkGroupsJSON":   wgJSON,
-		"WorkGroupFilter":  strings.TrimSpace(c.QueryParam("work_group_id")),
-	}, nil
+	data := map[string]interface{}{
+		"Title":           "일일 업무 현황",
+		"Active":          NavWorkPlan,
+		"View":            view,
+		"Summary":         summary,
+		"Tasks":           board,
+		"ByWorkType":      byWorkType,
+		"ByStatus":        byStatus,
+		"Projects":        projects,
+		"WorkProjects":    workProjects,
+		"Assignees":       assignees,
+		"Customers":       customers,
+		"ContractTypes":   contractTypes,
+		"BillingTypes":    billingTypes,
+		"ASCards":         asCards,
+		"MntCards":        mntCards,
+		"Date":            today,
+		"TodayLabel":      today,
+		"ModalRedirect":   modalRedirect,
+		"CanWrite":        canWriteWorkboard(c),
+		"FlashOK":         c.QueryParam("ok"),
+		"FlashErr":        c.QueryParam("err"),
+		"WorkGroups":      wgItems,
+		"WorkGroupsJSON":  wgJSON,
+		"WorkGroupFilter": strings.TrimSpace(c.QueryParam("work_group_id")),
+	}
+	attachNewWorkAssigneePicker(c, h.userRepo, data)
+	return data, nil
 }
 
 func (h *WorkboardHandler) CreateProject(c echo.Context) error {

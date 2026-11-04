@@ -48,7 +48,7 @@ const assigneeUnspecified = "담당자 미지정"
 
 func pickerPersonLabel(s string) string {
 	n := strings.TrimSpace(s)
-	if n == "" || n == "담당자" || strings.HasPrefix(n, "USR-") {
+	if n == "" || n == "담당자" || n == pickerNameUnregistered || strings.HasPrefix(n, "USR-") {
 		return ""
 	}
 	return n

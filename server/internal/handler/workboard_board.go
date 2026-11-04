@@ -991,6 +991,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"FlatHref":         boardURL(view, ds, flatKeep),
 		"ExtraAssignees":   extraAssignees,
 		"DayLeaveNames":    boardDayLeaveNames(h, c, ds),
+		"Assignees":        assignees,
 		"AssigneeLegend":   buildAssigneeLegend(legendTasks, assignees),
 		"Projects":         projects,
 		"WorkGroups":       wgItems,
@@ -1041,6 +1042,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
 	data["BoardShell"] = true
 	attachLiveWorkData(data, h, c, nil)
+	attachNewWorkAssigneePicker(c, h.userRepo, data)
 	return data, nil
 }
 
