@@ -259,8 +259,11 @@
 
   {{template "as_receipt_photos" .}}
 
+  {{if and .ActionErr (not .AttachErrMsg)}}
+  <div id="as-action-err-banner" class="js-action-err rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErrMsg}}</div>
+  {{end}}
   {{if and .DraftSetN (not .IsClosed)}}
-  <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">임시 저장된 조치 {{.DraftSetN}}건이 있습니다. 저장을 눌러 마무리하세요</div>
+  <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700" data-as-draft-notice="1">조치 세트 {{.DraftSetN}}건이 임시 저장되어 있습니다. 이 안내는 오류가 아닙니다. 아래 「저장」을 누르면 접수가 마무리됩니다.</div>
   {{end}}
   {{if .ReadOnly}}
   <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
@@ -292,7 +295,7 @@
           data-open-support="{{if .OpenSupportN}}{{.OpenSupportN}}{{else}}0{{end}}">
 <div class="p-4 sm:p-5 space-y-4">
         {{if and .ActionErr (not .AttachErrMsg)}}
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.ActionErrMsg}}</div>
+        <p class="sr-only">{{.ActionErrMsg}}</p>
         {{end}}
         {{if or .ApplyN .ApplySkip}}
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
@@ -853,8 +856,8 @@
       }
       if (reasonWrap) reasonWrap.classList.toggle('hidden', !isUndet);
       if (reasonInp) {
-        reasonInp.required = isUndet;
-        if (!isUndet) reasonInp.removeAttribute('required');
+        reasonInp.required = false;
+        reasonInp.removeAttribute('required');
       }
     }
     document.querySelectorAll('input[name="work_place"]').forEach(function (el) {
@@ -944,7 +947,11 @@
       });
       if (!window.confirm('선택한 접수에도 같은 조치를 남깁니다.\n' + names.join('\n') + '\n계속할까요?')) return;
       conf.value = '1';
-      form.submit();
+      if (window.ASActionSets && window.ASActionSets.prepareSubmit) window.ASActionSets.prepareSubmit();
+      setTimeout(function () {
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.submit();
+      }, 0);
     });
   })();
   var confSel = document.getElementById('as-confirmer-code');
@@ -955,54 +962,6 @@
     syncConf();
   }
 
-  (function bindKw(){
-    var box = document.getElementById('as-kw-box');
-    var list = document.getElementById('as-kw-list');
-    var empty = document.getElementById('as-kw-empty');
-    var sug = document.getElementById('as-kw-suggested');
-    var src = document.getElementById('as-action-taken');
-    if (!box || !list || !src) return;
-    function esc(s) {
-      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-    var field = box.getAttribute('data-field') || 'action';
-    var extra = box.getAttribute('data-extra') || '';
-    var t = null;
-    function render(items){
-      var keep = {};
-      list.querySelectorAll('input[type=checkbox]:checked').forEach(function(el){
-        var lab = el.closest('label');
-        keep[el.value] = lab ? (lab.getAttribute('data-label') || el.value) : el.value;
-      });
-      var sugIds = [];
-      var html = '';
-      (items || []).forEach(function(it){
-        sugIds.push(it.keyword_id);
-        var on = keep[it.keyword_id] ? ' checked' : '';
-        delete keep[it.keyword_id];
-        html += '<label data-label="' + esc(it.keyword) + '" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs border-slate-200 bg-white">' +
-          '<input type="checkbox" name="kw_' + field + '" value="' + esc(it.keyword_id) + '"' + on + ' class="rounded border-slate-300 text-blue-600">' +
-          '<span>' + esc(it.keyword) + '</span><span class="text-slate-400">' + esc(it.kw_group) + '</span></label>';
-      });
-      Object.keys(keep).forEach(function(id){
-        html += '<label data-label="' + esc(keep[id]) + '" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs border-blue-300 bg-blue-50">' +
-          '<input type="checkbox" name="kw_' + field + '" value="' + esc(id) + '" checked class="rounded border-slate-300 text-blue-600">' +
-          '<span>' + esc(keep[id]) + '</span></label>';
-      });
-      list.innerHTML = html;
-      if (sug) sug.value = sugIds.join(',');
-      if (empty) empty.classList.toggle('hidden', html !== '');
-    }
-    function run(){
-      var q = ((src.value || '') + ' ' + extra).trim();
-      if (q.length < 2) { render([]); return; }
-      fetch('/as/keywords/suggest?q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(d){
-        render((d && d.items) || []);
-      }).catch(function(){});
-    }
-    src.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(run, 400); });
-  })();
-
   (function actionContentHint(){
     var form = document.getElementById('as-action-form');
     var ta = document.getElementById('as-action-taken');
@@ -1011,17 +970,35 @@
     var shortOk = document.getElementById('as-action-short-ok');
     if (!form || !ta) return;
     function runeLen(s){ return Array.from(String(s || '').trim()).length; }
+    function lastSetText(){
+      var sets = document.querySelectorAll('#as-action-sets .as-action-set');
+      var last = sets.length ? sets[sets.length - 1] : null;
+      var vis = last && last.querySelector('.as-set-text');
+      if (vis) return vis.value || '';
+      return ta.value || '';
+    }
     function syncNA(){
       if (!na) return;
       var on = na.checked;
       if (reason) reason.classList.toggle('hidden', !on);
-      ta.required = !on;
+      ta.required = false;
+      ta.removeAttribute('required');
     }
     if (na) { na.addEventListener('change', syncNA); syncNA(); }
+    else { ta.required = false; ta.removeAttribute('required'); }
+    function resubmit(){
+      if (window.ASActionSets && window.ASActionSets.prepareSubmit) window.ASActionSets.prepareSubmit();
+      setTimeout(function () {
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.submit();
+      }, 0);
+    }
     form.addEventListener('submit', function(e){
+      if (window.ASActionSets && window.ASActionSets.prepareSubmit) window.ASActionSets.prepareSubmit();
       var n = parseInt(form.getAttribute('data-open-support') || '0', 10);
       var done = form.querySelector('input[name="result_code"]:checked');
-      if (n > 0 && done && done.value === 'done' && !form.querySelector('input[name="confirm_open_support"]')) {
+      var rc = document.getElementById('as-result-code');
+      if (n > 0 && ((done && done.value === 'done') || (rc && rc.value === 'done')) && !form.querySelector('input[name="confirm_open_support"]')) {
         if (!confirm('미완료 지원업무 ' + n + '건이 있습니다. 그대로 완료하시겠습니까?')) {
           e.preventDefault();
           return;
@@ -1034,11 +1011,11 @@
       }
       if (na && na.checked) return;
       if (shortOk && shortOk.value === '1') return;
-      if (runeLen(ta.value) >= 10) return;
+      if (runeLen(lastSetText()) >= 10) return;
       e.preventDefault();
       if (confirm('조금 더 적어 주시겠습니까?')) return;
       if (shortOk) shortOk.value = '1';
-      form.submit();
+      resubmit();
     });
   })();
 
@@ -1128,8 +1105,11 @@
 </script>
 <script src="/static/js/as_action_sets.js"></script>
 <script src="/static/js/as_action_set_cause.js"></script>
+<script src="/static/js/as_keywords.js"></script>
 <script>
 (function focusActionErr(){
+  var banner = document.getElementById('as-action-err-banner') || document.querySelector('.js-action-err');
+  if (banner && banner.scrollIntoView) banner.scrollIntoView({block:'start'});
   var params = new URLSearchParams(location.search);
   var err = params.get('err') || '';
   var seq = params.get('focus_set') || '';
@@ -1149,6 +1129,14 @@
       if (cat) { cat.classList.add('border-danger'); cat.focus(); }
     }
   }
+  if (err === 'assignee_required' || params.get('focus') === 'assignee') {
+    var box = document.querySelector('[data-assignee-picker="1"][data-focus-target="assignee"]');
+    if (box) {
+      box.classList.add('ring-2');
+      if (box.focus) box.focus();
+      if (box.scrollIntoView) box.scrollIntoView({block:'center'});
+    }
+  }
   if (err === 'work_date_required' || err === 'visit_date') {
     var el = document.querySelector('.as-set-work-date');
     if (el) {
@@ -1157,82 +1145,6 @@
       if (el.scrollIntoView) el.scrollIntoView({block:'center'});
     }
   }
-})();
-</script>
-<script>
-(function bindKw95_85(){
-  var box = document.getElementById('as-kw-box');
-  var list = document.getElementById('as-kw-list');
-  var empty = document.getElementById('as-kw-empty');
-  var sug = document.getElementById('as-kw-suggested');
-  var neu = document.getElementById('as-kw-new');
-  var neuEmpty = document.getElementById('as-kw-new-empty');
-  var manual = document.getElementById('as-kw-manual');
-  var chosen = document.getElementById('as-kw-chosen');
-  if (!box || !list) return;
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  var field = box.getAttribute('data-field') || 'action';
-  function texts(){
-    var t = box.getAttribute('data-extra') || '';
-    document.querySelectorAll('.as-set-text, .as-set-cause').forEach(function(el){ t += ' ' + (el.value||''); });
-    var hid = document.getElementById('as-action-taken');
-    if (hid) t += ' ' + hid.value;
-    return t;
-  }
-  function renderChosen(){
-    var bits = [];
-    list.querySelectorAll('input:checked').forEach(function(el){
-      var lab = el.closest('label');
-      bits.push((lab && lab.getAttribute('data-label') || el.value) + '(' + (lab && lab.getAttribute('data-group') || '') + ')');
-    });
-    if (neu) neu.querySelectorAll('input:checked').forEach(function(el){
-      var lab = el.closest('label');
-      bits.push((lab && lab.getAttribute('data-label') || '') + '(' + (lab && lab.getAttribute('data-group') || '') + ')');
-    });
-    if (manual && manual.value.trim()) bits.push(manual.value.trim());
-    if (chosen) chosen.textContent = bits.length ? bits.join(', ') : '없음';
-  }
-  function render(d){
-    var items = (d && d.items) || [];
-    var html = '';
-    var ids = [];
-    items.forEach(function(it){
-      ids.push(it.keyword_id);
-      html += '<label data-label="'+esc(it.keyword)+'" data-group="'+esc(it.kw_group)+'" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs border-slate-200 bg-white">' +
-        '<input type="checkbox" name="kw_'+field+'" value="'+esc(it.keyword_id)+'" class="rounded border-slate-300 text-blue-600">' +
-        '<span>'+esc(it.keyword)+'</span><span class="text-slate-400">'+esc(it.kw_group)+'</span></label>';
-    });
-    list.innerHTML = html;
-    if (sug) sug.value = ids.join(',');
-    if (empty) empty.classList.toggle('hidden', items.length > 0);
-    var news = (d && d.new) || [];
-    var nh = '';
-    news.forEach(function(it){
-      var key = 'new:'+it.keyword+'|'+(it.kw_group||'조치');
-      nh += '<label data-label="'+esc(it.keyword)+'" data-group="'+esc(it.kw_group)+'" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-dashed text-xs">' +
-        '<input type="checkbox" name="kw_'+field+'" value="'+esc(key)+'" class="rounded">' +
-        '<span>'+esc(it.keyword)+'</span><span class="text-slate-400">'+esc(it.kw_group)+'</span></label>';
-    });
-    if (neu) neu.innerHTML = nh;
-    if (neuEmpty) neuEmpty.classList.toggle('hidden', news.length > 0);
-    renderChosen();
-  }
-  var t=null;
-  function run(){
-    var q = texts().trim();
-    var body = new URLSearchParams(); body.set('text', q); body.set('q', q);
-    fetch('/as/keywords/suggest', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString()})
-      .then(function(r){ return r.json(); }).then(render).catch(function(){});
-  }
-  document.addEventListener('input', function(e){
-    if (!e.target) return;
-    if (e.target.classList && (e.target.classList.contains('as-set-text') || e.target.classList.contains('as-set-cause') || e.target.id==='as-kw-manual')) {
-      clearTimeout(t); t=setTimeout(run, 400); renderChosen();
-    }
-  });
-  if (list) list.addEventListener('change', renderChosen);
-  if (neu) neu.addEventListener('change', renderChosen);
-  run();
 })();
 </script>
 {{template "photo_zoom_script"}}

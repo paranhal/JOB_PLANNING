@@ -88,11 +88,11 @@ func (h *ASHandler) parsePostedSet(c echo.Context, p string, as *model.ASReceipt
 		CreatedBy:         ctxString(c, "user_id"),
 	}
 	model.ApplyVisitDateFromWork(&s, c.FormValue(p+"visit_date"))
-	if uid := strings.TrimSpace(c.FormValue(p + "assigned_user_id")); uid != "" && h.userRepo != nil {
-		if u, _ := h.userRepo.GetByID(uid); u != nil {
-			s.AssignedUserID = u.UserID
-			s.AssignedTo = u.FullName
-		}
+	if uid := strings.TrimSpace(firstNonEmpty(c.FormValue(p+"assigned_user_id"), s.AssignedUserID)); uid != "" {
+		s.AssignedUserID = uid
+	}
+	if n := resolvePersonLabel(h.userRepo, s.AssignedUserID, s.AssignedTo); n != "" {
+		s.AssignedTo = n
 	}
 	_ = c.Request().ParseForm()
 	vals := c.Request().PostForm[p+"leave_same"]
@@ -177,7 +177,7 @@ func actionSetTimeErrMessage(code string) string {
 }
 
 func (h *ASHandler) persistPostedSets(c echo.Context, as *model.ASReceipt, final bool) ([]model.ASActionSet, string) {
-	sets := h.collectPostedActionSets(c, as)
+	sets := fillEmptySetResultsFromForm(c, h.collectPostedActionSets(c, as))
 	if len(sets) == 0 {
 		if !final {
 			return nil, ""
@@ -225,9 +225,9 @@ func (h *ASHandler) SaveActionSet(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return c.JSON(http.StatusForbidden, map[string]string{"error": "읽기 전용입니다"})
@@ -277,7 +277,7 @@ func (h *ASHandler) SaveActionSet(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
 	}
-	got, _ := h.repo.GetByID(currentOrg(c), id)
+	got, _ := h.asInScope(c, id)
 	if got != nil && got.Status != beforeStatus {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "상태가 바뀌었습니다"})
 	}

@@ -18,7 +18,10 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
         <div class="min-w-0">
           {{if not $ro}}
-          {{template "assignee_picker" dict "Assignees" $root.Assignees "WorkGroups" $root.WorkGroups "Target" (printf "as-set-%d" $s.Seq) "Required" $root.AssigneeRequired "Label" "처리담당자" "AllowExternal" true "PickerNames" $root.PickerNames "OwnerID" $s.AssignedUserID}}
+          {{template "assignee_picker" dict "Assignees" $root.Assignees "WorkGroups" $root.WorkGroups "Target" (printf "as-set-%d" $s.Seq) "Required" $root.AssigneeRequired "Label" "처리담당자" "AllowExternal" true "PickerNames" $root.PickerNames "OwnerID" (or $s.AssignedUserID $root.PickerOwnerID) "SelectedIDs" (compactPickerIDs $s.AssignedUserID $root.PickerOwnerID) "ExternalName" (pickerPersonLabel (or $s.AssignedTo $root.PickerOwnerName))}}
+          {{if and $root.FocusAssignee (eq $root.ActionErr "assignee_required")}}
+          <p class="mt-1 text-xs text-danger" data-assignee-error>처리담당자를 선택하세요</p>
+          {{end}}
           {{else}}
           <p class="text-xs text-slate-500">처리담당자</p><p>{{if $s.AssignedTo}}{{$s.AssignedTo}}{{else}}—{{end}}</p>
           {{end}}

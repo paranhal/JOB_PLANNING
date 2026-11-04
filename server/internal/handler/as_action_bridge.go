@@ -98,6 +98,31 @@ func normalizeCauseFromSet(s *model.ASActionSet) {
 	s.CauseCat1Custom = ""
 }
 
+func formPostedAssigneeUserID(c echo.Context) bool {
+	if c == nil || c.Request() == nil {
+		return false
+	}
+	_ = c.Request().ParseForm()
+	_, ok := c.Request().PostForm["assignee_user_id"]
+	return ok
+}
+
+func fillEmptySetResultsFromForm(c echo.Context, posted []model.ASActionSet) []model.ASActionSet {
+	if c == nil || len(posted) == 0 {
+		return posted
+	}
+	rc := strings.TrimSpace(c.FormValue("result_code"))
+	if rc == "" {
+		return posted
+	}
+	for i := range posted {
+		if strings.TrimSpace(posted[i].ResultCode) == "" {
+			posted[i].ResultCode = rc
+		}
+	}
+	return posted
+}
+
 func (h *ASHandler) keepPostedAsDraft(c echo.Context, as *model.ASReceipt, posted []model.ASActionSet) {
 	if h == nil || h.setRepo == nil || as == nil || len(posted) == 0 {
 		return

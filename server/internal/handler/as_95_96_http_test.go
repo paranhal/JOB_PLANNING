@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
+	"golang.org/x/net/html"
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -226,5 +227,263 @@ func Test95_96_T8_CascadeSelectOnSetPage(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("js T8: %v\n%s", err, out)
+	}
+}
+
+func htmlAttr(n *html.Node, key string) string {
+	for _, a := range n.Attr {
+		if strings.EqualFold(a.Key, key) {
+			return a.Val
+		}
+	}
+	return ""
+}
+
+func htmlHasAttr(n *html.Node, key string) bool {
+	for _, a := range n.Attr {
+		if strings.EqualFold(a.Key, key) {
+			return true
+		}
+	}
+	return false
+}
+
+func htmlInnerText(n *html.Node) string {
+	var b strings.Builder
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			b.WriteString(n.Data)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return b.String()
+}
+
+func parseRenderedActionForm(page string) url.Values {
+	doc, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		return url.Values{}
+	}
+	form := url.Values{}
+	var walk func(*html.Node, bool)
+	walk = func(n *html.Node, inForm bool) {
+		if n.Type == html.ElementNode {
+			if n.Data == "form" {
+				inForm = strings.Contains(htmlAttr(n, "action"), "/update")
+			}
+			if inForm {
+				switch n.Data {
+				case "input":
+					name := htmlAttr(n, "name")
+					if name == "" {
+						break
+					}
+					typ := strings.ToLower(htmlAttr(n, "type"))
+					if typ == "" {
+						typ = "text"
+					}
+					switch typ {
+					case "submit", "button", "file", "image":
+					case "checkbox", "radio":
+						if htmlHasAttr(n, "checked") {
+							v := htmlAttr(n, "value")
+							if v == "" {
+								v = "on"
+							}
+							form.Add(name, v)
+						}
+					default:
+						form.Add(name, htmlAttr(n, "value"))
+					}
+				case "textarea":
+					if name := htmlAttr(n, "name"); name != "" {
+						form.Add(name, htmlInnerText(n))
+					}
+				case "select":
+					name := htmlAttr(n, "name")
+					if name == "" {
+						break
+					}
+					val := ""
+					var scan func(*html.Node)
+					scan = func(o *html.Node) {
+						if o.Type == html.ElementNode && o.Data == "option" && htmlHasAttr(o, "selected") {
+							val = htmlAttr(o, "value")
+						}
+						for c := o.FirstChild; c != nil; c = c.NextSibling {
+							scan(c)
+						}
+					}
+					scan(n)
+					form.Add(name, val)
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			next := inForm
+			if n.Type == html.ElementNode && n.Data == "form" && !strings.Contains(htmlAttr(n, "action"), "/update") {
+				next = false
+			}
+			walk(c, next)
+		}
+	}
+	walk(doc, false)
+	return form
+}
+
+func postASActionRaw(t *testing.T, e *echo.Echo, asID string, form url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/as/"+asID+"/update",
+		strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func fillRenderedSetCause(t *testing.T, form url.Values, cat1, cat2, cat3 string) {
+	t.Helper()
+	if _, ok := form["s1_cause_cat1"]; !ok {
+		t.Fatal("렌더 폼에 s1_cause_cat1 이 없다")
+	}
+	if _, ok := form["cause_cat1"]; !ok {
+		t.Fatal("렌더 폼에 접두어 없는 cause_cat1 숨은 칸이 없다")
+	}
+	form.Set("s1_cause_cat1", cat1)
+	form.Set("s1_cause_cat2", cat2)
+	form.Set("s1_cause_cat3", cat3)
+	form.Set("s1_process_type", "remote")
+	form.Set("s1_work_place", "office")
+	form.Set("s1_action_taken", "RFID 게이트 오류를 확인하고 재기동했습니다")
+	form.Set("s1_result_code", model.ResultDone)
+	form.Set("s1_leave_same", "1")
+	form.Set("action_short_ok", "1")
+	if _, ok := form["assignee_external"]; ok {
+		form.Set("assignee_external", "양기헌")
+	}
+	form.Set("cause_cat1", "")
+	form.Set("cause_cat1_custom", "")
+	form.Set("cause_cat2", "")
+	form.Set("cause_cat3", "")
+}
+
+func Test95_96_T10_RenderFormFinalSave(t *testing.T) {
+	cases := []struct {
+		name       string
+		c1, c2, c3 string
+	}{
+		{"rfid_with_l3", "rfid", "rfid.hw", "rfid.hw.part_check"},
+		{"l2_without_l3", "server", "server.hw", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e, h, asRepo, _, asID := newASActionFixture(t)
+			form := parseRenderedActionForm(getASActionPage(t, e, asID))
+			fillRenderedSetCause(t, form, tc.c1, tc.c2, tc.c3)
+			if strings.TrimSpace(form.Get("cause_cat1")) != "" || strings.TrimSpace(form.Get("cause_cat2")) != "" {
+				t.Fatal("접두어 없는 분류 칸이 채워져 있으면 렌더 폼 테스트가 아니다")
+			}
+			rec := postASActionRaw(t, e, asID, form)
+			if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+				t.Fatalf("T10 %s loc=%s", tc.name, rec.Header().Get("Location"))
+			}
+			got, err := asRepo.GetByID(repository.OrgAll, asID)
+			if err != nil || got == nil {
+				t.Fatal(err)
+			}
+			if got.CauseCat1 != tc.c1 || got.CauseCat2 != tc.c2 || got.CauseCat3 != tc.c3 {
+				t.Fatalf("접수 분류 %s/%s/%s", got.CauseCat1, got.CauseCat2, got.CauseCat3)
+			}
+			sets, _ := h.AS.setRepo.ListByAS(asID)
+			if len(sets) == 0 || sets[0].CauseCat1 != tc.c1 || sets[0].CauseCat2 != tc.c2 || sets[0].CauseCat3 != tc.c3 {
+				t.Fatalf("세트 분류 %+v", sets)
+			}
+		})
+	}
+}
+
+func Test95_96_T11_NoLegacyCausePrefill(t *testing.T) {
+	e, _, asRepo, _, asID := newASActionFixture(t)
+	form := parseRenderedActionForm(getASActionPage(t, e, asID))
+	fillRenderedSetCause(t, form, "rfid", "rfid.hw", "rfid.hw.part_check")
+	before := form.Encode()
+	fillCauseCatsFromLegacyType(form)
+	if form.Encode() != before {
+		t.Fatal("fillCauseCatsFromLegacyType 가 접두어 없는 분류를 보충했다 — T11은 그 경로를 쓰지 않는다")
+	}
+	if form.Get("cause_cat1") != "" || form.Get("s1_cause_cat1") != "rfid" {
+		t.Fatalf("T11 payload cat1=%q s1=%q", form.Get("cause_cat1"), form.Get("s1_cause_cat1"))
+	}
+	rec := postASActionRaw(t, e, asID, form)
+	loc := rec.Header().Get("Location")
+	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
+		t.Fatalf("T11 저장 실패 loc=%s", loc)
+	}
+	got, _ := asRepo.GetByID(repository.OrgAll, asID)
+	if got.CauseCat1 != "rfid" || got.CauseCat2 != "rfid.hw" || got.CauseCat3 != "rfid.hw.part_check" {
+		t.Fatalf("T11 cats %s/%s/%s", got.CauseCat1, got.CauseCat2, got.CauseCat3)
+	}
+}
+
+func Test95_96_T11_PreFixOverwriteWouldFail(t *testing.T) {
+	e, h, _, _, asID := newASActionFixture(t)
+	form := parseRenderedActionForm(getASActionPage(t, e, asID))
+	fillRenderedSetCause(t, form, "rfid", "rfid.hw", "rfid.hw.part_check")
+	as, err := h.AS.repo.GetByID(repository.OrgAll, asID)
+	if err != nil || as == nil {
+		t.Fatal(err)
+	}
+	posted := []model.ASActionSet{{
+		Seq: 1, CauseCat1: form.Get("s1_cause_cat1"), CauseCat2: form.Get("s1_cause_cat2"),
+		CauseCat3: form.Get("s1_cause_cat3"), ActionTaken: form.Get("s1_action_taken"),
+		ResultCode: form.Get("s1_result_code"), WorkPlace: "office", ProcessType: "remote",
+	}}
+	last := model.LastCommittedActionSet(posted)
+	if last == nil {
+		t.Fatal("세트 없음")
+	}
+	model.CopyActionSetOntoReceipt(as, *last)
+	if as.CauseCat1 != "rfid" {
+		t.Fatalf("복사 후 %s", as.CauseCat1)
+	}
+	_ = model.ApplyCauseCat1(as, form.Get("cause_cat1"), form.Get("cause_cat1_custom"))
+	as.CauseCat2 = strings.TrimSpace(form.Get("cause_cat2"))
+	as.CauseCat3 = strings.TrimSpace(form.Get("cause_cat3"))
+	cats, _ := h.AS.listCauseCategoriesForAS(as)
+	code := actionCauseCatMissingErr(as, cats)
+	if code != "cause_cat1" {
+		t.Fatalf("수정 전 덮어쓰기면 cause_cat1 이어야 한다 code=%s cat1=%s", code, as.CauseCat1)
+	}
+}
+
+func Test95_96_T4_ErrorOrder(t *testing.T) {
+	steps := []struct {
+		c1, c2, c3, want string
+	}{
+		{"", "", "", "cause_cat1"},
+		{"rfid", "", "", "cause_cat2"},
+		{"rfid", "rfid.hw", "", "cause_cat3"},
+	}
+	for _, st := range steps {
+		e, _, _, _, asID := newASActionFixture(t)
+		form := parseRenderedActionForm(getASActionPage(t, e, asID))
+		fillRenderedSetCause(t, form, st.c1, st.c2, st.c3)
+		rec := postASActionRaw(t, e, asID, form)
+		loc := rec.Header().Get("Location")
+		if rec.Code != http.StatusSeeOther || !strings.Contains(loc, "err="+st.want) {
+			t.Fatalf("want err=%s loc=%s", st.want, loc)
+		}
+		page := getASActionQuery(t, e, loc)
+		if !strings.Contains(page, "조치 1:") {
+			t.Fatalf("접두 문구 없음 %s", st.want)
+		}
+		if !strings.Contains(getASActionPage(t, e, asID), "RFID 게이트 오류를 확인하고 재기동했습니다") {
+			t.Fatal("오류 후 입력 유실")
+		}
 	}
 }

@@ -34,7 +34,9 @@
     appendDraftFlag: appendDraftFlag,
     copyWorkDateToVisit: copyWorkDateToVisit,
     missingLine: missingLine,
-    toggleOpen: null
+    toggleOpen: null,
+    mirrorLast: null,
+    prepareSubmit: null
   };
 
   var form = document.getElementById('as-action-form');
@@ -231,6 +233,50 @@
     syncTimes(root);
     syncVisitHint(root);
   }
+  function controlHidden(el) {
+    if (!el) return true;
+    if (el.disabled || el.type === 'hidden') return true;
+    if (el.classList.contains('hidden') || el.hasAttribute('hidden')) return true;
+    if (el.getAttribute('aria-hidden') === 'true') return true;
+    if (el.closest('.hidden, [hidden], [aria-hidden="true"]')) return true;
+    return false;
+  }
+  function clearHiddenRequired(root) {
+    (root || document).querySelectorAll('[required]').forEach(function (el) {
+      if (controlHidden(el)) {
+        el.required = false;
+        el.removeAttribute('required');
+      }
+    });
+  }
+  function clientErrBox() {
+    var el = document.getElementById('as-action-client-err');
+    if (el) return el;
+    el = document.createElement('p');
+    el.id = 'as-action-client-err';
+    el.className = 'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700';
+    el.setAttribute('data-as-client-err', '1');
+    if (form.firstChild) form.insertBefore(el, form.firstChild);
+    else form.appendChild(el);
+    return el;
+  }
+  function showConstraintFailure(el) {
+    var set = el && el.closest && el.closest('.as-action-set');
+    if (set) toggleOpen(set, true);
+    var name = (el && (el.getAttribute('name') || el.id)) || '';
+    var label = missingLabels[name] || missingLabels[name.replace(/^s\d+_/, '')] || name || '필수 항목';
+    var box = clientErrBox();
+    box.textContent = '저장하려면 이 칸을 채워 주세요: ' + label;
+    box.classList.remove('hidden');
+    try {
+      if (el && el.focus) el.focus();
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+    } catch (err) {}
+  }
+  function prepareSubmit() {
+    mirrorLast();
+    clearHiddenRequired();
+  }
   function mirrorLast() {
     var last = lastSet();
     if (!last) return;
@@ -295,7 +341,34 @@
     cloneSet();
   });
   box.querySelectorAll('.as-action-set').forEach(bindSet);
-  form.addEventListener('submit', function () { mirrorLast(); });
+  global.ASActionSets.mirrorLast = mirrorLast;
+  global.ASActionSets.prepareSubmit = prepareSubmit;
+  document.addEventListener('click', function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest('[type="submit"]') : null;
+    if (!btn) return;
+    var f = btn.form || (btn.getAttribute('form') ? document.getElementById(btn.getAttribute('form')) : null);
+    if (f !== form) return;
+    prepareSubmit();
+    if (form.checkValidity()) return;
+    e.preventDefault();
+    showConstraintFailure(form.querySelector(':invalid'));
+  }, true);
+  form.addEventListener('invalid', function (e) {
+    e.preventDefault();
+    showConstraintFailure(e.target);
+  }, true);
+  form.addEventListener('submit', function (e) {
+    var last = lastSet();
+    var rs = last && field(last, '.as-set-result');
+    var rc = document.getElementById('as-result-code');
+    if (rs && rc && !rs.value && rc.value) rs.value = rc.value;
+    prepareSubmit();
+    if (rs && !String(rs.value || '').trim()) {
+      e.preventDefault();
+      toggleOpen(last, true);
+      showConstraintFailure(rs);
+    }
+  }, true);
   window.addEventListener('beforeunload', function (e) {
     var dirty = false;
     box.querySelectorAll('.as-action-set').forEach(function (root) {

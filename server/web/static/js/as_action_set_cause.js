@@ -46,39 +46,37 @@
       var isCustom = cat1.value === 'custom';
       if (customWrap) customWrap.classList.toggle('hidden', !isCustom);
       if (customInp) {
-        customInp.required = isCustom;
-        if (!isCustom) {
-          customInp.value = '';
-          customInp.removeAttribute('required');
-        }
+        customInp.required = false;
+        customInp.removeAttribute('required');
+        if (!isCustom) customInp.value = '';
       }
       if (isCustom) {
         if (wrap2) wrap2.classList.add('hidden');
         if (wrap3) wrap3.classList.add('hidden');
-        if (cat2) { cat2.value = ''; cat2.required = false; }
-        if (cat3) { cat3.value = ''; cat3.required = false; }
+        if (cat2) { cat2.value = ''; cat2.required = false; cat2.removeAttribute('required'); }
+        if (cat3) { cat3.value = ''; cat3.required = false; cat3.removeAttribute('required'); }
         return;
       }
       var l2 = childrenOf(cats, cat1.value, 2);
       if (wrap2) wrap2.classList.toggle('hidden', l2.length === 0);
       if (l2.length === 0) {
-        if (cat2) { cat2.value = ''; cat2.required = false; }
+        if (cat2) { cat2.value = ''; cat2.required = false; cat2.removeAttribute('required'); }
         if (wrap3) wrap3.classList.add('hidden');
-        if (cat3) { cat3.value = ''; cat3.required = false; }
+        if (cat3) { cat3.value = ''; cat3.required = false; cat3.removeAttribute('required'); }
         return;
       }
       var cur2 = resetLower ? '' : ((cat2 && (cat2.value || cat2.getAttribute('data-current'))) || '');
       fill(cat2, l2, cur2);
-      if (cat2) cat2.required = l2.length > 0;
+      if (cat2) { cat2.required = false; cat2.removeAttribute('required'); }
       var l3 = childrenOf(cats, cat2 ? cat2.value : '', 3);
       if (wrap3) wrap3.classList.toggle('hidden', l3.length === 0);
       if (l3.length === 0) {
-        if (cat3) { cat3.value = ''; cat3.required = false; }
+        if (cat3) { cat3.value = ''; cat3.required = false; cat3.removeAttribute('required'); }
         return;
       }
       var cur3 = resetLower ? '' : ((cat3 && (cat3.value || cat3.getAttribute('data-current'))) || '');
       fill(cat3, l3, cur3);
-      if (cat3) cat3.required = true;
+      if (cat3) { cat3.required = false; cat3.removeAttribute('required'); }
     }
     cat1.addEventListener('change', function () { sync(true); });
     if (cat2) cat2.addEventListener('change', function () { sync(false); });

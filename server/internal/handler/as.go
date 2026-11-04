@@ -49,6 +49,31 @@ type ASHandler struct {
 	reportDocxPath      string
 }
 
+func (h *ASHandler) asInScope(c echo.Context, id string) (*model.ASReceipt, error) {
+	if h == nil || h.repo == nil {
+		return nil, echo.ErrNotFound
+	}
+	as, err := h.repo.GetByID(scopeOrgForRead(c), strings.TrimSpace(id))
+	if err != nil || as == nil {
+		return nil, echo.ErrNotFound
+	}
+	if err := denyUnlessCanView(c, as); err != nil {
+		return nil, err
+	}
+	return as, nil
+}
+
+func (h *ASHandler) asWritable(c echo.Context, id string) (*model.ASReceipt, error) {
+	as, err := h.asInScope(c, id)
+	if err != nil {
+		return nil, err
+	}
+	if !CanWriteOrg(c, as.OrgID) {
+		return nil, echo.ErrForbidden
+	}
+	return as, nil
+}
+
 func (h *ASHandler) List(c echo.Context) error {
 	status := c.QueryParam("status")
 	search := c.QueryParam("search")
@@ -610,9 +635,12 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 		} else if assignedCode != "" {
 			if u, _ := h.userRepo.GetByID(assignedCode); u != nil {
 				assignedUID = u.UserID
-				assignedName = u.FullName
+				assignedName = pickerDisplayName(*u)
+			} else if n := resolvePersonLabel(h.userRepo, assignedCode, ""); n != "" {
+				assignedUID = assignedCode
+				assignedName = n
 			} else {
-				assignedName = assignedCode
+				assignedName = pickerPersonLabel(assignedCode)
 			}
 		} else if v := c.FormValue("assigned_to"); v != "" {
 			assignedName = v
@@ -862,9 +890,9 @@ func (h *ASHandler) CustomerMatch(c echo.Context) error {
 
 func (h *ASHandler) UpdateCustomerDirect(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if !canEditASReceipt(c, as) {
 		return redirectASReceiptEditDenied(c, id, "action")
@@ -1013,9 +1041,9 @@ func (h *ASHandler) renderASNewDup(c echo.Context, base *model.ASReceipt, rows [
 
 func (h *ASHandler) Edit(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asInScope(c, id)
+	if err != nil {
+		return err
 	}
 	if !canEditASReceipt(c, as) {
 		return redirectASReceiptEditDenied(c, id, "show")
@@ -1064,9 +1092,9 @@ func (h *ASHandler) Edit(c echo.Context) error {
 
 func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	id := c.Param("id")
-	existing, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || existing == nil {
-		return echo.ErrNotFound
+	existing, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if !canEditASReceipt(c, existing) {
 		return redirectASReceiptEditDenied(c, id, "show")
@@ -1112,9 +1140,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 // UpdateVisitDate 상세에서 방문 예정일만 수정 (관리자·배정담당자)
 func (h *ASHandler) UpdateVisitDate(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if !canEditVisitDate(c, as) {
 		return echo.ErrForbidden
@@ -1148,9 +1176,9 @@ func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 
 func (h *ASHandler) Show(c echo.Context) error {
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asInScope(c, id)
+	if err != nil {
+		return err
 	}
 
 	embed := c.QueryParam("embed") == "1"
@@ -1175,7 +1203,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 	followups, _ := h.repo.ListTransferFollowups(as.ASID)
 	var parent *model.ASReceipt
 	if as.ParentASID != "" {
-		parent, _ = h.repo.GetByID(currentOrg(c), as.ParentASID)
+		parent, _ = h.asInScope(c, as.ParentASID)
 	}
 	assignees := listAssignableForPicker(h.userRepo, c)
 
@@ -1293,9 +1321,9 @@ func (h *ASHandler) Action(c echo.Context) error {
 	if draft, ok := c.Get("as_receipt_draft").(*model.ASReceipt); ok && draft != nil {
 		as = draft
 	} else {
-		as, err = h.repo.GetByID(currentOrg(c), id)
-		if err != nil || as == nil {
-			return echo.ErrNotFound
+		as, err = h.asInScope(c, id)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -1330,7 +1358,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 
 	var parent *model.ASReceipt
 	if as.ParentASID != "" {
-		parent, _ = h.repo.GetByID(currentOrg(c), as.ParentASID)
+		parent, _ = h.asInScope(c, as.ParentASID)
 	}
 	followups, _ := h.repo.ListTransferFollowups(as.ASID)
 
@@ -1377,6 +1405,12 @@ func (h *ASHandler) Action(c echo.Context) error {
 	if readOnly && !closed {
 		titleSuffix = " · 조치 (조회)"
 	}
+	asPickerStored := map[string]string{}
+	if id := strings.TrimSpace(as.AssignedUserID); id != "" {
+		asPickerStored[id] = as.AssignedTo
+	}
+	assignees = ensurePickerUsersNamed(h.userRepo, assignees, asPickerStored, as.AssignedUserID)
+	as.AssignedTo = userDisplayName(h.userRepo, as.AssignedUserID, as.AssignedTo)
 
 	data := map[string]interface{}{
 		"Title": as.ASNumber + titleSuffix, "Active": NavAS, "AS": as,
@@ -1390,9 +1424,10 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CauseFreeInput":       model.CauseCatalogEmpty(causeCats),
 		"ActionResults":        model.ActionResultOptions(),
 		"Assignees":            assignees,
-		"PickerNames":          pickerNamesFor(h.userRepo, assignees, as.AssignedUserID, currentUserID(c)),
-		"PickerOwnerID":        as.AssignedUserID,
-		"PickerUserIDs":        []string{as.AssignedUserID},
+		"PickerNames":          overlayPickerStoredNames(h.userRepo, pickerNamesFor(h.userRepo, assignees, as.AssignedUserID), asPickerStored),
+		"PickerOwnerID":        pickerOwnerID(assignees, as),
+		"PickerUserIDs":        pickerSelectedIDs(assignees, as),
+		"PickerOwnerName":      userDisplayName(h.userRepo, as.AssignedUserID, as.AssignedTo),
 		"WorkGroups":           h.visibleWorkGroups(c),
 		"GroupMembers":         h.groupMembersForAS(c, as),
 		"Contacts":             contacts,
@@ -1441,14 +1476,24 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CanEditReceipt":       canSaveASReceipt(c, as, canMod),
 		"CanDelete":            h.canDeleteThis(c, as),
 	}
+	if n := resolvePersonLabel(h.userRepo, as.AssignedUserID, as.AssignedTo); n != "" {
+		as.AssignedTo = n
+	}
 	if sets, ok := data["ActionSets"].([]model.ASActionSet); ok && len(sets) > 0 {
 		extraIDs := []string{as.AssignedUserID, currentUserID(c)}
-		for _, s := range sets {
-			extraIDs = append(extraIDs, s.AssignedUserID)
+		for i := range sets {
+			if n := resolvePersonLabel(h.userRepo, sets[i].AssignedUserID, sets[i].AssignedTo); n != "" {
+				sets[i].AssignedTo = n
+			}
+			extraIDs = append(extraIDs, sets[i].AssignedUserID)
 		}
 		assignees = ensurePickerUsers(h.userRepo, assignees, extraIDs...)
 		data["Assignees"] = assignees
 		data["PickerNames"] = pickerNamesFor(h.userRepo, assignees, extraIDs...)
+		if oid := pickerOwnerID(assignees, as); oid != "" {
+			data["PickerOwnerID"] = oid
+			data["PickerUserIDs"] = []string{oid}
+		}
 		data["DraftSetN"] = countSavedActionSets(sets)
 		data["LastActionSet"] = sets[len(sets)-1]
 		stored := 0
@@ -1526,9 +1571,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	prevTo, prevUID := as.AssignedTo, as.AssignedUserID
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
@@ -1537,20 +1582,31 @@ func (h *ASHandler) Update(c echo.Context) error {
 
 	// 접수담당은 배정만, 기술/관리자는 처리 필드 포함
 	if strings.TrimSpace(c.FormValue("assignee_multi")) == "1" {
-		sel, err := ParseSelection(c, h.pickerDeps(), PickerSpec{
-			AllowGroups: true, AllowExternal: true, Required: requiresAssigneeChoice(c),
-		})
-		if err != nil {
-			return rejectPickerErr(c, err, asOpenHrefQuery(id, ""))
-		}
-		if !sel.Empty() {
-			as.AssignedTo = sel.PrimaryName
-			as.AssignedUserID = sel.PrimaryUserID
-			if gid := sel.GroupID(); gid != "" || c.FormValue("work_group_present") == "1" {
-				as.WorkGroupID = gid
+		if formPostedAssigneeUserID(c) || strings.TrimSpace(c.FormValue("assignee_external")) != "" {
+			sel, err := ParseSelection(c, h.pickerDeps(), PickerSpec{
+				AllowGroups: true, AllowExternal: true, Required: requiresAssigneeChoice(c),
+			})
+			if err != nil {
+				h.keepPostedAsDraft(c, as, h.collectPostedActionSets(c, as))
+				return rejectPickerErr(c, err, asOpenHrefQuery(id, ""))
 			}
-			_ = repository.SaveAssignees(h.db, repository.AssigneeTargetASReceipt, as.ASID, sel.People, sel.GroupID())
+			if !sel.Empty() {
+				as.AssignedUserID = sel.PrimaryUserID
+				if n := resolvePersonLabel(h.userRepo, sel.PrimaryUserID, sel.PrimaryName); n != "" {
+					as.AssignedTo = n
+				} else {
+					as.AssignedTo = sel.PrimaryName
+				}
+				if gid := sel.GroupID(); gid != "" || c.FormValue("work_group_present") == "1" {
+					as.WorkGroupID = gid
+				}
+				_ = repository.SaveAssignees(h.db, repository.AssigneeTargetASReceipt, as.ASID, sel.People, sel.GroupID())
+			} else if requiresAssigneeChoice(c) {
+				h.keepPostedAsDraft(c, as, h.collectPostedActionSets(c, as))
+				return rejectAssigneeRequired(c, asOpenHrefQuery(id, ""))
+			}
 		}
+		// assignee_user_id 키가 없으면 접수에 저장된 담당자를 유지한다. 로그인 사용자로 채우지 않는다.
 	}
 	if strings.TrimSpace(c.FormValue("assignee_multi")) != "1" {
 		assignedCode := c.FormValue("assigned_to_code")
@@ -1560,9 +1616,12 @@ func (h *ASHandler) Update(c echo.Context) error {
 		} else if assignedCode != "" {
 			if u, _ := h.userRepo.GetByID(assignedCode); u != nil {
 				as.AssignedUserID = u.UserID
-				as.AssignedTo = u.FullName
+				as.AssignedTo = pickerDisplayName(*u)
+			} else if n := resolvePersonLabel(h.userRepo, assignedCode, ""); n != "" {
+				as.AssignedUserID = assignedCode
+				as.AssignedTo = n
 			} else {
-				as.AssignedTo = assignedCode
+				as.AssignedTo = pickerPersonLabel(assignedCode)
 			}
 		} else if v := c.FormValue("assigned_to"); v != "" {
 			as.AssignedTo = v
@@ -1571,11 +1630,16 @@ func (h *ASHandler) Update(c echo.Context) error {
 					for _, u := range users {
 						if strings.TrimSpace(u.FullName) == strings.TrimSpace(v) || u.Username == v {
 							as.AssignedUserID = u.UserID
-							as.AssignedTo = u.FullName
+							as.AssignedTo = pickerDisplayName(u)
 							break
 						}
 					}
 				}
+			}
+			if n := resolvePersonLabel(h.userRepo, as.AssignedUserID, as.AssignedTo); n != "" {
+				as.AssignedTo = n
+			} else {
+				as.AssignedTo = pickerPersonLabel(as.AssignedTo)
 			}
 		}
 		if gid := strings.TrimSpace(c.FormValue("work_group_id")); gid != "" || c.FormValue("work_group_present") == "1" {
@@ -1583,6 +1647,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		}
 	}
 	if requiresAssigneeChoice(c) && !assigneeFilled(as.AssignedTo, as.AssignedUserID, as.WorkGroupID) {
+		h.keepPostedAsDraft(c, as, h.collectPostedActionSets(c, as))
 		return rejectAssigneeRequired(c, asOpenHrefQuery(id, ""))
 	}
 	if strings.TrimSpace(as.WorkGroupID) != "" && strings.TrimSpace(c.FormValue("assignee_multi")) != "1" {
@@ -1605,7 +1670,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 		as.ActionTaken = strings.TrimSpace(c.FormValue("action_taken"))
 		formResult = strings.TrimSpace(c.FormValue("result_code"))
 		as.ResultCode = formResult
-		posted := h.collectPostedActionSets(c, as)
+		posted := fillEmptySetResultsFromForm(c, h.collectPostedActionSets(c, as))
 		fv := newActionFormView(c, posted)
 		as.ProcessTypeReason = strings.TrimSpace(fv.Get("process_type_reason"))
 		na := fv.Get("action_na") == "1"
@@ -2193,7 +2258,7 @@ func actionErrMessage(code string) string {
 	case "schedule_date":
 		return "일정 확정 시 예정업무일을 먼저 입력하세요."
 	case errAssigneeRequired:
-		return msgAssigneeRequired
+		return "처리담당자를 선택하세요"
 	default:
 		return code
 	}
@@ -2365,9 +2430,9 @@ func (h *ASHandler) Hold(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "action")
@@ -2398,9 +2463,9 @@ func (h *ASHandler) ReleaseHold(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if as.Status != "hold" {
 		return c.Redirect(http.StatusSeeOther, asOpenHref(id))
@@ -2424,9 +2489,9 @@ func (h *ASHandler) Transfer(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "action")
@@ -2443,9 +2508,9 @@ func (h *ASHandler) CompleteTransfer(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "action")
@@ -2467,9 +2532,9 @@ func (h *ASHandler) Cancel(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	as, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "action")
@@ -2516,6 +2581,10 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	asID := c.Param("id")
+	asRow, err := h.asWritable(c, asID)
+	if err != nil {
+		return err
+	}
 	timeSpent, _ := strconv.Atoi(c.FormValue("time_spent"))
 	if timeSpent <= 0 {
 		timeSpent = h.actionDurationMin(asID)
@@ -2543,16 +2612,10 @@ func (h *ASHandler) AddProcess(c echo.Context) error {
 	} else {
 		p.ProcessDatetime = time.Now()
 	}
-	if strings.TrimSpace(p.Worker) == "" {
-		if as, err := h.repo.GetByID(currentOrg(c), asID); err == nil && as != nil && strings.TrimSpace(as.AssignedTo) != "" {
-			p.Worker = as.AssignedTo
-		}
+	if strings.TrimSpace(p.Worker) == "" && strings.TrimSpace(asRow.AssignedTo) != "" {
+		p.Worker = asRow.AssignedTo
 	}
-	if as, err := h.repo.GetByID(currentOrg(c), asID); err == nil {
-		h.stampActedBy(c, p, as)
-	} else {
-		h.stampActedBy(c, p, nil)
-	}
+	h.stampActedBy(c, p, asRow)
 	if err := h.processRepo.Create(p); err != nil {
 		return err
 	}
@@ -2567,9 +2630,9 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 	id := c.Param("id")
-	src, err := h.repo.GetByID(currentOrg(c), id)
-	if err != nil || src == nil {
-		return echo.ErrNotFound
+	src, err := h.asWritable(c, id)
+	if err != nil {
+		return err
 	}
 	if !model.CanReopenAS(src.Status) {
 		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+url.QueryEscape("완료·종료된 건만 재접수할 수 있습니다")))
@@ -2593,7 +2656,7 @@ func (h *ASHandler) Reopen(c echo.Context) error {
 	if code := strings.TrimSpace(c.FormValue("assigned_to_code")); code != "" {
 		if u, _ := h.userRepo.GetByID(code); u != nil {
 			as.AssignedUserID = u.UserID
-			as.AssignedTo = u.FullName
+			as.AssignedTo = pickerDisplayName(*u)
 		}
 	}
 	as.VisitScheduledDate = normalizeVisitDate(c.FormValue("visit_scheduled_date"))
@@ -2625,9 +2688,9 @@ func (h *ASHandler) DeleteProcess(c echo.Context) error {
 	}
 	asID := c.Param("id")
 	processID := c.Param("process_id")
-	as, err := h.repo.GetByID(currentOrg(c), asID)
-	if err != nil || as == nil {
-		return echo.ErrNotFound
+	as, err := h.asWritable(c, asID)
+	if err != nil {
+		return err
 	}
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, asID, "action")
