@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
+
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -169,4 +171,100 @@ func Test95_123_T4_EditDropsProgressKeepsItems(t *testing.T) {
 		t.Fatal("상세에 기존 작업 항목이 없다")
 	}
 	_ = repo
+}
+
+func Test95_123_T5_OrderingPartyCustomerCombo(t *testing.T) {
+	dir := t.TempDir()
+	db, err := repository.InitDB(filepath.Join(dir, "d123-t5.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repository.NewUserRepo(db).EnsureAdmin(HashPassword("admin"))
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id, has_parent, party_kind)
+		VALUES ('C-EDU','충남교육청','충청남도교육청',1,'O01',0,'customer')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id, has_parent, party_kind)
+		VALUES ('C-SCH','공주생명과학고등학교','공주생명과학고등학교',1,'O01',0,'customer')`); err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	h := New(db)
+	g := e.Group("")
+	g.Use(h.Auth.AuthMiddleware)
+	g.GET("/lookup/customers", h.Customer.LookupJSON)
+	g.GET("/projects/new", h.Project.New)
+	g.POST("/projects", h.Project.Create)
+	g.GET("/projects/:id", h.Project.Show)
+	g.GET("/projects/:id/edit", h.Project.Edit)
+	g.POST("/projects/:id", h.Project.Update)
+	g.GET("/workboard/register", h.Workboard.Register)
+	ck := jwtCookie(t)
+
+	page := doGetWith(t, e, "/projects/new", ck)
+	if page.Code != http.StatusOK {
+		t.Fatalf("new %d", page.Code)
+	}
+	body := page.Body.String()
+	if strings.Contains(body, `<select name="ordering_party_id"`) || strings.Contains(body, `<select name="customer_id"`) {
+		t.Fatal("사업 등록에 select 목록이 남아 있다")
+	}
+	if !strings.Contains(body, "발주처 검색") || !strings.Contains(body, "고객명으로 찾기") {
+		t.Fatal("발주처·고객 검색 콤보가 없다")
+	}
+	if !strings.Contains(body, "customerCombo") {
+		t.Fatal("customerCombo 가 없다")
+	}
+
+	hit := doGetWith(t, e, "/lookup/customers?scope=party&q="+url.QueryEscape("충남")+"&limit=20", ck)
+	if hit.Code != http.StatusOK || !strings.Contains(hit.Body.String(), "C-EDU") {
+		t.Fatalf("검색 %d %s", hit.Code, hit.Body.String())
+	}
+
+	rec := doFormWith(t, e, "/projects", url.Values{
+		"name": {"검색사업"}, "status": {"active"}, "is_paid": {"1"},
+		"project_kind": {"build"}, "org_id": {"O01"},
+		"ordering_party_id": {"C-EDU"}, "customer_id": {"C-SCH"},
+	}, ck)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("등록 %d %s", rec.Code, rec.Body.String()[:min(400, rec.Body.Len())])
+	}
+	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
+	show := doGetWith(t, e, "/projects/"+id, ck).Body.String()
+	if !strings.Contains(show, "충남교육청") {
+		t.Fatal("상세에 발주처 이름이 없다")
+	}
+	edit := doGetWith(t, e, "/projects/"+id+"/edit", ck).Body.String()
+	if !strings.Contains(edit, "C-EDU") || !strings.Contains(edit, "C-SCH") {
+		t.Fatal("수정 화면에 선택값이 없다")
+	}
+	keep := doFormWith(t, e, "/projects/"+id, url.Values{
+		"name": {"검색사업"}, "status": {"active"}, "is_paid": {"1"},
+		"project_kind": {"build"}, "org_id": {"O01"},
+		"ordering_party_id": {"C-EDU"}, "customer_id": {"C-SCH"},
+	}, ck)
+	if keep.Code != http.StatusSeeOther {
+		t.Fatalf("수정 저장 %d", keep.Code)
+	}
+
+	custom := doFormWith(t, e, "/projects", url.Values{
+		"name": {"직접입력사업"}, "status": {"active"}, "is_paid": {"1"},
+		"project_kind": {"build"}, "org_id": {"O01"},
+		"ordering_party_id": {"custom"}, "ordering_party_custom": {"비전직접발주"},
+	}, ck)
+	if custom.Code != http.StatusSeeOther {
+		t.Fatalf("직접입력 %d", custom.Code)
+	}
+	cid := strings.TrimPrefix(strings.Split(custom.Header().Get("Location"), "?")[0], "/projects/")
+	cshow := doGetWith(t, e, "/projects/"+cid, ck).Body.String()
+	if !strings.Contains(cshow, "비전직접발주") {
+		t.Fatal("직접입력 발주처가 상세에 없다")
+	}
+
+	reg := doGetWith(t, e, "/workboard/register?view=day", ck).Body.String()
+	if strings.Contains(reg, `<select name="ordering_party_id"`) {
+		t.Fatal("일정표 사업 모달에 발주처 select가 남아 있다")
+	}
 }

@@ -66,15 +66,13 @@ func TestCustomerComboSelectLint(t *testing.T) {
 		"project/sites_pick.html":      "체크박스",
 		"as/knowledge.html":            "사례 건수 있는 사이트 목록(.Sites) — 마스터 콤보 아님",
 		"sales/form.html":              "후속: ScopeParty 콤보",
-		"project/form.html":            "후속: ScopeParty 콤보",
 		"contact/form.html":            "후속",
 		"contact_history/list.html":    "후속 필터",
 		"asset/form.html":              "후속",
 		"asset/list.html":              "후속 필터",
 		"relation/form.html":           "후속",
 		"space/list.html":              "후속 필터",
-		"admin_work/form.html":         "후속",
-		"workboard/_modals.html":       "발주처 ordering_party_id 후속",
+		"admin_work/form.html": "후속",
 	}
 	root := findTemplateRoot(t)
 	selRe := regexp.MustCompile(`(?is)<select[^>]*name="(customer_id|ordering_party_id|end_customer_id)"`)

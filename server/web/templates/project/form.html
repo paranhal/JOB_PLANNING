@@ -89,22 +89,25 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">발주처</label>
-        <select name="ordering_party_id" x-model="orderingPartyId" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 —</option>
-          {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
-          <option value="custom">직접입력</option>
-        </select>
-        <input x-show="orderingPartyId === 'custom'" x-cloak type="text" name="ordering_party_custom"
-               value="{{.Project.OrderingParty}}" class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주처 직접입력">
+        <label class="inline-flex items-center gap-1.5 text-xs text-gray-600 mb-1">
+          <input type="checkbox" class="rounded" x-model="orderingCustom"> 직접입력
+        </label>
+        <template x-if="!orderingCustom">
+          <div>
+            {{template "customer_combo" dict "Name" "ordering_party_id" "Scope" "party" "Value" .Project.OrderingPartyID "Placeholder" "발주처 검색"}}
+          </div>
+        </template>
+        <template x-if="orderingCustom">
+          <div>
+            <input type="hidden" name="ordering_party_id" value="custom">
+            <input type="text" name="ordering_party_custom" value="{{.Project.OrderingParty}}"
+                   class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주처 직접입력">
+          </div>
+        </template>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">고객</label>
-        <select name="customer_id" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 —</option>
-          {{range .Customers}}
-          <option value="{{.CustomerID}}" {{if eq $.Project.CustomerID .CustomerID}}selected{{end}}>{{.OrgName}}</option>
-          {{end}}
-        </select>
+        {{template "customer_combo" dict "Name" "customer_id" "Scope" "party" "Value" .Project.CustomerID "Placeholder" "고객명으로 찾기"}}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -240,6 +243,7 @@ function projectForm() {
   let initial = [];
   try { initial = JSON.parse({{toJSON .RulesJSON}}); } catch (e) { initial = []; }
   return {
+    orderingCustom: {{if or (eq .Project.OrderingPartyID "custom") (and .Project.OrderingParty (not .Project.OrderingPartyID))}}true{{else}}false{{end}},
     orderingPartyId: {{if .Project.OrderingPartyID}}{{toJSON .Project.OrderingPartyID}}{{else if .Project.OrderingParty}}"custom"{{else}}""{{end}},
     rules: Array.isArray(initial) ? initial : [],
     addRule() {

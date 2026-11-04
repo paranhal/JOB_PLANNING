@@ -453,6 +453,7 @@
     <form method="post" action="/workboard/projects" class="p-5 space-y-4"
           x-data="{
             orderingPartyId: '',
+            orderingCustom: false,
             customerId: '',
             contactId: '',
             contractMode: '',
@@ -490,7 +491,7 @@
                 window.location.href = '/contacts/new' + q;
               }
             }
-          }" x-init="resetContactSelect()">
+          }" x-init="resetContactSelect(); $watch('customerId', () => loadContacts())">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else if eq .View "list"}}/workboard/tasks{{else}}/workboard/kanban{{end}}">
       <input type="hidden" name="color" value="#3B82F6">
       <div>
@@ -499,14 +500,21 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-ink mb-1">발주처</label>
-        <select name="ordering_party_id" x-model="orderingPartyId" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 —</option>
-          {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
-          <option value="custom">직접입력</option>
-        </select>
-        <input x-show="orderingPartyId === 'custom'" x-cloak type="text" name="ordering_party_custom"
-               class="mt-2 w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주 기관·업체 직접입력">
-        <a x-show="orderingPartyId && orderingPartyId !== 'custom'" x-cloak
+        <label class="inline-flex items-center gap-1.5 text-xs text-ink-muted mb-1">
+          <input type="checkbox" class="rounded" x-model="orderingCustom"> 직접입력
+        </label>
+        <template x-if="!orderingCustom">
+          <div>
+            {{template "customer_combo" dict "Name" "ordering_party_id" "Scope" "party" "Placeholder" "발주처 검색" "SyncKey" "orderingPartyId"}}
+          </div>
+        </template>
+        <template x-if="orderingCustom">
+          <div>
+            <input type="hidden" name="ordering_party_id" value="custom">
+            <input type="text" name="ordering_party_custom" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="발주 기관·업체 직접입력">
+          </div>
+        </template>
+        <a x-show="!orderingCustom && orderingPartyId" x-cloak
            :href="'/customers/' + orderingPartyId"
            class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
           발주처 상세 보기 →
@@ -514,10 +522,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-ink mb-1">고객명</label>
-        <select name="customer_id" x-model="customerId" @change="loadContacts()" class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 —</option>
-          {{range .Customers}}<option value="{{.CustomerID}}">{{.OrgName}}</option>{{end}}
-        </select>
+        {{template "customer_combo" dict "Name" "customer_id" "Scope" "party" "Placeholder" "고객명으로 찾기" "SyncKey" "customerId"}}
         <a x-show="customerId" x-cloak
            :href="'/customers/' + customerId"
            class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">

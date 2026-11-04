@@ -1,5 +1,5 @@
 {{define "customer_combo"}}
-<div class="combobox" {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}})' @keydown.escape.window="open=false">
+<div class="combobox" {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}}, {{toJSON .SyncKey}})' @keydown.escape.window="open=false">
   <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}customer_id{{end}}" x-ref="hid" :value="selectedId" {{if .Required}}required{{end}}>
   <input type="search" class="input" autocomplete="off" role="combobox" :placeholder="placeholder"
          aria-autocomplete="list" :aria-expanded="open ? 'true' : 'false'" aria-controls="customer-combo-list"

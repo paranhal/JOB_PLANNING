@@ -675,7 +675,9 @@
       timer: null,
       syncKey: syncKey || '',
       init() {
-        if (this.syncKey && this.$data && this.$data[this.syncKey]) {
+        if (this.syncKey && this.$parent && this.$parent[this.syncKey]) {
+          this.selectedId = this.$parent[this.syncKey];
+        } else if (this.syncKey && this.$data && this.$data[this.syncKey]) {
           this.selectedId = this.$data[this.syncKey];
         }
         if (this.selectedId) this.restore();
@@ -697,6 +699,7 @@
         var self = this;
         this.selectedId = '';
         this.selectedLabel = '';
+        if (this.syncKey && this.$parent) this.$parent[this.syncKey] = '';
         clearTimeout(this.timer);
         this.timer = setTimeout(function () { self.search(false); }, 250);
       },
@@ -732,7 +735,10 @@
         this.selectedLabel = it.label || it.name;
         this.q = this.selectedLabel;
         this.open = false;
-        if (this.syncKey) this[this.syncKey] = it.id;
+        if (this.syncKey) {
+          this[this.syncKey] = it.id;
+          if (this.$parent) this.$parent[this.syncKey] = it.id;
+        }
         var el = this.$refs.hid;
         if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
       }
