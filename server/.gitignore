@@ -5,8 +5,8 @@
 data/*.db
 data/*.db-*
 
-# Go 빌드 산출물
-server
+# Go 빌드 산출물 (모듈 루트의 바이너리만. cmd/server 소스는 추적)
+/server
 *.exe
 dist/
 
