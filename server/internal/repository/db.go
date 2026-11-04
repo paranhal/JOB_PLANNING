@@ -1370,6 +1370,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASCauseCategoryOrgsV102(db)
 	applyWorkLiveV103(db)
 	applyProjectMatchPendingV104(db)
+	applySiteProgressV105(db)
 	applyProductCategory95_63(db)
 	applyProductGroups95_64(db)
 	applyCustomerProvisionalV74(db)
