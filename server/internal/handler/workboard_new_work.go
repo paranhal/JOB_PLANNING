@@ -44,6 +44,11 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		}
 	}
 	assignees := ensurePickerUsers(h.userRepo, listAssignableForPicker(h.userRepo, c), extraIDs...)
+	seed := defaultAssigneeSeed(c)
+	pickerIDs := seed.IDs
+	if len(pickerIDs) == 0 {
+		pickerIDs = extraIDs
+	}
 	data := map[string]interface{}{
 		"Date":             dateStr,
 		"Today":            today,
@@ -53,9 +58,10 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		"CanWrite":         true,
 		"Assignees":        assignees,
 		"PickerNames":      pickerNamesFor(h.userRepo, assignees, extraIDs...),
-		"PickerOwnerID":    currentUserID(c),
-		"PickerUserIDs":    []string{currentUserID(c)},
-		"AssigneeRequired": requiresAssigneeChoice(c),
+		"PickerOwnerID":    seed.OwnerID,
+		"PickerUserIDs":    pickerIDs,
+		"AssigneeRequired": seed.Required,
+		"AssigneeSeed":     seed,
 		"WorkGroups":       wgItems,
 		"WorkGroupsJSON":   wgJSON,
 		"ASCards":          []model.WBCard{},
