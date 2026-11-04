@@ -26,8 +26,9 @@ func TestCreateTaskWithTwoSupportsMakesThreeMembers(t *testing.T) {
 		"member_min":  {"120", "60"},
 		"redirect":    {"/workboard/register"},
 	})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=task") {
-		t.Fatalf("등록: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
+	loc := rec.Header().Get("Location")
+	if rec.Code != http.StatusSeeOther || redirectQuery(t, loc, "ok") != "plan_saved" {
+		t.Fatalf("등록: status=%d loc=%q", rec.Code, loc)
 	}
 	tasks, err := repo.ListTasks()
 	if err != nil || len(tasks) != 1 {

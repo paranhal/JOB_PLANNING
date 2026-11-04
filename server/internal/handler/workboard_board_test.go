@@ -138,8 +138,9 @@ func TestWorkboardCreateAndRender(t *testing.T) {
 		"progress":   {"40"},
 		"redirect":   {"/workboard/tasks"},
 	})
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "ok=task") {
-		t.Fatalf("업무 등록: status=%d loc=%q body=%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+	loc := rec.Header().Get("Location")
+	if rec.Code != http.StatusSeeOther || redirectQuery(t, loc, "ok") != "plan_saved" {
+		t.Fatalf("업무 등록: status=%d loc=%q body=%s", rec.Code, loc, rec.Body.String())
 	}
 
 	tasks, err := repo.ListTasks()
@@ -200,7 +201,7 @@ func TestWorkboardTaskWorkTypeRules(t *testing.T) {
 		"end_time":   {"09:30"},
 		"assignee":   {"최혜영"},
 	})
-	if !strings.Contains(rec.Header().Get("Location"), "ok=task") {
+	if redirectQuery(t, rec.Header().Get("Location"), "ok") != "plan_saved" {
 		t.Fatalf("행정업무 등록 실패: loc=%q", rec.Header().Get("Location"))
 	}
 	tasks, err := repo.ListTasks()
@@ -394,4 +395,13 @@ func TestWorkboardSubtaskTreeAndDelete(t *testing.T) {
 	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "err=has_subtasks") {
 		t.Fatalf("delete loc=%q", del.Header().Get("Location"))
 	}
+}
+
+func redirectQuery(t *testing.T, loc, key string) string {
+	t.Helper()
+	u, err := url.Parse(loc)
+	if err != nil {
+		t.Fatalf("Location 파싱 %q: %v", loc, err)
+	}
+	return u.Query().Get(key)
 }

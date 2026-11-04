@@ -11,10 +11,4 @@ internal/handler::TestWorkSelfReviewBlockedBecomesWaiting  # 1afb09a부터 실�
 internal/handler::TestWorkTodayAdminSeesOwnOnly  # 1afb09a부터 실패 / 95-113D / 2026-11-18
 internal/handler::TestWorkTodayAdminAssigneePicker  # 1afb09a부터 실패 / 95-113D / 2026-11-18
 internal/handler::TestWorkTodayDefaultIsListAndKanbanCountsMatch  # 1afb09a부터 실패 / 95-113D / 2026-11-18
-internal/handler::Test95_56_ErrorRedisplayKeepsInput  # 조치내용 미유지, 1afb09a부터 / 95-113D / 2026-11-18
-internal/handler::Test95_58_WorkDateFromStartKeepsPlan  # 시작 누락 시 입력 미보존, 1afb09a부터 / 95-113D / 2026-11-18
 internal/handler::TestPersonalBoardQueryCountBound  # 1afb09a부터 실패 / 95-113D / 2026-11-18
-internal/handler::TestWorkboardCreateAndRender  # 등록 303, 1afb09a부터 / 95-113D / 2026-11-18
-internal/handler::TestWorkboardTaskWorkTypeRules  # 행정 등록 실패, 1afb09a부터 / 95-113D / 2026-11-18
-internal/handler::TestCreateTaskWithTwoSupportsMakesThreeMembers  # 등록 303, 1afb09a부터 / 95-113D / 2026-11-18
-internal/handler::TestProjectWorkActionWorkPlaceRequired  # 근무구분 오류 시 조치내용 미유지, 1afb09a부터 / 95-113D / 2026-11-18
