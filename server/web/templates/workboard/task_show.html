@@ -360,6 +360,44 @@
       <div><dt class="text-xs text-ink-muted">작업 구분</dt><dd>{{if eq $t.WorkSubtype "build"}}구축{{else if eq $t.WorkSubtype "construction"}}공사{{else if eq $t.WorkSubtype "other"}}기타{{else}}—{{end}}</dd></div>
       <div class="sm:col-span-2"><dt class="text-xs text-ink-muted">대상 사이트</dt>
         <dd>{{if .WorkSites}}{{range $i, $s := .WorkSites}}{{if $i}}, {{end}}{{$s.SiteName}}{{if $s.ParentName}}({{$s.ParentName}}){{end}}{{if $s.OnProject}} · 사업 대상{{end}}{{end}}{{else}}—{{end}}</dd>
+      {{if and .CanCheckSites .WorkSites}}
+      <dt>사이트 진행</dt>
+      <dd>
+        <p class="text-sm mb-2">달성률 <span class="font-medium">{{.SiteCheckRate}}</span></p>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-xs" data-site-check-grid>
+            <thead>
+              <tr>
+                <th class="text-left pr-2 py-1">사이트</th>
+                {{range .SiteCheckDays}}<th class="px-1 py-1 whitespace-nowrap">{{.}}</th>{{end}}
+              </tr>
+            </thead>
+            <tbody>
+              {{range $s := .WorkSites}}
+              <tr>
+                <td class="pr-2 py-1">{{$s.SiteName}}</td>
+                {{range $d := $.SiteCheckDays}}
+                {{$k := printf "%s|%s" $s.SiteID $d}}
+                <td class="px-1 py-1">
+                  <form method="post" action="/workboard/tasks/{{$t.TaskID}}/site-check">
+                    <input type="hidden" name="customer_id" value="{{$s.SiteID}}">
+                    <input type="hidden" name="work_date" value="{{$d}}">
+                    {{if $.BackURL}}<input type="hidden" name="back" value="{{$.BackURL}}">{{end}}
+                    <select name="status" class="border rounded px-1 py-0.5" onchange="this.form.submit()">
+                      <option value="pending" {{if or (not (index $.SiteCheckHit $k)) (eq (index $.SiteCheckHit $k) "pending")}}selected{{end}}>미완</option>
+                      <option value="done" {{if eq (index $.SiteCheckHit $k) "done"}}selected{{end}}>완료</option>
+                      <option value="na" {{if eq (index $.SiteCheckHit $k) "na"}}selected{{end}}>해당없음</option>
+                    </select>
+                  </form>
+                </td>
+                {{end}}
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </dd>
+      {{end}}
       </div>
       {{end}}
       <div><dt class="text-xs text-ink-muted">업무 등록일</dt><dd>{{if $t.CreatedAt.IsZero}}—{{else}}{{$t.CreatedAt.Format "2006-01-02"}}{{end}}</dd></div>

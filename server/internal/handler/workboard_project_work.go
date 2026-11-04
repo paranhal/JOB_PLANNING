@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -146,6 +147,32 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 
 func (h *WorkboardHandler) SearchProjectWorkSites(c echo.Context) error {
 	return h.SearchWorkTaskSites(c)
+}
+
+func (h *WorkboardHandler) SaveSiteCheck(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	t, err := h.repo.GetTask(id)
+	if err != nil || t == nil {
+		return echo.ErrNotFound
+	}
+	if !canCheckTaskSiteProgress(c, t) {
+		return echo.ErrForbidden
+	}
+	cid := strings.TrimSpace(c.FormValue("customer_id"))
+	day := strings.TrimSpace(c.FormValue("work_date"))
+	st := strings.TrimSpace(c.FormValue("status"))
+	if err := h.repo.UpsertSiteCheck(t.TaskID, cid, day, st, currentUserID(c)); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	back := strings.TrimSpace(c.FormValue("back"))
+	loc := "/workboard/tasks/" + t.TaskID + "?ok=saved"
+	if back != "" {
+		loc += "&back=" + url.QueryEscape(back)
+	}
+	return c.Redirect(http.StatusSeeOther, loc)
 }
 
 func (h *WorkboardHandler) SearchWorkTaskSites(c echo.Context) error {

@@ -2751,6 +2751,10 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"Projects":         projects,
 		"WorkProjects":     workProjects,
 		"WorkSites":        workSites,
+		"SiteCheckDays":    model.DatesInclusive(t.WorkDate, t.DueDate),
+		"SiteCheckRate":    siteCheckRateOf(h.repo, t, workSites),
+		"SiteCheckHit":     siteCheckHitOf(h.repo, t.TaskID),
+		"CanCheckSites":    canCheckTaskSiteProgress(c, t) && h.repo.TrackProgress(t.TaskID),
 		"Customers":        customers,
 		"CanWrite":         canWrite,
 		"CanPlanEdit":      canPlanEditTask(c, t),
@@ -2980,6 +2984,29 @@ func applyCustomerForm(t *model.WorkTask, c echo.Context) {
 	if t.CustomerID != "" {
 		t.CustomerName = ""
 	}
+}
+
+func siteCheckRateOf(repo *repository.WBRepo, t *model.WorkTask, sites []repository.WorkTaskSite) string {
+	if repo == nil || t == nil {
+		return "—"
+	}
+	_, _, lab := repo.TaskSiteCheckRate(t.TaskID, t.WorkDate, t.DueDate, sites)
+	return lab
+}
+
+func siteCheckHitOf(repo *repository.WBRepo, taskID string) map[string]string {
+	out := map[string]string{}
+	if repo == nil {
+		return out
+	}
+	rows, err := repo.ListSiteChecks(taskID)
+	if err != nil {
+		return out
+	}
+	for _, r := range rows {
+		out[r.CustomerID+"|"+r.WorkDate] = r.Status
+	}
+	return out
 }
 
 func canWriteWorkboard(c echo.Context) bool {
