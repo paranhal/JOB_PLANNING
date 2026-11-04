@@ -597,3 +597,27 @@ func TestProjectWorkACLAndCrossTask(t *testing.T) {
 		t.Fatalf("읽기전용 검색 %d", roSRec.Code)
 	}
 }
+
+func Test95_119B_SitePickerKeyboardMarkup(t *testing.T) {
+	e, _, _ := newProjectWorkServer(t)
+	page := doGet(t, e, "/workboard/register?view=day")
+	if page.Code != http.StatusOK {
+		t.Fatalf("register %d", page.Code)
+	}
+	body := page.Body.String()
+	if !strings.Contains(body, `@keydown.enter.prevent="onEnter($event)"`) {
+		t.Fatal("검색 Enter 제출 방지 없음")
+	}
+	if !strings.Contains(body, `@keydown.arrow-down.prevent="move(1)"`) || !strings.Contains(body, `@keydown.arrow-up.prevent="move(-1)"`) {
+		t.Fatal("↑↓ 이동 없음")
+	}
+	if !strings.Contains(body, `@keydown.escape.stop.prevent="closeCands()"`) {
+		t.Fatal("Esc 후보 닫기 없음")
+	}
+	if !strings.Contains(body, `@click="pick(s)"`) {
+		t.Fatal("마우스 클릭 추가가 빠졌다")
+	}
+	if !strings.Contains(body, `x-ref="siteQ"`) {
+		t.Fatal("검색창 포커스 ref 없음")
+	}
+}

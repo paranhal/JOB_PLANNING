@@ -14,12 +14,17 @@
       </template>
     </span>
   </template>
-  <input type="search" x-model="q" @input="search()" autocomplete="off"
-         placeholder="학교·기관명을 2글자 이상 입력" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-hover">
+  <input type="search" x-ref="siteQ" x-model="q" @input="search()" autocomplete="off"
+         placeholder="학교·기관명을 2글자 이상 입력" class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-hover"
+         @keydown.enter.prevent="onEnter($event)"
+         @keydown.arrow-down.prevent="move(1)"
+         @keydown.arrow-up.prevent="move(-1)"
+         @keydown.escape.stop.prevent="closeCands()">
   <p class="text-xs text-ink-muted mt-1" x-text="hint"></p>
   <ul class="mt-1 border rounded-lg overflow-hidden" x-show="cands.length" x-cloak>
-    <template x-for="s in cands" :key="s.site_id">
-      <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-success-soft" @click="pick(s)">
+    <template x-for="(s, i) in cands" :key="s.site_id">
+      <li><button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-success-soft"
+                  :class="i===hi ? 'combobox-option-on' : ''" @click="pick(s)">
         <span x-text="s.site_name"></span>
         <span class="text-xs text-ink-subtle" x-text="(s.parent_name ? ' · ' + s.parent_name : '') + (s.region ? ' · ' + s.region : '') + (s.on_project ? ' · 사업 대상' : '')"></span>
       </button></li>

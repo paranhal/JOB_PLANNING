@@ -5,6 +5,7 @@
       sites: opts.sites || [],
       q: '',
       cands: [],
+      hi: 0,
       hint: opts.hint || '학교·기관명을 2글자 이상 입력',
       projectId: opts.projectId || '',
       searchUrl: opts.searchUrl || '/workboard/work-sites/search',
@@ -15,6 +16,35 @@
       excludeId: opts.excludeId || '',
       removeSite: function (id) {
         this.sites = (this.sites || []).filter(function (s) { return s.site_id !== id; });
+      },
+      move: function (d) {
+        var n = (this.cands || []).length;
+        if (!n) { this.hi = 0; return; }
+        this.hi = (this.hi + d + n) % n;
+      },
+      closeCands: function () {
+        this.cands = [];
+        this.hi = 0;
+      },
+      pickHighlight: function () {
+        var list = this.cands || [];
+        if (!list.length) return;
+        var i = this.hi;
+        if (i < 0 || i >= list.length) i = 0;
+        this.pick(list[i]);
+      },
+      onEnter: function (ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        this.pickHighlight();
+      },
+      focusSearch: function () {
+        var self = this;
+        var go = function () {
+          var el = self.$refs && self.$refs.siteQ;
+          if (el && el.focus) el.focus();
+        };
+        if (this.$nextTick) this.$nextTick(go);
+        else go();
       },
       pick: function (s) {
         if (!s || !s.site_id) return;
@@ -29,6 +59,8 @@
         this.sites = (this.sites || []).concat([row]);
         this.q = '';
         this.cands = [];
+        this.hi = 0;
+        this.focusSearch();
       },
       refreshBadges: function () {
         var ids = (this.sites || []).map(function (s) { return s.site_id; }).filter(Boolean);
@@ -50,6 +82,7 @@
         var q = (this.q || '').trim();
         if (q.length < 2) {
           this.cands = [];
+          this.hi = 0;
           this.hint = '학교·기관명을 2글자 이상 입력';
           return Promise.resolve();
         }
@@ -64,6 +97,7 @@
           self.cands = (j || []).filter(function (s) {
             return taken.indexOf(s.site_id) < 0 && s.site_id !== self.excludeId;
           });
+          self.hi = 0;
           self.hint = self.cands.length ? '' : '해당하는 사이트가 없습니다';
         }).catch(function () {
           self.cands = [];
