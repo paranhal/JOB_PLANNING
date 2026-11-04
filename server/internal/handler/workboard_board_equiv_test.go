@@ -355,8 +355,11 @@ func TestBoardCLevelForbiddenStill(t *testing.T) {
 	}
 	got, _ := users.GetByUsername("ceoeq")
 	rec := doGetWith(t, e, "/workboard/board", jwtCookieUser(t, got))
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("c_level %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("c_level 조회 %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "조회 전용") {
+		t.Fatal("C-Level 조회 전용 표시 없음")
 	}
 }
 

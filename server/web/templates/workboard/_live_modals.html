@@ -1,0 +1,34 @@
+{{define "live_work_modals"}}
+{{template "live_interrupt_modal" .}}
+{{template "live_postpone_modal" .}}
+{{if and .CanWrite (not .BoardShell)}}
+<div data-live-new-work-root="1" {{if .CanWrite}}x-data="boardNewWork()"{{end}}>
+{{template "wb_new_work_modal" .}}
+</div>
+{{end}}
+<script>
+(function () {
+  if (window.__liveInterruptBound) return;
+  window.__liveInterruptBound = true;
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-live-interrupt]');
+    if (!b) return;
+    e.preventDefault();
+    var host = b.getAttribute('data-live-host') || '';
+    var alpineRoot = document.getElementById('board-root') || document.querySelector('[data-live-new-work-root]');
+    if (alpineRoot && alpineRoot._x_dataStack && alpineRoot._x_dataStack[0] && alpineRoot._x_dataStack[0].openNewWork) {
+      alpineRoot._x_dataStack[0].openNewWork({hostId: host});
+      return;
+    }
+    var modal = document.getElementById('live-interrupt-modal');
+    if (modal) modal.hidden = false;
+  });
+  document.addEventListener('click', function (e) {
+    var c = e.target && e.target.closest && e.target.closest('[data-live-interrupt-close="1"]');
+    if (!c) return;
+    var modal = document.getElementById('live-interrupt-modal');
+    if (modal) modal.hidden = true;
+  });
+})();
+</script>
+{{end}}

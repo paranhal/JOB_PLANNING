@@ -1,0 +1,23 @@
+{{define "live_work_bar"}}
+{{if .HasUrgentBanner}}
+<div class="rounded-lg border border-danger bg-danger-soft px-4 py-2 text-sm text-danger" data-urgent-banner="1">
+  긴급 업무가 배정되었습니다. 자동으로 중단하지 않습니다.
+  {{range .UrgentBanner}}<a class="underline ml-2" href="/workboard/tasks/{{.TaskID}}">{{.Title}}</a>{{end}}
+</div>
+{{end}}
+{{if and .Task .LiveEnabled .LiveWorking}}
+<div class="rounded-xl border border-warning bg-warning-soft px-4 py-3 flex flex-wrap items-center gap-2" data-live-bar="1">
+  <span class="text-sm font-semibold text-ink">작업 중</span>
+  <button type="button" class="btn btn-secondary btn-sm" data-live-interrupt="1" data-live-host="{{.Task.TaskID}}">끼워넣기</button>
+  <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/live/end-day">
+    <button class="btn btn-secondary btn-sm">오늘 작업 종료</button>
+  </form>
+  <button type="button" class="btn btn-secondary btn-sm" data-live-postpone="1">다음 날짜로 연기</button>
+</div>
+{{end}}
+{{if and .Task .ShowLiveStart (not .LiveWorking)}}
+<form method="post" action="/workboard/tasks/{{.Task.TaskID}}/live/start" class="mb-2">
+  <button class="btn btn-primary btn-sm" data-live-start="1">작업 시작</button>
+</form>
+{{end}}
+{{end}}

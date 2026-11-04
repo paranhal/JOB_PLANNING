@@ -30,9 +30,19 @@ const (
 	CodeGroupItemKind = "wb_item_kind"
 	CodeGroupItemUnit = "wb_item_unit"
 
-	ReturnPending  = "pending"
-	ReturnReturned = "returned"
-	ReturnNone     = "no_return"
+	ReturnPending     = "pending"
+	ReturnReturned    = "returned"
+	ReturnNone        = "no_return"
+	ReturnResumedNow  = "resumed_now"
+	ReturnResumeLater = "resume_later"
+
+	SegSourceManual = "manual"
+	SegSourceLive   = "live"
+
+	EndedByUser      = "user"
+	EndedByInterrupt = "interrupt"
+	EndedByDayEnd    = "day_end"
+	EndedByAuto      = "auto"
 
 	MinSegmentMin   = 15
 	TravelMinMax    = 180
@@ -56,9 +66,19 @@ type WorkTaskSegment struct {
 	Assignee        string
 	WorkerUserID    string
 	WorkerName      string
-	InterruptTaskID string
-	Note            string
-	Virtual         bool
+	InterruptTaskID     string
+	Note                string
+	Source              string
+	EndedBy             string
+	TravelOrigin        string
+	TravelDest          string
+	TravelPlanDepart    string
+	TravelPlanArrive    string
+	TravelActualDepart  string
+	TravelActualArrive  string
+	TravelSource        string
+	TravelUnknownReason string
+	Virtual             bool
 }
 
 type WorkTaskDeparture struct {
@@ -71,6 +91,10 @@ type WorkTaskDeparture struct {
 	EndTime         string
 	InterruptTaskID string
 	ReturnStatus    string
+	Reason          string
+	NextActionDate  string
+	RemainingMin    *int
+	ForceReason     string
 }
 
 type WorkTaskItem struct {

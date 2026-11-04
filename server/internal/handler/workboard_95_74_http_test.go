@@ -98,7 +98,7 @@ func Test95_74_PickerDisplayName(t *testing.T) {
 		t.Fatalf("username fallback %s", pickerDisplayName(u))
 	}
 	u.Username = "USR-x"
-	if pickerDisplayName(u) != u.UserID {
+	if pickerDisplayName(u) != "이름 미등록" {
 		t.Fatalf("both USR %s", pickerDisplayName(u))
 	}
 	if pickerDisplayName(model.User{}) != "이름 미등록" {

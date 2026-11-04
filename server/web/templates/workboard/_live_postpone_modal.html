@@ -1,0 +1,19 @@
+{{define "live_postpone_modal"}}
+{{if .CanWrite}}
+<div id="live-postpone-modal" hidden class="modal-backdrop z-50 flex items-center justify-center p-4" data-live-postpone-modal="1">
+  <div class="modal-panel w-full max-w-md shadow-pop">
+    <h3 class="text-ui font-bold">익일 연장</h3>
+    <p class="text-ui-sm text-ink-muted mt-1">원래 예정일은 덮어쓰지 않습니다.</p>
+    <form method="post" action="/workboard/tasks/{{if .Task}}{{.Task.TaskID}}{{end}}/live/postpone" class="mt-3 space-y-3">
+      <label class="block text-sm">미완료 사유 <input name="reason" required class="w-full border rounded-lg px-3 py-2"></label>
+      <label class="block text-sm">다음 조치일 <input type="date" name="next_action_date" required class="w-full border rounded-lg px-3 py-2"></label>
+      <label class="block text-sm">남은 예상시간(분) <input type="number" name="remaining_min" class="w-full border rounded-lg px-3 py-2"></label>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-live-postpone-close="1">취소</button>
+        <button class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+{{end}}

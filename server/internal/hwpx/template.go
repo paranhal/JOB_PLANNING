@@ -58,7 +58,7 @@ func BuildPlaceholderTemplate() []byte {
 		{Name: "Preview/PrvText.txt", Body: encodeUTF16LE(previewText())},
 		{Name: "Preview/PrvImage.png", Body: previewPNG()},
 	})
-	if err != nil {
+		if err != nil {
 		return nil
 	}
 	return data

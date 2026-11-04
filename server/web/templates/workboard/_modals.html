@@ -94,32 +94,7 @@
         <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
         <p class="px-3 py-2 text-sm text-ink bg-hover border rounded-lg">{{if .Today}}{{.Today}}{{else}}{{.Date}}{{end}} <span class="text-xs text-ink-subtle">저장 시 자동</span></p>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-red-500">*</span></label>
-          <input type="date" name="work_date" x-model="preWork" required
-                 class="w-full border rounded-lg px-3 py-2 text-sm">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-ink mb-1">업무 종료일 <span class="text-red-500" x-show="!dueUndetermined">*</span></label>
-          <input type="date" name="due_date" x-model="preDue" @change="checkMnt()" :required="!dueUndetermined" :disabled="dueUndetermined"
-                 class="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-hover">
-          <label class="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
-            <input type="checkbox" name="due_undetermined" value="1" x-model="dueUndetermined" class="rounded">
-            미정 + 사유
-          </label>
-          <div x-show="dueUndetermined" x-cloak class="mt-2 space-y-1">
-            <select name="no_date_reason" :required="dueUndetermined" class="w-full border rounded-lg px-2 py-1.5 text-sm">
-              <option value="">— 사유 선택 —</option>
-              <option value="parts">부품 대기</option>
-              <option value="customer">고객 일정 미확정</option>
-              <option value="vendor">외부 업체 회신 대기</option>
-              <option value="other">기타</option>
-            </select>
-            <input name="no_date_detail" class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="기타인 경우 직접 입력">
-          </div>
-        </div>
-      </div>
+      {{template "wb_period_dates" dict "ShowUndetermined" true "Hint" "비우면 시작일과 같은 하루. 시작일 시작시간부터 종료일 종료시간까지 이어지는 하나의 업무입니다."}}
       <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
         <p class="text-xs font-medium text-ink">소요 예상 시간 <span class="text-red-500">*</span> <span class="text-ink-subtle font-normal">(분 단위)</span></p>
         <div class="grid grid-cols-2 gap-3">
@@ -379,10 +354,7 @@
         </div>
       </div>
       {{template "site_multi_picker" dict "Label" "대상 사이트"}}
-      <div>
-        <label class="block text-sm font-medium text-ink mb-1">작업일 <span class="text-red-500">*</span></label>
-        <input type="date" name="work_date" x-model="preWork" required class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
+      {{template "wb_period_dates" dict "ShowUndetermined" false "Hint" "비우면 시작일과 같은 하루. 시작일 시작시간부터 종료일 종료시간까지 이어지는 하나의 업무입니다. 날마다 같은 시간은 반복 옵션을 쓰세요."}}
       <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
         <p class="text-xs font-medium text-ink">시작·종료 시간 <span class="text-ink-subtle font-normal">(지정할 때만)</span></p>
         <div class="grid grid-cols-2 gap-3">

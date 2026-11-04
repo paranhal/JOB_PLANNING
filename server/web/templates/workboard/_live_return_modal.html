@@ -1,0 +1,18 @@
+{{define "live_return_modal"}}
+{{if .LivePendingReturn}}
+<div class="rounded-xl border border-line bg-white px-4 py-3 mt-3" data-live-return="1">
+  <p class="text-sm font-semibold">원래 업무로 돌아갈까요?</p>
+  <div class="flex flex-wrap gap-2 mt-2">
+    <form method="post" action="/workboard/departures/{{.LivePendingReturn.DepartureID}}/resume">
+      <button class="btn btn-primary btn-sm">지금 재개</button>
+    </form>
+    <form method="post" action="/workboard/departures/{{.LivePendingReturn.DepartureID}}/later" class="flex flex-wrap gap-2 items-end">
+      <label class="text-xs">중단 사유 <input name="reason" required class="border rounded px-2 py-1"></label>
+      <label class="text-xs">다음 조치일 <input type="date" name="next_action_date" class="border rounded px-2 py-1"></label>
+      <label class="text-xs">남은 예상(분) <input type="number" name="remaining_min" class="border rounded px-2 py-1 w-20"></label>
+      <button class="btn btn-secondary btn-sm">나중에 재개</button>
+    </form>
+  </div>
+</div>
+{{end}}
+{{end}}

@@ -9,11 +9,7 @@
       <p class="mb-1 text-ui text-ink-muted">내 일정과 업무를 한눈에 확인하세요.</p>
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-2">
-      {{template "board_scope_toggle" .}}
-      {{template "view_group_toggle" .}}
-      {{template "schedule_show_toggle" .}}
-      {{template "board_new_work_btn" .}}
-      {{template "board_view_links" .}}
+      {{template "board_top_controls" .}}
       {{template "board_period_seg_cal" .}}
     </div>
   </div>
@@ -25,13 +21,7 @@
       {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
       {{if eq .Cols "flat"}}<input type="hidden" name="cols" value="flat">{{end}}
       {{if .ShowParam}}<input type="hidden" name="show" value="{{.ShowParam}}">{{end}}
-      <label class="sr-only" for="board-project">사업</label>
-      <select id="board-project" name="project" onchange="this.form.submit()" class="h-8 rounded-lg border border-line bg-surface px-2 text-ui-sm text-ink">
-        <option value="" {{if eq .ProjectFilter ""}}selected{{end}}>사업 전체</option>
-        {{range .Projects}}
-        <option value="{{.ProjectID}}" {{if eq $.ProjectFilter .ProjectID}}selected{{end}}>{{if .ShortName}}{{.ShortName}}{{else}}{{.Name}}{{end}}</option>
-        {{end}}
-      </select>
+      {{template "project_filter" .ProjectFilterUI}}
       <label class="sr-only" for="board-group">업무 그룹</label>
       <select id="board-group" name="work_group_id" onchange="this.form.submit()" class="h-8 rounded-lg border border-line bg-surface px-2 text-ui-sm text-ink">
         <option value="" {{if eq .WorkGroupFilter ""}}selected{{end}}>그룹 전체</option>

@@ -818,6 +818,9 @@ type WorkTask struct {
 	OrigWorkDate        string    `json:"orig_work_date,omitempty"`
 	OrigDueDate         string    `json:"orig_due_date,omitempty"`
 	CarryCount          int       `json:"carry_count,omitempty"`
+	EstMinutes          int       `json:"est_minutes,omitempty"`
+	NextActionDate      string    `json:"next_action_date,omitempty"`
+	CompletionCondition string    `json:"completion_condition,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 

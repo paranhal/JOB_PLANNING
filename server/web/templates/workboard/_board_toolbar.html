@@ -1,0 +1,7 @@
+{{define "board_top_controls"}}
+{{template "ui_dropdown" .ScopeDrop}}
+{{if .ShowGroupDropdown}}{{template "ui_dropdown" .GroupDrop}}{{end}}
+{{template "schedule_show_toggle" .}}
+{{template "ui_dropdown" .ViewDrop}}
+{{template "board_new_work_btn" .}}
+{{end}}

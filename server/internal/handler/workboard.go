@@ -62,10 +62,57 @@ func (h *WorkboardHandler) Index(c echo.Context) error {
 }
 
 func (h *WorkboardHandler) Kanban(c echo.Context) error {
+	if strings.TrimSpace(c.QueryParam("unit")) == "occurrence" {
+		return h.occurrenceKanban(c)
+	}
 	data, err := h.boardData(c, "kanban")
 	if err != nil {
 		return err
 	}
+	attachLiveWorkData(data, h, c, nil)
+	return c.Render(http.StatusOK, "workboard/kanban.html", data)
+}
+
+func (h *WorkboardHandler) occurrenceKanban(c echo.Context) error {
+	parentID := strings.TrimSpace(c.QueryParam("parent"))
+	today := time.Now().Format(dateLayout)
+	cols := map[string][]model.WorkTask{
+		"scheduled":   {},
+		"in_progress": {},
+		"hold":        {},
+		"complete":    {},
+	}
+	if parentID != "" {
+		ch, _ := h.repo.ListChildren(parentID)
+		for _, t := range ch {
+			if t.RecurrenceRole != model.RecurrenceRoleOccurrence {
+				continue
+			}
+			st := model.NormalizeOccurrenceStatus(model.OccurrenceStatusForDisplay(t, today))
+			switch st {
+			case model.OccurrenceComplete:
+				cols["complete"] = append(cols["complete"], t)
+			case model.OccurrenceInProgress:
+				cols["in_progress"] = append(cols["in_progress"], t)
+			case model.OccurrenceHold, model.OccurrenceDeferred:
+				cols["hold"] = append(cols["hold"], t)
+			default:
+				cols["scheduled"] = append(cols["scheduled"], t)
+			}
+		}
+	}
+	data := map[string]interface{}{
+		"Title":          "실행 회차 칸반",
+		"Active":         NavWorkPlan,
+		"OccurrenceUnit": true,
+		"OccScheduled":   cols["scheduled"],
+		"OccInProgress":  cols["in_progress"],
+		"OccHold":        cols["hold"],
+		"OccComplete":    cols["complete"],
+		"CanWrite":       canWriteWorkboard(c),
+		"ParentID":       parentID,
+	}
+	attachLiveWorkData(data, h, c, nil)
 	return c.Render(http.StatusOK, "workboard/kanban.html", data)
 }
 
@@ -178,7 +225,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	assigneeFilter := scope.AssigneeFilter
 	scopeAll := scope.ScopeAll
 	showScopeToggle := scope.ShowToggle
-	projectFilter := strings.TrimSpace(c.QueryParam("project"))
+	projectFilter := h.sanitizeProjectQuery(c)
 
 	memberMap := map[string][]model.WorkTaskMember{}
 	if ids := taskIDsOf(placed); len(ids) > 0 {
@@ -350,7 +397,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	}
 	wgItems, wgJSON := h.workGroupPicks(c)
 
-	return c.Render(http.StatusOK, "workboard/register.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":                "일일 업무 등록",
 		"Active":               NavWorkRegister,
 		"View":                 view,
@@ -418,7 +465,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"WorkGroups":           wgItems,
 		"WorkGroupsJSON":       wgJSON,
 		"WorkGroupFilter":      groupFilter,
-	})
+	}
+	attachProjectFilter(c, h, data, "reg-project")
+	return c.Render(http.StatusOK, "workboard/register.html", data)
 }
 
 const (
@@ -2029,7 +2078,8 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if len(supports) > 0 && t.Assignee == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=owner"))
 	}
-	if err := h.rejectIfOverlap(c, t.WorkDate, t.StartTime, t.EndTime, "", occupancyNames(t.Assignee, supports)); err != nil {
+	planDates := collectPlanDatesFromForm(c, t.WorkDate, t.DueDate, h.holidayYearMissing())
+	if err := h.rejectIfOverlapDates(c, planDates, t.StartTime, t.EndTime, "", occupancyNames(t.Assignee, supports)); err != nil {
 		return overlapDone(err)
 	}
 	org, oerr := resolveInsertOrg(c)
@@ -2079,18 +2129,24 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			return err
 		}
 	}
+	skip := overlapSkipDateSet(c)
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
 		dates, err := collectDatesFromForm(mode, c.FormValue("daily_from"), c.FormValue("daily_to"), c.FormValue("sub_dates"))
 		if err == nil && len(dates) > 0 {
-			_, _ = h.repo.CreateSubtasks(t, dates)
+			_, _ = h.repo.CreateSubtasks(t, filterSkippedDates(dates, skip))
 		}
 	}
 	if applied, code := applyRecurrenceFromForm(c, h.repo, t, h.holidayYearMissing()); code != "" {
-		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"?err="+code)
+		_ = h.repo.DeleteTaskLogged(t.TaskID, "반복 생성 실패 롤백")
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+code))
 	} else if applied {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+t.TaskID+"?ok=rec_gen")
 	}
-	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
+	placed := 1
+	if n := len(filterSkippedDates(planDates, skip)); n > 0 {
+		placed = n
+	}
+	return c.Redirect(http.StatusSeeOther, redirectBack(c, planSaveSummaryQuery(placed, pendingSplitCount(c), len(skip))))
 }
 
 // dueBeforeWork 종료일(due_date)이 시작일(work_date)보다 앞이면 true. 한쪽이 비면 검사하지 않는다.
@@ -2163,6 +2219,32 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if !registerScope {
 		workDate, dueDate, start, end, dur = existing.WorkDate, existing.DueDate, existing.StartTime, existing.EndTime, existing.DurationMin
 		schedOK = true
+	}
+	if registerScope && !schedOK {
+		st := strings.TrimSpace(c.FormValue("start_time"))
+		en := strings.TrimSpace(c.FormValue("end_time"))
+		if st == "" && en == "" {
+			workDate = strings.TrimSpace(c.FormValue("work_date"))
+			dueDate = strings.TrimSpace(c.FormValue("due_date"))
+			if workDate != "" {
+				if d, err := model.ParseAppDate(workDate); err == nil {
+					workDate = d
+				}
+			}
+			if dueDate != "" {
+				if d, err := model.ParseAppDate(dueDate); err == nil {
+					dueDate = d
+				}
+			}
+			start, end, dur = existing.StartTime, existing.EndTime, existing.DurationMin
+			if workDate == "" {
+				workDate = existing.WorkDate
+			}
+			if dueDate == "" {
+				dueDate = existing.DueDate
+			}
+			schedOK = true
+		}
 	}
 	if !schedOK {
 		if !adminGTD {
@@ -2469,6 +2551,13 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		}
 	}
 	h.syncVisitDateFromTask(t.SourceType, t.SourceID, t.WorkDate)
+	if registerScope && existing.SourceType == model.WBSourceMaintenance && strings.TrimSpace(existing.SourceID) != "" {
+		clockChanged := model.ClockHHMM(t.StartTime) != model.ClockHHMM(existing.StartTime) ||
+			model.ClockHHMM(t.EndTime) != model.ClockHHMM(existing.EndTime)
+		if clockChanged && strings.TrimSpace(t.StartTime) != "" {
+			_ = h.repo.PushEnvelopeToVisit(existing.SourceID, t.StartTime, t.EndTime, t.DurationMin)
+		}
+	}
 	back := strings.TrimSpace(c.FormValue("back"))
 	base := "/workboard/tasks/" + id
 	if registerScope {
@@ -2591,7 +2680,11 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		}
 	}
 	pickerOwner, pickerIDs := pickerSeedFromTask(t, supportMembers, assignees)
-	assignees = ensurePickerUsers(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...)
+	storedNames := storedPickerNamesFromTask(t, supportMembers)
+	assignees = ensurePickerUsersNamed(h.userRepo, assignees, storedNames, append(pickerIDs, pickerOwner, currentUserID(c))...)
+	planStart, planEnd, planSegN := planClockOf(h.repo, t)
+	t.StartTime, t.EndTime = planStart, planEnd
+	t.Assignee = userDisplayName(h.userRepo, t.AssigneeUserID, t.Assignee)
 	var taskLeaveNames []string
 	if h.mntRepo != nil {
 		if lr := h.mntRepo.Leaves(); lr != nil && t.WorkDate != "" {
@@ -2636,9 +2729,12 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"CompleteLocal":    completeLocal,
 		"Assignees":        assignees,
 		"AssigneeRequired": requiresAssigneeChoice(c),
-		"PickerNames":      pickerNamesFor(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...),
+		"PickerNames":      overlayPickerStoredNames(h.userRepo, pickerNamesFor(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...), storedNames),
 		"PickerOwnerID":    pickerOwner,
 		"PickerUserIDs":    pickerIDs,
+		"DisplayAssignee":  userDisplayName(h.userRepo, t.AssigneeUserID, t.Assignee),
+		"PlanSegCount":     planSegN,
+		"PlanSegReadOnly":  planSegN >= 2,
 		"SupportMembers":   supportOnly,
 		"WorkGroups":       wgShow,
 		"WorkGroupsJSON":   wgShowJSON,
@@ -2679,6 +2775,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	attachWorkItemView(data, h, t, !canWrite)
 	attachWorkSegData(data, h.repo, t, c.QueryParam("err"), "/workboard/tasks/"+t.TaskID, !canWrite)
+	attachLiveWorkData(data, h, c, t)
 	sel := map[string]bool{}
 	for _, a := range t.LinkedAssets {
 		sel[a.AssetID] = true
@@ -2814,6 +2911,10 @@ func (h *WorkboardHandler) CreateSubtasks(c echo.Context) error {
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+parent.TaskID+"?err=sub")
 	}
+	if err := h.rejectIfOverlapDates(c, dates, parent.StartTime, parent.EndTime, parent.TaskID, occupancyNames(parent.Assignee, nil)); err != nil {
+		return overlapDone(err)
+	}
+	dates = filterSkippedDates(dates, overlapSkipDateSet(c))
 	n, err := h.repo.CreateSubtasks(parent, dates)
 	if err != nil {
 		if q := subtaskErrQuery(err); q != "" {

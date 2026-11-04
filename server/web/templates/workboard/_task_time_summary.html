@@ -1,0 +1,13 @@
+{{define "task_time_summary"}}
+{{if .TimeSummary}}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-2" data-time-summary="1">
+  <div class="rounded-lg border bg-white p-3"><p class="text-lg font-bold">{{.TimeSummary.ActualMin}}분</p><p class="text-[11px] text-ink-muted">실제 작업</p></div>
+  <div class="rounded-lg border bg-white p-3"><p class="text-lg font-bold">{{.TimeSummary.ElapsedMin}}분</p><p class="text-[11px] text-ink-muted">경과</p></div>
+  <div class="rounded-lg border bg-white p-3"><p class="text-lg font-bold">{{.TimeSummary.PausedMin}}분</p><p class="text-[11px] text-ink-muted">중단</p></div>
+  <div class="rounded-lg border bg-white p-3"><p class="text-lg font-bold">{{.TimeSummary.TravelMin}}분</p><p class="text-[11px] text-ink-muted">이동</p></div>
+</div>
+<p class="text-sm text-ink mt-2" data-occupy-line="1">{{.OccupyLine}}</p>
+{{if .PlanActualBadge}}<p class="text-xs text-warning mt-1" data-plan-actual-badge="1">{{.PlanActualBadge}}</p>{{end}}
+{{end}}
+{{range .LiveDepartures}}{{if .ForceReason}}<span class="text-xs text-danger" data-force-badge="1">충돌 강제</span>{{end}}{{end}}
+{{end}}

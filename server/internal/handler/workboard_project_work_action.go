@@ -157,9 +157,10 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		"Title": "작업 조치 · " + t.Title, "Active": workboardNavActive(back),
 		"Task": t, "Sites": sites, "Members": members, "Processes": procs,
 		"PartRows": parts, "PartsEnabled": enabled, "Attachments": docs,
-		"ActionPhotos": photos,
-		"Assignees":    listAssignableForPicker(h.userRepo, c),
-		"CanProcess":   canMod, "ReadOnly": readOnly, "CanWrite": canWrite,
+		"ActionPhotos":    photos,
+		"Assignees":       ensurePickerUsersNamed(h.userRepo, listAssignableForPicker(h.userRepo, c), storedPickerNamesFromTask(t, members), t.AssigneeUserID),
+		"DisplayAssignee": userDisplayName(h.userRepo, t.AssigneeUserID, t.Assignee),
+		"CanProcess":      canMod, "ReadOnly": readOnly, "CanWrite": canWrite,
 		"CanPlanEdit":   canPlanEditTask(c, t),
 		"CanCarry":      canPlanEditTask(c, t),
 		"TaskDelayed":   model.TaskDelayState(*t, now.Format(dateLayout)).Delayed,
@@ -254,6 +255,7 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	data["WorkItems"] = items
 	attachWorkItemView(data, h, t, readOnly)
 	attachWorkSegData(data, h.repo, t, errCode, projectWorkActionPath(t.TaskID), readOnly)
+	attachLiveWorkData(data, h, c, t)
 	deps, _ := h.repo.ListDepartures(t.TaskID)
 	data["Departures"] = deps
 	startLocal := defaultActionStartLocal(t, now)

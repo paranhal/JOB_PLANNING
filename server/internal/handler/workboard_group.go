@@ -59,11 +59,7 @@ func (h *WorkboardHandler) workGroupPicks(c echo.Context) ([]model.WorkGroup, st
 				}
 			}
 			if name == "" || strings.HasPrefix(name, "USR-") || name == "담당자" {
-				if id := strings.TrimSpace(m.UserID); id != "" {
-					name = id
-				} else {
-					name = pickerNameUnregistered
-				}
+				name = pickerNameUnregistered
 			}
 			p.Members = append(p.Members, workGroupPickMem{UserID: m.UserID, FullName: name, Role: m.Role})
 		}

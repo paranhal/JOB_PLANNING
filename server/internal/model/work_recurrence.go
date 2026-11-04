@@ -37,6 +37,7 @@ const (
 	OccurrenceOverdue    = "overdue"
 	OccurrenceDeferred   = "deferred"
 	OccurrenceSkipped    = "skipped"
+	OccurrenceHold       = "hold"
 
 	RecurrenceChangeFuture  = "future"   // 미완료 미래만 다시 생성 (기본)
 	RecurrenceChangeKeepAdd = "keep_add" // 기존 유지 + 새 일정만 추가
@@ -411,6 +412,8 @@ func OccurrenceStatusLabel(s string) string {
 		return "연기"
 	case OccurrenceSkipped:
 		return "제외"
+	case OccurrenceHold:
+		return "보류"
 	default:
 		return "예정"
 	}
@@ -570,7 +573,7 @@ func (p OccurrencePreview) SummaryLine() string {
 
 func NormalizeOccurrenceStatus(s string) string {
 	switch strings.TrimSpace(s) {
-	case OccurrenceInProgress, OccurrenceComplete, OccurrenceOverdue, OccurrenceDeferred, OccurrenceSkipped:
+	case OccurrenceInProgress, OccurrenceComplete, OccurrenceOverdue, OccurrenceDeferred, OccurrenceSkipped, OccurrenceHold:
 		return s
 	default:
 		return OccurrenceScheduled

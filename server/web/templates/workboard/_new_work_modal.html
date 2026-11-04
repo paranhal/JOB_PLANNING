@@ -104,7 +104,8 @@ function boardNewWork() {
       var qs = q.toString();
       history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
     },
-    openNewWork() {
+    liveHostId: '',
+    openNewWork(opts) {
       this.bindKindWatch();
       this.lastFocus = document.activeElement;
       this.newWorkOpen = true;
@@ -117,9 +118,10 @@ function boardNewWork() {
       this.preWork = '{{.Date}}';
       this.preStart = '09:00';
       this.preEnd = '09:30';
-      this.preAssignee = {{toJSON .CurrentUserName}};
-      this.preOwnerId = {{toJSON .UserID}};
-      this.preAssigneeIds = {{if .UserID}}[{{toJSON .UserID}}]{{else}}[]{{end}};
+      this.preAssignee = {{if .AssigneeSeed}}{{toJSON .AssigneeSeed.Name}}{{else}}{{toJSON .CurrentUserName}}{{end}};
+      this.preOwnerId = {{if .AssigneeSeed}}{{toJSON .AssigneeSeed.OwnerID}}{{else}}{{toJSON .UserID}}{{end}};
+      this.preAssigneeIds = {{if .AssigneeSeed}}{{toJSON .AssigneeSeed.IDs}}{{else if .UserID}}[{{toJSON .UserID}}]{{else}}[]{{end}};
+      this.liveHostId = (opts && opts.hostId) ? String(opts.hostId) : '';
       this.newWorkError = false;
       this.$nextTick(() => this.focusKind());
     },
@@ -176,6 +178,16 @@ function boardNewWork() {
           slot.innerHTML = html;
           if (window.Alpine && Alpine.initTree) Alpine.initTree(slot);
           if (window.bindASRegisterLookup) bindASRegisterLookup({ missingDialog: true });
+          if (self.liveHostId) {
+            var form = slot.querySelector('form');
+            if (form && !form.querySelector('[name="live_host_id"]')) {
+              var hid = document.createElement('input');
+              hid.type = 'hidden';
+              hid.name = 'live_host_id';
+              hid.value = self.liveHostId;
+              form.appendChild(hid);
+            }
+          }
           slot.querySelectorAll('button').forEach(function (b) {
             var t = (b.textContent || '');
             if (t.indexOf('유형 선택') >= 0 || t.indexOf('종류 선택') >= 0) {

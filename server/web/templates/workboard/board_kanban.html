@@ -10,14 +10,10 @@
       <p class="mb-1 text-ui text-ink-muted">오늘 기준. 날짜 이동 없이 새로고침합니다.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      {{template "board_scope_toggle" .}}
-      {{template "view_group_toggle" .}}
+      {{template "board_top_controls" .}}
       {{if .ShowMemberFilter}}
       <button type="button" class="btn btn-secondary btn-sm" x-show="closed" x-cloak @click="openBox()" aria-label="팀원별 보기 열기">팀원별 보기</button>
       {{end}}
-      {{template "schedule_show_toggle" .}}
-      {{template "board_new_work_btn" .}}
-      {{template "board_view_links" .}}
       <a href="{{.KanbanHref}}" class="inline-flex h-9 items-center rounded-[10px] border border-line bg-surface px-3 text-ui font-semibold text-ink hover:bg-hover">새로고침</a>
       <span class="text-ui font-semibold text-ink">{{.DateLabel}}</span>
     </div>

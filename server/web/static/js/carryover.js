@@ -106,27 +106,31 @@
     if (e.key === 'Escape') { closeCarry(); closeReason(); }
   });
 
-  var form = el('carry-form');
-  if (form) {
-    trap(el('carry-modal'));
-    form.addEventListener('submit', function (e) {
-      var delayed = el('carry-reason').required;
-      if (delayed && !String(el('carry-reason').value || '').trim()) {
-        e.preventDefault();
-        el('carry-reason-err').classList.remove('hidden');
-        el('carry-reason').focus();
-        if (el('carry-reason').scrollIntoView) el('carry-reason').scrollIntoView({ block: 'nearest' });
-      }
-    });
+  function bindCarryForms() {
+    var form = el('carry-form');
+    if (form) {
+      trap(el('carry-modal'));
+      form.addEventListener('submit', function (e) {
+        var delayed = el('carry-reason').required;
+        if (delayed && !String(el('carry-reason').value || '').trim()) {
+          e.preventDefault();
+          el('carry-reason-err').classList.remove('hidden');
+          el('carry-reason').focus();
+          if (el('carry-reason').scrollIntoView) el('carry-reason').scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
+    if (el('delay-reason-form')) {
+      trap(el('delay-reason-modal'));
+      el('delay-reason-form').addEventListener('submit', function (e) {
+        if (!String(el('delay-reason-text').value || '').trim()) {
+          e.preventDefault();
+          el('delay-reason-err').classList.remove('hidden');
+          el('delay-reason-text').focus();
+        }
+      });
+    }
   }
-  if (el('delay-reason-form')) {
-    trap(el('delay-reason-modal'));
-    el('delay-reason-form').addEventListener('submit', function (e) {
-      if (!String(el('delay-reason-text').value || '').trim()) {
-        e.preventDefault();
-        el('delay-reason-err').classList.remove('hidden');
-        el('delay-reason-text').focus();
-      }
-    });
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindCarryForms);
+  else bindCarryForms();
 })();

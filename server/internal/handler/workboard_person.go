@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -127,7 +128,10 @@ func (h *WorkboardHandler) stampBoardMove(c echo.Context, items []boardItem, wri
 			it.PlaceRef = it.Task.TaskID
 		}
 		if strings.TrimSpace(it.PlaceAssignee) == "" {
-			it.PlaceAssignee = strings.TrimSpace(it.Task.Assignee)
+			it.PlaceAssignee = userDisplayName(h.userRepo, it.Task.AssigneeUserID, it.Task.Assignee)
+			if it.PlaceAssignee == assigneeUnspecified {
+				it.PlaceAssignee = ""
+			}
 		}
 		it.PlaceDur = boardPlaceDur(*it)
 		if it.HasTime {
@@ -295,6 +299,8 @@ func boardScheduleErrMsg(raw string) string {
 		return "지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요."
 	case "place":
 		return "배치할 업무와 시간을 선택해 주세요."
+	case "date_order":
+		return "종료일은 시작일 이후여야 합니다"
 	case "seg_date":
 		return "구간 날짜를 바꿀 수 없습니다."
 	case "done":
@@ -302,6 +308,23 @@ func boardScheduleErrMsg(raw string) string {
 	default:
 		return ""
 	}
+}
+
+func boardPlanSavedMsg(c echo.Context) string {
+	ok := strings.TrimSpace(c.QueryParam("ok"))
+	if ok != "plan_saved" && ok != "task" {
+		return ""
+	}
+	placed, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("placed")))
+	split, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("split")))
+	skip, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("skip")))
+	if placed == 0 && split == 0 && skip == 0 {
+		if ok == "task" {
+			return ""
+		}
+		placed = 1
+	}
+	return fmt.Sprintf("%d일 등록, 끼워넣기 %d건, 건너뜀 %d건", placed, split, skip)
 }
 
 func boardDayLeaveNames(h *WorkboardHandler, c echo.Context, date string) []string {

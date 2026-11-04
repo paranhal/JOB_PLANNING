@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -13,14 +14,36 @@ func (r *WBRepo) ListSegments(taskID string) ([]model.WorkTaskSegment, error) {
 		return nil, nil
 	}
 	rows, err := r.db.Query(`
-		SELECT segment_id, task_id, kind, scope, seq, work_date, start_time, end_time, duration_min,
-		       travel_before_min, travel_after_min, user_id, assignee, worker_user_id, worker_name,
-		       interrupt_task_id, note
+		SELECT `+liveSegCols+`
 		FROM work_task_segments WHERE task_id=? ORDER BY kind, seq, start_time`, taskID)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
 		}
+		if strings.Contains(err.Error(), "no such column") {
+			return r.listSegmentsLegacy(taskID)
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.WorkTaskSegment
+	for rows.Next() {
+		var s model.WorkTaskSegment
+		if err := scanLiveSegment(&s, rows); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func (r *WBRepo) listSegmentsLegacy(taskID string) ([]model.WorkTaskSegment, error) {
+	rows, err := r.db.Query(`
+		SELECT segment_id, task_id, kind, scope, seq, work_date, start_time, end_time, duration_min,
+		       travel_before_min, travel_after_min, user_id, assignee, worker_user_id, worker_name,
+		       interrupt_task_id, note
+		FROM work_task_segments WHERE task_id=? ORDER BY kind, seq, start_time`, taskID)
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -79,9 +102,7 @@ func (r *WBRepo) ListSegmentsByTaskIDs(ids []string) (map[string][]model.WorkTas
 	ph := placeholders(len(ids))
 	args := iface(ids)
 	rows, err := r.db.Query(`
-		SELECT segment_id, task_id, kind, scope, seq, work_date, start_time, end_time, duration_min,
-		       travel_before_min, travel_after_min, user_id, assignee, worker_user_id, worker_name,
-		       interrupt_task_id, note
+		SELECT `+liveSegCols+`
 		FROM work_task_segments WHERE task_id IN (`+ph+`) ORDER BY task_id, kind, seq, start_time`, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
@@ -92,9 +113,7 @@ func (r *WBRepo) ListSegmentsByTaskIDs(ids []string) (map[string][]model.WorkTas
 	defer rows.Close()
 	for rows.Next() {
 		var s model.WorkTaskSegment
-		if err := rows.Scan(&s.SegmentID, &s.TaskID, &s.Kind, &s.Scope, &s.Seq, &s.WorkDate,
-			&s.StartTime, &s.EndTime, &s.DurationMin, &s.TravelBeforeMin, &s.TravelAfterMin,
-			&s.UserID, &s.Assignee, &s.WorkerUserID, &s.WorkerName, &s.InterruptTaskID, &s.Note); err != nil {
+		if err := scanLiveSegment(&s, rows); err != nil {
 			return nil, err
 		}
 		out[s.TaskID] = append(out[s.TaskID], s)
@@ -118,6 +137,18 @@ func (r *WBRepo) replaceSegmentsOfKind(taskID, kind string, segs []model.WorkTas
 		return err
 	}
 	for i, s := range segs {
+		if model.NormalizeSegmentKind(kind) == model.SegKindActual {
+			wid := strings.TrimSpace(firstNonEmpty(s.WorkerUserID, s.UserID))
+			if wid != "" && strings.TrimSpace(s.StartTime) != "" && strings.TrimSpace(s.EndTime) != "" {
+				hits, err := r.ActualOverlapsForWorker(wid, s.WorkDate, s.StartTime, s.EndTime, s.SegmentID)
+				if err != nil {
+					return err
+				}
+				if len(hits) > 0 {
+					return fmt.Errorf("작업자 구간이 겹칩니다: %s", hits[0].TaskID)
+				}
+			}
+		}
 		if err := r.insertSegment(taskID, kind, i+1, s); err != nil {
 			return err
 		}
@@ -144,21 +175,49 @@ func (r *WBRepo) insertSegment(taskID, kind string, seq int, s model.WorkTaskSeg
 		}
 	}
 	dur := s.DurationMin
-	if dur <= 0 {
+	if dur <= 0 && strings.TrimSpace(s.EndTime) != "" {
 		dur = model.DurationFromTimes(s.StartTime, s.EndTime)
+	}
+	src := strings.TrimSpace(s.Source)
+	if src == "" {
+		src = model.SegSourceManual
+	}
+	ts := strings.TrimSpace(s.TravelSource)
+	if ts == "" {
+		ts = model.SegSourceManual
 	}
 	_, err := r.db.Exec(`
 		INSERT INTO work_task_segments (
 			segment_id, task_id, kind, scope, seq, work_date, start_time, end_time, duration_min,
 			travel_before_min, travel_after_min, user_id, assignee, worker_user_id, worker_name,
-			interrupt_task_id, note)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			interrupt_task_id, note, source, ended_by, travel_origin, travel_dest,
+			travel_plan_depart, travel_plan_arrive, travel_actual_depart, travel_actual_arrive,
+			travel_source, travel_unknown_reason)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		id, taskID, kind, model.NormalizeSegmentScope(s.Scope), seq, strings.TrimSpace(s.WorkDate),
 		strings.TrimSpace(s.StartTime), strings.TrimSpace(s.EndTime), dur,
 		model.ClampTravelMin(s.TravelBeforeMin), model.ClampTravelMin(s.TravelAfterMin),
 		strings.TrimSpace(s.UserID), strings.TrimSpace(s.Assignee),
 		strings.TrimSpace(s.WorkerUserID), strings.TrimSpace(s.WorkerName),
-		strings.TrimSpace(s.InterruptTaskID), strings.TrimSpace(s.Note))
+		strings.TrimSpace(s.InterruptTaskID), strings.TrimSpace(s.Note),
+		src, strings.TrimSpace(s.EndedBy), strings.TrimSpace(s.TravelOrigin), strings.TrimSpace(s.TravelDest),
+		strings.TrimSpace(s.TravelPlanDepart), strings.TrimSpace(s.TravelPlanArrive),
+		strings.TrimSpace(s.TravelActualDepart), strings.TrimSpace(s.TravelActualArrive),
+		ts, strings.TrimSpace(s.TravelUnknownReason))
+	if err != nil && strings.Contains(err.Error(), "no such column") {
+		_, err = r.db.Exec(`
+			INSERT INTO work_task_segments (
+				segment_id, task_id, kind, scope, seq, work_date, start_time, end_time, duration_min,
+				travel_before_min, travel_after_min, user_id, assignee, worker_user_id, worker_name,
+				interrupt_task_id, note)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			id, taskID, kind, model.NormalizeSegmentScope(s.Scope), seq, strings.TrimSpace(s.WorkDate),
+			strings.TrimSpace(s.StartTime), strings.TrimSpace(s.EndTime), dur,
+			model.ClampTravelMin(s.TravelBeforeMin), model.ClampTravelMin(s.TravelAfterMin),
+			strings.TrimSpace(s.UserID), strings.TrimSpace(s.Assignee),
+			strings.TrimSpace(s.WorkerUserID), strings.TrimSpace(s.WorkerName),
+			strings.TrimSpace(s.InterruptTaskID), strings.TrimSpace(s.Note))
+	}
 	return err
 }
 
@@ -197,6 +256,13 @@ func (r *WBRepo) ApplyInterruptSplit(old *model.WorkTask, newID, date, newStart,
 			if model.NormalizeSegmentScope(seg.Scope) != model.SegScopeCommon {
 				next = append(next, seg)
 				continue
+			}
+			if date != "" {
+				segDay := strings.TrimSpace(seg.WorkDate)
+				if segDay != "" && segDay != date {
+					next = append(next, seg)
+					continue
+				}
 			}
 			if !model.RangesOverlapHHMM(seg.StartTime, seg.EndTime, newStart, newEnd) {
 				next = append(next, seg)
@@ -375,12 +441,35 @@ func (r *WBRepo) ListDepartures(taskID string) ([]model.WorkTaskDeparture, error
 		return nil, nil
 	}
 	rows, err := r.db.Query(`
-		SELECT departure_id, task_id, user_id, assignee, work_date, start_time, end_time, interrupt_task_id, return_status
+		SELECT departure_id, task_id, user_id, assignee, work_date, start_time, end_time, interrupt_task_id, return_status,
+		       COALESCE(reason,''), COALESCE(next_action_date,''), remaining_min, COALESCE(force_reason,'')
 		FROM work_task_departures WHERE task_id=? ORDER BY start_time`, taskID)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
 		}
+		if strings.Contains(err.Error(), "no such column") {
+			return r.listDeparturesLegacy(taskID)
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.WorkTaskDeparture
+	for rows.Next() {
+		d, err := scanDepartureLive(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+func (r *WBRepo) listDeparturesLegacy(taskID string) ([]model.WorkTaskDeparture, error) {
+	rows, err := r.db.Query(`
+		SELECT departure_id, task_id, user_id, assignee, work_date, start_time, end_time, interrupt_task_id, return_status
+		FROM work_task_departures WHERE task_id=? ORDER BY start_time`, taskID)
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -393,6 +482,23 @@ func (r *WBRepo) ListDepartures(taskID string) ([]model.WorkTaskDeparture, error
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+func scanDepartureLive(rows interface {
+	Scan(dest ...any) error
+}) (model.WorkTaskDeparture, error) {
+	var d model.WorkTaskDeparture
+	var rem sql.NullInt64
+	err := rows.Scan(&d.DepartureID, &d.TaskID, &d.UserID, &d.Assignee, &d.WorkDate, &d.StartTime, &d.EndTime, &d.InterruptTaskID, &d.ReturnStatus,
+		&d.Reason, &d.NextActionDate, &rem, &d.ForceReason)
+	if err != nil {
+		return d, err
+	}
+	if rem.Valid {
+		v := int(rem.Int64)
+		d.RemainingMin = &v
+	}
+	return d, nil
 }
 
 func (r *WBRepo) ListPendingReturns() ([]model.WorkTaskDeparture, error) {

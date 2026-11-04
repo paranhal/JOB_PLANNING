@@ -34,6 +34,12 @@ func Test95_60_ScheduleShowToggleBoard(t *testing.T) {
 	if err := repo.UpdateTask(actTk); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := repo.InsertWorkTaskProcess(model.WorkTaskProcess{
+		TaskID: actTk.TaskID, OrgID: actTk.OrgID, ProcessAt: "2026-10-20 11:00:00",
+		Worker: me.FullName, WorkerUserID: me.UserID, WorkContent: "조치60",
+	}); err != nil {
+		t.Fatal(err)
+	}
 	def := doGetWith(t, e, "/workboard/board?view=month&date=2026-10-15&auto=0", ck)
 	if def.Code != http.StatusOK {
 		t.Fatalf("default %d", def.Code)

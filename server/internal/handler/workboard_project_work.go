@@ -39,6 +39,20 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	} else {
 		workDay = d
 	}
+	dueDay := strings.TrimSpace(c.FormValue("due_date"))
+	if dueDay != "" {
+		if d, err := model.ParseAppDate(dueDay); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "종료일을 확인하세요")
+		} else {
+			dueDay = d
+		}
+	}
+	if dueDay == "" {
+		dueDay = workDay
+	}
+	if dueBeforeWork(workDay, dueDay) {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=date_order"))
+	}
 	sel, selErr := h.taskSelectionFromForm(c, true)
 	if selErr != nil {
 		return rejectPickerErr(c, selErr, redirectBack(c, ""))
@@ -76,7 +90,8 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	}
 	supports := parseSupportMembers(c, assignee)
 	if workDate != "" {
-		if err := h.rejectIfOverlap(c, workDate, start, end, "", occupancyNames(assignee, supports)); err != nil {
+		planDates := collectPlanDatesFromForm(c, workDay, dueDay, h.holidayYearMissing())
+		if err := h.rejectIfOverlapDates(c, planDates, start, end, "", occupancyNames(assignee, supports)); err != nil {
 			return overlapDone(err)
 		}
 	}
@@ -90,8 +105,8 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 		ProjectID:   projectID,
 		Title:       title,
 		Description: strings.TrimSpace(c.FormValue("description")),
-		DueDate:     workDay,
-		WorkDate:    workDate,
+		DueDate:     dueDay,
+		WorkDate:    firstNonEmpty(workDate, workDay),
 		StartTime:   start,
 		EndTime:     end,
 		DurationMin: dur,

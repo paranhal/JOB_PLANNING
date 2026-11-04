@@ -154,6 +154,98 @@ func (r *WBRepo) ListWorkTaskProcesses(orgID, taskID string) ([]model.WorkTaskPr
 	return out, rows.Err()
 }
 
+// ListTasksWithProcessBetweenForOrg 조치 이력(process_at)이 기간 안인 업무. 완료일만 있는 건 제외(95-94 Q-4).
+func (r *WBRepo) ListTasksWithProcessBetweenForOrg(from, to, orgID string) ([]model.WorkTask, map[string][]string, error) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	dates := map[string][]string{}
+	if from == "" || to == "" {
+		return nil, dates, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT p.task_id, substr(p.process_at,1,10)
+		FROM work_task_processes p
+		INNER JOIN work_tasks t ON t.task_id=p.task_id
+		WHERE substr(p.process_at,1,10) >= ? AND substr(p.process_at,1,10) <= ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'`, from, to)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, dates, nil
+		}
+		return nil, dates, err
+	}
+	defer rows.Close()
+	seenID := map[string]bool{}
+	var ids []string
+	for rows.Next() {
+		var id, day string
+		if err := rows.Scan(&id, &day); err != nil {
+			return nil, dates, err
+		}
+		id, day = strings.TrimSpace(id), strings.TrimSpace(day)
+		if id == "" || len(day) < 10 {
+			continue
+		}
+		day = day[:10]
+		dup := false
+		for _, d := range dates[id] {
+			if d == day {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			dates[id] = append(dates[id], day)
+		}
+		if !seenID[id] {
+			seenID[id] = true
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, dates, err
+	}
+	if len(ids) == 0 {
+		return nil, dates, nil
+	}
+	ph := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
+	args := make([]interface{}, 0, len(ids)+2)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	args = append(args, extra...)
+	list, err := r.listStoredTasks(`
+		WHERE t.task_id IN (`+ph+`)`+frag+workTaskOrder, args...)
+	if err != nil {
+		return nil, dates, err
+	}
+	return list, dates, nil
+}
+
+// CountCompleteWithoutProcessBetweenForOrg 완료일은 기간 안인데 조치 이력이 없는 건수.
+func (r *WBRepo) CountCompleteWithoutProcessBetweenForOrg(from, to, orgID string) (int, error) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return 0, nil
+	}
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	args := append([]interface{}{from, to}, extra...)
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks t
+		WHERE TRIM(COALESCE(t.complete_date,'')) != ''
+		  AND t.complete_date >= ? AND t.complete_date <= ?
+		  AND COALESCE(t.recurrence_role,'') != 'parent'
+		  AND NOT EXISTS (SELECT 1 FROM work_task_processes p WHERE p.task_id=t.task_id)`+frag, args...).Scan(&n)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return n, nil
+}
+
 func (r *WBRepo) ListWorkTaskParts(orgID, taskID string) ([]model.ASPartUsed, error) {
 	if _, err := RequireInsertOrg(orgID); err != nil {
 		return nil, err

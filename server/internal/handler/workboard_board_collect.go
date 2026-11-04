@@ -140,7 +140,7 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 	scope = h.withBoardMemberFilter(c, scope)
 	org := currentOrg(c)
 	today := time.Now().Format(dateLayout)
-	projectFilter := strings.TrimSpace(c.QueryParam("project"))
+	projectFilter := h.sanitizeProjectQuery(c)
 	groupFilter := strings.TrimSpace(c.QueryParam("work_group_id"))
 
 	syncFrom, syncTo := registerSyncWindow(from, to)
@@ -216,7 +216,7 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 	seen := map[string]bool{}
 	write := boardCanWrite(c)
 	for _, t := range visible {
-		it := buildBoardItem(t, memberMap[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
+		it := buildBoardItem(h.userRepo, t, memberMap[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
 		it.Members = memberMap[t.TaskID]
 		it.DedupKey = taskDedupKey(t)
 		it.Href = t.DetailHref()
@@ -232,7 +232,7 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 	}
 	out.PlanN = len(out.Placed)
 
-	execRaw, err := h.repo.ListTasksCompleteBetweenForOrg(from, to, org)
+	execRaw, procDates, err := h.repo.ListTasksWithProcessBetweenForOrg(from, to, org)
 	if err != nil {
 		return out, err
 	}
@@ -263,17 +263,23 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 	execVis = applyViewGroupToTasks(c, allExec, execVis, scope)
 	execSeen := map[string]bool{}
 	for _, t := range execVis {
-		it := buildBoardItem(t, execMem[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
-		it.Members = execMem[t.TaskID]
-		it.DedupKey = taskDedupKey(t) + "|act"
-		it.Href = t.DetailHref()
-		it.PlaceDate = model.TaskExecDate(t)
-		k := it.DedupKey
-		if execSeen[k] {
+		days := procDates[t.TaskID]
+		if len(days) == 0 {
 			continue
 		}
-		execSeen[k] = true
-		out.Exec = append(out.Exec, it)
+		for _, day := range days {
+			it := buildBoardItem(h.userRepo, t, execMem[t.TaskID], addrMap[strings.TrimSpace(t.CustomerID)], today)
+			it.Members = execMem[t.TaskID]
+			it.DedupKey = taskDedupKey(t) + "|act|" + day
+			it.Href = t.DetailHref()
+			it.PlaceDate = day
+			k := it.DedupKey
+			if execSeen[k] {
+				continue
+			}
+			execSeen[k] = true
+			out.Exec = append(out.Exec, it)
+		}
 	}
 	out.ActN = len(out.Exec)
 
@@ -358,7 +364,7 @@ func unplacedOtherCount(all, mine []model.WBCard) int {
 
 func cardToUnplacedItem(c echo.Context, card model.WBCard, today string, write bool, scope boardScope) boardItem {
 	t := model.WBCardAsWaitingTask(card)
-	it := buildBoardItem(t, nil, "", today)
+	it := buildBoardItem(nil, t, nil, "", today)
 	it.Unplaced = true
 	it.DateLabel = "날짜 미정"
 	href := strings.TrimSpace(card.SourceHref)
@@ -487,7 +493,7 @@ func workListToBoardItem(it model.WorkListItem, today string) boardItem {
 		t.WorkType = model.WBWorkAdmin
 		t.TaskID = it.RefID
 	}
-	bi := buildBoardItem(t, nil, "", today)
+	bi := buildBoardItem(nil, t, nil, "", today)
 	href := strings.TrimSpace(it.Href)
 	if href == "" {
 		href = t.DetailHref()

@@ -18,7 +18,7 @@ func ParseScheduleShow(raw string) (plan, act bool) {
 		switch strings.TrimSpace(p) {
 		case ScheduleShowPlan, "receipt", "p":
 			plan = true
-		case ScheduleShowAct, "done", "exec", "x":
+		case ScheduleShowAct, "done", "exec", "x", "action":
 			act = true
 		}
 	}

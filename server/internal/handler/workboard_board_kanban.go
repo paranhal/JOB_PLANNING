@@ -244,7 +244,7 @@ func mergeKanbanOpen(h *WorkboardHandler, c echo.Context, entries *boardEntries,
 		if t.Status == model.WBTaskCancelled {
 			continue
 		}
-		it := buildBoardItem(t, memberMap[t.TaskID], "", today)
+		it := buildBoardItem(h.userRepo, t, memberMap[t.TaskID], "", today)
 		it.DedupKey = taskDedupKey(t)
 		it.Href = t.DetailHref()
 		if seen[it.DedupKey] {

@@ -117,16 +117,20 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.Use(h.Auth.GuardCLevelHidden)
 	g.GET("/workboard", h.Workboard.Index)
 	g.GET("/workboard/board", h.Workboard.Board)
+	g.GET("/workboard/projects/other", h.Workboard.ListOtherProjects)
 	g.GET("/workboard/new-work/form", h.Workboard.NewWorkForm)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.POST("/workboard/mnt-quick-register", h.Workboard.QuickRegisterMaintenance)
 	g.GET("/workboard/mnt-candidates", h.Workboard.MntCandidates)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.POST("/workboard/schedule", h.Workboard.Schedule)
+	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
+	g.GET("/workboard/kanban", h.Workboard.Kanban)
 	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)
 	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
 	g.POST("/workboard/tasks/:id/merge-interrupt", h.Workboard.MergeInterrupt)
 	g.POST("/workboard/tasks/:id/return-confirm", h.Workboard.ConfirmReturn)
+	mountLiveWorkRoutes(g, h.Workboard)
 	g.GET("/work", h.Work.List)
 	g.GET("/work/all", h.Work.ListAll)
 	return e, db, got1, got2, h.Workboard.repo
@@ -209,8 +213,11 @@ func TestPersonalBoardCLevelAndLogin(t *testing.T) {
 	}
 	got, _ := users.GetByUsername("ceo1")
 	rec := doGetWith(t, e, "/workboard/board", jwtCookieUser(t, got))
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("c_level %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("c_level 조회 %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "조회 전용") {
+		t.Fatal("C-Level 조회 전용 표시 없음")
 	}
 	anon := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost/workboard/board", nil)

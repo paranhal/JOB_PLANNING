@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 const (
@@ -163,6 +164,10 @@ func (h *WorkboardHandler) Board(c echo.Context) error {
 		data["FlashErrMsg"] = msg
 		data["FlashPopup"] = msg
 	}
+	if ok := strings.TrimSpace(c.QueryParam("ok")); ok != "" {
+		data["FlashOK"] = ok
+		data["FlashOKMsg"] = boardPlanSavedMsg(c)
+	}
 	view := data["View"].(string)
 	tpl := "workboard/board_list.html"
 	switch view {
@@ -290,29 +295,17 @@ func boardStatus(t model.WorkTask, today string) boardStatusView {
 func taskAssignedToUser(t model.WorkTask, mems []model.WorkTaskMember, userID, displayName string) bool {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)
-	hasID := strings.TrimSpace(t.AssigneeUserID) != ""
 	if userID != "" && strings.TrimSpace(t.AssigneeUserID) == userID {
 		return true
 	}
-	for _, m := range mems {
-		if strings.TrimSpace(m.UserID) != "" {
-			hasID = true
-		}
-		if userID != "" && strings.TrimSpace(m.UserID) == userID {
-			return true
-		}
-	}
-	if hasID {
-		return false
-	}
-	if displayName == "" {
-		return false
-	}
-	if strings.TrimSpace(t.Assignee) == displayName {
+	if displayName != "" && strings.TrimSpace(t.Assignee) == displayName {
 		return true
 	}
 	for _, m := range mems {
-		if strings.TrimSpace(m.Assignee) == displayName {
+		if userID != "" && strings.TrimSpace(m.UserID) == userID {
+			return true
+		}
+		if displayName != "" && strings.TrimSpace(m.Assignee) == displayName {
 			return true
 		}
 	}
@@ -396,7 +389,7 @@ func boardAssigneeFields(primary string, names []string) (name, extra, title, in
 	if primary == "" && len(shown) > 0 {
 		primary = shown[0]
 	}
-	if primary == "" {
+	if primary == "" || primary == assigneeUnspecified {
 		return "미배정", "", "미배정", "?", "미배정"
 	}
 	if len(shown) > 1 {
@@ -409,7 +402,7 @@ func boardAssigneeFields(primary string, names []string) (name, extra, title, in
 	return primary, extra, title, firstRune(primary), primary + extra
 }
 
-func buildBoardItem(t model.WorkTask, mems []model.WorkTaskMember, addr string, today string) boardItem {
+func buildBoardItem(users *repository.UserRepo, t model.WorkTask, mems []model.WorkTaskMember, addr string, today string) boardItem {
 	names := []string{}
 	seen := map[string]bool{}
 	add := func(n string) {
@@ -420,11 +413,17 @@ func buildBoardItem(t model.WorkTask, mems []model.WorkTaskMember, addr string, 
 		seen[n] = true
 		names = append(names, n)
 	}
-	add(t.Assignee)
-	for _, m := range mems {
-		add(m.Assignee)
+	addDisp := func(uid, raw string) {
+		n := userDisplayName(users, uid, raw)
+		if n != assigneeUnspecified {
+			add(n)
+		}
 	}
-	name, extra, title, initial, line := boardAssigneeFields(t.Assignee, names)
+	addDisp(t.AssigneeUserID, t.Assignee)
+	for _, m := range mems {
+		addDisp(m.UserID, m.Assignee)
+	}
+	name, extra, title, initial, line := boardAssigneeFields(userDisplayName(users, t.AssigneeUserID, t.Assignee), names)
 	cust := strings.TrimSpace(t.SiteLine)
 	if cust == "" {
 		cust = strings.TrimSpace(t.OrgName)
@@ -674,7 +673,11 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 					items = append(items, it)
 					continue
 				}
-				if it.PlaceDate == day || model.TaskSpansDate(it.Task.WorkDate, it.Task.DueDate, day) {
+				if it.PlaceDate == day {
+					items = append(items, it)
+					continue
+				}
+				if showPlan && !boardItemIsExec(it) && model.TaskSpansDate(it.Task.WorkDate, it.Task.DueDate, day) {
 					items = append(items, it)
 				}
 			}
@@ -904,9 +907,11 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		}
 		dayPersonCols = buildBoardPersonCols(dayTimed, order, scope.AssigneeFilter, leaveHit, regNames)
 	}
-	planKeep.Set("show", model.ToggleScheduleShow(curShow, model.ScheduleShowPlan))
+	planKeep.Set("show", model.ScheduleShowPlan)
 	actKeep := cloneBoardQuery(keep)
-	actKeep.Set("show", model.ToggleScheduleShow(curShow, model.ScheduleShowAct))
+	actKeep.Set("show", model.ScheduleShowAct)
+	bothKeep := cloneBoardQuery(keep)
+	bothKeep.Set("show", model.EncodeScheduleShow(true, true))
 	personKeep := cloneBoardQuery(keep)
 	personKeep.Del("cols")
 	flatKeep := cloneBoardQuery(keep)
@@ -920,7 +925,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	for _, it := range calItems {
 		legendTasks = append(legendTasks, it.Task)
 	}
-	projects, _ := h.repo.ListProjects(true)
+	projects, _ := h.repo.ListActiveProjectsLabeled()
 	wgItems, _ := h.workGroupPicks(c)
 	data := map[string]interface{}{
 		"Title":            title,
@@ -1001,6 +1006,8 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"ActCount":         actN,
 		"ShowPlanHref":     boardURL(view, ds, planKeep),
 		"ShowActHref":      boardURL(view, ds, actKeep),
+		"ShowBothHref":     boardURL(view, ds, bothKeep),
+		"ShowScopeBadge":   showAct && scope.ScopeAll,
 	}
 	if view == boardViewKanban {
 		kanbanItems := append([]boardItem{}, calItems...)
@@ -1026,7 +1033,62 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	mergeCarryModal(data)
 	data["ItemOrgID"] = currentOrg(c)
 	attachWorkItemView(data, h, nil, false)
-	return attachViewGroup(c, data), nil
+	data = attachViewGroup(c, data)
+	attachBoardDropdowns(c, data, view)
+	attachProjectFilter(c, h, data, "board-project")
+	data["BoardShell"] = true
+	attachLiveWorkData(data, h, c, nil)
+	return data, nil
+}
+
+type uiDropItem struct {
+	Value    string
+	Label    string
+	Hint     string
+	Href     string
+	Selected bool
+}
+
+func uiDropData(id, label string, items []uiDropItem) map[string]interface{} {
+	cur := label
+	for _, it := range items {
+		if it.Selected {
+			cur = it.Label
+			break
+		}
+	}
+	return map[string]interface{}{
+		"ID": id, "Label": label, "Current": cur, "Items": items,
+	}
+}
+
+func attachBoardDropdowns(c echo.Context, data map[string]interface{}, view string) {
+	if data == nil {
+		return
+	}
+	scopeAll, _ := data["ScopeAll"].(bool)
+	mineHref, _ := data["MineHref"].(string)
+	allHref, _ := data["AllHref"].(string)
+	data["ScopeDrop"] = uiDropData("scope", "범위", []uiDropItem{
+		{Value: "mine", Label: "내 업무", Hint: "나에게 배정된 업무", Href: mineHref, Selected: !scopeAll},
+		{Value: "all", Label: "전체", Hint: "같은 조직의 업무", Href: allHref, Selected: scopeAll},
+	})
+	with, _ := data["ViewGroupWith"].(bool)
+	toggle, _ := data["ViewGroupToggle"].(bool)
+	data["ShowGroupDropdown"] = toggle && userHasWorkGroup(c)
+	data["GroupDrop"] = uiDropData("group", "그룹", []uiDropItem{
+		{Value: viewGroupWith, Label: "그룹 포함", Hint: "내가 속한 그룹 업무를 함께", Href: "?scope=with", Selected: with},
+		{Value: viewGroupMine, Label: "개인만", Hint: "그룹 업무를 빼고 개인 업무만", Href: "?scope=personal", Selected: !with},
+	})
+	listHref, _ := data["ListHref"].(string)
+	calHref, _ := data["CalHref"].(string)
+	kanbanHref, _ := data["KanbanHref"].(string)
+	calOn := view == boardViewDay || view == boardViewWeek || view == boardViewMonth
+	data["ViewDrop"] = uiDropData("view", "보기", []uiDropItem{
+		{Value: boardViewList, Label: "일정 리스트 보기", Hint: "날짜별 목록", Href: listHref, Selected: view == boardViewList},
+		{Value: "cal", Label: "일정 캘린더 보기", Hint: "일·주·월 달력", Href: calHref, Selected: calOn},
+		{Value: boardViewKanban, Label: "칸반 보기", Hint: "상태 칸반", Href: kanbanHref, Selected: view == boardViewKanban},
+	})
 }
 
 type boardListGroup struct {

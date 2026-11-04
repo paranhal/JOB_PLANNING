@@ -155,6 +155,10 @@ func (h *WorkboardHandler) runOccurrenceWrite(c echo.Context, regenerate bool) e
 	rule := parseRecurrenceForm(c)
 	rule.TaskID = t.TaskID
 	prev := service.ExpandOccurrencePreview(rule, service.DefaultCalendar(), h.holidayYearMissing())
+	if err := h.rejectIfOverlapDates(c, prev.Dates, t.StartTime, t.EndTime, t.TaskID, occupancyNames(t.Assignee, nil)); err != nil {
+		return overlapDone(err)
+	}
+	prev.Dates = filterSkippedDates(prev.Dates, overlapSkipDateSet(c))
 	if prev.RejectYear {
 		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_year")
 	}
@@ -383,7 +387,11 @@ func applyRecurrenceFromForm(c echo.Context, repo *repository.WBRepo, t *model.W
 	if prev.Warn200 && c.FormValue("confirm_over_200") != "1" {
 		return false, "rec_warn"
 	}
-	if _, err := repo.GenerateOccurrences(t, rule, prev.Dates); err != nil {
+	dates := filterSkippedDates(prev.Dates, overlapSkipDateSet(c))
+	if len(dates) == 0 {
+		return false, ""
+	}
+	if _, err := repo.GenerateOccurrences(t, rule, dates); err != nil {
 		if strings.Contains(err.Error(), "이미 실행 작업") {
 			return false, "rec_exists"
 		}

@@ -1,6 +1,16 @@
 {{define "title"}}일일 업무 현황 · 칸반{{end}}
 {{define "content"}}
 <div class="space-y-5">
+  {{template "live_work_bar" .}}
+  {{template "live_work_modals" .}}
+  {{if .OccurrenceUnit}}
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4" data-occ-kanban="1">
+    <div class="rounded-lg border p-3"><h3 class="font-semibold mb-2">예정 {{len .OccScheduled}}</h3>{{range .OccScheduled}}<a class="block text-sm py-1" href="/workboard/tasks/{{.TaskID}}">{{.Title}}</a>{{end}}</div>
+    <div class="rounded-lg border p-3"><h3 class="font-semibold mb-2">진행중 {{len .OccInProgress}}</h3>{{range .OccInProgress}}<a class="block text-sm py-1" href="/workboard/tasks/{{.TaskID}}">{{.Title}}</a>{{end}}</div>
+    <div class="rounded-lg border p-3"><h3 class="font-semibold mb-2">보류·연기 {{len .OccHold}}</h3>{{range .OccHold}}<a class="block text-sm py-1" href="/workboard/tasks/{{.TaskID}}">{{.Title}}</a>{{end}}</div>
+    <div class="rounded-lg border p-3"><h3 class="font-semibold mb-2">완료 {{len .OccComplete}}</h3>{{range .OccComplete}}<a class="block text-sm py-1" href="/workboard/tasks/{{.TaskID}}">{{.Title}}</a>{{end}}</div>
+  </div>
+  {{end}}
   {{if .FlashOK}}
   <div class="rounded-lg bg-success-soft border border-success px-4 py-2 text-sm text-success">저장되었습니다.</div>
   {{end}}

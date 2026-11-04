@@ -12,13 +12,10 @@
         <p class="mb-1 text-ui text-ink-muted">내게 배정된 업무를 한곳에서 확인하세요.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        {{template "board_scope_toggle" .}}
-        {{template "view_group_toggle" .}}
+        {{template "board_top_controls" .}}
         {{if .ShowMemberFilter}}
         <button type="button" class="btn btn-secondary btn-sm" x-show="closed" x-cloak @click="openBox()" aria-label="팀원별 보기 열기">팀원별 보기</button>
         {{end}}
-        {{template "schedule_show_toggle" .}}
-        {{template "board_view_links" .}}
         {{template "board_period_seg_list" .}}
         <form method="get" action="/workboard/board" class="contents">
           <input type="hidden" name="view" value="list">

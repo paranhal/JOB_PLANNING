@@ -6,7 +6,7 @@
 {{$isWork := eq .Task.WorkType "project_work"}}
 {{$t := .Task}}
 <div class="{{if .IsAdminGTD}}max-w-4xl{{else}}max-w-3xl{{end}} mx-auto space-y-5"
-     x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo',
+     x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo', planSegCount: {{if .PlanSegCount}}{{.PlanSegCount}}{{else}}0{{end}},
        openOcc: {{if .OpenOccurrenceCount}}{{.OpenOccurrenceCount}}{{else}}0{{end}},
        preAssignee: '{{$t.Assignee}}', preOwnerId: '{{.PickerOwnerID}}', preGroupId: '{{$t.WorkGroupID}}',
        preAssigneeIds: {{if .PickerUserIDs}}{{toJSON .PickerUserIDs}}{{else}}[]{{end}},
@@ -110,6 +110,13 @@
       {{end}}
     </div>
   </div>
+
+  {{template "live_work_bar" .}}
+  {{template "task_time_summary" .}}
+  {{template "multi_progress" .}}
+  {{template "multi_timeline" .}}
+  {{template "live_return_modal" .}}
+  {{template "live_work_modals" .}}
 
   {{if .DelayHistory}}
   <section class="card p-4 space-y-2">
@@ -350,7 +357,7 @@
       <div><dt class="text-xs text-ink-muted">업무 시작일</dt><dd>{{if $t.WorkDate}}{{$t.WorkDate}}{{else}}—{{end}}</dd></div>
       <div><dt class="text-xs text-ink-muted">업무 종료일</dt><dd>{{if $t.DueDate}}{{$t.DueDate}}{{else}}—{{end}}</dd></div>
       <div><dt class="text-xs text-ink-muted">시간</dt><dd>{{if $t.StartTime}}{{$t.StartTime}}~{{$t.EndTime}}{{else}}—{{end}}</dd></div>
-      <div><dt class="text-xs text-ink-muted">담당자</dt><dd>{{if $t.Assignee}}{{$t.Assignee}}{{else}}—{{end}}</dd></div>
+      <div><dt class="text-xs text-ink-muted">담당자</dt><dd>{{if .DisplayAssignee}}{{.DisplayAssignee}}{{else if $t.Assignee}}{{$t.Assignee}}{{else}}—{{end}}</dd></div>
     </dl>
   </div>
   {{end}}
@@ -496,20 +503,27 @@
     {{end}}
 
     <div class="rounded-lg border border-line bg-hover p-3 space-y-2">
-      <p class="text-xs font-medium text-ink">소요 예상 시간 {{if or $isAS $isMnt}}<span class="text-red-500">*</span>{{end}}</p>
+      <p class="text-xs font-medium text-ink">소요 예상 시간 {{if and (or $isAS $isMnt) $t.StartTime (not $.PlanSegReadOnly)}}<span class="text-red-500">*</span>{{end}}</p>
+      {{if .PlanSegReadOnly}}
+      <p class="text-sm text-ink">{{$t.StartTime}}~{{$t.EndTime}}</p>
+      <input type="hidden" name="start_time" value="{{$t.StartTime}}">
+      <input type="hidden" name="end_time" value="{{$t.EndTime}}">
+      <a href="{{.CalendarURL}}" class="text-xs text-primary hover:underline">작업 구간 {{.PlanSegCount}}개</a>
+      {{else}}
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs text-ink-muted mb-1">시작</label>
-          <input type="time" name="start_time" value="{{$t.StartTime}}" x-model="start" {{if or $isAS $isMnt}}required{{end}} step="60"
+          <input type="time" name="start_time" value="{{$t.StartTime}}" x-model="start" {{if and (or $isAS $isMnt) $t.StartTime}}required{{end}} step="60"
                  class="w-full border rounded-lg px-3 py-2">
         </div>
         <div>
           <label class="block text-xs text-ink-muted mb-1">종료</label>
-          <input type="time" name="end_time" value="{{$t.EndTime}}" x-model="end" {{if or $isAS $isMnt}}required{{end}} step="60"
+          <input type="time" name="end_time" value="{{$t.EndTime}}" x-model="end" {{if and (or $isAS $isMnt) $t.EndTime}}required{{end}} step="60"
                  class="w-full border rounded-lg px-3 py-2">
         </div>
       </div>
       <p class="text-[11px] text-ink-subtle">07:00~20:00 · 15분 단위</p>
+      {{end}}
     </div>
     {{template "wb_assignee_picker" .}}
     {{template "wb_plan_work_place" $t.WorkPlace}}
@@ -575,6 +589,7 @@
           <option value="complete" {{if eq $t.OccurrenceStatus "complete"}}selected{{end}}>완료</option>
           <option value="overdue" {{if eq $t.OccurrenceStatus "overdue"}}selected{{end}}>미완료</option>
           <option value="deferred" {{if eq $t.OccurrenceStatus "deferred"}}selected{{end}}>연기</option>
+          <option value="hold" {{if eq $t.OccurrenceStatus "hold"}}selected{{end}}>보류</option>
           <option value="skipped" {{if eq $t.OccurrenceStatus "skipped"}}selected{{end}}>제외</option>
         </select>
       </div>

@@ -1,0 +1,32 @@
+{{define "wb_period_dates"}}
+<div class="grid grid-cols-2 gap-3" data-wb-period-dates>
+  <div>
+    <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-red-500">*</span></label>
+    <input type="date" name="work_date" x-model="preWork" required
+           class="w-full border rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-ink mb-1">업무 종료일{{if .ShowUndetermined}} <span class="text-red-500" x-show="!dueUndetermined">*</span>{{end}}</label>
+    <input type="date" name="due_date" x-model="preDue"{{if .ShowUndetermined}} @change="checkMnt()" :required="!dueUndetermined" :disabled="dueUndetermined"{{end}}
+           class="w-full border rounded-lg px-3 py-2 text-sm{{if .ShowUndetermined}} disabled:bg-hover{{end}}">
+    {{if .ShowUndetermined}}
+    <label class="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
+      <input type="checkbox" name="due_undetermined" value="1" x-model="dueUndetermined" class="rounded">
+      미정 + 사유
+    </label>
+    <div x-show="dueUndetermined" x-cloak class="mt-2 space-y-1">
+      <select name="no_date_reason" :required="dueUndetermined" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+        <option value="">— 사유 선택 —</option>
+        <option value="parts">부품 대기</option>
+        <option value="customer">고객 일정 미확정</option>
+        <option value="vendor">외부 업체 회신 대기</option>
+        <option value="other">기타</option>
+      </select>
+      <input name="no_date_detail" class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="기타인 경우 직접 입력">
+    </div>
+    {{end}}
+    <p class="due-date-err mt-1 text-[11px] text-danger" hidden>종료일은 시작일 이후여야 합니다</p>
+    {{if .Hint}}<p class="text-[11px] text-ink-subtle mt-1">{{.Hint}}</p>{{end}}
+  </div>
+</div>
+{{end}}

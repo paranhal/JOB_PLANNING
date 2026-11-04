@@ -34,6 +34,9 @@
 {{if .EditUnlocked}}
 <div class="mb-3 rounded-control border border-success bg-success-soft px-4 py-2.5 text-ui text-ink">지난 날짜 수정 잠금이 해제되어 있습니다{{if .UnlockExpires}} ({{.UnlockExpires}}까지){{end}}.</div>
 {{end}}
+{{if .FlashOKMsg}}
+<div class="flash-success rounded-control mb-3" role="status">{{.FlashOKMsg}}</div>
+{{end}}
 {{if .FlashErrMsg}}
 <div class="flash-danger rounded-control mb-3" role="alert">{{.FlashErrMsg}}</div>
 {{else if .FlashErr}}
@@ -48,6 +51,8 @@
 {{template "board_unplaced" .}}
 </div>
 {{template "wb_new_work_modal" .}}
+{{template "live_work_bar" .}}
+{{template "live_work_modals" .}}
 {{template "board_place_modal" .}}
 <form method="post" action="/workboard/schedule" id="board-move-form" class="js-keep-modal hidden">
   <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
