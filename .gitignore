@@ -39,6 +39,8 @@ deploy/server-app.tar.prev-*
 output/
 .codex-finalizer-brochure/
 docs/리뷰/*.log
+docs/리뷰/screenshots/**/*.log
+docs/리뷰/screenshots/**/*.txt
 server/gotest*.log
 package-lock.json
 /testdata/
