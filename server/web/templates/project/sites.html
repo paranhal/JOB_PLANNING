@@ -6,11 +6,15 @@
       <h2 class="text-ui-xl font-extrabold text-ink mt-1">사이트·장비</h2>
       <p class="text-ui-sm text-ink-muted">{{.Project.Name}}</p>
     </div>
-    {{if .CanWrite}}
+    <div class="flex flex-wrap gap-2">
+    {{if .CanWriteSites}}
     <a href="/projects/{{.Project.ProjectID}}/sites/pick" class="btn btn-primary btn-sm">대상 학교 추가</a>
     <a href="/projects/{{.Project.ProjectID}}/sites/schools-template.xlsx" class="btn btn-secondary btn-sm">대상 학교 양식</a>
+    {{end}}
+    {{if .CanWrite}}
     <a href="/projects/{{.Project.ProjectID}}/sites/template.xlsx" class="btn btn-secondary btn-sm">장비 양식</a>
     {{end}}
+    </div>
   </div>
   {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
   {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}

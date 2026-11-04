@@ -147,6 +147,7 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
 		"Progress": prog, "SiteWorks": works,
 		"Q": q, "Region": region, "Status": st, "CanWrite": canWriteProjectEquip(c, h, p, org),
+		"CanWriteSites": canRegisterProjectSites(c, h, p, org),
 		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": nil, "Apply": false,
 	})
@@ -157,7 +158,7 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !canWriteProjectEquip(c, h, p, org) {
+	if !canRegisterProjectSites(c, h, p, org) {
 		return echo.ErrForbidden
 	}
 	_ = c.Request().ParseForm()
@@ -204,12 +205,21 @@ func (h *ProjectHandler) SitesPick(c echo.Context) error {
 			parentID = parents[0].CustomerID
 		}
 	}
-	picks, total, _ := h.pe.ListSchoolPick(p.ProjectID, org, parentID, q, region, page, 100)
+	if page < 1 {
+		page = 1
+	}
+	const pageSize = 100
+	picks, total, _ := h.pe.ListSchoolPick(p.ProjectID, org, parentID, q, region, page, pageSize)
+	pages := (total + pageSize - 1) / pageSize
+	if pages < 1 {
+		pages = 1
+	}
 	return c.Render(http.StatusOK, "project/sites_pick.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 대상 학교 추가", "Active": NavProjects, "Project": p,
 		"Parents": parents, "ParentID": parentID, "Picks": picks, "Total": total,
-		"Q": q, "Region": region, "Page": page, "CanWrite": canWriteProjectEquip(c, h, p, org),
-		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"Q": q, "Region": region, "Page": page, "Pages": pages, "PageSize": pageSize,
+		"CanWrite": canRegisterProjectSites(c, h, p, org),
+		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 
@@ -235,7 +245,7 @@ func (h *ProjectHandler) SiteSchoolImportPreview(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !canWriteProjectEquip(c, h, p, org) {
+	if !canRegisterProjectSites(c, h, p, org) {
 		return echo.ErrForbidden
 	}
 	raw, name, err := h.readEquipUpload(c)
@@ -255,7 +265,7 @@ func (h *ProjectHandler) SiteSchoolImportApply(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !canWriteProjectEquip(c, h, p, org) {
+	if !canRegisterProjectSites(c, h, p, org) {
 		return echo.ErrForbidden
 	}
 	raw, name, err := h.readEquipUpload(c)
@@ -275,7 +285,7 @@ func (h *ProjectHandler) SiteSave(c echo.Context) error {
 		return err
 	}
 	back := "/projects/" + p.ProjectID + "/sites"
-	if !canWriteProjectEquip(c, h, p, org) {
+	if !canRegisterProjectSites(c, h, p, org) {
 		return echo.ErrForbidden
 	}
 	so, _ := strconv.Atoi(c.FormValue("sort_order"))

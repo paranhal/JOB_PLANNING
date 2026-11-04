@@ -17,7 +17,17 @@
     <input class="input" name="region" value="{{.Region}}" placeholder="지역(시·군)">
     <button class="btn btn-secondary" type="submit">검색</button>
   </form>
-  <p class="text-ui-sm text-ink-muted">{{.Total}}곳</p>
+  <p class="text-ui-sm text-ink-muted">{{.Total}}곳{{if gt .Pages 1}} · {{.Page}}/{{.Pages}}쪽{{end}}</p>
+  {{if gt .Pages 1}}
+  <nav class="flex flex-wrap gap-2 text-ui-sm" data-sites-pick-pager>
+    {{if gt .Page 1}}
+    <a class="text-primary hover:underline" href="?parent_id={{.ParentID}}&amp;q={{.Q}}&amp;region={{.Region}}&amp;page={{sub .Page 1}}">이전</a>
+    {{end}}
+    {{if lt .Page .Pages}}
+    <a class="text-primary hover:underline" href="?parent_id={{.ParentID}}&amp;q={{.Q}}&amp;region={{.Region}}&amp;page={{add .Page 1}}">다음</a>
+    {{end}}
+  </nav>
+  {{end}}
   {{if .CanWrite}}
   <form method="post" action="/projects/{{.Project.ProjectID}}/sites/add-schools">
     <div class="card overflow-x-auto">

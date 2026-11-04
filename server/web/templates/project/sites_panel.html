@@ -1,0 +1,14 @@
+{{define "title"}}사이트 패널 · {{appName}}{{end}}
+{{define "content"}}
+<div class="mt-2 rounded-lg border border-line bg-hover px-3 py-2 text-xs space-y-1" data-project-sites-panel>
+  <p class="text-ink">이 사업 사이트 <span class="font-medium">{{.SiteCount}}</span>곳</p>
+  {{if eq .SiteCount 0}}
+  <p class="text-ink-muted">사이트를 먼저 등록하세요. 업무의 사이트는 필수가 아닙니다.</p>
+  {{end}}
+  {{if .CanWriteSites}}
+  <a href="/projects/{{.Project.ProjectID}}/sites/pick" class="text-primary hover:underline">사이트 등록</a>
+  {{else}}
+  <p class="text-ink-muted">사이트 등록은 조직관리자·PM만 할 수 있습니다</p>
+  {{end}}
+</div>
+{{end}}
