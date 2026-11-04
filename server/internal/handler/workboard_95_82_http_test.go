@@ -141,7 +141,13 @@ func Test95_82_SharedTemplateAndForm(t *testing.T) {
 	act := doGetWith(t, e, "/workboard/tasks/"+id+"/action", ck)
 	edit := doGetWith(t, e, "/workboard/tasks/"+id+"/edit", ck)
 	nw := doGetWith(t, e, "/workboard/new-work/form?kind=project_work&date=2026-11-02", ck)
-	for name, rec := range map[string]*httptest.ResponseRecorder{"show": show, "act": act, "edit": edit, "nw": nw} {
+	if nw.Code != http.StatusOK {
+		t.Fatalf("nw %d", nw.Code)
+	}
+	if strings.Contains(nw.Body.String(), "data-work-items") || strings.Contains(nw.Body.String(), "작업 리스트") {
+		t.Fatal("새 업무 등록에 작업 리스트가 남아 있다")
+	}
+	for name, rec := range map[string]*httptest.ResponseRecorder{"show": show, "act": act, "edit": edit} {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s %d", name, rec.Code)
 		}

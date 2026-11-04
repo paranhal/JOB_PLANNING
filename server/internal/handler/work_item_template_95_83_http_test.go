@@ -231,7 +231,14 @@ func Test95_83_SetExpandSnapshotSummaryCopy(t *testing.T) {
 	if nw.Code != http.StatusOK {
 		t.Fatalf("새업무 %d", nw.Code)
 	}
-	nb := nw.Body.String()
+	if strings.Contains(nw.Body.String(), "직접 입력 항목") {
+		t.Fatal("새 업무 등록에 작업 항목 선택이 남아 있다")
+	}
+	edit := doGetWith(t, e, "/workboard/tasks/"+id+"/edit", ck)
+	if edit.Code != http.StatusOK {
+		t.Fatalf("수정 %d", edit.Code)
+	}
+	nb := edit.Body.String()
 	if !strings.Contains(nb, "직접 입력 항목") || !strings.Contains(nb, "야외 배관 작업") {
 		t.Fatal("선택 목록 렌더 없음")
 	}
