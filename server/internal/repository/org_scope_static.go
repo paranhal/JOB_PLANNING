@@ -17,4 +17,5 @@ var orgScopeAllowlist = map[string]string{
 	"MatchProjectWork":             "95-87 사업 상세는 주관+유관 부서 업무를 함께 보여 준다. 편집 권한은 업무 조직.",
 	"MatchAdminTasks":              "95-87 사업 상세 행정 업무. 주관+유관 업무를 project_id 로 함께 조회.",
 	"LookupAccountingAssignees":    "95-88 회계 담당은 전 조직 활성 내부 직원(이름·조직명만). 삭제·비활성·협력사·vsadmin 제외. org_id 필터 없음.",
+	"SearchProjectSitePool":        "95-119 사업 사이트 풀. project_id로 한정하고 고객은 전사 공용(95-2E).",
 }
