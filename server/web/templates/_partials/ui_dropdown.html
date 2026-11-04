@@ -1,0 +1,25 @@
+{{define "ui_dropdown"}}
+<div class="ui-dd" data-ui-dd="{{.ID}}" x-data="uiDropdown()" @keydown.escape.window="close()" @click.outside="close()">
+  <button type="button" class="ui-dd-btn" x-ref="btn" @click="toggle()" @keydown="onKey($event)"
+          :aria-expanded="open ? 'true' : 'false'" aria-haspopup="listbox"
+          aria-label="{{.Label}}" id="ui-dd-btn-{{.ID}}">
+    <span class="ui-dd-kicker">{{.Label}}</span>
+    <span class="ui-dd-current">{{.Current}}</span>
+    <span class="ui-dd-caret" aria-hidden="true">▾</span>
+  </button>
+  <div class="ui-dd-menu" x-ref="menu" x-show="open" x-cloak role="listbox"
+       aria-labelledby="ui-dd-btn-{{.ID}}" @keydown="onKey($event)">
+    {{range .Items}}
+    <a class="ui-dd-item{{if .Selected}} is-on{{end}}" role="option" href="{{.Href}}" tabindex="0"
+       data-ui-dd-item="{{.Value}}" aria-checked="{{if .Selected}}true{{else}}false{{end}}"
+       {{if .Selected}}aria-selected="true"{{else}}aria-selected="false"{{end}}>
+      <span class="ui-dd-item-main">
+        {{if .Selected}}<span class="ui-dd-check" aria-hidden="true">✓</span>{{end}}
+        <span>{{.Label}}</span>
+      </span>
+      {{if .Hint}}<span class="ui-dd-hint">{{.Hint}}</span>{{end}}
+    </a>
+    {{end}}
+  </div>
+</div>
+{{end}}

@@ -66,6 +66,11 @@ func templateFiles(name string) []string {
 	if name == "auth/login.html" {
 		return files
 	}
+	if strings.HasPrefix(name, "exec/") {
+		if partials, err := filepath.Glob("web/templates/exec/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "meeting/") {
 		if partials, err := filepath.Glob("web/templates/meeting/_*.html"); err == nil {
 			files = append(files, partials...)
@@ -151,6 +156,11 @@ func templateFiles(name string) []string {
 			"web/templates/workboard/_work_items.html",
 		)
 	}
+	if strings.HasPrefix(name, "project/") {
+		if partials, err := filepath.Glob("web/templates/project/_*.html"); err == nil {
+			files = append(files, partials...)
+		}
+	}
 	if strings.HasPrefix(name, "stats/") {
 		if partials, err := filepath.Glob("web/templates/stats/_*.html"); err == nil {
 			files = append(files, partials...)
@@ -178,6 +188,8 @@ func templateFiles(name string) []string {
 		"web/templates/_ui_assignee_picker.html",
 		"web/templates/_project_year_dates.html",
 		"web/templates/_partials/view_group_toggle.html",
+		"web/templates/_partials/ui_dropdown.html",
+		"web/templates/_partials/project_filter.html",
 		"web/templates/_partials/page_back.html")
 	return files
 }
@@ -287,6 +299,7 @@ func injectOrgView(c echo.Context, dataMap map[string]interface{}) {
 	}
 	dataMap["CanViewOrgs"] = canViewOrgs(c)
 	dataMap["CanSwitchOrg"] = canSwitchOrg(c)
+	dataMap["ViewOnlyBanner"] = DataScopeFor(c).ReadOnly
 	id := currentOrg(c)
 	dataMap["OrgViewID"] = id
 	dataMap["OrgViewAll"] = id == repository.OrgAll
@@ -370,6 +383,9 @@ func funcMap() template.FuncMap {
 		"visitOwnerID":       visitOwnerUserID,
 		"visitGroupIDs":      visitGroupIDsCSV,
 		"pickerName":         pickerDisplayName,
+		"pickerPersonLabel":  pickerPersonLabel,
+		"pickerButtonLabel":  pickerButtonLabel,
+		"compactPickerIDs":   compactPickerIDs,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {
