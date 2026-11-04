@@ -47,6 +47,7 @@ function projectPicker(cfg) {
       var p = this.filtered[this.hi];
       if (p) this.pick(p.project_id, p.name, p.project_kind);
     },
+    sitesPanelHtml: '',
     pick: function (id, name, kind) {
       this.selectedId = id || '';
       this.selectedName = name || '';
@@ -55,6 +56,7 @@ function projectPicker(cfg) {
       if (typeof this.$dispatch === 'function') {
         this.$dispatch('project-picked', { id: this.selectedId, name: name || '', kind: kind || '' });
       }
+      this.loadSitesPanel();
       var self = this;
       if (this.$nextTick) {
         this.$nextTick(function () {
@@ -62,6 +64,29 @@ function projectPicker(cfg) {
           if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
         });
       }
+    },
+    loadSitesPanel: function () {
+      var id = this.selectedId || '';
+      if (!id) {
+        this.sitesPanelHtml = '';
+        return;
+      }
+      var self = this;
+      if (typeof document === 'undefined' || typeof fetch !== 'function') return;
+      fetch('/projects/' + encodeURIComponent(id) + '/sites-panel', {
+        credentials: 'same-origin',
+        headers: { 'HX-Request': 'true', 'Accept': 'text/html' }
+      }).then(function (r) {
+        if (!r.ok) {
+          self.sitesPanelHtml = '';
+          return '';
+        }
+        return r.text();
+      }).then(function (html) {
+        self.sitesPanelHtml = html || '';
+      }).catch(function () {
+        self.sitesPanelHtml = '';
+      });
     },
     clear: function () {
       this.pick('', '', '');

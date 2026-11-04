@@ -84,7 +84,9 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
+        <div @project-picked="projectId=$event.detail.id">
         {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+        </div>
       </div>
       <div>
         <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
