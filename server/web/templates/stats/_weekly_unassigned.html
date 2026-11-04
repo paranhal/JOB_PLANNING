@@ -72,6 +72,20 @@
       {{end}}
     </div>
     {{end}}
+    {{if .Draft.UnassignedMatchPending}}
+    <div class="mt-4" data-weekly-match-pending>
+      <h4 class="text-ui-sm font-extrabold text-ink mb-2">사업 미매칭 {{len .Draft.UnassignedMatchPending}}건</h4>
+      <ul class="text-ui-sm text-ink space-y-1">
+        {{range .Draft.UnassignedMatchPending}}
+        <li>
+          <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+          {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+          {{if .Date}}<span class="text-ui-xs text-ink-subtle">{{.Date}}</span>{{end}}
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
     {{if .Draft.UnassignedNoProject}}
     <div class="mt-4" data-weekly-task-link>
       <h4 class="text-ui-sm font-extrabold text-ink mb-2">사업이 연결되지 않은 업무 {{len .Draft.UnassignedNoProject}}건</h4>

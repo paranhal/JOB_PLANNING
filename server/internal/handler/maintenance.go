@@ -573,7 +573,7 @@ func (h *MaintenanceHandler) AddVisit(c echo.Context) error {
 	if _, err := h.requireVisiblePlan(c, planID); err != nil {
 		return err
 	}
-	v, err := h.parseVisitForm(c, planID, "")
+	v, err := h.parseVisitForm(c, planID, "", "")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -662,7 +662,7 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	if p := c.FormValue("plan_id"); p != "" {
 		planID = p
 	}
-	v, err := h.parseVisitForm(c, planID, vid)
+	v, err := h.parseVisitForm(c, planID, vid, existing.ProjectID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -695,7 +695,7 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, back+sep+"ok=edit")
 }
 
-func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID string) (model.MaintenanceVisit, error) {
+func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID, keepProject string) (model.MaintenanceVisit, error) {
 	date, err := model.ParseAppDate(c.FormValue("visit_date"))
 	if err != nil {
 		return model.MaintenanceVisit{}, err
@@ -712,7 +712,7 @@ func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID stri
 		VisitID: visitID, PlanID: planID, VisitDate: date, CustomerID: cust,
 		EntryCategory: cat, Notes: strings.TrimSpace(c.FormValue("notes")),
 		ProductType: strings.TrimSpace(c.FormValue("product_type")),
-		ProjectID:   strings.TrimSpace(c.FormValue("project_id")),
+		ProjectID:   postedFormValue(c, "project_id", keepProject),
 		Completed:   c.FormValue("completed") != "",
 		RoundNo:     parseVisitRound(c.FormValue("round_no")),
 	}

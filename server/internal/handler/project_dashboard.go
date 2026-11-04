@@ -188,6 +188,7 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		"KPINeed":       showNeed,
 		"KPIAct":        showAct,
 		"UnspecN":       acts.Unspec,
+		"MatchPendingN": acts.MatchPending,
 		"EquipLine":     h.dashboardEquipLine(rows),
 		"Back":          dashQuery(kind, act),
 		"ActAll":        dashQuery(kind, ""),

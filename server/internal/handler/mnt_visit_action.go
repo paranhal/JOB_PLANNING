@@ -259,7 +259,7 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	}
 	v := *existing
 	v.Notes = strings.TrimSpace(c.FormValue("notes"))
-	v.ProjectID = strings.TrimSpace(c.FormValue("project_id"))
+	v.ProjectID = postedFormValue(c, "project_id", existing.ProjectID)
 	if h.wbRepo != nil {
 		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, v.ProjectID); err != nil {
 			return err

@@ -145,6 +145,23 @@ func (h *WorkboardHandler) newWorkASCards(orgID string) ([]model.WBCard, error) 
 	return as, nil
 }
 
+func (h *WorkboardHandler) NewWorkASCardsJSON(c echo.Context) error {
+	if currentRole(c) == model.RoleCLevel || isReadOnly(c) {
+		return echo.ErrForbidden
+	}
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	cards, err := h.newWorkASCards(currentOrg(c))
+	if err != nil {
+		return err
+	}
+	if cards == nil {
+		cards = []model.WBCard{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"cards": cards})
+}
+
 func (h *WorkboardHandler) mntVisitsForPalette(orgID string) ([]model.MaintenanceVisit, error) {
 	if h.mntRepo == nil {
 		return nil, nil

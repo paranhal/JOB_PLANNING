@@ -243,7 +243,7 @@ function boardNewWork() {
 })();
 </script>
 <script type="application/json" id="wb-work-groups">{{.WorkGroupsJSON}}</script>
-<script src="/static/js/as-register-lookup.js"></script>
-<script src="/static/js/mnt-quick-register.js"></script>
+<script src="/static/js/as-register-lookup.js?v={{.AssetQuery}}"></script>
+<script src="/static/js/mnt-quick-register.js?v={{.AssetQuery}}"></script>
 {{end}}
 {{end}}

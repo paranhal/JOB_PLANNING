@@ -7,11 +7,12 @@ import (
 )
 
 type ProjectActivityCounts struct {
-	AS     map[string]int
-	Mnt    map[string]int
-	Wait   map[string]int
-	Work   map[string]int
-	Unspec int
+	AS           map[string]int
+	Mnt          map[string]int
+	Wait         map[string]int
+	Work         map[string]int
+	Unspec       int
+	MatchPending int
 }
 
 func (r *ProjectRepo) CountProjectActivities() (ProjectActivityCounts, error) {
@@ -38,7 +39,7 @@ func (r *ProjectRepo) CountProjectActivities() (ProjectActivityCounts, error) {
 		}
 		out.Mnt[id] = n
 	}
-	taskRows, err := r.db.Query(`SELECT COALESCE(project_id,''), COALESCE(work_type,''), COUNT(*) FROM work_tasks WHERE status!=? GROUP BY 1, 2`, model.WBTaskComplete)
+	taskRows, err := r.db.Query(`SELECT COALESCE(project_id,''), COALESCE(work_type,''), COALESCE(project_match_pending,0), COUNT(*) FROM work_tasks WHERE status!=? GROUP BY 1, 2, 3`, model.WBTaskComplete)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "no such table") {
 			return out, nil
@@ -48,11 +49,15 @@ func (r *ProjectRepo) CountProjectActivities() (ProjectActivityCounts, error) {
 	defer taskRows.Close()
 	for taskRows.Next() {
 		var id, wt string
-		var n int
-		if err := taskRows.Scan(&id, &wt, &n); err != nil {
+		var pending, n int
+		if err := taskRows.Scan(&id, &wt, &pending, &n); err != nil {
 			return out, err
 		}
 		id = strings.TrimSpace(id)
+		if pending != 0 {
+			out.MatchPending += n
+			continue
+		}
 		if id == "" {
 			out.Unspec += n
 			continue

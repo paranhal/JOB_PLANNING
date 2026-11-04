@@ -96,11 +96,14 @@ func TestASLookupAddLinkAttrs(t *testing.T) {
 	if !strings.Contains(chunk, "data.new_href") || !strings.Contains(chunk, "/as/new") {
 		t.Fatal("new_href 없음")
 	}
-	if !strings.Contains(chunk, `target = '_blank'`) && !strings.Contains(chunk, `target="_blank"`) {
-		t.Fatal("target=_blank 없음")
+	if !strings.Contains(js, `window.open(href, '_blank', 'noopener')`) {
+		t.Fatal("window.open 이중 안전 없음")
 	}
-	if !strings.Contains(chunk, `rel = 'noopener'`) && !strings.Contains(chunk, `rel="noopener"`) {
-		t.Fatal("rel=noopener 없음")
+	if !strings.Contains(js, "as-new-blocked") {
+		t.Fatal("팝업 차단 안내 없음")
+	}
+	if strings.Contains(chunk, `el('a'`) {
+		t.Fatal("모달 접수 추가가 <a> 이다")
 	}
 }
 

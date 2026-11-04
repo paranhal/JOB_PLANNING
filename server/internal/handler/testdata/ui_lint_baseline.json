@@ -882,7 +882,7 @@
     "cdn": 0
   },
   "maintenance/plan_show.html": {
-    "raw_color": 152,
+    "raw_color": 150,
     "hex": 6,
     "inline_style": 10,
     "style_tag": 0,
@@ -1582,7 +1582,7 @@
     "cdn": 0
   },
   "workboard/_modals.html": {
-    "raw_color": 34,
+    "raw_color": 31,
     "hex": 1,
     "inline_style": 0,
     "style_tag": 0,

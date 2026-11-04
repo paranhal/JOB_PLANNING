@@ -1,3 +1,78 @@
+window.openASReceiptTab = function (href) {
+  href = href || '/as/new';
+  var w = null;
+  try { w = window.open(href, '_blank', 'noopener'); } catch (e) { w = null; }
+  var note = document.getElementById('as-new-blocked');
+  if (w) {
+    if (note) note.hidden = true;
+    try { w.opener = null; } catch (e2) {}
+    return true;
+  }
+  if (note) note.hidden = false;
+  return false;
+};
+
+window.filterASWaitingOptions = function () {
+  var sel = document.getElementById('as-register-source');
+  var qEl = document.getElementById('as-register-q');
+  if (!sel) return;
+  var q = String((qEl && qEl.value) || '').toLowerCase();
+  Array.prototype.forEach.call(sel.options, function (o) {
+    if (!o.value) { o.hidden = false; return; }
+    o.hidden = !!(q && String(o.textContent || '').toLowerCase().indexOf(q) < 0);
+  });
+};
+
+window.setASWaitingPreselect = function (keep) {
+  var sel = document.getElementById('as-register-source');
+  if (!sel) return;
+  var ok = false;
+  Array.prototype.forEach.call(sel.options, function (o) {
+    if (o.value === keep) ok = true;
+  });
+  var v = ok ? keep : '';
+  sel.value = v;
+  var p = sel;
+  while (p && !p._x_dataStack) p = p.parentElement;
+  if (p && p._x_dataStack) {
+    p._x_dataStack.forEach(function (st) {
+      if (st && Object.prototype.hasOwnProperty.call(st, 'preselect')) st.preselect = v;
+    });
+  }
+};
+
+window.refreshASWaitingList = function () {
+  var btn = document.getElementById('as-refresh-list');
+  var sel = document.getElementById('as-register-source');
+  var keep = sel ? sel.value : '';
+  if (btn) btn.disabled = true;
+  fetch('/workboard/new-work/as-cards', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!sel) return;
+      var cards = (j && j.cards) || [];
+      sel.replaceChildren();
+      if (!cards.length) {
+        var empty = document.createElement('option');
+        empty.value = '';
+        empty.disabled = true;
+        empty.textContent = '대기 중인 AS가 없습니다';
+        sel.appendChild(empty);
+      } else {
+        cards.forEach(function (c) {
+          var o = document.createElement('option');
+          o.value = c.ref_id || '';
+          o.textContent = (c.title || '') + ' · ' + (c.source_number || '');
+          sel.appendChild(o);
+        });
+      }
+      window.filterASWaitingOptions();
+      window.setASWaitingPreselect(keep);
+    })
+    .catch(function () {})
+    .finally(function () { if (btn) btn.disabled = false; });
+};
+
 window.bindASRegisterLookup = function (opts) {
   opts = opts || {};
   var popup = !!opts.missingDialog;
@@ -53,15 +128,14 @@ window.bindASRegisterLookup = function (opts) {
     var btns = el('div', 'mt-4 flex justify-end gap-2', []);
     var addBtn = null;
     if (data.can_create) {
-      addBtn = el('a', 'inline-flex h-10 items-center rounded-[10px] bg-success px-4 font-semibold text-primary-fg', [txt('접수 추가')]);
-      addBtn.href = data.new_href || '/as/new';
-      addBtn.target = '_blank';
-      addBtn.rel = 'noopener';
+      addBtn = el('button', 'inline-flex h-10 items-center rounded-[10px] bg-success px-4 font-semibold text-primary-fg', [txt('접수 추가')]);
+      addBtn.type = 'button';
       addBtn.setAttribute('aria-label', 'AS 접수 추가');
       addBtn.addEventListener('click', function () {
         awaitingReturn = true;
         dismissed = '';
         closeMissingDialog();
+        window.openASReceiptTab(data.new_href || '/as/new');
       });
       btns.appendChild(addBtn);
     } else {
@@ -129,7 +203,7 @@ window.bindASRegisterLookup = function (opts) {
             });
           }
           if (dirty && !confirm('입력 중인 내용이 사라집니다')) return;
-          window.location.href = data.new_href || '/as/new';
+          window.openASReceiptTab(data.new_href || '/as/new');
         });
         btns.appendChild(add);
       }

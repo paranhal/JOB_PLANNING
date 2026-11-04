@@ -207,14 +207,14 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		unassigned = dropUnassignedKindsForActivity(unassigned, orgID)
 	}
 	out.Unassigned = unassigned
-	out.UnassignedNoRow, out.UnassignedForeign, out.UnassignedNoProject = SplitCompanyUnassigned(unassigned, orgID)
+	out.UnassignedNoRow, out.UnassignedForeign, out.UnassignedNoProject, out.UnassignedMatchPending = SplitCompanyUnassigned(unassigned, orgID)
 	for _, g := range out.UnassignedNoRow {
 		out.UnassignedNoRowTaskN += g.Count
 	}
 	for _, g := range out.UnassignedForeign {
 		out.UnassignedForeignTaskN += g.Count
 	}
-	out.UnassignedMainN = out.UnassignedNoRowTaskN + len(out.UnassignedNoProject)
+	out.UnassignedMainN = out.UnassignedNoRowTaskN + len(out.UnassignedNoProject) + len(out.UnassignedMatchPending)
 	return out, nil
 }
 
@@ -258,13 +258,17 @@ func companyWeeklyMntActorSQL(orgID string) (string, []interface{}) {
 	)`, []interface{}{orgID, orgID}
 }
 
-func SplitCompanyUnassigned(in []model.CompanyWeeklyUnassigned, viewOrg string) (groups, foreign []model.CompanyWeeklyUnassignedProject, noProject []model.CompanyWeeklyUnassigned) {
+func SplitCompanyUnassigned(in []model.CompanyWeeklyUnassigned, viewOrg string) (groups, foreign []model.CompanyWeeklyUnassignedProject, noProject, matchPending []model.CompanyWeeklyUnassigned) {
 	viewOrg = strings.TrimSpace(viewOrg)
 	order := make([]string, 0)
 	by := map[string]*model.CompanyWeeklyUnassignedProject{}
 	ford := make([]string, 0)
 	fby := map[string]*model.CompanyWeeklyUnassignedProject{}
 	for _, u := range in {
+		if u.MatchPending || u.Reason == model.UnassignedReasonMatchPending {
+			matchPending = append(matchPending, u)
+			continue
+		}
 		if strings.TrimSpace(u.ProjectID) == "" {
 			noProject = append(noProject, u)
 			continue
@@ -308,7 +312,7 @@ func SplitCompanyUnassigned(in []model.CompanyWeeklyUnassigned, viewOrg string) 
 		g.KindSummary = unassignedKindSummary(g.Items)
 		foreign = append(foreign, *g)
 	}
-	return groups, foreign, noProject
+	return groups, foreign, noProject, matchPending
 }
 
 func unassignedKindSummary(items []model.CompanyWeeklyUnassigned) string {
@@ -919,10 +923,11 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 			return
 		}
 		pid := strings.TrimSpace(row.ProjectID)
-		if pid != "" && mapped[pid] {
+		if row.MatchPending {
+			row.Reason = model.UnassignedReasonMatchPending
+		} else if pid != "" && mapped[pid] {
 			return
-		}
-		if pid == "" {
+		} else if pid == "" {
 			row.Reason = model.UnassignedReasonNoProject
 		} else {
 			row.Reason = model.UnassignedReasonNoRow
@@ -1014,7 +1019,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	trows, err := r.db.Query(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''), COALESCE(p.name,''), COALESCE(t.work_type,''),
 		       COALESCE(t.assignee,''), COALESCE(t.assignee_user_id,''),
-		       COALESCE(p.org_id,''), COALESCE(NULLIF(TRIM(p.project_kind),''),'maintenance')
+		       COALESCE(p.org_id,''), COALESCE(NULLIF(TRIM(p.project_kind),''),'maintenance'),
+		       COALESCE(t.project_match_pending,0)
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminDoneSQL+`
@@ -1026,7 +1032,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	}
 	for trows.Next() {
 		var id, title, date, pid, pname, wtype, asg, auid, porg, pkind string
-		if err := trows.Scan(&id, &title, &date, &pid, &pname, &wtype, &asg, &auid, &porg, &pkind); err != nil {
+		var pending int
+		if err := trows.Scan(&id, &title, &date, &pid, &pname, &wtype, &asg, &auid, &porg, &pkind, &pending); err != nil {
 			trows.Close()
 			return nil, err
 		}
@@ -1038,7 +1045,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkAdmin, KindLabel: label,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
-			ProjectOrgID: porg, ProjectKind: pkind,
+			ProjectOrgID: porg, ProjectKind: pkind, MatchPending: pending != 0,
 			Href: model.WorkTaskOpenHref(id, wtype), Bucket: "prev", BucketLabel: "전주 완료",
 			Assignee: asg, AssigneeUserID: auid,
 		})
@@ -1079,7 +1086,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		SELECT t.task_id, t.title, COALESCE(`+companyAdminPlanDateSQL()+`,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
 		       CASE WHEN TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != '' AND date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END,
 		       COALESCE(t.work_type,''), COALESCE(t.assignee,''), COALESCE(t.assignee_user_id,''),
-		       COALESCE(p.org_id,''), COALESCE(NULLIF(TRIM(p.project_kind),''),'maintenance')
+		       COALESCE(p.org_id,''), COALESCE(NULLIF(TRIM(p.project_kind),''),'maintenance'),
+		       COALESCE(t.project_match_pending,0)
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminPlanSQL+`
@@ -1095,7 +1103,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 	}
 	for crows.Next() {
 		var id, title, date, pid, pname, bucket, wtype, asg, auid, porg, pkind string
-		if err := crows.Scan(&id, &title, &date, &pid, &pname, &bucket, &wtype, &asg, &auid, &porg, &pkind); err != nil {
+		var pending int
+		if err := crows.Scan(&id, &title, &date, &pid, &pname, &bucket, &wtype, &asg, &auid, &porg, &pkind, &pending); err != nil {
 			crows.Close()
 			return nil, err
 		}
@@ -1111,7 +1120,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		addIf(model.CompanyWeeklyUnassigned{
 			Kind: model.ScopeWorkAdmin, KindLabel: kindLabel,
 			ID: id, Title: title, Date: date, ProjectID: pid, ProjectName: pname,
-			ProjectOrgID: porg, ProjectKind: pkind,
+			ProjectOrgID: porg, ProjectKind: pkind, MatchPending: pending != 0,
 			Href: model.WorkTaskOpenHref(id, wtype), Bucket: bucket, BucketLabel: label,
 			Assignee: asg, AssigneeUserID: auid,
 		})

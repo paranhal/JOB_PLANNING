@@ -80,8 +80,8 @@ func TestCompanyWeeklyUnassignedNoRowVsNoProject(t *testing.T) {
 	if len(draft.UnassignedNoProject) != 1 || draft.UnassignedNoProject[0].ID != "T-NP" {
 		t.Fatalf("no_project %+v", draft.UnassignedNoProject)
 	}
-	if draft.UnassignedNoRowTaskN+len(draft.UnassignedNoProject)+draft.UnassignedForeignTaskN != len(draft.Unassigned) {
-		t.Fatalf("구역 합 %d+%d+%d != %d", draft.UnassignedNoRowTaskN, len(draft.UnassignedNoProject), draft.UnassignedForeignTaskN, len(draft.Unassigned))
+	if draft.UnassignedNoRowTaskN+len(draft.UnassignedNoProject)+len(draft.UnassignedMatchPending)+draft.UnassignedForeignTaskN != len(draft.Unassigned) {
+		t.Fatalf("구역 합 %d+%d+%d+%d != %d", draft.UnassignedNoRowTaskN, len(draft.UnassignedNoProject), len(draft.UnassignedMatchPending), draft.UnassignedForeignTaskN, len(draft.Unassigned))
 	}
 }
 
@@ -202,5 +202,30 @@ func TestSetTaskProjectWeeklyUnassigned(t *testing.T) {
 	t2, err := wb.GetTask("T-NP")
 	if err != nil || t2.ProjectID != "WP-P1" {
 		t.Fatalf("%+v %v", t2, err)
+	}
+}
+
+func TestCompanyWeeklyMatchPendingSplit(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "cw113b.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	seedUnassignedNoRowFixture(t, db)
+	if _, err := db.Exec(`INSERT INTO work_tasks(task_id,work_type,title,status,project_id,org_id,complete_date,work_date,project_match_pending)
+		VALUES ('T-PEND','admin','미매칭','complete',NULL,'O03','2026-08-12','2026-08-12',1)`); err != nil {
+		t.Fatal(err)
+	}
+	draft, err := NewStatsRepo(db).BuildCompanyWeeklyDraftOrg(time.Date(2026, 8, 17, 0, 0, 0, 0, time.Local), "O03")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(draft.UnassignedMatchPending) != 1 || draft.UnassignedMatchPending[0].ID != "T-PEND" {
+		t.Fatalf("미매칭 %+v", draft.UnassignedMatchPending)
+	}
+	for _, u := range draft.UnassignedNoProject {
+		if u.ID == "T-PEND" {
+			t.Fatal("미매칭이 사업 미지정에 남아 있다")
+		}
 	}
 }

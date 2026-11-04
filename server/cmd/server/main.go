@@ -745,6 +745,7 @@ func main() {
 	wb.GET("/projects/picker-other", h.Workboard.ListPickerOtherProjects)
 	wb.POST("/board/kanban-move", h.Workboard.BoardKanbanMove)
 	wb.GET("/new-work/form", h.Workboard.NewWorkForm)
+	wb.GET("/new-work/as-cards", h.Workboard.NewWorkASCardsJSON)
 	wb.GET("/kanban", h.Workboard.Kanban)
 	wb.GET("/tasks", h.Workboard.List)
 	wb.GET("/register", h.Workboard.Register)

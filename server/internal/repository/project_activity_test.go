@@ -47,3 +47,32 @@ func TestCountProjectActivitiesMapsWorkType(t *testing.T) {
 		t.Fatal("미지정")
 	}
 }
+
+func TestCountProjectActivitiesSplitsMatchPending(t *testing.T) {
+	dir := t.TempDir()
+	db, err := InitDB(filepath.Join(dir, "act-pend.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	prepo := NewProjectRepo(db)
+	wb := NewWBRepo(db)
+	pend := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "미매칭", Status: model.WBTaskWaiting, DueDate: "2026-10-20", WorkDate: "2026-10-19", ProjectMatchPending: true}
+	empty := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "미지정", Status: model.WBTaskWaiting, DueDate: "2026-10-20", WorkDate: "2026-10-19"}
+	if err := wb.CreateTask(pend); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.CreateTask(empty); err != nil {
+		t.Fatal(err)
+	}
+	got, err := prepo.CountProjectActivities()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.MatchPending != 1 {
+		t.Fatalf("미매칭=%d", got.MatchPending)
+	}
+	if got.Unspec < 1 {
+		t.Fatal("미지정 분리 실패")
+	}
+}

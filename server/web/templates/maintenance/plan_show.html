@@ -197,7 +197,8 @@ window.mntAssigneeMulti = function (cfg) {
       product: d.product || '', assignee: d.assignee || '',
       category: d.category || 'normal', notes: d.notes || '',
       completed: d.completed === '1', completedDate: d.completedDate || d.date || '',
-      project: d.project || '', group: d.group || '', groups: d.groups || d.group || '', people: d.people || '', owner: d.owner || ''
+      project: d.project || '', projectName: d.projectName || '',
+      group: d.group || '', groups: d.groups || d.group || '', people: d.people || '', owner: d.owner || ''
     };
     this.editOpen = true;
     this.$nextTick(() => {
@@ -211,7 +212,20 @@ window.mntAssigneeMulti = function (cfg) {
         groups: d.groups || d.group || '',
         group: d.group || ''
       });
+      this.hydrateEditProject(d);
     });
+  },
+  hydrateEditProject(d) {
+    const box = document.querySelector('[data-mnt-edit-picker] [data-project-picker]');
+    if (!box) return;
+    const st = (window.Alpine && typeof Alpine.$data === 'function') ? Alpine.$data(box) : (box._x_dataStack && box._x_dataStack[0]);
+    if (!st || typeof st.pick !== 'function') return;
+    let name = d.projectName || '';
+    if (!name && d.project && st.items && st.items.length) {
+      const hit = st.items.find((p) => p.project_id === d.project);
+      if (hit) name = hit.name || '';
+    }
+    st.pick(d.project || '', name, '');
   }
 }">
   <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">
@@ -517,7 +531,7 @@ window.mntAssigneeMulti = function (cfg) {
         </div>
         <div>
           <label class="block text-gray-600 mb-1">사업명</label>
-          <div @project-picked="edit.project=$event.detail.id">
+          <div data-mnt-edit-picker @project-picked="edit.project=$event.detail.id">
             {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
           </div>
         </div>
@@ -977,7 +991,7 @@ window.mntAssigneeMulti = function (cfg) {
                         :data-product="card.product_type" :data-assignee="card.assignee"
                         :data-people="card.people_ids" :data-owner="card.owner_id" :data-group="card.work_group_id"
                         :data-groups="card.group_ids"
-                        :data-project="card.project_id" :data-category="card.entry_category"
+                        :data-project="card.project_id" :data-project-name="card.project_name" :data-category="card.entry_category"
                         :data-notes="card.notes"
                         :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
                         @click="openEdit($event.currentTarget)" aria-label="수정">›</button>
@@ -1000,7 +1014,7 @@ window.mntAssigneeMulti = function (cfg) {
                         :data-product="card.product_type" :data-assignee="card.assignee"
                         :data-people="card.people_ids" :data-owner="card.owner_id" :data-group="card.work_group_id"
                         :data-groups="card.group_ids"
-                        :data-project="card.project_id" :data-category="card.entry_category"
+                        :data-project="card.project_id" :data-project-name="card.project_name" :data-category="card.entry_category"
                         :data-notes="card.notes"
                         :data-completed="card.completed ? '1' : '0'" :data-completed-date="card.completed_date"
                         @click="openEdit($event.currentTarget)">수정</button>
@@ -1090,7 +1104,7 @@ window.mntAssigneeMulti = function (cfg) {
                   data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
                   data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"
                   data-groups="{{visitGroupIDs .}}"
-                  data-project="{{.ProjectID}}"
+                  data-project="{{.ProjectID}}" data-project-name="{{.ProjectName}}"
                   data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                   data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                   @click="openEdit($event.currentTarget)">수정</button>
@@ -1163,7 +1177,7 @@ window.mntAssigneeMulti = function (cfg) {
                     data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
                     data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"
                     data-groups="{{visitGroupIDs .}}"
-                    data-project="{{.ProjectID}}"
+                    data-project="{{.ProjectID}}" data-project-name="{{.ProjectName}}"
                     data-category="{{.EntryCategory}}" data-notes="{{.Notes}}"
                     data-completed="{{if .Completed}}1{{else}}0{{end}}" data-completed-date="{{.CompletedDate}}"
                     @click="openEdit($event.currentTarget)">수정</button>

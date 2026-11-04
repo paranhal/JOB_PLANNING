@@ -60,9 +60,10 @@ type IncompleteMntVisit struct {
 }
 
 const (
-	UnassignedReasonNoRow     = "no_row"
-	UnassignedReasonNoProject = "no_project"
-	UnassignedReasonForeign   = "foreign_org"
+	UnassignedReasonNoRow        = "no_row"
+	UnassignedReasonNoProject    = "no_project"
+	UnassignedReasonMatchPending = "match_pending"
+	UnassignedReasonForeign      = "foreign_org"
 )
 
 // CompanyWeeklyUnassigned 어느 행에도 안 붙은 활동. §16.6.5 · §16.6.9
@@ -79,20 +80,21 @@ type CompanyWeeklyUnassigned struct {
 	Href           string
 	Bucket         string // prev | plan | carry
 	BucketLabel    string
-	Reason         string // no_row | no_project | foreign_org
+	Reason         string // no_row | no_project | match_pending | foreign_org
+	MatchPending   bool
 	Assignee       string
 	AssigneeUserID string
 }
 
 // CompanyWeeklyUnassignedProject 보고서 행이 없는 사업 묶음.
 type CompanyWeeklyUnassignedProject struct {
-	ProjectID     string
-	ProjectName   string
-	ProjectOrgID  string
-	ProjectKind   string
-	Count         int
-	KindSummary   string
-	Items         []CompanyWeeklyUnassigned
+	ProjectID    string
+	ProjectName  string
+	ProjectOrgID string
+	ProjectKind  string
+	Count        int
+	KindSummary  string
+	Items        []CompanyWeeklyUnassigned
 }
 
 // CompanyWeeklyExclusion 미포함 후보가 빠진 이유(?debug=1). 95-34
@@ -112,6 +114,7 @@ type CompanyWeeklyDraft struct {
 	UnassignedNoRow        []CompanyWeeklyUnassignedProject
 	UnassignedNoRowTaskN   int
 	UnassignedNoProject    []CompanyWeeklyUnassigned
+	UnassignedMatchPending []CompanyWeeklyUnassigned
 	UnassignedForeign      []CompanyWeeklyUnassignedProject
 	UnassignedForeignTaskN int
 	UnassignedMainN        int

@@ -24,6 +24,7 @@ func planShowParseFiles(t *testing.T) []string {
 		filepath.Join(root, "_partials", "view_group_toggle.html"),
 		filepath.Join(root, "_partials", "schedule_show_toggle.html"),
 		filepath.Join(root, "_partials", "login_briefing.html"),
+		filepath.Join(root, "_partials", "project_picker.html"),
 	}
 }
 

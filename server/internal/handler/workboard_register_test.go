@@ -128,6 +128,12 @@ func TestBuildRegisterRowsPlacesCards(t *testing.T) {
 }
 
 // 파싱만으로는 실행 중 오류(함수 인자 타입 등)를 잡지 못해 실제 데이터로 렌더링한다.
+func registerTestFilterUI() map[string]interface{} {
+	return map[string]interface{}{
+		"ID": "reg-project", "Name": "project", "Own": []model.WorkProject{},
+	}
+}
+
 func registerParseFiles(t *testing.T) []string {
 	t.Helper()
 	root := findTemplateRoot(t)
@@ -148,6 +154,8 @@ func registerParseFiles(t *testing.T) []string {
 		filepath.Join(root, "_site_multi_picker.html"),
 		filepath.Join(root, "_ui_assignee_picker.html"),
 		filepath.Join(root, "_partials", "login_briefing.html"),
+		filepath.Join(root, "_partials", "project_picker.html"),
+		filepath.Join(root, "_partials", "project_filter.html"),
 	)
 	return files
 }
@@ -183,6 +191,7 @@ func TestRegisterTemplateRenders(t *testing.T) {
 		"ASCards":        cards, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
 		"PlacedCount": 1, "Projects": nil, "Assignees": nil,
 		"CanWrite": true, "ModalRedirect": "/workboard/register?view=week&date=2026-08-04",
+		"ProjectFilterUI": registerTestFilterUI(),
 	}
 
 	var buf bytes.Buffer
@@ -231,6 +240,7 @@ func TestRegisterDayTemplateAssigneeColumns(t *testing.T) {
 		"ASCards":        []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
 		"PlacedCount": 3, "Projects": nil, "Assignees": nil,
 		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18",
+		"ProjectFilterUI": registerTestFilterUI(),
 		"ExtraAssignees": []string{"이해진"}, "DayLeaveNames": []string{},
 		"AssigneeColMin": registerAssigneeColMinPx,
 	}
@@ -291,6 +301,7 @@ func Test95_88RegisterLeaveNamesJSON(t *testing.T) {
 		"SlotTimes": slotTimes, "GridHeightStyle": gridH, "SlotTopStyles": slotTops,
 		"ASCards": []model.WBCard{}, "MntCards": []model.WBCard{},
 		"AdminCards": []model.WBCard(nil), "CanWrite": true,
+		"ProjectFilterUI": registerTestFilterUI(),
 		"DayLeaveNames": []string{"홍길동", `김"연차`},
 		"ExtraAssignees": []string{},
 		"AssigneeColMin": registerAssigneeColMinPx,
@@ -342,6 +353,7 @@ func TestRegisterDayTemplateSupportCardsNoButtons(t *testing.T) {
 		"ASCards":        []model.WBCard{}, "MntCards": []model.WBCard{}, "AdminCards": []model.WBCard(nil),
 		"PlacedCount": 1, "Projects": nil, "Assignees": nil,
 		"CanWrite": true, "ModalRedirect": "/workboard/register",
+		"ProjectFilterUI": registerTestFilterUI(),
 		"ExtraAssignees": []string{}, "DayLeaveNames": []string{},
 		"AssigneeColMin": registerAssigneeColMinPx,
 	}
@@ -392,6 +404,7 @@ func TestRegisterDayTemplateUndatedRow(t *testing.T) {
 			Title: "[AS]유구도서관", Assignee: "최혜영", TaskID: "WT-1",
 		}},
 		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18",
+		"ProjectFilterUI": registerTestFilterUI(),
 		"ExtraAssignees": []string{}, "DayLeaveNames": []string{},
 		"AssigneeColMin": registerAssigneeColMinPx,
 	}
@@ -460,6 +473,7 @@ func TestRegisterKanbanTemplateFiveColumns(t *testing.T) {
 		"AssigneeQ": "&assignee=양기헌", "DisplayQ": "&assignee=양기헌&display=kanban",
 		"AssigneeFilter": "양기헌", "Assignees": nil, "Projects": nil,
 		"CanWrite": true, "ModalRedirect": "/workboard/register?view=day&date=2026-08-18&display=kanban",
+		"ProjectFilterUI": registerTestFilterUI(),
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
