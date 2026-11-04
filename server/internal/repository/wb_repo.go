@@ -42,7 +42,8 @@ const workTaskSelect = `
 		       COALESCE(p.name,''), COALESCE(p.color,''),
 		       COALESCE(t.org_id,''),
 		       COALESCE(t.work_group_id,''), COALESCE(wg.name,''),
-		       COALESCE(t.orig_work_date,''), COALESCE(t.orig_due_date,''), COALESCE(t.carry_count,0)
+		       COALESCE(t.orig_work_date,''), COALESCE(t.orig_due_date,''), COALESCE(t.carry_count,0),
+		       COALESCE(t.project_match_pending,0)
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
@@ -1036,8 +1037,8 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 			source_type, source_id, source_role, parent_task_id, customer_id, customer_name,
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
-			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, work_group_id, created_by_user_id, created_by_name, is_test)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, work_group_id, created_by_user_id, created_by_name, is_test, project_match_pending)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, t.WorkSubtype, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
@@ -1045,7 +1046,7 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.WaitPartyKind), nullIfEmpty(t.WaitParty), nullIfEmpty(t.WaitRequest),
 		nullIfEmpty(t.ReplyDueDate), nullIfEmpty(t.NextCheckDate), nullIfEmpty(t.CompleteNote),
 		nullIfEmpty(t.ReceiptDate), nullIfEmpty(t.CompleteDate),
-		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), t.OrgID, nullIfEmpty(t.WorkGroupID), byID, byName, stampIsTest())
+		nullIfEmpty(t.RecurrenceRole), t.OccurrenceSeq, nullIfEmpty(t.OccurrenceStatus), nullIfEmpty(t.NotDoneReason), t.OrgID, nullIfEmpty(t.WorkGroupID), byID, byName, stampIsTest(), boolToInt(t.ProjectMatchPending))
 	if err != nil {
 		return err
 	}
@@ -1093,6 +1094,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 				WHEN TRIM(COALESCE(complete_date,'')) != '' THEN complete_date
 				ELSE date('now','localtime')
 			END,
+			project_match_pending=?,
 			updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=?`,
 		t.WorkType, t.WorkSubtype, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
@@ -1104,7 +1106,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.WorkGroupID),
 		t.OrgID, t.OrgID,
 		t.ReceiptDate, t.ReceiptDate,
-		t.Status, t.CompleteDate, t.CompleteDate, t.TaskID)
+		t.Status, t.CompleteDate, t.CompleteDate, boolToInt(t.ProjectMatchPending), t.TaskID)
 	if err != nil {
 		return err
 	}
@@ -1299,6 +1301,7 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 	for rows.Next() {
 		var t model.WorkTask
 		var created, updated string
+		var pending int
 		if err := rows.Scan(
 			&t.TaskID, &t.WorkType, &t.WorkSubtype, &t.ProjectID, &t.Title, &t.Description,
 			&t.DueDate, &t.WorkDate, &t.StartTime, &t.EndTime, &t.DurationMin,
@@ -1315,12 +1318,13 @@ func scanWorkTasks(rows *sql.Rows) ([]model.WorkTask, error) {
 			&created, &updated,
 			&t.ProjectName, &t.ProjectColor,
 			&t.OrgID, &t.WorkGroupID, &t.WorkGroupName,
-			&t.OrigWorkDate, &t.OrigDueDate, &t.CarryCount,
+			&t.OrigWorkDate, &t.OrigDueDate, &t.CarryCount, &pending,
 		); err != nil {
 			return nil, err
 		}
 		t.CreatedAt = parseTime(created)
 		t.UpdatedAt = parseTime(updated)
+		t.ProjectMatchPending = pending != 0
 		t.DaysLeft = daysUntil(t.DueDate, today)
 		if t.DurationMin <= 0 {
 			t.DurationMin = 30

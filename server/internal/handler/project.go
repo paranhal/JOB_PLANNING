@@ -169,15 +169,15 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
 		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
-		"OrgFilter":   orgFilter,
+		"OrgFilter":     orgFilter,
 		"RelatedFilter": relFilter,
-		"OrgOptions":  orgOpts,
-		"ViewOrg":     view,
-		"CanWrite":    canWriteProjects(c),
-		"CanMerge":    currentRole(c) == model.RoleVisionAdmin,
-		"DupNames":    model.DuplicateProjectNameGroups(items),
-		"KindOptions": model.ProjectKindOptions(),
-		"FlashOK":     c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"OrgOptions":    orgOpts,
+		"ViewOrg":       view,
+		"CanWrite":      canWriteProjects(c),
+		"CanMerge":      currentRole(c) == model.RoleVisionAdmin,
+		"DupNames":      model.DuplicateProjectNameGroups(items),
+		"KindOptions":   model.ProjectKindOptions(),
+		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 
@@ -459,12 +459,12 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"RunLabel":     model.ContractRunLabel(p.ContractRunStatus(today)),
 		"Progress":     prog,
 		"FlashOK":      c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-		"Access":       model.ProjectAccess(*p, currentOrg(c)),
-		"CanRegisterWork": model.CanRegisterWorkOnProject(*p, currentOrg(c)),
-		"RelatedLine":  p.RelatedLine,
-		"RelatedOrgs":  p.RelatedOrgs,
-		"CanEditOrgs":  canEditProjectOrgs(c, p),
-		"OrgHomeName":  p.OrgLabel,
+		"Access":          model.ProjectAccess(*p, currentOrg(c)),
+		"CanRegisterWork": canWriteWorkboard(c) && model.CanLinkWorkProject(*p, pickerHomeOrg(c), currentRole(c), pickerExtraOrgIDs(c), false),
+		"RelatedLine":     p.RelatedLine,
+		"RelatedOrgs":     p.RelatedOrgs,
+		"CanEditOrgs":     canEditProjectOrgs(c, p),
+		"OrgHomeName":     p.OrgLabel,
 	})
 }
 

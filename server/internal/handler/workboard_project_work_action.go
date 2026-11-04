@@ -297,6 +297,9 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		formResult = v
 	}
 	data["FormResult"] = formResult
+	attachProjectPicker(c, h, data, ProjectPickerOpts{
+		Selected: t.ProjectID, SelectedName: t.ProjectName, EmptyLabel: "연결 해제",
+	})
 	return c.Render(http.StatusOK, "workboard/project_work_action.html", data)
 }
 
@@ -314,6 +317,8 @@ func projectWorkActionErr(code string) string {
 		return "조치 결과를 선택하세요"
 	case "project":
 		return "사업을 찾을 수 없습니다"
+	case "project_match":
+		return projectMatchNeededMsg
 	case "assignee":
 		return "담당자를 선택하세요"
 	case "work_date":
@@ -540,6 +545,9 @@ func (h *WorkboardHandler) SaveProjectWorkAction(c echo.Context) error {
 	members, _ := h.repo.ListMembers(t.TaskID)
 	if !canWriteProjectWorkAction(c, t, members) {
 		return echo.ErrForbidden
+	}
+	if err := denyIfProjectMatchPending(t); err != nil {
+		return h.failPWAction(c, t, "project_match")
 	}
 	closed := isProjectWorkClosed(t)
 	unlocked := false

@@ -60,12 +60,7 @@ window.mntWorkGroups = (function () {
         </div>
         <div>
           <label class="block text-sm font-medium text-ink mb-1">사업명</label>
-          <select name="project_id" class="input w-full text-sm">
-            <option value="">— 선택 —</option>
-            {{range .Projects}}
-            <option value="{{.ProjectID}}" {{if eq $.Visit.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
-            {{end}}
-          </select>
+          {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
         </div>
         <div>
           <label class="block text-sm font-medium text-ink mb-1">점검 대상(제품)</label>

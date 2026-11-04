@@ -45,7 +45,7 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 	customers, _ := h.customerRepo.ListSelectable()
 	flashErr := c.QueryParam("err")
 	kanban := model.FillAdminKanban(model.AdminKanbanColumnDefs(), items)
-	return c.Render(http.StatusOK, "admin_work/list.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":         "행정관련업무등록/처리",
 		"Active":        NavAdminWork,
 		"Items":         items,
@@ -71,7 +71,10 @@ func (h *AdminWorkHandler) List(c echo.Context) error {
 		"FlashOK":       c.QueryParam("ok"),
 		"FlashErr":      flashErr,
 		"FlashErrText":  gtdFlashMsg(flashErr, c.QueryParam("n")),
-	})
+	}
+	attachProjectPicker(c, pickerFromRepo(h.repo), data, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
+	data["ProjectPickerClosed"] = data["ProjectPicker"]
+	return c.Render(http.StatusOK, "admin_work/list.html", data)
 }
 
 func (h *AdminWorkHandler) Stats(c echo.Context) error {
@@ -93,7 +96,7 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 	projects, _ := h.repo.ListProjects(true)
 	assignees := listAssignableForPicker(h.userRepo, c)
 	customers, _ := h.customerRepo.ListSelectable()
-	return c.Render(http.StatusOK, "admin_work/stats.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":       "행정관련업무현황",
 		"Active":      NavAdminWorkStats,
 		"Stats":       st,
@@ -111,7 +114,10 @@ func (h *AdminWorkHandler) Stats(c echo.Context) error {
 		"Projects":    projects,
 		"Assignees":   assignees,
 		"Customers":   customers,
-	})
+	}
+	attachProjectPicker(c, pickerFromRepo(h.repo), data, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
+	data["ProjectPickerClosed"] = data["ProjectPicker"]
+	return c.Render(http.StatusOK, "admin_work/stats.html", data)
 }
 
 func (h *AdminWorkHandler) New(c echo.Context) error {
@@ -151,6 +157,8 @@ func (h *AdminWorkHandler) New(c echo.Context) error {
 		choices, _ := h.repo.ListSubtaskParentCandidates("")
 		data["ParentChoices"] = choices
 	}
+	attachProjectPicker(c, pickerFromRepo(h.repo), data, ProjectPickerOpts{AllowPending: true})
+	data["ProjectPickerClosed"] = buildProjectPicker(c, pickerFromRepo(h.repo), ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
 	return c.Render(http.StatusOK, "admin_work/form.html", data)
 }
 
@@ -202,9 +210,6 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 	if dueBeforeWork(workDate, dueDate) {
 		return fail("date_order")
 	}
-	if workType == model.WBWorkSupport && strings.TrimSpace(c.FormValue("project_id")) == "" {
-		return fail("project_required")
-	}
 	progress := 0
 	if p := strings.TrimSpace(c.FormValue("progress")); p != "" {
 		fmtScanInt(p, &progress)
@@ -227,7 +232,10 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 		ParentTaskID:   parentID,
 		OrgID:          assignableOrgID(c),
 	}
-	if err := requireProjectRegisterAccess(c, h.repo.GetProject, t.ProjectID); err != nil {
+	if code := applySupportProjectForm(c, t); code != "" {
+		return fail(code)
+	}
+	if err := requireProjectLink(c, h.repo.GetProject, t.ProjectID, false); err != nil {
 		return err
 	}
 	if d := strings.TrimSpace(c.FormValue("duration_min")); d != "" {

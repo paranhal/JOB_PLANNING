@@ -330,7 +330,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 			break
 		}
 	}
-	return c.Render(200, "maintenance/plan_show.html", attachViewGroup(c, map[string]interface{}{
+	mntData := map[string]interface{}{
 		"Title":               fmt.Sprintf("정기점검 %d년", plan.PlanYear),
 		"Active":              NavMaintenance,
 		"Plan":                plan,
@@ -396,7 +396,11 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"UseOrgProductLegend": h.useOrgProductLegend(plan.OrgID),
 		"WorkGroups":          workGroups,
 		"WorkGroupMembers":    workGroupMembersJSON,
-	}))
+	}
+	if h.wbRepo != nil {
+		attachProjectPicker(c, pickerFromRepo(h.wbRepo), mntData, ProjectPickerOpts{})
+	}
+	return c.Render(200, "maintenance/plan_show.html", attachViewGroup(c, mntData))
 }
 
 func (h *MaintenanceHandler) hydrateVisitPeople(visits []model.MaintenanceVisit) {

@@ -158,7 +158,7 @@
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-xl bg-danger-soft border border-danger px-4 py-2.5 text-sm text-red-800 shadow-sm">
-    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else if eq .FlashErr "kanban_unplanned"}}미계획으로 옮길 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.{{else if eq .FlashErr "kanban_assignee"}}담당자를 지정해야 오늘 예정으로 둘 수 있습니다.{{else if eq .FlashErr "kanban_complete"}}완료 내용을 입력하세요.{{else if eq .FlashErr "kanban_reopen"}}완료를 취소하고 되돌릴까요? 다시 끌어 확인하세요.{{else}}{{.FlashErr}}{{end}}
+    {{if eq .FlashErr "place"}}배치할 업무와 시간을 선택해 주세요.{{else if eq .FlashErr "overlap"}}같은 담당자의 시간이 겹칩니다. 다른 시각으로 배정해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "project_match"}}이 업무는 사업명 매칭이 필요합니다. 사업을 선택한 뒤 진행하세요.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "past"}}지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요.{{else if eq .FlashErr "task"}}업무명과 일자를 입력해 주세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else if eq .FlashErr "kanban_unplanned"}}미계획으로 옮길 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.{{else if eq .FlashErr "kanban_assignee"}}담당자를 지정해야 오늘 예정으로 둘 수 있습니다.{{else if eq .FlashErr "kanban_complete"}}완료 내용을 입력하세요.{{else if eq .FlashErr "kanban_reopen"}}완료를 취소하고 되돌릴까요? 다시 끌어 확인하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 

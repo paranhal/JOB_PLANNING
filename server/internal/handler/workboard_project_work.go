@@ -215,7 +215,7 @@ func (h *WorkboardHandler) assertProjectLinkable(c echo.Context, projectID strin
 	if err != nil || p == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
 	}
-	return requireProjectRegisterAccess(c, func(id string) (*model.WorkProject, error) {
+	return requireProjectLink(c, func(id string) (*model.WorkProject, error) {
 		return p, nil
-	}, projectID)
+	}, projectID, false)
 }

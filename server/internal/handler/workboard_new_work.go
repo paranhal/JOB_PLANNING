@@ -92,6 +92,8 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		data["Projects"] = projects
 		data["Customers"] = customers
 	}
+	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: kind == model.WBWorkAdmin || kind == model.WBWorkSales})
+	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
 	c.Request().Header.Set("HX-Request", "true")
 	data["ItemOrgID"] = currentOrg(c)
 	attachWorkItemView(data, h, nil, false)

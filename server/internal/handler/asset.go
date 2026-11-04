@@ -129,7 +129,7 @@ func (h *AssetHandler) New(c echo.Context) error {
 	}
 	projects, _ := h.wbRepo.ListProjects(false)
 
-	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "자산 등록", "Active": NavAssets, "IsNew": true,
 		"Asset": asset, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
@@ -139,7 +139,11 @@ func (h *AssetHandler) New(c echo.Context) error {
 		"OpStatuses":         opStatuses,
 		"MaintContractTypes": maintContractTypes, "MaintCycles": maintCycles,
 		"MaintBillingCycles": maintBillingCycles,
+	}
+	attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
+		IncludeClosed: true, EmptyLabel: "선택 안 함", Selected: asset.ProjectID,
 	})
+	return c.Render(http.StatusOK, "asset/form.html", data)
 }
 
 func (h *AssetHandler) Create(c echo.Context) error {
@@ -155,7 +159,7 @@ func (h *AssetHandler) Create(c echo.Context) error {
 	}
 	applyAssetBusinessRules(a)
 	if h.wbRepo != nil {
-		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, a.ProjectID); err != nil {
+		if err := requireProjectLink(c, h.wbRepo.GetProject, a.ProjectID, true); err != nil {
 			return err
 		}
 	}
@@ -258,7 +262,7 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 	projects, _ := h.wbRepo.ListProjects(false)
 	slots, filled := buildAssetImageSlots(h.attachRepo, id)
 
-	return c.Render(http.StatusOK, "asset/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": "자산 수정", "Active": NavAssets, "IsNew": false,
 		"Asset": a, "Customers": customers, "Projects": projects,
 		"ProductTypes": productTypes, "ProductCategories": productCategories,
@@ -270,7 +274,11 @@ func (h *AssetHandler) Edit(c echo.Context) error {
 		"MaintBillingCycles": maintBillingCycles,
 		"Images":             slots, "ImageCount": filled, "CanUpload": filled < 3,
 		"CanWrite": canWriteMaster(c),
+	}
+	attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
+		IncludeClosed: true, EmptyLabel: "선택 안 함", Selected: a.ProjectID, SelectedName: a.ProjectName,
 	})
+	return c.Render(http.StatusOK, "asset/form.html", data)
 }
 
 func (h *AssetHandler) Update(c echo.Context) error {
@@ -289,7 +297,7 @@ func (h *AssetHandler) Update(c echo.Context) error {
 	}
 	applyAssetBusinessRules(a)
 	if h.wbRepo != nil {
-		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, a.ProjectID); err != nil {
+		if err := requireProjectLink(c, h.wbRepo.GetProject, a.ProjectID, true); err != nil {
 			return err
 		}
 	}

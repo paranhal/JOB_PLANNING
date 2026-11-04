@@ -1,0 +1,83 @@
+{{define "project_picker"}}
+{{$p := .}}
+<div class="pp" data-project-picker
+     data-other-url="{{$p.OtherURL}}"
+     data-can-other="{{if $p.CanPickOther}}1{{else}}0{{end}}"
+     data-other-count="{{$p.OtherCount}}"
+     data-closed="{{if $p.IncludeClosed}}1{{else}}0{{end}}"
+     x-data='projectPicker({{toJSON $p}})'>
+  <input type="hidden" name="{{if $p.Name}}{{$p.Name}}{{else}}project_id{{end}}" value="{{$p.Selected}}" :value="selectedId" {{if $p.ID}}id="{{$p.ID}}"{{end}}>
+  {{if $p.AllowPending}}
+  <input type="hidden" name="project_match_pending" value="" :value="pending ? '1' : ''">
+  {{end}}
+  <div class="space-y-1" x-show="!pending">
+    <p class="text-xs text-ink" x-show="selectedName" x-cloak>
+      선택: <span class="font-medium" x-text="selectedName"></span>
+      <button type="button" class="text-ink-muted ml-1" @click="clear()">✕</button>
+    </p>
+    <input type="search" class="input w-full" autocomplete="off"
+           placeholder="{{if $p.Placeholder}}{{$p.Placeholder}}{{else}}사업명으로 찾기{{end}}"
+           x-model="q" @focus="open=true" @input="open=true"
+           @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+    <ul class="combobox-list" x-show="open" x-cloak>
+      <li>
+        <button type="button" class="menu-item w-full" @click="clear()" x-text="emptyLabel"></button>
+      </li>
+      <template x-for="(p, i) in filtered" :key="p.project_id">
+        <li>
+          <button type="button" class="menu-item w-full text-left" :class="i===hi ? 'combobox-option-on' : ''"
+                  @click="pick(p.project_id, p.name, p.project_kind)">
+            <span x-text="p.name"></span>
+            <span class="text-ink-muted text-xs" x-show="p.related" x-cloak> (유관)</span>
+            <span class="text-ink-muted text-xs" x-show="p.child_org" x-cloak x-text="' · '+p.child_org"></span>
+            <span class="text-ink-muted text-xs" x-show="p.closed_label" x-cloak x-text="' '+p.closed_label"></span>
+          </button>
+        </li>
+      </template>
+      <li x-show="filtered.length===0" class="menu-item text-ink-muted whitespace-normal">
+        등록된 사업이 없습니다. 찾는 사업이 등록되어 있지 않습니다
+      </li>
+      {{if $p.AllowQuickRegister}}
+      <li x-show="filtered.length===0">
+        <div data-pick-register-slot></div>
+      </li>
+      {{end}}
+      {{if $p.CanCreateProject}}
+      <li x-show="filtered.length===0" class="px-3 py-1">
+        <a href="/projects/new" class="text-xs text-primary hover:underline">사업 등록 화면</a>
+      </li>
+      {{end}}
+    </ul>
+    <div class="pt-1">
+      {{if $p.CanPickOther}}
+      <button type="button" class="text-xs text-ink-muted hover:underline" @click="toggleOther()">
+        <span x-text="otherOpen ? '▲ 타 부서 사업 접기' : ('▼ 타 부서 사업 보기 (' + otherCount + '건)')"></span>
+      </button>
+      {{else}}
+      <button type="button" class="text-xs text-ink-muted hover:underline" @click="denyOther()">▼ 타 부서 사업 보기</button>
+      {{end}}
+      <p class="text-xs text-danger mt-1" x-show="otherDenied" x-cloak>타 부서 사업을 선택할 권한이 없습니다</p>
+      <div class="mt-1 space-y-1" x-show="otherOpen" x-cloak>
+        <p class="text-xs text-ink-muted" x-show="otherLoading">불러오는 중…</p>
+        <p class="text-xs text-danger" x-show="otherErr" x-text="otherErr"></p>
+        <template x-for="g in otherGroups" :key="g.org_id || g.org_name">
+          <div>
+            <p class="text-xs font-medium text-ink-muted" x-text="g.org_name || '조직 미지정'"></p>
+            <template x-for="it in (g.items || [])" :key="it.project_id">
+              <button type="button" class="menu-item w-full text-left" @click="pick(it.project_id, it.name, it.project_kind)">
+                <span x-text="it.name"></span>
+              </button>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+  {{if $p.AllowPending}}
+  <label class="flex items-center gap-2 text-sm text-ink mt-2">
+    <input type="checkbox" class="rounded" :checked="pending" @change="setPending($event.target.checked)">
+    사업 필수 아님 / 사업명 나중에 매칭
+  </label>
+  {{end}}
+</div>
+{{end}}

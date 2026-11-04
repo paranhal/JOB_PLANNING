@@ -196,6 +196,11 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	if popup := h.consumeMntActionPopup(c, *v, name, back, embed); popup != nil {
 		data["MntSavePopup"] = popup
 	}
+	if h.wbRepo != nil {
+		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
+			Selected: v.ProjectID, SelectedName: v.ProjectName,
+		})
+	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", data)
 }
 

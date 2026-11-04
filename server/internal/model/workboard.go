@@ -761,6 +761,7 @@ type WorkTask struct {
 	WorkType            string    `json:"work_type"`              // admin / support / as / maintenance / sales / project_work
 	WorkSubtype         string    `json:"work_subtype,omitempty"` // build|construction|other
 	ProjectID           string    `json:"project_id"`
+	ProjectMatchPending bool      `json:"project_match_pending,omitempty"`
 	Title               string    `json:"title"`
 	Description         string    `json:"description"`
 	DueDate             string    `json:"due_date"`

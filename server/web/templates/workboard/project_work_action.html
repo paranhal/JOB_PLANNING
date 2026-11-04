@@ -16,7 +16,7 @@
             <input type="hidden" name="back" value="{{.BackURL}}">
             <div class="min-w-[12rem] flex-1">
               <label class="label">사업</label>
-              {{template "project_combo" dict "Items" .WorkProjects "Selected" .Task.ProjectID "Empty" "연결 해제" "Name" "project_id"}}
+              {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
             </div>
             <button class="btn btn-primary" {{if .ReadOnly}}disabled{{end}}>연결</button>
             <button class="btn" name="project_id" value="" {{if .ReadOnly}}disabled{{end}}>연결 해제</button>

@@ -355,6 +355,11 @@ func (h *WorkboardHandler) kanbanMoveTask(kind, id string) (*model.WorkTask, err
 func (h *WorkboardHandler) boardKanbanComplete(c echo.Context, key, from, date, note string) error {
 	kind, id := splitKanbanKey(key)
 	t, _ := h.kanbanMoveTask(kind, id)
+	if t != nil {
+		if err := denyIfProjectMatchPending(t); err != nil {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=project_match"))
+		}
+	}
 	if t != nil && model.SourceLinkedASOrMnt(*t) {
 		href := t.DetailHref()
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+service.KanbanErrActionScreen+"&action="+url.QueryEscape(href)))

@@ -78,10 +78,7 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
-      <select name="project_id" :required="workType === 'support'" class="w-full border rounded-lg px-3 py-2">
-        <option value="">— 선택 (해당 시) —</option>
-        {{range .Projects}}<option value="{{.ProjectID}}" {{if and $p (eq .ProjectID $p.ProjectID)}}selected{{end}}>{{.Name}}</option>{{end}}
-      </select>
+      {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
       <p class="text-[11px] text-gray-400 mt-1">사업에 해당하는 업무만 선택합니다. 지원업무는 필수입니다.</p>
     </div>
 

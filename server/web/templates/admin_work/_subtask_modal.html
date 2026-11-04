@@ -40,10 +40,9 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">사업명 <span class="text-red-500" x-show="subWorkType === 'support'">*</span></label>
-        <select name="project_id" x-model="subProject" :required="subWorkType === 'support'" class="w-full border rounded-lg px-3 py-2">
-          <option value="">— 선택 (해당 시) —</option>
-          {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
-        </select>
+        <div @project-picked="subProject=$event.detail.id">
+          {{if .ProjectPickerClosed}}{{template "project_picker" .ProjectPickerClosed}}{{else if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+        </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>

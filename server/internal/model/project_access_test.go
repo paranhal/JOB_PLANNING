@@ -23,3 +23,32 @@ func TestProjectAccessRoles(t *testing.T) {
 		t.Fatal("주관·유관 업무 등록")
 	}
 }
+
+func TestCanPickOtherAndLink(t *testing.T) {
+	p := WorkProject{OrgID: "O03", Status: WBProjectActive}
+	if CanPickOtherProjects(RoleTech) || CanPickOtherProjects(RoleCLevel) {
+		t.Fatal("기술·C-Level 타 부서")
+	}
+	if !CanPickOtherProjects(RoleOrgAdmin) || !CanPickOtherProjects(RoleSupport) || !CanPickOtherProjects(RoleVisionAdmin) {
+		t.Fatal("허용 역할")
+	}
+	if !ProjectInOwnPickScope(p, "O03", nil) {
+		t.Fatal("주관 내 부서")
+	}
+	if !ProjectInOwnPickScope(p, "O01", []string{"O03"}) {
+		t.Fatal("하위 조직은 내 부서")
+	}
+	if CanLinkWorkProject(p, "O01", RoleTech, nil, false) {
+		t.Fatal("기술 타 부서 저장")
+	}
+	if !CanLinkWorkProject(p, "O01", RoleOrgAdmin, nil, false) {
+		t.Fatal("조직관리자 타 부서 저장")
+	}
+	closed := WorkProject{OrgID: "O03", Status: WBProjectArchived}
+	if CanLinkWorkProject(closed, "O03", RoleTech, nil, false) {
+		t.Fatal("보관 거절")
+	}
+	if !CanLinkWorkProject(closed, "O03", RoleTech, nil, true) {
+		t.Fatal("IncludeClosed")
+	}
+}

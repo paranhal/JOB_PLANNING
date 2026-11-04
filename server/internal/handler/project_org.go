@@ -128,19 +128,19 @@ func (h *ProjectHandler) orgFormData(c echo.Context, p *model.WorkProject, isEdi
 	role := currentRole(c)
 	required := role == model.RoleVisionAdmin && !isEdit
 	return map[string]interface{}{
-		"OrgChoices":       orgs,
-		"OrgSelected":      selected,
-		"OrgLocked":        locked,
-		"OrgRequired":      required,
-		"OrgHomeName":      orgNameOf(orgs, selected),
-		"RelatedOrgIDs":    related,
-		"CanEditOrgs":      canEditProjectOrgs(c, p),
-		"CanTransferOrg":   isEdit && canTransferProjectOrg(c, p),
-		"OrgMoveImpact":    impact,
-		"KeepPrevRelated":  true,
-		"MoveOpenTasks":    true,
+		"OrgChoices":        orgs,
+		"OrgSelected":       selected,
+		"OrgLocked":         locked,
+		"OrgRequired":       required,
+		"OrgHomeName":       orgNameOf(orgs, selected),
+		"RelatedOrgIDs":     related,
+		"CanEditOrgs":       canEditProjectOrgs(c, p),
+		"CanTransferOrg":    isEdit && canTransferProjectOrg(c, p),
+		"OrgMoveImpact":     impact,
+		"KeepPrevRelated":   true,
+		"MoveOpenTasks":     true,
 		"DropForeignAssign": true,
-		"RelatedLine":      relatedLineForForm(p),
+		"RelatedLine":       relatedLineForForm(p),
 	}
 }
 
@@ -152,31 +152,7 @@ func relatedLineForForm(p *model.WorkProject) string {
 }
 
 func requireProjectRegisterAccess(c echo.Context, get func(string) (*model.WorkProject, error), projectID string) error {
-	projectID = strings.TrimSpace(projectID)
-	if projectID == "" {
-		return nil
-	}
-	if get == nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
-	}
-	p, err := get(projectID)
-	if err != nil || p == nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
-	}
-	org := ""
-	if c != nil {
-		org = currentOrg(c)
-		if org == "" {
-			org = loginHomeOrg(c)
-		}
-	}
-	if org == "" {
-		return nil
-	}
-	if !model.CanRegisterWorkOnProject(*p, org) {
-		return echo.NewHTTPError(http.StatusForbidden, "이 사업에 업무를 등록할 수 없습니다")
-	}
-	return nil
+	return requireProjectLink(c, get, projectID, false)
 }
 
 func orgNameOf(orgs []model.Org, id string) string {

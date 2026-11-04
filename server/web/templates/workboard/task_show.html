@@ -28,6 +28,7 @@
         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbWorkTypeClass $t.WorkType}}">{{wbWorkTypeLabel $t.WorkType}}</span>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{wbPriorityClass $t.Priority}}">{{wbPriorityLabel $t.Priority}}</span>
         {{if $t.WorkGroupName}}<span class="badge-neutral text-xs">그룹: {{$t.WorkGroupName}}</span>{{end}}
+        {{if $t.ProjectMatchPending}}<span class="badge badge-warning text-xs">사업명 매칭 필요</span>{{end}}
       </div>
       <p class="text-sm text-ink-muted mt-1">업무 고유번호 <span class="font-mono text-ink">{{$t.TaskID}}</span>
         {{if .Parent}} · 상위 <a href="/workboard/tasks/{{.Parent.TaskID}}" class="text-primary hover:underline">{{.Parent.Title}}</a>{{end}}
@@ -35,6 +36,14 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
+      {{if and $t.ProjectMatchPending .CanWrite (not .EditMode)}}
+      <form method="post" action="/workboard/tasks/{{$t.TaskID}}/match-project" class="w-full max-w-sm">
+        <input type="hidden" name="back" value="/workboard/tasks/{{$t.TaskID}}">
+        <p class="text-xs text-warning mb-1">이 업무는 사업명 매칭이 필요합니다. 사업을 선택한 뒤 진행하세요</p>
+        {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+        <button class="btn btn-primary btn-sm mt-2" type="submit">사업 매칭</button>
+      </form>
+      {{end}}
       {{if and $isAS .SourceHref}}
       {{if and .CanAction .ActionHref (ne .ActionHref .SourceHref)}}
       <a href="{{.SourceHref}}" class="px-3 py-1.5 text-sm border border-rose-300 text-rose-800 rounded-lg hover:bg-danger-soft">AS접수이동</a>
@@ -140,7 +149,7 @@
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-lg bg-danger-soft border border-danger px-4 py-2 text-sm text-red-800">
-    {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "sales_linked"}}이미 원본이 연결된 업무입니다.{{else if eq .FlashErr "activity"}}영업 활동으로 만들 수 없습니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "assignee_required"}}담당자를 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else}}{{.FlashErr}}{{end}}
+    {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "sales_linked"}}이미 원본이 연결된 업무입니다.{{else if eq .FlashErr "activity"}}영업 활동으로 만들 수 없습니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "project_match"}}이 업무는 사업명 매칭이 필요합니다. 사업을 선택한 뒤 진행하세요.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "assignee_required"}}담당자를 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
@@ -456,12 +465,7 @@
     {{if $isMnt}}
     <div>
       <label class="block text-sm font-medium text-ink mb-1">사업명</label>
-      <select name="project_id" class="w-full border rounded-lg px-3 py-2">
-        <option value="">— 선택 —</option>
-        {{range .WorkProjects}}
-        <option value="{{.ProjectID}}" {{if eq $.Task.ProjectID .ProjectID}}selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
+      {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
     </div>
     {{end}}
 
@@ -469,14 +473,14 @@
     <div x-data="siteMultiPicker({ projectId: '{{$t.ProjectID}}', sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{toJSON $s.SiteName}},parent_name:{{toJSON $s.ParentName}},region:{{toJSON $s.Region}},on_project:{{if $s.OnProject}}true{{else}}false{{end}}}{{end}}] })">
       <label class="block text-sm font-medium text-ink mb-1">사업</label>
       <div @project-picked="projectId=$event.detail.id; refreshBadges(); search()">
-        {{template "project_combo" dict "Items" .WorkProjects "Selected" $t.ProjectID "SelectedName" $t.ProjectName "Empty" "— 선택 (해당 시) —" "Name" "project_id"}}
+        {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
       </div>
       <div class="mt-3">{{template "site_multi_picker" dict "Label" "대상 사이트"}}</div>
     </div>
     {{else if not (or $isAS $isMnt)}}
     <div>
       <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
-      {{template "project_combo" dict "Items" .WorkProjects "Selected" $t.ProjectID "SelectedName" $t.ProjectName "Empty" "— 선택 (해당 시) —" "Name" "project_id"}}
+      {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
     </div>
     {{end}}
 

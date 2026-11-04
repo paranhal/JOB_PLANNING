@@ -427,10 +427,7 @@ window.mntAssigneeMulti = function (cfg) {
           </div>
           <div>
             <label class="block text-gray-600 mb-1">사업명</label>
-            <select name="project_id" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-              <option value="">— 선택 —</option>
-              {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
-            </select>
+            {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
           </div>
           <div>
             <label class="block text-gray-600 mb-1">담당자</label>
@@ -520,10 +517,9 @@ window.mntAssigneeMulti = function (cfg) {
         </div>
         <div>
           <label class="block text-gray-600 mb-1">사업명</label>
-          <select name="project_id" x-model="edit.project" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-            <option value="">— 선택 —</option>
-            {{range .Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
-          </select>
+          <div @project-picked="edit.project=$event.detail.id">
+            {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+          </div>
         </div>
         <div>
           <label class="block text-gray-600 mb-1">표시 유형</label>
@@ -739,10 +735,9 @@ window.mntAssigneeMulti = function (cfg) {
       {{if and $.ShowScopeToggle $.ScopeAll}}<input type="hidden" name="all" value="1">{{end}}
       {{if and $.AssigneeKey (ne $.AssigneeKey "all")}}<input type="hidden" name="cal_assignee" value="{{$.AssigneeKey}}">{{end}}
       <input type="date" name="visit_date" required class="input text-xs">
-      <select name="project_id" class="select text-xs max-w-[10rem]">
-        <option value="">사업명</option>
-        {{range $.Projects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
-      </select>
+      <div class="min-w-[12rem]">
+        {{if $.ProjectPicker}}{{template "project_picker" $.ProjectPicker}}{{end}}
+      </div>
       <div class="min-w-[12rem] max-w-xs">
         {{template "mnt_assignee_multi" dict "Assignees" $.Assignees "WorkGroups" $.WorkGroups "Target" "slot" "PickerNames" $.PickerNames}}
       </div>

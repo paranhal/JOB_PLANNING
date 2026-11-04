@@ -1036,6 +1036,9 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	data = attachViewGroup(c, data)
 	attachBoardDropdowns(c, data, view)
 	attachProjectFilter(c, h, data, "board-project")
+	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: true})
+	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
+	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
 	data["BoardShell"] = true
 	attachLiveWorkData(data, h, c, nil)
 	return data, nil

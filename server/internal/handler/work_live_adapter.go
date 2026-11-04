@@ -54,7 +54,7 @@ func (a adminAdapter) IsFieldWork(t *model.WorkTask) bool {
 	return model.NormalizeWorkPlace(t.WorkPlace) == model.WorkPlaceField
 }
 func (adminAdapter) AfterSegmentsChanged(*sql.Tx, *model.WorkTask) error { return nil }
-func (adminAdapter) EndHref(*model.WorkTask) string                     { return "" }
+func (adminAdapter) EndHref(*model.WorkTask) string                      { return "" }
 func (adminAdapter) CompletionRule(*model.WorkTask) model.CompletionRule {
 	return model.CompletionRule{Kind: "self", Label: "업무 상태"}
 }
@@ -142,6 +142,9 @@ func adapterFor(workType string) LiveAdapter {
 func liveCanStartCommon(c echo.Context, t *model.WorkTask) error {
 	if t == nil {
 		return echo.ErrNotFound
+	}
+	if err := denyIfProjectMatchPending(t); err != nil {
+		return err
 	}
 	if isReadOnly(c) || currentRole(c) == model.RoleCLevel || currentRole(c) == model.RoleObserver {
 		return echo.ErrForbidden

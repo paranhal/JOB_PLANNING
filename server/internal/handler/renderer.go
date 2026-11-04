@@ -190,6 +190,7 @@ func templateFiles(name string) []string {
 		"web/templates/_partials/view_group_toggle.html",
 		"web/templates/_partials/ui_dropdown.html",
 		"web/templates/_partials/project_filter.html",
+		"web/templates/_partials/project_picker.html",
 		"web/templates/_partials/page_back.html")
 	return files
 }

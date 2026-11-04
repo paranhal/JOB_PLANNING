@@ -84,11 +84,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
-        <select name="project_id" :required="workType === 'support'"
-                class="w-full border rounded-lg px-3 py-2 text-sm">
-          <option value="">— 선택 (해당 시) —</option>
-          {{range .WorkProjects}}<option value="{{.ProjectID}}">{{.Name}}</option>{{end}}
-        </select>
+        {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
       </div>
       <div>
         <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
@@ -350,7 +346,7 @@
       <div>
         <label class="block text-sm font-medium text-ink mb-1">사업</label>
         <div @project-picked="projectId=$event.detail.id; pickedKind=$event.detail.kind; suggestKind(); refreshBadges(); search()">
-          {{template "project_combo" dict "Items" .WorkProjects "Selected" "" "Empty" "— 선택 (해당 시) —" "Name" "project_id"}}
+          {{if .ProjectPickerWork}}{{template "project_picker" .ProjectPickerWork}}{{else if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
         </div>
       </div>
       {{template "site_multi_picker" dict "Label" "대상 사이트"}}

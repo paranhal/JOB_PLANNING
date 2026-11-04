@@ -467,6 +467,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"WorkGroupFilter":      groupFilter,
 	}
 	attachProjectFilter(c, h, data, "reg-project")
+	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: true})
+	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
+	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
 	return c.Render(http.StatusOK, "workboard/register.html", data)
 }
 
@@ -1181,6 +1184,9 @@ func paletteTaskCard(t model.WorkTask, dimmed bool) model.WBCard {
 	if t.WorkType == model.WBWorkProjectWork {
 		cat = model.WBWorkProjectWork
 		title = model.FormatProjectWorkTitle(t.Title)
+	}
+	if t.ProjectMatchPending {
+		title = title + " · 사업명 매칭 필요"
 	}
 	sub := t.Description
 	if t.WorkType == model.WBWorkProjectWork {
@@ -2068,8 +2074,8 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if t.Title == "" || (t.DueDate == "" && !dueUndeterminedFromForm(c)) {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=task"))
 	}
-	if t.WorkType == model.WBWorkSupport && t.ProjectID == "" {
-		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=project_required"))
+	if code := applySupportProjectForm(c, t); code != "" {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+code))
 	}
 	if err := h.assertProjectLinkable(c, t.ProjectID); err != nil {
 		return err
@@ -2289,10 +2295,6 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			} else {
 				workType = model.NormalizeDirectWorkType(c.FormValue("work_type"))
 				projectID = strings.TrimSpace(c.FormValue("project_id"))
-				if workType == model.WBWorkSupport && projectID == "" {
-					return c.Redirect(http.StatusSeeOther,
-						"/workboard/tasks/"+id+"/edit?err=project_required&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
-				}
 			}
 		}
 	}
@@ -2313,32 +2315,33 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		desc = strings.TrimSpace(c.FormValue("description"))
 	}
 	t := &model.WorkTask{
-		TaskID:         existing.TaskID,
-		WorkType:       workType,
-		WorkSubtype:    existing.WorkSubtype,
-		ProjectID:      projectID,
-		Title:          title,
-		Description:    desc,
-		CompleteNote:   existing.CompleteNote,
-		DueDate:        dueDate,
-		WorkDate:       workDate,
-		StartTime:      start,
-		EndTime:        end,
-		DurationMin:    dur,
-		Status:         status,
-		Priority:       priority,
-		Assignee:       assignee,
-		AssigneeUserID: existing.AssigneeUserID,
-		AssigneeSource: existing.AssigneeSource,
-		WorkGroupID:    existing.WorkGroupID,
-		OrgID:          existing.OrgID,
-		Tags:           strings.TrimSpace(c.FormValue("tags")),
-		Progress:       progress,
-		SourceType:     existing.SourceType,
-		SourceID:       existing.SourceID,
-		ParentTaskID:   existing.ParentTaskID,
-		CustomerID:     existing.CustomerID,
-		CustomerName:   existing.CustomerName,
+		TaskID:              existing.TaskID,
+		WorkType:            workType,
+		WorkSubtype:         existing.WorkSubtype,
+		ProjectID:           projectID,
+		Title:               title,
+		Description:         desc,
+		CompleteNote:        existing.CompleteNote,
+		DueDate:             dueDate,
+		WorkDate:            workDate,
+		StartTime:           start,
+		EndTime:             end,
+		DurationMin:         dur,
+		Status:              status,
+		Priority:            priority,
+		Assignee:            assignee,
+		AssigneeUserID:      existing.AssigneeUserID,
+		AssigneeSource:      existing.AssigneeSource,
+		WorkGroupID:         existing.WorkGroupID,
+		OrgID:               existing.OrgID,
+		Tags:                strings.TrimSpace(c.FormValue("tags")),
+		Progress:            progress,
+		SourceType:          existing.SourceType,
+		SourceID:            existing.SourceID,
+		ParentTaskID:        existing.ParentTaskID,
+		CustomerID:          existing.CustomerID,
+		CustomerName:        existing.CustomerName,
+		ProjectMatchPending: existing.ProjectMatchPending,
 	}
 	postedPicker := registerScope && strings.TrimSpace(c.FormValue("assignee_multi")) == "1"
 	var sel Selection
@@ -2417,6 +2420,12 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			taskPagePath(id, registerScope)+"?err=owner&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	org := taskOrgID(c, existing)
+	if registerScope {
+		if code := applySupportProjectForm(c, t); code != "" {
+			return c.Redirect(http.StatusSeeOther,
+				taskPagePath(id, registerScope)+"?err="+code+"&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		}
+	}
 	if err := h.assertProjectLinkable(c, t.ProjectID); err != nil {
 		return err
 	}
@@ -2891,6 +2900,14 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		data["CanWrite"] = false
 	}
 	h.renderTaskGTD(c, data, t)
+	pending := t.WorkType == model.WBWorkSupport
+	attachProjectPicker(c, h, data, ProjectPickerOpts{
+		Selected: t.ProjectID, SelectedName: t.ProjectName,
+		AllowPending: pending, Pending: t.ProjectMatchPending,
+	})
+	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{
+		IncludeClosed: true, AllowPending: true, Selected: t.ProjectID, SelectedName: t.ProjectName,
+	})
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)
 }
 
