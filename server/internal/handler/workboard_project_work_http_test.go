@@ -421,6 +421,18 @@ func TestProjectWorkSitesAndSearch(t *testing.T) {
 	}
 }
 
+func pickerOwnJSON(body string) string {
+	i := strings.Index(body, `"Own"`)
+	if i < 0 {
+		return ""
+	}
+	own := body[i:]
+	if j := strings.Index(own, `"OtherCount"`); j > 0 {
+		return own[:j]
+	}
+	return own
+}
+
 func TestProjectWorkOrgIsolationSearch(t *testing.T) {
 	e, repo, users := newProjectWorkServer(t)
 	oa03, err := users.GetByUsername("oa03")
@@ -474,8 +486,47 @@ func TestProjectWorkOrgIsolationSearch(t *testing.T) {
 	if emptyRec.Code != http.StatusOK {
 		t.Fatalf("O04 register status=%d", emptyRec.Code)
 	}
-	if !strings.Contains(emptyRec.Body.String(), `data-project-picker`) {
+	body04 := emptyRec.Body.String()
+	if !strings.Contains(body04, `data-project-picker`) {
 		t.Fatal("O04 등록 화면에 사업 피커 없음")
+	}
+	ownJSON := pickerOwnJSON(body04)
+	if strings.Contains(ownJSON, "도서관공사") || strings.Contains(ownJSON, "WP-O01") {
+		t.Fatal("O04 내 부서 목록에 O01 사업이 있다")
+	}
+
+	tech := model.User{Username: "ot04", PasswordHash: HashPassword("password10"), FullName: "빈기술", Role: model.RoleTech, IsActive: true, OrgID: "O04", ProfileDone: true}
+	if err := users.Create(&tech); err != nil {
+		t.Fatal(err)
+	}
+	ot04, err := users.GetByUsername("ot04")
+	if err != nil || ot04 == nil {
+		t.Fatal(err)
+	}
+	techRec := httptest.NewRecorder()
+	techReq := httptest.NewRequest(http.MethodGet, "/workboard/register?view=day", nil)
+	techReq.AddCookie(jwtCookieUser(t, ot04))
+	e.ServeHTTP(techRec, techReq)
+	if techRec.Code != http.StatusOK {
+		t.Fatalf("O04 기술 등록 화면 status=%d", techRec.Code)
+	}
+	techBody := techRec.Body.String()
+	if strings.Contains(pickerOwnJSON(techBody), "WP-O01") || strings.Contains(pickerOwnJSON(techBody), "도서관공사") {
+		t.Fatal("O04 기술직 내 부서 목록에 O01 사업이 있다")
+	}
+	if !strings.Contains(techBody, `data-can-other="0"`) {
+		t.Fatal("O04 기술직 타 부서 버튼이 권한 없음이 아니다")
+	}
+	if !strings.Contains(techBody, `denyOther()`) {
+		t.Fatal("O04 기술직 타 부서 거절 처리 없음")
+	}
+	denySave := doFormUser(t, e, "/workboard/tasks", url.Values{
+		"work_type": {"project_work"}, "title": {"O04타부서거절"}, "work_subtype": {"other"},
+		"work_date": {"2026-10-21"}, "assignee": {"빈기술"}, "project_id": {"WP-O01"},
+		"start_time": {"16:00"}, "end_time": {"16:30"},
+	}, jwtCookieUser(t, ot04))
+	if denySave.Code != http.StatusForbidden && denySave.Code != http.StatusBadRequest {
+		t.Fatalf("O04 기술직이 O01 사업 저장이 거절돼야 함 status=%d loc=%s", denySave.Code, denySave.Header().Get("Location"))
 	}
 
 	cl := httptest.NewRequest(http.MethodGet, "/workboard/work-sites/search?q="+url.QueryEscape("계룡"), nil)
