@@ -15,12 +15,12 @@
       <p class="text-ui">오늘 업무 <span class="font-semibold tabular-nums">{{.Total}}</span>건</p>
       <p class="text-ui-sm text-ink-muted">완료율 {{.DonePct}}%</p>
     </div>
-    <div class="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-hover" data-exec-bar>
-      {{if gt .Done 0}}<span class="block h-full bg-success" style="flex:{{.Done}} 0 0" data-exec-bar-done></span>{{end}}
-      {{if gt .InProgress 0}}<span class="block h-full bg-info" style="flex:{{.InProgress}} 0 0" data-exec-bar-prog></span>{{end}}
-      {{if gt .NotStarted 0}}<span class="block h-full bg-hover border-l border-line" style="flex:{{.NotStarted}} 0 0" data-exec-bar-wait></span>{{end}}
-      {{if gt .Delayed 0}}<span class="block h-full bg-danger" style="flex:{{.Delayed}} 0 0" data-exec-bar-delay></span>{{end}}
-    </div>
+    <svg class="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-hover" viewBox="0 0 100 1" preserveAspectRatio="none" data-exec-bar aria-hidden="true">
+      {{if gt .BarDone 0}}<rect data-exec-bar-done fill="rgb(var(--c-success))" x="0" y="0" width="{{.BarDone}}" height="1"/>{{end}}
+      {{if gt .BarProg 0}}<rect data-exec-bar-prog fill="rgb(var(--c-info))" x="{{.BarDone}}" y="0" width="{{.BarProg}}" height="1"/>{{end}}
+      {{if gt .BarWait 0}}<rect data-exec-bar-wait fill="rgb(var(--c-hover))" x="{{add .BarDone .BarProg}}" y="0" width="{{.BarWait}}" height="1"/>{{end}}
+      {{if gt .BarDelay 0}}<rect data-exec-bar-delay fill="rgb(var(--c-danger))" x="{{add (add .BarDone .BarProg) .BarWait}}" y="0" width="{{.BarDelay}}" height="1"/>{{end}}
+    </svg>
     <div class="mt-2 grid grid-cols-4 gap-1 text-center text-ui-xs text-ink-muted">
       <div>완료 <span class="block font-semibold tabular-nums text-success">{{.Done}}</span></div>
       <div>진행 <span class="block font-semibold tabular-nums text-info">{{.InProgress}}</span></div>

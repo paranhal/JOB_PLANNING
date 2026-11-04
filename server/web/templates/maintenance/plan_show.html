@@ -854,6 +854,8 @@ window.mntAssigneeMulti = function (cfg) {
 {{$today := .Today}}{{$pid := .Plan.PlanID}}{{$month := .Month}}{{$sq := .QScope}}{{$aq := .QAssignee}}{{$sh := .QShow}}
 <script type="application/json" id="mnt-day-visits">{{toJSON .DayVisits}}</script>
 <div id="mnt_calendar" class="flex flex-col lg:flex-row gap-3 lg:gap-0 items-stretch min-w-0 overflow-hidden">
+  <p id="mnt-cal-dnd-err" hidden class="mnt-cal-dnd-err px-3"></p>
+  <div id="mnt-cal-toast-host" class="fixed bottom-4 left-1/2 z-40 -translate-x-1/2"></div>
   <div id="mnt-cal-main" class="card mnt-cal-main">
     <div class="card-header flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">

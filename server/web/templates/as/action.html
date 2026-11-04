@@ -294,6 +294,7 @@
           {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           data-open-support="{{if .OpenSupportN}}{{.OpenSupportN}}{{else}}0{{end}}">
 <div class="p-4 sm:p-5 space-y-4">
+        <p id="as-action-client-err" hidden class="rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm text-danger" data-as-client-err="1"></p>
         {{if and .ActionErr (not .AttachErrMsg)}}
         <p class="sr-only">{{.ActionErrMsg}}</p>
         {{end}}

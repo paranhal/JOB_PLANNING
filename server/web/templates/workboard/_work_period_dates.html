@@ -1,12 +1,12 @@
 {{define "wb_period_dates"}}
 <div class="grid grid-cols-2 gap-3" data-wb-period-dates>
   <div>
-    <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-red-500">*</span></label>
+    <label class="block text-sm font-medium text-ink mb-1">업무 시작일 <span class="text-danger">*</span></label>
     <input type="date" name="work_date" x-model="preWork" required
            class="w-full border rounded-lg px-3 py-2 text-sm">
   </div>
   <div>
-    <label class="block text-sm font-medium text-ink mb-1">업무 종료일{{if .ShowUndetermined}} <span class="text-red-500" x-show="!dueUndetermined">*</span>{{end}}</label>
+    <label class="block text-sm font-medium text-ink mb-1">업무 종료일{{if .ShowUndetermined}} <span class="text-danger" x-show="!dueUndetermined">*</span>{{end}}</label>
     <input type="date" name="due_date" x-model="preDue"{{if .ShowUndetermined}} @change="checkMnt()" :required="!dueUndetermined" :disabled="dueUndetermined"{{end}}
            class="w-full border rounded-lg px-3 py-2 text-sm{{if .ShowUndetermined}} disabled:bg-hover{{end}}">
     {{if .ShowUndetermined}}

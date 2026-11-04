@@ -2,7 +2,7 @@
 {{if .LiveTimeline}}
 <div class="space-y-1 mt-3" data-live-timeline="1">
   {{range .LiveTimeline}}
-  <div class="rounded-lg px-3 py-2 text-sm {{if .InterruptTaskID}}bg-warning-soft{{else if gt .TravelBeforeMin 0}}bg-sky-50{{else}}bg-hover{{end}}">
+  <div class="rounded-lg px-3 py-2 text-sm {{if .InterruptTaskID}}bg-warning-soft{{else if gt .TravelBeforeMin 0}}bg-info-soft{{else}}bg-hover{{end}}">
     {{.WorkDate}} {{.StartTime}}{{if .EndTime}}–{{.EndTime}}{{else}} 작업 중{{end}}
     {{if .InterruptTaskID}} · 끼어든 업무{{end}}
     {{if gt .TravelBeforeMin 0}} · 이동 {{.TravelBeforeMin}}분{{end}}
