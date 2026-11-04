@@ -22,6 +22,7 @@ var uiComponentClasses = []string{
 	"kbd",
 	"avatar", "avatar-sm",
 	"menu", "menu-item",
+	"ui-dd", "ui-dd-btn", "ui-dd-menu", "ui-dd-item",
 	"modal-backdrop", "modal-panel", "peek-panel",
 	"stepper", "stepper-step", "stepper-step-done", "stepper-step-current", "stepper-step-pending", "stepper-step-rejected",
 	"toast",

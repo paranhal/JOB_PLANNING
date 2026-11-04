@@ -24,4 +24,9 @@ const b = ctx.window.mntVisitAction({ start: '10:00' });
 b.applyChip(90);
 assert(b.end === '11:30', '칩이 종료를 채움');
 
+const c = ctx.window.mntVisitAction({ start: '', end: '', planStart: '11:45', planEnd: '12:15' });
+assert(c.start === '' && c.end === '', '계획은 자동으로 안 채움');
+c.fillPlan();
+assert(c.start === '11:45' && c.end === '12:15', '계획 시각으로 채우기');
+
 console.log('mnt-visit-action_test.js ok');

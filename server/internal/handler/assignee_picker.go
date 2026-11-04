@@ -166,6 +166,7 @@ func ParseSelection(c echo.Context, deps PickerDeps, spec PickerSpec) (Selection
 		}}
 	}
 	sel.applyDurations()
+	sel.resolveNames(deps.Users)
 	return sel, nil
 }
 
@@ -201,6 +202,33 @@ func (s Selection) singleOnly() Selection {
 		out.GroupIDs = s.GroupIDs[:1]
 	}
 	return out
+}
+
+func (s *Selection) resolveNames(users *repository.UserRepo) {
+	if s == nil {
+		return
+	}
+	if n := resolvePersonLabel(users, s.PrimaryUserID, s.PrimaryName); n != "" {
+		s.PrimaryName = n
+	} else if pickerPersonLabel(s.PrimaryName) == "" {
+		s.PrimaryName = ""
+	}
+	if n := pickerPersonLabel(s.External); n != "" {
+		s.External = n
+	} else if strings.HasPrefix(strings.TrimSpace(s.External), "USR-") {
+		s.External = ""
+	}
+	for i := range s.People {
+		if n := resolvePersonLabel(users, s.People[i].UserID, s.People[i].Name); n != "" {
+			s.People[i].Name = n
+		}
+	}
+	s.Names = nil
+	for _, p := range s.People {
+		if n := pickerPersonLabel(p.Name); n != "" {
+			s.Names = append(s.Names, n)
+		}
+	}
 }
 
 func (s *Selection) applyDurations() {

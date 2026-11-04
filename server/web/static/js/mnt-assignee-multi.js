@@ -153,6 +153,8 @@ window.mntVisitAction = function (cfg) {
     end: cfg.end || '',
     travel: cfg.travel || 0,
     duration: cfg.duration || 0,
+    planStart: cfg.planStart || '',
+    planEnd: cfg.planEnd || '',
     q: '',
     productFilter: '',
     customs: cfg.customs || [],
@@ -195,6 +197,11 @@ window.mntVisitAction = function (cfg) {
       var n = new Date();
       var v = this.fmtT(n.getHours() * 60 + n.getMinutes());
       if (which === 'end') this.end = v; else this.start = v;
+      this.calc();
+    },
+    fillPlan() {
+      if (this.planStart) this.start = this.planStart;
+      if (this.planEnd) this.end = this.planEnd;
       this.calc();
     },
     applyChip(min) {

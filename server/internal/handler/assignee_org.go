@@ -44,20 +44,98 @@ func listAssignableForPicker(users *repository.UserRepo, c echo.Context) []model
 }
 
 const pickerNameUnregistered = "이름 미등록"
+const assigneeUnspecified = "담당자 미지정"
+
+func pickerPersonLabel(s string) string {
+	n := strings.TrimSpace(s)
+	if n == "" || n == "담당자" || strings.HasPrefix(n, "USR-") {
+		return ""
+	}
+	return n
+}
 
 func pickerDisplayName(u model.User) string {
-	n := strings.TrimSpace(u.FullName)
-	if n != "" && !strings.HasPrefix(n, "USR-") && n != "담당자" {
+	if n := pickerPersonLabel(u.FullName); n != "" {
 		return n
 	}
-	n = strings.TrimSpace(u.Username)
-	if n != "" && !strings.HasPrefix(n, "USR-") && n != "담당자" {
+	if n := pickerPersonLabel(u.Username); n != "" {
 		return n
-	}
-	if id := strings.TrimSpace(u.UserID); id != "" {
-		return id
 	}
 	return pickerNameUnregistered
+}
+
+func resolvePersonLabel(users *repository.UserRepo, uid, name string) string {
+	n := userDisplayName(users, uid, name)
+	if n == assigneeUnspecified {
+		return ""
+	}
+	return n
+}
+
+// userDisplayName 화면용 담당자 이름. USR- 번호는 쓰지 않는다.
+// 우선순위: 사용자 ID 로 찾은 이름 → 저장된 담당자 이름 → 「담당자 미지정」.
+func userDisplayName(users *repository.UserRepo, uid, storedName string) string {
+	id := strings.TrimSpace(uid)
+	if id == "" {
+		raw := strings.TrimSpace(storedName)
+		if strings.HasPrefix(raw, "USR-") {
+			id = raw
+		}
+	}
+	if users != nil && id != "" {
+		if u, err := users.GetByID(id); err == nil && u != nil {
+			n := pickerDisplayName(*u)
+			if n != "" && n != pickerNameUnregistered {
+				return n
+			}
+		}
+	}
+	if n := pickerPersonLabel(storedName); n != "" {
+		return n
+	}
+	return assigneeUnspecified
+}
+
+func pickerIDList(owner any, ids any) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(raw string) {
+		id := strings.TrimSpace(raw)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	if s, ok := owner.(string); ok {
+		add(s)
+	}
+	switch v := ids.(type) {
+	case []string:
+		for _, id := range v {
+			add(id)
+		}
+	}
+	return out
+}
+
+func pickerButtonLabel(names any, owner any, ids any, external any) string {
+	nm, _ := names.(map[string]string)
+	for _, id := range pickerIDList(owner, ids) {
+		if n := pickerPersonLabel(nm[id]); n != "" {
+			return n
+		}
+	}
+	if s, ok := external.(string); ok {
+		if n := pickerPersonLabel(s); n != "" {
+			return n
+		}
+	}
+	return "— 선택 —"
+}
+
+func compactPickerIDs(vals ...string) []string {
+	return pickerIDList("", vals)
 }
 
 func pickerNamesMap(users []model.User) map[string]string {
@@ -73,28 +151,99 @@ func pickerNamesMap(users []model.User) map[string]string {
 }
 
 func ensurePickerUsers(users *repository.UserRepo, list []model.User, extraIDs ...string) []model.User {
+	return ensurePickerUsersNamed(users, list, nil, extraIDs...)
+}
+
+func ensurePickerUsersNamed(users *repository.UserRepo, list []model.User, stored map[string]string, extraIDs ...string) []model.User {
 	seen := map[string]bool{}
 	for _, u := range list {
 		if id := strings.TrimSpace(u.UserID); id != "" {
 			seen[id] = true
 		}
 	}
-	if users == nil {
-		return list
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		if users != nil {
+			if u, err := users.GetByID(id); err == nil && u != nil {
+				if pickerPersonLabel(pickerDisplayName(*u)) == "" {
+					u.FullName = userDisplayName(users, id, stored[id])
+				}
+				list = append(list, *u)
+				return
+			}
+		}
+		list = append(list, model.User{UserID: id, FullName: userDisplayName(users, id, stored[id]), IsActive: true})
 	}
 	for _, raw := range extraIDs {
-		id := strings.TrimSpace(raw)
-		if id == "" || seen[id] {
-			continue
-		}
-		u, err := users.GetByID(id)
-		if err != nil || u == nil {
-			continue
-		}
-		list = append(list, *u)
-		seen[id] = true
+		add(raw)
+	}
+	for id := range stored {
+		add(id)
 	}
 	return list
+}
+
+func overlayPickerStoredNames(users *repository.UserRepo, names map[string]string, stored map[string]string) map[string]string {
+	if names == nil {
+		names = map[string]string{}
+	}
+	for id, raw := range stored {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		cur := names[id]
+		if pickerPersonLabel(cur) != "" && cur != pickerNameUnregistered {
+			continue
+		}
+		names[id] = userDisplayName(users, id, raw)
+	}
+	return names
+}
+
+func storedPickerNamesFromTask(t *model.WorkTask, members []model.WorkTaskMember) map[string]string {
+	out := map[string]string{}
+	if t != nil {
+		if id := strings.TrimSpace(t.AssigneeUserID); id != "" {
+			out[id] = t.Assignee
+		}
+	}
+	for _, m := range members {
+		if id := strings.TrimSpace(m.UserID); id != "" {
+			out[id] = m.Assignee
+		}
+	}
+	return out
+}
+
+func pickerOwnerID(users []model.User, as *model.ASReceipt) string {
+	if as == nil {
+		return ""
+	}
+	if id := strings.TrimSpace(as.AssignedUserID); id != "" {
+		return id
+	}
+	want := strings.TrimSpace(as.AssignedTo)
+	if want == "" {
+		return ""
+	}
+	for _, u := range users {
+		if strings.TrimSpace(u.FullName) == want || strings.TrimSpace(u.Username) == want {
+			return strings.TrimSpace(u.UserID)
+		}
+	}
+	return ""
+}
+
+func pickerSelectedIDs(users []model.User, as *model.ASReceipt) []string {
+	if id := pickerOwnerID(users, as); id != "" {
+		return []string{id}
+	}
+	return nil
 }
 
 func pickerNamesFor(users *repository.UserRepo, list []model.User, extraIDs ...string) map[string]string {
@@ -107,14 +256,10 @@ func pickerNamesFor(users *repository.UserRepo, list []model.User, extraIDs ...s
 		if id == "" {
 			continue
 		}
-		if n := strings.TrimSpace(names[id]); n != "" && !strings.HasPrefix(n, "USR-") {
+		if n := pickerPersonLabel(names[id]); n != "" && n != pickerNameUnregistered {
 			continue
 		}
-		u, err := users.GetByID(id)
-		if err != nil || u == nil {
-			continue
-		}
-		names[id] = pickerDisplayName(*u)
+		names[id] = userDisplayName(users, id, names[id])
 	}
 	return names
 }

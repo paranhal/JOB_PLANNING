@@ -80,11 +80,7 @@ func (h *MaintenanceHandler) workGroupPicksForVisit(c echo.Context) ([]model.Wor
 					}
 				}
 				if name == "" || strings.HasPrefix(name, "USR-") || name == "담당자" {
-					if id := strings.TrimSpace(m.UserID); id != "" {
-						name = id
-					} else {
-						name = pickerNameUnregistered
-					}
+					name = pickerNameUnregistered
 				}
 				p.Members = append(p.Members, mntWorkGroupMemJSON{UserID: m.UserID, Name: name, Role: m.Role})
 				names = append(names, name)
@@ -275,16 +271,11 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 	var ownerName string
 	for i, id := range ids {
 		u := h.lookupAssignableUser(c, id)
-		name := id
+		name := ""
 		if u != nil {
-			name = strings.TrimSpace(u.FullName)
-			if name == "" {
-				name = u.Username
-			}
-		} else if h.userRepo != nil {
-			if got, _ := h.userRepo.GetByID(id); got != nil {
-				name = strings.TrimSpace(got.FullName)
-			}
+			name = pickerDisplayName(*u)
+		} else if n := resolvePersonLabel(h.userRepo, id, ""); n != "" {
+			name = n
 		}
 		role := model.WBMemberSupport
 		if id == ownerID || (ownerID == "" && i == 0) {

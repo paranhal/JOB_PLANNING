@@ -108,13 +108,26 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 		assets, _ = h.assetRepo.ListByCustomer(v.CustomerID)
 	}
 	embed := c.QueryParam("embed") == "1" || c.FormValue("embed") == "1"
+	stored := map[string]string{}
+	var extraIDs []string
+	for _, p := range v.People {
+		if id := strings.TrimSpace(p.UserID); id != "" {
+			stored[id] = p.AssigneeName
+			extraIDs = append(extraIDs, id)
+		}
+	}
+	if oid := visitOwnerUserID(*v); oid != "" {
+		stored[oid] = v.Assignee
+		extraIDs = append(extraIDs, oid)
+	}
+	assignees = ensurePickerUsersNamed(h.userRepo, assignees, stored, extraIDs...)
 	data := map[string]interface{}{
 		"Title":               "정기점검 조치 · " + name,
 		"Active":              workboardNavActive(back),
 		"Visit":               v,
 		"SiteName":            name,
 		"Assignees":           assignees,
-		"PickerNames":         pickerNamesMap(assignees),
+		"PickerNames":         overlayPickerStoredNames(h.userRepo, pickerNamesFor(h.userRepo, assignees, extraIDs...), stored),
 		"WorkGroups":          groups,
 		"WorkGroupMembers":    groupJSON,
 		"Projects":            projects,
@@ -136,6 +149,9 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 		"PeopleIDs":           visitPeopleIDsCSV(*v),
 		"GroupIDs":            visitGroupIDsCSV(*v),
 		"OwnerUserID":         visitOwnerUserID(*v),
+		"PickerUserIDs":       extraIDs,
+		"PickerOwnerID":       visitOwnerUserID(*v),
+		"DisplayAssignee":     userDisplayName(h.userRepo, visitOwnerUserID(*v), v.Assignee),
 		"CanPlanEdit":         false,
 		"PlanEditHref":        "",
 		"TargetSelected":      visitTargetSelected(v.Targets),
@@ -152,6 +168,16 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 			items, _ := h.wbRepo.ListItems(daily.TaskID)
 			data["WorkItems"] = items
 			attachWorkSegData(data, h.wbRepo, daily, errCode, mntVisitActionHref(*v), !canEditVisitAction(c, v.Completed))
+			pst, pen, _ := planClockOf(h.wbRepo, daily)
+			data["PlanStart"] = pst
+			data["PlanEnd"] = pen
+			if pst != "" {
+				if pen != "" {
+					data["PlanTimeLabel"] = pst + "~" + pen
+				} else {
+					data["PlanTimeLabel"] = pst
+				}
+			}
 		} else {
 			attachWorkSegData(data, h.wbRepo, nil, errCode, mntVisitActionHref(*v), !canEditVisitAction(c, v.Completed))
 		}

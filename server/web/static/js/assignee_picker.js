@@ -1,8 +1,4 @@
 (function () {
-  var el = document.getElementById("wb-work-groups");
-  if (el) {
-    try { window.assigneePickerGroups = JSON.parse(el.textContent || "[]"); } catch (e) {}
-  }
   function mergePickerNames(raw) {
     window.assigneePickerNames = window.assigneePickerNames || {};
     if (!raw) return;
@@ -16,8 +12,14 @@
       });
     } catch (e) {}
   }
-  var namesEl = document.getElementById('assignee-picker-names');
-  if (namesEl) mergePickerNames(namesEl.textContent);
+  function loadPickerSeeds() {
+    var el = document.getElementById("wb-work-groups");
+    if (el) {
+      try { window.assigneePickerGroups = JSON.parse(el.textContent || "[]"); } catch (e) {}
+    }
+    var namesEl = document.getElementById('assignee-picker-names');
+    if (namesEl) mergePickerNames(namesEl.textContent);
+  }
   window.mergeAssigneePickerNames = mergePickerNames;
   window.safePickerLabel = function (id, fallback) {
     var names = window.assigneePickerNames || {};
@@ -25,17 +27,33 @@
     if (n && String(n).indexOf('USR-') !== 0 && n !== '담당자') return n;
     n = fallback;
     if (n && String(n).indexOf('USR-') !== 0 && n !== '담당자') return n;
-    id = String(id || '').trim();
-    if (id) return id;
     return '이름 미등록';
   };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadPickerSeeds);
+  else loadPickerSeeds();
 })();
+
+window.assigneePickerInitialExtra = function (cfg) {
+  cfg = cfg || {};
+  var extra = {};
+  var ids = cfg.selectedIds || cfg.selected || [];
+  if (!Array.isArray(ids)) ids = [];
+  ids.forEach(function (id) {
+    id = String(id || '').trim();
+    if (id) extra[id] = true;
+  });
+  var owner = String(cfg.ownerId || '').trim();
+  if (owner) extra[owner] = true;
+  return extra;
+};
 
 window.assigneePicker = window.assigneePicker || function (cfg) {
   cfg = cfg || {};
+  var initialExtra = window.assigneePickerInitialExtra(cfg);
   return {
-    open: false, q: '', groups: {}, extra: {}, exclude: {}, expanded: {}, ownerId: '',
-    supportMin: {}, external: '',
+    open: false, q: '', groups: {}, extra: initialExtra, exclude: {}, expanded: {},
+    ownerId: String(cfg.ownerId || '').trim(),
+    supportMin: {}, external: String(cfg.external || '').trim(),
     target: cfg.target || 'add',
     mode: cfg.mode || 'multi',
     layout: cfg.layout || '',
@@ -123,8 +141,6 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
         const txt = lab ? String(lab.textContent || '').trim() : '';
         if (txt && txt.indexOf('USR-') !== 0 && txt !== '담당자') return txt;
       }
-      id = String(id || '').trim();
-      if (id) return id;
       return '이름 미등록';
     },
     leaveNames() {
@@ -144,7 +160,7 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
       const gids = this.selectedGroupIds();
       const ids = this.selectedIds();
       if (!ids.length && !gids.length && !this.external) return '— 선택 —';
-      if (this.external && !ids.length) return this.external;
+      if (this.external && this.external !== '담당자' && String(this.external).indexOf('USR-') !== 0 && !ids.length) return this.external;
       const extras = this.extraIds().filter((id) => !this.inSelectedGroups(id));
       if (gids.length === 1 && extras.length === 0 && this.excludeIds().length === 0) {
         return this.groupOf(gids[0]).name || '그룹';

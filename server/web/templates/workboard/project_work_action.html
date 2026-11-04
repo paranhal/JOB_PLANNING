@@ -79,7 +79,7 @@
           <span class="badge">읽기 전용</span>
         </div>
         <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-ui">
-          <div><p class="text-ui-sm text-ink-muted">처리담당자</p><p>{{if .Task.Assignee}}{{.Task.Assignee}}{{else}}—{{end}}</p></div>
+          <div><p class="text-ui-sm text-ink-muted">처리담당자</p><p>{{if .DisplayAssignee}}{{.DisplayAssignee}}{{else if .Task.Assignee}}{{.Task.Assignee}}{{else}}—{{end}}</p></div>
           <div><p class="text-ui-sm text-ink-muted">근무구분</p><p>{{if eq .Task.WorkPlace "office"}}내근{{else if eq .Task.WorkPlace "field"}}외근{{else}}—{{end}}</p></div>
           <div><p class="text-ui-sm text-ink-muted">결과</p><p>{{.StatusLabel}}</p></div>
           <div class="sm:col-span-2"><p class="text-ui-sm text-ink-muted">조치내용</p><p class="whitespace-pre-line">{{if .Task.ActionTaken}}{{.Task.ActionTaken}}{{else}}—{{end}}</p></div>
@@ -548,7 +548,7 @@
         </dd>
       </div>
       <div><dt class="text-ui-sm text-ink-muted">작업 일정</dt><dd>{{.Task.WorkDate}} {{.Task.StartTime}}–{{.Task.EndTime}}</dd></div>
-      <div><dt class="text-ui-sm text-ink-muted">담당자</dt><dd>{{.Task.Assignee}}</dd></div>
+      <div><dt class="text-ui-sm text-ink-muted">담당자</dt><dd>{{if .DisplayAssignee}}{{.DisplayAssignee}}{{else}}{{.Task.Assignee}}{{end}}</dd></div>
       <div><dt class="text-ui-sm text-ink-muted">참여자</dt><dd>{{range $i, $m := .Members}}{{if $i}}, {{end}}{{$m.Assignee}}{{else}}—{{end}}</dd></div>
       {{if .Task.WorkGroupName}}<div><dt class="text-ui-sm text-ink-muted">업무 그룹</dt><dd>그룹: {{.Task.WorkGroupName}}</dd></div>{{end}}
     </dl>

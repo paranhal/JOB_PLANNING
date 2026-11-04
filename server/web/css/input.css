@@ -91,6 +91,47 @@
 
   .menu { @apply rounded-control border border-line bg-surface py-1 shadow-pop; }
   .menu-item { @apply flex items-center gap-2 px-3 py-1.5 text-ui text-ink hover:bg-hover; }
+  .ui-dd { @apply relative inline-block max-w-full; }
+  .ui-dd-btn { @apply btn btn-secondary btn-sm min-h-[44px] gap-1.5; }
+  .ui-dd-kicker { @apply text-ui-xs font-medium text-ink-muted; }
+  .ui-dd-current { @apply text-ui font-semibold text-ink; }
+  .ui-dd-caret { @apply text-ink-muted; }
+  .ui-dd-menu { @apply menu absolute left-0 z-30 mt-1 min-w-[12rem] max-w-xs; }
+  .ui-dd-item { @apply menu-item min-h-[44px] flex-col items-start no-underline; }
+  .ui-dd-item.is-on { @apply bg-selected; }
+  .ui-dd-item-main { @apply flex items-center gap-1.5; }
+  .ui-dd-check { @apply text-primary; }
+  .ui-dd-hint { @apply text-ui-xs text-ink-muted; }
+  .pf { @apply relative inline-block max-w-full; }
+  .pf-btn { @apply btn btn-secondary btn-sm min-h-[44px] max-w-[22rem] gap-1.5; }
+  .pf-btn.is-on { @apply border-primary bg-primary-soft; }
+  .pf-kicker { @apply text-ui-xs font-medium text-ink-muted; }
+  .pf-current { @apply inline-flex min-w-0 max-w-[15rem] items-center gap-1 overflow-hidden text-ui font-semibold text-ink; }
+  .pf-caret { @apply text-ink-muted; }
+  .pf-panel { @apply absolute left-0 z-30 mt-1 w-[23.75rem] max-w-[calc(100vw-1.5rem)] overflow-x-hidden overflow-y-auto rounded-card border border-line bg-surface shadow-pop; max-height: min(70vh, 32rem); }
+  .pf-search { @apply border-b border-line p-2.5; }
+  .pf-sech { @apply flex items-center justify-between px-3 py-1 text-ui-xs font-bold text-success; }
+  .pf-sech small { @apply font-medium text-ink-muted; }
+  .pf-sec { @apply max-h-60 overflow-y-auto overflow-x-hidden py-1; }
+  .pf-it { @apply flex w-full min-h-[44px] items-center gap-1.5 px-3 py-1.5 text-left text-ui text-ink hover:bg-hover; }
+  .pf-it.is-on { @apply bg-selected; }
+  .pf-chk { @apply w-4 shrink-0 font-bold text-primary; }
+  .pf-nm { @apply min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap; }
+  .pf-org { @apply shrink-0 rounded-control bg-hover px-1.5 py-0.5 text-[11px] font-bold text-ink-muted; }
+  .pf-org.is-rel { @apply bg-primary-soft text-primary; }
+  .pf-foot { @apply border-t border-line bg-canvas p-2.5; }
+  .pf-more { @apply btn btn-secondary min-h-[44px] w-full border-dashed font-semibold; }
+  .pf-hint { @apply mt-2 rounded-control bg-warning-soft px-2.5 py-2 text-ui-sm text-warning; }
+  .pf-other { @apply border-t border-line bg-canvas; }
+  .pf-obox { @apply m-2.5 overflow-hidden rounded-card border border-line bg-surface; }
+  .pf-oh { @apply flex items-center justify-between bg-hover px-3 py-2 text-ui-xs font-bold text-ink; }
+  .pf-ox { @apply cursor-pointer font-semibold text-primary; }
+  .pf-gh { @apply flex cursor-pointer items-center justify-between bg-canvas px-3 py-2 text-ui-sm font-semibold text-ink; }
+  .pf-gl { @apply max-h-36 overflow-y-auto overflow-x-hidden; }
+  .pf-empty { @apply px-3 py-3.5 text-ink-muted; }
+  @media (max-width: 400px) {
+    .pf-panel { @apply fixed bottom-0 left-0 right-0 top-auto z-40 mt-0 w-full max-w-none overflow-y-auto rounded-b-none; max-height: 80vh; }
+  }
   .combobox { @apply relative; }
   .combobox-list { @apply menu absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-auto; }
   .combobox-option-on { @apply bg-hover; }
@@ -224,6 +265,17 @@
   .mnt-cal-selected { @apply bg-selected ring-1 ring-inset ring-line-strong; }
   .mnt-cal-other { @apply opacity-50; }
   .mnt-cal-num-today { @apply inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-ink px-1 text-[11px] font-semibold text-primary-fg; }
+  .mnt-cal-main { @apply min-w-0 flex-1 overflow-hidden; }
+  @media (min-width: 1024px) {
+    .mnt-cal-main { min-width: 560px; }
+  }
+  .mnt-cal-chip-locked { @apply cursor-not-allowed; }
+  .mnt-cal-cell [draggable="true"] { @apply cursor-grab; }
+  .mnt-cal-drop { @apply bg-selected ring-1 ring-inset ring-line-strong; }
+  .mnt-cal-splitter { @apply w-1.5 shrink-0 cursor-col-resize self-stretch bg-line; }
+  .mnt-cal-splitter:hover, .mnt-cal-splitter:focus { @apply w-2 bg-line-strong outline-none; }
+  .mnt-cal-dnd-err { @apply mt-2 text-ui-sm text-danger; }
+  .mnt-cal-toast { @apply pointer-events-auto rounded-control border border-line bg-surface px-3 py-2 text-ui-sm text-ink shadow-pop; }
   .mnt-panel-bar { @apply w-1 shrink-0 self-stretch rounded-full; }
   .mnt-panel-bar-done { @apply mnt-panel-bar bg-ink-muted; }
   .mnt-panel-bar-planned { @apply mnt-panel-bar bg-line-strong; }

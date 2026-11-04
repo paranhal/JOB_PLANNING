@@ -25,6 +25,21 @@ type workSegRow struct {
 	Label      string
 }
 
+func planClockOf(repo *repository.WBRepo, t *model.WorkTask) (start, end string, n int) {
+	if t == nil {
+		return "", "", 0
+	}
+	if repo != nil {
+		if stored, err := repo.CountStoredPlanSegments(t.TaskID); err == nil {
+			n = stored
+		}
+		segs, _ := repo.ListPlanSegmentsOrVirtual(*t)
+		st, en, _ := model.EnvelopeFromPlanSegments(segs)
+		return model.ClockHHMM(st), model.ClockHHMM(en), n
+	}
+	return model.ClockHHMM(t.StartTime), model.ClockHHMM(t.EndTime), 0
+}
+
 func buildWorkSegRows(repo *repository.WBRepo, t *model.WorkTask) ([]workSegRow, int) {
 	if t == nil || repo == nil {
 		return nil, 0

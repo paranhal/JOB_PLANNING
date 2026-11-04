@@ -1,8 +1,8 @@
 {{define "assignee_picker"}}
 {{$fn := or .FieldName "assignee_user_id"}}
 <div class="relative w-full min-w-0" data-assignee-picker="1" data-mnt-assignee-multi="1" data-focus-target="assignee" tabindex="0"
-     x-data="assigneePicker({target:'{{if .Target}}{{.Target}}{{else}}add{{end}}', mode:'{{if .Mode}}{{.Mode}}{{else}}multi{{end}}', layout: {{toJSON .Layout}}, fieldName: {{toJSON $fn}}, allowExternal: {{if .AllowExternal}}true{{else}}false{{end}}, allowGroups: {{if eq .AllowGroups false}}false{{else}}true{{end}}, groups: {{if .OrgGroups}}{{toJSON .OrgGroups}}{{else}}null{{end}}})"
-     x-init="seedFromParent(); {{range .SelectedIDs}}togglePerson({{toJSON .}}, true); {{end}}"
+     x-data="assigneePicker({target:'{{if .Target}}{{.Target}}{{else}}add{{end}}', mode:'{{if .Mode}}{{.Mode}}{{else}}multi{{end}}', layout: {{toJSON .Layout}}, fieldName: {{toJSON $fn}}, allowExternal: {{if .AllowExternal}}true{{else}}false{{end}}, allowGroups: {{if eq .AllowGroups false}}false{{else}}true{{end}}, groups: {{if .OrgGroups}}{{toJSON .OrgGroups}}{{else}}null{{end}}, ownerId: {{toJSON .OwnerID}}, selectedIds: {{toJSON .SelectedIDs}}, external: {{toJSON .ExternalName}}})"
+     x-init="seedFromParent(); syncAssignedHidden(); {{range .SelectedIDs}}if(!personOn({{toJSON .}})) togglePerson({{toJSON .}}, true); {{end}}"
      @mnt-picker-hydrate.window="hydrateFrom($event.detail)"
      @assignee-picker-hydrate.window="hydrateFrom($event.detail)"
      @keydown.escape.window="if(open){ open=false }">
@@ -35,7 +35,7 @@
   <label class="block text-sm font-medium text-ink mb-1">{{if .Label}}{{.Label}}{{else}}담당자{{end}}{{if .Required}} <span class="text-danger">*</span>{{end}}</label>
   <button type="button" class="btn-secondary w-full text-left text-xs justify-between"
           @click="open=!open">
-    <span class="truncate" x-text="summaryLabel()"></span>
+    <span class="truncate" x-text="summaryLabel()">{{pickerButtonLabel .PickerNames .OwnerID .SelectedIDs .ExternalName}}</span>
     <span class="text-ink-subtle shrink-0">▾</span>
   </button>
   <div class="flex flex-wrap gap-1 mt-1" x-show="isOrgLayout() && selectedIds().length" x-cloak>
@@ -149,7 +149,7 @@
 {{end}}
 
 {{define "wb_assignee_picker"}}
-{{template "assignee_picker" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "wb" "Required" .AssigneeRequired "Label" "담당자" "SelectedIDs" .PickerUserIDs "OwnerID" .PickerOwnerID "PickerNames" .PickerNames}}
+{{template "assignee_picker" dict "Assignees" .Assignees "WorkGroups" .WorkGroups "Target" "wb" "Required" .AssigneeRequired "Label" "담당자" "SelectedIDs" .PickerUserIDs "OwnerID" .PickerOwnerID "PickerNames" .PickerNames "ExternalName" .DisplayAssignee}}
 {{end}}
 
 {{define "wb_multi_site_mode"}}
