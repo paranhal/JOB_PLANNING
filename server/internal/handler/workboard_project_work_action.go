@@ -256,6 +256,19 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	attachWorkItemView(data, h, t, readOnly)
 	attachWorkSegData(data, h.repo, t, errCode, projectWorkActionPath(t.TaskID), readOnly)
 	attachLiveWorkData(data, h, c, t)
+	if v, ok := c.Get("pw_action_err").(string); ok && v != "" {
+		overlayProjectWorkActionDraft(c, t)
+		overlaySupportDraft(c, listAssignableForPicker(h.userRepo, c))
+		if draft, ok := c.Get("pw_parts_rows").([]model.ASPartUsed); ok {
+			data["PartRows"] = draft
+		}
+		if en, ok := c.Get("pw_parts_enabled").(bool); ok {
+			data["PartsEnabled"] = en
+		}
+		if cl, ok := c.Get("pw_complete_local").(string); ok {
+			data["CompleteLocal"] = cl
+		}
+	}
 	deps, _ := h.repo.ListDepartures(t.TaskID)
 	data["Departures"] = deps
 	startLocal := defaultActionStartLocal(t, now)
