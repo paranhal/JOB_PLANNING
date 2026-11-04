@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>95-105 save block diag (pre-fix)</title>
+<div data-as-draft-notice="1">조치 세트 1건이 임시 저장되어 있습니다. 이 안내는 오류가 아닙니다.</div>
+<form id="as-action-form" action="/as/AS1/update" method="post">
+  <div id="as-action-sets">
+    <div class="as-action-set" data-action-set="1" data-open="1">
+      <div class="as-set-head"><b>조치 1</b></div>
+      <div class="as-set-body">
+        <select class="as-set-ptype" name="s1_process_type">
+          <option value="">선택</option>
+          <option value="remote" selected>원격</option>
+        </select>
+        <input class="as-set-work-date" name="s1_work_date" type="date" value="2026-11-03">
+        <textarea class="as-set-text" name="s1_action_taken">원격으로 재기동 후 정상입니다</textarea>
+        <select class="as-set-result" name="s1_result_code">
+          <option value="">선택하세요</option>
+          <option value="done" selected>완료</option>
+        </select>
+        <label><input type="radio" class="as-set-place" name="s1_work_place" value="office" checked>내근</label>
+      </div>
+    </div>
+  </div>
+  <textarea name="action_taken" id="as-action-taken" class="hidden"></textarea>
+  <input type="checkbox" name="action_na" value="1" class="hidden" id="as-action-na">
+  <input type="hidden" name="action_short_ok" id="as-action-short-ok" value="">
+  <select name="result_code" id="as-result-code"><option value=""></option><option value="done">완료</option></select>
+  <input type="hidden" id="as-process-type" name="process_type" value="">
+  <input type="hidden" id="as-visit-date" name="visit_date" value="">
+  <input type="hidden" id="as-work-place-mirror" value="">
+</form>
+<footer><button type="submit" form="as-action-form" class="btn-primary" id="as-save">저장</button></footer>
+<script src="./as_action_sets.js"></script>
+<script>
+(function actionContentHint(){
+  var form = document.getElementById('as-action-form');
+  var ta = document.getElementById('as-action-taken');
+  var na = document.getElementById('as-action-na');
+  var shortOk = document.getElementById('as-action-short-ok');
+  if (!form || !ta) return;
+  function runeLen(s){ return Array.from(String(s || '').trim()).length; }
+  function syncNA(){
+    if (!na) return;
+    var on = na.checked;
+    ta.required = !on;
+  }
+  if (na) { na.addEventListener('change', syncNA); syncNA(); }
+  form.addEventListener('submit', function(e){
+    if (na && na.checked) return;
+    if (shortOk && shortOk.value === '1') return;
+    if (runeLen(ta.value) >= 10) return;
+    e.preventDefault();
+    if (confirm('조금 더 적어 주시겠습니까?')) return;
+    if (shortOk) shortOk.value = '1';
+    form.submit();
+  });
+})();
+</script>
