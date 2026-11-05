@@ -209,6 +209,12 @@
           <option value="{{index . 0}}" {{if eq $.Quote.RoundRule (index . 0)}}selected{{end}}>{{index . 1}}</option>
           {{end}}
         </select>
+        <label class="block text-sm font-medium text-gray-700 mb-1 mt-2">적용 위치</label>
+        <select class="border rounded-lg px-3 py-2 text-sm bg-white" x-model="cutScope" :disabled="round==='none'">
+          <option value="total">총액</option>
+          <option value="item">품목별</option>
+        </select>
+        <input type="hidden" name="cut_scope" :value="cutScope">
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="isLabor() && (num(overhead)||num(tech))">
@@ -364,7 +370,7 @@
       <div class="sm:col-span-3">
         <p class="text-xs text-gray-500">합계 <span x-text="vat==='included' ? '(VAT포함)' : '(VAT미포함)'"></span></p>
         <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().total)+'원'"></p>
-        <p class="text-xs text-gray-500 mt-1" x-show="totals().before !== totals().total" x-text="'(' + (round==='hundred' ? '100원 단위 절사' : (round==='thousand' ? '1,000원 단위 절사' : '절사 없음')) + ' · 절사 전 '+fmt(totals().before)+')'"></p>
+        <p class="text-xs text-gray-500 mt-1" x-show="totals().before !== totals().total" x-text="'(' + cutHint() + ' · 절사 전 '+fmt(totals().before)+')'"></p>
       </div>
     </div>
     </details>
@@ -477,6 +483,7 @@ document.addEventListener('alpine:init', () => {
     return {
     vat: init.vat || 'excluded',
     round: init.round || 'none',
+    cutScope: init.cutScope || 'total',
     formType: init.formType || 'A',
     quoteKind: init.quoteKind || 'maint_service',
     purpose: init.purpose || 'deal',
@@ -583,26 +590,38 @@ document.addEventListener('alpine:init', () => {
       return v<=0 ? 0 : Math.floor(v);
     },
     roundN(n){
-      const u = this.round==='hundred' ? 100 : (this.round==='thousand' ? 1000 : 1);
+      const u = this.round==='hundred' ? 100 : (this.round==='thousand' ? 1000 : (this.round==='man' ? 10000 : 1));
       if(u<=1) return n;
       if(n<0) return -this.roundN(-n);
       return Math.floor(n/u)*u;
     },
+    cutHint(){
+      const w = this.round==='hundred' ? '백' : (this.round==='thousand' ? '천' : (this.round==='man' ? '만' : ''));
+      if(!w) return '절사 없음';
+      return w+' 단위 · '+(this.cutScope==='item'?'품목별':'총액')+' 기준';
+    },
     totals(){
+      let raw=0;
+      this.lines.forEach(ln => { raw += this.lineAmt(ln); });
       let sum=0;
-      this.lines.forEach(ln => { sum += this.lineAmt(ln); });
+      if(this.cutScope==='item' && this.round!=='none'){
+        this.lines.forEach(ln => { sum += this.roundN(this.lineAmt(ln)); });
+      } else { sum = raw; }
       let direct=sum, overhead=0, tech=0;
       if(this.isLabor()){
         const ohPct=this.num(this.overhead), techPct=this.num(this.tech);
         overhead = Math.floor(direct * ohPct / 100);
         tech = Math.floor((direct+overhead) * techPct / 100);
         sum = direct + overhead + tech;
+        raw = sum;
       }
       if(this.vat==='included'){
-        const before=sum, total=this.roundN(sum), supply=Math.floor(total/1.1), vat=total-supply;
-        return {sum, supply, vat, total, before, direct, overhead, tech};
+        const total = (this.cutScope==='item' && this.round!=='none') ? sum : this.roundN(sum);
+        const supply=Math.floor(total/1.1), vat=total-supply;
+        return {sum, supply, vat, total, before:raw, direct, overhead, tech};
       }
-      const supply=sum, vat=Math.floor(sum/10), before=supply+vat, total=this.roundN(before);
+      const supply=sum, vat=Math.floor(sum/10), before=supply+vat;
+      const total = (this.cutScope==='item' && this.round!=='none') ? before : this.roundN(before);
       return {sum, supply, vat, total, before, direct, overhead, tech};
     },
     fmt(n){
@@ -663,6 +682,7 @@ document.addEventListener('alpine:init', () => {
       const body = new FormData(form);
       body.set('vat_mode', this.vat);
       body.set('round_rule', this.round);
+      body.set('cut_scope', this.cutScope);
       this.previewMsg='';
       try {
         const r=await fetch('/quotes/preview',{method:'POST',headers:{'Accept':'application/json'},body});

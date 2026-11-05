@@ -214,13 +214,22 @@ func (h *ItemsHandler) QuoteLine(c echo.Context) error {
 		}
 		it = got
 	} else if name != "" {
-		if got, err := h.repo.FindByName(name); err == nil {
+		if got, err := h.repo.FindByNameSpec(name, spec); err == nil && got != nil {
 			it = got
+		} else if spec == "" {
+			if got, err := h.repo.FindByName(name); err == nil {
+				it = got
+			}
 		}
 	}
 
 	if it != nil {
 		_ = h.repo.LoadCatalog(it)
+		if register {
+			return c.JSON(http.StatusOK, map[string]interface{}{
+				"ok": false, "duplicate": true, "error": "이미 등록된 품목", "item": salesItemAPI(it),
+			})
+		}
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"ok": true, "ask_register": false, "item": salesItemAPI(it),
 		})

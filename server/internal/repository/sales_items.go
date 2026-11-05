@@ -101,6 +101,30 @@ func (r *SalesItemRepo) FindByName(name string) (*model.SalesItem, error) {
 	return scanSalesItem(row)
 }
 
+func (r *SalesItemRepo) FindByNameSpec(name, spec string) (*model.SalesItem, error) {
+	name = strings.TrimSpace(name)
+	spec = strings.TrimSpace(spec)
+	if name == "" {
+		return nil, sql.ErrNoRows
+	}
+	row := r.db.QueryRow(salesItemSelect+`
+		WHERE lower(i.name)=lower(?) AND lower(trim(COALESCE(i.spec,'')))=lower(?)
+		ORDER BY COALESCE(i.is_active,0) DESC, i.item_id LIMIT 1`, name, spec)
+	it, err := scanSalesItem(row)
+	if err == nil {
+		return it, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+	row = r.db.QueryRow(salesItemSelect+`
+		WHERE lower(i.name)=lower(?) AND EXISTS (
+			SELECT 1 FROM sales_item_specs sp WHERE sp.item_id=i.item_id AND lower(trim(COALESCE(sp.spec,'')))=lower(?)
+		)
+		ORDER BY COALESCE(i.is_active,0) DESC, i.item_id LIMIT 1`, name, spec)
+	return scanSalesItem(row)
+}
+
 func (r *SalesItemRepo) Suggest(q string, limit int) ([]model.SalesItem, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20

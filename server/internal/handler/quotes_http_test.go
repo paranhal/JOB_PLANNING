@@ -52,6 +52,7 @@ func newQuoteServerDB(t *testing.T) (*echo.Echo, *repository.QuoteRepo, *sql.DB)
 	g.POST("/quotes/:id/revise", h.Quotes.Revise)
 	g.POST("/quotes/:id/order", h.Orders.FromQuote)
 	g.POST("/quotes/:id/status", h.Quotes.SetStatus)
+	g.POST("/quotes/:id/mark-sent", h.Quotes.MarkSent)
 	g.POST("/quotes/:id/delete", h.Quotes.Delete)
 	g.GET("/quotes/:id/xlsx", h.Quotes.Download)
 	g.GET("/labor-rates", h.Quotes.LaborRates)
@@ -135,6 +136,9 @@ func TestQuotesHTTP_CreateElevenLinesAndFormGuards(t *testing.T) {
 	}
 	if !strings.Contains(body, "담당자") || !strings.Contains(body, "연락처") {
 		t.Fatal("담당자·연락처가 없다")
+	}
+	if !strings.Contains(body, "적용 위치") || !strings.Contains(body, "만 (10,000원)") {
+		t.Fatal("절사 위치·만 단위가 없다")
 	}
 
 	names := make([]string, 11)
@@ -294,10 +298,11 @@ func TestQuotesHTTP_VATIncluded5700000AndRoundHundred(t *testing.T) {
 		t.Fatalf("100원 절사 합계=%d", q2.Total)
 	}
 	show = doGet(t, e, "/quotes/"+id2)
-	if !strings.Contains(show.Body.String(), "100원 단위 절사") {
+	sb2 := show.Body.String()
+	if !strings.Contains(sb2, "백 단위") && !strings.Contains(sb2, "100원 단위 절사") {
 		t.Fatal("절사 라벨이 없다")
 	}
-	if strings.Contains(show.Body.String(), "1,000원 단위 절사") {
+	if strings.Contains(sb2, "천 단위") && !strings.Contains(sb2, "백 단위") {
 		t.Fatal("100원 절사인데 천원 라벨이 있다")
 	}
 }

@@ -14,6 +14,10 @@ const (
 	QuoteRoundNone     = "none"
 	QuoteRoundHundred  = "hundred"
 	QuoteRoundThousand = "thousand"
+	QuoteRoundMan      = "man"
+
+	QuoteCutTotal = "total"
+	QuoteCutItem  = "item"
 
 	QuoteFormA  = "A"
 	QuoteFormA2 = "A2"
@@ -54,6 +58,8 @@ var (
 	ErrQuoteDeleteNotDraft = fmt.Errorf("발송된 견적은 지울 수 없습니다. 「취소」로 바꾸세요.")
 	ErrQuoteDeleteHasRev   = fmt.Errorf("개정본이 있는 견적은 지울 수 없습니다.")
 	ErrQuoteDeleteHasOrder = fmt.Errorf("수주로 이어진 견적은 지울 수 없습니다.")
+	ErrQuoteNotDownloaded  = fmt.Errorf("견적서를 받은 뒤에 발송 처리할 수 있습니다")
+	ErrQuoteAlreadySent    = fmt.Errorf("이미 발송으로 처리된 견적입니다")
 )
 
 type SalesQuote struct {
@@ -77,6 +83,11 @@ type SalesQuote struct {
 	PaymentText    string
 	VATMode        string
 	RoundRule      string
+	CutScope       string
+	AttnPhone      string
+	AttnEmail      string
+	DownloadedAt   string
+	SentAt         string
 	Subtotal       int
 	VAT            int
 	Total          int
@@ -131,6 +142,8 @@ type QuoteTotals struct {
 	Total            int
 	TotalBeforeRound int
 	RoundRule        string
+	CutScope         string
+	CutAmount        int
 	Direct           int
 	Overhead         int
 	TechFee          int
@@ -232,13 +245,42 @@ func LaborAddons(direct int, overheadPct, techPct float64) LaborAddon {
 }
 
 func ComputeQuoteTotals(lines []SalesQuoteLine, vatMode, roundRule string) QuoteTotals {
-	return ComputeQuoteTotalsFromBase(sumLineAmount(lines), vatMode, roundRule)
+	return ComputeQuoteTotalsScoped(lines, vatMode, roundRule, QuoteCutTotal)
+}
+
+func ComputeQuoteTotalsScoped(lines []SalesQuoteLine, vatMode, roundRule, cutScope string) QuoteTotals {
+	roundRule = NormalizeRoundRule(roundRule)
+	cutScope = NormalizeCutScope(cutScope)
+	if cutScope == QuoteCutItem && RoundRuleUnit(roundRule) > 1 {
+		raw := sumLineAmount(lines)
+		sum := 0
+		for _, ln := range lines {
+			sum += ApplyRoundRule(LineAmount(ln), roundRule)
+		}
+		tot := ComputeQuoteTotalsFromBase(sum, vatMode, QuoteRoundNone)
+		tot.RoundRule = roundRule
+		tot.CutScope = QuoteCutItem
+		tot.CutAmount = raw - sum
+		if vatMode == QuoteVATIncluded {
+			tot.TotalBeforeRound = raw
+			tot.CutAmount = raw - tot.Total
+		} else {
+			tot.TotalBeforeRound = raw + raw/10
+		}
+		return tot
+	}
+	tot := ComputeQuoteTotalsFromBase(sumLineAmount(lines), vatMode, roundRule)
+	tot.CutScope = QuoteCutTotal
+	if tot.TotalBeforeRound > tot.Total {
+		tot.CutAmount = tot.TotalBeforeRound - tot.Total
+	}
+	return tot
 }
 
 func ComputeQuoteTotalsFromBase(sum int, vatMode, roundRule string) QuoteTotals {
 	vatMode = NormalizeVATMode(vatMode)
 	roundRule = NormalizeRoundRule(roundRule)
-	tot := QuoteTotals{LineSum: sum, Direct: sum, RoundRule: roundRule}
+	tot := QuoteTotals{LineSum: sum, Direct: sum, RoundRule: roundRule, CutScope: QuoteCutTotal}
 	if vatMode == QuoteVATIncluded {
 		tot.TotalBeforeRound = sum
 		tot.Total = ApplyRoundRule(sum, roundRule)
@@ -246,12 +288,18 @@ func ComputeQuoteTotalsFromBase(sum int, vatMode, roundRule string) QuoteTotals 
 			tot.Supply = int(float64(tot.Total) / 1.1)
 		}
 		tot.VAT = tot.Total - tot.Supply
+		if tot.TotalBeforeRound > tot.Total {
+			tot.CutAmount = tot.TotalBeforeRound - tot.Total
+		}
 		return tot
 	}
 	tot.Supply = sum
 	tot.VAT = sum / 10
 	tot.TotalBeforeRound = tot.Supply + tot.VAT
 	tot.Total = ApplyRoundRule(tot.TotalBeforeRound, roundRule)
+	if tot.TotalBeforeRound > tot.Total {
+		tot.CutAmount = tot.TotalBeforeRound - tot.Total
+	}
 	return tot
 }
 
@@ -263,14 +311,27 @@ func (q *SalesQuote) Totals() QuoteTotals {
 	direct := sumLineAmount(lines)
 	if QuoteFormIsLabor(q.FormType) {
 		add := LaborAddons(direct, q.OverheadRate, q.TechFeeRate)
+		if NormalizeCutScope(q.CutScope) == QuoteCutItem && RoundRuleUnit(q.RoundRule) > 1 {
+			rounded := ApplyRoundRule(add.Subtotal, q.RoundRule)
+			tot := ComputeQuoteTotalsFromBase(rounded, q.VATMode, QuoteRoundNone)
+			tot.RoundRule = NormalizeRoundRule(q.RoundRule)
+			tot.CutScope = QuoteCutItem
+			tot.CutAmount = add.Subtotal - rounded
+			tot.LineSum = rounded
+			tot.Direct = add.Direct
+			tot.Overhead = add.Overhead
+			tot.TechFee = add.TechFee
+			return tot
+		}
 		tot := ComputeQuoteTotalsFromBase(add.Subtotal, q.VATMode, q.RoundRule)
 		tot.LineSum = add.Subtotal
 		tot.Direct = add.Direct
 		tot.Overhead = add.Overhead
 		tot.TechFee = add.TechFee
+		tot.CutScope = NormalizeCutScope(q.CutScope)
 		return tot
 	}
-	return ComputeQuoteTotals(lines, q.VATMode, q.RoundRule)
+	return ComputeQuoteTotalsScoped(lines, q.VATMode, q.RoundRule, q.CutScope)
 }
 
 func ApplyQuoteTotals(q *SalesQuote, lines []SalesQuoteLine) error {
@@ -278,8 +339,14 @@ func ApplyQuoteTotals(q *SalesQuote, lines []SalesQuoteLine) error {
 		return fmt.Errorf("견적이 필요합니다")
 	}
 	q.Lines = PrepareQuoteLines(lines)
+	q.CutScope = NormalizeCutScope(q.CutScope)
+	q.RoundRule = NormalizeRoundRule(q.RoundRule)
 	tot := q.Totals()
-	q.Subtotal = tot.LineSum
+	q.Subtotal = sumLineAmount(q.Lines)
+	if QuoteFormIsLabor(q.FormType) {
+		add := LaborAddons(q.Subtotal, q.OverheadRate, q.TechFeeRate)
+		q.Subtotal = add.Subtotal
+	}
 	q.VAT = tot.VAT
 	q.Total = tot.Total
 	return nil
@@ -315,6 +382,8 @@ func RoundRuleUnit(rule string) int {
 		return 100
 	case QuoteRoundThousand:
 		return 1000
+	case QuoteRoundMan:
+		return 10000
 	default:
 		return 1
 	}
@@ -326,8 +395,23 @@ func RoundRuleLabel(rule string) string {
 		return "100원 단위 절사"
 	case QuoteRoundThousand:
 		return "1,000원 단위 절사"
+	case QuoteRoundMan:
+		return "10,000원 단위 절사"
 	default:
 		return "절사 없음"
+	}
+}
+
+func RoundRuleUnitWord(rule string) string {
+	switch NormalizeRoundRule(rule) {
+	case QuoteRoundHundred:
+		return "백"
+	case QuoteRoundThousand:
+		return "천"
+	case QuoteRoundMan:
+		return "만"
+	default:
+		return "원"
 	}
 }
 
@@ -337,9 +421,59 @@ func NormalizeRoundRule(s string) string {
 		return QuoteRoundHundred
 	case QuoteRoundThousand, "1000", "1,000":
 		return QuoteRoundThousand
+	case QuoteRoundMan, "10000", "10,000":
+		return QuoteRoundMan
 	default:
 		return QuoteRoundNone
 	}
+}
+
+func NormalizeCutScope(s string) string {
+	if strings.TrimSpace(s) == QuoteCutItem {
+		return QuoteCutItem
+	}
+	return QuoteCutTotal
+}
+
+func QuoteRoundOptions() [][]string {
+	return [][]string{
+		{QuoteRoundNone, "원 (절사 없음)"},
+		{QuoteRoundHundred, "백 (100원)"},
+		{QuoteRoundThousand, "천 (1,000원)"},
+		{QuoteRoundMan, "만 (10,000원)"},
+	}
+}
+
+func QuoteCutDisplay(rule, scope string, cut int) string {
+	rule = NormalizeRoundRule(rule)
+	if rule == QuoteRoundNone {
+		return ""
+	}
+	loc := "총액"
+	if NormalizeCutScope(scope) == QuoteCutItem {
+		loc = "품목별"
+	}
+	return fmt.Sprintf("절사: %s 단위 · %s 기준 · 절사액 %s원", RoundRuleUnitWord(rule), loc, formatQuoteCutWon(cut))
+}
+
+func formatQuoteCutWon(n int) string {
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	s := fmt.Sprintf("%d", n)
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(r)
+	}
+	out := b.String()
+	if neg {
+		return "-" + out
+	}
+	return out
 }
 
 func NormalizeVATMode(s string) string {

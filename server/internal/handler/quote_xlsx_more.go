@@ -255,7 +255,11 @@ func FillQuoteFormB1(q *model.SalesQuote, company model.QuoteCompany) ([]byte, e
 	}
 	_ = f.SetCellInt(sheet, fmt.Sprintf("K%d", 24+shift), tot.Supply)
 	_ = f.SetCellInt(sheet, fmt.Sprintf("K%d", 25+shift), tot.Total)
-	_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", 26+shift), model.RoundRuleLabel(q.RoundRule))
+	cut := model.QuoteCutDisplay(q.RoundRule, q.CutScope, tot.CutAmount)
+	if cut == "" {
+		cut = model.RoundRuleLabel(q.RoundRule)
+	}
+	_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", 26+shift), cut)
 	setPrintArea(f, sheet, fmt.Sprintf("$A$1:$K$%d", 28+shift))
 	_ = company
 	return writeWorkbook(f)
@@ -332,7 +336,11 @@ func FillQuoteFormB2(q *model.SalesQuote, company model.QuoteCompany) ([]byte, e
 	row++
 	_ = f.SetCellValue(sheet, fmt.Sprintf("J%d", row), "합계")
 	_ = f.SetCellInt(sheet, fmt.Sprintf("K%d", row), tot.Total)
-	_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", row+2), model.RoundRuleLabel(q.RoundRule))
+	cutB := model.QuoteCutDisplay(q.RoundRule, q.CutScope, tot.CutAmount)
+	if cutB == "" {
+		cutB = model.RoundRuleLabel(q.RoundRule)
+	}
+	_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", row+2), cutB)
 	setPrintArea(f, sheet, fmt.Sprintf("$A$1:$L$%d", row+4))
 	_ = company
 	return writeWorkbook(f)

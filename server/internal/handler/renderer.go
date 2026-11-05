@@ -904,6 +904,7 @@ func funcMap() template.FuncMap {
 		"quoteStatusLabel":    model.QuoteStatusLabel,
 		"vatModeLabel":        model.VATModeLabel,
 		"roundRuleLabel":      model.RoundRuleLabel,
+		"quoteCutLabel":       model.QuoteCutDisplay,
 		"quotePurposeLabel":   model.QuotePurposeLabel,
 		"quotePurposeClass":   model.QuotePurposeBadgeClass,
 		"quoteFormLabel":      model.QuoteFormLabel,

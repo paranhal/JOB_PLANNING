@@ -161,6 +161,17 @@ func NextCustomerID(db *sql.DB, mainPhone string) (string, error) {
 	return fmt.Sprintf("C%s-%s-%s", area, yy, fmtSeq3(n)), nil
 }
 
+func nextCustomerIDTx(tx *sql.Tx, mainPhone string) (string, error) {
+	area := ExtractAreaCode(mainPhone)
+	yy := time.Now().Format("06")
+	key := fmt.Sprintf("customer:%s:%s", area, yy)
+	n, err := nextSeqTx(tx, key)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("C%s-%s-%s", area, yy, fmtSeq3(n)), nil
+}
+
 // NextAssetID 설치자산: A{모델코드}{구분}-{NNN}
 func NextAssetID(db *sql.DB, modelName, productName, productType, manufacturer string) (string, error) {
 	model := NormalizeModelCode(modelName, productName, manufacturer)

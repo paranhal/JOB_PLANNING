@@ -73,8 +73,8 @@
         {{range .Rows}}
         <tr>
           <td class="px-3 py-2 font-mono text-xs whitespace-nowrap"><a href="/sales/{{.SalesID}}" class="text-primary" data-sales-row-link>{{.DisplayNo}}</a></td>
-          <td class="px-3 py-2 whitespace-nowrap">{{.Name}} {{if .IsTentativeName}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-hover text-ink-muted">(가칭)</span>{{end}} {{if .ForeignOrg}}<span class="badge badge-neutral" title="{{.ManageHint}}">{{.OrgLabel}}</span>{{end}}</td>
-          <td class="px-3 py-2 whitespace-nowrap">{{.Customer}}</td>
+          <td class="px-3 py-2 max-w-[14rem]" style="white-space:normal;overflow-wrap:anywhere">{{.Name}} {{if .IsTentativeName}}<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-hover text-ink-muted">(가칭)</span>{{end}} {{if .ForeignOrg}}<span class="badge badge-neutral" title="{{.ManageHint}}">{{.OrgLabel}}</span>{{end}}</td>
+          <td class="px-3 py-2 max-w-[12rem]" style="white-space:normal;overflow-wrap:anywhere">{{.Customer}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.Owner}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.DisplayStage}}</td>
           <td class="px-3 py-2 whitespace-nowrap">{{.EffectiveProb}}%</td>

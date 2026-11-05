@@ -179,6 +179,7 @@ type SalesProject struct {
 	OrgLabel                string
 	CreatedByUserID         string
 	CreatedByName           string
+	CreatedVia              string
 
 	SalesNo          string
 	BidStatus        string

@@ -54,6 +54,8 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/sales", h.Sales.List)
 	g.GET("/sales/dashboard", h.Sales.Dashboard)
 	g.GET("/sales/new", h.Sales.New)
+	g.GET("/sales/quick-quote", h.Sales.QuickQuoteNew)
+	g.POST("/sales/quick-quote", h.Sales.QuickQuoteCreate)
 	g.POST("/sales", h.Sales.Create)
 	g.GET("/sales/activities", h.Sales.Activities)
 	g.POST("/sales/activities", h.Sales.CreateActivity)
@@ -122,6 +124,11 @@ func newSalesServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	g.GET("/items", h.Items.List)
 	g.GET("/items/new", h.Items.New)
 	g.POST("/items", h.Items.Create)
+	g.GET("/lookup/customers", h.Customer.LookupJSON)
+	g.GET("/api/contacts/:customer_id", h.Contact.APIContactsByCustomer)
+	g.GET("/quotes/:id/xlsx", h.Quotes.Download)
+	g.POST("/quotes/:id/mark-sent", h.Quotes.MarkSent)
+	g.GET("/quotes/:id", h.Quotes.Show)
 	g.GET("/items/suggest", h.Items.Suggest)
 	g.POST("/items/quote-line", h.Items.QuoteLine)
 	g.POST("/items/partners", h.Items.CreatePartner)
@@ -1310,19 +1317,8 @@ func TestSalesHTTP_FormBizTypePrecisionQuickQuote(t *testing.T) {
 		t.Fatalf("즉시 견적 status=%d", rec.Code)
 	}
 	loc := rec.Header().Get("Location")
-	if !strings.Contains(loc, "/quotes/new?sales_id=") {
-		t.Fatalf("견적 이동 loc=%s", loc)
-	}
-	qqID := strings.TrimPrefix(strings.Split(loc, "sales_id=")[1], "")
-	if i := strings.Index(qqID, "&"); i >= 0 {
-		qqID = qqID[:i]
-	}
-	p, _ = repo.Get(qqID)
-	if p == nil || p.ExpectedAmount != 0 || p.ContractTarget != "" || p.Competitor != "" || p.LeadSource != "" {
-		t.Fatalf("즉시 견적 잔여값 amount=%d target=%s comp=%s lead=%s", p.ExpectedAmount, p.ContractTarget, p.Competitor, p.LeadSource)
-	}
-	if p.Stage != model.SalesStage4Discover {
-		t.Fatalf("단계=%s", p.Stage)
+	if !strings.Contains(loc, "/sales/quick-quote") {
+		t.Fatalf("빠른 견적 이동 loc=%s", loc)
 	}
 
 	rec = doForm(t, e, "/sales", url.Values{

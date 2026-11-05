@@ -1,0 +1,329 @@
+{{define "title"}}{{.Title}} · {{appName}}{{end}}
+{{define "content"}}
+<div class="max-w-5xl mx-auto space-y-4" x-data="quickQuoteForm" @keydown.escape.window="onEsc()">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h2 class="text-xl font-bold text-ink">빠른 견적</h2>
+      <p class="text-ui-sm text-ink-muted">단순 물품 납품 · 사업과 견적을 한 번에 만듭니다.</p>
+    </div>
+    <a href="/sales/new" class="text-ui-sm text-primary underline">영업 사업(기존)으로</a>
+  </div>
+
+  <form method="post" action="/sales/quick-quote" @submit.prevent="save()" class="space-y-4">
+    <input type="hidden" name="vat_mode" :value="vat">
+    <input type="hidden" name="round_rule" :value="round">
+    <input type="hidden" name="cut_scope" :value="cutScope">
+    <input type="hidden" name="new_customer" :value="newCust ? '1' : ''">
+    <input type="hidden" name="customer_id" :value="customerId">
+    <input type="hidden" name="contact_id" :value="contactId">
+    <input type="hidden" name="title_manual" :value="titleManual ? '1' : ''">
+
+    <section class="card p-5 space-y-3">
+      <div x-show="!newCust">
+        <label class="label">고객 <span class="text-danger">*</span></label>
+        {{template "customer_combo" dict "Name" "customer_pick" "Scope" "site" "SyncKey" "customerId" "Required" true "Placeholder" "등록 고객 검색"}}
+      </div>
+      <div x-show="newCust" x-cloak>
+        <label class="label">거래처명 <span class="text-danger">*</span></label>
+        <textarea name="customer_name" data-auto-text rows="1" x-model="customerName" class="input w-full" placeholder="거래처명"></textarea>
+      </div>
+      <div>
+        <label class="label">수신인 <span class="text-danger">*</span></label>
+        <div class="relative" x-show="!newCust">
+          <textarea name="attn_name" data-auto-text rows="1" x-model="attnName" @input="onAttnInput()" @focus="openAttn=true"
+                    class="input w-full" placeholder="담당자 검색 또는 직접 입력" role="combobox" aria-autocomplete="list"></textarea>
+          <ul x-show="openAttn && attnHits.length" x-cloak class="absolute z-30 mt-1 w-full bg-white border rounded-lg shadow max-h-48 overflow-auto" role="listbox">
+            <template x-for="(ct,i) in attnHits" :key="ct.contact_id">
+              <li><button type="button" class="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm" @click="pickAttn(ct)" x-text="ct.full_name"></button></li>
+            </template>
+          </ul>
+        </div>
+        <textarea x-show="newCust" x-cloak data-auto-text rows="1" x-model="attnName" class="input w-full" placeholder="담당자명"></textarea>
+        <p class="text-ui-xs text-amber-800 mt-1" x-show="attnNew && !newCust" x-cloak>등록되지 않은 담당자입니다. 저장하면 새 연락처로 추가됩니다.</p>
+      </div>
+      <div>
+        <label class="label">연락처 <span class="text-danger">*</span></label>
+        <textarea name="contact_line" data-auto-text rows="1" x-model="contactLine" class="input w-full" placeholder="010-0000-0000 / name@example.kr"></textarea>
+        <p class="text-ui-xs text-ink-muted mt-1" x-show="contactHint" x-cloak x-text="contactHint"></p>
+      </div>
+      <label class="inline-flex items-center gap-2 text-ui-sm">
+        <input type="checkbox" x-model="newCust" @change="onNewCust()">
+        신규 거래처 등록
+      </label>
+    </section>
+
+    <section class="card p-5 space-y-3 overflow-visible">
+      <div class="flex items-center justify-between">
+        <b class="text-ui font-semibold">품목</b>
+        <button type="button" class="text-sm text-primary" @click="addLine()">줄 추가</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-[720px] w-full text-sm">
+          <thead>
+            <tr class="text-left text-ink-muted">
+              <th class="py-2 pr-2">품명</th>
+              <th class="py-2 pr-2 w-36">규격</th>
+              <th class="py-2 pr-2 w-20">수량</th>
+              <th class="py-2 pr-2 w-20">단위</th>
+              <th class="py-2 pr-2 w-28">단가</th>
+              <th class="py-2 pr-2 w-28">금액</th>
+              <th class="py-2 w-28"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(ln, i) in lines" :key="ln.key">
+              <tr class="align-top border-t">
+                <td class="py-2 pr-2 relative">
+                  <textarea :name="'line_name'" data-auto-text rows="1" x-model="ln.name" @input="onName(i)" @focus="search(i)"
+                            class="input w-full" placeholder="품목 검색"></textarea>
+                  <ul x-show="ln.open && ln.hits.length" x-cloak
+                      class="fixed z-40 bg-white border rounded-lg shadow max-h-48 overflow-auto min-w-[16rem]"
+                      :style="ln.listStyle" role="listbox">
+                    <template x-for="it in ln.hits" :key="it.item_id">
+                      <li>
+                        <button type="button" class="w-full text-left px-3 py-2 hover:bg-blue-50" @click="pickItem(i,it)">
+                          <span class="font-medium" x-text="it.name"></span>
+                          <span class="text-xs text-ink-muted" x-text="' · '+(it.spec||'')+' · '+(it.unit||'')+' · '+(it.fill_price||it.list_price||0)"></span>
+                        </button>
+                      </li>
+                    </template>
+                  </ul>
+                  <p class="text-ui-xs text-ink-muted mt-1" x-show="ln.miss" x-cloak>품목 마스터에 없습니다 — 직접 입력하면 견적에 담깁니다.</p>
+                </td>
+                <td class="py-2 pr-2"><textarea :name="'line_spec'" data-auto-text rows="1" x-model="ln.spec" class="input w-full"></textarea>
+                  <input type="hidden" name="line_item_id" :value="ln.itemId"></td>
+                <td class="py-2 pr-2"><input name="line_qty" x-model="ln.qty" :id="'qq-qty-'+i" class="input w-full text-right"></td>
+                <td class="py-2 pr-2"><input name="line_unit" x-model="ln.unit" class="input w-full"></td>
+                <td class="py-2 pr-2"><input name="line_price" x-model="ln.price" class="input w-full text-right"></td>
+                <td class="py-2 pr-2 tabular-nums text-right" x-text="fmt(lineAmt(ln))"></td>
+                <td class="py-2">
+                  <span class="text-xs text-emerald-700" x-show="ln.registered" x-cloak>등록됨</span>
+                  <button type="button" class="text-xs border rounded px-2 py-1" x-show="!ln.registered && ln.name && ln.price" x-cloak @click="askMaster(i)">마스터 등록</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="label">절사 단위</label>
+          <select x-model="round" class="select w-full">
+            {{range .RoundOptions}}
+            <option value="{{index . 0}}">{{index . 1}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="label">적용 위치</label>
+          <select x-model="cutScope" class="select w-full" :disabled="round==='none'">
+            <option value="total">총액</option>
+            <option value="item">품목별</option>
+          </select>
+        </div>
+      </div>
+      <p class="text-sm">공급가 <b x-text="fmt(totals().supply)"></b> · 부가세 <b x-text="fmt(totals().vat)"></b> · 합계 <b x-text="fmt(totals().total)"></b>
+        <span class="text-ink-muted" x-text="cutLabel()"></span></p>
+    </section>
+
+    <section class="card p-5 space-y-3">
+      <label class="label">건명</label>
+      <textarea name="title" data-auto-text rows="1" x-model="title" @input="titleManual=true" class="input w-full"></textarea>
+      <details class="text-sm">
+        <summary class="cursor-pointer text-ink-muted">유효기간·결제·납기·장소·VAT</summary>
+        <div class="grid sm:grid-cols-2 gap-2 mt-2">
+          <input name="valid_until_text" value="{{.Quote.ValidUntilText}}" class="input" placeholder="유효기간">
+          <input name="due_text" value="{{.Quote.DueText}}" class="input" placeholder="납기">
+          <input name="place_text" value="{{.Quote.PlaceText}}" class="input" placeholder="장소">
+          <input name="payment_text" value="{{.Quote.PaymentText}}" class="input" placeholder="결제조건">
+          <select x-model="vat" class="select">
+            <option value="excluded">VAT 별도</option>
+            <option value="included">VAT 포함</option>
+          </select>
+        </div>
+      </details>
+      <details>
+        <summary class="cursor-pointer text-sm text-ink-muted">비고</summary>
+        <textarea name="remarks" data-auto-text rows="1" class="input w-full mt-2"></textarea>
+      </details>
+      <p class="text-ui-sm text-ink-muted">담당 {{.Quote.OwnerName}} · {{if .Quote.OwnerPhone}}{{.Quote.OwnerPhone}}{{else}}프로필 연락처 없음{{end}}</p>
+    </section>
+
+    <button type="submit" class="btn-primary px-4 py-2">저장</button>
+  </form>
+
+  <div x-show="dlg.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+       role="dialog" aria-modal="true" @click.self="closeDlg()" x-init="$watch('dlg.open', v => { if(v){ dlg.release=window.appDialogTrap && window.appDialogTrap($el); } else if(dlg.release) dlg.release(); })">
+    <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+      <h3 class="font-semibold" x-text="dlg.title"></h3>
+      <p class="text-sm whitespace-pre-wrap" x-text="dlg.body"></p>
+      <div class="flex flex-wrap justify-end gap-2">
+        <template x-for="b in dlg.buttons" :key="b.label">
+          <button type="button" class="px-3 py-2 text-sm border rounded-lg" :class="b.primary ? 'bg-primary text-white border-primary' : ''"
+                  :disabled="b.disabled" @click="b.fn && b.fn()" x-text="b.label"></button>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('quickQuoteForm', () => ({
+    customerId: '', customerName: '', attnName: '', contactId: '', contactLine: '',
+    attnHits: [], openAttn: false, attnNew: false, newCust: false, contacts: [],
+    contactHint: '', title: '', titleManual: false,
+    vat: 'excluded', round: 'none', cutScope: 'total',
+    lines: [{key:1,name:'',spec:'',qty:1,unit:'EA',price:'',itemId:'',hits:[],open:false,miss:false,registered:false,listStyle:''},
+            {key:2,name:'',spec:'',qty:'',unit:'EA',price:'',itemId:'',hits:[],open:false,miss:false,registered:false,listStyle:''}],
+    dlg: {open:false,title:'',body:'',buttons:[],release:null},
+    init() {
+      this.$watch('customerId', (v) => this.onCustomer(v));
+      this.$watch('lines', () => this.syncTitle(), { deep: true });
+    },
+    onNewCust() {
+      if (this.newCust) { this.customerId=''; this.contactId=''; this.contacts=[]; this.attnHits=[]; }
+    },
+    async onCustomer(id) {
+      this.attnName=''; this.contactLine=''; this.contactId=''; this.attnNew=false; this.contactHint='';
+      if (!id) { this.contacts=[]; return; }
+      try {
+        const r = await fetch('/api/contacts/'+encodeURIComponent(id), {headers:{'Accept':'application/json'}});
+        this.contacts = await r.json() || [];
+        if (this.contacts.length===1) this.pickAttn(this.contacts[0]);
+      } catch(e) { this.contacts=[]; }
+    },
+    onAttnInput() {
+      const q=(this.attnName||'').trim().toLowerCase();
+      this.attnHits = this.contacts.filter(c => (c.full_name||'').toLowerCase().includes(q));
+      const hit = this.contacts.find(c => (c.full_name||'') === this.attnName);
+      this.attnNew = !hit && !!(this.attnName||'').trim();
+      if (hit) this.pickAttn(hit);
+      else this.contactId='';
+    },
+    pickAttn(ct) {
+      this.attnName=ct.full_name; this.contactId=ct.contact_id; this.attnNew=false; this.openAttn=false;
+      const tel=ct.mobile||ct.phone||'';
+      this.contactLine = [tel, ct.email].filter(Boolean).join(' / ');
+      this.contactHint='';
+    },
+    onName(i) {
+      const ln=this.lines[i];
+      ln.registered=false; ln.itemId='';
+      this.search(i);
+    },
+    async search(i) {
+      const ln=this.lines[i];
+      const q=(ln.name||'').trim();
+      if (!q) { ln.hits=[]; ln.open=false; ln.miss=false; return; }
+      try {
+        const r=await fetch('/items/suggest?q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}});
+        ln.hits=await r.json()||[];
+        ln.open=ln.hits.length>0;
+        ln.miss=ln.hits.length===0;
+        const el=this.$el.querySelectorAll('textarea[name="line_name"]')[i];
+        if (el) {
+          const b=el.getBoundingClientRect();
+          ln.listStyle='left:'+b.left+'px;top:'+(b.bottom+4)+'px;width:'+Math.max(b.width,260)+'px';
+        }
+      } catch(e){ ln.hits=[]; ln.open=false; }
+    },
+    pickItem(i,it) {
+      const ln=this.lines[i];
+      ln.itemId=it.item_id; ln.name=it.name; ln.spec=it.spec||''; ln.unit=it.unit||'EA';
+      ln.price=it.fill_price||it.list_price||ln.price;
+      if (!ln.qty) ln.qty=1;
+      ln.open=false; ln.miss=false; ln.registered=true;
+      this.$nextTick(()=>{ const el=document.getElementById('qq-qty-'+i); if(el) el.focus(); });
+    },
+    addLine(){ this.lines.push({key:Date.now(),name:'',spec:'',qty:'',unit:'EA',price:'',itemId:'',hits:[],open:false,miss:false,registered:false,listStyle:''}); },
+    num(v){ const n=parseFloat(String(v||'').replace(/,/g,'')); return isFinite(n)?n:0; },
+    lineAmt(ln){ const v=this.num(ln.qty)*Math.floor(this.num(ln.price)); return v>0?Math.floor(v):0; },
+    roundU(){ return this.round==='hundred'?100:this.round==='thousand'?1000:this.round==='man'?10000:1; },
+    roundN(n){ const u=this.roundU(); if(u<=1||!n) return n; return Math.floor(n/u)*u; },
+    totals(){
+      let raw=0, sum=0;
+      this.lines.forEach(ln => { const a=this.lineAmt(ln); raw+=a; sum += (this.cutScope==='item' && this.roundU()>1) ? this.roundN(a) : a; });
+      if (this.vat==='included') {
+        const before=sum, total=this.cutScope==='item'?sum:this.roundN(sum);
+        return {supply:Math.floor(total/1.1), vat:total-Math.floor(total/1.1), total, before:raw, cut:raw-total};
+      }
+      const supply=sum, vat=Math.floor(sum/10), before=raw+Math.floor(raw/10);
+      const total=this.cutScope==='item'?supply+vat:this.roundN(supply+vat);
+      return {supply, vat: this.cutScope==='item'?vat:Math.floor((this.round==='none'?supply: (total- (total - this.roundN(supply+vat) ))) ), total, before, cut: before-total};
+    },
+    fmt(n){ n=Math.floor(n||0); const s=String(Math.abs(n)); let o=''; for(let i=0;i<s.length;i++){ if(i&& (s.length-i)%3===0) o+=','; o+=s[i]; } return (n<0?'-':'')+o; },
+    cutLabel(){
+      if(this.round==='none') return '';
+      const t=this.totals(); const u=this.round==='hundred'?'백':this.round==='thousand'?'천':this.round==='man'?'만':'원';
+      return '절사: '+u+' 단위 · '+(this.cutScope==='item'?'품목별':'총액')+' 기준 · 절사액 '+this.fmt(t.cut)+'원';
+    },
+    syncTitle(){
+      if(this.titleManual) return;
+      const names=this.lines.map(l=>(l.name||'').trim()).filter(Boolean);
+      if(!names.length){ this.title=''; return; }
+      this.title = names.length===1 ? names[0] : names[0]+' 외 '+(names.length-1)+'건';
+    },
+    popup(title, body, buttons){
+      this.dlg={open:true,title,body,buttons,release:null};
+    },
+    closeDlg(){ this.dlg.open=false; },
+    onEsc(){ if(this.dlg.open) this.closeDlg(); },
+    askMaster(i){
+      const ln=this.lines[i];
+      if(!(ln.name||'').trim() || !this.num(ln.price)){
+        this.popup('오류','품명 또는 단가를 입력하세요',[{label:'닫기',fn:()=>this.closeDlg()}]); return;
+      }
+      const price=this.fmt(this.num(ln.price));
+      this.popup('마스터 등록', '품명 '+(ln.name||'')+'\n규격 '+(ln.spec||'')+'\n단위 '+(ln.unit||'EA')+'\n소비자 가격 '+price+'원 ('+(this.vat==='included'?'VAT 포함':'VAT 별도')+')', [
+        {label:'닫기', fn:()=>this.closeDlg()},
+        {label:'등록', primary:true, fn:()=>this.doMaster(i)}
+      ]);
+    },
+    async doMaster(i){
+      const ln=this.lines[i];
+      const body=new URLSearchParams({name:ln.name,spec:ln.spec||'',unit:ln.unit||'EA',unit_price:String(this.num(ln.price)),register:'1'});
+      const r=await fetch('/items/quote-line',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded'},body});
+      const d=await r.json();
+      if(d && d.duplicate){
+        this.popup('이미 등록된 품목','기존 소비자 가격 '+this.fmt((d.item&& (d.item.list_price||d.item.fill_price))||0)+'원',[{label:'닫기',fn:()=>this.closeDlg()}]);
+        return;
+      }
+      if(!d || d.ok===false){ this.popup('오류',(d&&d.error)||'등록에 실패했습니다',[{label:'닫기',fn:()=>this.closeDlg()}]); return; }
+      ln.itemId=(d.item&&d.item.item_id)||''; ln.registered=true;
+      this.popup('등록했습니다','품목 마스터에 넣었습니다.',[{label:'닫기',fn:()=>this.closeDlg()}]);
+    },
+    async save(){
+      const fd=new FormData(this.$el.querySelector('form'));
+      const r=await fetch('/sales/quick-quote',{method:'POST',headers:{'Accept':'application/json'},body:fd});
+      const d=await r.json().catch(()=>({}));
+      if(!d || d.ok===false){
+        this.popup('저장 실패', d.error||'저장에 실패했습니다',[{label:'닫기',fn:()=>this.closeDlg()}]);
+        return;
+      }
+      let sentEnabled=false;
+      const self=this;
+      const xlsx=d.xlsx;
+      this.popup('견적서를 만들었습니다',
+        (d.quote_no||'')+' · 합계 '+this.fmt(d.total)+'원\n'+(d.cut_label||'')+'\n'+(d.master_note||'')+'\n'+(d.project_note||''),
+        [
+          {label:'견적서 받기(xlsx)', primary:true, fn:()=>{ window.location=xlsx; sentEnabled=true; self.dlg.buttons=self.dlg.buttons.map(b=> b.label==='발송 처리' ? Object.assign({},b,{disabled:false}) : b); }},
+          {label:'발송 처리', disabled:true, fn:()=> self.confirmSend(d.quote_id, d.detail)},
+          {label:'닫기', fn:()=>{ self.closeDlg(); location.href=d.detail; }}
+        ]);
+    },
+    confirmSend(id, detail){
+      this.popup('발송 처리','직접 발송한 것으로 처리합니다',[
+        {label:'닫기', fn:()=>this.closeDlg()},
+        {label:'발송 처리', primary:true, fn:()=>this.doSend(id, detail)}
+      ]);
+    },
+    async doSend(id, detail){
+      const r=await fetch('/quotes/'+id+'/mark-sent',{method:'POST',headers:{'Accept':'application/json'}});
+      const d=await r.json().catch(()=>({}));
+      if(!d||d.ok===false){ this.popup('오류',d.error||'처리할 수 없습니다',[{label:'닫기',fn:()=>this.closeDlg()}]); return; }
+      this.popup('발송으로 처리했습니다','',[{label:'닫기',fn:()=>{ this.closeDlg(); location.href=detail; }}]);
+    }
+  }));
+});
+</script>
+{{end}}

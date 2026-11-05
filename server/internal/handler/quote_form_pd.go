@@ -119,7 +119,16 @@ func FillQuoteFormP(q *model.SalesQuote, company model.QuoteCompany) ([]byte, er
 	_ = f.SetCellInt(sheet, fmt.Sprintf("I%d", vatRow), tot.VAT)
 	_ = f.SetCellInt(sheet, fmt.Sprintf("H%d", totRow), tot.Total)
 	applyMaintVisible(f, sheet, quoteFormP.MaintStart+shift, quoteFormP.MaintEnd+shift, q.MaintBlock)
-	_ = f.SetCellValue(sheet, shiftedCell(quoteFormP.Remarks, shift), q.Remarks)
+	cut := model.QuoteCutDisplay(q.RoundRule, q.CutScope, tot.CutAmount)
+	remarks := q.Remarks
+	if cut != "" {
+		if remarks != "" {
+			remarks = cut + "\n" + remarks
+		} else {
+			remarks = cut
+		}
+	}
+	_ = f.SetCellValue(sheet, shiftedCell(quoteFormP.Remarks, shift), remarks)
 	last := quoteFormP.footerRow() + shift
 	setPrintArea(f, sheet, fmt.Sprintf("$A$1:$I$%d", last))
 	setFitToWidth1(f, sheet)

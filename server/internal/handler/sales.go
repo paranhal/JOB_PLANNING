@@ -27,6 +27,10 @@ type SalesHandler struct {
 	codeRepo     *repository.CodeRepo
 	orgs         *repository.OrgRepo
 	attach       *AttachmentHandler
+	quoteRepo    *repository.QuoteRepo
+	itemRepo     *repository.SalesItemRepo
+	settings     *repository.SettingsRepo
+	db           *sql.DB
 }
 
 func NewSalesHandler(
@@ -253,6 +257,9 @@ func (h *SalesHandler) New(c echo.Context) error {
 	if !canWriteSalesDeal(c) {
 		return echo.ErrForbidden
 	}
+	if strings.TrimSpace(c.QueryParam("mode")) == "quick" || strings.TrimSpace(c.QueryParam("quick_quote")) == "1" {
+		return c.Redirect(http.StatusSeeOther, "/sales/quick-quote")
+	}
 	p := &model.SalesProject{
 		IsTentativeName: true,
 		Status:          model.SalesStatusActive,
@@ -322,7 +329,7 @@ func (h *SalesHandler) Create(c echo.Context) error {
 		})
 	}
 	if quick {
-		return c.Redirect(http.StatusSeeOther, "/quotes/new?sales_id="+url.QueryEscape(p.SalesID))
+		return c.Redirect(http.StatusSeeOther, "/sales/quick-quote")
 	}
 	loc := "/sales/" + p.SalesID + "?ok=created"
 	if from := strings.TrimSpace(c.FormValue("from_task")); from != "" {

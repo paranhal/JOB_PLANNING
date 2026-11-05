@@ -76,6 +76,21 @@ func TestQuoteLineDeleteAndReorder(t *testing.T) {
 	}
 }
 
+func TestQuoteCutT7Thousand(t *testing.T) {
+	lines := []SalesQuoteLine{
+		{Name: "a", Qty: 1, UnitPrice: 37035},
+		{Name: "b", Qty: 1, UnitPrice: 9999},
+	}
+	tot := ComputeQuoteTotalsScoped(lines, QuoteVATExcluded, QuoteRoundThousand, QuoteCutTotal)
+	if tot.Total != 51000 {
+		t.Fatalf("총액 천 합계=%d", tot.Total)
+	}
+	item := ComputeQuoteTotalsScoped(lines, QuoteVATExcluded, QuoteRoundThousand, QuoteCutItem)
+	if item.Supply != 46000 {
+		t.Fatalf("품목별 천 공급가=%d", item.Supply)
+	}
+}
+
 func TestQuoteRoundHundredMatchesLabel(t *testing.T) {
 	if RoundRuleLabel(QuoteRoundHundred) != "100원 단위 절사" {
 		t.Fatal(RoundRuleLabel(QuoteRoundHundred))

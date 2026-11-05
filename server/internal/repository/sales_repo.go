@@ -70,7 +70,8 @@ const salesSelect = `
 		COALESCE(s.created_by_user_id,''), COALESCE(s.created_by_name,''),
 		COALESCE(cu.org_name,''),
 		COALESCE(s.org_id,''),
-		COALESCE(NULLIF(TRIM(og.short_name),''), NULLIF(TRIM(og.org_name),''), '')
+		COALESCE(NULLIF(TRIM(og.short_name),''), NULLIF(TRIM(og.org_name),''), ''),
+		COALESCE(s.created_via,'')
 	FROM sales_projects s
 	LEFT JOIN customers cu ON cu.customer_id = s.customer_id
 	LEFT JOIN orgs og ON og.org_id = s.org_id`
@@ -383,8 +384,8 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 			bid_eval_method, mall_contract_type, prev_sales_id,
 			biz_type, budget_year, budget_status,
 			bid_ym, revenue_ym, revenue_from, revenue_to, billing_cycle, amount_vat_included, org_id,
-			created_by_user_id, created_by_name
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			created_by_user_id, created_by_name, created_via
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.SalesID, p.SalesNo, p.Name, boolToInt(p.IsTentativeName), p.TentativeName, p.Stage, p.Probability, overrideArg(p),
 		nullStr(p.CustomerID), p.ProspectName, p.ProspectRegion, boolToInt(p.CustomerConfirmed),
 		p.ExpectedYM, p.ExpectedPrecision, boolToInt(p.ExpectedYMConfirmed),
@@ -396,7 +397,7 @@ func (r *SalesRepo) Create(p *model.SalesProject) error {
 		p.AwardedAmount, p.ContractAmount, p.ContractTarget, p.ProcurementRoute, p.ContractMethod,
 		p.BidEvalMethod, p.MallContractType, p.PrevSalesID,
 		p.BizType, p.BudgetYear, p.BudgetStatus,
-		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded), p.OrgID, byID, byName)
+		p.BidYM, p.RevenueYM, p.RevenueFrom, p.RevenueTo, p.BillingCycle, boolToInt(p.AmountVATIncluded), p.OrgID, byID, byName, strings.TrimSpace(p.CreatedVia))
 	if err != nil {
 		return err
 	}
@@ -742,7 +743,7 @@ func scanSalesRow(row salesScanner) (*model.SalesProject, error) {
 		&p.BizType, &p.BudgetYear, &p.BudgetStatus, &p.DormantUntil, &p.DormantReason, &p.DormantAt, &p.DormantBy,
 		&p.BidYM, &p.RevenueYM, &p.RevenueFrom, &p.RevenueTo, &p.BillingCycle, &vatInc,
 		&p.CreatedAt, &p.UpdatedAt, &p.CreatedByUserID, &p.CreatedByName, &p.CustomerName,
-		&p.OrgID, &p.OrgLabel,
+		&p.OrgID, &p.OrgLabel, &p.CreatedVia,
 	)
 	if err != nil {
 		return nil, err

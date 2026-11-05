@@ -35,7 +35,9 @@ const salesQuoteSelect = `
 		COALESCE(maint_block,0),
 		COALESCE(created_at,''), COALESCE(updated_at,''),
 		COALESCE((SELECT sales_no FROM sales_projects p WHERE p.sales_id=sales_quotes.sales_id),''),
-		COALESCE(quote_kind,'')
+		COALESCE(quote_kind,''),
+		COALESCE(attn_phone,''), COALESCE(attn_email,''),
+		COALESCE(downloaded_at,''), COALESCE(sent_at,''), COALESCE(cut_scope,'total')
 	FROM sales_quotes`
 
 type QuoteFilter struct {
@@ -178,14 +180,16 @@ func (r *QuoteRepo) Create(q *model.SalesQuote) error {
 			subtotal, vat, total, owner_user_id, owner_name, owner_phone, remarks,
 			purpose, budget_year, overhead_rate, tech_fee_rate, status, is_legacy,
 			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id,
-			created_by_user_id, created_by_name
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			created_by_user_id, created_by_name,
+			attn_phone, attn_email, downloaded_at, sent_at, cut_scope
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		q.QuoteID, q.SalesID, q.QuoteNo, q.Rev, q.FormType, q.RecipientKind,
 		q.CustomerID, q.RecipientName, q.AttnName, q.AttnTitle, q.QuoteDate, q.Title,
 		q.ValidUntilText, q.DueText, q.PlaceText, q.PaymentText, q.VATMode, q.RoundRule,
 		q.Subtotal, q.VAT, q.Total, q.OwnerUserID, q.OwnerName, q.OwnerPhone, q.Remarks,
 		q.Purpose, q.BudgetYear, q.OverheadRate, q.TechFeeRate, q.Status, boolToInt(q.IsLegacy),
-		q.RevReason, boolToInt(q.IsReverseCalc), q.TargetTotal, boolToInt(q.MaintBlock), q.QuoteKind, q.OrgID, byID, byName)
+		q.RevReason, boolToInt(q.IsReverseCalc), q.TargetTotal, boolToInt(q.MaintBlock), q.QuoteKind, q.OrgID, byID, byName,
+		q.AttnPhone, q.AttnEmail, q.DownloadedAt, q.SentAt, model.NormalizeCutScope(q.CutScope))
 	if err != nil {
 		if isUniqueErr(err) {
 			return model.ErrQuoteNoDuplicate
@@ -243,14 +247,14 @@ func (r *QuoteRepo) Update(q *model.SalesQuote) error {
 				payment_text=?, vat_mode=?, round_rule=?, subtotal=?, vat=?, total=?,
 				owner_user_id=?, owner_name=?, owner_phone=?, remarks=?, purpose=?, budget_year=?,
 				overhead_rate=?, tech_fee_rate=?, status=?, is_reverse_calc=?, target_total=?,
-				maint_block=?, quote_kind=?, updated_at=CURRENT_TIMESTAMP
+				maint_block=?, quote_kind=?, attn_phone=?, attn_email=?, cut_scope=?, updated_at=CURRENT_TIMESTAMP
 			WHERE quote_id=?`,
 			q.SalesID, q.FormType, q.RecipientKind, q.CustomerID, q.RecipientName,
 			q.AttnName, q.AttnTitle, q.Title, q.ValidUntilText, q.DueText, q.PlaceText,
 			q.PaymentText, q.VATMode, q.RoundRule, q.Subtotal, q.VAT, q.Total,
 			q.OwnerUserID, q.OwnerName, q.OwnerPhone, q.Remarks, q.Purpose, q.BudgetYear,
 			q.OverheadRate, q.TechFeeRate, q.Status, boolToInt(q.IsReverseCalc), q.TargetTotal,
-			boolToInt(q.MaintBlock), q.QuoteKind, q.QuoteID)
+			boolToInt(q.MaintBlock), q.QuoteKind, q.AttnPhone, q.AttnEmail, model.NormalizeCutScope(q.CutScope), q.QuoteID)
 		if err != nil {
 			return err
 		}
@@ -335,14 +339,16 @@ func (r *QuoteRepo) Revise(id, reason string) (*model.SalesQuote, error) {
 			valid_until_text, due_text, place_text, payment_text, vat_mode, round_rule,
 			subtotal, vat, total, owner_user_id, owner_name, owner_phone, remarks,
 			purpose, budget_year, overhead_rate, tech_fee_rate, status, is_legacy,
-			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			rev_reason, is_reverse_calc, target_total, maint_block, quote_kind, org_id,
+			attn_phone, attn_email, downloaded_at, sent_at, cut_scope
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		dst.QuoteID, dst.SalesID, dst.QuoteNo, dst.Rev, dst.FormType, dst.RecipientKind,
 		dst.CustomerID, dst.RecipientName, dst.AttnName, dst.AttnTitle, dst.QuoteDate, dst.Title,
 		dst.ValidUntilText, dst.DueText, dst.PlaceText, dst.PaymentText, dst.VATMode, dst.RoundRule,
 		dst.Subtotal, dst.VAT, dst.Total, dst.OwnerUserID, dst.OwnerName, dst.OwnerPhone, dst.Remarks,
 		dst.Purpose, dst.BudgetYear, dst.OverheadRate, dst.TechFeeRate, dst.Status, boolToInt(dst.IsLegacy),
-		dst.RevReason, boolToInt(dst.IsReverseCalc), dst.TargetTotal, boolToInt(dst.MaintBlock), dst.QuoteKind, dst.OrgID)
+		dst.RevReason, boolToInt(dst.IsReverseCalc), dst.TargetTotal, boolToInt(dst.MaintBlock), dst.QuoteKind, dst.OrgID,
+		dst.AttnPhone, dst.AttnEmail, "", "", model.NormalizeCutScope(dst.CutScope))
 	if err != nil {
 		if isUniqueErr(err) {
 			return nil, model.ErrQuoteNoDuplicate
@@ -569,6 +575,13 @@ func (r *QuoteRepo) prepareSave(q *model.SalesQuote, allocNo bool) error {
 	q.FormType = model.NormalizeQuoteForm(q.FormType)
 	q.VATMode = model.NormalizeVATMode(q.VATMode)
 	q.RoundRule = model.NormalizeRoundRule(q.RoundRule)
+	q.CutScope = model.NormalizeCutScope(q.CutScope)
+	if q.RoundRule == model.QuoteRoundNone {
+		q.CutScope = model.QuoteCutTotal
+	}
+	q.AttnName = model.CollapseNewlines(q.AttnName)
+	q.Title = model.CollapseNewlines(q.Title)
+	q.RecipientName = model.CollapseNewlines(q.RecipientName)
 	q.Status = model.NormalizeQuoteStatus(q.Status)
 	q.Purpose = model.NormalizeQuotePurpose(q.Purpose)
 	q.RecipientKind = strings.TrimSpace(q.RecipientKind)
@@ -743,6 +756,7 @@ func scanQuote(row quoteScanner) (*model.SalesQuote, error) {
 		&q.Purpose, &q.BudgetYear, &q.OverheadRate, &q.TechFeeRate, &q.Status, &legacy,
 		&q.RevReason, &revCalc, &q.TargetTotal, &maint,
 		&q.CreatedAt, &q.UpdatedAt, &q.SalesNo, &q.QuoteKind,
+		&q.AttnPhone, &q.AttnEmail, &q.DownloadedAt, &q.SentAt, &q.CutScope,
 	)
 	if err != nil {
 		return nil, err
@@ -752,6 +766,8 @@ func scanQuote(row quoteScanner) (*model.SalesQuote, error) {
 	q.MaintBlock = maint != 0
 	q.FormType = model.NormalizeQuoteForm(q.FormType)
 	q.Purpose = model.NormalizeQuotePurpose(q.Purpose)
+	q.CutScope = model.NormalizeCutScope(q.CutScope)
+	q.RoundRule = model.NormalizeRoundRule(q.RoundRule)
 	return &q, nil
 }
 

@@ -225,6 +225,10 @@ func New(db *sql.DB) *Handler {
 				customerRepo, contactRepo, userRepo, codeRepo,
 			)
 			sh.orgs = repository.NewOrgRepo(db)
+			sh.quoteRepo = repository.NewQuoteRepo(db)
+			sh.itemRepo = repository.NewSalesItemRepo(db)
+			sh.settings = settingsRepo
+			sh.db = db
 			return sh
 		}(),
 		Quotes: NewQuotesHandler(

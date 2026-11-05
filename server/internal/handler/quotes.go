@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -262,6 +263,9 @@ func (h *QuotesHandler) Show(c echo.Context) error {
 		"FlashErr":     c.QueryParam("err"),
 		"AskNames":     ask,
 		"RoundLabel":   model.RoundRuleLabel(q.RoundRule),
+		"CutLabel":     model.QuoteCutDisplay(q.RoundRule, q.CutScope, tot.CutAmount),
+		"Downloaded":   strings.TrimSpace(q.DownloadedAt) != "",
+		"Sent":         model.NormalizeQuoteStatus(q.Status) == model.QuoteStatusSent,
 		"VATLabel":     model.VATModeLabel(q.VATMode),
 		"IsLatest":     latest,
 		"Revs":         revs,
@@ -404,7 +408,41 @@ func (h *QuotesHandler) Download(c echo.Context) error {
 	}
 	base := model.QuoteXLSXBaseName(q.DisplayNo(), q.RecipientName, salesName)
 	c.Response().Header().Set(echo.HeaderContentDisposition, model.QuoteXLSXContentDisposition(base))
+	_ = h.repo.MarkDownloaded(q.QuoteID)
 	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", raw)
+}
+
+func (h *QuotesHandler) MarkSent(c echo.Context) error {
+	if !canWriteSales(c) {
+		return echo.ErrForbidden
+	}
+	q, err := h.repo.MarkSent(c.Param("id"))
+	if err != nil {
+		code := http.StatusBadRequest
+		msg := err.Error()
+		if errors.Is(err, model.ErrQuoteNotDownloaded) {
+			msg = "견적서를 받은 뒤에 발송 처리할 수 있습니다"
+		} else if errors.Is(err, model.ErrQuoteAlreadySent) {
+			if wantsJSON(c) {
+				return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "already": true})
+			}
+			return c.Redirect(http.StatusSeeOther, "/quotes/"+c.Param("id")+"?ok=sent")
+		}
+		if wantsJSON(c) {
+			return c.JSON(code, map[string]interface{}{"ok": false, "error": msg})
+		}
+		return c.Redirect(http.StatusSeeOther, "/quotes/"+c.Param("id")+"?err="+url.QueryEscape(msg))
+	}
+	if wantsJSON(c) {
+		stage := ""
+		if q != nil && h.sales != nil && strings.TrimSpace(q.SalesID) != "" {
+			if p, err := h.sales.Get(q.SalesID); err == nil && p != nil {
+				stage = p.Stage
+			}
+		}
+		return c.JSON(http.StatusOK, map[string]interface{}{"ok": true, "status": "sent", "stage": stage})
+	}
+	return c.Redirect(http.StatusSeeOther, "/quotes/"+c.Param("id")+"?ok=sent")
 }
 
 func (h *QuotesHandler) Preview(c echo.Context) error {
@@ -428,11 +466,16 @@ func (h *QuotesHandler) Preview(c echo.Context) error {
 		"direct":             tot.Direct,
 		"overhead":           tot.Overhead,
 		"tech_fee":           tot.TechFee,
-		"round_label":        model.RoundRuleLabel(q.RoundRule),
-		"vat_label":          model.VATModeLabel(q.VATMode),
-		"overhead_diff":      model.RateDiffLabel(q.OverheadRate, stdOH),
-		"tech_diff":          model.RateDiffLabel(q.TechFeeRate, stdTech),
-		"lines":              len(q.Lines),
+		"round_label": func() string {
+			if s := model.QuoteCutDisplay(q.RoundRule, q.CutScope, tot.CutAmount); s != "" {
+				return s
+			}
+			return model.RoundRuleLabel(q.RoundRule)
+		}(),
+		"vat_label":     model.VATModeLabel(q.VATMode),
+		"overhead_diff": model.RateDiffLabel(q.OverheadRate, stdOH),
+		"tech_diff":     model.RateDiffLabel(q.TechFeeRate, stdTech),
+		"lines":         len(q.Lines),
 	})
 }
 
@@ -486,7 +529,7 @@ func (h *QuotesHandler) renderForm(c echo.Context, q *model.SalesQuote, isNew bo
 		"Title": title, "Active": NavQuotes, "IsNew": isNew, "Quote": q,
 		"Totals": tot, "FormError": formErr, "Users": users,
 		"CanWrite":         canWriteSales(c),
-		"RoundOptions":     [][]string{{"none", "절사 없음"}, {"hundred", "100원 단위 절사"}, {"thousand", "1,000원 단위 절사"}},
+		"RoundOptions":     model.QuoteRoundOptions(),
 		"Units":            model.SalesItemUnits(),
 		"FlashOK":          c.QueryParam("ok"),
 		"LaborRates":       rates,
@@ -527,6 +570,7 @@ type quoteFormInit struct {
 	Lines       []quoteFormInitLine `json:"lines"`
 	VAT         string              `json:"vat"`
 	Round       string              `json:"round"`
+	CutScope    string              `json:"cutScope"`
 	FormType    string              `json:"formType"`
 	QuoteKind   string              `json:"quoteKind"`
 	Purpose     string              `json:"purpose"`
@@ -545,6 +589,7 @@ func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int, lo
 		Lines:       []quoteFormInitLine{},
 		VAT:         model.QuoteVATExcluded,
 		Round:       model.QuoteRoundNone,
+		CutScope:    model.QuoteCutTotal,
 		FormType:    model.QuoteFormA,
 		QuoteKind:   model.QuoteKindMaint,
 		Purpose:     model.QuotePurposeDeal,
@@ -561,6 +606,9 @@ func quoteFormInitJSON(q *model.SalesQuote, stdOH, stdTech float64, year int, lo
 		}
 		if q.RoundRule != "" {
 			init.Round = q.RoundRule
+		}
+		if q.CutScope != "" {
+			init.CutScope = q.CutScope
 		}
 		if q.FormType != "" {
 			init.FormType = q.FormType
@@ -627,6 +675,7 @@ func (h *QuotesHandler) parseQuoteForm(c echo.Context) *model.SalesQuote {
 		PaymentText:    strings.TrimSpace(c.FormValue("payment_text")),
 		VATMode:        model.NormalizeVATMode(vat),
 		RoundRule:      model.NormalizeRoundRule(c.FormValue("round_rule")),
+		CutScope:       model.NormalizeCutScope(c.FormValue("cut_scope")),
 		OwnerUserID:    strings.TrimSpace(c.FormValue("owner_user_id")),
 		OwnerName:      strings.TrimSpace(c.FormValue("owner_name")),
 		OwnerPhone:     strings.TrimSpace(c.FormValue("owner_phone")),
