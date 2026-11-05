@@ -1,120 +1,169 @@
-{{define "title"}}업무 관리 · 일정 캘린더{{end}}
-{{/* ItemKindLine · SegLabel 은 board_cal_bar */}}
+{{define "title"}}업무 관리 · 일정표{{end}}
 {{define "content"}}
 {{template "board_shell_open" .}}
-  {{template "board_cal_head" .}}
-  {{if .DayUntimed}}
-  <div class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 py-2.5 text-ui-sm text-ink-muted">
-    <b class="text-ink">시간 미정</b>
-    {{range .DayUntimed}}
-    <a href="{{.Href}}" class="{{.Type.Text}} rounded border-l-[3px] border-current {{.Type.Bg}} px-2 py-0.5 text-[11px] font-semibold"><span class="text-ink">{{.Task.Title}}</span>{{template "board_assignee_line" .}}</a>
-    {{end}}
-  </div>
-  {{end}}
-  {{if eq .Cols "flat"}}
-  <div class="overflow-x-auto border-t border-line">
-    <div class="grid min-w-[620px] grid-cols-[64px_1fr]">
-      <div class="border-r border-line bg-canvas">
-        {{range .DayHours}}
-        <div class="board-day-hour px-3 pt-0.5 text-[11px] font-semibold text-ink-subtle">{{.}}</div>
-        {{end}}
-      </div>
-      <div class="relative" data-day-body data-drop="{{.Date}}" data-dayzone="1">
-        {{range .DayHours}}
-        <div class="board-day-hour border-t border-line"></div>
-        {{end}}
-        {{range .DayTimed}}
-        {{template "board_cal_bar" dict "Item" . "Page" $}}
-        {{end}}
-        {{if .ShowNowLine}}
-        <div class="absolute left-0 right-0 z-[2] border-t-2 border-danger" data-now="{{.DayNowTop}}"></div>
-        {{end}}
-      </div>
+{{template "board_cal_head" .}}
+{{/* register에서 복사(95-132) 일 보기 담당자 열 일정표. POST schedule and unschedule */}}
+<div class="p-3"
+     x-data="{
+       extraCols: [],
+       addOpen: false,
+       leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{toJSON $n}}{{end}}],
+       onLeave(name) { return !!name && this.leaveNames.indexOf(name) >= 0; },
+       sel: null,
+       addMinutes(hhmm, mins) {
+         const p = (hhmm || '09:00').split(':');
+         let t = (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0) + (mins||0);
+         if (t > 20*60) t = 20*60;
+         if (t < 0) t = 0;
+         return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0');
+       },
+       pick(el) {
+         const d = el.dataset;
+         if (this.sel && this.sel.kind === d.kind && this.sel.ref === d.ref) { this.sel = null; return; }
+         this.sel = {
+           kind: d.kind, ref: d.ref, title: d.title || '', assignee: d.assignee || '',
+           duration: d.duration || '30', href: d.href || '', edit: d.edit || '',
+           zone: d.zone || '', workDate: d.workDate || '',
+           startTime: d.startTime || '', endTime: d.endTime || '',
+           col: d.col || '', itemKey: d.itemKey || ''
+         };
+       },
+       isPicked(kind, ref) {
+         return this.sel && this.sel.kind === kind && this.sel.ref === ref;
+       },
+       place(el) {
+         if (!this.sel) return;
+         const date = el.dataset.date;
+         let time = (el.dataset.time === undefined || el.dataset.time === null) ? '09:00' : el.dataset.time;
+         const colAssignee = el.dataset.assignee;
+         if (colAssignee !== undefined) {
+           if (colAssignee && this.onLeave(colAssignee)) {
+             if (!confirm(colAssignee + '은 이 날 연차입니다. 그래도 배정할까요?')) return;
+           }
+           if ((this.sel.zone === 'grid' || this.sel.kind === 'task') && colAssignee !== this.sel.assignee) {
+             if (this.sel.startTime) time = this.sel.startTime;
+           }
+         }
+         if (this.sel.zone === 'grid' || this.sel.kind === 'task') {
+           const f = this.$refs.placeForm;
+           f.kind.value = this.sel.kind;
+           f.ref_id.value = this.sel.ref;
+           f.title.value = this.sel.title;
+           f.assignee.value = colAssignee !== undefined ? colAssignee : (this.sel.assignee || '');
+           f.assignee_from_column.value = colAssignee !== undefined ? '1' : '';
+           f.duration_min.value = this.sel.duration || '30';
+           f.work_date.value = date;
+           f.start_time.value = time;
+           f.end_time.value = time ? this.addMinutes(time, parseInt(this.sel.duration||'30',10)||30) : '';
+           f.submit();
+         }
+       },
+       openWork(el) {
+         const href = el.dataset.href;
+         if (href) window.location.href = href;
+       },
+       editWork(el) {
+         const href = el.dataset.edit;
+         if (href) window.location.href = href;
+       },
+       addExtra(name) {
+         if (name && this.extraCols.indexOf(name) < 0) this.extraCols.push(name);
+         this.addOpen = false;
+       }
+     }">
+  {{/* register에서 복사(95-132) POST schedule */}}
+  <form method="post" action="/workboard/schedule" x-ref="placeForm" class="js-keep-modal hidden" data-register-copy="95-132">
+    <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
+    <input type="hidden" name="kind">
+    <input type="hidden" name="ref_id">
+    <input type="hidden" name="title">
+    <input type="hidden" name="assignee">
+    <input type="hidden" name="assignee_from_column">
+    <input type="hidden" name="duration_min">
+    <input type="hidden" name="work_date">
+    <input type="hidden" name="start_time">
+    <input type="hidden" name="end_time">
+  </form>
+  {{if .UndatedCards}}
+  <div class="rounded-xl border border-amber-200 bg-warning-soft/80 shadow-sm overflow-hidden mb-2">
+    <div class="px-3 py-1.5 border-b border-amber-200 flex items-center justify-between">
+      <p class="text-xs font-bold text-warning">날짜 미정 <span class="font-semibold opacity-80">({{len .UndatedCards}}건)</span></p>
     </div>
-  </div>
-  {{else}}
-  <div class="overflow-x-auto border-t border-line"
-       x-data="{ extraCols: [], addOpen: false, leaveNames: [{{range $i, $n := .DayLeaveNames}}{{if $i}},{{end}}{{toJSON $n}}{{end}}], onLeave(name){ return !!name && this.leaveNames.indexOf(name)>=0; }, addExtra(name){ if(name && this.extraCols.indexOf(name)<0) this.extraCols.push(name); this.addOpen=false; } }">
-    {{if and (eq (len .DayPersonCols) 0) (eq (len .ExtraAssignees) 0)}}
-    <p class="px-4 py-8 text-center text-ui text-ink-muted">배치된 업무가 없습니다</p>
-    {{end}}
-    <div class="flex min-w-[620px]">
-      <div class="w-16 shrink-0 border-r border-line bg-canvas">
-        <div class="h-14 border-b border-line px-2 py-2 text-[11px] font-bold text-ink-subtle">시간</div>
-        {{range .DayHours}}
-        <div class="board-day-hour px-2 pt-0.5 text-[11px] font-semibold text-ink-subtle">{{.}}</div>
-        {{end}}
-      </div>
-      {{range .DayPersonCols}}
-      <div class="board-person-col relative flex-1 border-r border-line">
-        <div class="h-14 border-b border-line px-1.5 py-1.5 text-center {{if .Unassigned}}bg-canvas{{end}}">
-          <p class="truncate text-[11px] font-bold text-ink">{{.Label}}</p>
-          <p class="truncate text-[10px] text-ink-muted">{{.Sub}}</p>
-          {{if .Unregistered}}<p class="text-[10px] text-ink-muted">미등록</p>{{end}}
-          {{if .OnLeave}}<p class="text-[10px] text-warning">연차</p>{{end}}
-        </div>
-        <div class="board-day-stack relative" data-day-body data-drop="{{$.Date}}" data-dayzone="1" data-assignee="{{.Assignee}}">
-          {{range $.DayHours}}
-          <div class="board-day-hour border-t border-line"></div>
-          {{end}}
-          {{range .Items}}
-          {{template "board_cal_bar" dict "Item" . "Page" $}}
-          {{end}}
-        </div>
+    <div class="flex flex-wrap gap-1.5 p-2">
+      {{range .UndatedCards}}
+      <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug border border-amber-200 bg-white max-w-[14rem] {{if $.CanWrite}}cursor-grab{{end}}"
+           {{if $.CanWrite}}draggable="true"{{end}}
+           data-zone="undated" data-kind="task" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
+           data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}" data-href="{{.DetailHref}}"
+           @click="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)">
+        <p class="font-semibold truncate">{{.Title}}</p>
       </div>
       {{end}}
-      <template x-for="name in extraCols" :key="'c-'+name">
-        <div class="board-person-col relative flex-1 border-r border-line">
-          <div class="h-14 border-b border-line px-1.5 py-1.5 text-center">
-            <p class="truncate text-[11px] font-bold text-ink" x-text="name"></p>
-            <p class="text-[10px] text-ink-muted">0건</p>
-            <p class="text-[10px] text-warning" x-show="onLeave(name)" x-cloak>연차</p>
+    </div>
+  </div>
+  {{end}}
+  <div class="bg-white rounded-xl border border-line shadow-sm overflow-hidden">
+    {{if eq (len .DayColumns) 0}}
+    <div x-show="extraCols.length===0" class="px-4 py-10 text-center space-y-3">
+      <p class="text-sm text-ink-muted">배치된 업무가 없습니다</p>
+    </div>
+    {{end}}
+    <div class="max-h-[74vh] overflow-auto" x-show="{{len .DayColumns}} > 0 || extraCols.length > 0">
+      <div :style="'min-width:calc(3rem + ' + (({{len .DayColumns}} + extraCols.length) * {{.AssigneeColMin}}) + 'px)'">
+        <div class="sticky top-0 z-20 flex border-b border-line bg-hover/95 backdrop-blur">
+          <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-ink-subtle border-r border-line sticky left-0 z-30 bg-hover">시간</div>
+          {{range .DayColumns}}
+          <div class="px-1.5 py-2 border-r border-line text-center {{if .Unassigned}}bg-hover{{end}}"
+               style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;">
+            <p class="text-[11px] font-bold truncate">{{.Label}}</p>
+            <p class="text-[9px] truncate text-ink-subtle">{{.Sub}}</p>
+            {{if .OnLeave}}<p class="text-[9px] text-warning">연차</p>{{end}}
           </div>
-          <div class="board-day-stack relative" data-day-body data-drop="{{.Date}}" data-dayzone="1" x-bind:data-assignee="name">
-            {{range .DayHours}}
-            <div class="board-day-hour border-t border-line"></div>
+          {{end}}
+        </div>
+        <div class="flex relative">
+          <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-30 bg-white">
+            {{range .SlotTimes}}
+            <div class="box-border border-t border-slate-100 px-1" style="height:{{$.SlotRem}}rem">
+              <span class="block text-right text-[9px] pr-0.5 text-ink-muted" style="line-height:{{$.SlotRem}}rem">{{.}}</span>
+            </div>
             {{end}}
           </div>
-        </div>
-      </template>
-      {{if and .CanWrite .ExtraAssignees}}
-      <div class="sticky right-0 z-10 w-24 shrink-0 border-l border-line bg-canvas px-1 py-1.5">
-        <button type="button" @click="addOpen=!addOpen" class="board-bar-act whitespace-nowrap">＋담당자</button>
-        <div x-show="addOpen" x-cloak @click.outside="addOpen=false" class="absolute z-40 mt-1 max-h-56 min-w-[8rem] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-pop">
-          {{range .ExtraAssignees}}
-          <button type="button" class="block w-full px-3 py-1.5 text-left text-[11px] hover:bg-hover"
-                  x-show="extraCols.indexOf({{toJSON .}}) < 0"
-                  @click="addExtra({{toJSON .}})">{{.}}</button>
+          {{range .DayColumns}}
+          {{$col := .}}
+          <div class="relative border-r border-slate-50" style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{$.GridHeightStyle}}">
+            {{range $i, $t := $.SlotTimes}}
+            <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-primary-soft/60 cursor-pointer"
+                 style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"
+                 data-date="{{$col.Date}}" data-time="{{$t}}" data-assignee="{{$col.Assignee}}"
+                 @click="place($event.currentTarget)" @dragover.prevent @drop.prevent="place($event.currentTarget)"></div>
+            {{end}}
+            {{range $col.Blocks}}
+            <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative border border-black/5 cursor-pointer"
+                 style="{{.Style}}"
+                 {{if and $.CanWrite (not .IsSupport)}}draggable="true"{{end}}
+                 data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
+                 data-start-time="{{.Card.StartTime}}" data-end-time="{{.Card.EndTime}}"
+                 data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
+                 data-zone="grid" data-href="{{.Card.DetailHref}}" data-edit="{{.Card.EditHref}}"
+                 @click.stop="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)">
+              <span class="truncate font-semibold">{{.Card.Title}}</span>
+              {{if and $.CanWrite .Card.TaskID (not .IsSupport)}}
+              <form method="post" action="/workboard/unschedule" class="absolute top-0 right-0 z-10" @click.stop>
+                <input type="hidden" name="redirect" value="{{$.ScheduleRedirect}}">
+                <input type="hidden" name="task_id" value="{{.Card.TaskID}}">
+                <button type="submit" class="w-4 h-4 flex items-center justify-center rounded text-sm text-ink-subtle" title="대기 목록으로 내리기">&times;</button>
+              </form>
+              {{end}}
+            </div>
+            {{end}}
+          </div>
           {{end}}
         </div>
       </div>
-      {{end}}
     </div>
   </div>
-  {{end}}
-  </div>
+</div>
+</div>
 {{template "board_shell_close" .}}
-<script>
-(function(){
-  document.querySelectorAll('[data-day-body]').forEach(function(body){
-    body.querySelectorAll('.board-day-ev').forEach(function(el){
-      var cols=Math.max(parseInt(el.getAttribute('data-cols'),10)||1,1);
-      var col=parseInt(el.getAttribute('data-col'),10)||0;
-      var w=100/cols;
-      el.style.top=(parseInt(el.getAttribute('data-top'),10)||0)+'px';
-      el.style.height=(parseInt(el.getAttribute('data-h'),10)||40)+'px';
-      if(body.getAttribute('data-assignee')!==null){
-        el.style.left='6px';
-        el.style.right='6px';
-        el.style.width='auto';
-      } else {
-        el.style.left='calc('+(col*w)+'% + 6px)';
-        el.style.width='calc('+w+'% - 12px)';
-      }
-    });
-    var now=body.querySelector('[data-now]');
-    if(now) now.style.top=(parseInt(now.getAttribute('data-now'),10)||0)+'px';
-  });
-})();
-</script>
 {{end}}

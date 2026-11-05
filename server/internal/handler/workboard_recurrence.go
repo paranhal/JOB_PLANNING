@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -341,21 +340,24 @@ func (h *WorkboardHandler) DeleteRecurrenceParent(c echo.Context) error {
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	if err := denyUnlessCanEditTask(c, t); err != nil {
-		return err
-	}
 	loc := "/workboard/tasks/" + id
-	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {
-		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_has_complete")
+	key, why := deleteKeyForTask(*t)
+	if key == "" {
+		msg := why
+		if msg == "" {
+			msg = msgBulkNoKey
+		}
+		return c.Redirect(http.StatusSeeOther, loc+"?err="+url.QueryEscape(msg))
 	}
-	if err := h.repo.DeleteParentTask(id); err != nil {
-		if n, ok := model.HasSubtasksN(err); ok {
-			return c.Redirect(http.StatusSeeOther, loc+"?err=has_subtasks&n="+strconv.Itoa(n))
+	if reason := h.listDeleteBlockReason(c, t); reason != "" {
+		return c.Redirect(http.StatusSeeOther, loc+"?err="+url.QueryEscape(reason))
+	}
+	ok, reason, _ := h.deleteTaskForList(c, t)
+	if !ok {
+		if reason == "" {
+			reason = "삭제할 수 없습니다"
 		}
-		if strings.Contains(err.Error(), "보관") {
-			return c.Redirect(http.StatusSeeOther, loc+"?err=rec_has_complete")
-		}
-		return c.Redirect(http.StatusSeeOther, loc+"?err=rec_rule")
+		return c.Redirect(http.StatusSeeOther, loc+"?err="+url.QueryEscape(reason))
 	}
 	back := strings.TrimSpace(c.FormValue("back"))
 	if back == "" {

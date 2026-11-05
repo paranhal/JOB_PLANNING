@@ -25,9 +25,17 @@ var registerPlanKanbanOrder = []string{
 
 func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter, orgID string) ([]RegisterKanbanColumn, int, error) {
 	today := time.Now().Format(dateLayout)
-	empty := emptyRegisterKanban(date, today)
+	all, err := h.collectRegisterKanbanItems(date, assigneeFilter, orgID)
+	if err != nil {
+		return nil, 0, err
+	}
+	cols, total := h.mapRegisterKanban(all, date, today, assigneeFilter)
+	return cols, total, nil
+}
+
+func (h *WorkboardHandler) collectRegisterKanbanItems(date, assigneeFilter, orgID string) ([]model.WorkListItem, error) {
 	if h.workBoard == nil {
-		return empty, 0, nil
+		return nil, nil
 	}
 	var mineKeys []string
 	if strings.TrimSpace(assigneeFilter) != "" {
@@ -36,23 +44,23 @@ func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter, orgID string
 
 	completed, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketCompletedToday, date, "", mineKeys, 0, orgID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	progress, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketInProgress, date, "", mineKeys, 0, orgID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	delayed, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketDelayed, date, "", mineKeys, 0, orgID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	todayItems, err := h.workBoard.ListBucketOnForOrg(model.WorkBucketToday, date, "", mineKeys, 0, orgID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	unplanned, _, err := h.workBoard.ListUnplannedForOrg("", mineKeys, "", orgID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	seen := map[string]bool{}
@@ -69,12 +77,11 @@ func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter, orgID string
 	all = appendUniqueKanban(all, progress, seen)
 	all = appendUniqueKanban(all, delayed, seen)
 	all = appendUniqueKanban(all, todayItems, seen)
+	return all, nil
+}
 
-	by := map[string][]model.KanbanCard{}
-	for _, key := range registerPlanKanbanOrder {
-		by[key] = nil
-	}
-	total := 0
+func (h *WorkboardHandler) mapRegisterKanban(all []model.WorkListItem, date, today, assigneeFilter string) ([]RegisterKanbanColumn, int) {
+	var mapped []model.WorkListItem
 	for i := range all {
 		it := all[i]
 		if !it.ApplyPlanKanbanMapping(date) {
@@ -83,10 +90,25 @@ func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter, orgID string
 		if assigneeFilter != "" && strings.TrimSpace(it.Assignee) != assigneeFilter {
 			continue
 		}
+		mapped = append(mapped, it)
+	}
+	return h.columnsFromMappedKanban(mapped, date, today)
+}
+
+func (h *WorkboardHandler) columnsFromMappedKanban(mapped []model.WorkListItem, date, today string) ([]RegisterKanbanColumn, int) {
+	by := map[string][]model.KanbanCard{}
+	for _, key := range registerPlanKanbanOrder {
+		by[key] = nil
+	}
+	total := 0
+	for i := range mapped {
+		it := mapped[i]
+		if it.Bucket == "" {
+			continue
+		}
 		by[it.Bucket] = append(by[it.Bucket], h.toRegisterKanbanCard(it))
 		total++
 	}
-
 	cols := make([]model.KanbanColumn, 0, len(registerPlanKanbanOrder))
 	for _, key := range registerPlanKanbanOrder {
 		items := by[key]
@@ -101,6 +123,51 @@ func (h *WorkboardHandler) loadRegisterKanban(date, assigneeFilter, orgID string
 			Border: "border-slate-200",
 		})
 	}
+	return cols, total
+}
+
+func (h *WorkboardHandler) loadBoardKanban(from, to, selected, assigneeFilter, orgID string) ([]RegisterKanbanColumn, int, error) {
+	today := time.Now().Format(dateLayout)
+	from = model.NormalizeAppDate(from)
+	to = model.NormalizeAppDate(to)
+	selected = model.NormalizeAppDate(selected)
+	if from == "" {
+		from = selected
+	}
+	if to == "" {
+		to = from
+	}
+	if from == to {
+		return h.loadRegisterKanban(from, assigneeFilter, orgID)
+	}
+	seen := map[string]bool{}
+	var all []model.WorkListItem
+	cur, err := time.ParseInLocation(dateLayout, from, time.Local)
+	end, err2 := time.ParseInLocation(dateLayout, to, time.Local)
+	if err != nil || err2 != nil {
+		return h.loadRegisterKanban(selected, assigneeFilter, orgID)
+	}
+	for !cur.After(end) {
+		items, e := h.collectRegisterKanbanItems(cur.Format(dateLayout), assigneeFilter, orgID)
+		if e != nil {
+			return nil, 0, e
+		}
+		all = appendUniqueKanban(all, items, seen)
+		cur = cur.AddDate(0, 0, 1)
+	}
+	mapped := make([]model.WorkListItem, 0, len(all))
+	for i := range all {
+		it := all[i]
+		d := boardKanbanMapDate(it, from, to, selected)
+		if !it.ApplyPlanKanbanMapping(d) {
+			continue
+		}
+		if assigneeFilter != "" && strings.TrimSpace(it.Assignee) != assigneeFilter {
+			continue
+		}
+		mapped = append(mapped, it)
+	}
+	cols, total := h.columnsFromMappedKanban(mapped, selected, today)
 	return cols, total, nil
 }
 

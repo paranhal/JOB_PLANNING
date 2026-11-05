@@ -2764,6 +2764,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"TrackProgress":    h.repo.TrackProgress(t.TaskID),
 		"Customers":        customers,
 		"CanWrite":         canWrite,
+		"CanDelete":        false,
+		"DeleteDisabledReason": "",
 		"CanPlanEdit":      canPlanEditTask(c, t),
 		"CanCarry":         canPlanEditTask(c, t),
 		"TaskDelayed":      model.TaskDelayState(*t, today).Delayed,
@@ -2783,6 +2785,17 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"PWStatusLabel":    model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
 	}
 	mergeCarryModal(data)
+	delKey, delWhy := deleteKeyForTask(*t)
+	if delKey == "" {
+		data["CanDelete"] = false
+		data["DeleteDisabledReason"] = delWhy
+	} else if block := h.listDeleteBlockReason(c, t); block != "" {
+		data["CanDelete"] = false
+		data["DeleteDisabledReason"] = block
+	} else {
+		data["CanDelete"] = true
+		data["DeleteDisabledReason"] = ""
+	}
 	if hist, err := h.repo.ListDelaysByTask(t.TaskID); err == nil {
 		data["DelayHistory"] = hist
 	}

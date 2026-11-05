@@ -1,52 +1,95 @@
-{{define "title"}}업무 관리 · 칸반 보기{{end}}
+{{define "title"}}업무 관리 · 칸반{{end}}
 {{define "content"}}
 {{template "board_shell_open" .}}
-{{if .ShowMemberFilter}}<div x-data="memberFilterBox()">{{end}}
-<section class="card">
-  <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
-    <div>
-      <p class="text-ui-sm font-extrabold tracking-wide text-success">업무 관리</p>
-      <h1 class="mt-0.5 text-2xl font-bold text-ink">칸반 보기</h1>
-      <p class="mb-1 text-ui text-ink-muted">오늘 기준. 날짜 이동 없이 새로고침합니다.</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      {{template "board_top_controls" .}}
-      {{if .ShowMemberFilter}}
-      <button type="button" class="btn btn-secondary btn-sm" x-show="closed" x-cloak @click="openBox()" aria-label="팀원별 보기 열기">팀원별 보기</button>
-      {{end}}
-      <a href="{{.KanbanHref}}" class="inline-flex h-9 items-center rounded-[10px] border border-line bg-surface px-3 text-ui font-semibold text-ink hover:bg-hover">새로고침</a>
-      <span class="text-ui font-semibold text-ink">{{.DateLabel}}</span>
+{{template "board_cal_head" .}}
+{{/* register에서 복사(95-132) 칸반 5열 이동 POST */}}
+<div class="p-4 space-y-3"
+     x-data="{
+       sel: null,
+       kanbanAskAssignee: false,
+       kanbanAskComplete: false,
+       pendingMove: null,
+       kanbanAssignee: '',
+       kanbanNote: '',
+       pick(el) {
+         const d = el.dataset;
+         if (this.sel && this.sel.itemKey === d.itemKey) { this.sel = null; return; }
+         this.sel = { itemKey: d.itemKey, col: d.col, assignee: d.assignee || '' };
+       },
+       openWork(el) {
+         const href = el.dataset.href;
+         if (href) window.location.href = href;
+       },
+       dropKanban(el) {
+         if (!this.sel || !this.sel.itemKey) return;
+         const to = el.dataset.col;
+         if (!to || to === this.sel.col) return;
+         if (to === 'unplanned') { alert('미계획으로 되돌릴 수 없습니다. 예정일 삭제는 상세 화면에서 하세요.'); return; }
+         if (this.sel.col === 'completed_today') {
+           if (!confirm('완료를 취소하고 되돌릴까요?')) return;
+         }
+         this.pendingMove = { from: this.sel.col, to: to, key: this.sel.itemKey, assignee: this.sel.assignee || '' };
+         const needAssignee = (!this.pendingMove.assignee) && (to === 'today' || to === 'in_progress');
+         if (needAssignee) { this.kanbanAssignee = ''; this.kanbanAskAssignee = true; return; }
+         if (to === 'completed_today') { this.kanbanNote = ''; this.kanbanAskComplete = true; return; }
+         this.submitKanban();
+       },
+       submitKanban() {
+         const p = this.pendingMove;
+         if (!p) return;
+         const f = this.$refs.kanbanMoveForm;
+         if (!f) return;
+         f.from.value = p.from;
+         f.to.value = p.to;
+         f.item_key.value = p.key;
+         f.assignee.value = this.kanbanAssignee || p.assignee || '';
+         f.complete_note.value = this.kanbanNote || '';
+         f.confirm_reopen.value = p.from === 'completed_today' ? '1' : '';
+         this.kanbanAskAssignee = false;
+         this.kanbanAskComplete = false;
+         this.pendingMove = null;
+         f.submit();
+       }
+     }">
+  {{/* register에서 복사(95-132) POST register kanban-move */}}
+  <form method="post" action="/workboard/register/kanban-move" x-ref="kanbanMoveForm" class="hidden" data-register-copy="95-132">
+    <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
+    <input type="hidden" name="date" value="{{.Date}}">
+    <input type="hidden" name="from">
+    <input type="hidden" name="to">
+    <input type="hidden" name="item_key">
+    <input type="hidden" name="assignee">
+    <input type="hidden" name="complete_note">
+    <input type="hidden" name="confirm_reopen">
+  </form>
+  {{template "kanban_board" .}}
+  <p class="text-[11px] text-ink-muted">다섯 열 합계 <span class="font-semibold text-ink">{{.KanbanTotal}}</span>건 · 한 카드는 한 열에만 있습니다</p>
+  <div x-show="kanbanAskAssignee" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" @click.outside="kanbanAskAssignee=false">
+      <h3 class="font-semibold text-ink">담당자를 지정하세요</h3>
+      <select x-model="kanbanAssignee" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
+        <option value="">선택</option>
+        {{range .Assignees}}
+        <option value="{{.FullName}}">{{.FullName}}</option>
+        {{end}}
+      </select>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg border" @click="kanbanAskAssignee=false">취소</button>
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-primary text-white" @click="if(kanbanAssignee) submitKanban()">확인</button>
+      </div>
     </div>
   </div>
-</section>
-{{template "board_member_filter" .}}
-{{if .ShowMemberFilter}}</div>{{end}}
-
-<div class="mt-4 flex gap-3 overflow-x-auto snap-x snap-mandatory pb-3" data-kanban-board="1" data-move="/workboard/board/kanban-move">
-  {{template "board_kanban_col" dict "Title" "지연 업무" "Hint" "" "Col" "delay" "Items" .KanbanDelay "N" .KanbanDelayN}}
-  {{template "board_kanban_col" dict "Title" "진행중(일정 외)" "Hint" "오늘 일정 없음" "Col" "off" "Items" .KanbanOff "N" .KanbanOffN}}
-  <section class="min-w-[min(100%,72rem)] snap-start rounded-[12px] border border-line bg-canvas p-3">
-    <h2 class="mb-2 text-ui font-extrabold text-ink">오늘의 업무</h2>
-    <div class="flex gap-3 overflow-x-auto">
-      {{template "board_kanban_col" dict "Title" "계획" "Hint" "" "Col" "today_plan" "Items" .KanbanPlan "N" .KanbanPlanN}}
-      {{template "board_kanban_col" dict "Title" "진행중" "Hint" "" "Col" "today_progress" "Items" .KanbanProgress "N" .KanbanProgressN}}
-      {{template "board_kanban_col" dict "Title" "부분 완료" "Hint" "" "Col" "today_partial" "Items" .KanbanPartial "N" .KanbanPartialN}}
-      {{template "board_kanban_col" dict "Title" "완료" "Hint" "" "Col" "today_done" "Items" .KanbanDone "N" .KanbanDoneN}}
+  <div x-show="kanbanAskComplete" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" @click.outside="kanbanAskComplete=false">
+      <h3 class="font-semibold text-ink">완료 내용</h3>
+      <textarea x-model="kanbanNote" rows="3" class="w-full border border-line rounded-lg px-3 py-2 text-sm"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg border" @click="kanbanAskComplete=false">취소</button>
+        <button type="button" class="px-3 py-1.5 text-xs rounded-lg bg-primary text-white" @click="if(kanbanNote.trim()) submitKanban()">완료</button>
+      </div>
     </div>
-  </section>
+  </div>
+</div>
 </div>
 {{template "board_shell_close" .}}
-{{end}}
-
-{{define "board_kanban_col"}}
-<section class="flex w-[260px] min-w-[260px] shrink-0 snap-start flex-col rounded-[10px] border border-line bg-surface" data-kanban-col="{{.Col}}" x-data="{open:true}">
-  <button type="button" class="flex items-center justify-between gap-2 border-b border-line px-3 py-2 text-left" @click="open=!open">
-    <span class="text-ui font-bold text-ink">{{.Title}} <span class="text-ink-muted">{{.N}}</span></span>
-    {{if .Hint}}<span class="text-[11px] text-ink-muted">{{.Hint}}</span>{{end}}
-  </button>
-  <div class="space-y-2 p-2" x-show="open" data-kanban-drop="{{.Col}}">
-    {{if .Items}}{{range .Items}}{{template "board_kanban_card" .}}{{end}}
-    {{else}}<p class="px-2 py-6 text-center text-ui-sm text-ink-subtle">업무 없음</p>{{end}}
-  </div>
-</section>
 {{end}}

@@ -1,52 +1,13 @@
 {{define "board_cal_head"}}
 <section class="card">
   <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
-    <div class="flex flex-wrap items-end gap-3">
-      <div>
-        <p class="text-ui-sm font-extrabold tracking-wide text-success">SCHEDULE</p>
-        <h1 class="mt-0.5 text-2xl font-bold text-ink">일정 캘린더</h1>
-      </div>
-      <p class="mb-1 text-ui text-ink-muted">내 일정과 업무를 한눈에 확인하세요.</p>
+    <div>
+      <p class="text-ui-sm font-extrabold tracking-wide text-success">업무 관리</p>
+      <h1 class="mt-0.5 text-2xl font-bold text-ink">{{.Title}}</h1>
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       {{template "board_top_controls" .}}
-      {{template "board_period_seg_cal" .}}
     </div>
-  </div>
-  <div class="flex flex-wrap items-center gap-2 border-t border-line px-6 py-2.5">
-    <form method="GET" action="/workboard/board" data-nav-replace class="inline-flex flex-wrap items-center gap-1.5">
-      <input type="hidden" name="view" value="{{.View}}">
-      <input type="hidden" name="date" value="{{.Date}}">
-      {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
-      {{if .AssigneeFilter}}<input type="hidden" name="assignee" value="{{.AssigneeFilter}}">{{end}}
-      {{if eq .Cols "flat"}}<input type="hidden" name="cols" value="flat">{{end}}
-      {{if .ShowParam}}<input type="hidden" name="show" value="{{.ShowParam}}">{{end}}
-      {{template "project_filter" .ProjectFilterUI}}
-      <label class="sr-only" for="board-group">업무 그룹</label>
-      <select id="board-group" name="work_group_id" onchange="this.form.submit()" class="h-8 rounded-lg border border-line bg-surface px-2 text-ui-sm text-ink">
-        <option value="" {{if eq .WorkGroupFilter ""}}selected{{end}}>그룹 전체</option>
-        {{range .WorkGroups}}
-        <option value="{{.GroupID}}" {{if eq $.WorkGroupFilter .GroupID}}selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
-    </form>
-    {{if eq .View "day"}}
-    <div class="inline-flex rounded-lg border border-line overflow-hidden">
-      <a href="{{.PersonHref}}" data-nav-replace class="px-2.5 py-1 text-ui-sm font-semibold {{if ne .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">담당자별 열</a>
-      <a href="{{.FlatHref}}" data-nav-replace class="border-l border-line px-2.5 py-1 text-ui-sm font-semibold {{if eq .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">한 줄</a>
-    </div>
-    {{end}}
-    {{if .AssigneeLegend}}
-    <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-muted">
-      <span>담당자</span>
-      {{range .AssigneeLegend}}
-      <span class="inline-flex items-center gap-1 rounded border border-line bg-canvas px-1.5 py-0.5">
-        <span class="font-medium text-ink">{{.Name}}</span>
-        {{if .Unregistered}}<span class="text-[9px]">미등록</span>{{end}}
-      </span>
-      {{end}}
-    </div>
-    {{end}}
   </div>
 </section>
 <div class="card mt-4 overflow-hidden">

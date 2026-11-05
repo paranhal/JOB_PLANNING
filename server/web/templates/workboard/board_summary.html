@@ -1,0 +1,29 @@
+{{define "title"}}업무 관리{{end}}
+{{define "content"}}
+{{template "board_shell_open" .}}
+{{template "board_cal_head" .}}
+  <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+    {{range .BoardSummary.Cards}}
+    {{$card := .}}
+    <section class="rounded-[12px] border border-line bg-surface p-4" data-summary-card="{{$card.Key}}">
+      <h2 class="text-ui font-extrabold text-ink">{{$card.Title}}</h2>
+      <ul class="mt-3 space-y-2">
+        {{range $card.Rows}}
+        <li class="flex items-center justify-between gap-2 text-ui-sm">
+          <span class="text-ink-muted">{{.Label}}</span>
+          {{if $.BoardSummary.Period}}
+          <span class="tabular-nums font-semibold text-ink">{{.N}}</span>
+          {{else if $card.IsToday}}
+          <span class="tabular-nums font-semibold text-ink">{{.Done}}/{{.Total}}</span>
+          {{else}}
+          <span class="tabular-nums font-semibold text-ink">{{.N}}</span>
+          {{end}}
+        </li>
+        {{end}}
+      </ul>
+    </section>
+    {{end}}
+  </div>
+</div>
+{{template "board_shell_close" .}}
+{{end}}

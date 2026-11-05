@@ -1,7 +1,7 @@
 {{define "board_scope_toggle"}}
 <span class="board-sc" role="group" aria-label="범위">
-  <a href="{{.MineHref}}" class="{{if not .ScopeAll}}on{{end}}">내 업무</a>
-  <a href="{{.AllHref}}" class="{{if .ScopeAll}}on{{end}}">전체</a>
+  <a href="{{.MineHref}}" data-nav-replace class="{{if not .ScopeAll}}on{{end}}">내 업무</a>
+  <a href="{{.AllHref}}" data-nav-replace class="{{if .ScopeAll}}on{{end}}">전체</a>
 </span>
 {{end}}
 

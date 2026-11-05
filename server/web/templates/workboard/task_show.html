@@ -111,12 +111,14 @@
       {{if .CanAddSubtask}}
       <button type="button" @click="subOpen=true" class="px-3 py-1.5 text-sm border border-primary text-violet-800 rounded-lg hover:bg-primary-soft">＋하위 업무 등록</button>
       {{end}}
-      {{if and .CanWrite (ne $t.RecurrenceRole "occurrence")}}
+      {{if and .CanDelete (not .EditMode)}}
       <form method="post" action="/workboard/tasks/{{$t.TaskID}}/delete"
-            onsubmit="return confirm('이 업무를 삭제합니다. 하위 업무나 완료된 실행 작업이 있으면 거부됩니다.')">
+            onsubmit="return confirm('이 업무를 삭제합니다.')">
         <input type="hidden" name="back" value="{{.BackURL}}">
         <button class="px-3 py-1.5 text-sm border border-danger text-red-800 rounded-lg hover:bg-danger-soft">삭제</button>
       </form>
+      {{else if .DeleteDisabledReason}}
+      <p class="text-xs text-ink-muted" data-delete-disabled="1">{{.DeleteDisabledReason}}</p>
       {{end}}
     </div>
   </div>

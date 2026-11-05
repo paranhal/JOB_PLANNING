@@ -1,21 +1,18 @@
-{{define "board_view_links"}}
-<a href="{{.ListHref}}" class="inline-flex h-9 items-center rounded-[10px] border px-3 text-ui font-semibold {{if eq .View `list`}}border-success bg-success text-primary-fg{{else}}border-line bg-surface text-ink hover:bg-hover{{end}}">일정 리스트 보기</a>
-<a href="{{.CalHref}}" class="inline-flex h-9 items-center rounded-[10px] border px-3 text-ui font-semibold {{if or (eq .View `day`) (eq .View `week`) (eq .View `month`)}}border-success bg-success text-primary-fg{{else}}border-line bg-surface text-ink hover:bg-hover{{end}}">일정 캘린더 보기</a>
-<a href="{{.KanbanHref}}" class="inline-flex h-9 items-center rounded-[10px] border px-3 text-ui font-semibold {{if eq .View `kanban`}}border-success bg-success text-primary-fg{{else}}border-line bg-surface text-ink hover:bg-hover{{end}}">칸반 보기</a>
-{{end}}
-
-{{define "board_period_seg_cal"}}
-<div class="inline-flex shrink-0 flex-nowrap whitespace-nowrap rounded-xl border border-line bg-surface p-0.5">
-  <a href="{{.DayViewHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `day`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">일</a>
-  <a href="{{.WeekViewHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `week`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">주</a>
-  <a href="{{.MonthViewHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .View `month`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">월</a>
+{{define "board_period_seg"}}
+<div class="inline-flex shrink-0 flex-nowrap whitespace-nowrap rounded-xl border border-line bg-surface p-0.5" role="group" aria-label="기간">
+  <a href="{{.PeriodDayHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .Period `day`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">일</a>
+  <a href="{{.PeriodWeekHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .Period `week`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">주</a>
+  <a href="{{.PeriodMonthHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .Period `month`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">월</a>
 </div>
 {{end}}
 
-{{define "board_period_seg_list"}}
-<div class="inline-flex shrink-0 flex-nowrap whitespace-nowrap rounded-xl border border-line bg-surface p-0.5">
-  <a href="{{.ListDayHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if or (not .ListRange) (eq .ListRange `day`)}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">일</a>
-  <a href="{{.ListWeekHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .ListRange `week`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">주</a>
-  <a href="{{.ListMonthHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .ListRange `month`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">월</a>
+{{define "board_display_seg"}}
+<div class="inline-flex shrink-0 flex-nowrap whitespace-nowrap rounded-xl border border-line bg-surface p-0.5" role="group" aria-label="보기">
+  <a href="{{.SummaryHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .Display `summary`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">요약</a>
+  <a href="{{.ScheduleHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .Display `schedule`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">일정표</a>
+  <a href="{{.KanbanHref}}" class="rounded-lg px-3 py-1.5 text-ui font-bold {{if eq .Display `kanban`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">칸반</a>
 </div>
 {{end}}
+
+{{define "board_period_seg_cal"}}{{template "board_period_seg" .}}{{end}}
+{{define "board_period_seg_list"}}{{template "board_period_seg" .}}{{end}}

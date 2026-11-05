@@ -161,14 +161,19 @@ func TestPersonalBoardDefaultListMineOnly(t *testing.T) {
 		t.Fatalf("code=%d %s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "내업무-표시") {
-		t.Fatal("본인 업무 없음")
+	if !strings.Contains(body, `data-summary-card="today"`) {
+		t.Fatal("기본 화면이 요약이 아니다")
 	}
 	if strings.Contains(body, "동료업무-숨김") {
 		t.Fatal("타 담당자 업무가 보인다")
 	}
-	if !strings.Contains(body, "일일 업무") {
-		t.Fatal("리스트 제목 없음")
+	day := doGetWith(t, e, "/workboard/board?view=day", jwtCookieUser(t, me))
+	db := day.Body.String()
+	if !strings.Contains(db, "내업무-표시") {
+		t.Fatal("본인 업무 없음")
+	}
+	if strings.Contains(db, "동료업무-숨김") {
+		t.Fatal("타 담당자 업무가 일정표에 보인다")
 	}
 }
 
@@ -177,7 +182,7 @@ func TestPersonalBoardOrgIsolationAndOrgAllMineOnly(t *testing.T) {
 	today := time.Now().Format(dateLayout)
 	mustCreateBoardTask(t, repo, "O01내업무", today, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	mustCreateBoardTask(t, repo, "O02타업무", today, "09:00", "10:00", "O02", other.FullName, other.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
-	rec := doGetWith(t, e, "/workboard/board", jwtCookieUser(t, me))
+	rec := doGetWith(t, e, "/workboard/board?view=day", jwtCookieUser(t, me))
 	body := rec.Body.String()
 	if strings.Contains(body, "O02타업무") {
 		t.Fatal("O01 사용자에게 O02 업무가 보인다")
@@ -189,7 +194,7 @@ func TestPersonalBoardOrgIsolationAndOrgAllMineOnly(t *testing.T) {
 	}
 	got, _ := users.GetByUsername("vs1")
 	mustCreateBoardTask(t, repo, "비전본인", today, "13:00", "14:00", "O02", got.FullName, got.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
-	page := doGetWith(t, e, "/workboard/board", jwtCookieUser(t, got))
+	page := doGetWith(t, e, "/workboard/board?view=day", jwtCookieUser(t, got))
 	p := page.Body.String()
 	if !strings.Contains(p, "비전본인") {
 		t.Fatal("OrgAll 비전 본인 업무 없음")
@@ -197,7 +202,7 @@ func TestPersonalBoardOrgIsolationAndOrgAllMineOnly(t *testing.T) {
 	if !strings.Contains(p, "O01내업무") || !strings.Contains(p, "O02타업무") {
 		t.Fatal("비전 관리자 기본 전체에서 조직 업무가 안 보인다")
 	}
-	mine := doGetWith(t, e, "/workboard/board?assignee="+url.QueryEscape(got.FullName), jwtCookieUser(t, got))
+	mine := doGetWith(t, e, "/workboard/board?view=day&assignee="+url.QueryEscape(got.FullName), jwtCookieUser(t, got))
 	mb := mine.Body.String()
 	if !strings.Contains(mb, "비전본인") {
 		t.Fatal("비전 내 업무 필터에 본인 없음")
@@ -248,8 +253,8 @@ func TestPersonalBoardViewDateFallback(t *testing.T) {
 		}
 	}
 	bad := doGetWith(t, e, "/workboard/board?view=nope", ck)
-	if !strings.Contains(bad.Body.String(), "일일 업무") {
-		t.Fatal("잘못된 view 가 리스트로 안 떨어짐")
+	if !strings.Contains(bad.Body.String(), `data-summary-card="today"`) {
+		t.Fatal("잘못된 view 가 요약으로 안 떨어짐")
 	}
 }
 
@@ -263,7 +268,7 @@ func TestPersonalBoardMonthMoreAndOutsideMonth(t *testing.T) {
 	}
 	rec := doGetWith(t, e, "/workboard/board?view=month&date="+ds, jwtCookieUser(t, me))
 	body := rec.Body.String()
-	if !strings.Contains(body, "+2건 더보기") {
+	if !strings.Contains(body, "+3건 더보기") {
 		t.Fatalf("더보기 없음")
 	}
 	if !strings.Contains(body, "text-ink-subtle") {

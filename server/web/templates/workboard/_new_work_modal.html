@@ -1,6 +1,6 @@
 {{define "board_new_work_btn"}}
 {{if .CanWrite}}
-<button type="button" class="inline-flex h-9 items-center rounded-[10px] bg-success px-3.5 text-ui font-semibold text-primary-fg hover:opacity-90" @click="openNewWork()" data-new-work>+ 업무 등록</button>
+<button type="button" class="inline-flex h-9 items-center rounded-[10px] bg-success px-3.5 text-ui font-semibold text-primary-fg hover:opacity-90" @click="openNewWork()" data-new-work>{{if eq .Display "summary"}}+ 업무 시작{{else}}+ 업무 등록{{end}}</button>
 {{end}}
 {{end}}
 

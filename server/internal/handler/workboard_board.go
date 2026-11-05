@@ -16,14 +16,17 @@ import (
 )
 
 const (
-	boardViewList   = "list"
-	boardViewMonth  = "month"
-	boardViewWeek   = "week"
-	boardViewDay    = "day"
-	boardViewKanban = "kanban"
-	boardRangeDay   = "day"
-	boardRangeWeek  = "week"
-	boardRangeMonth = "month"
+	boardViewList     = "list"
+	boardViewMonth    = "month"
+	boardViewWeek     = "week"
+	boardViewDay      = "day"
+	boardViewKanban   = "kanban"
+	boardRangeDay     = "day"
+	boardRangeWeek    = "week"
+	boardRangeMonth   = "month"
+	boardDisplaySummary  = "summary"
+	boardDisplaySchedule = "schedule"
+	boardDisplayKanban   = "kanban"
 
 	boardDayStartHour = 7
 	boardDayEndHour   = 21
@@ -168,27 +171,68 @@ func (h *WorkboardHandler) Board(c echo.Context) error {
 		data["FlashOK"] = ok
 		data["FlashOKMsg"] = boardPlanSavedMsg(c)
 	}
-	view := data["View"].(string)
-	tpl := "workboard/board_list.html"
-	switch view {
-	case boardViewMonth:
-		tpl = "workboard/board_month.html"
-	case boardViewWeek:
-		tpl = "workboard/board_week.html"
-	case boardViewDay:
-		tpl = "workboard/board_day.html"
-	case boardViewKanban:
+	display, _ := data["Display"].(string)
+	period, _ := data["Period"].(string)
+	tpl := "workboard/board_summary.html"
+	switch display {
+	case boardDisplayKanban:
 		tpl = "workboard/board_kanban.html"
+	case boardDisplaySchedule:
+		switch period {
+		case boardRangeWeek:
+			tpl = "workboard/board_week.html"
+		case boardRangeMonth:
+			tpl = "workboard/board_month.html"
+		default:
+			tpl = "workboard/board_day.html"
+		}
 	}
 	return c.Render(http.StatusOK, tpl, data)
 }
 
 func parseBoardView(raw string) string {
+	d, p := parseBoardDisplay(raw, "")
+	return boardURLView(d, p)
+}
+
+func parseBoardDisplay(raw, rng string) (display, period string) {
+	period = parseListRangeParam(rng)
 	switch strings.TrimSpace(raw) {
-	case boardViewMonth, boardViewWeek, boardViewDay, boardViewList, boardViewKanban:
-		return strings.TrimSpace(raw)
+	case boardViewDay:
+		return boardDisplaySchedule, boardRangeDay
+	case boardViewWeek:
+		return boardDisplaySchedule, boardRangeWeek
+	case boardViewMonth:
+		return boardDisplaySchedule, boardRangeMonth
+	case boardViewList:
+		return boardDisplaySchedule, period
+	case boardViewKanban:
+		if period != boardRangeWeek && period != boardRangeMonth {
+			period = boardRangeDay
+		}
+		return boardDisplayKanban, period
+	case boardViewSummary, "":
+		return boardDisplaySummary, period
 	default:
-		return boardViewList
+		return boardDisplaySummary, boardRangeDay
+	}
+}
+
+func boardURLView(display, period string) string {
+	switch display {
+	case boardDisplayKanban:
+		return boardViewKanban
+	case boardDisplaySchedule:
+		switch period {
+		case boardRangeWeek:
+			return boardViewWeek
+		case boardRangeMonth:
+			return boardViewMonth
+		default:
+			return boardViewDay
+		}
+	default:
+		return boardViewSummary
 	}
 }
 
@@ -566,20 +610,14 @@ func collectASMntIDs(tasks []model.WorkTask) (asIDs, mntIDs []string) {
 }
 
 func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interface{}, error) {
-	view := parseBoardView(c.QueryParam("view"))
+	display, period := parseBoardDisplay(c.QueryParam("view"), c.QueryParam("range"))
+	view := boardURLView(display, period)
 	now := time.Now()
 	today := now.Format(dateLayout)
 	base := parseBoardDate(c.QueryParam("date"), now)
-	listRange := parseListRangeParam(c.QueryParam("range"))
-	if view == boardViewKanban {
-		base = parseBoardDate(today, now)
-		listRange = boardRangeDay
-	}
+	listRange := period
 	q := strings.TrimSpace(c.QueryParam("q"))
-	rangeView := view
-	if view == boardViewList {
-		rangeView = listRange
-	}
+	rangeView := boardRangeView(period)
 	fromT, toT := boardRange(rangeView, base)
 	from, to := fromT.Format(dateLayout), toT.Format(dateLayout)
 	scope := h.withBoardMemberFilter(c, resolveBoardScope(c))
@@ -668,7 +706,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 
 	weekdayKR := []string{"일", "월", "화", "수", "목", "금", "토"}
 	var monthWeeks [][]boardMonthCell
-	if view == boardViewMonth {
+	if display == boardDisplaySchedule && period == boardRangeMonth {
 		for w := 0; w < 6; w++ {
 			row := make([]boardMonthCell, 7)
 			for d := 0; d < 7; d++ {
@@ -677,9 +715,9 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 				list := byDate[ds]
 				more := 0
 				shown := list
-				if len(list) > 3 {
-					shown = list[:3]
-					more = len(list) - 3
+				if len(list) > 2 {
+					shown = list[:2]
+					more = len(list) - 2
 				}
 				row[d] = boardMonthCell{
 					Date:     ds,
@@ -696,7 +734,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	}
 
 	var weekCols []boardWeekCol
-	if view == boardViewWeek {
+	if display == boardDisplaySchedule && period == boardRangeWeek {
 		for i := 0; i < 7; i++ {
 			day := fromT.AddDate(0, 0, i)
 			ds := day.Format(dateLayout)
@@ -715,7 +753,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	dayHours := []string{}
 	colsMode := parseBoardCols(c.QueryParam("cols"))
 	var dayPersonCols []boardPersonCol
-	if view == boardViewDay {
+	if display == boardDisplaySchedule && period == boardRangeDay {
 		ds := base.Format(dateLayout)
 		list := byDate[ds]
 		for _, it := range calItems {
@@ -763,26 +801,25 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		}
 	}
 
-	shiftView := view
-	if view == boardViewList {
-		shiftView = listRange
-	}
+	shiftView := rangeView
 	prev := boardPeriodShift(shiftView, base, -1).Format(dateLayout)
 	next := boardPeriodShift(shiftView, base, 1).Format(dateLayout)
-	calHref := boardURL(boardViewDay, base.Format(dateLayout), keep)
-	listHref := boardURL(boardViewList, base.Format(dateLayout), keep)
-	kanbanHref := boardURL(boardViewKanban, today, keep)
+	calHref := boardModeURL(boardDisplaySchedule, boardRangeDay, base.Format(dateLayout), keep)
+	listHref := boardModeURL(boardDisplaySchedule, period, base.Format(dateLayout), keep)
 	ds := base.Format(dateLayout)
-	title := "일일 업무"
-	if view != boardViewList {
-		title = "일정 캘린더"
-	}
-	if view == boardViewKanban {
-		title = "칸반 보기"
+	kanbanHref := boardModeURL(boardDisplayKanban, period, ds, keep)
+	title := "업무 관리"
+	switch display {
+	case boardDisplaySchedule:
+		title = "일정표"
+	case boardDisplayKanban:
+		title = "칸반"
+	default:
+		title = "요약"
 	}
 	writeBase := boardCanWrite(c)
 	dsLock := base.Format(dateLayout)
-	dayPast := registerPastDayLockEnabled && view == boardViewDay && dsLock < today
+	dayPast := registerPastDayLockEnabled && display == boardDisplaySchedule && period == boardRangeDay && dsLock < today
 	unlocked, unlockExp := h.registerDayUnlocked(c, dsLock)
 	write := writeBase && (!dayPast || unlocked)
 	canUnlock := registerPastDayLockEnabled && writeBase && isAdminRole(c) && dayPast && !unlocked
@@ -857,7 +894,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	for i := range weekCols {
 		h.stampBoardMove(c, weekCols[i].Items, write, boardBack)
 	}
-	if view == boardViewDay && colsMode == boardColsPerson {
+	if display == boardDisplaySchedule && period == boardRangeDay && colsMode == boardColsPerson {
 		assignees := listAssignableForPicker(h.userRepo, c)
 		order := make([]string, 0, len(assignees))
 		regNames := map[string]bool{}
@@ -886,7 +923,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	flatKeep.Set("cols", boardColsFlat)
 	assignees := listAssignableForPicker(h.userRepo, c)
 	extraAssignees := extraAssigneesForBoard(assignees, dayPersonCols)
-	if view != boardViewDay || colsMode != boardColsPerson || strings.TrimSpace(scope.AssigneeFilter) != "" {
+	if display != boardDisplaySchedule || period != boardRangeDay || colsMode != boardColsPerson || strings.TrimSpace(scope.AssigneeFilter) != "" {
 		extraAssignees = nil
 	}
 	var legendTasks []model.WorkTask
@@ -895,10 +932,14 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	}
 	projects, _ := h.repo.ListActiveProjectsLabeled()
 	wgItems, _ := h.workGroupPicks(c)
+	prevWD := boardPrevWorkday(ds)
+	sum := buildBoardSummary(calItems, rangeView, from, to, ds, prevWD)
 	data := map[string]interface{}{
 		"Title":            title,
 		"Active":           NavWorkBoard,
 		"View":             view,
+		"Display":          display,
+		"Period":           period,
 		"Date":             ds,
 		"Today":            today,
 		"DateLabel":        formatDotDate(ds),
@@ -906,19 +947,25 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"ListRange":        listRange,
 		"ListGroups":       listGroups,
 		"KanbanHref":       kanbanHref,
+		"SummaryHref":      boardModeURL(boardDisplaySummary, period, ds, keep),
+		"ScheduleHref":     boardModeURL(boardDisplaySchedule, period, ds, keep),
+		"PeriodDayHref":    boardModeURL(display, boardRangeDay, ds, keep),
+		"PeriodWeekHref":   boardModeURL(display, boardRangeWeek, ds, keep),
+		"PeriodMonthHref":  boardModeURL(display, boardRangeMonth, ds, keep),
 		"PrevDate":         prev,
 		"NextDate":         next,
 		"Q":                q,
 		"Items":            items,
 		"Count":            uniqueTaskCount(items),
+		"BoardSummary":     sum,
 		"Unplaced":         unplaced,
 		"UnplacedN":        unplacedN,
 		"OtherUnplacedN":   entries.OtherUnplacedN,
 		"MineEmptyAllN":    mineEmptyN,
 		"ScopeAll":         scope.ScopeAll,
 		"ShowScopeToggle":  true,
-		"MineHref":         boardURL(view, ds, mineKeep),
-		"AllHref":          boardURL(view, ds, allKeep),
+		"MineHref":         boardModeURL(display, period, ds, mineKeep),
+		"AllHref":          boardModeURL(display, period, ds, allKeep),
 		"MonthWeeks":       monthWeeks,
 		"WeekCols":         weekCols,
 		"DayTimed":         dayTimed,
@@ -929,21 +976,21 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"DayBodyHeight":    (boardDayEndHour - boardDayStartHour + 1) * boardDayPxPerHour,
 		"CalHref":          calHref,
 		"ListHref":         listHref,
-		"PrevHref":         boardURL(view, prev, keep),
-		"NextHref":         boardURL(view, next, keep),
-		"TodayHref":        boardURL(view, today, keep),
-		"MonthViewHref":    boardURL(boardViewMonth, ds, keep),
-		"WeekViewHref":     boardURL(boardViewWeek, ds, keep),
-		"DayViewHref":      boardURL(boardViewDay, ds, keep),
-		"ListDayHref":      boardListRangeURL(ds, boardRangeDay, keep),
-		"ListWeekHref":     boardListRangeURL(ds, boardRangeWeek, keep),
-		"ListMonthHref":    boardListRangeURL(ds, boardRangeMonth, keep),
+		"PrevHref":         boardModeURL(display, period, prev, keep),
+		"NextHref":         boardModeURL(display, period, next, keep),
+		"TodayHref":        boardModeURL(display, period, today, keep),
+		"MonthViewHref":    boardModeURL(display, boardRangeMonth, ds, keep),
+		"WeekViewHref":     boardModeURL(display, boardRangeWeek, ds, keep),
+		"DayViewHref":      boardModeURL(display, boardRangeDay, ds, keep),
+		"ListDayHref":      boardModeURL(boardDisplaySchedule, boardRangeDay, ds, keep),
+		"ListWeekHref":     boardModeURL(boardDisplaySchedule, boardRangeWeek, ds, keep),
+		"ListMonthHref":    boardModeURL(boardDisplaySchedule, boardRangeMonth, ds, keep),
 		"MineParam":        scope.MineParam,
 		"AssigneeFilter":   scope.AssigneeFilter,
-		"ShowMemberFilter": showBoardMemberFilter(scope.Role, view),
+		"ShowMemberFilter": false,
 		"TeamMembers":      boardMemberOpts(scope),
 		"MemberFilterOn":   len(scope.MemberIDs) > 0,
-		"MemberAllHref":    boardURL(view, ds, memberAllKeep(keep)),
+		"MemberAllHref":    boardModeURL(display, period, ds, memberAllKeep(keep)),
 		"MembersParam":     strings.Join(scope.MemberIDs, ","),
 		"Weekdays":         weekdayKR,
 		"CanWrite":         write,
@@ -951,12 +998,12 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"CanUnlockPast":    canUnlock,
 		"EditUnlocked":     unlocked && dayPast,
 		"UnlockExpires":    unlockExpLabel,
-		"UnlockRedirect":   boardURL(view, ds, keep),
+		"UnlockRedirect":   boardModeURL(display, period, ds, keep),
 		"Cols":             colsMode,
 		"DayPersonCols":    dayPersonCols,
 		"AssigneeColMin":   registerAssigneeColMinPx,
-		"PersonHref":       boardURL(view, ds, personKeep),
-		"FlatHref":         boardURL(view, ds, flatKeep),
+		"PersonHref":       boardModeURL(display, period, ds, personKeep),
+		"FlatHref":         boardModeURL(display, period, ds, flatKeep),
 		"ExtraAssignees":   extraAssignees,
 		"DayLeaveNames":    boardDayLeaveNames(h, c, ds),
 		"Assignees":        assignees,
@@ -966,38 +1013,35 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"ProjectFilter":    strings.TrimSpace(c.QueryParam("project")),
 		"WorkGroupFilter":  strings.TrimSpace(c.QueryParam("work_group_id")),
 		"CurrentUserName":  me,
-		"BoardHref":        boardURL(view, ds, keep),
-		"ScheduleRedirect": boardURL(view, ds, keep),
+		"BoardHref":        boardModeURL(display, period, ds, keep),
+		"ScheduleRedirect": boardModeURL(display, period, ds, keep),
+		"ModalRedirect":    boardModeURL(display, period, ds, keep),
 		"ShowPlan":         showPlan,
 		"ShowAct":          showAct,
 		"ShowParam":        curShow,
 		"PlanCount":        planN,
 		"ActCount":         actN,
-		"ShowPlanHref":     boardURL(view, ds, planKeep),
-		"ShowActHref":      boardURL(view, ds, actKeep),
-		"ShowBothHref":     boardURL(view, ds, bothKeep),
+		"ShowPlanHref":     boardModeURL(display, period, ds, planKeep),
+		"ShowActHref":      boardModeURL(display, period, ds, actKeep),
+		"ShowBothHref":     boardModeURL(display, period, ds, bothKeep),
 		"ShowScopeBadge":   showAct && scope.ScopeAll,
+		"KanbanDrag":       write,
+		"KanbanDrop":       "el",
+		"KanbanHint":       "유형 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
 	}
-	if view == boardViewKanban {
-		kanbanItems := append([]boardItem{}, calItems...)
-		stampBoardPlanEdit(c, kanbanItems)
-		stampBoardDelayReasons(h, kanbanItems)
-		stampBoardItemKinds(h, kanbanItems)
-		h.stampBoardMove(c, kanbanItems, write, boardURL(view, ds, keep))
-		kcols := classifyKanban(kanbanItems, today)
-		stampKanbanExtras(h, kcols)
-		data["KanbanDelay"] = kcols[kanbanColDelay]
-		data["KanbanOff"] = kcols[kanbanColOff]
-		data["KanbanPlan"] = kcols[kanbanColPlan]
-		data["KanbanProgress"] = kcols[kanbanColProgress]
-		data["KanbanPartial"] = kcols[kanbanColPartial]
-		data["KanbanDone"] = kcols[kanbanColDone]
-		data["KanbanDelayN"] = len(kcols[kanbanColDelay])
-		data["KanbanOffN"] = len(kcols[kanbanColOff])
-		data["KanbanPlanN"] = len(kcols[kanbanColPlan])
-		data["KanbanProgressN"] = len(kcols[kanbanColProgress])
-		data["KanbanPartialN"] = len(kcols[kanbanColPartial])
-		data["KanbanDoneN"] = len(kcols[kanbanColDone])
+	if display == boardDisplayKanban {
+		af := strings.TrimSpace(scope.AssigneeFilter)
+		cols, total, kErr := h.loadBoardKanban(from, to, ds, af, currentOrg(c))
+		if kErr != nil {
+			return nil, kErr
+		}
+		data["KanbanColumns"] = cols
+		data["KanbanTotal"] = total
+	}
+	if display == boardDisplaySchedule && period == boardRangeDay {
+		if err := h.attachCopiedRegisterTimetable(c, data, ds, strings.TrimSpace(scope.AssigneeFilter), currentOrg(c)); err != nil {
+			return nil, err
+		}
 	}
 	mergeCarryModal(data)
 	data["ItemOrgID"] = currentOrg(c)
