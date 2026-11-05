@@ -62,7 +62,7 @@ func Test95_60_MntCalendarScheduleShow(t *testing.T) {
 		t.Fatalf("cal %d %s", def.Code, def.Body.String())
 	}
 	body := def.Body.String()
-	if !strings.Contains(body, "접수(계획)") || !strings.Contains(body, "조치(실행)") {
+	if !strings.Contains(body, "접수(계획)") || !strings.Contains(body, "완료") {
 		t.Fatal("정기점검 토글 없음")
 	}
 	days := mntDayVisitsJSON(body)
@@ -85,7 +85,7 @@ func Test95_60_MntCalendarScheduleShow(t *testing.T) {
 	if !strings.Contains(ad, "조치사이트") {
 		t.Fatal("조치만인데 완료 사이트 없음")
 	}
-	if !strings.Contains(ab, "접수(계획)") || !strings.Contains(ab, "조치(실행)") {
+	if !strings.Contains(ab, "접수(계획)") || !strings.Contains(ab, "완료") {
 		t.Fatal("꺼진 쪽 토글이 사라짐")
 	}
 

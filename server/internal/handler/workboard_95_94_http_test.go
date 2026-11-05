@@ -345,7 +345,7 @@ func Test95_94_C_ActionToggleAndCounts(t *testing.T) {
 	if strings.Contains(ab, "접수만94") || strings.Contains(ab, "기간걸침예정") {
 		t.Fatal("조치만인데 접수가 보임")
 	}
-	if !strings.Contains(ab, "조치(실행) 2건") {
+	if !strings.Contains(ab, "완료 2건") {
 		t.Fatalf("건수 %s", snippetShow(ab))
 	}
 	if !strings.Contains(ab, "총 2개의 업무") {

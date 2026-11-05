@@ -45,10 +45,10 @@ func Test95_60_ScheduleShowToggleBoard(t *testing.T) {
 		t.Fatalf("default %d", def.Code)
 	}
 	body := def.Body.String()
-	if !strings.Contains(body, "접수(계획)") || !strings.Contains(body, "조치(실행)") {
+	if !strings.Contains(body, "접수(계획)") || !strings.Contains(body, "완료") {
 		t.Fatal("토글 문구 없음")
 	}
-	if !strings.Contains(body, "접수(계획) 1건") || !strings.Contains(body, "조치(실행) 1건") {
+	if !strings.Contains(body, "접수(계획) 1건") || !strings.Contains(body, "완료 1건") {
 		t.Fatalf("건수 없음: %s", snippetShow(body))
 	}
 	if !strings.Contains(body, `data-show-bit="plan"`) || !strings.Contains(body, `data-show-bit="act"`) {
@@ -85,7 +85,7 @@ func Test95_60_ScheduleShowToggleBoard(t *testing.T) {
 	if !strings.Contains(ab, "완료일만60") {
 		t.Fatal("조치만인데 완료 업무 없음")
 	}
-	if !strings.Contains(ab, "접수(계획) 1건") || !strings.Contains(ab, "조치(실행) 1건") {
+	if !strings.Contains(ab, "접수(계획) 1건") || !strings.Contains(ab, "완료 1건") {
 		t.Fatal("꺼진 쪽 건수가 사라짐")
 	}
 
