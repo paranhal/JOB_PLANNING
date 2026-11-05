@@ -94,7 +94,10 @@ func TestSales95_19NewFormStageBoxAndFields(t *testing.T) {
 	if !strings.Contains(body, "open02: false") || !strings.Contains(body, "open03: false") || !strings.Contains(body, "open04: true") {
 		t.Fatal("접힘 기본값")
 	}
-	need := append(append([]string{"name", "is_tentative_name", "biz_type", "notes", "quick_quote", "initial_files"}, sales95_19Fields02...), sales95_19Fields03...)
+	if !strings.Contains(body, "/sales/quick-quote") {
+		t.Fatal("빠른 견적")
+	}
+	need := append(append([]string{"name", "is_tentative_name", "biz_type", "notes", "initial_files"}, sales95_19Fields02...), sales95_19Fields03...)
 	for _, n := range need {
 		if !strings.Contains(body, `name="`+n+`"`) {
 			if n == "group_id" {

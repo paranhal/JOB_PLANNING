@@ -34,7 +34,7 @@
               </template>
             </ul>
           </div>
-          <p class="text-ui-xs text-amber-800 mt-1" x-show="attnNew" x-cloak>등록되지 않은 담당자입니다. 저장하면 새 연락처로 추가됩니다.</p>
+          <p class="text-ui-xs text-warning mt-1" x-show="attnNew" x-cloak>등록되지 않은 담당자입니다. 저장하면 새 연락처로 추가됩니다.</p>
         </div>
       </fieldset>
       <fieldset class="min-w-0 border-0 p-0 m-0 space-y-3" :disabled="!newCust" x-show="newCust" x-cloak>
@@ -105,7 +105,7 @@
                 <td class="py-2 pr-2"><input name="line_price" x-model="ln.price" class="input w-full text-right"></td>
                 <td class="py-2 pr-2 tabular-nums text-right" x-text="fmt(lineAmt(ln))"></td>
                 <td class="py-2">
-                  <span class="text-xs text-emerald-700" x-show="ln.registered" x-cloak>등록됨</span>
+                  <span class="text-xs text-success" x-show="ln.registered" x-cloak>등록됨</span>
                   <button type="button" class="text-xs border rounded px-2 py-1" x-show="!ln.registered && ln.name && ln.price" x-cloak @click="askMaster(i)">마스터 등록</button>
                 </td>
               </tr>

@@ -370,7 +370,7 @@
       <div class="sm:col-span-3">
         <p class="text-xs text-gray-500">합계 <span x-text="vat==='included' ? '(VAT포함)' : '(VAT미포함)'"></span></p>
         <p class="text-lg font-semibold tabular-nums" x-text="fmt(totals().total)+'원'"></p>
-        <p class="text-xs text-gray-500 mt-1" x-show="totals().before !== totals().total" x-text="'(' + cutHint() + ' · 절사 전 '+fmt(totals().before)+')'"></p>
+        <p class="text-xs text-ink-muted mt-1" x-show="totals().before !== totals().total" x-text="'(' + cutHint() + ' · 절사 전 '+fmt(totals().before)+')'"></p>
       </div>
     </div>
     </details>
