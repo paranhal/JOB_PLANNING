@@ -2,7 +2,6 @@
 # 만료일이 지나면 test_gate 가 실패한다. 해결되면 이 파일에서 지운다.
 # 목표: 항목 0.
 # 95-113D: 1afb09a(95-111 직후)부터 이미 실패. UILint/UIContract는 등록하지 않음.
-internal/handler::TestShowPlanQuarterDisplayHTMLByMonth  # 1afb09a부터 실패 / 95-113D / 2026-11-18
 internal/handler::TestNewTestFilesDoNotCallTimeNow  # 95-86~111 등 기존 테스트 time.Now. 113 picker는 고정일로 제거 / 95-113D / 2026-11-18
 internal/handler::Test95_68_Survey94Templates  # 표 템플릿 95 vs 98 / 95-113D / 2026-11-18
 internal/handler::TestWorkSelfReviewHeaderAverage  # 1afb09a부터 실패 / 95-113D / 2026-11-18

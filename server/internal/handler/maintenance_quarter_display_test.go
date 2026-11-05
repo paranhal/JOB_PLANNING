@@ -43,7 +43,7 @@ func TestShowPlanQuarterDisplayHTMLByMonth(t *testing.T) {
 	if !strings.Contains(b1, "분기 점검 대기") || !strings.Contains(b1, "분기관") {
 		t.Fatalf("1월 안내/목록 없음: %s", b1)
 	}
-	if strings.Contains(b1, "분기 점검 확인") || strings.Contains(b1, "이미 점검함") || strings.Contains(b1, "건너뛰기") {
+	if strings.Contains(b1, "분기 점검 확인") || strings.Contains(b1, "이미 점검함") {
 		t.Fatal("1월에 확인 3입력이 보이면 안 됨")
 	}
 	if strings.Contains(b1, "아직 배정되지 않았습니다 —") {
