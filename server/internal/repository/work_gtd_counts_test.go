@@ -146,6 +146,14 @@ func TestAdminGTDStatusInclusionCounts(t *testing.T) {
 		t.Fatalf("행정 현황 Complete=%d want 1", st.Complete)
 	}
 
+	adm, err := NewStatsRepo(db).countAdminSlice(day, "2026-08-12", ParseMeetingFilter(model.StatsScopeTeam, "", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if adm.Receipt != 6 {
+		t.Fatalf("통계 행정 접수=%d want 6 (취소 WT-canc 제외)", adm.Receipt)
+	}
+
 	created := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "빠른메모", Status: model.WBTaskInbox}
 	if err := NewWBRepo(db).CreateTask(created); err != nil {
 		t.Fatal(err)

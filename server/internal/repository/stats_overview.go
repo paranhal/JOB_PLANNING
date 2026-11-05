@@ -413,6 +413,7 @@ func (r *StatsRepo) countAdminSlice(from, toEx string, f model.StatsMeetingFilte
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') >= ?
 		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') < ?`+adminSQL, args...)
 	if err != nil {
@@ -430,6 +431,7 @@ func (r *StatsRepo) countAdminSlice(from, toEx string, f model.StatsMeetingFilte
 	if s.Modified, err = r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND (
 		    (COALESCE(t.recurrence_role,'')='occurrence'
 		     AND t.status='complete'
@@ -454,6 +456,7 @@ func (r *StatsRepo) countSalesSlice(from, toEx string, f model.StatsMeetingFilte
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type = 'sales'
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') >= ?
 		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') < ?`+adminSQL, args...)
 	if err != nil {
@@ -471,6 +474,7 @@ func (r *StatsRepo) countSalesSlice(from, toEx string, f model.StatsMeetingFilte
 	if s.Modified, err = r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type = 'sales'
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND (
 		    (COALESCE(t.recurrence_role,'')='occurrence'
 		     AND t.status='complete'
@@ -495,6 +499,7 @@ func (r *StatsRepo) countProjectWorkSlice(from, toEx string, f model.StatsMeetin
 	n, err := r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type = 'project_work'
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') >= ?
 		  AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '') < ?`+adminSQL, args...)
 	if err != nil {
@@ -512,6 +517,7 @@ func (r *StatsRepo) countProjectWorkSlice(from, toEx string, f model.StatsMeetin
 	if s.Modified, err = r.countSQL(`
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type = 'project_work'
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND (
 		    (COALESCE(t.recurrence_role,'')='occurrence'
 		     AND t.status='complete'
