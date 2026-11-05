@@ -176,6 +176,7 @@ func (r *StatsRepo) countAdminCarry(dateBefore string, f model.StatsMeetingFilte
 		SELECT COUNT(*) FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
 		  AND COALESCE(t.status,'') != 'complete'
+		  AND COALESCE(t.status,'') != '`+model.WBTaskCancelled+`'
 		  AND `+dateExpr+` < ?
 		  AND `+dateExpr+` IS NOT NULL AND TRIM(COALESCE(`+dateExpr+`,'')) != ''`+adminSQL, args...)
 }

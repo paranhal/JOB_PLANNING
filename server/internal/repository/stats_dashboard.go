@@ -797,6 +797,7 @@ func (r *StatsRepo) mapDayCountsAdmin(from, toEx string, f model.StatsMeetingFil
 		SELECT ` + base + ` AS d, COUNT(*)
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')` + status + `
+		  AND COALESCE(t.status,'') != '` + model.WBTaskCancelled + `'
 		  AND ` + base + ` >= ? AND ` + base + ` < ?` + adminSQL + `
 		GROUP BY d`
 	return r.scanDayCountMap(q, append([]interface{}{from, toEx}, adminArgs...)...)
@@ -820,7 +821,8 @@ func (r *StatsRepo) mapDayCountsAdminOpen(from, toEx string, f model.StatsMeetin
 		SELECT ` + base + ` AS d, COUNT(*)
 		FROM work_tasks t
 		WHERE t.work_type IN ('admin','support')
-		  AND t.status != 'complete'
+		  AND COALESCE(t.status,'') != 'complete'
+		  AND COALESCE(t.status,'') != '` + model.WBTaskCancelled + `'
 		  AND ` + base + ` >= ? AND ` + base + ` < ?` + adminSQL + `
 		GROUP BY d`
 	return r.scanDayCountMap(q, append([]interface{}{from, toEx}, adminArgs...)...)

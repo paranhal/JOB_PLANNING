@@ -384,3 +384,43 @@ func TestAdminWorkCountsInReceiptNotProcess(t *testing.T) {
 	}
 	_ = kpi
 }
+
+func TestAdminChartReceiptOpenAndCarryExcludeCancelled(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "chart_canc.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	day := "2026-08-11"
+	insertGTDTask(t, db, "WT-open", model.WBWorkAdmin, model.WBTaskWaiting, day, "", "")
+	insertGTDTask(t, db, "WT-done", model.WBWorkAdmin, model.WBTaskComplete, day, "", day)
+	insertGTDTask(t, db, "WT-canc", model.WBWorkAdmin, model.WBTaskCancelled, day, "", "")
+	insertGTDTask(t, db, "WT-old-open", model.WBWorkAdmin, model.WBTaskWaiting, "2026-08-01", "", "")
+	insertGTDTask(t, db, "WT-old-canc", model.WBWorkAdmin, model.WBTaskCancelled, "2026-08-01", "", "")
+	insertGTDTask(t, db, "WT-old-done", model.WBWorkAdmin, model.WBTaskComplete, "2026-08-01", "", "2026-08-01")
+
+	repo := NewStatsRepo(db)
+	f := ParseMeetingFilter(model.StatsScopeTeam, "", "")
+	rec, err := repo.mapDayCountsAdmin(day, "2026-08-12", f, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec[day] != 2 {
+		t.Fatalf("차트 접수 %d want 2 (대기·완료 포함, 취소 제외) map=%v", rec[day], rec)
+	}
+	open, err := repo.mapDayCountsAdminOpen(day, "2026-08-12", f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open[day] != 1 {
+		t.Fatalf("차트 Open %d want 1 (대기만, 완료·취소 제외) map=%v", open[day], open)
+	}
+	carry, err := repo.countAdminCarry(day, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if carry != 1 {
+		t.Fatalf("이월 %d want 1 (과거 대기만, 완료·취소 제외)", carry)
+	}
+}
