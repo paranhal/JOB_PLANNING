@@ -10,38 +10,58 @@ import (
 	"testing"
 )
 
+func lookupSQLHasOrgFilter(sql string) bool {
+	s := strings.ToLower(sql)
+	return strings.Contains(s, "c.org_id=") || strings.Contains(s, "c.org_id =")
+}
+
+func lookupSQLHasTopOnly(sql string) bool {
+	s := strings.ReplaceAll(strings.ToLower(sql), " ", "")
+	return strings.Contains(s, "has_parent=0")
+}
+
 func TestCustomerLookupSQLHasNoOrgOrTopOnly(t *testing.T) {
-	src, err := os.ReadFile("customer_lookup.go")
-	if err != nil {
-		src, err = os.ReadFile("internal/repository/customer_lookup.go")
+	r := &CustomerRepo{}
+	def, _ := r.lookupWhere(CustomerQuery{Scope: ScopeSite})
+	if lookupSQLHasOrgFilter(def) {
+		t.Fatalf("기본 호출 SQL에 c.org_id= 가 있다: %s", def)
 	}
-	if err != nil {
-		t.Fatal(err)
+	if lookupSQLHasTopOnly(def) {
+		t.Fatalf("기본 호출 SQL에 has_parent=0 이 있다: %s", def)
 	}
-	body := string(src)
-	if strings.Contains(body, "org_id") {
-		t.Fatal("customer_lookup.go 에 org_id 조건이 있다")
+
+	all, _ := r.lookupWhere(CustomerQuery{Scope: ScopeSite, OrgID: OrgAll})
+	if lookupSQLHasOrgFilter(all) {
+		t.Fatalf("OrgAll SQL에 c.org_id= 가 있다: %s", all)
 	}
-	if strings.Contains(body, "has_parent=0") || strings.Contains(body, "has_parent = 0") {
-		t.Fatal("customer_lookup.go 에 최상위만 조건이 있다")
+	if lookupSQLHasTopOnly(all) {
+		t.Fatalf("OrgAll SQL에 has_parent=0 이 있다: %s", all)
+	}
+
+	org, _ := r.lookupWhere(CustomerQuery{Scope: ScopeSite, OrgID: "O01"})
+	if !lookupSQLHasOrgFilter(org) {
+		t.Fatalf("OrgID 지정 SQL에 c.org_id=? 가 없다: %s", org)
+	}
+	if lookupSQLHasTopOnly(org) {
+		t.Fatalf("OrgID 경로에 has_parent=0 이 있다: %s", org)
 	}
 }
 
 func TestNoCustomerPickerSQLOutsideLookup(t *testing.T) {
 	allowFn := map[string]string{
-		"List":               "고객현황 목록",
-		"ListForAPI":         "영업관리 연동 API",
+		"List":                         "고객현황 목록",
+		"ListForAPI":                   "영업관리 연동 API",
 		"SearchCustomersWithoutConfig": "Lookup 어댑터",
 		"SearchWorkTaskCustomers":      "Lookup 어댑터",
-		"Lookup":             "유일한 구현",
-		"LookupByIDs":        "유일한 구현",
-		"listFromLookup":     "Lookup 래퍼",
-		"ListSelectable":     "Lookup 래퍼",
-		"ListParties":        "Lookup 래퍼",
-		"ListAll":            "백업·현황 허용 래퍼",
-		"ListAllInOrg":       "deprecated 래퍼",
-		"ListForReceipt":     "Lookup 래퍼",
-		"ListForReceiptIncluding": "Lookup 래퍼",
+		"Lookup":                       "유일한 구현",
+		"LookupByIDs":                  "유일한 구현",
+		"listFromLookup":               "Lookup 래퍼",
+		"ListSelectable":               "Lookup 래퍼",
+		"ListParties":                  "Lookup 래퍼",
+		"ListAll":                      "백업·현황 허용 래퍼",
+		"ListAllInOrg":                 "deprecated 래퍼",
+		"ListForReceipt":               "Lookup 래퍼",
+		"ListForReceiptIncluding":      "Lookup 래퍼",
 	}
 	root := "."
 	if _, err := os.Stat("customer_lookup.go"); err != nil {
@@ -102,14 +122,15 @@ func TestNoCustomerPickerSQLOutsideLookup(t *testing.T) {
 
 func TestCustomerLookupGuardFailsOnOrgFilterSample(t *testing.T) {
 	sample := `func (r *CustomerRepo) Lookup(q CustomerQuery) { _ = "WHERE c.org_id=? AND has_parent=0" }`
-	if !strings.Contains(sample, "org_id") || !strings.Contains(sample, "has_parent=0") {
+	if !lookupSQLHasOrgFilter(sample) || !lookupSQLHasTopOnly(sample) {
 		t.Fatal("양성 샘플이 규칙을 안 건드린다")
 	}
-	src, _ := os.ReadFile("customer_lookup.go")
-	if src == nil {
-		src, _ = os.ReadFile("internal/repository/customer_lookup.go")
+	if !lookupSQLHasOrgFilter(sample) {
+		t.Fatal("가드가 기본 경로 조직 조건을 놓쳤다")
 	}
-	if strings.Contains(string(src), "org_id") || strings.Contains(string(src), "has_parent=0") {
-		t.Fatal("실제 Lookup 이 양성 샘플과 같이 org/최상위 조건을 가졌다")
+	r := &CustomerRepo{}
+	got, _ := r.lookupWhere(CustomerQuery{Scope: ScopeSite})
+	if lookupSQLHasOrgFilter(got) || lookupSQLHasTopOnly(got) {
+		t.Fatal("실제 기본 Lookup SQL이 양성 샘플과 같이 조직/최상위 조건을 가졌다")
 	}
 }
