@@ -38,8 +38,21 @@ func Test95_126QuickQuoteFlow(t *testing.T) {
 	}
 
 	qq := doGet(t, e, "/sales/quick-quote")
-	if qq.Code != http.StatusOK || !strings.Contains(qq.Body.String(), "신규 거래처 등록") {
+	qb := qq.Body.String()
+	if qq.Code != http.StatusOK || !strings.Contains(qb, "신규 거래처 등록") {
 		t.Fatalf("빠른 견적 화면 %d", qq.Code)
+	}
+	if !strings.Contains(qb, "novalidate") {
+		t.Fatal("저장이 HTML5 required에 막힘")
+	}
+	if !strings.Contains(qb, `name="new_customer"`) || strings.Count(qb, `name="attn_name"`) < 2 {
+		t.Fatal("신규 거래처 필드명")
+	}
+	if !strings.Contains(qb, "keydown.arrow-down") || strings.Contains(qb, `round==='none'?supply`) {
+		t.Fatal("품목 키보드 또는 부가세 분기")
+	}
+	if !strings.Contains(qb, "담당자명") || !strings.Contains(qb, "담당자 연락처") {
+		t.Fatal("신규 라벨")
 	}
 
 	miss := doFormJSON(t, e, "/sales/quick-quote", url.Values{

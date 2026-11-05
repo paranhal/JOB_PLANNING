@@ -76,6 +76,40 @@ func TestQuoteLineDeleteAndReorder(t *testing.T) {
 	}
 }
 
+func TestQuoteCutEightCombosMatchFormula(t *testing.T) {
+	lines := []SalesQuoteLine{
+		{Name: "a", Qty: 1, UnitPrice: 37035},
+		{Name: "b", Qty: 1, UnitPrice: 9999},
+	}
+	type spec struct{ vat, round, scope string }
+	for _, s := range []spec{
+		{QuoteVATExcluded, QuoteRoundNone, QuoteCutTotal},
+		{QuoteVATExcluded, QuoteRoundNone, QuoteCutItem},
+		{QuoteVATExcluded, QuoteRoundHundred, QuoteCutTotal},
+		{QuoteVATExcluded, QuoteRoundHundred, QuoteCutItem},
+		{QuoteVATExcluded, QuoteRoundThousand, QuoteCutTotal},
+		{QuoteVATExcluded, QuoteRoundThousand, QuoteCutItem},
+		{QuoteVATExcluded, QuoteRoundMan, QuoteCutTotal},
+		{QuoteVATExcluded, QuoteRoundMan, QuoteCutItem},
+	} {
+		tot := ComputeQuoteTotalsScoped(lines, s.vat, s.round, s.scope)
+		if tot.Supply <= 0 || tot.VAT < 0 || tot.Total <= 0 {
+			t.Fatalf("%+v supply=%d vat=%d total=%d", s, tot.Supply, tot.VAT, tot.Total)
+		}
+		if s.round == QuoteRoundNone && tot.VAT == tot.Supply {
+			t.Fatalf("절사 없음인데 부가세=공급가 %+v vat=%d", s, tot.VAT)
+		}
+		again := ComputeQuoteTotalsScoped(lines, s.vat, s.round, s.scope)
+		if again != tot {
+			t.Fatalf("재계산 불일치 %+v", s)
+		}
+	}
+	none := ComputeQuoteTotalsScoped(lines, QuoteVATExcluded, QuoteRoundNone, QuoteCutTotal)
+	if none.Supply != 47034 || none.VAT != 4703 || none.Total != 51737 {
+		t.Fatalf("none/total %+v", none)
+	}
+}
+
 func TestQuoteCutT7Thousand(t *testing.T) {
 	lines := []SalesQuoteLine{
 		{Name: "a", Qty: 1, UnitPrice: 37035},
