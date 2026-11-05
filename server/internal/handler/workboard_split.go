@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -525,6 +526,74 @@ func (h *WorkboardHandler) offerMergeAfterDelete(c echo.Context, deletedID strin
 
 func boardItemIsExec(it boardItem) bool {
 	return strings.Contains(it.DedupKey, "|act")
+}
+
+func boardCalItems(placed, overdue, exec []boardItem, showPlan, showAct bool, filterHit func(boardItem) bool) []boardItem {
+	var calItems []boardItem
+	if showPlan {
+		for _, it := range placed {
+			it.PlaceDate = model.TaskPlanDate(it.Task)
+			calItems = append(calItems, it)
+		}
+		for _, it := range overdue {
+			it.PlaceDate = model.TaskPlanDate(it.Task)
+			calItems = append(calItems, it)
+		}
+	}
+	if showAct {
+		same := map[string]bool{}
+		if showPlan {
+			for _, it := range calItems {
+				d := it.PlaceDate
+				if d == "" {
+					d = model.TaskPlanDate(it.Task)
+				}
+				if d != "" && d == model.TaskExecDate(it.Task) {
+					same[taskDedupKey(it.Task)] = true
+				}
+			}
+		}
+		for _, it := range exec {
+			if filterHit != nil && !filterHit(it) {
+				continue
+			}
+			ed := strings.TrimSpace(it.PlaceDate)
+			if ed == "" {
+				ed = model.TaskExecDate(it.Task)
+			}
+			if showPlan && same[taskDedupKey(it.Task)] {
+				continue
+			}
+			it.PlaceDate = ed
+			calItems = append(calItems, it)
+		}
+	}
+	return calItems
+}
+
+func boardListedItems(view, listRange string, base time.Time, calItems []boardItem, showPlan bool) []boardItem {
+	if view != boardViewList {
+		return calItems
+	}
+	if listRange != boardRangeDay {
+		return append([]boardItem{}, calItems...)
+	}
+	day := base.Format(dateLayout)
+	var items []boardItem
+	for _, it := range calItems {
+		if it.Overdue && showPlan {
+			items = append(items, it)
+			continue
+		}
+		if it.PlaceDate == day {
+			items = append(items, it)
+			continue
+		}
+		if showPlan && !boardItemIsExec(it) && model.TaskSpansDate(it.Task.WorkDate, it.Task.DueDate, day) {
+			items = append(items, it)
+		}
+	}
+	return items
 }
 
 func uniqueTaskCount(items []boardItem) int {

@@ -154,56 +154,112 @@ func (r *WBRepo) ListWorkTaskProcesses(orgID, taskID string) ([]model.WorkTaskPr
 	return out, rows.Err()
 }
 
-// ListTasksWithProcessBetweenForOrg 조치 이력(process_at)이 기간 안인 업무. 완료일만 있는 건 제외(95-94 Q-4).
+func appendTaskDay(dates map[string][]string, seenID map[string]bool, ids *[]string, id, day string) {
+	id, day = strings.TrimSpace(id), strings.TrimSpace(day)
+	if id == "" || len(day) < 10 {
+		return
+	}
+	day = day[:10]
+	for _, d := range dates[id] {
+		if d == day {
+			if !seenID[id] {
+				seenID[id] = true
+				*ids = append(*ids, id)
+			}
+			return
+		}
+	}
+	dates[id] = append(dates[id], day)
+	if !seenID[id] {
+		seenID[id] = true
+		*ids = append(*ids, id)
+	}
+}
+
+const execCompleteDaySQL = `CASE
+	WHEN t.source_type='` + model.WBSourceMaintenance + `' THEN COALESCE(NULLIF(TRIM(mv.completed_date),''), NULLIF(TRIM(mv.visit_date),''), COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), ''))
+	WHEN t.source_type='` + model.WBSourceAS + `' THEN COALESCE(substr(NULLIF(TRIM(ar.complete_datetime),''),1,10), NULLIF(TRIM(t.complete_date),''), COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), ''))
+	ELSE COALESCE(NULLIF(TRIM(t.complete_date),''), COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), ''))
+END`
+
+// ListTasksWithProcessBetweenForOrg 기간 안 조치 이력 + 완료일(D-279). 같은 날 1건.
 func (r *WBRepo) ListTasksWithProcessBetweenForOrg(from, to, orgID string) ([]model.WorkTask, map[string][]string, error) {
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
 	dates := map[string][]string{}
 	if from == "" || to == "" {
 		return nil, dates, nil
 	}
+	seenID := map[string]bool{}
+	var ids []string
 	rows, err := r.db.Query(`
 		SELECT p.task_id, substr(p.process_at,1,10)
 		FROM work_task_processes p
 		INNER JOIN work_tasks t ON t.task_id=p.task_id
 		WHERE substr(p.process_at,1,10) >= ? AND substr(p.process_at,1,10) <= ?
-		  AND COALESCE(t.recurrence_role,'') != 'parent'`, from, to)
+		  AND COALESCE(t.recurrence_role,'') != 'parent'
+		  AND COALESCE(t.status,'') != ?`, from, to, model.WBTaskCancelled)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
-			return nil, dates, nil
+			return r.listExecCompleteDays(from, to, orgID, dates, seenID, ids)
+		}
+		return nil, dates, err
+	}
+	scanErr := func() error {
+		defer rows.Close()
+		for rows.Next() {
+			var id, day string
+			if err := rows.Scan(&id, &day); err != nil {
+				return err
+			}
+			appendTaskDay(dates, seenID, &ids, id, day)
+		}
+		return rows.Err()
+	}()
+	if scanErr != nil {
+		return nil, dates, scanErr
+	}
+	return r.listExecCompleteDays(from, to, orgID, dates, seenID, ids)
+}
+
+func (r *WBRepo) listExecCompleteDays(from, to, orgID string, dates map[string][]string, seenID map[string]bool, ids []string) ([]model.WorkTask, map[string][]string, error) {
+	frag, extra := workTaskVisibleOrgSQL("t", orgID)
+	q := `
+		SELECT t.task_id, ` + execCompleteDaySQL + `
+		FROM work_tasks t
+		LEFT JOIN as_receipts ar ON t.source_type='` + model.WBSourceAS + `' AND ar.as_id=t.source_id
+		LEFT JOIN maintenance_visits mv ON t.source_type='` + model.WBSourceMaintenance + `' AND mv.visit_id=t.source_id
+		WHERE COALESCE(t.recurrence_role,'') != 'parent'
+		  AND COALESCE(t.status,'') != ?
+		  AND (
+		    (t.source_type='` + model.WBSourceMaintenance + `' AND COALESCE(mv.completed,0)=1)
+		    OR (t.source_type='` + model.WBSourceAS + `' AND ar.status IN ` + model.SQLStatusStatsCompleted + `)
+		    OR (COALESCE(t.source_type,'') NOT IN ('` + model.WBSourceAS + `','` + model.WBSourceMaintenance + `')
+		        AND (t.status='` + model.WBTaskComplete + `' OR TRIM(COALESCE(t.complete_date,'')) != ''))
+		  )
+		  AND (` + execCompleteDaySQL + `) >= ? AND (` + execCompleteDaySQL + `) <= ?` + frag
+	args := append([]interface{}{model.WBTaskCancelled, from, to}, extra...)
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return r.loadExecTasks(ids, orgID, dates)
 		}
 		return nil, dates, err
 	}
 	defer rows.Close()
-	seenID := map[string]bool{}
-	var ids []string
 	for rows.Next() {
 		var id, day string
 		if err := rows.Scan(&id, &day); err != nil {
 			return nil, dates, err
 		}
-		id, day = strings.TrimSpace(id), strings.TrimSpace(day)
-		if id == "" || len(day) < 10 {
-			continue
-		}
-		day = day[:10]
-		dup := false
-		for _, d := range dates[id] {
-			if d == day {
-				dup = true
-				break
-			}
-		}
-		if !dup {
-			dates[id] = append(dates[id], day)
-		}
-		if !seenID[id] {
-			seenID[id] = true
-			ids = append(ids, id)
-		}
+		appendTaskDay(dates, seenID, &ids, id, day)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, dates, err
 	}
+	return r.loadExecTasks(ids, orgID, dates)
+}
+
+func (r *WBRepo) loadExecTasks(ids []string, orgID string, dates map[string][]string) ([]model.WorkTask, map[string][]string, error) {
 	if len(ids) == 0 {
 		return nil, dates, nil
 	}
@@ -220,30 +276,6 @@ func (r *WBRepo) ListTasksWithProcessBetweenForOrg(from, to, orgID string) ([]mo
 		return nil, dates, err
 	}
 	return list, dates, nil
-}
-
-// CountCompleteWithoutProcessBetweenForOrg 완료일은 기간 안인데 조치 이력이 없는 건수.
-func (r *WBRepo) CountCompleteWithoutProcessBetweenForOrg(from, to, orgID string) (int, error) {
-	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
-	if from == "" || to == "" {
-		return 0, nil
-	}
-	frag, extra := workTaskVisibleOrgSQL("t", orgID)
-	args := append([]interface{}{from, to}, extra...)
-	var n int
-	err := r.db.QueryRow(`
-		SELECT COUNT(*) FROM work_tasks t
-		WHERE TRIM(COALESCE(t.complete_date,'')) != ''
-		  AND t.complete_date >= ? AND t.complete_date <= ?
-		  AND COALESCE(t.recurrence_role,'') != 'parent'
-		  AND NOT EXISTS (SELECT 1 FROM work_task_processes p WHERE p.task_id=t.task_id)`+frag, args...).Scan(&n)
-	if err != nil {
-		if strings.Contains(err.Error(), "no such table") {
-			return 0, nil
-		}
-		return 0, err
-	}
-	return n, nil
 }
 
 func (r *WBRepo) ListWorkTaskParts(orgID, taskID string) ([]model.ASPartUsed, error) {

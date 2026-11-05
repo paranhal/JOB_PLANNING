@@ -620,45 +620,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		}
 	}
 
-	var calItems []boardItem
-	if showPlan {
-		for _, it := range placed {
-			it.PlaceDate = model.TaskPlanDate(it.Task)
-			calItems = append(calItems, it)
-		}
-		for _, it := range overdue {
-			it.PlaceDate = model.TaskPlanDate(it.Task)
-			calItems = append(calItems, it)
-		}
-	}
-	if showAct {
-		same := map[string]bool{}
-		if showPlan {
-			for _, it := range calItems {
-				d := it.PlaceDate
-				if d == "" {
-					d = model.TaskPlanDate(it.Task)
-				}
-				if d != "" && d == model.TaskExecDate(it.Task) {
-					same[taskDedupKey(it.Task)] = true
-				}
-			}
-		}
-		for _, it := range entries.Exec {
-			if !filterHit(it) {
-				continue
-			}
-			ed := strings.TrimSpace(it.PlaceDate)
-			if ed == "" {
-				ed = model.TaskExecDate(it.Task)
-			}
-			if showPlan && same[taskDedupKey(it.Task)] {
-				continue
-			}
-			it.PlaceDate = ed
-			calItems = append(calItems, it)
-		}
-	}
+	calItems := boardCalItems(placed, overdue, entries.Exec, showPlan, showAct, filterHit)
 
 	calItems = h.expandBoardSegments(calItems, showPlan, showAct)
 	stampBoardItemKinds(h, calItems)
@@ -857,6 +819,12 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		if filterHit(it) {
 			actN++
 		}
+	}
+	if view != boardViewKanban {
+		planCal := h.expandBoardSegments(boardCalItems(placed, overdue, entries.Exec, true, false, filterHit), true, false)
+		actCal := h.expandBoardSegments(boardCalItems(placed, overdue, entries.Exec, false, true, filterHit), false, true)
+		planN = uniqueTaskCount(boardListedItems(view, listRange, base, planCal, true))
+		actN = uniqueTaskCount(boardListedItems(view, listRange, base, actCal, false))
 	}
 	curShow := model.EncodeScheduleShow(showPlan, showAct)
 	planKeep := cloneBoardQuery(keep)
