@@ -6,7 +6,7 @@
     <div>
       <p class="text-ui-sm mt-1 space-x-2">
         <a href="/projects/{{.Project.ProjectID}}/years" class="text-primary">연차</a>
-        <a href="/projects/{{.Project.ProjectID}}/sites" class="text-primary">사이트·장비</a>
+        <a href="/projects/{{.Project.ProjectID}}/sites" class="text-primary">사이트 등록</a>
       </p>
       <h2 class="text-xl font-bold text-ink mt-1">{{.Project.Name}}</h2>
       <p class="text-xs font-mono text-ink-subtle mt-0.5">{{.Project.ProjectID}}</p>
@@ -172,7 +172,7 @@
     {{else}}
     <p class="text-sm text-ink-muted">등록된 사이트가 없습니다.</p>
     {{end}}
-    <a href="/projects/{{.Project.ProjectID}}/sites" class="text-xs text-primary hover:underline">사이트·장비 화면</a>
+    <a href="/projects/{{.Project.ProjectID}}/sites" class="text-xs text-primary hover:underline">사이트 등록</a>
   </div>
 
   <div class="bg-white rounded-xl border border-line p-5 space-y-3">

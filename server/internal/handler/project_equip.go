@@ -130,27 +130,55 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	epage, _ := strconv.Atoi(c.QueryParam("epage"))
-	size, _ := strconv.Atoi(c.QueryParam("size"))
-	q, region, st := c.QueryParam("q"), c.QueryParam("region"), c.QueryParam("status")
-	sites, total, _ := h.pe.ListSites(p.ProjectID, q, region, st, page, size)
-	equips, etotal, _ := h.pe.ListEquipment(p.ProjectID, c.QueryParam("site_id"), c.QueryParam("equip_status"), c.QueryParam("eq"), epage, size)
-	years, _ := h.pe.ListYears(p.ProjectID)
-	cats, _ := h.pe.ListCategories(org, false)
-	smap, emap, pending := h.pe.Summary(p.ProjectID)
-	prog, _ := h.pe.SiteProgress(p.ProjectID)
-	works, _ := h.wbRepo.ListSiteWorksByProject(p.ProjectID)
+	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
+	_, etotal, _ := h.pe.ListEquipment(p.ProjectID, "", "", "", 1, 1)
+	siteType := strings.TrimSpace(c.QueryParam("type"))
+	if siteType == "" {
+		siteType = "school"
+	}
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
-		"Title": p.DisplayName() + " · 사이트·장비", "Active": NavProjects, "Project": p,
-		"Sites": sites, "SiteTotal": total, "Equips": equips, "EquipTotal": etotal,
-		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
-		"Progress": prog, "SiteWorks": works,
-		"Q": q, "Region": region, "Status": st, "CanWrite": canWriteProjectEquip(c, h, p, org),
+		"Title": p.DisplayName() + " · 사이트 등록", "Active": NavProjects, "Project": p,
+		"SiteTotal": total, "EquipTotal": etotal,
+		"CanWrite":      canWriteProjectEquip(c, h, p, org),
 		"CanWriteSites": canRegisterProjectSites(c, h, p, org),
-		"FlashOK": c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"SiteType":      siteType,
+		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": nil, "Apply": false,
 	})
+}
+
+func splitCSVParam(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func (h *ProjectHandler) SitesCandidates(c echo.Context) error {
+	p, org, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	typ := strings.TrimSpace(c.QueryParam("type"))
+	if typ == "" {
+		typ = "school"
+	}
+	if typ != "school" {
+		return c.JSON(http.StatusOK, repository.SchoolSiteCandidateResult{
+			Regions: []repository.SchoolSiteRegion{},
+			Items:   []repository.SchoolSiteCandidate{},
+		})
+	}
+	res, err := h.pe.ListSchoolSiteCandidates(p.ProjectID, org, c.QueryParam("q"),
+		splitCSVParam(c.QueryParam("sido")), splitCSVParam(c.QueryParam("sigungu")))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
 }
 
 func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
@@ -158,13 +186,38 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	jsonOut := wantsJSON(c) || wantsJSONError(c)
 	if !canRegisterProjectSites(c, h, p, org) {
+		if jsonOut {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "이 사업의 사이트를 등록할 권한이 없습니다"})
+		}
 		return echo.ErrForbidden
 	}
 	_ = c.Request().ParseForm()
 	ids := c.Request().Form["customer_id"]
-	if _, err := h.pe.AddSitesFromCustomers(p.ProjectID, org, currentUserID(c), ids); err != nil {
+	if len(ids) > 2000 {
+		msg := "한 번에 최대 2,000곳까지 등록할 수 있습니다"
+		if jsonOut {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": msg})
+		}
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", msg)
+	}
+	added, skipped, err := h.pe.AddSitesFromCustomers(p.ProjectID, org, currentUserID(c), ids)
+	if err != nil {
+		if jsonOut {
+			code := http.StatusBadRequest
+			if strings.Contains(err.Error(), "다른 조직") {
+				code = http.StatusForbidden
+			}
+			return c.JSON(code, map[string]string{"error": err.Error()})
+		}
 		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
+	}
+	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
+	if jsonOut {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"added": added, "skipped": skipped, "siteTotal": total,
+		})
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"/sites?ok=1")
 }
@@ -186,41 +239,11 @@ func (h *ProjectHandler) SitesBulkStatus(c echo.Context) error {
 }
 
 func (h *ProjectHandler) SitesPick(c echo.Context) error {
-	p, org, err := h.loadEquipProject(c)
+	p, _, err := h.loadEquipProject(c)
 	if err != nil {
 		return err
 	}
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	parentID := strings.TrimSpace(c.QueryParam("parent_id"))
-	q, region := c.QueryParam("q"), c.QueryParam("region")
-	parents, _ := h.pe.ListParentOrgs(org)
-	if parentID == "" && len(parents) > 0 {
-		for _, par := range parents {
-			if par.Name == model.SchoolParentOfficialName {
-				parentID = par.CustomerID
-				break
-			}
-		}
-		if parentID == "" {
-			parentID = parents[0].CustomerID
-		}
-	}
-	if page < 1 {
-		page = 1
-	}
-	const pageSize = 100
-	picks, total, _ := h.pe.ListSchoolPick(p.ProjectID, org, parentID, q, region, page, pageSize)
-	pages := (total + pageSize - 1) / pageSize
-	if pages < 1 {
-		pages = 1
-	}
-	return c.Render(http.StatusOK, "project/sites_pick.html", map[string]interface{}{
-		"Title": p.DisplayName() + " · 대상 학교 추가", "Active": NavProjects, "Project": p,
-		"Parents": parents, "ParentID": parentID, "Picks": picks, "Total": total,
-		"Q": q, "Region": region, "Page": page, "Pages": pages, "PageSize": pageSize,
-		"CanWrite": canRegisterProjectSites(c, h, p, org),
-		"FlashOK":  c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
-	})
+	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"/sites")
 }
 
 func (h *ProjectHandler) SiteSchoolTemplateXLSX(c echo.Context) error {
@@ -640,21 +663,13 @@ func (h *ProjectHandler) readEquipUpload(c echo.Context) ([]byte, string, error)
 }
 
 func (h *ProjectHandler) renderSitesPreview(c echo.Context, p *model.WorkProject, org string, prev *model.EquipImportPreview, applied bool) error {
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	size, _ := strconv.Atoi(c.QueryParam("size"))
-	sites, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", page, size)
-	equips, etotal, _ := h.pe.ListEquipment(p.ProjectID, "", "", "", 1, size)
-	years, _ := h.pe.ListYears(p.ProjectID)
-	cats, _ := h.pe.ListCategories(org, false)
-	smap, emap, pending := h.pe.Summary(p.ProjectID)
-	prog, _ := h.pe.SiteProgress(p.ProjectID)
-	works, _ := h.wbRepo.ListSiteWorksByProject(p.ProjectID)
+	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
+	_, etotal, _ := h.pe.ListEquipment(p.ProjectID, "", "", "", 1, 1)
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
-		"Title": p.DisplayName() + " · 사이트·장비", "Active": NavProjects, "Project": p,
-		"Sites": sites, "SiteTotal": total, "Equips": equips, "EquipTotal": etotal,
-		"Years": years, "Cats": cats, "SiteCounts": smap, "EquipCounts": emap, "Pending": pending,
-		"Progress": prog, "SiteWorks": works,
+		"Title": p.DisplayName() + " · 사이트 등록", "Active": NavProjects, "Project": p,
+		"SiteTotal": total, "EquipTotal": etotal, "SiteType": "school",
 		"CanWrite": canWriteProjectEquip(c, h, p, org),
+		"CanWriteSites": canRegisterProjectSites(c, h, p, org),
 		"Preview":  prev, "Apply": applied,
 	})
 }

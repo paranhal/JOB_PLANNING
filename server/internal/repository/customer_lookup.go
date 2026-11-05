@@ -21,6 +21,8 @@ type CustomerQuery struct {
 	Q          string
 	IncludeIDs []string
 	ParentID   string
+	Industry   string // 비면 업종 조건 없음. 「학교」면 school·학교 묶음
+	OrgID      string // 비면 조직 조건 없음(95-2E). 사업 사이트 후보만 사업 조직을 넣는다
 	Limit      int    // 0 = 제한 없음
 	Offset     int
 }
@@ -31,6 +33,8 @@ type CustomerOption struct {
 	Name        string
 	ParentName  string
 	Region      string
+	AddrSido    string
+	AddrSigungu string
 	ShortName   string
 	PartyKind   string
 	Label       string
@@ -72,6 +76,15 @@ func (r *CustomerRepo) lookupWhere(q CustomerQuery) (string, []interface{}) {
 	if pid := strings.TrimSpace(q.ParentID); pid != "" {
 		b.WriteString(` AND c.parent_customer_id=?`)
 		args = append(args, pid)
+	}
+	if ind := strings.TrimSpace(q.Industry); ind != "" {
+		clause, iargs := industryMatchSQL("c", ind)
+		b.WriteString(` AND ` + clause)
+		args = append(args, iargs...)
+	}
+	if org := strings.TrimSpace(q.OrgID); org != "" && org != OrgAll {
+		b.WriteString(` AND c.org_id=?`)
+		args = append(args, org)
 	}
 	term := strings.Join(strings.Fields(q.Q), " ")
 	if term != "" {
@@ -146,7 +159,7 @@ const customerLookupFrom = `
 		LEFT JOIN customers p ON p.customer_id = c.parent_customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = c.customer_id`
 
-// Lookup 선택 목록·검색의 유일한 구현. 조직 조건 없음, 하위 기관 포함.
+// Lookup 선택 목록·검색의 유일한 구현. OrgID가 비면 조직 조건 없음, 하위 기관 포함.
 func (r *CustomerRepo) Lookup(q CustomerQuery) ([]CustomerOption, int, error) {
 	if r == nil || r.db == nil {
 		return nil, 0, nil
@@ -161,6 +174,7 @@ func (r *CustomerRepo) Lookup(q CustomerQuery) ([]CustomerOption, int, error) {
 	sel := `
 		SELECT c.customer_id, c.org_name, COALESCE(p.org_name,''),
 		       COALESCE(NULLIF(TRIM(cfg.region),''), NULLIF(TRIM(c.addr_sigungu),''), COALESCE(c.addr_sido,'')),
+		       COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,''),
 		       COALESCE(cfg.short_name,''),
 		       COALESCE(NULLIF(TRIM(c.party_kind),''),'customer'),
 		       CASE WHEN c.is_active=1 THEN 0 ELSE 1 END,
@@ -195,7 +209,7 @@ func (r *CustomerRepo) Lookup(q CustomerQuery) ([]CustomerOption, int, error) {
 	for rows.Next() {
 		var it CustomerOption
 		var inactive, prov int
-		if err := rows.Scan(&it.ID, &it.Name, &it.ParentName, &it.Region, &it.ShortName, &it.PartyKind, &inactive, &prov); err != nil {
+		if err := rows.Scan(&it.ID, &it.Name, &it.ParentName, &it.Region, &it.AddrSido, &it.AddrSigungu, &it.ShortName, &it.PartyKind, &inactive, &prov); err != nil {
 			return nil, 0, err
 		}
 		it.Inactive = inactive == 1

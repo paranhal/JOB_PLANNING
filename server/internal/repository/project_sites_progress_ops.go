@@ -46,8 +46,8 @@ func (r *ProjectEquipRepo) SiteProgress(projectID string) (SiteProgress, error) 
 	return p, rows.Err()
 }
 
-func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string, customerIDs []string) (int, error) {
-	n := 0
+func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string, customerIDs []string) (int, int, error) {
+	n, skipped := 0, 0
 	now := time.Now().Format("2006-01-02 15:04:05")
 	for _, cid := range customerIDs {
 		cid = strings.TrimSpace(cid)
@@ -57,10 +57,10 @@ func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string
 		var name, cOrg string
 		err := r.db.QueryRow(`SELECT org_name, org_id FROM customers WHERE customer_id=?`, cid).Scan(&name, &cOrg)
 		if err != nil {
-			return n, fmt.Errorf("고객을 찾을 수 없습니다")
+			return n, skipped, fmt.Errorf("고객을 찾을 수 없습니다")
 		}
 		if cOrg != orgID {
-			return n, fmt.Errorf("다른 조직 고객입니다")
+			return n, skipped, fmt.Errorf("다른 조직 고객입니다")
 		}
 		s := &model.ProjectSite{
 			ProjectID: projectID, CustomerID: cid, SiteName: name,
@@ -68,15 +68,16 @@ func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string
 		}
 		if err := r.SaveSite(s); err != nil {
 			if strings.Contains(err.Error(), "같은") || strings.Contains(err.Error(), "이미 대상") {
+				skipped++
 				continue
 			}
-			return n, err
+			return n, skipped, err
 		}
 		_, _ = r.db.Exec(`INSERT INTO project_site_events(site_id,project_id,from_status,to_status,event_date,note,created_by,source)
 			VALUES(?,?,?,?,?,?,?,?)`, s.ID, projectID, "", model.SitePlanned, now[:10], "대상 추가", userID, "ui")
 		n++
 	}
-	return n, nil
+	return n, skipped, nil
 }
 
 func (r *ProjectEquipRepo) BulkSiteStatus(projectID, userID, to, eventDate, reason string, ids []string) error {

@@ -272,3 +272,28 @@ func TestLookupOrgIDFilterAndNormalizedInOrg(t *testing.T) {
 		t.Fatalf("전사 공용이어야 함 %+v", shared)
 	}
 }
+
+func TestLookupIndustryAndOrgOptions(t *testing.T) {
+	r := setupLookupDB(t)
+	if _, err := r.db.Exec(`UPDATE customers SET industry='학교' WHERE customer_id IN ('C-GONG','C-DUP')`); err != nil {
+		t.Fatal(err)
+	}
+	all, _, err := r.Lookup(CustomerQuery{Scope: ScopeSite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) < 4 {
+		t.Fatalf("기본 전사 %d", len(all))
+	}
+	sch, _, err := r.Lookup(CustomerQuery{Scope: ScopeSite, Industry: "학교", OrgID: "O01"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := idsOf(sch)
+	if !got["C-GONG"] || !got["C-DUP"] || got["C-O02"] || got["C-EDU"] {
+		t.Fatalf("업종+조직 %+v", got)
+	}
+	if sch[0].AddrSido == "" && sch[0].AddrSigungu == "" {
+		t.Fatal("시도·시군 비어 있음")
+	}
+}

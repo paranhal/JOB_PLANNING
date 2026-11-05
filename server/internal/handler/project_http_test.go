@@ -60,6 +60,7 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.GET("/projects/:id/years", h.Project.Years)
 	g.POST("/projects/:id/years", h.Project.YearSave)
 	g.GET("/projects/:id/sites", h.Project.Sites)
+	g.GET("/projects/:id/sites/candidates", h.Project.SitesCandidates)
 	g.GET("/projects/:id/sites/pick", h.Project.SitesPick)
 	g.POST("/projects/:id/sites", h.Project.SiteSave)
 	g.POST("/projects/:id/sites/add-schools", h.Project.SitesAddSchools)

@@ -1,236 +1,134 @@
-{{define "title"}}{{.Project.DisplayName}} · 사이트·장비 · {{appName}}{{end}}
+{{define "title"}}{{.Project.DisplayName}} · 사이트 등록 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-4">
-  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-    <div>
-      <h2 class="text-ui-xl font-extrabold text-ink mt-1">사이트·장비</h2>
-      <p class="text-ui-sm text-ink-muted">{{.Project.Name}}</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-    {{if .CanWriteSites}}
-    <a href="/projects/{{.Project.ProjectID}}/sites/pick" class="btn btn-primary btn-sm">대상 학교 추가</a>
-    <a href="/projects/{{.Project.ProjectID}}/sites/schools-template.xlsx" class="btn btn-secondary btn-sm">대상 학교 양식</a>
-    {{end}}
-    {{if .CanWrite}}
-    <a href="/projects/{{.Project.ProjectID}}/sites/template.xlsx" class="btn btn-secondary btn-sm">장비 양식</a>
-    {{end}}
-    </div>
+{{$cfg := dict "projectId" .Project.ProjectID "type" .SiteType "canWrite" .CanWriteSites "siteTotal" .SiteTotal "equipTotal" .EquipTotal}}
+<div class="space-y-4 overflow-x-hidden" data-school-site-page data-site-type="{{.SiteType}}" x-data='schoolSiteRegister({{toJSON $cfg}})' x-init="init()">
+  <div>
+    <a href="/projects/{{.Project.ProjectID}}" class="text-ui-sm text-primary hover:underline">‹ 이전 화면</a>
+    <h2 class="text-ui-xl font-extrabold text-ink mt-1">사이트 등록</h2>
+    <p class="text-ui-sm text-ink-muted">{{.Project.Name}}</p>
   </div>
+
   {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
   {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
 
-  <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
-    <div class="card p-4"><p class="text-ui-sm text-ink-muted">사이트</p><p class="text-ui-xl font-extrabold">{{.SiteTotal}}</p></div>
-    <div class="card p-4"><p class="text-ui-sm text-ink-muted">장비</p><p class="text-ui-xl font-extrabold">{{.EquipTotal}}</p></div>
-    <div class="card p-4"><p class="text-ui-sm text-ink-muted">미검수 사이트</p><p class="text-ui-sm mt-2">{{if .Pending}}{{range .Pending}}{{.}} {{end}}{{else}}—{{end}}</p></div>
-    <div class="card p-4"><p class="text-ui-sm text-ink-muted">설치/검수</p>
-      <p class="text-ui-xs text-ink-muted mt-2">설치 {{.Progress.Installed}}/{{.Progress.Denom}} · 검수 {{.Progress.Inspected}}/{{.Progress.Denom}}</p>
-      {{if .Progress.AllDone}}<p class="text-ui-sm text-ink mt-2">모든 사이트 검수 완료 — 사업을 완료 처리하시겠습니까?</p>{{end}}
-    </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">등록된 사이트</p><p class="text-ui-xl font-extrabold" data-site-total="{{.SiteTotal}}" x-text="siteTotal">{{.SiteTotal}}</p></div>
+    <div class="card p-4"><p class="text-ui-sm text-ink-muted">등록 장비</p><p class="text-ui-xl font-extrabold" data-equip-total>{{.EquipTotal}}</p></div>
   </div>
 
-  {{if .CanWrite}}
   <div class="card p-4 space-y-3">
-    <h3 class="font-semibold text-ink">엑셀 일괄 등록</h3>
-    <p class="text-ui-sm text-ink-muted">미리보기에서는 DB를 바꾸지 않습니다. 적용 시 오류 행은 건너뜁니다.</p>
-    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/import-preview" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
-      <input type="file" name="file" accept=".xlsx" required class="input">
-      <button type="submit" class="btn btn-secondary">미리보기</button>
-    </form>
-    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/import-apply" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
-      <input type="file" name="file" accept=".xlsx" required class="input">
-      <button type="submit" class="btn btn-primary">적용</button>
-    </form>
-    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/import-errors.xlsx" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
-      <input type="file" name="file" accept=".xlsx" required class="input">
-      <button type="submit" class="btn btn-secondary btn-sm">오류 목록 엑셀</button>
-    </form>
-    <h3 class="font-semibold text-ink pt-2">대상 학교 엑셀 (시트 사이트)</h3>
-    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/schools-import-preview" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
-      <input type="file" name="file" accept=".xlsx" required class="input">
-      <select name="mode" class="input"><option value="add">대상 학교 추가</option><option value="status">상태 일괄 갱신</option></select>
-      <label class="text-ui-sm flex items-center gap-1"><input type="checkbox" name="create_missing" value="1"> 마스터에 신규 등록</label>
-      <button type="submit" class="btn btn-secondary">미리보기</button>
-    </form>
-    <form method="post" action="/projects/{{.Project.ProjectID}}/sites/schools-import-apply" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
-      <input type="file" name="file" accept=".xlsx" required class="input">
-      <select name="mode" class="input"><option value="add">대상 학교 추가</option><option value="status">상태 일괄 갱신</option></select>
-      <label class="text-ui-sm flex items-center gap-1"><input type="checkbox" name="create_missing" value="1"> 마스터에 신규 등록</label>
-      <button type="submit" class="btn btn-primary">적용</button>
-    </form>
-  </div>
-  {{end}}
-
-  {{if .Preview}}
-  <div class="card p-4 space-y-2">
-    <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
-    <p class="text-ui-sm">사이트 신규 {{.Preview.SitesNew}} · 수정 {{.Preview.SitesUpd}} · 장비 신규 {{.Preview.EquipNew}} · 수정 {{.Preview.EquipUpd}} · 오류 {{.Preview.ErrN}}</p>
-    <div class="overflow-x-auto">
-      <table class="w-full text-ui">
-        <thead class="text-ink-muted text-left"><tr><th class="p-2">시트</th><th class="p-2">행</th><th class="p-2">처리</th><th class="p-2">키</th><th class="p-2">사유</th></tr></thead>
-        <tbody>
-          {{range .Preview.Rows}}
-          <tr class="border-t border-line"><td class="p-2">{{.Sheet}}</td><td class="p-2">{{.Line}}</td><td class="p-2">{{.Action}}</td><td class="p-2">{{.Key}}</td><td class="p-2">{{.Msg}}</td></tr>
-          {{end}}
-        </tbody>
-      </table>
+    <p class="text-ui-sm font-medium text-ink">유형</p>
+    <div class="flex flex-wrap gap-2" data-site-type-tabs>
+      <button type="button" class="btn btn-sm" data-type="school" @click="setType('school')" :class="type==='school' ? 'btn-primary' : 'btn-secondary'">학교</button>
+      <button type="button" class="btn btn-sm" data-type="public" @click="setType('public')" :class="type==='public' ? 'btn-primary' : 'btn-secondary'">공공기관</button>
+      <button type="button" class="btn btn-sm" data-type="library" @click="setType('library')" :class="type==='library' ? 'btn-primary' : 'btn-secondary'">도서관</button>
+      <button type="button" class="btn btn-sm" data-type="private" @click="setType('private')" :class="type==='private' ? 'btn-primary' : 'btn-secondary'">민간업체</button>
     </div>
   </div>
-  {{end}}
 
-  <form method="get" class="card p-3 flex flex-wrap gap-2">
-    <input class="input" name="q" value="{{.Q}}" placeholder="이름·지역">
-    <input class="input" name="region" value="{{.Region}}" placeholder="지역">
-    <select class="input" name="status">
-      <option value="">상태</option>
-      <option value="planned" {{if eq .Status "planned"}}selected{{end}}>예정</option>
-      <option value="in_progress" {{if eq .Status "in_progress"}}selected{{end}}>진행</option>
-      <option value="installed" {{if eq .Status "installed"}}selected{{end}}>설치완료</option>
-      <option value="inspected" {{if eq .Status "inspected"}}selected{{end}}>검수완료</option>
-      <option value="excluded" {{if eq .Status "excluded"}}selected{{end}}>제외</option>
-    </select>
-    <button class="btn btn-secondary" type="submit">검색</button>
-  </form>
+  <div class="card p-6 text-center" x-show="type!=='school'" x-cloak data-site-type-soon>
+    <p class="text-ink font-medium">화면 준비중</p>
+    <p class="text-ui-sm text-ink-muted mt-1" x-text="soonLabel()+' 사이트 등록 화면은 준비중입니다.'"></p>
+  </div>
 
-  {{if .CanWrite}}
-  <form method="post" action="/projects/{{.Project.ProjectID}}/sites/bulk-status" class="card overflow-x-auto space-y-2">
-    <div class="p-3 flex flex-wrap gap-2 items-end">
-      <label class="text-ui-sm">일괄 상태
-        <select class="input" name="status">
-          <option value="in_progress">진행</option>
-          <option value="installed">설치완료</option>
-          <option value="inspected">검수완료</option>
-          <option value="excluded">제외</option>
-        </select>
-      </label>
-      <label class="text-ui-sm">날짜 <input class="input" type="date" name="event_date"></label>
-      <label class="text-ui-sm">사유 <input class="input" name="reason" placeholder="제외 시 필수"></label>
-      <button class="btn btn-primary" type="submit">선택 변경</button>
+  <div class="space-y-4" x-show="type==='school'" data-school-site-area>
+    {{if not .CanWriteSites}}
+    <p class="text-ui-sm text-ink-muted" data-site-register-denied>이 사업의 사이트를 등록할 권한이 없습니다</p>
+    {{end}}
+    <p class="text-ui-sm text-danger" x-show="loadErr" x-cloak x-text="loadErr"></p>
+
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">시도지역</p>
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-ui-sm" data-sido-box>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" data-sido="ALL" :checked="sidoAll" @change="toggleSido('ALL')">전체</label>
+        <template x-for="r in regions" :key="'sd-'+r.sido">
+          <label class="inline-flex items-center gap-1">
+            <input type="checkbox" :data-sido="r.sido" :checked="!sidoAll && !!sidoSel[r.sido]" @change="toggleSido(r.sido)">
+            <span x-text="r.sido"></span>
+          </label>
+        </template>
+      </div>
     </div>
-    <table class="w-full text-ui">
-      <thead class="text-ink-muted text-left"><tr><th class="p-3"></th><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th><th class="p-3">작업 이력</th></tr></thead>
-      <tbody>
-        {{range .Sites}}
-        <tr class="border-t border-line">
-          <td class="p-3"><input type="checkbox" name="site_id" value="{{.ID}}"></td>
-          <td class="p-3">{{.SiteName}}</td>
-          <td class="p-3">{{.Region}}</td>
-          <td class="p-3">{{siteStatusLabel .Status}}</td>
-          <td class="p-3">{{.EquipN}}</td>
-          <td class="p-3 text-ui-sm">
-            {{$works := index $.SiteWorks .ID}}
-            {{range $works}}<div><a class="text-primary" href="/workboard/tasks/{{.TaskID}}/action">{{.Line}}</a></div>{{else}}—{{end}}
-          </td>
-        </tr>
-        {{else}}
-        <tr><td class="p-3 text-ink-muted" colspan="6">사이트가 없습니다.</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </form>
-  {{else}}
-  <div class="card overflow-x-auto">
-    <table class="w-full text-ui">
-      <thead class="text-ink-muted text-left"><tr><th class="p-3">사이트</th><th class="p-3">지역</th><th class="p-3">상태</th><th class="p-3">장비</th><th class="p-3">작업 이력</th></tr></thead>
-      <tbody>
-        {{range .Sites}}
-        <tr class="border-t border-line">
-          <td class="p-3">{{.SiteName}}</td>
-          <td class="p-3">{{.Region}}</td>
-          <td class="p-3">{{siteStatusLabel .Status}}</td>
-          <td class="p-3">{{.EquipN}}</td>
-          <td class="p-3 text-ui-sm">
-            {{$works := index $.SiteWorks .ID}}
-            {{range $works}}<div><a class="text-primary" href="/workboard/tasks/{{.TaskID}}/action">{{.Line}}</a></div>{{else}}—{{end}}
-          </td>
-        </tr>
-        {{else}}
-        <tr><td class="p-3 text-ink-muted" colspan="5">사이트가 없습니다.</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  {{end}}
 
-  {{if .CanWrite}}
-  <form method="post" action="/projects/{{.Project.ProjectID}}/sites" class="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-    <h3 class="md:col-span-3 font-semibold text-ink">사이트 등록</h3>
-    <label class="text-ui-sm">사이트명 <input class="input" name="site_name" required></label>
-    <label class="text-ui-sm">지역 <input class="input" name="region"></label>
-    <label class="text-ui-sm">상태
-      <select class="input" name="status">
-        <option value="planned">예정</option>
-        <option value="in_progress">진행</option>
-        <option value="installed">설치완료</option>
-        <option value="inspected">검수완료</option>
-        <option value="excluded">제외</option>
-      </select>
-    </label>
-    <label class="md:col-span-3 text-ui-sm">주소 <input class="input" name="address"></label>
-    <div class="md:col-span-3"><button class="btn btn-primary" type="submit">사이트 저장</button></div>
-  </form>
-  {{end}}
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">시군 지역</p>
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-ui-sm max-h-72 overflow-y-auto" data-sigungu-box>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" data-sigungu="ALL" :checked="sigunguAll" @change="toggleSigungu('ALL')">전체</label>
+        <template x-for="k in sigunKeys()" :key="'sg-'+k">
+          <label class="inline-flex items-center gap-1">
+            <input type="checkbox" :data-sigungu="k" :checked="!sigunguAll && !!sigunguSel[k]" @change="toggleSigungu(k)">
+            <span x-text="k.split('|')[1]"></span>
+            <span class="text-ink-muted" x-text="k.split('|')[0]"></span>
+          </label>
+        </template>
+      </div>
+    </div>
 
-  <div class="card overflow-x-auto">
-    <h3 class="font-semibold text-ink p-3">장비</h3>
-    <table class="w-full text-ui">
-      <thead class="text-ink-muted text-left"><tr><th class="p-3">사이트</th><th class="p-3">제품</th><th class="p-3">시리얼</th><th class="p-3">상태</th></tr></thead>
-      <tbody>
-        {{range .Equips}}
-        <tr class="border-t border-line">
-          <td class="p-3">{{.SiteName}}</td>
-          <td class="p-3">{{.ProductName}}</td>
-          <td class="p-3">{{.SerialNo}}</td>
-          <td class="p-3">{{equipStatusLabel .Status}}</td>
-        </tr>
-        {{else}}
-        <tr><td class="p-3 text-ink-muted" colspan="4">장비가 없습니다.</td></tr>
-        {{end}}
-      </tbody>
-    </table>
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">지역 검색</p>
+      <form class="flex flex-wrap gap-2" @submit.prevent="search()">
+        <input class="input flex-1 min-w-0" type="search" x-ref="q" x-model="q" placeholder="학교명·시도·시군" data-site-q>
+        <button type="submit" class="btn btn-secondary" data-site-search>검색</button>
+      </form>
+      <p class="text-ui-xs text-ink-muted">시도·시군은 바로 적용, 검색어는 검색 버튼(또는 Enter)으로 적용됩니다.</p>
+    </div>
+
+    <div class="card p-4 space-y-3">
+      <p class="text-ui-sm font-medium text-ink">선택 학교</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="inline-flex items-center gap-1 text-ui-sm">
+          <input type="checkbox" x-ref="allBox" data-site-all :disabled="!canWrite || freeCount()===0" @change="toggleAll($event.target.checked)">
+          <span>전체 선택</span>
+        </label>
+        <p class="text-ui-sm text-ink-muted" data-site-sum x-text="sumLine()"></p>
+        <button type="button" class="btn btn-primary ml-auto" id="btn-site-reg" x-ref="regBtn"
+                :disabled="!canWrite || busy || selectedCount()===0" @click="register()">
+          <span x-text="'등록 ('+selectedCount()+')'"></span>
+        </button>
+      </div>
+      <p class="text-ui-sm text-ink-muted" x-show="visible().length===0 && !loading" x-cloak data-site-empty>조건에 맞는 학교가 없습니다</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 max-h-72 overflow-y-auto" data-site-grid>
+        <template x-for="it in visible()" :key="it.id">
+          <label class="flex items-start gap-1 text-ui-sm border border-line rounded-control px-2 py-1" :class="it.registered ? 'opacity-70' : ''">
+            <input type="checkbox" :data-id="it.id" :disabled="!canWrite || it.registered || busy"
+                   :checked="!!picked[it.id] && !it.registered" @change="toggleOne(it.id, $event.target.checked)">
+            <span class="min-w-0">
+              <span x-text="it.name"></span>
+              <span class="ml-1 text-xs px-1 rounded bg-hover text-ink-muted" x-show="it.registered" x-cloak>등록됨</span>
+              <span class="block text-ui-xs text-ink-muted" x-show="!it.registered" x-text="it.sigungu"></span>
+            </span>
+          </label>
+        </template>
+      </div>
+    </div>
   </div>
 
-  {{if .CanWrite}}
-  <form method="post" action="/projects/{{.Project.ProjectID}}/equipment" class="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-    <h3 class="md:col-span-3 font-semibold text-ink">장비 등록</h3>
-    <label class="text-ui-sm">사이트
-      <select class="input" name="site_id" required>
-        <option value="">선택</option>
-        {{range .Sites}}<option value="{{.ID}}">{{.SiteName}}</option>{{end}}
-      </select>
-    </label>
-    <label class="text-ui-sm">분류
-      <select class="input" name="category_id">
-        <option value="">분류 없음(기타)</option>
-        {{range .Cats}}<option value="{{.ID}}">{{.Code}} {{.Name}}</option>{{end}}
-      </select>
-    </label>
-    <label class="text-ui-sm">연차
-      <select class="input" name="year_id">
-        <option value="">없음</option>
-        {{range .Years}}<option value="{{.ID}}">{{.YearNo}}</option>{{end}}
-      </select>
-    </label>
-    <label class="text-ui-sm">제품명 <input class="input" name="product_name" required></label>
-    <label class="text-ui-sm">모델 <input class="input" name="model"></label>
-    <label class="text-ui-sm">제조사 <input class="input" name="manufacturer"></label>
-    <label class="text-ui-sm">수량 <input class="input" type="number" name="qty" value="1" min="1"></label>
-    <label class="text-ui-sm">시리얼 <input class="input" name="serial_no"></label>
-    <label class="text-ui-sm">상태
-      <select class="input" name="status">
-        <option value="planned">예정</option>
-        <option value="delivered">납품</option>
-        <option value="installed">설치</option>
-        <option value="accepted">검수</option>
-        <option value="replaced">교체</option>
-        <option value="removed">철수</option>
-      </select>
-    </label>
-    <label class="text-ui-sm">설치위치 <input class="input" name="install_location"></label>
-    <label class="text-ui-sm">설치일 <input class="input" type="date" name="install_date"></label>
-    <label class="text-ui-sm">설치자산 연결 <input class="input" name="asset_id" placeholder="자산번호"></label>
-    <div class="md:col-span-3"><button class="btn btn-primary" type="submit">장비 저장</button></div>
-  </form>
-  {{end}}
+  <div x-show="modalOpen" x-cloak
+       class="modal-backdrop z-50 flex items-center justify-center p-4 overflow-x-hidden"
+       role="dialog" aria-modal="true" aria-labelledby="site-reg-title"
+       @click.self="closeModal()" @keydown.escape.window="if(modalOpen) closeModal()">
+    <div class="modal-panel w-full max-w-md shadow-pop" @click.stop>
+      <h2 id="site-reg-title" class="text-ui font-bold text-ink" x-text="modalTitle"></h2>
+      <div class="mt-2 text-ui text-ink space-y-1" x-html="modalBody"></div>
+      <div class="mt-4 flex justify-end">
+        <button type="button" class="btn btn-primary" data-site-modal-close @click="closeModal()">닫기</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+{{if .Preview}}
+<div class="card p-4 overflow-x-auto mt-4">
+  <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
+  <p class="text-ui-sm">사이트 신규 {{.Preview.SitesNew}} · 수정 {{.Preview.SitesUpd}} · 장비 신규 {{.Preview.EquipNew}} · 수정 {{.Preview.EquipUpd}} · 오류 {{.Preview.ErrN}}</p>
+  <table class="w-full text-ui mt-2">
+    <thead class="text-ink-muted text-left"><tr><th class="p-2">행</th><th class="p-2">구분</th><th class="p-2">결과</th><th class="p-2">내용</th></tr></thead>
+    <tbody>
+      {{range .Preview.Rows}}
+      <tr class="border-t border-line"><td class="p-2">{{.Line}}</td><td class="p-2">{{.Kind}}</td><td class="p-2">{{.Action}}</td><td class="p-2">{{.Key}} {{.Msg}}</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
 {{end}}

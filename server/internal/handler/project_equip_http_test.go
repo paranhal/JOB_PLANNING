@@ -47,7 +47,7 @@ func TestProjectEquipHTTPYearsSitesImportPerm(t *testing.T) {
 	}
 	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
 	show := doGet(t, e, "/projects/"+id)
-	if show.Code != http.StatusOK || !strings.Contains(show.Body.String(), "사이트·장비") {
+	if show.Code != http.StatusOK || !strings.Contains(show.Body.String(), "사이트 등록") {
 		t.Fatalf("show %d", show.Code)
 	}
 	years := doGet(t, e, "/projects/"+id+"/years")
@@ -68,8 +68,11 @@ func TestProjectEquipHTTPYearsSitesImportPerm(t *testing.T) {
 		t.Fatalf("site %d", sok.Code)
 	}
 	sites := doGet(t, e, "/projects/"+id+"/sites")
-	if sites.Code != http.StatusOK || !strings.Contains(sites.Body.String(), "본관") {
-		t.Fatal("site list")
+	if sites.Code != http.StatusOK || !strings.Contains(sites.Body.String(), "사이트 등록") {
+		t.Fatal("site page")
+	}
+	if !strings.Contains(sites.Body.String(), `data-site-total="1"`) {
+		t.Fatal("등록된 사이트 수")
 	}
 	xlsx := doGet(t, e, "/projects/"+id+"/sites/template.xlsx")
 	if xlsx.Code != http.StatusOK {

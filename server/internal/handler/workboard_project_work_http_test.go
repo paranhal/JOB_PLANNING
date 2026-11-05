@@ -114,6 +114,8 @@ func newProjectWorkHarness(t *testing.T) (*echo.Echo, *repository.WBRepo, *repos
 	g.GET("/attachments/:id", h.Attachment.Download)
 	g.POST("/attachments/:id/delete", h.Attachment.Delete)
 	g.GET("/projects/:id/sites", h.Project.Sites)
+	g.GET("/projects/:id/sites/candidates", h.Project.SitesCandidates)
+	g.GET("/projects/:id", h.Project.Show)
 	h.Attachment.uploadDir = filepath.Join(t.TempDir(), "uploads")
 	return e, repository.NewWBRepo(db), users, db
 }
@@ -417,16 +419,20 @@ func TestProjectWorkSitesAndSearch(t *testing.T) {
 		t.Fatalf("제거한 S2 이력 %+v", hist["S2"])
 	}
 	sitesPage := doGet(t, e, "/projects/WP-O01/sites")
-	if sitesPage.Code != http.StatusOK {
-		t.Fatalf("사이트 화면 %d", sitesPage.Code)
+	if sitesPage.Code != http.StatusOK || !strings.Contains(sitesPage.Body.String(), "사이트 등록") {
+		t.Fatalf("사이트 등록 화면 %d", sitesPage.Code)
 	}
-	body := sitesPage.Body.String()
-	if !strings.Contains(body, "작업 이력") || !strings.Contains(body, "공사 · 설치 · 완료") || !strings.Contains(body, "/workboard/tasks/"+id) {
-		t.Fatal("사이트 행 작업 이력 없음")
+	if strings.Contains(sitesPage.Body.String(), "엑셀 일괄 등록") {
+		t.Fatal("사이트 등록에 엑셀 UI가 남음")
 	}
-	if !strings.Contains(body, "설치완료") {
-		t.Fatal("완료 연동 설치완료 없음")
+	projPage := doGet(t, e, "/projects/WP-O01")
+	if projPage.Code != http.StatusOK {
+		t.Fatalf("사업 상세 %d", projPage.Code)
 	}
+	if !strings.Contains(projPage.Body.String(), "사이트·진행") || !strings.Contains(projPage.Body.String(), "계룡고") {
+		t.Fatal("사업 상세 사이트 탭에 대상이 없다")
+	}
+	_ = db
 }
 
 func pickerOwnJSON(body string) string {

@@ -21,6 +21,8 @@ func mount119(e *echo.Echo, h *Handler) {
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/projects/new", h.Project.New)
 	g.GET("/projects/:id", h.Project.Show)
+	g.GET("/projects/:id/sites", h.Project.Sites)
+	g.GET("/projects/:id/sites/candidates", h.Project.SitesCandidates)
 	g.GET("/projects/:id/sites/pick", h.Project.SitesPick)
 	g.GET("/projects/:id/sites-panel", h.Project.SitesPanel)
 	g.POST("/projects/:id/sites/add-schools", h.Project.SitesAddSchools)
@@ -47,22 +49,22 @@ func Test95_119_DutyPMAndSitePickPager(t *testing.T) {
 		}
 	}
 	p1 := doGet(t, e, "/projects/WP-O01/sites/pick?parent_id=C-edu")
-	if p1.Code != http.StatusOK {
-		t.Fatalf("pick %d %s", p1.Code, p1.Body.String())
+	if p1.Code != http.StatusSeeOther {
+		t.Fatalf("pick redirect %d %s", p1.Code, p1.Body.String())
 	}
-	body := p1.Body.String()
-	if !strings.Contains(body, `data-sites-pick-pager`) || !strings.Contains(body, "page=2") {
-		t.Fatal("1쪽에 다음 페이지 링크가 없다")
+	if loc := p1.Header().Get("Location"); !strings.Contains(loc, "/projects/WP-O01/sites") {
+		t.Fatalf("pick loc %s", loc)
 	}
-	if !strings.Contains(body, "선택한 학교 추가") {
+	sitesPage := doGet(t, e, "/projects/WP-O01/sites")
+	if sitesPage.Code != http.StatusOK {
+		t.Fatalf("sites %d", sitesPage.Code)
+	}
+	body := sitesPage.Body.String()
+	if strings.Contains(body, `data-sites-pick-pager`) {
+		t.Fatal("페이징 UI가 남음")
+	}
+	if !strings.Contains(body, "등록 (") && !strings.Contains(body, `id="btn-site-reg"`) {
 		t.Fatal("관리자 등록 버튼 없음")
-	}
-	p2 := doGet(t, e, "/projects/WP-O01/sites/pick?parent_id=C-edu&page=2")
-	if p2.Code != http.StatusOK {
-		t.Fatalf("page2 %d", p2.Code)
-	}
-	if !strings.Contains(p2.Body.String(), "page=1") || !strings.Contains(p2.Body.String(), "이전") {
-		t.Fatal("2쪽에 이전 링크가 없다")
 	}
 }
 
@@ -86,11 +88,18 @@ func Test95_119_SiteRegisterPMOnly(t *testing.T) {
 		ex.UserID, pm.UserID); err != nil {
 		t.Fatal(err)
 	}
-	deny := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieUser(t, ex))
-	if deny.Code != http.StatusOK {
-		t.Fatalf("수행 pick %d", deny.Code)
+	denyPick := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieUser(t, ex))
+	if denyPick.Code != http.StatusSeeOther {
+		t.Fatalf("수행 pick %d", denyPick.Code)
 	}
-	if strings.Contains(deny.Body.String(), "선택한 학교 추가") {
+	deny := doGetWith(t, e, "/projects/WP-O01/sites", jwtCookieUser(t, ex))
+	if deny.Code != http.StatusOK {
+		t.Fatalf("수행 sites %d", deny.Code)
+	}
+	if !strings.Contains(deny.Body.String(), "이 사업의 사이트를 등록할 권한이 없습니다") {
+		t.Fatal("수행 담당 안내 없음")
+	}
+	if !strings.Contains(deny.Body.String(), "data-site-register-denied") {
 		t.Fatal("수행 담당이 사이트 등록 가능")
 	}
 	add := doFormUser(t, e, "/projects/WP-O01/sites/add-schools", url.Values{"customer_id": {"C-pct"}}, jwtCookieUser(t, ex))
@@ -100,9 +109,16 @@ func Test95_119_SiteRegisterPMOnly(t *testing.T) {
 	if add.Code == http.StatusSeeOther {
 		t.Fatal("수행 담당 추가가 통과함")
 	}
-	ok := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieUser(t, pm))
-	if ok.Code != http.StatusOK || !strings.Contains(ok.Body.String(), "선택한 학교 추가") {
-		t.Fatalf("PM pick %d", ok.Code)
+	okPick := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieUser(t, pm))
+	if okPick.Code != http.StatusSeeOther {
+		t.Fatalf("PM pick %d", okPick.Code)
+	}
+	ok := doGetWith(t, e, "/projects/WP-O01/sites", jwtCookieUser(t, pm))
+	if ok.Code != http.StatusOK || strings.Contains(ok.Body.String(), "이 사업의 사이트를 등록할 권한이 없습니다") {
+		t.Fatalf("PM sites %d", ok.Code)
+	}
+	if !strings.Contains(ok.Body.String(), `id="btn-site-reg"`) {
+		t.Fatal("PM 등록 버튼")
 	}
 	panel := httptest.NewRequest(http.MethodGet, "/projects/WP-O01/sites-panel", nil)
 	panel.Header.Set("HX-Request", "true")
@@ -391,7 +407,11 @@ func Test95_119A_HTMXAndPermissionMatrix(t *testing.T) {
 	}
 
 	clPick := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieRole(t, model.RoleCLevel))
-	if clPick.Code == http.StatusOK && strings.Contains(clPick.Body.String(), "선택한 학교 추가") {
+	if clPick.Code != http.StatusSeeOther && clPick.Code != http.StatusForbidden {
+		t.Fatalf("C-Level pick %d", clPick.Code)
+	}
+	clSites := doGetWith(t, e, "/projects/WP-O01/sites", jwtCookieRole(t, model.RoleCLevel))
+	if clSites.Code == http.StatusOK && !strings.Contains(clSites.Body.String(), "이 사업의 사이트를 등록할 권한이 없습니다") {
 		t.Fatal("C-Level이 사이트 등록 가능")
 	}
 	clAdd := doFormUser(t, e, "/projects/WP-O01/sites/add-schools", url.Values{"customer_id": {"C-pct"}}, jwtCookieRole(t, model.RoleCLevel))
@@ -430,8 +450,12 @@ func Test95_119A_HTMXAndPermissionMatrix(t *testing.T) {
 	}
 	vu, _ := users.GetByUsername("vs119a")
 	vPick := doGetWith(t, e, "/projects/WP-O01/sites/pick", jwtCookieUser(t, vu))
-	if vPick.Code != http.StatusOK || !strings.Contains(vPick.Body.String(), "선택한 학교 추가") {
+	if vPick.Code != http.StatusSeeOther {
 		t.Fatalf("비젼 pick %d", vPick.Code)
+	}
+	vSites := doGetWith(t, e, "/projects/WP-O01/sites", jwtCookieUser(t, vu))
+	if vSites.Code != http.StatusOK || strings.Contains(vSites.Body.String(), "이 사업의 사이트를 등록할 권한이 없습니다") {
+		t.Fatalf("비젼 sites %d", vSites.Code)
 	}
 }
 
