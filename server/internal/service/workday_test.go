@@ -94,6 +94,33 @@ func TestNextWorkdayTable(t *testing.T) {
 	}
 }
 
+func TestPrevWorkdayTable(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "wd_prev.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	hol := repository.NewHolidayRepo(db)
+	if _, err := db.Exec(`INSERT INTO holidays(holiday_date, holiday_year, name, kind) VALUES ('2026-11-10', 2026, '임시휴일', 'company')`); err != nil {
+		t.Fatal(err)
+	}
+	f := WorkdayFinder{Cal: NewCalendar(hol), YearMissing: hol.YearMissing}
+	mon := time.Date(2026, 11, 9, 0, 0, 0, 0, time.Local)
+	got, _ := f.PrevWorkday(mon, nil, "", false)
+	if got != "2026-11-06" {
+		t.Fatalf("월→금 %s", got)
+	}
+	tue := time.Date(2026, 11, 10, 0, 0, 0, 0, time.Local)
+	got, _ = f.PrevWorkday(tue, nil, "", false)
+	if got != "2026-11-09" {
+		t.Fatalf("화→월 %s", got)
+	}
+	got, _ = f.PrevWorkday(time.Date(2026, 11, 11, 0, 0, 0, 0, time.Local), nil, "", false)
+	if got != "2026-11-09" {
+		t.Fatalf("공휴일 건너뜀 %s", got)
+	}
+}
+
 func containsSkip(list []SkipInfo, reason string) bool {
 	for _, s := range list {
 		if s.Reason == reason {

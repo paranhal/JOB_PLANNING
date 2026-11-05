@@ -43,6 +43,15 @@ func NextWorkday(from time.Time, who []string, orgID string, includeFrom bool) (
 	}.NextWorkday(from, who, orgID, includeFrom)
 }
 
+// PrevWorkday from 기준 이전 영업일. includeFrom=false 이면 전날부터 찾는다.
+// 연차를 넣지 않으려면 who 를 비운다(95-132 직전 근무일).
+func PrevWorkday(from time.Time, who []string, orgID string, includeFrom bool) (string, []SkipInfo) {
+	return WorkdayFinder{
+		Cal:    DefaultCalendar(),
+		Leaves: DefaultLeaves(),
+	}.PrevWorkday(from, who, orgID, includeFrom)
+}
+
 func (f WorkdayFinder) NextWorkday(from time.Time, who []string, orgID string, includeFrom bool) (string, []SkipInfo) {
 	if from.IsZero() {
 		from = time.Now()
@@ -74,6 +83,47 @@ func (f WorkdayFinder) NextWorkday(from time.Time, who []string, orgID string, i
 		if skip {
 			skipped = append(skipped, SkipInfo{Date: ds, Reason: reason})
 			cur = cur.AddDate(0, 0, 1)
+			continue
+		}
+		if missingNoted {
+			skipped = append(skipped, SkipInfo{Date: ds, Reason: "휴일 정보를 확인하세요"})
+		}
+		return ds, skipped
+	}
+	return cur.Format("2006-01-02"), skipped
+}
+
+func (f WorkdayFinder) PrevWorkday(from time.Time, who []string, orgID string, includeFrom bool) (string, []SkipInfo) {
+	if from.IsZero() {
+		from = time.Now()
+	}
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
+	cur := from
+	if !includeFrom {
+		cur = from.AddDate(0, 0, -1)
+	}
+	start := cur.AddDate(0, 0, -workdaySearchCap)
+	leaveByDate := f.leaveIndex(start.Format("2006-01-02"), cur.Format("2006-01-02"), orgID)
+	who = compactWho(who)
+	var skipped []SkipInfo
+	missingNoted := false
+	for i := 0; i <= workdaySearchCap; i++ {
+		ds := cur.Format("2006-01-02")
+		if i == workdaySearchCap {
+			for cur.Weekday() == time.Saturday || cur.Weekday() == time.Sunday {
+				cur = cur.AddDate(0, 0, -1)
+			}
+			ds = cur.Format("2006-01-02")
+			skipped = append(skipped, SkipInfo{Date: ds, Reason: "휴일 정보를 확인하세요"})
+			return ds, skipped
+		}
+		if f.yearMissing(cur.Year()) && !missingNoted {
+			missingNoted = true
+		}
+		reason, skip := f.skipReason(cur, ds, who, leaveByDate)
+		if skip {
+			skipped = append(skipped, SkipInfo{Date: ds, Reason: reason})
+			cur = cur.AddDate(0, 0, -1)
 			continue
 		}
 		if missingNoted {
