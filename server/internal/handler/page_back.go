@@ -211,14 +211,14 @@ func SafePageBack(raw, fallback string) string {
 	return u.Path
 }
 
-func safeBackFromReferer(referer, currentPath string) string {
+func safeBackFromReferer(referer, currentPath string) (href string, samePath bool) {
 	referer = strings.TrimSpace(referer)
 	if referer == "" {
-		return ""
+		return "", false
 	}
 	u, err := url.Parse(referer)
 	if err != nil {
-		return ""
+		return "", false
 	}
 	cand := u.Path
 	if u.RawQuery != "" {
@@ -226,15 +226,15 @@ func safeBackFromReferer(referer, currentPath string) string {
 	}
 	got := SafePageBack(cand, "")
 	if got == "" {
-		return ""
+		return "", false
 	}
 	if normalizePagePath(u.Path) == normalizePagePath(currentPath) {
-		return ""
+		return got, true
 	}
-	return got
+	return got, false
 }
 
-// ResolvePageBack §3: 안전한 back → 부모 맵 → history.back(href는 대시보드) → 대시보드.
+// ResolvePageBack §3: 안전한 back → Referer(같은 경로는 history) → 부모 맵 → 대시보드.
 func ResolvePageBack(currentPath, backQuery, referer string) (href, kind string) {
 	cur := normalizePagePath(currentPath)
 	if b := strings.TrimSpace(backQuery); b != "" {
@@ -242,7 +242,10 @@ func ResolvePageBack(currentPath, backQuery, referer string) (href, kind string)
 			return got, pageBackKindBack
 		}
 	}
-	if ref := safeBackFromReferer(referer, cur); ref != "" {
+	if ref, same := safeBackFromReferer(referer, cur); ref != "" {
+		if same {
+			return ref, pageBackKindHistory
+		}
 		return ref, pageBackKindBack
 	}
 	if p := ParentPage(cur); p != "" {

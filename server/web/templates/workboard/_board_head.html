@@ -14,7 +14,7 @@
     </div>
   </div>
   <div class="flex flex-wrap items-center gap-2 border-t border-line px-6 py-2.5">
-    <form method="GET" action="/workboard/board" class="inline-flex flex-wrap items-center gap-1.5">
+    <form method="GET" action="/workboard/board" data-nav-replace class="inline-flex flex-wrap items-center gap-1.5">
       <input type="hidden" name="view" value="{{.View}}">
       <input type="hidden" name="date" value="{{.Date}}">
       {{if eq .MineParam "0"}}<input type="hidden" name="mine" value="0">{{end}}
@@ -32,8 +32,8 @@
     </form>
     {{if eq .View "day"}}
     <div class="inline-flex rounded-lg border border-line overflow-hidden">
-      <a href="{{.PersonHref}}" class="px-2.5 py-1 text-ui-sm font-semibold {{if ne .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">담당자별 열</a>
-      <a href="{{.FlatHref}}" class="border-l border-line px-2.5 py-1 text-ui-sm font-semibold {{if eq .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">한 줄</a>
+      <a href="{{.PersonHref}}" data-nav-replace class="px-2.5 py-1 text-ui-sm font-semibold {{if ne .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">담당자별 열</a>
+      <a href="{{.FlatHref}}" data-nav-replace class="border-l border-line px-2.5 py-1 text-ui-sm font-semibold {{if eq .Cols `flat`}}bg-success text-primary-fg{{else}}text-ink-muted{{end}}">한 줄</a>
     </div>
     {{end}}
     {{if .AssigneeLegend}}
@@ -51,9 +51,9 @@
 </section>
 <div class="card mt-4 overflow-hidden">
   <div class="flex items-center gap-2 px-5 py-3.5">
-    <a href="{{.PrevHref}}" class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="이전">‹</a>
+    <a href="{{.PrevHref}}" data-nav-replace class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="이전">‹</a>
     <p class="min-w-0 text-lg font-extrabold text-ink">{{.PeriodLabel}}</p>
-    <a href="{{.NextHref}}" class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="다음">›</a>
-    <a href="{{.TodayHref}}" class="ml-1 inline-flex h-8 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm font-semibold text-ink">오늘</a>
+    <a href="{{.NextHref}}" data-nav-replace class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="다음">›</a>
+    <a href="{{.TodayHref}}" data-nav-replace class="ml-1 inline-flex h-8 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm font-semibold text-ink">오늘</a>
   </div>
 {{end}}

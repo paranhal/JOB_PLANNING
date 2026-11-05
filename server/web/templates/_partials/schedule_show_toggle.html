@@ -1,8 +1,8 @@
 {{define "schedule_show_toggle"}}
 <span class="sched-show" id="schedule-show" role="group" aria-label="접수·조치 표시" data-show="{{.ShowParam}}" data-storage-key="jp.schedule.show">
-  <a href="{{.ShowPlanHref}}" class="{{if and .ShowPlan (not .ShowAct)}}on{{end}}" data-show-bit="plan">접수(계획) {{.PlanCount}}건</a>
-  <a href="{{.ShowActHref}}" class="{{if and .ShowAct (not .ShowPlan)}}on{{end}}" data-show-bit="act">조치(실행) {{.ActCount}}건</a>
-  {{if .ShowBothHref}}<a href="{{.ShowBothHref}}" class="{{if and .ShowPlan .ShowAct}}on{{end}}" data-show-bit="both">둘 다</a>{{end}}
+  <a href="{{.ShowPlanHref}}" class="{{if and .ShowPlan (not .ShowAct)}}on{{end}}" data-show-bit="plan" data-nav-replace>접수(계획) {{.PlanCount}}건</a>
+  <a href="{{.ShowActHref}}" class="{{if and .ShowAct (not .ShowPlan)}}on{{end}}" data-show-bit="act" data-nav-replace>조치(실행) {{.ActCount}}건</a>
+  {{if .ShowBothHref}}<a href="{{.ShowBothHref}}" class="{{if and .ShowPlan .ShowAct}}on{{end}}" data-show-bit="both" data-nav-replace>둘 다</a>{{end}}
 </span>
 {{if .ShowScopeBadge}}<span class="ml-2 text-ui-sm text-ink-muted" data-show-scope-badge>전체 · 조직 전체</span>{{end}}
 {{end}}

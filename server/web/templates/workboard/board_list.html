@@ -17,7 +17,7 @@
         <button type="button" class="btn btn-secondary btn-sm" x-show="closed" x-cloak @click="openBox()" aria-label="팀원별 보기 열기">팀원별 보기</button>
         {{end}}
         {{template "board_period_seg_list" .}}
-        <form method="get" action="/workboard/board" class="contents">
+        <form method="get" action="/workboard/board" data-nav-replace class="contents">
           <input type="hidden" name="view" value="list">
           <input type="hidden" name="date" value="{{.Date}}">
           {{if and .ListRange (ne .ListRange `day`)}}<input type="hidden" name="range" value="{{.ListRange}}">{{end}}
@@ -31,9 +31,9 @@
         {{template "board_new_work_btn" .}}
         <span class="rounded-full bg-success-soft px-4 py-2 text-ui font-bold text-success">전체 {{.Count}}건</span>
         <div class="flex items-center gap-1 text-ui font-semibold text-ink-muted">
-          <a href="{{.PrevHref}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="이전">‹</a>
-          <a href="{{.TodayHref}}" class="inline-flex h-6 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm">오늘</a>
-          <a href="{{.NextHref}}" class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="다음">›</a>
+          <a href="{{.PrevHref}}" data-nav-replace class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="이전">‹</a>
+          <a href="{{.TodayHref}}" data-nav-replace class="inline-flex h-6 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm">오늘</a>
+          <a href="{{.NextHref}}" data-nav-replace class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-surface" aria-label="다음">›</a>
           <span class="ml-1">{{.PeriodLabel}}</span>
         </div>
       </div>
