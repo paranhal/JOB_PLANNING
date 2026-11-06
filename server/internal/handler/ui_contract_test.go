@@ -31,6 +31,7 @@ var getElementByIdAllow = map[string]bool{
 	"board-m-from-col": true, "board-m-dur": true, "board-m-date": true, "board-m-start": true, "board-m-end": true,
 	"board-unlock": true, "pw-assignee-code": true,
 	"as-set-toast": true, // JS가 없으면 만들어서 붙임
+	"work-list-select": true, // 옛 board 리스트. 업무 관리는 삭제, AS는 as-list-select
 }
 
 var xDataNameRe = regexp.MustCompile(`x-data="([A-Za-z_][A-Za-z0-9_]*)\s*\(`)

@@ -206,8 +206,8 @@ func TestUnplacedBoxNotOnCalendar(t *testing.T) {
 	if !strings.Contains(month, "미배치 업무") || !strings.Contains(month, "날짜없는AS") {
 		t.Fatal("월 보기 미배치 박스에 날짜 없는 AS 없음")
 	}
-	if !strings.Contains(month, "data-pf=\"as\"") {
-		t.Fatal("유형 필터 칩 없음")
+	if strings.Contains(month, "data-pf=\"as\"") {
+		t.Fatal("제거된 유형 필터 칩이 있다")
 	}
 	if !strings.Contains(month, "data-ptoggle") {
 		t.Fatal("접기 버튼 없음")
