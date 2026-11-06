@@ -9,8 +9,9 @@
 {{define "wb_new_work_modal"}}
 {{if .CanWrite}}
 <template x-teleport="body">
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/55 hidden" x-show="newWorkOpen"
-     @keydown.escape.window="if (newWorkOpen) closeNewWork()" role="dialog" aria-modal="true" aria-labelledby="nw-title">
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/55" x-show="newWorkOpen" x-cloak
+     @keydown.escape.window="if (newWorkOpen) closeNewWork()" @click.self="closeNewWork()"
+     role="dialog" aria-modal="true" aria-labelledby="nw-title" data-new-work-dialog>
   <div class="flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[22px] bg-surface shadow-pop"
        :class="newWorkStep === 1 ? 'max-w-[760px]' : 'max-w-lg'">
     <div class="flex items-start justify-between px-7 pb-4 pt-5">
@@ -109,6 +110,11 @@ function boardNewWork() {
       history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
     },
     liveHostId: '',
+    syncNewWorkDialog() {
+      var el = document.querySelector('[data-new-work-dialog]');
+      if (!el) return;
+      el.style.display = this.newWorkOpen ? 'flex' : 'none';
+    },
     openNewWork(opts) {
       this.bindKindWatch();
       this.lastFocus = document.activeElement;
@@ -127,7 +133,7 @@ function boardNewWork() {
       this.preAssigneeIds = {{if .AssigneeSeed}}{{toJSON .AssigneeSeed.IDs}}{{else if .UserID}}[{{toJSON .UserID}}]{{else}}[]{{end}};
       this.liveHostId = (opts && opts.hostId) ? String(opts.hostId) : '';
       this.newWorkError = false;
-      this.$nextTick(() => this.focusKind());
+      this.$nextTick(() => { this.syncNewWorkDialog(); this.focusKind(); });
     },
     closeNewWork() {
       if (window.__asLookupMissingOpen) return;
@@ -135,6 +141,7 @@ function boardNewWork() {
       this.newWorkOpen = false;
       this.newWorkStep = 1;
       this.dailyKind = '';
+      this.syncNewWorkDialog();
       var btn = this.lastFocus;
       this.$nextTick(() => { if (btn && btn.focus) btn.focus(); });
     },
