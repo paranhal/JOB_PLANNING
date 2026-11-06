@@ -91,8 +91,11 @@ func TestSales95_19NewFormStageBoxAndFields(t *testing.T) {
 	if !strings.Contains(body, "10%") {
 		t.Fatal("신규 10%")
 	}
-	if !strings.Contains(body, "open02: false") || !strings.Contains(body, "open03: false") || !strings.Contains(body, "open04: true") {
+	if !strings.Contains(body, "open02: false") || !strings.Contains(body, "open03: false") || !strings.Contains(body, "open04: false") {
 		t.Fatal("접힘 기본값")
+	}
+	if !strings.Contains(body, "자세한 정보") {
+		t.Fatal("등록 자세한 정보")
 	}
 	if !strings.Contains(body, "/sales/quick-quote") {
 		t.Fatal("빠른 견적")

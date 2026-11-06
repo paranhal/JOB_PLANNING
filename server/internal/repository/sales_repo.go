@@ -108,6 +108,7 @@ type SalesListFilter struct {
 	PersonUserID     string
 	OwnerUserID      string // MyScope 전용. Owner(이름 필터)와 혼동 금지.
 	MyScope          bool
+	MissingNeeded    bool
 }
 
 func appendSalesOrgOrOwner(q string, args []interface{}, alias, orgID, ownerUserID string, myScope bool) (string, []interface{}) {

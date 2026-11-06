@@ -90,6 +90,7 @@ func parseSalesListFilterQ(c echo.Context, f repository.SalesListFilter) reposit
 	f.GroupID = strings.TrimSpace(c.QueryParam("group_id"))
 	f.ExpectedFrom = strings.TrimSpace(c.QueryParam("expected_from"))
 	f.ExpectedTo = strings.TrimSpace(c.QueryParam("expected_to"))
+	f.MissingNeeded = c.QueryParam("missing") == "1"
 	return f
 }
 

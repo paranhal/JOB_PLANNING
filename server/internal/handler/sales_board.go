@@ -141,6 +141,9 @@ func salesFilterEncode(f repository.SalesListFilter, extra string) string {
 	if f.GroupID != "" {
 		q.Set("group_id", f.GroupID)
 	}
+	if f.MissingNeeded {
+		q.Set("missing", "1")
+	}
 	s := q.Encode()
 	if extra == "" {
 		return s

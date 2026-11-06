@@ -68,6 +68,17 @@ func (h *SalesHandler) List(c echo.Context) error {
 	if view == "pipeline" {
 		return h.renderSalesPipeline(c, f, items)
 	}
+	missingN := 0
+	var missingKeep []model.SalesProject
+	for i := range items {
+		if model.SalesMissingInfo(&items[i]).ListNeeded() {
+			missingN++
+			missingKeep = append(missingKeep, items[i])
+		}
+	}
+	if f.MissingNeeded {
+		items = missingKeep
+	}
 	sortKey, dir := parseOptionalSort(c.QueryParam("sort"), c.QueryParam("dir"), "name,stage,customer,period,amount")
 	if view == "list" && sortKey != "" {
 		sortSalesProjects(items, sortKey, dir)
@@ -141,6 +152,9 @@ func (h *SalesHandler) List(c echo.Context) error {
 		"Dir":                 dir,
 		"SortHref":            hrefs,
 		"SortSelect":          sortSelectOptions(salesListSortCols(), hrefs, sortKey, dir),
+		"ShowMissingFilter":   true,
+		"MissingNeeded":       f.MissingNeeded,
+		"MissingCount":        missingN,
 	})
 }
 

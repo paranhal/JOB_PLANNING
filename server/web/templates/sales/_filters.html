@@ -8,7 +8,7 @@
 {{end}}
 
 {{define "sales_list_filters"}}
-<form method="get" action="{{.FilterAction}}" class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
+<form method="get" action="{{.FilterAction}}" data-nav-replace class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
   {{if .View}}<input type="hidden" name="display" value="{{.View}}"><input type="hidden" name="view" value="{{.View}}">{{end}}
   {{if .FromTask}}<input type="hidden" name="from_task" value="{{.FromTask}}">{{end}}
   {{if .Sort}}<input type="hidden" name="sort" value="{{.Sort}}"><input type="hidden" name="dir" value="{{.Dir}}">{{end}}
@@ -50,6 +50,12 @@
       <option value="0" {{if eq .AmountConfirmed "0"}}selected{{end}}>미확정</option>
     </select>
   </div>
+  {{if and (eq .FilterAction "/sales") .ShowMissingFilter}}
+  <label class="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
+    <input type="checkbox" name="missing" value="1" {{if .MissingNeeded}}checked{{end}} onchange="this.form.submit()">
+    보완 필요{{if .MissingCount}} ({{.MissingCount}}건){{end}}
+  </label>
+  {{end}}
   {{if eq .FilterAction "/sales"}}
   <div>
     <label class="block text-xs text-gray-500 mb-1">단계</label>
@@ -131,7 +137,7 @@
   </label>
   {{end}}
   <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed .IncludeClosed .IncludeDormant .ContractTarget .BizType .BudgetYear .BudgetStatus .GroupID}}
+  {{if or .Search .Stage .Status .Owner .Period .Customer .AmountConfirmed .IncludeClosed .IncludeDormant .ContractTarget .BizType .BudgetYear .BudgetStatus .GroupID .MissingNeeded}}
   <a href="{{if .FilterReset}}{{.FilterReset}}{{else}}{{.FilterAction}}{{end}}" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">초기화</a>
   {{end}}
 </form>
