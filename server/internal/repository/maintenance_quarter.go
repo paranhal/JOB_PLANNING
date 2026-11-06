@@ -108,13 +108,22 @@ func (r *MaintenanceRepo) computeOpenUnassignedSlots(planID string, year, month 
 	if slow {
 		return r.computeOpenUnassignedSlotsSlow(planID, year, month)
 	}
-	configs, err := r.ListSiteConfigs()
-	if err != nil {
-		return nil, err
+	return r.ListOpenUnassignedSlotsFrom(planID, year, month, nil, nil)
+}
+
+func (r *MaintenanceRepo) ListOpenUnassignedSlotsFrom(planID string, year, month int, configs []model.MaintenanceSiteConfig, visits []model.MaintenanceVisit) ([]model.UnassignedMonthSlot, error) {
+	var err error
+	if configs == nil {
+		configs, err = r.ListSiteConfigs()
+		if err != nil {
+			return nil, err
+		}
 	}
-	visits, err := r.ListVisits(planID)
-	if err != nil {
-		return nil, err
+	if visits == nil {
+		visits, err = r.ListVisits(planID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	slots := listUnassignedMonthSlotsFrom(configs, visits, year, month)
 	var out []model.UnassignedMonthSlot
@@ -205,15 +214,24 @@ func (r *MaintenanceRepo) PendingQuarterSlots(planID string, year, quarter int) 
 
 // PendingPeriodSlots 보는 달이 속한 기간(분기·반기·연)에서 아직 방문·건너뜀이 없는 슬롯.
 func (r *MaintenanceRepo) PendingPeriodSlots(planID string, year, month int) ([]model.UnassignedMonthSlot, error) {
-	configs, err := r.ListSiteConfigs()
-	if err != nil {
-		return nil, err
+	return r.PendingPeriodSlotsFrom(planID, year, month, nil, nil)
+}
+
+func (r *MaintenanceRepo) PendingPeriodSlotsFrom(planID string, year, month int, configs []model.MaintenanceSiteConfig, visits []model.MaintenanceVisit) ([]model.UnassignedMonthSlot, error) {
+	var err error
+	if configs == nil {
+		configs, err = r.ListSiteConfigs()
+		if err != nil {
+			return nil, err
+		}
 	}
-	visits, err := r.ListVisits(planID)
-	if err != nil {
-		return nil, err
+	if visits == nil {
+		visits, err = r.ListVisits(planID)
+		if err != nil {
+			return nil, err
+		}
 	}
-	lookup, err := r.assigneeIndex(planID)
+	lookup, err := r.assigneeIndexFromVisits(planID, visits)
 	if err != nil {
 		return nil, err
 	}
@@ -365,16 +383,21 @@ func (r *MaintenanceRepo) SkipQuarterSlot(planID, customerID, slotKey, reason, c
 
 // ListOpenUnassignedSlotsForOrg 해당 조직 점검 사이트만 남긴다(빈 org_id 는 도서관만).
 func (r *MaintenanceRepo) ListOpenUnassignedSlotsForOrg(planID string, year, month int, orgID string) ([]model.UnassignedMonthSlot, error) {
-	slots, err := r.ListOpenUnassignedSlots(planID, year, month)
-	if err != nil {
-		return nil, err
-	}
 	cfgs, err := r.ListSiteConfigs()
 	if err != nil {
 		return nil, err
 	}
+	cfgs = FilterSiteConfigsByOrg(cfgs, orgID)
+	slots, err := r.ListOpenUnassignedSlotsFrom(planID, year, month, cfgs, nil)
+	if err != nil {
+		return nil, err
+	}
+	return FilterSlotsBySiteConfigs(slots, cfgs), nil
+}
+
+func FilterSlotsBySiteConfigs(slots []model.UnassignedMonthSlot, cfgs []model.MaintenanceSiteConfig) []model.UnassignedMonthSlot {
 	allow := map[string]bool{}
-	for _, cfg := range FilterSiteConfigsByOrg(cfgs, orgID) {
+	for _, cfg := range cfgs {
 		allow[cfg.CustomerID] = true
 	}
 	var out []model.UnassignedMonthSlot
@@ -383,7 +406,7 @@ func (r *MaintenanceRepo) ListOpenUnassignedSlotsForOrg(planID string, year, mon
 			out = append(out, s)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // FilterUnassignedSlotsByOrg 빈 org_id 행은 레거시로 두고, 값이 있으면 조직만 남긴다.

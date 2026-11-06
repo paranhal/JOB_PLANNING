@@ -163,24 +163,6 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	visits, err := h.repo.ListVisits(plan.PlanID)
-	if err != nil {
-		return err
-	}
-	visits = model.DatedVisits(visits)
-	h.hydrateVisitPeople(visits)
-	prof.mark("list_visits")
-	// 기술담당: 기본은 본인 배정만. all=1 이면 전체(타 담당자 포함).
-	scopeAll := mntScopeAll(c)
-	showScopeToggle := isTechRole(c)
-	if showScopeToggle && !scopeAll {
-		visits = filterVisitsByAssignee(visits, assigneeKeys(c))
-	}
-	customers, err := h.customerRepo.ListSelectable()
-	if err != nil {
-		return err
-	}
-	prof.mark("customers")
 	today := time.Now().Format(dateLayout)
 	view := mntView(c.QueryParam("view"))
 	month := 0
@@ -190,10 +172,33 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if month < 1 || month > 12 {
 		month = 0
 	}
-	// 캘린더·칸반은 한 달을 보는 화면이라 달이 정해져야 한다.
 	if month == 0 && view != mntViewList {
-		month = defaultPlanMonth(plan.PlanYear, visits, time.Now())
+		month = defaultPlanMonth(plan.PlanYear, nil, time.Now())
+		if plan.PlanYear != time.Now().Year() {
+			month = h.repo.FirstVisitMonth(plan.PlanID, plan.PlanYear)
+		}
 	}
+
+	yearVisits, err := h.repo.ListVisits(plan.PlanID)
+	if err != nil {
+		return err
+	}
+	visits := model.DatedVisits(yearVisits)
+	yearTotal, yearDone := 0, 0
+	for _, v := range visits {
+		yearTotal++
+		if v.Completed {
+			yearDone++
+		}
+	}
+	h.hydrateVisitPeople(visits)
+	prof.mark("list_visits")
+	scopeAll := mntScopeAll(c)
+	showScopeToggle := isTechRole(c)
+	if showScopeToggle && !scopeAll {
+		visits = filterVisitsByAssignee(visits, assigneeKeys(c))
+	}
+	prof.mark("customers")
 
 	quotaMonth := month
 	if quotaMonth == 0 {
@@ -232,13 +237,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 	shown = filterVisitsByScheduleShow(shown, showPlan, showAct)
 
-	doneCount := 0
 	var incomplete []model.MaintenanceVisit
-	for _, v := range visits {
-		if v.Completed {
-			doneCount++
-		}
-	}
 	for _, v := range shown {
 		if v.Completed {
 			continue
@@ -273,20 +272,19 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if enc := yearQ.Encode(); enc != "" {
 		yearQuery = "?" + enc
 	}
-	var projects []model.WorkProject
-	if h.wbRepo != nil {
-		projects, _ = h.wbRepo.ListProjects(true)
-	}
 	prof.mark("lookups")
+	cfgs, _ := h.repo.ListSiteConfigs()
+	cfgs = repository.FilterSiteConfigsByOrg(cfgs, plan.OrgID)
 	var unassigned []model.UnassignedMonthSlot
 	if quotaMonth >= 1 && quotaMonth <= 12 {
-		unassigned, _ = h.repo.ListOpenUnassignedSlotsForOrg(plan.PlanID, plan.PlanYear, quotaMonth, plan.OrgID)
+		unassigned, _ = h.repo.ListOpenUnassignedSlotsFrom(plan.PlanID, plan.PlanYear, quotaMonth, cfgs, yearVisits)
+		unassigned = repository.FilterSlotsBySiteConfigs(unassigned, cfgs)
 	}
 	dupMonth := month
 	if view != mntViewList {
 		dupMonth = quotaMonth
 	}
-	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, dupMonth)
+	dupCount, _ := h.repo.CountDuplicateDropsFromVisits(yearVisits, plan.PlanYear, dupMonth)
 	qNum := model.CalendarQuarter(quotaMonth)
 	qFrom, qTo := model.QuarterDateBounds(plan.PlanYear, qNum)
 	weeks := decorateMntWeeks(buildVisitCalendarShow(plan.PlanYear, month, shown, today, showPlan, showAct), today, h.holidayRepo, h.repo.Leaves(), currentUserID(c))
@@ -301,13 +299,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if scopeAll && showScopeToggle {
 		scopeAllFlag = "1"
 	}
-	cfgs, _ := h.repo.ListSiteConfigs()
-	cfgs = repository.FilterSiteConfigsByOrg(cfgs, plan.OrgID)
-	custItems := make([]model.CustomerListItem, 0, len(customers))
-	for _, cu := range customers {
-		custItems = append(custItems, model.CustomerListItem{CustomerID: cu.CustomerID, SiteRegion: cu.Region, AddrSido: cu.AddrSido})
-	}
-	regions := visitRegionMap(custItems, cfgs)
+	regions := visitRegionMap(nil, cfgs)
 	dayCards := buildVisitCards(shown, today, model.NextMonthStart(time.Now()).Format("2006-01-02"), regions)
 	attachCardHrefs(dayCards, plan.PlanID, view, month, assigneeKey, scopeAllFlag, selDay, showEnc)
 	stats := mntMonthStats(shown, today)
@@ -324,8 +316,8 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if month != 0 {
 		monthQ = "&month=" + strconv.Itoa(month)
 	}
-	periodGroups := buildPeriodGroups(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c))
-	attachPeriodGroupRegions(h.repo, periodGroups)
+	periodGroups := buildPeriodGroupsFrom(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c), cfgs, yearVisits)
+	attachPeriodGroupRegions(periodGroups, cfgs)
 	prof.mark("site_period")
 	periodGroups = filterPeriodGroupsByAssignee(periodGroups, assigneeKey, calGroups, userName)
 	unassigned = filterSlotsByAssigneeKey(unassigned, assigneeKey, calGroups, userName)
@@ -345,10 +337,9 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"Plans":               plans,
 		"YearQuery":           yearQuery,
 		"Visits":              visits,
-		"Customers":           customers,
+		"YearVisitCount":      yearTotal,
 		"Assignees":           assignees,
 		"AssigneeRequired":    requiresAssigneeChoice(c),
-		"Projects":            projects,
 		"Unassigned":          unassigned,
 		"PeriodGroups":        periodGroups,
 		"QuarterPending":      quarterPending,
@@ -384,8 +375,8 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"ShowPlanHref":        "/maintenance/" + plan.PlanID + "?view=" + view + monthQ + qScope + qAssignee + "&show=" + url.QueryEscape(model.ToggleScheduleShow(showEnc, model.ScheduleShowPlan)),
 		"ShowActHref":         "/maintenance/" + plan.PlanID + "?view=" + view + monthQ + qScope + qAssignee + "&show=" + url.QueryEscape(model.ToggleScheduleShow(showEnc, model.ScheduleShowAct)),
 		"TodayHref":           template.URL(calTodayHref(plan.PlanID, plan.PlanYear, today, assigneeKey, scopeAllFlag, showEnc)),
-		"DoneCount":           doneCount,
-		"OpenCount":           len(visits) - doneCount,
+		"DoneCount":           yearDone,
+		"OpenCount":           yearTotal - yearDone,
 		"IncompleteVisits":    incomplete,
 		"FlashDone":           c.QueryParam("done"),
 		"FlashOK":             c.QueryParam("ok"),
@@ -1156,10 +1147,14 @@ func (h *MaintenanceHandler) ExportSiteConfigsExcel(c echo.Context) error {
 }
 
 func buildPeriodGroups(repo *repository.MaintenanceRepo, planID string, year, month int, orgID string) []model.MaintenancePeriodGroup {
+	return buildPeriodGroupsFrom(repo, planID, year, month, orgID, nil, nil)
+}
+
+func buildPeriodGroupsFrom(repo *repository.MaintenanceRepo, planID string, year, month int, orgID string, cfgs []model.MaintenanceSiteConfig, visits []model.MaintenanceVisit) []model.MaintenancePeriodGroup {
 	if repo == nil || month < 1 {
 		return nil
 	}
-	slots, _ := repo.PendingPeriodSlots(planID, year, month)
+	slots, _ := repo.PendingPeriodSlotsFrom(planID, year, month, cfgs, visits)
 	slots = repository.FilterUnassignedSlotsByOrg(slots, orgID)
 	by := map[string][]model.UnassignedMonthSlot{}
 	order := []string{"quarterly", "semi", "yearly"}
@@ -1185,12 +1180,8 @@ func buildPeriodGroups(repo *repository.MaintenanceRepo, planID string, year, mo
 	return out
 }
 
-func attachPeriodGroupRegions(repo *repository.MaintenanceRepo, groups []model.MaintenancePeriodGroup) {
-	if repo == nil || len(groups) == 0 {
-		return
-	}
-	cfgs, err := repo.ListSiteConfigs()
-	if err != nil {
+func attachPeriodGroupRegions(groups []model.MaintenancePeriodGroup, cfgs []model.MaintenanceSiteConfig) {
+	if len(groups) == 0 {
 		return
 	}
 	by := map[string]string{}

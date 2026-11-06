@@ -244,15 +244,62 @@ func scanVisits(rows *sql.Rows) ([]model.MaintenanceVisit, error) {
 }
 
 func (r *MaintenanceRepo) ListVisitsByMonth(planID string, year, month int) ([]model.MaintenanceVisit, error) {
-	prefix := fmt.Sprintf("%d-%02d-%%", year, month)
+	from, to := monthDateBounds(year, month)
 	rows, err := r.db.Query(visitSelectColumns+`
-		WHERE v.plan_id = ? AND v.visit_date LIKE ?
-		ORDER BY v.visit_date, v.sort_order`, planID, prefix)
+		WHERE v.plan_id = ? AND v.visit_date >= ? AND v.visit_date < ?
+		ORDER BY v.visit_date, v.sort_order`, planID, from, to)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	return scanVisits(rows)
+}
+
+func (r *MaintenanceRepo) ListVisitsCoveringMonth(planID string, year, month int) ([]model.MaintenanceVisit, error) {
+	from, to := monthDateBounds(year, month)
+	rows, err := r.db.Query(visitSelectColumns+`
+		WHERE v.plan_id = ? AND (
+			(v.visit_date >= ? AND v.visit_date < ?)
+			OR (v.completed_date >= ? AND v.completed_date < ?)
+		)
+		ORDER BY v.visit_date, v.sort_order`, planID, from, to, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanVisits(rows)
+}
+
+func monthDateBounds(year, month int) (from, to string) {
+	from = fmt.Sprintf("%04d-%02d-01", year, month)
+	if month == 12 {
+		return from, fmt.Sprintf("%04d-01-01", year+1)
+	}
+	return from, fmt.Sprintf("%04d-%02d-01", year, month+1)
+}
+
+func (r *MaintenanceRepo) CountDatedVisits(planID string) (total, done int, err error) {
+	err = r.db.QueryRow(`
+		SELECT COUNT(*), COALESCE(SUM(CASE WHEN COALESCE(completed,0)=1 THEN 1 ELSE 0 END),0)
+		FROM maintenance_visits
+		WHERE plan_id=? AND length(trim(COALESCE(visit_date,''))) >= 10`, planID).Scan(&total, &done)
+	return total, done, err
+}
+
+func (r *MaintenanceRepo) FirstVisitMonth(planID string, year int) int {
+	var d string
+	err := r.db.QueryRow(`
+		SELECT MIN(visit_date) FROM maintenance_visits
+		WHERE plan_id=? AND visit_date LIKE ? AND length(trim(visit_date)) >= 10`,
+		planID, fmt.Sprintf("%04d-%%", year)).Scan(&d)
+	if err != nil || len(d) < 7 {
+		return 1
+	}
+	var m int
+	if _, err := fmt.Sscanf(d[5:7], "%d", &m); err != nil || m < 1 || m > 12 {
+		return 1
+	}
+	return m
 }
 
 // ListVisitsBetween 기간 안의 모든 계획 방문 (업무 등록 화면의 정기점검 카드용)

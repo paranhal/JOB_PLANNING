@@ -249,7 +249,7 @@ window.mntAssigneeMulti = function (cfg) {
         {{if .Plan.Title}}{{.Plan.Title}} · {{end}}
         {{if and (ne .View "list") (ne .Month 0)}}{{.Month}}월 · {{end}}
         {{if eq .Plan.Status "approved"}}<span class="text-green-700 font-medium">승인됨</span>{{else}}<span class="text-amber-700 font-medium">초안</span>{{end}}
-        · {{.ScopeNote}} · 방문 {{len .Visits}}건 (완료 <span class="text-green-700 font-medium">{{.DoneCount}}</span> · 예정 {{.OpenCount}})
+        · {{.ScopeNote}} · 방문 {{if .YearVisitCount}}{{.YearVisitCount}}{{else}}{{len .Visits}}{{end}}건 (완료 <span class="text-green-700 font-medium">{{.DoneCount}}</span> · 예정 {{.OpenCount}})
       </p>
     </div>
     <div class="flex flex-wrap gap-2">

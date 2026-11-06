@@ -252,3 +252,228 @@ func seedMnt139Visits(t *testing.T, db *sql.DB, planID string, total, incomplete
 		t.Fatal(err)
 	}
 }
+
+func Test95_139_OpenLiveMatchesVisitHasOpenLive(t *testing.T) {
+	e, db, planID := newMnt139App(t, true)
+	_ = e
+	seedMnt139Visits(t, db, planID, 40, 12)
+	openIDs := seedMnt139WorkTasks(t, db, 500, 10, []string{"m139_0001", "m139_0002"})
+	h := New(db)
+	visits, err := repository.NewMaintenanceRepo(db).ListVisits(planID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch := h.Maintenance.openLiveVisitIDs(visits)
+	for _, v := range visits {
+		got := batch[v.VisitID]
+		want := h.Maintenance.visitHasOpenLive(v.VisitID)
+		if got != want {
+			t.Fatalf("%s batch=%v visitHasOpenLive=%v", v.VisitID, got, want)
+		}
+	}
+	if !batch["m139_0001"] || !batch["m139_0002"] {
+		t.Fatalf("열린 구간 방문이 빠짐 %+v openSeed=%v", batch, openIDs)
+	}
+	if batch["m139_0003"] {
+		t.Fatal("닫힌 구간 방문이 열린 것으로 나옴")
+	}
+	if batch["m139_0010"] {
+		t.Fatal("연결 작업 없는 미완료가 열린 것으로 나옴")
+	}
+}
+
+func Test95_139_QueryCap60(t *testing.T) {
+	t.Setenv(dbprof.EnvKey, "1")
+	e, db, planID := newMnt139App(t, true)
+	seedMnt139Visits(t, db, planID, 850, 130)
+	seedMnt139WorkTasks(t, db, 5000, 800, []string{"m139_0000", "m139_0005", "m139_0010"})
+	paths := []struct {
+		path string
+		max  int64
+	}{
+		{"/maintenance/" + planID + "?view=list", 70},
+		{"/maintenance/" + planID + "?view=list&month=10", 60},
+		{"/maintenance/" + planID + "?view=calendar&month=10", 60},
+		{"/maintenance/" + planID + "?view=kanban&month=10", 60},
+	}
+	for _, p := range paths {
+		rec := doGetWith(t, e, p.path, jwtCookie(t))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status %d", p.path, rec.Code)
+		}
+		n := parseTimingQueries(rec.Header().Get("Server-Timing"))
+		t.Logf("%s q=%d max=%d", p.path, n, p.max)
+		if n > p.max {
+			t.Errorf("%s 쿼리 %d > %d", p.path, n, p.max)
+		}
+	}
+}
+
+func Test95_139_BatchVsNaive5000(t *testing.T) {
+	t.Setenv(dbprof.EnvKey, "1")
+	_, db, planID := newMnt139App(t, true)
+	seedMnt139Visits(t, db, planID, 850, 130)
+	seedMnt139WorkTasks(t, db, 5000, 800, nil)
+	visits, err := repository.NewMaintenanceRepo(db).ListVisits(planID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var incomplete []string
+	for _, v := range visits {
+		if !v.Completed {
+			incomplete = append(incomplete, v.VisitID)
+		}
+	}
+	wb := repository.NewWBRepo(db)
+	var naive int64
+	dbprof.Begin(&naive)
+	for _, id := range incomplete {
+		_, _ = wb.GetTaskBySource(model.WBSourceMaintenance, id)
+	}
+	dbprof.End()
+	var batch int64
+	dbprof.Begin(&batch)
+	_, err = wb.ListTasksBySourceIDs(model.WBSourceMaintenance, incomplete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dbprof.End()
+	t.Logf("work_tasks 5000 · 방문연결 800 · 미완료 %d · GetTaskBySource×N=%d · ListTasksBySourceIDs=%d", len(incomplete), naive, batch)
+	if batch == 0 || naive == 0 {
+		t.Fatalf("측정 실패 naive=%d batch=%d", naive, batch)
+	}
+	if batch >= naive {
+		t.Fatalf("일괄이 더 많음 naive=%d batch=%d", naive, batch)
+	}
+}
+
+func Test95_139_ExplainUsesSourceIndex(t *testing.T) {
+	_, db, _ := newMnt139App(t, false)
+	rows, err := db.Query(`EXPLAIN QUERY PLAN SELECT task_id FROM work_tasks WHERE source_type=? AND source_id IN (?,?)`,
+		model.WBSourceMaintenance, "m139_0000", "m139_0001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var plan strings.Builder
+	for rows.Next() {
+		var a, b, c int
+		var d string
+		if err := rows.Scan(&a, &b, &c, &d); err != nil {
+			t.Fatal(err)
+		}
+		plan.WriteString(d)
+		plan.WriteByte('\n')
+	}
+	txt := plan.String()
+	t.Log(txt)
+	if strings.Contains(strings.ToLower(txt), "scan table work_tasks") && !strings.Contains(strings.ToLower(txt), "using index") {
+		t.Fatalf("work_tasks 풀스캔: %s", txt)
+	}
+	srows, err := db.Query(`EXPLAIN QUERY PLAN SELECT DISTINCT task_id FROM work_task_segments WHERE task_id IN (?) AND kind=? AND TRIM(COALESCE(end_time,''))=''`,
+		"WT1", model.SegKindActual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srows.Close()
+	plan.Reset()
+	for srows.Next() {
+		var a, b, c int
+		var d string
+		if err := srows.Scan(&a, &b, &c, &d); err != nil {
+			t.Fatal(err)
+		}
+		plan.WriteString(d)
+		plan.WriteByte('\n')
+	}
+	txt = plan.String()
+	t.Log(txt)
+	if strings.Contains(strings.ToLower(txt), "scan table work_task_segments") && !strings.Contains(strings.ToLower(txt), "using index") {
+		t.Fatalf("work_task_segments 풀스캔: %s", txt)
+	}
+}
+
+func Test95_139_T3_Measure850VisitsAfter5000Tasks(t *testing.T) {
+	t.Setenv(dbprof.EnvKey, "1")
+	e, db, planID := newMnt139App(t, true)
+	seedMnt139Visits(t, db, planID, 850, 130)
+	seedMnt139WorkTasks(t, db, 5000, 800, []string{"m139_0000"})
+	screens := []struct{ name, path string }{
+		{"목록", "/maintenance/" + planID + "?view=list"},
+		{"캘린더·월10", "/maintenance/" + planID + "?view=calendar&month=10"},
+		{"캘린더·월11", "/maintenance/" + planID + "?view=calendar&month=11"},
+		{"칸반·월10", "/maintenance/" + planID + "?view=kanban&month=10"},
+		{"관리", "/maintenance/" + planID + "/manage"},
+	}
+	fmt.Printf("\n95-139 구현 후 (방문 850 · 미완료 130 · work_tasks 5000 · 방문연결 800)\n")
+	fmt.Printf("%-18s %8s %8s %8s\n", "화면", "ms", "쿼리", "KB")
+	for _, sc := range screens {
+		start := time.Now()
+		rec := doGetWith(t, e, sc.path, jwtCookie(t))
+		st := rec.Header().Get("Server-Timing")
+		fmt.Printf("%-18s %8.0f %8d %8.1f  %s\n", sc.name, msDur(time.Since(start)), parseTimingQueries(st), float64(rec.Body.Len())/1024, compactTiming(st))
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s status %d", sc.name, rec.Code)
+		}
+	}
+	if sc := screens[len(screens)-1]; sc.name == "관리" {
+		_ = sc
+	}
+}
+
+func seedMnt139WorkTasks(t *testing.T, db *sql.DB, total, linked int, openVisitIDs []string) []string {
+	t.Helper()
+	if total < linked {
+		t.Fatalf("total=%d linked=%d", total, linked)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.Prepare(`INSERT INTO work_tasks
+		(task_id, work_type, title, due_date, work_date, status, priority, assignee, source_type, source_id, org_id)
+		VALUES (?,?,?,?,?,'waiting','normal','관리자',?,?,?)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stmt.Close()
+	seg, err := tx.Prepare(`INSERT INTO work_task_segments
+		(segment_id, task_id, kind, seq, work_date, start_time, end_time)
+		VALUES (?,?,?,?,?,?,?)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer seg.Close()
+	openSet := map[string]bool{}
+	for _, id := range openVisitIDs {
+		openSet[id] = true
+	}
+	var opened []string
+	for i := 0; i < total; i++ {
+		tid := fmt.Sprintf("wt139_%04d", i)
+		srcType, srcID := "", ""
+		if i < linked {
+			srcType = model.WBSourceMaintenance
+			srcID = fmt.Sprintf("m139_%04d", i)
+		} else {
+			srcType = "other"
+			srcID = tid
+		}
+		if _, err := stmt.Exec(tid, model.WBWorkMaintenance, "더미"+tid, "2026-10-01", "2026-10-01", srcType, srcID, model.OrgIDLibrary); err != nil {
+			t.Fatal(err)
+		}
+		end := "11:00"
+		if openSet[srcID] {
+			end = ""
+			opened = append(opened, srcID)
+		}
+		if _, err := seg.Exec("sg139_"+tid, tid, model.SegKindActual, 1, "2026-10-01", "09:00", end); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return opened
+}

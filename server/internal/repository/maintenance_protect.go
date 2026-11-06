@@ -175,6 +175,25 @@ func (r *MaintenanceRepo) ListDuplicateDrops(planID string, year, month int) ([]
 	if err != nil {
 		return nil, err
 	}
+	return r.duplicateDropsFromVisits(visits)
+}
+
+func (r *MaintenanceRepo) duplicateDropsFromVisits(visits []model.MaintenanceVisit) ([]DuplicateDrop, error) {
+	return r.classifyCollectedDrops(r.collectDuplicateDrops(visits))
+}
+
+func (r *MaintenanceRepo) duplicateDropsFromVisitsRange(visits []model.MaintenanceVisit, year, month int) ([]DuplicateDrop, error) {
+	if month >= 1 && month <= 12 {
+		return r.duplicateDropsFromVisits(filterVisitsInMonth(visits, year, month))
+	}
+	var collected []DuplicateDrop
+	for m := 1; m <= 12; m++ {
+		collected = append(collected, r.collectDuplicateDrops(filterVisitsInMonth(visits, year, m))...)
+	}
+	return r.classifyCollectedDrops(collected)
+}
+
+func (r *MaintenanceRepo) collectDuplicateDrops(visits []model.MaintenanceVisit) []DuplicateDrop {
 	type key struct {
 		cust  string
 		slot  string
@@ -233,13 +252,24 @@ func (r *MaintenanceRepo) ListDuplicateDrops(planID string, year, month int) ([]
 			continue
 		}
 		seen[d.Drop.VisitID] = struct{}{}
-		r.classifyDuplicateDrop(&d)
 		out = append(out, d)
+	}
+	return out
+}
+
+func (r *MaintenanceRepo) classifyCollectedDrops(out []DuplicateDrop) ([]DuplicateDrop, error) {
+	checkIDs := make([]string, 0, len(out))
+	for _, d := range out {
+		checkIDs = append(checkIDs, d.Drop.VisitID)
+	}
+	linked := r.visitIDsWithLinkedAction(checkIDs)
+	for i := range out {
+		r.classifyDuplicateDrop(&out[i], linked[out[i].Drop.VisitID])
 	}
 	return out, nil
 }
 
-func (r *MaintenanceRepo) classifyDuplicateDrop(d *DuplicateDrop) {
+func (r *MaintenanceRepo) classifyDuplicateDrop(d *DuplicateDrop, linkedAction bool) {
 	if d == nil {
 		return
 	}
@@ -259,9 +289,50 @@ func (r *MaintenanceRepo) classifyDuplicateDrop(d *DuplicateDrop) {
 		d.SkipReason = "남을 방문이 같은 슬롯에 없습니다"
 		return
 	}
-	if r.visitHasActionRecord(d.Drop) {
+	if visitHasLocalAction(d.Drop) || linkedAction {
 		d.SkipReason = DupSkipRecord
 	}
+}
+
+func visitHasLocalAction(v model.MaintenanceVisit) bool {
+	return strings.TrimSpace(v.Notes) != "" || strings.TrimSpace(v.StartTime) != "" || strings.TrimSpace(v.EndTime) != ""
+}
+
+func (r *MaintenanceRepo) visitIDsWithLinkedAction(ids []string) map[string]bool {
+	out := map[string]bool{}
+	ids = uniqueNonEmpty(ids)
+	if r == nil || r.db == nil || len(ids) == 0 {
+		return out
+	}
+	tables := []string{
+		"maintenance_visit_targets",
+		"maintenance_visit_signatures",
+		"maintenance_visit_reports",
+		"maintenance_reports",
+	}
+	for i := 0; i < len(ids); i += inClauseChunk {
+		end := i + inClauseChunk
+		if end > len(ids) {
+			end = len(ids)
+		}
+		part := ids[i:end]
+		ph := placeholders(len(part))
+		args := iface(part)
+		for _, tbl := range tables {
+			rows, err := r.db.Query(`SELECT DISTINCT visit_id FROM `+tbl+` WHERE visit_id IN (`+ph+`)`, args...)
+			if err != nil {
+				continue
+			}
+			for rows.Next() {
+				var id string
+				if rows.Scan(&id) == nil && strings.TrimSpace(id) != "" {
+					out[id] = true
+				}
+			}
+			rows.Close()
+		}
+	}
+	return out
 }
 
 func visitYearMonth(date string) string {
@@ -273,10 +344,7 @@ func visitYearMonth(date string) string {
 }
 
 func (r *MaintenanceRepo) visitHasActionRecord(v model.MaintenanceVisit) bool {
-	if strings.TrimSpace(v.Notes) != "" {
-		return true
-	}
-	if strings.TrimSpace(v.StartTime) != "" || strings.TrimSpace(v.EndTime) != "" {
+	if visitHasLocalAction(v) {
 		return true
 	}
 	targets, err := r.ListVisitTargets(v.VisitID)
@@ -310,19 +378,28 @@ func (r *MaintenanceRepo) visitHasSignatureOrReport(visitID string) bool {
 }
 
 func (r *MaintenanceRepo) CountDuplicateDrops(planID string, year int, month int) (int, error) {
-	if month >= 1 && month <= 12 {
-		d, err := r.ListDuplicateDrops(planID, year, month)
-		return len(d), err
+	visits, err := r.ListVisits(planID)
+	if err != nil {
+		return 0, err
 	}
-	n := 0
-	for m := 1; m <= 12; m++ {
-		d, err := r.ListDuplicateDrops(planID, year, m)
-		if err != nil {
-			return n, err
+	return r.CountDuplicateDropsFromVisits(visits, year, month)
+}
+
+func (r *MaintenanceRepo) CountDuplicateDropsFromVisits(visits []model.MaintenanceVisit, year, month int) (int, error) {
+	d, err := r.duplicateDropsFromVisitsRange(visits, year, month)
+	return len(d), err
+}
+
+func filterVisitsInMonth(visits []model.MaintenanceVisit, year, month int) []model.MaintenanceVisit {
+	from, to := monthDateBounds(year, month)
+	var out []model.MaintenanceVisit
+	for _, v := range visits {
+		d := strings.TrimSpace(v.VisitDate)
+		if d >= from && d < to {
+			out = append(out, v)
 		}
-		n += len(d)
 	}
-	return n, nil
+	return out
 }
 
 // deleteVisitAllowProtectedDuplicate 중복 정리 전용. allowProtectedDuplicate=true 일 때만

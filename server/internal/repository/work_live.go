@@ -109,6 +109,49 @@ func (r *WBRepo) ListOpenActualForWorker(workerID string) ([]model.WorkTaskSegme
 	return out, rows.Err()
 }
 
+func (r *WBRepo) ListOpenActualTaskIDs(taskIDs []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	ids := uniqueNonEmpty(taskIDs)
+	if r == nil || r.db == nil || len(ids) == 0 {
+		return out, nil
+	}
+	for i := 0; i < len(ids); i += inClauseChunk {
+		end := i + inClauseChunk
+		if end > len(ids) {
+			end = len(ids)
+		}
+		part := ids[i:end]
+		rows, err := r.db.Query(`
+			SELECT DISTINCT task_id FROM work_task_segments
+			WHERE task_id IN (`+placeholders(len(part))+`)
+			  AND kind=?
+			  AND TRIM(COALESCE(end_time,''))=''`,
+			append(iface(part), model.SegKindActual)...)
+		if err != nil {
+			if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+				return out, nil
+			}
+			return nil, err
+		}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if strings.TrimSpace(id) != "" {
+				out[id] = true
+			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 func (r *WBRepo) ListOpenActualForTask(taskID, workerID string) ([]model.WorkTaskSegment, error) {
 	all, err := r.ListActualSegments(taskID)
 	if err != nil {

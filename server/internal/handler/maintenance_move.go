@@ -70,12 +70,38 @@ func (h *MaintenanceHandler) visitHasOpenLive(visitID string) bool {
 
 func (h *MaintenanceHandler) openLiveVisitIDs(visits []model.MaintenanceVisit) map[string]bool {
 	out := map[string]bool{}
+	if h == nil || h.wbRepo == nil {
+		return out
+	}
+	var ids []string
 	for _, v := range visits {
-		if v.Completed {
+		if !v.Completed {
+			ids = append(ids, v.VisitID)
+		}
+	}
+	if len(ids) == 0 {
+		return out
+	}
+	bySrc, err := h.wbRepo.ListTasksBySourceIDs(model.WBSourceMaintenance, ids)
+	if err != nil {
+		return out
+	}
+	taskIDs := make([]string, 0, len(bySrc))
+	visitOf := map[string]string{}
+	for vid, t := range bySrc {
+		if t == nil || strings.TrimSpace(t.TaskID) == "" {
 			continue
 		}
-		if h.visitHasOpenLive(v.VisitID) {
-			out[v.VisitID] = true
+		taskIDs = append(taskIDs, t.TaskID)
+		visitOf[t.TaskID] = vid
+	}
+	open, err := h.wbRepo.ListOpenActualTaskIDs(taskIDs)
+	if err != nil {
+		return out
+	}
+	for taskID := range open {
+		if vid := visitOf[taskID]; vid != "" {
+			out[vid] = true
 		}
 	}
 	return out

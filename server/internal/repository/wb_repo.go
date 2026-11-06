@@ -583,28 +583,85 @@ func (r *WBRepo) GetTaskBySource(sourceType, sourceID string, sourceRole ...stri
 	if len(sourceRole) > 0 {
 		role = strings.TrimSpace(sourceRole[0])
 	}
-	all, err := r.ListTasks()
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceID == "" {
+		return nil, nil
+	}
+	items, err := r.listStoredTasks(` WHERE t.source_type=? AND t.source_id=?`+workTaskOrder, sourceType, sourceID)
 	if err != nil {
 		return nil, err
 	}
-	for _, t := range all {
-		if t.SourceType != sourceType || t.SourceID != sourceID {
+	return pickWorkTaskBySource(items, sourceID, role), nil
+}
+
+const inClauseChunk = 400
+
+func (r *WBRepo) ListTasksBySourceIDs(sourceType string, sourceIDs []string, sourceRole ...string) (map[string]*model.WorkTask, error) {
+	out := map[string]*model.WorkTask{}
+	role := ""
+	if len(sourceRole) > 0 {
+		role = strings.TrimSpace(sourceRole[0])
+	}
+	ids := uniqueNonEmpty(sourceIDs)
+	if r == nil || r.db == nil || len(ids) == 0 {
+		return out, nil
+	}
+	items, err := r.listTasksBySourceIDs(sourceType, ids)
+	if err != nil {
+		return out, err
+	}
+	by := map[string][]model.WorkTask{}
+	for _, t := range items {
+		by[t.SourceID] = append(by[t.SourceID], t)
+	}
+	for _, id := range ids {
+		if t := pickWorkTaskBySource(by[id], id, role); t != nil {
+			out[id] = t
+		}
+	}
+	return out, nil
+}
+
+func (r *WBRepo) listTasksBySourceIDs(sourceType string, sourceIDs []string) ([]model.WorkTask, error) {
+	var out []model.WorkTask
+	for i := 0; i < len(sourceIDs); i += inClauseChunk {
+		end := i + inClauseChunk
+		if end > len(sourceIDs) {
+			end = len(sourceIDs)
+		}
+		part := sourceIDs[i:end]
+		args := []interface{}{sourceType}
+		args = append(args, iface(part)...)
+		items, err := r.listStoredTasks(` WHERE t.source_type=? AND t.source_id IN (`+placeholders(len(part))+`)`+workTaskOrder, args...)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, items...)
+	}
+	return out, nil
+}
+
+func pickWorkTaskBySource(items []model.WorkTask, sourceID, role string) *model.WorkTask {
+	sourceID = strings.TrimSpace(sourceID)
+	role = strings.TrimSpace(role)
+	for _, t := range items {
+		if t.SourceID != sourceID {
 			continue
 		}
 		got := strings.TrimSpace(t.SourceRole)
 		if role != "" {
 			if got == role {
 				task := t
-				return &task, nil
+				return &task
 			}
 			continue
 		}
 		if got == "" || got == model.WBSourceRoleDone {
 			task := t
-			return &task, nil
+			return &task
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // NextFreeSlot 해당 날짜에서 이미 배치된 업무 뒤를 이은 다음 시작시각(전체).
