@@ -91,8 +91,19 @@ func (h *StatsHandler) LinkWeeklyTasksProject(c echo.Context) error {
 	for _, ref := range refs {
 		switch ref.Kind {
 		case weeklyKindMnt:
-			href := "/maintenance"
-			warns = append(warns, ref.ID+": 점검 일정에서 사업 확인 ("+href+")")
+			n, err := h.linkWeeklyMnt(c, orgID, ref.ID, pid)
+			if err == echo.ErrNotFound {
+				return err
+			}
+			if err != nil {
+				warns = append(warns, ref.ID+": "+err.Error())
+				continue
+			}
+			if n != "" {
+				assigneeNames = append(assigneeNames, n)
+			}
+			okN++
+			linked = append(linked, weeklyKindMnt+":"+ref.ID)
 		case weeklyKindAS:
 			n, err := h.linkWeeklyAS(c, asRepo, unlock, orgID, ref.ID, pid, primary)
 			if err == echo.ErrNotFound {
@@ -125,7 +136,7 @@ func (h *StatsHandler) LinkWeeklyTasksProject(c echo.Context) error {
 	}
 	if okN > 0 {
 		accessLog(c, auditlog.Record{
-			Action: auditlog.ActionUpdate, TargetTable: "work_tasks,as_receipts", TargetID: strings.Join(linked, ","),
+			Action: auditlog.ActionUpdate, TargetTable: "work_tasks,as_receipts,maintenance_visits", TargetID: strings.Join(linked, ","),
 			Reason: fmt.Sprintf("주간보고 사업 연결 %s → %s", strings.Join(linked, ","), pid), Result: auditlog.ResultOK,
 		})
 	}
@@ -222,6 +233,27 @@ func (h *StatsHandler) linkWeeklyAS(c echo.Context, asRepo *repository.ASRepo, u
 		an = primary.FullName
 	}
 	return an, nil
+}
+
+func (h *StatsHandler) linkWeeklyMnt(c echo.Context, orgID, visitID, pid string) (string, error) {
+	if h.mntRepo == nil {
+		return "", fmt.Errorf("점검 저장소가 없습니다")
+	}
+	v, err := h.mntRepo.GetVisit(visitID)
+	if err != nil || v == nil {
+		return "", fmt.Errorf("업무가 없습니다")
+	}
+	plan, err := h.mntRepo.GetPlan(v.PlanID)
+	if err != nil || plan == nil || strings.TrimSpace(plan.OrgID) != orgID {
+		return "", echo.ErrNotFound
+	}
+	if !h.canLinkWeeklyMnt(c, v.Assignee, "", plan.OrgID) {
+		return "", fmt.Errorf("권한이 없습니다")
+	}
+	if _, _, err := h.mntRepo.SetVisitProject(orgID, visitID, pid); err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 func projectLinkLineHandler(before, after string) string {
@@ -381,6 +413,10 @@ func (h *StatsHandler) canLinkWeeklyTask(c echo.Context, t *model.WorkTask) bool
 		}
 	}
 	return false
+}
+
+func (h *StatsHandler) canLinkWeeklyMnt(c echo.Context, assignedTo, assignedUID, orgID string) bool {
+	return h.canLinkWeeklyAS(c, assignedTo, assignedUID, orgID)
 }
 
 func (h *StatsHandler) canLinkWeeklyAS(c echo.Context, assignedTo, assignedUID, orgID string) bool {

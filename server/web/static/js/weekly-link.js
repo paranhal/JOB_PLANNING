@@ -64,8 +64,6 @@
     }
     var ok = !!proj;
     if (foreign && !(foreignBox && foreignBox.checked)) ok = false;
-    var onlyMnt = (m.getAttribute("data-only-mnt") === "1");
-    if (onlyMnt) ok = false;
     if (btn) btn.disabled = !ok;
   }
 
@@ -127,22 +125,12 @@
     var host = modal().querySelector("[data-weekly-link-items]");
     host.innerHTML = "";
     items.forEach(function (it) {
-      if (isMnt(it)) return;
       var inp = document.createElement("input");
       inp.type = "hidden";
       inp.name = "item";
       inp.value = it.kind + ":" + it.id;
       host.appendChild(inp);
     });
-  }
-
-  function mntHref(items) {
-    var href = "";
-    (items || []).forEach(function (it) {
-      if (!isMnt(it)) return;
-      if (!href && it.href) href = it.href;
-    });
-    return href || "/maintenance";
   }
 
   function markCurrentAssignee(uid, name) {
@@ -188,22 +176,20 @@
     if (skip) {
       if (!onlyMnt && mntN > 0) {
         skip.hidden = false;
-        skip.textContent = "정기점검 " + mntN + "건은 이번 연결에서 제외됩니다";
+        skip.textContent = "담당자 변경은 일반 업무·AS에만 적용됩니다";
       } else {
         skip.hidden = true;
         skip.textContent = "";
       }
     }
     var mntHint = m.querySelector("[data-mnt-hint]");
-    if (mntHint) mntHint.hidden = !onlyMnt;
-    var goto = m.querySelector("[data-mnt-goto]");
-    if (goto) goto.setAttribute("href", mntHref(items));
+    if (mntHint) mntHint.hidden = true;
     var projBox = m.querySelector("[data-project-box]");
-    if (projBox) projBox.hidden = onlyMnt;
+    if (projBox) projBox.hidden = false;
     var asgBox = m.querySelector("[data-weekly-assignee]");
     if (asgBox) asgBox.hidden = onlyMnt;
     var submit = m.querySelector("[data-weekly-link-submit]");
-    if (submit) submit.hidden = onlyMnt;
+    if (submit) submit.hidden = false;
     var closeBtn0 = m.querySelector("[data-weekly-link-close]");
     if (closeBtn0) closeBtn0.textContent = "닫기";
     var keep = m.querySelector("[data-assignee-keep]");

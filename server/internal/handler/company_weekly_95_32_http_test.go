@@ -62,8 +62,8 @@ func seedWeekly32(t *testing.T, db *sql.DB) {
 		VALUES ('T-NP32','admin','사업없음행정','waiting',NULL,'O03','','2026-08-12','김기술')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT OR IGNORE INTO maintenance_plans (plan_id, plan_year, title, status)
-		VALUES ('MP32', 2026, '계획', 'approved')`); err != nil {
+	if _, err := db.Exec(`INSERT OR IGNORE INTO maintenance_plans (plan_id, plan_year, title, status, org_id)
+		VALUES ('MP32', 2026, '계획', 'approved', 'O03')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO maintenance_visits
@@ -274,20 +274,25 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 		t.Fatalf("업무 연결 %+v", tk)
 	}
 
-	var vpid string
-	_ = db.QueryRow(`SELECT COALESCE(project_id,'') FROM maintenance_visits WHERE visit_id='V32'`).Scan(&vpid)
 	mnt := postWeeklyLink(t, e, url.Values{
 		"item": {"maintenance_visit:V32"}, "project_id": {"WP-P1"},
 		"org": {"O03"}, "week": {"2026-08-17"},
 	}, ck)
 	locM, _ := url.QueryUnescape(mnt.Header().Get("Location"))
-	if !strings.Contains(locM, "점검 일정에서 사업 확인") {
-		t.Fatalf("점검 안내 %s", locM)
+	if mnt.Code != http.StatusSeeOther || !strings.Contains(locM, "연결했습니다") {
+		t.Fatalf("점검 연결 %d %s", mnt.Code, locM)
 	}
-	var vpid2 string
-	_ = db.QueryRow(`SELECT COALESCE(project_id,'') FROM maintenance_visits WHERE visit_id='V32'`).Scan(&vpid2)
-	if vpid2 != vpid {
-		t.Fatalf("점검 사업이 바뀜 %s→%s", vpid, vpid2)
+	var vpid2, vdate, vcust, vasg string
+	var vdone int
+	if err := db.QueryRow(`SELECT COALESCE(project_id,''), visit_date, customer_id, COALESCE(assignee,''), COALESCE(completed,0)
+		FROM maintenance_visits WHERE visit_id='V32'`).Scan(&vpid2, &vdate, &vcust, &vasg, &vdone); err != nil {
+		t.Fatal(err)
+	}
+	if vpid2 != "WP-P1" {
+		t.Fatalf("점검 사업 %s", vpid2)
+	}
+	if vdate != "2026-08-12" || vcust != "C32" || vasg != "김기술" || vdone != 1 {
+		t.Fatalf("점검 다른 칸 변경 date=%s cust=%s asg=%s done=%d", vdate, vcust, vasg, vdone)
 	}
 
 	if _, err := db.Exec(`INSERT INTO as_receipts (
@@ -369,9 +374,14 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 		t.Fatalf("혼합 %d", mix.Code)
 	}
 	if !strings.Contains(locMix, "need_row") && !strings.Contains(locMix, "WP-P2") {
-		if !strings.Contains(locMix, "연결했습니다") && !strings.Contains(locMix, "점검") {
+		if !strings.Contains(locMix, "연결했습니다") {
 			t.Fatalf("혼합 loc %s", locMix)
 		}
+	}
+	var vmix string
+	_ = db.QueryRow(`SELECT COALESCE(project_id,'') FROM maintenance_visits WHERE visit_id='V32'`).Scan(&vmix)
+	if vmix != "WP-P2" {
+		t.Fatalf("혼합 점검 사업 %s", vmix)
 	}
 
 	logs := readAccessLogs(t, accessPath)
