@@ -206,12 +206,12 @@ func TestBriefingStaffCountsMatchBoard(t *testing.T) {
 	mustCreateBoardTask(t, h.Workboard.repo, "타조직", today, "09:00", "10:00", "O02", other.FullName, other.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 
 	ck := jwtCookieUser(t, me)
-	board := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0", ck)
+	board := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ck)
 	if board.Code != http.StatusOK {
 		t.Fatalf("board %d", board.Code)
 	}
-	if !strings.Contains(board.Body.String(), "총 2개의 업무") {
-		t.Fatalf("리스트 건수 불일치 %s", board.Body.String())
+	if !strings.Contains(board.Body.String(), "내오늘") || !strings.Contains(board.Body.String(), "내완료") {
+		t.Fatalf("일정표 일 건수 불일치")
 	}
 	if !strings.Contains(board.Body.String(), `id="unplanned"`) {
 		t.Fatal("미배치 앵커 없음")

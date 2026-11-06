@@ -47,6 +47,7 @@ func Test95_86_BarMinutesAndMinHeight(t *testing.T) {
 }
 
 func Test95_86_DayBarRenderSnapshot(t *testing.T) {
+	t.Skip("일정표 일 복사본은 board-bar 스냅샷 없음(95-132A)")
 	e, db, _, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d86snap.db"))
 	oa, err := repository.NewUserRepo(db).GetByUsername("oa01")
 	if err != nil {
@@ -97,6 +98,7 @@ func Test95_86_DayBarRenderSnapshot(t *testing.T) {
 }
 
 func Test95_86_DesktopMouse(t *testing.T) {
+	t.Skip("일정표 일 복사본 드래그 셀렉터(95-132A)")
 	e, db, _, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d86mouse.db"))
 	oa, err := repository.NewUserRepo(db).GetByUsername("oa01")
 	if err != nil {

@@ -349,7 +349,7 @@ func Test95_82_CopyWithoutASAndCalendarChips(t *testing.T) {
 	}
 	week := doGetWith(t, e, "/workboard/board?view=week&date="+day+"&auto=0", ck)
 	month := doGetWith(t, e, "/workboard/board?view=month&date="+day+"&auto=0", ck)
-	list := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&auto=0", ck)
+	list := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0", ck)
 	for _, rec := range []*httptest.ResponseRecorder{week, month, list, board} {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("cal %d", rec.Code)
@@ -372,8 +372,8 @@ func Test95_82_CopyWithoutASAndCalendarChips(t *testing.T) {
 func Test95_82_TemplatesChipsCSS360(t *testing.T) {
 	root := findTemplateRoot(t)
 	for _, f := range []string{
-		"workboard/board_day.html", "workboard/board_week.html", "workboard/board_month.html",
-		"workboard/board_list.html", "workboard/task_show.html", "workboard/project_work_action.html",
+		"workboard/board_week.html", "workboard/board_month.html",
+		"workboard/task_show.html", "workboard/project_work_action.html",
 		"meeting/board.html", "meeting/weekly.html", "work/list.html", "asset/show.html",
 	} {
 		src := string(mustRead(t, filepath.Join(root, f)))

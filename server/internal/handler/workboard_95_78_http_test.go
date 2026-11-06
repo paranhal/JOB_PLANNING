@@ -231,14 +231,6 @@ func Test95_78_HTMLSplitAndSegments(t *testing.T) {
 	if !strings.Contains(base, "overlap-travel-min") {
 		t.Fatal("이동 시간 없음")
 	}
-	day := string(mustRead(t, filepath.Join(root, "workboard/board_day.html")))
-	if !strings.Contains(day, "SegLabel") && !strings.Contains(day, ".SegLabel") {
-		t.Fatal("일 보기 구간 표시 없음")
-	}
-	list := string(mustRead(t, filepath.Join(root, "workboard/board_list.html")))
-	if !strings.Contains(list, "┗") {
-		t.Fatal("리스트 조각 행 없음")
-	}
 	act := string(mustRead(t, filepath.Join(root, "workboard/project_work_action.html")))
 	if !strings.Contains(act, "work_segments_form") && !strings.Contains(act, "작업 구간") {
 		t.Fatal("작업 구간 표 없음")
@@ -262,16 +254,13 @@ func Test95_78_BoardCountStaysTaskBased(t *testing.T) {
 		{Kind: model.SegKindPlan, Scope: model.SegScopeCommon, WorkDate: day, StartTime: "09:00", EndTime: "10:00"},
 		{Kind: model.SegKindPlan, Scope: model.SegScopeCommon, WorkDate: day, StartTime: "14:00", EndTime: "18:00"},
 	})
-	page := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&auto=0", ck)
+	page := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0", ck)
 	if page.Code != http.StatusOK {
-		t.Fatalf("list %d", page.Code)
+		t.Fatalf("day %d", page.Code)
 	}
 	body := page.Body.String()
-	if !strings.Contains(body, "전체 1건") && !strings.Contains(body, "총 1개의 업무") {
-		t.Fatal("건수가 업무 1건이 아님")
-	}
-	if !strings.Contains(body, "┗") && !strings.Contains(body, `data-seg-frag="1"`) {
-		t.Fatal("접힌 조각 행 없음")
+	if !strings.Contains(body, "막대OO") {
+		t.Fatal("일정표 일에 업무가 없다")
 	}
 }
 

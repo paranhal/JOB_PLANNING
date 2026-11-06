@@ -114,7 +114,7 @@ func extractWorkListCSRF(body string) string {
 func Test95_41_BoardListSetsCSRFCookieMatchingToken(t *testing.T) {
 	e, _, si, _ := new95_41App(t)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/workboard/board?view=list&date=2026-10-25&auto=0", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/workboard/board?view=day&date=2026-10-25&auto=0", nil)
 	req.AddCookie(jwtCookieUser(t, si))
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -192,7 +192,7 @@ func Test95_41_CookieJarLoginPreviewDelete(t *testing.T) {
 	_, _ = io.Copy(io.Discard, login.Body)
 	login.Body.Close()
 
-	list, err := client.Get(srv.URL + "/workboard/board?view=list&date=2026-10-25&auto=0")
+	list, err := client.Get(srv.URL + "/workboard/board?view=day&date=2026-10-25&auto=0")
 	if err != nil {
 		t.Fatal(err)
 	}

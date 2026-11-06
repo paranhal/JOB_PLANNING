@@ -29,7 +29,7 @@ func Test95_113BNewWorkASRefreshMarkupAndJSON(t *testing.T) {
 	if !strings.Contains(as, "팝업이 차단되어 새 탭을 열 수 없습니다") {
 		t.Fatal("팝업 차단 안내 없음")
 	}
-	board := doGetWith(t, e, "/workboard/board?view=list", ck).Body.String()
+	board := doGetWith(t, e, "/workboard/board?view=day", ck).Body.String()
 	if !strings.Contains(board, "/static/js/as-register-lookup.js?v=") {
 		t.Fatal("모달 JS AssetQuery 없음")
 	}

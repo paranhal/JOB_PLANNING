@@ -392,8 +392,10 @@ func TestWorkboardSubtaskTreeAndDelete(t *testing.T) {
 	}
 
 	del := doForm(t, e, "/workboard/tasks/"+root.TaskID+"/delete", url.Values{"back": {"/workboard/register"}})
-	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "err=has_subtasks") {
-		t.Fatalf("delete loc=%q", del.Header().Get("Location"))
+	loc := del.Header().Get("Location")
+	unesc, _ := url.QueryUnescape(loc)
+	if del.Code != http.StatusSeeOther || (!strings.Contains(loc, "err=has_subtasks") && !strings.Contains(unesc, "하위 업무")) {
+		t.Fatalf("delete loc=%q", loc)
 	}
 }
 

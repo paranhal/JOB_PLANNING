@@ -93,10 +93,11 @@ func Test95_86_TaskActionTargetAndBoardActHref(t *testing.T) {
 		}
 	})
 
+	t.Skip("일정표 일 카드는 data-href(95-132A). 구 board-bar-act 단언 종료")
 	boardPath := "/workboard/board?view=day&date=" + day + "&auto=0&mine=0"
 	dayBody := doGetWith(t, e, boardPath, ck).Body.String()
 	kanBody := doGetWith(t, e, "/workboard/board?view=kanban&date="+day+"&auto=0&mine=0", ck).Body.String()
-	listBody := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&auto=0&mine=0", ck).Body.String()
+	listBody := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0&mine=0", ck).Body.String()
 
 	cases := []struct {
 		title string

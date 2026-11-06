@@ -118,7 +118,7 @@ func Test95_42_SyntheticASCheckboxAndDeleteWithAndWithoutTask(t *testing.T) {
 				keys = append(keys, bi.DeleteKey)
 				asIDs = append(asIDs, as.ASID)
 			}
-			page := doGetWith(t, e, "/workboard/board?view=list&date=2026-10-25&auto=0", jwtCookieUser(t, si))
+			page := doGetWith(t, e, "/workboard/board?view=day&date=2026-10-25&auto=0", jwtCookieUser(t, si))
 			if page.Code != http.StatusOK {
 				t.Fatalf("board %d", page.Code)
 			}

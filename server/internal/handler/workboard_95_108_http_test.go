@@ -4,11 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -55,23 +53,8 @@ func Test95_108_V2V3_BoardRenderOwnOnly(t *testing.T) {
 	}
 	ck := jwtCookieUser(t, me)
 	body := doGetWith(t, e, "/workboard/board?view=day&auto=0", ck).Body.String()
-	if !strings.Contains(body, `data-project-filter`) {
-		t.Fatal("project_filter 없음")
-	}
-	if strings.Contains(body, nameOther108) || strings.Contains(body, nameEmpty108) {
-		t.Fatal("초기 HTML 에 타 부서/미지정 사업명")
-	}
-	if !strings.Contains(body, nameOwn108) || !strings.Contains(body, nameRel108) {
-		t.Fatal("내 조직·유관 사업명 없음")
-	}
-	if !strings.Contains(body, "유관") {
-		t.Fatal("유관 표시 없음")
-	}
-	if !strings.Contains(body, "타 부서 사업 보기") {
-		t.Fatal("타 부서 버튼 없음")
-	}
-	if !strings.Contains(body, `data-other-count="2"`) {
-		t.Fatal("OtherCount 불일치")
+	if strings.Contains(body, `data-project-filter`) {
+		t.Fatal("업무 관리에 사업 필터가 남아 있다")
 	}
 }
 
@@ -176,29 +159,12 @@ func Test95_108_V5V6V7_SelectAndEmptyCount(t *testing.T) {
 		t.Fatal(err)
 	}
 	ck := jwtCookieUser(t, me)
-	empty := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0&mine=0", ck).Body.String()
-	nEmpty := regexp.MustCompile(`전체 (\d+)건`).FindStringSubmatch(empty)
-	if nEmpty == nil {
-		t.Fatal("빈 필터 건수")
+	page := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0&mine=0", ck).Body.String()
+	if strings.Contains(page, `data-project-filter`) {
+		t.Fatal("사업 필터가 남아 있다")
 	}
-	fake := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0&mine=0&project=WP-NOPE", ck).Body.String()
-	nFake := regexp.MustCompile(`전체 (\d+)건`).FindStringSubmatch(fake)
-	if nFake == nil || nFake[1] != nEmpty[1] {
-		t.Fatalf("위조 ID 무시 실패 empty=%v fake=%v", nEmpty, nFake)
-	}
-	if strings.Contains(fake, `value="WP-NOPE"`) {
-		t.Fatal("위조 ID 가 hidden 에 남음")
-	}
-	ownPage := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0&mine=0&project="+own.ProjectID, ck).Body.String()
-	if !strings.Contains(ownPage, "108본사업무") || strings.Contains(ownPage, "108타부서연결") {
-		t.Fatal("내 조직 사업 필터")
-	}
-	othPage := doGetWith(t, e, "/workboard/board?view=day&auto=0&project="+oth.ProjectID, ck).Body.String()
-	if !strings.Contains(othPage, `data-pf-org-tag`) || !strings.Contains(othPage, "미디어") {
-		t.Fatal("타 부서 선택 이름표")
-	}
-	if !strings.Contains(othPage, nameOther108) {
-		t.Fatal("선택 라벨에 타 부서 사업명")
+	if !strings.Contains(page, "108본사업무") || !strings.Contains(page, "108타부서연결") {
+		t.Fatal("일정표 일에 업무가 없다")
 	}
 }
 
@@ -216,22 +182,13 @@ func Test95_108_V8_CLevelNoMineBox(t *testing.T) {
 	}
 	got, _ := users.GetByUsername("ceo108")
 	body := doGetWith(t, e, "/workboard/board?view=day&auto=0", jwtCookieUser(t, got)).Body.String()
-	if strings.Contains(body, "내 조직") {
-		t.Fatal("C-Level 에 내 조직")
-	}
-	if strings.Contains(body, "타 부서 사업 보기") {
-		t.Fatal("C-Level 타 부서 버튼")
-	}
-	if !strings.Contains(body, `data-all-orgs="1"`) {
-		t.Fatal("C-Level all-orgs")
-	}
-	if strings.Contains(body, nameOther108) || strings.Contains(body, nameOwn108) {
-		t.Fatal("C-Level 초기 HTML 에 사업명")
+	if strings.Contains(body, "타 부서 사업 보기") || strings.Contains(body, `data-project-filter`) {
+		t.Fatal("C-Level 사업 필터")
 	}
 	oa, _ := users.GetByUsername("oa01")
 	oaBody := doGetWith(t, e, "/workboard/board?view=day&auto=0", jwtCookieUser(t, oa)).Body.String()
-	if !strings.Contains(oaBody, "내 조직 사업") || !strings.Contains(oaBody, "타 부서 사업 보기") {
-		t.Fatal("조직관리자 구조")
+	if strings.Contains(oaBody, "타 부서 사업 보기") || strings.Contains(oaBody, `data-project-filter`) {
+		t.Fatal("조직관리자 사업 필터")
 	}
 }
 
@@ -278,31 +235,5 @@ func Test95_108_V9_JSUnitAndV12_CSS(t *testing.T) {
 }
 
 func Test95_108_V10_Browser(t *testing.T) {
-	e, db, me, _ := app95_108(t)
-	mustProject108(t, db, nameOwn108, model.OrgIDLibrary)
-	mustProject108(t, db, nameOther108, "O02")
-	ck := jwtCookieVerified(t, me)
-	staticDir, err := filepath.Abs(filepath.Join(findTemplateRoot(t), "..", "static"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.Static("/static", staticDir)
-	srv := httptest.NewServer(e)
-	t.Cleanup(srv.Close)
-	cmd := exec.Command("node", "95_108_project_filter_browser.mjs")
-	cmd.Dir = filepath.Join(findTemplateRoot(t), "..", "static", "js")
-	cmd.Env = append(os.Environ(),
-		"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1",
-		"BASE_URL="+srv.URL,
-		"AUTH_COOKIE="+ck.Value,
-		"OTHER_NAME="+nameOther108,
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		s := string(out)
-		if strings.Contains(s, "Executable doesn't exist") || strings.Contains(s, "is not found") || strings.Contains(s, "browserType.launch") {
-			t.Skip(s)
-		}
-		t.Fatalf("브라우저: %v\n%s", err, out)
-	}
+	t.Skip("업무 관리 사업 필터 제거(95-132A). register는 V11")
 }

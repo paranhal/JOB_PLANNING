@@ -166,7 +166,7 @@ func Test95_47_MarkDonePopupAndBackAndHideButton(t *testing.T) {
 		"assignee":   {"최혜영"},
 		"visit_date": {"2026-10-12"},
 		"mark_done":  {"1"},
-		"back":       {"/workboard/board?view=list"},
+		"back":       {"/workboard/board?view=day"},
 	}, nil)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("완료 %d", rec.Code)
@@ -181,7 +181,7 @@ func Test95_47_MarkDonePopupAndBackAndHideButton(t *testing.T) {
 	if !strings.Contains(body, "점검이 완료되었습니다.") {
 		t.Fatal("완료 팝업 제목 없음")
 	}
-	if !strings.Contains(body, "/workboard/board?view=list") {
+	if !strings.Contains(body, "/workboard/board?view=day") {
 		t.Fatal("back 주소 없음")
 	}
 	if strings.Contains(body, "방문 완료 처리") && strings.Contains(body, `name="mark_done"`) {
@@ -219,9 +219,10 @@ func Test95_47_TimesSyncToWorkTask(t *testing.T) {
 	if task.StartTime != "10:00" || task.EndTime != "11:30" || task.DurationMin != 90 {
 		t.Fatalf("업무 시간 %+v", task)
 	}
-	board := doMnt47Get(t, e, "/workboard/board?view=list&date=2026-10-12")
-	if !strings.Contains(board.Body.String(), "10:00~11:30") && !strings.Contains(board.Body.String(), "10/12") {
-		t.Fatalf("리스트 일정 없음: 일부=%s", board.Body.String()[:min(800, len(board.Body.String()))])
+	board := doMnt47Get(t, e, "/workboard/board?view=day&date=2026-10-12")
+	b := board.Body.String()
+	if !strings.Contains(b, "10:00") || !strings.Contains(b, "11:30") {
+		t.Fatalf("일정표 시각 없음: 일부=%s", b[:min(800, len(b))])
 	}
 }
 

@@ -29,7 +29,7 @@ func Test_LegacyParity_Calendar(t *testing.T) {
 		{
 			Name:   "리스트",
 			Legacy: "work/all.html",
-			Modern: []string{"workboard/board_list.html"},
+			Modern: []string{"workboard/list.html"},
 			Posts:  []string{"/work/review/complete", "/work/review/hold"},
 			Needles: []string{},
 		},

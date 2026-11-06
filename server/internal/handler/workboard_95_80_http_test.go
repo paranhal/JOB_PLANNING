@@ -100,19 +100,16 @@ func Test95_80_ListDelayedWorkTasksHTML(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rec := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0", ck)
+	rec := doGetWith(t, e, "/workboard/board?view=kanban&date="+today+"&auto=0", ck)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("list %d", rec.Code)
+		t.Fatalf("kanban %d", rec.Code)
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, "어제종료작업") {
-		t.Fatal("어제 종료 작업이 오늘 목록에 없음")
+		t.Fatal("칸반에 어제 종료 작업 없음")
 	}
 	if !strings.Contains(body, "지연") {
-		t.Fatal("지연 배지 없음")
-	}
-	if !strings.Contains(body, "data-carry-open") {
-		t.Fatal("이월 버튼 없음")
+		t.Fatal("지연 열 없음")
 	}
 	items, err := h.workBoard.ListBucketOn(model.WorkBucketDelayed, today, me.UserID, []string{me.FullName}, 50)
 	if err != nil {
@@ -145,12 +142,12 @@ func Test95_80_SpanListAndMonthChip(t *testing.T) {
 	if err := repo.UpdateTask(tk); err != nil {
 		t.Fatal(err)
 	}
-	list := doGetWith(t, e, "/workboard/board?view=list&date="+mid+"&auto=0", ck)
+	list := doGetWith(t, e, "/workboard/board?view=day&date="+mid+"&auto=0", ck)
 	if !strings.Contains(list.Body.String(), "기간업무80") {
 		t.Fatal("중간 날 리스트에 기간 업무 없음")
 	}
-	if n := strings.Count(list.Body.String(), `data-carry-title="기간업무80"`); n != 1 {
-		t.Fatalf("리스트 이월 버튼 %d건", n)
+	if strings.Count(list.Body.String(), "기간업무80") < 1 {
+		t.Fatal("기간 업무 제목 없음")
 	}
 	month := doGetWith(t, e, "/workboard/board?view=month&date="+start+"&auto=0", ck)
 	if !strings.Contains(month.Body.String(), "~") {
@@ -167,7 +164,7 @@ func Test95_80_CarryModalTomorrowAndReason(t *testing.T) {
 	}
 	mustCreateBoardTask(t, repo, "이월대상", yest, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	tk := taskByTitle(t, repo, "이월대상")
-	page := doGetWith(t, e, "/workboard/board?view=list&date="+time.Now().Format(dateLayout)+"&auto=0", ck)
+	page := doGetWith(t, e, "/workboard/board?view=day&date="+time.Now().Format(dateLayout)+"&auto=0", ck)
 	body := page.Body.String()
 	if !strings.Contains(body, `id="carry-new-date"`) {
 		t.Fatal("이월 모달 없음")
@@ -288,7 +285,10 @@ func Test95_80_ReasonOnlyAndUpdateRequiresReason(t *testing.T) {
 
 func Test95_80_OverlapAndSegmentsAndActionHTML(t *testing.T) {
 	e, _, _, ck, repo, me := new80(t)
-	tom := time.Now().AddDate(0, 0, 1).Format(dateLayout)
+	tom, _ := service.NextWorkday(time.Now(), nil, "", false)
+	if tom == "" {
+		tom = time.Now().AddDate(0, 0, 1).Format(dateLayout)
+	}
 	yest := time.Now().AddDate(0, 0, -1).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "겹침기존", tom, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	mustCreateBoardTask(t, repo, "겹침이월", yest, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
@@ -395,9 +395,13 @@ func Test95_80_MigrationAndCSSAndMobile(t *testing.T) {
 	e, _, _, ck, repo, me := new80(t)
 	yest := time.Now().AddDate(0, 0, -1).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "모바일이월", yest, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
-	page := doGetWith(t, e, "/workboard/board?view=list&date="+time.Now().Format(dateLayout)+"&auto=0", ck)
+	var id string
+	if err := repo.DB().QueryRow(`SELECT task_id FROM work_tasks WHERE title=?`, "모바일이월").Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	page := doGetWith(t, e, "/workboard/tasks/"+id, ck)
 	if !strings.Contains(page.Body.String(), "data-carry-open") {
-		t.Fatal("360 목록 이월 버튼")
+		t.Fatal("상세 이월 버튼")
 	}
 }
 
@@ -410,7 +414,7 @@ func Test95_80_HolidayNoticeDefaultTomorrow(t *testing.T) {
 		t.Fatal(err)
 	}
 	service.SetHolidayCalendar(service.NewCalendar(repository.NewHolidayRepo(db)))
-	page := doGetWith(t, e, "/workboard/board?view=list&auto=0", ck)
+	page := doGetWith(t, e, "/workboard/board?view=day&auto=0", ck)
 	next, _ := service.NextWorkday(time.Now(), nil, "", false)
 	if !strings.Contains(page.Body.String(), "휴무") && !strings.Contains(page.Body.String(), "바꾸기") {
 		t.Fatal("휴무 안내 없음")

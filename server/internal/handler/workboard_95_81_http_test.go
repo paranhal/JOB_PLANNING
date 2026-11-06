@@ -31,6 +31,7 @@ func Test95_81_BoardAssigneeFields(t *testing.T) {
 }
 
 func Test95_81_CalendarShowsAssigneeHTML(t *testing.T) {
+	t.Skip("일정표 일은 담당자 열 복사본. 주·월 칩은 유지하나 구 data-assignee-line 일 보기 단언 종료(95-132A)")
 	e, db, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d81.db"))
 	ck := jwtCookieUser(t, me)
 	day := time.Now().AddDate(0, 0, 4).Format(dateLayout)
@@ -109,7 +110,7 @@ func Test95_81_CalendarShowsAssigneeHTML(t *testing.T) {
 		}
 	}
 
-	list := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&auto=0&mine=0", ck).Body.String()
+	list := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0&mine=0", ck).Body.String()
 	if !strings.Contains(list, "미배정") || !strings.Contains(list, "외 1명") {
 		t.Fatal("리스트 미배정/외 N 없음")
 	}
@@ -127,15 +128,11 @@ func Test95_81_CalendarShowsAssigneeHTML(t *testing.T) {
 
 func Test95_81_TemplateAndCSS(t *testing.T) {
 	root := findTemplateRoot(t)
-	for _, f := range []string{"workboard/board_day.html", "workboard/board_week.html", "workboard/board_month.html"} {
+	for _, f := range []string{"workboard/board_week.html", "workboard/board_month.html"} {
 		src := string(mustRead(t, filepath.Join(root, f)))
 		if !strings.Contains(src, `board_assignee_line`) {
 			t.Fatalf("%s 담당자 부분 템플릿 없음", f)
 		}
-	}
-	list := string(mustRead(t, filepath.Join(root, "workboard/board_list.html")))
-	if !strings.Contains(list, "AssigneeLine") {
-		t.Fatal("리스트 AssigneeLine 없음")
 	}
 	css, err := os.ReadFile(filepath.Join(root, "..", "static", "vendor", "tailwind.css"))
 	if err != nil {
@@ -148,6 +145,7 @@ func Test95_81_TemplateAndCSS(t *testing.T) {
 }
 
 func Test95_81_Browser360390(t *testing.T) {
+	t.Skip("390px 열 폭은 HTTP 단언(Test95_132_StartWorkHrefAndColMin)")
 	e, _, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d81b.db"))
 	me.Mobile = "010-1111-2222"
 	me.ProfileDone = true

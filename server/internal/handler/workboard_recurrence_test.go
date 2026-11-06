@@ -328,8 +328,10 @@ func TestRecurrenceChangeKeepsCompleteAndBlocksDelete(t *testing.T) {
 	}
 
 	del := doForm(t, e, "/workboard/tasks/"+parent.TaskID+"/delete", url.Values{})
-	if del.Code != http.StatusSeeOther || !strings.Contains(del.Header().Get("Location"), "err=rec_has_complete") {
-		t.Fatalf("삭제 거부 loc=%q", del.Header().Get("Location"))
+	loc := del.Header().Get("Location")
+	unesc, _ := url.QueryUnescape(loc)
+	if del.Code != http.StatusSeeOther || (!strings.Contains(loc, "err=rec_has_complete") && !strings.Contains(unesc, "완료된 실행 작업")) {
+		t.Fatalf("삭제 거부 loc=%q", loc)
 	}
 	if got, _ := repo.GetTask(parent.TaskID); got == nil {
 		t.Fatal("상위가 삭제됐다")

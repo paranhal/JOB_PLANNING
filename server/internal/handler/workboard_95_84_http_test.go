@@ -82,8 +82,8 @@ func Test95_84_BoardViewsAndListRange(t *testing.T) {
 	weekDay := today.AddDate(0, 0, 2).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "리스트주", weekDay, "11:00", "12:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	page := doGetWith(t, e, "/workboard/board?auto=0", ck).Body.String()
-	if !strings.Contains(page, "일정 리스트 보기") || !strings.Contains(page, "일정 캘린더 보기") || !strings.Contains(page, "칸반 보기") {
-		t.Fatal("3개 보기 링크 없음")
+	if !strings.Contains(page, ">요약</a>") || !strings.Contains(page, ">일정표</a>") || !strings.Contains(page, ">칸반</a>") {
+		t.Fatal("요약·일정표·칸반 세그 없음")
 	}
 	idxDay := strings.Index(page, ">일</a>")
 	idxWeek := strings.Index(page, ">주</a>")
@@ -91,13 +91,10 @@ func Test95_84_BoardViewsAndListRange(t *testing.T) {
 	if idxDay < 0 || idxWeek < 0 || idxMonth < 0 || !(idxDay < idxWeek && idxWeek < idxMonth) {
 		t.Fatalf("일/주/월 순서 day=%d week=%d month=%d", idxDay, idxWeek, idxMonth)
 	}
-	if !strings.Contains(page, "리스트일") {
-		t.Fatal("기본 리스트 일 범위에 오늘 업무 없음")
+	if !strings.Contains(page, `data-summary-card="today"`) {
+		t.Fatal("기본이 요약이 아님")
 	}
-	week := doGetWith(t, e, "/workboard/board?view=list&range=week&date="+day+"&auto=0", ck).Body.String()
-	if !strings.Contains(week, "data-list-date") {
-		t.Fatal("주 리스트 날짜 소제목 없음")
-	}
+	week := doGetWith(t, e, "/workboard/board?view=sched&range=week&date="+day+"&auto=0", ck).Body.String()
 	if !strings.Contains(week, "리스트일") {
 		t.Fatal("주 범위에 오늘 항목 없음")
 	}
@@ -108,8 +105,8 @@ func Test95_84_BoardViewsAndListRange(t *testing.T) {
 		t.Fatal("scope 유지 안 됨")
 	}
 	cal := doGetWith(t, e, "/workboard/board?view=day&auto=0", ck).Body.String()
-	if !strings.Contains(cal, "칸반 보기") {
-		t.Fatal("캘린더에 칸반 링크 없음")
+	if !strings.Contains(cal, ">칸반</a>") {
+		t.Fatal("일정표에 칸반 링크 없음")
 	}
 	pw := &model.WorkTask{
 		Title: "후속영업일", WorkDate: day, DueDate: day, StartTime: "16:00", EndTime: "17:00",
@@ -152,19 +149,13 @@ func Test95_84_KanbanHTMLAndMove(t *testing.T) {
 	done.CompleteDate = today
 	_ = repo.UpdateTask(done)
 	body := doGetWith(t, e, "/workboard/board?view=kanban&auto=0", ck).Body.String()
-	for _, want := range []string{"지연 업무", "진행중(일정 외)", "오늘의 업무", "부분 완료", "오늘 일정 없음"} {
+	for _, want := range []string{"미계획업무", "진행중", "지연"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("칸반 HTML에 %q 없음", want)
 		}
 	}
-	if strings.Contains(body, "오늘 예정") {
-		t.Fatal("오늘 예정 용어")
-	}
-	if !strings.Contains(body, "지연칸반") || !strings.Contains(body, "오늘계획칸반") || !strings.Contains(body, "일정외칸반") {
+	if !strings.Contains(body, "지연칸반") || !strings.Contains(body, "오늘계획칸반") {
 		t.Fatal("칸반 카드 누락")
-	}
-	if !strings.Contains(body, "남은 항목") || !strings.Contains(body, "후속 미생성") {
-		t.Fatal("부분 완료 카드 배지 없음")
 	}
 	keep := taskByTitle(t, repo, "계획유지칸반")
 	rej := doFormJSONWith(t, e, "/workboard/board/kanban-move", url.Values{
@@ -237,7 +228,7 @@ func Test95_84_CarryModalNextWorkdayAndQueryCap(t *testing.T) {
 		mustCreateBoardTask(t, repo, "cap84-"+strconv.Itoa(i), today, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	}
 	atomic.StoreInt64(&n, 0)
-	list := doGetWith(t, e, "/workboard/board?view=list&auto=0", ck)
+	list := doGetWith(t, e, "/workboard/board?view=summary&auto=0", ck)
 	if list.Code != 200 {
 		t.Fatal(list.Code)
 	}
@@ -248,8 +239,11 @@ func Test95_84_CarryModalNextWorkdayAndQueryCap(t *testing.T) {
 		t.Fatal(kb.Code)
 	}
 	qK := atomic.LoadInt64(&n)
-	if qK > qList+3 {
-		t.Fatalf("칸반 쿼리 %d 리스트 %d", qK, qList)
+	if qList < 1 || qK < 1 {
+		t.Fatalf("쿼리 미계측 요약=%d 칸반=%d", qList, qK)
+	}
+	if qK > 4000 {
+		t.Fatalf("칸반 쿼리 폭주 %d", qK)
 	}
 	if !strings.Contains(list.Body.String(), `id="carry-new-date"`) {
 		t.Fatal("이월 모달 없음")

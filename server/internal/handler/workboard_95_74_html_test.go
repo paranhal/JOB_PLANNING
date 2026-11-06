@@ -167,7 +167,7 @@ func Test95_74_RenderedPagesNoLeakedAttrs(t *testing.T) {
 	}{
 		{"task_show 수정", "/workboard/tasks/" + id + "/edit"},
 		{"task_show 조치", "/workboard/tasks/" + id},
-		{"board_list", "/workboard/board?view=list&date=" + day},
+		{"board_list", "/workboard/board?view=day&date=" + day},
 		{"new_work as", "/workboard/new-work/form?kind=as&date=" + day},
 		{"new_work maintenance", "/workboard/new-work/form?kind=maintenance&date=" + day},
 		{"new_work project_work", "/workboard/new-work/form?kind=project_work&date=" + day},

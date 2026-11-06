@@ -67,12 +67,12 @@ func Test95_67_SafePageBackAndResolveOrder(t *testing.T) {
 	if SafePageBack("/admin-work", "/") != "/admin-work" {
 		t.Fatal("내부 경로")
 	}
-	if SafePageBack("/workboard/board?view=list", "/") != "/workboard/board?view=list" {
+	if SafePageBack("/workboard/board?view=day", "/") != "/workboard/board?view=day" {
 		t.Fatal("쿼리 유지")
 	}
 
-	href, kind := ResolvePageBack("/workboard/board", "", "http://localhost/workboard/board?view=list&date=2026-11-05")
-	if href != "/workboard/board?view=list&date=2026-11-05" || kind != pageBackKindHistory {
+	href, kind := ResolvePageBack("/workboard/board", "", "http://localhost/workboard/board?view=day&date=2026-11-05")
+	if href != "/workboard/board?view=day&date=2026-11-05" || kind != pageBackKindHistory {
 		t.Fatalf("같은 경로 보기 전환 href=%s kind=%s", href, kind)
 	}
 	href, kind = ResolvePageBack("/sales", "", "http://localhost/sales?view=kanban")
@@ -139,7 +139,7 @@ func Test95_127_SamePathRefererIsHistoryBack(t *testing.T) {
 	e, _, me, _, _ := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "pb127.db"))
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost/workboard/board?view=day&date=2026-11-05", nil)
-	req.Header.Set("Referer", "http://localhost/workboard/board?view=list&date=2026-11-05&show=plan")
+	req.Header.Set("Referer", "http://localhost/workboard/board?view=day&date=2026-11-05&show=plan")
 	req.AddCookie(jwtCookieUser(t, me))
 	e.ServeHTTP(rec, req)
 	body := rec.Body.String()
@@ -149,8 +149,8 @@ func Test95_127_SamePathRefererIsHistoryBack(t *testing.T) {
 	if !strings.Contains(body, `data-page-back="history"`) {
 		t.Fatal("같은 경로 Referer는 history")
 	}
-	if !strings.Contains(body, "/workboard/board?view=list&amp;date=2026-11-05&amp;show=plan") &&
-		!strings.Contains(body, "/workboard/board?view=list&date=2026-11-05&show=plan") {
+	if !strings.Contains(body, "/workboard/board?view=day&amp;date=2026-11-05&amp;show=plan") &&
+		!strings.Contains(body, "/workboard/board?view=day&date=2026-11-05&show=plan") {
 		t.Fatal("href가 직전 목록 URL이 아님")
 	}
 	if !strings.Contains(body, `data-nav-replace`) {

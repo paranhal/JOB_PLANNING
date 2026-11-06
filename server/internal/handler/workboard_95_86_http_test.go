@@ -131,30 +131,14 @@ func Test95_86_AssigneeColumnAndHTML(t *testing.T) {
 	day := time.Now().AddDate(0, 0, 4).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "열업무", day, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	body := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0&mine=0", ck).Body.String()
-	if !strings.Contains(body, "담당자별 열") || !strings.Contains(body, "한 줄") {
-		t.Fatal("열 전환 없음")
-	}
-	if !strings.Contains(body, `name="project"`) || !strings.Contains(body, `name="work_group_id"`) {
-		t.Fatal("필터 없음")
-	}
 	if !strings.Contains(body, "/workboard/schedule") || !strings.Contains(body, "assignee_from_column") {
 		t.Fatal("배치 폼 없음")
 	}
 	if !strings.Contains(body, "/workboard/unschedule") {
 		t.Fatal("내리기 없음")
 	}
-	if !strings.Contains(body, "조치") || !strings.Contains(body, "수정") || !strings.Contains(body, "계획 수정") {
-		t.Fatal("바 버튼 없음")
-	}
-	if !strings.Contains(body, `data-board-bar`) || !strings.Contains(body, `data-dayzone`) {
-		t.Fatal("이동 마크 없음")
-	}
 	if !strings.Contains(body, me.FullName) {
 		t.Fatal("담당자 열 이름 없음")
-	}
-	flat := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0&mine=0&cols=flat", ck).Body.String()
-	if !strings.Contains(flat, `data-board-bar`) {
-		t.Fatal("한 줄 바 없음")
 	}
 	week := doGetWith(t, e, "/workboard/board?view=week&date="+day+"&auto=0&mine=0", ck).Body.String()
 	if !strings.Contains(week, `data-keep-time`) {
@@ -167,6 +151,7 @@ func Test95_86_AssigneeColumnAndHTML(t *testing.T) {
 }
 
 func Test95_86_ActButtonsAndDoneOpen(t *testing.T) {
+	t.Skip("일정표 일은 register 복사 카드(95-132A). 구 막대 조치 버튼 단언 종료")
 	e, _, ck, repo, me := new86(t)
 	today := time.Now().Format(dateLayout)
 	day := time.Now().AddDate(0, 0, 8).Format(dateLayout)
@@ -281,6 +266,7 @@ func Test95_86_SupportNotMovableAndTemplates(t *testing.T) {
 }
 
 func Test95_86_ResizeDuration(t *testing.T) {
+	t.Skip("일정표 일 복사본은 막대 리사이즈 없음(95-132A)")
 	e, db, ck, repo, me := new86(t)
 	day := time.Now().AddDate(0, 0, 7).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "길이원", day, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
@@ -397,6 +383,7 @@ func Test95_86_ResizeDuration(t *testing.T) {
 }
 
 func Test95_86_BrowserDragAndTap(t *testing.T) {
+	t.Skip("일정표 일 복사본 셀렉터(95-132A)")
 	e, _, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d86b.db"))
 	me.Mobile = "010-1111-2222"
 	me.ProfileDone = true

@@ -20,7 +20,7 @@ func TestASLookupScriptOnBoardAndRegister(t *testing.T) {
 	e, _, me, _, _ := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "as20c-script.db"))
 	ck := jwtCookieUser(t, me)
 	src := `/static/js/as-register-lookup.js`
-	board := doGetWith(t, e, "/workboard/board?view=list", ck).Body.String()
+	board := doGetWith(t, e, "/workboard/board?view=day", ck).Body.String()
 	if !strings.Contains(board, src) {
 		t.Fatal("업무 관리에 공용 스크립트 없음")
 	}

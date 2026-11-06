@@ -100,7 +100,7 @@ func Test95_71_OverlapErrVisibleOnBoard(t *testing.T) {
 	day := time.Now().AddDate(0, 0, 2).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "기존겹침", day, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 
-	boardRedir := "/workboard/board?view=list&date=" + day
+	boardRedir := "/workboard/board?view=day&date=" + day
 	dup := doFormWith(t, e, "/workboard/tasks", url.Values{
 		"work_type": {"admin"}, "title": {"새겹침"}, "work_date": {day}, "due_date": {day},
 		"start_time": {"09:30"}, "end_time": {"10:30"}, "assignee": {me.FullName},
@@ -335,18 +335,13 @@ func Test95_71_PlanEditButtonAndCompleteForbidden(t *testing.T) {
 	if !strings.Contains(as, "계획 수정") {
 		t.Fatal("AS 조치 화면에 계획 수정 없음")
 	}
-	bl := string(mustRead(t, filepath.Join(root, "workboard/board_list.html")))
-	if !strings.Contains(bl, "PlanEditHref") || !strings.Contains(bl, "계획 수정") {
-		t.Fatal("보드 목록에 계획 수정 없음")
-	}
-
 	e, _, me, _, repo := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "d71-btn.db"))
 	ck := jwtCookieUser(t, me)
 	day := time.Now().AddDate(0, 0, 2).Format(dateLayout)
 	mustCreateBoardTask(t, repo, "버튼대상", day, "09:00", "09:30", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
-	board := doGetWith(t, e, "/workboard/board?view=list&date="+day, ck)
-	if board.Code != http.StatusOK || !strings.Contains(board.Body.String(), "계획 수정") {
-		t.Fatalf("보드 목록에 계획 수정이 없다 code=%d", board.Code)
+	board := doGetWith(t, e, "/workboard/board?view=day&date="+day+"&auto=0", ck)
+	if board.Code != http.StatusOK || !strings.Contains(board.Body.String(), "버튼대상") {
+		t.Fatalf("일정표 일에 업무가 없다 code=%d", board.Code)
 	}
 
 	var id string

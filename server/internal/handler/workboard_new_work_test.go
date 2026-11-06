@@ -68,7 +68,7 @@ func TestNewWorkFormKindsAndAuth(t *testing.T) {
 		"admin": "title", "sales": "title",
 	}
 	for kind, wt := range wantType {
-		rec := doGetWith(t, e, "/workboard/new-work/form?kind="+kind+"&date=2026-10-24&redirect="+url.QueryEscape("/workboard/board?view=list&date=2026-10-24"), ck)
+		rec := doGetWith(t, e, "/workboard/new-work/form?kind="+kind+"&date=2026-10-24&redirect="+url.QueryEscape("/workboard/board?view=day&date=2026-10-24"), ck)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s → %d %s", kind, rec.Code, rec.Body.String())
 		}
@@ -234,7 +234,7 @@ func TestNewWorkFormSharesFieldNames(t *testing.T) {
 			t.Fatalf("%s named: %v", kind, err)
 		}
 		data["KindBackLabel"] = "← 업무 유형 선택"
-		data["ModalRedirect"] = "/workboard/board?view=list&date=2026-10-24"
+		data["ModalRedirect"] = "/workboard/board?view=day&date=2026-10-24"
 		if err := tmpl.ExecuteTemplate(&b, "content", data); err != nil {
 			t.Fatalf("%s fragment: %v", kind, err)
 		}

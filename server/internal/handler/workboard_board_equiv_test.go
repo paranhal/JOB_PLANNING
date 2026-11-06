@@ -140,7 +140,7 @@ func collectFor(t *testing.T, h *Handler, u *model.User, path string) boardEntri
 func TestCollectBoardEntriesSubsetOfLegacy(t *testing.T) {
 	e, _, h, us, today, _ := seedEquivBoard(t)
 	_ = e
-	entries := collectFor(t, h, us.me, "/workboard/board?view=list&date="+today+"&auto=0")
+	entries := collectFor(t, h, us.me, "/workboard/board?view=day&date="+today+"&auto=0")
 	got := entries.keySet()
 	legacy := map[string]bool{}
 	reg := doGetWith(t, e, "/workboard/register?view=day&date="+today+"&auto=0", jwtCookieUser(t, us.me))
@@ -159,7 +159,7 @@ func TestCollectBoardEntriesSubsetOfLegacy(t *testing.T) {
 	}
 	missing := []string{}
 	for _, title := range []string{"날짜본인", "구성원전용", "영업활동건", "날짜없는AS"} {
-		body := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0", jwtCookieUser(t, us.me)).Body.String()
+		body := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", jwtCookieUser(t, us.me)).Body.String()
 		unp := doGetWith(t, e, "/workboard/board?view=month&date="+today+"&auto=0", jwtCookieUser(t, us.me)).Body.String()
 		if !strings.Contains(body, title) && !strings.Contains(unp, title) {
 			missing = append(missing, title)
@@ -168,7 +168,7 @@ func TestCollectBoardEntriesSubsetOfLegacy(t *testing.T) {
 	if len(missing) > 0 {
 		t.Fatalf("새 화면에 없음: %s", strings.Join(missing, ","))
 	}
-	if strings.Contains(doGetWith(t, e, "/workboard/board?view=list&date="+today, jwtCookieUser(t, us.me)).Body.String(), "취소건") {
+	if strings.Contains(doGetWith(t, e, "/workboard/board?view=day&date="+today, jwtCookieUser(t, us.me)).Body.String(), "취소건") {
 		t.Fatal("새 화면에 취소")
 	}
 }
@@ -183,14 +183,14 @@ func TestCollectBoardAutoPlaceAndAuto0(t *testing.T) {
 	if strings.TrimSpace(st) != "" {
 		t.Fatal("시드에 시각이 있음")
 	}
-	collectFor(t, h, us.me, "/workboard/board?view=list&date="+today+"&auto=0")
+	collectFor(t, h, us.me, "/workboard/board?view=day&date="+today+"&auto=0")
 	if err := db.QueryRow(`SELECT start_time FROM work_tasks WHERE task_id=?`, id).Scan(&st); err != nil {
 		t.Fatal(err)
 	}
 	if strings.TrimSpace(st) != "" {
 		t.Fatal("auto=0 인데 시각이 채워졌다")
 	}
-	collectFor(t, h, us.me, "/workboard/board?view=list&date="+today)
+	collectFor(t, h, us.me, "/workboard/board?view=day&date="+today)
 	if err := db.QueryRow(`SELECT work_date, start_time FROM work_tasks WHERE task_id=?`, id).Scan(&wd, &st); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestBoardOverdueBadgeMatchesWorkToday(t *testing.T) {
 	e, _, _, us, today, _ := seedEquivBoard(t)
 	ck := jwtCookieUser(t, us.me)
 	work := doGetWith(t, e, "/work", ck)
-	board := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0", ck)
+	board := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ck)
 	if !strings.Contains(board.Body.String(), "지연") {
 		t.Fatal("리스트에 지연 배지 없음")
 	}
@@ -233,23 +233,23 @@ func TestBoardOverdueBadgeMatchesWorkToday(t *testing.T) {
 func TestBoardScopeMineAllAssigneeAndMember(t *testing.T) {
 	e, _, _, us, today, _ := seedEquivBoard(t)
 	ck := jwtCookieUser(t, us.me)
-	mine := doGetWith(t, e, "/workboard/board?date="+today+"&auto=0", ck).Body.String()
+	mine := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ck).Body.String()
 	if strings.Contains(mine, "날짜타인") {
 		t.Fatal("기술 기본 내 업무에 타인")
 	}
 	if !strings.Contains(mine, "구성원전용") {
 		t.Fatal("구성원 전용 업무가 내 범위에 없음")
 	}
-	all := doGetWith(t, e, "/workboard/board?date="+today+"&mine=0&auto=0", ck).Body.String()
+	all := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&mine=0&auto=0", ck).Body.String()
 	if !strings.Contains(all, "날짜타인") && !strings.Contains(all, "관리자행정") {
 		t.Fatal("mine=0 전체에 타인/관리자 업무 없음")
 	}
 	ack := jwtCookieUser(t, us.admin)
-	adm := doGetWith(t, e, "/workboard/board?date="+today+"&auto=0", ack).Body.String()
+	adm := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ack).Body.String()
 	if !strings.Contains(adm, "날짜본인") || !strings.Contains(adm, "관리자행정") {
 		t.Fatal("관리자 기본 전체 실패")
 	}
-	one := doGetWith(t, e, "/workboard/board?date="+today+"&assignee="+url.QueryEscape(us.me.FullName)+"&auto=0", ack).Body.String()
+	one := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&assignee="+url.QueryEscape(us.me.FullName)+"&auto=0", ack).Body.String()
 	if !strings.Contains(one, "날짜본인") {
 		t.Fatal("assignee 한 명 필터 실패")
 	}
@@ -257,7 +257,7 @@ func TestBoardScopeMineAllAssigneeAndMember(t *testing.T) {
 
 func TestBoardOrgIsolationAndCLevel(t *testing.T) {
 	e, _, _, us, today, _ := seedEquivBoard(t)
-	body := doGetWith(t, e, "/workboard/board?date="+today+"&mine=0&auto=0", jwtCookieUser(t, us.o03)).Body.String()
+	body := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&mine=0&auto=0", jwtCookieUser(t, us.o03)).Body.String()
 	if strings.Contains(body, "날짜본인") || strings.Contains(body, "O01내") {
 		t.Fatal("O03 전체 범위에 O01 업무")
 	}
@@ -268,7 +268,7 @@ func TestBoardOrgIsolationAndCLevel(t *testing.T) {
 
 func TestBoardDedupAndWorkItemHref(t *testing.T) {
 	e, db, h, us, today, _ := seedEquivBoard(t)
-	entries := collectFor(t, h, us.admin, "/workboard/board?view=list&date="+today+"&auto=0")
+	entries := collectFor(t, h, us.admin, "/workboard/board?view=day&date="+today+"&auto=0")
 	n := 0
 	for k := range entries.keySet() {
 		if strings.HasPrefix(k, "as:AS-D") {
@@ -314,7 +314,7 @@ func TestBoardRegisterBidirectionalCreate(t *testing.T) {
 		"redirect": {"/workboard/register"},
 	}
 	_ = doFormWith(t, e, "/workboard/tasks", form2, ck)
-	board := doGetWith(t, e, "/workboard/board?date="+today+"&auto=0", ck).Body.String()
+	board := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ck).Body.String()
 	if !strings.Contains(board, "구화면등록") {
 		t.Fatal("구 화면 등록이 새 화면에 없음")
 	}
@@ -330,13 +330,13 @@ func TestBoardPlaceFromUnplacedUsesSchedule(t *testing.T) {
 	form := url.Values{
 		"kind": {"task"}, "ref_id": {tid}, "work_date": {today},
 		"start_time": {"19:00"}, "end_time": {"19:30"}, "assignee": {us.me.FullName},
-		"redirect": {"/workboard/board?view=list&date=" + today + "&auto=0"},
+		"redirect": {"/workboard/board?view=day&date=" + today + "&auto=0"},
 	}
 	rec := doFormWith(t, e, "/workboard/schedule", form, ck)
 	if rec.Code != http.StatusSeeOther && rec.Code != http.StatusOK {
 		t.Fatalf("place %d %s", rec.Code, rec.Body.String())
 	}
-	board := doGetWith(t, e, "/workboard/board?view=list&date="+today+"&auto=0", ck).Body.String()
+	board := doGetWith(t, e, "/workboard/board?view=day&date="+today+"&auto=0", ck).Body.String()
 	if !strings.Contains(board, "예정일만") {
 		t.Fatal("배치 후 리스트에 없음")
 	}
