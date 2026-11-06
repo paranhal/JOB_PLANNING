@@ -119,16 +119,30 @@
     rows.forEach(function (row) { list.appendChild(row); });
   }
 
+  function isMnt(it) {
+    return !!(it && it.kind === "maintenance_visit");
+  }
+
   function fillItems(items) {
     var host = modal().querySelector("[data-weekly-link-items]");
     host.innerHTML = "";
     items.forEach(function (it) {
+      if (isMnt(it)) return;
       var inp = document.createElement("input");
       inp.type = "hidden";
       inp.name = "item";
       inp.value = it.kind + ":" + it.id;
       host.appendChild(inp);
     });
+  }
+
+  function mntHref(items) {
+    var href = "";
+    (items || []).forEach(function (it) {
+      if (!isMnt(it)) return;
+      if (!href && it.href) href = it.href;
+    });
+    return href || "/maintenance";
   }
 
   function markCurrentAssignee(uid, name) {
@@ -167,12 +181,31 @@
     });
     var foreignBox = m.querySelector("[data-confirm-foreign]");
     if (foreignBox) foreignBox.checked = false;
-    var onlyMnt = items.every(function (it) { return it.kind === "maintenance_visit"; });
+    var mntN = items.filter(isMnt).length;
+    var onlyMnt = mntN > 0 && mntN === items.length;
     m.setAttribute("data-only-mnt", onlyMnt ? "1" : "0");
+    var skip = m.querySelector("[data-mnt-skip]");
+    if (skip) {
+      if (!onlyMnt && mntN > 0) {
+        skip.hidden = false;
+        skip.textContent = "정기점검 " + mntN + "건은 이번 연결에서 제외됩니다";
+      } else {
+        skip.hidden = true;
+        skip.textContent = "";
+      }
+    }
     var mntHint = m.querySelector("[data-mnt-hint]");
     if (mntHint) mntHint.hidden = !onlyMnt;
+    var goto = m.querySelector("[data-mnt-goto]");
+    if (goto) goto.setAttribute("href", mntHref(items));
     var projBox = m.querySelector("[data-project-box]");
     if (projBox) projBox.hidden = onlyMnt;
+    var asgBox = m.querySelector("[data-weekly-assignee]");
+    if (asgBox) asgBox.hidden = onlyMnt;
+    var submit = m.querySelector("[data-weekly-link-submit]");
+    if (submit) submit.hidden = onlyMnt;
+    var closeBtn0 = m.querySelector("[data-weekly-link-close]");
+    if (closeBtn0) closeBtn0.textContent = "닫기";
     var keep = m.querySelector("[data-assignee-keep]");
     if (keep) keep.checked = true;
     m.querySelectorAll("[data-assignee-radio]").forEach(function (r) {
@@ -210,7 +243,8 @@
       date: el.getAttribute("data-date") || "",
       project: el.getAttribute("data-project") || "없음",
       assignee: el.getAttribute("data-assignee") || "",
-      uid: el.getAttribute("data-uid") || ""
+      uid: el.getAttribute("data-uid") || "",
+      href: el.getAttribute("data-href") || ""
     };
   }
 

@@ -129,6 +129,22 @@ func TestCompanyWeeklyUnlinkedRowT1T2T3(t *testing.T) {
 		}
 	}
 
+	var hasAS, hasMnt, hasTask bool
+	for _, a := range append(append([]model.CompanyWeeklyAutoLine{}, row.AutoDone...), row.AutoPlan...) {
+		if strings.HasPrefix(a.Key, "as:") {
+			hasAS = true
+		}
+		if strings.HasPrefix(a.Key, "mnt:") {
+			hasMnt = true
+		}
+		if strings.HasPrefix(a.Key, "task:") {
+			hasTask = true
+		}
+	}
+	if !hasAS || !hasMnt || !hasTask {
+		t.Fatalf("T3 통칭 행 누락 as=%v mnt=%v task=%v done=%+v plan=%+v", hasAS, hasMnt, hasTask, row.AutoDone, row.AutoPlan)
+	}
+
 	o02, err := repo.BuildCompanyWeeklyDraftOrg(anchor, "O02")
 	if err != nil {
 		t.Fatal(err)

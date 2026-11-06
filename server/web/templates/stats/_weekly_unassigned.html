@@ -107,7 +107,7 @@
               data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
               data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
               data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
-              data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">
+              data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}" data-href="{{.Href}}">
             <label class="inline-flex items-center gap-2">
               <input type="checkbox" class="rounded" data-weekly-item value="{{$lk}}:{{.ID}}">
               <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
@@ -117,7 +117,7 @@
                     data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
                     data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
                     data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
-                    data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">사업 연결</button>
+                    data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}" data-href="{{.Href}}">사업 연결</button>
           </li>
           {{end}}
         </ul>
@@ -126,7 +126,11 @@
                class="w-full md:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl md:rounded-card bg-canvas p-4 shadow-pop">
             <h2 id="weekly-link-title" class="text-ui font-bold text-ink" data-weekly-link-title>사업 연결</h2>
             <ul class="mt-2 text-ui-sm text-ink space-y-1" data-weekly-link-summary></ul>
-            <p class="mt-2 text-ui-sm text-ink-muted" data-mnt-hint hidden>점검 방문은 이 화면에서 사업을 바꾸지 않습니다. 점검 일정에서 확인하세요.</p>
+            <p class="mt-2 text-ui-sm text-ink-muted" data-mnt-skip hidden></p>
+            <p class="mt-2 text-ui-sm text-ink-muted" data-mnt-hint hidden>
+              이 화면에서 정기점검 사업을 바꾸지 않습니다.
+              <a class="underline" href="/maintenance" data-mnt-goto>정기점검에서 사업 지정</a>
+            </p>
             <div class="mt-3 space-y-2" data-project-box>
               <p class="text-ui-sm font-extrabold text-ink">사업</p>
               <input type="search" class="input w-full" placeholder="사업 검색" data-project-filter autocomplete="off">
@@ -152,7 +156,7 @@
             {{template "weekly_assignee_field" $}}
             <div data-weekly-link-items></div>
             <div class="mt-4 flex justify-end gap-2">
-              <button type="button" class="btn-secondary btn-sm" data-weekly-link-close>취소</button>
+              <button type="button" class="btn-secondary btn-sm" data-weekly-link-close>닫기</button>
               <button type="submit" class="btn-primary btn-sm" data-weekly-link-submit disabled>연결</button>
             </div>
           </div>
@@ -186,14 +190,14 @@
                 data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
                 data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
                 data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
-                data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">
+                data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}" data-href="{{.Href}}">
               <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
               {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
               {{if $.CanWrite}}<button class="btn-secondary btn-sm" type="button" data-weekly-link
                       data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
                       data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
                       data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
-                      data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}">연결 변경</button>{{end}}
+                      data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}" data-href="{{.Href}}">연결 변경</button>{{end}}
             </li>
             {{end}}
           </ul>
