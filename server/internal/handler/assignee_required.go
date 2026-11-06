@@ -21,6 +21,9 @@ func assigneeFilled(name, uid, groupID string) bool {
 }
 
 func rejectAssigneeRequired(c echo.Context, path string) error {
+	if wantsJSONError(c) {
+		return echo.NewHTTPError(http.StatusBadRequest, msgAssigneeRequired)
+	}
 	if c.Request().Header.Get("HX-Request") == "true" {
 		c.Response().Header().Set("HX-Retarget", "[data-focus-target=assignee]")
 		c.Response().Header().Set("HX-Reswap", "innerHTML")

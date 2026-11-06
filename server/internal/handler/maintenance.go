@@ -666,6 +666,7 @@ func (h *MaintenanceHandler) UpdateVisit(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	keepExistingVisitAssignees(&v, existing)
 	if requiresAssigneeChoice(c) && !assigneeFilled(v.Assignee, "", v.WorkGroupID) && len(v.People) == 0 {
 		return rejectAssigneeRequired(c, planURLFrom(c, planID, ""))
 	}
@@ -726,6 +727,18 @@ func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID, kee
 		return v, err
 	}
 	return v, nil
+}
+
+func keepExistingVisitAssignees(dst *model.MaintenanceVisit, src *model.MaintenanceVisit) {
+	if dst == nil || src == nil {
+		return
+	}
+	if assigneeFilled(dst.Assignee, "", dst.WorkGroupID) || len(dst.People) > 0 {
+		return
+	}
+	dst.People = append([]model.MaintenanceVisitAssignee{}, src.People...)
+	dst.Assignee = src.Assignee
+	dst.WorkGroupID = src.WorkGroupID
 }
 
 func parseVisitRound(s string) int {

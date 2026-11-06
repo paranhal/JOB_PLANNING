@@ -1,11 +1,12 @@
 {{define "customer_combo"}}
-<div class="combobox" {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}}, {{toJSON .SyncKey}})' @keydown.escape.window="open=false">
-  <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}customer_id{{end}}" x-ref="hid" :value="selectedId" {{if .Required}}required{{end}}>
+<div class="combobox" data-customer-combo {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}}, {{toJSON .SyncKey}})' @keydown.escape.window="open=false">
+  <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}customer_id{{end}}" x-ref="hid" :value="selectedId">
   <input type="search" class="input" autocomplete="off" role="combobox" :placeholder="placeholder"
          aria-autocomplete="list" :aria-expanded="open ? 'true' : 'false'" aria-controls="customer-combo-list"
          x-model="q" @focus="open=true; if(!items.length) search(false)"
          @input="onInput()"
          @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+  <p class="field-hint text-danger" x-show="missHint" x-cloak x-text="missHint"></p>
   <p class="field-hint" x-show="selectedLabel && selectedId" x-cloak x-text="'선택: ' + selectedLabel"></p>
   <ul id="customer-combo-list" class="combobox-list" role="listbox" x-show="open" x-cloak>
     <template x-for="(it, i) in items" :key="it.id">
