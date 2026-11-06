@@ -892,7 +892,7 @@ func TestSalesHTTP_PromoteProspectThenKeepActivities(t *testing.T) {
 	}
 
 	again := doGet(t, e, "/sales/"+id+"/promote")
-	if again.Code != http.StatusSeeOther || !strings.Contains(again.Header().Get("Location"), "/projects/"+wpID) {
+	if again.Code != http.StatusSeeOther || !strings.Contains(again.Header().Get("Location"), "err=already_promoted") {
 		t.Fatalf("두 번째 승격: loc=%q", again.Header().Get("Location"))
 	}
 
