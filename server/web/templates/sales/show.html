@@ -81,9 +81,10 @@
   {{end}}
   {{if eq .FlashOK "created"}}
   <div class="rounded-lg bg-success-soft text-success text-sm px-4 py-2 border border-success">등록했습니다.</div>
-  <div x-show="createdOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45"
+  <div x-show="createdOpen" x-cloak @keydown.escape.window="createdOpen=false">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45"
        role="dialog" aria-modal="true" aria-labelledby="sales-created-title"
-       @keydown.escape.window="createdOpen=false" @click.self="createdOpen=false">
+       @click.self="createdOpen=false">
     <div class="bg-surface border-2 border-line rounded-xl p-4 w-full max-w-md max-h-[90vh] overflow-auto space-y-3">
       <h3 id="sales-created-title" class="text-base font-semibold text-ink">사업을 등록했습니다</h3>
       <dl class="grid grid-cols-[5.5rem_1fr] gap-x-3 gap-y-1 text-sm">
@@ -115,6 +116,7 @@
         <button type="button" class="btn btn-primary" @click="createdOpen=false">닫기</button>
       </div>
     </div>
+  </div>
   </div>
   {{end}}
   {{if and (not .MissingInfo.HideBox) .MissingInfo.HasEmpty}}
