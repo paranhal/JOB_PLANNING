@@ -56,6 +56,7 @@ func parseVisitFilter(c echo.Context) repository.VisitFilter {
 
 // ManagePlan 정기점검 관리 화면 (§23.10).
 func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
+	prof := mntProfFrom(c)
 	if !canViewMaintenance(c) {
 		return echo.ErrForbidden
 	}
@@ -82,6 +83,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 	unassigned, _ := h.repo.ListOpenUnassignedSlotsForOrg(plan.PlanID, plan.PlanYear, um, plan.OrgID)
 	unassignedGroups := groupUnassignedByRegion(unassigned, cfgs)
 	dupCount, _ := h.repo.CountDuplicateDrops(plan.PlanID, plan.PlanYear, 0)
+	prof.mark("manage_load")
 
 	var assignees []model.User
 	if h.userRepo != nil {
@@ -103,6 +105,7 @@ func (h *MaintenanceHandler) ManagePlan(c echo.Context) error {
 		}
 	}
 
+	prof.mark("prepare")
 	return c.Render(http.StatusOK, "maintenance/plan_manage.html", attachViewGroup(c, map[string]interface{}{
 		"Title": fmt.Sprintf("정기점검 관리 %d년", plan.PlanYear), "Active": NavMaintenance,
 		"Plan": plan, "Plans": plans, "IsAdmin": isAdminRole(c),

@@ -158,6 +158,7 @@ func (h *MaintenanceHandler) CreatePlan(c echo.Context) error {
 }
 
 func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
+	prof := mntProfFrom(c)
 	plan, err := h.requireVisiblePlan(c, c.Param("id"))
 	if err != nil {
 		return err
@@ -168,6 +169,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 	visits = model.DatedVisits(visits)
 	h.hydrateVisitPeople(visits)
+	prof.mark("list_visits")
 	// 기술담당: 기본은 본인 배정만. all=1 이면 전체(타 담당자 포함).
 	scopeAll := mntScopeAll(c)
 	showScopeToggle := isTechRole(c)
@@ -178,6 +180,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	prof.mark("customers")
 	today := time.Now().Format(dateLayout)
 	view := mntView(c.QueryParam("view"))
 	month := 0
@@ -250,6 +253,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if h.userRepo != nil {
 		assignees = listAssignableForPicker(h.userRepo, c)
 	}
+	prof.mark("filter")
 	plans, _ := h.repo.ListPlans()
 	yearQ := url.Values{}
 	if v := strings.TrimSpace(c.QueryParam("view")); v != "" {
@@ -273,6 +277,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if h.wbRepo != nil {
 		projects, _ = h.wbRepo.ListProjects(true)
 	}
+	prof.mark("lookups")
 	var unassigned []model.UnassignedMonthSlot
 	if quotaMonth >= 1 && quotaMonth <= 12 {
 		unassigned, _ = h.repo.ListOpenUnassignedSlotsForOrg(plan.PlanID, plan.PlanYear, quotaMonth, plan.OrgID)
@@ -289,7 +294,9 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if !dayInWeeks(weeks, selDay) {
 		selDay = defaultSelectedDay(plan.PlanYear, month, today, shown)
 	}
-	attachCalendarChips(weeks, today, selDay, h.openLiveVisitIDs(shown))
+	openLive := h.openLiveVisitIDs(shown)
+	prof.mark("open_live")
+	attachCalendarChips(weeks, today, selDay, openLive)
 	scopeAllFlag := ""
 	if scopeAll && showScopeToggle {
 		scopeAllFlag = "1"
@@ -319,6 +326,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	}
 	periodGroups := buildPeriodGroups(h.repo, plan.PlanID, plan.PlanYear, quotaMonth, currentOrg(c))
 	attachPeriodGroupRegions(h.repo, periodGroups)
+	prof.mark("site_period")
 	periodGroups = filterPeriodGroupsByAssignee(periodGroups, assigneeKey, calGroups, userName)
 	unassigned = filterSlotsByAssigneeKey(unassigned, assigneeKey, calGroups, userName)
 	var quarterPending []model.UnassignedMonthSlot
@@ -400,6 +408,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if h.wbRepo != nil {
 		attachProjectPicker(c, pickerFromRepo(h.wbRepo), mntData, ProjectPickerOpts{})
 	}
+	prof.mark("prepare")
 	return c.Render(200, "maintenance/plan_show.html", attachViewGroup(c, mntData))
 }
 

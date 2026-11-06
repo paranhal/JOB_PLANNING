@@ -21,6 +21,7 @@ import (
 	"customer-support/internal/auditlog"
 	"customer-support/internal/backup"
 	"customer-support/internal/config"
+	"customer-support/internal/dbprof"
 	"customer-support/internal/handler"
 	"customer-support/internal/hwpx"
 	"customer-support/internal/mailer"
@@ -76,7 +77,7 @@ func main() {
 	_ = godotenv.Load()
 	cfg := config.Load()
 
-	db, err := repository.InitDB(cfg.DBPath)
+	db, err := dbprof.OpenAppDB(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("DB 초기화 실패: %v", err)
 	}
@@ -213,6 +214,7 @@ func main() {
 	g.Use(h.Auth.GuardViewAsWrite)
 	g.Use(h.InjectAssignNotices)
 	g.Use(h.InjectLoginBriefing)
+	g.Use(handler.MntProfileMiddleware)
 
 	g.GET("/", h.Dashboard)
 	g.GET("/exec", h.Exec.Dashboard, h.Auth.RequireExecView)
