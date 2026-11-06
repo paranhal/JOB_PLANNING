@@ -1,7 +1,7 @@
 {{define "title"}}{{.Title}} · 영업 사업{{end}}
 
 {{define "content"}}
-<div class="space-y-4" x-data="Object.assign(salesDnd({kind:'project'}), salesActPanel({{if .FromTask}}true{{else}}false{{end}}, '{{.Tab}}'), {sleepOpen:false})">
+<div class="space-y-4" x-data="Object.assign(salesDnd({kind:'project'}), salesActPanel({{if .FromTask}}true{{else}}false{{end}}, '{{.Tab}}'), {sleepOpen:false, createdOpen: {{if eq .FlashOK "created"}}true{{else}}false{{end}}})">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
       <h2 class="text-xl font-bold text-ink mt-1 {{if not .Project.NameConfirmed}}text-ink-subtle{{end}}"><span class="font-mono text-base text-ink-muted">{{.Project.DisplayNo}}</span> {{.Project.Name}}</h2>
@@ -81,7 +81,58 @@
   {{end}}
   {{if eq .FlashOK "created"}}
   <div class="rounded-lg bg-success-soft text-success text-sm px-4 py-2 border border-success">등록했습니다.</div>
-  {{else if eq .FlashOK "updated"}}
+  <div x-show="createdOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45"
+       role="dialog" aria-modal="true" aria-labelledby="sales-created-title"
+       @keydown.escape.window="createdOpen=false" @click.self="createdOpen=false">
+    <div class="bg-surface border-2 border-line rounded-xl p-4 w-full max-w-md max-h-[90vh] overflow-auto space-y-3">
+      <h3 id="sales-created-title" class="text-base font-semibold text-ink">사업을 등록했습니다</h3>
+      <dl class="grid grid-cols-[5.5rem_1fr] gap-x-3 gap-y-1 text-sm">
+        <dt class="text-ink-muted">사업명</dt>
+        <dd class="min-w-0">{{.Raw.Name}}{{if .Raw.IsTentativeName}} <span class="text-xs text-ink-muted">(가칭)</span>{{end}}</dd>
+        <dt class="text-ink-muted">고객</dt>
+        <dd class="min-w-0">{{if .Project.Customer}}{{.Project.Customer}}{{else}}—{{end}}</dd>
+        <dt class="text-ink-muted">영업담당</dt>
+        <dd class="min-w-0">{{if .Raw.SalesOwner}}{{.Raw.SalesOwner}}{{else}}—{{end}}</dd>
+        <dt class="text-ink-muted">단계</dt>
+        <dd>{{if .Project.DisplayStage}}{{.Project.DisplayStage}}{{else}}발굴{{end}}</dd>
+        <dt class="text-ink-muted">소속 조직</dt>
+        <dd class="min-w-0">{{if .Project.OrgLabel}}{{.Project.OrgLabel}}{{else}}{{.Raw.OrgID}}{{end}}</dd>
+      </dl>
+      {{if .OwnerSkip}}
+      <p class="text-sm rounded-lg px-3 py-2 bg-warning-soft text-warning">영업담당이 지정되지 않았습니다(조직이 달라 자동 지정되지 않음)</p>
+      {{end}}
+      <div class="rounded-lg px-3 py-2 bg-warning-soft text-warning text-sm space-y-1">
+        <b class="block text-ink">단계별 입력 안내</b>
+        <p class="text-ui-xs text-ink-muted">사업 상세에서 언제든 입력·수정할 수 있습니다.</p>
+        {{range .MissingInfo.Items}}
+        <div class="flex justify-between gap-2 py-1 border-t border-line">
+          <span>{{if .Filled}}✓{{else}}□{{end}} {{.Label}}</span>
+          <span class="text-[11px] px-1.5 py-0.5 rounded {{if .Filled}}bg-success-soft text-success{{else}}bg-warning-soft text-warning{{end}}">{{if .Filled}}입력됨{{else}}{{.When}}{{end}}</span>
+        </div>
+        {{end}}
+      </div>
+      <div class="flex justify-end">
+        <button type="button" class="btn btn-primary" @click="createdOpen=false">닫기</button>
+      </div>
+    </div>
+  </div>
+  {{end}}
+  {{if and (not .MissingInfo.HideBox) .MissingInfo.HasEmpty}}
+  <div class="rounded-lg bg-warning-soft text-warning text-sm px-4 py-3 border border-line space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <b class="text-ink">보완할 정보</b>
+      {{range .MissingInfo.Items}}
+      {{if not .Filled}}
+      <span class="text-[11px] px-1.5 py-0.5 rounded bg-surface text-warning border border-line">{{.Label}} · {{.When}}</span>
+      {{end}}
+      {{end}}
+    </div>
+    {{if .CanManage}}
+    <a href="/sales/{{.Raw.SalesID}}/edit" class="text-sm text-primary underline">자세한 정보 입력</a>
+    {{end}}
+  </div>
+  {{end}}
+  {{if eq .FlashOK "updated"}}
   <div class="rounded-lg bg-success-soft text-success text-sm px-4 py-2 border border-success">저장했습니다.</div>
   {{else if eq .FlashOK "stage"}}
   <div class="rounded-lg bg-success-soft text-success text-sm px-4 py-2 border border-success">단계를 변경했습니다.</div>

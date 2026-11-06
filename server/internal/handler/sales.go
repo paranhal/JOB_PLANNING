@@ -485,6 +485,8 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"NextActions":    nextActions,
 		"WinProbChoices": []int{10, 20, 30, 40, 50, 60, 70, 80, 90},
 		"ListBack":       salesListBack(c, p),
+		"MissingInfo":    model.SalesMissingInfo(p),
+		"OwnerSkip":      c.QueryParam("owner_skip") == "1",
 	}
 	if strings.TrimSpace(c.QueryParam("modal")) == "1" {
 		return RenderPartial(c, "sales/modal.html", data)
