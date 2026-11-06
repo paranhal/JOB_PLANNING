@@ -73,8 +73,8 @@ var tableColsSkipFiles = []string{
 
 func Test95_68_Survey94Templates(t *testing.T) {
 	got := tableColsTemplateFiles(t)
-	if len(got) != 98 {
-		t.Fatalf("표/grid 템플릿 %d개 want 98: %v", len(got), got)
+	if len(got) != 96 {
+		t.Fatalf("표/grid 템플릿 %d개 want 96: %v", len(got), got)
 	}
 	set := map[string]bool{}
 	for _, f := range got {
@@ -85,8 +85,8 @@ func Test95_68_Survey94Templates(t *testing.T) {
 			t.Errorf("제외 목록에 있는데 조사 대상이 아니다: %s", f)
 		}
 	}
-	if !set["workboard/board_list.html"] {
-		t.Fatal("board_list.html 이 조사 대상에 없다")
+	if set["workboard/board_list.html"] {
+		t.Fatal("제거된 board_list.html 이 조사 대상에 있다")
 	}
 	if !set["as/_list_table.html"] || !set["product_group/list.html"] || !set["work_item_template/list.html"] {
 		t.Fatal("자동 적용 리스트가 빠졌다")
@@ -94,8 +94,8 @@ func Test95_68_Survey94Templates(t *testing.T) {
 	if len(tableColsSkipFiles) != 30 {
 		t.Fatalf("제외 %d want 30", len(tableColsSkipFiles))
 	}
-	if 98-len(tableColsSkipFiles) != 68 {
-		t.Fatalf("자동 적용 %d want 68", 98-len(tableColsSkipFiles))
+	if 96-len(tableColsSkipFiles) != 66 {
+		t.Fatalf("자동 적용 %d want 66", 96-len(tableColsSkipFiles))
 	}
 }
 
@@ -142,17 +142,6 @@ func Test95_68_LayoutScriptAndSkipAttrs(t *testing.T) {
 
 func Test95_68_BoardListGridAndASListControls(t *testing.T) {
 	root := testWebRoot(t)
-	board, err := os.ReadFile(filepath.Join(root, "templates", "workboard", "board_list.html"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs := string(board)
-	if !strings.Contains(bs, `data-grid-cols="workboard_list"`) {
-		t.Fatal("일일 업무 grid 키 없음")
-	}
-	if !strings.Contains(bs, `js-wl-check`) || !strings.Contains(bs, `js-wl-all`) || !strings.Contains(bs, "선택 삭제") {
-		t.Fatal("체크박스·선택 삭제 마크업이 빠졌다")
-	}
 	as, err := os.ReadFile(filepath.Join(root, "templates", "as", "_list_table.html"))
 	if err != nil {
 		t.Fatal(err)

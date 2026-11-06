@@ -340,7 +340,7 @@ func Test95_94_C_ActionToggleAndCounts(t *testing.T) {
 		Worker: other.FullName, WorkerUserID: other.UserID, WorkContent: "타인",
 	})
 
-	act := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&range=day&auto=0&show=act", ck)
+	act := doGetWith(t, e, "/workboard/board?view=sched&range=day&date="+day+"&auto=0&show=act", ck)
 	ab := act.Body.String()
 	if strings.Contains(ab, "접수만94") || strings.Contains(ab, "기간걸침예정") {
 		t.Fatal("조치만인데 접수가 보임")
@@ -348,16 +348,13 @@ func Test95_94_C_ActionToggleAndCounts(t *testing.T) {
 	if !strings.Contains(ab, "완료 2건") {
 		t.Fatalf("건수 %s", snippetShow(ab))
 	}
-	if !strings.Contains(ab, "총 2개의 업무") {
-		t.Fatal("헤더 건수 불일치")
-	}
 	if strings.Contains(ab, "타담당조치") {
 		t.Fatal("내 업무에 타인 조치")
 	}
 	if !strings.Contains(ab, "data-show-bit=\"both\"") {
 		t.Fatal("둘 다 없음")
 	}
-	all := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&range=day&auto=0&show=act&mine=0", ck)
+	all := doGetWith(t, e, "/workboard/board?view=sched&range=day&date="+day+"&auto=0&show=act&mine=0", ck)
 	if !strings.Contains(all.Body.String(), "타담당조치") {
 		t.Fatal("전체에 타인 조치 없음")
 	}
@@ -367,7 +364,7 @@ func Test95_94_C_ActionToggleAndCounts(t *testing.T) {
 	if strings.Contains(all.Header().Get("Location"), "mine=") && false {
 		t.Fatal("범위가 바뀜")
 	}
-	both := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&range=day&auto=0&show=plan,act", ck)
+	both := doGetWith(t, e, "/workboard/board?view=sched&range=day&date="+day+"&auto=0&show=plan,act", ck)
 	bb := both.Body.String()
 	if !strings.Contains(bb, "접수만94") || !strings.Contains(bb, "조치94") {
 		t.Fatal("둘 다 합집합 아님")

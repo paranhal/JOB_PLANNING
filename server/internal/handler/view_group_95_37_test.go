@@ -86,17 +86,12 @@ func Test95_37ToggleOnRequiredScreens(t *testing.T) {
 			t.Errorf("%s (%s) 토글 없음", label, rel)
 		}
 	}
-	for _, rel := range []string{"workboard/board_list.html", "workboard/_board_head.html", "workboard/board_kanban.html"} {
-		b, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil {
-			t.Fatalf("%s 읽기 %v", rel, err)
-		}
-		if !strings.Contains(string(b), `board_top_controls`) {
-			t.Errorf("%s 상단 드롭다운 묶음 없음", rel)
-		}
-		if strings.Contains(string(b), `view_group_toggle`) {
-			t.Errorf("%s 가 공용 view_group_toggle 을 쓰면 안 된다", rel)
-		}
+	b, err := os.ReadFile(filepath.Join(root, "workboard/_board_head.html"))
+	if err != nil {
+		t.Fatalf("board_head 읽기 %v", err)
+	}
+	if !strings.Contains(string(b), `board_top_controls`) {
+		t.Errorf("workboard/_board_head.html 상단 묶음 없음")
 	}
 }
 

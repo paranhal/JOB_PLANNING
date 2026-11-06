@@ -73,7 +73,7 @@ func Test95_127_CompleteWithoutProcessInActView(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	act := doGetWith(t, e, "/workboard/board?view=list&date="+day+"&range=day&auto=0&show=act", ck)
+	act := doGetWith(t, e, "/workboard/board?view=sched&range=day&date="+day+"&auto=0&show=act", ck)
 	ab := act.Body.String()
 	if !strings.Contains(ab, "완료일만127") {
 		t.Fatal("일반 완료일만 없음")
@@ -89,8 +89,5 @@ func Test95_127_CompleteWithoutProcessInActView(t *testing.T) {
 	}
 	if !strings.Contains(ab, "완료 3건") {
 		t.Fatalf("완료 건수 %s", snippetShow(ab))
-	}
-	if !strings.Contains(ab, "총 3개의 업무") {
-		t.Fatal("목록 건수와 배지가 다름")
 	}
 }

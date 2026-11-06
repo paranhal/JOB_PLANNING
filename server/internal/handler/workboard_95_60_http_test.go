@@ -30,17 +30,17 @@ func Test95_60_ScheduleShowToggleBoard(t *testing.T) {
 		t.Fatal(err)
 	}
 	actTk.Status = model.WBTaskComplete
-	actTk.CompleteDate = "2026-10-20"
+	actTk.CompleteDate = "2026-10-10"
 	if err := repo.UpdateTask(actTk); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := repo.InsertWorkTaskProcess(model.WorkTaskProcess{
-		TaskID: actTk.TaskID, OrgID: actTk.OrgID, ProcessAt: "2026-10-20 11:00:00",
+		TaskID: actTk.TaskID, OrgID: actTk.OrgID, ProcessAt: "2026-10-10 11:00:00",
 		Worker: me.FullName, WorkerUserID: me.UserID, WorkContent: "조치60",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	def := doGetWith(t, e, "/workboard/board?view=month&date=2026-10-15&auto=0", ck)
+	def := doGetWith(t, e, "/workboard/board?view=sched&range=day&date=2026-10-10&auto=0", ck)
 	if def.Code != http.StatusOK {
 		t.Fatalf("default %d", def.Code)
 	}
@@ -66,18 +66,16 @@ func Test95_60_ScheduleShowToggleBoard(t *testing.T) {
 	if strings.Contains(body, "완료일만60") {
 		t.Fatal("기본(접수)에 완료일만 업무가 보임")
 	}
-	for _, view := range []string{"month", "week", "day", "list"} {
-		page := doGetWith(t, e, "/workboard/board?view="+view+"&date=2026-10-10&auto=0", ck)
-		b := page.Body.String()
-		if !strings.Contains(b, "id=\"schedule-show\"") {
-			t.Fatalf("%s 토글 없음", view)
-		}
-		if !strings.Contains(b, "show=") {
-			t.Fatalf("%s 링크에 show 없음", view)
-		}
+	page := doGetWith(t, e, "/workboard/board?view=sched&range=day&date=2026-10-10&auto=0", ck)
+	b := page.Body.String()
+	if !strings.Contains(b, "id=\"schedule-show\"") {
+		t.Fatal("일정표 일 토글 없음")
+	}
+	if !strings.Contains(b, "show=") {
+		t.Fatal("링크에 show 없음")
 	}
 
-	actOnly := doGetWith(t, e, "/workboard/board?view=month&date=2026-10-15&auto=0&show=act", ck)
+	actOnly := doGetWith(t, e, "/workboard/board?view=sched&range=day&date=2026-10-10&auto=0&show=act", ck)
 	ab := actOnly.Body.String()
 	if strings.Contains(ab, "예정만60") {
 		t.Fatal("조치만인데 계획 업무가 보임")
@@ -89,13 +87,13 @@ func Test95_60_ScheduleShowToggleBoard(t *testing.T) {
 		t.Fatal("꺼진 쪽 건수가 사라짐")
 	}
 
-	both := doGetWith(t, e, "/workboard/board?view=month&date=2026-10-15&auto=0&show=plan,act", ck)
+	both := doGetWith(t, e, "/workboard/board?view=sched&range=day&date=2026-10-10&auto=0&show=plan,act", ck)
 	bb := both.Body.String()
 	if !strings.Contains(bb, "예정만60") || !strings.Contains(bb, "완료일만60") {
 		t.Fatal("둘 다 켜기에서 누락")
 	}
 
-	empty := doGetWith(t, e, "/workboard/board?view=month&date=2026-10-15&auto=0&show=", ck)
+	empty := doGetWith(t, e, "/workboard/board?view=sched&range=day&date=2026-10-10&auto=0&show=", ck)
 	if !strings.Contains(empty.Body.String(), "예정만60") || strings.Contains(empty.Body.String(), "완료일만60") {
 		t.Fatal("빈 show 는 접수만이어야 함")
 	}

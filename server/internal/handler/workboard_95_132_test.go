@@ -17,6 +17,9 @@ func Test95_132_ParseBoardDisplay(t *testing.T) {
 		{"nope", "", boardDisplaySummary, boardRangeDay},
 		{"list", "week", boardDisplaySchedule, boardRangeWeek},
 		{"day", "", boardDisplaySchedule, boardRangeDay},
+		{"sched", "day", boardDisplaySchedule, boardRangeDay},
+		{"sched", "week", boardDisplaySchedule, boardRangeWeek},
+		{"sched", "", boardDisplaySchedule, boardRangeDay},
 		{"kanban", "", boardDisplayKanban, boardRangeDay},
 		{"kanban", "week", boardDisplayKanban, boardRangeWeek},
 		{"summary", "month", boardDisplaySummary, boardRangeMonth},
@@ -65,8 +68,8 @@ func Test95_132_SummaryScheduleKanbanCounts(t *testing.T) {
 	if _, err := repo.DB().Exec(`UPDATE work_tasks SET complete_date=? WHERE title='오늘완료'`, today); err != nil {
 		t.Fatal(err)
 	}
-	sum := doGetWith(t, e, "/workboard/board?date="+today, ck).Body.String()
-	day := doGetWith(t, e, "/workboard/board?view=day&date="+today, ck).Body.String()
+	sum := doGetWith(t, e, "/workboard/board?view=summary&date="+today, ck).Body.String()
+	day := doGetWith(t, e, "/workboard/board?view=sched&range=day&date="+today, ck).Body.String()
 	kan := doGetWith(t, e, "/workboard/board?view=kanban&date="+today, ck).Body.String()
 	if !strings.Contains(sum, `data-summary-card="today"`) {
 		t.Fatal("요약 오늘 카드 없음")
@@ -111,6 +114,30 @@ func Test95_132_TaskShowDeleteMatchesList(t *testing.T) {
 	}
 	if strings.Contains(mb, `/workboard/tasks/`+mnt.TaskID+`/delete`) {
 		t.Fatal("점검 상세에 삭제 버튼이 있다")
+	}
+}
+
+func Test95_132_StartWorkHrefAndColMin(t *testing.T) {
+	e, _, me, _, _ := seedPersonalBoard(t, "sqlite", filepath.Join(t.TempDir(), "132start.db"))
+	ck := jwtCookieUser(t, me)
+	today := time.Now().Format(dateLayout)
+	sum := doGetWith(t, e, "/workboard/board?view=summary&date="+today+"&auto=0", ck).Body.String()
+	if !strings.Contains(sum, "view=sched") || !strings.Contains(sum, "range=day") {
+		t.Fatal("요약 업무 시작 URL 없음")
+	}
+	if strings.Contains(sum, `id="schedule-show"`) {
+		t.Fatal("요약에 접수 토글")
+	}
+	day := doGetWith(t, e, "/workboard/board?view=sched&range=day&date="+today+"&auto=0", ck).Body.String()
+	if !strings.Contains(day, `id="schedule-show"`) {
+		t.Fatal("일정표 일 토글 없음")
+	}
+	if !strings.Contains(day, "390") {
+		t.Fatal("담당자 열 390px 없음")
+	}
+	week := doGetWith(t, e, "/workboard/board?view=week&date="+today+"&auto=0", ck).Body.String()
+	if strings.Contains(week, `id="schedule-show"`) {
+		t.Fatal("주에 토글")
 	}
 }
 
